@@ -281,133 +281,182 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 	end
 
 	if from.passive == "splash" then
-		-- The Mage: a FIREBALL. A glowing ball with fire and a trail leaves the staff's crystal, flies straight at the
-		-- target and bursts there over the splash area (its splash damage is in `step`).
-		local ORANGE = Color3.fromRGB(255, 150, 50)
-		local YELLOW = Color3.fromRGB(255, 230, 140)
-		local start = a + UP * 1.2
+		-- The Mage: an ARCANE FIREBALL. The staff tilts toward the enemy, its crystal charges up for a moment
+		-- (a growing purple glow at the tip), then a purple ball with a trail flies straight at the target and
+		-- bursts over the splash area (its splash damage is in `step`).
+		local PURPLE = Color3.fromRGB(190, 110, 255)
+		local PALE = Color3.fromRGB(235, 205, 255)
+		local CHARGE = 0.22 -- seconds the crystal charges before the shot
+		local tip: BasePart? = nil
 		local weapon = from.model:FindFirstChild("Weapon")
 		if weapon then
 			local topY = -math.huge
 			for _, piece in weapon:GetChildren() do
 				if piece:IsA("BasePart") and piece.Name == "Piece" and piece.Position.Y > topY then
 					topY = piece.Position.Y
-					start = piece.Position
+					tip = piece
 				end
 			end
 		end
-		local flight = math.clamp((b - start).Magnitude / 90, 0.1, 0.3)
-		local ball = Instance.new("Part")
-		ball.Shape = Enum.PartType.Ball
-		ball.Size = Vector3.one * 1.5
-		ball.Color = ORANGE
-		ball.Material = Enum.Material.Neon
-		ball.Anchored = true
-		ball.CanCollide = false
-		ball.CanQuery = false
-		ball.CanTouch = false
-		ball.CastShadow = false
-		ball.CFrame = CFrame.new(start)
-		local core = Instance.new("Part")
-		core.Shape = Enum.PartType.Ball
-		core.Size = Vector3.one * 0.8
-		core.Color = YELLOW
-		core.Material = Enum.Material.Neon
-		core.Anchored = true
-		core.CanCollide = false
-		core.CanQuery = false
-		core.CanTouch = false
-		core.CastShadow = false
-		core.CFrame = CFrame.new(start)
-		local fire = Instance.new("Fire")
-		fire.Size = 4
-		fire.Heat = 6
-		fire.Color = ORANGE
-		fire.SecondaryColor = Color3.fromRGB(255, 70, 20)
-		fire.Parent = ball
-		local light = Instance.new("PointLight")
-		light.Color = ORANGE
-		light.Range = 10
-		light.Brightness = 1.5
-		light.Parent = ball
-		local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
-		a0.Position = Vector3.new(0, 0.6, 0)
-		a1.Position = Vector3.new(0, -0.6, 0)
-		a0.Parent = ball
-		a1.Parent = ball
-		local trail = Instance.new("Trail")
-		trail.Attachment0 = a0
-		trail.Attachment1 = a1
-		trail.Color = ColorSequence.new(YELLOW, Color3.fromRGB(255, 80, 20))
-		trail.Transparency = NumberSequence.new(0.2, 1)
-		trail.Lifetime = 0.25
-		trail.LightEmission = 1
-		trail.Parent = ball
-		ball.Parent = parent
-		core.Parent = parent
-		local info = TweenInfo.new(flight, Enum.EasingStyle.Linear)
-		TweenService:Create(ball, info, { CFrame = CFrame.new(b) }):Play()
-		TweenService:Create(core, info, { CFrame = CFrame.new(b) }):Play()
-		Debris:AddItem(ball, flight + 0.02)
-		Debris:AddItem(core, flight + 0.02)
-		task.delay(flight, function()
+		-- The staff points at the enemy: the grip tilts the whole weapon forward, and back after the shot.
+		local hand = from.model:FindFirstChild("RightHand")
+		local grip = hand and hand:FindFirstChild("RightGrip")
+		if grip and grip:IsA("Motor6D") then
+			TweenService:Create(grip, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = CFrame.Angles(math.rad(-70), 0, 0) }):Play()
+			task.delay(CHARGE + 0.25, function()
+				if grip.Parent then
+					TweenService:Create(grip, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = CFrame.new() }):Play()
+				end
+			end)
+		end
+		-- The charge: a glow welded to the crystal that grows and brightens.
+		local charge = Instance.new("Part")
+		charge.Shape = Enum.PartType.Ball
+		charge.Size = Vector3.one * 0.4
+		charge.Color = PALE
+		charge.Material = Enum.Material.Neon
+		charge.Transparency = 0.2
+		charge.CanCollide = false
+		charge.CanQuery = false
+		charge.CanTouch = false
+		charge.Massless = true
+		charge.CastShadow = false
+		local chargeLight = Instance.new("PointLight")
+		chargeLight.Color = PURPLE
+		chargeLight.Range = 4
+		chargeLight.Brightness = 0.5
+		chargeLight.Parent = charge
+		if tip then
+			charge.Anchored = false
+			charge.CFrame = tip.CFrame
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = tip
+			weld.Part1 = charge
+			weld.Parent = charge
+		else
+			charge.Anchored = true
+			charge.CFrame = CFrame.new(a + UP * 1.2)
+		end
+		charge.Parent = parent
+		TweenService:Create(charge, TweenInfo.new(CHARGE, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = Vector3.one * 1.6 }):Play()
+		TweenService:Create(chargeLight, TweenInfo.new(CHARGE), { Range = 10, Brightness = 2 }):Play()
+		Debris:AddItem(charge, CHARGE + 0.02)
+
+		task.delay(CHARGE, function()
 			if not parent.Parent then
 				return
 			end
-			-- The burst: a flash that grows over the splash area, a ring on the floor and embers flying out.
-			local radius = Balance.SplashRadius
-			local flash = Instance.new("Part")
-			flash.Shape = Enum.PartType.Ball
-			flash.Size = Vector3.one * 1.5
-			flash.Color = YELLOW
-			flash.Material = Enum.Material.Neon
-			flash.Transparency = 0.1
-			flash.Anchored = true
-			flash.CanCollide = false
-			flash.CanQuery = false
-			flash.CanTouch = false
-			flash.CastShadow = false
-			flash.CFrame = CFrame.new(b)
-			flash.Parent = parent
-			TweenService:Create(flash, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.one * radius * 1.3, Transparency = 1, Color = ORANGE }):Play()
-			Debris:AddItem(flash, 0.35)
-			local ring = Instance.new("Part")
-			ring.Shape = Enum.PartType.Cylinder
-			ring.Size = Vector3.new(0.3, 1, 1)
-			ring.Color = ORANGE
-			ring.Material = Enum.Material.Neon
-			ring.Transparency = 0.2
-			ring.Anchored = true
-			ring.CanCollide = false
-			ring.CanQuery = false
-			ring.CanTouch = false
-			ring.CastShadow = false
-			ring.CFrame = CFrame.new(to.pos + UP * 0.3) * CFrame.Angles(0, 0, math.rad(90))
-			ring.Parent = parent
-			TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.new(0.3, radius * 2, radius * 2), Transparency = 1 }):Play()
-			Debris:AddItem(ring, 0.4)
-			for _ = 1, 10 do
-				local angle = math.random() * math.pi * 2
-				local distance = radius * (0.3 + math.random() * 0.6)
-				local ember = Instance.new("Part")
-				ember.Shape = Enum.PartType.Ball
-				ember.Size = Vector3.one * (0.3 + math.random() * 0.3)
-				ember.Color = if math.random() < 0.5 then ORANGE else YELLOW
-				ember.Material = Enum.Material.Neon
-				ember.Anchored = true
-				ember.CanCollide = false
-				ember.CanQuery = false
-				ember.CanTouch = false
-				ember.CastShadow = false
-				ember.CFrame = CFrame.new(b)
-				ember.Parent = parent
-				TweenService:Create(ember, TweenInfo.new(0.4 + math.random() * 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-					Position = b + Vector3.new(math.cos(angle) * distance, 1 + math.random() * 3, math.sin(angle) * distance),
-					Transparency = 1,
-					Size = Vector3.one * 0.1,
-				}):Play()
-				Debris:AddItem(ember, 0.75)
-			end
+			local start = if tip and tip.Parent then tip.Position else a + UP * 1.2
+			local flight = math.clamp((b - start).Magnitude / 110, 0.08, 0.25)
+			local ball = Instance.new("Part")
+			ball.Shape = Enum.PartType.Ball
+			ball.Size = Vector3.one * 1.6
+			ball.Color = PURPLE
+			ball.Material = Enum.Material.Neon
+			ball.Transparency = 0.1
+			ball.Anchored = true
+			ball.CanCollide = false
+			ball.CanQuery = false
+			ball.CanTouch = false
+			ball.CastShadow = false
+			ball.CFrame = CFrame.new(start)
+			local core = Instance.new("Part")
+			core.Shape = Enum.PartType.Ball
+			core.Size = Vector3.one * 0.8
+			core.Color = PALE
+			core.Material = Enum.Material.Neon
+			core.Anchored = true
+			core.CanCollide = false
+			core.CanQuery = false
+			core.CanTouch = false
+			core.CastShadow = false
+			core.CFrame = CFrame.new(start)
+			local light = Instance.new("PointLight")
+			light.Color = PURPLE
+			light.Range = 10
+			light.Brightness = 1.6
+			light.Parent = ball
+			local sparkles = Instance.new("Sparkles")
+			sparkles.SparkleColor = PALE
+			sparkles.Parent = ball
+			local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+			a0.Position = Vector3.new(0, 0.7, 0)
+			a1.Position = Vector3.new(0, -0.7, 0)
+			a0.Parent = ball
+			a1.Parent = ball
+			local trail = Instance.new("Trail")
+			trail.Attachment0 = a0
+			trail.Attachment1 = a1
+			trail.Color = ColorSequence.new(PALE, Color3.fromRGB(120, 40, 200))
+			trail.Transparency = NumberSequence.new(0.15, 1)
+			trail.Lifetime = 0.3
+			trail.LightEmission = 1
+			trail.Parent = ball
+			ball.Parent = parent
+			core.Parent = parent
+			local info = TweenInfo.new(flight, Enum.EasingStyle.Linear)
+			TweenService:Create(ball, info, { CFrame = CFrame.new(b) }):Play()
+			TweenService:Create(core, info, { CFrame = CFrame.new(b) }):Play()
+			Debris:AddItem(ball, flight + 0.02)
+			Debris:AddItem(core, flight + 0.02)
+			task.delay(flight, function()
+				if not parent.Parent then
+					return
+				end
+				-- The burst: a flash growing over the splash area, a ring on the floor and arcane sparks flying out.
+				local radius = Balance.SplashRadius
+				local flash = Instance.new("Part")
+				flash.Shape = Enum.PartType.Ball
+				flash.Size = Vector3.one * 1.6
+				flash.Color = PALE
+				flash.Material = Enum.Material.Neon
+				flash.Transparency = 0.1
+				flash.Anchored = true
+				flash.CanCollide = false
+				flash.CanQuery = false
+				flash.CanTouch = false
+				flash.CastShadow = false
+				flash.CFrame = CFrame.new(b)
+				flash.Parent = parent
+				TweenService:Create(flash, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.one * radius * 1.3, Transparency = 1, Color = PURPLE }):Play()
+				Debris:AddItem(flash, 0.35)
+				local ring = Instance.new("Part")
+				ring.Shape = Enum.PartType.Cylinder
+				ring.Size = Vector3.new(0.3, 1, 1)
+				ring.Color = PURPLE
+				ring.Material = Enum.Material.Neon
+				ring.Transparency = 0.2
+				ring.Anchored = true
+				ring.CanCollide = false
+				ring.CanQuery = false
+				ring.CanTouch = false
+				ring.CastShadow = false
+				ring.CFrame = CFrame.new(to.pos + UP * 0.3) * CFrame.Angles(0, 0, math.rad(90))
+				ring.Parent = parent
+				TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.new(0.3, radius * 2, radius * 2), Transparency = 1 }):Play()
+				Debris:AddItem(ring, 0.4)
+				for _ = 1, 10 do
+					local angle = math.random() * math.pi * 2
+					local distance = radius * (0.3 + math.random() * 0.6)
+					local spark = Instance.new("Part")
+					spark.Size = Vector3.new(0.25, 0.5, 0.25)
+					spark.Color = if math.random() < 0.5 then PURPLE else PALE
+					spark.Material = Enum.Material.Neon
+					spark.Anchored = true
+					spark.CanCollide = false
+					spark.CanQuery = false
+					spark.CanTouch = false
+					spark.CastShadow = false
+					spark.CFrame = CFrame.new(b) * CFrame.Angles(math.random() * 3, math.random() * 3, 0)
+					spark.Parent = parent
+					TweenService:Create(spark, TweenInfo.new(0.4 + math.random() * 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Position = b + Vector3.new(math.cos(angle) * distance, 1 + math.random() * 3, math.sin(angle) * distance),
+						Transparency = 1,
+						Size = Vector3.one * 0.1,
+					}):Play()
+					Debris:AddItem(spark, 0.75)
+				end
+			end)
 		end)
 		return
 	end

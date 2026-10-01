@@ -20,7 +20,7 @@ local EVOLUTIONS = {
 	-- standing staff forward. The attack animation moves the hand, and the weapon follows it.)
 	Knight = { data = require(script.Parent.StageModels.KnightEvolution), attack = "slash", holdFrom = 99 },
 	Archer = { data = require(script.Parent.StageModels.ArcherEvolution), attack = "lunge", holdFrom = 99 },
-	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "cast", holdFrom = 99 },
+	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "lunge", holdFrom = 99 }, -- a thrust: the staff points at the enemy while the fireball charges
 }
 
 local C = Color3.fromRGB
