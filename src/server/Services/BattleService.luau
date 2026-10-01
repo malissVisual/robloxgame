@@ -280,6 +280,138 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 		return
 	end
 
+	if from.passive == "splash" then
+		-- The Mage: a FIREBALL. A glowing ball with fire and a trail leaves the staff's crystal, flies straight at the
+		-- target and bursts there over the splash area (its splash damage is in `step`).
+		local ORANGE = Color3.fromRGB(255, 150, 50)
+		local YELLOW = Color3.fromRGB(255, 230, 140)
+		local start = a + UP * 1.2
+		local weapon = from.model:FindFirstChild("Weapon")
+		if weapon then
+			local topY = -math.huge
+			for _, piece in weapon:GetChildren() do
+				if piece:IsA("BasePart") and piece.Name == "Piece" and piece.Position.Y > topY then
+					topY = piece.Position.Y
+					start = piece.Position
+				end
+			end
+		end
+		local flight = math.clamp((b - start).Magnitude / 90, 0.1, 0.3)
+		local ball = Instance.new("Part")
+		ball.Shape = Enum.PartType.Ball
+		ball.Size = Vector3.one * 1.5
+		ball.Color = ORANGE
+		ball.Material = Enum.Material.Neon
+		ball.Anchored = true
+		ball.CanCollide = false
+		ball.CanQuery = false
+		ball.CanTouch = false
+		ball.CastShadow = false
+		ball.CFrame = CFrame.new(start)
+		local core = Instance.new("Part")
+		core.Shape = Enum.PartType.Ball
+		core.Size = Vector3.one * 0.8
+		core.Color = YELLOW
+		core.Material = Enum.Material.Neon
+		core.Anchored = true
+		core.CanCollide = false
+		core.CanQuery = false
+		core.CanTouch = false
+		core.CastShadow = false
+		core.CFrame = CFrame.new(start)
+		local fire = Instance.new("Fire")
+		fire.Size = 4
+		fire.Heat = 6
+		fire.Color = ORANGE
+		fire.SecondaryColor = Color3.fromRGB(255, 70, 20)
+		fire.Parent = ball
+		local light = Instance.new("PointLight")
+		light.Color = ORANGE
+		light.Range = 10
+		light.Brightness = 1.5
+		light.Parent = ball
+		local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+		a0.Position = Vector3.new(0, 0.6, 0)
+		a1.Position = Vector3.new(0, -0.6, 0)
+		a0.Parent = ball
+		a1.Parent = ball
+		local trail = Instance.new("Trail")
+		trail.Attachment0 = a0
+		trail.Attachment1 = a1
+		trail.Color = ColorSequence.new(YELLOW, Color3.fromRGB(255, 80, 20))
+		trail.Transparency = NumberSequence.new(0.2, 1)
+		trail.Lifetime = 0.25
+		trail.LightEmission = 1
+		trail.Parent = ball
+		ball.Parent = parent
+		core.Parent = parent
+		local info = TweenInfo.new(flight, Enum.EasingStyle.Linear)
+		TweenService:Create(ball, info, { CFrame = CFrame.new(b) }):Play()
+		TweenService:Create(core, info, { CFrame = CFrame.new(b) }):Play()
+		Debris:AddItem(ball, flight + 0.02)
+		Debris:AddItem(core, flight + 0.02)
+		task.delay(flight, function()
+			if not parent.Parent then
+				return
+			end
+			-- The burst: a flash that grows over the splash area, a ring on the floor and embers flying out.
+			local radius = Balance.SplashRadius
+			local flash = Instance.new("Part")
+			flash.Shape = Enum.PartType.Ball
+			flash.Size = Vector3.one * 1.5
+			flash.Color = YELLOW
+			flash.Material = Enum.Material.Neon
+			flash.Transparency = 0.1
+			flash.Anchored = true
+			flash.CanCollide = false
+			flash.CanQuery = false
+			flash.CanTouch = false
+			flash.CastShadow = false
+			flash.CFrame = CFrame.new(b)
+			flash.Parent = parent
+			TweenService:Create(flash, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.one * radius * 1.3, Transparency = 1, Color = ORANGE }):Play()
+			Debris:AddItem(flash, 0.35)
+			local ring = Instance.new("Part")
+			ring.Shape = Enum.PartType.Cylinder
+			ring.Size = Vector3.new(0.3, 1, 1)
+			ring.Color = ORANGE
+			ring.Material = Enum.Material.Neon
+			ring.Transparency = 0.2
+			ring.Anchored = true
+			ring.CanCollide = false
+			ring.CanQuery = false
+			ring.CanTouch = false
+			ring.CastShadow = false
+			ring.CFrame = CFrame.new(to.pos + UP * 0.3) * CFrame.Angles(0, 0, math.rad(90))
+			ring.Parent = parent
+			TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.new(0.3, radius * 2, radius * 2), Transparency = 1 }):Play()
+			Debris:AddItem(ring, 0.4)
+			for _ = 1, 10 do
+				local angle = math.random() * math.pi * 2
+				local distance = radius * (0.3 + math.random() * 0.6)
+				local ember = Instance.new("Part")
+				ember.Shape = Enum.PartType.Ball
+				ember.Size = Vector3.one * (0.3 + math.random() * 0.3)
+				ember.Color = if math.random() < 0.5 then ORANGE else YELLOW
+				ember.Material = Enum.Material.Neon
+				ember.Anchored = true
+				ember.CanCollide = false
+				ember.CanQuery = false
+				ember.CanTouch = false
+				ember.CastShadow = false
+				ember.CFrame = CFrame.new(b)
+				ember.Parent = parent
+				TweenService:Create(ember, TweenInfo.new(0.4 + math.random() * 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Position = b + Vector3.new(math.cos(angle) * distance, 1 + math.random() * 3, math.sin(angle) * distance),
+					Transparency = 1,
+					Size = Vector3.one * 0.1,
+				}):Play()
+				Debris:AddItem(ember, 0.75)
+			end
+		end)
+		return
+	end
+
 	if from.range > 10 then
 		neon(Vector3.new(0.3, 0.3, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b), nil, 0.1)
 	end

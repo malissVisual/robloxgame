@@ -495,6 +495,9 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
 - **Ascended soldiers:** two **level 9** soldiers of a class whose level 9 is bought merge into one **ASCENDED**
   soldier (`Grid.mergeResult`): +50% HP and damage (`Units.AscendedBonus`), its class passive doubled, a golden
   halo, sparkles and a "★" on its card, sells for 3x. It cannot be merged further.
+- **The Mage's attack is a fireball** (`effect` in BattleService): a glowing ball with fire and a trail leaves the staff's
+  crystal, flies straight at the target and bursts over the splash area (`Balance.SplashRadius`); its splash damage is the
+  Mage's Arcane Burst passive.
 - **Class passives** (`Units.Passives`, shown in the Soldiers tab and on a card's popup): Knight **Shield Wall**
   (20% to block a hit), Archer **Power Shot** (every 3rd shot x2), Hunter **Deadeye** (25% double damage), Mage
   **Arcane Burst** (hits splash 50% to nearby enemies), Tank **Bulwark** (enemies within 14 studs attack it
