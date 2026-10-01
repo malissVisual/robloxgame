@@ -163,6 +163,7 @@ UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
+UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
 
 function UI.stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
@@ -4220,9 +4221,9 @@ do
 				done += 1
 			end
 		end
-		button.Visible = not state.battling
+		button.Visible = UI.ACHIEVEMENTS and not state.battling
 		button.Text = string.format("ACHIEVEMENTS  %d/%d%s", done, #Achievements.List, if state.title then "  ·  ★ " .. state.title else "")
-		panel.Visible = open and not state.battling
+		panel.Visible = UI.ACHIEVEMENTS and open and not state.battling
 		if not panel.Visible then
 			return
 		end
