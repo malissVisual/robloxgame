@@ -369,6 +369,34 @@ the first time **completes the map** ("TRAINING CAMP CLEARED!"); you can still r
 any wave. The wave heading over the enemies shows the phase, `WAVE n / 100` and the count. A new map is a new
 block in `Config/Maps.luau` (`phases` can be written by hand or generated like the Training Camp's).
 
+## The final boss: Grubnak — The Rift King (wave 100)
+
+The last boss of the Training Camp (`Boss20`, archetype `RiftKing`) has his own fight: `server/Services/RiftKing.luau`,
+all numbers in `shared/Config/RiftKing.luau` (health, damage, ranges, cooldowns, warning windows), the model in
+`shared/Enemy.luau` (look `RiftKing`: black plate with gold trim, purple rift crystals, a gold crown with crystal
+points, a red cape, a rift orb in the left hand and the giant crystal hammer in the right; about twice a player's
+height). You stand in the arena during the battle, so you dodge too: every attack goes **ground warning → dodge
+window → impact**. Warnings lie flat on the floor with a bright border and a translucent fill, never hurt, mark
+exactly the area that is hit, and are removed after the impact. Your soldiers in the area take a multiple of the
+boss's damage, your character takes health points; one impact hits a target once.
+
+1. **Crystal Volley** – three crystals fly along arcs onto red circles (radius 5) locked 1.3 s before they land.
+2. **Hammer Slam** – the hammer goes up and an orange cone (16 studs, ±35°) is locked in front of him; it comes down after 1 s.
+3. **Rift Shockwave** – a 0.9 s wind-up (a pulsing glow at his feet), then a purple ring runs outward at 14 studs/s;
+   only the moving band hurts, the inside never does, and a character mid-jump (or 2.2 studs up) is over it.
+4. **Meteor Rain** – 4 red circles (6 enraged) with at least a 4-stud path between them; purple crystal meteors
+   land 1.5 s later.
+
+A hit of 6 % of his health or more **staggers** him (a flash and a step back). Below 30 % he is **enraged**: the
+crystals glow brighter with their own lights, glowing cracks appear on the armor plates, cooldowns shrink to 60 %
+and attacks come in pairs (a shockwave is followed by a volley, a slam by meteors), each with its own full warning.
+A wide **boss health bar** at the top of the screen (remote `BossHp`) shows his health and turns red with an
+ENRAGED tag. Targeting, health and damage are the server's (the battle simulation), several players in the arena
+all dodge, and `RiftKing.cleanup` removes every warning, crystal and ring when he dies or the battle ends.
+To test him: ADMIN → wave 100 (the admin tools set the wave), then PLAY. `python3 tools/tests/run_riftking_test.py
+[luau]` runs the fight's logic test (standalone Luau with Roblox stubs: timings, locked warnings, one hit per impact,
+the jump over the ring, meteor gaps, enrage, stagger, cleanup); the model and animations need a Studio playtest.
+
 ## The FIGHT button and the battle panel (starting a wave, difficulty and wave choice)
 
 Nothing pops up when you walk onto the raised fight arena. The **FIGHT** button in the bottom bar opens

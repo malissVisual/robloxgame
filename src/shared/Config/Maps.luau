@@ -63,7 +63,7 @@ Maps.Defs = {
 			"Hobgoblin Patrol", "Hobgoblin Marksmen", "Hobgoblin Siege Party", "Hobgoblin Hex Pack",
 			"Orc Vanguard", "Orc Hunters", "Orc Crushers", "Orc Warlocks",
 			"Troll Ambush", "Troll Stalkers", "Troll Stampede", "Troll Witchcraft",
-			"Demon Scouts", "Demon Archers", "Demon Legion", "The Emperor's Court",
+			"Demon Scouts", "Demon Archers", "Demon Legion", "The Rift King's Court",
 		}),
 	},
 } :: { [string]: Def }

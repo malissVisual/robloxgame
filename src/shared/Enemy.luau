@@ -605,6 +605,102 @@ function Enemy.build(kind: string, level: number): Model
 		mushroom(hand, "ClubShroomA", Vector3.new(0.2, 0.3, -2.4), 0.6)
 		mushroom(hand, "ClubShroomB", Vector3.new(-0.25, 0.25, -1.6), 0.45)
 		topOffset = hy + 2.4
+	elseif look == "RiftKing" then
+		-- FINAL BOSS: Grubnak — The Rift King. Black plate with gold trim and purple rift crystals, a gold crown with
+		-- crystal spikes, a red cape, a purple orb in the left hand and a giant crystal-powered hammer in the right.
+		-- Crystals carry the attribute "RiftCrystal" and the armor plates "RiftArmor": the fight (RiftKing.luau)
+		-- brightens the crystals and cracks the armor when the boss is enraged.
+		local BLACK = C(38, 38, 46)
+		local CRYSTAL = C(185, 90, 255)
+		local function crystal(part: BasePart, name: string, offset: Vector3, size: number, angles: Vector3?): Part
+			local shard = attach(part, name, Vector3.new(size * 0.55, size, size * 0.55), offset, CRYSTAL, nil, NEON, angles or Vector3.new(0, 45, 0))
+			shard:SetAttribute("RiftCrystal", true)
+			return shard
+		end
+		local function plate(part: BasePart, name: string, grow: Vector3, offset: Vector3): Part
+			local armor = cover(part, name, grow, offset, BLACK, METAL)
+			armor:SetAttribute("RiftArmor", true)
+			return armor
+		end
+		-- The face: purple glowing eyes, big tusks.
+		for _, eyeName in { "EyeL", "EyeR" } do
+			local eye = model:FindFirstChild(eyeName) :: BasePart?
+			if eye then
+				eye.Color = CRYSTAL
+			end
+		end
+		attach(head, "TuskL", Vector3.new(0.16, 0.42, 0.14), Vector3.new(-0.28, -hy * 0.5, -hz - 0.02), BONE, nil, nil, Vector3.new(0, 0, 8))
+		attach(head, "TuskR", Vector3.new(0.16, 0.42, 0.14), Vector3.new(0.28, -hy * 0.5, -hz - 0.02), BONE, nil, nil, Vector3.new(0, 0, -8))
+		-- Armor: chest and back plates with a gold frame and a purple gem, pauldrons with crystal spikes,
+		-- gauntlets, leg plates, boots with gold caps.
+		plate(upper, "ChestPlate", Vector3.new(0.4, 0.15, 0.4), Vector3.zero)
+		attach(upper, "ChestFrame", Vector3.new(ux * 2 + 0.44, 0.2, 0.08), Vector3.new(0, uy - 0.15, -uz - 0.23), GOLD, nil, METAL)
+		attach(upper, "ChestFrameLow", Vector3.new(ux * 2 + 0.44, 0.2, 0.08), Vector3.new(0, -uy + 0.15, -uz - 0.23), GOLD, nil, METAL)
+		attach(upper, "ChestBeltL", Vector3.new(0.18, uy * 2 - 0.2, 0.08), Vector3.new(-ux * 0.55, 0, -uz - 0.23), GOLD, nil, METAL)
+		attach(upper, "ChestBeltR", Vector3.new(0.18, uy * 2 - 0.2, 0.08), Vector3.new(ux * 0.55, 0, -uz - 0.23), GOLD, nil, METAL)
+		crystal(upper, "ChestGem", Vector3.new(0, 0, -uz - 0.3), 0.7, Vector3.new(0, 0, 45))
+		attach(upper, "ChestGemFrame", Vector3.new(0.95, 0.95, 0.06), Vector3.new(0, 0, -uz - 0.24), GOLD, nil, METAL, Vector3.new(0, 0, 45))
+		for _, arm in { leftArm, rightArm } do
+			local ay = arm.Size.Y / 2 / s
+			local side = if arm == leftArm then -1 else 1
+			plate(arm, "Pauldron", Vector3.new(0.6, -0.2, 0.6), Vector3.new(side * 0.15, ay - 0.25, 0))
+			attach(arm, "PauldronRim", Vector3.new(arm.Size.X / s + 0.75, 0.16, arm.Size.Z / s + 0.75), Vector3.new(side * 0.15, ay + 0.05, 0), GOLD, nil, METAL)
+			crystal(arm, "PauldronCrystalA", Vector3.new(side * 0.35, ay + 0.55, 0), 0.9, Vector3.new(0, 45, -side * 15))
+			crystal(arm, "PauldronCrystalB", Vector3.new(side * 0.05, ay + 0.45, -0.3), 0.6, Vector3.new(-20, 45, 0))
+			crystal(arm, "PauldronCrystalC", Vector3.new(side * 0.1, ay + 0.4, 0.3), 0.5, Vector3.new(20, 45, 0))
+		end
+		for _, forearm in { limb("LeftLowerArm"), limb("RightLowerArm") } do
+			plate(forearm, "Gauntlet", Vector3.new(0.3, 0.05, 0.3), Vector3.zero)
+			attach(forearm, "GauntletRim", Vector3.new(forearm.Size.X / s + 0.42, 0.14, forearm.Size.Z / s + 0.42), Vector3.new(0, forearm.Size.Y / 2 / s - 0.05, 0), GOLD, nil, METAL)
+		end
+		for _, part in { leftLeg, rightLeg, leftShin, rightShin } do
+			plate(part, "LegPlate", Vector3.new(0.22, 0.02, 0.22), Vector3.zero)
+		end
+		boots(BLACK)
+		attach(leftFoot, "BootCap", Vector3.new(leftFoot.Size.X / s + 0.2, 0.3, 0.3), Vector3.new(0, 0, -leftFoot.Size.Z / s / 2), GOLD, nil, METAL)
+		attach(rightFoot, "BootCap", Vector3.new(rightFoot.Size.X / s + 0.2, 0.3, 0.3), Vector3.new(0, 0, -rightFoot.Size.Z / s / 2), GOLD, nil, METAL)
+		belt(BLACK, GOLD)
+		crystal(lower, "BeltGem", Vector3.new(0, 0.1, -lz - 0.3), 0.45, Vector3.new(0, 0, 45))
+		-- The red cape with a high collar.
+		attach(upper, "Cape", Vector3.new(ux * 2 + 0.5, 3.4, 0.16), Vector3.new(0, -1.1, uz + 0.2), RED, nil, nil, Vector3.new(-7, 0, 0))
+		attach(upper, "CapeCollar", Vector3.new(ux * 2 + 0.8, 0.45, uz * 2 + 0.6), Vector3.new(0, uy + 0.1, 0), RED)
+		-- The crown: a gold band, five gold points and a purple crystal on every point.
+		attach(head, "Crown", Vector3.new(hx * 2 + 0.2, 0.4, hz * 2 + 0.2), Vector3.new(0, hy + 0.1, 0), GOLD, nil, METAL)
+		for i, x in { -0.75, -0.38, 0, 0.38, 0.75 } do
+			local tall = if i == 3 then 0.7 elseif i == 2 or i == 4 then 0.55 else 0.4
+			attach(head, "CrownPoint" .. i, Vector3.new(0.2, tall, 0.2), Vector3.new(x * hx, hy + 0.3 + tall / 2, -hz * 0.35), GOLD, nil, METAL)
+			crystal(head, "CrownCrystal" .. i, Vector3.new(x * hx, hy + 0.45 + tall, -hz * 0.35), 0.45 + (if i == 3 then 0.25 else 0))
+		end
+		-- The left hand: a glowing rift orb.
+		local orb = attach(leftHand, "RiftOrb", Vector3.new(1.3, 1.3, 1.3), Vector3.new(0, -0.3, -0.7), CRYSTAL, Enum.PartType.Ball, NEON)
+		orb:SetAttribute("RiftCrystal", true)
+		local orbLight = Instance.new("PointLight")
+		orbLight.Color = CRYSTAL
+		orbLight.Range = 10
+		orbLight.Brightness = 1.2
+		orbLight.Parent = orb
+		-- The right hand: the giant hammer. A long dark handle with gold bands, a black block head framed in gold,
+		-- crystals set in its faces and a crystal spike on top.
+		attach(hand, "HammerHandle", Vector3.new(0.34, 0.34, 4.6), Vector3.new(0, -0.1, -1.6), DARK_IRON, nil, METAL)
+		for _, z in { -0.5, -1.4, -2.6 } do
+			attach(hand, "HammerBand", Vector3.new(0.44, 0.44, 0.3), Vector3.new(0, -0.1, z), GOLD, nil, METAL)
+		end
+		local hammerHead = attach(hand, "HammerHead", Vector3.new(2.2, 1.5, 1.5), Vector3.new(0, -0.1, -3.9), BLACK, nil, METAL)
+		hammerHead:SetAttribute("RiftArmor", true)
+		attach(hand, "HammerFrameA", Vector3.new(2.3, 0.2, 1.6), Vector3.new(0, 0.6, -3.9), GOLD, nil, METAL)
+		attach(hand, "HammerFrameB", Vector3.new(2.3, 0.2, 1.6), Vector3.new(0, -0.8, -3.9), GOLD, nil, METAL)
+		attach(hand, "HammerFrameC", Vector3.new(2.3, 1.6, 0.2), Vector3.new(0, -0.1, -3.2), GOLD, nil, METAL)
+		attach(hand, "HammerFrameD", Vector3.new(2.3, 1.6, 0.2), Vector3.new(0, -0.1, -4.6), GOLD, nil, METAL)
+		crystal(hand, "HammerCrystalL", Vector3.new(-1.2, -0.1, -3.9), 0.8, Vector3.new(0, 0, 90))
+		crystal(hand, "HammerCrystalR", Vector3.new(1.2, -0.1, -3.9), 0.8, Vector3.new(0, 0, 90))
+		crystal(hand, "HammerCrystalFront", Vector3.new(0, -0.1, -4.75), 0.6, Vector3.new(90, 0, 0))
+		crystal(hand, "HammerCrystalTop", Vector3.new(0, 0.95, -3.9), 1.1)
+		local hammerLight = Instance.new("PointLight")
+		hammerLight.Color = CRYSTAL
+		hammerLight.Range = 9
+		hammerLight.Brightness = 0.8
+		hammerLight.Parent = hammerHead
+		topOffset = hy + 2.8
 	else
 		-- Unknown look: a bare goblin with a club.
 		belt(DARK_LEATHER)

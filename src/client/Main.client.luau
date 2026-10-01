@@ -2883,6 +2883,72 @@ Net.get("BossIntro").OnClientEvent:Connect(function(name: string)
 end)
 end
 
+-- ── Boss health bar ────────────────────────────────────────────────────────
+-- The final boss (Grubnak — The Rift King) sends its health every few ticks ("BossHp": name, fraction, enraged).
+-- A wide bar at the top of the screen; it turns red with an ENRAGED tag below 30 %, and hides when the boss
+-- dies, the battle ends or nothing arrives for a while.
+do
+	local bar = Instance.new("Frame")
+	bar.Name = "BossBar"
+	bar.AnchorPoint = Vector2.new(0.5, 0)
+	bar.Position = UDim2.new(0.5, 0, 0, 16)
+	bar.Size = UDim2.fromOffset(560, 60)
+	bar.BackgroundColor3 = BG
+	bar.BackgroundTransparency = 0.15
+	bar.BorderSizePixel = 0
+	bar.Visible = false
+	bar.ZIndex = 14
+	bar.Parent = gui
+	corner(bar, 12)
+	local barStroke = UI.stroke(bar, Color3.fromRGB(185, 90, 255), 2)
+	local bossName = label(bar, "", UDim2.fromOffset(14, 6), UDim2.fromOffset(400, 22), 17, Enum.Font.GothamBlack, WHITE)
+	bossName.ZIndex = 15
+	local tag = label(bar, "ENRAGED", UDim2.new(1, -124, 0, 6), UDim2.fromOffset(110, 22), 15, Enum.Font.GothamBlack, RED)
+	tag.TextXAlignment = Enum.TextXAlignment.Right
+	tag.Visible = false
+	tag.ZIndex = 15
+	local back = Instance.new("Frame")
+	back.Position = UDim2.fromOffset(14, 34)
+	back.Size = UDim2.new(1, -28, 0, 16)
+	back.BackgroundColor3 = Color3.fromRGB(14, 16, 24)
+	back.BorderSizePixel = 0
+	back.ZIndex = 15
+	back.Parent = bar
+	corner(back, 6)
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(185, 90, 255)
+	fill.BorderSizePixel = 0
+	fill.ZIndex = 16
+	fill.Parent = back
+	corner(fill, 6)
+	local percent = label(back, "100%", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 12, Enum.Font.GothamBold, WHITE)
+	percent.TextXAlignment = Enum.TextXAlignment.Center
+	percent.TextStrokeTransparency = 0.4
+	percent.ZIndex = 17
+	local lastAt = 0
+	Net.get("BossHp").OnClientEvent:Connect(function(name: string, fraction: number, enraged: boolean)
+		lastAt = os.clock()
+		if fraction <= 0 then
+			bar.Visible = false
+			return
+		end
+		bar.Visible = true
+		bossName.Text = string.upper(name)
+		tag.Visible = enraged == true
+		local color = if enraged then RED else Color3.fromRGB(185, 90, 255)
+		fill.BackgroundColor3 = color
+		barStroke.Color = color
+		TweenService:Create(fill, TweenInfo.new(0.15), { Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1) }):Play()
+		percent.Text = string.format("%d%%", math.ceil(fraction * 100))
+	end)
+	RunService.RenderStepped:Connect(function()
+		if bar.Visible and (not state.battling or os.clock() - lastAt > 3) then
+			bar.Visible = false
+		end
+	end)
+end
+
 -- ── Wave result: the rewards drop in at the top ────────────────────────────
 -- No result box: after a wave the title, the coins and every drop (soldier cards, lucky drop, new spell)
 -- pop in one after another at the top of the screen, and the drops go straight into the inventory.

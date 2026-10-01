@@ -19,6 +19,7 @@ local Waves = require(Shared.Config.Waves)
 
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
+local RiftKing = require(script.Parent.RiftKing)
 local Soldier = require(Shared.Soldier)
 
 local PLAYER_SIDE, ENEMY_SIDE = 1, 2
@@ -31,7 +32,7 @@ type Fighter = {
 	tier: number, -- level
 	coinMult: number, -- multiplier of the coins it drops when killed
 	boss: boolean, -- a boss (percent-damage spells hurt it less)
-	ability: string?, -- a boss's ability: "slam" | "summon" | "volley" | "heal" (from its look)
+	ability: string?, -- a boss's ability: "slam" | "summon" | "volley" | "heal" (from its archetype), "riftking" = the final boss (RiftKing.luau)
 	abilityTimer: number, -- battle seconds until the ability fires again
 	summoned: boolean, -- the Chief already called its reinforcements
 	armor: number, -- takes this part less damage (0 for everybody right now)
@@ -74,6 +75,7 @@ export type Battle = {
 	summonTier: number,
 	plot: Plots.Plot,
 	onSummon: ((Fighter) -> ())?,
+	rift: RiftKing.State?, -- the final boss's fight, while Grubnak — The Rift King is in this battle
 }
 local active: { [Player]: Battle } = {}
 
@@ -368,6 +370,11 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 			continue
 		end
 		f.clock += dt
+		if f.ability == "riftking" and battle.rift then
+			if RiftKing.update(battle.rift, dt) then
+				continue -- the Rift King is casting one of his four attacks (RiftKing.luau moves and hits for him)
+			end
+		end
 		if f.stunUntil > f.clock then
 			continue -- stunned by a boss slam
 		end
@@ -420,6 +427,10 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 			end
 			if f.side == ENEMY_SIDE then
 				onEnemyDeath(f) -- the caller pays out the coins for the kill
+			end
+			if f.ability == "riftking" and battle.rift then
+				RiftKing.cleanup(battle.rift) -- every warning, crystal and ring goes away with him
+				battle.rift = nil
 			end
 		end
 	end
@@ -482,8 +493,13 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		if fighter.boss then
 			-- The boss's archetype decides its ability.
 			local archetype = Enemies.Kinds[e.kind].archetype
-			fighter.ability = if archetype == "Brute" then "slam" elseif archetype == "Chief" then "summon" elseif archetype == "Archer" then "volley" else "heal"
-			fighter.abilityTimer = if fighter.ability == "slam" then Balance.BossSlamEvery elseif fighter.ability == "volley" then Balance.BossVolleyEvery elseif fighter.ability == "heal" then Balance.BossHealEvery else 1
+			if archetype == "RiftKing" then
+				fighter.ability = "riftking" -- the final boss: its own fight (RiftKing.luau), never the simple abilities
+				fighter.abilityTimer = math.huge
+			else
+				fighter.ability = if archetype == "Brute" then "slam" elseif archetype == "Chief" then "summon" elseif archetype == "Archer" then "volley" else "heal"
+				fighter.abilityTimer = if fighter.ability == "slam" then Balance.BossSlamEvery elseif fighter.ability == "volley" then Balance.BossVolleyEvery elseif fighter.ability == "heal" then Balance.BossHealEvery else 1
+			end
 		end
 		fighter.maxHp *= enemyPower
 		fighter.hp = fighter.maxHp
@@ -512,9 +528,25 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		summonTier = options.summonTier,
 		plot = plot,
 		onSummon = nil,
+		rift = nil,
 	}
 	numbersOn[plot.folder] = battle.numbers
 	active[player] = battle
+	for _, f in fighters do
+		if f.ability == "riftking" then
+			battle.rift = RiftKing.new({
+				player = player,
+				plot = plot,
+				parent = plot.folder,
+				fighters = fighters,
+				playerSide = PLAYER_SIDE,
+				damage = damage,
+				popNumber = function(target, amount)
+					popNumber(plot.folder, target, amount)
+				end,
+			}, f)
+		end
+	end
 
 	task.spawn(function()
 		-- Phase 1: everybody teleports from the pads into the arena (a flash on both ends) and the
@@ -551,6 +583,10 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		end
 
 		local won = countAlive(fighters, ENEMY_SIDE) == 0 and countAlive(fighters, PLAYER_SIDE) > 0
+		if battle.rift then
+			RiftKing.cleanup(battle.rift) -- the battle ended with the boss still up (time ran out, the squad fell)
+			battle.rift = nil
+		end
 		active[player] = nil
 		numbersOn[plot.folder] = nil
 		profile.battling = false
