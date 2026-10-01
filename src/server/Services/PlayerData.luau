@@ -164,6 +164,7 @@ local function fresh(): Profile
 			unlocked[class] = true
 		end
 	end
+	unlocked.Mage = true -- the Mage is a start class now: a new player gets one in the squad right away
 	return {
 		coins = Balance.StartCoins,
 		xp = 0,
@@ -173,13 +174,14 @@ local function fresh(): Profile
 		quests = { day = "", progress = {}, done = {} },
 		board = Grid.new(Balance.BoardSize),
 		boardSlots = Balance.BoardStartSlots,
-		-- There is no summoning: a new player starts with three level 1 characters already in the squad (more come
-		-- as wave drops).
+		-- There is no summoning: a new player starts with four level 1 characters already in the squad (a Knight,
+		-- an Archer, a Mage and a second Knight; more come as wave drops).
 		squad = (function(): Grid.Cells
 			local squad = Grid.new(Balance.SquadSize)
 			squad[1] = { class = "Knight", tier = 1 }
 			squad[2] = { class = "Archer", tier = 1 }
-			squad[3] = { class = "Knight", tier = 1 }
+			squad[3] = { class = "Mage", tier = 1 }
+			squad[4] = { class = "Knight", tier = 1 }
 			return squad
 		end)(),
 		purchases = 0,
