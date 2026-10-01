@@ -306,7 +306,9 @@ function Enemy.build(kind: string, level: number): Model
 	-- A box around a body part (its size at scale 1 plus `grow`, and always a bit thicker than the part so it
 	-- reads as a piece of clothing or armor), for clothes, armor and hoods.
 	local function cover(part: BasePart, name: string, grow: Vector3, offset: Vector3, color: Color3, material: Enum.Material?): Part
-		return attach(part, name, part.Size / s + grow + Vector3.new(0.2, 0, 0.2), offset, color, nil, material)
+		-- (the layer stays thin: the body part itself is painted in the outfit's color, see paint; a thick box
+		-- around every limb made the goblins look like stacks of crates)
+		return attach(part, name, part.Size / s + grow * 0.6 + Vector3.new(0.08, 0, 0.08), offset, color, nil, material)
 	end
 	-- The outfit: the body parts themselves take the clothes' colors (torso, arms, legs, feet); the head and the
 	-- hands keep the skin. Without this every goblin is a green body with a thing on its head.
@@ -429,7 +431,7 @@ function Enemy.build(kind: string, level: number): Model
 		belt(DARK_LEATHER, IRON)
 		attach(hand, "DaggerGrip", Vector3.new(0.16, 0.16, 0.5), Vector3.new(0, -0.1, -0.2), DARK_WOOD)
 		attach(hand, "DaggerGuard", Vector3.new(0.45, 0.12, 0.12), Vector3.new(0, -0.1, -0.5), IRON, nil, METAL)
-		attach(hand, "DaggerBlade", Vector3.new(0.12, 0.3, 1.1), Vector3.new(0, -0.1, -1.1), STEEL, nil, METAL)
+		attach(hand, "DaggerBlade", Vector3.new(0.14, 0.42, 1.3), Vector3.new(0, -0.1, -1.2), STEEL, nil, METAL)
 		topOffset = hy + 1.0
 	elseif look == "Rubac" then
 		-- The warrior: grey plate, pauldrons, a sword and a red shield with a white bolt.
