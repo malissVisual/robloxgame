@@ -1092,6 +1092,9 @@ local function onSetSetting(player: Player, key: any, value: any)
 	if current == nil or type(value) ~= type(current) then
 		return
 	end
+	if type(value) == "string" and #value > 1000 then
+		return -- the UI layout is a short JSON; anything longer is not ours
+	end
 	profile.settings[key] = if type(value) == "number" then math.clamp(value, 0, 1) else value
 	pushState(player)
 end

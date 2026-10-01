@@ -195,7 +195,7 @@ local function fresh(): Profile
 		achievements = {},
 		title = nil,
 		lastSeen = 0,
-		settings = { volume = 1, numbers = true, arrows = true, music = true },
+		settings = { volume = 1, numbers = true, arrows = true, music = true, layout = "" }, -- layout: where the player dragged the UI panels (JSON, client-owned)
 		battleSpeed = 1,
 	}
 end

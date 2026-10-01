@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
@@ -148,6 +149,157 @@ local function label(parent: Instance, text: string, position: UDim2, size: UDim
 	l.ZIndex = 3
 	l.Parent = parent
 	return l
+end
+
+local function stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
+	local s = Instance.new("UIStroke")
+	s.Color = color
+	s.Thickness = thickness
+	s.Transparency = transparency or 0
+	s.Parent = parent
+	return s
+end
+
+-- A vertical (or rotated) two-color gradient over a frame's background.
+local function gradient(parent: Instance, top: Color3, bottom: Color3, rotation: number?): UIGradient
+	local g = Instance.new("UIGradient")
+	g.Color = ColorSequence.new(top, bottom)
+	g.Rotation = rotation or 90
+	g.Parent = parent
+	return g
+end
+
+-- A small rounded pill with a short text (a stat, a key, a tag).
+local function chip(parent: Instance, text: string, position: UDim2, size: UDim2, background: Color3, color: Color3, textSize: number?): TextLabel
+	local back = Instance.new("Frame")
+	back.Position = position
+	back.Size = size
+	back.BackgroundColor3 = background
+	back.BorderSizePixel = 0
+	back.ZIndex = 3
+	back.Parent = parent
+	corner(back, math.floor(size.Y.Offset / 2))
+	local text_ = label(back, text, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), textSize or 11, Enum.Font.GothamBold, color)
+	text_.TextXAlignment = Enum.TextXAlignment.Center
+	text_.ZIndex = 4
+	return text_
+end
+
+-- ── Movable panels ────────────────────────────────────────────────────────
+-- Any panel with a handle (its title bar) can be dragged anywhere on the screen. The positions are kept per
+-- panel name, saved in the player's settings ("layout", a JSON string) and put back on the next join;
+-- RESET LAYOUT in the settings puts every panel back where it started.
+
+type Movable = { frame: GuiObject, anchor: Vector2, position: UDim2 }
+local movables: { [string]: Movable } = {}
+local layout: { [string]: { number } } = {} -- name → { x, y } in GUI (scaled) pixels, anchor 0,0
+local layoutSaveToken = 0
+
+local function saveLayout()
+	layoutSaveToken += 1
+	local token = layoutSaveToken
+	task.delay(0.6, function()
+		if token == layoutSaveToken then
+			Net.get("SetSetting"):FireServer("layout", HttpService:JSONEncode(layout))
+		end
+	end)
+end
+
+-- Keeps the panel inside the screen (in GUI pixels, after the UIScale).
+local function clampToScreen(frame: GuiObject, x: number, y: number): (number, number)
+	local scale = guiScale.Scale
+	local screen = gui.AbsoluteSize / scale
+	local size = frame.AbsoluteSize / scale
+	return math.clamp(x, 0, math.max(0, screen.X - size.X)), math.clamp(y, 0, math.max(0, screen.Y - size.Y))
+end
+
+local function placePanel(name: string, x: number, y: number)
+	local movable = movables[name]
+	if not movable then
+		return
+	end
+	x, y = clampToScreen(movable.frame, x, y)
+	movable.frame.AnchorPoint = Vector2.zero
+	movable.frame.Position = UDim2.fromOffset(x, y)
+	layout[name] = { math.floor(x + 0.5), math.floor(y + 0.5) }
+end
+
+local function resetLayout()
+	for name, movable in movables do
+		movable.frame.AnchorPoint = movable.anchor
+		movable.frame.Position = movable.position
+		layout[name] = nil
+	end
+	saveLayout()
+end
+
+local function makeMovable(name: string, frame: GuiObject, handle: GuiObject)
+	movables[name] = { frame = frame, anchor = frame.AnchorPoint, position = frame.Position }
+	local dragging = false
+	local startPointer = Vector2.zero
+	local startPosition = Vector2.zero
+	handle.Active = true
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		dragging = true
+		startPointer = Vector2.new(input.Position.X, input.Position.Y)
+		startPosition = (frame.AbsolutePosition - gui.AbsolutePosition) / guiScale.Scale
+		-- From now on the panel is placed by its top-left corner, whatever anchor it had.
+		frame.AnchorPoint = Vector2.zero
+		frame.Position = UDim2.fromOffset(startPosition.X, startPosition.Y)
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if not dragging or (input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch) then
+			return
+		end
+		local delta = (Vector2.new(input.Position.X, input.Position.Y) - startPointer) / guiScale.Scale
+		placePanel(name, startPosition.X + delta.X, startPosition.Y + delta.Y)
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			dragging = false
+			saveLayout()
+		end
+	end)
+end
+
+-- Puts the panels where the saved layout says (once, when the settings arrive).
+local layoutApplied: string? = nil
+local function applyLayout(saved: any)
+	if type(saved) ~= "string" or saved == layoutApplied then
+		return
+	end
+	layoutApplied = saved
+	if saved == "" then
+		return
+	end
+	local ok, decoded = pcall(HttpService.JSONDecode, HttpService, saved)
+	if not ok or type(decoded) ~= "table" then
+		return
+	end
+	for name, entry in decoded do
+		if movables[name] and type(entry) == "table" and type(entry[1]) == "number" and type(entry[2]) == "number" then
+			placePanel(name, entry[1], entry[2])
+		end
+	end
+end
+
+-- The grip dots on a drag handle (the sign that the panel can be moved).
+local function grip(parent: Instance, x: number, y: number, color: Color3)
+	for row = 0, 1 do
+		for col = 0, 2 do
+			local dot = Instance.new("Frame")
+			dot.Position = UDim2.fromOffset(x + col * 5, y + row * 5)
+			dot.Size = UDim2.fromOffset(3, 3)
+			dot.BackgroundColor3 = color
+			dot.BorderSizePixel = 0
+			dot.ZIndex = 3
+			dot.Parent = parent
+			corner(dot, 2)
+		end
+	end
 end
 
 -- ── Bottom bar ────────────────────────────────────────────────────────────
@@ -399,34 +551,80 @@ RunService.RenderStepped:Connect(render)
 
 local pointer = Vector2.zero -- last pointer position (mouse or finger), GUI space
 
+local PANEL_DARK = Color3.fromRGB(16, 18, 26) -- the dark tiles inside the panel
+local PAGE_TOP = 84 -- the pages start under the title bar and the tabs
+
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
 panel.AnchorPoint = Vector2.new(0, 0.5)
 panel.Position = UDim2.new(0, 14, 0.5, -44) -- a bit up, away from the HUD
-panel.Size = UDim2.fromOffset(384, 610)
+panel.Size = UDim2.fromOffset(384, 650)
 panel.BackgroundColor3 = BG
-panel.BackgroundTransparency = 0.1
+panel.BackgroundTransparency = 0.04
 panel.BorderSizePixel = 0
 panel.Active = true -- clicks on the panel never reach the 3D world
 panel.Parent = gui
-corner(panel, 12)
+corner(panel, 14)
+gradient(panel, Color3.fromRGB(36, 39, 54), Color3.fromRGB(18, 20, 28))
+local panelStroke = stroke(panel, Color3.fromRGB(70, 76, 100), 1.5)
 
-local panelStroke = Instance.new("UIStroke")
-panelStroke.Color = BADGE
-panelStroke.Thickness = 2
-panelStroke.Parent = panel
+-- The title bar: grab it to move the whole panel anywhere.
+local header = Instance.new("Frame")
+header.Name = "Header"
+header.Size = UDim2.new(1, 0, 0, 38)
+header.BackgroundColor3 = Color3.fromRGB(44, 48, 68)
+header.BackgroundTransparency = 0.15
+header.BorderSizePixel = 0
+header.Parent = panel
+corner(header, 14)
+local headerBottom = Instance.new("Frame") -- squares off the bottom corners of the bar
+headerBottom.Position = UDim2.new(0, 0, 0, 24)
+headerBottom.Size = UDim2.new(1, 0, 0, 14)
+headerBottom.BackgroundColor3 = Color3.fromRGB(44, 48, 68)
+headerBottom.BackgroundTransparency = 0.15
+headerBottom.BorderSizePixel = 0
+headerBottom.Parent = header
+local headerLine = Instance.new("Frame")
+headerLine.Position = UDim2.new(0, 0, 1, 0)
+headerLine.Size = UDim2.new(1, 0, 0, 1)
+headerLine.BackgroundColor3 = Color3.fromRGB(70, 76, 100)
+headerLine.BorderSizePixel = 0
+headerLine.Parent = header
+grip(header, 14, 14, MUTED)
+local headerTitle = label(header, "MERGE BLADES", UDim2.fromOffset(36, 0), UDim2.fromOffset(200, 38), 14, Enum.Font.GothamBlack, WHITE)
+local headerHint = label(header, "drag to move", UDim2.new(1, -118, 0, 0), UDim2.fromOffset(106, 38), 10, Enum.Font.GothamMedium, MUTED)
+headerHint.TextXAlignment = Enum.TextXAlignment.Right
+header.MouseEnter:Connect(function()
+	headerTitle.TextColor3 = GOLD
+	headerHint.TextColor3 = WHITE
+end)
+header.MouseLeave:Connect(function()
+	headerTitle.TextColor3 = WHITE
+	headerHint.TextColor3 = MUTED
+end)
+makeMovable("Panel", panel, header)
 
--- Tabs: Inventory (soldiers waiting to be placed), Soldiers (index of every class) and Waves
--- (difficulty and which wave to fight).
+-- Tabs: Inventory (the squad and the merge board), Soldiers (the index of every class), Upgrades (merge
+-- levels) and Spells. A segmented bar; the active tab is lit in its own color.
 local TAB_NAMES = { "Inventory", "Soldiers", "Upgrades", "Spells" }
+local TAB_ACCENT = { Inventory = GOLD, Soldiers = Color3.fromRGB(90, 170, 255), Upgrades = Color3.fromRGB(170, 130, 255), Spells = ORANGE }
 local pages: { [string]: Frame } = {}
 local tabButtons: { [string]: TextButton } = {}
+
+local tabBar = Instance.new("Frame")
+tabBar.Position = UDim2.fromOffset(10, 46)
+tabBar.Size = UDim2.fromOffset(364, 32)
+tabBar.BackgroundColor3 = PANEL_DARK
+tabBar.BackgroundTransparency = 0.2
+tabBar.BorderSizePixel = 0
+tabBar.Parent = panel
+corner(tabBar, 10)
 
 local function makePage(name: string): Frame
 	local page = Instance.new("Frame")
 	page.Name = name
-	page.Position = UDim2.fromOffset(0, 44)
-	page.Size = UDim2.new(1, 0, 1, -44)
+	page.Position = UDim2.fromOffset(0, PAGE_TOP)
+	page.Size = UDim2.new(1, 0, 1, -PAGE_TOP)
 	page.BackgroundTransparency = 1
 	page.Visible = false
 	page.Parent = panel
@@ -440,32 +638,56 @@ local function showTab(name: string)
 	end
 	for tabName, button in tabButtons do
 		local active = tabName == name
-		button.BackgroundColor3 = if active then BADGE else BG
+		button.BackgroundColor3 = TAB_ACCENT[tabName]:Lerp(BG, 0.3)
+		button.BackgroundTransparency = if active then 0 else 1
 		button.TextColor3 = if active then WHITE else MUTED
 	end
 end
 
 for i, name in TAB_NAMES do
 	local button = Instance.new("TextButton")
-	button.Position = UDim2.fromOffset(8 + (i - 1) * 93, 8)
-	button.Size = UDim2.fromOffset(88, 30)
+	button.Position = UDim2.fromOffset(4 + (i - 1) * 89, 3)
+	button.Size = UDim2.fromOffset(88, 26)
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Font = Enum.Font.GothamBold
 	button.TextSize = 11
 	button.Text = string.upper(name)
-	button.Parent = panel
+	button.Parent = tabBar
 	corner(button, 8)
 	button.Activated:Connect(function()
+		playSound("click")
 		showTab(name)
 	end)
+	button.MouseEnter:Connect(function()
+		if not pages[name].Visible then
+			button.TextColor3 = WHITE
+		end
+	end)
+	button.MouseLeave:Connect(function()
+		if not pages[name].Visible then
+			button.TextColor3 = MUTED
+		end
+	end)
 	tabButtons[name] = button
+end
+
+-- A section heading inside a page: a short colored bar and a small caps title.
+local function sectionTitle(page: Instance, text: string, y: number, accent: Color3)
+	local bar_ = Instance.new("Frame")
+	bar_.Position = UDim2.fromOffset(12, y + 2)
+	bar_.Size = UDim2.fromOffset(3, 12)
+	bar_.BackgroundColor3 = accent
+	bar_.BorderSizePixel = 0
+	bar_.Parent = page
+	corner(bar_, 2)
+	label(page, text, UDim2.fromOffset(20, y), UDim2.fromOffset(200, 16), 12, Enum.Font.GothamBold, MUTED)
 end
 
 -- Inventory page: the equipped squad on top, the inventory below. The inventory IS the 3D merge
 -- board: the same soldiers stand on the pads in the lobby.
 local inventoryPage = makePage("Inventory")
-label(inventoryPage, "BATTLE SQUAD", UDim2.fromOffset(12, 0), UDim2.fromOffset(120, 16), 12, Enum.Font.GothamBold, MUTED)
+sectionTitle(inventoryPage, "BATTLE SQUAD", 0, ORANGE)
 local squadCount = label(inventoryPage, "0/9", UDim2.fromOffset(296, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 squadCount.TextXAlignment = Enum.TextXAlignment.Right
 
@@ -561,7 +783,7 @@ local function slotBonus(i: number): (number, number, Color3)
 	return math.floor(hp * 100 + 0.5), math.floor(damage * 100 + 0.5), tint
 end
 
-label(inventoryPage, "INVENTORY", UDim2.fromOffset(12, 344), UDim2.fromOffset(120, 16), 12, Enum.Font.GothamBold, MUTED)
+sectionTitle(inventoryPage, "INVENTORY", 344, GOLD)
 local inventoryCount = label(inventoryPage, "0/6", UDim2.fromOffset(296, 344), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 inventoryCount.TextXAlignment = Enum.TextXAlignment.Right
 
@@ -965,16 +1187,17 @@ local renderSpells: () -> () = function() end
 do
 
 local soldiersPage = makePage("Soldiers")
-label(soldiersPage, "Your soldiers", UDim2.fromOffset(14, 2), UDim2.fromOffset(150, 18), 13, Enum.Font.Gotham, MUTED)
-local unlockedCount = label(soldiersPage, "", UDim2.fromOffset(150, 2), UDim2.fromOffset(72, 20), 15, Enum.Font.GothamMedium, MUTED)
+sectionTitle(soldiersPage, "YOUR SOLDIERS", 0, TAB_ACCENT.Soldiers)
+local unlockedCount = label(soldiersPage, "", UDim2.fromOffset(296, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 unlockedCount.TextXAlignment = Enum.TextXAlignment.Right
 
 local soldiersScroll = Instance.new("ScrollingFrame")
-soldiersScroll.Position = UDim2.fromOffset(10, 26)
-soldiersScroll.Size = UDim2.fromOffset(362, 520)
+soldiersScroll.Position = UDim2.fromOffset(10, 24)
+soldiersScroll.Size = UDim2.new(1, -20, 1, -34)
 soldiersScroll.BackgroundTransparency = 1
 soldiersScroll.BorderSizePixel = 0
 soldiersScroll.ScrollBarThickness = 4
+soldiersScroll.ScrollBarImageColor3 = MUTED
 soldiersScroll.CanvasSize = UDim2.new()
 soldiersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 soldiersScroll.Parent = soldiersPage
@@ -984,49 +1207,65 @@ soldiersLayout.Padding = UDim.new(0, 6)
 soldiersLayout.SortOrder = Enum.SortOrder.LayoutOrder
 soldiersLayout.Parent = soldiersScroll
 
-type SoldierRow = { overlay: Frame, status: TextLabel }
+type SoldierRow = { frame: Frame, stroke: UIStroke, overlay: Frame, status: TextLabel }
 local soldierRows: { [string]: SoldierRow } = {}
 
+-- One row per class: the 3D soldier on a dark tile, the name, the stats as pills, the passive and whether
+-- the class is unlocked. A locked class is dimmed with LOCKED over its tile.
 for i, class in Units.ClassList do
 	local def = Units.Classes[class]
 	local row = Instance.new("Frame")
 	row.LayoutOrder = i
-	row.Size = UDim2.new(1, -8, 0, 80)
-	row.BackgroundColor3 = def.color:Lerp(BG, 0.75)
+	row.Size = UDim2.new(1, -8, 0, 86)
+	row.BackgroundColor3 = def.color:Lerp(BG, 0.8)
 	row.BorderSizePixel = 0
 	row.Parent = soldiersScroll
-	corner(row, 8)
-	local rowStroke = Instance.new("UIStroke")
-	rowStroke.Color = def.color
-	rowStroke.Thickness = 2
-	rowStroke.Parent = row
+	corner(row, 10)
+	local rowStroke = stroke(row, def.color, 1.5, 0.4)
 
+	local accentBar = Instance.new("Frame")
+	accentBar.Position = UDim2.fromOffset(0, 10)
+	accentBar.Size = UDim2.fromOffset(4, 66)
+	accentBar.BackgroundColor3 = def.color
+	accentBar.BorderSizePixel = 0
+	accentBar.Parent = row
+	corner(accentBar, 2)
+
+	local tile = Instance.new("Frame")
+	tile.Position = UDim2.fromOffset(12, 8)
+	tile.Size = UDim2.fromOffset(70, 70)
+	tile.BackgroundColor3 = PANEL_DARK
+	tile.BorderSizePixel = 0
+	tile.Parent = row
+	corner(tile, 8)
 	local view = Instance.new("ViewportFrame")
-	view.Position = UDim2.fromOffset(4, 4)
-	view.Size = UDim2.fromOffset(56, 56)
+	view.Size = UDim2.fromScale(1, 1)
 	view.BackgroundTransparency = 1
 	view.Ambient = Color3.fromRGB(175, 175, 185)
 	view.LightColor = Color3.new(1, 1, 1)
-	view.Parent = row
+	view.Parent = tile
 	fillViewport(view, { class = class, tier = 1 })
 
 	-- A dark veil over the 3D view while the class is still locked.
 	local overlay = Instance.new("Frame")
-	overlay.Position = UDim2.fromOffset(4, 4)
-	overlay.Size = UDim2.fromOffset(56, 56)
+	overlay.Size = UDim2.fromScale(1, 1)
 	overlay.BackgroundColor3 = Color3.new(0, 0, 0)
-	overlay.BackgroundTransparency = 0.35
+	overlay.BackgroundTransparency = 0.45
 	overlay.BorderSizePixel = 0
 	overlay.ZIndex = 2
-	overlay.Parent = row
-	corner(overlay, 6)
+	overlay.Parent = tile
+	corner(overlay, 8)
+	local locked = label(overlay, "LOCKED", UDim2.new(0, 0, 1, -18), UDim2.new(1, 0, 0, 14), 9, Enum.Font.GothamBlack, MUTED)
+	locked.TextXAlignment = Enum.TextXAlignment.Center
 
-	label(row, def.label, UDim2.fromOffset(66, 5), UDim2.fromOffset(140, 20), 16, Enum.Font.GothamBold, WHITE)
-	label(row, string.format("HP %d · DMG %d · RNG %d", def.hp, def.damage, def.range), UDim2.fromOffset(66, 26), UDim2.fromOffset(280, 16), 12, Enum.Font.Gotham, MUTED)
-	local status = label(row, "", UDim2.fromOffset(66, 43), UDim2.fromOffset(280, 16), 12, Enum.Font.GothamBold, GREEN)
-	local passive = label(row, Units.passiveText(class), UDim2.fromOffset(66, 60), UDim2.fromOffset(280, 16), 10, Enum.Font.GothamMedium, GOLD)
+	label(row, def.label, UDim2.fromOffset(92, 7), UDim2.fromOffset(180, 20), 16, Enum.Font.GothamBold, WHITE)
+	chip(row, string.format("HP %d", def.hp), UDim2.fromOffset(92, 30), UDim2.fromOffset(60, 18), PANEL_DARK, GREEN)
+	chip(row, string.format("DMG %d", def.damage), UDim2.fromOffset(156, 30), UDim2.fromOffset(66, 18), PANEL_DARK, ORANGE)
+	chip(row, string.format("RNG %d", def.range), UDim2.fromOffset(226, 30), UDim2.fromOffset(60, 18), PANEL_DARK, Color3.fromRGB(120, 180, 255))
+	local passive = label(row, Units.passiveText(class), UDim2.fromOffset(92, 52), UDim2.fromOffset(270, 14), 10, Enum.Font.GothamMedium, GOLD)
 	passive.TextScaled = true
-	soldierRows[class] = { overlay = overlay, status = status }
+	local status = label(row, "", UDim2.fromOffset(92, 67), UDim2.fromOffset(270, 14), 11, Enum.Font.GothamBold, GREEN)
+	soldierRows[class] = { frame = row, stroke = rowStroke, overlay = overlay, status = status }
 end
 
 renderSoldiers = function()
@@ -1038,6 +1277,8 @@ renderSoldiers = function()
 			unlocked += 1
 		end
 		row.overlay.Visible = not isUnlocked
+		row.frame.BackgroundTransparency = if isUnlocked then 0 else 0.35
+		row.stroke.Transparency = if isUnlocked then 0.4 else 0.75
 		local unlock = Units.Classes[class].unlock
 		if isUnlocked then
 			row.status.Text = "Unlocked"
@@ -1334,53 +1575,91 @@ end)
 -- Upgrades page: the merge level of every soldier class is bought separately. Without the upgrade
 -- two soldiers of a class cannot be merged past the level bought so far.
 local upgradesPage = makePage("Upgrades")
-label(upgradesPage, "MERGE LEVEL PER SOLDIER", UDim2.fromOffset(12, 0), UDim2.fromOffset(200, 16), 12, Enum.Font.GothamBold, MUTED)
-type UpgradeRow = { frame: Frame, sub: TextLabel, button: TextButton }
+sectionTitle(upgradesPage, "MERGE LEVEL PER SOLDIER", 0, TAB_ACCENT.Upgrades)
+label(upgradesPage, "the dots are the 9 merge levels: lit = bought", UDim2.fromOffset(12, 16), UDim2.fromOffset(340, 14), 10, Enum.Font.GothamMedium, MUTED)
+type UpgradeRow = { frame: Frame, stroke: UIStroke, sub: TextLabel, dots: { Frame }, button: TextButton, buttonStroke: UIStroke }
 local upgradeRows: { [string]: UpgradeRow } = {}
 for i, class in Units.ClassList do
 	local def = Units.Classes[class]
 	local row = Instance.new("Frame")
-	row.Position = UDim2.fromOffset(8, 20 + (i - 1) * 43)
-	row.Size = UDim2.fromOffset(364, 40)
-	row.BackgroundColor3 = BADGE
+	row.Position = UDim2.fromOffset(8, 36 + (i - 1) * 60)
+	row.Size = UDim2.fromOffset(368, 54)
+	row.BackgroundColor3 = def.color:Lerp(BG, 0.8)
 	row.BorderSizePixel = 0
 	row.Parent = upgradesPage
-	corner(row, 8)
-	label(row, def.label, UDim2.fromOffset(10, 3), UDim2.fromOffset(120, 18), 14, Enum.Font.GothamBold, WHITE)
-	local sub = label(row, "", UDim2.fromOffset(10, 22), UDim2.fromOffset(250, 14), 11, Enum.Font.Gotham, MUTED)
+	corner(row, 10)
+	local rowStroke = stroke(row, def.color, 1.5, 0.4)
+	local accentBar = Instance.new("Frame")
+	accentBar.Position = UDim2.fromOffset(0, 8)
+	accentBar.Size = UDim2.fromOffset(4, 38)
+	accentBar.BackgroundColor3 = def.color
+	accentBar.BorderSizePixel = 0
+	accentBar.Parent = row
+	corner(accentBar, 2)
+	label(row, def.label, UDim2.fromOffset(14, 5), UDim2.fromOffset(150, 18), 14, Enum.Font.GothamBold, WHITE)
+	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(240, 14), 11, Enum.Font.Gotham, MUTED)
+	-- The nine merge levels as dots (lit in the level color up to the bought level).
+	local dots = {}
+	for k = 1, Units.MaxTier do
+		local dot = Instance.new("Frame")
+		dot.Position = UDim2.fromOffset(14 + (k - 1) * 14, 41)
+		dot.Size = UDim2.fromOffset(10, 5)
+		dot.BackgroundColor3 = Color3.fromRGB(40, 44, 60)
+		dot.BorderSizePixel = 0
+		dot.Parent = row
+		corner(dot, 2)
+		dots[k] = dot
+	end
 	local button = Instance.new("TextButton")
-	button.Position = UDim2.fromOffset(270, 5)
-	button.Size = UDim2.fromOffset(88, 30)
+	button.Position = UDim2.fromOffset(268, 9)
+	button.Size = UDim2.fromOffset(92, 36)
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Font = Enum.Font.GothamBold
 	button.TextSize = 11
 	button.TextColor3 = WHITE
 	button.Parent = row
-	corner(button, 6)
+	corner(button, 8)
+	local buttonStroke = stroke(button, GREEN, 1.5, 1)
 	button.Activated:Connect(function()
+		playSound("click")
 		Net.get("UnlockTier"):FireServer(class)
 	end)
-	upgradeRows[class] = { frame = row, sub = sub, button = button }
+	upgradeRows[class] = { frame = row, stroke = rowStroke, sub = sub, dots = dots, button = button, buttonStroke = buttonStroke }
 end
 
 renderLevels = function()
 	for _, class in Units.ClassList do
 		local row = upgradeRows[class]
+		local cap = if state.unlocked[class] == true then capOf(class) else 0
+		for k, dot in row.dots do
+			if k <= cap then
+				dot.BackgroundColor3 = Levels.color(k)
+				dot.BackgroundTransparency = 0
+			elseif k == cap + 1 and cap > 0 then
+				dot.BackgroundColor3 = Levels.color(k)
+				dot.BackgroundTransparency = 0.6 -- the next one to buy
+			else
+				dot.BackgroundColor3 = Color3.fromRGB(40, 44, 60)
+				dot.BackgroundTransparency = 0
+			end
+		end
 		if state.unlocked[class] ~= true then
 			row.sub.Text = "Not unlocked yet"
 			row.button.Visible = false
 			row.frame.BackgroundTransparency = 0.5
+			row.stroke.Transparency = 0.8
 		else
 			row.frame.BackgroundTransparency = 0
+			row.stroke.Transparency = 0.4
 			row.button.Visible = true
-			local cap = capOf(class)
 			local nextTier = cap + 1
 			if nextTier > Units.MaxTier then
 				row.sub.Text = string.format("Merges up to Lv %d (max)", cap)
 				row.button.Text = "MAX"
-				row.button.BackgroundColor3 = BADGE
+				row.button.BackgroundColor3 = PANEL_DARK
 				row.button.TextTransparency = 0.4
+				row.buttonStroke.Transparency = 1
 			else
 				local def = Balance.TierUnlocks[nextTier]
 				row.sub.Text = if cap <= 1 then "Cannot merge yet" else string.format("Merges up to Lv %d", cap)
@@ -1390,8 +1669,9 @@ renderLevels = function()
 					row.button.Text = string.format("Lv %d\n%d coins", nextTier, def.cost)
 				end
 				local ready = state.cleared >= def.wave and state.coins >= def.cost
-				row.button.BackgroundColor3 = if ready then GREEN:Lerp(BG, 0.3) else BADGE
+				row.button.BackgroundColor3 = if ready then GREEN:Lerp(BG, 0.25) else PANEL_DARK
 				row.button.TextTransparency = if ready then 0 else 0.35
+				row.buttonStroke.Transparency = if ready then 0.2 else 1
 			end
 		end
 	end
@@ -1404,47 +1684,74 @@ end
 -- is found only by grinding: it can drop after a won wave from its wave on (Config/Spells.luau).
 do
 	local page = makePage("Spells")
-	label(page, "YOU CARRY TWO SPELLS", UDim2.fromOffset(12, 0), UDim2.fromOffset(250, 16), 12, Enum.Font.GothamBold, MUTED)
-	local slotLabels: { [string]: TextLabel } = {}
+	sectionTitle(page, "YOU CARRY TWO SPELLS", 0, TAB_ACCENT.Spells)
+	-- The two slots on top: the key in a badge and the spell's name, outlined in the spell's color.
+	type SlotBox = { text: TextLabel, stroke: UIStroke, icon: Frame }
+	local slotBoxes: { [string]: SlotBox } = {}
 	for i, slot in { "q", "e" } do
 		local box = Instance.new("Frame")
-		box.Position = UDim2.fromOffset(8 + (i - 1) * 184, 20)
-		box.Size = UDim2.fromOffset(180, 32)
-		box.BackgroundColor3 = BADGE
+		box.Position = UDim2.fromOffset(8 + (i - 1) * 186, 20)
+		box.Size = UDim2.fromOffset(182, 40)
+		box.BackgroundColor3 = PANEL_DARK
 		box.BorderSizePixel = 0
 		box.Parent = page
-		corner(box, 8)
-		slotLabels[slot] = label(box, "", UDim2.fromOffset(8, 0), UDim2.new(1, -12, 1, 0), 14, Enum.Font.GothamBold, WHITE)
+		corner(box, 10)
+		local boxStroke = stroke(box, BADGE, 1.5, 0.3)
+		local key = Instance.new("Frame")
+		key.Position = UDim2.fromOffset(6, 7)
+		key.Size = UDim2.fromOffset(26, 26)
+		key.BackgroundColor3 = BADGE
+		key.BorderSizePixel = 0
+		key.Parent = box
+		corner(key, 7)
+		local keyText = label(key, string.upper(slot), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 14, Enum.Font.GothamBlack, WHITE)
+		keyText.TextXAlignment = Enum.TextXAlignment.Center
+		local icon = Instance.new("Frame")
+		icon.Position = UDim2.fromOffset(40, 14)
+		icon.Size = UDim2.fromOffset(12, 12)
+		icon.BackgroundColor3 = BADGE
+		icon.BorderSizePixel = 0
+		icon.Parent = box
+		corner(icon, 6)
+		local text = label(box, "", UDim2.fromOffset(58, 0), UDim2.new(1, -62, 1, 0), 13, Enum.Font.GothamBold, WHITE)
+		slotBoxes[slot] = { text = text, stroke = boxStroke, icon = icon }
 	end
 
-	type SpellRow = { frame: Frame, status: TextLabel, buttons: { [string]: TextButton } }
+	type SpellRow = { frame: Frame, stroke: UIStroke, status: TextLabel, buttons: { [string]: TextButton } }
 	local rows: { [string]: SpellRow } = {}
 	for i, id in Spells.Order do
 		local def = Spells.Defs[id]
 		local row = Instance.new("Frame")
-		row.Position = UDim2.fromOffset(8, 60 + (i - 1) * 54)
-		row.Size = UDim2.fromOffset(364, 50)
-		row.BackgroundColor3 = BADGE
+		row.Position = UDim2.fromOffset(8, 70 + (i - 1) * 60)
+		row.Size = UDim2.fromOffset(368, 54)
+		row.BackgroundColor3 = def.color:Lerp(BG, 0.82)
 		row.BorderSizePixel = 0
 		row.Parent = page
-		corner(row, 8)
-		local accent = Instance.new("Frame")
-		accent.Size = UDim2.new(0, 4, 1, -12)
-		accent.Position = UDim2.fromOffset(4, 6)
-		accent.BackgroundColor3 = def.color
-		accent.BorderSizePixel = 0
-		accent.Parent = row
-		label(row, def.label, UDim2.fromOffset(14, 3), UDim2.fromOffset(160, 18), 14, Enum.Font.GothamBold, WHITE)
-		local description = label(row, def.description, UDim2.fromOffset(14, 21), UDim2.fromOffset(260, 27), 10, Enum.Font.Gotham, MUTED)
+		corner(row, 10)
+		local rowStroke = stroke(row, def.color, 1.5, 0.45)
+		-- The spell's icon: a disc in its color with its first letter.
+		local icon = Instance.new("Frame")
+		icon.Position = UDim2.fromOffset(9, 9)
+		icon.Size = UDim2.fromOffset(36, 36)
+		icon.BackgroundColor3 = def.color
+		icon.BorderSizePixel = 0
+		icon.Parent = row
+		corner(icon, 18)
+		gradient(icon, Color3.new(1, 1, 1):Lerp(def.color, 0.55), def.color)
+		local letter = label(icon, string.upper(string.sub(def.label, 1, 1)), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 17, Enum.Font.GothamBlack, def.color:Lerp(Color3.new(0, 0, 0), 0.7))
+		letter.TextXAlignment = Enum.TextXAlignment.Center
+		label(row, def.label, UDim2.fromOffset(54, 5), UDim2.fromOffset(160, 18), 14, Enum.Font.GothamBold, WHITE)
+		local description = label(row, def.description, UDim2.fromOffset(54, 23), UDim2.fromOffset(226, 28), 10, Enum.Font.Gotham, MUTED)
 		description.TextWrapped = true
 		description.TextYAlignment = Enum.TextYAlignment.Top
-		local status = label(row, string.format("Can drop after wave %d", def.dropWave or 0), UDim2.fromOffset(280, 8), UDim2.fromOffset(80, 36), 10, Enum.Font.GothamMedium, GOLD)
+		local status = label(row, string.format("Drops after\nwave %d", def.dropWave or 0), UDim2.fromOffset(282, 8), UDim2.fromOffset(78, 38), 10, Enum.Font.GothamMedium, GOLD)
 		status.TextWrapped = true
-		status.TextYAlignment = Enum.TextYAlignment.Top
+		status.TextXAlignment = Enum.TextXAlignment.Right
+		status.TextYAlignment = Enum.TextYAlignment.Center
 		local buttons: { [string]: TextButton } = {}
 		for b, slot in { "q", "e" } do
 			local button = Instance.new("TextButton")
-			button.Position = UDim2.fromOffset(290 + (b - 1) * 36, 10)
+			button.Position = UDim2.fromOffset(290 + (b - 1) * 36, 12)
 			button.Size = UDim2.fromOffset(30, 30)
 			button.BorderSizePixel = 0
 			button.AutoButtonColor = false
@@ -1452,32 +1759,42 @@ do
 			button.TextSize = 14
 			button.Text = string.upper(slot)
 			button.Parent = row
-			corner(button, 6)
+			corner(button, 8)
 			button.Activated:Connect(function()
+				playSound("click")
 				Net.get("EquipSpell"):FireServer(id, slot)
 			end)
 			buttons[slot] = button
 		end
-		rows[id] = { frame = row, status = status, buttons = buttons }
+		rows[id] = { frame = row, stroke = rowStroke, status = status, buttons = buttons }
 	end
 
 	renderSpells = function()
-		for slot, text in slotLabels do
+		for slot, box in slotBoxes do
 			local id = (state.spells.slots :: { [string]: string })[slot]
 			local def = Spells.Defs[id]
 			if def then
-				text.Text = string.format("[%s] %s", string.upper(slot), def.label)
-				text.TextColor3 = def.color
+				box.text.Text = def.label
+				box.text.TextColor3 = WHITE
+				box.stroke.Color = def.color
+				box.icon.BackgroundColor3 = def.color
+			else
+				box.text.Text = "empty"
+				box.text.TextColor3 = MUTED
+				box.stroke.Color = BADGE
+				box.icon.BackgroundColor3 = BADGE
 			end
 		end
 		for id, row in rows do
 			local owned = state.spells.owned[id] == true
+			local def = Spells.Defs[id]
 			row.status.Visible = not owned
-			row.frame.BackgroundTransparency = if owned then 0 else 0.45
+			row.frame.BackgroundTransparency = if owned then 0 else 0.5
+			row.stroke.Transparency = if owned then 0.45 else 0.8
 			for slot, button in row.buttons do
 				button.Visible = owned
 				local equipped = (state.spells.slots :: { [string]: string })[slot] == id
-				button.BackgroundColor3 = if equipped then GREEN:Lerp(BG, 0.3) else BG
+				button.BackgroundColor3 = if equipped then def.color:Lerp(BG, 0.2) else PANEL_DARK
 				button.TextColor3 = if equipped then WHITE else MUTED
 			end
 		end
@@ -1500,6 +1817,7 @@ Net.get("State").OnClientEvent:Connect(function(new)
 	end
 	stateReceivedAt = now
 	state = new
+	applyLayout(state.settings and state.settings.layout)
 	renderInventory()
 	renderSoldiers()
 	renderLevels()
@@ -3556,7 +3874,10 @@ do
 	questPanel.Visible = false
 	questPanel.Parent = gui
 	corner(questPanel, 10)
+	stroke(questPanel, Color3.fromRGB(70, 76, 100), 1.5, 0.3)
 	label(questPanel, "DAILY QUESTS", UDim2.fromOffset(10, 4), UDim2.fromOffset(150, 14), 11, Enum.Font.GothamBold, MUTED)
+	grip(questPanel, 190, 6, MUTED)
+	makeMovable("Quests", questPanel, questPanel) -- grab it anywhere, it has no controls
 
 	local rows: { { text: TextLabel, count: TextLabel } } = {}
 	for i = 1, 3 do
@@ -3818,7 +4139,7 @@ do
 	panel.Name = "SettingsPanel"
 	panel.AnchorPoint = Vector2.new(1, 0)
 	panel.Position = UDim2.new(1, -60, 0, 160)
-	panel.Size = UDim2.fromOffset(250, 212)
+	panel.Size = UDim2.fromOffset(250, 250)
 	panel.BackgroundColor3 = BG
 	panel.BackgroundTransparency = 0.05
 	panel.BorderSizePixel = 0
@@ -3826,12 +4147,34 @@ do
 	panel.Visible = false
 	panel.Parent = gui
 	corner(panel, 12)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = BADGE
-	stroke.Thickness = 2
-	stroke.Parent = panel
-	local title = label(panel, "SETTINGS", UDim2.fromOffset(0, 8), UDim2.new(1, 0, 0, 22), 16, Enum.Font.GothamBlack, WHITE)
+	stroke(panel, Color3.fromRGB(70, 76, 100), 1.5)
+	-- The title bar is the drag handle.
+	local titleBar = Instance.new("Frame")
+	titleBar.Size = UDim2.new(1, 0, 0, 34)
+	titleBar.BackgroundTransparency = 1
+	titleBar.Parent = panel
+	grip(titleBar, 12, 12, MUTED)
+	local title = label(titleBar, "SETTINGS", UDim2.fromOffset(0, 6), UDim2.new(1, 0, 0, 22), 16, Enum.Font.GothamBlack, WHITE)
 	title.TextXAlignment = Enum.TextXAlignment.Center
+	makeMovable("Settings", panel, titleBar)
+
+	-- RESET LAYOUT: every movable panel goes back where it started.
+	local resetButton = Instance.new("TextButton")
+	resetButton.Position = UDim2.fromOffset(14, 208)
+	resetButton.Size = UDim2.new(1, -28, 0, 28)
+	resetButton.BackgroundColor3 = BADGE
+	resetButton.BorderSizePixel = 0
+	resetButton.AutoButtonColor = false
+	resetButton.Font = Enum.Font.GothamBold
+	resetButton.TextSize = 12
+	resetButton.TextColor3 = WHITE
+	resetButton.Text = "RESET LAYOUT  (panel positions)"
+	resetButton.Parent = panel
+	corner(resetButton, 8)
+	resetButton.Activated:Connect(function()
+		resetLayout()
+		playSound("click")
+	end)
 
 	-- Volume: - and +.
 	label(panel, "Volume", UDim2.fromOffset(14, 40), UDim2.fromOffset(120, 24), 13, Enum.Font.GothamMedium, WHITE)
@@ -3888,7 +4231,10 @@ do
 	end)
 	RunService.RenderStepped:Connect(function()
 		gear.Position = UDim2.new(1, -14, 0, if state.isAdmin then 160 else 14)
-		panel.Position = UDim2.new(1, -60, 0, if state.isAdmin then 160 else 14)
+		if not layout.Settings then -- unless the player moved it somewhere
+			panel.AnchorPoint = Vector2.new(1, 0)
+			panel.Position = UDim2.new(1, -60, 0, if state.isAdmin then 160 else 14)
+		end
 		panel.Visible = open
 		if not open then
 			return
