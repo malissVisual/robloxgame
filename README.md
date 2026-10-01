@@ -109,8 +109,9 @@ Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 - **Movable panels:** the left panel (grab its title bar), the daily quests and the settings can be dragged
   anywhere on the screen. The positions are saved in the player's settings (`layout`, a JSON string the client
   owns) and come back on the next join; **RESET LAYOUT** in the settings puts everything back.
-- **Folding the left panel:** the − / + button in its title bar, or **H**, folds it to the title bar and back
-  (saved with the layout). The panel is drawn at `UI.PANEL_SCALE` (1.15) of its layout size.
+- **Folding the panel:** the − / + button in its title bar, or **H**, folds it to the title bar and back
+  (saved with the layout). The panel is a wide one (640 × 420, two columns on every page), starts in the
+  middle of the screen and is drawn at `UI.PANEL_SCALE` (1.15) of its layout size.
 - **Drag & drop:** press the mouse (or a finger) anywhere on a pad with a soldier (you do not
   have to hit the soldier itself) and drag it onto another pad. The target lights up: **gold** = the two will merge (class + level must match), **blue** =
   swap, **white** = move to an empty pad. The server decides the result.

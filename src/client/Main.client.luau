@@ -214,15 +214,16 @@ function UI.grip(parent: Instance, x: number, y: number, color: Color3)
 end
 
 -- A section heading inside a page: a short colored bar and a small caps title.
-function UI.section(page: Instance, text: string, y: number, accent: Color3)
+function UI.section(page: Instance, text: string, y: number, accent: Color3, x: number?)
+	local left = x or 12
 	local bar_ = Instance.new("Frame")
-	bar_.Position = UDim2.fromOffset(12, y + 2)
+	bar_.Position = UDim2.fromOffset(left, y + 2)
 	bar_.Size = UDim2.fromOffset(3, 12)
 	bar_.BackgroundColor3 = accent
 	bar_.BorderSizePixel = 0
 	bar_.Parent = page
 	corner(bar_, 2)
-	label(page, text, UDim2.fromOffset(20, y), UDim2.fromOffset(200, 16), 13, Enum.Font.GothamBold, MUTED)
+	label(page, text, UDim2.fromOffset(left + 8, y), UDim2.fromOffset(200, 16), 13, Enum.Font.GothamBold, MUTED)
 end
 
 -- ── Movable panels ────────────────────────────────────────────────────────
@@ -580,9 +581,9 @@ local pointer = Vector2.zero -- last pointer position (mouse or finger), GUI spa
 
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.AnchorPoint = Vector2.new(0, 0.5)
-panel.Position = UDim2.new(0, 14, 0.5, -44) -- a bit up, away from the HUD
-panel.Size = UDim2.fromOffset(384, 650)
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
+panel.Position = UDim2.new(0.5, 0, 0.52, 0) -- the middle of the screen, a little low
+panel.Size = UDim2.fromOffset(640, 420)
 panel.BackgroundColor3 = BG
 panel.BackgroundTransparency = 0.04
 panel.BorderSizePixel = 0
@@ -692,7 +693,7 @@ do
 local tabBar = Instance.new("Frame")
 tabBar.Name = "TabBar"
 tabBar.Position = UDim2.fromOffset(10, 46)
-tabBar.Size = UDim2.fromOffset(364, 32)
+tabBar.Size = UDim2.fromOffset(620, 32)
 tabBar.BackgroundColor3 = UI.DARK
 tabBar.BackgroundTransparency = 0.2
 tabBar.BorderSizePixel = 0
@@ -701,8 +702,8 @@ corner(tabBar, 10)
 
 for i, name in TAB_NAMES do
 	local button = Instance.new("TextButton")
-	button.Position = UDim2.fromOffset(4 + (i - 1) * 89, 3)
-	button.Size = UDim2.fromOffset(88, 26)
+	button.Position = UDim2.fromOffset(4 + (i - 1) * 154, 3)
+	button.Size = UDim2.fromOffset(152, 26)
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Font = Enum.Font.GothamBold
@@ -735,7 +736,7 @@ UI.setCollapsed = function(on: boolean)
 	panel.AnchorPoint = Vector2.zero
 	panel.Position = UDim2.fromOffset(corner_.X, corner_.Y)
 	tabBar.Visible = not on
-	panel.Size = if on then UDim2.fromOffset(384, 38) else UDim2.fromOffset(384, 650)
+	panel.Size = if on then UDim2.fromOffset(640, 38) else UDim2.fromOffset(640, 420)
 	panel:SetAttribute("Collapsed", on)
 	showTab(UI.tab)
 	task.defer(function()
@@ -749,14 +750,14 @@ end
 -- board: the same soldiers stand on the pads in the lobby.
 local inventoryPage = makePage("Inventory")
 UI.section(inventoryPage, "BATTLE SQUAD", 0, ORANGE)
-local squadCount = label(inventoryPage, "0/9", UDim2.fromOffset(296, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
+local squadCount = label(inventoryPage, "0/9", UDim2.fromOffset(256, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 squadCount.TextXAlignment = Enum.TextXAlignment.Right
 
 -- The squad as it stands in the arena: a 3 x 3 grid, the FRONT row (nearest to the enemies) on top. Every
 -- slot shows its bonus in color (green = HP, orange = damage) and is tinted like its pad on the map. Drag
 -- cards between the slots (or from the inventory) to arrange the squad right here.
 local squadStrip = Instance.new("Frame")
-squadStrip.Position = UDim2.fromOffset(42, 36)
+squadStrip.Position = UDim2.fromOffset(16, 36)
 squadStrip.Size = UDim2.fromOffset(300, 300)
 squadStrip.BackgroundTransparency = 1
 squadStrip.Parent = inventoryPage
@@ -765,14 +766,14 @@ squadLayout.CellSize = UDim2.fromOffset(96, 96)
 squadLayout.CellPadding = UDim2.fromOffset(6, 6)
 squadLayout.SortOrder = Enum.SortOrder.LayoutOrder
 squadLayout.Parent = squadStrip
-local enemySide = label(inventoryPage, "▲ ENEMIES", UDim2.fromOffset(42, 18), UDim2.fromOffset(300, 16), 12, Enum.Font.GothamBold, RED)
+local enemySide = label(inventoryPage, "▲ ENEMIES", UDim2.fromOffset(16, 18), UDim2.fromOffset(300, 16), 12, Enum.Font.GothamBold, RED)
 enemySide.TextXAlignment = Enum.TextXAlignment.Center
 
 -- The "i" button next to BATTLE SQUAD: the legend of the slot bonuses shows while the mouse is on it (or after
 -- a tap), in a popup beside the panel, so it never takes room from the grid.
 do
 	local infoButton = Instance.new("TextButton")
-	infoButton.Position = UDim2.fromOffset(350, 16)
+	infoButton.Position = UDim2.fromOffset(228, -3)
 	infoButton.Size = UDim2.fromOffset(22, 22)
 	infoButton.BackgroundColor3 = BADGE
 	infoButton.BorderSizePixel = 0
@@ -844,13 +845,13 @@ local function slotBonus(i: number): (number, number, Color3)
 	return math.floor(hp * 100 + 0.5), math.floor(damage * 100 + 0.5), tint
 end
 
-UI.section(inventoryPage, "INVENTORY", 344, GOLD)
-local inventoryCount = label(inventoryPage, "0/6", UDim2.fromOffset(296, 344), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
+UI.section(inventoryPage, "INVENTORY", 0, GOLD, 334)
+local inventoryCount = label(inventoryPage, "0/6", UDim2.fromOffset(556, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 inventoryCount.TextXAlignment = Enum.TextXAlignment.Right
 
 local scroll = Instance.new("ScrollingFrame")
-scroll.Position = UDim2.fromOffset(12, 364)
-scroll.Size = UDim2.fromOffset(362, 142)
+scroll.Position = UDim2.fromOffset(334, 20)
+scroll.Size = UDim2.fromOffset(296, 200)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 6
@@ -884,8 +885,8 @@ local function moveIntoInventory(b: Button, x: number, y: number, width: number,
 		b.sub.TextSize = 11
 	end
 end
-moveIntoInventory(autoMerge, 12, 512, 176, 44, true)
-moveIntoInventory(equipBest, 196, 512, 176, 44, true)
+moveIntoInventory(autoMerge, 334, 230, 144, 44, true)
+moveIntoInventory(equipBest, 486, 230, 144, 44, true)
 upgrade.button.Visible = false -- merge slots are bought with the "+" card at the end of the inventory
 
 -- The "+" card after the last slot of the inventory: buys Balance.BoardUpgradeStep more merge slots.
@@ -1249,7 +1250,7 @@ do
 
 local soldiersPage = makePage("Soldiers")
 UI.section(soldiersPage, "YOUR SOLDIERS", 0, UI.TAB_ACCENT.Soldiers)
-local unlockedCount = label(soldiersPage, "", UDim2.fromOffset(296, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
+local unlockedCount = label(soldiersPage, "", UDim2.fromOffset(552, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 unlockedCount.TextXAlignment = Enum.TextXAlignment.Right
 
 local soldiersScroll = Instance.new("ScrollingFrame")
@@ -1263,8 +1264,9 @@ soldiersScroll.CanvasSize = UDim2.new()
 soldiersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 soldiersScroll.Parent = soldiersPage
 
-local soldiersLayout = Instance.new("UIListLayout")
-soldiersLayout.Padding = UDim.new(0, 6)
+local soldiersLayout = Instance.new("UIGridLayout") -- two columns of class cards
+soldiersLayout.CellSize = UDim2.fromOffset(308, 86)
+soldiersLayout.CellPadding = UDim2.fromOffset(8, 6)
 soldiersLayout.SortOrder = Enum.SortOrder.LayoutOrder
 soldiersLayout.Parent = soldiersScroll
 
@@ -1277,7 +1279,7 @@ for i, class in Units.ClassList do
 	local def = Units.Classes[class]
 	local row = Instance.new("Frame")
 	row.LayoutOrder = i
-	row.Size = UDim2.new(1, -8, 0, 86)
+	row.Size = UDim2.fromOffset(308, 86)
 	row.BackgroundColor3 = def.color:Lerp(BG, 0.8)
 	row.BorderSizePixel = 0
 	row.Parent = soldiersScroll
@@ -1293,8 +1295,8 @@ for i, class in Units.ClassList do
 	corner(accentBar, 2)
 
 	local tile = Instance.new("Frame")
-	tile.Position = UDim2.fromOffset(12, 8)
-	tile.Size = UDim2.fromOffset(70, 70)
+	tile.Position = UDim2.fromOffset(12, 10)
+	tile.Size = UDim2.fromOffset(66, 66)
 	tile.BackgroundColor3 = UI.DARK
 	tile.BorderSizePixel = 0
 	tile.Parent = row
@@ -1319,13 +1321,13 @@ for i, class in Units.ClassList do
 	local locked = label(overlay, "LOCKED", UDim2.new(0, 0, 1, -18), UDim2.new(1, 0, 0, 14), 9, Enum.Font.GothamBlack, MUTED)
 	locked.TextXAlignment = Enum.TextXAlignment.Center
 
-	label(row, def.label, UDim2.fromOffset(92, 7), UDim2.fromOffset(180, 20), 16, Enum.Font.GothamBold, WHITE)
-	UI.chip(row, string.format("HP %d", def.hp), UDim2.fromOffset(92, 30), UDim2.fromOffset(60, 18), UI.DARK, GREEN, 12)
-	UI.chip(row, string.format("DMG %d", def.damage), UDim2.fromOffset(156, 30), UDim2.fromOffset(66, 18), UI.DARK, ORANGE, 12)
-	UI.chip(row, string.format("RNG %d", def.range), UDim2.fromOffset(226, 30), UDim2.fromOffset(60, 18), UI.DARK, Color3.fromRGB(120, 180, 255), 12)
-	local passive = label(row, Units.passiveText(class), UDim2.fromOffset(92, 52), UDim2.fromOffset(270, 14), 11, Enum.Font.GothamMedium, GOLD)
+	label(row, def.label, UDim2.fromOffset(88, 7), UDim2.fromOffset(160, 20), 16, Enum.Font.GothamBold, WHITE)
+	UI.chip(row, string.format("HP %d", def.hp), UDim2.fromOffset(88, 30), UDim2.fromOffset(56, 18), UI.DARK, GREEN, 12)
+	UI.chip(row, string.format("DMG %d", def.damage), UDim2.fromOffset(148, 30), UDim2.fromOffset(62, 18), UI.DARK, ORANGE, 12)
+	UI.chip(row, string.format("RNG %d", def.range), UDim2.fromOffset(214, 30), UDim2.fromOffset(58, 18), UI.DARK, Color3.fromRGB(120, 180, 255), 12)
+	local passive = label(row, Units.passiveText(class), UDim2.fromOffset(88, 52), UDim2.fromOffset(212, 14), 11, Enum.Font.GothamMedium, GOLD)
 	passive.TextScaled = true
-	local status = label(row, "", UDim2.fromOffset(92, 67), UDim2.fromOffset(270, 14), 12, Enum.Font.GothamBold, GREEN)
+	local status = label(row, "", UDim2.fromOffset(88, 67), UDim2.fromOffset(212, 14), 12, Enum.Font.GothamBold, GREEN)
 	soldierRows[class] = { frame = row, stroke = rowStroke, overlay = overlay, status = status }
 end
 
@@ -1643,8 +1645,8 @@ local upgradeRows: { [string]: UpgradeRow } = {}
 for i, class in Units.ClassList do
 	local def = Units.Classes[class]
 	local row = Instance.new("Frame")
-	row.Position = UDim2.fromOffset(8, 36 + (i - 1) * 60)
-	row.Size = UDim2.fromOffset(368, 54)
+	row.Position = UDim2.fromOffset(8 + ((i - 1) % 2) * 316, 36 + ((i - 1) // 2) * 60) -- two columns
+	row.Size = UDim2.fromOffset(308, 54)
 	row.BackgroundColor3 = def.color:Lerp(BG, 0.8)
 	row.BorderSizePixel = 0
 	row.Parent = upgradesPage
@@ -1658,7 +1660,7 @@ for i, class in Units.ClassList do
 	accentBar.Parent = row
 	corner(accentBar, 2)
 	label(row, def.label, UDim2.fromOffset(14, 5), UDim2.fromOffset(150, 18), 14, Enum.Font.GothamBold, WHITE)
-	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(240, 14), 12, Enum.Font.Gotham, MUTED)
+	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(190, 14), 12, Enum.Font.Gotham, MUTED)
 	-- The nine merge levels as dots (lit in the level color up to the bought level).
 	local dots = {}
 	for k = 1, Units.MaxTier do
@@ -1672,8 +1674,8 @@ for i, class in Units.ClassList do
 		dots[k] = dot
 	end
 	local button = Instance.new("TextButton")
-	button.Position = UDim2.fromOffset(268, 9)
-	button.Size = UDim2.fromOffset(92, 36)
+	button.Position = UDim2.fromOffset(212, 9)
+	button.Size = UDim2.fromOffset(88, 36)
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Font = Enum.Font.GothamBold
@@ -1751,8 +1753,8 @@ do
 	local slotBoxes: { [string]: SlotBox } = {}
 	for i, slot in { "q", "e" } do
 		local box = Instance.new("Frame")
-		box.Position = UDim2.fromOffset(8 + (i - 1) * 186, 20)
-		box.Size = UDim2.fromOffset(182, 40)
+		box.Position = UDim2.fromOffset(8 + (i - 1) * 316, 20)
+		box.Size = UDim2.fromOffset(308, 40)
 		box.BackgroundColor3 = UI.DARK
 		box.BorderSizePixel = 0
 		box.Parent = page
@@ -1783,8 +1785,8 @@ do
 	for i, id in Spells.Order do
 		local def = Spells.Defs[id]
 		local row = Instance.new("Frame")
-		row.Position = UDim2.fromOffset(8, 70 + (i - 1) * 60)
-		row.Size = UDim2.fromOffset(368, 54)
+		row.Position = UDim2.fromOffset(8 + ((i - 1) % 2) * 316, 70 + ((i - 1) // 2) * 60) -- two columns
+		row.Size = UDim2.fromOffset(308, 54)
 		row.BackgroundColor3 = def.color:Lerp(BG, 0.82)
 		row.BorderSizePixel = 0
 		row.Parent = page
@@ -1802,17 +1804,17 @@ do
 		local letter = label(icon, string.upper(string.sub(def.label, 1, 1)), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 17, Enum.Font.GothamBlack, def.color:Lerp(Color3.new(0, 0, 0), 0.7))
 		letter.TextXAlignment = Enum.TextXAlignment.Center
 		label(row, def.label, UDim2.fromOffset(54, 5), UDim2.fromOffset(160, 18), 14, Enum.Font.GothamBold, WHITE)
-		local description = label(row, def.description, UDim2.fromOffset(54, 23), UDim2.fromOffset(226, 28), 11, Enum.Font.Gotham, MUTED)
+		local description = label(row, def.description, UDim2.fromOffset(54, 23), UDim2.fromOffset(176, 28), 11, Enum.Font.Gotham, MUTED)
 		description.TextWrapped = true
 		description.TextYAlignment = Enum.TextYAlignment.Top
-		local status = label(row, string.format("Drops after\nwave %d", def.dropWave or 0), UDim2.fromOffset(282, 8), UDim2.fromOffset(78, 38), 10, Enum.Font.GothamMedium, GOLD)
+		local status = label(row, string.format("Drops after\nwave %d", def.dropWave or 0), UDim2.fromOffset(232, 8), UDim2.fromOffset(68, 38), 10, Enum.Font.GothamMedium, GOLD)
 		status.TextWrapped = true
 		status.TextXAlignment = Enum.TextXAlignment.Right
 		status.TextYAlignment = Enum.TextYAlignment.Center
 		local buttons: { [string]: TextButton } = {}
 		for b, slot in { "q", "e" } do
 			local button = Instance.new("TextButton")
-			button.Position = UDim2.fromOffset(290 + (b - 1) * 36, 12)
+			button.Position = UDim2.fromOffset(236 + (b - 1) * 36, 12)
 			button.Size = UDim2.fromOffset(30, 30)
 			button.BorderSizePixel = 0
 			button.AutoButtonColor = false
