@@ -329,9 +329,6 @@ function Layout.apply(saved: any)
 			Layout.place(name, entry[1], entry[2])
 		end
 	end
-	if decoded.collapsed == true then
-		UI.setCollapsed(true)
-	end
 	UI.hidden = decoded.hidden == true
 end
 
@@ -407,16 +404,16 @@ local equipBest = makeButton("^", "EQUIP BEST", ORANGE, 3)
 -- Top left HUD: the account level (with its experience bar) and the coins.
 local hud = Instance.new("Frame")
 hud.Name = "Hud"
-hud.AnchorPoint = Vector2.new(0, 1)
-hud.Position = UDim2.new(0, 14, 1, -14) -- bottom left corner
-hud.Size = UDim2.fromOffset(320, 66)
+hud.AnchorPoint = Vector2.new(0.5, 1)
+hud.Position = UDim2.new(0.5, 0, 1, -14) -- the middle of the bottom edge, stretched wide
+hud.Size = UDim2.fromOffset(520, 70)
 hud.BackgroundColor3 = BG
 hud.BackgroundTransparency = 0.12
 hud.BorderSizePixel = 0
 hud.Active = true
 hud.Parent = gui
 local hudScale = Instance.new("UIScale")
-hudScale.Scale = 1.1 -- level and coins, big enough to read at a glance
+hudScale.Scale = 1.15 -- level and coins, big enough to read at a glance
 hudScale.Parent = hud
 corner(hud, 12)
 local hudStroke = Instance.new("UIStroke")
@@ -440,10 +437,11 @@ levelTag.TextXAlignment = Enum.TextXAlignment.Center
 local levelNumber = label(levelBadge, "1", UDim2.fromOffset(0, 15), UDim2.new(1, 0, 0, 30), 24, Enum.Font.GothamBlack, WHITE)
 levelNumber.TextXAlignment = Enum.TextXAlignment.Center
 
-local xpText = label(hud, "", UDim2.fromOffset(66, 8), UDim2.fromOffset(246, 14), 12, Enum.Font.GothamMedium, MUTED)
+local xpText = label(hud, "", UDim2.fromOffset(70, 9), UDim2.fromOffset(436, 14), 12, Enum.Font.GothamMedium, MUTED)
+Layout.make("Hud", hud, hud) -- grab it anywhere, it has no controls
 local xpBack = Instance.new("Frame")
-xpBack.Position = UDim2.fromOffset(66, 25)
-xpBack.Size = UDim2.fromOffset(244, 8)
+xpBack.Position = UDim2.fromOffset(70, 27)
+xpBack.Size = UDim2.fromOffset(436, 9)
 xpBack.BackgroundColor3 = Color3.fromRGB(14, 16, 24)
 xpBack.BorderSizePixel = 0
 xpBack.Parent = hud
@@ -457,12 +455,12 @@ corner(xpFill, 4)
 
 -- The coins (pill): a UIScale pulses it when a coin is picked up.
 local pill = Instance.new("Frame")
-pill.Position = UDim2.fromOffset(66, 38)
-pill.Size = UDim2.fromOffset(244, 20)
+pill.Position = UDim2.fromOffset(70, 41)
+pill.Size = UDim2.fromOffset(436, 22)
 pill.BackgroundTransparency = 1
 pill.Parent = hud
-local coinsLabel = label(pill, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 16, Enum.Font.GothamBold, GOLD)
-local saveLabel = label(pill, "", UDim2.fromOffset(120, 0), UDim2.fromOffset(124, 20), 11, Enum.Font.GothamMedium, GREEN)
+local coinsLabel = label(pill, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 18, Enum.Font.GothamBold, GOLD)
+local saveLabel = label(pill, "", UDim2.fromOffset(280, 0), UDim2.fromOffset(156, 22), 11, Enum.Font.GothamMedium, GREEN)
 saveLabel.TextXAlignment = Enum.TextXAlignment.Right
 
 -- The battle panel (opened by the FIGHT button) is defined further down.
@@ -626,7 +624,7 @@ headerLine.BorderSizePixel = 0
 headerLine.Parent = header
 UI.grip(header, 14, 14, MUTED)
 local headerTitle = label(header, "MERGE BLADES", UDim2.fromOffset(36, 0), UDim2.fromOffset(200, 38), 15, Enum.Font.GothamBlack, WHITE)
-local headerHint = label(header, "drag to move · H hides", UDim2.new(1, -176, 0, 0), UDim2.fromOffset(130, 38), 10, Enum.Font.GothamMedium, MUTED)
+local headerHint = label(header, "drag to move · H hides it", UDim2.new(1, -140, 0, 0), UDim2.fromOffset(130, 38), 10, Enum.Font.GothamMedium, MUTED)
 headerHint.TextXAlignment = Enum.TextXAlignment.Right
 header.MouseEnter:Connect(function()
 	headerTitle.TextColor3 = GOLD
@@ -636,87 +634,7 @@ header.MouseLeave:Connect(function()
 	headerTitle.TextColor3 = WHITE
 	headerHint.TextColor3 = MUTED
 end)
--- The − / + button folds the panel to its title bar and back.
-local fold = Instance.new("TextButton")
-fold.AnchorPoint = Vector2.new(1, 0)
-fold.Position = UDim2.new(1, -8, 0, 6)
-fold.Size = UDim2.fromOffset(32, 26)
-fold.BackgroundColor3 = BADGE
-fold.BorderSizePixel = 0
-fold.AutoButtonColor = false
-fold.Font = Enum.Font.GothamBlack
-fold.TextSize = 18
-fold.TextColor3 = WHITE
-fold.Text = "−"
-fold.ZIndex = 4
-fold.Parent = header
-corner(fold, 7)
-fold.Activated:Connect(function()
-	UI.setCollapsed(not UI.collapsed)
-end)
-panel:GetAttributeChangedSignal("Collapsed"):Connect(function()
-	local on = panel:GetAttribute("Collapsed") == true
-	fold.Text = if on then "+" else "−"
-	headerHint.Text = if on then "click + or press H to show" else "drag to move · H hides"
-end)
 Layout.make("Panel", panel, header)
-end
-
--- The inventory icon on the left edge of the screen: a bag. A click hides the whole panel, another shows it.
-do
-local icon = Instance.new("TextButton")
-icon.Name = "InventoryIcon"
-icon.AnchorPoint = Vector2.new(0, 0.5)
-icon.Position = UDim2.new(0, 14, 0.5, 0)
-icon.Size = UDim2.fromOffset(56, 56)
-icon.BackgroundColor3 = BG
-icon.BackgroundTransparency = 0.08
-icon.BorderSizePixel = 0
-icon.AutoButtonColor = false
-icon.Text = ""
-icon.Parent = gui
-corner(icon, 14)
-local iconScale = Instance.new("UIScale") -- drawn at 1.5x (84 px): easy to hit
-iconScale.Scale = 1.5
-iconScale.Parent = icon
-local iconStroke = UI.stroke(icon, GOLD, 2, 0.35)
-local function piece(x: number, y: number, w: number, h: number, color: Color3, radius: number): Frame
-	local f = Instance.new("Frame")
-	f.Position = UDim2.fromOffset(x, y)
-	f.Size = UDim2.fromOffset(w, h)
-	f.BackgroundColor3 = color
-	f.BorderSizePixel = 0
-	f.ZIndex = 2
-	f.Parent = icon
-	corner(f, radius)
-	return f
-end
-local handle = piece(22, 5, 12, 10, BG, 5) -- the ring handle (a hollow frame)
-handle.BackgroundTransparency = 1
-UI.stroke(handle, GOLD, 2)
-local flap = piece(14, 13, 28, 10, GOLD:Lerp(BG, 0.3), 4) -- the flap
-local body = piece(14, 21, 28, 20, GOLD, 6) -- the bag
-piece(25, 23, 6, 6, BG, 3) -- the clasp
-local tag = label(icon, "INV", UDim2.fromOffset(0, 41), UDim2.new(1, 0, 0, 13), 9, Enum.Font.GothamBlack, MUTED)
-tag.TextXAlignment = Enum.TextXAlignment.Center
-icon.MouseEnter:Connect(function()
-	iconStroke.Transparency = 0
-end)
-icon.MouseLeave:Connect(function()
-	iconStroke.Transparency = 0.35
-end)
-icon.Activated:Connect(function()
-	UI.hidden = not UI.hidden
-	Layout.save()
-end)
-RunService.RenderStepped:Connect(function()
-	-- Lit while the panel shows, dim while it is hidden.
-	local shown = not UI.hidden
-	iconStroke.Color = if shown then GOLD else MUTED
-	body.BackgroundColor3 = if shown then GOLD else MUTED
-	flap.BackgroundColor3 = (if shown then GOLD else MUTED):Lerp(BG, 0.3)
-	tag.Text = if shown then "INV" else "SHOW"
-end)
 end
 
 -- Tabs: Inventory (the squad and the merge board), Soldiers (the index of every class), Upgrades (merge
@@ -947,6 +865,158 @@ local function moveIntoInventory(b: Button, x: number, y: number, width: number,
 end
 moveIntoInventory(autoMerge, 334, 230, 144, 44, true)
 moveIntoInventory(equipBest, 486, 230, 144, 44, true)
+
+-- ── The dock on the left edge of the screen ──────────────────────────────
+-- Four square icons, one per tab of the panel, and the FIGHT button under them. An icon opens the panel on
+-- its tab; the icon of the open tab hides the panel again. The dock moves by the grip on top.
+do
+local DOCK_TILE = 64
+local DOCK_STEP = 72
+local dock = Instance.new("Frame")
+dock.Name = "Dock"
+dock.AnchorPoint = Vector2.new(0, 0.5)
+dock.Position = UDim2.new(0, 14, 0.5, 0)
+dock.Size = UDim2.fromOffset(76, 18 + 4 * DOCK_STEP + 64)
+dock.BackgroundColor3 = BG
+dock.BackgroundTransparency = 0.06
+dock.BorderSizePixel = 0
+dock.Active = true
+dock.Parent = gui
+corner(dock, 16)
+UI.gradient(dock, Color3.fromRGB(36, 39, 54), Color3.fromRGB(18, 20, 28))
+UI.stroke(dock, Color3.fromRGB(70, 76, 100), 1.5)
+local dockGrip = Instance.new("Frame")
+dockGrip.Size = UDim2.new(1, 0, 0, 18)
+dockGrip.BackgroundTransparency = 1
+dockGrip.Parent = dock
+UI.grip(dockGrip, 31, 7, MUTED)
+Layout.make("Dock", dock, dockGrip)
+
+type DockIcon = { button: TextButton, stroke: UIStroke, parts: { Frame }, tag: TextLabel, accent: Color3 }
+local icons: { [string]: DockIcon } = {}
+
+-- A small drawing piece inside a tile.
+local function piece(parent: Instance, x: number, y: number, w: number, h: number, color: Color3, radius: number, rotation: number?): Frame
+	local f = Instance.new("Frame")
+	f.Position = UDim2.fromOffset(x, y)
+	f.Size = UDim2.fromOffset(w, h)
+	f.BackgroundColor3 = color
+	f.BorderSizePixel = 0
+	f.Rotation = rotation or 0
+	f.ZIndex = 2
+	f.Parent = parent
+	corner(f, radius)
+	return f
+end
+
+-- One tile: `draw` returns the pieces that take the tab's color (the rest stays dark).
+local function tile(index: number, name: string, tag: string, draw: (TextButton) -> { Frame })
+	local accent = UI.TAB_ACCENT[name]
+	local button = Instance.new("TextButton")
+	button.Name = "Dock_" .. name
+	button.Position = UDim2.fromOffset(6, 18 + (index - 1) * DOCK_STEP)
+	button.Size = UDim2.fromOffset(DOCK_TILE, DOCK_TILE)
+	button.BackgroundColor3 = UI.DARK
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Text = ""
+	button.Parent = dock
+	corner(button, 12)
+	local buttonStroke = UI.stroke(button, accent, 2, 0.65)
+	local parts = draw(button)
+	local tagLabel = label(button, tag, UDim2.fromOffset(0, 47), UDim2.new(1, 0, 0, 13), 9, Enum.Font.GothamBlack, MUTED)
+	tagLabel.TextXAlignment = Enum.TextXAlignment.Center
+	button.MouseEnter:Connect(function()
+		buttonStroke.Transparency = 0
+	end)
+	button.MouseLeave:Connect(function()
+		buttonStroke.Transparency = if not UI.hidden and UI.tab == name then 0.1 else 0.65
+	end)
+	button.Activated:Connect(function()
+		if UI.hidden or UI.tab ~= name then
+			UI.hidden = false
+			showTab(name)
+		else
+			UI.hidden = true
+		end
+		Layout.save()
+	end)
+	icons[name] = { button = button, stroke = buttonStroke, parts = parts, tag = tagLabel, accent = accent }
+end
+
+tile(1, "Inventory", "INV", function(b) -- a bag
+	local handle = piece(b, 26, 5, 12, 10, BG, 5)
+	handle.BackgroundTransparency = 1
+	local handleStroke = UI.stroke(handle, GOLD, 2)
+	local flap = piece(b, 18, 13, 28, 10, GOLD, 4)
+	local body = piece(b, 18, 21, 28, 22, GOLD, 6)
+	piece(b, 29, 24, 6, 6, BG, 3)
+	-- (the handle's stroke follows the body's color each frame, see below)
+	handle:SetAttribute("StrokeOnly", true)
+	return { flap, body, handle }
+end)
+tile(2, "Characters", "CHAR", function(b) -- a little figure
+	local head = piece(b, 25, 7, 14, 14, GOLD, 7)
+	local torso = piece(b, 22, 23, 20, 15, GOLD, 5)
+	local legL = piece(b, 23, 39, 8, 6, GOLD, 2)
+	local legR = piece(b, 33, 39, 8, 6, GOLD, 2)
+	return { head, torso, legL, legR }
+end)
+tile(3, "Upgrades", "UPG", function(b) -- an arrow up
+	local head = piece(b, 24, 9, 16, 16, GOLD, 3, 45)
+	local stem = piece(b, 29, 22, 6, 22, GOLD, 3)
+	piece(b, 24, 24, 16, 8, UI.DARK, 0) -- cuts the lower half of the rotated square into an arrow head
+	return { head, stem }
+end)
+tile(4, "Spells", "SPELL", function(b) -- a diamond and two sparks
+	local gem = piece(b, 22, 14, 20, 20, GOLD, 4, 45)
+	piece(b, 28, 20, 8, 8, UI.DARK, 2, 45)
+	local sparkA = piece(b, 13, 11, 5, 5, GOLD, 2, 45)
+	local sparkB = piece(b, 47, 31, 5, 5, GOLD, 2, 45)
+	return { gem, sparkA, sparkB }
+end)
+
+-- FIGHT moves from the bottom bar into the dock, under the icons.
+fight.button.Parent = dock
+fight.button.Position = UDim2.fromOffset(6, 18 + 4 * DOCK_STEP)
+fight.button.Size = UDim2.fromOffset(DOCK_TILE, 56)
+do
+	local badge = fight.key.Parent :: Frame
+	badge.Visible = false
+	fight.title.Position = UDim2.fromOffset(0, 6)
+	fight.title.Size = UDim2.new(1, 0, 0, 18)
+	fight.title.TextSize = 14
+	fight.title.TextXAlignment = Enum.TextXAlignment.Center
+	fight.sub.Position = UDim2.fromOffset(3, 25)
+	fight.sub.Size = UDim2.new(1, -6, 0, 26)
+	fight.sub.TextSize = 9
+	fight.sub.TextWrapped = true
+	fight.sub.TextXAlignment = Enum.TextXAlignment.Center
+end
+
+RunService.RenderStepped:Connect(function()
+	for name, icon in icons do
+		local active = not UI.hidden and UI.tab == name
+		local color = if active then icon.accent else MUTED
+		icon.button.BackgroundColor3 = if active then icon.accent:Lerp(BG, 0.72) else UI.DARK
+		icon.stroke.Color = icon.accent
+		if not active then
+			icon.stroke.Transparency = 0.65
+		end
+		icon.tag.TextColor3 = if active then WHITE else MUTED
+		for _, part in icon.parts do
+			if part:GetAttribute("StrokeOnly") then
+				local s = part:FindFirstChildOfClass("UIStroke")
+				if s then
+					s.Color = color
+				end
+			else
+				part.BackgroundColor3 = color
+			end
+		end
+	end
+end)
+end
 upgrade.button.Visible = false -- merge slots are bought with the "+" card at the end of the inventory
 
 -- The "+" card after the last slot of the inventory: buys Balance.BoardUpgradeStep more merge slots.
@@ -4409,7 +4479,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	elseif input.KeyCode == Enum.KeyCode.Q then
 		castSpell("q") -- METEOR at the cursor (only in a battle)
 	elseif input.KeyCode == Enum.KeyCode.H then
-		UI.setCollapsed(not UI.collapsed) -- fold / unfold the left panel
+		UI.hidden = not UI.hidden -- hide / show the panel (same as its icon in the dock)
+		Layout.save()
 	elseif isPointerPress(input) then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)
 		closeCardPopup() -- a click in the world closes the popup
