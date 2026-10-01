@@ -301,7 +301,7 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 		-- The mage raises the arm with the staff: the shoulder joint itself turns (no Roblox animation, so the legs
 		-- and the body stay as they are), the staff points at the enemy, the shot kicks the arm back a little
 		-- (recoil) and the arm comes down again after it.
-		local RAISE = math.rad(-85)
+		local RAISE = math.rad(80) -- the arm swings FORWARD (a negative angle took it up behind the head)
 		local upperArm = from.model:FindFirstChild("RightUpperArm")
 		local shoulder = upperArm and upperArm:FindFirstChild("RightShoulder")
 		if shoulder and shoulder:IsA("Motor6D") then
@@ -311,7 +311,7 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 				if not shoulder.Parent then
 					return
 				end
-				TweenService:Create(shoulder, TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = rest * CFrame.Angles(RAISE - math.rad(22), 0, 0) }):Play()
+				TweenService:Create(shoulder, TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = rest * CFrame.Angles(RAISE + math.rad(22), 0, 0) }):Play()
 				task.delay(0.08, function()
 					if shoulder.Parent then
 						TweenService:Create(shoulder, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = rest * CFrame.Angles(RAISE, 0, 0) }):Play()
