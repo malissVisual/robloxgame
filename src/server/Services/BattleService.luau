@@ -922,7 +922,7 @@ function BattleService.spell(player: Player, id: string, position: Vector3?): (b
 	elseif id == "shield" then
 		local target = position or bestAllyCenter(battle.fighters, def.radius or 10)
 		if not target then
-			return false, "No soldiers to protect"
+			return false, "No characters to protect"
 		end
 		shieldSpell(battle, target, def)
 	elseif id == "armageddon" then

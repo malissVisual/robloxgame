@@ -149,13 +149,13 @@ return {
 	CoinLifetime = 40, -- seconds on the ground before a coin flies to you on its own
 
 	-- World (studs, z is the direction from the lobby to the enemies)
-	SlotSpacing = 6,
+	SlotSpacing = 7, -- between pads (the characters are ~0.9-1.26 of an R15; 7 leaves air between them)
 	-- Every player gets their own plot (own spawn, board, arena). Plots are laid out in a grid:
 	PlotsPerRow = 4,
 	PlotSpacingX = 90, -- between plots side by side (a plot is 64 wide)
 	PlotSpacingZ = 240, -- between rows of plots (a plot is ~210 long)
-	BoardStart = -50, -- z of the board's back row (rows go up to z = -20), in the lobby
-	SquadStart = 34, -- z of the squad's back row (3 rows: 34, 40, 46), in the arena
+	BoardStart = -50, -- z of the board's back row (rows go up to z = -15), in the lobby
+	SquadStart = 32, -- z of the squad's back row (3 rows: 32, 39, 46), in the arena, before the fight arena's step
 	EnemyFront = 118, -- z of the enemy's front row (the big raised fight arena is between squad and enemies)
 	EnemyColumns = 4, -- enemies stand in 4 columns (up to 3 rows)
 

@@ -24,6 +24,11 @@ local SKIN = C(245, 205, 48)
 local RIG_SCALE = 0.95 -- the rig's size against the block soldier of the same level
 local FEET = 2.4 -- the pivot is FEET * scale above the soles, like every other class (Soldier.lift)
 
+-- How strong the designs' lights and sparkles come out (1 = as designed). Kept soft on purpose.
+local AURA_RANGE = 0.6
+local AURA_BRIGHTNESS = 0.45
+local AURA_SPARKLES = 0.35
+
 -- Set by SoldierRig.build for the gear functions below (they run right away, never yield).
 local scale = 1
 local static = false -- a bare preview: everything anchored, no lights / particles
@@ -61,22 +66,26 @@ local function mk(rig, limb, kind, size, offset, color, mat, extra)
 		w.Part1 = p
 		w.Parent = p
 	end
+	-- Lights and sparkles are kept soft (AURA_*): the designs ask for a lot of them, and at full strength
+	-- the glow swallowed the characters standing next to each other.
 	if extra and extra.light and not static then
 		local l = Instance.new("PointLight")
 		l.Color = extra.light
-		l.Range = (extra.range or 10) * scale
-		l.Brightness = extra.bright or 2
+		l.Range = (extra.range or 10) * scale * AURA_RANGE
+		l.Brightness = (extra.bright or 2) * AURA_BRIGHTNESS
+		l.Shadows = false
 		l.Parent = p
 	end
 	if extra and extra.sparkle and not static then
 		local e = Instance.new("ParticleEmitter")
 		e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
 		e.Color = ColorSequence.new(extra.sparkle)
-		e.Rate = extra.rate or 18
-		e.Lifetime = NumberRange.new(1, 2)
-		e.Speed = NumberRange.new(1, 3)
+		e.Rate = (extra.rate or 18) * AURA_SPARKLES
+		e.Lifetime = NumberRange.new(0.8, 1.4)
+		e.Speed = NumberRange.new(0.8, 2)
 		e.SpreadAngle = Vector2.new(180, 180)
-		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) })
+		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
 		e.LightEmission = 1
 		e.Parent = p
 	end

@@ -32,8 +32,10 @@ local LEVEL_TINT = { 0, 0.12, 0.22, 0.3, 0.38, 0.45, 0.52, 0.6, 0.68 }
 
 local Soldier = {}
 
+-- How big a character is at a merge level. Gentle: a level 9 is a quarter bigger than a level 1, so the
+-- squad and the board stay readable (a 2x level 9 crowded its neighbours and hid the pads).
 function Soldier.scale(tier: number): number
-	return 1 + 0.12 * (tier - 1)
+	return 0.9 + 0.045 * (tier - 1)
 end
 
 function Soldier.lift(tier: number, ascended: boolean?): number
@@ -205,16 +207,14 @@ local function buildStageSoldier(model: Model, s: number, tier: number, enemy: b
 		end
 	end
 
-	-- The aura of the high stages: a glow and sparkles in the level color (not in UI previews).
+	-- The aura of the high stages: a soft glow in the level color (not in UI previews). No sparkles: they
+	-- drowned the character.
 	if stage.aura and not bare and not enemy then
 		local light = Instance.new("PointLight")
 		light.Color = Levels.color(tier)
-		light.Brightness = 2
-		light.Range = 10
+		light.Brightness = 0.8
+		light.Range = 6
 		light.Parent = torso
-		local sparkles = Instance.new("Sparkles")
-		sparkles.SparkleColor = Levels.color(tier)
-		sparkles.Parent = torso
 	end
 
 	return head
@@ -276,16 +276,13 @@ local function buildStageFromData(model: Model, s: number, tier: number, bare: b
 		end
 	end
 
-	-- The aura of the high stages: a glow and sparkles in the level color (not in UI previews).
+	-- The aura of the high stages: a soft glow in the level color (not in UI previews).
 	if stage.aura and not bare and torso then
 		local light = Instance.new("PointLight")
 		light.Color = Levels.color(tier)
-		light.Brightness = 2
-		light.Range = 10
+		light.Brightness = 0.8
+		light.Range = 6
 		light.Parent = torso
-		local sparkles = Instance.new("Sparkles")
-		sparkles.SparkleColor = Levels.color(tier)
-		sparkles.Parent = torso
 	end
 
 	return head, stage.top
@@ -332,13 +329,14 @@ local function finishModel(model: Model, head: Part, topOffset: number, s: numbe
 	bar.BackgroundColor3 = Color3.fromRGB(80, 220, 90)
 	bar.Parent = back
 
-	-- From level 5 on, your soldiers get a glow outline in the level color.
+	-- From level 5 on, your characters get a thin outline in the level color (kept faint: the gear
+	-- itself shows the level).
 	if not enemy and tier >= 5 then
 		local glow = Instance.new("Highlight")
 		glow.Name = "LevelGlow"
 		glow.FillTransparency = 1
 		glow.OutlineColor = levelColor
-		glow.OutlineTransparency = 0
+		glow.OutlineTransparency = 0.5
 		glow.Parent = model
 	end
 

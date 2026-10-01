@@ -76,6 +76,12 @@ The **Hunter**, the **Berserker** and the **Tank** have their 9 designed stages 
 
 Every class now has a design of its own; the generic level gear (`Soldier.luau`) is only the fallback for a class without one.
 
+**Size and aura.** In the UI the soldiers are called **characters**. A character grows gently with its level
+(`Soldier.scale`: 0.9 at level 1, 1.26 at level 9 — a 2x level 9 used to crowd its neighbours), the pads are
+`Balance.SlotSpacing` (7) apart, and the lights and sparkles of the designs come out soft (`AURA_*` in
+`SoldierRig.luau`; the level outline is faint, the stage auras have no sparkles). The fight arena
+(`FightArena.luau`) is 60 x 62 studs with the fighters 14 (yours) / 12 (enemies) apart and 10 between rows.
+
 The level colors (label, card outline, pad under the soldier, effects) follow the rarity colors of the
 Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 

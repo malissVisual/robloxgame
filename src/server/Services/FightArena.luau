@@ -14,14 +14,14 @@
 
 local HEIGHT = 2 -- the arena is one step (2 studs) above the floor
 local STEP = 1 -- height of the small stair step on each side
-local Z0, Z1 = 51, 111 -- platform start / end (z, plot-relative): a big arena, 60 studs deep
-local HALF_WIDTH = 24 -- 48 studs wide
-local STAIR_WIDTH = 24
+local Z0, Z1 = 51, 113 -- platform start / end (z, plot-relative): a big arena, 62 studs deep
+local HALF_WIDTH = 30 -- 60 studs wide (the plot is 64)
+local STAIR_WIDTH = 30
 local STAIR_DEPTH = 2
-local PLAYER_SPACING = 11 -- between your fighters in a row: the formation is spread over the arena, so the column
-local ENEMY_SPACING = 9 -- of a pad decides in which lane the soldier fights
-local ROW_GAP = 8 -- between rows
-local PLAYER_Z, ENEMY_Z = 58, 92 -- your back row / the enemies' front row (your 3 rows are a ROW_GAP apart)
+local PLAYER_SPACING = 14 -- between your fighters in a row: the formation is spread over the arena, so the column
+local ENEMY_SPACING = 12 -- of a pad decides in which lane the character fights
+local ROW_GAP = 10 -- between rows
+local PLAYER_Z, ENEMY_Z = 58, 90 -- your back row / the enemies' front row (your 3 rows are a ROW_GAP apart)
 local PAD_TOP = 0.6 -- height of the staging pads above the floor
 
 export type Arena = {

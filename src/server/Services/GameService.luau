@@ -391,7 +391,7 @@ local function onAutoMerge(player: Player)
 		end
 	end
 	if merges == 0 then
-		notify(player, "Nothing to merge — you need two identical soldiers and the level bought in the UPGRADES tab")
+		notify(player, "Nothing to merge — you need two identical characters and the level bought in the UPGRADES tab")
 		return
 	end
 	questProgress(player, profile, "merges", merges)
@@ -471,7 +471,7 @@ local function onEquipBest(player: Player)
 	profile.squad = newSquad
 	profile.board = newBoard
 	refresh(player)
-	notify(player, "Equipped your best soldiers")
+	notify(player, "Equipped your best characters")
 end
 
 -- Equip: a soldier from the inventory goes into the first free slot of the battle squad.
@@ -490,7 +490,7 @@ local function onEquip(player: Player, id: any)
 	end
 	local free = Grid.firstEmpty(profile.squad)
 	if not free then
-		notify(player, "Your battle squad is full — unequip a soldier first")
+		notify(player, "Your battle squad is full — unequip a character first")
 		return
 	end
 	profile.squad[free] = unit
@@ -515,7 +515,7 @@ local function onUnequip(player: Player, id: any)
 	end
 	local free = firstFreeBoardSlot(profile)
 	if not free then
-		notify(player, "Your inventory is full — merge soldiers or buy more merge slots")
+		notify(player, "Your inventory is full — merge characters or buy more merge slots")
 		return
 	end
 	profile.board[free] = unit
@@ -561,7 +561,7 @@ local function onSpawn(player: Player, amount: any)
 	end
 	local free = countFreeBoard(profile)
 	if free <= 0 then
-		notify(player, "Your inventory is full — sell or merge soldiers, or buy more merge slots")
+		notify(player, "Your inventory is full — sell or merge characters, or buy more merge slots")
 		return
 	end
 	local count = math.min(Balance.SummonCount, free)
@@ -576,7 +576,7 @@ local function onSpawn(player: Player, amount: any)
 	local fullCost = if better then Balance.BetterSummonCost else Balance.SummonCost
 	local cost = math.ceil(fullCost * count / Balance.SummonCount)
 	if profile.coins < cost then
-		notify(player, string.format("%s costs %d coins (%d soldiers)", if better then "The better summoner" else "Summoning", cost, count))
+		notify(player, string.format("%s costs %d coins (%d characters)", if better then "The better summoner" else "Summoning", cost, count))
 		return
 	end
 	profile.coins -= cost
@@ -649,7 +649,7 @@ local function onUpgradeLevel(player: Player)
 	end
 	local cost = PlayerData.levelUpgradeCost(profile)
 	if not cost then
-		notify(player, "Soldiers already start at the highest level")
+		notify(player, "Characters already start at the highest level")
 		return
 	end
 
@@ -660,7 +660,7 @@ local function onUpgradeLevel(player: Player)
 	profile.coins -= cost
 	profile.startLevel += 1
 	refresh(player)
-	notify(player, string.format("New soldiers now start at level %d!", profile.startLevel))
+	notify(player, string.format("New characters now start at level %d!", profile.startLevel))
 end
 
 -- Buys the next merge level of one soldier class: needs enough cleared waves and coins. Without it
@@ -1132,9 +1132,9 @@ local function onBattle(player: Player)
 	end
 	if Grid.count(profile.squad) == 0 then
 		if Grid.count(profile.board) == 0 then
-			notify(player, "You have no soldiers — use the BUY SOLDIER button")
+			notify(player, "You have no characters — summon some at the altar")
 		else
-			notify(player, "Your squad is empty — click a soldier in the inventory and equip it")
+			notify(player, "Your squad is empty — click a character in the inventory and equip it")
 		end
 		return
 	end

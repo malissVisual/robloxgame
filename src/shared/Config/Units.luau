@@ -140,7 +140,7 @@ Units.Passives = {
 	splash = { label = "Arcane Burst", text = "hits splash %d%% to nearby enemies", value = 0.5 },
 	taunt = { label = "Bulwark", text = "enemies within %d studs attack it first", value = 14 },
 	rage = { label = "Bloodlust", text = "up to +%d%% damage as HP drops", value = 0.8 },
-	inspire = { label = "Banner", text = "your soldiers nearby deal +%d%% damage", value = 0.1 },
+	inspire = { label = "Banner", text = "your characters nearby deal +%d%% damage", value = 0.1 },
 } :: { [string]: Passive }
 
 -- The text of a class's passive, with its number filled in (doubled for an Ascended soldier).

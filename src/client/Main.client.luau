@@ -156,7 +156,7 @@ end
 local UI = {}
 UI.DARK = Color3.fromRGB(16, 18, 26) -- the dark tiles inside the panel
 UI.PAGE_TOP = 84 -- the pages of the left panel start under its title bar and tabs
-UI.TAB_ACCENT = { Inventory = GOLD, Soldiers = Color3.fromRGB(90, 170, 255), Upgrades = Color3.fromRGB(170, 130, 255), Spells = ORANGE }
+UI.TAB_ACCENT = { Inventory = GOLD, Characters = Color3.fromRGB(90, 170, 255), Upgrades = Color3.fromRGB(170, 130, 255), Spells = ORANGE }
 UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
 UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
@@ -396,7 +396,7 @@ local function makeButton(keyText: string, titleText: string, accent: Color3, or
 	return { button = b, sub = sub, fill = fill, title = title, key = key }
 end
 
-local buy = makeButton("E", "BUY SOLDIER", GREEN, 1)
+local buy = makeButton("E", "BUY CHARACTER", GREEN, 1)
 local fight = makeButton(">", "FIGHT", ORANGE, 2)
 local upgrade = makeButton("^", "MERGE SLOTS", Color3.fromRGB(170, 130, 255), 2)
 local autoMerge = makeButton("»", "AUTO MERGE", Color3.fromRGB(90, 170, 255), 2)
@@ -716,7 +716,7 @@ end
 
 -- Tabs: Inventory (the squad and the merge board), Soldiers (the index of every class), Upgrades (merge
 -- levels) and Spells. A segmented bar; the active tab is lit in its own color.
-local TAB_NAMES = { "Inventory", "Soldiers", "Upgrades", "Spells" }
+local TAB_NAMES = { "Inventory", "Characters", "Upgrades", "Spells" }
 local pages: { [string]: Frame } = {}
 local tabButtons: { [string]: TextButton } = {}
 
@@ -1303,8 +1303,8 @@ local renderSpells: () -> () = function() end
 -- ── Soldiers tab: the index of every class (unlocked ones and how to unlock the rest) ────
 do
 
-local soldiersPage = makePage("Soldiers")
-UI.section(soldiersPage, "YOUR SOLDIERS", 0, UI.TAB_ACCENT.Soldiers)
+local soldiersPage = makePage("Characters")
+UI.section(soldiersPage, "YOUR CHARACTERS", 0, UI.TAB_ACCENT.Characters)
 local unlockedCount = label(soldiersPage, "", UDim2.fromOffset(552, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 unlockedCount.TextXAlignment = Enum.TextXAlignment.Right
 
@@ -1664,14 +1664,14 @@ RunService.RenderStepped:Connect(function()
 	if not visible then
 		return
 	end
-	levelCurrent.Text = string.format("Bought soldiers start at level %d", state.startLevel)
+	levelCurrent.Text = string.format("Bought characters start at level %d", state.startLevel)
 	if state.levelCost == 0 then
 		levelInfo.Text = "That is the highest start level."
 		levelButton.Text = "MAX LEVEL"
 		levelButton.BackgroundColor3 = BADGE
 		levelButton.TextTransparency = 0.4
 	else
-		levelInfo.Text = string.format("Upgrade so new soldiers start at level %d (never above the level you bought for that soldier in the UPGRADES tab).", state.startLevel + 1)
+		levelInfo.Text = string.format("Upgrade so new characters start at level %d (never above the level you bought for that character in the UPGRADES tab).", state.startLevel + 1)
 		levelButton.Text = string.format("UPGRADE TO LEVEL %d  ·  %d coins", state.startLevel + 1, state.levelCost)
 		local canAfford = state.coins >= state.levelCost
 		levelButton.BackgroundColor3 = if canAfford then Color3.fromRGB(140, 100, 230) else BADGE
@@ -1693,7 +1693,7 @@ end)
 -- Upgrades page: the merge level of every soldier class is bought separately. Without the upgrade
 -- two soldiers of a class cannot be merged past the level bought so far.
 local upgradesPage = makePage("Upgrades")
-UI.section(upgradesPage, "MERGE LEVEL PER SOLDIER", 0, UI.TAB_ACCENT.Upgrades)
+UI.section(upgradesPage, "MERGE LEVEL PER CHARACTER", 0, UI.TAB_ACCENT.Upgrades)
 label(upgradesPage, "the dots are the 9 merge levels: lit = bought", UDim2.fromOffset(12, 16), UDim2.fromOffset(340, 14), 10, Enum.Font.GothamMedium, MUTED)
 type UpgradeRow = { frame: Frame, stroke: UIStroke, sub: TextLabel, dots: { Frame }, button: TextButton, buttonStroke: UIStroke }
 local upgradeRows: { [string]: UpgradeRow } = {}
@@ -1987,7 +1987,7 @@ end)
 
 -- One-time hint shortly after joining.
 task.delay(3, function()
-	showToast("Summon soldiers at the green altar (E), drag cards onto each other to merge, equip your squad, then press FIGHT", 9)
+	showToast("Summon characters at the green altar (E), drag cards onto each other to merge, equip your squad, then press FIGHT", 9)
 end)
 end
 
@@ -3606,10 +3606,10 @@ local function requestBuy()
 		Net.get("Buy"):FireServer() -- the server says why it is not possible (full inventory)
 		return
 	end
-	askConfirm("Get a soldier?", {
-		"Soldiers are FREE",
+	askConfirm("Get a character?", {
+		"Characters are FREE",
 		string.format("Free places in your inventory: %d", state.boardFree),
-		"A random soldier goes to your inventory (the merge room).",
+		"A random character goes to your inventory (the merge room).",
 	}, "GET", GREEN, function()
 		Net.get("Buy"):FireServer(1)
 	end, Enum.KeyCode.E) -- E opens this popup, E again confirms
@@ -3830,7 +3830,7 @@ end)
 adminButton("RESET", 100, RED:Lerp(BG, 0.4), function()
 	askConfirm("Reset everything?", {
 		"Admin reset",
-		"Coins, soldiers, waves and unlocks are wiped",
+		"Coins, characters, waves and unlocks are wiped",
 		"(the saved data too). This cannot be undone.",
 	}, "RESET", RED, function()
 		Net.get("AdminReset"):FireServer()
@@ -3937,7 +3937,7 @@ do
 		while true do
 
 			local plot = findPlot()
-			for name, action in { SummonAltar = "Summon soldiers", BetterAltar = "Better summon" } do
+			for name, action in { SummonAltar = "Summon characters", BetterAltar = "Better summon" } do
 				local part = if plot then plot:FindFirstChild(name) else nil
 				local prompt = prompts[name]
 				if part and (not prompt or not prompt.Parent) then
@@ -3965,9 +3965,9 @@ do
 					if left > 0 then
 						prompt.ObjectText = string.format("Ready in %ds", math.ceil(left))
 					elseif name == "BetterAltar" then
-						prompt.ObjectText = if state.cleared >= Balance.BetterSummonWave then string.format("%d coins · %d soldiers · better levels", Balance.BetterSummonCost, Balance.SummonCount) else string.format("Locked · clear wave %d", Balance.BetterSummonWave)
+						prompt.ObjectText = if state.cleared >= Balance.BetterSummonWave then string.format("%d coins · %d characters · better levels", Balance.BetterSummonCost, Balance.SummonCount) else string.format("Locked · clear wave %d", Balance.BetterSummonWave)
 					else
-						prompt.ObjectText = string.format("%d coins · %d soldiers", Balance.SummonCost, Balance.SummonCount)
+						prompt.ObjectText = string.format("%d coins · %d characters", Balance.SummonCost, Balance.SummonCount)
 					end
 				end
 			end
