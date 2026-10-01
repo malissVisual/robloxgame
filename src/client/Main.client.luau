@@ -172,6 +172,10 @@ UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
+UI.cancelAim = function() end -- set in the spells block: stop aiming a spell
+UI.aimClick = function(): boolean
+	return false
+end -- set in the spells block: a click in the world while aiming casts the spell (true = the click was used)
 
 function UI.stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
 	local s = Instance.new("UIStroke")
@@ -3810,10 +3814,11 @@ local function requestFight()
 end
 
 -- ── Spells: Q and E (the two spells you carry) ──────────────────────────
--- During a battle press Q or E (or click the buttons) to cast the spell you carry in that slot. They aim
--- themselves (auto aim: the biggest group of enemies, the group that needs healing ...); hold SHIFT to aim
--- with the mouse (a ring shows where). Which two spells you carry is chosen in the SPELLS tab of the left
--- panel. Every slot has its own cooldown (the server owns it and tells the client).
+-- During a battle press Q or E (or click the buttons) to pick the spell of that slot, then CLICK on the arena
+-- where it should land: while you aim, a ring shows the area it hits and a glowing arc shows its path from you
+-- to that spot. Esc (or the same key again) cancels. A spell that hits the whole arena (no aiming) casts at
+-- once. Which two spells you carry is chosen in the SPELLS tab of the panel. Every slot has its own cooldown
+-- (the server owns it and tells the client).
 
 -- Set below; called from the key handler at the end of the file (Q / E).
 local castSpell: (string) -> () = function() end
@@ -3869,9 +3874,7 @@ do
 		return groundPoint(arena.Position.Y + arena.Size.Y / 2)
 	end
 
-	local function shiftHeld(): boolean
-		return UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
-	end
+	local aiming: string? = nil -- the slot being aimed with the mouse (Q / E pressed, waiting for the click)
 
 	castSpell = function(slot: string)
 		local spell = buttons[slot]
@@ -3879,15 +3882,37 @@ do
 		if not spell or not def or not state.battling or confirmLayer or os.clock() < spell.readyAt then
 			return
 		end
-		-- Auto aim: the server picks the target. Hold SHIFT to aim with the mouse instead.
-		if def.aimed and shiftHeld() then
-			local point = aimPoint()
-			if point then
-				Net.get("Ability"):FireServer(slot, point)
-			end
+		if def.aimed then
+			-- Pick the spell; the click on the arena casts it (UI.aimClick). The same key again cancels.
+			aiming = if aiming == slot then nil else slot
 		else
-			Net.get("Ability"):FireServer(slot)
+			aiming = nil
+			Net.get("Ability"):FireServer(slot) -- hits the whole arena: no aiming
 		end
+	end
+
+	UI.cancelAim = function()
+		aiming = nil
+	end
+
+	-- A click in the world while aiming: cast at the pointed spot. Returns true when the click was used.
+	UI.aimClick = function(): boolean
+		local slot = aiming
+		if not slot then
+			return false
+		end
+		local spell = buttons[slot]
+		if not spell or not state.battling or os.clock() < spell.readyAt then
+			aiming = nil
+			return false
+		end
+		local point = aimPoint()
+		if not point then
+			return true -- pointing at the sky: keep aiming
+		end
+		Net.get("Ability"):FireServer(slot, point)
+		aiming = nil
+		return true
 	end
 
 	for slot, spell in buttons do
@@ -3904,22 +3929,45 @@ do
 	end)
 
 	-- A small hint above the buttons.
-	local hint = label(gui, "Spells aim themselves · hold SHIFT to aim with the mouse", UDim2.new(1, -18 - 2 * (width + 8) + 8, 1, -90), UDim2.fromOffset(2 * (width + 8) - 8, 16), 12, Enum.Font.GothamMedium, MUTED)
+	local hint = label(gui, "Q / E picks a spell · click on the arena where it lands · Esc cancels", UDim2.new(1, -18 - 2 * (width + 8) + 8, 1, -90), UDim2.fromOffset(2 * (width + 8) - 8, 16), 12, Enum.Font.GothamMedium, MUTED)
 	hint.TextXAlignment = Enum.TextXAlignment.Right
 	hint.Visible = false
 
-	-- The ring on the floor that shows where an aimed spell would land (only while SHIFT is held).
-	local ring = Instance.new("Part")
-	ring.Name = "SpellRing"
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Color = Color3.fromRGB(255, 190, 120)
-	ring.Material = Enum.Material.Neon
-	ring.Transparency = 0.7
-	ring.Anchored = true
-	ring.CanCollide = false
-	ring.CanQuery = false
-	ring.CanTouch = false
-	ring.CastShadow = false
+	-- The aim preview: a ring on the floor where the spell lands (its real radius), a brighter rim, and a glowing
+	-- arc of beads from your character to that spot (the path the spell takes).
+	local function previewPart(name: string, shape: Enum.PartType?): Part
+		local p = Instance.new("Part")
+		p.Name = name
+		if shape then
+			p.Shape = shape
+		end
+		p.Color = Color3.fromRGB(255, 190, 120)
+		p.Material = Enum.Material.Neon
+		p.Transparency = 0.7
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		return p
+	end
+	local ring = previewPart("SpellRing", Enum.PartType.Cylinder)
+	local rim = previewPart("SpellRim", Enum.PartType.Cylinder)
+	rim.Transparency = 0.15
+	local BEADS = 14
+	local beads: { Part } = {}
+	for i = 1, BEADS do
+		local bead = previewPart("SpellBead", Enum.PartType.Ball)
+		bead.Transparency = 0.2
+		beads[i] = bead
+	end
+	local function hidePreview()
+		ring.Parent = nil
+		rim.Parent = nil
+		for _, bead in beads do
+			bead.Parent = nil
+		end
+	end
 
 	RunService.RenderStepped:Connect(function()
 		local now = os.clock()
@@ -3954,18 +4002,51 @@ do
 				end
 			end
 		end
-		if state.battling and aimedRadius and shiftHeld() then
-			local point = aimPoint()
-			if point then
-				ring.Size = Vector3.new(0.15, aimedRadius * 2, aimedRadius * 2)
-				ring.Color = aimedColor
-				ring.CFrame = CFrame.new(point + Vector3.new(0, 0.2, 0)) * CFrame.Angles(0, 0, math.rad(90))
-				ring.Parent = workspace
-			else
-				ring.Parent = nil
+		if not state.battling then
+			aiming = nil
+		end
+		local aimSlot = aiming
+		local aimDef: Spells.Def? = nil
+		if aimSlot then
+			local _, def = spellOf(aimSlot)
+			aimDef = def
+		end
+		for slot, spell in buttons do
+			spell.stroke.Thickness = if slot == aimSlot then 4 else 2 -- the picked spell's button lights up
+		end
+		local point = if aimDef and aimDef.aimed then aimPoint() else nil
+		if aimDef and point then
+			local radius = aimDef.radius or 6
+			local color = aimDef.color
+			local flatPoint = point + Vector3.new(0, 0.2, 0)
+			local turn = CFrame.Angles(0, 0, math.rad(90))
+			ring.Size = Vector3.new(0.15, radius * 2, radius * 2)
+			ring.Color = color
+			ring.Transparency = 0.6 + math.sin(now * 5) * 0.1
+			ring.CFrame = CFrame.new(flatPoint) * turn
+			ring.Parent = workspace
+			rim.Size = Vector3.new(0.2, radius * 2 + 0.5, radius * 2 + 0.5)
+			rim.Color = color
+			rim.CFrame = CFrame.new(flatPoint + Vector3.new(0, 0.02, 0)) * turn
+			rim.Parent = workspace
+			-- The path: a parabola from your character's chest to the spot, drawn with beads that run along it.
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local from = if root and root:IsA("BasePart") then root.Position + Vector3.new(0, 1, 0) else point + Vector3.new(0, 12, 0)
+			local to = point + Vector3.new(0, 0.6, 0)
+			local distance = (to - from).Magnitude
+			local height = math.clamp(distance * 0.35, 3, 14)
+			for i, bead in beads do
+				local t = ((i - 1) / BEADS + (now * 0.6) % (1 / BEADS)) -- the beads slide toward the target
+				local pos = from:Lerp(to, t) + Vector3.new(0, math.sin(t * math.pi) * height, 0)
+				local size = 0.3 + t * 0.35
+				bead.Size = Vector3.one * size
+				bead.Color = color
+				bead.Position = pos
+				bead.Parent = workspace
 			end
 		else
-			ring.Parent = nil
+			hidePreview()
 		end
 	end)
 end
@@ -4682,6 +4763,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if input.KeyCode == Enum.KeyCode.Escape then
 		closeConfirm()
 		UI.battleOpen = false
+		UI.cancelAim()
 	elseif input.KeyCode == Enum.KeyCode.E then
 		-- E summons at the altar (a ProximityPrompt); inside a popup that uses E it confirms; in a battle it heals.
 		if confirmLayer then
@@ -4703,6 +4785,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		Layout.save()
 	elseif isPointerPress(input) then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)
+		if UI.aimClick() then
+			return -- the click cast the picked spell where the mouse points
+		end
 		closeCardPopup() -- a click in the world closes the popup
 		beginDrag()
 	end

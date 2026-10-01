@@ -126,6 +126,11 @@ Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 
 ## Controls
 
+**Spells are aimed with the mouse:** during a battle press **Q** or **E** (or click the spell button) to pick the
+spell, a ring on the arena floor shows the area it will hit (its real radius) and a glowing arc of beads shows its
+path from your character to that spot; **click on the arena** to cast it there. Esc or the same key again cancels.
+A spell that hits the whole arena (Smite, Armageddon) casts at once.
+
 The battle is started with the big green **PLAY** button at the bottom right (its own little dock, movable by the grip
 on top): it opens the battle panel (difficulty, wave, START WAVE). The main panel (inventory, characters, upgrades,
 spells) starts at the top of the screen and hides while the battle panel is open, so the two never lie over each
