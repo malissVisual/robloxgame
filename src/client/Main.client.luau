@@ -4045,14 +4045,14 @@ do
 				if part and part:IsA("BasePart") then
 					local base = part:GetAttribute("BaseTransparency")
 					if type(base) == "number" then
-						part.Transparency = base + wave * 0.22
+						part.Transparency = base + wave * 0.15
 					end
 				end
 			end
 			local ring = pad:FindFirstChild("HoloRing")
 			local glow = ring and ring:FindFirstChild("Glow")
 			if glow and glow:IsA("PointLight") then
-				glow.Brightness = 0.8 + (1 - wave) * 0.9
+				glow.Brightness = 0.3 + (1 - wave) * 0.4
 			end
 		end
 	end)

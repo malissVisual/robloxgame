@@ -52,7 +52,7 @@ local ORIGIN_Y = 0.3 -- above a possible Baseplate (its top is y = 0)
 local PAD_TOP = 0.6 -- how far a pad rises above the floor (the top of the designed fight slot)
 local SLOT_COLOR = Color3.fromRGB(107, 114, 128) -- the ring of an empty slot
 local LOCKED_COLOR = Color3.fromRGB(42, 44, 54) -- merge pads that are not bought yet
-local SQUAD_COLOR = Color3.fromRGB(120, 215, 255) -- the holographic ring of an EMPTY squad pad (bright: "put someone here")
+local SQUAD_COLOR = Color3.fromRGB(70, 150, 190) -- the holographic ring of an EMPTY squad pad (lit, but soft: "put someone here")
 local SQUAD_TAKEN_COLOR = Color3.fromRGB(128, 134, 150) -- the ring once a soldier stands on the pad (grey: satisfied)
 
 local ARENA_START = 30 -- z of the arena gate (a road leads from the lobby to it)
@@ -233,24 +233,24 @@ local function holoPad(pad: Part, occupied: boolean)
 	local ring = disc("HoloRing", 6.2, 0.22, 0.11)
 	ring.Material = Enum.Material.Neon
 	ring.Color = color
-	ring.Transparency = if occupied then 0.55 else 0.05
+	ring.Transparency = if occupied then 0.6 else 0.3
 	ring:SetAttribute("BaseTransparency", ring.Transparency)
 	local inner = disc("HoloInner", 5.4, 0.2, 0.1)
 	inner.Material = Enum.Material.Neon
 	inner.Color = if occupied then Color3.fromRGB(40, 42, 52) else SQUAD_COLOR:Lerp(Color3.new(0, 0, 0), 0.55)
-	inner.Transparency = if occupied then 0.75 else 0.35
+	inner.Transparency = if occupied then 0.8 else 0.55
 	local fill = disc("HoloFill", 4.6, 0.18, 0.09)
 	fill.Material = Enum.Material.Neon
 	fill.Color = color
-	fill.Transparency = if occupied then 0.93 else 0.78
+	fill.Transparency = if occupied then 0.95 else 0.88
 	fill:SetAttribute("BaseTransparency", fill.Transparency)
 	local light = ring:FindFirstChild("Glow") :: PointLight?
 	if not light then
 		light = Instance.new("PointLight")
 		local made = light :: PointLight
 		made.Name = "Glow"
-		made.Range = 9
-		made.Brightness = 1.2
+		made.Range = 7
+		made.Brightness = 0.5
 		made.Shadows = false
 		made.Parent = ring
 	end
