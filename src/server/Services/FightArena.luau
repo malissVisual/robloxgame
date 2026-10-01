@@ -21,7 +21,7 @@ local STAIR_DEPTH = 2
 local PLAYER_SPACING = 14 -- between your fighters in a row: the formation is spread over the arena, so the column
 local ENEMY_SPACING = 12 -- of a pad decides in which lane the character fights
 local ROW_GAP = 10 -- between rows
-local PLAYER_Z, ENEMY_Z = 58, 90 -- your back row / the enemies' front row (your 3 rows are a ROW_GAP apart)
+local PLAYER_Z, ENEMY_Z = 58, 90 -- your back row / the enemies' front row (your 2 rows are a ROW_GAP apart)
 local PAD_TOP = 0.6 -- height of the staging pads above the floor
 
 export type Arena = {

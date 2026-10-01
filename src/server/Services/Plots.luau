@@ -52,27 +52,7 @@ local ORIGIN_Y = 0.3 -- above a possible Baseplate (its top is y = 0)
 local PAD_TOP = 0.6 -- how far a pad rises above the floor (the top of the designed fight slot)
 local SLOT_COLOR = Color3.fromRGB(107, 114, 128) -- the ring of an empty slot
 local LOCKED_COLOR = Color3.fromRGB(42, 44, 54) -- merge pads that are not bought yet
-local SQUAD_COLOR = Color3.fromRGB(104, 70, 76) -- (the squad pads take their color from their bonus, see squadPadColor)
-
--- The squad is 3 x 3. Its rows (back / middle / front) and columns (left / middle / right) decide what
--- standing on a pad gives (Balance.FrontRowHp ...). Returns: back row, front row, middle column.
-local function padInfo(i: number): (boolean, boolean, boolean)
-	local rows = Balance.SquadSize // Balance.SquadColumns
-	local row = (i - 1) // Balance.SquadColumns
-	return row == 0, row == rows - 1, (i - 1) % Balance.SquadColumns == 1
-end
-
--- The color of a squad pad shows its bonus: green = HP, orange = damage, a mix where it gives both.
-local function squadPadColor(i: number): Color3
-	local back, front, middleColumn = padInfo(i)
-	local hp = (if front then 1 else 0) + (if middleColumn then 1 else 0)
-	local damage = (if back then 1 else 0) + (if middleColumn then 0 else 1)
-	local neutral = Vector3.new(78, 82, 104) / 255
-	local green = Vector3.new(60, 190, 100) / 255
-	local orange = Vector3.new(235, 130, 50) / 255
-	local v = neutral + (green - neutral) * (hp / 2) + (orange - neutral) * (damage / 2)
-	return Color3.new(math.clamp(v.X, 0, 1), math.clamp(v.Y, 0, 1), math.clamp(v.Z, 0, 1))
-end
+local SQUAD_COLOR = Color3.fromRGB(190, 120, 70) -- the six squad pads (warm, one color: the pads give no bonus)
 
 local ARENA_START = 30 -- z of the arena gate (a road leads from the lobby to it)
 
@@ -325,17 +305,18 @@ local function makeClick(part: BasePart, owner: Player, action: () -> ())
 	end)
 end
 
--- Slot id → ground position. Board (1 … BoardSize) is 6x6, the squad (SquadOffset + 1 …) is 3x3.
--- column = x (left to right), row = z (0 = back, last = closest to the enemies).
+-- Slot id → ground position. Board (1 … BoardSize) is 6x6, the squad (SquadOffset + 1 …) is 3 columns x 2 rows,
+-- its pads further apart (Balance.SquadSpacing). column = x (left to right), row = z (0 = back, last = closest
+-- to the enemies).
 function Plots.slotGround(plot: Plot, id: number): Vector3
-	local columns, start, index = Balance.BoardColumns, Balance.BoardStart, id
+	local columns, start, index, spacing = Balance.BoardColumns, Balance.BoardStart, id, Balance.SlotSpacing
 	if id > Balance.SquadOffset then
-		columns, start, index = Balance.SquadColumns, Balance.SquadStart, id - Balance.SquadOffset
+		columns, start, index, spacing = Balance.SquadColumns, Balance.SquadStart, id - Balance.SquadOffset, Balance.SquadSpacing
 	end
 	local col = (index - 1) % columns
 	local row = (index - 1) // columns
-	local x = (col - (columns - 1) / 2) * Balance.SlotSpacing
-	return plot.origin + Vector3.new(x, PAD_TOP, start + row * Balance.SlotSpacing)
+	local x = (col - (columns - 1) / 2) * spacing
+	return plot.origin + Vector3.new(x, PAD_TOP, start + row * spacing)
 end
 
 -- Where the `i`-th of `count` enemies stands. Rows fill from the front and each row is centered.
@@ -445,7 +426,7 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 		decoratePad(plot.slotPads[i], SLOT_COLOR, false, "", false, true)
 	end
 	for i = 1, Balance.SquadSize do
-		addPad(Balance.SquadOffset + i, squadPadColor(i))
+		addPad(Balance.SquadOffset + i, SQUAD_COLOR)
 	end
 
 	-- Small signs that show only when you are close.
@@ -467,10 +448,7 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 		end
 	end
 	areaSign("BoardSign", 0, Balance.BoardStart - 7, '<font size="13" color="#9aa0aa">DRAG TO MERGE</font>\n<font size="26">MERGE BOARD</font>')
-	areaSign("BackRowSign", -14, Balance.SquadStart, string.format('<font size="13" color="#9aa0aa">BACK ROW · ranged +%d%% range</font>\n<font size="20">+%d%% DAMAGE</font>', math.floor(Balance.BackRangedRange * 100 + 0.5), math.floor(Balance.BackRowDamage * 100 + 0.5)))
-	areaSign("MiddleRowSign", -14, Balance.SquadStart + Balance.SlotSpacing, '<font size="13" color="#9aa0aa">MIDDLE ROW</font>\n<font size="20">NO ROW BONUS</font>')
-	areaSign("FrontRowSign", -14, Balance.SquadStart + 2 * Balance.SlotSpacing, string.format('<font size="13" color="#9aa0aa">FRONT ROW · Tank -%d%% damage taken</font>\n<font size="20">+%d%% HP</font>', math.floor(Balance.FrontTankArmor * 100 + 0.5), math.floor(Balance.FrontRowHp * 100 + 0.5)))
-	areaSign("SquadSign", 18, Balance.SquadStart + 3, '<font size="13" color="#9aa0aa">THESE FIGHT</font>\n<font size="26">SQUAD</font>')
+	areaSign("SquadSign", 22, Balance.SquadStart + Balance.SquadSpacing / 2, '<font size="13" color="#9aa0aa">THESE SIX FIGHT</font>\n<font size="26">SQUAD</font>')
 
 	-- The level-upgrade station in the lobby: stand on it and the upgrade panel opens (bought soldiers
 	-- start at a higher merge level). The server checks the invisible zone for the purchase.
@@ -616,7 +594,7 @@ function Plots.render(plot: Plot, board: Grid.Cells, squad: Grid.Cells, boardSlo
 	end
 	for i = 1, Balance.SquadSize do
 		local unit = squad[i]
-		renderCell(Balance.SquadOffset + i, unit, squadPadColor(i), false, 0.7)
+		renderCell(Balance.SquadOffset + i, unit, SQUAD_COLOR, false, 0.7)
 		setRingAura(plot.slotPads[Balance.SquadOffset + i], unit)
 	end
 	Plots.renderHolograms(plot, squad)
@@ -644,7 +622,7 @@ function Plots.renderHolograms(plot: Plot, squad: Grid.Cells)
 
 		local model = Soldier.build(unit.class, unit.tier, false, true, unit.ascended)
 		model.Name = "Hologram" .. i
-		local tint = squadPadColor(i):Lerp(Color3.fromRGB(140, 220, 255), 0.5)
+		local tint = SQUAD_COLOR:Lerp(Color3.fromRGB(140, 220, 255), 0.5)
 		local count = 0
 		for _, part in model:GetDescendants() do
 			if part:IsA("BasePart") then

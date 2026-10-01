@@ -163,7 +163,7 @@ UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
 UI.battleOpen = false -- the battle panel (wave, difficulty, START WAVE) is open: the PLAY button toggles it
-UI.LAYOUT_VERSION = 2 -- a saved layout from an older version loses the panel position (the defaults changed)
+UI.LAYOUT_VERSION = 3 -- a saved layout from an older version loses the panel / HUD positions (the defaults changed)
 UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the settings gear moves below)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
@@ -329,7 +329,8 @@ function Layout.apply(saved: any)
 		return
 	end
 	if decoded.v ~= UI.LAYOUT_VERSION then
-		decoded.Panel = nil -- the panel moved to the top of the screen by default; an old saved spot is dropped
+		decoded.Panel = nil -- the panel moved to the top of the screen, the HUD to the bottom left: old spots are dropped
+		decoded.Hud = nil
 	end
 	for name, entry in decoded do
 		if Layout.movables[name] and type(entry) == "table" and type(entry[1]) == "number" and type(entry[2]) == "number" then
@@ -411,8 +412,8 @@ local equipBest = makeButton("^", "EQUIP BEST", ORANGE, 3)
 -- Top left HUD: the account level (with its experience bar) and the coins.
 local hud = Instance.new("Frame")
 hud.Name = "Hud"
-hud.AnchorPoint = Vector2.new(0.5, 1)
-hud.Position = UDim2.new(0.5, 0, 1, -14) -- the middle of the bottom edge, stretched wide
+hud.AnchorPoint = Vector2.new(0, 1)
+hud.Position = UDim2.new(0, 14, 1, -14) -- the bottom left corner (the squad bar has the middle, PLAY the right)
 hud.Size = UDim2.fromOffset(520, 70)
 hud.BackgroundColor3 = BG
 hud.BackgroundTransparency = 0.12
@@ -736,112 +737,62 @@ UI.setCollapsed = function(on: boolean)
 end
 end
 
--- Inventory page: the equipped squad on top, the inventory below. The inventory IS the 3D merge
--- board: the same soldiers stand on the pads in the lobby.
-local inventoryPage = makePage("Inventory")
-UI.section(inventoryPage, "BATTLE SQUAD", 0, ORANGE)
-local squadCount = label(inventoryPage, "0/9", UDim2.fromOffset(256, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
+-- ── Battle squad bar (the bottom of the screen) ──────────────────────────
+-- The six soldiers that fight, as they stand on their pads: 3 columns, 2 rows, the FRONT row (nearest to the
+-- enemies) on top. Drag cards here from the inventory (or between the two rows) to arrange the squad; a card
+-- dragged onto the main panel goes back to the inventory. The bar moves by the grip on top and steps aside
+-- during a battle. (Laid out at 284 x 234 and drawn at UI.PANEL_SCALE, like the main panel.)
+UI.squadBar = Instance.new("Frame")
+UI.squadBar.Name = "SquadBar"
+UI.squadBar.AnchorPoint = Vector2.new(0.5, 1)
+UI.squadBar.Position = UDim2.new(0.5, 0, 1, -14)
+UI.squadBar.Size = UDim2.fromOffset(284, 234)
+UI.squadBar.BackgroundColor3 = BG
+UI.squadBar.BackgroundTransparency = 0.04
+UI.squadBar.BorderSizePixel = 0
+UI.squadBar.Active = true
+UI.squadBar.Parent = gui
+corner(UI.squadBar, 14)
+UI.gradient(UI.squadBar, Color3.fromRGB(36, 39, 54), Color3.fromRGB(18, 20, 28))
+UI.squadStroke = UI.stroke(UI.squadBar, Color3.fromRGB(70, 76, 100), 1.5)
+do
+	local squadScale = Instance.new("UIScale")
+	squadScale.Scale = UI.PANEL_SCALE
+	squadScale.Parent = UI.squadBar
+	local squadGrip = Instance.new("Frame")
+	squadGrip.Size = UDim2.new(1, 0, 0, 18)
+	squadGrip.BackgroundTransparency = 1
+	squadGrip.Parent = UI.squadBar
+	UI.grip(squadGrip, 142 - 7, 7, MUTED)
+	Layout.make("Squad", UI.squadBar, squadGrip)
+	local enemySide = label(UI.squadBar, "▲ ENEMIES", UDim2.fromOffset(16, 18), UDim2.fromOffset(252, 16), 12, Enum.Font.GothamBold, RED)
+	enemySide.TextXAlignment = Enum.TextXAlignment.Center
+	UI.section(UI.squadBar, "BATTLE SQUAD", 212, ORANGE, 16)
+end
+local squadCount = label(UI.squadBar, "0/6", UDim2.fromOffset(196, 212), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 squadCount.TextXAlignment = Enum.TextXAlignment.Right
-
--- The squad as it stands in the arena: a 3 x 3 grid, the FRONT row (nearest to the enemies) on top. Every
--- slot shows its bonus in color (green = HP, orange = damage) and is tinted like its pad on the map. Drag
--- cards between the slots (or from the inventory) to arrange the squad right here.
 local squadStrip = Instance.new("Frame")
-squadStrip.Position = UDim2.fromOffset(16, 36)
-squadStrip.Size = UDim2.fromOffset(300, 300)
+squadStrip.Position = UDim2.fromOffset(16, 38)
+squadStrip.Size = UDim2.fromOffset(252, 166)
 squadStrip.BackgroundTransparency = 1
-squadStrip.Parent = inventoryPage
+squadStrip.Parent = UI.squadBar
 local squadLayout = Instance.new("UIGridLayout")
-squadLayout.CellSize = UDim2.fromOffset(96, 96)
+squadLayout.CellSize = UDim2.fromOffset(80, 80)
 squadLayout.CellPadding = UDim2.fromOffset(6, 6)
 squadLayout.SortOrder = Enum.SortOrder.LayoutOrder
 squadLayout.Parent = squadStrip
-local enemySide = label(inventoryPage, "▲ ENEMIES", UDim2.fromOffset(16, 18), UDim2.fromOffset(300, 16), 12, Enum.Font.GothamBold, RED)
-enemySide.TextXAlignment = Enum.TextXAlignment.Center
 
--- The "i" button next to BATTLE SQUAD: the legend of the slot bonuses shows while the mouse is on it (or after
--- a tap), in a popup beside the panel, so it never takes room from the grid.
-do
-	local infoButton = Instance.new("TextButton")
-	infoButton.Position = UDim2.fromOffset(228, -3)
-	infoButton.Size = UDim2.fromOffset(22, 22)
-	infoButton.BackgroundColor3 = BADGE
-	infoButton.BorderSizePixel = 0
-	infoButton.AutoButtonColor = false
-	infoButton.Font = Enum.Font.GothamBlack
-	infoButton.TextSize = 13
-	infoButton.TextColor3 = MUTED
-	infoButton.Text = "i"
-	infoButton.Parent = inventoryPage
-	corner(infoButton, 11)
+-- Inventory page: the inventory, full width (the squad has its own bar at the bottom of the screen). The
+-- inventory IS the 3D merge board: the same soldiers stand on the pads in the lobby.
+local inventoryPage = makePage("Inventory")
 
-	local infoPopup = Instance.new("TextLabel")
-	infoPopup.Size = UDim2.fromOffset(210, 0)
-	infoPopup.AutomaticSize = Enum.AutomaticSize.Y
-	infoPopup.BackgroundColor3 = BG
-	infoPopup.BackgroundTransparency = 0.05
-	infoPopup.BorderSizePixel = 0
-	infoPopup.Font = Enum.Font.GothamMedium
-	infoPopup.TextSize = 12
-	infoPopup.TextColor3 = WHITE
-	infoPopup.RichText = true
-	infoPopup.TextWrapped = true
-	infoPopup.TextXAlignment = Enum.TextXAlignment.Left
-	infoPopup.TextYAlignment = Enum.TextYAlignment.Top
-	infoPopup.Visible = false
-	infoPopup.ZIndex = 50
-	infoPopup.Parent = gui
-	corner(infoPopup, 10)
-	local infoPadding = Instance.new("UIPadding")
-	infoPadding.PaddingTop = UDim.new(0, 10)
-	infoPadding.PaddingBottom = UDim.new(0, 10)
-	infoPadding.PaddingLeft = UDim.new(0, 12)
-	infoPadding.PaddingRight = UDim.new(0, 12)
-	infoPadding.Parent = infoPopup
-	infoPopup.Text = string.format(
-		'<b>SLOT BONUSES</b>\n<font color="#7ee08a">green number = +%% HP</font>\n<font color="#ffb070">orange number = +%% damage</font>\n\nFront row (top) +%d%% HP\nBack row (bottom) +%d%% DMG\nMiddle column +%d%% HP\nSide columns +%d%% DMG\n\n<font color="#a5aab9">Archer, Hunter, Mage in the back row: +range.\nTank in the front row: takes less damage.</font>',
-		math.floor(Balance.FrontRowHp * 100 + 0.5),
-		math.floor(Balance.BackRowDamage * 100 + 0.5),
-		math.floor(Balance.CenterHp * 100 + 0.5),
-		math.floor(Balance.FlankDamage * 100 + 0.5)
-	)
-	local function showInfo(on: boolean)
-		infoPopup.Visible = on
-		if on then
-			infoPopup.Position = UDim2.fromOffset(infoButton.AbsolutePosition.X + 30, infoButton.AbsolutePosition.Y)
-		end
-		infoButton.TextColor3 = if on then WHITE else MUTED
-	end
-	infoButton.MouseEnter:Connect(function()
-		showInfo(true)
-	end)
-	infoButton.MouseLeave:Connect(function()
-		showInfo(false)
-	end)
-	infoButton.Activated:Connect(function()
-		showInfo(not infoPopup.Visible)
-	end)
-end
-
--- The bonus of squad slot i (1 … 9): HP and damage in percent, and the tint of its pad.
-local function slotBonus(i: number): (number, number, Color3)
-	local rows = Balance.SquadSize // Balance.SquadColumns
-	local row = (i - 1) // Balance.SquadColumns
-	local front, back, middle = row == rows - 1, row == 0, (i - 1) % Balance.SquadColumns == 1
-	local hp = (if front then Balance.FrontRowHp else 0) + (if middle then Balance.CenterHp else 0)
-	local damage = (if back then Balance.BackRowDamage else 0) + (if middle then 0 else Balance.FlankDamage)
-	local green, orange = Color3.fromRGB(60, 190, 100), Color3.fromRGB(235, 130, 50)
-	local tint = if hp > 0 and damage > 0 then green:Lerp(orange, damage / (hp + damage)) elseif hp > 0 then green else orange
-	return math.floor(hp * 100 + 0.5), math.floor(damage * 100 + 0.5), tint
-end
-
-UI.section(inventoryPage, "INVENTORY", 0, GOLD, 334)
+UI.section(inventoryPage, "INVENTORY", 0, GOLD, 16)
 local inventoryCount = label(inventoryPage, "0/6", UDim2.fromOffset(556, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 inventoryCount.TextXAlignment = Enum.TextXAlignment.Right
 
 local scroll = Instance.new("ScrollingFrame")
-scroll.Position = UDim2.fromOffset(334, 20)
-scroll.Size = UDim2.fromOffset(296, 200)
+scroll.Position = UDim2.fromOffset(16, 20)
+scroll.Size = UDim2.fromOffset(614, 200)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 6
@@ -875,8 +826,8 @@ local function moveIntoInventory(b: Button, x: number, y: number, width: number,
 		b.sub.TextSize = 11
 	end
 end
-moveIntoInventory(autoMerge, 334, 230, 144, 44, true)
-moveIntoInventory(equipBest, 486, 230, 144, 44, true)
+moveIntoInventory(autoMerge, 16, 230, 300, 44, true)
+moveIntoInventory(equipBest, 330, 230, 300, 44, true)
 
 -- ── The dock on the left edge of the screen ──────────────────────────────
 -- Four square icons, one per tab of the panel. An icon opens the panel on its tab; the icon of the open tab
@@ -1138,13 +1089,23 @@ UserInputService.InputChanged:Connect(function(input)
 	scroll.CanvasPosition = Vector2.new(0, math.clamp(scroll.CanvasPosition.Y - input.Position.Z * 60, 0, maxY))
 end)
 
-local function pointerOverPanel(): boolean
-	local p, s = panel.AbsolutePosition, panel.AbsoluteSize
+-- Is the pointer over `frame` (a visible one)?
+local function pointerOver(frame: GuiObject): boolean
+	if not frame.Visible then
+		return false
+	end
+	local p, s = frame.AbsolutePosition, frame.AbsoluteSize
 	return pointer.X >= p.X and pointer.X <= p.X + s.X and pointer.Y >= p.Y and pointer.Y <= p.Y + s.Y
 end
 
+-- Over the main panel (store a soldier) or the squad bar (equip it): both take dragged soldiers.
+local function pointerOverPanel(): boolean
+	return pointerOver(panel) or pointerOver(UI.squadBar)
+end
+
 local function setPanelHighlight(on: boolean)
-	panelStroke.Color = if on then GOLD else BADGE
+	panelStroke.Color = if on and pointerOver(panel) then GOLD else BADGE
+	UI.squadStroke.Color = if on and pointerOver(UI.squadBar) then GOLD else Color3.fromRGB(70, 76, 100)
 end
 
 -- A soldier card: a small 3D view of the soldier (ViewportFrame) on a dark tile with an outline
@@ -1354,36 +1315,6 @@ local function renderInventory()
 			styleEmptyCard(card)
 		end
 		card.BackgroundTransparency = 0
-		-- The slot's bonus: a colored line on top and a tint of the card like its pad.
-		local hp, damage, tint = slotBonus(i)
-		local bonus = card:FindFirstChild("Bonus") :: TextLabel?
-		if not bonus then
-			bonus = label(card, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 16, Enum.Font.GothamBold, WHITE)
-			local made = bonus :: TextLabel
-			made.Name = "Bonus"
-			made.RichText = true
-			made.TextStrokeTransparency = 0.5
-			made.TextXAlignment = Enum.TextXAlignment.Center
-			made.TextYAlignment = Enum.TextYAlignment.Center
-			made.ZIndex = 3
-		end
-		local parts = {}
-		if hp > 0 then
-			table.insert(parts, string.format('<font color="#7ee08a">+%d%% HP</font>', hp))
-		end
-		if damage > 0 then
-			table.insert(parts, string.format('<font color="#ffb070">+%d%% DMG</font>', damage))
-		end
-		local bonusLabel = bonus :: TextLabel
-		bonusLabel.Text = table.concat(parts, "\n")
-		bonusLabel.Visible = not unit -- only on an empty slot; a filled slot shows its soldier
-		if not unit then
-			card.BackgroundColor3 = tint:Lerp(BG, 0.72)
-			local stroke = card:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				stroke.Color = tint:Lerp(BG, 0.3)
-			end
-		end
 	end
 	squadCount.Text = string.format("%d/%d", equipped, Balance.SquadSize)
 end
@@ -2161,7 +2092,7 @@ local function getPlot(): Instance?
 	return plots and plots:FindFirstChild("Plot_" .. player.UserId)
 end
 
--- Slot ids: the merge board is 1 … BoardSize, the squad is SquadOffset + 1 … SquadOffset + SquadSize.
+-- Slot ids: the merge board is 1 … BoardSize, the squad is SquadOffset + 1 … SquadOffset + SquadSize (six).
 local slotIds: { number } = {}
 for i = 1, Balance.BoardSize do
 	table.insert(slotIds, i)
@@ -2562,7 +2493,7 @@ local function endDrag()
 		local targetCard = cardIdAtPointer(d.slot)
 		if targetCard then
 			Net.get("Interact"):FireServer(d.slot, targetCard) -- merge / swap with that card
-		elseif d.slot > Balance.SquadOffset then
+		elseif d.slot > Balance.SquadOffset and pointerOver(panel) then
 			Net.get("Unequip"):FireServer(d.slot) -- a squad soldier dropped on the panel goes back to the inventory
 		end
 		task.delay(0.5, function()
@@ -2612,8 +2543,9 @@ openCardPopup = function(id: number)
 
 	local popup = Instance.new("Frame")
 	popup.AnchorPoint = Vector2.new(0, 0.5)
+	local container: GuiObject = if equipped then UI.squadBar else panel
 	popup.Position = UDim2.fromOffset(
-		panel.AbsolutePosition.X + panel.AbsoluteSize.X + 10,
+		container.AbsolutePosition.X + container.AbsoluteSize.X + 10,
 		math.clamp(card.AbsolutePosition.Y + card.AbsoluteSize.Y / 2, 80, math.max(80, gui.AbsoluteSize.Y - 80))
 	)
 	popup.Size = UDim2.fromOffset(220, 168)
@@ -4299,6 +4231,7 @@ end
 do
 	RunService.RenderStepped:Connect(function()
 		panel.Visible = not state.battling and not UI.hidden and not UI.battleOpen
+		UI.squadBar.Visible = not state.battling
 	end)
 end
 

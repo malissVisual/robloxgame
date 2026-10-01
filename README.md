@@ -27,7 +27,7 @@ Then in Studio: **Plugins → Rojo → Connect** (localhost, 34872) and **Play**
 Summon (altar, E) → the soldiers land in the INVENTORY (= the 3D merge room)
    ↑                                        │ drag a card onto a card (UI) or a pad onto a pad (3D): merge
    │                                        │ click a card → EQUIP (into the battle squad)
-   │                        BATTLE SQUAD (3D, 3 x 3 = 9 places) → FIGHT (pick difficulty + wave, START WAVE) → arena
+   │                        BATTLE SQUAD (3D, 3 x 2 = 6 places) → PLAY (pick difficulty + wave, START WAVE) → arena
    └── coins from kills go straight to you, XP drops as orbs; a win = a soldier drop + next wave ────────┘
 ```
 
@@ -183,7 +183,7 @@ other; it comes back when the battle panel closes, and opening it from the dock 
 
 ```
 lobby (-68 … -4)              →  road (-4 … 30)  →  gate  →  ARENA 1 – Training (30 … 140)
-your spawn (z = -9)              ~34 studs of grass   name    SQUAD 3 × 3        z = 34 … 46 (colored pads, they wait here)
+your spawn (z = -9)              ~34 studs of grass   name    SQUAD 3 × 2        z = 31 … 42 (six pads 11 apart, they wait here)
 MERGE BOARD 6 × 6 (z = -50…-20)  with a worn road             FIGHT ARENA, one step up (z = 51 … 111, 48 wide)
                                                               enemy wave 4 wide, up to 3 rows (z = 118 … 130), visible before the battle
 ```
@@ -196,25 +196,21 @@ simple placeholder platform with two steps, isolated in `src/server/Services/Fig
 replace `FightArena.build` with your own design. The rest of the game only needs the returned
 `heightAt(worldZ)` and `spot(side, index, count)` (see the comment at the top of that file).
 
-**The squad is 3 x 3** (nine soldiers: a back, a middle and a front row). The **Inventory tab** shows it the same way
-(BATTLE SQUAD, a big 3 x 3 grid with the front row on top, "▲ ENEMIES" above it): an empty slot shows its bonus
-(green = +HP %, orange = +damage %) and is tinted like its pad; the "i" button next to it shows the legend in a
-popup. Arrange the squad right in the panel by dragging cards (or on the map). The pads in the world have no
-bonus tags. **Pad bonuses** (a small tag on every
-squad pad shows what it gives, `Balance.FrontRowHp` and the rest; the **color of the pad** shows it too: green =
-HP, orange = damage, yellow-ish where it gives both): the **front row** +25% HP, the **back row** +15% damage
-(the middle row has no row bonus); the **middle column** +10% HP, the two **outer
-columns** (the left and right lane) +10% damage; **ranged soldiers** (Archer, Hunter, Mage) in the back row
-have +15% range and a **Tank** in the front row takes 15% less damage. The bonuses stack (a soldier in the
-front-middle pad has +25% and +10% HP), so a tank belongs in front, an archer in the back, and the
-strongest hitter on the flank.
+**The squad is exactly six** (`Balance.SquadSize`, 3 columns × 2 rows: a back and a front row), nothing more to
+buy around it. In the lobby the six pads stand 11 studs apart (`Balance.SquadSpacing`, the merge board is tighter)
+so the characters have room and are seen one by one; they are all one warm color and give **no bonuses**: where a
+soldier stands only decides which enemies it meets first. The **squad bar** at the bottom of the screen shows the
+same six places (3 × 2, the front row on top, "▲ ENEMIES" above it); drag cards onto it from the inventory, between
+its slots, or onto the main panel to unequip. The bar moves by its grip and hides during a battle. The HUD (level,
+coins) sits in the bottom left corner, PLAY in the bottom right. (A profile saved with the old 3 × 3 squad keeps its
+soldiers: the three beyond the sixth place move to free pads of the merge board, or are sold when there is none.)
 
 **The big arena and the formation:** the fight arena is 48 studs wide and 60 deep. Your squad's formation is
 **spread over it**: the three columns of the squad pads stand 11 studs apart (left, middle, right lane), the
-back row 8 studs behind the front row, and the enemies (4 columns, 9 studs apart, up to 3 rows) start about 26
+back row 10 studs behind the front row, and the enemies (4 columns, 9 studs apart, up to 3 rows) start about 26
 studs in front of your front row. Everybody fights the nearest enemy, so **where you put a soldier decides what
-it fights**: the front row meets the enemies first and has +25% HP, the back row (ranged soldiers!) stays behind
-with +15% damage, and a soldier on the left pad fights the enemies on the left. Battles are longer now
+it fights**: the front row meets the enemies first, the back row (ranged soldiers!) stays behind, and a soldier on
+the left pad fights the enemies on the left. Battles are longer now
 (`Balance.BattleTimeLimit` = 90 s).
 
 ## Multiple players
@@ -383,9 +379,8 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
 ## Tactics, rewards and the long game
 
 **Tactics before the fight**
-- **Rows matter:** the squad has a **front row** (the pads nearest to the enemies, ids 104 – 106) with +25% HP
-  and a **back row** with +15% damage (`Balance.FrontRowHp`, `BackRowDamage`); signs on the ground say which is
-  which. Tanks in front, archers behind.
+- **Rows matter:** the squad has a **front row** (the pads nearest to the enemies, ids 104 – 106) that meets the
+  enemies first and a **back row** that stays behind; the pads give no stat bonuses. Tanks in front, archers behind.
 - **Synergies** (`Synergy.luau`, shown in the battle panel): **Frontline** (Knight, Tank, Berserker, Soldier)
   2 = +10% HP for everybody, 3+ = +20%; **Ranged** (Archer, Hunter, Mage) 2 = +10% damage, 3+ = +20%;
   **4 different classes** = +10% HP and damage. The soldiers you put in the squad decide, not only the level.

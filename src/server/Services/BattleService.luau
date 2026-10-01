@@ -34,7 +34,7 @@ type Fighter = {
 	ability: string?, -- a boss's ability: "slam" | "summon" | "volley" | "heal" (from its look)
 	abilityTimer: number, -- battle seconds until the ability fires again
 	summoned: boolean, -- the Chief already called its reinforcements
-	armor: number, -- takes this part less damage (a Tank in the front row)
+	armor: number, -- takes this part less damage (0 for everybody right now)
 	clock: number, -- battle time this fighter has lived (seconds; the battle speed counts in it)
 	stunUntil: number, -- cannot act until this battle time (a boss slam)
 	slowUntil: number, -- Frost Nova: acts at slowFactor speed until this battle time
@@ -463,24 +463,11 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			fighter.passive = passiveId
 			fighter.passiveValue = Units.Passives[passiveId].value * (if cell.ascended then 2 else 1)
 			fighter.spot = plot.arena.spot(PLAYER_SIDE, i, Balance.SquadSize)
-			-- Tactics: the front row (nearest to the enemies) has more HP, the back row hits harder;
-			-- the squad's synergies make everybody stronger.
-			local rowIndex = (i - 1) // Balance.SquadColumns
-			local front = rowIndex == Balance.SquadSize // Balance.SquadColumns - 1 -- the row nearest to the enemies
-			local back = rowIndex == 0 -- (the rows between have no row bonus)
-			local power = 1
-			-- The pad decides more: the middle column has more HP, the two outer columns (the lanes on the
-			-- left / right) hit harder; ranged soldiers in the back row see further, a Tank in front takes less.
-			local middle = (i - 1) % Balance.SquadColumns == 1
-			fighter.maxHp *= power * synergy.hp * (if front then 1 + Balance.FrontRowHp else 1) * (if middle then 1 + Balance.CenterHp else 1)
+			-- The squad's synergies make everybody stronger; the pad a soldier stands on gives nothing (it only
+			-- decides which enemies it meets first).
+			fighter.maxHp *= synergy.hp
 			fighter.hp = fighter.maxHp
-			fighter.damage *= power * synergy.damage * (if back then 1 + Balance.BackRowDamage else 1) * (if middle then 1 else 1 + Balance.FlankDamage)
-			if Synergy.Roles[cell.class] == "Ranged" and back then
-				fighter.range *= 1 + Balance.BackRangedRange
-			end
-			if cell.class == "Tank" and front then
-				fighter.armor = Balance.FrontTankArmor
-			end
+			fighter.damage *= synergy.damage
 			table.insert(fighters, fighter)
 		end
 	end

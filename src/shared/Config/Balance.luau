@@ -11,9 +11,11 @@ local Balance = {
 	BoardUpgradeStep = 3, -- slots gained per upgrade
 	BoardUpgradeBaseCost = 40, -- cost of the first upgrade
 	BoardUpgradeGrowth = 1.6, -- every upgrade costs 60% more
-	-- Squad: the soldiers that actually fight (3 columns × 2 rows), in the arena.
+	-- Squad: the soldiers that actually fight: exactly six, 3 columns × 2 rows (a back and a front row), in the
+	-- arena. The squad has no upgrades and the pads give no bonuses: the six just stand there, well apart.
 	SquadColumns = 3,
-	SquadSize = 9, -- 3 x 3: a back, a middle and a front row
+	SquadSize = 6,
+	SquadSpacing = 11, -- between the squad pads (the merge board uses the tighter SlotSpacing)
 	-- Slot ids: the board is 1 … BoardSize, the squad is SquadOffset + 1 … SquadOffset + SquadSize.
 	SquadOffset = 100,
 
@@ -60,13 +62,7 @@ local Balance = {
 	AdminUnlockCoins = 1000000, -- coins the admin "UNLOCK ALL" button gives
 	AdminProgressCoins = 1000, -- coins the admin "+ PROGRESS" button gives
 
-	-- Tactics (the squad is 3 wide, 2 rows: the FRONT row is the one nearest to the enemies).
-	FrontRowHp = 0.25, -- soldiers of the front row have +25% HP
-	BackRowDamage = 0.15, -- soldiers of the back row deal +15% damage
-	FlankDamage = 0.10, -- the two outer columns (left / right lane) deal +10% damage
-	CenterHp = 0.10, -- the middle column has +10% HP
-	BackRangedRange = 0.15, -- ranged soldiers (Archer, Hunter, Mage) in the back row have +15% range
-	FrontTankArmor = 0.15, -- a Tank in the front row takes 15% less damage
+	-- (The pads of the squad give no bonuses: where a soldier stands only decides what it fights first.)
 	-- Synergies of the squad (see Synergy.luau): two roles, Frontline and Ranged, and a mixed squad.
 	SynergyLow = { count = 2, bonus = 0.10 }, -- 2 soldiers of a role
 	SynergyHigh = { count = 3, bonus = 0.20 }, -- 3 or more soldiers of a role
@@ -156,7 +152,7 @@ local Balance = {
 	PlotSpacingX = 90, -- between plots side by side (a plot is 64 wide)
 	PlotSpacingZ = 240, -- between rows of plots (a plot is ~210 long)
 	BoardStart = -50, -- z of the board's back row (rows go up to z = -15), in the lobby
-	SquadStart = 32, -- z of the squad's back row (3 rows: 32, 39, 46), in the arena, before the fight arena's step
+	SquadStart = 31, -- z of the squad's back row (2 rows: 31, 42), in the arena, before the fight arena's step
 	EnemyFront = 118, -- z of the enemy's front row (the big raised fight arena is between squad and enemies)
 	EnemyColumns = 4, -- enemies stand in 4 columns (up to 3 rows)
 

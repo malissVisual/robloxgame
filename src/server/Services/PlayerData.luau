@@ -13,6 +13,7 @@ local Difficulties = require(Shared.Config.Difficulties)
 local Spells = require(Shared.Config.Spells)
 local Achievements = require(Shared.Config.Achievements)
 local Grid = require(Shared.Grid)
+local Levels = require(Shared.Config.Levels)
 
 export type Profile = {
 	coins: number,
@@ -266,6 +267,31 @@ local function applySaved(profile: Profile, saved: any)
 	profile.boardSlots = number(saved.boardSlots, profile.boardSlots, Balance.BoardStartSlots, Balance.BoardSize)
 	profile.board = cleanCells(saved.board, Balance.BoardSize)
 	profile.squad = cleanCells(saved.squad, Balance.SquadSize)
+	-- A squad saved when it had more places than today (it was 3 x 3 = 9): the soldiers beyond the last place
+	-- go to free pads of the merge board (unlocked pads first), and when there is no room they are sold.
+	if type(saved.squad) == "table" then
+		for i = Balance.SquadSize + 1, 30 do
+			local unit = copyUnit(saved.squad[i])
+			if unit then
+				local placed = false
+				for pass = 1, 2 do
+					for id = 1, Balance.BoardSize do
+						if not profile.board[id] and (pass == 2 or Grid.isBoardUnlocked(id, profile.boardSlots)) then
+							profile.board[id] = unit
+							placed = true
+							break
+						end
+					end
+					if placed then
+						break
+					end
+				end
+				if not placed then
+					profile.coins += Levels.sellValue(unit.tier, unit.ascended)
+				end
+			end
+		end
+	end
 	profile.purchases = number(saved.purchases, 0, 0, 2 ^ 40)
 	for _, class in Units.ClassList do
 		local raw = if type(saved.tierUnlocked) == "table" then saved.tierUnlocked[class] elseif type(saved.tierUnlocked) == "number" then saved.tierUnlocked else nil
