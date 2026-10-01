@@ -751,6 +751,62 @@ local function onAdminReset(player: Player)
 	notify(player, "Admin: progress reset")
 end
 
+-- Admin: the test tools of the admin panel. `command` picks the tool, `a` / `b` are its number / class:
+--   coins ±n · wave n · spawn class tier · spawnall class (level 1 … 9 of it) · clear (the inventory) ·
+--   slots (every merge slot) · startlevel n
+local function onAdminCommand(player: Player, command: any, a: any, b: any)
+	local profile, plot = PlayerData.get(player), plots[player]
+	if not profile or not plot or not isAdmin(player) or profile.battling or profile.rolling or type(command) ~= "string" then
+		return
+	end
+	if command == "coins" and type(a) == "number" then
+		local amount = math.clamp(math.floor(a), -1000000, 1000000)
+		profile.coins = math.max(0, profile.coins + amount)
+		notify(player, string.format("Admin: %+d coins", amount))
+	elseif command == "wave" and type(a) == "number" then
+		profile.wave = math.clamp(math.floor(a), 1, plot.map.waves)
+		profile.selectedWave = profile.wave
+		profile.bestWave = math.max(profile.bestWave, profile.wave)
+		profile.mapCleared = profile.wave >= plot.map.waves
+		notify(player, string.format("Admin: wave %d", profile.wave))
+	elseif command == "spawn" and Units.isValidClass(a) and type(b) == "number" then
+		local tier = math.clamp(math.floor(b), 1, Units.MaxTier)
+		profile.unlocked[a] = true
+		if (profile.tierUnlocked[a] or 1) < tier then
+			profile.tierUnlocked[a] = tier
+		end
+		if addToInventory(profile, { class = a, tier = tier }) then
+			notify(player, string.format("Admin: %s Lv %d put in the inventory", Units.Classes[a].label, tier))
+		else
+			notify(player, "Admin: the inventory is full")
+		end
+	elseif command == "spawnall" and Units.isValidClass(a) then
+		profile.unlocked[a] = true
+		profile.tierUnlocked[a] = Units.MaxTier
+		local stored = 0
+		for tier = 1, Units.MaxTier do
+			if addToInventory(profile, { class = a, tier = tier }) then
+				stored += 1
+			end
+		end
+		notify(player, string.format("Admin: %s Lv 1-9 (%d fit in the inventory)", Units.Classes[a].label, stored))
+	elseif command == "clear" then
+		for id = 1, Balance.BoardSize do
+			profile.board[id] = false
+		end
+		notify(player, "Admin: inventory cleared")
+	elseif command == "slots" then
+		profile.boardSlots = Balance.BoardSize
+		notify(player, "Admin: every merge slot unlocked")
+	elseif command == "startlevel" and type(a) == "number" then
+		profile.startLevel = math.clamp(math.floor(a), 1, Balance.StartLevelMax)
+		notify(player, string.format("Admin: new characters start at level %d", profile.startLevel))
+	else
+		return
+	end
+	refresh(player)
+end
+
 local function onUpgrade(player: Player)
 	local profile, plot = PlayerData.get(player), plots[player]
 	if not profile or not plot or profile.battling or profile.rolling then
@@ -1399,6 +1455,7 @@ function GameService.init()
 	Net.get("AdminProgress").OnServerEvent:Connect(onAdminProgress)
 	Net.get("AdminUnlock").OnServerEvent:Connect(onAdminUnlock)
 	Net.get("AdminReset").OnServerEvent:Connect(onAdminReset)
+	Net.get("AdminCommand").OnServerEvent:Connect(onAdminCommand)
 	Net.get("UpgradeLevel").OnServerEvent:Connect(onUpgradeLevel)
 	Net.get("BattleSpeed").OnServerEvent:Connect(onBattleSpeed)
 	Net.get("SetSetting").OnServerEvent:Connect(onSetSetting)

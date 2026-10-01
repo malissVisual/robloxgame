@@ -162,6 +162,7 @@ UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
+UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the settings gear moves below)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
@@ -3862,47 +3863,137 @@ end
 -- ── Admin tools (only for the owner / in Studio) ─────────────────────────
 do
 
+-- A small red ADMIN button in the top right corner; a click opens the test tools under it: progress, coins,
+-- the wave, spawning any character at any level into the inventory, clearing the inventory, a reset.
+local PANEL_W = 236
+local PANEL_H = 318
+local adminOpen = false
+local adminClass = 1 -- index into Units.ClassList
+local adminTier = 1
+
+local toggle = Instance.new("TextButton")
+toggle.Name = "AdminToggle"
+toggle.AnchorPoint = Vector2.new(1, 0)
+toggle.Position = UDim2.new(1, -14, 0, 14)
+toggle.Size = UDim2.fromOffset(92, 30)
+toggle.BackgroundColor3 = BG
+toggle.BackgroundTransparency = 0.15
+toggle.BorderSizePixel = 0
+toggle.AutoButtonColor = false
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 12
+toggle.TextColor3 = RED
+toggle.Text = "ADMIN  ▾"
+toggle.Visible = false
+toggle.Parent = gui
+corner(toggle, 8)
+UI.stroke(toggle, RED, 1.5, 0.3)
+toggle.Activated:Connect(function()
+	adminOpen = not adminOpen
+	toggle.Text = if adminOpen then "ADMIN  ▴" else "ADMIN  ▾"
+end)
+
 local adminPanel = Instance.new("Frame")
 adminPanel.Name = "AdminPanel"
 adminPanel.AnchorPoint = Vector2.new(1, 0)
-adminPanel.Position = UDim2.new(1, -14, 0, 14)
-adminPanel.Size = UDim2.fromOffset(150, 136)
+adminPanel.Position = UDim2.new(1, -14, 0, 50)
+adminPanel.Size = UDim2.fromOffset(PANEL_W, PANEL_H)
 adminPanel.BackgroundColor3 = BG
-adminPanel.BackgroundTransparency = 0.15
+adminPanel.BackgroundTransparency = 0.08
 adminPanel.BorderSizePixel = 0
 adminPanel.Active = true
 adminPanel.Visible = false
 adminPanel.Parent = gui
 corner(adminPanel, 10)
-local adminStroke = Instance.new("UIStroke")
-adminStroke.Color = RED
-adminStroke.Thickness = 2
-adminStroke.Parent = adminPanel
-local adminTitle = label(adminPanel, "ADMIN", UDim2.fromOffset(0, 6), UDim2.fromOffset(150, 16), 12, Enum.Font.GothamBold, RED)
-adminTitle.TextXAlignment = Enum.TextXAlignment.Center
+UI.stroke(adminPanel, RED, 1.5, 0.3)
 
-local function adminButton(text: string, y: number, color: Color3, action: () -> ())
+local function section(text: string, y: number)
+	label(adminPanel, text, UDim2.fromOffset(10, y), UDim2.fromOffset(PANEL_W - 20, 14), 10, Enum.Font.GothamBold, MUTED)
+end
+
+local function adminButton(text: string, x: number, y: number, w: number, color: Color3, action: () -> ()): TextButton
 	local b = Instance.new("TextButton")
-	b.Position = UDim2.fromOffset(10, y)
-	b.Size = UDim2.fromOffset(130, 30)
+	b.Position = UDim2.fromOffset(x, y)
+	b.Size = UDim2.fromOffset(w, 28)
 	b.BackgroundColor3 = color
 	b.BorderSizePixel = 0
 	b.AutoButtonColor = false
 	b.Font = Enum.Font.GothamBold
-	b.TextSize = 13
+	b.TextSize = 12
 	b.TextColor3 = WHITE
 	b.Text = text
 	b.Parent = adminPanel
-	corner(b, 8)
+	corner(b, 7)
 	b.Activated:Connect(action)
+	return b
 end
-adminButton("+ PROGRESS", 28, GREEN:Lerp(BG, 0.3), function()
+
+local function command(name: string, a: any?, b: any?)
+	Net.get("AdminCommand"):FireServer(name, a, b)
+end
+
+-- Progress
+section("PROGRESS", 8)
+adminButton("+ PROGRESS", 10, 24, 104, GREEN:Lerp(BG, 0.3), function()
 	Net.get("AdminProgress"):FireServer()
 end)
-adminButton("UNLOCK ALL", 64, GOLD:Lerp(BG, 0.45), function()
+adminButton("UNLOCK ALL", 122, 24, 104, GOLD:Lerp(BG, 0.45), function()
 	Net.get("AdminUnlock"):FireServer()
 end)
-adminButton("RESET", 100, RED:Lerp(BG, 0.4), function()
+
+-- Coins
+section("COINS", 60)
+for i, amount in { 1000, 10000, 100000 } do
+	adminButton(string.format("+%dk", amount // 1000), 10 + (i - 1) * 74, 76, 68, GOLD:Lerp(BG, 0.55), function()
+		command("coins", amount)
+	end)
+end
+
+-- Wave
+local waveTitle = label(adminPanel, "WAVE", UDim2.fromOffset(10, 112), UDim2.fromOffset(PANEL_W - 20, 14), 10, Enum.Font.GothamBold, MUTED)
+adminButton("−5", 10, 128, 68, BADGE, function()
+	command("wave", state.wave - 5)
+end)
+adminButton("+5", 84, 128, 68, BADGE, function()
+	command("wave", state.wave + 5)
+end)
+adminButton("MAX", 158, 128, 68, BADGE, function()
+	command("wave", state.mapWaves)
+end)
+
+-- Spawn: a class (cycled with the arrows) at a level (− / +), one of it or all nine levels.
+section("SPAWN INTO THE INVENTORY", 164)
+local classLabel = label(adminPanel, "", UDim2.fromOffset(40, 180), UDim2.fromOffset(PANEL_W - 80, 28), 13, Enum.Font.GothamBold, WHITE)
+classLabel.TextXAlignment = Enum.TextXAlignment.Center
+adminButton("<", 10, 180, 26, BADGE, function()
+	adminClass = (adminClass - 2) % #Units.ClassList + 1
+end)
+adminButton(">", PANEL_W - 36, 180, 26, BADGE, function()
+	adminClass = adminClass % #Units.ClassList + 1
+end)
+local tierLabel = label(adminPanel, "", UDim2.fromOffset(40, 212), UDim2.fromOffset(PANEL_W - 80, 28), 13, Enum.Font.GothamBold, GOLD)
+tierLabel.TextXAlignment = Enum.TextXAlignment.Center
+adminButton("−", 10, 212, 26, BADGE, function()
+	adminTier = math.max(1, adminTier - 1)
+end)
+adminButton("+", PANEL_W - 36, 212, 26, BADGE, function()
+	adminTier = math.min(Units.MaxTier, adminTier + 1)
+end)
+adminButton("SPAWN 1", 10, 246, 104, GREEN:Lerp(BG, 0.3), function()
+	command("spawn", Units.ClassList[adminClass], adminTier)
+end)
+adminButton("SPAWN LV 1-9", 122, 246, 104, GREEN:Lerp(BG, 0.45), function()
+	command("spawnall", Units.ClassList[adminClass])
+end)
+
+-- Inventory and reset
+adminButton("CLEAR INVENTORY", 10, 280, 104, BADGE, function()
+	command("clear")
+end)
+adminButton("ALL SLOTS", 122, 280, 48, BADGE, function()
+	command("slots")
+end)
+adminButton("RESET", 178, 280, 48, RED:Lerp(BG, 0.4), function()
 	askConfirm("Reset everything?", {
 		"Admin reset",
 		"Coins, characters, waves and unlocks are wiped",
@@ -3913,7 +4004,18 @@ adminButton("RESET", 100, RED:Lerp(BG, 0.4), function()
 end)
 
 RunService.RenderStepped:Connect(function()
-	adminPanel.Visible = state.isAdmin
+	toggle.Visible = state.isAdmin
+	adminPanel.Visible = state.isAdmin and adminOpen
+	UI.adminHeight = if not state.isAdmin then 0 elseif adminOpen then 36 + PANEL_H else 30
+	if not adminPanel.Visible then
+		return
+	end
+	waveTitle.Text = string.format("WAVE  ·  now %d of %d", state.wave, state.mapWaves)
+	local class = Units.ClassList[adminClass]
+	classLabel.Text = Units.Classes[class].label
+	classLabel.TextColor3 = Units.Classes[class].color
+	tierLabel.Text = string.format("Level %d", adminTier)
+	tierLabel.TextColor3 = Levels.color(adminTier)
 end)
 end
 
@@ -4422,10 +4524,12 @@ do
 		playSound("click")
 	end)
 	RunService.RenderStepped:Connect(function()
-		gear.Position = UDim2.new(1, -14, 0, if state.isAdmin then 160 else 14)
+		-- Under the admin tools when there are any (they take UI.adminHeight of the corner).
+		local top = 14 + (if UI.adminHeight > 0 then UI.adminHeight + 10 else 0)
+		gear.Position = UDim2.new(1, -14, 0, top)
 		if not Layout.saved.Settings then -- unless the player moved it somewhere
 			panel.AnchorPoint = Vector2.new(1, 0)
-			panel.Position = UDim2.new(1, -60, 0, if state.isAdmin then 160 else 14)
+			panel.Position = UDim2.new(1, -60, 0, top)
 		end
 		panel.Visible = open
 		if not open then
