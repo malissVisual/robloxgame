@@ -1,6 +1,7 @@
 --!nonstrict
--- The designed classes (Soldier, Knight, Archer) as R15 characters: 9 designed stages each (one per merge level). The
--- Soldier comes from design/SoldierMerge_R15_Builder, the Knight from the red knight cards. The gear is parts welded on the limbs of the R15 base rig (Rig.base).
+-- The designed classes (Soldier, Knight, Archer, Mage) as R15 characters: 9 designed stages each (one per merge level). The
+-- Soldier comes from design/SoldierMerge_R15_Builder, the Knight from the red knight cards, the Archer from the green
+-- archer cards, the Mage from the purple mage cards. The gear is parts welded on the limbs of the R15 base rig (Rig.base).
 --   1 Recruit · 2 Private · 3 Corporal · 4 Sergeant · 5 Lieutenant · 6 Captain · 7 Major · 8 General · 9 Legend
 -- Without the base rig (it could not be made, or it has not reached this client yet) the same design is built
 -- on a body of plain blocks with the same limb names (a statue: no animations), so the look never falls back
@@ -1010,8 +1011,328 @@ ARCHER[9] = { name = "Legend", torso = C(46, 160, 120), legs = C(38, 140, 104), 
 		end
 	end }
 
+-- ── The Mage: 9 levels (design: the purple mage cards) ──
+--   1 Novice · 2 Sorcerer · 3 Wizard · 4 Mage · 5 Arcanist · 6 Archmage · 7 Cosmic Mage · 8 Grand Mage · 9 Legend
+local M_TUNIC = C(122, 112, 146)
+local M_TUNIC_DARK = C(82, 74, 100)
+local M_PURPLE = C(120, 90, 172)
+local M_PURPLE_DARK = C(78, 56, 118)
+local M_NAVY = C(44, 42, 92)
+local M_INDIGO = C(64, 66, 130)
+local M_HAT = C(50, 40, 70)
+local M_HAT_BROWN = C(62, 46, 72)
+local M_GOLD = C(214, 170, 60)
+local M_GOLD_LIGHT = C(240, 200, 70)
+local M_GOLD_DARK = C(170, 128, 44)
+local M_WOOD = C(72, 52, 40)
+local M_WHITE = C(236, 236, 242)
+local M_CRYSTAL = C(176, 150, 255)
+local M_VIOLET = C(200, 150, 255)
+local M_CYAN = C(130, 210, 255)
+local M_BLUE = C(150, 205, 255)
+local M_ORANGE = C(255, 160, 70)
+local M_PINK = C(255, 130, 210)
+local M_SKY = C(200, 218, 250)
+local M_SILVER = C(222, 222, 236)
+local M_PAGES = C(240, 226, 196)
+
+-- A pointy hat: a brim, a band and a cone of shrinking cylinders whose tip leans back a little
+-- (a straight cone looks like a gnome). `stars` = the color of the little stars on the cone, or nil.
+-- Returns how high the tip is above the head's center.
+local function pointyHat(r, col, band, height, stars, small)
+	local brim = if small then 2.2 else 2.7
+	mk(r, "Head", "cyl", V(0.16, brim, brim), CF(0, 0.68, 0.03) * ANG(0, 0, R(90)), col, FABRIC)
+	mk(r, "Head", "cyl", V(0.3, 1.45, 1.45), CF(0, 0.9, 0.03) * ANG(0, 0, R(90)), band, FABRIC)
+	local SEGMENTS = 5
+	local y = 0.76
+	local segH = height / SEGMENTS
+	local lean = height * 0.16
+	for i = 1, SEGMENTS do
+		local f = (i - 1) / SEGMENTS
+		local d = math.max(0.26, 1.5 * (1 - f))
+		mk(r, "Head", "cyl", V(segH + 0.03, d, d), CF(0, y + segH / 2, 0.03 + lean * f * f) * ANG(0, 0, R(90)), col, FABRIC)
+		y += segH
+	end
+	mk(r, "Head", "ball", V(0.26, 0.26, 0.26), CF(0, y, 0.03 + lean), band, NEON, { light = band, range = 6 })
+	if stars then
+		for k = 0, 4 do
+			local f = 0.15 + k / 5 * 0.55
+			local a = k * 2.4 + 0.6
+			local rad = 0.75 * (1 - f) + 0.04
+			mk(r, "Head", "block", V(0.14, 0.14, 0.14), CF(math.cos(a) * rad, 0.76 + f * height, 0.03 + math.sin(a) * rad + lean * f * f) * ANG(0, a, R(45)), stars, NEON)
+		end
+	end
+	return y
+end
+
+-- The staff in the left hand (it stands upright next to the hand, the top above the head):
+-- `topKind` = "crystal" | "orb" | "bigorb".
+local function staff(r, woodCol, topKind, topCol, length, ringCol)
+	local at = CF(-0.15, 0, -0.55)
+	mk(r, "LeftHand", "cyl", V(length, 0.24, 0.24), at * CF(0, length * 0.28, 0) * ANG(0, 0, R(90)), woodCol, Enum.Material.Wood)
+	local topY = length * 0.28 + length / 2 + 0.2
+	if ringCol then
+		mk(r, "LeftHand", "cyl", V(0.14, 0.4, 0.4), at * CF(0, topY - 0.55, 0) * ANG(0, 0, R(90)), ringCol, METAL)
+	end
+	if topKind == "crystal" then
+		mk(r, "LeftHand", "block", V(0.42, 1.0, 0.42), at * CF(0, topY + 0.3, 0) * ANG(0, R(45), 0), topCol, NEON, { light = topCol, range = 10, bright = 2 })
+	elseif topKind == "bigorb" then
+		mk(r, "LeftHand", "ball", V(1.1, 1.1, 1.1), at * CF(0, topY + 0.4, 0), topCol, NEON, { light = topCol, range = 16, bright = 3 })
+		local ring = mk(r, "LeftHand", "cyl", V(0.1, 1.6, 1.6), at * CF(0, topY + 0.4, 0) * ANG(R(20), 0, 0) * ANG(0, 0, R(90)), ringCol or M_GOLD, NEON)
+		if ring then
+			ring.Transparency = 0.3
+		end
+	else
+		mk(r, "LeftHand", "ball", V(0.8, 0.8, 0.8), at * CF(0, topY + 0.25, 0), topCol, NEON, { light = topCol, range = 12, bright = 2 })
+	end
+end
+
+-- The robe from the waist down: narrower at the hips, wider at the hem.
+local function robe(r, col, hem)
+	mk(r, "LowerTorso", "block", V(2.3, 1.1, 1.3), CF(0, -0.45, 0), col, FABRIC)
+	mk(r, "LowerTorso", "block", V(2.9, 1.3, 1.7), CF(0, -1.5, 0), col, FABRIC)
+	if hem then
+		mk(r, "LowerTorso", "block", V(3.0, 0.14, 1.8), CF(0, -2.1, 0), hem, FABRIC)
+	end
+end
+
+local function beard(r)
+	mk(r, "Head", "block", V(0.76, 0.55, 0.3), CF(0, -0.7, -0.5), M_WHITE, PLASTIC)
+	mk(r, "Head", "block", V(0.42, 0.5, 0.26), CF(0, -1.15, -0.48), M_WHITE, PLASTIC)
+end
+
+-- The rune circle on the ground: a glowing disc and six runes around it.
+local function runeRing(r, col)
+	local disc = mk(r, "LowerTorso", "cyl", V(0.08, 5.6, 5.6), CF(0, -2.12, 0) * ANG(0, 0, R(90)), col, NEON)
+	if disc then
+		disc.Transparency = 0.55
+	end
+	for i = 0, 5 do
+		local a = i / 6 * math.pi * 2
+		mk(r, "LowerTorso", "block", V(0.3, 0.06, 0.3), CF(math.cos(a) * 2.4, -2.07, math.sin(a) * 2.4) * ANG(0, -a, 0), col, NEON)
+	end
+end
+
+-- Floating glowing bits around the shoulders (orbs, crystals…): `spots` = { x, y, z } in the torso's space.
+local function floating(r, kind, size, spots, col, rot)
+	for _, p in ipairs(spots) do
+		mk(r, "UpperTorso", kind, size, CF(p[1], p[2], p[3]) * (rot or CF()), col, NEON, { light = col, range = 7 })
+	end
+end
+
+-- The emblem on the chest: "diamond" | "star" | "moon".
+local function emblem(r, kind, col, backCol)
+	if kind == "diamond" then
+		mk(r, "UpperTorso", "block", V(0.5, 0.5, 0.1), CF(0, 0.1, -0.56) * ANG(0, 0, R(45)), col, NEON, { light = col, range = 8 })
+	elseif kind == "star" then
+		mk(r, "UpperTorso", "ball", V(0.8, 0.8, 0.1), CF(0, 0.1, -0.55), backCol or M_GOLD, NEON)
+		mk(r, "UpperTorso", "ball", V(0.52, 0.52, 0.12), CF(0, 0.1, -0.6), col, NEON, { light = col, range = 10, bright = 2 })
+	elseif kind == "moon" then
+		mk(r, "UpperTorso", "ball", V(0.66, 0.66, 0.1), CF(0, 0.1, -0.55), col, NEON, { light = col, range = 8 })
+		mk(r, "UpperTorso", "ball", V(0.56, 0.56, 0.12), CF(0.17, 0.17, -0.6), backCol or M_NAVY, PLASTIC)
+	end
+end
+
+local MAGE = {}
+
+MAGE[1] = { name = "Novice", torso = M_TUNIC, legs = M_TUNIC_DARK, top = 2.5, attack = "cast", hold = false,
+	build = function(r)
+		pointyHat(r, C(66, 56, 98), M_GOLD, 1.4, nil, true)
+		belt(r, C(120, 90, 50), M_GOLD)
+		boots(r, C(70, 60, 56))
+		staff(r, C(150, 120, 70), "crystal", M_CRYSTAL, 5.2, nil)
+	end }
+
+MAGE[2] = { name = "Sorcerer", torso = M_PURPLE, legs = M_PURPLE_DARK, top = 3.0, attack = "cast", hold = false,
+	build = function(r)
+		pointyHat(r, M_HAT_BROWN, M_GOLD, 2.0, nil, false)
+		robe(r, M_PURPLE_DARK, M_GOLD)
+		belt(r, C(90, 67, 38), M_GOLD)
+		mk(r, "LowerTorso", "block", V(0.5, 0.5, 0.3), CF(0.75, -0.2, -0.6), C(120, 82, 48), FABRIC) -- pouch
+		boots(r, C(60, 50, 56))
+		staff(r, M_WOOD, "orb", M_VIOLET, 5.4, nil)
+	end }
+
+MAGE[3] = { name = "Wizard", torso = C(110, 96, 160), legs = C(150, 120, 70), top = 3.4, attack = "cast", hold = false,
+	build = function(r)
+		pointyHat(r, C(40, 36, 78), M_GOLD, 2.4, M_GOLD, false)
+		beard(r)
+		robe(r, C(150, 120, 70), M_GOLD)
+		for _, p in ipairs({ { -0.8, -0.6 }, { 0.6, -1.0 }, { -0.3, -1.5 }, { 0.9, -1.8 } }) do -- stars on the robe
+			mk(r, "LowerTorso", "block", V(0.14, 0.14, 0.06), CF(p[1], p[2], -0.88) * ANG(0, 0, R(45)), M_GOLD_LIGHT, NEON)
+		end
+		belt(r, C(90, 67, 38), M_GOLD)
+		mk(r, "LowerTorso", "block", V(0.3, 0.7, 0.55), CF(-1.2, -0.3, -0.1) * ANG(0, 0, R(8)), C(110, 70, 48), Enum.Material.Wood) -- spellbook
+		mk(r, "LowerTorso", "block", V(0.22, 0.6, 0.46), CF(-1.26, -0.3, -0.1) * ANG(0, 0, R(8)), M_PAGES, PLASTIC)
+		boots(r, C(60, 50, 56))
+		staff(r, M_WOOD, "crystal", M_CYAN, 5.6, M_GOLD)
+	end }
+
+MAGE[4] = { name = "Mage", torso = M_INDIGO, legs = C(200, 160, 70), top = 3.5, attack = "cast", hold = false,
+	build = function(r)
+		pointyHat(r, M_HAT, M_GOLD, 2.6, M_GOLD, false)
+		beard(r)
+		cloak(r, C(70, 50, 110), M_GOLD, 4.2)
+		robe(r, C(200, 160, 70), M_GOLD_LIGHT)
+		for _, y in ipairs({ 0.45, 0.1, -0.25 }) do -- gold buttons
+			mk(r, "UpperTorso", "block", V(0.7, 0.08, 0.06), CF(0, y, -0.54), M_GOLD, METAL)
+		end
+		shoulderPads(r, C(40, 34, 60), FABRIC, nil)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(0.28, 0.5, 0.28), CF(0, 0.95, 0) * ANG(0, R(45), 0), M_CRYSTAL, NEON)
+		belt(r, C(40, 34, 60), M_WHITE)
+		boots(r, C(40, 34, 60))
+		staff(r, M_WOOD, "orb", M_BLUE, 5.6, M_GOLD)
+		floating(r, "ball", V(0.42, 0.42, 0.42), { { -2.6, 1.0, 0.2 }, { 2.7, 0.4, -0.3 }, { -2.3, -0.6, -0.4 } }, M_BLUE)
+		runeRing(r, M_BLUE)
+	end }
+
+MAGE[5] = { name = "Arcanist", torso = C(76, 54, 120), legs = C(200, 160, 70), top = 2.0, attack = "cast", hold = false,
+	build = function(r)
+		hood(r, C(30, 26, 40))
+		mk(r, "Head", "block", V(1.24, 1.24, 0.1), CF(0, 0, -0.6), C(8, 6, 12), PLASTIC) -- the face in shadow
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(-0.25, 0.1, -0.66), M_VIOLET, NEON, { light = M_VIOLET, range = 8 })
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(0.25, 0.1, -0.66), M_VIOLET, NEON)
+		mk(r, "Head", "block", V(0.22, 0.4, 0.1), CF(0, 0.75, -0.7) * ANG(0, 0, R(45)), M_VIOLET, NEON, { light = M_VIOLET, range = 6 }) -- the gem on the brow
+		robe(r, C(200, 160, 70), M_GOLD_LIGHT)
+		emblem(r, "diamond", M_VIOLET, nil)
+		shoulderPads(r, C(120, 90, 60), FABRIC, nil)
+		belt(r, C(40, 34, 60), M_GOLD)
+		boots(r, C(40, 34, 60))
+		staff(r, C(40, 32, 52), "orb", C(90, 50, 140), 5.6, M_GOLD)
+		-- the floating grimoire and cards
+		mk(r, "UpperTorso", "block", V(0.7, 0.9, 0.2), CF(-2.4, -0.4, -0.4) * ANG(R(10), R(25), R(15)), C(110, 70, 48), Enum.Material.Wood)
+		mk(r, "UpperTorso", "block", V(0.62, 0.82, 0.08), CF(-2.4, -0.4, -0.55) * ANG(R(10), R(25), R(15)), M_PAGES, PLASTIC)
+		for _, p in ipairs({ { 2.6, 0.6, 0.3 }, { 2.3, -0.5, -0.5 } }) do
+			local card = mk(r, "UpperTorso", "block", V(0.5, 0.7, 0.06), CF(p[1], p[2], p[3]) * ANG(0, R(-20), R(12)), M_CRYSTAL, NEON, { light = M_VIOLET, range = 6 })
+			if card then
+				card.Transparency = 0.2
+			end
+		end
+		floating(r, "ball", V(0.4, 0.4, 0.4), { { -2.8, 1.4, 0.4 }, { 2.9, 1.6, -0.2 }, { 0, 2.6, 0.6 } }, M_VIOLET)
+		runeRing(r, M_VIOLET)
+	end }
+
+MAGE[6] = { name = "Archmage", torso = C(60, 50, 96), legs = C(222, 176, 60), top = 3.6, attack = "cast", hold = false,
+	build = function(r)
+		pointyHat(r, M_SKY, M_GOLD, 2.6, M_GOLD, false)
+		beard(r)
+		cloak(r, C(222, 176, 60), M_GOLD_LIGHT, 4.4)
+		robe(r, C(222, 176, 60), M_GOLD_LIGHT)
+		emblem(r, "star", M_ORANGE, M_GOLD)
+		spikedPauldrons(r, C(40, 34, 60), M_VIOLET, true)
+		belt(r, C(40, 34, 60), M_ORANGE)
+		boots(r, C(40, 34, 60))
+		staff(r, M_WOOD, "orb", C(50, 50, 120), 5.8, M_GOLD)
+		mk(r, "LeftHand", "ball", V(1.1, 1.1, 1.1), CF(-0.15, 5.8 * 0.28 + 5.8 / 2 + 0.45, -0.55), M_ORANGE, NEON, { light = M_ORANGE, range = 14, bright = 2 }).Transparency = 0.6 -- the storm glow around the orb
+		floating(r, "ball", V(0.42, 0.42, 0.42), { { -2.7, 1.2, 0.3 }, { 2.8, 0.6, -0.3 }, { -2.5, -0.5, -0.4 }, { 2.6, 1.9, 0.4 } }, M_ORANGE)
+		for i, p in ipairs({ { -2.9, 0.5, 0 }, { -3.1, 0.0, 0 }, { -2.8, -0.5, 0 } }) do -- the lightning bolt
+			mk(r, "UpperTorso", "block", V(0.12, 0.6, 0.08), CF(p[1], p[2], p[3]) * ANG(0, 0, R(if i % 2 == 0 then -35 else 35)), M_GOLD_LIGHT, NEON, { light = M_GOLD_LIGHT, range = 6 })
+		end
+		runeRing(r, M_ORANGE)
+		local aura = mk(r, "UpperTorso", "ball", V(0.4, 0.4, 0.4), CF(0, 0, 0), M_ORANGE, NEON, { sparkle = M_ORANGE, rate = 16 })
+		if aura then
+			aura.Transparency = 1
+		end
+	end }
+
+MAGE[7] = { name = "Cosmic Mage", torso = M_NAVY, legs = C(200, 160, 70), top = 2.3, attack = "cast", hold = false,
+	build = function(r)
+		local hat = C(172, 140, 222)
+		mk(r, "Head", "ball", V(1.75, 1.75, 1.75), CF(0, 0.55, 0.03), hat, PLASTIC) -- the turban dome
+		mk(r, "Head", "cyl", V(0.3, 1.85, 1.85), CF(0, 0.35, 0.03) * ANG(0, 0, R(90)), C(60, 50, 90), FABRIC)
+		mk(r, "Head", "ball", V(0.42, 0.42, 0.14), CF(0, 0.95, -0.8), M_GOLD_LIGHT, NEON, { light = M_GOLD_LIGHT, range = 6 }) -- the crescent
+		mk(r, "Head", "ball", V(0.36, 0.36, 0.16), CF(0.13, 1.02, -0.84), hat, PLASTIC)
+		robe(r, C(200, 160, 70), M_CYAN)
+		for _, p in ipairs({ { -0.7, -0.7 }, { 0.5, -1.1 }, { -0.2, -1.6 }, { 0.8, -1.9 }, { -0.9, -1.4 } }) do -- stars on the robe
+			mk(r, "LowerTorso", "block", V(0.1, 0.1, 0.06), CF(p[1], p[2], -0.88), M_WHITE, NEON)
+		end
+		emblem(r, "moon", M_GOLD_LIGHT, M_NAVY)
+		shoulderPads(r, C(60, 50, 100), FABRIC, M_CYAN)
+		belt(r, C(40, 34, 60), M_CYAN)
+		boots(r, C(40, 34, 60))
+		staff(r, C(40, 32, 52), "orb", C(40, 40, 110), 5.6, M_GOLD)
+		mk(r, "LeftHand", "ball", V(0.5, 0.5, 0.14), CF(-0.15, 5.6 * 0.28 + 5.6 / 2 + 0.95, -0.55), M_GOLD_LIGHT, NEON) -- the crescent over the orb
+		-- the planets
+		mk(r, "UpperTorso", "ball", V(0.7, 0.7, 0.7), CF(-2.8, 1.3, 0.3), M_ORANGE, NEON, { light = M_ORANGE, range = 7 })
+		mk(r, "UpperTorso", "cyl", V(0.06, 1.3, 1.3), CF(-2.8, 1.3, 0.3) * ANG(R(25), 0, R(90)), M_GOLD_LIGHT, NEON)
+		mk(r, "UpperTorso", "ball", V(0.55, 0.55, 0.55), CF(2.9, 0.2, -0.3), M_BLUE, NEON, { light = M_BLUE, range = 7 })
+		mk(r, "UpperTorso", "ball", V(0.45, 0.45, 0.45), CF(2.4, 2.2, 0.4), M_VIOLET, NEON, { light = M_VIOLET, range = 7 })
+		runeRing(r, M_CYAN)
+		local aura = mk(r, "UpperTorso", "ball", V(0.4, 0.4, 0.4), CF(0, 0, 0), M_CYAN, NEON, { sparkle = M_CYAN, rate = 18 })
+		if aura then
+			aura.Transparency = 1
+		end
+	end }
+
+MAGE[8] = { name = "Grand Mage", torso = M_GOLD_LIGHT, legs = C(200, 150, 50), top = 3.6, attack = "cast", hold = false,
+	build = function(r)
+		pointyHat(r, C(60, 45, 40), M_GOLD_LIGHT, 2.6, nil, false)
+		for i = 0, 4 do -- the golden crown around the band
+			local a = i / 5 * math.pi * 2 + math.pi / 2
+			mk(r, "Head", "block", V(0.22, 0.6, 0.22), CF(math.cos(a) * 0.78, 1.2, 0.03 + math.sin(a) * 0.78) * ANG(0, -a, 0), M_GOLD_LIGHT, NEON)
+		end
+		beard(r)
+		robe(r, C(200, 150, 50), M_PINK)
+		emblem(r, "diamond", M_PINK, nil)
+		mk(r, "UpperTorso", "cyl", V(0.1, 0.9, 0.9), CF(0, 0.1, -0.53) * ANG(0, R(90), 0), M_GOLD_DARK, METAL) -- the medallion behind the gem
+		shoulderPads(r, C(50, 40, 60), FABRIC, nil)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(0.3, 0.3, 0.3), CF(0, 0.85, 0) * ANG(0, R(45), 0), M_PINK, NEON)
+		belt(r, C(50, 40, 60), M_PINK)
+		boots(r, C(50, 40, 60))
+		staff(r, M_WOOD, "bigorb", M_BLUE, 5.8, M_GOLD_LIGHT)
+		for i, p in ipairs({ { -2.7, 1.4, 0.3 }, { 2.9, 1.1, -0.3 }, { -2.5, -0.3, -0.5 }, { 2.6, -0.4, 0.5 } }) do -- the flying books
+			local a = R(i * 55)
+			mk(r, "UpperTorso", "block", V(0.65, 0.85, 0.18), CF(p[1], p[2], p[3]) * ANG(R(8), a, R(-10)), if i % 2 == 0 then M_PAGES else M_GOLD_LIGHT, PLASTIC)
+			mk(r, "UpperTorso", "block", V(0.2, 0.2, 0.06), CF(p[1], p[2], p[3]) * ANG(R(8), a, R(-10)) * CF(0, 0, -0.1) * ANG(0, 0, R(45)), M_PINK, NEON)
+		end
+		floating(r, "ball", V(0.4, 0.4, 0.4), { { -3.1, 0.6, 0.0 }, { 3.2, 2.2, 0.2 } }, M_PINK)
+		runeRing(r, M_GOLD_LIGHT)
+		local aura = mk(r, "UpperTorso", "ball", V(0.4, 0.4, 0.4), CF(0, 0, 0), M_GOLD_LIGHT, NEON, { sparkle = M_GOLD_LIGHT, rate = 22 })
+		if aura then
+			aura.Transparency = 1
+		end
+	end }
+
+MAGE[9] = { name = "Legend", torso = C(52, 42, 94), legs = C(210, 170, 70), top = 3.9, attack = "cast", hold = false,
+	build = function(r)
+		pointyHat(r, M_SILVER, M_GOLD_LIGHT, 2.6, M_GOLD_LIGHT, false)
+		for i = 0, 17 do -- the halo above the hat
+			local a = i / 18 * math.pi * 2
+			mk(r, "Head", "block", V(0.4, 0.1, 0.2), CF(math.cos(a) * 1.15, 3.75, 0.3 + math.sin(a) * 1.15) * ANG(0, -a, 0), M_GOLD_LIGHT, NEON, i == 0 and { light = M_GOLD_LIGHT, range = 16, bright = 3 } or nil)
+		end
+		beard(r)
+		robe(r, C(210, 170, 70), M_CYAN)
+		mk(r, "UpperTorso", "block", V(1.9, 0.12, 0.1), CF(0, 0.68, -0.54), M_GOLD_LIGHT, METAL)
+		mk(r, "UpperTorso", "block", V(1.9, 0.12, 0.1), CF(0, -0.68, -0.54), M_GOLD_LIGHT, METAL)
+		mk(r, "UpperTorso", "block", V(0.62, 0.62, 0.1), CF(0, 0.05, -0.55) * ANG(0, 0, R(45)), M_GOLD_LIGHT, METAL)
+		mk(r, "UpperTorso", "block", V(0.42, 0.42, 0.14), CF(0, 0.05, -0.6) * ANG(0, 0, R(45)), M_CYAN, NEON, { light = M_CYAN, range = 14, bright = 3, sparkle = M_CYAN, rate = 20 })
+		shoulderPads(r, C(210, 170, 70), METAL, M_CYAN)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(0.3, 0.5, 0.3), CF(0, 0.95, 0) * ANG(0, R(45), 0), M_CYAN, NEON)
+		belt(r, C(40, 34, 60), M_CYAN)
+		boots(r, C(60, 50, 90))
+		both(r, { "LeftFoot", "RightFoot" }, "block", V(1.1, 0.14, 1.25), CF(0, -0.02, -0.05), M_GOLD_LIGHT, METAL)
+		staff(r, C(120, 100, 150), "bigorb", M_CYAN, 6.0, M_GOLD_LIGHT)
+		-- the wings of light
+		for _, s in ipairs({ -1, 1 }) do
+			for i = 1, 6 do
+				local phi = R(-55 + i * 22)
+				local L = 2.2 + math.sin(i * 0.55) * 1.7
+				mk(r, "UpperTorso", "block", V(L, 0.1, 0.5), CF(s * (0.8 + math.cos(phi) * L / 2), 0.4 + math.sin(phi) * L / 2, 0.75 + i * 0.05) * ANG(0, 0, s * phi), i % 2 == 0 and M_GOLD_LIGHT or M_CYAN, NEON, (i == 3) and { light = M_CYAN, range = 14, bright = 2 } or nil)
+			end
+		end
+		-- the floating crystals
+		for _, p in ipairs({ { -3.2, 2.2, 0.5 }, { 3.4, 3.0, -0.4 }, { -3.0, -0.6, -0.7 }, { 3.2, -0.2, 0.6 }, { 0, 4.6, 0.6 } }) do
+			mk(r, "UpperTorso", "block", V(0.3, 0.75, 0.3), CF(p[1], p[2], p[3]) * ANG(0, R(45), 0), M_CYAN, NEON, { light = M_CYAN, range = 8 })
+		end
+		runeRing(r, M_CYAN)
+		local aura = mk(r, "UpperTorso", "ball", V(0.4, 0.4, 0.4), CF(0, 0, 0), M_GOLD_LIGHT, NEON, { sparkle = M_GOLD_LIGHT, rate = 40 })
+		if aura then
+			aura.Transparency = 1
+		end
+	end }
+
 -- The classes that have a design here.
-local CLASSES = { Soldier = LEVELS, Knight = KNIGHT, Archer = ARCHER }
+local CLASSES = { Soldier = LEVELS, Knight = KNIGHT, Archer = ARCHER, Mage = MAGE }
 
 -- The block body: the R15 limbs as plain parts (name, size, center; the soles are at y = 0, scale 1).
 local BLOCK_LIMBS = {

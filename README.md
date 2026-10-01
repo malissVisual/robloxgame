@@ -60,7 +60,12 @@ into data by `tools/stages_from_rbxmx.py` → `src/shared/StageModels/<Class>.lu
 changing the design, e.g. `python tools/stages_from_rbxmx.py design/Knight_AllStages.rbxmx
 src/shared/StageModels/Knight.luau`). Stage 7, 8 and 9 have an aura (glow + sparkles in the level color).
 
-The **other classes** (Hunter, Mage, Tank, Berserker) share generic level gear on top
+The **Mage** is an R15 character with **9 designed stages** too (`src/shared/SoldierRig.luau`, `MAGE`, from the
+purple mage cards): Novice · Sorcerer · Wizard · Mage · Arcanist · Archmage · Cosmic Mage · Grand Mage · Legend —
+a pointy hat, a robe and a staff in the left hand from the start; later a beard, a cloak, floating orbs and a rune
+circle, a hood with glowing eyes, planets, flying books, a halo and wings of light.
+
+The **other classes** (Hunter, Tank, Berserker) share generic level gear on top
 of their own look: Lv 2 cape, Lv 3 shoulder plates, Lv 4 glowing belt and spikes, Lv 5 floating orbs
 and a glow outline, Lv 6 metal armor, Lv 7 wings, Lv 8 a halo, Lv 9 a long red hero cape.
 
