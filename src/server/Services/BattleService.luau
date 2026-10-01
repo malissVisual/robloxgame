@@ -286,7 +286,7 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 		-- bursts over the splash area (its splash damage is in `step`).
 		local PURPLE = Color3.fromRGB(190, 110, 255)
 		local PALE = Color3.fromRGB(235, 205, 255)
-		local CHARGE = 0.22 -- seconds the crystal charges before the shot
+		local CHARGE = 0.4 -- seconds the crystal charges before the shot
 		local tip: BasePart? = nil
 		local weapon = from.model:FindFirstChild("Weapon")
 		if weapon then
@@ -298,12 +298,14 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 				end
 			end
 		end
-		-- The staff points at the enemy: the grip tilts the whole weapon forward, and back after the shot.
+		-- The mage raises the hand with the staff (the forearm comes up, so the staff points at the enemy) for the
+		-- charge and the shot, then lowers it; the grip lifts the crystal a little more.
+		Rig.raise(from.model, CHARGE + 0.35)
 		local hand = from.model:FindFirstChild("RightHand")
 		local grip = hand and hand:FindFirstChild("RightGrip")
 		if grip and grip:IsA("Motor6D") then
-			TweenService:Create(grip, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = CFrame.Angles(math.rad(-70), 0, 0) }):Play()
-			task.delay(CHARGE + 0.25, function()
+			TweenService:Create(grip, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = CFrame.Angles(math.rad(-15), 0, 0) }):Play()
+			task.delay(CHARGE + 0.35, function()
 				if grip.Parent then
 					TweenService:Create(grip, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = CFrame.new() }):Play()
 				end
@@ -338,7 +340,7 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 			charge.CFrame = CFrame.new(a + UP * 1.2)
 		end
 		charge.Parent = parent
-		TweenService:Create(charge, TweenInfo.new(CHARGE, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = Vector3.one * 1.6 }):Play()
+		TweenService:Create(charge, TweenInfo.new(CHARGE, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = Vector3.one * 2.2 }):Play()
 		TweenService:Create(chargeLight, TweenInfo.new(CHARGE), { Range = 10, Brightness = 2 }):Play()
 		Debris:AddItem(charge, CHARGE + 0.02)
 
@@ -350,7 +352,7 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 			local flight = math.clamp((b - start).Magnitude / 110, 0.08, 0.25)
 			local ball = Instance.new("Part")
 			ball.Shape = Enum.PartType.Ball
-			ball.Size = Vector3.one * 1.6
+			ball.Size = Vector3.one * 2.3
 			ball.Color = PURPLE
 			ball.Material = Enum.Material.Neon
 			ball.Transparency = 0.1
@@ -362,7 +364,7 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 			ball.CFrame = CFrame.new(start)
 			local core = Instance.new("Part")
 			core.Shape = Enum.PartType.Ball
-			core.Size = Vector3.one * 0.8
+			core.Size = Vector3.one * 1.2
 			core.Color = PALE
 			core.Material = Enum.Material.Neon
 			core.Anchored = true
@@ -380,8 +382,8 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 			sparkles.SparkleColor = PALE
 			sparkles.Parent = ball
 			local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
-			a0.Position = Vector3.new(0, 0.7, 0)
-			a1.Position = Vector3.new(0, -0.7, 0)
+			a0.Position = Vector3.new(0, 1.0, 0)
+			a1.Position = Vector3.new(0, -1.0, 0)
 			a0.Parent = ball
 			a1.Parent = ball
 			local trail = Instance.new("Trail")
@@ -407,7 +409,7 @@ local function effect(from: Fighter, to: Fighter, parent: Instance)
 				local radius = Balance.SplashRadius
 				local flash = Instance.new("Part")
 				flash.Shape = Enum.PartType.Ball
-				flash.Size = Vector3.one * 1.6
+				flash.Size = Vector3.one * 2.3
 				flash.Color = PALE
 				flash.Material = Enum.Material.Neon
 				flash.Transparency = 0.1

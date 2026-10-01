@@ -157,6 +157,23 @@ function Rig.attack(model: Model, speed: number?)
 	end
 end
 
+-- Raises the weapon hand (the forearm comes up, the weapon points forward) for `duration` seconds, then lowers
+-- it again: the mage's charge pose. Nothing happens for a rig that holds its hand up all the time anyway.
+function Rig.raise(model: Model, duration: number)
+	local rig = rigOf(model)
+	local info = registered[model]
+	local track = rig and rig.tracks.hold
+	if not track or (info and info.hold) then
+		return
+	end
+	track:Play(0.12)
+	task.delay(duration, function()
+		if track.IsPlaying then
+			track:Stop(0.25)
+		end
+	end)
+end
+
 -- One animation by name (a boss ability): "jump", "cast", "lunge", "slash".
 function Rig.cast(model: Model, name: string)
 	local rig = rigOf(model)
