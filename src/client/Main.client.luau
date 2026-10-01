@@ -167,7 +167,7 @@ UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
 UI.battleOpen = false -- the battle panel (wave, difficulty, START WAVE) is open: the PLAY button toggles it
-UI.LAYOUT_VERSION = 3 -- a saved layout from an older version loses the panel / HUD positions (the defaults changed)
+UI.LAYOUT_VERSION = 4 -- a saved layout from an older version loses the moved panels' positions (the defaults changed)
 UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the settings gear moves below)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
@@ -333,8 +333,10 @@ function Layout.apply(saved: any)
 		return
 	end
 	if decoded.v ~= UI.LAYOUT_VERSION then
-		decoded.Panel = nil -- the panel moved to the top of the screen, the HUD to the bottom left: old spots are dropped
-		decoded.Hud = nil
+		-- The defaults changed (squad bar top left, dock under it, PLAY beside the dock, panel up): old spots are dropped.
+		for _, name in { "Panel", "Hud", "Squad", "Dock", "Play" } do
+			decoded[name] = nil
+		end
 	end
 	for name, entry in decoded do
 		if Layout.movables[name] and type(entry) == "table" and type(entry[1]) == "number" and type(entry[2]) == "number" then
@@ -602,7 +604,7 @@ local pointer = Vector2.zero -- last pointer position (mouse or finger), GUI spa
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
 panel.AnchorPoint = Vector2.new(0.5, 0)
-panel.Position = UDim2.new(0.5, 0, 0, 12) -- the top of the screen, in the middle: clear of the HUD, the dock and PLAY
+panel.Position = UDim2.new(0.56, 0, 0, 12) -- the top of the screen, a little right of the middle: clear of the squad bar, the dock and PLAY
 panel.Size = UDim2.fromOffset(640, 420)
 panel.BackgroundColor3 = BG
 panel.BackgroundTransparency = 0.04
@@ -748,8 +750,8 @@ end
 -- during a battle. (Laid out at 284 x 234 and drawn at UI.PANEL_SCALE, like the main panel.)
 UI.squadBar = Instance.new("Frame")
 UI.squadBar.Name = "SquadBar"
-UI.squadBar.AnchorPoint = Vector2.new(0.5, 1)
-UI.squadBar.Position = UDim2.new(0.5, 0, 1, -14)
+UI.squadBar.AnchorPoint = Vector2.new(0, 0)
+UI.squadBar.Position = UDim2.new(0, 20, 0, 20) -- the top left corner; the dock sits under it, PLAY beside the dock
 UI.squadBar.Size = UDim2.fromOffset(284, 234)
 UI.squadBar.BackgroundColor3 = BG
 UI.squadBar.BackgroundTransparency = 0.04
@@ -841,8 +843,8 @@ local DOCK_TILE = 64
 local DOCK_STEP = 72
 local dock = Instance.new("Frame")
 dock.Name = "Dock"
-dock.AnchorPoint = Vector2.new(0, 0.5)
-dock.Position = UDim2.new(0, 14, 0.5, 0)
+dock.AnchorPoint = Vector2.new(0, 0)
+dock.Position = UDim2.new(0, 20, 0, 20 + 234 * UI.PANEL_SCALE + 16) -- under the squad bar
 dock.Size = UDim2.fromOffset(76, 18 + 4 * DOCK_STEP)
 dock.BackgroundColor3 = BG
 dock.BackgroundTransparency = 0.06
@@ -952,8 +954,8 @@ do
 	local PLAY_W, PLAY_H = 176, 156
 	local playDock = Instance.new("Frame")
 	playDock.Name = "PlayDock"
-	playDock.AnchorPoint = Vector2.new(1, 1)
-	playDock.Position = UDim2.new(1, -14, 1, -14)
+	playDock.AnchorPoint = Vector2.new(0, 0)
+	playDock.Position = UDim2.new(0, 20 + 76 + 28, 0, 20 + 234 * UI.PANEL_SCALE + 16 + 50) -- beside the dock
 	playDock.Size = UDim2.fromOffset(PLAY_W + 12, 18 + PLAY_H + 6)
 	playDock.BackgroundColor3 = BG
 	playDock.BackgroundTransparency = 0.06
