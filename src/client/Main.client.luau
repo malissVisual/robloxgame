@@ -162,6 +162,7 @@ UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
+UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
 
 function UI.stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
@@ -3993,7 +3994,9 @@ do
 	UI.stroke(questPanel, Color3.fromRGB(70, 76, 100), 1.5, 0.3)
 	label(questPanel, "DAILY QUESTS", UDim2.fromOffset(10, 4), UDim2.fromOffset(150, 14), 11, Enum.Font.GothamBold, MUTED)
 	UI.grip(questPanel, 190, 6, MUTED)
-	Layout.make("Quests", questPanel, questPanel) -- grab it anywhere, it has no controls
+	if UI.QUESTS then
+		Layout.make("Quests", questPanel, questPanel) -- grab it anywhere, it has no controls
+	end
 
 	local rows: { { text: TextLabel, count: TextLabel } } = {}
 	for i = 1, 3 do
@@ -4005,7 +4008,7 @@ do
 	end
 
 	RunService.RenderStepped:Connect(function()
-		questPanel.Visible = #state.quests > 0 and not state.battling -- the fight needs the room
+		questPanel.Visible = UI.QUESTS and #state.quests > 0 and not state.battling -- the fight needs the room
 		for i, row in rows do
 			local quest = state.quests[i]
 			if quest then
