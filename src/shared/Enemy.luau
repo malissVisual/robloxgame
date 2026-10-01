@@ -303,9 +303,28 @@ function Enemy.build(kind: string, level: number): Model
 	attach(head, "EyeR", Vector3.new(0.28, 0.2, 0.1), Vector3.new(hx * 0.45, 0.2, -hz + 0.02), YELLOW, nil, Enum.Material.Neon, Vector3.new(0, 0, 12))
 	attach(head, "FangL", Vector3.new(0.1, 0.2, 0.08), Vector3.new(-0.2, -hy * 0.55, -hz + 0.02), BONE)
 	attach(head, "FangR", Vector3.new(0.1, 0.2, 0.08), Vector3.new(0.2, -hy * 0.55, -hz + 0.02), BONE)
-	-- A box around a body part (its size at scale 1 plus `grow`), for clothes, armor and hoods.
+	-- A box around a body part (its size at scale 1 plus `grow`, and always a bit thicker than the part so it
+	-- reads as a piece of clothing or armor), for clothes, armor and hoods.
 	local function cover(part: BasePart, name: string, grow: Vector3, offset: Vector3, color: Color3, material: Enum.Material?): Part
-		return attach(part, name, part.Size / s + grow, offset, color, nil, material)
+		return attach(part, name, part.Size / s + grow + Vector3.new(0.2, 0, 0.2), offset, color, nil, material)
+	end
+	-- The outfit: the body parts themselves take the clothes' colors (torso, arms, legs, feet); the head and the
+	-- hands keep the skin. Without this every goblin is a green body with a thing on its head.
+	local function paint(torsoColor: Color3, armColor: Color3, legColor: Color3, footColor: Color3)
+		for _, item in model:GetChildren() do
+			if item:IsA("BasePart") then
+				local n = item.Name
+				if n == "UpperTorso" or n == "LowerTorso" then
+					item.Color = torsoColor
+				elseif n == "LeftUpperArm" or n == "RightUpperArm" or n == "LeftLowerArm" or n == "RightLowerArm" then
+					item.Color = armColor
+				elseif n == "LeftFoot" or n == "RightFoot" then
+					item.Color = footColor
+				elseif string.find(n, "Leg") then
+					item.Color = legColor
+				end
+			end
+		end
 	end
 	local leftHand = limb("LeftHand")
 	local leftArm = limb("LeftUpperArm")
@@ -371,7 +390,7 @@ function Enemy.build(kind: string, level: number): Model
 	local function pauldrons(color: Color3, material: Enum.Material?, spikes: boolean?)
 		for _, arm in { leftArm, rightArm } do
 			local ay = arm.Size.Y / 2 / s
-			attach(arm, "Pauldron", Vector3.new(arm.Size.X / s + 0.3, 0.5, arm.Size.Z / s + 0.3), Vector3.new(0, ay - 0.1, 0), color, nil, material)
+			attach(arm, "Pauldron", Vector3.new(arm.Size.X / s + 0.55, 0.6, arm.Size.Z / s + 0.55), Vector3.new(0, ay - 0.05, 0), color, nil, material)
 			if spikes then
 				attach(arm, "PauldronSpike", Vector3.new(0.22, 0.6, 0.22), Vector3.new(0, ay + 0.35, 0), STEEL, nil, METAL)
 			end
@@ -396,6 +415,7 @@ function Enemy.build(kind: string, level: number): Model
 	local attack = "slash"
 	if look == "Prcek" then
 		-- The small scout: a brown hood, a leather vest with a belt, a short dagger.
+		paint(DARK_LEATHER, skin, LEATHER, DARK_LEATHER)
 		hood(LEATHER)
 		cover(upper, "Vest", Vector3.new(0.12, -0.2, 0.12), Vector3.new(0, -0.05, 0), DARK_LEATHER)
 		belt(DARK_LEATHER, IRON)
@@ -405,6 +425,7 @@ function Enemy.build(kind: string, level: number): Model
 		topOffset = hy + 1.0
 	elseif look == "Rubac" then
 		-- The warrior: grey plate, pauldrons, a sword and a red shield with a white bolt.
+		paint(IRON, IRON, DARK_IRON, DARK_IRON)
 		cover(upper, "ChestPlate", Vector3.new(0.2, 0.05, 0.2), Vector3.zero, IRON, METAL)
 		attach(upper, "ChestLine", Vector3.new(0.12, uy * 2 - 0.3, 0.06), Vector3.new(0, 0, -uz - 0.13), DARK_IRON, nil, METAL)
 		pauldrons(IRON, METAL)
@@ -419,6 +440,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "Lucistnik" then
 		-- The archer: a dark green hood and tunic, a bow and a quiver of red-fletched arrows.
 		attack = "lunge"
+		paint(FOREST, FOREST, DARK_GREEN, DARK_LEATHER)
 		hood(FOREST)
 		cover(upper, "Tunic", Vector3.new(0.12, 0.06, 0.12), Vector3.zero, FOREST)
 		belt(DARK_LEATHER, IRON)
@@ -434,6 +456,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "Mag" then
 		-- The mage: a purple robe with gold trim, a pointed hat, a staff with a purple crystal.
 		attack = "cast"
+		paint(PURPLE, PURPLE, DARK_PURPLE, DARK_PURPLE)
 		robe(PURPLE, GOLD, 1.3)
 		pointedHat(PURPLE, DARK_PURPLE)
 		staff(VIOLET_GLOW)
@@ -441,6 +464,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "Lecitel" then
 		-- The healer: a cream robe with green trim, a white hood, a staff with a green crystal, a pouch.
 		attack = "cast"
+		paint(CREAM, CREAM, CREAM, LEATHER)
 		robe(CREAM, C(95, 150, 70), 1.3)
 		hood(CREAM, 0.35)
 		attach(lower, "Pouch", Vector3.new(0.4, 0.4, 0.3), Vector3.new(-lx - 0.1, -0.1, 0), LEATHER)
@@ -449,6 +473,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "ZeleznyTesak" then
 		-- Miniboss: dark red heavy armor with spiked steel pauldrons, a horned spiked helmet, a serrated cleaver and
 		-- a red skull shield.
+		paint(C(150, 40, 40), DARK_IRON, C(120, 35, 35), DARK_IRON)
 		cover(upper, "ChestPlate", Vector3.new(0.3, 0.1, 0.3), Vector3.zero, C(150, 40, 40), METAL)
 		attach(upper, "ChestStrap", Vector3.new(0.35, uy * 2, 0.08), Vector3.new(0, 0, -uz - 0.18), DARK_IRON, nil, METAL)
 		pauldrons(DARK_IRON, METAL, true)
@@ -471,6 +496,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "JedovyStopar" then
 		-- Miniboss: a dark green hooded cloak, a crossbow and glowing poison vials on the belt.
 		attack = "lunge"
+		paint(DARK_GREEN, DARK_GREEN, DARK_GREEN, DARK_LEATHER)
 		hood(DARK_GREEN, 0.35)
 		cover(upper, "Cloak", Vector3.new(0.2, 0.1, 0.2), Vector3.zero, DARK_GREEN)
 		attach(upper, "CloakBack", Vector3.new(ux * 2 + 0.1, 2.4, 0.12), Vector3.new(0, -0.8, uz + 0.1), DARK_GREEN, nil, nil, Vector3.new(-6, 0, 0))
@@ -489,6 +515,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "RunovySaman" then
 		-- Miniboss: a skull headdress with antlers, a teal tunic, a bone necklace, a skull staff and glowing runes.
 		attack = "cast"
+		paint(TEAL, skin, TEAL, DARK_LEATHER)
 		cover(upper, "Tunic", Vector3.new(0.14, 0.08, 0.14), Vector3.zero, TEAL)
 		attach(lower, "TunicSkirt", Vector3.new(lx * 2 + 0.2, 0.9, lz * 2 + 0.2), Vector3.new(0, -0.35, 0), TEAL)
 		belt(DARK_LEATHER, BONE)
@@ -511,6 +538,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "KralGrubnak" then
 		-- Boss: a gold crown with a red gem, black armor with gold trim, a red cape and a great double axe.
 		local BLACK = C(45, 45, 52)
+		paint(BLACK, BLACK, BLACK, C(35, 35, 40))
 		cover(upper, "ChestPlate", Vector3.new(0.3, 0.1, 0.3), Vector3.zero, BLACK, METAL)
 		attach(upper, "ChestTrim", Vector3.new(ux * 2 + 0.32, 0.18, 0.08), Vector3.new(0, uy - 0.2, -uz - 0.18), GOLD, nil, METAL)
 		pauldrons(BLACK, METAL)
@@ -532,6 +560,7 @@ function Enemy.build(kind: string, level: number): Model
 	elseif look == "KovarMorg" then
 		-- Boss: a brown and iron smith with a glowing forge in his chest, an iron helmet and a huge ember hammer.
 		local BROWN = C(110, 70, 40)
+		paint(BROWN, skin, BROWN, DARK_IRON)
 		cover(upper, "ChestPlate", Vector3.new(0.3, 0.1, 0.3), Vector3.zero, BROWN, METAL)
 		attach(upper, "ForgeGlow", Vector3.new(1.0, 0.9, 0.1), Vector3.new(0, -0.05, -uz - 0.17), EMBER, nil, NEON)
 		for _, x in { -0.3, 0, 0.3 } do
@@ -551,6 +580,7 @@ function Enemy.build(kind: string, level: number): Model
 		-- Boss: the plague mother: a dark green robe, antlers with hanging vials, a skull on the belt, a staff with a
 		-- poison crystal and dripping green bottles.
 		attack = "cast"
+		paint(DARK_GREEN, DARK_GREEN, DARK_GREEN, DARK_GREEN)
 		robe(DARK_GREEN, C(70, 120, 60), 1.5)
 		hood(DARK_GREEN, 0.35)
 		for _, side in { -1, 1 } do
@@ -567,6 +597,7 @@ function Enemy.build(kind: string, level: number): Model
 		-- Boss: the archmage: a dark purple robe with gold trim, a tall hat, a glowing book in the left hand and
 		-- purple crystals floating about.
 		attack = "cast"
+		paint(DARK_PURPLE, DARK_PURPLE, DARK_PURPLE, DARK_PURPLE)
 		robe(DARK_PURPLE, GOLD, 1.6)
 		attach(upper, "Collar", Vector3.new(ux * 2 + 0.5, 0.5, uz * 2 + 0.4), Vector3.new(0, uy + 0.1, 0), DARK_PURPLE)
 		pointedHat(DARK_PURPLE, GOLD)
@@ -584,6 +615,7 @@ function Enemy.build(kind: string, level: number): Model
 		local BARK = C(110, 75, 45)
 		local MOSS = C(90, 140, 60)
 		local CAP = C(200, 50, 50)
+		paint(BARK, BARK, BARK, DARK_WOOD)
 		local function mushroom(part: BasePart, name: string, offset: Vector3, size: number)
 			attach(part, name .. "Stem", Vector3.new(size * 0.45, size * 0.7, size * 0.45), offset, CREAM)
 			attach(part, name .. "Cap", Vector3.new(size * 1.2, size * 0.5, size * 1.2), offset + Vector3.new(0, size * 0.5, 0), CAP)
@@ -612,6 +644,7 @@ function Enemy.build(kind: string, level: number): Model
 		-- brightens the crystals and cracks the armor when the boss is enraged.
 		local BLACK = C(38, 38, 46)
 		local CRYSTAL = C(185, 90, 255)
+		paint(BLACK, BLACK, BLACK, BLACK)
 		local function crystal(part: BasePart, name: string, offset: Vector3, size: number, angles: Vector3?): Part
 			local shard = attach(part, name, Vector3.new(size * 0.55, size, size * 0.55), offset, CRYSTAL, nil, NEON, angles or Vector3.new(0, 45, 0))
 			shard:SetAttribute("RiftCrystal", true)
