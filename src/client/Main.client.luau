@@ -580,7 +580,7 @@ panel.BorderSizePixel = 0
 panel.Active = true -- clicks on the panel never reach the 3D world
 panel.Parent = gui
 corner(panel, 14)
-gradient(panel, Color3.fromRGB(36, 39, 54), Color3.fromRGB(18, 20, 28))
+UI.gradient(panel, Color3.fromRGB(36, 39, 54), Color3.fromRGB(18, 20, 28))
 local panelStroke = UI.stroke(panel, Color3.fromRGB(70, 76, 100), 1.5)
 
 -- The title bar: grab it to move the whole panel anywhere.
@@ -606,7 +606,7 @@ headerLine.Size = UDim2.new(1, 0, 0, 1)
 headerLine.BackgroundColor3 = Color3.fromRGB(70, 76, 100)
 headerLine.BorderSizePixel = 0
 headerLine.Parent = header
-grip(header, 14, 14, MUTED)
+UI.grip(header, 14, 14, MUTED)
 local headerTitle = label(header, "MERGE BLADES", UDim2.fromOffset(36, 0), UDim2.fromOffset(200, 38), 14, Enum.Font.GothamBlack, WHITE)
 local headerHint = label(header, "drag to move", UDim2.new(1, -118, 0, 0), UDim2.fromOffset(106, 38), 10, Enum.Font.GothamMedium, MUTED)
 headerHint.TextXAlignment = Enum.TextXAlignment.Right
