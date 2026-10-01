@@ -43,10 +43,10 @@ local function getBase(): Model?
 		local ok, result = pcall(function()
 			local description = Instance.new("HumanoidDescription")
 			-- A goblin: a big head on a short, stocky body.
-			description.HeadScale = 1.35
+			description.HeadScale = 1.3
 			description.HeightScale = 0.92
-			description.WidthScale = 1.15
-			description.DepthScale = 1.1
+			description.WidthScale = 1.0
+			description.DepthScale = 1.0
 			return Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
 		end)
 		local rig = if ok then result :: Model else nil
@@ -364,9 +364,10 @@ function Enemy.build(kind: string, level: number): Model
 		attach(head, name .. "L", Vector3.new(0.26, hy * 2 + 0.1, hz * 2 + 0.1), Vector3.new(-(hx + 0.13), -0.02, 0.05), color, nil, material)
 		attach(head, name .. "R", Vector3.new(0.26, hy * 2 + 0.1, hz * 2 + 0.1), Vector3.new(hx + 0.13, -0.02, 0.05), color, nil, material)
 	end
-	local function hood(color: Color3, tall: number?) -- a hood: open in front, a flap down the back
+	local function hood(color: Color3, tall: number?) -- a hood: open in front, a point on top, hanging a bit lower at the back
 		headwear("Hood", color, nil, tall or 0.35)
-		attach(head, "HoodBack", Vector3.new(hx * 2 + 0.1, hy * 1.4, 0.3), Vector3.new(0, -hy * 0.25, hz + 0.3), color)
+		attach(head, "HoodPeak", Vector3.new(hx * 1.2, 0.3, hz * 1.2), Vector3.new(0, hy + 0.1 + (tall or 0.35), 0.1), color)
+		attach(head, "HoodTail", Vector3.new(hx * 2 + 0.3, 0.5, 0.26), Vector3.new(0, -hy - 0.2, hz + 0.13), color)
 	end
 	local function pointedHat(color: Color3, brim: Color3)
 		attach(head, "HatBrim", Vector3.new(hx * 2 + 0.9, 0.12, hz * 2 + 0.9), Vector3.new(0, hy + 0.02, 0), brim)
@@ -400,9 +401,9 @@ function Enemy.build(kind: string, level: number): Model
 	local function pauldrons(color: Color3, material: Enum.Material?, spikes: boolean?)
 		for _, arm in { leftArm, rightArm } do
 			local ay = arm.Size.Y / 2 / s
-			attach(arm, "Pauldron", Vector3.new(arm.Size.X / s + 0.55, 0.6, arm.Size.Z / s + 0.55), Vector3.new(0, ay - 0.05, 0), color, nil, material)
+			attach(arm, "Pauldron", Vector3.new(arm.Size.X / s + 0.3, 0.42, arm.Size.Z / s + 0.3), Vector3.new(0, ay + 0.02, 0), color, nil, material)
 			if spikes then
-				attach(arm, "PauldronSpike", Vector3.new(0.22, 0.6, 0.22), Vector3.new(0, ay + 0.35, 0), STEEL, nil, METAL)
+				attach(arm, "PauldronSpike", Vector3.new(0.2, 0.5, 0.2), Vector3.new(0, ay + 0.4, 0), STEEL, nil, METAL)
 			end
 		end
 	end
@@ -584,8 +585,8 @@ function Enemy.build(kind: string, level: number): Model
 		headwear("Helm", IRON, METAL, 0.3)
 		attach(head, "HelmRidge", Vector3.new(0.2, 0.3, hz * 2 + 0.4), Vector3.new(0, hy + 0.25, 0), DARK_IRON, nil, METAL)
 		attach(hand, "HammerHandle", Vector3.new(0.3, 0.3, 3.2), Vector3.new(0, -0.1, -1.0), DARK_WOOD)
-		attach(hand, "HammerHead", Vector3.new(1.3, 1.1, 1.1), Vector3.new(0, -0.1, -2.6), DARK_IRON, nil, METAL)
-		attach(hand, "HammerEmber", Vector3.new(1.34, 0.4, 0.4), Vector3.new(0, -0.1, -2.6), EMBER, nil, NEON)
+		attach(hand, "HammerHead", Vector3.new(1.1, 0.9, 0.9), Vector3.new(0, -0.1, -2.6), DARK_IRON, nil, METAL)
+		attach(hand, "HammerEmber", Vector3.new(1.14, 0.34, 0.34), Vector3.new(0, -0.1, -2.6), EMBER, nil, NEON)
 		topOffset = hy + 1.8
 	elseif look == "MorovaMatka" then
 		-- Boss: the plague mother: a dark green robe, antlers with hanging vials, a skull on the belt, a staff with a
