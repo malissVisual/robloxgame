@@ -173,7 +173,15 @@ local function fresh(): Profile
 		quests = { day = "", progress = {}, done = {} },
 		board = Grid.new(Balance.BoardSize),
 		boardSlots = Balance.BoardStartSlots,
-		squad = Grid.new(Balance.SquadSize),
+		-- There is no summoning: a new player starts with three level 1 characters already in the squad (more come
+		-- as wave drops).
+		squad = (function(): Grid.Cells
+			local squad = Grid.new(Balance.SquadSize)
+			squad[1] = { class = "Knight", tier = 1 }
+			squad[2] = { class = "Archer", tier = 1 }
+			squad[3] = { class = "Knight", tier = 1 }
+			return squad
+		end)(),
 		purchases = 0,
 		startLevel = 1,
 		tierUnlocked = tierUnlocked,

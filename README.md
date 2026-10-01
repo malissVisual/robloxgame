@@ -29,6 +29,13 @@ by game server").
 
 ## Game loop
 
+**Current simplifications:** the game is silent (no sounds, no music; `playSound` is a no-op), there are **no
+summoning altars and no level-upgrade station** in the lobby (a new player starts with two Knights and an Archer
+level 1 in the squad, and every won wave drops new characters), and there is **no countdown**: PLAY fades the
+screen to black for 1.1 s with FIGHT! on it (you are moved into the arena while it is dark, the fight starts as it
+clears, `Balance.BattleCountdown`), and the end of the battle fades to black for 1 s while you are put back at
+your spawn (remote `Countdown` carries "start" / "end").
+
 ```
 Summon (altar, E) → the soldiers land in the INVENTORY (= the 3D merge room)
    ↑                                        │ drag a card onto a card (UI) or a pad onto a pad (3D): merge

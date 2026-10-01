@@ -1189,7 +1189,7 @@ local function onBattle(player: Player)
 	end
 	if Grid.count(profile.squad) == 0 then
 		if Grid.count(profile.board) == 0 then
-			notify(player, "You have no characters — summon some at the altar")
+			notify(player, "You have no characters — won waves drop new ones")
 		else
 			notify(player, "Your squad is empty — click a character in the inventory and equip it")
 		end
@@ -1202,12 +1202,14 @@ local function onBattle(player: Player)
 	profile.battling = true
 	refresh(player)
 
-	-- You fight too (Q / E spells): START WAVE puts you into the arena, on its near edge behind your squad,
-	-- looking at the enemies.
-	local character = player.Character
-	if character then
-		local spot = plot.arena.center + Vector3.new(0, 3, -27)
-		character:PivotTo(CFrame.lookAt(spot, spot + Vector3.new(0, 0, 1)))
+	-- You fight too (Q / E spells): you are put into the arena, on its near edge behind your squad, looking at
+	-- the enemies, while the screen is black (see the fade below).
+	local function enterArena()
+		local character = player.Character
+		if character then
+			local spot = plot.arena.center + Vector3.new(0, 3, -27)
+			character:PivotTo(CFrame.lookAt(spot, spot + Vector3.new(0, 0, 1)))
+		end
 	end
 
 	-- Coins come only from kills and go straight to your balance (so progress is kept even when the
@@ -1246,18 +1248,18 @@ local function onBattle(player: Player)
 	end
 
 	task.spawn(function()
-		-- Get ready: 3, 2, 1, FIGHT!
-		for i = Balance.BattleCountdown, 1, -1 do
-			if plots[player] ~= plot then
-				return
-			end
-			Net.get("Countdown"):FireClient(player, i)
-			task.wait(1)
-		end
+		-- No countdown: a quick fade to black with FIGHT! (1.1 s). You are moved into the arena while it is dark
+		-- and the fight starts as the screen clears.
+		Net.get("Countdown"):FireClient(player, "start")
+		task.wait(0.35)
 		if plots[player] ~= plot then
 			return
 		end
-		Net.get("Countdown"):FireClient(player, 0)
+		enterArena()
+		task.wait(Balance.BattleCountdown - 0.35)
+		if plots[player] ~= plot then
+			return
+		end
 
 		BattleService.start(player, profile, plot, {
 			enemyPower = difficulty.enemyPower * (if isElite then Balance.ElitePower else 1),
@@ -1266,8 +1268,9 @@ local function onBattle(player: Player)
 			summonTier = (Waves.phase(wave, plot.map)),
 		}, onKill, function(won)
 			checkAchievements(player, profile)
-			-- Back to the spawn once the fight is over.
-			task.delay(1.2, function()
+			-- Back to the spawn once the fight is over: a 1 s fade to black, the move happens while it is dark.
+			Net.get("Countdown"):FireClient(player, "end")
+			task.delay(0.4, function()
 				local character = player.Character
 				local home = plots[player]
 				if character and home then
@@ -1445,7 +1448,9 @@ end
 
 function GameService.init()
 	-- E = buy, Q = battle, R = upgrade (the client sends key presses and drags).
-	Net.get("Buy").OnServerEvent:Connect(onSpawn)
+	-- (Summoning at altars and the level-upgrade station are gone: characters come from wave drops. The Buy /
+	-- UpgradeLevel remotes stay registered but nothing listens to them.)
+	local _unusedSummon = onSpawn
 	Net.get("Battle").OnServerEvent:Connect(onBattle)
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)
 	Net.get("UnlockTier").OnServerEvent:Connect(onUnlockTier)
@@ -1457,7 +1462,7 @@ function GameService.init()
 	Net.get("AdminUnlock").OnServerEvent:Connect(onAdminUnlock)
 	Net.get("AdminReset").OnServerEvent:Connect(onAdminReset)
 	Net.get("AdminCommand").OnServerEvent:Connect(onAdminCommand)
-	Net.get("UpgradeLevel").OnServerEvent:Connect(onUpgradeLevel)
+	local _unusedUpgrade = onUpgradeLevel
 	Net.get("BattleSpeed").OnServerEvent:Connect(onBattleSpeed)
 	Net.get("SetSetting").OnServerEvent:Connect(onSetSetting)
 	Net.get("AutoMerge").OnServerEvent:Connect(onAutoMerge)

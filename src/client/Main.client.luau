@@ -110,6 +110,10 @@ end
 -- sounds too (the Sfx remote). Music loops when Sounds.Music is set.
 local soundVolume = 1
 local function playSound(name: string, pitch: number?)
+	-- The game is silent: no UI clicks, no battle sounds, no music (the server's Sfx messages are ignored too).
+	if true then
+		return
+	end
 	local def = Sounds.Defs[name]
 	if not def or soundVolume <= 0 then
 		return
@@ -2064,7 +2068,7 @@ end)
 
 -- One-time hint shortly after joining.
 task.delay(3, function()
-	showToast("Summon characters at the green altar (E), drag cards onto each other to merge, equip your squad, then press PLAY", 9)
+	showToast("Drag cards onto each other to merge, equip your squad in the bar below, then press PLAY. Won waves drop new characters.", 9)
 end)
 end
 
@@ -2804,41 +2808,77 @@ end
 
 RunService.RenderStepped:Connect(updateCardDrag)
 
--- ── Countdown before the battle ───────────────────────────────────────────
--- "3, 2, 1, FIGHT!" in the middle of the screen (the server counts, the client shows it).
+-- ── The battle fade ───────────────────────────────────────────────────────
+-- No countdown: PLAY fades the screen to black for about a second with "FIGHT!" on it (the server moves you into
+-- the arena while it is dark and starts the fight as it clears), and the end of the battle fades to black again
+-- for a second while you are put back at your spawn. "Countdown" carries "start" or "end".
 do
 
-local countdownLabel = Instance.new("TextLabel")
-countdownLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-countdownLabel.Position = UDim2.fromScale(0.5, 0.3)
-countdownLabel.Size = UDim2.fromOffset(500, 130)
-countdownLabel.BackgroundTransparency = 1
-countdownLabel.Font = Enum.Font.GothamBlack
-countdownLabel.TextSize = 96
-countdownLabel.TextColor3 = WHITE
-countdownLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-countdownLabel.TextTransparency = 1
-countdownLabel.TextStrokeTransparency = 1
-countdownLabel.Text = ""
-countdownLabel.Parent = gui
-local countdownScale = Instance.new("UIScale")
-countdownScale.Parent = countdownLabel
-local countdownId = 0
+local fadeFrame = Instance.new("Frame")
+fadeFrame.Name = "BattleFade"
+fadeFrame.Size = UDim2.fromScale(1, 1)
+fadeFrame.Position = UDim2.fromScale(0, 0)
+fadeFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+fadeFrame.BackgroundTransparency = 1
+fadeFrame.BorderSizePixel = 0
+fadeFrame.ZIndex = 60
+fadeFrame.Visible = false
+fadeFrame.Parent = gui
+local fadeText = Instance.new("TextLabel")
+fadeText.AnchorPoint = Vector2.new(0.5, 0.5)
+fadeText.Position = UDim2.fromScale(0.5, 0.5)
+fadeText.Size = UDim2.fromOffset(600, 140)
+fadeText.BackgroundTransparency = 1
+fadeText.Font = Enum.Font.GothamBlack
+fadeText.TextSize = 110
+fadeText.TextColor3 = ORANGE
+fadeText.TextStrokeColor3 = Color3.new(0, 0, 0)
+fadeText.TextStrokeTransparency = 0.4
+fadeText.TextTransparency = 1
+fadeText.Text = "FIGHT!"
+fadeText.ZIndex = 61
+fadeText.Parent = fadeFrame
+local fadeScale = Instance.new("UIScale")
+fadeScale.Parent = fadeText
+local fadeId = 0
 
-Net.get("Countdown").OnClientEvent:Connect(function(n: number)
-	countdownId += 1
-	local id = countdownId
-	countdownLabel.Text = if n > 0 then tostring(n) else "FIGHT!"
-	countdownLabel.TextColor3 = if n > 0 then WHITE else ORANGE
-	countdownLabel.TextTransparency = 0
-	countdownLabel.TextStrokeTransparency = 0.3
-	countdownScale.Scale = 1.7
-	TweenService:Create(countdownScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-	task.delay(if n > 0 then 0.8 else 0.9, function()
-		if id == countdownId then
-			TweenService:Create(countdownLabel, TweenInfo.new(0.2), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+-- `inTime` to black, `hold` dark, `outTime` back; the text shows while it is dark when `withText`.
+local function fade(inTime: number, hold: number, outTime: number, withText: boolean)
+	fadeId += 1
+	local id = fadeId
+	fadeFrame.Visible = true
+	fadeText.TextTransparency = 1
+	TweenService:Create(fadeFrame, TweenInfo.new(inTime, Enum.EasingStyle.Quad), { BackgroundTransparency = 0 }):Play()
+	task.delay(inTime, function()
+		if id ~= fadeId then
+			return
 		end
+		if withText then
+			fadeScale.Scale = 1.6
+			fadeText.TextTransparency = 0
+			TweenService:Create(fadeScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		end
+		task.delay(hold, function()
+			if id ~= fadeId then
+				return
+			end
+			TweenService:Create(fadeFrame, TweenInfo.new(outTime, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+			TweenService:Create(fadeText, TweenInfo.new(outTime * 0.6), { TextTransparency = 1 }):Play()
+			task.delay(outTime, function()
+				if id == fadeId then
+					fadeFrame.Visible = false
+				end
+			end)
+		end)
 	end)
+end
+
+Net.get("Countdown").OnClientEvent:Connect(function(what: any)
+	if what == "end" then
+		fade(0.35, 0.3, 0.35, false) -- 1 s: dark while you are put back at the spawn
+	else
+		fade(0.3, 0.5, 0.3, true) -- 1.1 s: FIGHT! in the dark, the fight is on as it clears
+	end
 end)
 
 -- A boss wave is announced with a big red banner while the countdown runs.

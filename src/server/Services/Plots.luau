@@ -515,76 +515,14 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 	areaSign("BoardSign", 0, Balance.BoardStart - 7, '<font size="13" color="#9aa0aa">DRAG TO MERGE</font>\n<font size="26">MERGE BOARD</font>')
 	areaSign("SquadSign", 24, Balance.SquadStart + Balance.SquadSpacing / 2, '<font size="13" color="#9aa0aa">THESE SIX FIGHT</font>\n<font size="26">SQUAD</font>')
 
-	-- The level-upgrade station in the lobby: stand on it and the upgrade panel opens (bought soldiers
-	-- start at a higher merge level). The server checks the invisible zone for the purchase.
-	local stationPos = origin + Vector3.new(-24, 0, -24)
-	local stationColor = Color3.fromRGB(170, 130, 255)
-	local station = makePart(folder, "LevelStation", Vector3.new(10, 0.4, 10), stationPos + Vector3.new(0, 0.2, 0), stationColor, Enum.Material.Neon)
-	station.Transparency = 0.25
-	station.CanCollide = false
-	station.CanQuery = false
-	local crystal = makePart(folder, "LevelCrystal", Vector3.new(2.2, 2.2, 2.2), stationPos + Vector3.new(0, 4.5, 0), stationColor, Enum.Material.Neon)
-	crystal.CFrame = CFrame.new(stationPos + Vector3.new(0, 4.5, 0)) * CFrame.Angles(math.rad(45), math.rad(45), 0)
-	crystal.CanCollide = false
-	crystal.CanQuery = false
-	local crystalLight = Instance.new("PointLight")
-	crystalLight.Color = stationColor
-	crystalLight.Range = 16
-	crystalLight.Brightness = 2
-	crystalLight.Parent = crystal
-	areaSign("LevelSign", -24, -24, '<font size="13" color="#9aa0aa">STRONGER SOLDIERS</font>\n<font size="26">LEVEL UPGRADE</font>', true)
-	local upgradeZone = makePart(folder, "UpgradeZone", Vector3.new(10, 14, 10), stationPos + Vector3.new(0, 6, 0), Color3.new(1, 1, 1))
+	-- No summoning altars and no level-upgrade station any more: characters come from wave drops (and the admin
+	-- tools). The invisible UpgradeZone part is kept for the code that reads it, far below the ground.
+	local upgradeZone = makePart(folder, "UpgradeZone", Vector3.new(1, 1, 1), origin + Vector3.new(0, -500, 0), Color3.new(1, 1, 1))
 	upgradeZone.Transparency = 1
 	upgradeZone.CanCollide = false
 	upgradeZone.CanQuery = false
 	upgradeZone.CanTouch = false
 	plot.upgradeZone = upgradeZone
-
-	-- The summoning altar in the lobby (right of the merge board): the client puts a "Summon soldier"
-	-- ProximityPrompt (E) on the part named "SummonAltar". Soldiers are free.
-	local altarPos = origin + Vector3.new(24, 0, -24)
-	local altarColor = Color3.fromRGB(90, 220, 140)
-	local altar = makePart(folder, "SummonAltar", Vector3.new(10, 0.6, 10), altarPos + Vector3.new(0, 0.3, 0), altarColor:Lerp(Color3.new(0, 0, 0), 0.55), Enum.Material.Slate)
-	altar.CanQuery = false
-	local altarRing = makePart(folder, "SummonRing", Vector3.new(0.4, 8, 8), altarPos + Vector3.new(0, 0.65, 0), altarColor, Enum.Material.Neon)
-	altarRing.Shape = Enum.PartType.Cylinder
-	altarRing.CFrame = CFrame.new(altarPos + Vector3.new(0, 0.65, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	altarRing.Transparency = 0.2
-	altarRing.CanCollide = false
-	altarRing.CanQuery = false
-	local altarOrb = makePart(folder, "SummonOrb", Vector3.one * 2.4, altarPos + Vector3.new(0, 4.5, 0), altarColor, Enum.Material.Neon)
-	altarOrb.Shape = Enum.PartType.Ball
-	altarOrb.CanCollide = false
-	altarOrb.CanQuery = false
-	local altarLight = Instance.new("PointLight")
-	altarLight.Color = altarColor
-	altarLight.Range = 18
-	altarLight.Brightness = 2
-	altarLight.Parent = altarOrb
-	areaSign("AltarSign", 24, -24, string.format('<font size="13" color="#9aa0aa">%d COINS · x%d · PRESS E</font>\n<font size="26">SUMMON SOLDIERS</font>', Balance.SummonCost, Balance.SummonCount), true)
-
-	-- The BETTER summoner (gold, next to the first altar): from wave 10 of Training Camp it summons better
-	-- levels for coins. The client puts a prompt on the part named "BetterAltar".
-	local betterPos = origin + Vector3.new(24, 0, -40)
-	local betterColor = Color3.fromRGB(255, 200, 70)
-	local better = makePart(folder, "BetterAltar", Vector3.new(10, 0.6, 10), betterPos + Vector3.new(0, 0.3, 0), betterColor:Lerp(Color3.new(0, 0, 0), 0.6), Enum.Material.Slate)
-	better.CanQuery = false
-	local betterRing = makePart(folder, "BetterRing", Vector3.new(0.4, 8, 8), betterPos + Vector3.new(0, 0.65, 0), betterColor, Enum.Material.Neon)
-	betterRing.Shape = Enum.PartType.Cylinder
-	betterRing.CFrame = CFrame.new(betterPos + Vector3.new(0, 0.65, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	betterRing.Transparency = 0.2
-	betterRing.CanCollide = false
-	betterRing.CanQuery = false
-	local betterOrb = makePart(folder, "BetterOrb", Vector3.one * 3, betterPos + Vector3.new(0, 5, 0), betterColor, Enum.Material.Neon)
-	betterOrb.Shape = Enum.PartType.Ball
-	betterOrb.CanCollide = false
-	betterOrb.CanQuery = false
-	local betterLight = Instance.new("PointLight")
-	betterLight.Color = betterColor
-	betterLight.Range = 20
-	betterLight.Brightness = 3
-	betterLight.Parent = betterOrb
-	areaSign("BetterSign", 24, -40, string.format('<font size="13" color="#9aa0aa">WAVE %d · %d COINS · x%d</font>\n<font size="26">BETTER SUMMONER</font>', Balance.BetterSummonWave, Balance.BetterSummonCost, Balance.SummonCount), true)
 
 	-- Unobtrusive heading above the enemy grid (map, wave, count).
 	local waveSign = makePart(folder, "WaveSign", Vector3.new(1, 1, 1), origin + Vector3.new(0, 0.5, Balance.EnemyFront + 2), Color3.new(1, 1, 1))
