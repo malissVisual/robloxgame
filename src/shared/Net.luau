@@ -18,6 +18,7 @@ local NAMES = {
 	"AdminProgress", -- client → server: admin only, +1 wave and coins
 	"AdminUnlock", -- client → server: admin only, unlocks everything
 	"AdminReset", -- client → server: admin only, wipes the whole progress
+	"AdminCommand", -- client → server: admin only, the test tools (command, a, b): coins, wave, spawn, spawnall, clear, slots, startlevel
 	"Ability", -- client → server: cast the spell of a slot ("q" | "e") during a battle, optionally at an aimed point; server → client: (slot, cooldown)
 	"BossIntro", -- server → client: a boss wave starts (boss name)
 	"AutoFight", -- client → server: turn auto fight on / off (starts the next wave by itself)
