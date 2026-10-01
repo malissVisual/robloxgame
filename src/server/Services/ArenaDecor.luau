@@ -51,7 +51,23 @@ local PLACEMENTS: { [string]: { Placement } } = {
 
 local ArenaDecor = {}
 
-local RING_SCALE = 1.7 -- the big arena gets bigger ring marks than the design's
+local RING_SCALE = 2.0 -- the big arena gets bigger ring marks than the design's
+
+-- The placements above were laid out for the original arena (a plot 64 wide, the arena z = 30 … 140). The
+-- plot is 84 wide and 160 long now: x is stretched to the new width, the things along the fight platform
+-- (z 34 … 117) are spread over the longer platform and the far end (the dummies, hay, targets) moves back.
+local OLD_HALF, NEW_HALF = 32, 42
+local OLD_FAR, NEW_FAR = 118, 136 -- where the far end (the enemy area) began / begins
+local function stretched(placement: Placement): (number, number)
+	local x = placement.x * NEW_HALF / OLD_HALF
+	local z = placement.z
+	if z >= OLD_FAR then
+		z += NEW_FAR - OLD_FAR
+	elseif z > 34 then
+		z = 34 + (z - 34) * (NEW_FAR - 1 - 34) / (OLD_FAR - 1 - 34)
+	end
+	return x, z
+end
 
 local function buildPart(parent: Instance, data: any, base: CFrame): Part
 	local p = Instance.new("Part")
@@ -124,7 +140,8 @@ function ArenaDecor.build(designId: string, folder: Instance, origin: Vector3, r
 		if parts then
 			local model = Instance.new("Model")
 			model.Name = string.format("%s%d", placement.name, i)
-			local base = CFrame.new(origin + Vector3.new(placement.x, 0, placement.z)) * CFrame.Angles(0, math.rad(placement.rotation or 0), 0)
+			local px, pz = stretched(placement)
+			local base = CFrame.new(origin + Vector3.new(px, 0, pz)) * CFrame.Angles(0, math.rad(placement.rotation or 0), 0)
 			for _, part in parts do
 				buildPart(model, part, base)
 			end

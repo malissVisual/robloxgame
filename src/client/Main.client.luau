@@ -1518,6 +1518,11 @@ battlePanel.Active = true -- clicks on the panel never reach the 3D world
 battlePanel.Visible = false
 battlePanel.Parent = gui
 corner(battlePanel, 14)
+do -- bigger and wider: laid out at 560 x 292, drawn at 1.3x (every text and button grows with it)
+	local battleScale = Instance.new("UIScale")
+	battleScale.Scale = 1.3
+	battleScale.Parent = battlePanel
+end
 local battleStroke = Instance.new("UIStroke")
 battleStroke.Color = ORANGE
 battleStroke.Thickness = 3
@@ -4018,11 +4023,10 @@ RunService.RenderStepped:Connect(function()
 end)
 end
 
--- ── Squad pad auras (animation) ────────────────────────────────────────────
--- The server builds the aura of every squad pad (Plots.setRingAura); here the rune rings and orbs spin and
--- the glow disk pulses (only on your own plot, and only on the client).
+-- ── Squad pad rings (animation) ────────────────────────────────────────────
+-- The server builds the holographic ring of every squad pad (Plots, holoPad). Here an EMPTY ring breathes
+-- (its glow comes and goes) so it asks for a soldier; a taken ring stays grey and still. Only on the client.
 do
-	local SPIN = { Runes = 0.9, RunesB = -0.6, Orbs = 1.8 }
 	local time = 0
 	RunService.RenderStepped:Connect(function(dt)
 		time += dt
@@ -4032,20 +4036,23 @@ do
 		end
 		for i = 1, Balance.SquadSize do
 			local pad = plot:FindFirstChild("Slot" .. (Balance.SquadOffset + i))
-			local aura = pad and pad:FindFirstChild("LevelAura")
-			local center = aura and aura:FindFirstChild("Center")
-			if aura and center and center:IsA("BasePart") then
-				local c = center.CFrame
-				for name, speed in SPIN do
-					local group = aura:FindFirstChild(name)
-					if group and group:IsA("Model") then
-						group:PivotTo(c * CFrame.Angles(0, speed * dt, 0) * c:ToObjectSpace(group:GetPivot()))
+			if not pad or pad:GetAttribute("Occupied") ~= false then
+				continue
+			end
+			local wave = (math.sin(time * 2.2 + i * 1.1) + 1) / 2 -- 0 … 1
+			for _, name in { "HoloRing", "HoloFill" } do
+				local part = pad:FindFirstChild(name)
+				if part and part:IsA("BasePart") then
+					local base = part:GetAttribute("BaseTransparency")
+					if type(base) == "number" then
+						part.Transparency = base + wave * 0.22
 					end
 				end
-				local glow = aura:FindFirstChild("GlowDisk")
-				if glow and glow:IsA("BasePart") then
-					glow.Transparency = (glow:GetAttribute("BaseTransparency") or glow.Transparency) + math.sin(time * 3 + i) * 0.05
-				end
+			end
+			local ring = pad:FindFirstChild("HoloRing")
+			local glow = ring and ring:FindFirstChild("Glow")
+			if glow and glow:IsA("PointLight") then
+				glow.Brightness = 0.8 + (1 - wave) * 0.9
 			end
 		end
 	end)

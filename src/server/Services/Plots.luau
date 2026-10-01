@@ -52,11 +52,13 @@ local ORIGIN_Y = 0.3 -- above a possible Baseplate (its top is y = 0)
 local PAD_TOP = 0.6 -- how far a pad rises above the floor (the top of the designed fight slot)
 local SLOT_COLOR = Color3.fromRGB(107, 114, 128) -- the ring of an empty slot
 local LOCKED_COLOR = Color3.fromRGB(42, 44, 54) -- merge pads that are not bought yet
-local SQUAD_COLOR = Color3.fromRGB(190, 120, 70) -- the six squad pads (warm, one color: the pads give no bonus)
+local SQUAD_COLOR = Color3.fromRGB(120, 215, 255) -- the holographic ring of an EMPTY squad pad (bright: "put someone here")
+local SQUAD_TAKEN_COLOR = Color3.fromRGB(128, 134, 150) -- the ring once a soldier stands on the pad (grey: satisfied)
 
 local ARENA_START = 30 -- z of the arena gate (a road leads from the lobby to it)
 
 local Plots = {}
+Plots.setRingAura = setRingAura -- (the designed rarity auras are not used on the squad pads right now; kept for later)
 
 local root: Folder? = nil
 
@@ -192,6 +194,70 @@ local function decoratePad(pad: Part, ringColor: Color3, glow: boolean, text: st
 	local glowLight = light :: PointLight
 	glowLight.Color = ringColor
 	glowLight.Enabled = glow
+end
+
+-- ── The holographic ring of a squad pad ──
+-- The six squad pads are no stone slots: each is a flat holographic ring on the floor. Empty, it glows bright
+-- (a light, a soft disc inside, the client pulses it); with a soldier on it, it turns grey and quiet. The
+-- "Slot<id>" part stays the invisible block the game uses (drag target, position); this builds its look.
+local function holoPad(pad: Part, occupied: boolean)
+	pad.Transparency = 1
+	local floorY = pad.Position.Y - pad.Size.Y / 2
+	local x, z = pad.Position.X, pad.Position.Z
+	local color = if occupied then SQUAD_TAKEN_COLOR else SQUAD_COLOR
+	local function disc(name: string, diameter: number, thickness: number, lift: number): Part
+		local p = pad:FindFirstChild(name) :: Part?
+		if not p then
+			p = Instance.new("Part")
+			local made = p :: Part
+			made.Name = name
+			made.Shape = Enum.PartType.Cylinder
+			made.Anchored = true
+			made.CanCollide = false
+			made.CanQuery = false
+			made.CanTouch = false
+			made.CastShadow = false
+			made.Size = Vector3.new(thickness, diameter, diameter)
+			made.CFrame = CFrame.new(x, floorY + lift, z) * CFrame.Angles(0, 0, math.rad(90))
+			made.Parent = pad
+		end
+		return p :: Part
+	end
+	for _, name in { "Base", "Top", "Label", "Post0", "Post1", "Post2", "Post3", "Cap0", "Cap1", "Cap2", "Cap3", "LevelAura" } do
+		local old = pad:FindFirstChild(name)
+		if old then
+			old:Destroy()
+		end
+	end
+	-- The ring (Neon), a thinner second ring inside it and a faint disc filling the middle.
+	local ring = disc("HoloRing", 6.2, 0.22, 0.11)
+	ring.Material = Enum.Material.Neon
+	ring.Color = color
+	ring.Transparency = if occupied then 0.55 else 0.05
+	ring:SetAttribute("BaseTransparency", ring.Transparency)
+	local inner = disc("HoloInner", 5.4, 0.2, 0.1)
+	inner.Material = Enum.Material.Neon
+	inner.Color = if occupied then Color3.fromRGB(40, 42, 52) else SQUAD_COLOR:Lerp(Color3.new(0, 0, 0), 0.55)
+	inner.Transparency = if occupied then 0.75 else 0.35
+	local fill = disc("HoloFill", 4.6, 0.18, 0.09)
+	fill.Material = Enum.Material.Neon
+	fill.Color = color
+	fill.Transparency = if occupied then 0.93 else 0.78
+	fill:SetAttribute("BaseTransparency", fill.Transparency)
+	local light = ring:FindFirstChild("Glow") :: PointLight?
+	if not light then
+		light = Instance.new("PointLight")
+		local made = light :: PointLight
+		made.Name = "Glow"
+		made.Range = 9
+		made.Brightness = 1.2
+		made.Shadows = false
+		made.Parent = ring
+	end
+	local glow = light :: PointLight
+	glow.Color = color
+	glow.Enabled = not occupied
+	pad:SetAttribute("Occupied", occupied)
 end
 
 -- ── The aura of a squad pad (design/BattleRing_Auras.rbxmx) ──
@@ -341,8 +407,8 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 
 	-- Layout along z: lobby with spawn + merge board (zMin … -4) → road (-4 … ARENA_START) →
 	-- arena with squad, showcase and enemies (… zMax).
-	local zMin, zMax = -68, 140
-	local width = 64
+	local zMin, zMax = -68, 160
+	local width = 84
 	local function floorStrip(name: string, z0: number, z1: number, color: Color3, material: Enum.Material): Part
 		return makePart(folder, name, Vector3.new(width, 1, z1 - z0), origin + Vector3.new(0, -0.5, (z0 + z1) / 2), color, material)
 	end
@@ -413,20 +479,19 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 	-- accepts a wave start or a wave / difficulty change from someone inside this invisible zone.
 	plot.battleZone = plot.arena.zone
 
-	-- Pads: the 6x6 merge board and the 3x3 squad. Soldiers are moved by dragging
-	-- (handled on the client), so the pads have no click handlers.
-	local function addPad(id: number, color: Color3)
+	-- Pads: the 6x6 merge board (designed slots) and the six squad pads (holographic rings). Soldiers are moved
+	-- by dragging (handled on the client), so the pads have no click handlers.
+	local function addPad(id: number, color: Color3): Part
 		local ground = Plots.slotGround(plot, id)
 		local pad = makePart(folder, "Slot" .. id, Vector3.new(5, PAD_TOP, 5), ground - Vector3.new(0, PAD_TOP / 2, 0), color)
 		plot.slotPads[id] = pad
-		decoratePad(pad, color, false, "+", false)
+		return pad
 	end
 	for i = 1, Balance.BoardSize do
-		addPad(i, SLOT_COLOR)
-		decoratePad(plot.slotPads[i], SLOT_COLOR, false, "", false, true)
+		decoratePad(addPad(i, SLOT_COLOR), SLOT_COLOR, false, "", false, true)
 	end
 	for i = 1, Balance.SquadSize do
-		addPad(Balance.SquadOffset + i, SQUAD_COLOR)
+		holoPad(addPad(Balance.SquadOffset + i, SQUAD_COLOR), false)
 	end
 
 	-- Small signs that show only when you are close.
@@ -448,7 +513,7 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 		end
 	end
 	areaSign("BoardSign", 0, Balance.BoardStart - 7, '<font size="13" color="#9aa0aa">DRAG TO MERGE</font>\n<font size="26">MERGE BOARD</font>')
-	areaSign("SquadSign", 22, Balance.SquadStart + Balance.SquadSpacing / 2, '<font size="13" color="#9aa0aa">THESE SIX FIGHT</font>\n<font size="26">SQUAD</font>')
+	areaSign("SquadSign", 24, Balance.SquadStart + Balance.SquadSpacing / 2, '<font size="13" color="#9aa0aa">THESE SIX FIGHT</font>\n<font size="26">SQUAD</font>')
 
 	-- The level-upgrade station in the lobby: stand on it and the upgrade panel opens (bought soldiers
 	-- start at a higher merge level). The server checks the invisible zone for the purchase.
@@ -553,7 +618,10 @@ end
 function Plots.render(plot: Plot, board: Grid.Cells, squad: Grid.Cells, boardSlots: number)
 	local function renderCell(id: number, cell: Grid.Cell, baseColor: Color3, locked: boolean, tierMix: number?)
 		local pad = plot.slotPads[id]
-		if locked then
+		if id > Balance.SquadOffset then
+			holoPad(pad, cell ~= false) -- a squad pad: bright ring while empty, grey once taken
+			pad:SetAttribute("Locked", false)
+		elseif locked then
 			-- Not bought yet: a dark pad that cannot be used.
 			decoratePad(pad, LOCKED_COLOR, false, "LOCKED", true, id <= Balance.BoardSize)
 			pad:SetAttribute("Locked", true)
@@ -595,7 +663,6 @@ function Plots.render(plot: Plot, board: Grid.Cells, squad: Grid.Cells, boardSlo
 	for i = 1, Balance.SquadSize do
 		local unit = squad[i]
 		renderCell(Balance.SquadOffset + i, unit, SQUAD_COLOR, false, 0.7)
-		setRingAura(plot.slotPads[Balance.SquadOffset + i], unit)
 	end
 	Plots.renderHolograms(plot, squad)
 end
@@ -622,7 +689,7 @@ function Plots.renderHolograms(plot: Plot, squad: Grid.Cells)
 
 		local model = Soldier.build(unit.class, unit.tier, false, true, unit.ascended)
 		model.Name = "Hologram" .. i
-		local tint = SQUAD_COLOR:Lerp(Color3.fromRGB(140, 220, 255), 0.5)
+		local tint = SQUAD_COLOR
 		local count = 0
 		for _, part in model:GetDescendants() do
 			if part:IsA("BasePart") then

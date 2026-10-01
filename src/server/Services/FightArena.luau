@@ -9,19 +9,19 @@
 --                             side 2 = the enemy wave (index 1 … count, front row first)
 -- Everything else in `build` (shape, materials, decorations, walls) is free to change.
 -- Coordinates are relative to the plot: `origin` is the top of the plot's floor, +z points from
--- your squad toward the enemies. The squad stands at z = 34 … 46 and the enemy preview at
--- z = 118 … 130; the arena (z = 51 … 111) sits between them.
+-- your squad toward the enemies. The squad stands at z = 37 … 49 and the enemy preview at
+-- z = 136 … 150; the arena (z = 56 … 128) sits between them.
 
 local HEIGHT = 2 -- the arena is one step (2 studs) above the floor
 local STEP = 1 -- height of the small stair step on each side
-local Z0, Z1 = 51, 113 -- platform start / end (z, plot-relative): a big arena, 62 studs deep
-local HALF_WIDTH = 30 -- 60 studs wide (the plot is 64)
-local STAIR_WIDTH = 30
+local Z0, Z1 = 56, 128 -- platform start / end (z, plot-relative): a big arena, 72 studs deep
+local HALF_WIDTH = 38 -- 76 studs wide (the plot is 84)
+local STAIR_WIDTH = 36
 local STAIR_DEPTH = 2
-local PLAYER_SPACING = 14 -- between your fighters in a row: the formation is spread over the arena, so the column
-local ENEMY_SPACING = 12 -- of a pad decides in which lane the character fights
+local PLAYER_SPACING = 16 -- between your fighters in a row: the formation is spread over the arena, so the column
+local ENEMY_SPACING = 13 -- of a pad decides in which lane the character fights
 local ROW_GAP = 10 -- between rows
-local PLAYER_Z, ENEMY_Z = 58, 90 -- your back row / the enemies' front row (your 2 rows are a ROW_GAP apart)
+local PLAYER_Z, ENEMY_Z = 66, 104 -- your back row / the enemies' front row (your 2 rows are a ROW_GAP apart)
 local PAD_TOP = 0.6 -- height of the staging pads above the floor
 
 export type Arena = {

@@ -81,7 +81,7 @@ Every class now has a design of its own; the generic level gear (`Soldier.luau`)
 (`Soldier.scale`: 0.9 at level 1, 1.26 at level 9 — a 2x level 9 used to crowd its neighbours), the pads are
 `Balance.SlotSpacing` (7) apart, and the lights and sparkles of the designs come out soft (`AURA_*` in
 `SoldierRig.luau`; the level outline is faint, the stage auras have no sparkles). The fight arena
-(`FightArena.luau`) is 60 x 62 studs with the fighters 14 (yours) / 12 (enemies) apart and 10 between rows.
+(`FightArena.luau`) is 76 x 72 studs with the fighters 16 (yours) / 13 (enemies) apart and 10 between rows.
 
 The level colors (label, card outline, pad under the soldier, effects) follow the rarity colors of the
 Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
@@ -183,9 +183,9 @@ other; it comes back when the battle panel closes, and opening it from the dock 
 
 ```
 lobby (-68 … -4)              →  road (-4 … 30)  →  gate  →  ARENA 1 – Training (30 … 140)
-your spawn (z = -9)              ~34 studs of grass   name    SQUAD 3 × 2        z = 31 … 42 (six pads 11 apart, they wait here)
-MERGE BOARD 6 × 6 (z = -50…-20)  with a worn road             FIGHT ARENA, one step up (z = 51 … 111, 48 wide)
-                                                              enemy wave 4 wide, up to 3 rows (z = 118 … 130), visible before the battle
+your spawn (z = -9)              ~34 studs of grass   name    SQUAD 3 × 2        z = 37 … 49 (six holographic rings 12 apart)
+MERGE BOARD 6 × 6 (z = -50…-20)  with a worn road             FIGHT ARENA, one step up (z = 56 … 128, 76 wide)
+                                                              enemy wave 4 wide, up to 3 rows (z = 136 … 150), visible before the battle
 ```
 
 ## Fight arena (placeholder)
@@ -197,16 +197,18 @@ replace `FightArena.build` with your own design. The rest of the game only needs
 `heightAt(worldZ)` and `spot(side, index, count)` (see the comment at the top of that file).
 
 **The squad is exactly six** (`Balance.SquadSize`, 3 columns × 2 rows: a back and a front row), nothing more to
-buy around it. In the lobby the six pads stand 11 studs apart (`Balance.SquadSpacing`, the merge board is tighter)
-so the characters have room and are seen one by one; they are all one warm color and give **no bonuses**: where a
-soldier stands only decides which enemies it meets first. The **squad bar** at the bottom of the screen shows the
+buy around it. In the arena the six pads stand 12 studs apart (`Balance.SquadSpacing`, the merge board is tighter)
+so the characters have room and are seen one by one, and well inside the arena (z 37 … 49 of a plot that is 84 wide
+and 160 long). They are **holographic rings** (`holoPad` in `Plots.luau`): an empty ring glows bright cyan and
+breathes (the client pulses it) to ask for a soldier; with a soldier on it, it turns grey and quiet. They give **no
+bonuses**: where a soldier stands only decides which enemies it meets first. The **squad bar** at the bottom of the screen shows the
 same six places (3 × 2, the front row on top, "▲ ENEMIES" above it); drag cards onto it from the inventory, between
 its slots, or onto the main panel to unequip. The bar moves by its grip and hides during a battle. The HUD (level,
 coins) sits in the bottom left corner, PLAY in the bottom right. (A profile saved with the old 3 × 3 squad keeps its
 soldiers: the three beyond the sixth place move to free pads of the merge board, or are sold when there is none.)
 
-**The big arena and the formation:** the fight arena is 48 studs wide and 60 deep. Your squad's formation is
-**spread over it**: the three columns of the squad pads stand 11 studs apart (left, middle, right lane), the
+**The big arena and the formation:** the fight arena is 76 studs wide and 72 deep. Your squad's formation is
+**spread over it**: the three columns of the fighters stand 16 studs apart (left, middle, right lane), the
 back row 10 studs behind the front row, and the enemies (4 columns, 9 studs apart, up to 3 rows) start about 26
 studs in front of your front row. Everybody fights the nearest enemy, so **where you put a soldier decides what
 it fights**: the front row meets the enemies first, the back row (ranged soldiers!) stays behind, and a soldier on

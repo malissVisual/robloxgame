@@ -15,7 +15,7 @@ local Balance = {
 	-- arena. The squad has no upgrades and the pads give no bonuses: the six just stand there, well apart.
 	SquadColumns = 3,
 	SquadSize = 6,
-	SquadSpacing = 11, -- between the squad pads (the merge board uses the tighter SlotSpacing)
+	SquadSpacing = 12, -- between the squad pads (the merge board uses the tighter SlotSpacing)
 	-- Slot ids: the board is 1 … BoardSize, the squad is SquadOffset + 1 … SquadOffset + SquadSize.
 	SquadOffset = 100,
 
@@ -149,11 +149,11 @@ local Balance = {
 	SlotSpacing = 7, -- between pads (the characters are ~0.9-1.26 of an R15; 7 leaves air between them)
 	-- Every player gets their own plot (own spawn, board, arena). Plots are laid out in a grid:
 	PlotsPerRow = 4,
-	PlotSpacingX = 90, -- between plots side by side (a plot is 64 wide)
-	PlotSpacingZ = 240, -- between rows of plots (a plot is ~210 long)
+	PlotSpacingX = 110, -- between plots side by side (a plot is 84 wide)
+	PlotSpacingZ = 260, -- between rows of plots (a plot is 228 long)
 	BoardStart = -50, -- z of the board's back row (rows go up to z = -15), in the lobby
-	SquadStart = 31, -- z of the squad's back row (2 rows: 31, 42), in the arena, before the fight arena's step
-	EnemyFront = 118, -- z of the enemy's front row (the big raised fight arena is between squad and enemies)
+	SquadStart = 37, -- z of the squad's back row (2 rows: 37, 49), inside the arena, well before the fight arena's step
+	EnemyFront = 136, -- z of the enemy's front row (the big raised fight arena is between squad and enemies)
 	EnemyColumns = 4, -- enemies stand in 4 columns (up to 3 rows)
 
 	-- Enemy waves (see Config/Waves.luau): a map's waves come in phases of PhaseLength waves.
