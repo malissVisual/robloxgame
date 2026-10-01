@@ -154,13 +154,16 @@ local Balance = {
 	BoardStart = -50, -- z of the board's back row (rows go up to z = -15), in the lobby
 	SquadStart = 37, -- z of the squad's back row (2 rows: 37, 49), inside the arena, well before the fight arena's step
 	EnemyFront = 136, -- z of the enemy's front row (the big raised fight arena is between squad and enemies)
-	EnemyColumns = 4, -- enemies stand in 4 columns (up to 3 rows)
+	EnemyColumns = 4, -- enemies stand in 4 columns ...
+	EnemyRowsMax = 3, -- ... and never more than 3 rows: a bigger wave (SWARM) gets more columns, so the preview stays on the plot
 
 	-- Enemy waves (see Config/Waves.luau): a map's waves come in phases of PhaseLength waves.
 	PhaseLength = 5,
 	EnemyBase = 2, -- enemies in a wave = EnemyBase + wave * EnemyPerWave, at most EnemyMax
 	EnemyPerWave = 1,
 	EnemyMax = 12,
+	HordeMax = 18, -- the SWARM twist (Config/Mutators.luau) may raise a wave to this many enemies (the scatter formation holds 18)
+	MutatorCoinsCap = 0.35, -- the coin bonus of a wave's twists together is at most +35 %
 	EnemyHpBoost = 1.7, -- every enemy's HP and damage are multiplied by these (the wave difficulty in one place)
 	EnemyDamageBoost = 1.4,
 	EnemyLevelScale = 1.2, -- each enemy level (= phase number, every 5 waves) makes an enemy this much stronger

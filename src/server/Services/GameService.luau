@@ -19,6 +19,7 @@ local Achievements = require(Shared.Config.Achievements)
 local Maps = require(Shared.Config.Maps)
 local Net = require(Shared.Net)
 local Balance = require(Shared.Config.Balance)
+local Mutators = require(Shared.Config.Mutators)
 
 local BattleService = require(script.Parent.BattleService)
 local PlayerData = require(script.Parent.PlayerData)
@@ -1221,8 +1222,13 @@ local function onBattle(player: Player)
 	local isElite = not isBoss and wave >= Balance.EliteMinWave and rng:NextNumber() < Balance.EliteChance
 	local streakMult = 1 + Balance.StreakBonus * math.min(profile.streak, Balance.StreakMax) -- waves won in a row
 	local eliteMult = if isElite then Balance.EliteCoins else 1
+	-- The wave's TWISTS (Config/Mutators.luau): seeded by the wave number, so the preview (its TWIST line and the
+	-- formation), the banner and the fight agree — an elite roll (decided only now) never drops a twist the arena
+	-- preview already promised; an elite is harder through Balance.ElitePower alone.
+	local twists = Mutators.forWave(wave, plot.map)
+	local twistCoins = 1 + Mutators.coinBonus(twists)
 	local function onKill(level: number, position: Vector3, coinMult: number)
-		local base = math.floor(Waves.killReward(wave, level) * difficulty.rewardMultiplier * coinMult * streakMult * eliteMult)
+		local base = math.floor(Waves.killReward(wave, level) * difficulty.rewardMultiplier * coinMult * streakMult * eliteMult * twistCoins)
 		local multiplier = rollCoinBonus() -- a lucky kill drops x2, x3 or x5 the coins
 		kills += 1
 		questProgress(player, profile, "kills", 1)
@@ -1246,6 +1252,29 @@ local function onBattle(player: Player)
 	else
 		sfx(player, "fight")
 	end
+	-- The twists get their own banner under the boss banner and chips for the whole fight ("WaveIntro"); it is sent
+	-- as the black fade clears (below), so the whole banner is readable and not hidden behind FIGHT!.
+	local function sendWaveIntro()
+		if #twists == 0 then
+			return
+		end
+		local function rgb(color: Color3): { number }
+			return { math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5) }
+		end
+		local labels: { string } = {}
+		local chips: { any } = {}
+		for _, def in twists do
+			table.insert(labels, def.label)
+			table.insert(chips, { label = def.label, subtitle = def.subtitle, color = rgb(def.color) })
+		end
+		local bonus = math.floor(Mutators.coinBonus(twists) * 100 + 0.5)
+		Net.get("WaveIntro"):FireClient(player, {
+			title = table.concat(labels, " + "),
+			subtitle = twists[1].subtitle .. (if bonus > 0 then string.format(" · +%d%% COINS", bonus) else ""),
+			color = rgb(twists[1].color),
+			chips = chips,
+		})
+	end
 
 	task.spawn(function()
 		-- No countdown: a quick fade to black with FIGHT! (1.1 s). You are moved into the arena while it is dark
@@ -1260,16 +1289,24 @@ local function onBattle(player: Player)
 		if plots[player] ~= plot then
 			return
 		end
+		sendWaveIntro()
 
 		BattleService.start(player, profile, plot, {
 			enemyPower = difficulty.enemyPower * (if isElite then Balance.ElitePower else 1),
 			elite = isElite,
 			summonKind = phase.kinds[1],
 			summonTier = (Waves.phase(wave, plot.map)),
-		}, onKill, function(won)
+			wave = wave,
+			notify = function(text: string)
+				notify(player, text)
+			end,
+			twists = twists,
+			formation = Waves.formation(wave, twists),
+		}, onKill, function(won: boolean, result: BattleService.Result)
 			checkAchievements(player, profile)
 			-- Back to the spawn once the fight is over: a 1 s fade to black, the move happens while it is dark.
 			Net.get("Countdown"):FireClient(player, "end")
+			Net.get("WaveIntro"):FireClient(player, nil) -- the twist chips go away
 			task.delay(0.4, function()
 				local character = player.Character
 				local home = plots[player]
@@ -1328,6 +1365,9 @@ local function onBattle(player: Player)
 			local extraDrops: { Drop } = {} -- Nightmare (and an elite wave) gives an extra drop
 			for _ = 1, difficulty.extraDrops + (if isElite then 1 else 0) do
 				table.insert(extraDrops, battleDrop(profile, wave, false))
+			end
+			if result and result.bonusDrop then
+				table.insert(extraDrops, battleDrop(profile, wave, false)) -- the treasure goblin was caught
 			end
 			local candidates, lucky = luckyDrop(profile, wave, difficulty.luckyDropChance)
 			local spellDrop = rollSpellDrop(player, profile, wave, difficulty.luckyDropChance, isBoss or isElite)

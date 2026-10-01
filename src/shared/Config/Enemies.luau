@@ -144,6 +144,18 @@ buildRoster("", {
 	{ "Demon Lord", "Chief" }, { "Hellbow", "Archer" }, { "Infernal Titan", "Brute" }, { RiftKing.Name, "RiftKing" },
 }, 1)
 
+-- Extra kinds the wave TWISTS add to a wave (Config/Mutators.luau → Waves.get); they are not roster members and never
+-- appear on their own. The War Totem is a block pillar (Enemy.luau builds it) that stands still; the twist's runtime
+-- heals the enemies around it. The Treasure Goblin is a scout with a sack that only runs away and escapes after a while.
+Enemies.Kinds.Totem = {
+	label = "War Totem", archetype = "Totem", look = "Totem", color = C(90, 140, 70),
+	hp = 70, damage = 0, range = 0, cooldown = 10, speed = 0, splash = false, size = 1, coins = 1.5,
+}
+Enemies.Kinds.Treasure = {
+	label = "Treasure Goblin", archetype = "Treasure", look = "Prcek", color = C(255, 200, 60),
+	hp = 21, damage = 0, range = 0, cooldown = 10, speed = 14, splash = false, size = 0.9, coins = 10,
+}
+
 -- Stats of a kind at an enemy level (each level makes it Balance.EnemyLevelScale times stronger).
 function Enemies.stats(kind: string, level: number): Units.Stats
 	local def = Enemies.Kinds[kind]

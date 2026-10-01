@@ -102,4 +102,24 @@ end
 
 S.workspace = { GetAttribute = function() return nil end }
 S.task = { delay = function() end, spawn = function(f, ...) f(...) end, wait = function() end }
+
+-- Random: a small LCG (deterministic per seed; the real Roblox generator differs, the tests check properties only).
+local RandomMT = {}
+RandomMT.__index = RandomMT
+local function lcgStep(self)
+	self.state = (self.state * 1103515245 + 12345) % 2147483648
+	return self.state / 2147483648
+end
+function RandomMT.NextNumber(self, a, b)
+	lcgStep(self)
+	local u = lcgStep(self)
+	if a then return a + (b - a) * u end
+	return u
+end
+function RandomMT.NextInteger(self, a, b)
+	lcgStep(self)
+	local u = lcgStep(self)
+	return a + math.floor(u * (b - a + 1))
+end
+S.Random = { new = function(seed) return setmetatable({ state = math.floor(seed or os.clock() * 1000) % 2147483648 }, RandomMT) end }
 return S

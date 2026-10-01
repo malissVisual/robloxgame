@@ -2879,8 +2879,60 @@ local function fade(inTime: number, hold: number, outTime: number, withText: boo
 	end)
 end
 
+-- The wave's TWISTS (Config/Mutators.luau) are announced under the boss banner ("WaveIntro": title, subtitle, color,
+-- chips) and then stay as small chips under the top bar until the fight ends (WaveIntro nil or Countdown "end").
+local waveBanner = Instance.new("TextLabel")
+waveBanner.AnchorPoint = Vector2.new(0.5, 0.5)
+waveBanner.Position = UDim2.fromScale(0.5, 0.27)
+waveBanner.Size = UDim2.fromOffset(700, 80)
+waveBanner.BackgroundTransparency = 1
+waveBanner.Font = Enum.Font.GothamBlack
+waveBanner.RichText = true
+waveBanner.TextSize = 30
+waveBanner.TextColor3 = Color3.fromRGB(200, 170, 255)
+waveBanner.TextStrokeColor3 = Color3.new(0, 0, 0)
+waveBanner.TextStrokeTransparency = 0.3
+waveBanner.TextTransparency = 1
+waveBanner.Text = ""
+waveBanner.ZIndex = 15
+waveBanner.Parent = gui
+local waveScale = Instance.new("UIScale")
+waveScale.Parent = waveBanner
+local waveId = 0
+local chipRow = Instance.new("Frame")
+chipRow.Name = "TwistChips"
+chipRow.AnchorPoint = Vector2.new(0.5, 0)
+chipRow.Position = UDim2.new(0.5, 0, 0, 92)
+chipRow.Size = UDim2.fromOffset(0, 28)
+chipRow.AutomaticSize = Enum.AutomaticSize.X
+chipRow.BackgroundTransparency = 1
+chipRow.Visible = false
+chipRow.ZIndex = 14
+chipRow.Parent = gui
+do
+	local chipLayout = Instance.new("UIListLayout")
+	chipLayout.FillDirection = Enum.FillDirection.Horizontal
+	chipLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	chipLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	chipLayout.Padding = UDim.new(0, 6)
+	chipLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	chipLayout.Parent = chipRow
+end
+local function clearWaveIntro()
+	waveId += 1
+	waveBanner.TextTransparency = 1
+	waveBanner.TextStrokeTransparency = 1
+	chipRow.Visible = false
+	for _, child in chipRow:GetChildren() do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+end
+
 Net.get("Countdown").OnClientEvent:Connect(function(what: any)
 	if what == "end" then
+		clearWaveIntro()
 		fade(0.35, 0.3, 0.35, false) -- 1 s: dark while you are put back at the spawn
 	else
 		fade(0.3, 0.5, 0.3, true) -- 1.1 s: FIGHT! in the dark, the fight is on as it clears
@@ -2925,6 +2977,52 @@ Net.get("BossIntro").OnClientEvent:Connect(function(name: string)
 		if id == bossId then
 			TweenService:Create(bossBanner, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 		end
+	end)
+end)
+
+Net.get("WaveIntro").OnClientEvent:Connect(function(data: any)
+	clearWaveIntro()
+	if type(data) ~= "table" then
+		return -- nil clears the banner and the chips
+	end
+	local id = waveId
+	local rgb = data.color or { 200, 170, 255 }
+	local color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+	waveBanner.TextColor3 = color
+	waveBanner.Text = string.format('%s\n<font size="18" color="#e6e6f0">%s</font>', tostring(data.title or ""), tostring(data.subtitle or ""))
+	waveBanner.TextTransparency = 0
+	waveBanner.TextStrokeTransparency = 0.3
+	waveScale.Scale = 1.6
+	TweenService:Create(waveScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	task.delay(3.2, function()
+		if id ~= waveId then
+			return
+		end
+		TweenService:Create(waveBanner, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		-- One chip per twist docks under the top bar for the rest of the fight.
+		for i, chip in (data.chips or {}) :: { any } do
+			local chipRgb = chip.color or rgb
+			local chipColor = Color3.fromRGB(chipRgb[1], chipRgb[2], chipRgb[3])
+			local frame = Instance.new("Frame")
+			frame.LayoutOrder = i
+			frame.BackgroundColor3 = Color3.new(0, 0, 0)
+			frame.BackgroundTransparency = 0.35
+			frame.BorderSizePixel = 0
+			frame.Size = UDim2.fromOffset(10, 28)
+			frame.AutomaticSize = Enum.AutomaticSize.X
+			frame.ZIndex = 14
+			corner(frame, 10)
+			UI.stroke(frame, chipColor, 2)
+			local padding = Instance.new("UIPadding")
+			padding.PaddingLeft = UDim.new(0, 10)
+			padding.PaddingRight = UDim.new(0, 10)
+			padding.Parent = frame
+			local text = label(frame, tostring(chip.label or ""), UDim2.fromOffset(0, 0), UDim2.new(0, 0, 1, 0), 16, Enum.Font.GothamBlack, chipColor)
+			text.AutomaticSize = Enum.AutomaticSize.X
+			text.ZIndex = 15
+			frame.Parent = chipRow
+		end
+		chipRow.Visible = true
 	end)
 end)
 end

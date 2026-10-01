@@ -9,11 +9,22 @@
 --   level  = the phase number (phase 1 → enemy level 1, phase 2 → level 2, …); Balance.EnemyLevelScale
 --   kinds  = the phase's `kinds` in order, repeated (a kind listed twice appears twice as often)
 --   boss   = every Balance.PhaseLength-th wave the last enemy is the phase's boss
+--   twists = the wave's TWISTS (Config/Mutators.luau, seeded by the wave number) may rewrite the list: SWARM (more,
+--            weaker), BIG BOYS (fewer, a level higher), CHAMPION (one entry flagged), TREASURE GOBLIN / WAR TOTEMS
+--            (extra entries). The preview and the fight both read this list, so they always agree.
+--   formation = Waves.formation(wave, twists): the layout the enemies stand in (Config/Formations.luau)
 
 local Balance = require(script.Parent.Balance)
 local Maps = require(script.Parent.Maps)
+local Enemies = require(script.Parent.Enemies)
+local Mutators = require(script.Parent.Mutators)
 
-export type Enemy = { kind: string, tier: number } -- tier = enemy level
+export type Enemy = {
+	kind: string,
+	tier: number, -- enemy level
+	champion: boolean?, -- the wave's CHAMPION (twist): much stronger, the Mage prefers it
+	role: string?, -- "treasure" | "totem" for the twist extras (the formation places them apart)
+}
 
 local Waves = {}
 
@@ -36,7 +47,27 @@ function Waves.get(wave: number, map: Maps.Def): { Enemy }
 	if wave % Balance.PhaseLength == 0 then
 		enemies[count] = { kind = phase.boss, tier = level } -- the last wave of a phase has its boss
 	end
-	return enemies
+	return Mutators.applyComposition(enemies, Mutators.forWave(wave, map), wave, function(kind)
+		local def = Enemies.Kinds[kind]
+		return if def then def.archetype else nil
+	end)
+end
+
+-- The layout the wave stands in (Config/Formations.luau): a boss wave holds court, a swarm scatters, the pincer
+-- twist takes the flanks, otherwise the place in the phase decides (line, wedge, shieldwall, wedge, boss).
+function Waves.formation(wave: number, twists: { Mutators.Def }): string
+	if wave % Balance.PhaseLength == 0 then
+		return "bossCourt"
+	end
+	if Mutators.has(twists, "swarm") then
+		return "scatter"
+	end
+	local pincer = Mutators.has(twists, "pincer")
+	if pincer then
+		return pincer.Formation
+	end
+	local inPhase = (wave - 1) % Balance.PhaseLength + 1
+	return ({ "line", "wedge", "shieldwall", "wedge" })[inPhase] or "line"
 end
 
 -- Coins for killing one enemy of the given level in the given wave (times the kind's coin multiplier).

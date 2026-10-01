@@ -74,6 +74,9 @@ local function getBase(): Model?
 end
 
 function Enemy.lift(kind: string, level: number): number
+	if Enemies.Kinds[kind].look == "Totem" then
+		return 3 * Enemy.scale(kind, level) -- the pillar's pivot (its post) sits 3 studs over the ground
+	end
 	if getBase() then
 		return baseLift * RIG_SCALE * Enemy.scale(kind, level)
 	end
@@ -220,8 +223,104 @@ local function buildBlocks(kind: string, level: number): Model
 	return model
 end
 
+-- Name + level label and a hidden HP bar for a block model (Soldier.showBar / Soldier.setHp find "Back" and "Bar").
+local function blockInfo(adornee: BasePart, topOffset: number, text: string)
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Info"
+	gui.Size = UDim2.fromOffset(190, 30)
+	gui.StudsOffset = Vector3.new(0, topOffset, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 40
+	gui.Adornee = adornee
+	gui.Parent = adornee
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 20)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 18
+	label.TextColor3 = C(255, 230, 120)
+	label.TextStrokeTransparency = 0.3
+	label.Text = text
+	label.Parent = gui
+
+	local back = Instance.new("Frame")
+	back.Name = "Back"
+	back.Position = UDim2.fromOffset(0, 22)
+	back.Size = UDim2.new(1, 0, 0, 7)
+	back.BackgroundColor3 = C(35, 35, 35)
+	back.BorderSizePixel = 0
+	back.Visible = false
+	back.Parent = gui
+
+	local bar = Instance.new("Frame")
+	bar.Name = "Bar"
+	bar.Size = UDim2.fromScale(1, 1)
+	bar.BorderSizePixel = 0
+	bar.BackgroundColor3 = C(230, 70, 70)
+	bar.Parent = back
+end
+
+-- ── The War Totem (a twist's pillar, no rig) ──
+-- A wooden post with a green skull on top, a Neon ring around it and bone charms: it stands still and the wave
+-- twist heals the enemies around it. PrimaryPart = the post, anchored, pivot 3 studs over the ground (Enemy.lift).
+local function buildTotem(kind: string, level: number): Model
+	local def = Enemies.Kinds[kind]
+	local s = Enemy.scale(kind, level)
+	local GREEN = C(120, 230, 110)
+	local model = Instance.new("Model")
+	model.Name = def.label
+
+	local function add(name: string, size: Vector3, offset: Vector3, color: Color3, material: Enum.Material?, shape: Enum.PartType?): Part
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size * s
+		p.CFrame = CFrame.new(offset * s)
+		p.Color = color
+		p.Material = material or Enum.Material.Wood
+		if shape then
+			p.Shape = shape
+		end
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.Parent = model
+		return p
+	end
+
+	local post = add("Post", Vector3.new(1.2, 6, 1.2), Vector3.zero, DARK_WOOD)
+	model.PrimaryPart = post
+	add("Base", Vector3.new(2.2, 0.5, 2.2), Vector3.new(0, -2.75, 0), WOOD)
+	local skull = add("Skull", Vector3.new(1.4, 1.4, 1.4), Vector3.new(0, 3.6, 0), GREEN, Enum.Material.Neon)
+	add("EyeL", Vector3.new(0.3, 0.3, 0.2), Vector3.new(-0.32, 3.75, -0.7), C(20, 30, 20), Enum.Material.SmoothPlastic)
+	add("EyeR", Vector3.new(0.3, 0.3, 0.2), Vector3.new(0.32, 3.75, -0.7), C(20, 30, 20), Enum.Material.SmoothPlastic)
+	add("Jaw", Vector3.new(0.9, 0.25, 0.2), Vector3.new(0, 3.2, -0.7), C(20, 30, 20), Enum.Material.SmoothPlastic)
+	local ring = add("Ring", Vector3.new(0.3, 2.6, 2.6), Vector3.new(0, 1.2, 0), GREEN, Enum.Material.Neon, Enum.PartType.Cylinder)
+	ring.CFrame = CFrame.new(Vector3.new(0, 1.2, 0) * s) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Transparency = 0.3
+	for i = 1, 3 do
+		local angle = math.rad(i * 120)
+		add("Charm" .. i, Vector3.new(0.35, 0.6, 0.25), Vector3.new(math.cos(angle) * 0.95, -0.4 - i * 0.3, math.sin(angle) * 0.95), BONE, Enum.Material.SmoothPlastic)
+	end
+	local light = Instance.new("PointLight")
+	light.Color = GREEN
+	light.Range = 10
+	light.Brightness = 1
+	light.Parent = skull
+
+	blockInfo(skull, 1.6 * s, string.format("%s · %s", def.label, Levels.label(level)))
+	model:PivotTo(CFrame.new(0, Enemy.lift(kind, level), 0))
+	return model
+end
+
 -- ── The R15 enemy ──
 function Enemy.build(kind: string, level: number): Model
+	if Enemies.Kinds[kind].look == "Totem" then
+		return buildTotem(kind, level) -- a pillar, not a goblin (no rig)
+	end
 	local base = getBase()
 	if not base then
 		return buildBlocks(kind, level)
@@ -490,6 +589,20 @@ function Enemy.build(kind: string, level: number): Model
 		belt(DARK_LEATHER, IRON)
 		blade("Dagger", 1.1, 0.4, 0.5, STEEL)
 		topOffset = hy + 1.0
+		if def.archetype == "Treasure" then
+			-- The TREASURE GOBLIN (a wave twist): the scout with a bulging brown sack on his back, a golden coin
+			-- peeking out and a golden glow, so he is spotted at once.
+			local SACK = C(140, 95, 50)
+			attach(upper, "Sack", Vector3.new(1.6, 1.6, 1.2), Vector3.new(0, 0.1, uz + 0.75), SACK, nil, Enum.Material.Fabric, Vector3.new(-8, 0, 0))
+			attach(upper, "SackKnot", Vector3.new(0.5, 0.4, 0.5), Vector3.new(0, 1.0, uz + 0.55), SACK:Lerp(Color3.new(0, 0, 0), 0.25), nil, Enum.Material.Fabric)
+			attach(upper, "SackCoin", Vector3.new(0.5, 0.5, 0.12), Vector3.new(0.3, 0.95, uz + 0.9), C(255, 215, 80), Enum.PartType.Cylinder, Enum.Material.Neon, Vector3.new(0, 90, 0))
+			local glow = Instance.new("Highlight")
+			glow.FillColor = C(255, 215, 80)
+			glow.FillTransparency = 0.75
+			glow.OutlineColor = C(255, 235, 150)
+			glow.OutlineTransparency = 0
+			glow.Parent = model
+		end
 	elseif look == "Rubac" then
 		hold = false
 		-- The warrior: grey plate, pauldrons, a sword and a red shield with a white bolt.

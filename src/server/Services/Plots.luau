@@ -19,6 +19,7 @@ local Maps = require(Shared.Config.Maps)
 local Soldier = require(Shared.Soldier)
 local Enemy = require(Shared.Enemy)
 local Enemies = require(Shared.Config.Enemies)
+local Mutators = require(Shared.Config.Mutators)
 local ArenaDecor = require(script.Parent.ArenaDecor)
 local RingAuras = require(script.Parent.DecorData.BattleRingAuras)
 local FightArena = require(script.Parent.FightArena)
@@ -385,9 +386,11 @@ function Plots.slotGround(plot: Plot, id: number): Vector3
 	return plot.origin + Vector3.new(x, PAD_TOP, start + row * spacing)
 end
 
--- Where the `i`-th of `count` enemies stands. Rows fill from the front and each row is centered.
+-- Where the `i`-th of `count` enemies stands. Rows fill from the front and each row is centered. A wave bigger than
+-- EnemyColumns × EnemyRowsMax (SWARM, up to Balance.HordeMax + a treasure goblin) gets more columns instead of a
+-- 4th row, which would stand past the plot's floor and front fence.
 function Plots.enemyGround(plot: Plot, i: number, count: number): Vector3
-	local cols = Balance.EnemyColumns
+	local cols = math.max(Balance.EnemyColumns, math.ceil(count / Balance.EnemyRowsMax))
 	local row = (i - 1) // cols
 	local inRow = math.min(cols, count - row * cols)
 	local x = (((i - 1) % cols + 1) - (inRow + 1) / 2) * Balance.SlotSpacing
@@ -707,7 +710,40 @@ function Plots.showEnemies(plot: Plot, wave: number, difficulty: string)
 		decoratePad(pad, Color3.fromRGB(200, 70, 70), true, "", false) -- the same designed slot, with a red ring
 
 		local model = Enemy.build(e.kind, e.tier)
-		local p = ground + Vector3.new(0, Enemy.lift(e.kind, e.tier), 0)
+		local lift = Enemy.lift(e.kind, e.tier)
+		if e.champion then
+			-- The wave's CHAMPION (a twist): bigger, with a gold-red glow and a tag, so you see it before the fight.
+			-- (The battle multiplies the lift the same way and skips the scaling when this attribute is set.)
+			local size = Mutators.Defs.champion.Size
+			pcall(function()
+				model:ScaleTo(model:GetScale() * size)
+			end)
+			model:SetAttribute("ChampionScaled", true)
+			lift *= size
+			local glow = Instance.new("Highlight")
+			glow.FillColor = Mutators.Defs.champion.color
+			glow.FillTransparency = 0.7
+			glow.OutlineColor = Color3.fromRGB(255, 90, 60)
+			glow.OutlineTransparency = 0
+			glow.Parent = model
+			local tag = Instance.new("BillboardGui")
+			tag.Name = "ChampionTag"
+			tag.Size = UDim2.fromOffset(160, 26)
+			tag.StudsOffset = Vector3.new(0, lift * 2.2, 0)
+			tag.AlwaysOnTop = true
+			tag.MaxDistance = 120
+			tag.Parent = model.PrimaryPart or model
+			local tagText = Instance.new("TextLabel")
+			tagText.Size = UDim2.fromScale(1, 1)
+			tagText.BackgroundTransparency = 1
+			tagText.Font = Enum.Font.GothamBlack
+			tagText.TextSize = 20
+			tagText.TextColor3 = Mutators.Defs.champion.color
+			tagText.TextStrokeTransparency = 0.2
+			tagText.Text = "CHAMPION"
+			tagText.Parent = tag
+		end
+		local p = ground + Vector3.new(0, lift, 0)
 		model:PivotTo(CFrame.lookAt(p, p - Vector3.new(0, 0, 1))) -- facing the player
 		model.Parent = folder
 		table.insert(models, model)
@@ -718,16 +754,27 @@ function Plots.showEnemies(plot: Plot, wave: number, difficulty: string)
 	plot.enemies = enemies
 	plot.enemyModels = models
 
-	-- Minimal heading: small map name, big wave number, small count.
+	-- Minimal heading: small map name, big wave number, small count, and the wave's twists (Config/Mutators.luau).
 	local _, phase = Waves.phase(wave, plot.map)
+	local twists = Mutators.forWave(wave, plot.map)
+	local twistLine = ""
+	if #twists > 0 then
+		local labels: { string } = {}
+		for _, def in twists do
+			table.insert(labels, def.label)
+		end
+		local bonus = math.floor(Mutators.coinBonus(twists) * 100 + 0.5)
+		twistLine = string.format('\n<font size="13" color="#c9a7ff">TWIST: %s%s</font>', table.concat(labels, " + "), if bonus > 0 then string.format(" · +%d%% COINS", bonus) else "")
+	end
 	plot.waveLabel.Text = string.format(
-		'<font size="13" color="#9aa0aa">%s</font>\n<font size="30">WAVE %d / %d</font>\n<font size="13" color="#9aa0aa">%d %s · %s</font>',
+		'<font size="13" color="#9aa0aa">%s</font>\n<font size="30">WAVE %d / %d</font>\n<font size="13" color="#9aa0aa">%d %s · %s</font>%s',
 		string.upper(phase.name),
 		wave,
 		plot.map.waves,
 		#enemies,
 		plot.map.enemyName,
-		string.upper(difficulty)
+		string.upper(difficulty),
+		twistLine
 	)
 end
 

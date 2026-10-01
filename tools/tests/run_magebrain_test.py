@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Runs the logic test of the Mage's battle AI (server/Services/MageBrain.luau) in the standalone Luau CLI with the
-Roblox stubs (roblox_stubs.luau): spell unlocks per level, target selection, attacks, kiting in bursts, strong
-spells and mana, healing an ally, arena bounds, cleanup.
+Roblox stubs (roblox_stubs.luau): spell unlocks per level, target selection, attacks, no walking while anything is
+in range, strong spells and mana, healing an ally, arena bounds, the reactions (avenger, overcharge, hop, counter-spell,
+guardian, repel, pop rate limit) and cleanup.
 
     python3 tools/tests/run_magebrain_test.py [path to the luau binary]
 """
@@ -28,7 +29,7 @@ local Vector3, CFrame, Instance, Enum, Color3, TweenInfo = Stubs.Vector3, Stubs.
 local TweenService, Debris, workspace, task = Stubs.TweenService, Stubs.Debris, Stubs.workspace, Stubs.task
 local Config = require("./MageConfig")
 local Spells = require("./MageSpells")
-local Rig = { setMoving = function() end, attack = function() end }
+local Rig = { setMoving = function() end, attack = function() end, cast = function() end, raise = function() end }
 '''
     open(os.path.join(tmp, "MageBrain_copy.luau"), "w", encoding="utf-8").write(strip(head + source[source.index(marker):]))
     result = subprocess.run([luau, "test.luau"], cwd=tmp, capture_output=True, text=True)
