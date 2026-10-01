@@ -354,9 +354,17 @@ function Enemy.build(kind: string, level: number): Model
 	local lx, lz = lower.Size.X / 2 / s, lower.Size.Z / 2 / s
 
 	-- Pieces several designs share.
-	local function hood(color: Color3, tall: number?) -- a hood: a cap over the head and a flap down the back
-		cover(head, "Hood", Vector3.new(0.25, tall or 0.3, 0.25), Vector3.new(0, 0.12, 0.04), color)
-		attach(head, "HoodBack", Vector3.new(hx * 2 + 0.1, hy * 1.4, 0.3), Vector3.new(0, -hy * 0.25, hz + 0.15), color)
+	-- Headwear that leaves the FACE OPEN (a box around the whole head hid the face and the ears): a cap on top, a
+	-- panel behind the head and one on each side.
+	local function headwear(name: string, color: Color3, material: Enum.Material?, capHeight: number?)
+		attach(head, name .. "Top", Vector3.new(hx * 2 + 0.3, capHeight or 0.35, hz * 2 + 0.3), Vector3.new(0, hy + 0.08, 0.02), color, nil, material)
+		attach(head, name .. "Back", Vector3.new(hx * 2 + 0.3, hy * 2 + 0.1, 0.26), Vector3.new(0, -0.02, hz + 0.13), color, nil, material)
+		attach(head, name .. "L", Vector3.new(0.26, hy * 2 + 0.1, hz * 2 + 0.1), Vector3.new(-(hx + 0.13), -0.02, 0.05), color, nil, material)
+		attach(head, name .. "R", Vector3.new(0.26, hy * 2 + 0.1, hz * 2 + 0.1), Vector3.new(hx + 0.13, -0.02, 0.05), color, nil, material)
+	end
+	local function hood(color: Color3, tall: number?) -- a hood: open in front, a flap down the back
+		headwear("Hood", color, nil, tall or 0.35)
+		attach(head, "HoodBack", Vector3.new(hx * 2 + 0.1, hy * 1.4, 0.3), Vector3.new(0, -hy * 0.25, hz + 0.3), color)
 	end
 	local function pointedHat(color: Color3, brim: Color3)
 		attach(head, "HatBrim", Vector3.new(hx * 2 + 0.9, 0.12, hz * 2 + 0.9), Vector3.new(0, hy + 0.02, 0), brim)
@@ -480,7 +488,8 @@ function Enemy.build(kind: string, level: number): Model
 		legWear(C(120, 35, 35))
 		boots(DARK_IRON)
 		belt(DARK_IRON, IRON)
-		cover(head, "Helm", Vector3.new(0.3, 0.1, 0.3), Vector3.new(0, 0.15, 0), DARK_IRON, METAL)
+		headwear("Helm", DARK_IRON, METAL, 0.3)
+		attach(head, "NoseGuard", Vector3.new(0.2, hy * 1.1, 0.12), Vector3.new(0, -0.05, -hz - 0.08), DARK_IRON, nil, METAL)
 		for _, x in { -0.5, 0, 0.5 } do
 			attach(head, "HelmSpike", Vector3.new(0.2, 0.6, 0.2), Vector3.new(x * hx, hy + 0.4, 0), STEEL, nil, METAL, Vector3.new(0, 0, -x * 25))
 		end
@@ -570,7 +579,7 @@ function Enemy.build(kind: string, level: number): Model
 		legWear(BROWN)
 		boots(DARK_IRON)
 		belt(DARK_IRON, IRON)
-		cover(head, "Helm", Vector3.new(0.3, 0.05, 0.3), Vector3.new(0, 0.2, 0), IRON, METAL)
+		headwear("Helm", IRON, METAL, 0.3)
 		attach(head, "HelmRidge", Vector3.new(0.2, 0.3, hz * 2 + 0.4), Vector3.new(0, hy + 0.25, 0), DARK_IRON, nil, METAL)
 		attach(hand, "HammerHandle", Vector3.new(0.3, 0.3, 3.2), Vector3.new(0, -0.1, -1.0), DARK_WOOD)
 		attach(hand, "HammerHead", Vector3.new(1.3, 1.1, 1.1), Vector3.new(0, -0.1, -2.6), DARK_IRON, nil, METAL)
