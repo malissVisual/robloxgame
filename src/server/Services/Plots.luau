@@ -581,7 +581,7 @@ function Plots.render(plot: Plot, board: Grid.Cells, squad: Grid.Cells, boardSlo
 			pad:SetAttribute("Locked", true)
 		else
 			-- The ring shows the soldier's level color (gold at the maximum); an empty pad keeps its own color.
-			local ring = if cell then (if cell.tier >= Units.MaxTier then SLOT_GOLD else Levels.color(cell.tier)) else baseColor
+			local ring = if cell then (if cell.tier >= Units.maxTier(cell.class) then SLOT_GOLD else Levels.color(cell.tier)) else baseColor
 			decoratePad(pad, ring, cell ~= false, if cell then "" else "+", false, id <= Balance.BoardSize)
 			pad:SetAttribute("Locked", false)
 		end

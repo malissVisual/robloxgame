@@ -105,7 +105,7 @@ end
 -- The next merge level of a class and what it needs, or nil when the class is maxed.
 function PlayerData.nextTierUnlock(profile: Profile, class: string): (number?, { wave: number, cost: number }?)
 	local tier = (profile.tierUnlocked[class] or 1) + 1
-	if tier > Units.MaxTier then
+	if tier > Units.maxTier(class) then
 		return nil, nil
 	end
 	return tier, Balance.TierUnlocks[tier]
@@ -214,7 +214,7 @@ end
 
 local function copyUnit(raw: any): Grid.Unit?
 	if type(raw) == "table" and Units.isValidClass(raw.class) and type(raw.tier) == "number" then
-		return { class = raw.class, tier = math.clamp(math.floor(raw.tier), 1, Units.MaxTier), ascended = if raw.ascended == true then true else nil }
+		return { class = raw.class, tier = math.clamp(math.floor(raw.tier), 1, Units.maxTier(raw.class)), ascended = if raw.ascended == true then true else nil }
 	end
 	return nil
 end
@@ -269,7 +269,7 @@ local function applySaved(profile: Profile, saved: any)
 	profile.purchases = number(saved.purchases, 0, 0, 2 ^ 40)
 	for _, class in Units.ClassList do
 		local raw = if type(saved.tierUnlocked) == "table" then saved.tierUnlocked[class] elseif type(saved.tierUnlocked) == "number" then saved.tierUnlocked else nil
-		profile.tierUnlocked[class] = number(raw, Balance.StartUnlockedTier, Balance.StartUnlockedTier, Units.MaxTier)
+		profile.tierUnlocked[class] = number(raw, Balance.StartUnlockedTier, Balance.StartUnlockedTier, Units.maxTier(class))
 	end
 	profile.startLevel = number(saved.startLevel, 1, 1, Balance.StartLevelMax)
 	if type(saved.map) == "string" and Maps.Defs[saved.map] then

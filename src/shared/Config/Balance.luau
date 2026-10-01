@@ -43,6 +43,7 @@ return {
 		[7] = { wave = 25, cost = 6000 },
 		[8] = { wave = 40, cost = 15000 },
 		[9] = { wave = 60, cost = 40000 },
+		-- levels 10 … 30 (only the Knight goes this far) are filled in below
 	},
 
 	-- Account level (shown top left): experience from kills and won waves. Going from level L to L + 1

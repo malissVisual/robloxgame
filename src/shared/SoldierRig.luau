@@ -1,14 +1,18 @@
 --!nonstrict
 -- The designed classes (Soldier, Knight, Archer, Mage, Hunter, Berserker, Tank) as R15 characters: 9 designed stages
--- each (one per merge level). The Soldier comes from design/SoldierMerge_R15_Builder, the Knight from the red knight
--- cards, the Archer from the green archer cards, the Mage from the purple mage cards, the Hunter, the Berserker and the
--- Tank from their card sheets. The gear is parts welded on the limbs of the R15 base rig (Rig.base).
+-- each (one per merge level), except the Knight, which has 30 (the R15 evolution models, buildEvolution below).
+-- The Soldier comes from design/SoldierMerge_R15_Builder, the Archer from the green archer cards, the Mage from the
+-- purple mage cards, the Hunter, the Berserker and the Tank from their card sheets. The gear is parts welded on the
+-- limbs of the R15 base rig (Rig.base).
 --   1 Recruit · 2 Private · 3 Corporal · 4 Sergeant · 5 Lieutenant · 6 Captain · 7 Major · 8 General · 9 Legend
 -- Without the base rig (it could not be made, or it has not reached this client yet) the same design is built
 -- on a body of plain blocks with the same limb names (a statue: no animations), so the look never falls back
 -- to something else.
 
 local Rig = require(script.Parent.Rig)
+-- The Knight does not use the 9 cards below any more: its 30 merge levels are the R15 evolution models
+-- (design/KnightEvolution, generated into StageModels/KnightEvolution), see buildEvolution.
+local Evolution = require(script.Parent.StageModels.KnightEvolution)
 
 local C = Color3.fromRGB
 local V = Vector3.new
@@ -2202,6 +2206,140 @@ local function blockBody(rs: number): Model
 	return model
 end
 
+-- ---------------------------------------------------------------------------------------------------------
+-- The Knight: 30 merge levels, each a complete R15 character of its own (own body proportions, joints and
+-- gear) from the evolution models. Nothing comes from the base rig here: the body parts, the 15 Motor6D
+-- joints and the welded gear are all built from the data, at the scale asked for.
+local MATERIAL: { [number]: Enum.Material } = {}
+for _, item in Enum.Material:GetEnumItems() do
+	MATERIAL[item.Value] = item
+end
+local PART_TYPE: { [number]: Enum.PartType } = {}
+for _, item in Enum.PartType:GetEnumItems() do
+	PART_TYPE[item.Value] = item
+end
+
+-- `cf` with its position scaled by `k` (the rotation stays).
+local function scaledCF(cf: CFrame, k: number): CFrame
+	return CFrame.new(cf.Position * k) * cf.Rotation
+end
+
+local function evolutionPart(entry, k: number, static: boolean): BasePart
+	local extra = entry[6]
+	local p: BasePart
+	if extra and extra.wedge then
+		p = Instance.new("WedgePart")
+	else
+		local part = Instance.new("Part")
+		part.Shape = (extra and extra.shape and PART_TYPE[extra.shape]) or Enum.PartType.Block
+		p = part
+	end
+	p.Size = entry[3] * k
+	p.Color = entry[4]
+	p.Material = MATERIAL[entry[5]] or PLASTIC
+	p.Transparency = (extra and extra.t) or 0
+	p.Reflectance = (extra and extra.r) or 0
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = false
+	p.Massless = true
+	p.CastShadow = false
+	p.Anchored = static
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	return p
+end
+
+-- Builds the Knight of the level; same contract as SoldierRig.build. Returns nil when the level has no data.
+local function buildEvolution(tier: number, s: number, bare: boolean?): (Model?, BasePart?, number?)
+	local data = Evolution.level(math.clamp(tier, 1, Evolution.Count))
+	if not data then
+		return nil
+	end
+	local rs = s * RIG_SCALE
+	local isStatic = bare == true
+	local model = Instance.new("Model")
+	model.Name = "Soldier"
+
+	-- The body: the 16 R15 parts, in model space (feet on y = 0, facing -Z).
+	local parts: { [string]: BasePart } = {}
+	local soleY = math.huge
+	for _, entry in data.body do
+		local p = evolutionPart(entry, rs, isStatic)
+		p.Name = entry[1]
+		p.CFrame = scaledCF(entry[2], rs)
+		p.CanQuery = true
+		p.CastShadow = p.Name ~= "HumanoidRootPart"
+		p.Parent = model
+		parts[p.Name] = p
+		if string.find(p.Name, "Foot") then
+			soleY = math.min(soleY, p.Position.Y - p.Size.Y / 2)
+		end
+	end
+	local root = parts.HumanoidRootPart
+	local head = parts.Head
+	if not root or not head then
+		model:Destroy()
+		return nil
+	end
+	root.Anchored = true
+	model.PrimaryPart = root
+	if soleY == math.huge then
+		soleY = root.Position.Y - 2.95 * rs
+	end
+	-- The pivot sits FEET * s above the soles (Soldier.lift), like every other class.
+	root.PivotOffset = CFrame.new(0, FEET * s - (root.Position.Y - soleY), 0)
+
+	-- The gear, welded on the body part it belongs to.
+	for _, entry in data.gear do
+		local host = parts[entry[1]]
+		if host then
+			local p = evolutionPart(entry, rs, isStatic)
+			p.Name = "Gear_" .. entry[1]
+			p.CFrame = host.CFrame * scaledCF(entry[2], rs)
+			p.Parent = model
+			if not isStatic then
+				local w = Instance.new("WeldConstraint")
+				w.Part0 = host
+				w.Part1 = p
+				w.Parent = p
+			end
+		end
+	end
+
+	if isStatic then
+		-- A statue (UI previews, holograms): every part anchored in place, no joints, no Humanoid.
+		return model, head, data.top * RIG_SCALE
+	end
+
+	-- The 15 Motor6D joints (parented to Part1, as Roblox rigs are), then the Humanoid that animates them.
+	for _, joint in data.joints do
+		local part0, part1 = parts[joint[2]], parts[joint[3]]
+		if part0 and part1 then
+			local m = Instance.new("Motor6D")
+			m.Name = joint[1]
+			m.Part0 = part0
+			m.Part1 = part1
+			m.C0 = scaledCF(joint[4], rs)
+			m.C1 = scaledCF(joint[5], rs)
+			m.Parent = part1
+		end
+	end
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.HipHeight = (root.Position.Y - root.Size.Y / 2) - soleY
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	humanoid.EvaluateStateMachine = false
+	humanoid.BreakJointsOnDeath = false
+	humanoid.RequiresNeck = false
+	humanoid.AutomaticScalingEnabled = false
+	Instance.new("Animator").Parent = humanoid
+	humanoid.Parent = model
+	Rig.animate(model, "slash", tier >= 3) -- from level 3 on the Knight carries a weapon
+	return model, head, data.top * RIG_SCALE
+end
+
 local SoldierRig = {}
 
 function SoldierRig.has(class: string): boolean
@@ -2209,6 +2347,12 @@ function SoldierRig.has(class: string): boolean
 end
 
 function SoldierRig.name(tier: number, class: string?): string
+	if class == "Knight" then
+		local data = Evolution.level(math.clamp(tier, 1, Evolution.Count))
+		if data then
+			return data.name
+		end
+	end
 	local levels = CLASSES[class or "Soldier"] or LEVELS
 	return levels[math.clamp(tier, 1, #levels)].name
 end
@@ -2217,6 +2361,13 @@ end
 -- still statue (UI previews, holograms): everything anchored, no Humanoid, no lights. Returns the model, its
 -- head and how high the label floats over it (in studs at scale 1), or nil when there is no base rig.
 function SoldierRig.build(tier: number, s: number, bare: boolean?, class: string?): (Model?, BasePart?, number?)
+	if class == "Knight" then
+		-- The 30-level evolution (no base rig needed); the 9 cards below are only the fallback without data.
+		local model, head, top = buildEvolution(tier, s, bare)
+		if model then
+			return model, head, top
+		end
+	end
 	local base = Rig.base()
 	local levels = CLASSES[class or "Soldier"] or LEVELS
 	local def = levels[math.clamp(tier, 1, #levels)]

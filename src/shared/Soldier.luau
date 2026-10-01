@@ -35,7 +35,8 @@ local Soldier = {}
 -- How big a character is at a merge level. Gentle: a level 9 is a quarter bigger than a level 1, so the
 -- squad and the board stay readable (a 2x level 9 crowded its neighbours and hid the pads).
 function Soldier.scale(tier: number): number
-	return 0.9 + 0.045 * (tier - 1)
+	-- Past level 9 (the Knight's evolution goes to 30) the growth slows down: a level 30 is ~1.5.
+	return 0.9 + 0.045 * math.min(tier - 1, 8) + 0.012 * math.max(0, tier - 9)
 end
 
 function Soldier.lift(tier: number, ascended: boolean?): number
@@ -397,7 +398,7 @@ function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolea
 	model.Name = def.label
 
 	if SoldierRig.has(class) then
-		-- The Soldier and the Knight are R15 characters with 9 designed stages (SoldierRig.luau). Without the base rig
+		-- The designed classes are R15 characters with 9 designed stages, the Knight with 30 (SoldierRig.luau). Without the base rig
 		-- (it could not be made, or it has not reached this client yet) the block soldier below is built.
 		local rig, rigHead, rigTop = SoldierRig.build(tier, s, bare, class)
 		if rig and rigHead and rigTop then

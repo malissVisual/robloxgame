@@ -35,9 +35,10 @@ The server decides everything (buying, merging, rolling, the battle simulation).
 
 ## Merge levels
 
-Every soldier has a **level** (`Config/Levels.luau`, **1 … 9**). Merging two soldiers of the same
-class and level makes one soldier one level higher. A level makes the soldier stronger (×1.8 HP and
-damage per level) and changes its look.
+Every soldier has a **level** (`Config/Levels.luau`, **1 … 9**; the **Knight goes to 30**, see below). Merging
+two soldiers of the same class and level makes one soldier one level higher. A level makes the soldier
+stronger (×1.8 HP and damage per level) and changes its look. The limit is per class (`Units.maxTier(class)`,
+from `maxTier` in `Units.Classes`); `Balance.TierUnlocks` has the price of every level up to 30.
 
 **The Soldier** has its own model with **9 stages of gear** (designed in Claude Design, the project
 `soldier-merge`; built in `Soldier.luau`, `buildStageSoldier`). The gear is cumulative, and a Soldier
@@ -280,8 +281,30 @@ balance and the result screen shows the total of the wave as one small line.
 The **Archer** too (Apprentice, Marksman, Tracker, Ranger, Elven Archer, Shadow Stalker, Storm Archer, Royal
 Master, Legend; a bow in the left hand and a quiver on the back).
 
-The **Knight** has the same kind of design (9 ranks: Squire, Footman, Swordsman, Knight, Elite Knight, Paladin,
-Dragon Knight, Grandmaster, Legend; sword and shield), in the same file.
+### The Knight: 30 merge levels (the R15 evolution)
+
+The **Knight** is the one class with **30 merge levels** (`Units.Classes.Knight.maxTier = 30`). Every level is a
+complete R15 character of its own, from the 30 models in `design/KnightEvolution/` (`Evolution_L01_…rbxmx` …
+`Evolution_L30_…rbxmx`, the names in `prehled-levelu.csv`, the overview `vsech-30-levelu.png`): six eras of five
+levels, from the first human to the year 3000.
+
+| Levels | Era | Ranks |
+|---|---|---|
+| 1 – 5 | Pravěk (prehistory) | První člověk, Sběrač, Lovec, Stopař, Náčelník |
+| 6 – 10 | Starověk (antiquity) | Osadník, Měděný strážce, Bronzový bojovník, Falanga, Legionář |
+| 11 – 15 | Středověk (Middle Ages) | Zbrojnoš, Pěší rytíř, Plátový rytíř, Velitel, Královský rytíř |
+| 16 – 20 | Průmysl (industrial) | Průzkumník, Mechanik, Parní strážce, Ocelový veterán, Dieselový titán |
+| 21 – 25 | Moderní (modern) | Taktický strážce, Specialista, Těžký operativ, Exo prototyp, Exo elita |
+| 26 – 30 | Budoucnost (future) | Sentinel, Vanguard, Nano strážce, Nova velitel, Apex |
+
+`tools/evolution_from_rbxmx.py` turns the models into data (`python3 tools/evolution_from_rbxmx.py
+design/KnightEvolution src/shared/StageModels/KnightEvolution`): one module per era (body parts, the 15 joints and
+the gear relative to its body part) plus `init.luau`, which loads an era the first time one of its levels is asked
+for. `SoldierRig.luau` (`buildEvolution`) builds the character from that data at runtime: the body parts with the
+model's own proportions, Motor6D joints and a Humanoid (so the battle animations work), the gear welded on; for
+UI previews and holograms it is a statue (everything anchored). Levels 10 … 30 have their own level colors
+(`Levels.Colors`) and prices (`Balance.TierUnlocks`: two more waves and 25 % more coins per level). The old
+9 red-knight cards stay in the file only as a fallback without data. Run the tool again after changing a model.
 
 The **Soldier class is an R15 character** too (`src/shared/SoldierRig.luau`, from `design/SoldierMerge_R15_Builder.lua`):
 9 designed ranks, one per merge level (Recruit, Private, Corporal, Sergeant, Lieutenant, Captain, Major, General,

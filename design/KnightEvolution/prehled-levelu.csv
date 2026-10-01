@@ -1,0 +1,31 @@
+﻿Level,Název,Epocha,Téma / rok,Nové vybavení,Počet dílů
+1,První člověk,PRAVĚK,Pravěk,"Bederní rouška, bosé nohy, odkrytý trup.",30
+2,Sběrač,PRAVĚK,Pravěk,"Přibývá provazový opasek, zápěstní ovázání a brašnička.",39
+3,Lovec,PRAVĚK,Pravěk,"Kožešina přes jedno rameno, sandály a dřevěný kyj.",50
+4,Stopař,PRAVĚK,Pravěk,"Celá kožená tunika, lýtkové ovázání a kamenná sekera.",66
+5,Náčelník,PRAVĚK,Pravěk,"Kožešinový límec, kožené boty, kostěný náhrdelník a oštěp.",80
+6,Osadník,STAROVĚK,Starověk,"Tkaná tunika pod koženou vestou, široký pás a měděné spony.",49
+7,Měděný strážce,STAROVĚK,Starověk,"Měděné hrudní pláty, nátepníky a malý dřevěný štít.",62
+8,Bronzový bojovník,STAROVĚK,Starověk,"Bronzový kyrys, otevřená přilba a krátký meč.",74
+9,Falanga,STAROVĚK,Starověk,"Bronzová ramena, holeně, chochol a větší kulatý štít.",90
+10,Legionář,STAROVĚK,Starověk,"Železná pásová zbroj, lícnice, vrstvená suknice a obdélníkový štít.",109
+11,Zbrojnoš,STŘEDOVĚK,Středověk,"Prošívaný oděv, kroužkové panely, železná přilba a normanský štít.",108
+12,Pěší rytíř,STŘEDOVĚK,Středověk,"Hrudní plát, ocelové holeně, ramena a modrý tabard.",82
+13,Plátový rytíř,STŘEDOVĚK,Středověk,"Plné plátové krytí stehen a paží, hledí a členěná ramena.",103
+14,Velitel,STŘEDOVĚK,Středověk,"Další lamely, červený plášť, chochol a ozdobné lemy.",120
+15,Královský rytíř,STŘEDOVĚK,Středověk,"Bílozlaté pláty, zesílený krunýř, erb a bohatší zdobení.",125
+16,Průzkumník,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Zpevněná uniforma, kožený kabátec, mosazné pláty a nástroj.",68
+17,Mechanik,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Ochranné brýle, náprsní kapsy, měděné klouby a nářadí.",77
+18,Parní strážce,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Parní nádrž na zádech, tlakové měřidlo a vyztužené ruce.",85
+19,Ocelový veterán,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Ocelová přilba, respirátor, těžká ramena a kolena.",107
+20,Dieselový titán,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Mechanické výztuhy, uzavřená maska a dvojice zádových válců.",132
+21,Taktický strážce,MODERNÍ DOBA,Moderní doba,"Moderní plná uniforma, balistická vesta, přilba a výstroj.",80
+22,Specialista,MODERNÍ DOBA,Moderní doba,"Další pouzdra, chrániče paží, noční optika a vysílačka.",85
+23,Těžký operativ,MODERNÍ DOBA,Moderní doba,"Uzavřená balistická maska, břišní a stehenní pláty.",101
+24,Exo prototyp,MODERNÍ DOBA,Moderní doba,"První vnější exoskelet, písty a zádová baterie.",125
+25,Exo elita,MODERNÍ DOBA,Moderní doba,"Celotělové kryty exoskeletu, senzory a první světelné indikátory.",135
+26,Sentinel,BUDOUCNOST,2100,"Uzavřený futuristický oblek, modrý visor a energetické spoje.",125
+27,Vanguard,BUDOUCNOST,2300,"Vrstvené bílé panely, pohon na zádech a energetická čepel.",140
+28,Nano strážce,BUDOUCNOST,2500,"Nanotechnologické pláty, zesílená ramena a hrudní reaktor.",152
+29,Nova velitel,BUDOUCNOST,2800,"Další reaktory, zádová energetická žebra a velký štít.",160
+30,Apex,BUDOUCNOST,3000,"Kompletní bílozlatý oblek, šest zádových stabilizátorů a koróna reaktoru.",183

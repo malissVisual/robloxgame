@@ -45,17 +45,18 @@ function Grid.canMerge(a: Cell, b: Cell, limits: { [string]: number }?): boolean
 	if a == false or b == false or a.class ~= b.class or a.tier ~= b.tier then
 		return false
 	end
-	local cap = if limits then limits[a.class] or 1 else Units.MaxTier
-	if a.tier >= Units.MaxTier then
-		-- Two level 9 soldiers of a class whose level 9 is bought become one ASCENDED soldier.
-		return cap >= Units.MaxTier and not a.ascended and not b.ascended
+	local maxTier = Units.maxTier(a.class)
+	local cap = if limits then limits[a.class] or 1 else maxTier
+	if a.tier >= maxTier then
+		-- Two top-level soldiers of a class whose top level is bought become one ASCENDED soldier.
+		return cap >= maxTier and not a.ascended and not b.ascended
 	end
-	return a.tier < math.min(cap, Units.MaxTier)
+	return a.tier < math.min(cap, maxTier)
 end
 
 -- The soldier two merged ones become.
 function Grid.mergeResult(a: Unit): Unit
-	if a.tier >= Units.MaxTier then
+	if a.tier >= Units.maxTier(a.class) then
 		return { class = a.class, tier = a.tier, ascended = true }
 	end
 	return { class = a.class, tier = a.tier + 1 }

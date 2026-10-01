@@ -1792,12 +1792,15 @@ for i, class in Units.ClassList do
 	corner(accentBar, 2)
 	label(row, def.label, UDim2.fromOffset(14, 5), UDim2.fromOffset(150, 18), 14, Enum.Font.GothamBold, WHITE)
 	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(190, 14), 12, Enum.Font.Gotham, MUTED)
-	-- The nine merge levels as dots (lit in the level color up to the bought level).
+	-- The merge levels as dots (lit in the level color up to the bought level): 9 for most classes, 30 for the
+	-- Knight, squeezed into the same width.
 	local dots = {}
-	for k = 1, Units.MaxTier do
+	local maxTier = Units.maxTier(class)
+	local step = math.min(14, math.floor(280 / maxTier))
+	for k = 1, maxTier do
 		local dot = Instance.new("Frame")
-		dot.Position = UDim2.fromOffset(14 + (k - 1) * 14, 41)
-		dot.Size = UDim2.fromOffset(10, 5)
+		dot.Position = UDim2.fromOffset(14 + (k - 1) * step, 41)
+		dot.Size = UDim2.fromOffset(math.max(3, step - 3), 5)
 		dot.BackgroundColor3 = Color3.fromRGB(40, 44, 60)
 		dot.BorderSizePixel = 0
 		dot.Parent = row
@@ -1847,7 +1850,7 @@ renderLevels = function()
 			row.stroke.Transparency = 0.4
 			row.button.Visible = true
 			local nextTier = cap + 1
-			if nextTier > Units.MaxTier then
+			if nextTier > Units.maxTier(class) then
 				row.sub.Text = string.format("Merges up to Lv %d (max)", cap)
 				row.button.Text = "MAX"
 				row.button.BackgroundColor3 = UI.DARK
@@ -2193,7 +2196,7 @@ end
 local function canMerge(a: Model, b: Model): boolean
 	return a:GetAttribute("Class") == b:GetAttribute("Class")
 		and a:GetAttribute("Tier") == b:GetAttribute("Tier")
-		and (a:GetAttribute("Tier") :: number) < math.min(Units.MaxTier, capOf(a:GetAttribute("Class") :: string))
+		and (a:GetAttribute("Tier") :: number) < math.min(Units.maxTier(a:GetAttribute("Class") :: string), capOf(a:GetAttribute("Class") :: string))
 end
 
 local function glide(model: Model, goal: CFrame, duration: number)
@@ -2437,7 +2440,7 @@ local function updateDrag(dt: number)
 		local same = target ~= nil
 			and target.class == d.model:GetAttribute("Class")
 			and target.tier == d.model:GetAttribute("Tier")
-			and target.tier < math.min(Units.MaxTier, capOf(target.class))
+			and target.tier < math.min(Units.maxTier(target.class), capOf(target.class))
 		markCard(targetId, if same then INDICATOR_GOLD elseif target then INDICATOR_SWAP else INDICATOR_MOVE)
 	else
 		markCard(nil, INDICATOR_MOVE)
@@ -2639,7 +2642,7 @@ local function padForUnit(unit: { class: string, tier: number }): (number?, Colo
 	end
 	local mergeable = target:GetAttribute("Class") == unit.class
 		and target:GetAttribute("Tier") == unit.tier
-		and unit.tier < math.min(Units.MaxTier, capOf(unit.class))
+		and unit.tier < math.min(Units.maxTier(unit.class), capOf(unit.class))
 	return slot, if mergeable then INDICATOR_GOLD else INDICATOR_SWAP
 end
 
@@ -2728,7 +2731,7 @@ local function updateCardDrag(dt: number)
 			-- Over the panel: the card under the pointer is the merge target.
 			local targetId = cardIdAtPointer(d.id)
 			local target = if targetId then unitAt(targetId) else nil
-			local same = target ~= nil and target.class == unit.class and target.tier == unit.tier and unit.tier < math.min(Units.MaxTier, capOf(unit.class))
+			local same = target ~= nil and target.class == unit.class and target.tier == unit.tier and unit.tier < math.min(Units.maxTier(unit.class), capOf(unit.class))
 			markCard(targetId, if same then INDICATOR_GOLD elseif target then INDICATOR_SWAP else INDICATOR_MOVE)
 		end
 		return
@@ -3967,9 +3970,11 @@ local classLabel = label(adminPanel, "", UDim2.fromOffset(40, 180), UDim2.fromOf
 classLabel.TextXAlignment = Enum.TextXAlignment.Center
 adminButton("<", 10, 180, 26, BADGE, function()
 	adminClass = (adminClass - 2) % #Units.ClassList + 1
+	adminTier = math.min(adminTier, Units.maxTier(Units.ClassList[adminClass]))
 end)
 adminButton(">", PANEL_W - 36, 180, 26, BADGE, function()
 	adminClass = adminClass % #Units.ClassList + 1
+	adminTier = math.min(adminTier, Units.maxTier(Units.ClassList[adminClass]))
 end)
 local tierLabel = label(adminPanel, "", UDim2.fromOffset(40, 212), UDim2.fromOffset(PANEL_W - 80, 28), 13, Enum.Font.GothamBold, GOLD)
 tierLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -3977,12 +3982,12 @@ adminButton("−", 10, 212, 26, BADGE, function()
 	adminTier = math.max(1, adminTier - 1)
 end)
 adminButton("+", PANEL_W - 36, 212, 26, BADGE, function()
-	adminTier = math.min(Units.MaxTier, adminTier + 1)
+	adminTier = math.min(Units.maxTier(Units.ClassList[adminClass]), adminTier + 1)
 end)
 adminButton("SPAWN 1", 10, 246, 104, GREEN:Lerp(BG, 0.3), function()
 	command("spawn", Units.ClassList[adminClass], adminTier)
 end)
-adminButton("SPAWN LV 1-9", 122, 246, 104, GREEN:Lerp(BG, 0.45), function()
+adminButton("SPAWN ALL LVS", 122, 246, 104, GREEN:Lerp(BG, 0.45), function()
 	command("spawnall", Units.ClassList[adminClass])
 end)
 

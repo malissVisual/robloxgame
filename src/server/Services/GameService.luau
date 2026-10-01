@@ -303,7 +303,8 @@ local function onInteract(player: Player, from: any, to: any)
 	end
 	local a, b = fromCells[fromIndex], toCells[toIndex]
 	if a and b and a.class == b.class and a.tier == b.tier and not Grid.canMerge(a, b, profile.tierUnlocked) and not (a.ascended or b.ascended) then
-		notify(player, if a.tier >= Units.MaxTier then string.format("Two level 9 %ss become an ASCENDED one once level 9 of the class is bought (UPGRADES tab)", Units.Classes[a.class].label) else string.format("%s level %d is locked — buy it in the UPGRADES tab (coins + cleared waves)", Units.Classes[a.class].label, a.tier + 1))
+		local maxTier = Units.maxTier(a.class)
+		notify(player, if a.tier >= maxTier then string.format("Two level %d %ss become an ASCENDED one once level %d of the class is bought (UPGRADES tab)", maxTier, Units.Classes[a.class].label, maxTier) else string.format("%s level %d is locked — buy it in the UPGRADES tab (coins + cleared waves)", Units.Classes[a.class].label, a.tier + 1))
 		sfx(player, "error")
 	end
 	local result = Grid.interact(fromCells, fromIndex, toCells, toIndex, profile.tierUnlocked)
@@ -722,7 +723,7 @@ local function onAdminUnlock(player: Player)
 	end
 	for _, class in Units.ClassList do
 		profile.unlocked[class] = true
-		profile.tierUnlocked[class] = Units.MaxTier
+		profile.tierUnlocked[class] = Units.maxTier(class)
 	end
 	for _, id in Spells.Order do
 		profile.spells.owned[id] = true
@@ -770,7 +771,7 @@ local function onAdminCommand(player: Player, command: any, a: any, b: any)
 		profile.mapCleared = profile.wave >= plot.map.waves
 		notify(player, string.format("Admin: wave %d", profile.wave))
 	elseif command == "spawn" and Units.isValidClass(a) and type(b) == "number" then
-		local tier = math.clamp(math.floor(b), 1, Units.MaxTier)
+		local tier = math.clamp(math.floor(b), 1, Units.maxTier(a))
 		profile.unlocked[a] = true
 		if (profile.tierUnlocked[a] or 1) < tier then
 			profile.tierUnlocked[a] = tier
@@ -782,14 +783,14 @@ local function onAdminCommand(player: Player, command: any, a: any, b: any)
 		end
 	elseif command == "spawnall" and Units.isValidClass(a) then
 		profile.unlocked[a] = true
-		profile.tierUnlocked[a] = Units.MaxTier
+		profile.tierUnlocked[a] = Units.maxTier(a)
 		local stored = 0
-		for tier = 1, Units.MaxTier do
+		for tier = 1, Units.maxTier(a) do
 			if addToInventory(profile, { class = a, tier = tier }) then
 				stored += 1
 			end
 		end
-		notify(player, string.format("Admin: %s Lv 1-9 (%d fit in the inventory)", Units.Classes[a].label, stored))
+		notify(player, string.format("Admin: %s Lv 1-%d (%d fit in the inventory)", Units.Classes[a].label, Units.maxTier(a), stored))
 	elseif command == "clear" then
 		for id = 1, Balance.BoardSize do
 			profile.board[id] = false
@@ -872,7 +873,7 @@ local function battleDrop(profile: PlayerData.Profile, wave: number, guaranteedB
 	-- A bonus drop is one level higher (always on a boss wave, otherwise a small chance).
 	local bonus = guaranteedBonus or rng:NextNumber() < Balance.BonusDropChance
 	if bonus then
-		tier = math.min(tier + 1, Units.MaxTier)
+		tier = math.min(tier + 1, Units.maxTier(class))
 	end
 	local stored = countFreeBoard(profile) > #profile.pendingUnits
 	table.insert(profile.pendingUnits, { class = class, tier = tier })

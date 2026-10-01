@@ -25,6 +25,7 @@ export type ClassDef = Stats & {
 	color: Color3,
 	unlock: Unlock?, -- nil = unlocked from the start
 	passive: string, -- the class's own trick in the battle (see Units.Passives)
+	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); the Knight has 30 looks
 }
 
 -- Every class has a PASSIVE (BattleService applies it). `value` is its strength; an ASCENDED soldier
@@ -130,8 +131,17 @@ Units.Classes = {
 		speed = 10,
 		splash = false,
 		passive = "block",
+		-- 30 merge levels: the R15 evolution from the first human to the year 3000 (design/KnightEvolution,
+		-- built from StageModels/KnightEvolution by SoldierRig).
+		maxTier = 30,
 	},
 } :: { [string]: ClassDef }
+
+-- The highest merge level of a class (Units.MaxTier unless the class says otherwise).
+function Units.maxTier(class: string?): number
+	local def = if class then Units.Classes[class] else nil
+	return if def and def.maxTier then def.maxTier else Units.MaxTier
+end
 
 Units.Passives = {
 	block = { label = "Shield Wall", text = "%d%% chance to block a hit", value = 0.2 },
