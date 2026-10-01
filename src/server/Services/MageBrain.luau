@@ -4,14 +4,15 @@
 --
 -- UTILITY AI: každých 0,2–0,4 s (náhodný posun) brain ohodnotí možné akce skóre 0–1 a vybere nejlepší,
 -- s malou setrvačností pro aktuální akci:
---   attack   základní kouzlo na vybraný cíl (v dosahu)
+--   attack   základní kouzlo na vybraný cíl (v dosahu); mág při tom STOJÍ (žádné pobíhání)
 --   strong   silné kouzlo: AoE do těžiště shluku nepřátel, řetěz, singularita, nebo dorážka cíle s nízkým HP
---   retreat  kiting: nepřítel na blízko je nebezpečný (nebo mág stojí v telegrafované ploše) → couvá šikmo
+--   escape   stojí v telegrafované ploše nepřítele (např. kruh bosse) → vystoupí z ní nejkratší cestou
 --   shield   bariéra při nízkém HP nebo hrozbě
---   blink    teleport, když je obklíčený
+--   blink    teleport pryč, když je obklíčený (od levelu 26)
 --   support  léčení spojence s nejnižším HP (od levelu 21)
---   approach přiblížení na optimální vzdálenost, když nemá cíl v dosahu
+--   approach jde dopředu jen tehdy, když NIKDO není v dosahu; zastaví, jakmile někoho v dosahu má
 --   idle     krátká pauza, otočení k hrozbě
+-- Mág tedy nikdy necouvá do davu ani netancuje sem a tam: chytrost je ve výběru cíle a kouzel.
 -- Výběr cíle je vážený (blízkost, nízké HP, nenávist k tomu, kdo mě zranil, typ nepřítele) s pamětí: cíl drží
 -- 1,5 s, pokud není nový výrazně lepší; na změnu reaguje s reakční dobou podle levelu a občas „lidsky“ zaváhá.
 -- Silná kouzla mají telegraf: krystal hole zesílí (světlo i velikost) a paže se zvedne, pak teprve výstřel.
@@ -70,9 +71,6 @@ export type Brain = {
 	velocity: { [any]: Vector3 },
 	casting: Cast?,
 	hesitateUntil: number,
-	retreatStarted: number, -- kdy začalo aktuální couvání (couvá v krátkých dávkách, pak zase střílí)
-	noRetreatUntil: number, -- po dávce couvání chvíli necouvá (jinak by kitoval donekonečna a nestřílel)
-	strafeSign: number,
 	shoulderRest: CFrame?,
 	debugLabel: TextLabel?,
 	update: (self: Brain, dt: number) -> (),
@@ -176,9 +174,6 @@ function MageBrain.new(ctx: Context, fighter: any, level: number): Brain
 		velocity = {},
 		casting = nil,
 		hesitateUntil = 0,
-		retreatStarted = -1,
-		noRetreatUntil = 0,
-		strafeSign = if math.random() < 0.5 then -1 else 1,
 		shoulderRest = nil,
 		debugLabel = nil,
 	}, MageBrain) :: any
@@ -307,7 +302,8 @@ local function targetScore(self: Brain, enemy: any, maxRange: number): number
 	local hate = clamp01((self.hate[enemy] or 0) / 3)
 	local archetype = self.ctx.archetype(enemy)
 	local typePriority = (archetype and Config.TypePriority[archetype]) or 0.4
-	return proximity * w.Proximity + lowHp * w.LowHp + hate * w.Hate + typePriority * w.Type
+	local inRange = if dist <= maxRange then w.InRange else 0
+	return inRange + proximity * w.Proximity + lowHp * w.LowHp + hate * w.Hate + typePriority * w.Type
 end
 
 local function chooseTarget(self: Brain, enemies: { any })
@@ -638,37 +634,24 @@ local function think(self: Brain)
 	local target = self.target
 	local range = f.range
 	local U = Config.Utility
-	local nearestEnemy, nearestDist = nearest(f.pos, enemies)
+	local _, nearestDist = nearest(f.pos, enemies)
 	local dangerCount = 0
 	for _, enemy in enemies do
-		if (flat(enemy.pos) - flat(f.pos)).Magnitude <= Config.KiteDistance then
+		if (flat(enemy.pos) - flat(f.pos)).Magnitude <= Config.SurroundDistance then
 			dangerCount += 1
 		end
 	end
 	local hpFrac = f.hp / math.max(f.maxHp, 1)
 	local hazard = hazardAt(self, f.pos)
 	local targetDist = if target then (flat(target.pos) - flat(f.pos)).Magnitude else math.huge
+	local anyInRange = nearestDist <= range
 
-	-- Skóre akcí.
+	-- Skóre akcí. Stojí a střílí, kdykoli má někoho v dosahu; jde dopředu jen, když nemá nikoho.
 	local scores: { [string]: number } = {}
 	scores.idle = U.IdleScore
 	scores.attack = if target and targetDist <= range then U.AttackBase + 0.15 * clamp01(1 - targetDist / range) else 0
-	scores.approach = if target and targetDist > range then U.ApproachBase else 0
-	-- Kiting v dávkách: couvá nejvýš RetreatBurst sekund, pak RetreatPause sekund couvat nechce (střílí), jinak by
-	-- před rychlými nepřáteli utíkal donekonečna. Telegrafovaná plocha nebo nízké HP dávky přebíjejí.
-	scores.retreat = 0
-	if hazard then
-		scores.retreat = U.HazardRetreat
-	elseif nearestEnemy and nearestDist < Config.KiteDistance then
-		scores.retreat = U.RetreatBase + 0.3 * clamp01(1 - nearestDist / Config.KiteDistance)
-		local inBurst = self.action == "retreat" and self.retreatStarted >= 0 and clock - self.retreatStarted <= Config.RetreatBurst
-		if self.action == "retreat" and not inBurst and hpFrac > 0.4 then
-			self.noRetreatUntil = clock + Config.RetreatPause
-		end
-		if clock < self.noRetreatUntil and hpFrac > 0.4 and not inBurst then
-			scores.retreat *= 0.3
-		end
-	end
+	scores.approach = if not anyInRange and #enemies > 0 then U.ApproachBase else 0
+	scores.escape = if hazard then U.HazardEscape else 0
 	local shieldSpell = spellOfKind(self, "shield")
 	scores.shield = if shieldSpell and (hpFrac < U.ShieldBelowHp or (dangerCount >= 2 and hpFrac < 0.6)) then U.ShieldScore else 0
 	local blinkSpell = spellOfKind(self, "blink")
@@ -734,7 +717,7 @@ local function think(self: Brain)
 
 	-- „Lidská“ chyba: zaváhání, nebo AoE mířené kousek vedle. Vyšší level chybuje méně.
 	local mistake = math.random() < lerpByLevel(self.level, Config.MistakeChance.L1, Config.MistakeChance.L30)
-	if mistake and bestAction ~= "retreat" then
+	if mistake and bestAction ~= "escape" then
 		if bestAction == "strong" and strongPoint then
 			local angle = math.random() * math.pi * 2
 			local err = Config.AimError * (1 - clamp01((self.level - 1) / 29))
@@ -744,9 +727,6 @@ local function think(self: Brain)
 		end
 	end
 
-	if bestAction == "retreat" and self.action ~= "retreat" then
-		self.retreatStarted = clock
-	end
 	self.action = bestAction
 	self.actionScore = math.min(bestScore, 1)
 
@@ -825,65 +805,50 @@ local function act(self: Brain, dt: number)
 	local target = self.target
 	local action = self.action
 	local enemies = enemiesOf(self)
-	local nearestEnemy, nearestDist = nearest(f.pos, enemies)
+	local nearestEnemy = nearest(f.pos, enemies)
 	local range = f.range
-	local optimalLow, optimalHigh = range * Config.OptimalRange[1], range * Config.OptimalRange[2]
 
-	if action == "retreat" then
-		-- Pryč od hrozby (nebo ze středu telegrafované plochy), šikmo do strany; u okraje otočí stranu.
+	if action == "escape" then
+		-- Ven z telegrafované plochy nejkratší cestou (od jejího středu), kousek za okraj.
 		local hazard = hazardAt(self, f.pos)
-		local threatPos = if hazard then hazard.pos elseif nearestEnemy then nearestEnemy.pos else nil
-		if threatPos then
-			local away = flat(f.pos) - flat(threatPos)
+		if hazard then
+			local away = flat(f.pos) - flat(hazard.pos)
 			if away.Magnitude < 0.1 then
 				away = Vector3.new(0, 0, -1)
 			end
-			local angle = math.rad(Config.StrafeAngle) * self.strafeSign
-			local dir = CFrame.Angles(0, angle, 0):VectorToWorldSpace(away.Unit)
-			local goal = f.pos + dir * 6
-			local clamped = clampToArena(self, goal)
-			if (flat(clamped) - flat(goal)).Magnitude > 0.5 then
-				self.strafeSign = -self.strafeSign -- u okraje couvá na druhou stranu
-			end
-			moveTowards(self, clamped, dt, 1)
-			ctx.face(f, if target then target.pos else threatPos)
-			-- Střílí i při couvání: když je základní kouzlo připravené a cíl v dosahu, otočí se a vystřelí.
-			if target and not hazard and (flat(target.pos) - flat(f.pos)).Magnitude <= range + 1 then
-				local rate = if f.slowUntil > f.clock then f.slowFactor else 1
-				f.timer -= dt * rate
-				if f.timer <= 0 then
-					f.timer = f.cooldown
-					startCast(self, self.basic, target, nil)
-				end
-			end
+			local goal = hazard.pos + away.Unit * (hazard.radius + 2)
+			moveTowards(self, clampToArena(self, goal), dt, 1)
 		else
 			Rig.setMoving(f.model, false)
+		end
+		if target then
+			ctx.face(f, target.pos)
 		end
 		return
 	end
 
-	if action == "approach" and target then
-		moveTowards(self, target.pos, dt, 1)
-		ctx.face(f, target.pos)
+	if action == "approach" then
+		-- Nikdo v dosahu: jde k nejbližšímu nepříteli a zastaví, jakmile ho má pohodlně v dosahu.
+		local goal = nearestEnemy
+		if goal then
+			local dist = (flat(goal.pos) - flat(f.pos)).Magnitude
+			if dist > range * Config.StopAtRange then
+				moveTowards(self, goal.pos, dt, 1)
+			else
+				Rig.setMoving(f.model, false)
+			end
+			ctx.face(f, goal.pos)
+		else
+			Rig.setMoving(f.model, false)
+		end
 		return
 	end
 
 	if action == "attack" and target then
-		local dist = (flat(target.pos) - flat(f.pos)).Magnitude
-		-- Drží optimální vzdálenost: moc daleko → krok blíž, moc blízko → pomalu šikmo zpět.
-		if dist > optimalHigh and dist > range * 0.95 then
-			moveTowards(self, target.pos, dt, 1)
-		elseif dist < optimalLow then
-			local away = flat(f.pos) - flat(target.pos)
-			if away.Magnitude > 0.1 then
-				local dir = CFrame.Angles(0, math.rad(Config.StrafeAngle) * self.strafeSign, 0):VectorToWorldSpace(away.Unit)
-				moveTowards(self, f.pos + dir * 4, dt, 0.5)
-			end
-		else
-			Rig.setMoving(f.model, false)
-		end
+		-- Stojí na místě, dívá se na cíl a střílí v tempu útoku mága.
+		Rig.setMoving(f.model, false)
 		ctx.face(f, target.pos)
-		-- Základní kouzlo v tempu útoku mága.
+		local dist = (flat(target.pos) - flat(f.pos)).Magnitude
 		local rate = if f.slowUntil > f.clock then f.slowFactor else 1
 		f.timer -= dt * rate
 		if f.timer <= 0 and dist <= range + 1 then
@@ -893,11 +858,11 @@ local function act(self: Brain, dt: number)
 		return
 	end
 
-	-- idle a vše ostatní: stojí, dívá se na hrozbu.
+	-- idle a vše ostatní: stojí, dívá se na cíl nebo na nejbližšího nepřítele.
 	Rig.setMoving(f.model, false)
 	if target then
 		ctx.face(f, target.pos)
-	elseif nearestEnemy and nearestDist < math.huge then
+	elseif nearestEnemy then
 		ctx.face(f, nearestEnemy.pos)
 	end
 end

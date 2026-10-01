@@ -14,14 +14,12 @@ local MageConfig = {
 	Hesitation = { 0.3, 0.6 }, -- jak dlouho zaváhání trvá (sekundy)
 	AimError = 2.5, -- studů vedle u chybně mířeného AoE (násobeno 1 - level/30)
 
-	-- Pohyb: drží si 70–85 % dosahu základního kouzla; couvá šikmo (ne rovně dozadu).
-	OptimalRange = { 0.7, 0.85 },
-	KiteDistance = 8, -- nepřítel blíž než tohle je nebezpečný
-	StrafeAngle = 50, -- stupně odchylky od směru „přímo pryč“
+	-- Pohyb: mág STOJÍ a střílí, kdykoli má někoho v dosahu. Jde dopředu jen, když nemá nikoho, a zastaví, jakmile
+	-- má nejbližšího nepřítele v StopAtRange × dosah. Necouvá; z telegrafované plochy nepřítele vystoupí.
+	StopAtRange = 0.85,
 	ArenaMargin = 3, -- studů od okraje plošiny, kam mág nevkročí
-	SurroundedCount = 2, -- tolik nepřátel do KiteDistance = obklíčení (blink)
-	RetreatBurst = 0.8, -- sekund couvání v jedné dávce …
-	RetreatPause = 1.5, -- … a pak tolik sekund raději střílí, i když je nepřítel blízko (není-li HP pod 40 %)
+	SurroundDistance = 6, -- nepřátelé do této vzdálenosti se počítají jako obklíčení …
+	SurroundedCount = 2, -- … a od tolika mág blinkne pryč (má-li teleport)
 
 	-- Zdroje.
 	Mana = { Max = 100, Start = 60, Regen = 9 }, -- regenerace za sekundu bitvy
@@ -33,7 +31,7 @@ local MageConfig = {
 	HateDecay = 0.35, -- za sekundu
 
 	-- Výběr cíle: váhy složek skóre (blízkost, nízké HP, hrozba, typ nepřítele).
-	Target = { Proximity = 0.35, LowHp = 0.3, Hate = 0.25, Type = 0.2 },
+	Target = { InRange = 0.5, Proximity = 0.35, LowHp = 0.3, Hate = 0.25, Type = 0.2 }, -- InRange: co už je v dosahu, má přednost
 	TypePriority = { Archer = 1.0, Shaman = 0.9, Chief = 0.5, RiftKing = 0.6, Grunt = 0.4, Brute = 0.2 },
 
 	-- Utility: základní hodnoty akcí (a bonusy), výsledek se ořízne na 0–1.
@@ -42,8 +40,7 @@ local MageConfig = {
 		AttackBase = 0.55,
 		StrongPerEnemy = 0.2, -- AoE: za každého nepřítele ve shluku (od dvou)
 		StrongFinish = 0.7, -- silné kouzlo na cíl, kterého dorazí
-		RetreatBase = 0.6,
-		HazardRetreat = 0.95, -- stojí v telegrafované AoE nepřítele
+		HazardEscape = 0.95, -- stojí v telegrafované AoE nepřítele → ven
 		ShieldBelowHp = 0.35,
 		ShieldScore = 0.8,
 		BlinkScore = 0.85,

@@ -439,10 +439,11 @@ one instance per Mage, created by BattleService at the start of the fight and st
 0.2–0.4 s (random offset, so the mages never think in the same tick) it scores the possible actions 0–1 and runs
 the best one, with a little inertia for the current action: **attack** (the basic spell on its target), **strong**
 (an AoE into the centroid of a cluster of enemies, a chain, a singularity, or a finisher on a low-HP target),
-**retreat** (kiting: a close enemy is dangerous, so it backs off diagonally in short bursts, shooting while it
-goes, and steps out of a telegraphed enemy area such as the Rift King's circles, which carry the `Hazard`
+**escape** (it steps out of a telegraphed enemy area such as the Rift King's circles, which carry the `Hazard`
 attribute), **shield** (below 35 % HP or when threatened), **blink** (surrounded), **support** (heal the ally with
-the lowest HP, from level 21), **approach** (no target in range) and **idle**. Targets are chosen by a weighted
+the lowest HP, from level 21), **approach** (nothing in range: it walks toward the nearest enemy and stops at 85 % of its range) and **idle**. A Mage
+**stands still while it has anyone in range** and never backs into the enemies: its intelligence shows in whom it
+targets and which spell it uses, not in running around. Targets are chosen by a weighted
 score (proximity, low HP, hate toward whoever hurt it, enemy type: archers and shamans before brutes) with
 memory (a target is held 1.5 s unless a clearly better one appears) and a level-scaled reaction time (0.6 s at
 level 1, 0.15 s at level 30); it sometimes hesitates or aims an AoE a little off (less at higher levels).
@@ -455,7 +456,7 @@ and have cooldowns, so the brain saves them; before one, the staff's crystals br
 rises (the telegraph), then the spell fires. All numbers live in `shared/Config/MageConfig.luau`; set
 `Debug = true` there or `workspace:SetAttribute("MageDebug", true)` at runtime for a label over every Mage with
 its action, score, target, mana and HP. `python3 tools/tests/run_magebrain_test.py [luau]` runs the brain's logic
-test in standalone Luau (spell unlocks, attacks, kiting bursts, strong spells and mana, healing, bounds).
+test in standalone Luau (spell unlocks, attacks, standing still in range, strong spells and mana, healing, bounds).
 
 ## The FIGHT button and the battle panel (starting a wave, difficulty and wave choice)
 

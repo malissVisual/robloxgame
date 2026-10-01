@@ -57,7 +57,8 @@ local function scenario(level, allyLowHp)
 	local brain = MageBrain.new(ctx, mage, level)
 	local actions = {}
 	local minMana = 1000
-	local retreated = false
+	local movedWhileInRange = false
+	local approachedTooClose = false
 	local DT = 0.05
 	for tick = 1, 40 / DT do
 		for _, f in fighters do f.clock += DT end
@@ -69,18 +70,22 @@ local function scenario(level, allyLowHp)
 			end
 		end
 		local before = mage.pos
+		local nearestD = math.huge
+		for _, f in fighters do if f.side == 2 and f.hp > 0 then nearestD = math.min(nearestD, (f.pos - mage.pos).Magnitude) end end
 		brain:update(DT)
 		actions[brain.action] = (actions[brain.action] or 0) + 1
 		minMana = math.min(minMana, brain.mana)
-		if brain.action == "retreat" and (mage.pos - before).Magnitude > 0 then retreated = true end
+		local moved = (mage.pos - before).Magnitude > 0
+		if moved and nearestD <= mage.range and brain.action ~= "escape" and brain.action ~= "blink" then movedWhileInRange = true end
+		if moved and brain.action == "approach" and nearestD < mage.range * 0.85 - 0.5 then approachedTooClose = true end
 	end
-	return brain, log, actions, minMana, retreated, mage
+	return brain, log, actions, minMana, (not movedWhileInRange) and (not approachedTooClose), mage
 end
 
 local brain, log, actions, minMana, retreated, mage = scenario(15, false)
 check(log.attacks > 5, "L15: basic attacks happen (" .. log.attacks .. ")")
 check((actions.approach or 0) > 0 or (actions.attack or 0) > 0, "L15: approach / attack actions chosen")
-check(retreated, "L15: the mage kited away from close enemies")
+check(retreated, "L15: the mage never walks while an enemy is in range and stops approaching at 85 % of range")
 check(minMana < 60, "L15: a strong spell was paid for (mana dipped to " .. math.floor(minMana) .. ")")
 check(log.damages > 0, "L15: a strong spell dealt damage (" .. log.damages .. " hits)")
 check(brain.target ~= nil or true, "L15: target selection ran")
