@@ -1,0 +1,476 @@
+# Merge Blades
+
+A Roblox merge autobattler. You summon soldiers at an altar in the lobby and they land in your **inventory**,
+which is at the same time the **3D merge room**: every soldier in the inventory automatically
+stands on a pad of the merge board in the lobby. You merge two identical ones into a stronger one
+right in the UI inventory (drag a card onto another card) or in 3D (drag a soldier onto another),
+**equip** your best into the 3×2 battle squad and send the squad into battle against a wave. They
+teleport into a raised fight arena and fight on their own, PvE only. PC first, mobile later.
+
+Most things are 3D in the world. The UI is the FIGHT button at the bottom, the HUD with the account level and
+coins (bottom left), the left panel (Inventory / Soldiers / Upgrades / Spells tabs), the battle panel (opened
+with the FIGHT button) and short toast messages. Every soldier has its name and level (e.g. "Archer · Lv 3")
+floating above it.
+
+## Running
+
+```bash
+node tools/rojo-sync.js
+```
+
+Then in Studio: **Plugins → Rojo → Connect** (localhost, 34872) and **Play**.
+(`rojo serve` works too if it is allowed to run: `rokit install && rojo serve`.)
+
+## Game loop
+
+```
+Summon (altar, E) → the soldiers land in the INVENTORY (= the 3D merge room)
+   ↑                                        │ drag a card onto a card (UI) or a pad onto a pad (3D): merge
+   │                                        │ click a card → EQUIP (into the battle squad)
+   │                        BATTLE SQUAD (3D, 3 x 3 = 9 places) → FIGHT (pick difficulty + wave, START WAVE) → arena
+   └── coins from kills go straight to you, XP drops as orbs; a win = a soldier drop + next wave ────────┘
+```
+
+The server decides everything (buying, merging, rolling, the battle simulation).
+
+## Merge levels
+
+Every soldier has a **level** (`Config/Levels.luau`, **1 … 9**). Merging two soldiers of the same
+class and level makes one soldier one level higher. A level makes the soldier stronger (×1.8 HP and
+damage per level) and changes its look.
+
+**The Soldier** has its own model with **9 stages of gear** (designed in Claude Design, the project
+`soldier-merge`; built in `Soldier.luau`, `buildStageSoldier`). The gear is cumulative, and a Soldier
+card's popup shows what its level added:
+
+| Level | Soldier gear | Level color |
+|---|---|---|
+| Lv 1 | Starting gear: cap and pistol | Common (gray) |
+| Lv 2 | Combat helmet | Common (gray) |
+| Lv 3 | Assault rifle | Uncommon (green) |
+| Lv 4 | Tactical vest | Uncommon (green) |
+| Lv 5 | Shades | Rare (blue) |
+| Lv 6 | Minigun | Rare (blue) |
+| Lv 7 | Medals and an aura (glow + sparkles) | Epic (purple) |
+| Lv 8 | Golden gear (helmet and minigun) | Legendary (orange) |
+| Lv 9 | Hero cape | Mythic (red) |
+
+The **Knight** and the **Archer** also have their own designed models with **9 stages** (`design/Knight_AllStages.rbxmx` and `design/Archer_AllStages.rbxmx`, turned
+into data by `tools/stages_from_rbxmx.py` → `src/shared/StageModels/<Class>.luau`; run the tool again after
+changing the design, e.g. `python tools/stages_from_rbxmx.py design/Knight_AllStages.rbxmx
+src/shared/StageModels/Knight.luau`). Stage 7, 8 and 9 have an aura (glow + sparkles in the level color).
+
+The **other classes** (Hunter, Mage, Tank, Berserker) share generic level gear on top
+of their own look: Lv 2 cape, Lv 3 shoulder plates, Lv 4 glowing belt and spikes, Lv 5 floating orbs
+and a glow outline, Lv 6 metal armor, Lv 7 wings, Lv 8 a halo, Lv 9 a long red hero cape.
+
+The level colors (label, card outline, pad under the soldier, effects) follow the rarity colors of the
+Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
+
+- **Buying** gives a random unlocked class at Lv 1. **Wave drops** give a random class at a higher
+  level as the waves go on (Lv 1 + wave / 7, up to Lv 5). They go to the inventory; when it is full
+  they are sold for coins (`Levels.sellValue`).
+
+## Inventory, merge room and equipping
+
+- **The inventory IS the merge board.** There is only one storage: the 36 pads of the merge board in
+  the lobby. Every soldier you own that is not equipped stands on one of them, and the same soldiers
+  are the cards of the **Inventory** tab (left panel), so what is in the inventory is automatically
+  visible in the 3D merge room. New soldiers (bought or dropped) take the first free pad, front row
+  first; when it is full they are sold for coins (`Levels.sellValue`).
+- **Its size is an upgrade:** you start with 6 usable pads (the front row) = 6 inventory places. The
+  **"+" card** at the end of the inventory grid (a big plus that breathes, brighter when you can afford it) buys
+  +3 places; every upgrade costs 60% more (`Balance.BoardUpgrade*`) up to
+  36. Locked pads are dark and half-transparent.
+- **Merging in the UI:** drag a card onto another card. The target card's outline lights up (gold =
+  they will merge: same class and level, blue = swap, white = move) and a 3D soldier follows your
+  cursor. Dropping on a 3D pad works too. Merging in 3D (drag a soldier onto another) works as
+  before, and the merge effect plays in the 3D room either way.
+- **Equipping:** **click** a card: a small popup offers **EQUIP** (into the first free squad slot;
+  it shows how many are free). The **EQUIPPED** row at the top of the panel shows the squad, and
+  clicking an equipped card offers **UNEQUIP** (back to the first free inventory place). You can
+  also drag between the rows, or drop a squad soldier from the 3D world onto the panel to unequip it.
+  Only equipped soldiers fight.
+
+## Controls
+
+- **Drag & drop:** press the mouse (or a finger) anywhere on a pad with a soldier (you do not
+  have to hit the soldier itself) and drag it onto another pad. The target lights up: **gold** = the two will merge (class + level must match), **blue** =
+  swap, **white** = move to an empty pad. The server decides the result.
+- **Hover:** with nothing grabbed, the pad under the mouse gets a pulsing disc and the soldier on
+  it lifts a little and glows, so you see what you would grab (client-side only).
+- **Summoning altars (lobby):** soldiers cost coins and come from the glowing green altar right of the merge
+  board: walk up and press **E** ("Summon soldiers"). One summon gives **2 soldiers for 15 coins**
+  (`Balance.SummonCost`, `SummonCount`); they land on the first free pads of your inventory **right away** (a light
+  beam on each and a quick reveal: the altar flashes, the cards pop in with a climbing chime and drop away in about
+  a second; no roll to wait for). Only a short **0.8 s cooldown**
+  (`Balance.SummonCooldown`) stops spamming. With fewer than 2 free places you get fewer
+  soldiers and pay only for those; with a full inventory you get a message. The prompt is made on the client,
+  so only you see it on your own plot. There is no buy button in the UI.
+- **Better summoner (lobby):** the gold altar next to it. It needs **10 cleared waves** of Training Camp and
+  works the same way (2 soldiers, no waiting) for **150 coins**, but every soldier starts at level 2
+  or higher (your start level, if that is higher) with a 35% chance of +1, 15% of +2 and 5% of +3 levels, even
+  above the merge limit you have bought for its class (`Balance.BetterSummon*`, `rollBetterTier`).
+- **Selling:** click a card in the inventory (or the squad) and press **SELL**: the soldier goes for coins
+  (`Levels.sellValue`: 2 coins at level 1, doubling every level, so 4, 8, 16 … 512 at level 9). It also works
+  for the equipped squad, only not during a battle or a roll. The server does the sale (`onSell`).
+- **Level upgrade station (lobby):** the glowing purple pad with the crystal, left of the merge board. Stand
+  on it and a panel opens: buy a higher **start level** for bought soldiers (they normally start at level
+  1; levels 2 – 5 cost 250 / 750 / 2250 / 6750 coins, `Balance.StartLevel*`); it can never be higher than
+  your unlocked merge level. The server checks that you stand in the station's zone (`Plots.isInUpgradeZone`).
+- **AUTO MERGE** (in the Inventory tab) merges every possible pair of the merge board **and the battle squad** (same class and level; a pair with a squad soldier stays in the squad) again
+  and again until nothing is left, with a burst on the result pads; it shows how many merges are possible.
+  **EQUIP BEST** puts the strongest soldiers (squad + inventory, by hp × damage / cooldown) into the battle
+  squad and the rest back into the inventory. Both are server-checked (`onAutoMerge`, `onEquipBest`) and
+  locked during rolls and battles.
+- **Merge levels are bought per soldier** (UPGRADES tab of the left panel): every class has its own merge
+  level limit. You start unable to merge a class at all; to merge it up to level N you buy that level for
+  that class with **coins and enough cleared waves** (`Balance.TierUnlocks`, the same price list for every
+  class): Lv 2 = 50 coins, Lv 3 = wave 1 + 150, Lv 4 = 3 + 400, Lv 5 = 8 + 1000, Lv 6 = 15 + 2500, Lv 7 = 25 + 6000,
+  Lv 8 = 40 + 15000, Lv 9 = 60 + 40000. Locked merges do nothing (a message explains); auto merge, drops
+  and the start level respect the limit of each class (`profile.tierUnlocked[class]`).
+- **Saving:** (the HUD says "progress saved" or, in red, "saving OFF"; it is also saved after every won wave) progress (coins, soldiers, inventory / squad, merge slots, waves, unlocked classes and
+  levels, difficulty, start level) is saved to a DataStore (`Balance.DataStoreName`) when you leave, every
+  `Balance.SaveInterval` seconds, on level unlocks and when the server shuts down. It needs "Enable Studio
+  Access to API Services" in Game Settings > Security (and a published place) to work in Studio. If a save cannot be read, that
+  session is not saved (the old save is never overwritten).
+- **Admin tools:** the game owner, everyone in Studio and the ids in `Balance.AdminUserIds` see a small red
+  **ADMIN** panel (top right): **+ PROGRESS** (+1 wave and `Balance.AdminProgressCoins` coins), **UNLOCK ALL** (every class with all its merge levels, every spell, all merge slots, the best start
+  level, every wave and `Balance.AdminUnlockCoins` coins) and **RESET**
+  (asks first, wipes all progress and the saved data). The server checks the admin rights (`isAdmin`).
+- **FIGHT** (bottom bar) opens the battle panel (wave, difficulty, START WAVE) from anywhere; the button
+  shows the wave and difficulty, or "Next wave in Ns" (see "The FIGHT button and the battle panel").
+- **Merge effect** (`Plots.mergeEffect`): orbs fly in arcs, then a white flash, colored core, 2–3
+  shockwave rings, a light pillar, sparks, the new soldier popping in with an overshoot and a
+  rising "MERGE! Lv 3". It scales with the level.
+- **Roll animation (UI only):** `playRollAnimation(pool, classes, tiers, onLanded)` in `Main.client.luau` is kept for
+  a future shop; summoning does not use it any more (no waiting).
+- Labels in the world only show when you are close.
+
+## Plot layout (along the z axis)
+
+```
+lobby (-68 … -4)              →  road (-4 … 30)  →  gate  →  ARENA 1 – Training (30 … 140)
+your spawn (z = -9)              ~34 studs of grass   name    SQUAD 3 × 3        z = 34 … 46 (colored pads, they wait here)
+MERGE BOARD 6 × 6 (z = -50…-20)  with a worn road             FIGHT ARENA, one step up (z = 51 … 111, 48 wide)
+                                                              enemy wave 4 wide, up to 3 rows (z = 118 … 130), visible before the battle
+```
+
+## Fight arena (placeholder)
+
+Both sides stand visible on their pads. When the battle starts they teleport into the fight arena (a flash on the pads and in the arena),
+which is **one step (2 studs) higher** than the rest of the plot, and fight there. The arena is a
+simple placeholder platform with two steps, isolated in `src/server/Services/FightArena.luau`:
+replace `FightArena.build` with your own design. The rest of the game only needs the returned
+`heightAt(worldZ)` and `spot(side, index, count)` (see the comment at the top of that file).
+
+**The squad is 3 x 3** (nine soldiers: a back, a middle and a front row). The **Inventory tab** shows it the same way
+(BATTLE SQUAD, a big 3 x 3 grid with the front row on top, "▲ ENEMIES" above it): an empty slot shows its bonus
+(green = +HP %, orange = +damage %) and is tinted like its pad; the "i" button next to it shows the legend in a
+popup. Arrange the squad right in the panel by dragging cards (or on the map). The pads in the world have no
+bonus tags. **Pad bonuses** (a small tag on every
+squad pad shows what it gives, `Balance.FrontRowHp` and the rest; the **color of the pad** shows it too: green =
+HP, orange = damage, yellow-ish where it gives both): the **front row** +25% HP, the **back row** +15% damage
+(the middle row has no row bonus); the **middle column** +10% HP, the two **outer
+columns** (the left and right lane) +10% damage; **ranged soldiers** (Archer, Hunter, Mage) in the back row
+have +15% range and a **Tank** in the front row takes 15% less damage. The bonuses stack (a soldier in the
+front-middle pad has +25% and +10% HP), so a tank belongs in front, an archer in the back, and the
+strongest hitter on the flank.
+
+**The big arena and the formation:** the fight arena is 48 studs wide and 60 deep. Your squad's formation is
+**spread over it**: the three columns of the squad pads stand 11 studs apart (left, middle, right lane), the
+back row 8 studs behind the front row, and the enemies (4 columns, 9 studs apart, up to 3 rows) start about 26
+studs in front of your front row. Everybody fights the nearest enemy, so **where you put a soldier decides what
+it fights**: the front row meets the enemies first and has +25% HP, the back row (ranged soldiers!) stays behind
+with +15% damage, and a soldier on the left pad fights the enemies on the left. Battles are longer now
+(`Balance.BattleTimeLimit` = 90 s).
+
+## Multiple players
+
+Every player gets their **own plot** (own spawn, merge board, squad, arena, enemy preview), so
+nothing is shared and nobody sees another player's soldiers move. Plots are laid out in a grid
+(`Balance.PlotsPerRow` = 4 per row, `PlotSpacingX` / `PlotSpacingZ` apart) and the slot is freed
+when a player leaves. Each plot has its own `SpawnLocation` (`player.RespawnLocation`), and a
+safety check moves the character there if it spawned somewhere else. Client-side effects (hover
+disc, drag) only look at the player's own plot; server-made effects (roll, merge, drops)
+replicate to everyone.
+
+## Soldier classes
+
+Everybody starts with two classes: **Knight** (armored melee) and **Archer** (ranged). The others are
+unlocked in **Arena 1 – Training Camp** by a **lucky drop** after a won wave: from the wave in the
+table on, that class is in the draw.
+
+| Class | In the lucky-drop draw from | |
+|---|---|---|
+| Knight, Archer | — | start classes |
+| Hunter | wave 3 | new in Arena 1 (very long range) |
+| Mage | wave 6 | new in Arena 1 (splash damage) |
+| Tank | wave 10 | new in Arena 1 (lots of HP) |
+| Berserker | wave 15 | reserved for the wave system, for now |
+| **Soldier** | wave 15 | **LEGENDARY**: the 9-stage designed soldier, a rare lucky drop (a quarter of the normal chance inside the draw) |
+
+The **Soldiers** tab (left panel) is the index: every class with a 3D preview, its stats and
+either "Unlocked" or "Lucky drop from wave N".
+
+## Coins and XP from kills
+
+There is **no coin bonus for clearing a wave**. Every enemy you kill **drops coins that fall on
+the ground**: a few gold coins pop out, bounce and lie spinning where the enemy died (only you see
+your coins). **Walk close and they fly to you smoothly** (`Balance.CoinMagnetRadius`), your coin
+counter pulses, and only then are they paid. The coins of a kill land close together and the pull
+radius is generous, so collecting them is easy. So you have to step into the arena to collect them;
+after `Balance.CoinLifetime` seconds they fly to you on their own, and when the next battle starts
+the leftovers are paid automatically, so nothing is ever lost. A wave you lose still drops coins
+for what you killed, so you can always progress.
+
+One kill's coins are
+
+`floor((KillCoinBase + KillCoinPerWave × wave) × (1 + KillCoinPerLevel × (enemy level − 1)))`
+
+times the difficulty's reward multiplier (Easy ×0.7, Normal ×1, Hard ×1.6, Nightmare ×2.6), split into at most
+`CoinsPerKillMax` pickups. With the defaults (`KillCoinBase` 8, `KillCoinPerWave` 2,
+`KillCoinPerLevel` 0.5) a wave-1 enemy pays 10 coins, a wave-5 enemy 18, and a level-2 enemy 1.5×
+as much.
+
+**Bonus:** every kill also rolls a chance for **more** (`Balance.CoinBonus`): 15% for ×2, 4% for ×3 and
+1% for ×5 (about one kill in five has a bonus). A bonus multiplies the coins and the XP of the kill: it
+drops bigger, colored XP orbs, more of them, and a floating **BONUS xN!**. The coins go straight to your
+balance and the result screen shows the total of the wave as one small line.
+
+## Battle timing and the rewards
+
+- **Countdown:** confirming the wave shows a big **3 · 2 · 1 · FIGHT!** before the soldiers march into the
+  arena (`Balance.BattleCountdown`).
+- **After a wave** there is no result box: the rewards **drop in one after another at the top of the screen**
+  (a small pill each): the title (WAVE n CLEARED / BOSS / ELITE), `+N coins` (and the streak), every dropped
+  soldier with a little 3D card (and BONUS LEVEL), a lucky drop ("LUCKY DROP: X unlocked!", chance by difficulty,
+  guaranteed after `Balance.LuckyDropPity` clears without luck) and a new spell. The drops go **straight into the
+  inventory** (`CollectDrops` right away; `Balance.DropCollectTime` is the server's fallback). After a defeat one
+  pill says "DEFEAT · +N coins" and there is a `DefeatCooldown` (3 s) pause. You are brought back to your spawn.
+
+## Enemies and waves (Training Camp: 100 waves, 20 phases, 20 bosses)
+
+The **Archer** too (Apprentice, Marksman, Tracker, Ranger, Elven Archer, Shadow Stalker, Storm Archer, Royal
+Master, Legend; a bow in the left hand and a quiver on the back).
+
+The **Knight** has the same kind of design (9 ranks: Squire, Footman, Swordsman, Knight, Elite Knight, Paladin,
+Dragon Knight, Grandmaster, Legend; sword and shield), in the same file.
+
+The **Soldier class is an R15 character** too (`src/shared/SoldierRig.luau`, from `design/SoldierMerge_R15_Builder.lua`):
+9 designed ranks, one per merge level (Recruit, Private, Corporal, Sergeant, Lieutenant, Captain, Major, General,
+Legend), with gear welded on the limbs, and it is animated in the battle (idle, run, attack, death). The base rig
+is made once on the server and kept in ReplicatedStorage (`R15Base`, see `src/shared/Rig.luau`) so the client can
+clone it for the cards; UI previews and holograms are still statues of it. The other classes are block models.
+
+Enemies are **R15 characters** (a rig made once on the server and cloned; goblin ears, nose, eyes, clothes and a
+weapon are welded on) with animations: idle, run, an attack swing (slash / bow lunge / cast), boss abilities and a
+fall when they die. Their attacks are shown (a flying arrow, a glowing orb, a slash arc). If the rig cannot be
+made, the old block model is used. `EnemyHpBoost` (1.7) and `EnemyDamageBoost` (1.4) in `Balance.luau` make every
+enemy stronger in one place.
+
+Enemies are **not** your soldier classes. Every map has its own enemy folk (`Config/Enemies.luau`, models
+in `src/shared/Enemy.luau`). The Training Camp has **100 waves split into 20 phases of 5 waves**
+(`Balance.PhaseLength`), and the game changes every 5 waves: **one new mob joins** (the newest is twice as
+common, the mobs of the last three phases stay) and the phase ends with **its own boss**. The mobs come
+in five families that rank up every 4 phases (a bit stronger and bigger each time), and every family has
+four archetypes: a grunt, an **archer** (ranged), a **brute** (tanky) and a **shaman** (splash).
+
+| Phases | Waves | Family | New mobs, one per phase | Bosses (waves 5, 10, 15 …) |
+|---|---|---|---|---|
+| 1 – 4 | 1 – 20 | **Goblin** | Goblin, Goblin Archer, Goblin Brute, Goblin Shaman | Grubnak the Bully, Goblin Chief, Goblin King, Shaman Elder |
+| 5 – 8 | 21 – 40 | **Hobgoblin** | Hobgoblin, Archer, Brute, Shaman | Hobgoblin Warlord, Deadeye Hob, Bonecrusher, Hexmaster |
+| 9 – 12 | 41 – 60 | **Orc** | Orc, Archer, Brute, Shaman | Orc Chieftain, Orc Sniper Lord, Mountain Breaker, Orc Warlock |
+| 13 – 16 | 61 – 80 | **Troll** | Troll, Archer, Brute, Shaman | Troll King, Troll Stalker, Colossus, Troll Witch Doctor |
+| 17 – 20 | 81 – 100 | **Demon** | Demon, Archer, Brute, Shaman | Demon Lord, Hellbow, Infernal Titan, **The Demon Emperor** (wave 100) |
+
+The rules (`Config/Waves.luau`): a phase starts with a few enemies and gets bigger every wave, later phases
+start bigger (`EnemyBase + 2 + (phase - 1) // 3 + place in the phase`, 12 at most); the enemy **level is the
+phase number** and every level makes enemies `EnemyLevelScale` = 1.2× stronger (wave 100 = level 20, about
+30x wave 1, plus the family bonus), so the game stays fair for a first arena; every 5th wave the last enemy
+is the phase's boss. Bosses and better mobs drop more coins (`coins` in `Enemies.luau`), and the coins of a
+kill grow only a little with the level (`KillCoinPerLevel`). **Percent-damage spells do only 35% of their damage
+to a boss** (`Balance.SpellBossFactor`), so your spells help but do not kill the fight for you. Clearing wave 100
+the first time **completes the map** ("TRAINING CAMP CLEARED!"); you can still repeat
+any wave. The wave heading over the enemies shows the phase, `WAVE n / 100` and the count. A new map is a new
+block in `Config/Maps.luau` (`phases` can be written by hand or generated like the Training Camp's).
+
+## The FIGHT button and the battle panel (starting a wave, difficulty and wave choice)
+
+Nothing pops up when you walk onto the raised fight arena. The **FIGHT** button in the bottom bar opens
+the **battle panel** in the middle of the screen (click FIGHT again, the X or Esc to close it). In the
+panel you choose:
+
+- the **difficulty** (`Config/Difficulties.luau`): **Easy / Normal / Hard / Nightmare** change the enemies' power
+  (×0.7 / ×1 / ×1.6 / **×2.4**), the coins per kill (×0.7 / ×1 / ×1.6 / ×2.6), the XP (×0.7 / ×1 / ×1.5 / ×2.5)
+  and the lucky-drop chance (25 / 35 / 50 / 60%). **Nightmare** is the hardest but pays the most: **one extra
+  drop** after every won wave (a second card next to the first), much more XP and coins;
+- **which wave to fight**, with `<` and `>`: any wave up to the highest one you reached, so you can
+  repeat earlier ones. It also shows the phase, how many goblins the wave has and whether it is a boss
+  wave. Clearing a wave you already cleared gives coins, a drop and a lucky-drop roll but **no
+  progress**; clearing the newest wave moves you on;
+- then **START WAVE** (it shows "Next wave in Ns" during the pause after a wave).
+
+The server checks everything (not during rolls and battles; the wave has to be one you reached). The
+(invisible) **BattleZone** box over the fight arena is not used for any menu now, it only stays as a marker
+of the fight place (`FightArena.build`). The enemy preview and its heading follow your choice.
+
+## Tactics, rewards and the long game
+
+**Tactics before the fight**
+- **Rows matter:** the squad has a **front row** (the pads nearest to the enemies, ids 104 – 106) with +25% HP
+  and a **back row** with +15% damage (`Balance.FrontRowHp`, `BackRowDamage`); signs on the ground say which is
+  which. Tanks in front, archers behind.
+- **Synergies** (`Synergy.luau`, shown in the battle panel): **Frontline** (Knight, Tank, Berserker, Soldier)
+  2 = +10% HP for everybody, 3+ = +20%; **Ranged** (Archer, Hunter, Mage) 2 = +10% damage, 3+ = +20%;
+  **4 different classes** = +10% HP and damage. The soldiers you put in the squad decide, not only the level.
+
+**During the fight**
+- **Your own spells:** you carry **two spells at a time**, one on **Q** and one on **E**, chosen in the
+  **SPELLS tab** of the left panel (click Q or E on a spell you own; if it is in the other slot the two swap;
+  not during a battle). You start with **Meteor** and **Heal**; every other spell is **found only by grinding**:
+  after a won wave of its wave or higher it can drop (chance = the difficulty's lucky-drop chance x
+  `Balance.SpellDropFactor`, doubled on a boss wave, one spell at a time, and it stays yours for good, also after
+  for good). The spells (`Config/Spells.luau`, the wave they can drop from in brackets):
+  **Meteor** (start) damages the enemies in a 9 stud circle (12% of their max HP, cooldown 7 s): a warning disc, a
+  burning fireball, shockwaves and sparks; **Heal** (start) heals your soldiers in a 10 stud circle (35% of their
+  max HP, 18 s); **Smite** (wave 25) calls a jagged lightning bolt on every enemy (20%, 30 s); **Frost Nova**
+  (wave 50) hurts the enemies in a circle (6%) and makes them act at half speed for 4 s (14 s); **Divine Shield**
+  (wave 75) lets your soldiers in a circle take 85% less damage for 4 s (24 s); **Armageddon** (wave 100) rains six
+  meteors on random enemies (10% each, 45 s). Percent-damage spells do only 35% of their damage to a boss.
+  In a battle two buttons in the bottom right show your two spells with their cooldowns (Q / E or a click).
+  **Auto aim:** the spells aim themselves (damage spells at the biggest group of enemies, Heal at the group
+  that lacks the most HP, Divine Shield at the biggest group of your soldiers; Smite and Armageddon need no aim;
+  with no target you get a message and the spell is not used up); **hold SHIFT** to aim with the mouse (a ring
+  shows where it lands). Every slot has its own cooldown and is ready at the start of every wave; the server
+  checks the cooldown, the aim (inside `Balance.SpellRange`) and that a battle is running (`BattleService.spell`).
+  E summons at the altars in the lobby, so there is no conflict.
+- **Damage numbers** float above every hit (white on enemies, red on your soldiers; not more than 14 per tick).
+- **Boss waves** (5, 10, 15) get a big red banner during the countdown, double account XP and a guaranteed
+  **bonus drop** (one level higher). Any drop has an 8% chance to be a bonus drop ("BONUS LEVEL!").
+
+**Rewards**
+- **Account level rewards:** every level gives coins (50 × the level), every 5th level also +3 merge slots.
+  New maps and soldiers are meant to unlock with the level later.
+- **Win streak:** every wave won in a row gives +5% coins from kills, up to +25% (a defeat resets it; the result
+  screen shows "streak xN").
+
+**Content and the long game**
+- **Ascended soldiers:** two **level 9** soldiers of a class whose level 9 is bought merge into one **ASCENDED**
+  soldier (`Grid.mergeResult`): +50% HP and damage (`Units.AscendedBonus`), its class passive doubled, a golden
+  halo, sparkles and a "★" on its card, sells for 3x. It cannot be merged further.
+- **Class passives** (`Units.Passives`, shown in the Soldiers tab and on a card's popup): Knight **Shield Wall**
+  (20% to block a hit), Archer **Power Shot** (every 3rd shot x2), Hunter **Deadeye** (25% double damage), Mage
+  **Arcane Burst** (hits splash 50% to nearby enemies), Tank **Bulwark** (enemies within 14 studs attack it
+  first), Berserker **Bloodlust** (up to +80% damage as HP drops), Soldier **Banner** (your soldiers within 10
+  studs deal +10%). Ascended = doubled.
+- **Boss abilities** (`Balance.Boss*`): a Brute boss **slams** every 8 s (2x damage + 1 s stun around it), a Chief
+  **summons** two mobs of the phase at half HP, an Archer boss fires a **volley** at every soldier in range every
+  6 s, a Shaman boss **heals** its whole wave 8% every 7 s. The boss's look decides (Config/Enemies.luau).
+- **Elite waves** (`Balance.Elite*`): from wave 3 a normal wave has a 10% chance to be ELITE: golden, 1.5x stronger
+  enemies, a "ELITE WAVE" banner, double coins, a guaranteed extra drop and a doubled spell-drop chance.
+- **Battle speed** (`Balance.BattleSpeeds`): the SPEED button in the battle panel cycles 1x / 2x, also during a
+  battle (every tick of the simulation counts double). **SKIP** on the result screen delivers the drops at once
+  and the next wave may start right away.
+- **Achievements** (`Config/Achievements.luau`, the ACHIEVEMENTS button under the daily quests): 18 one-time
+  goals (kills, merges, level 5 / 9 / Ascended soldiers, waves, bosses, Nightmare, spells, summons, account
+  level) with coins + XP; the latest one is your **title**, shown over your head (★ Warlord).
+- **Offline income** (`Balance.Offline*`): while you are away your camp earns 6 coins per hour for every wave
+  of your best wave, up to 8 hours; a WELCOME BACK popup pays it when you come back.
+- **Into the arena:** START WAVE teleports you onto the near edge of the fight arena, behind your squad and
+  looking at the enemies, so you are in the fight for your Q / E spells. After the battle you are brought back to
+  your spawn. The camera stays yours; only the left
+  panel, the quests and the achievements button hide while the battle runs.
+- **Sounds** (`Config/Sounds.luau`): Roblox's built-in sounds for clicks, summons, merges, level ups, spells,
+  boss intros, won / lost waves … replace any id with your own asset; `Sounds.Music` (empty by default) loops
+  as music. The server asks for sounds with the `Sfx` remote.
+- **Settings** (the gear, top right): volume, damage numbers (the server stops sending them), arena holograms,
+  music. Saved with the profile (`profile.settings`).
+- **Mobile:** the UI scales down on small screens (`UIScale` by viewport height), drag & drop works with a finger,
+  spells always aim themselves on touch (no SHIFT).
+
+## Squad pad auras (the designed battle rings)
+
+A soldier on a **squad pad** lights it up with the aura of its level's rarity (`design/BattleRing_Auras.rbxmx`,
+turned into data by `tools/rings_from_rbxmx.py` → `src/server/Services/DecorData/BattleRingAuras.luau`, built by
+`setRingAura` in Plots.luau): **Common** (Lv 1–2) a soft glow disk, **Uncommon** (3–4) + rising sparks, **Rare**
+(5–6) + a light pillar, **Epic** (7) + a ring of runes, **Legendary** (8) + circling orbs, **Mythic** (9 and Ascended)
++ a second rune ring and beams. The client spins the runes and orbs and pulses the glow. Run the tool again
+after changing the design (`python tools/rings_from_rbxmx.py design/BattleRing_Auras.rbxmx
+src/server/Services/DecorData/BattleRingAuras.luau`).
+
+## Signs and labels
+
+The world stays quiet: the small area signs (MERGE BOARD, SQUAD, the altars …) show only from about 16 studs
+and are faint, a soldier's name / level label shows from 40 studs (in a battle the HP bar widens it, because
+the battle is watched from above), and the **bonus tags of the squad pads are hidden**: hover a pad with the
+mouse to see its bonus (also while dragging).
+
+## The look of the pads (the designed fight slot)
+
+The **merge board** is kept minimal: every one of its 36 pads is only a flat dark disc with a thin ring in the
+state's color (grey empty, the soldier's level color glowing, dark and faint when locked). The squad pads and the
+enemy preview use the full **fight slot** of the design
+(`design/TrainingArena1.server.lua`, `design/FightSlot_Variants.rbxmx`): a stone base, a glowing ring, a wooden
+top, four posts with gold caps and a word on top. `Plots.decoratePad` builds it around the invisible
+`Slot<id>` block, and `Plots.render` changes the state: an **empty** pad has a grey ring and a "+" (the squad
+pads keep their bonus color: green = HP, orange = damage), a pad with a **soldier** has a glowing ring in the
+soldier's **level color** (gold at the maximum level), a pad that is **not bought yet** is dark and says
+"LOCKED", the enemy pads have a red ring. While you drag a soldier the ring of the target shows the result
+(gold = merge, blue = swap, white = move). Pads are now 0.6 studs high (`PAD_TOP`), the soldiers stand on the
+wooden top.
+
+On the **fight arena floor** a **hologram** of every equipped soldier (a see-through, glowing copy in the color of
+its pad) floats on the exact spot where it will appear when the battle starts (`Plots.renderHolograms`; the client
+animates them and hides them during a battle, the "Arena holograms" setting turns them off). So you see in
+advance where every pad's soldier will fight.
+
+## The look of Arena 1 (designed in Claude Design)
+
+`design/TrainingArena1.rbxmx` is turned into data by `tools/decor_from_rbxmx.py`
+(`python tools/decor_from_rbxmx.py design/TrainingArena1.rbxmx src/server/Services/DecorData/TrainingArena1.luau`)
+and built by `Services/ArenaDecor.luau`: the **entrance arch** ("TRAINING ARENA 1") over the gate with fences on
+both sides, torches and banners, and around the fight place weapon rack, training dummies, archery targets,
+hay, sandbags, barrels and crates, plus the **ring marks** on the fight platform. The sand floor and the
+wood colors of the map come from the design too (`Config/Maps.luau`). One copy of every prop is stored; the
+list of where the copies stand is `PLACEMENTS` in `ArenaDecor.luau` (x / z relative to the plot, optional
+rotation), so moving or adding props is a one-line change. Props never block clicks (`CanQuery = false`) and
+stay out of the fight area. A map with `decor = "..."` in `Config/Maps.luau` gets its own design the same way.
+
+## Maps
+
+One map: the **Training Camp** (Arena 1, goblins → demons, 100 waves). `Config/Maps.luau` holds the look (floor /
+road / fence, decor id), the gate text and the roster's phases (`makePhases(prefix, names)`); `Config/Enemies.luau`
+builds the roster with `buildRoster(prefix, families, bosses, power)`. A second map would be a new roster and a new
+block in `Maps.Defs` / `Maps.Order`.
+
+## Tuning
+
+| File | What |
+|---|---|
+| `src/shared/Config/Balance.luau` | Board / squad / inventory sizes, merge-slot upgrades, prices, distances, timings |
+| `src/shared/Config/Units.luau` | Classes, stats, power growth per level, unlock conditions |
+| `src/shared/Config/Levels.luau` | Level colors, labels, sell value |
+| `src/shared/Config/Difficulties.luau` | Easy / Normal / Hard / Nightmare: enemy power, coin and XP multipliers, extra drops, lucky-drop chance |
+| `src/shared/Config/Waves.luau` | Wave rules (count, enemy level, phases, bosses) and coin rewards |
+| `src/shared/Config/Enemies.luau` | Goblin kinds: stats, size, coin multiplier |
+| `src/shared/Enemy.luau` | 3D goblin models |
+| `src/shared/Config/Maps.luau` | Map looks |
+| `src/shared/Grid.luau` | Pure merge / move / swap logic and slot ids |
+| `src/shared/Soldier.luau` | 3D soldier models (also used by the UI previews) and the level looks |
+| `src/server/Services/Plots.luau` | The 3D plot: lobby, road, board, squad, roll and merge effects, enemy preview |
+| `src/server/Services/FightArena.luau` | The raised fight arena (placeholder) |
+| `src/server/Services/BattleService.luau` | March into the arena and the battle simulation |
+| `src/server/Services/GameService.luau` | Player flow: buying, inventory, merging, upgrades, drops |
+| `src/client/Main.client.luau` | Bottom bar, left panel (Inventory / Soldiers / Waves), drag & drop, hover, toasts |
+
+A new class = a block in `Units.luau` (with `unlock = { wave }` if it must be unlocked) plus a branch
+in `Soldier.luau` for its look.
+
+## TODO
+
+- [ ] Own design of the fight arena platform (the props and slots are designed, the platform is a block)
+- [ ] Real music and custom sound assets (Config/Sounds.luau)
+- [ ] Game passes (2x coins, auto merge)
+- [ ] A second map
+- [ ] Trading / gifting soldiers between players
