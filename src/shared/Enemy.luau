@@ -1,8 +1,9 @@
 --!strict
--- 3D enemy models (the Training Camp's goblins). An enemy is an R15 character (a rig made once by
--- Players:CreateHumanoidModelFromDescription and cloned), painted in its skin color, with goblin ears, nose,
--- eyes, clothes and a weapon welded on, and it plays animations (idle, run, attack, cast, death; see
--- Rig.luau). If the rig cannot be made (server only, needs the
+-- 3D enemy models: the 13 designed goblins of the sheet "Roblox R15 — Goblin NPC" (5 standard goblins, 3 minibosses,
+-- 5 bosses; which kind uses which is in Enemies.luau). An enemy is an R15 character (a stocky rig made once by
+-- Players:CreateHumanoidModelFromDescription and cloned), painted in its skin color, with goblin ears, nose, eyes
+-- and fangs, and the design's clothes, armor and weapon welded on the right body parts, and it plays animations
+-- (idle, run, attack, cast, death; see Rig.luau). If the rig cannot be made (server only, needs the
 -- Roblox assets), the old model assembled from blocks is used. `Enemy.lift` is the distance from the pivot down
 -- to the ground, and the enemy faces -Z. The label and HP bar are named like the soldier's, so the battle code
 -- (Soldier.showBar / Soldier.setHp) works on enemies too.
@@ -41,7 +42,11 @@ local function getBase(): Model?
 		baseState = "loading"
 		local ok, result = pcall(function()
 			local description = Instance.new("HumanoidDescription")
-			description.HeadScale = 1.25 -- a goblin has a big head
+			-- A goblin: a big head on a short, stocky body.
+			description.HeadScale = 1.35
+			description.HeightScale = 0.92
+			description.WidthScale = 1.15
+			description.DepthScale = 1.1
 			return Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
 		end)
 		local rig = if ok then result :: Model else nil
@@ -77,7 +82,8 @@ end
 
 local function buildBlocks(kind: string, level: number): Model
 	local def = Enemies.Kinds[kind]
-	local look = def.look -- the model of the kind (several kinds share one)
+	-- The block fallback knows only the five old shapes: pick one by the archetype.
+	local look = ({ Grunt = "Goblin", Archer = "GoblinArcher", Brute = "GoblinBrute", Shaman = "GoblinShaman", Chief = "GoblinChief" })[def.archetype] or "Goblin"
 	local s = Enemy.scale(kind, level)
 	-- A higher level darkens the skin a little toward its level color.
 	local skin = def.color:Lerp(Levels.color(level), 0.1 * math.min(level - 1, 4) / 4 + (if level >= 5 then 0.05 else 0))
@@ -297,68 +303,318 @@ function Enemy.build(kind: string, level: number): Model
 	attach(head, "EyeR", Vector3.new(0.28, 0.2, 0.1), Vector3.new(hx * 0.45, 0.2, -hz + 0.02), YELLOW, nil, Enum.Material.Neon, Vector3.new(0, 0, 12))
 	attach(head, "FangL", Vector3.new(0.1, 0.2, 0.08), Vector3.new(-0.2, -hy * 0.55, -hz + 0.02), BONE)
 	attach(head, "FangR", Vector3.new(0.1, 0.2, 0.08), Vector3.new(0.2, -hy * 0.55, -hz + 0.02), BONE)
-	attach(lower, "Loincloth", Vector3.new(2.1, 0.75, 1.12), Vector3.new(0, -0.1, 0), CLOTH)
-	attach(upper, "Strap", Vector3.new(0.3, 2.0, 1.1), Vector3.new(0, 0, 0), DARK_WOOD, nil, nil, Vector3.new(0, 0, 38))
+	-- A box around a body part (its size at scale 1 plus `grow`), for clothes, armor and hoods.
+	local function cover(part: BasePart, name: string, grow: Vector3, offset: Vector3, color: Color3, material: Enum.Material?): Part
+		return attach(part, name, part.Size / s + grow, offset, color, nil, material)
+	end
+	local leftHand = limb("LeftHand")
+	local leftArm = limb("LeftUpperArm")
+	local rightArm = limb("RightUpperArm")
+	local leftLeg, rightLeg = limb("LeftUpperLeg"), limb("RightUpperLeg")
+	local leftShin, rightShin = limb("LeftLowerLeg"), limb("RightLowerLeg")
+	local leftFoot, rightFoot = limb("LeftFoot"), limb("RightFoot")
+	local METAL = Enum.Material.Metal
+	local NEON = Enum.Material.Neon
+	local LEATHER = C(120, 80, 45)
+	local DARK_LEATHER = C(80, 52, 30)
+	local IRON = C(120, 125, 135)
+	local DARK_IRON = C(70, 74, 84)
+	local GOLD = C(230, 185, 50)
+	local RED = C(170, 40, 40)
+	local PURPLE = C(95, 50, 150)
+	local DARK_PURPLE = C(55, 30, 90)
+	local CREAM = C(238, 232, 215)
+	local FOREST = C(45, 85, 50)
+	local DARK_GREEN = C(32, 60, 38)
+	local TEAL = C(45, 110, 120)
+	local POISON = C(130, 255, 60)
+	local VIOLET_GLOW = C(190, 110, 255)
+	local CYAN_GLOW = C(90, 220, 255)
+	local EMBER = C(255, 140, 40)
+	local ux, uy, uz = upper.Size.X / 2 / s, upper.Size.Y / 2 / s, upper.Size.Z / 2 / s
+	local lx, lz = lower.Size.X / 2 / s, lower.Size.Z / 2 / s
+
+	-- Pieces several designs share.
+	local function hood(color: Color3, tall: number?) -- a hood: a cap over the head and a flap down the back
+		cover(head, "Hood", Vector3.new(0.25, tall or 0.3, 0.25), Vector3.new(0, 0.12, 0.04), color)
+		attach(head, "HoodBack", Vector3.new(hx * 2 + 0.1, hy * 1.4, 0.3), Vector3.new(0, -hy * 0.25, hz + 0.15), color)
+	end
+	local function pointedHat(color: Color3, brim: Color3)
+		attach(head, "HatBrim", Vector3.new(hx * 2 + 0.9, 0.12, hz * 2 + 0.9), Vector3.new(0, hy + 0.02, 0), brim)
+		attach(head, "HatCone1", Vector3.new(hx * 1.6, 0.6, hz * 1.6), Vector3.new(0, hy + 0.35, 0), color)
+		attach(head, "HatCone2", Vector3.new(hx * 1.1, 0.6, hz * 1.1), Vector3.new(0.05, hy + 0.9, -0.03), color, nil, nil, Vector3.new(0, 0, 8))
+		attach(head, "HatCone3", Vector3.new(hx * 0.6, 0.6, hz * 0.6), Vector3.new(0.14, hy + 1.4, -0.05), color, nil, nil, Vector3.new(0, 0, 16))
+	end
+	local function belt(color: Color3, buckle: Color3?)
+		attach(lower, "Belt", Vector3.new(lx * 2 + 0.2, 0.22, lz * 2 + 0.2), Vector3.new(0, 0.1, 0), color)
+		if buckle then
+			attach(lower, "Buckle", Vector3.new(0.3, 0.3, 0.08), Vector3.new(0, 0.1, -lz - 0.14), buckle, nil, METAL)
+		end
+	end
+	local function robe(color: Color3, trim: Color3, skirtDrop: number)
+		cover(upper, "Robe", Vector3.new(0.14, 0.1, 0.14), Vector3.zero, color)
+		attach(lower, "RobeSkirt", Vector3.new(lx * 2 + 0.25, skirtDrop, lz * 2 + 0.25), Vector3.new(0, -skirtDrop / 2 + 0.1, 0), color)
+		attach(upper, "RobeTrim", Vector3.new(0.3, uy * 2 + 0.1, 0.06), Vector3.new(0, 0, -uz - 0.1), trim)
+		belt(trim)
+	end
+	local function staff(crystal: Color3, size: number?) -- in the right hand, along -Z (held up)
+		attach(hand, "Staff", Vector3.new(0.2, 0.2, 3.4), Vector3.new(0, -0.1, -0.9), WOOD)
+		local k = size or 0.55
+		attach(hand, "Crystal", Vector3.new(k, k * 1.6, k), Vector3.new(0, -0.1, -2.75), crystal, nil, NEON, Vector3.new(90, 45, 0))
+	end
+	local function shield(face: Color3, emblem: Color3, emblemName: string) -- on the left forearm
+		local forearm = limb("LeftLowerArm")
+		attach(forearm, "Shield", Vector3.new(0.18, 1.6, 1.3), Vector3.new(-0.5, 0, -0.1), face, nil, METAL)
+		attach(forearm, "ShieldRim", Vector3.new(0.12, 1.75, 1.45), Vector3.new(-0.46, 0, -0.1), IRON, nil, METAL)
+		attach(forearm, emblemName, Vector3.new(0.1, 0.7, 0.45), Vector3.new(-0.6, 0.05, -0.1), emblem)
+	end
+	local function pauldrons(color: Color3, material: Enum.Material?, spikes: boolean?)
+		for _, arm in { leftArm, rightArm } do
+			local ay = arm.Size.Y / 2 / s
+			attach(arm, "Pauldron", Vector3.new(arm.Size.X / s + 0.3, 0.5, arm.Size.Z / s + 0.3), Vector3.new(0, ay - 0.1, 0), color, nil, material)
+			if spikes then
+				attach(arm, "PauldronSpike", Vector3.new(0.22, 0.6, 0.22), Vector3.new(0, ay + 0.35, 0), STEEL, nil, METAL)
+			end
+		end
+	end
+	local function boots(color: Color3)
+		cover(leftFoot, "Boot", Vector3.new(0.14, 0.14, 0.14), Vector3.zero, color)
+		cover(rightFoot, "Boot", Vector3.new(0.14, 0.14, 0.14), Vector3.zero, color)
+	end
+	local function legWear(color: Color3)
+		for _, part in { leftLeg, rightLeg, leftShin, rightShin } do
+			cover(part, "LegWear", Vector3.new(0.1, 0.02, 0.1), Vector3.zero, color)
+		end
+	end
+	local function vial(part: BasePart, name: string, offset: Vector3, glow: Color3)
+		attach(part, name, Vector3.new(0.22, 0.34, 0.22), offset, glow, nil, NEON)
+		attach(part, name .. "Cap", Vector3.new(0.14, 0.1, 0.14), offset + Vector3.new(0, 0.22, 0), DARK_WOOD)
+	end
 
 	-- The weapon lies along the hand's -Z (the "hold" animation raises the forearm, so it points up).
 	local topOffset = hy + 0.9
 	local attack = "slash"
-	if look == "Goblin" then
+	if look == "Prcek" then
+		-- The small scout: a brown hood, a leather vest with a belt, a short dagger.
+		hood(LEATHER)
+		cover(upper, "Vest", Vector3.new(0.12, -0.2, 0.12), Vector3.new(0, -0.05, 0), DARK_LEATHER)
+		belt(DARK_LEATHER, IRON)
+		attach(hand, "DaggerGrip", Vector3.new(0.16, 0.16, 0.5), Vector3.new(0, -0.1, -0.2), DARK_WOOD)
+		attach(hand, "DaggerGuard", Vector3.new(0.45, 0.12, 0.12), Vector3.new(0, -0.1, -0.5), IRON, nil, METAL)
+		attach(hand, "DaggerBlade", Vector3.new(0.12, 0.3, 1.1), Vector3.new(0, -0.1, -1.1), STEEL, nil, METAL)
+		topOffset = hy + 1.0
+	elseif look == "Rubac" then
+		-- The warrior: grey plate, pauldrons, a sword and a red shield with a white bolt.
+		cover(upper, "ChestPlate", Vector3.new(0.2, 0.05, 0.2), Vector3.zero, IRON, METAL)
+		attach(upper, "ChestLine", Vector3.new(0.12, uy * 2 - 0.3, 0.06), Vector3.new(0, 0, -uz - 0.13), DARK_IRON, nil, METAL)
+		pauldrons(IRON, METAL)
+		legWear(DARK_IRON)
+		boots(DARK_IRON)
+		belt(DARK_LEATHER, GOLD)
+		shield(RED, CREAM, "Bolt")
+		attach(hand, "SwordGrip", Vector3.new(0.18, 0.18, 0.6), Vector3.new(0, -0.1, -0.25), DARK_WOOD)
+		attach(hand, "SwordGuard", Vector3.new(0.7, 0.14, 0.14), Vector3.new(0, -0.1, -0.6), IRON, nil, METAL)
+		attach(hand, "SwordBlade", Vector3.new(0.14, 0.4, 1.9), Vector3.new(0, -0.1, -1.6), STEEL, nil, METAL)
+		topOffset = hy + 1.1
+	elseif look == "Lucistnik" then
+		-- The archer: a dark green hood and tunic, a bow and a quiver of red-fletched arrows.
+		attack = "lunge"
+		hood(FOREST)
+		cover(upper, "Tunic", Vector3.new(0.12, 0.06, 0.12), Vector3.zero, FOREST)
+		belt(DARK_LEATHER, IRON)
+		legWear(DARK_GREEN)
+		boots(DARK_LEATHER)
+		attach(hand, "Bow", Vector3.new(0.15, 0.3, 2.8), Vector3.new(0, -0.1, -0.5), WOOD)
+		attach(hand, "BowString", Vector3.new(0.04, 0.04, 2.7), Vector3.new(0, 0.25, -0.5), BONE)
+		attach(upper, "Quiver", Vector3.new(0.45, 1.4, 0.45), Vector3.new(0.35, 0.2, uz + 0.25), DARK_LEATHER, nil, nil, Vector3.new(0, 0, -18))
+		for i, x in { -0.12, 0, 0.12 } do
+			attach(upper, "Arrow" .. i, Vector3.new(0.08, 0.5, 0.08), Vector3.new(0.35 + x + (i - 2) * 0.1, 1.05, uz + 0.25), RED, nil, nil, Vector3.new(0, 0, -18))
+		end
+		topOffset = hy + 1.3
+	elseif look == "Mag" then
+		-- The mage: a purple robe with gold trim, a pointed hat, a staff with a purple crystal.
+		attack = "cast"
+		robe(PURPLE, GOLD, 1.3)
+		pointedHat(PURPLE, DARK_PURPLE)
+		staff(VIOLET_GLOW)
+		topOffset = hy + 2.1
+	elseif look == "Lecitel" then
+		-- The healer: a cream robe with green trim, a white hood, a staff with a green crystal, a pouch.
+		attack = "cast"
+		robe(CREAM, C(95, 150, 70), 1.3)
+		hood(CREAM, 0.35)
+		attach(lower, "Pouch", Vector3.new(0.4, 0.4, 0.3), Vector3.new(-lx - 0.1, -0.1, 0), LEATHER)
+		staff(POISON)
+		topOffset = hy + 1.4
+	elseif look == "ZeleznyTesak" then
+		-- Miniboss: dark red heavy armor with spiked steel pauldrons, a horned spiked helmet, a serrated cleaver and
+		-- a red skull shield.
+		cover(upper, "ChestPlate", Vector3.new(0.3, 0.1, 0.3), Vector3.zero, C(150, 40, 40), METAL)
+		attach(upper, "ChestStrap", Vector3.new(0.35, uy * 2, 0.08), Vector3.new(0, 0, -uz - 0.18), DARK_IRON, nil, METAL)
+		pauldrons(DARK_IRON, METAL, true)
+		legWear(C(120, 35, 35))
+		boots(DARK_IRON)
+		belt(DARK_IRON, IRON)
+		cover(head, "Helm", Vector3.new(0.3, 0.1, 0.3), Vector3.new(0, 0.15, 0), DARK_IRON, METAL)
+		for _, x in { -0.5, 0, 0.5 } do
+			attach(head, "HelmSpike", Vector3.new(0.2, 0.6, 0.2), Vector3.new(x * hx, hy + 0.4, 0), STEEL, nil, METAL, Vector3.new(0, 0, -x * 25))
+		end
+		attach(head, "HornL", Vector3.new(0.25, 0.9, 0.25), Vector3.new(-hx - 0.1, hy, 0), STEEL, nil, METAL, Vector3.new(0, 0, 35))
+		attach(head, "HornR", Vector3.new(0.25, 0.9, 0.25), Vector3.new(hx + 0.1, hy, 0), STEEL, nil, METAL, Vector3.new(0, 0, -35))
+		shield(RED, CREAM, "Skull")
+		attach(hand, "CleaverGrip", Vector3.new(0.2, 0.2, 0.8), Vector3.new(0, -0.1, -0.3), DARK_WOOD)
+		attach(hand, "CleaverBlade", Vector3.new(0.16, 1.0, 2.2), Vector3.new(0, -0.45, -1.9), STEEL, nil, METAL)
+		for i = 0, 3 do
+			attach(hand, "CleaverTooth", Vector3.new(0.16, 0.3, 0.3), Vector3.new(0, -1.0, -1.1 - i * 0.5), STEEL, nil, METAL, Vector3.new(45, 0, 0))
+		end
+		topOffset = hy + 1.8
+	elseif look == "JedovyStopar" then
+		-- Miniboss: a dark green hooded cloak, a crossbow and glowing poison vials on the belt.
+		attack = "lunge"
+		hood(DARK_GREEN, 0.35)
+		cover(upper, "Cloak", Vector3.new(0.2, 0.1, 0.2), Vector3.zero, DARK_GREEN)
+		attach(upper, "CloakBack", Vector3.new(ux * 2 + 0.1, 2.4, 0.12), Vector3.new(0, -0.8, uz + 0.1), DARK_GREEN, nil, nil, Vector3.new(-6, 0, 0))
+		belt(DARK_LEATHER, IRON)
+		legWear(DARK_GREEN)
+		boots(DARK_LEATHER)
+		for i, x in { -0.45, -0.15, 0.15 } do
+			vial(lower, "Vial" .. i, Vector3.new(x, -0.35, -lz - 0.15), POISON)
+		end
+		attach(hand, "CrossbowStock", Vector3.new(0.22, 0.3, 2.2), Vector3.new(0, -0.1, -0.9), DARK_WOOD)
+		attach(hand, "CrossbowBow", Vector3.new(2.0, 0.12, 0.2), Vector3.new(0, 0, -1.8), WOOD)
+		attach(hand, "CrossbowString", Vector3.new(1.9, 0.04, 0.04), Vector3.new(0, 0, -1.55), BONE)
+		attach(hand, "CrossbowBolt", Vector3.new(0.08, 0.08, 1.2), Vector3.new(0, 0.12, -1.3), STEEL, nil, METAL)
+		attach(upper, "Quiver", Vector3.new(0.45, 1.3, 0.45), Vector3.new(0.4, 0.2, uz + 0.25), DARK_LEATHER, nil, nil, Vector3.new(0, 0, -18))
+		topOffset = hy + 1.4
+	elseif look == "RunovySaman" then
+		-- Miniboss: a skull headdress with antlers, a teal tunic, a bone necklace, a skull staff and glowing runes.
+		attack = "cast"
+		cover(upper, "Tunic", Vector3.new(0.14, 0.08, 0.14), Vector3.zero, TEAL)
+		attach(lower, "TunicSkirt", Vector3.new(lx * 2 + 0.2, 0.9, lz * 2 + 0.2), Vector3.new(0, -0.35, 0), TEAL)
+		belt(DARK_LEATHER, BONE)
+		for i, x in { -0.45, -0.25, 0, 0.25, 0.45 } do
+			attach(upper, "Tooth" .. i, Vector3.new(0.1, 0.3, 0.1), Vector3.new(x, uy - 0.35 - math.abs(x) * 0.3, -uz - 0.1), BONE)
+		end
+		attach(head, "SkullCap", Vector3.new(hx * 2 + 0.3, hy + 0.2, hz * 2 + 0.2), Vector3.new(0, hy * 0.6, -0.05), BONE)
+		attach(head, "SkullEyeL", Vector3.new(0.3, 0.3, 0.1), Vector3.new(-hx * 0.4, hy * 0.9, -hz - 0.1), C(40, 40, 40))
+		attach(head, "SkullEyeR", Vector3.new(0.3, 0.3, 0.1), Vector3.new(hx * 0.4, hy * 0.9, -hz - 0.1), C(40, 40, 40))
+		for _, side in { -1, 1 } do
+			attach(head, "Antler", Vector3.new(0.2, 1.3, 0.2), Vector3.new(side * (hx + 0.1), hy + 0.7, 0), BONE, nil, nil, Vector3.new(0, 0, -side * 28))
+			attach(head, "AntlerTine", Vector3.new(0.16, 0.6, 0.16), Vector3.new(side * (hx + 0.45), hy + 1.25, 0), BONE, nil, nil, Vector3.new(0, 0, side * 20))
+		end
+		attach(hand, "Staff", Vector3.new(0.2, 0.2, 3.2), Vector3.new(0, -0.1, -0.9), WOOD)
+		attach(hand, "StaffSkull", Vector3.new(0.6, 0.6, 0.6), Vector3.new(0, -0.1, -2.7), BONE)
+		for i, offset in { Vector3.new(0.5, 0.3, -2.4), Vector3.new(-0.5, 0.2, -2.9), Vector3.new(0.3, -0.5, -3.1) } do
+			attach(hand, "Rune" .. i, Vector3.new(0.22, 0.22, 0.22), offset, CYAN_GLOW, nil, NEON, Vector3.new(30 * i, 45, 0))
+		end
+		topOffset = hy + 2.3
+	elseif look == "KralGrubnak" then
+		-- Boss: a gold crown with a red gem, black armor with gold trim, a red cape and a great double axe.
+		local BLACK = C(45, 45, 52)
+		cover(upper, "ChestPlate", Vector3.new(0.3, 0.1, 0.3), Vector3.zero, BLACK, METAL)
+		attach(upper, "ChestTrim", Vector3.new(ux * 2 + 0.32, 0.18, 0.08), Vector3.new(0, uy - 0.2, -uz - 0.18), GOLD, nil, METAL)
+		pauldrons(BLACK, METAL)
+		attach(upper, "Cape", Vector3.new(ux * 2 + 0.3, 3.2, 0.14), Vector3.new(0, -1.0, uz + 0.12), RED, nil, nil, Vector3.new(-8, 0, 0))
+		attach(upper, "CapeCollar", Vector3.new(ux * 2 + 0.5, 0.35, uz * 2 + 0.4), Vector3.new(0, uy, 0), RED)
+		legWear(BLACK)
+		boots(C(35, 35, 40))
+		belt(C(35, 35, 40), GOLD)
+		attach(head, "Crown", Vector3.new(hx * 2 + 0.1, 0.35, hz * 2 + 0.1), Vector3.new(0, hy + 0.1, 0), GOLD, nil, METAL)
+		for _, x in { -0.6, -0.3, 0, 0.3, 0.6 } do
+			attach(head, "CrownSpike", Vector3.new(0.18, 0.45, 0.18), Vector3.new(x * hx, hy + 0.5, -hz + 0.08), GOLD, nil, METAL)
+		end
+		attach(head, "CrownGem", Vector3.new(0.3, 0.3, 0.12), Vector3.new(0, hy + 0.25, -hz - 0.06), C(220, 40, 60), nil, NEON, Vector3.new(0, 0, 45))
+		attach(hand, "AxeHandle", Vector3.new(0.28, 0.28, 3.4), Vector3.new(0, -0.1, -1.1), DARK_WOOD)
+		attach(hand, "AxeBand", Vector3.new(0.34, 0.34, 0.5), Vector3.new(0, -0.1, -2.0), GOLD, nil, METAL)
+		attach(hand, "AxeBladeL", Vector3.new(0.18, 1.5, 1.4), Vector3.new(-0.8, -0.1, -2.5), STEEL, nil, METAL)
+		attach(hand, "AxeBladeR", Vector3.new(0.18, 1.5, 1.4), Vector3.new(0.8, -0.1, -2.5), STEEL, nil, METAL)
+		topOffset = hy + 1.9
+	elseif look == "KovarMorg" then
+		-- Boss: a brown and iron smith with a glowing forge in his chest, an iron helmet and a huge ember hammer.
+		local BROWN = C(110, 70, 40)
+		cover(upper, "ChestPlate", Vector3.new(0.3, 0.1, 0.3), Vector3.zero, BROWN, METAL)
+		attach(upper, "ForgeGlow", Vector3.new(1.0, 0.9, 0.1), Vector3.new(0, -0.05, -uz - 0.17), EMBER, nil, NEON)
+		for _, x in { -0.3, 0, 0.3 } do
+			attach(upper, "ForgeBar", Vector3.new(0.12, 1.0, 0.1), Vector3.new(x, -0.05, -uz - 0.2), DARK_IRON, nil, METAL)
+		end
+		pauldrons(IRON, METAL)
+		legWear(BROWN)
+		boots(DARK_IRON)
+		belt(DARK_IRON, IRON)
+		cover(head, "Helm", Vector3.new(0.3, 0.05, 0.3), Vector3.new(0, 0.2, 0), IRON, METAL)
+		attach(head, "HelmRidge", Vector3.new(0.2, 0.3, hz * 2 + 0.4), Vector3.new(0, hy + 0.25, 0), DARK_IRON, nil, METAL)
+		attach(hand, "HammerHandle", Vector3.new(0.3, 0.3, 3.2), Vector3.new(0, -0.1, -1.0), DARK_WOOD)
+		attach(hand, "HammerHead", Vector3.new(1.3, 1.1, 1.1), Vector3.new(0, -0.1, -2.6), DARK_IRON, nil, METAL)
+		attach(hand, "HammerEmber", Vector3.new(1.34, 0.4, 0.4), Vector3.new(0, -0.1, -2.6), EMBER, nil, NEON)
+		topOffset = hy + 1.8
+	elseif look == "MorovaMatka" then
+		-- Boss: the plague mother: a dark green robe, antlers with hanging vials, a skull on the belt, a staff with a
+		-- poison crystal and dripping green bottles.
+		attack = "cast"
+		robe(DARK_GREEN, C(70, 120, 60), 1.5)
+		hood(DARK_GREEN, 0.35)
+		for _, side in { -1, 1 } do
+			attach(head, "Antler", Vector3.new(0.18, 1.3, 0.18), Vector3.new(side * (hx + 0.1), hy + 0.6, 0.1), DARK_WOOD, nil, nil, Vector3.new(0, 0, -side * 30))
+			attach(head, "AntlerTine", Vector3.new(0.14, 0.6, 0.14), Vector3.new(side * (hx + 0.5), hy + 1.15, 0.1), DARK_WOOD, nil, nil, Vector3.new(0, 0, side * 15))
+			vial(head, "AntlerVial", Vector3.new(side * (hx + 0.75), hy + 0.65, 0.1), POISON)
+		end
+		attach(lower, "BeltSkull", Vector3.new(0.45, 0.45, 0.35), Vector3.new(0, -0.2, -lz - 0.3), BONE)
+		vial(lower, "VialL", Vector3.new(-0.55, -0.4, -lz - 0.2), POISON)
+		vial(lower, "VialR", Vector3.new(0.55, -0.4, -lz - 0.2), POISON)
+		staff(POISON, 0.7)
+		topOffset = hy + 2.3
+	elseif look == "ArcimagVex" then
+		-- Boss: the archmage: a dark purple robe with gold trim, a tall hat, a glowing book in the left hand and
+		-- purple crystals floating about.
+		attack = "cast"
+		robe(DARK_PURPLE, GOLD, 1.6)
+		attach(upper, "Collar", Vector3.new(ux * 2 + 0.5, 0.5, uz * 2 + 0.4), Vector3.new(0, uy + 0.1, 0), DARK_PURPLE)
+		pointedHat(DARK_PURPLE, GOLD)
+		attach(head, "HatBand", Vector3.new(hx * 1.7, 0.16, hz * 1.7), Vector3.new(0, hy + 0.22, 0), GOLD, nil, METAL)
+		attach(leftHand, "Book", Vector3.new(0.8, 0.12, 1.0), Vector3.new(0, -0.2, -0.3), C(70, 40, 110))
+		attach(leftHand, "BookGlow", Vector3.new(0.6, 0.14, 0.8), Vector3.new(0, -0.14, -0.3), VIOLET_GLOW, nil, NEON)
+		for i, offset in { Vector3.new(-0.7, 0.4, -0.6), Vector3.new(0.5, 0.9, -0.8), Vector3.new(-0.2, 1.3, -0.3) } do
+			attach(leftHand, "FloatCrystal" .. i, Vector3.new(0.25, 0.4, 0.25), offset, VIOLET_GLOW, nil, NEON, Vector3.new(20 * i, 45, 15))
+		end
+		staff(VIOLET_GLOW, 0.7)
+		topOffset = hy + 2.5
+	elseif look == "HoubovyTitan" then
+		-- Boss: the mushroom titan: bark plates on the body, moss, red-capped mushrooms on the head and shoulders,
+		-- and a mushroom club.
+		local BARK = C(110, 75, 45)
+		local MOSS = C(90, 140, 60)
+		local CAP = C(200, 50, 50)
+		local function mushroom(part: BasePart, name: string, offset: Vector3, size: number)
+			attach(part, name .. "Stem", Vector3.new(size * 0.45, size * 0.7, size * 0.45), offset, CREAM)
+			attach(part, name .. "Cap", Vector3.new(size * 1.2, size * 0.5, size * 1.2), offset + Vector3.new(0, size * 0.5, 0), CAP)
+			attach(part, name .. "Dot", Vector3.new(size * 0.3, size * 0.1, size * 0.3), offset + Vector3.new(size * 0.25, size * 0.78, -size * 0.2), CREAM)
+		end
+		cover(upper, "BarkChest", Vector3.new(0.4, 0.2, 0.4), Vector3.zero, BARK, Enum.Material.Wood)
+		attach(upper, "Moss", Vector3.new(ux * 2 + 0.5, 0.35, uz * 2 + 0.5), Vector3.new(0, uy + 0.05, 0), MOSS, nil, Enum.Material.Grass)
+		pauldrons(BARK, Enum.Material.Wood)
+		for _, part in { leftArm, rightArm, leftLeg, rightLeg, leftShin, rightShin } do
+			cover(part, "Bark", Vector3.new(0.2, 0.02, 0.2), Vector3.zero, BARK, Enum.Material.Wood)
+		end
+		boots(DARK_WOOD)
+		mushroom(head, "HeadShroomA", Vector3.new(-0.2, hy + 0.3, 0.1), 0.9)
+		mushroom(head, "HeadShroomB", Vector3.new(0.45, hy + 0.1, -0.15), 0.6)
+		mushroom(leftArm, "ShoulderShroom", Vector3.new(-0.1, leftArm.Size.Y / 2 / s + 0.3, 0), 0.7)
+		mushroom(rightArm, "ShoulderShroom", Vector3.new(0.15, rightArm.Size.Y / 2 / s + 0.3, 0.1), 0.5)
+		attach(hand, "Club", Vector3.new(0.4, 0.4, 3.2), Vector3.new(0, -0.1, -1.0), BARK, nil, Enum.Material.Wood)
+		attach(hand, "ClubKnot", Vector3.new(0.7, 0.7, 0.9), Vector3.new(0, -0.1, -2.5), DARK_WOOD, nil, Enum.Material.Wood)
+		mushroom(hand, "ClubShroomA", Vector3.new(0.2, 0.3, -2.4), 0.6)
+		mushroom(hand, "ClubShroomB", Vector3.new(-0.25, 0.25, -1.6), 0.45)
+		topOffset = hy + 2.4
+	else
+		-- Unknown look: a bare goblin with a club.
+		belt(DARK_LEATHER)
 		attach(hand, "ClubHandle", Vector3.new(0.25, 0.25, 2.0), Vector3.new(0, -0.1, -0.7), WOOD)
 		attach(hand, "ClubHead", Vector3.new(0.6, 0.6, 0.75), Vector3.new(0, -0.1, -1.85), DARK_WOOD)
-	elseif look == "GoblinArcher" then
-		attack = "lunge"
-		attach(head, "Hood", Vector3.new(hx * 2 + 0.2, 0.5, hz * 2 + 0.2), Vector3.new(0, hy - 0.1, 0), CLOTH)
-		attach(hand, "Bow", Vector3.new(0.15, 0.3, 2.6), Vector3.new(0, -0.1, -0.35), WOOD)
-		attach(hand, "BowString", Vector3.new(0.04, 0.04, 2.5), Vector3.new(0, 0.25, -0.35), BONE)
-		attach(upper, "Quiver", Vector3.new(0.4, 1.3, 0.4), Vector3.new(0.3, 0.2, 0.7), DARK_WOOD, nil, nil, Vector3.new(0, 0, -20))
-		topOffset = hy + 1.2
-	elseif look == "GoblinBrute" then
-		attach(head, "BoneHelm", Vector3.new(hx * 2 + 0.25, 0.6, hz * 2 + 0.2), Vector3.new(0, hy - 0.1, 0), BONE)
-		attach(head, "HornL", Vector3.new(0.25, 0.8, 0.25), Vector3.new(-hx * 0.8, hy + 0.5, 0), BONE, nil, nil, Vector3.new(0, 0, 18))
-		attach(head, "HornR", Vector3.new(0.25, 0.8, 0.25), Vector3.new(hx * 0.8, hy + 0.5, 0), BONE, nil, nil, Vector3.new(0, 0, -18))
-		attach(hand, "ClubHandle", Vector3.new(0.35, 0.35, 2.6), Vector3.new(0, -0.1, -0.9), WOOD)
-		attach(hand, "ClubHead", Vector3.new(0.95, 0.95, 0.95), Vector3.new(0, -0.1, -2.4), DARK_WOOD)
-		for _, offset in { Vector3.new(0.55, 0, 0), Vector3.new(-0.55, 0, 0), Vector3.new(0, 0.55, 0), Vector3.new(0, -0.55, 0) } do
-			attach(hand, "Spike", Vector3.new(0.3, 0.3, 0.3), Vector3.new(0, -0.1, -2.4) + offset, STEEL, nil, Enum.Material.Metal)
-		end
-		attach(upper, "ChestPlate", Vector3.new(2.1, 1.0, 1.12), Vector3.new(0, 0.25, 0), DARK_WOOD)
-		topOffset = hy + 1.7
-	elseif look == "GoblinShaman" then
-		attack = "cast"
-		attach(upper, "Robe", Vector3.new(2.12, 1.7, 1.12), Vector3.new(0, 0, 0), C(110, 70, 150))
-		attach(lower, "RobeSkirt", Vector3.new(2.2, 1.3, 1.2), Vector3.new(0, -0.45, 0), C(95, 60, 135))
-		for i, x in { -0.4, 0, 0.4 } do
-			attach(head, "Feather" .. i, Vector3.new(0.18, 0.9, 0.18), Vector3.new(x, hy + 0.4, 0), C(255, 120 + i * 40, 60), nil, nil, Vector3.new(0, 0, -x * 40))
-		end
-		attach(hand, "Staff", Vector3.new(0.2, 0.2, 3.2), Vector3.new(0, -0.1, -0.6), WOOD)
-		attach(hand, "Orb", Vector3.new(0.75, 0.75, 0.75), Vector3.new(0, -0.1, -2.4), C(120, 255, 110), Enum.PartType.Ball, Enum.Material.Neon)
-		topOffset = hy + 1.8
-	elseif look == "GoblinChief" then
-		local gold = C(230, 180, 40)
-		attach(head, "Crown", Vector3.new(hx * 2 + 0.1, 0.3, hz * 2 + 0.1), Vector3.new(0, hy + 0.05, 0), gold, nil, Enum.Material.Metal)
-		for _, x in { -0.5, -0.25, 0, 0.25, 0.5 } do
-			attach(head, "CrownSpike", Vector3.new(0.18, 0.45, 0.18), Vector3.new(x, hy + 0.4, -hz + 0.1), gold, nil, Enum.Material.Metal)
-		end
-		attach(upper, "Cape", Vector3.new(2.0, 3.0, 0.12), Vector3.new(0, -0.7, 0.62), C(160, 30, 30), nil, nil, Vector3.new(-8, 0, 0))
-		attach(upper, "Pauldrons", Vector3.new(3.4, 0.4, 1.2), Vector3.new(0, 0.75, 0), gold, nil, Enum.Material.Metal)
-		attach(hand, "AxeHandle", Vector3.new(0.3, 0.3, 2.9), Vector3.new(0, -0.1, -0.9), WOOD)
-		attach(hand, "AxeBlade", Vector3.new(0.2, 1.2, 1.3), Vector3.new(0, -0.75, -2.0), STEEL, nil, Enum.Material.Metal)
-		attach(head, "WarPaintL", Vector3.new(0.15, 0.45, 0.06), Vector3.new(-hx * 0.75, -0.05, -hz + 0.02), C(180, 30, 30))
-		attach(head, "WarPaintR", Vector3.new(0.15, 0.45, 0.06), Vector3.new(hx * 0.75, -0.05, -hz + 0.02), C(180, 30, 30))
-		topOffset = hy + 1.7
 	end
 
-	-- Gear that grows with the enemy level.
-	if level >= 3 then
-		attach(limb("LeftUpperArm"), "SpikeL", Vector3.new(0.3, 0.6, 0.3), Vector3.new(0, 0.7, 0), BONE)
-		attach(limb("RightUpperArm"), "SpikeR", Vector3.new(0.3, 0.6, 0.3), Vector3.new(0, 0.7, 0), BONE)
-	end
-	if level >= 5 then
-		attach(lower, "Belt", Vector3.new(2.15, 0.25, 1.16), Vector3.new(0, 0.2, 0), STEEL, nil, Enum.Material.Metal)
-	end
+	-- A soft aura in the level color from level 7 on (the only thing the level adds to the designed look).
 	if level >= 7 then
-		attach(upper, "Aura", Vector3.new(0.9, 0.9, 0.9), Vector3.new(0, 0.2, 0.9), Levels.color(level), Enum.PartType.Ball, Enum.Material.Neon)
+		attach(upper, "Aura", Vector3.new(0.9, 0.9, 0.9), Vector3.new(0, 0.2, uz + 0.5), Levels.color(level), Enum.PartType.Ball, NEON)
 	end
 
 	-- Name + level label and a hidden HP bar (Soldier.showBar / Soldier.setHp find "Back" and "Bar").

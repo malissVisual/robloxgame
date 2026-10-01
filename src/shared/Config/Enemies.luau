@@ -16,7 +16,8 @@ local Balance = require(script.Parent.Balance)
 
 export type Kind = {
 	label: string,
-	look: string, -- which model of Enemy.luau it uses: Goblin, GoblinArcher, GoblinBrute, GoblinShaman, GoblinChief
+	archetype: string, -- Grunt, Archer, Brute, Shaman (mobs) or Brute, Chief, Archer, Shaman (bosses): stats, ability
+	look: string, -- which of the 13 designed goblins of Enemy.luau it uses (GOBLIN_LOOKS below)
 	color: Color3, -- skin / main color
 	hp: number,
 	damage: number,
@@ -40,33 +41,56 @@ local C = Color3.fromRGB
 
 -- The four archetypes of normal mobs (the base of every family).
 local ARCHETYPES = {
-	Grunt = { look = "Goblin", hp = 35, damage = 5, range = 4, cooldown = 1.0, speed = 12, splash = false, size = 1, coins = 1, suffix = "" },
-	Archer = { look = "GoblinArcher", hp = 25, damage = 6, range = 26, cooldown = 1.3, speed = 10, splash = false, size = 0.95, coins = 1.2, suffix = " Archer" },
-	Brute = { look = "GoblinBrute", hp = 130, damage = 9, range = 4, cooldown = 1.4, speed = 8, splash = false, size = 1.35, coins = 2, suffix = " Brute" },
-	Shaman = { look = "GoblinShaman", hp = 30, damage = 10, range = 20, cooldown = 2.0, speed = 9, splash = true, size = 1, coins = 2, suffix = " Shaman" },
+	Grunt = { hp = 35, damage = 5, range = 4, cooldown = 1.0, speed = 12, splash = false, size = 1, coins = 1, suffix = "" },
+	Archer = { hp = 25, damage = 6, range = 26, cooldown = 1.3, speed = 10, splash = false, size = 0.95, coins = 1.2, suffix = " Archer" },
+	Brute = { hp = 130, damage = 9, range = 4, cooldown = 1.4, speed = 8, splash = false, size = 1.35, coins = 2, suffix = " Brute" },
+	Shaman = { hp = 30, damage = 10, range = 20, cooldown = 2.0, speed = 9, splash = true, size = 1, coins = 2, suffix = " Shaman" },
 }
 -- The order the four archetypes of a family appear in (one per phase).
 local ORDER = { "Grunt", "Archer", "Brute", "Shaman" }
 
--- The bosses: an archetype each. The boss's `look` decides its ability in the battle:
+-- The 13 designed goblins (design sheet "Roblox R15 — Goblin NPC", built in Enemy.luau), spread over the
+-- roster: a mob archetype takes turns between its designs family by family, a boss archetype boss by boss.
+--   standard: Prcek (dagger), Rubac (sword + shield), Lucistnik (bow), Mag (purple mage), Lecitel (white healer)
+--   minibosses: ZeleznyTesak (red armor, cleaver, skull shield), JedovyStopar (crossbow, poison vials), RunovySaman (skull staff, antlers)
+--   bosses: KralGrubnak (crown, axe, cape), KovarMorg (forge hammer), MorovaMatka (plague), ArcimagVex (book, crystals), HoubovyTitan (mushrooms)
+local MOB_LOOKS = {
+	Grunt = { "Prcek", "Rubac" },
+	Archer = { "Lucistnik", "JedovyStopar" },
+	Brute = { "ZeleznyTesak", "Rubac" },
+	Shaman = { "Mag", "Lecitel", "RunovySaman" },
+}
+local BOSS_LOOKS = {
+	Brute = { "KovarMorg", "HoubovyTitan" },
+	Chief = { "KralGrubnak" },
+	Archer = { "JedovyStopar" },
+	Shaman = { "MorovaMatka", "ArcimagVex" },
+}
+
+-- The bosses: an archetype each. The boss's archetype decides its ability in the battle:
 -- Brute = slam, Chief = summons, Archer = volley, Shaman = heals its wave.
 local BOSS_ARCHETYPES = {
-	Brute = { look = "GoblinBrute", hp = 300, damage = 12, range = 4, cooldown = 1.4, speed = 8, splash = false, size = 1.9, coins = 5 },
-	Chief = { look = "GoblinChief", hp = 380, damage = 16, range = 5, cooldown = 1.2, speed = 9, splash = false, size = 1.7, coins = 6 },
-	Archer = { look = "GoblinArcher", hp = 220, damage = 15, range = 32, cooldown = 1.1, speed = 9, splash = false, size = 1.6, coins = 5 },
-	Shaman = { look = "GoblinShaman", hp = 240, damage = 14, range = 22, cooldown = 1.8, speed = 9, splash = true, size = 1.7, coins = 5 },
+	Brute = { hp = 300, damage = 12, range = 4, cooldown = 1.4, speed = 8, splash = false, size = 1.9, coins = 5 },
+	Chief = { hp = 380, damage = 16, range = 5, cooldown = 1.2, speed = 9, splash = false, size = 1.7, coins = 6 },
+	Archer = { hp = 220, damage = 15, range = 32, cooldown = 1.1, speed = 9, splash = false, size = 1.6, coins = 5 },
+	Shaman = { hp = 240, damage = 14, range = 22, cooldown = 1.8, speed = 9, splash = true, size = 1.7, coins = 5 },
 }
 
 -- Builds the 20 mobs and 20 bosses of a roster. `families` rule 4 phases each (a bit stronger and bigger
 -- than the previous one), `bosses` = { { name, archetype }, … } (20 entries). `power` scales the roster.
 local function buildRoster(prefix: string, families: { Family }, bosses: { { string } }, power: number)
+	local bossCount: { [string]: number } = {} -- how many bosses of each archetype so far (they take turns in BOSS_LOOKS)
 	for n = 1, Enemies.PhaseCount do
-		local family = families[(n - 1) // 4 + 1]
+		local familyIndex = (n - 1) // 4 + 1
+		local family = families[familyIndex]
 
-		local archetype = ARCHETYPES[ORDER[(n - 1) % 4 + 1]]
+		local archetypeName = ORDER[(n - 1) % 4 + 1]
+		local archetype = ARCHETYPES[archetypeName]
+		local mobLooks = MOB_LOOKS[archetypeName]
 		Enemies.Kinds[prefix .. "Mob" .. n] = {
 			label = family.name .. archetype.suffix,
-			look = archetype.look,
+			archetype = archetypeName,
+			look = mobLooks[(familyIndex - 1) % #mobLooks + 1],
 			color = family.color,
 			hp = archetype.hp * family.power * power,
 			damage = archetype.damage * family.power * power,
@@ -80,9 +104,12 @@ local function buildRoster(prefix: string, families: { Family }, bosses: { { str
 
 		local name, bossType = bosses[n][1], bosses[n][2]
 		local boss = BOSS_ARCHETYPES[bossType]
+		local bossLooks = BOSS_LOOKS[bossType]
+		bossCount[bossType] = (bossCount[bossType] or 0) + 1
 		Enemies.Kinds[prefix .. "Boss" .. n] = {
 			label = name,
-			look = boss.look,
+			archetype = bossType,
+			look = bossLooks[(bossCount[bossType] - 1) % #bossLooks + 1],
 			color = family.color:Lerp(Color3.new(0, 0, 0), 0.15),
 			hp = boss.hp * family.power * power,
 			damage = boss.damage * family.power * power,

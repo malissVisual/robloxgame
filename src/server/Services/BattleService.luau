@@ -480,9 +480,9 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		fighter.kind = e.kind
 		fighter.boss = Enemies.Kinds[e.kind].boss == true
 		if fighter.boss then
-			-- The boss's look decides its ability.
-			local look = Enemies.Kinds[e.kind].look
-			fighter.ability = if look == "GoblinBrute" then "slam" elseif look == "GoblinChief" then "summon" elseif look == "GoblinArcher" then "volley" else "heal"
+			-- The boss's archetype decides its ability.
+			local archetype = Enemies.Kinds[e.kind].archetype
+			fighter.ability = if archetype == "Brute" then "slam" elseif archetype == "Chief" then "summon" elseif archetype == "Archer" then "volley" else "heal"
 			fighter.abilityTimer = if fighter.ability == "slam" then Balance.BossSlamEvery elseif fighter.ability == "volley" then Balance.BossVolleyEvery elseif fighter.ability == "heal" then Balance.BossHealEvery else 1
 		end
 		fighter.maxHp *= enemyPower

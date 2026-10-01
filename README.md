@@ -281,6 +281,17 @@ balance and the result screen shows the total of the wave as one small line.
 
 ## Enemies and waves (Training Camp: 100 waves, 20 phases, 20 bosses)
 
+**The enemies are the 13 designed goblins** of the sheet "Roblox R15 — Goblin NPC" (`Enemy.luau`): five standard
+goblins (Prcek with a dagger, Rubáč with sword and shield, Lučištník with a bow, Mág in purple, Léčitel in white), three
+minibosses (Železný tesák in red armor with a cleaver and a skull shield, Jedový stopař with a crossbow and poison vials,
+Runový šaman with a skull headdress and runes) and five bosses (Král Grubnak, Kovář Morg, Morová matka, Arcimág Vex,
+Houbový titán). Every one is a stocky R15 rig (big head, short body) with the design's clothes, armor and weapon
+welded on the right body parts, so the idle / run / attack / death animations work. `Enemies.luau` spreads them over
+the roster: a mob archetype takes turns between its designs family by family (Grunt = Prcek / Rubáč, Archer = Lučištník /
+Jedový stopař, Brute = Železný tesák / Rubáč, Shaman = Mág / Léčitel / Runový šaman), a boss archetype boss by boss
+(Brute = Kovář Morg / Houbový titán, Chief = Král Grubnak, Archer = Jedový stopař, Shaman = Morová matka / Arcimág
+Vex); the family still tints the skin. A boss's ability comes from its archetype, not its look.
+
 The **Archer** too (Apprentice, Marksman, Tracker, Ranger, Elven Archer, Shadow Stalker, Storm Archer, Royal
 Master, Legend; a bow in the left hand and a quiver on the back).
 
