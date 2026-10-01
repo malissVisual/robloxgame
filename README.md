@@ -458,6 +458,17 @@ rises (the telegraph), then the spell fires. All numbers live in `shared/Config/
 its action, score, target, mana and HP. `python3 tools/tests/run_magebrain_test.py [luau]` runs the brain's logic
 test in standalone Luau (spell unlocks, attacks, standing still in range, strong spells and mana, healing, bounds).
 
+## The battle panel is a wave browser
+
+PLAY opens the battle panel (640 × 380, drawn at 1.3×). Left: the **difficulty** as four rows (Easy, Normal, Hard,
+Nightmare) each saying what it multiplies (enemies, coins, XP, extra drops) and the squad's synergy. Right: **every
+wave of the map as a tile**, five per row (a row is a phase with its name, the fifth tile is the phase's BOSS):
+cleared waves are green, your next wave orange, locked waves dark, the selected one has a white frame, and every
+tile shows a colored dot per **twist** of that wave (`Config/Mutators.luau`, deterministic, so the browser can show
+them in advance). Click a tile (or `<` `>`) to select a wave you have reached; under the grid the selected wave is
+described: phase, enemy count, the boss, its twists with one line of advice each, and whether it is cleared (coins
+and a drop, no progress) or your next one. START WAVE names the wave and the difficulty.
+
 ## The FIGHT button and the battle panel (starting a wave, difficulty and wave choice)
 
 Nothing pops up when you walk onto the raised fight arena. The **FIGHT** button in the bottom bar opens

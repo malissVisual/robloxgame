@@ -18,6 +18,7 @@ local Levels = require(Shared:WaitForChild("Config"):WaitForChild("Levels"))
 local Difficulties = require(Shared:WaitForChild("Config"):WaitForChild("Difficulties"))
 local Maps = require(Shared:WaitForChild("Config"):WaitForChild("Maps"))
 local Waves = require(Shared:WaitForChild("Config"):WaitForChild("Waves"))
+local Mutators = require(Shared:WaitForChild("Config"):WaitForChild("Mutators"))
 local Enemies = require(Shared:WaitForChild("Config"):WaitForChild("Enemies"))
 local Soldier = require(Shared:WaitForChild("Soldier"))
 local Grid = require(Shared:WaitForChild("Grid"))
@@ -1516,11 +1517,19 @@ local function computeInZone(zoneName: string): boolean
 end
 -- The battle panel is opened with the PLAY button (UI.battleOpen); while it is open the main panel steps aside.
 
+-- The battle panel: a WAVE BROWSER. Left: the difficulty (four rows with what each one multiplies) and the squad's
+-- synergy. Right: every wave of the map as a tile, five per row (one row = one phase, with its name), the fifth tile
+-- of a row is the phase's boss; cleared waves are green, the next one orange, locked ones dark, the selected one has
+-- a white frame, and a tile shows a dot for every twist (Config/Mutators) of its wave. Under the grid the selected
+-- wave is described: phase, enemies, boss, its twists with advice, and what fighting it gives. (One do-block: the
+-- client is near Luau's 200-locals limit.)
+do
+local PANEL_W, PANEL_H = 640, 380
 local battlePanel = Instance.new("Frame")
 battlePanel.Name = "BattlePanel"
 battlePanel.AnchorPoint = Vector2.new(0.5, 0.5)
 battlePanel.Position = UDim2.fromScale(0.5, 0.5)
-battlePanel.Size = UDim2.fromOffset(560, 292)
+battlePanel.Size = UDim2.fromOffset(PANEL_W, PANEL_H)
 battlePanel.BackgroundColor3 = BG
 battlePanel.BackgroundTransparency = 0.05
 battlePanel.BorderSizePixel = 0
@@ -1528,24 +1537,25 @@ battlePanel.Active = true -- clicks on the panel never reach the 3D world
 battlePanel.Visible = false
 battlePanel.Parent = gui
 corner(battlePanel, 14)
-do -- bigger and wider: laid out at 560 x 292, drawn at 1.3x (every text and button grows with it)
+do -- bigger and wider: laid out at 640 x 380, drawn at 1.3x (every text and button grows with it)
 	local battleScale = Instance.new("UIScale")
 	battleScale.Scale = 1.3
 	battleScale.Parent = battlePanel
 end
-local battleStroke = Instance.new("UIStroke")
-battleStroke.Color = ORANGE
-battleStroke.Thickness = 3
-battleStroke.Parent = battlePanel
+UI.stroke(battlePanel, ORANGE, 3)
 
-local function battleText(text: string, x: number, y: number, width: number, height: number, size: number, font: Enum.Font, color: Color3): TextLabel
-	local l = label(battlePanel, text, UDim2.fromOffset(x, y), UDim2.fromOffset(width, height), size, font, color)
+local function hex(color: Color3): string
+	return string.format("#%02x%02x%02x", math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5))
+end
+
+local function battleText(parent: Instance, text: string, x: number, y: number, width: number, height: number, size: number, font: Enum.Font, color: Color3): TextLabel
+	local l = label(parent, text, UDim2.fromOffset(x, y), UDim2.fromOffset(width, height), size, font, color)
 	l.TextWrapped = true
 	l.TextYAlignment = Enum.TextYAlignment.Top
 	return l
 end
 
-local function battleButton(text: string, x: number, y: number, width: number, height: number): TextButton
+local function battleButton(parent: Instance, text: string, x: number, y: number, width: number, height: number): TextButton
 	local b = Instance.new("TextButton")
 	b.Position = UDim2.fromOffset(x, y)
 	b.Size = UDim2.fromOffset(width, height)
@@ -1556,59 +1566,154 @@ local function battleButton(text: string, x: number, y: number, width: number, h
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 15
 	b.Text = text
-	b.Parent = battlePanel
+	b.Parent = parent
 	corner(b, 8)
 	return b
 end
 
-local battleClose = battleButton("X", 522, 8, 30, 30)
-battleClose.BackgroundColor3 = BADGE
+-- ── Top bar: title, map, SPEED, AUTO, X ──
+local battleClose = battleButton(battlePanel, "X", PANEL_W - 38, 8, 30, 30)
 battleClose.Activated:Connect(function()
 	UI.battleOpen = false
 end)
-
-local battleTitle = battleText("BATTLE", 0, 8, 560, 30, 26, Enum.Font.GothamBlack, ORANGE)
-battleTitle.TextXAlignment = Enum.TextXAlignment.Center
-local battleMapLabel = battleText("", 0, 40, 560, 16, 12, Enum.Font.Gotham, MUTED)
-battleMapLabel.TextXAlignment = Enum.TextXAlignment.Center
-
-battleText("DIFFICULTY", 14, 68, 250, 16, 12, Enum.Font.GothamBold, MUTED)
-local difficultyButtons: { [string]: TextButton } = {}
-for i, key in Difficulties.Order do
-	local button = battleButton(Difficulties.Defs[key].label, 14 + ((i - 1) % 2) * 128, 86 + ((i - 1) // 2) * 36, 122, 32) -- 2 x 2
-	button.Activated:Connect(function()
-		Net.get("SetDifficulty"):FireServer(key)
-	end)
-	difficultyButtons[key] = button
-end
-local difficultyInfo = battleText("", 14, 158, 262, 34, 12, Enum.Font.Gotham, MUTED)
--- The squad's synergies (Synergy.luau) and the row bonuses.
-local synergyLabel = battleText("", 14, 196, 268, 32, 12, Enum.Font.GothamMedium, GOLD)
-
--- AUTO FIGHT: after a win the next wave starts by itself (a defeat stops it).
-local autoFightButton = battleButton("AUTO: OFF", 404, 8, 112, 30)
-
--- SPEED: cycles the battle speed (1x / 2x), also while a battle runs.
-local speedButton = battleButton("SPEED 1x", 296, 8, 100, 30)
+local battleTitle = battleText(battlePanel, "BATTLE", 14, 6, 200, 30, 24, Enum.Font.GothamBlack, ORANGE)
+battleTitle.TextYAlignment = Enum.TextYAlignment.Center
+local battleMapLabel = battleText(battlePanel, "", 118, 6, 260, 30, 12, Enum.Font.Gotham, MUTED)
+battleMapLabel.TextYAlignment = Enum.TextYAlignment.Center
+local speedButton = battleButton(battlePanel, "SPEED 1x", PANEL_W - 38 - 8 - 96, 8, 96, 30)
 speedButton.TextSize = 13
 speedButton.Activated:Connect(function()
 	Net.get("BattleSpeed"):FireServer()
 end)
-
+local autoFightButton = battleButton(battlePanel, "AUTO: OFF", PANEL_W - 38 - 8 - 96 - 8 - 104, 8, 104, 30)
 autoFightButton.TextSize = 13
 autoFightButton.Activated:Connect(function()
 	Net.get("AutoFight"):FireServer(not state.autoFight)
 end)
 
-battleText("WAVE TO FIGHT", 296, 68, 250, 16, 12, Enum.Font.GothamBold, MUTED)
-local waveMinus = battleButton("<", 296, 86, 44, 40)
-local wavePlus = battleButton(">", 502, 86, 44, 40)
-local waveText = battleText("", 344, 86, 154, 40, 22, Enum.Font.GothamBold, WHITE)
-waveText.TextXAlignment = Enum.TextXAlignment.Center
-waveText.TextYAlignment = Enum.TextYAlignment.Center
-local waveInfo = battleText("", 296, 130, 250, 64, 12, Enum.Font.Gotham, MUTED)
+-- ── Left column: the difficulty rows and the synergy ──
+local LEFT_W = 246
+battleText(battlePanel, "DIFFICULTY", 14, 48, LEFT_W, 16, 12, Enum.Font.GothamBold, MUTED)
+local difficultyButtons: { [string]: TextButton } = {}
+for i, key in Difficulties.Order do
+	local def = Difficulties.Defs[key]
+	local button = battleButton(battlePanel, "", 14, 66 + (i - 1) * 40, LEFT_W, 36)
+	local name = label(button, def.label, UDim2.fromOffset(10, 3), UDim2.fromOffset(120, 18), 14, Enum.Font.GothamBlack, WHITE)
+	name.Name = "Title"
+	local extras = if def.extraDrops > 0 then string.format(" · +%d drop", def.extraDrops) else ""
+	local sub = label(button, string.format("enemies x%.1f · coins x%.1f · XP x%.1f%s", def.enemyPower, def.rewardMultiplier, def.xpMultiplier, extras), UDim2.fromOffset(10, 20), UDim2.fromOffset(LEFT_W - 20, 14), 10, Enum.Font.GothamMedium, MUTED)
+	sub.Name = "Sub"
+	button.Activated:Connect(function()
+		Net.get("SetDifficulty"):FireServer(key)
+	end)
+	difficultyButtons[key] = button
+end
+battleText(battlePanel, "SQUAD", 14, 230, LEFT_W, 16, 12, Enum.Font.GothamBold, MUTED)
+local synergyLabel = battleText(battlePanel, "", 14, 248, LEFT_W, 64, 11, Enum.Font.GothamMedium, GOLD)
 
-local startButton = battleButton("START WAVE", 14, 234, 532, 48)
+-- ── Right column: the wave grid ──
+local RIGHT_X, RIGHT_W = 276, PANEL_W - 276 - 14
+local PHASE_LABEL_W = 86
+local TILE_W, TILE_H, TILE_GAP, ROW_H = 46, 30, 4, 36
+battleText(battlePanel, "WAVES", RIGHT_X, 48, 120, 16, 12, Enum.Font.GothamBold, MUTED)
+local reachedLabel = battleText(battlePanel, "", RIGHT_X + 120, 48, RIGHT_W - 120 - 60, 16, 11, Enum.Font.GothamMedium, MUTED)
+reachedLabel.TextXAlignment = Enum.TextXAlignment.Right
+local waveMinus = battleButton(battlePanel, "<", RIGHT_X + RIGHT_W - 56, 44, 26, 22)
+local wavePlus = battleButton(battlePanel, ">", RIGHT_X + RIGHT_W - 26, 44, 26, 22)
+waveMinus.TextSize = 13
+wavePlus.TextSize = 13
+
+local waveScroll = Instance.new("ScrollingFrame")
+waveScroll.Position = UDim2.fromOffset(RIGHT_X, 66)
+waveScroll.Size = UDim2.fromOffset(RIGHT_W, 164)
+waveScroll.BackgroundColor3 = UI.DARK
+waveScroll.BackgroundTransparency = 0.3
+waveScroll.BorderSizePixel = 0
+waveScroll.ScrollBarThickness = 6
+waveScroll.ScrollBarImageColor3 = MUTED
+waveScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+waveScroll.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+waveScroll.CanvasSize = UDim2.new()
+waveScroll.Parent = battlePanel
+corner(waveScroll, 8)
+
+type WaveTile = { button: TextButton, stroke: UIStroke, number: TextLabel, dots: { Frame } }
+local waveTiles: { [number]: WaveTile } = {}
+local phaseLabels: { TextLabel } = {}
+local gridMap: string? = nil -- the map the grid was built for
+
+local function buildGrid(map: Maps.Def)
+	for _, tile in waveTiles do
+		tile.button:Destroy()
+	end
+	for _, l in phaseLabels do
+		l:Destroy()
+	end
+	table.clear(waveTiles)
+	table.clear(phaseLabels)
+	local rows = math.ceil(map.waves / Balance.PhaseLength)
+	waveScroll.CanvasSize = UDim2.fromOffset(0, rows * ROW_H + 6)
+	for row = 1, rows do
+		local phase = map.phases[math.min(row, #map.phases)]
+		local y = 4 + (row - 1) * ROW_H
+		local phaseLabel = label(waveScroll, string.format("%d · %s", row, phase.name), UDim2.fromOffset(6, y), UDim2.fromOffset(PHASE_LABEL_W - 8, TILE_H), 9, Enum.Font.GothamMedium, MUTED)
+		phaseLabel.TextWrapped = true
+		phaseLabel.TextYAlignment = Enum.TextYAlignment.Center
+		table.insert(phaseLabels, phaseLabel)
+		for col = 1, Balance.PhaseLength do
+			local wave = (row - 1) * Balance.PhaseLength + col
+			if wave > map.waves then
+				break
+			end
+			local isBoss = col == Balance.PhaseLength
+			local button = Instance.new("TextButton")
+			button.Name = "Wave" .. wave
+			button.Position = UDim2.fromOffset(PHASE_LABEL_W + (col - 1) * (TILE_W + TILE_GAP), y)
+			button.Size = UDim2.fromOffset(TILE_W, TILE_H)
+			button.BorderSizePixel = 0
+			button.AutoButtonColor = false
+			button.BackgroundColor3 = BADGE
+			button.Text = ""
+			button.Parent = waveScroll
+			corner(button, 6)
+			local stroke = UI.stroke(button, WHITE, 2, 1)
+			local number = label(button, tostring(wave), UDim2.fromOffset(0, 0), UDim2.new(1, 0, 1, 0), if isBoss then 12 else 13, if isBoss then Enum.Font.GothamBlack else Enum.Font.GothamBold, WHITE)
+			number.TextXAlignment = Enum.TextXAlignment.Center
+			number.TextYAlignment = Enum.TextYAlignment.Center
+			if isBoss then
+				local tag = label(button, "BOSS", UDim2.fromOffset(0, 19), UDim2.new(1, 0, 0, 10), 7, Enum.Font.GothamBlack, RED)
+				tag.TextXAlignment = Enum.TextXAlignment.Center
+				number.Position = UDim2.fromOffset(0, -4)
+			end
+			-- A dot per twist of the wave (its color), in the top right corner.
+			local dots = {}
+			local twists = Mutators.forWave(wave, map)
+			for i, twist in twists do
+				local dot = Instance.new("Frame")
+				dot.Size = UDim2.fromOffset(6, 6)
+				dot.Position = UDim2.fromOffset(TILE_W - 9 - (i - 1) * 8, 3)
+				dot.BackgroundColor3 = twist.color
+				dot.BorderSizePixel = 0
+				dot.ZIndex = 3
+				dot.Parent = button
+				corner(dot, 3)
+				table.insert(dots, dot)
+			end
+			button.Activated:Connect(function()
+				if wave <= state.wave and not state.battling and not state.rolling then
+					Net.get("SetWave"):FireServer(wave)
+				end
+			end)
+			waveTiles[wave] = { button = button, stroke = stroke, number = number, dots = dots }
+		end
+	end
+end
+
+-- The selected wave described under the grid.
+local waveInfo = battleText(battlePanel, "", RIGHT_X, 236, RIGHT_W, 84, 11, Enum.Font.GothamMedium, MUTED)
+waveInfo.RichText = true
+
+local startButton = battleButton(battlePanel, "START WAVE", 14, PANEL_H - 56, PANEL_W - 28, 44)
 startButton.TextSize = 18
 startButton.Font = Enum.Font.GothamBlack
 
@@ -1629,6 +1734,7 @@ end)
 
 -- The texts that only change with the selection are rebuilt when it changes (not every frame).
 local battleInfoKey = ""
+local wasVisible = false
 
 renderBattlePanel = function()
 	if state.battling then
@@ -1637,7 +1743,14 @@ renderBattlePanel = function()
 	local visible = UI.battleOpen
 	battlePanel.Visible = visible
 	if not visible then
+		wasVisible = false
 		return
+	end
+	local map = Maps.Defs[state.map]
+	if gridMap ~= state.map then
+		gridMap = state.map
+		buildGrid(map)
+		battleInfoKey = ""
 	end
 
 	speedButton.Text = string.format("SPEED %dx", state.battleSpeed)
@@ -1653,28 +1766,67 @@ renderBattlePanel = function()
 		synergyLabel.TextColor3 = MUTED
 	end
 
-	local map = Maps.Defs[state.map]
 	local key = string.format("%s|%d|%d|%s", state.map, state.selectedWave, state.wave, state.difficulty)
-	if key ~= battleInfoKey then
+	if key ~= battleInfoKey or not wasVisible then
 		battleInfoKey = key
-		battleMapLabel.Text = string.format("%s · %s", map.arena, string.upper(map.label))
-
-		local difficulty = Difficulties.Defs[state.difficulty]
-		difficultyInfo.Text = string.format("Enemies x%.1f power · coins x%.1f · XP x%.1f%s · lucky drop %d%%", difficulty.enemyPower, difficulty.rewardMultiplier, difficulty.xpMultiplier, if difficulty.extraDrops > 0 then string.format(" · +%d drop", difficulty.extraDrops) else "", math.floor(difficulty.luckyDropChance * 100 + 0.5))
+		battleMapLabel.Text = string.format("%s · %s · %d waves", map.arena, string.upper(map.label), map.waves)
+		reachedLabel.Text = string.format("reached wave %d of %d", state.wave, map.waves)
 		for difficultyKey, button in difficultyButtons do
-			button.BackgroundColor3 = if state.difficulty == difficultyKey then GREEN:Lerp(BG, 0.35) else BADGE
+			local on = state.difficulty == difficultyKey
+			button.BackgroundColor3 = if on then GREEN:Lerp(BG, 0.35) else BADGE
+			local title = button:FindFirstChild("Title")
+			if title and title:IsA("TextLabel") then
+				title.TextColor3 = if on then WHITE else MUTED
+			end
 		end
 
-		waveText.Text = string.format("Wave %d / %d", state.selectedWave, map.waves)
-		local _, phase = Waves.phase(state.selectedWave, map)
-		local enemies = Waves.get(state.selectedWave, map)
-		local lines = { string.format("%s · %d %s", phase.name, #enemies, map.enemyName) }
-		if state.selectedWave % Balance.PhaseLength == 0 then
-			table.insert(lines, string.format("BOSS WAVE: %s", Enemies.Kinds[phase.boss].label))
+		-- The tiles: cleared / next / locked / selected.
+		for wave, tile in waveTiles do
+			local cleared = wave < state.wave
+			local isNext = wave == state.wave
+			local locked = wave > state.wave
+			local isBoss = wave % Balance.PhaseLength == 0
+			local base = if cleared then GREEN:Lerp(BG, 0.55) elseif isNext then ORANGE:Lerp(BG, 0.25) else UI.DARK
+			if isBoss and not locked then
+				base = base:Lerp(RED, 0.25)
+			end
+			tile.button.BackgroundColor3 = base
+			tile.number.TextColor3 = if locked then MUTED else WHITE
+			tile.number.TextTransparency = if locked then 0.45 else 0
+			tile.stroke.Transparency = if wave == state.selectedWave then 0 else 1
+			for _, dot in tile.dots do
+				dot.BackgroundTransparency = if locked then 0.6 else 0
+			end
 		end
-		table.insert(lines, string.format("Reached wave %d. %s", state.wave, if state.selectedWave < state.wave then "Repeating gives coins and a drop, no progress." else "Clear it to move on."))
+		-- Scroll so the selected wave's row is in view (with the row above it).
+		local row = (state.selectedWave - 1) // Balance.PhaseLength
+		waveScroll.CanvasPosition = Vector2.new(0, math.max(0, (row - 1) * ROW_H))
+
+		-- The selected wave in words.
+		local phaseIndex, phase = Waves.phase(state.selectedWave, map)
+		local enemies = Waves.get(state.selectedWave, map)
+		local lines = { string.format('<font color="#ffffff"><b>WAVE %d</b></font>  ·  %s (phase %d)  ·  %d %s', state.selectedWave, phase.name, phaseIndex, #enemies, map.enemyName) }
+		if state.selectedWave % Balance.PhaseLength == 0 then
+			table.insert(lines, string.format('<font color="%s"><b>BOSS WAVE</b></font>: %s', hex(RED), Enemies.Kinds[phase.boss].label))
+		end
+		local twists = Mutators.forWave(state.selectedWave, map)
+		if #twists > 0 then
+			local parts = {}
+			for _, twist in twists do
+				table.insert(parts, string.format('<font color="%s"><b>%s</b></font> — %s', hex(twist.color), twist.label, twist.subtitle))
+			end
+			table.insert(lines, table.concat(parts, "\n"))
+		else
+			table.insert(lines, "No twist: a plain wave.")
+		end
+		if state.selectedWave < state.wave then
+			table.insert(lines, string.format('<font color="%s">Cleared.</font> Repeating gives coins and a drop, no progress.', hex(GREEN)))
+		else
+			table.insert(lines, string.format('<font color="%s">Your next wave.</font> Clear it to move on.', hex(ORANGE)))
+		end
 		waveInfo.Text = table.concat(lines, "\n")
 	end
+	wasVisible = true
 
 	-- The start button follows the timers every frame.
 	local remaining = math.max(0, state.nextWaveIn - (os.clock() - stateReceivedAt))
@@ -1687,13 +1839,15 @@ renderBattlePanel = function()
 		startButton.BackgroundColor3 = BADGE
 		startButton.TextTransparency = 0.4
 	else
-		startButton.Text = string.format("START WAVE %d", state.selectedWave)
+		local difficulty = Difficulties.Defs[state.difficulty]
+		startButton.Text = string.format("START WAVE %d  ·  %s", state.selectedWave, string.upper(difficulty.label))
 		startButton.BackgroundColor3 = ORANGE:Lerp(BG, 0.15)
 		startButton.TextTransparency = 0
 	end
 	local canEdit = remaining <= 0 and not state.rolling
 	waveMinus.TextTransparency = if canEdit and state.selectedWave > 1 then 0 else 0.6
 	wavePlus.TextTransparency = if canEdit and state.selectedWave < state.wave then 0 else 0.6
+end
 end
 
 -- ── Level upgrade panel ───────────────────────────────────────────────────
