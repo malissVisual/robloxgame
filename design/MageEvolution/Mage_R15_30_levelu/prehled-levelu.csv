@@ -1,0 +1,31 @@
+﻿Level,Název,Epocha,Téma / rok,Nové vybavení,Počet dílů
+1,Učeň,Pravěk,Učeň šamana / 30 000 př. n. l.,"Hůl z větve s kamenným lůžkem a krystalem, hliněná miska s odvarem, čelenka s pírkem, pazourkový nůž",181
+2,Zaříkávač,Pravěk,Zaříkávač kmene / 25 000 př. n. l.,"Pernatá koruna, krátký roztřepený kožešinový plášť, malované pruhy na tvářích, hůl se zkříženými kostmi a pírky, kamenná koule duchů",226
+3,Kostěný šaman,Pravěk,Kostěný šaman / 18 000 př. n. l.,"Parohová čelenka, žebrový náprsník, kostěný nárameník s lebkou, hůl se zvířecí lebkou a kostěnými drápy, lebeční miska s elixírem",245
+4,Šaman totemu,Pravěk,Strážce totemu / 12 000 př. n. l.,"Vlčí kápě s lebkou, dlouhý medvědí plášť, náhrdelník z drápů, totemová hůl s vyřezanou tváří a křídly, kouřící hliněná nádoba",272
+5,Velký šaman,Pravěk,Velký šaman kmene / 4 000 př. n. l.,"Koruna z mamutích klů s krystalem na čele, plášť z mamutí kožešiny s kly na ramenou, malované otisky dlaní, rozvidlená hůl s velkým krystalem, krystalový úlomek",306
+6,Chrámový kněz,Starověk,Egyptský chrámový kněz / 2600 př. n. l.,"Pruhovaný šátek nemes, lněná sukně shendyt, široký límec usekh, levhartí šerpa, bronzová hůl was, papyrový svitek",228
+7,Faraonův mág,Starověk,Dvorní mág faraona / 1300 př. n. l.,"Vysoká koruna s kobrou uraeus, dlouhý lněný hábit, purpurový plášť, zlatý pektorál s křídly, hůl s ankhem a slunečním kotoučem, zlatá koule na podstavci",255
+8,Věštec,Starověk,Řecký věštec z Delf / 500 př. n. l.,"Zlatý vavřínový věnec, bílý chitón, purpurový himation s meandrem, plnovous, hůl caduceus s hady a křídly, svitek s pečetí",240
+9,Učenec z Alexandrie,Starověk,Učenec Alexandrijské knihovny / 250 př. n. l.,"Kápě s diadémem, pouzdro na svitky na zádech, bronzové chrániče předloktí, hůl s armilárními prstenci, armilární sféra",268
+10,Velekněz,Starověk,Římský velekněz / 100 n. l.,"Paprsčitá zlatá koruna, purpurová tóga se zlatým lemem, pektorál, plášť se sponou, hůl s orlem a vavřínovým kruhem, kodex",256
+11,Čaroděj,Středověk,Klasický čaroděj / 800,"Špičatý klobouk, hábit s rukávy do zvonu, provazový opasek se střapci, kniha kouzel, hůl se třemi drápy, 2 levitující runy",191
+12,Kouzelník,Středověk,Dvorní kouzelník / 1000,"Klobouk s hvězdami a přezkou, plášť s hvězdami, krátký vous, svítící koule, hůl se čtyřmi drápy a 3 levitujícími krystaly",225
+13,Runový mág,Středověk,Runový mág / 1200,"Hluboká kápě s runovou čelenkou, hábit s runami, otevřená runová kniha, runová hůl s kamenným prstencem a 4 levitujícími runami",268
+14,Hvězdný mág,Středověk,Hvězdopravec / 1350,"Vysoký klobouk s půlměsícem, vysoký límec, nárameníky s hvězdami, křišťálová koule na podstavci, hůl s půlměsícem a 5 krystaly",299
+15,Velmistr magie,Středověk,Velmistr řádu mágů / 1450,"Obří klobouk s pérem a drahokamem, nejdelší vous, vrstvené hábity se zlatou výšivkou, grimoár na řetězu, zlatá hůl se čtyřmi drápy a 6 krystaly",318
+16,Alchymista,Průmyslový věk,Alchymista manufaktur / 1760,"Kožená čepice s mosaznými brýlemi, kožená zástěra, opasek s lahvičkami, mosazná hůl s krystalem v kleci a měřidlem, baňka s elixírem",247
+17,Parní mág,Průmyslový věk,Parní mág / 1820,"Cylindr s ozubenými koly, frak s vestou, bandalír s lahvičkami, parní hůl s tlakovou nádobou, ventilem a manometrem, mosazná koule",294
+18,Mechanik éteru,Průmyslový věk,Mechanik éteru / 1860,"Letecká kukla s brýlemi, kabát s mosaznými knoflíky, nárameník s ozubeným kolem, hůl s velkým ozubeným kolem a ciferníky, kniha s mosaznými rohy",299
+19,Elektromág,Průmyslový věk,Elektromág / 1890,"Cylindr s Teslovou cívkou, brýle na očích, batoh s měděnými nádržemi, hůl s Teslovými prstenci a výboji, bleskový globus",309
+20,Mistr éteru,Průmyslový věk,Mistr éteru / 1910,"Svítící oči, mechanická koruna na klobouku, mechanická výztuha paže, dlouhý kabát s kapes, hůl s mosaznými prstenci a 6 krystaly, kámen mudrců v kleci",371
+21,Technomág,Moderní doba,Technomág / 2000,"Taktický kabát s kápí, sluchátka s mikrofonem, energetické jádro na hrudi, holopanel na zápěstí, karbonová hůl s emitorem, holografický tablet",215
+22,Kybermág,Moderní doba,Kybermág / 2020,"Neonový vizor, pancéřová vesta s LED pásky, holografické panely, emitorový prstenec na holi, datový krystal",261
+23,Datový šaman,Moderní doba,Datový šaman / 2040,"Kápě s neonovým lemem, obvodové tetování, orbitální dron, šestiúhelníková hlavice hole, holografická kniha",260
+24,Strážce sítě,Moderní doba,Strážce sítě / 2060,"Polopřilba s ploutvemi, ramenní emitory, plášť rozdělený na pruhy, plazmová hůl s dvojitými hroty, energetická koule",274
+25,Plazmový velitel,Moderní doba,Velitel technomágů / 2090,"Vysoký límec s anténami, korunový vizor, holografické runy, velký emitorový prstenec na holi, plazmové jádro",341
+26,Hvězdný poutník,Budoucnost,Hvězdný poutník / 2100,"Bílé panely se svítícími spoji, kápě s azurovým lemem, malá aureola, kvantové ohnisko s prstencem, levitující úlomky",255
+27,Kosmický mág,Budoucnost,Kosmický mág / 2300,"Levitující nárameníky, energetická aureola, plášť s hvězdným polem, gyroskopická hůl se dvěma prstenci, kosmická koule",340
+28,Nebeský mudrc,Budoucnost,Nebeský mudrc / 2500,"Vysoká bílá koruna z panelů, dvojitá aureola, prstenec krystalů kolem těla, trojitý prstenec na holi, levitující holo-svitek",381
+29,Arcimág,Budoucnost,Kosmický arcimág / 2800,"Energetická koruna s hroty, krystalová křídla, velká aureola, shluk krystalů na holi, singularita v levé ruce",510
+30,Apex mág,Budoucnost,Apex mág / 3000,"Koruna z energie a trojitá aureola, křídla ze světla, plášť z hvězd, kvantové ohnisko se třemi gyroskopy, kvantová krychle, roj krystalů",570

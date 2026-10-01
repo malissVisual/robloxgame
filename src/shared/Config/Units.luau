@@ -25,7 +25,7 @@ export type ClassDef = Stats & {
 	color: Color3,
 	unlock: Unlock?, -- nil = unlocked from the start
 	passive: string, -- the class's own trick in the battle (see Units.Passives)
-	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); Knight and Archer have 30 looks
+	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); Knight, Archer and Mage have 30 looks
 }
 
 -- Every class has a PASSIVE (BattleService applies it). `value` is its strength; an ASCENDED soldier
@@ -98,6 +98,9 @@ Units.Classes = {
 		splash = true,
 		unlock = { wave = 6 },
 		passive = "splash",
+		-- 30 merge levels: the R15 evolution of the mage, a shaman's apprentice to the Apex mage of the year 3000
+		-- (design/MageEvolution, built from StageModels/MageEvolution by SoldierRig).
+		maxTier = 30,
 	},
 	Tank = {
 		label = "Tank",

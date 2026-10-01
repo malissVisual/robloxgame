@@ -1,0 +1,143 @@
+﻿MÁG R15 – EVOLUCE 30 LEVELŮ (MERGE)
+============================================================
+Jednotka: Mage (mág) · 30 merge levelů od pravěku do roku 3000
+Styl: blocky Roblox low-poly, pouze Part a WedgePart, bez meshí, textur a asset ID.
+
+OBSAH BALÍČKU
+------------------------------------------------------------
+modely/Mage_L01_Ucen.rbxmx … Mage_L30_ApexMag.rbxmx
+    každý level zvlášť, model stojí u počátku (0, 0, 0)
+Mage_R15_01-30.rbxm      všech 30 modelů v jednom souboru (binární, menší)
+Mage_R15_01-30.rbxmx     totéž v XML
+    kořen = Folder „Mage_R15_01-30“; modely jsou rozložené v mřížce
+    (sloupec = level v epoše po 8 studech v ose X, řádek = epocha po 10 studech v ose Z),
+    aby se po vložení do Studia nepřekrývaly. Ve hře je stejně klonujte a posouvejte přes PivotTo.
+prehled-levelu.csv       Level, Název, Epocha, Téma / rok, Nové vybavení, Počet dílů (UTF-8)
+validation.json          kontrola struktury každého modelu i obou souhrnných souborů
+nahledy/vsech-30-levelu.png
+nahledy/era-01.png … era-06.png      po 5 levelech na epochu
+nahledy/LV01_*, LV15_*, LV30_*       zepředu, pravý bok, zezadu, levý bok + souhrn 4-pohledy
+
+IMPORT DO ROBLOX STUDIA
+------------------------------------------------------------
+1. Pravým tlačítkem na ReplicatedStorage (nebo Workspace) → Insert from File… → vyberte .rbxm/.rbxmx.
+   Případně soubor přetáhněte myší do okna Studia.
+2. Jednotlivé levely: složka modely/. Celá sada: Mage_R15_01-30.rbxm.
+3. Žádné skripty, žádné externí assety – model se načte okamžitě a offline.
+
+STRUKTURA KAŽDÉHO MODELU
+------------------------------------------------------------
+Mage_LXX_<Nazev> (Model, PrimaryPart = HumanoidRootPart)
+├─ HumanoidRootPart        jediný ukotvený díl (Anchored = true), průhledný
+├─ Head, UpperTorso, LowerTorso
+├─ Left/Right UpperArm, LowerArm, Hand
+├─ Left/Right UpperLeg, LowerLeg, Foot
+│    15 kloubů Motor6D se standardními jmény (Root, Waist, Neck, LeftShoulder,
+│    LeftElbow, LeftWrist, RightShoulder, RightElbow, RightWrist, LeftHip, LeftKnee,
+│    LeftAnkle, RightHip, RightKnee, RightAnkle) – vždy uvnitř Part1
+│    + R15 rig attachments (…RigAttachment) a standardní attachmenty pro doplňky
+│      (HatAttachment, HairAttachment, FaceFrontAttachment, BodyFront/BackAttachment,
+│       Left/RightGripAttachment, Left/RightFootAttachment, RootAttachment …)
+├─ Equipment (Folder)       veškerá výbava; každá položka je Model
+│    každý díl má Weld (Part0 = část těla, Part1 = díl, C1 = identita)
+│    Face, Hair, Beard, klobouk/kápě/koruna → Head
+│    tunika, plášť (Cloak), límec, náhrdelník, aureola… → UpperTorso / Head
+│    hábit (Robe), opasek (Belt), šosy → LowerTorso
+│    rukávy a nárameníky → UpperArm / LowerArm, rukavice → Hand
+│    boty → Foot, holenní část bot → LowerLeg
+│    Staff → RightHand: díl Handle je přivařen k RightHand, ostatní díly hole
+│      (včetně levitujících krystalů a run Float*) jsou přivařeny k Handle
+│    předmět v levé ruce (kniha, krystal, koule, svitek…) → LeftHand
+├─ Humanoid (RigType = R15, HipHeight = 2.35) └─ Animator
+├─ IntValue Level (1–30)
+├─ StringValue UnitType = Mage
+├─ StringValue Era (Pravěk / Starověk / Středověk / Průmyslový věk / Moderní doba / Budoucnost)
+└─ StringValue Appearance (český popis vzhledu)
+
+KONVENCE
+------------------------------------------------------------
+• Postava stojí chodidly přesně na y = 0 a dívá se do −Z (LookVector = 0, 0, −1).
+• Všechny díly mají CanCollide = false, CanTouch = false; výbava Massless = true.
+• Hůl: osa hole prochází středem pravé pěsti (RightHand), prsty pěsti ji obepínají.
+  Krystal hole je samostatný Neon díl „Crystal“ s PointLight. Od levelu 11 kolem hlavice
+  levitují krystaly nebo runy (díly Float*), pevně přivařené k holi.
+• Póza držení hole a předmětu je zapečená v C0 kloubů ramen/loktů – standardní R15
+  animace (idle, walk) běží nad ní přes Motor6D.Transform.
+• Pro pohyb jednotky nastavte HumanoidRootPart.Anchored = false.
+• Svítící oči od levelu 20 (Neon), výraz obličeje se mění od zvědavého učně po přísného arcimága.
+
+POUŽITÍ V MERGE HŘE (ukázka Luau – do vlastního skriptu, model žádný skript neobsahuje)
+------------------------------------------------------------
+local folder = game.ReplicatedStorage:WaitForChild("Mage_R15_01-30")
+local function spawnMage(level, cframe)
+    for _, m in folder:GetChildren() do
+        if m:FindFirstChild("Level") and m.Level.Value == level then
+            local unit = m:Clone()
+            unit:PivotTo(cframe)   -- pivot = HumanoidRootPart
+            unit.Parent = workspace
+            return unit
+        end
+    end
+end
+
+PŘEHLED LEVELŮ
+------------------------------------------------------------
+Level Název                  Epocha           Téma / rok                     Dílů
+1     Učeň                   Pravěk           30 000 př. n. l.               181
+2     Zaříkávač              Pravěk           25 000 př. n. l.               226
+3     Kostěný šaman          Pravěk           18 000 př. n. l.               245
+4     Šaman totemu           Pravěk           12 000 př. n. l.               272
+5     Velký šaman            Pravěk           4 000 př. n. l.                306
+6     Chrámový kněz          Starověk         2600 př. n. l.                 228
+7     Faraonův mág           Starověk         1300 př. n. l.                 255
+8     Věštec                 Starověk         500 př. n. l.                  240
+9     Učenec z Alexandrie    Starověk         250 př. n. l.                  268
+10    Velekněz               Starověk         100 n. l.                      256
+11    Čaroděj                Středověk        800                            191
+12    Kouzelník              Středověk        1000                           225
+13    Runový mág             Středověk        1200                           268
+14    Hvězdný mág            Středověk        1350                           299
+15    Velmistr magie         Středověk        1450                           318
+16    Alchymista             Průmyslový věk   1760                           247
+17    Parní mág              Průmyslový věk   1820                           294
+18    Mechanik éteru         Průmyslový věk   1860                           299
+19    Elektromág             Průmyslový věk   1890                           309
+20    Mistr éteru            Průmyslový věk   1910                           371
+21    Technomág              Moderní doba     2000                           215
+22    Kybermág               Moderní doba     2020                           261
+23    Datový šaman           Moderní doba     2040                           260
+24    Strážce sítě           Moderní doba     2060                           274
+25    Plazmový velitel       Moderní doba     2090                           341
+26    Hvězdný poutník        Budoucnost       2100                           255
+27    Kosmický mág           Budoucnost       2300                           340
+28    Nebeský mudrc          Budoucnost       2500                           381
+29    Arcimág                Budoucnost       2800                           510
+30    Apex mág               Budoucnost       3000                           570
+
+Epochy (5 levelů každá):
+  01–05 Pravěk – šaman s kostmi, kožešinami, hliněnými nádobami, hůl z větve s kamenem
+  06–10 Starověk – lněné a purpurové hábity, zlato, Egypt/Řecko/Řím, hůl s bronzem
+  11–15 Středověk – klasický čaroděj, špičatý klobouk, kniha kouzel, hvězdy, runy
+  16–20 Průmyslový věk – alchymista, brýle, lahvičky, mosazné mechanismy, měřidla a pára
+  21–25 Moderní doba – technomág, taktický kabát, holografické panely, energetické jádro
+  26–30 Budoucnost (2100, 2300, 2500, 2800, 3000) – kosmický arcimág, bílé panely se
+        svítícími spoji, levitující krystaly, aureola z energie, kvantové ohnisko
+
+VALIDACE (podrobně ve validation.json)
+------------------------------------------------------------
+Všech 30 levelů bez chyb: OK
+15 standardních Motor6D, C0/C1 sedí na rig attachments: OK
+Humanoid R15 + Animator: OK
+Ukotvený jen HumanoidRootPart: OK
+Kolize vypnuté: OK
+Bez skriptů / meshí / textur / asset ID: OK / OK
+Veškerá výbava přivařená (řetěz končí na části těla): OK
+Hůl v pravé ruce, osa prochází pěstí: OK
+Krystal na každé holi = Neon + PointLight: OK
+Levitující krystaly/runy od L11: OK
+Chodidla na y = 0, nic pod zemí; pohled do −Z: OK / OK
+Sousední levely mění geometrii: OK
+Soubory přísně načtené knihovnou rbx-dom (rbx_xml/rbx_binary): OK
+rbxm a rbxmx obsahují stejné instance: OK (19842 instancí)
+Počet dílů: L01 = 181 (min. 60), L30 = 570 (víc než 250), celkem 8705
+

@@ -1,0 +1,4248 @@
+{
+  "summary": {
+    "generated": "2026-10-01",
+    "unit_type": "Mage",
+    "levels": 30,
+    "all_levels_ok": true,
+    "levels_failed": [],
+    "part_count_L01": 181,
+    "part_count_L30": 570,
+    "min_parts_L01_ge_60": true,
+    "parts_L30_gt_250": true,
+    "total_parts": 8705,
+    "every_level": {
+      "motor6d_15_standard": true,
+      "humanoid_r15_animator": true,
+      "only_hrp_anchored": true,
+      "all_cancollide_false": true,
+      "no_scripts": true,
+      "no_meshes_textures_assets": true,
+      "all_equipment_welded": true,
+      "staff_in_right_hand_through_fist": true,
+      "staff_crystal_neon_with_pointlight": true,
+      "floating_crystals_or_runes_from_L11": true,
+      "feet_on_y0": true,
+      "faces_minus_z": true,
+      "metadata_present": true,
+      "neighbours_change_geometry": true,
+      "rbx_dom_strict_parse": true
+    },
+    "combined_files": {
+      "rbxmx": {
+        "bytes": 15260627,
+        "instances": 19842,
+        "class_counts": {
+          "Animator": 30,
+          "Attachment": 1470,
+          "Folder": 31,
+          "Humanoid": 30,
+          "IntValue": 30,
+          "Model": 739,
+          "Motor6D": 450,
+          "Part": 8653,
+          "PointLight": 42,
+          "StringValue": 90,
+          "WedgePart": 52,
+          "Weld": 8225
+        },
+        "top_level_models": 30,
+        "anchored_parts": 30,
+        "anchored_names": [
+          "HumanoidRootPart"
+        ],
+        "pointlights": 42
+      },
+      "rbxm": {
+        "bytes": 292695,
+        "instances": 19842,
+        "class_counts": {
+          "Animator": 30,
+          "Attachment": 1470,
+          "Folder": 31,
+          "Humanoid": 30,
+          "IntValue": 30,
+          "Model": 739,
+          "Motor6D": 450,
+          "Part": 8653,
+          "PointLight": 42,
+          "StringValue": 90,
+          "WedgePart": 52,
+          "Weld": 8225
+        },
+        "top_level_models": 30,
+        "anchored_parts": 30,
+        "anchored_names": [
+          "HumanoidRootPart"
+        ],
+        "pointlights": 42
+      },
+      "rbxm_equals_rbxmx": true
+    },
+    "validator": "Python (zdrojová data + ElementTree) a rbx-dom (rbx_xml 3.0 s ErrorOnUnknown, rbx_binary 3.0) – zpětné načtení obou formátů"
+  },
+  "levels": [
+    {
+      "level": 1,
+      "model": "Mage_L01_Ucen",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 165,
+        "equipment_welded_to_body": "165/165",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Tunic": [
+            "UpperTorso"
+          ],
+          "FurCollar": [
+            "UpperTorso"
+          ],
+          "Necklace": [
+            "UpperTorso"
+          ],
+          "FurKilt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "Headgear": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "ClayBowl": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 32,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": 0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 1,
+          "UnitType": "Mage",
+          "Era": "Pravěk",
+          "AppearanceChars": 233
+        },
+        "part_count": 181,
+        "wedge_count": 1,
+        "neon_parts": 7,
+        "pointlights": 1
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L01_Ucen.rbxmx",
+        "bytes": 318015,
+        "instances": 436,
+        "referents_unique": 436,
+        "refs_used": 361,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 2,
+      "model": "Mage_L02_Zarikavac",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 210,
+        "equipment_welded_to_body": "210/210",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Tunic": [
+            "UpperTorso"
+          ],
+          "FurCollar": [
+            "UpperTorso"
+          ],
+          "FurCape": [
+            "UpperTorso"
+          ],
+          "Necklace": [
+            "UpperTorso"
+          ],
+          "FurKilt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightArmBand": [
+            "RightUpperArm"
+          ],
+          "LeftArmBand": [
+            "LeftUpperArm"
+          ],
+          "Headgear": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "SpiritStone": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 42,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": 0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 2,
+          "UnitType": "Mage",
+          "Era": "Pravěk",
+          "AppearanceChars": 222
+        },
+        "part_count": 226,
+        "wedge_count": 0,
+        "neon_parts": 7,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 86,
+          "removed_or_moved_parts": 45
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L02_Zarikavac.rbxmx",
+        "bytes": 393252,
+        "instances": 530,
+        "referents_unique": 530,
+        "refs_used": 451,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 3,
+      "model": "Mage_L03_KostenySaman",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 229,
+        "equipment_welded_to_body": "229/229",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Tunic": [
+            "UpperTorso"
+          ],
+          "FurCollar": [
+            "UpperTorso"
+          ],
+          "Necklace": [
+            "UpperTorso"
+          ],
+          "FurKilt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightArmBand": [
+            "RightUpperArm"
+          ],
+          "LeftArmBand": [
+            "LeftUpperArm"
+          ],
+          "BonePauldron": [
+            "LeftUpperArm"
+          ],
+          "Headgear": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "SkullBowl": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 48,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": 0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 3,
+          "UnitType": "Mage",
+          "Era": "Pravěk",
+          "AppearanceChars": 234
+        },
+        "part_count": 245,
+        "wedge_count": 3,
+        "neon_parts": 10,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 111,
+          "removed_or_moved_parts": 88
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L03_KostenySaman.rbxmx",
+        "bytes": 424251,
+        "instances": 568,
+        "referents_unique": 568,
+        "refs_used": 489,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 4,
+      "model": "Mage_L04_SamanTotemu",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 256,
+        "equipment_welded_to_body": "256/256",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Tunic": [
+            "UpperTorso"
+          ],
+          "FurCollar": [
+            "UpperTorso"
+          ],
+          "BearCloak": [
+            "UpperTorso"
+          ],
+          "FurRolls": [
+            "UpperTorso"
+          ],
+          "Necklace": [
+            "UpperTorso"
+          ],
+          "FurKilt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightArmBand": [
+            "RightUpperArm"
+          ],
+          "LeftArmBand": [
+            "LeftUpperArm"
+          ],
+          "BonePauldron": [
+            "LeftUpperArm"
+          ],
+          "Headgear": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "SmokeVessel": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 49,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": 0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 4,
+          "UnitType": "Mage",
+          "Era": "Pravěk",
+          "AppearanceChars": 280
+        },
+        "part_count": 272,
+        "wedge_count": 15,
+        "neon_parts": 8,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 114,
+          "removed_or_moved_parts": 87
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L04_SamanTotemu.rbxmx",
+        "bytes": 469466,
+        "instances": 624,
+        "referents_unique": 624,
+        "refs_used": 543,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 5,
+      "model": "Mage_L05_VelkySaman",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 290,
+        "equipment_welded_to_body": "290/290",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Tunic": [
+            "UpperTorso"
+          ],
+          "FurCollar": [
+            "UpperTorso"
+          ],
+          "MammothCloak": [
+            "UpperTorso"
+          ],
+          "FurRolls": [
+            "UpperTorso"
+          ],
+          "Necklace": [
+            "UpperTorso"
+          ],
+          "FurKilt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightArmBand": [
+            "RightUpperArm"
+          ],
+          "LeftArmBand": [
+            "LeftUpperArm"
+          ],
+          "BonePauldron": [
+            "LeftUpperArm"
+          ],
+          "Headgear": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "CrystalShard": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 49,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": 0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 5,
+          "UnitType": "Mage",
+          "Era": "Pravěk",
+          "AppearanceChars": 244
+        },
+        "part_count": 306,
+        "wedge_count": 10,
+        "neon_parts": 14,
+        "pointlights": 3,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 150,
+          "removed_or_moved_parts": 116
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L05_VelkySaman.rbxmx",
+        "bytes": 526705,
+        "instances": 695,
+        "referents_unique": 695,
+        "refs_used": 611,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 6,
+      "model": "Mage_L06_ChramovyKnez",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 212,
+        "equipment_welded_to_body": "212/212",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Nemes": [
+            "Head"
+          ],
+          "BroadCollar": [
+            "UpperTorso"
+          ],
+          "LeopardSash": [
+            "UpperTorso"
+          ],
+          "Shendyt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightArmlet": [
+            "RightUpperArm"
+          ],
+          "LeftArmlet": [
+            "LeftUpperArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "Papyrus": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 40,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 6,
+          "UnitType": "Mage",
+          "Era": "Starověk",
+          "AppearanceChars": 246
+        },
+        "part_count": 228,
+        "wedge_count": 0,
+        "neon_parts": 10,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 170,
+          "removed_or_moved_parts": 248
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L06_ChramovyKnez.rbxmx",
+        "bytes": 395618,
+        "instances": 531,
+        "referents_unique": 531,
+        "refs_used": 455,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 7,
+      "model": "Mage_L07_FaraonuvMag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 239,
+        "equipment_welded_to_body": "239/239",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Khepresh": [
+            "Head"
+          ],
+          "BroadCollar": [
+            "UpperTorso"
+          ],
+          "Pectoral": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "GoldenOrb": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 44,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 7,
+          "UnitType": "Mage",
+          "Era": "Starověk",
+          "AppearanceChars": 254
+        },
+        "part_count": 255,
+        "wedge_count": 0,
+        "neon_parts": 14,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 162,
+          "removed_or_moved_parts": 137
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L07_FaraonuvMag.rbxmx",
+        "bytes": 440115,
+        "instances": 587,
+        "referents_unique": 587,
+        "refs_used": 509,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 8,
+      "model": "Mage_L08_Vestec",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 224,
+        "equipment_welded_to_body": "224/224",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "LaurelWreath": [
+            "Head"
+          ],
+          "Chiton": [
+            "UpperTorso"
+          ],
+          "Himation": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "SealedScroll": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 60,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 8,
+          "UnitType": "Mage",
+          "Era": "Starověk",
+          "AppearanceChars": 219
+        },
+        "part_count": 240,
+        "wedge_count": 0,
+        "neon_parts": 9,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 153,
+          "removed_or_moved_parts": 167
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L08_Vestec.rbxmx",
+        "bytes": 417436,
+        "instances": 557,
+        "referents_unique": 557,
+        "refs_used": 479,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 9,
+      "model": "Mage_L09_UcenecAlexandrie",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 252,
+        "equipment_welded_to_body": "252/252",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Hood": [
+            "Head"
+          ],
+          "Himation": [
+            "UpperTorso"
+          ],
+          "ScrollCase": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBronzeBracer": [
+            "RightLowerArm"
+          ],
+          "LeftBronzeBracer": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "ArmillarySphere": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 75,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 9,
+          "UnitType": "Mage",
+          "Era": "Starověk",
+          "AppearanceChars": 252
+        },
+        "part_count": 268,
+        "wedge_count": 0,
+        "neon_parts": 13,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 172,
+          "removed_or_moved_parts": 145
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L09_UcenecAlexandrie.rbxmx",
+        "bytes": 464486,
+        "instances": 614,
+        "referents_unique": 614,
+        "refs_used": 535,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 10,
+      "model": "Mage_L10_Veleknez",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 240,
+        "equipment_welded_to_body": "240/240",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "RadiateCrown": [
+            "Head"
+          ],
+          "Toga": [
+            "UpperTorso"
+          ],
+          "Pectoral": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "Codex": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 0,
+        "staff_parts": 62,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 10,
+          "UnitType": "Mage",
+          "Era": "Starověk",
+          "AppearanceChars": 247
+        },
+        "part_count": 256,
+        "wedge_count": 1,
+        "neon_parts": 16,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 170,
+          "removed_or_moved_parts": 180
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L10_Veleknez.rbxmx",
+        "bytes": 441295,
+        "instances": 589,
+        "referents_unique": 589,
+        "refs_used": 511,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 11,
+      "model": "Mage_L11_Carodej",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 175,
+        "equipment_welded_to_body": "175/175",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "RobeTop": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Hat": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "Spellbook": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 6,
+        "staff_parts": 42,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 11,
+          "UnitType": "Mage",
+          "Era": "Středověk",
+          "AppearanceChars": 248
+        },
+        "part_count": 191,
+        "wedge_count": 2,
+        "neon_parts": 11,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 130,
+          "removed_or_moved_parts": 196
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L11_Carodej.rbxmx",
+        "bytes": 336546,
+        "instances": 461,
+        "referents_unique": 461,
+        "refs_used": 381,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 12,
+      "model": "Mage_L12_Kouzelnik",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 209,
+        "equipment_welded_to_body": "209/209",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "RobeTop": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "Hat": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "GlowOrb": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 6,
+        "staff_parts": 48,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 12,
+          "UnitType": "Mage",
+          "Era": "Středověk",
+          "AppearanceChars": 220
+        },
+        "part_count": 225,
+        "wedge_count": 2,
+        "neon_parts": 48,
+        "pointlights": 2,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 120,
+          "removed_or_moved_parts": 86
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L12_Kouzelnik.rbxmx",
+        "bytes": 393386,
+        "instances": 528,
+        "referents_unique": 528,
+        "refs_used": 449,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 13,
+      "model": "Mage_L13_RunovyMag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 252,
+        "equipment_welded_to_body": "252/252",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "RobeTop": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Hood": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "RuneBook": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            150,
+            120,
+            255
+          ]
+        },
+        "staff_floating_parts": 12,
+        "staff_parts": 66,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 13,
+          "UnitType": "Mage",
+          "Era": "Středověk",
+          "AppearanceChars": 238
+        },
+        "part_count": 268,
+        "wedge_count": 2,
+        "neon_parts": 57,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 154,
+          "removed_or_moved_parts": 110
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L13_RunovyMag.rbxmx",
+        "bytes": 463868,
+        "instances": 614,
+        "referents_unique": 614,
+        "refs_used": 535,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 14,
+      "model": "Mage_L14_HvezdnyMag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 283,
+        "equipment_welded_to_body": "283/283",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "RobeTop": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "RightPauldron": [
+            "RightUpperArm"
+          ],
+          "LeftPauldron": [
+            "LeftUpperArm"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Hat": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "CrystalBall": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 10,
+        "staff_parts": 66,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 14,
+          "UnitType": "Mage",
+          "Era": "Středověk",
+          "AppearanceChars": 251
+        },
+        "part_count": 299,
+        "wedge_count": 2,
+        "neon_parts": 52,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 155,
+          "removed_or_moved_parts": 125
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L14_HvezdnyMag.rbxmx",
+        "bytes": 516508,
+        "instances": 679,
+        "referents_unique": 679,
+        "refs_used": 597,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 15,
+      "model": "Mage_L15_VelmistrMagie",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 302,
+        "equipment_welded_to_body": "302/302",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "RobeTop": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "RightPauldron": [
+            "RightUpperArm"
+          ],
+          "LeftPauldron": [
+            "LeftUpperArm"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Hat": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "ChainedGrimoire": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 12,
+        "staff_parts": 66,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 15,
+          "UnitType": "Mage",
+          "Era": "Středověk",
+          "AppearanceChars": 259
+        },
+        "part_count": 318,
+        "wedge_count": 2,
+        "neon_parts": 66,
+        "pointlights": 2,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 144,
+          "removed_or_moved_parts": 127
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L15_VelmistrMagie.rbxmx",
+        "bytes": 548253,
+        "instances": 718,
+        "referents_unique": 718,
+        "refs_used": 635,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 16,
+      "model": "Mage_L16_Alchymista",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 231,
+        "equipment_welded_to_body": "231/231",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Coat": [
+            "UpperTorso"
+          ],
+          "CoatTails": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Apron": [
+            "UpperTorso"
+          ],
+          "ApronSkirt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightShirtCuff": [
+            "RightLowerArm"
+          ],
+          "LeftShirtCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "LeatherCap": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "Flask": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 6,
+        "staff_parts": 56,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 16,
+          "UnitType": "Mage",
+          "Era": "Průmyslový věk",
+          "AppearanceChars": 241
+        },
+        "part_count": 247,
+        "wedge_count": 2,
+        "neon_parts": 19,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 157,
+          "removed_or_moved_parts": 227
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L16_Alchymista.rbxmx",
+        "bytes": 426525,
+        "instances": 576,
+        "referents_unique": 576,
+        "refs_used": 493,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 17,
+      "model": "Mage_L17_ParniMag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 278,
+        "equipment_welded_to_body": "278/278",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Coat": [
+            "UpperTorso"
+          ],
+          "CoatTails": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Bandolier": [
+            "UpperTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightShirtCuff": [
+            "RightLowerArm"
+          ],
+          "LeftShirtCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "TopHat": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "BrassSphere": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 6,
+        "staff_parts": 63,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 17,
+          "UnitType": "Mage",
+          "Era": "Průmyslový věk",
+          "AppearanceChars": 253
+        },
+        "part_count": 294,
+        "wedge_count": 2,
+        "neon_parts": 20,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 151,
+          "removed_or_moved_parts": 105
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L17_ParniMag.rbxmx",
+        "bytes": 503474,
+        "instances": 667,
+        "referents_unique": 667,
+        "refs_used": 587,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 18,
+      "model": "Mage_L18_MechanikEteru",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 283,
+        "equipment_welded_to_body": "283/283",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Coat": [
+            "UpperTorso"
+          ],
+          "Scarf": [
+            "UpperTorso"
+          ],
+          "CoatTails": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "Epaulette": [
+            "RightUpperArm"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightShirtCuff": [
+            "RightLowerArm"
+          ],
+          "LeftShirtCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "AviatorCap": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "BrassTome": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 8,
+        "staff_parts": 84,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 18,
+          "UnitType": "Mage",
+          "Era": "Průmyslový věk",
+          "AppearanceChars": 223
+        },
+        "part_count": 299,
+        "wedge_count": 2,
+        "neon_parts": 15,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 162,
+          "removed_or_moved_parts": 159
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L18_MechanikEteru.rbxmx",
+        "bytes": 514378,
+        "instances": 678,
+        "referents_unique": 678,
+        "refs_used": 597,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 19,
+      "model": "Mage_L19_Elektromag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 293,
+        "equipment_welded_to_body": "293/293",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Coat": [
+            "UpperTorso"
+          ],
+          "CoatTails": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "TankPack": [
+            "UpperTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightShirtCuff": [
+            "RightLowerArm"
+          ],
+          "LeftShirtCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "TeslaHat": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "LightningGlobe": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            150,
+            200,
+            255
+          ]
+        },
+        "staff_floating_parts": 10,
+        "staff_parts": 72,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 19,
+          "UnitType": "Mage",
+          "Era": "Průmyslový věk",
+          "AppearanceChars": 227
+        },
+        "part_count": 309,
+        "wedge_count": 2,
+        "neon_parts": 42,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 169,
+          "removed_or_moved_parts": 156
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L19_Elektromag.rbxmx",
+        "bytes": 530058,
+        "instances": 699,
+        "referents_unique": 699,
+        "refs_used": 617,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 20,
+      "model": "Mage_L20_MistrEteru",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 355,
+        "equipment_welded_to_body": "355/355",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "Coat": [
+            "UpperTorso"
+          ],
+          "CoatTails": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "TankPack": [
+            "UpperTorso"
+          ],
+          "ArmBraceUpper": [
+            "RightUpperArm"
+          ],
+          "ArmBraceLower": [
+            "RightLowerArm"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightShirtCuff": [
+            "RightLowerArm"
+          ],
+          "LeftShirtCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "CrownHat": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "PhilosopherStone": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            92,
+            255
+          ]
+        },
+        "staff_floating_parts": 12,
+        "staff_parts": 96,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 20,
+          "UnitType": "Mage",
+          "Era": "Průmyslový věk",
+          "AppearanceChars": 251
+        },
+        "part_count": 371,
+        "wedge_count": 2,
+        "neon_parts": 43,
+        "pointlights": 2,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 192,
+          "removed_or_moved_parts": 132
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L20_MistrEteru.rbxmx",
+        "bytes": 631638,
+        "instances": 824,
+        "referents_unique": 824,
+        "refs_used": 741,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 21,
+      "model": "Mage_L21_Technomag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 199,
+        "equipment_welded_to_body": "199/199",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "TacticalCoat": [
+            "UpperTorso"
+          ],
+          "CoatSkirt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "ThighRig": [
+            "RightUpperLeg"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightElbowPad": [
+            "RightLowerArm"
+          ],
+          "LeftElbowPad": [
+            "LeftLowerArm"
+          ],
+          "WristHolo": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "TacticalHood": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "HoloTablet": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            96,
+            255
+          ]
+        },
+        "staff_floating_parts": 6,
+        "staff_parts": 38,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 21,
+          "UnitType": "Mage",
+          "Era": "Moderní doba",
+          "AppearanceChars": 235
+        },
+        "part_count": 215,
+        "wedge_count": 0,
+        "neon_parts": 60,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 142,
+          "removed_or_moved_parts": 294
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L21_Technomag.rbxmx",
+        "bytes": 375323,
+        "instances": 511,
+        "referents_unique": 511,
+        "refs_used": 429,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 22,
+      "model": "Mage_L22_Kybermag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 245,
+        "equipment_welded_to_body": "245/245",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "TacticalCoat": [
+            "UpperTorso"
+          ],
+          "CoatSkirt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "ThighRig": [
+            "RightUpperLeg"
+          ],
+          "RightKneePad": [
+            "RightLowerLeg"
+          ],
+          "LeftKneePad": [
+            "LeftLowerLeg"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightElbowPad": [
+            "RightLowerArm"
+          ],
+          "LeftElbowPad": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "Visor": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "DataCrystal": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            96,
+            255
+          ]
+        },
+        "staff_floating_parts": 4,
+        "staff_parts": 73,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 22,
+          "UnitType": "Mage",
+          "Era": "Moderní doba",
+          "AppearanceChars": 205
+        },
+        "part_count": 261,
+        "wedge_count": 0,
+        "neon_parts": 83,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 130,
+          "removed_or_moved_parts": 84
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L22_Kybermag.rbxmx",
+        "bytes": 450246,
+        "instances": 605,
+        "referents_unique": 605,
+        "refs_used": 521,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 23,
+      "model": "Mage_L23_DatovySaman",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 244,
+        "equipment_welded_to_body": "244/244",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "TacticalCoat": [
+            "UpperTorso"
+          ],
+          "CoatSkirt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "ThighRig": [
+            "RightUpperLeg"
+          ],
+          "RightKneePad": [
+            "RightLowerLeg"
+          ],
+          "LeftKneePad": [
+            "LeftLowerLeg"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightElbowPad": [
+            "RightLowerArm"
+          ],
+          "LeftElbowPad": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerLED": [
+            "RightHand"
+          ],
+          "LeftFingerLED": [
+            "LeftHand"
+          ],
+          "Drone": [
+            "UpperTorso"
+          ],
+          "DataHood": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "HoloBook": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            60,
+            220,
+            255
+          ]
+        },
+        "staff_floating_parts": 6,
+        "staff_parts": 54,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 23,
+          "UnitType": "Mage",
+          "Era": "Moderní doba",
+          "AppearanceChars": 206
+        },
+        "part_count": 260,
+        "wedge_count": 0,
+        "neon_parts": 90,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 103,
+          "removed_or_moved_parts": 104
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L23_DatovySaman.rbxmx",
+        "bytes": 449022,
+        "instances": 605,
+        "referents_unique": 605,
+        "refs_used": 519,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 24,
+      "model": "Mage_L24_StrazceSite",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 258,
+        "equipment_welded_to_body": "258/258",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "TacticalCoat": [
+            "UpperTorso"
+          ],
+          "CoatSkirt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "ThighRig": [
+            "RightUpperLeg"
+          ],
+          "RightKneePad": [
+            "RightLowerLeg"
+          ],
+          "LeftKneePad": [
+            "LeftLowerLeg"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightElbowPad": [
+            "RightLowerArm"
+          ],
+          "LeftElbowPad": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerLED": [
+            "RightHand"
+          ],
+          "LeftFingerLED": [
+            "LeftHand"
+          ],
+          "RightShoulderEmitter": [
+            "RightUpperArm"
+          ],
+          "LeftShoulderEmitter": [
+            "LeftUpperArm"
+          ],
+          "StripCloak": [
+            "UpperTorso"
+          ],
+          "HalfHelmet": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "EnergyOrb": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            96,
+            255
+          ]
+        },
+        "staff_floating_parts": 8,
+        "staff_parts": 45,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 24,
+          "UnitType": "Mage",
+          "Era": "Moderní doba",
+          "AppearanceChars": 201
+        },
+        "part_count": 274,
+        "wedge_count": 2,
+        "neon_parts": 87,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 121,
+          "removed_or_moved_parts": 107
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L24_StrazceSite.rbxmx",
+        "bytes": 472879,
+        "instances": 636,
+        "referents_unique": 636,
+        "refs_used": 547,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 25,
+      "model": "Mage_L25_PlazmovyVelitel",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 325,
+        "equipment_welded_to_body": "325/325",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "TacticalCoat": [
+            "UpperTorso"
+          ],
+          "CoatSkirt": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "ThighRig": [
+            "RightUpperLeg"
+          ],
+          "RightKneePad": [
+            "RightLowerLeg"
+          ],
+          "LeftKneePad": [
+            "LeftLowerLeg"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightElbowPad": [
+            "RightLowerArm"
+          ],
+          "LeftElbowPad": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerLED": [
+            "RightHand"
+          ],
+          "LeftFingerLED": [
+            "LeftHand"
+          ],
+          "HoloRunes": [
+            "UpperTorso"
+          ],
+          "CommandCape": [
+            "UpperTorso"
+          ],
+          "CrownVisor": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "PlasmaCore": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            96,
+            255
+          ]
+        },
+        "staff_floating_parts": 10,
+        "staff_parts": 89,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 25,
+          "UnitType": "Mage",
+          "Era": "Moderní doba",
+          "AppearanceChars": 229
+        },
+        "part_count": 341,
+        "wedge_count": 0,
+        "neon_parts": 142,
+        "pointlights": 3,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 182,
+          "removed_or_moved_parts": 115
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L25_PlazmovyVelitel.rbxmx",
+        "bytes": 586834,
+        "instances": 771,
+        "referents_unique": 771,
+        "refs_used": 681,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 26,
+      "model": "Mage_L26_HvezdnyPoutnik",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 239,
+        "equipment_welded_to_body": "239/239",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "PanelRobe": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerGlow": [
+            "RightHand"
+          ],
+          "LeftFingerGlow": [
+            "LeftHand"
+          ],
+          "Aureole": [
+            "Head"
+          ],
+          "StarHood": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "StarOrb": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            80,
+            205,
+            255
+          ]
+        },
+        "staff_floating_parts": 8,
+        "staff_parts": 71,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 26,
+          "UnitType": "Mage",
+          "Era": "Budoucnost",
+          "AppearanceChars": 226
+        },
+        "part_count": 255,
+        "wedge_count": 0,
+        "neon_parts": 106,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 179,
+          "removed_or_moved_parts": 268
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L26_HvezdnyPoutnik.rbxmx",
+        "bytes": 441561,
+        "instances": 590,
+        "referents_unique": 590,
+        "refs_used": 509,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 27,
+      "model": "Mage_L27_KosmickyMag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 324,
+        "equipment_welded_to_body": "324/324",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "PanelRobe": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerGlow": [
+            "RightHand"
+          ],
+          "LeftFingerGlow": [
+            "LeftHand"
+          ],
+          "RightHoverPauldron": [
+            "RightUpperArm"
+          ],
+          "LeftHoverPauldron": [
+            "LeftUpperArm"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "Aureole": [
+            "Head"
+          ],
+          "ShardCrown": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "CosmicOrb": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            100,
+            255
+          ]
+        },
+        "staff_floating_parts": 10,
+        "staff_parts": 71,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 27,
+          "UnitType": "Mage",
+          "Era": "Budoucnost",
+          "AppearanceChars": 192
+        },
+        "part_count": 340,
+        "wedge_count": 0,
+        "neon_parts": 177,
+        "pointlights": 1,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 187,
+          "removed_or_moved_parts": 99
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L27_KosmickyMag.rbxmx",
+        "bytes": 584370,
+        "instances": 764,
+        "referents_unique": 764,
+        "refs_used": 679,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 28,
+      "model": "Mage_L28_NebeskyMudrc",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 365,
+        "equipment_welded_to_body": "365/365",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "PanelRobe": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerGlow": [
+            "RightHand"
+          ],
+          "LeftFingerGlow": [
+            "LeftHand"
+          ],
+          "RightHoverPauldron": [
+            "RightUpperArm"
+          ],
+          "LeftHoverPauldron": [
+            "LeftUpperArm"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "Aureole": [
+            "Head"
+          ],
+          "CrystalOrbit": [
+            "LowerTorso"
+          ],
+          "PanelCrown": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "HoloScroll": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            100,
+            255
+          ]
+        },
+        "staff_floating_parts": 12,
+        "staff_parts": 91,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 28,
+          "UnitType": "Mage",
+          "Era": "Budoucnost",
+          "AppearanceChars": 206
+        },
+        "part_count": 381,
+        "wedge_count": 0,
+        "neon_parts": 203,
+        "pointlights": 2,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 182,
+          "removed_or_moved_parts": 141
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L28_NebeskyMudrc.rbxmx",
+        "bytes": 650846,
+        "instances": 848,
+        "referents_unique": 848,
+        "refs_used": 761,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 29,
+      "model": "Mage_L29_Arcimag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 494,
+        "equipment_welded_to_body": "494/494",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "PanelRobe": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerGlow": [
+            "RightHand"
+          ],
+          "LeftFingerGlow": [
+            "LeftHand"
+          ],
+          "RightHoverPauldron": [
+            "RightUpperArm"
+          ],
+          "LeftHoverPauldron": [
+            "LeftUpperArm"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "Aureole": [
+            "Head"
+          ],
+          "CrystalOrbit": [
+            "LowerTorso"
+          ],
+          "Wings": [
+            "UpperTorso"
+          ],
+          "EnergyCrown": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "Singularity": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            100,
+            255
+          ]
+        },
+        "staff_floating_parts": 12,
+        "staff_parts": 93,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 29,
+          "UnitType": "Mage",
+          "Era": "Budoucnost",
+          "AppearanceChars": 219
+        },
+        "part_count": 510,
+        "wedge_count": 0,
+        "neon_parts": 323,
+        "pointlights": 2,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 305,
+          "removed_or_moved_parts": 176
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L29_Arcimag.rbxmx",
+        "bytes": 874509,
+        "instances": 1107,
+        "referents_unique": 1107,
+        "refs_used": 1019,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    },
+    {
+      "level": 30,
+      "model": "Mage_L30_ApexMag",
+      "errors": [],
+      "checks": {
+        "body_parts": "16/16",
+        "motor6d": "15/15 OK",
+        "attachments": 49,
+        "humanoid": "R15 + Animator",
+        "anchored": [
+          "HumanoidRootPart"
+        ],
+        "cancollide_true": 0,
+        "scripts": 0,
+        "meshes_textures": 0,
+        "equipment_parts": 554,
+        "equipment_welded_to_body": "554/554",
+        "equipment_items": {
+          "Face": [
+            "Head"
+          ],
+          "Hair": [
+            "Head"
+          ],
+          "Beard": [
+            "Head"
+          ],
+          "PanelRobe": [
+            "UpperTorso"
+          ],
+          "Robe": [
+            "LowerTorso"
+          ],
+          "Belt": [
+            "LowerTorso"
+          ],
+          "RightSleeve": [
+            "RightUpperArm"
+          ],
+          "LeftSleeve": [
+            "LeftUpperArm"
+          ],
+          "RightCuff": [
+            "RightLowerArm"
+          ],
+          "LeftCuff": [
+            "LeftLowerArm"
+          ],
+          "RightBoot": [
+            "RightFoot"
+          ],
+          "RightBootShaft": [
+            "RightLowerLeg"
+          ],
+          "LeftBoot": [
+            "LeftFoot"
+          ],
+          "LeftBootShaft": [
+            "LeftLowerLeg"
+          ],
+          "RightGlove": [
+            "RightHand"
+          ],
+          "RightBracer": [
+            "RightLowerArm"
+          ],
+          "LeftGlove": [
+            "LeftHand"
+          ],
+          "LeftBracer": [
+            "LeftLowerArm"
+          ],
+          "RightFingerGlow": [
+            "RightHand"
+          ],
+          "LeftFingerGlow": [
+            "LeftHand"
+          ],
+          "RightHoverPauldron": [
+            "RightUpperArm"
+          ],
+          "LeftHoverPauldron": [
+            "LeftUpperArm"
+          ],
+          "Cloak": [
+            "UpperTorso"
+          ],
+          "Aureole": [
+            "Head"
+          ],
+          "CrystalOrbit": [
+            "LowerTorso"
+          ],
+          "Wings": [
+            "UpperTorso"
+          ],
+          "ApexCrown": [
+            "Head"
+          ],
+          "Staff": [
+            "RightHand"
+          ],
+          "QuantumCube": [
+            "LeftHand"
+          ]
+        },
+        "staff_through_fist": {
+          "axis_distance_from_hand_center": 0.0,
+          "handle_center_inside_hand": true,
+          "staff_root_welded_to": "RightHand"
+        },
+        "staff_parts_welded_to_handle": true,
+        "staff_crystal": {
+          "material": "Neon",
+          "pointlight": true,
+          "color": [
+            176,
+            100,
+            255
+          ]
+        },
+        "staff_floating_parts": 16,
+        "staff_parts": 119,
+        "feet_bottom_y": 0.0,
+        "lowest_point_y": -0.0,
+        "faces_minus_z": true,
+        "metadata": {
+          "Level": 30,
+          "UnitType": "Mage",
+          "Era": "Budoucnost",
+          "AppearanceChars": 274
+        },
+        "part_count": 570,
+        "wedge_count": 0,
+        "neon_parts": 376,
+        "pointlights": 4,
+        "geometry_changed_vs_prev": {
+          "new_or_moved_parts": 333,
+          "removed_or_moved_parts": 273
+        }
+      },
+      "ok": true,
+      "file": {
+        "path": "modely/Mage_L30_ApexMag.rbxmx",
+        "bytes": 973917,
+        "instances": 1229,
+        "referents_unique": 1229,
+        "refs_used": 1139,
+        "refs_unresolved": 0,
+        "asset_ids": 0,
+        "rbx_dom_strict_parse": true,
+        "rbx_dom_class_counts_match": true,
+        "joints_with_null_parts": 0
+      }
+    }
+  ]
+}

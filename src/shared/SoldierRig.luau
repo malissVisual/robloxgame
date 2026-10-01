@@ -1,6 +1,6 @@
 --!nonstrict
 -- The designed classes (Soldier, Knight, Archer, Mage, Hunter, Berserker, Tank) as R15 characters: 9 designed stages
--- each (one per merge level), except the Knight and the Archer, which have 30 (the R15 evolution models,
+-- each (one per merge level), except the Knight, the Archer and the Mage, which have 30 (the R15 evolution models,
 -- buildEvolution below). The Soldier comes from design/SoldierMerge_R15_Builder, the Mage from the purple mage
 -- cards, the Hunter, the Berserker and the Tank from their card sheets. The gear is parts welded on the limbs of
 -- the R15 base rig (Rig.base).
@@ -10,13 +10,14 @@
 -- to something else.
 
 local Rig = require(script.Parent.Rig)
--- The Knight and the Archer do not use their 9 cards below any more: their 30 merge levels are the R15 evolution
--- models (design/KnightEvolution, design/ArcherEvolution; generated into StageModels/<Class>Evolution), see
+-- The Knight, the Archer and the Mage do not use their 9 cards below any more: their 30 merge levels are the R15
+-- evolution models (design/KnightEvolution, ArcherEvolution, MageEvolution; generated into StageModels/<Class>Evolution), see
 -- buildEvolution. `attack` / `hold` = the animations (Rig.animate); `holdFrom` = the level the weapon hand is
 -- held up from (the Knight carries a weapon from level 3; the bow of the Archer hangs in the left hand).
 local EVOLUTIONS = {
 	Knight = { data = require(script.Parent.StageModels.KnightEvolution), attack = "slash", holdFrom = 3 },
 	Archer = { data = require(script.Parent.StageModels.ArcherEvolution), attack = "lunge", holdFrom = 99 },
+	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "cast", holdFrom = 1 },
 }
 
 local C = Color3.fromRGB
@@ -2310,6 +2311,16 @@ local function buildEvolution(class: string, tier: number, s: number, bare: bool
 				w.Part0 = host
 				w.Part1 = p
 				w.Parent = p
+				-- A light the design put on the part (a crystal, an orb): kept soft like the other auras.
+				local lightData = entry[6] and entry[6].light
+				if lightData then
+					local l = Instance.new("PointLight")
+					l.Color = Color3.fromRGB(lightData[1], lightData[2], lightData[3])
+					l.Range = lightData[4] * rs * AURA_RANGE
+					l.Brightness = lightData[5] * AURA_BRIGHTNESS
+					l.Shadows = false
+					l.Parent = p
+				end
 			end
 		end
 	end

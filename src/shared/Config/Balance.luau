@@ -45,7 +45,7 @@ local Balance = {
 		[7] = { wave = 25, cost = 6000 },
 		[8] = { wave = 40, cost = 15000 },
 		[9] = { wave = 60, cost = 40000 },
-		-- levels 10 … 30 (only the Knight and the Archer go this far) are filled in below
+		-- levels 10 … 30 (only the Knight, the Archer and the Mage go this far) are filled in below
 	},
 
 	-- Account level (shown top left): experience from kills and won waves. Going from level L to L + 1
@@ -182,7 +182,7 @@ local Balance = {
 	SplashFraction = 0.5,
 }
 
--- Merge levels 10 … 30 exist only for the Knight and the Archer (their 30-level evolutions, maxTier in Units):
+-- Merge levels 10 … 30 exist only for the Knight, the Archer and the Mage (their 30-level evolutions, maxTier in Units):
 -- every further level needs two more cleared waves (up to 100) and costs 25 % more coins than the one before.
 for tier = 10, 30 do
 	Balance.TierUnlocks[tier] = { wave = math.min(100, 60 + 2 * (tier - 9)), cost = math.floor(40000 * 1.25 ^ (tier - 9)) }

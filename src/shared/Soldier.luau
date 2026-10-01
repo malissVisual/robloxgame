@@ -398,7 +398,7 @@ function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolea
 	model.Name = def.label
 
 	if SoldierRig.has(class) then
-		-- The designed classes are R15 characters with 9 designed stages, the Knight and the Archer with 30 (SoldierRig.luau). Without the base rig
+		-- The designed classes are R15 characters with 9 designed stages, the Knight, the Archer and the Mage with 30 (SoldierRig.luau). Without the base rig
 		-- (it could not be made, or it has not reached this client yet) the block soldier below is built.
 		local rig, rigHead, rigTop = SoldierRig.build(tier, s, bare, class)
 		if rig and rigHead and rigTop then
