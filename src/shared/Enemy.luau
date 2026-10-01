@@ -43,10 +43,10 @@ local function getBase(): Model?
 		local ok, result = pcall(function()
 			local description = Instance.new("HumanoidDescription")
 			-- A goblin: a big head on a short, stocky body.
-			description.HeadScale = 1.3
-			description.HeightScale = 0.92
-			description.WidthScale = 1.0
-			description.DepthScale = 1.0
+			description.HeadScale = 1.45
+			description.HeightScale = 0.86
+			description.WidthScale = 0.95
+			description.DepthScale = 0.95
 			return Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
 		end)
 		local rig = if ok then result :: Model else nil
@@ -295,14 +295,29 @@ function Enemy.build(kind: string, level: number): Model
 	-- The head's half sizes at scale 1 (the head has its own scale).
 	local hx, hy, hz = head.Size.X / 2 / s, head.Size.Y / 2 / s, head.Size.Z / 2 / s
 
-	-- The goblin face: long ears, a pointy nose, glowing eyes, fangs.
-	attach(head, "EarL", Vector3.new(0.9, 0.3, 0.15), Vector3.new(-hx - 0.3, 0.15, 0), skin, nil, nil, Vector3.new(0, 0, 22))
-	attach(head, "EarR", Vector3.new(0.9, 0.3, 0.15), Vector3.new(hx + 0.3, 0.15, 0), skin, nil, nil, Vector3.new(0, 0, -22))
-	attach(head, "Nose", Vector3.new(0.22, 0.32, 0.5), Vector3.new(0, -0.08, -hz - 0.15), dark)
-	attach(head, "EyeL", Vector3.new(0.28, 0.2, 0.1), Vector3.new(-hx * 0.45, 0.2, -hz + 0.02), YELLOW, nil, Enum.Material.Neon, Vector3.new(0, 0, -12))
-	attach(head, "EyeR", Vector3.new(0.28, 0.2, 0.1), Vector3.new(hx * 0.45, 0.2, -hz + 0.02), YELLOW, nil, Enum.Material.Neon, Vector3.new(0, 0, 12))
-	attach(head, "FangL", Vector3.new(0.1, 0.2, 0.08), Vector3.new(-0.2, -hy * 0.55, -hz + 0.02), BONE)
-	attach(head, "FangR", Vector3.new(0.1, 0.2, 0.08), Vector3.new(0.2, -hy * 0.55, -hz + 0.02), BONE)
+	-- The goblin face (the design sheet): long pointed ears angled up and back, a pointy nose, angry brows over
+	-- pale eyes with dark pupils, a wide dark mouth and two tusks rising from the lower jaw. Bigger fists too.
+	local INK = C(28, 30, 36)
+	local EYE = C(236, 240, 180)
+	attach(head, "EarL", Vector3.new(1.2, 0.36, 0.22), Vector3.new(-hx - 0.45, 0.3, 0.1), skin, nil, nil, Vector3.new(0, 15, 32))
+	attach(head, "EarR", Vector3.new(1.2, 0.36, 0.22), Vector3.new(hx + 0.45, 0.3, 0.1), skin, nil, nil, Vector3.new(0, -15, -32))
+	attach(head, "EarTipL", Vector3.new(0.45, 0.22, 0.14), Vector3.new(-hx - 0.95, 0.62, 0.22), skin, nil, nil, Vector3.new(0, 15, 32))
+	attach(head, "EarTipR", Vector3.new(0.45, 0.22, 0.14), Vector3.new(hx + 0.95, 0.62, 0.22), skin, nil, nil, Vector3.new(0, -15, -32))
+	attach(head, "Nose", Vector3.new(0.26, 0.3, 0.55), Vector3.new(0, -0.05, -hz - 0.2), skin, nil, nil, Vector3.new(-12, 0, 0))
+	for _, side in { -1, 1 } do
+		local x = side * hx * 0.42
+		attach(head, "Eye", Vector3.new(0.34, 0.26, 0.08), Vector3.new(x, 0.22, -hz - 0.02), EYE)
+		attach(head, "Pupil", Vector3.new(0.14, 0.18, 0.1), Vector3.new(x + side * 0.03, 0.2, -hz - 0.04), INK)
+		attach(head, "Brow", Vector3.new(0.44, 0.1, 0.08), Vector3.new(x + side * 0.02, 0.42, -hz - 0.03), INK, nil, nil, Vector3.new(0, 0, side * 18))
+		attach(head, "Tusk", Vector3.new(0.13, 0.32, 0.12), Vector3.new(side * 0.26, -hy * 0.42, -hz - 0.06), BONE, nil, nil, Vector3.new(0, 0, -side * 10))
+	end
+	attach(head, "Mouth", Vector3.new(0.72, 0.13, 0.06), Vector3.new(0, -hy * 0.5, -hz - 0.02), INK)
+	for _, handName in { "LeftHand", "RightHand" } do
+		local fist = model:FindFirstChild(handName) :: BasePart?
+		if fist then
+			fist.Size = fist.Size * Vector3.new(1.3, 1.15, 1.3)
+		end
+	end
 	-- A box around a body part (its size at scale 1 plus `grow`, and always a bit thicker than the part so it
 	-- reads as a piece of clothing or armor), for clothes, armor and hoods.
 	local function cover(part: BasePart, name: string, grow: Vector3, offset: Vector3, color: Color3, material: Enum.Material?): Part
@@ -389,14 +404,38 @@ function Enemy.build(kind: string, level: number): Model
 	end
 	local function staff(crystal: Color3, size: number?) -- in the right hand, along -Z (held up)
 		attach(hand, "Staff", Vector3.new(0.2, 0.2, 3.4), Vector3.new(0, -0.1, -0.9), WOOD)
+		attach(hand, "StaffGrip", Vector3.new(0.26, 0.26, 0.5), Vector3.new(0, -0.1, -0.1), LEATHER)
+		attach(hand, "StaffBandA", Vector3.new(0.27, 0.27, 0.12), Vector3.new(0, -0.1, -1.6), GOLD, nil, METAL)
+		attach(hand, "StaffBandB", Vector3.new(0.27, 0.27, 0.12), Vector3.new(0, -0.1, -2.3), GOLD, nil, METAL)
 		local k = size or 0.55
-		attach(hand, "Crystal", Vector3.new(k, k * 1.6, k), Vector3.new(0, -0.1, -2.75), crystal, nil, NEON, Vector3.new(90, 45, 0))
+		-- The crystal sits in a small claw (two prongs) and lights its surroundings.
+		attach(hand, "ClawL", Vector3.new(0.1, 0.1, 0.5), Vector3.new(-k * 0.45, -0.1, -2.6), DARK_WOOD)
+		attach(hand, "ClawR", Vector3.new(0.1, 0.1, 0.5), Vector3.new(k * 0.45, -0.1, -2.6), DARK_WOOD)
+		local gem = attach(hand, "Crystal", Vector3.new(k, k * 1.6, k), Vector3.new(0, -0.1, -2.85), crystal, nil, NEON, Vector3.new(90, 45, 0))
+		local light = Instance.new("PointLight")
+		light.Color = crystal
+		light.Range = 7
+		light.Brightness = 0.9
+		light.Shadows = false
+		light.Parent = gem
+	end
+	local function bow(color: Color3) -- a bow with curved tips and a string, along -Z (held up)
+		attach(hand, "BowGrip", Vector3.new(0.22, 0.34, 0.6), Vector3.new(0, -0.1, -0.5), LEATHER)
+		attach(hand, "BowUpper", Vector3.new(0.15, 0.28, 1.3), Vector3.new(0, -0.05, -1.3), color, nil, nil, Vector3.new(10, 0, 0))
+		attach(hand, "BowLower", Vector3.new(0.15, 0.28, 1.3), Vector3.new(0, -0.05, 0.3), color, nil, nil, Vector3.new(-10, 0, 0))
+		attach(hand, "BowTipUpper", Vector3.new(0.13, 0.22, 0.45), Vector3.new(0, 0.12, -2.05), color, nil, nil, Vector3.new(30, 0, 0))
+		attach(hand, "BowTipLower", Vector3.new(0.13, 0.22, 0.45), Vector3.new(0, 0.12, 1.05), color, nil, nil, Vector3.new(-30, 0, 0))
+		attach(hand, "BowString", Vector3.new(0.04, 0.04, 3.0), Vector3.new(0, 0.3, -0.5), BONE)
 	end
 	local function shield(face: Color3, emblem: Color3, emblemName: string) -- on the left forearm
 		local forearm = limb("LeftLowerArm")
 		attach(forearm, "Shield", Vector3.new(0.18, 1.6, 1.3), Vector3.new(-0.5, 0, -0.1), face, nil, METAL)
 		attach(forearm, "ShieldRim", Vector3.new(0.12, 1.75, 1.45), Vector3.new(-0.46, 0, -0.1), IRON, nil, METAL)
 		attach(forearm, emblemName, Vector3.new(0.1, 0.7, 0.45), Vector3.new(-0.6, 0.05, -0.1), emblem)
+		attach(forearm, "ShieldBoss", Vector3.new(0.14, 0.3, 0.3), Vector3.new(-0.64, 0.05, -0.1), GOLD, nil, METAL)
+		for _, corner_ in { Vector3.new(0.6, 0.45), Vector3.new(-0.6, 0.45), Vector3.new(0.6, -0.65), Vector3.new(-0.6, -0.65) } do
+			attach(forearm, "Rivet", Vector3.new(0.08, 0.12, 0.12), Vector3.new(-0.62, corner_.X, corner_.Y), IRON, nil, METAL)
+		end
 	end
 	local function pauldrons(color: Color3, material: Enum.Material?, spikes: boolean?)
 		for _, arm in { leftArm, rightArm } do
@@ -421,20 +460,38 @@ function Enemy.build(kind: string, level: number): Model
 		attach(part, name .. "Cap", Vector3.new(0.14, 0.1, 0.14), offset + Vector3.new(0, 0.22, 0), DARK_WOOD)
 	end
 
-	-- The weapon lies along the hand's -Z (the "hold" animation raises the forearm, so it points up).
+	-- Weapons: a staff, a bow or a crossbow lies along the hand's -Z and the "hold" animation raises the forearm,
+	-- so it points up. A MELEE weapon (dagger, sword, cleaver, axe, hammer, club) hangs down from the hand at the
+	-- side (along -Y) and the arm stays down (`hold` = false): `weapon` takes the same numbers as a -Z weapon
+	-- (width, height, length) and turns them to hang.
+	local hold = true
+	local function weapon(name: string, size: Vector3, offset: Vector3, color: Color3, shape: Enum.PartType?, material: Enum.Material?, angles: Vector3?): Part
+		return attach(hand, name, Vector3.new(size.X, size.Z, size.Y), Vector3.new(offset.X, offset.Z - 0.15, offset.Y + 0.1), color, shape, material, angles)
+	end
+	-- A blade weapon with the details of the sheet: a wrapped grip with a pommel, a guard, the blade with a
+	-- lighter fuller line down its middle. `length` = the blade, `width` = how wide it is.
+	local function blade(prefix: string, length: number, width: number, guardWidth: number, bladeColor: Color3)
+		weapon(prefix .. "Grip", Vector3.new(0.17, 0.17, 0.55), Vector3.new(0, -0.1, -0.2), DARK_WOOD)
+		weapon(prefix .. "GripWrap", Vector3.new(0.2, 0.2, 0.12), Vector3.new(0, -0.1, -0.3), LEATHER)
+		weapon(prefix .. "Pommel", Vector3.new(0.26, 0.26, 0.18), Vector3.new(0, -0.1, 0.12), GOLD, nil, METAL)
+		weapon(prefix .. "Guard", Vector3.new(guardWidth, 0.16, 0.16), Vector3.new(0, -0.1, -0.52), IRON, nil, METAL)
+		weapon(prefix .. "Blade", Vector3.new(0.12, width, length), Vector3.new(0, -0.1, -0.6 - length / 2), bladeColor, nil, METAL)
+		weapon(prefix .. "Fuller", Vector3.new(0.14, width * 0.3, length * 0.75), Vector3.new(0, -0.1, -0.6 - length / 2 + length * 0.05), C(225, 230, 240), nil, METAL)
+		weapon(prefix .. "Tip", Vector3.new(0.12, width * 0.55, 0.3), Vector3.new(0, -0.1, -0.6 - length - 0.12), bladeColor, nil, METAL)
+	end
 	local topOffset = hy + 0.9
 	local attack = "slash"
 	if look == "Prcek" then
+		hold = false
 		-- The small scout: a brown hood, a leather vest with a belt, a short dagger.
 		paint(DARK_LEATHER, skin, LEATHER, DARK_LEATHER)
 		hood(LEATHER)
 		cover(upper, "Vest", Vector3.new(0.12, -0.2, 0.12), Vector3.new(0, -0.05, 0), DARK_LEATHER)
 		belt(DARK_LEATHER, IRON)
-		attach(hand, "DaggerGrip", Vector3.new(0.16, 0.16, 0.5), Vector3.new(0, -0.1, -0.2), DARK_WOOD)
-		attach(hand, "DaggerGuard", Vector3.new(0.45, 0.12, 0.12), Vector3.new(0, -0.1, -0.5), IRON, nil, METAL)
-		attach(hand, "DaggerBlade", Vector3.new(0.14, 0.42, 1.3), Vector3.new(0, -0.1, -1.2), STEEL, nil, METAL)
+		blade("Dagger", 1.1, 0.4, 0.5, STEEL)
 		topOffset = hy + 1.0
 	elseif look == "Rubac" then
+		hold = false
 		-- The warrior: grey plate, pauldrons, a sword and a red shield with a white bolt.
 		paint(IRON, IRON, DARK_IRON, DARK_IRON)
 		cover(upper, "ChestPlate", Vector3.new(0.2, 0.05, 0.2), Vector3.zero, IRON, METAL)
@@ -444,9 +501,7 @@ function Enemy.build(kind: string, level: number): Model
 		boots(DARK_IRON)
 		belt(DARK_LEATHER, GOLD)
 		shield(RED, CREAM, "Bolt")
-		attach(hand, "SwordGrip", Vector3.new(0.18, 0.18, 0.6), Vector3.new(0, -0.1, -0.25), DARK_WOOD)
-		attach(hand, "SwordGuard", Vector3.new(0.7, 0.14, 0.14), Vector3.new(0, -0.1, -0.6), IRON, nil, METAL)
-		attach(hand, "SwordBlade", Vector3.new(0.14, 0.4, 1.9), Vector3.new(0, -0.1, -1.6), STEEL, nil, METAL)
+		blade("Sword", 1.9, 0.42, 0.75, STEEL)
 		topOffset = hy + 1.1
 	elseif look == "Lucistnik" then
 		-- The archer: a dark green hood and tunic, a bow and a quiver of red-fletched arrows.
@@ -457,8 +512,7 @@ function Enemy.build(kind: string, level: number): Model
 		belt(DARK_LEATHER, IRON)
 		legWear(DARK_GREEN)
 		boots(DARK_LEATHER)
-		attach(hand, "Bow", Vector3.new(0.15, 0.3, 2.8), Vector3.new(0, -0.1, -0.5), WOOD)
-		attach(hand, "BowString", Vector3.new(0.04, 0.04, 2.7), Vector3.new(0, 0.25, -0.5), BONE)
+		bow(WOOD)
 		attach(upper, "Quiver", Vector3.new(0.45, 1.4, 0.45), Vector3.new(0.35, 0.2, uz + 0.25), DARK_LEATHER, nil, nil, Vector3.new(0, 0, -18))
 		for i, x in { -0.12, 0, 0.12 } do
 			attach(upper, "Arrow" .. i, Vector3.new(0.08, 0.5, 0.08), Vector3.new(0.35 + x + (i - 2) * 0.1, 1.05, uz + 0.25), RED, nil, nil, Vector3.new(0, 0, -18))
@@ -482,6 +536,7 @@ function Enemy.build(kind: string, level: number): Model
 		staff(POISON)
 		topOffset = hy + 1.4
 	elseif look == "ZeleznyTesak" then
+		hold = false
 		-- Miniboss: dark red heavy armor with spiked steel pauldrons, a horned spiked helmet, a serrated cleaver and
 		-- a red skull shield.
 		paint(C(150, 40, 40), DARK_IRON, C(120, 35, 35), DARK_IRON)
@@ -499,10 +554,10 @@ function Enemy.build(kind: string, level: number): Model
 		attach(head, "HornL", Vector3.new(0.25, 0.9, 0.25), Vector3.new(-hx - 0.1, hy, 0), STEEL, nil, METAL, Vector3.new(0, 0, 35))
 		attach(head, "HornR", Vector3.new(0.25, 0.9, 0.25), Vector3.new(hx + 0.1, hy, 0), STEEL, nil, METAL, Vector3.new(0, 0, -35))
 		shield(RED, CREAM, "Skull")
-		attach(hand, "CleaverGrip", Vector3.new(0.2, 0.2, 0.8), Vector3.new(0, -0.1, -0.3), DARK_WOOD)
-		attach(hand, "CleaverBlade", Vector3.new(0.16, 1.0, 2.2), Vector3.new(0, -0.45, -1.9), STEEL, nil, METAL)
+		weapon("CleaverGrip", Vector3.new(0.2, 0.2, 0.8), Vector3.new(0, -0.1, -0.3), DARK_WOOD)
+		weapon("CleaverBlade", Vector3.new(0.16, 1.0, 2.2), Vector3.new(0, -0.45, -1.9), STEEL, nil, METAL)
 		for i = 0, 3 do
-			attach(hand, "CleaverTooth", Vector3.new(0.16, 0.3, 0.3), Vector3.new(0, -1.0, -1.1 - i * 0.5), STEEL, nil, METAL, Vector3.new(45, 0, 0))
+			weapon("CleaverTooth", Vector3.new(0.16, 0.3, 0.3), Vector3.new(0, -1.0, -1.1 - i * 0.5), STEEL, nil, METAL)
 		end
 		topOffset = hy + 1.8
 	elseif look == "JedovyStopar" then
@@ -548,6 +603,7 @@ function Enemy.build(kind: string, level: number): Model
 		end
 		topOffset = hy + 2.3
 	elseif look == "KralGrubnak" then
+		hold = false
 		-- Boss: a gold crown with a red gem, black armor with gold trim, a red cape and a great double axe.
 		local BLACK = C(45, 45, 52)
 		paint(BLACK, BLACK, BLACK, C(35, 35, 40))
@@ -564,12 +620,13 @@ function Enemy.build(kind: string, level: number): Model
 			attach(head, "CrownSpike", Vector3.new(0.18, 0.45, 0.18), Vector3.new(x * hx, hy + 0.5, -hz + 0.08), GOLD, nil, METAL)
 		end
 		attach(head, "CrownGem", Vector3.new(0.3, 0.3, 0.12), Vector3.new(0, hy + 0.25, -hz - 0.06), C(220, 40, 60), nil, NEON, Vector3.new(0, 0, 45))
-		attach(hand, "AxeHandle", Vector3.new(0.28, 0.28, 3.4), Vector3.new(0, -0.1, -1.1), DARK_WOOD)
-		attach(hand, "AxeBand", Vector3.new(0.34, 0.34, 0.5), Vector3.new(0, -0.1, -2.0), GOLD, nil, METAL)
-		attach(hand, "AxeBladeL", Vector3.new(0.18, 1.5, 1.4), Vector3.new(-0.8, -0.1, -2.5), STEEL, nil, METAL)
-		attach(hand, "AxeBladeR", Vector3.new(0.18, 1.5, 1.4), Vector3.new(0.8, -0.1, -2.5), STEEL, nil, METAL)
+		weapon("AxeHandle", Vector3.new(0.28, 0.28, 3.4), Vector3.new(0, -0.1, -1.1), DARK_WOOD)
+		weapon("AxeBand", Vector3.new(0.34, 0.34, 0.5), Vector3.new(0, -0.1, -2.0), GOLD, nil, METAL)
+		weapon("AxeBladeL", Vector3.new(0.18, 1.5, 1.4), Vector3.new(-0.8, -0.1, -2.5), STEEL, nil, METAL)
+		weapon("AxeBladeR", Vector3.new(0.18, 1.5, 1.4), Vector3.new(0.8, -0.1, -2.5), STEEL, nil, METAL)
 		topOffset = hy + 1.9
 	elseif look == "KovarMorg" then
+		hold = false
 		-- Boss: a brown and iron smith with a glowing forge in his chest, an iron helmet and a huge ember hammer.
 		local BROWN = C(110, 70, 40)
 		paint(BROWN, skin, BROWN, DARK_IRON)
@@ -584,9 +641,9 @@ function Enemy.build(kind: string, level: number): Model
 		belt(DARK_IRON, IRON)
 		headwear("Helm", IRON, METAL, 0.3)
 		attach(head, "HelmRidge", Vector3.new(0.2, 0.3, hz * 2 + 0.4), Vector3.new(0, hy + 0.25, 0), DARK_IRON, nil, METAL)
-		attach(hand, "HammerHandle", Vector3.new(0.3, 0.3, 3.2), Vector3.new(0, -0.1, -1.0), DARK_WOOD)
-		attach(hand, "HammerHead", Vector3.new(1.1, 0.9, 0.9), Vector3.new(0, -0.1, -2.6), DARK_IRON, nil, METAL)
-		attach(hand, "HammerEmber", Vector3.new(1.14, 0.34, 0.34), Vector3.new(0, -0.1, -2.6), EMBER, nil, NEON)
+		weapon("HammerHandle", Vector3.new(0.3, 0.3, 3.2), Vector3.new(0, -0.1, -1.0), DARK_WOOD)
+		weapon("HammerHead", Vector3.new(1.1, 0.9, 0.9), Vector3.new(0, -0.1, -2.6), DARK_IRON, nil, METAL)
+		weapon("HammerEmber", Vector3.new(1.14, 0.34, 0.34), Vector3.new(0, -0.1, -2.6), EMBER, nil, NEON)
 		topOffset = hy + 1.8
 	elseif look == "MorovaMatka" then
 		-- Boss: the plague mother: a dark green robe, antlers with hanging vials, a skull on the belt, a staff with a
@@ -622,6 +679,7 @@ function Enemy.build(kind: string, level: number): Model
 		staff(VIOLET_GLOW, 0.7)
 		topOffset = hy + 2.5
 	elseif look == "HoubovyTitan" then
+		hold = false
 		-- Boss: the mushroom titan: bark plates on the body, moss, red-capped mushrooms on the head and shoulders,
 		-- and a mushroom club.
 		local BARK = C(110, 75, 45)
@@ -644,12 +702,13 @@ function Enemy.build(kind: string, level: number): Model
 		mushroom(head, "HeadShroomB", Vector3.new(0.45, hy + 0.1, -0.15), 0.6)
 		mushroom(leftArm, "ShoulderShroom", Vector3.new(-0.1, leftArm.Size.Y / 2 / s + 0.3, 0), 0.7)
 		mushroom(rightArm, "ShoulderShroom", Vector3.new(0.15, rightArm.Size.Y / 2 / s + 0.3, 0.1), 0.5)
-		attach(hand, "Club", Vector3.new(0.4, 0.4, 3.2), Vector3.new(0, -0.1, -1.0), BARK, nil, Enum.Material.Wood)
-		attach(hand, "ClubKnot", Vector3.new(0.7, 0.7, 0.9), Vector3.new(0, -0.1, -2.5), DARK_WOOD, nil, Enum.Material.Wood)
+		weapon("Club", Vector3.new(0.4, 0.4, 3.2), Vector3.new(0, -0.1, -1.0), BARK, nil, Enum.Material.Wood)
+		weapon("ClubKnot", Vector3.new(0.7, 0.7, 0.9), Vector3.new(0, -0.1, -2.5), DARK_WOOD, nil, Enum.Material.Wood)
 		mushroom(hand, "ClubShroomA", Vector3.new(0.2, 0.3, -2.4), 0.6)
 		mushroom(hand, "ClubShroomB", Vector3.new(-0.25, 0.25, -1.6), 0.45)
 		topOffset = hy + 2.4
 	elseif look == "RiftKing" then
+		hold = false
 		-- FINAL BOSS: Grubnak — The Rift King. Black plate with gold trim and purple rift crystals, a gold crown with
 		-- crystal spikes, a red cape, a purple orb in the left hand and a giant crystal-powered hammer in the right.
 		-- Crystals carry the attribute "RiftCrystal" and the armor plates "RiftArmor": the fight (RiftKing.luau)
@@ -668,10 +727,10 @@ function Enemy.build(kind: string, level: number): Model
 			return armor
 		end
 		-- The face: purple glowing eyes, big tusks.
-		for _, eyeName in { "EyeL", "EyeR" } do
-			local eye = model:FindFirstChild(eyeName) :: BasePart?
-			if eye then
-				eye.Color = CRYSTAL
+		for _, item in model:GetChildren() do
+			if item.Name == "Eye" and item:IsA("BasePart") then
+				item.Color = CRYSTAL
+				item.Material = NEON
 			end
 		end
 		attach(head, "TuskL", Vector3.new(0.16, 0.42, 0.14), Vector3.new(-0.28, -hy * 0.5, -hz - 0.02), BONE, nil, nil, Vector3.new(0, 0, 8))
@@ -726,20 +785,20 @@ function Enemy.build(kind: string, level: number): Model
 		orbLight.Parent = orb
 		-- The right hand: the giant hammer. A long dark handle with gold bands, a black block head framed in gold,
 		-- crystals set in its faces and a crystal spike on top.
-		attach(hand, "HammerHandle", Vector3.new(0.34, 0.34, 4.6), Vector3.new(0, -0.1, -1.6), DARK_IRON, nil, METAL)
+		weapon("HammerHandle", Vector3.new(0.34, 0.34, 4.6), Vector3.new(0, -0.1, -1.6), DARK_IRON, nil, METAL)
 		for _, z in { -0.5, -1.4, -2.6 } do
-			attach(hand, "HammerBand", Vector3.new(0.44, 0.44, 0.3), Vector3.new(0, -0.1, z), GOLD, nil, METAL)
+			weapon("HammerBand", Vector3.new(0.44, 0.44, 0.3), Vector3.new(0, -0.1, z), GOLD, nil, METAL)
 		end
-		local hammerHead = attach(hand, "HammerHead", Vector3.new(2.2, 1.5, 1.5), Vector3.new(0, -0.1, -3.9), BLACK, nil, METAL)
+		local hammerHead = weapon("HammerHead", Vector3.new(2.2, 1.5, 1.5), Vector3.new(0, -0.1, -3.9), BLACK, nil, METAL)
 		hammerHead:SetAttribute("RiftArmor", true)
-		attach(hand, "HammerFrameA", Vector3.new(2.3, 0.2, 1.6), Vector3.new(0, 0.6, -3.9), GOLD, nil, METAL)
-		attach(hand, "HammerFrameB", Vector3.new(2.3, 0.2, 1.6), Vector3.new(0, -0.8, -3.9), GOLD, nil, METAL)
-		attach(hand, "HammerFrameC", Vector3.new(2.3, 1.6, 0.2), Vector3.new(0, -0.1, -3.2), GOLD, nil, METAL)
-		attach(hand, "HammerFrameD", Vector3.new(2.3, 1.6, 0.2), Vector3.new(0, -0.1, -4.6), GOLD, nil, METAL)
-		crystal(hand, "HammerCrystalL", Vector3.new(-1.2, -0.1, -3.9), 0.8, Vector3.new(0, 0, 90))
-		crystal(hand, "HammerCrystalR", Vector3.new(1.2, -0.1, -3.9), 0.8, Vector3.new(0, 0, 90))
-		crystal(hand, "HammerCrystalFront", Vector3.new(0, -0.1, -4.75), 0.6, Vector3.new(90, 0, 0))
-		crystal(hand, "HammerCrystalTop", Vector3.new(0, 0.95, -3.9), 1.1)
+		weapon("HammerFrameA", Vector3.new(2.3, 0.2, 1.6), Vector3.new(0, 0.6, -3.9), GOLD, nil, METAL)
+		weapon("HammerFrameB", Vector3.new(2.3, 0.2, 1.6), Vector3.new(0, -0.8, -3.9), GOLD, nil, METAL)
+		weapon("HammerFrameC", Vector3.new(2.3, 1.6, 0.2), Vector3.new(0, -0.1, -3.2), GOLD, nil, METAL)
+		weapon("HammerFrameD", Vector3.new(2.3, 1.6, 0.2), Vector3.new(0, -0.1, -4.6), GOLD, nil, METAL)
+		crystal(hand, "HammerCrystalL", Vector3.new(-1.2, -4.05, 0), 0.8, Vector3.new(0, 0, 90))
+		crystal(hand, "HammerCrystalR", Vector3.new(1.2, -4.05, 0), 0.8, Vector3.new(0, 0, 90))
+		crystal(hand, "HammerCrystalBottom", Vector3.new(0, -4.9, 0), 0.6, Vector3.new(90, 0, 0))
+		crystal(hand, "HammerCrystalFront", Vector3.new(0, -4.05, -1.05), 1.1, Vector3.new(90, 0, 0))
 		local hammerLight = Instance.new("PointLight")
 		hammerLight.Color = CRYSTAL
 		hammerLight.Range = 9
@@ -748,9 +807,10 @@ function Enemy.build(kind: string, level: number): Model
 		topOffset = hy + 2.8
 	else
 		-- Unknown look: a bare goblin with a club.
+		hold = false
 		belt(DARK_LEATHER)
-		attach(hand, "ClubHandle", Vector3.new(0.25, 0.25, 2.0), Vector3.new(0, -0.1, -0.7), WOOD)
-		attach(hand, "ClubHead", Vector3.new(0.6, 0.6, 0.75), Vector3.new(0, -0.1, -1.85), DARK_WOOD)
+		weapon("ClubHandle", Vector3.new(0.25, 0.25, 2.0), Vector3.new(0, -0.1, -0.7), WOOD)
+		weapon("ClubHead", Vector3.new(0.6, 0.6, 0.75), Vector3.new(0, -0.1, -1.85), DARK_WOOD)
 	end
 
 	-- A soft aura in the level color from level 7 on (the only thing the level adds to the designed look).
@@ -796,7 +856,7 @@ function Enemy.build(kind: string, level: number): Model
 
 	model:PivotTo(CFrame.new(0, Enemy.lift(kind, level), 0))
 
-	Rig.animate(model, attack, true) -- idle / run / attack / death (Rig.luau)
+	Rig.animate(model, attack, hold) -- idle / run / attack / death (Rig.luau); melee goblins keep the arm down
 	return model
 end
 
