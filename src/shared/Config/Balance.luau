@@ -1,7 +1,7 @@
 --!strict
 -- All tuning numbers in one place.
 
-return {
+local Balance = {
 	-- Inventory = merge board (6 × 6 pads in the lobby next to your spawn): every soldier you own that
 	-- is not equipped stands on a pad, and the same soldiers are the cards of the UI inventory.
 	-- You start with only a few usable slots (= the inventory size) and buy more with upgrades.
@@ -43,7 +43,7 @@ return {
 		[7] = { wave = 25, cost = 6000 },
 		[8] = { wave = 40, cost = 15000 },
 		[9] = { wave = 60, cost = 40000 },
-		-- levels 10 … 30 (only the Knight goes this far) are filled in below
+		-- levels 10 … 30 (only the Knight and the Archer go this far) are filled in below
 	},
 
 	-- Account level (shown top left): experience from kills and won waves. Going from level L to L + 1
@@ -185,3 +185,11 @@ return {
 	SplashRadius = 6,
 	SplashFraction = 0.5,
 }
+
+-- Merge levels 10 … 30 exist only for the Knight and the Archer (their 30-level evolutions, maxTier in Units):
+-- every further level needs two more cleared waves (up to 100) and costs 25 % more coins than the one before.
+for tier = 10, 30 do
+	Balance.TierUnlocks[tier] = { wave = math.min(100, 60 + 2 * (tier - 9)), cost = math.floor(40000 * 1.25 ^ (tier - 9)) }
+end
+
+return Balance

@@ -25,7 +25,7 @@ export type ClassDef = Stats & {
 	color: Color3,
 	unlock: Unlock?, -- nil = unlocked from the start
 	passive: string, -- the class's own trick in the battle (see Units.Passives)
-	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); the Knight has 30 looks
+	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); Knight and Archer have 30 looks
 }
 
 -- Every class has a PASSIVE (BattleService applies it). `value` is its strength; an ASCENDED soldier
@@ -70,6 +70,9 @@ Units.Classes = {
 		speed = 10,
 		splash = false,
 		passive = "volley",
+		-- 30 merge levels: the R15 evolution of the archer woman, prehistory to the year 3000 (design/ArcherEvolution,
+		-- built from StageModels/ArcherEvolution by SoldierRig).
+		maxTier = 30,
 	},
 	-- The three new classes of Arena 1 (Training Camp):
 	Hunter = {

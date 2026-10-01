@@ -1,0 +1,31 @@
+﻿Level,Název,Epocha,Téma / rok,Nové vybavení,Počet dílů
+1,První lovkyně,PRAVĚK,Pravěk,"Jednoduchý kožený oděv, rozpuštěné vlasy, bosé nohy a malý dřevěný luk.",59
+2,Stopařka,PRAVĚK,Pravěk,"Provazový pás, chránič levého předloktí, kožené ovázání a první zapletený pramen.",72
+3,Lovkyně,PRAVĚK,Pravěk,"Kožešinové rameno, sandály, první kožený toulec se šípy a delší luk.",107
+4,Sběratelka trofejí,PRAVĚK,Pravěk,"Boty, vázané holeně, kostěné spony, lepší toulec a zesílená rukojeť luku.",121
+5,Náčelnice lovkyň,PRAVĚK,Pravěk,"Kožešinový límec, pletený cop, kostěné ozdoby a první kostěné výztuhy luku.",146
+6,Lučištnice osady,STAROVĚK,Starověk,"Lněná tunika, kožená vesta, široký pás a nový vrstvený luk.",118
+7,Měděná strážkyně,STAROVĚK,Starověk,"Měděný chránič ramene a předloktí, zdobený pás a kovové kování toulce.",124
+8,Bronzová lovkyně,STAROVĚK,Starověk,"Bronzové hrudní panely, čelenka, chrániče holení a zakřivené konce luku.",140
+9,Pouštní průzkumnice,STAROVĚK,Starověk,"Šátek přes ramena, další lamely, lícní pásky a bronzové ozdoby luku.",154
+10,Velitelka střelkyň,STAROVĚK,Starověk,"Železné lamely, ochranná otevřená přilba, dlouhý cop a zpevněný toulec.",177
+11,Lesní lučištnice,STŘEDOVĚK,Středověk,"Zelená kápě, lehký kožený kabátec, dlouhý luk a lesní pláštík.",131
+12,Hraničářka,STŘEDOVĚK,Středověk,"Kroužkový podklad, kožené pouzdro a zesílený chránič lukové paže.",146
+13,Ocelová střelkyně,STŘEDOVĚK,Středověk,"Lehké ocelové hrudní panely, stehenní ochrana a kovaný luk.",166
+14,Královská lučištnice,STŘEDOVĚK,Středověk,"Modrý plášť, stříbrné ozdoby, čelenka a zdobené rameno.",169
+15,Mistryně luku,STŘEDOVĚK,Středověk,"Bílozlatá lehká zbroj, smaragdový erb, korunová čelenka a mistrovský luk.",184
+16,Průzkumnice,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Cestovní kabátec, přezky, nástrojové pouzdro a kovem vyztužený luk.",139
+17,Mechanická střelkyně,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Ochranné brýle, mosazná ramena luku a první kladky.",149
+18,Parní lučištnice,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Malá tlaková nádrž na toulci, měřidlo, píst a mechanický zaměřovač.",158
+19,Ocelová průzkumnice,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Přilba s brýlemi, ocelová kolena a větší mechanické výztuhy luku.",174
+20,Dieselová lovkyně,PRŮMYSLOVÝ VĚK,Průmyslový věk,"Vnější výztuhy paží, dvojice patron na toulci a zpevněný kladkový luk.",198
+21,Taktická lučištnice,MODERNÍ DOBA,Moderní doba,"Zelená uniforma, lehká balistická vesta, culík a moderní kladkový luk.",155
+22,Specialistka,MODERNÍ DOBA,Moderní doba,"Noční monokulár, vysílačka, kapsy a stabilizátor luku.",162
+23,Elitní průzkumnice,MODERNÍ DOBA,Moderní doba,"Lehká balistická přilba, hrudní a stehenní pláty a lepší optika.",180
+24,Exo střelkyně,MODERNÍ DOBA,Moderní doba,"Pístové podpěry paží a nohou, baterie a asistované napínání luku.",205
+25,Exo mistryně,MODERNÍ DOBA,Moderní doba,"Kryty exoskeletu, senzorový visor, uhlíkový toulec a kontrolní světla.",222
+26,Sentinel,BUDOUCNOST,2100,"Uzavřený střelecký oblek, úzký visor, světelné spoje a energeticky posílený luk.",211
+27,Vega,BUDOUCNOST,2300,"Bílé panely, pohonné trysky u toulce a energetické šípy.",217
+28,Nova,BUDOUCNOST,2500,"Nanotechnologické chrániče, hrudní reaktor a zdvojené větve luku.",232
+29,Astral,BUDOUCNOST,2800,"Další stabilizátory na zádech, optické senzory a zdobený kvantový luk.",240
+30,Apex lučištnice,BUDOUCNOST,3000,"Kompletní bílozlatá střelecká zbroj, koróna reaktoru, energetický toulec a nejpropracovanější luk.",271

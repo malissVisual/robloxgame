@@ -1,18 +1,23 @@
 --!nonstrict
 -- The designed classes (Soldier, Knight, Archer, Mage, Hunter, Berserker, Tank) as R15 characters: 9 designed stages
--- each (one per merge level), except the Knight, which has 30 (the R15 evolution models, buildEvolution below).
--- The Soldier comes from design/SoldierMerge_R15_Builder, the Archer from the green archer cards, the Mage from the
--- purple mage cards, the Hunter, the Berserker and the Tank from their card sheets. The gear is parts welded on the
--- limbs of the R15 base rig (Rig.base).
+-- each (one per merge level), except the Knight and the Archer, which have 30 (the R15 evolution models,
+-- buildEvolution below). The Soldier comes from design/SoldierMerge_R15_Builder, the Mage from the purple mage
+-- cards, the Hunter, the Berserker and the Tank from their card sheets. The gear is parts welded on the limbs of
+-- the R15 base rig (Rig.base).
 --   1 Recruit · 2 Private · 3 Corporal · 4 Sergeant · 5 Lieutenant · 6 Captain · 7 Major · 8 General · 9 Legend
 -- Without the base rig (it could not be made, or it has not reached this client yet) the same design is built
 -- on a body of plain blocks with the same limb names (a statue: no animations), so the look never falls back
 -- to something else.
 
 local Rig = require(script.Parent.Rig)
--- The Knight does not use the 9 cards below any more: its 30 merge levels are the R15 evolution models
--- (design/KnightEvolution, generated into StageModels/KnightEvolution), see buildEvolution.
-local Evolution = require(script.Parent.StageModels.KnightEvolution)
+-- The Knight and the Archer do not use their 9 cards below any more: their 30 merge levels are the R15 evolution
+-- models (design/KnightEvolution, design/ArcherEvolution; generated into StageModels/<Class>Evolution), see
+-- buildEvolution. `attack` / `hold` = the animations (Rig.animate); `holdFrom` = the level the weapon hand is
+-- held up from (the Knight carries a weapon from level 3; the bow of the Archer hangs in the left hand).
+local EVOLUTIONS = {
+	Knight = { data = require(script.Parent.StageModels.KnightEvolution), attack = "slash", holdFrom = 3 },
+	Archer = { data = require(script.Parent.StageModels.ArcherEvolution), attack = "lunge", holdFrom = 99 },
+}
 
 local C = Color3.fromRGB
 local V = Vector3.new
@@ -2207,9 +2212,9 @@ local function blockBody(rs: number): Model
 end
 
 -- ---------------------------------------------------------------------------------------------------------
--- The Knight: 30 merge levels, each a complete R15 character of its own (own body proportions, joints and
--- gear) from the evolution models. Nothing comes from the base rig here: the body parts, the 15 Motor6D
--- joints and the welded gear are all built from the data, at the scale asked for.
+-- The Knight and the Archer: 30 merge levels each, every level a complete R15 character of its own (own body
+-- proportions, joints and gear) from the evolution models. Nothing comes from the base rig here: the body
+-- parts, the 15 Motor6D joints and the welded gear are all built from the data, at the scale asked for.
 local MATERIAL: { [number]: Enum.Material } = {}
 for _, item in Enum.Material:GetEnumItems() do
 	MATERIAL[item.Value] = item
@@ -2250,9 +2255,11 @@ local function evolutionPart(entry, k: number, static: boolean): BasePart
 	return p
 end
 
--- Builds the Knight of the level; same contract as SoldierRig.build. Returns nil when the level has no data.
-local function buildEvolution(tier: number, s: number, bare: boolean?): (Model?, BasePart?, number?)
-	local data = Evolution.level(math.clamp(tier, 1, Evolution.Count))
+-- Builds the character of the level; same contract as SoldierRig.build. Returns nil when the class has no
+-- evolution or the level no data.
+local function buildEvolution(class: string, tier: number, s: number, bare: boolean?): (Model?, BasePart?, number?)
+	local evolution = EVOLUTIONS[class]
+	local data = evolution and evolution.data.level(math.clamp(tier, 1, evolution.data.Count))
 	if not data then
 		return nil
 	end
@@ -2336,7 +2343,7 @@ local function buildEvolution(tier: number, s: number, bare: boolean?): (Model?,
 	humanoid.AutomaticScalingEnabled = false
 	Instance.new("Animator").Parent = humanoid
 	humanoid.Parent = model
-	Rig.animate(model, "slash", tier >= 3) -- from level 3 on the Knight carries a weapon
+	Rig.animate(model, evolution.attack, tier >= evolution.holdFrom)
 	return model, head, data.top * RIG_SCALE
 end
 
@@ -2347,8 +2354,9 @@ function SoldierRig.has(class: string): boolean
 end
 
 function SoldierRig.name(tier: number, class: string?): string
-	if class == "Knight" then
-		local data = Evolution.level(math.clamp(tier, 1, Evolution.Count))
+	local evolution = EVOLUTIONS[class or ""]
+	if evolution then
+		local data = evolution.data.level(math.clamp(tier, 1, evolution.data.Count))
 		if data then
 			return data.name
 		end
@@ -2361,9 +2369,9 @@ end
 -- still statue (UI previews, holograms): everything anchored, no Humanoid, no lights. Returns the model, its
 -- head and how high the label floats over it (in studs at scale 1), or nil when there is no base rig.
 function SoldierRig.build(tier: number, s: number, bare: boolean?, class: string?): (Model?, BasePart?, number?)
-	if class == "Knight" then
+	if class and EVOLUTIONS[class] then
 		-- The 30-level evolution (no base rig needed); the 9 cards below are only the fallback without data.
-		local model, head, top = buildEvolution(tier, s, bare)
+		local model, head, top = buildEvolution(class, tier, s, bare)
 		if model then
 			return model, head, top
 		end

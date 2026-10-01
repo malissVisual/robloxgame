@@ -1,0 +1,69 @@
+LUČIŠTNICE R15 — 30 LEVELŮ OD PRAVĚKU DO ROKU 3000
+
+SOUBORY K PŘEDÁNÍ CLAUDOVI
+Archer_R15_01-30.rbxm: všech 30 skutečných Roblox modelů v jednom souboru.
+Archer_R15_01-30.rbxmx: tentýž balíček v čitelném XML formátu.
+modely/: všech 30 úrovní zvlášť, každá u počátku souřadnic.
+nahledy/lucistnice-vyber.png: reprezentativní výběr devíti vzhledů.
+nahledy/vsech-30-levelu.png: kompletní přehled.
+nahledy/era-01.png až era-06.png: detailnější přehledy každé epochy.
+nahledy/LV01-ctyri-pohledy.png, LV15-ctyri-pohledy.png, LV30-ctyri-pohledy.png:
+přední, oba boční a zadní pohledy pro kontrolu účesů, toulce a luku.
+prehled-levelu.csv: jména, epochy a konkrétní změny všech třiceti úrovní.
+
+VÝVOJ
+01–05: pravěká lovkyně. Od jednoduchého koženého oděvu a dřevěného luku
+k ovázání rukou, kožešinám, botám, copům, kostěným ozdobám a toulci.
+06–10: starověká lučištnice. Lněné oblečení, měď, bronz, železné lamely,
+ochranné čelenky, přilba a zakřivený vrstvený luk.
+11–15: středověká hraničářka. Kápě, krátký plášť, kroužkové panely,
+lehká plátová zbroj, stříbrná výstroj a královské bílozlaté provedení.
+16–20: průmyslová střelkyně. Cestovní kabátec, brýle, mosazné kladky,
+tlakové nádrže, písty a mechanicky zpevněný luk.
+21–25: moderní specialistka. Balistická vesta, monokulár, pouzdra, baterie,
+stabilizátor, asistovaný kladkový luk a lehký exoskelet.
+26–30: roky 2100, 2300, 2500, 2800 a 3000. Energetické luky a šípy,
+optický visor, nanotechnologické pláty, reaktory a kompaktní stabilizátory.
+
+VÝTVARNÉ PROVEDENÍ
+Vlastní užší R15 silueta; ženský obličej a několik účesů z reálných dílů:
+rozpuštěné vlasy, zapletené prameny, dva copy a culík.
+První úroveň má jednoduchý plně zakrývající kožený oděv a bosé nohy.
+Brnění je lehké a asymetrické. Levá paže má výraznější chránič proti tětivě,
+pravá ruka střeleckou rukavici. Žádný meč ani štít.
+Luk drží levá ruka, volný šíp pravá. Toulec je na pravé straně zad,
+krátký pláštík převážně na levé, aby zůstalo vybavení čitelné.
+Tětiva, kladky, výztuhy, zaměřovač a šípy jsou skutečné Part objekty.
+Nejde pouze o přebarvené rytíře. Každá sousední úroveň mění geometrii.
+
+ZADÁNÍ PRO CLAUDA
+„Importuj přiložené Archer_R15_01-30.rbxmx nebo .rbxm do Roblox Studia.
+Jsou to hotové vzhledy ženské lučištnice pro 30 merge levelů od pravěku
+do roku 3000. Zachovej geometrii, R15 klouby, svary, luky, toulce a účesy.
+Každý model má IntValue Level a StringValue UnitType = Archer.
+Zatím nepřidávej merge systém, střelbu ani jinou herní logiku.“
+
+TECHNICKÉ VLASTNOSTI
+Každý model: 15 R15 částí těla, HumanoidRootPart, 15 Motor6D kloubů,
+Humanoid.RigType = R15, Animator a odpovídající rig attachments.
+Equipment obsahuje oděv, vlasy a výbavu, připevněné přes Weld k jednotlivým
+částem těla. Metadata: Level, UnitType, Era a Appearance.
+Žádné nahrané meshe, textury, externí asset ID nebo placené závislosti.
+Bez Script, LocalScript a ModuleScript objektů.
+
+ROZSAH
+Jde o vzhledy připravené k vystavení a úpravám. Ukotvený je pouze
+HumanoidRootPart, kolize jsou vypnuté. Pro chodící postavu je třeba odkotvit
+kořen, nastavit kolize a přidat animace. Póza je klidová, ne natažení luku.
+Luk a šípy zatím nestřílejí. Tětiva, copy, pláště a dekorace jsou pevné díly.
+Vývoj epoch je stylizovaný pro hru, nikoli historická rekonstrukce.
+
+KONTROLA
+Ověřena struktura všech třiceti modelů, všechny odkazy, klouby, svary,
+ukotvení, rozměry, transformace a přítomnost správně připevněného vybavení.
+Převedeno nástrojem Rojo 7.7.0 do binárního Roblox formátu.
+Přímý import a animace v Roblox Studiu nebyly v této relaci spuštěny.
+Náhledy jsou lokální rendery přesné exportované geometrie. Nejde o AI obrázky
+ani screenshoty ze Studia; osvětlení a materiály mohou ve Studiu vypadat jinak.
+
+Původní mužská evoluce i devět rytířů zůstávají v samostatných balíčcích.
