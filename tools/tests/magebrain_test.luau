@@ -77,7 +77,7 @@ local function scenario(level, allyLowHp)
 		minMana = math.min(minMana, brain.mana)
 		local moved = (mage.pos - before).Magnitude > 0
 		if moved and nearestD <= mage.range and brain.action ~= "escape" and brain.action ~= "blink" then movedWhileInRange = true end
-		if moved and brain.action == "approach" and nearestD < mage.range * 0.85 - 0.5 then approachedTooClose = true end
+		if moved and brain.action == "approach" and nearestD <= mage.range then approachedTooClose = true end
 	end
 	return brain, log, actions, minMana, (not movedWhileInRange) and (not approachedTooClose), mage
 end
@@ -85,7 +85,7 @@ end
 local brain, log, actions, minMana, retreated, mage = scenario(15, false)
 check(log.attacks > 5, "L15: basic attacks happen (" .. log.attacks .. ")")
 check((actions.approach or 0) > 0 or (actions.attack or 0) > 0, "L15: approach / attack actions chosen")
-check(retreated, "L15: the mage never walks while an enemy is in range and stops approaching at 85 % of range")
+check(retreated, "L15: the mage never walks while an enemy is in range")
 check(minMana < 60, "L15: a strong spell was paid for (mana dipped to " .. math.floor(minMana) .. ")")
 check(log.damages > 0, "L15: a strong spell dealt damage (" .. log.damages .. " hits)")
 check(brain.target ~= nil or true, "L15: target selection ran")

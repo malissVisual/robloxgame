@@ -828,11 +828,12 @@ local function act(self: Brain, dt: number)
 	end
 
 	if action == "approach" then
-		-- Nikdo v dosahu: jde k nejbližšímu nepříteli a zastaví, jakmile ho má pohodlně v dosahu.
+		-- Nikdo v dosahu: jde k nejbližšímu nepříteli a zastaví v tom okamžiku, kdy ho má v dosahu (i mezi dvěma
+		-- rozhodnutími, takže nikdy nedošlapuje k nepříteli, kterého už může střílet).
 		local goal = nearestEnemy
 		if goal then
 			local dist = (flat(goal.pos) - flat(f.pos)).Magnitude
-			if dist > range * Config.StopAtRange then
+			if dist > range then
 				moveTowards(self, goal.pos, dt, 1)
 			else
 				Rig.setMoving(f.model, false)

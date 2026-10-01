@@ -441,7 +441,7 @@ the best one, with a little inertia for the current action: **attack** (the basi
 (an AoE into the centroid of a cluster of enemies, a chain, a singularity, or a finisher on a low-HP target),
 **escape** (it steps out of a telegraphed enemy area such as the Rift King's circles, which carry the `Hazard`
 attribute), **shield** (below 35 % HP or when threatened), **blink** (surrounded), **support** (heal the ally with
-the lowest HP, from level 21), **approach** (nothing in range: it walks toward the nearest enemy and stops at 85 % of its range) and **idle**. A Mage
+the lowest HP, from level 21), **approach** (nothing in range: it walks toward the nearest enemy and stops the moment it has one in range) and **idle**. A Mage
 **stands still while it has anyone in range** and never backs into the enemies: its intelligence shows in whom it
 targets and which spell it uses, not in running around. Targets are chosen by a weighted
 score (proximity, low HP, hate toward whoever hurt it, enemy type: archers and shamans before brutes) with

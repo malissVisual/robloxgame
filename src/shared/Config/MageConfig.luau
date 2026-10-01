@@ -14,9 +14,8 @@ local MageConfig = {
 	Hesitation = { 0.3, 0.6 }, -- jak dlouho zaváhání trvá (sekundy)
 	AimError = 2.5, -- studů vedle u chybně mířeného AoE (násobeno 1 - level/30)
 
-	-- Pohyb: mág STOJÍ a střílí, kdykoli má někoho v dosahu. Jde dopředu jen, když nemá nikoho, a zastaví, jakmile
-	-- má nejbližšího nepřítele v StopAtRange × dosah. Necouvá; z telegrafované plochy nepřítele vystoupí.
-	StopAtRange = 0.85,
+	-- Pohyb: mág STOJÍ a střílí, kdykoli má někoho v dosahu. Jde dopředu jen, když nemá nikoho, a zastaví v okamžiku,
+	-- kdy nejbližšího nepřítele v dosahu má. Necouvá; z telegrafované plochy nepřítele vystoupí.
 	ArenaMargin = 3, -- studů od okraje plošiny, kam mág nevkročí
 	SurroundDistance = 6, -- nepřátelé do této vzdálenosti se počítají jako obklíčení …
 	SurroundedCount = 2, -- … a od tolika mág blinkne pryč (má-li teleport)
