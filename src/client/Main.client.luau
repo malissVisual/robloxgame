@@ -162,6 +162,8 @@ UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
+UI.battleOpen = false -- the battle panel (wave, difficulty, START WAVE) is open: the PLAY button toggles it
+UI.LAYOUT_VERSION = 2 -- a saved layout from an older version loses the panel position (the defaults changed)
 UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the settings gear moves below)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
@@ -250,6 +252,7 @@ function Layout.save()
 		if token == Layout.token then
 			Layout.saved.collapsed = if UI.collapsed then true else nil
 			Layout.saved.hidden = if UI.hidden then true else nil
+			Layout.saved.v = UI.LAYOUT_VERSION
 			Net.get("SetSetting"):FireServer("layout", HttpService:JSONEncode(Layout.saved))
 		end
 	end)
@@ -325,6 +328,9 @@ function Layout.apply(saved: any)
 	if not ok or type(decoded) ~= "table" then
 		return
 	end
+	if decoded.v ~= UI.LAYOUT_VERSION then
+		decoded.Panel = nil -- the panel moved to the top of the screen by default; an old saved spot is dropped
+	end
 	for name, entry in decoded do
 		if Layout.movables[name] and type(entry) == "table" and type(entry[1]) == "number" and type(entry[2]) == "number" then
 			Layout.place(name, entry[1], entry[2])
@@ -338,7 +344,7 @@ end
 local bar = Instance.new("Frame")
 bar.Name = "Bar"
 bar.AnchorPoint = Vector2.new(0.5, 1)
-bar.Position = UDim2.new(0.5, 0, 1, -14)
+bar.Position = UDim2.new(0.5, 0, 1, -14 - 81 - 10) -- just above the HUD (70 px, drawn at 1.15)
 bar.Size = UDim2.fromOffset(444, 64)
 bar.BackgroundTransparency = 1
 bar.Parent = gui
@@ -464,7 +470,7 @@ local coinsLabel = label(pill, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1),
 local saveLabel = label(pill, "", UDim2.fromOffset(280, 0), UDim2.fromOffset(156, 22), 11, Enum.Font.GothamMedium, GREEN)
 saveLabel.TextXAlignment = Enum.TextXAlignment.Right
 
--- The battle panel (opened by the FIGHT button) is defined further down.
+-- The battle panel (opened by the PLAY button) is defined further down.
 local renderBattlePanel: () -> () = function() end
 
 local autoMergeKey: any = nil
@@ -520,7 +526,7 @@ local function render()
 	fight.title.TextTransparency = if locked then 0.5 else 0
 	if state.battling then
 		fight.sub.Text = if state.autoFight then "Battle · AUTO" else "Battle running…"
-		fight.sub.TextColor3 = MUTED
+		fight.sub.TextColor3 = WHITE
 	elseif state.rolling then
 		fight.sub.Text = "Rolling…"
 		fight.sub.TextColor3 = MUTED
@@ -528,8 +534,13 @@ local function render()
 		fight.sub.Text = string.format("Next wave in %ds%s", math.ceil(waitLeft), if state.autoFight then " · AUTO" else "")
 		fight.sub.TextColor3 = MUTED
 	else
-		fight.sub.Text = if battleOpen then "Close" else string.format("Wave %d · %s", state.selectedWave, Difficulties.Defs[state.difficulty].label)
-		fight.sub.TextColor3 = GOLD
+		fight.sub.Text = if UI.battleOpen then "Close" else string.format("Wave %d · %s", state.selectedWave, Difficulties.Defs[state.difficulty].label)
+		fight.sub.TextColor3 = WHITE
+	end
+	if locked then
+		fight.button.BackgroundColor3 = GREEN:Lerp(BG, 0.6)
+	elseif fight.button.BackgroundColor3 == GREEN:Lerp(BG, 0.6) then
+		fight.button.BackgroundColor3 = GREEN
 	end
 
 	-- Auto merge: how many merges the board could do right now. Equip best: whether it would change anything.
@@ -585,8 +596,8 @@ local pointer = Vector2.zero -- last pointer position (mouse or finger), GUI spa
 
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-panel.Position = UDim2.new(0.5, 0, 0.52, 0) -- the middle of the screen, a little low
+panel.AnchorPoint = Vector2.new(0.5, 0)
+panel.Position = UDim2.new(0.5, 0, 0, 12) -- the top of the screen, in the middle: clear of the HUD, the dock and PLAY
 panel.Size = UDim2.fromOffset(640, 420)
 panel.BackgroundColor3 = BG
 panel.BackgroundTransparency = 0.04
@@ -868,8 +879,8 @@ moveIntoInventory(autoMerge, 334, 230, 144, 44, true)
 moveIntoInventory(equipBest, 486, 230, 144, 44, true)
 
 -- ── The dock on the left edge of the screen ──────────────────────────────
--- Four square icons, one per tab of the panel, and the FIGHT button under them. An icon opens the panel on
--- its tab; the icon of the open tab hides the panel again. The dock moves by the grip on top.
+-- Four square icons, one per tab of the panel. An icon opens the panel on its tab; the icon of the open tab
+-- hides the panel again. The dock moves by the grip on top. (PLAY has its own dock on the right edge, below.)
 do
 local DOCK_TILE = 64
 local DOCK_STEP = 72
@@ -877,7 +888,7 @@ local dock = Instance.new("Frame")
 dock.Name = "Dock"
 dock.AnchorPoint = Vector2.new(0, 0.5)
 dock.Position = UDim2.new(0, 14, 0.5, 0)
-dock.Size = UDim2.fromOffset(76, 18 + 4 * DOCK_STEP + 64)
+dock.Size = UDim2.fromOffset(76, 18 + 4 * DOCK_STEP)
 dock.BackgroundColor3 = BG
 dock.BackgroundTransparency = 0.06
 dock.BorderSizePixel = 0
@@ -936,6 +947,7 @@ local function tile(index: number, name: string, tag: string, draw: (TextButton)
 	button.Activated:Connect(function()
 		if UI.hidden or UI.tab ~= name then
 			UI.hidden = false
+			UI.battleOpen = false -- the panel and the battle panel are never open together
 			showTab(name)
 		else
 			UI.hidden = true
@@ -977,22 +989,72 @@ tile(4, "Spells", "SPELL", function(b) -- a diamond and two sparks
 	return { gem, sparkA, sparkB }
 end)
 
--- FIGHT moves from the bottom bar into the dock, under the icons.
-fight.button.Parent = dock
-fight.button.Position = UDim2.fromOffset(6, 18 + 4 * DOCK_STEP)
-fight.button.Size = UDim2.fromOffset(DOCK_TILE, 56)
+-- ── PLAY: the big green button on the right edge ─────────────────────────
+-- The old FIGHT button, now a big green PLAY in its own little dock at the bottom right (a grip on top, so it
+-- moves like the others). It opens the battle panel (wave, difficulty, START WAVE); the main panel hides while
+-- that is open and comes back when it closes.
 do
+	local PLAY_W, PLAY_H = 176, 156
+	local playDock = Instance.new("Frame")
+	playDock.Name = "PlayDock"
+	playDock.AnchorPoint = Vector2.new(1, 1)
+	playDock.Position = UDim2.new(1, -14, 1, -14)
+	playDock.Size = UDim2.fromOffset(PLAY_W + 12, 18 + PLAY_H + 6)
+	playDock.BackgroundColor3 = BG
+	playDock.BackgroundTransparency = 0.06
+	playDock.BorderSizePixel = 0
+	playDock.Active = true
+	playDock.Parent = gui
+	corner(playDock, 16)
+	UI.gradient(playDock, Color3.fromRGB(36, 39, 54), Color3.fromRGB(18, 20, 28))
+	UI.stroke(playDock, Color3.fromRGB(70, 76, 100), 1.5)
+	local playGrip = Instance.new("Frame")
+	playGrip.Size = UDim2.new(1, 0, 0, 18)
+	playGrip.BackgroundTransparency = 1
+	playGrip.Parent = playDock
+	UI.grip(playGrip, (PLAY_W + 12) / 2 - 7, 7, MUTED)
+	Layout.make("Play", playDock, playGrip)
+
+	fight.button.Parent = playDock
+	fight.button.Position = UDim2.fromOffset(6, 18)
+	fight.button.Size = UDim2.fromOffset(PLAY_W, PLAY_H)
+	fight.button.BackgroundColor3 = GREEN
+	fight.button.BackgroundTransparency = 0
+	local playStroke = fight.button:FindFirstChildOfClass("UIStroke")
+	if playStroke then
+		playStroke.Color = Color3.fromRGB(170, 245, 195)
+		playStroke.Transparency = 0.15
+		playStroke.Thickness = 2.5
+	end
+	fight.fill.BackgroundColor3 = WHITE
+	fight.fill.BackgroundTransparency = 0.8
+	-- A big ">" in a darker green square, PLAY under it, then the wave and difficulty.
 	local badge = fight.key.Parent :: Frame
-	badge.Visible = false
-	fight.title.Position = UDim2.fromOffset(0, 6)
-	fight.title.Size = UDim2.new(1, 0, 0, 18)
-	fight.title.TextSize = 14
+	badge.AnchorPoint = Vector2.new(0.5, 0)
+	badge.Position = UDim2.new(0.5, 0, 0, 12)
+	badge.Size = UDim2.fromOffset(58, 58)
+	badge.BackgroundColor3 = Color3.fromRGB(28, 110, 66)
+	fight.key.TextSize = 40
+	fight.title.Text = "PLAY"
+	fight.title.Position = UDim2.fromOffset(0, 74)
+	fight.title.Size = UDim2.new(1, 0, 0, 40)
+	fight.title.TextSize = 34
+	fight.title.Font = Enum.Font.GothamBlack
 	fight.title.TextXAlignment = Enum.TextXAlignment.Center
-	fight.sub.Position = UDim2.fromOffset(3, 25)
-	fight.sub.Size = UDim2.new(1, -6, 0, 26)
-	fight.sub.TextSize = 9
+	fight.sub.Position = UDim2.fromOffset(6, 116)
+	fight.sub.Size = UDim2.new(1, -12, 0, 34)
+	fight.sub.TextSize = 12
 	fight.sub.TextWrapped = true
 	fight.sub.TextXAlignment = Enum.TextXAlignment.Center
+	fight.sub.TextYAlignment = Enum.TextYAlignment.Top
+	fight.button.MouseEnter:Connect(function()
+		if not (state.rolling or state.battling) then
+			fight.button.BackgroundColor3 = Color3.fromRGB(110, 225, 150)
+		end
+	end)
+	fight.button.MouseLeave:Connect(function()
+		fight.button.BackgroundColor3 = if state.rolling or state.battling then GREEN:Lerp(BG, 0.6) else GREEN
+	end)
 end
 
 RunService.RenderStepped:Connect(function()
@@ -1492,7 +1554,7 @@ end
 end
 
 -- ── Battle panel ──────────────────────────────────────────────────────────
--- The FIGHT button opens this panel: choose the difficulty and the wave, then START WAVE.
+-- The PLAY button opens this panel: choose the difficulty and the wave, then START WAVE.
 
 local function findPlot(): Instance?
 	local plotsFolder = workspace:FindFirstChild("Plots")
@@ -1511,7 +1573,7 @@ local function computeInZone(zoneName: string): boolean
 	local half = zone.Size / 2
 	return math.abs(offset.X) <= half.X and math.abs(offset.Y) <= half.Y and math.abs(offset.Z) <= half.Z
 end
-local battleOpen = false -- the battle panel (wave, difficulty, start) is opened with the FIGHT button
+-- The battle panel is opened with the PLAY button (UI.battleOpen); while it is open the main panel steps aside.
 
 local battlePanel = Instance.new("Frame")
 battlePanel.Name = "BattlePanel"
@@ -1556,7 +1618,7 @@ end
 local battleClose = battleButton("X", 522, 8, 30, 30)
 battleClose.BackgroundColor3 = BADGE
 battleClose.Activated:Connect(function()
-	battleOpen = false
+	UI.battleOpen = false
 end)
 
 local battleTitle = battleText("BATTLE", 0, 8, 560, 30, 26, Enum.Font.GothamBlack, ORANGE)
@@ -1616,7 +1678,7 @@ wavePlus.Activated:Connect(function()
 end)
 startButton.Activated:Connect(function()
 	Net.get("Battle"):FireServer()
-	battleOpen = false
+	UI.battleOpen = false
 end)
 
 -- The texts that only change with the selection are rebuilt when it changes (not every frame).
@@ -1624,9 +1686,9 @@ local battleInfoKey = ""
 
 renderBattlePanel = function()
 	if state.battling then
-		battleOpen = false
+		UI.battleOpen = false
 	end
-	local visible = battleOpen
+	local visible = UI.battleOpen
 	battlePanel.Visible = visible
 	if not visible then
 		return
@@ -2066,7 +2128,7 @@ end)
 
 -- One-time hint shortly after joining.
 task.delay(3, function()
-	showToast("Summon characters at the green altar (E), drag cards onto each other to merge, equip your squad, then press FIGHT", 9)
+	showToast("Summon characters at the green altar (E), drag cards onto each other to merge, equip your squad, then press PLAY", 9)
 end)
 end
 
@@ -3694,12 +3756,12 @@ local function requestBuy()
 	end, Enum.KeyCode.E) -- E opens this popup, E again confirms
 end
 
--- FIGHT: opens / closes the battle panel (wave, difficulty and START WAVE) in the middle of the screen.
+-- PLAY: opens / closes the battle panel (wave, difficulty and START WAVE) in the middle of the screen.
 local function requestFight()
 	if state.rolling or state.battling then
 		return
 	end
-	battleOpen = not battleOpen
+	UI.battleOpen = not UI.battleOpen
 end
 
 -- ── Spells: Q and E (the two spells you carry) ──────────────────────────
@@ -4216,9 +4278,6 @@ do
 	Net.get("Sfx").OnClientEvent:Connect(function(name: string)
 		playSound(name)
 	end)
-	fight.button.Activated:Connect(function()
-		playSound("click")
-	end)
 	if Sounds.Music ~= "" then
 		local music = Instance.new("Sound")
 		music.Name = "Music"
@@ -4234,11 +4293,12 @@ do
 end
 
 -- ── During a battle ────────────────────────────────────────────────────────
--- The camera stays yours (the server puts you into the arena for your spells); only the left panel steps
--- aside while the battle runs, so the fight is not covered.
+-- The camera stays yours (the server puts you into the arena for your spells); only the main panel steps
+-- aside while the battle runs, so the fight is not covered. It also steps aside while the battle panel (PLAY)
+-- is open, so the two never lie over each other, and comes back when that closes.
 do
 	RunService.RenderStepped:Connect(function()
-		panel.Visible = not state.battling and not UI.hidden
+		panel.Visible = not state.battling and not UI.hidden and not UI.battleOpen
 	end)
 end
 
@@ -4573,7 +4633,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 	if input.KeyCode == Enum.KeyCode.Escape then
 		closeConfirm()
-		battleOpen = false
+		UI.battleOpen = false
 	elseif input.KeyCode == Enum.KeyCode.E then
 		-- E summons at the altar (a ProximityPrompt); inside a popup that uses E it confirms; in a battle it heals.
 		if confirmLayer then
@@ -4589,6 +4649,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		castSpell("q") -- METEOR at the cursor (only in a battle)
 	elseif input.KeyCode == Enum.KeyCode.H then
 		UI.hidden = not UI.hidden -- hide / show the panel (same as its icon in the dock)
+		if not UI.hidden then
+			UI.battleOpen = false
+		end
 		Layout.save()
 	elseif isPointerPress(input) then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)

@@ -113,6 +113,11 @@ Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 
 ## Controls
 
+The battle is started with the big green **PLAY** button at the bottom right (its own little dock, movable by the grip
+on top): it opens the battle panel (difficulty, wave, START WAVE). The main panel (inventory, characters, upgrades,
+spells) starts at the top of the screen and hides while the battle panel is open, so the two never lie over each
+other; it comes back when the battle panel closes, and opening it from the dock (or H) closes the battle panel.
+
 - **Movable panels:** the left panel (grab its title bar), the daily quests and the settings can be dragged
   anywhere on the screen. The positions are saved in the player's settings (`layout`, a JSON string the client
   owns) and come back on the next join; **RESET LAYOUT** in the settings puts everything back.
