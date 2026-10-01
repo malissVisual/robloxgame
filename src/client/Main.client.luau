@@ -157,6 +157,11 @@ local UI = {}
 UI.DARK = Color3.fromRGB(16, 18, 26) -- the dark tiles inside the panel
 UI.PAGE_TOP = 84 -- the pages of the left panel start under its title bar and tabs
 UI.TAB_ACCENT = { Inventory = GOLD, Soldiers = Color3.fromRGB(90, 170, 255), Upgrades = Color3.fromRGB(170, 130, 255), Spells = ORANGE }
+UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
+UI.panelScale = Instance.new("UIScale")
+UI.tab = "Inventory" -- the open tab of the left panel
+UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
+UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
 
 function UI.stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
 	local s = Instance.new("UIStroke")
@@ -217,7 +222,7 @@ function UI.section(page: Instance, text: string, y: number, accent: Color3)
 	bar_.BorderSizePixel = 0
 	bar_.Parent = page
 	corner(bar_, 2)
-	label(page, text, UDim2.fromOffset(20, y), UDim2.fromOffset(200, 16), 12, Enum.Font.GothamBold, MUTED)
+	label(page, text, UDim2.fromOffset(20, y), UDim2.fromOffset(200, 16), 13, Enum.Font.GothamBold, MUTED)
 end
 
 -- ── Movable panels ────────────────────────────────────────────────────────
@@ -228,7 +233,7 @@ end
 type Movable = { frame: GuiObject, anchor: Vector2, position: UDim2 }
 local Layout = {
 	movables = {} :: { [string]: Movable },
-	saved = {} :: { [string]: { number } }, -- name → { x, y } in GUI (scaled) pixels, anchor 0,0
+	saved = {} :: { [string]: any }, -- name → { x, y } in GUI (scaled) pixels, anchor 0,0; "collapsed" = the left panel is folded
 	token = 0,
 	applied = nil :: string?,
 }
@@ -238,6 +243,7 @@ function Layout.save()
 	local token = Layout.token
 	task.delay(0.6, function()
 		if token == Layout.token then
+			Layout.saved.collapsed = if UI.collapsed then true else nil
 			Net.get("SetSetting"):FireServer("layout", HttpService:JSONEncode(Layout.saved))
 		end
 	end)
@@ -317,6 +323,9 @@ function Layout.apply(saved: any)
 		if Layout.movables[name] and type(entry) == "table" and type(entry[1]) == "number" and type(entry[2]) == "number" then
 			Layout.place(name, entry[1], entry[2])
 		end
+	end
+	if decoded.collapsed == true then
+		UI.setCollapsed(true)
 	end
 end
 
@@ -582,6 +591,9 @@ panel.Parent = gui
 corner(panel, 14)
 UI.gradient(panel, Color3.fromRGB(36, 39, 54), Color3.fromRGB(18, 20, 28))
 local panelStroke = UI.stroke(panel, Color3.fromRGB(70, 76, 100), 1.5)
+-- Bigger: the panel is laid out at 384 x 650 and drawn scaled up (every text and tile grows with it).
+UI.panelScale.Scale = UI.PANEL_SCALE
+UI.panelScale.Parent = panel
 
 -- The title bar: grab it to move the whole panel anywhere.
 do
@@ -607,8 +619,8 @@ headerLine.BackgroundColor3 = Color3.fromRGB(70, 76, 100)
 headerLine.BorderSizePixel = 0
 headerLine.Parent = header
 UI.grip(header, 14, 14, MUTED)
-local headerTitle = label(header, "MERGE BLADES", UDim2.fromOffset(36, 0), UDim2.fromOffset(200, 38), 14, Enum.Font.GothamBlack, WHITE)
-local headerHint = label(header, "drag to move", UDim2.new(1, -118, 0, 0), UDim2.fromOffset(106, 38), 10, Enum.Font.GothamMedium, MUTED)
+local headerTitle = label(header, "MERGE BLADES", UDim2.fromOffset(36, 0), UDim2.fromOffset(200, 38), 15, Enum.Font.GothamBlack, WHITE)
+local headerHint = label(header, "drag to move · H hides", UDim2.new(1, -176, 0, 0), UDim2.fromOffset(130, 38), 10, Enum.Font.GothamMedium, MUTED)
 headerHint.TextXAlignment = Enum.TextXAlignment.Right
 header.MouseEnter:Connect(function()
 	headerTitle.TextColor3 = GOLD
@@ -617,6 +629,30 @@ end)
 header.MouseLeave:Connect(function()
 	headerTitle.TextColor3 = WHITE
 	headerHint.TextColor3 = MUTED
+end)
+-- The − / + button folds the panel to its title bar and back.
+local fold = Instance.new("TextButton")
+fold.AnchorPoint = Vector2.new(1, 0)
+fold.Position = UDim2.new(1, -8, 0, 6)
+fold.Size = UDim2.fromOffset(32, 26)
+fold.BackgroundColor3 = BADGE
+fold.BorderSizePixel = 0
+fold.AutoButtonColor = false
+fold.Font = Enum.Font.GothamBlack
+fold.TextSize = 18
+fold.TextColor3 = WHITE
+fold.Text = "−"
+fold.ZIndex = 4
+fold.Parent = header
+corner(fold, 7)
+fold.Activated:Connect(function()
+	playSound("click")
+	UI.setCollapsed(not UI.collapsed)
+end)
+panel:GetAttributeChangedSignal("Collapsed"):Connect(function()
+	local on = panel:GetAttribute("Collapsed") == true
+	fold.Text = if on then "+" else "−"
+	headerHint.Text = if on then "click + or press H to show" else "drag to move · H hides"
 end)
 Layout.make("Panel", panel, header)
 end
@@ -640,8 +676,9 @@ local function makePage(name: string): Frame
 end
 
 local function showTab(name: string)
+	UI.tab = name
 	for tabName, page in pages do
-		page.Visible = tabName == name
+		page.Visible = tabName == name and not UI.collapsed
 	end
 	for tabName, button in tabButtons do
 		local active = tabName == name
@@ -653,6 +690,7 @@ end
 
 do
 local tabBar = Instance.new("Frame")
+tabBar.Name = "TabBar"
 tabBar.Position = UDim2.fromOffset(10, 46)
 tabBar.Size = UDim2.fromOffset(364, 32)
 tabBar.BackgroundColor3 = UI.DARK
@@ -687,6 +725,23 @@ for i, name in TAB_NAMES do
 		end
 	end)
 	tabButtons[name] = button
+end
+
+-- Folding: only the title bar stays; the tabs and the open page hide. The panel keeps its top-left corner
+-- (it is placed by that corner from then on) and is kept inside the screen when it grows back.
+UI.setCollapsed = function(on: boolean)
+	UI.collapsed = on
+	local corner_ = (panel.AbsolutePosition - gui.AbsolutePosition) / guiScale.Scale
+	panel.AnchorPoint = Vector2.zero
+	panel.Position = UDim2.fromOffset(corner_.X, corner_.Y)
+	tabBar.Visible = not on
+	panel.Size = if on then UDim2.fromOffset(384, 38) else UDim2.fromOffset(384, 650)
+	panel:SetAttribute("Collapsed", on)
+	showTab(UI.tab)
+	task.defer(function()
+		Layout.place("Panel", corner_.X, corner_.Y) -- clamp (the size changed)
+		Layout.save()
+	end)
 end
 end
 
@@ -1265,12 +1320,12 @@ for i, class in Units.ClassList do
 	locked.TextXAlignment = Enum.TextXAlignment.Center
 
 	label(row, def.label, UDim2.fromOffset(92, 7), UDim2.fromOffset(180, 20), 16, Enum.Font.GothamBold, WHITE)
-	UI.chip(row, string.format("HP %d", def.hp), UDim2.fromOffset(92, 30), UDim2.fromOffset(60, 18), UI.DARK, GREEN)
-	UI.chip(row, string.format("DMG %d", def.damage), UDim2.fromOffset(156, 30), UDim2.fromOffset(66, 18), UI.DARK, ORANGE)
-	UI.chip(row, string.format("RNG %d", def.range), UDim2.fromOffset(226, 30), UDim2.fromOffset(60, 18), UI.DARK, Color3.fromRGB(120, 180, 255))
-	local passive = label(row, Units.passiveText(class), UDim2.fromOffset(92, 52), UDim2.fromOffset(270, 14), 10, Enum.Font.GothamMedium, GOLD)
+	UI.chip(row, string.format("HP %d", def.hp), UDim2.fromOffset(92, 30), UDim2.fromOffset(60, 18), UI.DARK, GREEN, 12)
+	UI.chip(row, string.format("DMG %d", def.damage), UDim2.fromOffset(156, 30), UDim2.fromOffset(66, 18), UI.DARK, ORANGE, 12)
+	UI.chip(row, string.format("RNG %d", def.range), UDim2.fromOffset(226, 30), UDim2.fromOffset(60, 18), UI.DARK, Color3.fromRGB(120, 180, 255), 12)
+	local passive = label(row, Units.passiveText(class), UDim2.fromOffset(92, 52), UDim2.fromOffset(270, 14), 11, Enum.Font.GothamMedium, GOLD)
 	passive.TextScaled = true
-	local status = label(row, "", UDim2.fromOffset(92, 67), UDim2.fromOffset(270, 14), 11, Enum.Font.GothamBold, GREEN)
+	local status = label(row, "", UDim2.fromOffset(92, 67), UDim2.fromOffset(270, 14), 12, Enum.Font.GothamBold, GREEN)
 	soldierRows[class] = { frame = row, stroke = rowStroke, overlay = overlay, status = status }
 end
 
@@ -1603,7 +1658,7 @@ for i, class in Units.ClassList do
 	accentBar.Parent = row
 	corner(accentBar, 2)
 	label(row, def.label, UDim2.fromOffset(14, 5), UDim2.fromOffset(150, 18), 14, Enum.Font.GothamBold, WHITE)
-	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(240, 14), 11, Enum.Font.Gotham, MUTED)
+	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(240, 14), 12, Enum.Font.Gotham, MUTED)
 	-- The nine merge levels as dots (lit in the level color up to the bought level).
 	local dots = {}
 	for k = 1, Units.MaxTier do
@@ -1747,7 +1802,7 @@ do
 		local letter = label(icon, string.upper(string.sub(def.label, 1, 1)), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 17, Enum.Font.GothamBlack, def.color:Lerp(Color3.new(0, 0, 0), 0.7))
 		letter.TextXAlignment = Enum.TextXAlignment.Center
 		label(row, def.label, UDim2.fromOffset(54, 5), UDim2.fromOffset(160, 18), 14, Enum.Font.GothamBold, WHITE)
-		local description = label(row, def.description, UDim2.fromOffset(54, 23), UDim2.fromOffset(226, 28), 10, Enum.Font.Gotham, MUTED)
+		local description = label(row, def.description, UDim2.fromOffset(54, 23), UDim2.fromOffset(226, 28), 11, Enum.Font.Gotham, MUTED)
 		description.TextWrapped = true
 		description.TextYAlignment = Enum.TextYAlignment.Top
 		local status = label(row, string.format("Drops after\nwave %d", def.dropWave or 0), UDim2.fromOffset(282, 8), UDim2.fromOffset(78, 38), 10, Enum.Font.GothamMedium, GOLD)
@@ -4292,6 +4347,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		end
 	elseif input.KeyCode == Enum.KeyCode.Q then
 		castSpell("q") -- METEOR at the cursor (only in a battle)
+	elseif input.KeyCode == Enum.KeyCode.H then
+		UI.setCollapsed(not UI.collapsed) -- fold / unfold the left panel
+		playSound("click")
 	elseif isPointerPress(input) then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)
 		closeCardPopup() -- a click in the world closes the popup
