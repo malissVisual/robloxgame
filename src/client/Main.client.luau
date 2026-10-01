@@ -161,6 +161,7 @@ UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is lai
 UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
+UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
 
 function UI.stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
@@ -245,6 +246,7 @@ function Layout.save()
 	task.delay(0.6, function()
 		if token == Layout.token then
 			Layout.saved.collapsed = if UI.collapsed then true else nil
+			Layout.saved.hidden = if UI.hidden then true else nil
 			Net.get("SetSetting"):FireServer("layout", HttpService:JSONEncode(Layout.saved))
 		end
 	end)
@@ -328,6 +330,7 @@ function Layout.apply(saved: any)
 	if decoded.collapsed == true then
 		UI.setCollapsed(true)
 	end
+	UI.hidden = decoded.hidden == true
 end
 
 -- ── Bottom bar ────────────────────────────────────────────────────────────
@@ -647,7 +650,6 @@ fold.ZIndex = 4
 fold.Parent = header
 corner(fold, 7)
 fold.Activated:Connect(function()
-	playSound("click")
 	UI.setCollapsed(not UI.collapsed)
 end)
 panel:GetAttributeChangedSignal("Collapsed"):Connect(function()
@@ -656,6 +658,60 @@ panel:GetAttributeChangedSignal("Collapsed"):Connect(function()
 	headerHint.Text = if on then "click + or press H to show" else "drag to move · H hides"
 end)
 Layout.make("Panel", panel, header)
+end
+
+-- The inventory icon on the left edge of the screen: a bag. A click hides the whole panel, another shows it.
+do
+local icon = Instance.new("TextButton")
+icon.Name = "InventoryIcon"
+icon.AnchorPoint = Vector2.new(0, 0.5)
+icon.Position = UDim2.new(0, 14, 0.5, 0)
+icon.Size = UDim2.fromOffset(56, 56)
+icon.BackgroundColor3 = BG
+icon.BackgroundTransparency = 0.08
+icon.BorderSizePixel = 0
+icon.AutoButtonColor = false
+icon.Text = ""
+icon.Parent = gui
+corner(icon, 14)
+local iconStroke = UI.stroke(icon, GOLD, 2, 0.35)
+local function piece(x: number, y: number, w: number, h: number, color: Color3, radius: number): Frame
+	local f = Instance.new("Frame")
+	f.Position = UDim2.fromOffset(x, y)
+	f.Size = UDim2.fromOffset(w, h)
+	f.BackgroundColor3 = color
+	f.BorderSizePixel = 0
+	f.ZIndex = 2
+	f.Parent = icon
+	corner(f, radius)
+	return f
+end
+local handle = piece(22, 5, 12, 10, BG, 5) -- the ring handle (a hollow frame)
+handle.BackgroundTransparency = 1
+UI.stroke(handle, GOLD, 2)
+local flap = piece(14, 13, 28, 10, GOLD:Lerp(BG, 0.3), 4) -- the flap
+local body = piece(14, 21, 28, 20, GOLD, 6) -- the bag
+piece(25, 23, 6, 6, BG, 3) -- the clasp
+local tag = label(icon, "INV", UDim2.fromOffset(0, 41), UDim2.new(1, 0, 0, 13), 9, Enum.Font.GothamBlack, MUTED)
+tag.TextXAlignment = Enum.TextXAlignment.Center
+icon.MouseEnter:Connect(function()
+	iconStroke.Transparency = 0
+end)
+icon.MouseLeave:Connect(function()
+	iconStroke.Transparency = 0.35
+end)
+icon.Activated:Connect(function()
+	UI.hidden = not UI.hidden
+	Layout.save()
+end)
+RunService.RenderStepped:Connect(function()
+	-- Lit while the panel shows, dim while it is hidden.
+	local shown = not UI.hidden
+	iconStroke.Color = if shown then GOLD else MUTED
+	body.BackgroundColor3 = if shown then GOLD else MUTED
+	flap.BackgroundColor3 = (if shown then GOLD else MUTED):Lerp(BG, 0.3)
+	tag.Text = if shown then "INV" else "SHOW"
+end)
 end
 
 -- Tabs: Inventory (the squad and the merge board), Soldiers (the index of every class), Upgrades (merge
@@ -712,7 +768,6 @@ for i, name in TAB_NAMES do
 	button.Parent = tabBar
 	corner(button, 8)
 	button.Activated:Connect(function()
-		playSound("click")
 		showTab(name)
 	end)
 	button.MouseEnter:Connect(function()
@@ -1685,7 +1740,6 @@ for i, class in Units.ClassList do
 	corner(button, 8)
 	local buttonStroke = UI.stroke(button, GREEN, 1.5, 1)
 	button.Activated:Connect(function()
-		playSound("click")
 		Net.get("UnlockTier"):FireServer(class)
 	end)
 	upgradeRows[class] = { frame = row, stroke = rowStroke, sub = sub, dots = dots, button = button, buttonStroke = buttonStroke }
@@ -1824,7 +1878,6 @@ do
 			button.Parent = row
 			corner(button, 8)
 			button.Activated:Connect(function()
-				playSound("click")
 				Net.get("EquipSpell"):FireServer(id, slot)
 			end)
 			buttons[slot] = button
@@ -4001,7 +4054,7 @@ end
 -- aside while the battle runs, so the fight is not covered.
 do
 	RunService.RenderStepped:Connect(function()
-		panel.Visible = not state.battling
+		panel.Visible = not state.battling and not UI.hidden
 	end)
 end
 
@@ -4236,7 +4289,6 @@ do
 	corner(resetButton, 8)
 	resetButton.Activated:Connect(function()
 		Layout.reset()
-		playSound("click")
 	end)
 
 	-- Volume: - and +.
@@ -4351,7 +4403,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		castSpell("q") -- METEOR at the cursor (only in a battle)
 	elseif input.KeyCode == Enum.KeyCode.H then
 		UI.setCollapsed(not UI.collapsed) -- fold / unfold the left panel
-		playSound("click")
 	elseif isPointerPress(input) then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)
 		closeCardPopup() -- a click in the world closes the popup

@@ -109,6 +109,8 @@ Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 - **Movable panels:** the left panel (grab its title bar), the daily quests and the settings can be dragged
   anywhere on the screen. The positions are saved in the player's settings (`layout`, a JSON string the client
   owns) and come back on the next join; **RESET LAYOUT** in the settings puts everything back.
+- **The inventory icon** (the bag on the left edge of the screen) hides the whole panel and shows it again
+  (saved with the layout).
 - **Folding the panel:** the − / + button in its title bar, or **H**, folds it to the title bar and back
   (saved with the layout). The panel is a wide one (640 × 420, two columns on every page), starts in the
   middle of the screen and is drawn at `UI.PANEL_SCALE` (1.15) of its layout size.
