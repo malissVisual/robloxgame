@@ -416,7 +416,7 @@ hud.BorderSizePixel = 0
 hud.Active = true
 hud.Parent = gui
 local hudScale = Instance.new("UIScale")
-hudScale.Scale = 0.75 -- the HUD is small: it should not get in the way
+hudScale.Scale = 1.1 -- level and coins, big enough to read at a glance
 hudScale.Parent = hud
 corner(hud, 12)
 local hudStroke = Instance.new("UIStroke")
@@ -676,6 +676,9 @@ icon.AutoButtonColor = false
 icon.Text = ""
 icon.Parent = gui
 corner(icon, 14)
+local iconScale = Instance.new("UIScale") -- drawn at 1.5x (84 px): easy to hit
+iconScale.Scale = 1.5
+iconScale.Parent = icon
 local iconStroke = UI.stroke(icon, GOLD, 2, 0.35)
 local function piece(x: number, y: number, w: number, h: number, color: Color3, radius: number): Frame
 	local f = Instance.new("Frame")
