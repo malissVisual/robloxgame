@@ -432,6 +432,31 @@ To test him: ADMIN → wave 100 (the admin tools set the wave), then PLAY. `pyth
 [luau]` runs the fight's logic test (standalone Luau with Roblox stubs: timings, locked warnings, one hit per impact,
 the jump over the ring, meteor gaps, enrage, stagger, cleanup); the model and animations need a Studio playtest.
 
+## The Mage's battle AI (utility AI)
+
+The **Mage** does not just stand and shoot: every Mage in a battle gets a **brain** (`server/Services/MageBrain.luau`,
+one instance per Mage, created by BattleService at the start of the fight and stepped every simulation tick). Every
+0.2–0.4 s (random offset, so the mages never think in the same tick) it scores the possible actions 0–1 and runs
+the best one, with a little inertia for the current action: **attack** (the basic spell on its target), **strong**
+(an AoE into the centroid of a cluster of enemies, a chain, a singularity, or a finisher on a low-HP target),
+**retreat** (kiting: a close enemy is dangerous, so it backs off diagonally in short bursts, shooting while it
+goes, and steps out of a telegraphed enemy area such as the Rift King's circles, which carry the `Hazard`
+attribute), **shield** (below 35 % HP or when threatened), **blink** (surrounded), **support** (heal the ally with
+the lowest HP, from level 21), **approach** (no target in range) and **idle**. Targets are chosen by a weighted
+score (proximity, low HP, hate toward whoever hurt it, enemy type: archers and shamans before brutes) with
+memory (a target is held 1.5 s unless a clearly better one appears) and a level-scaled reaction time (0.6 s at
+level 1, 0.15 s at level 30); it sometimes hesitates or aims an AoE a little off (less at higher levels).
+
+Spells (`shared/Config/MageSpells.luau`) come by era and level: a basic bolt per era (fire stone, sun ray, magic
+missile, arc bolt, plasma beam, quantum bolt) plus the newest unlocked strong spells, 1–10: one extra, 11–20: two,
+21–30: three and a heal (spark swarm, sandstorm, chain lightning, ice barrier, steam blast, electric arc, EMP slow,
+med drone, quantum blink, gravitational singularity, star rain, nano heal). Strong spells cost **mana** (regenerating)
+and have cooldowns, so the brain saves them; before one, the staff's crystals brighten and grow and the arm
+rises (the telegraph), then the spell fires. All numbers live in `shared/Config/MageConfig.luau`; set
+`Debug = true` there or `workspace:SetAttribute("MageDebug", true)` at runtime for a label over every Mage with
+its action, score, target, mana and HP. `python3 tools/tests/run_magebrain_test.py [luau]` runs the brain's logic
+test in standalone Luau (spell unlocks, attacks, kiting bursts, strong spells and mana, healing, bounds).
+
 ## The FIGHT button and the battle panel (starting a wave, difficulty and wave choice)
 
 Nothing pops up when you walk onto the raised fight arena. The **FIGHT** button in the bottom bar opens

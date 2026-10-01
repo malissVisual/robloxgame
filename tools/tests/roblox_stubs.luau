@@ -29,6 +29,7 @@ local function cf(p) return setmetatable({ Position = p }, CF) end
 CF.__index = CF
 CF.__mul = function(a, b) return cf(a.Position + b.Position) end
 CF.__sub = function(a, v) return cf(a.Position - v) end
+function CF.VectorToWorldSpace(_, v) return v end
 S.CFrame = {
 	new = function(a, b, c) if type(a) == "number" then return cf(vec(a, b, c)) elseif a then return cf(a) else return cf(vec(0, 0, 0)) end end,
 	Angles = function() return cf(vec(0, 0, 0)) end,
@@ -57,6 +58,7 @@ function Inst.IsA(self, class) return self.ClassName == class or (class == "Base
 function Inst.SetAttribute(self, k, v) self.attributes[k] = v end
 function Inst.GetAttribute(self, k) return self.attributes[k] end
 function Inst.GetDescendants(self) return self.descendants or {} end
+function Inst.GetChildren(self) return self.descendants or {} end
 function Inst.FindFirstChild(self, name)
 	for _, d in self.descendants or {} do if d.Name == name then return d end end
 	return nil
@@ -79,7 +81,9 @@ S.tweens = 0
 S.TweenService = { Create = function(_, obj, _info, goals) return { Play = function() S.tweens += 1; for k, v in goals do obj[k] = v end end } end }
 S.Debris = { AddItem = function(_, obj) obj.Parent = nil; obj.destroyed = true end } -- (removed at once: the test counts live parts)
 S.players = {}
-S.Players = { GetPlayers = function() return S.players end }
+S.Players = { GetPlayers = function() S.workspace = { GetAttribute = function() return nil end }
+S.task = { delay = function() end, spawn = function(f, ...) f(...) end, wait = function() end }
+return S.players end }
 S.sent = {} -- Net messages
 S.Net = { get = function(name) return { FireClient = function(_, player, ...) table.insert(S.sent, { name = name, ... }) end } end }
 S.casts = {}
@@ -96,4 +100,6 @@ function S.newPlayer(name, position)
 	return { Name = name, Parent = true, Character = character, root = root, humanoid = humanoid }
 end
 
+S.workspace = { GetAttribute = function() return nil end }
+S.task = { delay = function() end, spawn = function(f, ...) f(...) end, wait = function() end }
 return S

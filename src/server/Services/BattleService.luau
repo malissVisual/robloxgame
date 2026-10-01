@@ -20,6 +20,7 @@ local Waves = require(Shared.Config.Waves)
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
 local RiftKing = require(script.Parent.RiftKing)
+local MageBrain = require(script.Parent.MageBrain)
 local Soldier = require(Shared.Soldier)
 
 local PLAYER_SIDE, ENEMY_SIDE = 1, 2
@@ -47,6 +48,7 @@ type Fighter = {
 	shots: number, -- attacks made (Power Shot: every 3rd)
 	dead: boolean, -- its death was handled (the model falls and fades)
 	kind: string?, -- an enemy's kind (Config/Enemies)
+	brain: any?, -- a Mage's battle AI (MageBrain.luau): it takes over the fighter's movement and attacks
 	maxHp: number,
 	hp: number,
 	damage: number,
@@ -105,6 +107,7 @@ local function makeFighter(side: number, stats: Units.Stats, tier: number, color
 		shots = 0,
 		dead = false,
 		kind = nil,
+		brain = nil,
 		maxHp = stats.hp,
 		hp = stats.hp,
 		damage = stats.damage,
@@ -568,6 +571,30 @@ end
 
 local bossAbility: (Battle, Fighter, number) -> () = function() end -- defined below (needs the spell effects)
 
+-- One attack of `f` on `target` (× `mult`): the damage with the passives, the hit effect, the swing animation and the
+-- splash (the Mage's Arcane Burst or an enemy with splash). Used by the step loop and by the Mage brains.
+local function performAttack(battle: Battle, f: Fighter, target: Fighter, mult: number?)
+	local fighters, effects = battle.fighters, battle.parent
+	local amount = attackDamage(f, fighters) * (mult or 1)
+	local taken = damage(target, amount)
+	popNumber(effects, target, taken)
+	effect(f, target, effects)
+	Rig.attack(f.model, battle.speed())
+	if target.brain then
+		target.brain:onDamaged(f) -- a Mage remembers who hurt it
+	end
+	local splashFraction = if f.passive == "splash" then f.passiveValue elseif f.splash then Balance.SplashFraction else 0
+	if splashFraction > 0 then
+		for _, other in fighters do
+			if other ~= target and other.side == target.side and other.hp > 0 then
+				if (other.pos - target.pos).Magnitude <= Balance.SplashRadius then
+					popNumber(effects, other, damage(other, amount * splashFraction))
+				end
+			end
+		end
+	end
+end
+
 local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 	local fighters, effects = battle.fighters, battle.parent
 	numbersThisTick = 0
@@ -583,6 +610,10 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 		end
 		if f.stunUntil > f.clock then
 			continue -- stunned by a boss slam
+		end
+		if f.brain then
+			f.brain:update(dt) -- a Mage thinks for itself (MageBrain.luau): targets, kiting, spells
+			continue
 		end
 		if f.boss and f.ability then
 			f.abilityTimer -= dt
@@ -601,22 +632,7 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 			f.timer -= dt * rate
 			if f.timer <= 0 then
 				f.timer = f.cooldown
-				local amount = attackDamage(f, fighters)
-				local taken = damage(target, amount)
-				popNumber(effects, target, taken)
-				effect(f, target, effects)
-				Rig.attack(f.model, battle.speed())
-				-- Splash: the Mage's Arcane Burst (its passive value) or an enemy with splash.
-				local splashFraction = if f.passive == "splash" then f.passiveValue elseif f.splash then Balance.SplashFraction else 0
-				if splashFraction > 0 then
-					for _, other in fighters do
-						if other ~= target and other.side == target.side and other.hp > 0 then
-							if (other.pos - target.pos).Magnitude <= Balance.SplashRadius then
-								popNumber(effects, other, damage(other, amount * splashFraction))
-							end
-						end
-					end
-				end
+				performAttack(battle, f, target)
 			end
 		else
 			f.pos += delta.Unit * math.min(f.speed * dt * rate, dist - f.range)
@@ -637,6 +653,9 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 			if f.ability == "riftking" and battle.rift then
 				RiftKing.cleanup(battle.rift) -- every warning, crystal and ring goes away with him
 				battle.rift = nil
+			end
+			if f.brain then
+				f.brain:destroy()
 			end
 		end
 	end
@@ -669,6 +688,7 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 
 	-- Only the squad fights; the merge board is just storage.
 	local synergy = Synergy.compute(profile.squad)
+	local mages: { { fighter: Fighter, level: number } } = {}
 	for i = 1, Balance.SquadSize do
 		local id = Balance.SquadOffset + i
 		local cell = profile.squad[i]
@@ -686,6 +706,9 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			fighter.hp = fighter.maxHp
 			fighter.damage *= synergy.damage
 			table.insert(fighters, fighter)
+			if cell.class == "Mage" then
+				table.insert(mages, { fighter = fighter, level = cell.tier })
+			end
 		end
 	end
 
@@ -738,6 +761,44 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 	}
 	numbersOn[plot.folder] = battle.numbers
 	active[player] = battle
+	-- Every Mage gets a brain (MageBrain.luau): it needs the battle's fighters, the damage helpers, the arena
+	-- bounds and the enemies' telegraphed areas (parts with the "Hazard" attribute, e.g. the Rift King's).
+	if #mages > 0 then
+		local center = plot.arena.center
+		local brainContext: MageBrain.Context = {
+			fighters = fighters,
+			parent = plot.folder,
+			playerSide = PLAYER_SIDE,
+			attack = function(f, target, mult)
+				performAttack(battle, f, target, mult)
+			end,
+			damage = damage,
+			popNumber = function(target, amount, color)
+				popNumber(plot.folder, target, amount, color)
+			end,
+			face = face,
+			bounds = { center = center, halfX = 36, halfZ = 34 },
+			hazards = function()
+				local list = {}
+				local fx = plot.folder:FindFirstChild("RiftKingFx")
+				if fx then
+					for _, part in fx:GetChildren() do
+						local radius = part:GetAttribute("Hazard")
+						if type(radius) == "number" and part:IsA("BasePart") then
+							table.insert(list, { pos = part.Position, radius = radius })
+						end
+					end
+				end
+				return list
+			end,
+			archetype = function(f)
+				return if f.kind and Enemies.Kinds[f.kind] then Enemies.Kinds[f.kind].archetype else nil
+			end,
+		}
+		for _, entry in mages do
+			entry.fighter.brain = MageBrain.new(brainContext, entry.fighter, entry.level)
+		end
+	end
 	for _, f in fighters do
 		if f.ability == "riftking" then
 			battle.rift = RiftKing.new({

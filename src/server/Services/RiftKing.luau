@@ -239,6 +239,7 @@ local function warningCircle(state: State, position: Vector3, radius: number, co
 	local turn = CFrame.Angles(0, 0, math.rad(90))
 	local border = part(state, Vector3.new(0.28, radius * 2, radius * 2), CFrame.new(position.X, y + 0.2, position.Z) * turn, color, 0.05, Enum.PartType.Cylinder)
 	local fill = part(state, Vector3.new(0.2, (radius - 0.35) * 2, (radius - 0.35) * 2), CFrame.new(position.X, y + 0.21, position.Z) * turn, color, 0.7, Enum.PartType.Cylinder)
+	border:SetAttribute("Hazard", radius) -- the Mage's AI reads these and steps out of the circle
 	pulse(fill, 0.7, 0.45)
 	return { border, fill }
 end
