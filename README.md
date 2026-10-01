@@ -357,7 +357,12 @@ design/MageEvolution/Mage_R15_30_levelu/modely src/shared/StageModels/MageEvolut
 the gear relative to its body part) plus `init.luau`, which loads an era the first time one of its levels is asked
 for. `SoldierRig.luau` (`buildEvolution`) builds the character from that data at runtime: the body parts with the
 model's own proportions, Motor6D joints and a Humanoid (so the battle animations work), the gear welded on; for
-UI previews and holograms it is a statue (everything anchored). Levels 10 … 30 have their own level colors
+UI previews and holograms it is a statue (everything anchored). **What the hands hold is separate**: the converter
+writes the right hand's parts as `weapon` and the left hand's as `offhand` (relative to the hand, following weld
+chains such as staff → Handle → hand), and `shared/Weapons.luau` builds them as the models `Weapon` / `Offhand`
+inside the character, gripped by a Motor6D (`RightGrip` / `LeftGrip`, as Roblox tools are). The grip is the
+design's rest pose (no "hold" animation turns it), the attack animation swings the hand and the weapon with it,
+and `Weapons.equip(character, "RightHand", parts, scale, static)` can give a character another weapon later. Levels 10 … 30 have their own level colors
 (`Levels.Colors`) and prices (`Balance.TierUnlocks`: two more waves and 25 % more coins per level). The old
 9 knight, archer and mage cards stay in the file only as a fallback without data. Run the tool again after changing a model.
 

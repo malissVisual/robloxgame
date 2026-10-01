@@ -10,14 +10,17 @@
 -- to something else.
 
 local Rig = require(script.Parent.Rig)
+local Weapons = require(script.Parent.Weapons)
 -- The Knight, the Archer and the Mage do not use their 9 cards below any more: their 30 merge levels are the R15
 -- evolution models (design/KnightEvolution, ArcherEvolution, MageEvolution; generated into StageModels/<Class>Evolution), see
 -- buildEvolution. `attack` / `hold` = the animations (Rig.animate); `holdFrom` = the level the weapon hand is
 -- held up from (the Knight carries a weapon from level 3; the bow of the Archer hangs in the left hand).
 local EVOLUTIONS = {
-	Knight = { data = require(script.Parent.StageModels.KnightEvolution), attack = "slash", holdFrom = 3 },
+	-- (holdFrom = 99: the designs' rest pose is the grip; the "hold" animation would turn a hanging sword or a
+	-- standing staff forward. The attack animation moves the hand, and the weapon follows it.)
+	Knight = { data = require(script.Parent.StageModels.KnightEvolution), attack = "slash", holdFrom = 99 },
 	Archer = { data = require(script.Parent.StageModels.ArcherEvolution), attack = "lunge", holdFrom = 99 },
-	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "cast", holdFrom = 1 },
+	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "cast", holdFrom = 99 },
 }
 
 local C = Color3.fromRGB
@@ -2324,6 +2327,10 @@ local function buildEvolution(class: string, tier: number, s: number, bare: bool
 			end
 		end
 	end
+
+	-- What the hands hold: separate, swappable models gripped by the hands (Weapons.luau).
+	Weapons.equip(model, "RightHand", data.weapon, rs, isStatic)
+	Weapons.equip(model, "LeftHand", data.offhand, rs, isStatic)
 
 	if isStatic then
 		-- A statue (UI previews, holograms): every part anchored in place, no joints, no Humanoid.
