@@ -1,7 +1,8 @@
 --!nonstrict
--- The designed classes (Soldier, Knight, Archer, Mage) as R15 characters: 9 designed stages each (one per merge level). The
--- Soldier comes from design/SoldierMerge_R15_Builder, the Knight from the red knight cards, the Archer from the green
--- archer cards, the Mage from the purple mage cards. The gear is parts welded on the limbs of the R15 base rig (Rig.base).
+-- The designed classes (Soldier, Knight, Archer, Mage, Hunter, Berserker, Tank) as R15 characters: 9 designed stages
+-- each (one per merge level). The Soldier comes from design/SoldierMerge_R15_Builder, the Knight from the red knight
+-- cards, the Archer from the green archer cards, the Mage from the purple mage cards, the Hunter, the Berserker and the
+-- Tank from their card sheets. The gear is parts welded on the limbs of the R15 base rig (Rig.base).
 --   1 Recruit · 2 Private · 3 Corporal · 4 Sergeant · 5 Lieutenant · 6 Captain · 7 Major · 8 General · 9 Legend
 -- Without the base rig (it could not be made, or it has not reached this client yet) the same design is built
 -- on a body of plain blocks with the same limb names (a statue: no animations), so the look never falls back
@@ -1331,8 +1332,809 @@ MAGE[9] = { name = "Legend", torso = C(52, 42, 94), legs = C(210, 170, 70), top 
 		end
 	end }
 
+-- ── Shared gear for the Hunter, the Berserker and the Tank (design: their card sheets) ──
+
+-- A crossbow in the right hand: the stock along -Z, the bow across it near the front.
+local function crossbow(r, stockCol, bowCol, boltCol, size)
+	size = size or 1
+	mk(r, "RightHand", "block", V(0.26, 0.4, 2.2) * size, CF(0, -0.15, -0.9 * size), stockCol, Enum.Material.Wood)
+	mk(r, "RightHand", "block", V(2.2, 0.14, 0.2) * size, CF(0, -0.1, -1.6 * size), bowCol, Enum.Material.Wood)
+	mk(r, "RightHand", "block", V(1.15, 0.05, 0.05) * size, CF(-0.55 * size, 0, -1.3 * size) * ANG(0, R(-28), 0), K_WHITE, PLASTIC)
+	mk(r, "RightHand", "block", V(1.15, 0.05, 0.05) * size, CF(0.55 * size, 0, -1.3 * size) * ANG(0, R(28), 0), K_WHITE, PLASTIC)
+	if boltCol then
+		mk(r, "RightHand", "block", V(0.08, 0.08, 1.4) * size, CF(0, 0.08, -1.3 * size), boltCol, NEON, { light = boltCol, range = 8 })
+	end
+end
+
+-- A long rifle with a scope (the Soldier's rifle plus the scope).
+local function longRifle(r, col, glow, size)
+	size = size or 1.2
+	rifle(r, col, glow, size)
+	mk(r, "RightHand", "cyl", V(0.6, 0.3, 0.3), CF(0, 0.2, -1.0 * size) * ANG(0, R(90), 0), C(20, 22, 24), METAL)
+	if glow then
+		mk(r, "RightHand", "ball", V(0.22, 0.22, 0.1), CF(0, 0.2, -1.32 * size), glow, NEON)
+	end
+end
+
+-- An axe in a hand: a haft along -Z and a head near the end (`double` = a blade on both sides).
+local function axe(r, limb, haftCol, headCol, edgeCol, size, double)
+	size = size or 1
+	mk(r, limb, "block", V(0.22, 0.22, 3.0) * size, CF(0, -0.15, -1.0 * size), haftCol, Enum.Material.Wood)
+	mk(r, limb, "block", V(0.26, 0.5, 0.5) * size, CF(0, -0.15, 0.4 * size), C(70, 52, 40), PLASTIC)
+	mk(r, limb, "block", V(0.3, 1.3, 0.9) * size, CF(0, 0.5 * size, -2.1 * size), headCol, METAL)
+	if edgeCol then
+		mk(r, limb, "block", V(0.34, 1.35, 0.14) * size, CF(0, 0.5 * size, -2.6 * size), edgeCol, NEON, { light = edgeCol, range = 8 })
+	end
+	if double then
+		mk(r, limb, "block", V(0.3, 1.3, 0.9) * size, CF(0, -0.8 * size, -2.1 * size), headCol, METAL)
+		if edgeCol then
+			mk(r, limb, "block", V(0.34, 1.35, 0.14) * size, CF(0, -0.8 * size, -2.6 * size), edgeCol, NEON)
+		end
+	end
+end
+
+-- A tower shield on the left hand: a tall plate with a point below, a border and an emblem
+-- ("cross" | "diamond" | "star" | "runes" | "none").
+local function towerShield(r, col, trim, emblemKind, emblemCol, size)
+	size = size or 1
+	local at = CF(-0.4, -0.3, -0.75)
+	mk(r, "LeftHand", "block", V(1.7, 3.0, 0.16) * size, at, trim, METAL)
+	mk(r, "LeftHand", "block", V(1.2, 1.2, 0.16) * size, at * CF(0, -1.5 * size, 0) * ANG(0, 0, R(45)), trim, METAL)
+	mk(r, "LeftHand", "block", V(1.45, 2.8, 0.18) * size, at * CF(0, 0, -0.02), col, METAL)
+	mk(r, "LeftHand", "block", V(1.0, 1.0, 0.18) * size, at * CF(0, -1.5 * size, -0.02) * ANG(0, 0, R(45)), col, METAL)
+	local front = at * CF(0, 0, -0.13)
+	if emblemKind == "cross" then
+		mk(r, "LeftHand", "block", V(0.22, 2.2, 0.05) * size, front, emblemCol, PLASTIC)
+		mk(r, "LeftHand", "block", V(1.1, 0.22, 0.05) * size, front * CF(0, 0.5 * size, 0), emblemCol, PLASTIC)
+	elseif emblemKind == "diamond" then
+		mk(r, "LeftHand", "block", V(0.9, 0.9, 0.05) * size, front * ANG(0, 0, R(45)), emblemCol, METAL)
+		mk(r, "LeftHand", "block", V(0.5, 0.5, 0.06) * size, front * CF(0, 0, -0.02) * ANG(0, 0, R(45)), trim, NEON, { light = trim, range = 8 })
+	elseif emblemKind == "star" then
+		mk(r, "LeftHand", "block", V(0.8, 0.8, 0.05) * size, front, emblemCol, METAL)
+		mk(r, "LeftHand", "block", V(0.8, 0.8, 0.05) * size, front * ANG(0, 0, R(45)), emblemCol, METAL)
+	elseif emblemKind == "runes" then
+		mk(r, "LeftHand", "block", V(0.08, 2.4, 0.05) * size, front, emblemCol, NEON)
+		mk(r, "LeftHand", "block", V(1.2, 0.08, 0.05) * size, front, emblemCol, NEON)
+		mk(r, "LeftHand", "block", V(0.08, 2.0, 0.05) * size, front * ANG(0, 0, R(40)), emblemCol, NEON)
+		mk(r, "LeftHand", "block", V(0.08, 2.0, 0.05) * size, front * ANG(0, 0, R(-40)), emblemCol, NEON)
+		mk(r, "LeftHand", "ball", V(0.4, 0.4, 0.1) * size, front * CF(0, 0, -0.02), emblemCol, NEON, { light = emblemCol, range = 10 })
+	end
+end
+
+-- A mace in the right hand: a haft and a ball head with spikes.
+local function mace(r, haftCol, headCol, spikeCol)
+	mk(r, "RightHand", "block", V(0.22, 0.22, 2.4), CF(0, -0.15, -1.0), haftCol, Enum.Material.Wood)
+	mk(r, "RightHand", "ball", V(0.75, 0.75, 0.75), CF(0, -0.15, -2.3), headCol, METAL)
+	for _, o in ipairs({ { 0.4, 0 }, { -0.4, 0 }, { 0, 0.4 }, { 0, -0.4 } }) do
+		mk(r, "RightHand", "block", V(0.16, 0.16, 0.16), CF(o[1], -0.15 + o[2], -2.3), spikeCol or headCol, METAL)
+	end
+	mk(r, "RightHand", "block", V(0.16, 0.16, 0.3), CF(0, -0.15, -2.75), spikeCol or headCol, METAL)
+end
+
+-- A war hammer in the right hand.
+local function warHammer(r, headCol, haftCol, glow, size)
+	size = size or 1
+	mk(r, "RightHand", "block", V(0.24, 0.24, 3.4) * size, CF(0, -0.15, -1.2 * size), haftCol, Enum.Material.Wood)
+	mk(r, "RightHand", "block", V(1.5, 0.85, 0.85) * size, CF(0, -0.15, -2.7 * size), headCol, METAL)
+	if glow then
+		mk(r, "RightHand", "block", V(1.52, 0.12, 0.3) * size, CF(0, -0.15, -2.7 * size), glow, NEON, { light = glow, range = 10 })
+	end
+end
+
+local function club(r, col)
+	mk(r, "RightHand", "block", V(0.26, 0.26, 2.2), CF(0, -0.15, -0.9), col, Enum.Material.Wood)
+	mk(r, "RightHand", "block", V(0.6, 0.6, 1.0), CF(0, -0.15, -2.2), col, Enum.Material.Wood)
+end
+
+-- The fur kilt from the waist down.
+local function furKilt(r, col, hemCol)
+	mk(r, "LowerTorso", "block", V(2.3, 1.1, 1.3), CF(0, -0.5, 0), col, FABRIC)
+	for _, x in ipairs({ -0.8, -0.27, 0.27, 0.8 }) do
+		mk(r, "LowerTorso", "wedge", V(0.5, 0.4, 0.3), CF(x, -1.2, -0.55) * ANG(R(180), 0, 0), hemCol or col, FABRIC)
+	end
+end
+
+local function furShoulders(r, col)
+	both(r, { "LeftUpperArm", "RightUpperArm" }, "ball", V(1.45, 0.9, 1.45), CF(0, 0.5, 0), col, FABRIC)
+end
+
+-- War tattoos: zigzags on the arms and the chest.
+local function tattoos(r, col, neon)
+	local mat = neon and NEON or PLASTIC
+	for _, limb in ipairs({ "LeftUpperArm", "RightUpperArm" }) do
+		mk(r, limb, "block", V(0.08, 0.7, 0.08), CF(0, 0.25, -0.52) * ANG(0, 0, R(30)), col, mat)
+		mk(r, limb, "block", V(0.08, 0.7, 0.08), CF(0, -0.25, -0.52) * ANG(0, 0, R(-30)), col, mat)
+	end
+	mk(r, "UpperTorso", "block", V(0.08, 0.8, 0.08), CF(-0.6, 0.35, -0.53) * ANG(0, 0, R(28)), col, mat)
+	mk(r, "UpperTorso", "block", V(0.08, 0.8, 0.08), CF(-0.6, -0.35, -0.53) * ANG(0, 0, R(-28)), col, mat)
+	mk(r, "UpperTorso", "block", V(0.08, 0.8, 0.08), CF(0.6, 0.35, -0.53) * ANG(0, 0, R(-28)), col, mat)
+	mk(r, "UpperTorso", "block", V(0.08, 0.8, 0.08), CF(0.6, -0.35, -0.53) * ANG(0, 0, R(28)), col, mat)
+end
+
+local function wristWraps(r, col)
+	both(r, { "LeftLowerArm", "RightLowerArm" }, "block", V(1.08, 0.5, 1.08), CF(0, -0.1, 0), col, FABRIC)
+end
+
+-- Antlers on the head.
+local function antlers(r, col)
+	for _, s in ipairs({ -1, 1 }) do
+		mk(r, "Head", "block", V(0.14, 1.2, 0.14), CF(s * 0.5, 1.2, 0) * ANG(0, 0, R(s * -20)), col, METAL)
+		mk(r, "Head", "block", V(0.12, 0.6, 0.12), CF(s * 0.78, 1.5, 0) * ANG(0, 0, R(s * -55)), col, METAL)
+		mk(r, "Head", "block", V(0.12, 0.5, 0.12), CF(s * 0.62, 1.85, 0) * ANG(0, 0, R(s * 15)), col, METAL)
+	end
+end
+
+-- Floating targeting reticles around the shoulders.
+local function reticles(r, col, spots)
+	for _, p in ipairs(spots) do
+		local at = CF(p[1], p[2], p[3])
+		local ring = mk(r, "UpperTorso", "cyl", V(0.08, 0.9, 0.9), at * ANG(0, R(90), 0), col, NEON, { light = col, range = 7 })
+		if ring then
+			ring.Transparency = 0.35
+		end
+		mk(r, "UpperTorso", "block", V(0.06, 1.2, 0.06), at, col, NEON)
+		mk(r, "UpperTorso", "block", V(1.2, 0.06, 0.06), at, col, NEON)
+	end
+end
+
+-- The wings of light (the Legend pattern), in two colors.
+local function lightWings(r, colA, colB)
+	for _, s in ipairs({ -1, 1 }) do
+		for i = 1, 6 do
+			local phi = R(-55 + i * 22)
+			local L = 2.2 + math.sin(i * 0.55) * 1.7
+			mk(r, "UpperTorso", "block", V(L, 0.1, 0.5), CF(s * (0.8 + math.cos(phi) * L / 2), 0.4 + math.sin(phi) * L / 2, 0.75 + i * 0.05) * ANG(0, 0, s * phi), i % 2 == 0 and colA or colB, NEON, (i == 3) and { light = colB, range = 14, bright = 2 } or nil)
+		end
+	end
+end
+
+-- The halo over the head (the Legend pattern).
+local function halo(r, col, height)
+	for i = 0, 17 do
+		local a = i / 18 * math.pi * 2
+		mk(r, "Head", "block", V(0.4, 0.1, 0.2), CF(math.cos(a) * 1.15, height, math.sin(a) * 1.15) * ANG(0, -a, 0), col, NEON, i == 0 and { light = col, range = 16, bright = 3 } or nil)
+	end
+end
+
+local function sparkleAura(r, col, rate)
+	local aura = mk(r, "UpperTorso", "ball", V(0.4, 0.4, 0.4), CF(0, 0, 0), col, NEON, { sparkle = col, rate = rate })
+	if aura then
+		aura.Transparency = 1
+	end
+end
+
+-- Flames (balls of fire) at the given spots on a limb.
+local function flames(r, limb, spots, size)
+	for _, p in ipairs(spots) do
+		mk(r, limb, "ball", V(size, size * 1.5, size), CF(p[1], p[2], p[3]), K_FIRE, NEON, { light = K_FIRE, range = 6 })
+		mk(r, limb, "ball", V(size * 0.5, size * 0.9, size * 0.5), CF(p[1], p[2] + size * 0.2, p[3] - 0.05), K_FLAME, NEON)
+	end
+end
+
+-- ── The Hunter: 9 levels (design: the teal hunter cards) ──
+--   1 Scout · 2 Trapper · 3 Tracker · 4 Sharpshooter · 5 Nightstalker · 6 Hawkeye · 7 Phantom Ranger ·
+--   8 Royal Huntsman · 9 Legend
+local H_TEAL = C(70, 200, 200)
+local H_CYAN = C(110, 220, 255)
+local H_LEATHER = C(122, 90, 58)
+local H_DARK_LEATHER = C(90, 64, 40)
+local H_GREEN = C(111, 138, 82)
+local H_FOREST = C(79, 122, 74)
+local H_DARK_FOREST = C(35, 64, 42)
+local H_SLATE = C(58, 90, 86)
+local H_INK = C(28, 36, 36)
+local H_GOLD = C(200, 165, 70)
+local H_WHITE = C(240, 236, 228)
+local H_CRIMSON = C(138, 42, 58)
+local H_ORANGE = C(250, 150, 70)
+
+local HUNTER = {}
+
+HUNTER[1] = { name = "Scout", torso = H_GREEN, legs = C(90, 70, 50), top = 1.8, attack = "lunge", hold = false,
+	build = function(r)
+		cap(r, H_LEATHER, H_DARK_LEATHER)
+		belt(r, C(74, 56, 38), H_GOLD)
+		mk(r, "LowerTorso", "block", V(0.55, 0.6, 0.35), CF(0.7, -0.2, -0.55), H_LEATHER, FABRIC) -- satchel
+		boots(r, C(70, 60, 56))
+		crossbow(r, H_LEATHER, H_DARK_LEATHER, nil, 0.9)
+	end }
+
+HUNTER[2] = { name = "Trapper", torso = H_FOREST, legs = C(74, 58, 42), top = 1.9, attack = "lunge", hold = false,
+	build = function(r)
+		hood(r, H_DARK_FOREST)
+		mk(r, "UpperTorso", "block", V(1.7, 1.0, 0.14), CF(0, 0.25, -0.55), H_LEATHER, FABRIC) -- leather vest
+		belt(r, C(46, 36, 24), H_GOLD)
+		mk(r, "LowerTorso", "block", V(0.55, 0.5, 0.3), CF(-0.7, -0.15, -0.6), H_LEATHER, FABRIC) -- pouch
+		gloves(r, H_DARK_LEATHER)
+		boots(r, C(46, 36, 24))
+		quiver(r, H_DARK_LEATHER, K_WHITE, 3)
+		crossbow(r, H_DARK_LEATHER, C(60, 42, 24), nil, 1.0)
+	end }
+
+HUNTER[3] = { name = "Tracker", torso = C(138, 106, 68), legs = C(74, 58, 42), top = 2.4, attack = "lunge", hold = false,
+	build = function(r)
+		hood(r, H_DARK_FOREST)
+		feather(r, K_WHITE, C(200, 60, 60))
+		cloak(r, H_DARK_FOREST, H_DARK_FOREST, 4.0)
+		mk(r, "UpperTorso", "block", V(0.16, 2.0, 0.06), CF(0, 0, -0.62) * ANG(0, 0, R(48)), C(60, 42, 24), FABRIC) -- crossed straps
+		mk(r, "UpperTorso", "block", V(0.16, 2.0, 0.06), CF(0, 0, -0.62) * ANG(0, 0, R(-48)), C(60, 42, 24), FABRIC)
+		mk(r, "UpperTorso", "ball", V(0.28, 0.28, 0.12), CF(0, 0, -0.66), H_GOLD, METAL)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(1.1, 1.0, 1.1), CF(0, 0.3, 0), H_DARK_FOREST, FABRIC)
+		bracers(r, H_LEATHER, nil)
+		gloves(r, C(60, 42, 24))
+		belt(r, C(46, 36, 24), H_GOLD)
+		kneepads(r, H_LEATHER)
+		boots(r, C(46, 36, 24))
+		quiver(r, H_DARK_LEATHER, H_TEAL, 4)
+		crossbow(r, C(60, 42, 24), C(42, 28, 16), H_TEAL, 1.05)
+	end }
+
+HUNTER[4] = { name = "Sharpshooter", torso = H_SLATE, legs = C(46, 58, 58), top = 2.0, attack = "lunge", hold = false,
+	build = function(r)
+		cap(r, C(38, 58, 56), H_INK)
+		mk(r, "Head", "block", V(1.25, 0.26, 0.1), CF(0, 0.55, -0.7), H_INK, PLASTIC) -- the goggle strap
+		mk(r, "Head", "cyl", V(0.12, 0.4, 0.4), CF(-0.3, 0.6, -0.78) * ANG(0, R(90), 0), H_TEAL, NEON, { light = H_TEAL, range = 6 })
+		mk(r, "Head", "cyl", V(0.12, 0.4, 0.4), CF(0.3, 0.6, -0.78) * ANG(0, R(90), 0), H_TEAL, NEON)
+		chestPlate(r, C(38, 58, 56), H_TEAL)
+		mk(r, "UpperTorso", "block", V(0.3, 2.2, 0.12), CF(0, 0, -0.72) * ANG(0, 0, R(-45)), H_DARK_LEATHER, FABRIC) -- bandolier
+		for i = -1, 1 do
+			mk(r, "UpperTorso", "block", V(0.12, 0.3, 0.1), CF(i * 0.45, i * 0.45, -0.8) * ANG(0, 0, R(-45)), H_GOLD, METAL)
+		end
+		pauldrons(r, C(38, 58, 56))
+		belt(r, H_INK, H_TEAL)
+		kneepads(r, H_TEAL)
+		gloves(r, H_INK)
+		boots(r, H_INK)
+		longRifle(r, C(38, 58, 56), H_TEAL, 1.2)
+	end }
+
+HUNTER[5] = { name = "Nightstalker", torso = C(38, 50, 54), legs = H_INK, top = 2.3, attack = "lunge", hold = false,
+	build = function(r)
+		hood(r, C(20, 28, 30))
+		mk(r, "Head", "block", V(1.24, 1.24, 0.1), CF(0, 0, -0.6), C(8, 12, 14), PLASTIC) -- the face in shadow
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(-0.25, 0.1, -0.66), H_TEAL, NEON, { light = H_TEAL, range = 8 })
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(0.25, 0.1, -0.66), H_TEAL, NEON)
+		mk(r, "Head", "block", V(1.1, 0.3, 0.3), CF(0, 0.75, -0.6), C(14, 18, 20), PLASTIC) -- night vision mount
+		mk(r, "Head", "cyl", V(0.1, 0.34, 0.34), CF(-0.3, 0.75, -0.78) * ANG(0, R(90), 0), C(124, 255, 107), NEON, { light = C(124, 255, 107), range = 6 })
+		mk(r, "Head", "cyl", V(0.1, 0.34, 0.34), CF(0.3, 0.75, -0.78) * ANG(0, R(90), 0), C(124, 255, 107), NEON)
+		cloak(r, C(26, 36, 38), C(26, 36, 38), 4.4)
+		chestPlate(r, C(20, 28, 30), nil)
+		emblem(r, "diamond", H_TEAL, nil)
+		pauldrons(r, C(20, 28, 30))
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(1.1, 0.08, 1.1), CF(0, 0.2, 0), H_TEAL, NEON)
+		belt(r, C(14, 18, 20), C(200, 140, 255))
+		kneepads(r, C(46, 58, 58))
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(0.8, 0.06, 0.08), CF(0, 0.5, -0.69), H_TEAL, NEON)
+		gloves(r, C(14, 18, 20))
+		boots(r, C(14, 18, 20))
+		longRifle(r, C(20, 28, 30), C(200, 140, 255), 1.25)
+	end }
+
+HUNTER[6] = { name = "Hawkeye", torso = C(74, 58, 46), legs = C(46, 42, 38), top = 2.2, attack = "lunge", hold = false,
+	build = function(r)
+		cap(r, C(74, 58, 46), H_GOLD)
+		mk(r, "Head", "block", V(1.5, 0.12, 1.5), CF(0, 0.44, 0.03), H_GOLD, METAL)
+		mk(r, "Head", "wedge", V(0.1, 0.6, 0.5), CF(0.55, 0.95, 0.1) * ANG(R(-30), 0, R(-25)), H_ORANGE, FABRIC)
+		mk(r, "Head", "cyl", V(0.12, 0.5, 0.5), CF(0.25, 0.12, -0.66) * ANG(0, R(90), 0), C(46, 42, 38), METAL) -- the mechanical eye
+		mk(r, "Head", "cyl", V(0.14, 0.32, 0.32), CF(0.25, 0.12, -0.68) * ANG(0, R(90), 0), H_TEAL, NEON, { light = H_TEAL, range = 8 })
+		chestPlate(r, C(46, 42, 38), H_GOLD)
+		emblem(r, "star", H_TEAL, H_GOLD)
+		pauldrons(r, H_GOLD)
+		bracers(r, C(46, 42, 38), H_GOLD)
+		gloves(r, C(46, 42, 38))
+		belt(r, C(46, 42, 38), H_ORANGE)
+		kneepads(r, H_GOLD)
+		boots(r, H_GOLD)
+		-- the hawk on the left shoulder
+		mk(r, "LeftUpperArm", "ball", V(0.6, 0.5, 0.8), CF(-0.2, 1.05, 0), C(122, 90, 58), FABRIC)
+		mk(r, "LeftUpperArm", "ball", V(0.36, 0.36, 0.36), CF(-0.2, 1.4, -0.3), C(122, 90, 58), FABRIC)
+		mk(r, "LeftUpperArm", "wedge", V(0.14, 0.16, 0.26), CF(-0.2, 1.38, -0.56) * ANG(R(90), 0, 0), H_GOLD, PLASTIC)
+		mk(r, "LeftUpperArm", "ball", V(0.1, 0.1, 0.1), CF(-0.3, 1.46, -0.44), K_WHITE, NEON)
+		crossbow(r, C(46, 42, 38), H_GOLD, H_TEAL, 1.1)
+		mk(r, "RightHand", "block", V(2.3, 0.06, 0.06), CF(0, 0.05, -1.75), H_TEAL, NEON) -- the energy bow string
+	end }
+
+HUNTER[7] = { name = "Phantom Ranger", torso = C(42, 58, 82), legs = C(30, 42, 62), top = 2.4, attack = "lunge", hold = false,
+	build = function(r)
+		hood(r, C(220, 232, 240))
+		mk(r, "Head", "block", V(1.24, 1.24, 0.1), CF(0, 0, -0.6), C(10, 16, 32), PLASTIC)
+		mk(r, "Head", "block", V(0.9, 0.22, 0.1), CF(0, 0.12, -0.66), H_CYAN, NEON, { light = H_CYAN, range = 8 }) -- the visor
+		local ghost = mk(r, "UpperTorso", "block", V(2.5, 3.6, 0.14), CF(0, -1.1, 0.7) * ANG(R(6), 0, 0), H_CYAN, NEON)
+		if ghost then
+			ghost.Transparency = 0.6
+		end
+		chestPlate(r, C(14, 20, 32), nil)
+		mk(r, "UpperTorso", "cyl", V(0.1, 0.8, 0.8), CF(0, 0.1, -0.72) * ANG(0, R(90), 0), H_CYAN, NEON, { light = H_CYAN, range = 10 })
+		mk(r, "UpperTorso", "cyl", V(0.12, 0.6, 0.6), CF(0, 0.1, -0.72) * ANG(0, R(90), 0), C(14, 20, 32), PLASTIC)
+		mk(r, "UpperTorso", "ball", V(0.22, 0.22, 0.14), CF(0, 0.1, -0.8), H_CYAN, NEON)
+		pauldrons(r, C(220, 232, 240))
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(1.1, 0.06, 1.1), CF(0, 0.2, 0), H_CYAN, NEON)
+		belt(r, C(14, 20, 32), H_CYAN)
+		gloves(r, C(14, 20, 32))
+		boots(r, C(14, 20, 32))
+		both(r, { "LeftFoot", "RightFoot" }, "block", V(1.12, 0.1, 1.27), CF(0, 0.5, -0.05), H_CYAN, NEON)
+		reticles(r, H_CYAN, { { -2.8, 1.4, 0.2 }, { 2.9, -0.4, -0.3 }, { 2.4, 2.4, 0.4 } })
+		longRifle(r, C(220, 232, 240), H_CYAN, 1.3)
+		sparkleAura(r, H_CYAN, 14)
+	end }
+
+HUNTER[8] = { name = "Royal Huntsman", torso = H_WHITE, legs = C(42, 42, 52), top = 3.0, attack = "lunge", hold = false,
+	build = function(r)
+		cap(r, C(42, 42, 52), H_GOLD)
+		mk(r, "Head", "block", V(1.5, 0.14, 1.5), CF(0, 0.44, 0.03), H_GOLD, METAL)
+		antlers(r, H_GOLD)
+		cloak(r, H_CRIMSON, H_GOLD, 4.4)
+		mk(r, "UpperTorso", "block", V(0.14, 1.6, 0.06), CF(0, 0, -0.54), H_GOLD, METAL) -- the coat seam and buttons
+		for _, y in ipairs({ 0.45, 0.1, -0.25 }) do
+			mk(r, "UpperTorso", "ball", V(0.16, 0.16, 0.1), CF(-0.35, y, -0.55), H_GOLD, METAL)
+			mk(r, "UpperTorso", "ball", V(0.16, 0.16, 0.1), CF(0.35, y, -0.55), H_GOLD, METAL)
+		end
+		mk(r, "UpperTorso", "block", V(0.4, 2.2, 0.08), CF(0, 0, -0.58) * ANG(0, 0, R(-40)), H_CRIMSON, FABRIC) -- the sash
+		pauldrons(r, H_GOLD)
+		bracers(r, H_WHITE, H_GOLD)
+		gloves(r, H_GOLD)
+		belt(r, C(42, 42, 52), H_GOLD)
+		kneepads(r, H_GOLD)
+		boots(r, H_GOLD)
+		-- the floating golden arrows
+		for _, p in ipairs({ { -2.8, 0.6, 0.3, 25 }, { 3.0, 1.6, -0.3, -30 } }) do
+			mk(r, "UpperTorso", "block", V(0.08, 1.6, 0.08), CF(p[1], p[2], p[3]) * ANG(0, 0, R(p[4])), K_WHITE, PLASTIC)
+			mk(r, "UpperTorso", "block", V(0.3, 0.3, 0.1), CF(p[1], p[2], p[3]) * ANG(0, 0, R(p[4])) * CF(0, 0.95, 0) * ANG(0, 0, R(45)), H_GOLD, METAL)
+		end
+		longRifle(r, H_GOLD, K_WHITE, 1.3)
+	end }
+
+HUNTER[9] = { name = "Legend", torso = H_WHITE, legs = C(42, 42, 64), top = 3.6, attack = "lunge", hold = false,
+	build = function(r)
+		hood(r, H_WHITE)
+		mk(r, "Head", "block", V(1.64, 0.14, 1.6), CF(0, 0.6, 0.05), H_GOLD, METAL)
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(-0.25, 0.12, -0.62), H_CYAN, NEON, { light = H_CYAN, range = 8 })
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(0.25, 0.12, -0.62), H_CYAN, NEON)
+		halo(r, H_GOLD, 2.45)
+		mk(r, "Head", "block", V(0.08, 2.9, 0.08), CF(0, 2.45, 0), H_GOLD, NEON) -- the reticle lines across the halo
+		mk(r, "Head", "block", V(2.9, 0.08, 0.08), CF(0, 2.45, 0), H_GOLD, NEON)
+		mk(r, "UpperTorso", "block", V(1.8, 1.4, 0.3), CF(0, 0.05, -0.6), H_GOLD, METAL)
+		mk(r, "UpperTorso", "cyl", V(0.12, 1.0, 1.0), CF(0, 0.1, -0.78) * ANG(0, R(90), 0), H_CYAN, NEON, { light = H_CYAN, range = 14, bright = 3, sparkle = H_CYAN, rate = 20 })
+		mk(r, "UpperTorso", "cyl", V(0.14, 0.76, 0.76), CF(0, 0.1, -0.78) * ANG(0, R(90), 0), H_GOLD, METAL)
+		mk(r, "UpperTorso", "ball", V(0.3, 0.3, 0.16), CF(0, 0.1, -0.88), H_CYAN, NEON)
+		pauldrons(r, H_GOLD, 1.1)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(1.2, 0.06, 1.2), CF(0, 0.2, 0), H_CYAN, NEON)
+		bracers(r, H_GOLD, H_CYAN)
+		gloves(r, H_GOLD)
+		belt(r, C(42, 42, 64), H_CYAN)
+		kneepads(r, H_GOLD)
+		boots(r, H_GOLD)
+		lightWings(r, H_GOLD, H_CYAN)
+		for _, p in ipairs({ { -3.2, 2.2, 0.5 }, { 3.4, 3.0, -0.4 }, { -3.0, -0.6, -0.7 } }) do
+			mk(r, "UpperTorso", "block", V(0.3, 0.75, 0.3), CF(p[1], p[2], p[3]) * ANG(0, R(45), 0), H_CYAN, NEON, { light = H_CYAN, range = 8 })
+		end
+		longRifle(r, H_GOLD, H_CYAN, 1.4)
+		local beam = mk(r, "RightHand", "block", V(0.3, 0.3, 4.0), CF(0, 0.12, -3.6), H_CYAN, NEON, { light = H_CYAN, range = 12 })
+		if beam then
+			beam.Transparency = 0.5
+		end
+		sparkleAura(r, H_GOLD, 30)
+	end }
+
+-- ── The Berserker: 9 levels (design: the orange berserker cards) ──
+--   1 Brawler · 2 Raider · 3 Marauder · 4 Berserker · 5 Bloodrager · 6 Warlord · 7 Firebrand · 8 Warchief ·
+--   9 Legend
+local B_FUR = C(110, 90, 70)
+local B_FUR_DARK = C(74, 56, 38)
+local B_LEATHER = C(74, 56, 38)
+local B_STEEL = C(184, 192, 204)
+local B_IRON = C(110, 118, 128)
+local B_RED = C(200, 60, 60)
+local B_BLOOD = C(255, 60, 60)
+local B_ORANGE = C(235, 130, 50)
+local B_GOLD = C(250, 220, 80)
+local B_BLACK = C(30, 26, 36)
+local B_BONE = C(232, 224, 200)
+local B_WOOD = C(122, 90, 58)
+
+local BERSERKER = {}
+
+BERSERKER[1] = { name = "Brawler", torso = SKIN, legs = SKIN, top = 1.7, attack = "slash", hold = true,
+	build = function(r)
+		mk(r, "Head", "block", V(1.26, 0.22, 1.26), CF(0, 0.35, 0), C(138, 42, 42), FABRIC) -- the headband
+		furKilt(r, B_FUR, B_FUR_DARK)
+		belt(r, B_LEATHER, B_IRON)
+		wristWraps(r, C(138, 42, 42))
+		boots(r, B_LEATHER)
+		axe(r, "RightHand", B_WOOD, B_IRON, nil, 1.0, false)
+	end }
+
+BERSERKER[2] = { name = "Raider", torso = SKIN, legs = B_LEATHER, top = 2.2, attack = "slash", hold = true,
+	build = function(r)
+		cap(r, B_FUR, B_IRON)
+		horns(r, B_BONE, false)
+		mk(r, "UpperTorso", "block", V(0.5, 1.6, 1.06), CF(-0.75, 0, 0), B_FUR, FABRIC) -- the fur vest
+		mk(r, "UpperTorso", "block", V(0.5, 1.6, 1.06), CF(0.75, 0, 0), B_FUR, FABRIC)
+		furKilt(r, B_FUR, B_FUR_DARK)
+		belt(r, B_LEATHER, B_IRON)
+		bracers(r, B_LEATHER, nil)
+		boots(r, C(46, 36, 24))
+		axe(r, "RightHand", B_WOOD, B_IRON, nil, 1.0, false)
+		axe(r, "LeftHand", B_WOOD, B_IRON, nil, 1.0, false)
+	end }
+
+BERSERKER[3] = { name = "Marauder", torso = SKIN, legs = B_LEATHER, top = 2.3, attack = "slash", hold = true,
+	build = function(r)
+		cap(r, B_FUR, B_IRON)
+		horns(r, B_BONE, false)
+		mk(r, "Head", "block", V(1.24, 0.18, 0.06), CF(0, 0.15, -0.62), B_RED, PLASTIC) -- war paint across the eyes
+		furShoulders(r, B_FUR)
+		tattoos(r, B_RED, false)
+		wristWraps(r, C(90, 70, 50))
+		furKilt(r, C(90, 70, 54), B_FUR_DARK)
+		belt(r, C(46, 36, 24), C(200, 165, 70))
+		boots(r, C(46, 36, 24))
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(1.1, 0.3, 1.1), CF(0, -0.15, 0), B_FUR, FABRIC)
+		axe(r, "RightHand", C(90, 64, 40), B_STEEL, nil, 1.1, false)
+		axe(r, "LeftHand", C(90, 64, 40), B_STEEL, nil, 1.1, false)
+		both(r, { "LeftHand", "RightHand" }, "block", V(0.34, 0.2, 0.9), CF(0, 1.1, -2.3), C(138, 42, 42), PLASTIC) -- the red band on the heads
+	end }
+
+BERSERKER[4] = { name = "Berserker", torso = SKIN, legs = C(58, 46, 38), top = 2.4, attack = "slash", hold = true,
+	build = function(r)
+		helmet(r, B_IRON, C(46, 42, 42))
+		horns(r, B_BONE, false)
+		mk(r, "Head", "block", V(0.14, 0.9, 1.2), CF(0, 0.95, 0), C(74, 82, 92), METAL) -- the crest
+		mk(r, "Head", "block", V(1.1, 0.14, 0.06), CF(0, -0.1, -0.62), C(30, 26, 36), PLASTIC) -- a scar
+		tattoos(r, B_RED, false)
+		mk(r, "UpperTorso", "block", V(0.1, 1.2, 0.06), CF(0.2, 0.1, -0.54) * ANG(0, 0, R(-20)), C(138, 42, 42), PLASTIC) -- the chest scar
+		pauldrons(r, B_IRON)
+		bracers(r, B_IRON, nil)
+		furKilt(r, C(90, 70, 54), B_FUR_DARK)
+		mk(r, "LowerTorso", "block", V(2.34, 0.14, 1.34), CF(0, -0.95, 0), B_IRON, METAL)
+		belt(r, C(46, 36, 24), B_STEEL)
+		boots(r, B_IRON)
+		axe(r, "RightHand", C(58, 46, 38), B_STEEL, B_RED, 1.15, false)
+		axe(r, "LeftHand", C(58, 46, 38), B_STEEL, B_RED, 1.15, false)
+	end }
+
+BERSERKER[5] = { name = "Bloodrager", torso = SKIN, legs = C(42, 32, 36), top = 2.4, attack = "slash", hold = true,
+	build = function(r)
+		helmet(r, C(74, 82, 92), C(30, 26, 36))
+		horns(r, B_BLACK, false)
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(-0.25, 0.12, -0.64), B_BLOOD, NEON, { light = B_BLOOD, range = 8 })
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(0.25, 0.12, -0.64), B_BLOOD, NEON)
+		mk(r, "Head", "block", V(0.08, 0.5, 0.06), CF(-0.3, -0.25, -0.62) * ANG(0, 0, R(15)), B_RED, PLASTIC)
+		tattoos(r, B_ORANGE, true)
+		-- the chains across the chest and the medallion
+		for i = -2, 2 do
+			mk(r, "UpperTorso", "block", V(0.14, 0.26, 0.1), CF(i * 0.4, i * 0.4, -0.58) * ANG(0, 0, R(45)), B_IRON, METAL)
+			mk(r, "UpperTorso", "block", V(0.14, 0.26, 0.1), CF(i * 0.4, -i * 0.4, -0.58) * ANG(0, 0, R(-45)), B_IRON, METAL)
+		end
+		mk(r, "UpperTorso", "cyl", V(0.1, 0.5, 0.5), CF(0, 0, -0.64) * ANG(0, R(90), 0), C(74, 82, 92), METAL)
+		mk(r, "UpperTorso", "ball", V(0.26, 0.26, 0.1), CF(0, 0, -0.7), B_BLOOD, NEON, { light = B_BLOOD, range = 8 })
+		spikedPauldrons(r, C(74, 82, 92), B_STEEL, false)
+		bracers(r, C(74, 82, 92), nil)
+		furKilt(r, C(58, 42, 42), C(42, 32, 36))
+		mk(r, "LowerTorso", "block", V(2.34, 0.14, 1.34), CF(0, -0.95, 0), B_IRON, METAL)
+		belt(r, C(42, 32, 36), B_BLOOD)
+		boots(r, C(74, 82, 92))
+		axe(r, "RightHand", C(30, 26, 36), B_STEEL, B_BLOOD, 1.2, false)
+		axe(r, "LeftHand", C(30, 26, 36), B_STEEL, B_BLOOD, 1.2, false)
+	end }
+
+BERSERKER[6] = { name = "Warlord", torso = SKIN, legs = C(42, 32, 36), top = 2.8, attack = "slash", hold = true,
+	build = function(r)
+		helmet(r, C(74, 82, 92), C(30, 26, 36))
+		mk(r, "Head", "block", V(1.56, 0.14, 1.56), CF(0, 0.38, 0.03), C(200, 165, 70), METAL)
+		horns(r, B_BONE, false)
+		mk(r, "Head", "block", V(0.14, 1.2, 1.3), CF(0, 1.05, 0), C(200, 165, 70), METAL) -- the gold crest
+		mk(r, "UpperTorso", "block", V(2.06, 0.8, 1.08), CF(0, 0.4, 0), C(74, 82, 92), METAL) -- the chest harness
+		mk(r, "UpperTorso", "block", V(2.08, 0.12, 1.1), CF(0, 0.0, 0), C(200, 165, 70), METAL)
+		tattoos(r, B_ORANGE, true)
+		spikedPauldrons(r, C(74, 82, 92), C(200, 165, 70), false)
+		bracers(r, C(200, 165, 70), nil)
+		furKilt(r, C(74, 48, 48), C(42, 32, 36))
+		mk(r, "LowerTorso", "block", V(2.34, 0.14, 1.34), CF(0, -0.95, 0), C(200, 165, 70), METAL)
+		belt(r, C(42, 32, 36), C(200, 165, 70))
+		-- the skull trophies on the belt
+		for _, x in ipairs({ -0.7, 0.7 }) do
+			mk(r, "LowerTorso", "block", V(0.36, 0.4, 0.3), CF(x, -0.4, -0.58), B_BONE, PLASTIC)
+			mk(r, "LowerTorso", "block", V(0.08, 0.1, 0.05), CF(x - 0.08, -0.35, -0.74), B_BLACK, PLASTIC)
+			mk(r, "LowerTorso", "block", V(0.08, 0.1, 0.05), CF(x + 0.08, -0.35, -0.74), B_BLACK, PLASTIC)
+		end
+		boots(r, C(74, 82, 92))
+		both(r, { "LeftFoot", "RightFoot" }, "block", V(1.1, 0.12, 1.25), CF(0, 0.5, -0.05), C(200, 165, 70), METAL)
+		axe(r, "RightHand", C(30, 26, 36), B_STEEL, B_ORANGE, 1.5, true)
+		mk(r, "RightHand", "block", V(0.34, 2.6, 0.2), CF(0, -0.15, -2.9), C(200, 165, 70), METAL)
+	end }
+
+BERSERKER[7] = { name = "Firebrand", torso = SKIN, legs = C(42, 26, 26), top = 2.6, attack = "slash", hold = true,
+	build = function(r)
+		flames(r, "Head", { { -0.4, 0.9, 0.1 }, { 0, 1.1, 0 }, { 0.4, 0.9, 0.1 }, { -0.2, 1.3, -0.1 }, { 0.25, 1.35, 0.05 } }, 0.5)
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(-0.25, 0.12, -0.64), K_FLAME, NEON, { light = K_FIRE, range = 8 })
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(0.25, 0.12, -0.64), K_FLAME, NEON)
+		tattoos(r, K_FIRE, true)
+		mk(r, "UpperTorso", "block", V(0.08, 1.5, 0.06), CF(0, 0, -0.54), K_FIRE, NEON)
+		spikedPauldrons(r, C(42, 26, 26), K_FIRE, true)
+		bracers(r, C(42, 26, 26), K_FIRE)
+		furKilt(r, C(58, 32, 32), C(42, 26, 26))
+		mk(r, "LowerTorso", "block", V(2.34, 0.14, 1.34), CF(0, -0.95, 0), B_ORANGE, NEON)
+		belt(r, C(42, 26, 26), K_FIRE)
+		boots(r, C(42, 26, 26))
+		both(r, { "LeftFoot", "RightFoot" }, "block", V(1.1, 0.1, 1.25), CF(0, 0.5, -0.05), B_ORANGE, NEON)
+		axe(r, "RightHand", C(42, 26, 26), K_FIRE, K_FLAME, 1.2, false)
+		axe(r, "LeftHand", C(42, 26, 26), K_FIRE, K_FLAME, 1.2, false)
+		flames(r, "RightHand", { { 0, 1.2, -2.5 }, { 0, 1.5, -2.2 } }, 0.4)
+		flames(r, "LeftHand", { { 0, 1.2, -2.5 }, { 0, 1.5, -2.2 } }, 0.4)
+		runeRing(r, B_ORANGE)
+		sparkleAura(r, K_FIRE, 16)
+	end }
+
+BERSERKER[8] = { name = "Warchief", torso = B_BLACK, legs = B_BLACK, top = 3.0, attack = "slash", hold = true,
+	build = function(r)
+		helmet(r, B_BLACK, C(20, 18, 24))
+		mk(r, "Head", "block", V(1.56, 0.14, 1.56), CF(0, 0.38, 0.03), B_GOLD, METAL)
+		horns(r, B_GOLD, false)
+		mk(r, "Head", "block", V(0.14, 1.3, 1.1), CF(0, 1.1, 0.05), B_GOLD, METAL)
+		mk(r, "Head", "block", V(0.2, 0.7, 0.6), CF(0, 1.75, 0.1), B_RED, FABRIC) -- the red plume
+		mk(r, "Head", "block", V(0.3, 0.1, 0.06), CF(-0.42, -0.1, -0.62), B_RED, PLASTIC) -- face stripes
+		mk(r, "Head", "block", V(0.3, 0.1, 0.06), CF(0.42, -0.1, -0.62), B_RED, PLASTIC)
+		cloak(r, C(110, 118, 128), C(74, 82, 92), 4.6)
+		mk(r, "UpperTorso", "ball", V(2.3, 0.7, 1.4), CF(0, 0.85, 0.2), C(140, 148, 160), FABRIC) -- the wolf pelt collar
+		chestPlate(r, C(42, 32, 36), B_GOLD)
+		mk(r, "UpperTorso", "block", V(0.7, 0.7, 0.1), CF(0, 0.05, -0.72) * ANG(0, 0, R(45)), B_GOLD, METAL)
+		mk(r, "UpperTorso", "block", V(0.4, 0.4, 0.12), CF(0, 0.05, -0.76) * ANG(0, 0, R(45)), B_RED, NEON)
+		spikedPauldrons(r, B_GOLD, B_BLACK, false)
+		bracers(r, B_GOLD, nil)
+		mk(r, "LowerTorso", "block", V(2.3, 1.1, 1.3), CF(0, -0.5, 0), C(42, 32, 36), FABRIC)
+		mk(r, "LowerTorso", "block", V(2.34, 0.14, 1.34), CF(0, -0.95, 0), B_GOLD, METAL)
+		belt(r, C(42, 32, 36), B_GOLD)
+		gloves(r, B_GOLD)
+		boots(r, B_GOLD)
+		axe(r, "RightHand", B_BLACK, B_GOLD, nil, 1.7, true)
+		mk(r, "RightHand", "block", V(0.36, 3.0, 0.2), CF(0, -0.15, -3.1), C(255, 240, 160), METAL)
+		mk(r, "RightHand", "block", V(0.38, 3.2, 0.1), CF(0, -0.15, -2.4), B_RED, PLASTIC)
+	end }
+
+BERSERKER[9] = { name = "Legend", torso = SKIN, legs = C(42, 26, 26), top = 3.6, attack = "slash", hold = true,
+	build = function(r)
+		mk(r, "Head", "block", V(1.26, 0.2, 1.26), CF(0, 0.5, 0), C(240, 200, 90), METAL) -- the gold band
+		horns(r, K_FIRE, true)
+		for _, s in ipairs({ -1, 1 }) do
+			mk(r, "Head", "block", V(0.2, 0.6, 0.2), CF(s * 1.4, 1.5, 0) * ANG(0, 0, R(s * -15)), K_FLAME, NEON)
+		end
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(-0.25, 0.12, -0.64), C(255, 240, 160), NEON, { light = K_FLAME, range = 8 })
+		mk(r, "Head", "ball", V(0.3, 0.16, 0.1), CF(0.25, 0.12, -0.64), C(255, 240, 160), NEON)
+		mk(r, "Head", "block", V(0.08, 0.5, 0.06), CF(-0.32, -0.25, -0.62) * ANG(0, 0, R(15)), K_FIRE, NEON)
+		mk(r, "Head", "block", V(0.08, 0.5, 0.06), CF(0.32, -0.25, -0.62) * ANG(0, 0, R(-15)), K_FIRE, NEON)
+		halo(r, K_FLAME, 2.5)
+		tattoos(r, K_FIRE, true)
+		mk(r, "UpperTorso", "block", V(0.08, 1.5, 0.06), CF(0, 0, -0.54) * ANG(0, 0, R(8)), K_FLAME, NEON)
+		mk(r, "UpperTorso", "cyl", V(0.1, 0.6, 0.6), CF(0, 0.05, -0.56) * ANG(0, R(90), 0), C(240, 200, 90), METAL)
+		mk(r, "UpperTorso", "ball", V(0.3, 0.3, 0.12), CF(0, 0.05, -0.62), K_FIRE, NEON, { light = K_FIRE, range = 12, bright = 3 })
+		spikedPauldrons(r, C(240, 200, 90), K_FIRE, true)
+		bracers(r, C(240, 200, 90), K_FIRE)
+		furKilt(r, C(58, 32, 32), C(42, 26, 26))
+		mk(r, "LowerTorso", "block", V(2.34, 0.14, 1.34), CF(0, -0.95, 0), C(240, 200, 90), METAL)
+		belt(r, C(42, 26, 26), K_FIRE)
+		boots(r, C(240, 200, 90))
+		lightWings(r, K_FLAME, K_FIRE)
+		axe(r, "RightHand", C(42, 26, 26), K_FIRE, K_FLAME, 1.5, true)
+		axe(r, "LeftHand", C(42, 26, 26), K_FIRE, K_FLAME, 1.5, true)
+		flames(r, "RightHand", { { 0, 1.6, -2.6 }, { 0, -1.9, -2.6 }, { 0, 2.0, -2.1 } }, 0.5)
+		flames(r, "LeftHand", { { 0, 1.6, -2.6 }, { 0, -1.9, -2.6 }, { 0, 2.0, -2.1 } }, 0.5)
+		runeRing(r, K_FIRE)
+		sparkleAura(r, K_FLAME, 40)
+	end }
+
+-- ── The Tank: 9 levels (design: the golden tank cards) ──
+--   1 Guard · 2 Shieldbearer · 3 Defender · 4 Bulwark · 5 Juggernaut · 6 Ironwall · 7 Titan · 8 Colossus · 9 Legend
+local T_LEATHER = C(138, 106, 68)
+local T_WOOD = C(160, 122, 74)
+local T_STEEL = C(154, 163, 175)
+local T_IRON = C(110, 118, 128)
+local T_DARK_IRON = C(74, 62, 58)
+local T_BLUE = C(74, 90, 140)
+local T_SKY = C(120, 200, 255)
+local T_ICE = C(220, 232, 240)
+local T_GOLD = C(200, 165, 70)
+local T_GOLD_LIGHT = C(250, 220, 80)
+local T_CREAM = C(255, 240, 160)
+local T_CRIMSON = C(138, 42, 58)
+local T_CYAN = C(110, 220, 255)
+local T_NAVY = C(42, 58, 82)
+local T_ORANGE = C(250, 150, 70)
+
+local TANK = {}
+
+TANK[1] = { name = "Guard", torso = T_LEATHER, legs = C(90, 70, 50), top = 1.7, attack = "slash", hold = true,
+	build = function(r)
+		cap(r, C(110, 82, 52), C(90, 64, 40))
+		mk(r, "UpperTorso", "block", V(1.7, 1.4, 0.14), CF(0, 0, -0.55), C(110, 82, 52), FABRIC) -- the leather vest
+		mk(r, "UpperTorso", "block", V(0.1, 1.4, 0.05), CF(0, 0, -0.63), C(90, 64, 40), FABRIC)
+		belt(r, C(74, 56, 38), T_STEEL)
+		boots(r, C(60, 50, 40))
+		roundShield(r, T_WOOD, nil)
+		club(r, C(122, 90, 58))
+	end }
+
+TANK[2] = { name = "Shieldbearer", torso = T_IRON, legs = C(74, 58, 42), top = 1.9, attack = "slash", hold = true,
+	build = function(r)
+		helmet(r, T_STEEL, T_IRON)
+		mk(r, "Head", "block", V(0.14, 0.5, 1.2), CF(0, 0.95, 0), T_STEEL, METAL)
+		chestPlate(r, T_STEEL, nil)
+		mk(r, "UpperTorso", "block", V(0.5, 0.5, 0.1), CF(0, 0.1, -0.72) * ANG(0, 0, R(45)), T_GOLD, METAL)
+		belt(r, C(74, 56, 38), T_GOLD)
+		gloves(r, C(74, 56, 38))
+		boots(r, T_IRON)
+		roundShield(r, T_STEEL, T_IRON)
+		mk(r, "LeftHand", "ball", V(0.5, 0.5, 0.3), CF(-0.35, 0.1, -0.86), T_GOLD, METAL)
+		mace(r, C(90, 64, 40), T_STEEL, nil)
+	end }
+
+TANK[3] = { name = "Defender", torso = T_IRON, legs = T_IRON, top = 2.0, attack = "slash", hold = true,
+	build = function(r)
+		helmet(r, T_STEEL, T_IRON)
+		mk(r, "Head", "block", V(0.18, 0.75, 0.1), CF(0, 0.2, -0.68), T_STEEL, METAL) -- the nasal bar
+		mk(r, "Head", "block", V(1.3, 0.4, 0.1), CF(0, -0.4, -0.62), T_IRON, METAL) -- mail over the chin
+		mk(r, "Head", "block", V(0.14, 0.5, 1.2), CF(0, 0.95, 0), T_STEEL, METAL)
+		mk(r, "UpperTorso", "block", V(1.85, 1.4, 0.2), CF(0, 0.05, -0.58), T_BLUE, METAL)
+		chestCross(r, K_WHITE)
+		pauldrons(r, T_STEEL)
+		belt(r, C(74, 56, 38), T_GOLD)
+		kneepads(r, T_STEEL)
+		gloves(r, T_IRON)
+		boots(r, T_IRON)
+		towerShield(r, T_BLUE, T_IRON, "cross", K_WHITE, 1.0)
+		mace(r, C(90, 64, 40), T_STEEL, T_STEEL)
+	end }
+
+TANK[4] = { name = "Bulwark", torso = T_STEEL, legs = T_STEEL, top = 2.1, attack = "slash", hold = true,
+	build = function(r)
+		helmet(r, T_STEEL, T_IRON)
+		mk(r, "Head", "block", V(1.56, 0.12, 1.56), CF(0, 0.38, 0.03), T_GOLD, METAL)
+		mk(r, "Head", "block", V(0.14, 0.6, 1.2), CF(0, 1.0, 0), T_STEEL, METAL)
+		mk(r, "Head", "block", V(1.3, 0.4, 0.1), CF(0, -0.4, -0.62), T_IRON, METAL)
+		chestPlate(r, T_IRON, T_GOLD)
+		mk(r, "UpperTorso", "block", V(0.7, 0.7, 0.1), CF(0, 0.05, -0.72) * ANG(0, 0, R(45)), T_GOLD, METAL)
+		spikedPauldrons(r, T_IRON, T_STEEL, false)
+		bracers(r, T_IRON, nil)
+		belt(r, C(74, 82, 92), T_GOLD)
+		kneepads(r, T_IRON)
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(0.9, 0.08, 0.1), CF(0, 0.5, -0.68), T_GOLD, METAL)
+		gloves(r, T_IRON)
+		boots(r, T_IRON)
+		towerShield(r, T_STEEL, T_GOLD, "diamond", T_BLUE, 1.05)
+		warHammer(r, T_STEEL, C(74, 56, 38), nil, 1.0)
+	end }
+
+TANK[5] = { name = "Juggernaut", torso = T_IRON, legs = T_IRON, top = 2.3, attack = "slash", hold = true,
+	build = function(r)
+		greatHelm(r, T_IRON, T_STEEL, T_SKY)
+		mk(r, "Head", "block", V(0.16, 0.7, 1.3), CF(0, 1.05, 0), T_STEEL, METAL)
+		chestPlate(r, T_IRON, T_SKY)
+		mk(r, "UpperTorso", "cyl", V(0.12, 0.8, 0.8), CF(0, 0.05, -0.72) * ANG(0, R(90), 0), T_STEEL, METAL)
+		mk(r, "UpperTorso", "ball", V(0.4, 0.4, 0.2), CF(0, 0.05, -0.78), T_SKY, NEON, { light = T_SKY, range = 10 })
+		pauldrons(r, T_IRON, 1.2)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(1.3, 0.08, 1.3), CF(0, 0.2, 0), T_SKY, NEON)
+		bracers(r, T_IRON, nil)
+		belt(r, C(42, 42, 52), T_SKY)
+		kneepads(r, T_IRON)
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(0.9, 0.08, 0.1), CF(0, 0.5, -0.68), T_SKY, NEON)
+		gloves(r, T_IRON)
+		boots(r, T_IRON)
+		towerShield(r, T_IRON, T_SKY, "diamond", T_SKY, 1.15)
+		warHammer(r, T_IRON, C(42, 42, 52), T_SKY, 1.15)
+	end }
+
+TANK[6] = { name = "Ironwall", torso = T_DARK_IRON, legs = C(46, 42, 42), top = 2.3, attack = "slash", hold = true,
+	build = function(r)
+		greatHelm(r, T_DARK_IRON, nil, T_ORANGE)
+		mk(r, "Head", "block", V(0.6, 0.3, 0.3), CF(-0.95, 0.5, 0), T_DARK_IRON, METAL) -- the short horns
+		mk(r, "Head", "block", V(0.6, 0.3, 0.3), CF(0.95, 0.5, 0), T_DARK_IRON, METAL)
+		chestPlate(r, T_DARK_IRON, nil)
+		mk(r, "UpperTorso", "block", V(0.08, 1.2, 0.06), CF(0, 0.05, -0.72), T_ORANGE, NEON)
+		for _, s in ipairs({ -1, 1 }) do
+			mk(r, "UpperTorso", "block", V(0.08, 0.6, 0.06), CF(s * 0.5, 0.35, -0.72) * ANG(0, 0, R(s * 30)), T_ORANGE, NEON)
+			mk(r, "UpperTorso", "block", V(0.08, 0.6, 0.06), CF(s * 0.5, -0.25, -0.72) * ANG(0, 0, R(s * -30)), T_ORANGE, NEON)
+		end
+		mk(r, "UpperTorso", "ball", V(0.3, 0.3, 0.14), CF(0, 0.05, -0.76), T_ORANGE, NEON, { light = T_ORANGE, range = 12 })
+		pauldrons(r, T_DARK_IRON, 1.2)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(0.08, 0.5, 0.08), CF(-0.2, 0.55, -0.6) * ANG(0, 0, R(30)), T_ORANGE, NEON)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(0.08, 0.5, 0.08), CF(0.2, 0.55, -0.6) * ANG(0, 0, R(-30)), T_ORANGE, NEON)
+		bracers(r, T_DARK_IRON, T_ORANGE)
+		belt(r, C(30, 26, 26), T_ORANGE)
+		kneepads(r, T_DARK_IRON)
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(0.4, 0.08, 0.08), CF(-0.2, 0.5, -0.69) * ANG(0, 0, R(35)), T_ORANGE, NEON)
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(0.4, 0.08, 0.08), CF(0.2, 0.5, -0.69) * ANG(0, 0, R(-35)), T_ORANGE, NEON)
+		gloves(r, T_DARK_IRON)
+		boots(r, C(30, 26, 26))
+		both(r, { "LeftFoot", "RightFoot" }, "block", V(1.1, 0.08, 1.25), CF(0, 0.5, -0.05), T_ORANGE, NEON)
+		towerShield(r, T_DARK_IRON, C(46, 42, 42), "runes", T_ORANGE, 1.15)
+		-- the armored fist
+		mk(r, "RightHand", "block", V(1.5, 1.2, 1.5), CF(0, -0.25, -0.1), T_DARK_IRON, METAL)
+		for _, x in ipairs({ -0.4, 0, 0.4 }) do
+			mk(r, "RightHand", "block", V(0.22, 0.5, 0.1), CF(x, -0.2, -0.86), T_ORANGE, NEON, x == 0 and { light = T_ORANGE, range = 8 } or nil)
+		end
+	end }
+
+TANK[7] = { name = "Titan", torso = T_NAVY, legs = T_NAVY, top = 2.7, attack = "slash", hold = true,
+	build = function(r)
+		greatHelm(r, T_ICE, nil, T_CYAN)
+		mk(r, "Head", "block", V(0.3, 0.9, 0.3), CF(0, 1.2, 0) * ANG(0, R(45), 0), T_CYAN, NEON, { light = T_CYAN, range = 8 }) -- the crest crystal
+		chestPlate(r, T_ICE, nil)
+		mk(r, "UpperTorso", "block", V(0.9, 0.9, 0.1), CF(0, 0.05, -0.72) * ANG(0, 0, R(45)), T_NAVY, METAL)
+		mk(r, "UpperTorso", "block", V(0.5, 0.5, 0.14), CF(0, 0.05, -0.76) * ANG(0, 0, R(45)), T_CYAN, NEON, { light = T_CYAN, range = 12, bright = 2 })
+		spikedPauldrons(r, T_ICE, T_CYAN, true)
+		bracers(r, T_ICE, T_CYAN)
+		belt(r, T_NAVY, T_CYAN)
+		kneepads(r, T_ICE)
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(0.3, 0.3, 0.08), CF(0, 0.5, -0.7) * ANG(0, 0, R(45)), T_CYAN, NEON)
+		gloves(r, T_ICE)
+		boots(r, T_ICE)
+		-- the energy barrier: two arcs of light beside the body
+		for _, s in ipairs({ -1, 1 }) do
+			for i = -2, 2 do
+				local a = R(i * 18)
+				local p = mk(r, "UpperTorso", "block", V(0.12, 0.9, 0.6), CF(s * 2.8 * math.cos(a), math.sin(a) * 2.8 - 0.3, 0) * ANG(0, 0, R(-i * 18 * s)), T_CYAN, NEON, i == 0 and { light = T_CYAN, range = 10 } or nil)
+				if p then
+					p.Transparency = 0.45
+				end
+			end
+		end
+		towerShield(r, T_ICE, T_NAVY, "diamond", T_CYAN, 1.2)
+		warHammer(r, T_ICE, T_NAVY, T_CYAN, 1.2)
+	end }
+
+TANK[8] = { name = "Colossus", torso = T_GOLD_LIGHT, legs = C(42, 42, 52), top = 2.6, attack = "slash", hold = true,
+	build = function(r)
+		greatHelm(r, T_GOLD_LIGHT, T_CRIMSON, nil)
+		for i = -2, 2 do -- the crest fan
+			mk(r, "Head", "wedge", V(0.22, 0.9 - math.abs(i) * 0.15, 0.3), CF(i * 0.3, 1.2, 0.0) * ANG(0, R(180), 0), T_CREAM, METAL)
+		end
+		mk(r, "UpperTorso", "block", V(1.9, 1.45, 0.3), CF(0, 0.05, -0.6), T_CREAM, METAL)
+		mk(r, "UpperTorso", "block", V(1.6, 1.15, 0.1), CF(0, 0.05, -0.76), T_CRIMSON, METAL)
+		mk(r, "UpperTorso", "block", V(0.7, 0.7, 0.06), CF(0, 0.05, -0.82), T_GOLD_LIGHT, METAL)
+		mk(r, "UpperTorso", "block", V(0.7, 0.7, 0.06), CF(0, 0.05, -0.82) * ANG(0, 0, R(45)), T_GOLD_LIGHT, METAL)
+		spikedPauldrons(r, T_GOLD_LIGHT, T_CREAM, false)
+		both(r, { "LeftUpperArm", "RightUpperArm" }, "block", V(1.64, 0.1, 1.64), CF(0, 0.5, 0), T_CRIMSON, METAL)
+		bracers(r, T_CREAM, nil)
+		belt(r, C(42, 42, 52), T_CRIMSON)
+		kneepads(r, T_GOLD_LIGHT)
+		gloves(r, T_GOLD_LIGHT)
+		boots(r, T_GOLD_LIGHT)
+		-- the banner on the back
+		mk(r, "UpperTorso", "block", V(0.1, 5.2, 0.1), CF(0.9, 1.6, 0.75), C(74, 56, 38), Enum.Material.Wood)
+		mk(r, "UpperTorso", "block", V(0.08, 2.0, 1.5), CF(0.9, 3.1, 1.55), T_CRIMSON, FABRIC)
+		mk(r, "UpperTorso", "block", V(0.1, 2.06, 0.1), CF(0.9, 3.1, 2.3), T_GOLD_LIGHT, METAL)
+		mk(r, "UpperTorso", "block", V(0.06, 0.6, 0.6), CF(0.85, 3.1, 1.55) * ANG(R(45), 0, 0), T_GOLD_LIGHT, METAL)
+		towerShield(r, T_CRIMSON, T_GOLD_LIGHT, "star", T_GOLD_LIGHT, 1.25)
+		warHammer(r, T_GOLD_LIGHT, C(42, 42, 52), T_CREAM, 1.2)
+	end }
+
+TANK[9] = { name = "Legend", torso = T_GOLD_LIGHT, legs = C(42, 42, 64), top = 3.5, attack = "slash", hold = true,
+	build = function(r)
+		greatHelm(r, T_CREAM, T_GOLD_LIGHT, T_CYAN)
+		for _, x in ipairs({ -0.4, 0, 0.4 }) do
+			mk(r, "Head", "wedge", V(0.26, 0.8, 0.3), CF(x, 1.15, 0) * ANG(0, R(180), 0), T_GOLD_LIGHT, METAL)
+		end
+		halo(r, T_GOLD_LIGHT, 2.4)
+		mk(r, "UpperTorso", "block", V(1.9, 1.45, 0.3), CF(0, 0.05, -0.6), T_CREAM, METAL)
+		mk(r, "UpperTorso", "block", V(1.6, 1.15, 0.1), CF(0, 0.05, -0.76), C(42, 42, 64), METAL)
+		mk(r, "UpperTorso", "block", V(0.8, 0.8, 0.08), CF(0, 0.05, -0.82) * ANG(0, 0, R(45)), T_GOLD_LIGHT, METAL)
+		mk(r, "UpperTorso", "block", V(0.45, 0.45, 0.14), CF(0, 0.05, -0.88) * ANG(0, 0, R(45)), T_CYAN, NEON, { light = T_CYAN, range = 16, bright = 4, sparkle = T_CYAN, rate = 25 })
+		spikedPauldrons(r, T_CREAM, T_CYAN, true)
+		bracers(r, T_CREAM, T_CYAN)
+		belt(r, C(42, 42, 64), T_CYAN)
+		kneepads(r, T_GOLD_LIGHT)
+		both(r, { "LeftLowerLeg", "RightLowerLeg" }, "block", V(0.3, 0.3, 0.08), CF(0, 0.5, -0.7) * ANG(0, 0, R(45)), T_CYAN, NEON)
+		gloves(r, T_GOLD_LIGHT)
+		boots(r, T_GOLD_LIGHT)
+		lightWings(r, T_GOLD_LIGHT, T_CYAN)
+		towerShield(r, C(42, 42, 64), T_GOLD_LIGHT, "diamond", T_CYAN, 1.3)
+		warHammer(r, T_CREAM, T_GOLD_LIGHT, T_CYAN, 1.25)
+		mk(r, "RightHand", "block", V(0.3, 0.3, 0.7), CF(0, -0.15, -4.15) * ANG(0, R(45), 0), T_CYAN, NEON, { light = T_CYAN, range = 10 })
+		sparkleAura(r, T_GOLD_LIGHT, 40)
+	end }
+
 -- The classes that have a design here.
-local CLASSES = { Soldier = LEVELS, Knight = KNIGHT, Archer = ARCHER, Mage = MAGE }
+local CLASSES = { Soldier = LEVELS, Knight = KNIGHT, Archer = ARCHER, Mage = MAGE, Hunter = HUNTER, Berserker = BERSERKER, Tank = TANK }
 
 -- The block body: the R15 limbs as plain parts (name, size, center; the soles are at y = 0, scale 1).
 local BLOCK_LIMBS = {

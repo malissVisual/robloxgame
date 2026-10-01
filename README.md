@@ -65,9 +65,16 @@ purple mage cards): Novice · Sorcerer · Wizard · Mage · Arcanist · Archmage
 a pointy hat, a robe and a staff in the left hand from the start; later a beard, a cloak, floating orbs and a rune
 circle, a hood with glowing eyes, planets, flying books, a halo and wings of light.
 
-The **other classes** (Hunter, Tank, Berserker) share generic level gear on top
-of their own look: Lv 2 cape, Lv 3 shoulder plates, Lv 4 glowing belt and spikes, Lv 5 floating orbs
-and a glow outline, Lv 6 metal armor, Lv 7 wings, Lv 8 a halo, Lv 9 a long red hero cape.
+The **Hunter**, the **Berserker** and the **Tank** have their 9 designed stages in `SoldierRig.luau` too (`HUNTER`,
+`BERSERKER`, `TANK`, from their card sheets):
+
+| Class | Levels 1 → 9 |
+|---|---|
+| Hunter | Scout · Trapper · Tracker · Sharpshooter · Nightstalker · Hawkeye · Phantom Ranger · Royal Huntsman · Legend — crossbow → long rifle with a scope; a cap, a hood, goggles, night vision, a mechanical eye and a hawk, floating reticles, antlers, wings of light |
+| Berserker | Brawler · Raider · Marauder · Berserker · Bloodrager · Warlord · Firebrand · Warchief · Legend — a bare chest and one axe → two flaming great axes; fur, horns, war paint, tattoos, chains, skull trophies, burning hair, a wolf pelt, wings of fire |
+| Tank | Guard · Shieldbearer · Defender · Bulwark · Juggernaut · Ironwall · Titan · Colossus · Legend — a round wooden shield and a club → a tower shield and a war hammer; plate, a closed helm with a glowing slit, glowing runes, an energy barrier, a banner, a halo and wings of light |
+
+Every class now has a design of its own; the generic level gear (`Soldier.luau`) is only the fallback for a class without one.
 
 The level colors (label, card outline, pad under the soldier, effects) follow the rarity colors of the
 Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
