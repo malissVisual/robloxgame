@@ -21,6 +21,12 @@ node tools/rojo-sync.js
 Then in Studio: **Plugins → Rojo → Connect** (localhost, 34872) and **Play**.
 (`rojo serve` works too if it is allowed to run: `rokit install && rojo serve`.)
 
+**On a Mac without the terminal:** double-click `nastav-mac.command` once (it checks Git and Node, downloads the
+Rojo 7.7.0 Studio plugin into `~/Documents/Roblox/Plugins`, pulls the latest version and starts the sync), and from
+then on double-click `aktualizuj-a-spust.command` (pull + sync). Keep the window it opens; in Studio: Stop → Rojo
+Disconnect → Connect → Play. Connect only while the game is NOT playing (otherwise "Http requests can only be executed
+by game server").
+
 ## Game loop
 
 ```
