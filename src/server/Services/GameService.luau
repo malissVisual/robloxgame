@@ -11,6 +11,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Grid = require(Shared.Grid)
 local Units = require(Shared.Config.Units)
 local MageUpgrades = require(Shared.MageUpgrades)
+local Wizards = require(Shared.Config.Wizards)
 local Levels = require(Shared.Config.Levels)
 local Waves = require(Shared.Config.Waves)
 local Difficulties = require(Shared.Config.Difficulties)
@@ -58,6 +59,29 @@ local function isAdmin(player: Player): boolean
 end
 
 -- State for the client UI: bottom bar, inventory, merge slots, soldiers index and waves.
+-- The coins per minute all your wizards earn (the inventory and the squad; a complete codex adds a bonus).
+local function incomePerMinute(profile: PlayerData.Profile): number
+	local total = 0
+	for _, cells in { profile.board, profile.squad } do
+		for i = 1, #cells do
+			local unit = cells[i]
+			if unit then
+				total += Wizards.income(unit)
+			end
+		end
+	end
+	local found = 0
+	for _, id in Wizards.Order do
+		if profile.codex[id] then
+			found += 1
+		end
+	end
+	if found >= #Wizards.Order then
+		total *= 1 + Balance.CodexCompleteBonus
+	end
+	return total
+end
+
 local function pushState(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -116,6 +140,9 @@ local function pushState(player: Player)
 		settings = profile.settings,
 		battleSpeed = profile.battleSpeed,
 		bestWave = profile.bestWave,
+		codex = profile.codex, -- the wizard types found
+		summonPity = profile.summonPity,
+		incomePerMin = incomePerMinute(profile),
 	})
 end
 
@@ -272,13 +299,33 @@ end
 
 -- Puts a soldier into the inventory (the first free pad). When the inventory is full the soldier
 -- is sold instead. Returns true if it was stored.
+-- Coins a wizard sells for (its level, Ascended, and its rarity).
+local function sellValue(unit: Grid.Unit): number
+	return Levels.sellValue(unit.tier, unit.ascended) * Wizards.rarityOf(unit).sell
+end
+
 local function addToInventory(profile: PlayerData.Profile, unit: Grid.Unit): boolean
 	local id = firstFreeBoardSlot(profile)
 	if not id then
-		profile.coins += Levels.sellValue(unit.tier, unit.ascended)
+		profile.coins += sellValue(unit)
 		return false
 	end
 	profile.board[id] = unit
+	return true
+end
+
+-- THE CODEX: the first wizard of a type pays the rarity's discovery coins and is announced (a banner on the
+-- client). Returns true for a new type.
+local function noteFound(player: Player, profile: PlayerData.Profile, unit: Grid.Unit): boolean
+	local id = unit.variant or Wizards.Default
+	if profile.codex[id] then
+		return false
+	end
+	profile.codex[id] = true
+	local def = Wizards.Types[id]
+	local rarity = Wizards.Rarities[def.rarity]
+	profile.coins += rarity.discovery
+	Net.get("Discovery"):FireClient(player, id, rarity.discovery) -- the client shows the big banner
 	return true
 end
 
@@ -295,7 +342,9 @@ local function onInteract(player: Player, from: any, to: any)
 		return
 	end
 	local a, b = fromCells[fromIndex], toCells[toIndex]
-	if a and b and a.class == b.class and a.tier == b.tier and not Grid.canMerge(a, b, profile.tierUnlocked) and not (a.ascended or b.ascended) then
+	if a and b and a.class == b.class and a.tier == b.tier and (a.variant or Wizards.Default) ~= (b.variant or Wizards.Default) then
+		notify(player, string.format("Only two wizards of the same type merge (%s + %s)", Wizards.label(a), Wizards.label(b)))
+	elseif a and b and a.class == b.class and a.tier == b.tier and not Grid.canMerge(a, b, profile.tierUnlocked) and not (a.ascended or b.ascended) then
 		local maxTier = Units.maxTier(a.class)
 		notify(player, if a.tier >= maxTier then string.format("Two level %d %ss become an ASCENDED one once level %d of the class is bought (UPGRADES tab)", maxTier, Units.Classes[a.class].label, maxTier) else string.format("%s level %d is locked — buy it in the UPGRADES tab (coins + cleared waves)", Units.Classes[a.class].label, a.tier + 1))
 		sfx(player, "error")
@@ -365,7 +414,7 @@ local function onAutoMerge(player: Player)
 		for _, id in order do
 			local unit = cell(id)
 			if unit and Grid.canMerge(unit, unit, profile.tierUnlocked) then
-				local key = unit.class .. "|" .. unit.tier
+				local key = unit.class .. "|" .. (unit.variant or Wizards.Default) .. "|" .. unit.tier
 				local other = waiting[key]
 				if other then
 					local made = Grid.mergeResult(unit)
@@ -420,7 +469,8 @@ local function onEquipBest(player: Player)
 	local function add(unit: Grid.Cell)
 		if unit then
 			local stats = Units.stats(unit.class, unit.tier, unit.ascended)
-			table.insert(entries, { unit = unit, score = stats.hp * stats.damage / stats.cooldown })
+			local power = Wizards.rarityOf(unit).stats
+			table.insert(entries, { unit = unit, score = stats.hp * stats.damage * power * power / stats.cooldown })
 		end
 	end
 	for i = 1, Balance.SquadSize do
@@ -608,6 +658,61 @@ local function onSpawn(player: Player, amount: any)
 	Net.get("RollResult"):FireClient(player, pool, classes, tiers)
 end
 
+-- THE SUMMON PORTAL: 1 or 10 wizards for coins (Balance.WizardSummonCost / WizardSummonTenCost). Every type is
+-- rolled by rarity (Wizards.odds at luck 1); after Balance.SummonPity summons without an Epic or better the next one
+-- is Epic or better. They land on free inventory pads (there must be room for all of them).
+local summonBusy: { [Player]: number } = {}
+local function onSummonWizard(player: Player, amount: any)
+	local profile, plot = PlayerData.get(player), plots[player]
+	if not profile or not plot or profile.battling or profile.rolling then
+		return
+	end
+	local now = os.clock()
+	if (summonBusy[player] or 0) > now then
+		return
+	end
+	local count = if amount == 10 then 10 else 1
+	local cost = if count == 10 then Balance.WizardSummonTenCost else Balance.WizardSummonCost
+	if countFreeBoard(profile) < count then
+		notify(player, string.format("You need %d free inventory places for %d summon%s", count, count, if count > 1 then "s" else ""))
+		return
+	end
+	if profile.coins < cost then
+		notify(player, string.format("Not enough coins (%d needed)", cost))
+		return
+	end
+	summonBusy[player] = now + 0.6
+	profile.coins -= cost
+	addStat(player, profile, "summons", count)
+	local results: { { variant: string, tier: number, new: boolean, slot: number } } = {}
+	for _ = 1, count do
+		local pityHit = profile.summonPity + 1 >= Balance.SummonPity
+		local variant = Wizards.roll(rng, 1, if pityHit then 3 else nil)
+		if Wizards.Rarities[Wizards.Types[variant].rarity].order >= 3 then
+			profile.summonPity = 0
+		else
+			profile.summonPity += 1
+		end
+		local unit: Grid.Unit = { class = "Mage", tier = Balance.SummonLevel, variant = variant }
+		local isNew = noteFound(player, profile, unit)
+		local id = firstFreeBoardSlot(profile)
+		if id then
+			profile.board[id] = unit
+		end
+		table.insert(results, { variant = variant, tier = unit.tier, new = isNew, slot = id or 0 })
+	end
+	refresh(player)
+	for _, r in results do
+		if r.slot > 0 then
+			local unit = profile.board[r.slot]
+			if unit then
+				Plots.dropEffect(plot, r.slot, unit.tier)
+			end
+		end
+	end
+	Net.get("SummonResult"):FireClient(player, results)
+end
+
 -- Selling: a soldier of the inventory or the squad goes for coins (Levels.sellValue).
 local function onSell(player: Player, id: any)
 	local profile = PlayerData.get(player)
@@ -622,11 +727,11 @@ local function onSell(player: Player, id: any)
 	if not unit then
 		return
 	end
-	local price = Levels.sellValue(unit.tier, unit.ascended)
+	local price = sellValue(unit)
 	cells[index] = false
 	profile.coins += price
 	refresh(player)
-	notify(player, string.format("Sold %s %s for %d coins", Units.Classes[unit.class].label, Levels.label(unit.tier), price))
+	notify(player, string.format("Sold %s %s for %d coins", Wizards.label(unit), Levels.label(unit.tier), price))
 	sfx(player, "coins")
 end
 
@@ -772,6 +877,14 @@ local function onAdminCommand(player: Player, command: any, a: any, b: any)
 		else
 			notify(player, "Admin: the inventory is full")
 		end
+	elseif command == "wizard" and Wizards.isValid(a) and type(b) == "number" then
+		local unit: Grid.Unit = { class = "Mage", tier = math.clamp(math.floor(b), 1, Units.maxTier("Mage")), variant = a }
+		noteFound(player, profile, unit)
+		if addToInventory(profile, unit) then
+			notify(player, string.format("Admin: %s Lv %d put in the inventory", Wizards.Types[a].label, unit.tier))
+		else
+			notify(player, "Admin: the inventory is full")
+		end
 	elseif command == "spawnall" and Units.isValidClass(a) then
 		profile.unlocked[a] = true
 		profile.tierUnlocked[a] = Units.maxTier(a)
@@ -875,7 +988,7 @@ local function onSetDifficulty(player: Player, difficulty: any)
 	refresh(player)
 end
 
-type Drop = { class: string, tier: number, stored: boolean, bonus: boolean }
+type Drop = { class: string, tier: number, stored: boolean, bonus: boolean, variant: string }
 
 -- Drop for a won wave: a random unlocked class; the higher the wave, the higher its level.
 -- It is only queued here; it enters the inventory after the result screen (collectPending).
@@ -888,9 +1001,12 @@ local function battleDrop(profile: PlayerData.Profile, wave: number, guaranteedB
 	if bonus then
 		tier = math.min(tier + 1, Units.maxTier(class))
 	end
+	-- The wizard type is rolled by rarity; later waves, bosses and Nightmare roll better.
+	local luck = (1 + wave * Balance.DropLuckPerWave) * (if guaranteedBonus then 1.6 else 1) * (if profile.difficulty == "Nightmare" then 1.3 else 1)
+	local variant = Wizards.roll(rng, luck)
 	local stored = countFreeBoard(profile) > #profile.pendingUnits
-	table.insert(profile.pendingUnits, { class = class, tier = tier })
-	return { class = class, tier = tier, stored = stored, bonus = bonus }
+	table.insert(profile.pendingUnits, { class = class, tier = tier, variant = variant })
+	return { class = class, tier = tier, stored = stored, bonus = bonus, variant = variant }
 end
 
 -- Lucky drop: a chance to unlock one of the locked classes that can drop from this wave on
@@ -1044,6 +1160,7 @@ collectPending = function(player: Player)
 	local units = table.clone(profile.pendingUnits)
 	table.clear(profile.pendingUnits)
 	for _, unit in units do
+		noteFound(player, profile, unit)
 		addToInventory(profile, unit) -- sold if the inventory is full
 	end
 	refresh(player)
@@ -1427,6 +1544,7 @@ function GameService.init()
 	Net.get("Battle").OnServerEvent:Connect(onBattle)
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)
 	Net.get("MageUpgrade").OnServerEvent:Connect(onMageUpgrade)
+	Net.get("SummonWizard").OnServerEvent:Connect(onSummonWizard)
 	Net.get("UnlockTier").OnServerEvent:Connect(onUnlockTier)
 	Net.get("Sell").OnServerEvent:Connect(onSell)
 	Net.get("AutoFight").OnServerEvent:Connect(onAutoFight)
@@ -1448,7 +1566,28 @@ function GameService.init()
 	Net.get("Unequip").OnServerEvent:Connect(onUnequip)
 	Net.get("RequestState").OnServerEvent:Connect(pushState)
 	Players.PlayerAdded:Connect(join)
-	Players.PlayerRemoving:Connect(leave)
+	Players.PlayerRemoving:Connect(function(player)
+		summonBusy[player] = nil
+		leave(player)
+	end)
+	-- THE WIZARDS' INCOME: every Balance.IncomeTick seconds each player gets the coins their wizards earned.
+	task.spawn(function()
+		while true do
+			task.wait(Balance.IncomeTick)
+			for _, player in Players:GetPlayers() do
+				local profile = PlayerData.get(player)
+				if profile then
+					local earned = incomePerMinute(profile) * Balance.IncomeTick / 60 + profile.incomeCarry
+					local whole = math.floor(earned)
+					profile.incomeCarry = earned - whole
+					if whole > 0 then
+						profile.coins += whole
+						pushState(player)
+					end
+				end
+			end
+		end
+	end)
 	for _, player in Players:GetPlayers() do
 		task.spawn(join, player)
 	end

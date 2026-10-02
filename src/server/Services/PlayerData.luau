@@ -12,6 +12,7 @@ local Maps = require(Shared.Config.Maps)
 local Difficulties = require(Shared.Config.Difficulties)
 local Grid = require(Shared.Grid)
 local Levels = require(Shared.Config.Levels)
+local Wizards = require(Shared.Config.Wizards)
 
 -- The lifetime counters a profile keeps (all start at 0).
 local STAT_KEYS = { "kills", "merges", "maxTier", "ascended", "wavesWon", "bossKills", "nightmareWaves", "summons" }
@@ -46,6 +47,9 @@ export type Profile = {
 	map: string, -- current map (Config/Maps)
 	bestWave: number, -- the highest wave ever reached (offline income)
 	stats: { [string]: number }, -- lifetime counters (kills, merges, waves won …)
+	codex: { [string]: boolean }, -- the wizard types found (Config/Wizards; the codex pays for every new one)
+	summonPity: number, -- summons since the last Epic or better (Balance.SummonPity guarantees one)
+	incomeCarry: number, -- the fraction of a coin the wizards' income has not paid yet
 	lastSeen: number, -- os.time() of the last save (offline income)
 	settings: { [string]: any }, -- volume, numbers, arrows (arena holograms), music
 	battleSpeed: number, -- 1 or 2 (this session only)
@@ -196,6 +200,9 @@ local function fresh(): Profile
 		map = Maps.First,
 		bestWave = 1,
 		stats = {},
+		codex = { Arcane = true }, -- a new player starts with Arcane Mages
+		summonPity = 0,
+		incomeCarry = 0,
 		lastSeen = 0,
 		settings = { volume = 1, numbers = true, arrows = true, music = true, layout = "" }, -- layout: where the player dragged the UI panels (JSON, client-owned)
 		battleSpeed = 1,
@@ -218,7 +225,12 @@ local function copyUnit(raw: any): Grid.Unit?
 	if type(raw) == "table" and type(raw.class) == "string" and type(raw.tier) == "number" then
 		-- A soldier of a removed class (Knight, Archer, …) in an old save becomes a Mage of the same level.
 		local class = if Units.isValidClass(raw.class) then raw.class else Units.ClassList[1]
-		return { class = class, tier = math.clamp(math.floor(raw.tier), 1, Units.maxTier(class)), ascended = if raw.ascended == true then true else nil }
+		return {
+			class = class,
+			tier = math.clamp(math.floor(raw.tier), 1, Units.maxTier(class)),
+			ascended = if raw.ascended == true then true else nil,
+			variant = if Wizards.isValid(raw.variant) then raw.variant else nil, -- nil = the default Arcane Mage
+		}
 	end
 	return nil
 end
@@ -277,7 +289,7 @@ local function applySaved(profile: Profile, saved: any)
 					end
 				end
 				if not placed then
-					profile.coins += Levels.sellValue(unit.tier, unit.ascended)
+					profile.coins += Levels.sellValue(unit.tier, unit.ascended) * Wizards.rarityOf(unit).sell
 				end
 			end
 		end
@@ -305,6 +317,23 @@ local function applySaved(profile: Profile, saved: any)
 		end
 	end
 	profile.lastSeen = number(saved.lastSeen, 0, 0, 2 ^ 40)
+	if type(saved.codex) == "table" then
+		for _, id in Wizards.Order do
+			if saved.codex[id] == true then
+				profile.codex[id] = true
+			end
+		end
+	end
+	profile.summonPity = number(saved.summonPity, 0, 0, 1000)
+	-- Every wizard you already own counts as found (older saves had no codex).
+	for _, cells in { profile.board, profile.squad } do
+		for i = 1, #cells do
+			local unit = cells[i]
+			if unit then
+				profile.codex[unit.variant or Wizards.Default] = true
+			end
+		end
+	end
 	if type(saved.settings) == "table" then
 		for key, default in profile.settings do
 			local value = saved.settings[key]
@@ -346,13 +375,13 @@ local function serialize(profile: Profile): { [string]: any }
 		local out = {}
 		for i = 1, #source do
 			local unit = source[i]
-			out[i] = if unit then { class = unit.class, tier = unit.tier, ascended = unit.ascended } else false
+			out[i] = if unit then { class = unit.class, tier = unit.tier, ascended = unit.ascended, variant = unit.variant } else false
 		end
 		return out
 	end
 	local pending = {}
 	for _, unit in profile.pendingUnits do
-		table.insert(pending, { class = unit.class, tier = unit.tier, ascended = unit.ascended })
+		table.insert(pending, { class = unit.class, tier = unit.tier, ascended = unit.ascended, variant = unit.variant })
 	end
 	return {
 		version = 1,
@@ -376,6 +405,8 @@ local function serialize(profile: Profile): { [string]: any }
 		bestWave = profile.bestWave,
 		stats = profile.stats,
 		lastSeen = os.time(),
+		codex = profile.codex,
+		summonPity = profile.summonPity,
 		settings = profile.settings,
 		pending = pending,
 		pendingUnlock = profile.pendingUnlock,

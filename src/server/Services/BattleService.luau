@@ -27,6 +27,8 @@ local BattleFx = require(script.Parent.BattleFx)
 local EnemyBrain = require(script.Parent.EnemyBrain)
 local WaveMutators = require(script.Parent.WaveMutators)
 local Soldier = require(Shared.Soldier)
+local Wizards = require(Shared.Config.Wizards) -- the wizard types: rarity stats and battle traits
+local MageConfig = require(Shared.Config.MageConfig)
 
 local PLAYER_SIDE, ENEMY_SIDE = 1, 2
 local UP = Vector3.new(0, 1, 0)
@@ -85,6 +87,11 @@ type Fighter = {
 	burnDps: number, -- ... losing this many HP per second ...
 	burnBy: Fighter?, -- ... credited to this mage
 	burnTick: number, -- seconds of burning not yet applied
+	-- The wizard type (Config/Wizards.luau): its battle trait and the trait's counters.
+	variant: string?,
+	trait: string?,
+	traitHits: number, -- hits dealt (Starfall: every 4th calls a star)
+	traitTimer: number, -- seconds since the last Bloom heal
 	maxHp: number,
 	hp: number,
 	damage: number,
@@ -228,6 +235,10 @@ local function makeFighter(side: number, stats: Units.Stats, tier: number, color
 		burnDps = 0,
 		burnBy = nil,
 		burnTick = 0,
+		variant = nil,
+		trait = nil,
+		traitHits = 0,
+		traitTimer = 0,
 		maxHp = stats.hp,
 		hp = stats.hp,
 		damage = stats.damage,
@@ -829,14 +840,106 @@ local function hurt(battle: Battle, target: Fighter, amount: number, source: Fig
 	return taken
 end
 
+-- Heals `target` by `amount` (clamped to its max HP) with a green number: a shaman's mend, a boss's heal.
+local function heal(battle: Battle, target: Fighter, amount: number)
+	if target.hp <= 0 then
+		return
+	end
+	local before = target.hp
+	target.hp = math.min(target.maxHp, target.hp + amount)
+	Soldier.setHp(target.model, target.hp / target.maxHp)
+	if target.hp - before > 0.5 then
+		popNumber(battle.parent, target, target.hp - before, Color3.fromRGB(120, 255, 150))
+	end
+end
+
+-- THE WIZARD TRAITS (Config/Wizards.luau): what the wizard type adds to every attack of its mage. `before` scales the
+-- damage of the hit (Reap's crit, Rift's bonus); `after` runs once the hit landed (`taken` = the damage it did).
+local T = Wizards.Traits
+local CHILL_COLOR = Color3.fromRGB(150, 220, 255)
+local function traitBefore(battle: Battle, f: Fighter, target: Fighter, amount: number): number
+	local trait = f.trait
+	if trait == "reap" and math.random() < T.reap.Chance then
+		BattleFx.pop(battle.parent, target.pos + UP * (target.lift * 2 + 1.5), "CRIT", f.color:Lerp(Color3.new(1, 1, 1), 0.4), 18)
+		return amount * T.reap.Mult
+	elseif trait == "rift" then
+		return amount * (1 + T.rift.Damage)
+	end
+	return amount
+end
+
+local function traitAfter(battle: Battle, f: Fighter, target: Fighter, amount: number, taken: number)
+	local trait = f.trait
+	if not trait or target.side == f.side then
+		return
+	end
+	local parent = battle.parent
+	local wiz = Wizards.Types[f.variant or Wizards.Default]
+	if trait == "flow" then
+		local brain = f.brain :: any
+		if brain and type(brain.mana) == "number" then
+			brain.mana = math.min(MageConfig.Mana.Max, brain.mana + T.flow.Mana)
+		end
+	elseif trait == "burn" and target.hp > 0 then
+		target.burnUntil = math.max(target.burnUntil, target.clock + T.burn.Time)
+		target.burnDps = math.max(target.burnDps, target.maxHp * T.burn.Dps)
+		target.burnBy = f
+		BattleFx.tint(target.model, wiz.color, T.burn.Time)
+	elseif trait == "chill" and target.hp > 0 then
+		local slowed = target.slowUntil > target.clock
+		target.slowUntil = math.max(target.slowUntil, target.clock + T.chill.Time)
+		target.slowFactor = math.min(if slowed then target.slowFactor else 1, T.chill.Factor)
+		BattleFx.tint(target.model, CHILL_COLOR, T.chill.Time)
+	elseif trait == "chain" then
+		local best: Fighter? = nil
+		local bestDist = T.chain.Radius
+		for _, other in battle.fighters do
+			if other ~= target and other.side == target.side and other.hp > 0 then
+				local d = (other.pos - target.pos).Magnitude
+				if d <= bestDist then
+					best, bestDist = other, d
+				end
+			end
+		end
+		if best then
+			BattleFx.beam(parent, target.pos + UP * target.lift, best.pos + UP * best.lift, wiz.color2, 0.25, 0.2)
+			popNumber(parent, best, applyDamage(battle, best, amount * T.chain.Fraction, f, true), wiz.color2)
+		end
+	elseif trait == "reap" and taken > 0 then
+		heal(battle, f, taken * T.reap.Lifesteal)
+	elseif trait == "rift" and target.hp > 0 and math.random() < T.rift.Chance then
+		target.stunUntil = math.max(target.stunUntil, target.clock + T.rift.Stun)
+		BattleFx.tint(target.model, wiz.color2, T.rift.Stun)
+		BattleFx.pop(parent, target.pos + UP * (target.lift * 2 + 1.5), "STUN", wiz.color2, 16)
+	elseif trait == "starfall" then
+		f.traitHits += 1
+		if f.traitHits % T.starfall.Every == 0 then
+			BattleFx.beam(parent, target.pos + UP * 30, target.pos, wiz.color2, 1.2, 0.3)
+			BattleFx.groundRing(parent, target.pos, wiz.color, T.starfall.Radius, 0.5)
+			BattleFx.sparks(parent, target.pos + UP, wiz.color2, 12, T.starfall.Radius * 0.6, 5)
+			for _, other in battle.fighters do
+				if other.side == target.side and other.hp > 0 and (other.pos - target.pos).Magnitude <= T.starfall.Radius then
+					popNumber(parent, other, applyDamage(battle, other, amount * T.starfall.Mult, f, true), wiz.color2)
+				end
+			end
+		end
+	end
+end
+
 -- One attack of `f` on `target` (× `mult`): the damage with the passives, the hit effect, the swing animation and the
 -- splash (the Mage's Arcane Burst or an enemy with splash). Used by the step loop and by the Mage brains.
 local function performAttack(battle: Battle, f: Fighter, target: Fighter, mult: number?)
 	local fighters, effects = battle.fighters, battle.parent
 	local amount = attackDamage(f, fighters) * (mult or 1)
+	if f.trait then
+		amount = traitBefore(battle, f, target, amount)
+	end
 	local execute = f.boltStyle == "execute" -- the Mage's killing blow: a gold number (effect() resets the style)
 	local taken = applyDamage(battle, target, amount, f)
 	popNumber(effects, target, taken, if execute then Color3.fromRGB(255, 215, 90) else nil)
+	if f.trait then
+		traitAfter(battle, f, target, amount, taken)
+	end
 	effect(f, target, effects)
 	Rig.attack(f.model, battle.speed())
 	if f.side == ENEMY_SIDE and f.buffUntil > f.clock and f.buffDamage > 0 then
@@ -852,19 +955,6 @@ local function performAttack(battle: Battle, f: Fighter, target: Fighter, mult: 
 				end
 			end
 		end
-	end
-end
-
--- Heals `target` by `amount` (clamped to its max HP) with a green number: a shaman's mend, a boss's heal.
-local function heal(battle: Battle, target: Fighter, amount: number)
-	if target.hp <= 0 then
-		return
-	end
-	local before = target.hp
-	target.hp = math.min(target.maxHp, target.hp + amount)
-	Soldier.setHp(target.model, target.hp / target.maxHp)
-	if target.hp - before > 0.5 then
-		popNumber(battle.parent, target, target.hp - before, Color3.fromRGB(120, 255, 150))
 	end
 end
 
@@ -938,6 +1028,28 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 			if f.burnTick >= 0.5 then
 				popNumber(battle.parent, f, applyDamage(battle, f, f.burnDps * f.burnTick, f.burnBy, true), SMOLDER_COLOR)
 				f.burnTick = 0
+			end
+		end
+		if f.trait == "bloom" then
+			-- BLOOM (the Verdant Mage): every few seconds the most hurt ally nearby is healed.
+			f.traitTimer += dt
+			if f.traitTimer >= T.bloom.Every then
+				f.traitTimer = 0
+				local best: Fighter? = nil
+				local bestFrac = 1
+				for _, ally in fighters do
+					if ally.side == f.side and ally.hp > 0 and (ally.pos - f.pos).Magnitude <= T.bloom.Radius then
+						local frac = ally.hp / ally.maxHp
+						if frac < bestFrac then
+							best, bestFrac = ally, frac
+						end
+					end
+				end
+				if best then
+					local wiz = Wizards.Types.Verdant
+					BattleFx.beam(battle.parent, f.pos + UP * f.lift, best.pos + UP * best.lift, wiz.color2, 0.2, 0.3)
+					heal(battle, best, best.maxHp * T.bloom.Heal)
+				end
 			end
 		end
 		if f.mageLevel and MageTree.has(f.mageLevel, "healAura") then
@@ -1095,7 +1207,10 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		local cell = profile.squad[i]
 		local model = plot.models[id]
 		if cell and model then
-			local fighter = makeFighter(PLAYER_SIDE, Units.stats(cell.class, cell.tier, cell.ascended), cell.tier, Units.Classes[cell.class].color, Soldier.lift(cell.tier, cell.ascended), 1, Plots.slotGround(plot, id), model)
+			local wiz = Wizards.of(cell) -- the wizard type: its color, its rarity's stats and its trait
+			local fighter = makeFighter(PLAYER_SIDE, Units.stats(cell.class, cell.tier, cell.ascended), cell.tier, wiz.color, Soldier.lift(cell.tier, cell.ascended), 1, Plots.slotGround(plot, id), model)
+			fighter.variant = wiz.id
+			fighter.trait = wiz.trait
 			-- The class passive (doubled for an Ascended soldier).
 			local passiveId = Units.Classes[cell.class].passive
 			fighter.passive = passiveId
@@ -1105,9 +1220,10 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			fighter.ascended = cell.ascended == true
 			-- The squad's synergies make everybody stronger; the pad a soldier stands on gives nothing (it only
 			-- decides which enemies it meets first).
-			fighter.maxHp *= synergy.hp * boosts.hp
+			local rarityStats = Wizards.rarityOf(cell).stats
+			fighter.maxHp *= synergy.hp * boosts.hp * rarityStats
 			fighter.hp = fighter.maxHp
-			fighter.damage *= synergy.damage * boosts.damage
+			fighter.damage *= synergy.damage * boosts.damage * rarityStats
 			fighter.cooldown *= boosts.cooldown
 			fighter.timer = math.min(fighter.timer, fighter.cooldown)
 			table.insert(fighters, fighter)

@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Levels = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Levels"))
+local Wizards = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Wizards"))
 
 local MageAnimator = {}
 
@@ -288,7 +289,9 @@ local function updateRig(rig: Rig, now: number, dt: number)
 	-- The aura: shards orbiting the waist, a disc on the ground. More shards, higher and faster with the level
 	-- and while gliding; a blink flashes them wide.
 	local wanted = math.clamp(2 + level // 4, 2, 6)
-	local color = Levels.color(level)
+	-- A wizard type (the "Variant" attribute) colors its aura; otherwise the level color.
+	local variant = model:GetAttribute("Variant")
+	local color = if Wizards.isValid(variant) then Wizards.Types[variant :: string].color else Levels.color(level)
 	local shardColor = color:Lerp(Color3.new(1, 1, 1), 0.3)
 	while #rig.shards < wanted do
 		local i = #rig.shards + 1

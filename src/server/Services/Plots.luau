@@ -20,6 +20,7 @@ local Soldier = require(Shared.Soldier)
 local Enemy = require(Shared.Enemy)
 local Enemies = require(Shared.Config.Enemies)
 local Mutators = require(Shared.Config.Mutators)
+local Wizards = require(Shared.Config.Wizards)
 local ArenaDecor = require(script.Parent.ArenaDecor)
 local RingAuras = require(script.Parent.DecorData.BattleRingAuras)
 local FightArena = require(script.Parent.FightArena)
@@ -503,6 +504,44 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 		end
 	end
 	areaSign("BoardSign", 0, Balance.BoardStart - 7, '<font size="13" color="#9aa0aa">DRAG TO MERGE</font>\n<font size="26">MERGE BOARD</font>')
+
+	-- THE SUMMON PORTAL (lobby, right of the merge board): a stone base, a standing ring of glowing runes and a swirl
+	-- inside it. The client puts its own prompt on the "SummonPortal" part (only the owner sees it) and opens the
+	-- summon panel (Config/Wizards, GameService onSummonWizard).
+	do
+		local portalAt = origin + Vector3.new(36, 0, Balance.BoardStart + 14)
+		local stone = Color3.fromRGB(70, 66, 84)
+		local base = makePart(folder, "SummonPortal", Vector3.new(9, 0.8, 9), portalAt + Vector3.new(0, 0.4, 0), stone, Enum.Material.Slate)
+		base.Shape = Enum.PartType.Cylinder
+		base.Size = Vector3.new(0.8, 10, 10)
+		base.CFrame = CFrame.new(portalAt + Vector3.new(0, 0.4, 0)) * CFrame.Angles(0, 0, math.rad(90))
+		local center = portalAt + Vector3.new(0, 5.6, 0)
+		local SEGMENTS = 20
+		for i = 1, SEGMENTS do
+			local a0 = (i - 0.5) / SEGMENTS * math.pi * 2
+			local pos = center + Vector3.new(math.cos(a0) * 4.2, math.sin(a0) * 4.2, 0)
+			local rune = makePart(folder, "PortalRune", Vector3.new(1.35, 0.55, 0.7), pos, if i % 2 == 0 then Color3.fromRGB(200, 120, 255) else Color3.fromRGB(110, 200, 255), Enum.Material.Neon)
+			rune.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, a0 + math.pi / 2)
+			rune.CanCollide = false
+			rune.CanQuery = false
+		end
+		for side = -1, 1, 2 do
+			local pillar = makePart(folder, "PortalPillar", Vector3.new(1.2, 10.5, 1.2), portalAt + Vector3.new(side * 5, 5.25, 0), stone, Enum.Material.Slate)
+			pillar.CanQuery = false
+		end
+		local swirl = makePart(folder, "PortalSwirl", Vector3.new(0.2, 7.6, 7.6), center, Color3.fromRGB(150, 90, 230), Enum.Material.Neon)
+		swirl.Shape = Enum.PartType.Cylinder
+		swirl.CFrame = CFrame.new(center) * CFrame.Angles(0, math.rad(90), 0)
+		swirl.Transparency = 0.45
+		swirl.CanCollide = false
+		swirl.CanQuery = false
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(180, 120, 255)
+		light.Range = 16
+		light.Brightness = 1.6
+		light.Parent = swirl
+		areaSign("PortalSign", 36, Balance.BoardStart + 14 - 6, '<font size="13" color="#c8a0ff">E · SUMMON WIZARDS</font>\n<font size="26">SUMMON PORTAL</font>', true)
+	end
 	areaSign("SquadSign", 42, Balance.SquadStart, '<font size="13" color="#9aa0aa">THESE SIX FIGHT</font>\n<font size="26">SQUAD</font>')
 
 	-- No summoning altars and no level-upgrade station any more: characters come from wave drops (and the admin
@@ -560,7 +599,7 @@ function Plots.render(plot: Plot, board: Grid.Cells, squad: Grid.Cells, boardSlo
 			pad:SetAttribute("Locked", false)
 		end
 
-		local signature = if cell then string.format("%s|%d%s", cell.class, cell.tier, if cell.ascended then "A" else "") else ""
+		local signature = if cell then string.format("%s|%d%s|%s", cell.class, cell.tier, if cell.ascended then "A" else "", cell.variant or "") else ""
 		if plot.rendered[id] == signature then
 			return
 		end
@@ -574,13 +613,14 @@ function Plots.render(plot: Plot, board: Grid.Cells, squad: Grid.Cells, boardSlo
 			return
 		end
 
-		local model = Soldier.build(cell.class, cell.tier, false, nil, cell.ascended)
+		local model = Soldier.build(cell.class, cell.tier, false, nil, cell.ascended, cell.variant or Wizards.Default)
 		local p = Plots.slotGround(plot, id) + Vector3.new(0, Soldier.lift(cell.tier, cell.ascended), 0)
 		model:PivotTo(CFrame.lookAt(p, p + Vector3.new(0, 0, 1))) -- facing the enemies
 		model:SetAttribute("Slot", id)
 		model:SetAttribute("Class", cell.class)
 		model:SetAttribute("Tier", cell.tier)
 		model:SetAttribute("Ascended", cell.ascended == true)
+		model:SetAttribute("Variant", cell.variant or Wizards.Default)
 		model.Parent = plot.folder
 		plot.models[id] = model
 	end

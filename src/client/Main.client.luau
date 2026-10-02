@@ -14,6 +14,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 local Balance = require(Shared:WaitForChild("Config"):WaitForChild("Balance"))
 local Units = require(Shared:WaitForChild("Config"):WaitForChild("Units"))
+local Wizards = require(Shared:WaitForChild("Config"):WaitForChild("Wizards")) -- the wizard types (rarity, colors, trait)
 local Levels = require(Shared:WaitForChild("Config"):WaitForChild("Levels"))
 local MageSpells = require(Shared:WaitForChild("Config"):WaitForChild("MageSpells"))
 local SoldierRig = require(Shared:WaitForChild("SoldierRig"))
@@ -84,6 +85,9 @@ local state = {
 	bestWave = 1,
 	cleared = 0,
 	isAdmin = false,
+	codex = {} :: { [string]: boolean }, -- the wizard types found (Config/Wizards.luau)
+	summonPity = 0, -- summons since the last Epic or better (the portal's pity)
+	incomePerMin = 0, -- coins per minute from every wizard you own
 }
 local rollStart, battleStart = 0, 0
 local stateReceivedAt, cooldownTotal = 0, 1 -- for the next-wave timer in the battle panel
@@ -172,6 +176,7 @@ UI.popupAt = nil :: Vector2? -- where the open popup was asked for (a click in t
 UI.popupRebuild = false -- rebuilding the open popup (after a purchase): no fade-in
 UI.openSkillTree = function(id: number) end -- set in the skill tree block: the big tree of a mage (slot id)
 UI.closeSkillTree = function() end
+UI.openWizards = function(_page: string?) end -- set in the Wizards block: the summon portal / codex window
 UI.refreshSkillTree = function() end -- after a new state: redraw the open tree
 UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
 UI.panelScale = Instance.new("UIScale")
@@ -1154,7 +1159,7 @@ local function fillViewport(view: ViewportFrame, unit: { class: string, tier: nu
 			child:Destroy()
 		end
 	end
-	local model = Soldier.build(unit.class, unit.tier, false, true, (unit :: any).ascended)
+	local model = Soldier.build(unit.class, unit.tier, false, true, (unit :: any).ascended, Wizards.of(unit).id)
 	model.Parent = view
 	local scale = Soldier.scale(unit.tier)
 	local target = Vector3.new(0, 2.7 * scale, 0)
@@ -1168,7 +1173,13 @@ end
 
 local function styleCard(card: Frame, unit: { class: string, tier: number })
 	local levelColor = Levels.color(unit.tier)
-	card.BackgroundColor3 = Units.Classes[unit.class].color:Lerp(BG, 0.65)
+	local wiz = Wizards.of(unit)
+	card.BackgroundColor3 = wiz.color:Lerp(BG, 0.62)
+	local rarityBar = card:FindFirstChild("Rarity") :: Frame?
+	if rarityBar then
+		rarityBar.Visible = true
+		rarityBar.BackgroundColor3 = Wizards.Rarities[wiz.rarity].color
+	end
 	local stroke = card:FindFirstChildOfClass("UIStroke")
 	if stroke then
 		stroke.Color = levelColor
@@ -1183,7 +1194,7 @@ local function styleCard(card: Frame, unit: { class: string, tier: number })
 		stroke.Color = Color3.fromRGB(255, 215, 90)
 	end
 	-- Rebuild the 3D view only when the soldier actually changed.
-	local signature = string.format("%s|%d%s", unit.class, unit.tier, if ascended then "A" else "")
+	local signature = string.format("%s|%d%s|%s", unit.class, unit.tier, if ascended then "A" else "", wiz.id)
 	if card:GetAttribute("Sig") ~= signature then
 		card:SetAttribute("Sig", signature)
 		local view = card:FindFirstChild("View") :: ViewportFrame?
@@ -1214,6 +1225,15 @@ local function makeCard(): Frame
 	local tier = label(card, "", UDim2.new(0, 0, 1, -18), UDim2.new(1, -5, 0, 16), 13, Enum.Font.GothamBold, GOLD)
 	tier.Name = "Tier"
 	tier.TextXAlignment = Enum.TextXAlignment.Right
+
+	-- The wizard's rarity: a thin stripe along the top in the rarity color.
+	local rarity = Instance.new("Frame")
+	rarity.Name = "Rarity"
+	rarity.Size = UDim2.new(1, 0, 0, 4)
+	rarity.BorderSizePixel = 0
+	rarity.Visible = false
+	rarity.ZIndex = 2
+	rarity.Parent = card
 	return card
 end
 
@@ -1246,6 +1266,10 @@ local function styleEmptyCard(card: Frame)
 	local tier = card:FindFirstChild("Tier") :: TextLabel?
 	if tier then
 		tier.Text = ""
+	end
+	local rarityBar = card:FindFirstChild("Rarity") :: Frame?
+	if rarityBar then
+		rarityBar.Visible = false
 	end
 	if card:GetAttribute("Sig") ~= "" then
 		card:SetAttribute("Sig", "")
@@ -1962,6 +1986,7 @@ end
 local function canMerge(a: Model, b: Model): boolean
 	return a:GetAttribute("Class") == b:GetAttribute("Class")
 		and a:GetAttribute("Tier") == b:GetAttribute("Tier")
+		and (a:GetAttribute("Variant") or Wizards.Default) == (b:GetAttribute("Variant") or Wizards.Default) -- only the same wizard type
 		and (a:GetAttribute("Tier") :: number) < math.min(Units.maxTier(a:GetAttribute("Class") :: string), capOf(a:GetAttribute("Class") :: string))
 end
 
@@ -2237,6 +2262,7 @@ local function updateDrag(dt: number)
 		local same = target ~= nil
 			and target.class == d.model:GetAttribute("Class")
 			and target.tier == d.model:GetAttribute("Tier")
+			and Wizards.of(target).id == (d.model:GetAttribute("Variant") or Wizards.Default)
 			and target.tier < math.min(Units.maxTier(target.class), capOf(target.class))
 		markCard(targetId, if same then INDICATOR_GOLD elseif target then INDICATOR_SWAP else INDICATOR_MOVE)
 	else
@@ -2413,7 +2439,9 @@ openCardPopup = function(id: number, at: Vector2?)
 		return l
 	end
 	local y = 8
-	line(string.format("%s%s · %s", if ascended then "★ " else "", Units.Classes[unit.class].label, Levels.label(unit.tier)), y, 16, Enum.Font.GothamBold, WHITE, 20)
+	local wiz = Wizards.of(unit)
+	local rarity = Wizards.Rarities[wiz.rarity]
+	line(string.format("%s%s · %s", if ascended then "★ " else "", wiz.label, Levels.label(unit.tier)), y, 16, Enum.Font.GothamBold, wiz.color:Lerp(WHITE, 0.45), 20)
 	-- SKILL TREE: the big view of every merge level (locked ones too).
 	local treeButton = Instance.new("TextButton")
 	treeButton.Position = UDim2.fromOffset(W - 12 - 104, 8)
@@ -2432,13 +2460,18 @@ openCardPopup = function(id: number, at: Vector2?)
 		closeCardPopup()
 		UI.openSkillTree(id)
 	end)
-	local tierLabel = line(string.upper(SoldierRig.name(unit.tier, unit.class)) .. (if ascended then "  ·  ASCENDED" else ""), y + 20, 10, Enum.Font.GothamBlack, levelColor, 14)
+	local tierLabel = line(string.format('<font color="%s">%s</font>  ·  %s', "#" .. rarity.color:ToHex(), rarity.label, string.upper(SoldierRig.name(unit.tier, unit.class))) .. (if ascended then "  ·  ASCENDED" else ""), y + 20, 10, Enum.Font.GothamBlack, levelColor, 14)
 	tierLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	y += 40
+	-- The wizard type's battle trait and what it earns per minute.
+	line(string.format('◆ %s  <font color="#a5aab9">%s</font>', wiz.traitLabel, wiz.traitText), y, 11, Enum.Font.GothamBold, wiz.color2, 15)
+	y += 15
+	line(string.format('<font color="#a5aab9">Earns</font> %s coins / min  <font color="#a5aab9">· %s stats x%.2f</font>', string.format("%.1f", Wizards.income(unit)):gsub("%.0$", ""), rarity.label, rarity.stats), y, 11, Enum.Font.GothamMedium, GREEN, 15)
+	y += 20
 
 	local stats = Units.stats(unit.class, unit.tier, ascended)
 	local boosts = MageUpgrades.multipliers(state.mageUpgrades) -- the bought upgrades are already in these numbers
-	line(string.format('<font color="#a5aab9">HP</font> %d   <font color="#a5aab9">DMG</font> %d   <font color="#a5aab9">RANGE</font> %d   <font color="#a5aab9">EVERY</font> %.2f s', math.floor(stats.hp * boosts.hp + 0.5), math.floor(stats.damage * boosts.damage + 0.5), stats.range, stats.cooldown * boosts.cooldown), y, 12, Enum.Font.GothamMedium, WHITE)
+	line(string.format('<font color="#a5aab9">HP</font> %d   <font color="#a5aab9">DMG</font> %d   <font color="#a5aab9">RANGE</font> %d   <font color="#a5aab9">EVERY</font> %.2f s', math.floor(stats.hp * boosts.hp * rarity.stats + 0.5), math.floor(stats.damage * boosts.damage * rarity.stats + 0.5), stats.range, stats.cooldown * boosts.cooldown), y, 12, Enum.Font.GothamMedium, WHITE)
 	y += 18
 	line(Units.passiveText(unit.class, ascended), y, 11, Enum.Font.Gotham, MUTED)
 	y += 22
@@ -2956,6 +2989,7 @@ local function padForUnit(unit: { class: string, tier: number }): (number?, Colo
 	end
 	local mergeable = target:GetAttribute("Class") == unit.class
 		and target:GetAttribute("Tier") == unit.tier
+		and (target:GetAttribute("Variant") or Wizards.Default) == Wizards.of(unit).id
 		and unit.tier < math.min(Units.maxTier(unit.class), capOf(unit.class))
 	return slot, if mergeable then INDICATOR_GOLD else INDICATOR_SWAP
 end
@@ -2995,7 +3029,7 @@ beginCardDrag = function(id: number, input: InputObject)
 	local ghostModel = ghostView:FindFirstChildOfClass("Model")
 
 	-- The real 3D soldier that appears in the world once the cursor leaves the panel.
-	local world = Soldier.build(unit.class, unit.tier, false, nil, (unit :: any).ascended)
+	local world = Soldier.build(unit.class, unit.tier, false, nil, (unit :: any).ascended, Wizards.of(unit).id)
 
 	cardDrag = {
 		id = id,
@@ -3046,7 +3080,7 @@ local function updateCardDrag(dt: number)
 			-- Over the panel: the card under the pointer is the merge target.
 			local targetId = cardIdAtPointer(d.id)
 			local target = if targetId then unitAt(targetId) else nil
-			local same = target ~= nil and target.class == unit.class and target.tier == unit.tier and unit.tier < math.min(Units.maxTier(unit.class), capOf(unit.class))
+			local same = target ~= nil and target.class == unit.class and target.tier == unit.tier and Wizards.of(target).id == Wizards.of(unit).id and unit.tier < math.min(Units.maxTier(unit.class), capOf(unit.class))
 			markCard(targetId, if same then INDICATOR_GOLD elseif target then INDICATOR_SWAP else INDICATOR_MOVE)
 		end
 		return
@@ -3593,7 +3627,7 @@ do
 	end)
 
 	local function unitText(unit: any): string
-		return string.format("%s %s", Units.Classes[unit.class].label, Levels.label(unit.tier))
+		return string.format("%s %s", Wizards.label(unit), Levels.label(unit.tier))
 	end
 	local lootCards: { { card: Frame, unit: any, cover: Frame, under: TextLabel, holder: Frame } } = {}
 	local countStart = 0
@@ -3915,7 +3949,7 @@ local function playRollAnimation(pool: { string }, classes: { string }, tiers: {
 				slot.stroke.Color = slot.classColor
 				slot.stroke.Thickness = 4
 			end
-			slot.name.Text = string.format("%s · %s", Units.Classes[unit.class].label, Levels.label(unit.tier))
+			slot.name.Text = string.format("%s · %s", Wizards.label(unit), Levels.label(unit.tier))
 			slot.scale.Scale = 0.6
 			TweenService:Create(slot.scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 			for d, dot in slot.dots do
@@ -4421,7 +4455,7 @@ do
 local PANEL_W = 236
 local PANEL_H = 318
 local adminOpen = false
-local adminClass = 1 -- index into Units.ClassList
+local adminClass = 1 -- index into Wizards.Order (the wizard type to spawn)
 local adminTier = 1
 
 local toggle = Instance.new("TextButton")
@@ -4514,17 +4548,15 @@ adminButton("MAX", 158, 128, 68, BADGE, function()
 	command("wave", state.mapWaves)
 end)
 
--- Spawn: a class (cycled with the arrows) at a level (− / +), one of it or all nine levels.
+-- Spawn: a wizard type (cycled with the arrows) at a level (− / +); or every level of the Mage (Arcane).
 section("SPAWN INTO THE INVENTORY", 164)
 local classLabel = label(adminPanel, "", UDim2.fromOffset(40, 180), UDim2.fromOffset(PANEL_W - 80, 28), 13, Enum.Font.GothamBold, WHITE)
 classLabel.TextXAlignment = Enum.TextXAlignment.Center
 adminButton("<", 10, 180, 26, BADGE, function()
-	adminClass = (adminClass - 2) % #Units.ClassList + 1
-	adminTier = math.min(adminTier, Units.maxTier(Units.ClassList[adminClass]))
+	adminClass = (adminClass - 2) % #Wizards.Order + 1
 end)
 adminButton(">", PANEL_W - 36, 180, 26, BADGE, function()
-	adminClass = adminClass % #Units.ClassList + 1
-	adminTier = math.min(adminTier, Units.maxTier(Units.ClassList[adminClass]))
+	adminClass = adminClass % #Wizards.Order + 1
 end)
 local tierLabel = label(adminPanel, "", UDim2.fromOffset(40, 212), UDim2.fromOffset(PANEL_W - 80, 28), 13, Enum.Font.GothamBold, GOLD)
 tierLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -4532,13 +4564,13 @@ adminButton("−", 10, 212, 26, BADGE, function()
 	adminTier = math.max(1, adminTier - 1)
 end)
 adminButton("+", PANEL_W - 36, 212, 26, BADGE, function()
-	adminTier = math.min(Units.maxTier(Units.ClassList[adminClass]), adminTier + 1)
+	adminTier = math.min(Units.maxTier("Mage"), adminTier + 1)
 end)
 adminButton("SPAWN 1", 10, 246, 104, GREEN:Lerp(BG, 0.3), function()
-	command("spawn", Units.ClassList[adminClass], adminTier)
+	command("wizard", Wizards.Order[adminClass], adminTier)
 end)
 adminButton("SPAWN ALL LVS", 122, 246, 104, GREEN:Lerp(BG, 0.45), function()
-	command("spawnall", Units.ClassList[adminClass])
+	command("spawnall", "Mage")
 end)
 
 -- Inventory and reset
@@ -4566,9 +4598,10 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 	waveTitle.Text = string.format("WAVE  ·  now %d of %d", state.wave, state.mapWaves)
-	local class = Units.ClassList[adminClass]
-	classLabel.Text = Units.Classes[class].label
-	classLabel.TextColor3 = Units.Classes[class].color
+	local wiz = Wizards.Types[Wizards.Order[adminClass]]
+	classLabel.Text = string.format("%s  <font color=\"#%s\">%s</font>", wiz.label, Wizards.Rarities[wiz.rarity].color:ToHex(), Wizards.Rarities[wiz.rarity].label)
+	classLabel.RichText = true
+	classLabel.TextColor3 = wiz.color:Lerp(WHITE, 0.3)
 	tierLabel.Text = string.format("Level %d", adminTier)
 	tierLabel.TextColor3 = Levels.color(adminTier)
 end)
@@ -4656,6 +4689,408 @@ do
 			end
 			task.wait(0.1)
 		end
+	end)
+end
+
+-- ── Wizards: the summon portal and the codex ──────────────────────────────
+-- One window with two pages. SUMMON: the odds of every rarity, the pity counter and SUMMON x1 / x10 (coins); the
+-- results flip in one by one, a NEW badge on a type you did not have. CODEX: every wizard type, the found ones in
+-- color with their trait, the others "???". Opened by the WIZARDS tile in the dock and by the portal in the lobby
+-- (E). A first find shows a big banner (the Discovery remote) and pays coins. Config/Wizards.luau has the numbers.
+do
+	local W, H = 560, 420
+	local window = Instance.new("Frame")
+	window.Name = "Wizards"
+	window.AnchorPoint = Vector2.new(0.5, 0.5)
+	window.Position = UDim2.fromScale(0.5, 0.5)
+	window.Size = UDim2.fromOffset(W, H)
+	window.BackgroundColor3 = BG
+	window.BorderSizePixel = 0
+	window.Active = true
+	window.Visible = false
+	window.ZIndex = 50
+	window.Parent = gui
+	corner(window, 14)
+	UI.gradient(window, Color3.fromRGB(40, 34, 60), Color3.fromRGB(18, 18, 28))
+	UI.stroke(window, Color3.fromRGB(150, 110, 230), 2)
+	local windowScale = Instance.new("UIScale")
+	windowScale.Scale = 1.1
+	windowScale.Parent = window
+
+	local function text(parent: Instance, t: string, x: number, y: number, w: number, h: number, size: number, font: Enum.Font, color: Color3): TextLabel
+		local l = label(parent, t, UDim2.fromOffset(x, y), UDim2.fromOffset(w, h), size, font, color)
+		l.ZIndex = 52
+		l.RichText = true
+		return l
+	end
+	local function button(parent: Instance, t: string, x: number, y: number, w: number, h: number, color: Color3): TextButton
+		local b = Instance.new("TextButton")
+		b.Position = UDim2.fromOffset(x, y)
+		b.Size = UDim2.fromOffset(w, h)
+		b.BackgroundColor3 = color
+		b.BorderSizePixel = 0
+		b.AutoButtonColor = true
+		b.Font = Enum.Font.GothamBlack
+		b.TextSize = 13
+		b.TextColor3 = WHITE
+		b.RichText = true
+		b.Text = t
+		b.ZIndex = 52
+		b.Parent = parent
+		corner(b, 8)
+		return b
+	end
+
+	text(window, "WIZARDS", 18, 10, 200, 28, 20, Enum.Font.GothamBlack, WHITE)
+	local close = button(window, "✕", W - 44, 10, 30, 28, BADGE)
+	close.Activated:Connect(function()
+		window.Visible = false
+	end)
+
+	local pages: { [string]: Frame } = {}
+	local tabs: { [string]: TextButton } = {}
+	local page = "Summon"
+	local function showPage(name: string)
+		page = name
+		for id, frame in pages do
+			frame.Visible = id == name
+			tabs[id].BackgroundColor3 = if id == name then Color3.fromRGB(150, 110, 230) else BADGE
+		end
+	end
+	for i, id in { "Summon", "Codex" } do
+		local tab = button(window, string.upper(id), 130 + (i - 1) * 108, 12, 100, 26, BADGE)
+		tab.TextSize = 12
+		tabs[id] = tab
+		local frame = Instance.new("Frame")
+		frame.Position = UDim2.fromOffset(0, 48)
+		frame.Size = UDim2.new(1, 0, 1, -48)
+		frame.BackgroundTransparency = 1
+		frame.ZIndex = 51
+		frame.Parent = window
+		pages[id] = frame
+		tab.Activated:Connect(function()
+			showPage(id)
+		end)
+	end
+
+	-- SUMMON page: the odds on the left, the buttons and the results on the right.
+	local summonPage = pages.Summon
+	text(summonPage, "ODDS", 18, 4, 150, 16, 11, Enum.Font.GothamBlack, GOLD)
+	local y = 22
+	for _, rid in Wizards.RarityOrder do
+		local r = Wizards.Rarities[rid]
+		local chance = Wizards.odds(1)[rid] * 100
+		local names = {}
+		for _, tid in Wizards.Order do
+			if Wizards.Types[tid].rarity == rid then
+				table.insert(names, (string.gsub(Wizards.Types[tid].label, " Mage", "")))
+			end
+		end
+		text(summonPage, string.format('<b>%s</b>  <font color="#ffffff">%s%%</font>', r.label, if chance < 1 then string.format("%.1f", chance) else string.format("%d", math.floor(chance + 0.5))), 18, y, 170, 16, 12, Enum.Font.GothamBold, r.color)
+		text(summonPage, table.concat(names, ", "), 18, y + 15, 170, 14, 10, Enum.Font.GothamMedium, MUTED)
+		y += 36
+	end
+	local pityLabel = text(summonPage, "", 18, y + 4, 180, 30, 11, Enum.Font.GothamBold, Color3.fromRGB(200, 160, 255))
+	pityLabel.TextWrapped = true
+
+	local one = button(summonPage, "", 210, 8, 160, 48, Color3.fromRGB(120, 80, 200))
+	local ten = button(summonPage, "", 380, 8, 160, 48, Color3.fromRGB(200, 120, 60))
+	local hint = text(summonPage, "Only two wizards of the same type merge. Every wizard earns coins per minute.", 210, 62, 330, 28, 10, Enum.Font.GothamMedium, MUTED)
+	hint.TextWrapped = true
+	local results = Instance.new("Frame")
+	results.Position = UDim2.fromOffset(210, 96)
+	results.Size = UDim2.fromOffset(330, 260)
+	results.BackgroundColor3 = UI.DARK
+	results.BackgroundTransparency = 0.2
+	results.BorderSizePixel = 0
+	results.ZIndex = 51
+	results.Parent = summonPage
+	corner(results, 10)
+	local emptyText = text(results, "Summon to get new wizards!", 0, 0, 330, 260, 13, Enum.Font.GothamBold, MUTED)
+	emptyText.TextXAlignment = Enum.TextXAlignment.Center
+
+	local summonAt = 0
+	local function summon(count: number)
+		if os.clock() < summonAt or state.rolling or state.battling then
+			return
+		end
+		summonAt = os.clock() + 0.7
+		Net.get("SummonWizard"):FireServer(count)
+	end
+	one.Activated:Connect(function()
+		summon(1)
+	end)
+	ten.Activated:Connect(function()
+		summon(10)
+	end)
+
+	-- One result tile: the wizard's color, name, rarity and level; a NEW badge on a first find. Flips in.
+	local function resultTile(index: number, total: number, r: any)
+		local wiz = Wizards.Types[r.variant] or Wizards.Types[Wizards.Default]
+		local rarity = Wizards.Rarities[wiz.rarity]
+		local cols = if total == 1 then 1 else 5
+		local tw, th = if total == 1 then 150 else 60, if total == 1 then 170 else 116
+		local col, row = (index - 1) % cols, (index - 1) // cols
+		local x = if total == 1 then (330 - tw) / 2 else 7 + col * 64
+		local yy = if total == 1 then 45 else 10 + row * 124
+		local tileFrame = Instance.new("Frame")
+		tileFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+		tileFrame.Position = UDim2.fromOffset(x + tw / 2, yy + th / 2)
+		tileFrame.Size = UDim2.fromOffset(0, th)
+		tileFrame.BackgroundColor3 = wiz.color:Lerp(BG, 0.45)
+		tileFrame.BorderSizePixel = 0
+		tileFrame.ZIndex = 52
+		tileFrame.Parent = results
+		corner(tileFrame, 8)
+		UI.stroke(tileFrame, rarity.color, if rarity.order >= 3 then 3 else 2)
+		local orb = Instance.new("Frame")
+		orb.AnchorPoint = Vector2.new(0.5, 0)
+		orb.Position = UDim2.new(0.5, 0, 0, 10)
+		orb.Size = UDim2.fromOffset(tw * 0.5, tw * 0.5)
+		orb.BackgroundColor3 = wiz.color2
+		orb.BorderSizePixel = 0
+		orb.ZIndex = 53
+		orb.Parent = tileFrame
+		corner(orb, 100)
+		UI.stroke(orb, wiz.color, 3)
+		local small = total > 1
+		local name = text(tileFrame, (string.gsub(wiz.label, " Mage", "")), 0, tw * 0.5 + 14, tw, 16, if small then 10 else 16, Enum.Font.GothamBlack, WHITE)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		name.ZIndex = 54
+		local rar = text(tileFrame, rarity.label, 0, tw * 0.5 + (if small then 28 else 34), tw, 14, if small then 8 else 12, Enum.Font.GothamBold, rarity.color)
+		rar.TextXAlignment = Enum.TextXAlignment.Center
+		rar.ZIndex = 54
+		if not small then
+			local trait = text(tileFrame, wiz.traitLabel, 0, tw * 0.5 + 52, tw, 14, 11, Enum.Font.GothamMedium, wiz.color2)
+			trait.TextXAlignment = Enum.TextXAlignment.Center
+			trait.ZIndex = 54
+		end
+		if r.new then
+			local badge = UI.chip(tileFrame, "NEW", UDim2.fromOffset(2, 2), UDim2.fromOffset(if small then 28 else 40, if small then 14 else 18), GREEN, WHITE, if small then 8 else 11)
+			badge.ZIndex = 55
+		end
+		task.delay((index - 1) * 0.12, function()
+			TweenService:Create(tileFrame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromOffset(tw, th) }):Play()
+		end)
+	end
+
+	Net.get("SummonResult").OnClientEvent:Connect(function(list: { any })
+		for _, child in results:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		emptyText.Visible = false
+		window.Visible = true
+		showPage("Summon")
+		for i, r in list do
+			resultTile(i, #list, r)
+		end
+	end)
+
+	-- CODEX page: 8 boxes (4 x 2).
+	local codexPage = pages.Codex
+	local countLabel = text(codexPage, "", 18, 4, 300, 18, 13, Enum.Font.GothamBlack, GOLD)
+	local bonusLabel = text(codexPage, "", 18, 330, W - 36, 30, 11, Enum.Font.GothamMedium, MUTED)
+	bonusLabel.TextWrapped = true
+	type Entry = { box: Frame, orb: Frame, name: TextLabel, rarity: TextLabel, trait: TextLabel }
+	local entries: { [string]: Entry } = {}
+	for i, id in Wizards.Order do
+		local col, row = (i - 1) % 4, (i - 1) // 4
+		local box = Instance.new("Frame")
+		box.Position = UDim2.fromOffset(18 + col * 132, 28 + row * 150)
+		box.Size = UDim2.fromOffset(124, 142)
+		box.BackgroundColor3 = UI.DARK
+		box.BorderSizePixel = 0
+		box.ZIndex = 52
+		box.Parent = codexPage
+		corner(box, 10)
+		local orb = Instance.new("Frame")
+		orb.AnchorPoint = Vector2.new(0.5, 0)
+		orb.Position = UDim2.new(0.5, 0, 0, 10)
+		orb.Size = UDim2.fromOffset(46, 46)
+		orb.BorderSizePixel = 0
+		orb.ZIndex = 53
+		orb.Parent = box
+		corner(orb, 100)
+		local name = text(box, "", 0, 60, 124, 16, 13, Enum.Font.GothamBlack, WHITE)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		local rarity = text(box, "", 0, 76, 124, 14, 10, Enum.Font.GothamBold, WHITE)
+		rarity.TextXAlignment = Enum.TextXAlignment.Center
+		local trait = text(box, "", 6, 92, 112, 46, 9, Enum.Font.GothamMedium, MUTED)
+		trait.TextXAlignment = Enum.TextXAlignment.Center
+		trait.TextYAlignment = Enum.TextYAlignment.Top
+		trait.TextWrapped = true
+		entries[id] = { box = box, orb = orb, name = name, rarity = rarity, trait = trait }
+	end
+
+	local function refresh()
+		local codex = (state :: any).codex or {}
+		local found = 0
+		for _, id in Wizards.Order do
+			local wiz = Wizards.Types[id]
+			local rarity = Wizards.Rarities[wiz.rarity]
+			local e = entries[id]
+			local has = codex[id] == true
+			if has then
+				found += 1
+			end
+			e.box.BackgroundColor3 = if has then wiz.color:Lerp(BG, 0.7) else UI.DARK
+			e.orb.BackgroundColor3 = if has then wiz.color2 else BADGE
+			e.name.Text = if has then (string.gsub(wiz.label, " Mage", "")) else "???"
+			e.rarity.Text = rarity.label
+			e.rarity.TextColor3 = rarity.color
+			e.trait.Text = if has then string.format('<font color="#%s"><b>%s</b></font>\n%s', wiz.color2:ToHex(), wiz.traitLabel, wiz.traitText) else string.format("Find it: %d coins", rarity.discovery)
+		end
+		countLabel.Text = string.format("FOUND %d / %d", found, #Wizards.Order)
+		bonusLabel.Text = if found >= #Wizards.Order
+			then string.format('<font color="#78dc8c">Codex complete: every wizard earns +%d%% coins!</font>', math.floor(Balance.CodexCompleteBonus * 100 + 0.5))
+			else string.format("Every new type pays coins the first time you get it. Find all %d: every wizard earns +%d%% coins.", #Wizards.Order, math.floor(Balance.CodexCompleteBonus * 100 + 0.5))
+
+		local pity = (state :: any).summonPity or 0
+		pityLabel.Text = string.format("EPIC or better guaranteed in %d summon%s", math.max(1, Balance.SummonPity - pity), if Balance.SummonPity - pity == 1 then "" else "s")
+		one.Text = string.format('SUMMON x1\n<font size="11" color="#ffd75a">%d coins</font>', Balance.WizardSummonCost)
+		ten.Text = string.format('SUMMON x10\n<font size="11" color="#ffd75a">%d coins</font>', Balance.WizardSummonTenCost)
+		one.BackgroundTransparency = if state.coins >= Balance.WizardSummonCost then 0 else 0.5
+		ten.BackgroundTransparency = if state.coins >= Balance.WizardSummonTenCost then 0 else 0.5
+	end
+
+	UI.openWizards = function(name: string?)
+		window.Visible = true
+		showPage(name or page)
+		refresh()
+	end
+	showPage("Summon")
+
+	-- The WIZARDS tile in the dock (under the Inventory): a little orb in a rune ring.
+	dock.Size = UDim2.fromOffset(76, 18 + 2 * DOCK_STEP)
+	local wizTile = Instance.new("TextButton")
+	wizTile.Name = "Dock_Wizards"
+	wizTile.Position = UDim2.fromOffset(6, 18 + DOCK_STEP)
+	wizTile.Size = UDim2.fromOffset(DOCK_TILE, DOCK_TILE)
+	wizTile.BackgroundColor3 = UI.DARK
+	wizTile.BorderSizePixel = 0
+	wizTile.AutoButtonColor = false
+	wizTile.Text = ""
+	wizTile.Parent = dock
+	corner(wizTile, 12)
+	local wizStroke = UI.stroke(wizTile, Color3.fromRGB(170, 120, 255), 2, 0.65)
+	local ring = Instance.new("Frame")
+	ring.Position = UDim2.fromOffset(17, 6)
+	ring.Size = UDim2.fromOffset(30, 30)
+	ring.BackgroundTransparency = 1
+	ring.ZIndex = 2
+	ring.Parent = wizTile
+	corner(ring, 100)
+	UI.stroke(ring, Color3.fromRGB(170, 120, 255), 3)
+	local core = Instance.new("Frame")
+	core.Position = UDim2.fromOffset(25, 14)
+	core.Size = UDim2.fromOffset(14, 14)
+	core.BackgroundColor3 = Color3.fromRGB(235, 205, 255)
+	core.BorderSizePixel = 0
+	core.ZIndex = 3
+	core.Parent = wizTile
+	corner(core, 100)
+	local wizTag = label(wizTile, "WIZARDS", UDim2.fromOffset(0, 47), UDim2.new(1, 0, 0, 13), 9, Enum.Font.GothamBlack, MUTED)
+	wizTag.TextXAlignment = Enum.TextXAlignment.Center
+	wizTile.MouseEnter:Connect(function()
+		wizStroke.Transparency = 0
+	end)
+	wizTile.MouseLeave:Connect(function()
+		wizStroke.Transparency = 0.65
+	end)
+	wizTile.Activated:Connect(function()
+		if window.Visible then
+			window.Visible = false
+		else
+			UI.openWizards()
+		end
+	end)
+
+	-- The income chip in the resources bar: coins per minute from every wizard you own.
+	UI.addResource("income", "PER MIN", GREEN, 2)
+
+	-- The portal's prompt (only you see it, on your own plot).
+	local prompt: ProximityPrompt? = nil
+	local last = 0
+	RunService.Heartbeat:Connect(function()
+		local now = os.clock()
+		if now - last < 0.2 then
+			return
+		end
+		last = now
+		UI.setResource("income", math.floor(((state :: any).incomePerMin or 0) + 0.5))
+		if window.Visible then
+			refresh()
+			if state.battling then
+				window.Visible = false
+			end
+		end
+		if not prompt or not prompt.Parent then
+			local plot = findPlot()
+			local part = plot and plot:FindFirstChild("SummonPortal")
+			if part then
+				local made = Instance.new("ProximityPrompt")
+				made.ActionText = "Summon wizards"
+				made.ObjectText = "Summon Portal"
+				made.KeyboardKeyCode = Enum.KeyCode.E
+				made.GamepadKeyCode = Enum.KeyCode.ButtonX
+				made.HoldDuration = 0
+				made.MaxActivationDistance = 12
+				made.RequiresLineOfSight = false
+				made.Parent = part
+				made.Triggered:Connect(function()
+					UI.openWizards("Summon")
+				end)
+				prompt = made
+			end
+		end
+		if prompt then
+			prompt.Enabled = not (state.rolling or state.battling)
+		end
+	end)
+
+	-- A first find: a big banner in the wizard's colors and the coins it paid.
+	local banner = Instance.new("Frame")
+	banner.AnchorPoint = Vector2.new(0.5, 0)
+	banner.Position = UDim2.new(0.5, 0, 0, -140)
+	banner.Size = UDim2.fromOffset(420, 96)
+	banner.BackgroundColor3 = BG
+	banner.BorderSizePixel = 0
+	banner.ZIndex = 60
+	banner.Parent = gui
+	corner(banner, 14)
+	local bannerStroke = UI.stroke(banner, GOLD, 3)
+	local bannerTitle = label(banner, "NEW WIZARD DISCOVERED", UDim2.fromOffset(0, 8), UDim2.new(1, 0, 0, 18), 13, Enum.Font.GothamBlack, GOLD)
+	bannerTitle.TextXAlignment = Enum.TextXAlignment.Center
+	bannerTitle.ZIndex = 61
+	local bannerName = label(banner, "", UDim2.fromOffset(0, 28), UDim2.new(1, 0, 0, 34), 30, Enum.Font.GothamBlack, WHITE)
+	bannerName.TextXAlignment = Enum.TextXAlignment.Center
+	bannerName.ZIndex = 61
+	local bannerSub = label(banner, "", UDim2.fromOffset(0, 64), UDim2.new(1, 0, 0, 22), 14, Enum.Font.GothamBold, WHITE)
+	bannerSub.TextXAlignment = Enum.TextXAlignment.Center
+	bannerSub.RichText = true
+	bannerSub.ZIndex = 61
+	local bannerId = 0
+	Net.get("Discovery").OnClientEvent:Connect(function(id: string, coins: number)
+		local wiz = Wizards.Types[id]
+		if not wiz then
+			return
+		end
+		local rarity = Wizards.Rarities[wiz.rarity]
+		bannerId += 1
+		local mine = bannerId
+		bannerName.Text = wiz.label
+		bannerName.TextColor3 = wiz.color:Lerp(WHITE, 0.35)
+		bannerStroke.Color = rarity.color
+		bannerSub.Text = string.format('<font color="#%s">%s</font>  ·  %s  ·  <font color="#ffd75a">+%d coins</font>', rarity.color:ToHex(), rarity.label, wiz.traitLabel, coins)
+		banner.Position = UDim2.new(0.5, 0, 0, -140)
+		TweenService:Create(banner, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 0, 90) }):Play()
+		task.delay(3.6, function()
+			if mine == bannerId then
+				TweenService:Create(banner, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(0.5, 0, 0, -140) }):Play()
+			end
+		end)
 	end)
 end
 

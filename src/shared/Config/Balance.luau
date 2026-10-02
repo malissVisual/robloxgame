@@ -19,6 +19,14 @@ local Balance = {
 		swiftness = { label = "SWIFTNESS", text = "+%d%% attack speed", step = 0.03 },
 	},
 	MageUpgradeOrder = { "power", "vitality", "swiftness" },
+	-- THE WIZARDS (Config/Wizards.luau): the summon portal in the lobby, the income, the luck of the drops.
+	WizardSummonCost = 200, -- coins for one summon …
+	WizardSummonTenCost = 1800, -- … and for ten at once (a 10% discount)
+	SummonPity = 40, -- summons without an Epic or better → the next one is Epic or better
+	SummonLevel = 1, -- the level of a summoned wizard
+	IncomeTick = 5, -- seconds between two payouts of the wizards' income (coins per minute, Wizards.income)
+	CodexCompleteBonus = 0.25, -- every type found: +25% income
+	DropLuckPerWave = 0.012, -- a wave drop's luck = 1 + wave × this (bosses ×1.6, Nightmare ×1.3)
 	MageUpgradeMax = 20,
 	MageUpgradeBaseCost = 60,
 	MageUpgradeGrowth = 1.3,

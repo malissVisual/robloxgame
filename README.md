@@ -291,6 +291,42 @@ new squad). The table below is the removed roster; the lucky-drop machinery stay
 The **Soldiers** tab (left panel) is the index: every class with a 3D preview, its stats and
 either "Unlocked" or "Lucky drop from wave N".
 
+## Wizard types (Config/Wizards.luau)
+
+Every Mage is one of **8 wizard types**. A type has its own element, **rarity**, colors (card, robe tint, glowing
+parts, aura, bolts), stats (the rarity multiplies HP and damage) and its own **battle trait** (BattleService, on
+every attack of that mage). **Only two wizards of the same type and level merge.** Old saves: a mage without a type
+is an Arcane Mage.
+
+| Type | Rarity | Trait |
+|---|---|---|
+| Arcane | Common | Arcane Flow: every hit restores 4 mana |
+| Ember | Common | Kindle: burns 3% max HP / s for 2 s |
+| Frost | Rare | Frostbite: slows 35% for 1.5 s |
+| Storm | Rare | Arc: jumps to one more enemy for 50% |
+| Verdant | Epic | Bloom: every 2 s heals the most hurt ally by 5% |
+| Shadow | Epic | Reap: 20% for a 2.2x crit, 10% lifesteal |
+| Void | Legendary | Rift: +25% damage, 18% stun for 0.8 s |
+| Celestial | Mythic | Starfall: every 4th hit 160% around the target |
+
+Rarities (weight / stats / coins per minute / sell / codex coins): Common 60 / x1.00 / 1 / x1 / 150 · Rare 27 / x1.12
+/ 2 / x2 / 400 · Epic 10 / x1.25 / 4 / x4 / 1000 · Legendary 2.6 / x1.42 / 8 / x8 / 3000 · Mythic 0.4 / x1.65 / 16 /
+x16 / 8000.
+
+**How you get them**
+- **Wave drops** roll the type; later waves (+1.2% luck per wave), bosses and Nightmare roll better.
+- **The Summon Portal** in the lobby (right of the merge board, E) or the **WIZARDS** tile in the dock:
+  SUMMON x1 (200 coins) or x10 (1800). After 40 summons without an Epic or better, the next one is Epic+ (pity).
+- **The Codex** (WIZARDS window, CODEX page): the first wizard of every type pays its rarity's coins and shows a
+  banner. With all 8 found, every wizard earns +25% coins.
+- **Income**: every wizard you own (inventory and squad) earns coins per minute (rarity income, +35% per level,
+  Ascended x2); the PER MIN chip in the resources bar shows the total.
+
+**Looks**: right now every type is the Mage tinted with its colors. A designed model for a type goes into
+`Wizards.Types.<Type>.evolution` (wired into SoldierRig when the designs arrive).
+
+Admin panel: the arrows cycle the wizard types, SPAWN 1 puts one at the chosen level into the inventory.
+
 ## Coins and XP from kills
 
 There is **no coin bonus for clearing a wave**. Every enemy you kill **drops coins that fall on

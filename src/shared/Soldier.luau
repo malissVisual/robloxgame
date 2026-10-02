@@ -9,6 +9,7 @@ local Units = require(Shared.Config.Units)
 local Levels = require(Shared.Config.Levels)
 local Rig = require(script.Parent.Rig)
 local SoldierRig = require(script.Parent.SoldierRig)
+local Wizards = require(Shared.Config.Wizards)
 
 -- The server makes the R15 base rig right away (the Soldier class and the client's previews clone it).
 if game:GetService("RunService"):IsServer() then
@@ -283,7 +284,7 @@ local function buildStageFromData(model: Model, s: number, tier: number, bare: b
 end
 
 -- Adds the name / level / HP label and the glow outline, and puts the model in its standing pose.
-local function finishModel(model: Model, head: Part, topOffset: number, s: number, def: Units.ClassDef, tier: number, enemy: boolean, levelColor: Color3, bare: boolean?, ascended: boolean?): Model
+local function finishModel(model: Model, head: Part, topOffset: number, s: number, def: Units.ClassDef, tier: number, enemy: boolean, levelColor: Color3, bare: boolean?, ascended: boolean?, title: string?): Model
 	-- Tier label + hidden HP bar (shown in battle).
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Info"
@@ -301,7 +302,7 @@ local function finishModel(model: Model, head: Part, topOffset: number, s: numbe
 	label.TextSize = 18
 	label.TextColor3 = if enemy then Color3.fromRGB(255, 230, 120) else levelColor
 	label.TextStrokeTransparency = 0.3
-	label.Text = string.format("%s%s · %s", if ascended then "★ " else "", def.label, if ascended then "ASCENDED" else Levels.label(tier)) -- e.g. "Archer · Lv 3"
+	label.Text = string.format("%s%s · %s", if ascended then "★ " else "", title or def.label, if ascended then "ASCENDED" else Levels.label(tier)) -- e.g. "Archer · Lv 3"
 	if ascended then
 		label.TextColor3 = Color3.fromRGB(255, 225, 120)
 	end
@@ -374,9 +375,44 @@ local function finishModel(model: Model, head: Part, topOffset: number, s: numbe
 	return model
 end
 
+-- The wizard type's colors on a built mage: the glowing parts (crystals, orbs, runes), the lights and sparks
+-- take the type's colors and the robe is tinted toward it. (A type with its own designed models will not need it.)
+local BODY_SKIP = { Head = true, LeftHand = true, RightHand = true, HumanoidRootPart = true, Face = true }
+local function tintWizard(model: Model, wiz: Wizards.Def)
+	local glow = wiz.color:Lerp(wiz.color2, 0.3)
+	local ascended = model:FindFirstChild("AscendedHalo") ~= nil -- the golden sparkles stay gold
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			if d.Material == Enum.Material.Neon then
+				d.Color = glow
+			elseif d.Name ~= "AscendedHalo" and not BODY_SKIP[d.Name] and not string.find(d.Name, "Hand") then
+				d.Color = d.Color:Lerp(wiz.color, if string.sub(d.Name, 1, 5) == "Gear_" then 0.22 else 0.38)
+			end
+		elseif d:IsA("PointLight") then
+			d.Color = wiz.color
+		elseif d:IsA("Sparkles") and not ascended then
+			d.SparkleColor = wiz.color2
+		elseif d:IsA("ParticleEmitter") then
+			d.Color = ColorSequence.new(wiz.color2, wiz.color)
+		end
+	end
+	model:SetAttribute("Variant", wiz.id)
+end
+
 -- `bare` = only the body (no level / HP label, no glow): used for the 3D previews in the UI.
 -- `ascended` = two level 9 soldiers merged into one (a golden halo, a little bigger).
-function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolean?, ascended: boolean?): Model
+-- `variant` = the wizard type (Config/Wizards): its name on the label and its colors on the model.
+function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolean?, ascended: boolean?, variant: string?): Model
+	if variant and not enemy and Wizards.isValid(variant) then
+		local wiz = Wizards.Types[variant :: string]
+		local model = Soldier.buildPlain(class, tier, enemy, bare, ascended, wiz.label)
+		tintWizard(model, wiz)
+		return model
+	end
+	return Soldier.buildPlain(class, tier, enemy, bare, ascended)
+end
+
+function Soldier.buildPlain(class: string, tier: number, enemy: boolean, bare: boolean?, ascended: boolean?, title: string?): Model
 	local def = Units.Classes[class]
 	local s = Soldier.scale(tier) * (if ascended then 1.1 else 1)
 	local main = if enemy then def.color:Lerp(ENEMY_TINT, 0.55) else def.color
@@ -396,12 +432,12 @@ function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolea
 		local rig, rigHead, rigTop = SoldierRig.build(tier, s, bare, class)
 		if rig and rigHead and rigTop then
 			rig.Name = def.label
-			return finishModel(rig, rigHead :: any, rigTop, s, def, tier, enemy, levelColor, bare, ascended)
+			return finishModel(rig, rigHead :: any, rigTop, s, def, tier, enemy, levelColor, bare, ascended, title)
 		end
 	end
 	if class == "Soldier" then
 		local soldierHead = buildStageSoldier(model, s, tier, enemy, bare)
-		return finishModel(model, soldierHead, 2.4, s, def, tier, enemy, levelColor, bare, ascended)
+		return finishModel(model, soldierHead, 2.4, s, def, tier, enemy, levelColor, bare, ascended, title)
 	end
 
 	-- In all offsets -Z is "forward" (where the soldier looks).
@@ -491,7 +527,7 @@ function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolea
 		topOffset += 0.9
 	end
 
-	return finishModel(model, head, topOffset, s, def, tier, enemy, levelColor, bare, ascended)
+	return finishModel(model, head, topOffset, s, def, tier, enemy, levelColor, bare, ascended, title)
 end
 
 -- What this level adds to a class, e.g. "Combat helmet" for a Lv 2 Soldier (only the Soldier has named gear).

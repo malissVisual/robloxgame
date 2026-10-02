@@ -29,6 +29,9 @@ local NAMES = {
 	"SetSetting", -- client → server: change a setting (key, value)
 	"WelcomeBack", -- server → client: the offline-income popup (coins, hours)
 	"Upgrade", -- client → server: R pressed, unlock more merge slots
+	"SummonWizard", -- client → server: summon wizards at the portal (1 or 10)
+	"SummonResult", -- server → client: what the portal gave ({ { variant, tier, new, slot } })
+	"Discovery", -- server → client: a new wizard type found (type id, coins paid)
 	"MageUpgrade", -- client → server: buy the next level of a Mage upgrade track (power | vitality | swiftness), from a mage's card
 	"SetWave", -- client → server: choose the wave to fight / repeat (only inside the arena)
 	"SetDifficulty", -- client → server: choose the difficulty (only inside the arena)

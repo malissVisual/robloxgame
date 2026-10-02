@@ -7,7 +7,7 @@
 local Balance = require(script.Parent.Config.Balance)
 local Units = require(script.Parent.Config.Units)
 
-export type Unit = { class: string, tier: number, ascended: boolean? } -- tier = merge level; ascended = two level 9 merged
+export type Unit = { class: string, tier: number, ascended: boolean?, variant: string? } -- tier = merge level; ascended = two top-level merged; variant = the wizard type (Config/Wizards; nil = Arcane)
 export type Cell = Unit | false
 export type Cells = { Cell }
 
@@ -45,6 +45,9 @@ function Grid.canMerge(a: Cell, b: Cell, limits: { [string]: number }?): boolean
 	if a == false or b == false or a.class ~= b.class or a.tier ~= b.tier then
 		return false
 	end
+	if (a.variant or "Arcane") ~= (b.variant or "Arcane") then
+		return false -- only two wizards of the same type merge
+	end
 	local maxTier = Units.maxTier(a.class)
 	local cap = if limits then limits[a.class] or 1 else maxTier
 	if a.tier >= maxTier then
@@ -57,9 +60,9 @@ end
 -- The soldier two merged ones become.
 function Grid.mergeResult(a: Unit): Unit
 	if a.tier >= Units.maxTier(a.class) then
-		return { class = a.class, tier = a.tier, ascended = true }
+		return { class = a.class, tier = a.tier, ascended = true, variant = a.variant }
 	end
-	return { class = a.class, tier = a.tier + 1 }
+	return { class = a.class, tier = a.tier + 1, variant = a.variant }
 end
 
 -- The merge board unlocks from the row closest to the player (the front) toward the back,
