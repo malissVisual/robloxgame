@@ -218,19 +218,10 @@ function UI.chip(parent: Instance, text: string, position: UDim2, size: UDim2, b
 end
 
 -- The grip dots on a drag handle (the sign that the panel can be moved).
+-- The drag handles of the panels used to show six little dots; they are drawn no more (the panels still move by
+-- the same spots: the squad bar's, the dock's and PLAY's top strip, the panel's title bar, the HUD anywhere).
 function UI.grip(parent: Instance, x: number, y: number, color: Color3)
-	for row = 0, 1 do
-		for col = 0, 2 do
-			local dot = Instance.new("Frame")
-			dot.Position = UDim2.fromOffset(x + col * 5, y + row * 5)
-			dot.Size = UDim2.fromOffset(3, 3)
-			dot.BackgroundColor3 = color
-			dot.BorderSizePixel = 0
-			dot.ZIndex = 3
-			dot.Parent = parent
-			corner(dot, 2)
-		end
-	end
+	local _ = parent, x, y, color
 end
 
 -- A section heading inside a page: a short colored bar and a small caps title.
