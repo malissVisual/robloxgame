@@ -18,6 +18,7 @@ local Levels = require(Shared:WaitForChild("Config"):WaitForChild("Levels"))
 local MageSpells = require(Shared:WaitForChild("Config"):WaitForChild("MageSpells"))
 local SoldierRig = require(Shared:WaitForChild("SoldierRig"))
 local MageUpgrades = require(Shared:WaitForChild("MageUpgrades"))
+local MageTree = require(Shared:WaitForChild("Config"):WaitForChild("MageTree"))
 local Difficulties = require(Shared:WaitForChild("Config"):WaitForChild("Difficulties"))
 local Maps = require(Shared:WaitForChild("Config"):WaitForChild("Maps"))
 local Waves = require(Shared:WaitForChild("Config"):WaitForChild("Waves"))
@@ -2383,9 +2384,10 @@ openCardPopup = function(id: number, at: Vector2?)
 	line(Units.passiveText(unit.class, ascended), y, 11, Enum.Font.Gotham, MUTED)
 	y += 22
 
-	-- The spells of this level: the basic bolt and the strong spells (kind in grey), then the next unlock.
+	-- The merge-level TREE (Config/MageTree.luau): the attacks of this level (the basic bolt and the strong spells,
+	-- kind in grey) and the passives it has, then what the next level brings.
 	local basic, others = MageSpells.forLevel(unit.tier)
-	line("SPELLS", y, 10, Enum.Font.GothamBlack, GOLD, 14)
+	line("ATTACKS", y, 10, Enum.Font.GothamBlack, GOLD, 14)
 	y += 15
 	local KIND = { bolt = "basic attack", aoe = "area", chain = "chain", shield = "barrier", heal = "heal", blink = "blink", pull = "pull", repel = "knockback" }
 	local spells = { basic }
@@ -2393,23 +2395,34 @@ openCardPopup = function(id: number, at: Vector2?)
 		table.insert(spells, spell)
 	end
 	for _, spell in spells do
-		local extra = if spell.basic then "" else string.format("  ·  %d mana, %ds", spell.mana, spell.cooldown)
+		local extra = if spell.basic then (if spell.pierce then "  ·  pierces" else "") else string.format("  ·  %d mana, %ds", spell.mana, spell.cooldown)
 		local l = line(string.format('● %s  <font color="#a5aab9">%s%s</font>', spell.label, KIND[spell.kind] or spell.kind, extra), y, 11, Enum.Font.GothamMedium, spell.color:Lerp(WHITE, 0.35), 15)
 		l.TextTruncate = Enum.TextTruncate.AtEnd
 		y += 15
 	end
-	local nextSpell: MageSpells.Spell? = nil
-	for _, spell in MageSpells.Defs do
-		if spell.minLevel > unit.tier and spell.minLevel <= Units.maxTier(unit.class) and (not nextSpell or spell.minLevel < (nextSpell :: MageSpells.Spell).minLevel) then
-			nextSpell = spell
+	local passives = {}
+	for _, entry in MageTree.unlocked(unit.tier) do
+		if entry.kind == "passive" then
+			table.insert(passives, entry)
 		end
 	end
-	if nextSpell then
-		line(string.format('<font color="#a5aab9">Lv %d unlocks</font>  %s', nextSpell.minLevel, nextSpell.label), y + 2, 11, Enum.Font.Gotham, MUTED, 15)
-		y += 17
+	if #passives > 0 then
+		y += 4
+		line("PASSIVES", y, 10, Enum.Font.GothamBlack, GOLD, 14)
+		y += 15
+		for _, entry in passives do
+			local l = line(string.format('◆ %s  <font color="#a5aab9">%s</font>', entry.label, entry.text), y, 11, Enum.Font.GothamMedium, Color3.fromRGB(190, 230, 255), 15)
+			l.TextTruncate = Enum.TextTruncate.AtEnd
+			y += 15
+		end
+	end
+	local nextEntry = MageTree.nextEntry(unit.tier)
+	if nextEntry then
+		line(string.format('<font color="#a5aab9">Lv %d adds</font>  %s %s  <font color="#a5aab9">%s</font>', nextEntry.level, if nextEntry.kind == "attack" then "●" else "◆", nextEntry.label, nextEntry.text), y + 3, 11, Enum.Font.Gotham, MUTED, 15)
+		y += 18
 	else
-		line(if unit.tier >= Units.maxTier(unit.class) then '<font color="#a5aab9">Top level' .. (if ascended then "" else ": merge two for ASCENDED") .. '</font>' else '<font color="#a5aab9">No more spells to unlock</font>', y + 2, 11, Enum.Font.Gotham, MUTED, 15)
-		y += 17
+		line('<font color="#a5aab9">Top level' .. (if ascended then "" else ": merge two for ASCENDED") .. '</font>', y + 3, 11, Enum.Font.Gotham, MUTED, 15)
+		y += 18
 	end
 	y += 8
 

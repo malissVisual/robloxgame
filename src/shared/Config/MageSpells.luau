@@ -30,6 +30,7 @@ export type Spell = {
 	jumps: number?, -- chain
 	blink: number?, -- studů
 	pull: number?, -- studů stažení
+	pierce: number?, -- základní střela: zasáhne až tolik nepřátel v řadě (Sluneční paprsek)
 	push: number?, -- repel: studů odhození
 	stun: number?, -- repel: sekund omráčení
 	allyCast: boolean?, -- shield: lze seslat i na spojence (reakce Strážce)
@@ -48,20 +49,19 @@ MageSpells.Defs = {
 	-- PRAVĚK
 	{ id = "fireStone", label = "Ohnivý kámen", era = 1, minLevel = 1, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.4, damage = 1.0, color = C(255, 140, 60), color2 = C(255, 220, 140) },
 	{ id = "sparkSwarm", label = "Roj jisker", era = 1, minLevel = 3, kind = "aoe", mana = 35, cooldown = 7, castTime = 0.7, damage = 1.3, radius = 5, color = C(255, 180, 80), color2 = C(255, 240, 170) },
-	{ id = "healingLight", label = "Léčivé světlo", era = 1, minLevel = 2, kind = "heal", mana = 40, cooldown = 14, castTime = 0.5, damage = 0, heal = 0.3, radius = 30, color = C(120, 255, 170), color2 = WHITE }, -- the old player's Heal, now the Mage's from level 2
 	{ id = "arcanePush", label = "Arkánový úder", era = 1, minLevel = 5, kind = "repel", mana = 30, cooldown = 10, castTime = 0.35, damage = 0.6, radius = 7, push = 8, stun = 0.6, color = PURPLE, color2 = WHITE },
 	-- STAROVĚK
-	{ id = "sunRay", label = "Sluneční paprsek", era = 2, minLevel = 6, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.35, damage = 1.05, color = C(255, 210, 90), color2 = WHITE },
-	{ id = "sandstorm", label = "Písečná bouře", era = 2, minLevel = 8, kind = "aoe", mana = 40, cooldown = 8, castTime = 0.8, damage = 1.2, radius = 7, slow = { factor = 0.6, time = 2.5 }, color = C(230, 190, 110), color2 = C(255, 235, 190) },
+	{ id = "sunRay", label = "Sluneční paprsek", era = 2, minLevel = 7, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.35, damage = 1.05, pierce = 2, color = C(255, 210, 90), color2 = WHITE },
+	{ id = "sandstorm", label = "Písečná bouře", era = 2, minLevel = 9, kind = "aoe", mana = 40, cooldown = 8, castTime = 0.8, damage = 1.2, radius = 7, slow = { factor = 0.6, time = 2.5 }, color = C(230, 190, 110), color2 = C(255, 235, 190) },
 	-- STŘEDOVĚK
 	{ id = "magicMissile", label = "Magická střela", era = 3, minLevel = 11, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.32, damage = 1.1, color = PURPLE, color2 = C(235, 205, 255) },
-	{ id = "chainLightning", label = "Řetězový blesk", era = 3, minLevel = 12, kind = "chain", mana = 35, cooldown = 7, castTime = 0.6, damage = 0.9, jumps = 3, radius = 9, color = C(170, 200, 255), color2 = WHITE },
-	{ id = "iceBarrier", label = "Ledová bariéra", era = 3, minLevel = 14, kind = "shield", mana = 30, cooldown = 12, castTime = 0.3, damage = 0, shield = { reduction = 0.5, time = 3 }, allyCast = true, color = C(150, 220, 255), color2 = WHITE },
+	{ id = "chainLightning", label = "Řetězový blesk", era = 3, minLevel = 11, kind = "chain", mana = 35, cooldown = 7, castTime = 0.6, damage = 0.9, jumps = 3, radius = 9, color = C(170, 200, 255), color2 = WHITE },
+	{ id = "iceBarrier", label = "Ledová bariéra", era = 3, minLevel = 17, kind = "shield", mana = 30, cooldown = 12, castTime = 0.3, damage = 0, shield = { reduction = 0.5, time = 3 }, allyCast = true, color = C(150, 220, 255), color2 = WHITE },
 	-- PRŮMYSLOVÝ VĚK
-	{ id = "arcBolt", label = "Elektrická střela", era = 4, minLevel = 16, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.3, damage = 1.15, color = C(120, 200, 255), color2 = WHITE },
-	{ id = "steamBlast", label = "Parní exploze", era = 4, minLevel = 17, kind = "aoe", mana = 45, cooldown = 8, castTime = 0.8, damage = 1.8, radius = 6, color = C(220, 220, 230), color2 = C(255, 170, 90) },
-	{ id = "electricArc", label = "Elektrický oblouk", era = 4, minLevel = 19, kind = "chain", mana = 40, cooldown = 7, castTime = 0.55, damage = 1.0, jumps = 4, radius = 10, color = C(140, 220, 255), color2 = WHITE },
-	{ id = "shockwave", label = "Rázová vlna", era = 4, minLevel = 18, kind = "repel", mana = 30, cooldown = 10, castTime = 0.3, damage = 0.7, radius = 8, push = 9, stun = 0.6, color = C(220, 220, 230), color2 = C(255, 170, 90) },
+	{ id = "arcBolt", label = "Elektrická střela", era = 4, minLevel = 17, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.3, damage = 1.15, color = C(120, 200, 255), color2 = WHITE },
+	{ id = "steamBlast", label = "Parní exploze", era = 4, minLevel = 15, kind = "aoe", mana = 45, cooldown = 8, castTime = 0.8, damage = 1.8, radius = 6, color = C(220, 220, 230), color2 = C(255, 170, 90) },
+	{ id = "electricArc", label = "Elektrický oblouk", era = 4, minLevel = 13, kind = "chain", mana = 40, cooldown = 7, castTime = 0.55, damage = 1.0, jumps = 4, radius = 10, color = C(140, 220, 255), color2 = WHITE },
+	{ id = "shockwave", label = "Rázová vlna", era = 4, minLevel = 15, kind = "repel", mana = 30, cooldown = 10, castTime = 0.3, damage = 0.7, radius = 8, push = 9, stun = 0.6, color = C(220, 220, 230), color2 = C(255, 170, 90) },
 	{ id = "insulation", label = "Izolační pole", era = 4, minLevel = 18, kind = "shield", mana = 30, cooldown = 12, castTime = 0.3, damage = 0, shield = { reduction = 0.5, time = 3 }, allyCast = true, color = C(255, 200, 90), color2 = WHITE },
 	-- MODERNÍ DOBA
 	{ id = "plasmaBeam", label = "Plazmový paprsek", era = 5, minLevel = 21, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.28, damage = 1.2, color = C(120, 255, 220), color2 = WHITE },
@@ -81,50 +81,29 @@ function MageSpells.era(level: number): number
 	return math.clamp(math.ceil(level / 5), 1, 6)
 end
 
--- Kouzla, která má mág daného levelu: základní útok své epochy a nejnovější odemčená silná kouzla
--- (1–10: celkem 2, 11–20: 3, 21–30: 4) plus nejnovější odražení (repel, od levelu 5) a nejnovější kouzlo podpory
--- (léčení, od levelu 2 — hráč už kouzla nemá, léčí mág) — ty dvě mimo strop silných kouzel. Vrací (základní, ostatní).
+-- Kouzla, která má mág daného levelu, podle STROMU (Config/MageTree.luau): základní útok = nejnovější základní
+-- střela s minLevel <= level, ostatní = všechna silná kouzla s minLevel <= level (od nejstaršího). Žádný strop:
+-- strom určuje, co kdy přibude (3 Roj jisker, 5 Arkánový úder, 9 Písečná bouře, 11 Řetězový blesk, 13 Elektrický
+-- oblouk, 15 Parní exploze + Rázová vlna). Kouzla s minLevel > 16 jsou mimo dosah (strop mága je 16), zůstávají
+-- pro budoucí epochy. Vrací (základní, ostatní).
 function MageSpells.forLevel(level: number): (Spell, { Spell })
-	local era = MageSpells.era(level)
 	local basic: Spell? = nil
 	local others: { Spell } = {}
-	local support: { Spell } = {}
-	local repel: Spell? = nil
 	for _, spell in MageSpells.Defs do
 		if spell.minLevel > level then
 			continue
 		end
 		if spell.basic then
-			if spell.era <= era and (not basic or spell.era > (basic :: Spell).era) then
+			if not basic or spell.minLevel > (basic :: Spell).minLevel then
 				basic = spell
-			end
-		elseif spell.kind == "heal" then
-			table.insert(support, spell)
-		elseif spell.kind == "repel" then
-			if not repel or spell.minLevel > (repel :: Spell).minLevel then
-				repel = spell
 			end
 		else
 			table.insert(others, spell)
 		end
 	end
-	-- Nejnovější kouzla první (vyšší minLevel), ponechat tolik, kolik level dovolí.
 	table.sort(others, function(a, b)
-		return a.minLevel > b.minLevel
+		return a.minLevel < b.minLevel
 	end)
-	local count = if level <= 10 then 1 elseif level <= 20 then 2 else 3
-	while #others > count do
-		table.remove(others)
-	end
-	if repel then
-		table.insert(others, repel)
-	end
-	table.sort(support, function(a, b)
-		return a.minLevel > b.minLevel
-	end)
-	if support[1] then
-		table.insert(others, support[1])
-	end
 	return basic :: Spell, others
 end
 

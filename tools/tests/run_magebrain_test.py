@@ -19,7 +19,7 @@ def strip(text):
 with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(HERE, "roblox_stubs.luau"), os.path.join(tmp, "stubs.luau"))
     shutil.copy(os.path.join(HERE, "magebrain_test.luau"), os.path.join(tmp, "test.luau"))
-    for name in ("MageConfig", "MageSpells"):
+    for name in ("MageConfig", "MageSpells", "MageTree"):
         text = strip(open(os.path.join(ROOT, "src/shared/Config/%s.luau" % name), encoding="utf-8").read())
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write('local Stubs = require("./stubs")\nlocal Color3 = Stubs.Color3\n' + text)
     source = open(os.path.join(ROOT, "src/server/Services/MageBrain.luau"), encoding="utf-8").read()
@@ -29,6 +29,7 @@ local Vector3, CFrame, Instance, Enum, Color3, TweenInfo = Stubs.Vector3, Stubs.
 local TweenService, Debris, workspace, task = Stubs.TweenService, Stubs.Debris, Stubs.workspace, Stubs.task
 local Config = require("./MageConfig")
 local Spells = require("./MageSpells")
+local Tree = require("./MageTree")
 local Rig = { setMoving = function() end, attack = function() end, cast = function() end, raise = function() end }
 '''
     open(os.path.join(tmp, "MageBrain_copy.luau"), "w", encoding="utf-8").write(strip(head + source[source.index(marker):]))

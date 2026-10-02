@@ -15,6 +15,7 @@ local Enemy = require(Shared.Enemy)
 local Rig = require(Shared.Rig)
 local Synergy = require(Shared.Synergy)
 local MageUpgrades = require(Shared.MageUpgrades)
+local MageTree = require(Shared.Config.MageTree) -- the Mage's merge-level tree: its passives are applied here
 local Waves = require(Shared.Config.Waves)
 local Net = require(Shared.Net)
 
@@ -71,6 +72,18 @@ type Fighter = {
 	baseLift: number, -- the lift at creation (the Overcharge hover restores it)
 	bonusCoins: number, -- extra coin multiplier at death (treasure goblin, bounty)
 	noReward: boolean, -- its death pays no coins (the treasure goblin escaped)
+	-- The Mage's merge-level tree (Config/MageTree.luau): a mage's level and the state of its passives.
+	mageLevel: number?, -- set for your mages only
+	ascended: boolean?,
+	hitCount: number, -- hits dealt (Focus: every 4th is doubled)
+	hitStreak: number, -- hits in a row (Overload: 5 charge the next bolt) ...
+	overloaded: boolean, -- ... which explodes into an area
+	barrierUsed: boolean, -- the Emergency Barrier fired (once per battle)
+	auraTimer: number, -- Healing Aura: seconds since its last pulse
+	burnUntil: number, -- on fire (Smolder) until this battle time ...
+	burnDps: number, -- ... losing this many HP per second ...
+	burnBy: Fighter?, -- ... credited to this mage
+	burnTick: number, -- seconds of burning not yet applied
 	maxHp: number,
 	hp: number,
 	damage: number,
@@ -201,6 +214,17 @@ local function makeFighter(side: number, stats: Units.Stats, tier: number, color
 		baseLift = lift,
 		bonusCoins = 0,
 		noReward = false,
+		mageLevel = nil,
+		ascended = nil,
+		hitCount = 0,
+		hitStreak = 0,
+		overloaded = false,
+		barrierUsed = false,
+		auraTimer = 0,
+		burnUntil = 0,
+		burnDps = 0,
+		burnBy = nil,
+		burnTick = 0,
 		maxHp = stats.hp,
 		hp = stats.hp,
 		damage = stats.damage,
@@ -698,8 +722,77 @@ local bossAbility: (Battle, Fighter, number) -> () = function() end -- defined b
 -- EVERY damage path goes through here: the hit itself, the brains' onDamaged, and the "allyHurt" / "kill" / "allyDown"
 -- events (each edge once per fighter). `source` is nil for the player's spells, storms and puddles. Returns the damage
 -- really taken.
-local function applyDamage(battle: Battle, target: Fighter, amount: number, source: Fighter?): number
+local P = MageTree.Passives
+local SMOLDER_COLOR = Color3.fromRGB(255, 150, 60)
+local MIRROR_COLOR = Color3.fromRGB(150, 230, 255)
+local BARRIER_COLOR = Color3.fromRGB(120, 200, 255)
+local OVERLOAD_COLOR = Color3.fromRGB(220, 130, 255)
+
+-- `plain` = no tree passives (a reflected hit, an Overload explosion, a burn tick), so they never feed themselves.
+local applyDamage: (battle: Battle, target: Fighter, amount: number, source: Fighter?, plain: boolean?) -> number
+applyDamage = function(battle: Battle, target: Fighter, amount: number, source: Fighter?, plain: boolean?): number
+	-- The Mage's tree (Config/MageTree.luau), the attacker's side: Archmage and Focus scale the hit.
+	local tree = if source and not plain then source.mageLevel else nil
+	if tree then
+		local mage = source :: Fighter
+		if MageTree.has(tree, "archmage") then
+			amount *= 1 + P.archmage.Damage * (if mage.ascended then 2 else 1)
+		end
+		if MageTree.has(tree, "focus") then
+			mage.hitCount += 1
+			if mage.hitCount % P.focus.Every == 0 then
+				amount *= P.focus.Mult
+			end
+		end
+	end
+	-- The target's side: MIRROR sends a ranged hit back to the shooter.
+	if target.mageLevel and source and not plain and source.side ~= target.side and source.range >= P.mirror.MinRange and MageTree.has(target.mageLevel, "mirror") and math.random() < P.mirror.Chance then
+		local parent = battle.parent
+		BattleFx.beam(parent, target.pos + UP * target.lift, source.pos + UP * source.lift, MIRROR_COLOR, 0.35, 0.22)
+		BattleFx.tint(target.model, MIRROR_COLOR, 0.3)
+		popNumber(parent, source, applyDamage(battle, source, amount, target, true), MIRROR_COLOR)
+		return 0
+	end
 	local taken = damage(target, amount)
+	if tree and taken > 0 and source and source.side ~= target.side then
+		local mage = source :: Fighter
+		if MageTree.has(tree, "smolder") then
+			-- SMOLDER: the target burns (the ticks are in step()).
+			target.burnUntil = math.max(target.burnUntil, target.clock + P.smolder.Time)
+			target.burnDps = math.max(target.burnDps, target.maxHp * P.smolder.Dps)
+			target.burnBy = mage
+			BattleFx.tint(target.model, SMOLDER_COLOR, P.smolder.Time)
+		end
+		if MageTree.has(tree, "overload") then
+			if mage.overloaded then
+				-- OVERLOAD: this bolt explodes: everybody around the target takes the hit too.
+				mage.overloaded = false
+				local parent = battle.parent
+				BattleFx.groundRing(parent, target.pos, OVERLOAD_COLOR, P.overload.Radius, 0.45)
+				BattleFx.sparks(parent, target.pos + UP * target.lift, OVERLOAD_COLOR, 10, P.overload.Radius * 0.6, 4)
+				for _, other in battle.fighters do
+					if other ~= target and other.side == target.side and other.hp > 0 and (other.pos - target.pos).Magnitude <= P.overload.Radius then
+						popNumber(parent, other, applyDamage(battle, other, taken * P.overload.Fraction, mage, true), OVERLOAD_COLOR)
+					end
+				end
+			else
+				mage.hitStreak += 1
+				if mage.hitStreak >= P.overload.Hits then
+					mage.hitStreak = 0
+					mage.overloaded = true -- the next hit explodes
+					BattleFx.tint(mage.model, OVERLOAD_COLOR, 0.6)
+				end
+			end
+		end
+	end
+	-- EMERGENCY BARRIER: a mage dropping under half its HP shields itself once per battle.
+	if target.mageLevel and not target.barrierUsed and target.hp > 0 and target.hp < target.maxHp * P.emergencyBarrier.Below and MageTree.has(target.mageLevel, "emergencyBarrier") then
+		target.barrierUsed = true
+		target.shieldUntil = math.max(target.shieldUntil, target.clock + P.emergencyBarrier.Time)
+		target.shieldReduction = math.max(if target.shieldUntil > target.clock then target.shieldReduction else 0, P.emergencyBarrier.Reduction)
+		BattleFx.tint(target.model, BARRIER_COLOR, P.emergencyBarrier.Time)
+		BattleFx.pop(battle.parent, target.pos + UP * (target.lift * 2 + 1), "BARRIER", BARRIER_COLOR, 18)
+	end
 	target.lastHitBy = source
 	target.lastHitAt = battle.clock
 	if target.brain then
@@ -824,6 +917,30 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 	local mutators = battle.mutators
 	if mutators and mutators.step then
 		mutators:step(dt) -- the wave twists: puddles, storms, regen, the ambush, the enrage timer …
+	end
+	-- The Mage tree's passives that tick: enemies on fire (Smolder) and the Healing Aura's pulses.
+	for _, f in fighters do
+		if f.hp <= 0 then
+			continue
+		end
+		if f.burnUntil > f.clock then
+			f.burnTick += dt
+			if f.burnTick >= 0.5 then
+				popNumber(battle.parent, f, applyDamage(battle, f, f.burnDps * f.burnTick, f.burnBy, true), SMOLDER_COLOR)
+				f.burnTick = 0
+			end
+		end
+		if f.mageLevel and MageTree.has(f.mageLevel, "healAura") then
+			f.auraTimer += dt
+			if f.auraTimer >= 1 then
+				for _, ally in fighters do
+					if ally.side == f.side and ally.hp > 0 and ally.hp < ally.maxHp and (ally.pos - f.pos).Magnitude <= P.healAura.Radius then
+						heal(battle, ally, ally.maxHp * P.healAura.Rate * f.auraTimer)
+					end
+				end
+				f.auraTimer = 0
+			end
+		end
 	end
 	for _, f in fighters do
 		if f.hp <= 0 then
@@ -970,6 +1087,8 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			fighter.passive = passiveId
 			fighter.passiveValue = Units.Passives[passiveId].value * (if cell.ascended then 2 else 1)
 			fighter.spot = fighter.pos -- nobody is teleported: the six start the fight on their pads and walk
+			fighter.mageLevel = cell.tier -- the merge-level tree (Config/MageTree.luau): its passives read this
+			fighter.ascended = cell.ascended == true
 			-- The squad's synergies make everybody stronger; the pad a soldier stands on gives nothing (it only
 			-- decides which enemies it meets first).
 			fighter.maxHp *= synergy.hp * boosts.hp

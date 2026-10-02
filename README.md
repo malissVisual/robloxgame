@@ -461,8 +461,18 @@ score (proximity, low HP, hate toward whoever hurt it, enemy type: archers and s
 memory (a target is held 1.5 s unless a clearly better one appears) and a level-scaled reaction time (0.6 s at
 level 1, 0.15 s at level 30); it sometimes hesitates or aims an AoE a little off (less at higher levels).
 
-The Mage casts all the spells of the game (the player has none). A **Healing Light** (the old player's Heal) is the
-Mage's from level 2: the newest heal spell is always carried, besides the strong spells and the repel.
+The Mage casts all the spells of the game (the player has none). **What a merge level gives is the TREE**
+(`Config/MageTree.luau`): odd levels from 3 add an attack (a spell of `MageSpells.luau`, its `minLevel` matches),
+even levels a passive, everything stacks. 1 Fire Stone (basic) · 2 **Smolder** (hits set the target on fire, 2% max
+HP/s for 3 s) · 3 Spark Swarm · 4 **Focus** (every 4th hit x2) · 5 Arcane Push · 6 **Healing Aura** (allies within
+12 studs heal 1% HP/s) · 7 Sun Ray (a basic bolt that pierces into a 2nd enemy) · 8 **Blood Mana** (a kill: +25 mana,
+every cooldown -1 s) · 9 Sandstorm · 10 **Mirror** (20% to reflect a ranged hit) · 11 Chain Lightning + Magic Missile
+· 12 **Emergency Barrier** (under 50% HP: -50% damage for 3 s, once per battle) · 13 Electric Arc · 14 **Overload**
+(5 hits in a row charge the next bolt, which explodes into a 6 stud area) · 15 Steam Blast + Shockwave · 16
+**Archmage** (-25% cooldowns, +20% damage; Ascended doubles it). The passives' numbers are `MageTree.Passives`;
+BattleService applies them in `applyDamage` / `step` (Smolder, Focus, Mirror, Barrier, Overload, the aura),
+MageBrain the Blood Mana, the Archmage's cooldowns and the piercing bolt. `MageSpells.forLevel` simply returns
+every spell with `minLevel <= level` (no caps); the spells of the later eras (minLevel 17+) are out of reach.
 Spells (`shared/Config/MageSpells.luau`) come by era and level: a basic bolt per era (fire stone, sun ray, magic
 missile, arc bolt, plasma beam, quantum bolt) plus the newest unlocked strong spells, 1–10: one extra, 11–20: two,
 21–30: three and a heal (spark swarm, sandstorm, chain lightning, ice barrier, steam blast, electric arc, EMP slow,

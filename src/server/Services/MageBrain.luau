@@ -66,6 +66,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config.MageConfig)
 local Spells = require(Shared.Config.MageSpells)
+local Tree = require(Shared.Config.MageTree) -- the merge-level tree: Blood Mana, the Archmage's cooldowns, the piercing bolt
 local Rig = require(Shared.Rig)
 
 local UP = Vector3.new(0, 1, 0)
@@ -374,6 +375,14 @@ local victory: (self: Brain) -> () -- níže (potřebuje pop)
 -- Událost bitvy (BattleService.emit). Ukládá se do schránky a zpracuje v nejbližším update; konec bitvy hned
 -- (po něm už update nepřijde).
 function MageBrain.onEvent(self: Brain, name: string, payload: any)
+	if name == "kill" and payload and payload.killer == self.f and Tree.has(self.level, "bloodMana") then
+		-- BLOOD MANA (tree level 8): a kill refunds mana and hurries every cooldown.
+		local B = Tree.Passives.bloodMana
+		self.mana = math.min(Config.Mana.Max, self.mana + B.Mana)
+		for id, ready in self.cooldownReady do
+			self.cooldownReady[id] = ready - B.Cooldown
+		end
+	end
 	if name == "battleEnd" then
 		if payload and payload.won and self.f.hp > 0 then
 			victory(self)
@@ -718,7 +727,9 @@ local function startCast(self: Brain, spell: Spells.Spell, target: any?, point: 
 	end
 	self.mana -= cost
 	if spell.cooldown > 0 then
-		self.cooldownReady[spell.id] = f.clock + spell.cooldown
+		-- ARCHMAGE (tree level 16): shorter cooldowns (doubled when Ascended).
+		local factor = if Tree.has(self.level, "archmage") then 1 - Tree.Passives.archmage.Cooldown * (if f.ascended then 2 else 1) else 1
+		self.cooldownReady[spell.id] = f.clock + spell.cooldown * factor
 	end
 	local cast: Cast = {
 		spell = spell,
@@ -823,6 +834,32 @@ local function resolve(self: Brain, cast: Cast)
 				f.boltStyle = "execute"
 			end
 			ctx.attack(f, target, spell.damage * mult)
+			if spell.pierce and spell.pierce > 1 then
+				-- SUN RAY (tree level 7): the bolt goes on into the enemies standing behind the target (up to 10 studs
+				-- further, 3 to the side), one per extra pierce.
+				local dir = flat(target.pos - f.pos)
+				if dir.Magnitude > 0.01 then
+					dir = dir.Unit
+					local extra = spell.pierce - 1
+					for _, other in enemies do
+						if extra <= 0 then
+							break
+						end
+						if other ~= target and other.hp > 0 then
+							local v = flat(other.pos - target.pos)
+							local along = v:Dot(dir)
+							if along > 0 and along <= 10 and (v - dir * along).Magnitude <= 3 then
+								local taken = ctx.damage(other, f.damage * spell.damage * mult)
+								ctx.popNumber(other, taken, spell.color)
+								if ctx.fx.beam then
+									ctx.fx.beam(ctx.parent, target.pos + UP * target.lift, other.pos + UP * other.lift, spell.color, 0.35, 0.2)
+								end
+								extra -= 1
+							end
+						end
+					end
+				end
+			end
 			if cast.trip and target == cast.trip then
 				-- TRIP BOLT: Brute v nájezdu zpomalen.
 				local CA = Config.Reactions.ChargeAlert
