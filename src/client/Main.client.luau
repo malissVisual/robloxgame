@@ -27,7 +27,6 @@ local Enemies = require(Shared:WaitForChild("Config"):WaitForChild("Enemies"))
 local Soldier = require(Shared:WaitForChild("Soldier"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Sounds = require(Shared:WaitForChild("Config"):WaitForChild("Sounds"))
-local Achievements = require(Shared:WaitForChild("Config"):WaitForChild("Achievements"))
 local SoundService = game:GetService("SoundService")
 local Synergy = require(Shared:WaitForChild("Synergy"))
 
@@ -78,7 +77,6 @@ local state = {
 	xpInto = 0,
 	xpNeeded = 60,
 	stats = {} :: { [string]: number },
-	achievements = {} :: { [string]: boolean },
 	title = nil :: string?,
 	settings = { volume = 1, numbers = true, arrows = true, music = true } :: { [string]: any },
 	battleSpeed = 1,
@@ -184,7 +182,6 @@ UI.LAYOUT_VERSION = 5 -- a saved layout from an older version loses the moved pa
 UI.SQUAD_W, UI.SQUAD_H = 446, 132 -- the squad bar's layout size (one row of six cards); the dock and PLAY sit under it
 UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the settings gear moves below)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
-UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
 
 function UI.stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
@@ -4559,125 +4556,6 @@ do
 				frame:Destroy()
 			end
 		end)
-	end)
-end
-
--- ── Achievements list ──────────────────────────────────────────────────────
--- A button under the daily quests opens the list of every achievement with its progress.
-do
-	local open = false
-	local button = Instance.new("TextButton")
-	button.AnchorPoint = Vector2.new(1, 0.5)
-	button.Position = UDim2.new(1, -14, 0.5, 56)
-	button.Size = UDim2.fromOffset(214, 26)
-	button.BackgroundColor3 = BG
-	button.BackgroundTransparency = 0.25
-	button.BorderSizePixel = 0
-	button.AutoButtonColor = false
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 12
-	button.TextColor3 = GOLD
-	button.Text = "ACHIEVEMENTS"
-	button.Parent = gui
-	corner(button, 8)
-
-	local panel = Instance.new("ScrollingFrame")
-	panel.AnchorPoint = Vector2.new(0.5, 0.5)
-	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(440, 420)
-	panel.BackgroundColor3 = BG
-	panel.BackgroundTransparency = 0.05
-	panel.BorderSizePixel = 0
-	panel.ScrollBarThickness = 5
-	panel.CanvasSize = UDim2.new()
-	panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	panel.Active = true
-	panel.Visible = false
-	panel.ZIndex = 30
-	panel.Parent = gui
-	corner(panel, 14)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = GOLD
-	stroke.Thickness = 3
-	stroke.Parent = panel
-	local list = Instance.new("UIListLayout")
-	list.Padding = UDim.new(0, 4)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Parent = panel
-	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 10)
-	padding.PaddingBottom = UDim.new(0, 10)
-	padding.Parent = panel
-	local heading = Instance.new("TextLabel")
-	heading.LayoutOrder = 0
-	heading.Size = UDim2.new(1, -20, 0, 30)
-	heading.BackgroundTransparency = 1
-	heading.Font = Enum.Font.GothamBlack
-	heading.TextSize = 22
-	heading.TextColor3 = GOLD
-	heading.Text = "ACHIEVEMENTS  (click to close)"
-	heading.ZIndex = 31
-	heading.Parent = panel
-
-	type Row = { frame: Frame, progress: TextLabel }
-	local rows: { [string]: Row } = {}
-	for i, def in Achievements.List do
-		local row = Instance.new("Frame")
-		row.LayoutOrder = i
-		row.Size = UDim2.new(1, -24, 0, 46)
-		row.BackgroundColor3 = BADGE
-		row.BorderSizePixel = 0
-		row.ZIndex = 31
-		row.Parent = panel
-		corner(row, 8)
-		local name = label(row, string.format("★ %s", def.label), UDim2.fromOffset(10, 4), UDim2.fromOffset(300, 18), 14, Enum.Font.GothamBold, WHITE)
-		name.ZIndex = 32
-		local text = label(row, string.format("%s · +%d coins%s", def.text, def.coins, if def.xp > 0 then string.format(" · +%d XP", def.xp) else ""), UDim2.fromOffset(10, 24), UDim2.fromOffset(320, 16), 11, Enum.Font.Gotham, MUTED)
-		text.ZIndex = 32
-		local progress = label(row, "", UDim2.fromOffset(320, 0), UDim2.fromOffset(90, 46), 13, Enum.Font.GothamBold, GOLD)
-		progress.TextXAlignment = Enum.TextXAlignment.Right
-		progress.ZIndex = 32
-		rows[def.id] = { frame = row, progress = progress }
-	end
-
-	button.Activated:Connect(function()
-		open = not open
-		playSound("click")
-	end)
-	panel.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			open = false
-		end
-	end)
-
-	local function statValue(key: string): number
-		if key == "level" then
-			return state.level
-		end
-		return state.stats[key] or 0
-	end
-
-	RunService.RenderStepped:Connect(function()
-		local done = 0
-		for _, def in Achievements.List do
-			if state.achievements[def.id] then
-				done += 1
-			end
-		end
-		button.Visible = UI.ACHIEVEMENTS and not state.battling
-		button.Text = string.format("ACHIEVEMENTS  %d/%d%s", done, #Achievements.List, if state.title then "  ·  ★ " .. state.title else "")
-		panel.Visible = UI.ACHIEVEMENTS and open and not state.battling
-		if not panel.Visible then
-			return
-		end
-		for _, def in Achievements.List do
-			local row = rows[def.id]
-			local finished = state.achievements[def.id] == true
-			row.frame.BackgroundTransparency = if finished then 0 else 0.4
-			row.progress.Text = if finished then "DONE" else string.format("%d/%d", math.min(statValue(def.stat), def.target), def.target)
-			row.progress.TextColor3 = if finished then GREEN else GOLD
-		end
 	end)
 end
 

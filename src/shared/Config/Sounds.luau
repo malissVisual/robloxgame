@@ -17,7 +17,6 @@ Sounds.Defs = {
 	merge = { id = "rbxasset://sounds/snap.mp3", volume = 0.7, speed = 1 },
 	mergeBig = { id = "rbxasset://sounds/snap.mp3", volume = 0.9, speed = 0.7 }, -- level 5 and up
 	levelUp = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.8, speed = 1.4 },
-	achievement = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.8, speed = 1.7 },
 	coins = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.5, speed = 1.2 },
 	fight = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.7, speed = 0.6 },
 	spell = { id = "rbxasset://sounds/snap.mp3", volume = 0.7, speed = 1.4 },

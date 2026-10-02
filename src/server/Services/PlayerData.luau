@@ -10,9 +10,11 @@ local Balance = require(Shared.Config.Balance)
 local Units = require(Shared.Config.Units)
 local Maps = require(Shared.Config.Maps)
 local Difficulties = require(Shared.Config.Difficulties)
-local Achievements = require(Shared.Config.Achievements)
 local Grid = require(Shared.Grid)
 local Levels = require(Shared.Config.Levels)
+
+-- The lifetime counters a profile keeps (all start at 0).
+local STAT_KEYS = { "kills", "merges", "maxTier", "ascended", "wavesWon", "bossKills", "nightmareWaves", "summons" }
 
 export type Profile = {
 	coins: number,
@@ -42,9 +44,7 @@ export type Profile = {
 	rolling: boolean, -- roll animation running (actions are locked)
 	map: string, -- current map (Config/Maps)
 	bestWave: number, -- the highest wave ever reached (offline income)
-	stats: { [string]: number }, -- lifetime counters for achievements (Config/Achievements.luau)
-	achievements: { [string]: boolean }, -- done achievements
-	title: string?, -- the title shown over your head (the latest achievement)
+	stats: { [string]: number }, -- lifetime counters (kills, merges, waves won …)
 	lastSeen: number, -- os.time() of the last save (offline income)
 	settings: { [string]: any }, -- volume, numbers, arrows (arena holograms), music
 	battleSpeed: number, -- 1 or 2 (this session only)
@@ -194,8 +194,6 @@ local function fresh(): Profile
 		map = Maps.First,
 		bestWave = 1,
 		stats = {},
-		achievements = {},
-		title = nil,
 		lastSeen = 0,
 		settings = { volume = 1, numbers = true, arrows = true, music = true, layout = "" }, -- layout: where the player dragged the UI panels (JSON, client-owned)
 		battleSpeed = 1,
@@ -300,19 +298,9 @@ local function applySaved(profile: Profile, saved: any)
 	profile.mapCleared = saved.mapCleared == true
 	profile.bestWave = number(saved.bestWave, profile.wave, 1, 100000)
 	if type(saved.stats) == "table" then
-		for _, key in Achievements.StatKeys do
+		for _, key in STAT_KEYS do
 			profile.stats[key] = number(saved.stats[key], 0, 0, 2 ^ 40)
 		end
-	end
-	if type(saved.achievements) == "table" then
-		for id in Achievements.ById do
-			if saved.achievements[id] == true then
-				profile.achievements[id] = true
-			end
-		end
-	end
-	if type(saved.title) == "string" and #saved.title <= 32 then
-		profile.title = saved.title
 	end
 	profile.lastSeen = number(saved.lastSeen, 0, 0, 2 ^ 40)
 	if type(saved.settings) == "table" then
@@ -385,8 +373,6 @@ local function serialize(profile: Profile): { [string]: any }
 		map = profile.map,
 		bestWave = profile.bestWave,
 		stats = profile.stats,
-		achievements = profile.achievements,
-		title = profile.title,
 		lastSeen = os.time(),
 		settings = profile.settings,
 		pending = pending,
@@ -452,12 +438,12 @@ function PlayerData.reset(profile: Profile)
 	end
 end
 
--- A lifetime counter (achievements) goes up.
+-- A lifetime counter goes up.
 function PlayerData.addStat(profile: Profile, key: string, amount: number)
 	profile.stats[key] = (profile.stats[key] or 0) + amount
 end
 
--- The value an achievement looks at.
+-- A counter's value ("level" = the account level).
 function PlayerData.statValue(profile: Profile, key: string): number
 	if key == "level" then
 		return (PlayerData.levelInfo(profile.xp))

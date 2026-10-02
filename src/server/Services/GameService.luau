@@ -15,7 +15,6 @@ local Levels = require(Shared.Config.Levels)
 local Waves = require(Shared.Config.Waves)
 local Difficulties = require(Shared.Config.Difficulties)
 local Enemies = require(Shared.Config.Enemies)
-local Achievements = require(Shared.Config.Achievements)
 local Maps = require(Shared.Config.Maps)
 local Net = require(Shared.Net)
 local Balance = require(Shared.Config.Balance)
@@ -115,7 +114,6 @@ local function pushState(player: Player)
 		cleared = PlayerData.clearedWaves(profile),
 		isAdmin = isAdmin(player),
 		stats = profile.stats,
-		achievements = profile.achievements,
 		settings = profile.settings,
 		battleSpeed = profile.battleSpeed,
 		bestWave = profile.bestWave,
@@ -224,25 +222,9 @@ end
 
 local addXp: (Player, PlayerData.Profile, number) -> () = function() end -- defined below
 
--- Checks every achievement against the profile's counters; a finished one pays (coins + XP; no title any more).
-local function checkAchievements(player: Player, profile: PlayerData.Profile)
-	for _, def in Achievements.List do
-		if not profile.achievements[def.id] and PlayerData.statValue(profile, def.stat) >= def.target then
-			profile.achievements[def.id] = true
-			profile.coins += def.coins
-			notify(player, string.format("ACHIEVEMENT: %s (%s) · +%d coins%s", def.label, def.text, def.coins, if def.xp > 0 then string.format(" · +%d XP", def.xp) else ""))
-			sfx(player, "achievement")
-			if def.xp > 0 then
-				addXp(player, profile, def.xp)
-			end
-		end
-	end
-end
-
--- A lifetime counter goes up and the achievements are checked.
+-- A lifetime counter goes up (kills, merges, waves …: kept for stats; the achievements are gone).
 local function addStat(player: Player, profile: PlayerData.Profile, key: string, amount: number)
 	PlayerData.addStat(profile, key, amount)
-	checkAchievements(player, profile)
 end
 
 -- Gives account experience. Every account level gives coins, and every 5th one also merge slots;
@@ -269,7 +251,6 @@ addXp = function(player: Player, profile: PlayerData.Profile, amount: number)
 		refresh(player)
 	end
 	if after > before then
-		checkAchievements(player, profile)
 	end
 end
 
@@ -365,7 +346,6 @@ local function onInteract(player: Player, from: any, to: any)
 			if made.ascended then
 				PlayerData.addStat(profile, "ascended", 1)
 			end
-			checkAchievements(player, profile)
 			sfx(player, if made.tier >= 5 then "mergeBig" else "merge")
 		end
 	end
@@ -1257,7 +1237,6 @@ local function onBattle(player: Player)
 			twists = twists,
 			formation = Waves.formation(wave, twists),
 		}, onKill, function(won: boolean, result: BattleService.Result)
-			checkAchievements(player, profile)
 			-- Back to the spawn once the fight is over: a 1 s fade to black, the move happens while it is dark.
 			Net.get("Countdown"):FireClient(player, "end")
 			Net.get("WaveIntro"):FireClient(player, nil) -- the twist chips go away
@@ -1324,7 +1303,6 @@ local function onBattle(player: Player)
 				table.insert(extraDrops, battleDrop(profile, wave, false)) -- the treasure goblin was caught
 			end
 			local candidates, lucky = luckyDrop(profile, wave, difficulty.luckyDropChance)
-			checkAchievements(player, profile)
 			profile.nextWaveAt = os.clock() + Balance.RewardTime
 			refresh(player)
 
@@ -1418,7 +1396,6 @@ local function join(player: Player)
 	task.delay(2, function()
 		if plots[player] then
 			welcome(player, profile)
-			checkAchievements(player, profile)
 			refresh(player)
 		end
 	end)
