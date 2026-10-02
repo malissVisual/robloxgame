@@ -163,6 +163,9 @@ UI.PAGE_TOP = 46 -- the page of the left panel starts right under its title bar 
 UI.TAB_ACCENT = { Inventory = GOLD }
 UI.popupGlow = nil :: Highlight? -- the light outline on the mage whose popup is open (see openCardPopup)
 UI.popupCard = nil :: Frame?
+UI.popupId = 0 -- the slot of the mage whose popup is open
+UI.popupLeftAt = nil :: number? -- os.clock() when the pointer left the mage and the popup (nil while over them)
+UI.popupFading = false -- the popup is fading out
 UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
 UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
@@ -2289,7 +2292,7 @@ RunService.RenderStepped:Connect(updateHover)
 -- in the 3D world, to merge (same class and level), swap or move it. The server decides
 -- (Interact), so merging works right in the UI inventory and in the 3D room alike.
 
-local cardPopup: Frame? = nil
+local cardPopup: CanvasGroup? = nil
 
 local function closeCardPopup()
 	if cardPopup then
@@ -2308,6 +2311,8 @@ local function closeCardPopup()
 		end
 		UI.popupCard = nil
 	end
+	UI.popupLeftAt = nil
+	UI.popupFading = false
 end
 
 openCardPopup = function(id: number, at: Vector2?)
@@ -2324,7 +2329,7 @@ openCardPopup = function(id: number, at: Vector2?)
 	-- The mage's card: name and level, its stats, the spells it casts at this level (MageSpells), what the next
 	-- level unlocks, then EQUIP / UNEQUIP and SELL. (Later: upgrades and spell choices live here too.)
 	local W = 300
-	local popup = Instance.new("Frame")
+	local popup = Instance.new("CanvasGroup") -- a group, so the whole popup can fade out at once
 	popup.Name = "CardPopup"
 	popup.AnchorPoint = Vector2.new(0, 0.5)
 	popup.BackgroundColor3 = BG
@@ -2462,7 +2467,43 @@ openCardPopup = function(id: number, at: Vector2?)
 	popup.Position = UDim2.fromOffset(x, cy)
 	popup.Parent = gui
 	cardPopup = popup
+	UI.popupId = id
+	UI.popupLeftAt = nil
+	UI.popupFading = false
 end
+
+-- The popup lives on hover: it stays while the pointer is over the mage (its card in the panel or its model in
+-- the world) or over the popup itself (you can move the mouse into it); a moment after the pointer leaves both
+-- it fades out and is gone. (Clicks elsewhere still close it at once.)
+RunService.RenderStepped:Connect(function()
+	local popup = cardPopup
+	if not popup or UI.popupFading then
+		return
+	end
+	local over = pointerOver(popup)
+	local marked = UI.popupCard
+	if not over and marked and marked.Visible and marked.Parent then
+		over = pointerOver(marked)
+	end
+	if not over then
+		local model = soldierUnderPointer()
+		over = model ~= nil and model:GetAttribute("Slot") == UI.popupId
+	end
+	if over then
+		UI.popupLeftAt = nil
+	elseif not UI.popupLeftAt then
+		UI.popupLeftAt = os.clock()
+	elseif os.clock() - UI.popupLeftAt > 0.35 then
+		UI.popupFading = true
+		local tween = TweenService:Create(popup, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 1 })
+		tween:Play()
+		tween.Completed:Connect(function()
+			if cardPopup == popup then
+				closeCardPopup()
+			end
+		end)
+	end
+end)
 
 type CardDrag = {
 	id: number,
