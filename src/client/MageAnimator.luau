@@ -180,11 +180,14 @@ local function gesture(o: { [string]: Vector3 }, kind: string, w: number, r: num
 		add("Neck", -0.15 * (w + r), -side * 0.2 * sweep * w, 0)
 		add(other, 0.3 * w, 0, -side * 0.5 * w)
 	elseif kind == "repel" then
-		-- Arms out and the whole body spins once (the Root joint turns the body on the root), arms snap wide.
-		add("LeftShoulder", -0.3 * w, 0, 1.5 * w + 1.2 * r)
-		add("RightShoulder", -0.3 * w, 0, -1.5 * w - 1.2 * r)
-		add("Root", 0, math.pi * 2 * smooth(w), 0)
-		add("Waist", -0.1 * w, 0, 0)
+		-- A burst: the arms cross in front of the chest and the body curls in; on the release the arms fling wide
+		-- and the chest opens up (the shockwave leaves the mage), then it settles.
+		add("LeftShoulder", -1.1 * w - 0.2 * r, 0, -0.8 * w + 1.4 * r)
+		add("RightShoulder", -1.1 * w - 0.2 * r, 0, 0.8 * w - 1.4 * r)
+		add("LeftElbow", 0.9 * w, 0, 0)
+		add("RightElbow", 0.9 * w, 0, 0)
+		add("Waist", 0.3 * w - 0.2 * r, 0, 0)
+		add("Neck", 0.2 * w - 0.25 * r, 0, 0)
 	elseif kind == "shield" or kind == "ward" or kind == "heal" then
 		-- A slow rise of both arms, palms up, the head lifting; it stays a moment and comes down softly.
 		add("LeftShoulder", -2.0 * w - 1.6 * r, 0, 0.7 * w + 0.5 * r)

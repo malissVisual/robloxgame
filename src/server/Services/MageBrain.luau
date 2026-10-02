@@ -168,6 +168,7 @@ export type Brain = {
 	glideSparkAt: number,
 	castHand: string,
 	castCount: number,
+	pushes: { { enemy: any, dir: Vector3, left: number, speed: number } },
 	hopUntil: number,
 	hopFrom: Vector3?,
 	hopTo: Vector3?,
@@ -341,6 +342,7 @@ function MageBrain.new(ctx: Context, fighter: any, level: number): Brain
 		glideSparkAt = 0,
 		castHand = "R", -- the bolts alternate hands (the client's gesture)
 		castCount = 0,
+		pushes = {}, -- enemies being knocked back (a repel): they slide away over a moment instead of teleporting
 		hopUntil = 0,
 		hopFrom = nil,
 		hopTo = nil,
@@ -1090,17 +1092,23 @@ local function resolve(self: Brain, cast: Cast)
 			end
 		end
 	elseif spell.kind == "repel" then
-		-- REPEL: prstenec a 6 paprsků od mága; nepřátelé v poloměru odletí o `push`, chvíli omráčení, zranění.
+		-- REPEL: a crisp, HOLLOW shockwave (a ring of thin shards racing outward along the floor, nothing filled
+		-- that hides the fight), a small flash at the mage, and the enemies in range SLIDE back over 0.25 s (see
+		-- tickVisuals: self.pushes) with a short dust puff each; they are stunned for a moment and take damage.
 		local radius = spell.radius or 7
 		local push = spell.push or 8
-		groundRing(parent, f.pos, spell.color, radius, 0.5)
-		groundRing(parent, f.pos, spell.color2, radius * 0.6, 0.35)
-		local origin = f.pos + UP * 1.2
-		for i = 1, 6 do
-			local angle = (i / 6) * math.pi * 2
-			beam(parent, origin, origin + Vector3.new(math.cos(angle) * radius, 0.5, math.sin(angle) * radius), spell.color2, 0.35, 0.3)
+		local SEGMENTS = 18
+		local groundY = f.pos.Y + 0.25
+		for i = 1, SEGMENTS do
+			local angle = (i / SEGMENTS) * math.pi * 2
+			local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			local start = Vector3.new(f.pos.X, groundY, f.pos.Z) + dir * 1.2
+			local shard = neon(parent, Vector3.new(0.12, 0.25, 1.1), CFrame.lookAt(start, start + Vector3.new(-dir.Z, 0, dir.X)), if i % 2 == 0 then spell.color else spell.color2, 0.25)
+			local goal = Vector3.new(f.pos.X, groundY, f.pos.Z) + dir * radius
+			fade(shard, 0.3, { CFrame = CFrame.lookAt(goal, goal + Vector3.new(-dir.Z, 0, dir.X)), Size = Vector3.new(0.06, 0.12, 2.2), Transparency = 1 })
 		end
-		sparks(parent, f.pos, spell.color, 10, radius * 0.6, 4)
+		local flash = neon(parent, Vector3.one * 1.6, CFrame.new(f.pos + UP * (f.lift * 0.8)), spell.color2, 0.45, Enum.PartType.Ball)
+		fade(flash, 0.18, { Size = Vector3.one * 3.6, Transparency = 1 })
 		for _, enemy in enemies do
 			local away = flat(enemy.pos) - flat(f.pos)
 			local d = away.Magnitude
@@ -1110,16 +1118,13 @@ local function resolve(self: Brain, cast: Cast)
 						local angle = math.random() * math.pi * 2
 						away = Vector3.new(math.cos(angle), 0, math.sin(angle))
 					end
-					local destination = clampToArena(self, enemy.pos + away.Unit * push)
-					enemy.pos = Vector3.new(destination.X, enemy.pos.Y, destination.Z)
-					enemy.stunUntil = math.max(enemy.stunUntil or 0, enemy.clock + (spell.stun or 0.6))
-					ctx.face(enemy, f.pos)
-					ctx.fx.afterimage(parent, enemy.pos, enemy.lift, spell.color2)
+					table.insert(self.pushes, { enemy = enemy, dir = away.Unit, left = push, speed = push / 0.25 })
+					enemy.stunUntil = math.max(enemy.stunUntil or 0, enemy.clock + (spell.stun or 0.6) + 0.25)
+					sparks(parent, enemy.pos, spell.color, 3, 1.2, 1.5)
 				end
 				ctx.popNumber(enemy, ctx.damage(enemy, f.damage * spell.damage * mult))
 			end
 		end
-		pop(self, pick(Config.Lines.repel), spell.color, 26, true)
 	end
 end
 
@@ -1518,6 +1523,20 @@ end
 -- Vizuály každý tick: vznášení při Overcharge, runy, konec Overcharge, stroboskop Last Standu, vyprchávání Zuřivosti.
 local function tickVisuals(self: Brain, dt: number)
 	local f, ctx = self.f, self.ctx
+	-- Enemies knocked back by a repel slide away (ease out: fast first, slowing).
+	for i = #self.pushes, 1, -1 do
+		local p = self.pushes[i]
+		local enemy = p.enemy
+		if enemy.hp <= 0 or p.left <= 0.01 then
+			table.remove(self.pushes, i)
+		else
+			local step = math.min(p.left, math.max(p.speed * dt * (0.4 + 1.2 * p.left / (p.speed * 0.25)), 0.05))
+			local next = clampToArena(self, enemy.pos + p.dir * step)
+			enemy.pos = Vector3.new(next.X, enemy.pos.Y, next.Z)
+			p.left -= step
+			ctx.face(enemy, enemy.pos - p.dir)
+		end
+	end
 	local O = Config.Reactions.Overcharge
 	local F = Config.Reactions.Fury
 	if self.overchargeUntil > 0 and f.clock >= self.overchargeUntil then
