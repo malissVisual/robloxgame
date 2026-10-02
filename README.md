@@ -16,7 +16,7 @@ SPELLS tab and no spell drops. Older passages below about other classes or "your
 version.
 
 Most things are 3D in the world. The UI is the PLAY button, the HUD with the account level and
-coins (bottom left), the left panel (a single Inventory page: the mages; a click on a mage, its card or its model,
+coins in a RESOURCES bar above the level HUD (bottom left; more currencies can be added with `UI.addResource`), the left panel (a single Inventory page: the mages; a click on a mage, its card or its model,
 opens its card: level name, stats, the attacks and passives of this level, the next unlock, a **SKILL TREE** button
 (the big view: all 16 levels on a winding path, locked ones grey with a lock, hover for details, the account
 upgrades under it) and the **Mage upgrades**, three tracks
@@ -191,7 +191,7 @@ other; it comes back when the battle panel closes, and opening it from the dock 
   class): Lv 2 = 50 coins, Lv 3 = wave 1 + 150, Lv 4 = 3 + 400, Lv 5 = 8 + 1000, Lv 6 = 15 + 2500, Lv 7 = 25 + 6000,
   Lv 8 = 40 + 15000, Lv 9 = 60 + 40000. Locked merges do nothing (a message explains); auto merge, drops
   and the start level respect the limit of each class (`profile.tierUnlocked[class]`).
-- **Saving:** (the HUD says "progress saved" or, in red, "saving OFF"; it is also saved after every won wave) progress (coins, soldiers, inventory / squad, merge slots, waves, unlocked classes and
+- **Saving:** (the HUD says "" or, in red, "(no saving indicator any more)"; it is also saved after every won wave) progress (coins, soldiers, inventory / squad, merge slots, waves, unlocked classes and
   levels, difficulty, start level) is saved to a DataStore (`Balance.DataStoreName`) when you leave, every
   `Balance.SaveInterval` seconds, on level unlocks and when the server shuts down. It needs "Enable Studio
   Access to API Services" in Game Settings > Security (and a published place) to work in Studio. If a save cannot be read, that

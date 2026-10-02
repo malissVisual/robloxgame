@@ -69,7 +69,6 @@ local state = {
 	tierUnlocked = {} :: { [string]: number }, -- per class: the highest merge level bought
 	mageUpgrades = {} :: { [string]: number }, -- the Mage's upgrade tracks (shared/MageUpgrades.luau)
 	autoFight = false,
-	saving = false,
 	quests = {} :: { any },
 	mapCleared = false,
 	streak = 0,
@@ -345,7 +344,7 @@ function Layout.apply(saved: any)
 	end
 	if decoded.v ~= UI.LAYOUT_VERSION then
 		-- The defaults changed (squad bar top left, dock under it, PLAY beside the dock, panel up): old spots are dropped.
-		for _, name in { "Panel", "Hud", "Squad", "Dock", "Play" } do
+		for _, name in { "Panel", "Hud", "Squad", "Dock", "Play", "Resources" } do
 			decoded[name] = nil
 		end
 	end
@@ -426,12 +425,12 @@ local upgrade = makeButton("^", "MERGE SLOTS", Color3.fromRGB(170, 130, 255), 2)
 local autoMerge = makeButton("»", "AUTO MERGE", Color3.fromRGB(90, 170, 255), 2)
 local equipBest = makeButton("^", "EQUIP BEST", ORANGE, 3)
 
--- Top left HUD: the account level (with its experience bar) and the coins.
+-- Bottom left HUD: the account level with its experience bar. (The coins live in the RESOURCES bar above it.)
 local hud = Instance.new("Frame")
 hud.Name = "Hud"
 hud.AnchorPoint = Vector2.new(0, 1)
 hud.Position = UDim2.new(0, 14, 1, -14) -- the bottom left corner (the squad bar has the middle, PLAY the right)
-hud.Size = UDim2.fromOffset(520, 70)
+hud.Size = UDim2.fromOffset(520, 66)
 hud.BackgroundColor3 = BG
 hud.BackgroundTransparency = 0.12
 hud.BorderSizePixel = 0
@@ -462,11 +461,11 @@ levelTag.TextXAlignment = Enum.TextXAlignment.Center
 local levelNumber = label(levelBadge, "1", UDim2.fromOffset(0, 15), UDim2.new(1, 0, 0, 30), 24, Enum.Font.GothamBlack, WHITE)
 levelNumber.TextXAlignment = Enum.TextXAlignment.Center
 
-local xpText = label(hud, "", UDim2.fromOffset(70, 9), UDim2.fromOffset(436, 14), 12, Enum.Font.GothamMedium, MUTED)
+local xpText = label(hud, "", UDim2.fromOffset(70, 14), UDim2.fromOffset(436, 14), 12, Enum.Font.GothamMedium, MUTED)
 Layout.make("Hud", hud, hud) -- grab it anywhere, it has no controls
 local xpBack = Instance.new("Frame")
-xpBack.Position = UDim2.fromOffset(70, 27)
-xpBack.Size = UDim2.fromOffset(436, 9)
+xpBack.Position = UDim2.fromOffset(70, 36)
+xpBack.Size = UDim2.fromOffset(436, 12)
 xpBack.BackgroundColor3 = Color3.fromRGB(14, 16, 24)
 xpBack.BorderSizePixel = 0
 xpBack.Parent = hud
@@ -478,15 +477,67 @@ xpFill.BorderSizePixel = 0
 xpFill.Parent = xpBack
 corner(xpFill, 4)
 
--- The coins (pill): a UIScale pulses it when a coin is picked up.
-local pill = Instance.new("Frame")
-pill.Position = UDim2.fromOffset(70, 41)
-pill.Size = UDim2.fromOffset(436, 22)
-pill.BackgroundTransparency = 1
-pill.Parent = hud
-local coinsLabel = label(pill, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 18, Enum.Font.GothamBold, GOLD)
-local saveLabel = label(pill, "", UDim2.fromOffset(280, 0), UDim2.fromOffset(156, 22), 11, Enum.Font.GothamMedium, GREEN)
-saveLabel.TextXAlignment = Enum.TextXAlignment.Right
+-- RESOURCES bar: a row of chips above the HUD, one per currency. Coins now; more values (gems, materials …)
+-- are added with UI.addResource and set with UI.setResource. Movable like the HUD.
+local resources = Instance.new("Frame")
+resources.Name = "Resources"
+resources.AnchorPoint = Vector2.new(0, 1)
+resources.Position = UDim2.new(0, 14, 1, -14 - 66 * 1.15 - 10) -- just above the HUD (which is drawn at 1.15)
+resources.Size = UDim2.fromOffset(0, 40)
+resources.AutomaticSize = Enum.AutomaticSize.X
+resources.BackgroundColor3 = BG
+resources.BackgroundTransparency = 0.12
+resources.BorderSizePixel = 0
+resources.Active = true
+resources.Parent = gui
+corner(resources, 12)
+UI.stroke(resources, BADGE, 2)
+do
+	local resourcesScale = Instance.new("UIScale")
+	resourcesScale.Scale = 1.15
+	resourcesScale.Parent = resources
+	local row = Instance.new("UIListLayout")
+	row.FillDirection = Enum.FillDirection.Horizontal
+	row.VerticalAlignment = Enum.VerticalAlignment.Center
+	row.Padding = UDim.new(0, 14)
+	row.SortOrder = Enum.SortOrder.LayoutOrder
+	row.Parent = resources
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 12)
+	pad.PaddingRight = UDim.new(0, 14)
+	pad.Parent = resources
+end
+Layout.make("Resources", resources, resources)
+UI.resourceLabels = {} :: { [string]: TextLabel }
+-- A chip: a colored dot (the icon) and the value in the resource's color.
+UI.addResource = function(key: string, name: string, color: Color3, order: number)
+	local chip = Instance.new("Frame")
+	chip.Name = "Resource_" .. key
+	chip.LayoutOrder = order
+	chip.Size = UDim2.fromOffset(0, 26)
+	chip.AutomaticSize = Enum.AutomaticSize.X
+	chip.BackgroundTransparency = 1
+	chip.Parent = resources
+	local dot = Instance.new("Frame")
+	dot.Size = UDim2.fromOffset(14, 14)
+	dot.Position = UDim2.fromOffset(0, 6)
+	dot.BackgroundColor3 = color
+	dot.BorderSizePixel = 0
+	dot.Parent = chip
+	corner(dot, 7)
+	UI.stroke(dot, color:Lerp(Color3.new(1, 1, 1), 0.5), 1.5)
+	local value = label(chip, "0", UDim2.fromOffset(20, 0), UDim2.fromOffset(0, 26), 17, Enum.Font.GothamBold, color)
+	value.AutomaticSize = Enum.AutomaticSize.X
+	label(chip, name, UDim2.fromOffset(20, 18), UDim2.fromOffset(60, 10), 8, Enum.Font.GothamMedium, MUTED).TextTransparency = 0.2
+	UI.resourceLabels[key] = value
+end
+UI.setResource = function(key: string, amount: number)
+	local value = UI.resourceLabels[key]
+	if value then
+		value.Text = string.format("%d", amount)
+	end
+end
+UI.addResource("coins", "COINS", GOLD, 1)
 
 -- The battle panel (opened by the PLAY button) is defined further down.
 local renderBattlePanel: () -> () = function() end
@@ -511,9 +562,7 @@ local function render()
 	local now = os.clock()
 	local locked = state.rolling or state.battling
 
-	coinsLabel.Text = string.format("Coins  %d", state.coins)
-	saveLabel.Text = if state.saving then "progress saved" else "saving OFF"
-	saveLabel.TextColor3 = if state.saving then GREEN else RED
+	UI.setResource("coins", state.coins)
 	levelNumber.Text = tostring(state.level)
 	xpText.Text = string.format("Account level %d · %d/%d XP", state.level, state.xpInto, state.xpNeeded)
 	soundVolume = state.settings.volume or 1

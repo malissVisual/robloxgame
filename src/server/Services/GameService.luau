@@ -105,7 +105,6 @@ local function pushState(player: Player)
 		mageUpgrades = profile.mageUpgrades,
 		level = accountLevel,
 		autoFight = profile.autoFight,
-		saving = PlayerData.savingOn(player),
 		quests = PlayerData.questsView(profile),
 		mapCleared = profile.mapCleared,
 		streak = profile.streak,
