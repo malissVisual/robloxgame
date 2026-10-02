@@ -140,15 +140,16 @@ Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 
 ## Controls
 
-**Your character moves well** (`src/client/PlayerMovement.luau`): **SPRINT** (hold Left Shift; a RUN toggle button on
-touch, L3 on a gamepad) is faster and replaces the walk animation with a procedural run cycle (deep lean, long
-strides with the knees snapping up, pumping arms, a bounce on every step, timed by the distance travelled), widens
-the camera, kicks up dust and draws speed streaks behind the hands and feet; the slide is driven by a LinearVelocity
-(no PlayerModule needed); **SLIDE** (C or
-Left Ctrl while running; a SLIDE button on touch, B on a gamepad) drops you low into a slide pose (leaning back, the
-lead leg stretched, a hand trailing) that bleeds its speed off over 0.8 s with a spray of dust and the camera
-going down; **JUMP during a slide** is a long slide jump that keeps the momentum. The poses overwrite the joints'
-`Transform` after the animator (Stepped), so the default run keeps playing underneath. Numbers: `CONFIG` there.
+**Your character moves well** (`src/client/PlayerMovement.luau`, its own ScreenGui): **SPRINT** (hold Left Shift, or
+the SPRINT button in the bottom right corner, which toggles) replaces the walk with a procedural run cycle (a deep
+lean, long strides with the knees snapping up, arms pumping with follow-through so the forearms and hands flow, a
+bounce and a roll on every step, a lean into turns), widens the camera, sends speed lines across the screen edges,
+streaks the hands and feet and kicks up dust. **SLIDE** (C / Left Ctrl while running, or the SLIDE button) is a
+real slide: the hip height drops so the body is on the floor, a LinearVelocity carries it on and bleeds the speed
+off, with a dust spray, heel sparks and scrape marks left on the ground; **jump during a slide** (or the SLIDE
+button again) is a long slide jump. The **KEYS ?** button over the two buttons opens a small key card (it shows
+itself once after joining). The poses overwrite the joints' `Transform` after the animator (Stepped). Numbers:
+`CONFIG` there.
 
 **You only control your character** (walk around, watch the fight). The Mages cast their spells themselves; there
 are no player spells, no Q / E and no mouse aiming any more.
