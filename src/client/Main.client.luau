@@ -2400,15 +2400,15 @@ openCardPopup = function(id: number, at: Vector2?)
 	end
 	local nextSpell: MageSpells.Spell? = nil
 	for _, spell in MageSpells.Defs do
-		if spell.minLevel > unit.tier and (not nextSpell or spell.minLevel < (nextSpell :: MageSpells.Spell).minLevel) then
+		if spell.minLevel > unit.tier and spell.minLevel <= Units.maxTier(unit.class) and (not nextSpell or spell.minLevel < (nextSpell :: MageSpells.Spell).minLevel) then
 			nextSpell = spell
 		end
 	end
 	if nextSpell then
 		line(string.format('<font color="#a5aab9">Lv %d unlocks</font>  %s', nextSpell.minLevel, nextSpell.label), y + 2, 11, Enum.Font.Gotham, MUTED, 15)
 		y += 17
-	elseif unit.tier >= Units.maxTier(unit.class) then
-		line('<font color="#a5aab9">Top level: every spell known</font>', y + 2, 11, Enum.Font.Gotham, MUTED, 15)
+	else
+		line(if unit.tier >= Units.maxTier(unit.class) then '<font color="#a5aab9">Top level' .. (if ascended then "" else ": merge two for ASCENDED") .. '</font>' else '<font color="#a5aab9">No more spells to unlock</font>', y + 2, 11, Enum.Font.Gotham, MUTED, 15)
 		y += 17
 	end
 	y += 8

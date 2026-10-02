@@ -26,7 +26,7 @@ export type ClassDef = Stats & {
 	color: Color3,
 	unlock: Unlock?, -- nil = unlocked from the start
 	passive: string, -- the class's own trick in the battle (see Units.Passives)
-	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); the Mage has 30 looks
+	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); the Mage has 16 (of 30 looks)
 }
 
 -- Every class has a PASSIVE (BattleService applies it). `value` is its strength; an ASCENDED soldier
@@ -58,10 +58,11 @@ Units.Classes = {
 		speed = 9,
 		splash = true,
 		passive = "splash",
-		-- 30 merge levels: the R15 evolution of the mage, a shaman's apprentice to the Apex mage of the year 3000
-		-- (design/MageEvolution, built from StageModels/MageEvolution by SoldierRig). The Mage casts all the spells
-		-- of the game itself (Config/MageSpells.luau, MageBrain); you only walk around with your character.
-		maxTier = 30,
+		-- 16 merge levels (the top: two level 16 merged = ASCENDED). The looks are the first 16 of the mage's 30-level
+		-- R15 evolution (design/MageEvolution, StageModels/MageEvolution, SoldierRig), prehistory to the industrial
+		-- age; the data for 17 … 30 stays for later. The Mage casts all the spells of the game itself
+		-- (Config/MageSpells.luau, MageBrain); you only walk around with your character.
+		maxTier = 16,
 	},
 } :: { [string]: ClassDef }
 

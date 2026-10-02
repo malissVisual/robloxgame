@@ -7,7 +7,8 @@ right in the UI inventory (drag a card onto another card) or in 3D (drag a soldi
 **equip** your best into the battle squad (one row of six) and send the squad into battle against a wave. Both
 sides walk from their rows onto a big round fight arena and fight on their own, PvE only. PC first, mobile later.
 
-**Current state (Mage only):** the game has ONE class, the **Mage** (30 merge levels, the R15 evolution). The Knight,
+**Current state (Mage only):** the game has ONE class, the **Mage** (**16 merge levels**, `maxTier = 16`; two level 16
+merged = ASCENDED; the looks are the first 16 of the 30-level R15 evolution, the data for 17 … 30 stays for later). The Knight,
 the Archer, the Hunter, the Tank, the Berserker and the Soldier were removed (a saved soldier of a removed class
 loads as a Mage of the same level). **You do not cast anything**: the Mages fight and cast every spell on their own
 (`Config/MageSpells.luau`, `MageBrain.luau`), and you only walk around with your character; there is no Q / E, no
