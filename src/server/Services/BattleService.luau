@@ -140,6 +140,7 @@ export type Battle = {
 	twists: { any }, -- the wave's twist definitions (Config/Mutators.luau)
 	formation: string, -- the enemies' layout name (Config/Formations.luau; informational, see Plots.showEnemies)
 	enemyCtx: any?, -- the enemy brains' shared context (EnemyBrain.Context), built in start()
+	damageDealt: number, -- damage your side dealt to the enemies (the result screen)
 	groundAt: (Vector3) -> number, -- world y of the ground under a position (the arena's heightAt): fighters walk
 	-- from their pads up the step onto the round platform and down again, so every tick snaps them to the ground
 }
@@ -754,6 +755,9 @@ applyDamage = function(battle: Battle, target: Fighter, amount: number, source: 
 		return 0
 	end
 	local taken = damage(target, amount)
+	if source and source.side == PLAYER_SIDE and target.side == ENEMY_SIDE then
+		battle.damageDealt += taken
+	end
 	if tree and taken > 0 and source and source.side ~= target.side then
 		local mage = source :: Fighter
 		if MageTree.has(tree, "smolder") then
@@ -1062,7 +1066,11 @@ export type Options = {
 	formation: string?, -- the enemies' layout (Waves.formation; "line" when missing)
 }
 
-export type Result = { bonusDrop: boolean } -- an extra drop earned in the fight (the treasure goblin)
+export type Result = {
+	bonusDrop: boolean, -- an extra drop earned in the fight (the treasure goblin)
+	damage: number, -- damage your side dealt to the enemies (the result screen)
+	duration: number, -- battle seconds the fight took
+}
 
 -- Starts the battle. `plot.models` must be rendered from the current squad.
 -- At the end sets `profile.battling = false` and calls onFinished(won, result).
@@ -1174,6 +1182,7 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		groundAt = function(pos: Vector3): number
 			return plot.arena.heightAt(pos)
 		end,
+		damageDealt = 0,
 	}
 	battle.emit = function(name: string, payload: any)
 		for _, f in fighters do
@@ -1479,7 +1488,7 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		end
 
 		if player.Parent and plot.folder.Parent then
-			onFinished(won, { bonusDrop = mutators.bonusDrop })
+			onFinished(won, { bonusDrop = mutators.bonusDrop, damage = battle.damageDealt, duration = battle.clock })
 		end
 	end)
 end

@@ -42,6 +42,7 @@ export type Profile = {
 	nextCoinId: number,
 	unlocked: { [string]: boolean }, -- unlocked classes
 	rolling: boolean, -- roll animation running (actions are locked)
+	resultPending: boolean, -- the result screen of the last wave is up: the loot waits for CLAIM LOOT, no new wave until then
 	map: string, -- current map (Config/Maps)
 	bestWave: number, -- the highest wave ever reached (offline income)
 	stats: { [string]: number }, -- lifetime counters (kills, merges, waves won …)
@@ -191,6 +192,7 @@ local function fresh(): Profile
 		nextCoinId = 0,
 		unlocked = unlocked,
 		rolling = false,
+		resultPending = false,
 		map = Maps.First,
 		bestWave = 1,
 		stats = {},

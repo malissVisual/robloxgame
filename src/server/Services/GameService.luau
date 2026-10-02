@@ -1005,13 +1005,25 @@ local function payAllXp(player: Player)
 	Net.get("CoinsClear"):FireClient(player)
 end
 
--- Moves the queued drop (and the lucky-drop soldier + unlock) into the inventory. The client
--- calls it (CollectDrops) when the cards have flown into the inventory panel; a timer calls it as
--- a fallback. Safe to call twice.
+local startNextWave: (Player) -> () = function() end -- = onBattle (defined below): auto fight after CLAIM LOOT
+
+-- Moves the queued drop (and the lucky-drop soldier + unlock) into the inventory. The client calls it
+-- (CollectDrops) when CLAIM LOOT is clicked on the result screen; a long timer calls it as a fallback. Safe to
+-- call twice. It also closes the result: the next wave may start (auto fight starts it).
 collectPending = function(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return
+	end
+	if profile.resultPending then
+		profile.resultPending = false
+		if profile.autoFight and not profile.battling then
+			task.delay(0.8, function()
+				if PlayerData.get(player) == profile and profile.autoFight and not profile.battling and not profile.rolling and not profile.resultPending then
+					startNextWave(player)
+				end
+			end)
+		end
 	end
 	-- The drops have landed (or the result screen was skipped): the next wave may start soon.
 	if not profile.battling and profile.nextWaveAt > os.clock() + 0.4 then
@@ -1098,6 +1110,10 @@ end
 local function onBattle(player: Player)
 	local profile, plot = PlayerData.get(player), plots[player]
 	if not profile or not plot or profile.battling or profile.rolling then
+		return
+	end
+	if profile.resultPending then
+		notify(player, "Claim the loot of the last wave first")
 		return
 	end
 	-- The FIGHT button starts the selected wave from anywhere (the wave and difficulty are chosen
@@ -1206,14 +1222,38 @@ local function onBattle(player: Player)
 			twists = twists,
 			formation = Waves.formation(wave, twists),
 		}, onKill, function(won: boolean, result: BattleService.Result)
-			-- Back to the spawn once the fight is over: a 1 s fade to black, the move happens while it is dark.
-			Net.get("Countdown"):FireClient(player, "end")
-			Net.get("WaveIntro"):FireClient(player, nil) -- the twist chips go away
-			task.delay(0.4, function()
-				local character = player.Character
-				local home = plots[player]
-				if character and home then
-					character:PivotTo(home.respawn.CFrame + Vector3.new(0, 4, 0))
+			-- The fight is over: the camera stays on the battlefield for Balance.ResultHold (victory poses, the last
+			-- numbers), then a 1 s fade to black (you are put back at your spawn while it is dark) and, as it clears,
+			-- the RESULT SCREEN: damage, kills, time, coins, XP, the loot. The loot waits for CLAIM LOOT (collectPending)
+			-- and no new wave starts before that.
+			profile.resultPending = true
+			local hold = Balance.ResultHold
+			task.delay(hold, function()
+				if plots[player] ~= plot then
+					return
+				end
+				Net.get("Countdown"):FireClient(player, "end")
+				Net.get("WaveIntro"):FireClient(player, nil) -- the twist chips go away
+				task.delay(0.4, function()
+					local character = player.Character
+					local home = plots[player]
+					if character and home then
+						character:PivotTo(home.respawn.CFrame + Vector3.new(0, 4, 0))
+					end
+				end)
+			end)
+			local function sendResult(payload: { [string]: any })
+				payload.damage = math.floor(result.damage + 0.5)
+				payload.time = math.floor(result.duration + 0.5)
+				task.delay(hold + 0.9, function()
+					if plots[player] == plot then
+						Net.get("WaveResult"):FireClient(player, payload)
+					end
+				end)
+			end
+			task.delay(Balance.DropCollectTime, function()
+				if plots[player] == plot then
+					collectPending(player) -- the fallback: the loot never waits forever
 				end
 			end)
 			if not won then
@@ -1225,7 +1265,7 @@ local function onBattle(player: Player)
 				profile.nextWaveAt = os.clock() + Balance.DefeatCooldown
 				refresh(player)
 				sfx(player, "lost")
-				Net.get("WaveResult"):FireClient(player, {
+				sendResult({
 					won = false,
 					wave = wave,
 					difficulty = difficulty.label,
@@ -1262,7 +1302,8 @@ local function onBattle(player: Player)
 				PlayerData.addStat(profile, "nightmareWaves", 1)
 			end
 			sfx(player, "won")
-			addXp(player, profile, (Balance.XpPerWave + 5 * wave) * (if isBoss then 2 else 1) * difficulty.xpMultiplier)
+			local xpGained = math.floor((Balance.XpPerWave + 5 * wave) * (if isBoss then 2 else 1) * difficulty.xpMultiplier)
+			addXp(player, profile, xpGained)
 			local drop = battleDrop(profile, wave, isBoss)
 			local extraDrops: { Drop } = {} -- Nightmare (and an elite wave) gives an extra drop
 			for _ = 1, difficulty.extraDrops + (if isElite then 1 else 0) do
@@ -1276,23 +1317,17 @@ local function onBattle(player: Player)
 			refresh(player)
 
 			task.spawn(PlayerData.save, player) -- progress is saved after every won wave
+			-- (Auto fight starts the next wave from collectPending, once CLAIM LOOT was clicked.)
 
-			-- Auto fight: the next wave starts by itself once the result screen is over.
-			if profile.autoFight then
-				task.delay(Balance.RewardTime + 0.6, function()
-					if plots[player] == plot and profile.autoFight and not profile.battling and not profile.rolling then
-						onBattle(player)
-					end
-				end)
-			end
-
-			task.delay(Balance.DropCollectTime, function()
-				if plots[player] == plot then
-					collectPending(player)
+			-- The others in the server hear about it (a line in their notices).
+			for _, other in Players:GetPlayers() do
+				if other ~= player then
+					notify(other, string.format("%s cleared wave %d on %s · %d damage", player.DisplayName, wave, difficulty.label, math.floor(result.damage + 0.5)))
 				end
-			end)
-			Net.get("WaveResult"):FireClient(player, {
+			end
+			sendResult({
 				won = true,
+				xp = xpGained,
 				wave = wave,
 				replay = not firstClear,
 				mapCleared = mapJustCleared,
@@ -1313,6 +1348,7 @@ local function onBattle(player: Player)
 		end)
 	end)
 end
+startNextWave = onBattle
 
 local function join(player: Player)
 	local index = 1

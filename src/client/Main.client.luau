@@ -3469,124 +3469,272 @@ local function flyToInventory(card: Frame, unit: { class: string, tier: number }
 	tween:Play()
 end
 
--- After a wave there is no result box: the rewards drop in one after another at the top of the screen (a
--- small line each, a little 3D card for a soldier), and the drops go straight into the inventory.
-local rewardFeed = Instance.new("Frame")
-rewardFeed.Name = "RewardFeed"
-rewardFeed.AnchorPoint = Vector2.new(0.5, 0)
-rewardFeed.Position = UDim2.new(0.5, 0, 0, 66)
-rewardFeed.Size = UDim2.fromOffset(380, 0)
-rewardFeed.AutomaticSize = Enum.AutomaticSize.Y
-rewardFeed.BackgroundTransparency = 1
-rewardFeed.Parent = gui
-local rewardLayout = Instance.new("UIListLayout")
-rewardLayout.Padding = UDim.new(0, 5)
-rewardLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-rewardLayout.SortOrder = Enum.SortOrder.LayoutOrder
-rewardLayout.Parent = rewardFeed
-local rewardOrder = 0
+-- ── The RESULT SCREEN after a wave ─────────────────────────────────────────
+-- The fight is over, the camera held on the battlefield, the screen faded and cleared: now this. A big card in the
+-- middle: WAVE n CLEARED (or DEFEAT), the difficulty and the streak, three stat tiles that count up (damage dealt,
+-- kills, time), the coins and XP, the loot (soldier cards, bonus level, the lucky drop) and CLAIM LOOT. The loot
+-- enters the inventory only when you click (CollectDrops), and no new wave starts before that.
+local showResult: (any) -> () = function() end
+do
+	local RW, RH = 640, 500
+	local screen = Instance.new("CanvasGroup")
+	screen.Name = "ResultScreen"
+	screen.AnchorPoint = Vector2.new(0.5, 0.5)
+	screen.Position = UDim2.fromScale(0.5, 0.5)
+	screen.Size = UDim2.fromOffset(RW, RH)
+	screen.BackgroundColor3 = BG
+	screen.BackgroundTransparency = 0.03
+	screen.BorderSizePixel = 0
+	screen.Visible = false
+	screen.Active = true
+	screen.ZIndex = 60
+	screen.Parent = gui
+	corner(screen, 18)
+	UI.gradient(screen, Color3.fromRGB(38, 41, 58), Color3.fromRGB(16, 18, 26))
+	local screenStroke = UI.stroke(screen, GOLD, 2, 0.2)
 
--- One reward line: text (rich), an optional soldier card, an accent color. It pops in and fades after a while.
-local function pushReward(text: string, accent: Color3, unit: { class: string, tier: number }?, stay: number)
-	rewardOrder += 1
-	local pill = Instance.new("Frame")
-	pill.LayoutOrder = rewardOrder
-	pill.Size = UDim2.fromOffset(0, 34)
-	pill.AutomaticSize = Enum.AutomaticSize.X
-	pill.BackgroundColor3 = BG
-	pill.BackgroundTransparency = 0.15
-	pill.BorderSizePixel = 0
-	pill.Parent = rewardFeed
-	corner(pill, 17)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = accent
-	stroke.Thickness = 2
-	stroke.Parent = pill
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, if unit then 4 else 14)
-	padding.PaddingRight = UDim.new(0, 14)
-	padding.Parent = pill
-	local row = Instance.new("UIListLayout")
-	row.FillDirection = Enum.FillDirection.Horizontal
-	row.VerticalAlignment = Enum.VerticalAlignment.Center
-	row.Padding = UDim.new(0, 8)
-	row.Parent = pill
-	if unit then
-		local card = makeCard()
-		card.Size = UDim2.fromOffset(28, 28)
-		card.Parent = pill
-		styleCard(card, unit)
-		local tier = card:FindFirstChild("Tier")
-		if tier then
-			tier:Destroy()
-		end
+	local function text(name: string, y: number, height: number, size: number, font: Enum.Font, color: Color3, x: number?, width: number?): TextLabel
+		local l = label(screen, "", UDim2.fromOffset(x or 24, y), UDim2.fromOffset(width or (RW - 48), height), size, font, color)
+		l.Name = name
+		l.RichText = true
+		l.ZIndex = 61
+		return l
 	end
-	local line = Instance.new("TextLabel")
-	line.Size = UDim2.fromOffset(0, 34)
-	line.AutomaticSize = Enum.AutomaticSize.X
-	line.BackgroundTransparency = 1
-	line.Font = Enum.Font.GothamBold
-	line.TextSize = 15
-	line.TextColor3 = WHITE
-	line.RichText = true
-	line.Text = text
-	line.Parent = pill
+	local title = text("Title", 22, 40, 34, Enum.Font.GothamBlack, GOLD)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	local subtitle = text("Subtitle", 64, 18, 13, Enum.Font.GothamMedium, MUTED)
+	subtitle.TextXAlignment = Enum.TextXAlignment.Center
 
-	local scale = Instance.new("UIScale")
-	scale.Scale = 0.4
-	scale.Parent = pill
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-	task.delay(stay, function()
-		if not pill.Parent then
+	-- Three stat tiles.
+	type Tile = { value: TextLabel, target: number, format: (number) -> string }
+	local tiles: { Tile } = {}
+	local function tile(index: number, caption: string, format: (number) -> string)
+		local box = Instance.new("Frame")
+		box.Position = UDim2.fromOffset(24 + (index - 1) * 200, 96)
+		box.Size = UDim2.fromOffset(192, 78)
+		box.BackgroundColor3 = UI.DARK
+		box.BackgroundTransparency = 0.15
+		box.BorderSizePixel = 0
+		box.ZIndex = 61
+		box.Parent = screen
+		corner(box, 12)
+		UI.stroke(box, BADGE, 1.5)
+		local value = label(box, "0", UDim2.fromOffset(0, 10), UDim2.new(1, 0, 0, 36), 30, Enum.Font.GothamBlack, WHITE)
+		value.TextXAlignment = Enum.TextXAlignment.Center
+		value.ZIndex = 62
+		local cap = label(box, caption, UDim2.fromOffset(0, 50), UDim2.new(1, 0, 0, 14), 10, Enum.Font.GothamBold, MUTED)
+		cap.TextXAlignment = Enum.TextXAlignment.Center
+		cap.ZIndex = 62
+		tiles[index] = { value = value, target = 0, format = format }
+	end
+	local function thousands(n: number): string
+		local str = tostring(math.floor(n + 0.5))
+		local out = ""
+		while #str > 3 do
+			out = " " .. string.sub(str, -3) .. out
+			str = string.sub(str, 1, -4)
+		end
+		return str .. out
+	end
+	tile(1, "DAMAGE DEALT", thousands)
+	tile(2, "KILLS", function(n)
+		return tostring(math.floor(n + 0.5))
+	end)
+	tile(3, "TIME", function(n)
+		local total = math.floor(n + 0.5)
+		return string.format("%d:%02d", total // 60, total % 60)
+	end)
+
+	-- Coins and XP.
+	local rewardLine = text("Rewards", 188, 24, 18, Enum.Font.GothamBold, GOLD)
+	rewardLine.TextXAlignment = Enum.TextXAlignment.Center
+
+	-- The loot: a row of soldier cards with a line under each.
+	local lootCaption = text("LootCaption", 224, 14, 10, Enum.Font.GothamBlack, GOLD)
+	local lootRow = Instance.new("Frame")
+	lootRow.Position = UDim2.fromOffset(24, 242)
+	lootRow.Size = UDim2.fromOffset(RW - 48, 120)
+	lootRow.BackgroundTransparency = 1
+	lootRow.ZIndex = 61
+	lootRow.Parent = screen
+	local lootLayout = Instance.new("UIListLayout")
+	lootLayout.FillDirection = Enum.FillDirection.Horizontal
+	lootLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	lootLayout.Padding = UDim.new(0, 14)
+	lootLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	lootLayout.Parent = lootRow
+	local luckyLine = text("Lucky", 366, 18, 13, Enum.Font.GothamBold, GREEN)
+	luckyLine.TextXAlignment = Enum.TextXAlignment.Center
+	local hintLine = text("Hint", 388, 16, 11, Enum.Font.Gotham, MUTED)
+	hintLine.TextXAlignment = Enum.TextXAlignment.Center
+
+	local claim = Instance.new("TextButton")
+	claim.AnchorPoint = Vector2.new(0.5, 0)
+	claim.Position = UDim2.new(0.5, 0, 0, RH - 84)
+	claim.Size = UDim2.fromOffset(300, 56)
+	claim.BackgroundColor3 = GREEN:Lerp(BG, 0.15)
+	claim.BorderSizePixel = 0
+	claim.AutoButtonColor = false
+	claim.Font = Enum.Font.GothamBlack
+	claim.TextSize = 20
+	claim.TextColor3 = WHITE
+	claim.Text = "CLAIM LOOT"
+	claim.ZIndex = 62
+	claim.Parent = screen
+	corner(claim, 14)
+	local claimStroke = UI.stroke(claim, GREEN, 2)
+	claim.MouseEnter:Connect(function()
+		claim.BackgroundColor3 = GREEN
+	end)
+	claim.MouseLeave:Connect(function()
+		claim.BackgroundColor3 = GREEN:Lerp(BG, 0.15)
+	end)
+
+	local function unitText(unit: any): string
+		return string.format("%s %s", Units.Classes[unit.class].label, Levels.label(unit.tier))
+	end
+	local lootCards: { { card: Frame, unit: any } } = {}
+	local countStart = 0
+	local open = false
+	local claiming = false
+
+	-- The stat tiles count up over 0.9 s after the screen opened.
+	RunService.RenderStepped:Connect(function()
+		if not open then
 			return
 		end
-		local fade = TweenInfo.new(0.35)
-		TweenService:Create(pill, fade, { BackgroundTransparency = 1 }):Play()
-		TweenService:Create(line, fade, { TextTransparency = 1 }):Play()
-		TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
-		TweenService:Create(scale, fade, { Scale = 0.85 }):Play()
-		task.delay(0.4, function()
-			pill:Destroy()
+		local t = math.clamp((os.clock() - countStart) / 0.9, 0, 1)
+		local e = 1 - (1 - t) ^ 3
+		for _, tl in tiles do
+			tl.value.Text = tl.format(tl.target * e)
+		end
+	end)
+
+	local function close()
+		open = false
+		local tween = TweenService:Create(screen, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 1 })
+		tween:Play()
+		tween.Completed:Connect(function()
+			if not open then
+				screen.Visible = false
+			end
+		end)
+	end
+
+	claim.Activated:Connect(function()
+		if claiming or not open then
+			return
+		end
+		claiming = true
+		claim.Text = "…"
+		-- The loot flies into the inventory, then the server delivers it (CollectDrops) and the screen goes.
+		local flying = 0
+		for _, entry in lootCards do
+			flying += 1
+			flyToInventory(entry.card, entry.unit, function()
+				flying -= 1
+			end)
+		end
+		task.delay(if flying > 0 then 0.5 else 0.05, function()
+			Net.get("CollectDrops"):FireServer()
+			close()
+			claiming = false
 		end)
 	end)
-end
 
-local function unitText(unit: any): string
-	return string.format("%s %s", Units.Classes[unit.class].label, Levels.label(unit.tier))
-end
+	showResult = function(result: any)
+		for _, child in lootRow:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		table.clear(lootCards)
+		local won = result.won == true
+		screenStroke.Color = if won then GOLD else RED
+		if won then
+			title.TextColor3 = GOLD
+			title.Text = if result.mapCleared then string.format("%s CLEARED!", string.upper(result.mapLabel)) elseif result.elite then string.format("ELITE WAVE %d CLEARED", result.wave) elseif result.boss then string.format("BOSS WAVE %d CLEARED", result.wave) else string.format("WAVE %d CLEARED", result.wave)
+		else
+			title.TextColor3 = RED
+			title.Text = string.format("DEFEAT  ·  WAVE %d", result.wave)
+		end
+		local bits = { string.upper(tostring(result.difficulty or "")) }
+		if won and (result.streak or 0) > 1 then
+			table.insert(bits, string.format("streak x%d", result.streak))
+		end
+		if won and result.replay then
+			table.insert(bits, "replayed wave")
+		end
+		if not won then
+			table.insert(bits, "the squad fell — merge, upgrade and try again")
+		end
+		subtitle.Text = table.concat(bits, "   ·   ")
 
-local function showResult(result: any)
-	-- The drops go straight into the inventory (no waiting for a result screen).
-	if result.won then
-		Net.get("CollectDrops"):FireServer()
+		tiles[1].target = result.damage or 0
+		tiles[2].target = result.kills or 0
+		tiles[3].target = result.time or 0
+		for _, tl in tiles do
+			tl.value.Text = tl.format(0)
+		end
+		countStart = os.clock()
+
+		rewardLine.Text = string.format('<font color="#ffcd5a">+%d coins</font>%s', result.coins or 0, if won and result.xp then string.format('     <font color="#7ee08a">+%d XP</font>', result.xp) else "")
+
+		local loot = {}
+		if won then
+			if result.drop then
+				table.insert(loot, { unit = result.drop, line = if result.drop.bonus then "BONUS LEVEL" else "", sold = result.drop.stored == false })
+			end
+			for _, extra in result.extraDrops or {} do
+				table.insert(loot, { unit = extra, line = "", sold = extra.stored == false })
+			end
+			if result.luckyResult then
+				table.insert(loot, { unit = { class = result.luckyResult, tier = 1 }, line = "LUCKY DROP", sold = false })
+			end
+		end
+		lootCaption.Text = if #loot > 0 then "LOOT" else ""
+		for i, item in loot do
+			local holder = Instance.new("Frame")
+			holder.LayoutOrder = i
+			holder.Size = UDim2.fromOffset(96, 120)
+			holder.BackgroundTransparency = 1
+			holder.ZIndex = 61
+			holder.Parent = lootRow
+			local card = makeCard()
+			card.AnchorPoint = Vector2.new(0.5, 0)
+			card.Position = UDim2.new(0.5, 0, 0, 0)
+			card.Size = UDim2.fromOffset(84, 84)
+			card.Parent = holder
+			styleCard(card, item.unit)
+			for _, d in card:GetDescendants() do
+				if d:IsA("GuiObject") then
+					d.ZIndex = 63
+				end
+			end
+			card.ZIndex = 62
+			local under = label(holder, unitText(item.unit) .. (if item.sold then '\n<font color="#a5aab9">inventory full: sold</font>' elseif item.line ~= "" then '\n<font color="#ffcd5a">' .. item.line .. "</font>" else ""), UDim2.fromOffset(-10, 88), UDim2.fromOffset(116, 32), 10, Enum.Font.GothamBold, WHITE)
+			under.TextXAlignment = Enum.TextXAlignment.Center
+			under.RichText = true
+			under.ZIndex = 63
+			table.insert(lootCards, { card = card, unit = item.unit })
+			-- The cards pop in one after another.
+			local scale = Instance.new("UIScale")
+			scale.Scale = 0.3
+			scale.Parent = holder
+			TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0.5 + i * 0.12), { Scale = 1 }):Play()
+		end
+		luckyLine.Text = if won and result.luckyResult then string.format("LUCKY DROP: %s unlocked!", Units.Classes[result.luckyResult].label) elseif won and result.luckyCandidates and #result.luckyCandidates > 0 then string.format('<font color="#a5aab9">lucky drop chance %d%% — not this time</font>', math.floor((result.luckyChance or 0) * 100 + 0.5)) else ""
+		hintLine.Text = if won then "the loot enters your inventory when you claim it" else "no loot this time"
+		claim.Text = if won then "CLAIM LOOT" else "CONTINUE"
+		claim.BackgroundColor3 = (if won then GREEN else Color3.fromRGB(120, 130, 160)):Lerp(BG, 0.15)
+		claimStroke.Color = if won then GREEN else Color3.fromRGB(120, 130, 160)
+		claiming = false
+
+		open = true
+		screen.Visible = true
+		screen.GroupTransparency = 1
+		TweenService:Create(screen, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 0 }):Play()
 	end
-
-	local entries: { { text: string, accent: Color3, unit: any? } } = {}
-	if result.won then
-		local title = if result.mapCleared then string.format("%s CLEARED!", string.upper(result.mapLabel)) elseif result.elite then string.format("ELITE WAVE %d CLEARED", result.wave) elseif result.boss then string.format("BOSS WAVE %d CLEARED", result.wave) else string.format("WAVE %d CLEARED", result.wave)
-		table.insert(entries, { text = string.format('<font color="#ffcd5a">%s</font>', title), accent = GOLD })
-		table.insert(entries, { text = string.format('<font color="#ffcd5a">+%d coins</font>%s', result.coins or 0, if (result.streak or 0) > 1 then string.format("  ·  streak x%d", result.streak) else ""), accent = GOLD })
-		local drop = result.drop
-		if drop then
-			table.insert(entries, { text = unitText(drop) .. (if drop.bonus then '  <font color="#ffcd5a">BONUS LEVEL</font>' else "") .. (if drop.stored then "" else '  <font color="#a5aab9">(inventory full: sold)</font>'), accent = Levels.color(drop.tier), unit = drop })
-		end
-		for _, extra in result.extraDrops or {} do
-			table.insert(entries, { text = "+ " .. unitText(extra) .. (if extra.stored then "" else '  <font color="#a5aab9">(sold)</font>'), accent = Levels.color(extra.tier), unit = extra })
-		end
-		if result.luckyResult then
-			table.insert(entries, { text = string.format('<font color="#7ee08a">LUCKY DROP: %s unlocked!</font>', Units.Classes[result.luckyResult].label), accent = GREEN, unit = { class = result.luckyResult, tier = 1 } })
-		end
-	else
-		table.insert(entries, { text = string.format('<font color="#f0645a">DEFEAT</font>  ·  wave %d  ·  <font color="#ffcd5a">+%d coins</font>', result.wave, result.coins or 0), accent = RED })
-	end
-
-	-- One after another, like loot dropping in.
-	task.spawn(function()
-		for i, entry in entries do
-			pushReward(entry.text, entry.accent, entry.unit, 3.6 + (#entries - i) * 0.25)
-			task.wait(0.35)
-		end
-	end)
 end
 
 Net.get("WaveResult").OnClientEvent:Connect(showResult)
