@@ -17,6 +17,7 @@ local MageAnimator = {}
 
 local JOINTS = { "Root", "Waist", "Neck", "LeftShoulder", "RightShoulder", "LeftElbow", "RightElbow", "LeftWrist", "RightWrist", "LeftHip", "RightHip", "LeftKnee", "RightKnee", "LeftAnkle", "RightAnkle" }
 local RECOVER = 0.4 -- seconds a gesture takes to settle after the spell fired
+local RECOVER_BOLT = 0.6 -- the bolt's throw holds its stretch longer (big, readable)
 
 type Cast = { kind: string, duration: number, hand: string, startedAt: number }
 type Shard = { part: Part, angle: number, height: number, speed: number }
@@ -150,12 +151,17 @@ local function gesture(o: { [string]: Vector3 }, kind: string, w: number, r: num
 	local other = if hand == "L" then "RightShoulder" else "LeftShoulder"
 	local elbow = if hand == "L" then "LeftElbow" else "RightElbow"
 	if kind == "bolt" then
-		-- Wind-up: the hand draws back and up, the torso coils; release: a snap forward with a twist, then it settles.
-		add(arm, 0.7 * w - 1.9 * r, 0, side * (0.25 * w + 0.1 * r))
-		add(elbow, 0.9 * w + 0.2 * r, 0, 0)
-		add("Waist", 0.05 * w - 0.1 * r, -side * (0.35 * w - 0.3 * r), 0)
-		add("Neck", -0.1 * r, side * 0.15 * w, 0)
-		add(other, 0.2 * w + 0.3 * r, 0, -side * 0.25 * (w + r))
+		-- A BIG throw. Wind-up: the hand swings far back and up behind the head, the elbow bends, the torso coils
+		-- away and leans back, the other arm reaches forward to aim. Release: the arm whips forward fully stretched
+		-- at the target, the torso unwinds past the middle and bows into the throw, the other arm swings back; it
+		-- holds the stretch a moment and settles (RECOVER_BOLT).
+		add(arm, 1.5 * w - 2.9 * r, 0, side * (0.45 * w + 0.15 * r))
+		add(elbow, 1.4 * w - 0.1 * r, 0, 0)
+		add("Waist", -0.18 * w + 0.32 * r, -side * (0.7 * w - 0.6 * r), 0)
+		add("Root", 0, -side * (0.25 * w - 0.2 * r), 0)
+		add("Neck", 0.1 * w - 0.2 * r, side * (0.3 * w - 0.15 * r), 0)
+		add(other, -1.1 * w + 0.7 * r, 0, -side * (0.2 * w + 0.45 * r))
+		add(if hand == "L" then "RightElbow" else "LeftElbow", 0.5 * w, 0, 0)
 	elseif kind == "aoe" or kind == "pull" then
 		-- Both arms rise over the head, then slam down (aoe) / yank back (pull); the torso bows.
 		local up = -2.5 * w
@@ -253,11 +259,15 @@ local function updateRig(rig: Rig, now: number, dt: number)
 	local cast = rig.cast
 	if cast then
 		local since = now - cast.startedAt
+		local recover = if cast.kind == "bolt" then RECOVER_BOLT else RECOVER
 		if since <= cast.duration then
 			gesture(o, cast.kind, smooth(since / cast.duration), 0, cast.hand)
-		elseif since <= cast.duration + RECOVER then
-			local k = 1 - (since - cast.duration) / RECOVER
-			gesture(o, cast.kind, 0, outBack(k) * k, cast.hand)
+		elseif since <= cast.duration + recover then
+			local k = 1 - (since - cast.duration) / recover
+			-- The release: a quick snap into the full stretch (the first 15 %), held, then eased back.
+			local snap = math.clamp((1 - k) / 0.15, 0, 1)
+			local amount = if cast.kind == "bolt" then math.min(smooth(snap), smooth(k / 0.6)) else outBack(k) * k
+			gesture(o, cast.kind, 0, amount, cast.hand)
 		else
 			rig.cast = nil
 		end
