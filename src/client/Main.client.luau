@@ -1909,11 +1909,13 @@ end
 local function glide(model: Model, goal: CFrame, duration: number)
 	local start = model:GetPivot()
 	local t0 = os.clock()
+	model:SetAttribute("Gliding", true) -- the hover leaves a gliding model alone (see updateHover)
 	task.spawn(function()
 		while model.Parent do
 			local a = (os.clock() - t0) / duration
 			if a >= 1 then
 				model:PivotTo(goal)
+				model:SetAttribute("Gliding", nil)
 				return
 			end
 			model:PivotTo(start:Lerp(goal, 1 - (1 - a) ^ 3))
@@ -1980,6 +1982,22 @@ local function hoverColor(slot: number, model: Model?): Color3
 	return if ring and ring:IsA("BasePart") then ring.Color:Lerp(Color3.new(1, 1, 1), 0.45) else HOVER_EMPTY
 end
 
+-- Where a soldier on a pad really belongs: on top of its pad (by its Slot attribute), lifted by its size, with
+-- its current facing. Hover lifts and drags return the model HERE, never to "where it was a moment ago": that
+-- used to stack up (a click while the hover lift or the glide back was still running made the model float
+-- a little higher every time).
+local function trueHome(model: Model): CFrame
+	local current = model:GetPivot()
+	local slot = model:GetAttribute("Slot")
+	local pad = if type(slot) == "number" then padOf(slot) else nil
+	local tier = model:GetAttribute("Tier")
+	if not pad or type(tier) ~= "number" then
+		return current
+	end
+	local lift = Soldier.lift(tier, model:GetAttribute("Ascended") == true)
+	return current.Rotation + Vector3.new(pad.Position.X, pad.Position.Y + pad.Size.Y / 2 + lift, pad.Position.Z)
+end
+
 type Lifted = { home: CFrame, offset: number, target: number, glow: Highlight? }
 local lifted: { [Model]: Lifted } = {}
 local hoveredModel: Model? = nil
@@ -1990,7 +2008,7 @@ local function liftModel(model: Model, up: boolean)
 		if not up then
 			return
 		end
-		entry = { home = model:GetPivot(), offset = 0, target = 0, glow = nil }
+		entry = { home = trueHome(model), offset = 0, target = 0, glow = nil }
 		lifted[model] = entry
 	end
 	entry.target = if up then HOVER_LIFT else 0
@@ -2027,6 +2045,9 @@ local function updateHover(dt: number)
 	end
 	local idle = UserInputService.MouseEnabled and not state.rolling and not state.battling
 	local model = if idle then soldierUnderPointer() else nil
+	if model and model:GetAttribute("Gliding") then
+		model = nil -- still gliding back from a drag: no hover lift until it has landed
+	end
 	if model ~= hoveredModel then
 		if hoveredModel then
 			liftModel(hoveredModel, false)
@@ -2100,7 +2121,7 @@ local function beginDrag()
 		hoveredModel = nil
 	end
 	local groundY = pad.Position.Y + pad.Size.Y / 2
-	local home = model:GetPivot()
+	local home = trueHome(model)
 	drag = {
 		slot = slot,
 		model = model,
