@@ -183,7 +183,9 @@ local function showTitle(player: Player, profile: PlayerData.Profile)
 		l.Parent = made
 	end
 	local level = PlayerData.levelInfo(profile.xp)
-	;((gui :: BillboardGui):FindFirstChild("Level") :: TextLabel).Text = string.format('%s  <font color="#ffcd5a">Lv %d</font>', player.DisplayName, level)
+	-- The owner (an admin: the game's creator, Balance.AdminUserIds, Studio) gets a red [OWNER] before the name.
+	local prefix = if isAdmin(player) then '<font color="#f0645a">[OWNER]</font> ' else ""
+	;((gui :: BillboardGui):FindFirstChild("Level") :: TextLabel).Text = string.format('%s%s  <font color="#ffcd5a">Lv %d</font>', prefix, player.DisplayName, level)
 end
 
 local addXp: (Player, PlayerData.Profile, number) -> () = function() end -- defined below
