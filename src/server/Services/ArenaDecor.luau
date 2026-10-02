@@ -6,7 +6,7 @@
 -- top of the plot's floor, +z points from your squad toward the enemies).
 --
 -- The decor never blocks the game: it has no click / query collision (soldiers behind it can still
--- be picked) and stays at the sides of the fight area (x beyond +-22) and at the gate.
+-- be picked) and stays along the plot's side fences, past the round fight platform, and at the gate.
 
 local Data: { [string]: any } = {
 	TrainingArena1 = require(script.Parent.DecorData.TrainingArena1),
@@ -51,13 +51,14 @@ local PLACEMENTS: { [string]: { Placement } } = {
 
 local ArenaDecor = {}
 
-local RING_SCALE = 2.0 -- the big arena gets bigger ring marks than the design's
+local RING_SCALE = 4.0 -- the big round arena (140 across) gets much bigger ring marks than the design's
 
 -- The placements above were laid out for the original arena (a plot 64 wide, the arena z = 30 … 140). The
--- plot is 84 wide and 160 long now: x is stretched to the new width, the things along the fight platform
--- (z 34 … 117) are spread over the longer platform and the far end (the dummies, hay, targets) moves back.
-local OLD_HALF, NEW_HALF = 32, 42
-local OLD_FAR, NEW_FAR = 118, 136 -- where the far end (the enemy area) began / begins
+-- plot is 160 wide and 296 long now, with the round fight platform (z 56 … 196) in the middle: x is stretched
+-- to the new width (the props stand along the side fences), the things along the fight platform (z 34 … 117)
+-- are spread over the platform's length and the far end (the dummies, hay, targets) moves behind the enemies' row.
+local OLD_HALF, NEW_HALF = 32, 76
+local OLD_FAR, NEW_FAR = 118, 210 -- where the far end (the enemy area) began / begins
 local function stretched(placement: Placement): (number, number)
 	local x = placement.x * NEW_HALF / OLD_HALF
 	local z = placement.z

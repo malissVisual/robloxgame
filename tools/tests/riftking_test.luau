@@ -30,7 +30,7 @@ S.players = { player }
 local damageLog = {}
 local ctx = {
 	player = player,
-	plot = { arena = { heightAt = function() return 2 end, center = vec(0, 2, 0) }, inArena = function() return true end },
+	plot = { arena = { heightAt = function() return 2 end, center = vec(0, 2, 0), radius = 70 }, inArena = function() return true end },
 	parent = S.newInstance("Folder"),
 	fighters = fighters,
 	playerSide = 1,

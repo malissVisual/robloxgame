@@ -11,9 +11,9 @@ local Balance = {
 	BoardUpgradeStep = 3, -- slots gained per upgrade
 	BoardUpgradeBaseCost = 40, -- cost of the first upgrade
 	BoardUpgradeGrowth = 1.6, -- every upgrade costs 60% more
-	-- Squad: the soldiers that actually fight: exactly six, 3 columns × 2 rows (a back and a front row), in the
+	-- Squad: the soldiers that actually fight: exactly six, in ONE row side by side (left to right), in the
 	-- arena. The squad has no upgrades and the pads give no bonuses: the six just stand there, well apart.
-	SquadColumns = 3,
+	SquadColumns = 6,
 	SquadSize = 6,
 	SquadSpacing = 12, -- between the squad pads (the merge board uses the tighter SlotSpacing)
 	-- Slot ids: the board is 1 … BoardSize, the squad is SquadOffset + 1 … SquadOffset + SquadSize.
@@ -71,7 +71,7 @@ local Balance = {
 
 	-- The player's spells (Config/Spells.luau): two equipped ones (Q and E) during a battle. They aim
 	-- themselves; with SHIFT held you aim with the mouse into the arena.
-	SpellRange = 50, -- studs from the middle of the arena: further aims are refused
+	SpellRange = 72, -- studs from the middle of the round arena (its radius is 70): further aims are refused
 	SpellBossFactor = 0.35, -- percent-damage spells do only this part of their damage to a boss
 	SpellDropFactor = 0.5, -- chance of a spell drop after a won wave = the difficulty's lucky-drop chance x this
 		-- (doubled on a boss wave); only spells whose dropWave is reached, and not yet owned, can drop
@@ -149,20 +149,18 @@ local Balance = {
 	SlotSpacing = 7, -- between pads (the characters are ~0.9-1.26 of an R15; 7 leaves air between them)
 	-- Every player gets their own plot (own spawn, board, arena). Plots are laid out in a grid:
 	PlotsPerRow = 4,
-	PlotSpacingX = 110, -- between plots side by side (a plot is 84 wide)
-	PlotSpacingZ = 260, -- between rows of plots (a plot is 228 long)
+	PlotSpacingX = 190, -- between plots side by side (a plot is 160 wide)
+	PlotSpacingZ = 330, -- between rows of plots (a plot is 296 long)
 	BoardStart = -50, -- z of the board's back row (rows go up to z = -15), in the lobby
-	SquadStart = 37, -- z of the squad's back row (2 rows: 37, 49), inside the arena, well before the fight arena's step
-	EnemyFront = 136, -- z of the enemy's front row (the big raised fight arena is between squad and enemies)
-	EnemyColumns = 4, -- enemies stand in 4 columns ...
-	EnemyRowsMax = 3, -- ... and never more than 3 rows: a bigger wave (SWARM) gets more columns, so the preview stays on the plot
+	SquadStart = 43, -- z of the squad's row (one row of six), inside the arena, just before the round fight arena's step (z 56)
+	EnemyFront = 204, -- z of the enemies' row (one row, side by side; the round fight arena, z 56 … 196, is between the two rows)
 
 	-- Enemy waves (see Config/Waves.luau): a map's waves come in phases of PhaseLength waves.
 	PhaseLength = 5,
 	EnemyBase = 2, -- enemies in a wave = EnemyBase + wave * EnemyPerWave, at most EnemyMax
 	EnemyPerWave = 1,
 	EnemyMax = 12,
-	HordeMax = 18, -- the SWARM twist (Config/Mutators.luau) may raise a wave to this many enemies (the scatter formation holds 18)
+	HordeMax = 18, -- the SWARM twist (Config/Mutators.luau) may raise a wave to this many enemies (the row holds 19 on the 160 wide plot)
 	MutatorCoinsCap = 0.35, -- the coin bonus of a wave's twists together is at most +35 %
 	EnemyHpBoost = 1.7, -- every enemy's HP and damage are multiplied by these (the wave difficulty in one place)
 	EnemyDamageBoost = 1.4,

@@ -76,7 +76,7 @@ local function flat(v: Vector3): Vector3
 end
 
 local function groundY(state: State, position: Vector3): number
-	return state.ctx.plot.arena.heightAt(position.Z)
+	return state.ctx.plot.arena.heightAt(position)
 end
 
 local function part(state: State, size: Vector3, cf: CFrame, color: Color3, transparency: number, shape: Enum.PartType?): Part
@@ -554,8 +554,8 @@ local function startMeteors(state: State)
 	local minDistance = cfg.Radius * 2 + cfg.Gap -- between two circle centers: a safe path stays between them
 	local chosen: { Vector3 } = {}
 	local function accept(p: Vector3): boolean
-		if math.abs(p.X - center.X) > 32 or math.abs(p.Z - center.Z) > 30 then
-			return false -- off the platform
+		if (flat(p) - flat(center)).Magnitude > state.ctx.plot.arena.radius - 6 then
+			return false -- off the round platform
 		end
 		for _, other in chosen do
 			if (other - p).Magnitude < minDistance then

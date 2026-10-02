@@ -1,5 +1,9 @@
 --!strict
--- Enemy FORMATIONS: where the wave stands in the fight arena when the fight starts. A layout is a list of slots per
+-- Enemy FORMATIONS: layouts of a wave on the fight platform. NOT USED to place anybody since the fight starts
+-- without a teleport (both sides walk from their rows, see Plots.showEnemies / Plots.enemyGround); the module and
+-- its test (tools/tests/mutators_test.luau) stay for a future layout mode. Waves.formation(wave, twists) still names
+-- the wave's layout. Original description:
+-- Where the wave stands in the fight arena when the fight starts. A layout is a list of slots per
 -- role (melee / heavy / ranged / boss) as offsets from the arena center (x to the side, z toward the enemies' end);
 -- `Formations.spots` hands every enemy of the wave a world position, in the order of the wave's enemy list.
 --

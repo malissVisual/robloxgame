@@ -168,7 +168,8 @@ UI.tab = "Inventory" -- the open tab of the left panel
 UI.collapsed = false -- the left panel folded to its title bar (the − / + button, or H)
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
 UI.battleOpen = false -- the battle panel (wave, difficulty, START WAVE) is open: the PLAY button toggles it
-UI.LAYOUT_VERSION = 4 -- a saved layout from an older version loses the moved panels' positions (the defaults changed)
+UI.LAYOUT_VERSION = 5 -- a saved layout from an older version loses the moved panels' positions (the defaults changed)
+UI.SQUAD_W, UI.SQUAD_H = 446, 132 -- the squad bar's layout size (one row of six cards); the dock and PLAY sit under it
 UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the settings gear moves below)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
@@ -752,12 +753,12 @@ end
 -- The six soldiers that fight, as they stand on their pads: 3 columns, 2 rows, the FRONT row (nearest to the
 -- enemies) on top. Drag cards here from the inventory (or between the two rows) to arrange the squad; a card
 -- dragged onto the main panel goes back to the inventory. The bar moves by the grip on top and steps aside
--- during a battle. (Laid out at 284 x 234 and drawn at UI.PANEL_SCALE, like the main panel.)
+-- during a battle. (Laid out at UI.SQUAD_W x UI.SQUAD_H and drawn at UI.PANEL_SCALE, like the main panel.)
 UI.squadBar = Instance.new("Frame")
 UI.squadBar.Name = "SquadBar"
 UI.squadBar.AnchorPoint = Vector2.new(0, 0)
 UI.squadBar.Position = UDim2.new(0, 20, 0, 20) -- the top left corner; the dock sits under it, PLAY beside the dock
-UI.squadBar.Size = UDim2.fromOffset(284, 234)
+UI.squadBar.Size = UDim2.fromOffset(UI.SQUAD_W, UI.SQUAD_H)
 UI.squadBar.BackgroundColor3 = BG
 UI.squadBar.BackgroundTransparency = 0.04
 UI.squadBar.BorderSizePixel = 0
@@ -774,21 +775,21 @@ do
 	squadGrip.Size = UDim2.new(1, 0, 0, 18)
 	squadGrip.BackgroundTransparency = 1
 	squadGrip.Parent = UI.squadBar
-	UI.grip(squadGrip, 142 - 7, 7, MUTED)
+	UI.grip(squadGrip, UI.SQUAD_W / 2 - 7, 7, MUTED)
 	Layout.make("Squad", UI.squadBar, squadGrip)
-	local enemySide = label(UI.squadBar, "▲ ENEMIES", UDim2.fromOffset(16, 18), UDim2.fromOffset(252, 16), 12, Enum.Font.GothamBold, RED)
+	local enemySide = label(UI.squadBar, "▲ ENEMIES", UDim2.fromOffset(16, 18), UDim2.fromOffset(UI.SQUAD_W - 32, 16), 12, Enum.Font.GothamBold, RED)
 	enemySide.TextXAlignment = Enum.TextXAlignment.Center
-	UI.section(UI.squadBar, "BATTLE SQUAD", 212, ORANGE, 16)
+	UI.section(UI.squadBar, "BATTLE SQUAD", 110, ORANGE, 16)
 end
-local squadCount = label(UI.squadBar, "0/6", UDim2.fromOffset(196, 212), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
+local squadCount = label(UI.squadBar, "0/6", UDim2.fromOffset(UI.SQUAD_W - 16 - 72, 110), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 squadCount.TextXAlignment = Enum.TextXAlignment.Right
 local squadStrip = Instance.new("Frame")
 squadStrip.Position = UDim2.fromOffset(16, 38)
-squadStrip.Size = UDim2.fromOffset(252, 166)
+squadStrip.Size = UDim2.fromOffset(UI.SQUAD_W - 32, 64)
 squadStrip.BackgroundTransparency = 1
 squadStrip.Parent = UI.squadBar
 local squadLayout = Instance.new("UIGridLayout")
-squadLayout.CellSize = UDim2.fromOffset(80, 80)
+squadLayout.CellSize = UDim2.fromOffset(64, 64) -- six in one row, like the pads
 squadLayout.CellPadding = UDim2.fromOffset(6, 6)
 squadLayout.SortOrder = Enum.SortOrder.LayoutOrder
 squadLayout.Parent = squadStrip
@@ -849,7 +850,7 @@ local DOCK_STEP = 72
 local dock = Instance.new("Frame")
 dock.Name = "Dock"
 dock.AnchorPoint = Vector2.new(0, 0)
-dock.Position = UDim2.new(0, 20, 0, 20 + 234 * UI.PANEL_SCALE + 16) -- under the squad bar
+dock.Position = UDim2.new(0, 20, 0, 20 + UI.SQUAD_H * UI.PANEL_SCALE + 16) -- under the squad bar
 dock.Size = UDim2.fromOffset(76, 18 + 4 * DOCK_STEP)
 dock.BackgroundColor3 = BG
 dock.BackgroundTransparency = 0.06
@@ -960,7 +961,7 @@ do
 	local playDock = Instance.new("Frame")
 	playDock.Name = "PlayDock"
 	playDock.AnchorPoint = Vector2.new(0, 0)
-	playDock.Position = UDim2.new(0, 20 + 76 + 28, 0, 20 + 234 * UI.PANEL_SCALE + 16 + 50) -- beside the dock
+	playDock.Position = UDim2.new(0, 20 + 76 + 28, 0, 20 + UI.SQUAD_H * UI.PANEL_SCALE + 16 + 50) -- beside the dock
 	playDock.Size = UDim2.fromOffset(PLAY_W + 12, 18 + PLAY_H + 6)
 	playDock.BackgroundColor3 = BG
 	playDock.BackgroundTransparency = 0.06
@@ -1314,7 +1315,7 @@ local function renderInventory()
 	local equipped = 0
 	for i = 1, Balance.SquadSize do
 		local id = Balance.SquadOffset + i
-		-- The front row (the last one) is drawn on top, like looking at the arena from your side.
+		-- One row of six, left to right like the pads (the formula also handles several rows: the last one on top).
 		local row = (i - 1) // Balance.SquadColumns
 		local order = (Balance.SquadSize // Balance.SquadColumns - 1 - row) * Balance.SquadColumns + (i - 1) % Balance.SquadColumns + 1
 		local card = ensureCard(id, squadStrip, nil, order)
@@ -4123,7 +4124,8 @@ do
 		if not arena or not arena:IsA("BasePart") then
 			return nil
 		end
-		return groundPoint(arena.Position.Y + arena.Size.Y / 2)
+		local top = arena:GetAttribute("TopY")
+		return groundPoint(if type(top) == "number" then top else arena.Position.Y + arena.Size.Y / 2)
 	end
 
 	local aiming: string? = nil -- the slot being aimed with the mouse (Q / E pressed, waiting for the click)
@@ -4494,57 +4496,6 @@ do
 			local glow = ring and ring:FindFirstChild("Glow")
 			if glow and glow:IsA("PointLight") then
 				glow.Brightness = 0.3 + (1 - wave) * 0.4
-			end
-		end
-	end)
-end
-
--- ── Arena holograms ────────────────────────────────────────────────────────
--- The see-through copies of your squad on the arena floor (built by the server, see `Plots.renderHolograms`)
--- float gently here, each with its own timing, and disappear while a battle runs. Every part
--- is moved on its own from the CFrame it arrived with (and a marker is only used when all its parts have
--- arrived), so an arrow can never jump somewhere else while it is still being replicated.
-do
-	type Piece = { part: BasePart, cf: CFrame }
-	type Marker = { model: Model, phase: number, pieces: { Piece } }
-	local markers: { Marker } = {}
-	local known: { [Model]: boolean } = {}
-
-	task.spawn(function()
-		while true do
-			local plot = findPlot()
-			local folder = if plot then plot:FindFirstChild("ArenaSlots") else nil
-			if folder then
-				for _, child in folder:GetChildren() do
-					if child:IsA("Model") and not known[child] then
-						local expected = child:GetAttribute("Parts")
-						local pieces: { Piece } = {}
-						for _, part in child:GetChildren() do
-							if part:IsA("BasePart") then
-								table.insert(pieces, { part = part, cf = part.CFrame })
-							end
-						end
-						if type(expected) == "number" and #pieces == expected then
-							known[child] = true
-							table.insert(markers, { model = child, phase = child:GetAttribute("Phase") or 0, pieces = pieces })
-						end
-					end
-				end
-			end
-			task.wait(1)
-		end
-	end)
-
-	RunService.RenderStepped:Connect(function()
-		local time = os.clock()
-		local hidden = if state.battling or state.settings.arrows == false then 1 else 0
-		for _, marker in markers do
-			if marker.model.Parent then
-				local offset = Vector3.new(0, 0.3 + math.sin(time * 2 + marker.phase) * 0.25, 0)
-				for _, piece in marker.pieces do
-					piece.part.CFrame = piece.cf + offset
-					piece.part.LocalTransparencyModifier = hidden
-				end
 			end
 		end
 	end)
@@ -4943,7 +4894,7 @@ do
 
 	-- On / off switches.
 	local toggles: { [string]: TextButton } = {}
-	local names = { { "numbers", "Damage numbers" }, { "arrows", "Arena holograms" }, { "music", "Music" } }
+	local names = { { "numbers", "Damage numbers" }, { "music", "Music" } }
 	for i, entry in names do
 		local key, text = entry[1], entry[2]
 		local y = 74 + (i - 1) * 32

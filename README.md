@@ -4,8 +4,8 @@ A Roblox merge autobattler. You summon soldiers at an altar in the lobby and the
 which is at the same time the **3D merge room**: every soldier in the inventory automatically
 stands on a pad of the merge board in the lobby. You merge two identical ones into a stronger one
 right in the UI inventory (drag a card onto another card) or in 3D (drag a soldier onto another),
-**equip** your best into the 3×2 battle squad and send the squad into battle against a wave. They
-teleport into a raised fight arena and fight on their own, PvE only. PC first, mobile later.
+**equip** your best into the battle squad (one row of six) and send the squad into battle against a wave. Both
+sides walk from their rows onto a big round fight arena and fight on their own, PvE only. PC first, mobile later.
 
 Most things are 3D in the world. The UI is the FIGHT button at the bottom, the HUD with the account level and
 coins (bottom left), the left panel (Inventory / Soldiers / Upgrades / Spells tabs), the battle panel (opened
@@ -200,38 +200,42 @@ other; it comes back when the battle panel closes, and opening it from the dock 
 ## Plot layout (along the z axis)
 
 ```
-lobby (-68 … -4)              →  road (-4 … 30)  →  gate  →  ARENA 1 – Training (30 … 140)
-your spawn (z = -9)              ~34 studs of grass   name    SQUAD 3 × 2        z = 37 … 49 (six holographic rings 12 apart)
-MERGE BOARD 6 × 6 (z = -50…-20)  with a worn road             FIGHT ARENA, one step up (z = 56 … 128, 76 wide)
-                                                              enemy wave 4 wide, up to 3 rows (z = 136 … 150), visible before the battle
+lobby (-68 … -4)              →  road (-4 … 30)  →  gate  →  ARENA 1 – Training (30 … 228), the plot is 160 wide
+your spawn (z = -9)              ~34 studs of grass   name    SQUAD, one row of six        z = 43 (six holographic rings 12 apart)
+MERGE BOARD 6 × 6 (z = -50…-20)  with a worn road             ROUND FIGHT ARENA, one step up (z = 56 … 196, 140 across)
+                                                              enemy wave, one row side by side (z = 204), visible before the battle
 ```
 
 ## Fight arena (placeholder)
 
-Both sides stand visible on their pads. When the battle starts they teleport into the fight arena (a flash on the pads and in the arena),
-which is **one step (2 studs) higher** than the rest of the plot, and fight there. The arena is a
-simple placeholder platform with two steps, isolated in `src/server/Services/FightArena.luau`:
-replace `FightArena.build` with your own design. The rest of the game only needs the returned
-`heightAt(worldZ)` and `spot(side, index, count)` (see the comment at the top of that file).
+Both sides stand visible in their rows: your six on their pads at z = 43, the wave in one row at z = 204. **Nobody
+is teleported**: when the battle starts both sides turn to each other and **walk** up onto the round fight arena,
+which is **one step (2 studs) higher** than the rest of the plot, and fight there (every tick the server snaps a
+fighter's height to the ground under it, so they walk up the step and down past the edge). The arena is a simple
+placeholder: a round platform 140 studs across (twice the old arena's depth) with a darker rim and a low ring step,
+isolated in `src/server/Services/FightArena.luau`: replace `FightArena.build` with your own design. The rest of the
+game only needs the returned `heightAt(worldPos)`, `center`, `radius` and `spot(side, index, count)` (see the comment
+at the top of that file). The mouse aim of the spells reads the `TopY` attribute of the part named `FightArena`.
 
-**The squad is exactly six** (`Balance.SquadSize`, 3 columns × 2 rows: a back and a front row), nothing more to
-buy around it. In the arena the six pads stand 12 studs apart (`Balance.SquadSpacing`, the merge board is tighter)
-so the characters have room and are seen one by one, and well inside the arena (z 37 … 49 of a plot that is 84 wide
-and 160 long). They are **holographic rings** (`holoPad` in `Plots.luau`): an empty ring glows bright cyan and
-breathes (the client pulses it) to ask for a soldier; with a soldier on it, it turns grey and quiet. They give **no
-bonuses**: where a soldier stands only decides which enemies it meets first. The **squad bar** at the bottom of the screen shows the
-same six places (3 × 2, the front row on top, "▲ ENEMIES" above it); drag cards onto it from the inventory, between
-its slots, or onto the main panel to unequip. The bar moves by its grip and hides during a battle. The HUD (level,
-coins) sits in the bottom left corner, PLAY in the bottom right. (A profile saved with the old 3 × 3 squad keeps its
-soldiers: the three beyond the sixth place move to free pads of the merge board, or are sold when there is none.)
+**The squad is exactly six** (`Balance.SquadSize`, ONE row of six side by side, `Balance.SquadColumns` = 6), nothing
+more to buy around it. In the arena the six pads stand 12 studs apart (`Balance.SquadSpacing`, the merge board is
+tighter) so the characters have room and are seen one by one, just before the round platform's step (z 43 of a plot
+that is 160 wide and 296 long). They are **holographic rings** (`holoPad` in `Plots.luau`): an empty ring glows cyan
+and breathes (the client pulses it) to ask for a soldier; with a soldier on it, it turns grey and quiet. They give
+**no bonuses**: where a soldier stands only decides which enemies it meets first. The **squad bar** (top left) shows
+the same six places in one row, left to right like the pads ("▲ ENEMIES" above it); drag cards onto it from the
+inventory, between its slots, or onto the main panel to unequip. The bar moves by its grip and hides during a battle.
+The dock and PLAY sit under it, the HUD (level, coins) in the bottom left corner. (A profile saved with the old 3 × 3
+squad keeps its soldiers: the three beyond the sixth place move to free pads of the merge board, or are sold when
+there is none.)
 
-**The big arena and the formation:** the fight arena is 76 studs wide and 72 deep. Your squad's formation is
-**spread over it**: the three columns of the fighters stand 16 studs apart (left, middle, right lane), the
-back row 10 studs behind the front row, and the enemies (4 columns, 9 studs apart, up to 3 rows) start about 26
-studs in front of your front row. Everybody fights the nearest enemy, so **where you put a soldier decides what
-it fights**: the front row meets the enemies first, the back row (ranged soldiers!) stays behind, and a soldier on
-the left pad fights the enemies on the left. Battles are longer now
-(`Balance.BattleTimeLimit` = 90 s).
+**The rows and who fights whom:** the enemies stand in ONE row too (`Plots.enemyGround`: 7 studs apart, centered,
+the boss in the middle, melee around it and the shooters on the flanks; the PINCER twist splits the row into two
+groups with a 24 stud gap, `Mutators.Defs.pincer.Gap`). Everybody fights the nearest enemy and walks straight at it
+over the platform, so **where you put a soldier decides what it fights**: a soldier on the left pad meets the enemies
+on the left. The enemy formations of `Config/Formations.luau` are no longer used to place anybody (nobody is moved
+into the arena); the module and its test stay for a future layout mode. Battles are long (`Balance.BattleTimeLimit`
+= 90 s).
 
 ## Multiple players
 
@@ -554,15 +558,15 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
   level) with coins + XP; the latest one is your **title**, shown over your head (★ Warlord).
 - **Offline income** (`Balance.Offline*`): while you are away your camp earns 6 coins per hour for every wave
   of your best wave, up to 8 hours; a WELCOME BACK popup pays it when you come back.
-- **Into the arena:** START WAVE teleports you onto the near edge of the fight arena, behind your squad and
-  looking at the enemies, so you are in the fight for your Q / E spells. After the battle you are brought back to
+- **Into the arena:** START WAVE moves you (the player, not the squad) onto the near edge of the round fight arena,
+  behind your squad and looking at the enemies, so you are in the fight for your Q / E spells. After the battle you are brought back to
   your spawn. The camera stays yours; only the left
   panel, the quests and the achievements button hide while the battle runs.
 - **Sounds** (`Config/Sounds.luau`): Roblox's built-in sounds for clicks, summons, merges, level ups, spells,
   boss intros, won / lost waves … replace any id with your own asset; `Sounds.Music` (empty by default) loops
   as music. The server asks for sounds with the `Sfx` remote.
-- **Settings** (the gear, top right): volume, damage numbers (the server stops sending them), arena holograms,
-  music. Saved with the profile (`profile.settings`).
+- **Settings** (the gear, top right): volume, damage numbers (the server stops sending them), music. Saved with
+  the profile (`profile.settings`).
 - **Mobile:** the UI scales down on small screens (`UIScale` by viewport height), drag & drop works with a finger,
   spells always aim themselves on touch (no SHIFT).
 
@@ -597,10 +601,8 @@ soldier's **level color** (gold at the maximum level), a pad that is **not bough
 (gold = merge, blue = swap, white = move). Pads are now 0.6 studs high (`PAD_TOP`), the soldiers stand on the
 wooden top.
 
-On the **fight arena floor** a **hologram** of every equipped soldier (a see-through, glowing copy in the color of
-its pad) floats on the exact spot where it will appear when the battle starts (`Plots.renderHolograms`; the client
-animates them and hides them during a battle, the "Arena holograms" setting turns them off). So you see in
-advance where every pad's soldier will fight.
+There are no holograms on the fight arena any more: the soldiers fight from where they stand, so the pads
+themselves show the line-up.
 
 ## The look of Arena 1 (designed in Claude Design)
 

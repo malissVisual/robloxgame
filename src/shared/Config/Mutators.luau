@@ -122,9 +122,9 @@ Mutators.Defs = {
 		Dps = 0.03, -- × maxHp per second to every fighter inside (both sides)
 		Slow = 0.7, -- slowFactor while inside
 		PlayerDps = 3, -- HP per second to a player standing inside
-		BandX = 24, -- puddle centers: x within center ± BandX ...
-		BandZMin = -6, -- ... z within center + [BandZMin, BandZMax] (the middle band, between the two sides)
-		BandZMax = 10,
+		BandX = 44, -- puddle centers: x within center ± BandX ...
+		BandZMin = -22, -- ... z within center + [BandZMin, BandZMax] (the middle of the round arena, between the two sides)
+		BandZMax = 22,
 		MinGap = 11, -- between two puddles
 		SpotGap = 8, -- from every start spot of a fighter
 		PulseFrom = 0.45, -- the cylinders pulse between these transparencies
@@ -157,7 +157,8 @@ Mutators.Defs = {
 	pincer = {
 		id = "pincer", label = "PINCER", subtitle = "they come from the sides — guard your archers", color = C(255, 140, 200), tag = "formation",
 		minWave = 14, weight = 1.0, threat = 0.7, bossOk = false, excludes = {}, coinBonus = 0.10,
-		Formation = "pincer", -- Formations.luau layout
+		Formation = "pincer", -- Formations.luau layout (informational: the wave stands in its row and walks from there)
+		Gap = 24, -- studs of empty middle in the enemies' row: the wave stands in two groups, left and right
 	},
 	ambush = {
 		id = "ambush", label = "AMBUSH", subtitle = "reinforcements arrive mid-fight", color = C(255, 90, 60), tag = "event",

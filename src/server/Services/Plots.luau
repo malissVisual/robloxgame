@@ -33,13 +33,11 @@ export type Plot = {
 	folder: Folder,
 	models: { [number]: Model }, -- by slot id
 	rendered: { [number]: string }, -- what is drawn on each slot (class|tier)
-	hologramFolder: Folder, -- the holograms of your squad in the arena (where each soldier will appear)
-	holograms: { [number]: Model }, -- by squad index
-	hologramSig: { [number]: string },
 	slotPads: { [number]: Part },
-	-- Preview of the enemy wave (sorted from the front row; models follow the same order).
+	-- Preview of the enemy wave: one row, left to right as seen from your side (models follow the same order).
 	enemies: { Waves.Enemy },
 	enemyModels: { Model },
+	enemyPincer: boolean, -- the PINCER twist: the row stands in two groups with a gap in the middle
 	previewFolder: Folder?,
 	previewKey: string?, -- wave|difficulty of the current enemy preview
 	arenaFloor: Part, -- the arena's floor, used to tell whether the player stands inside the arena
@@ -372,9 +370,8 @@ local function makeClick(part: BasePart, owner: Player, action: () -> ())
 	end)
 end
 
--- Slot id → ground position. Board (1 … BoardSize) is 6x6, the squad (SquadOffset + 1 …) is 3 columns x 2 rows,
--- its pads further apart (Balance.SquadSpacing). column = x (left to right), row = z (0 = back, last = closest
--- to the enemies).
+-- Slot id → ground position. Board (1 … BoardSize) is 6x6, the squad (SquadOffset + 1 …) is ONE row of six side
+-- by side, its pads further apart (Balance.SquadSpacing). column = x (left to right), row = z (0 = back).
 function Plots.slotGround(plot: Plot, id: number): Vector3
 	local columns, start, index, spacing = Balance.BoardColumns, Balance.BoardStart, id, Balance.SlotSpacing
 	if id > Balance.SquadOffset then
@@ -386,15 +383,16 @@ function Plots.slotGround(plot: Plot, id: number): Vector3
 	return plot.origin + Vector3.new(x, PAD_TOP, start + row * spacing)
 end
 
--- Where the `i`-th of `count` enemies stands. Rows fill from the front and each row is centered. A wave bigger than
--- EnemyColumns × EnemyRowsMax (SWARM, up to Balance.HordeMax + a treasure goblin) gets more columns instead of a
--- 4th row, which would stand past the plot's floor and front fence.
+-- Where the `i`-th of `count` enemies stands: ONE row side by side at z = Balance.EnemyFront, centered on the plot
+-- (left to right as seen from your side). A SWARM wave of 18 + a treasure goblin is 126 studs wide, well inside the
+-- 160 wide plot. With the PINCER twist the row splits into two groups with a gap in the middle (they come from
+-- the sides).
 function Plots.enemyGround(plot: Plot, i: number, count: number): Vector3
-	local cols = math.max(Balance.EnemyColumns, math.ceil(count / Balance.EnemyRowsMax))
-	local row = (i - 1) // cols
-	local inRow = math.min(cols, count - row * cols)
-	local x = (((i - 1) % cols + 1) - (inRow + 1) / 2) * Balance.SlotSpacing
-	return plot.origin + Vector3.new(x, PAD_TOP, Balance.EnemyFront + row * Balance.SlotSpacing)
+	local x = (i - (count + 1) / 2) * Balance.SlotSpacing
+	if plot.enemyPincer and count >= 2 then
+		x += if i <= count / 2 then -Mutators.Defs.pincer.Gap / 2 else Mutators.Defs.pincer.Gap / 2
+	end
+	return plot.origin + Vector3.new(x, PAD_TOP, Balance.EnemyFront)
 end
 
 function Plots.create(index: number, owner: Player, mapId: string): Plot
@@ -409,9 +407,9 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 	folder.Parent = rootFolder()
 
 	-- Layout along z: lobby with spawn + merge board (zMin … -4) → road (-4 … ARENA_START) →
-	-- arena with squad, showcase and enemies (… zMax).
-	local zMin, zMax = -68, 160
-	local width = 84
+	-- arena with the squad's row, the big round fight platform and the enemies' row (… zMax).
+	local zMin, zMax = -68, 228
+	local width = 160
 	local function floorStrip(name: string, z0: number, z1: number, color: Color3, material: Enum.Material): Part
 		return makePart(folder, name, Vector3.new(width, 1, z1 - z0), origin + Vector3.new(0, -0.5, (z0 + z1) / 2), color, material)
 	end
@@ -446,12 +444,10 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 		folder = folder,
 		models = {},
 		rendered = {},
-		hologramFolder = nil :: any,
-		holograms = {},
-		hologramSig = {},
 		slotPads = {},
 		enemies = {},
 		enemyModels = {},
+		enemyPincer = false,
 		previewFolder = nil,
 		previewKey = nil,
 		arenaFloor = arenaFloor,
@@ -463,14 +459,6 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 
 	-- The fight arena, one step up, between your squad and the enemies.
 	plot.arena = FightArena.build(folder, origin, map.laneColor, map.laneMaterial)
-
-	-- Holograms of your squad on the arena floor: a see-through copy of every equipped soldier stands where it
-	-- will appear when the battle starts (Plots.render builds them, the client makes them float and hides them
-	-- during a battle).
-	local hologramFolder = Instance.new("Folder")
-	hologramFolder.Name = "ArenaSlots"
-	hologramFolder.Parent = folder
-	plot.hologramFolder = hologramFolder
 
 	-- The designed look of the arena: the entrance arch over the gate, fences, torches, banners, training
 	-- props at the sides and the ring marks on the fight platform.
@@ -516,7 +504,7 @@ function Plots.create(index: number, owner: Player, mapId: string): Plot
 		end
 	end
 	areaSign("BoardSign", 0, Balance.BoardStart - 7, '<font size="13" color="#9aa0aa">DRAG TO MERGE</font>\n<font size="26">MERGE BOARD</font>')
-	areaSign("SquadSign", 24, Balance.SquadStart + Balance.SquadSpacing / 2, '<font size="13" color="#9aa0aa">THESE SIX FIGHT</font>\n<font size="26">SQUAD</font>')
+	areaSign("SquadSign", 42, Balance.SquadStart, '<font size="13" color="#9aa0aa">THESE SIX FIGHT</font>\n<font size="26">SQUAD</font>')
 
 	-- No summoning altars and no level-upgrade station any more: characters come from wave drops (and the admin
 	-- tools). The invisible UpgradeZone part is kept for the code that reads it, far below the ground.
@@ -605,54 +593,6 @@ function Plots.render(plot: Plot, board: Grid.Cells, squad: Grid.Cells, boardSlo
 		local unit = squad[i]
 		renderCell(Balance.SquadOffset + i, unit, SQUAD_COLOR, false, 0.7)
 	end
-	Plots.renderHolograms(plot, squad)
-end
-
--- The holograms in the arena: one see-through, glowing copy of every equipped soldier on the spot where it
--- will fight. Only the ones whose soldier changed are rebuilt. The models carry the "Parts" / "Phase"
--- attributes the client uses to float them (and to hide them during a battle).
-function Plots.renderHolograms(plot: Plot, squad: Grid.Cells)
-	for i = 1, Balance.SquadSize do
-		local unit = squad[i]
-		local signature = if unit then string.format("%s|%d%s", unit.class, unit.tier, if unit.ascended then "A" else "") else ""
-		if plot.hologramSig[i] == signature then
-			continue
-		end
-		plot.hologramSig[i] = signature
-		local old = plot.holograms[i]
-		if old then
-			old:Destroy()
-			plot.holograms[i] = nil
-		end
-		if not unit then
-			continue
-		end
-
-		local model = Soldier.build(unit.class, unit.tier, false, true, unit.ascended)
-		model.Name = "Hologram" .. i
-		local tint = SQUAD_COLOR
-		local count = 0
-		for _, part in model:GetDescendants() do
-			if part:IsA("BasePart") then
-				part.Material = Enum.Material.Neon
-				part.Color = part.Color:Lerp(tint, 0.6)
-				part.Transparency = math.max(part.Transparency, 0.55)
-				part.CanCollide = false
-				part.CanQuery = false
-				part.CanTouch = false
-				part.CastShadow = false
-				count += 1
-			elseif part:IsA("Sparkles") or part:IsA("PointLight") or part:IsA("Highlight") then
-				part:Destroy()
-			end
-		end
-		local spot = plot.arena.spot(1, i, Balance.SquadSize) + Vector3.new(0, Soldier.lift(unit.tier, unit.ascended), 0)
-		model:PivotTo(CFrame.lookAt(spot, spot + Vector3.new(0, 0, 1))) -- facing the enemies
-		model:SetAttribute("Parts", count)
-		model:SetAttribute("Phase", i * 0.7)
-		model.Parent = plot.hologramFolder
-		plot.holograms[i] = model
-	end
 end
 
 -- Drops the squad's models so the next render rebuilds them (after a battle moved and
@@ -688,15 +628,27 @@ function Plots.showEnemies(plot: Plot, wave: number, difficulty: string)
 	end
 	Plots.clearEnemies(plot)
 
-	local enemies = Waves.get(wave, plot.map)
-	-- Melee and strongest in the front row, ranged behind them.
-	table.sort(enemies, function(a, b)
-		local ra, rb = Enemies.Kinds[a.kind].range, Enemies.Kinds[b.kind].range
-		if ra ~= rb then
-			return ra < rb
+	local sorted = Waves.get(wave, plot.map)
+	-- One row, seen from your side: the boss in the middle, melee and the strongest around it, the shooters on
+	-- the flanks. (Sort from the strongest, then deal the slots out from the middle: right, left, right …)
+	table.sort(sorted, function(a, b)
+		local ka, kb = Enemies.Kinds[a.kind], Enemies.Kinds[b.kind]
+		if (ka.boss == true) ~= (kb.boss == true) then
+			return ka.boss == true
+		end
+		if ka.range ~= kb.range then
+			return ka.range < kb.range
 		end
 		return a.tier > b.tier
 	end)
+	local enemies: { Waves.Enemy } = table.create(#sorted)
+	local middle = (#sorted + 1) // 2
+	for k, e in sorted do
+		local offset = k // 2
+		enemies[if k % 2 == 0 then middle + offset else middle - offset] = e
+	end
+	local twists = Mutators.forWave(wave, plot.map)
+	plot.enemyPincer = Mutators.has(twists, "pincer") ~= nil
 
 	local folder = Instance.new("Folder")
 	folder.Name = "EnemyPreview"
@@ -756,7 +708,6 @@ function Plots.showEnemies(plot: Plot, wave: number, difficulty: string)
 
 	-- Minimal heading: small map name, big wave number, small count, and the wave's twists (Config/Mutators.luau).
 	local _, phase = Waves.phase(wave, plot.map)
-	local twists = Mutators.forWave(wave, plot.map)
 	local twistLine = ""
 	if #twists > 0 then
 		local labels: { string } = {}

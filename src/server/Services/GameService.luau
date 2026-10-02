@@ -1208,7 +1208,7 @@ local function onBattle(player: Player)
 	local function enterArena()
 		local character = player.Character
 		if character then
-			local spot = plot.arena.center + Vector3.new(0, 3, -27)
+			local spot = plot.arena.center + Vector3.new(0, 3, -(plot.arena.radius - 12)) -- the near edge of the round platform
 			character:PivotTo(CFrame.lookAt(spot, spot + Vector3.new(0, 0, 1)))
 		end
 	end

@@ -16,7 +16,6 @@ local Rig = require(Shared.Rig)
 local Synergy = require(Shared.Synergy)
 local Spells = require(Shared.Config.Spells)
 local Waves = require(Shared.Config.Waves)
-local Formations = require(Shared.Config.Formations)
 local Net = require(Shared.Net)
 
 local PlayerData = require(script.Parent.PlayerData)
@@ -30,8 +29,6 @@ local Soldier = require(Shared.Soldier)
 
 local PLAYER_SIDE, ENEMY_SIDE = 1, 2
 local UP = Vector3.new(0, 1, 0)
-local TELEPORT_OUT = 0.25 -- seconds of the flash on the pads before everybody vanishes
-local TELEPORT_IN = 0.45 -- seconds of the flash in the arena before the fight starts
 
 type Fighter = {
 	side: number,
@@ -128,8 +125,10 @@ export type Battle = {
 	spawnEnemy: ((kind: string, tier: number, pos: Vector3) -> Fighter)?, -- a new enemy mid-fight (a Chief's summon, an ambush)
 	mutators: any?, -- the wave twists runtime (WaveMutators.luau), when any
 	twists: { any }, -- the wave's twist definitions (Config/Mutators.luau)
-	formation: string, -- the enemies' layout (Config/Formations.luau)
+	formation: string, -- the enemies' layout name (Config/Formations.luau; informational, see Plots.showEnemies)
 	enemyCtx: any?, -- the enemy brains' shared context (EnemyBrain.Context), built in start()
+	groundAt: (Vector3) -> number, -- world y of the ground under a position (the arena's heightAt): fighters walk
+	-- from their pads up the step onto the round platform and down again, so every tick snaps them to the ground
 }
 local active: { [Player]: Battle } = {}
 
@@ -831,6 +830,10 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 			continue
 		end
 		f.clock += dt
+		local groundY = battle.groundAt(f.pos)
+		if math.abs(groundY - f.pos.Y) > 0.01 then
+			f.pos = Vector3.new(f.pos.X, groundY, f.pos.Z) -- up the step onto the platform (and down past its edge)
+		end
 		if f.ability == "riftking" and battle.rift then
 			if RiftKing.update(battle.rift, dt) then
 				continue -- the Rift King is casting one of his four attacks (RiftKing.luau moves and hits for him)
@@ -965,7 +968,7 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			local passiveId = Units.Classes[cell.class].passive
 			fighter.passive = passiveId
 			fighter.passiveValue = Units.Passives[passiveId].value * (if cell.ascended then 2 else 1)
-			fighter.spot = plot.arena.spot(PLAYER_SIDE, i, Balance.SquadSize)
+			fighter.spot = fighter.pos -- nobody is teleported: the six start the fight on their pads and walk
 			-- The squad's synergies make everybody stronger; the pad a soldier stands on gives nothing (it only
 			-- decides which enemies it meets first).
 			fighter.maxHp *= synergy.hp
@@ -978,19 +981,12 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		end
 	end
 
-	-- The enemies are already standing in the wave preview (Plots.showEnemies); in the arena they take the wave's
-	-- formation (Config/Formations.luau): a role per enemy from its archetype, a world spot per role.
-	local roles: { string } = {}
-	for _, e in plot.enemies do
-		local def = Enemies.Kinds[e.kind]
-		local archetype = def.archetype
-		table.insert(roles, if def.boss then "boss" elseif archetype == "Totem" then "totem" elseif archetype == "Treasure" then "treasure" elseif archetype == "Archer" or archetype == "Shaman" then "ranged" elseif archetype == "Brute" or archetype == "Chief" then "heavy" else "melee")
-	end
-	local spots = Formations.spots(options.formation or "line", roles, plot.arena.center)
+	-- The enemies are already standing in the wave preview (Plots.showEnemies, one row); they start the fight
+	-- right there and walk toward your squad, nobody is teleported.
 	for i, e in plot.enemies do
 		local pos = Plots.enemyGround(plot, i, #plot.enemies)
 		local fighter = makeFighter(ENEMY_SIDE, Enemies.stats(e.kind, e.tier), e.tier, Enemies.Kinds[e.kind].color, Enemy.lift(e.kind, e.tier), Enemies.Kinds[e.kind].coins, pos, plot.enemyModels[i])
-		fighter.spot = spots[i] or plot.arena.spot(ENEMY_SIDE, i, #plot.enemies)
+		fighter.spot = pos
 		fighter.kind = e.kind
 		fighter.champion = e.champion == true -- the CHAMPION twist (its stats come from mutators:applyTo)
 		fighter.boss = Enemies.Kinds[e.kind].boss == true
@@ -1053,6 +1049,9 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		twists = options.twists or {},
 		formation = options.formation or "line",
 		enemyCtx = nil,
+		groundAt = function(pos: Vector3): number
+			return plot.arena.heightAt(pos)
+		end,
 	}
 	battle.emit = function(name: string, payload: any)
 		for _, f in fighters do
@@ -1092,8 +1091,11 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		return list
 	end
 	local function groundY(pos: Vector3): number
-		return plot.arena.heightAt(pos.Z) + 0.2
+		return plot.arena.heightAt(pos) + 0.2
 	end
+	-- The brains keep their goals inside this square, inscribed in the round platform (its corners are on the edge).
+	local arenaHalf = math.floor(plot.arena.radius * 0.7)
+	local arenaBounds = { center = plot.arena.center, halfX = arenaHalf, halfZ = arenaHalf }
 	local function archetypeOf(f: Fighter): string?
 		return if f.kind and Enemies.Kinds[f.kind] then Enemies.Kinds[f.kind].archetype else nil
 	end
@@ -1117,7 +1119,7 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			heal(battle, target, amount)
 		end,
 		face = face,
-		bounds = { center = plot.arena.center, halfX = 36, halfZ = 34 },
+		bounds = arenaBounds,
 		emit = battle.emit,
 		addHazard = function(pos, radius, duration, kind, source)
 			addHazard(battle, pos, radius, duration, kind, source)
@@ -1249,7 +1251,7 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 				popNumber(plot.folder, target, amount, color)
 			end,
 			face = face,
-			bounds = { center = center, halfX = 36, halfZ = 34 },
+			bounds = arenaBounds,
 			hazards = hazardList,
 			archetype = function(f)
 				return if f.kind and Enemies.Kinds[f.kind] then Enemies.Kinds[f.kind].archetype else nil
@@ -1288,23 +1290,16 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 	end
 
 	task.spawn(function()
-		-- Phase 1: everybody teleports from the pads into the arena (a flash on both ends) and the
-		-- fight starts right away.
+		-- Phase 1: no teleport. Everybody starts where it stands (your six on their pads, the wave in its row),
+		-- turns to the other side and the fight starts right away: both sides walk up onto the round platform.
 		if not (player.Parent and plot.folder.Parent) then
 			active[player] = nil
 			numbersOn[plot.folder] = nil
 			return
 		end
 		for _, f in fighters do
-			teleportFlash(f, f.pos, plot.folder)
+			face(f, f.pos + Vector3.new(0, 0, if f.side == PLAYER_SIDE then 10 else -10)) -- facing the other side
 		end
-		task.wait(TELEPORT_OUT)
-		for _, f in fighters do
-			f.pos = f.spot
-			face(f, f.spot + Vector3.new(0, 0, if f.side == PLAYER_SIDE then 10 else -10)) -- facing the other side
-			teleportFlash(f, f.spot, plot.folder)
-		end
-		task.wait(TELEPORT_IN)
 		battle.emit("battleStart", {})
 		mutators:onStart() -- the twists' world cues (moon, clouds, puddles, the enrage bar)
 
