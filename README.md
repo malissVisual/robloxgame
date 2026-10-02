@@ -310,7 +310,8 @@ balance and the result screen shows the total of the wave as one small line.
   **The result screen:** the camera stays on the battlefield for `Balance.ResultHold` (1.4 s), the screen fades,
   and a big card opens: WAVE n CLEARED (or DEFEAT), the difficulty and the streak, three tiles that count up (damage
   dealt, kills, time), the coins and XP, the loot as soldier cards (BONUS LEVEL, sold, the lucky drop) and **CLAIM
-  LOOT**: the loot enters the inventory only then (`CollectDrops`; `Balance.DropCollectTime` is a long fallback) and
+  LOOT** after **SHOW LOOT** (the cards lie face down with a question mark until you reveal them, then flip over
+  with confetti): the loot enters the inventory only then (`CollectDrops`; `Balance.DropCollectTime` is a long fallback) and
   no new wave starts before (`profile.resultPending`; auto fight waits for the claim too). The other players in the
   server get a notice line about the cleared wave.
 - the **difficulty** (`Config/Difficulties.luau`): **Easy / Normal / Hard / Nightmare** change the enemies' power
@@ -484,3 +485,8 @@ in `Soldier.luau` for its look.
 - [ ] Game passes (2x coins, auto merge)
 - [ ] A second map
 - [ ] Trading / gifting soldiers between players
+
+**The Mage moves like a mage** (`MageConfig.Glide`): while it walks it floats up 0.7 studs, leans into the motion,
+bobs and trails arcane sparks; its rig plays no run animation (`Rig.animate(…, glide)`), the brain sets the lift
+and `fighter.tilt`, which `face()` applies. Game texts are English (spell names, the evolution's level names).
+
