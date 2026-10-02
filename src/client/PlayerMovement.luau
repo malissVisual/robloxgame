@@ -31,9 +31,9 @@ local CONFIG = {
 	SlideStartSpeed = 56, -- the slide starts this fast …
 	SlideEndSpeed = 16, -- … and bleeds off to this
 	SlideTime = 0.85,
-	SlideMinSpeed = 12, -- you have to be moving at least this fast to slide
+	SlideStandStart = 40, -- a slide from standing still (in the facing direction) starts this fast
 	SlideCooldown = 0.6,
-	SlideDrop = 1.35, -- studs the hip height goes down: the body really is on the floor
+	SlideDrop = 1.2, -- studs the hip height goes down: the body is low, lying back (not sunk into the floor)
 	SlideCameraDrop = 0.6, -- extra studs the camera goes down
 	SlideJumpForward = 40, -- a jump during a slide: this much forward speed …
 	SlideJumpUp = 48, -- … and this much up
@@ -71,6 +71,7 @@ type State = {
 	slideStart: number,
 	slideDir: Vector3,
 	slideReadyAt: number,
+	slideFrom: number, -- the speed this slide started with
 	slideWeight: number, -- 0 … 1 blend of the slide pose
 	runWeight: number, -- 0 … 1 blend of the sprint cycle
 	stride: number, -- the run cycle's phase
@@ -94,6 +95,7 @@ local state: State = {
 	slideStart = 0,
 	slideDir = Vector3.new(0, 0, -1),
 	slideReadyAt = 0,
+	slideFrom = 56,
 	slideWeight = 0,
 	runWeight = 0,
 	stride = 0,
@@ -234,13 +236,15 @@ local function startSlide()
 	if state.sliding or not humanoid or not root or humanoid.Health <= 0 or os.clock() < state.slideReadyAt or not isGrounded() then
 		return
 	end
+	-- Straight away, from any movement: along the way you move, or (standing still) where you face.
 	local velocity = flat(root.AssemblyLinearVelocity)
-	if velocity.Magnitude < CONFIG.SlideMinSpeed then
-		return
-	end
+	local moveDir = flat(humanoid.MoveDirection)
+	local facing = flat(root.CFrame.LookVector)
+	local dir = if velocity.Magnitude > 4 then velocity.Unit elseif moveDir.Magnitude > 0.1 then moveDir.Unit elseif facing.Magnitude > 0.1 then facing.Unit else Vector3.new(0, 0, -1)
 	state.sliding = true
 	state.slideStart = os.clock()
-	state.slideDir = velocity.Unit
+	state.slideDir = dir
+	state.slideFrom = if velocity.Magnitude > 4 then CONFIG.SlideStartSpeed else CONFIG.SlideStandStart
 	-- The slide drives itself: a horizontal LinearVelocity on the root (gravity and the slide jump stay free).
 	local attachment = root:FindFirstChild("RootAttachment") or root:FindFirstChildOfClass("Attachment")
 	if attachment and attachment:IsA("Attachment") then
@@ -252,7 +256,7 @@ local function startSlide()
 		force.PrimaryTangentAxis = Vector3.new(1, 0, 0)
 		force.SecondaryTangentAxis = Vector3.new(0, 0, 1)
 		force.MaxForce = 1e6
-		force.PlaneVelocity = Vector2.new(state.slideDir.X, state.slideDir.Z) * CONFIG.SlideStartSpeed
+		force.PlaneVelocity = Vector2.new(state.slideDir.X, state.slideDir.Z) * state.slideFrom
 		force.Parent = root
 		state.slideForce = force
 	end
@@ -301,23 +305,25 @@ end
 
 -- ── The poses ───────────────────────────────────────────────────────────────
 
--- The slide (Transform per joint): leaning back, the lead leg stretched forward, the other tucked under, one hand
--- trailing on the ground, the other up for balance, the head looking ahead. (The hip height does the drop.)
+-- The slide (Transform per joint): you LIE BACK (the pelvis tips back ~50°) with BOTH KNEES BENT and the feet out
+-- in front on the floor, one hand trailing on the ground behind, the other resting forward, the chest curled a
+-- little and the head looking ahead. The hip height drops (SlideDrop) so the body is low but not in the floor.
+-- (Angles: a positive hip angle swings the leg forward, a negative knee bends it; the pelvis lean adds to both.)
 local SLIDE_POSE: { [string]: CFrame } = {
-	Root = CFrame.new(0, -0.15, 0) * CFrame.Angles(0.55, 0, 0.06),
-	Waist = CFrame.Angles(-0.12, 0.15, 0),
-	Neck = CFrame.Angles(-0.42, -0.12, 0),
-	RightHip = CFrame.Angles(1.2, 0, -0.08),
-	RightKnee = CFrame.Angles(-0.1, 0, 0),
-	RightAnkle = CFrame.Angles(0.4, 0, 0),
-	LeftHip = CFrame.Angles(0.55, 0, 0.2),
+	Root = CFrame.Angles(0.9, 0, 0.05),
+	Waist = CFrame.Angles(-0.28, 0.12, 0),
+	Neck = CFrame.Angles(-0.5, -0.1, 0),
+	RightHip = CFrame.Angles(1.08, 0, -0.12), -- the lead thigh points forward and a little up …
+	RightKnee = CFrame.Angles(-1.05, 0, 0), -- … the shin comes down to the foot on the floor
+	RightAnkle = CFrame.Angles(-0.35, 0, 0),
+	LeftHip = CFrame.Angles(1.4, 0, 0.16), -- the other knee higher and more bent (tucked)
 	LeftKnee = CFrame.Angles(-1.8, 0, 0),
-	LeftAnkle = CFrame.Angles(0.25, 0, 0),
-	LeftShoulder = CFrame.Angles(-0.6, 0, 0.8),
-	LeftElbow = CFrame.Angles(0.15, 0, 0),
-	LeftWrist = CFrame.Angles(-0.5, 0, 0),
-	RightShoulder = CFrame.Angles(1.15, 0, -0.4),
-	RightElbow = CFrame.Angles(0.7, 0, 0),
+	LeftAnkle = CFrame.Angles(-0.2, 0, 0),
+	LeftShoulder = CFrame.Angles(-1.68, 0, 0.45), -- the hand trailing on the ground behind
+	LeftElbow = CFrame.Angles(0.2, 0, 0),
+	LeftWrist = CFrame.Angles(-0.6, 0, 0),
+	RightShoulder = CFrame.Angles(0.5, 0, -0.3), -- the other arm forward, resting toward the knee
+	RightElbow = CFrame.Angles(0.9, 0, 0),
 }
 
 -- One joint of the sprint cycle at stride phase `p` (nil = leave the animation's value). The arms lag the legs a
@@ -483,7 +489,7 @@ local KEYS = {
 	{ "W A S D", "move" },
 	{ "Space", "jump" },
 	{ "Shift (hold)", "sprint" },
-	{ "C / Ctrl", "slide (while running)" },
+	{ "C / Ctrl", "slide" },
 	{ "Space in a slide", "slide jump" },
 	{ "Click a mage", "its card" },
 	{ "Hold & drag", "move / merge a mage" },
@@ -599,7 +605,7 @@ local function update(dt: number)
 	if state.sliding then
 		local t = math.clamp((now - state.slideStart) / CONFIG.SlideTime, 0, 1)
 		local e = 1 - (1 - t) ^ 2
-		local slideSpeed = CONFIG.SlideStartSpeed + (CONFIG.SlideEndSpeed - CONFIG.SlideStartSpeed) * e
+		local slideSpeed = state.slideFrom + (CONFIG.SlideEndSpeed - state.slideFrom) * e
 		humanoid.WalkSpeed = slideSpeed
 		if state.slideForce then
 			state.slideForce.PlaneVelocity = Vector2.new(state.slideDir.X, state.slideDir.Z) * slideSpeed
