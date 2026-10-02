@@ -178,7 +178,7 @@ UI.collapsed = false -- the left panel folded to its title bar (the − / + butt
 UI.hidden = false -- the whole panel hidden (the inventory icon on the left edge shows it again)
 UI.battleOpen = false -- the battle panel (wave, difficulty, START WAVE) is open: the PLAY button toggles it
 UI.LAYOUT_VERSION = 5 -- a saved layout from an older version loses the moved panels' positions (the defaults changed)
-UI.SQUAD_W, UI.SQUAD_H = 446, 132 -- the squad bar's layout size (one row of six cards); the dock and PLAY sit under it
+UI.SQUAD_W, UI.SQUAD_H = 446, 114 -- the squad bar's layout size (one row of six cards); the dock and PLAY sit under it
 UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the settings gear moves below)
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
@@ -823,14 +823,12 @@ do
 	squadGrip.Parent = UI.squadBar
 	UI.grip(squadGrip, UI.SQUAD_W / 2 - 7, 7, MUTED)
 	Layout.make("Squad", UI.squadBar, squadGrip)
-	local enemySide = label(UI.squadBar, "▲ ENEMIES", UDim2.fromOffset(16, 18), UDim2.fromOffset(UI.SQUAD_W - 32, 16), 12, Enum.Font.GothamBold, RED)
-	enemySide.TextXAlignment = Enum.TextXAlignment.Center
-	UI.section(UI.squadBar, "BATTLE SQUAD", 110, ORANGE, 16)
+	UI.section(UI.squadBar, "BATTLE SQUAD", 92, ORANGE, 16)
 end
-local squadCount = label(UI.squadBar, "0/6", UDim2.fromOffset(UI.SQUAD_W - 16 - 72, 110), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
+local squadCount = label(UI.squadBar, "0/6", UDim2.fromOffset(UI.SQUAD_W - 16 - 72, 92), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
 squadCount.TextXAlignment = Enum.TextXAlignment.Right
 local squadStrip = Instance.new("Frame")
-squadStrip.Position = UDim2.fromOffset(16, 38)
+squadStrip.Position = UDim2.fromOffset(16, 20)
 squadStrip.Size = UDim2.fromOffset(UI.SQUAD_W - 32, 64)
 squadStrip.BackgroundTransparency = 1
 squadStrip.Parent = UI.squadBar
