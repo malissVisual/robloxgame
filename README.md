@@ -574,8 +574,8 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
 - **Battle speed** (`Balance.BattleSpeeds`): the SPEED button in the battle panel cycles 1x / 2x, also during a
   battle (every tick of the simulation counts double). **SKIP** on the result screen delivers the drops at once
   and the next wave may start right away.
-- **Achievements** were removed (the lifetime counters `profile.stats` stay). Over your head: your name, account
-  level and an XP bar.
+- **Achievements** were removed (the lifetime counters `profile.stats` stay). Over your head: only your name and
+  account level (the XP bar is in the HUD, bottom left).
 - **Offline income** (`Balance.Offline*`): while you are away your camp earns 6 coins per hour for every wave
   of your best wave, up to 8 hours; a WELCOME BACK popup pays it when you come back.
 - **Into the arena:** START WAVE moves you (the player, not the squad) onto the near edge of the round fight arena,

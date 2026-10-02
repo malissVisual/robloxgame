@@ -143,9 +143,9 @@ local function sfx(player: Player, name: string)
 	Net.get("Sfx"):FireClient(player, name)
 end
 
--- Over the player's head: the name with the ACCOUNT LEVEL and an XP bar to the next level (no titles: they were
--- dull). Roblox's own name tag is hidden so the two do not overlap. Rebuilt on every spawn, refreshed on XP.
--- (The name stays `showTitle` for its callers.)
+-- Over the player's head: the name with the ACCOUNT LEVEL, nothing else (no XP, no titles). Roblox's own name tag
+-- is hidden so the two do not overlap. Rebuilt on every spawn, refreshed on a level up. (The name stays `showTitle`
+-- for its callers.)
 local function showTitle(player: Player, profile: PlayerData.Profile)
 	local character = player.Character
 	local head = character and character:FindFirstChild("Head")
@@ -165,59 +165,25 @@ local function showTitle(player: Player, profile: PlayerData.Profile)
 		gui = Instance.new("BillboardGui")
 		local made = gui :: BillboardGui
 		made.Name = "PlayerTag"
-		made.Size = UDim2.fromOffset(220, 48)
-		made.StudsOffset = Vector3.new(0, 2.9, 0)
+		made.Size = UDim2.fromOffset(220, 24)
+		made.StudsOffset = Vector3.new(0, 2.6, 0)
 		made.AlwaysOnTop = true
 		made.MaxDistance = 90
 		made.ResetOnSpawn = false
 		made.Parent = head
-		local function text(name: string, y: number, height: number, size: number, color: Color3, font: Enum.Font): TextLabel
-			local l = Instance.new("TextLabel")
-			l.Name = name
-			l.Position = UDim2.fromOffset(0, y)
-			l.Size = UDim2.new(1, 0, 0, height)
-			l.BackgroundTransparency = 1
-			l.Font = font
-			l.TextSize = size
-			l.TextColor3 = color
-			l.TextStrokeTransparency = 0.4
-			l.RichText = true
-			l.Parent = made
-			return l
-		end
-		text("Level", 0, 22, 16, Color3.new(1, 1, 1), Enum.Font.GothamBold)
-		local track = Instance.new("Frame")
-		track.Name = "Track"
-		track.AnchorPoint = Vector2.new(0.5, 0)
-		track.Position = UDim2.new(0.5, 0, 0, 25)
-		track.Size = UDim2.fromOffset(150, 8)
-		track.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
-		track.BackgroundTransparency = 0.15
-		track.BorderSizePixel = 0
-		track.Parent = made
-		local trackCorner = Instance.new("UICorner")
-		trackCorner.CornerRadius = UDim.new(0, 4)
-		trackCorner.Parent = track
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = Color3.fromRGB(70, 76, 100)
-		stroke.Thickness = 1
-		stroke.Parent = track
-		local fill = Instance.new("Frame")
-		fill.Name = "Fill"
-		fill.Size = UDim2.fromScale(0, 1)
-		fill.BackgroundColor3 = Color3.fromRGB(255, 205, 90)
-		fill.BorderSizePixel = 0
-		fill.Parent = track
-		local fillCorner = Instance.new("UICorner")
-		fillCorner.CornerRadius = UDim.new(0, 4)
-		fillCorner.Parent = fill
-		text("Xp", 34, 12, 9, Color3.fromRGB(200, 205, 220), Enum.Font.GothamMedium)
+		local l = Instance.new("TextLabel")
+		l.Name = "Level"
+		l.Size = UDim2.fromScale(1, 1)
+		l.BackgroundTransparency = 1
+		l.Font = Enum.Font.GothamBold
+		l.TextSize = 16
+		l.TextColor3 = Color3.new(1, 1, 1)
+		l.TextStrokeTransparency = 0.4
+		l.RichText = true
+		l.Parent = made
 	end
-	local made = gui :: BillboardGui
-	local level, into, needed = PlayerData.levelInfo(profile.xp)
-	;(made:FindFirstChild("Level") :: TextLabel).Text = string.format('%s  <font color="#ffcd5a">Lv %d</font>', player.DisplayName, level)
-	;((made:FindFirstChild("Track") :: Frame):FindFirstChild("Fill") :: Frame).Size = UDim2.fromScale(math.clamp(into / math.max(1, needed), 0, 1), 1)
-	;(made:FindFirstChild("Xp") :: TextLabel).Text = string.format("%d / %d XP", into, needed)
+	local level = PlayerData.levelInfo(profile.xp)
+	;((gui :: BillboardGui):FindFirstChild("Level") :: TextLabel).Text = string.format('%s  <font color="#ffcd5a">Lv %d</font>', player.DisplayName, level)
 end
 
 local addXp: (Player, PlayerData.Profile, number) -> () = function() end -- defined below
@@ -233,7 +199,7 @@ addXp = function(player: Player, profile: PlayerData.Profile, amount: number)
 	local before = PlayerData.levelInfo(profile.xp)
 	profile.xp += math.max(0, math.floor(amount))
 	local after = PlayerData.levelInfo(profile.xp)
-	showTitle(player, profile) -- the bar over the head
+	showTitle(player, profile) -- the level over the head
 	local slotsChanged = false
 	for level = before + 1, after do
 		local coins = Balance.LevelRewardCoins * level
