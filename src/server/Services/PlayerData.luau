@@ -26,6 +26,7 @@ export type Profile = {
 	purchases: number,
 	startLevel: number, -- merge level a bought soldier starts at (upgraded at the lobby station)
 	tierUnlocked: { [string]: number }, -- per class: the highest merge level bought for it (coins + cleared waves)
+	mageUpgrades: { [string]: number }, -- the Mage's upgrade tracks (shared/MageUpgrades.luau): level per track
 	wave: number, -- the highest wave you can fight (progress)
 	selectedWave: number, -- the wave you will fight next (1 … wave), set in the Waves tab
 	difficulty: string, -- key of Config/Difficulties, set in the Waves tab
@@ -176,6 +177,7 @@ local function fresh(): Profile
 		purchases = 0,
 		startLevel = 1,
 		tierUnlocked = tierUnlocked,
+		mageUpgrades = {},
 		wave = 1,
 		selectedWave = 1,
 		difficulty = Difficulties.Default,
@@ -322,6 +324,11 @@ local function applySaved(profile: Profile, saved: any)
 		end
 	end
 	profile.luckyMisses = number(saved.luckyMisses, 0, 0, 1000)
+	if type(saved.mageUpgrades) == "table" then
+		for _, id in Balance.MageUpgradeOrder do
+			profile.mageUpgrades[id] = number(saved.mageUpgrades[id], 0, 0, Balance.MageUpgradeMax)
+		end
+	end
 	if type(saved.unlocked) == "table" then
 		for _, class in Units.ClassList do
 			if saved.unlocked[class] == true then
@@ -368,6 +375,7 @@ local function serialize(profile: Profile): { [string]: any }
 		purchases = profile.purchases,
 		startLevel = profile.startLevel,
 		tierUnlocked = profile.tierUnlocked,
+		mageUpgrades = profile.mageUpgrades,
 		wave = profile.wave,
 		selectedWave = profile.selectedWave,
 		difficulty = profile.difficulty,

@@ -15,8 +15,11 @@ SPELLS tab and no spell drops. Older passages below about other classes or "your
 version.
 
 Most things are 3D in the world. The UI is the PLAY button, the HUD with the account level and
-coins (bottom left), the left panel (a single Inventory page: the mages; a click on a mage opens its popup and
-outlines it lightly, no Characters / Upgrades tabs, merging is never capped), the battle panel (opened
+coins (bottom left), the left panel (a single Inventory page: the mages; a click on a mage, its card or its model,
+opens its card: level name, stats, the spells of this level, the next unlock and the **Mage upgrades**, three tracks
+bought with coins that apply to every mage, `shared/MageUpgrades.luau`, `Balance.MageUpgrades*`; the card lives on
+hover and fades out when the pointer leaves it; a press is a click until the pointer moves 16 px or is held 0.45 s;
+no Characters / Upgrades tabs, merging is never capped), the battle panel (opened
 with PLAY) and short toast messages. Every soldier has its name and level (e.g. "Mage · Lv 3")
 floating above it.
 

@@ -11,6 +11,17 @@ local Balance = {
 	BoardUpgradeStep = 3, -- slots gained per upgrade
 	BoardUpgradeBaseCost = 40, -- cost of the first upgrade
 	BoardUpgradeGrowth = 1.6, -- every upgrade costs 60% more
+	-- The Mage's upgrades (shared/MageUpgrades.luau): bought in a mage's card, they apply to every mage. Three
+	-- tracks, each up to MageUpgradeMax levels; level n costs MageUpgradeBaseCost x MageUpgradeGrowth ^ (n - 1).
+	MageUpgrades = {
+		power = { label = "POWER", text = "+%d%% damage", step = 0.05 },
+		vitality = { label = "VITALITY", text = "+%d%% HP", step = 0.05 },
+		swiftness = { label = "SWIFTNESS", text = "+%d%% attack speed", step = 0.03 },
+	},
+	MageUpgradeOrder = { "power", "vitality", "swiftness" },
+	MageUpgradeMax = 20,
+	MageUpgradeBaseCost = 60,
+	MageUpgradeGrowth = 1.3,
 	-- Squad: the soldiers that actually fight: exactly six, in ONE row side by side (left to right), in the
 	-- arena. The squad has no upgrades and the pads give no bonuses: the six just stand there, well apart.
 	SquadColumns = 6,

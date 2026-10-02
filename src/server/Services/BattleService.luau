@@ -14,6 +14,7 @@ local Enemies = require(Shared.Config.Enemies)
 local Enemy = require(Shared.Enemy)
 local Rig = require(Shared.Rig)
 local Synergy = require(Shared.Synergy)
+local MageUpgrades = require(Shared.MageUpgrades)
 local Waves = require(Shared.Config.Waves)
 local Net = require(Shared.Net)
 
@@ -956,6 +957,7 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 
 	-- Only the squad fights; the merge board is just storage.
 	local synergy = Synergy.compute(profile.squad)
+	local boosts = MageUpgrades.multipliers(profile.mageUpgrades) -- the account's Mage upgrades (every mage)
 	local mages: { { fighter: Fighter, level: number } } = {}
 	for i = 1, Balance.SquadSize do
 		local id = Balance.SquadOffset + i
@@ -970,9 +972,11 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			fighter.spot = fighter.pos -- nobody is teleported: the six start the fight on their pads and walk
 			-- The squad's synergies make everybody stronger; the pad a soldier stands on gives nothing (it only
 			-- decides which enemies it meets first).
-			fighter.maxHp *= synergy.hp
+			fighter.maxHp *= synergy.hp * boosts.hp
 			fighter.hp = fighter.maxHp
-			fighter.damage *= synergy.damage
+			fighter.damage *= synergy.damage * boosts.damage
+			fighter.cooldown *= boosts.cooldown
+			fighter.timer = math.min(fighter.timer, fighter.cooldown)
 			table.insert(fighters, fighter)
 			if cell.class == "Mage" then
 				table.insert(mages, { fighter = fighter, level = cell.tier })

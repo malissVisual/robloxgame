@@ -29,6 +29,7 @@ local NAMES = {
 	"SetSetting", -- client → server: change a setting (key, value)
 	"WelcomeBack", -- server → client: the offline-income popup (coins, hours)
 	"Upgrade", -- client → server: R pressed, unlock more merge slots
+	"MageUpgrade", -- client → server: buy the next level of a Mage upgrade track (power | vitality | swiftness), from a mage's card
 	"SetWave", -- client → server: choose the wave to fight / repeat (only inside the arena)
 	"SetDifficulty", -- client → server: choose the difficulty (only inside the arena)
 	"Notice", -- server → client: short message (text)

@@ -17,6 +17,7 @@ local Units = require(Shared:WaitForChild("Config"):WaitForChild("Units"))
 local Levels = require(Shared:WaitForChild("Config"):WaitForChild("Levels"))
 local MageSpells = require(Shared:WaitForChild("Config"):WaitForChild("MageSpells"))
 local SoldierRig = require(Shared:WaitForChild("SoldierRig"))
+local MageUpgrades = require(Shared:WaitForChild("MageUpgrades"))
 local Difficulties = require(Shared:WaitForChild("Config"):WaitForChild("Difficulties"))
 local Maps = require(Shared:WaitForChild("Config"):WaitForChild("Maps"))
 local Waves = require(Shared:WaitForChild("Config"):WaitForChild("Waves"))
@@ -66,6 +67,7 @@ local state = {
 	startLevelMax = 5,
 	levelCost = 0,
 	tierUnlocked = {} :: { [string]: number }, -- per class: the highest merge level bought
+	mageUpgrades = {} :: { [string]: number }, -- the Mage's upgrade tracks (shared/MageUpgrades.luau)
 	autoFight = false,
 	saving = false,
 	quests = {} :: { any },
@@ -166,6 +168,8 @@ UI.popupCard = nil :: Frame?
 UI.popupId = 0 -- the slot of the mage whose popup is open
 UI.popupLeftAt = nil :: number? -- os.clock() when the pointer left the mage and the popup (nil while over them)
 UI.popupFading = false -- the popup is fading out
+UI.popupAt = nil :: Vector2? -- where the open popup was asked for (a click in the world), to rebuild it in place
+UI.popupRebuild = false -- rebuilding the open popup (after a purchase): no fade-in
 UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
 UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
@@ -2373,7 +2377,8 @@ openCardPopup = function(id: number, at: Vector2?)
 	y += 40
 
 	local stats = Units.stats(unit.class, unit.tier, ascended)
-	line(string.format('<font color="#a5aab9">HP</font> %d   <font color="#a5aab9">DMG</font> %d   <font color="#a5aab9">RANGE</font> %d   <font color="#a5aab9">EVERY</font> %.1f s', math.floor(stats.hp + 0.5), math.floor(stats.damage + 0.5), stats.range, stats.cooldown), y, 12, Enum.Font.GothamMedium, WHITE)
+	local boosts = MageUpgrades.multipliers(state.mageUpgrades) -- the bought upgrades are already in these numbers
+	line(string.format('<font color="#a5aab9">HP</font> %d   <font color="#a5aab9">DMG</font> %d   <font color="#a5aab9">RANGE</font> %d   <font color="#a5aab9">EVERY</font> %.2f s', math.floor(stats.hp * boosts.hp + 0.5), math.floor(stats.damage * boosts.damage + 0.5), stats.range, stats.cooldown * boosts.cooldown), y, 12, Enum.Font.GothamMedium, WHITE)
 	y += 18
 	line(Units.passiveText(unit.class, ascended), y, 11, Enum.Font.Gotham, MUTED)
 	y += 22
@@ -2407,6 +2412,62 @@ openCardPopup = function(id: number, at: Vector2?)
 		y += 17
 	end
 	y += 8
+
+	-- UPGRADES (every mage): three tracks with their bonus and a "+" button with the price of the next level.
+	line("UPGRADES  <font color=\"#a5aab9\">for every mage</font>", y, 10, Enum.Font.GothamBlack, GOLD, 14)
+	y += 16
+	for _, trackId in Balance.MageUpgradeOrder do
+		local def = Balance.MageUpgrades[trackId]
+		local level = MageUpgrades.level(state.mageUpgrades, trackId)
+		local cost = MageUpgrades.cost(level)
+		local row = Instance.new("Frame")
+		row.Position = UDim2.fromOffset(12, y)
+		row.Size = UDim2.fromOffset(W - 24, 26)
+		row.BackgroundColor3 = UI.DARK
+		row.BackgroundTransparency = 0.3
+		row.BorderSizePixel = 0
+		row.ZIndex = 41
+		row.Parent = popup
+		corner(row, 6)
+		local name = label(row, string.format("%s <font color=\"#a5aab9\">%d/%d</font>", def.label, level, Balance.MageUpgradeMax), UDim2.fromOffset(8, 0), UDim2.fromOffset(120, 26), 11, Enum.Font.GothamBold, WHITE)
+		name.RichText = true
+		name.ZIndex = 42
+		local bonus = label(row, MageUpgrades.text(trackId, level), UDim2.fromOffset(118, 0), UDim2.fromOffset(78, 26), 10, Enum.Font.GothamMedium, GREEN)
+		bonus.ZIndex = 42
+		local buy = Instance.new("TextButton")
+		buy.Position = UDim2.fromOffset(W - 24 - 76, 3)
+		buy.Size = UDim2.fromOffset(72, 20)
+		buy.BorderSizePixel = 0
+		buy.AutoButtonColor = false
+		buy.Font = Enum.Font.GothamBold
+		buy.TextSize = 11
+		buy.TextColor3 = WHITE
+		buy.ZIndex = 42
+		buy.Parent = row
+		corner(buy, 5)
+		if cost then
+			local affordable = state.coins >= cost
+			buy.Text = string.format("+  %d", cost)
+			buy.BackgroundColor3 = if affordable then GOLD:Lerp(BG, 0.35) else BADGE
+			buy.TextTransparency = if affordable then 0 else 0.45
+			buy.Activated:Connect(function()
+				Net.get("MageUpgrade"):FireServer(trackId)
+				-- The server answers with a new state; the open card is rebuilt in place to show it.
+				task.delay(0.2, function()
+					if cardPopup and UI.popupId == id then
+						UI.popupRebuild = true
+						openCardPopup(id, UI.popupAt)
+					end
+				end)
+			end)
+		else
+			buy.Text = "MAX"
+			buy.BackgroundColor3 = BADGE
+			buy.TextTransparency = 0.45
+		end
+		y += 30
+	end
+	y += 6
 
 	local free = if equipped then state.boardFree else state.squadFree
 	local button = Instance.new("TextButton")
@@ -2468,8 +2529,15 @@ openCardPopup = function(id: number, at: Vector2?)
 	popup.Parent = gui
 	cardPopup = popup
 	UI.popupId = id
+	UI.popupAt = at
 	UI.popupLeftAt = nil
 	UI.popupFading = false
+	if UI.popupRebuild then
+		UI.popupRebuild = false -- rebuilt in place after a purchase: no fade-in (it would flicker)
+	else
+		popup.GroupTransparency = 1
+		TweenService:Create(popup, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 0 }):Play()
+	end
 end
 
 -- The popup lives on hover: it stays while the pointer is over the mage (its card in the panel or its model in

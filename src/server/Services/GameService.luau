@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Grid = require(Shared.Grid)
 local Units = require(Shared.Config.Units)
+local MageUpgrades = require(Shared.MageUpgrades)
 local Levels = require(Shared.Config.Levels)
 local Waves = require(Shared.Config.Waves)
 local Difficulties = require(Shared.Config.Difficulties)
@@ -102,6 +103,7 @@ local function pushState(player: Player)
 		startLevelMax = Balance.StartLevelMax,
 		levelCost = PlayerData.levelUpgradeCost(profile) or 0, -- 0 = at the maximum
 		tierUnlocked = profile.tierUnlocked,
+		mageUpgrades = profile.mageUpgrades,
 		level = accountLevel,
 		autoFight = profile.autoFight,
 		saving = PlayerData.savingOn(player),
@@ -804,6 +806,28 @@ local function onAdminCommand(player: Player, command: any, a: any, b: any)
 	refresh(player)
 end
 
+-- Buys the next level of a Mage upgrade track (shared/MageUpgrades.luau) from a mage's card.
+local function onMageUpgrade(player: Player, id: any)
+	local profile = PlayerData.get(player)
+	if not profile or profile.battling or profile.rolling or type(id) ~= "string" or not Balance.MageUpgrades[id] then
+		return
+	end
+	local level = MageUpgrades.level(profile.mageUpgrades, id)
+	local cost = MageUpgrades.cost(level)
+	if not cost then
+		notify(player, string.format("%s is at its maximum", Balance.MageUpgrades[id].label))
+		return
+	end
+	if profile.coins < cost then
+		notify(player, string.format("Not enough coins (%s costs %d)", Balance.MageUpgrades[id].label, cost))
+		return
+	end
+	profile.coins -= cost
+	profile.mageUpgrades[id] = level + 1
+	refresh(player)
+	notify(player, string.format("%s %d: every mage %s", Balance.MageUpgrades[id].label, level + 1, MageUpgrades.text(id, level + 1)))
+end
+
 local function onUpgrade(player: Player)
 	local profile, plot = PlayerData.get(player), plots[player]
 	if not profile or not plot or profile.battling or profile.rolling then
@@ -1376,6 +1400,7 @@ function GameService.init()
 	local _unusedSummon = onSpawn
 	Net.get("Battle").OnServerEvent:Connect(onBattle)
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)
+	Net.get("MageUpgrade").OnServerEvent:Connect(onMageUpgrade)
 	Net.get("UnlockTier").OnServerEvent:Connect(onUnlockTier)
 	Net.get("Sell").OnServerEvent:Connect(onSell)
 	Net.get("AutoFight").OnServerEvent:Connect(onAutoFight)
