@@ -19,6 +19,7 @@ local MageSpells = require(Shared:WaitForChild("Config"):WaitForChild("MageSpell
 local SoldierRig = require(Shared:WaitForChild("SoldierRig"))
 local MageUpgrades = require(Shared:WaitForChild("MageUpgrades"))
 local MageTree = require(Shared:WaitForChild("Config"):WaitForChild("MageTree"))
+require(script.Parent:WaitForChild("MageAnimator")).start() -- the Mage's body language: idle, glide, gestures, aura (client/MageAnimator.luau)
 local Difficulties = require(Shared:WaitForChild("Config"):WaitForChild("Difficulties"))
 local Maps = require(Shared:WaitForChild("Config"):WaitForChild("Maps"))
 local Waves = require(Shared:WaitForChild("Config"):WaitForChild("Waves"))

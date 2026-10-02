@@ -91,6 +91,13 @@ local function rigOf(model: Model)
 	if not info or not model:IsDescendantOf(workspace) then
 		return nil
 	end
+	if info.glide then
+		-- The Mage: no animation assets at all; the client poses its joints (client/MageAnimator.luau) from the
+		-- attributes the server sets (Glide, Cast, Blink). setMoving / attack / raise do nothing here.
+		rig = { tracks = {}, moving = nil, attack = info.attack, glide = true }
+		loaded[model] = rig
+		return rig
+	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
 	if not animator then

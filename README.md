@@ -486,7 +486,13 @@ in `Soldier.luau` for its look.
 - [ ] A second map
 - [ ] Trading / gifting soldiers between players
 
-**The Mage moves like a mage** (`MageConfig.Glide`): while it walks it floats up 0.7 studs, leans into the motion,
-bobs and trails arcane sparks; its rig plays no run animation (`Rig.animate(…, glide)`), the brain sets the lift
-and `fighter.tilt`, which `face()` applies. Game texts are English (spell names, the evolution's level names).
+**The Mage's body language** lives on the client (`src/client/MageAnimator.luau`, 60 fps, no animation assets):
+it poses the R15 joints of every Mage model procedurally from attributes the server sets (`Glide` 0 … 1, `Cast`
+= "kind|duration|hand" + `CastId`, `Blink`): a living idle (breathing, a wandering gaze), the GLIDE while it
+moves (the legs dangle and breathe, knees bent, toes down, the arms open, the body sways; the server lifts it
+0.7 studs and leans it, `MageConfig.Glide`, `fighter.tilt` applied by `face()`), one gesture per spell kind (a
+bolt thrust from alternating hands with a torso twist, both arms up and a slam for an area spell, a sweep for a
+chain, a full-body spin with the arms out for a knockback, a slow raise for a barrier / heal, a yank for a
+pull, crossed arms for a blink) and an AURA: shards orbiting the mage (2 + level/4, faster and wider while
+gliding, a flash on a blink) and a glowing disc under it. A gliding rig loads no Roblox animations at all. Game texts are English (spell names, the evolution's level names).
 

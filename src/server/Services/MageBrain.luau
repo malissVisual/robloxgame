@@ -166,6 +166,8 @@ export type Brain = {
 	glide: number,
 	glideTarget: number,
 	glideSparkAt: number,
+	castHand: string,
+	castCount: number,
 	hopUntil: number,
 	hopFrom: Vector3?,
 	hopTo: Vector3?,
@@ -337,6 +339,8 @@ function MageBrain.new(ctx: Context, fighter: any, level: number): Brain
 		glide = 0, -- 0 … 1: how far the mage is in its gliding pose (MageConfig.Glide)
 		glideTarget = 0,
 		glideSparkAt = 0,
+		castHand = "R", -- the bolts alternate hands (the client's gesture)
+		castCount = 0,
 		hopUntil = 0,
 		hopFrom = nil,
 		hopTo = nil,
@@ -419,6 +423,7 @@ function MageBrain.destroy(self: Brain)
 	end
 	self.hover = 0
 	self.glide = 0
+	self.f.model:SetAttribute("Glide", 0)
 	self.f.tilt = 0
 	self.f.lift = self.f.baseLift
 end
@@ -773,6 +778,14 @@ local function startCast(self: Brain, spell: Spells.Spell, target: any?, point: 
 		end
 	end
 	self.casting = cast
+	-- The client animates the gesture of this cast (client/MageAnimator.luau): kind, how long the wind-up is
+	-- (the spell fires at its end) and which hand; the bolts alternate hands.
+	if spell.kind == "bolt" then
+		self.castHand = if self.castHand == "R" then "L" else "R"
+	end
+	self.castCount += 1
+	f.model:SetAttribute("Cast", string.format("%s|%.2f|%s", spell.kind, duration, self.castHand))
+	f.model:SetAttribute("CastId", self.castCount)
 	telegraph(self, duration, not spell.basic)
 	if point then
 		look(self, point)
@@ -1051,6 +1064,7 @@ local function resolve(self: Brain, cast: Cast)
 		fade(flashA, 0.35, { Size = Vector3.one * 6, Transparency = 1 })
 		f.pos = Vector3.new(destination.X, f.pos.Y, destination.Z)
 		f.model:PivotTo(CFrame.new(f.pos + UP * f.lift) * (f.model:GetPivot() - f.model:GetPivot().Position))
+		f.model:SetAttribute("Blink", ((f.model:GetAttribute("Blink") :: number?) or 0) + 1) -- the client flashes the aura
 		local flashB = neon(parent, Vector3.one * 2, CFrame.new(f.pos + UP * f.lift), spell.color2, 0.1, Enum.PartType.Ball)
 		fade(flashB, 0.35, { Size = Vector3.one * 6, Transparency = 1 })
 		sparks(parent, f.pos, spell.color, 8, 2, 4)
@@ -1526,6 +1540,7 @@ local function tickVisuals(self: Brain, dt: number)
 	if self.glide ~= self.glideTarget then
 		local step = dt / G.Time
 		self.glide = if math.abs(self.glideTarget - self.glide) <= step then self.glideTarget else self.glide + (if self.glideTarget > self.glide then step else -step)
+		f.model:SetAttribute("Glide", self.glide) -- the client dangles the legs and widens the aura
 		changed = true
 	end
 	if self.glide > 0 then
