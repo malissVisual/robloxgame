@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[26] = {
-		name = "Hvězdný poutník", era = "Budoucnost",
+		name = "Star Wanderer", era = "Future",
 		desc = "Bílé panely se svítícími spoji, kápě s azurovým lemem, malá aureola, kvantové ohnisko s prstencem, levitující úlomky",
 		top = 4.164, -- the name label this high over the head
 		body = {

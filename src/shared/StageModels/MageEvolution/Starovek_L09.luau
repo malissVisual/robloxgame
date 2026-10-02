@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[9] = {
-		name = "Učenec z Alexandrie", era = "Starověk",
+		name = "Scholar of Alexandria", era = "Antiquity",
 		desc = "Kápě s diadémem, pouzdro na svitky na zádech, bronzové chrániče předloktí, hůl s armilárními prstenci, armilární sféra",
 		top = 3.913, -- the name label this high over the head
 		body = {

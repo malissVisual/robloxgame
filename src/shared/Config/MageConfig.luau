@@ -26,6 +26,10 @@ local MageConfig = {
 
 	-- Zdroje.
 	Mana = { Max = 100, Start = 70, Regen = 11 }, -- regenerace za sekundu bitvy
+	-- GLIDE: a mage moves like a mage. While it walks it floats up Height studs, leans Lean radians into the motion
+	-- and bobs (Bob studs, BobSpeed rad/s); a few arcane sparks trail under it every SparkEvery seconds. Time = the
+	-- seconds it takes to lift off / settle down. (Rig plays no run animation for a gliding rig.)
+	Glide = { Height = 0.7, Lean = 0.14, Bob = 0.12, BobSpeed = 6, Time = 0.25, SparkEvery = 0.2 },
 
 	-- Paměť.
 	TargetHold = 1.5, -- sekundy, po které drží cíl, pokud se neobjeví výrazně lepší

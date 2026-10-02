@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[28] = {
-		name = "Nebeský mudrc", era = "Budoucnost",
+		name = "Celestial Sage", era = "Future",
 		desc = "Vysoká bílá koruna z panelů, dvojitá aureola, prstenec krystalů kolem těla, trojitý prstenec na holi, levitující holo-svitek",
 		top = 4.43, -- the name label this high over the head
 		body = {

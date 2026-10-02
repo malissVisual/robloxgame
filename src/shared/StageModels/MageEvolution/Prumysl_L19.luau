@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[19] = {
-		name = "Elektromág", era = "Průmyslový věk",
+		name = "Electromage", era = "Industrial Age",
 		desc = "Cylindr s Teslovou cívkou, brýle na očích, batoh s měděnými nádržemi, hůl s Teslovými prstenci a výboji, bleskový globus",
 		top = 4.349, -- the name label this high over the head
 		body = {

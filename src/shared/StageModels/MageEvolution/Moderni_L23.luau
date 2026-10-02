@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[23] = {
-		name = "Datový šaman", era = "Moderní doba",
+		name = "Data Shaman", era = "Modern Era",
 		desc = "Kápě s neonovým lemem, obvodové tetování, orbitální dron, šestiúhelníková hlavice hole, holografická kniha",
 		top = 4.217, -- the name label this high over the head
 		body = {

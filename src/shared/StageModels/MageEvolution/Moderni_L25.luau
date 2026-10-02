@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[25] = {
-		name = "Plazmový velitel", era = "Moderní doba",
+		name = "Plasma Commander", era = "Modern Era",
 		desc = "Vysoký límec s anténami, korunový vizor, holografické runy, velký emitorový prstenec na holi, plazmové jádro",
 		top = 4.454, -- the name label this high over the head
 		body = {

@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[3] = {
-		name = "Kostěný šaman", era = "Pravěk",
+		name = "Bone Shaman", era = "Prehistory",
 		desc = "Parohová čelenka, žebrový náprsník, kostěný nárameník s lebkou, hůl se zvířecí lebkou a kostěnými drápy, lebeční miska s elixírem",
 		top = 3.564, -- the name label this high over the head
 		body = {

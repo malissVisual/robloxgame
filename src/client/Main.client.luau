@@ -3593,10 +3593,11 @@ do
 	local function unitText(unit: any): string
 		return string.format("%s %s", Units.Classes[unit.class].label, Levels.label(unit.tier))
 	end
-	local lootCards: { { card: Frame, unit: any } } = {}
+	local lootCards: { { card: Frame, unit: any, cover: Frame, under: TextLabel, holder: Frame } } = {}
 	local countStart = 0
 	local open = false
 	local claiming = false
+	local revealed = true -- false while the loot lies face down (SHOW LOOT first)
 
 	-- The stat tiles count up over 0.9 s after the screen opened.
 	RunService.RenderStepped:Connect(function()
@@ -3621,8 +3622,41 @@ do
 		end)
 	end
 
+	-- SHOW LOOT: the face-down cards flip over one after another, with a little confetti.
+	local function revealLoot()
+		revealed = true
+		claim.Text = "CLAIM LOOT"
+		for i, entry in lootCards do
+			task.delay((i - 1) * 0.18, function()
+				if not entry.cover.Parent then
+					return
+				end
+				local flip = TweenService:Create(entry.cover, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = UDim2.fromOffset(0, 84), BackgroundTransparency = 1 })
+				flip:Play()
+				flip.Completed:Connect(function()
+					entry.cover:Destroy()
+				end)
+				local pop = Instance.new("UIScale")
+				pop.Scale = 0.6
+				pop.Parent = entry.card
+				TweenService:Create(pop, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0.18), { Scale = 1 }):Play()
+				TweenService:Create(entry.under, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0.2), { TextTransparency = 0 }):Play()
+				task.delay(0.2, function()
+					local center = entry.card.AbsolutePosition + entry.card.AbsoluteSize / 2 - gui.AbsolutePosition
+					for _ = 1, 8 do
+						confettiPop(gui, UDim2.fromOffset(center.X, center.Y), 90)
+					end
+				end)
+			end)
+		end
+	end
+
 	claim.Activated:Connect(function()
 		if claiming or not open then
+			return
+		end
+		if not revealed then
+			revealLoot()
 			return
 		end
 		claiming = true
@@ -3716,7 +3750,23 @@ do
 			under.TextXAlignment = Enum.TextXAlignment.Center
 			under.RichText = true
 			under.ZIndex = 63
-			table.insert(lootCards, { card = card, unit = item.unit })
+			under.TextTransparency = 1 -- shown when the card is revealed
+			-- Face down until SHOW LOOT: a dark cover with a question mark over the card.
+			local cover = Instance.new("Frame")
+			cover.Name = "Cover"
+			cover.AnchorPoint = Vector2.new(0.5, 0)
+			cover.Position = UDim2.new(0.5, 0, 0, 0)
+			cover.Size = UDim2.fromOffset(84, 84)
+			cover.BackgroundColor3 = UI.DARK
+			cover.BorderSizePixel = 0
+			cover.ZIndex = 65
+			cover.Parent = holder
+			corner(cover, 10)
+			UI.stroke(cover, GOLD, 2, 0.3)
+			local question = label(cover, "?", UDim2.fromOffset(0, 0), UDim2.fromScale(1, 1), 44, Enum.Font.GothamBlack, GOLD)
+			question.TextXAlignment = Enum.TextXAlignment.Center
+			question.ZIndex = 66
+			table.insert(lootCards, { card = card, unit = item.unit, cover = cover, under = under, holder = holder })
 			-- The cards pop in one after another.
 			local scale = Instance.new("UIScale")
 			scale.Scale = 0.3
@@ -3724,8 +3774,9 @@ do
 			TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0.5 + i * 0.12), { Scale = 1 }):Play()
 		end
 		luckyLine.Text = if won and result.luckyResult then string.format("LUCKY DROP: %s unlocked!", Units.Classes[result.luckyResult].label) elseif won and result.luckyCandidates and #result.luckyCandidates > 0 then string.format('<font color="#a5aab9">lucky drop chance %d%% — not this time</font>', math.floor((result.luckyChance or 0) * 100 + 0.5)) else ""
-		hintLine.Text = if won then "the loot enters your inventory when you claim it" else "no loot this time"
-		claim.Text = if won then "CLAIM LOOT" else "CONTINUE"
+		hintLine.Text = if won then "show the loot, then claim it: it enters your inventory only then" else "no loot this time"
+		revealed = not (won and #loot > 0)
+		claim.Text = if not won then "CONTINUE" elseif #loot > 0 then "SHOW LOOT" else "CLAIM LOOT"
 		claim.BackgroundColor3 = (if won then GREEN else Color3.fromRGB(120, 130, 160)):Lerp(BG, 0.15)
 		claimStroke.Color = if won then GREEN else Color3.fromRGB(120, 130, 160)
 		claiming = false

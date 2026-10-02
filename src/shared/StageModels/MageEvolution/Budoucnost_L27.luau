@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[27] = {
-		name = "Kosmický mág", era = "Budoucnost",
+		name = "Cosmic Mage", era = "Future",
 		desc = "Levitující nárameníky, energetická aureola, plášť s hvězdným polem, gyroskopická hůl se dvěma prstenci, kosmická koule",
 		top = 4.289, -- the name label this high over the head
 		body = {

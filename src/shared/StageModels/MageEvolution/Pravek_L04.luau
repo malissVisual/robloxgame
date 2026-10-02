@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[4] = {
-		name = "Šaman totemu", era = "Pravěk",
+		name = "Totem Shaman", era = "Prehistory",
 		desc = "Vlčí kápě s lebkou, dlouhý medvědí plášť, náhrdelník z drápů, totemová hůl s vyřezanou tváří a křídly, kouřící hliněná nádoba",
 		top = 3.669, -- the name label this high over the head
 		body = {

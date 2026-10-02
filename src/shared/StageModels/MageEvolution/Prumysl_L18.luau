@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[18] = {
-		name = "Mechanik éteru", era = "Průmyslový věk",
+		name = "Aether Mechanic", era = "Industrial Age",
 		desc = "Letecká kukla s brýlemi, kabát s mosaznými knoflíky, nárameník s ozubeným kolem, hůl s velkým ozubeným kolem a ciferníky, kniha s mosaznými rohy",
 		top = 3.994, -- the name label this high over the head
 		body = {

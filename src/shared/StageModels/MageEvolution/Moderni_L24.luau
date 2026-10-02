@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[24] = {
-		name = "Strážce sítě", era = "Moderní doba",
+		name = "Grid Warden", era = "Modern Era",
 		desc = "Polopřilba s ploutvemi, ramenní emitory, plášť rozdělený na pruhy, plazmová hůl s dvojitými hroty, energetická koule",
 		top = 4.297, -- the name label this high over the head
 		body = {

@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[5] = {
-		name = "Velký šaman", era = "Pravěk",
+		name = "Great Shaman", era = "Prehistory",
 		desc = "Koruna z mamutích klů s krystalem na čele, plášť z mamutí kožešiny s kly na ramenou, malované otisky dlaní, rozvidlená hůl s velkým krystalem, krystalový úlomek",
 		top = 3.893, -- the name label this high over the head
 		body = {

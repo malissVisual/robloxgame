@@ -70,6 +70,7 @@ type Fighter = {
 	boltStyle: string?, -- "execute" → the Mage's next fireball is bigger with a white core (effect() resets it)
 	boltTint: Color3?, -- the Mage's next fireball color override (effect() resets it)
 	baseLift: number, -- the lift at creation (the Overcharge hover restores it)
+	tilt: number, -- radians of forward lean applied by face() (the Mage's glide; 0 for everybody else)
 	bonusCoins: number, -- extra coin multiplier at death (treasure goblin, bounty)
 	noReward: boolean, -- its death pays no coins (the treasure goblin escaped)
 	-- The Mage's merge-level tree (Config/MageTree.luau): a mage's level and the state of its passives.
@@ -213,6 +214,7 @@ local function makeFighter(side: number, stats: Units.Stats, tier: number, color
 		boltStyle = nil,
 		boltTint = nil,
 		baseLift = lift,
+		tilt = 0,
 		bonusCoins = 0,
 		noReward = false,
 		mageLevel = nil,
@@ -283,7 +285,11 @@ local function face(f: Fighter, target: Vector3)
 	local p = f.pos + UP * f.lift
 	local look = Vector3.new(target.X, p.Y, target.Z)
 	if (look - p).Magnitude > 0.05 then
-		f.model:PivotTo(CFrame.lookAt(p, look))
+		local cf = CFrame.lookAt(p, look)
+		if f.tilt ~= 0 then
+			cf *= CFrame.Angles(f.tilt, 0, 0) -- a negative tilt leans the head into the motion
+		end
+		f.model:PivotTo(cf)
 	end
 end
 

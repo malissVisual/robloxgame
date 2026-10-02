@@ -18,7 +18,7 @@ local Weapons = require(script.Parent.Weapons)
 local EVOLUTIONS = {
 	-- (holdFrom = 99: the designs' rest pose is the grip; the "hold" animation would turn a hanging sword or a
 	-- standing staff forward. The attack animation moves the hand, and the weapon follows it.)
-	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "none", holdFrom = 99 }, -- no swing: the hand with the staff is raised while the fireball charges (Rig.raise)
+	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "none", holdFrom = 99, glide = true }, -- no swing: the hand with the staff is raised while the fireball charges (Rig.raise)
 }
 
 local C = Color3.fromRGB
@@ -2360,7 +2360,7 @@ local function buildEvolution(class: string, tier: number, s: number, bare: bool
 	humanoid.AutomaticScalingEnabled = false
 	Instance.new("Animator").Parent = humanoid
 	humanoid.Parent = model
-	Rig.animate(model, evolution.attack, tier >= evolution.holdFrom)
+	Rig.animate(model, evolution.attack, tier >= evolution.holdFrom, evolution.glide == true)
 	return model, head, data.top * RIG_SCALE
 end
 

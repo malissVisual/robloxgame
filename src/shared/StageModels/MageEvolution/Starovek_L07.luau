@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[7] = {
-		name = "Faraonův mág", era = "Starověk",
+		name = "Pharaoh's Mage", era = "Antiquity",
 		desc = "Vysoká koruna s kobrou uraeus, dlouhý lněný hábit, purpurový plášť, zlatý pektorál s křídly, hůl s ankhem a slunečním kotoučem, zlatá koule na podstavci",
 		top = 3.888, -- the name label this high over the head
 		body = {

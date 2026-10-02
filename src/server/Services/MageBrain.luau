@@ -163,6 +163,9 @@ export type Brain = {
 	overchargeUntil: number,
 	runeRing: any?,
 	hover: number,
+	glide: number,
+	glideTarget: number,
+	glideSparkAt: number,
 	hopUntil: number,
 	hopFrom: Vector3?,
 	hopTo: Vector3?,
@@ -193,7 +196,7 @@ MageBrain.__index = MageBrain
 -- Pseudo-kouzlo Strážce bez štítu v repertoáru: Ward (−Reduction poškození spojenci na Time sekund).
 local WARD: Spells.Spell = {
 	id = "ward",
-	label = "Ochranná runa",
+	label = "Guardian Rune",
 	era = 0,
 	minLevel = 0,
 	kind = "ward",
@@ -331,6 +334,9 @@ function MageBrain.new(ctx: Context, fighter: any, level: number): Brain
 		overchargeUntil = 0,
 		runeRing = nil,
 		hover = 0,
+		glide = 0, -- 0 … 1: how far the mage is in its gliding pose (MageConfig.Glide)
+		glideTarget = 0,
+		glideSparkAt = 0,
 		hopUntil = 0,
 		hopFrom = nil,
 		hopTo = nil,
@@ -412,6 +418,8 @@ function MageBrain.destroy(self: Brain)
 		cast.reticle = nil
 	end
 	self.hover = 0
+	self.glide = 0
+	self.f.tilt = 0
 	self.f.lift = self.f.baseLift
 end
 
@@ -446,6 +454,13 @@ local function nearest(from: Vector3, list: { any }): (any?, number)
 		end
 	end
 	return best, bestDist
+end
+
+-- Moving or standing: the rig's animation state and the glide target (the Mage floats while it moves, see
+-- tickVisuals / MageConfig.Glide).
+local function setGlide(self: Brain, moving: boolean)
+	Rig.setMoving(self.f.model, moving)
+	self.glideTarget = if moving then 1 else 0
 end
 
 -- Místo uvnitř plošiny (okraj s rezervou).
@@ -764,7 +779,7 @@ local function startCast(self: Brain, spell: Spells.Spell, target: any?, point: 
 	elseif target then
 		look(self, target.pos)
 	end
-	Rig.setMoving(f.model, false)
+	setGlide(self, false)
 end
 
 -- ── Zuřivost a Overcharge ───────────────────────────────────────────────────
@@ -1300,7 +1315,7 @@ local function hopTick(self: Brain)
 	end
 	local pos = from:Lerp(to, t)
 	f.pos = Vector3.new(pos.X, f.pos.Y, pos.Z)
-	Rig.setMoving(f.model, true)
+	setGlide(self, true)
 	local step = 1 / math.max(CA.Afterimages - 1, 1)
 	if self.hopAfterimages < CA.Afterimages and t >= self.hopAfterimages * step - 0.001 then
 		ctx.fx.afterimage(ctx.parent, f.pos, f.lift, self.basic.color)
@@ -1310,7 +1325,7 @@ local function hopTick(self: Brain)
 		look(self, self.hopLook)
 	end
 	if t >= 1 then
-		Rig.setMoving(f.model, false)
+		setGlide(self, false)
 	end
 end
 
@@ -1495,6 +1510,7 @@ local function tickVisuals(self: Brain, dt: number)
 		endOvercharge(self)
 	end
 	local wantHover = if isOvercharged(self) then O.Hover else 0
+	local changed = false
 	if self.hover ~= wantHover then
 		local step = O.Hover / O.HoverTime * dt
 		if math.abs(wantHover - self.hover) <= step then
@@ -1502,7 +1518,31 @@ local function tickVisuals(self: Brain, dt: number)
 		else
 			self.hover += if wantHover > self.hover then step else -step
 		end
+		changed = true
+	end
+	-- GLIDE: while the mage moves it floats up a little, leans into the motion and bobs (a mage, not a jogger);
+	-- a few arcane sparks trail under it. It lifts off and settles smoothly.
+	local G = Config.Glide
+	if self.glide ~= self.glideTarget then
+		local step = dt / G.Time
+		self.glide = if math.abs(self.glideTarget - self.glide) <= step then self.glideTarget else self.glide + (if self.glideTarget > self.glide then step else -step)
+		changed = true
+	end
+	if self.glide > 0 then
+		local bob = math.sin(f.clock * G.BobSpeed) * G.Bob * self.glide
+		f.lift = f.baseLift + self.hover + self.glide * G.Height + bob
+		f.tilt = -G.Lean * self.glide
+		changed = true
+		if self.glide > 0.5 and f.clock - self.glideSparkAt >= G.SparkEvery and ctx.fx.sparks then
+			self.glideSparkAt = f.clock
+			ctx.fx.sparks(ctx.parent, f.pos + Vector3.new(0, 0.3, 0), self.basic.color, 2, 0.7, 1.2)
+		end
+	elseif changed or f.tilt ~= 0 then
 		f.lift = f.baseLift + self.hover
+		f.tilt = 0
+		changed = true
+	end
+	if changed then
 		ctx.face(f, self.lastLook or (f.pos + Vector3.new(0, 0, 10)))
 	end
 	local ring = self.runeRing
@@ -1826,7 +1866,7 @@ local function moveTowards(self: Brain, goal: Vector3, dt: number, speedFactor: 
 	local delta = flat(goal) - flat(f.pos)
 	local dist = delta.Magnitude
 	if dist < 0.05 then
-		Rig.setMoving(f.model, false)
+		setGlide(self, false)
 		return
 	end
 	local stepLength = math.min(f.speed * dt * rate * speedFactor, dist)
@@ -1845,7 +1885,7 @@ local function moveTowards(self: Brain, goal: Vector3, dt: number, speedFactor: 
 	end
 	local next = clampToArena(self, f.pos + step)
 	f.pos = Vector3.new(next.X, f.pos.Y, next.Z)
-	Rig.setMoving(f.model, true)
+	setGlide(self, true)
 end
 
 local function act(self: Brain, dt: number)
@@ -1869,7 +1909,7 @@ local function act(self: Brain, dt: number)
 			local goal = hazard.pos + away.Unit * (hazard.radius + exit)
 			moveTowards(self, clampToArena(self, goal), dt, 1)
 		else
-			Rig.setMoving(f.model, false)
+			setGlide(self, false)
 			self.action = "idle"
 			self.reactionBusyUntil = math.max(self.reactionBusyUntil, f.clock + Config.HazardHold)
 		end
@@ -1888,18 +1928,18 @@ local function act(self: Brain, dt: number)
 			if dist > range then
 				moveTowards(self, goal.pos, dt, 1)
 			else
-				Rig.setMoving(f.model, false)
+				setGlide(self, false)
 			end
 			look(self, goal.pos)
 		else
-			Rig.setMoving(f.model, false)
+			setGlide(self, false)
 		end
 		return
 	end
 
 	if action == "attack" and target then
 		-- Stojí na místě, dívá se na cíl a střílí v tempu útoku mága (při Overcharge rychleji).
-		Rig.setMoving(f.model, false)
+		setGlide(self, false)
 		look(self, target.pos)
 		local dist = (flat(target.pos) - flat(f.pos)).Magnitude
 		local rate = (if f.slowUntil > f.clock then f.slowFactor else 1) * (f.haste or 1)
@@ -1914,7 +1954,7 @@ local function act(self: Brain, dt: number)
 	end
 
 	-- idle a vše ostatní: stojí, dívá se na cíl nebo na nejbližšího nepřítele; z nudy gesto.
-	Rig.setMoving(f.model, false)
+	setGlide(self, false)
 	local lookAt = if target then target.pos elseif nearestEnemy then nearestEnemy.pos else nil
 	if lookAt then
 		look(self, lookAt)
@@ -1960,7 +2000,7 @@ function MageBrain.update(self: Brain, dt: number)
 			self.casting = nil
 			resolve(self, cast)
 		else
-			Rig.setMoving(f.model, false)
+			setGlide(self, false)
 			local target = cast.target
 			local lookAt = cast.point or (target and target.hp > 0 and target.pos)
 			if lookAt then
@@ -1970,7 +2010,7 @@ function MageBrain.update(self: Brain, dt: number)
 		return
 	end
 	if f.clock < self.reactionBusyUntil or f.clock < self.hesitateUntil then
-		Rig.setMoving(f.model, false)
+		setGlide(self, false)
 		return
 	end
 	self.thinkIn -= dt

@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[29] = {
-		name = "Arcimág", era = "Budoucnost",
+		name = "Archmage", era = "Future",
 		desc = "Energetická koruna s hroty, krystalová křídla, velká aureola, shluk krystalů na holi, singularita v levé ruce",
 		top = 4.574, -- the name label this high over the head
 		body = {

@@ -109,7 +109,7 @@ local function rigOf(model: Model)
 			tracks[name] = track
 		end
 	end
-	rig = { tracks = tracks, moving = nil, attack = info.attack }
+	rig = { tracks = tracks, moving = nil, attack = info.attack, glide = info.glide }
 	loaded[model] = rig
 	if info.hold and tracks.hold then
 		tracks.hold:Play(0.1)
@@ -124,6 +124,9 @@ function Rig.setMoving(model: Model, moving: boolean)
 		return
 	end
 	rig.moving = moving
+	if rig.glide then
+		return -- a gliding rig (the Mage) keeps its idle pose: the server floats and leans it instead of a run
+	end
 	local on, off = rig.tracks[if moving then "run" else "idle"], rig.tracks[if moving then "idle" else "run"]
 	if off then
 		off:Stop(0.15)
@@ -134,9 +137,10 @@ function Rig.setMoving(model: Model, moving: boolean)
 end
 
 -- Registers a rig: `attack` = its attack animation ("slash" | "lunge" | "cast"), `hold` = the weapon hand is
--- held up. The idle animation starts as soon as the caller has put the model into the world.
-function Rig.animate(model: Model, attack: string, hold: boolean)
-	registered[model] = { attack = attack, hold = hold }
+-- held up, `glide` = no run animation (the Mage floats; MageBrain moves it). The idle animation starts as soon as
+-- the caller has put the model into the world.
+function Rig.animate(model: Model, attack: string, hold: boolean, glide: boolean?)
+	registered[model] = { attack = attack, hold = hold, glide = glide == true }
 	task.spawn(function()
 		for _ = 1, 30 do
 			if model:IsDescendantOf(workspace) then

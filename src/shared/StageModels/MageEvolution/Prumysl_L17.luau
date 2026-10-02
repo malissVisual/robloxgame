@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[17] = {
-		name = "Parní mág", era = "Průmyslový věk",
+		name = "Steam Mage", era = "Industrial Age",
 		desc = "Cylindr s ozubenými koly, frak s vestou, bandalír s lahvičkami, parní hůl s tlakovou nádobou, ventilem a manometrem, mosazná koule",
 		top = 3.729, -- the name label this high over the head
 		body = {

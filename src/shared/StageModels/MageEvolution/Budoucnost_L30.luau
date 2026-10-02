@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[30] = {
-		name = "Apex mág", era = "Budoucnost",
+		name = "Apex Mage", era = "Future",
 		desc = "Koruna z energie a trojitá aureola, křídla ze světla, plášť z hvězd, kvantové ohnisko se třemi gyroskopy, kvantová krychle, roj krystalů",
 		top = 4.85, -- the name label this high over the head
 		body = {

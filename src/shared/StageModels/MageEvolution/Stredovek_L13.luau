@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[13] = {
-		name = "Runový mág", era = "Středověk",
+		name = "Rune Mage", era = "Middle Ages",
 		desc = "Hluboká kápě s runovou čelenkou, hábit s runami, otevřená runová kniha, runová hůl s kamenným prstencem a 4 levitujícími runami",
 		top = 3.785, -- the name label this high over the head
 		body = {

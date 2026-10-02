@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[12] = {
-		name = "Kouzelník", era = "Středověk",
+		name = "Wizard", era = "Middle Ages",
 		desc = "Klobouk s hvězdami a přezkou, plášť s hvězdami, krátký vous, svítící koule, hůl se čtyřmi drápy a 3 levitujícími krystaly",
 		top = 4.132, -- the name label this high over the head
 		body = {

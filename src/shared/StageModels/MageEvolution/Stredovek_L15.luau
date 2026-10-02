@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[15] = {
-		name = "Velmistr magie", era = "Středověk",
+		name = "Grandmaster of Magic", era = "Middle Ages",
 		desc = "Obří klobouk s pérem a drahokamem, nejdelší vous, vrstvené hábity se zlatou výšivkou, grimoár na řetězu, zlatá hůl se čtyřmi drápy a 6 krystaly",
 		top = 4.272, -- the name label this high over the head
 		body = {

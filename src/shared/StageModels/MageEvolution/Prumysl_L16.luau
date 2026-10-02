@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[16] = {
-		name = "Alchymista", era = "Průmyslový věk",
+		name = "Alchemist", era = "Industrial Age",
 		desc = "Kožená čepice s mosaznými brýlemi, kožená zástěra, opasek s lahvičkami, mosazná hůl s krystalem v kleci a měřidlem, baňka s elixírem",
 		top = 3.923, -- the name label this high over the head
 		body = {

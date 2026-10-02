@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[2] = {
-		name = "Zaříkávač", era = "Pravěk",
+		name = "Chanter", era = "Prehistory",
 		desc = "Pernatá koruna, krátký roztřepený kožešinový plášť, malované pruhy na tvářích, hůl se zkříženými kostmi a pírky, kamenná koule duchů",
 		top = 3.229, -- the name label this high over the head
 		body = {

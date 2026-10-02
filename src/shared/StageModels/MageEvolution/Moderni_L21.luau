@@ -17,7 +17,7 @@ local CF = CFrame.new
 return {
 
 	[21] = {
-		name = "Technomág", era = "Moderní doba",
+		name = "Technomage", era = "Modern Era",
 		desc = "Taktický kabát s kápí, sluchátka s mikrofonem, energetické jádro na hrudi, holopanel na zápěstí, karbonová hůl s emitorem, holografický tablet",
 		top = 3.823, -- the name label this high over the head
 		body = {
