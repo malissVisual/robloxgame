@@ -1211,7 +1211,7 @@ local function styleEmptyCard(card: Frame)
 end
 
 -- Filled in below, after the 3D drag helpers exist.
-local openCardPopup: (id: number) -> () = function() end
+local openCardPopup: (id: number, at: Vector2?) -> () = function() end -- `at`: open next to this screen point (a click in the world)
 local beginCardDrag: (id: number, input: InputObject) -> () = function() end
 
 local function ensureCard(id: number, parent: Instance, size: UDim2?, order: number): Frame
@@ -1797,11 +1797,19 @@ type Drag = {
 	lift: number,
 	hovered: number?,
 	shown: number?,
-	glow: Highlight,
+	glow: Highlight?, -- made when the soldier is really picked up
 	targetGlow: Highlight?,
 	padColors: { [number]: Color3 },
+	pressedAt: number, -- os.clock() of the press
+	startPointer: Vector2,
+	picked: boolean, -- the drag really started (moved far enough or held long enough); until then it is a click
 }
 local drag: Drag? = nil
+-- Click or drag (a soldier in the world and a card in the panel alike)? A press is a CLICK until the pointer
+-- moves at least CARD_DRAG_SLOP pixels or the button is held CARD_HOLD_TIME seconds; releasing before that opens
+-- the soldier's popup. (6 px used to be enough: the mouse jitters and every click looked like a drag.)
+local CARD_DRAG_SLOP = 16
+local CARD_HOLD_TIME = 0.45
 
 local function getPlot(): Instance?
 	local plots = workspace:FindFirstChild("Plots")
@@ -2132,9 +2140,12 @@ local function beginDrag()
 		lift = home.Position.Y - groundY,
 		hovered = nil,
 		shown = nil,
-		glow = makeGlow(model, INDICATOR_MOVE),
+		glow = nil,
 		targetGlow = nil,
 		padColors = {},
+		pressedAt = os.clock(),
+		startPointer = pointer,
+		picked = false,
 	}
 end
 
@@ -2146,6 +2157,13 @@ local function updateDrag(dt: number)
 	if not d.model.Parent then
 		drag = nil -- the server re-rendered the plot
 		return
+	end
+	if not d.picked then
+		if (pointer - d.startPointer).Magnitude < CARD_DRAG_SLOP and os.clock() - d.pressedAt < CARD_HOLD_TIME then
+			return -- still a click: the soldier stays on its pad
+		end
+		d.picked = true -- picked up: from here on it is a drag
+		d.glow = makeGlow(d.model, INDICATOR_MOVE)
 	end
 
 	local point = groundPoint(d.groundY)
@@ -2201,14 +2219,19 @@ local function updateDrag(dt: number)
 		end
 	end
 	setDisc(hovered, color)
-	d.glow.FillColor = color
-	d.glow.OutlineColor = color
+	local glow = d.glow
+	if glow then
+		glow.FillColor = color
+		glow.OutlineColor = color
+	end
 	if mergeable and target then
 		if not d.targetGlow then
 			d.targetGlow = makeGlow(target, INDICATOR_GOLD)
 		end
 		local pulse = 0.35 + 0.3 * (0.5 + 0.5 * math.sin(os.clock() * 10))
-		d.glow.FillTransparency = pulse
+		if glow then
+			glow.FillTransparency = pulse
+		end
 		;(d.targetGlow :: Highlight).FillTransparency = pulse
 	end
 end
@@ -2219,13 +2242,19 @@ local function endDrag()
 		return
 	end
 	drag = nil
+	if not d.picked then
+		openCardPopup(d.slot, pointer) -- a plain click on the soldier: its card, next to the pointer
+		return
+	end
 	setDisc(nil)
 	local overPanel = pointerOverPanel()
 	setPanelHighlight(false)
 	markCard(nil, INDICATOR_MOVE)
 	local to = d.hovered
 	clearIndicator(d)
-	d.glow:Destroy()
+	if d.glow then
+		d.glow:Destroy()
+	end
 	if overPanel then
 		local targetCard = cardIdAtPointer(d.slot)
 		if targetCard then
@@ -2281,7 +2310,7 @@ local function closeCardPopup()
 	end
 end
 
-openCardPopup = function(id: number)
+openCardPopup = function(id: number, at: Vector2?)
 	local unit = unitAt(id)
 	local card = slotCards[id]
 	if not unit or not card or state.rolling or state.battling then
@@ -2423,6 +2452,12 @@ openCardPopup = function(id: number)
 	local right = (container.AbsolutePosition.X + container.AbsoluteSize.X) / scale + 10
 	local x = if right + W <= screen.X then right else math.max(8, container.AbsolutePosition.X / scale - W - 10)
 	local cy = math.clamp(card.AbsolutePosition.Y / scale + card.AbsoluteSize.Y / scale / 2, H / 2 + 8, math.max(H / 2 + 8, screen.Y - H / 2 - 8))
+	if at then
+		-- A click on the soldier in the world: next to the pointer instead.
+		local px, py = at.X / scale, at.Y / scale
+		x = if px + 18 + W <= screen.X then px + 18 else math.max(8, px - 18 - W)
+		cy = math.clamp(py, H / 2 + 8, math.max(H / 2 + 8, screen.Y - H / 2 - 8))
+	end
 	popup.Size = UDim2.fromOffset(W, H)
 	popup.Position = UDim2.fromOffset(x, cy)
 	popup.Parent = gui
@@ -2444,10 +2479,6 @@ type CardDrag = {
 	moved: boolean, -- the drag really started (moved far enough or held long enough); until then it is a click
 }
 local cardDrag: CardDrag? = nil
--- Click or drag? A press is a CLICK until the pointer moves at least CARD_DRAG_SLOP pixels or the button is held
--- CARD_HOLD_TIME seconds; releasing before that opens the card's popup. (6 px was too little: the mouse jitters.)
-local CARD_DRAG_SLOP = 16
-local CARD_HOLD_TIME = 0.45
 
 -- The pad under the pointer (unlocked board pads and squad pads only) and its indicator color.
 local function padForUnit(unit: { class: string, tier: number }): (number?, Color3)
