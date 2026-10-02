@@ -15,6 +15,8 @@ local Net = require(Shared:WaitForChild("Net"))
 local Balance = require(Shared:WaitForChild("Config"):WaitForChild("Balance"))
 local Units = require(Shared:WaitForChild("Config"):WaitForChild("Units"))
 local Levels = require(Shared:WaitForChild("Config"):WaitForChild("Levels"))
+local MageSpells = require(Shared:WaitForChild("Config"):WaitForChild("MageSpells"))
+local SoldierRig = require(Shared:WaitForChild("SoldierRig"))
 local Difficulties = require(Shared:WaitForChild("Config"):WaitForChild("Difficulties"))
 local Maps = require(Shared:WaitForChild("Config"):WaitForChild("Maps"))
 local Waves = require(Shared:WaitForChild("Config"):WaitForChild("Waves"))
@@ -2287,24 +2289,23 @@ openCardPopup = function(id: number)
 	end
 	closeCardPopup()
 	local equipped = id > Balance.SquadOffset
+	local ascended = (unit :: any).ascended == true
+	local levelColor = Levels.color(unit.tier)
 
+	-- The mage's card: name and level, its stats, the spells it casts at this level (MageSpells), what the next
+	-- level unlocks, then EQUIP / UNEQUIP and SELL. (Later: upgrades and spell choices live here too.)
+	local W = 300
 	local popup = Instance.new("Frame")
+	popup.Name = "CardPopup"
 	popup.AnchorPoint = Vector2.new(0, 0.5)
-	local container: GuiObject = if equipped then UI.squadBar else panel
-	popup.Position = UDim2.fromOffset(
-		container.AbsolutePosition.X + container.AbsoluteSize.X + 10,
-		math.clamp(card.AbsolutePosition.Y + card.AbsoluteSize.Y / 2, 80, math.max(80, gui.AbsoluteSize.Y - 80))
-	)
-	popup.Size = UDim2.fromOffset(220, 168)
 	popup.BackgroundColor3 = BG
 	popup.BackgroundTransparency = 0.05
 	popup.BorderSizePixel = 0
 	popup.Active = true -- clicks on the popup never reach the 3D world
 	popup.ZIndex = 40
-	popup.Parent = gui
 	corner(popup, 12)
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = Levels.color(unit.tier)
+	stroke.Color = levelColor
 	stroke.Thickness = 2
 	stroke.Parent = popup
 
@@ -2317,28 +2318,71 @@ openCardPopup = function(id: number)
 	UI.popupCard = card
 	local world = modelAt(id)
 	if world then
-		local glow = makeGlow(world, Levels.color(unit.tier))
+		local glow = makeGlow(world, levelColor)
 		glow.Name = "PopupGlow"
 		glow.FillTransparency = 0.88
 		glow.OutlineTransparency = 0.35
 		UI.popupGlow = glow
 	end
 
-	local title = label(popup, string.format("%s · %s", Units.Classes[unit.class].label, Levels.label(unit.tier)), UDim2.fromOffset(10, 6), UDim2.fromOffset(200, 20), 16, Enum.Font.GothamBold, WHITE)
-	title.ZIndex = 41
-	local hint = label(popup, Units.passiveText(unit.class, (unit :: any).ascended), UDim2.fromOffset(10, 28), UDim2.fromOffset(200, 16), 11, Enum.Font.Gotham, MUTED)
-	hint.TextScaled = true
-	hint.ZIndex = 41
+	local function line(text: string, y: number, size: number, font: Enum.Font, color: Color3, height: number?): TextLabel
+		local l = label(popup, text, UDim2.fromOffset(12, y), UDim2.fromOffset(W - 24, height or 16), size, font, color)
+		l.ZIndex = 41
+		l.RichText = true
+		l.TextTruncate = Enum.TextTruncate.AtEnd
+		return l
+	end
+	local y = 8
+	line(string.format("%s%s · %s", if ascended then "★ " else "", Units.Classes[unit.class].label, Levels.label(unit.tier)), y, 16, Enum.Font.GothamBold, WHITE, 20)
+	local tierLabel = line(string.upper(SoldierRig.name(unit.tier, unit.class)) .. (if ascended then "  ·  ASCENDED" else ""), y + 20, 10, Enum.Font.GothamBlack, levelColor, 14)
+	tierLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	y += 40
+
+	local stats = Units.stats(unit.class, unit.tier, ascended)
+	line(string.format('<font color="#a5aab9">HP</font> %d   <font color="#a5aab9">DMG</font> %d   <font color="#a5aab9">RANGE</font> %d   <font color="#a5aab9">EVERY</font> %.1f s', math.floor(stats.hp + 0.5), math.floor(stats.damage + 0.5), stats.range, stats.cooldown), y, 12, Enum.Font.GothamMedium, WHITE)
+	y += 18
+	line(Units.passiveText(unit.class, ascended), y, 11, Enum.Font.Gotham, MUTED)
+	y += 22
+
+	-- The spells of this level: the basic bolt and the strong spells (kind in grey), then the next unlock.
+	local basic, others = MageSpells.forLevel(unit.tier)
+	line("SPELLS", y, 10, Enum.Font.GothamBlack, GOLD, 14)
+	y += 15
+	local KIND = { bolt = "basic attack", aoe = "area", chain = "chain", shield = "barrier", heal = "heal", blink = "blink", pull = "pull", repel = "knockback" }
+	local spells = { basic }
+	for _, spell in others do
+		table.insert(spells, spell)
+	end
+	for _, spell in spells do
+		local extra = if spell.basic then "" else string.format("  ·  %d mana, %ds", spell.mana, spell.cooldown)
+		local l = line(string.format('● %s  <font color="#a5aab9">%s%s</font>', spell.label, KIND[spell.kind] or spell.kind, extra), y, 11, Enum.Font.GothamMedium, spell.color:Lerp(WHITE, 0.35), 15)
+		l.TextTruncate = Enum.TextTruncate.AtEnd
+		y += 15
+	end
+	local nextSpell: MageSpells.Spell? = nil
+	for _, spell in MageSpells.Defs do
+		if spell.minLevel > unit.tier and (not nextSpell or spell.minLevel < (nextSpell :: MageSpells.Spell).minLevel) then
+			nextSpell = spell
+		end
+	end
+	if nextSpell then
+		line(string.format('<font color="#a5aab9">Lv %d unlocks</font>  %s', nextSpell.minLevel, nextSpell.label), y + 2, 11, Enum.Font.Gotham, MUTED, 15)
+		y += 17
+	elseif unit.tier >= Units.maxTier(unit.class) then
+		line('<font color="#a5aab9">Top level: every spell known</font>', y + 2, 11, Enum.Font.Gotham, MUTED, 15)
+		y += 17
+	end
+	y += 8
 
 	local free = if equipped then state.boardFree else state.squadFree
 	local button = Instance.new("TextButton")
-	button.Position = UDim2.fromOffset(10, 62)
-	button.Size = UDim2.fromOffset(200, 42)
+	button.Position = UDim2.fromOffset(12, y)
+	button.Size = UDim2.fromOffset(W - 24, 40)
 	button.BackgroundColor3 = if equipped then Color3.fromRGB(90, 100, 135) else GREEN:Lerp(BG, 0.3)
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Font = Enum.Font.GothamBold
-	button.TextSize = 16
+	button.TextSize = 15
 	button.TextColor3 = WHITE
 	button.TextTransparency = if free > 0 then 0 else 0.55
 	button.Text = string.format("%s  ·  %d free", if equipped then "UNEQUIP" else "EQUIP", free)
@@ -2349,17 +2393,18 @@ openCardPopup = function(id: number)
 		closeCardPopup()
 		Net.get(if equipped then "Unequip" else "Equip"):FireServer(id)
 	end)
+	y += 46
 	-- SELL: the soldier goes for coins.
 	local sell = Instance.new("TextButton")
-	sell.Position = UDim2.fromOffset(10, 114)
-	sell.Size = UDim2.fromOffset(200, 42)
+	sell.Position = UDim2.fromOffset(12, y)
+	sell.Size = UDim2.fromOffset(W - 24, 40)
 	sell.BackgroundColor3 = Color3.fromRGB(140, 85, 60)
 	sell.BorderSizePixel = 0
 	sell.AutoButtonColor = false
 	sell.Font = Enum.Font.GothamBold
-	sell.TextSize = 16
+	sell.TextSize = 15
 	sell.TextColor3 = WHITE
-	sell.Text = string.format("SELL  ·  +%d coins", Levels.sellValue(unit.tier, (unit :: any).ascended))
+	sell.Text = string.format("SELL  ·  +%d coins", Levels.sellValue(unit.tier, ascended))
 	sell.ZIndex = 41
 	sell.Parent = popup
 	corner(sell, 8)
@@ -2367,6 +2412,20 @@ openCardPopup = function(id: number)
 		closeCardPopup()
 		Net.get("Sell"):FireServer(id)
 	end)
+	y += 50
+	local H = y
+
+	-- Next to the card's container (right of it, or left when there is no room), always inside the screen: a
+	-- panel dragged to the right edge used to push the popup off screen, which looked like "nothing opens".
+	local container: GuiObject = if equipped then UI.squadBar else panel
+	local scale = guiScale.Scale
+	local screen = gui.AbsoluteSize / scale
+	local right = (container.AbsolutePosition.X + container.AbsoluteSize.X) / scale + 10
+	local x = if right + W <= screen.X then right else math.max(8, container.AbsolutePosition.X / scale - W - 10)
+	local cy = math.clamp(card.AbsolutePosition.Y / scale + card.AbsoluteSize.Y / scale / 2, H / 2 + 8, math.max(H / 2 + 8, screen.Y - H / 2 - 8))
+	popup.Size = UDim2.fromOffset(W, H)
+	popup.Position = UDim2.fromOffset(x, cy)
+	popup.Parent = gui
 	cardPopup = popup
 end
 
@@ -2388,7 +2447,7 @@ local cardDrag: CardDrag? = nil
 -- Click or drag? A press is a CLICK until the pointer moves at least CARD_DRAG_SLOP pixels or the button is held
 -- CARD_HOLD_TIME seconds; releasing before that opens the card's popup. (6 px was too little: the mouse jitters.)
 local CARD_DRAG_SLOP = 16
-local CARD_HOLD_TIME = 0.3
+local CARD_HOLD_TIME = 0.45
 
 -- The pad under the pointer (unlocked board pads and squad pads only) and its indicator color.
 local function padForUnit(unit: { class: string, tier: number }): (number?, Color3)
