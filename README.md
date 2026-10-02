@@ -576,7 +576,9 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
   and the next wave may start right away.
 - **Achievements** (`Config/Achievements.luau`, the ACHIEVEMENTS button under the daily quests): 18 one-time
   goals (kills, merges, level 5 / 9 / Ascended soldiers, waves, bosses, Nightmare, summons, account
-  level) with coins + XP; the latest one is your **title**, shown over your head (★ Warlord).
+  level) with coins + XP. The **title** over your head comes only from the waves you have cleared
+  (`Balance.Titles`: Recruit, Fighter at 5, Veteran 10, Warrior 20, Champion 30, Warlord 40, Hero 50, Legend 65,
+  Mythic 80, Rift Conqueror 100), under your name, account level and XP bar.
 - **Offline income** (`Balance.Offline*`): while you are away your camp earns 6 coins per hour for every wave
   of your best wave, up to 8 hours; a WELCOME BACK popup pays it when you come back.
 - **Into the arena:** START WAVE moves you (the player, not the squad) onto the near edge of the round fight arena,

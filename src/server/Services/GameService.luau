@@ -116,7 +116,7 @@ local function pushState(player: Player)
 		isAdmin = isAdmin(player),
 		stats = profile.stats,
 		achievements = profile.achievements,
-		title = profile.title,
+		title = PlayerData.titleFor(profile), -- by the waves cleared (Balance.Titles)
 		settings = profile.settings,
 		battleSpeed = profile.battleSpeed,
 		bestWave = profile.bestWave,
@@ -147,7 +147,7 @@ local function sfx(player: Player, name: string)
 end
 
 -- Over the player's head: the name with the ACCOUNT LEVEL, an XP bar to the next level and, under it, the title
--- (the latest achievement). Roblox's own name tag is hidden so the two do not overlap. Rebuilt on every spawn,
+-- (by the waves cleared, Balance.Titles; achievements give no title). Roblox's own name tag is hidden so the two do not overlap. Rebuilt on every spawn,
 -- refreshed on XP and on a new title. (The name stays `showTitle` for its callers.)
 local function showTitle(player: Player, profile: PlayerData.Profile)
 	local character = player.Character
@@ -222,21 +222,19 @@ local function showTitle(player: Player, profile: PlayerData.Profile)
 	;(made:FindFirstChild("Level") :: TextLabel).Text = string.format('%s  <font color="#ffcd5a">Lv %d</font>', player.DisplayName, level)
 	;((made:FindFirstChild("Track") :: Frame):FindFirstChild("Fill") :: Frame).Size = UDim2.fromScale(math.clamp(into / math.max(1, needed), 0, 1), 1)
 	;(made:FindFirstChild("Xp") :: TextLabel).Text = string.format("%d / %d XP", into, needed)
-	;(made:FindFirstChild("Title") :: TextLabel).Text = if profile.title then "★ " .. profile.title else ""
+	;(made:FindFirstChild("Title") :: TextLabel).Text = "★ " .. PlayerData.titleFor(profile) -- by the waves cleared only
 end
 
 local addXp: (Player, PlayerData.Profile, number) -> () = function() end -- defined below
 
--- Checks every achievement against the profile's counters; a finished one pays and becomes your title.
+-- Checks every achievement against the profile's counters; a finished one pays (coins + XP; no title any more).
 local function checkAchievements(player: Player, profile: PlayerData.Profile)
 	for _, def in Achievements.List do
 		if not profile.achievements[def.id] and PlayerData.statValue(profile, def.stat) >= def.target then
 			profile.achievements[def.id] = true
 			profile.coins += def.coins
-			profile.title = def.label
 			notify(player, string.format("ACHIEVEMENT: %s (%s) · +%d coins%s", def.label, def.text, def.coins, if def.xp > 0 then string.format(" · +%d XP", def.xp) else ""))
 			sfx(player, "achievement")
-			showTitle(player, profile)
 			if def.xp > 0 then
 				addXp(player, profile, def.xp)
 			end
