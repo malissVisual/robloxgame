@@ -151,7 +151,7 @@ local function fresh(): Profile
 	local unlocked: { [string]: boolean } = {}
 	local tierUnlocked: { [string]: number } = {}
 	for _, class in Units.ClassList do
-		tierUnlocked[class] = Balance.StartUnlockedTier
+		tierUnlocked[class] = Units.maxTier(class) -- merging is never capped (the Upgrades tab is gone)
 		if not Units.Classes[class].unlock then
 			unlocked[class] = true
 		end
@@ -283,7 +283,8 @@ local function applySaved(profile: Profile, saved: any)
 	profile.purchases = number(saved.purchases, 0, 0, 2 ^ 40)
 	for _, class in Units.ClassList do
 		local raw = if type(saved.tierUnlocked) == "table" then saved.tierUnlocked[class] elseif type(saved.tierUnlocked) == "number" then saved.tierUnlocked else nil
-		profile.tierUnlocked[class] = number(raw, Balance.StartUnlockedTier, Balance.StartUnlockedTier, Units.maxTier(class))
+		local _ = raw -- an old save's bought cap is ignored: merging is never capped any more
+		profile.tierUnlocked[class] = Units.maxTier(class)
 	end
 	profile.startLevel = number(saved.startLevel, 1, 1, Balance.StartLevelMax)
 	if type(saved.map) == "string" and Maps.Defs[saved.map] then

@@ -157,8 +157,10 @@ end
 -- so every new file-level name counts (the same reason the big sections below are do-blocks).
 local UI = {}
 UI.DARK = Color3.fromRGB(16, 18, 26) -- the dark tiles inside the panel
-UI.PAGE_TOP = 84 -- the pages of the left panel start under its title bar and tabs
-UI.TAB_ACCENT = { Inventory = GOLD, Characters = Color3.fromRGB(90, 170, 255), Upgrades = Color3.fromRGB(170, 130, 255) }
+UI.PAGE_TOP = 46 -- the page of the left panel starts right under its title bar (there are no tabs any more)
+UI.TAB_ACCENT = { Inventory = GOLD }
+UI.popupGlow = nil :: Highlight? -- the light outline on the mage whose popup is open (see openCardPopup)
+UI.popupCard = nil :: Frame?
 UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
 UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
@@ -655,10 +657,10 @@ end)
 Layout.make("Panel", panel, header)
 end
 
--- Tabs: Inventory (the squad and the merge board), Characters (the index of every class) and Upgrades (merge
--- levels). A segmented bar; the active tab is lit in its own color. (The Mages cast every spell themselves now,
--- so there is no SPELLS tab and no Q / E.)
-local TAB_NAMES = { "Inventory", "Characters", "Upgrades" }
+-- The left panel has ONE page now: the Inventory (the mages). The Characters, Upgrades and Spells tabs are
+-- gone (one class, merging is never capped, the Mages cast on their own), so the tab bar is built but hidden;
+-- the page / tab machinery stays for a future tab.
+local TAB_NAMES = { "Inventory" }
 local pages: { [string]: Frame } = {}
 local tabButtons: { [string]: TextButton } = {}
 
@@ -696,6 +698,7 @@ tabBar.BackgroundColor3 = UI.DARK
 tabBar.BackgroundTransparency = 0.2
 tabBar.BorderSizePixel = 0
 tabBar.Parent = panel
+tabBar.Visible = false -- a single page needs no tabs
 corner(tabBar, 10)
 
 for i, name in TAB_NAMES do
@@ -732,7 +735,6 @@ UI.setCollapsed = function(on: boolean)
 	local corner_ = (panel.AbsolutePosition - gui.AbsolutePosition) / guiScale.Scale
 	panel.AnchorPoint = Vector2.zero
 	panel.Position = UDim2.fromOffset(corner_.X, corner_.Y)
-	tabBar.Visible = not on
 	panel.Size = if on then UDim2.fromOffset(640, 38) else UDim2.fromOffset(640, 420)
 	panel:SetAttribute("Collapsed", on)
 	showTab(UI.tab)
@@ -798,7 +800,7 @@ inventoryCount.TextXAlignment = Enum.TextXAlignment.Right
 
 local scroll = Instance.new("ScrollingFrame")
 scroll.Position = UDim2.fromOffset(16, 20)
-scroll.Size = UDim2.fromOffset(614, 200)
+scroll.Size = UDim2.fromOffset(614, 238)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 6
@@ -832,12 +834,11 @@ local function moveIntoInventory(b: Button, x: number, y: number, width: number,
 		b.sub.TextSize = 11
 	end
 end
-moveIntoInventory(autoMerge, 16, 230, 300, 44, true)
-moveIntoInventory(equipBest, 330, 230, 300, 44, true)
+moveIntoInventory(autoMerge, 16, 268, 300, 44, true)
+moveIntoInventory(equipBest, 330, 268, 300, 44, true)
 
 -- ── The dock on the left edge of the screen ──────────────────────────────
--- Four square icons, one per tab of the panel. An icon opens the panel on its tab; the icon of the open tab
--- hides the panel again. The dock moves by the grip on top. (PLAY has its own dock on the right edge, below.)
+-- One square icon (the Inventory). It opens the panel; clicked again it hides the panel. The dock moves by the grip on top. (PLAY has its own dock on the right edge, below.)
 do
 local DOCK_TILE = 64
 local DOCK_STEP = 72
@@ -845,7 +846,7 @@ local dock = Instance.new("Frame")
 dock.Name = "Dock"
 dock.AnchorPoint = Vector2.new(0, 0)
 dock.Position = UDim2.new(0, 20, 0, 20 + UI.SQUAD_H * UI.PANEL_SCALE + 16) -- under the squad bar
-dock.Size = UDim2.fromOffset(76, 18 + 3 * DOCK_STEP)
+dock.Size = UDim2.fromOffset(76, 18 + 1 * DOCK_STEP)
 dock.BackgroundColor3 = BG
 dock.BackgroundTransparency = 0.06
 dock.BorderSizePixel = 0
@@ -924,19 +925,6 @@ tile(1, "Inventory", "INV", function(b) -- a bag
 	-- (the handle's stroke follows the body's color each frame, see below)
 	handle:SetAttribute("StrokeOnly", true)
 	return { flap, body, handle }
-end)
-tile(2, "Characters", "CHAR", function(b) -- a little figure
-	local head = piece(b, 25, 7, 14, 14, GOLD, 7)
-	local torso = piece(b, 22, 23, 20, 15, GOLD, 5)
-	local legL = piece(b, 23, 39, 8, 6, GOLD, 2)
-	local legR = piece(b, 33, 39, 8, 6, GOLD, 2)
-	return { head, torso, legL, legR }
-end)
-tile(3, "Upgrades", "UPG", function(b) -- an arrow up
-	local head = piece(b, 24, 9, 16, 16, GOLD, 3, 45)
-	local stem = piece(b, 29, 22, 6, 22, GOLD, 3)
-	piece(b, 24, 24, 16, 8, UI.DARK, 0) -- cuts the lower half of the rotated square into an arrow head
-	return { head, stem }
 end)
 -- ── PLAY: the big green button on the right edge ─────────────────────────
 -- The old FIGHT button, now a big green PLAY in its own little dock at the bottom right (a grip on top, so it
@@ -1361,126 +1349,6 @@ local function markCard(id: number?, color: Color3)
 	end
 end
 
--- The Soldiers and Upgrades sections below live in do-blocks (a Luau function may hold only 200 local
--- variables); these two are filled in there and called from the state handler.
-local renderSoldiers: () -> () = function() end
-local renderLevels: () -> () = function() end
-
--- ── Soldiers tab: the index of every class (unlocked ones and how to unlock the rest) ────
-do
-
-local soldiersPage = makePage("Characters")
-UI.section(soldiersPage, "YOUR CHARACTERS", 0, UI.TAB_ACCENT.Characters)
-local unlockedCount = label(soldiersPage, "", UDim2.fromOffset(552, 0), UDim2.fromOffset(72, 16), 13, Enum.Font.GothamMedium, MUTED)
-unlockedCount.TextXAlignment = Enum.TextXAlignment.Right
-
-local soldiersScroll = Instance.new("ScrollingFrame")
-soldiersScroll.Position = UDim2.fromOffset(10, 24)
-soldiersScroll.Size = UDim2.new(1, -20, 1, -34)
-soldiersScroll.BackgroundTransparency = 1
-soldiersScroll.BorderSizePixel = 0
-soldiersScroll.ScrollBarThickness = 4
-soldiersScroll.ScrollBarImageColor3 = MUTED
-soldiersScroll.CanvasSize = UDim2.new()
-soldiersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-soldiersScroll.Parent = soldiersPage
-
-local soldiersLayout = Instance.new("UIGridLayout") -- two columns of class cards
-soldiersLayout.CellSize = UDim2.fromOffset(308, 86)
-soldiersLayout.CellPadding = UDim2.fromOffset(8, 6)
-soldiersLayout.SortOrder = Enum.SortOrder.LayoutOrder
-soldiersLayout.Parent = soldiersScroll
-
-type SoldierRow = { frame: Frame, stroke: UIStroke, overlay: Frame, status: TextLabel }
-local soldierRows: { [string]: SoldierRow } = {}
-
--- One row per class: the 3D soldier on a dark tile, the name, the stats as pills, the passive and whether
--- the class is unlocked. A locked class is dimmed with LOCKED over its tile.
-for i, class in Units.ClassList do
-	local def = Units.Classes[class]
-	local row = Instance.new("Frame")
-	row.LayoutOrder = i
-	row.Size = UDim2.fromOffset(308, 86)
-	row.BackgroundColor3 = def.color:Lerp(BG, 0.8)
-	row.BorderSizePixel = 0
-	row.Parent = soldiersScroll
-	corner(row, 10)
-	local rowStroke = UI.stroke(row, def.color, 1.5, 0.4)
-
-	local accentBar = Instance.new("Frame")
-	accentBar.Position = UDim2.fromOffset(0, 10)
-	accentBar.Size = UDim2.fromOffset(4, 66)
-	accentBar.BackgroundColor3 = def.color
-	accentBar.BorderSizePixel = 0
-	accentBar.Parent = row
-	corner(accentBar, 2)
-
-	local tile = Instance.new("Frame")
-	tile.Position = UDim2.fromOffset(12, 10)
-	tile.Size = UDim2.fromOffset(66, 66)
-	tile.BackgroundColor3 = UI.DARK
-	tile.BorderSizePixel = 0
-	tile.Parent = row
-	corner(tile, 8)
-	local view = Instance.new("ViewportFrame")
-	view.Size = UDim2.fromScale(1, 1)
-	view.BackgroundTransparency = 1
-	view.Ambient = Color3.fromRGB(175, 175, 185)
-	view.LightColor = Color3.new(1, 1, 1)
-	view.Parent = tile
-	fillViewport(view, { class = class, tier = 1 })
-
-	-- A dark veil over the 3D view while the class is still locked.
-	local overlay = Instance.new("Frame")
-	overlay.Size = UDim2.fromScale(1, 1)
-	overlay.BackgroundColor3 = Color3.new(0, 0, 0)
-	overlay.BackgroundTransparency = 0.45
-	overlay.BorderSizePixel = 0
-	overlay.ZIndex = 2
-	overlay.Parent = tile
-	corner(overlay, 8)
-	local locked = label(overlay, "LOCKED", UDim2.new(0, 0, 1, -18), UDim2.new(1, 0, 0, 14), 9, Enum.Font.GothamBlack, MUTED)
-	locked.TextXAlignment = Enum.TextXAlignment.Center
-
-	label(row, def.label, UDim2.fromOffset(88, 7), UDim2.fromOffset(160, 20), 16, Enum.Font.GothamBold, WHITE)
-	UI.chip(row, string.format("HP %d", def.hp), UDim2.fromOffset(88, 30), UDim2.fromOffset(56, 18), UI.DARK, GREEN, 12)
-	UI.chip(row, string.format("DMG %d", def.damage), UDim2.fromOffset(148, 30), UDim2.fromOffset(62, 18), UI.DARK, ORANGE, 12)
-	UI.chip(row, string.format("RNG %d", def.range), UDim2.fromOffset(214, 30), UDim2.fromOffset(58, 18), UI.DARK, Color3.fromRGB(120, 180, 255), 12)
-	local passive = label(row, Units.passiveText(class), UDim2.fromOffset(88, 52), UDim2.fromOffset(212, 14), 11, Enum.Font.GothamMedium, GOLD)
-	passive.TextScaled = true
-	local status = label(row, "", UDim2.fromOffset(88, 67), UDim2.fromOffset(212, 14), 12, Enum.Font.GothamBold, GREEN)
-	soldierRows[class] = { frame = row, stroke = rowStroke, overlay = overlay, status = status }
-end
-
-renderSoldiers = function()
-	local unlocked = 0
-	for _, class in Units.ClassList do
-		local row = soldierRows[class]
-		local isUnlocked = state.unlocked[class] == true
-		if isUnlocked then
-			unlocked += 1
-		end
-		row.overlay.Visible = not isUnlocked
-		row.frame.BackgroundTransparency = if isUnlocked then 0 else 0.35
-		row.stroke.Transparency = if isUnlocked then 0.4 else 0.75
-		local unlock = Units.Classes[class].unlock
-		if isUnlocked then
-			row.status.Text = "Unlocked"
-			row.status.TextColor3 = GREEN
-		elseif unlock then
-			if unlock.legendary then
-				row.status.Text = string.format("LEGENDARY · lucky drop, wave %d+", unlock.wave)
-				row.status.TextColor3 = Levels.color(8)
-			else
-				row.status.Text = string.format("Lucky drop from wave %d", unlock.wave)
-				row.status.TextColor3 = GOLD
-			end
-		end
-	end
-	unlockedCount.Text = string.format("%d/%d", unlocked, #Units.ClassList)
-end
-end
-
 -- ── Battle panel ──────────────────────────────────────────────────────────
 -- The PLAY button opens this panel: choose the difficulty and the wave, then START WAVE.
 
@@ -1836,193 +1704,7 @@ renderBattlePanel = function()
 end
 end
 
--- ── Level upgrade panel ───────────────────────────────────────────────────
--- The lobby station: stand on it and this panel opens. Bought soldiers start at the level you buy here.
-do
-
-local upgradeOpen = false -- true while you stand on the level station
-
-local levelPanel = Instance.new("Frame")
-levelPanel.Name = "LevelPanel"
-levelPanel.AnchorPoint = Vector2.new(0.5, 0.5)
-levelPanel.Position = UDim2.fromScale(0.5, 0.5)
-levelPanel.Size = UDim2.fromOffset(420, 190)
-levelPanel.BackgroundColor3 = BG
-levelPanel.BackgroundTransparency = 0.05
-levelPanel.BorderSizePixel = 0
-levelPanel.Active = true
-levelPanel.Visible = false
-levelPanel.Parent = gui
-corner(levelPanel, 14)
-local levelStroke = Instance.new("UIStroke")
-levelStroke.Color = Color3.fromRGB(170, 130, 255)
-levelStroke.Thickness = 3
-levelStroke.Parent = levelPanel
-
-local levelTitle = label(levelPanel, "LEVEL UPGRADE", UDim2.fromOffset(0, 10), UDim2.fromOffset(420, 30), 26, Enum.Font.GothamBlack, Color3.fromRGB(190, 160, 255))
-levelTitle.TextXAlignment = Enum.TextXAlignment.Center
-local levelCurrent = label(levelPanel, "", UDim2.fromOffset(0, 50), UDim2.fromOffset(420, 26), 20, Enum.Font.GothamBold, WHITE)
-levelCurrent.TextXAlignment = Enum.TextXAlignment.Center
-local levelInfo = label(levelPanel, "", UDim2.fromOffset(20, 82), UDim2.fromOffset(380, 36), 13, Enum.Font.Gotham, MUTED)
-levelInfo.TextXAlignment = Enum.TextXAlignment.Center
-levelInfo.TextWrapped = true
-levelInfo.TextYAlignment = Enum.TextYAlignment.Top
-
-local levelButton = Instance.new("TextButton")
-levelButton.Position = UDim2.fromOffset(20, 128)
-levelButton.Size = UDim2.fromOffset(380, 48)
-levelButton.BorderSizePixel = 0
-levelButton.AutoButtonColor = false
-levelButton.Font = Enum.Font.GothamBlack
-levelButton.TextSize = 18
-levelButton.TextColor3 = WHITE
-levelButton.Parent = levelPanel
-corner(levelButton, 8)
-levelButton.Activated:Connect(function()
-	Net.get("UpgradeLevel"):FireServer()
-end)
-
-RunService.RenderStepped:Connect(function()
-	local visible = upgradeOpen and not state.battling
-	levelPanel.Visible = visible
-	if not visible then
-		return
-	end
-	levelCurrent.Text = string.format("Bought characters start at level %d", state.startLevel)
-	if state.levelCost == 0 then
-		levelInfo.Text = "That is the highest start level."
-		levelButton.Text = "MAX LEVEL"
-		levelButton.BackgroundColor3 = BADGE
-		levelButton.TextTransparency = 0.4
-	else
-		levelInfo.Text = string.format("Upgrade so new characters start at level %d (never above the level you bought for that character in the UPGRADES tab).", state.startLevel + 1)
-		levelButton.Text = string.format("UPGRADE TO LEVEL %d  ·  %d coins", state.startLevel + 1, state.levelCost)
-		local canAfford = state.coins >= state.levelCost
-		levelButton.BackgroundColor3 = if canAfford then Color3.fromRGB(140, 100, 230) else BADGE
-		levelButton.TextTransparency = if canAfford then 0 else 0.4
-	end
-end)
-
--- Checking the zone a few times a second is enough.
-local padCheckTimer = 0
-RunService.Heartbeat:Connect(function(dt)
-	padCheckTimer += dt
-	if padCheckTimer < 0.15 then
-		return
-	end
-	padCheckTimer = 0
-	upgradeOpen = computeInZone("UpgradeZone")
-end)
-
--- Upgrades page: the merge level of every soldier class is bought separately. Without the upgrade
--- two soldiers of a class cannot be merged past the level bought so far.
-local upgradesPage = makePage("Upgrades")
-UI.section(upgradesPage, "MERGE LEVEL PER CHARACTER", 0, UI.TAB_ACCENT.Upgrades)
-label(upgradesPage, "the dots are the 9 merge levels: lit = bought", UDim2.fromOffset(12, 16), UDim2.fromOffset(340, 14), 10, Enum.Font.GothamMedium, MUTED)
-type UpgradeRow = { frame: Frame, stroke: UIStroke, sub: TextLabel, dots: { Frame }, button: TextButton, buttonStroke: UIStroke }
-local upgradeRows: { [string]: UpgradeRow } = {}
-for i, class in Units.ClassList do
-	local def = Units.Classes[class]
-	local row = Instance.new("Frame")
-	row.Position = UDim2.fromOffset(8 + ((i - 1) % 2) * 316, 36 + ((i - 1) // 2) * 60) -- two columns
-	row.Size = UDim2.fromOffset(308, 54)
-	row.BackgroundColor3 = def.color:Lerp(BG, 0.8)
-	row.BorderSizePixel = 0
-	row.Parent = upgradesPage
-	corner(row, 10)
-	local rowStroke = UI.stroke(row, def.color, 1.5, 0.4)
-	local accentBar = Instance.new("Frame")
-	accentBar.Position = UDim2.fromOffset(0, 8)
-	accentBar.Size = UDim2.fromOffset(4, 38)
-	accentBar.BackgroundColor3 = def.color
-	accentBar.BorderSizePixel = 0
-	accentBar.Parent = row
-	corner(accentBar, 2)
-	label(row, def.label, UDim2.fromOffset(14, 5), UDim2.fromOffset(150, 18), 14, Enum.Font.GothamBold, WHITE)
-	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(190, 14), 12, Enum.Font.Gotham, MUTED)
-	-- The merge levels as dots (lit in the level color up to the bought level): 30 for the
-	-- Mage, squeezed into the same width.
-	local dots = {}
-	local maxTier = Units.maxTier(class)
-	local step = math.min(14, math.floor(280 / maxTier))
-	for k = 1, maxTier do
-		local dot = Instance.new("Frame")
-		dot.Position = UDim2.fromOffset(14 + (k - 1) * step, 41)
-		dot.Size = UDim2.fromOffset(math.max(3, step - 3), 5)
-		dot.BackgroundColor3 = Color3.fromRGB(40, 44, 60)
-		dot.BorderSizePixel = 0
-		dot.Parent = row
-		corner(dot, 2)
-		dots[k] = dot
-	end
-	local button = Instance.new("TextButton")
-	button.Position = UDim2.fromOffset(212, 9)
-	button.Size = UDim2.fromOffset(88, 36)
-	button.BorderSizePixel = 0
-	button.AutoButtonColor = false
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 11
-	button.TextColor3 = WHITE
-	button.Parent = row
-	corner(button, 8)
-	local buttonStroke = UI.stroke(button, GREEN, 1.5, 1)
-	button.Activated:Connect(function()
-		Net.get("UnlockTier"):FireServer(class)
-	end)
-	upgradeRows[class] = { frame = row, stroke = rowStroke, sub = sub, dots = dots, button = button, buttonStroke = buttonStroke }
-end
-
-renderLevels = function()
-	for _, class in Units.ClassList do
-		local row = upgradeRows[class]
-		local cap = if state.unlocked[class] == true then capOf(class) else 0
-		for k, dot in row.dots do
-			if k <= cap then
-				dot.BackgroundColor3 = Levels.color(k)
-				dot.BackgroundTransparency = 0
-			elseif k == cap + 1 and cap > 0 then
-				dot.BackgroundColor3 = Levels.color(k)
-				dot.BackgroundTransparency = 0.6 -- the next one to buy
-			else
-				dot.BackgroundColor3 = Color3.fromRGB(40, 44, 60)
-				dot.BackgroundTransparency = 0
-			end
-		end
-		if state.unlocked[class] ~= true then
-			row.sub.Text = "Not unlocked yet"
-			row.button.Visible = false
-			row.frame.BackgroundTransparency = 0.5
-			row.stroke.Transparency = 0.8
-		else
-			row.frame.BackgroundTransparency = 0
-			row.stroke.Transparency = 0.4
-			row.button.Visible = true
-			local nextTier = cap + 1
-			if nextTier > Units.maxTier(class) then
-				row.sub.Text = string.format("Merges up to Lv %d (max)", cap)
-				row.button.Text = "MAX"
-				row.button.BackgroundColor3 = UI.DARK
-				row.button.TextTransparency = 0.4
-				row.buttonStroke.Transparency = 1
-			else
-				local def = Balance.TierUnlocks[nextTier]
-				row.sub.Text = if cap <= 1 then "Cannot merge yet" else string.format("Merges up to Lv %d", cap)
-				if state.cleared < def.wave then
-					row.button.Text = string.format("Lv %d\nwave %d", nextTier, def.wave)
-				else
-					row.button.Text = string.format("Lv %d\n%d coins", nextTier, def.cost)
-				end
-				local ready = state.cleared >= def.wave and state.coins >= def.cost
-				row.button.BackgroundColor3 = if ready then GREEN:Lerp(BG, 0.25) else UI.DARK
-				row.button.TextTransparency = if ready then 0 else 0.35
-				row.buttonStroke.Transparency = if ready then 0.2 else 1
-			end
-		end
-	end
-end
-
 showTab("Inventory")
-end
 
 -- ── State from the server ─────────────────────────────────────────────────
 
@@ -2042,8 +1724,6 @@ Net.get("State").OnClientEvent:Connect(function(new)
 	state = new
 	Layout.apply(state.settings and state.settings.layout)
 	renderInventory()
-	renderSoldiers()
-	renderLevels()
 end)
 
 -- (showToast is set in the Toast section below and also used by later sections.)
@@ -2564,6 +2244,18 @@ local function closeCardPopup()
 		cardPopup:Destroy()
 		cardPopup = nil
 	end
+	if UI.popupGlow then
+		UI.popupGlow:Destroy()
+		UI.popupGlow = nil
+	end
+	local marked = UI.popupCard
+	if marked then
+		local stroke = marked:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Thickness = 2
+		end
+		UI.popupCard = nil
+	end
 end
 
 openCardPopup = function(id: number)
@@ -2594,6 +2286,22 @@ openCardPopup = function(id: number)
 	stroke.Color = Levels.color(unit.tier)
 	stroke.Thickness = 2
 	stroke.Parent = popup
+
+	-- A light outline on the mage itself while its popup is open: its card gets a slightly stronger stroke and
+	-- its model on the pad a faint glow in the level color (both go away with the popup).
+	local cardStroke = card:FindFirstChildOfClass("UIStroke")
+	if cardStroke then
+		cardStroke.Thickness = 3
+	end
+	UI.popupCard = card
+	local world = modelAt(id)
+	if world then
+		local glow = makeGlow(world, Levels.color(unit.tier))
+		glow.Name = "PopupGlow"
+		glow.FillTransparency = 0.88
+		glow.OutlineTransparency = 0.35
+		UI.popupGlow = glow
+	end
 
 	local title = label(popup, string.format("%s · %s", Units.Classes[unit.class].label, Levels.label(unit.tier)), UDim2.fromOffset(10, 6), UDim2.fromOffset(200, 20), 16, Enum.Font.GothamBold, WHITE)
 	title.ZIndex = 41

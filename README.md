@@ -15,7 +15,8 @@ SPELLS tab and no spell drops. Older passages below about other classes or "your
 version.
 
 Most things are 3D in the world. The UI is the PLAY button, the HUD with the account level and
-coins (bottom left), the left panel (Inventory / Characters / Upgrades tabs), the battle panel (opened
+coins (bottom left), the left panel (a single Inventory page: the mages; a click on a mage opens its popup and
+outlines it lightly, no Characters / Upgrades tabs, merging is never capped), the battle panel (opened
 with PLAY) and short toast messages. Every soldier has its name and level (e.g. "Mage · Lv 3")
 floating above it.
 
@@ -546,7 +547,7 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
   Motor6D turns, with a thrust animation), its crystal charges for 0.22 s with a growing purple glow, then a purple ball
   with a trail flies straight at the target and bursts over the splash area (`Balance.SplashRadius`); its splash damage
   is the Mage's Arcane Burst passive.
-- **Class passive** (`Units.Passives`, shown in the Characters tab and on a card's popup): Mage **Arcane Burst**
+- **Class passive** (`Units.Passives`, shown on a card's popup): Mage **Arcane Burst**
   (hits splash 50% to nearby enemies). Ascended = doubled. (The other passives in the table belong to removed
   classes.)
 - **Boss abilities** (`Balance.Boss*`): a Brute boss **slams** every 8 s (2x damage + 1 s stun around it), a Chief
