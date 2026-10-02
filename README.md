@@ -148,7 +148,10 @@ streaks the hands and feet and kicks up dust. **SLIDE** (C / Left Ctrl while run
 real slide: the hip height drops so the body is on the floor, a LinearVelocity carries it on and bleeds the speed
 off, with a dust spray, heel sparks and scrape marks left on the ground; **jump during a slide** (or the SLIDE
 button again) is a long slide jump. The **KEYS ?** button over the two buttons opens a small key card (it shows
-itself once after joining). The poses overwrite the joints' `Transform` after the animator (Stepped). Numbers:
+itself once after joining). The poses overwrite the joints' `Transform` after the animator (PreSimulation). Since Roblox's 2026 Avatar Joint
+Upgrade a player's R15 joints are AnimationConstraints (swapped in after spawn), so joints are looked up by name in
+either class and looked up again when the rig changes; a PostSimulation self-check mutes the default Animate while
+posing if it keeps overriding the poses. One Output line per character tells the rig type and the joints found. Numbers:
 `CONFIG` there.
 
 **You only control your character** (walk around, watch the fight). The Mages cast their spells themselves; there

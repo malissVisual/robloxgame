@@ -10,8 +10,13 @@
 --           hand trailing, the speed bleeds off; dust sprays, sparks fly from the heel, scrape marks are left on
 --           the floor, the camera goes down. JUMP during a slide = a SLIDE JUMP (a long leap with the momentum).
 --   KEYS    the "?" button over the two buttons opens a small card with every key (it shows itself once).
--- The poses overwrite the R15 joints' Transform after the animator (Stepped) and blend in and out. All numbers
--- are in CONFIG.
+-- The poses overwrite the R15 joints' Transform after the animator (RunService.PreSimulation) and blend in and
+-- out. THE JOINTS: since Roblox's Avatar Joint Upgrade (2026) a player's R15 joints are AnimationConstraints, not
+-- Motor6Ds, and the server swaps them in a moment AFTER the character spawns; both classes have a writable
+-- Transform. So the joints are looked up by name in their part (any of the two classes, the AnimationConstraint
+-- preferred), looked up again whenever the rig changes, and never written through C0 / C1. A self-check after the
+-- physics step verifies the writes stuck; if the default Animate keeps winning, it is muted while posing. On an R6
+-- character the poses are off (the movement and effects still work). All numbers are in CONFIG.
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -39,6 +44,8 @@ local CONFIG = {
 	SlideJumpUp = 48, -- … and this much up
 	BlendIn = 0.09, -- seconds a pose takes to blend in / out
 	BlendOut = 0.22,
+	SuppressAnimate = "auto", -- "auto" (mute the default Animate while posing only if it overrides us), "always", "never"
+	Debug = true, -- one Output line per character with the rig type and the joints found
 }
 
 local BG = Color3.fromRGB(24, 26, 36)
@@ -61,9 +68,22 @@ local JOINT_PARTS: { [string]: string } = {
 }
 
 type State = {
+	character: Model?,
 	humanoid: Humanoid?,
 	root: BasePart?,
-	joints: { [string]: Motor6D },
+	rig: string, -- "R15" | "R6" | "none"
+	joints: { [string]: any }, -- Motor6D or AnimationConstraint (both have a writable Transform)
+	jointCount: number,
+	written: { [string]: CFrame }, -- the Transform we wrote last frame, per joint
+	lastAnim: { [string]: CFrame }, -- the last Transform the animator wrote, per joint
+	dirty: boolean, -- look the joints up again before the next pose
+	bindId: number,
+	conns: { RBXScriptConnection },
+	animateSuppressed: boolean,
+	forceSuppress: boolean, -- the self-check found the default Animate overriding our poses
+	badFrames: number,
+	checkBad: number,
+	checkTotal: number,
 	baseHip: number,
 	sprintHeld: boolean,
 	sprintToggled: boolean,
@@ -85,9 +105,22 @@ type State = {
 	slideForce: LinearVelocity?,
 }
 local state: State = {
+	character = nil,
 	humanoid = nil,
 	root = nil,
+	rig = "none",
 	joints = {},
+	jointCount = 0,
+	written = {},
+	lastAnim = {},
+	dirty = false,
+	bindId = 0,
+	conns = {},
+	animateSuppressed = false,
+	forceSuppress = false,
+	badFrames = 0,
+	checkBad = 0,
+	checkTotal = 0,
 	baseHip = 2,
 	sprintHeld = false,
 	sprintToggled = false,
@@ -131,9 +164,141 @@ local function emitter(parent: Instance, texture: string, color: Color3, rate: n
 	return e
 end
 
+-- ── Joints (Motor6D or AnimationConstraint) ────────────────────────────────
+
+local function isJoint(i: Instance): boolean
+	return i:IsA("AnimationConstraint") or i:IsA("Motor6D")
+end
+
+-- The part a joint moves.
+local function part1Of(j: Instance): Instance?
+	if j:IsA("AnimationConstraint") then
+		local a1 = (j :: any).Attachment1
+		return if a1 then a1.Parent else nil
+	elseif j:IsA("Motor6D") then
+		return (j :: Motor6D).Part1
+	end
+	return nil
+end
+
+local function describeJoints()
+	if not CONFIG.Debug then
+		return
+	end
+	local classes: { [string]: number } = {}
+	local missing: { string } = {}
+	for name in JOINT_PARTS do
+		local j = state.joints[name]
+		if j then
+			classes[j.ClassName] = (classes[j.ClassName] or 0) + 1
+		else
+			table.insert(missing, name)
+		end
+	end
+	local parts: { string } = {}
+	for class, n in classes do
+		table.insert(parts, string.format("%s=%d", class, n))
+	end
+	print(string.format("[PlayerMovement] rig %s, joints %d/15 (%s)%s", state.rig, state.jointCount, table.concat(parts, ", "), if #missing > 0 then " missing: " .. table.concat(missing, ", ") else ""))
+end
+
+-- Finds every joint by name in its part (any of the two classes; the AnimationConstraint wins, because while the
+-- server swaps them both exist under the same name); a name that is not found is matched by the part it moves.
+local function resolveJoints()
+	state.dirty = false
+	local character = state.character
+	if not character or state.rig ~= "R15" then
+		return
+	end
+	local byPart: { [Instance]: Instance }? = nil
+	local count = 0
+	for name, partName in JOINT_PARTS do
+		local part = character:FindFirstChild(partName)
+		local found: Instance? = nil
+		if part then
+			for _, child in part:GetChildren() do
+				if child.Name == name and isJoint(child) then
+					found = child
+					if child:IsA("AnimationConstraint") then
+						break
+					end
+				end
+			end
+			if not found then
+				if not byPart then
+					local map: { [Instance]: Instance } = {}
+					for _, d in character:GetDescendants() do
+						if isJoint(d) and not d:FindFirstAncestorWhichIsA("Accoutrement") then -- hip accessories have their own "LeftHip"
+							local moved = part1Of(d)
+							if moved and (not map[moved] or d:IsA("AnimationConstraint")) then
+								map[moved] = d
+							end
+						end
+					end
+					byPart = map
+				end
+				found = (byPart :: { [Instance]: Instance })[part]
+			end
+		end
+		if state.joints[name] ~= found then
+			state.joints[name] = found
+			state.written[name] = nil
+			state.lastAnim[name] = nil
+		end
+		if found then
+			count += 1
+		end
+	end
+	if count ~= state.jointCount then
+		state.jointCount = count
+		describeJoints()
+	end
+end
+
+-- Mutes the default Animate while posing (the fallback when it keeps overriding us) and restores it.
+local function isDefaultTrack(t: AnimationTrack): boolean
+	local p = t.Priority
+	return p == Enum.AnimationPriority.Core or p == Enum.AnimationPriority.Idle or p == Enum.AnimationPriority.Movement
+end
+local function setAnimateSuppressed(on: boolean)
+	if state.animateSuppressed == on then
+		return
+	end
+	state.animateSuppressed = on
+	local character, humanoid = state.character, state.humanoid
+	local animate = character and character:FindFirstChild("Animate")
+	if animate and animate:IsA("BaseScript") then
+		animate.Enabled = not on
+	end
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if on and animator then
+		for _, t in animator:GetPlayingAnimationTracks() do
+			if isDefaultTrack(t) then
+				t:Stop(0.12)
+			end
+		end
+	end
+end
+
 local function bindCharacter(character: Model)
+	state.bindId += 1
+	local id = state.bindId
+	for _, c in state.conns do
+		c:Disconnect()
+	end
+	table.clear(state.conns)
+	table.clear(state.joints)
+	table.clear(state.written)
+	table.clear(state.lastAnim)
+	state.jointCount = 0
+	state.animateSuppressed = false
+	state.character = character
+	state.rig = "none"
 	local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
 	local root = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
+	if id ~= state.bindId then
+		return -- a newer character took over while this one loaded
+	end
 	state.humanoid = humanoid
 	state.root = root
 	state.sliding = false
@@ -141,14 +306,44 @@ local function bindCharacter(character: Model)
 	state.runWeight = 0
 	state.slideForce = nil
 	state.baseHip = if humanoid then humanoid.HipHeight else 2
-	table.clear(state.joints)
-	for name, partName in JOINT_PARTS do
-		local part = character:WaitForChild(partName, 5)
-		local motor = part and part:FindFirstChild(name)
-		if motor and motor:IsA("Motor6D") then
-			state.joints[name] = motor
+	state.rig = if humanoid and humanoid.RigType == Enum.HumanoidRigType.R15 then "R15" elseif humanoid then "R6" else "none"
+	-- The joints: now, and again whenever the rig changes (the server swaps Motor6Ds for AnimationConstraints after
+	-- the spawn; an appearance update rebuilds parts).
+	resolveJoints()
+	table.insert(state.conns, character.DescendantAdded:Connect(function(d)
+		if isJoint(d) or d:IsA("BasePart") then
+			state.dirty = true
+		end
+	end))
+	table.insert(state.conns, character.DescendantRemoving:Connect(function(d)
+		if isJoint(d) then
+			state.dirty = true
+		end
+	end))
+	if humanoid then
+		table.insert(state.conns, humanoid:GetPropertyChangedSignal("RigType"):Connect(function()
+			state.rig = if humanoid.RigType == Enum.HumanoidRigType.R15 then "R15" else "R6"
+			state.dirty = true
+		end))
+		local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator", 5)
+		if animator and animator:IsA("Animator") then
+			table.insert(state.conns, animator.AnimationPlayed:Connect(function(track)
+				if state.animateSuppressed and isDefaultTrack(track) then
+					track:Stop(0)
+				end
+			end))
 		end
 	end
+	task.delay(1.5, function()
+		if id == state.bindId then
+			resolveJoints()
+			if state.rig == "R6" then
+				print("[PlayerMovement] R6 character: sprint / slide poses are off (set the avatar to R15 in Game Settings)")
+			else
+				describeJoints()
+			end
+		end
+	end)
 	if root then
 		local feet = Instance.new("Attachment")
 		feet.Name = "MovementFeet"
@@ -216,9 +411,15 @@ local function endSlide(jump: boolean)
 	if humanoid then
 		humanoid.WalkSpeed = if wantsSprint() then CONFIG.SprintSpeed else CONFIG.WalkSpeed
 		local ease = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		TweenService:Create(humanoid, ease, { CameraOffset = Vector3.zero, HipHeight = state.baseHip }):Play()
+		if state.rig == "R15" then
+			TweenService:Create(humanoid, ease, { CameraOffset = Vector3.zero, HipHeight = state.baseHip }):Play()
+		else
+			TweenService:Create(humanoid, ease, { CameraOffset = Vector3.zero }):Play()
+		end
 		if jump and root then
-			humanoid.HipHeight = state.baseHip
+			if state.rig == "R15" then
+				humanoid.HipHeight = state.baseHip
+			end
 			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 			root.AssemblyLinearVelocity = state.slideDir * CONFIG.SlideJumpForward + Vector3.new(0, CONFIG.SlideJumpUp, 0)
 		end
@@ -263,7 +464,11 @@ local function startSlide()
 	humanoid.WalkSpeed = CONFIG.SlideStartSpeed
 	-- A REAL slide: the hip height drops, so the whole body is down on the floor (the camera follows it down).
 	local drop = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(humanoid, drop, { HipHeight = math.max(0.25, state.baseHip - CONFIG.SlideDrop), CameraOffset = Vector3.new(0, -CONFIG.SlideCameraDrop, 0) }):Play()
+	if state.rig == "R15" then
+		TweenService:Create(humanoid, drop, { HipHeight = math.max(0.25, state.baseHip - CONFIG.SlideDrop), CameraOffset = Vector3.new(0, -CONFIG.SlideCameraDrop, 0) }):Play()
+	else
+		TweenService:Create(humanoid, drop, { CameraOffset = Vector3.new(0, -1.6, 0) }):Play() -- (R6 HipHeight is an offset: leave it)
+	end
 	if state.slideDust then
 		state.slideDust.Enabled = true
 		state.slideDust:Emit(30)
@@ -324,6 +529,7 @@ local SLIDE_POSE: { [string]: CFrame } = {
 	LeftWrist = CFrame.Angles(-0.6, 0, 0),
 	RightShoulder = CFrame.Angles(0.5, 0, -0.3), -- the other arm forward, resting toward the knee
 	RightElbow = CFrame.Angles(0.9, 0, 0),
+	RightWrist = CFrame.Angles(0.2, 0, 0),
 }
 
 -- One joint of the sprint cycle at stride phase `p` (nil = leave the animation's value). The arms lag the legs a
@@ -660,30 +866,94 @@ local function update(dt: number)
 		trail.Enabled = sprintingNow or state.sliding
 	end
 	updateScreen(dt, math.clamp(speed / CONFIG.SprintSpeed, 0, 1.4))
+
+	-- The default Animate is muted only while posing, and only when it keeps overriding the poses (or "always").
+	local posing = state.rig == "R15" and state.jointCount >= 10 and humanoid.Health > 0 and (state.sliding or sprintingNow)
+	local mute = CONFIG.SuppressAnimate == "always" or (CONFIG.SuppressAnimate == "auto" and state.forceSuppress)
+	setAnimateSuppressed(posing and mute)
 end
 
--- The poses, after the animator wrote this frame's Transforms.
+local function same(a: CFrame, b: CFrame): boolean
+	return a.Position:FuzzyEq(b.Position, 1e-4) and a.XVector:FuzzyEq(b.XVector, 1e-4) and a.YVector:FuzzyEq(b.YVector, 1e-4)
+end
+
+-- The poses, after the animator wrote this frame's Transforms (PreSimulation) and before they are applied. Each
+-- joint is lerped from the animation's value to the run cycle (runWeight) and then to the slide (slideWeight).
+-- When nobody wrote the joint since our last write (the animator muted / throttled), it starts from the last
+-- real animation value instead, so no joint freezes in a pose after the blend-out.
 local function pose()
+	local humanoid = state.humanoid
+	state.checkBad, state.checkTotal = 0, 0
+	if state.rig ~= "R15" or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	local st = humanoid:GetState()
+	if st == Enum.HumanoidStateType.Dead or st == Enum.HumanoidStateType.Physics or st == Enum.HumanoidStateType.Ragdoll then
+		return -- the engine ragdolls the joints: leave them
+	end
+	if state.dirty then
+		resolveJoints()
+	end
 	local sw, rw = state.slideWeight, state.runWeight
 	if sw <= 0.001 and rw <= 0.001 then
 		return
 	end
 	for name, joint in state.joints do
 		if not joint.Parent then
+			state.dirty = true
 			continue
 		end
-		local current = joint.Transform
+		local live: CFrame = joint.Transform
+		local mine = state.written[name]
+		local base = live
+		if mine and same(live, mine) then
+			base = state.lastAnim[name] or CFrame.identity
+		else
+			state.lastAnim[name] = live
+		end
+		local out = base
 		if rw > 0.001 then
-			local runPose = sprintPose(name, state.stride, state.turnRoll)
-			if runPose then
-				current = current:Lerp(runPose, rw)
+			local run = sprintPose(name, state.stride, state.turnRoll)
+			if run then
+				out = out:Lerp(run, rw)
 			end
 		end
-		local target = SLIDE_POSE[name]
-		if sw > 0.001 and target then
-			current = current:Lerp(target, sw)
+		local slide = if sw > 0.001 then SLIDE_POSE[name] else nil
+		if slide then
+			out = out:Lerp(slide, sw)
 		end
-		joint.Transform = current
+		joint.Transform = out
+		state.written[name] = out
+		state.checkTotal += 1
+		if not same(joint.Transform, out) then
+			state.checkBad += 1 -- the write was refused
+		end
+	end
+end
+
+-- After the physics step: did our writes stick? If most were overwritten or refused for a moment, mute the default
+-- Animate while posing (CONFIG.SuppressAnimate "auto"), and say so once.
+local function check()
+	if state.rig ~= "R15" or (state.slideWeight <= 0.001 and state.runWeight <= 0.001) then
+		return
+	end
+	local bad, total = state.checkBad, state.checkTotal
+	for name, joint in state.joints do
+		local w = state.written[name]
+		if w and joint.Parent and not same(joint.Transform, w) then
+			bad += 1
+		end
+	end
+	if total > 0 and bad * 2 > total then
+		state.badFrames += 1
+		if state.badFrames == 8 and CONFIG.SuppressAnimate == "auto" and not state.forceSuppress then
+			state.forceSuppress = true
+			warn(string.format("[PlayerMovement] %d/%d joint poses were overwritten or refused: muting the default Animate while posing", bad, total))
+		elseif state.badFrames == 120 and state.animateSuppressed then
+			warn("[PlayerMovement] poses are still refused with Animate muted: check Workspace.AuthorityMode / UseFixedSimulation in Studio")
+		end
+	else
+		state.badFrames = 0
 	end
 end
 
@@ -712,7 +982,8 @@ function PlayerMovement.start()
 		end
 	end)
 	RunService.RenderStepped:Connect(update)
-	RunService.Stepped:Connect(pose) -- after the animator: overwrite / blend the joints' Transform
+	RunService.PreSimulation:Connect(pose) -- after the animator wrote Transform, before it is applied: our poses
+	RunService.PostSimulation:Connect(check) -- did they stick? (the Animate fallback)
 	-- The keys card shows itself once, for a few seconds, the first time.
 	task.delay(3, function()
 		showCard(true)
