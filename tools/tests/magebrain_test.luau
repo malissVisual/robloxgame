@@ -263,6 +263,23 @@ do
 	check(w5.ally.shieldUntil > w5.ally.clock and w5.ally.shieldReduction == 0.25, "(e) guardian: a level 5 mage wards the ally (-25 %)")
 end
 
+-- ── (h) BLINK DODGE: a grunt walks up to a level 1 mage (no knockback) → it teleports away, stays in range ──
+do
+	local wh2 = world(1, { enemies = 1, enemyPos = function() return vec(0, 2, 10) end })
+	local grunt = wh2.enemies[1]
+	local t = wh2.until_(function() return wh2.brain.blinkReadyAt > 0 end, 6)
+	local d = (flat(grunt.pos - wh2.mage.pos)).Magnitude
+	check(wh2.brain.blinkReadyAt > 0, string.format("(h) dodge: the mage blinked when the grunt came close (after %.2f s)", t))
+	check(d >= 8, string.format("(h) dodge: it landed away from the grunt (%.1f studs)", d))
+	check(d <= wh2.mage.range + 2, string.format("(h) dodge: it is still within shooting range (%.1f <= %.1f)", d, wh2.mage.range + 2))
+	local after = wh2.mage.pos
+	local readyAt = wh2.brain.blinkReadyAt
+	wh2.run(1)
+	check(wh2.brain.blinkReadyAt == readyAt, "(h) dodge: no second blink within the cooldown")
+	check(not wh2.movedWhileInRange, "(h) dodge: the blink is the only move while in range")
+	local _ = after
+end
+
 -- ── (f) REPEL: 3 grunts at 4 studs are pushed away, the mage does not move ──
 do
 	local wf = world(5, { walk = false, enemies = 3, enemyPos = function(i) local a = i / 3 * math.pi * 2; return vec(math.cos(a) * 4, 2, math.sin(a) * 4) end })

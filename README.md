@@ -500,6 +500,12 @@ in `Soldier.luau` for its look.
 - [ ] A second map
 - [ ] Trading / gifting soldiers between players
 
+**The Mage watches and dodges** (`MageBrain.luau`, `MageConfig`): it always turns smoothly to its target, or to the
+nearest enemy from afar (`TurnRate`), also while it waits or recovers. When a melee enemy gets within 5.5 studs it
+BLINKS away (`Reactions.BlinkDodge`): to the spot that is farthest from every enemy, preferring the other side of the
+attacker and staying within shooting range, and lands looking back at it (cooldown 9 s at level 1 down to 4 s at
+level 16; the knockback answers first when it is ready).
+
 **The Mage's body language** lives on the client (`src/client/MageAnimator.luau`, 60 fps, no animation assets):
 it poses the R15 joints of every Mage model procedurally from attributes the server sets (`Glide` 0 … 1, `Cast`
 = "kind|duration|hand" + `CastId`, `Blink`): a living idle (breathing, a wandering gaze), the GLIDE while it

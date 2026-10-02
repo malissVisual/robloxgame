@@ -152,6 +152,9 @@ export type Brain = {
 	shoulderRest: CFrame?,
 	debugLabel: TextLabel?,
 	lastLook: Vector3?,
+	lookGoal: Vector3?, -- where the mage wants to face (tracking)
+	facing: Vector3, -- where it faces now (flat unit vector, turned toward lookGoal at Config.TurnRate)
+	blinkReadyAt: number, -- the blink dodge's cooldown
 	-- Reakce.
 	inbox: { { name: string, payload: any, at: number } },
 	reaction: Reaction?,
@@ -327,6 +330,9 @@ function MageBrain.new(ctx: Context, fighter: any, level: number): Brain
 		shoulderRest = nil,
 		debugLabel = nil,
 		lastLook = nil,
+		lookGoal = nil,
+		facing = Vector3.new(0, 0, 1),
+		blinkReadyAt = 0,
 		inbox = {},
 		reaction = nil,
 		pending = nil,
@@ -552,9 +558,36 @@ local function skillDelay(self: Brain): number
 end
 
 -- Otočení k bodu (pamatuje si ho kvůli vznášení, které model každý tick přepivotuje).
+-- Where the mage should face; the body turns there smoothly (turnStep, every tick).
 local function look(self: Brain, point: Vector3)
 	self.lastLook = point
-	self.ctx.face(self.f, point)
+	self.lookGoal = point
+end
+
+-- Turns the body toward lookGoal at most Config.TurnRate rad/s and faces it there (also refreshes the pose when
+-- the lift or the lean changed).
+local function turnStep(self: Brain, dt: number)
+	local f = self.f
+	local goal = self.lookGoal
+	if goal then
+		local want = flat(goal - f.pos)
+		if want.Magnitude > 0.05 then
+			want = want.Unit
+			local current = self.facing
+			local angle = math.acos(math.clamp(current.X * want.X + current.Z * want.Z, -1, 1))
+			local maxStep = Config.TurnRate * dt
+			if angle <= maxStep or angle < 1e-3 then
+				self.facing = want
+			else
+				-- Rotate around the up axis by maxStep toward `want` (the side from the cross product).
+				local sign = if current.X * want.Z - current.Z * want.X >= 0 then 1 else -1
+				local a = maxStep * sign
+				local c, sn = math.cos(a), math.sin(a)
+				self.facing = Vector3.new(current.X * c - current.Z * sn, 0, current.X * sn + current.Z * c).Unit
+			end
+		end
+	end
+	self.ctx.face(f, f.pos + self.facing * 10)
 end
 
 -- ── Hlášky a reakční slot ───────────────────────────────────────────────────
@@ -1277,6 +1310,103 @@ local function fidget(self: Brain, lookAt: Vector3?)
 	end
 end
 
+-- BLINK DODGE: a melee enemy is about to reach the mage → it teleports away, to the spot that is farthest from
+-- every enemy, preferring the other side of the attacker and staying within shooting range; it lands looking back.
+local function blinkDodge(self: Brain, threat: any): boolean
+	local f, ctx = self.f, self.ctx
+	local B = Config.Reactions.BlinkDodge
+	local enemies = enemiesOf(self)
+	local here = flat(f.pos)
+	local fromThreat = here - flat(threat.pos)
+	fromThreat = if fromThreat.Magnitude > 0.05 then fromThreat.Unit else Vector3.new(0, 0, -1)
+	local best: Vector3? = nil
+	local bestScore = -math.huge
+	for ring = 1, 2 do
+		local center = if ring == 1 then flat(threat.pos) else here
+		for i = 0, 11 do
+			local a = i / 12 * math.pi * 2
+			local candidate = Vector3.new(center.X + math.cos(a) * B.Distance, f.pos.Y, center.Z + math.sin(a) * B.Distance)
+			if not insideArena(self, candidate) or hazardAt(self, candidate) then
+				continue
+			end
+			local flatCandidate = flat(candidate)
+			local closest = math.huge
+			for _, e in enemies do
+				closest = math.min(closest, (flat(e.pos) - flatCandidate).Magnitude)
+			end
+			local side = flatCandidate - flat(threat.pos)
+			local sideUnit = if side.Magnitude > 0.05 then side.Unit else nil
+			local other = if sideUnit then -(sideUnit.X * fromThreat.X + sideUnit.Z * fromThreat.Z) else 0 -- 1 = right across the attacker
+			local score = math.min(closest, 16) + other * B.OtherSide - (if closest > f.range + 2 then B.OutOfRange else 0)
+			if score > bestScore then
+				best, bestScore = candidate, score
+			end
+		end
+	end
+	if not best then
+		return false
+	end
+	if self.casting and self.casting.spell.basic then
+		cancelCast(self)
+	end
+	local parent = ctx.parent
+	local color, color2 = self.basic.color, self.basic.color2
+	local from = f.pos + UP * f.lift
+	ctx.fx.afterimage(parent, f.pos, f.lift, color)
+	fade(neon(parent, Vector3.one * 1.8, CFrame.new(from), color, 0.15, Enum.PartType.Ball), 0.3, { Size = Vector3.one * 5, Transparency = 1 })
+	sparks(parent, f.pos, color, 6, 2, 2.5)
+	f.pos = Vector3.new(best.X, f.pos.Y, best.Z)
+	local to = f.pos + UP * f.lift
+	fade(neon(parent, Vector3.one * 4, CFrame.new(to), color2, 0.2, Enum.PartType.Ball), 0.3, { Size = Vector3.one * 1, Transparency = 1 })
+	groundRing(parent, f.pos, color, 3.5, 0.35)
+	-- Lands looking straight back at the attacker.
+	local back = flat(threat.pos - f.pos)
+	if back.Magnitude > 0.05 then
+		self.facing = back.Unit
+	end
+	look(self, threat.pos)
+	f.model:SetAttribute("Blink", ((f.model:GetAttribute("Blink") :: number?) or 0) + 1)
+	self.castCount += 1
+	f.model:SetAttribute("Cast", "blink|0.12|R")
+	f.model:SetAttribute("CastId", self.castCount)
+	local cooldown = B.CooldownLow + (B.CooldownTop - B.CooldownLow) * clamp01((self.level - 1) / 15)
+	self.blinkReadyAt = f.clock + cooldown
+	self.reactionBusyUntil = math.max(self.reactionBusyUntil, f.clock + B.Recover)
+	self.action = "blink"
+	setGlide(self, false)
+	pop(self, pick(Config.Lines.dodge), color2, 20, false)
+	return true
+end
+
+-- Is a melee enemy about to reach the mage? (The knockback answers first when it is ready.)
+local function tryDodge(self: Brain): boolean
+	local f = self.f
+	local B = Config.Reactions.BlinkDodge
+	if self.level < B.MinLevel or f.clock < self.blinkReadyAt or self.hopUntil > 0 or #self.pushes > 0 then
+		return false
+	end
+	if self.casting and not self.casting.spell.basic then
+		return false -- a strong spell (or the knockback itself) is being cast
+	end
+	local threat, threatDist = nil, math.huge
+	for _, e in enemiesOf(self) do
+		if (e.range or 0) <= B.MeleeRange and (e.stunUntil or 0) <= e.clock then
+			local d = (flat(e.pos) - flat(f.pos)).Magnitude
+			if d <= B.Trigger and d < threatDist then
+				threat, threatDist = e, d
+			end
+		end
+	end
+	if not threat then
+		return false
+	end
+	local repel = spellOfKind(self, "repel")
+	if repel and spellReady(self, repel) then
+		return false
+	end
+	return blinkDodge(self, threat)
+end
+
 -- 6 ARCANE HOP: 5 studů kolmo na dráhu Bruta (ke středu arény; při shodě dál od Bruta), se stíny.
 local function hop(self: Brain, brute: any, from: Vector3, to: Vector3)
 	local f = self.f
@@ -1576,9 +1706,7 @@ local function tickVisuals(self: Brain, dt: number)
 		f.tilt = 0
 		changed = true
 	end
-	if changed then
-		ctx.face(f, self.lastLook or (f.pos + Vector3.new(0, 0, 10)))
-	end
+	-- (the facing is refreshed every tick by turnStep, which also applies the new lift / lean)
 	local ring = self.runeRing
 	if ring then
 		ring.update(f.pos + UP * (f.lift + 0.3), dt)
@@ -2000,11 +2128,8 @@ end
 
 -- Jeden tick bitvy pro mága: regenerace, události → reakce, vizuály, hop, dokončení castu, čekající dovednost,
 -- zaváhání, rozhodnutí v intervalu, akce.
-function MageBrain.update(self: Brain, dt: number)
+local function updateInner(self: Brain, dt: number)
 	local f = self.f
-	if f.hp <= 0 then
-		return
-	end
 	self.mana = math.min(Config.Mana.Max, self.mana + Config.Mana.Regen * dt)
 
 	drainInbox(self)
@@ -2028,6 +2153,11 @@ function MageBrain.update(self: Brain, dt: number)
 		return
 	end
 
+	-- BLINK DODGE: a melee enemy is about to reach the mage.
+	if tryDodge(self) then
+		return
+	end
+
 	local cast = self.casting
 	if cast then
 		if f.clock >= cast.at then
@@ -2045,6 +2175,11 @@ function MageBrain.update(self: Brain, dt: number)
 	end
 	if f.clock < self.reactionBusyUntil or f.clock < self.hesitateUntil then
 		setGlide(self, false)
+		-- Busy (a reaction, recovering from a blink, hesitating): it keeps watching its target.
+		local watch = self.target
+		if watch and watch.hp > 0 then
+			look(self, watch.pos)
+		end
 		return
 	end
 	self.thinkIn -= dt
@@ -2056,6 +2191,22 @@ function MageBrain.update(self: Brain, dt: number)
 		end
 	end
 	act(self, dt)
+end
+
+function MageBrain.update(self: Brain, dt: number)
+	local f = self.f
+	if f.hp <= 0 then
+		return
+	end
+	updateInner(self, dt)
+	-- TRACKING: with nothing else to look at, the mage watches its target, or the nearest enemy from afar.
+	if not self.lookGoal or (self.target and self.target.hp > 0 and not self.casting and self.hopUntil <= 0 and self.action ~= "approach") then
+		local watch = if self.target and self.target.hp > 0 then self.target else nearest(f.pos, enemiesOf(self))
+		if watch then
+			self.lookGoal = watch.pos
+		end
+	end
+	turnStep(self, dt)
 end
 
 return MageBrain

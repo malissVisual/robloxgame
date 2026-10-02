@@ -26,6 +26,9 @@ local MageConfig = {
 
 	-- Zdroje.
 	Mana = { Max = 100, Start = 70, Regen = 11 }, -- regenerace za sekundu bitvy
+	-- TRACKING: the mage always turns to its target (or the nearest enemy) smoothly, at most TurnRate rad/s, also
+	-- while it waits, recovers or stands far away; the body never snaps around.
+	TurnRate = 8,
 	-- GLIDE: a mage moves like a mage. While it walks it floats up Height studs, leans Lean radians into the motion
 	-- and bobs (Bob studs, BobSpeed rad/s); a few arcane sparks trail under it every SparkEvery seconds. Time = the
 	-- seconds it takes to lift off / settle down. (Rig plays no run animation for a gliding rig.)
@@ -84,6 +87,11 @@ local MageConfig = {
 		ChargeAlert = { HopDistance = 5, HopTime = 0.25, HopCooldown = 8, HopMinLevel = 8, HopTrigger = 3, HopRecover = 0.3, Afterimages = 3, TripMult = 0.5, TripSlow = 0.5, TripTime = 1.2, TripCooldown = 5, AllyTrigger = 4 },
 		Counter = { Cooldown = 6, CastTime = 0.15, ExtraRange = 3 }, -- protikouzlo na cast šamana / léčení bosse
 		LastStand = { Below = 0.3, Duration = 4, Reduction = 0.5, FuryBonus = 40 },
+		-- BLINK DODGE: a melee enemy (range <= MeleeRange) gets within Trigger studs → the mage teleports away, to the
+		-- spot around it that is farthest from every enemy, preferring the OTHER side of the attacker, still within
+		-- shooting range; it lands looking back at the attacker. Cooldown from CooldownLow (level 1) to CooldownTop
+		-- (level 16). The knockback (repel) answers first when it is ready.
+		BlinkDodge = { MinLevel = 1, Trigger = 5.5, MeleeRange = 6, Distance = 11, CooldownLow = 9, CooldownTop = 4, Recover = 0.25, OtherSide = 4, OutOfRange = 6 },
 		Finish = { Below = 0.35, Mult = 1.5, CastTime = 0.5, Scale = 1.6 }, -- poprava posledního nepřítele
 		Combo = { Window = 1.5, Bonus = 0.25, ShatterMin = 2, ShatterBonus = 0.3 }, -- kombo s kouzlem hráče / rozbití zpomalených
 		MultiKillWindow = 0.5,
@@ -96,6 +104,7 @@ local MageConfig = {
 	-- Krátké hlášky nad hlavou (anglicky, aby seděly ke zbytku UI); vybírá se náhodně z variant.
 	Lines = {
 		kill = { "HA!", "NEXT.", "TOO SLOW" },
+		dodge = { "NOPE.", "MISSED!", "OVER HERE!" },
 		hit = { "OW!", "RUDE." },
 		allyHurt = { "HOLD ON!" },
 		allyDown = { "NO!" },
