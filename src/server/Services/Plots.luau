@@ -731,29 +731,80 @@ local function easeOutBack(x: number): number
 	return 1 + c3 * (x - 1) ^ 3 + c1 * (x - 1) ^ 2
 end
 
--- Merge effect. Phase 1: orbs stream from the source pad to the target pad in arcs.
--- Phase 2: white flash + colored core, expanding shockwave rings, a light pillar, sparks
--- flying in arcs, the new soldier popping in with an overshoot and a rising "MERGE! T3".
--- Everything gets stronger with the tier. Runs in its own thread; the caller has already
--- rendered the new soldier on `toSlot` (it is hidden until the burst).
-function Plots.mergeEffect(plot: Plot, fromGround: Vector3, toSlot: number, tier: number)
+-- MERGE, the heart of the game. Nobody blinks out of existence: the two old soldiers stay visible and come
+-- together. `Plots.takeForMerge` is called BEFORE the render (it pulls the two old models out of the plot's
+-- bookkeeping so the render leaves them alone and builds the new soldier on `to`), then `Plots.mergeEffect`
+-- choreographs:
+--   1. the two old soldiers turn toward each other and spin up; the one from `from` glides in an arc onto the
+--      target pad while a WIND of streaks whirls around them, tightening and rising;
+--   2. they meet: a white flash, shockwave rings, a light pillar, the wind blows outward;
+--   3. the new soldier fades in out of the flash, growing from 0.7 to 1 with one smooth full turn, settling to
+--      face the arena; "MERGE! Lv N" rises. Everything scales a little with the level.
+-- With no old models (the auto merge, which renders everything at once) only phases 2 and 3 play.
+function Plots.takeForMerge(plot: Plot, from: number, to: number): (Model?, Model?)
+	local oldFrom, oldTo = plot.models[from], plot.models[to]
+	for _, id in { from, to } do
+		local model = plot.models[id]
+		if model then
+			plot.models[id] = nil
+			plot.rendered[id] = nil -- the render rebuilds the pad (empty for `from`, the merged soldier for `to`)
+			model:SetAttribute("Slot", nil) -- the client's hover / drag leave it alone from now on
+			model:SetAttribute("Merging", true)
+		end
+	end
+	return oldFrom, oldTo
+end
+
+function Plots.mergeEffect(plot: Plot, oldFrom: Model?, oldTo: Model?, toSlot: number, tier: number)
 	local folder = plot.folder
 	local color = Levels.color(tier)
 	local bright = color:Lerp(Color3.new(1, 1, 1), 0.55)
-	local a = fromGround + Vector3.new(0, 2, 0)
 	local ground = Plots.slotGround(plot, toSlot)
-	local b = ground + Vector3.new(0, 2.5, 0)
-	local strength = math.clamp(tier, 2, 9)
+	local center = ground + Vector3.new(0, 2.5, 0)
+	local strength = math.clamp(tier, 2, 16)
 	local model = plot.models[toSlot]
 	local lift = Soldier.lift(tier)
 	local rng = Random.new()
+	local FORWARD = Vector3.new(0, 0, 1) -- the soldiers face the arena
 
-	-- Keeps the model's feet on the ground while it scales.
-	local function place(scale: number)
+	-- The new soldier: hidden until the flash, then fades in while it grows and turns.
+	local parts: { { part: BasePart, transparency: number } } = {}
+	if model then
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				table.insert(parts, { part = d, transparency = d.Transparency })
+				d.Transparency = 1
+			elseif d:IsA("PointLight") or d:IsA("Sparkles") or d:IsA("ParticleEmitter") or d:IsA("BillboardGui") then
+				d.Enabled = false
+			end
+		end
+	end
+	local function reveal(fraction: number) -- 0 = hidden … 1 = as built
+		for _, entry in parts do
+			if entry.part.Parent then
+				entry.part.Transparency = 1 - (1 - entry.transparency) * fraction
+			end
+		end
+	end
+	local function finish()
+		reveal(1)
+		if model and model.Parent then
+			model:ScaleTo(1)
+			local p = ground + Vector3.new(0, lift, 0)
+			model:PivotTo(CFrame.lookAt(p, p + FORWARD))
+			for _, d in model:GetDescendants() do
+				if d:IsA("PointLight") or d:IsA("Sparkles") or d:IsA("ParticleEmitter") or d:IsA("BillboardGui") then
+					d.Enabled = true
+				end
+			end
+		end
+	end
+	-- Keeps the new soldier's feet on the ground while it scales and turns.
+	local function placeNew(scale: number, yaw: number)
 		if model and model.Parent then
 			model:ScaleTo(scale)
 			local p = ground + Vector3.new(0, lift * scale, 0)
-			model:PivotTo(CFrame.lookAt(p, p + Vector3.new(0, 0, 1)))
+			model:PivotTo(CFrame.new(p) * CFrame.Angles(0, yaw, 0))
 		end
 	end
 
@@ -773,66 +824,135 @@ function Plots.mergeEffect(plot: Plot, fromGround: Vector3, toSlot: number, tier
 		p.Parent = folder
 		return p
 	end
-
 	local function fade(part: Part, seconds: number, goal: { [string]: any })
 		TweenService:Create(part, TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal):Play()
 		Debris:AddItem(part, seconds + 0.1)
 	end
+	local function smooth(t: number): number
+		return t * t * (3 - 2 * t)
+	end
+
+	-- The WIND: thin streaks whirling around the target pad on a rising helix (each with its own height, speed and
+	-- phase); `tight` 1 … 0 pulls them in, `gust` blows them outward and fades them.
+	type Streak = { part: Part, angle: number, speed: number, height: number, length: number }
+	local streaks: { Streak } = {}
+	local function makeWind()
+		for i = 1, 12 + strength // 2 do
+			local length = 1.6 + rng:NextNumber() * 1.6
+			local part = neon(Enum.PartType.Block, Vector3.new(0.12, 0.12, length), center, if i % 3 == 0 then bright elseif i % 3 == 1 then color else Color3.new(1, 1, 1), 0.45)
+			streaks[i] = { part = part, angle = rng:NextNumber() * math.pi * 2, speed = (6 + rng:NextNumber() * 4) * (if i % 2 == 0 then 1 else -1), height = 0.4 + rng:NextNumber() * 3.6, length = length }
+		end
+	end
+	local function windStep(dt: number, radius: number, rise: number, transparency: number)
+		for _, w in streaks do
+			if not w.part.Parent then
+				continue
+			end
+			w.angle += w.speed * dt
+			local r = radius + math.sin(w.angle * 0.5) * 0.3
+			local pos = ground + Vector3.new(math.cos(w.angle) * r, w.height + rise, math.sin(w.angle) * r)
+			local tangent = Vector3.new(-math.sin(w.angle), 0.12, math.cos(w.angle)) * (if w.speed > 0 then 1 else -1)
+			w.part.CFrame = CFrame.lookAt(pos, pos + tangent)
+			w.part.Transparency = transparency
+		end
+	end
+	local function windGone()
+		for _, w in streaks do
+			w.part:Destroy()
+		end
+	end
 
 	task.spawn(function()
-		place(0.05) -- hide the result until the burst
-
-		-- Phase 1: orbs fly in.
-		local flyTime, orbCount = 0.3, 10
-		local orbs: { Part } = {}
-		local side = Vector3.new(-(b - a).Z, 0, (b - a).X)
-		side = if side.Magnitude < 0.01 then Vector3.new(1, 0, 0) else side.Unit
-		for i = 1, orbCount do
-			orbs[i] = neon(Enum.PartType.Ball, Vector3.one * (0.7 + (i % 3) * 0.2), a, if i % 2 == 0 then color else bright, 0)
-		end
-		local start = os.clock()
-		while folder.Parent do
-			local elapsed = os.clock() - start
-			if elapsed >= flyTime + orbCount * 0.02 then
-				break
-			end
-			for i, orb in orbs do
-				local t = math.clamp((elapsed - i * 0.02) / flyTime, 0, 1)
-				local e = t * t * (3 - 2 * t)
-				local arc = math.sin(math.pi * e)
-				local wobble = (if i % 2 == 0 then 1 else -1) * arc * (1.5 + i * 0.15)
-				orb.Position = a:Lerp(b, e) + Vector3.new(0, arc * 3, 0) + side * wobble
-			end
+		local hasOld = oldFrom ~= nil and oldFrom.Parent ~= nil and oldTo ~= nil and oldTo.Parent ~= nil
+		local last = os.clock()
+		local function tick(): number
 			RunService.Heartbeat:Wait()
+			local now = os.clock()
+			local dt = math.min(0.1, now - last)
+			last = now
+			return dt
 		end
-		for _, orb in orbs do
-			orb:Destroy()
+
+		-- Phase 1: the two come together (only when the old soldiers are here).
+		if hasOld then
+			local fromModel, toModel = oldFrom :: Model, oldTo :: Model
+			local startFrom = fromModel:GetPivot()
+			local startTo = toModel:GetPivot()
+			local goal = ground + Vector3.new(0, startTo.Position.Y - ground.Y, 0) -- the target's spot, its own height
+			local meetTime = 0.7
+			makeWind()
+			local elapsed = 0
+			local yawFrom, yawTo = 0, 0
+			while folder.Parent and elapsed < meetTime do
+				local dt = tick()
+				elapsed += dt
+				local t = math.clamp(elapsed / meetTime, 0, 1)
+				local e = smooth(t)
+				-- The spin picks up speed: a smooth turn that ends in a whirl (about 1.5 turns for the mover).
+				yawFrom += dt * (2 + 10 * t)
+				yawTo -= dt * (1 + 6 * t)
+				local arc = math.sin(math.pi * e) * 2.2
+				local p = startFrom.Position:Lerp(goal, e) + Vector3.new(0, arc, 0)
+				if fromModel.Parent then
+					fromModel:PivotTo(CFrame.new(p) * CFrame.Angles(0, yawFrom, 0))
+				end
+				if toModel.Parent then
+					local hover = math.sin(math.pi * e) * 0.6
+					toModel:PivotTo(CFrame.new(startTo.Position + Vector3.new(0, hover, 0)) * CFrame.Angles(0, yawTo, 0))
+				end
+				-- The wind tightens from 4 studs to 1.2 and lifts a little.
+				windStep(dt, 4 - 2.8 * e, e * 0.8, 0.45 - 0.25 * e)
+			end
+			-- They meet: both shrink into the light in a blink of 0.12 s.
+			local shrinkTime, shrunk = 0.12, 0
+			while folder.Parent and shrunk < shrinkTime do
+				local dt = tick()
+				shrunk += dt
+				local k = math.max(0.15, 1 - shrunk / shrinkTime)
+				for _, m in { fromModel, toModel } do
+					if m.Parent then
+						m:ScaleTo(k)
+						local p = m:GetPivot()
+						m:PivotTo(CFrame.new(p.Position:Lerp(center, 0.5)) * (p - p.Position))
+					end
+				end
+				windStep(dt, 1.2, 0.8, 0.2)
+			end
+			fromModel:Destroy()
+			toModel:Destroy()
+		else
+			makeWind()
+			local spinUp, elapsed = 0.25, 0
+			while folder.Parent and elapsed < spinUp do
+				local dt = tick()
+				elapsed += dt
+				windStep(dt, 3 - 1.8 * elapsed / spinUp, elapsed / spinUp * 0.8, 0.3)
+			end
 		end
 		if not folder.Parent then
+			windGone()
 			return
 		end
 
-		-- Phase 2: burst.
-		fade(neon(Enum.PartType.Ball, Vector3.one * 2, b, Color3.new(1, 1, 1), 0), 0.35, {
-			Size = Vector3.one * (8 + strength * 1.5),
+		-- Phase 2: the flash.
+		fade(neon(Enum.PartType.Ball, Vector3.one * 2, center, Color3.new(1, 1, 1), 0), 0.35, {
+			Size = Vector3.one * (7 + strength),
 			Transparency = 1,
 		})
-		fade(neon(Enum.PartType.Ball, Vector3.one * 1.5, b, color, 0.2), 0.5, {
-			Size = Vector3.one * (5 + strength),
+		fade(neon(Enum.PartType.Ball, Vector3.one * 1.5, center, color, 0.2), 0.5, {
+			Size = Vector3.one * (4 + strength * 0.8),
 			Transparency = 1,
 		})
-
 		local pillar = neon(Enum.PartType.Block, Vector3.new(2.6, 60, 2.6), ground + Vector3.new(0, 30, 0), color, 0.35)
 		fade(pillar, 0.7, { Size = Vector3.new(0.2, 60, 0.2), Transparency = 1 })
-
-		for r = 1, 1 + strength // 3 do -- 2 to 3 shockwave rings
+		for r = 1, 2 + strength // 6 do -- 2 to 4 shockwave rings
 			task.delay((r - 1) * 0.09, function()
 				if not folder.Parent then
 					return
 				end
 				local ring = neon(Enum.PartType.Cylinder, Vector3.new(0.25, 2, 2), ground + Vector3.new(0, 0.35, 0), if r % 2 == 1 then bright else color, 0.15)
 				ring.CFrame = CFrame.new(ring.Position) * CFrame.Angles(0, 0, math.rad(90)) -- lay the cylinder flat
-				fade(ring, 0.55, { Size = Vector3.new(0.25, 12 + strength * 2, 12 + strength * 2), Transparency = 1 })
+				fade(ring, 0.55, { Size = Vector3.new(0.25, 10 + strength * 1.5, 10 + strength * 1.5), Transparency = 1 })
 			end)
 		end
 
@@ -847,58 +967,60 @@ function Plots.mergeEffect(plot: Plot, fromGround: Vector3, toSlot: number, tier
 		text.Size = UDim2.fromScale(1, 1)
 		text.BackgroundTransparency = 1
 		text.Font = Enum.Font.GothamBold
-		text.TextSize = 24 + strength * 2
+		text.TextSize = 22 + strength
 		text.TextColor3 = bright
 		text.TextStrokeColor3 = color
 		text.TextStrokeTransparency = 0.2
-		text.Text = string.format("MERGE!  T%d", tier)
+		text.Text = string.format("MERGE!  Lv %d", tier)
 		text.Parent = gui
-		TweenService:Create(gui, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { StudsOffset = Vector3.new(0, 5, 0) }):Play()
-		TweenService:Create(text, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.6), {
+		TweenService:Create(gui, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { StudsOffset = Vector3.new(0, 5, 0) }):Play()
+		TweenService:Create(text, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.7), {
 			TextTransparency = 1,
 			TextStrokeTransparency = 1,
 		}):Play()
-		Debris:AddItem(anchor, 1.2)
+		Debris:AddItem(anchor, 1.3)
 
-		-- Sparks fly in arcs and the soldier pops in.
+		-- Phase 3: the new soldier grows out of the light with one smooth full turn; sparks fly; the wind blows out.
 		local sparks: { { part: Part, vel: Vector3 } } = {}
-		for i = 1, 12 + strength * 4 do
+		for i = 1, 10 + strength * 2 do
 			local angle = rng:NextNumber() * math.pi * 2
-			local speed = 10 + rng:NextNumber() * 12
+			local speed = 8 + rng:NextNumber() * 10
 			local sparkColor = if i % 3 == 0 then Color3.new(1, 1, 1) elseif i % 2 == 0 then color else bright
 			sparks[i] = {
-				part = neon(Enum.PartType.Ball, Vector3.one * (0.25 + rng:NextNumber() * 0.3), b, sparkColor, 0),
-				vel = Vector3.new(math.cos(angle) * speed, 12 + rng:NextNumber() * 14, math.sin(angle) * speed),
+				part = neon(Enum.PartType.Ball, Vector3.one * (0.22 + rng:NextNumber() * 0.28), center, sparkColor, 0),
+				vel = Vector3.new(math.cos(angle) * speed, 10 + rng:NextNumber() * 12, math.sin(angle) * speed),
 			}
 		end
-		local burstStart = os.clock()
-		local last = burstStart
-		local life, popTime = 0.9, 0.4
-		while folder.Parent do
-			local now = os.clock()
-			local elapsed = now - burstStart
-			local dt = now - last
-			last = now
-			if elapsed >= life then
-				break
-			end
-			for _, s in sparks do
-				s.vel += Vector3.new(0, -45 * dt, 0)
-				local pos = s.part.Position + s.vel * dt
+		local life, growTime = 0.9, 0.55
+		local elapsed = 0
+		placeNew(0.7, 0)
+		while folder.Parent and elapsed < life do
+			local dt = tick()
+			elapsed += dt
+			for _, sp in sparks do
+				sp.vel += Vector3.new(0, -40 * dt, 0)
+				local pos = sp.part.Position + sp.vel * dt
 				if pos.Y < ground.Y + 0.2 then
 					pos = Vector3.new(pos.X, ground.Y + 0.2, pos.Z)
-					s.vel = Vector3.zero
+					sp.vel = Vector3.zero
 				end
-				s.part.Position = pos
-				s.part.Transparency = (elapsed / life) ^ 2
+				sp.part.Position = pos
+				sp.part.Transparency = (elapsed / life) ^ 2
 			end
-			place(math.max(0.05, easeOutBack(math.clamp(elapsed / popTime, 0, 1))))
-			RunService.Heartbeat:Wait()
+			local g = math.clamp(elapsed / growTime, 0, 1)
+			-- One full turn that slows into place (ease out), the size overshoots a touch (ease out back).
+			local yaw = math.pi * 2 * (1 - (1 - g) ^ 3)
+			placeNew(0.7 + 0.3 * easeOutBack(g), yaw)
+			reveal(math.clamp(elapsed / 0.3, 0, 1))
+			-- The wind gusts outward and fades.
+			local gust = math.clamp(elapsed / 0.5, 0, 1)
+			windStep(dt, 1.2 + gust * 6, 0.8 + gust * 2.5, 0.2 + gust * 0.8)
 		end
-		place(1)
-		for _, s in sparks do
-			s.part:Destroy()
+		windGone()
+		for _, sp in sparks do
+			sp.part:Destroy()
 		end
+		finish()
 	end)
 end
 

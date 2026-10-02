@@ -304,7 +304,9 @@ local function onInteract(player: Player, from: any, to: any)
 	if not result then
 		return
 	end
+	local oldFrom, oldTo = nil, nil
 	if result == "merge" then
+		oldFrom, oldTo = Plots.takeForMerge(plot, from, to) -- the two old soldiers stay for the merge show
 		questProgress(player, profile, "merges", 1)
 		local made = toCells[toIndex]
 		if made then
@@ -320,7 +322,7 @@ local function onInteract(player: Player, from: any, to: any)
 	if result == "merge" then
 		local cell = toCells[toIndex]
 		if cell then
-			Plots.mergeEffect(plot, Plots.slotGround(plot, from), to, cell.tier)
+			Plots.mergeEffect(plot, oldFrom, oldTo, to, cell.tier)
 		end
 	end
 end
@@ -399,7 +401,7 @@ local function onAutoMerge(player: Player)
 			shown += 1
 			task.delay(shown * 0.12, function()
 				if plots[player] == plot and cell(target) == result then
-					Plots.mergeEffect(plot, Plots.slotGround(plot, source), target, result.tier)
+					Plots.mergeEffect(plot, nil, nil, target, result.tier)
 				end
 			end)
 		end

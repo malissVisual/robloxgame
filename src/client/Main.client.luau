@@ -2310,16 +2310,16 @@ local function endDrag()
 			Net.get("Unequip"):FireServer(d.slot) -- a squad soldier dropped on the panel goes back to the inventory
 		end
 		task.delay(0.5, function()
-			if d.model.Parent then
-				glide(d.model, d.home, 0.15)
+			if d.model.Parent and not d.model:GetAttribute("Merging") then
+				glide(d.model, d.home, 0.15) -- (a soldier in the merge show is the server's now)
 			end
 		end)
 	elseif to and to ~= d.slot then
 		Net.get("Interact"):FireServer(d.slot, to)
 		-- On success the server re-renders the plot; if nothing changed, glide back home.
 		task.delay(0.5, function()
-			if d.model.Parent then
-				glide(d.model, d.home, 0.15)
+			if d.model.Parent and not d.model:GetAttribute("Merging") then
+				glide(d.model, d.home, 0.15) -- (a soldier in the merge show is the server's now)
 			end
 		end)
 	else
