@@ -116,7 +116,6 @@ local function pushState(player: Player)
 		isAdmin = isAdmin(player),
 		stats = profile.stats,
 		achievements = profile.achievements,
-		title = PlayerData.titleFor(profile), -- by the waves cleared (Balance.Titles)
 		settings = profile.settings,
 		battleSpeed = profile.battleSpeed,
 		bestWave = profile.bestWave,
@@ -146,9 +145,9 @@ local function sfx(player: Player, name: string)
 	Net.get("Sfx"):FireClient(player, name)
 end
 
--- Over the player's head: the name with the ACCOUNT LEVEL, an XP bar to the next level and, under it, the title
--- (by the waves cleared, Balance.Titles; achievements give no title). Roblox's own name tag is hidden so the two do not overlap. Rebuilt on every spawn,
--- refreshed on XP and on a new title. (The name stays `showTitle` for its callers.)
+-- Over the player's head: the name with the ACCOUNT LEVEL and an XP bar to the next level (no titles: they were
+-- dull). Roblox's own name tag is hidden so the two do not overlap. Rebuilt on every spawn, refreshed on XP.
+-- (The name stays `showTitle` for its callers.)
 local function showTitle(player: Player, profile: PlayerData.Profile)
 	local character = player.Character
 	local head = character and character:FindFirstChild("Head")
@@ -168,7 +167,7 @@ local function showTitle(player: Player, profile: PlayerData.Profile)
 		gui = Instance.new("BillboardGui")
 		local made = gui :: BillboardGui
 		made.Name = "PlayerTag"
-		made.Size = UDim2.fromOffset(220, 62)
+		made.Size = UDim2.fromOffset(220, 48)
 		made.StudsOffset = Vector3.new(0, 2.9, 0)
 		made.AlwaysOnTop = true
 		made.MaxDistance = 90
@@ -215,14 +214,12 @@ local function showTitle(player: Player, profile: PlayerData.Profile)
 		fillCorner.CornerRadius = UDim.new(0, 4)
 		fillCorner.Parent = fill
 		text("Xp", 34, 12, 9, Color3.fromRGB(200, 205, 220), Enum.Font.GothamMedium)
-		text("Title", 46, 16, 13, Color3.fromRGB(255, 205, 90), Enum.Font.GothamBold)
 	end
 	local made = gui :: BillboardGui
 	local level, into, needed = PlayerData.levelInfo(profile.xp)
 	;(made:FindFirstChild("Level") :: TextLabel).Text = string.format('%s  <font color="#ffcd5a">Lv %d</font>', player.DisplayName, level)
 	;((made:FindFirstChild("Track") :: Frame):FindFirstChild("Fill") :: Frame).Size = UDim2.fromScale(math.clamp(into / math.max(1, needed), 0, 1), 1)
 	;(made:FindFirstChild("Xp") :: TextLabel).Text = string.format("%d / %d XP", into, needed)
-	;(made:FindFirstChild("Title") :: TextLabel).Text = "★ " .. PlayerData.titleFor(profile) -- by the waves cleared only
 end
 
 local addXp: (Player, PlayerData.Profile, number) -> () = function() end -- defined below

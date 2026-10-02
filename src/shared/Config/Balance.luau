@@ -127,19 +127,6 @@ local Balance = {
 	LevelRewardCoins = 50, -- coins for reaching an account level (times the level)
 	LevelRewardSlotsEvery = 5, -- every 5th account level also gives merge slots ...
 	LevelRewardSlots = 3, -- ... this many
-	-- The TITLE over your head comes only from the waves you have cleared (the highest entry whose `wave` you reached).
-	Titles = {
-		{ wave = 0, label = "Recruit" },
-		{ wave = 5, label = "Fighter" },
-		{ wave = 10, label = "Veteran" },
-		{ wave = 20, label = "Warrior" },
-		{ wave = 30, label = "Champion" },
-		{ wave = 40, label = "Warlord" },
-		{ wave = 50, label = "Hero" },
-		{ wave = 65, label = "Legend" },
-		{ wave = 80, label = "Mythic" },
-		{ wave = 100, label = "Rift Conqueror" },
-	},
 	BonusDropChance = 0.08, -- chance that a wave drop is one level higher (always on a boss wave)
 	StreakBonus = 0.05, -- +5% coins per won wave in a row ...
 	StreakMax = 5, -- ... up to 5 waves (+25%)

@@ -70,18 +70,6 @@ function PlayerData.levelInfo(xp: number): (number, number, number)
 	return level, xp, needed
 end
 
--- The title over the head: by the waves cleared only (Balance.Titles).
-function PlayerData.titleFor(profile: Profile): string
-	local cleared = PlayerData.clearedWaves(profile)
-	local title = Balance.Titles[1].label
-	for _, entry in Balance.Titles do
-		if cleared >= entry.wave then
-			title = entry.label
-		end
-	end
-	return title
-end
-
 -- The daily quests: a new day (UTC) starts them over.
 function PlayerData.questDay(profile: Profile)
 	local day = os.date("!%Y%m%d") :: string
