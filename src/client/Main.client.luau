@@ -171,6 +171,9 @@ UI.popupLeftAt = nil :: number? -- os.clock() when the pointer left the mage and
 UI.popupFading = false -- the popup is fading out
 UI.popupAt = nil :: Vector2? -- where the open popup was asked for (a click in the world), to rebuild it in place
 UI.popupRebuild = false -- rebuilding the open popup (after a purchase): no fade-in
+UI.openSkillTree = function(id: number) end -- set in the skill tree block: the big tree of a mage (slot id)
+UI.closeSkillTree = function() end
+UI.refreshSkillTree = function() end -- after a new state: redraw the open tree
 UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
 UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
@@ -1734,6 +1737,7 @@ Net.get("State").OnClientEvent:Connect(function(new)
 	state = new
 	Layout.apply(state.settings and state.settings.layout)
 	renderInventory()
+	UI.refreshSkillTree()
 end)
 
 -- (showToast is set in the Toast section below and also used by later sections.)
@@ -2373,6 +2377,24 @@ openCardPopup = function(id: number, at: Vector2?)
 	end
 	local y = 8
 	line(string.format("%s%s · %s", if ascended then "★ " else "", Units.Classes[unit.class].label, Levels.label(unit.tier)), y, 16, Enum.Font.GothamBold, WHITE, 20)
+	-- SKILL TREE: the big view of every merge level (locked ones too).
+	local treeButton = Instance.new("TextButton")
+	treeButton.Position = UDim2.fromOffset(W - 12 - 104, 8)
+	treeButton.Size = UDim2.fromOffset(104, 22)
+	treeButton.BackgroundColor3 = GOLD:Lerp(BG, 0.45)
+	treeButton.BorderSizePixel = 0
+	treeButton.AutoButtonColor = false
+	treeButton.Font = Enum.Font.GothamBold
+	treeButton.TextSize = 11
+	treeButton.TextColor3 = WHITE
+	treeButton.Text = "SKILL TREE  ▸"
+	treeButton.ZIndex = 42
+	treeButton.Parent = popup
+	corner(treeButton, 6)
+	treeButton.Activated:Connect(function()
+		closeCardPopup()
+		UI.openSkillTree(id)
+	end)
 	local tierLabel = line(string.upper(SoldierRig.name(unit.tier, unit.class)) .. (if ascended then "  ·  ASCENDED" else ""), y + 20, 10, Enum.Font.GothamBlack, levelColor, 14)
 	tierLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	y += 40
@@ -2585,6 +2607,287 @@ RunService.RenderStepped:Connect(function()
 		end)
 	end
 end)
+
+
+-- ── Skill tree (the big view) ─────────────────────────────────────────────
+-- SKILL TREE in a mage's card opens this: every merge level of the tree (Config/MageTree.luau) as a node on a
+-- winding path (1 … 8 left to right, 9 … 16 back), attacks as circles, passives as diamonds. The nodes up to the
+-- mage's level glow in their level color, the current one has a ring, the locked ones are grey with a lock; hover
+-- a node for its description. Under the path: the three account upgrades (coins), buyable here too. Esc, the X or
+-- a click in the world closes it.
+do
+	local TREE_W, TREE_H = 820, 478
+	local NODE, COL_STEP = 58, 92
+	local ROW_Y = { 92, 214 }
+	local X0 = (TREE_W - 8 * COL_STEP + (COL_STEP - NODE)) / 2
+	local LOCK = Color3.fromRGB(70, 74, 92)
+	local ATTACK_TINT, PASSIVE_TINT = Color3.fromRGB(255, 200, 120), Color3.fromRGB(170, 220, 255)
+
+	local tree = Instance.new("CanvasGroup")
+	tree.Name = "SkillTree"
+	tree.AnchorPoint = Vector2.new(0.5, 0.5)
+	tree.Position = UDim2.fromScale(0.5, 0.5)
+	tree.Size = UDim2.fromOffset(TREE_W, TREE_H)
+	tree.BackgroundColor3 = BG
+	tree.BackgroundTransparency = 0.03
+	tree.BorderSizePixel = 0
+	tree.Visible = false
+	tree.Active = true
+	tree.ZIndex = 50
+	tree.Parent = gui
+	corner(tree, 16)
+	UI.gradient(tree, Color3.fromRGB(36, 39, 54), Color3.fromRGB(16, 18, 26))
+	local treeStroke = UI.stroke(tree, GOLD, 2, 0.35)
+
+	local treeTitle = label(tree, "SKILL TREE", UDim2.fromOffset(20, 12), UDim2.fromOffset(500, 26), 22, Enum.Font.GothamBlack, GOLD)
+	treeTitle.ZIndex = 51
+	local treeSub = label(tree, "", UDim2.fromOffset(20, 40), UDim2.fromOffset(620, 16), 12, Enum.Font.GothamMedium, MUTED)
+	treeSub.ZIndex = 51
+	treeSub.RichText = true
+	local closeButton = Instance.new("TextButton")
+	closeButton.Position = UDim2.fromOffset(TREE_W - 44, 12)
+	closeButton.Size = UDim2.fromOffset(30, 30)
+	closeButton.BackgroundColor3 = UI.DARK
+	closeButton.BorderSizePixel = 0
+	closeButton.AutoButtonColor = false
+	closeButton.Font = Enum.Font.GothamBold
+	closeButton.TextSize = 16
+	closeButton.TextColor3 = MUTED
+	closeButton.Text = "✕"
+	closeButton.ZIndex = 52
+	closeButton.Parent = tree
+	corner(closeButton, 8)
+
+	-- Where node `i` sits (its top-left corner).
+	local function nodePos(i: number): (number, number)
+		local column, row = (i - 1) % 8, (i - 1) // 8
+		local x = X0 + (if row == 0 then column else 7 - column) * COL_STEP
+		return x, ROW_Y[row + 1]
+	end
+
+	-- The path: a line between every node and the next (the turn between 8 and 9 goes down).
+	for i = 1, #MageTree.Levels - 1 do
+		local x1, y1 = nodePos(i)
+		local x2, y2 = nodePos(i + 1)
+		local link = Instance.new("Frame")
+		link.Name = "Link" .. i
+		link.BackgroundColor3 = LOCK
+		link.BorderSizePixel = 0
+		link.ZIndex = 51
+		if y1 == y2 then
+			link.Position = UDim2.fromOffset(math.min(x1, x2) + NODE - 4, y1 + NODE / 2 - 2)
+			link.Size = UDim2.fromOffset(COL_STEP - NODE + 8, 4)
+		else
+			link.Position = UDim2.fromOffset(x1 + NODE / 2 - 2, y1 + NODE - 4)
+			link.Size = UDim2.fromOffset(4, y2 - y1 - NODE + 8)
+		end
+		link.Parent = tree
+	end
+
+	type Node = { frame: Frame, icon: TextLabel, levelLabel: TextLabel, name: TextLabel, stroke: UIStroke, lock: TextLabel, link: Frame? }
+	local nodes: { Node } = {}
+	local descTitle = label(tree, "", UDim2.fromOffset(20, 300), UDim2.fromOffset(TREE_W - 40, 20), 15, Enum.Font.GothamBold, WHITE)
+	descTitle.ZIndex = 51
+	descTitle.RichText = true
+	local descText = label(tree, "", UDim2.fromOffset(20, 322), UDim2.fromOffset(TREE_W - 40, 34), 12, Enum.Font.Gotham, MUTED)
+	descText.ZIndex = 51
+	descText.TextWrapped = true
+	descText.TextYAlignment = Enum.TextYAlignment.Top
+
+	local treeId = 0 -- the slot of the mage shown
+	local treeLevel = 0
+	local hoverLevel: number? = nil
+
+	local function describe(entry: MageTree.Entry, level: number)
+		local unlocked = entry.level <= level
+		local kindText = if entry.kind == "attack" then "attack" else "passive"
+		local spell = nil
+		for _, def in MageSpells.Defs do
+			if def.id == entry.id then
+				spell = def
+			end
+		end
+		local stats = if spell and not spell.basic then string.format("  ·  %d mana, %ds cooldown", spell.mana, spell.cooldown) else ""
+		descTitle.Text = string.format('%s %s  <font color="#a5aab9">Lv %d · %s%s</font>%s', if entry.kind == "attack" then "●" else "◆", entry.label, entry.level, kindText, stats, if unlocked then "" else '  <font color="#f0645a">LOCKED</font>')
+		descText.Text = entry.text .. (if unlocked then "" else string.format("  —  merge two level %d mages to reach level %d.", entry.level - 1, entry.level))
+	end
+
+	for i, entry in MageTree.Levels do
+		local x, y = nodePos(i)
+		local frame = Instance.new("Frame")
+		frame.Name = "Node" .. i
+		frame.Position = UDim2.fromOffset(x, y)
+		frame.Size = UDim2.fromOffset(NODE, NODE)
+		frame.BackgroundColor3 = UI.DARK
+		frame.BorderSizePixel = 0
+		frame.ZIndex = 52
+		frame.Active = true
+		frame.Parent = tree
+		corner(frame, if entry.kind == "attack" then NODE / 2 else 12)
+		if entry.kind == "passive" then
+			frame.Rotation = 45 -- a diamond
+		end
+		local stroke = UI.stroke(frame, LOCK, 2)
+		local icon = label(frame, if entry.kind == "attack" then "●" else "◆", UDim2.fromOffset(0, 8), UDim2.new(1, 0, 0, 24), 20, Enum.Font.GothamBold, MUTED)
+		icon.TextXAlignment = Enum.TextXAlignment.Center
+		icon.ZIndex = 53
+		icon.Rotation = -frame.Rotation
+		local levelLabel = label(frame, "Lv " .. entry.level, UDim2.fromOffset(0, 32), UDim2.new(1, 0, 0, 14), 10, Enum.Font.GothamBlack, MUTED)
+		levelLabel.TextXAlignment = Enum.TextXAlignment.Center
+		levelLabel.ZIndex = 53
+		levelLabel.Rotation = -frame.Rotation
+		local lock = label(frame, "🔒", UDim2.fromOffset(0, 0), UDim2.fromScale(1, 1), 18, Enum.Font.GothamBold, WHITE)
+		lock.TextXAlignment = Enum.TextXAlignment.Center
+		lock.ZIndex = 54
+		lock.Rotation = -frame.Rotation
+		lock.TextTransparency = 0.25
+		local name = label(tree, entry.label, UDim2.fromOffset(x - 18, y + NODE + 6), UDim2.fromOffset(NODE + 36, 14), 10, Enum.Font.GothamMedium, MUTED)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.ZIndex = 52
+		frame.MouseEnter:Connect(function()
+			hoverLevel = entry.level
+			describe(entry, treeLevel)
+		end)
+		frame.MouseLeave:Connect(function()
+			if hoverLevel == entry.level then
+				hoverLevel = nil
+				local next = MageTree.nextEntry(treeLevel)
+				describe(next or MageTree.Levels[#MageTree.Levels], treeLevel)
+			end
+		end)
+		nodes[i] = { frame = frame, icon = icon, levelLabel = levelLabel, name = name, stroke = stroke, lock = lock, link = tree:FindFirstChild("Link" .. i) :: Frame? }
+	end
+
+	-- The account upgrades (coins) under the path: three columns.
+	label(tree, "UPGRADES  ·  for every mage, bought with coins", UDim2.fromOffset(20, 364), UDim2.fromOffset(500, 14), 10, Enum.Font.GothamBlack, GOLD).ZIndex = 51
+	type Track = { name: TextLabel, bonus: TextLabel, buy: TextButton, id: string }
+	local tracks: { Track } = {}
+	for k, trackId in Balance.MageUpgradeOrder do
+		local def = Balance.MageUpgrades[trackId]
+		local box = Instance.new("Frame")
+		box.Position = UDim2.fromOffset(20 + (k - 1) * 262, 384)
+		box.Size = UDim2.fromOffset(250, 72)
+		box.BackgroundColor3 = UI.DARK
+		box.BackgroundTransparency = 0.2
+		box.BorderSizePixel = 0
+		box.ZIndex = 51
+		box.Parent = tree
+		corner(box, 10)
+		local name = label(box, def.label, UDim2.fromOffset(12, 8), UDim2.fromOffset(160, 18), 13, Enum.Font.GothamBold, WHITE)
+		name.RichText = true
+		name.ZIndex = 52
+		local bonus = label(box, "", UDim2.fromOffset(12, 28), UDim2.fromOffset(160, 16), 11, Enum.Font.GothamMedium, GREEN)
+		bonus.ZIndex = 52
+		local buy = Instance.new("TextButton")
+		buy.Position = UDim2.fromOffset(12, 46)
+		buy.Size = UDim2.fromOffset(226, 20)
+		buy.BorderSizePixel = 0
+		buy.AutoButtonColor = false
+		buy.Font = Enum.Font.GothamBold
+		buy.TextSize = 11
+		buy.TextColor3 = WHITE
+		buy.ZIndex = 52
+		buy.Parent = box
+		corner(buy, 5)
+		buy.Activated:Connect(function()
+			if MageUpgrades.cost(MageUpgrades.level(state.mageUpgrades, trackId)) then
+				Net.get("MageUpgrade"):FireServer(trackId) -- the new state redraws the strip (UI.refreshSkillTree)
+			end
+		end)
+		tracks[k] = { name = name, bonus = bonus, buy = buy, id = trackId }
+	end
+
+	local function render(level: number, ascended: boolean)
+		treeLevel = level
+		local color = Levels.color(level)
+		treeStroke.Color = color
+		treeSub.Text = string.format('%sMage · <font color="#ffffff">Lv %d</font> of %d  ·  attacks ● on odd levels, passives ◆ on even ones  ·  merge two of the same level for the next one', if ascended then "★ ASCENDED " else "", level, MageTree.MaxLevel)
+		for i, entry in MageTree.Levels do
+			local node = nodes[i]
+			local unlocked = entry.level <= level
+			local current = entry.level == level
+			local tint = if entry.kind == "attack" then ATTACK_TINT else PASSIVE_TINT
+			local nodeColor = if unlocked then Levels.color(entry.level) else LOCK
+			node.frame.BackgroundColor3 = if unlocked then nodeColor:Lerp(BG, 0.55) else UI.DARK
+			node.stroke.Color = if unlocked then nodeColor else LOCK
+			node.stroke.Thickness = if current then 4 else 2
+			node.icon.TextColor3 = if unlocked then tint else LOCK
+			node.icon.TextTransparency = if unlocked then 0 else 0.3
+			node.levelLabel.TextColor3 = if unlocked then WHITE else MUTED
+			node.levelLabel.TextTransparency = if unlocked then 0 else 0.4
+			node.lock.Visible = not unlocked
+			node.name.TextColor3 = if current then WHITE elseif unlocked then tint else MUTED
+			node.name.TextTransparency = if unlocked then 0 else 0.45
+			if node.link then
+				node.link.BackgroundColor3 = if entry.level < level then Levels.color(entry.level):Lerp(BG, 0.3) else LOCK
+			end
+		end
+		for _, track in tracks do
+			local trackLevel = MageUpgrades.level(state.mageUpgrades, track.id)
+			local cost = MageUpgrades.cost(trackLevel)
+			track.name.Text = string.format("%s <font color=\"#a5aab9\">%d/%d</font>", Balance.MageUpgrades[track.id].label, trackLevel, Balance.MageUpgradeMax)
+			track.bonus.Text = MageUpgrades.text(track.id, trackLevel)
+			if cost then
+				local affordable = state.coins >= cost
+				track.buy.Text = string.format("+  %d coins", cost)
+				track.buy.BackgroundColor3 = if affordable then GOLD:Lerp(BG, 0.35) else BADGE
+				track.buy.TextTransparency = if affordable then 0 else 0.45
+			else
+				track.buy.Text = "MAX"
+				track.buy.BackgroundColor3 = BADGE
+				track.buy.TextTransparency = 0.45
+			end
+		end
+		if not hoverLevel then
+			local next = MageTree.nextEntry(level)
+			describe(next or MageTree.Levels[#MageTree.Levels], level)
+		end
+	end
+
+	UI.openSkillTree = function(id: number)
+		local unit = unitAt(id)
+		if not unit then
+			return
+		end
+		treeId = id
+		hoverLevel = nil
+		render(unit.tier, (unit :: any).ascended == true)
+		tree.Visible = true
+		tree.GroupTransparency = 1
+		TweenService:Create(tree, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 0 }):Play()
+	end
+	UI.closeSkillTree = function()
+		if not tree.Visible then
+			return
+		end
+		local tween = TweenService:Create(tree, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 1 })
+		tween:Play()
+		tween.Completed:Connect(function()
+			if tree.GroupTransparency >= 0.99 then
+				tree.Visible = false
+			end
+		end)
+	end
+	UI.refreshSkillTree = function()
+		if not tree.Visible then
+			return
+		end
+		local unit = unitAt(treeId)
+		if unit then
+			render(unit.tier, (unit :: any).ascended == true)
+		else
+			UI.closeSkillTree() -- the mage was merged away or sold
+		end
+	end
+	closeButton.Activated:Connect(UI.closeSkillTree)
+	closeButton.MouseEnter:Connect(function()
+		closeButton.TextColor3 = WHITE
+	end)
+	closeButton.MouseLeave:Connect(function()
+		closeButton.TextColor3 = MUTED
+	end)
+end
 
 type CardDrag = {
 	id: number,
@@ -4535,6 +4838,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if input.KeyCode == Enum.KeyCode.Escape then
 		closeConfirm()
 		UI.battleOpen = false
+		UI.closeSkillTree()
 	elseif input.KeyCode == Enum.KeyCode.E then
 		-- Inside a popup that uses E it confirms. (No spells on Q / E any more: the Mages cast on their own.)
 		if confirmLayer then
@@ -4553,6 +4857,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	elseif isPointerPress(input) then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)
 		closeCardPopup() -- a click in the world closes the popup
+		UI.closeSkillTree() -- and the big skill tree
 		beginDrag()
 	end
 end)
