@@ -82,8 +82,11 @@ type State = {
 	animateSuppressed: boolean,
 	forceSuppress: boolean, -- the self-check found the default Animate overriding our poses
 	badFrames: number,
-	checkBad: number,
+	refusedFrames: number,
+	checkBad: number, -- writes refused this frame (read back different right after writing)
 	checkTotal: number,
+	refused: { [string]: boolean }, -- joints whose write was refused this frame
+	hipTween: Tween?, -- the slide's HipHeight tween (while it plays, HipHeight changes are ours)
 	baseHip: number,
 	sprintHeld: boolean,
 	sprintToggled: boolean,
@@ -119,8 +122,11 @@ local state: State = {
 	animateSuppressed = false,
 	forceSuppress = false,
 	badFrames = 0,
+	refusedFrames = 0,
 	checkBad = 0,
 	checkTotal = 0,
+	refused = {},
+	hipTween = nil,
 	baseHip = 2,
 	sprintHeld = false,
 	sprintToggled = false,
@@ -292,6 +298,9 @@ local function bindCharacter(character: Model)
 	table.clear(state.lastAnim)
 	state.jointCount = 0
 	state.animateSuppressed = false
+	state.forceSuppress = false -- the fallback is decided again for every character
+	state.badFrames = 0
+	state.refusedFrames = 0
 	state.character = character
 	state.rig = "none"
 	local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
@@ -325,14 +334,25 @@ local function bindCharacter(character: Model)
 			state.rig = if humanoid.RigType == Enum.HumanoidRigType.R15 then "R15" else "R6"
 			state.dirty = true
 		end))
-		local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator", 5)
-		if animator and animator:IsA("Animator") then
+		-- The resting hip height follows the rig (an appearance update can change it), but not our slide tween.
+		table.insert(state.conns, humanoid:GetPropertyChangedSignal("HipHeight"):Connect(function()
+			local tween = state.hipTween
+			if not state.sliding and state.slideWeight <= 0.001 and not (tween and tween.PlaybackState == Enum.PlaybackState.Playing) then
+				state.baseHip = humanoid.HipHeight
+			end
+		end))
+		-- While Animate is muted, new default tracks are stopped as they start (the Animator may come a moment later).
+		task.spawn(function()
+			local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator", 5)
+			if id ~= state.bindId or not animator or not animator:IsA("Animator") then
+				return
+			end
 			table.insert(state.conns, animator.AnimationPlayed:Connect(function(track)
 				if state.animateSuppressed and isDefaultTrack(track) then
 					track:Stop(0)
 				end
 			end))
-		end
+		end)
 	end
 	task.delay(1.5, function()
 		if id == state.bindId then
@@ -412,7 +432,9 @@ local function endSlide(jump: boolean)
 		humanoid.WalkSpeed = if wantsSprint() then CONFIG.SprintSpeed else CONFIG.WalkSpeed
 		local ease = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		if state.rig == "R15" then
-			TweenService:Create(humanoid, ease, { CameraOffset = Vector3.zero, HipHeight = state.baseHip }):Play()
+			local tween = TweenService:Create(humanoid, ease, { CameraOffset = Vector3.zero, HipHeight = state.baseHip })
+			state.hipTween = tween
+			tween:Play()
 		else
 			TweenService:Create(humanoid, ease, { CameraOffset = Vector3.zero }):Play()
 		end
@@ -464,8 +486,11 @@ local function startSlide()
 	humanoid.WalkSpeed = CONFIG.SlideStartSpeed
 	-- A REAL slide: the hip height drops, so the whole body is down on the floor (the camera follows it down).
 	local drop = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	if state.rig == "R15" then
-		TweenService:Create(humanoid, drop, { HipHeight = math.max(0.25, state.baseHip - CONFIG.SlideDrop), CameraOffset = Vector3.new(0, -CONFIG.SlideCameraDrop, 0) }):Play()
+	if state.rig == "R15" and state.jointCount >= 10 then
+		-- (only when the pose can land: without joints the body would sink with straight legs)
+		local tween = TweenService:Create(humanoid, drop, { HipHeight = math.max(0.25, state.baseHip - CONFIG.SlideDrop), CameraOffset = Vector3.new(0, -CONFIG.SlideCameraDrop, 0) })
+		state.hipTween = tween
+		tween:Play()
 	else
 		TweenService:Create(humanoid, drop, { CameraOffset = Vector3.new(0, -1.6, 0) }):Play() -- (R6 HipHeight is an offset: leave it)
 	end
@@ -868,9 +893,18 @@ local function update(dt: number)
 	updateScreen(dt, math.clamp(speed / CONFIG.SprintSpeed, 0, 1.4))
 
 	-- The default Animate is muted only while posing, and only when it keeps overriding the poses (or "always").
-	local posing = state.rig == "R15" and state.jointCount >= 10 and humanoid.Health > 0 and (state.sliding or sprintingNow)
+	-- Muted as a pose starts; un-muted only once both poses have fully blended out AND the feet are on the ground
+	-- (re-enabling restarts the Animate script, which would otherwise show the idle stance in mid-air after a
+	-- jump or a slide jump).
 	local mute = CONFIG.SuppressAnimate == "always" or (CONFIG.SuppressAnimate == "auto" and state.forceSuppress)
-	setAnimateSuppressed(posing and mute)
+	local canPose = state.rig == "R15" and state.jointCount >= 10 and humanoid.Health > 0
+	if humanoid.Health <= 0 or not canPose or not mute then
+		setAnimateSuppressed(false)
+	elseif state.sliding or sprintingNow then
+		setAnimateSuppressed(true)
+	elseif state.animateSuppressed and state.runWeight <= 0.001 and state.slideWeight <= 0.001 and isGrounded() then
+		setAnimateSuppressed(false)
+	end
 end
 
 local function same(a: CFrame, b: CFrame): boolean
@@ -895,7 +929,18 @@ local function pose()
 		resolveJoints()
 	end
 	local sw, rw = state.slideWeight, state.runWeight
+	table.clear(state.refused)
 	if sw <= 0.001 and rw <= 0.001 then
+		-- Fully blended out: a joint nobody rewrote since our last write gets its animation value back once.
+		if next(state.written) ~= nil then
+			for name, joint in state.joints do
+				local mine = state.written[name]
+				if mine and joint.Parent and same(joint.Transform, mine) then
+					joint.Transform = state.lastAnim[name] or CFrame.identity
+				end
+			end
+			table.clear(state.written)
+		end
 		return
 	end
 	for name, joint in state.joints do
@@ -927,39 +972,51 @@ local function pose()
 		state.checkTotal += 1
 		if not same(joint.Transform, out) then
 			state.checkBad += 1 -- the write was refused
+			state.refused[name] = true
 		end
 	end
 end
 
--- After the physics step: did our writes stick? If most were overwritten or refused for a moment, mute the default
--- Animate while posing (CONFIG.SuppressAnimate "auto"), and say so once.
+-- After the physics step: did our writes stick? Each joint counts once. If most ACCEPTED writes were overwritten
+-- afterwards for a moment, the default Animate is fighting us: mute it while posing (CONFIG.SuppressAnimate "auto")
+-- and say so once. Writes the engine REFUSED are a different problem (muting does not help): warned about once.
 local function check()
 	if state.rig ~= "R15" or (state.slideWeight <= 0.001 and state.runWeight <= 0.001) then
 		return
 	end
-	local bad, total = state.checkBad, state.checkTotal
+	local total = state.checkTotal
+	if total <= 0 then
+		return
+	end
+	local overwritten = 0
 	for name, joint in state.joints do
 		local w = state.written[name]
-		if w and joint.Parent and not same(joint.Transform, w) then
-			bad += 1
+		if w and joint.Parent and not state.refused[name] and not same(joint.Transform, w) then
+			overwritten += 1
 		end
 	end
-	if total > 0 and bad * 2 > total then
+	if overwritten * 2 > total then
 		state.badFrames += 1
 		if state.badFrames == 8 and CONFIG.SuppressAnimate == "auto" and not state.forceSuppress then
 			state.forceSuppress = true
-			warn(string.format("[PlayerMovement] %d/%d joint poses were overwritten or refused: muting the default Animate while posing", bad, total))
-		elseif state.badFrames == 120 and state.animateSuppressed then
-			warn("[PlayerMovement] poses are still refused with Animate muted: check Workspace.AuthorityMode / UseFixedSimulation in Studio")
+			warn(string.format("[PlayerMovement] %d/%d joint poses were overwritten after posing: muting the default Animate while posing", overwritten, total))
 		end
 	else
 		state.badFrames = 0
+	end
+	if state.checkBad * 2 > total then
+		state.refusedFrames += 1
+		if state.refusedFrames == 120 then
+			warn(string.format("[PlayerMovement] %d/%d joint pose writes are refused by the engine: check Workspace.AuthorityMode / UseFixedSimulation in Studio", state.checkBad, total))
+		end
+	else
+		state.refusedFrames = 0
 	end
 end
 
 local function onSprint(_: string, inputState: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
 	state.sprintHeld = inputState == Enum.UserInputState.Begin or inputState == Enum.UserInputState.Change
-	return Enum.ContextActionResult.Pass
+	return Enum.ContextActionResult.Sink -- Shift is the sprint here, not Roblox's Shift Lock toggle
 end
 local function onSlide(_: string, inputState: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
 	if inputState == Enum.UserInputState.Begin then
@@ -974,7 +1031,7 @@ function PlayerMovement.start()
 	end
 	player.CharacterAdded:Connect(bindCharacter)
 	-- Keys (no automatic touch buttons: the screen has its own SPRINT / SLIDE buttons in the bottom right).
-	ContextActionService:BindAction("MB_Sprint", onSprint, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3)
+	ContextActionService:BindActionAtPriority("MB_Sprint", onSprint, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3)
 	ContextActionService:BindAction("MB_Slide", onSlide, false, Enum.KeyCode.C, Enum.KeyCode.LeftControl, Enum.KeyCode.ButtonB)
 	game:GetService("UserInputService").JumpRequest:Connect(function()
 		if state.sliding then
