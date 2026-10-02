@@ -141,7 +141,10 @@ Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 ## Controls
 
 **Your character moves well** (`src/client/PlayerMovement.luau`): **SPRINT** (hold Left Shift; a RUN toggle button on
-touch, L3 on a gamepad) is faster, leans the body into the run, widens the camera and kicks up dust; **SLIDE** (C or
+touch, L3 on a gamepad) is faster and replaces the walk animation with a procedural run cycle (deep lean, long
+strides with the knees snapping up, pumping arms, a bounce on every step, timed by the distance travelled), widens
+the camera, kicks up dust and draws speed streaks behind the hands and feet; the slide is driven by a LinearVelocity
+(no PlayerModule needed); **SLIDE** (C or
 Left Ctrl while running; a SLIDE button on touch, B on a gamepad) drops you low into a slide pose (leaning back, the
 lead leg stretched, a hand trailing) that bleeds its speed off over 0.8 s with a spray of dust and the camera
 going down; **JUMP during a slide** is a long slide jump that keeps the momentum. The poses overwrite the joints'

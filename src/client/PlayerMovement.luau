@@ -19,7 +19,10 @@ local CONFIG = {
 	WalkSpeed = 20, -- the server's walk speed (GameService: 16 × 1.25)
 	SprintSpeed = 32,
 	SprintFov = 82, -- the camera's field of view while sprinting (normal: 70)
-	SprintLean = 0.18, -- radians the body leans forward while sprinting
+	SprintLean = 0.38, -- radians the body leans forward while sprinting
+	StrideRate = 0.55, -- running cycle: radians of the stride phase per stud travelled (faster run = faster legs)
+	StrideSwing = 1.05, -- hip swing (radians)
+	ArmPump = 1.15, -- shoulder swing (radians)
 	SlideStartSpeed = 54, -- the slide starts this fast …
 	SlideEndSpeed = 18, -- … and bleeds off to this
 	SlideTime = 0.8,
@@ -47,9 +50,12 @@ type State = {
 	slideDir: Vector3,
 	slideReadyAt: number,
 	slideWeight: number, -- 0 … 1 blend of the slide pose
-	leanWeight: number, -- 0 … 1 blend of the sprint lean
+	leanWeight: number, -- 0 … 1 blend of the sprint pose (the procedural run cycle)
+	stride: number, -- the run cycle's phase
+	trails: { Trail },
 	dust: ParticleEmitter?,
 	slideDust: ParticleEmitter?,
+	slideForce: LinearVelocity?, -- drives the slide (horizontal only; gravity and jumps stay free)
 }
 local state: State = {
 	character = nil,
@@ -64,24 +70,12 @@ local state: State = {
 	slideReadyAt = 0,
 	slideWeight = 0,
 	leanWeight = 0,
+	stride = 0,
+	trails = {},
 	dust = nil,
 	slideDust = nil,
+	slideForce = nil,
 }
-
-local controls: any = nil
-local function getControls(): any
-	if controls then
-		return controls
-	end
-	local ok, module = pcall(function()
-		local scripts = player:WaitForChild("PlayerScripts")
-		return (require :: any)(scripts:WaitForChild("PlayerModule")):GetControls()
-	end)
-	if ok then
-		controls = module
-	end
-	return controls
-end
 
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
@@ -126,8 +120,33 @@ local function bindCharacter(character: Model)
 		feet.Name = "MovementFeet"
 		feet.Position = Vector3.new(0, -root.Size.Y / 2 - 2.6, 0.4)
 		feet.Parent = root
-		state.dust = emitter(feet, Color3.fromRGB(210, 190, 150), 18, 0.7, 4)
+		state.dust = emitter(feet, Color3.fromRGB(210, 190, 150), 28, 0.8, 5)
 		state.slideDust = emitter(feet, Color3.fromRGB(230, 210, 170), 90, 1.3, 10)
+	end
+	-- Speed streaks behind the hands and feet while sprinting (Trails between two attachments on each limb).
+	table.clear(state.trails)
+	for _, limb in { "LeftHand", "RightHand", "LeftFoot", "RightFoot" } do
+		local part = character:FindFirstChild(limb)
+		if part and part:IsA("BasePart") then
+			local a0 = Instance.new("Attachment")
+			a0.Position = Vector3.new(0, 0.25, 0)
+			a0.Parent = part
+			local a1 = Instance.new("Attachment")
+			a1.Position = Vector3.new(0, -0.25, 0)
+			a1.Parent = part
+			local trail = Instance.new("Trail")
+			trail.Attachment0 = a0
+			trail.Attachment1 = a1
+			trail.Lifetime = 0.22
+			trail.MinLength = 0.05
+			trail.Color = ColorSequence.new(Color3.fromRGB(235, 245, 255), Color3.fromRGB(150, 200, 255))
+			trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+			trail.LightEmission = 0.6
+			trail.FaceCamera = true
+			trail.Enabled = false
+			trail.Parent = part
+			table.insert(state.trails, trail)
+		end
 	end
 end
 
@@ -147,9 +166,9 @@ local function endSlide(jump: boolean)
 	end
 	state.sliding = false
 	state.slideReadyAt = os.clock() + CONFIG.SlideCooldown
-	local c = getControls()
-	if c then
-		c:Enable()
+	if state.slideForce then
+		state.slideForce:Destroy()
+		state.slideForce = nil
 	end
 	local humanoid, root = state.humanoid, state.root
 	if humanoid then
@@ -178,9 +197,21 @@ local function startSlide()
 	state.sliding = true
 	state.slideStart = os.clock()
 	state.slideDir = velocity.Unit
-	local c = getControls()
-	if c then
-		c:Disable() -- the slide steers itself; jump is ours (slide jump)
+	-- The slide drives itself: a horizontal LinearVelocity on the root (your keys do not steer it; gravity and the
+	-- slide jump stay free).
+	local attachment = root:FindFirstChild("RootAttachment") or root:FindFirstChildOfClass("Attachment")
+	if attachment and attachment:IsA("Attachment") then
+		local force = Instance.new("LinearVelocity")
+		force.Name = "SlideForce"
+		force.Attachment0 = attachment
+		force.RelativeTo = Enum.ActuatorRelativeTo.World
+		force.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
+		force.PrimaryTangentAxis = Vector3.new(1, 0, 0)
+		force.SecondaryTangentAxis = Vector3.new(0, 0, 1)
+		force.MaxForce = 1e6
+		force.PlaneVelocity = Vector2.new(state.slideDir.X, state.slideDir.Z) * CONFIG.SlideStartSpeed
+		force.Parent = root
+		state.slideForce = force
 	end
 	humanoid.WalkSpeed = CONFIG.SlideStartSpeed
 	TweenService:Create(humanoid, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CameraOffset = Vector3.new(0, -CONFIG.SlideCameraDrop, 0) }):Play()
@@ -238,8 +269,11 @@ local function update(dt: number)
 	if state.sliding then
 		local t = math.clamp((now - state.slideStart) / CONFIG.SlideTime, 0, 1)
 		local e = 1 - (1 - t) ^ 2
-		humanoid.WalkSpeed = CONFIG.SlideStartSpeed + (CONFIG.SlideEndSpeed - CONFIG.SlideStartSpeed) * e
-		humanoid:Move(state.slideDir, false)
+		local slideSpeed = CONFIG.SlideStartSpeed + (CONFIG.SlideEndSpeed - CONFIG.SlideStartSpeed) * e
+		humanoid.WalkSpeed = slideSpeed
+		if state.slideForce then
+			state.slideForce.PlaneVelocity = Vector2.new(state.slideDir.X, state.slideDir.Z) * slideSpeed
+		end
 		if t >= 1 or humanoid.Health <= 0 then
 			endSlide(false)
 		elseif not isGrounded() and now - state.slideStart > 0.15 then
@@ -266,10 +300,52 @@ local function update(dt: number)
 	state.slideWeight = approach(state.slideWeight, if state.sliding then 1 else 0, CONFIG.BlendIn, CONFIG.BlendOut)
 	state.leanWeight = approach(state.leanWeight, if run and isGrounded() and not state.sliding then 1 else 0, 0.2, 0.25)
 
-	-- Dust.
+	-- The run cycle advances with the distance travelled (the legs never skate).
+	local speed = flat(root.AssemblyLinearVelocity).Magnitude
+	state.stride = (state.stride + speed * dt * CONFIG.StrideRate) % (math.pi * 2)
+
+	-- Dust and the speed streaks.
+	local sprintingNow = run and isGrounded() and not state.sliding and speed > CONFIG.WalkSpeed * 0.8
 	if state.dust then
-		state.dust.Enabled = run and isGrounded() and not state.sliding
+		state.dust.Enabled = sprintingNow
 	end
+	for _, trail in state.trails do
+		trail.Enabled = sprintingNow or state.sliding
+	end
+end
+
+-- One joint of the sprint cycle at stride phase `p` (nil = leave the animation's value).
+local function sprintPose(name: string, p: number): CFrame?
+	local s, c = math.sin(p), math.cos(p)
+	local swing, pump, lean = CONFIG.StrideSwing, CONFIG.ArmPump, CONFIG.SprintLean
+	if name == "Root" then
+		return CFrame.new(0, 0.18 * math.abs(c) - 0.12, 0) * CFrame.Angles(-lean, 0.14 * s, 0)
+	elseif name == "Waist" then
+		return CFrame.Angles(-0.06, -0.24 * s, 0)
+	elseif name == "Neck" then
+		return CFrame.Angles(lean * 0.75, 0.1 * s, 0)
+	elseif name == "RightHip" then
+		return CFrame.Angles(swing * s, 0, 0)
+	elseif name == "LeftHip" then
+		return CFrame.Angles(-swing * s, 0, 0)
+	elseif name == "RightKnee" then
+		return CFrame.Angles(-0.25 - 1.35 * math.max(0, -s) - 0.35 * math.max(0, c), 0, 0)
+	elseif name == "LeftKnee" then
+		return CFrame.Angles(-0.25 - 1.35 * math.max(0, s) - 0.35 * math.max(0, -c), 0, 0)
+	elseif name == "RightAnkle" then
+		return CFrame.Angles(0.45 * math.max(0, -s) - 0.15 * math.max(0, s), 0, 0)
+	elseif name == "LeftAnkle" then
+		return CFrame.Angles(0.45 * math.max(0, s) - 0.15 * math.max(0, -s), 0, 0)
+	elseif name == "RightShoulder" then
+		return CFrame.Angles(-pump * s + 0.1, 0, -0.12)
+	elseif name == "LeftShoulder" then
+		return CFrame.Angles(pump * s + 0.1, 0, 0.12)
+	elseif name == "RightElbow" then
+		return CFrame.Angles(1.25 + 0.3 * math.max(0, -s), 0, 0)
+	elseif name == "LeftElbow" then
+		return CFrame.Angles(1.25 + 0.3 * math.max(0, s), 0, 0)
+	end
+	return nil
 end
 
 -- The poses, after the animator wrote this frame's Transforms.
@@ -283,11 +359,15 @@ local function pose()
 			continue
 		end
 		local current = joint.Transform
-		if lw > 0.001 and name == "Root" then
-			current *= CFrame.Angles(-CONFIG.SprintLean * lw, 0, 0) -- lean into the sprint
-		end
-		if lw > 0.001 and name == "Neck" then
-			current *= CFrame.Angles(CONFIG.SprintLean * 0.6 * lw, 0, 0) -- the head stays level
+		if lw > 0.001 then
+			-- THE SPRINT: a full procedural run cycle replaces the walk animation (blended by lw): a deep forward
+			-- lean, long strides with the knees snapping up behind, the toes pointing, the arms pumping hard with
+			-- bent elbows opposite to the legs, the hips and shoulders twisting against each other, a bounce on
+			-- every step, the head held level.
+			local runPose = sprintPose(name, state.stride)
+			if runPose then
+				current = current:Lerp(runPose, lw)
+			end
 		end
 		local target = SLIDE_POSE[name]
 		if sw > 0.001 and target then
