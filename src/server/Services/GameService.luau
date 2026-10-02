@@ -14,7 +14,6 @@ local Levels = require(Shared.Config.Levels)
 local Waves = require(Shared.Config.Waves)
 local Difficulties = require(Shared.Config.Difficulties)
 local Enemies = require(Shared.Config.Enemies)
-local Spells = require(Shared.Config.Spells)
 local Achievements = require(Shared.Config.Achievements)
 local Maps = require(Shared.Config.Maps)
 local Net = require(Shared.Net)
@@ -105,7 +104,6 @@ local function pushState(player: Player)
 		tierUnlocked = profile.tierUnlocked,
 		level = accountLevel,
 		autoFight = profile.autoFight,
-		spells = profile.spells,
 		saving = PlayerData.savingOn(player),
 		quests = PlayerData.questsView(profile),
 		mapCleared = profile.mapCleared,
@@ -715,7 +713,7 @@ local function onAdminProgress(player: Player)
 	notify(player, string.format("Admin: wave %d reached, +%d coins", profile.wave, Balance.AdminProgressCoins))
 end
 
--- Admin: everything unlocked at once: every class and all its merge levels, every spell, all merge slots,
+-- Admin: everything unlocked at once: every class and all its merge levels, all merge slots,
 -- the best start level, every wave of the map (so any wave can be picked) and a pile of coins.
 local function onAdminUnlock(player: Player)
 	local profile, plot = PlayerData.get(player), plots[player]
@@ -725,9 +723,6 @@ local function onAdminUnlock(player: Player)
 	for _, class in Units.ClassList do
 		profile.unlocked[class] = true
 		profile.tierUnlocked[class] = Units.maxTier(class)
-	end
-	for _, id in Spells.Order do
-		profile.spells.owned[id] = true
 	end
 	profile.boardSlots = Balance.BoardSize
 	profile.startLevel = Balance.StartLevelMax
@@ -1035,99 +1030,6 @@ local function onAutoFight(player: Player, value: any)
 	pushState(player)
 end
 
--- Spells (Config/Spells.luau): you carry two, one on Q and one on E; each slot has its own cooldown. The
--- client sends the slot (and, when the player holds SHIFT, the point he aims at on the arena floor); without
--- a point the spell aims itself (auto aim).
-local abilityReadyAt: { [Player]: { [string]: number } } = {}
-local function onAbility(player: Player, slot: any, position: any)
-	local profile, plot = PlayerData.get(player), plots[player]
-	if not profile or not plot or not profile.battling then
-		return
-	end
-	if slot ~= "q" and slot ~= "e" then
-		return
-	end
-	local id = (profile.spells.slots :: { [string]: string })[slot]
-	local def = Spells.Defs[id]
-	if not def then
-		return
-	end
-	local cooldowns = abilityReadyAt[player]
-	if not cooldowns then
-		cooldowns = {}
-		abilityReadyAt[player] = cooldowns
-	end
-	local now = os.clock()
-	if (cooldowns[slot] or 0) > now then
-		return
-	end
-
-	-- With a point (the player aims with the mouse) it must be a real position inside the arena's range.
-	local target: Vector3? = nil
-	if def.aimed and position ~= nil then
-		if typeof(position) ~= "Vector3" or position.X ~= position.X or position.Z ~= position.Z then
-			return
-		end
-		local center = plot.arena.center
-		if (Vector3.new(position.X, 0, position.Z) - Vector3.new(center.X, 0, center.Z)).Magnitude > Balance.SpellRange then
-			return
-		end
-		target = Vector3.new(position.X, center.Y, position.Z)
-	end
-	local ok, reason = BattleService.spell(player, id, target)
-	if not ok and reason then
-		notify(player, reason)
-	end
-	if ok then
-		cooldowns[slot] = now + def.cooldown
-		Net.get("Ability"):FireClient(player, slot, def.cooldown) -- the client shows the cooldown
-		addStat(player, profile, "spellsCast", 1)
-		sfx(player, "spell")
-	end
-end
-
--- Puts an owned spell into the Q or the E slot (if it is in the other slot, the two swap).
-local function onEquipSpell(player: Player, id: any, slot: any)
-	local profile = PlayerData.get(player)
-	if not profile or profile.battling or profile.rolling then
-		return
-	end
-	if not Spells.isValid(id) or (slot ~= "q" and slot ~= "e") or not profile.spells.owned[id] then
-		return
-	end
-	local slots = profile.spells.slots :: { [string]: string }
-	local other = if slot == "q" then "e" else "q"
-	if slots[other] == id then
-		slots[other] = slots[slot]
-	end
-	slots[slot] = id
-	pushState(player)
-end
-
--- After a won wave a spell can drop (and stays yours): only spells whose dropWave has been reached and that
--- you do not own yet. The chance is the difficulty's lucky-drop chance x Balance.SpellDropFactor (doubled
--- on a boss wave). Returns the id of the new spell.
-local function rollSpellDrop(player: Player, profile: PlayerData.Profile, wave: number, luckyChance: number, isBoss: boolean): string?
-	local eligible: { string } = {}
-	for _, id in Spells.Order do
-		local def = Spells.Defs[id]
-		if def.dropWave and wave >= def.dropWave and not profile.spells.owned[id] then
-			table.insert(eligible, id)
-		end
-	end
-	if #eligible == 0 then
-		return nil
-	end
-	local chance = luckyChance * Balance.SpellDropFactor * (if isBoss then 2 else 1)
-	if rng:NextNumber() >= chance then
-		return nil
-	end
-	local id = eligible[rng:NextInteger(1, #eligible)]
-	profile.spells.owned[id] = true
-	notify(player, string.format("NEW SPELL: %s! Equip it in the SPELLS tab (you carry two).", Spells.Defs[id].label))
-	return id
-end
-
 -- The SPEED button: cycles the battle speed (Balance.BattleSpeeds), also during a battle.
 local function onBattleSpeed(player: Player)
 	local profile = PlayerData.get(player)
@@ -1203,16 +1105,6 @@ local function onBattle(player: Player)
 	profile.battling = true
 	refresh(player)
 
-	-- You fight too (Q / E spells): you are put into the arena, on its near edge behind your squad, looking at
-	-- the enemies, while the screen is black (see the fade below).
-	local function enterArena()
-		local character = player.Character
-		if character then
-			local spot = plot.arena.center + Vector3.new(0, 3, -(plot.arena.radius - 12)) -- the near edge of the round platform
-			character:PivotTo(CFrame.lookAt(spot, spot + Vector3.new(0, 0, 1)))
-		end
-	end
-
 	-- Coins come only from kills and go straight to your balance (so progress is kept even when the
 	-- wave is lost); the XP of a kill drops on the ground as orbs.
 	local kills = 0
@@ -1241,7 +1133,6 @@ local function onBattle(player: Player)
 	end
 
 	-- A boss wave is announced with a banner; SMITE is ready again for every wave.
-	abilityReadyAt[player] = nil
 	local _, phase = Waves.phase(wave, plot.map)
 	if isBoss then
 		Net.get("BossIntro"):FireClient(player, Enemies.Kinds[phase.boss].label)
@@ -1277,15 +1168,10 @@ local function onBattle(player: Player)
 	end
 
 	task.spawn(function()
-		-- No countdown: a quick fade to black with FIGHT! (1.1 s). You are moved into the arena while it is dark
-		-- and the fight starts as the screen clears.
+		-- No countdown: a quick fade to black with FIGHT! (1.1 s) and the fight starts as the screen clears. You stay
+		-- where you are (you only walk around with your character; the Mages fight and cast on their own).
 		Net.get("Countdown"):FireClient(player, "start")
-		task.wait(0.35)
-		if plots[player] ~= plot then
-			return
-		end
-		enterArena()
-		task.wait(Balance.BattleCountdown - 0.35)
+		task.wait(Balance.BattleCountdown)
 		if plots[player] ~= plot then
 			return
 		end
@@ -1370,7 +1256,6 @@ local function onBattle(player: Player)
 				table.insert(extraDrops, battleDrop(profile, wave, false)) -- the treasure goblin was caught
 			end
 			local candidates, lucky = luckyDrop(profile, wave, difficulty.luckyDropChance)
-			local spellDrop = rollSpellDrop(player, profile, wave, difficulty.luckyDropChance, isBoss or isElite)
 			checkAchievements(player, profile)
 			profile.nextWaveAt = os.clock() + Balance.RewardTime
 			refresh(player)
@@ -1405,7 +1290,6 @@ local function onBattle(player: Player)
 				elite = isElite,
 				drop = drop,
 				extraDrops = extraDrops,
-				spellDrop = spellDrop,
 				luckyCandidates = candidates,
 				luckyResult = lucky,
 				luckyChance = difficulty.luckyDropChance,
@@ -1480,7 +1364,6 @@ local function leave(player: Player)
 	end
 	plots[player] = nil
 	adminCache[player] = nil
-	abilityReadyAt[player] = nil
 	summonReadyAt[player] = nil
 	PlayerData.save(player)
 	PlayerData.remove(player)
@@ -1494,9 +1377,7 @@ function GameService.init()
 	Net.get("Battle").OnServerEvent:Connect(onBattle)
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)
 	Net.get("UnlockTier").OnServerEvent:Connect(onUnlockTier)
-	Net.get("Ability").OnServerEvent:Connect(onAbility)
 	Net.get("Sell").OnServerEvent:Connect(onSell)
-	Net.get("EquipSpell").OnServerEvent:Connect(onEquipSpell)
 	Net.get("AutoFight").OnServerEvent:Connect(onAutoFight)
 	Net.get("AdminProgress").OnServerEvent:Connect(onAdminProgress)
 	Net.get("AdminUnlock").OnServerEvent:Connect(onAdminUnlock)

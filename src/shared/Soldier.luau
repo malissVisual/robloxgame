@@ -15,13 +15,6 @@ if game:GetService("RunService"):IsServer() then
 	task.spawn(Rig.base)
 end
 
--- Classes whose look comes from a designed model with one stage per merge level (9 stages). The data
--- modules are generated from the design files by tools/stages_from_rbxmx.py (see src/shared/StageModels).
-local STAGE_MODELS: { [string]: { stages: { any } } } = {
-	Knight = require(script.Parent.StageModels.Knight),
-	Archer = require(script.Parent.StageModels.Archer),
-}
-
 local SKIN = Color3.fromRGB(245, 220, 185)
 local DARK = Color3.fromRGB(55, 58, 70)
 local WOOD = Color3.fromRGB(120, 85, 50)
@@ -398,7 +391,7 @@ function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolea
 	model.Name = def.label
 
 	if SoldierRig.has(class) then
-		-- The designed classes are R15 characters with 9 designed stages, the Knight, the Archer and the Mage with 30 (SoldierRig.luau). Without the base rig
+		-- The Mage is an R15 character with 30 designed levels (SoldierRig.luau). Without the data
 		-- (it could not be made, or it has not reached this client yet) the block soldier below is built.
 		local rig, rigHead, rigTop = SoldierRig.build(tier, s, bare, class)
 		if rig and rigHead and rigTop then
@@ -409,13 +402,6 @@ function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolea
 	if class == "Soldier" then
 		local soldierHead = buildStageSoldier(model, s, tier, enemy, bare)
 		return finishModel(model, soldierHead, 2.4, s, def, tier, enemy, levelColor, bare, ascended)
-	end
-
-	-- Classes with a designed model (Knight, Archer): the stage of the level, straight from the design data.
-	local stageData = STAGE_MODELS[class]
-	if stageData then
-		local stageHead, stageTop = buildStageFromData(model, s, tier, bare, stageData.stages)
-		return finishModel(model, stageHead, stageTop, s, def, tier, enemy, levelColor, bare, ascended)
 	end
 
 	-- In all offsets -Z is "forward" (where the soldier looks).
@@ -446,30 +432,7 @@ function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolea
 	local head = add("Head", Vector3.new(1.2, 1.2, 1.2), Vector3.new(0, 1.6, 0), SKIN)
 
 	local topOffset = 2.4
-	if class == "Archer" then
-		add("Hood", Vector3.new(1.4, 0.55, 1.4), Vector3.new(0, 2.25, 0), Color3.fromRGB(40, 90, 50))
-		add("Bow", Vector3.new(0.2, 2.6, 0.4), Vector3.new(1.5, 0.3, -0.8), WOOD)
-	elseif class == "Tank" then
-		add("Helmet", Vector3.new(1.5, 0.8, 1.5), Vector3.new(0, 2.35, 0), STEEL, nil, Enum.Material.Metal)
-		add("Crest", Vector3.new(0.2, 0.6, 1.2), Vector3.new(0, 2.95, 0), Color3.fromRGB(190, 50, 50))
-		add("Shield", Vector3.new(0.35, 2.6, 2.0), Vector3.new(-1.9, 0.2, -0.5), Color3.fromRGB(150, 110, 50), nil, Enum.Material.Metal)
-		add("ShieldBoss", Vector3.new(0.5, 0.7, 0.7), Vector3.new(-2.15, 0.2, -0.5), STEEL, Enum.PartType.Ball, Enum.Material.Metal)
-		add("Mace", Vector3.new(0.3, 1.8, 0.3), Vector3.new(1.4, 0.7, -0.9), WOOD)
-		add("MaceHead", Vector3.new(0.8, 0.8, 0.8), Vector3.new(1.4, 1.8, -0.9), STEEL, Enum.PartType.Ball, Enum.Material.Metal)
-		topOffset = 3.4
-	elseif class == "Berserker" then
-		add("HornL", Vector3.new(0.3, 0.9, 0.3), Vector3.new(-0.55, 2.55, 0), Color3.fromRGB(240, 235, 215))
-		add("HornR", Vector3.new(0.3, 0.9, 0.3), Vector3.new(0.55, 2.55, 0), Color3.fromRGB(240, 235, 215))
-		add("Headband", Vector3.new(1.3, 0.3, 1.3), Vector3.new(0, 1.85, 0), Color3.fromRGB(170, 40, 40))
-		add("AxeHandle", Vector3.new(0.25, 3.0, 0.25), Vector3.new(1.5, 0.6, -0.9), WOOD)
-		add("AxeHead", Vector3.new(0.3, 1.2, 1.4), Vector3.new(1.5, 1.9, -1.3), STEEL, nil, Enum.Material.Metal)
-		topOffset = 3.2
-	elseif class == "Hunter" then
-		add("Cap", Vector3.new(1.4, 0.5, 1.4), Vector3.new(0, 2.2, 0), Color3.fromRGB(50, 110, 110))
-		add("Visor", Vector3.new(1.3, 0.2, 0.7), Vector3.new(0, 2.05, -0.9), Color3.fromRGB(50, 110, 110))
-		add("Rifle", Vector3.new(0.3, 0.3, 3.6), Vector3.new(1.3, 0.5, -1.6), DARK, nil, Enum.Material.Metal)
-		add("Scope", Vector3.new(0.3, 0.3, 1.0), Vector3.new(1.3, 0.85, -1.2), def.color:Lerp(Color3.new(1, 1, 1), 0.3), nil, Enum.Material.Neon)
-	else
+	do -- the block Mage (the fallback when the R15 evolution data is missing)
 		add("HatBrim", Vector3.new(1.9, 0.2, 1.9), Vector3.new(0, 2.05, 0), Color3.fromRGB(70, 40, 100))
 		add("HatTop", Vector3.new(1.0, 1.3, 1.0), Vector3.new(0, 2.7, 0), Color3.fromRGB(90, 55, 130))
 		add("Staff", Vector3.new(0.25, 3.4, 0.25), Vector3.new(1.5, 0.4, -0.8), WOOD)

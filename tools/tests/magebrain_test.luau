@@ -9,8 +9,8 @@ local function flat(v) return vec(v.X, 0, v.Z) end
 
 -- spells per level (the repel spell and the heal sit outside the strong-spell cap)
 local basic1, others1 = Spells.forLevel(1); check(basic1.id == "fireStone" and #others1 == 0, "L1: fire stone only")
-local basic5, others5 = Spells.forLevel(5); check(#others5 == 2 and others5[1].id == "sparkSwarm" and others5[2].id == "arcanePush", "L5: + spark swarm + arcane push")
-local basic15, others15 = Spells.forLevel(15); check(basic15.id == "magicMissile" and #others15 == 3 and others15[3].kind == "repel", "L15: magic missile + 2 + repel (" .. others15[1].id .. ", " .. others15[2].id .. ", " .. others15[3].id .. ")")
+local basic5, others5 = Spells.forLevel(5); check(#others5 == 3 and others5[1].id == "sparkSwarm" and others5[2].id == "arcanePush" and others5[3].id == "healingLight", "L5: + spark swarm + arcane push + healing light")
+local basic15, others15 = Spells.forLevel(15); check(basic15.id == "magicMissile" and #others15 == 4 and others15[3].kind == "repel" and others15[4].kind == "heal", "L15: magic missile + 2 + repel + heal (" .. others15[1].id .. ", " .. others15[2].id .. ", " .. others15[3].id .. ")")
 local basic30, others30 = Spells.forLevel(30); check(basic30.id == "quantumBolt" and #others30 == 5, "L30: quantum bolt + 3 + repel + support (" .. #others30 .. ")")
 
 local function makeModel()

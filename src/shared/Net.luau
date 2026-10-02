@@ -19,13 +19,11 @@ local NAMES = {
 	"AdminUnlock", -- client → server: admin only, unlocks everything
 	"AdminReset", -- client → server: admin only, wipes the whole progress
 	"AdminCommand", -- client → server: admin only, the test tools (command, a, b): coins, wave, spawn, spawnall, clear, slots, startlevel
-	"Ability", -- client → server: cast the spell of a slot ("q" | "e") during a battle, optionally at an aimed point; server → client: (slot, cooldown)
 	"BossIntro", -- server → client: a boss wave starts (boss name)
 	"BossHp", -- server → client: the boss health bar (name, fraction of health, enraged); fraction 0 hides it
 	"WaveIntro", -- server → client: the wave's twists banner + chips ({ title, subtitle, color = {r,g,b}, chips = { { label, subtitle, color } } }) or nil to clear
 	"AutoFight", -- client → server: turn auto fight on / off (starts the next wave by itself)
 	"Sell", -- client → server: sell a soldier of the inventory / squad for coins (slot id)
-	"EquipSpell", -- client → server: put an owned spell into the Q or the E slot (spell id, slot)
 	"BattleSpeed", -- client → server: cycle the battle speed (1x / 2x)
 	"Sfx", -- server → client: play a sound (name of Config/Sounds)
 	"SetSetting", -- client → server: change a setting (key, value)

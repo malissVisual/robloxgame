@@ -18,7 +18,7 @@ Levels.Colors = {
 	Color3.fromRGB(192, 132, 252), -- 7 Epic
 	Color3.fromRGB(251, 146, 60), -- 8 Legendary
 	Color3.fromRGB(248, 113, 113), -- 9 Mythic
-	-- 10 … 30 exist only for the Knight, the Archer and the Mage (their 30-level evolutions): the eras of the design.
+	-- 10 … 30 exist for the Mage (its 30-level evolution): the eras of the design.
 	Color3.fromRGB(239, 68, 68), -- 10 Legionnaire (the last of antiquity)
 	Color3.fromRGB(125, 211, 252), -- 11 Middle Ages
 	Color3.fromRGB(125, 211, 252), -- 12

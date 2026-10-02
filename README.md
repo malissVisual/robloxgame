@@ -7,9 +7,16 @@ right in the UI inventory (drag a card onto another card) or in 3D (drag a soldi
 **equip** your best into the battle squad (one row of six) and send the squad into battle against a wave. Both
 sides walk from their rows onto a big round fight arena and fight on their own, PvE only. PC first, mobile later.
 
-Most things are 3D in the world. The UI is the FIGHT button at the bottom, the HUD with the account level and
-coins (bottom left), the left panel (Inventory / Soldiers / Upgrades / Spells tabs), the battle panel (opened
-with the FIGHT button) and short toast messages. Every soldier has its name and level (e.g. "Archer · Lv 3")
+**Current state (Mage only):** the game has ONE class, the **Mage** (30 merge levels, the R15 evolution). The Knight,
+the Archer, the Hunter, the Tank, the Berserker and the Soldier were removed (a saved soldier of a removed class
+loads as a Mage of the same level). **You do not cast anything**: the Mages fight and cast every spell on their own
+(`Config/MageSpells.luau`, `MageBrain.luau`), and you only walk around with your character; there is no Q / E, no
+SPELLS tab and no spell drops. Older passages below about other classes or "your own spells" describe the removed
+version.
+
+Most things are 3D in the world. The UI is the PLAY button, the HUD with the account level and
+coins (bottom left), the left panel (Inventory / Characters / Upgrades tabs), the battle panel (opened
+with PLAY) and short toast messages. Every soldier has its name and level (e.g. "Mage · Lv 3")
 floating above it.
 
 ## Running
@@ -30,9 +37,9 @@ by game server").
 ## Game loop
 
 **Current simplifications:** the game is silent (no sounds, no music; `playSound` is a no-op), there are **no
-summoning altars and no level-upgrade station** in the lobby (a new player starts with two Knights and an Archer
-level 1 in the squad, and every won wave drops new characters), and there is **no countdown**: PLAY fades the
-screen to black for 1.1 s with FIGHT! on it (you are moved into the arena while it is dark, the fight starts as it
+summoning altars and no level-upgrade station** in the lobby (a new player starts with four level 1 Mages in the
+squad, and every won wave drops new characters), and there is **no countdown**: PLAY fades the
+screen to black for 1.1 s with FIGHT! on it (you stay where you are, the fight starts as it
 clears, `Balance.BattleCountdown`), and the end of the battle fades to black for 1 s while you are put back at
 your spawn (remote `Countdown` carries "start" / "end").
 
@@ -48,7 +55,7 @@ The server decides everything (buying, merging, rolling, the battle simulation).
 
 ## Merge levels
 
-Every soldier has a **level** (`Config/Levels.luau`, **1 … 9**; the **Knight, the Archer and the Mage go to 30**, see below). Merging
+Every soldier has a **level** (`Config/Levels.luau`; the **Mage goes to 30**, see below). Merging
 two soldiers of the same class and level makes one soldier one level higher. A level makes the soldier
 stronger (×1.8 HP and damage per level) and changes its look. The limit is per class (`Units.maxTier(class)`,
 from `maxTier` in `Units.Classes`); `Balance.TierUnlocks` has the price of every level up to 30.
@@ -126,14 +133,12 @@ Soldier design, so Lv 1 and 2, 3 and 4, 5 and 6 share a color.
 
 ## Controls
 
-**Spells are aimed with the mouse:** during a battle press **Q** or **E** (or click the spell button) to pick the
-spell, a ring on the arena floor shows the area it will hit (its real radius) and a glowing arc of beads shows its
-path from your character to that spot; **click on the arena** to cast it there. Esc or the same key again cancels.
-A spell that hits the whole arena (Smite, Armageddon) casts at once.
+**You only control your character** (walk around, watch the fight). The Mages cast their spells themselves; there
+are no player spells, no Q / E and no mouse aiming any more.
 
 The battle is started with the big green **PLAY** button at the bottom right (its own little dock, movable by the grip
-on top): it opens the battle panel (difficulty, wave, START WAVE). The main panel (inventory, characters, upgrades,
-spells) starts at the top of the screen and hides while the battle panel is open, so the two never lie over each
+on top): it opens the battle panel (difficulty, wave, START WAVE). The main panel (inventory, characters, upgrades)
+starts at the top of the screen and hides while the battle panel is open, so the two never lie over each
 other; it comes back when the battle panel closes, and opening it from the dock (or H) closes the battle panel.
 
 - **Movable panels:** the left panel (grab its title bar), the daily quests and the settings can be dragged
@@ -215,7 +220,7 @@ fighter's height to the ground under it, so they walk up the step and down past 
 placeholder: a round platform 140 studs across (twice the old arena's depth) with a darker rim and a low ring step,
 isolated in `src/server/Services/FightArena.luau`: replace `FightArena.build` with your own design. The rest of the
 game only needs the returned `heightAt(worldPos)`, `center`, `radius` and `spot(side, index, count)` (see the comment
-at the top of that file). The mouse aim of the spells reads the `TopY` attribute of the part named `FightArena`.
+at the top of that file). The part named `FightArena` carries a `TopY` attribute (the height of its top).
 
 **The squad is exactly six** (`Balance.SquadSize`, ONE row of six side by side, `Balance.SquadColumns` = 6), nothing
 more to buy around it. In the arena the six pads stand 12 studs apart (`Balance.SquadSpacing`, the merge board is
@@ -249,9 +254,9 @@ replicate to everyone.
 
 ## Soldier classes
 
-Everybody starts with two classes: **Knight** (armored melee) and **Archer** (ranged). The others are
-unlocked in **Arena 1 – Training Camp** by a **lucky drop** after a won wave: from the wave in the
-table on, that class is in the draw.
+**There is one class now: the Mage** (`Units.ClassList = { "Mage" }`, unlocked from the start, four level 1 Mages in a
+new squad). The table below is the removed roster; the lucky-drop machinery stays in the code for a future class
+(with no locked class the draw is empty).
 
 | Class | In the lucky-drop draw from | |
 |---|---|---|
@@ -297,7 +302,7 @@ balance and the result screen shows the total of the wave as one small line.
 - **After a wave** there is no result box: the rewards **drop in one after another at the top of the screen**
   (a small pill each): the title (WAVE n CLEARED / BOSS / ELITE), `+N coins` (and the streak), every dropped
   soldier with a little 3D card (and BONUS LEVEL), a lucky drop ("LUCKY DROP: X unlocked!", chance by difficulty,
-  guaranteed after `Balance.LuckyDropPity` clears without luck) and a new spell. The drops go **straight into the
+  guaranteed after `Balance.LuckyDropPity` clears without luck). The drops go **straight into the
   inventory** (`CollectDrops` right away; `Balance.DropCollectTime` is the server's fallback). After a defeat one
   pill says "DEFEAT · +N coins" and there is a `DefeatCooldown` (3 s) pause. You are brought back to your spawn.
 
@@ -402,8 +407,7 @@ start bigger (`EnemyBase + 2 + (phase - 1) // 3 + place in the phase`, 12 at mos
 phase number** and every level makes enemies `EnemyLevelScale` = 1.2× stronger (wave 100 = level 20, about
 30x wave 1, plus the family bonus), so the game stays fair for a first arena; every 5th wave the last enemy
 is the phase's boss. Bosses and better mobs drop more coins (`coins` in `Enemies.luau`), and the coins of a
-kill grow only a little with the level (`KillCoinPerLevel`). **Percent-damage spells do only 35% of their damage
-to a boss** (`Balance.SpellBossFactor`), so your spells help but do not kill the fight for you. Clearing wave 100
+kill grow only a little with the level (`KillCoinPerLevel`). Clearing wave 100
 the first time **completes the map** ("TRAINING CAMP CLEARED!"); you can still repeat
 any wave. The wave heading over the enemies shows the phase, `WAVE n / 100` and the count. A new map is a new
 block in `Config/Maps.luau` (`phases` can be written by hand or generated like the Training Camp's).
@@ -452,6 +456,8 @@ score (proximity, low HP, hate toward whoever hurt it, enemy type: archers and s
 memory (a target is held 1.5 s unless a clearly better one appears) and a level-scaled reaction time (0.6 s at
 level 1, 0.15 s at level 30); it sometimes hesitates or aims an AoE a little off (less at higher levels).
 
+The Mage casts all the spells of the game (the player has none). A **Healing Light** (the old player's Heal) is the
+Mage's from level 2: the newest heal spell is always carried, besides the strong spells and the repel.
 Spells (`shared/Config/MageSpells.luau`) come by era and level: a basic bolt per era (fire stone, sun ray, magic
 missile, arc bolt, plasma beam, quantum bolt) plus the newest unlocked strong spells, 1–10: one extra, 11–20: two,
 21–30: three and a heal (spark swarm, sandstorm, chain lightning, ice barrier, steam blast, electric arc, EMP slow,
@@ -496,14 +502,14 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
 ## Tactics, rewards and the long game
 
 **Tactics before the fight**
-- **Rows matter:** the squad has a **front row** (the pads nearest to the enemies, ids 104 – 106) that meets the
-  enemies first and a **back row** that stays behind; the pads give no stat bonuses. Tanks in front, archers behind.
-- **Synergies** (`Synergy.luau`, shown in the battle panel): **Frontline** (Knight, Tank, Berserker, Soldier)
-  2 = +10% HP for everybody, 3+ = +20%; **Ranged** (Archer, Hunter, Mage) 2 = +10% damage, 3+ = +20%;
-  **4 different classes** = +10% HP and damage. The soldiers you put in the squad decide, not only the level.
+- **One row:** the six pads stand side by side; a Mage on the left pad meets the enemies on the left. The pads
+  give no stat bonuses.
+- **Synergies** (`Synergy.luau`, shown in the battle panel): **Ranged** (the Mage) 2 = +10% damage, 3+ = +20%
+  (the Frontline and mixed-class bonuses need classes that no longer exist).
 
 **During the fight**
-- **Your own spells:** you carry **two spells at a time**, one on **Q** and one on **E**, chosen in the
+- **No spells of your own any more** (the Mages cast everything, see "The Mage" below). The paragraph that follows
+  describes the removed player spells: you carried **two spells at a time**, one on **Q** and one on **E**, chosen in the
   **SPELLS tab** of the left panel (click Q or E on a spell you own; if it is in the other slot the two swap;
   not during a battle). You start with **Meteor** and **Heal**; every other spell is **found only by grinding**:
   after a won wave of its wave or higher it can drop (chance = the difficulty's lucky-drop chance x
@@ -540,11 +546,9 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
   Motor6D turns, with a thrust animation), its crystal charges for 0.22 s with a growing purple glow, then a purple ball
   with a trail flies straight at the target and bursts over the splash area (`Balance.SplashRadius`); its splash damage
   is the Mage's Arcane Burst passive.
-- **Class passives** (`Units.Passives`, shown in the Soldiers tab and on a card's popup): Knight **Shield Wall**
-  (20% to block a hit), Archer **Power Shot** (every 3rd shot x2), Hunter **Deadeye** (25% double damage), Mage
-  **Arcane Burst** (hits splash 50% to nearby enemies), Tank **Bulwark** (enemies within 14 studs attack it
-  first), Berserker **Bloodlust** (up to +80% damage as HP drops), Soldier **Banner** (your soldiers within 10
-  studs deal +10%). Ascended = doubled.
+- **Class passive** (`Units.Passives`, shown in the Characters tab and on a card's popup): Mage **Arcane Burst**
+  (hits splash 50% to nearby enemies). Ascended = doubled. (The other passives in the table belong to removed
+  classes.)
 - **Boss abilities** (`Balance.Boss*`): a Brute boss **slams** every 8 s (2x damage + 1 s stun around it), a Chief
   **summons** two mobs of the phase at half HP, an Archer boss fires a **volley** at every soldier in range every
   6 s, a Shaman boss **heals** its whole wave 8% every 7 s. The boss's look decides (Config/Enemies.luau).
@@ -554,7 +558,7 @@ of the fight place (`FightArena.build`). The enemy preview and its heading follo
   battle (every tick of the simulation counts double). **SKIP** on the result screen delivers the drops at once
   and the next wave may start right away.
 - **Achievements** (`Config/Achievements.luau`, the ACHIEVEMENTS button under the daily quests): 18 one-time
-  goals (kills, merges, level 5 / 9 / Ascended soldiers, waves, bosses, Nightmare, spells, summons, account
+  goals (kills, merges, level 5 / 9 / Ascended soldiers, waves, bosses, Nightmare, summons, account
   level) with coins + XP; the latest one is your **title**, shown over your head (★ Warlord).
 - **Offline income** (`Balance.Offline*`): while you are away your camp earns 6 coins per hour for every wave
   of your best wave, up to 8 hours; a WELCOME BACK popup pays it when you come back.

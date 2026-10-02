@@ -12,13 +12,7 @@ local Grid = require(script.Parent.Grid)
 local Synergy = {}
 
 Synergy.Roles = {
-	Knight = "Frontline",
-	Tank = "Frontline",
-	Berserker = "Frontline",
-	Soldier = "Frontline",
-	Archer = "Ranged",
-	Hunter = "Ranged",
-	Mage = "Ranged",
+	Mage = "Ranged", -- the only class now (the Frontline classes were removed; the role table stays for a future class)
 } :: { [string]: string }
 
 export type Result = {

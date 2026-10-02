@@ -57,7 +57,6 @@ local SQUAD_TAKEN_COLOR = Color3.fromRGB(128, 134, 150) -- the ring once a soldi
 local ARENA_START = 30 -- z of the arena gate (a road leads from the lobby to it)
 
 local Plots = {}
-Plots.setRingAura = setRingAura -- (the designed rarity auras are not used on the squad pads right now; kept for later)
 
 local root: Folder? = nil
 
@@ -656,10 +655,7 @@ function Plots.showEnemies(plot: Plot, wave: number, difficulty: string)
 
 	local models: { Model } = {}
 	for i, e in enemies do
-		local ground = Plots.enemyGround(plot, i, #enemies)
-		local pad = makePart(folder, "EnemyPad", Vector3.new(5, PAD_TOP, 5), ground - Vector3.new(0, PAD_TOP / 2, 0), Color3.fromRGB(120, 55, 55))
-		pad.CanQuery = false
-		decoratePad(pad, Color3.fromRGB(200, 70, 70), true, "", false) -- the same designed slot, with a red ring
+		local ground = Plots.enemyGround(plot, i, #enemies) -- no pads under the enemies (their red glow was a wall of light)
 
 		local model = Enemy.build(e.kind, e.tier)
 		local lift = Enemy.lift(e.kind, e.tier)

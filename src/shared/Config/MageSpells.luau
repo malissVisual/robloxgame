@@ -48,6 +48,7 @@ MageSpells.Defs = {
 	-- PRAVĚK
 	{ id = "fireStone", label = "Ohnivý kámen", era = 1, minLevel = 1, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.4, damage = 1.0, color = C(255, 140, 60), color2 = C(255, 220, 140) },
 	{ id = "sparkSwarm", label = "Roj jisker", era = 1, minLevel = 3, kind = "aoe", mana = 35, cooldown = 7, castTime = 0.7, damage = 1.3, radius = 5, color = C(255, 180, 80), color2 = C(255, 240, 170) },
+	{ id = "healingLight", label = "Léčivé světlo", era = 1, minLevel = 2, kind = "heal", mana = 40, cooldown = 14, castTime = 0.5, damage = 0, heal = 0.3, radius = 30, color = C(120, 255, 170), color2 = WHITE }, -- the old player's Heal, now the Mage's from level 2
 	{ id = "arcanePush", label = "Arkánový úder", era = 1, minLevel = 5, kind = "repel", mana = 30, cooldown = 10, castTime = 0.35, damage = 0.6, radius = 7, push = 8, stun = 0.6, color = PURPLE, color2 = WHITE },
 	-- STAROVĚK
 	{ id = "sunRay", label = "Sluneční paprsek", era = 2, minLevel = 6, kind = "bolt", basic = true, mana = 0, cooldown = 0, castTime = 0.35, damage = 1.05, color = C(255, 210, 90), color2 = WHITE },
@@ -81,8 +82,8 @@ function MageSpells.era(level: number): number
 end
 
 -- Kouzla, která má mág daného levelu: základní útok své epochy a nejnovější odemčená silná kouzla
--- (1–10: celkem 2, 11–20: 3, 21–30: 4) plus nejnovější odražení (repel, od levelu 5) a kouzla podpory od
--- levelu 21 — ty dvě mimo strop silných kouzel. Vrací (základní, ostatní).
+-- (1–10: celkem 2, 11–20: 3, 21–30: 4) plus nejnovější odražení (repel, od levelu 5) a nejnovější kouzlo podpory
+-- (léčení, od levelu 2 — hráč už kouzla nemá, léčí mág) — ty dvě mimo strop silných kouzel. Vrací (základní, ostatní).
 function MageSpells.forLevel(level: number): (Spell, { Spell })
 	local era = MageSpells.era(level)
 	local basic: Spell? = nil
@@ -118,13 +119,11 @@ function MageSpells.forLevel(level: number): (Spell, { Spell })
 	if repel then
 		table.insert(others, repel)
 	end
-	if level >= 21 then
-		table.sort(support, function(a, b)
-			return a.minLevel > b.minLevel
-		end)
-		if support[1] then
-			table.insert(others, support[1])
-		end
+	table.sort(support, function(a, b)
+		return a.minLevel > b.minLevel
+	end)
+	if support[1] then
+		table.insert(others, support[1])
 	end
 	return basic :: Spell, others
 end

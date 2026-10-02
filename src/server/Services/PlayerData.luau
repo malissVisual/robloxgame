@@ -10,7 +10,6 @@ local Balance = require(Shared.Config.Balance)
 local Units = require(Shared.Config.Units)
 local Maps = require(Shared.Config.Maps)
 local Difficulties = require(Shared.Config.Difficulties)
-local Spells = require(Shared.Config.Spells)
 local Achievements = require(Shared.Config.Achievements)
 local Grid = require(Shared.Grid)
 local Levels = require(Shared.Config.Levels)
@@ -19,12 +18,11 @@ export type Profile = {
 	coins: number,
 	xp: number, -- account experience (the account level is calculated from it)
 	streak: number, -- waves won in a row (this session only)
-	spells: { owned: { [string]: boolean }, slots: { q: string, e: string } }, -- the spells you own and the two you carry
 	autoFight: boolean, -- start the next wave by itself after a win (this session only)
 	quests: { day: string, progress: { [string]: number }, done: { [string]: boolean } }, -- today's daily quests
 	board: Grid.Cells, -- the INVENTORY = the 6x6 merge board (only the first `boardSlots` pads are usable)
 	boardSlots: number, -- unlocked merge slots, bought with upgrades
-	squad: Grid.Cells, -- the 3x2 squad that fights
+	squad: Grid.Cells, -- the squad that fights (one row of six)
 	purchases: number,
 	startLevel: number, -- merge level a bought soldier starts at (upgraded at the lobby station)
 	tierUnlocked: { [string]: number }, -- per class: the highest merge level bought for it (coins + cleared waves)
@@ -152,36 +150,27 @@ end
 local function fresh(): Profile
 	local unlocked: { [string]: boolean } = {}
 	local tierUnlocked: { [string]: number } = {}
-	local ownedSpells: { [string]: boolean } = {}
-	for id, def in Spells.Defs do
-		if def.dropWave == nil then
-			ownedSpells[id] = true
-		end
-	end
 	for _, class in Units.ClassList do
 		tierUnlocked[class] = Balance.StartUnlockedTier
 		if not Units.Classes[class].unlock then
 			unlocked[class] = true
 		end
 	end
-	unlocked.Mage = true -- the Mage is a start class now: a new player gets one in the squad right away
 	return {
 		coins = Balance.StartCoins,
 		xp = 0,
 		streak = 0,
-		spells = { owned = ownedSpells, slots = { q = Spells.Start.q, e = Spells.Start.e } },
 		autoFight = false,
 		quests = { day = "", progress = {}, done = {} },
 		board = Grid.new(Balance.BoardSize),
 		boardSlots = Balance.BoardStartSlots,
-		-- There is no summoning: a new player starts with four level 1 characters already in the squad (a Knight,
-		-- an Archer, a Mage and a second Knight; more come as wave drops).
+		-- There is no summoning: a new player starts with four level 1 Mages already in the squad (merge two for a
+		-- level 2; more come as wave drops).
 		squad = (function(): Grid.Cells
 			local squad = Grid.new(Balance.SquadSize)
-			squad[1] = { class = "Knight", tier = 1 }
-			squad[2] = { class = "Archer", tier = 1 }
-			squad[3] = { class = "Mage", tier = 1 }
-			squad[4] = { class = "Knight", tier = 1 }
+			for i = 1, 4 do
+				squad[i] = { class = "Mage", tier = 1 }
+			end
 			return squad
 		end)(),
 		purchases = 0,
@@ -224,8 +213,10 @@ local function saveKey(player: Player): string
 end
 
 local function copyUnit(raw: any): Grid.Unit?
-	if type(raw) == "table" and Units.isValidClass(raw.class) and type(raw.tier) == "number" then
-		return { class = raw.class, tier = math.clamp(math.floor(raw.tier), 1, Units.maxTier(raw.class)), ascended = if raw.ascended == true then true else nil }
+	if type(raw) == "table" and type(raw.class) == "string" and type(raw.tier) == "number" then
+		-- A soldier of a removed class (Knight, Archer, …) in an old save becomes a Mage of the same level.
+		local class = if Units.isValidClass(raw.class) then raw.class else Units.ClassList[1]
+		return { class = class, tier = math.clamp(math.floor(raw.tier), 1, Units.maxTier(class)), ascended = if raw.ascended == true then true else nil }
 	end
 	return nil
 end
@@ -253,19 +244,6 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	profile.coins = number(saved.coins, profile.coins, 0, 2 ^ 50)
 	profile.xp = number(saved.xp, 0, 0, 2 ^ 50)
-	if type(saved.spells) == "table" then
-		if type(saved.spells.owned) == "table" then
-			for id in Spells.Defs do
-				if saved.spells.owned[id] == true then
-					profile.spells.owned[id] = true
-				end
-			end
-		end
-		local slots = saved.spells.slots
-		if type(slots) == "table" and Spells.isValid(slots.q) and Spells.isValid(slots.e) and slots.q ~= slots.e and profile.spells.owned[slots.q] and profile.spells.owned[slots.e] then
-			profile.spells.slots = { q = slots.q, e = slots.e }
-		end
-	end
 	if type(saved.quests) == "table" and type(saved.quests.day) == "string" then
 		local quests = { day = saved.quests.day, progress = {}, done = {} }
 		for _, quest in Balance.Quests do
@@ -382,7 +360,6 @@ local function serialize(profile: Profile): { [string]: any }
 		version = 1,
 		coins = profile.coins,
 		xp = profile.xp,
-		spells = profile.spells,
 		quests = profile.quests,
 		board = cells(profile.board),
 		boardSlots = profile.boardSlots,

@@ -2,8 +2,9 @@
 -- Soldier classes and their growth by level (tier).
 -- Merging two of the same (class + level) creates level + 1 (see Levels.luau).
 --
--- Everyone starts with two classes (Knight and Archer). The others are locked: clearing the
--- wave in `unlock.wave` in Arena 1 (Training Camp) unlocks the class and drops one of them.
+-- There is ONE class now: the Mage (30 merge levels, the R15 evolution). The other classes (Knight, Archer, Hunter,
+-- Tank, Berserker, Soldier) were removed; a saved soldier of a removed class loads as a Mage of the same level
+-- (PlayerData). The unlock machinery (`unlock`) stays for a future class.
 
 export type Stats = {
 	hp: number,
@@ -25,7 +26,7 @@ export type ClassDef = Stats & {
 	color: Color3,
 	unlock: Unlock?, -- nil = unlocked from the start
 	passive: string, -- the class's own trick in the battle (see Units.Passives)
-	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); Knight, Archer and Mage have 30 looks
+	maxTier: number?, -- the class's own highest merge level (default Units.MaxTier); the Mage has 30 looks
 }
 
 -- Every class has a PASSIVE (BattleService applies it). `value` is its strength; an ASCENDED soldier
@@ -44,49 +45,9 @@ Units.MaxTier = 9
 Units.AscendedBonus = 0.5 -- an Ascended soldier (two level 9 merged) has +50% HP and damage and a doubled passive
 Units.TierScale = 1.8 -- how many times stronger level + 1 is than level
 
-Units.ClassList = { "Knight", "Archer", "Hunter", "Mage", "Tank", "Berserker", "Soldier" }
+Units.ClassList = { "Mage" }
 
 Units.Classes = {
-	Soldier = {
-		label = "Soldier",
-		color = Color3.fromRGB(90, 140, 220),
-		hp = 100,
-		damage = 10,
-		range = 4,
-		cooldown = 1.0,
-		speed = 12,
-		splash = false,
-		-- LEGENDARY: the 9-stage designed soldier is a rare lucky drop (it is only a fraction of the draw).
-		unlock = { wave = 15, weight = 0.25, legendary = true },
-		passive = "inspire",
-	},
-	Archer = {
-		label = "Archer",
-		color = Color3.fromRGB(90, 190, 110),
-		hp = 60,
-		damage = 14,
-		range = 30,
-		cooldown = 1.1,
-		speed = 10,
-		splash = false,
-		passive = "volley",
-		-- 30 merge levels: the R15 evolution of the archer woman, prehistory to the year 3000 (design/ArcherEvolution,
-		-- built from StageModels/ArcherEvolution by SoldierRig).
-		maxTier = 30,
-	},
-	-- The three new classes of Arena 1 (Training Camp):
-	Hunter = {
-		label = "Hunter",
-		color = Color3.fromRGB(70, 200, 200),
-		hp = 40,
-		damage = 34,
-		range = 45,
-		cooldown = 2.2,
-		speed = 8,
-		splash = false,
-		unlock = { wave = 3 },
-		passive = "crit",
-	},
 	Mage = {
 		label = "Mage",
 		color = Color3.fromRGB(180, 100, 210),
@@ -96,49 +57,10 @@ Units.Classes = {
 		cooldown = 1.6,
 		speed = 9,
 		splash = true,
-		unlock = { wave = 6 },
 		passive = "splash",
 		-- 30 merge levels: the R15 evolution of the mage, a shaman's apprentice to the Apex mage of the year 3000
-		-- (design/MageEvolution, built from StageModels/MageEvolution by SoldierRig).
-		maxTier = 30,
-	},
-	Tank = {
-		label = "Tank",
-		color = Color3.fromRGB(200, 165, 70),
-		hp = 220,
-		damage = 7,
-		range = 4,
-		cooldown = 1.0,
-		speed = 9,
-		splash = false,
-		unlock = { wave = 10 },
-		passive = "taunt",
-	},
-	-- Reserved for the wave system (later waves):
-	Berserker = {
-		label = "Berserker",
-		color = Color3.fromRGB(235, 130, 50),
-		hp = 90,
-		damage = 24,
-		range = 4,
-		cooldown = 0.8,
-		speed = 15,
-		splash = false,
-		unlock = { wave = 15 },
-		passive = "rage",
-	},
-	Knight = {
-		label = "Knight",
-		color = Color3.fromRGB(150, 160, 190),
-		hp = 170,
-		damage = 15,
-		range = 4,
-		cooldown = 1.1,
-		speed = 10,
-		splash = false,
-		passive = "block",
-		-- 30 merge levels: the R15 evolution from the first human to the year 3000 (design/KnightEvolution,
-		-- built from StageModels/KnightEvolution by SoldierRig).
+		-- (design/MageEvolution, built from StageModels/MageEvolution by SoldierRig). The Mage casts all the spells
+		-- of the game itself (Config/MageSpells.luau, MageBrain); you only walk around with your character.
 		maxTier = 30,
 	},
 } :: { [string]: ClassDef }

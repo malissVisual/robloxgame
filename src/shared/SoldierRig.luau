@@ -18,8 +18,6 @@ local Weapons = require(script.Parent.Weapons)
 local EVOLUTIONS = {
 	-- (holdFrom = 99: the designs' rest pose is the grip; the "hold" animation would turn a hanging sword or a
 	-- standing staff forward. The attack animation moves the hand, and the weapon follows it.)
-	Knight = { data = require(script.Parent.StageModels.KnightEvolution), attack = "slash", holdFrom = 99 },
-	Archer = { data = require(script.Parent.StageModels.ArcherEvolution), attack = "lunge", holdFrom = 99 },
 	Mage = { data = require(script.Parent.StageModels.MageEvolution), attack = "none", holdFrom = 99 }, -- no swing: the hand with the staff is raised while the fireball charges (Rig.raise)
 }
 
@@ -2156,7 +2154,8 @@ TANK[9] = { name = "Legend", torso = T_GOLD_LIGHT, legs = C(42, 42, 64), top = 3
 	end }
 
 -- The classes that have a design here.
-local CLASSES = { Soldier = LEVELS, Knight = KNIGHT, Archer = ARCHER, Mage = MAGE, Hunter = HUNTER, Berserker = BERSERKER, Tank = TANK }
+-- Only the Mage is a class of the game now; the other card tables above stay as reference data (unused).
+local CLASSES = { Mage = MAGE }
 
 -- The block body: the R15 limbs as plain parts (name, size, center; the soles are at y = 0, scale 1).
 local BLOCK_LIMBS = {

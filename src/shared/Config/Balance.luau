@@ -45,7 +45,7 @@ local Balance = {
 		[7] = { wave = 25, cost = 6000 },
 		[8] = { wave = 40, cost = 15000 },
 		[9] = { wave = 60, cost = 40000 },
-		-- levels 10 … 30 (only the Knight, the Archer and the Mage go this far) are filled in below
+		-- levels 10 … 30 (the Mage goes this far) are filled in below
 	},
 
 	-- Account level (shown top left): experience from kills and won waves. Going from level L to L + 1
@@ -68,13 +68,6 @@ local Balance = {
 	SynergyHigh = { count = 3, bonus = 0.20 }, -- 3 or more soldiers of a role
 	SynergyMixedClasses = 4, -- this many different classes in the squad ...
 	SynergyMixedBonus = 0.10, -- ... give +10% HP and damage to everybody
-
-	-- The player's spells (Config/Spells.luau): two equipped ones (Q and E) during a battle. They aim
-	-- themselves; with SHIFT held you aim with the mouse into the arena.
-	SpellRange = 72, -- studs from the middle of the round arena (its radius is 70): further aims are refused
-	SpellBossFactor = 0.35, -- percent-damage spells do only this part of their damage to a boss
-	SpellDropFactor = 0.5, -- chance of a spell drop after a won wave = the difficulty's lucky-drop chance x this
-		-- (doubled on a boss wave); only spells whose dropWave is reached, and not yet owned, can drop
 
 	-- Daily quests (three per day, they reset at midnight UTC): progress counts while you play.
 	Quests = {
@@ -183,7 +176,7 @@ local Balance = {
 	SplashFraction = 0.5,
 }
 
--- Merge levels 10 … 30 exist only for the Knight, the Archer and the Mage (their 30-level evolutions, maxTier in Units):
+-- Merge levels 10 … 30 exist for the Mage (its 30-level evolution, maxTier in Units):
 -- every further level needs two more cleared waves (up to 100) and costs 25 % more coins than the one before.
 for tier = 10, 30 do
 	Balance.TierUnlocks[tier] = { wave = math.min(100, 60 + 2 * (tier - 9)), cost = math.floor(40000 * 1.25 ^ (tier - 9)) }

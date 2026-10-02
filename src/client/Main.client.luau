@@ -22,7 +22,6 @@ local Mutators = require(Shared:WaitForChild("Config"):WaitForChild("Mutators"))
 local Enemies = require(Shared:WaitForChild("Config"):WaitForChild("Enemies"))
 local Soldier = require(Shared:WaitForChild("Soldier"))
 local Grid = require(Shared:WaitForChild("Grid"))
-local Spells = require(Shared:WaitForChild("Config"):WaitForChild("Spells"))
 local Sounds = require(Shared:WaitForChild("Config"):WaitForChild("Sounds"))
 local Achievements = require(Shared:WaitForChild("Config"):WaitForChild("Achievements"))
 local SoundService = game:GetService("SoundService")
@@ -66,7 +65,6 @@ local state = {
 	levelCost = 0,
 	tierUnlocked = {} :: { [string]: number }, -- per class: the highest merge level bought
 	autoFight = false,
-	spells = { owned = {} :: { [string]: boolean }, slots = { q = "meteor", e = "heal" } },
 	saving = false,
 	quests = {} :: { any },
 	mapCleared = false,
@@ -93,8 +91,7 @@ gui.Name = "MergeBlades"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- On small screens (phones) the whole UI shrinks a little so everything fits; on touch there is no SHIFT,
--- so the spells always aim themselves.
+-- On small screens (phones) the whole UI shrinks a little so everything fits.
 local IS_TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local guiScale = Instance.new("UIScale")
 guiScale.Parent = gui
@@ -161,7 +158,7 @@ end
 local UI = {}
 UI.DARK = Color3.fromRGB(16, 18, 26) -- the dark tiles inside the panel
 UI.PAGE_TOP = 84 -- the pages of the left panel start under its title bar and tabs
-UI.TAB_ACCENT = { Inventory = GOLD, Characters = Color3.fromRGB(90, 170, 255), Upgrades = Color3.fromRGB(170, 130, 255), Spells = ORANGE }
+UI.TAB_ACCENT = { Inventory = GOLD, Characters = Color3.fromRGB(90, 170, 255), Upgrades = Color3.fromRGB(170, 130, 255) }
 UI.PANEL_SCALE = 1.15 -- the left panel is drawn this much bigger than it is laid out
 UI.panelScale = Instance.new("UIScale")
 UI.tab = "Inventory" -- the open tab of the left panel
@@ -174,10 +171,6 @@ UI.adminHeight = 0 -- how much of the top right corner the admin tools take (the
 UI.QUESTS = false -- the daily quests panel is switched off for now (the server still tracks them)
 UI.ACHIEVEMENTS = false -- the achievements button and list are switched off for now (still tracked)
 UI.setCollapsed = function(_on: boolean) end -- set below, once the panel exists
-UI.cancelAim = function() end -- set in the spells block: stop aiming a spell
-UI.aimClick = function(): boolean
-	return false
-end -- set in the spells block: a click in the world while aiming casts the spell (true = the click was used)
 
 function UI.stroke(parent: Instance, color: Color3, thickness: number, transparency: number?): UIStroke
 	local s = Instance.new("UIStroke")
@@ -662,9 +655,10 @@ end)
 Layout.make("Panel", panel, header)
 end
 
--- Tabs: Inventory (the squad and the merge board), Soldiers (the index of every class), Upgrades (merge
--- levels) and Spells. A segmented bar; the active tab is lit in its own color.
-local TAB_NAMES = { "Inventory", "Characters", "Upgrades", "Spells" }
+-- Tabs: Inventory (the squad and the merge board), Characters (the index of every class) and Upgrades (merge
+-- levels). A segmented bar; the active tab is lit in its own color. (The Mages cast every spell themselves now,
+-- so there is no SPELLS tab and no Q / E.)
+local TAB_NAMES = { "Inventory", "Characters", "Upgrades" }
 local pages: { [string]: Frame } = {}
 local tabButtons: { [string]: TextButton } = {}
 
@@ -851,7 +845,7 @@ local dock = Instance.new("Frame")
 dock.Name = "Dock"
 dock.AnchorPoint = Vector2.new(0, 0)
 dock.Position = UDim2.new(0, 20, 0, 20 + UI.SQUAD_H * UI.PANEL_SCALE + 16) -- under the squad bar
-dock.Size = UDim2.fromOffset(76, 18 + 4 * DOCK_STEP)
+dock.Size = UDim2.fromOffset(76, 18 + 3 * DOCK_STEP)
 dock.BackgroundColor3 = BG
 dock.BackgroundTransparency = 0.06
 dock.BorderSizePixel = 0
@@ -944,14 +938,6 @@ tile(3, "Upgrades", "UPG", function(b) -- an arrow up
 	piece(b, 24, 24, 16, 8, UI.DARK, 0) -- cuts the lower half of the rotated square into an arrow head
 	return { head, stem }
 end)
-tile(4, "Spells", "SPELL", function(b) -- a diamond and two sparks
-	local gem = piece(b, 22, 14, 20, 20, GOLD, 4, 45)
-	piece(b, 28, 20, 8, 8, UI.DARK, 2, 45)
-	local sparkA = piece(b, 13, 11, 5, 5, GOLD, 2, 45)
-	local sparkB = piece(b, 47, 31, 5, 5, GOLD, 2, 45)
-	return { gem, sparkA, sparkB }
-end)
-
 -- ── PLAY: the big green button on the right edge ─────────────────────────
 -- The old FIGHT button, now a big green PLAY in its own little dock at the bottom right (a grip on top, so it
 -- moves like the others). It opens the battle panel (wave, difficulty, START WAVE); the main panel hides while
@@ -1379,7 +1365,6 @@ end
 -- variables); these two are filled in there and called from the state handler.
 local renderSoldiers: () -> () = function() end
 local renderLevels: () -> () = function() end
-local renderSpells: () -> () = function() end
 
 -- ── Soldiers tab: the index of every class (unlocked ones and how to unlock the rest) ────
 do
@@ -1955,8 +1940,8 @@ for i, class in Units.ClassList do
 	corner(accentBar, 2)
 	label(row, def.label, UDim2.fromOffset(14, 5), UDim2.fromOffset(150, 18), 14, Enum.Font.GothamBold, WHITE)
 	local sub = label(row, "", UDim2.fromOffset(14, 23), UDim2.fromOffset(190, 14), 12, Enum.Font.Gotham, MUTED)
-	-- The merge levels as dots (lit in the level color up to the bought level): 9 for most classes, 30 for the
-	-- Knight, squeezed into the same width.
+	-- The merge levels as dots (lit in the level color up to the bought level): 30 for the
+	-- Mage, squeezed into the same width.
 	local dots = {}
 	local maxTier = Units.maxTier(class)
 	local step = math.min(14, math.floor(280 / maxTier))
@@ -2039,126 +2024,6 @@ end
 showTab("Inventory")
 end
 
--- Spells page: the two spells you carry (Q and E) and every spell of the game. A spell you do not own yet
--- is found only by grinding: it can drop after a won wave from its wave on (Config/Spells.luau).
-do
-	local page = makePage("Spells")
-	UI.section(page, "YOU CARRY TWO SPELLS", 0, UI.TAB_ACCENT.Spells)
-	-- The two slots on top: the key in a badge and the spell's name, outlined in the spell's color.
-	type SlotBox = { text: TextLabel, stroke: UIStroke, icon: Frame }
-	local slotBoxes: { [string]: SlotBox } = {}
-	for i, slot in { "q", "e" } do
-		local box = Instance.new("Frame")
-		box.Position = UDim2.fromOffset(8 + (i - 1) * 316, 20)
-		box.Size = UDim2.fromOffset(308, 40)
-		box.BackgroundColor3 = UI.DARK
-		box.BorderSizePixel = 0
-		box.Parent = page
-		corner(box, 10)
-		local boxStroke = UI.stroke(box, BADGE, 1.5, 0.3)
-		local key = Instance.new("Frame")
-		key.Position = UDim2.fromOffset(6, 7)
-		key.Size = UDim2.fromOffset(26, 26)
-		key.BackgroundColor3 = BADGE
-		key.BorderSizePixel = 0
-		key.Parent = box
-		corner(key, 7)
-		local keyText = label(key, string.upper(slot), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 14, Enum.Font.GothamBlack, WHITE)
-		keyText.TextXAlignment = Enum.TextXAlignment.Center
-		local icon = Instance.new("Frame")
-		icon.Position = UDim2.fromOffset(40, 14)
-		icon.Size = UDim2.fromOffset(12, 12)
-		icon.BackgroundColor3 = BADGE
-		icon.BorderSizePixel = 0
-		icon.Parent = box
-		corner(icon, 6)
-		local text = label(box, "", UDim2.fromOffset(58, 0), UDim2.new(1, -62, 1, 0), 13, Enum.Font.GothamBold, WHITE)
-		slotBoxes[slot] = { text = text, stroke = boxStroke, icon = icon }
-	end
-
-	type SpellRow = { frame: Frame, stroke: UIStroke, status: TextLabel, buttons: { [string]: TextButton } }
-	local rows: { [string]: SpellRow } = {}
-	for i, id in Spells.Order do
-		local def = Spells.Defs[id]
-		local row = Instance.new("Frame")
-		row.Position = UDim2.fromOffset(8 + ((i - 1) % 2) * 316, 70 + ((i - 1) // 2) * 60) -- two columns
-		row.Size = UDim2.fromOffset(308, 54)
-		row.BackgroundColor3 = def.color:Lerp(BG, 0.82)
-		row.BorderSizePixel = 0
-		row.Parent = page
-		corner(row, 10)
-		local rowStroke = UI.stroke(row, def.color, 1.5, 0.45)
-		-- The spell's icon: a disc in its color with its first letter.
-		local icon = Instance.new("Frame")
-		icon.Position = UDim2.fromOffset(9, 9)
-		icon.Size = UDim2.fromOffset(36, 36)
-		icon.BackgroundColor3 = def.color
-		icon.BorderSizePixel = 0
-		icon.Parent = row
-		corner(icon, 18)
-		UI.gradient(icon, Color3.new(1, 1, 1):Lerp(def.color, 0.55), def.color)
-		local letter = label(icon, string.upper(string.sub(def.label, 1, 1)), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 17, Enum.Font.GothamBlack, def.color:Lerp(Color3.new(0, 0, 0), 0.7))
-		letter.TextXAlignment = Enum.TextXAlignment.Center
-		label(row, def.label, UDim2.fromOffset(54, 5), UDim2.fromOffset(160, 18), 14, Enum.Font.GothamBold, WHITE)
-		local description = label(row, def.description, UDim2.fromOffset(54, 23), UDim2.fromOffset(176, 28), 11, Enum.Font.Gotham, MUTED)
-		description.TextWrapped = true
-		description.TextYAlignment = Enum.TextYAlignment.Top
-		local status = label(row, string.format("Drops after\nwave %d", def.dropWave or 0), UDim2.fromOffset(232, 8), UDim2.fromOffset(68, 38), 10, Enum.Font.GothamMedium, GOLD)
-		status.TextWrapped = true
-		status.TextXAlignment = Enum.TextXAlignment.Right
-		status.TextYAlignment = Enum.TextYAlignment.Center
-		local buttons: { [string]: TextButton } = {}
-		for b, slot in { "q", "e" } do
-			local button = Instance.new("TextButton")
-			button.Position = UDim2.fromOffset(236 + (b - 1) * 36, 12)
-			button.Size = UDim2.fromOffset(30, 30)
-			button.BorderSizePixel = 0
-			button.AutoButtonColor = false
-			button.Font = Enum.Font.GothamBold
-			button.TextSize = 14
-			button.Text = string.upper(slot)
-			button.Parent = row
-			corner(button, 8)
-			button.Activated:Connect(function()
-				Net.get("EquipSpell"):FireServer(id, slot)
-			end)
-			buttons[slot] = button
-		end
-		rows[id] = { frame = row, stroke = rowStroke, status = status, buttons = buttons }
-	end
-
-	renderSpells = function()
-		for slot, box in slotBoxes do
-			local id = (state.spells.slots :: { [string]: string })[slot]
-			local def = Spells.Defs[id]
-			if def then
-				box.text.Text = def.label
-				box.text.TextColor3 = WHITE
-				box.stroke.Color = def.color
-				box.icon.BackgroundColor3 = def.color
-			else
-				box.text.Text = "empty"
-				box.text.TextColor3 = MUTED
-				box.stroke.Color = BADGE
-				box.icon.BackgroundColor3 = BADGE
-			end
-		end
-		for id, row in rows do
-			local owned = state.spells.owned[id] == true
-			local def = Spells.Defs[id]
-			row.status.Visible = not owned
-			row.frame.BackgroundTransparency = if owned then 0 else 0.5
-			row.stroke.Transparency = if owned then 0.45 else 0.8
-			for slot, button in row.buttons do
-				button.Visible = owned
-				local equipped = (state.spells.slots :: { [string]: string })[slot] == id
-				button.BackgroundColor3 = if equipped then def.color:Lerp(BG, 0.2) else UI.DARK
-				button.TextColor3 = if equipped then WHITE else MUTED
-			end
-		end
-	end
-end
-
 -- ── State from the server ─────────────────────────────────────────────────
 
 Net.get("State").OnClientEvent:Connect(function(new)
@@ -2179,7 +2044,6 @@ Net.get("State").OnClientEvent:Connect(function(new)
 	renderInventory()
 	renderSoldiers()
 	renderLevels()
-	renderSpells()
 end)
 
 -- (showToast is set in the Toast section below and also used by later sections.)
@@ -3427,9 +3291,6 @@ local function showResult(result: any)
 		if result.luckyResult then
 			table.insert(entries, { text = string.format('<font color="#7ee08a">LUCKY DROP: %s unlocked!</font>', Units.Classes[result.luckyResult].label), accent = GREEN, unit = { class = result.luckyResult, tier = 1 } })
 		end
-		if result.spellDrop then
-			table.insert(entries, { text = string.format('<font color="#96c8ff">NEW SPELL: %s</font>', Spells.Defs[result.spellDrop].label), accent = Spells.Defs[result.spellDrop].color })
-		end
 	else
 		table.insert(entries, { text = string.format('<font color="#f0645a">DEFEAT</font>  ·  wave %d  ·  <font color="#ffcd5a">+%d coins</font>', result.wave, result.coins or 0), accent = RED })
 	end
@@ -4066,245 +3927,6 @@ local function requestFight()
 	UI.battleOpen = not UI.battleOpen
 end
 
--- ── Spells: Q and E (the two spells you carry) ──────────────────────────
--- During a battle press Q or E (or click the buttons) to pick the spell of that slot, then CLICK on the arena
--- where it should land: while you aim, a ring shows the area it hits and a glowing arc shows its path from you
--- to that spot. Esc (or the same key again) cancels. A spell that hits the whole arena (no aiming) casts at
--- once. Which two spells you carry is chosen in the SPELLS tab of the panel. Every slot has its own cooldown
--- (the server owns it and tells the client).
-
--- Set below; called from the key handler at the end of the file (Q / E).
-local castSpell: (string) -> () = function() end
-
-do
-	type SpellButton = { slot: string, key: string, readyAt: number, cooldown: number, fill: Frame, titleLabel: TextLabel, subLabel: TextLabel, button: TextButton, stroke: UIStroke }
-	local buttons: { [string]: SpellButton } = {}
-	local width = 150
-
-	for i, slot in { "q", "e" } do
-		local button = Instance.new("TextButton")
-		button.Name = "Spell_" .. slot
-		button.AnchorPoint = Vector2.new(1, 1)
-		button.Position = UDim2.new(1, -18 - (2 - i) * (width + 8), 1, -18)
-		button.Size = UDim2.fromOffset(width, 64)
-		button.BackgroundColor3 = BG
-		button.BackgroundTransparency = 0.1
-		button.BorderSizePixel = 0
-		button.AutoButtonColor = false
-		button.Text = ""
-		button.ClipsDescendants = true
-		button.Visible = false
-		button.Parent = gui
-		corner(button, 12)
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 2
-		stroke.Parent = button
-		local fill = Instance.new("Frame")
-		fill.Size = UDim2.fromScale(1, 1)
-		fill.BackgroundTransparency = 0.7
-		fill.BorderSizePixel = 0
-		fill.Parent = button
-		local titleLabel = label(button, "", UDim2.fromOffset(0, 8), UDim2.new(1, 0, 0, 24), 16, Enum.Font.GothamBlack, WHITE)
-		titleLabel.TextXAlignment = Enum.TextXAlignment.Center
-		local subLabel = label(button, "", UDim2.fromOffset(0, 34), UDim2.new(1, 0, 0, 18), 12, Enum.Font.GothamMedium, GOLD)
-		subLabel.TextXAlignment = Enum.TextXAlignment.Center
-		buttons[slot] = { slot = slot, key = string.upper(slot), readyAt = 0, cooldown = 1, fill = fill, titleLabel = titleLabel, subLabel = subLabel, button = button, stroke = stroke }
-	end
-
-	-- The spell in a slot (nil-safe).
-	local function spellOf(slot: string): (string?, Spells.Def?)
-		local id = (state.spells.slots :: { [string]: string })[slot]
-		return id, Spells.Defs[id]
-	end
-
-	-- Where the mouse points on the arena floor (nil when it points at the sky).
-	local function aimPoint(): Vector3?
-		local plot = findPlot()
-		local arena = if plot then plot:FindFirstChild("FightArena") else nil
-		if not arena or not arena:IsA("BasePart") then
-			return nil
-		end
-		local top = arena:GetAttribute("TopY")
-		return groundPoint(if type(top) == "number" then top else arena.Position.Y + arena.Size.Y / 2)
-	end
-
-	local aiming: string? = nil -- the slot being aimed with the mouse (Q / E pressed, waiting for the click)
-
-	castSpell = function(slot: string)
-		local spell = buttons[slot]
-		local _, def = spellOf(slot)
-		if not spell or not def or not state.battling or confirmLayer or os.clock() < spell.readyAt then
-			return
-		end
-		if def.aimed then
-			-- Pick the spell; the click on the arena casts it (UI.aimClick). The same key again cancels.
-			aiming = if aiming == slot then nil else slot
-		else
-			aiming = nil
-			Net.get("Ability"):FireServer(slot) -- hits the whole arena: no aiming
-		end
-	end
-
-	UI.cancelAim = function()
-		aiming = nil
-	end
-
-	-- A click in the world while aiming: cast at the pointed spot. Returns true when the click was used.
-	UI.aimClick = function(): boolean
-		local slot = aiming
-		if not slot then
-			return false
-		end
-		local spell = buttons[slot]
-		if not spell or not state.battling or os.clock() < spell.readyAt then
-			aiming = nil
-			return false
-		end
-		local point = aimPoint()
-		if not point then
-			return true -- pointing at the sky: keep aiming
-		end
-		Net.get("Ability"):FireServer(slot, point)
-		aiming = nil
-		return true
-	end
-
-	for slot, spell in buttons do
-		spell.button.Activated:Connect(function()
-			castSpell(slot)
-		end)
-	end
-	Net.get("Ability").OnClientEvent:Connect(function(slot: string, cooldown: number)
-		local spell = buttons[slot]
-		if spell then
-			spell.cooldown = cooldown
-			spell.readyAt = os.clock() + cooldown
-		end
-	end)
-
-	-- A small hint above the buttons.
-	local hint = label(gui, "Q / E picks a spell · click on the arena where it lands · Esc cancels", UDim2.new(1, -18 - 2 * (width + 8) + 8, 1, -90), UDim2.fromOffset(2 * (width + 8) - 8, 16), 12, Enum.Font.GothamMedium, MUTED)
-	hint.TextXAlignment = Enum.TextXAlignment.Right
-	hint.Visible = false
-
-	-- The aim preview: a ring on the floor where the spell lands (its real radius), a brighter rim, and a glowing
-	-- arc of beads from your character to that spot (the path the spell takes).
-	local function previewPart(name: string, shape: Enum.PartType?): Part
-		local p = Instance.new("Part")
-		p.Name = name
-		if shape then
-			p.Shape = shape
-		end
-		p.Color = Color3.fromRGB(255, 190, 120)
-		p.Material = Enum.Material.Neon
-		p.Transparency = 0.7
-		p.Anchored = true
-		p.CanCollide = false
-		p.CanQuery = false
-		p.CanTouch = false
-		p.CastShadow = false
-		return p
-	end
-	local ring = previewPart("SpellRing", Enum.PartType.Cylinder)
-	local rim = previewPart("SpellRim", Enum.PartType.Cylinder)
-	rim.Transparency = 0.15
-	local BEADS = 14
-	local beads: { Part } = {}
-	for i = 1, BEADS do
-		local bead = previewPart("SpellBead", Enum.PartType.Ball)
-		bead.Transparency = 0.2
-		beads[i] = bead
-	end
-	local function hidePreview()
-		ring.Parent = nil
-		rim.Parent = nil
-		for _, bead in beads do
-			bead.Parent = nil
-		end
-	end
-
-	RunService.RenderStepped:Connect(function()
-		local now = os.clock()
-		hint.Visible = state.battling and not IS_TOUCH
-		local aimedRadius: number? = nil
-		local aimedColor = Color3.fromRGB(255, 190, 120)
-		for slot, spell in buttons do
-			local _, def = spellOf(slot)
-			spell.button.Visible = state.battling and def ~= nil
-			if def then
-				spell.titleLabel.Text = string.format("[%s] %s", spell.key, string.upper(def.label))
-				spell.stroke.Color = def.color
-				spell.fill.BackgroundColor3 = def.color
-				if def.aimed and def.radius then
-					aimedRadius, aimedColor = def.radius, def.color
-				end
-				if state.battling then
-					local left = spell.readyAt - now
-					if left > 0 then
-						spell.subLabel.Text = string.format("%ds", math.ceil(left))
-						spell.subLabel.TextColor3 = MUTED
-						spell.fill.Size = UDim2.fromScale(math.clamp(1 - left / spell.cooldown, 0, 1), 1)
-						spell.titleLabel.TextTransparency = 0.5
-					else
-						spell.subLabel.Text = def.hint
-						spell.subLabel.TextColor3 = GOLD
-						spell.fill.Size = UDim2.fromScale(1, 1)
-						spell.titleLabel.TextTransparency = 0
-					end
-				else
-					spell.readyAt = 0 -- every wave starts with the spells ready
-				end
-			end
-		end
-		if not state.battling then
-			aiming = nil
-		end
-		local aimSlot = aiming
-		local aimDef: Spells.Def? = nil
-		if aimSlot then
-			local _, def = spellOf(aimSlot)
-			aimDef = def
-		end
-		for slot, spell in buttons do
-			spell.stroke.Thickness = if slot == aimSlot then 4 else 2 -- the picked spell's button lights up
-		end
-		local point = if aimDef and aimDef.aimed then aimPoint() else nil
-		if aimDef and point then
-			local radius = aimDef.radius or 6
-			local color = aimDef.color
-			local flatPoint = point + Vector3.new(0, 0.2, 0)
-			local turn = CFrame.Angles(0, 0, math.rad(90))
-			ring.Size = Vector3.new(0.15, radius * 2, radius * 2)
-			ring.Color = color
-			ring.Transparency = 0.6 + math.sin(now * 5) * 0.1
-			ring.CFrame = CFrame.new(flatPoint) * turn
-			ring.Parent = workspace
-			rim.Size = Vector3.new(0.2, radius * 2 + 0.5, radius * 2 + 0.5)
-			rim.Color = color
-			rim.CFrame = CFrame.new(flatPoint + Vector3.new(0, 0.02, 0)) * turn
-			rim.Parent = workspace
-			-- The path: a parabola from your character's chest to the spot, drawn with beads that run along it.
-			local character = player.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			local from = if root and root:IsA("BasePart") then root.Position + Vector3.new(0, 1, 0) else point + Vector3.new(0, 12, 0)
-			local to = point + Vector3.new(0, 0.6, 0)
-			local distance = (to - from).Magnitude
-			local height = math.clamp(distance * 0.35, 3, 14)
-			for i, bead in beads do
-				local t = ((i - 1) / BEADS + (now * 0.6) % (1 / BEADS)) -- the beads slide toward the target
-				local pos = from:Lerp(to, t) + Vector3.new(0, math.sin(t * math.pi) * height, 0)
-				local size = 0.3 + t * 0.35
-				bead.Size = Vector3.one * size
-				bead.Color = color
-				bead.Position = pos
-				bead.Parent = workspace
-			end
-		else
-			hidePreview()
-		end
-	end)
-end
-
 -- ── Admin tools (only for the owner / in Studio) ─────────────────────────
 do
 
@@ -4624,7 +4246,7 @@ do
 end
 
 -- ── During a battle ────────────────────────────────────────────────────────
--- The camera stays yours (the server puts you into the arena for your spells); only the main panel steps
+-- The camera stays yours and you stay where you are (the Mages fight on their own); only the main panel steps
 -- aside while the battle runs, so the fight is not covered. It also steps aside while the battle panel (PLAY)
 -- is open, so the two never lie over each other, and comes back when that closes.
 do
@@ -4966,20 +4588,15 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if input.KeyCode == Enum.KeyCode.Escape then
 		closeConfirm()
 		UI.battleOpen = false
-		UI.cancelAim()
 	elseif input.KeyCode == Enum.KeyCode.E then
-		-- E summons at the altar (a ProximityPrompt); inside a popup that uses E it confirms; in a battle it heals.
+		-- Inside a popup that uses E it confirms. (No spells on Q / E any more: the Mages cast on their own.)
 		if confirmLayer then
 			local callback = confirmCallback
 			if confirmKeyCode == Enum.KeyCode.E and callback then
 				closeConfirm()
 				callback()
 			end
-		else
-			castSpell("e")
 		end
-	elseif input.KeyCode == Enum.KeyCode.Q then
-		castSpell("q") -- METEOR at the cursor (only in a battle)
 	elseif input.KeyCode == Enum.KeyCode.H then
 		UI.hidden = not UI.hidden -- hide / show the panel (same as its icon in the dock)
 		if not UI.hidden then
@@ -4988,9 +4605,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		Layout.save()
 	elseif isPointerPress(input) then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)
-		if UI.aimClick() then
-			return -- the click cast the picked spell where the mouse points
-		end
 		closeCardPopup() -- a click in the world closes the popup
 		beginDrag()
 	end

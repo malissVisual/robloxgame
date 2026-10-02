@@ -28,7 +28,6 @@ Achievements.List = {
 	{ id = "waves250", label = "Arena Regular", text = "Win 250 waves", stat = "wavesWon", target = 250, coins = 2500, xp = 1200 },
 	{ id = "boss10", label = "Boss Hunter", text = "Beat 10 boss waves", stat = "bossKills", target = 10, coins = 1000, xp = 500 },
 	{ id = "nightmare25", label = "Nightmare Walker", text = "Win 25 waves on Nightmare", stat = "nightmareWaves", target = 25, coins = 2500, xp = 1200 },
-	{ id = "spells100", label = "Spellcaster", text = "Cast 100 spells", stat = "spellsCast", target = 100, coins = 500, xp = 250 },
 	{ id = "summons100", label = "Summoner", text = "Summon 100 characters", stat = "summons", target = 100, coins = 400, xp = 200 },
 	{ id = "level10", label = "Apprentice", text = "Reach account level 10", stat = "level", target = 10, coins = 500, xp = 0 },
 	{ id = "level25", label = "Champion", text = "Reach account level 25", stat = "level", target = 25, coins = 2500, xp = 0 },
@@ -40,6 +39,6 @@ for _, def in Achievements.List do
 end
 
 -- The stats every profile counts (all start at 0).
-Achievements.StatKeys = { "kills", "merges", "maxTier", "ascended", "wavesWon", "bossKills", "nightmareWaves", "spellsCast", "summons" }
+Achievements.StatKeys = { "kills", "merges", "maxTier", "ascended", "wavesWon", "bossKills", "nightmareWaves", "summons" }
 
 return Achievements
