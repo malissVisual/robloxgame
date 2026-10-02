@@ -2360,9 +2360,14 @@ type CardDrag = {
 	placed: boolean,
 	spin: number,
 	startPointer: Vector2,
-	moved: boolean,
+	pressedAt: number, -- os.clock() of the press: a long hold picks the card up even without moving
+	moved: boolean, -- the drag really started (moved far enough or held long enough); until then it is a click
 }
 local cardDrag: CardDrag? = nil
+-- Click or drag? A press is a CLICK until the pointer moves at least CARD_DRAG_SLOP pixels or the button is held
+-- CARD_HOLD_TIME seconds; releasing before that opens the card's popup. (6 px was too little: the mouse jitters.)
+local CARD_DRAG_SLOP = 16
+local CARD_HOLD_TIME = 0.3
 
 -- The pad under the pointer (unlocked board pads and squad pads only) and its indicator color.
 local function padForUnit(unit: { class: string, tier: number }): (number?, Color3)
@@ -2419,9 +2424,6 @@ beginCardDrag = function(id: number, input: InputObject)
 	-- The real 3D soldier that appears in the world once the cursor leaves the panel.
 	local world = Soldier.build(unit.class, unit.tier, false, nil, (unit :: any).ascended)
 
-	if slotCards[id] then
-		slotCards[id].BackgroundTransparency = 0.6 -- the card stays as a dimmed placeholder
-	end
 	cardDrag = {
 		id = id,
 		ghost = ghost,
@@ -2433,6 +2435,7 @@ beginCardDrag = function(id: number, input: InputObject)
 		placed = false,
 		spin = 0,
 		startPointer = pointer,
+		pressedAt = os.clock(),
 		moved = false,
 	}
 end
@@ -2443,10 +2446,13 @@ local function updateCardDrag(dt: number)
 		return
 	end
 	if not d.moved then
-		if (pointer - d.startPointer).Magnitude < 6 then
+		if (pointer - d.startPointer).Magnitude < CARD_DRAG_SLOP and os.clock() - d.pressedAt < CARD_HOLD_TIME then
 			return -- still a click
 		end
-		d.moved = true
+		d.moved = true -- picked up: from here on it is a drag
+		if slotCards[d.id] then
+			slotCards[d.id].BackgroundTransparency = 0.6 -- the card stays as a dimmed placeholder
+		end
 	end
 
 	local unit = unitAt(d.id)
