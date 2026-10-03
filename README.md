@@ -322,8 +322,28 @@ x16 / 8000.
 - **Income**: every wizard you own (inventory and squad) earns coins per minute (rarity income, +35% per level,
   Ascended x2); the PER MIN chip in the resources bar shows the total.
 
-**Looks**: right now every type is the Mage tinted with its colors. A designed model for a type goes into
-`Wizards.Types.<Type>.evolution` (wired into SoldierRig when the designs arrive).
+**Looks**: six types have their own designed models, **16 levels each** (the "Merge Wizardi 1–16" design):
+Ember = **Fire**, Frost = **Ice**, Storm = **Storm**, Verdant = **Nature**, Shadow = **Shadow**, Arcane = **Arcane**
+(`Wizards.Types.<Type>.evolution` names the element; `SoldierRig.build` builds `StageModels/WizardEvolution/<Element>_L##`
+instead of the Mage's evolution; the card shows the level's own name, e.g. "Flame Archmage"). Void and Celestial
+are still the Mage tinted with their colors. What grows with the level (the same for every element; the element
+is in the colors and the head of the staff: flames, an ice crystal, a lightning ring, a living branch, a crescent
+moon, an arcane star):
+
+| Level | Gear |
+|---|---|
+| 1–3 | apprentice: a short wand with a spark, a plain robe and hat |
+| 4 | a staff with the element head, a beard, a belt, trims on the robe and the hat |
+| 7 | a cape, shoulder pads, a rune circle on the ground |
+| 8 | an element orb floating over the left hand |
+| 10 | a metal staff, glowing eyes, a star on the hat, floating orbs (more at 11 and 12), a high collar |
+| 11 | gold trims and pads, a colored cape lining |
+| 13 | wings of light, a crown on the hat, a second rune circle |
+| 16 | a golden staff, a golden rune circle, a big halo of light |
+
+The models are generated: change `tools/wizards_evolution.py` and run `python3 tools/wizards_evolution.py` (it
+also draws the preview sheets into `design/WizardEvolution/`); `python3 tools/tests/run_wizard_models_test.py`
+checks them.
 
 Admin panel: the arrows cycle the wizard types, SPAWN 1 puts one at the chosen level into the inventory.
 

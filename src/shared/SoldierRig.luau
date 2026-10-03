@@ -11,6 +11,9 @@
 
 local Rig = require(script.Parent.Rig)
 local Weapons = require(script.Parent.Weapons)
+-- The element wizards (Fire, Ice, Storm, Nature, Shadow, Arcane: 16 levels each), built like the Mage's evolution
+-- for the wizard types that name an element (Config/Wizards.luau, `evolution`).
+local WizardEvolution = require(script.Parent.StageModels.WizardEvolution)
 -- The Knight, the Archer and the Mage do not use their 9 cards below any more: their 30 merge levels are the R15
 -- evolution models (design/KnightEvolution, ArcherEvolution, MageEvolution; generated into StageModels/<Class>Evolution), see
 -- buildEvolution. `attack` / `hold` = the animations (Rig.animate); `holdFrom` = the level the weapon hand is
@@ -2260,9 +2263,16 @@ end
 
 -- Builds the character of the level; same contract as SoldierRig.build. Returns nil when the class has no
 -- evolution or the level no data.
-local function buildEvolution(class: string, tier: number, s: number, bare: boolean?): (Model?, BasePart?, number?)
+local function buildEvolution(class: string, tier: number, s: number, bare: boolean?, element: string?): (Model?, BasePart?, number?)
 	local evolution = EVOLUTIONS[class]
-	local data = evolution and evolution.data.level(math.clamp(tier, 1, evolution.data.Count))
+	local data = nil
+	if evolution and element and WizardEvolution.has(element) then
+		data = WizardEvolution.level(element, tier) -- the element wizard's own model
+	end
+	local ownModel = data ~= nil
+	if not data and evolution then
+		data = evolution.data.level(math.clamp(tier, 1, evolution.data.Count))
+	end
 	if not data then
 		return nil
 	end
@@ -2270,6 +2280,9 @@ local function buildEvolution(class: string, tier: number, s: number, bare: bool
 	local isStatic = bare == true
 	local model = Instance.new("Model")
 	model.Name = "Soldier"
+	if ownModel then
+		model:SetAttribute("WizardElement", element)
+	end
 
 	-- The body: the 16 R15 parts, in model space (feet on y = 0, facing -Z).
 	local parts: { [string]: BasePart } = {}
@@ -2370,8 +2383,14 @@ function SoldierRig.has(class: string): boolean
 	return CLASSES[class] ~= nil
 end
 
-function SoldierRig.name(tier: number, class: string?): string
+function SoldierRig.name(tier: number, class: string?, element: string?): string
 	local evolution = EVOLUTIONS[class or ""]
+	if evolution and element and WizardEvolution.has(element) then
+		local data = WizardEvolution.level(element, tier)
+		if data then
+			return data.name
+		end
+	end
 	if evolution then
 		local data = evolution.data.level(math.clamp(tier, 1, evolution.data.Count))
 		if data then
@@ -2385,10 +2404,11 @@ end
 -- Builds the Soldier of the level at the block scale `s` (Soldier.scale × the Ascended bonus). `bare` = a
 -- still statue (UI previews, holograms): everything anchored, no Humanoid, no lights. Returns the model, its
 -- head and how high the label floats over it (in studs at scale 1), or nil when there is no base rig.
-function SoldierRig.build(tier: number, s: number, bare: boolean?, class: string?): (Model?, BasePart?, number?)
+-- `element` = an element wizard's own models (StageModels/WizardEvolution) instead of the class's evolution.
+function SoldierRig.build(tier: number, s: number, bare: boolean?, class: string?, element: string?): (Model?, BasePart?, number?)
 	if class and EVOLUTIONS[class] then
 		-- The 30-level evolution (no base rig needed); the 9 cards below are only the fallback without data.
-		local model, head, top = buildEvolution(class, tier, s, bare)
+		local model, head, top = buildEvolution(class, tier, s, bare, element)
 		if model then
 			return model, head, top
 		end

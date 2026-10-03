@@ -7,9 +7,9 @@
 -- in the lobby (coins; an Epic or better is guaranteed after Balance.SummonPity summons without one) and the CODEX
 -- pays coins for every new type you find. Every wizard you own earns coins per minute (Wizards.income).
 --
--- LOOKS: right now every type uses the Mage's evolution models, tinted with its colors (the staff crystals, the aura,
--- the bolts, the card). When the designed models arrive, a type gets `evolution = <its StageModels module>` here and
--- SoldierRig will build it instead (wired in when the designs arrive).
+-- LOOKS: a type with `evolution` (an element of StageModels/WizardEvolution: Fire, Ice, Storm, Nature, Shadow, Arcane)
+-- has its own designed models, 16 levels (tools/wizards_evolution.py, the "Merge Wizardi 1–16" design); SoldierRig
+-- builds those. A type without it (Void, Celestial) uses the Mage's evolution models, tinted with its colors.
 
 local Wizards = {}
 
@@ -35,7 +35,7 @@ export type Def = {
 	trait: string, -- the battle trait id (BattleService)
 	traitLabel: string,
 	traitText: string,
-	evolution: any?, -- the designed models of this type (later); nil = the Mage's models, tinted
+	evolution: string?, -- the element of its designed models (StageModels/WizardEvolution); nil = the Mage's models, tinted
 }
 
 local C = Color3.fromRGB
@@ -52,31 +52,37 @@ Wizards.RarityOrder = { "Common", "Rare", "Epic", "Legendary", "Mythic" }
 Wizards.Types = {
 	Arcane = {
 		id = "Arcane", label = "Arcane Mage", element = "Arcane", rarity = "Common",
+		evolution = "Arcane",
 		color = C(180, 100, 210), color2 = C(235, 205, 255),
 		trait = "flow", traitLabel = "Arcane Flow", traitText = "every hit restores 4 mana (more spells)",
 	},
 	Ember = {
 		id = "Ember", label = "Ember Mage", element = "Fire", rarity = "Common",
+		evolution = "Fire",
 		color = C(255, 120, 50), color2 = C(255, 215, 140),
 		trait = "burn", traitLabel = "Kindle", traitText = "hits burn the target: 3% max HP per second for 2 s",
 	},
 	Frost = {
 		id = "Frost", label = "Frost Mage", element = "Ice", rarity = "Rare",
+		evolution = "Ice",
 		color = C(120, 200, 255), color2 = C(225, 245, 255),
 		trait = "chill", traitLabel = "Frostbite", traitText = "hits slow the target by 35% for 1.5 s",
 	},
 	Storm = {
 		id = "Storm", label = "Storm Mage", element = "Lightning", rarity = "Rare",
+		evolution = "Storm",
 		color = C(130, 160, 255), color2 = C(240, 245, 255),
 		trait = "chain", traitLabel = "Arc", traitText = "hits jump to one more enemy nearby for 50%",
 	},
 	Verdant = {
 		id = "Verdant", label = "Verdant Mage", element = "Nature", rarity = "Epic",
+		evolution = "Nature",
 		color = C(100, 210, 110), color2 = C(210, 255, 200),
 		trait = "bloom", traitLabel = "Bloom", traitText = "every 2 s heals the most hurt ally nearby by 5% max HP",
 	},
 	Shadow = {
 		id = "Shadow", label = "Shadow Mage", element = "Shadow", rarity = "Epic",
+		evolution = "Shadow",
 		color = C(110, 70, 150), color2 = C(200, 160, 255),
 		trait = "reap", traitLabel = "Reap", traitText = "20% chance of a 2.2x critical hit; heals 10% of the damage",
 	},

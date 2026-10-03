@@ -405,14 +405,19 @@ end
 function Soldier.build(class: string, tier: number, enemy: boolean, bare: boolean?, ascended: boolean?, variant: string?): Model
 	if variant and not enemy and Wizards.isValid(variant) then
 		local wiz = Wizards.Types[variant :: string]
-		local model = Soldier.buildPlain(class, tier, enemy, bare, ascended, wiz.label)
-		tintWizard(model, wiz)
+		local model = Soldier.buildPlain(class, tier, enemy, bare, ascended, wiz.label, wiz.evolution)
+		if wiz.evolution and model:GetAttribute("WizardElement") == wiz.evolution then
+			model:SetAttribute("Variant", wiz.id) -- its own designed model: already in its colors
+		else
+			tintWizard(model, wiz)
+		end
 		return model
 	end
 	return Soldier.buildPlain(class, tier, enemy, bare, ascended)
 end
 
-function Soldier.buildPlain(class: string, tier: number, enemy: boolean, bare: boolean?, ascended: boolean?, title: string?): Model
+-- `element` = the designed models of a wizard type (StageModels/WizardEvolution) instead of the class's own.
+function Soldier.buildPlain(class: string, tier: number, enemy: boolean, bare: boolean?, ascended: boolean?, title: string?, element: string?): Model
 	local def = Units.Classes[class]
 	local s = Soldier.scale(tier) * (if ascended then 1.1 else 1)
 	local main = if enemy then def.color:Lerp(ENEMY_TINT, 0.55) else def.color
@@ -429,7 +434,7 @@ function Soldier.buildPlain(class: string, tier: number, enemy: boolean, bare: b
 	if SoldierRig.has(class) then
 		-- The Mage is an R15 character with 30 designed levels (SoldierRig.luau). Without the data
 		-- (it could not be made, or it has not reached this client yet) the block soldier below is built.
-		local rig, rigHead, rigTop = SoldierRig.build(tier, s, bare, class)
+		local rig, rigHead, rigTop = SoldierRig.build(tier, s, bare, class, element)
 		if rig and rigHead and rigTop then
 			rig.Name = def.label
 			return finishModel(rig, rigHead :: any, rigTop, s, def, tier, enemy, levelColor, bare, ascended, title)

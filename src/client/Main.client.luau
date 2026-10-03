@@ -2461,7 +2461,7 @@ openCardPopup = function(id: number, at: Vector2?)
 		closeCardPopup()
 		UI.openSkillTree(id)
 	end)
-	local tierLabel = line(string.format('<font color="%s">%s</font>  ·  %s', "#" .. rarity.color:ToHex(), rarity.label, string.upper(SoldierRig.name(unit.tier, unit.class))) .. (if ascended then "  ·  ASCENDED" else ""), y + 20, 10, Enum.Font.GothamBlack, levelColor, 14)
+	local tierLabel = line(string.format('<font color="%s">%s</font>  ·  %s', "#" .. rarity.color:ToHex(), rarity.label, string.upper(SoldierRig.name(unit.tier, unit.class, wiz.evolution))) .. (if ascended then "  ·  ASCENDED" else ""), y + 20, 10, Enum.Font.GothamBlack, levelColor, 14)
 	tierLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	y += 40
 	-- The wizard type's battle trait and what it earns per minute.
