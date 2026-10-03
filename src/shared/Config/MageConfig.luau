@@ -119,6 +119,7 @@ local MageConfig = {
 		multi = { "DOUBLE!", "TRIPLE!" },
 		victory = { "EASY.", "WHO'S NEXT?" },
 		ambush = { "BEHIND US!" },
+		reinforcements = { "MORE OF THEM!", "HERE THEY COME!" },
 		champion = { "BIG ONE." },
 		treasure = { "GET HIM!" },
 	},

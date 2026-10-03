@@ -1554,6 +1554,17 @@ function GameService.init()
 	Net.get("AdminCommand").OnServerEvent:Connect(onAdminCommand)
 	local _unusedUpgrade = onUpgradeLevel
 	Net.get("BattleSpeed").OnServerEvent:Connect(onBattleSpeed)
+	Net.get("CastSpell").OnServerEvent:Connect(function(player: Player, id: any)
+		-- The player's meteor (Config/BattleSpells.luau): the server checks the fight and the cooldown and answers
+		-- with the cooldown left, so the button's ring stays right.
+		if type(id) ~= "string" then
+			return
+		end
+		local cast, wait = BattleService.castSpell(player, id)
+		if wait then
+			Net.get("SpellState"):FireClient(player, { id = id, cast = cast, wait = wait })
+		end
+	end)
 	Net.get("SetSetting").OnServerEvent:Connect(onSetSetting)
 	Net.get("AutoMerge").OnServerEvent:Connect(onAutoMerge)
 	Net.get("EquipBest").OnServerEvent:Connect(onEquipBest)

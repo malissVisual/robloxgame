@@ -5382,6 +5382,124 @@ upgrade.button.Activated:Connect(function()
 	Net.get("Upgrade"):FireServer()
 end)
 
+-- ── METEOR: the player's spell during a fight (Config/BattleSpells.luau) ──
+-- A round button at the bottom center while a fight runs (or F): the server drops a meteor on the biggest group of
+-- enemies and answers with the cooldown (SpellState), which the dark fill and the seconds show.
+do
+	local Spells = require(Shared:WaitForChild("Config"):WaitForChild("BattleSpells"))
+	local M = Spells.Meteor
+	local readyAt, total = 0, 1
+	local wasBattling = false
+
+	local button = Instance.new("TextButton")
+	button.Name = "MeteorButton"
+	button.AnchorPoint = Vector2.new(0.5, 1)
+	button.Position = UDim2.new(0.5, 0, 1, -26)
+	button.Size = UDim2.fromOffset(96, 96)
+	button.BackgroundColor3 = Color3.fromRGB(70, 28, 18)
+	button.AutoButtonColor = false
+	button.Text = ""
+	button.Visible = false
+	button.ClipsDescendants = true
+	button.Parent = gui
+	corner(button, 48)
+	local ring = UI.stroke(button, M.Color, 4)
+	local icon = Instance.new("Frame") -- the meteor: a glowing ball with a tail
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.56, 0.4)
+	icon.Size = UDim2.fromOffset(30, 30)
+	icon.BackgroundColor3 = M.Color
+	icon.Parent = button
+	corner(icon, 15)
+	local core = Instance.new("Frame")
+	core.AnchorPoint = Vector2.new(0.5, 0.5)
+	core.Position = UDim2.fromScale(0.5, 0.5)
+	core.Size = UDim2.fromOffset(14, 14)
+	core.BackgroundColor3 = M.Color2
+	core.Parent = icon
+	corner(core, 7)
+	for i = 1, 3 do
+		local tail = Instance.new("Frame")
+		tail.AnchorPoint = Vector2.new(0.5, 0.5)
+		tail.Position = UDim2.new(0.56, -12 - i * 7, 0.4, -8 - i * 6)
+		tail.Size = UDim2.fromOffset(12 - i * 2, 12 - i * 2)
+		tail.BackgroundColor3 = M.Color
+		tail.BackgroundTransparency = 0.2 + i * 0.2
+		tail.Parent = button
+		corner(tail, 6)
+	end
+	local name = label(button, "METEOR", UDim2.new(0, 0, 1, -34), UDim2.new(1, 0, 0, 16), 13, Enum.Font.GothamBlack, WHITE)
+	name.TextXAlignment = Enum.TextXAlignment.Center
+	local key = label(button, if IS_TOUCH then "" else "F", UDim2.new(0, 0, 1, -19), UDim2.new(1, 0, 0, 13), 11, Enum.Font.GothamBold, M.Color2)
+	key.TextXAlignment = Enum.TextXAlignment.Center
+	name.ZIndex, key.ZIndex = 5, 5 -- over the cooldown fill
+	local shade = Instance.new("Frame") -- the cooldown: a dark fill that sinks
+	shade.AnchorPoint = Vector2.new(0, 1)
+	shade.Position = UDim2.fromScale(0, 1)
+	shade.Size = UDim2.fromScale(1, 0)
+	shade.BackgroundColor3 = Color3.new(0, 0, 0)
+	shade.BackgroundTransparency = 0.35
+	shade.BorderSizePixel = 0
+	shade.ZIndex = 3
+	shade.Parent = button
+	local seconds = label(button, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 30, Enum.Font.GothamBlack, WHITE)
+	seconds.TextXAlignment = Enum.TextXAlignment.Center
+	seconds.ZIndex = 4
+
+	local function cast()
+		if not state.battling or os.clock() < readyAt - 0.15 then
+			return
+		end
+		Net.get("CastSpell"):FireServer("meteor")
+		readyAt = os.clock() + 0.5 -- until the server answers (no double cast)
+		TweenService:Create(button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), { Size = UDim2.fromOffset(108, 108) }):Play()
+	end
+	button.Activated:Connect(cast)
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if not processed and input.KeyCode == M.Key then
+			cast()
+		end
+	end)
+	Net.get("SpellState").OnClientEvent:Connect(function(data)
+		if type(data) ~= "table" or data.id ~= "meteor" or type(data.wait) ~= "number" then
+			return
+		end
+		readyAt = os.clock() + data.wait
+		if data.cast then
+			total = math.max(0.1, data.wait)
+		else
+			total = math.max(total, data.wait, 0.1)
+		end
+	end)
+
+	RunService.RenderStepped:Connect(function()
+		local battling = state.battling == true
+		if battling and not wasBattling then
+			-- A new fight: ready after the black fade and the first delay (the server corrects it on the first press).
+			local speed = math.max(1, state.battleSpeed or 1)
+			total = Balance.BattleCountdown + M.FirstDelay / speed
+			readyAt = battleStart + total
+		end
+		wasBattling = battling
+		button.Visible = battling
+		if not battling then
+			return
+		end
+		local left = readyAt - os.clock()
+		if left > 0.05 then
+			shade.Size = UDim2.fromScale(1, math.clamp(left / total, 0, 1))
+			seconds.Text = tostring(math.ceil(left))
+			ring.Color = MUTED
+			ring.Thickness = 3
+		else
+			shade.Size = UDim2.fromScale(1, 0)
+			seconds.Text = ""
+			ring.Color = M.Color:Lerp(M.Color2, (math.sin(os.clock() * 6) + 1) / 2) -- ready: the ring glows
+			ring.Thickness = 4
+		end
+	end)
+end
+
 local function isPointerPress(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
 end

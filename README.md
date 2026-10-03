@@ -10,7 +10,7 @@ sides walk from their rows onto a big round fight arena and fight on their own, 
 **Current state (Mage only):** the game has ONE class, the **Mage** (**16 merge levels**, `maxTier = 16`; two level 16
 merged = ASCENDED; the looks are the first 16 of the 30-level R15 evolution, the data for 17 … 30 stays for later). The Knight,
 the Archer, the Hunter, the Tank, the Berserker and the Soldier were removed (a saved soldier of a removed class
-loads as a Mage of the same level). **You do not cast anything**: the Mages fight and cast every spell on their own
+loads as a Mage of the same level). **You cast only the METEOR** (the round button / F during a fight, see Battle timing): the Mages fight and cast every other spell on their own
 (`Config/MageSpells.luau`, `MageBrain.luau`), and you only walk around with your character; there is no Q / E, no
 SPELLS tab and no spell drops. Older passages below about other classes or "your own spells" describe the removed
 version.
@@ -380,6 +380,21 @@ balance and the result screen shows the total of the wave as one small line.
   bosses' slams, volleys and heals never showed. Now a squad of the expected strength shoots for about **15 s at
   wave 1 and 20-30 s later** (a boss wave longer), plus the walk in, and loses about a third of its HP; an
   under-merged squad can lose. To make fights shorter or longer, scale the `WaveHp` points (×0.8 = 20 % shorter).
+- **Bosses are long fights:** a boss (every 5th wave, the Rift King) has `Balance.BossHp` (×3.5) the HP but only
+  `Balance.BossDamage` (×0.6) the damage; burns (a part of max HP) hurt it only `Balance.BossPercentDamage` (30 %)
+  as much; a boss wave may last `Balance.BossBattleTimeLimit` (180 s) instead of 90.
+- **The fight's extra action** (`Config/BattleSpells.luau`, run by `server/Services/BattleSpells.luau`, tested by
+  `tools/tests/run_battlespells_test.py`):
+  - **Reinforcements:** from wave 2 (not on boss waves, nor with the AMBUSH / SWARM twists) about a third of the
+    wave comes again 6 s in (or when 40 % of it is dead): red circles, "REINFORCEMENTS!", then they flash in on the
+    far side. The wave is not beaten while they are on their way.
+  - **METEOR, your spell:** the round button at the bottom center during a fight, or **F**. It falls on the biggest
+    group of enemies: 1.2 × the sum of your mages' attack to everyone inside (a boss 60 %), a short stun; ready 3 s
+    into the fight, then every 15 s (the ring shows the cooldown). Mages with an area spell ready combo into it.
+  - **Signature spells:** every element wizard casts its own big spell every 12 s (level 1) to 8 s (level 16), its
+    name over its head: Fire **INFERNO** (area blast + burn), Ice **FROST NOVA** (area + freeze), Storm
+    **THUNDERSTORM** (4 lightning strikes), Nature **WILD GROVE** (roots the enemies, heals the squad), Shadow
+    **SHADOW CLAW** (the 3 weakest enemies, executes one under 15 %), Arcane **ARCANE BARRAGE** (6 missiles).
 - **Countdown:** confirming the wave shows a big **3 · 2 · 1 · FIGHT!** before the soldiers march into the
   arena (`Balance.BattleCountdown`).
 - **After a wave** there is no result box: the rewards **drop in one after another at the top of the screen**

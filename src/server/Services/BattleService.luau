@@ -26,6 +26,7 @@ local MageBrain = require(script.Parent.MageBrain)
 local BattleFx = require(script.Parent.BattleFx)
 local EnemyBrain = require(script.Parent.EnemyBrain)
 local WaveMutators = require(script.Parent.WaveMutators)
+local BattleSpells = require(script.Parent.BattleSpells) -- reinforcements, the player's meteor, the element signatures
 local Soldier = require(Shared.Soldier)
 local Wizards = require(Shared.Config.Wizards) -- the wizard types: rarity stats and battle traits
 local MageConfig = require(Shared.Config.MageConfig)
@@ -149,6 +150,8 @@ export type Battle = {
 	formation: string, -- the enemies' layout name (Config/Formations.luau; informational, see Plots.showEnemies)
 	enemyCtx: any?, -- the enemy brains' shared context (EnemyBrain.Context), built in start()
 	damageDealt: number, -- damage your side dealt to the enemies (the result screen)
+	spells: any?, -- BattleSpells.luau: reinforcements, the player's meteor, the element wizards' signature spells
+	pendingEnemies: number, -- enemies announced but not spawned yet (reinforcements): the wave is not beaten while any are
 	groundAt: (Vector3) -> number, -- world y of the ground under a position (the arena's heightAt): fighters walk
 	-- from their pads up the step onto the round platform and down again, so every tick snaps them to the ground
 }
@@ -969,9 +972,9 @@ local function spawnEnemy(battle: Battle, kind: string, tier: number, pos: Vecto
 	fighter.kind = kind
 	fighter.boss = def.boss == true
 	local waveHp, waveDamage = Balance.waveScale(battle.wave) -- the wave curve (Balance.WaveHp / WaveDamage)
-	fighter.maxHp *= battle.enemyPower * waveHp
+	fighter.maxHp *= battle.enemyPower * waveHp * (if fighter.boss then Balance.BossHp else 1) -- bosses: long, not deadly
 	fighter.hp = fighter.maxHp
-	fighter.damage *= battle.enemyPower * waveDamage
+	fighter.damage *= battle.enemyPower * waveDamage * (if fighter.boss then Balance.BossDamage else 1)
 	if battle.elite then
 		local glow = Instance.new("Highlight")
 		glow.FillColor = Color3.fromRGB(255, 200, 60)
@@ -1019,6 +1022,9 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 	if mutators and mutators.step then
 		mutators:step(dt) -- the wave twists: puddles, storms, regen, the ambush, the enrage timer …
 	end
+	if battle.spells then
+		BattleSpells.step(battle.spells, dt) -- reinforcements and the element wizards' signature spells
+	end
 	-- The Mage tree's passives that tick: enemies on fire (Smolder) and the Healing Aura's pulses.
 	for _, f in fighters do
 		if f.hp <= 0 then
@@ -1027,7 +1033,8 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 		if f.burnUntil > f.clock then
 			f.burnTick += dt
 			if f.burnTick >= 0.5 then
-				popNumber(battle.parent, f, applyDamage(battle, f, f.burnDps * f.burnTick, f.burnBy, true), SMOLDER_COLOR)
+				local dps = f.burnDps * (if f.boss then Balance.BossPercentDamage else 1) -- (a part of max HP: less on a boss)
+				popNumber(battle.parent, f, applyDamage(battle, f, dps * f.burnTick, f.burnBy, true), SMOLDER_COLOR)
 				f.burnTick = 0
 			end
 		end
@@ -1255,9 +1262,9 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 				fighter.abilityTimer = if fighter.ability == "slam" then Balance.BossSlamEvery elseif fighter.ability == "volley" then Balance.BossVolleyEvery elseif fighter.ability == "heal" then Balance.BossHealEvery else 1
 			end
 		end
-		fighter.maxHp *= enemyPower * waveHp
+		fighter.maxHp *= enemyPower * waveHp * (if fighter.boss then Balance.BossHp else 1) -- bosses: long, not deadly
 		fighter.hp = fighter.maxHp
-		fighter.damage *= enemyPower * waveDamage
+		fighter.damage *= enemyPower * waveDamage * (if fighter.boss then Balance.BossDamage else 1)
 		if options.elite then
 			-- Elite enemies glow golden.
 			local glow = Instance.new("Highlight")
@@ -1307,6 +1314,8 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			return plot.arena.heightAt(pos)
 		end,
 		damageDealt = 0,
+		spells = nil,
+		pendingEnemies = 0,
 	}
 	battle.emit = function(name: string, payload: any)
 		for _, f in fighters do
@@ -1485,6 +1494,58 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 		end
 	end
 
+	-- The fight's extra action (BattleSpells.luau): reinforcements, the player's meteor, the signature spells.
+	local twistIds: { string } = {}
+	for _, def in battle.twists do
+		if type(def) == "table" and type(def.id) == "string" then
+			table.insert(twistIds, def.id)
+		end
+	end
+	battle.spells = BattleSpells.new({
+		fighters = fighters,
+		playerSide = PLAYER_SIDE,
+		enemySide = ENEMY_SIDE,
+		parent = plot.folder,
+		fx = BattleFx,
+		fxFolder = fxFolder,
+		groundY = groundY,
+		damage = function(target, amount, source)
+			return applyDamage(battle, target, amount, source, true)
+		end,
+		popNumber = function(target, amount, color)
+			popNumber(plot.folder, target, amount, color)
+		end,
+		heal = function(target, amount)
+			heal(battle, target, amount)
+		end,
+		schedule = function(delay, fn)
+			schedule(battle, delay, fn)
+		end,
+		addMover = function(fn)
+			addMover(battle, fn)
+		end,
+		addHazard = function(pos, radius, duration, kind, source)
+			addHazard(battle, pos, radius, duration, kind, source)
+		end,
+		emit = battle.emit,
+		notify = battle.notify,
+		spawnEnemy = function(kind, tier, pos)
+			return spawnEnemy(battle, kind, tier, pos)
+		end,
+		hold = function(count)
+			battle.pendingEnemies = math.max(0, battle.pendingEnemies + count)
+		end,
+		archetype = archetypeOf,
+		clock = function()
+			return battle.clock
+		end,
+		center = plot.arena.center,
+		wave = battle.wave,
+		boss = battle.wave > 0 and battle.wave % Balance.PhaseLength == 0,
+		twists = twistIds,
+		random = Random.new(battle.wave * 104729 + 7),
+	})
+
 	-- Every Mage gets a brain (MageBrain.luau) with its own context (the Mage is the source of its damage): the
 	-- battle's fighters, the damage helpers, the visuals (BattleFx), the events, the clock and the arena bounds.
 	local center = plot.arena.center
@@ -1560,7 +1621,8 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 
 		-- Phase 2: the fight. The battle speed (1x / 2x) stretches every tick.
 		local elapsed = 0
-		while player.Parent and plot.folder.Parent and elapsed < Balance.BattleTimeLimit do
+		local limit = if battle.wave > 0 and battle.wave % Balance.PhaseLength == 0 then Balance.BossBattleTimeLimit else Balance.BattleTimeLimit
+		while player.Parent and plot.folder.Parent and elapsed < limit do
 			task.wait(Balance.BattleTickRate)
 			numbersOn[plot.folder] = profile.settings.numbers ~= false
 			local dt = Balance.BattleTickRate * battle.speed()
@@ -1568,12 +1630,12 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			step(battle, dt, function(enemy)
 				onKill(enemy.tier, enemy.pos, enemy.coinMult * math.max(0, 1 + enemy.bonusCoins)) -- twists change a kill's coins (champion, swarm)
 			end)
-			if countAlive(fighters, PLAYER_SIDE) == 0 or countAlive(fighters, ENEMY_SIDE) == 0 then
+			if countAlive(fighters, PLAYER_SIDE) == 0 or (countAlive(fighters, ENEMY_SIDE) == 0 and battle.pendingEnemies == 0) then
 				break
 			end
 		end
 
-		local won = countAlive(fighters, ENEMY_SIDE) == 0 and countAlive(fighters, PLAYER_SIDE) > 0
+		local won = countAlive(fighters, ENEMY_SIDE) == 0 and battle.pendingEnemies == 0 and countAlive(fighters, PLAYER_SIDE) > 0
 		battle.won = won
 		battle.emit("battleEnd", { won = won })
 		if battle.rift then
@@ -1624,6 +1686,17 @@ local groundRing = BattleFx.groundRing
 local sparks = BattleFx.sparks
 
 -- A colored glow on a fighter for a while (a boss's stun).
+-- The player's spell (the round button / F during a fight): returns (cast, REAL seconds until the next one, so the
+-- client's cooldown ring matches at 2x speed too). (false, nil) when there is no fight.
+function BattleService.castSpell(player: Player, id: string): (boolean, number?)
+	local battle = active[player]
+	if not battle or not battle.spells or battle.won ~= nil or id ~= "meteor" then
+		return false, nil
+	end
+	local ok, wait = BattleSpells.castMeteor(battle.spells)
+	return ok, wait / math.max(1, battle.speed())
+end
+
 local function tint(f: Fighter, color: Color3, duration: number)
 	BattleFx.tint(f.model, color, duration)
 end

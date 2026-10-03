@@ -184,6 +184,14 @@ local Balance = {
 	-- and merges every pair: a fight takes about 14 s of shooting at wave 1, 20-25 s later, a boss wave a third
 	-- longer (plus the walk in), and the squad loses about a third of its HP. An under-merged squad struggles and
 	-- may lose (Balance.BattleTimeLimit); replaying low waves stays quick.
+	-- BOSSES are long fights, not one-shots: a boss (every 5th wave and the Rift King) gets BossHp × the HP but only
+	-- BossDamage × the damage, so the squad has to grind it down without dying in seconds. Damage that is a part of
+	-- the target's max HP (burns: the Ember Mage, Smolder, Inferno) hurts a boss only BossPercentDamage as much, or
+	-- a big HP pool would not matter. A boss wave may last BossBattleTimeLimit seconds.
+	BossHp = 3.5,
+	BossDamage = 0.6,
+	BossPercentDamage = 0.3,
+	BossBattleTimeLimit = 180,
 	WaveHp = { { 1, 3.5 }, { 5, 4.8 }, { 10, 7.5 }, { 20, 13 }, { 30, 22 }, { 45, 27 }, { 60, 24 }, { 80, 17 }, { 100, 11 } },
 	WaveDamage = { { 1, 0.7 }, { 5, 0.8 }, { 10, 1.3 }, { 20, 2 }, { 30, 2.7 }, { 45, 3 }, { 60, 2.5 }, { 80, 1.7 }, { 100, 1.1 } },
 

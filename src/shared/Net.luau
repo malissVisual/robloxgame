@@ -25,6 +25,8 @@ local NAMES = {
 	"AutoFight", -- client → server: turn auto fight on / off (starts the next wave by itself)
 	"Sell", -- client → server: sell a soldier of the inventory / squad for coins (slot id)
 	"BattleSpeed", -- client → server: cycle the battle speed (1x / 2x)
+	"CastSpell", -- client → server: the player's spell during a fight ("meteor"; Config/BattleSpells)
+	"SpellState", -- server → client: the spell's cooldown after a cast or a refused one ({ id, cast, wait = real seconds })
 	"Sfx", -- server → client: play a sound (name of Config/Sounds)
 	"SetSetting", -- client → server: change a setting (key, value)
 	"WelcomeBack", -- server → client: the offline-income popup (coins, hours)
