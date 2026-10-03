@@ -4697,7 +4697,8 @@ end
 -- results flip in one by one, a NEW badge on a type you did not have. CODEX: every wizard type, the found ones in
 -- color with their trait, the others "???". Opened by the WIZARDS tile in the dock and by the portal in the lobby
 -- (E). A first find shows a big banner (the Discovery remote) and pays coins. Config/Wizards.luau has the numbers.
-do
+-- (Its own function, not a do-block: the main chunk is at Luau's limit of 200 registers.)
+UI.buildWizards = function()
 	local W, H = 560, 420
 	local window = Instance.new("Frame")
 	window.Name = "Wizards"
@@ -5093,6 +5094,7 @@ do
 		end)
 	end)
 end
+UI.buildWizards()
 
 -- ── Daily quests ──────────────────────────────────────────────────────────
 -- Three small goals a day (Balance.Quests); a finished one pays coins and XP. Above the HUD.
