@@ -177,6 +177,15 @@ local Balance = {
 	EnemyHpBoost = 1.7, -- every enemy's HP and damage are multiplied by these (the wave difficulty in one place)
 	EnemyDamageBoost = 1.4,
 	EnemyLevelScale = 1.2, -- each enemy level (= phase number, every 5 waves) makes an enemy this much stronger
+	-- THE WAVE CURVE: on top of all that, the enemies of wave W get WaveHp(W) times the HP and WaveDamage(W) times the
+	-- damage (points in between are interpolated). Without it a squad killed every wave in 1-4 s (the mages merge
+	-- 1.8x per level, the waves grew far slower), so nothing of the fight (spells, dodges, Fury, Overcharge, boss
+	-- slams and volleys) ever happened. Tuned on a model of a player who wins every wave, summons with the coins
+	-- and merges every pair: a fight takes about 14 s of shooting at wave 1, 20-25 s later, a boss wave a third
+	-- longer (plus the walk in), and the squad loses about a third of its HP. An under-merged squad struggles and
+	-- may lose (Balance.BattleTimeLimit); replaying low waves stays quick.
+	WaveHp = { { 1, 3.5 }, { 5, 4.8 }, { 10, 7.5 }, { 20, 13 }, { 30, 22 }, { 45, 27 }, { 60, 24 }, { 80, 17 }, { 100, 11 } },
+	WaveDamage = { { 1, 0.7 }, { 5, 0.8 }, { 10, 1.3 }, { 20, 2 }, { 30, 2.7 }, { 45, 3 }, { 60, 2.5 }, { 80, 1.7 }, { 100, 1.1 } },
 
 	-- Roll animation of a bought soldier (UI only): swirl, then reveal (seconds)
 	RollTime = 1.1,
@@ -195,6 +204,29 @@ local Balance = {
 	SplashRadius = 6,
 	SplashFraction = 0.5,
 }
+
+-- The wave curve's multipliers of enemy HP and damage at a wave (Balance.WaveHp / WaveDamage, interpolated between
+-- the points on a log scale; before the first / after the last point the end values hold).
+local function curve(points: { { number } }, wave: number): number
+	if wave <= points[1][1] then
+		return points[1][2]
+	end
+	for i = 2, #points do
+		local a, b = points[i - 1], points[i]
+		if wave <= b[1] then
+			local f = (wave - a[1]) / (b[1] - a[1])
+			return math.exp(math.log(a[2]) + (math.log(b[2]) - math.log(a[2])) * f)
+		end
+	end
+	return points[#points][2]
+end
+
+function Balance.waveScale(wave: number?): (number, number)
+	if type(wave) ~= "number" or wave < 1 then
+		return 1, 1
+	end
+	return curve(Balance.WaveHp, wave), curve(Balance.WaveDamage, wave)
+end
 
 -- Merge levels 10 … 30 exist for the Mage (its 30-level evolution, maxTier in Units):
 -- every further level needs two more cleared waves (up to 100) and costs 25 % more coins than the one before.

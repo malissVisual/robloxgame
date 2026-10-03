@@ -374,6 +374,12 @@ balance and the result screen shows the total of the wave as one small line.
 
 ## Battle timing and the rewards
 
+- **How long a fight takes (the wave curve):** the enemies of wave W get `Balance.WaveHp` × HP and
+  `Balance.WaveDamage` × damage on top of their level and the difficulty (`Balance.waveScale`, interpolated between
+  the points). Before it a merged squad killed any wave in 1-4 s, so the spells, dodges, Fury, Overcharge and the
+  bosses' slams, volleys and heals never showed. Now a squad of the expected strength shoots for about **15 s at
+  wave 1 and 20-30 s later** (a boss wave longer), plus the walk in, and loses about a third of its HP; an
+  under-merged squad can lose. To make fights shorter or longer, scale the `WaveHp` points (×0.8 = 20 % shorter).
 - **Countdown:** confirming the wave shows a big **3 · 2 · 1 · FIGHT!** before the soldiers march into the
   arena (`Balance.BattleCountdown`).
 - **After a wave** there is no result box: the rewards **drop in one after another at the top of the screen**

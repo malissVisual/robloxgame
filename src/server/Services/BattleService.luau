@@ -968,9 +968,10 @@ local function spawnEnemy(battle: Battle, kind: string, tier: number, pos: Vecto
 	local fighter = makeFighter(ENEMY_SIDE, Enemies.stats(kind, tier), tier, def.color, Enemy.lift(kind, tier), def.coins, pos, model)
 	fighter.kind = kind
 	fighter.boss = def.boss == true
-	fighter.maxHp *= battle.enemyPower
+	local waveHp, waveDamage = Balance.waveScale(battle.wave) -- the wave curve (Balance.WaveHp / WaveDamage)
+	fighter.maxHp *= battle.enemyPower * waveHp
 	fighter.hp = fighter.maxHp
-	fighter.damage *= battle.enemyPower
+	fighter.damage *= battle.enemyPower * waveDamage
 	if battle.elite then
 		local glow = Instance.new("Highlight")
 		glow.FillColor = Color3.fromRGB(255, 200, 60)
@@ -1197,6 +1198,7 @@ export type Result = {
 function BattleService.start(player: Player, profile: PlayerData.Profile, plot: Plots.Plot, options: Options, onKill: (level: number, position: Vector3, coinMult: number) -> (), onFinished: (won: boolean, result: Result) -> ())
 	local fighters: { Fighter } = {}
 	local enemyPower = options.enemyPower
+	local waveHp, waveDamage = Balance.waveScale(options.wave) -- the wave curve: how long and how hard the fight is
 
 	-- Only the squad fights; the merge board is just storage.
 	local synergy = Synergy.compute(profile.squad)
@@ -1253,9 +1255,9 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 				fighter.abilityTimer = if fighter.ability == "slam" then Balance.BossSlamEvery elseif fighter.ability == "volley" then Balance.BossVolleyEvery elseif fighter.ability == "heal" then Balance.BossHealEvery else 1
 			end
 		end
-		fighter.maxHp *= enemyPower
+		fighter.maxHp *= enemyPower * waveHp
 		fighter.hp = fighter.maxHp
-		fighter.damage *= enemyPower
+		fighter.damage *= enemyPower * waveDamage
 		if options.elite then
 			-- Elite enemies glow golden.
 			local glow = Instance.new("Highlight")
