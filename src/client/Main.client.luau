@@ -916,6 +916,7 @@ dockGrip.BackgroundTransparency = 1
 dockGrip.Parent = dock
 UI.grip(dockGrip, 31, 7, MUTED)
 Layout.make("Dock", dock, dockGrip)
+UI.dock, UI.DOCK_STEP, UI.DOCK_TILE = dock, DOCK_STEP, DOCK_TILE -- for the WIZARDS tile (built further down)
 
 type DockIcon = { button: TextButton, stroke: UIStroke, parts: { Frame }, tag: TextLabel, accent: Color3 }
 local icons: { [string]: DockIcon } = {}
@@ -4964,16 +4965,16 @@ UI.buildWizards = function()
 	showPage("Summon")
 
 	-- The WIZARDS tile in the dock (under the Inventory): a little orb in a rune ring.
-	dock.Size = UDim2.fromOffset(76, 18 + 2 * DOCK_STEP)
+	UI.dock.Size = UDim2.fromOffset(76, 18 + 2 * UI.DOCK_STEP)
 	local wizTile = Instance.new("TextButton")
 	wizTile.Name = "Dock_Wizards"
-	wizTile.Position = UDim2.fromOffset(6, 18 + DOCK_STEP)
-	wizTile.Size = UDim2.fromOffset(DOCK_TILE, DOCK_TILE)
+	wizTile.Position = UDim2.fromOffset(6, 18 + UI.DOCK_STEP)
+	wizTile.Size = UDim2.fromOffset(UI.DOCK_TILE, UI.DOCK_TILE)
 	wizTile.BackgroundColor3 = UI.DARK
 	wizTile.BorderSizePixel = 0
 	wizTile.AutoButtonColor = false
 	wizTile.Text = ""
-	wizTile.Parent = dock
+	wizTile.Parent = UI.dock
 	corner(wizTile, 12)
 	local wizStroke = UI.stroke(wizTile, Color3.fromRGB(170, 120, 255), 2, 0.65)
 	local ring = Instance.new("Frame")
