@@ -10,7 +10,7 @@ sides walk from their rows onto a big round fight arena and fight on their own, 
 **Current state (Mage only):** the game has ONE class, the **Mage** (**16 merge levels**, `maxTier = 16`; two level 16
 merged = ASCENDED; the looks are the first 16 of the 30-level R15 evolution, the data for 17 … 30 stays for later). The Knight,
 the Archer, the Hunter, the Tank, the Berserker and the Soldier were removed (a saved soldier of a removed class
-loads as a Mage of the same level). **You cast only the METEOR** (the round button / F during a fight, see Battle timing): the Mages fight and cast every other spell on their own
+loads as a Mage of the same level). **You cast four spells** (METEOR, BLIZZARD, LIGHTNING, HEAL: the round buttons / keys 1-4 during a fight, see Battle timing): the Mages fight and cast every other spell on their own
 (`Config/MageSpells.luau`, `MageBrain.luau`), and you only walk around with your character; there is no Q / E, no
 SPELLS tab and no spell drops. Older passages below about other classes or "your own spells" describe the removed
 version.
@@ -388,9 +388,20 @@ balance and the result screen shows the total of the wave as one small line.
   - **Reinforcements:** from wave 2 (not on boss waves, nor with the AMBUSH / SWARM twists) about a third of the
     wave comes again 6 s in (or when 40 % of it is dead): red circles, "REINFORCEMENTS!", then they flash in on the
     far side. The wave is not beaten while they are on their way.
-  - **METEOR, your spell:** the round button at the bottom center during a fight, or **F**. It falls on the biggest
-    group of enemies: 1.2 × the sum of your mages' attack to everyone inside (a boss 60 %), a short stun; ready 3 s
-    into the fight, then every 15 s (the ring shows the cooldown). Mages with an area spell ready combo into it.
+  - **YOUR SPELLS:** four round buttons at the bottom center during a fight (keys **1-4**, **F** = meteor). Press one,
+    then click / tap where it should land (a ring follows the mouse); press it again and it aims itself at the biggest
+    group; right-click / Esc cancels. Their strength is the sum of your living mages' attack ("power"):
+    **METEOR** (1× power in a big circle, stun, every 15 s), **BLIZZARD** (0.3× power, freezes everyone inside for
+    2.5 s, a boss 0.8 s, every 20 s), **LIGHTNING** (0.4× power, jumps through 5 enemies, every 10 s), **HEAL** (35 %
+    HP and a 40 % shield for 3 s to every mage, every 25 s). Mages with an area spell ready combo into an aimed one.
+  - **Enemy affixes:** from wave 4 some enemies (15 % + 1 % per wave, at most 40 %) carry a tag over their head and pay
+    +50 % coins: **SHIELDED** (a bubble of 60 % HP), **SWIFT** (×1.6 speed), **EXPLOSIVE** (wave 6+: blows up 0.8 s after
+    death, the mages step out of the circle), **SPLITTER** (wave 8+: splits into two small fast copies), **GIANT**
+    (wave 10+: bigger, ×2.5 HP).
+  - **Feel:** mage hits can **CRIT** (12 %, double, gold number); kills within 1.6 s build a **COMBO** (big counter on
+    the screen, every kill of it +10 % coins up to +100 %); meteors, explosions and a boss's fall **shake the camera**;
+    a boss's death shows **BOSS DEFEATED!** and runs the rest of the fight in **slow motion** for a moment.
+  - **Boss chest:** a won boss wave pays 12 kills' worth of coins and **two extra wizards** (the first Epic or better).
   - **Signature spells:** every element wizard casts its own big spell every 12 s (level 1) to 8 s (level 16), its
     name over its head: Fire **INFERNO** (area blast + burn), Ice **FROST NOVA** (area + freeze), Storm
     **THUNDERSTORM** (4 lightning strikes), Nature **WILD GROVE** (roots the enemies, heals the squad), Shadow

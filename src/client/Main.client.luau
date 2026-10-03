@@ -5382,120 +5382,313 @@ upgrade.button.Activated:Connect(function()
 	Net.get("Upgrade"):FireServer()
 end)
 
--- ── METEOR: the player's spell during a fight (Config/BattleSpells.luau) ──
--- A round button at the bottom center while a fight runs (or F): the server drops a meteor on the biggest group of
--- enemies and answers with the cooldown (SpellState), which the dark fill and the seconds show.
+-- ── YOUR SPELLS and the FEEL of a fight (Config/BattleSpells.luau) ──
+-- Four round buttons at the bottom center while a fight runs (keys 1-4, F = meteor): press one, then click (tap) where
+-- it should land; press it again and it aims itself; right-click / Esc cancels; HEAL needs no aim. The server answers
+-- every cast with the cooldown (SpellState). BattleFeel brings the camera shakes, the kill COMBO counter and the
+-- BOSS DEFEATED banner.
 do
 	local Spells = require(Shared:WaitForChild("Config"):WaitForChild("BattleSpells"))
-	local M = Spells.Meteor
-	local readyAt, total = 0, 1
+	local camera = workspace.CurrentCamera
+	local SIZE, GAP = 84, 12
 	local wasBattling = false
+	local aiming: string? = nil
 
-	local button = Instance.new("TextButton")
-	button.Name = "MeteorButton"
-	button.AnchorPoint = Vector2.new(0.5, 1)
-	button.Position = UDim2.new(0.5, 0, 1, -26)
-	button.Size = UDim2.fromOffset(96, 96)
-	button.BackgroundColor3 = Color3.fromRGB(70, 28, 18)
-	button.AutoButtonColor = false
-	button.Text = ""
-	button.Visible = false
-	button.ClipsDescendants = true
-	button.Parent = gui
-	corner(button, 48)
-	local ring = UI.stroke(button, M.Color, 4)
-	local icon = Instance.new("Frame") -- the meteor: a glowing ball with a tail
-	icon.AnchorPoint = Vector2.new(0.5, 0.5)
-	icon.Position = UDim2.fromScale(0.56, 0.4)
-	icon.Size = UDim2.fromOffset(30, 30)
-	icon.BackgroundColor3 = M.Color
-	icon.Parent = button
-	corner(icon, 15)
-	local core = Instance.new("Frame")
-	core.AnchorPoint = Vector2.new(0.5, 0.5)
-	core.Position = UDim2.fromScale(0.5, 0.5)
-	core.Size = UDim2.fromOffset(14, 14)
-	core.BackgroundColor3 = M.Color2
-	core.Parent = icon
-	corner(core, 7)
-	for i = 1, 3 do
-		local tail = Instance.new("Frame")
-		tail.AnchorPoint = Vector2.new(0.5, 0.5)
-		tail.Position = UDim2.new(0.56, -12 - i * 7, 0.4, -8 - i * 6)
-		tail.Size = UDim2.fromOffset(12 - i * 2, 12 - i * 2)
-		tail.BackgroundColor3 = M.Color
-		tail.BackgroundTransparency = 0.2 + i * 0.2
-		tail.Parent = button
-		corner(tail, 6)
+	local bar = Instance.new("Frame")
+	bar.Name = "SpellBar"
+	bar.AnchorPoint = Vector2.new(0.5, 1)
+	bar.Position = UDim2.new(0.5, 0, 1, -22)
+	bar.Size = UDim2.fromOffset(#Spells.PlayerSpellOrder * (SIZE + GAP) - GAP, SIZE)
+	bar.BackgroundTransparency = 1
+	bar.Visible = false
+	bar.Parent = gui
+	local hint = label(bar, "", UDim2.new(0, -100, 0, -30), UDim2.new(1, 200, 0, 22), 15, Enum.Font.GothamBold, WHITE)
+	hint.TextXAlignment = Enum.TextXAlignment.Center
+	hint.TextStrokeTransparency = 0.3
+
+	-- The aiming ring on the ground (only this player sees it).
+	local ring = Instance.new("Part")
+	ring.Name = "SpellAim"
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.CanQuery = false
+	ring.CanTouch = false
+	ring.CastShadow = false
+	ring.Material = Enum.Material.Neon
+	ring.Transparency = 0.55
+
+	type Slot = { spell: any, button: TextButton, shade: Frame, seconds: TextLabel, stroke: UIStroke, readyAt: number, total: number }
+	local slots: { [string]: Slot } = {}
+
+	local function icon(button: TextButton, spell: any)
+		local function blob(x: number, y: number, w: number, h: number, color: Color3, round: number, rotation: number?)
+			local f = Instance.new("Frame")
+			f.AnchorPoint = Vector2.new(0.5, 0.5)
+			f.Position = UDim2.new(0.5, x, 0.4, y)
+			f.Size = UDim2.fromOffset(w, h)
+			f.BackgroundColor3 = color
+			f.BorderSizePixel = 0
+			f.Rotation = rotation or 0
+			f.Parent = button
+			corner(f, round)
+			return f
+		end
+		if spell.id == "meteor" then
+			for i = 3, 1, -1 do
+				blob(-6 - i * 6, -6 - i * 5, 12 - i * 2, 12 - i * 2, spell.color, 6, 0).BackgroundTransparency = 0.2 + i * 0.2
+			end
+			blob(3, 3, 28, 28, spell.color, 14)
+			blob(3, 3, 13, 13, spell.color2, 7)
+		elseif spell.id == "frost" then
+			blob(0, 0, 24, 24, spell.color, 3, 45)
+			blob(0, 0, 12, 12, spell.color2, 2, 45)
+			blob(-15, 9, 8, 8, spell.color, 2, 45)
+			blob(15, 9, 8, 8, spell.color, 2, 45)
+		elseif spell.id == "lightning" then
+			blob(3, -9, 7, 22, spell.color, 2, 25)
+			blob(-1, 0, 16, 6, spell.color, 2, -10)
+			blob(-4, 9, 7, 22, spell.color, 2, 25)
+		else -- heal: a cross
+			blob(0, 0, 10, 30, spell.color, 3)
+			blob(0, 0, 30, 10, spell.color, 3)
+			blob(0, 0, 6, 6, spell.color2, 3)
+		end
 	end
-	local name = label(button, "METEOR", UDim2.new(0, 0, 1, -34), UDim2.new(1, 0, 0, 16), 13, Enum.Font.GothamBlack, WHITE)
-	name.TextXAlignment = Enum.TextXAlignment.Center
-	local key = label(button, if IS_TOUCH then "" else "F", UDim2.new(0, 0, 1, -19), UDim2.new(1, 0, 0, 13), 11, Enum.Font.GothamBold, M.Color2)
-	key.TextXAlignment = Enum.TextXAlignment.Center
-	name.ZIndex, key.ZIndex = 5, 5 -- over the cooldown fill
-	local shade = Instance.new("Frame") -- the cooldown: a dark fill that sinks
-	shade.AnchorPoint = Vector2.new(0, 1)
-	shade.Position = UDim2.fromScale(0, 1)
-	shade.Size = UDim2.fromScale(1, 0)
-	shade.BackgroundColor3 = Color3.new(0, 0, 0)
-	shade.BackgroundTransparency = 0.35
-	shade.BorderSizePixel = 0
-	shade.ZIndex = 3
-	shade.Parent = button
-	local seconds = label(button, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 30, Enum.Font.GothamBlack, WHITE)
-	seconds.TextXAlignment = Enum.TextXAlignment.Center
-	seconds.ZIndex = 4
 
-	local function cast()
-		if not state.battling or os.clock() < readyAt - 0.15 then
+	local function cast(id: string, point: Vector3?)
+		local slot = slots[id]
+		aiming = nil
+		ring.Parent = nil
+		if not slot or not state.battling or os.clock() < slot.readyAt - 0.15 then
 			return
 		end
-		Net.get("CastSpell"):FireServer("meteor")
-		readyAt = os.clock() + 0.5 -- until the server answers (no double cast)
-		TweenService:Create(button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), { Size = UDim2.fromOffset(108, 108) }):Play()
+		Net.get("CastSpell"):FireServer(id, point)
+		slot.readyAt = os.clock() + 0.5 -- until the server answers (no double cast)
+		TweenService:Create(slot.button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), { Size = UDim2.fromOffset(SIZE + 12, SIZE + 12) }):Play()
 	end
-	button.Activated:Connect(cast)
+
+	local function press(id: string)
+		local slot = slots[id]
+		if not slot or not state.battling then
+			return
+		end
+		if os.clock() < slot.readyAt - 0.15 then
+			return -- still cooling down
+		end
+		if not slot.spell.aim or aiming == id then
+			cast(id, nil) -- HEAL, or pressed twice: it aims itself
+		else
+			aiming = id
+			ring.Color = slot.spell.color
+			ring.Size = Vector3.new(0.3, slot.spell.radius * 2, slot.spell.radius * 2)
+		end
+	end
+
+	for i, id in Spells.PlayerSpellOrder do
+		local spell = Spells.PlayerSpells[id]
+		local button = Instance.new("TextButton")
+		button.Name = id
+		button.AnchorPoint = Vector2.new(0.5, 0.5)
+		button.Position = UDim2.fromOffset((i - 1) * (SIZE + GAP) + SIZE / 2, SIZE / 2)
+		button.Size = UDim2.fromOffset(SIZE, SIZE)
+		button.BackgroundColor3 = spell.color:Lerp(Color3.new(0, 0, 0), 0.72)
+		button.AutoButtonColor = false
+		button.Text = ""
+		button.ClipsDescendants = true
+		button.Parent = bar
+		corner(button, SIZE / 2)
+		local stroke = UI.stroke(button, spell.color, 4)
+		icon(button, spell)
+		local name = label(button, spell.label, UDim2.new(0, 0, 1, -32), UDim2.new(1, 0, 0, 14), 11, Enum.Font.GothamBlack, WHITE)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		local keyName = if IS_TOUCH then "" else tostring(i) .. (if spell.alt then " / " .. spell.alt.Name else "")
+		local key = label(button, keyName, UDim2.new(0, 0, 1, -18), UDim2.new(1, 0, 0, 12), 10, Enum.Font.GothamBold, spell.color2)
+		key.TextXAlignment = Enum.TextXAlignment.Center
+		name.ZIndex, key.ZIndex = 5, 5
+		local shade = Instance.new("Frame")
+		shade.AnchorPoint = Vector2.new(0, 1)
+		shade.Position = UDim2.fromScale(0, 1)
+		shade.Size = UDim2.fromScale(1, 0)
+		shade.BackgroundColor3 = Color3.new(0, 0, 0)
+		shade.BackgroundTransparency = 0.35
+		shade.BorderSizePixel = 0
+		shade.ZIndex = 3
+		shade.Parent = button
+		local seconds = label(button, "", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 28, Enum.Font.GothamBlack, WHITE)
+		seconds.TextXAlignment = Enum.TextXAlignment.Center
+		seconds.ZIndex = 4
+		slots[id] = { spell = spell, button = button, shade = shade, seconds = seconds, stroke = stroke, readyAt = 0, total = 1 }
+		button.Activated:Connect(function()
+			press(id)
+		end)
+	end
+
+	local function groundPoint(screen: Vector2, viewport: boolean): Vector3?
+		local ray = if viewport then camera:ViewportPointToRay(screen.X, screen.Y) else camera:ScreenPointToRay(screen.X, screen.Y)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { ring, player.Character :: any }
+		local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+		return if result then result.Position else nil
+	end
+
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if not processed and input.KeyCode == M.Key then
-			cast()
+		if processed or not state.battling then
+			return
+		end
+		if aiming and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			local id = aiming :: string
+			cast(id, groundPoint(Vector2.new(input.Position.X, input.Position.Y), false))
+			return
+		end
+		if aiming and (input.UserInputType == Enum.UserInputType.MouseButton2 or input.KeyCode == Enum.KeyCode.Escape) then
+			aiming = nil
+			ring.Parent = nil
+			return
+		end
+		for _, id in Spells.PlayerSpellOrder do
+			local spell = Spells.PlayerSpells[id]
+			if input.KeyCode == spell.key or (spell.alt and input.KeyCode == spell.alt) then
+				press(id)
+				return
+			end
 		end
 	end)
+
 	Net.get("SpellState").OnClientEvent:Connect(function(data)
-		if type(data) ~= "table" or data.id ~= "meteor" or type(data.wait) ~= "number" then
+		if type(data) ~= "table" or type(data.wait) ~= "number" then
 			return
 		end
-		readyAt = os.clock() + data.wait
-		if data.cast then
-			total = math.max(0.1, data.wait)
-		else
-			total = math.max(total, data.wait, 0.1)
+		local slot = slots[data.id]
+		if not slot then
+			return
+		end
+		slot.readyAt = os.clock() + data.wait
+		slot.total = if data.cast then math.max(0.1, data.wait) else math.max(slot.total, data.wait, 0.1)
+	end)
+
+	-- ── FEEL: the camera shake, the combo counter, the boss banner ──
+	local shake = 0
+	RunService:BindToRenderStep("BattleShake", Enum.RenderPriority.Camera.Value + 1, function(dt)
+		if shake <= 0.01 then
+			shake = 0
+			return
+		end
+		local cam = workspace.CurrentCamera
+		local a = shake
+		cam.CFrame *= CFrame.new((math.random() - 0.5) * a, (math.random() - 0.5) * a, 0) * CFrame.Angles(0, 0, (math.random() - 0.5) * a * 0.03)
+		shake *= math.exp(-dt * 7)
+	end)
+
+	local combo = label(gui, "", UDim2.new(0.5, -200, 0, 92), UDim2.fromOffset(400, 54), 46, Enum.Font.GothamBlack, GOLD)
+	combo.TextXAlignment = Enum.TextXAlignment.Center
+	combo.TextStrokeTransparency = 0.2
+	combo.TextTransparency = 1
+	combo.TextStrokeTransparency = 1
+	local comboSub = label(combo, "", UDim2.new(0, 0, 1, -4), UDim2.new(1, 0, 0, 22), 18, Enum.Font.GothamBold, WHITE)
+	comboSub.TextXAlignment = Enum.TextXAlignment.Center
+	comboSub.TextTransparency = 1
+	comboSub.TextStrokeTransparency = 1
+	local comboScale = Instance.new("UIScale")
+	comboScale.Parent = combo
+	local comboHideAt = 0
+
+	local flash = Instance.new("Frame")
+	flash.Size = UDim2.fromScale(1, 1)
+	flash.Position = UDim2.fromOffset(0, -60)
+	flash.Size = UDim2.new(1, 0, 1, 120)
+	flash.BackgroundColor3 = WHITE
+	flash.BackgroundTransparency = 1
+	flash.BorderSizePixel = 0
+	flash.ZIndex = 20
+	flash.Parent = gui
+	local banner = label(gui, "BOSS DEFEATED!", UDim2.new(0.5, -350, 0.3, 0), UDim2.fromOffset(700, 80), 64, Enum.Font.GothamBlack, GOLD)
+	banner.TextXAlignment = Enum.TextXAlignment.Center
+	banner.TextTransparency = 1
+	banner.TextStrokeTransparency = 1
+	banner.ZIndex = 21
+	local bannerScale = Instance.new("UIScale")
+	bannerScale.Parent = banner
+
+	Net.get("BattleFeel").OnClientEvent:Connect(function(data)
+		if type(data) ~= "table" then
+			return
+		end
+		if data.kind == "shake" and type(data.power) == "number" then
+			shake = math.max(shake, data.power)
+		elseif data.kind == "combo" and type(data.n) == "number" then
+			combo.Text = string.format("COMBO x%d", data.n)
+			comboSub.Text = if (data.bonus or 0) > 0 then string.format("+%d%% COINS", data.bonus) else ""
+			combo.TextColor3 = if data.n >= 8 then RED elseif data.n >= 5 then ORANGE else GOLD
+			combo.TextTransparency, combo.TextStrokeTransparency = 0, 0.2
+			comboSub.TextTransparency, comboSub.TextStrokeTransparency = 0, 0.4
+			comboScale.Scale = 1.5 + math.min(data.n, 10) * 0.05
+			TweenService:Create(comboScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			comboHideAt = os.clock() + Spells.Combo.Window + 0.3
+		elseif data.kind == "boss" then
+			shake = math.max(shake, data.shake or 1)
+			flash.BackgroundTransparency = 0.3
+			TweenService:Create(flash, TweenInfo.new(0.5), { BackgroundTransparency = 1 }):Play()
+			banner.TextTransparency, banner.TextStrokeTransparency = 0, 0.1
+			bannerScale.Scale = 2
+			TweenService:Create(bannerScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			task.delay(2.2, function()
+				TweenService:Create(banner, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+			end)
 		end
 	end)
 
 	RunService.RenderStepped:Connect(function()
+		local now = os.clock()
+		if comboHideAt > 0 and now > comboHideAt then
+			comboHideAt = 0
+			TweenService:Create(combo, TweenInfo.new(0.3), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+			TweenService:Create(comboSub, TweenInfo.new(0.3), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		end
 		local battling = state.battling == true
 		if battling and not wasBattling then
-			-- A new fight: ready after the black fade and the first delay (the server corrects it on the first press).
+			-- A new fight: every spell is ready after the black fade and its own first delay (the server corrects it).
 			local speed = math.max(1, state.battleSpeed or 1)
-			total = Balance.BattleCountdown + M.FirstDelay / speed
-			readyAt = battleStart + total
+			for _, slot in slots do
+				slot.total = Balance.BattleCountdown + slot.spell.first / speed
+				slot.readyAt = battleStart + slot.total
+			end
+		end
+		if not battling and wasBattling then
+			aiming = nil
+			ring.Parent = nil
 		end
 		wasBattling = battling
-		button.Visible = battling
+		bar.Visible = battling
 		if not battling then
 			return
 		end
-		local left = readyAt - os.clock()
-		if left > 0.05 then
-			shade.Size = UDim2.fromScale(1, math.clamp(left / total, 0, 1))
-			seconds.Text = tostring(math.ceil(left))
-			ring.Color = MUTED
-			ring.Thickness = 3
+		for _, slot in slots do
+			local left = slot.readyAt - now
+			if left > 0.05 then
+				slot.shade.Size = UDim2.fromScale(1, math.clamp(left / slot.total, 0, 1))
+				slot.seconds.Text = tostring(math.ceil(left))
+				slot.stroke.Color = MUTED
+				slot.stroke.Thickness = 3
+			else
+				slot.shade.Size = UDim2.fromScale(1, 0)
+				slot.seconds.Text = ""
+				slot.stroke.Color = slot.spell.color:Lerp(slot.spell.color2, (math.sin(now * 6) + 1) / 2) -- ready: the ring glows
+				slot.stroke.Thickness = if aiming == slot.spell.id then 6 else 4
+			end
+		end
+		if aiming then
+			hint.Text = if IS_TOUCH then "Tap where it should land · tap the button again: auto aim" else "Click where it should land · press again: auto aim · right-click: cancel"
+			local point = groundPoint(UserInputService:GetMouseLocation(), true)
+			if point and not IS_TOUCH then
+				ring.CFrame = CFrame.new(point + Vector3.new(0, 0.2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+				ring.Parent = workspace
+			else
+				ring.Parent = nil
+			end
 		else
-			shade.Size = UDim2.fromScale(1, 0)
-			seconds.Text = ""
-			ring.Color = M.Color:Lerp(M.Color2, (math.sin(os.clock() * 6) + 1) / 2) -- ready: the ring glows
-			ring.Thickness = 4
+			hint.Text = ""
 		end
 	end)
 end

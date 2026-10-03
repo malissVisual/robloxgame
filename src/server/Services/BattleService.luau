@@ -26,7 +26,8 @@ local MageBrain = require(script.Parent.MageBrain)
 local BattleFx = require(script.Parent.BattleFx)
 local EnemyBrain = require(script.Parent.EnemyBrain)
 local WaveMutators = require(script.Parent.WaveMutators)
-local BattleSpells = require(script.Parent.BattleSpells) -- reinforcements, the player's meteor, the element signatures
+local BattleSpells = require(script.Parent.BattleSpells) -- the player's spells, reinforcements, signatures, affixes, combo
+local SpellConfig = require(Shared.Config.BattleSpells)
 local Soldier = require(Shared.Soldier)
 local Wizards = require(Shared.Config.Wizards) -- the wizard types: rarity stats and battle traits
 local MageConfig = require(Shared.Config.MageConfig)
@@ -937,9 +938,15 @@ local function performAttack(battle: Battle, f: Fighter, target: Fighter, mult: 
 	if f.trait then
 		amount = traitBefore(battle, f, target, amount)
 	end
+	local crit = f.mageLevel ~= nil and target.side ~= f.side and math.random() < SpellConfig.Crit.Chance
+	if crit then
+		-- CRITICAL HIT (Config/BattleSpells): double damage, a gold number and "CRIT!".
+		amount *= SpellConfig.Crit.Mult
+		BattleFx.pop(effects, target.pos + UP * (target.lift * 2 + 2), "CRIT!", SpellConfig.Crit.Color, 22)
+	end
 	local execute = f.boltStyle == "execute" -- the Mage's killing blow: a gold number (effect() resets the style)
 	local taken = applyDamage(battle, target, amount, f)
-	popNumber(effects, target, taken, if execute then Color3.fromRGB(255, 215, 90) else nil)
+	popNumber(effects, target, taken, if execute or crit then Color3.fromRGB(255, 215, 90) else nil)
 	if f.trait then
 		traitAfter(battle, f, target, amount, taken)
 	end
@@ -1139,6 +1146,9 @@ local function step(battle: Battle, dt: number, onEnemyDeath: (Fighter) -> ())
 			if mutators and mutators.onDeath then
 				mutators:onDeath(f) -- volatile blasts, the treasure goblin's bonus (needs f.pos / f.damage)
 			end
+			if battle.spells then
+				BattleSpells.onDeath(battle.spells, f) -- the combo (its coins), the boss's fall, explosive / splitter enemies
+			end
 			if f.side == ENEMY_SIDE and not f.noReward then
 				onEnemyDeath(f) -- the caller pays out the coins for the kill
 			end
@@ -1280,12 +1290,16 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 	local fxFolder = Instance.new("Folder")
 	fxFolder.Name = "BattleFx"
 	fxFolder.Parent = plot.folder
+	local slowmoUntil, slowmoSpeed = 0, 1 -- (real clock) the fight runs at slowmoSpeed until then
 
 	local battle: Battle = {
 		fighters = fighters,
 		parent = plot.folder,
 		numbers = profile.settings.numbers ~= false,
 		speed = function()
+			if os.clock() < slowmoUntil then
+				return slowmoSpeed -- a boss's slow-motion death (BattleSpells)
+			end
 			return profile.battleSpeed
 		end,
 		enemyPower = enemyPower,
@@ -1540,6 +1554,22 @@ function BattleService.start(player: Player, profile: PlayerData.Profile, plot: 
 			return battle.clock
 		end,
 		center = plot.arena.center,
+		arenaRadius = plot.arena.radius,
+		feel = function(data)
+			if player.Parent then
+				Net.get("BattleFeel"):FireClient(player, data) -- camera shakes, the combo counter, the boss banner
+			end
+		end,
+		slowmo = function(speed, seconds)
+			slowmoSpeed = speed
+			slowmoUntil = os.clock() + seconds
+		end,
+		scaleModel = function(f, scale)
+			pcall(function()
+				f.model:ScaleTo(f.model:GetScale() * scale)
+			end)
+			f.lift *= scale
+		end,
 		wave = battle.wave,
 		boss = battle.wave > 0 and battle.wave % Balance.PhaseLength == 0,
 		twists = twistIds,
@@ -1686,14 +1716,15 @@ local groundRing = BattleFx.groundRing
 local sparks = BattleFx.sparks
 
 -- A colored glow on a fighter for a while (a boss's stun).
--- The player's spell (the round button / F during a fight): returns (cast, REAL seconds until the next one, so the
+-- The player's spell `id` (Config/BattleSpells.PlayerSpells: the round buttons / keys 1-4 during a fight), aimed at
+-- `point` (nil, or a point outside the arena: it aims itself). Returns (cast, REAL seconds until it is ready, so the
 -- client's cooldown ring matches at 2x speed too). (false, nil) when there is no fight.
-function BattleService.castSpell(player: Player, id: string): (boolean, number?)
+function BattleService.castSpell(player: Player, id: string, point: Vector3?): (boolean, number?)
 	local battle = active[player]
-	if not battle or not battle.spells or battle.won ~= nil or id ~= "meteor" then
+	if not battle or not battle.spells or battle.won ~= nil or not SpellConfig.PlayerSpells[id] then
 		return false, nil
 	end
-	local ok, wait = BattleSpells.castMeteor(battle.spells)
+	local ok, wait = BattleSpells.castPlayer(battle.spells, id, point)
 	return ok, wait / math.max(1, battle.speed())
 end
 

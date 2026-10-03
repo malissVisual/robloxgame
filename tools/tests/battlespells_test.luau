@@ -1,6 +1,6 @@
 -- Logic test of server/Services/BattleSpells.luau (run by run_battlespells_test.py with the Roblox stubs): the
--- reinforcements (when, how many, which waves), the player's meteor (cooldown, damage from the squad, bosses) and the
--- six element signature spells (each one casts, hits and does its own thing).
+-- reinforcements (when, how many, which waves), the player's four spells (cooldowns, damage from the squad, bosses,
+-- aiming), the six element signature spells, the enemy affixes, the kill combo and the boss's fall.
 local Stubs = require("./stubs")
 local Vector3 = Stubs.Vector3
 local BattleSpells = require("./BattleSpells")
@@ -20,7 +20,8 @@ local function newFighter(side, x, z, extra)
 	local f = {
 		side = side, hp = 100, maxHp = 100, pos = Vector3.new(x, 0, z), lift = 2, damage = 10, range = 22, clock = 0,
 		stunUntil = 0, slowUntil = 0, slowFactor = 1, burnUntil = 0, burnDps = 0, burnBy = nil, boss = false,
-		model = Stubs.newInstance("Model"), kind = "Mob1", tier = 1,
+		model = Stubs.newInstance("Model"), kind = "Mob1", tier = 1, bonusCoins = 0, haste = 1, shieldHp = 0,
+		shieldUntil = 0, shieldReduction = 0,
 	}
 	for k, v in extra or {} do
 		f[k] = v
@@ -34,7 +35,7 @@ local function fakePart()
 end
 
 local function newBattle(opts)
-	local battle = { clock = 0, events = {}, movers = {}, pending = 0, pops = {}, spawned = {}, notices = {}, emitted = {}, healed = 0 }
+	local battle = { clock = 0, events = {}, movers = {}, pending = 0, pops = {}, spawned = {}, notices = {}, emitted = {}, healed = 0, feel = {}, slowmo = 0, marks = {} }
 	battle.fighters = opts.fighters
 	local fx = setmetatable({
 		newPart = function(_, _, cf, _, _, _)
@@ -44,6 +45,7 @@ local function newBattle(opts)
 			return p
 		end,
 		reticle = function() return fakePart() end,
+		mark = function(_, text) table.insert(battle.marks, text); return fakePart() end,
 		warningCircle = function() return { fakePart() } end,
 		pop = function(_, _, text) table.insert(battle.pops, text) end,
 	}, { __index = function() return noop end })
@@ -76,6 +78,10 @@ local function newBattle(opts)
 		archetype = function(f) return f.archetype or "Grunt" end,
 		clock = function() return battle.clock end,
 		center = Vector3.new(0, 0, 0),
+		arenaRadius = 70,
+		feel = function(data) table.insert(battle.feel, data) end,
+		slowmo = function(_, seconds) battle.slowmo = seconds end,
+		scaleModel = function(f, scale) f.lift *= scale end,
 		wave = opts.wave or 3,
 		boss = opts.boss == true,
 		twists = opts.twists or {},
@@ -161,10 +167,10 @@ do
 	end
 	local b = newBattle({ fighters = fighters, wave = 1 }) -- (wave 1: no reinforcements to confuse the counts)
 	local ok, wait = BattleSpells.castMeteor(b.state)
-	check(not ok and math.abs(wait - Config.Meteor.FirstDelay) < 1e-6, "refused before FirstDelay")
-	b.advance(Config.Meteor.FirstDelay + 0.01)
+	check(not ok and math.abs(wait - Config.PlayerSpells.meteor.first) < 1e-6, "refused before FirstDelay")
+	b.advance(Config.PlayerSpells.meteor.first + 0.01)
 	ok, wait = BattleSpells.castMeteor(b.state)
-	check(ok and wait == Config.Meteor.Cooldown, "cast once ready")
+	check(ok and wait == Config.PlayerSpells.meteor.cooldown, "cast once ready")
 	local spell = false
 	for _, e in b.emitted do
 		if e.name == "playerSpell" and e.payload.id == "meteor" then
@@ -174,13 +180,13 @@ do
 	check(spell, "playerSpell emitted (the mages' combo)")
 	ok = BattleSpells.castMeteor(b.state)
 	check(not ok, "refused while cooling down")
-	b.advance(Config.Meteor.Fall + 0.1)
-	local expected = 60 * Config.Meteor.Damage
+	b.advance(Config.PlayerSpells.meteor.fall + 0.1)
+	local expected = 60 * Config.PlayerSpells.meteor.damage
 	check(math.abs(fighters[1].hp - (1000 - expected)) < 1e-6, "a mob takes 1.2 × the squad's attack (" .. fighters[1].hp .. ")")
-	check(math.abs(boss.hp - (1000 - expected * Config.Meteor.BossDamage)) < 1e-6, "the boss takes less")
+	check(math.abs(boss.hp - (1000 - expected * Config.PlayerSpells.meteor.bossDamage)) < 1e-6, "the boss takes less")
 	check(fighters[6].hp == 1000, "far enemies are not hit")
 	check(fighters[1].stunUntil > fighters[1].clock, "stunned")
-	b.advance(Config.Meteor.Cooldown)
+	b.advance(Config.PlayerSpells.meteor.cooldown)
 	ok = BattleSpells.castMeteor(b.state)
 	check(ok, "ready again after the cooldown")
 end
@@ -245,6 +251,150 @@ do -- a wizard without an element (Void) and an enemy-free fight cast nothing
 	check(#b.pops == 0, "Void has no signature")
 end
 check(Config.signatureCooldown(1) == Config.SignatureCooldownLow and Config.signatureCooldown(16) == Config.SignatureCooldownTop, "cooldown by level")
+
+-- ── The other player spells ──
+local function squadAndWave(wave)
+	local fighters = enemies(5, 30)
+	for _, e in fighters do
+		e.maxHp, e.hp = 1000, 1000
+	end
+	local mages = {}
+	for i = 1, 3 do
+		local m = newFighter(PLAYER, i * 3, 0, { damage = 20, hp = 30 })
+		table.insert(mages, m)
+		table.insert(fighters, m)
+	end
+	return fighters, mages
+end
+do
+	local fighters, _ = squadAndWave()
+	local b = newBattle({ fighters = fighters, wave = 1 })
+	b.advance(Config.PlayerSpells.frost.first + 0.01)
+	local ok = BattleSpells.castPlayer(b.state, "frost", Vector3.new(4, 0, 30))
+	check(ok, "blizzard cast at an aimed point")
+	local frozen = 0
+	for i = 1, 5 do
+		if fighters[i].stunUntil > fighters[i].clock + 1 then
+			frozen += 1
+		end
+	end
+	check(frozen >= 3, "blizzard freezes the group (" .. frozen .. ")")
+	check(table.find(b.marks, "FROZEN") ~= nil, "FROZEN tags")
+end
+do
+	local fighters, _ = squadAndWave()
+	local b = newBattle({ fighters = fighters, wave = 1 })
+	b.advance(Config.PlayerSpells.lightning.first + 0.01)
+	local ok = BattleSpells.castPlayer(b.state, "lightning", Vector3.new(999, 0, 999)) -- outside the arena: aims itself
+	check(ok, "lightning cast (bad aim → auto)")
+	b.advance(1)
+	local struck = 0
+	for i = 1, 5 do
+		if fighters[i].hp < 1000 then
+			struck += 1
+		end
+	end
+	check(struck == 5, "lightning jumps through the whole group (" .. struck .. ")")
+end
+do
+	local fighters, mages = squadAndWave()
+	local b = newBattle({ fighters = fighters, wave = 1 })
+	local ok, wait = BattleSpells.castPlayer(b.state, "heal", nil)
+	check(not ok and wait > 0, "heal not ready at once")
+	b.advance(Config.PlayerSpells.heal.first + 0.01)
+	ok = BattleSpells.castPlayer(b.state, "heal", nil)
+	check(ok and mages[1].hp > 30 and mages[1].shieldUntil > mages[1].clock, "heal heals and shields the squad")
+	check(not BattleSpells.castPlayer(b.state, "nonsense", nil), "unknown spell refused")
+end
+
+-- ── Affixes ──
+do
+	check(Config.affixChance(1) == 0 and Config.affixChance(4) > 0 and Config.affixChance(500) == Config.Affixes.ChanceMax, "affix chance by wave")
+	local fighters = enemies(60, 20)
+	local b = newBattle({ fighters = fighters, wave = 30 })
+	local count, kinds = 0, {}
+	for f, id in b.state.affixes do
+		count += 1
+		kinds[id] = true
+		check(f.bonusCoins >= Config.Affixes.Coins, "an affixed enemy pays more")
+	end
+	check(count > 5 and count < 50, "some enemies have affixes (" .. count .. ")")
+	check(kinds.giant and kinds.splitter and kinds.explosive and kinds.shielded and kinds.swift, "every affix appears at wave 30")
+	for f, id in b.state.affixes do
+		if id == "shielded" then
+			check(f.shieldHp > 0, "shielded has a bubble")
+		elseif id == "giant" then
+			check(f.maxHp > 100 and f.lift > 2, "giant is bigger")
+		elseif id == "swift" then
+			check(f.haste > 1, "swift is faster")
+		end
+	end
+end
+do -- a splitter's death: two smaller copies, the wave held while they come
+	local f = newFighter(ENEMY, 0, 10)
+	local mage = newFighter(PLAYER, 0, 0)
+	local b = newBattle({ fighters = { f, mage }, wave = 1 })
+	b.state.affixes[f] = "splitter"
+	f.hp = 0
+	BattleSpells.onDeath(b.state, f)
+	check(b.pending == 2, "split: 2 on their way")
+	b.advance(0.1)
+	check(#b.spawned == 2 and b.pending == 0 and b.spawned[1].maxHp < f.maxHp, "split: 2 small copies")
+end
+do -- an explosive's death: the mages inside are hurt after the warning
+	local f = newFighter(ENEMY, 0, 2, { damage = 10 })
+	local mage = newFighter(PLAYER, 0, 0)
+	local far = newFighter(PLAYER, 30, 0)
+	local b = newBattle({ fighters = { f, mage, far }, wave = 1 })
+	b.state.affixes[f] = "explosive"
+	f.hp = 0
+	BattleSpells.onDeath(b.state, f)
+	check(mage.hp == 100, "explosion waits for its warning")
+	b.advance(Config.Affixes.Defs.explosive.delay + 0.1)
+	check(mage.hp < 100 and far.hp == 100, "explosion hurts the mage inside only")
+end
+
+-- ── Combo and the boss's fall ──
+do
+	local list = enemies(4)
+	local boss = newFighter(ENEMY, 0, 40, { boss = true })
+	table.insert(list, boss)
+	local b = newBattle({ fighters = list, wave = 1 })
+	for i = 1, 3 do
+		list[i].hp = 0
+		BattleSpells.onDeath(b.state, list[i])
+		b.advance(0.5)
+	end
+	check(b.state.combo == 3, "3 quick kills = combo 3")
+	check(math.abs(list[3].bonusCoins - 2 * Config.Combo.CoinStep) < 1e-9, "the 3rd kill pays 20 % more")
+	local shown = false
+	for _, d in b.feel do
+		if d.kind == "combo" and d.n == 3 then
+			shown = true
+		end
+	end
+	check(shown, "the combo is sent to the screen")
+	b.advance(Config.Combo.Window + 0.5)
+	list[4].hp = 0
+	BattleSpells.onDeath(b.state, list[4])
+	check(b.state.combo == 1, "a slow kill starts a new combo")
+	boss.hp = 0
+	-- (no other enemy left: no slow motion, but the banner)
+	BattleSpells.onDeath(b.state, boss)
+	local banner = false
+	for _, d in b.feel do
+		banner = banner or d.kind == "boss"
+	end
+	check(banner and b.slowmo == 0, "boss: banner, no slow motion when the fight is over")
+end
+do
+	local boss = newFighter(ENEMY, 0, 40, { boss = true })
+	local other = newFighter(ENEMY, 5, 40)
+	local b = newBattle({ fighters = { boss, other }, wave = 1 })
+	boss.hp = 0
+	BattleSpells.onDeath(b.state, boss)
+	check(b.slowmo > 0, "boss: slow motion while the fight goes on")
+end
 
 if fails == 0 then
 	print("ALL CHECKS PASSED")

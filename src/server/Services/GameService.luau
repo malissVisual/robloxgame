@@ -12,6 +12,7 @@ local Grid = require(Shared.Grid)
 local Units = require(Shared.Config.Units)
 local MageUpgrades = require(Shared.MageUpgrades)
 local Wizards = require(Shared.Config.Wizards)
+local BattleSpellsConfig = require(Shared.Config.BattleSpells) -- the boss chest
 local Levels = require(Shared.Config.Levels)
 local Waves = require(Shared.Config.Waves)
 local Difficulties = require(Shared.Config.Difficulties)
@@ -992,7 +993,8 @@ type Drop = { class: string, tier: number, stored: boolean, bonus: boolean, vari
 
 -- Drop for a won wave: a random unlocked class; the higher the wave, the higher its level.
 -- It is only queued here; it enters the inventory after the result screen (collectPending).
-local function battleDrop(profile: PlayerData.Profile, wave: number, guaranteedBonus: boolean): Drop
+-- `minOrder` = the wizard type is at least this rarity (3 = Epic: the boss chest).
+local function battleDrop(profile: PlayerData.Profile, wave: number, guaranteedBonus: boolean, minOrder: number?): Drop
 	local pool = PlayerData.unlockedClasses(profile)
 	local class = pool[rng:NextInteger(1, #pool)]
 	local tier = math.min(1 + wave // 7, 5, profile.tierUnlocked[class] or 1)
@@ -1003,7 +1005,7 @@ local function battleDrop(profile: PlayerData.Profile, wave: number, guaranteedB
 	end
 	-- The wizard type is rolled by rarity; later waves, bosses and Nightmare roll better.
 	local luck = (1 + wave * Balance.DropLuckPerWave) * (if guaranteedBonus then 1.6 else 1) * (if profile.difficulty == "Nightmare" then 1.3 else 1)
-	local variant = Wizards.roll(rng, luck)
+	local variant = Wizards.roll(rng, luck, minOrder)
 	local stored = countFreeBoard(profile) > #profile.pendingUnits
 	table.insert(profile.pendingUnits, { class = class, tier = tier, variant = variant })
 	return { class = class, tier = tier, stored = stored, bonus = bonus, variant = variant }
@@ -1429,6 +1431,18 @@ local function onBattle(player: Player)
 			if result and result.bonusDrop then
 				table.insert(extraDrops, battleDrop(profile, wave, false)) -- the treasure goblin was caught
 			end
+			if isBoss then
+				-- THE BOSS CHEST (Config/BattleSpells.BossChest): extra wizards (the first Epic or better) and coins.
+				local chest = BattleSpellsConfig.BossChest
+				for i = 1, chest.Drops do
+					table.insert(extraDrops, battleDrop(profile, wave, false, if i <= chest.EpicDrops then 3 else nil))
+				end
+				local chestCoins = math.floor(chest.CoinKills * Waves.killReward(wave, (Waves.phase(wave, plot.map))) * difficulty.rewardMultiplier)
+				profile.coins += chestCoins
+				earnedCoins += chestCoins
+				notify(player, string.format("BOSS CHEST: +%d coins and %d wizards!", chestCoins, chest.Drops))
+				pushState(player)
+			end
 			local candidates, lucky = luckyDrop(profile, wave, difficulty.luckyDropChance)
 			profile.nextWaveAt = os.clock() + Balance.RewardTime
 			refresh(player)
@@ -1554,13 +1568,17 @@ function GameService.init()
 	Net.get("AdminCommand").OnServerEvent:Connect(onAdminCommand)
 	local _unusedUpgrade = onUpgradeLevel
 	Net.get("BattleSpeed").OnServerEvent:Connect(onBattleSpeed)
-	Net.get("CastSpell").OnServerEvent:Connect(function(player: Player, id: any)
-		-- The player's meteor (Config/BattleSpells.luau): the server checks the fight and the cooldown and answers
-		-- with the cooldown left, so the button's ring stays right.
+	Net.get("CastSpell").OnServerEvent:Connect(function(player: Player, id: any, point: any)
+		-- The player's spells (Config/BattleSpells.luau): the server checks the fight, the cooldown and the aimed point
+		-- and answers with the cooldown left, so the button's ring stays right.
 		if type(id) ~= "string" then
 			return
 		end
-		local cast, wait = BattleService.castSpell(player, id)
+		local aim: Vector3? = nil
+		if typeof(point) == "Vector3" and point.X == point.X and point.Z == point.Z and math.abs(point.X) < 1e6 and math.abs(point.Z) < 1e6 then
+			aim = point
+		end
+		local cast, wait = BattleService.castSpell(player, id, aim)
 		if wait then
 			Net.get("SpellState"):FireClient(player, { id = id, cast = cast, wait = wait })
 		end

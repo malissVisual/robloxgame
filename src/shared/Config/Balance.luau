@@ -192,7 +192,7 @@ local Balance = {
 	BossDamage = 0.6,
 	BossPercentDamage = 0.3,
 	BossBattleTimeLimit = 180,
-	WaveHp = { { 1, 3.5 }, { 5, 4.8 }, { 10, 7.5 }, { 20, 13 }, { 30, 22 }, { 45, 27 }, { 60, 24 }, { 80, 17 }, { 100, 11 } },
+	WaveHp = { { 1, 3.5 }, { 5, 5.5 }, { 10, 8.6 }, { 20, 15 }, { 30, 25 }, { 45, 31 }, { 60, 28 }, { 80, 20 }, { 100, 13 } }, -- (+15 % from wave 5 for your spells and the crits)
 	WaveDamage = { { 1, 0.7 }, { 5, 0.8 }, { 10, 1.3 }, { 20, 2 }, { 30, 2.7 }, { 45, 3 }, { 60, 2.5 }, { 80, 1.7 }, { 100, 1.1 } },
 
 	-- Roll animation of a bought soldier (UI only): swirl, then reveal (seconds)

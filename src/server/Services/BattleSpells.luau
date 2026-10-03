@@ -1,10 +1,12 @@
 --!strict
--- The fight's extra action (numbers in Config/BattleSpells.luau): REINFORCEMENTS (part of the wave comes again a few
--- seconds in), the player's METEOR (the round button / F during a fight) and the element wizards' SIGNATURE spells
--- (Inferno, Frost Nova, Thunderstorm, Wild Grove, Shadow Claw, Arcane Barrage). BattleService creates one State per
--- battle with a context (the same helpers the brains and the wave twists get), calls step(dt) every tick and
--- castMeteor() when the player presses the button. Everything runs on the battle clock (schedule / movers), so the
--- battle speed (2x) and the end of the battle (events and movers are cleared) are handled by BattleService.
+-- The fight's extra action (numbers in Config/BattleSpells.luau): the PLAYER'S SPELLS (meteor, blizzard, lightning,
+-- heal: the round buttons / keys 1-4), REINFORCEMENTS (part of the wave comes again a few seconds in), the element
+-- wizards' SIGNATURE spells (Inferno, Frost Nova, Thunderstorm, Wild Grove, Shadow Claw, Arcane Barrage), the enemy
+-- AFFIXES (shielded, swift, explosive, splitter, giant) and the FEEL (crits, the kill combo, camera shakes, the
+-- boss's slow-motion death). BattleService creates one State per battle with a context (the same helpers the brains
+-- and the wave twists get), calls step(dt) every tick, onDeath(f) for every death and castPlayer() when the player
+-- casts. Everything runs on the battle clock (schedule / movers), so the battle speed (2x) and the end of the battle
+-- (events and movers are cleared) are handled by BattleService.
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Wizards = require(Shared.Config.Wizards)
@@ -36,19 +38,27 @@ export type Ctx = {
 	archetype: (f: any) -> string?,
 	clock: () -> number,
 	center: Vector3, -- the arena's center
+	arenaRadius: number,
 	wave: number,
 	boss: boolean, -- a boss wave
 	twists: { string }, -- the ids of the wave's twists
+	feel: (data: { [string]: any }) -> (), -- to the player's screen: { kind = "shake" | "combo" | "boss", … }
+	slowmo: (speed: number, seconds: number) -> (), -- the fight runs slower for a few real seconds
+	scaleModel: (f: any, scale: number) -> (), -- makes a fighter's model bigger / smaller (and its lift)
 	random: Random?,
 }
 
 export type State = {
 	ctx: Ctx,
-	meteorReady: number, -- battle clock
+	ready: { [string]: number }, -- player spell id → battle clock when it is ready
 	nextSignature: { [any]: number }, -- mage fighter → battle clock of its next signature spell
 	elements: { [any]: string }, -- mage fighter → its element (only the element wizards)
 	reinforce: boolean, -- this wave gets reinforcements (not sent yet)
 	starting: { any }, -- the starting combat enemies (their deaths trigger the reinforcements early)
+	affixes: { [any]: string }, -- enemy fighter → its affix id
+	shieldTags: { [any]: Instance }, -- shielded enemy → its tag (removed when the bubble pops)
+	combo: number, -- kills in the running combo
+	lastKill: number, -- battle clock of the last kill
 	rng: Random,
 }
 
@@ -96,16 +106,122 @@ local function has(list: { string }, id: string): boolean
 	return table.find(list, id) ~= nil
 end
 
+-- A mage's hit with the CRIT roll: × Crit.Mult, a gold number and "CRIT!".
+local function hit(self: State, f: any, target: any, amount: number, color: Color3): number
+	local ctx = self.ctx
+	local crit = f.side == ctx.playerSide and self.rng:NextNumber() < Config.Crit.Chance
+	if crit then
+		amount *= Config.Crit.Mult
+		ctx.fx.pop(ctx.parent, target.pos + UP * (target.lift * 2 + 2), "CRIT!", Config.Crit.Color, 22)
+	end
+	local taken = ctx.damage(target, amount, f)
+	ctx.popNumber(target, taken, if crit then Config.Crit.Color else color)
+	return taken
+end
+
+-- ── Enemy affixes ───────────────────────────────────────────────────────────
+
+local function giveAffix(self: State, f: any, id: string)
+	local ctx, A = self.ctx, Config.Affixes.Defs[id]
+	self.affixes[f] = id
+	f.bonusCoins += Config.Affixes.Coins
+	local tag = ctx.fx.mark(f.model, A.label, A.color, 600)
+	if id == "shielded" then
+		f.shieldHp += f.maxHp * (A.shield :: number)
+		self.shieldTags[f] = tag
+		ctx.fx.tint(f.model, A.color, 1.5)
+	elseif id == "swift" then
+		f.haste *= A.haste :: number
+	elseif id == "giant" then
+		f.maxHp *= A.hp :: number
+		f.hp = f.maxHp
+		f.damage *= A.damage :: number
+		ctx.scaleModel(f, A.scale :: number)
+	end
+end
+
+local function rollAffixes(self: State)
+	local chance = Config.affixChance(self.ctx.wave)
+	if chance <= 0 then
+		return
+	end
+	local pool: { string } = {}
+	for _, id in Config.Affixes.Order do
+		if self.ctx.wave >= Config.Affixes.Defs[id].minWave then
+			table.insert(pool, id)
+		end
+	end
+	for _, f in self.starting do
+		if self.rng:NextNumber() < chance then
+			giveAffix(self, f, pool[self.rng:NextInteger(1, #pool)])
+		end
+	end
+end
+
+local function explode(self: State, f: any)
+	local ctx, A = self.ctx, Config.Affixes.Defs.explosive
+	local pos = Vector3.new(f.pos.X, ctx.groundY(f.pos), f.pos.Z)
+	local radius, damage = A.radius :: number, f.damage * (A.damage :: number)
+	local parts = ctx.fx.warningCircle(ctx.fxFolder, pos, radius, A.color, pos.Y + 0.05)
+	ctx.addHazard(pos, radius, A.delay :: number, "volatile", nil) -- the mages step out of it
+	ctx.schedule(A.delay :: number, function()
+		for _, part in parts do
+			part:Destroy()
+		end
+		ctx.fx.groundRing(ctx.parent, pos, A.color, radius * 1.2, 0.5)
+		ctx.fx.sparks(ctx.parent, pos, A.color, 16, radius, 7)
+		local flash = ctx.fx.newPart(ctx.parent, Vector3.one * 2, CFrame.new(pos + UP * 1.5), A.color, 0.1, Enum.PartType.Ball)
+		ctx.fx.fade(flash, 0.4, { Size = Vector3.one * radius * 2, Transparency = 1 })
+		ctx.feel({ kind = "shake", power = Config.ExplosionShake })
+		for _, mage in ctx.fighters do
+			if mage.side == ctx.playerSide and alive(mage) and (flat(mage.pos) - flat(pos)).Magnitude <= radius then
+				ctx.popNumber(mage, ctx.damage(mage, damage, nil), A.color)
+			end
+		end
+	end)
+end
+
+local function split(self: State, f: any)
+	local ctx, A = self.ctx, Config.Affixes.Defs.splitter
+	local count = A.parts :: number
+	local pos, kind, tier, hp, damage = f.pos, f.kind, f.tier, f.maxHp * (A.hp :: number), f.damage
+	if not kind then
+		return
+	end
+	ctx.hold(count) -- the wave is not beaten while they are coming
+	ctx.fx.pop(ctx.parent, pos + UP * (f.lift * 2 + 1), "SPLIT!", A.color, 22)
+	ctx.schedule(0.05, function()
+		for i = 1, count do
+			local angle = (i / count) * math.pi * 2
+			local child = ctx.spawnEnemy(kind, tier, pos + Vector3.new(math.cos(angle) * 2.5, 0, math.sin(angle) * 2.5))
+			child.maxHp = hp
+			child.hp = hp
+			child.damage = damage * 0.6
+			child.haste *= 1.3
+			ctx.scaleModel(child, 0.7)
+			ctx.fx.tint(child.model, A.color, 1)
+		end
+		ctx.hold(-count)
+	end)
+end
+
 function BattleSpells.new(ctx: Ctx): State
 	local self: State = {
 		ctx = ctx,
-		meteorReady = Config.Meteor.FirstDelay,
+		ready = {},
 		nextSignature = {},
 		elements = {},
 		reinforce = false,
 		starting = {},
+		affixes = {},
+		shieldTags = {},
+		combo = 0,
+		lastKill = -math.huge,
 		rng = ctx.random or Random.new(),
 	}
+	for id, spell in Config.PlayerSpells do
+		self.ready[id] = spell.first
+	end
 	for _, f in ctx.fighters do
 		if f.side == ctx.playerSide and f.variant then
 			local def = Wizards.Types[f.variant]
@@ -129,6 +245,7 @@ function BattleSpells.new(ctx: Ctx): State
 		end
 	end
 	self.reinforce = ctx.wave >= R.MinWave and not ctx.boss and not skip and #self.starting > 0
+	rollAffixes(self)
 	return self
 end
 
@@ -189,52 +306,52 @@ local function stepReinforcements(self: State)
 	end
 end
 
--- ── The player's meteor ─────────────────────────────────────────────────────
+-- ── The player's spells ─────────────────────────────────────────────────────
 
--- Returns (cast, battle seconds until the next one).
-function BattleSpells.castMeteor(self: State): (boolean, number)
-	local ctx, M = self.ctx, Config.Meteor
-	local now = ctx.clock()
-	if now < self.meteorReady then
-		return false, self.meteorReady - now
-	end
-	local enemies = enemiesOf(self)
-	local target = densest(enemies, M.Radius)
-	if not target then
-		return false, 0
-	end
-	local power = 0
-	for _, f in ctx.fighters do
-		if f.side == ctx.playerSide and alive(f) then
-			power += f.damage
+local function power(self: State): number
+	local sum = 0
+	for _, f in self.ctx.fighters do
+		if f.side == self.ctx.playerSide and alive(f) then
+			sum += f.damage
 		end
 	end
-	if power <= 0 then
-		return false, 0
+	return sum
+end
+
+local function impactPoint(self: State, spell: Config.PlayerSpell, aim: Vector3?): Vector3?
+	local ctx = self.ctx
+	if aim and (flat(aim) - flat(ctx.center)).Magnitude <= ctx.arenaRadius + Config.AimSlack then
+		return Vector3.new(aim.X, ctx.groundY(aim), aim.Z)
 	end
-	self.meteorReady = now + M.Cooldown
-	local point = Vector3.new(target.pos.X, ctx.groundY(target.pos), target.pos.Z)
-	local fx = ctx.fx
-	local reticle = fx.reticle(ctx.fxFolder, point, M.Radius, M.Color, point.Y + 0.05)
-	ctx.emit("playerSpell", { id = "meteor", point = point }) -- the mages combo their area spells into it
-	local rock = fx.newPart(ctx.fxFolder, Vector3.one * 5, CFrame.new(point + Vector3.new(14, 60, 10)), M.Color, 0, Enum.PartType.Ball)
-	local core = fx.newPart(ctx.fxFolder, Vector3.one * 3, rock.CFrame, M.Color2, 0, Enum.PartType.Ball)
+	local target = densest(enemiesOf(self), spell.radius)
+	if not target then
+		return nil
+	end
+	return Vector3.new(target.pos.X, ctx.groundY(target.pos), target.pos.Z)
+end
+
+local function meteor(self: State, M: Config.PlayerSpell, point: Vector3, strength: number)
+	local ctx, fx = self.ctx, self.ctx.fx
+	local reticle = fx.reticle(ctx.fxFolder, point, M.radius, M.color, point.Y + 0.05)
+	local rock = fx.newPart(ctx.fxFolder, Vector3.one * 5, CFrame.new(point + Vector3.new(14, 60, 10)), M.color, 0, Enum.PartType.Ball)
+	local core = fx.newPart(ctx.fxFolder, Vector3.one * 3, rock.CFrame, M.color2, 0, Enum.PartType.Ball)
 	local light = Instance.new("PointLight")
-	light.Color = M.Color
+	light.Color = M.color
 	light.Range = 30
 	light.Brightness = 4
 	light.Parent = rock
 	local from = rock.Position
 	local elapsed = 0
+	local fall = M.fall :: number
 	ctx.addMover(function(dt: number): boolean
 		elapsed += dt
-		local f = math.clamp(elapsed / M.Fall, 0, 1)
+		local f = math.clamp(elapsed / fall, 0, 1)
 		local pos = from:Lerp(point + UP * 2, f * f)
 		if rock.Parent then
 			rock.CFrame = CFrame.new(pos)
 			core.CFrame = CFrame.new(pos)
 			if math.random() < 0.7 then
-				fx.sparks(ctx.fxFolder, pos - UP, M.Color, 1, 1.5, 3) -- a burning trail
+				fx.sparks(ctx.fxFolder, pos - UP, M.color, 1, 1.5, 3) -- a burning trail
 			end
 		end
 		if f < 1 then
@@ -244,28 +361,175 @@ function BattleSpells.castMeteor(self: State): (boolean, number)
 		core:Destroy()
 		reticle:Destroy()
 		-- IMPACT
-		fx.groundRing(ctx.parent, point, M.Color, M.Radius * 1.3, 0.6)
-		fx.groundRing(ctx.parent, point, M.Color2, M.Radius * 0.8, 0.4)
-		fx.sparks(ctx.parent, point, M.Color, 24, M.Radius, 9)
-		fx.sparks(ctx.parent, point, M.Color2, 12, M.Radius * 0.6, 12)
-		local flash = fx.newPart(ctx.parent, Vector3.one * 4, CFrame.new(point + UP * 2), M.Color2, 0.1, Enum.PartType.Ball)
-		fx.fade(flash, 0.5, { Size = Vector3.one * (M.Radius * 2.4), Transparency = 1 })
-		fx.pop(ctx.parent, point + UP * 6, "METEOR!", M.Color2, 30)
-		for _, enemy in within(enemiesOf(self), point, M.Radius) do
-			local amount = power * M.Damage * (if enemy.boss then M.BossDamage else 1)
-			ctx.popNumber(enemy, ctx.damage(enemy, amount, nil), M.Color)
+		fx.groundRing(ctx.parent, point, M.color, M.radius * 1.3, 0.6)
+		fx.groundRing(ctx.parent, point, M.color2, M.radius * 0.8, 0.4)
+		fx.sparks(ctx.parent, point, M.color, 24, M.radius, 9)
+		fx.sparks(ctx.parent, point, M.color2, 12, M.radius * 0.6, 12)
+		local flash = fx.newPart(ctx.parent, Vector3.one * 4, CFrame.new(point + UP * 2), M.color2, 0.1, Enum.PartType.Ball)
+		fx.fade(flash, 0.5, { Size = Vector3.one * (M.radius * 2.4), Transparency = 1 })
+		fx.pop(ctx.parent, point + UP * 6, "METEOR!", M.color2, 30)
+		ctx.feel({ kind = "shake", power = M.shake })
+		for _, enemy in within(enemiesOf(self), point, M.radius) do
+			local amount = strength * (M.damage :: number) * (if enemy.boss then M.bossDamage :: number else 1)
+			ctx.popNumber(enemy, ctx.damage(enemy, amount, nil), M.color)
 			if alive(enemy) then
-				enemy.stunUntil = math.max(enemy.stunUntil, enemy.clock + M.Stun)
-				fx.tint(enemy.model, M.Color, M.Stun)
+				enemy.stunUntil = math.max(enemy.stunUntil, enemy.clock + (M.stun :: number))
+				fx.tint(enemy.model, M.color, M.stun :: number)
 			end
 		end
 		return false
 	end)
-	return true, M.Cooldown
 end
 
-function BattleSpells.meteorIn(self: State): number
-	return math.max(0, self.meteorReady - self.ctx.clock())
+local function blizzard(self: State, S: Config.PlayerSpell, point: Vector3, strength: number)
+	local ctx, fx = self.ctx, self.ctx.fx
+	fx.groundRing(ctx.parent, point, S.color, S.radius, 0.8)
+	fx.groundRing(ctx.parent, point, S.color2, S.radius * 0.6, 0.6)
+	for i = 1, 16 do -- ice falling from the sky, shards growing from the ground
+		local a = self.rng:NextNumber() * math.pi * 2
+		local r = S.radius * math.sqrt(self.rng:NextNumber())
+		local at = point + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+		local h = 2 + self.rng:NextNumber() * 3
+		local shard = fx.newPart(ctx.parent, Vector3.new(0.8, h, 0.8), CFrame.new(at + UP * (h / 2)) * CFrame.Angles(self.rng:NextNumber() * 0.6, a, self.rng:NextNumber() * 0.6), S.color, 0.1)
+		shard.Material = Enum.Material.Ice
+		fx.fade(shard, 2.2, { Transparency = 1, Size = Vector3.new(0.2, h, 0.2) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		if i <= 8 then
+			fx.beam(ctx.parent, at + Vector3.new(4, 30, 2), at, S.color2, 0.4, 0.35)
+		end
+	end
+	fx.pop(ctx.parent, point + UP * 6, "BLIZZARD!", S.color2, 30)
+	ctx.feel({ kind = "shake", power = S.shake })
+	for _, enemy in within(enemiesOf(self), point, S.radius) do
+		ctx.popNumber(enemy, ctx.damage(enemy, strength * (S.damage :: number) * (if enemy.boss then S.bossDamage :: number else 1), nil), S.color)
+		if alive(enemy) then
+			local time = if enemy.boss then S.bossFreeze :: number else S.freeze :: number
+			enemy.stunUntil = math.max(enemy.stunUntil, enemy.clock + time)
+			fx.tint(enemy.model, S.color2, time)
+			fx.mark(enemy.model, "FROZEN", S.color2, time)
+		end
+	end
+end
+
+local function lightning(self: State, S: Config.PlayerSpell, point: Vector3, strength: number)
+	local ctx, fx = self.ctx, self.ctx.fx
+	local enemies = enemiesOf(self)
+	local first, bestDist = nil, math.huge
+	for _, e in enemies do
+		local d = (flat(e.pos) - flat(point)).Magnitude
+		if d < bestDist then
+			first, bestDist = e, d
+		end
+	end
+	if not first then
+		return
+	end
+	ctx.feel({ kind = "shake", power = S.shake })
+	local hitSet: { [any]: boolean } = {}
+	local current = first
+	local from = current.pos + UP * 45
+	for i = 0, S.jumps :: number do
+		local target, origin = current, from
+		hitSet[target] = true
+		ctx.schedule(i * 0.08, function()
+			if not alive(target) then
+				return
+			end
+			if i == 0 then
+				fx.lightning(ctx.parent, origin, target.pos, S.color, 1)
+				fx.groundRing(ctx.parent, target.pos, S.color2, 4, 0.35)
+				fx.pop(ctx.parent, target.pos + UP * 6, "LIGHTNING!", S.color, 28)
+			else
+				fx.beam(ctx.parent, origin, target.pos + UP * target.lift, S.color, 0.5, 0.3)
+				fx.beam(ctx.parent, origin, target.pos + UP * target.lift, S.color2, 0.2, 0.3)
+			end
+			fx.sparks(ctx.parent, target.pos, S.color, 6, 2, 4)
+			ctx.popNumber(target, ctx.damage(target, strength * (S.damage :: number) * (if target.boss then S.bossDamage :: number else 1), nil), S.color)
+			if alive(target) then
+				target.stunUntil = math.max(target.stunUntil, target.clock + (S.stun :: number))
+			end
+		end)
+		-- the next jump: the nearest enemy not hit yet
+		local nextTarget, nextDist = nil, S.jumpRadius :: number
+		for _, e in enemies do
+			if not hitSet[e] then
+				local d = (flat(e.pos) - flat(current.pos)).Magnitude
+				if d <= nextDist then
+					nextTarget, nextDist = e, d
+				end
+			end
+		end
+		if not nextTarget then
+			break
+		end
+		from = current.pos + UP * current.lift
+		current = nextTarget
+	end
+end
+
+local function healSquad(self: State, S: Config.PlayerSpell)
+	local ctx, fx = self.ctx, self.ctx.fx
+	for _, mage in ctx.fighters do
+		if mage.side == ctx.playerSide and alive(mage) then
+			ctx.heal(mage, mage.maxHp * (S.heal :: number))
+			mage.shieldUntil = math.max(mage.shieldUntil, mage.clock + (S.shieldTime :: number))
+			mage.shieldReduction = math.max(mage.shieldReduction, S.shield :: number)
+			fx.groundRing(ctx.parent, mage.pos, S.color, 5, 0.6)
+			fx.sparks(ctx.parent, mage.pos, S.color2, 8, 2, 6)
+			fx.beam(ctx.parent, mage.pos + UP * 30, mage.pos, S.color2, 0.8, 0.4)
+			fx.tint(mage.model, S.color, S.shieldTime :: number)
+		end
+	end
+	fx.pop(ctx.parent, ctx.center + UP * 8, "HEAL!", S.color2, 32)
+end
+
+-- The player casts `id` (aimed at `aim`, or nil: it aims itself). Returns (cast, battle seconds until it is ready).
+function BattleSpells.castPlayer(self: State, id: string, aim: Vector3?): (boolean, number)
+	local ctx = self.ctx
+	local spell = Config.PlayerSpells[id]
+	if not spell then
+		return false, 0
+	end
+	local now = ctx.clock()
+	local ready = self.ready[id] or spell.first
+	if now < ready then
+		return false, ready - now
+	end
+	local strength = power(self)
+	if strength <= 0 then
+		return false, 0
+	end
+	local point: Vector3? = nil
+	if spell.aim then
+		point = impactPoint(self, spell, aim)
+		if not point then
+			return false, 0
+		end
+	end
+	self.ready[id] = now + spell.cooldown
+	if id == "meteor" then
+		meteor(self, spell, point :: Vector3, strength)
+	elseif id == "frost" then
+		blizzard(self, spell, point :: Vector3, strength)
+	elseif id == "lightning" then
+		lightning(self, spell, point :: Vector3, strength)
+	elseif id == "heal" then
+		healSquad(self, spell)
+	end
+	if point then
+		ctx.emit("playerSpell", { id = id, point = point }) -- the mages combo their area spells into it
+	end
+	return true, spell.cooldown
+end
+
+-- Kept for older callers: the meteor aimed by itself.
+function BattleSpells.castMeteor(self: State): (boolean, number)
+	return BattleSpells.castPlayer(self, "meteor", nil)
+end
+
+-- Battle seconds until the player's spell `id` is ready.
+function BattleSpells.readyIn(self: State, id: string): number
+	local spell = Config.PlayerSpells[id]
+	return math.max(0, (self.ready[id] or (if spell then spell.first else 0)) - self.ctx.clock())
 end
 
 -- ── The element wizards' signature spells ───────────────────────────────────
@@ -283,12 +547,6 @@ local function nearestWithin(self: State, f: any, reach: number): any?
 		end
 	end
 	return best
-end
-
-local function hit(self: State, f: any, target: any, amount: number, color: Color3): number
-	local taken = self.ctx.damage(target, amount, f)
-	self.ctx.popNumber(target, taken, color)
-	return taken
 end
 
 local CAST: { [string]: (self: State, f: any, sig: any, target: any) -> () } = {}
@@ -458,9 +716,57 @@ end
 
 BattleSpells.signatureCooldown = Config.signatureCooldown
 
+-- ── Deaths: the combo, the boss's fall, explosive and splitter enemies ──────────
+
+-- Called by BattleService for every fighter that just died (before its kill is paid, so the combo's coins count).
+function BattleSpells.onDeath(self: State, f: any)
+	local ctx = self.ctx
+	if f.side ~= ctx.enemySide then
+		return
+	end
+	local now = ctx.clock()
+	local K = Config.Combo
+	if now - self.lastKill <= K.Window then
+		self.combo += 1
+	else
+		self.combo = 1
+	end
+	self.lastKill = now
+	local bonus = math.min(K.CoinMax, K.CoinStep * (self.combo - 1))
+	f.bonusCoins += bonus
+	if self.combo >= K.Show then
+		ctx.feel({ kind = "combo", n = self.combo, bonus = math.floor(bonus * 100 + 0.5) })
+	end
+	if f.boss then
+		ctx.feel({ kind = "boss", shake = Config.BossShake })
+		local others = 0
+		for _, e in ctx.fighters do
+			if e.side == ctx.enemySide and alive(e) then
+				others += 1
+			end
+		end
+		if others > 0 then
+			ctx.slowmo(Config.BossSlowmo.Speed, Config.BossSlowmo.Time)
+		end
+	end
+	local affix = self.affixes[f]
+	if affix == "explosive" then
+		explode(self, f)
+	elseif affix == "splitter" then
+		split(self, f)
+	end
+	self.affixes[f] = nil
+end
+
 function BattleSpells.step(self: State, _dt: number)
 	stepReinforcements(self)
 	stepSignatures(self)
+	for f, tag in self.shieldTags do
+		if not alive(f) or f.shieldHp <= 0 then
+			tag:Destroy() -- the bubble popped (BattleFx.shieldBreak shows it)
+			self.shieldTags[f] = nil
+		end
+	end
 end
 
 return BattleSpells
