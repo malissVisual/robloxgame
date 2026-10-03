@@ -14,8 +14,8 @@ node tools/rojo-sync.js zombie-delivery
 ```
 
 (from the repository root). In Studio open a **new Baseplate place** (not the Merge Blades one), then
-**Plugins → Rojo → Connect** and **Play**. On a Mac you can double-click `zombie-delivery/spust-zombie-delivery.command`
-instead (git pull + the sync).
+**Plugins → Rojo → Connect** and **Play**. Instead of the command you can double-click `zombie-delivery/spust-zombie-delivery.cmd` (Windows) or
+`zombie-delivery/spust-zombie-delivery.command` (Mac): git pull + the sync.
 
 A Play test in Studio without API access cannot save, so it starts with `Config.StudioStartMoney` ($25,000) to try the
 shop. A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
