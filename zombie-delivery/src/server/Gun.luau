@@ -1,6 +1,7 @@
 --!strict
--- The roof gun. The client says where it shoots (Fire, a point in the world), the server checks the fire rate,
--- turns the turret, raycasts every pellet from the roof and deals the damage (a head hit is a crit).
+-- The guns. The client says where it shoots (Fire, a point in the world), the server checks the fire rate, turns
+-- the roof turret (the driver) or shoots from the seat (a passenger, with their own gun), raycasts every pellet and
+-- deals the damage (a head hit is a crit, the grenade launcher blows up where it hits).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,9 +32,9 @@ local function onFire(player: Player, target: any)
 	if typeof(target) ~= "Vector3" or target ~= target then
 		return
 	end
-	local car = Vehicles.get(player)
+	local car, driving, seatPart = Vehicles.seatedIn(player)
 	local profile = PlayerData.get(player)
-	if not car or not profile or not Vehicles.isDriving(player) then
+	if not car or not seatPart or not profile then
 		return
 	end
 	local stats = Economy.weaponStats(profile.weapon, profile.upgrades)
@@ -43,8 +44,13 @@ local function onFire(player: Player, target: any)
 	end
 	lastShot[player] = now
 
-	Vehicles.aim(car, target)
-	local origin = (car.chassis.CFrame * car.turretBase).Position + Vector3.new(0, 0.4, 0)
+	local origin: Vector3
+	if driving then
+		Vehicles.aim(car, target)
+		origin = (car.chassis.CFrame * car.turretBase).Position + Vector3.new(0, 0.4, 0)
+	else
+		origin = seatPart.Position + Vector3.new(0, 3, 0) -- leaning out of the window
+	end
 	local toTarget = target - origin
 	local direction = if toTarget.Magnitude > 1 then toTarget.Unit else car.chassis.CFrame.LookVector
 	origin += direction * 2
@@ -68,7 +74,16 @@ local function onFire(player: Player, target: any)
 		local finish = if result then result.Position else origin + dir * stats.range
 		if result then
 			local zombie = Zombies.fromPart(result.Instance)
-			if zombie then
+			if stats.splash > 0 then
+				local blast = Instance.new("Explosion")
+				blast.BlastPressure = 0
+				blast.DestroyJointRadiusPercent = 0
+				blast.BlastRadius = stats.splash
+				blast.Position = result.Position
+				blast.Parent = workspace
+				local killed = Zombies.damageArea(result.Position, stats.splash, stats.damage, player)
+				hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, killed > 0)
+			elseif zombie then
 				local crit = result.Instance.Name == "Head"
 				local damage = stats.damage * (if crit then Config.Horde.HeadshotMultiplier else 1)
 				local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40 })

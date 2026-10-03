@@ -19,10 +19,15 @@ local NAMES = {
 	"Hit", -- server → client: the shooter's hit marker (position, damage, crit, killed)
 	"Reward", -- server → client: money popped from a kill (position, amount)
 	"Bump", -- server → client: the car hit something heavy, keep this share of the speed
-	"Buy", -- client → server: buy (kind = "car" | "weapon", id)
+	"Buy", -- client → server: buy (kind = "car" | "weapon" | "item", id, amount for items)
 	"Equip", -- client → server: equip (kind, id)
 	"Upgrade", -- client → server: next level of an upgrade track (id)
 	"Notice", -- server → client: a short toast (text)
+	"Play", -- client → server: PLAY was pressed on the start screen (the car comes now)
+	"UseItem", -- client → server: use a consumable (id, aimed point or nil)
+	"Boost", -- server → client: nitro (seconds, speed multiplier)
+	"OpenShop", -- server → client: a shop prompt was used (shop id, focused item id or nil)
+	"Paint", -- client → server: buy / apply a paint job on the equipped car (paint id)
 }
 
 local folder: Folder

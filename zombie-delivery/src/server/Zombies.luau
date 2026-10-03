@@ -15,7 +15,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
-local CityGrid = require(Shared.CityGrid)
+local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
@@ -32,6 +32,7 @@ export type Zombie = {
 	root: Part,
 	torso: Part,
 	owner: Player?, -- whose job / area spawned it (for the caps)
+	resident: boolean, -- lives in the world: never despawns
 	dead: boolean,
 	guard: boolean, -- waits at a delivery address until somebody comes close
 	nextAttack: number,
@@ -238,7 +239,7 @@ function Zombies.fromPart(part: Instance): Zombie?
 	return nil
 end
 
-function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean?): Zombie?
+function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean?, resident: boolean?): Zombie?
 	if #zombies >= Horde.MaxTotal then
 		return nil
 	end
@@ -254,6 +255,7 @@ function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean
 		root = root,
 		torso = torso,
 		owner = owner,
+		resident = resident == true,
 		dead = false,
 		guard = guard == true,
 		nextAttack = 0,
@@ -264,6 +266,7 @@ function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean
 		weld = nil,
 		lastHitBy = nil,
 	}
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model.Parent = workspace:FindFirstChild("Zombies") or workspace
 	pcall(function()
 		root:SetNetworkOwner(nil)
@@ -289,14 +292,9 @@ function Zombies.findSpot(center: Vector3, heading: Vector3?, minDistance: numbe
 		local distance = rng:NextNumber(low, high)
 		local px = center.X + math.cos(angle) * distance
 		local pz = center.Z + math.sin(angle) * distance
-		local x, z, axis = CityGrid.nearestRoad(px, pz)
-		local lateral = rng:NextNumber(-1, 1) * (CityGrid.RoadWidth / 2 - 4)
-		if axis == "z" then
-			x += lateral
-		else
-			z += lateral
-		end
-		local spot = Vector3.new(x, World.RoadTop, z)
+		local x, z, dx, dz, width = Map.nearestRoad(px, pz)
+		local lateral = rng:NextNumber(-1, 1) * (width / 2 - 4)
+		local spot = Vector3.new(x - dz * lateral, World.RoadTop, z + dx * lateral)
 		if World.isSafe(spot) or (spot - center).Magnitude < low * 0.6 then
 			continue
 		end
@@ -331,6 +329,11 @@ function Zombies.spawnGuards(owner: Player, at: Vector3, outward: Vector3, count
 	local along = Vector3.new(outward.Z, 0, -outward.X)
 	for _ = 1, count do
 		local offset = along * rng:NextNumber(-16, 16) + outward * rng:NextNumber(0, 12)
+		if outward.Magnitude < 0.5 then
+			-- an open yard: all around
+			local angle = rng:NextNumber(0, math.pi * 2)
+			offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(8, 26)
+		end
 		Zombies.spawn(Economy.pickKind(kinds, rng:NextNumber()), at + offset, owner, true)
 	end
 end
@@ -514,7 +517,8 @@ local function step()
 		end
 
 		-- Too far from everybody: gone.
-		if nearestPlayerDistance(position) > Horde.DespawnDistance or position.Y < -50 then
+		if position.Y < -8 or (not z.resident and nearestPlayerDistance(position) > Horde.DespawnDistance) then
+			-- drowned in the river / the sea, or nobody around
 			remove(z)
 			z.model:Destroy()
 			continue
@@ -545,7 +549,7 @@ local function step()
 
 		-- Chase the nearest target.
 		local best: Target? = nil
-		local bestDistance = if z.guard then 90 else 400
+		local bestDistance = if z.guard then 90 elseif z.resident then 160 else 400
 		for _, t in targets do
 			local d = (t.position - position).Magnitude
 			if d < bestDistance then
@@ -576,12 +580,74 @@ local function step()
 	end
 end
 
+-- A blast or a fire: damage everything in the radius (less at the edge). Returns the number killed.
+function Zombies.damageArea(center: Vector3, radius: number, damage: number, by: Player?): number
+	local killed = 0
+	for _, z in table.clone(zombies) do
+		if z.dead then
+			continue
+		end
+		local offset = z.root.Position - center
+		local distance = offset.Magnitude
+		if distance <= radius then
+			local share = 1 - 0.5 * distance / radius
+			local push = if distance > 0.1 then offset.Unit * 40 + Vector3.new(0, 30, 0) else Vector3.new(0, 40, 0)
+			if Zombies.damage(z, damage * share, by, { push = push }) then
+				killed += 1
+			end
+		end
+	end
+	return killed
+end
+
+-- ── Residents: the zombies that live in the world ──────────────────────────
+
+local RESIDENT_KINDS = { walker = 0.72, runner = 0.22, brute = 0.06 }
+
+local function residentSpot(): (Vector3?, string)
+	if rng:NextNumber() < 0.2 then
+		for _, yard in Map.Yards do
+			if yard.id == "base" then
+				return Vector3.new(rng:NextNumber(yard.x0 + 30, yard.x1 - 30), World.RoadTop, rng:NextNumber(yard.z0 + 30, yard.z1 - 30)), "soldier"
+			end
+		end
+	end
+	local addresses = Map.addresses()
+	local a = addresses[rng:NextInteger(1, #addresses)]
+	local spot = Vector3.new(a.x + rng:NextNumber(-8, 8), World.RoadTop, a.z + rng:NextNumber(-8, 8))
+	return spot, Economy.pickKind(RESIDENT_KINDS, rng:NextNumber())
+end
+
+local function keepResidents()
+	local alive = 0
+	for _, z in zombies do
+		if z.resident then
+			alive += 1
+		end
+	end
+	local missing = Horde.Residents.count - alive
+	-- Everybody at once when the server starts, then a couple at a time.
+	local batch = if alive == 0 then missing else math.min(missing, 2)
+	for _ = 1, batch do
+		local spot, kind = residentSpot()
+		if spot and nearestPlayerDistance(spot) > 90 then
+			Zombies.spawn(kind, spot, nil, false, true)
+		end
+	end
+end
+
 function Zombies.all(): { Zombie }
 	return zombies
 end
 
 function Zombies.start()
 	RunService.Heartbeat:Connect(step)
+	task.spawn(function()
+		while true do
+			keepResidents()
+			task.wait(Horde.Residents.respawn / 5)
+		end
+	end)
 end
 
 return Zombies

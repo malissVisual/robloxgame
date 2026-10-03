@@ -22,6 +22,7 @@ export type WeaponStats = {
 	range: number,
 	pellets: number,
 	spread: number,
+	splash: number,
 }
 
 export type Payout = {
@@ -59,6 +60,33 @@ function Economy.findUpgrade(id: string): Config.UpgradeDef?
 	return nil
 end
 
+function Economy.findItem(id: string): Config.ItemDef?
+	for _, item in Config.Items do
+		if item.id == id then
+			return item
+		end
+	end
+	return nil
+end
+
+function Economy.findPaint(id: string): Config.PaintDef?
+	for _, paint in Config.Paints do
+		if paint.id == id then
+			return paint
+		end
+	end
+	return nil
+end
+
+function Economy.findModifier(id: string): Config.ModifierDef?
+	for _, modifier in Config.Jobs.Modifiers do
+		if modifier.id == id then
+			return modifier
+		end
+	end
+	return nil
+end
+
 function Economy.level(upgrades: Upgrades, id: string): number
 	return upgrades[id] or 0
 end
@@ -87,7 +115,7 @@ function Economy.carStats(carId: string, upgrades: Upgrades): CarStats
 	return {
 		maxSpeed = def.maxSpeed * engine,
 		accel = def.accel * engine,
-		turn = def.turn,
+		turn = def.turn * Economy.multiplier(upgrades, "handling"),
 		health = math.floor(def.health * Economy.multiplier(upgrades, "armor")),
 		ramPower = def.ramPower * Economy.multiplier(upgrades, "plow"),
 	}
@@ -101,6 +129,7 @@ function Economy.weaponStats(weaponId: string, upgrades: Upgrades): WeaponStats
 		range = def.range,
 		pellets = def.pellets,
 		spread = def.spread,
+		splash = def.splash,
 	}
 end
 
@@ -112,12 +141,21 @@ function Economy.ramDamage(speed: number, ramPower: number): number
 	return speed * Config.Horde.RamDamagePerSpeed * ramPower
 end
 
-function Economy.jobPay(tier: Config.TierDef, distance: number): number
-	return math.floor((tier.basePay + distance * tier.payPerStud) / 5 + 0.5) * 5
+-- payMultiplier / timeMultiplier come from the job's modifier (1 without one).
+function Economy.jobPay(tier: Config.TierDef, distance: number, payMultiplier: number?): number
+	return math.floor((tier.basePay + distance * tier.payPerStud) * (payMultiplier or 1) / 5 + 0.5) * 5
 end
 
-function Economy.timeLimit(distance: number): number
-	return math.floor(Config.Jobs.TimeBase + distance * Config.Jobs.TimePerStud + 0.5)
+function Economy.timeLimit(distance: number, timeMultiplier: number?): number
+	return math.floor((Config.Jobs.TimeBase + distance * Config.Jobs.TimePerStud) * (timeMultiplier or 1) + 0.5)
+end
+
+-- What every member of a delivery crew gets: (the driver's total, each passenger's share).
+function Economy.crewSplit(total: number, passengers: number): (number, number)
+	local jobs = Config.Jobs
+	local driver = math.floor(total * (1 + jobs.CrewDriverBonus * passengers) + 0.5)
+	local share = if passengers > 0 then math.floor(total * jobs.CrewShare + 0.5) else 0
+	return driver, share
 end
 
 -- condition 0 … 1 (cargo health), timeLeft and timeLimit in seconds.

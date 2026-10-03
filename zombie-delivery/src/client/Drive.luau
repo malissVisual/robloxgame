@@ -11,6 +11,9 @@ local Drive = {}
 
 local player = Players.LocalPlayer
 local speed = 0 -- signed, along the nose
+local steerInput = 0
+local boostUntil = 0
+local boostMultiplier = 1
 
 function Drive.myCar(): Model?
 	local cars = workspace:FindFirstChild("Cars")
@@ -32,8 +35,39 @@ function Drive.isDriving(): boolean
 	return car ~= nil and humanoid ~= nil and humanoid.SeatPart ~= nil and humanoid.SeatPart:IsDescendantOf(car)
 end
 
+-- The car the local player sits in (any seat) and whether they drive it.
+function Drive.seatedCar(): (Model?, boolean)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	if not seat then
+		return nil, false
+	end
+	local car = seat.Parent
+	if car and car:IsA("Model") and car:GetAttribute("OwnerId") ~= nil then
+		return car, seat.Name == "DriverSeat"
+	end
+	return nil, false
+end
+
 function Drive.speed(): number
 	return speed
+end
+
+-- -1 … 1, the local driver's steering (for the front wheels).
+function Drive.steer(): number
+	return steerInput
+end
+
+function Drive.boosting(): boolean
+	return os.clock() < boostUntil
+end
+
+-- Nitro: `seconds` of a higher top speed.
+function Drive.boost(seconds: number, multiplier: number)
+	boostUntil = os.clock() + seconds
+	boostMultiplier = multiplier
+	speed *= 1.15
 end
 
 -- Hit something heavy: keep this share of the speed.
@@ -93,8 +127,13 @@ local function step(dt: number)
 		end
 	end
 
-	local maxSpeed = (car:GetAttribute("MaxSpeed") or 60) :: number
+	local maxSpeed = (car:GetAttribute("MaxSpeed") or 60) :: number * ((car:GetAttribute("SpeedMult") or 1) :: number)
 	local accel = (car:GetAttribute("Accel") or 26) :: number
+	if Drive.boosting() and throttle > 0 then
+		maxSpeed *= boostMultiplier
+		accel *= 2.5
+	end
+	steerInput = steer
 	local turn = (car:GetAttribute("Turn") or 1.8) :: number
 
 	local look = chassis.CFrame.LookVector

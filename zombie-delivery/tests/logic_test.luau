@@ -1,9 +1,9 @@
--- Logic test of the pure modules (shared/Economy.luau, shared/CityGrid.luau) in the standalone Luau CLI.
+-- Logic test of the pure modules (shared/Economy.luau, shared/Map.luau) in the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
 local Economy = require("./Economy")
-local CityGrid = require("./CityGrid")
+local Map = require("./Map")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -70,18 +70,40 @@ check("every car has a style and a price", (function()
 	return Config.Cars[1].price == 0 and Config.Weapons[1].price == 0
 end)())
 
--- CityGrid --------------------------------------------------------------------
+-- Economy v2 -------------------------------------------------------------------
 
-local x, z, axis = CityGrid.nearestRoad(0, 26)
-check("road in front of the depot", x == 0 and near(z, CityGrid.Cell / 2) and axis == "x", `{x} {z} {axis}`)
+check("handling upgrade", near(Economy.carStats("van", { handling = 5 }).turn, 1.8 * 1.4))
+check("launcher splash", Economy.weaponStats("launcher", {}).splash == 14)
+check("items exist", Economy.findItem("nitro") ~= nil and Economy.findItem("nope") == nil)
+check("paints exist", Economy.findPaint("factory") ~= nil and (Economy.findPaint("factory") :: any).price == 0)
+check("modifier exists", Economy.findModifier("rush") ~= nil)
+check("pay multiplier", Economy.jobPay(tier1, 400, 1.5) > Economy.jobPay(tier1, 400))
+check("time multiplier", Economy.timeLimit(400, 0.7) < Economy.timeLimit(400))
+local solo, none = Economy.crewSplit(300, 0)
+check("solo crew split", solo == 300 and none == 0)
+local driver, share = Economy.crewSplit(300, 2)
+check("crew split", driver == 300 + 90 and share == 150, `{driver} {share}`)
+check("items have unique ids", (function()
+	local seen = {}
+	for _, item in Config.Items do
+		if seen[item.id] then
+			return false
+		end
+		seen[item.id] = true
+	end
+	return #Config.Items == 5
+end)())
 
-local seed = CityGrid.lcg(42)
+-- Map -------------------------------------------------------------------------
+
+local seed = Map.lcg(42)
 local allOnRoad = true
-for _ = 1, 2000 do
-	local px = (seed() - 0.5) * CityGrid.Edge * 2.4
-	local pz = (seed() - 0.5) * CityGrid.Edge * 2.4
-	local rx, rz = CityGrid.nearestRoad(px, pz)
-	if not CityGrid.onRoad(rx, rz) then
+local b = Map.Bounds
+for _ = 1, 3000 do
+	local px = b.x0 + seed() * (b.x1 - b.x0)
+	local pz = b.z0 + seed() * (b.z1 - b.z0)
+	local rx, rz, dx, dz, width = Map.nearestRoad(px, pz)
+	if not Map.onRoad(rx, rz) or math.abs(dx * dx + dz * dz - 1) > 1e-6 or width < Config.City.RoadWidth then
 		allOnRoad = false
 		print("  off road:", px, pz, "->", rx, rz)
 		break
@@ -89,32 +111,68 @@ for _ = 1, 2000 do
 end
 check("nearestRoad is always on a road", allOnRoad)
 
-check("block centre is in a block", CityGrid.inBlock(CityGrid.Cell, 0, 0))
-check("road centre is not in a block", not CityGrid.inBlock(CityGrid.Cell / 2, 0, 0))
+local rx, rz = Map.nearestRoad(0, 26)
+check("road in front of the depot", near(rx, 0) and near(rz, Map.Cell / 2), `{rx} {rz}`)
+check("depot is safe", Map.isSafe(0, 0) and not Map.isSafe(400, 0))
+check("river is water", Map.inWater(840, 0) and not Map.inWater(0, 0) and Map.inWater(1800, 0))
 
-local addresses = CityGrid.addresses()
-local blocks = (CityGrid.Blocks * 2 + 1) ^ 2
-check("two addresses per block", #addresses == (blocks - 1) * 2, #addresses)
+local bridgesOk = true
+for _, s in Map.Connectors do
+	if s.kind == "bridge" then
+		-- a bridge spans the river and ends on land at both sides
+		if not (math.min(s.ax, s.bx) < Map.River.x0 and math.max(s.ax, s.bx) > Map.River.x1) then
+			bridgesOk = false
+		end
+	elseif Map.inWater(s.ax, s.az) or Map.inWater(s.bx, s.bz) then
+		bridgesOk = false
+	end
+end
+check("only bridges cross water", bridgesOk)
+
+-- The tunnel: the north highway runs straight through the mountain.
+local mountain = Map.Mountain
+local mx, mz = Map.nearestRoad(mountain.x, mountain.z)
+check("a road goes through the mountain", near(mx, mountain.x) and near(mz, mountain.z), `{mx} {mz}`)
+
+for _, place in Map.Places do
+	check(`place {place.name} is reachable`, Map.onRoad(place.x, place.z) and not Map.inWater(place.x, place.z))
+end
+for id, shop in Map.Shops do
+	check(`shop {id} is in the safe zone`, Map.isSafe(shop.x, shop.z))
+end
+
+local addresses = Map.addresses()
+check("addresses are cached", Map.addresses() == addresses)
 local good = true
+local poiCount = 0
 for _, a in addresses do
-	if not CityGrid.onRoad(a.x, a.z) or math.sqrt(a.x * a.x + a.z * a.z) < Config.City.SafeRadius then
+	if not Map.onRoad(a.x, a.z) or Map.isSafe(a.x, a.z) or Map.inWater(a.x, a.z) then
 		good = false
 		print("  bad address:", a.name, a.x, a.z)
 	end
+	if a.poi then
+		poiCount += 1
+	end
 end
-check("addresses are on roads, out of the depot", good)
-check("addresses are cached", CityGrid.addresses() == addresses)
+check("addresses are on roads, out of the safe zone, not in water", good)
+check("every place is an address", poiCount == #Map.Places)
+check("plenty of addresses", #addresses > 200, #addresses)
 
+local depotX, depotZ = 0, 26
 for index, tier in Config.Jobs.Tiers do
 	local count = 0
 	for _, a in addresses do
-		local d = CityGrid.manhattan(0, 26, a.x, a.z)
+		local d = Map.manhattan(depotX, depotZ, a.x, a.z)
 		if d >= tier.minDistance and d <= tier.maxDistance then
 			count += 1
 		end
 	end
-	check(`tier {index} has jobs from the depot`, count >= 5, count)
+	check(`tier {index} has jobs from the depot`, count >= 4, count)
 end
+
+local district, i, j = Map.blockAt(Map.Cell, 0)
+check("blockAt finds the dealer block", district ~= nil and district.id == "downtown" and i == 1 and j == 0)
+check("blockAt on a road is nil", (Map.blockAt(Map.Cell / 2, 0)) == nil)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

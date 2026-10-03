@@ -1,7 +1,8 @@
 --!strict
--- The roof gun on the client. Hold the left mouse button to shoot where the mouse points, or hold FIRE
--- (the round button, or F) to shoot the nearest zombie (the ones hanging on your car first). The server checks
--- every shot (server/Gun.luau); here are the inputs, the tracers, the hit numbers and the money pop-ups.
+-- The gun on the client. In any seat of a car (the driver fires the roof gun, a passenger out of the window) hold
+-- the left mouse button to shoot where the mouse points, or hold FIRE (the round button, or F) to shoot the nearest
+-- zombie (the ones hanging on your car first). The server checks every shot (server/Gun.luau); here are the inputs,
+-- the tracers, the hit numbers and the money pop-ups.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -106,7 +107,13 @@ end
 
 -- ── Aiming ─────────────────────────────────────────────────────────────────
 
-local function muzzle(car: Model): Vector3?
+local function muzzle(car: Model, driving: boolean): Vector3?
+	if not driving then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local seat = humanoid and humanoid.SeatPart
+		return if seat then seat.Position + Vector3.new(0, 3, 0) else nil
+	end
 	local barrel = car:FindFirstChild("Barrel")
 	local attachment = barrel and barrel:FindFirstChild("Muzzle")
 	if attachment and attachment:IsA("Attachment") then
@@ -116,13 +123,16 @@ local function muzzle(car: Model): Vector3?
 	return if chassis then chassis.Position + Vector3.new(0, 6, 0) else nil
 end
 
-local function mouseTarget(car: Model): Vector3
+local function mouseTarget(car: Model?): Vector3
 	local camera = workspace.CurrentCamera
 	local location = UserInputService:GetMouseLocation()
 	local ray = camera:ViewportPointToRay(location.X, location.Y)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	local exclude: { Instance } = { car, effects }
+	local exclude: { Instance } = { effects }
+	if car then
+		table.insert(exclude, car)
+	end
 	if player.Character then
 		table.insert(exclude, player.Character)
 	end
@@ -158,17 +168,33 @@ local function autoTarget(from: Vector3, range: number): Vector3?
 	return best
 end
 
+-- Where a thrown item lands: the mouse on a computer, the nearest zombie (or 40 studs ahead) on a touch screen.
+function Shooting.aimPoint(): Vector3?
+	local car = Drive.seatedCar()
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local from = if car and car.PrimaryPart then car.PrimaryPart.Position elseif root then root.Position else nil
+	if not from then
+		return nil
+	end
+	if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
+		local look = if car and car.PrimaryPart then car.PrimaryPart.CFrame.LookVector elseif root then root.CFrame.LookVector else Vector3.zAxis
+		return autoTarget(from, 80) or from + look * 40
+	end
+	return mouseTarget(car)
+end
+
 local function step()
-	if not (mouseHeld or autoHeld) or not Drive.isDriving() then
+	if not (mouseHeld or autoHeld) then
 		return
 	end
+	local car, driving = Drive.seatedCar()
 	local now = os.clock()
-	if now < nextShot then
+	if not car or now < nextShot then
 		return
 	end
-	local car = Drive.myCar()
-	local from = car and muzzle(car)
-	if not car or not from then
+	local from = muzzle(car, driving)
+	if not from then
 		return
 	end
 	local stats = Economy.weaponStats(weapon, upgrades)

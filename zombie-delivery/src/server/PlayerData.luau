@@ -18,6 +18,9 @@ export type Profile = {
 	weapons: { [string]: boolean },
 	weapon: string,
 	upgrades: { [string]: number },
+	items: { [string]: number }, -- consumables (Config.Items): how many
+	paints: { [string]: boolean }, -- bought paint jobs
+	carPaint: { [string]: string }, -- car id → paint id
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -45,6 +48,9 @@ local function newProfile(): Profile
 		weapons = { [Config.Weapons[1].id] = true },
 		weapon = Config.Weapons[1].id,
 		upgrades = {},
+		items = { repair = 1, molotov = 2 },
+		paints = { factory = true },
+		carPaint = {},
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -84,6 +90,25 @@ local function applySaved(profile: Profile, saved: any)
 	if type(saved.upgrades) == "table" then
 		for _, def in Config.Upgrades do
 			profile.upgrades[def.id] = number(saved.upgrades[def.id], 0, def.maxLevel)
+		end
+	end
+	if type(saved.items) == "table" then
+		for _, def in Config.Items do
+			profile.items[def.id] = number(saved.items[def.id], 0, def.max)
+		end
+	end
+	if type(saved.paints) == "table" then
+		for id, owned in saved.paints do
+			if owned == true and type(id) == "string" and Economy.findPaint(id) then
+				profile.paints[id] = true
+			end
+		end
+	end
+	if type(saved.carPaint) == "table" then
+		for carId, paintId in saved.carPaint do
+			if type(carId) == "string" and type(paintId) == "string" and Economy.findCar(carId) and profile.paints[paintId] then
+				profile.carPaint[carId] = paintId
+			end
 		end
 	end
 	if type(saved.car) == "string" and profile.cars[saved.car] then
@@ -129,9 +154,38 @@ function PlayerData.load(player: Player)
 	end
 	if player.Parent then
 		profiles[player] = profile
+		local stats = Instance.new("Folder")
+		stats.Name = "leaderstats"
+		local money = Instance.new("IntValue")
+		money.Name = "Money"
+		money.Value = profile.money
+		money.Parent = stats
+		local deliveries = Instance.new("IntValue")
+		deliveries.Name = "Deliveries"
+		deliveries.Value = profile.deliveries
+		deliveries.Parent = stats
+		stats.Parent = player
 		changed:Fire(player)
 	end
 end
+
+-- The player list shows money and deliveries.
+local function updateLeaderstats(player: Player)
+	local profile = profiles[player]
+	local stats = player:FindFirstChild("leaderstats")
+	if not profile or not stats then
+		return
+	end
+	local money = stats:FindFirstChild("Money") :: IntValue?
+	local deliveries = stats:FindFirstChild("Deliveries") :: IntValue?
+	if money then
+		money.Value = math.min(profile.money, 2 ^ 31 - 1)
+	end
+	if deliveries then
+		deliveries.Value = profile.deliveries
+	end
+end
+changed.Event:Connect(updateLeaderstats)
 
 function PlayerData.save(player: Player)
 	local profile = profiles[player]
@@ -146,6 +200,9 @@ function PlayerData.save(player: Player)
 		weapons = profile.weapons,
 		weapon = profile.weapon,
 		upgrades = profile.upgrades,
+		items = profile.items,
+		paints = profile.paints,
+		carPaint = profile.carPaint,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -185,6 +242,22 @@ function PlayerData.spend(player: Player, amount: number): boolean
 		return false
 	end
 	profile.money -= amount
+	changed:Fire(player)
+	return true
+end
+
+-- Adds (or with a negative amount takes) consumables; false when there is not enough or no room.
+function PlayerData.addItem(player: Player, id: string, amount: number): boolean
+	local profile = profiles[player]
+	local def = Economy.findItem(id)
+	if not profile or not def then
+		return false
+	end
+	local count = (profile.items[id] or 0) + amount
+	if count < 0 or count > def.max then
+		return false
+	end
+	profile.items[id] = count
 	changed:Fire(player)
 	return true
 end

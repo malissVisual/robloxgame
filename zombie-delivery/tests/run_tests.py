@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Runs the logic test of the shared modules (Config, Economy, CityGrid) in the standalone Luau CLI.
+Runs the logic test of the shared modules (Config, Economy, Map) in the standalone Luau CLI.
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 """
@@ -11,7 +11,7 @@ SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 with tempfile.TemporaryDirectory() as tmp:
-    for name in ("Config", "Economy", "CityGrid"):
+    for name in ("Config", "Economy", "Map"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
         source = source.replace("require(script.Parent.Config)", 'require("./Config")')
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(source)
