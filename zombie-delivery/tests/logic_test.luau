@@ -62,9 +62,16 @@ check("pickKind weights", Economy.pickKind({ walker = 9, brute = 1 }, 0.05) == "
 check("pickKind empty", Economy.pickKind({}, 0.5) == "walker")
 
 check("every car has a style and a price", (function()
-	for i, car in Config.Cars do
-		if car.price < 0 or car.style == "" or (i > 1 and car.price <= Config.Cars[i - 1].price) then
+	local last = -1
+	for _, car in Config.Cars do
+		if car.style == "" or car.price < 0 then
 			return false
+		end
+		if not car.company then
+			if car.price <= last then
+				return false -- the dealer's cars get pricier down the list
+			end
+			last = car.price
 		end
 	end
 	return Config.Cars[1].price == 0 and Config.Weapons[1].price == 0
@@ -169,6 +176,36 @@ for index, tier in Config.Jobs.Tiers do
 	end
 	check(`tier {index} has jobs from the depot`, count >= 4, count)
 end
+
+check("the lodge is in winter, across the ice", Map.isWinter(-655, -2200) and Map.onIce(-300, -2200) and not Map.isWinter(0, 0))
+local ix, iz = Map.nearestRoad(-300, -2150)
+check("an ice road crosses the lake", Map.onIce(ix, iz), `{ix} {iz}`)
+check("company cars are not for sale", (function()
+	for _, car in Config.Cars do
+		if car.company and car.price ~= 0 then
+			return false
+		end
+	end
+	return Economy.findCar("icecream") ~= nil and (Economy.findCar("icecream") :: any).company == true
+end)())
+check("job types use real cars and places", (function()
+	for _, t in Config.JobTypes do
+		if t.vehicle and not Economy.findCar(t.vehicle) then
+			return false
+		end
+		if t.place then
+			local found = false
+			for _, place in Map.Places do
+				found = found or place.id == t.place
+			end
+			if not found then
+				return false
+			end
+		end
+	end
+	return true
+end)())
+check("bandits shoot", Config.Zombies.bandit.ranged == true and (Config.Zombies.bandit.range or 0) > 0)
 
 local district, i, j = Map.blockAt(Map.Cell, 0)
 check("blockAt finds the dealer block", district ~= nil and district.id == "downtown" and i == 1 and j == 0)

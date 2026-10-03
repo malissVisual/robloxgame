@@ -218,7 +218,7 @@ function Hud.setOffers(list: { any })
 	Ui.clear(jobs.body)
 	for order, offer in list do
 		local color = STAR_COLORS[offer.stars] or C.red
-		local c = card(jobs.body, 104, order)
+		local c = card(jobs.body, if offer.jobType then 126 else 104, order, offer.jobType ~= nil)
 		Ui.label(c, string.rep("★", offer.stars), UDim2.fromOffset(110, 26), { Position = UDim2.fromOffset(12, 6), TextColor3 = color, TextSize = 24 })
 		Ui.label(c, offer.tierName:upper(), UDim2.fromOffset(110, 18), { Position = UDim2.fromOffset(12, 32), TextColor3 = color, TextSize = 14 })
 		if offer.modifier then
@@ -231,9 +231,10 @@ function Hud.setOffers(list: { any })
 			})
 			Ui.corner(chip, 6)
 		end
-		Ui.label(c, `{offer.cargo} → {offer.customer}`, UDim2.new(1, -260, 0, 24), { Position = UDim2.fromOffset(124, 6), TextSize = 18 })
-		Ui.label(c, `Pick up: {offer.pickup}`, UDim2.new(1, -260, 0, 18), { Position = UDim2.fromOffset(124, 32), TextColor3 = Color3.fromRGB(130, 200, 255), TextSize = 14, Font = Enum.Font.GothamMedium })
-		Ui.label(c, `Deliver: {offer.address}, {offer.district} · {offer.distance} m · {Ui.clock(offer.time)}`, UDim2.new(1, -260, 0, 18), {
+		local headline = if offer.jobType then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo} → {offer.customer}`
+		Ui.label(c, headline, UDim2.new(1, -260, 0, 24), { Position = UDim2.fromOffset(124, 6), TextSize = 18, TextColor3 = if offer.jobType then Color3.fromRGB(130, 200, 255) else C.text })
+		Ui.label(c, `First: {offer.first}`, UDim2.new(1, -260, 0, 18), { Position = UDim2.fromOffset(124, 32), TextColor3 = Color3.fromRGB(130, 200, 255), TextSize = 14, Font = Enum.Font.GothamMedium })
+		Ui.label(c, `{offer.stops} stops · last: {offer.address}, {offer.district} · {offer.distance} m · {Ui.clock(offer.time)}`, UDim2.new(1, -260, 0, 18), {
 			Position = UDim2.fromOffset(124, 52),
 			TextColor3 = C.dim,
 			TextSize = 14,
@@ -241,6 +242,10 @@ function Hud.setOffers(list: { any })
 		})
 		if offer.modifier then
 			Ui.label(c, offer.modifier.description, UDim2.new(1, -260, 0, 18), { Position = UDim2.fromOffset(124, 74), TextColor3 = C.red, TextSize = 13, Font = Enum.Font.GothamMedium })
+		end
+		if offer.jobType then
+			local extra = if offer.vehicle then `Company vehicle: {offer.vehicle}. ` else ""
+			Ui.label(c, extra .. offer.jobType.description, UDim2.new(1, -260, 0, 34), { Position = UDim2.fromOffset(124, if offer.modifier then 92 else 74), TextColor3 = C.dim, TextSize = 13, Font = Enum.Font.GothamMedium })
 		end
 		Ui.label(c, Ui.money(offer.pay), UDim2.fromOffset(110, 30), { Position = UDim2.new(1, -244, 0, 36), TextColor3 = C.money, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Right })
 		local accept = Ui.button(c, "ACCEPT", UDim2.fromOffset(110, 46), C.green, function()
@@ -280,6 +285,9 @@ local function renderShop()
 	end
 	if shopId == "dealer" then
 		for order, def in Config.Cars do
+			if def.company then
+				continue
+			end
 			local c = card(shop.body, 84, order + 1, def.id == shopFocus)
 			cardText(c, def.name, carStats(def), def.description)
 			if state.car == def.id then
@@ -297,7 +305,7 @@ local function renderShop()
 	elseif shopId == "depot" then
 		note(shop.body, "Your cars. Buy new ones at Dead End Motors (next door, east).", C.dim, 1)
 		for order, def in Config.Cars do
-			if not state.cars[def.id] then
+			if not state.cars[def.id] or def.company then
 				continue
 			end
 			local c = card(shop.body, 84, order + 1)
@@ -438,7 +446,7 @@ local function renderBackpack()
 	elseif backpackTab == "cars" then
 		note(backpack.body, "Switch cars at the depot garage, buy new ones at Dead End Motors.", C.dim, 1)
 		for order, def in Config.Cars do
-			if state.cars[def.id] then
+			if state.cars[def.id] and not def.company then
 				local c = card(backpack.body, 84, order + 1)
 				cardText(c, def.name, carStats(def), def.description)
 				if state.car == def.id then
@@ -748,8 +756,9 @@ function Hud.setJob(newJob: any)
 	end
 	local pickup = job.stage == "pickup"
 	local modifier = if job.modifier then `  [{job.modifier.name}]` else ""
-	jobTitle.Text = `{string.rep("★", job.stars)}  {job.cargo} → {job.customer}{modifier}`
-	jobStage.Text = if pickup then `1/2  PICK UP at the {job.pickup}` else `2/2  DELIVER to {job.address}, {job.district}`
+	local name = if job.jobType then job.jobType.name else `{job.cargo} → {job.customer}`
+	jobTitle.Text = `{string.rep("★", job.stars)}  {name}{modifier}`
+	jobStage.Text = `{job.stopIndex}/{job.stopCount}  {job.stopLabel}`
 	jobStage.TextColor3 = if pickup then PICKUP_COLOR else C.yellow
 	conditionFill.Size = UDim2.fromScale(math.clamp(job.condition, 0, 1), 1)
 	conditionFill.BackgroundColor3 = if job.condition > 0.6 then C.yellow elseif job.condition > 0.3 then Color3.fromRGB(255, 140, 40) else C.red
@@ -772,7 +781,7 @@ function Hud.setJob(newJob: any)
 	local progress = job.progress or 0
 	loadBack.Visible = progress > 0
 	loadFill.Size = UDim2.fromScale(math.clamp(progress, 0, 1), 1)
-	loadText.Text = if pickup then "LOADING... hold still" else "UNLOADING... hold them off!"
+	loadText.Text = if pickup then "LOADING... hold still" elseif job.cargo == "Ice Cream" then "SELLING ICE CREAM... hold still" else "UNLOADING... hold them off!"
 end
 
 function Hud.setVisible(visible: boolean)

@@ -192,6 +192,24 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(0.2, 1.6, 1.6), Vector3.new(-4.2, 3.6, -8.6), "accent"), -- stop sign
 		},
 	},
+	movingtruck = {
+		width = 7.4,
+		length = 17,
+		wheel = 1.6,
+		wheelWidth = 1.3,
+		clearance = 1.1,
+		seat = Vector3.new(-1.6, 0.5, -4.8),
+		passengers = { Vector3.new(1.6, 0.5, -4.8) },
+		roof = 8.6,
+		boxes = {
+			box(Vector3.new(7.4, 2.4, 2.4), Vector3.new(0, 1.2, -7.3), "body"),
+			box(Vector3.new(7.4, 4.6, 3.6), Vector3.new(0, 2.3, -4.6), "glass"),
+			box(Vector3.new(7.4, 0.8, 3.6), Vector3.new(0, 5, -4.6), "body"),
+			box(Vector3.new(7.6, 8, 10.6), Vector3.new(0, 4, 2.9), "body"), -- the box
+			box(Vector3.new(7.7, 1.4, 9.6), Vector3.new(0, 5, 2.9), "logo"),
+			box(Vector3.new(7.8, 0.8, 0.6), Vector3.new(0, 0.4, -8.6), "dark"),
+		},
+	},
 	monster = {
 		width = 8,
 		length = 14,
@@ -294,6 +312,8 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			c = Color3.fromRGB(220, 180, 120)
 		elseif b.kind == "ball" then
 			c = Color3.fromRGB(255, 150, 200)
+		elseif b.kind == "logo" then
+			c = Color3.fromRGB(240, 240, 240)
 		end
 		local p = newPart(model, if b.kind == "glass" then "Cabin" else "Body", b.size, top * CFrame.new(b.offset), c, material)
 		p.Massless = true
@@ -635,8 +655,8 @@ function Vehicles.remove(player: Player)
 end
 
 -- Puts the player's equipped car on the nearest road and seats them. Returns an error text when it cannot.
--- force skips the cooldown (a car just bought or equipped).
-function Vehicles.spawn(player: Player, force: boolean?): string?
+-- force skips the cooldown (a car just bought or equipped); carId = a company vehicle lent for a job.
+function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string?
 	local profile = PlayerData.get(player)
 	if not profile then
 		return "Still loading..."
@@ -645,7 +665,7 @@ function Vehicles.spawn(player: Player, force: boolean?): string?
 	if not force and lastSpawn[player] and now - lastSpawn[player] < Config.SpawnCarCooldown then
 		return "Wait a moment before calling the car again."
 	end
-	local def = Economy.findCar(profile.car) or Config.Cars[1]
+	local def = Economy.findCar(carId or profile.car) or Config.Cars[1]
 	local character = player.Character
 	local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local from = if rootPart then rootPart.Position else World.DepotSpawn
@@ -676,7 +696,7 @@ function Vehicles.spawn(player: Player, force: boolean?): string?
 	end
 	local ground = CFrame.lookAt(position, position + direction)
 	local stats = Economy.carStats(def.id, profile.upgrades)
-	local built = build(def, paintColor(def, profile.carPaint[def.id]), ground, false)
+	local built = build(def, paintColor(def, if def.company then nil else profile.carPaint[def.id]), ground, false)
 	local seat = built.seat :: VehicleSeat
 	local car: Car = {
 		owner = player,
@@ -735,7 +755,7 @@ end
 function Vehicles.refreshStats(player: Player)
 	local car = Vehicles.get(player)
 	local profile = PlayerData.get(player)
-	if not car or not profile or profile.car ~= car.id then
+	if not car or not profile then
 		return
 	end
 	local share = car.health / car.stats.health

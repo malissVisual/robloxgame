@@ -47,7 +47,7 @@ export type Segment = {
 	bx: number,
 	bz: number,
 	width: number,
-	kind: string, -- street | grid | bridge | highway
+	kind: string, -- street | grid | bridge | highway | ice
 	name: string?,
 }
 
@@ -77,6 +77,9 @@ Map.River = { x0 = 760, x1 = 920 }
 Map.Sea = { x0 = 1660 }
 Map.WaterLevel = -3
 Map.Mountain = { x = 300, z = -1700, radius = 265, tunnelZ0 = -1960, tunnelZ1 = -1440 }
+-- North of the mountain it is winter: snow, and a frozen lake the Lodge Road crosses on the ice.
+Map.WinterZ = -1965
+Map.Lake = { x0 = -490, x1 = -110, z0 = -2340, z1 = -2060 }
 
 Map.Districts = {
 	{
@@ -146,6 +149,7 @@ Map.Yards = {
 	{ id = "farm", name = "Old Farm", x0 = -2030, z0 = 370, x1 = -1730, z1 = 670 },
 	{ id = "docks", name = "Harbor Docks", x0 = 1601, z0 = -200, x1 = 1656, z1 = 200 },
 	{ id = "gas", name = "Gas Station", x0 = 92, z0 = -960, x1 = 200, z1 = -840 },
+	{ id = "lodge", name = "Ski Lodge", x0 = -780, z0 = -2320, x1 = -530, z1 = -2080 },
 } :: { Area }
 
 -- Named destinations (the far, crazy deliveries).
@@ -155,6 +159,7 @@ Map.Places = {
 	{ id = "farm", name = "Old Farm", x = -1880, z = 520, nx = 0, nz = 0 },
 	{ id = "docks", name = "Harbor Docks", x = 1626, z = 0, nx = 0, nz = 0 },
 	{ id = "gas", name = "Gas Station", x = 146, z = -900, nx = 0, nz = 0 },
+	{ id = "lodge", name = "Ski Lodge", x = -655, z = -2200, nx = 0, nz = 0 },
 } :: { Place }
 
 -- ── Roads ──────────────────────────────────────────────────────────────────
@@ -184,6 +189,8 @@ end
 line({ { 0.5 * CELL, -downtownEdge }, { 0.5 * CELL, -1000 }, { 300, -1240 }, { 300, -2360 } }, HIGHWAY, "highway", "North Highway")
 line({ { -downtownEdge, 1.5 * CELL }, { -1100, 1.5 * CELL }, { -1400, 520 }, { -1730, 520 } }, HIGHWAY, "highway", "West Highway")
 line({ { -1100, 1.5 * CELL }, { -1100, -460 } }, HIGHWAY, "highway", "Radio Road")
+line({ { 300 - HIGHWAY / 2, -2200 }, { Map.Lake.x1, -2200 } }, HIGHWAY, "highway", "Lodge Road")
+line({ { Map.Lake.x1, -2200 }, { -530, -2200 } }, HIGHWAY, "ice", "Ice Road")
 
 Map.Connectors = connectors
 
@@ -256,6 +263,15 @@ end
 
 function Map.inWater(x: number, z: number): boolean
 	return (x > Map.River.x0 and x < Map.River.x1) or x > Map.Sea.x0
+end
+
+function Map.isWinter(x: number, z: number): boolean
+	return z < Map.WinterZ and x < Map.River.x0
+end
+
+function Map.onIce(x: number, z: number): boolean
+	local lake = Map.Lake
+	return x > lake.x0 and x < lake.x1 and z > lake.z0 and z < lake.z1
 end
 
 function Map.manhattan(ax: number, az: number, bx: number, bz: number): number

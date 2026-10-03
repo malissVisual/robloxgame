@@ -101,12 +101,15 @@ local function draw(parent: any, scale: number, labels: boolean): Canvas
 		BorderSizePixel = 0,
 		ZIndex = 1,
 	}, parent)
+	rect(content, B.x0, B.z0, Map.River.x0, Map.WinterZ, scale, Color3.fromRGB(196, 202, 208), 2) -- winter
+	local lake = Map.Lake
+	rect(content, lake.x0, lake.z0, lake.x1, lake.z1, scale, Color3.fromRGB(150, 200, 225), 3)
 	local water = Color3.fromRGB(44, 86, 112)
 	rect(content, Map.River.x0, B.z0, Map.River.x1, B.z1, scale, water, 2)
 	rect(content, Map.Sea.x0, B.z0, B.x1, B.z1, scale, water, 2)
 	-- The mountain.
 	local m = Map.Mountain
-	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.fromRGB(104, 98, 88), 2)
+	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.fromRGB(104, 98, 88), 3)
 	Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, hill)
 	-- Yards.
 	for _, yard in Map.Yards do
@@ -128,7 +131,10 @@ local function draw(parent: any, scale: number, labels: boolean): Canvas
 	for _, s in Map.Segments do
 		local dx, dz = s.bx - s.ax, s.bz - s.az
 		local length = math.sqrt(dx * dx + dz * dz)
-		local color = if s.kind == "bridge" then Color3.fromRGB(150, 90, 50) elseif s.kind == "highway" then Color3.fromRGB(58, 58, 64) else Color3.fromRGB(36, 36, 40)
+		local color = if s.kind == "bridge" then Color3.fromRGB(150, 90, 50)
+			elseif s.kind == "ice" then Color3.fromRGB(120, 170, 200)
+			elseif s.kind == "highway" then Color3.fromRGB(58, 58, 64)
+			else Color3.fromRGB(36, 36, 40)
 		Ui.make("Frame", {
 			Size = UDim2.fromOffset((length + s.width) * scale, math.max(2, s.width * scale)),
 			Position = point((s.ax + s.bx) / 2, (s.az + s.bz) / 2, scale),
@@ -169,6 +175,8 @@ local function draw(parent: any, scale: number, labels: boolean): Canvas
 			end
 		end
 		caption(content, "TUNNEL", m.x + 70, m.z, scale, 13, Color3.fromRGB(230, 230, 230), 7)
+		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 30, scale, 13, Color3.fromRGB(40, 80, 110), 7)
+		caption(content, "WINTER", 0, Map.WinterZ - 60, scale, 16, Color3.fromRGB(60, 70, 80), 7)
 	end
 	local markers = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 8 }, content)
 	return { content = content, scale = scale, markers = markers }

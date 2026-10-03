@@ -13,11 +13,13 @@ local ZombieAnimator = require(Client.ZombieAnimator)
 local CarVisuals = require(Client.CarVisuals)
 local Hud = require(Client.Hud)
 local Menu = require(Client.Menu)
+local Weather = require(Client.Weather)
 
 Drive.start()
 Shooting.start()
 ZombieAnimator.start()
 CarVisuals.start()
+Weather.start()
 Hud.start()
 
 Net.get("State").OnClientEvent:Connect(function(state)

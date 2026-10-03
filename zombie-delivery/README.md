@@ -1,10 +1,11 @@
 # Zombie Delivery
 
-A second Roblox game in this repository (Merge Blades lives in the root). **You run a delivery company in a city
-full of zombies**: take a job, drive the cargo to the customer while zombies chase you, run them over or shoot them
-with the gun on your roof, get paid, and buy better cars, guns and upgrades.
+A second Roblox game in this repository (Merge Blades lives in the root). **You run a delivery company** in a world
+gone wrong: take a job, pick the cargo up, drive it across the map while bandits shoot at you from roadblocks and
+zombies chase you, unload it under fire, get paid, and buy better cars, guns, items and upgrades. Friends ride along
+in your passenger seats, shoot out of the windows and share the pay.
 
-Everything is built in code (the city, the cars, the zombies, the interface), so the game needs no assets: open an
+Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync.
 
 ## Running
@@ -14,61 +15,85 @@ node tools/rojo-sync.js zombie-delivery
 ```
 
 (from the repository root). In Studio open a **new Baseplate place** (not the Merge Blades one), then
-**Plugins → Rojo → Connect** and **Play**. Instead of the command you can double-click `zombie-delivery/spust-zombie-delivery.cmd` (Windows) or
-`zombie-delivery/spust-zombie-delivery.command` (Mac): git pull + the sync.
+**Plugins → Rojo → Connect** and **Play**. Instead of the command you can double-click
+`zombie-delivery/spust-zombie-delivery.cmd` (Windows) or `zombie-delivery/spust-zombie-delivery.command` (Mac):
+git pull + the sync.
 
 A Play test in Studio without API access cannot save, so it starts with `Config.StudioStartMoney` ($25,000) to try the
-shop. A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
+shops. A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
 
 ## How to play
 
 | Input | PC | Touch |
 |---|---|---|
 | Drive | WASD / arrows | thumbstick |
-| Shoot where you aim | hold left mouse | – |
-| Shoot the nearest zombie (auto-aim) | hold F | hold FIRE |
+| Shoot where you aim (driver: roof gun, passenger: out of the window) | hold left mouse | – |
+| Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
+| Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
+| Jobs / map / backpack | J / M / B | the buttons |
+| Get in your car / ride in a friend's car | E / R | the prompt |
 | Get out | Space | jump button |
-| Get in | walk to the car, E | tap the prompt |
 
-1. You spawn at the **depot** (Zombie Delivery Co., the green circle in the middle of the city) and get your car on the
-   road in front of it. The depot is safe: no zombies, the car is repaired there and the shop only works there.
-2. **JOBS** opens the job board: one offer for every danger level, measured from where you are.
-   ★ near, a few walkers · ★★ further, runners, a horde at the door · ★★★ far across the city, brutes, a big horde.
-3. Follow the **arrow over your car** and the **yellow beacon**. Zombies keep coming while the job runs.
-   * Fast (18+ studs/s) you **run them over**. A brute survives a hit, slows you down and dents the car.
-   * Slow or standing, they **grab the car** (sides, back, roof) and bite it until you shoot them off.
-   * Every bite costs car health **and cargo condition**.
-4. **Stop in the yellow circle** to deliver: the pay × the cargo condition (50 % … 100 %), + 25 % for finishing in
-   the first half of the time, + $3 for every zombie killed on the way. Every kill also pays on the spot.
-   The job fails when the timer runs out or the car is destroyed (press **CAR** for a new one).
-5. **GARAGE** (in the depot): cars, guns and upgrades.
+1. The **start screen** flies over the city; **PLAY** starts the game and brings your car.
+2. You start at the **depot** in the middle of Downtown. Around it is the **safe zone** (green line) with the shops:
+   **Dead End Motors** (cars, walk among the showroom cars), **Lead & Co.** (guns), **Wrench Garage** (upgrades, paint
+   jobs, free repairs inside), **Last Stop Supplies** (items). Walk in and use the counter.
+3. **JOBS** (or the job board at the depot): one special job and one delivery of every danger level.
+   * Every delivery has stops: **pick up** (stop in the blue circle and hold still while it is loaded), then
+     **deliver** (stop in the yellow circle and hold still while it is unloaded).
+   * ★ near and quiet · ★★ bandit roadblocks · ★★★ across the city, gunners and brutes · ★★★★ INSANE: the far places.
+   * Modifiers on the far jobs: RUSH (less time), FRAGILE (hits cost double), HEAVY LOAD (slower car), WANTED
+     (twice the enemies), each pays more.
+   * **Special jobs** (one is always on the board):
+     * **Ice Cream Route**: the company lends you its ice cream truck, sell at 4 stops.
+     * **Moving Day**: the company's moving truck, load furniture at a house and unload it at the new home.
+     * **Winter Run**: through the tunnel and over the **frozen lake** (the car slides on the ice) to the Ski Lodge.
+4. **Enemies**: **bandits** and **gunners** with guns (they set up roadblocks ahead of you, camp at the far places and
+   shoot your car), and zombies (walkers, runners, brutes, soldiers at the base). Run them over (fast) or shoot them.
+   Zombies grab a slow car and bite it until you shoot them off.
+5. The pay: the job's pay × cargo condition (50 – 100 %), + 25 % for finishing in the first half of the time,
+   + $3 per enemy killed. Every kill also pays on the spot, and so do the **supply crates** (? on the map).
+6. **Crews**: friends press R at your car to ride along. Their kills count for your job, each passenger gets half of
+   the pay and you +15 % per passenger.
+
+## The world
+
+Downtown (the depot and the shops), the river with **Rust Bridge** and **Old Bridge**, the **Harbor** (warehouses,
+containers, the docks on the sea), the **Suburbs**, the **North Highway** past the Gas Station through the
+**Mount Rot tunnel** to the snowy north: the **Military Base** and, over the frozen lake, the **Ski Lodge**; the
+**West Highway** to the **Radio Station** and the **Old Farm**. The minimap (top left) and the big map (M) show it all.
 
 ## Content
 
-* **Cars**: Old Van (free), Pickup, Muscle Car, Armored Truck, Monster Truck (speed, health, ram power).
-* **Guns**: Roof Pistol (free), SMG, Shotgun (7 pellets), Minigun. A head hit is a ×2 crit.
-* **Upgrades** (5 levels each): Engine, Armor, Ram Plow, Gun Damage, Fire Rate.
-* **Zombies**: Walker, Runner, Brute.
+* **Cars** (Dead End Motors): Old Van (free), Pickup, Muscle Car, Armored Truck, School Bus, Monster Truck.
+  Company vehicles for the special jobs: Ice Cream Truck, Moving Truck.
+* **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher. Head hits are ×2.
+* **Upgrades** (Wrench Garage, 5 levels each): Engine, Handling, Armor, Ram Plow, Gun Damage, Fire Rate; paint jobs.
+* **Items** (Last Stop Supplies): Repair Kit, Medkit, Nitro, Molotov, Landmine.
+* **Enemies**: Bandit, Gunner, Walker, Runner, Brute, Soldier.
 
-All numbers are in `src/shared/Config.luau`; the formulas are in `src/shared/Economy.luau`.
+All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
+`src/shared/Economy.luau`.
 
 ## Code
 
 ```
-src/shared/   Config (all numbers), Economy (prices, stats, pay), CityGrid (blocks, roads, addresses), Net (remotes)
-src/server/   Main (wiring, shop), World (builds the city), PlayerData (saves), Vehicles (cars), Zombies,
-              Gun (the roof gun, server checked), Jobs (job board, deliveries, zombie director)
-src/client/   Main, Drive (car controller), Shooting (gun input, tracers, numbers), ZombieAnimator, Hud, Ui
-tests/        logic test of Economy and CityGrid
+src/shared/   Config (all numbers), Map (world layout, roads, addresses), Economy (prices, stats, pay), Net (remotes)
+src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats),
+              Zombies (zombies and bandits, roadblocks), Gun (shots, server checked), Jobs (job board, stops, special
+              jobs, crews), Items (consumables, supply crates), Shops (counters, showroom, purchases)
+src/client/   Main, Menu (start screen), Hud (interface), MapView (minimap, big map), Drive (car controller, ice),
+              Shooting (aim, tracers, hit numbers), CarVisuals (tyres, prompts, name tags), ZombieAnimator, Weather, Ui
+tests/        logic test of Economy and Map
 ```
 
-**Driving** is arcade, not wheel physics: the wheels are welded frictionless colliders and the chassis has a
-`LinearVelocity` (in the ground plane, gravity still works) and an `AngularVelocity` (turning, keeps the car upright).
-The driver's client owns the car and sets both from the VehicleSeat's throttle / steer (`client/Drive.luau`).
+**Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
+(`LinearVelocity` in the ground plane, `AngularVelocity` for turning and staying upright). The driver's client owns the
+car and sets both from the VehicleSeat (`client/Drive.luau`); on ice the velocity follows the nose only slowly.
 
-**Zombies** are custom rigs (R15 humanoid type so `HipHeight` works at any scale) animated on the clients by joint
-transforms (`client/ZombieAnimator.luau`). Cars and zombies do not collide physically (collision groups): running one
-over and grabbing the car are computed on the server from the car's box (`server/Zombies.luau`).
+**Enemies** are custom rigs (R15 humanoid type so `HipHeight` works at any scale) animated on the clients by joint
+transforms. Cars and enemies do not collide physically (collision groups): running one over and grabbing the car are
+computed on the server from the car's box (`server/Zombies.luau`).
 
 ## Tests
 
@@ -80,5 +105,5 @@ Needs the standalone Luau CLI (https://github.com/luau-lang/luau/releases).
 
 ## Ideas for later
 
-Night shifts (double pay, more zombies), spitters and zombie dogs, a boss customer, co-op (one drives, one shoots),
-nitro, more maps, sounds and music, hiring AI couriers that earn while you are away.
+Bandit cars that chase you, more special jobs (an armoured cash transport, a hospital run with a patient, a pizza
+rush with a timer per stop), night shifts, sounds and music, hiring AI couriers that earn while you are away.

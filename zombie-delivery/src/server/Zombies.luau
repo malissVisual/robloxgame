@@ -1,5 +1,6 @@
 --!strict
--- The zombies: built in code (blocky bodies with glowing eyes), they chase the nearest car or player on foot.
+-- The enemies: zombies and bandits, built in code (blocky bodies). Zombies chase the nearest car or player on foot;
+-- bandits (Config.Zombies with ranged = true) keep their distance and shoot, often from a roadblock across the road.
 --
 --   * a car going fast (Horde.RamMinSpeed or more) runs them over: damage = speed × ramPower, a survivor slows it down
 --   * a slow or standing car gets grabbed: the zombie hangs on its side / back / roof (welded) and bites it until shot
@@ -104,10 +105,23 @@ local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Mod
 	local rightArm = limb(model, "Right Arm", Vector3.new(1, 2, 1) * s, skin)
 	local leftLeg = limb(model, "Left Leg", Vector3.new(1, 2, 1) * s, pants)
 	local rightLeg = limb(model, "Right Leg", Vector3.new(1, 2, 1) * s, pants)
+	local bandit = def.ranged == true
 	for _, side in { -1, 1 } do
-		local eye = limb(model, "Eye", Vector3.new(0.22, 0.18, 0.1) * s, Color3.fromRGB(255, 60, 40), Enum.Material.Neon)
+		local eye = limb(model, "Eye", Vector3.new(0.22, 0.18, 0.1) * s, if bandit then Color3.fromRGB(20, 20, 20) else Color3.fromRGB(255, 60, 40), if bandit then Enum.Material.SmoothPlastic else Enum.Material.Neon)
 		eye.Massless = true
 		motor("Eye", head, eye, CFrame.new(0.28 * side * s, 0.12 * s, -0.6 * s), CFrame.identity)
+	end
+	if bandit then
+		-- A bandana, a cap and a gun.
+		local bandana = limb(model, "Bandana", Vector3.new(1.25, 0.5, 1.25) * s, if kind == "gunner" then Color3.fromRGB(30, 30, 30) else Color3.fromRGB(170, 30, 30), Enum.Material.Fabric)
+		bandana.Massless = true
+		motor("Bandana", head, bandana, CFrame.new(0, -0.25 * s, 0), CFrame.identity)
+		local cap = limb(model, "Cap", Vector3.new(1.3, 0.4, 1.3) * s, Color3.fromRGB(40, 40, 46), Enum.Material.Fabric)
+		cap.Massless = true
+		motor("Cap", head, cap, CFrame.new(0, 0.6 * s, 0), CFrame.identity)
+		local gun = limb(model, "Gun", Vector3.new(0.35, 0.5, if kind == "gunner" then 3.2 else 1.8) * s, Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
+		gun.Massless = true
+		motor("Gun", rightArm, gun, CFrame.new(0, -0.9 * s, -0.6 * s) * CFrame.Angles(math.rad(-80), 0, 0), CFrame.identity)
 	end
 	if kind == "brute" then
 		local jaw = limb(model, "Jaw", Vector3.new(1, 0.3, 0.4) * s, Color3.fromRGB(60, 20, 20))
@@ -117,9 +131,11 @@ local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Mod
 
 	-- Plain joints (no rotation in C0 / C1): the client sets Transform to swing them.
 	motor("RootJoint", root, torso, CFrame.identity, CFrame.identity)
-	motor("Neck", torso, head, CFrame.new(0, s, 0) * CFrame.Angles(math.rad(-12), 0, math.rad(rng:NextNumber(-15, 15))), CFrame.new(0, -0.6 * s, 0))
-	local reach = CFrame.Angles(math.rad(80), 0, 0) -- arms forward, the zombie pose
-	motor("Left Shoulder", torso, leftArm, CFrame.new(-1.5 * s, 0.5 * s, 0) * reach, CFrame.new(0, 0.5 * s, 0))
+	local tilt = if bandit then CFrame.identity else CFrame.Angles(math.rad(-12), 0, math.rad(rng:NextNumber(-15, 15)))
+	motor("Neck", torso, head, CFrame.new(0, s, 0) * tilt, CFrame.new(0, -0.6 * s, 0))
+	local reach = CFrame.Angles(math.rad(80), 0, 0) -- arms forward: the zombie pose, or aiming the gun
+	local leftReach = if bandit then CFrame.Angles(math.rad(75), math.rad(-30), 0) else reach
+	motor("Left Shoulder", torso, leftArm, CFrame.new(-1.5 * s, 0.5 * s, 0) * leftReach, CFrame.new(0, 0.5 * s, 0))
 	motor("Right Shoulder", torso, rightArm, CFrame.new(1.5 * s, 0.5 * s, 0) * reach, CFrame.new(0, 0.5 * s, 0))
 	motor("Left Hip", torso, leftLeg, CFrame.new(-0.5 * s, -s, 0), CFrame.new(0, s, 0))
 	motor("Right Hip", torso, rightLeg, CFrame.new(0.5 * s, -s, 0), CFrame.new(0, s, 0))
@@ -141,6 +157,9 @@ local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Mod
 	model.PrimaryPart = root
 	model:PivotTo(CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
 	model:SetAttribute("Zombie", kind)
+	if bandit then
+		model:SetAttribute("Bandit", true)
+	end
 	return model, humanoid, root, torso
 end
 
@@ -370,6 +389,9 @@ end
 
 -- ── Behaviour ──────────────────────────────────────────────────────────────
 
+local shoot: (Zombie, any) -> ()
+local nearestPlayerDistanceFn: (Vector3) -> number
+
 local LATCH_SLOTS = 4
 
 -- Where on the car a latched zombie hangs (car space) and which way it faces.
@@ -451,6 +473,8 @@ local function nearestPlayerDistance(position: Vector3): number
 	return best
 end
 
+nearestPlayerDistanceFn = nearestPlayerDistance
+
 -- Is the zombie touching this car? (car space box test)
 local function touches(car: Vehicles.Car, position: Vector3, reach: number): boolean
 	local p = car.chassis.CFrame:PointToObjectSpace(position)
@@ -478,6 +502,9 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 		end
 		return
 	end
+	if z.def.ranged then
+		return -- bandits do not grab cars, they shoot them
+	end
 	-- Brutes are too heavy to hang on a car, they hit it from the ground.
 	if z.kind ~= "brute" and latch(z, car) then
 		return
@@ -487,6 +514,94 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 		z.nextAttack = now + z.def.attackEvery
 		Vehicles.damage(car, z.def.damage)
 		Zombies.onCarDamaged(car.owner, z.def.damage)
+	end
+end
+
+local tracer = Net.get("Tracer")
+local BANDIT_TRACER = Color3.fromRGB(255, 80, 60)
+
+-- A bandit's shot: needs a clear line, hits less often at a fast target.
+function shoot(z: Zombie, target: Target)
+	local position = z.root.Position
+	local flat = Vector3.new(target.position.X, position.Y, target.position.Z)
+	z.root.CFrame = CFrame.lookAt(position, flat)
+	local from = position + Vector3.new(0, 1.2 * z.def.scale, 0) + z.root.CFrame.LookVector * 2
+	local aim = target.position + Vector3.new(0, 1.5, 0)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { workspace:FindFirstChild("Zombies") or z.model }
+	local result = workspace:Raycast(from, aim - from, params)
+	local targetModel: Instance? = if target.car then target.car.model elseif target.humanoid then target.humanoid.Parent else nil
+	if result and not (targetModel and result.Instance:IsDescendantOf(targetModel)) then
+		return -- no clear line of fire
+	end
+	local speed = Vector3.new(target.velocity.X, 0, target.velocity.Z).Magnitude
+	local chance = (z.def.accuracy or 0.6) * math.clamp(1 - speed / 120, 0.3, 1)
+	local damage = z.def.shotDamage or 6
+	if rng:NextNumber() < chance then
+		tracer:FireAllClients(from, aim, BANDIT_TRACER, 0)
+		local car = target.car
+		if car then
+			Vehicles.damage(car, damage, "The bandits shot your car to pieces!")
+			Zombies.onCarDamaged(car.owner, damage)
+		elseif target.humanoid then
+			target.humanoid:TakeDamage(damage)
+		end
+	else
+		local miss = aim + Vector3.new(rng:NextNumber(-6, 6), rng:NextNumber(-2, 4), rng:NextNumber(-6, 6))
+		tracer:FireAllClients(from, miss, BANDIT_TRACER, 0)
+	end
+end
+
+-- ── Roadblocks ─────────────────────────────────────────────────────────────
+
+type Roadblock = { model: Model, owner: Player, born: number }
+local roadblocks: { Roadblock } = {}
+
+-- A bandit car across one lane and bandits behind it. at = on the road, along = the road's direction.
+function Zombies.roadblock(owner: Player, at: Vector3, along: Vector3, count: number)
+	local model = Instance.new("Model")
+	model.Name = "Roadblock"
+	local side = Vector3.new(-along.Z, 0, along.X)
+	local lane = if rng:NextNumber() < 0.5 then -1 else 1
+	local center = at + side * lane * 7
+	local frame = CFrame.lookAt(center, center + side) -- across the road
+	local function piece(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Anchored = true
+		p.Size = size
+		p.CFrame = frame * offset
+		p.Color = color
+		p.Material = material
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Parent = model
+	end
+	piece("Body", Vector3.new(6.4, 2.6, 13), CFrame.new(0, World.RoadTop + 2, 0), Color3.fromRGB(28, 28, 32), Enum.Material.Metal)
+	piece("Cabin", Vector3.new(5.6, 2, 6), CFrame.new(0, World.RoadTop + 4.2, 0.5), Color3.fromRGB(28, 28, 32), Enum.Material.Metal)
+	piece("Stripe", Vector3.new(6.5, 0.6, 13.1), CFrame.new(0, World.RoadTop + 2.4, 0), Color3.fromRGB(170, 30, 30), Enum.Material.SmoothPlastic)
+	for _, x in { -6, 6 } do
+		piece("Barrel", Vector3.new(3, 3.6, 3), CFrame.new(x, World.RoadTop + 1.8, -9), Color3.fromRGB(120, 60, 30), Enum.Material.CorrodedMetal)
+	end
+	model.Parent = workspace:FindFirstChild("Effects") or workspace
+	table.insert(roadblocks, { model = model, owner = owner, born = os.clock() })
+	for _ = 1, count do
+		local spot = center - along * rng:NextNumber(4, 16) + side * rng:NextNumber(-10, 10)
+		local kind = if rng:NextNumber() < 0.25 then "gunner" else "bandit"
+		Zombies.spawn(kind, Vector3.new(spot.X, World.RoadTop, spot.Z), owner, true)
+	end
+end
+
+local function cleanRoadblocks()
+	local now = os.clock()
+	for n = #roadblocks, 1, -1 do
+		local r = roadblocks[n]
+		local pivot = r.model:GetPivot().Position
+		if now - r.born > 150 or not r.owner.Parent or nearestPlayerDistanceFn(pivot) > 400 then
+			r.model:Destroy()
+			table.remove(roadblocks, n)
+		end
 	end
 end
 
@@ -549,7 +664,9 @@ local function step()
 
 		-- Chase the nearest target.
 		local best: Target? = nil
-		local bestDistance = if z.guard then 90 elseif z.resident then 160 else 400
+		local ranged = z.def.ranged == true
+		local range = z.def.range or 0
+		local bestDistance = if ranged then range + 40 elseif z.guard then 90 elseif z.resident then 160 else 400
 		for _, t in targets do
 			local d = (t.position - position).Magnitude
 			if d < bestDistance then
@@ -564,6 +681,22 @@ local function step()
 			continue
 		end
 		z.guard = false
+		if ranged then
+			-- Bandits: get within range, stand and shoot.
+			if bestDistance > range * 0.85 then
+				local goal = position + (best.position - position).Unit * (bestDistance - range * 0.6)
+				if not World.isSafe(goal) then
+					z.humanoid:MoveTo(goal)
+				end
+			else
+				z.humanoid:MoveTo(position)
+				if now >= z.nextAttack then
+					z.nextAttack = now + (z.def.fireEvery or 1.5) * rng:NextNumber(0.85, 1.15)
+					shoot(z, best)
+				end
+			end
+			continue
+		end
 		local lead = Vector3.new(best.velocity.X, 0, best.velocity.Z) * math.clamp(bestDistance / 60, 0, 0.8)
 		local goal = best.position + lead
 		if World.isSafe(goal) then
@@ -605,6 +738,16 @@ end
 local RESIDENT_KINDS = { walker = 0.72, runner = 0.22, brute = 0.06 }
 
 local function residentSpot(): (Vector3?, string)
+	if rng:NextNumber() < 0.15 then
+		-- A bandit camp at one of the far places.
+		local camps = { "gas", "farm", "radio", "lodge" }
+		local id = camps[rng:NextInteger(1, #camps)]
+		for _, yard in Map.Yards do
+			if yard.id == id then
+				return Vector3.new(rng:NextNumber(yard.x0 + 15, yard.x1 - 15), World.RoadTop, rng:NextNumber(yard.z0 + 15, yard.z1 - 15)), if rng:NextNumber() < 0.3 then "gunner" else "bandit"
+			end
+		end
+	end
 	if rng:NextNumber() < 0.2 then
 		for _, yard in Map.Yards do
 			if yard.id == "base" then
@@ -645,6 +788,7 @@ function Zombies.start()
 	task.spawn(function()
 		while true do
 			keepResidents()
+			cleanRoadblocks()
 			task.wait(Horde.Residents.respawn / 5)
 		end
 	end)

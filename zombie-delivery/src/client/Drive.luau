@@ -4,8 +4,11 @@
 -- Input comes from the VehicleSeat (WASD / arrows, gamepad, the mobile thumbstick), with a WASD fallback.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+
+local Map = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Map"))
 
 local Drive = {}
 
@@ -163,7 +166,15 @@ local function step(dt: number)
 	end
 	speed = moveToward(speed, target, rate * dt)
 
+	-- On ice (and a little on snow) the car does not go where it points at once: it slides.
 	local velocity = look * speed
+	local position = chassis.Position
+	local traction = if Map.onIce(position.X, position.Z) then 1.3 elseif Map.isWinter(position.X, position.Z) then 6 else 0
+	if traction > 0 then
+		local current = chassis.AssemblyLinearVelocity
+		current = Vector3.new(current.X, 0, current.Z)
+		velocity = current + (velocity - current) * math.min(1, traction * dt)
+	end
 	linear.PlaneVelocity = Vector2.new(velocity.X, velocity.Z)
 	local grip = math.clamp(math.abs(speed) / 12, 0, 1)
 	local yaw = -steer * turn * grip * (if speed >= 0 then 1 else -1)

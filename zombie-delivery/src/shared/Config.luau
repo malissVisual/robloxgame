@@ -32,6 +32,7 @@ export type CarDef = {
 	ramPower: number, -- multiplies the damage of running a zombie over
 	color: { number },
 	description: string,
+	company: boolean?, -- a company vehicle: not for sale, the special jobs lend it to you
 }
 
 Config.Cars = {
@@ -75,19 +76,6 @@ Config.Cars = {
 		description = "Outruns every zombie. Do not crash. 1 passenger.",
 	},
 	{
-		id = "icecream",
-		name = "Ice Cream Truck",
-		price = 6000,
-		style = "icecream",
-		maxSpeed = 68,
-		accel = 30,
-		turn = 1.9,
-		health = 600,
-		ramPower = 1.3,
-		color = { 250, 240, 245 },
-		description = "Zombies love ice cream. Sturdy and sweet. 1 passenger.",
-	},
-	{
 		id = "armored",
 		name = "Armored Truck",
 		price = 9000,
@@ -125,6 +113,35 @@ Config.Cars = {
 		ramPower = 2.5,
 		color = { 60, 130, 220 },
 		description = "Huge wheels. Zombies are just speed bumps. 3 passengers.",
+	},
+	-- Company vehicles (the special jobs lend them, Config.JobTypes).
+	{
+		id = "icecream",
+		name = "Ice Cream Truck",
+		price = 0,
+		style = "icecream",
+		maxSpeed = 64,
+		accel = 28,
+		turn = 1.9,
+		health = 650,
+		ramPower = 1.3,
+		color = { 250, 240, 245 },
+		description = "The company's ice cream truck.",
+		company = true,
+	},
+	{
+		id = "movingtruck",
+		name = "Moving Truck",
+		price = 0,
+		style = "movingtruck",
+		maxSpeed = 58,
+		accel = 22,
+		turn = 1.5,
+		health = 900,
+		ramPower = 1.6,
+		color = { 230, 120, 40 },
+		description = "The company's moving truck.",
+		company = true,
 	},
 } :: { CarDef }
 
@@ -311,6 +328,12 @@ export type ZombieDef = {
 	skin: { number },
 	shirt: { number },
 	pants: { number },
+	-- Bandits: they shoot instead of biting.
+	ranged: boolean?,
+	range: number?, -- they shoot from this far
+	shotDamage: number?,
+	fireEvery: number?,
+	accuracy: number?, -- hit chance at a standing target (less at speed)
 }
 
 Config.Zombies = {
@@ -350,6 +373,40 @@ Config.Zombies = {
 		shirt = { 72, 88, 50 },
 		pants = { 60, 70, 44 },
 	},
+	bandit = {
+		name = "Bandit",
+		health = 80,
+		speed = 18,
+		damage = 6,
+		attackEvery = 1,
+		reward = 15,
+		scale = 1,
+		skin = { 205, 160, 120 },
+		shirt = { 30, 30, 34 },
+		pants = { 50, 60, 90 },
+		ranged = true,
+		range = 95,
+		shotDamage = 7,
+		fireEvery = 1.3,
+		accuracy = 0.7,
+	},
+	gunner = {
+		name = "Gunner",
+		health = 120,
+		speed = 15,
+		damage = 8,
+		attackEvery = 1,
+		reward = 25,
+		scale = 1.05,
+		skin = { 150, 110, 80 },
+		shirt = { 120, 30, 30 },
+		pants = { 40, 40, 40 },
+		ranged = true,
+		range = 150,
+		shotDamage = 12,
+		fireEvery = 1.8,
+		accuracy = 0.6,
+	},
 	brute = {
 		name = "Brute",
 		health = 420,
@@ -381,7 +438,7 @@ Config.Horde = {
 	RamSelfDamage = 0.12, -- the car takes this share of a survivor's health as damage
 	HeadshotMultiplier = 2,
 	-- When nobody has a job a few zombies still wander around a player (and pay for kills).
-	Ambient = { every = 6, count = 1, max = 6, kinds = { walker = 0.85, runner = 0.15 } },
+	Ambient = { every = 7, count = 1, max = 5, kinds = { walker = 0.6, runner = 0.1, bandit = 0.3 } },
 	-- Zombies that live in the world all the time (they never despawn, the dead come back).
 	Residents = { count = 36, respawn = 25 },
 }
@@ -399,6 +456,8 @@ export type TierDef = {
 	kinds: { [string]: number },
 	guardHorde: number, -- zombies waiting at the destination
 	modifierChance: number,
+	ambushEvery: number, -- seconds between bandit roadblocks ahead of you (0 = none)
+	ambushSize: number,
 }
 
 export type ModifierDef = {
@@ -440,12 +499,14 @@ Config.Jobs = {
 			maxDistance = 650,
 			basePay = 80,
 			payPerStud = 0.2,
-			spawnEvery = 5,
-			spawnCount = 2,
-			maxZombies = 10,
-			kinds = { walker = 0.85, runner = 0.15 },
+			spawnEvery = 8,
+			spawnCount = 1,
+			maxZombies = 6,
+			kinds = { walker = 0.75, runner = 0.1, bandit = 0.15 },
 			guardHorde = 0,
 			modifierChance = 0,
+			ambushEvery = 0,
+			ambushSize = 0,
 		},
 		{
 			stars = 2,
@@ -454,12 +515,14 @@ Config.Jobs = {
 			maxDistance = 1200,
 			basePay = 140,
 			payPerStud = 0.3,
-			spawnEvery = 3.5,
-			spawnCount = 3,
-			maxZombies = 16,
-			kinds = { walker = 0.6, runner = 0.4 },
+			spawnEvery = 6,
+			spawnCount = 2,
+			maxZombies = 10,
+			kinds = { walker = 0.4, runner = 0.2, bandit = 0.4 },
 			guardHorde = 4,
 			modifierChance = 0.25,
+			ambushEvery = 45,
+			ambushSize = 3,
 		},
 		{
 			stars = 3,
@@ -468,12 +531,14 @@ Config.Jobs = {
 			maxDistance = 2000,
 			basePay = 260,
 			payPerStud = 0.45,
-			spawnEvery = 2.6,
-			spawnCount = 4,
-			maxZombies = 22,
-			kinds = { walker = 0.5, runner = 0.38, brute = 0.12 },
+			spawnEvery = 5,
+			spawnCount = 2,
+			maxZombies = 14,
+			kinds = { walker = 0.25, runner = 0.2, bandit = 0.35, gunner = 0.1, brute = 0.1 },
 			guardHorde = 7,
 			modifierChance = 0.5,
+			ambushEvery = 30,
+			ambushSize = 4,
 		},
 		{
 			stars = 4,
@@ -482,20 +547,25 @@ Config.Jobs = {
 			maxDistance = 99999,
 			basePay = 500,
 			payPerStud = 0.6,
-			spawnEvery = 2.2,
-			spawnCount = 4,
-			maxZombies = 26,
-			kinds = { walker = 0.35, runner = 0.35, soldier = 0.18, brute = 0.12 },
+			spawnEvery = 4,
+			spawnCount = 3,
+			maxZombies = 18,
+			kinds = { walker = 0.15, runner = 0.15, soldier = 0.15, bandit = 0.3, gunner = 0.15, brute = 0.1 },
 			guardHorde = 10,
 			modifierChance = 1,
+			ambushEvery = 22,
+			ambushSize = 5,
 		},
 	} :: { TierDef },
 	Modifiers = {
 		{ id = "rush", name = "RUSH", description = "30% less time", payMultiplier = 1.4, timeMultiplier = 0.7, spawnMultiplier = 1, conditionMultiplier = 1, speedMultiplier = 1 },
 		{ id = "fragile", name = "FRAGILE", description = "Every hit costs double cargo condition", payMultiplier = 1.35, timeMultiplier = 1, spawnMultiplier = 1, conditionMultiplier = 2, speedMultiplier = 1 },
 		{ id = "heavy", name = "HEAVY LOAD", description = "Your car is 20% slower", payMultiplier = 1.3, timeMultiplier = 1.15, spawnMultiplier = 1, conditionMultiplier = 1, speedMultiplier = 0.8 },
-		{ id = "horde", name = "HORDE", description = "Twice the zombies", payMultiplier = 1.5, timeMultiplier = 1, spawnMultiplier = 2, conditionMultiplier = 1, speedMultiplier = 1 },
+		{ id = "horde", name = "WANTED", description = "Twice the enemies, bandits want your cargo", payMultiplier = 1.5, timeMultiplier = 1, spawnMultiplier = 2, conditionMultiplier = 1, speedMultiplier = 1 },
 	} :: { ModifierDef },
+	-- How often (and how many) the bandits set up a roadblock ahead of you, see the tiers. A roadblock is a car across
+	-- the road with bandits around it.
+	AmbushDistance = 170,
 	Cargo = {
 		{ "Pizza", "Canned Food", "Batteries", "Water Bottles", "Mail" },
 		{ "Medkit Box", "Fuel Can", "Radio Parts", "Ammo Crate" },
@@ -517,5 +587,62 @@ Config.Jobs = {
 		"Last Barber",
 	},
 }
+
+export type JobTypeDef = {
+	id: string,
+	name: string,
+	description: string,
+	vehicle: string?, -- the company lends you this car for the job
+	stops: number, -- deliveries after the pickup
+	loadTime: number, -- 0 = no pickup (the truck is already loaded)
+	unloadTime: number,
+	payPerStop: number, -- on top of the tier's pay
+	tier: number, -- the danger level (enemies)
+	place: string?, -- the destination is this named place (shared/Map.luau)
+	cargo: string,
+}
+
+-- Special jobs: one of them is on the job board next to the ordinary deliveries.
+Config.JobTypes = {
+	{
+		id = "icecream",
+		name = "Ice Cream Route",
+		description = "The company lends you its ice cream truck: sell at 4 stops, hold still while the kids buy.",
+		vehicle = "icecream",
+		stops = 4,
+		loadTime = 0,
+		unloadTime = 3,
+		payPerStop = 70,
+		tier = 2,
+		place = nil,
+		cargo = "Ice Cream",
+	},
+	{
+		id = "moving",
+		name = "Moving Day",
+		description = "Load a family's furniture into the company's moving truck and bring it to their new home.",
+		vehicle = "movingtruck",
+		stops = 1,
+		loadTime = 8,
+		unloadTime = 8,
+		payPerStop = 250,
+		tier = 2,
+		place = nil,
+		cargo = "Furniture",
+	},
+	{
+		id = "winter",
+		name = "Winter Run",
+		description = "Through the tunnel to the Ski Lodge, over the frozen lake. The ice is slippery!",
+		vehicle = nil,
+		stops = 1,
+		loadTime = 3,
+		unloadTime = 4,
+		payPerStop = 400,
+		tier = 4,
+		place = "lodge",
+		cargo = "Hot Soup",
+	},
+} :: { JobTypeDef }
 
 return Config

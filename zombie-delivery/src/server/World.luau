@@ -149,6 +149,21 @@ end
 
 local function tree(parent: Instance, x: number, z: number, y: number?)
 	local base = y or WALK_TOP
+	if Map.isWinter(x, z) then
+		-- A snowy pine: stacked dark balls with snow on top.
+		local height = rng:NextNumber(10, 16)
+		cylinder(parent, "Trunk", height, 1.2, CFrame.new(x, base + height / 2, z) * UPRIGHT, Color3.fromRGB(70, 52, 40), Enum.Material.Wood)
+		for n = 0, 2 do
+			local size = 9 - n * 2.5
+			local ball = part(parent, "Needles", Vector3.new(size, size * 0.8, size), CFrame.new(x, base + height * 0.45 + n * 3.2, z), Color3.fromRGB(40, 64, 46), Enum.Material.Grass)
+			ball.Shape = Enum.PartType.Ball
+			ball.CanCollide = false
+		end
+		local cap = part(parent, "Snow", Vector3.new(3, 2.4, 3), CFrame.new(x, base + height * 0.45 + 8.4, z), Color3.fromRGB(245, 248, 250), Enum.Material.Snow)
+		cap.Shape = Enum.PartType.Ball
+		cap.CanCollide = false
+		return
+	end
 	local height = rng:NextNumber(7, 13)
 	cylinder(parent, "Trunk", height, 1.4, CFrame.new(x, base + height / 2, z) * UPRIGHT, Color3.fromRGB(80, 60, 44), Enum.Material.Wood)
 	local size = rng:NextNumber(7, 12)
@@ -271,7 +286,8 @@ local function buildGround(world: Instance)
 		{ 900, b.z0 - 60 },
 	}
 	for _, h in hills do
-		terrain:FillBall(Vector3.new(h[1], -40, h[2]), rng:NextNumber(120, 150), Enum.Material.Grass)
+		local material = if Map.isWinter(h[1], h[2]) then Enum.Material.Snow else Enum.Material.Grass
+		terrain:FillBall(Vector3.new(h[1], -40, h[2]), rng:NextNumber(120, 150), material)
 	end
 end
 
@@ -671,6 +687,19 @@ local function buildConnectors(parent: Instance)
 		if s.kind == "bridge" then
 			buildBridge(parent, s)
 			continue
+		elseif s.kind == "ice" then
+			-- A road of packed ice over the frozen lake, marked with flag poles.
+			local frame, length = segmentFrame(s, ROAD_TOP)
+			local ice = part(roads, "IceRoad", Vector3.new(s.width, 0.4, length), frame * CFrame.new(0, -0.2, 0), Color3.fromRGB(200, 228, 240), Enum.Material.Ice)
+			ice.Reflectance = 0.15
+			for z = -length / 2 + 10, length / 2 - 10, 40 do
+				for _, side in { -1, 1 } do
+					local pole = frame * CFrame.new(side * (s.width / 2 + 1.5), 3, z)
+					part(roads, "IcePole", Vector3.new(0.4, 6, 0.4), pole, Color3.fromRGB(60, 60, 60), Enum.Material.Metal)
+					deco(part(roads, "IceFlag", Vector3.new(0.1, 1.2, 1.8), pole * CFrame.new(0, 2.4, 0.9), Color3.fromRGB(230, 50, 40), Enum.Material.Fabric))
+				end
+			end
+			continue
 		end
 		local frame, length = segmentFrame(s, ROAD_TOP)
 		part(roads, "Road", Vector3.new(s.width, 0.4, length), frame * CFrame.new(0, -0.2, 0), ASPHALT, Enum.Material.Asphalt)
@@ -695,7 +724,8 @@ local function buildConnectors(parent: Instance)
 	for n, a in connectors do
 		for m = n + 1, #connectors do
 			local b = connectors[m]
-			if a.kind ~= "bridge" and b.kind ~= "bridge" and a.bx == b.ax and a.bz == b.az then
+			local plain = a.kind ~= "bridge" and b.kind ~= "bridge" and a.kind ~= "ice" and b.kind ~= "ice"
+			if plain and a.bx == b.ax and a.bz == b.az then
 				cylinder(roads, "Joint", 0.4, a.width, CFrame.new(a.bx, ROAD_TOP - 0.25, a.bz) * UPRIGHT, ASPHALT, Enum.Material.Asphalt)
 			end
 		end
@@ -917,6 +947,50 @@ local function buildGas(parent: Instance)
 	sign(gas, "GAS", Vector3.new(14, 6, 0.5), CFrame.lookAt(Vector3.new(cx - 10, ROAD_TOP + 19, cz + 24.5), Vector3.new(cx - 10, ROAD_TOP + 19, cz + 30)), Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 40, 40))
 end
 
+local function cabin(parent: Instance, frame: CFrame, w: number, d: number, h: number)
+	part(parent, "Cabin", Vector3.new(w, h, d), frame * CFrame.new(0, h / 2, 0), Color3.fromRGB(120, 80, 50), Enum.Material.WoodPlanks)
+	gableRoof(parent, frame * CFrame.new(0, h, 0), w + 3, d + 3, h * 0.6, Color3.fromRGB(240, 244, 248))
+	part(parent, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -d / 2 - 0.2), Color3.fromRGB(80, 50, 30), Enum.Material.Wood)
+	for _, x in { -w / 3, w / 3 } do
+		local window = deco(part(parent, "Window", Vector3.new(4, 3, 0.3), frame * CFrame.new(x, h * 0.55, -d / 2 - 0.15), Color3.fromRGB(255, 200, 110), Enum.Material.Neon))
+		light(window, 18, 1, Color3.fromRGB(255, 190, 110))
+	end
+end
+
+local function buildWinter(parent: Instance)
+	local winter = folder(parent, "Winter")
+	local b = Map.Bounds
+	local snow = Color3.fromRGB(236, 240, 244)
+	tiled(winter, "Snow", b.x0 - 700, Map.River.x0, b.z0 - 700, Map.WinterZ, 0, 0.2, snow, Enum.Material.Snow)
+	-- The frozen lake.
+	local lake = Map.Lake
+	local ice = part(winter, "FrozenLake", Vector3.new(lake.x1 - lake.x0, 0.4, lake.z1 - lake.z0), CFrame.new((lake.x0 + lake.x1) / 2, 0, (lake.z0 + lake.z1) / 2), Color3.fromRGB(170, 210, 230), Enum.Material.Ice)
+	ice.Reflectance = 0.25
+	for _ = 1, 12 do
+		deco(part(winter, "Crack", Vector3.new(rng:NextNumber(8, 30), 0.05, 0.4), CFrame.new(rng:NextNumber(lake.x0 + 20, lake.x1 - 20), 0.22, rng:NextNumber(lake.z0 + 20, lake.z1 - 20)) * CFrame.Angles(0, rng:NextNumber(0, 3), 0), Color3.fromRGB(110, 150, 170)))
+	end
+	-- The Ski Lodge.
+	local yard = yardOf("lodge")
+	part(winter, "Yard", Vector3.new(yard.x1 - yard.x0, 0.4, yard.z1 - yard.z0), CFrame.new((yard.x0 + yard.x1) / 2, ROAD_TOP - 0.2, (yard.z0 + yard.z1) / 2), Color3.fromRGB(215, 220, 226), Enum.Material.Snow)
+	local cx, cz = (yard.x0 + yard.x1) / 2, (yard.z0 + yard.z1) / 2
+	local lodge = CFrame.lookAt(Vector3.new(cx - 70, ROAD_TOP, cz), Vector3.new(cx, ROAD_TOP, cz))
+	cabin(winter, lodge, 50, 34, 18)
+	sign(winter, "SKI LODGE", Vector3.new(26, 5, 0.4), lodge * CFrame.new(0, 22, -18), Color3.fromRGB(255, 220, 120))
+	cabin(winter, CFrame.lookAt(Vector3.new(cx + 20, ROAD_TOP, cz - 85), Vector3.new(cx + 20, ROAD_TOP, cz)), 18, 14, 10)
+	cabin(winter, CFrame.lookAt(Vector3.new(cx + 20, ROAD_TOP, cz + 85), Vector3.new(cx + 20, ROAD_TOP, cz)), 18, 14, 10)
+	-- A ski lift up the hill behind.
+	local liftColor = Color3.fromRGB(90, 90, 96)
+	for n = 0, 5 do
+		local x, z = yard.x0 - 30 - n * 60, cz - 40 + n * 6
+		local height = 18 + n * 14
+		part(winter, "LiftPole", Vector3.new(1.4, height, 1.4), CFrame.new(x, height / 2, z), liftColor, Enum.Material.Metal)
+		part(winter, "LiftArm", Vector3.new(1, 1, 8), CFrame.new(x, height, z), liftColor, Enum.Material.Metal)
+	end
+	workspace.Terrain:FillBall(Vector3.new(yard.x0 - 260, -120, cz - 20), 220, Enum.Material.Snow)
+	placeSign(winter, "SKI LODGE · ICE ROAD", lake.x1 + 30, -2200 - 30, Vector3.new(1, 0, 0), Color3.fromRGB(140, 220, 255))
+	placeSign(winter, "THIN ICE · DRIVE SLOW", 300 - 40, -2170, Vector3.new(0, 0, 1), Color3.fromRGB(255, 120, 100))
+end
+
 -- ── Scattered things ───────────────────────────────────────────────────────
 
 local function insideDistrict(x: number, z: number, margin: number): boolean
@@ -940,7 +1014,7 @@ local function buildForests(parent: Instance)
 		end
 		local x = rng:NextNumber(b.x0 + 40, b.x1 - 40)
 		local z = rng:NextNumber(b.z0 + 40, b.z1 - 40)
-		if Map.inWater(x, z) or insideDistrict(x, z, 20) or Map.inYard(x, z) then
+		if Map.inWater(x, z) or insideDistrict(x, z, 20) or Map.inYard(x, z) or Map.onIce(x, z) then
 			continue
 		end
 		if (Vector3.new(x - m.x, 0, z - m.z)).Magnitude < m.radius + 60 then
@@ -1059,6 +1133,7 @@ function World.build()
 	buildFarm(world)
 	buildDocks(world)
 	buildGas(world)
+	buildWinter(world)
 	buildForests(world)
 	buildRoadWrecks(world)
 	buildBoundary(world)

@@ -69,7 +69,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 	end
 	if kind == "car" then
 		local def = Economy.findCar(id)
-		if not def or profile.cars[id] or refuse(player, "dealer") then
+		if not def or def.company or profile.cars[id] or refuse(player, "dealer") then
 			return
 		end
 		if not PlayerData.spend(player, def.price) then
@@ -170,7 +170,12 @@ local function buildShowroom()
 	local folder = Instance.new("Folder")
 	folder.Name = "Showroom"
 	folder.Parent = workspace
-	for index, def in Config.Cars do
+	local index = 0
+	for _, def in Config.Cars do
+		if def.company then
+			continue -- the job board lends those
+		end
+		index += 1
 		local slot = World.DealerSlots[index]
 		if not slot then
 			break

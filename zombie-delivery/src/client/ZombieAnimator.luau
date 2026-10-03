@@ -1,6 +1,7 @@
 --!strict
--- Animates the zombies on this client: a shambling walk (legs swing with the speed, arms sway out in front),
--- a twitchy head, and a frantic clawing for the ones hanging on a car. Only joint transforms, no animation assets.
+-- Animates the zombies and bandits on this client: a shambling walk (legs swing with the speed, arms sway out in
+-- front), a twitchy head, a frantic clawing for the ones hanging on a car, a steady aim for the bandits.
+-- Only joint transforms, no animation assets.
 
 local RunService = game:GetService("RunService")
 
@@ -96,6 +97,13 @@ local function step(dt: number)
 		local swing = math.sin(rig.stride) * 0.8 * amount
 		set(rig.leftLeg, CFrame.Angles(swing, 0, 0))
 		set(rig.rightLeg, CFrame.Angles(-swing, 0, 0))
+		if model:GetAttribute("Bandit") then
+			-- Bandits hold the gun steady and look around.
+			set(rig.leftArm, CFrame.identity)
+			set(rig.rightArm, CFrame.Angles(math.sin(p * 1.5) * 0.04, 0, 0))
+			set(rig.neck, CFrame.Angles(0, math.sin(p * 0.9) * 0.25, 0))
+			continue
+		end
 		set(rig.leftArm, CFrame.Angles(math.sin(p * 2.1) * 0.15 - swing * 0.2, 0, math.sin(p * 1.3) * 0.1))
 		set(rig.rightArm, CFrame.Angles(math.sin(p * 2.4 + 1) * 0.15 + swing * 0.2, 0, math.sin(p * 1.7) * 0.1))
 		set(rig.neck, CFrame.Angles(math.sin(p * 3.3) * 0.1, math.sin(p * 0.7) * 0.3, math.sin(p * 5) * 0.06))
