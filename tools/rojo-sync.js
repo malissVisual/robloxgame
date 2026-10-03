@@ -19,7 +19,8 @@
  *   2) Instance má klíče PascalCase (Id, Parent, Name, ClassName, Properties,
  *      Children, Metadata), ale úplně všechno ostatní je camelCase.
  *
- * Spuštění:  node tools/rojo-sync.js
+ * Spuštění:  node tools/rojo-sync.js              (Merge Blades, default.project.json v kořeni)
+ *            node tools/rojo-sync.js zombie-delivery  (jiný projekt: složka s vlastním default.project.json)
  */
 
 "use strict";
@@ -29,7 +30,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 
-const PROJECT_ROOT = path.resolve(__dirname, "..");
+const PROJECT_ROOT = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, "..");
 const PROJECT_FILE = path.join(PROJECT_ROOT, "default.project.json");
 const PORT = Number(process.env.ROJO_PORT || 34872);
 const HOST = "127.0.0.1";

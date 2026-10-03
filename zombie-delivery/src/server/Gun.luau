@@ -1,0 +1,89 @@
+--!strict
+-- The roof gun. The client says where it shoots (Fire, a point in the world), the server checks the fire rate,
+-- turns the turret, raycasts every pellet from the roof and deals the damage (a head hit is a crit).
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Economy = require(Shared.Economy)
+local Net = require(Shared.Net)
+local Vehicles = require(script.Parent.Vehicles)
+local Zombies = require(script.Parent.Zombies)
+local PlayerData = require(script.Parent.PlayerData)
+
+local Gun = {}
+
+local lastShot: { [Player]: number } = {}
+local rng = Random.new()
+
+local function spreadDirection(direction: Vector3, degrees: number): Vector3
+	if degrees <= 0 then
+		return direction
+	end
+	local spread = math.rad(degrees)
+	local frame = CFrame.lookAt(Vector3.zero, direction)
+	return (frame * CFrame.Angles(rng:NextNumber(-spread, spread), rng:NextNumber(-spread, spread), 0)).LookVector
+end
+
+local function onFire(player: Player, target: any)
+	if typeof(target) ~= "Vector3" or target ~= target then
+		return
+	end
+	local car = Vehicles.get(player)
+	local profile = PlayerData.get(player)
+	if not car or not profile or not Vehicles.isDriving(player) then
+		return
+	end
+	local stats = Economy.weaponStats(profile.weapon, profile.upgrades)
+	local now = os.clock()
+	if lastShot[player] and now - lastShot[player] < stats.interval * 0.8 then
+		return -- faster than the gun can fire (a little slack for the network)
+	end
+	lastShot[player] = now
+
+	Vehicles.aim(car, target)
+	local origin = (car.chassis.CFrame * car.turretBase).Position + Vector3.new(0, 0.4, 0)
+	local toTarget = target - origin
+	local direction = if toTarget.Magnitude > 1 then toTarget.Unit else car.chassis.CFrame.LookVector
+	origin += direction * 2
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local exclude: { Instance } = { car.model }
+	if player.Character then
+		table.insert(exclude, player.Character)
+	end
+	params.FilterDescendantsInstances = exclude
+	params.CollisionGroup = "Bullet"
+
+	local def = Economy.findWeapon(profile.weapon) or Config.Weapons[1]
+	local color = Color3.fromRGB(def.color[1], def.color[2], def.color[3])
+	local tracer = Net.get("Tracer")
+	local hit = Net.get("Hit")
+	for _ = 1, stats.pellets do
+		local dir = spreadDirection(direction, stats.spread)
+		local result = workspace:Raycast(origin, dir * stats.range, params)
+		local finish = if result then result.Position else origin + dir * stats.range
+		if result then
+			local zombie = Zombies.fromPart(result.Instance)
+			if zombie then
+				local crit = result.Instance.Name == "Head"
+				local damage = stats.damage * (if crit then Config.Horde.HeadshotMultiplier else 1)
+				local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40 })
+				hit:FireClient(player, result.Position, math.floor(damage + 0.5), crit, killed)
+			end
+		end
+		tracer:FireAllClients(origin, finish, color, player.UserId)
+	end
+end
+
+function Gun.start()
+	Net.get("Fire").OnServerEvent:Connect(onFire)
+	Players.PlayerRemoving:Connect(function(player)
+		lastShot[player] = nil
+	end)
+end
+
+return Gun
