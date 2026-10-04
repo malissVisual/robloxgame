@@ -1,7 +1,8 @@
 --!strict
 -- The gun arm. Aiming on foot, every character's arms come up and point the gun where it aims (up or down too):
--- the right arm straight forward, the left hand under the gun. The pose is laid over the walk animation every
--- frame (Motor6D.Transform, after the animations ran), smoothly up and down. Works for R15 and R6 characters.
+-- the right arm straight forward, the left hand under the gun. Every frame the shoulder joints turn (Motor6D.C0,
+-- which no animation touches) and the walk animation's swing of the arms fades out (Motor6D.Transform, after the
+-- animations ran), smoothly up and down. Works for R15 and R6 characters.
 -- Your own character follows your camera directly; the others follow the Aiming / AimPitch attributes the server
 -- sets on their characters.
 
@@ -15,9 +16,8 @@ local ArmPose = {}
 local RAISE_TIME = 0.2 -- seconds for the arm to come up
 local LOWER_TIME = 0.3
 local blends: { [Model]: number } = {}
--- What this module last wrote into each joint: if it is still there, no animation drives that joint this frame and
--- the rest pose (identity) is the base, so an arm never stays stuck up.
-local written: { [Motor6D]: CFrame } = {}
+-- Each joint's own C0 before any posing (the pose turns it, and gives it back exactly).
+local rest: { [Motor6D]: CFrame } = {}
 
 local function joint(parent: Instance?, name: string): Motor6D?
 	local found = parent and parent:FindFirstChild(name)
@@ -25,17 +25,17 @@ local function joint(parent: Instance?, name: string): Motor6D?
 end
 
 local function lay(motor: Motor6D?, goal: CFrame, t: number)
-	if motor then
-		local last = written[motor]
-		local base: CFrame = if last and last == motor.Transform then CFrame.identity else motor.Transform
-		local value = base:Lerp(goal, t)
-		motor.Transform = value
-		if t > 0 then
-			written[motor] = value
-		else
-			written[motor] = nil
-		end
+	if not motor then
+		return
 	end
+	local base = rest[motor]
+	if not base then
+		base = motor.C0
+		rest[motor] = base
+	end
+	motor.C0 = base * CFrame.identity:Lerp(goal, t)
+	-- The animation's own swing of this joint fades out while the gun is up.
+	motor.Transform = motor.Transform:Lerp(CFrame.identity, t)
 end
 
 local function pose(character: Model, t: number, pitch: number)
@@ -97,9 +97,9 @@ local function step(dt: number)
 			blends[character] = nil
 		end
 	end
-	for motor in written do
+	for motor in rest do
 		if not motor.Parent then
-			written[motor] = nil
+			rest[motor] = nil
 		end
 	end
 end
