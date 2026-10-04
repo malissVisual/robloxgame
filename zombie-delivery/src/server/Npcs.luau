@@ -2,7 +2,8 @@
 -- People in the world: realistic R15 characters (built from a HumanoidDescription, Roblox's own body) who stand at
 -- their place, play an idle animation, turn to you when you come close, say a line in a speech bubble and can walk
 -- somewhere. The employers stand at their WORK HERE boards (server/World.luau), the givers hand cargo over at
--- pick-ups, the receivers take it at the drops, kids board the bus (server/Cargo.luau).
+-- pick-ups, the receivers take it at the drops, kids board the bus, a patient boards the ambulance
+-- (server/Cargo.luau). Dr. Novak at the City Clinic wears a white coat, the bank guard a uniform.
 --
 -- Outfits are made of colours and a few parts (no clothing assets): the body parts are coloured like a shirt, pants
 -- and shoes, with a hat, hair, a vest or an apron welded on (Npcs.look gives every role its own look). A standing
@@ -32,6 +33,10 @@ export type Look = {
 	shoes: { number }?,
 	boots: boolean?, -- the shins in the shoe colour (riding boots, army boots)
 	shortSleeves: boolean?, -- forearms show the skin
+	coat: { number }?, -- a long coat over everything (the doctor's white coat)
+	tie: { number }?, -- a tie down the shirt front
+	bandage: boolean?, -- a bandage round the head (a patient)
+	walkSpeed: number?, -- studs / s (default 8, a kid 9; a patient shuffles)
 }
 
 local GROUP = "Npc"
@@ -141,8 +146,8 @@ local function pick<T>(list: { T }, h: number, salt: number): T
 end
 
 -- A quick look for a role (consistent outfits): "rancher", "soldier", "officer", "farmer", "worker", "foreman",
--- "teacher", "kid", "shopkeeper", "grocer", "icecream", "mover", "cook", "clerk", "attendant", "rider",
--- anything else = a townsperson. Skin and hair come from the name, so the same person always looks the same.
+-- "teacher", "kid", "shopkeeper", "grocer", "icecream", "mover", "cook", "clerk", "attendant", "rider", "doctor",
+-- "nurse", "patient", "banker", "guard", anything else = a townsperson. Skin and hair come from the name, so the same person always looks the same.
 function Npcs.look(role: string, name: string, title: string?): Look
 	local h = hash(name .. role)
 	local look: Look = {
@@ -207,6 +212,28 @@ function Npcs.look(role: string, name: string, title: string?): Look
 		look.hat, look.hatColor = "helmet", { 30, 30, 34 }
 		look.shirt, look.pants, look.vest = { 236, 236, 236 }, { 214, 196, 160 }, { 40, 60, 90 }
 		look.boots, look.shoes = true, { 26, 22, 20 }
+	elseif role == "doctor" then
+		look.hat = "none"
+		look.shirt, look.pants, look.coat, look.tie = { 150, 196, 220 }, { 60, 66, 80 }, { 246, 246, 248 }, { 40, 80, 140 }
+		look.shoes = { 30, 30, 32 }
+	elseif role == "nurse" then
+		look.hat = "none"
+		look.shirt, look.pants = { 96, 176, 176 }, { 96, 176, 176 }
+		look.shortSleeves, look.shoes = true, { 240, 240, 240 }
+	elseif role == "patient" then
+		-- A hospital gown, a bandaged head, slow on the feet.
+		look.hat = "none"
+		look.shirt, look.pants = { 176, 206, 226 }, { 176, 206, 226 }
+		look.shortSleeves, look.bandage, look.walkSpeed = true, true, 4.5
+		look.shoes = { 220, 220, 216 }
+	elseif role == "banker" then
+		look.hat = "none"
+		look.shirt, look.pants, look.vest, look.tie = { 236, 236, 240 }, { 34, 36, 46 }, { 34, 36, 46 }, { 196, 156, 50 }
+		look.shoes = { 20, 20, 22 }
+	elseif role == "guard" then
+		look.hat, look.hatColor = "cap", { 30, 40, 70 }
+		look.shirt, look.pants, look.vest = { 60, 76, 120 }, { 30, 34, 50 }, { 34, 38, 48 }
+		look.boots, look.shoes = true, { 24, 22, 20 }
 	else
 		look.hat = if h % 5 == 0 then "cap" elseif h % 5 == 1 then "beanie" else "none"
 		look.hatColor = pick(SHIRTS, h, 29)
@@ -267,8 +294,10 @@ local function dress(model: Model, look: Look)
 			end
 		end
 	end
-	paint({ "UpperTorso", "LeftUpperArm", "RightUpperArm" }, shirt)
-	paint({ "LeftLowerArm", "RightLowerArm" }, if look.shortSleeves then skin else shirt)
+	local sleeve = if look.coat then rgb(look.coat, shirt) else shirt
+	paint({ "UpperTorso" }, shirt)
+	paint({ "LeftUpperArm", "RightUpperArm" }, sleeve)
+	paint({ "LeftLowerArm", "RightLowerArm" }, if look.shortSleeves and not look.coat then skin else sleeve)
 	paint({ "LeftHand", "RightHand", "Head" }, skin)
 	paint({ "LowerTorso", "LeftUpperLeg", "RightUpperLeg" }, pants)
 	paint({ "LeftLowerLeg", "RightLowerLeg" }, if look.boots then shoes else pants)
@@ -289,6 +318,18 @@ local function dress(model: Model, look: Look)
 		if look.apron then
 			wear(model, torso, "Apron", Vector3.new(s.X * 0.7, s.Y * 0.8, 0.06), CFrame.new(0, -s.Y * 0.08, -s.Z * 0.53), rgb(look.apron, shirt))
 		end
+		if look.tie then
+			wear(model, torso, "Tie", Vector3.new(s.X * 0.12, s.Y * 0.72, 0.05), CFrame.new(0, s.Y * 0.06, -s.Z * 0.54), rgb(look.tie, shirt), Enum.Material.SmoothPlastic)
+		end
+		if look.coat then
+			-- An open coat: the back and both sides, the shirt (and the tie) showing down the middle.
+			local coat = rgb(look.coat, shirt)
+			wear(model, torso, "CoatBack", Vector3.new(s.X * 1.08, s.Y * 1.02, 0.08), CFrame.new(0, -s.Y * 0.02, s.Z * 0.56), coat)
+			for _, side in { -1, 1 } do
+				wear(model, torso, "CoatFront", Vector3.new(s.X * 0.36, s.Y * 1.02, s.Z * 1.16), CFrame.new(side * s.X * 0.36, -s.Y * 0.02, 0), coat)
+			end
+			wear(model, torso, "Pocket", Vector3.new(s.X * 0.18, s.Y * 0.16, 0.04), CFrame.new(-s.X * 0.32, s.Y * 0.16, -s.Z * 0.6), Color3.fromRGB(60, 120, 200), Enum.Material.SmoothPlastic)
+		end
 		-- A collar.
 		wear(model, torso, "Collar", Vector3.new(s.X * 0.42, s.Y * 0.08, s.Z * 0.9), CFrame.new(0, s.Y * 0.48, 0), shirt:Lerp(Color3.new(0, 0, 0), 0.15))
 	end
@@ -297,6 +338,16 @@ local function dress(model: Model, look: Look)
 		wear(model, lower, "Belt", Vector3.new(s.X * 1.04, s.Y * 0.22, s.Z * 1.08), CFrame.new(0, s.Y * 0.32, 0), Color3.fromRGB(40, 30, 24), Enum.Material.Leather)
 		if look.apron then
 			wear(model, lower, "ApronSkirt", Vector3.new(s.X * 0.8, s.Y * 1.6, 0.06), CFrame.new(0, -s.Y * 0.35, -s.Z * 0.55), rgb(look.apron, shirt))
+		end
+		if look.coat then
+			-- The coat's tails down to the knees (open at the front).
+			local coat = rgb(look.coat, shirt)
+			local drop = s.Y * 3.2
+			wear(model, lower, "CoatTail", Vector3.new(s.X * 1.12, drop, 0.08), CFrame.new(0, s.Y * 0.4 - drop / 2, s.Z * 0.6), coat)
+			for _, side in { -1, 1 } do
+				wear(model, lower, "CoatTail", Vector3.new(0.08, drop, s.Z * 1.2), CFrame.new(side * s.X * 0.57, s.Y * 0.4 - drop / 2, 0), coat)
+				wear(model, lower, "CoatTail", Vector3.new(s.X * 0.24, drop, 0.08), CFrame.new(side * s.X * 0.45, s.Y * 0.4 - drop / 2, -s.Z * 0.6), coat)
+			end
 		end
 	end
 
@@ -311,6 +362,11 @@ local function dress(model: Model, look: Look)
 	if look.hair and hat ~= "helmet" and hat ~= "beanie" then
 		-- Hair: an ellipsoid over the top and the back of the head.
 		wear(model, head, "Hair", Vector3.new(h.X * 1.04, h.Y * 0.62, h.Z * 1.06), CFrame.new(0, h.Y * 0.24, h.Z * 0.06), rgb(look.hair, Color3.new(0, 0, 0)), Enum.Material.SmoothPlastic, Enum.MeshType.Sphere)
+	end
+	if look.bandage then
+		-- A white band round the forehead, a plaster on the cheek.
+		wear(model, head, "Bandage", Vector3.new(h.Y * 0.24, h.X * 1.08, h.Z * 1.1), CFrame.new(0, h.Y * 0.2, 0) * UPRIGHT, Color3.fromRGB(246, 244, 238), Enum.Material.Fabric, nil, Enum.PartType.Cylinder)
+		wear(model, head, "Plaster", Vector3.new(h.X * 0.22, h.Y * 0.14, 0.04), CFrame.new(h.X * 0.22, -h.Y * 0.12, -h.Z * 0.5), Color3.fromRGB(226, 196, 160), Enum.Material.Fabric)
 	end
 	if hat == "cowboy" then
 		wear(model, head, "HatBrim", Vector3.new(0.08, h.X * 1.9, h.Z * 1.9), CFrame.new(0, h.Y * 0.36, 0) * UPRIGHT, hatColor, Enum.Material.Leather, nil, Enum.PartType.Cylinder)
@@ -339,6 +395,7 @@ local function lookKey(look: Look): string
 	return table.concat({
 		c(look.skin), c(look.shirt), c(look.pants), c(look.hatColor), c(look.hair), c(look.vest), c(look.apron), c(look.shoes),
 		look.hat or "none", tostring(look.child == true), tostring(look.boots == true), tostring(look.shortSleeves == true),
+		c(look.coat), c(look.tie), tostring(look.bandage == true),
 	}, "|")
 end
 
@@ -749,7 +806,7 @@ function Npcs.spawn(look: Look, at: CFrame): Model
 		scale = scale,
 	}
 	if humanoid then
-		humanoid.WalkSpeed = if look.child then 9 else 8
+		humanoid.WalkSpeed = look.walkSpeed or (if look.child then 9 else 8)
 		local animator = humanoid:FindFirstChildOfClass("Animator")
 		if animator then
 			state.idle = loadTrack(animator, IDLE)
