@@ -8,6 +8,7 @@
 local Config = require(script.Parent.Config)
 local Missions = require(script.Parent.Missions)
 local Levels = require(script.Parent.Levels)
+local Map = require(script.Parent.Map)
 
 local Challenges = {}
 
@@ -49,10 +50,86 @@ export type ChallengeDef = {
 	hidden: boolean?, -- shown as ??? until done (a secret challenge)
 }
 
--- [contract stub: stream "challenges-data" writes the list (about 40)]
+-- The categories, in the order the CHALLENGES tab shows them.
+Challenges.Categories = {
+	{ id = "combat", name = "Combat" },
+	{ id = "driving", name = "Driving" },
+	{ id = "missions", name = "Missions" },
+	{ id = "explorer", name = "Explorer" },
+	{ id = "coop", name = "Co-op" },
+	{ id = "wealth", name = "Wealth" },
+} :: { { id: string, name: string } }
+
+-- The goals that depend on the game's data (they grow with it, the descriptions follow).
+local MISSIONS_TOTAL = #Missions.List -- 100
+local CAMPAIGNS_TOTAL = #Missions.Campaigns -- 10
+local _, STARS_TOTAL = Missions.stars({}) -- 300 (3 per mission)
+local PLACES_TOTAL = #Map.Places -- 29
+local MAX_LEVEL = Config.Levels.MaxLevel -- 15
+-- The lost packages (Map.Secrets, written by stream "secrets-world").
+-- [3.1 fallback: until Map.Secrets lands in Map this reads nil and the spec's count, 30, is used. Once Map.Secrets is
+-- typed, the cast can go: `#Map.Secrets`.]
+local secretList = (Map :: any).Secrets :: { any }?
+local SECRETS_TOTAL = if secretList and #secretList > 0 then #secretList else 30
+
+-- The list, category by category, easy to hard. Money runs from 200 (minutes) to 20,000 (the long game); about ten
+-- give a title, four are hidden (??? until done). There is no "every challenge" challenge: finishing all of them is
+-- Config.Rewards.Challenges itself (Dead End).
 Challenges.List = {
+	-- ── Combat ──
 	{ id = "first_blood", name = "First Blood", description = "Kill 10 zombies.", category = "combat", stat = "kills", goal = 10, money = 200 },
-	{ id = "headhunter", name = "Headhunter", description = "Kill 100 zombies with a headshot.", category = "combat", stat = "headshots", goal = 100, money = 2000, title = "Headhunter" },
+	{ id = "sharpshooter", name = "Sharpshooter", description = "Kill 25 zombies with a headshot.", category = "combat", stat = "headshots", goal = 25, money = 500 },
+	{ id = "bigger_they_are", name = "The Bigger They Are", description = "Bring down 10 brutes.", category = "combat", stat = "brutes", goal = 10, money = 800 },
+	{ id = "bandit_bounty", name = "Bandit Bounty", description = "Take out 25 bandits on foot.", category = "combat", stat = "bandits", goal = 25, money = 1500 },
+	{ id = "demolition", name = "Demolition Crew", description = "Get 50 kills with explosions: grenades, molotovs, anything that goes boom.", category = "combat", stat = "explosions", goal = 50, money = 1500 },
+	{ id = "horde_breaker", name = "Horde Breaker", description = "Kill 500 zombies.", category = "combat", stat = "kills", goal = 500, money = 2000 },
+	{ id = "headhunter", name = "Headhunter", description = "Kill 250 zombies with a headshot.", category = "combat", stat = "headshots", goal = 250, money = 4000, title = "Headhunter" },
+	{ id = "giant_slayer", name = "Giant Slayer", description = "Bring down 100 brutes.", category = "combat", stat = "brutes", goal = 100, money = 6000, title = "Giant Slayer" },
+	{ id = "undertaker", name = "The Undertaker", description = "Kill 5,000 zombies.", category = "combat", stat = "kills", goal = 5000, money = 15000, title = "The Undertaker" },
+
+	-- ── Driving ──
+	{ id = "sunday_driver", name = "Sunday Driver", description = "Drive 25,000 studs.", category = "driving", stat = "distance", goal = 25000, money = 300 },
+	{ id = "speed_bump", name = "Speed Bump", description = "Run over 50 zombies.", category = "driving", stat = "runOvers", goal = 50, money = 600 },
+	{ id = "highway_patrol", name = "Highway Patrol", description = "Wreck 10 bandit cars.", category = "driving", stat = "banditCars", goal = 10, money = 2000 },
+	{ id = "mounted_mayhem", name = "Mounted Mayhem", description = "Get 100 kills with a car gun.", category = "driving", stat = "carGunKills", goal = 100, money = 2500 },
+	{ id = "long_haul", name = "Long Haul", description = "Drive 250,000 studs.", category = "driving", stat = "distance", goal = 250000, money = 3000 },
+	{ id = "road_warrior", name = "Road Warrior", description = "Drive 1,000,000 studs.", category = "driving", stat = "distance", goal = 1000000, money = 12000, title = "Road Warrior" },
+
+	-- ── Missions ──
+	{ id = "on_the_clock", name = "On the Clock", description = "Finish 5 different missions.", category = "missions", stat = "missions", goal = 5, money = 500 },
+	{ id = "story_time", name = "Story Time", description = "Finish 1 whole campaign (all of its missions).", category = "missions", stat = "campaigns", goal = 1, money = 1000 },
+	{ id = "night_shift", name = "Night Shift", description = "Finish 15 missions at night.", category = "missions", stat = "nightMissions", goal = 15, money = 2000 },
+	{ id = "hold_the_line", name = "Hold the Line", description = "Win 10 HOLD OUT fights.", category = "missions", stat = "defends", goal = 10, money = 2000 },
+	{ id = "wave_rider", name = "Wave Rider", description = "Live through 100 zombie waves on a job.", category = "missions", stat = "waves", goal = 100, money = 2000 },
+	{ id = "trusted_courier", name = "Trusted Courier", description = "Finish 25 different missions.", category = "missions", stat = "missions", goal = 25, money = 2500 },
+	{ id = "flawless", name = "Flawless", description = "Finish 25 missions with 3 stars.", category = "missions", stat = "perfect", goal = 25, money = 2500 },
+	{ id = "star_collector", name = "Star Collector", description = "Collect 100 mission stars.", category = "missions", stat = "stars", goal = 100, money = 3000 },
+	{ id = "top_of_the_ladder", name = "Top of the Ladder", description = `Reach level {MAX_LEVEL}, the very top.`, category = "missions", stat = "level", goal = MAX_LEVEL, money = 10000 },
+	{ id = "legendary_courier", name = "Legendary Courier", description = `Finish all {MISSIONS_TOTAL} missions.`, category = "missions", stat = "missions", goal = MISSIONS_TOTAL, money = 15000, title = "Legendary Courier" },
+	{ id = "city_saviour", name = "Saviour of the City", description = `Finish all {CAMPAIGNS_TOTAL} campaigns.`, category = "missions", stat = "campaigns", goal = CAMPAIGNS_TOTAL, money = 20000 },
+	{ id = "three_star_general", name = "Three-Star General", description = `Collect all {STARS_TOTAL} stars: 3 on every mission.`, category = "missions", stat = "stars", goal = STARS_TOTAL, money = 20000, title = "Three-Star General" },
+	-- hidden: odd feats, ??? until done
+	{ id = "ghost", name = "Ghost Courier", description = "Finish 1 NO SHOOTING mission without firing a single shot.", category = "missions", stat = "quietMissions", goal = 1, money = 2000, title = "The Ghost", hidden = true },
+	{ id = "horse_whisperer", name = "Horse Whisperer", description = "Deliver 25 horses.", category = "missions", stat = "horses", goal = 25, money = 2500, title = "Horse Whisperer", hidden = true },
+	{ id = "against_the_clock", name = "Against the Clock", description = "Finish 10 missions with the clock ticking.", category = "missions", stat = "rushes", goal = 10, money = 3000, hidden = true },
+
+	-- ── Explorer ──
+	{ id = "sightseer", name = "Sightseer", description = "Discover 5 places.", category = "explorer", stat = "visited", goal = 5, money = 300 },
+	{ id = "lost_and_found", name = "Lost and Found", description = "Find 1 lost package.", category = "explorer", stat = "secrets", goal = 1, money = 300 },
+	{ id = "package_sniffer", name = "Package Sniffer", description = "Find 10 lost packages.", category = "explorer", stat = "secrets", goal = 10, money = 2500 },
+	{ id = "cartographer", name = "Cartographer", description = `Discover all {PLACES_TOTAL} places.`, category = "explorer", stat = "visited", goal = PLACES_TOTAL, money = 5000, title = "Cartographer" },
+	{ id = "every_last_box", name = "Every Last Box", description = `Find all {SECRETS_TOTAL} lost packages.`, category = "explorer", stat = "secrets", goal = SECRETS_TOTAL, money = 10000 },
+
+	-- ── Co-op ──
+	{ id = "better_together", name = "Better Together", description = "Finish 1 mission with a crew mate.", category = "coop", stat = "coopMissions", goal = 1, money = 300 },
+	{ id = "riding_shotgun", name = "Riding Shotgun", description = "Get 50 kills from a passenger seat.", category = "coop", stat = "gunnerKills", goal = 50, money = 1500 },
+	{ id = "crew_chief", name = "Crew Chief", description = "Finish 25 missions with a crew mate.", category = "coop", stat = "coopMissions", goal = 25, money = 4000, title = "Crew Chief" },
+
+	-- ── Wealth ──
+	{ id = "first_paycheck", name = "First Paycheck", description = "Earn $10,000.", category = "wealth", stat = "earned", goal = 10000, money = 300 },
+	{ id = "home_sweet_home", name = "Home Sweet Home", description = "Buy 1 property.", category = "wealth", stat = "properties", goal = 1, money = 1000 },
+	{ id = "car_collector", name = "Car Collector", description = "Own 5 cars.", category = "wealth", stat = "cars", goal = 5, money = 2000 },
+	{ id = "millionaire", name = "Millionaire", description = "Earn $1,000,000.", category = "wealth", stat = "earned", goal = 1000000, money = 10000, title = "Millionaire", hidden = true },
 } :: { ChallengeDef }
 
 export type ProfileLike = {
