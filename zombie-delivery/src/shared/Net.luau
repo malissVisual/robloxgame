@@ -31,6 +31,10 @@ local NAMES = {
 	"AcceptEmployer", -- client → server: take a job from the employer whose board you stand at (employer id)
 	"Aiming", -- client → server: aiming on foot or not (the gun arm goes up / down for everybody)
 	"Admin", -- client → server: an admin command (name, argument) — only for admins (server/Admin.luau)
+	"CrewInvite", -- client → server: invite a player into my job (userId); server → client: an invitation (from userId, job name)
+	"CrewAnswer", -- client → server: accept / decline an invitation (from userId, accepted)
+	"CrewState", -- server → client: my crew (owner, members, pay shares) or nil
+	"Leaderboard", -- client → server: send me the board; server → client: the rows (name, level, rank, deliveries, earned)
 }
 
 local folder: Folder

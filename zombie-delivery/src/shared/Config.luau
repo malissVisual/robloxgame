@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.4"
+Config.Version = "2.5"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -43,6 +43,7 @@ export type CarDef = {
 	color: { number },
 	description: string,
 	company: boolean?, -- not for sale: an employer lends it for their jobs and gives it to you after a few of them
+	level: number?, -- the driver level (Config.Levels) needed to buy it
 	employer: string?, -- who (Config.Employers)
 	mount: boolean?, -- a car gun (Config.CarGuns) fits on its roof; the company / work vehicles carry none
 }
@@ -64,6 +65,7 @@ Config.Cars = {
 	},
 	{
 		id = "pickup",
+		level = 2,
 		mount = true,
 		name = "Pickup",
 		price = 1500,
@@ -78,6 +80,7 @@ Config.Cars = {
 	},
 	{
 		id = "muscle",
+		level = 4,
 		mount = true,
 		name = "Muscle Car",
 		price = 4000,
@@ -184,6 +187,21 @@ Config.Cars = {
 		employer = "ranch",
 	},
 	{
+		id = "ambulance",
+		name = "Ambulance",
+		price = 0,
+		style = "ambulance",
+		maxSpeed = 70,
+		accel = 30,
+		turn = 1.8,
+		health = 800,
+		ramPower = 1.4,
+		color = { 245, 245, 245 },
+		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
+		company = true,
+		employer = "clinic",
+	},
+	{
 		id = "fueltruck",
 		name = "Fuel Truck",
 		price = 0,
@@ -213,6 +231,7 @@ export type WeaponDef = {
 	color: { number }, -- tracer colour
 	description: string,
 	earned: string?, -- not sold: this employer (Config.Employers) gives it to you after some jobs
+	level: number?, -- the driver level (Config.Levels) needed to buy it
 	oneHanded: boolean?, -- fires out of a car window too (any seat); the two-handed guns only on foot
 }
 
@@ -233,6 +252,7 @@ Config.Weapons = {
 	},
 	{
 		id = "smg",
+		level = 2,
 		oneHanded = true,
 		name = "SMG",
 		price = 2000,
@@ -247,6 +267,7 @@ Config.Weapons = {
 	},
 	{
 		id = "shotgun",
+		level = 3,
 		name = "Shotgun",
 		price = 3500,
 		damage = 15,
@@ -260,6 +281,7 @@ Config.Weapons = {
 	},
 	{
 		id = "rifle",
+		level = 5,
 		name = "Hunting Rifle",
 		price = 6000,
 		damage = 48,
@@ -273,6 +295,7 @@ Config.Weapons = {
 	},
 	{
 		id = "minigun",
+		level = 8,
 		name = "Minigun",
 		price = 12000,
 		damage = 15,
@@ -286,6 +309,7 @@ Config.Weapons = {
 	},
 	{
 		id = "launcher",
+		level = 10,
 		name = "Grenade Launcher",
 		price = 18000,
 		damage = 90,
@@ -343,11 +367,13 @@ export type CarGunDef = {
 	splash: number, -- radius of the blast (0 = none)
 	color: { number }, -- tracer colour
 	description: string,
+	level: number?, -- the driver level (Config.Levels) needed to buy it
 }
 
 Config.CarGuns = {
 	{
 		id = "roofmg",
+		level = 3,
 		name = "Roof Machine Gun",
 		price = 3500,
 		damage = 14,
@@ -361,6 +387,7 @@ Config.CarGuns = {
 	},
 	{
 		id = "roofminigun",
+		level = 7,
 		name = "Roof Minigun",
 		price = 12000,
 		damage = 16,
@@ -374,6 +401,7 @@ Config.CarGuns = {
 	},
 	{
 		id = "rooflauncher",
+		level = 9,
 		name = "Roof Grenade Launcher",
 		price = 15000,
 		damage = 80,
@@ -654,6 +682,7 @@ Config.Horde = {
 export type TierDef = {
 	stars: number,
 	name: string,
+	level: number, -- the driver level (Config.Levels) that unlocks this danger level on the job board
 	minDistance: number,
 	maxDistance: number,
 	basePay: number,
@@ -706,6 +735,63 @@ export type BusinessDef = {
 	receivers: { PersonDef },
 }
 
+-- Day and night (server/DayNight.luau): the clock runs, the night is dark, the street lamps and the headlights come
+-- on, more zombies roam and the waves are bigger, and every delivery pays more.
+Config.DayNight = {
+	DayLength = 960, -- seconds for a whole day (24 h of game time)
+	StartHour = 9, -- the clock when the server starts
+	NightFrom = 19.5, -- the night: from this hour …
+	NightTo = 6, -- … until this one
+	NightPay = 1.4, -- pay multiplier for a job finished at night
+	NightWaves = 1.5, -- wave size multiplier at night
+	NightRoam = 1.6, -- roaming zombies multiplier at night
+}
+
+-- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
+-- on the job board (Jobs.Tiers level), cars, guns and car guns (their level field) and some special jobs.
+Config.Levels = {
+	MaxLevel = 15,
+	XpBase = 120, -- XP needed for level 2; every next level needs more (shared/Levels.luau xpFor)
+	XpGrowth = 1.35,
+	XpPerStar = 60, -- a finished delivery: stars × this …
+	XpPerPiece = 10, -- … + per piece delivered …
+	XpPerKill = 4, -- … + per enemy killed during the job
+	XpNightBonus = 1.25, -- … × this at night
+	XpFailed = 0.25, -- a failed job still gives this share
+	Ranks = { -- the rank name from this level on
+		{ level = 1, name = "Rookie Courier" },
+		{ level = 2, name = "Courier" },
+		{ level = 3, name = "Runner" },
+		{ level = 4, name = "Road Rat" },
+		{ level = 5, name = "Road Warrior" },
+		{ level = 6, name = "Veteran Driver" },
+		{ level = 8, name = "Wasteland Trucker" },
+		{ level = 10, name = "Convoy Captain" },
+		{ level = 12, name = "Dead End Legend" },
+		{ level = 15, name = "King of the Road" },
+	} :: { { level: number, name: string } },
+}
+
+-- Traffic (server/Traffic.luau): civilian cars driving the roads and people walking the sidewalks, near the players
+-- only (they appear out of sight and disappear far away).
+Config.Traffic = {
+	CarsPerPlayer = 6,
+	MaxCars = 24,
+	PedestriansPerPlayer = 8,
+	MaxPedestrians = 30,
+	SpawnMin = 120,
+	SpawnMax = 260,
+	Despawn = 340,
+	CarSpeed = 34,
+}
+
+-- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
+Config.Crew = {
+	MaxMembers = 3,
+	InviteRange = 60, -- studs to the player you invite (or use the crew button from anywhere)
+	InviteTimeout = 30,
+}
+
 Config.Jobs = {
 	DeliverRadius = 18,
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
@@ -729,6 +815,7 @@ Config.Jobs = {
 	Tiers = {
 		{
 			stars = 1,
+			level = 1,
 			name = "Easy",
 			minDistance = 150,
 			maxDistance = 650,
@@ -750,6 +837,7 @@ Config.Jobs = {
 		},
 		{
 			stars = 2,
+			level = 2,
 			name = "Risky",
 			minDistance = 550,
 			maxDistance = 1200,
@@ -771,6 +859,7 @@ Config.Jobs = {
 		},
 		{
 			stars = 3,
+			level = 4,
 			name = "Deadly",
 			minDistance = 1000,
 			maxDistance = 2000,
@@ -792,6 +881,7 @@ Config.Jobs = {
 		},
 		{
 			stars = 4,
+			level = 6,
 			name = "INSANE",
 			minDistance = 1800,
 			maxDistance = 99999,
@@ -1080,6 +1170,9 @@ Config.Cargo = {
 		soup = { piece = "soup box", plural = "soup boxes", look = "soup" },
 		horse = { piece = "horse", plural = "horses", look = "horse" },
 		kid = { piece = "kid", plural = "kids", look = "kid" },
+		cash = { piece = "sack of cash", plural = "sacks of cash", look = "gold" },
+		patient = { piece = "patient", plural = "patients", look = "patient" },
+		pizza = { piece = "pizza stack", plural = "pizza stacks", look = "pizza" },
 	} :: { [string]: { piece: string, plural: string, look: string } },
 	-- Extra seconds on the clock for every piece handled at a stop (loading and unloading each count).
 	TimePerPiece = { carry = 9, lead = 14, board = 4, serve = 0 } :: { [string]: number },
@@ -1134,6 +1227,10 @@ export type JobTypeDef = {
 	itemKind: string, -- the look of one piece: crate | ammo | sack | barrel | icebox | furniture | soup | horse | kid
 	giver: string, -- the person (an R15 NPC) who hands the cargo over at the pick-up
 	receiver: string, -- the person who takes it at the drop
+	timeLimit: number?, -- a fixed time limit in seconds (a rush), instead of the distance-based one
+	banditBoost: number?, -- bandits want this cargo: roadblocks and chases come this many times as often
+	level: number?, -- the driver level (Config.Levels) needed to take it
+	board: boolean?, -- on the job board (not taken at an employer's place)
 }
 
 -- Special jobs. The ones with an employer are taken at the employer's place; the others show up on the job board.
@@ -1330,6 +1427,86 @@ Config.JobTypes = {
 		giver = "Hank, the depot worker",
 		receiver = "Tony, the pump attendant",
 	},
+	{
+		id = "cashrun",
+		name = "Cash Transport",
+		description = "Load sacks of cash at the First Zombie Bank into the army's armored truck and bring them to the Military Base vault. Every bandit in town wants this cargo.",
+		vehicle = "armored",
+		employer = nil,
+		board = true,
+		level = 5,
+		pickups = 1,
+		pickupAt = "bank",
+		drops = 1,
+		dropAt = "base",
+		loadTime = 3,
+		unloadTime = 3,
+		payPerStop = 400,
+		tier = 4,
+		cargo = "Cash",
+		pickupLabel = "LOAD THE CASH AT",
+		dropLabel = "DELIVER THE CASH TO",
+		load = "carry",
+		unload = "carry",
+		items = 3,
+		itemKind = "cash",
+		giver = "Mr. Gold, the bank manager",
+		receiver = "Captain Reyes",
+		banditBoost = 2,
+	},
+	{
+		id = "ambulance",
+		name = "Ambulance Run",
+		description = "A patient is waiting at their home. Pick them up in the clinic's ambulance and rush them to the City Clinic before it is too late.",
+		vehicle = "ambulance",
+		employer = "clinic",
+		level = 3,
+		pickups = 1,
+		pickupAt = nil,
+		drops = 1,
+		dropAt = "clinic",
+		loadTime = 3,
+		unloadTime = 3,
+		payPerStop = 220,
+		tier = 2,
+		cargo = "Patient",
+		pickupLabel = "PICK UP THE PATIENT AT",
+		dropLabel = "RUSH THE PATIENT TO",
+		load = "board",
+		unload = "board",
+		items = 1,
+		itemKind = "patient",
+		giver = "The patient's family",
+		receiver = "Dr. Novak",
+		timeLimit = 150,
+	},
+	{
+		id = "pizzarush",
+		name = "Pizza Rush",
+		description = "Hot pizza, three minutes, no excuses. Pick up the order at Luigi's and deliver it before it gets cold.",
+		vehicle = nil,
+		employer = nil,
+		board = true,
+		level = 1,
+		pickups = 1,
+		pickupAt = nil,
+		drops = 1,
+		dropAt = nil,
+		loadTime = 2,
+		unloadTime = 2,
+		payPerStop = 120,
+		tier = 1,
+		cargo = "Pizza",
+		pickupLabel = "PICK UP THE PIZZA AT",
+		dropLabel = "DELIVER THE PIZZA TO",
+		load = "carry",
+		unload = "carry",
+		items = 1,
+		itemKind = "pizza",
+		giver = "Luigi, the pizza chef",
+		receiver = "A hungry customer",
+		timeLimit = 180,
+	},
 } :: { JobTypeDef }
 
 export type EmployerDef = {
@@ -1353,6 +1530,7 @@ Config.Employers = {
 	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "movingtruck", needed = 3, person = "Dana, the boss", pitch = "Families are getting out of town. Move their things." },
 	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, person = "Old Man Jenkins", pitch = "The city is hungry. Take my monster truck to the markets." },
 	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "livestock", needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My horses are sold to the riding school. Lead them into the truck gently, and keep the bandits off them." },
+	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "ambulance", needed = 3, person = "Dr. Novak", pitch = "The phones never stop ringing. Take the ambulance, bring the patients in alive." },
 	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Rosa, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
 

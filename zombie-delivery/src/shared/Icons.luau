@@ -104,6 +104,8 @@ local CARGO_ALIASES: { [string]: string } = {
 	cake = "crate",
 	vaccine = "medicine",
 	sample = "medicine",
+	cash = "crate",
+	patient = "kid",
 }
 
 -- A piece of cargo: a kind (crate, ammo, sack, barrel, icebox, furniture, soup, horse, kid) or a look (pizza, parcel,
@@ -121,10 +123,19 @@ local LANDMARK_ALIASES: { [string]: string } = {
 	frosty = "icecream", -- Frosty's Ice Cream as a place (Map.Places); the employer is "icecream"
 	base = "army", -- the Military Base as a place; the employer is "army"
 }
+-- Landmarks with no map icon of their own yet: another icon's full name.
+local LANDMARK_BORROWED: { [string]: string } = {
+	bank = "cargo_crate",
+	clinic = "cargo_medicine",
+}
 
 function Icons.landmark(landmarkId: string?): string?
 	if landmarkId == nil then
 		return nil
+	end
+	local borrowed = LANDMARK_BORROWED[landmarkId]
+	if borrowed then
+		return if Icons.Ids[borrowed] ~= nil then borrowed else nil
 	end
 	return named("map_", LANDMARK_ALIASES[landmarkId] or landmarkId)
 end

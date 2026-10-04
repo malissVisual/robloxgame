@@ -31,6 +31,17 @@ export type Profile = {
 
 local PlayerData = {}
 
+-- [CONTRACT STUBS, stream "levels" implements them with profile.xp]
+-- Adds XP; returns the new level and whether it went up.
+function PlayerData.addXp(_player: Player, _amount: number): (number, boolean)
+	return 1, false
+end
+
+-- The player's driver level (1 when not loaded).
+function PlayerData.level(_player: Player): number
+	return 1
+end
+
 local profiles: { [Player]: Profile } = {}
 local canSave: { [Player]: boolean } = {}
 local changed = Instance.new("BindableEvent")

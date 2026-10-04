@@ -18,6 +18,8 @@ local CameraRig = require(Client.CameraRig)
 local ArmPose = require(Client.ArmPose)
 local AdminPanel = require(Client.AdminPanel)
 local AnimalAnimator = require(Client.AnimalAnimator)
+local Leaderboard = require(Client.Leaderboard)
+local CrewPanel = require(Client.CrewPanel)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -38,9 +40,11 @@ safely("CameraRig", CameraRig.start)
 safely("ArmPose", ArmPose.start)
 safely("AdminPanel", AdminPanel.start)
 safely("AnimalAnimator", AnimalAnimator.start)
+safely("Leaderboard", Leaderboard.start)
+safely("CrewPanel", CrewPanel.start)
 Shooting.notify = Hud.toast
 CameraRig.mouseNeeded = function(): boolean
-	return Hud.anyWindowOpen() or AdminPanel.isOpen()
+	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen()
 end
 
 Net.get("State").OnClientEvent:Connect(function(state)
