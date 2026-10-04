@@ -28,6 +28,9 @@ export type Profile = {
 	carGuns: { [string]: string }, -- car id → the car gun on its roof (Config.CarGuns); no entry = none
 	rep: { [string]: number }, -- jobs done for each employer (Config.Employers)
 	xp: number, -- driver XP (Config.Levels); older saves have none: 0
+	properties: { [string]: boolean }, -- owned real estate (Config.Estate ids)
+	home: string?, -- the home you spawn at (an owned mansion / villa / house), nil = the depot
+	business: { couriers: number, upgrades: { [string]: number }, safe: number, lastTick: number }, -- your company (Config.Business); lastTick = os.time() of the last payout
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -61,6 +64,9 @@ local function newProfile(): Profile
 		carGuns = {}, -- every car starts without a gun
 		rep = {},
 		xp = 0,
+		properties = {},
+		home = nil,
+		business = { couriers = 0, upgrades = {}, safe = 0, lastTick = 0 },
 		deliveries = 0,
 		kills = 0,
 		earned = 0,

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.5"
+Config.Version = "2.6"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -790,6 +790,68 @@ Config.Crew = {
 	MaxMembers = 3,
 	InviteRange = 60, -- studs to the player you invite (or use the crew button from anywhere)
 	InviteTimeout = 30,
+}
+
+-- Real estate (server/Estate.luau): homes, garages and offices you buy with the money you made. A home is where you
+-- spawn and its garage keeps cars; garages add car slots; an office runs your own delivery company
+-- (Config.Business). Every player owns their own copy (saved in the profile): two owners of the same mansion on one
+-- server both use it. Where each one stands is in shared/Map.luau (Map.EstatePlots, same ids).
+export type EstateDef = {
+	id: string,
+	name: string,
+	kind: string, -- mansion | villa | house | garage | office
+	price: number,
+	garageSlots: number, -- car slots it adds (homes and garages)
+	couriers: number?, -- offices: how many couriers your company can employ from there
+	level: number?, -- the driver level (Config.Levels) needed to buy it
+	description: string,
+}
+
+Config.Estate = {
+	BaseCarSlots = 3, -- the depot's lot: cars you can own without any garage
+	SellBack = 0.6, -- selling returns this share of the price
+	Properties = {
+		{ id = "hilltop", name = "Hilltop Mansion", kind = "mansion", price = 6000000, garageSlots = 8, level = 10, description = "The top of Sunset Hills: the whole city at your feet, an infinity pool and a garage for eight." },
+		{ id = "oceanview", name = "Ocean View Mansion", kind = "mansion", price = 4500000, garageSlots = 8, level = 9, description = "On the cliffs over the sea, glass all around, a private pier and a garage for eight." },
+		{ id = "pinecrest", name = "Pinecrest Mansion", kind = "mansion", price = 3000000, garageSlots = 6, level = 8, description = "A stone mansion among the pines, a pool and a garage for six." },
+		{ id = "lakeside", name = "Lakeside Villa", kind = "villa", price = 1500000, garageSlots = 4, level = 7, description = "A modern villa by the water with a garage for four." },
+		{ id = "sunset", name = "Sunset Villa", kind = "villa", price = 1000000, garageSlots = 4, level = 6, description = "A white villa on the hill road, sunsets included. Garage for four." },
+		{ id = "maple", name = "12 Maple Street", kind = "house", price = 400000, garageSlots = 2, level = 4, description = "A two-storey family house in the Suburbs with a double garage." },
+		{ id = "oak", name = "7 Oak Lane", kind = "house", price = 300000, garageSlots = 2, level = 3, description = "A brick house with a porch and a double garage." },
+		{ id = "birch", name = "Birch Cottage", kind = "house", price = 200000, garageSlots = 2, level = 2, description = "A cosy cottage at the edge of town, garage for two." },
+		{ id = "elm", name = "Elm Bungalow", kind = "house", price = 150000, garageSlots = 1, level = 1, description = "A small bungalow: your first home, one car fits in the garage." },
+		{ id = "garage_harbor", name = "Harbor Lockup", kind = "garage", price = 50000, garageSlots = 4, level = 1, description = "A rented lock-up at the harbor: four more car slots." },
+		{ id = "garage_north", name = "Highway Garage", kind = "garage", price = 80000, garageSlots = 4, level = 2, description = "A garage on the North Highway: four more car slots." },
+		{ id = "garage_downtown", name = "Downtown Parking", kind = "garage", price = 120000, garageSlots = 6, level = 3, description = "A floor of the downtown parking house: six more car slots." },
+		{ id = "office_harbor", name = "Harbor Point Office", kind = "office", price = 500000, garageSlots = 0, couriers = 3, level = 5, description = "A room in the Harbor Point tower: start your own delivery company with up to 3 couriers." },
+		{ id = "office_tower", name = "Dispatch Tower, 8th floor", kind = "office", price = 900000, garageSlots = 0, couriers = 6, level = 7, description = "A corner office high in the Dispatch Tower: up to 6 couriers." },
+		{ id = "office_penthouse", name = "Dispatch Tower Penthouse", kind = "office", price = 2500000, garageSlots = 0, couriers = 12, level = 11, description = "The top floor of the Dispatch Tower: an empire of up to 12 couriers." },
+	} :: { EstateDef },
+}
+
+-- Calling your car (server/CarCall.luau): it does not appear out of thin air: a chauffeur drives it to you along
+-- the roads from out of sight, parks next to you, gets out, walks away and fades.
+Config.CarCall = {
+	ArriveWithin = 15, -- seconds; a car that is stuck is placed next to you at this point
+	SpawnMin = 110, -- studs from you, along the roads
+	SpawnMax = 200,
+	Speed = 55,
+	DriverFade = 2.5,
+}
+
+-- Your delivery company (server/Business.luau), run from an office computer: hire couriers who make deliveries for
+-- you while you play (and, less, while you are away), buy them vans, grow the company.
+Config.Business = {
+	CourierCost = 25000, -- hiring one courier
+	CourierPerMinute = 120, -- what one courier earns per minute while you are on the server
+	OfflineShare = 0.4, -- while you are away they earn this share …
+	OfflineHours = 8, -- … for at most this long
+	SafeCap = 500000, -- the company's safe: earnings wait here until you collect them at the office
+	Upgrades = { -- levels multiply the couriers' earnings
+		{ id = "vans", name = "Better vans", description = "+15% per level: faster, safer deliveries", maxLevel = 5, baseCost = 60000, costGrowth = 1.9, perLevel = 0.15 },
+		{ id = "dispatch", name = "Dispatch software", description = "+10% per level: smarter routes", maxLevel = 5, baseCost = 40000, costGrowth = 1.8, perLevel = 0.10 },
+		{ id = "security", name = "Armed escorts", description = "+12% per level: fewer lost loads", maxLevel = 5, baseCost = 80000, costGrowth = 2.0, perLevel = 0.12 },
+	} :: { { id: string, name: string, description: string, maxLevel: number, baseCost: number, costGrowth: number, perLevel: number } },
 }
 
 Config.Jobs = {

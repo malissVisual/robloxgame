@@ -31,6 +31,9 @@ local DayNight = require(Server.DayNight)
 local Traffic = require(Server.Traffic)
 local Crew = require(Server.Crew)
 local Ranking = require(Server.Ranking)
+local Estate = require(Server.Estate)
+local CarCall = require(Server.CarCall)
+local Business = require(Server.Business)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -140,6 +143,9 @@ Crew.hasJob = Jobs.active
 Crew.statusOf = Jobs.crewStatus
 safely("Crew", Crew.start)
 safely("Ranking", Ranking.start)
+safely("Estate", Estate.start)
+safely("CarCall", CarCall.start)
+safely("Business", Business.start)
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).

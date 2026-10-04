@@ -35,6 +35,9 @@ local NAMES = {
 	"CrewAnswer", -- client → server: accept / decline an invitation (from userId, accepted)
 	"CrewState", -- server → client: my crew (owner, members, pay shares) or nil
 	"Leaderboard", -- client → server: send me the board; server → client: the rows (name, level, rank, deliveries, earned)
+	"Estate", -- client → server: (action "buy" | "sell" | "home", estate id); server → client: open the listing (estate id)
+	"Business", -- client → server: (action "hire" | "fire" | "upgrade" | "collect" | "open", arg); server → client: the company state
+	"CarCall", -- server → client: your car is on the way (seconds left, car model) or arrived / failed (nil)
 }
 
 local folder: Folder
