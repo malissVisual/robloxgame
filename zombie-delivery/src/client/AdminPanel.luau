@@ -6,6 +6,7 @@
 -- and in the window's title bar while it is open (the toasts are behind it).
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
 
+local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -443,17 +444,21 @@ function AdminPanel.start()
 	end
 	refreshButton()
 
-	-- P opens and closes the panel (not while typing in a text box, e.g. the chat).
-	UserInputService.InputBegan:Connect(function(input)
-		if input.KeyCode ~= Enum.KeyCode.P or UserInputService:GetFocusedTextBox() then
-			return
+	-- P opens and closes the panel (not while typing in a text box, e.g. the chat). Bound at a high priority, so no
+	-- other binding of the game or of Roblox can swallow it.
+	ContextActionService:BindActionAtPriority("ZombieDeliveryAdmin", function(_name, state, _input)
+		if state ~= Enum.UserInputState.Begin or UserInputService:GetFocusedTextBox() then
+			return Enum.ContextActionResult.Pass
 		end
 		if isAdmin() then
 			setOpen(not window.Visible)
-		else
-			warn("[Admin] P pressed, but you are not an admin (Config.Admin)")
+			print(`[AdminPanel] P: the panel is {if window.Visible then "open" else "closed"}`)
+			return Enum.ContextActionResult.Sink
 		end
-	end)
+		warn("[AdminPanel] P pressed, but you are not an admin (Config.Admin)")
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.ContextActionPriority.High.Value + 100, Enum.KeyCode.P)
+	print(`[AdminPanel] ready: press P (admin: {isAdmin()})`)
 end
 
 function AdminPanel.isOpen(): boolean
