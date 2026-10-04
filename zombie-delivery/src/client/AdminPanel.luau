@@ -1,5 +1,5 @@
 --!strict
--- The admin panel (F7 or the small ADMIN button top right; only for players with the "Admin" attribute, see
+-- The admin panel (P or the small ADMIN button top right; only for players with the "Admin" attribute, see
 -- server/Admin.luau, which checks every command again). One window with sections on the left: unlock & money,
 -- cars, guns, teleport (every Map.Landmarks place), jobs (every special job and the ordinary tiers), enemies, world
 -- (time of day) and player (god mode, heal, finish the stop). The answers come back as toasts (the Notice remote),
@@ -328,7 +328,7 @@ local function build()
 	scale = Ui.make("UIScale", {}, window)
 	Ui.stroke(window, C.red, 2)
 	Ui.label(window, "ADMIN", UDim2.new(0, 200, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBlack, TextColor3 = C.red })
-	Ui.label(window, "testing tools · F7", UDim2.new(1, -300, 0, 44), { Position = UDim2.fromOffset(130, 8), TextSize = 15, Font = Enum.Font.GothamMedium, TextColor3 = C.dim })
+	Ui.label(window, "testing tools · P", UDim2.new(1, -300, 0, 44), { Position = UDim2.fromOffset(130, 8), TextSize = 15, Font = Enum.Font.GothamMedium, TextColor3 = C.dim })
 	status = Ui.label(window, "", UDim2.new(1, -360, 0, 20), {
 		Position = UDim2.fromOffset(300, 20),
 		TextSize = 14,
@@ -434,7 +434,7 @@ function AdminPanel.start()
 		if processed or UserInputService:GetFocusedTextBox() then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.F7 and isAdmin() then
+		if input.KeyCode == Enum.KeyCode.P and isAdmin() then
 			setOpen(not window.Visible)
 		end
 	end)

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.0"
+Config.Version = "2.0.1"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -14,7 +14,7 @@ Config.StudioStartMoney = 25000 -- a Play test in Studio (no saves) starts rich,
 Config.AutosaveSeconds = 60
 Config.SpawnCarCooldown = 4
 
--- Who may open the admin panel (F7 / the ADMIN button, server/Admin.luau): everybody in a Studio Play test, the
+-- Who may open the admin panel (P / the ADMIN button, server/Admin.luau): everybody in a Studio Play test, the
 -- game's owner (game.CreatorId) and these user ids.
 Config.Admin = {
 	InStudio = true,

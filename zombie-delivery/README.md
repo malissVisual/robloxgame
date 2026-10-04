@@ -41,7 +41,7 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Get out | Space | jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
 | Put down / Let go (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | the prompt |
-| Admin panel (testing tools; only for admins: a Studio Play test, the place's owner, `Config.Admin.UserIds`) | F7 | the ADMIN button |
+| Admin panel (testing tools; only for admins: a Studio Play test, the place's owner, `Config.Admin.UserIds`) | P | the ADMIN button |
 
 While you carry something (or lead a horse) you cannot shoot, sprint or drive, and you walk slower.
 
@@ -132,7 +132,7 @@ src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, 
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
               Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
-              prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (F7),
+              prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
               Weather, Ui
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map), cargo (pieces and pay), roads (the GPS)
 ```
@@ -160,7 +160,7 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 Runs every `tests/*_test.luau` (logic, cargo, roads). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
-**Testing in Studio**: the admin panel (F7, or the ADMIN button top right) unlocks everything, gives money, spawns
+**Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
 cars, guns and enemies, teleports to every place, starts any job, sets the time of day, heals, finishes the current
 stop and switches god mode. It
 is there for a Studio Play test, for the owner of a user-owned place and for the user ids in `Config.Admin.UserIds`;
