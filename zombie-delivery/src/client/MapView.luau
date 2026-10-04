@@ -1,8 +1,13 @@
 --!strict
 -- The minimap (always on: bottom left on a computer, top left on a touch screen) and the big map (M / MAP).
--- Both are drawn once from shared/Map.luau: land, winter, water, the mountain, roads, blocks and an icon for every
--- landmark (shops, employers, far places). Live markers: you (an arrow), other players, bandit cars (red !),
--- supply crates (?), the delivery target (★) and your GPS point (◆; both stick to the minimap's edge when far).
+-- Both are drawn once from shared/Map.luau: land, winter, water, the mountain, blocks, roads (highways and bridges
+-- stand out) and an icon for every landmark (shops, employers, far places). Live markers: you (an arrow), other
+-- players, bandit cars (red !), supply crates (?), the delivery target (★) and your GPS point (◆; both stick to the
+-- minimap's edge when far).
+-- Like GTA, the way there is drawn along the roads (shared/Roads.luau): yellow to the job's target, purple to the
+-- GPS point. A route is worked out again when the target changes or you leave it by more than ROUTE_OFF studs, and
+-- the part behind you is cut off as you drive. The minimap turns with the camera (north marker on its edge) and
+-- zooms out a little at speed; it updates MINI_HZ times a second.
 -- The big map lists every landmark with what you can do there; click one to set the GPS.
 
 local Players = game:GetService("Players")
@@ -13,6 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Map = require(Shared.Map)
+local Roads = require(Shared.Roads)
 local Ui = require(script.Parent.Ui)
 
 local MapView = {}
@@ -24,13 +30,37 @@ local WORLD_H = B.z1 - B.z0
 
 local MINI = 230
 local MINI_SCALE = 0.6 -- px per stud: the minimap shows about 380 studs across
+local MINI_HZ = 20
+local MINI_EDGE = MINI / 2 - 13 -- markers pinned to the edge stay this far from the centre (a square)
+local ZOOM_OUT = 0.72 -- the minimap's zoom at full speed
 local BIG_SCALE = 0.16 -- the big map is drawn at this scale and then fitted to the screen
 local LIST_W = 320
+local ROUTE_OFF = 40 -- studs off the route before it is worked out again
+local ROUTE_GAP = 0.5 -- seconds between two routes to the same target
 
+local C = {
+	land = Color3.fromRGB(47, 55, 45),
+	snow = Color3.fromRGB(176, 186, 196),
+	water = Color3.fromRGB(38, 82, 112),
+	shore = Color3.fromRGB(64, 112, 140),
+	ice = Color3.fromRGB(150, 196, 220),
+	yard = Color3.fromRGB(82, 84, 88),
+	special = Color3.fromRGB(96, 88, 62),
+	roadEdge = Color3.fromRGB(22, 24, 28),
+	road = Color3.fromRGB(128, 132, 140),
+	highway = Color3.fromRGB(208, 212, 218),
+	bridge = Color3.fromRGB(184, 128, 78),
+	iceRoad = Color3.fromRGB(184, 228, 244),
+	safe = Color3.fromRGB(80, 255, 140),
+	job = Color3.fromRGB(255, 204, 40),
+	gps = Color3.fromRGB(176, 92, 255),
+	routeEdge = Color3.fromRGB(20, 18, 24),
+	accent = Color3.fromRGB(255, 196, 50),
+}
 local BLOCK_COLORS = {
-	downtown = Color3.fromRGB(86, 86, 92),
-	harbor = Color3.fromRGB(96, 88, 78),
-	suburbs = Color3.fromRGB(78, 98, 64),
+	downtown = Color3.fromRGB(66, 68, 74),
+	harbor = Color3.fromRGB(72, 68, 62),
+	suburbs = Color3.fromRGB(60, 74, 54),
 }
 local KIND_COLORS = {
 	shop = Color3.fromRGB(70, 170, 90),
@@ -38,7 +68,28 @@ local KIND_COLORS = {
 	place = Color3.fromRGB(150, 80, 200),
 }
 
-type Canvas = { content: any, scale: number, markers: any }
+-- A route line on one canvas: two pools of rotated frames (a dark edge under the colour), drawn from `step` on.
+type Line = { edges: { any }, fills: { any }, parent: any, color: Color3, width: number, full: number, cut: number }
+type Canvas = { content: any, scale: number, markers: any, job: Line, gps: Line }
+
+-- A route to a goal (the job's target or the GPS point).
+type Route = {
+	goal: Vector3?,
+	points: { Roads.Point }?,
+	computedAt: number,
+	dirty: boolean,
+	step: number, -- the step of the route you are on (the steps before it are behind you)
+	cutX: number, -- where you are on that step
+	cutZ: number,
+	full: number, -- bumped when the steps change (redraw every frame of the line)
+	cut: number, -- bumped when only the cut point moved (redraw the first frame)
+}
+
+local function newRoute(): Route
+	return { goal = nil, points = nil, computedAt = -math.huge, dirty = false, step = 1, cutX = 0, cutZ = 0, full = 0, cut = 0 }
+end
+local jobRoute = newRoute()
+local gpsRoute = newRoute()
 
 -- Set by Hud: the GPS was set (landmark) or cleared (nil).
 MapView.onWaypoint = function(_landmark: Map.Landmark?) end
@@ -46,12 +97,26 @@ MapView.onWaypoint = function(_landmark: Map.Landmark?) end
 local target: Vector3? = nil
 local waypoint: Vector3? = nil
 
+-- A new goal for a route (Hud repeats the same target with every job update: that is not a change).
+local function setGoal(route: Route, goal: Vector3?)
+	local old = route.goal
+	if goal and old and (Vector3.new(goal.X, 0, goal.Z) - Vector3.new(old.X, 0, old.Z)).Magnitude < 1 then
+		return
+	end
+	route.goal = goal
+	route.points = nil
+	route.dirty = goal ~= nil
+	route.full += 1
+end
+
 function MapView.setTarget(position: Vector3?)
 	target = position
+	setGoal(jobRoute, position)
 end
 
 function MapView.setWaypoint(position: Vector3?)
 	waypoint = position
+	setGoal(gpsRoute, position)
 end
 
 -- ── Drawing ────────────────────────────────────────────────────────────────
@@ -70,6 +135,18 @@ local function rect(parent: any, x0: number, z0: number, x1: number, z1: number,
 	}, parent)
 end
 
+local function rounded(frame: any, radius: number)
+	Ui.make("UICorner", { CornerRadius = UDim.new(0, radius) }, frame)
+end
+
+-- A straight band from (ax, az) to (bx, bz), `width` pixels thick, its ends extended by `extend` pixels.
+local function band(frame: any, ax: number, az: number, bx: number, bz: number, scale: number, width: number, extend: number)
+	local dx, dz = bx - ax, bz - az
+	frame.Position = point((ax + bx) / 2, (az + bz) / 2, scale)
+	frame.Size = UDim2.fromOffset(math.sqrt(dx * dx + dz * dz) * scale + extend, width)
+	frame.Rotation = math.deg(math.atan2(dz, dx))
+end
+
 local function caption(parent: any, text: string, x: number, z: number, scale: number, size: number, color: Color3)
 	Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(200, size + 4),
@@ -81,7 +158,7 @@ local function caption(parent: any, text: string, x: number, z: number, scale: n
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = color,
 		TextStrokeTransparency = 0.2,
-		ZIndex = 7,
+		ZIndex = 8,
 	}, parent)
 end
 
@@ -102,58 +179,132 @@ local function landmarkIcon(parent: any, landmark: Map.Landmark, scale: number, 
 	return icon
 end
 
+local function newLine(parent: any, color: Color3, width: number): Line
+	return { edges = {}, fills = {}, parent = parent, color = color, width = width, full = -1, cut = -1 }
+end
+
+local function lineFrame(line: Line, list: { any }, index: number, edge: boolean): any
+	local frame = list[index]
+	if not frame then
+		frame = Ui.make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = if edge then C.routeEdge else line.color,
+			BackgroundTransparency = if edge then 0.25 else 0,
+			BorderSizePixel = 0,
+			ZIndex = if edge then 1 else 2,
+		}, line.parent)
+		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, frame) -- round ends: the steps join smoothly
+		list[index] = frame
+	end
+	frame.Visible = true
+	return frame
+end
+
+local function hideLine(line: Line, from: number)
+	for n = from, #line.fills do
+		line.fills[n].Visible = false
+		line.edges[n].Visible = false
+	end
+end
+
+-- Draws the route on one canvas (only what changed since the last time).
+local function drawLine(line: Line, route: Route, scale: number)
+	local points = route.points
+	if not points then
+		if line.full ~= route.full then
+			hideLine(line, 1)
+			line.full, line.cut = route.full, route.cut
+		end
+		return
+	end
+	local onlyFirst = line.full == route.full
+	if onlyFirst and line.cut == route.cut then
+		return
+	end
+	local w = line.width
+	local n = 0
+	for k = route.step, #points - 1 do
+		local a, b = points[k], points[k + 1]
+		local ax, az = if k == route.step then route.cutX else a.x, if k == route.step then route.cutZ else a.z
+		if k > route.step and onlyFirst then
+			break
+		end
+		n += 1
+		band(lineFrame(line, line.edges, n, true), ax, az, b.x, b.z, scale, w + 3, w + 3)
+		band(lineFrame(line, line.fills, n, false), ax, az, b.x, b.z, scale, w, w)
+	end
+	if not onlyFirst then
+		hideLine(line, n + 1)
+	end
+	line.full, line.cut = route.full, route.cut
+end
+
 -- The whole world into a frame at `scale` pixels per stud.
 local function draw(parent: any, scale: number, big: boolean): Canvas
 	local content = Ui.make("Frame", {
 		Size = UDim2.fromOffset(WORLD_W * scale, WORLD_H * scale),
-		BackgroundColor3 = Color3.fromRGB(64, 70, 52),
+		BackgroundColor3 = C.land,
 		BorderSizePixel = 0,
 		ZIndex = 1,
 	}, parent)
-	rect(content, B.x0, B.z0, Map.River.x0, Map.WinterZ, scale, Color3.fromRGB(196, 202, 208), 2)
-	local water = Color3.fromRGB(44, 86, 112)
-	rect(content, Map.River.x0, B.z0, Map.River.x1, B.z1, scale, water, 2)
-	rect(content, Map.Sea.x0, B.z0, B.x1, B.z1, scale, water, 2)
+	-- Ground, water, winter.
+	rect(content, B.x0, B.z0, Map.River.x0, Map.WinterZ, scale, C.snow, 2)
+	local river = Map.River
+	rect(content, river.x0, B.z0, river.x1, B.z1, scale, C.water, 2)
+	rect(content, Map.Sea.x0, B.z0, B.x1, B.z1, scale, C.water, 2)
+	local shore = math.max(1, 5 * scale)
+	rect(content, river.x0, B.z0, river.x0 + shore / scale, B.z1, scale, C.shore, 2)
+	rect(content, river.x1 - shore / scale, B.z0, river.x1, B.z1, scale, C.shore, 2)
+	rect(content, Map.Sea.x0, B.z0, Map.Sea.x0 + shore / scale, B.z1, scale, C.shore, 2)
 	local lake = Map.Lake
-	rect(content, lake.x0, lake.z0, lake.x1, lake.z1, scale, Color3.fromRGB(150, 200, 225), 3)
+	rounded(rect(content, lake.x0, lake.z0, lake.x1, lake.z1, scale, C.ice, 3), math.floor(40 * scale))
 	local m = Map.Mountain
-	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.fromRGB(110, 102, 92), 3)
+	-- (white: the gradient gives the colour, lit from the north-west)
+	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.new(1, 1, 1), 3)
 	Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, hill)
+	Ui.make("UIGradient", {
+		Color = ColorSequence.new(Color3.fromRGB(150, 142, 132), Color3.fromRGB(70, 66, 60)),
+		Rotation = 45,
+	}, hill)
 	for _, yard in Map.Yards do
-		rect(content, yard.x0, yard.z0, yard.x1, yard.z1, scale, Color3.fromRGB(100, 100, 100), 3)
+		rounded(rect(content, yard.x0, yard.z0, yard.x1, yard.z1, scale, C.yard, 3), math.max(2, math.floor(12 * scale)))
 	end
+	-- Blocks, a little lighter than the ground; the special ones warmer.
 	local half = Map.BlockSize / 2
+	local blockRadius = math.max(2, math.floor(8 * scale))
 	for _, d in Map.Districts do
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
 				local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
-				local special = Map.special(d.id, i, j)
-				local color = if special then Color3.fromRGB(120, 110, 70) else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
-				rect(content, cx - half, cz - half, cx + half, cz + half, scale, color, 3)
+				local color = if Map.special(d.id, i, j) then C.special else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
+				rounded(rect(content, cx - half, cz - half, cx + half, cz + half, scale, color, 3), blockRadius)
 			end
 		end
 	end
-	for _, s in Map.Segments do
-		local dx, dz = s.bx - s.ax, s.bz - s.az
-		local length = math.sqrt(dx * dx + dz * dz)
-		local color = if s.kind == "bridge" then Color3.fromRGB(150, 90, 50)
-			elseif s.kind == "ice" then Color3.fromRGB(120, 170, 200)
-			elseif s.kind == "highway" then Color3.fromRGB(58, 58, 64)
-			else Color3.fromRGB(36, 36, 40)
-		Ui.make("Frame", {
-			Size = UDim2.fromOffset((length + s.width) * scale, math.max(2, s.width * scale)),
-			Position = point((s.ax + s.bx) / 2, (s.az + s.bz) / 2, scale),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Rotation = math.deg(math.atan2(dz, dx)),
-			BackgroundColor3 = color,
-			BorderSizePixel = 0,
-			ZIndex = 4,
-		}, content)
+	-- Roads: all the dark edges first, then the fills, so the junctions are clean.
+	local border = if big then 1.5 else 3
+	for pass = 1, 2 do
+		for _, s in Map.Segments do
+			local width = math.max(2, s.width * scale)
+			local color = if pass == 1 then C.roadEdge
+				elseif s.kind == "bridge" then C.bridge
+				elseif s.kind == "ice" then C.iceRoad
+				elseif s.kind == "highway" then C.highway
+				else C.road
+			local extra = if pass == 1 then border else 0
+			local frame = Ui.make("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = color,
+				BorderSizePixel = 0,
+				ZIndex = 3 + pass,
+			}, content)
+			band(frame, s.ax, s.az, s.bx, s.bz, scale, width + extra, s.width * scale + extra)
+		end
 	end
 	local safeHalf = Config.City.SafeHalf
-	local safe = rect(content, -safeHalf, -safeHalf, safeHalf, safeHalf, scale, Color3.new(0, 0, 0), 5)
+	local safe = rect(content, -safeHalf, -safeHalf, safeHalf, safeHalf, scale, Color3.new(0, 0, 0), 6)
 	safe.BackgroundTransparency = 1
-	Ui.make("UIStroke", { Color = Color3.fromRGB(80, 255, 140), Thickness = 2 }, safe)
+	Ui.make("UIStroke", { Color = C.safe, Thickness = if big then 2 else 1.5, Transparency = 0.25 }, safe)
 	if big then
 		for _, d in Map.Districts do
 			local x0, x1, z0 = Map.districtEdges(d)
@@ -162,10 +313,53 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		caption(content, "TUNNEL", m.x + 80, m.z, scale, 11, Color3.fromRGB(230, 230, 230))
 		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 40, scale, 11, Color3.fromRGB(40, 80, 110))
 		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, Color3.fromRGB(60, 70, 80))
-		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, Color3.fromRGB(80, 255, 140))
+		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.safe)
 	end
-	local markers = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 8 }, content)
-	return { content = content, scale = scale, markers = markers }
+	-- The routes (the GPS under the job), then the markers on top.
+	local routes = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 7 }, content)
+	local gpsLayer = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 1 }, routes)
+	local jobLayer = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 2 }, routes)
+	local width = if big then 4 else 7
+	local markers = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 9 }, content)
+	return {
+		content = content,
+		scale = scale,
+		markers = markers,
+		job = newLine(jobLayer, C.job, width),
+		gps = newLine(gpsLayer, C.gps, width),
+	}
+end
+
+-- ── Routes ─────────────────────────────────────────────────────────────────
+
+-- Works the route out (when needed) and cuts off the part behind you.
+local function updateRoute(route: Route, position: Vector3, now: number)
+	local goal = route.goal
+	if not goal then
+		return
+	end
+	local points = route.points
+	if points and not route.dirty then
+		local k, x, z, off = Roads.closest(points, position.X, position.Z, route.step)
+		if off <= ROUTE_OFF or now - route.computedAt < ROUTE_GAP then
+			if k ~= route.step then
+				route.step, route.cutX, route.cutZ = k, x, z
+				route.full += 1
+			elseif (x - route.cutX) ^ 2 + (z - route.cutZ) ^ 2 > 4 then
+				route.cutX, route.cutZ = x, z
+				route.cut += 1
+			end
+			return
+		end
+	end
+	-- A new target, or you left the route: the way from here.
+	points = Roads.route(position.X, position.Z, goal.X, goal.Z)
+	route.points = points
+	route.computedAt = now
+	route.dirty = false
+	route.step = 1
+	route.cutX, route.cutZ = position.X, position.Z
+	route.full += 1
 end
 
 -- ── Live markers ───────────────────────────────────────────────────────────
@@ -242,7 +436,8 @@ local function layer(canvas: Canvas): Layer
 	}
 end
 
-local function updateLayer(l: Layer)
+-- rotation: the markers' own rotation (on the turning minimap they turn back to stay upright).
+local function updateLayer(l: Layer, rotation: number)
 	local scale = l.canvas.scale
 	local n = 0
 	for _, other in Players:GetPlayers() do
@@ -260,7 +455,9 @@ local function updateLayer(l: Layer)
 		for _, crate in loot:GetChildren() do
 			if crate:IsA("BasePart") then
 				n += 1
-				take(l.crates, n).Position = point(crate.Position.X, crate.Position.Z, scale)
+				local marker = take(l.crates, n)
+				marker.Position = point(crate.Position.X, crate.Position.Z, scale)
+				marker.Rotation = rotation
 			end
 		end
 	end
@@ -272,23 +469,27 @@ local function updateLayer(l: Layer)
 			local chassis = if car:IsA("Model") then car.PrimaryPart else nil
 			if chassis and ((car:GetAttribute("Health") or 0) :: number) > 0 then
 				n += 1
-				take(l.enemies, n).Position = point(chassis.Position.X, chassis.Position.Z, scale)
+				local marker = take(l.enemies, n)
+				marker.Position = point(chassis.Position.X, chassis.Position.Z, scale)
+				marker.Rotation = rotation
 			end
 		end
 	end
 	hideFrom(l.enemies, n + 1)
 end
 
--- Where am I and which way do I face.
-local function myPose(): (Vector3?, Vector3)
+-- Where am I, which way do I face and how fast am I going.
+local function myPose(): (Vector3?, Vector3, number)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then
-		return nil, Vector3.new(0, 0, -1)
+		return nil, Vector3.new(0, 0, -1), 0
 	end
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local seat = humanoid and humanoid.SeatPart
-	return root.Position, if seat then seat.CFrame.LookVector else root.CFrame.LookVector
+	local velocity = root.AssemblyLinearVelocity
+	local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	return root.Position, if seat then seat.CFrame.LookVector else root.CFrame.LookVector, speed
 end
 
 local function heading(facing: Vector3): number
@@ -297,33 +498,187 @@ end
 
 -- ── The minimap ────────────────────────────────────────────────────────────
 
-local mini: any = nil
+local mini: any = nil -- the holder (what setVisible hides)
+local miniCanvas: Canvas? = nil
 local miniLayer: Layer? = nil
+local miniZoom: any = nil -- UIScale of the zoom frame
+local miniRotor: any = nil -- turns the map with the camera
+local miniIcons: { any } = {}
 local miniMe: any = nil
 local miniStar: any = nil
 local miniGps: any = nil
+local miniNorth: any = nil
+local cameraHeading = 0
+local iconHeading = math.huge
+local zoom = 1
 
--- A marker inside the minimap, or pinned to its edge when the point is out of view.
+-- A screen offset from the minimap's centre (pixels, y down) turned by `degrees` clockwise.
+local function turn(x: number, y: number, degrees: number): (number, number)
+	local a = math.rad(degrees)
+	local c, s = math.cos(a), math.sin(a)
+	return x * c - y * s, x * s + y * c
+end
+
+-- An offset kept inside the minimap's square (on its edge when too far).
+local function clampToEdge(x: number, y: number): (number, number, boolean)
+	local far = math.max(math.abs(x), math.abs(y))
+	if far > MINI_EDGE then
+		return x / far * MINI_EDGE, y / far * MINI_EDGE, true
+	end
+	return x, y, false
+end
+
+-- A marker over the turning map, or pinned to its edge when the point is out of view.
 local function pin(marker: any, from: Vector3, at: Vector3?, scale: number)
 	if not at then
 		marker.Visible = false
 		return
 	end
-	local dx = (at.X - from.X) * scale
-	local dy = (at.Z - from.Z) * scale
-	local limit = MINI / 2 - 12
-	local distance = math.sqrt(dx * dx + dy * dy)
-	if distance > limit then
-		dx, dy = dx / distance * limit, dy / distance * limit
-	end
-	marker.Position = UDim2.fromOffset(MINI / 2 + dx, MINI / 2 + dy)
+	local x, y = turn((at.X - from.X) * scale, (at.Z - from.Z) * scale, -cameraHeading)
+	x, y = clampToEdge(x, y)
+	marker.Position = UDim2.fromOffset(MINI / 2 + x, MINI / 2 + y)
 	marker.Visible = true
+end
+
+local function updateMini(position: Vector3, facing: Vector3, speed: number)
+	local canvas = miniCanvas
+	if not canvas or not miniLayer then
+		return
+	end
+	-- Turn with the camera (keep the last heading while it looks straight down).
+	local camera = workspace.CurrentCamera
+	if camera then
+		local look = camera.CFrame.LookVector
+		if Vector3.new(look.X, 0, look.Z).Magnitude > 0.15 then
+			cameraHeading = heading(look)
+		end
+	end
+	miniRotor.Rotation = -cameraHeading
+	-- Zoom out a little at speed.
+	local wanted = 1 - (1 - ZOOM_OUT) * math.clamp((speed - 30) / 80, 0, 1)
+	zoom += (wanted - zoom) * 0.12
+	if math.abs(miniZoom.Scale - zoom) > 0.002 then
+		miniZoom.Scale = zoom
+	end
+	local px, py = (position.X - B.x0) * MINI_SCALE, (position.Z - B.z0) * MINI_SCALE
+	canvas.content.Position = UDim2.fromOffset(-px, -py)
+	miniMe.Rotation = heading(facing) - cameraHeading
+	-- The icons on the map stay upright.
+	if math.abs(cameraHeading - iconHeading) > 0.5 then
+		iconHeading = cameraHeading
+		for _, icon in miniIcons do
+			icon.Rotation = cameraHeading
+		end
+	end
+	updateLayer(miniLayer, cameraHeading)
+	drawLine(canvas.gps, gpsRoute, MINI_SCALE)
+	drawLine(canvas.job, jobRoute, MINI_SCALE)
+	local scale = MINI_SCALE * zoom
+	pin(miniStar, position, target, scale)
+	pin(miniGps, position, waypoint, scale)
+	local nx, ny = clampToEdge(turn(0, -MINI, -cameraHeading))
+	miniNorth.Position = UDim2.fromOffset(MINI / 2 + nx, MINI / 2 + ny)
+end
+
+local function buildMini(column: any, touch: boolean)
+	mini = Ui.make("Frame", {
+		Name = "Minimap",
+		Size = UDim2.fromOffset(MINI, MINI),
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+	}, column)
+	local shadow = Ui.make("Frame", {
+		Size = UDim2.new(1, 8, 1, 8),
+		Position = UDim2.fromOffset(-4, -1),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.65,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+	}, mini)
+	Ui.corner(shadow, 20)
+	-- The map is a CanvasGroup: it clips the turning content to its rounded square.
+	local group = Ui.make("CanvasGroup", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C.land,
+		BorderSizePixel = 0,
+		ZIndex = 2,
+	}, mini)
+	Ui.corner(group, 16)
+	local zoomFrame = Ui.make("Frame", {
+		Size = UDim2.fromOffset(0, 0),
+		Position = UDim2.fromScale(0.5, 0.5),
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+	}, group)
+	miniZoom = Ui.make("UIScale", { Scale = 1 }, zoomFrame)
+	miniRotor = Ui.make("Frame", {
+		Size = UDim2.fromOffset(0, 0),
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+	}, zoomFrame)
+	local canvas = draw(miniRotor, MINI_SCALE, false)
+	miniCanvas = canvas
+	for _, landmark in Map.Landmarks do
+		table.insert(miniIcons, landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false))
+	end
+	miniLayer = layer(canvas)
+	-- Soft shading at the top and the bottom.
+	for _, side in { { 0, 90 }, { 1, -90 } } do
+		local shade = Ui.make("Frame", {
+			Size = UDim2.new(1, 0, 0, 46),
+			Position = UDim2.fromScale(0, side[1]),
+			AnchorPoint = Vector2.new(0, side[1]),
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			BorderSizePixel = 0,
+			ZIndex = 20,
+		}, group)
+		Ui.make("UIGradient", {
+			Rotation = side[2],
+			Transparency = NumberSequence.new(0.45, 1),
+		}, shade)
+	end
+	-- You: an arrow in the middle, pointing the way you face.
+	miniMe = symbol(group, "▲", 22, Color3.new(1, 1, 1), 22)
+	miniMe.Position = UDim2.fromScale(0.5, 0.5)
+	miniMe.TextStrokeColor3 = Color3.fromRGB(10, 10, 14)
+	miniMe.Visible = true
+	miniStar = symbol(group, "★", 26, C.job, 23)
+	miniGps = symbol(group, "◆", 20, C.gps, 23)
+	miniNorth = Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(20, 20),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, 13),
+		BackgroundColor3 = Color3.fromRGB(24, 26, 30),
+		Text = "N",
+		TextSize = 13,
+		Font = Enum.Font.GothamBlack,
+		TextColor3 = Color3.new(1, 1, 1),
+		ZIndex = 24,
+	}, group)
+	Ui.corner(miniNorth, 10)
+	Ui.make("UIStroke", { Color = Color3.fromRGB(230, 70, 60), Thickness = 1.5 }, miniNorth)
+	Ui.make("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 16),
+		Position = UDim2.new(0, 0, 1, -18),
+		BackgroundTransparency = 1,
+		Text = if touch then "MAP button = big map" else "M = big map & GPS",
+		TextSize = 12,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Color3.fromRGB(230, 230, 230),
+		TextStrokeTransparency = 0.3,
+		ZIndex = 25,
+	}, group)
+	-- The frame around it.
+	local border = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 3 }, mini)
+	Ui.corner(border, 16)
+	Ui.make("UIStroke", { Color = C.accent, Thickness = 2 }, border)
 end
 
 -- ── The big map ────────────────────────────────────────────────────────────
 
 local big: any = nil
 local bigScale: any = nil
+local bigCanvas: Canvas? = nil
 local bigLayer: Layer? = nil
 local bigMe: any = nil
 local bigStar: any = nil
@@ -340,6 +695,43 @@ local function fitBig()
 	bigScale.Scale = math.clamp(math.min(viewport.X * 0.96 / w, viewport.Y * 0.9 / h), 0.3, 1.6)
 end
 
+local function updateBig(position: Vector3, facing: Vector3)
+	local canvas = bigCanvas
+	if not canvas or not bigLayer then
+		return
+	end
+	bigMe.Visible = true
+	bigMe.Position = point(position.X, position.Z, BIG_SCALE)
+	bigMe.Rotation = heading(facing)
+	updateLayer(bigLayer, 0)
+	drawLine(canvas.gps, gpsRoute, BIG_SCALE)
+	drawLine(canvas.job, jobRoute, BIG_SCALE)
+	bigStar.Visible = target ~= nil
+	if target then
+		bigStar.Position = point(target.X, target.Z, BIG_SCALE)
+	end
+	bigGps.Visible = waypoint ~= nil
+	if waypoint then
+		bigGps.Position = point(waypoint.X, waypoint.Z, BIG_SCALE)
+	end
+end
+
+local function refresh()
+	local position, facing, speed = myPose()
+	if not position then
+		return
+	end
+	local now = os.clock()
+	updateRoute(jobRoute, position, now)
+	updateRoute(gpsRoute, position, now)
+	if mini.Visible then
+		updateMini(position, facing, speed)
+	end
+	if big.Visible then
+		updateBig(position, facing)
+	end
+end
+
 function MapView.isOpen(): boolean
 	return big ~= nil and big.Visible
 end
@@ -348,6 +740,9 @@ function MapView.toggle()
 	if big then
 		fitBig()
 		big.Visible = not big.Visible
+		if big.Visible then
+			refresh()
+		end
 	end
 end
 
@@ -361,7 +756,7 @@ function MapView.setVisible(visible: boolean)
 end
 
 local function setGps(landmark: Map.Landmark?)
-	waypoint = if landmark then Vector3.new(landmark.x, Map.RoadTop, landmark.z) else nil
+	MapView.setWaypoint(if landmark then Vector3.new(landmark.x, Map.RoadTop, landmark.z) else nil)
 	MapView.onWaypoint(landmark)
 end
 
@@ -432,56 +827,12 @@ local function buildList(parent: any)
 	end
 end
 
--- column: the frame the minimap goes into (under the money panel, laid out by Hud).
-function MapView.start(gui: any, column: any)
-	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local function hex(color: Color3): string
+	return string.format("#%02X%02X%02X", math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5))
+end
 
-	-- Minimap.
-	mini = Ui.make("CanvasGroup", {
-		Name = "Minimap",
-		Size = UDim2.fromOffset(MINI, MINI),
-		BackgroundColor3 = Color3.fromRGB(20, 22, 26),
-		BorderSizePixel = 0,
-		LayoutOrder = 2,
-	}, column)
-	Ui.corner(mini, 14)
-	local canvas = draw(mini, MINI_SCALE, false)
-	for _, landmark in Map.Landmarks do
-		landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false)
-	end
-	miniLayer = layer(canvas)
-	miniMe = symbol(mini, "▲", 24, Color3.new(1, 1, 1), 20)
-	miniMe.Position = UDim2.fromScale(0.5, 0.5)
-	miniMe.Visible = true
-	miniStar = symbol(mini, "★", 26, Color3.fromRGB(255, 220, 40), 21)
-	miniGps = symbol(mini, "◆", 22, Color3.fromRGB(90, 200, 255), 21)
-	local frame = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 30 }, mini)
-	Ui.corner(frame, 14)
-	Ui.make("UIStroke", { Color = Color3.fromRGB(255, 196, 50), Thickness = 2 }, frame)
-	Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(20, 20),
-		Position = UDim2.new(0.5, -10, 0, 2),
-		BackgroundTransparency = 1,
-		Text = "N",
-		TextSize = 16,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.new(1, 1, 1),
-		TextStrokeTransparency = 0,
-		ZIndex = 31,
-	}, mini)
-	Ui.make("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 16),
-		Position = UDim2.new(0, 0, 1, -18),
-		BackgroundTransparency = 1,
-		Text = if touch then "MAP button = big map" else "M = big map & GPS",
-		TextSize = 12,
-		Font = Enum.Font.GothamBold,
-		TextColor3 = Color3.fromRGB(230, 230, 230),
-		TextStrokeTransparency = 0.3,
-		ZIndex = 31,
-	}, mini)
-
-	-- Big map: drawn at a fixed scale, fitted to the screen with a UIScale when it opens.
+local function buildBig(gui: any)
+	-- Drawn at a fixed scale, fitted to the screen with a UIScale when it opens.
 	local mapW, mapH = WORLD_W * BIG_SCALE, WORLD_H * BIG_SCALE
 	big = Ui.make("Frame", {
 		Name = "BigMap",
@@ -494,16 +845,17 @@ function MapView.start(gui: any, column: any)
 	}, gui)
 	bigScale = Ui.make("UIScale", {}, big)
 	Ui.corner(big, 12)
-	Ui.stroke(big, Color3.fromRGB(255, 196, 50), 2)
+	Ui.stroke(big, C.accent, 2)
 	Ui.make("TextLabel", {
 		Size = UDim2.new(1, -60, 0, 36),
 		Position = UDim2.fromOffset(12, 6),
 		BackgroundTransparency = 1,
-		Text = "MAP   ▲ you   ★ delivery   ◆ GPS   ! bandit car   ? crate",
+		RichText = true,
+		Text = `MAP   ▲ you   <font color="{hex(C.job)}">★ delivery ━</font>   <font color="{hex(C.gps)}">◆ GPS ━</font>   <font color="#FF5050">!</font> bandit car   ? crate`,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextSize = 18,
 		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.fromRGB(255, 196, 50),
+		TextColor3 = C.accent,
 		ZIndex = 41,
 	}, big)
 	local close = Ui.button(big, "X", UDim2.fromOffset(34, 34), Color3.fromRGB(230, 70, 60), function()
@@ -518,51 +870,42 @@ function MapView.start(gui: any, column: any)
 		ClipsDescendants = true,
 		ZIndex = 40,
 	}, big)
-	local bc = draw(holder, BIG_SCALE, true)
+	local canvas = draw(holder, BIG_SCALE, true)
+	bigCanvas = canvas
 	for _, landmark in Map.Landmarks do
-		local icon = landmarkIcon(bc.markers, landmark, BIG_SCALE, 24, true)
+		local icon = landmarkIcon(canvas.markers, landmark, BIG_SCALE, 24, true)
 		icon.Activated:Connect(function()
 			setGps(landmark)
 			big.Visible = false
 		end)
 	end
-	bigLayer = layer(bc)
-	bigMe = symbol(bc.markers, "▲", 24, Color3.new(1, 1, 1), 20)
-	bigStar = symbol(bc.markers, "★", 28, Color3.fromRGB(255, 220, 40), 21)
-	bigGps = symbol(bc.markers, "◆", 24, Color3.fromRGB(90, 200, 255), 21)
+	bigLayer = layer(canvas)
+	bigMe = symbol(canvas.markers, "▲", 24, Color3.new(1, 1, 1), 20)
+	bigStar = symbol(canvas.markers, "★", 28, C.job, 21)
+	bigGps = symbol(canvas.markers, "◆", 24, C.gps, 21)
 	buildList(big)
+end
+
+-- column: the frame the minimap goes into (under the money panel, laid out by Hud).
+function MapView.start(gui: any, column: any)
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	buildMini(column, touch)
+	buildBig(gui)
 
 	local camera = workspace.CurrentCamera
 	if camera then
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitBig)
 	end
 
-	RunService.RenderStepped:Connect(function()
-		local position, facing = myPose()
-		if not position then
+	local elapsed = 0
+	RunService.RenderStepped:Connect(function(dt)
+		elapsed += dt
+		if elapsed < 1 / MINI_HZ then
 			return
 		end
-		if mini.Visible and miniLayer then
-			local px, py = (position.X - B.x0) * MINI_SCALE, (position.Z - B.z0) * MINI_SCALE
-			miniLayer.canvas.content.Position = UDim2.fromOffset(MINI / 2 - px, MINI / 2 - py)
-			miniMe.Rotation = heading(facing)
-			updateLayer(miniLayer)
-			pin(miniStar, position, target, MINI_SCALE)
-			pin(miniGps, position, waypoint, MINI_SCALE)
-		end
-		if big.Visible and bigLayer then
-			bigMe.Visible = true
-			bigMe.Position = point(position.X, position.Z, BIG_SCALE)
-			bigMe.Rotation = heading(facing)
-			updateLayer(bigLayer)
-			bigStar.Visible = target ~= nil
-			if target then
-				bigStar.Position = point(target.X, target.Z, BIG_SCALE)
-			end
-			bigGps.Visible = waypoint ~= nil
-			if waypoint then
-				bigGps.Position = point(waypoint.X, waypoint.Z, BIG_SCALE)
-			end
+		elapsed = math.min(elapsed - 1 / MINI_HZ, 1 / MINI_HZ)
+		if mini.Visible or big.Visible then
+			refresh()
 		end
 	end)
 end
