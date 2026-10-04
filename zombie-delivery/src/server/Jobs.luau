@@ -18,9 +18,11 @@
 --
 -- Crew: friends who ride in the owner's car, and the players the owner invited into the job (server/Crew.luau
 -- Crew.members), help (their kills count, they may carry the cargo) and get paid too: every crew member gets half of
--- the payout and the owner +15 % per member (Economy.crewSplit). Each gets their own DeliveryResult with the whole
--- split. Since 3.0 the crew stays together after the job (friends play mission after mission; server/Crew.luau breaks
--- it up when they leave, are kicked or quit). Jobs.crewStatus tells the members what the owner does.
+-- the payout and the owner +15 % per member (Economy.crewSplit), Config.Crew.MaxMembers paid at most (the invited
+-- first). A rider stays on the job while they stay with it (pruneRiders: in the car or within Config.Crew.RiderRange).
+-- Each gets their own DeliveryResult with the whole split. Since 3.0 the crew stays together after the job (friends
+-- play mission after mission; server/Crew.luau breaks it up when they leave, are kicked or quit). Jobs.crewStatus
+-- tells the members what the owner does.
 --
 -- 2.5: special jobs on the board (JobTypeDef.board: the Cash Transport, the Pizza Rush; the Winter Run) next to the
 -- employers' ones (the City Clinic's Ambulance Run). A rush has a fixed clock (timeLimit); bandits want some cargo
@@ -42,8 +44,9 @@
 --   spotless  below SpotlessFail condition the mission fails at once
 --   hunted    the bandits come HuntedBoost times as often (a ★ mission gets the ★★ bandits)
 -- A co-op mission pays × Economy.coopPay and its enemies are × Economy.coopEnemies of the crew (riders and members
--- besides the owner), recounted when the crew changes. Done: the rating (Missions.rate) goes into the result and to
--- Jobs.onMissionComplete (server/Missions.luau pays the rewards and saves the stars).
+-- besides the owner, crewOf: MaxMembers at most), recounted when the crew changes. Done: the rating (Missions.rate)
+-- goes into the result and to Jobs.onMissionComplete (server/Missions.luau pays the rewards and saves the stars) with
+-- the crew who are there at the finish.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -119,7 +122,8 @@ type Job = {
 	stealNotice: number, -- when "they are stealing" was last said
 	stealMeter: number, -- a full one = a piece stolen
 	cargo: Cargo.Session,
-	crew: { [Player]: boolean }, -- everybody who rode in the owner's car during the job
+	crew: { [Player]: boolean }, -- who rode in the owner's car during the job and stays with it (pruneRiders)
+	members: { [Player]: boolean }, -- the invited crew at the last tick (who leaves it stops riding along too)
 	footSince: number?, -- handling cargo on foot at this stop since
 	nextFoot: number,
 	footWarned: boolean,
@@ -447,6 +451,11 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 	local defendTime = if twists.defend and jobType then math.max(5, jobType.defendTime or 30) else 0
 	local basePay = Economy.jobPay(tier, distance, modifier and modifier.payMultiplier) + extraPay
 	local pay = if jobType and next(twists) then math.floor(basePay * Missions.twistPay(jobType) / 5 + 0.5) * 5 else basePay
+	-- A rush runs on its fixed clock; one with a fixed drop (a mission taken anywhere: the pick-up near you, the drop
+	-- where it is) never gets less than the ordinary clock for its route.
+	local clock = if timeLimit
+		then (if jobType and jobType.dropAt then math.max(timeLimit, Economy.timeLimit(distance) + handling) else timeLimit)
+		else Economy.timeLimit(distance, modifier and modifier.timeMultiplier) + handling
 	local boost = math.max(1, if jobType and jobType.banditBoost then jobType.banditBoost else 1)
 	if twists.hunted then
 		boost *= Config.Missions.HuntedBoost
@@ -456,7 +465,7 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 		stops = stops,
 		distance = distance,
 		pay = pay,
-		time = (timeLimit or (Economy.timeLimit(distance, modifier and modifier.timeMultiplier) + handling)) + defendTime,
+		time = clock + defendTime,
 		cargo = cargo,
 		customer = customer,
 		jobType = jobType,
@@ -570,7 +579,14 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	end
 	local kind = Tuning.Kinds[jobType.itemKind] or Tuning.Kinds.crate
 	local pieces: CargoInfo = { kind = jobType.itemKind, look = kind.look, piece = kind.piece, plural = kind.plural, total = jobType.items }
-	return finishOffer(jobType.tier, stops, routeLength(from.X, from.Z, stops), jobType.cargo, customer, jobType, pieces, jobType.payPerStop * #stops)
+	-- A mission starts wherever START was pressed: the drive to its first stop counts (pay and clock) for at most
+	-- the board's pick-up distance, nothing for coming from across the map.
+	local route = routeLength(from.X, from.Z, stops)
+	if jobType.mission then
+		local first = stops[1].address
+		route -= math.max(0, Map.manhattan(from.X, from.Z, first.x, first.z) - JobsConfig.PickupMaxDistance)
+	end
+	return finishOffer(jobType.tier, stops, route, jobType.cargo, customer, jobType, pieces, jobType.payPerStop * #stops)
 end
 
 -- One card of the job board. A job above the player's level is shown LOCKED (locked, level): accepting it is refused.
@@ -674,21 +690,52 @@ local function isMember(owner: Player, player: Player): boolean
 	return table.find(Crew.members(owner), player) ~= nil
 end
 
--- Everybody paid on this job besides the owner, still in the game: who rode in the owner's car during the job and
--- the invited crew members (each once).
+-- Everybody paid on this job besides the owner, still in the game: the invited crew members, then who rode in the
+-- owner's car and stayed with it (each once), Config.Crew.MaxMembers at most (the pay, co-op and its enemies).
 local function crewOf(job: Job, owner: Player): { Player }
 	local list = {}
-	for rider in job.crew do
-		if rider ~= owner and rider.Parent then
-			table.insert(list, rider)
-		end
-	end
 	for _, member in Crew.members(owner) do
 		if member ~= owner and member.Parent and not table.find(list, member) then
 			table.insert(list, member)
 		end
 	end
+	for rider in job.crew do
+		if #list >= Config.Crew.MaxMembers then
+			break
+		end
+		if rider ~= owner and rider.Parent and not table.find(list, rider) then
+			table.insert(list, rider)
+		end
+	end
 	return list
+end
+
+-- Is `who` with the owner: in the owner's car, or within Config.Crew.RiderRange of them (on foot or in a car of their
+-- own following along)?
+local function withOwner(owner: Player, who: Player): boolean
+	local car = Vehicles.seatedIn(who)
+	if car and car.owner == owner then
+		return true
+	end
+	local a, b = playerPosition(owner), playerPosition(who)
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude <= Config.Crew.RiderRange
+end
+
+-- Who rode along stays on the job only while they are with it (withOwner): not on a job of their own or in another
+-- crew, not far off, and not after leaving the owner's crew (or being taken out of it). Every tick.
+local function pruneRiders(player: Player, job: Job)
+	local members: { [Player]: boolean } = {}
+	for _, member in Crew.members(player) do
+		members[member] = true
+	end
+	for rider in job.crew do
+		local leader = Crew.ownerOf(rider)
+		local leftCrew = job.members[rider] and not members[rider]
+		if not rider.Parent or jobs[rider] or (leader and leader ~= player) or leftCrew or not withOwner(player, rider) then
+			job.crew[rider] = nil
+		end
+	end
+	job.members = members
 end
 
 local function endJob(player: Player, job: Job, linger: boolean)
@@ -765,6 +812,10 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		lift = offer.twists.lift == true,
 	})
 	local crewCount = #Crew.members(player)
+	local members: { [Player]: boolean } = {}
+	for _, member in Crew.members(player) do
+		members[member] = true
+	end
 	job = {
 		offer = offer,
 		endsAt = workspace:GetServerTimeNow() + offer.time,
@@ -782,6 +833,7 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		stealMeter = 0,
 		cargo = session,
 		crew = crew,
+		members = members,
 		footSince = nil,
 		nextFoot = 0,
 		footWarned = false,
@@ -942,6 +994,13 @@ end
 
 local function complete(player: Player, job: Job)
 	local crew = crewOf(job, player) -- before endJob: the riders' seats and the members as they are now
+	-- The mission's credit goes to who is there at the finish (in the car or near the owner), not who stayed home.
+	local present: { Player } = {}
+	for _, member in crew do
+		if withOwner(player, member) then
+			table.insert(present, member)
+		end
+	end
 	local timeLeft = job.endsAt - workspace:GetServerTimeNow()
 	endJob(player, job, true)
 	local offer = job.offer
@@ -1050,7 +1109,7 @@ local function complete(player: Player, job: Job)
 	local missionId = offer.mission
 	if missionId and onMission then
 		local ok, err = pcall(function()
-			onMission(player, missionId, stars, crew)
+			onMission(player, missionId, stars, present)
 		end)
 		if not ok then
 			warn(`[Jobs] onMissionComplete failed: {err}`)
@@ -1058,9 +1117,9 @@ local function complete(player: Player, job: Job)
 	end
 end
 
--- The job a kill counts for: the killer's own, the one of the crew they were invited into, the one of the car they
--- ride in, or the one they help on foot.
-local function jobOwner(player: Player): Player?
+-- The job a player is on right now: their own, the one of the crew they were invited into, or the one of the car they
+-- ride in.
+local function currentOwner(player: Player): Player?
 	if jobs[player] then
 		return player
 	end
@@ -1071,6 +1130,15 @@ local function jobOwner(player: Player): Player?
 	local car, driving = Vehicles.seatedIn(player)
 	if car and not driving and jobs[car.owner] then
 		return car.owner
+	end
+	return nil
+end
+
+-- The job a kill counts for: currentOwner, or the one they rode along on and help on foot.
+local function jobOwner(player: Player): Player?
+	local current = currentOwner(player)
+	if current then
+		return current
 	end
 	for owner, job in jobs do
 		if job.crew[player] then
@@ -1111,9 +1179,10 @@ local function spotlessFailed(player: Player, job: Job): boolean
 end
 
 -- A shot by anybody (server/Gun.luau Gun.onShot). The quiet twist: every shot of the job's people (the owner, the
--- crew, the riders) costs cargo condition; the dynamite goes off at 0.
+-- crew, whoever sits in the owner's car now: currentOwner, not who rode along once) costs cargo condition; the
+-- dynamite goes off at 0.
 function Jobs.onShot(player: Player)
-	local owner = jobOwner(player)
+	local owner = currentOwner(player)
 	local job = owner and jobs[owner]
 	if not owner or not job or not job.offer.twists.quiet then
 		return
@@ -1493,7 +1562,9 @@ local function update(dt: number)
 			continue
 		end
 
-		-- Everybody who rides in the owner's car is crew (they may carry the cargo, their kills count).
+		-- Everybody who rides in the owner's car is crew (they may carry the cargo, their kills count) while they
+		-- stay with it.
+		pruneRiders(player, job)
 		if car then
 			for _, rider in Vehicles.passengersOf(car) do
 				job.crew[rider] = true
@@ -1661,6 +1732,7 @@ function Jobs.start()
 		end
 		for _, other in jobs do
 			other.crew[player] = nil
+			other.members[player] = nil
 			other.quietNotice[player] = nil
 		end
 	end)

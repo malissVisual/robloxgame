@@ -790,6 +790,7 @@ Config.Crew = {
 	MaxMembers = 3,
 	InviteRange = 60, -- studs to the player you invite (or use the crew button from anywhere)
 	InviteTimeout = 30,
+	RiderRange = 250, -- a rider who got out stays on the owner's job (paid, credited) within this of the owner
 }
 
 -- Real estate (server/Estate.luau): homes, garages and offices you buy with the money you made. A home is where you

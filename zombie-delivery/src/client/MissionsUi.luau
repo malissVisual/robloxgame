@@ -86,6 +86,8 @@ local selectedCampaign = Missions.Campaigns[1].id
 local selectedMission: string? = nil
 local filter = "all" -- "all" | "coop"
 local pendingStart: string? = nil -- START was pressed for this one: the window closes when it runs
+local hasState = false -- the server's state came at least once
+local blindPick = false -- the window opened before it did: the first state picks the campaign again
 local remote: RemoteEvent? = nil
 
 -- The window's parts (built on the first open) and the banner's / the card's.
@@ -505,6 +507,7 @@ local function selectCampaign(id: string)
 	end
 	selectedCampaign = id
 	selectedMission = currentMission(id)
+	blindPick = false
 	render()
 	if refs.missions then
 		refs.missions.CanvasPosition = Vector2.zero
@@ -989,6 +992,7 @@ local function setOpen(open: boolean, campaignId: string?)
 		local target = if campaignId and Missions.findCampaign(campaignId) then campaignId else nil
 		if target or not window.Visible then
 			local id = target or currentCampaign()
+			blindPick = not target and not hasState
 			if id ~= selectedCampaign or not selectedMission then
 				selectedCampaign = id
 				selectedMission = currentMission(id)
@@ -1046,9 +1050,8 @@ end
 -- ── The banner during a mission (the Hud's top stack) ──────────────────────
 
 local function buildBanner()
+	-- Right under the job panel and the crew strip, above the car call line and the toasts (Hud's SLOT_ORDER).
 	local slot = Hud.topSlot("mission")
-	-- Right under the job panel and the crew strip, above the car call line and the toasts.
-	slot.LayoutOrder = 2
 	local banner = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 	banner.Name = "MissionBanner"
 	banner.AutomaticSize = Enum.AutomaticSize.Y
@@ -1366,6 +1369,13 @@ local function applyState(data: any)
 	serverLevel = if type(data.level) == "number" then data.level else nil
 	active = if type(data.active) == "string" then data.active else nil
 	crewOwner = if type(data.crewOwner) == "string" then data.crewOwner else nil
+	hasState = true
+	-- Opened before the first state (a slow load): pick where the player is in the story now.
+	if blindPick then
+		blindPick = false
+		selectedCampaign = currentCampaign()
+		selectedMission = currentMission(selectedCampaign)
+	end
 	if pendingStart and active == pendingStart then
 		pendingStart = nil
 		setOpen(false)
@@ -1441,7 +1451,15 @@ function MissionsUi.start()
 		if kind == "state" then
 			applyState(data)
 		elseif kind == "cleared" then
-			showCleared(data)
+			-- The Hud's DELIVERY result comes first: the card waits until it is closed (not over its pay and buttons).
+			task.spawn(function()
+				task.wait(0.2)
+				local waited = 0
+				while Hud.resultOpen() and waited < 120 do
+					waited += task.wait(0.25)
+				end
+				showCleared(data)
+			end)
 		elseif type(kind) == "table" then
 			applyState(kind)
 		end

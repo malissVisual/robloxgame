@@ -9,6 +9,11 @@ friends join your crew: they ride along in your passenger seats or follow in the
 With the money you make you buy **real estate** (version 2.6): homes to spawn at, garages for more cars, and offices in
 the city's towers from which **your own delivery company** of hired couriers earns for you, even while you are away.
 Version 2.7 brings the game's **own sound and music**: soft, minimal, made for it (see **Sound and music**).
+Version 3.0 is about **missions and co-op**: **100 story missions** in 10 campaigns, each told by a client with a
+briefing and a debrief, rated 1 – 3 stars and spiced with **twists** (hold out at the drop, no shooting, a horde at
+every stop …); the co-op ones pay more and get harder with every crew mate. **Crews now stay together** from one
+mission to the next, a crew board finds you mates, and 15 new places (an airfield, a prison, a lighthouse, a power
+plant …) wait at the end of new roads (see **Missions**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -41,7 +46,8 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | Jobs / map / backpack | J / M / B | the buttons |
-| Crew panel (invite / accept / leave) | K | CREW button |
+| Missions (the campaigns, START, the stars) | U | MISSIONS button |
+| Crew panel (invite / accept / leave / kick, the crew board) | K | CREW button |
 | Leaderboard | L | TOP button |
 | Get in your car / ride in a friend's car | E / R | the prompt |
 | Get out | Space | jump button |
@@ -143,10 +149,14 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
 6. **Crews**: press **K** (or **CREW**) and invite a player (up to `Config.Crew.MaxMembers` = 3 members; they get
    30 s to answer on the invitation card). You can invite with or without a job. Members work on your job: they
    carry the cargo, their kills count, the purple GPS leads them to your next stop and the panel shows your job and
-   its clock. Friends who press R at your car to ride along are paid the same way. Every member and rider gets half
-   of the pay and the same XP, you get +15 % per member: nobody loses money (the panel shows the split of the base
-   pay). The crew breaks up when your job ends, when you break it up, or for a member who leaves (LEAVE), is removed
-   (REMOVE) or takes a job of their own; a piece a former member was carrying drops where they stand.
+   its clock. Friends who press R at your car to ride along are paid the same way while they stay with the job (in
+   your car, or on foot within `Config.Crew.RiderRange` = 250 studs of you); at most `MaxMembers` are paid, the
+   members first. Every member and rider gets half of the pay and the same XP, you get +15 % per member: nobody
+   loses money (the panel shows the split of the base pay). Since 3.0 the crew **stays together** when a job ends:
+   it breaks up only when you break it up, or for a member who leaves (LEAVE), is taken out (KICK), takes a job of
+   their own or quits; a piece a former member was carrying drops where they stand. The **crew board** (LOOKING FOR
+   CREW in the crew window) lists the players who want a crew, for one mission or any, with INVITE; your own toggle
+   puts you on it, and FIND CREW on a co-op mission does that and opens the window.
 
 **Driver levels.** Every delivery gives XP: stars × 60 + 10 per piece delivered + 4 per kill, × 1.25 at night; a
 failed job gives 25 % (once something was done). 15 levels, each with a rank name (Rookie Courier, Courier, Runner,
@@ -167,6 +177,59 @@ money earned, best first, the ones out on a job tagged.
 Night is from 18:15 to 06:15, lined up with the Roblox sun: the sky goes dark (the look fades in over dusk and out
 over dawn), the **street lamps**, the lit windows and every car's **headlights** come on. At night the jobs pay
 × 1.4, the waves are × 1.5 bigger and × 1.6 as many zombies roam (smoothly in between at dusk and dawn).
+
+## Missions
+
+Press **U** (or **MISSIONS**) anywhere: the window lists the **10 campaigns** of **10 missions** each
+(`shared/Missions.luau`), with the total stars (X / 300) on top and ALL / CO-OP tabs. Every campaign has a client,
+a story, a colour and the driver level it opens at; its missions open **one after another** (finish one, any rating,
+and the next is open; some need a higher level of their own). Click a mission for its card: the briefing in the
+client's words, the twists, the cargo, the vehicle, the danger level and the pay, and **START**. The mission starts
+right where you are (the pick-up is near you, or at its fixed place); a member of somebody's crew sees "your crew
+leader picks the mission" instead (the leader's START takes the crew along). A NIGHT ONLY mission starts only after
+dark.
+
+| Campaign | Client | Level | Campaign reward |
+|---|---|---|---|
+| 📦 First Shift | Marge, the dispatcher | 1 | $2,500 |
+| 🏥 Code Red | Dr. Novak, the City Clinic | 2 | $4,000 |
+| 🛒 Empty Shelves | Mr. Patel, FreshMart | 3 | $5,500 |
+| 🚒 Smoke and Sirens | Chief Ramirez, Fire Station 9 | 4 | $7,000 |
+| 🪖 Iron Supply | Captain Reyes, the Military Base | 5 | $9,000 |
+| ⚡ Lights Out | Engineer Volkov, the Power Plant | 6 | $11,000 |
+| 🐴 Wild West End | Walt, the rancher | 7 | $13,000 |
+| 🧪 Patient Zero | Dr. Ito, the Biotech Lab | 9 | $16,000 |
+| 💰 Dirty Money | Vinnie, the fixer | 11 | $20,000 |
+| 🚌 Last Convoy | Mayor Grant, City Hall | 13 | $30,000 |
+
+* **Stars** (`Missions.rate`): done = ★; the cargo still at 75 % or more = ★★; and 30 % or more of the clock left =
+  ★★★. Your best rating per mission is saved.
+* **Rewards** (server/Missions.luau): the job's own pay as always (× the twists' pay), plus the **first clear's
+  reward** ($300 – $10,000, once) with × 1.5 the job's XP (`FirstClearXp`), **$150 for every new star**
+  (`StarBonus`), and the **campaign reward** once all ten are done. A card celebrates it: the stars fly in, the
+  client's debrief, the rewards and NEXT (it waits until the delivery result is closed).
+* **Twists** (`Config.Missions.Twists`, each pays more):
+
+  | Twist | What happens | Pay |
+  |---|---|---|
+  | 🛡 HOLD OUT | at the last drop hold the area (on foot within 45 studs of the receiver) while the dead come in waves; leaving pauses the countdown | × 1.3 |
+  | 🏋 TWO-MAN LIFT | heavy pieces: alone you carry them slowly, with a crew mate within 10 studs at full speed | × 1.25 |
+  | 🤫 NO SHOOTING | explosive cargo: every shot of yours, your crew's or a passenger's costs 6 % of the cargo; at 0 it goes BOOM | × 1.35 |
+  | ☣ HOT ZONE | a horde waits at every stop | × 1.3 |
+  | 🌙 NIGHT ONLY | starts only after dark | × 1.2 |
+  | 🎯 SHOTGUN SEAT | kills from the passenger seats pay triple | × 1.1 |
+  | 💎 SPOTLESS | below 60 % cargo the mission fails at once | × 1.4 |
+  | 🏴 HUNTED | bandit cars and roadblocks come 2.5 times as often | × 1.35 |
+
+* **Co-op** (46 of the missions, tagged CO-OP; they can still be played alone): for every crew mate besides you
+  (members and riders, `MaxMembers` at most) the pay is × (1 + 0.25 per mate) for everybody and the enemies (waves,
+  foot waves, hordes) × (1 + 0.35 per mate), recounted when the crew changes (a toast says so).
+* **The crew gets the stars too** (`Config.Missions.CrewCredit`): the members and riders with you at the finish get
+  the rating, the first clear and the campaign as if it were theirs, if the mission is open for them (its campaign,
+  its level, the mission before it); otherwise only their share of the pay.
+* During a mission a **banner** in the HUD's top stack shows "MISSION 3/10 · Name", the twists, the crew count and
+  the HOLD OUT countdown; the crew members' strip shows it too.
+* The leaderboard (L) has a **STARS** column (ties on the level go to the stars).
 
 ## Real estate and your company
 
@@ -233,6 +296,16 @@ employer now) through the **Mount Rot tunnel** to the snowy north: the **Militar
 **Silver Spur Ranch**. Downtown also has the **First Zombie Bank** (just north of the safe zone, on 6th Ave: the Cash
 Transport loads at its steps) and the **City Clinic** (south-west of the depot, the emergency canopy on 4th Ave).
 
+New in 3.0, the 15 mission places, all on the map's list with GPS: in Downtown's blocks **City Hall** (north of the
+depot), **Precinct 13** (north-west), **Fire Station 9** (east), the **Corner Pharmacy** (south) and the **FreshMart**
+supermarket (west, with its car park); the **Harbor Warehouse** in the Harbor; and on the edges of the map, each at
+the end of its road: the **Old Airfield** (a runway, far south-west down the **Airfield Road** off the West Highway),
+**Blackrock Prison** (walls and towers, far north-west down **Blackrock Road** off the Radio Road), the **Survivor
+Camp** (tents and barricades on the Radio Road), the **Biotech Lab** (**Lab Road** off the North Highway), the **Train
+Yard** (rails and wagons, up **Rail Yard Road** north of Downtown), **Lighthouse Point** (on the coast, **Lighthouse
+Road** on from Cliff Road), the **Power Plant** (chimneys, south of the Harbor), the **Water Works** (by the river,
+**Waterworks Road**) and the **Stadium Shelter** (tents on the field, south of the Suburbs).
+
 New in 2.6: **Sunset Hills** north-east of Downtown (Sunset Drive winds up to the Hilltop Mansion, with a gate, lamps
 and pines), the **Dispatch Tower** next to the depot and **Harbor Point** by the docks (offices, elevators, roof
 helipads), **Ocean View** on the sea cliffs (Cliff Road), **Pinecrest** in the western pines (Pine Lane), the
@@ -248,9 +321,9 @@ and it is a smoking wreck, towed away later. They appear out of sight and vanish
 per server (`Config.Traffic`); during a job a bandit pickup can hide among them.
 
 **The HUD** (laid out from the screen size, so nothing overlaps on a PC or a phone): money and the minimap bottom
-left on a PC (top left on touch screens, clear of the thumbstick); the job panel, the crew strip, the car call line,
-the level-up banner and the toasts in one stack at the top centre; the buttons **JOBS, MAP, BAG, CAR, TOP, CREW,
-ESTATE** on the right edge in 1, 2 or 4 columns (on a PC down at the weapon bar, clear of Roblox's player list; the
+left on a PC (top left on touch screens, clear of the thumbstick); the job panel, the crew strip, the mission banner,
+the car call line, the level-up banner and the toasts in one stack at the top centre; the buttons **JOBS, MISSIONS,
+MAP, BAG, CAR, TOP, CREW, ESTATE** on the right edge in 1, 2 or 4 columns (on a PC down at the weapon bar, clear of Roblox's player list; the
 ADMIN button above them for admins); the weapon bar and the hotbar bottom right; the car panel and the hint at the
 bottom centre. On touch FIRE sits above the jump button and the panels move left of it.
 
@@ -281,6 +354,9 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
   **horses** graze, walk on a rope and ride in the livestock truck's stalls; your **chauffeur** brings your car.
 * **Real estate** (`Config.Estate`): 3 mansions, 2 villas, 4 houses, 3 garages, 3 offices. **Your company**
   (`Config.Business`): couriers, 3 upgrades, the safe.
+* **Missions** (`shared/Missions.luau`, 3.0): 10 campaigns × 10 missions, 8 twists, 46 co-op missions, 15 new places;
+  new cargo (water, generators, batteries, TNT, documents, electronics, weapons, paintings, mail, tyres, plants) and
+  survivors who walk aboard by themselves.
 
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
@@ -326,7 +402,8 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
               AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
               Levels (XP, levels, rank names), TrafficLanes (the traffic's lanes, turns and sidewalks), SoundSheet
-              (where each sound and music loop sits in the two audio assets)
+              (where each sound and music loop sits in the two audio assets), Missions (3.0: the 10 campaigns and 100
+              missions, unlocking, the rating, the stars, the twists' pay)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business), Vehicles (cars, seats, cargo slots, the roof turret of a car gun,
@@ -339,7 +416,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
               the crew state), Ranking (the leaderboard rows), Estate (buying, selling, the home, car slots, the home
               respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your
-              company: couriers, upgrades, the safe, online and offline earnings, the office computer)
+              company: couriers, upgrades, the safe, online and offline earnings, the office computer), Missions (3.0: the
+              MISSIONS window's state, START checked, the rewards, stars and crew credit when one is done)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
               Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
@@ -347,13 +425,16 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               Weather (the day and night look), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
-              card), Sounds (the music and every sound effect, N / SOUND)
+              card), Sounds (the music and every sound effect, N / SOUND), MissionsUi (3.0: the MISSIONS window (U),
+              the mission banner in the top stack, the celebration card)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
               (XP and ranks), jobs25 (the 2.5 jobs and places), traffic (lanes, turns, spawn spots, sidewalks); the
               2.6 real estate checks are in logic (every property placed, no overlaps, the towers and offices, the
-              roads to every property, the landmarks); audio (every sound has its region, every gun its shot)
+              roads to every property, the landmarks) and so are the 3.0 places (every one placed, on its road, with
+              its cargo spot); audio (every sound has its region, every gun its shot); missions (the 10 campaigns and
+              100 missions valid against Config and Map, the design rules, unlocked, rate, stars, twistPay)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -379,7 +460,8 @@ computed on the server from the car's box (`server/Zombies.luau`).
 python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
-Runs every `tests/*_test.luau` (logic with the 2.6 real estate, cargo, roads, cargun, icons, levels, jobs25, traffic, audio). Needs the standalone Luau CLI
+Runs every `tests/*_test.luau` (logic with the 2.6 real estate and the 3.0 places, cargo, roads, cargun, icons, levels,
+jobs25, traffic, audio, missions) and compiles every module. Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
@@ -388,7 +470,9 @@ driver level (the LV buttons, LEVEL -1 / +1; UNLOCK also sets the top level), se
 dawn … through `DayNight.setClock`), heals, finishes the current stop and switches god mode. The **Estate, company**
 tab gives every property (or one), takes them all, sets the home (or the depot), teleports to any property and
 fills, adds $50,000 to or empties the company safe (UNLOCK also gives every property and, without a home, the most
-expensive mansion as the home). It
+expensive mansion as the home). The **Missions** tab starts any of the 100 missions now (locks ignored; a running job
+is cancelled, a NIGHT ONLY one turns the clock to night), sets every mission to 3 stars and every campaign done (no
+money; UNLOCK does it too) or clears the progress (commands `missionStart`, `missionsAll`, `missionsReset`). It
 is there for a Studio Play test, for the owner of a user-owned place and for the user ids in `Config.Admin.UserIds`;
 the server checks every command again.
 

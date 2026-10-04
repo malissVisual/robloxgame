@@ -3,7 +3,8 @@
 -- what is open, the campaigns), starting a mission (checked: open, level, no job running, not in somebody else's
 -- crew; then server/Jobs.luau startMission plays it), and the rewards when one is done (Jobs.onMissionComplete,
 -- wired to Missions.onComplete in Main): the first clear's reward and XP, every new star, the campaign's reward, and
--- the same for the crew who helped (Config.Missions.CrewCredit).
+-- the same for the crew who helped (Config.Missions.CrewCredit: the members and riders at the finish, and only when
+-- the mission is open for them).
 --
 -- The "Missions" remote (shared/Net.luau):
 --   client → server  ("open")               send me my missions state
@@ -33,12 +34,13 @@ local Crew = require(Server.Crew)
 
 local Missions = {}
 
-local ACTION_GAP = 0.4 -- seconds between two requests of one player (a spam guard)
+local ACTION_GAP = 0.4 -- seconds between two requests of one kind ("open", "start") of one player (a spam guard)
 local WATCH_EVERY = 1 -- seconds between two checks whether a window's state changed on its own
 
 local remote: RemoteEvent? = nil
 local notice: RemoteEvent? = nil
-local lastAction: { [Player]: number } = {}
+local lastAction: { [Player]: number } = {} -- "open"
+local lastStart: { [Player]: number } = {} -- "start" (its own gap: START right after the window opened still counts)
 local watching: { [Player]: string } = {} -- players who opened the window → the signature of the state they have
 local started: { [Player]: string } = {} -- the mission each player started here (until their job ends)
 local pendingOpen: { [Player]: boolean } = {} -- an "open" that came too quickly waits for its answer
@@ -308,7 +310,8 @@ local function credit(player: Player, def: MissionData.MissionDef, stars: number
 	}
 end
 
--- Jobs.onMissionComplete is wired to this in Main: the owner and everyone paid with them (members), the rating.
+-- Jobs.onMissionComplete is wired to this in Main: the owner, the crew who were there at the finish (members), the
+-- rating.
 function Missions.onComplete(owner: Player, missionId: string, stars: number, members: { Player })
 	local def = if type(missionId) == "string" then MissionData.find(missionId) else nil
 	if not def then
@@ -329,6 +332,19 @@ function Missions.onComplete(owner: Player, missionId: string, stars: number, me
 		if not player.Parent then
 			continue
 		end
+		-- A crew member gets the mission's credit only when it is open for them (its campaign, its level, the mission
+		-- before it): the pay share they already have.
+		if player ~= owner then
+			local profile = PlayerData.get(player)
+			if not profile then
+				continue
+			end
+			local open = MissionData.unlocked(def.id, profile.missions, Levels.levelFor(profile.xp))
+			if not open then
+				say(player, `"{def.name}" is not open for you yet: you get your share of the pay, not the mission's stars and rewards.`)
+				continue
+			end
+		end
 		local ok, result = pcall(credit, player, def, rating, owner)
 		if not ok then
 			warn(`[Missions] credit for {player.Name} failed: {result}`)
@@ -346,8 +362,13 @@ local function onRequest(player: Player, action: any, arg: any)
 		return
 	end
 	local now = os.clock()
-	if lastAction[player] and now - lastAction[player] < ACTION_GAP then
-		if action == "open" and not pendingOpen[player] then
+	local last = if action == "start" then lastStart else lastAction
+	if last[player] and now - last[player] < ACTION_GAP then
+		if action == "start" then
+			-- Never silent: the window waits for an answer ("Starting …").
+			say(player, "Too fast, try again.")
+			Missions.send(player)
+		elseif action == "open" and not pendingOpen[player] then
 			-- A quick reopen still gets the state (a little later, once).
 			pendingOpen[player] = true
 			task.delay(ACTION_GAP, function()
@@ -359,7 +380,7 @@ local function onRequest(player: Player, action: any, arg: any)
 		end
 		return
 	end
-	lastAction[player] = now
+	last[player] = now
 	if action == "open" then
 		if not PlayerData.get(player) then
 			say(player, "Still loading...")
@@ -389,6 +410,7 @@ function Missions.start()
 	getRemote().OnServerEvent:Connect(onRequest)
 	Players.PlayerRemoving:Connect(function(player)
 		lastAction[player] = nil
+		lastStart[player] = nil
 		watching[player] = nil
 		started[player] = nil
 		pendingOpen[player] = nil

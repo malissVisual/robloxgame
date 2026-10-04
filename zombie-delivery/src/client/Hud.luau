@@ -254,9 +254,10 @@ end
 -- Top centre, one column that grows downward (a UIListLayout: a hidden entry takes no room, so nothing overlaps):
 --   1 the job panel (your own job)
 --   2 the crew slot (a member's view of the leader's job, an invitation: client/CrewPanel.luau, through Hud.topSlot)
---   3 the car call line ("Your car is on the way · 9 s")
---   4 the level-up banner
---   5 the toasts (the newest last, MAX_TOASTS at most)
+--   3 the mission banner (3.0: client/MissionsUi.luau)
+--   4 the car call line ("Your car is on the way · 9 s")
+--   5 the level-up banner
+--   6 the toasts (the newest last, MAX_TOASTS at most)
 -- The job panel, the crew strip and the invitation card never show at the same time (a job of your own, a crew
 -- member without one, neither); the rest stacks under whichever shows.
 
@@ -273,7 +274,7 @@ topStack = placed(Ui.make("Frame", {
 }, gui))
 Ui.list(topStack, true, 8, Enum.HorizontalAlignment.Center)
 
-local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, carcall = 3, levelup = 4, toasts = 5 }
+local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, mission = 3, carcall = 4, levelup = 5, toasts = 6 }
 local slots: { [string]: Frame } = {}
 
 -- A place in the top stack for another module's panel, by name ("crew"; an unknown name goes under the toasts).
@@ -1330,6 +1331,11 @@ function Hud.showResult(r: any)
 		openJobs()
 	end)
 	next.LayoutOrder = 91
+end
+
+-- Is the DELIVERY result window open (client/MissionsUi.luau waits with its celebration card until it is closed)?
+function Hud.resultOpen(): boolean
+	return result ~= nil and result.frame.Visible == true
 end
 end
 
@@ -2410,7 +2416,7 @@ end
 --     column when it fits at a scale of at least 0.6 (computer) or 0.7 (touch: the buttons are 100 × 48 there and
 --     never smaller than 0.8 of that), else two columns, else four (two rows). A computer centres them in the room.
 --   * Top stack: centred, TOP_W × S wide (narrower down to TOP_MIN_W before it gets smaller), between the minimap (touch) and the buttons / ADMIN, and as tall as the
---     room over the bottom panels allows (TOP_EST_H: a two-line job panel and the car call line, with the loading
+--     room over the bottom panels allows (TOP_EST_H: a two-line job panel, the mission banner and the car call line, with the loading
 --     bar's room under it); smaller when it has to. On a touch screen with no room beside the buttons (upright) it
 --     goes under the minimap and the buttons.
 --   * The loading bar: at 62 % of the height, under the top stack and over the panels at the bottom.
@@ -2423,7 +2429,7 @@ local BUTTON_W, BUTTON_H = 150, 46
 local TOUCH_BUTTON_W, TOUCH_BUTTON_H = 88, 48
 local BUTTON_GAP = 8
 local TOUCH_BUTTON_MIN = 0.8
-local TOP_EST_H = 240 -- the top stack's usual height (unscaled): a two-line job panel and the car call line
+local TOP_EST_H = 320 -- the top stack's usual height (unscaled): a two-line job panel, the mission banner (up to 80) and the car call line
 local TOP_MIN_W = 400 -- a narrow span first makes the top stack narrower (down to this), then smaller
 local HINT_LINES = if touchLayout then 2 else 1 -- the hint may wrap (upward) this far
 

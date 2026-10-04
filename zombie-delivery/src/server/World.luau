@@ -1277,7 +1277,8 @@ local function buildConnectors(parent: Instance)
 				local side = if n % 2 == 0 then 1 else -1
 				local p = (frame * CFrame.new(side * (s.width / 2 + 4), 0, (n / (count + 1) - 0.5) * length)).Position
 				local tunnel = math.abs(p.X - Map.Mountain.x) < 60 and p.Z > Map.Mountain.tunnelZ0 - 20 and p.Z < Map.Mountain.tunnelZ1 + 20
-				if not tunnel then
+				-- Not in a yard (a lamp pole in the Survivor Camp's gate): the way in stays clear.
+				if not tunnel and not Map.inYard(p.X, p.Z) then
 					lamp(roads, p.X, p.Z, ROAD_TOP, frame.RightVector * -side, true)
 				end
 			end
@@ -3600,8 +3601,10 @@ local function defineMissionPlaces()
 		local market = folder(parent, "FreshMart")
 		sidewalk(market, cx, cz, Color3.fromRGB(150, 150, 146))
 		local facing = Vector3.new(1, 0, 0)
-		local w, d, h = 96, 50, 16
-		local frame = shopFrame(cx, cz, facing, 28) -- the back wall at the block's edge, the car park in front
+		local w, d, h = 96, 44, 16
+		-- The back wall just inside the sidewalk ring (TrafficLanes.SidewalkInset: the walkers pass behind it), the
+		-- front where the car park starts.
+		local frame = shopFrame(cx, cz, facing, 25)
 		local wallColor = Color3.fromRGB(226, 220, 204)
 		building(market, frame, w, d, h, wallColor, Enum.Material.Brick, 14, 10)
 		local front = -d / 2
