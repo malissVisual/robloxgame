@@ -38,11 +38,11 @@ Icons.Ids = {
 	cargo_pizza = "rbxassetid://130054548111151",
 	cargo_medicine = "rbxassetid://110277502418757",
 	-- Items (art/cargo, 256 x 256).
-	item_repair = "",
-	item_medkit = "",
+	item_repair = "rbxassetid://121885914064020",
+	item_medkit = "rbxassetid://116950241930496",
 	item_nitro = "rbxassetid://124345149039037",
-	item_molotov = "",
-	item_mine = "",
+	item_molotov = "rbxassetid://94641923810845",
+	item_mine = "rbxassetid://109583785484960",
 	-- Map markers: shops, employers, far places (art/map, 128 x 128).
 	map_depot = "rbxassetid://137094707646902",
 	map_dealer = "",
