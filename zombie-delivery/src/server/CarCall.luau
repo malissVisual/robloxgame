@@ -536,16 +536,17 @@ local function tell(d: Delivery, now: number)
 	end
 end
 
-local function tellDone(player: Player)
+-- A reason (shown in yellow by client/Hud.luau) when the car did not come; none when it is here.
+local function tellDone(player: Player, reason: string?)
 	if player.Parent then
-		Net.get("CarCall"):FireClient(player, nil)
+		Net.get("CarCall"):FireClient(player, nil, reason)
 	end
 end
 
 -- ── Ending a call ──────────────────────────────────────────────────────────
 
 -- The call is over without a hand-over (the car is gone, replaced, the player left): the chauffeur just goes.
-local function abort(d: Delivery)
+local function abort(d: Delivery, reason: string?)
 	if deliveries[d.player] == d then
 		deliveries[d.player] = nil
 	end
@@ -554,7 +555,7 @@ local function abort(d: Delivery)
 	if npc and npc.Parent then
 		Npcs.remove(npc)
 	end
-	tellDone(d.player)
+	tellDone(d.player, reason)
 end
 
 -- Arrived: the car stops, the chauffeur gets out, the car is yours.
@@ -806,7 +807,8 @@ local function step(dt: number)
 		end
 		local car = d.car
 		if not player.Parent or Vehicles.get(player) ~= car or not car.chassis.Parent then
-			abort(d) -- the car is gone (wrecked, replaced, the player left)
+			-- the car is gone (wrecked, replaced, the player left)
+			abort(d, if car.wrecked or not car.chassis.Parent then "Your car didn't make it" else "Car call cancelled")
 			continue
 		end
 		if now >= d.deadline and not d.parking then
@@ -902,7 +904,7 @@ end
 function CarCall.cancel(player: Player)
 	local d = deliveries[player]
 	if d then
-		abort(d)
+		abort(d, "Car call cancelled")
 		Vehicles.remove(player)
 	end
 end
@@ -955,18 +957,20 @@ function CarCall.start()
 		spawnedAt[player] = nil
 		playedAt[player] = nil
 	end)
-	Net.get("Play").OnServerEvent:Connect(function(player)
-		playedAt[player] = os.clock()
-		-- Main gives the car on PLAY too; whichever handler ran first, the car that just came for a player with a home
-		-- stands at the home garage (they spawn at home, server/Estate.luau).
-		task.defer(function()
-			local car = Vehicles.get(player)
-			local spot = homeGarage(player)
-			if car and spot and not car.chauffeured and os.clock() - car.born < 2 and flat(car.chassis.Position - spot.Position).Magnitude > 40 then
-				local def = Economy.findCar(car.id)
-				Vehicles.spawn(player, true, if def and def.company then car.id else nil)
-			end
-		end)
+end
+
+-- PLAY on the start screen, called by Main.server.luau's one Play handler before it gives the car.
+function CarCall.onPlay(player: Player)
+	playedAt[player] = os.clock()
+	-- The car that just came for a player with a home stands at the home garage (they spawn at home,
+	-- server/Estate.luau); a re-check once Main has given it.
+	task.defer(function()
+		local car = Vehicles.get(player)
+		local spot = homeGarage(player)
+		if car and spot and not car.chauffeured and os.clock() - car.born < 2 and flat(car.chassis.Position - spot.Position).Magnitude > 40 then
+			local def = Economy.findCar(car.id)
+			Vehicles.spawn(player, true, if def and def.company then car.id else nil)
+		end
 	end)
 end
 

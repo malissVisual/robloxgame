@@ -6,6 +6,8 @@ across the map while bandits shoot at you from roadblocks and zombies chase you,
 get paid, earn XP and climb the driver ranks, and buy better cars, guns, car guns, items and upgrades. The clock runs
 from day into night (darker, more zombies, better pay), civilian traffic and people on foot fill the streets, and
 friends join your crew: they ride along in your passenger seats or follow in their own car, shoot and share the pay.
+With the money you make you buy **real estate** (version 2.6): homes to spawn at, garages for more cars, and offices in
+the city's towers from which **your own delivery company** of hired couriers earns for you, even while you are away.
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -44,6 +46,10 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Get out | Space | jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
 | Put down / Let go (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | the prompt |
+| Real estate list (every property, buy, sell, set your home, GPS) | H | ESTATE button |
+| View a property's listing (at its FOR SALE sign) | E | the prompt |
+| Run your company (at your office's computer: hire, upgrades, collect the safe) | E | the prompt |
+| Ride a tower elevator (step on a pad under a floor sign) | walk onto it | walk onto it |
 | Admin panel (testing tools; only for admins: a Studio Play test, the place's owner, `Config.Admin.UserIds`) | P | the ADMIN button |
 
 While you carry something (or lead a horse) you cannot shoot, sprint or drive, and you walk slower.
@@ -57,8 +63,10 @@ shows it). A car starts with none. They fit the Old Van, the Pickup, the Muscle 
 Truck, not the work vehicles (bus, ice cream, moving, livestock, fuel truck). A driver without a car gun shoots a
 one-handed gun out of the window (a drive-by); passengers always use their own gun.
 
-1. The **start screen** flies over the city; **PLAY** starts the game and brings your car.
-2. You start at the **depot** in the middle of Downtown. Around it is the **safe zone** (green line) with the shops:
+1. The **start screen** flies over the city; **PLAY** starts the game and brings your car. With a **home** (see
+   **Real estate and your company**) you spawn there after PLAY and after every death, and your car waits in front of
+   the home's garage (walk to it and press E); without one the car is placed next to you and you sit in it.
+2. Without a home you start at the **depot** in the middle of Downtown. Around it is the **safe zone** (green line) with the shops:
    **Dead End Motors** (cars, walk among the showroom cars), **Lead & Co.** (guns), **Wrench Garage** (upgrades, paint
    jobs, car guns, free repairs inside), **Last Stop Supplies** (items). Walk in and use the counter.
 3. **JOBS** (or the job board at the depot): one special job and one delivery of every danger level.
@@ -116,6 +124,15 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
      on a headshot.
    A wrecked car (or dying) does **not** end the job: a wreck ruins 25 % of the pieces in it (at least one), press
    CAR for a new car (the company vehicle on a special job) and keep going while the time lasts.
+
+   **CAR calls your car**: it does not appear out of thin air. A **chauffeur** (black suit, cap) drives it to you
+   along the roads from out of sight, 110 – 200 studs away (or out of your nearest garage within 400 studs), brakes for
+   traffic, overtakes what blocks the lane, parks at your curb, gets out, walks off and fades; then it is yours (walk
+   to it, E). The HUD shows "Your car is on the way · N s" with a bar, a marker over the car and on the maps, and the
+   CAR button counts down. If it is not there within **15 s** (`Config.CarCall.ArriveWithin`) the car is placed next
+   to you and you sit in it, the old way. If the car is wrecked on the way the HUD says so (press CAR again); a respawn
+   cancels the call and brings the car the instant way. Sitting in your own car, CAR still resets it on the spot
+   (to unflip or unstick it).
 5. The pay: the job's pay × the share of the pieces delivered × cargo condition (50 – 100 %), + 25 % for finishing
    in the first half of the time, + $3 per enemy killed; an ordinary delivery also pays $15 per piece. Finished **at
    night** it pays up to × 1.4 on top (the **Night bonus** line of the result; the job board tags the offers
@@ -150,6 +167,61 @@ Night is from 18:15 to 06:15, lined up with the Roblox sun: the sky goes dark (t
 over dawn), the **street lamps**, the lit windows and every car's **headlights** come on. At night the jobs pay
 × 1.4, the waves are × 1.5 bigger and × 1.6 as many zombies roam (smoothly in between at dusk and dawn).
 
+## Real estate and your company
+
+Press **H** (or **ESTATE**) for the list of every property (filters ALL / HOMES / GARAGES / OFFICES / OWNED): price,
+driver level, car slots or couriers, who owns it on this server, GPS. Each property has a **FOR SALE** sign in front
+(E opens its listing; the board shows OWNED and the owners' names once somebody on the server has it). You **buy at
+the property** (within reach of its sign or on its lot; away from it the BUY button turns into GO THERE TO BUY and
+sets the GPS) with the money you made, if your driver level is high enough. Every player owns their own copy: two
+owners of the same mansion both use it. Everything you own is saved.
+
+| Property | Kind | Where | Price | Level | Car slots / couriers |
+|---|---|---|---|---|---|
+| Hilltop Mansion | mansion | the top of **Sunset Hills** (north-east of Downtown, up the winding Sunset Drive) | $6,000,000 | 10 | 8 cars |
+| Ocean View Mansion | mansion | on the sea cliffs north of the Harbor, up Cliff Road (a private pier) | $4,500,000 | 9 | 8 cars |
+| Pinecrest Mansion | mansion | in the pines south of the West Highway, down Pine Lane | $3,000,000 | 8 | 6 cars |
+| Lakeside Villa | villa | far north by the frozen lake, on the Lodge Road (a jetty onto the ice) | $1,500,000 | 7 | 4 cars |
+| Sunset Villa | villa | in the west, at the end of Sunset Lane off the Radio Road | $1,000,000 | 6 | 4 cars |
+| 12 Maple Street | house | a Suburbs lot | $400,000 | 4 | 2 cars |
+| 7 Oak Lane | house | a Suburbs lot | $300,000 | 3 | 2 cars |
+| Birch Cottage | house | the west edge of the Suburbs, at the end of Birch Lane | $200,000 | 2 | 2 cars |
+| Elm Bungalow | house | a Suburbs lot | $150,000 | 1 | 1 car |
+| Harbor Lockup | garage | the Harbor | $50,000 | 1 | 4 cars |
+| Highway Garage | garage | on the North Highway | $80,000 | 2 | 4 cars |
+| Downtown Parking | garage | Downtown, in the safe zone | $120,000 | 3 | 6 cars |
+| Harbor Point Office | office | **Harbor Point** tower (the Harbor, by the docks), 7th floor | $500,000 | 5 | 3 couriers |
+| Dispatch Tower, 8th floor | office | **Dispatch Tower** (Downtown, by the depot), 8th floor | $900,000 | 7 | 6 couriers |
+| Dispatch Tower Penthouse | office | Dispatch Tower, the top (14th) floor | $2,500,000 | 11 | 12 couriers |
+
+* **Homes** (mansions, villas, houses) are furnished, two storeys for the big ones. Your first home becomes **your
+  home** at once; SET AS HOME picks another one, SPAWN AT THE DEPOT none. You spawn at your home after PLAY and after
+  every death, and the car you get then waits in front of its garage.
+* **Car slots**: you can own `Config.Estate.BaseCarSlots` = **2** cars without any property; every home and garage
+  adds its garage's slots. Buying a car at Dead End Motors needs a free slot (the dealer tells you to look at ESTATE
+  otherwise). Company vehicles earned by working do not count, and cars you already own are never taken away.
+* **Selling** (SELL, click twice to confirm) pays back **60 %** of the price (`Config.Estate.SellBack`). The home you
+  spawn at cannot be sold until you set another home or the depot.
+* **Offices** are in the two towers: **Dispatch Tower** (14 floors, Downtown, next to the depot) and **Harbor Point**
+  (12 floors, the Harbor). Each has a lobby with a receptionist and the office directory (FOR SALE signs of its
+  offices), glass office floors and a roof terrace with a helipad. The floors are joined by **elevator pads**: step on
+  the pad under a floor sign and you ride to that floor.
+
+**Your delivery company.** Owning an office starts it; the office with the most courier seats runs it. Use the
+**computer** on your office desk (E, "Run your company"; you must stand at it):
+
+* **Couriers**: HIRE costs $25,000 each (`Config.Business.CourierCost`), up to the office's seats (3, 6 or 12); FIRE
+  gives no refund. A courier earns **$120 per minute** while you are on the server. Couriers above the seats (after
+  selling the bigger office) stay on the payroll but earn nothing (NO DESK).
+* **Upgrades** (5 levels each, the price grows per level): Better vans (+15 % per level, from $60,000), Dispatch
+  software (+10 %, from $40,000), Armed escorts (+12 %, from $80,000); all levels together make up to × 2.85.
+* **The safe**: earnings go into the company safe (paid every 10 s online), not into your money. It holds at most
+  **$500,000** (`SafeCap`); a full safe stops filling. **COLLECT** at the office computer moves it into your money.
+* **While you are away** the couriers earn **40 %** (`OfflineShare`) for at most **8 hours** (`OfflineHours`), into the
+  safe. After PLAY a card says what the company made while you were away, with a GPS button to the office.
+* The window shows the safe counting up, the earnings per minute, the seats, the upgrades and the couriers "on the
+  road" with a dispatch radio feed. Those runs are for show; the money is worked out on the server.
+
 ## The world
 
 Downtown (the depot and the shops), the river with **Rust Bridge** and **Old Bridge**, the **Harbor** (warehouses,
@@ -160,12 +232,26 @@ employer now) through the **Mount Rot tunnel** to the snowy north: the **Militar
 **Silver Spur Ranch**. Downtown also has the **First Zombie Bank** (just north of the safe zone, on 6th Ave: the Cash
 Transport loads at its steps) and the **City Clinic** (south-west of the depot, the emergency canopy on 4th Ave).
 
+New in 2.6: **Sunset Hills** north-east of Downtown (Sunset Drive winds up to the Hilltop Mansion, with a gate, lamps
+and pines), the **Dispatch Tower** next to the depot and **Harbor Point** by the docks (offices, elevators, roof
+helipads), **Ocean View** on the sea cliffs (Cliff Road), **Pinecrest** in the western pines (Pine Lane), the
+**Lakeside Villa** by the frozen lake, the **Sunset Villa** off the Radio Road (Sunset Lane), **Birch Cottage** (Birch
+Lane), the houses for sale on Suburbs lots and the three garages (Harbor Lockup, Highway Garage, Downtown Parking). All
+of them are on the map's list with GPS.
+
 **Traffic and pedestrians.** Civilian cars drive the roads around every player (on the right, slowing for the turns,
 a random road at every junction; none in the winter, on the ice road or in the tunnel) and people walk the city's
 sidewalks and cross the streets (fewer at night; they run from zombies). The cars stop for anything in their lane
 (your car, a bandit, somebody on foot) and turn around after a while behind something that stays. Ram one at speed
 and it is a smoking wreck, towed away later. They appear out of sight and vanish far away, with caps per player and
 per server (`Config.Traffic`); during a job a bandit pickup can hide among them.
+
+**The HUD** (laid out from the screen size, so nothing overlaps on a PC or a phone): money and the minimap bottom
+left on a PC (top left on touch screens, clear of the thumbstick); the job panel, the crew strip, the car call line,
+the level-up banner and the toasts in one stack at the top centre; the buttons **JOBS, MAP, BAG, CAR, TOP, CREW,
+ESTATE** on the right edge in 1, 2 or 4 columns (on a PC down at the weapon bar, clear of Roblox's player list; the
+ADMIN button above them for admins); the weapon bar and the hotbar bottom right; the car panel and the hint at the
+bottom centre. On touch FIRE sits above the jump button and the panels move left of it.
 
 The minimap (bottom left; top left on touch screens) turns with the camera; it and the big map
 (M) show it all. The big map lists every shop, employer and far place with what you can do there: click one to set
@@ -191,7 +277,9 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 * **Enemies**: Walker, Runner, Brute (zombies, around you all the time, in waves during a job); Bandit, Gunner,
   Soldier (people: only during a job).
 * **People**: the employers, givers, receivers and kids are R15 NPCs that talk, turn to you and walk; the ranch's
-  **horses** graze, walk on a rope and ride in the livestock truck's stalls.
+  **horses** graze, walk on a rope and ride in the livestock truck's stalls; your **chauffeur** brings your car.
+* **Real estate** (`Config.Estate`): 3 mansions, 2 villas, 4 houses, 3 garages, 3 offices. **Your company**
+  (`Config.Business`): couriers, 3 upgrades, the safe.
 
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
@@ -219,30 +307,41 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
               AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
               Levels (XP, levels, rank names), TrafficLanes (the traffic's lanes, turns and sidewalks)
-src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats,
-              cargo slots, the roof turret of a car gun), Zombies (zombies and bandits, roadblocks, the roamers,
+src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
+              elevators, FOR SALE signs and office computers), PlayerData (saves, leaderstats; the save also holds the
+              properties, the home and the business), Vehicles (cars, seats, cargo slots, the roof turret of a car gun,
+              the instant spawns and the home garage spot), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
               the window), Jobs (job board, stops, special jobs, crews, the zombie waves), Cargo (the cargo you carry, lead or board at a
               stop, the pieces in the vehicle), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
-              the crew state), Ranking (the leaderboard rows)
+              the crew state), Ranking (the leaderboard rows), Estate (buying, selling, the home, car slots, the home
+              respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your
+              company: couriers, upgrades, the safe, online and offline earnings, the office computer)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
               Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
               prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
               Weather (the day and night look), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
-              job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels)
+              job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels), EstateUi (H, the
+              real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
+              card)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
-              (XP and ranks), jobs25 (the 2.5 jobs and places), traffic (lanes, turns, spawn spots, sidewalks)
+              (XP and ranks), jobs25 (the 2.5 jobs and places), traffic (lanes, turns, spawn spots, sidewalks); the
+              2.6 real estate checks are in logic (every property placed, no overlaps, the towers and offices, the
+              roads to every property, the landmarks)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
 (`LinearVelocity` in the ground plane, `AngularVelocity` for turning and staying upright). The driver's client owns the
-car and sets both from the VehicleSeat (`client/Drive.luau`); on ice the velocity follows the nose only slowly.
+car and sets both from the VehicleSeat (`client/Drive.luau`); on ice the velocity follows the nose only slowly. While
+a chauffeur drives it (the model's `Chauffeured` attribute) the **server** owns the car and sets both constraints
+(`server/CarCall.luau`), and its Drive / Ride prompts wait in a `ParkedPrompts` folder; at the hand-over the prompts
+come back and the owner's client gets the car.
 
 **Joints**: since Roblox's Avatar Joint Upgrade (default in every place since 2026) an R15 character's joints are
 `AnimationConstraint`s, not `Motor6D`s (same names, but C0 / C1 are read-only). Everything that poses or ragdolls a
@@ -260,17 +359,19 @@ computed on the server from the car's box (`server/Zombies.luau`).
 python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
-Runs every `tests/*_test.luau` (logic, cargo, roads, cargun, icons, levels, jobs25, traffic). Needs the standalone Luau CLI
+Runs every `tests/*_test.luau` (logic with the 2.6 real estate, cargo, roads, cargun, icons, levels, jobs25, traffic). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
 cars, puts any car gun on your car (or none), guns and enemies, teleports to every place, starts any job, sets the
 driver level (the LV buttons, LEVEL -1 / +1; UNLOCK also sets the top level), sets the time of day (dusk, night,
-dawn … through `DayNight.setClock`), heals, finishes the current stop and switches god mode. It
+dawn … through `DayNight.setClock`), heals, finishes the current stop and switches god mode. The **Estate, company**
+tab gives every property (or one), takes them all, sets the home (or the depot), teleports to any property and
+fills, adds $50,000 to or empties the company safe (UNLOCK also gives every property and, without a home, the most
+expensive mansion as the home). It
 is there for a Studio Play test, for the owner of a user-owned place and for the user ids in `Config.Admin.UserIds`;
 the server checks every command again.
 
 ## Ideas for later
 
-Sounds and music, traffic lights at the junctions, hiring AI couriers that earn while you are away, a crew
-leaderboard.
+Sounds and music, traffic lights at the junctions, a crew leaderboard, company vans driving past in traffic.

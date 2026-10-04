@@ -2285,10 +2285,12 @@ local function onCarCall(first: any, second: any)
 			car = model or (if running and old then old.car else nil),
 		}
 	elseif old or reason then
+		local failed = type(reason) == "string" and reason ~= ""
 		call = {
 			arriveAt = now,
 			total = 1,
-			car = model or (if old then old.car else nil),
+			-- A call that failed (car wrecked, cancelled) has no car to mark.
+			car = if failed then nil else model or (if old then old.car else nil),
 			doneAt = now + CALL_DONE_SHOWN,
 			doneText = if type(reason) == "string" and reason ~= "" then `🚗  {reason}` else nil,
 		}
@@ -2584,7 +2586,9 @@ layout = function()
 		button.TextSize = if touchLayout then 16 else 18
 	end
 	setScale(buttonGrid, buttonScale)
-	local gridTop = if touchLayout then rightTop else rightTop + math.max(0, (room - gh * buttonScale) / 2)
+	-- On a computer the grid sits at the bottom of its room (on the weapon bar), clear of Roblox's player list
+	-- (leaderstats) in the top-right corner.
+	local gridTop = if touchLayout then rightTop else math.max(rightTop, rightBottom - gh * buttonScale)
 	buttonGrid.AnchorPoint = Vector2.new(1, 0)
 	buttonGrid.Position = UDim2.fromOffset(W - MARGIN, gridTop)
 	local grid = box(W - MARGIN - gw * buttonScale, gridTop, W - MARGIN, gridTop + gh * buttonScale)

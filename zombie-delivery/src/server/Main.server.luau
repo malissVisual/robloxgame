@@ -263,6 +263,10 @@ Net.get("Play").OnServerEvent:Connect(function(player)
 		return
 	end
 	playing[player] = true
+	-- The only Play listener (a PLAY queued during World.build reaches just the first one): the call's PLAY time and
+	-- the trip home first, then the car (at the home garage when there is a home).
+	CarCall.onPlay(player)
+	Estate.onPlay(player)
 	giveCar(player)
 end)
 

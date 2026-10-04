@@ -1304,6 +1304,8 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	car.model:SetAttribute("Siren", carId ~= nil and def.company == true)
 	car.model:SetAttribute("Chauffeured", car.chauffeured)
 	writeAttributes(car)
+	-- Connect the prompts while they are still on the chassis (the connections follow them into ParkedPrompts and back).
+	watchPrompts(car)
 	if car.chauffeured then
 		-- Out of reach while the chauffeur drives (client/CarVisuals.luau looks for them on the chassis only).
 		local parked = Instance.new("Folder")
@@ -1322,7 +1324,6 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	for _, p in car.passengers do
 		watchSeat(car, p, 1, false)
 	end
-	watchPrompts(car)
 
 	-- Heavy enough to plough through, light enough to stop against a wall.
 	local mass = car.chassis.AssemblyMass

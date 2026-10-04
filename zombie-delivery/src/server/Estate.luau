@@ -404,22 +404,24 @@ end
 local function updatePlates()
 	platesDirty = false
 	local owners = ownersOnServer()
-	for id, list in plates do
-		local def = byId[id]
+	local boards = worldTable("EstateSigns")
+	for id, def in byId do
 		local names = owners[id]
-		local text: string
-		local color: Color3
-		if names and #names > 0 then
-			local shown = table.concat(names, ", ", 1, math.min(#names, 3))
-			text = `Owned by {shown}{if #names > 3 then ` +{#names - 3}` else ""}`
-			color = PLATE.yellow
-		else
-			text = `FOR SALE {money(def.price)}{if def.level and def.level > 1 then ` · LEVEL {def.level}` else ""}`
-			color = PLATE.money
-		end
-		for _, plate in list do
+		local owned = names ~= nil and #names > 0
+		local shown = if names and owned then table.concat(names, ", ", 1, math.min(#names, 3)) .. (if #names > 3 then ` +{#names - 3}` else "") else ""
+		local text = if owned then `Owned by {shown}` else `FOR SALE {money(def.price)}{if def.level and def.level > 1 then ` · LEVEL {def.level}` else ""}`
+		local color = if owned then PLATE.yellow else PLATE.money
+		for _, plate in plates[id] or ({} :: { Plate }) do
 			plate.status.Text = text
 			plate.status.TextColor3 = color
+		end
+		-- The boards World painted (SurfaceGui "Plate" > "Status") follow too.
+		local labels = boards[id]
+		for _, label in if type(labels) == "table" then labels else {} do
+			if typeof(label) == "Instance" and label:IsA("TextLabel") and label.Parent then
+				label.Text = if owned then `OWNED\n{shown}` else `FOR SALE\n{money(def.price)}`
+				label.TextColor3 = if owned then Color3.fromRGB(40, 140, 60) else Color3.fromRGB(196, 40, 36)
+			end
 		end
 	end
 end
@@ -674,6 +676,15 @@ end
 
 -- ── Start ──────────────────────────────────────────────────────────────────
 
+-- PLAY on the start screen: from the depot (where the character stood behind the menu) to the home. Called by
+-- Main.server.luau's one Play handler (a PLAY queued while the world was building reaches only the first listener).
+function Estate.onPlay(player: Player)
+	if not played[player] then
+		played[player] = true
+		task.spawn(sendHome, player, player.Character)
+	end
+end
+
 function Estate.start()
 	for _, sign in signs() do
 		local plate = buildPlate(sign)
@@ -705,13 +716,6 @@ function Estate.start()
 			platesDirty = true
 		end
 		owning[player] = nil
-	end)
-	-- PLAY on the start screen: from the depot (where the character stood behind the menu) to the home.
-	Net.get("Play").OnServerEvent:Connect(function(player)
-		if not played[player] then
-			played[player] = true
-			task.spawn(sendHome, player, player.Character)
-		end
 	end)
 	-- The plates (and the owners in everybody's listing) follow ownership changes, at most once a second.
 	task.spawn(function()

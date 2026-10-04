@@ -2433,7 +2433,8 @@ local function defineRealEstate()
 		local A, B = X0 + 21, X0 + 37
 		wall(home, f, false, Z0 + 1, Z1 - 1, A, L1, L2 - 0.6, { { at = 0, width = 8, bottom = 0, top = 9.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
 		wall(home, f, false, Z0 + 1, Z1 - 1, B, L1, L2 - 0.6, { { at = 0, width = 8, bottom = 0, top = 9.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
-		wall(home, f, false, Z0 + 1, Z1 - 1, A, L2, TOP, { { at = 8, width = 5, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
+		-- The west bedroom door opens onto the full landing south of the stairwell (not the narrow ledge beside it).
+		wall(home, f, false, Z0 + 1, Z1 - 1, A, L2, TOP, { { at = -8, width = 5, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
 		wall(home, f, false, Z0 + 1, Z1 - 1, B, L2, TOP, { { at = -6, width = 5, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
 		wall(home, f, true, B + 0.3, X1 - 1, 6, L2, TOP, { { at = B + 6, width = 4, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
 		homeRoof(home, f, X0, Z0, X1, Z1, TOP + 0.6, style)
