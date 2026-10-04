@@ -16,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local Drive = require(script.Parent.Drive)
+local CameraRig = require(script.Parent.CameraRig)
 
 local Shooting = {}
 
@@ -127,7 +128,8 @@ end
 local function mouseTarget(car: Model?): Vector3
 	local camera = workspace.CurrentCamera
 	local location = UserInputService:GetMouseLocation()
-	local ray = camera:ViewportPointToRay(location.X, location.Y)
+	-- Locked mouse (GTA aiming): the crosshair in the middle of the screen.
+	local ray = CameraRig.aimRay() or camera:ViewportPointToRay(location.X, location.Y)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	local exclude: { Instance } = { effects }

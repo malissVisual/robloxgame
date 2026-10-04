@@ -27,9 +27,12 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Input | PC | Touch |
 |---|---|---|
 | Drive | WASD / arrows | thumbstick |
-| Shoot where you aim (driver: roof gun, passenger: out of the window, on foot: your pistol) | hold left mouse | – |
+| Aim (GTA style: the mouse is locked, the camera follows it, crosshair in the middle) | move the mouse | – |
+| Shoot (driver: roof gun, passenger: out of the window, on foot: the gun in your hand) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
+| Switch gun | Q (or click the weapon bar) | the weapon bar |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
+| Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | Jobs / map / backpack | J / M / B | the buttons |
 | Get in your car / ride in a friend's car | E / R | the prompt |
 | Get out | Space | jump button |
@@ -94,7 +97,8 @@ src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, 
               Zombies (zombies and bandits, roadblocks), BanditCars (the chasing pickups, driven by the server),
               Gun (shots, server checked), Jobs (job board, stops, special jobs, crews), Items (consumables, supply
               crates), Shops (counters, showroom, purchases)
-src/client/   Main, Menu (start screen), Hud (interface), MapView (minimap, big map), Drive (car controller, ice),
+src/client/   Main, Menu (start screen), Hud (interface), MapView (minimap, big map), CameraRig (GTA-style aim camera),
+              Drive (car controller, ice),
               Shooting (aim, tracers, hit numbers), CarVisuals (tyres, prompts, name tags), ZombieAnimator, Weather, Ui
 tests/        logic test of Economy and Map
 ```

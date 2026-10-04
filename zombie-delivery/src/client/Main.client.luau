@@ -14,6 +14,7 @@ local CarVisuals = require(Client.CarVisuals)
 local Hud = require(Client.Hud)
 local Menu = require(Client.Menu)
 local Weather = require(Client.Weather)
+local CameraRig = require(Client.CameraRig)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -30,6 +31,8 @@ safely("ZombieAnimator", ZombieAnimator.start)
 safely("CarVisuals", CarVisuals.start)
 safely("Weather", Weather.start)
 safely("Hud", Hud.start)
+safely("CameraRig", CameraRig.start)
+CameraRig.mouseNeeded = Hud.anyWindowOpen
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)
@@ -46,6 +49,7 @@ Net.get("Boost").OnClientEvent:Connect(Drive.boost)
 local function play()
 	pcall(function()
 		Hud.setVisible(true)
+		CameraRig.setEnabled(true)
 	end)
 	Net.get("Play"):FireServer()
 end

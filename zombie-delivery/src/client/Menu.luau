@@ -144,7 +144,7 @@ function Menu.show(onPlay: () -> ())
 		Size = UDim2.new(1, 0, 0, 24),
 		Position = UDim2.new(0, 0, 1, -34),
 		BackgroundTransparency = 1,
-		Text = "PLAY (or Enter) · WASD drive · hold left mouse shoot · F auto-aim · 1-5 items · M map · J jobs · B backpack",
+		Text = "PLAY (or Enter) · WASD drive · mouse aims, left mouse shoots · Q gun · 1-5 items · M map · J jobs · B bag · Alt = mouse",
 		TextSize = 16,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Color3.fromRGB(200, 200, 200),

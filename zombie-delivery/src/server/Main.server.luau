@@ -129,32 +129,89 @@ local function giveCar(player: Player)
 	end
 end
 
--- A pistol in the hand: you can shoot on foot too (server/Gun.luau).
-local function giveHandGun(character: Model)
+-- The gun you have equipped, in your hand, the arm raised to aim (everybody sees it). You can shoot on foot too.
+type GunPiece = { size: Vector3, offset: Vector3, color: Color3, material: Enum.Material }
+local DARK = Color3.fromRGB(30, 30, 34)
+local GUN_LOOKS: { [string]: { GunPiece } } = {
+	pistol = { { size = Vector3.new(0.3, 0.45, 1.3), offset = Vector3.new(0, 0.15, -0.3), color = DARK, material = Enum.Material.Metal } },
+	smg = {
+		{ size = Vector3.new(0.35, 0.55, 2), offset = Vector3.new(0, 0.2, -0.6), color = DARK, material = Enum.Material.Metal },
+		{ size = Vector3.new(0.25, 0.8, 0.35), offset = Vector3.new(0, -0.35, -0.5), color = Color3.fromRGB(60, 60, 64), material = Enum.Material.Metal },
+	},
+	shotgun = {
+		{ size = Vector3.new(0.3, 0.35, 3.2), offset = Vector3.new(0, 0.2, -1.2), color = DARK, material = Enum.Material.Metal },
+		{ size = Vector3.new(0.32, 0.5, 1.1), offset = Vector3.new(0, 0.05, 0.6), color = Color3.fromRGB(110, 70, 40), material = Enum.Material.Wood },
+	},
+	rifle = {
+		{ size = Vector3.new(0.25, 0.3, 3.8), offset = Vector3.new(0, 0.2, -1.4), color = Color3.fromRGB(70, 60, 50), material = Enum.Material.Wood },
+		{ size = Vector3.new(0.3, 0.3, 1.1), offset = Vector3.new(0, 0.55, -0.6), color = DARK, material = Enum.Material.Metal },
+	},
+	minigun = {
+		{ size = Vector3.new(0.9, 0.9, 3), offset = Vector3.new(0, 0.3, -1.1), color = Color3.fromRGB(80, 80, 86), material = Enum.Material.DiamondPlate },
+		{ size = Vector3.new(0.5, 0.7, 0.8), offset = Vector3.new(0, -0.3, 0), color = DARK, material = Enum.Material.Metal },
+	},
+	launcher = {
+		{ size = Vector3.new(0.7, 0.7, 3), offset = Vector3.new(0, 0.35, -1), color = Color3.fromRGB(70, 90, 50), material = Enum.Material.Metal },
+		{ size = Vector3.new(0.25, 0.6, 0.3), offset = Vector3.new(0, -0.2, -0.2), color = DARK, material = Enum.Material.Metal },
+	},
+}
+local heldWeapon: { [Player]: string } = {}
+
+local function giveHandGun(player: Player, character: Model)
 	local hand = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
-	if not hand or not hand:IsA("BasePart") then
+	local profile = PlayerData.get(player)
+	if not hand or not hand:IsA("BasePart") or not character.Parent then
 		return
 	end
-	local gun = Instance.new("Part")
-	gun.Name = "HandGun"
-	gun.Size = Vector3.new(0.3, 0.5, 1.6)
-	gun.Color = Color3.fromRGB(30, 30, 34)
-	gun.Material = Enum.Material.Metal
-	gun.CanCollide = false
-	gun.CanQuery = false
-	gun.CanTouch = false
-	gun.Massless = true
-	gun.CFrame = hand.CFrame * CFrame.new(0, -0.35, -0.5)
-	local w = Instance.new("WeldConstraint")
-	w.Part0 = hand
-	w.Part1 = gun
-	w.Parent = gun
-	gun.Parent = character
+	local old = character:FindFirstChild("HandGun")
+	if old then
+		old:Destroy()
+	end
+	-- Raise the gun arm once (the walk animation still swings it a little).
+	local upper = character:FindFirstChild("RightUpperArm")
+	local shoulder = upper and upper:FindFirstChild("RightShoulder")
+	if shoulder and shoulder:IsA("Motor6D") and not shoulder:GetAttribute("Raised") then
+		shoulder:SetAttribute("Raised", true)
+		shoulder.C0 = shoulder.C0 * CFrame.Angles(math.rad(85), 0, 0)
+	end
+	local weapon = if profile then profile.weapon else "pistol"
+	heldWeapon[player] = weapon
+	local model = Instance.new("Model")
+	model.Name = "HandGun"
+	-- Along the arm (the arm points forward once raised).
+	local grip = hand.CFrame * CFrame.new(0, -0.4, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+	for _, piece in GUN_LOOKS[weapon] or GUN_LOOKS.pistol do
+		local p = Instance.new("Part")
+		p.Name = "GunPart"
+		p.Size = piece.size
+		p.Color = piece.color
+		p.Material = piece.material
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.Massless = true
+		p.CFrame = grip * CFrame.new(piece.offset)
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = hand
+		w.Part1 = p
+		w.Parent = p
+		p.Parent = model
+	end
+	model.Parent = character
 end
+
+-- A new gun equipped: the hand changes.
+PlayerData.Changed:Connect(function(player)
+	local profile = PlayerData.get(player)
+	local character = player.Character
+	if profile and character and heldWeapon[player] ~= profile.weapon then
+		task.spawn(giveHandGun, player, character)
+	end
+end)
 
 local function onPlayer(player: Player)
 	player.CharacterAdded:Connect(function(character)
-		task.spawn(giveHandGun, character)
+		task.spawn(giveHandGun, player, character)
 		if playing[player] then
 			task.wait(1)
 			giveCar(player)
@@ -167,6 +224,7 @@ for _, player in Players:GetPlayers() do
 end
 Players.PlayerRemoving:Connect(function(player)
 	playing[player] = nil
+	heldWeapon[player] = nil
 	Zombies.clearOwner(player)
 end)
 

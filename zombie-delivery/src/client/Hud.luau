@@ -106,6 +106,19 @@ end
 
 local windows: { any } = {}
 
+-- Does the interface need the mouse right now (a window or the big map is open)?
+function Hud.anyWindowOpen(): boolean
+	if MapView.isOpen() then
+		return true
+	end
+	for _, w in windows do
+		if w.Visible then
+			return true
+		end
+	end
+	return false
+end
+
 local function closeWindows()
 	for _, w in windows do
 		w.Visible = false
@@ -633,12 +646,91 @@ end)
 
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
+-- The inventory bar: items (keys 1-5) and above them the guns you own (Q switches). Bottom right on a computer,
+-- bottom centre on a touch screen (the FIRE button is bottom right there).
 local hotbar = scaled(Ui.make("Frame", {
 	Size = UDim2.fromOffset(5 * 64 + 4 * 8, 64),
-	Position = UDim2.new(0.5, 0, 1, -112),
-	AnchorPoint = Vector2.new(0.5, 1),
+	Position = if touchLayout then UDim2.new(0.5, 0, 1, -112) else UDim2.new(1, -16, 1, -16),
+	AnchorPoint = if touchLayout then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 	BackgroundTransparency = 1,
 }, gui))
+local weaponBar = scaled(Ui.make("Frame", {
+	Size = UDim2.fromOffset(5 * 64 + 4 * 8, 78),
+	Position = if touchLayout then UDim2.new(0.5, 0, 1, -184) else UDim2.new(1, -16, 1, -88),
+	AnchorPoint = if touchLayout then Vector2.new(0.5, 1) else Vector2.new(1, 1),
+	BackgroundTransparency = 1,
+}, gui))
+Ui.label(weaponBar, "WEAPON  ·  Q to switch", UDim2.new(1, 0, 0, 16), {
+	TextXAlignment = Enum.TextXAlignment.Right,
+	TextSize = 13,
+	TextColor3 = C.yellow,
+	TextStrokeTransparency = 0.4,
+})
+local weaponRow = Ui.make("Frame", {
+	Size = UDim2.new(1, 0, 0, 58),
+	Position = UDim2.fromOffset(0, 18),
+	BackgroundTransparency = 1,
+}, weaponBar)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	HorizontalAlignment = Enum.HorizontalAlignment.Right,
+	Padding = UDim.new(0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, weaponRow)
+
+local SHORT_NAMES: { [string]: string } = { pistol = "PISTOL", smg = "SMG", shotgun = "SHOTGUN", rifle = "RIFLE", minigun = "MINIGUN", launcher = "LAUNCHER" }
+
+local function renderWeapons()
+	Ui.clear(weaponRow)
+	if not state then
+		return
+	end
+	for order, def in Config.Weapons do
+		if not state.weapons[def.id] then
+			continue
+		end
+		local current = state.weapon == def.id
+		local slot = Ui.make("TextButton", {
+			Size = UDim2.fromOffset(if current then 96 else 70, 58),
+			BackgroundColor3 = if current then Color3.fromRGB(70, 60, 20) else C.panel,
+			BackgroundTransparency = 0.1,
+			Text = "",
+			LayoutOrder = order,
+			AutoButtonColor = true,
+		}, weaponRow)
+		Ui.corner(slot, 10)
+		Ui.stroke(slot, if current then C.yellow else C.grey, if current then 2.5 else 1)
+		Ui.label(slot, if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.new(1, 0, 0, 30), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
+		Ui.label(slot, SHORT_NAMES[def.id] or def.name, UDim2.new(1, -4, 0, 18), {
+			Position = UDim2.fromOffset(2, 34),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextSize = 12,
+			TextColor3 = if current then C.yellow else C.text,
+		})
+		slot.Activated:Connect(function()
+			Net.get("Equip"):FireServer("weapon", def.id)
+		end)
+	end
+end
+
+-- Q: the next gun you own.
+local function nextWeapon()
+	if not state then
+		return
+	end
+	local owned = {}
+	for _, def in Config.Weapons do
+		if state.weapons[def.id] then
+			table.insert(owned, def.id)
+		end
+	end
+	if #owned < 2 then
+		Hud.toast("Buy more guns at Lead & Co.")
+		return
+	end
+	local index = table.find(owned, state.weapon) or 0
+	Net.get("Equip"):FireServer("weapon", owned[index % #owned + 1])
+end
 Ui.list(hotbar, false, 8)
 local hotbarCounts: { [string]: any } = {}
 for index, def in Config.Items do
@@ -708,7 +800,7 @@ local healthBack, healthFill = Ui.bar(carPanel, UDim2.new(1, 0, 0, 18), C.green)
 healthBack.Position = UDim2.fromOffset(0, 32)
 local healthText = Ui.label(healthBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 14, ZIndex = 2 })
 local hint = Ui.label(gui, "", UDim2.fromOffset(640, 22), {
-	Position = UDim2.new(0.5, 0, 1, -182),
+	Position = UDim2.new(0.5, 0, 1, if touchLayout then -262 else -104),
 	AnchorPoint = Vector2.new(0.5, 1),
 	TextXAlignment = Enum.TextXAlignment.Center,
 	TextColor3 = C.dim,
@@ -864,6 +956,7 @@ function Hud.setState(newState: any)
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
 	end
+	renderWeapons()
 	if shop.frame.Visible then
 		renderShop()
 	end
@@ -958,13 +1051,13 @@ RunService.RenderStepped:Connect(function()
 		hint.Text = "SAFE ZONE · shops around the depot · JOBS to start a delivery"
 		hint.TextColor3 = C.green
 	elseif driving and not touch then
-		hint.Text = "WASD drive · hold left mouse shoot · F auto-aim · 1-5 items · Space get out"
+		hint.Text = "WASD drive · mouse aims · left mouse shoots · Q gun · 1-5 items · hold Alt = free mouse"
 		hint.TextColor3 = C.dim
 	elseif not car then
 		hint.Text = "Press CAR to call your car"
 		hint.TextColor3 = C.dim
 	elseif not seatedIn then
-		hint.Text = if touch then "On foot: FIRE to shoot · walk to your car and press E" else "On foot: hold left mouse to shoot · walk to your car and press E"
+		hint.Text = if touch then "On foot: FIRE to shoot · walk to your car and press E" else "On foot: aim with the mouse, left mouse shoots · E at your car to drive · hold Alt = free mouse"
 		hint.TextColor3 = C.dim
 	else
 		hint.Text = ""
@@ -1032,6 +1125,8 @@ function Hud.start()
 			end
 		elseif key == Enum.KeyCode.B then
 			toggleBackpack()
+		elseif key == Enum.KeyCode.Q then
+			nextWeapon()
 		else
 			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five }
 			local index = table.find(numbers, key)
