@@ -2011,6 +2011,8 @@ end
 -- A banner in the top stack (under the job panel; a level-up mostly comes as the job ends): LEVEL UP, the new level
 -- and rank, what it unlocks; the XP bar flashes. Under the windows, so it never hides the delivery result.
 
+local refreshLevel: () -> ()
+do -- (a block of its own: its locals stay out of the module's 200-register limit)
 local levelUpFrame = Ui.make("CanvasGroup", {
 	Name = "LevelUp",
 	Size = UDim2.new(0.82, 0, 0, 0),
@@ -2090,7 +2092,7 @@ end
 local shownLevel: number? = nil
 
 -- The LV chip, the rank, the XP bar; a level-up flashes and the open shop shows what it unlocked.
-local function refreshLevel()
+function refreshLevel()
 	local xp = myXp()
 	if xp == nil then
 		levelChip.Text = "LV 1"
@@ -2121,6 +2123,7 @@ local function refreshLevel()
 		renderShop()
 	end
 end
+end
 
 -- ── Car call ───────────────────────────────────────────────────────────────
 -- The CarCall remote (server/CarCall.luau): (seconds left, the car's model) while a chauffeur drives your car to
@@ -2129,6 +2132,12 @@ end
 -- floats over the car (MapView pins it on the maps) and the CAR button counts down. The count runs on here between
 -- two messages (a loop at 10 Hz, only while a call is on); a call that never ends gives up CALL_STALE s late.
 
+type CarCallState = { arriveAt: number, total: number, car: Model?, doneAt: number?, doneText: string? }
+local call: CarCallState? = nil
+local callMarker: any
+local onCarCall: (any, any) -> ()
+-- (A block of its own: its locals do not count toward the module's 200-register limit.)
+do
 local CALL_COLOR = C.blue
 local CALL_DONE_SHOWN = 3 -- seconds "Your car is here" stays
 local CALL_STALE = 20
@@ -2156,7 +2165,7 @@ local callBack, callFill = Ui.bar(callLine, UDim2.new(1, -24, 0, 5), CALL_COLOR)
 callBack.Position = UDim2.new(0, 12, 1, -10)
 
 -- The marker over the car in the world (seen through walls, like the delivery label).
-local callMarker = Ui.make("BillboardGui", {
+callMarker = Ui.make("BillboardGui", {
 	Name = "CarCallMarker",
 	Size = UDim2.fromOffset(200, 64),
 	StudsOffsetWorldSpace = Vector3.new(0, 7, 0),
@@ -2193,8 +2202,6 @@ Ui.label(callMarker, "▼", UDim2.new(1, 0, 0, 22), {
 	TextStrokeTransparency = 0.2,
 })
 
-type CarCallState = { arriveAt: number, total: number, car: Model?, doneAt: number?, doneText: string? }
-local call: CarCallState? = nil
 local callLoop = false
 
 local function carPart(car: Model?): BasePart?
@@ -2263,7 +2270,7 @@ local function updateCall(): boolean
 	return true
 end
 
-local function onCarCall(first: any, second: any)
+function onCarCall(first: any, second: any)
 	local seconds, car, reason = first, second, nil
 	if type(first) == "table" then
 		seconds = first.seconds or first.left or first.eta
@@ -2318,6 +2325,7 @@ local function onCarCall(first: any, second: any)
 		end
 		callLoop = false
 	end)
+end
 end
 
 -- ── Layout ─────────────────────────────────────────────────────────────────

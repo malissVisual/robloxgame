@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.6"
+Config.Version = "2.6.1"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
