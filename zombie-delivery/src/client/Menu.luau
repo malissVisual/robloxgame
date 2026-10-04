@@ -143,10 +143,13 @@ function Menu.show(onPlay: () -> ())
 
 	infoLabel = title("Loading your company...", 360, 20, Color3.fromRGB(220, 220, 210))
 	Ui.make("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 24),
-		Position = UDim2.new(0, 0, 1, -34),
+		Size = UDim2.new(1, -240, 0, 44),
+		Position = UDim2.new(0.5, 0, 1, -12),
+		AnchorPoint = Vector2.new(0.5, 1),
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Bottom,
 		BackgroundTransparency = 1,
-		Text = "PLAY (or Enter) · WASD drive · mouse aims, left mouse shoots · E pick up / load · Q gun · 1-5 items · M map · J jobs · B bag · Alt = mouse",
+		Text = "PLAY (or Enter) · WASD drive · mouse aims, left mouse shoots · E pick up / load · G put down · Q gun · 1-5 items · M map · J jobs · B bag · Alt = mouse",
 		TextSize = 16,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Color3.fromRGB(200, 200, 200),

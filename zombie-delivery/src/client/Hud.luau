@@ -115,6 +115,22 @@ local function jobItemKind(): string
 	return if type(kind) == "string" then kind else "crate"
 end
 
+-- The job's cargo for the texts: its icon and the payload's own names ("pizza box" / "pizza boxes"), else the kind's.
+local function jobCargo(): ItemInfo
+	local info = itemInfo(jobItemKind())
+	if not job then
+		return info
+	end
+	local one = if type(job.piece) == "string" and job.piece ~= "" then job.piece else info.one
+	local many = if type(job.pieces) == "string" and job.pieces ~= "" then job.pieces else info.many
+	return { icon = info.icon, one = one, many = many }
+end
+
+-- What is in your hands, named like the job names it when it is the job's cargo.
+local function heldInfo(kind: string): ItemInfo
+	return if job and kind == jobItemKind() then jobCargo() else itemInfo(kind)
+end
+
 -- Pieces riding in your vehicle (the payload, else the vehicle's CargoCount attribute).
 local function inVehicle(): number?
 	if job and type(job.inCar) == "number" then
@@ -315,6 +331,14 @@ end
 
 local STAR_COLORS = { C.green, C.yellow, C.red, Color3.fromRGB(200, 80, 255) }
 
+-- How the cargo of an offer moves, in two or three words (offer.handling: the first stop's mode).
+local OFFER_HANDLING: { [string]: string } = {
+	carry = "carried by hand",
+	lead = "led on a rope",
+	board = "they get on",
+	serve = "sold from the truck",
+}
+
 function Hud.setOffers(list: { any })
 	if job then
 		return
@@ -322,7 +346,18 @@ function Hud.setOffers(list: { any })
 	Ui.clear(jobs.body)
 	for order, offer in list do
 		local color = STAR_COLORS[offer.stars] or C.red
-		local c = card(jobs.body, if offer.jobType then 126 else 104, order, offer.jobType ~= nil)
+		-- The lines of the card from the top; the card grows with them.
+		local y = 94
+		local modifierY, typeY = 0, 0
+		if offer.modifier then
+			modifierY = y
+			y += 20
+		end
+		if offer.jobType then
+			typeY = y
+			y += 36
+		end
+		local c = card(jobs.body, math.max(104, y + 4), order, offer.jobType ~= nil)
 		Ui.label(c, string.rep("★", offer.stars), UDim2.fromOffset(110, 26), { Position = UDim2.fromOffset(12, 6), TextColor3 = color, TextSize = 24 })
 		Ui.label(c, offer.tierName:upper(), UDim2.fromOffset(110, 18), { Position = UDim2.fromOffset(12, 32), TextColor3 = color, TextSize = 14 })
 		if offer.modifier then
@@ -344,12 +379,25 @@ function Hud.setOffers(list: { any })
 			TextSize = 14,
 			Font = Enum.Font.GothamMedium,
 		})
+		-- The cargo: how many pieces and how they move.
+		local count = tonumber(offer.pieces)
+		if count and count > 0 then
+			local info = itemInfo(offer.itemKind)
+			local name = if count == 1 then (offer.piece or info.one) else (offer.piecesName or info.many)
+			local how = OFFER_HANDLING[offer.handling or ""]
+			Ui.label(c, `{info.icon} {count} {name}` .. (if how then ` · {how}` else ""), UDim2.new(1, -260, 0, 18), {
+				Position = UDim2.fromOffset(124, 72),
+				TextColor3 = C.text,
+				TextSize = 14,
+				Font = Enum.Font.GothamMedium,
+			})
+		end
 		if offer.modifier then
-			Ui.label(c, offer.modifier.description, UDim2.new(1, -260, 0, 18), { Position = UDim2.fromOffset(124, 74), TextColor3 = C.red, TextSize = 13, Font = Enum.Font.GothamMedium })
+			Ui.label(c, offer.modifier.description, UDim2.new(1, -260, 0, 18), { Position = UDim2.fromOffset(124, modifierY), TextColor3 = C.red, TextSize = 13, Font = Enum.Font.GothamMedium })
 		end
 		if offer.jobType then
 			local extra = if offer.vehicle then `Company vehicle: {offer.vehicle}. ` else ""
-			Ui.label(c, extra .. offer.jobType.description, UDim2.new(1, -260, 0, 34), { Position = UDim2.fromOffset(124, if offer.modifier then 92 else 74), TextColor3 = C.dim, TextSize = 13, Font = Enum.Font.GothamMedium })
+			Ui.label(c, extra .. offer.jobType.description, UDim2.new(1, -260, 0, 34), { Position = UDim2.fromOffset(124, typeY), TextColor3 = C.dim, TextSize = 13, Font = Enum.Font.GothamMedium })
 		end
 		Ui.label(c, Ui.money(offer.pay), UDim2.fromOffset(110, 30), { Position = UDim2.new(1, -244, 0, 36), TextColor3 = C.money, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Right })
 		local accept = Ui.button(c, "ACCEPT", UDim2.fromOffset(110, 46), C.green, function()
@@ -642,15 +690,15 @@ local function cargoCard(parent: any)
 	if not job then
 		return
 	end
-	local kind = jobItemKind()
-	local info = itemInfo(kind)
+	local info = jobCargo()
 	local holding = myCarrying()
 	local aboard = inVehicle()
 	local car = Drive.myCar()
 	local carDef = car and Economy.findCar(tostring(car:GetAttribute("CarId")))
-	local c = card(parent, 96, -1, true)
+	local lost = tonumber(job.lost) or 0
+	local c = card(parent, if lost > 0 then 118 else 96, -1, true)
 	Ui.label(c, "ON THIS JOB", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(12, 8), TextColor3 = C.yellow, TextSize = 14 })
-	local held = if holding then itemInfo(holding) else nil
+	local held = if holding then heldInfo(holding) else nil
 	Ui.label(c, if held then `✋  In your hands: {held.icon} {held.one}` else "✋  Your hands are free", UDim2.new(1, -24, 0, 24), {
 		Position = UDim2.fromOffset(12, 30),
 		TextSize = 18,
@@ -661,9 +709,18 @@ local function cargoCard(parent: any)
 		elseif aboard > 0 then `🚚  In the {vehicle}: {aboard} × {info.icon} {if aboard == 1 then info.one else info.many}`
 		else `🚚  The {vehicle} is empty`
 	if type(job.total) == "number" then
-		text ..= `  ·  {job.total} in all`
+		local arrived = tonumber(job.deliveredTotal)
+		text ..= if arrived then `  ·  {arrived}/{job.total} delivered` else `  ·  {job.total} in all`
 	end
 	Ui.label(c, text, UDim2.new(1, -24, 0, 24), { Position = UDim2.fromOffset(12, 60), TextSize = 16, TextColor3 = C.text, Font = Enum.Font.GothamMedium })
+	if lost > 0 then
+		Ui.label(c, `⚠  Lost on the way: {lost} {if lost == 1 then info.one else info.many}`, UDim2.new(1, -24, 0, 20), {
+			Position = UDim2.fromOffset(12, 88),
+			TextSize = 15,
+			TextColor3 = C.red,
+			Font = Enum.Font.GothamMedium,
+		})
+	end
 end
 
 function renderBackpack()
@@ -745,7 +802,7 @@ end
 
 -- ── Delivery result ────────────────────────────────────────────────────────
 
-local result = window("DELIVERY", Vector2.new(440, 470))
+local result = window("DELIVERY", Vector2.new(460, 540))
 
 function Hud.showResult(r: any)
 	closeWindows()
@@ -766,25 +823,45 @@ function Hud.showResult(r: any)
 		local payout = r.payout
 		line("DELIVERED!", nil, C.green, 1)
 		line(`{r.cargo} for {r.customer}`, nil, C.dim, 2)
-		line("Pay", Ui.money(payout.base), nil, 3)
-		line(`Cargo condition {math.floor(r.condition * 100 + 0.5)}%`, Ui.money(payout.conditionPay), nil, 4)
-		line("Speed bonus", "+" .. Ui.money(payout.fastBonus), nil, 5)
-		line(`Enemies killed ({r.kills})`, "+" .. Ui.money(payout.killBonus), nil, 6)
-		if r.crew > 0 then
-			line(`Crew bonus ({r.crew} riding)`, "+" .. Ui.money(r.crewBonus), nil, 7)
+		-- The pieces: how many arrived, and how many bandits or crashes took.
+		local pieces = tonumber(r.pieces)
+		if pieces and pieces > 0 then
+			local delivered = tonumber(r.delivered) or pieces
+			local lost = tonumber(r.lost) or 0
+			local name = if pieces == 1 then (r.piece or "piece") else (r.piecesName or "pieces")
+			line(`Delivered {delivered}/{pieces} {name}`, nil, if delivered >= pieces then C.green else C.yellow, 3)
+			if lost > 0 then
+				line(`Lost on the way: {lost}`, nil, C.red, 4)
+			end
 		end
-		line("TOTAL", Ui.money(r.total), C.yellow, 8)
+		line("Pay", Ui.money(payout.base), nil, 5)
+		line(`Cargo condition {math.floor(r.condition * 100 + 0.5)}%`, Ui.money(payout.conditionPay), nil, 6)
+		line("Speed bonus", "+" .. Ui.money(payout.fastBonus), nil, 7)
+		line(`Enemies killed ({r.kills})`, "+" .. Ui.money(payout.killBonus), nil, 8)
+		if r.crew > 0 then
+			line(`Crew bonus ({r.crew} riding)`, "+" .. Ui.money(r.crewBonus), nil, 9)
+		end
+		line("TOTAL", Ui.money(r.total), C.yellow, 10)
 		local employer = r.employer
 		if employer then
-			line(`{employer.name}: {employer.done} jobs done`, nil, Color3.fromRGB(255, 200, 60), 9)
+			line(`{employer.name}: {employer.done} jobs done`, nil, Color3.fromRGB(255, 200, 60), 11)
+			-- The next reward of that employer (the gun comes first, then the vehicle).
+			local done = tonumber(employer.done) or 0
+			local gunAt = tonumber(employer.weaponAt)
+			local nextUp = if employer.weapon and gunAt and done < gunAt then `{gunAt - done} more for the {employer.weapon}`
+				elseif type(employer.needed) == "number" and done < employer.needed and employer.reward ~= "" then `{employer.needed - done} more for the {employer.reward}`
+				else nil
+			if nextUp then
+				line(nextUp, nil, C.dim, 12)
+			end
 		end
 		local newCar = r.unlockedCar or (employer and employer.unlocked)
 		if newCar then
-			line(`🚚 NEW CAR: the {newCar} is yours!`, nil, C.green, 10)
+			line(`🚚 NEW CAR: the {newCar} is yours!`, nil, C.green, 13)
 		end
 		if type(r.unlockedWeapon) == "string" then
 			local gun = Economy.findWeapon(r.unlockedWeapon)
-			line(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`, nil, C.green, 11)
+			line(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`, nil, C.green, 14)
 		end
 	else
 		line("DELIVERY FAILED", nil, C.red, 1)
@@ -1063,8 +1140,9 @@ local function renderCargoRow()
 	local kind = jobItemKind()
 	local needed = if show then tonumber(job.needed) or 0 else 0
 	local done = if show then tonumber(job.delivered) or 0 else 0
+	local lost = if show then tonumber(job.lost) or 0 else 0
 	local aboard = inVehicle()
-	local signature = `{show}|{holding}|{kind}|{needed}|{done}|{aboard}|{total}|{handling}|{job and job.stage}`
+	local signature = `{show}|{holding}|{kind}|{needed}|{done}|{lost}|{aboard}|{total}|{handling}|{job and job.stage}`
 	if signature == cargoSignature then
 		return
 	end
@@ -1077,7 +1155,7 @@ local function renderCargoRow()
 	local info = itemInfo(kind)
 	local byHand = handling == "carry" or handling == "lead"
 	if holding then
-		local held = itemInfo(holding)
+		local held = heldInfo(holding)
 		Ui.chip(cargoRow, `{held.icon} {if holding == "horse" then "Leading a" else "Holding"} {held.one}`, C.yellow, Color3.new(0, 0, 0)).LayoutOrder = 1
 	elseif byHand then
 		Ui.chip(cargoRow, "✋ Hands free", C.panelLight, C.dim).LayoutOrder = 1
@@ -1111,6 +1189,9 @@ local function renderCargoRow()
 	if total ~= needed then
 		-- More stops: how much the whole job moves.
 		Ui.chip(cargoRow, `{total} in all`, Color3.fromRGB(30, 33, 38), C.dim).LayoutOrder = 4
+	end
+	if lost > 0 then
+		Ui.chip(cargoRow, `⚠ {lost} lost`, Color3.fromRGB(90, 28, 28), Color3.fromRGB(255, 150, 140)).LayoutOrder = 5
 	end
 end
 
@@ -1221,7 +1302,7 @@ local function pointArrow(origin: Vector3?, flat: Vector3, scale: number)
 end
 
 -- The GPS: a place picked on the big map (the job's target goes first).
-local GPS_COLOR = Color3.fromRGB(90, 200, 255)
+local GPS_COLOR = Color3.fromRGB(176, 92, 255) -- the purple of the GPS route on the maps (client/MapView.luau)
 local gps: { position: Vector3, name: string }? = nil
 
 MapView.onWaypoint = function(landmark)
@@ -1254,9 +1335,9 @@ local function myPosition(): Vector3?
 	return if car and car.PrimaryPart then car.PrimaryPart.Position else nil
 end
 
--- Where to go now on foot at a carry / lead stop with the vehicle parked in the circle: to the pile or the person
--- (to pick a piece up, or to hand it over), or to the vehicle's back (to load it, or to take the next one out).
--- Returns the point, its label and whether it is the vehicle; nil = the park circle (driving, or not parked yet).
+-- Where to go now on foot at a carry / lead stop: to the pile or the person (to pick a piece up, or to hand it
+-- over), or to the back of your vehicle (to load what you hold, or to take the next one out).
+-- Returns the point, its label and whether it is the vehicle; nil = the park circle (seated, or not a carry stop).
 local function footTarget(): (Vector3?, string?, boolean)
 	if not job or Drive.seatedCar() then
 		return nil, nil, false
@@ -1265,22 +1346,22 @@ local function footTarget(): (Vector3?, string?, boolean)
 	if handling ~= "carry" and handling ~= "lead" then
 		return nil, nil, false
 	end
-	local car = Drive.myCar()
-	local chassis = car and car.PrimaryPart
-	if not chassis then
-		return nil, nil, false
-	end
-	local circle: Vector3 = job.position
-	if Vector3.new(chassis.Position.X - circle.X, 0, chassis.Position.Z - circle.Z).Magnitude > Config.Jobs.DeliverRadius + 8 then
-		return nil, nil, false
-	end
 	local pickup = job.stage == "pickup"
 	local holding = myCarrying() ~= nil
-	local toVehicle = if pickup then holding else not holding
+	local aboard = inVehicle() or 0
+	local toVehicle = if pickup then holding else (not holding and aboard > 0)
 	if toVehicle then
-		local back = (chassis.CFrame * CFrame.new(0, 0, chassis.Size.Z / 2 + 2)).Position
-		local text = if pickup then (if handling == "lead" then "LEAD IT IN" else "LOAD IT HERE") else (if handling == "lead" then "LEAD ONE OUT" else "TAKE ONE OUT")
-		return back, text, true
+		local car = Drive.myCar()
+		local chassis = car and car.PrimaryPart
+		local root = myRoot()
+		-- The vehicle's back (its CargoDoor attachment), if the vehicle is not far away.
+		if chassis and root and (chassis.Position - root.Position).Magnitude < 150 then
+			local door = chassis:FindFirstChild("CargoDoor")
+			local back = if door and door:IsA("Attachment") then door.WorldPosition else (chassis.CFrame * CFrame.new(0, 0, chassis.Size.Z / 2 + 2)).Position
+			local text = if pickup then (if handling == "lead" then "LEAD IT IN" else "LOAD IT HERE") else (if handling == "lead" then "LEAD ONE OUT" else "TAKE ONE OUT")
+			return back, text, true
+		end
+		return nil, nil, false
 	end
 	local pile = job.pile
 	if typeof(pile) ~= "Vector3" then
@@ -1401,7 +1482,10 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 	if holding then
-		hint.Text = if holding == "horse" then "Leading a horse: walk slowly, no gun" else "Hands full: no gun, no sprint"
+		-- G is the server's "Put down" / "Let go" prompt key (server/Cargo.luau); touch screens tap the prompt.
+		local key = if touch then "tap PUT DOWN" else "G puts it down"
+		hint.Text = if holding == "horse" then `Leading a horse: no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}`
+			else `Hands full: no gun, no sprint · E loads / hands over · {key} to shoot`
 		hint.TextColor3 = C.yellow
 	elseif inShop then
 		hint.Text = `{Map.Shops[inShop].name}: walk to the counter and press E`
@@ -1459,7 +1543,7 @@ RunService.RenderStepped:Connect(function()
 		if position then
 			local flat = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
 			local distance = math.floor(flat.Magnitude)
-			jobInfo.Text = `Stop {job.stopIndex}/{job.stopCount}` .. (if person then `  ·  {person}` else "") .. `  ·  {distance} m`
+			jobInfo.Text = `Stop {job.stopIndex}/{job.stopCount}` .. (if person then `  ·  👤 {person}` else "") .. `  ·  {distance} m`
 			labelText.Text = if footText then `{footText}\n{distance} m` else (if pickup then "PICK UP" else string.upper(person or job.customer)) .. `\n{distance} m`
 			local chassis = if seatedIn then seatedIn.PrimaryPart else nil
 			if chassis then
