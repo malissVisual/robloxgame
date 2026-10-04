@@ -1,15 +1,17 @@
 --!strict
 -- The admin tools for testing (Config.Admin): unlock everything, money, any car or gun, teleport to any landmark,
--- start any job, finish the current stop, god mode, spawn enemies, a bandit car, clear the enemies, time of day,
--- heal. Admins (a Studio Play test, the owner of a user-owned place, Config.Admin.UserIds) get the player attribute
--- "Admin" (the client shows the panel, client/AdminPanel.luau); every command is checked here again.
+-- start any job, finish the current stop, god mode, spawn enemies, a bandit car, clear the enemies, the driver level,
+-- time of day (day / night), heal. Admins (a Studio Play test, the owner of a user-owned place,
+-- Config.Admin.UserIds) get the player attribute "Admin" (the client shows the panel, client/AdminPanel.luau); every
+-- command is checked here again.
 --
 -- Commands over the "Admin" remote (name, arg):
 --   unlockAll                 every car (company ones too), every gun (earned ones too), every paint, 10 of each
 --                             item, every employer's progress at the top (their rewards count as earned), the Roof
---                             Minigun on every car that can carry a car gun
+--                             Minigun on every car that can carry a car gun, and the top driver level
 --   maxUpgrades               every upgrade track at its last level
 --   money      amount         + money
+--   setLevel   level          the driver level (1 … Config.Levels.MaxLevel): XP = exactly what that level needs
 --   car        car id         that car, now, next to you
 --   weapon     weapon id      give it and put it in your hand
 --   teleport   landmark id    you (and your car if you drive it) to a Map.Landmarks place
@@ -20,10 +22,9 @@
 --                             you for ADMIN_HUNT s even without a job (Zombies.hunts)
 --   banditCar                 a bandit pickup chasing you (even without a job, BanditCars.wanted)
 --   clear                     kill / remove the enemies around you and the ones after you
---   time       hour           Lighting.ClockTime
+--   time       hour           the clock (DayNight.setClock: the night comes with it)
 --   heal                      you and your car full
 
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -31,6 +32,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
+local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 
@@ -41,6 +43,7 @@ local Vehicles = require(Server.Vehicles)
 local Zombies = require(Server.Zombies)
 local BanditCars = require(Server.BanditCars)
 local Jobs = require(Server.Jobs)
+local DayNight = require(Server.DayNight)
 
 local Admin = {}
 
@@ -119,8 +122,23 @@ local function unlockAll(player: Player)
 	for _, employer in Config.Employers do
 		profile.rep[employer.id] = math.max(profile.rep[employer.id] or 0, employer.needed, employer.weaponAt or 0)
 	end
-	PlayerData.notify(player)
-	say(player, "ADMIN: every car, gun, paint and employer reward unlocked, 10 of each item. Car guns: Cars tab.")
+	-- The top driver level: nothing is locked any more (PlayerData.setLevel fires Changed).
+	local level = PlayerData.setLevel(player, Config.Levels.MaxLevel)
+	say(player, `ADMIN: every car, gun, paint and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
+end
+
+-- The driver level: the XP becomes exactly what that level needs.
+local function setLevel(player: Player, arg: any)
+	if type(arg) ~= "number" or arg ~= arg then
+		say(player, "ADMIN: which level?")
+		return
+	end
+	if not PlayerData.get(player) then
+		say(player, "Still loading...")
+		return
+	end
+	local level = PlayerData.setLevel(player, arg)
+	say(player, `ADMIN: driver level {level} ({Levels.rank(level)}).`)
 end
 
 -- The gun on the roof of your equipped car (a Config.CarGuns id, or "none" to take it off).
@@ -461,8 +479,9 @@ local function setTime(player: Player, arg: any)
 	if type(arg) ~= "number" or arg ~= arg then
 		return
 	end
-	Lighting.ClockTime = math.clamp(arg, 0, 24) % 24
-	say(player, string.format("ADMIN: the time is %02d:%02d.", math.floor(Lighting.ClockTime), math.floor(Lighting.ClockTime % 1 * 60)))
+	local hour = math.clamp(arg, 0, 24) % 24
+	DayNight.setClock(hour)
+	say(player, string.format("ADMIN: the time is %02d:%02d (%s).", math.floor(hour), math.floor(hour % 1 * 60), if DayNight.isNight() then "night" else "day"))
 end
 
 -- ── The remote ─────────────────────────────────────────────────────────────
@@ -471,6 +490,7 @@ local COMMANDS: { [string]: (Player, any) -> () } = {
 	unlockAll = unlockAll,
 	maxUpgrades = maxUpgrades,
 	money = money,
+	setLevel = setLevel,
 	car = car,
 	carGun = carGun,
 	weapon = weapon,

@@ -1,7 +1,9 @@
 --!strict
 -- The player's progress: money, the cars and guns they own, the equipped ones, the car guns on their roofs, the upgrade
--- levels and lifetime stats.
+-- levels, the driver XP (the level and the rank come from it, shared/Levels.luau) and lifetime stats.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
+-- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
+-- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
@@ -11,6 +13,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
+local Levels = require(Shared.Levels)
 
 export type Profile = {
 	money: number,
@@ -24,23 +27,13 @@ export type Profile = {
 	carPaint: { [string]: string }, -- car id → paint id
 	carGuns: { [string]: string }, -- car id → the car gun on its roof (Config.CarGuns); no entry = none
 	rep: { [string]: number }, -- jobs done for each employer (Config.Employers)
+	xp: number, -- driver XP (Config.Levels); older saves have none: 0
 	deliveries: number,
 	kills: number,
 	earned: number,
 }
 
 local PlayerData = {}
-
--- [CONTRACT STUBS, stream "levels" implements them with profile.xp]
--- Adds XP; returns the new level and whether it went up.
-function PlayerData.addXp(_player: Player, _amount: number): (number, boolean)
-	return 1, false
-end
-
--- The player's driver level (1 when not loaded).
-function PlayerData.level(_player: Player): number
-	return 1
-end
 
 local profiles: { [Player]: Profile } = {}
 local canSave: { [Player]: boolean } = {}
@@ -67,6 +60,7 @@ local function newProfile(): Profile
 		carPaint = {},
 		carGuns = {}, -- every car starts without a gun
 		rep = {},
+		xp = 0,
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -89,6 +83,7 @@ local function applySaved(profile: Profile, saved: any)
 	profile.deliveries = number(saved.deliveries, 0, 2 ^ 50)
 	profile.kills = number(saved.kills, 0, 2 ^ 50)
 	profile.earned = number(saved.earned, 0, 2 ^ 50)
+	profile.xp = number(saved.xp, 0, 2 ^ 50) -- older saves have no xp: 0 (level 1)
 	if type(saved.cars) == "table" then
 		for id, owned in saved.cars do
 			if owned == true and type(id) == "string" and Economy.findCar(id) then
@@ -185,6 +180,11 @@ function PlayerData.load(player: Player)
 		profiles[player] = profile
 		local stats = Instance.new("Folder")
 		stats.Name = "leaderstats"
+		-- The first stat is the one the player list sorts by: the best couriers on top.
+		local level = Instance.new("IntValue")
+		level.Name = "Level"
+		level.Value = Levels.levelFor(profile.xp)
+		level.Parent = stats
 		local money = Instance.new("IntValue")
 		money.Name = "Money"
 		money.Value = profile.money
@@ -198,15 +198,30 @@ function PlayerData.load(player: Player)
 	end
 end
 
--- The player list shows money and deliveries.
+-- The player list shows the level, money and deliveries; the attributes carry the XP to the client.
 local function updateLeaderstats(player: Player)
 	local profile = profiles[player]
-	local stats = player:FindFirstChild("leaderstats")
-	if not profile or not stats then
+	if not profile then
 		return
 	end
+	local levelNow = Levels.levelFor(profile.xp)
+	if player:GetAttribute("Xp") ~= profile.xp then
+		player:SetAttribute("Xp", profile.xp)
+	end
+	if player:GetAttribute("Level") ~= levelNow then
+		player:SetAttribute("Level", levelNow)
+		player:SetAttribute("Rank", Levels.rank(levelNow))
+	end
+	local stats = player:FindFirstChild("leaderstats")
+	if not stats then
+		return
+	end
+	local level = stats:FindFirstChild("Level") :: IntValue?
 	local money = stats:FindFirstChild("Money") :: IntValue?
 	local deliveries = stats:FindFirstChild("Deliveries") :: IntValue?
+	if level then
+		level.Value = levelNow
+	end
 	if money then
 		money.Value = math.min(profile.money, 2 ^ 31 - 1)
 	end
@@ -234,6 +249,7 @@ function PlayerData.save(player: Player)
 		carPaint = profile.carPaint,
 		carGuns = profile.carGuns,
 		rep = profile.rep,
+		xp = profile.xp,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -318,6 +334,48 @@ function PlayerData.giveCar(player: Player, id: string): boolean
 	profile.cars[id] = true
 	changed:Fire(player)
 	return new
+end
+
+-- ── Driver levels (Config.Levels, shared/Levels.luau) ─────────────────────
+
+-- Adds XP; returns the new level and whether it went up.
+function PlayerData.addXp(player: Player, amount: number): (number, boolean)
+	local profile = profiles[player]
+	if not profile then
+		return 1, false
+	end
+	local before = Levels.levelFor(profile.xp)
+	if type(amount) ~= "number" or amount ~= amount or amount <= 0 then
+		return before, false
+	end
+	profile.xp = math.min(profile.xp + math.floor(amount + 0.5), 2 ^ 50)
+	local after = Levels.levelFor(profile.xp)
+	changed:Fire(player)
+	return after, after > before
+end
+
+-- The player's driver level (1 when not loaded).
+function PlayerData.level(player: Player): number
+	local profile = profiles[player]
+	return if profile then Levels.levelFor(profile.xp) else 1
+end
+
+-- The player's XP (0 when not loaded).
+function PlayerData.xp(player: Player): number
+	local profile = profiles[player]
+	return if profile then profile.xp else 0
+end
+
+-- Sets the driver level (the admin tools): the XP becomes exactly what that level needs. Returns the level.
+function PlayerData.setLevel(player: Player, level: number): number
+	local profile = profiles[player]
+	if not profile then
+		return 1
+	end
+	local target = math.clamp(math.floor(level), 1, Config.Levels.MaxLevel)
+	profile.xp = Levels.xpFor(target)
+	changed:Fire(player)
+	return target
 end
 
 function PlayerData.notify(player: Player)
