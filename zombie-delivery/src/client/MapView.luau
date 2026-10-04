@@ -39,23 +39,23 @@ local ROUTE_OFF = 40 -- studs off the route before it is worked out again
 local ROUTE_GAP = 0.5 -- seconds between two routes to the same target
 
 local C = {
-	land = Color3.fromRGB(47, 55, 45),
+	land = Color3.fromRGB(39, 52, 43),
 	snow = Color3.fromRGB(176, 186, 196),
-	water = Color3.fromRGB(38, 82, 112),
+	water = Color3.fromRGB(41, 78, 86),
 	shore = Color3.fromRGB(64, 112, 140),
 	ice = Color3.fromRGB(150, 196, 220),
 	yard = Color3.fromRGB(82, 84, 88),
 	special = Color3.fromRGB(96, 88, 62),
 	roadEdge = Color3.fromRGB(22, 24, 28),
-	road = Color3.fromRGB(128, 132, 140),
-	highway = Color3.fromRGB(208, 212, 218),
+	road = Color3.fromRGB(125, 138, 121),
+	highway = Color3.fromRGB(226, 230, 209),
 	bridge = Color3.fromRGB(184, 128, 78),
 	iceRoad = Color3.fromRGB(184, 228, 244),
-	safe = Color3.fromRGB(80, 255, 140),
-	job = Color3.fromRGB(255, 204, 40),
+	safe = Color3.fromRGB(153, 212, 125),
+	job = Ui.Colors.yellow,
 	gps = Color3.fromRGB(176, 92, 255),
 	routeEdge = Color3.fromRGB(20, 18, 24),
-	accent = Color3.fromRGB(255, 196, 50),
+	accent = Ui.Colors.yellow,
 }
 local BLOCK_COLORS = {
 	downtown = Color3.fromRGB(66, 68, 74),
@@ -63,8 +63,8 @@ local BLOCK_COLORS = {
 	suburbs = Color3.fromRGB(60, 74, 54),
 }
 local KIND_COLORS = {
-	shop = Color3.fromRGB(70, 170, 90),
-	employer = Color3.fromRGB(210, 150, 30),
+	shop = Ui.Colors.green,
+	employer = Ui.Colors.yellow,
 	place = Color3.fromRGB(150, 80, 200),
 }
 

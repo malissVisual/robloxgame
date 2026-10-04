@@ -1,20 +1,10 @@
 --!strict
 -- Small helpers for building the interface in code.
 
+local TweenService = game:GetService("TweenService")
+local Theme = require(script.Parent.Theme)
 local Ui = {}
-
-Ui.Colors = {
-	panel = Color3.fromRGB(22, 24, 28),
-	panelLight = Color3.fromRGB(38, 42, 48),
-	text = Color3.fromRGB(240, 240, 235),
-	dim = Color3.fromRGB(160, 165, 170),
-	money = Color3.fromRGB(120, 230, 110),
-	yellow = Color3.fromRGB(255, 196, 50),
-	red = Color3.fromRGB(230, 70, 60),
-	green = Color3.fromRGB(80, 200, 100),
-	blue = Color3.fromRGB(70, 140, 230),
-	grey = Color3.fromRGB(90, 96, 104),
-}
+Ui.Colors = Theme.Colors
 
 -- Instance.new + properties + parent. Returns any, so the caller can use the class's properties freely.
 function Ui.make(className: string, props: { [string]: any }, parent: Instance?): any
@@ -29,15 +19,18 @@ function Ui.make(className: string, props: { [string]: any }, parent: Instance?)
 end
 
 function Ui.corner(parent: Instance, radius: number?)
-	Ui.make("UICorner", { CornerRadius = UDim.new(0, radius or 10) }, parent)
+	Ui.make("UICorner", { CornerRadius = UDim.new(0, radius or Theme.Radius) }, parent)
 end
 
+-- Reuse the border when a caller highlights a panel; avoid overlapping double strokes.
 function Ui.stroke(parent: Instance, color: Color3?, thickness: number?): any
-	return Ui.make("UIStroke", {
-		Color = color or Color3.new(0, 0, 0),
-		Thickness = thickness or 2,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, parent)
+	local border: any = parent:FindFirstChild("UiBorder")
+	if not border then
+		border = Ui.make("UIStroke", { Name = "UiBorder", ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, parent)
+	end
+	border.Color = color or Theme.Border
+	border.Thickness = thickness or 1
+	return border
 end
 
 function Ui.padding(parent: Instance, pixels: number)
@@ -60,10 +53,11 @@ function Ui.panel(parent: Instance, size: UDim2, position: UDim2, anchor: Vector
 		Position = position,
 		AnchorPoint = anchor or Vector2.zero,
 		BackgroundColor3 = Ui.Colors.panel,
-		BackgroundTransparency = 0.15,
+		BackgroundTransparency = Theme.PanelTransparency,
 		BorderSizePixel = 0,
 	}, parent)
-	Ui.corner(frame, 12)
+	Ui.corner(frame, Theme.Radius)
+	Ui.stroke(frame, Theme.Border, 1)
 	return frame
 end
 
@@ -73,7 +67,7 @@ function Ui.label(parent: Instance, text: string, size: UDim2, props: { [string]
 		BackgroundTransparency = 1,
 		Text = text,
 		TextColor3 = Ui.Colors.text,
-		Font = Enum.Font.GothamBold,
+		Font = Theme.HeadingFont,
 		TextSize = 18,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextWrapped = true,
@@ -92,13 +86,26 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 		BackgroundColor3 = color,
 		BorderSizePixel = 0,
 		Text = text,
-		TextColor3 = Color3.new(1, 1, 1),
-		Font = Enum.Font.GothamBlack,
+		TextColor3 = Theme.textOn(color),
+		Font = Theme.HeadingFont,
 		TextSize = 18,
-		AutoButtonColor = true,
+		AutoButtonColor = false,
 	}, parent)
-	Ui.corner(button, 10)
-	Ui.stroke(button, Color3.new(0, 0, 0), 2)
+	Ui.corner(button, Theme.Radius)
+	local border = Ui.stroke(button, color:Lerp(Color3.new(1, 1, 1), 0.25), 1)
+	border.Transparency = 0.4
+	local feedback: Tween? = nil
+	local function highlight(on: boolean)
+		if feedback then feedback:Cancel() end
+		local tween = TweenService:Create(border, TweenInfo.new(0.12), { Transparency = if on then 0 else 0.4 })
+		feedback = tween
+		tween:Play()
+	end
+	button.MouseEnter:Connect(function() highlight(true) end)
+	button.MouseLeave:Connect(function() highlight(false) end)
+	button.SelectionGained:Connect(function() highlight(true) end)
+	button.SelectionLost:Connect(function() highlight(false) end)
+	button.Destroying:Connect(function() if feedback then feedback:Cancel() end end)
 	button.Activated:Connect(onClick)
 	return button
 end
@@ -112,7 +119,7 @@ function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Colo
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Text = text,
-		TextColor3 = textColor or Ui.Colors.text,
+		TextColor3 = textColor or Theme.textOn(color or Ui.Colors.panelLight),
 		Font = Enum.Font.GothamBold,
 		TextSize = 14,
 	}, parent)
@@ -122,7 +129,7 @@ function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Colo
 end
 
 function Ui.bar(parent: Instance, size: UDim2, color: Color3): (any, any)
-	local back = Ui.make("Frame", { Size = size, BackgroundColor3 = Color3.fromRGB(10, 10, 12), BorderSizePixel = 0 }, parent)
+	local back = Ui.make("Frame", { Size = size, BackgroundColor3 = Color3.fromRGB(10, 16, 13), BorderSizePixel = 0 }, parent)
 	Ui.corner(back, 6)
 	local fill = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BorderSizePixel = 0 }, back)
 	Ui.corner(fill, 6)

@@ -51,7 +51,7 @@ local function updateScale()
 	local size = camera.ViewportSize
 	local value = math.clamp(math.min(size.X / 1150, size.Y / 680), 0.55, 1.1)
 	for _, s in scales do
-		s.Scale = value
+		s.Scale = math.max(value, tonumber(s:GetAttribute("MinimumScale")) or 0)
 	end
 end
 
@@ -234,8 +234,8 @@ local function window(title: string, size: Vector2): Window
 	frame.Visible = false
 	frame.BackgroundTransparency = 0.05
 	frame.ZIndex = 5
-	Ui.stroke(frame, C.yellow, 2)
-	local titleLabel = Ui.label(frame, title, UDim2.new(1, -70, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBlack, TextColor3 = C.yellow })
+	Ui.stroke(frame, C.panelLight:Lerp(C.text, 0.2), 1)
+	local titleLabel = Ui.label(frame, title, UDim2.new(1, -70, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBold, TextColor3 = C.text })
 	local close = Ui.button(frame, "X", UDim2.fromOffset(40, 40), C.red, function()
 		frame.Visible = false
 	end)
@@ -261,9 +261,10 @@ local function card(parent: any, height: number, order: number, highlight: boole
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Ui.corner(frame, 10)
+	Ui.corner(frame, 8)
+	Ui.stroke(frame, C.panelLight:Lerp(C.text, 0.13), 1)
 	if highlight then
-		Ui.stroke(frame, C.yellow, 3)
+		Ui.stroke(frame, C.yellow, 1.5)
 	end
 	return frame
 end
@@ -933,6 +934,10 @@ local side = scaled(Ui.make("Frame", {
 	AnchorPoint = Vector2.new(1, 0.5),
 	BackgroundTransparency = 1,
 }, gui))
+if touchLayout then
+	local sideScale = side:FindFirstChildOfClass("UIScale")
+	if sideScale then sideScale:SetAttribute("MinimumScale", 44 / 52) end
+end
 Ui.list(side, true, 10)
 Ui.button(side, "JOBS  [J]", UDim2.fromOffset(150, 52), C.yellow, function()
 	if jobs.frame.Visible then
@@ -941,11 +946,11 @@ Ui.button(side, "JOBS  [J]", UDim2.fromOffset(150, 52), C.yellow, function()
 		openJobs()
 	end
 end).TextColor3 = Color3.new(0, 0, 0)
-Ui.button(side, "MAP  [M]", UDim2.fromOffset(150, 52), Color3.fromRGB(150, 90, 200), function()
+Ui.button(side, "MAP  [M]", UDim2.fromOffset(150, 52), C.panelLight, function()
 	MapView.toggle()
 end)
-Ui.button(side, "BAG  [B]", UDim2.fromOffset(150, 52), C.blue, toggleBackpack)
-Ui.button(side, "CAR", UDim2.fromOffset(150, 52), C.grey, function()
+Ui.button(side, "BAG  [B]", UDim2.fromOffset(150, 52), C.panelLight, toggleBackpack)
+Ui.button(side, "CAR", UDim2.fromOffset(150, 52), C.panelLight, function()
 	Net.get("SpawnCar"):FireServer()
 end)
 
@@ -1035,7 +1040,7 @@ local function renderWeapons()
 		weaponRow.Size = UDim2.new(1, 0, 0, 58)
 		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 58), BackgroundTransparency = 1 }, weaponRow)
 		Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right }, row)
-		local slot = Ui.make("Frame", { Size = UDim2.fromOffset(140, 58), BackgroundColor3 = Color3.fromRGB(20, 46, 76), BackgroundTransparency = 0.1 }, row)
+		local slot = Ui.make("Frame", { Size = UDim2.fromOffset(140, 58), BackgroundColor3 = C.panelLight, BackgroundTransparency = 0.1 }, row)
 		Ui.corner(slot, 10)
 		Ui.stroke(slot, C.blue, 2.5)
 		Ui.label(slot, if carGun.splash > 0 then "💥" else "🔫", UDim2.new(1, 0, 0, 30), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
@@ -1078,7 +1083,7 @@ local function renderWeapons()
 		local usable = not seated or def.oneHanded == true
 		local slot = Ui.make("TextButton", {
 			Size = UDim2.fromOffset(if current then 96 else 70, 58),
-			BackgroundColor3 = if current and usable then Color3.fromRGB(70, 60, 20) else C.panel,
+			BackgroundColor3 = if current and usable then C.panelLight else C.panel,
 			BackgroundTransparency = if usable then 0.1 else 0.45,
 			Text = "",
 			LayoutOrder = index,
@@ -1180,7 +1185,7 @@ end)
 
 -- ── Car panel ──────────────────────────────────────────────────────────────
 
-local carPanel = scaled(Ui.panel(gui, UDim2.fromOffset(380, 78), UDim2.new(0.5, 0, 1, -18), Vector2.new(0.5, 1)))
+local carPanel = scaled(Ui.panel(gui, UDim2.fromOffset(380, 86), UDim2.new(0.5, 0, 1, -18), Vector2.new(0.5, 1)))
 Ui.padding(carPanel, 10)
 local carName = Ui.label(carPanel, "", UDim2.new(0.6, 0, 0, 24), { TextSize = 20, Font = Enum.Font.GothamBlack })
 local speedLabel = Ui.label(carPanel, "", UDim2.new(0.4, 0, 0, 24), {
@@ -1190,9 +1195,12 @@ local speedLabel = Ui.label(carPanel, "", UDim2.new(0.4, 0, 0, 24), {
 	TextSize = 20,
 	Font = Enum.Font.GothamBlack,
 })
-local healthBack, healthFill = Ui.bar(carPanel, UDim2.new(1, 0, 0, 18), C.green)
+local healthBack, healthFill = Ui.bar(carPanel, UDim2.new(1, 0, 0, 8), C.green)
 healthBack.Position = UDim2.fromOffset(0, 32)
-local healthText = Ui.label(healthBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 14, ZIndex = 2 })
+local healthText = Ui.label(carPanel, "", UDim2.new(1, 0, 0, 18), {
+	Position = UDim2.fromOffset(0, 44), TextXAlignment = Enum.TextXAlignment.Left,
+	TextSize = 13, TextColor3 = C.dim, ZIndex = 2,
+})
 local hint = Ui.label(gui, "", UDim2.fromOffset(640, 22), {
 	Position = UDim2.new(0.5, 0, 1, if touchLayout then -262 else -104),
 	AnchorPoint = Vector2.new(0.5, 1),
@@ -1230,12 +1238,15 @@ local jobStep = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
 local jobInfo = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 18), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 15, Font = Enum.Font.GothamMedium })
 local cargoRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = 4, Visible = false }, jobPanel)
 Ui.list(cargoRow, false, 6)
-local conditionBack, conditionFill = Ui.bar(jobPanel, UDim2.new(1, 0, 0, 16), C.yellow)
+local conditionBack, conditionFill = Ui.bar(jobPanel, UDim2.new(1, 0, 0, 8), C.yellow)
 conditionBack.LayoutOrder = 5
-local conditionText = Ui.label(conditionBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 12, ZIndex = 2 })
+local conditionText = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
+	AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 6,
+	TextXAlignment = Enum.TextXAlignment.Left, TextSize = 14, TextColor3 = C.dim, ZIndex = 2,
+})
 
 -- Loading / unloading / boarding bar in the middle of the screen.
-local loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, 26), Color3.fromRGB(110, 190, 255))
+local loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, 26), C.blue)
 scaled(loadBack)
 loadBack.AnchorPoint = Vector2.new(0.5, 0.5)
 loadBack.Position = UDim2.fromScale(0.5, 0.62)

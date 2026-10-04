@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local Ui = require(script.Parent.Ui)
+local Theme = require(script.Parent.Theme)
 
 local Menu = {}
 
@@ -17,6 +18,7 @@ local player = Players.LocalPlayer
 local gui: any = nil
 local infoLabel: any = nil
 local flying = false
+local lastState: any = nil
 
 -- Camera stops around the depot (close enough to be streamed in), looped.
 local SHOTS = {
@@ -76,8 +78,9 @@ local function controls(enabled: boolean)
 end
 
 function Menu.setState(state: any)
+	lastState = state
 	if infoLabel and state then
-		infoLabel.Text = `Your company: {Ui.money(state.money)}  ·  {state.deliveries} deliveries  ·  {state.kills} zombies`
+		infoLabel.Text = `{Ui.money(state.money)}  ·  {state.deliveries} deliveries  ·  {state.kills} kills`
 	end
 end
 
@@ -85,88 +88,175 @@ function Menu.show(onPlay: () -> ())
 	gui = Ui.make("ScreenGui", {
 		Name = "StartScreen",
 		ResetOnSpawn = false,
-		IgnoreGuiInset = true,
+		IgnoreGuiInset = false,
 		DisplayOrder = 20,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	}, player:WaitForChild("PlayerGui"))
 
-	-- Dark edges.
-	for _, info in { { 0, 0 }, { 1, 180 } } do
-		local band = Ui.make("Frame", {
-			Size = UDim2.fromScale(1, 0.45),
-			Position = UDim2.fromScale(0, if info[1] == 0 then 0 else 0.55),
-			BackgroundColor3 = Color3.new(0, 0, 0),
-			BorderSizePixel = 0,
-			Active = false,
-			ZIndex = 1,
+	local C = Theme.Colors
+	if Theme.Images.menuBackground ~= "" then
+		Ui.make("ImageLabel", {
+			Name = "MenuArtwork", Size = UDim2.fromScale(1, 1), Image = Theme.Images.menuBackground,
+			ScaleType = Enum.ScaleType.Crop, BackgroundTransparency = 1, ZIndex = 1,
 		}, gui)
-		Ui.make("UIGradient", {
-			Rotation = 90 + info[2],
-			Transparency = NumberSequence.new(0.1, 1),
-		}, band)
 	end
+	-- An unobtrusive veil lets real-time world scenery remain the focal point.
+	local veil = Ui.make("Frame", {
+		Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.panel,
+		BackgroundTransparency = 0.35, BorderSizePixel = 0, Active = false, ZIndex = 2,
+	}, gui)
+	Ui.make("UIGradient", {
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.8) }),
+		Rotation = 0,
+	}, veil)
 
 	local center = Ui.make("Frame", {
-		Size = UDim2.fromOffset(760, 420),
-		Position = UDim2.fromScale(0.5, 0.45),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundTransparency = 1,
-		ZIndex = 5, -- above the dark edges, so nothing covers PLAY
+		Name = "DispatchMenu", Size = UDim2.fromOffset(560, 500),
+		Position = UDim2.new(0.08, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundTransparency = 1, ZIndex = 5,
 	}, gui)
-	local camera = workspace.CurrentCamera
-	local viewport = if camera then camera.ViewportSize else Vector2.new(1280, 720)
-	Ui.make("UIScale", { Scale = math.clamp(math.min(viewport.X / 900, viewport.Y / 560), 0.5, 1.2) }, center)
-
-	local function title(text: string, y: number, size: number, color: Color3)
-		local label = Ui.make("TextLabel", {
-			Size = UDim2.new(1, 0, 0, size + 10),
-			Position = UDim2.fromOffset(0, y),
-			BackgroundTransparency = 1,
-			Text = text,
-			TextSize = size,
-			Font = Enum.Font.GothamBlack,
-			TextColor3 = color,
-		}, center)
-		Ui.make("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 4 }, label)
-		return label
+	local menuScale = Ui.make("UIScale", {}, center)
+	local face = Ui.panel(center, UDim2.fromScale(1, 1), UDim2.new())
+	face.Name = "ShiftCard"
+	face.ZIndex = 5
+	local rail = Ui.make("Frame", {
+		Size = UDim2.new(0, 4, 1, -48), Position = UDim2.fromOffset(0, 24),
+		BackgroundColor3 = C.yellow, BorderSizePixel = 0, ZIndex = 6,
+	}, face)
+	Ui.corner(rail, 2)
+	Ui.label(face, "DEAD END DISPATCH   /   DELIVERY COMPANY", UDim2.fromOffset(510, 20), {
+		Position = UDim2.fromOffset(24, 22), TextSize = 14, TextColor3 = C.dim, ZIndex = 6,
+	})
+	local topTitle = Ui.label(face, "ZOMBIE", UDim2.fromOffset(510, 76), {
+		Position = UDim2.fromOffset(24, 60), TextSize = 64, Font = Theme.DisplayFont, ZIndex = 6,
+	})
+	local bottomTitle = Ui.label(face, "DELIVERY", UDim2.fromOffset(510, 76), {
+		Position = UDim2.fromOffset(24, 128), TextSize = 64, TextColor3 = C.yellow, Font = Theme.DisplayFont, ZIndex = 6,
+	})
+	if Theme.Images.logo ~= "" then
+		topTitle.Visible, bottomTitle.Visible = false, false
+		Ui.make("ImageLabel", {
+			Size = UDim2.fromOffset(510, 158), Position = UDim2.fromOffset(24, 52),
+			Image = Theme.Images.logo, ScaleType = Enum.ScaleType.Fit, BackgroundTransparency = 1, ZIndex = 6,
+		}, face)
 	end
-	title("ZOMBIE", 0, 96, Color3.fromRGB(150, 230, 90))
-	title("DELIVERY", 92, 96, Color3.fromRGB(255, 196, 50))
-	title("Deliver. Survive. Get paid.", 200, 26, Color3.fromRGB(240, 240, 235))
+	local tagline = Ui.label(face, "Deliver. Survive. Get paid.", UDim2.fromOffset(510, 30), {
+		Position = UDim2.fromOffset(24, 216), TextSize = 22, TextColor3 = C.dim, ZIndex = 6,
+	})
+	local company = Ui.panel(face, UDim2.fromOffset(512, 64), UDim2.fromOffset(24, 264))
+	company.BackgroundColor3 = C.panelLight
+	company.ZIndex = 6
+	Ui.label(company, "YOUR COMPANY", UDim2.fromOffset(488, 16), {
+		Position = UDim2.fromOffset(12, 10), TextSize = 12, TextColor3 = C.dim, ZIndex = 7,
+	})
+	infoLabel = Ui.label(company, "Loading your company...", UDim2.fromOffset(488, 24), {
+		Position = UDim2.fromOffset(12, 30), TextSize = 17, ZIndex = 7,
+	})
+	Menu.setState(lastState)
+	local play = Ui.button(face, "PLAY  /  START YOUR SHIFT", UDim2.fromOffset(512, 72), C.yellow, function() end)
+	play.Position = UDim2.fromOffset(24, 344)
+	play.TextSize = 23
+	play.ZIndex = 7
 
-	local play = Ui.button(center, "PLAY", UDim2.fromOffset(300, 84), Color3.fromRGB(70, 190, 90), function() end)
-	play.Position = UDim2.fromOffset(230, 262)
-	play.TextSize = 46
-	play.ZIndex = 10
-	-- A slow pulse.
-	TweenService:Create(play, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { BackgroundColor3 = Color3.fromRGB(100, 225, 120) }):Play()
-
-	infoLabel = title("Loading your company...", 360, 20, Color3.fromRGB(220, 220, 210))
+	-- Controls live on a separate card so the start screen remains readable on phones.
+	local help = Ui.panel(center, UDim2.fromScale(1, 1), UDim2.new())
+	help.Name = "ControlsCard"
+	help.ZIndex, help.Visible = 15, false
+	Ui.label(help, "CONTROLS", UDim2.fromOffset(460, 38), {
+		Position = UDim2.fromOffset(24, 22), TextSize = 28, TextColor3 = C.yellow, ZIndex = 16,
+	})
+	local closeHelp = Ui.button(help, "BACK", UDim2.fromOffset(116, 48), C.panelLight, function()
+		help.Visible, face.Visible = false, true
+	end)
+	closeHelp.Position, closeHelp.ZIndex = UDim2.fromOffset(420, 20), 16
+	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local controlsText: { { string } } = if touchLayout then {
+		{ "MOVE", "Left thumbstick" }, { "SHOOT", "FIRE button" },
+		{ "CARGO", "Tap prompts to pick up and load" }, { "PUT DOWN", "PUT DOWN / LET GO button" },
+		{ "WEAPONS", "Tap the weapon bar" }, { "ITEMS", "Tap the hotbar" },
+		{ "NAVIGATE", "JOBS / MAP / BAG / CAR buttons" }, { "EXIT CAR", "Jump button" },
+	} else {
+		{ "MOVE", "WASD / arrows    ·    Shift: sprint" }, { "COMBAT", "Mouse: aim    ·    RMB: aim    ·    LMB: shoot" },
+		{ "CARGO", "E: pick up / load    ·    G: put down" }, { "EQUIPMENT", "Q: switch weapon    ·    1–5: items" },
+		{ "WINDOWS", "J: jobs    ·    M: map    ·    B: bag" }, { "MOUSE", "Alt: free cursor" },
+		{ "VEHICLE", "E / R: enter    ·    Space: exit" }, { "ADMIN", "P: admin (when authorized)" },
+	}
+	local rows = {}
+	for i, entry in controlsText do
+		local row = Ui.make("Frame", {
+			Size = UDim2.fromOffset(512, 44), Position = UDim2.fromOffset(24, 84 + (i - 1) * 46),
+			BackgroundColor3 = C.panelLight, BackgroundTransparency = if i % 2 == 0 then 1 else 0.3,
+			BorderSizePixel = 0, ZIndex = 16,
+		}, help)
+		Ui.corner(row, 5)
+		Ui.label(row, entry[1], UDim2.fromOffset(128, 44), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = C.yellow, ZIndex = 17 })
+		Ui.label(row, entry[2], UDim2.fromOffset(366, 44), { Position = UDim2.fromOffset(140, 0), TextSize = 16, Font = Theme.Font, ZIndex = 17 })
+		table.insert(rows, row)
+	end
+	local controlsButton = Ui.button(face, "CONTROLS", UDim2.fromOffset(240, 44), C.panelLight, function()
+		help.Visible, face.Visible = true, false
+	end)
+	controlsButton.Position, controlsButton.ZIndex = UDim2.fromOffset(24, 430), 7
+	local enterHint = Ui.label(face, if touchLayout then "Tap PLAY to begin" else "Press ENTER to begin", UDim2.fromOffset(244, 44), {
+		Position = UDim2.fromOffset(292, 430), TextSize = 15, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
+	})
 	Ui.make("TextLabel", {
-		Size = UDim2.new(1, -240, 0, 44),
-		Position = UDim2.new(0.5, 0, 1, -12),
-		AnchorPoint = Vector2.new(0.5, 1),
-		TextWrapped = true,
-		TextYAlignment = Enum.TextYAlignment.Bottom,
-		BackgroundTransparency = 1,
-		Text = "PLAY (or Enter) · WASD drive · mouse aims, left mouse shoots · E pick up / load · G put down · Q gun · 1-5 items · M map · J jobs · B bag · Alt = mouse",
-		TextSize = 16,
-		Font = Enum.Font.GothamBold,
-		TextColor3 = Color3.fromRGB(200, 200, 200),
-		TextStrokeTransparency = 0.4,
+		Size = UDim2.fromOffset(200, 20), Position = UDim2.new(1, -12, 1, -8), AnchorPoint = Vector2.new(1, 1),
+		BackgroundTransparency = 1, Text = `version {Config.Version}`, TextXAlignment = Enum.TextXAlignment.Right,
+		TextSize = 14, Font = Theme.Font, TextColor3 = C.dim, ZIndex = 6,
 	}, gui)
 
-	Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(200, 20),
-		Position = UDim2.new(1, -12, 1, -8),
-		AnchorPoint = Vector2.new(1, 1),
-		BackgroundTransparency = 1,
-		Text = `version {Config.Version}`,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextSize = 14,
-		Font = Enum.Font.GothamBold,
-		TextColor3 = Color3.fromRGB(180, 180, 180),
-	}, gui)
+	local viewportConnection: RBXScriptConnection? = nil
+	local cameraConnection: RBXScriptConnection? = nil
+	local function fitMenu()
+		local camera = workspace.CurrentCamera
+		local v = if camera then camera.ViewportSize else Vector2.new(1280, 720)
+		local compact = v.Y < 480
+		local narrow = v.X < 600 and not compact
+		local height = if compact then 440 elseif narrow and help.Visible then 820 elseif narrow then 650 else 500
+		local factor = math.max(0.35, math.min((v.X - 32) / 560, (v.Y - 64) / height, 1.05))
+		menuScale.Scale = factor
+		center.Size = UDim2.fromOffset(560, height)
+		center.Position = if v.X < 900 then UDim2.fromScale(0.5, 0.5) else UDim2.new(0.08, 0, 0.5, 0)
+		center.AnchorPoint = if v.X < 900 then Vector2.new(0.5, 0.5) else Vector2.new(0, 0.5)
+		topTitle.Position = UDim2.fromOffset(24, if compact then 48 else 60)
+		bottomTitle.Position = UDim2.fromOffset(24, if compact then 110 else 128)
+		tagline.Position = UDim2.fromOffset(24, if compact then 192 else 216)
+		company.Position = UDim2.fromOffset(24, if compact then 234 else 264)
+		company.Size = UDim2.fromOffset(512, if narrow then 112 else 64)
+		infoLabel.TextSize = math.max(17, 14 / factor)
+		infoLabel.Size = UDim2.fromOffset(488, if narrow then 70 else 24)
+		tagline.TextSize = math.max(22, 14 / factor)
+		enterHint.TextSize = math.max(15, 12 / factor)
+		play.Position = UDim2.fromOffset(24, if compact then 308 elseif narrow then 392 else 344)
+		play.Size = UDim2.fromOffset(512, math.max(if compact then 56 else 72, 44 / factor))
+		local controlY = if compact then 374 elseif narrow then 498 else 430
+		controlsButton.Position = UDim2.fromOffset(24, controlY)
+		controlsButton.Size = UDim2.fromOffset(240, math.max(44, 44 / factor))
+		enterHint.Position = UDim2.fromOffset(292, controlY)
+		closeHelp.Size = UDim2.fromOffset(116, math.max(48, 44 / factor))
+		for i, row in rows do
+			local gap = if compact then 41 elseif narrow then 86 else 46
+			local rowHeight = if narrow then 80 else 44
+			row.Position = UDim2.fromOffset(24, 84 + (i - 1) * gap)
+			row.Size = UDim2.fromOffset(512, rowHeight)
+			for _, child in row:GetChildren() do
+				if child:IsA("TextLabel") then
+					child.Size = UDim2.new(child.Size.X.Scale, child.Size.X.Offset, 0, rowHeight)
+					child.TextSize = math.max(16, 13 / factor)
+				end
+			end
+		end
+	end
+	local function watchCamera()
+		if viewportConnection then viewportConnection:Disconnect() end
+		local camera = workspace.CurrentCamera
+		viewportConnection = if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMenu) else nil
+		fitMenu()
+	end
+	cameraConnection = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
+	watchCamera()
+	help:GetPropertyChangedSignal("Visible"):Connect(fitMenu)
 
 	-- The black fade only shows (and only exists in front of PLAY) after PLAY was pressed.
 	local fade = Ui.make("Frame", {
@@ -185,6 +275,8 @@ function Menu.show(onPlay: () -> ())
 			return
 		end
 		pressed = true
+		if viewportConnection then viewportConnection:Disconnect() end
+		if cameraConnection then cameraConnection:Disconnect() end
 		if keyConnection then
 			keyConnection:Disconnect()
 		end
