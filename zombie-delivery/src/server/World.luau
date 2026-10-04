@@ -3,8 +3,13 @@
 -- gets the same world): the land, the river and the sea (terrain water), the three districts (Downtown, Harbor,
 -- Suburbs), the bridges, the highways with the mountain tunnel (terrain), the far places (Military Base, Radio
 -- Station, Old Farm, Harbor Docks, Gas Station, Silver Spur Ranch, Riverside Riding School, Harbor Fuel Depot), the
--- depot and the four shops, lamps, wrecks, forests and the light. Every employer stands at their WORK HERE board
--- (an R15 person from server/Npcs.luau); horses graze at the ranch and the riding school (server/Animals.luau).
+-- depot and the four shops, the First Zombie Bank and the City Clinic, street lamps, wrecks, forests and the light.
+-- Every employer stands at their WORK HERE board (an R15 person from server/Npcs.luau); horses graze at the ranch and
+-- the riding school (server/Animals.luau).
+--
+-- The night: the street lamps, the lit windows and the night lights of the far places are registered with
+-- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
+-- (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,6 +21,7 @@ local Map = require(Shared.Map)
 
 local Npcs = require(script.Parent.Npcs)
 local Animals = require(script.Parent.Animals)
+local DayNight = require(script.Parent.DayNight)
 
 local World = {}
 
@@ -61,6 +67,7 @@ local CONTAINER_COLORS = {
 	Color3.fromRGB(150, 80, 120),
 }
 local ASPHALT = Color3.fromRGB(46, 46, 50)
+local GLASS_BLUE = Color3.fromRGB(150, 190, 210)
 local LINE = Color3.fromRGB(200, 170, 60)
 
 -- ── Helpers ────────────────────────────────────────────────────────────────
@@ -116,13 +123,21 @@ local function tiled(parent: Instance, name: string, x0: number, x1: number, z0:
 	return list
 end
 
-local function light(parent: Instance, range: number, brightness: number, color: Color3)
+local function light(parent: Instance, range: number, brightness: number, color: Color3): PointLight
 	local l = Instance.new("PointLight")
 	l.Range = range
 	l.Brightness = brightness
 	l.Color = color
 	l.Shadows = false
 	l.Parent = parent
+	return l
+end
+
+-- A window that is dark glass (its colour now) by day and warm light at night (DayNight switches it).
+local WINDOW_LIT = Color3.fromRGB(255, 210, 120)
+local WINDOW_DIM = Color3.fromRGB(40, 50, 60)
+local function nightWindow(p: Part, lit: Color3?)
+	DayNight.nightLight(p, lit or WINDOW_LIT, p.Color, "Glass")
 end
 
 local function sign(parent: Instance, text: string, size: Vector3, cframe: CFrame, color: Color3, background: Color3?)
@@ -202,11 +217,32 @@ local function wreck(parent: Instance, cframe: CFrame, color: Color3?)
 	model.Parent = parent
 end
 
-local function lamp(parent: Instance, x: number, z: number, base: number?)
+-- A street lamp: a pole, an arm reaching over the road (`reach`: the flat direction) and a head that glows at night.
+-- Only the lamps with `beam` carry a real light (a SpotLight shining down: a pool of light on the road); the others
+-- just glow (cheap). DayNight switches them all with the night.
+local LAMP_LIT = Color3.fromRGB(255, 214, 150)
+local LAMP_DIM = Color3.fromRGB(170, 170, 160)
+local LAMP_POLE = Color3.fromRGB(50, 50, 54)
+local function lamp(parent: Instance, x: number, z: number, base: number?, reach: Vector3?, beam: boolean?)
 	local y = base or WALK_TOP
-	part(parent, "Pole", Vector3.new(0.6, 16, 0.6), CFrame.new(x, y + 8, z), Color3.fromRGB(50, 50, 54), Enum.Material.Metal)
-	local head = deco(part(parent, "Lamp", Vector3.new(1.6, 0.6, 1.6), CFrame.new(x, y + 16, z), Color3.fromRGB(255, 220, 160), Enum.Material.Neon))
-	light(head, 42, 1.4, Color3.fromRGB(255, 210, 150))
+	local out = if reach and reach.Magnitude > 0.01 then Vector3.new(reach.X, 0, reach.Z).Unit else Vector3.new(-1, 0, 0)
+	part(parent, "Pole", Vector3.new(0.6, 16, 0.6), CFrame.new(x, y + 8, z), LAMP_POLE, Enum.Material.Metal)
+	local foot = Vector3.new(x, y + 15.8, z)
+	deco(part(parent, "LampArm", Vector3.new(0.35, 0.35, 4.4), CFrame.lookAt(foot + out * 2.2, foot + out * 4.4), LAMP_POLE, Enum.Material.Metal))
+	local at = foot + out * 4.2 - Vector3.new(0, 0.3, 0)
+	deco(part(parent, "LampHood", Vector3.new(2, 0.3, 1.4), CFrame.lookAt(at + Vector3.new(0, 0.3, 0), at + Vector3.new(0, 0.3, 0) + out), LAMP_POLE, Enum.Material.Metal))
+	local head = deco(part(parent, "Lamp", Vector3.new(1.7, 0.3, 1.1), CFrame.lookAt(at, at + out), LAMP_DIM, Enum.Material.Glass))
+	if beam ~= false then
+		local spot = Instance.new("SpotLight")
+		spot.Face = Enum.NormalId.Bottom
+		spot.Angle = 120
+		spot.Range = 40
+		spot.Brightness = 2.4
+		spot.Color = Color3.fromRGB(255, 208, 150)
+		spot.Shadows = false
+		spot.Parent = head
+	end
+	DayNight.nightLight(head, LAMP_LIT, LAMP_DIM, "Glass")
 end
 
 -- A closed building with a door in the front wall. frame: origin at the floor centre, -Z (LookVector) = the front.
@@ -379,13 +415,19 @@ local function buildDistrictRoads(parent: Instance, d: Map.District)
 			deco(part(parent, "Line", Vector3.new(BLOCK, 0.05, 0.6), CFrame.new(cx, ROAD_TOP + 0.02, z), LINE))
 		end
 	end
-	-- Lamps at the crossings.
+	-- Lamps at the crossings (on the corner, the arm over the crossing). Downtown has one at every crossing, the other
+	-- districts at every other one; about half of them carry a real light, the rest only glow.
+	local reach = Vector3.new(-1, 0, -1)
 	for kx = d.i0 - 1, d.i1 do
 		for kz = d.j0 - 1, d.j1 do
 			local x = d.ox + (kx + 0.5) * CELL + ROAD / 2 + 2
 			local z = d.oz + (kz + 0.5) * CELL + ROAD / 2 + 2
-			if x < x1 and z < z1 and (d.style == "downtown" or (kx + kz) % 2 == 0) then
-				lamp(parent, x, z)
+			if d.style == "downtown" then
+				if x < x1 and z < z1 then
+					lamp(parent, x, z, nil, reach, (kx + kz) % 2 == 0)
+				end
+			elseif x < x1 and z < z1 and (kx + kz) % 2 == 0 then
+				lamp(parent, x, z, nil, reach, kx % 2 == 0)
 			end
 		end
 	end
@@ -398,15 +440,18 @@ local function windowStrips(parent: Instance, cx: number, cz: number, w: number,
 		for side = 0, 3 do
 			local faceWidth = if side % 2 == 0 then w else d
 			local faceDepth = if side % 2 == 0 then d else w
-			local lit = rng:NextNumber() < 0.25
-			deco(part(
+			local lit = rng:NextNumber() < 0.25 -- these light up at night
+			local window = deco(part(
 				parent,
 				"Window",
 				Vector3.new(faceWidth - 4, 3, 0.3),
 				CFrame.new(cx, y, cz) * CFrame.Angles(0, side * math.pi / 2, 0) * CFrame.new(0, 0, faceDepth / 2 + 0.1),
-				if lit then Color3.fromRGB(255, 210, 120) else Color3.fromRGB(30, 36, 44),
-				if lit then Enum.Material.Neon else Enum.Material.Glass
+				Color3.fromRGB(30, 36, 44),
+				Enum.Material.Glass
 			))
+			if lit then
+				nightWindow(window)
+			end
 		end
 	end
 end
@@ -495,7 +540,10 @@ local function house(parent: Instance, frame: CFrame)
 	part(parent, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -d / 2 - 0.2), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
 	for _, x in { -w / 3, w / 3 } do
 		local lit = rng:NextNumber() < 0.3
-		deco(part(parent, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -d / 2 - 0.15), if lit then Color3.fromRGB(255, 210, 120) else Color3.fromRGB(40, 50, 60), if lit then Enum.Material.Neon else Enum.Material.Glass))
+		local window = deco(part(parent, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -d / 2 - 0.15), Color3.fromRGB(40, 50, 60), Enum.Material.Glass))
+		if lit then
+			nightWindow(window)
+		end
 	end
 end
 
@@ -674,6 +722,8 @@ end
 local buildSchool: (Instance, number, number) -> ()
 local buildFrosty: (Instance, number, number) -> ()
 local buildMovers: (Instance, number, number) -> ()
+local buildBank: (Instance, number, number) -> ()
+local buildClinic: (Instance, number, number) -> ()
 
 -- What each employer's person wears (server/Npcs.luau roles).
 local EMPLOYER_ROLES: { [string]: string } = {
@@ -684,6 +734,7 @@ local EMPLOYER_ROLES: { [string]: string } = {
 	farm = "farmer",
 	ranch = "rancher",
 	gas = "attendant",
+	clinic = "doctor",
 }
 
 -- "Walt, the rancher" → "Walt" and "Rancher · Silver Spur Ranch"; "Captain Reyes" → itself and the place's name.
@@ -805,6 +856,179 @@ function buildMovers(parent: Instance, cx: number, cz: number)
 	employerBoard(movers, "movers", facing)
 end
 
+-- A person who only stands there (a guard, a nurse): an R15 NPC from server/Npcs.luau, or nothing if none can be made.
+local function bystander(role: string, person: string, place: string, at: CFrame)
+	local ok, err = pcall(function()
+		local who, title = nameAndTitle(person, place)
+		local feet = at.Position
+		Npcs.spawn(Npcs.look(role, who, title), CFrame.lookAt(feet, feet + at.LookVector))
+	end)
+	if not ok then
+		warn(`[World] no {person} at {place}: {err}`)
+	end
+end
+
+-- ── First Zombie Bank ──────────────────────────────────────────────────────
+-- Downtown, just north of the safe zone, its front on the avenue to the North Highway: a marble hall with a portico
+-- of columns, steps down to the curb where the armored truck loads the cash (Map.CargoSpots.bank), the vault door
+-- inside, a guard at the door.
+
+local MARBLE = Color3.fromRGB(214, 208, 192)
+local GOLD = Color3.fromRGB(226, 182, 64)
+
+function buildBank(parent: Instance, cx: number, cz: number)
+	local bank = folder(parent, "FirstZombieBank")
+	sidewalk(bank, cx, cz, Color3.fromRGB(168, 162, 150))
+	local facing = Vector3.new(-1, 0, 0)
+	local w, d, h = 72, 56, 24
+	local frame = shopFrame(cx, cz, facing, 14)
+	building(bank, frame, w, d, h, MARBLE, Enum.Material.Marble, 12, 14)
+	local front = -d / 2
+	-- The portico: a platform with a step, six columns, the beam with the name and the pediment over it.
+	part(bank, "Portico", Vector3.new(48, 1.2, 10), frame * CFrame.new(0, 0.6, front - 5), MARBLE, Enum.Material.Marble)
+	part(bank, "Step", Vector3.new(48, 0.6, 3), frame * CFrame.new(0, 0.3, front - 11.5), MARBLE:Lerp(Color3.new(0, 0, 0), 0.08), Enum.Material.Marble)
+	for _, x in { -21, -15, -9, 9, 15, 21 } do
+		cylinder(bank, "Column", 18.6, 2.4, frame * CFrame.new(x, 1.2 + 9.3, front - 7.5) * UPRIGHT, MARBLE, Enum.Material.Marble)
+		part(bank, "ColumnBase", Vector3.new(3.2, 0.6, 3.2), frame * CFrame.new(x, 1.5, front - 7.5), MARBLE, Enum.Material.Marble)
+		part(bank, "ColumnCap", Vector3.new(3.2, 0.6, 3.2), frame * CFrame.new(x, 19.5, front - 7.5), MARBLE, Enum.Material.Marble)
+	end
+	part(bank, "Beam", Vector3.new(50, 2.6, 10), frame * CFrame.new(0, 21.1, front - 5), MARBLE, Enum.Material.Marble)
+	gableRoof(bank, frame * CFrame.new(0, 22.4, front - 5) * CFrame.Angles(0, math.pi / 2, 0), 10, 50, 6.5, MARBLE)
+	sign(bank, "FIRST ZOMBIE BANK", Vector3.new(40, 2.2, 0.3), frame * CFrame.new(0, 21.1, front - 10.16), GOLD, Color3.fromRGB(34, 52, 44))
+	local coin = deco(part(bank, "Coin", Vector3.new(0.3, 3.6, 3.6), frame * CFrame.new(0, 24.6, front - 10.1) * CFrame.Angles(0, math.pi / 2, 0), GOLD, Enum.Material.Metal))
+	coin.Shape = Enum.PartType.Cylinder
+	-- A copper dome on the roof.
+	part(bank, "DomeBase", Vector3.new(22, 1.2, 22), frame * CFrame.new(0, h + 1.6, 6), MARBLE, Enum.Material.Marble)
+	cylinder(bank, "DomeDrum", 7, 16, frame * CFrame.new(0, h + 5.2, 6) * UPRIGHT, MARBLE, Enum.Material.Marble)
+	local dome = part(bank, "Dome", Vector3.new(16, 16, 16), frame * CFrame.new(0, h + 8.7, 6), Color3.fromRGB(96, 140, 118), Enum.Material.Metal)
+	dome.Shape = Enum.PartType.Ball
+	-- Tall windows beside the door: they glow at night; lanterns at the door, a light under the portico.
+	for _, x in { -27, -17, 17, 27 } do
+		nightWindow(deco(part(bank, "Window", Vector3.new(5, 12, 0.2), frame * CFrame.new(x, 9, front - 0.6), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 226, 160))
+	end
+	for _, x in { -7.6, 7.6 } do
+		local lantern = deco(part(bank, "Lantern", Vector3.new(1, 1.8, 1), frame * CFrame.new(x, 9, front - 0.9), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+		DayNight.nightLight(lantern, Color3.fromRGB(255, 220, 140), Color3.fromRGB(150, 140, 110), "Glass")
+	end
+	local porch = deco(part(bank, "PorticoLight", Vector3.new(3, 0.3, 3), frame * CFrame.new(0, 19.6, front - 5), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+	light(porch, 34, 1.6, Color3.fromRGB(255, 222, 170))
+	DayNight.nightLight(porch, Color3.fromRGB(255, 230, 170), Color3.fromRGB(150, 140, 110), "Glass")
+	-- Inside: the tellers' counter behind glass, the round vault door in the back wall, gold bars on a cart.
+	part(bank, "TellerCounter", Vector3.new(40, 4, 3), frame * CFrame.new(0, 2, 4), Color3.fromRGB(96, 66, 44), Enum.Material.Wood)
+	local screen = part(bank, "TellerGlass", Vector3.new(40, 4, 0.2), frame * CFrame.new(0, 6, 4), GLASS_BLUE, Enum.Material.Glass)
+	screen.Transparency = 0.6
+	local vault = frame * CFrame.new(0, 7.5, d / 2 - 1.6) * CFrame.Angles(0, math.pi / 2, 0)
+	cylinder(bank, "VaultDoor", 1.2, 13, vault, Color3.fromRGB(150, 150, 156), Enum.Material.DiamondPlate)
+	cylinder(bank, "VaultHub", 1.8, 3, vault * CFrame.new(0.6, 0, 0), GOLD, Enum.Material.Metal)
+	for n = 0, 2 do
+		deco(part(bank, "VaultSpoke", Vector3.new(0.4, 0.5, 8), vault * CFrame.new(1, 0, 0) * CFrame.Angles(n * math.pi / 3, 0, 0), GOLD, Enum.Material.Metal))
+	end
+	part(bank, "Cart", Vector3.new(5, 0.4, 3), frame * CFrame.new(-14, 2, 18), Color3.fromRGB(70, 70, 76), Enum.Material.Metal)
+	for n = 0, 5 do
+		local bar = part(bank, "GoldBar", Vector3.new(1.4, 0.6, 0.8), frame * CFrame.new(-15.6 + (n % 3) * 1.6, 2.5 + math.floor(n / 3) * 0.6, 18), GOLD, Enum.Material.Metal)
+		bar.Reflectance = 0.2
+	end
+	-- Flags at the corners of the forecourt, a sign at the curb for the armored trucks.
+	for _, x in { -33, 33 } do
+		part(bank, "FlagPole", Vector3.new(0.5, 18, 0.5), frame * CFrame.new(x, 9, front - 14), Color3.fromRGB(210, 210, 210), Enum.Material.Metal)
+		deco(part(bank, "Flag", Vector3.new(6, 3.6, 0.2), frame * CFrame.new(x + (if x > 0 then -3.2 else 3.2), 15.8, front - 14), Color3.fromRGB(40, 110, 70), Enum.Material.Fabric))
+	end
+	local spot = Map.CargoSpots.bank
+	local post = Vector3.new(spot.pile.x - 2, WALK_TOP, spot.pile.z - 15)
+	part(bank, "SignPost", Vector3.new(0.4, 7, 0.4), CFrame.new(post + Vector3.new(0, 3.5, 0)), Color3.fromRGB(60, 60, 60), Enum.Material.Metal)
+	sign(bank, "ARMORED TRUCKS ONLY", Vector3.new(7, 2, 0.2), CFrame.lookAt(post + Vector3.new(0, 6.4, 0), post + Vector3.new(0, 6.4, 0) + facing), Color3.fromRGB(255, 255, 255), Color3.fromRGB(34, 52, 44))
+	-- The guard by the door (on a cash run the manager brings the sacks out to the curb).
+	bystander("guard", "Sam, the bank guard", "First Zombie Bank", frame * CFrame.new(12, 1.2, front - 9.6))
+end
+
+-- ── City Clinic ────────────────────────────────────────────────────────────
+-- Downtown, south-west of the depot: a white two-storey clinic with blue windows, the emergency canopy over the
+-- sidewalk where the ambulance unloads (Map.CargoSpots.clinic), a helipad on the roof, beds inside. Dr. Novak hires
+-- ambulance drivers at the WORK HERE board beside the front; a nurse waits under the canopy.
+
+local CLINIC_WHITE = Color3.fromRGB(238, 240, 236)
+local CLINIC_RED = Color3.fromRGB(214, 36, 40)
+
+-- A red cross (two bars) on a plane: frame at its centre, facing -Z.
+local function redCross(parent: Instance, frame: CFrame, size: number)
+	deco(part(parent, "Cross", Vector3.new(size, size / 3, 0.3), frame, CLINIC_RED, Enum.Material.Neon))
+	deco(part(parent, "Cross", Vector3.new(size / 3, size, 0.3), frame, CLINIC_RED, Enum.Material.Neon))
+end
+
+function buildClinic(parent: Instance, cx: number, cz: number)
+	local clinic = folder(parent, "CityClinic")
+	sidewalk(clinic, cx, cz, Color3.fromRGB(176, 178, 176))
+	local facing = Vector3.new(1, 0, 0)
+	local spot = Map.CargoSpots.clinic
+	-- The building is centred on the emergency entrance (in line with the cargo spot), set back 10 in the block.
+	local origin = Vector3.new(cx - 10, WALK_TOP, spot.pile.z)
+	local frame = CFrame.lookAt(origin, origin + facing)
+	local w, d, h = 84, 56, 26
+	building(clinic, frame, w, d, h, CLINIC_WHITE, Enum.Material.Concrete, 14, 11)
+	local front = -d / 2
+	sign(clinic, "CITY CLINIC", Vector3.new(44, 5, 0.5), frame * CFrame.new(0, h + 4, front), CLINIC_RED, Color3.fromRGB(250, 250, 250))
+	-- Window bands on both floors (they glow cold white at night), a red cross on the front.
+	local paneDim, paneLit = Color3.fromRGB(110, 150, 180), Color3.fromRGB(226, 240, 255)
+	for _, x in { -26, 26 } do
+		for _, y in { 6.5, 17.5 } do
+			local pane = deco(part(clinic, "Window", Vector3.new(26, 4, 0.2), frame * CFrame.new(x, y, front - 0.6), paneDim, Enum.Material.Glass))
+			DayNight.nightLight(pane, paneLit, paneDim, "Glass")
+		end
+	end
+	local over = deco(part(clinic, "Window", Vector3.new(12, 4, 0.2), frame * CFrame.new(0, 19, front - 0.6), paneDim, Enum.Material.Glass))
+	DayNight.nightLight(over, paneLit, paneDim, "Glass")
+	deco(part(clinic, "CrossPanel", Vector3.new(7, 6.6, 0.3), frame * CFrame.new(-36, 12, front - 0.65), Color3.fromRGB(250, 250, 250), Enum.Material.SmoothPlastic))
+	redCross(clinic, frame * CFrame.new(-36, 12, front - 0.85), 5.4)
+	-- The emergency canopy from the door out to the curb: the ambulance unloads under it.
+	local toCurb = (origin.X + d / 2) - (cx + BLOCK / 2) -- negative: the curb is in front of the wall
+	local length = -toCurb - 2
+	local mid = front - length / 2
+	part(clinic, "Canopy", Vector3.new(26, 0.8, length), frame * CFrame.new(0, 13.4, mid), CLINIC_WHITE, Enum.Material.Metal)
+	deco(part(clinic, "CanopyTrim", Vector3.new(26.4, 0.5, length + 0.4), frame * CFrame.new(0, 12.9, mid), CLINIC_RED, Enum.Material.SmoothPlastic))
+	for _, x in { -12, 12 } do
+		part(clinic, "CanopyPost", Vector3.new(0.8, 13, 0.8), frame * CFrame.new(x, 6.5, front - length + 1), Color3.fromRGB(200, 200, 204), Enum.Material.Metal)
+	end
+	sign(clinic, "EMERGENCY", Vector3.new(18, 2.6, 0.3), frame * CFrame.new(0, 14.6, front - length - 0.2), Color3.fromRGB(255, 255, 255), CLINIC_RED)
+	local panel = deco(part(clinic, "CanopyLight", Vector3.new(8, 0.2, 2), frame * CFrame.new(0, 12.6, mid), Color3.fromRGB(190, 196, 200), Enum.Material.Glass))
+	light(panel, 30, 1.8, Color3.fromRGB(235, 245, 255))
+	DayNight.nightLight(panel, Color3.fromRGB(240, 248, 255), Color3.fromRGB(190, 196, 200), "Glass")
+	-- A sign at the curb, a bench by the door.
+	local post = Vector3.new(spot.pile.x + 1, WALK_TOP, spot.pile.z + 19)
+	part(clinic, "SignPost", Vector3.new(0.4, 7, 0.4), CFrame.new(post + Vector3.new(0, 3.5, 0)), Color3.fromRGB(60, 60, 60), Enum.Material.Metal)
+	sign(clinic, "AMBULANCES ONLY", Vector3.new(7, 2, 0.2), CFrame.lookAt(post + Vector3.new(0, 6.4, 0), post + Vector3.new(0, 6.4, 0) + facing), Color3.fromRGB(255, 255, 255), CLINIC_RED)
+	local bench = frame * CFrame.new(24, 0, front - 4)
+	part(clinic, "Bench", Vector3.new(8, 0.5, 2), bench * CFrame.new(0, 1.8, 0), Color3.fromRGB(110, 80, 56), Enum.Material.WoodPlanks)
+	part(clinic, "BenchBack", Vector3.new(8, 2, 0.4), bench * CFrame.new(0, 3, 0.9), Color3.fromRGB(110, 80, 56), Enum.Material.WoodPlanks)
+	for _, x in { -3.4, 3.4 } do
+		part(clinic, "BenchLeg", Vector3.new(0.4, 1.6, 1.8), bench * CFrame.new(x, 0.8, 0), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+	end
+	-- On the roof: the helipad with its H and lights, a big red cross seen from the road.
+	cylinder(clinic, "Helipad", 0.3, 26, frame * CFrame.new(10, h + 1.15, 6) * UPRIGHT, Color3.fromRGB(70, 74, 78), Enum.Material.Concrete)
+	for _, piece in { { 1.6, 10, -3 }, { 1.6, 10, 3 }, { 6, 1.6, 0 } } do
+		deco(part(clinic, "H", Vector3.new(piece[1], 0.05, piece[2]), frame * CFrame.new(10 + piece[3], h + 1.32, 6), Color3.fromRGB(240, 240, 240)))
+	end
+	for n = 0, 5 do
+		local angle = n * math.pi / 3
+		local beacon = deco(part(clinic, "PadLight", Vector3.new(0.6, 0.4, 0.6), frame * CFrame.new(10 + math.cos(angle) * 12, h + 1.4, 6 + math.sin(angle) * 12), Color3.fromRGB(120, 140, 110), Enum.Material.Glass))
+		DayNight.nightLight(beacon, Color3.fromRGB(120, 255, 120), Color3.fromRGB(120, 140, 110), "Glass")
+	end
+	part(clinic, "CrossPost", Vector3.new(0.6, 6, 0.6), frame * CFrame.new(-28, h + 3.5, front + 4.6), Color3.fromRGB(90, 90, 94), Enum.Material.Metal)
+	deco(part(clinic, "CrossSign", Vector3.new(11, 11, 0.4), frame * CFrame.new(-28, h + 9, front + 4), Color3.fromRGB(250, 250, 250), Enum.Material.SmoothPlastic))
+	redCross(clinic, frame * CFrame.new(-28, h + 9, front + 3.7), 9)
+	-- Inside: the reception desk, beds with curtains along the back wall.
+	part(clinic, "Reception", Vector3.new(14, 4, 3), frame * CFrame.new(-16, 2, -8), Color3.fromRGB(220, 222, 226), Enum.Material.SmoothPlastic)
+	for _, x in { -32, -22, 22, 32 } do
+		local bed = frame * CFrame.new(x, 0, d / 2 - 7)
+		part(clinic, "BedFrame", Vector3.new(4, 1.6, 8), bed * CFrame.new(0, 0.8, 0), Color3.fromRGB(150, 156, 160), Enum.Material.Metal)
+		part(clinic, "Mattress", Vector3.new(3.8, 0.8, 7.6), bed * CFrame.new(0, 2, 0), Color3.fromRGB(245, 245, 248), Enum.Material.Fabric)
+		part(clinic, "Pillow", Vector3.new(3, 0.6, 1.6), bed * CFrame.new(0, 2.7, 2.8), Color3.fromRGB(250, 250, 252), Enum.Material.Fabric)
+		local curtain = deco(part(clinic, "Curtain", Vector3.new(0.2, 7, 9), bed * CFrame.new(-2.6, 4.2, 0), Color3.fromRGB(150, 200, 200), Enum.Material.Fabric))
+		curtain.Transparency = 0.2
+	end
+	employerBoard(clinic, "clinic", facing)
+	bystander("nurse", "Nurse Kim", "City Clinic", frame * CFrame.new(-8, 0, front - 6))
+end
+
 -- A big icon with the name over every shop, employer and far place, seen from afar (the way to find things).
 local function buildLandmarkTags(parent: Instance)
 	local tags = folder(parent, "LandmarkTags")
@@ -867,6 +1091,12 @@ local function buildDistrict(parent: Instance, d: Map.District)
 				continue
 			elseif special == "movers" then
 				buildMovers(district, cx, cz)
+				continue
+			elseif special == "bank" then
+				buildBank(district, cx, cz)
+				continue
+			elseif special == "clinic" then
+				buildClinic(district, cx, cz)
 				continue
 			elseif special then
 				continue
@@ -994,7 +1224,7 @@ local function buildConnectors(parent: Instance)
 				local p = (frame * CFrame.new(side * (s.width / 2 + 4), 0, (n / (count + 1) - 0.5) * length)).Position
 				local tunnel = math.abs(p.X - Map.Mountain.x) < 60 and p.Z > Map.Mountain.tunnelZ0 - 20 and p.Z < Map.Mountain.tunnelZ1 + 20
 				if not tunnel then
-					lamp(roads, p.X, p.Z, ROAD_TOP)
+					lamp(roads, p.X, p.Z, ROAD_TOP, frame.RightVector * -side, true)
 				end
 			end
 		end
@@ -1079,8 +1309,9 @@ local function watchtower(parent: Instance, x: number, z: number)
 	end
 	part(parent, "Platform", Vector3.new(9, 1, 9), CFrame.new(x, ROAD_TOP + 20, z), wood, Enum.Material.WoodPlanks)
 	part(parent, "TowerRoof", Vector3.new(10, 1, 10), CFrame.new(x, ROAD_TOP + 27, z), Color3.fromRGB(70, 80, 60), Enum.Material.Metal)
-	local lamp_ = deco(part(parent, "Searchlight", Vector3.new(1.5, 1.5, 1.5), CFrame.new(x, ROAD_TOP + 22, z), Color3.fromRGB(255, 250, 220), Enum.Material.Neon))
+	local lamp_ = deco(part(parent, "Searchlight", Vector3.new(1.5, 1.5, 1.5), CFrame.new(x, ROAD_TOP + 22, z), Color3.fromRGB(150, 150, 140), Enum.Material.Glass))
 	light(lamp_, 50, 2, Color3.fromRGB(255, 250, 230))
+	DayNight.nightLight(lamp_, Color3.fromRGB(255, 250, 220), Color3.fromRGB(150, 150, 140), "Glass")
 end
 
 local function buildBase(parent: Instance)
@@ -1271,7 +1502,7 @@ local function buildGas(parent: Instance)
 		end
 	end
 	local canopy = part(gas, "Canopy", Vector3.new(52, 2, 48), CFrame.new(cx - 10, ROAD_TOP + 15, cz), Color3.fromRGB(200, 40, 40), Enum.Material.Metal)
-	light(canopy, 40, 1.5, Color3.fromRGB(255, 240, 220))
+	DayNight.nightLight(light(canopy, 40, 1.5, Color3.fromRGB(255, 240, 220)))
 	for _, dz in { -9, 9 } do
 		part(gas, "Pump", Vector3.new(2.5, 5, 4), CFrame.new(cx - 10, ROAD_TOP + 2.5, cz + dz), Color3.fromRGB(230, 230, 230), Enum.Material.Metal)
 	end
@@ -1381,7 +1612,7 @@ local function buildRanch(parent: Instance)
 	gableRoof(ranch, house * CFrame.new(0, hh, 0), hw + 3, hd + 3, 6, Color3.fromRGB(90, 60, 50))
 	part(ranch, "Door", Vector3.new(4, 7, 0.4), house * CFrame.new(0, 3.5, -hd / 2 - 0.2), Color3.fromRGB(110, 60, 40), Enum.Material.Wood)
 	for _, x in { -8, 8 } do
-		deco(part(ranch, "Window", Vector3.new(4, 3.5, 0.3), house * CFrame.new(x, 6, -hd / 2 - 0.15), Color3.fromRGB(255, 210, 130), Enum.Material.Neon))
+		nightWindow(deco(part(ranch, "Window", Vector3.new(4, 3.5, 0.3), house * CFrame.new(x, 6, -hd / 2 - 0.15), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 210, 130))
 	end
 	part(ranch, "Porch", Vector3.new(hw - 4, 0.6, 6), house * CFrame.new(0, 0.3, -hd / 2 - 3), Color3.fromRGB(140, 104, 70), Enum.Material.WoodPlanks)
 	part(ranch, "PorchRoof", Vector3.new(hw - 2, 0.5, 7), house * CFrame.new(0, 8.6, -hd / 2 - 3.2) * CFrame.Angles(math.rad(-8), 0, 0), Color3.fromRGB(90, 60, 50), Enum.Material.Slate)
@@ -1481,7 +1712,7 @@ local function buildStables(parent: Instance)
 	gableRoof(school, club * CFrame.new(0, 10, 0), 31, 21, 5, Color3.fromRGB(50, 96, 64))
 	part(school, "Door", Vector3.new(4, 7, 0.4), club * CFrame.new(0, 3.5, -9.2), Color3.fromRGB(50, 96, 64), Enum.Material.Wood)
 	for _, x in { -8, 8 } do
-		deco(part(school, "Window", Vector3.new(4.5, 3, 0.3), club * CFrame.new(x, 5.5, -9.15), Color3.fromRGB(255, 214, 140), Enum.Material.Neon))
+		nightWindow(deco(part(school, "Window", Vector3.new(4.5, 3, 0.3), club * CFrame.new(x, 5.5, -9.15), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 214, 140))
 	end
 	sign(school, "RIDING SCHOOL", Vector3.new(14, 2.2, 0.3), club * CFrame.new(0, 8.6, -9.4), Color3.fromRGB(255, 255, 255), Color3.fromRGB(40, 90, 60))
 
@@ -1594,7 +1825,7 @@ local function buildFuelDepot(parent: Instance)
 		end
 	end
 	local roof = part(depot, "ShedRoof", Vector3.new(27, 0.8, 26), shed * CFrame.new(0, 12.4, 0), Color3.fromRGB(70, 74, 80), Enum.Material.CorrodedMetal)
-	light(roof, 34, 1.4, Color3.fromRGB(255, 236, 200))
+	DayNight.nightLight(light(roof, 34, 1.4, Color3.fromRGB(255, 236, 200)))
 	sign(depot, "BARREL LOADING", Vector3.new(14, 2, 0.3), shed * CFrame.new(0, 11, -13.2) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(30, 30, 30), Color3.fromRGB(240, 200, 50))
 	-- Full barrels on pallets at the back of the shed, empty ones by the wall.
 	local colors = { Color3.fromRGB(190, 44, 36), Color3.fromRGB(40, 80, 150), Color3.fromRGB(220, 170, 40) }
@@ -1613,7 +1844,7 @@ local function buildFuelDepot(parent: Instance)
 	part(depot, "Office", Vector3.new(24, 9, 14), office * CFrame.new(0, 4.5, 0), Color3.fromRGB(220, 220, 214), Enum.Material.Metal)
 	part(depot, "OfficeRoof", Vector3.new(25, 0.6, 15), office * CFrame.new(0, 9.3, 0), Color3.fromRGB(90, 94, 100), Enum.Material.Metal)
 	part(depot, "Door", Vector3.new(3.6, 7, 0.3), office * CFrame.new(-6, 3.5, -7.1), Color3.fromRGB(70, 90, 120), Enum.Material.Metal)
-	deco(part(depot, "Window", Vector3.new(8, 3, 0.3), office * CFrame.new(4, 5, -7.1), Color3.fromRGB(255, 220, 150), Enum.Material.Neon))
+	nightWindow(deco(part(depot, "Window", Vector3.new(8, 3, 0.3), office * CFrame.new(4, 5, -7.1), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 220, 150))
 	placeSign(depot, "HARBOR FUEL DEPOT", yard.x0 + 70, yard.z0 + 6, Vector3.new(0, 0, -1), Color3.fromRGB(255, 210, 80))
 	sign(depot, "NO SMOKING", Vector3.new(6, 2, 0.2), CFrame.lookAt(Vector3.new((bx0 + bx1) / 2, ROAD_TOP + 4.6, bz0 - 0.6), Vector3.new((bx0 + bx1) / 2, ROAD_TOP + 4.6, bz0 - 10)), Color3.fromRGB(255, 255, 255), red)
 	local wire = Color3.fromRGB(110, 114, 118)
@@ -1637,8 +1868,9 @@ local function cabin(parent: Instance, frame: CFrame, w: number, d: number, h: n
 	gableRoof(parent, frame * CFrame.new(0, h, 0), w + 3, d + 3, h * 0.6, Color3.fromRGB(240, 244, 248))
 	part(parent, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -d / 2 - 0.2), Color3.fromRGB(80, 50, 30), Enum.Material.Wood)
 	for _, x in { -w / 3, w / 3 } do
-		local window = deco(part(parent, "Window", Vector3.new(4, 3, 0.3), frame * CFrame.new(x, h * 0.55, -d / 2 - 0.15), Color3.fromRGB(255, 200, 110), Enum.Material.Neon))
+		local window = deco(part(parent, "Window", Vector3.new(4, 3, 0.3), frame * CFrame.new(x, h * 0.55, -d / 2 - 0.15), WINDOW_DIM, Enum.Material.Glass))
 		light(window, 18, 1, Color3.fromRGB(255, 190, 110))
+		nightWindow(window, Color3.fromRGB(255, 200, 110))
 	end
 end
 
@@ -1784,11 +2016,17 @@ local function buildBoundary(parent: Instance)
 	end
 end
 
+-- The day look (the clock and the night are server/DayNight.luau's; every client blends the night look over this,
+-- client/Weather.luau). A sky with stars and a big moon for the night.
 local function setLighting()
-	Lighting.ClockTime = 18.6
 	Lighting.Brightness = 1.6
 	Lighting.Ambient = Color3.fromRGB(70, 70, 80)
 	Lighting.OutdoorAmbient = Color3.fromRGB(100, 100, 110)
+	local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
+	sky.StarCount = 3000
+	sky.MoonAngularSize = 14
+	sky.CelestialBodiesShown = true
+	sky.Parent = Lighting
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
 	atmosphere.Density = 0.3
 	atmosphere.Color = Color3.fromRGB(150, 160, 140)

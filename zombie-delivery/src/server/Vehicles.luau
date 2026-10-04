@@ -14,7 +14,14 @@
 -- CarDef.mount). Then a turret with that gun's look sits on the roof: the model "CarGun" inside the car, its "Barrel"
 -- part holds the "Muzzle" attachment (client/Shooting.luau draws the tracers from there), and the car model carries
 -- the attribute CarGun = the gun's id (the clients read it).
+--
+-- Lights: every car (the players', the bandits', the traffic's) has headlights and tail lights that glow at night
+-- (registered with server/DayNight.luau, which switches them with the workspace attribute "Night"); the headlights
+-- carry SpotLights (two on a player's car, one on an NPC car: cheap). The ambulance has a roof light bar: its lenses
+-- are tagged "SirenLight" and flash on every client (client/Weather.luau) while the car's attribute Siren is true
+-- (a company ambulance lent for a job, or Vehicles.setSiren).
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -26,6 +33,7 @@ local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
+local DayNight = require(script.Parent.DayNight)
 
 export type Car = {
 	owner: Player,
@@ -57,7 +65,7 @@ Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
 local DARK = Color3.fromRGB(34, 34, 38)
 local GLASS = Color3.fromRGB(150, 190, 210)
 
-type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail
+type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue | lightbar
 
 -- Where the cargo rides (server/Cargo.luau): the slots are the bottom centres of the pieces (facing the front),
 -- the door is where you load at the back, the entry is where passengers (the school kids) get in.
@@ -77,6 +85,7 @@ type Style = {
 	seat: Vector3, -- the driver, relative to the chassis top centre
 	passengers: { Vector3 },
 	roof: number, -- turret height above the chassis top
+	head: Vector2?, -- the headlights' height and z (default: 1.2 up, on the front end)
 	boxes: { Box }, -- relative to the chassis top centre (offset = centre of the box)
 	cargo: CargoSpec, -- relative to the chassis top centre
 }
@@ -140,6 +149,38 @@ local function flatbedBoxes(): { Box }
 			table.insert(list, box(Vector3.new(0.4, 2.4, 0.4), Vector3.new(x, 1.5, z), "rail"))
 		end
 	end
+	return list
+end
+
+-- The ambulance: a white box van with red stripes and crosses, the light bar on the cab roof, the rear doors where
+-- the patient gets in (the cargo entry is behind the car).
+local function ambulanceBoxes(): { Box }
+	local list = {
+		box(Vector3.new(7, 2.2, 2.6), Vector3.new(0, 1.1, -6.2), "body"), -- hood
+		box(Vector3.new(7.06, 0.6, 2.6), Vector3.new(0, 1.3, -6.2), "accent"), -- the stripe goes round the nose
+		box(Vector3.new(7, 4.4, 3.6), Vector3.new(0, 2.2, -3.2), "glass"), -- cab
+		box(Vector3.new(7, 0.6, 3.6), Vector3.new(0, 4.7, -3.2), "body"), -- cab roof
+		box(Vector3.new(7.4, 6.4, 8.6), Vector3.new(0, 3.2, 3.2), "body"), -- the patient box
+		box(Vector3.new(7.5, 0.9, 8.6), Vector3.new(0, 1.9, 3.2), "accent"), -- red stripe
+		box(Vector3.new(7.5, 0.3, 8.6), Vector3.new(0, 5.6, 3.2), "accent"), -- thin stripe up top
+		box(Vector3.new(7.2, 0.8, 0.6), Vector3.new(0, 0.4, -7.6), "dark"), -- bumper
+		box(Vector3.new(7.6, 0.3, 0.5), Vector3.new(0, 0.15, 7.6), "dark"), -- rear step
+		box(Vector3.new(0.15, 5.4, 0.12), Vector3.new(0, 3.2, 7.56), "dark"), -- the rear doors' seam
+		box(Vector3.new(2.4, 1.6, 0.1), Vector3.new(-1.5, 4.4, 7.55), "glass"), -- rear windows
+		box(Vector3.new(2.4, 1.6, 0.1), Vector3.new(1.5, 4.4, 7.55), "glass"),
+		box(Vector3.new(5.8, 0.4, 1.3), Vector3.new(0, 5.2, -3.4), "lightbar"), -- the light bar on the cab roof
+		box(Vector3.new(2.5, 0.6, 1.1), Vector3.new(-1.45, 5.7, -3.4), "sirenred"),
+		box(Vector3.new(2.5, 0.6, 1.1), Vector3.new(1.45, 5.7, -3.4), "sirenblue"),
+		box(Vector3.new(0.8, 0.5, 0.8), Vector3.new(-3.1, 6.65, 7.1), "sirenred"), -- corner lights at the back
+		box(Vector3.new(0.8, 0.5, 0.8), Vector3.new(3.1, 6.65, 7.1), "sirenblue"),
+	}
+	-- A red cross on both sides and on the back.
+	for _, x in { -3.76, 3.76 } do
+		table.insert(list, box(Vector3.new(0.1, 2.4, 0.8), Vector3.new(x, 4.1, 3.6), "cross"))
+		table.insert(list, box(Vector3.new(0.1, 0.8, 2.4), Vector3.new(x, 4.1, 3.6), "cross"))
+	end
+	table.insert(list, box(Vector3.new(1.4, 0.45, 0.1), Vector3.new(1.5, 2.8, 7.56), "cross"))
+	table.insert(list, box(Vector3.new(0.45, 1.4, 0.1), Vector3.new(1.5, 2.8, 7.56), "cross"))
 	return list
 end
 
@@ -235,6 +276,7 @@ local STYLES: { [string]: Style } = {
 		seat = Vector3.new(-1.6, 0.5, -3.6),
 		passengers = { Vector3.new(1.6, 0.5, -3.6), Vector3.new(-2, 6.2, 5), Vector3.new(2, 6.2, 5) },
 		roof = 6.4,
+		head = Vector2.new(1.5, -8.35), -- on the ram plate
 		boxes = {
 			box(Vector3.new(7.4, 2.4, 3), Vector3.new(0, 1.2, -6), "body"),
 			box(Vector3.new(7.4, 4.6, 4), Vector3.new(0, 2.3, -2.6), "glass"),
@@ -317,6 +359,7 @@ local STYLES: { [string]: Style } = {
 		seat = Vector3.new(-1.4, 0.5, -0.8),
 		passengers = { Vector3.new(1.4, 0.5, -0.8), Vector3.new(-1.8, 2.0, 4), Vector3.new(1.8, 2.0, 4) },
 		roof = 5,
+		head = Vector2.new(1.2, -6.65), -- on the hood's face
 		boxes = {
 			box(Vector3.new(7, 2, 4), Vector3.new(0, 1, -4.6), "body"),
 			box(Vector3.new(7, 4, 4), Vector3.new(0, 2, -0.6), "glass"),
@@ -352,10 +395,32 @@ local STYLES: { [string]: Style } = {
 		boxes = flatbedBoxes(),
 		cargo = cargo("truck", 16, 7.2, { Vector3.new(-1.7, 0.5, 2.6), Vector3.new(1.7, 0.5, 2.6), Vector3.new(-1.7, 0.5, 6), Vector3.new(1.7, 0.5, 6) }),
 	},
+	ambulance = {
+		width = 7,
+		length = 15,
+		wheel = 1.4,
+		wheelWidth = 1.1,
+		clearance = 1.0,
+		seat = Vector3.new(-1.5, 0.5, -3.2),
+		passengers = { Vector3.new(1.5, 0.5, -3.2) },
+		roof = 6.4,
+		boxes = ambulanceBoxes(),
+		-- The patient lies on the stretcher in the back; they get in through the rear doors.
+		cargo = cargo("ambulance", 15, 7, { Vector3.new(0, 0.6, 3.6) }, Vector3.new(0, 0, 15 / 2 + 2.5)),
+	},
 }
 
 local CHASSIS_HEIGHT = 1.2
 local FRICTIONLESS = PhysicalProperties.new(0.7, 0, 0, 100, 1)
+
+-- The lights' colours: lit at night (Neon), dim by day.
+local HEAD_LIT, HEAD_DIM = Color3.fromRGB(255, 246, 214), Color3.fromRGB(196, 202, 206)
+local TAIL_LIT, TAIL_DIM = Color3.fromRGB(255, 36, 30), Color3.fromRGB(116, 22, 22)
+Vehicles.SirenTag = "SirenLight" -- the ambulance's light bar (client/Weather.luau flashes it)
+local SIREN_DIM: { [string]: Color3 } = {
+	sirenred = Color3.fromRGB(120, 34, 34),
+	sirenblue = Color3.fromRGB(34, 44, 120),
+}
 
 local function newPart(model: Model, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material): Part
 	local p = Instance.new("Part")
@@ -506,10 +571,13 @@ local function buildTurret(model: Model, chassis: BasePart, turretBase: CFrame, 
 end
 
 -- Builds the body. display = a showroom model (anchored, no seats, no movers). gunId = the car gun on its roof (nil:
--- none).
-local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?): Built
+-- none). oneBeam: only one headlight carries a SpotLight (the NPC cars: cheaper).
+local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?, oneBeam: boolean?): Built
 	local style = STYLES[def.style] or STYLES.van
-	local accent = if def.style == "icecream" then Color3.fromRGB(255, 120, 180) elseif def.style == "bus" then Color3.fromRGB(200, 30, 30) else color:Lerp(Color3.new(1, 1, 1), 0.45)
+	local accent = if def.style == "icecream"
+		then Color3.fromRGB(255, 120, 180)
+		elseif def.style == "bus" or def.style == "ambulance" then Color3.fromRGB(205, 30, 34)
+		else color:Lerp(Color3.new(1, 1, 1), 0.45)
 
 	local model = Instance.new("Model")
 	model.Name = def.name
@@ -544,8 +612,15 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			c, material = Color3.fromRGB(128, 92, 58), Enum.Material.WoodPlanks
 		elseif b.kind == "rail" then
 			c, material = Color3.fromRGB(70, 72, 76), Enum.Material.Metal
+		elseif b.kind == "cross" then
+			c = Color3.fromRGB(205, 30, 34)
+		elseif b.kind == "lightbar" then
+			c, material = DARK, Enum.Material.Metal
+		elseif SIREN_DIM[b.kind] then
+			c = SIREN_DIM[b.kind]
 		end
-		local p = newPart(model, if b.kind == "glass" then "Cabin" else "Body", b.size, top * CFrame.new(b.offset), c, material)
+		local name = if b.kind == "glass" then "Cabin" elseif b.kind == "lightbar" then "LightBar" elseif SIREN_DIM[b.kind] then "SirenLens" else "Body"
+		local p = newPart(model, name, b.size, top * CFrame.new(b.offset), c, material)
 		p.Massless = true
 		p.CustomPhysicalProperties = FRICTIONLESS
 		if b.kind == "glass" then
@@ -555,6 +630,21 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		end
 		if b.kind == "body" then
 			table.insert(paintParts, p)
+		elseif SIREN_DIM[b.kind] or b.kind == "lightbar" then
+			-- The light bar: the lenses flash red / blue, the bar holds the light that throws the colour around.
+			p.CanCollide = false
+			local lens: { [string]: string } = { sirenred = "red", sirenblue = "blue" }
+			p:SetAttribute("Lens", lens[b.kind] or "bar")
+			if b.kind == "lightbar" and not display then
+				local glow = Instance.new("PointLight")
+				glow.Name = "SirenGlow"
+				glow.Range = 24
+				glow.Brightness = 3
+				glow.Shadows = false
+				glow.Enabled = false
+				glow.Parent = p
+			end
+			CollectionService:AddTag(p, Vehicles.SirenTag)
 		end
 		weld(chassis, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
@@ -597,26 +687,33 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		weld(tyre, spoke)
 	end
 
-	-- Lights.
+	-- Lights: they glow at night (DayNight switches them); the headlights throw a beam.
 	local front = -style.length / 2
-	for _, x in { -style.width / 2 + 1, style.width / 2 - 1 } do
-		local head = newPart(model, "Headlight", Vector3.new(1.2, 0.6, 0.2), top * CFrame.new(x, 0.5, front - 0.05), Color3.fromRGB(255, 245, 210), Enum.Material.Neon)
+	local headY = if style.head then style.head.X else 1.2
+	local headZ = if style.head then style.head.Y else front - 0.05
+	for n, x in { -style.width / 2 + 1, style.width / 2 - 1 } do
+		local head = newPart(model, "Headlight", Vector3.new(1.2, 0.6, 0.2), top * CFrame.new(x, headY, headZ), HEAD_DIM, Enum.Material.Glass)
 		head.CanCollide = false
+		head.CanQuery = false
 		head.Massless = true
 		weld(chassis, head)
-		if not display then
+		if not display and (n == 1 or not oneBeam) then
 			local spot = Instance.new("SpotLight")
 			spot.Face = Enum.NormalId.Front
-			spot.Range = 55
-			spot.Angle = 50
-			spot.Brightness = 3
+			spot.Range = if oneBeam then 50 else 60
+			spot.Angle = if oneBeam then 70 else 55
+			spot.Brightness = if oneBeam then 3.4 else 4
 			spot.Color = Color3.fromRGB(255, 240, 210)
+			spot.Shadows = false
 			spot.Parent = head
 		end
-		local tail = newPart(model, "Taillight", Vector3.new(1, 0.5, 0.2), top * CFrame.new(x, 0.6, -front + 0.05), Color3.fromRGB(220, 30, 30), Enum.Material.Neon)
+		DayNight.nightLight(head, HEAD_LIT, HEAD_DIM, "Glass")
+		local tail = newPart(model, "Taillight", Vector3.new(1, 0.5, 0.2), top * CFrame.new(x, 0.6, -front + 0.05), TAIL_DIM, Enum.Material.SmoothPlastic)
 		tail.CanCollide = false
+		tail.CanQuery = false
 		tail.Massless = true
 		weld(chassis, tail)
+		DayNight.nightLight(tail, TAIL_LIT, TAIL_DIM, "SmoothPlastic")
 	end
 
 	-- The roof gun, only when one is installed.
@@ -767,7 +864,7 @@ end
 
 -- A car for the enemies, driven by the server (server/BanditCars.luau): no seats, no prompts, bandit figures inside.
 function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
-	local built = build(def, rgb(def.color), ground, false, "roofmg")
+	local built = build(def, rgb(def.color), ground, false, "roofmg", true)
 	local model = built.model
 	local spots: { CFrame } = {}
 	local seat = built.seat
@@ -805,6 +902,57 @@ function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
 		linear = built.chassis:FindFirstChild("Drive") :: LinearVelocity,
 		angular = built.chassis:FindFirstChild("Steer") :: AngularVelocity,
 		guns = guns,
+	}
+end
+
+export type TrafficCar = {
+	model: Model,
+	chassis: Part,
+	size: Vector3,
+	linear: LinearVelocity,
+	angular: AngularVelocity,
+}
+
+-- A civilian at the wheel: a body and a head in the driver's seat.
+local DRIVER_SHIRTS = { Color3.fromRGB(70, 110, 160), Color3.fromRGB(160, 60, 60), Color3.fromRGB(90, 130, 90), Color3.fromRGB(200, 180, 140), Color3.fromRGB(60, 60, 66) }
+local DRIVER_SKINS = { Color3.fromRGB(255, 224, 196), Color3.fromRGB(214, 160, 120), Color3.fromRGB(132, 88, 60), Color3.fromRGB(241, 194, 160) }
+
+-- A civilian car for the traffic (server/Traffic.luau): an ordinary style in `color` (default: its factory colour),
+-- no gun, no seats, no prompts, a driver at the wheel, one headlight beam. It keeps its movers ("Drive", "Steer")
+-- like an NPC car; anchor it to step it by CFrame. Its parts are in the "Car" collision group.
+function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?): TrafficCar
+	local built = build(def, color or rgb(def.color), ground, false, nil, true)
+	local model = built.model
+	local seat = built.seat
+	local rng = Random.new()
+	if seat then
+		local at = seat.CFrame
+		local function piece(name: string, size: Vector3, offset: CFrame, c: Color3)
+			local p = newPart(model, name, size, at * offset, c, Enum.Material.SmoothPlastic)
+			p.CanCollide = false
+			p.CanQuery = false
+			p.Massless = true
+			weld(built.chassis, p)
+		end
+		piece("DriverBody", Vector3.new(2, 2, 1), CFrame.new(0, 1.4, 0), DRIVER_SHIRTS[rng:NextInteger(1, #DRIVER_SHIRTS)])
+		piece("DriverHead", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 3, 0), DRIVER_SKINS[rng:NextInteger(1, #DRIVER_SKINS)])
+		seat:Destroy()
+	end
+	for _, p in built.passengers do
+		p:Destroy()
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("ProximityPrompt") or d:IsA("Attachment") and (d.Name == "CargoDoor" or d.Name == "CargoEntry") then
+			d:Destroy()
+		end
+	end
+	model:SetAttribute("Traffic", true)
+	return {
+		model = model,
+		chassis = built.chassis,
+		size = built.size,
+		linear = built.chassis:FindFirstChild("Drive") :: LinearVelocity,
+		angular = built.chassis:FindFirstChild("Steer") :: AngularVelocity,
 	}
 end
 
@@ -1083,6 +1231,8 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	car.model:SetAttribute("CarId", def.id)
 	car.model:SetAttribute("SpeedMult", 1)
 	car.model:SetAttribute("CarGun", gunId)
+	-- A company vehicle lent for a job runs with its lights flashing (the ambulance's light bar).
+	car.model:SetAttribute("Siren", carId ~= nil and def.company == true)
 	writeAttributes(car)
 	car.model.Parent = workspace:FindFirstChild("Cars") or workspace
 	cars[player] = car
@@ -1167,6 +1317,14 @@ function Vehicles.refreshGun(player: Player)
 	car.model:SetAttribute("CarGun", want)
 end
 
+-- The light bar on (an ambulance on a job) or off; every client flashes it (client/Weather.luau).
+function Vehicles.setSiren(player: Player, on: boolean)
+	local car = Vehicles.get(player)
+	if car then
+		car.model:SetAttribute("Siren", on)
+	end
+end
+
 -- A job modifier (HEAVY LOAD) slows the car down; the owner's client reads the attribute.
 function Vehicles.setSpeedMultiplier(player: Player, multiplier: number)
 	local car = Vehicles.get(player)
@@ -1187,10 +1345,17 @@ local function wreck(car: Car, reason: string)
 	explosion.BlastRadius = 8
 	explosion.Position = car.chassis.Position
 	explosion.Parent = workspace
+	car.model:SetAttribute("Siren", false)
 	for _, d in car.model:GetDescendants() do
 		if d:IsA("BasePart") then
+			-- Burnt out: the lights stay dark through the night.
+			CollectionService:RemoveTag(d, DayNight.Tag)
+			CollectionService:RemoveTag(d, Vehicles.SirenTag)
+			if d.Material == Enum.Material.Neon then
+				d.Material = Enum.Material.SmoothPlastic
+			end
 			d.Color = d.Color:Lerp(Color3.new(0.08, 0.08, 0.08), 0.75)
-		elseif d:IsA("ProximityPrompt") or d:IsA("SpotLight") then
+		elseif d:IsA("ProximityPrompt") or d:IsA("Light") then
 			d:Destroy()
 		end
 	end

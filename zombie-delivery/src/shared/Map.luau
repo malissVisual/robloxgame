@@ -9,6 +9,11 @@
 --              west to the Radio Station and the Old Farm; the Ranch Road off the West Highway to Silver Spur Ranch
 --   Riverside  the Riverside Riding School by the river, down Riding School Lane from the Suburbs
 --   Harbor     the Harbor Fuel Depot south of the warehouses
+--   Downtown   the First Zombie Bank just north of the safe zone (on 6th Ave, the way to the North Highway) and
+--              the City Clinic south-west of the depot
+--
+-- It also holds the shape of the night over the clock (Map.nightFactor): the server runs the clock
+-- (server/DayNight.luau), every client draws the look from the same numbers (client/Weather.luau).
 --
 -- A district is a grid: block (i, j) is centred at (ox + i × CELL, oz + j × CELL); the roads run between the blocks
 -- and around them (road k between block k and k + 1, centred at ox + (k + 0.5) × CELL).
@@ -134,6 +139,8 @@ Map.SpecialBlocks = {
 		["0,1"] = "mechanic",
 		["0,-1"] = "supplies",
 		["2,1"] = "movers",
+		["1,-2"] = "bank", -- First Zombie Bank: its front on 6th Ave, just out of the safe zone
+		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
 	},
 	suburbs = { ["0,2"] = "school" },
 	harbor = { ["1,0"] = "frosty" },
@@ -187,6 +194,9 @@ Map.Places = {
 	{ id = "ranch", name = "Silver Spur Ranch", x = -900, z = 740, nx = 0, nz = 0 },
 	{ id = "stables", name = "Riverside Riding School", x = 640, z = 972, nx = 0, nz = 0 },
 	{ id = "fueldepot", name = "Harbor Fuel Depot", x = 1440, z = 550, nx = 0, nz = 0 },
+	-- Downtown, on the road in front of their blocks (outside the safe zone, so they are addresses too).
+	{ id = "bank", name = "First Zombie Bank", x = CELL - BLOCK / 2 - 6, z = -2 * CELL, nx = -1, nz = 0 },
+	{ id = "clinic", name = "City Clinic", x = -2 * CELL + BLOCK / 2 + 6, z = 2 * CELL + 12, nx = 1, nz = 0 },
 } :: { Place }
 
 -- Where each employer's board stands (walk up to it to work for them).
@@ -199,6 +209,7 @@ Map.EmployerSpots = {
 	farm = { x = -1790, z = 560 },
 	ranch = { x = -930, z = 728 },
 	gas = { x = 188, z = -948 },
+	clinic = { x = -2 * CELL + BLOCK / 2 - 8, z = 2 * CELL - 26 }, -- by the clinic's front door, left of the emergency bay
 } :: { [string]: { x: number, z: number } }
 Map.EmployerRadius = 40
 
@@ -223,6 +234,8 @@ local rawSpots: { [string]: { park: { number }, pile: { number } } } = {
 	lodge = { park = { -684, -2208 }, pile = { -699, -2200 } }, -- at the lodge door
 	school = { park = { 14, 1124 }, pile = { 20, 1140 } }, -- the school gate
 	movers = { park = { 349, 172 }, pile = { 337, 172 } }, -- the loading door, away from the WORK HERE board
+	bank = { park = { 76, -292 }, pile = { 93, -292 } }, -- at the curb below the bank's steps (6th Ave)
+	clinic = { park = { -219, 300 }, pile = { -237, 300 } }, -- under the emergency canopy (4th Ave)
 }
 for id, spot in rawSpots do
 	local dx, dz = spot.park[1] - spot.pile[1], spot.park[2] - spot.pile[2]
@@ -254,6 +267,7 @@ local EMPLOYER_WHERE: { [string]: string } = {
 	farm = "At the end of the West Highway.",
 	ranch = "Off the West Highway, down the Ranch Road.",
 	gas = "On the North Highway.",
+	clinic = "Downtown, south-west of the depot.",
 }
 for _, employer in Config.Employers do
 	local spot = Map.EmployerSpots[employer.id]
@@ -295,6 +309,7 @@ for _, info in {
 	{ "docks", "⚓", "The harbor, on the sea. Army ammo is loaded here." },
 	{ "stables", "🐎", "By the river, down Riding School Lane from the Suburbs. The ranch horses go here." },
 	{ "fueldepot", "🛢️", "South of the Harbor. Fuel barrels for the Gas Station." },
+	{ "bank", "🏦", "Downtown, just north of the safe zone. The cash transports load here." },
 } do
 	for _, place in Map.Places do
 		if place.id == info[1] then
@@ -303,6 +318,32 @@ for _, info in {
 	end
 end
 Map.Landmarks = landmarks
+
+-- ── Day and night ──────────────────────────────────────────────────────────
+-- The clock (Lighting.ClockTime, 0 – 24) runs over Config.DayNight.DayLength. It is night from NightFrom to NightTo;
+-- the look fades over NIGHT_FADE hours on either side of both (dusk and dawn).
+
+local NIGHT_FADE = 1
+
+-- Is it night at this hour (the street lamps and the headlights are on, more zombies, better pay)?
+function Map.isNight(hour: number): boolean
+	local h = hour % 24
+	return h >= Config.DayNight.NightFrom or h < Config.DayNight.NightTo
+end
+
+-- 0 in full day … 1 in deep night, smooth through dusk and dawn (0.5 right when the night starts or ends).
+function Map.nightFactor(hour: number): number
+	local h = hour % 24
+	local function ramp(edge: number): number -- 0 before the fade, 1 after it, smoothstep in between
+		local t = math.clamp((h - (edge - NIGHT_FADE)) / (2 * NIGHT_FADE), 0, 1)
+		return t * t * (3 - 2 * t)
+	end
+	-- The evening fades in toward NightFrom, the morning out toward NightTo (noon splits them).
+	if h >= 12 then
+		return ramp(Config.DayNight.NightFrom)
+	end
+	return 1 - ramp(Config.DayNight.NightTo)
+end
 
 -- ── Roads ──────────────────────────────────────────────────────────────────
 

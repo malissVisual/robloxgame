@@ -1,5 +1,5 @@
--- Logic test of the pure modules (shared/Economy.luau, shared/Map.luau) in the standalone Luau CLI.
--- Run: python3 tests/run_tests.py [path to the luau binary]
+-- Logic test of the pure modules (shared/Economy.luau, shared/Map.luau: the world layout and the night clock) in the
+-- standalone Luau CLI. Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
 local Economy = require("./Economy")
@@ -456,6 +456,107 @@ check("employer landmarks tell the car and the gun reward", (function()
 	end
 	return false
 end)())
+
+-- Zombie Delivery 2.5: the First Zombie Bank, the City Clinic, day and night ----------------------------------
+
+local bank, clinic = findPlace("bank"), findPlace("clinic")
+check("the bank and the clinic are places", bank ~= nil and clinic ~= nil)
+if bank and clinic then
+	local half = Config.City.SafeHalf
+	local bankDistrict = Map.blockAt(bank.x - bank.nx * 20, bank.z - bank.nz * 20)
+	check("the bank is downtown, on its own block", bankDistrict ~= nil and bankDistrict.id == "downtown"
+		and Map.special("downtown", 1, -2) == "bank")
+	check("the bank is out of the safe zone, at its edge", not Map.isSafe(bank.x, bank.z)
+		and math.max(math.abs(bank.x), math.abs(bank.z)) < half + Map.Cell)
+	local clinicDistrict = Map.blockAt(clinic.x - clinic.nx * 20, clinic.z - clinic.nz * 20)
+	check("the clinic is in the city, on its own block", clinicDistrict ~= nil and Map.special(clinicDistrict.id, -2, 2) == "clinic")
+	check("the bank and the clinic face their road", Map.onRoad(bank.x, bank.z) and Map.onRoad(clinic.x, clinic.z)
+		and not Map.onRoad(bank.x - bank.nx * 20, bank.z) and not Map.onRoad(clinic.x - clinic.nx * 20, clinic.z))
+	check("the bank and the clinic are not in a yard", Map.inYard(bank.x, bank.z) == nil and Map.inYard(clinic.x, clinic.z) == nil)
+end
+check("the clinic has a board (Dr. Novak), on its sidewalk", (function()
+	local spot = Map.EmployerSpots.clinic
+	if not spot or not clinic then
+		return false
+	end
+	local d = Map.blockAt(spot.x, spot.z)
+	return d ~= nil and Map.special(d.id, -2, 2) == "clinic" and not Map.onRoad(spot.x, spot.z)
+		and math.sqrt((spot.x - clinic.x) ^ 2 + (spot.z - clinic.z) ^ 2) < Map.EmployerRadius + 20
+end)())
+check("the bank and the clinic have cargo spots, the pile on their own block", (function()
+	for _, id in { "bank", "clinic" } do
+		local spot = Map.CargoSpots[id]
+		if not spot then
+			return false
+		end
+		local d = Map.blockAt(spot.pile.x, spot.pile.z)
+		if not d or Map.special(d.id, if id == "bank" then 1 else -2, if id == "bank" then -2 else 2) ~= id then
+			return false
+		end
+	end
+	return true
+end)())
+check("the board and the pile at the clinic stand apart", (function()
+	local spot, board = Map.CargoSpots.clinic, Map.EmployerSpots.clinic
+	return spot ~= nil and board ~= nil and math.sqrt((spot.pile.x - board.x) ^ 2 + (spot.pile.z - board.z) ^ 2) > 20
+end)())
+check("the cash run loads at the bank, the ambulance drops at the clinic", (function()
+	local cash, ambulance = Economy.findJobType("cashrun"), Economy.findJobType("ambulance")
+	return cash ~= nil and cash.pickupAt == "bank" and ambulance ~= nil and ambulance.dropAt == "clinic" and ambulance.employer == "clinic"
+end)())
+check("the bank and the clinic are landmarks", (function()
+	local found = {}
+	for _, landmark in Map.Landmarks do
+		found[landmark.id] = landmark.kind
+	end
+	return found.bank == "place" and found.clinic == "employer"
+end)())
+check("the clinic's landmark names the ambulance", (function()
+	for _, landmark in Map.Landmarks do
+		if landmark.id == "clinic" then
+			return landmark.description:find("Ambulance", 1, true) ~= nil and landmark.description:find("Dr. Novak", 1, true) ~= nil
+		end
+	end
+	return false
+end)())
+check("special blocks do not hold addresses", (function()
+	for _, a in Map.addresses() do
+		local d, bi, bj = Map.blockAt(a.x - a.nx * 20, a.z - a.nz * 20)
+		if not a.poi and d and Map.special(d.id, bi, bj) then
+			return false
+		end
+	end
+	return true
+end)())
+
+local dn = Config.DayNight
+check("night: the clock", Map.isNight(dn.NightFrom) and Map.isNight(0) and Map.isNight(dn.NightTo - 0.01)
+	and not Map.isNight(dn.NightTo) and not Map.isNight(12) and not Map.isNight(dn.NightFrom - 0.01) and Map.isNight(24 + 1))
+check("night factor: day 0, deep night 1", Map.nightFactor(12) == 0 and Map.nightFactor(9) == 0 and Map.nightFactor(0) == 1
+	and Map.nightFactor(dn.NightFrom + 2) == 1 and Map.nightFactor(dn.NightTo - 2) == 1, Map.nightFactor(0))
+check("night factor: half way at dusk and dawn", near(Map.nightFactor(dn.NightFrom), 0.5) and near(Map.nightFactor(dn.NightTo), 0.5))
+check("night factor: smooth and in order through dusk and dawn", (function()
+	local last = Map.nightFactor(14)
+	for step = 1, 200 do
+		local hour = 14 + step * 0.05 -- 14:00 … 24:00
+		local f = Map.nightFactor(hour)
+		if f < last - 1e-9 or f - last > 0.08 or f < 0 or f > 1 then
+			return false
+		end
+		last = f
+	end
+	for step = 1, 200 do
+		local hour = step * 0.05 -- 0:00 … 10:00: only falls
+		local f = Map.nightFactor(hour)
+		if f > last + 1e-9 or last - f > 0.08 then
+			return false
+		end
+		last = f
+	end
+	return last == 0
+end)())
+check("night numbers make sense", dn.DayLength >= 120 and dn.NightFrom > 12 and dn.NightTo < 12 and dn.NightPay > 1
+	and dn.NightWaves >= 1 and dn.NightRoam >= 1 and not Map.isNight(dn.StartHour))
 
 local district, i, j = Map.blockAt(Map.Cell, 0)
 check("blockAt finds the dealer block", district ~= nil and district.id == "downtown" and i == 1 and j == 0)
