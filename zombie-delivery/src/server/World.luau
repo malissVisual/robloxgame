@@ -21,6 +21,9 @@
 -- Airfield, the Power Plant, the Water Works, the Biotech Lab, Blackrock Prison, Lighthouse Point, the Train Yard, the
 -- Survivor Camp and the Stadium Shelter in their yards at the end of their roads (Map.PlaceRoads).
 --
+-- Zombie Delivery 3.1, the lost packages (Map.Secrets, see "The lost packages" below): a worn cardboard box hidden at
+-- every place, with its prompt (World.SecretPrompts) for server/Challenges.luau.
+--
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
 -- (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
@@ -68,6 +71,9 @@ World.OfficePrompts = {} :: { { prompt: ProximityPrompt, office: string } }
 -- the status line of every FOR SALE sign (a TextLabel "Status" on the EstatePrompt's parent; "FOR SALE\n$x" to start
 -- with, server/Estate.luau may write the owners there)
 World.EstateSigns = {} :: { [string]: { TextLabel } }
+-- 3.1, the lost packages (Map.Secrets; see "The lost packages" below): every package's prompt (a ProximityPrompt
+-- "SecretPrompt", attribute Secret = the Map.Secrets id) for server/Challenges.luau
+World.SecretPrompts = {} :: { { prompt: ProximityPrompt, id: string } }
 
 local rng = Random.new(Config.City.Seed)
 
@@ -4697,6 +4703,148 @@ local function buildBoundary(parent: Instance)
 	end
 end
 
+-- ── The lost packages (Zombie Delivery 3.1) ────────────────────────────────
+-- One at every place where Map.Secrets puts it (y: the floor under it): a small worn cardboard box with tape and a
+-- shipping label, a faint warm glow and a "?" over it that shows only within 25 studs, in the folder
+-- workspace.World.Secrets (a model "LostPackage", attribute Secret = the id). It does not collide and bullets go
+-- through it; its "SecretPrompt" (Open · Lost package, a short hold) is registered in World.SecretPrompts: the server
+-- (server/Challenges.luau) pays the finder once, the finder's client hides the ones it has found
+-- (client/Secrets.luau). Where a place has nothing to hide behind near its point, the package brings its own cover
+-- (COVERS: real props in workspace.World.SecretSpots, never hidden).
+-- Everything lives in this one function: the main chunk of this file is close to Luau's 200 locals.
+
+local function buildSecrets(world: Instance)
+	local packages = folder(world, "Secrets")
+	local spots = folder(world, "SecretSpots")
+	local CARDBOARD = Color3.fromRGB(150, 116, 76)
+	local TAPE = Color3.fromRGB(196, 168, 110)
+	local SAND = Color3.fromRGB(170, 150, 110)
+	local HAY = Color3.fromRGB(216, 186, 100)
+	local SNOW = Color3.fromRGB(245, 248, 250)
+
+	-- The covers, built around the package's floor point (cf, world axes): where they stand from the package (dx, dz).
+	local COVERS: { [string]: { kind: string, dx: number, dz: number } } = {
+		secret_base = { kind = "sandbags", dx = 0, dz = 0 }, -- a nest round the package, open to the south
+		secret_lodge = { kind = "snowman", dx = 0, dz = 3.5 }, -- between the package and the lodge's road
+		secret_ranch = { kind = "hay", dx = 4, dz = 0 },
+		secret_stables = { kind = "hay", dx = 4.4, dz = 0 },
+		secret_airfield = { kind = "tyres", dx = 4, dz = 0 }, -- by the fence's end post at the gate
+		secret_movers = { kind = "boxes", dx = 0.9, dz = 4.6 }, -- against the front wall
+		secret_powerplant = { kind = "reel", dx = 0, dz = -4.6 },
+	}
+	local BUILD_COVER: { [string]: (CFrame) -> () } = {
+		sandbags = function(cf: CFrame)
+			for _, side in { -1, 1 } do
+				part(spots, "Sandbags", Vector3.new(2, 2.6, 7), cf * CFrame.new(side * 3.4, 1.3, 0.4), SAND, Enum.Material.Fabric)
+			end
+			part(spots, "Sandbags", Vector3.new(8.8, 2.6, 2), cf * CFrame.new(0, 1.3, -3.4), SAND, Enum.Material.Fabric)
+			part(spots, "Sandbags", Vector3.new(4, 1.3, 2), cf * CFrame.new(-1.6, 3.25, -3.4), SAND:Lerp(Color3.new(0, 0, 0), 0.08), Enum.Material.Fabric)
+		end,
+		snowman = function(cf: CFrame)
+			for _, ball in { { 4.4, 2.1 }, { 3.2, 5.4 }, { 2.3, 7.8 } } do
+				local p = part(spots, "Snowman", Vector3.new(ball[1], ball[1], ball[1]), cf * CFrame.new(0, ball[2], 0), SNOW, Enum.Material.Snow)
+				p.Shape = Enum.PartType.Ball
+			end
+			-- He looks south, away from the package: the carrot nose, the coal eyes, two stick arms.
+			deco(part(spots, "Nose", Vector3.new(0.35, 0.35, 1.4), cf * CFrame.new(0, 7.8, 1.6), Color3.fromRGB(240, 130, 30), Enum.Material.SmoothPlastic))
+			for _, side in { -1, 1 } do
+				deco(part(spots, "Eye", Vector3.new(0.3, 0.3, 0.2), cf * CFrame.new(side * 0.45, 8.3, 1.08), Color3.fromRGB(20, 20, 22), Enum.Material.Slate))
+				deco(part(spots, "Arm", Vector3.new(3, 0.25, 0.25), cf * CFrame.new(side * 2.6, 5.8, 0) * CFrame.Angles(0, 0, side * math.rad(25)), Color3.fromRGB(90, 64, 44), Enum.Material.Wood))
+			end
+		end,
+		hay = function(cf: CFrame)
+			for _, dz in { -1.4, 1.4 } do
+				part(spots, "HayBale", Vector3.new(2.6, 2.4, 2.8), cf * CFrame.new(0, 1.2, dz), HAY, Enum.Material.Grass)
+			end
+			part(spots, "HayBale", Vector3.new(2.6, 2.4, 2.8), cf * CFrame.new(0.2, 3.6, 0.3) * CFrame.Angles(0, 0.2, 0), HAY:Lerp(Color3.new(0, 0, 0), 0.06), Enum.Material.Grass)
+		end,
+		tyres = function(cf: CFrame)
+			for k = 0, 3 do
+				cylinder(spots, "Tire", 1.1, 3.4, cf * CFrame.new(0, 0.55 + k * 1.1, 0) * CFrame.Angles(0, k * 0.4, 0) * UPRIGHT, Color3.fromRGB(26, 26, 28), Enum.Material.Rubber)
+			end
+			cylinder(spots, "Tire", 1.1, 3.4, cf * CFrame.new(0.4, 1.6, 2.2) * CFrame.Angles(math.rad(70), 0, 0) * UPRIGHT, Color3.fromRGB(30, 30, 32), Enum.Material.Rubber)
+		end,
+		boxes = function(cf: CFrame)
+			part(spots, "MovingBox", Vector3.new(3.4, 3.4, 3.4), cf * CFrame.new(0, 1.7, 0), Color3.fromRGB(190, 150, 100), Enum.Material.Cardboard)
+			part(spots, "MovingBox", Vector3.new(2.6, 2.4, 2.6), cf * CFrame.new(0.2, 4.6, 0.2) * CFrame.Angles(0, 0.3, 0), Color3.fromRGB(176, 138, 92), Enum.Material.Cardboard)
+			part(spots, "MovingBox", Vector3.new(2.8, 2.2, 3), cf * CFrame.new(0.3, 1.1, 3.4) * CFrame.Angles(0, -0.15, 0), Color3.fromRGB(200, 160, 110), Enum.Material.Cardboard)
+		end,
+		reel = function(cf: CFrame)
+			local wood = Color3.fromRGB(140, 104, 66)
+			for _, side in { -1, 1 } do
+				cylinder(spots, "ReelEnd", 0.6, 5, cf * CFrame.new(side * 1.4, 2.5, 0), wood, Enum.Material.WoodPlanks)
+			end
+			cylinder(spots, "Cable", 2.2, 3.6, cf * CFrame.new(0, 2.5, 0), Color3.fromRGB(30, 30, 32), Enum.Material.Rubber)
+		end,
+	}
+
+	-- The package itself (cf: its floor point, turned a little).
+	local function package(secret: Map.Secret)
+		local model = Instance.new("Model")
+		model.Name = "LostPackage"
+		model:SetAttribute("Secret", secret.id)
+		local turn = math.rad((#secret.id * 37) % 21 - 10) -- each one a little askew (fixed: the same on every server)
+		local cf = CFrame.new(secret.x, secret.y, secret.z) * CFrame.Angles(0, turn, 0)
+		local size = Vector3.new(2, 1.3, 1.6)
+		local box = deco(part(model, "Box", size, cf * CFrame.new(0, size.Y / 2, 0), CARDBOARD, Enum.Material.Cardboard))
+		-- Worn: a darker corner, the tape round it both ways, a faded shipping label, a flap that came loose.
+		deco(part(model, "Wear", Vector3.new(0.7, 0.9, 1.62), cf * CFrame.new(0.66, 0.5, 0), CARDBOARD:Lerp(Color3.new(0, 0, 0), 0.22), Enum.Material.Cardboard))
+		deco(part(model, "Tape", Vector3.new(2.04, 0.06, 0.4), cf * CFrame.new(0, size.Y + 0.02, 0), TAPE, Enum.Material.Plastic))
+		deco(part(model, "Tape", Vector3.new(0.4, 0.06, 1.64), cf * CFrame.new(0, size.Y + 0.03, 0), TAPE, Enum.Material.Plastic))
+		for _, side in { -1, 1 } do
+			deco(part(model, "Tape", Vector3.new(0.06, 1.34, 0.4), cf * CFrame.new(side * 1.01, size.Y / 2, 0), TAPE, Enum.Material.Plastic))
+		end
+		deco(part(model, "Label", Vector3.new(0.6, 0.04, 0.45), cf * CFrame.new(-0.55, size.Y + 0.05, 0.45) * CFrame.Angles(0, 0.2, 0), Color3.fromRGB(222, 216, 196), Enum.Material.SmoothPlastic))
+		deco(part(model, "Flap", Vector3.new(0.9, 0.05, 0.7), cf * CFrame.new(0.55, size.Y + 0.12, -0.5) * CFrame.Angles(math.rad(14), 0.1, 0), CARDBOARD:Lerp(Color3.new(1, 1, 1), 0.08), Enum.Material.Cardboard))
+		-- The faint glow (it helps at night) and the "?" up close.
+		local glow = light(box, 7, 0.6, Color3.fromRGB(255, 214, 140))
+		glow.Name = "Glow"
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "Hint"
+		gui.Size = UDim2.fromScale(1.4, 1.4)
+		gui.StudsOffset = Vector3.new(0, 1.7, 0)
+		gui.MaxDistance = 25
+		gui.LightInfluence = 0
+		gui.Parent = box
+		local mark = Instance.new("TextLabel")
+		mark.Size = UDim2.fromScale(1, 1)
+		mark.BackgroundTransparency = 1
+		mark.Text = "?"
+		mark.TextScaled = true
+		mark.Font = Enum.Font.GothamBlack
+		mark.TextColor3 = Color3.fromRGB(255, 214, 90)
+		mark.TextStrokeTransparency = 0.35
+		mark.Parent = gui
+		local p = Instance.new("ProximityPrompt")
+		p.Name = "SecretPrompt"
+		p.ActionText = "Open"
+		p.ObjectText = "Lost package"
+		p.HoldDuration = 0.5
+		p.MaxActivationDistance = 9
+		p.RequiresLineOfSight = false
+		p:SetAttribute("Secret", secret.id)
+		p.Parent = box
+		table.insert(World.SecretPrompts, { prompt = p, id = secret.id })
+		model.PrimaryPart = box
+		model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- the whole box streams in at once (client/Secrets)
+		model.Parent = packages
+	end
+
+	for _, secret in Map.Secrets do
+		local ok, err = pcall(function()
+			package(secret)
+			local cover = COVERS[secret.id]
+			local build = if cover then BUILD_COVER[cover.kind] else nil
+			if cover and build then
+				build(CFrame.new(secret.x + cover.dx, secret.y, secret.z + cover.dz))
+			end
+		end)
+		if not ok then
+			warn(`[World] the lost package {secret.id} failed: {err}`)
+		end
+	end
+end
+
 -- The day look (the clock and the night are server/DayNight.luau's; every client blends the night look over this,
 -- client/Weather.luau). A sky with stars and a big moon for the night.
 local function setLighting()
@@ -4813,6 +4961,9 @@ function World.build()
 	end)
 	piece("landmark tags", function()
 		buildLandmarkTags(world)
+	end)
+	piece("lost packages", function()
+		buildSecrets(world)
 	end)
 	piece("lighting", setLighting)
 end

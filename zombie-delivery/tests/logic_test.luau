@@ -1321,6 +1321,106 @@ end)())
 check("the old places keep their spots", findPlace("bank") ~= nil and Map.CargoSpots.bank ~= nil and Map.special("downtown", 1, -2) == "bank"
 	and Map.special("downtown", -2, 2) == "clinic" and yardById("fueldepot") ~= nil and Map.CargoSpots.radio ~= nil)
 
+-- Zombie Delivery 3.1: the lost packages (Map.Secrets) ----------------------------------------------------------------
+
+do
+	local byId: { [string]: Map.Secret } = {}
+	local unique, valid = true, true
+	for _, secret in Map.Secrets do
+		if byId[secret.id] then
+			unique = false
+			print("  duplicate secret:", secret.id)
+		end
+		byId[secret.id] = secret
+		local place = findPlace(secret.place)
+		if not place or secret.id:sub(1, #("secret_" .. secret.place)) ~= "secret_" .. secret.place then
+			valid = false
+			print("  secret without its place:", secret.id, secret.place)
+		end
+		if type(secret.hint) ~= "string" or #secret.hint < 12 or type(secret.y) ~= "number" or secret.y < 0 or secret.y > 20 then
+			valid = false
+			print("  bad hint or height:", secret.id)
+		end
+	end
+	check("the secrets' ids are unique", unique)
+	check("every secret names its place, a hint and a floor height", valid)
+	check("about 30 lost packages", #Map.Secrets >= #Map.Places and #Map.Secrets <= #Map.Places + 3, #Map.Secrets)
+	check("every place has its lost package", (function()
+		for _, place in Map.Places do
+			if not byId["secret_" .. place.id] then
+				print("  no package at:", place.id)
+				return false
+			end
+		end
+		return true
+	end)())
+	check("every package lies close to its place (an extra one in its place's yard)", (function()
+		for _, secret in Map.Secrets do
+			local place = findPlace(secret.place)
+			if not place then
+				return false
+			end
+			local distance = math.sqrt((secret.x - place.x) ^ 2 + (secret.z - place.z) ^ 2)
+			if secret.id == "secret_" .. place.id then
+				if distance > 60 then
+					print("  too far from its place:", secret.id, distance)
+					return false
+				end
+			else
+				local yard = Map.inYard(secret.x, secret.z)
+				if not yard or yard.id ~= place.id then
+					print("  the extra one is not in its place's yard:", secret.id)
+					return false
+				end
+			end
+		end
+		return true
+	end)())
+	check("every package is in bounds, dry, off the ice", (function()
+		for _, secret in Map.Secrets do
+			if not inBounds(secret.x, secret.z) or Map.inWater(secret.x, secret.z) or Map.onIce(secret.x, secret.z) then
+				print("  out of bounds or wet:", secret.id)
+				return false
+			end
+		end
+		return true
+	end)())
+	check("no package where cargo is loaded or an employer stands", (function()
+		for _, secret in Map.Secrets do
+			local function near(x: number, z: number, radius: number): boolean
+				return (secret.x - x) ^ 2 + (secret.z - z) ^ 2 < radius * radius
+			end
+			for _, spot in Map.CargoSpots do
+				if near(spot.park.x, spot.park.z, 8) or near(spot.pile.x, spot.pile.z, 8) then
+					print("  on a cargo spot:", secret.id)
+					return false
+				end
+			end
+			for _, spot in Map.EmployerSpots do
+				if near(spot.x, spot.z, 6) then
+					print("  on an employer's spot:", secret.id)
+					return false
+				end
+			end
+		end
+		return true
+	end)())
+	check("no package on a road (the ones in town on their block's sidewalk)", (function()
+		for _, secret in Map.Secrets do
+			if onAsphalt(secret.x, secret.z, 1) then
+				print("  on a road:", secret.id)
+				return false
+			end
+			local district = Map.blockAt(secret.x, secret.z)
+			if district and secret.y < Map.WalkTop then
+				print("  under the sidewalk:", secret.id)
+				return false
+			end
+		end
+		return true
+	end)())
+end
+
 local district, i, j = Map.blockAt(Map.Cell, 0)
 check("blockAt finds the dealer block", district ~= nil and district.id == "downtown" and i == 1 and j == 0)
 check("blockAt on a road is nil", (Map.blockAt(Map.Cell / 2, 0)) == nil)

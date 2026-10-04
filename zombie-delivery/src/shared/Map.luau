@@ -24,6 +24,7 @@
 --              Power Plant (south of the Harbor), the Water Works (by the river), the Biotech Lab and the Train Yard
 --              (north of Downtown), Blackrock Prison (far north-west), Lighthouse Point (on the coast north of Ocean
 --              View), the Survivor Camp (on the Radio Road) and the Stadium Shelter (south of the Suburbs)
+--   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
 --
 -- It also holds the shape of the night over the clock (Map.nightFactor): the server runs the clock
 -- (server/DayNight.luau), every client draws the look from the same numbers (client/Weather.luau).
@@ -80,6 +81,16 @@ export type Place = {
 	z: number,
 	nx: number, -- the side the zombies wait on (0, 0 = all around)
 	nz: number,
+}
+
+-- 3.1: a lost package hidden at a place (Map.Secrets).
+export type Secret = {
+	id: string, -- "secret_<place id>"; an extra one at a fun spot: "secret_<place id>_<where>"
+	place: string, -- the Map.Places id it belongs to
+	hint: string, -- a riddle-ish line for the SECRETS tab (client/MissionsUi.luau)
+	x: number,
+	y: number, -- the floor under the package (the ground, a sidewalk, a portico, a platform, a stand)
+	z: number,
 }
 
 export type Address = {
@@ -251,6 +262,52 @@ Map.Places = {
 	{ id = "camp", name = "Survivor Camp", x = -1058, z = -250, nx = 0, nz = 0 },
 	{ id = "stadium", name = "Stadium Shelter", x = 0, z = 1300, nx = 0, nz = 0 },
 } :: { Place }
+
+-- 3.1, the lost packages: one hidden at every place (and one more at a fun spot), found on foot with its prompt
+-- (server/World.luau builds them, server/Challenges.luau pays the finder once, client/Secrets.luau hides the ones a
+-- player has found, client/MissionsUi.luau shows the hints). Each one lies next to something real of its place
+-- (server/World.luau's builders): behind a building or a stand, under a bench or a table, between parked things, up
+-- on a platform; within 60 studs of the place's point (the extra one anywhere in its place's yard), never in the
+-- water, never inside a solid part, reachable on foot (a jump is about 7 studs). Where a place has nothing to hide
+-- behind near its point, World brings a small cover with the package (a sandbag nest, a snowman, hay, tyres, boxes,
+-- a cable reel). y is the floor under the package: the yards 0.4 (ROAD_TOP), the blocks' sidewalks 0.6 (WALK_TOP).
+Map.Secrets = {
+	-- The far places.
+	{ id = "secret_base", place = "base", hint = "The soldiers built a little sandbag nest in the middle of the yard. Something waits inside.", x = 330, y = 0.4, z = -2632 },
+	{ id = "secret_radio", place = "radio", hint = "At the feet of the tall steel giant, under its blinking red eye.", x = -1061, y = 0.4, z = -603.5 },
+	{ id = "secret_farm", place = "farm", hint = "Fresh food is sold out front; something less fresh waits behind the stand.", x = -1874.5, y = 0.4, z = 470.2 },
+	{ id = "secret_docks", place = "docks", hint = "Behind the tallest stack of ammo crates, with the sea at your back.", x = 1650.5, y = 0.4, z = -14 },
+	{ id = "secret_gas", place = "gas", hint = "Behind the little shop, where the pumps can't see.", x = 196.5, y = 0.4, z = -890 },
+	{ id = "secret_lodge", place = "lodge", hint = "A cold guard with a carrot nose keeps watch by the lodge. Look behind him.", x = -690, y = 0.4, z = -2241.5 },
+	{ id = "secret_ranch", place = "ranch", hint = "Just inside the gate, the hay hides something the horses won't eat.", x = -940, y = 0.4, z = 708 },
+	{ id = "secret_stables", place = "stables", hint = "Hay by the lamp near the clubhouse: look on the side away from the stalls.", x = 619.6, y = 0.4, z = 931.5 },
+	{ id = "secret_fueldepot", place = "fueldepot", hint = "Behind the full barrels at the back of the loading shed. No smoking!", x = 1465, y = 0.4, z = 592 },
+	-- The employers' buildings in town.
+	{ id = "secret_school", place = "school", hint = "Class is out. In the corner of the front wall, as far from the door as you can get.", x = -38.5, y = 0.6, z = 1171 },
+	{ id = "secret_frosty", place = "frosty", hint = "Hugging the pink wall north of the door, out of the sun, like ice cream should.", x = 1209.6, y = 0.6, z = -30 },
+	{ id = "secret_movers", place = "movers", hint = "Among the moving boxes nobody ever moved, against the orange wall.", x = 302.4, y = 0.6, z = 111 },
+	{ id = "secret_bank", place = "bank", hint = "Up the steps, between marble and money: behind the last column on the south side.", x = 127.6, y = 1.8, z = -266 },
+	{ id = "secret_clinic", place = "clinic", hint = "The patients' bench by the front door hides more than old gum.", x = -266, y = 0.6, z = 324 },
+	-- The missions' places in town (3.0).
+	{ id = "secret_pharmacy", place = "pharmacy", hint = "Right under the green cross, against the wall.", x = 116, y = 0.6, z = 414 },
+	{ id = "secret_market", place = "market", hint = "Between the grocery pallets at the delivery bay.", x = -411, y = 0.7, z = 109 },
+	{ id = "secret_warehouse", place = "warehouse", hint = "The yellow forklift parked out front is hiding something behind its back.", x = 1353, y = 0.6, z = 310 },
+	{ id = "secret_firestation", place = "firestation", hint = "Tucked behind the red hydrant on the corner. No hose needed.", x = 316, y = 0.6, z = -104 },
+	{ id = "secret_police", place = "police", hint = "Between the two parked patrol cars. Nobody is watching.", x = -258, y = 0.6, z = -258 },
+	{ id = "secret_cityhall", place = "cityhall", hint = "Make a wish at the fountain, then look on its far side, toward the hall.", x = 22, y = 0.6, z = -401.5 },
+	-- The missions' places out of town (3.0).
+	{ id = "secret_airfield", place = "airfield", hint = "Old tyres by the fence, just inside the gate on your right. Look behind them.", x = -1430.5, y = 0.4, z = 1156 },
+	{ id = "secret_powerplant", place = "powerplant", hint = "A big cable reel by the lamp in front of the turbine hall. Check the side facing the hall.", x = 1114, y = 0.4, z = 602.6 },
+	{ id = "secret_waterworks", place = "waterworks", hint = "The pump house hums. Walk down its west wall.", x = 483, y = 0.4, z = 732 },
+	{ id = "secret_lab", place = "lab", hint = "Right under the yellow BIOHAZARD sign. Nobody wants to look there.", x = -213.2, y = 0.4, z = -1036 },
+	{ id = "secret_prison", place = "prison", hint = "At the foot of the left gate tower, where the tower meets the wall.", x = -1626, y = 0.4, z = -961.5 },
+	{ id = "secret_lighthouse", place = "lighthouse", hint = "Behind the keeper's cottage, right below the chimney.", x = 1590.4, y = 0.4, z = -1051 },
+	{ id = "secret_trainyard", place = "trainyard", hint = "Up on the freight platform, past the last crates at the east end.", x = -203, y = 3.4, z = -817 },
+	{ id = "secret_camp", place = "camp", hint = "Behind the sandbags by the gate, in the corner with the planks.", x = -1073, y = 0.4, z = -285.5 },
+	{ id = "secret_stadium", place = "stadium", hint = "Under the supply table by the gate, among the relief goods.", x = 15, y = 0.4, z = 1318 },
+	-- The extra one: the stands are steps (4 studs each); the top row is under the roof.
+	{ id = "secret_stadium_top", place = "stadium", hint = "Climb to the very top row of the east stands, far end. Best seat in the house.", x = 191, y = 16.4, z = 1430 },
+} :: { Secret }
 
 -- Where each employer's board stands (walk up to it to work for them).
 -- (keyed by Config.Employers ids)

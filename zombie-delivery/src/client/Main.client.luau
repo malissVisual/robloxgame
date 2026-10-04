@@ -25,6 +25,7 @@ local BusinessUi = require(Client.BusinessUi)
 local TrafficAnimator = require(Client.TrafficAnimator)
 local Sounds = require(Client.Sounds)
 local MissionsUi = require(Client.MissionsUi)
+local Secrets = require(Client.Secrets)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -52,6 +53,7 @@ safely("BusinessUi", BusinessUi.start)
 safely("TrafficAnimator", TrafficAnimator.start)
 safely("Sounds", Sounds.start)
 safely("MissionsUi", MissionsUi.start)
+safely("Secrets", Secrets.start)
 Shooting.notify = Hud.toast
 Sounds.notify = Hud.toast
 Hud.onSound = Sounds.cycle
