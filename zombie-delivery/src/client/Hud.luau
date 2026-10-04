@@ -205,11 +205,13 @@ end
 -- ── Money ──────────────────────────────────────────────────────────────────
 
 -- On a computer the chat sits top left: money goes bottom left above the minimap. On a touch screen top left.
-local touchLayout = Ui.touchLayout()
+local touchLayout: any, LEFT_H: any, LEFT_W: any, leftStack: any, moneyLabel: any, statsLabel: any, levelChip: any, rankLabel: any, xpLabel: any, xpBack: any, xpFill: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+touchLayout = Ui.touchLayout()
 -- Money and the minimap share one column (one scale), so they can never overlap.
 local MONEY_HEIGHT = 110 -- money, the stats, the level and the XP bar
-local LEFT_W, LEFT_H = 230, MONEY_HEIGHT + 8 + 230 -- (the minimap is 230 × 230, client/MapView.luau)
-local leftStack = placed(Ui.make("Frame", {
+LEFT_W, LEFT_H = 230, MONEY_HEIGHT + 8 + 230 -- (the minimap is 230 × 230, client/MapView.luau)
+leftStack = placed(Ui.make("Frame", {
 	Name = "LeftStack",
 	Size = UDim2.fromOffset(LEFT_W, LEFT_H),
 	Position = if touchLayout then UDim2.fromOffset(16, 16) else UDim2.new(0, 16, 1, -16),
@@ -220,23 +222,23 @@ Ui.list(leftStack, true, 8)
 local moneyPanel = Ui.panel(leftStack, UDim2.fromOffset(230, MONEY_HEIGHT), UDim2.new())
 moneyPanel.LayoutOrder = 1
 Ui.padding(moneyPanel, 8)
-local moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 32), { TextColor3 = C.money, TextSize = 30, Font = Enum.Font.GothamBlack })
-local statsLabel = Ui.label(moneyPanel, "", UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 34), TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
+moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 32), { TextColor3 = C.money, TextSize = 30, Font = Enum.Font.GothamBlack })
+statsLabel = Ui.label(moneyPanel, "", UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 34), TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
 -- The driver level: a LV chip and the rank name, under them the XP bar and the XP into this level.
 local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 54), BackgroundTransparency = 1, ClipsDescendants = true }, moneyPanel)
 Ui.list(levelRow, false, 6)
-local levelChip = Ui.chip(levelRow, "LV 1", C.yellow, Color3.new(0.04, 0.05, 0.04))
+levelChip = Ui.chip(levelRow, "LV 1", C.yellow, Color3.new(0.04, 0.05, 0.04))
 levelChip.Font = Enum.Font.GothamBlack
 levelChip.TextSize = 13
 levelChip.LayoutOrder = 1
-local rankLabel = Ui.label(levelRow, "", UDim2.new(0, 0, 1, 0), {
+rankLabel = Ui.label(levelRow, "", UDim2.new(0, 0, 1, 0), {
 	AutomaticSize = Enum.AutomaticSize.X,
 	TextWrapped = false,
 	TextSize = 13,
 	TextColor3 = C.yellow,
 	LayoutOrder = 2,
 })
-local xpLabel = Ui.label(moneyPanel, "", UDim2.fromOffset(84, 16), {
+xpLabel = Ui.label(moneyPanel, "", UDim2.fromOffset(84, 16), {
 	Position = UDim2.new(1, -84, 0, 77),
 	TextXAlignment = Enum.TextXAlignment.Right,
 	TextSize = 12,
@@ -244,8 +246,9 @@ local xpLabel = Ui.label(moneyPanel, "", UDim2.fromOffset(84, 16), {
 	Font = Enum.Font.GothamMedium,
 	TextWrapped = false,
 })
-local xpBack, xpFill = Ui.bar(moneyPanel, UDim2.new(1, -90, 0, 7), C.yellow)
+xpBack, xpFill = Ui.bar(moneyPanel, UDim2.new(1, -90, 0, 7), C.yellow)
 xpBack.Position = UDim2.fromOffset(0, 82)
+end
 
 -- ── Top stack ──────────────────────────────────────────────────────────────
 -- Top centre, one column that grows downward (a UIListLayout: a hidden entry takes no room, so nothing overlaps):
@@ -257,8 +260,10 @@ xpBack.Position = UDim2.fromOffset(0, 82)
 -- The job panel, the crew strip and the invitation card never show at the same time (a job of your own, a crew
 -- member without one, neither); the rest stacks under whichever shows.
 
-local TOP_W = 540
-local topStack = placed(Ui.make("Frame", {
+local TOP_W: any, topStack: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+TOP_W = 540
+topStack = placed(Ui.make("Frame", {
 	Name = "TopStack",
 	Size = UDim2.fromOffset(TOP_W, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
@@ -294,10 +299,13 @@ function Hud.topSlot(name: string): Frame
 	slots[name] = slot
 	return slot
 end
+end
 
 -- ── Toasts ─────────────────────────────────────────────────────────────────
 
-local toasts = Hud.topSlot("toasts")
+local toasts: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+toasts = Hud.topSlot("toasts")
 local MAX_TOASTS = if touchLayout then 2 else 3
 local toastOrder = 0
 
@@ -335,6 +343,7 @@ function Hud.toast(text: string)
 		task.wait(0.45)
 		label:Destroy()
 	end)
+end
 end
 
 -- ── Windows ────────────────────────────────────────────────────────────────
@@ -587,7 +596,9 @@ end
 
 -- ── Job board ──────────────────────────────────────────────────────────────
 
-local jobs = window("JOB BOARD", Vector2.new(600, 470))
+local jobs: any, openJobs: any, STAR_COLORS: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+jobs = window("JOB BOARD", Vector2.new(600, 470))
 local offersRemote = Net.get("RequestOffers")
 
 local function jobsMessage(text: string)
@@ -595,7 +606,7 @@ local function jobsMessage(text: string)
 	Ui.label(jobs.body, text, UDim2.new(1, -10, 0, 60), { TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Center })
 end
 
-local function openJobs()
+function openJobs()
 	closeWindows()
 	jobs.frame.Visible = true
 	if job then
@@ -611,7 +622,7 @@ local function openJobs()
 	offersRemote:FireServer()
 end
 
-local STAR_COLORS = { C.green, C.yellow, C.red, Color3.fromRGB(200, 80, 255) }
+STAR_COLORS = { C.green, C.yellow, C.red, Color3.fromRGB(200, 80, 255) }
 
 -- How the cargo of an offer moves, in two or three words (offer.handling: the first stop's mode).
 local OFFER_HANDLING: { [string]: string } = {
@@ -713,6 +724,7 @@ function Hud.setOffers(list: { any })
 		offersRemote:FireServer()
 	end)
 	refresh.LayoutOrder = 99
+end
 end
 
 -- ── Shops ──────────────────────────────────────────────────────────────────
@@ -910,6 +922,7 @@ end
 
 -- ── Employers ──────────────────────────────────────────────────────────────
 
+do -- (its own block: the locals below stay out of the 200-register limit)
 local employerWindow = window("WORK", Vector2.new(580, 520))
 
 -- How the cargo of a job type gets in and out, in a few words.
@@ -1035,14 +1048,17 @@ function Hud.openShop(id: string, focus: string?)
 	shop.frame.Visible = true
 	renderShop()
 end
+end
 
 -- ── Backpack ───────────────────────────────────────────────────────────────
 
-local backpack = window("BACKPACK", Vector2.new(640, 500))
+local backpack: any, renderBackpack: any, useItem: any, toggleBackpack: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+backpack = window("BACKPACK", Vector2.new(640, 500))
 local backpackTab = "items"
-local renderBackpack: () -> ()
+-- (renderBackpack is declared above the block)
 
-local function useItem(id: string)
+function useItem(id: string)
 	local count = if state then state.items[id] or 0 else 0
 	if count <= 0 then
 		local def = Economy.findItem(id)
@@ -1162,7 +1178,7 @@ function renderBackpack()
 	end
 end
 
-local function toggleBackpack()
+function toggleBackpack()
 	if backpack.frame.Visible then
 		backpack.frame.Visible = false
 	else
@@ -1171,10 +1187,13 @@ local function toggleBackpack()
 		renderBackpack()
 	end
 end
+end
 
 -- ── Delivery result ────────────────────────────────────────────────────────
 
-local result = window("DELIVERY", Vector2.new(460, 540))
+local result: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+result = window("DELIVERY", Vector2.new(460, 540))
 
 -- The crew of a job (r.crew): a number (riders, older payloads) or the list of everyone paid { { name, pay } }
 -- (the owner too; an entry may say owner = true).
@@ -1312,6 +1331,7 @@ function Hud.showResult(r: any)
 	end)
 	next.LayoutOrder = 91
 end
+end
 
 -- ── Buttons ────────────────────────────────────────────────────────────────
 
@@ -1324,6 +1344,9 @@ end
 Hud.onCrew = nil :: (() -> ())?
 Hud.onEstate = nil :: (() -> ())?
 
+type ButtonDef = { id: string, text: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
+local BUTTONS: { ButtonDef }, buttonGrid: any, buttonLayout: any, hudButtons: { [string]: any }
+do -- (its own block: the locals below stay out of the 200-register limit)
 local function toggleJobs()
 	if jobs.frame.Visible then
 		jobs.frame.Visible = false
@@ -1332,8 +1355,8 @@ local function toggleJobs()
 	end
 end
 
-type ButtonDef = { id: string, text: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
-local BUTTONS: { ButtonDef } = {
+-- (type declared above)
+BUTTONS = {
 	{ id = "jobs", text = "JOBS", key = "J", color = C.yellow, onClick = toggleJobs },
 	{ id = "map", text = "MAP", key = "M", color = C.panelLight, onClick = function()
 		MapView.toggle()
@@ -1365,21 +1388,21 @@ local BUTTONS: { ButtonDef } = {
 	end },
 }
 
-local buttonGrid = placed(Ui.make("Frame", {
+buttonGrid = placed(Ui.make("Frame", {
 	Name = "HudButtons",
 	Size = UDim2.fromOffset(150, 7 * 46),
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 96),
 	BackgroundTransparency = 1,
 }, gui))
-local buttonLayout = Ui.make("UIGridLayout", {
+buttonLayout = Ui.make("UIGridLayout", {
 	CellSize = UDim2.fromOffset(150, 46),
 	CellPadding = UDim2.fromOffset(8, 8),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	FillDirection = Enum.FillDirection.Vertical,
 	StartCorner = Enum.StartCorner.TopRight,
 }, buttonGrid)
-local hudButtons: { [string]: any } = {}
+hudButtons = {}
 local buttonStrokes: { [string]: Color3 } = {}
 
 for order, def in BUTTONS do
@@ -1436,23 +1459,26 @@ function Hud.flashButton(id: string, color: Color3?, seconds: number?)
 		stroke.Color = buttonStrokes[id] or Theme.Border
 	end)
 end
+end
 
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
 -- The inventory bar: items (keys 1-5) and above them the guns you own (Q switches). Bottom right on a computer,
 -- bottom centre on a touch screen (the FIRE button is bottom right there). layout() places them.
-local BAR_W = 5 * 64 + 4 * 8
-local HOTBAR_H = 64
+local BAR_W: any, HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, hotbarCounts: any, FIRE_SIZE: any, fire: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+BAR_W = 5 * 64 + 4 * 8
+HOTBAR_H = 64
 -- The guns line up toward the screen's edge on a computer (bottom right), around the middle on a touch screen.
 local BAR_ALIGN = if touchLayout then Enum.HorizontalAlignment.Center else Enum.HorizontalAlignment.Right
-local hotbar = placed(Ui.make("Frame", {
+hotbar = placed(Ui.make("Frame", {
 	Name = "Hotbar",
 	Size = UDim2.fromOffset(BAR_W, HOTBAR_H),
 	Position = if touchLayout then UDim2.new(0.5, 0, 1, -112) else UDim2.new(1, -16, 1, -16),
 	AnchorPoint = if touchLayout then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 	BackgroundTransparency = 1,
 }, gui))
-local weaponBar = placed(Ui.make("Frame", {
+weaponBar = placed(Ui.make("Frame", {
 	Name = "WeaponBar",
 	Size = UDim2.fromOffset(BAR_W, 78),
 	Position = if touchLayout then UDim2.new(0.5, 0, 1, -184) else UDim2.new(1, -16, 1, -88),
@@ -1494,11 +1520,11 @@ local function seatView(): (boolean, Config.CarGunDef?)
 	return seatedIn ~= nil, if seatedIn and driving then Shooting.carGunOf(seatedIn) else nil
 end
 
-local function weaponBarKey(): string
+function weaponBarKey(): string
 	local seated, carGun = seatView()
 	return `{seated}|{if carGun then carGun.id else ""}`
 end
-local shownWeaponBar = ""
+shownWeaponBar = ""
 
 -- A small tag in the top left corner of a weapon slot.
 local function slotTag(slot: any, text: string, color: Color3)
@@ -1517,7 +1543,7 @@ local function slotTag(slot: any, text: string, color: Color3)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 3) }, tag)
 end
 
-local function renderWeapons()
+function renderWeapons()
 	Ui.clear(weaponRow)
 	shownWeaponBar = weaponBarKey()
 	if not state then
@@ -1606,7 +1632,7 @@ local function renderWeapons()
 end
 
 -- Q: the next gun you own.
-local function nextWeapon()
+function nextWeapon()
 	if not state then
 		return
 	end
@@ -1624,7 +1650,7 @@ local function nextWeapon()
 	Net.get("Equip"):FireServer("weapon", owned[index % #owned + 1])
 end
 Ui.list(hotbar, false, 8)
-local hotbarCounts: { [string]: any } = {}
+hotbarCounts = {}
 for index, def in Config.Items do
 	local art = Icons.item(def.id)
 	local slot = Ui.make("TextButton", {
@@ -1655,8 +1681,8 @@ for index, def in Config.Items do
 end
 
 -- FIRE for touch screens (auto-aim). layout() keeps it above Roblox's jump button.
-local FIRE_SIZE = 110
-local fire = placed(Ui.make("TextButton", {
+FIRE_SIZE = 110
+fire = placed(Ui.make("TextButton", {
 	Name = "Fire",
 	Size = UDim2.fromOffset(FIRE_SIZE, FIRE_SIZE),
 	Position = UDim2.new(1, -40, 1, -190),
@@ -1681,6 +1707,7 @@ fire.InputEnded:Connect(function(input: InputObject)
 		Shooting.setAutoHeld(false)
 	end
 end)
+end
 
 -- ── Car panel ──────────────────────────────────────────────────────────────
 
@@ -1720,50 +1747,52 @@ local hint = Ui.label(gui, "", UDim2.fromOffset(640, 22), {
 -- Top centre (the first entry of the top stack): the job and the clock, what to do now (big), the stop and the
 -- person, the cargo (in your hands, at this stop, in the vehicle) and the cargo's condition.
 
-local jobPanel = Ui.panel(Hud.topSlot("job"), UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
+local jobPanel: any, jobStroke: any, jobTitle: any, jobTimer: any, jobStep: any, jobInfo: any, conditionBack: any, conditionFill: any, conditionText: any, LOAD_H: any, loadFill: any, loadBack: any, loadText: any, cargoSignature: any, renderCargoRow: any
+do -- (its own block: the locals below stay out of the 200-register limit)
+jobPanel = Ui.panel(Hud.topSlot("job"), UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 jobPanel.Name = "JobPanel"
 jobPanel.AutomaticSize = Enum.AutomaticSize.Y
 jobPanel.Visible = false
 Ui.padding(jobPanel, 12)
-local jobStroke = Ui.stroke(jobPanel, C.yellow, 2)
+jobStroke = Ui.stroke(jobPanel, C.yellow, 2)
 Ui.list(jobPanel, true, 6)
 local jobHeader = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, jobPanel)
-local jobTitle = Ui.label(jobHeader, "", UDim2.new(1, -80, 1, 0), { TextSize = 15, TextColor3 = C.dim, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
-local jobTimer = Ui.label(jobHeader, "", UDim2.new(0, 80, 1, 0), {
+jobTitle = Ui.label(jobHeader, "", UDim2.new(1, -80, 1, 0), { TextSize = 15, TextColor3 = C.dim, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
+jobTimer = Ui.label(jobHeader, "", UDim2.new(0, 80, 1, 0), {
 	Position = UDim2.new(1, -80, 0, 0),
 	TextXAlignment = Enum.TextXAlignment.Right,
 	TextSize = 22,
 	Font = Enum.Font.GothamBlack,
 })
-local jobStep = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
+jobStep = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
 	AutomaticSize = Enum.AutomaticSize.Y,
 	LayoutOrder = 2,
 	TextSize = 24,
 	Font = Enum.Font.GothamBlack,
 })
-local jobInfo = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 18), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 15, Font = Enum.Font.GothamMedium })
+jobInfo = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 18), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 15, Font = Enum.Font.GothamMedium })
 local cargoRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = 4, Visible = false }, jobPanel)
 Ui.list(cargoRow, false, 6)
-local conditionBack, conditionFill = Ui.bar(jobPanel, UDim2.new(1, 0, 0, 8), C.yellow)
+conditionBack, conditionFill = Ui.bar(jobPanel, UDim2.new(1, 0, 0, 8), C.yellow)
 conditionBack.LayoutOrder = 5
-local conditionText = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
+conditionText = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
 	AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 6,
 	TextXAlignment = Enum.TextXAlignment.Left, TextSize = 14, TextColor3 = C.dim, ZIndex = 2,
 })
 
 -- Loading / unloading / boarding bar under the middle of the screen (layout() keeps it over the bottom panels).
-local LOAD_H = 26
-local loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, LOAD_H), C.blue)
+LOAD_H = 26
+loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, LOAD_H), C.blue)
 scaled(loadBack)
 loadBack.AnchorPoint = Vector2.new(0.5, 0.5)
 loadBack.Position = UDim2.fromScale(0.5, 0.62)
 loadBack.Visible = false
-local loadText = Ui.label(loadBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 16, ZIndex = 2, Font = Enum.Font.GothamBlack })
+loadText = Ui.label(loadBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 16, ZIndex = 2, Font = Enum.Font.GothamBlack })
 
-local cargoSignature = ""
+cargoSignature = ""
 
 -- The cargo chips: what you hold, the pieces of this stop (done ones bright), how many ride in the vehicle.
-local function renderCargoRow()
+function renderCargoRow()
 	local handling = job and job.handling
 	local total = job and job.total
 	local show = job ~= nil and type(total) == "number" and total > 0 and handling ~= "drive"
@@ -1826,11 +1855,14 @@ local function renderCargoRow()
 		Ui.chip(cargoRow, `⚠ {lost} lost`, Color3.fromRGB(90, 28, 28), Color3.fromRGB(255, 150, 140)).LayoutOrder = 5
 	end
 end
+end
 
 -- ── The way to the target ──────────────────────────────────────────────────
 -- The park circle (a ring and a light beam) and, on foot during a carry step, a small ring at the pile / the
 -- person with a thin beam over their head; a floating label and an arrow (over the car, or over your head on foot).
 
+local beacon: any, ring: any, pileRing: any, label: any, labelText: any, HIDDEN: any, PICKUP_COLOR: any, PILE_COLOR: any, UPRIGHT: any, hideGuide: any, placeGuide: any, pointArrow: any, GPS_COLOR: any, gps: any, myPosition: any, footTarget: any
+do -- (its own block: the locals below stay out of the 200-register limit)
 local guide = Instance.new("Folder")
 guide.Name = "DeliveryGuide"
 guide.Parent = workspace
@@ -1853,15 +1885,15 @@ end
 
 local BEACON_WIDE = Vector3.new(240, 5, 5)
 local BEACON_THIN = Vector3.new(240, 1.2, 1.2)
-local beacon = guidePart("Beacon", BEACON_WIDE, 0.55)
+beacon = guidePart("Beacon", BEACON_WIDE, 0.55)
 beacon.Shape = Enum.PartType.Cylinder
-local ring = guidePart("Ring", Vector3.new(0.2, Config.Jobs.DeliverRadius * 2, Config.Jobs.DeliverRadius * 2), 0.5)
+ring = guidePart("Ring", Vector3.new(0.2, Config.Jobs.DeliverRadius * 2, Config.Jobs.DeliverRadius * 2), 0.5)
 ring.Shape = Enum.PartType.Cylinder
-local pileRing = guidePart("PileRing", Vector3.new(0.2, 7, 7), 0.35)
+pileRing = guidePart("PileRing", Vector3.new(0.2, 7, 7), 0.35)
 pileRing.Shape = Enum.PartType.Cylinder
-local label = guidePart("Label", Vector3.new(0.2, 0.2, 0.2), 1)
+label = guidePart("Label", Vector3.new(0.2, 0.2, 0.2), 1)
 local labelGui = Ui.make("BillboardGui", { Size = UDim2.fromOffset(260, 60), AlwaysOnTop = true, LightInfluence = 0, MaxDistance = 100000 }, label)
-local labelText = Ui.label(labelGui, "", UDim2.fromScale(1, 1), {
+labelText = Ui.label(labelGui, "", UDim2.fromScale(1, 1), {
 	TextXAlignment = Enum.TextXAlignment.Center,
 	TextColor3 = C.yellow,
 	TextSize = 20,
@@ -1874,12 +1906,12 @@ local arrowParts = {
 	{ part = guidePart("ArrowLeft", Vector3.new(0.6, 0.4, 2.6), 0), offset = CFrame.lookAt(Vector3.new(-0.84, 0, -0.6), Vector3.new(0, 0, -1.6)) },
 	{ part = guidePart("ArrowRight", Vector3.new(0.6, 0.4, 2.6), 0), offset = CFrame.lookAt(Vector3.new(0.84, 0, -0.6), Vector3.new(0, 0, -1.6)) },
 }
-local HIDDEN = CFrame.new(0, -1000, 0)
-local PICKUP_COLOR = Color3.fromRGB(110, 190, 255)
-local PILE_COLOR = Color3.fromRGB(120, 235, 140)
-local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: stood up
+HIDDEN = CFrame.new(0, -1000, 0)
+PICKUP_COLOR = Color3.fromRGB(110, 190, 255)
+PILE_COLOR = Color3.fromRGB(120, 235, 140)
+UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: stood up
 
-local function hideGuide()
+function hideGuide()
 	beacon.CFrame = HIDDEN
 	ring.CFrame = HIDDEN
 	pileRing.CFrame = HIDDEN
@@ -1905,7 +1937,7 @@ end
 
 -- The park circle at p with the beam over it (or a thin beam over the pile / the person at `beamAt`), the label
 -- over `labelAt` (default p).
-local function placeGuide(p: Vector3, color: Color3, beamAt: Vector3?, labelAt: Vector3?)
+function placeGuide(p: Vector3, color: Color3, beamAt: Vector3?, labelAt: Vector3?)
 	paintGuide(color)
 	ring.CFrame = CFrame.new(p + Vector3.new(0, 0.15, 0)) * UPRIGHT
 	if beamAt then
@@ -1920,7 +1952,7 @@ local function placeGuide(p: Vector3, color: Color3, beamAt: Vector3?, labelAt: 
 end
 
 -- The arrow at `origin` pointing along `flat` (scale < 1: the small one over your head on foot).
-local function pointArrow(origin: Vector3?, flat: Vector3, scale: number)
+function pointArrow(origin: Vector3?, flat: Vector3, scale: number)
 	if origin and flat.Magnitude > 6 then
 		local frame = CFrame.lookAt(origin, origin + flat.Unit)
 		for _, a in arrowParts do
@@ -1934,8 +1966,8 @@ local function pointArrow(origin: Vector3?, flat: Vector3, scale: number)
 end
 
 -- The GPS: a place picked on the big map (the job's target goes first).
-local GPS_COLOR = Color3.fromRGB(176, 92, 255) -- the purple of the GPS route on the maps (client/MapView.luau)
-local gps: { position: Vector3, name: string }? = nil
+GPS_COLOR = Color3.fromRGB(176, 92, 255) -- the purple of the GPS route on the maps (client/MapView.luau)
+gps = nil
 
 MapView.onWaypoint = function(landmark)
 	if landmark then
@@ -1954,7 +1986,7 @@ MapView.onWaypoint = function(landmark)
 end
 
 -- Seated: the car. On foot: you.
-local function myPosition(): Vector3?
+function myPosition(): Vector3?
 	local seated = Drive.seatedCar()
 	if seated and seated.PrimaryPart then
 		return seated.PrimaryPart.Position
@@ -1970,7 +2002,7 @@ end
 -- Where to go now on foot at a carry / lead stop: to the pile or the person (to pick a piece up, or to hand it
 -- over), or to the back of your vehicle (to load what you hold, or to take the next one out).
 -- Returns the point, its label and whether it is the vehicle; nil = the park circle (seated, or not a carry stop).
-local function footTarget(): (Vector3?, string?, boolean)
+function footTarget(): (Vector3?, string?, boolean)
 	if not job or Drive.seatedCar() then
 		return nil, nil, false
 	end
@@ -2005,6 +2037,7 @@ local function footTarget(): (Vector3?, string?, boolean)
 	end
 	local person = if type(job.person) == "string" and job.person ~= "" then job.person:upper() else (if pickup then "PICK UP" else "HAND IT OVER")
 	return pile, person, false
+end
 end
 
 -- ── Level up ───────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ with tempfile.TemporaryDirectory() as tmp:
             ok = False
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)
 # catches what the type checker does not, e.g. more than 200 locals in one function ("Out of local registers").
+# -O0 -g2 like Roblox Studio: without optimization constants take registers too, so this is the strict check.
 compiler = os.path.join(os.path.dirname(os.path.abspath(luau)), "luau-compile") if os.path.dirname(luau) else (shutil.which("luau-compile") or "")
 if compiler and os.path.exists(compiler):
     src = os.path.join(os.path.dirname(HERE), "src")
@@ -36,7 +37,7 @@ if compiler and os.path.exists(compiler):
         for name in sorted(files):
             if name.endswith(".luau"):
                 path = os.path.join(root, name)
-                result = subprocess.run([compiler, "--null", path], capture_output=True, text=True)
+                result = subprocess.run([compiler, "--null", "-O0", "-g2", path], capture_output=True, text=True)  # the strictest: how Studio compiles
                 if result.returncode != 0 or "Error" in result.stdout + result.stderr:
                     bad += 1
                     print(f"COMPILE FAIL  {os.path.relpath(path, src)}: {(result.stdout + result.stderr).strip()}")
