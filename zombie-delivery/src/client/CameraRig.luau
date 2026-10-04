@@ -1,13 +1,17 @@
 --!strict
 -- GTA-style aiming on a computer: the mouse is locked in the middle of the screen, the mouse moves the camera
--- (over the shoulder on foot, behind the car when driving), a crosshair shows where the gun hits (red over an enemy)
--- and your character faces where you aim. When a window is open (map, shop, backpack, job
+-- (behind you on foot, behind the car when driving), a crosshair shows where the gun hits (red over an enemy).
+-- On foot it plays like GTA: walking and running the character turns where it goes; aiming (right mouse) or
+-- shooting (left mouse) it turns to the crosshair, the camera moves in over the shoulder and the gun arm goes up. When a window is open (map, shop, backpack, job
 -- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Drive = require(script.Parent.Drive)
 
 local CameraRig = {}
@@ -19,6 +23,11 @@ local pitch = -0.12
 local zoom = 1
 local lastMouse = 0
 local altHeld = false
+local rmbHeld = false -- aiming
+local lmbHeld = false -- shooting
+local lastFire = 0
+local aimBlend = 0 -- 0 = walking camera, 1 = over the shoulder
+local aimingSent = false
 local SENSITIVITY = 0.0032
 
 -- Set by Main: is a window open that needs the mouse?
@@ -111,7 +120,24 @@ end
 
 local wasActive = false
 
-local function update()
+local function lerp(a: number, b: number, t: number): number
+	return a + (b - a) * t
+end
+
+-- Tell the server (the gun arm goes up / down for everybody).
+local function sendAiming(aiming: boolean)
+	if aiming ~= aimingSent then
+		aimingSent = aiming
+		Net.get("Aiming"):FireServer(aiming)
+	end
+end
+
+-- Shooting module: a shot was fired (the character turns to the aim for a moment).
+function CameraRig.noteFire()
+	lastFire = os.clock()
+end
+
+local function update(dt: number)
 	local camera = workspace.CurrentCamera
 	if not camera then
 		return
@@ -121,6 +147,8 @@ local function update()
 		if wasActive then
 			wasActive = false
 			camera.CameraType = Enum.CameraType.Custom
+			camera.FieldOfView = 70
+			sendAiming(false)
 			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 			UserInputService.MouseIconEnabled = true
 			if crosshair then
@@ -159,6 +187,11 @@ local function update()
 		end
 	end
 
+	-- Aiming: right mouse held, shooting, or a shot a moment ago (on foot only).
+	local wantAim = locked and not car and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
+	aimBlend = lerp(aimBlend, if wantAim then 1 else 0, math.min(1, dt * 10))
+	sendAiming(wantAim)
+
 	local rotation = CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
 	local focus: Vector3
 	local back: Vector3
@@ -169,8 +202,9 @@ local function update()
 		back = Vector3.new(0, 2, (size.Z * 0.7 + 9) * zoom)
 		table.insert(exclude, car)
 	else
-		focus = root.Position + Vector3.new(0, 1.8, 0)
-		back = Vector3.new(2.2, 0.6, 9 * zoom) -- over the right shoulder
+		focus = root.Position + Vector3.new(0, lerp(2.2, 1.8, aimBlend), 0)
+		-- Walking: behind, a little to the side. Aiming: close over the right shoulder.
+		back = Vector3.new(lerp(0.8, 2.3, aimBlend), lerp(1.2, 0.5, aimBlend), lerp(11, 6.5, aimBlend) * zoom)
 	end
 	local effects = workspace:FindFirstChild("LocalEffects")
 	if effects then
@@ -189,11 +223,15 @@ local function update()
 	local position = if hit then hit.Position + (focus - desired).Unit * 0.6 else desired
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector)
+	camera.FieldOfView = lerp(70, 55, aimBlend)
 
-	-- On foot the character faces the aim and raises the gun.
-	if not car then
+	-- On foot: the character turns where it walks (the Humanoid does it), or toward the aim while aiming.
+	if wantAim then
 		humanoid.AutoRotate = false
-		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+		local look = root.CFrame.LookVector
+		local current = math.atan2(-look.X, -look.Z)
+		local diff = (yaw - current + math.pi) % (2 * math.pi) - math.pi
+		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, current + diff * math.min(1, dt * 18), 0)
 	else
 		humanoid.AutoRotate = true
 	end
@@ -220,14 +258,24 @@ function CameraRig.start()
 			zoom = math.clamp(zoom - input.Position.Z * 0.1, 0.5, 2)
 		end
 	end)
-	UserInputService.InputBegan:Connect(function(input)
+	UserInputService.InputBegan:Connect(function(input, processed)
 		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
 			altHeld = true
+		elseif processed then
+			return
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+			rmbHeld = true
+		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+			lmbHeld = true
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
 			altHeld = false
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+			rmbHeld = false
+		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+			lmbHeld = false
 		end
 	end)
 	RunService:BindToRenderStep("ZombieDeliveryCamera", Enum.RenderPriority.Camera.Value + 1, update)

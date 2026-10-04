@@ -156,6 +156,26 @@ local GUN_LOOKS: { [string]: { GunPiece } } = {
 	},
 }
 local heldWeapon: { [Player]: string } = {}
+local shoulderRest: { [Motor6D]: CFrame } = {}
+
+-- Aiming on foot: the gun arm goes up (everybody sees it), and down again.
+local function setAiming(player: Player, aiming: any)
+	local character = player.Character
+	local upper = character and character:FindFirstChild("RightUpperArm")
+	local shoulder = upper and upper:FindFirstChild("RightShoulder")
+	if not shoulder or not shoulder:IsA("Motor6D") then
+		return
+	end
+	local rest = shoulderRest[shoulder]
+	if not rest then
+		rest = shoulder.C0
+		shoulderRest[shoulder] = rest
+		shoulder.Destroying:Connect(function()
+			shoulderRest[shoulder] = nil
+		end)
+	end
+	shoulder.C0 = if aiming == true then rest * CFrame.Angles(math.rad(85), 0, 0) else rest
+end
 
 local function giveHandGun(player: Player, character: Model)
 	local hand = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
@@ -167,18 +187,11 @@ local function giveHandGun(player: Player, character: Model)
 	if old then
 		old:Destroy()
 	end
-	-- Raise the gun arm once (the walk animation still swings it a little).
-	local upper = character:FindFirstChild("RightUpperArm")
-	local shoulder = upper and upper:FindFirstChild("RightShoulder")
-	if shoulder and shoulder:IsA("Motor6D") and not shoulder:GetAttribute("Raised") then
-		shoulder:SetAttribute("Raised", true)
-		shoulder.C0 = shoulder.C0 * CFrame.Angles(math.rad(85), 0, 0)
-	end
 	local weapon = if profile then profile.weapon else "pistol"
 	heldWeapon[player] = weapon
 	local model = Instance.new("Model")
 	model.Name = "HandGun"
-	-- Along the arm (the arm points forward once raised).
+	-- Along the arm: down at your side when walking, forward when the arm goes up to aim (Aiming).
 	local grip = hand.CFrame * CFrame.new(0, -0.4, 0) * CFrame.Angles(math.rad(-90), 0, 0)
 	for _, piece in GUN_LOOKS[weapon] or GUN_LOOKS.pistol do
 		local p = Instance.new("Part")
@@ -227,6 +240,8 @@ Players.PlayerRemoving:Connect(function(player)
 	heldWeapon[player] = nil
 	Zombies.clearOwner(player)
 end)
+
+Net.get("Aiming").OnServerEvent:Connect(setAiming)
 
 Net.get("Play").OnServerEvent:Connect(function(player)
 	if playing[player] then

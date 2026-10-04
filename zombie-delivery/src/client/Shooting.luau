@@ -235,6 +235,7 @@ local function step()
 		return
 	end
 	nextShot = now + stats.interval
+	CameraRig.noteFire()
 	fireRemote:FireServer(target)
 	local def = Economy.findWeapon(weapon)
 	local color = if def then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) else Color3.new(1, 1, 0.6)

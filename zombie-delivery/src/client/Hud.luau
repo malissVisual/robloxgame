@@ -1062,7 +1062,7 @@ RunService.RenderStepped:Connect(function()
 		hint.Text = "Press CAR to call your car"
 		hint.TextColor3 = C.dim
 	elseif not seatedIn then
-		hint.Text = if touch then "On foot: FIRE to shoot · walk to your car and press E" else "On foot: aim with the mouse, left mouse shoots · E at your car to drive · hold Alt = free mouse"
+		hint.Text = if touch then "On foot: FIRE to shoot · walk to your car and press E" else "On foot: right mouse aims, left mouse shoots · E at your car to drive · hold Alt = free mouse"
 		hint.TextColor3 = C.dim
 	else
 		hint.Text = ""
