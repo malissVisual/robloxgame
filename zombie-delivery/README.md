@@ -61,7 +61,8 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
    them with guns, ramming, mines or molotovs ($75). **Bandits** and **gunners** on foot set up roadblocks ahead of
    you, camp at the far places and shoot your car. Bandits next to your car **steal your cargo** bit by bit (all of
    it gone = the job fails). Zombies (walkers, runners, brutes, soldiers at the base) are rarer: run them over or
-   shoot them; they grab a slow car and bite it until you shoot them off.
+   shoot them (a **headshot kills** at once, a brute takes 4×; an X on the crosshair shows hits, red for a kill,
+   big with a ring for a headshot); they grab a slow car and bite it until you shoot them off.
    A wrecked car (or dying) does **not** end the job: some cargo is lost, press CAR for a new car (the company
    vehicle on a special job) and keep going while the time lasts.
 5. The pay: the job's pay × cargo condition (50 – 100 %), + 25 % for finishing in the first half of the time,

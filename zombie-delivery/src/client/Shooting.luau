@@ -107,6 +107,81 @@ function Shooting.floatText(position: Vector3, text: string, color: Color3, size
 	Debris:AddItem(anchor, 0.85)
 end
 
+-- ── The hit marker (GTA style): an X around the crosshair, no numbers ────────
+-- white = a hit, red = a kill, big red X with a ring = a headshot.
+
+local markerBars: { Frame } = {}
+local markerScale: UIScale? = nil
+local markerRing: Frame? = nil
+local markerStroke: UIStroke? = nil
+
+local function makeHitmarker()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "Hitmarker"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 6
+	gui.Parent = player:WaitForChild("PlayerGui")
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.fromOffset(48, 48)
+	holder.Position = UDim2.fromScale(0.5, 0.5)
+	holder.AnchorPoint = Vector2.new(0.5, 0.5)
+	holder.BackgroundTransparency = 1
+	holder.Parent = gui
+	local scale = Instance.new("UIScale")
+	scale.Parent = holder
+	markerScale = scale
+	for _, info in { { -1, -1, -45 }, { 1, 1, -45 }, { 1, -1, 45 }, { -1, 1, 45 } } do
+		local bar = Instance.new("Frame")
+		bar.Size = UDim2.fromOffset(3, 11)
+		bar.AnchorPoint = Vector2.new(0.5, 0.5)
+		bar.Position = UDim2.new(0.5, info[1] * 10, 0.5, info[2] * 10)
+		bar.Rotation = info[3]
+		bar.BorderSizePixel = 0
+		bar.BackgroundColor3 = Color3.new(1, 1, 1)
+		bar.BackgroundTransparency = 1
+		bar.Parent = holder
+		table.insert(markerBars, bar)
+	end
+	local ring = Instance.new("Frame")
+	ring.Size = UDim2.fromOffset(20, 20)
+	ring.AnchorPoint = Vector2.new(0.5, 0.5)
+	ring.Position = UDim2.fromScale(0.5, 0.5)
+	ring.BackgroundTransparency = 1
+	ring.Parent = holder
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = ring
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(255, 60, 50)
+	stroke.Thickness = 2
+	stroke.Transparency = 1
+	stroke.Parent = ring
+	markerRing = ring
+	markerStroke = stroke
+end
+
+function Shooting.hitmarker(kind: string)
+	local color = if kind == "hit" then Color3.new(1, 1, 1) else Color3.fromRGB(255, 60, 50)
+	local time = if kind == "head" then 0.45 elseif kind == "kill" then 0.35 else 0.2
+	for _, bar in markerBars do
+		bar.BackgroundColor3 = color
+		bar.BackgroundTransparency = 0
+		TweenService:Create(bar, TweenInfo.new(time), { BackgroundTransparency = 1 }):Play()
+	end
+	if markerScale then
+		markerScale.Scale = if kind == "head" then 1.7 elseif kind == "kill" then 1.3 else 1
+		TweenService:Create(markerScale, TweenInfo.new(time), { Scale = if kind == "head" then 1.3 else 1 }):Play()
+	end
+	local ring, stroke = markerRing, markerStroke
+	if kind == "head" and ring and stroke then
+		ring.Size = UDim2.fromOffset(18, 18)
+		stroke.Transparency = 0
+		TweenService:Create(ring, TweenInfo.new(0.4), { Size = UDim2.fromOffset(56, 56) }):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.4), { Transparency = 1 }):Play()
+	end
+end
+
 -- ── Aiming ─────────────────────────────────────────────────────────────────
 
 local function muzzle(car: Model, driving: boolean): Vector3?
@@ -154,7 +229,7 @@ local function autoTarget(from: Vector3, range: number): Vector3?
 	local bestScore = math.huge
 	for _, model in folder:GetChildren() do
 		local humanoid = model:FindFirstChildOfClass("Humanoid")
-		local torso = model:FindFirstChild("Torso") :: BasePart?
+		local torso = (model:FindFirstChild("UpperTorso") or model:FindFirstChild("Torso")) :: BasePart?
 		if humanoid and torso and humanoid.Health > 0 then
 			local distance = (torso.Position - from).Magnitude
 			if distance <= range then
@@ -271,15 +346,9 @@ function Shooting.start()
 			Shooting.tracer(from, to, color)
 		end
 	end)
-	Net.get("Hit").OnClientEvent:Connect(function(position: Vector3, damage: number, crit: boolean, killed: boolean)
-		if crit then
-			Shooting.floatText(position, `{damage}!`, Color3.fromRGB(255, 220, 60), 30)
-		else
-			Shooting.floatText(position, tostring(damage), Color3.new(1, 1, 1), 22)
-		end
-		if killed then
-			Shooting.floatText(position + Vector3.new(0, 2, 0), "KILL", Color3.fromRGB(255, 80, 60), 26)
-		end
+	makeHitmarker()
+	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: boolean)
+		Shooting.hitmarker(if crit then "head" elseif killed then "kill" else "hit")
 	end)
 	Net.get("Reward").OnClientEvent:Connect(function(position: Vector3, amount: number)
 		Shooting.floatText(position + Vector3.new(0, 1, 0), `+${amount}`, Color3.fromRGB(120, 240, 110), 26)

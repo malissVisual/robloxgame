@@ -73,6 +73,9 @@ local function step(dt: number)
 		if not model:IsA("Model") then
 			continue
 		end
+		if model:FindFirstChild("UpperTorso") then
+			continue -- a real R15 body: animated by its Animator on the server
+		end
 		local rig = rigOf(model)
 		if not rig or rig.humanoid.Health <= 0 then
 			continue

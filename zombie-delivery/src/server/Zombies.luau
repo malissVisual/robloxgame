@@ -88,7 +88,7 @@ local function motor(name: string, part0: BasePart, part1: BasePart, c0: CFrame,
 	m.Parent = part0
 end
 
-local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Model, Humanoid, Part, Part)
+local function buildBlocky(kind: string, def: Config.ZombieDef, at: Vector3): (Model, Humanoid, Part, Part)
 	local s = def.scale
 	local model = Instance.new("Model")
 	model.Name = def.name
@@ -164,6 +164,245 @@ local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Mod
 	return model, humanoid, root, torso
 end
 
+-- ── Realistic bodies: R15 characters with animations ───────────────────────
+-- Built once per kind from a HumanoidDescription (Roblox's own R15 body), then cloned. Zombies walk with Roblox's
+-- zombie animations, bandits with the normal ones. If R15 cannot be built, the blocky body above is used.
+
+local ANIMATIONS: { [string]: { [string]: string } } = {
+	zombie = { idle = "rbxassetid://616158929", walk = "rbxassetid://616168032", run = "rbxassetid://616163682" },
+	human = { idle = "rbxassetid://507766388", walk = "rbxassetid://507777826", run = "rbxassetid://507767714" },
+}
+
+local templates: { [string]: Model } = {}
+local noTemplate: { [string]: boolean } = {}
+
+local function attach(model: Model, to: BasePart, name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material, headPart: boolean): Part
+	local p = limb(model, name, size, color, material)
+	p.Massless = true
+	p.CFrame = to.CFrame * offset
+	if headPart then
+		p:SetAttribute("HeadPart", true) -- a hit here is a headshot
+	end
+	local w = Instance.new("WeldConstraint")
+	w.Part0 = to
+	w.Part1 = p
+	w.Parent = p
+	return p
+end
+
+local function template(kind: string, def: Config.ZombieDef): Model?
+	if templates[kind] or noTemplate[kind] then
+		return templates[kind]
+	end
+	local s = def.scale
+	local bandit = def.ranged == true
+	local ok, result = pcall(function()
+		local description = Instance.new("HumanoidDescription")
+		local skin, shirt, pants = rgb(def.skin), rgb(def.shirt), rgb(def.pants)
+		description.HeadColor = skin
+		description.LeftArmColor = skin
+		description.RightArmColor = skin
+		description.TorsoColor = shirt
+		description.LeftLegColor = pants
+		description.RightLegColor = pants
+		description.HeightScale = s
+		description.WidthScale = if kind == "brute" then s * 1.3 else s
+		description.DepthScale = if kind == "brute" then s * 1.2 else s
+		description.HeadScale = if kind == "brute" then s * 0.9 else 1
+		return Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
+	end)
+	if not ok or not result then
+		warn(`[Zombies] no R15 body for {kind}, using blocks: {result}`)
+		noTemplate[kind] = true
+		return nil
+	end
+	local model = result :: Model
+	model.Name = def.name
+	local head = model:FindFirstChild("Head") :: BasePart?
+	local hand = model:FindFirstChild("RightHand") :: BasePart?
+	if head then
+		local face = head:FindFirstChildOfClass("Decal")
+		if bandit then
+			-- A bandana over the mouth, a cap.
+			attach(model, head, "Bandana", Vector3.new(1.25, 0.45, 1.25) * s, CFrame.new(0, -0.25 * s, 0), if kind == "gunner" then Color3.fromRGB(30, 30, 30) else Color3.fromRGB(170, 30, 30), Enum.Material.Fabric, true)
+			attach(model, head, "Cap", Vector3.new(1.3, 0.35, 1.3) * s, CFrame.new(0, 0.55 * s, 0), Color3.fromRGB(40, 40, 46), Enum.Material.Fabric, true)
+		else
+			-- No smile: glowing eyes and a dark mouth.
+			if face then
+				face:Destroy()
+			end
+			for _, side in { -1, 1 } do
+				attach(model, head, "Eye", Vector3.new(0.2, 0.14, 0.06) * s, CFrame.new(0.22 * side * s, 0.12 * s, -0.6 * s), Color3.fromRGB(255, 60, 40), Enum.Material.Neon, true)
+			end
+			attach(model, head, "Mouth", Vector3.new(0.5, 0.18, 0.06) * s, CFrame.new(0, -0.25 * s, -0.6 * s), Color3.fromRGB(40, 10, 10), Enum.Material.SmoothPlastic, true)
+		end
+	end
+	if bandit and hand then
+		local grip = hand.CFrame * CFrame.new(0, -0.4, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+		local gun = limb(model, "Gun", Vector3.new(0.3, 0.45, if kind == "gunner" then 3.2 else 1.6) * s, Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
+		gun.Massless = true
+		gun.CFrame = grip * CFrame.new(0, 0.15, if kind == "gunner" then -1.2 else -0.4)
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = hand
+		w.Part1 = gun
+		w.Parent = gun
+	end
+	-- Bandits hold the gun up: both arms forward.
+	if bandit then
+		local right = model:FindFirstChild("RightUpperArm")
+		local rightShoulder = right and right:FindFirstChild("RightShoulder")
+		if rightShoulder and rightShoulder:IsA("Motor6D") then
+			rightShoulder.C0 = rightShoulder.C0 * CFrame.Angles(math.rad(85), 0, 0)
+		end
+		local left = model:FindFirstChild("LeftUpperArm")
+		local leftShoulder = left and left:FindFirstChild("LeftShoulder")
+		if leftShoulder and leftShoulder:IsA("Motor6D") then
+			leftShoulder.C0 = leftShoulder.C0 * CFrame.Angles(math.rad(75), math.rad(-35), 0)
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = "Zombie"
+			d.CanCollide = d.Name == "UpperTorso" or d.Name == "LowerTorso"
+		end
+	end
+	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
+	humanoid.RequiresNeck = false
+	humanoid.BreakJointsOnDeath = false -- we ragdoll instead
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	model:SetAttribute("Zombie", kind)
+	if bandit then
+		model:SetAttribute("Bandit", true)
+	end
+	templates[kind] = model
+	return model
+end
+
+local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Model, Humanoid, Part, Part)
+	local source = template(kind, def)
+	if not source then
+		return buildBlocky(kind, def, at)
+	end
+	local model = source:Clone()
+	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
+	local root = model:FindFirstChild("HumanoidRootPart") :: Part
+	local torso = (model:FindFirstChild("UpperTorso") or root) :: Part
+	-- Every zombie a little different.
+	local tint = rng:NextNumber(-0.1, 0.1)
+	for _, name in { "UpperTorso", "LowerTorso" } do
+		local part = model:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			part.Color = part.Color:Lerp(if tint > 0 then Color3.new(1, 1, 1) else Color3.new(0, 0, 0), math.abs(tint) * 2)
+		end
+	end
+	humanoid.MaxHealth = def.health
+	humanoid.Health = def.health
+	humanoid.WalkSpeed = def.speed * rng:NextNumber(0.9, 1.1)
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+	model.PrimaryPart = root
+	model:PivotTo(CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
+	return model, humanoid, root, torso
+end
+
+type Moves = { idle: AnimationTrack?, walk: AnimationTrack?, run: AnimationTrack? }
+local moves: { [Model]: Moves } = {}
+
+local function loadMoves(model: Model, humanoid: Humanoid, bandit: boolean)
+	if not model:FindFirstChild("UpperTorso") then
+		return -- the blocky body is animated by the clients
+	end
+	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
+	animator.Parent = humanoid
+	local set = if bandit then ANIMATIONS.human else ANIMATIONS.zombie
+	local tracks: Moves = {}
+	for key, id in set do
+		local ok, track = pcall(function()
+			local animation = Instance.new("Animation")
+			animation.AnimationId = id
+			return animator:LoadAnimation(animation)
+		end)
+		if ok and track then
+			track.Looped = true
+			(tracks :: any)[key] = track
+		end
+	end
+	moves[model] = tracks
+	if tracks.idle then
+		tracks.idle:Play()
+	end
+	model.Destroying:Connect(function()
+		moves[model] = nil
+	end)
+end
+
+-- Walk / run / stand, from how fast the body really moves.
+local function animate(model: Model, root: BasePart, runner: boolean)
+	local tracks = moves[model]
+	if not tracks then
+		return
+	end
+	local v = root.AssemblyLinearVelocity
+	local speed = Vector3.new(v.X, 0, v.Z).Magnitude
+	local moving = if runner then tracks.run or tracks.walk else tracks.walk
+	if speed > 1.5 and moving then
+		if not moving.IsPlaying then
+			moving:Play(0.2)
+			if tracks.idle then
+				tracks.idle:Stop(0.2)
+			end
+		end
+		moving:AdjustSpeed(math.clamp(speed / (if runner then 24 else 12), 0.5, 2))
+	elseif tracks.idle and not tracks.idle.IsPlaying then
+		tracks.idle:Play(0.2)
+		for _, track in { tracks.walk, tracks.run } do
+			if track and track.IsPlaying then
+				track:Stop(0.2)
+			end
+		end
+	end
+end
+
+-- A ragdoll: the joints become ball sockets and the body collapses (R15 rig attachments), else it falls apart.
+local function ragdoll(model: Model)
+	local sockets = 0
+	for _, motor in model:GetDescendants() do
+		if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then
+			local a0 = motor.Part0:FindFirstChild(motor.Name .. "RigAttachment")
+			local a1 = motor.Part1:FindFirstChild(motor.Name .. "RigAttachment")
+			if a0 and a1 and a0:IsA("Attachment") and a1:IsA("Attachment") then
+				local socket = Instance.new("BallSocketConstraint")
+				socket.Attachment0 = a0
+				socket.Attachment1 = a1
+				socket.LimitsEnabled = true
+				socket.TwistLimitsEnabled = true
+				socket.UpperAngle = 60
+				socket.TwistLowerAngle = -45
+				socket.TwistUpperAngle = 45
+				socket.Parent = motor.Part0
+				motor.Enabled = false
+				sockets += 1
+			end
+		end
+	end
+	if sockets == 0 then
+		for _, motor in model:GetDescendants() do
+			if motor:IsA("Motor6D") then
+				motor:Destroy()
+			end
+		end
+	end
+	local tracks = moves[model]
+	if tracks then
+		for _, track in { tracks.idle, tracks.walk, tracks.run } do
+			if track then
+				track:Stop(0)
+			end
+		end
+	end
+end
+
 -- ── Life and death ─────────────────────────────────────────────────────────
 
 local function unlatch(z: Zombie)
@@ -194,7 +433,8 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?)
 	end
 	remove(z)
 	z.humanoid.Health = 0
-	-- The body falls apart: collides only with the ground and buildings, never with cars or players.
+	ragdoll(z.model)
+	-- The body collapses: collides only with the ground and buildings, never with cars or players.
 	for _, d in z.model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.CanCollide = d.Name ~= "HumanoidRootPart"
@@ -214,7 +454,7 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?)
 		rewardRemote:FireClient(killer, z.root.Position + Vector3.new(0, 4, 0), z.def.reward)
 		Zombies.onKill(killer, z)
 	end
-	task.delay(3, function()
+	task.delay(6, function()
 		z.model:Destroy()
 	end)
 end
@@ -291,6 +531,7 @@ function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean
 	pcall(function()
 		root:SetNetworkOwner(nil)
 	end)
+	loadMoves(model, humanoid, def.ranged == true)
 	humanoid.Died:Connect(function()
 		if not z.dead then
 			kill(z, z.lastHitBy, nil)
@@ -615,6 +856,9 @@ local function step()
 			continue
 		end
 		local position = z.root.Position
+		if not z.car then
+			animate(z.model, z.root, z.def.speed > 20)
+		end
 
 		-- Hanging on a car: bite it, die in the depot.
 		local car = z.car
@@ -790,6 +1034,12 @@ function Zombies.all(): { Zombie }
 end
 
 function Zombies.start()
+	-- Build the R15 bodies up front (it can take a moment), not in the middle of a fight.
+	task.spawn(function()
+		for kind, def in Config.Zombies do
+			template(kind, def)
+		end
+	end)
 	RunService.Heartbeat:Connect(step)
 	task.spawn(function()
 		while true do

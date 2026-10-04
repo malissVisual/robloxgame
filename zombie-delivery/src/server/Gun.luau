@@ -91,8 +91,12 @@ local function onFire(player: Player, target: any)
 				killed += BanditCars.damageArea(result.Position, stats.splash, stats.damage, player)
 				hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, killed > 0)
 			elseif zombie then
-				local crit = result.Instance.Name == "Head"
-				local damage = stats.damage * (if crit then Config.Horde.HeadshotMultiplier else 1)
+				-- A headshot kills on the spot (a brute takes four times the damage).
+				local crit = result.Instance.Name == "Head" or result.Instance:GetAttribute("HeadPart") == true
+				local damage = stats.damage
+				if crit then
+					damage = if zombie.kind == "brute" then stats.damage * Config.Horde.HeadshotMultiplier * 2 else zombie.humanoid.Health + 1
+				end
 				local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40 })
 				hit:FireClient(player, result.Position, math.floor(damage + 0.5), crit, killed)
 			else
