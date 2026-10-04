@@ -1,14 +1,14 @@
 --!strict
 -- The admin tools for testing (Config.Admin): unlock everything, money, any car or gun, teleport to any landmark,
 -- start any job, finish the current stop, god mode, spawn enemies, a bandit car, clear the enemies, the driver level,
--- time of day (day / night), heal. Admins (a Studio Play test, the owner of a user-owned place,
+-- time of day (day / night), heal, the real estate (give, take, set the home, teleport) and the company's safe. Admins (a Studio Play test, the owner of a user-owned place,
 -- Config.Admin.UserIds) get the player attribute "Admin" (the client shows the panel, client/AdminPanel.luau); every
 -- command is checked here again.
 --
 -- Commands over the "Admin" remote (name, arg):
 --   unlockAll                 every car (company ones too), every gun (earned ones too), every paint, 10 of each
---                             item, every employer's progress at the top (their rewards count as earned), the Roof
---                             Minigun on every car that can carry a car gun, and the top driver level
+--                             item, every employer's progress at the top (their rewards count as earned), every
+--                             property (the biggest mansion as the home if you have none) and the top driver level
 --   maxUpgrades               every upgrade track at its last level
 --   money      amount         + money
 --   setLevel   level          the driver level (1 … Config.Levels.MaxLevel): XP = exactly what that level needs
@@ -24,6 +24,11 @@
 --   clear                     kill / remove the enemies around you and the ones after you
 --   time       hour           the clock (DayNight.setClock: the night comes with it)
 --   heal                      you and your car full
+--   giveEstate id | "all"     a property (Config.Estate) for free, or every one (a first home becomes your home)
+--   clearEstate               every property taken away (and the home: the depot), to try buying again
+--   setHome    id | "depot"   the home you spawn at (an owned mansion / villa / house)
+--   estateTeleport id         you to the property (its spawn spot inside, or the road at its plot)
+--   businessCash amount?      your company's safe (Config.Business): + amount, or filled up to SafeCap
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +49,7 @@ local Zombies = require(Server.Zombies)
 local BanditCars = require(Server.BanditCars)
 local Jobs = require(Server.Jobs)
 local DayNight = require(Server.DayNight)
+local Estate = require(Server.Estate)
 
 local Admin = {}
 
@@ -89,6 +95,16 @@ local function humanoidOf(player: Player): Humanoid?
 	return if humanoid and humanoid.Health > 0 then humanoid else nil
 end
 
+-- $1,234,567
+local function moneyText(amount: number): string
+	local text = tostring(math.floor(amount))
+	local formatted = text:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	if formatted:sub(1, 1) == "," then
+		formatted = formatted:sub(2)
+	end
+	return "$" .. formatted
+end
+
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
@@ -122,9 +138,11 @@ local function unlockAll(player: Player)
 	for _, employer in Config.Employers do
 		profile.rep[employer.id] = math.max(profile.rep[employer.id] or 0, employer.needed, employer.weaponAt or 0)
 	end
+	-- Every property (homes, garages, offices); the biggest home becomes the home if there is none.
+	Estate.give(player, "all")
 	-- The top driver level: nothing is locked any more (PlayerData.setLevel fires Changed).
 	local level = PlayerData.setLevel(player, Config.Levels.MaxLevel)
-	say(player, `ADMIN: every car, gun, paint and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
+	say(player, `ADMIN: every car, gun, paint, property and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
 end
 
 -- The driver level: the XP becomes exactly what that level needs.
@@ -304,6 +322,129 @@ local function teleport(player: Player, arg: any)
 	character:PivotTo(CFrame.lookAt(at, at + along))
 	root.AssemblyLinearVelocity = Vector3.zero
 	say(player, `ADMIN: {landmark.name}.`)
+end
+
+-- ── Real estate and the company ────────────────────────────────────────────
+
+local function giveEstate(player: Player, arg: any)
+	if not PlayerData.get(player) then
+		say(player, "Still loading...")
+		return
+	end
+	if arg == "all" then
+		local given = Estate.give(player, "all")
+		local home = Estate.homeOf(player)
+		local def = if home then Estate.find(home) else nil
+		say(player, `ADMIN: every property is yours ({given} new). Home: {if def then def.name else "the depot"}.`)
+		return
+	end
+	local def = Estate.find(arg)
+	if not def then
+		say(player, "ADMIN: unknown property.")
+		return
+	end
+	local given = Estate.give(player, def.id)
+	say(player, if given > 0 then `ADMIN: {def.name} is yours.` else `ADMIN: you already own {def.name}.`)
+end
+
+local function clearEstate(player: Player)
+	local count = Estate.clear(player)
+	say(player, `ADMIN: {count} properties taken away. You spawn at the depot.`)
+end
+
+local function setHome(player: Player, arg: any)
+	if arg == nil or arg == "depot" then
+		local err = Estate.setHome(player, nil)
+		if err then
+			say(player, `ADMIN: {err}`)
+		end
+		return
+	end
+	local def = Estate.find(arg)
+	if not def or not Estate.isHome(def.id) then
+		say(player, "ADMIN: that is not a home (mansion, villa or house).")
+		return
+	end
+	if not Estate.owns(player, def.id) then
+		Estate.give(player, def.id) -- the admin way: own it first
+	end
+	local err = Estate.setHome(player, def.id)
+	if err then
+		say(player, `ADMIN: {err}`)
+	end
+end
+
+-- To the property: inside at its spawn spot (homes, offices), else the road next to its plot.
+local function estateTeleport(player: Player, arg: any)
+	local def = Estate.find(arg)
+	if not def then
+		say(player, "ADMIN: unknown property.")
+		return
+	end
+	local spawns = (World :: any).EstateSpawns
+	local spot = if type(spawns) == "table" then spawns[def.id] else nil
+	local at: CFrame? = nil
+	if typeof(spot) == "CFrame" then
+		at = spot + Vector3.new(0, 3.5, 0)
+	else
+		local plots = (Map :: any).EstatePlots
+		local plot = if type(plots) == "table" then plots[def.id] else nil
+		if type(plot) == "table" and type(plot.x) == "number" and type(plot.z) == "number" then
+			local rx, rz, dx, dz = Map.nearestRoad(plot.x, plot.z)
+			local ground = Vector3.new(rx, World.RoadTop + 3.5, rz)
+			at = CFrame.lookAt(ground, ground + Vector3.new(dx, 0, dz))
+		end
+	end
+	local character = player.Character
+	local humanoid = humanoidOf(player)
+	if not at then
+		say(player, `ADMIN: {def.name} has no place on the map yet.`)
+		return
+	end
+	if not character or not humanoid then
+		say(player, "ADMIN: you have no body right now.")
+		return
+	end
+	if humanoid.SeatPart then
+		humanoid.Sit = false
+		local seatWeld = humanoid.SeatPart:FindFirstChild("SeatWeld")
+		if seatWeld then
+			seatWeld:Destroy()
+		end
+		task.wait()
+	end
+	local target: CFrame = at
+	pcall(function()
+		player:RequestStreamAroundAsync(target.Position, 5)
+	end)
+	if player.Character ~= character or not character.Parent then
+		return
+	end
+	character:PivotTo(target)
+	local root = rootOf(player)
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+	end
+	say(player, `ADMIN: {def.name}.`)
+end
+
+-- The company's safe (server/Business.luau pays the couriers into it; COLLECT at the office takes it out).
+local function businessCash(player: Player, arg: any)
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	local cap = Config.Business.SafeCap
+	local company = profile.business
+	if type(arg) == "number" and arg == arg then
+		company.safe = math.clamp(company.safe + math.floor(arg), 0, cap)
+	else
+		company.safe = cap
+	end
+	PlayerData.notify(player)
+	local office = Estate.officeOf(player)
+	say(player, `ADMIN: the company safe holds {moneyText(company.safe)}.{if office then "" else " Buy an office (or giveEstate) to collect it."}`)
 end
 
 -- ── Jobs ───────────────────────────────────────────────────────────────────
@@ -505,6 +646,11 @@ local COMMANDS: { [string]: (Player, any) -> () } = {
 	heal = function(player: Player)
 		heal(player, false)
 	end,
+	giveEstate = giveEstate,
+	clearEstate = clearEstate,
+	setHome = setHome,
+	estateTeleport = estateTeleport,
+	businessCash = businessCash,
 }
 
 local function onCommand(player: Player, name: any, arg: any)

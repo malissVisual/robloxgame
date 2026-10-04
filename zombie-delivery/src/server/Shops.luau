@@ -3,7 +3,8 @@
 -- your screen); the purchases are checked here, also that you really stand in that shop and that your driver level
 -- (shared/Levels.luau) is high enough for what you buy (the level field of Config.Cars, Weapons and CarGuns).
 --
---   Dead End Motors     cars (the showroom models have their own prompts)
+--   Dead End Motors     cars (the showroom models have their own prompts); every car needs a free car slot
+--                       (Estate.carSlots: homes and garages add them; the employers' company cars take none)
 --   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
 --   Wrench Garage       upgrades, paint jobs and car guns (one on the roof of the equipped car; free repairs inside)
 --   Last Stop Supplies  consumables
@@ -22,6 +23,7 @@ local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
 local Jobs = require(script.Parent.Jobs)
+local Estate = require(script.Parent.Estate)
 
 local Shops = {}
 
@@ -56,6 +58,18 @@ local function tooLow(player: Player, name: string, level: number?): boolean
 	return true
 end
 
+-- Every car you own needs a slot (server/Estate.luau: Config.Estate.BaseCarSlots + the garages of your homes and
+-- garages). The company vehicles earned from employers do not take one, and the cars you have stay even when the
+-- slots shrink (a garage sold): only buying needs a free slot. True (and a notice) when there is none.
+local function noSlot(player: Player): boolean
+	local used, slots = Estate.carsOwned(player), Estate.carSlots(player)
+	if used < slots then
+		return false
+	end
+	notice:FireClient(player, `No free car slot: {used} cars, {slots} slots. Buy a home or a garage for more (ESTATE, H).`)
+	return true
+end
+
 local function equipCar(player: Player, id: string)
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -81,7 +95,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 	end
 	if kind == "car" then
 		local def = Economy.findCar(id)
-		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or tooLow(player, def.name, def.level) then
+		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or tooLow(player, def.name, def.level) or noSlot(player) then
 			return
 		end
 		if not PlayerData.spend(player, def.price) then
