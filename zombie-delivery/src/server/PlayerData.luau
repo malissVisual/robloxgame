@@ -17,6 +17,7 @@ local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Missions = require(Shared.Missions)
+local Challenges = require(Shared.Challenges)
 
 export type Profile = {
 	money: number,
@@ -36,6 +37,13 @@ export type Profile = {
 	business: { couriers: number, upgrades: { [string]: number }, safe: number, lastTick: number }, -- your company (Config.Business); lastTick = os.time() of the last payout
 	missions: { [string]: number }, -- the best rating (1 – 3 stars) of every mission done (shared/Missions.luau ids)
 	campaigns: { [string]: boolean }, -- campaigns whose reward was paid (all ten missions done)
+	-- 3.1, the challenges (shared/Challenges.luau), secrets (Map.Secrets) and rewards (Config.Rewards):
+	stats: { [string]: number }, -- counters the challenges read (Challenges.Counters: headshots, distance, …)
+	visited: { [string]: boolean }, -- places (Map.Places ids) you have been to
+	secrets: { [string]: boolean }, -- secret packages found (Map.Secrets ids)
+	challenges: { [string]: boolean }, -- challenges done (their reward paid)
+	titles: { [string]: boolean }, -- titles earned
+	title: string?, -- the title shown over your head and on the leaderboard (an earned one)
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -74,6 +82,12 @@ local function newProfile(): Profile
 		business = { couriers = 0, upgrades = {}, safe = 0, lastTick = 0 },
 		missions = {},
 		campaigns = {},
+		stats = {},
+		visited = {},
+		secrets = {},
+		challenges = {},
+		titles = {},
+		title = nil,
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -163,6 +177,34 @@ local function applyMissions(profile: Profile, saved: { [any]: any })
 	end
 end
 
+-- The challenges' counters (only Challenges.Counters, whole numbers ≥ 0), the places visited, the secrets found, the
+-- challenges done, the titles earned and the one shown. Saves from before 3.1 have none. Ids are only kept when
+-- they are short strings (the lists they come from are checked by server/Challenges.luau when it reads them).
+local function applyChallenges(profile: Profile, saved: { [any]: any })
+	if type(saved.stats) == "table" then
+		for _, name in Challenges.Counters do
+			local value = saved.stats[name]
+			if type(value) == "number" and value == value and value > 0 then
+				profile.stats[name] = math.floor(math.min(value, 1e12))
+			end
+		end
+	end
+	for _, key in { "visited", "secrets", "challenges", "titles" } do
+		local list = saved[key]
+		if type(list) == "table" then
+			local into = (profile :: any)[key] :: { [string]: boolean }
+			for id, on in list do
+				if on == true and type(id) == "string" and #id <= 40 then
+					into[id] = true
+				end
+			end
+		end
+	end
+	if type(saved.title) == "string" and profile.titles[saved.title] then
+		profile.title = saved.title
+	end
+end
+
 -- Saved data is checked, never trusted.
 local function applySaved(profile: Profile, saved: any)
 	if type(saved) ~= "table" then
@@ -226,6 +268,7 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	applyEstate(profile, saved)
 	applyMissions(profile, saved)
+	applyChallenges(profile, saved)
 	if type(saved.car) == "string" and profile.cars[saved.car] then
 		profile.car = saved.car
 	end
@@ -346,6 +389,12 @@ function PlayerData.save(player: Player)
 		business = profile.business,
 		missions = profile.missions,
 		campaigns = profile.campaigns,
+		stats = profile.stats,
+		visited = profile.visited,
+		secrets = profile.secrets,
+		challenges = profile.challenges,
+		titles = profile.titles,
+		title = profile.title,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

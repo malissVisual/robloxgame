@@ -40,6 +40,7 @@ local NAMES = {
 	"CarCall", -- server → client: your car is on the way (seconds left, car model) or arrived / failed (nil)
 	"Missions", -- client → server: ("open") or ("start", mission id); server → client: the progress (MissionsState)
 	"CrewBoard", -- client → server: looking for a crew (mission id or "any") or not (nil); server → clients: who is looking
+	"Challenges", -- client → server: ("open") or ("title", title or nil); server → client: ("state", …) or ("unlocked", …)
 }
 
 local folder: Folder

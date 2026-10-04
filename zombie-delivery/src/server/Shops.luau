@@ -110,6 +110,11 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		if not def or profile.weapons[id] then
 			return
 		end
+		if def.exclusive then
+			-- 3.1: a reward nobody can buy (Config.Rewards).
+			notice:FireClient(player, `The {def.name} is not for sale. It is a reward: you will know when you have earned it.`)
+			return
+		end
 		if def.earned then
 			-- Not for sale: an employer gives it to the couriers who work for them.
 			local employer = Economy.findEmployer(def.earned)
@@ -215,6 +220,10 @@ local function onPaint(player: Player, id: any)
 		return
 	end
 	if not profile.paints[paint.id] then
+		if paint.exclusive then
+			notice:FireClient(player, `{paint.name} is not for sale. It is a reward.`)
+			return
+		end
 		if not PlayerData.spend(player, paint.price) then
 			notice:FireClient(player, "Not enough money.")
 			return

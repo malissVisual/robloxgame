@@ -79,7 +79,7 @@ for _, def in Config.Weapons do
 	end
 end
 table.sort(oneHanded)
-check("one-handed: pistol, revolver, smg", table.concat(oneHanded, ",") == "pistol,revolver,smg", table.concat(oneHanded, ","))
+check("one-handed: pistol, revolver, smg (and the golden pistol)", table.concat(oneHanded, ",") == "goldpistol,pistol,revolver,smg", table.concat(oneHanded, ","))
 for _, id in { "shotgun", "rifle", "carbine", "minigun", "launcher" } do
 	check(`{id} is two-handed`, not Economy.oneHanded(id))
 end

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.0.1"
+Config.Version = "3.1"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -233,6 +233,8 @@ export type WeaponDef = {
 	earned: string?, -- not sold: this employer (Config.Employers) gives it to you after some jobs
 	level: number?, -- the driver level (Config.Levels) needed to buy it
 	oneHanded: boolean?, -- fires out of a car window too (any seat); the two-handed guns only on foot
+	exclusive: string?, -- 3.1: not sold, a reward nobody can buy (Config.Rewards: a campaign id, "secrets" or "challenges")
+	pierce: number?, -- 3.1: the bullet goes on through this many more enemies
 }
 
 Config.Weapons = {
@@ -351,6 +353,66 @@ Config.Weapons = {
 		description = "Army issue, steady full auto. The base gives it to the couriers it trusts.",
 		earned = "army",
 	},
+	-- 3.1, exclusive: rewards nobody can buy (Config.Rewards). Finish a campaign, or every challenge.
+	{
+		id = "reyes",
+		name = "Reyes' Carbine",
+		price = 0,
+		damage = 28,
+		fireRate = 8,
+		range = 220,
+		pellets = 1,
+		spread = 0.7,
+		splash = 0,
+		color = { 170, 210, 110 },
+		description = "Captain Reyes' own rifle, given to the courier who kept the base alive.",
+		exclusive = "army",
+	},
+	{
+		id = "lever",
+		name = "Walt's Lever Rifle",
+		price = 0,
+		damage = 72,
+		fireRate = 1.5,
+		range = 260,
+		pellets = 1,
+		spread = 0.15,
+		splash = 0,
+		color = { 240, 190, 120 },
+		description = "Walt's grandfather's rifle. One shot goes through two of them.",
+		exclusive = "ranch",
+		pierce = 1,
+	},
+	{
+		id = "goldpistol",
+		oneHanded = true,
+		name = "Vinnie's Golden Pistol",
+		price = 0,
+		damage = 38,
+		fireRate = 4,
+		range = 175,
+		pellets = 1,
+		spread = 0.4,
+		splash = 0,
+		color = { 255, 215, 60 },
+		description = "Solid gold, solid stopping power. Vinnie only gives it to family.",
+		exclusive = "underworld",
+	},
+	{
+		id = "deadend",
+		name = "Dead End",
+		price = 0,
+		damage = 64,
+		fireRate = 5,
+		range = 290,
+		pellets = 1,
+		spread = 0.25,
+		splash = 0,
+		color = { 190, 80, 255 },
+		description = "The last courier's gun. Its rounds go through three of them. Nobody else has one.",
+		exclusive = "challenges",
+		pierce = 3,
+	},
 } :: { WeaponDef }
 
 -- Car guns: bolted on the roof at Wrench Garage (one per car, on the cars with CarDef.mount), fired by the driver.
@@ -468,7 +530,14 @@ Config.ItemTuning = {
 	UseCooldown = 0.4,
 }
 
-export type PaintDef = { id: string, name: string, price: number, color: { number }? }
+export type PaintDef = {
+	id: string,
+	name: string,
+	price: number,
+	color: { number }?,
+	material: string?, -- 3.1: an Enum.Material name for the body (Neon, Foil, Glass, Metal …), else the car's own
+	exclusive: string?, -- 3.1: not sold, a reward (Config.Rewards: a campaign id or "secrets")
+}
 
 -- Paint jobs at Wrench Garage (per car). "factory" = the car's own colour.
 Config.Paints = {
@@ -480,7 +549,39 @@ Config.Paints = {
 	{ id = "toxic", name = "Toxic Green", price = 900, color = { 90, 230, 60 } },
 	{ id = "pink", name = "Hot Pink", price = 1200, color = { 255, 80, 170 } },
 	{ id = "gold", name = "Gold", price = 3000, color = { 230, 180, 50 } },
+	-- 3.1, exclusive: rewards (Config.Rewards), never sold.
+	{ id = "dispatchyellow", name = "Dispatch Yellow", price = 0, color = { 255, 196, 30 }, material = "Metal", exclusive = "dispatch" },
+	{ id = "medicmint", name = "Medic Mint", price = 0, color = { 150, 230, 205 }, exclusive = "clinic" },
+	{ id = "freshlime", name = "Fresh Lime", price = 0, color = { 150, 220, 60 }, exclusive = "market" },
+	{ id = "fireengine", name = "Fire Engine", price = 0, color = { 205, 25, 20 }, material = "Metal", exclusive = "firehouse" },
+	{ id = "volt", name = "Volt Neon", price = 0, color = { 60, 170, 255 }, material = "Neon", exclusive = "power" },
+	{ id = "toxicglow", name = "Toxic Glow", price = 0, color = { 120, 255, 80 }, material = "Neon", exclusive = "lab" },
+	{ id = "sunrise", name = "Sunrise Chrome", price = 0, color = { 255, 170, 90 }, material = "Foil", exclusive = "exodus" },
+	{ id = "phantom", name = "Phantom", price = 0, color = { 46, 44, 70 }, material = "Glass", exclusive = "secrets" },
 } :: { PaintDef }
+
+-- 3.1: what you get for finishing things (server/Challenges.luau gives it, client/MissionsUi.luau shows it). Every
+-- campaign gives a title and an exclusive gun or paint; finding every secret package and finishing every challenge
+-- (shared/Challenges.luau) give the rarest ones. Nothing here can be bought.
+Config.Rewards = {
+	Campaigns = {
+		dispatch = { paint = "dispatchyellow", title = "Dispatcher's Favourite" },
+		clinic = { paint = "medicmint", title = "Field Medic" },
+		market = { paint = "freshlime", title = "Grocery Hero" },
+		firehouse = { paint = "fireengine", title = "Smoke Eater" },
+		army = { weapon = "reyes", title = "Quartermaster" },
+		power = { paint = "volt", title = "Live Wire" },
+		ranch = { weapon = "lever", title = "Outlaw Tamer" },
+		lab = { paint = "toxicglow", title = "Cure Runner" },
+		underworld = { weapon = "goldpistol", title = "Made Man" },
+		exodus = { paint = "sunrise", title = "Last Convoy Captain" },
+	} :: { [string]: { weapon: string?, paint: string?, title: string } },
+	-- The lost packages hidden at every place (Map.Secrets): money for each, and for all of them …
+	SecretMoney = 300,
+	Secrets = { paint = "phantom", title = "Treasure Hunter", money = 25000 },
+	-- … and for every challenge done: the gun nobody else has.
+	Challenges = { weapon = "deadend", title = "The Last Courier", money = 50000 },
+}
 
 -- Supply crates lying around the world: drive or walk into one.
 Config.Loot = {
@@ -882,6 +983,10 @@ Config.Audio = {
 		roofmg = "gun_light",
 		roofminigun = "gun_rapid",
 		rooflauncher = "gun_launch",
+		reyes = "gun_light",
+		lever = "gun_crack",
+		goldpistol = "gun_crack",
+		deadend = "gun_crack",
 	} :: { [string]: string },
 }
 

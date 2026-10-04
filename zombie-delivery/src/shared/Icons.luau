@@ -84,9 +84,20 @@ local function named(prefix: string, id: string?): string?
 	return if Icons.Ids[name] ~= nil then name else nil
 end
 
+-- The exclusive guns (3.1) have no picture of their own yet: the closest one.
+local WEAPON_ALIASES: { [string]: string } = {
+	reyes = "carbine",
+	lever = "rifle",
+	goldpistol = "pistol",
+	deadend = "rifle",
+}
+
 -- A hand gun (Config.Weapons id). The car guns (Config.CarGuns) have no icon: nil.
 function Icons.weapon(weaponId: string?): string?
-	return named("weapon_", weaponId)
+	if weaponId == nil then
+		return nil
+	end
+	return named("weapon_", WEAPON_ALIASES[weaponId] or weaponId)
 end
 
 -- An item (Config.Items id).

@@ -35,6 +35,7 @@ local Estate = require(Server.Estate)
 local CarCall = require(Server.CarCall)
 local Business = require(Server.Business)
 local Missions = require(Server.Missions)
+local Challenges = require(Server.Challenges)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -149,6 +150,7 @@ safely("CarCall", CarCall.start)
 safely("Business", Business.start)
 Jobs.onMissionComplete = Missions.onComplete
 safely("Missions", Missions.start)
+safely("Challenges", Challenges.start)
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
