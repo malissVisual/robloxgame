@@ -1050,13 +1050,13 @@ RunService.RenderStepped:Connect(function()
 		hint.Text = `{Map.Shops[inShop].name}: walk to the counter and press E`
 		hint.TextColor3 = C.green
 	elseif seatedIn and not driving then
-		hint.Text = "Riding along: hold left mouse to shoot (F auto-aim), Space to get out"
+		hint.Text = "Riding along: right mouse aims, left mouse shoots (F auto-aim), Space to get out"
 		hint.TextColor3 = Color3.fromRGB(140, 210, 255)
 	elseif safe and not job then
 		hint.Text = "SAFE ZONE · shops around the depot · JOBS to start a delivery"
 		hint.TextColor3 = C.green
 	elseif driving and not touch then
-		hint.Text = "WASD drive · mouse aims · left mouse shoots · Q gun · 1-5 items · hold Alt = free mouse"
+		hint.Text = "WASD drive · hold right mouse to aim · left mouse shoots · Q gun · 1-5 items · Alt = free mouse"
 		hint.TextColor3 = C.dim
 	elseif not car then
 		hint.Text = "Press CAR to call your car"

@@ -28,6 +28,7 @@ local lmbHeld = false -- shooting
 local lastFire = 0
 local aimBlend = 0 -- 0 = walking camera, 1 = over the shoulder
 local aimingSent = false
+local smoothFocus: Vector3? = nil -- the camera's focus follows smoothly (no shaking with every bump of the car)
 local SENSITIVITY = 0.0032
 
 -- Set by Main: is a window open that needs the mouse?
@@ -174,8 +175,11 @@ local function update(dt: number)
 
 	local car, driving = Drive.seatedCar()
 	local now = os.clock()
+	-- Aiming from a car (drive-by): right mouse held, any seat.
+	local carAim = locked and car ~= nil and rmbHeld and humanoid.Health > 0
+
 	-- Driving and not touching the mouse for a moment: the camera swings back behind the car.
-	if car and driving and car.PrimaryPart and now - lastMouse > 1.2 then
+	if car and driving and car.PrimaryPart and now - lastMouse > 1.2 and not carAim then
 		local chassis = car.PrimaryPart
 		local v = chassis.AssemblyLinearVelocity
 		if Vector3.new(v.X, 0, v.Z).Magnitude > 8 then
@@ -189,7 +193,7 @@ local function update(dt: number)
 
 	-- Aiming: right mouse held, shooting, or a shot a moment ago (on foot only).
 	local wantAim = locked and not car and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
-	aimBlend = lerp(aimBlend, if wantAim then 1 else 0, math.min(1, dt * 10))
+	aimBlend = lerp(aimBlend, if wantAim or carAim then 1 else 0, math.min(1, dt * 10))
 	sendAiming(wantAim)
 
 	local rotation = CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
@@ -199,21 +203,28 @@ local function update(dt: number)
 	if car and car.PrimaryPart then
 		local size = car:GetExtentsSize()
 		focus = car.PrimaryPart.Position + Vector3.new(0, size.Y * 0.6 + 2, 0)
-		back = Vector3.new(0, 2, (size.Z * 0.7 + 9) * zoom)
+		-- Behind the car; aiming: closer, over the right side of the roof.
+		back = Vector3.new(lerp(0, 3, aimBlend), lerp(2, 0.8, aimBlend), lerp(size.Z * 0.7 + 9, size.Z * 0.3 + 4, aimBlend) * zoom)
 		table.insert(exclude, car)
 	else
 		focus = root.Position + Vector3.new(0, lerp(2.2, 1.8, aimBlend), 0)
 		-- Walking: behind, a little to the side. Aiming: close over the right shoulder.
 		back = Vector3.new(lerp(0.8, 2.3, aimBlend), lerp(1.2, 0.5, aimBlend), lerp(11, 6.5, aimBlend) * zoom)
 	end
-	local effects = workspace:FindFirstChild("LocalEffects")
-	if effects then
-		table.insert(exclude, effects)
+	-- Only the world stops the camera, not things that move around.
+	for _, name in { "LocalEffects", "DeliveryGuide", "Zombies", "Cars", "BanditCars", "Loot", "Effects" } do
+		local thing = workspace:FindFirstChild(name)
+		if thing then
+			table.insert(exclude, thing)
+		end
 	end
-	local guide = workspace:FindFirstChild("DeliveryGuide")
-	if guide then
-		table.insert(exclude, guide)
-	end
+	-- Smooth follow: sideways tight, up and down soft (the car's bumps do not shake the picture).
+	local last = smoothFocus
+	local previous: Vector3 = if last and (last - focus).Magnitude <= 40 then last else focus
+	local side = math.min(1, dt * 25)
+	local vertical = math.min(1, dt * 7)
+	focus = Vector3.new(lerp(previous.X, focus.X, side), lerp(previous.Y, focus.Y, vertical), lerp(previous.Z, focus.Z, side))
+	smoothFocus = focus
 	local desired = focus + rotation:VectorToWorldSpace(back)
 	-- Do not go through walls.
 	local params = RaycastParams.new()
