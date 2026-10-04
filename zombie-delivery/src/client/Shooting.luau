@@ -3,7 +3,8 @@
 -- a passenger out of the window) hold
 -- the left mouse button to shoot where the mouse points, or hold FIRE (the round button, or F) to shoot the nearest
 -- zombie (the ones hanging on your car first). The server checks every shot (server/Gun.luau); here are the inputs,
--- the tracers, the hit numbers and the money pop-ups.
+-- the tracers, the hit feedback (with the dot in client/CameraRig.luau) and the money pop-ups. Nothing fires while
+-- your hands hold cargo.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -108,13 +109,14 @@ function Shooting.floatText(position: Vector3, text: string, color: Color3, size
 	Debris:AddItem(anchor, 0.85)
 end
 
--- ── The hit marker (GTA style): an X around the crosshair, no numbers ────────
--- white = a hit, red = a kill, big red X with a ring = a headshot.
+-- ── Hit feedback ───────────────────────────────────────────────────────────
+-- The dot in the middle (client/CameraRig.luau) pulses on every hit and turns red for a moment on a kill; only a
+-- headshot draws an X around it.
 
 local markerBars: { Frame } = {}
+local markerStrokes: { UIStroke } = {}
 local markerScale: UIScale? = nil
-local markerRing: Frame? = nil
-local markerStroke: UIStroke? = nil
+local HEAD_COLOR = Color3.fromRGB(255, 64, 52)
 
 local function makeHitmarker()
 	local gui = Instance.new("ScreenGui")
@@ -124,7 +126,7 @@ local function makeHitmarker()
 	gui.DisplayOrder = 6
 	gui.Parent = player:WaitForChild("PlayerGui")
 	local holder = Instance.new("Frame")
-	holder.Size = UDim2.fromOffset(48, 48)
+	holder.Size = UDim2.fromOffset(40, 40)
 	holder.Position = UDim2.fromScale(0.5, 0.5)
 	holder.AnchorPoint = Vector2.new(0.5, 0.5)
 	holder.BackgroundTransparency = 1
@@ -132,54 +134,47 @@ local function makeHitmarker()
 	local scale = Instance.new("UIScale")
 	scale.Parent = holder
 	markerScale = scale
+	-- Four short strokes on the diagonals, leaving the dot free in the middle.
 	for _, info in { { -1, -1, -45 }, { 1, 1, -45 }, { 1, -1, 45 }, { -1, 1, 45 } } do
 		local bar = Instance.new("Frame")
-		bar.Size = UDim2.fromOffset(3, 11)
+		bar.Size = UDim2.fromOffset(2, 9)
 		bar.AnchorPoint = Vector2.new(0.5, 0.5)
-		bar.Position = UDim2.new(0.5, info[1] * 10, 0.5, info[2] * 10)
+		bar.Position = UDim2.new(0.5, info[1] * 8, 0.5, info[2] * 8)
 		bar.Rotation = info[3]
 		bar.BorderSizePixel = 0
-		bar.BackgroundColor3 = Color3.new(1, 1, 1)
+		bar.BackgroundColor3 = HEAD_COLOR
 		bar.BackgroundTransparency = 1
 		bar.Parent = holder
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Color3.new(0, 0, 0)
+		stroke.Thickness = 1
+		stroke.Transparency = 1
+		stroke.Parent = bar
 		table.insert(markerBars, bar)
+		table.insert(markerStrokes, stroke)
 	end
-	local ring = Instance.new("Frame")
-	ring.Size = UDim2.fromOffset(20, 20)
-	ring.AnchorPoint = Vector2.new(0.5, 0.5)
-	ring.Position = UDim2.fromScale(0.5, 0.5)
-	ring.BackgroundTransparency = 1
-	ring.Parent = holder
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = ring
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(255, 60, 50)
-	stroke.Thickness = 2
-	stroke.Transparency = 1
-	stroke.Parent = ring
-	markerRing = ring
-	markerStroke = stroke
 end
 
-function Shooting.hitmarker(kind: string)
-	local color = if kind == "hit" then Color3.new(1, 1, 1) else Color3.fromRGB(255, 60, 50)
-	local time = if kind == "head" then 0.45 elseif kind == "kill" then 0.35 else 0.2
+-- kind: "hit" | "kill" | "head" (a headshot; it counts as a kill unless `killed` says otherwise).
+function Shooting.hitmarker(kind: string, killed: boolean?)
+	local kill = kind == "kill" or (kind == "head" and killed ~= false)
+	CameraRig.hitFeedback(if kill then "kill" else "hit")
+	if kind ~= "head" then
+		return
+	end
+	local fade = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	for _, bar in markerBars do
-		bar.BackgroundColor3 = color
 		bar.BackgroundTransparency = 0
-		TweenService:Create(bar, TweenInfo.new(time), { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(bar, fade, { BackgroundTransparency = 1 }):Play()
 	end
-	if markerScale then
-		markerScale.Scale = if kind == "head" then 1.7 elseif kind == "kill" then 1.3 else 1
-		TweenService:Create(markerScale, TweenInfo.new(time), { Scale = if kind == "head" then 1.3 else 1 }):Play()
+	for _, stroke in markerStrokes do
+		stroke.Transparency = 0.3
+		TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
 	end
-	local ring, stroke = markerRing, markerStroke
-	if kind == "head" and ring and stroke then
-		ring.Size = UDim2.fromOffset(18, 18)
-		stroke.Transparency = 0
-		TweenService:Create(ring, TweenInfo.new(0.4), { Size = UDim2.fromOffset(56, 56) }):Play()
-		TweenService:Create(stroke, TweenInfo.new(0.4), { Transparency = 1 }):Play()
+	local scale = markerScale
+	if scale then
+		scale.Scale = 1.7
+		TweenService:Create(scale, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 	end
 end
 
@@ -331,6 +326,10 @@ local function step()
 	if now < nextShot then
 		return
 	end
+	-- Cargo in the hands: no shooting (the server ignores it too).
+	if not car and CameraRig.carrying() then
+		return
+	end
 	-- On foot: start raising the gun, the shot comes once it is up.
 	if not CameraRig.canShoot() then
 		CameraRig.noteFire()
@@ -413,8 +412,9 @@ function Shooting.start()
 		end
 	end)
 	makeHitmarker()
-	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: boolean)
-		Shooting.hitmarker(if crit then "head" elseif killed then "kill" else "hit")
+	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: any)
+		local dead = killed == true or (type(killed) == "number" and killed > 0)
+		Shooting.hitmarker(if crit then "head" elseif dead then "kill" else "hit", dead)
 	end)
 	Net.get("Reward").OnClientEvent:Connect(function(position: Vector3, amount: number)
 		Shooting.floatText(position + Vector3.new(0, 1, 0), `+${amount}`, Color3.fromRGB(120, 240, 110), 26)
