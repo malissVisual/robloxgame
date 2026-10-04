@@ -351,6 +351,13 @@ function CameraRig.start()
 			lmbHeld = false
 		end
 	end)
+	-- Leaving the window (Alt+Tab, a screenshot) can swallow the key-up events: nothing stays held.
+	UserInputService.WindowFocusReleased:Connect(function()
+		altHeld = false
+		shiftHeld = false
+		rmbHeld = false
+		lmbHeld = false
+	end)
 	RunService:BindToRenderStep("ZombieDeliveryCamera", Enum.RenderPriority.Camera.Value + 1, update)
 end
 

@@ -95,7 +95,8 @@ All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map
 ## Code
 
 ```
-src/shared/   Config (all numbers), Map (world layout, roads, addresses), Economy (prices, stats, pay), Net (remotes)
+src/shared/   Config (all numbers), Map (world layout, roads, addresses), Economy (prices, stats, pay), Net (remotes),
+              Joints (Motor6D or AnimationConstraint)
 src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats),
               Zombies (zombies and bandits, roadblocks), BanditCars (the chasing pickups, driven by the server),
               Gun (shots, server checked), Jobs (job board, stops, special jobs, crews), Items (consumables, supply
@@ -111,8 +112,13 @@ tests/        logic test of Economy and Map
 (`LinearVelocity` in the ground plane, `AngularVelocity` for turning and staying upright). The driver's client owns the
 car and sets both from the VehicleSeat (`client/Drive.luau`); on ice the velocity follows the nose only slowly.
 
-**Enemies** are custom rigs (R15 humanoid type so `HipHeight` works at any scale) animated on the clients by joint
-transforms. Cars and enemies do not collide physically (collision groups): running one over and grabbing the car are
+**Joints**: since Roblox's Avatar Joint Upgrade (default in every place since 2026) an R15 character's joints are
+`AnimationConstraint`s, not `Motor6D`s (same names, but C0 / C1 are read-only). Everything that poses or ragdolls a
+body goes through `shared/Joints.luau` (both kinds) and writes `Transform` in `RunService.PreSimulation`, after the
+animations: the aiming arms (`client/ArmPose.luau`), the bandits' raised guns, the ragdolls.
+
+**Enemies** are R15 bodies made from a HumanoidDescription (blocky custom rigs as the fallback) animated by their
+Animator, the blocky ones on the clients by joint transforms. Cars and enemies do not collide physically (collision groups): running one over and grabbing the car are
 computed on the server from the car's box (`server/Zombies.luau`).
 
 ## Tests

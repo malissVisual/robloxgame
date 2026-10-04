@@ -162,8 +162,6 @@ local GUN_LOOKS: { [string]: { GunPiece } } = {
 		{ size = Vector3.new(0.25, 0.6, 0.3), offset = Vector3.new(0, -0.2, -0.2), color = DARK, material = Enum.Material.Metal },
 	},
 }
-local heldWeapon: { [Player]: string } = {}
-
 -- Aiming on foot: the clients raise the gun arm (client/ArmPose.luau) of every character marked Aiming, pointed
 -- AimPitch up or down.
 local function setAiming(player: Player, aiming: any, aimPitch: any)
@@ -177,22 +175,39 @@ local function setAiming(player: Player, aiming: any, aimPitch: any)
 	end
 end
 
-local function giveHandGun(player: Player, character: Model)
-	local hand = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
-	local profile = PlayerData.get(player)
-	if not hand or not hand:IsA("BasePart") or not character.Parent then
-		return
+local function handOf(character: Model): BasePart?
+	local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+	return if hand and hand:IsA("BasePart") then hand else nil
+end
+
+-- Does the character hold this gun, still welded to the hand it has now? (Roblox can rebuild the body parts after
+-- the spawn, when the avatar loads, and a reset breaks the joints in models inside the character.)
+local function holds(character: Model, weapon: string): boolean
+	local gun = character:FindFirstChild("HandGun")
+	if not gun or gun:GetAttribute("Weapon") ~= weapon then
+		return false
 	end
+	local hand = handOf(character)
+	local weld = gun:FindFirstChildWhichIsA("WeldConstraint", true)
+	if not hand or not weld then
+		return false
+	end
+	local held: Instance? = weld.Part1
+	return weld.Part0 == hand and held ~= nil and held.Parent == gun
+end
+
+local function buildHandGun(character: Model, hand: BasePart, weapon: string)
 	local old = character:FindFirstChild("HandGun")
 	if old then
 		old:Destroy()
 	end
-	local weapon = if profile then profile.weapon else "pistol"
-	heldWeapon[player] = weapon
 	local model = Instance.new("Model")
 	model.Name = "HandGun"
-	-- Along the arm: down at your side when walking, forward when the arm goes up to aim (Aiming).
-	local grip = hand.CFrame * CFrame.new(0, -0.4, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+	model:SetAttribute("Weapon", weapon)
+	-- Along the arm: down at your side when walking, forward when the arms come up to aim (client/ArmPose.luau).
+	-- An R15 hand is small: the grip is just under it; an R6 arm is 2 studs long: the grip is at its end.
+	local below = if hand.Name == "Right Arm" then hand.Size.Y / 2 + 0.1 else 0.4
+	local grip = hand.CFrame * CFrame.new(0, -below, 0) * CFrame.Angles(math.rad(-90), 0, 0)
 	for _, piece in GUN_LOOKS[weapon] or GUN_LOOKS.pistol do
 		local p = Instance.new("Part")
 		p.Name = "GunPart"
@@ -213,18 +228,33 @@ local function giveHandGun(player: Player, character: Model)
 	model.Parent = character
 end
 
--- A new gun equipped: the hand changes.
-PlayerData.Changed:Connect(function(player)
-	local profile = PlayerData.get(player)
+-- The gun you have equipped, in your hand (everybody sees it). Safe to call any time: it only builds when the gun
+-- is missing, is the wrong one, or lost its hand.
+local function ensureHandGun(player: Player)
 	local character = player.Character
-	if profile and character and heldWeapon[player] ~= profile.weapon then
-		task.spawn(giveHandGun, player, character)
+	if not character or not character:IsDescendantOf(workspace) then
+		return
 	end
-end)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local hand = handOf(character)
+	if not humanoid or humanoid.Health <= 0 or not hand then
+		return
+	end
+	local profile = PlayerData.get(player)
+	local weapon = if profile then profile.weapon else "pistol"
+	if not holds(character, weapon) then
+		buildHandGun(character, hand, weapon)
+	end
+end
+
+-- A new gun equipped: the hand changes.
+PlayerData.Changed:Connect(ensureHandGun)
 
 local function onPlayer(player: Player)
-	player.CharacterAdded:Connect(function(character)
-		task.spawn(giveHandGun, player, character)
+	player.CharacterAppearanceLoaded:Connect(function()
+		ensureHandGun(player)
+	end)
+	player.CharacterAdded:Connect(function()
 		if playing[player] then
 			task.wait(1)
 			giveCar(player)
@@ -235,9 +265,18 @@ Players.PlayerAdded:Connect(onPlayer)
 for _, player in Players:GetPlayers() do
 	onPlayer(player)
 end
+-- The safety net: whatever happened at the spawn (a character that was there before this script got here, a hand
+-- rebuilt when the avatar loaded, a reset), every player gets the gun back within a second.
+task.spawn(function()
+	while true do
+		task.wait(1)
+		for _, player in Players:GetPlayers() do
+			ensureHandGun(player)
+		end
+	end
+end)
 Players.PlayerRemoving:Connect(function(player)
 	playing[player] = nil
-	heldWeapon[player] = nil
 	Zombies.clearOwner(player)
 end)
 

@@ -4,6 +4,7 @@ rem Ve Studiu otevri NOVY prazdny place (Baseplate), pak Rojo - Connect - Play. 
 cd /d "%~dp0.."
 echo == Stahuji nejnovejsi verzi z GitHubu ==
 git pull
+if errorlevel 1 (echo. & echo !! git pull selhal - oprav chybu vyse, jinak spustis starou verzi. & pause & exit /b 1)
 echo.
 echo == Spoustim synchronizaci Zombie Delivery (nech toto okno otevrene) ==
 node tools\rojo-sync.js zombie-delivery

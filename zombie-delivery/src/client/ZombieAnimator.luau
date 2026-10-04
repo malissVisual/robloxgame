@@ -1,20 +1,26 @@
 --!strict
 -- Animates the zombies and bandits on this client: a shambling walk (legs swing with the speed, arms sway out in
 -- front), a twitchy head, a frantic clawing for the ones hanging on a car, a steady aim for the bandits.
--- Only joint transforms, no animation assets.
+-- Only joint transforms, no animation assets. The R15 bodies walk with their Animator (server); the bandits among
+-- them hold their guns up with the players' aim pose (client/ArmPose.luau) laid over it.
+-- The joints can be Motor6Ds or AnimationConstraints (shared/Joints.luau).
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
+local ArmPose = require(script.Parent.ArmPose)
 
 local ZombieAnimator = {}
 
 type Rig = {
 	root: BasePart,
 	humanoid: Humanoid,
-	neck: Motor6D?,
-	leftArm: Motor6D?,
-	rightArm: Motor6D?,
-	leftLeg: Motor6D?,
-	rightLeg: Motor6D?,
+	neck: any, -- Motor6D or AnimationConstraint
+	leftArm: any,
+	rightArm: any,
+	leftLeg: any,
+	rightLeg: any,
 	phase: number,
 	stride: number, -- walking phase, advances with the speed
 }
@@ -22,9 +28,17 @@ type Rig = {
 local rigs: { [Model]: Rig } = {}
 local RANGE = 220
 
-local function find(model: Model, name: string): Motor6D?
-	local motor = model:FindFirstChild(name, true)
-	return if motor and motor:IsA("Motor6D") then motor else nil
+local function find(model: Model, name: string): any
+	local found: Instance? = nil
+	for _, d in model:GetDescendants() do
+		if d.Name == name and Joints.isJoint(d) then
+			if d:IsA("AnimationConstraint") then
+				return d
+			end
+			found = found or d
+		end
+	end
+	return found
 end
 
 local function rigOf(model: Model): Rig?
@@ -55,9 +69,9 @@ local function rigOf(model: Model): Rig?
 	return rig
 end
 
-local function set(motor: Motor6D?, cframe: CFrame)
-	if motor and motor.Parent then
-		motor.Transform = cframe
+local function set(joint: any, cframe: CFrame)
+	if joint and joint.Parent then
+		joint.Transform = cframe
 	end
 end
 
@@ -74,7 +88,15 @@ local function step(dt: number)
 			continue
 		end
 		if model:FindFirstChild("UpperTorso") then
-			continue -- a real R15 body: animated by its Animator on the server
+			-- A real R15 body: animated by its Animator (server). A bandit holds the gun up over the walk.
+			if model:GetAttribute("Bandit") then
+				local humanoid = model:FindFirstChildOfClass("Humanoid")
+				local root = model:FindFirstChild("HumanoidRootPart")
+				if humanoid and humanoid.Health > 0 and root and root:IsA("BasePart") and (root.Position - eye).Magnitude <= RANGE then
+					ArmPose.apply(model, 1, 0)
+				end
+			end
+			continue
 		end
 		local rig = rigOf(model)
 		if not rig or rig.humanoid.Health <= 0 then
@@ -114,9 +136,8 @@ local function step(dt: number)
 end
 
 function ZombieAnimator.start()
-	RunService.Stepped:Connect(function(_time, dt)
-		step(dt)
-	end)
+	-- After the animations, before the engine applies the joints.
+	RunService.PreSimulation:Connect(step)
 end
 
 return ZombieAnimator

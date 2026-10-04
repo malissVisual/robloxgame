@@ -18,6 +18,7 @@ local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
+local Joints = require(Shared.Joints)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
@@ -110,15 +111,18 @@ local function buildBlocky(kind: string, def: Config.ZombieDef, at: Vector3): (M
 	for _, side in { -1, 1 } do
 		local eye = limb(model, "Eye", Vector3.new(0.22, 0.18, 0.1) * s, if bandit then Color3.fromRGB(20, 20, 20) else Color3.fromRGB(255, 60, 40), if bandit then Enum.Material.SmoothPlastic else Enum.Material.Neon)
 		eye.Massless = true
+		eye:SetAttribute("HeadPart", true) -- a hit here is a headshot
 		motor("Eye", head, eye, CFrame.new(0.28 * side * s, 0.12 * s, -0.6 * s), CFrame.identity)
 	end
 	if bandit then
 		-- A bandana, a cap and a gun.
 		local bandana = limb(model, "Bandana", Vector3.new(1.25, 0.5, 1.25) * s, if kind == "gunner" then Color3.fromRGB(30, 30, 30) else Color3.fromRGB(170, 30, 30), Enum.Material.Fabric)
 		bandana.Massless = true
+		bandana:SetAttribute("HeadPart", true) -- a hit here is a headshot
 		motor("Bandana", head, bandana, CFrame.new(0, -0.25 * s, 0), CFrame.identity)
 		local cap = limb(model, "Cap", Vector3.new(1.3, 0.4, 1.3) * s, Color3.fromRGB(40, 40, 46), Enum.Material.Fabric)
 		cap.Massless = true
+		cap:SetAttribute("HeadPart", true) -- a hit here is a headshot
 		motor("Cap", head, cap, CFrame.new(0, 0.6 * s, 0), CFrame.identity)
 		local gun = limb(model, "Gun", Vector3.new(0.35, 0.5, if kind == "gunner" then 3.2 else 1.8) * s, Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
 		gun.Massless = true
@@ -127,6 +131,7 @@ local function buildBlocky(kind: string, def: Config.ZombieDef, at: Vector3): (M
 	if kind == "brute" then
 		local jaw = limb(model, "Jaw", Vector3.new(1, 0.3, 0.4) * s, Color3.fromRGB(60, 20, 20))
 		jaw.Massless = true
+		jaw:SetAttribute("HeadPart", true) -- a hit here is a headshot
 		motor("Jaw", head, jaw, CFrame.new(0, -0.35 * s, -0.5 * s), CFrame.identity)
 	end
 
@@ -247,19 +252,8 @@ local function template(kind: string, def: Config.ZombieDef): Model?
 		w.Part1 = gun
 		w.Parent = gun
 	end
-	-- Bandits hold the gun up: both arms forward.
-	if bandit then
-		local right = model:FindFirstChild("RightUpperArm")
-		local rightShoulder = right and right:FindFirstChild("RightShoulder")
-		if rightShoulder and rightShoulder:IsA("Motor6D") then
-			rightShoulder.C0 = rightShoulder.C0 * CFrame.Angles(math.rad(85), 0, 0)
-		end
-		local left = model:FindFirstChild("LeftUpperArm")
-		local leftShoulder = left and left:FindFirstChild("LeftShoulder")
-		if leftShoulder and leftShoulder:IsA("Motor6D") then
-			leftShoulder.C0 = leftShoulder.C0 * CFrame.Angles(math.rad(75), math.rad(-35), 0)
-		end
-	end
+	-- Bandits hold the gun up: the clients raise both arms over the walk (client/ZombieAnimator.luau), so it works
+	-- for Motor6D and AnimationConstraint joints alike (the gun follows the hand).
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.CollisionGroup = "Zombie"
@@ -364,33 +358,48 @@ local function animate(model: Model, root: BasePart, runner: boolean)
 	end
 end
 
--- A ragdoll: the joints become ball sockets and the body collapses (R15 rig attachments), else it falls apart.
+-- A ragdoll: the joints go limp and ball sockets hold the limbs (R15), else the body falls apart (blocky).
+-- R15 joints are Motor6Ds or, since Roblox's Avatar Joint Upgrade, AnimationConstraints that already come with a
+-- ball socket each ("<Joint>BallSocket"): that one is used, otherwise a socket is added between the rig attachments.
 local function ragdoll(model: Model)
-	local sockets = 0
-	for _, motor in model:GetDescendants() do
-		if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then
-			local a0 = motor.Part0:FindFirstChild(motor.Name .. "RigAttachment")
-			local a1 = motor.Part1:FindFirstChild(motor.Name .. "RigAttachment")
-			if a0 and a1 and a0:IsA("Attachment") and a1:IsA("Attachment") then
-				local socket = Instance.new("BallSocketConstraint")
-				socket.Attachment0 = a0
-				socket.Attachment1 = a1
-				socket.LimitsEnabled = true
-				socket.TwistLimitsEnabled = true
-				socket.UpperAngle = 60
-				socket.TwistLowerAngle = -45
-				socket.TwistUpperAngle = 45
-				socket.Parent = motor.Part0
-				motor.Enabled = false
-				sockets += 1
-			end
+	local joints: { Instance } = {}
+	for _, d in model:GetDescendants() do
+		if Joints.isJoint(d) then
+			table.insert(joints, d)
 		end
 	end
-	if sockets == 0 then
-		for _, motor in model:GetDescendants() do
-			if motor:IsA("Motor6D") then
-				motor:Destroy()
+	local sockets = 0
+	for _, joint in joints do
+		local a0, a1, p0, p1 = Joints.ends(joint)
+		if not (a0 and a1 and p0 and p1) then
+			continue
+		end
+		local socket: BallSocketConstraint? = nil
+		for _, c in p1:GetChildren() do
+			if c:IsA("BallSocketConstraint") and Joints.partOf(c.Attachment0) == p0 and Joints.partOf(c.Attachment1) == p1 then
+				socket = c
+				break
 			end
+		end
+		if not socket then
+			local made = Instance.new("BallSocketConstraint")
+			made.Attachment0 = a0
+			made.Attachment1 = a1
+			made.LimitsEnabled = true
+			made.TwistLimitsEnabled = true
+			made.UpperAngle = 60
+			made.TwistLowerAngle = -45
+			made.TwistUpperAngle = 45
+			made.Parent = p1
+			socket = made
+		end
+		(socket :: BallSocketConstraint).Enabled = true;
+		(joint :: any).Enabled = false
+		sockets += 1
+	end
+	if sockets == 0 then
+		for _, joint in joints do
+			joint:Destroy()
 		end
 	end
 	local tracks = moves[model]
