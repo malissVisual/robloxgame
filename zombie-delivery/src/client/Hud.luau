@@ -762,6 +762,47 @@ local function renderShop()
 	if not state then
 		return
 	end
+	-- 3.1: the exclusive guns and paints (WeaponDef / PaintDef.exclusive) are never sold. Not yours yet: a dimmed card
+	-- with a REWARD chip and how to earn it (Config.Rewards: a campaign, every lost package, or a secret: the
+	-- every-challenge gun keeps even its stats hidden). Yours: the normal card with an EXCLUSIVE badge.
+	-- (Locals in here, not at the top: Hud.luau sits at the 200-register limit.)
+	local function rewardHow(exclusive: string): (string, string)
+		if exclusive == "challenges" then
+			return "???", "a secret reward"
+		elseif exclusive == "secrets" then
+			return "REWARD", "find every lost package"
+		end
+		for _, campaign in require(Shared.Missions).Campaigns do
+			if campaign.id == exclusive then
+				return "REWARD", `finish {campaign.name}`
+			end
+		end
+		return "REWARD", "a reward"
+	end
+	local function badge(c: any, text: string, color: Color3, y: number)
+		local chip = Ui.chip(c, text, color, if color == C.yellow then Color3.new(0, 0, 0) else Color3.new(1, 1, 1))
+		chip.Size = UDim2.fromOffset(0, 18)
+		chip.Position = UDim2.new(1, -162, 0, y)
+		chip.TextSize = 12
+		chip.ZIndex = 3
+	end
+	local function rewardCard(c: any, exclusive: string)
+		-- Dim what is on the card so far (the name, the stats, the swatch), then the bright chip and the how-to.
+		c.BackgroundTransparency = 0.45
+		for _, d in c:GetChildren() do
+			if d:IsA("TextLabel") then
+				d.TextTransparency = 0.35
+			elseif d:IsA("Frame") then
+				d.BackgroundTransparency = 0.35
+			end
+		end
+		local chip, how = rewardHow(exclusive)
+		badge(c, if chip == "???" then "???  SECRET" else "🏆 REWARD", C.yellow, 2)
+		local button = cardButton(c, how, C.grey, false, function() end)
+		button.TextSize = 13
+		button.TextWrapped = true
+		button.TextColor3 = C.text
+	end
 	local money = state.money
 	local here = nearShop(shopId)
 	shop.title.Text = (Map.Shops[shopId] and Map.Shops[shopId].name or "SHOP"):upper()
@@ -810,9 +851,21 @@ local function renderShop()
 		note(shop.body, "Guns for your hands. One-handed ones (pistol, revolver, SMG) also fire out of a car window; car guns are at Wrench Garage.", C.dim, 1)
 		for order, def in Config.Weapons do
 			local c = card(shop.body, 84, order + 1)
-			local lock = if state.weapons[def.id] or def.earned then nil else lockedAt(def.level)
-			cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else "") .. (if lock then ` · from level {lock}` else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
-			if state.weapon == def.id then
+			local lock = if state.weapons[def.id] or def.earned or def.exclusive then nil else lockedAt(def.level)
+			local exclusive = def.exclusive
+			if exclusive and exclusive == "challenges" and not state.weapons[def.id] then
+				-- The gun nobody else has: a dark silhouette, nothing given away.
+				Ui.icon(c, Icons.weapon(def.id), "❔", UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, 17), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = Color3.new(0, 0, 0) })
+				cardText(c, "???", "Damage ??? · ???/s · Range ???", "Nobody has ever seen it. Some say it waits for the courier who does everything.", 70)
+			else
+				cardText(c, def.name, gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else "") .. (if lock then ` · from level {lock}` else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
+			end
+			if exclusive and state.weapons[def.id] then
+				badge(c, "★ EXCLUSIVE", Ui.Gps, 2)
+			end
+			if exclusive and not state.weapons[def.id] then
+				rewardCard(c, exclusive)
+			elseif state.weapon == def.id then
 				cardButton(c, "IN HAND", C.grey, false, function() end)
 			elseif state.weapons[def.id] then
 				cardButton(c, "EQUIP", C.blue, true, function()
@@ -898,23 +951,36 @@ local function renderShop()
 			note(shop.body, `Paint for your {if carDef then carDef.name else "car"}. Bought paints are yours for every car.`, C.dim, 1)
 			local current = state.carPaint[state.car] or "factory"
 			for order, def in Config.Paints do
-				local c = card(shop.body, 70, order + 1)
+				-- 3.1: an exclusive paint's card is taller (its chip sits above the button).
+				local c = card(shop.body, if def.exclusive then 84 else 70, order + 1)
 				local swatchColor = if def.color then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) elseif carDef then Color3.fromRGB(carDef.color[1], carDef.color[2], carDef.color[3]) else C.grey
-				local swatch = Ui.make("Frame", { Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, 13), BackgroundColor3 = swatchColor }, c)
+				local swatch = Ui.make("Frame", { Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, if def.exclusive then 20 else 13), BackgroundColor3 = swatchColor }, c)
 				Ui.corner(swatch, 8)
-				Ui.stroke(swatch, Color3.new(0, 0, 0), 2)
+				Ui.stroke(swatch, if def.material == "Neon" then swatchColor:Lerp(Color3.new(1, 1, 1), 0.5) else Color3.new(0, 0, 0), 2)
 				Ui.label(c, def.name, UDim2.new(1, -260, 0, 26), { Position = UDim2.fromOffset(70, 8), TextSize = 20, Font = Enum.Font.GothamBlack })
-				Ui.label(c, if state.paints[def.id] then "Owned" else Ui.money(def.price), UDim2.new(1, -260, 0, 20), { Position = UDim2.fromOffset(70, 36), TextColor3 = C.yellow, TextSize = 15 })
+				-- The finish (PaintDef.material) after the price: "Owned · Neon finish".
+				local finish = if def.material then ` · {def.material} finish` else ""
+				Ui.label(c, (if state.paints[def.id] then "Owned" elseif def.exclusive then "Never sold" else Ui.money(def.price)) .. finish, UDim2.new(1, -260, 0, 20), { Position = UDim2.fromOffset(70, 36), TextColor3 = C.yellow, TextSize = 15 })
+				local exclusive = def.exclusive
+				if exclusive then
+					if state.paints[def.id] then
+						badge(c, "★ EXCLUSIVE", Ui.Gps, 2)
+					else
+						rewardCard(c, exclusive)
+						continue
+					end
+				end
+				local y = if exclusive then 22 else 15
 				if current == def.id then
-					cardButton(c, "ON YOUR CAR", C.grey, false, function() end).Position = UDim2.new(1, -162, 0, 15)
+					cardButton(c, "ON YOUR CAR", C.grey, false, function() end).Position = UDim2.new(1, -162, 0, y)
 				elseif state.paints[def.id] then
 					cardButton(c, "APPLY", C.blue, here, function()
 						Net.get("Paint"):FireServer(def.id)
-					end).Position = UDim2.new(1, -162, 0, 15)
+					end).Position = UDim2.new(1, -162, 0, y)
 				else
 					cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 						Net.get("Paint"):FireServer(def.id)
-					end).Position = UDim2.new(1, -162, 0, 15)
+					end).Position = UDim2.new(1, -162, 0, y)
 				end
 			end
 		end
@@ -1157,7 +1223,14 @@ function renderBackpack()
 		for order, def in Config.Weapons do
 			if state.weapons[def.id] then
 				local c = card(backpack.body, 84, order + 1)
-				cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
+				cardText(c, def.name, gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
+				if def.exclusive then
+					-- 3.1: a reward nobody can buy (Config.Rewards).
+					local chip = Ui.chip(c, "★ EXCLUSIVE", Ui.Gps, Color3.new(1, 1, 1))
+					chip.Size = UDim2.fromOffset(0, 18)
+					chip.Position = UDim2.new(1, -162, 0, 2)
+					chip.TextSize = 12
+				end
 				if state.weapon == def.id then
 					cardButton(c, "IN HAND", C.grey, false, function() end)
 				else

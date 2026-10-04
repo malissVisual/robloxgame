@@ -24,6 +24,7 @@ export type WeaponStats = {
 	pellets: number,
 	spread: number,
 	splash: number,
+	pierce: number, -- 3.1: how many more enemies a round goes through after the first (0: it stops at the first)
 }
 
 export type Payout = {
@@ -171,6 +172,7 @@ function Economy.weaponStats(weaponId: string, upgrades: Upgrades): WeaponStats
 		pellets = def.pellets,
 		spread = def.spread,
 		splash = def.splash,
+		pierce = def.pierce or 0,
 	}
 end
 
@@ -184,6 +186,7 @@ function Economy.carGunStats(gunId: string, upgrades: Upgrades): WeaponStats
 		pellets = def.pellets,
 		spread = def.spread,
 		splash = def.splash,
+		pierce = 0,
 	}
 end
 
