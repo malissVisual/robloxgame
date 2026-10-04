@@ -23,6 +23,7 @@ local CrewPanel = require(Client.CrewPanel)
 local EstateUi = require(Client.EstateUi)
 local BusinessUi = require(Client.BusinessUi)
 local TrafficAnimator = require(Client.TrafficAnimator)
+local Sounds = require(Client.Sounds)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -48,7 +49,10 @@ safely("CrewPanel", CrewPanel.start)
 safely("EstateUi", EstateUi.start)
 safely("BusinessUi", BusinessUi.start)
 safely("TrafficAnimator", TrafficAnimator.start)
+safely("Sounds", Sounds.start)
 Shooting.notify = Hud.toast
+Sounds.notify = Hud.toast
+Hud.onSound = Sounds.cycle
 -- One window at a time: every HUD window, the leaderboard and the crew window close the others.
 Hud.onCloseWindows = function()
 	CrewPanel.close()
@@ -78,6 +82,7 @@ local function play()
 	pcall(function()
 		Hud.setVisible(true)
 		CameraRig.setEnabled(true)
+		Sounds.setInGame(true)
 	end)
 	Net.get("Play"):FireServer()
 end

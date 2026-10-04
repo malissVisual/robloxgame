@@ -117,6 +117,9 @@ function Ui.label(parent: Instance, text: string, size: UDim2, props: { [string]
 	return label
 end
 
+-- Set by client/Sounds.luau: a soft click for every button made here.
+Ui.onClick = nil :: (() -> ())?
+
 function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, onClick: () -> ()): any
 	local button = Ui.make("TextButton", {
 		Size = size,
@@ -143,7 +146,13 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 	button.SelectionGained:Connect(function() highlight(true) end)
 	button.SelectionLost:Connect(function() highlight(false) end)
 	button.Destroying:Connect(function() if feedback then feedback:Cancel() end end)
-	button.Activated:Connect(onClick)
+	button.Activated:Connect(function()
+		local click = Ui.onClick
+		if click then
+			click()
+		end
+		onClick()
+	end)
 	return button
 end
 

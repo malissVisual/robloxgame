@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.6.2"
+Config.Version = "2.7"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -852,6 +852,36 @@ Config.Business = {
 		{ id = "dispatch", name = "Dispatch software", description = "+10% per level: smarter routes", maxLevel = 5, baseCost = 40000, costGrowth = 1.8, perLevel = 0.10 },
 		{ id = "security", name = "Armed escorts", description = "+12% per level: fewer lost loads", maxLevel = 5, baseCost = 80000, costGrowth = 2.0, perLevel = 0.12 },
 	} :: { { id: string, name: string, description: string, maxLevel: number, baseCost: number, costGrowth: number, perLevel: number } },
+}
+
+-- The game's own sounds and music (client/Sounds.luau; the sounds themselves: art/audio/make_audio.py, regions in
+-- shared/SoundSheet.luau). Volumes 0..1; the SOUND button / N key cycles: everything on, music off, all off.
+Config.Audio = {
+	MusicVolume = 0.32,
+	EffectsVolume = 0.7,
+	MusicFade = 2.5, -- seconds of crossfade between two music loops
+	TensionHold = 14, -- the tense loop keeps playing at least this long once it starts
+	TensionAfterWave = 40, -- seconds of tense music after a zombie wave arrives
+	TensionZombies = 3, -- … or while this many zombies are within TensionRange of you on a job
+	TensionRange = 45,
+	GroanEvery = 2.6, -- seconds between zombie groans (a random zombie near you; none when none is near)
+	GroanRange = 70,
+	HearRange = 260, -- other players' shots and explosions further away are not played
+	MaxVoices = 24, -- 3D one-shot sounds at once
+	-- The shot sound of every gun (hand guns and car guns; others fall back to gun_light).
+	WeaponSounds = {
+		pistol = "gun_light",
+		smg = "gun_light",
+		carbine = "gun_light",
+		revolver = "gun_crack",
+		rifle = "gun_crack",
+		shotgun = "gun_heavy",
+		minigun = "gun_rapid",
+		launcher = "gun_launch",
+		roofmg = "gun_light",
+		roofminigun = "gun_rapid",
+		rooflauncher = "gun_launch",
+	} :: { [string]: string },
 }
 
 Config.Jobs = {

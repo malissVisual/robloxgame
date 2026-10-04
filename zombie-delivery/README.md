@@ -8,6 +8,7 @@ from day into night (darker, more zombies, better pay), civilian traffic and peo
 friends join your crew: they ride along in your passenger seats or follow in their own car, shoot and share the pay.
 With the money you make you buy **real estate** (version 2.6): homes to spawn at, garages for more cars, and offices in
 the city's towers from which **your own delivery company** of hired couriers earns for you, even while you are away.
+Version 2.7 brings the game's **own sound and music**: soft, minimal, made for it (see **Sound and music**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -300,13 +301,32 @@ The interface tints the white icons (`ImageColor3`); `Ui.icon` (client) draws an
 landmark tags over the buildings (server) use the same ids, and `client/Theme.luau` takes the logo and the menu
 background from there too. The car guns have no icon (they keep their emoji).
 
+## Sound and music
+
+Every sound is synthesized for the game by `art/audio/make_audio.py` (numpy + ffmpeg, nothing borrowed): soft
+gunshots per gun type, hit / headshot / kill ticks, explosions, cargo pickup / put down / load, cash, job done / failed,
+level up, the wave alarm, UI clicks, notices, the chauffeur's horn, the elevator ding, two zombie groans and a seamless
+engine loop; and four calm music loops: **menu**, **day**, **night** and **tension** (on a job when a zombie wave
+arrives or zombies crowd you). Roblox limits audio uploads, so it is all in **two files**: `art/audio/sfx.ogg` (every
+effect one after another) and `art/audio/music.ogg` (the loops); `src/shared/SoundSheet.luau` (written by the script)
+says where each one sits, and `client/Sounds.luau` plays just that region (`PlaybackRegion` / `LoopRegion`).
+
+1. In Studio: **View → Asset Manager → Bulk Import**, pick `art/audio/sfx.ogg` and `art/audio/music.ogg`.
+2. Copy each one's asset id into `SoundSheet.SfxId` / `SoundSheet.MusicId` as `"rbxassetid://<number>"` and sync.
+
+Until then the game is silent (one note in the Output). The **SOUND** button / **N** key cycles: everything on →
+music off → all off; volumes, the crossfade and when the tense loop plays are in `Config.Audio`. To change a sound,
+edit the script and run `python3 art/audio/make_audio.py` from `zombie-delivery/` (it rewrites both files and
+SoundSheet; upload them again).
+
 ## Code
 
 ```
 src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo spots), Roads (the road graph and the
               GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
               AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
-              Levels (XP, levels, rank names), TrafficLanes (the traffic's lanes, turns and sidewalks)
+              Levels (XP, levels, rank names), TrafficLanes (the traffic's lanes, turns and sidewalks), SoundSheet
+              (where each sound and music loop sits in the two audio assets)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business), Vehicles (cars, seats, cargo slots, the roof turret of a car gun,
@@ -327,13 +347,13 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               Weather (the day and night look), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
-              card)
+              card), Sounds (the music and every sound effect, N / SOUND)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
               (XP and ranks), jobs25 (the 2.5 jobs and places), traffic (lanes, turns, spawn spots, sidewalks); the
               2.6 real estate checks are in logic (every property placed, no overlaps, the towers and offices, the
-              roads to every property, the landmarks)
+              roads to every property, the landmarks); audio (every sound has its region, every gun its shot)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -359,7 +379,7 @@ computed on the server from the car's box (`server/Zombies.luau`).
 python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
-Runs every `tests/*_test.luau` (logic with the 2.6 real estate, cargo, roads, cargun, icons, levels, jobs25, traffic). Needs the standalone Luau CLI
+Runs every `tests/*_test.luau` (logic with the 2.6 real estate, cargo, roads, cargun, icons, levels, jobs25, traffic, audio). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
@@ -374,4 +394,4 @@ the server checks every command again.
 
 ## Ideas for later
 
-Sounds and music, traffic lights at the junctions, a crew leaderboard, company vans driving past in traffic.
+Traffic lights at the junctions, a crew leaderboard, company vans driving past in traffic.

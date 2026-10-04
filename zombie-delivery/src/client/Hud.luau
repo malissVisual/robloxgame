@@ -1343,6 +1343,7 @@ end
 -- property (EstateUi.toggleList). Unset, the button says what it is for (CrewPanel.start sets onCrew by itself too).
 Hud.onCrew = nil :: (() -> ())?
 Hud.onEstate = nil :: (() -> ())?
+Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
 
 type ButtonDef = { id: string, text: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
 local BUTTONS: { ButtonDef }, buttonGrid: any, buttonLayout: any, hudButtons: { [string]: any }
@@ -1386,11 +1387,17 @@ BUTTONS = {
 			Hud.toast("Real estate is not open yet. [fallback: Hud.onEstate is not set]")
 		end
 	end },
+	{ id = "sound", text = "SOUND", key = "N", color = C.panelLight, onClick = function()
+		local cb = Hud.onSound
+		if cb then
+			cb()
+		end
+	end },
 }
 
 buttonGrid = placed(Ui.make("Frame", {
 	Name = "HudButtons",
-	Size = UDim2.fromOffset(150, 7 * 46),
+	Size = UDim2.fromOffset(150, 8 * 46),
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 96),
 	BackgroundTransparency = 1,
@@ -2613,12 +2620,12 @@ layout = function()
 	buttonLayout.CellSize = UDim2.fromOffset(bw, bh)
 	buttonLayout.CellPadding = UDim2.fromOffset(BUTTON_GAP, BUTTON_GAP)
 	if columns >= 4 then
-		-- Rows: JOBS MAP BAG CAR / TOP CREW ESTATE.
+		-- Rows: JOBS MAP BAG CAR / TOP CREW ESTATE SOUND.
 		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
 		buttonLayout.StartCorner = Enum.StartCorner.TopLeft
 		buttonLayout.FillDirectionMaxCells = columns
 	else
-		-- Columns from the screen's edge: JOBS MAP BAG CAR | TOP CREW ESTATE.
+		-- Columns from the screen's edge: JOBS MAP BAG CAR | TOP CREW ESTATE SOUND.
 		buttonLayout.FillDirection = Enum.FillDirection.Vertical
 		buttonLayout.StartCorner = Enum.StartCorner.TopRight
 		buttonLayout.FillDirectionMaxCells = math.ceil(count / columns)
