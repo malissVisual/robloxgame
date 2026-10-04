@@ -583,16 +583,32 @@ export type ModifierDef = {
 	speedMultiplier: number,
 }
 
+-- A person at a pick-up or a drop (an R15 NPC, server/Npcs.luau): role = the look (Npcs.look).
+export type PersonDef = { name: string, title: string?, role: string }
+
+-- A business on the job board: what it sends (pieces you carry by hand) and who would want it.
+export type BusinessDef = {
+	id: string,
+	place: string, -- shown in the pick-up label ("PICK UP at the Pharmacy, ...")
+	cargo: string, -- the job's cargo name
+	piece: string, -- one piece ("medicine box")
+	plural: string,
+	kind: string, -- the Carrying kind (the carry pose): crate | ammo | sack | barrel | icebox | furniture | soup
+	look: string, -- the model of a piece (server/Cargo.luau)
+	pieces: { number }, -- min, max
+	tiers: { number }, -- the danger levels it shows up in
+	giver: PersonDef,
+	receivers: { PersonDef },
+}
+
 Config.Jobs = {
 	DeliverRadius = 18,
-	-- Every job has two stops: pick the cargo up (stand still while it is loaded), then deliver it (stand still while
-	-- it is unloaded, the zombies keep coming).
-	LoadTime = 3,
-	UnloadTime = 4,
+	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
+	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).
+	-- The serve stops (ice cream) are the old way: hold still in the circle for the job type's unloadTime.
 	HoldMaxSpeed = 8, -- the car must (almost) stand still in the circle
 	PickupMinDistance = 120,
 	PickupMaxDistance = 520,
-	PickupPlaces = { "Supermarket", "Pharmacy", "Warehouse", "Pizza Place", "Hardware Store", "Bakery", "Post Office", "Pawn Shop", "Gas Station" },
 	TimeBase = 30,
 	TimePerStud = 1 / 22,
 	FastShare = 0.5, -- deliver with at least this share of the time left for the speed bonus
@@ -686,26 +702,288 @@ Config.Jobs = {
 	-- How often (and how many) the bandits set up a roadblock ahead of you, see the tiers. A roadblock is a car across
 	-- the road with bandits around it.
 	AmbushDistance = 170,
-	Cargo = {
-		{ "Pizza", "Canned Food", "Batteries", "Water Bottles", "Mail" },
-		{ "Medkit Box", "Fuel Can", "Radio Parts", "Ammo Crate" },
-		{ "Antidote", "Vaccine Case", "Generator Core", "Secret Documents" },
-		{ "Nuclear Battery", "Live Zombie Sample", "The General's Wedding Cake", "Prototype Cure", "Gold Bars" },
-	},
-	Customers = {
-		"Grandma Rose",
-		"Survivor Camp",
-		"Dr. Novak",
-		"Pizza Lover",
-		"The Mayor",
-		"Fire Station",
-		"Old Pete",
-		"Police Bunker",
-		"The Twins",
-		"Hospital Roof",
-		"Mrs. Hungry",
-		"Last Barber",
-	},
+	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
+	Businesses = {
+		{
+			id = "pizzeria",
+			place = "Pizza Place",
+			cargo = "Pizzas",
+			piece = "pizza stack",
+			plural = "pizza stacks",
+			kind = "crate",
+			look = "pizza",
+			pieces = { 1, 2 },
+			tiers = { 1, 2 },
+			giver = { name = "Luigi", title = "Pizza chef", role = "cook" },
+			receivers = {
+				{ name = "Mrs. Hungry", title = "Ordered extra cheese", role = "townsperson" },
+				{ name = "The Twins", title = "Night shift", role = "townsperson" },
+				{ name = "Chief Brody", title = "Fire station", role = "worker" },
+			},
+		},
+		{
+			id = "bakery",
+			place = "Bakery",
+			cargo = "Fresh Bread",
+			piece = "bread sack",
+			plural = "bread sacks",
+			kind = "sack",
+			look = "bread",
+			pieces = { 2, 3 },
+			tiers = { 1, 2 },
+			giver = { name = "Anna", title = "Baker", role = "cook" },
+			receivers = {
+				{ name = "Big Mike", title = "Survivor camp cook", role = "cook" },
+				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+				{ name = "Grandma Rose", title = "Feeds the street", role = "townsperson" },
+			},
+		},
+		{
+			id = "post",
+			place = "Post Office",
+			cargo = "Parcels",
+			piece = "parcel",
+			plural = "parcels",
+			kind = "crate",
+			look = "parcel",
+			pieces = { 1, 3 },
+			tiers = { 1, 2, 3 },
+			giver = { name = "Mr. Grant", title = "Postmaster", role = "clerk" },
+			receivers = {
+				{ name = "Grandma Rose", title = "Waiting for letters", role = "townsperson" },
+				{ name = "The Mayor", title = "City hall", role = "clerk" },
+				{ name = "Sal", title = "The last barber", role = "shopkeeper" },
+			},
+		},
+		{
+			id = "pharmacy",
+			place = "Pharmacy",
+			cargo = "Medicine",
+			piece = "medicine box",
+			plural = "medicine boxes",
+			kind = "crate",
+			look = "medicine",
+			pieces = { 1, 3 },
+			tiers = { 1, 2, 3 },
+			giver = { name = "Mr. Patel", title = "Pharmacist", role = "clerk" },
+			receivers = {
+				{ name = "Dr. Novak", title = "Doctor", role = "clerk" },
+				{ name = "Nurse Kim", title = "Rooftop clinic", role = "clerk" },
+				{ name = "Grandma Rose", title = "Needs her pills", role = "townsperson" },
+			},
+		},
+		{
+			id = "supermarket",
+			place = "Supermarket",
+			cargo = "Groceries",
+			piece = "grocery box",
+			plural = "grocery boxes",
+			kind = "crate",
+			look = "groceries",
+			pieces = { 2, 3 },
+			tiers = { 1, 2 },
+			giver = { name = "Carla", title = "Store manager", role = "shopkeeper" },
+			receivers = {
+				{ name = "Big Mike", title = "Survivor camp cook", role = "cook" },
+				{ name = "Mrs. Hungry", title = "Empty fridge", role = "townsperson" },
+				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+			},
+		},
+		{
+			id = "hardware",
+			place = "Hardware Store",
+			cargo = "Tools",
+			piece = "tool crate",
+			plural = "tool crates",
+			kind = "crate",
+			look = "tools",
+			pieces = { 1, 3 },
+			tiers = { 2, 3 },
+			giver = { name = "Bob", title = "Hardware store", role = "worker" },
+			receivers = {
+				{ name = "Chief Brody", title = "Fire station", role = "worker" },
+				{ name = "Old Pete", title = "Fixing his roof", role = "townsperson" },
+				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
+			},
+		},
+		{
+			id = "electronics",
+			place = "Electronics Store",
+			cargo = "Radio Parts",
+			piece = "parts box",
+			plural = "parts boxes",
+			kind = "crate",
+			look = "parcel",
+			pieces = { 1, 2 },
+			tiers = { 2, 3 },
+			giver = { name = "Kenji", title = "Electronics store", role = "clerk" },
+			receivers = {
+				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
+				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
+				{ name = "The Mayor", title = "City hall", role = "clerk" },
+			},
+		},
+		{
+			id = "pawnshop",
+			place = "Pawn Shop",
+			cargo = "Ammo",
+			piece = "ammo crate",
+			plural = "ammo crates",
+			kind = "ammo",
+			look = "ammo",
+			pieces = { 1, 2 },
+			tiers = { 2, 3, 4 },
+			giver = { name = "Vinnie", title = "Pawn broker", role = "shopkeeper" },
+			receivers = {
+				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
+				{ name = "Jax", title = "Survivor camp guard", role = "worker" },
+			},
+		},
+		{
+			id = "warehouse",
+			place = "Warehouse",
+			cargo = "Generator Fuel",
+			piece = "fuel barrel",
+			plural = "fuel barrels",
+			kind = "barrel",
+			look = "barrel",
+			pieces = { 1, 2 },
+			tiers = { 2, 3, 4 },
+			giver = { name = "Gus", title = "Warehouse keeper", role = "worker" },
+			receivers = {
+				{ name = "Nurse Kim", title = "The clinic's generator", role = "clerk" },
+				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
+				{ name = "Old Pete", title = "Cold house", role = "townsperson" },
+			},
+		},
+		{
+			id = "lab",
+			place = "Research Lab",
+			cargo = "Vaccine",
+			piece = "vaccine cooler",
+			plural = "vaccine coolers",
+			kind = "icebox",
+			look = "vaccine",
+			pieces = { 1, 2 },
+			tiers = { 3, 4 },
+			giver = { name = "Dr. Ito", title = "Lab scientist", role = "clerk" },
+			receivers = {
+				{ name = "Dr. Novak", title = "Doctor", role = "clerk" },
+				{ name = "Nurse Kim", title = "Rooftop clinic", role = "clerk" },
+			},
+		},
+		{
+			id = "samples",
+			place = "Research Lab",
+			cargo = "Zombie Samples",
+			piece = "sample case",
+			plural = "sample cases",
+			kind = "icebox",
+			look = "sample",
+			pieces = { 1, 2 },
+			tiers = { 4 },
+			giver = { name = "Dr. Ito", title = "Lab scientist", role = "clerk" },
+			receivers = {
+				{ name = "Dr. Novak", title = "Working on a cure", role = "clerk" },
+			},
+		},
+		{
+			id = "bank",
+			place = "Bank",
+			cargo = "Gold Bars",
+			piece = "strongbox",
+			plural = "strongboxes",
+			kind = "crate",
+			look = "gold",
+			pieces = { 1, 2 },
+			tiers = { 3, 4 },
+			giver = { name = "Mr. Sterling", title = "Bank manager", role = "clerk" },
+			receivers = {
+				{ name = "The Mayor", title = "City hall", role = "clerk" },
+				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
+			},
+		},
+		{
+			id = "cake",
+			place = "Bakery",
+			cargo = "Wedding Cake",
+			piece = "cake box",
+			plural = "cake boxes",
+			kind = "crate",
+			look = "cake",
+			pieces = { 1, 1 },
+			tiers = { 3, 4 },
+			giver = { name = "Anna", title = "Baker", role = "cook" },
+			receivers = {
+				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
+			},
+		},
+	} :: { BusinessDef },
+	-- At a far place the place's own person takes the ordinary deliveries.
+	PlacePeople = {
+		base = { name = "Sergeant Hayes", title = "Quartermaster", role = "soldier" },
+		lodge = { name = "Ingrid", title = "Lodge keeper", role = "shopkeeper" },
+		radio = { name = "Sparks", title = "Radio operator", role = "worker" },
+		farm = { name = "Old Man Jenkins", title = "Farmer", role = "farmer" },
+		docks = { name = "Rocco", title = "Dock foreman", role = "worker" },
+		gas = { name = "Rosa", title = "Station owner", role = "shopkeeper" },
+		school = { name = "Ms. Parker", title = "Teacher", role = "teacher" },
+		frosty = { name = "Frosty", title = "Ice cream maker", role = "cook" },
+		movers = { name = "Dana", title = "Big Move Movers", role = "mover" },
+		ranch = { name = "Walt", title = "Rancher", role = "rancher" },
+		stables = { name = "Emma", title = "Riding instructor", role = "rancher" },
+		fueldepot = { name = "Hank", title = "Depot worker", role = "worker" },
+	} :: { [string]: PersonDef },
+	-- The look of the giver and the receiver of every special job (Config.JobTypes giver / receiver are the names).
+	People = {
+		schoolrun = { giver = "townsperson", receiver = "teacher" },
+		armysupply = { giver = "worker", receiver = "soldier" },
+		icecream = { giver = "cook", receiver = "kid" },
+		moving = { giver = "townsperson", receiver = "townsperson" },
+		farmrun = { giver = "farmer", receiver = "shopkeeper" },
+		winter = { giver = "cook", receiver = "shopkeeper" },
+		horses = { giver = "rancher", receiver = "rancher" },
+		fuelrun = { giver = "worker", receiver = "shopkeeper" },
+	} :: { [string]: { giver: string, receiver: string } },
+}
+
+-- Cargo on foot (server/Cargo.luau): pick a piece up (E), carry it in your hands, load it into the back of the vehicle
+-- (E); at the drop take it out and carry it to the receiver. Horses are led on a rope, kids walk by themselves.
+Config.Cargo = {
+	-- The pieces of the special jobs (Config.JobTypes itemKind): the name and the model.
+	Kinds = {
+		crate = { piece = "crate", plural = "crates", look = "crate" },
+		ammo = { piece = "ammo crate", plural = "ammo crates", look = "ammo" },
+		sack = { piece = "sack of food", plural = "sacks of food", look = "sack" },
+		barrel = { piece = "fuel barrel", plural = "fuel barrels", look = "barrel" },
+		icebox = { piece = "ice box", plural = "ice boxes", look = "icebox" },
+		furniture = { piece = "piece of furniture", plural = "pieces of furniture", look = "furniture" },
+		soup = { piece = "soup box", plural = "soup boxes", look = "soup" },
+		horse = { piece = "horse", plural = "horses", look = "horse" },
+		kid = { piece = "kid", plural = "kids", look = "kid" },
+	} :: { [string]: { piece: string, plural: string, look: string } },
+	-- Extra seconds on the clock for every piece handled at a stop (loading and unloading each count).
+	TimePerPiece = { carry = 9, lead = 14, board = 4, serve = 0 } :: { [string]: number },
+	PayPerPiece = 15, -- an ordinary delivery pays this per piece on top of the tier's pay
+	SpawnDistance = 300, -- the people and the cargo appear when the job's owner is this close to the stop
+	ApproachDistance = 80, -- closer than this the HUD says what to do on foot and the enemies come on foot
+	PileOffset = 12, -- an address without a cargo spot: the pile is this far from the road toward the building
+	PromptDistance = 10,
+	HoldDuration = 0.25, -- hold E this long to pick up / load / hand over
+	MaxCarSpeed = 6, -- the vehicle must stand to load or unload it
+	StealPieceRate = 3, -- bandits at the car: their steal share x this fills a meter, every full one = a piece gone
+	KidGap = 0.9, -- seconds between the kids getting on / off
+	WalkTimeout = 14, -- a kid walking longer than this counts as arrived
+	Linger = 5, -- the people of a finished stop stay this long
+	-- Enemies on foot while you handle the cargo at a stop (per danger tier): the first ones come FootGrace s after
+	-- you get there, then `count` every `every` s while fewer than `max` of yours are alive.
+	FootGrace = 8,
+	FootWaves = {
+		{ every = 0, count = 0, max = 0 },
+		{ every = 16, count = 1, max = 5 },
+		{ every = 13, count = 2, max = 7 },
+		{ every = 10, count = 2, max = 9 },
+	} :: { { every: number, count: number, max: number } },
 }
 
 export type JobTypeDef = {

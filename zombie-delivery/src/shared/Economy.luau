@@ -158,6 +158,59 @@ function Economy.crewSplit(total: number, passengers: number): (number, number)
 	return driver, share
 end
 
+function Economy.findJobType(id: string): Config.JobTypeDef?
+	for _, jobType in Config.JobTypes do
+		if jobType.id == id then
+			return jobType
+		end
+	end
+	return nil
+end
+
+function Economy.findEmployer(id: string): Config.EmployerDef?
+	for _, employer in Config.Employers do
+		if employer.id == id then
+			return employer
+		end
+	end
+	return nil
+end
+
+-- A job's pieces split over its stops, the first stops take the odd ones: 4 over 3 = { 2, 1, 1 }.
+function Economy.splitPieces(total: number, parts: number): { number }
+	local list = {}
+	if parts <= 0 then
+		return list
+	end
+	local each = math.floor(total / parts)
+	local extra = total - each * parts
+	for n = 1, parts do
+		table.insert(list, each + (if n <= extra then 1 else 0))
+	end
+	return list
+end
+
+-- What a job pays when `delivered` of its `total` pieces arrived (stolen and wrecked ones are missing).
+function Economy.cargoPay(pay: number, delivered: number, total: number): number
+	if total <= 0 then
+		return pay
+	end
+	return math.floor(pay * math.clamp(delivered / total, 0, 1) / 5 + 0.5) * 5
+end
+
+-- Extra seconds on the clock for handling `pieces` at a stop that way (carry | lead | board | serve).
+function Economy.handlingTime(mode: string, pieces: number): number
+	return (Config.Cargo.TimePerPiece[mode] or 0) * math.max(0, pieces)
+end
+
+-- Pieces still in the ice cream truck after `served` of its `stops` serve stops (it empties evenly).
+function Economy.serveLeft(total: number, stops: number, served: number): number
+	if stops <= 0 then
+		return 0
+	end
+	return math.ceil(total * math.max(0, stops - served) / stops - 1e-9)
+end
+
 -- condition 0 … 1 (cargo health), timeLeft and timeLimit in seconds.
 function Economy.payout(pay: number, condition: number, timeLeft: number, timeLimit: number, kills: number): Payout
 	local jobs = Config.Jobs

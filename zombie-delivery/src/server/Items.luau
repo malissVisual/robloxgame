@@ -179,6 +179,10 @@ end
 
 -- Returns an error text, or nil when the item was used.
 local function apply(player: Player, id: string, target: Vector3?): string?
+	local body = player.Character
+	if (id == "repair" or id == "molotov") and body and body:GetAttribute("Carrying") ~= nil then
+		return "Your hands are full. Put it down first (G)."
+	end
 	if id == "repair" then
 		local car = Vehicles.get(player)
 		local root = rootOf(player)

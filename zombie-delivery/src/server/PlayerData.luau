@@ -270,6 +270,33 @@ function PlayerData.addItem(player: Player, id: string, amount: number): boolean
 	return true
 end
 
+-- Gives a gun (an employer's reward, the admin tools); true when it is new. equip = put it in the hand too.
+function PlayerData.giveWeapon(player: Player, id: string, equip: boolean?): boolean
+	local profile = profiles[player]
+	if not profile or not Economy.findWeapon(id) then
+		return false
+	end
+	local new = not profile.weapons[id]
+	profile.weapons[id] = true
+	if equip then
+		profile.weapon = id
+	end
+	changed:Fire(player)
+	return new
+end
+
+-- Gives a car (an employer's reward, the admin tools); true when it is new.
+function PlayerData.giveCar(player: Player, id: string): boolean
+	local profile = profiles[player]
+	if not profile or not Economy.findCar(id) then
+		return false
+	end
+	local new = not profile.cars[id]
+	profile.cars[id] = true
+	changed:Fire(player)
+	return new
+end
+
 function PlayerData.notify(player: Player)
 	changed:Fire(player)
 end

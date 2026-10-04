@@ -3,7 +3,7 @@
 -- your screen); the purchases are checked here, also that you really stand in that shop.
 --
 --   Dead End Motors     cars (the showroom models have their own prompts)
---   Lead & Co.          guns
+--   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
 --   Wrench Garage       upgrades and paint jobs (and free repairs inside)
 --   Last Stop Supplies  consumables
 --   Depot Garage        switch between your cars
@@ -81,7 +81,16 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		equipCar(player, id)
 	elseif kind == "weapon" then
 		local def = Economy.findWeapon(id)
-		if not def or profile.weapons[id] or refuse(player, "guns") then
+		if not def or profile.weapons[id] then
+			return
+		end
+		if def.earned then
+			-- Not for sale: an employer gives it to the couriers who work for them.
+			local employer = Economy.findEmployer(def.earned)
+			notice:FireClient(player, `The {def.name} is not for sale. Work for {if employer then employer.name else "its owner"} to earn it.`)
+			return
+		end
+		if refuse(player, "guns") then
 			return
 		end
 		if not PlayerData.spend(player, def.price) then

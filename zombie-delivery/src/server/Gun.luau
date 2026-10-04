@@ -2,6 +2,7 @@
 -- The guns. The client says where it shoots (Fire, a point in the world), the server checks the fire rate, turns
 -- the roof turret (the driver), shoots from the seat (a passenger) or from the hand (on foot), raycasts every pellet
 -- and deals the damage to zombies, bandits and bandit cars (a head hit is a crit, the grenade launcher blows up).
+-- Nobody shoots with full hands: a character carrying cargo (the Carrying attribute, server/Cargo.luau) cannot fire.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,6 +41,9 @@ local function onFire(player: Player, target: any)
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not profile or not humanoid or not root or humanoid.Health <= 0 then
 		return
+	end
+	if character and character:GetAttribute("Carrying") ~= nil then
+		return -- the hands are full (a crate, a horse's rope): put it down first
 	end
 	local stats = Economy.weaponStats(profile.weapon, profile.upgrades)
 	local now = os.clock()

@@ -18,6 +18,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
+local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
 
@@ -50,7 +51,16 @@ Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
 local DARK = Color3.fromRGB(34, 34, 38)
 local GLASS = Color3.fromRGB(150, 190, 210)
 
-type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball
+type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail
+
+-- Where the cargo rides (server/Cargo.luau): the slots are the bottom centres of the pieces (facing the front),
+-- the door is where you load at the back, the entry is where passengers (the school kids) get in.
+type CargoSpec = {
+	slots: { Vector3 },
+	noun: string, -- "Load it into the back of the {noun}"
+	door: Vector3,
+	entry: Vector3,
+}
 
 type Style = {
 	width: number,
@@ -62,10 +72,69 @@ type Style = {
 	passengers: { Vector3 },
 	roof: number, -- turret height above the chassis top
 	boxes: { Box }, -- relative to the chassis top centre (offset = centre of the box)
+	cargo: CargoSpec, -- relative to the chassis top centre
 }
 
 local function box(size: Vector3, offset: Vector3, kind: string): Box
 	return { size = size, offset = offset, kind = kind }
+end
+
+local function cargo(noun: string, length: number, width: number, slots: { Vector3 }, entry: Vector3?): CargoSpec
+	return {
+		slots = slots,
+		noun = noun,
+		door = Vector3.new(0, 2.4, length / 2 + 0.6),
+		entry = entry or Vector3.new(width / 2 + 1.5, 0, 0),
+	}
+end
+
+-- The slatted stall box of the livestock truck: posts and boards on both sides, the horses show between them.
+local function stallBoxes(): { Box }
+	local list = {
+		box(Vector3.new(7.6, 2.4, 2.6), Vector3.new(0, 1.2, -8.7), "body"), -- hood
+		box(Vector3.new(7.6, 4.6, 3.6), Vector3.new(0, 2.3, -5.6), "glass"), -- cab
+		box(Vector3.new(7.6, 0.8, 3.6), Vector3.new(0, 5, -5.6), "body"),
+		box(Vector3.new(7.8, 0.8, 0.6), Vector3.new(0, 0.4, -10.1), "dark"), -- bumper
+		box(Vector3.new(7.6, 0.4, 13.6), Vector3.new(0, 0.2, 3), "dark"), -- stall floor
+		box(Vector3.new(7.6, 7.6, 0.5), Vector3.new(0, 3.8, -3.65), "body"), -- front wall
+		box(Vector3.new(0.25, 3.2, 12.4), Vector3.new(0, 2, 3.2), "rail"), -- divider between the two stalls
+		box(Vector3.new(7.2, 6.6, 0.35), Vector3.new(0, 3.5, 9.8), "wood"), -- the ramp, folded up
+		box(Vector3.new(7.6, 0.4, 0.5), Vector3.new(0, 7.6, 9.8), "dark"),
+	}
+	for _, x in { -3.65, 3.65 } do
+		for _, y in { 1.3, 3.1, 4.9, 6.7 } do
+			table.insert(list, box(Vector3.new(0.3, 0.8, 13.4), Vector3.new(x, y, 3), "wood"))
+		end
+		for _, z in { -3.5, 0.6, 3.6, 6.6, 9.6 } do
+			table.insert(list, box(Vector3.new(0.45, 7.8, 0.45), Vector3.new(x, 3.9, z), "dark"))
+		end
+		table.insert(list, box(Vector3.new(0.5, 0.4, 13.6), Vector3.new(x, 7.9, 3), "body"))
+	end
+	return list
+end
+
+-- The fuel truck: a cab, a flatbed with stake sides and a headboard, the barrels stand in a rack.
+local function flatbedBoxes(): { Box }
+	local list = {
+		box(Vector3.new(7.2, 2.2, 5.2), Vector3.new(0, 1.1, -5.4), "body"), -- hood
+		box(Vector3.new(7.2, 4.4, 3.6), Vector3.new(0, 2.2, -1), "glass"), -- cab
+		box(Vector3.new(7.2, 0.8, 3.6), Vector3.new(0, 4.8, -1), "body"),
+		box(Vector3.new(7.4, 0.8, 0.6), Vector3.new(0, 0.4, -8.1), "dark"), -- bumper
+		box(Vector3.new(7.2, 0.5, 7.2), Vector3.new(0, 0.25, 4.4), "plate"), -- the flatbed
+		box(Vector3.new(7.2, 3.4, 0.3), Vector3.new(0, 2.2, 1), "rail"), -- headboard
+		box(Vector3.new(7.2, 0.3, 0.3), Vector3.new(0, 1.9, 4.2), "rail"), -- the rack between the rows
+		box(Vector3.new(7.2, 0.5, 0.3), Vector3.new(0, 0.8, 7.9), "accent"), -- tail rail
+		box(Vector3.new(0.3, 2.4, 1.4), Vector3.new(-3.5, 1.4, -1.6), "white"), -- hazard plates on the doors
+		box(Vector3.new(0.3, 2.4, 1.4), Vector3.new(3.5, 1.4, -1.6), "white"),
+	}
+	for _, x in { -3.45, 3.45 } do
+		table.insert(list, box(Vector3.new(0.3, 0.4, 7), Vector3.new(x, 2.3, 4.4), "accent")) -- stake rails
+		table.insert(list, box(Vector3.new(0.3, 0.4, 7), Vector3.new(x, 1.3, 4.4), "accent"))
+		for _, z in { 1.2, 4.4, 7.7 } do
+			table.insert(list, box(Vector3.new(0.4, 2.4, 0.4), Vector3.new(x, 1.5, z), "rail"))
+		end
+	end
+	return list
 end
 
 -- Front of the car is -Z (the LookVector).
@@ -86,6 +155,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(6.6, 5, 6.4), Vector3.new(0, 2.5, 3.2), "body"), -- cargo box
 			box(Vector3.new(6.8, 0.8, 0.6), Vector3.new(0, 0.4, -6.6), "dark"), -- bumper
 		},
+		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.5, 0, 1.6), Vector3.new(1.5, 0, 1.6), Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6) }),
 	},
 	pickup = {
 		width = 6.4,
@@ -103,9 +173,9 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(0.4, 1.6, 5.4), Vector3.new(-3, 0.8, 3.8), "body"), -- bed walls
 			box(Vector3.new(0.4, 1.6, 5.4), Vector3.new(3, 0.8, 3.8), "body"),
 			box(Vector3.new(6.4, 1.6, 0.4), Vector3.new(0, 0.8, 6.3), "body"),
-			box(Vector3.new(4, 1.4, 1.4), Vector3.new(0, 0.7, 5.3), "accent"), -- the cargo
 			box(Vector3.new(6.8, 0.9, 0.7), Vector3.new(0, 0.3, -6.7), "dark"),
 		},
+		cargo = cargo("pickup", 13, 6.4, { Vector3.new(-1.4, 0, 5.1), Vector3.new(1.4, 0, 5.1), Vector3.new(0, 0, 3.6), Vector3.new(0, 2.1, 5.1) }),
 	},
 	muscle = {
 		width = 6.4,
@@ -126,6 +196,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(0.9, 1.42, 0), "accent"), -- stripes
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(-0.9, 1.42, 0), "accent"),
 		},
+		cargo = cargo("car", 13.5, 6.4, { Vector3.new(-1.2, 0.3, 5), Vector3.new(1.2, 0.3, 5) }),
 	},
 	icecream = {
 		width = 6.8,
@@ -147,6 +218,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(2.6, 2.6, 2.6), Vector3.new(0, 8.4, 4.6), "ball"), -- the scoop
 			box(Vector3.new(7, 0.8, 0.6), Vector3.new(0, 0.4, -7.1), "dark"),
 		},
+		cargo = cargo("truck", 14, 6.8, { Vector3.new(-1.6, 0, 1.4), Vector3.new(1.6, 0, 1.4), Vector3.new(-1.6, 0, 4.6), Vector3.new(1.6, 0, 4.6) }),
 	},
 	armored = {
 		width = 7.4,
@@ -167,6 +239,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(8, 2.4, 1), Vector3.new(0, 0.9, -7.8), "plate"), -- ram plate
 			box(Vector3.new(7.6, 1.2, 0.4), Vector3.new(0, 6.6, 7), "plate"), -- roof rail for the gunners
 		},
+		cargo = cargo("truck", 15, 7.4, { Vector3.new(-1.8, 0, 2), Vector3.new(1.8, 0, 2), Vector3.new(-1.8, 0, 5.2), Vector3.new(1.8, 0, 5.2) }),
 	},
 	bus = {
 		width = 8,
@@ -191,6 +264,17 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(8.4, 0.8, 0.6), Vector3.new(0, 0.4, -12.2), "dark"),
 			box(Vector3.new(0.2, 1.6, 1.6), Vector3.new(-4.2, 3.6, -8.6), "accent"), -- stop sign
 		},
+		cargo = cargo("bus", 24, 8, {
+			-- the kids sit at the windows
+			Vector3.new(-2.6, 2.2, -4.2),
+			Vector3.new(2.6, 2.2, -4.2),
+			Vector3.new(-2.6, 2.2, 0.5),
+			Vector3.new(2.6, 2.2, 0.5),
+			Vector3.new(-2.6, 2.2, 5.5),
+			Vector3.new(2.6, 2.2, 5.5),
+			Vector3.new(-2.6, 2.2, 8.5),
+			Vector3.new(2.6, 2.2, 8.5),
+		}, Vector3.new(5.5, 0, -9.6)),
 	},
 	movingtruck = {
 		width = 7.4,
@@ -209,6 +293,14 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(7.7, 1.4, 9.6), Vector3.new(0, 5, 2.9), "logo"),
 			box(Vector3.new(7.8, 0.8, 0.6), Vector3.new(0, 0.4, -8.6), "dark"),
 		},
+		cargo = cargo("truck", 17, 7.4, {
+			Vector3.new(-1.8, 0, -0.6),
+			Vector3.new(1.8, 0, -0.6),
+			Vector3.new(-1.8, 0, 2.8),
+			Vector3.new(1.8, 0, 2.8),
+			Vector3.new(-1.8, 0, 6.2),
+			Vector3.new(1.8, 0, 6.2),
+		}),
 	},
 	monster = {
 		width = 8,
@@ -228,6 +320,31 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(1, 1.4, 12), Vector3.new(-3.2, -0.6, 0), "accent"), -- frame rails
 			box(Vector3.new(1, 1.4, 12), Vector3.new(3.2, -0.6, 0), "accent"),
 		},
+		cargo = cargo("truck", 14, 8, { Vector3.new(-2.2, 1.8, 5.6), Vector3.new(0, 1.8, 5.6), Vector3.new(2.2, 1.8, 5.6), Vector3.new(0, 3.8, 5.6) }),
+	},
+	livestock = {
+		width = 7.6,
+		length = 20,
+		wheel = 1.6,
+		wheelWidth = 1.3,
+		clearance = 1.1,
+		seat = Vector3.new(-1.6, 0.5, -5.8),
+		passengers = { Vector3.new(1.6, 0.5, -5.8) },
+		roof = 8.4,
+		boxes = stallBoxes(),
+		cargo = cargo("truck", 20, 7.6, { Vector3.new(-1.8, 0.4, 3.2), Vector3.new(1.8, 0.4, 3.2) }),
+	},
+	fueltruck = {
+		width = 7.2,
+		length = 16,
+		wheel = 1.5,
+		wheelWidth = 1.2,
+		clearance = 1.0,
+		seat = Vector3.new(-1.5, 0.5, -1),
+		passengers = { Vector3.new(1.5, 0.5, -1) },
+		roof = 5.2,
+		boxes = flatbedBoxes(),
+		cargo = cargo("truck", 16, 7.2, { Vector3.new(-1.7, 0.5, 2.6), Vector3.new(1.7, 0.5, 2.6), Vector3.new(-1.7, 0.5, 6), Vector3.new(1.7, 0.5, 6) }),
 	},
 }
 
@@ -314,6 +431,10 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			c = Color3.fromRGB(255, 150, 200)
 		elseif b.kind == "logo" then
 			c = Color3.fromRGB(240, 240, 240)
+		elseif b.kind == "wood" then
+			c, material = Color3.fromRGB(128, 92, 58), Enum.Material.WoodPlanks
+		elseif b.kind == "rail" then
+			c, material = Color3.fromRGB(70, 72, 76), Enum.Material.Metal
 		end
 		local p = newPart(model, if b.kind == "glass" then "Cabin" else "Body", b.size, top * CFrame.new(b.offset), c, material)
 		p.Massless = true
@@ -484,6 +605,17 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	angular.AngularVelocity = Vector3.zero
 	angular.Parent = chassis
 
+	-- The cargo: the back door (server/Cargo.luau puts the Load / Take out prompt there) and the passengers' door.
+	local door = Instance.new("Attachment")
+	door.Name = "CargoDoor"
+	door.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + style.cargo.door
+	door.Parent = chassis
+	local entry = Instance.new("Attachment")
+	entry.Name = "CargoEntry"
+	entry.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + style.cargo.entry
+	entry.Parent = chassis
+	model:SetAttribute("CargoCount", 0)
+
 	-- Prompts: the owner drives, everybody else rides (the clients show only the one that fits them).
 	type PromptInfo = { name: string, action: string, key: Enum.KeyCode }
 	local promptInfos: { PromptInfo } = {
@@ -591,6 +723,22 @@ local function writeAttributes(car: Car)
 	model:SetAttribute("Health", math.ceil(car.health))
 end
 
+-- What the character holds in its hands (server/Cargo.luau sets it), or nil.
+local function carrying(character: Instance?): string?
+	local value = character and character:GetAttribute("Carrying")
+	return if type(value) == "string" then value else nil
+end
+
+-- Nobody gets into a seat with a crate in the hands (or a horse on the rope): load it first.
+local function handsFull(player: Player): boolean
+	local held = carrying(player.Character)
+	if not held then
+		return false
+	end
+	Net.get("Notice"):FireClient(player, if held == "horse" then "Load the horse first (E at the back of the truck)." else "Load it first (E at the back of the vehicle).")
+	return true
+end
+
 local function eject(seat: Seat | VehicleSeat)
 	local occupant = seat.Occupant
 	local seatWeld = seat:FindFirstChild("SeatWeld")
@@ -611,6 +759,8 @@ local function watchSeat(car: Car, seat: Seat | VehicleSeat, side: number, drive
 		if occupant then
 			if driver and occupant.Parent ~= car.owner.Character then
 				eject(seat) -- somebody else's car
+			elseif driver and handsFull(car.owner) then
+				eject(seat)
 			else
 				sitting = occupant
 			end
@@ -639,13 +789,13 @@ local function watchPrompts(car: Car)
 	end
 	drive.Triggered:Connect(function(player)
 		local humanoid = humanoidOf(player)
-		if player == car.owner and not car.wrecked and not car.seat.Occupant and humanoid then
+		if player == car.owner and not car.wrecked and not car.seat.Occupant and humanoid and not handsFull(player) then
 			car.seat:Sit(humanoid)
 		end
 	end)
 	ride.Triggered:Connect(function(player)
 		local humanoid = humanoidOf(player)
-		if player == car.owner or car.wrecked or not humanoid or humanoid.SeatPart then
+		if player == car.owner or car.wrecked or not humanoid or humanoid.SeatPart or handsFull(player) then
 			return
 		end
 		for _, seat in car.passengers do
@@ -715,6 +865,40 @@ end
 function Vehicles.speed(car: Car): number
 	local v = car.chassis.AssemblyLinearVelocity
 	return Vector3.new(v.X, 0, v.Z).Magnitude
+end
+
+-- ── Cargo (server/Cargo.luau) ───────────────────────────────────────────────
+
+local function styleOf(car: Car): Style
+	local def = Economy.findCar(car.id)
+	return (def and STYLES[def.style]) or STYLES.van
+end
+
+-- Where the loaded pieces ride, relative to the chassis: the bottom centre of a piece, facing the front.
+function Vehicles.cargoSlots(car: Car): { CFrame }
+	local list = {}
+	for _, slot in styleOf(car).cargo.slots do
+		table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + slot))
+	end
+	return list
+end
+
+-- What the HUD calls the cargo space: "Load it into the back of the {noun}".
+function Vehicles.cargoNoun(car: Car): string
+	return styleOf(car).cargo.noun
+end
+
+-- The back of the vehicle, where the Load / Take out prompt sits.
+function Vehicles.cargoDoor(car: Car): Attachment?
+	local door = car.chassis:FindFirstChild("CargoDoor")
+	return if door and door:IsA("Attachment") then door else nil
+end
+
+-- Where passengers get in (the school bus door), on the ground next to the vehicle, in world space.
+function Vehicles.cargoEntry(car: Car): Vector3
+	local entry = car.chassis:FindFirstChild("CargoEntry")
+	local point = if entry and entry:IsA("Attachment") then entry.WorldPosition else car.chassis.Position
+	return Vector3.new(point.X, car.chassis.Position.Y - CHASSIS_HEIGHT / 2 - styleOf(car).clearance, point.Z)
 end
 
 function Vehicles.remove(player: Player)
@@ -813,7 +997,7 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	end)
 
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.Health > 0 then
+	if humanoid and humanoid.Health > 0 and not carrying(character) then
 		task.defer(function()
 			if not car.wrecked then
 				seat:Sit(humanoid)
