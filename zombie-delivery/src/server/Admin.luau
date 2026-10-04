@@ -109,12 +109,6 @@ local function unlockAll(player: Player)
 	for _, paint in Config.Paints do
 		profile.paints[paint.id] = true
 	end
-	-- The Roof Minigun on every car you own that can carry a car gun.
-	for _, car in Config.Cars do
-		if profile.cars[car.id] and Economy.canMount(car.id) then
-			profile.carGuns[car.id] = "roofminigun"
-		end
-	end
 	for _, item in Config.Items do
 		profile.items[item.id] = math.max(profile.items[item.id] or 0, math.min(10, item.max))
 	end
@@ -123,8 +117,34 @@ local function unlockAll(player: Player)
 		profile.rep[employer.id] = math.max(profile.rep[employer.id] or 0, employer.needed, employer.weaponAt or 0)
 	end
 	PlayerData.notify(player)
+	say(player, "ADMIN: every car, gun, paint and employer reward unlocked, 10 of each item. Car guns: Cars tab.")
+end
+
+-- The gun on the roof of your equipped car (a Config.CarGuns id, or "none" to take it off).
+local function carGun(player: Player, arg: any)
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	local carId = profile.car
+	if not Economy.canMount(carId) then
+		say(player, "ADMIN: this vehicle can't carry a gun (van, pickup, muscle car, monster truck, armored truck can).")
+		return
+	end
+	if arg == "none" then
+		profile.carGuns[carId] = nil
+		say(player, "ADMIN: the car gun is off. Now you shoot out of the window (pistol, revolver, SMG only).")
+	elseif type(arg) == "string" and Economy.findCarGun(arg) then
+		profile.carGuns[carId] = arg
+		local def = Economy.findCarGun(arg)
+		say(player, `ADMIN: {if def then def.name else arg} on the roof.`)
+	else
+		say(player, "ADMIN: unknown car gun.")
+		return
+	end
+	PlayerData.notify(player)
 	Vehicles.refreshGun(player)
-	say(player, "ADMIN: every car, gun, paint and employer reward unlocked, 10 of each item, a Roof Minigun on every car that takes one.")
 end
 
 local function maxUpgrades(player: Player)
@@ -446,6 +466,7 @@ local COMMANDS: { [string]: (Player, any) -> () } = {
 	maxUpgrades = maxUpgrades,
 	money = money,
 	car = car,
+	carGun = carGun,
 	weapon = weapon,
 	teleport = teleport,
 	job = job,
@@ -487,6 +508,7 @@ end
 local function onPlayer(player: Player)
 	if Admin.isAdmin(player) then
 		player:SetAttribute("Admin", true)
+		print(`[Admin] {player.Name} is an admin: press P for the admin panel`)
 	end
 	player.CharacterAdded:Connect(function()
 		-- God mode survives a respawn.

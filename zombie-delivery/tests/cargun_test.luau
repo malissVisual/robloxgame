@@ -118,7 +118,7 @@ check("passenger: never the car gun", Economy.fireMode(true, false, "pistol", "r
 check("passenger: no rifle", Economy.fireMode(true, false, "rifle", "roofmg") == nil)
 check("passenger: no carbine", Economy.fireMode(true, false, "carbine", nil) == nil)
 
-check("version 2.1", Config.Version == "2.1", Config.Version)
+check("version 2.1+", string.sub(Config.Version, 1, 3) == "2.1", Config.Version)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

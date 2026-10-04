@@ -176,9 +176,8 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 Runs every `tests/*_test.luau` (logic, cargo, roads, cargun). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
-**Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything (with a Roof Minigun on
-every car that takes one), gives money, spawns
-cars, guns and enemies, teleports to every place, starts any job, sets the time of day, heals, finishes the current
+**Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
+cars, puts any car gun on your car (or none), guns and enemies, teleports to every place, starts any job, sets the time of day, heals, finishes the current
 stop and switches god mode. It
 is there for a Studio Play test, for the owner of a user-owned place and for the user ids in `Config.Admin.UserIds`;
 the server checks every command again.

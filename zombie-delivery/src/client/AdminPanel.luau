@@ -7,6 +7,7 @@
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
@@ -32,8 +33,10 @@ local tabButtons: { [string]: any } = {}
 local section = "unlock"
 local spawnCount = 1
 
+-- In a Studio Play test everybody is an admin (Config.Admin.InStudio): the panel opens even before the server's
+-- "Admin" attribute arrives. The server checks every command again anyway.
 local function isAdmin(): boolean
-	return player:GetAttribute("Admin") == true
+	return player:GetAttribute("Admin") == true or (Config.Admin.InStudio and RunService:IsStudio())
 end
 
 local function send(name: string, arg: any?)
@@ -106,7 +109,7 @@ local SECTIONS = {
 local render: () -> ()
 
 local function renderUnlock()
-	heading("Unlock", "Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, every employer's jobs counted as done, and a Roof Minigun on every car that can carry a car gun.")
+	heading("Unlock", "Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, and every employer's jobs counted as done. Car guns: Cars tab.")
 	local row = grid(200)
 	action(row, "UNLOCK EVERYTHING", C.yellow, function()
 		send("unlockAll")
@@ -133,6 +136,16 @@ local function renderCars()
 		if def.company then
 			button.TextColor3 = Color3.new(0, 0, 0)
 		end
+	end
+	heading("Car gun on your car", "The gun on the roof of the car you drive (van, pickup, muscle, monster, armored). Without one you shoot out of the window: pistol, revolver or SMG only.")
+	local gunCells = grid(150)
+	action(gunCells, "No car gun", C.red, function()
+		send("carGun", "none")
+	end)
+	for _, def in Config.CarGuns do
+		action(gunCells, def.name, C.blue, function()
+			send("carGun", def.id)
+		end)
 	end
 end
 
@@ -430,12 +443,15 @@ function AdminPanel.start()
 	end
 	refreshButton()
 
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed or UserInputService:GetFocusedTextBox() then
+	-- P opens and closes the panel (not while typing in a text box, e.g. the chat).
+	UserInputService.InputBegan:Connect(function(input)
+		if input.KeyCode ~= Enum.KeyCode.P or UserInputService:GetFocusedTextBox() then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.P and isAdmin() then
+		if isAdmin() then
 			setOpen(not window.Visible)
+		else
+			warn("[Admin] P pressed, but you are not an admin (Config.Admin)")
 		end
 	end)
 end
