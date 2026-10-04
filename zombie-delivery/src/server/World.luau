@@ -265,9 +265,9 @@ local function lamp(parent: Instance, x: number, z: number, base: number?, reach
 	if beam ~= false then
 		local spot = Instance.new("SpotLight")
 		spot.Face = Enum.NormalId.Bottom
-		spot.Angle = 120
-		spot.Range = 40
-		spot.Brightness = 2.4
+		spot.Angle = 130
+		spot.Range = 52
+		spot.Brightness = 3
 		spot.Color = Color3.fromRGB(255, 208, 150)
 		spot.Shadows = false
 		spot.Parent = head

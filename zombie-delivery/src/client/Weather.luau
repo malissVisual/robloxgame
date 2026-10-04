@@ -2,8 +2,10 @@
 -- The weather and the light, only on this client:
 --   * Day and night: the server runs the clock (Lighting.ClockTime, server/DayNight.luau); this blends the look of
 --     the night over the day look from the same clock (Map.nightFactor): darker blue ambient and moonlight, a blue
---     night grade, a denser dark haze, a warm glow through dusk and dawn, a little bloom on the lights. Not pitch
---     black: the roads stay readable, the lamps and headlights (switched by the server) do the rest.
+--     night grade, a dark haze, a warm glow through dusk and dawn, a little bloom on the lights. Never pitch black:
+--     a bright moon, the towns glow back at night (a warm haze, more light, blended in near the districts), and your
+--     own soft light around you, so a zombie is always visible; the lamps and headlights (switched by the server)
+--     still clearly matter.
 --   * Winter north of the mountain: snow falls around the camera and the air turns cold and white (blended into
 --     the same look, day or night).
 --   * The ambulance's light bar flashes red / blue while its car's attribute Siren is true (server/Vehicles.luau
@@ -12,6 +14,7 @@
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -54,19 +57,29 @@ local DAY: Look = {
 	bloom = 0.35,
 }
 local NIGHT: Look = {
-	brightness = 1.1, -- the moon
-	ambient = Color3.fromRGB(42, 46, 62),
-	outdoor = Color3.fromRGB(64, 72, 104),
-	exposure = -0.15,
-	haze = Color3.fromRGB(56, 66, 94),
-	decay = Color3.fromRGB(26, 32, 50),
-	density = 0.36,
-	hazeAmount = 1.1,
-	tint = Color3.fromRGB(184, 200, 255),
-	saturation = -0.35,
-	contrast = 0.18,
+	-- Moody but readable: you see the lamps are needed, never so dark that a zombie hides in the black.
+	brightness = 1.5, -- the moon
+	ambient = Color3.fromRGB(68, 72, 94),
+	outdoor = Color3.fromRGB(96, 104, 138),
+	exposure = 0,
+	haze = Color3.fromRGB(62, 72, 102),
+	decay = Color3.fromRGB(30, 36, 56),
+	density = 0.3,
+	hazeAmount = 0.7,
+	tint = Color3.fromRGB(200, 212, 255),
+	saturation = -0.25,
+	contrast = 0.12,
 	bloom = 0.9,
 }
+-- In town at night the streets glow back: a warm sodium haze and more light from everywhere (blended in with the
+-- distance to the nearest district, CITY_FADE studs outside its edge roads).
+local CITY_OUTDOOR = Color3.fromRGB(128, 120, 122)
+local CITY_AMBIENT = Color3.fromRGB(88, 84, 92)
+local CITY_HAZE = Color3.fromRGB(110, 92, 84)
+local CITY_FADE = 220
+-- Your own soft light at night (only on your screen): the zombie right next to you is never in the black.
+local AURA_RANGE = 26
+local AURA_BRIGHTNESS = 0.9
 local DUSK_HAZE = Color3.fromRGB(196, 128, 92)
 local DUSK_TINT = Color3.fromRGB(255, 216, 190)
 local WINTER_HAZE_DAY = Color3.fromRGB(220, 230, 240)
@@ -75,6 +88,18 @@ local WINTER_DENSITY = 0.12 -- added to the density in the snow
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
+end
+
+-- 0 … 1: how much "in town" the point is (1 inside a district's edge roads, fading to 0 CITY_FADE studs out).
+local function cityFactor(x: number, z: number): number
+	local best = 0
+	for _, district in Map.Districts do
+		local x0, x1, z0, z1 = Map.districtEdges(district)
+		local dx = math.max(x0 - x, 0, x - x1)
+		local dz = math.max(z0 - z, 0, z - z1)
+		best = math.max(best, 1 - math.clamp(math.sqrt(dx * dx + dz * dz) / CITY_FADE, 0, 1))
+	end
+	return best
 end
 
 -- ── The light bars ─────────────────────────────────────────────────────────
@@ -163,23 +188,39 @@ function Weather.start()
 
 	local wasWinter = false
 	local winter = 0 -- 0 … 1: how far the winter look is blended in (fades over ~2 s)
-	local lastNight, lastWinter = -1, -1
+	local lastNight, lastWinter, lastCity = -1, -1, -1
+	local city = 0 -- 0 … 1: the town glow (follows the camera, eases over ~1 s)
 	local lookClock, tagClock, flashClock, beat = 0, 0, 0, 0
+	local aura = Instance.new("PointLight")
+	aura.Name = "NightAura"
+	aura.Range = AURA_RANGE
+	aura.Color = Color3.fromRGB(200, 214, 255)
+	aura.Shadows = false
+	aura.Brightness = 0
 
 	-- The look for this night factor and winter blend: written only when it changed (the clock crawls).
 	local function applyLook(f: number)
-		if math.abs(f - lastNight) < 0.002 and math.abs(winter - lastWinter) < 0.002 then
+		-- Your own light follows your character (re-parented after a respawn).
+		local character = Players.LocalPlayer.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and aura.Parent ~= root then
+			aura.Parent = root
+		end
+		aura.Brightness = AURA_BRIGHTNESS * f
+		aura.Enabled = f > 0.02
+		if math.abs(f - lastNight) < 0.002 and math.abs(winter - lastWinter) < 0.002 and math.abs(city - lastCity) < 0.01 then
 			return
 		end
 		local dusk = 4 * f * (1 - f) -- 1 halfway through dusk or dawn
+		local glow = city * f -- the town glow is a night thing
 		Lighting.Brightness = lerp(DAY.brightness, NIGHT.brightness, f)
-		Lighting.Ambient = DAY.ambient:Lerp(NIGHT.ambient, f)
-		Lighting.OutdoorAmbient = DAY.outdoor:Lerp(NIGHT.outdoor, f)
+		Lighting.Ambient = DAY.ambient:Lerp(NIGHT.ambient, f):Lerp(CITY_AMBIENT, glow)
+		Lighting.OutdoorAmbient = DAY.outdoor:Lerp(NIGHT.outdoor, f):Lerp(CITY_OUTDOOR, glow)
 		Lighting.ExposureCompensation = lerp(DAY.exposure, NIGHT.exposure, f)
 		local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 		if atmosphere then
 			local haze = DAY.haze:Lerp(NIGHT.haze, f):Lerp(DUSK_HAZE, dusk * 0.55)
-			atmosphere.Color = haze:Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter)
+			atmosphere.Color = haze:Lerp(CITY_HAZE, glow * 0.6):Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter)
 			atmosphere.Decay = DAY.decay:Lerp(NIGHT.decay, f)
 			atmosphere.Density = lerp(DAY.density, NIGHT.density, f) + WINTER_DENSITY * winter
 			atmosphere.Haze = lerp(DAY.hazeAmount, NIGHT.hazeAmount, f)
@@ -194,7 +235,7 @@ function Weather.start()
 		bloom.Threshold = lerp(1.4, 1.05, f)
 		-- Until the server has made the atmosphere and the grade (the world is still building), try again next time.
 		if atmosphere and grade then
-			lastNight, lastWinter = f, winter
+			lastNight, lastWinter, lastCity = f, winter, city
 		end
 	end
 
@@ -237,6 +278,7 @@ function Weather.start()
 		lookClock += dt
 		if lookClock >= LOOK_EVERY then
 			winter = math.clamp(winter + (if inWinter then 1 else -1) * lookClock / 2, 0, 1)
+			city += (cityFactor(position.X, position.Z) - city) * math.min(1, lookClock)
 			lookClock = 0
 			applyLook(Map.nightFactor(Lighting.ClockTime))
 		end
