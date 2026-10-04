@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.7"
+Config.Version = "3.0"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -884,6 +884,43 @@ Config.Audio = {
 	} :: { [string]: string },
 }
 
+-- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
+-- (U) anywhere, server checked (server/Missions.luau), played as jobs (server/Jobs.luau startMission) with twists.
+-- Every mission is rated 1 – 3 stars; the best rating is saved (profile.missions).
+Config.Missions = {
+	-- The rating: done = 1 star; the cargo at least TwoStarCondition = 2; and with at least ThreeStarTime of the
+	-- clock left = 3.
+	TwoStarCondition = 0.75,
+	ThreeStarTime = 0.3,
+	StarBonus = 150, -- paid once for every new star (best rating goes up)
+	FirstClearXp = 1.5, -- the XP of the first clear × this
+	-- Co-op missions (MissionDef.coop): every crew member besides the owner adds this share of the pay (for everyone)
+	-- and this share of enemies (waves, foot waves, hordes).
+	CoopPayPerMember = 0.25,
+	CoopEnemyPerMember = 0.35,
+	CrewCredit = true, -- crew members who helped get the stars too (friends progress together)
+	-- The twists (JobTypeDef.twists): what the card says and how much more they pay.
+	Twists = {
+		defend = { name = "HOLD OUT", icon = "🛡", description = "At the last drop, hold the area until the receiver is done, the dead come in waves", pay = 1.3 },
+		lift = { name = "TWO-MAN LIFT", icon = "🏋", description = "Heavy pieces: alone you carry them slowly, with a crew mate beside you at full speed", pay = 1.25 },
+		quiet = { name = "NO SHOOTING", icon = "🤫", description = "Explosive cargo: every shot from your crew costs cargo condition", pay = 1.35 },
+		guarded = { name = "HOT ZONE", icon = "☣", description = "A horde waits at every stop", pay = 1.3 },
+		night = { name = "NIGHT ONLY", icon = "🌙", description = "Only after dark", pay = 1.2 },
+		gunner = { name = "SHOTGUN SEAT", icon = "🎯", description = "Kills from the passenger seats pay triple", pay = 1.1 },
+		spotless = { name = "SPOTLESS", icon = "💎", description = "The cargo must arrive in good shape: below 60 % the mission fails", pay = 1.4 },
+		hunted = { name = "HUNTED", icon = "🏴", description = "Bandit cars hunt you the whole way", pay = 1.35 },
+	} :: { [string]: { name: string, icon: string, description: string, pay: number } },
+	SpotlessFail = 0.6, -- spotless: the mission fails below this condition
+	QuietCost = 0.06, -- quiet: condition lost per shot
+	LiftSlowSpeed = 7, -- lift: walking speed carrying alone (with a crew mate within LiftHelpRange: normal)
+	LiftHelpRange = 10,
+	GunnerKillBonus = 3, -- gunner: a passenger's kill pays KillBonus × this
+	HuntedBoost = 2.5, -- hunted: roadblocks and chases this many times as often
+	DefendRadius = 45, -- defend: stay within this of the receiver
+	DefendWaveEvery = 9, -- defend: a wave around the stop every … s
+	GuardedHorde = 5, -- guarded: zombies waiting at every stop (× the tier's stars / 2, at least this)
+}
+
 Config.Jobs = {
 	DeliverRadius = 18,
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
@@ -1272,6 +1309,28 @@ Config.Cargo = {
 		cash = { piece = "sack of cash", plural = "sacks of cash", look = "gold" },
 		patient = { piece = "patient", plural = "patients", look = "patient" },
 		pizza = { piece = "pizza stack", plural = "pizza stacks", look = "pizza" },
+		-- 3.0 (the missions, shared/Missions.luau): looks the ordinary deliveries already had …
+		medicine = { piece = "medicine box", plural = "medicine boxes", look = "medicine" },
+		vaccine = { piece = "vaccine cooler", plural = "vaccine coolers", look = "vaccine" },
+		sample = { piece = "sample case", plural = "sample cases", look = "sample" },
+		groceries = { piece = "grocery bag", plural = "grocery bags", look = "groceries" },
+		parcel = { piece = "parcel", plural = "parcels", look = "parcel" },
+		tools = { piece = "toolbox", plural = "toolboxes", look = "tools" },
+		bread = { piece = "bread sack", plural = "bread sacks", look = "bread" },
+		cake = { piece = "cake box", plural = "cake boxes", look = "cake" },
+		-- … and new ones (server/Cargo.luau builds them)
+		water = { piece = "water jug", plural = "water jugs", look = "water" },
+		generator = { piece = "generator", plural = "generators", look = "generator" },
+		battery = { piece = "battery pack", plural = "battery packs", look = "battery" },
+		tnt = { piece = "dynamite crate", plural = "dynamite crates", look = "tnt" },
+		documents = { piece = "briefcase", plural = "briefcases", look = "documents" },
+		electronics = { piece = "radio parts crate", plural = "radio parts crates", look = "electronics" },
+		weapons = { piece = "weapons case", plural = "weapons cases", look = "weapons" },
+		painting = { piece = "painting", plural = "paintings", look = "painting" },
+		mail = { piece = "mail sack", plural = "mail sacks", look = "mail" },
+		tires = { piece = "tire stack", plural = "tire stacks", look = "tires" },
+		plants = { piece = "seedling tray", plural = "seedling trays", look = "plants" },
+		survivor = { piece = "survivor", plural = "survivors", look = "survivor" }, -- board: they walk in themselves
 	} :: { [string]: { piece: string, plural: string, look: string } },
 	-- Extra seconds on the clock for every piece handled at a stop (loading and unloading each count).
 	TimePerPiece = { carry = 9, lead = 14, board = 4, serve = 0 } :: { [string]: number },
@@ -1332,6 +1391,13 @@ export type JobTypeDef = {
 	banditBoost: number?, -- bandits want this cargo: roadblocks and chases come this many times as often
 	level: number?, -- the driver level (Config.Levels) needed to take it
 	board: boolean?, -- on the job board (not taken at an employer's place)
+	-- 3.0, the missions (shared/Missions.luau builds JobTypeDefs with these; Config.Missions.Twists):
+	twists: { string }?, -- the mission's twists: defend | lift | quiet | guarded | night | gunner | spotless | hunted
+	defendTime: number?, -- defend: seconds to hold out at the last drop
+	coop: boolean?, -- made for a crew: pays more and gets harder with every member (Config.Missions)
+	giverRole: string?, -- the look of the giver (server/Npcs.luau roles), else Config.Jobs.People / "townsperson"
+	receiverRole: string?, -- the look of the receiver
+	mission: string?, -- the mission id (shared/Missions.luau) when this job is a mission
 }
 
 -- Special jobs. The ones with an employer are taken at the employer's place; the others show up on the job board.

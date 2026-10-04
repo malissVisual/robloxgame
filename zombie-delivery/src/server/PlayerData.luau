@@ -16,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
+local Missions = require(Shared.Missions)
 
 export type Profile = {
 	money: number,
@@ -33,6 +34,8 @@ export type Profile = {
 	properties: { [string]: boolean }, -- owned real estate (Config.Estate ids)
 	home: string?, -- the home you spawn at (an owned mansion / villa / house), nil = the depot
 	business: { couriers: number, upgrades: { [string]: number }, safe: number, lastTick: number }, -- your company (Config.Business); lastTick = os.time() of the last payout
+	missions: { [string]: number }, -- the best rating (1 – 3 stars) of every mission done (shared/Missions.luau ids)
+	campaigns: { [string]: boolean }, -- campaigns whose reward was paid (all ten missions done)
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -69,6 +72,8 @@ local function newProfile(): Profile
 		properties = {},
 		home = nil,
 		business = { couriers = 0, upgrades = {}, safe = 0, lastTick = 0 },
+		missions = {},
+		campaigns = {},
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -139,6 +144,25 @@ local function applyEstate(profile: Profile, saved: { [any]: any })
 	end
 end
 
+-- The missions' best ratings (only shared/Missions.luau ids, 1 – 3 stars) and the campaigns already rewarded.
+-- Saves from before 3.0 have none.
+local function applyMissions(profile: Profile, saved: { [any]: any })
+	if type(saved.missions) == "table" then
+		for id, stars in saved.missions do
+			if type(id) == "string" and Missions.find(id) and type(stars) == "number" and stars >= 1 then
+				profile.missions[id] = math.clamp(math.floor(stars), 1, 3)
+			end
+		end
+	end
+	if type(saved.campaigns) == "table" then
+		for id, done in saved.campaigns do
+			if type(id) == "string" and done == true and Missions.findCampaign(id) then
+				profile.campaigns[id] = true
+			end
+		end
+	end
+end
+
 -- Saved data is checked, never trusted.
 local function applySaved(profile: Profile, saved: any)
 	if type(saved) ~= "table" then
@@ -201,6 +225,7 @@ local function applySaved(profile: Profile, saved: any)
 		end
 	end
 	applyEstate(profile, saved)
+	applyMissions(profile, saved)
 	if type(saved.car) == "string" and profile.cars[saved.car] then
 		profile.car = saved.car
 	end
@@ -319,6 +344,8 @@ function PlayerData.save(player: Player)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,
+		missions = profile.missions,
+		campaigns = profile.campaigns,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

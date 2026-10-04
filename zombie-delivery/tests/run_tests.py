@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, SoundSheet) in the
+Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, SoundSheet, Missions) in the
 standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS PASSED".
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "Economy", "Map", "Roads", "Icons", "Levels", "TrafficLanes", "SoundSheet")
+PURE = ("Config", "Economy", "Map", "Roads", "Icons", "Levels", "TrafficLanes", "SoundSheet", "Missions")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True

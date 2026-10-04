@@ -1344,6 +1344,7 @@ end
 Hud.onCrew = nil :: (() -> ())?
 Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
+Hud.onMissions = nil :: (() -> ())? -- client/MissionsUi.luau: the MISSIONS window
 
 type ButtonDef = { id: string, text: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
 local BUTTONS: { ButtonDef }, buttonGrid: any, buttonLayout: any, hudButtons: { [string]: any }
@@ -1359,6 +1360,12 @@ end
 -- (type declared above)
 BUTTONS = {
 	{ id = "jobs", text = "JOBS", key = "J", color = C.yellow, onClick = toggleJobs },
+	{ id = "missions", text = "MISSIONS", key = "U", color = C.panelLight, stroke = C.yellow, onClick = function()
+		local cb = Hud.onMissions
+		if cb then
+			cb()
+		end
+	end },
 	{ id = "map", text = "MAP", key = "M", color = C.panelLight, onClick = function()
 		MapView.toggle()
 	end },
@@ -1397,7 +1404,7 @@ BUTTONS = {
 
 buttonGrid = placed(Ui.make("Frame", {
 	Name = "HudButtons",
-	Size = UDim2.fromOffset(150, 8 * 46),
+	Size = UDim2.fromOffset(150, 9 * 46),
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 96),
 	BackgroundTransparency = 1,
@@ -2620,12 +2627,12 @@ layout = function()
 	buttonLayout.CellSize = UDim2.fromOffset(bw, bh)
 	buttonLayout.CellPadding = UDim2.fromOffset(BUTTON_GAP, BUTTON_GAP)
 	if columns >= 4 then
-		-- Rows: JOBS MAP BAG CAR / TOP CREW ESTATE SOUND.
+		-- Rows: JOBS MISSIONS MAP BAG / CAR TOP CREW ESTATE / SOUND.
 		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
 		buttonLayout.StartCorner = Enum.StartCorner.TopLeft
 		buttonLayout.FillDirectionMaxCells = columns
 	else
-		-- Columns from the screen's edge: JOBS MAP BAG CAR | TOP CREW ESTATE SOUND.
+		-- Columns from the screen's edge: JOBS MISSIONS MAP BAG CAR | TOP CREW ESTATE SOUND.
 		buttonLayout.FillDirection = Enum.FillDirection.Vertical
 		buttonLayout.StartCorner = Enum.StartCorner.TopRight
 		buttonLayout.FillDirectionMaxCells = math.ceil(count / columns)

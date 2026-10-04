@@ -1187,6 +1187,25 @@ local function update(dt: number)
 	end
 end
 
+-- ── Missions (shared/Missions.luau, server/Missions.luau) ───────────────────
+
+-- Set by Main: a mission was finished (the owner, the mission id, the rating 1 – 3, everybody paid with the owner).
+Jobs.onMissionComplete = nil :: ((owner: Player, missionId: string, stars: number, members: { Player }) -> ())?
+
+-- Start a mission for the player now (server/Missions.luau checked that it is open). False and why not.
+-- [contract stub: stream "missions-jobs" implements it with the twists]
+function Jobs.startMission(player: Player, def: Config.JobTypeDef): (boolean, string?)
+	local current = jobs[player]
+	if current then
+		return false, "Finish your current delivery first."
+	end
+	local offer = jobOffer(playerPosition(player), def)
+	if not offer then
+		return false, "No route for this mission from here, try again."
+	end
+	return startJob(player, offer), nil
+end
+
 -- ── Admin tools (server/Admin.luau) ────────────────────────────────────────
 
 -- Start any job now, next to the player: a Config.JobTypes id (with its vehicle), or "ordinary" / "ordinary1" …

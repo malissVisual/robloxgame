@@ -106,6 +106,19 @@ local CARGO_ALIASES: { [string]: string } = {
 	sample = "medicine",
 	cash = "crate",
 	patient = "kid",
+	-- 3.0, the missions' cargo
+	water = "barrel",
+	generator = "crate",
+	battery = "crate",
+	tnt = "ammo",
+	documents = "parcel",
+	electronics = "crate",
+	weapons = "ammo",
+	painting = "furniture",
+	mail = "sack",
+	tires = "crate",
+	plants = "sack",
+	survivor = "kid",
 }
 
 -- A piece of cargo: a kind (crate, ammo, sack, barrel, icebox, furniture, soup, horse, kid) or a look (pizza, parcel,

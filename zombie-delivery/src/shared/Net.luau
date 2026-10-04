@@ -38,6 +38,8 @@ local NAMES = {
 	"Estate", -- client → server: (action "buy" | "sell" | "home", estate id); server → client: open the listing (estate id)
 	"Business", -- client → server: (action "hire" | "fire" | "upgrade" | "collect" | "open", arg); server → client: the company state
 	"CarCall", -- server → client: your car is on the way (seconds left, car model) or arrived / failed (nil)
+	"Missions", -- client → server: ("open") or ("start", mission id); server → client: the progress (MissionsState)
+	"CrewBoard", -- client → server: looking for a crew (mission id or "any") or not (nil); server → clients: who is looking
 }
 
 local folder: Folder
