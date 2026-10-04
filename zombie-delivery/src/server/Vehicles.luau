@@ -466,6 +466,33 @@ local function paintColor(def: Config.CarDef, paintId: string?): Color3
 	return rgb(def.color)
 end
 
+-- 3.1: a paint job's finish on the painted body panels (PaintDef.material: Neon, Foil, Metal, Glass …), else the
+-- body's own SmoothPlastic. Only the panels in paintParts take it (never the windows, the trim or the lights). A
+-- neon paint glows by itself, so its colour is toned down to stay a glow and not a floodlight in the dark.
+local BODY_MATERIAL = Enum.Material.SmoothPlastic
+local function applyPaint(parts: { BasePart }, def: Config.CarDef, paintId: string?)
+	local color = paintColor(def, paintId)
+	local paint = paintId and Economy.findPaint(paintId)
+	local material = BODY_MATERIAL
+	if paint and paint.material then
+		local ok, found = pcall(function()
+			return (Enum.Material :: any)[paint.material]
+		end)
+		if ok and typeof(found) == "EnumItem" then
+			material = found :: Enum.Material
+		end
+	end
+	if material == Enum.Material.Neon then
+		color = color:Lerp(Color3.new(0, 0, 0), 0.35)
+	end
+	for _, p in parts do
+		p.Color = color
+		p.Material = material
+		-- Glass: a dark, glossy, still solid shell (the Phantom), never see-through.
+		p.Reflectance = if material == Enum.Material.Glass then 0.25 elseif material == Enum.Material.Foil then 0.1 else 0
+	end
+end
+
 type Built = {
 	model: Model,
 	chassis: Part,
@@ -1272,7 +1299,9 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 
 	local stats = Economy.carStats(def.id, profile.upgrades)
 	local gunId = gunFor(player, def.id)
-	local built = build(def, paintColor(def, if def.company then nil else profile.carPaint[def.id]), ground, false, gunId)
+	local paintId = if def.company then nil else profile.carPaint[def.id]
+	local built = build(def, paintColor(def, paintId), ground, false, gunId)
+	applyPaint(built.paintParts, def, paintId)
 	local driverSeat = built.seat :: VehicleSeat
 	local car: Car = {
 		owner = player,
@@ -1463,10 +1492,7 @@ function Vehicles.repaint(player: Player)
 	if not car or not profile or not def then
 		return
 	end
-	local color = paintColor(def, profile.carPaint[car.id])
-	for _, p in car.paintParts do
-		p.Color = color
-	end
+	applyPaint(car.paintParts, def, if def.company then nil else profile.carPaint[car.id])
 end
 
 -- A car gun bought (or changed): the live car gets the turret that fits it now, or loses the one it should not have.

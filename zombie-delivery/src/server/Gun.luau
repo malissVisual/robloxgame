@@ -1,7 +1,7 @@
 --!strict
 -- The guns. The client says where it shoots (Fire, a point in the world), the server decides what fires
 -- (Economy.fireMode), checks the fire rate, raycasts every pellet and deals the damage to zombies, bandits and bandit
--- cars (a head hit is a crit, the grenade launchers blow up):
+-- cars (a head hit is a crit, the grenade launchers blow up; 3.1: a piercing gun's round goes on through more of them):
 --   on foot      the gun in your hand
 --   driver       the car gun on the roof, if the car has one (the turret turns to the target)
 --   any seat     otherwise a one-handed gun (pistol, revolver, SMG) out of the side window; a two-handed gun does not
@@ -37,6 +37,49 @@ local function spreadDirection(direction: Vector3, degrees: number): Vector3
 	local spread = math.rad(degrees)
 	local frame = CFrame.lookAt(Vector3.zero, direction)
 	return (frame * CFrame.Angles(rng:NextNumber(-spread, spread), rng:NextNumber(-spread, spread), 0)).LookVector
+end
+
+-- One round hits `result`: the damage it deals (a blast, a zombie with its headshot, a bandit car). Returns the enemy
+-- model a piercing round may go on through (nil: it stops here) and whether passing it is free (a body already dead).
+local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stats: Economy.WeaponStats): (Model?, boolean)
+	local hit = Net.get("Hit")
+	if stats.splash > 0 then
+		local blast = Instance.new("Explosion")
+		blast.BlastPressure = 0
+		blast.DestroyJointRadiusPercent = 0
+		blast.BlastRadius = stats.splash
+		blast.Position = result.Position
+		blast.Parent = workspace
+		local killed = Zombies.damageArea(result.Position, stats.splash, stats.damage, player)
+		killed += BanditCars.damageArea(result.Position, stats.splash, stats.damage, player)
+		hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, killed > 0)
+		return nil, false
+	end
+	local zombie = Zombies.fromPart(result.Instance)
+	if zombie then
+		if zombie.dead then
+			return zombie.model, true
+		end
+		-- A headshot kills on the spot (a brute takes four times the damage).
+		local crit = result.Instance.Name == "Head" or result.Instance:GetAttribute("HeadPart") == true
+		local damage = stats.damage
+		if crit then
+			damage = if zombie.kind == "brute" then stats.damage * Config.Horde.HeadshotMultiplier * 2 else zombie.humanoid.Health + 1
+		end
+		local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40 })
+		hit:FireClient(player, result.Position, math.floor(damage + 0.5), crit, killed)
+		return zombie.model, false
+	end
+	local banditCar = BanditCars.fromPart(result.Instance)
+	if banditCar then
+		if banditCar.dead then
+			return banditCar.npc.model, true
+		end
+		local destroyed = BanditCars.damage(banditCar, stats.damage, player)
+		hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, destroyed)
+		return banditCar.npc.model, false
+	end
+	return nil, false
 end
 
 local function onFire(player: Player, target: any)
@@ -99,38 +142,41 @@ local function onFire(player: Player, target: any)
 	local look: { number } = if carGun then carGun.color else (Economy.findWeapon(profile.weapon) or Config.Weapons[1]).color
 	local color = Color3.fromRGB(look[1], look[2], look[3])
 	local tracer = Net.get("Tracer")
-	local hit = Net.get("Hit")
 	for _ = 1, stats.pellets do
 		local dir = spreadDirection(direction, stats.spread)
-		local result = workspace:Raycast(origin, dir * stats.range, params)
-		local finish = if result then result.Position else origin + dir * stats.range
-		if result then
-			local zombie = Zombies.fromPart(result.Instance)
-			if stats.splash > 0 then
-				local blast = Instance.new("Explosion")
-				blast.BlastPressure = 0
-				blast.DestroyJointRadiusPercent = 0
-				blast.BlastRadius = stats.splash
-				blast.Position = result.Position
-				blast.Parent = workspace
-				local killed = Zombies.damageArea(result.Position, stats.splash, stats.damage, player)
-				killed += BanditCars.damageArea(result.Position, stats.splash, stats.damage, player)
-				hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, killed > 0)
-			elseif zombie then
-				-- A headshot kills on the spot (a brute takes four times the damage).
-				local crit = result.Instance.Name == "Head" or result.Instance:GetAttribute("HeadPart") == true
-				local damage = stats.damage
-				if crit then
-					damage = if zombie.kind == "brute" then stats.damage * Config.Horde.HeadshotMultiplier * 2 else zombie.humanoid.Health + 1
-				end
-				local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40 })
-				hit:FireClient(player, result.Position, math.floor(damage + 0.5), crit, killed)
-			else
-				local banditCar = BanditCars.fromPart(result.Instance)
-				if banditCar then
-					local destroyed = BanditCars.damage(banditCar, stats.damage, player)
-					hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, destroyed)
-				end
+		-- 3.1: a piercing round (WeaponDef.pierce) goes on through that many more enemies, each taking the full
+		-- damage; it stops at anything else (a wall, the ground) and the tracer ends at its last hit, else the range.
+		local rayParams = params
+		local left = if stats.splash > 0 then 0 else stats.pierce
+		local start = origin
+		local travel = stats.range
+		local finish = origin + dir * stats.range
+		for _ = 0, stats.pierce + 4 do -- bounded: a few dead bodies in the way may be passed for free
+			local result = workspace:Raycast(start, dir * travel, rayParams)
+			if not result then
+				finish = start + dir * travel
+				break
+			end
+			finish = result.Position
+			local through, free = hitPart(player, result, dir, stats)
+			if not through or (left <= 0 and not free) then
+				break
+			end
+			if not free then
+				left -= 1
+			end
+			if rayParams == params then
+				-- The shared params stay as they are; this round gets its own copy that skips the ones it went through.
+				rayParams = RaycastParams.new()
+				rayParams.FilterType = Enum.RaycastFilterType.Exclude
+				rayParams.FilterDescendantsInstances = table.clone(exclude)
+				rayParams.CollisionGroup = params.CollisionGroup
+			end
+			rayParams:AddToFilter(through)
+			travel -= (result.Position - start).Magnitude
+			start = result.Position
+			if travel <= 0.5 then
+				break
 			end
 		end
 		tracer:FireAllClients(origin, finish, color, player.UserId)
