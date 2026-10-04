@@ -912,7 +912,7 @@ Config.Missions = {
 	} :: { [string]: { name: string, icon: string, description: string, pay: number } },
 	SpotlessFail = 0.6, -- spotless: the mission fails below this condition
 	QuietCost = 0.06, -- quiet: condition lost per shot
-	LiftSlowSpeed = 7, -- lift: walking speed carrying alone (with a crew mate within LiftHelpRange: normal)
+	LiftSlowSpeed = 4.5, -- lift: walking speed carrying alone (with a crew mate within LiftHelpRange: normal)
 	LiftHelpRange = 10,
 	GunnerKillBonus = 3, -- gunner: a passenger's kill pays KillBonus × this
 	HuntedBoost = 2.5, -- hunted: roadblocks and chases this many times as often

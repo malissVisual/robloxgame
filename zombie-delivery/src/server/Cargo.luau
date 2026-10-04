@@ -1894,7 +1894,7 @@ function Cargo.step(session: Session): (string, string)
 	local piece = session.info.piece
 	if mode == "serve" then
 		if parked and driving then
-			return mode, "Hold still while the kids buy ice cream"
+			return mode, "Hold still while the customers buy"
 		end
 		return mode, `Park in the {circle} circle and hold still`
 	elseif mode == "board" then

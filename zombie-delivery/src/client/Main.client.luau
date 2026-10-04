@@ -67,6 +67,7 @@ EstateUi.onOpen = Hud.closeWindows
 MissionsUi.onOpen = Hud.closeWindows
 Hud.onEstate = EstateUi.toggleList
 Hud.onMissions = MissionsUi.toggle
+MissionsUi.onFindCrew = CrewPanel.open
 CameraRig.mouseNeeded = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen()
 end

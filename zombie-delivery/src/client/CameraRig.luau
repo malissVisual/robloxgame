@@ -39,6 +39,13 @@ local WALK_SPEED = 10
 local SPRINT_SPEED = 22
 local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
+
+-- The step with cargo in the hands: slower still with a heavy piece and nobody helping (the TWO-MAN LIFT twist:
+-- server/Cargo.luau sets the character's CarrySpeed attribute).
+local function carrySpeed(character: Model): number
+	local lift = character:GetAttribute("CarrySpeed")
+	return if type(lift) == "number" then math.min(lift, CARRY_SPEED) else CARRY_SPEED
+end
 -- The body has weight: the speed builds up and bleeds off instead of jumping (studs per second, per second).
 local SPEED_UP = 26
 local SLOW_DOWN = 38
@@ -313,7 +320,7 @@ local function update(dt: number)
 	-- On foot: walk, sprint with Shift, a careful step with the gun up (aiming or shooting).
 	if not car then
 		local target = if wantAim then AIM_WALK_SPEED
-			elseif handsFull then CARRY_SPEED
+			elseif handsFull then carrySpeed(character)
 			elseif shiftHeld then SPRINT_SPEED
 			else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
@@ -410,7 +417,7 @@ local function touchCarrySpeed()
 		end
 		local seated = humanoid.SeatPart ~= nil
 		if carryingOf(character) and not seated then
-			humanoid.WalkSpeed = CARRY_SPEED
+			humanoid.WalkSpeed = carrySpeed(character)
 			slowed = true
 		elseif slowed then
 			slowed = false
