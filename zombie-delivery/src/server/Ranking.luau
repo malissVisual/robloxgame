@@ -2,7 +2,7 @@
 -- The server's leaderboard: the best couriers on this server. A client asks over the Leaderboard remote (the window,
 -- client/Leaderboard.luau, asks when it opens and every few seconds while it stays open) and gets every player's row:
 -- name, level, rank, XP, mission stars (3.0, shared/Missions.luau), deliveries, kills, money earned and whether they are
--- out on a job. Sorted by level, then mission stars, then money earned, then deliveries. Rows are built from the profiles (server/PlayerData.luau) on demand: nothing runs
+-- out on a job, and the title they show (3.1). Sorted by level, then mission stars, then money earned, then deliveries. Rows are built from the profiles (server/PlayerData.luau) on demand: nothing runs
 -- while nobody looks.
 
 local Players = game:GetService("Players")
@@ -33,6 +33,7 @@ export type Row = {
 	kills: number,
 	earned: number,
 	onJob: boolean,
+	title: string?, -- 3.1: the title they show (server/Challenges.luau), nil = none
 }
 
 local MIN_GAP = 0.5 -- seconds between two answers to one player (a spammed remote costs nothing)
@@ -79,6 +80,7 @@ function Ranking.rows(): { Row }
 			kills = profile.kills,
 			earned = profile.earned,
 			onJob = Jobs.involved(player), -- their own job, or in the crew of one
+			title = profile.title,
 		})
 	end
 	table.sort(rows, better)

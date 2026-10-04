@@ -3,8 +3,8 @@
 -- server/Admin.luau, which checks every command again). One window with sections on the left: unlock, driver level &
 -- money, cars, guns, teleport (every Map.Landmarks place), jobs (every special job and the ordinary tiers), enemies,
 -- estate & company (give / take properties, the home, teleport to a property, the company's safe), world (time of
--- day: day and night, server/DayNight.luau), missions (start any of the 100, all at 3 stars, reset; shared/Missions.luau)
--- and player (god mode, heal, finish the stop). The answers
+-- day: day and night, server/DayNight.luau), missions (start any of the 100, all at 3 stars, reset; shared/Missions.luau),
+-- challenges (3.1: all done, every lost package found, start over, any title; server/Challenges.luau) and player (god mode, heal, finish the stop). The answers
 -- come back as toasts (the Notice remote), and in the window's title bar while it is open (the toasts are behind it).
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
 
@@ -20,6 +20,7 @@ local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local MissionData = require(Shared.Missions)
+local ChallengeData = require(Shared.Challenges)
 local Ui = require(script.Parent.Ui)
 
 local C = Ui.Colors
@@ -38,6 +39,9 @@ local tabButtons: { [string]: any } = {}
 local section = "unlock"
 local spawnCount = 1
 local missionProgress: { [string]: number } = {} -- your best ratings (the Missions remote's "state"), for the colours
+-- 3.1: your challenges' state (the Challenges remote's "state", asked when the Challenges tab opens).
+local challengeState: { done: number, secrets: number, secretsTotal: number, visited: number, placesTotal: number, title: string?, titles: { [string]: boolean } } =
+	{ done = 0, secrets = 0, secretsTotal = 0, visited = 0, placesTotal = 0, title = nil, titles = {} }
 
 -- In a Studio Play test everybody is an admin (Config.Admin.InStudio): the panel opens even before the server's
 -- "Admin" attribute arrives. The server checks every command again anyway.
@@ -111,6 +115,7 @@ local SECTIONS = {
 	{ "estate", "Estate, company" },
 	{ "world", "World" },
 	{ "missions", "Missions" },
+	{ "challenges", "Challenges, secrets" },
 	{ "player", "Player" },
 }
 
@@ -406,6 +411,38 @@ local function renderMissions()
 	end
 end
 
+-- 3.1, the challenges (shared/Challenges.luau): all done, every secret package found, start over, any title.
+local function renderChallenges()
+	local state = challengeState
+	heading(
+		`Challenges · {state.done} / {#ChallengeData.List} · secrets {state.secrets} / {state.secretsTotal} · places {state.visited} / {state.placesTotal}`,
+		"Players see them in the MISSIONS window (U): CHALLENGES, SECRETS, REWARDS. ALL CHALLENGES gives every challenge's money and title, every campaign's reward and Dead End. RESET takes the exclusive guns and paints back too."
+	)
+	local row = grid(200)
+	action(row, "ALL CHALLENGES", C.yellow, function()
+		send("challengesAll")
+	end).TextColor3 = Color3.new(0, 0, 0)
+	action(row, "ALL SECRETS FOUND", C.blue, function()
+		send("secretsAll")
+	end)
+	action(row, "RESET CHALLENGES", C.red, function()
+		send("challengesReset")
+	end)
+	heading(`Title: {state.title or "none"}`, "Given and shown over your head and on the leaderboard (TOP).")
+	local titles = grid(232)
+	local none = action(titles, "NO TITLE", if state.title == nil then C.yellow else C.grey, function()
+		send("title", "none")
+	end)
+	none.TextColor3 = if state.title == nil then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
+	for _, title in ChallengeData.allTitles() do
+		local on = state.title == title
+		local button = action(titles, title, if on then C.yellow elseif state.titles[title] then C.green else C.panelLight, function()
+			send("title", title)
+		end)
+		button.TextColor3 = if on or state.titles[title] then Color3.new(0, 0, 0) else C.text
+	end
+end
+
 local function renderPlayer()
 	local on = player:GetAttribute("God") == true
 	heading("God mode", "You and your car take no damage (a car in the water is put back on the road).")
@@ -434,6 +471,7 @@ local RENDERERS: { [string]: () -> () } = {
 	estate = renderEstate,
 	world = renderWorld,
 	missions = renderMissions,
+	challenges = renderChallenges,
 	player = renderPlayer,
 }
 
@@ -512,11 +550,13 @@ local function build()
 	Ui.list(tabs, true, 6)
 	for index, entry in SECTIONS do
 		local id = entry[1]
-		local button = Ui.button(tabs, entry[2], UDim2.new(1, 0, 0, 38), C.panelLight, function()
+		local button = Ui.button(tabs, entry[2], UDim2.new(1, 0, 0, 34), C.panelLight, function()
 			section = id
 			render()
 			if id == "missions" then
 				Net.get("Missions"):FireServer("open")
+			elseif id == "challenges" then
+				Net.get("Challenges"):FireServer("open")
 			end
 		end)
 		button.TextSize = 16
@@ -599,6 +639,41 @@ function AdminPanel.start()
 			end
 		end
 		if window.Visible and section == "missions" then
+			render()
+		end
+	end)
+	-- 3.1: your challenges' state (the same "state" the MISSIONS window's tabs get).
+	Net.get("Challenges").OnClientEvent:Connect(function(kind: any, state: any)
+		if kind ~= "state" or type(state) ~= "table" then
+			return
+		end
+		local function size(set: any): number
+			local n = 0
+			if type(set) == "table" then
+				for _ in set do
+					n += 1
+				end
+			end
+			return n
+		end
+		local titles: { [string]: boolean } = {}
+		if type(state.titles) == "table" then
+			for title, on in state.titles do
+				if type(title) == "string" and on then
+					titles[title] = true
+				end
+			end
+		end
+		challengeState = {
+			done = size(state.done),
+			secrets = size(state.secrets),
+			secretsTotal = tonumber(state.secretsTotal) or 0,
+			visited = size(state.visited),
+			placesTotal = tonumber(state.placesTotal) or 0,
+			title = if type(state.title) == "string" then state.title else nil,
+			titles = titles,
+		}
+		if window.Visible and section == "challenges" then
 			render()
 		end
 	end)
