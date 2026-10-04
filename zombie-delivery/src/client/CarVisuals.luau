@@ -72,15 +72,27 @@ local function freeSeat(car: Model): boolean
 	return false
 end
 
+local function allCars(): { Instance }
+	local list = {}
+	for _, name in { "Cars", "BanditCars" } do
+		local folder = workspace:FindFirstChild(name)
+		if folder then
+			for _, car in folder:GetChildren() do
+				table.insert(list, car)
+			end
+		end
+	end
+	return list
+end
+
 local function step(dt: number)
-	local folder = workspace:FindFirstChild("Cars")
 	local camera = workspace.CurrentCamera
-	if not folder or not camera then
+	if not camera then
 		return
 	end
 	local eye = camera.CFrame.Position
 	local seatedIn = Drive.seatedCar()
-	for _, car in folder:GetChildren() do
+	for _, car in allCars() do
 		if not car:IsA("Model") then
 			continue
 		end
@@ -100,7 +112,7 @@ local function step(dt: number)
 		if ride and ride:IsA("ProximityPrompt") then
 			ride.Enabled = not mine and seatedIn == nil and freeSeat(car)
 		end
-		if not mine and not state.tagged then
+		if not mine and not state.tagged and car:GetAttribute("OwnerId") ~= nil then
 			state.tagged = true
 			nameTag(car, chassis)
 		end

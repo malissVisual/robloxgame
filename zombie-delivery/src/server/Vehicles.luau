@@ -510,6 +510,78 @@ function Vehicles.displayModel(def: Config.CarDef, ground: CFrame): Model
 	return built.model
 end
 
+export type NpcCar = {
+	model: Model,
+	chassis: Part,
+	turret: Weld,
+	turretBase: CFrame,
+	size: Vector3,
+	linear: LinearVelocity,
+	angular: AngularVelocity,
+	guns: { BasePart }, -- the gunners' guns (where the shots come from)
+}
+
+-- A bandit figure sitting where a seat was: a body, a head with a bandana, and a gun for the gunners.
+local function dummy(model: Model, chassis: Part, seat: CFrame, gunner: boolean): BasePart?
+	local function piece(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material): Part
+		local p = newPart(model, name, size, seat * offset, color, material)
+		p.CanCollide = false
+		p.Massless = true
+		weld(chassis, p)
+		return p
+	end
+	piece("BanditBody", Vector3.new(2, 2, 1), CFrame.new(0, 1.4, 0), Color3.fromRGB(30, 30, 34), Enum.Material.Fabric)
+	piece("BanditHead", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 3, 0), Color3.fromRGB(205, 160, 120), Enum.Material.SmoothPlastic)
+	piece("Bandana", Vector3.new(1.25, 0.5, 1.25), CFrame.new(0, 2.75, 0), Color3.fromRGB(170, 30, 30), Enum.Material.Fabric)
+	if not gunner then
+		return nil
+	end
+	return piece("BanditGun", Vector3.new(0.35, 0.5, 2.8), CFrame.new(0.9, 2.1, -1.2), Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
+end
+
+-- A car for the enemies, driven by the server (server/BanditCars.luau): no seats, no prompts, bandit figures inside.
+function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
+	local built = build(def, rgb(def.color), ground, false)
+	local model = built.model
+	local spots: { CFrame } = {}
+	local seat = built.seat
+	if seat then
+		table.insert(spots, seat.CFrame)
+		seat:Destroy()
+	end
+	for _, p in built.passengers do
+		table.insert(spots, p.CFrame)
+		p:Destroy()
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("ProximityPrompt") then
+			d:Destroy()
+		end
+	end
+	local guns: { BasePart } = {}
+	for n, spot in spots do
+		local gun = dummy(model, built.chassis, spot, n > 1)
+		if gun then
+			table.insert(guns, gun)
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = "EnemyCar"
+		end
+	end
+	return {
+		model = model,
+		chassis = built.chassis,
+		turret = built.turret,
+		turretBase = built.turretBase,
+		size = built.size,
+		linear = built.chassis:FindFirstChild("Drive") :: LinearVelocity,
+		angular = built.chassis:FindFirstChild("Steer") :: AngularVelocity,
+		guns = guns,
+	}
+end
+
 local function writeAttributes(car: Car)
 	local model = car.model
 	model:SetAttribute("MaxSpeed", car.stats.maxSpeed)

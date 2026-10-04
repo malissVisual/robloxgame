@@ -27,7 +27,7 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Input | PC | Touch |
 |---|---|---|
 | Drive | WASD / arrows | thumbstick |
-| Shoot where you aim (driver: roof gun, passenger: out of the window) | hold left mouse | – |
+| Shoot where you aim (driver: roof gun, passenger: out of the window, on foot: your pistol) | hold left mouse | – |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
 | Jobs / map / backpack | J / M / B | the buttons |
@@ -48,9 +48,13 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
      * **Ice Cream Route**: the company lends you its ice cream truck, sell at 4 stops.
      * **Moving Day**: the company's moving truck, load furniture at a house and unload it at the new home.
      * **Winter Run**: through the tunnel and over the **frozen lake** (the car slides on the ice) to the Ski Lodge.
-4. **Enemies**: **bandits** and **gunners** with guns (they set up roadblocks ahead of you, camp at the far places and
-   shoot your car), and zombies (walkers, runners, brutes, soldiers at the base). Run them over (fast) or shoot them.
-   Zombies grab a slow car and bite it until you shoot them off.
+4. **Enemies**: **bandit pickups** come after you on the road (from ★★ up), ram you and shoot from the bed; destroy
+   them with guns, ramming, mines or molotovs ($75). **Bandits** and **gunners** on foot set up roadblocks ahead of
+   you, camp at the far places and shoot your car. Bandits next to your car **steal your cargo** bit by bit (all of
+   it gone = the job fails). Zombies (walkers, runners, brutes, soldiers at the base) are rarer: run them over or
+   shoot them; they grab a slow car and bite it until you shoot them off.
+   A wrecked car (or dying) does **not** end the job: some cargo is lost, press CAR for a new car (the company
+   vehicle on a special job) and keep going while the time lasts.
 5. The pay: the job's pay × cargo condition (50 – 100 %), + 25 % for finishing in the first half of the time,
    + $3 per enemy killed. Every kill also pays on the spot, and so do the **supply crates** (? on the map).
 6. **Crews**: friends press R at your car to ride along. Their kills count for your job, each passenger gets half of
@@ -80,8 +84,9 @@ All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map
 ```
 src/shared/   Config (all numbers), Map (world layout, roads, addresses), Economy (prices, stats, pay), Net (remotes)
 src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats),
-              Zombies (zombies and bandits, roadblocks), Gun (shots, server checked), Jobs (job board, stops, special
-              jobs, crews), Items (consumables, supply crates), Shops (counters, showroom, purchases)
+              Zombies (zombies and bandits, roadblocks), BanditCars (the chasing pickups, driven by the server),
+              Gun (shots, server checked), Jobs (job board, stops, special jobs, crews), Items (consumables, supply
+              crates), Shops (counters, showroom, purchases)
 src/client/   Main, Menu (start screen), Hud (interface), MapView (minimap, big map), Drive (car controller, ice),
               Shooting (aim, tracers, hit numbers), CarVisuals (tyres, prompts, name tags), ZombieAnimator, Weather, Ui
 tests/        logic test of Economy and Map
@@ -105,5 +110,5 @@ Needs the standalone Luau CLI (https://github.com/luau-lang/luau/releases).
 
 ## Ideas for later
 
-Bandit cars that chase you, more special jobs (an armoured cash transport, a hospital run with a patient, a pizza
+More special jobs (an armoured cash transport, a hospital run with a patient, a pizza
 rush with a timer per stop), night shifts, sounds and music, hiring AI couriers that earn while you are away.

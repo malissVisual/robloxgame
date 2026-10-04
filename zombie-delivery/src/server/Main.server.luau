@@ -17,11 +17,12 @@ local Jobs = require(Server.Jobs)
 local Gun = require(Server.Gun)
 local Items = require(Server.Items)
 local Shops = require(Server.Shops)
+local BanditCars = require(Server.BanditCars)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
 -- the ground, bullets fly through cars and corpses.
-for _, name in { "Car", "Zombie", "Corpse", "Bullet" } do
+for _, name in { "Car", "Zombie", "Corpse", "Bullet", "EnemyCar" } do
 	pcall(function()
 		PhysicsService:RegisterCollisionGroup(name)
 	end)
@@ -33,6 +34,9 @@ PhysicsService:CollisionGroupSetCollidable("Corpse", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("Corpse", "Corpse", false)
 PhysicsService:CollisionGroupSetCollidable("Bullet", "Car", false)
 PhysicsService:CollisionGroupSetCollidable("Bullet", "Corpse", false)
+-- The bandits' cars bump into your car and the world, the zombies and the corpses pass through, bullets hit them.
+PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Zombie", false)
+PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
 World.build()
 
@@ -69,10 +73,26 @@ end
 Zombies.onCarDamaged = function(player, amount)
 	Jobs.onCarDamaged(player, amount)
 end
+Zombies.onSteal = function(player, share)
+	Jobs.steal(player, share)
+end
+BanditCars.onKill = function(player)
+	Jobs.onKill(player)
+end
+BanditCars.onCarDamaged = function(player, amount)
+	Jobs.onCarDamaged(player, amount)
+end
+BanditCars.onSteal = function(player, share)
+	Jobs.steal(player, share)
+end
+BanditCars.wanted = Jobs.active
 Vehicles.onWrecked = function(player, car, reason)
 	Zombies.releaseCar(car)
-	Jobs.fail(player, `{reason} The cargo is gone.`)
-	notice:FireClient(player, "Your car is wrecked. Press CAR for a new one.")
+	if Jobs.active(player) then
+		Jobs.onCarWrecked(player)
+	else
+		notice:FireClient(player, `{reason} Press CAR for a new one.`)
+	end
 end
 
 PlayerData.start()
@@ -82,6 +102,7 @@ Jobs.start()
 Gun.start()
 Items.start()
 Shops.start()
+BanditCars.start()
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
 local playing: { [Player]: boolean } = {}
@@ -93,12 +114,36 @@ local function giveCar(player: Player)
 		waited += task.wait(0.5)
 	end
 	if player.Parent and playing[player] and not Vehicles.get(player) and PlayerData.get(player) then
-		Vehicles.spawn(player, true)
+		Vehicles.spawn(player, true, Jobs.vehicleFor(player))
 	end
 end
 
+-- A pistol in the hand: you can shoot on foot too (server/Gun.luau).
+local function giveHandGun(character: Model)
+	local hand = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
+	if not hand or not hand:IsA("BasePart") then
+		return
+	end
+	local gun = Instance.new("Part")
+	gun.Name = "HandGun"
+	gun.Size = Vector3.new(0.3, 0.5, 1.6)
+	gun.Color = Color3.fromRGB(30, 30, 34)
+	gun.Material = Enum.Material.Metal
+	gun.CanCollide = false
+	gun.CanQuery = false
+	gun.CanTouch = false
+	gun.Massless = true
+	gun.CFrame = hand.CFrame * CFrame.new(0, -0.35, -0.5)
+	local w = Instance.new("WeldConstraint")
+	w.Part0 = hand
+	w.Part1 = gun
+	w.Parent = gun
+	gun.Parent = character
+end
+
 local function onPlayer(player: Player)
-	player.CharacterAdded:Connect(function()
+	player.CharacterAdded:Connect(function(character)
+		task.spawn(giveHandGun, character)
 		if playing[player] then
 			task.wait(1)
 			giveCar(player)
@@ -132,7 +177,7 @@ Net.get("SpawnCar").OnServerEvent:Connect(function(player)
 		notice:FireClient(player, "Your car is still out there. Find it!")
 		return
 	end
-	local err = Vehicles.spawn(player)
+	local err = Vehicles.spawn(player, false, Jobs.vehicleFor(player))
 	if err then
 		notice:FireClient(player, err)
 	end

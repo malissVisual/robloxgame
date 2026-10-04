@@ -56,6 +56,7 @@ local rewardRemote = Net.get("Reward")
 -- Set by Main.
 Zombies.onKill = function(_player: Player, _zombie: Zombie) end
 Zombies.onCarDamaged = function(_player: Player, _amount: number) end
+Zombies.onSteal = function(_player: Player, _share: number) end
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -690,6 +691,11 @@ local function step()
 				end
 			else
 				z.humanoid:MoveTo(position)
+				-- Right next to a car: they grab what they can from the cargo.
+				local targetCar = best.car
+				if targetCar and bestDistance < 14 then
+					Zombies.onSteal(targetCar.owner, Config.BanditCar.StealPerSecond * Horde.RepathEvery)
+				end
 				if now >= z.nextAttack then
 					z.nextAttack = now + (z.def.fireEvery or 1.5) * rng:NextNumber(0.85, 1.15)
 					shoot(z, best)

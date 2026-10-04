@@ -1,7 +1,7 @@
 --!strict
 -- The guns. The client says where it shoots (Fire, a point in the world), the server checks the fire rate, turns
--- the roof turret (the driver) or shoots from the seat (a passenger, with their own gun), raycasts every pellet and
--- deals the damage (a head hit is a crit, the grenade launcher blows up where it hits).
+-- the roof turret (the driver), shoots from the seat (a passenger) or from the hand (on foot), raycasts every pellet
+-- and deals the damage to zombies, bandits and bandit cars (a head hit is a crit, the grenade launcher blows up).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +12,7 @@ local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
+local BanditCars = require(script.Parent.BanditCars)
 local PlayerData = require(script.Parent.PlayerData)
 
 local Gun = {}
@@ -34,7 +35,10 @@ local function onFire(player: Player, target: any)
 	end
 	local car, driving, seatPart = Vehicles.seatedIn(player)
 	local profile = PlayerData.get(player)
-	if not car or not seatPart or not profile then
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not profile or not humanoid or not root or humanoid.Health <= 0 then
 		return
 	end
 	local stats = Economy.weaponStats(profile.weapon, profile.upgrades)
@@ -45,21 +49,23 @@ local function onFire(player: Player, target: any)
 	lastShot[player] = now
 
 	local origin: Vector3
-	if driving then
+	if car and driving then
 		Vehicles.aim(car, target)
 		origin = (car.chassis.CFrame * car.turretBase).Position + Vector3.new(0, 0.4, 0)
-	else
+	elseif seatPart then
 		origin = seatPart.Position + Vector3.new(0, 3, 0) -- leaning out of the window
+	else
+		origin = root.Position + Vector3.new(0, 1.5, 0) -- on foot, from the hand
 	end
 	local toTarget = target - origin
-	local direction = if toTarget.Magnitude > 1 then toTarget.Unit else car.chassis.CFrame.LookVector
+	local direction = if toTarget.Magnitude > 1 then toTarget.Unit else root.CFrame.LookVector
 	origin += direction * 2
 
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	local exclude: { Instance } = { car.model }
-	if player.Character then
-		table.insert(exclude, player.Character)
+	local exclude: { Instance } = { character :: Model }
+	if car then
+		table.insert(exclude, car.model)
 	end
 	params.FilterDescendantsInstances = exclude
 	params.CollisionGroup = "Bullet"
@@ -82,12 +88,19 @@ local function onFire(player: Player, target: any)
 				blast.Position = result.Position
 				blast.Parent = workspace
 				local killed = Zombies.damageArea(result.Position, stats.splash, stats.damage, player)
+				killed += BanditCars.damageArea(result.Position, stats.splash, stats.damage, player)
 				hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, killed > 0)
 			elseif zombie then
 				local crit = result.Instance.Name == "Head"
 				local damage = stats.damage * (if crit then Config.Horde.HeadshotMultiplier else 1)
 				local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40 })
 				hit:FireClient(player, result.Position, math.floor(damage + 0.5), crit, killed)
+			else
+				local banditCar = BanditCars.fromPart(result.Instance)
+				if banditCar then
+					local destroyed = BanditCars.damage(banditCar, stats.damage, player)
+					hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, destroyed)
+				end
 			end
 		end
 		tracer:FireAllClients(origin, finish, color, player.UserId)

@@ -16,6 +16,7 @@ local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
+local BanditCars = require(script.Parent.BanditCars)
 local PlayerData = require(script.Parent.PlayerData)
 
 local Tuning = Config.ItemTuning
@@ -95,6 +96,7 @@ local function molotov(player: Player, target: Vector3?): string?
 		local ends = os.clock() + Tuning.MolotovTime
 		while os.clock() < ends do
 			Zombies.damageArea(landing, radius, Tuning.MolotovDps * 0.5, player)
+			BanditCars.damageArea(landing, radius, Tuning.MolotovDps * 0.5, player)
 			task.wait(0.5)
 		end
 		patch:Destroy()
@@ -123,7 +125,9 @@ local function explodeMine(owner: Player, mine: Part)
 	blast.BlastRadius = Tuning.MineRadius
 	blast.Position = position
 	blast.Parent = workspace
-	Zombies.damageArea(position, Tuning.MineRadius, Tuning.MineDamage, if owner.Parent then owner else nil)
+	local by = if owner.Parent then owner else nil
+	Zombies.damageArea(position, Tuning.MineRadius, Tuning.MineDamage, by)
+	BanditCars.damageArea(position, Tuning.MineRadius, Tuning.MineDamage, by)
 end
 
 local function dropMine(player: Player): string?
@@ -151,6 +155,10 @@ local function dropMine(player: Player): string?
 				break
 			end
 			dot.Transparency = if dot.Transparency == 0 then 0.7 else 0
+			if os.clock() - born > 1 and BanditCars.near(at, Tuning.MineTrigger + 4) then
+				explodeMine(player, mine)
+				break
+			end
 			if os.clock() - born > 1 then
 				for _, z in Zombies.all() do
 					if not z.dead and (z.root.Position - at).Magnitude < Tuning.MineTrigger * z.def.scale then

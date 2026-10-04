@@ -1,5 +1,6 @@
 --!strict
--- The gun on the client. In any seat of a car (the driver fires the roof gun, a passenger out of the window) hold
+-- The gun on the client. On foot (the pistol in your hand) or in any seat of a car (the driver fires the roof gun,
+-- a passenger out of the window) hold
 -- the left mouse button to shoot where the mouse points, or hold FIRE (the round button, or F) to shoot the nearest
 -- zombie (the ones hanging on your car first). The server checks every shot (server/Gun.luau); here are the inputs,
 -- the tracers, the hit numbers and the money pop-ups.
@@ -165,6 +166,19 @@ local function autoTarget(from: Vector3, range: number): Vector3?
 			end
 		end
 	end
+	-- Bandit cars come first (after the zombies hanging on your car).
+	local cars = workspace:FindFirstChild("BanditCars")
+	if cars then
+		for _, model in cars:GetChildren() do
+			local chassis = if model:IsA("Model") then model.PrimaryPart else nil
+			if chassis and ((model:GetAttribute("Health") or 0) :: number) > 0 then
+				local distance = (chassis.Position - from).Magnitude
+				if distance <= range and distance - 300 < bestScore then
+					best, bestScore = chassis.Position + Vector3.new(0, 2, 0), distance - 300
+				end
+			end
+		end
+	end
 	return best
 end
 
@@ -190,10 +204,17 @@ local function step()
 	end
 	local car, driving = Drive.seatedCar()
 	local now = os.clock()
-	if not car or now < nextShot then
+	if now < nextShot then
 		return
 	end
-	local from = muzzle(car, driving)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not humanoid or not root or humanoid.Health <= 0 then
+		return
+	end
+	-- On foot: from the pistol in your hand.
+	local from = if car then muzzle(car, driving) else root.Position + Vector3.new(0, 1.5, 0) + root.CFrame.LookVector
 	if not from then
 		return
 	end
@@ -202,8 +223,8 @@ local function step()
 	if autoHeld then
 		target = autoTarget(from, stats.range)
 		if not target then
-			local chassis = car.PrimaryPart
-			target = if chassis then from + chassis.CFrame.LookVector * stats.range else nil
+			local forward = if car and car.PrimaryPart then car.PrimaryPart.CFrame.LookVector else root.CFrame.LookVector
+			target = from + forward * stats.range
 		end
 	else
 		target = mouseTarget(car)

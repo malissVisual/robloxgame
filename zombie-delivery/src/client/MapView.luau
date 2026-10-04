@@ -299,6 +299,38 @@ local function crateDot(parent: any): any
 	return dot
 end
 
+local function enemyDot(parent: any): any
+	local dot = Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(14, 14),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(220, 40, 40),
+		Text = "!",
+		TextScaled = true,
+		Font = Enum.Font.GothamBlack,
+		TextColor3 = Color3.new(1, 1, 1),
+		ZIndex = 19,
+	}, parent)
+	Ui.corner(dot, 7)
+	Ui.stroke(dot, Color3.new(0, 0, 0), 1.5)
+	return dot
+end
+
+-- The bandit cars chasing somebody (red "!").
+local function updateEnemies(canvas: Canvas, enemies: Pool)
+	local n = 0
+	local folder = workspace:FindFirstChild("BanditCars")
+	if folder then
+		for _, car in folder:GetChildren() do
+			local chassis = if car:IsA("Model") then car.PrimaryPart else nil
+			if chassis and ((car:GetAttribute("Health") or 0) :: number) > 0 then
+				n += 1
+				take(enemies, n).Position = point(chassis.Position.X, chassis.Position.Z, canvas.scale)
+			end
+		end
+	end
+	hideFrom(enemies, n + 1)
+end
+
 local function updateMarkers(canvas: Canvas, players: Pool, crates: Pool)
 	local n = 0
 	for _, other in Players:GetPlayers() do
@@ -342,6 +374,7 @@ local miniMe: any = nil
 local miniStar: any = nil
 local miniPlayers: Pool? = nil
 local miniCrates: Pool? = nil
+local miniEnemies: Pool? = nil
 
 -- ── The big map ────────────────────────────────────────────────────────────
 
@@ -351,6 +384,7 @@ local bigMe: any = nil
 local bigStar: any = nil
 local bigPlayers: Pool? = nil
 local bigCrates: Pool? = nil
+local bigEnemies: Pool? = nil
 
 function MapView.isOpen(): boolean
 	return big ~= nil and big.Visible
@@ -382,6 +416,9 @@ local function updateMini(position: Vector3, facing: Vector3)
 	if miniPlayers and miniCrates then
 		updateMarkers(canvas, miniPlayers, miniCrates)
 	end
+	if miniEnemies then
+		updateEnemies(canvas, miniEnemies)
+	end
 	-- The target: inside the view, or pinned to the edge.
 	if target then
 		local dx = (target.X - position.X) * canvas.scale
@@ -408,6 +445,9 @@ local function updateBig(position: Vector3, facing: Vector3)
 	if bigPlayers and bigCrates then
 		updateMarkers(canvas, bigPlayers, bigCrates)
 	end
+	if bigEnemies then
+		updateEnemies(canvas, bigEnemies)
+	end
 	if target then
 		bigStar.Position = point(target.X, target.Z, canvas.scale)
 		bigStar.Visible = true
@@ -431,6 +471,7 @@ function MapView.start(gui: any, scaleOf: (any) -> any)
 	miniCanvas = canvas
 	miniPlayers = pool(canvas.markers, playerDot)
 	miniCrates = pool(canvas.markers, crateDot)
+	miniEnemies = pool(canvas.markers, enemyDot)
 	miniMe = arrow(mini, 22, Color3.fromRGB(255, 255, 255))
 	miniMe.Position = UDim2.fromScale(0.5, 0.5)
 	miniStar = star(mini, 24)
@@ -468,7 +509,7 @@ function MapView.start(gui: any, scaleOf: (any) -> any)
 		Size = UDim2.new(1, -60, 0, 36),
 		Position = UDim2.fromOffset(12, 4),
 		BackgroundTransparency = 1,
-		Text = "MAP   ▲ you   ★ delivery   ? supply crate   📍 far places",
+		Text = "MAP   ▲ you   ★ delivery   ! bandit car   ? supply crate   📍 far places",
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextSize = 18,
 		Font = Enum.Font.GothamBlack,
@@ -487,6 +528,7 @@ function MapView.start(gui: any, scaleOf: (any) -> any)
 	bigCanvas = bc
 	bigPlayers = pool(bc.markers, playerDot)
 	bigCrates = pool(bc.markers, crateDot)
+	bigEnemies = pool(bc.markers, enemyDot)
 	bigMe = arrow(bc.markers, 22, Color3.fromRGB(255, 255, 255))
 	bigStar = star(bc.markers, 28)
 

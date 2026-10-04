@@ -22,6 +22,7 @@ local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
+local BanditCars = require(script.Parent.BanditCars)
 local PlayerData = require(script.Parent.PlayerData)
 
 type Stop = {
@@ -53,7 +54,9 @@ type Job = {
 	guards: boolean, -- the horde at the last stop was spawned
 	nextSpawn: number,
 	nextAmbush: number,
+	nextChase: number,
 	dirty: boolean, -- something changed, send it
+	stealNotice: number, -- when "they are stealing" was last said
 }
 
 local Jobs = {}
@@ -369,7 +372,9 @@ local function accept(player: Player, index: any)
 		guards = false,
 		nextSpawn = os.clock() + 3,
 		nextAmbush = os.clock() + 12,
+		nextChase = os.clock() + 20,
 		dirty = false,
+		stealNotice = 0,
 	}
 	Vehicles.setSpeedMultiplier(player, if offer.modifier then offer.modifier.speedMultiplier else 1)
 	send(player)
@@ -438,6 +443,52 @@ function Jobs.onKill(player: Player)
 	if job then
 		job.kills += 1
 		job.dirty = true
+	end
+end
+
+-- The company vehicle the job lent (CAR brings it back after a wreck), or nil for your own car.
+function Jobs.vehicleFor(player: Player): string?
+	local job = jobs[player]
+	local jobType = job and job.offer.jobType
+	return if jobType then jobType.vehicle else nil
+end
+
+local function loaded(job: Job): boolean
+	-- The cargo is on board once the pickup is done (an ice cream route starts loaded).
+	return job.offer.stops[job.stop].kind ~= "pickup"
+end
+
+local function loseCargo(player: Player, job: Job, share: number, reason: string)
+	job.condition = math.max(0, job.condition - share)
+	job.dirty = true
+	if job.condition <= 0 then
+		Jobs.fail(player, reason)
+	end
+end
+
+-- Bandits next to the car carry the cargo off, bit by bit.
+function Jobs.steal(player: Player, share: number)
+	local job = jobs[player]
+	if not job or not loaded(job) then
+		return
+	end
+	local now = os.clock()
+	if now - job.stealNotice > 4 then
+		job.stealNotice = now
+		notice:FireClient(player, "The bandits are stealing your cargo! Get away or shoot them!")
+	end
+	loseCargo(player, job, share, "The bandits stole all of your cargo!")
+end
+
+-- A wrecked car does not end the job: some cargo is lost, call a new car and keep going before the time runs out.
+function Jobs.onCarWrecked(player: Player)
+	local job = jobs[player]
+	if not job then
+		return
+	end
+	notice:FireClient(player, "Your car is wrecked! Press CAR and keep going, the clock is ticking.")
+	if loaded(job) then
+		loseCargo(player, job, Config.BanditCar.WreckCargoLoss, "Your car was wrecked and the cargo is ruined.")
 	end
 end
 
@@ -549,6 +600,12 @@ local function update(dt: number)
 			local room = math.floor(tier.maxZombies * multiplier) - Zombies.countFor(player)
 			if room > 0 then
 				Zombies.spawnAround(player, position, heading, math.min(room, tier.spawnCount), tier.kinds)
+			end
+		end
+		if tier.chaseEvery > 0 and now >= job.nextChase and not World.isSafe(position) then
+			job.nextChase = now + tier.chaseEvery / multiplier * rng:NextNumber(0.8, 1.2)
+			if BanditCars.countFor(player) < tier.chaseMax and BanditCars.chase(player, position, heading) then
+				notice:FireClient(player, "Bandits are on your tail! Shoot them or lose them!")
 			end
 		end
 		if tier.ambushEvery > 0 and now >= job.nextAmbush and not World.isSafe(position) then

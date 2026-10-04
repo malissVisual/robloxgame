@@ -818,7 +818,7 @@ RunService.RenderStepped:Connect(function()
 	end
 
 	local touch = UserInputService.TouchEnabled
-	fire.Visible = seatedIn ~= nil and touch
+	fire.Visible = touch
 	-- Which shop am I in?
 	local inShop: string? = nil
 	for id in Map.Shops do
@@ -844,7 +844,7 @@ RunService.RenderStepped:Connect(function()
 		hint.Text = "Press CAR to call your car"
 		hint.TextColor3 = C.dim
 	elseif not seatedIn then
-		hint.Text = "Walk to your car and press E to drive"
+		hint.Text = if touch then "On foot: FIRE to shoot · walk to your car and press E" else "On foot: hold left mouse to shoot · walk to your car and press E"
 		hint.TextColor3 = C.dim
 	else
 		hint.Text = ""

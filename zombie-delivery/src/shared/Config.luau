@@ -317,6 +317,37 @@ Config.Loot = {
 	Reach = 9,
 }
 
+-- The bandits' pickup: chases you along the roads, two gunners in the bed shoot at your car.
+Config.BanditCar = {
+	car = {
+		id = "banditpickup",
+		name = "Bandit Pickup",
+		price = 0,
+		style = "pickup",
+		maxSpeed = 70,
+		accel = 38,
+		turn = 2.1,
+		health = 280,
+		ramPower = 1,
+		color = { 22, 22, 26 },
+		description = "",
+		company = true,
+	} :: CarDef,
+	CatchUpSpeed = 84, -- far behind they put the foot down
+	Range = 95, -- the gunners shoot from this close
+	FireEvery = 0.8,
+	ShotDamage = 6,
+	Accuracy = 0.55,
+	SwipeDamage = 14, -- ramming you from the side
+	Reward = 75,
+	SpawnBehind = 190, -- studs behind you on the road
+	Lifetime = 150,
+	DespawnDistance = 520,
+	RamDamagePerSpeed = 2, -- you ramming it
+	StealPerSecond = 0.05, -- bandits next to your car carry off this share of the cargo every second
+	WreckCargoLoss = 0.25, -- a wrecked car loses this share of the cargo (the job goes on: call a new car)
+}
+
 export type ZombieDef = {
 	name: string,
 	health: number,
@@ -458,6 +489,8 @@ export type TierDef = {
 	modifierChance: number,
 	ambushEvery: number, -- seconds between bandit roadblocks ahead of you (0 = none)
 	ambushSize: number,
+	chaseEvery: number, -- seconds between bandit cars coming after you (0 = none)
+	chaseMax: number, -- bandit cars chasing you at once
 }
 
 export type ModifierDef = {
@@ -507,6 +540,8 @@ Config.Jobs = {
 			modifierChance = 0,
 			ambushEvery = 0,
 			ambushSize = 0,
+			chaseEvery = 0,
+			chaseMax = 0,
 		},
 		{
 			stars = 2,
@@ -523,6 +558,8 @@ Config.Jobs = {
 			modifierChance = 0.25,
 			ambushEvery = 45,
 			ambushSize = 3,
+			chaseEvery = 55,
+			chaseMax = 1,
 		},
 		{
 			stars = 3,
@@ -539,6 +576,8 @@ Config.Jobs = {
 			modifierChance = 0.5,
 			ambushEvery = 30,
 			ambushSize = 4,
+			chaseEvery = 38,
+			chaseMax = 1,
 		},
 		{
 			stars = 4,
@@ -555,6 +594,8 @@ Config.Jobs = {
 			modifierChance = 1,
 			ambushEvery = 22,
 			ambushSize = 5,
+			chaseEvery = 26,
+			chaseMax = 2,
 		},
 	} :: { TierDef },
 	Modifiers = {
