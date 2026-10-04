@@ -3,15 +3,18 @@
 --
 -- K or the CREW button (the Hud's own, in its button column: Hud.onCrew = CrewPanel.toggle) opens a window with:
 --   * what your crew does right now (the leader's job: its step, the clock, how far the stop is),
---   * your crew (the leader and the members, level and distance; the leader may take a member out),
+--   * your crew (the leader and the members, level and distance; the leader may KICK a member),
 --   * the pay split (Economy.crewSplit: the leader +15 % per member, each member half the pay, on top),
 --   * the invitations you got (ACCEPT / DECLINE, they run out after Config.Crew.InviteTimeout) and the ones you sent,
+--   * LOOKING FOR CREW (3.0, the CrewBoard remote): your own toggle and every player on the crew board (name, level,
+--     the mission they want, INVITE); MISSIONS' FIND CREW puts you on it for a co-op mission and opens this window,
 --   * every other player on the server (name, level, distance) with INVITE,
---   * LEAVE (the leader: break the crew up).
+--   * LEAVE (the leader: break the crew up). Crews outlive the jobs (3.0): play mission after mission together.
 -- Outside the window:
 --   * the number of invitations waiting on the CREW button (Hud.setBadge), which flashes when one comes,
 --   * an invitation card at the top (ACCEPT / DECLINE right there, or K for the panel),
---   * for a member: the leader's job at the top (like your own job panel, in the GPS purple), the GPS set to the
+--   * for a member: the leader's job at the top (like your own job panel, in the GPS purple; on a mission its
+--     number, name and twists), the GPS set to the
 --     leader's next stop (MapView.setWaypoint: the purple route on the minimap and the big map) and a purple beam
 --     over it in the world,
 --   * a small tag over your crewmates' heads.
@@ -29,6 +32,7 @@ local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
+local Missions = require(Shared.Missions)
 local Ui = require(script.Parent.Ui)
 local MapView = require(script.Parent.MapView)
 local Hud = require(script.Parent.Hud)
@@ -51,6 +55,10 @@ local ownJob = false -- a job of my own runs (the Job remote)
 
 local inviteRemote: RemoteEvent? = nil
 local answerRemote: RemoteEvent? = nil
+local boardRemote: RemoteEvent? = nil
+
+-- The crew board (server/Crew.luau boardList): who is looking for a crew, the newest first.
+local board: { any } = {}
 
 local gui: any = nil
 local window: any = nil
@@ -60,6 +68,7 @@ local stripTitle: any = nil
 local stripTimer: any = nil
 local stripStep: any = nil
 local stripInfo: any = nil
+local stripMission: any = nil -- the leader's mission: its twists, the crew, the defend countdown
 local card: any = nil -- an invitation (top centre)
 local cardTitle: any = nil
 local cardTimer: any = nil
@@ -170,6 +179,69 @@ local function stars(count: any): string
 	return if type(count) == "number" and count > 0 then string.rep("★", count) .. "  " else ""
 end
 
+-- ── Missions (3.0) ─────────────────────────────────────────────────────────
+
+-- The mission part of a job status (Jobs.crewStatus `mission`), or nil.
+local function missionOf(job: any): any
+	local mission = if type(job) == "table" then job.mission else nil
+	return if type(mission) == "table" and type(mission.id) == "string" then mission else nil
+end
+
+-- "🎯 MISSION 3/10 · Name".
+local function missionTitle(mission: any): string
+	local number = if type(mission.number) == "number" then `{mission.number}/10` else ""
+	return `🎯 MISSION {number}  ·  {tostring(mission.name or "?")}`
+end
+
+-- The twists (icon and name), the CO-OP badge and, while holding out, the countdown: one line.
+local function missionLine(mission: any, short: boolean?): string
+	local parts = {}
+	if type(mission.defendLeft) == "number" and mission.defendLeft > 0 then
+		table.insert(parts, `🛡 HOLD OUT {Ui.clock(mission.defendLeft)}`)
+	end
+	for _, id in (if type(mission.twists) == "table" then mission.twists else {}) do
+		local info = Config.Missions.Twists[id]
+		if info then
+			table.insert(parts, if short then info.icon else `{info.icon} {info.name}`)
+		end
+	end
+	if mission.coop == true then
+		table.insert(parts, "👥 CO-OP")
+	end
+	return if #parts > 0 then table.concat(parts, "  ·  ") else "no twists"
+end
+
+-- What a crew-board entry wants: "MISSION 3/10 · Name" (CO-OP), or any mission.
+local function wantText(item: any): string
+	if type(item.missionName) == "string" then
+		local campaign = if type(item.campaign) == "string" then Missions.findCampaign(item.campaign) else nil
+		local number = if type(item.number) == "number" then ` {item.number}/10` else ""
+		return `{if campaign then campaign.icon .. " " else ""}MISSION{number} · {item.missionName}{if item.coop then "  ·  CO-OP" else ""}`
+	end
+	return "any mission or job"
+end
+
+local function ago(since: any): string
+	local seconds = if type(since) == "number" then math.max(0, now() - since) else 0
+	return if seconds < 60 then "just now" else `{math.floor(seconds / 60)} min ago`
+end
+
+-- My entry on the crew board, or nil.
+local function myBoardEntry(): any
+	for _, item in board do
+		if type(item) == "table" and item.userId == player.UserId then
+			return item
+		end
+	end
+	return nil
+end
+
+local function lookFor(mission: string?)
+	if boardRemote then
+		boardRemote:FireServer(mission)
+	end
+end
+
 local function invite(userId: number)
 	if inviteRemote then
 		inviteRemote:FireServer(userId)
@@ -271,14 +343,15 @@ local function renderJob(myRole: string?)
 	local ownerName = if crew and type(crew.owner) == "table" then crew.owner.name else "The leader"
 	if not job then
 		if myRole == "member" then
-			note(`No job yet: {ownerName} takes one at the job board (J) or an employer, and you work on it together.`, C.text)
+			note(`No job yet: {ownerName} picks a mission (U), a job at the board (J) or an employer's, and you work on it together.`, C.text)
 		elseif myRole == "owner" then
-			note("Take a job (J, or an employer's WORK HERE board): your crew works on it with you.", C.text)
+			note("Pick a mission (U, the CO-OP ones are made for a crew) or take a job (J, or an employer's WORK HERE board): your crew works on it with you. The crew stays together after the job.", C.text)
 		end
 		return
 	end
-	local frame = row(84, GPS)
-	Ui.label(frame, `{stars(job.stars)}{tostring(job.name or "Job")}`, UDim2.new(1, -110, 0, 22), {
+	local mission = missionOf(job)
+	local frame = row(if mission then 106 else 84, GPS)
+	Ui.label(frame, if mission then missionTitle(mission) else `{stars(job.stars)}{tostring(job.name or "Job")}`, UDim2.new(1, -110, 0, 22), {
 		Position = UDim2.fromOffset(14, 6),
 		TextSize = 15,
 		TextColor3 = C.dim,
@@ -305,6 +378,16 @@ local function renderJob(myRole: string?)
 		Font = Enum.Font.GothamMedium,
 		TextColor3 = C.dim,
 	})
+	local twistLabel = if mission
+		then Ui.label(frame, "", UDim2.new(1, -28, 0, 18), {
+			Position = UDim2.fromOffset(14, 80),
+			TextSize = 14,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = C.yellow,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+		else nil
 	table.insert(live, function()
 		local left = if type(job.endsAt) == "number" then job.endsAt - now() else nil
 		timer.Text = if left then Ui.clock(left) else ""
@@ -312,6 +395,11 @@ local function renderJob(myRole: string?)
 		local position = if typeof(job.position) == "Vector3" then job.position else nil
 		info.Text = if myRole == "member" then `{meters(distanceTo(position))} to the stop  ·  the purple GPS route leads there`
 			else `{meters(distanceTo(position))} to the stop`
+		-- The newest state's mission (the defend countdown moves without a new render).
+		local fresh = missionOf(status())
+		if twistLabel and fresh then
+			twistLabel.Text = missionLine(fresh)
+		end
 	end)
 end
 
@@ -410,7 +498,7 @@ local function renderCrew(myRole: string)
 		refresh()
 		table.insert(live, refresh)
 		if canKick then
-			rowButton(frame, "REMOVE", C.red, true, 1, function()
+			rowButton(frame, "KICK", C.red, true, 1, function()
 				answer("kick", entry.userId)
 			end)
 		end
@@ -462,6 +550,85 @@ local function renderInvitations()
 	end
 end
 
+-- The INVITE button of another player (the players list and the crew board): its text and whether it works.
+local function inviteState(id: number, myRole: string?): (string, boolean)
+	if crewIds()[id] then
+		return "IN CREW", false
+	elseif myRole == "member" then
+		return "LEADER ONLY", false
+	end
+	for _, item in listOf("pending") do
+		if item.userId == id then
+			return "INVITED", false
+		end
+	end
+	for _, item in listOf("invites") do
+		if item.userId == id then
+			return "ASKED YOU", false
+		end
+	end
+	local max = if crew and type(crew.maxMembers) == "number" then crew.maxMembers else Config.Crew.MaxMembers
+	if #listOf("members") + #listOf("pending") >= max then
+		return "CREW FULL", false
+	end
+	return "INVITE", true
+end
+
+-- The crew board: my own toggle, then everybody looking for a crew (INVITE them).
+local function renderBoard(myRole: string?)
+	local others = {}
+	for _, item in board do
+		if type(item) == "table" and type(item.userId) == "number" and item.userId ~= player.UserId then
+			table.insert(others, item)
+		end
+	end
+	heading(`🔎 LOOKING FOR CREW{if #others > 0 then `  ·  {#others}` else ""}`)
+	-- Me.
+	local mine = myBoardEntry()
+	if myRole == nil then
+		local frame = row(56, if mine then C.yellow else nil)
+		if mine then
+			local sub = rowText(frame, "You are on the crew board", "", C.yellow, 1)
+			local function refresh()
+				sub.Text = `for {wantText(mine)}  ·  {ago(mine.since)}`
+			end
+			refresh()
+			table.insert(live, refresh)
+			rowButton(frame, "STOP", C.red, true, 1, function()
+				lookFor(nil)
+			end)
+		else
+			rowText(frame, "Looking for a crew?", "Go on the board: players see you and can invite you.", C.text, 1)
+			rowButton(frame, "LOOK", C.green, not ownJob, 1, function()
+				lookFor("any")
+			end)
+		end
+	end
+	if #others == 0 then
+		note(if myRole == "member" then "Nobody is looking for a crew right now." else "Nobody is looking for a crew right now. FIND CREW on a co-op mission (U) puts you on the board.")
+		return
+	end
+	for _, item in others do
+		local id: number = item.userId
+		local frame = row(56, if item.coop then GPS else nil)
+		local level = if type(item.level) == "number" then item.level else nil
+		local sub = rowText(frame, `🔎 {tostring(item.name)}`, "", C.text, 1)
+		local busy = item.busy == true
+		local function refresh()
+			sub.Text = `{levelText(level)}  ·  {wantText(item)}  ·  {if busy then "on a job" else ago(item.since)}`
+		end
+		refresh()
+		table.insert(live, refresh)
+		local text, enabled = inviteState(id, myRole)
+		if enabled and busy then
+			text, enabled = "ON A JOB", false
+		end
+		rowButton(frame, text, C.green, enabled, 1, function()
+			invite(id)
+		end)
+	end
+end
+
 -- Every other player on the server, the nearest first.
 local function renderPlayers(myRole: string?)
 	heading("PLAYERS ON THIS SERVER")
@@ -481,42 +648,27 @@ local function renderPlayers(myRole: string?)
 		note("Nobody else is here yet. Invite a friend to the game (Roblox menu → Invite Friends), then into your crew.")
 		return
 	end
-	local inCrew = crewIds()
-	local invited: { [number]: boolean } = {}
-	for _, item in listOf("pending") do
-		invited[item.userId] = true
+	local onBoard: { [number]: boolean } = {}
+	for _, item in board do
+		if type(item) == "table" and type(item.userId) == "number" then
+			onBoard[item.userId] = true
+		end
 	end
-	local invitedMe: { [number]: boolean } = {}
-	for _, item in listOf("invites") do
-		invitedMe[item.userId] = true
-	end
-	local max = if crew and type(crew.maxMembers) == "number" then crew.maxMembers else Config.Crew.MaxMembers
-	local taken = #listOf("members") + #listOf("pending")
 	for _, item in others do
 		local other: Player = item.player
 		local id = other.UserId
 		local frame = row(56)
 		local sub = rowText(frame, other.DisplayName, "", C.text, 1)
+		local looking = if onBoard[id] then "  ·  🔎 looking" else ""
 		local function refresh()
 			local distance = distanceToPlayer(other)
 			local near = distance ~= nil and distance <= Config.Crew.InviteRange
-			sub.Text = `{levelText(levelOf(other))}  ·  {meters(distance)}{if near then "  ·  nearby" else ""}`
+			sub.Text = `{levelText(levelOf(other))}  ·  {meters(distance)}{if near then "  ·  nearby" else ""}{looking}`
 			sub.TextColor3 = if near then C.green else C.dim
 		end
 		refresh()
 		table.insert(live, refresh)
-		local text, enabled = "INVITE", true
-		if inCrew[id] then
-			text, enabled = "IN CREW", false
-		elseif myRole == "member" then
-			text, enabled = "LEADER ONLY", false
-		elseif invited[id] then
-			text, enabled = "INVITED", false
-		elseif invitedMe[id] then
-			text, enabled = "ASKED YOU", false
-		elseif taken >= max then
-			text, enabled = "CREW FULL", false
-		end
+		local text, enabled = inviteState(id, myRole)
 		rowButton(frame, text, C.green, enabled, 1, function()
 			invite(id)
 		end)
@@ -537,7 +689,7 @@ local function render()
 	elseif myRole == "owner" then
 		note("You lead the crew: your members work on your job (they may carry the cargo, their kills count) and share the pay.", C.text)
 	else
-		note("Invite players into your job: they carry, shoot and ride along, and each gets a share of the pay. You can invite with or without a job.", C.text)
+		note("Invite players into your job: they carry, shoot and ride along, and each gets a share of the pay. You can invite with or without a job, and the crew stays together for the next one.", C.text)
 	end
 	renderJob(myRole)
 	if myRole then
@@ -549,6 +701,7 @@ local function render()
 	end
 	renderSplit(names, myRole == nil)
 	renderInvitations()
+	renderBoard(myRole)
 	renderPlayers(myRole)
 	if myRole then
 		local leave = Ui.button(body, if myRole == "owner" then "BREAK UP THE CREW" else "LEAVE THE CREW", UDim2.new(1, -10, 0, 44), C.red, function()
@@ -624,11 +777,17 @@ local function updateStrip()
 	if not job then
 		stripTitle.Text = `👥  CREW  ·  {string.upper(ownerName)}`
 		stripTimer.Text = ""
-		stripStep.Text = `Waiting for {ownerName} to take a job`
-		stripInfo.Text = "K: the crew panel"
+		stripStep.Text = `Waiting for {ownerName} to pick a mission or a job`
+		stripInfo.Text = "K: the crew panel  ·  U: the missions"
+		stripMission.Visible = false
 		return
 	end
-	stripTitle.Text = `👥  CREW  ·  {stars(job.stars)}{tostring(job.name or "")}`
+	local mission = missionOf(job)
+	stripTitle.Text = if mission then `👥  CREW  ·  {missionTitle(mission)}` else `👥  CREW  ·  {stars(job.stars)}{tostring(job.name or "")}`
+	stripMission.Visible = mission ~= nil
+	if mission then
+		stripMission.Text = missionLine(mission)
+	end
 	local left = if type(job.endsAt) == "number" then job.endsAt - now() else nil
 	stripTimer.Text = if left then Ui.clock(left) else ""
 	stripTimer.TextColor3 = if left and left < 15 then C.red else C.text
@@ -741,6 +900,8 @@ local function signature(state: any): string
 	if type(job) == "table" then
 		local p = job.position
 		add(job.name, job.step, job.stars, job.endsAt, if typeof(p) == "Vector3" then `{math.floor(p.X)},{math.floor(p.Z)}` else "")
+		local mission = missionOf(job)
+		add(if mission then mission.id else "")
 	end
 	local split = state.split
 	if type(split) == "table" then
@@ -754,6 +915,10 @@ local shown = ""
 -- A new CrewState: everything that shows it.
 local function apply(state: any)
 	crew = if type(state) == "table" then state else nil
+	-- The state carries the crew board too (the CrewBoard remote sends it on its own on every change).
+	if crew and type(crew.lfg) == "table" then
+		board = crew.lfg
+	end
 	updateBadge()
 	updateCard()
 	updateStrip()
@@ -837,6 +1002,15 @@ local function build()
 		Font = Enum.Font.GothamBlack,
 	})
 	stripInfo = Ui.label(strip, "", UDim2.new(1, 0, 0, 18), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
+	stripMission = Ui.label(strip, "", UDim2.new(1, 0, 0, 18), {
+		LayoutOrder = 4,
+		Visible = false,
+		TextColor3 = C.yellow,
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
 
 	-- The invitation card: in the crew slot too (shown only without a job of your own and without a crew).
 	card = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
@@ -917,6 +1091,14 @@ function CrewPanel.start()
 
 	inviteRemote = Net.get("CrewInvite")
 	answerRemote = Net.get("CrewAnswer")
+	boardRemote = Net.get("CrewBoard")
+	-- The crew board changed: the open window shows it.
+	Net.get("CrewBoard").OnClientEvent:Connect(function(list: any)
+		board = if type(list) == "table" then list else {}
+		if window.Visible then
+			render()
+		end
+	end)
 	local stateRemote = Net.get("CrewState")
 	stateRemote.OnClientEvent:Connect(apply)
 	-- An invitation: the card shows it with the next state (it comes with the invitation); the CREW button flashes.
@@ -994,6 +1176,18 @@ end
 
 function CrewPanel.close()
 	setOpen(false)
+end
+
+-- Opens the window (MISSIONS' FIND CREW: MissionsUi.onFindCrew, wired in Main).
+function CrewPanel.open()
+	if window and not window.Visible then
+		setOpen(true)
+	end
+end
+
+-- Puts me on the crew board for a mission ("any" = anything) or takes me off (nil): the server checks it.
+function CrewPanel.lookFor(mission: string?)
+	lookFor(mission)
 end
 
 -- Opens the window, or closes it when it is open (K, the Hud's CREW button through Hud.onCrew).
