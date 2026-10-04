@@ -75,6 +75,7 @@ local function sendState(player: Player)
 		rep = profile.rep,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
+		xp = profile.xp,
 	})
 end
 
@@ -136,6 +137,7 @@ safely("Admin", Admin.start)
 safely("DayNight", DayNight.start)
 safely("Traffic", Traffic.start)
 Crew.hasJob = Jobs.active
+Crew.statusOf = Jobs.crewStatus
 safely("Crew", Crew.start)
 safely("Ranking", Ranking.start)
 print("[Server] Zombie Delivery is running")

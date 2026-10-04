@@ -337,7 +337,7 @@ local function update(dt: number)
 		back = Vector3.new(lerp(0.8, 2.3, aimBlend), lerp(1.2, 0.5, aimBlend), lerp(11, 6.5, aimBlend) * zoom)
 	end
 	-- Only the world stops the camera, not things that move around (a horse on the rope right behind you too).
-	for _, name in { "LocalEffects", "DeliveryGuide", "Zombies", "Cars", "BanditCars", "Loot", "Effects", "Npcs", "Animals" } do
+	for _, name in { "LocalEffects", "DeliveryGuide", "Zombies", "Cars", "BanditCars", "Loot", "Effects", "Npcs", "Animals", "Traffic" } do
 		local thing = workspace:FindFirstChild(name)
 		if thing then
 			table.insert(exclude, thing)

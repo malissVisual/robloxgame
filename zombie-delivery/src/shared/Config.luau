@@ -1460,7 +1460,7 @@ Config.JobTypes = {
 		items = 3,
 		itemKind = "cash",
 		giver = "Mr. Gold, the bank manager",
-		receiver = "Captain Reyes",
+		receiver = "Sergeant Hayes",
 		banditBoost = 2,
 	},
 	{
@@ -1486,7 +1486,7 @@ Config.JobTypes = {
 		items = 1,
 		itemKind = "patient",
 		giver = "The patient's family",
-		receiver = "Dr. Novak",
+		receiver = "Nurse Ada",
 		timeLimit = 150,
 	},
 	{

@@ -213,9 +213,9 @@ local function setLights(car: Car, on: boolean)
 	end
 end
 
--- A civilian car out of Vehicles.buildNpc: the roof gun, the movers, the wheel colliders, the cargo marks and the
--- bandit passengers go; the driver gets ordinary clothes.
-local function civilian(npc: Vehicles.NpcCar): { SpotLight }
+-- A civilian car out of Vehicles.buildTraffic (no gun, a civilian driver): the movers and the leftover cargo marks
+-- go (it is stepped by CFrame), the headlight beams are collected; the old bandit leftovers are cleaned defensively.
+local function civilian(npc: Vehicles.TrafficCar): { SpotLight }
 	local model = npc.model
 	local gun = model:FindFirstChild("CarGun")
 	if gun then
@@ -292,7 +292,7 @@ local function spawnCar(g: TrafficLanes.Graph, edge: number, s: number): Car?
 	local piece = TrafficLanes.lane(g, edge)
 	local x, z, hx, hz = TrafficLanes.at(piece, s)
 	local ground = carFrame(x, z, hx, hz)
-	local ok, npc = pcall(Vehicles.buildNpc, def, ground)
+	local ok, npc = pcall(Vehicles.buildTraffic, def, ground)
 	if not ok then
 		warn(`[Traffic] no car: {npc}`)
 		return nil
