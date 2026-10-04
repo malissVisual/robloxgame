@@ -32,8 +32,8 @@ function Ui.corner(parent: Instance, radius: number?)
 	Ui.make("UICorner", { CornerRadius = UDim.new(0, radius or 10) }, parent)
 end
 
-function Ui.stroke(parent: Instance, color: Color3?, thickness: number?)
-	Ui.make("UIStroke", {
+function Ui.stroke(parent: Instance, color: Color3?, thickness: number?): any
+	return Ui.make("UIStroke", {
 		Color = color or Color3.new(0, 0, 0),
 		Thickness = thickness or 2,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
@@ -101,6 +101,24 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 	Ui.stroke(button, Color3.new(0, 0, 0), 2)
 	button.Activated:Connect(onClick)
 	return button
+end
+
+-- A small rounded tag that grows with its text (cargo counts, rewards).
+function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Color3?): any
+	local chip = Ui.make("TextLabel", {
+		Size = UDim2.new(0, 0, 1, 0),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundColor3 = color or Ui.Colors.panelLight,
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		Text = text,
+		TextColor3 = textColor or Ui.Colors.text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+	}, parent)
+	Ui.corner(chip, 6)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, chip)
+	return chip
 end
 
 function Ui.bar(parent: Instance, size: UDim2, color: Color3): (any, any)

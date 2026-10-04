@@ -1,14 +1,17 @@
 --!strict
 -- GTA-style aiming on a computer: the mouse is locked in the middle of the screen, the mouse moves the camera
--- (behind you on foot, behind the car when driving), a crosshair shows where the gun hits (red over an enemy).
+-- (behind you on foot, behind the car when driving), a dot in the middle shows where the gun hits (dim over nothing,
+-- white over an enemy, a pulse on a hit, red on a kill).
 -- On foot it plays like GTA: a calm walk (Shift sprints), the speed builds up and bleeds off (the body has weight),
 -- the character turns where it goes; aiming (right mouse) or shooting (left mouse) it slows to a careful step, turns
 -- to the crosshair and raises the gun (shots wait until it is up, client/ArmPose.luau; out of a sprint the body
 -- first slows down and the gun comes up slower), the camera moves in over the shoulder. When a window is open (map, shop, backpack, job
 -- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera.
+-- With cargo in your hands (the Carrying attribute, server/Cargo.luau) there is no aiming, no sprint and a slower step.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,6 +38,7 @@ local aimSince = 0 -- when the gun started going up (shots wait until it is up)
 local WALK_SPEED = 10
 local SPRINT_SPEED = 22
 local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
+local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
 -- The body has weight: the speed builds up and bleeds off instead of jumping (studs per second, per second).
 local SPEED_UP = 26
 local SLOW_DOWN = 38
@@ -54,7 +58,22 @@ end
 
 local supported = UserInputService.KeyboardEnabled and UserInputService.MouseEnabled
 
-local crosshair: any = nil
+-- ── The crosshair: one small dot ────────────────────────────────────────────
+-- Dim grey over nothing, white over an enemy (it fades between the two), a quick pulse on every hit, a short red
+-- tint on a kill (Shooting draws the X of a headshot on top).
+
+local DOT_SIZE = 6
+local DOT_IDLE = Color3.fromRGB(62, 64, 68)
+local DOT_ENEMY = Color3.new(1, 1, 1)
+local DOT_KILL = Color3.fromRGB(255, 64, 52)
+local RING_IDLE = Color3.fromRGB(215, 215, 215)
+
+local crosshair: Frame? = nil
+local dotScale: UIScale? = nil
+local dotStroke: UIStroke? = nil
+local enemyBlend = 0 -- 0 = nothing hostile under the dot, 1 = an enemy
+local pulse = 0 -- 1 right after a hit, fades fast
+local killTint = 0 -- 1 right after a kill, fades
 
 local function makeCrosshair()
 	local gui = Instance.new("ScreenGui")
@@ -63,43 +82,114 @@ local function makeCrosshair()
 	gui.IgnoreGuiInset = true
 	gui.DisplayOrder = 5
 	gui.Parent = player:WaitForChild("PlayerGui")
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.fromOffset(26, 26)
-	frame.Position = UDim2.fromScale(0.5, 0.5)
-	frame.AnchorPoint = Vector2.new(0.5, 0.5)
-	frame.BackgroundTransparency = 1
-	frame.Visible = false
-	frame.Parent = gui
-	local function bar(size: UDim2, position: UDim2)
-		local b = Instance.new("Frame")
-		b.Size = size
-		b.Position = position
-		b.AnchorPoint = Vector2.new(0.5, 0.5)
-		b.BackgroundColor3 = Color3.new(1, 1, 1)
-		b.BorderSizePixel = 0
-		b.Parent = frame
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = Color3.new(0, 0, 0)
-		stroke.Thickness = 1
-		stroke.Parent = b
-	end
-	bar(UDim2.fromOffset(2, 8), UDim2.new(0.5, 0, 0, 4))
-	bar(UDim2.fromOffset(2, 8), UDim2.new(0.5, 0, 1, -4))
-	bar(UDim2.fromOffset(8, 2), UDim2.new(0, 4, 0.5, 0))
-	bar(UDim2.fromOffset(8, 2), UDim2.new(1, -4, 0.5, 0))
-	bar(UDim2.fromOffset(3, 3), UDim2.fromScale(0.5, 0.5))
-	crosshair = frame
+	local dot = Instance.new("Frame")
+	dot.Name = "Dot"
+	dot.Size = UDim2.fromOffset(DOT_SIZE, DOT_SIZE)
+	dot.Position = UDim2.fromScale(0.5, 0.5)
+	dot.AnchorPoint = Vector2.new(0.5, 0.5)
+	dot.BackgroundColor3 = DOT_IDLE
+	dot.BackgroundTransparency = 0.25
+	dot.BorderSizePixel = 0
+	dot.Visible = false
+	dot.Parent = gui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = dot
+	-- A thin outline keeps the dot readable on a dark street and on a bright sky.
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = RING_IDLE
+	stroke.Thickness = 1
+	stroke.Transparency = 0.6
+	stroke.Parent = dot
+	local scale = Instance.new("UIScale")
+	scale.Parent = dot
+	crosshair = dot
+	dotScale = scale
+	dotStroke = stroke
 end
 
-local function setCrosshairColor(color: Color3)
-	if not crosshair then
-		return
+-- Shooting: one of your shots hit ("hit"), killed ("kill") or hit a head ("head").
+function CameraRig.hitFeedback(kind: string)
+	pulse = 1
+	if kind == "kill" or kind == "head" then
+		killTint = 1
 	end
-	for _, b in crosshair:GetChildren() do
-		if b:IsA("Frame") then
-			b.BackgroundColor3 = color
+end
+
+-- Is an enemy (a living zombie, bandit or bandit car) right under the dot?
+local enemyParams = RaycastParams.new()
+enemyParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function hostile(hit: Instance): boolean
+	local model: Instance? = hit:FindFirstAncestorOfClass("Model")
+	while model and model ~= workspace do
+		if model:GetAttribute("Zombie") ~= nil or model:GetAttribute("Bandit") ~= nil then
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				return humanoid.Health > 0
+			end
+			local health = model:GetAttribute("Health")
+			return type(health) ~= "number" or health > 0
+		end
+		local parent = model.Parent
+		model = if parent and parent:IsA("Model") then parent elseif parent then parent:FindFirstAncestorOfClass("Model") else nil
+	end
+	return false
+end
+
+local function enemyUnderCrosshair(camera: Camera, character: Model, car: Model?): boolean
+	local exclude: { Instance } = { character }
+	if car then
+		table.insert(exclude, car)
+	end
+	for _, name in { "LocalEffects", "DeliveryGuide" } do
+		local thing = workspace:FindFirstChild(name)
+		if thing then
+			table.insert(exclude, thing)
 		end
 	end
+	enemyParams.FilterDescendantsInstances = exclude
+	local viewport = camera.ViewportSize
+	local ray = camera:ViewportPointToRay(viewport.X / 2, viewport.Y / 2)
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 300, enemyParams)
+	return result ~= nil and hostile(result.Instance)
+end
+
+local function updateCrosshair(dt: number, show: boolean, over: boolean)
+	local dot = crosshair
+	if not dot then
+		return
+	end
+	dot.Visible = show
+	enemyBlend += ((if over and show then 1 else 0) - enemyBlend) * math.min(1, dt * 14)
+	pulse = math.max(0, pulse - dt * 6)
+	killTint = math.max(0, killTint - dt * 2.6)
+	if not show then
+		return
+	end
+	local hot = math.max(enemyBlend, killTint)
+	dot.BackgroundColor3 = DOT_IDLE:Lerp(DOT_ENEMY, enemyBlend):Lerp(DOT_KILL, killTint)
+	dot.BackgroundTransparency = 0.25 * (1 - hot)
+	local stroke = dotStroke
+	if stroke then
+		stroke.Color = RING_IDLE:Lerp(Color3.new(0, 0, 0), hot)
+		stroke.Transparency = 0.6 - 0.25 * hot
+	end
+	local scale = dotScale
+	if scale then
+		-- Pops out on the hit and settles back (eased).
+		scale.Scale = 1 + 0.9 * pulse * pulse + 0.15 * enemyBlend
+	end
+end
+
+-- What the local character holds in its hands (server/Cargo.luau sets the Carrying attribute), or nil.
+local function carryingOf(character: Model?): string?
+	local value = if character then character:GetAttribute("Carrying") else nil
+	return if type(value) == "string" and value ~= "" then value else nil
+end
+
+function CameraRig.carrying(): string?
+	return carryingOf(player.Character)
 end
 
 -- Is the mouse captured right now (aiming), or free (a window, Alt, Roblox's menu, typing)?
@@ -116,23 +206,6 @@ function CameraRig.setEnabled(on: boolean)
 			yaw = math.atan2(-look.X, -look.Z)
 		end
 	end
-end
-
-local function enemyUnderCrosshair(camera: Camera, exclude: { Instance }): boolean
-	local viewport = camera.ViewportSize
-	local ray = camera:ViewportPointToRay(viewport.X / 2, viewport.Y / 2)
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = exclude
-	local result = workspace:Raycast(ray.Origin, ray.Direction * 300, params)
-	if not result then
-		return false
-	end
-	local model = result.Instance:FindFirstAncestorOfClass("Model")
-	while model and model.Parent and model.Parent ~= workspace and not model:GetAttribute("Zombie") and not model:GetAttribute("Bandit") do
-		model = model.Parent:FindFirstAncestorOfClass("Model")
-	end
-	return model ~= nil and (model:GetAttribute("Zombie") ~= nil or model:GetAttribute("Bandit") ~= nil)
 end
 
 local wasActive = false
@@ -192,9 +265,7 @@ local function update(dt: number)
 			sendAiming(false)
 			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 			UserInputService.MouseIconEnabled = true
-			if crosshair then
-				crosshair.Visible = false
-			end
+			updateCrosshair(dt, false, false)
 		end
 		return
 	end
@@ -209,12 +280,11 @@ local function update(dt: number)
 	local locked = CameraRig.locked()
 	UserInputService.MouseBehavior = if locked then Enum.MouseBehavior.LockCenter else Enum.MouseBehavior.Default
 	UserInputService.MouseIconEnabled = not locked
-	if crosshair then
-		crosshair.Visible = locked
-	end
 
 	local car, driving = Drive.seatedCar()
 	local now = os.clock()
+	-- Cargo in the hands (on foot): the aim inputs do nothing.
+	local handsFull = car == nil and carryingOf(character) ~= nil
 	-- Aiming from a car (drive-by): right mouse held, any seat.
 	local carAim = locked and car ~= nil and rmbHeld and humanoid.Health > 0
 
@@ -232,7 +302,7 @@ local function update(dt: number)
 	end
 
 	-- Aiming: right mouse held, shooting, or a shot a moment ago (on foot only).
-	local wantAim = locked and not car and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
+	local wantAim = locked and not car and not handsFull and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
 	aimBlend = lerp(aimBlend, if wantAim or carAim then 1 else 0, math.min(1, dt * 10))
 	if wantAim and not aimingSent then
 		aimSince = now
@@ -242,7 +312,10 @@ local function update(dt: number)
 
 	-- On foot: walk, sprint with Shift, a careful step with the gun up (aiming or shooting).
 	if not car then
-		local target = if wantAim then AIM_WALK_SPEED elseif shiftHeld then SPRINT_SPEED else WALK_SPEED
+		local target = if wantAim then AIM_WALK_SPEED
+			elseif handsFull then CARRY_SPEED
+			elseif shiftHeld then SPRINT_SPEED
+			else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
 		humanoid.WalkSpeed = speed
@@ -263,8 +336,8 @@ local function update(dt: number)
 		-- Walking: behind, a little to the side. Aiming: close over the right shoulder.
 		back = Vector3.new(lerp(0.8, 2.3, aimBlend), lerp(1.2, 0.5, aimBlend), lerp(11, 6.5, aimBlend) * zoom)
 	end
-	-- Only the world stops the camera, not things that move around.
-	for _, name in { "LocalEffects", "DeliveryGuide", "Zombies", "Cars", "BanditCars", "Loot", "Effects" } do
+	-- Only the world stops the camera, not things that move around (a horse on the rope right behind you too).
+	for _, name in { "LocalEffects", "DeliveryGuide", "Zombies", "Cars", "BanditCars", "Loot", "Effects", "Npcs", "Animals" } do
 		local thing = workspace:FindFirstChild(name)
 		if thing then
 			table.insert(exclude, thing)
@@ -322,13 +395,33 @@ local function update(dt: number)
 		humanoid.AutoRotate = true
 	end
 
-	if locked then
-		setCrosshairColor(if enemyUnderCrosshair(camera, exclude) then Color3.fromRGB(255, 70, 60) else Color3.new(1, 1, 1))
-	end
+	local showDot = locked and not handsFull and humanoid.Health > 0
+	updateCrosshair(dt, showDot, showDot and enemyUnderCrosshair(camera, character, car))
+end
+
+-- Touch screens keep the Roblox camera and walk; only the slower step with cargo in the hands is set here.
+local function touchCarrySpeed()
+	local slowed = false
+	RunService.Heartbeat:Connect(function()
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if not humanoid then
+			return
+		end
+		local seated = humanoid.SeatPart ~= nil
+		if carryingOf(character) and not seated then
+			humanoid.WalkSpeed = CARRY_SPEED
+			slowed = true
+		elseif slowed then
+			slowed = false
+			humanoid.WalkSpeed = StarterPlayer.CharacterWalkSpeed
+		end
+	end)
 end
 
 function CameraRig.start()
 	if not supported then
+		touchCarrySpeed()
 		return
 	end
 	makeCrosshair()
