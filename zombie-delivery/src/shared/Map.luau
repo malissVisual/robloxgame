@@ -6,7 +6,9 @@
 --   Harbor     east, across the river (Rust Bridge, Old Bridge), docks on the sea
 --   Suburbs    south, little houses
 --   Highways   north to the Gas Station, through the mountain tunnel to the Military Base;
---              west to the Radio Station and the Old Farm
+--              west to the Radio Station and the Old Farm; the Ranch Road off the West Highway to Silver Spur Ranch
+--   Riverside  the Riverside Riding School by the river, down Riding School Lane from the Suburbs
+--   Harbor     the Harbor Fuel Depot south of the warehouses
 --
 -- A district is a grid: block (i, j) is centred at (ox + i × CELL, oz + j × CELL); the roads run between the blocks
 -- and around them (road k between block k and k + 1, centred at ox + (k + 0.5) × CELL).
@@ -160,6 +162,15 @@ Map.Yards = {
 	{ id = "docks", name = "Harbor Docks", x0 = 1601, z0 = -200, x1 = 1656, z1 = 200 },
 	{ id = "gas", name = "Gas Station", x0 = 92, z0 = -960, x1 = 200, z1 = -840 },
 	{ id = "lodge", name = "Ski Lodge", x0 = -780, z0 = -2320, x1 = -530, z1 = -2080 },
+	{ id = "ranch", name = "Silver Spur Ranch", x0 = -1010, z0 = 700, x1 = -790, z1 = 880 },
+	{ id = "stables", name = "Riverside Riding School", x0 = 580, z0 = 890, x1 = 745, z1 = 1060 },
+	{ id = "fueldepot", name = "Harbor Fuel Depot", x0 = 1290, z0 = 521, x1 = 1640, z1 = 720 },
+} :: { Area }
+
+-- Open ground next to the yards that must stay free of trees (the ranch paddock, the riding arena).
+Map.Clearings = {
+	{ id = "paddock", name = "Paddock", x0 = -1010, z0 = 880, x1 = -790, z1 = 1020 },
+	{ id = "arena", name = "Riding Arena", x0 = 585, z0 = 1060, x1 = 750, z1 = 1235 },
 } :: { Area }
 
 -- Named destinations (the far, crazy deliveries).
@@ -173,6 +184,9 @@ Map.Places = {
 	{ id = "school", name = "Sunny Hill School", x = 0, z = 900 + 2 * CELL - BLOCK / 2 - 6, nx = 0, nz = -1 },
 	{ id = "frosty", name = "Frosty's Ice Cream", x = 1080 + CELL - BLOCK / 2 - 6, z = 0, nx = -1, nz = 0 },
 	{ id = "movers", name = "Big Move Movers", x = 2 * CELL + BLOCK / 2 + 6, z = CELL, nx = 1, nz = 0 },
+	{ id = "ranch", name = "Silver Spur Ranch", x = -900, z = 740, nx = 0, nz = 0 },
+	{ id = "stables", name = "Riverside Riding School", x = 640, z = 972, nx = 0, nz = 0 },
+	{ id = "fueldepot", name = "Harbor Fuel Depot", x = 1440, z = 550, nx = 0, nz = 0 },
 } :: { Place }
 
 -- Where each employer's board stands (walk up to it to work for them).
@@ -183,8 +197,42 @@ Map.EmployerSpots = {
 	movers = { x = 2 * CELL + BLOCK / 2 - 8, z = CELL },
 	army = { x = 330, z = -2385 },
 	farm = { x = -1790, z = 560 },
+	ranch = { x = -930, z = 728 },
+	gas = { x = 188, z = -948 },
 } :: { [string]: { x: number, z: number } }
 Map.EmployerRadius = 40
+
+export type CargoSpot = {
+	park: { x: number, z: number }, -- where the vehicle stops (the circle)
+	pile: { x: number, z: number }, -- where the cargo stands / the receiver waits (on foot, 8 – 20 studs from park)
+	facing: { x: number, z: number }, -- the way the person at the pile faces (a unit direction: toward the park)
+}
+
+-- Where the special jobs load and unload (server/Cargo.luau): park in the circle, carry the cargo between the pile
+-- and the back of the vehicle. Ordinary addresses have no spot (the park is the address, the pile 12 studs in).
+local cargoSpots: { [string]: CargoSpot } = {}
+local rawSpots: { [string]: { park: { number }, pile: { number } } } = {
+	docks = { park = { 1622, -12 }, pile = { 1636, -4 } }, -- by the cranes, ammo pallets behind
+	frosty = { park = { 1162, 16 }, pile = { 1177, 20 } }, -- on the sidewalk next to the shop door
+	farm = { park = { -1850, 490 }, pile = { -1862, 480 } }, -- the produce stand by the barn
+	ranch = { park = { -858, 800 }, pile = { -842, 806 } }, -- in front of the stable
+	stables = { park = { 650, 960 }, pile = { 662, 948 } }, -- in front of the riding school stable
+	fueldepot = { park = { 1436, 565 }, pile = { 1452, 574 } }, -- under the loading shed
+	gas = { park = { 150, -945 }, pile = { 165, -936 } }, -- the tank filler by the shop
+	base = { park = { 282, -2420 }, pile = { 268, -2430 } }, -- the ammo bunker inside the gate
+	lodge = { park = { -684, -2208 }, pile = { -699, -2200 } }, -- at the lodge door
+	school = { park = { 14, 1124 }, pile = { 20, 1140 } }, -- the school gate
+}
+for id, spot in rawSpots do
+	local dx, dz = spot.park[1] - spot.pile[1], spot.park[2] - spot.pile[2]
+	local length = math.sqrt(dx * dx + dz * dz)
+	cargoSpots[id] = {
+		park = { x = spot.park[1], z = spot.park[2] },
+		pile = { x = spot.pile[1], z = spot.pile[2] },
+		facing = { x = dx / length, z = dz / length },
+	}
+end
+Map.CargoSpots = cargoSpots
 
 export type Landmark = { id: string, name: string, icon: string, x: number, z: number, kind: string, description: string }
 
@@ -196,13 +244,36 @@ local landmarks: { Landmark } = {
 	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, free repairs." },
 	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Repair kits, medkits, nitro, molotovs, mines." },
 }
+-- Where each employer is, in a few words (the map's list).
+local EMPLOYER_WHERE: { [string]: string } = {
+	school = "In the Suburbs.",
+	army = "North, through the Mount Rot tunnel.",
+	icecream = "In the Harbor.",
+	movers = "Downtown.",
+	farm = "At the end of the West Highway.",
+	ranch = "Off the West Highway, down the Ranch Road.",
+	gas = "On the North Highway.",
+}
 for _, employer in Config.Employers do
 	local spot = Map.EmployerSpots[employer.id]
-	local reward = ""
+	local reward = employer.reward
 	for _, car in Config.Cars do
 		if car.id == employer.reward then
 			reward = car.name
 		end
+	end
+	local gun: string? = nil
+	for _, weapon in Config.Weapons do
+		if employer.weapon and weapon.id == employer.weapon then
+			gun = weapon.name
+		end
+	end
+	local where = EMPLOYER_WHERE[employer.id]
+	local text = `{if where then where .. " " else ""}Work for {employer.person}.`
+	if gun and employer.weaponAt then
+		text ..= ` After {employer.weaponAt} jobs you earn the {gun}, after {employer.needed} the {reward} is yours.`
+	else
+		text ..= ` After {employer.needed} jobs the {reward} is yours.`
 	end
 	if spot then
 		table.insert(landmarks, {
@@ -212,15 +283,17 @@ for _, employer in Config.Employers do
 			x = spot.x,
 			z = spot.z,
 			kind = "employer",
-			description = `Work here. After {employer.needed} jobs the {reward} is yours.`,
+			description = text,
 		})
 	end
 end
+-- The far places that are not an employer's (the Gas Station and the Old Farm are listed as employers).
 for _, info in {
 	{ "lodge", "⛷️", "Far north, across the frozen lake." },
-	{ "gas", "⛽", "On the North Highway." },
 	{ "radio", "📡", "At the end of the Radio Road." },
-	{ "docks", "⚓", "The harbor, on the sea." },
+	{ "docks", "⚓", "The harbor, on the sea. Army ammo is loaded here." },
+	{ "stables", "🐎", "By the river, down Riding School Lane from the Suburbs. The ranch horses go here." },
+	{ "fueldepot", "🛢️", "South of the Harbor. Fuel barrels for the Gas Station." },
 } do
 	for _, place in Map.Places do
 		if place.id == info[1] then
@@ -259,6 +332,9 @@ line({ { -downtownEdge, 1.5 * CELL }, { -1100, 1.5 * CELL }, { -1400, 520 }, { -
 line({ { -1100, 1.5 * CELL }, { -1100, -460 } }, HIGHWAY, "highway", "Radio Road")
 line({ { 300 - HIGHWAY / 2, -2200 }, { Map.Lake.x1, -2200 } }, HIGHWAY, "highway", "Lodge Road")
 line({ { Map.Lake.x1, -2200 }, { -530, -2200 } }, HIGHWAY, "ice", "Ice Road")
+-- Country roads: they start on another road's centre line (a T-junction) and end at their yard.
+line({ { -900, 1.5 * CELL }, { -900, 700 } }, ROAD, "street", "Ranch Road")
+line({ { 2.5 * CELL, 900 + 0.5 * CELL }, { 580, 900 + 0.5 * CELL } }, ROAD, "street", "Riding School Lane")
 
 Map.Connectors = connectors
 
