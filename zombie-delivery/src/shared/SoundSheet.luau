@@ -5,8 +5,8 @@
 
 local SoundSheet = {}
 
-SoundSheet.SfxId = "" -- "rbxassetid://…" of art/audio/sfx.ogg
-SoundSheet.MusicId = "" -- "rbxassetid://…" of art/audio/music.ogg
+SoundSheet.SfxId = "rbxassetid://108821829330157" -- "rbxassetid://…" of art/audio/sfx.ogg
+SoundSheet.MusicId = "rbxassetid://71392718953355" -- "rbxassetid://…" of art/audio/music.ogg
 
 SoundSheet.Sfx = {
 	gun_light = { 0.0, 0.349977 },
