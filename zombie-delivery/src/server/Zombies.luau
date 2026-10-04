@@ -76,8 +76,9 @@ Zombies.onKill = function(_player: Player, _zombie: Zombie) end
 Zombies.onCarDamaged = function(_player: Player, _amount: number) end
 Zombies.onSteal = function(_player: Player, _share: number) end
 -- 3.1: how a kill happened, for the challenges' counters (server/Challenges.luau; Main wires it). cause = "gun" (a
--- direct hit), "car" (run over), "splash" (a blast or a fire) or "other" (it just died, e.g. its humanoid).
-export type KillInfo = { kind: string, bandit: boolean, headshot: boolean, cause: string }
+-- direct hit), "car" (run over), "splash" (a blast or a fire) or "other" (it just died, e.g. its humanoid); from = what
+-- fired from a car seat (server/Gun.luau: "cargun" the roof gun, "window" a passenger's gun; nil = anything else).
+export type KillInfo = { kind: string, bandit: boolean, headshot: boolean, cause: string, from: string? }
 Zombies.onKillInfo = nil :: ((player: Player, info: KillInfo) -> ())?
 -- Do the people (ZombieDef.jobOnly: bandits, gunners, soldiers) go after this player? Main: on a job or riding in
 -- one's crew (Jobs.involved); Admin adds the players who called enemies. Zombies go after everybody.
@@ -481,9 +482,9 @@ local function remove(z: Zombie)
 	end
 end
 
--- killer = nil: no reward (despawn, the safe zone). push = velocity for the flying parts. cause and headshot: how
--- (Zombies.onKillInfo).
-local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, headshot: boolean?)
+-- killer = nil: no reward (despawn, the safe zone). push = velocity for the flying parts. cause, headshot and from:
+-- how (Zombies.onKillInfo).
+local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, headshot: boolean?, from: string?)
 	if z.dead then
 		return
 	end
@@ -516,6 +517,7 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 				bandit = z.def.ranged == true,
 				headshot = headshot == true,
 				cause = cause or "other",
+				from = from,
 			})
 		end
 	end
@@ -524,8 +526,9 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 	end)
 end
 
--- cause (3.1): "car" (run over), "splash" (a blast or a fire); nil = a gun's hit.
-export type HitInfo = { crit: boolean?, push: Vector3?, cause: string? }
+-- cause (3.1): "car" (run over), "splash" (a blast or a fire); nil = a gun's hit. from (3.1): the gun fired from a car
+-- seat ("cargun", "window"; Zombies.KillInfo).
+export type HitInfo = { crit: boolean?, push: Vector3?, cause: string?, from: string? }
 
 -- Returns true when the hit killed it.
 function Zombies.damage(z: Zombie, amount: number, by: Player?, info: HitInfo?): boolean
@@ -538,7 +541,7 @@ function Zombies.damage(z: Zombie, amount: number, by: Player?, info: HitInfo?):
 	end
 	local health = z.humanoid.Health - amount
 	if health <= 0 then
-		kill(z, by, info and info.push, if info then info.cause or "gun" else "gun", info ~= nil and info.crit == true)
+		kill(z, by, info and info.push, if info then info.cause or "gun" else "gun", info ~= nil and info.crit == true, info and info.from)
 		return true
 	end
 	z.humanoid.Health = health
@@ -1217,8 +1220,9 @@ local function step()
 	end
 end
 
--- A blast or a fire: damage everything in the radius (less at the edge). Returns the number killed.
-function Zombies.damageArea(center: Vector3, radius: number, damage: number, by: Player?): number
+-- A blast or a fire: damage everything in the radius (less at the edge). Returns the number killed. from: a car gun's
+-- blast ("cargun", server/Gun.luau; HitInfo.from).
+function Zombies.damageArea(center: Vector3, radius: number, damage: number, by: Player?, from: string?): number
 	local killed = 0
 	for _, z in table.clone(zombies) do
 		if z.dead then
@@ -1229,7 +1233,7 @@ function Zombies.damageArea(center: Vector3, radius: number, damage: number, by:
 		if distance <= radius then
 			local share = 1 - 0.5 * distance / radius
 			local push = if distance > 0.1 then offset.Unit * 40 + Vector3.new(0, 30, 0) else Vector3.new(0, 40, 0)
-			if Zombies.damage(z, damage * share, by, { push = push, cause = "splash" }) then
+			if Zombies.damage(z, damage * share, by, { push = push, cause = "splash", from = from }) then
 				killed += 1
 			end
 		end

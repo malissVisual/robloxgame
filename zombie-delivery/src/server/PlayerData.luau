@@ -43,6 +43,7 @@ export type Profile = {
 	secrets: { [string]: boolean }, -- secret packages found (Map.Secrets ids)
 	challenges: { [string]: boolean }, -- challenges done (their reward paid)
 	titles: { [string]: boolean }, -- titles earned
+	rewards: { [string]: boolean }, -- Config.Rewards given (a campaign id, "secrets", "challenges"): each once
 	title: string?, -- the title shown over your head and on the leaderboard (an earned one)
 	deliveries: number,
 	kills: number,
@@ -87,6 +88,7 @@ local function newProfile(): Profile
 		secrets = {},
 		challenges = {},
 		titles = {},
+		rewards = {},
 		title = nil,
 		deliveries = 0,
 		kills = 0,
@@ -178,8 +180,8 @@ local function applyMissions(profile: Profile, saved: { [any]: any })
 end
 
 -- The challenges' counters (only Challenges.Counters, whole numbers ≥ 0), the places visited, the secrets found, the
--- challenges done, the titles earned and the one shown. Saves from before 3.1 have none. Ids are only kept when
--- they are short strings (the lists they come from are checked by server/Challenges.luau when it reads them).
+-- challenges done, the titles earned, the rewards given and the title shown. Saves from before 3.1 have none. Ids are
+-- only kept when they are short strings (the lists they come from are checked by server/Challenges.luau).
 local function applyChallenges(profile: Profile, saved: { [any]: any })
 	if type(saved.stats) == "table" then
 		for _, name in Challenges.Counters do
@@ -189,7 +191,7 @@ local function applyChallenges(profile: Profile, saved: { [any]: any })
 			end
 		end
 	end
-	for _, key in { "visited", "secrets", "challenges", "titles" } do
+	for _, key in { "visited", "secrets", "challenges", "titles", "rewards" } do
 		local list = saved[key]
 		if type(list) == "table" then
 			local into = (profile :: any)[key] :: { [string]: boolean }
@@ -394,6 +396,7 @@ function PlayerData.save(player: Player)
 		secrets = profile.secrets,
 		challenges = profile.challenges,
 		titles = profile.titles,
+		rewards = profile.rewards,
 		title = profile.title,
 		deliveries = profile.deliveries,
 		kills = profile.kills,

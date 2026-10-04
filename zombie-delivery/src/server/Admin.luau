@@ -38,9 +38,12 @@
 --   challengesAll             3.1: every challenge done (its money and title), every campaign's reward and the last
 --                             one (Dead End) (server/Challenges.luau)
 --   secretsAll                every lost package found (no money each) and their reward (Phantom)
---   challengesReset           the challenges' stats, secrets, places, titles cleared, the exclusive guns and paints
---                             taken back (the campaigns stay done: their rewards come back on the next join)
---   title      name           that title given and shown over your head ("none": no title shown)
+--   challengesReset           the challenges' stats, secrets, places, titles and rewards cleared, the exclusive guns
+--                             and paints taken back; the challenges the profile still reaches (kills, level,
+--                             missions ...) stay done without money (the campaigns stay done: their rewards come back
+--                             on the next join)
+--   title      name           that title given and shown over your head ("none": no title shown); a reward's title
+--                             comes without its reward
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -534,8 +537,8 @@ local function secretsAll(player: Player)
 end
 
 local function challengesReset(player: Player)
-	Challenges.adminReset(player)
-	say(player, "ADMIN: challenges, stats, secrets, places and titles cleared, exclusive guns and paints taken back.")
+	local kept = Challenges.adminReset(player)
+	say(player, `ADMIN: challenges, stats, secrets, places, titles and rewards cleared, exclusive guns and paints taken back. {kept} challenges your progress still reaches stay done (no money).`)
 end
 
 local function setTitle(player: Player, arg: any)

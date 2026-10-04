@@ -49,8 +49,8 @@
 -- the crew who are there at the finish.
 --
 -- 3.1, the challenges (server/Challenges.luau): Jobs.onStat (wired in Main) hears the waves that came, a HOLD OUT won,
--- the pieces delivered (and the people boarded, the horses) for the owner and the crew, and at a mission's finish
--- co-op, night, 3 stars, a rush and a NO SHOOTING mission without a shot for who was there.
+-- the pieces delivered (and the people boarded, the horses) for the owner and the crew with them, and at a mission's
+-- finish co-op, night, 3 stars, a rush and a NO SHOOTING mission without a shot for who was there.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -729,14 +729,6 @@ local function stat(player: Player, name: string, amount: number)
 	end
 end
 
--- The same stat for the owner and everybody paid with them (crewOf).
-local function statCrew(owner: Player, job: Job, name: string, amount: number)
-	stat(owner, name, amount)
-	for _, member in crewOf(job, owner) do
-		stat(member, name, amount)
-	end
-end
-
 -- Is `who` with the owner: in the owner's car, or within Config.Crew.RiderRange of them (on foot or in a car of their
 -- own following along)?
 local function withOwner(owner: Player, who: Player): boolean
@@ -746,6 +738,17 @@ local function withOwner(owner: Player, who: Player): boolean
 	end
 	local a, b = playerPosition(owner), playerPosition(who)
 	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude <= Config.Crew.RiderRange
+end
+
+-- The same stat for the owner and the crew who are with them now (crewOf, withOwner: like the finish's `present`, not
+-- who stayed home).
+local function statCrew(owner: Player, job: Job, name: string, amount: number)
+	stat(owner, name, amount)
+	for _, member in crewOf(job, owner) do
+		if withOwner(owner, member) then
+			stat(member, name, amount)
+		end
+	end
 end
 
 -- Who rode along stays on the job only while they are with it (withOwner): not on a job of their own or in another

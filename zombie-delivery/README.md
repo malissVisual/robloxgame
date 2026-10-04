@@ -13,7 +13,11 @@ Version 3.0 is about **missions and co-op**: **100 story missions** in 10 campai
 briefing and a debrief, rated 1 – 3 stars and spiced with **twists** (hold out at the drop, no shooting, a horde at
 every stop …); the co-op ones pay more and get harder with every crew mate. **Crews now stay together** from one
 mission to the next, a crew board finds you mates, and 15 new places (an airfield, a prison, a lighthouse, a power
-plant …) wait at the end of new roads (see **Missions**).
+plant …) wait at the end of new roads (see **Missions**). Version 3.0.1 made the **night readable** (a brighter moon,
+the town glowing back, your own soft light). Version 3.1 gives every place and every mission **a reason to keep
+playing**: **42 challenges**, **30 lost packages** hidden at the places, and rewards nobody can buy: every campaign
+gives a **title** and an **exclusive gun or paint**, every package found the Phantom paint, and every challenge done
+**Dead End**, the gun nobody else has (see **Challenges, secrets and rewards**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -46,13 +50,14 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | Jobs / map / backpack | J / M / B | the buttons |
-| Missions (the campaigns, START, the stars) | U | MISSIONS button |
+| Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS button |
 | Crew panel (invite / accept / leave / kick, the crew board) | K | CREW button |
 | Leaderboard | L | TOP button |
 | Get in your car / ride in a friend's car | E / R | the prompt |
 | Get out | Space | jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
 | Put down / Let go (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | the prompt |
+| Open a lost package (3.1) | hold E | the prompt |
 | Real estate list (every property, buy, sell, set your home, GPS) | H | ESTATE button |
 | View a property's listing (at its FOR SALE sign) | E | the prompt |
 | Run your company (at your office's computer: hire, upgrades, collect the safe) | E | the prompt |
@@ -176,7 +181,10 @@ money earned, best first, the ones out on a job tagged.
 **Day and night.** The clock runs: a whole day takes 16 minutes (`Config.DayNight`, the server starts at 09:00).
 Night is from 18:15 to 06:15, lined up with the Roblox sun: the sky goes dark (the look fades in over dusk and out
 over dawn), the **street lamps**, the lit windows and every car's **headlights** come on. At night the jobs pay
-× 1.4, the waves are × 1.5 bigger and × 1.6 as many zombies roam (smoothly in between at dusk and dawn).
+× 1.4, the waves are × 1.5 bigger and × 1.6 as many zombies roam (smoothly in between at dusk and dawn). Since
+3.0.1 the night is dark but **readable** (`client/Weather.luau`): a brighter moon and night ambient with less haze; in
+town the streets **glow back** (a warm haze and more light near the districts); you carry **your own soft light** (on
+your client only), so a zombie is never hidden in the black; and the street lamps light a wider, brighter pool.
 
 ## Missions
 
@@ -230,6 +238,81 @@ dark.
 * During a mission a **banner** in the HUD's top stack shows "MISSION 3/10 · Name", the twists, the crew count and
   the HOLD OUT countdown; the crew members' strip shows it too.
 * The leaderboard (L) has a **STARS** column (ties on the level go to the stars).
+
+## Challenges, secrets and rewards
+
+Version 3.1 (`shared/Challenges.luau`, `server/Challenges.luau`, `Config.Rewards`). Everything is saved, and every
+reward is given **once** (the save marks it given).
+
+**Campaign rewards.** Finishing all ten missions of a campaign still pays its money (see **Missions**), and now also
+gives a **title** and an **exclusive gun or paint** (`Config.Rewards.Campaigns`). Campaigns finished before 3.1 give
+theirs on the next join.
+
+| Campaign | Exclusive reward | Title |
+|---|---|---|
+| 📦 First Shift | Dispatch Yellow paint (metal) | Dispatcher's Favourite |
+| 🏥 Code Red | Medic Mint paint | Field Medic |
+| 🛒 Empty Shelves | Fresh Lime paint | Grocery Hero |
+| 🚒 Smoke and Sirens | Fire Engine paint (metal) | Smoke Eater |
+| 🪖 Iron Supply | **Reyes' Carbine** (gun) | Quartermaster |
+| ⚡ Lights Out | Volt Neon paint (neon) | Live Wire |
+| 🐴 Wild West End | **Walt's Lever Rifle** (gun, a round hits 2 in a row) | Outlaw Tamer |
+| 🧪 Patient Zero | Toxic Glow paint (neon) | Cure Runner |
+| 💰 Dirty Money | **Vinnie's Golden Pistol** (gun, one-handed) | Made Man |
+| 🚌 Last Convoy | Sunrise Chrome paint (foil) | Last Convoy Captain |
+
+**The lost packages.** A worn cardboard box with tape, a faint glow and a "?" seen within 25 studs is hidden at every
+one of the 29 places, plus one more up on the stadium stands: **30** in all (`Map.Secrets`, built by
+`server/World.luau`). They are hidden but fair: behind a building or a stand, under a bench or a table, between parked
+things, up on a platform you can climb; never in the water or inside a wall. Walk up and hold E (**Open**): **$300** each
+(`Config.Rewards.SecretMoney`) and a popup "LOST PACKAGE 12/30". A package you found disappears **for you only**
+(`client/Secrets.luau`); the ones you have not found bob, sway and sparkle a little when you come close. The server
+checks that you stand next to the package, level with it. **All 30** give the **Phantom** paint (glass), the title
+**Treasure Hunter** and **$25,000**. The places count too: the first visit to each (within 70 studs of its point)
+shows "NEW PLACE DISCOVERED: Old Airfield (12/29)".
+
+**The challenges.** 42 goals in six categories, from minutes to the long game; each pays **$200 – $20,000**, 11 also
+give a title, and 4 are **hidden** (??? until done):
+
+| Category | Challenges (goal · money · title) |
+|---|---|
+| ⚔️ Combat | First Blood (10 kills · $200), Sharpshooter (25 headshots · $500), The Bigger They Are (10 brutes · $800), Bandit Bounty (25 bandits on foot · $1,500), Demolition Crew (50 explosion kills · $1,500), Horde Breaker (500 kills · $2,000), Headhunter (250 headshots · $4,000 · Headhunter), Giant Slayer (100 brutes · $6,000 · Giant Slayer), The Undertaker (5,000 kills · $15,000 · The Undertaker) |
+| 🚗 Driving | Sunday Driver (25,000 studs · $300), Speed Bump (run over 50 · $600), Highway Patrol (10 bandit cars · $2,000), Mounted Mayhem (100 car gun kills · $2,500), Long Haul (250,000 studs · $3,000), Road Warrior (1,000,000 studs · $12,000 · Road Warrior) |
+| 🎯 Missions | On the Clock (5 missions · $500), Story Time (1 campaign · $1,000), Night Shift (15 at night · $2,000), Hold the Line (10 HOLD OUT won · $2,000), Wave Rider (100 waves · $2,000), Trusted Courier (25 missions · $2,500), Flawless (25 at 3 stars · $2,500), Star Collector (100 stars · $3,000), Top of the Ladder (level 15 · $10,000), Legendary Courier (all 100 missions · $15,000 · Legendary Courier), Saviour of the City (all 10 campaigns · $20,000), Three-Star General (all 300 stars · $20,000 · Three-Star General); hidden: Ghost Courier (a NO SHOOTING mission without a shot · $2,000 · The Ghost), Horse Whisperer (25 horses · $2,500 · Horse Whisperer), Against the Clock (10 timed missions · $3,000) |
+| 🧭 Explorer | Sightseer (5 places · $300), Lost and Found (1 package · $300), Package Sniffer (10 packages · $2,500), Cartographer (all 29 places · $5,000 · Cartographer), Every Last Box (all 30 packages · $10,000) |
+| 🤝 Co-op | Better Together (1 mission with a crew mate · $300), Riding Shotgun (50 kills from a passenger seat · $1,500), Crew Chief (25 missions with a crew mate · $4,000 · Crew Chief) |
+| 💰 Wealth | First Paycheck (earn $10,000 · $300), Home Sweet Home (1 property · $1,000), Car Collector (5 cars · $2,000); hidden: Millionaire (earn $1,000,000 · $10,000 · Millionaire) |
+
+How they count (`Challenges.Counters` in the save, the rest read from the profile): a **car gun kill** is a kill by
+the roof gun, a **passenger seat kill** one by a passenger's gun out of the window (a mine or a fire is neither, and
+a blast is an explosion kill); the distance is driven as the driver (a teleport does not count); the waves, HOLD OUT
+wins, pieces, horses and passengers count for the job's owner and the crew **with them** (in the car or within
+`Config.Crew.RiderRange`), and a mission's finish (co-op, night, 3 stars, timed, NO SHOOTING without a shot) for who
+was there. The server checks them after every change (at most twice a second, everybody every 5 s) and pays at once.
+
+**Dead End.** Finish **every** challenge and you get **Dead End** (`Config.Rewards.Challenges`): a black and purple
+rifle with neon strips and a glow, purple tracers, 64 damage, and rounds that **go through 3 more** enemies (zombies
+or bandit cars, each taking the full damage). Nobody can buy it; the shop shows it as "??? · a secret reward". It
+comes with the title **The Last Courier** and **$50,000**.
+
+**Titles.** Every title you earn (the challenges', the campaigns', Treasure Hunter, The Last Courier) is yours; pick
+one to show in **REWARDS** (EQUIP, or none). It shows in gold over your head for everybody (within 80 studs) and next
+to your name on the leaderboard (TOP). Your first title is shown at once.
+
+**The new tabs** in the MISSIONS window (U):
+
+* **CHALLENGES**: on top the Dead End card (a dark silhouette and "???" until it is yours, "Complete every challenge
+  (X/42)"), then the challenges by category, each with its description, a progress bar, the money and the title, ✓
+  when done; the hidden ones read ??? until then.
+* **SECRETS**: found X/30 and the money so far, every place with ✓ for its package or its hint ("Visit <place>
+  first" before you have been there), and the Phantom card.
+* **REWARDS**: the ten campaign rewards (earned, or "finish <campaign>"; a click opens the campaign), your titles with
+  EQUIP, and the exclusive guns and paints.
+* The MISSIONS tab's campaign header shows the campaign's reward too ("Reward: Reyes' Carbine + title Quartermaster").
+* **Popups** at the top centre, one at a time: a strip for a new place, a card for a package or a challenge (its money
+  and title), and a BIG card with a glow and confetti for a campaign's, every package's and every challenge's
+  reward. They wait while the DELIVERY result, the mission's celebration card or the MISSIONS window is up, so
+  nothing covers them; a flood (many at once) merges into one card per kind. A click dismisses one.
 
 ## Real estate and your company
 
@@ -341,7 +424,15 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
   your hand (`shared/GunModels.luau`, the bandits carry the same pistol and rifle): a muzzle flash and a recoil kick on
   every shot, the tracers start at the muzzle. A headshot kills. Earned by working, not sold: the **Ranch Revolver**
   (Silver Spur Ranch) and the **Army Carbine** (Military Base). One-handed (they also fire out of a car window):
-  Pistol, Ranch Revolver, SMG.
+  Pistol, Ranch Revolver, SMG, Vinnie's Golden Pistol.
+* **Exclusive gear** (3.1, `exclusive` in `Config.Weapons` / `Config.Paints`, never sold; see **Challenges, secrets
+  and rewards**): the guns **Reyes' Carbine** (an olive carbine with a scope), **Walt's Lever Rifle** (wood, a round
+  hits 2 in a row), **Vinnie's Golden Pistol** and **Dead End** (a round hits 4 in a row), each with its own model; the paints
+  Dispatch Yellow, Medic Mint, Fresh Lime, Fire Engine, Volt Neon, Toxic Glow, Sunrise Chrome and Phantom, some with
+  a **finish** (metal, neon, foil, glass) on the body panels (`PaintDef.material`). The shops show them as dimmed
+  **REWARD** cards with how to earn them ("REWARD · finish Iron Supply", "REWARD · find every lost package", "??? · a
+  secret reward" for Dead End, its stats hidden); once yours they show normally with a ★ EXCLUSIVE badge and are
+  equipped and painted like any other.
 * **Car guns** (Wrench Garage, on the roof of the equipped car, one per car; a new one replaces the old one, no
   refund): Roof Machine Gun (a slim barrel with an ammo box), Roof Minigun (a rotary barrel cluster), Roof Grenade
   Launcher (a fat tube). The Gun Damage and Fire Rate upgrades work for them too.
@@ -357,6 +448,8 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 * **Missions** (`shared/Missions.luau`, 3.0): 10 campaigns × 10 missions, 8 twists, 46 co-op missions, 15 new places;
   new cargo (water, generators, batteries, TNT, documents, electronics, weapons, paintings, mail, tyres, plants) and
   survivors who walk aboard by themselves.
+* **Challenges, secrets, rewards** (3.1): 42 challenges (`shared/Challenges.luau`), 30 lost packages (`Map.Secrets`),
+  10 campaign rewards, the Phantom and Dead End rewards, 11 + 12 titles (`Config.Rewards`).
 
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
@@ -403,13 +496,14 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
               Levels (XP, levels, rank names), TrafficLanes (the traffic's lanes, turns and sidewalks), SoundSheet
               (where each sound and music loop sits in the two audio assets), Missions (3.0: the 10 campaigns and 100
-              missions, unlocking, the rating, the stars, the twists' pay)
+              missions, unlocking, the rating, the stars, the twists' pay), Challenges (3.1: the 42 challenges, the
+              counters, value / progress / doneCount / allTitles)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business), Vehicles (cars, seats, cargo slots, the roof turret of a car gun,
               the instant spawns and the home garage spot), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
-              the window), Jobs (job board, stops, special jobs, crews, the zombie waves), Cargo (the cargo you carry, lead or board at a
+              the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves), Cargo (the cargo you carry, lead or board at a
               stop, the pieces in the vehicle), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
@@ -417,16 +511,20 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               the crew state), Ranking (the leaderboard rows), Estate (buying, selling, the home, car slots, the home
               respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your
               company: couriers, upgrades, the safe, online and offline earnings, the office computer), Missions (3.0: the
-              MISSIONS window's state, START checked, the rewards, stars and crew credit when one is done)
+              MISSIONS window's state, START checked, the rewards, stars and crew credit when one is done), Challenges
+              (3.1: counts the stats from the other modules' hooks, the distance and the places visited, checks and
+              pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
+              the head, the Challenges remote)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
               Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
               prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
-              Weather (the day and night look), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
+              Weather (the day and night look; 3.0.1: the readable night, the town glow, your own light), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
               card), Sounds (the music and every sound effect, N / SOUND), MissionsUi (3.0: the MISSIONS window (U),
-              the mission banner in the top stack, the celebration card)
+              the mission banner in the top stack, the celebration card; 3.1: the CHALLENGES, SECRETS and REWARDS
+              tabs and the unlock popups), Secrets (3.1: hides the lost packages you found, animates the others nearby)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
@@ -434,7 +532,10 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               2.6 real estate checks are in logic (every property placed, no overlaps, the towers and offices, the
               roads to every property, the landmarks) and so are the 3.0 places (every one placed, on its road, with
               its cargo spot); audio (every sound has its region, every gun its shot); missions (the 10 campaigns and
-              100 missions valid against Config and Map, the design rules, unlocked, rate, stars, twistPay)
+              100 missions valid against Config and Map, the design rules, unlocked, rate, stars, twistPay); 3.1:
+              challenges (the list, the must-have goals, the titles, the hidden ones, the helpers on a fake profile),
+              gear (piercing rounds, the paint finishes, every exclusive item a reward) and the lost packages in logic
+              (one per place, near it, in bounds, dry, off the roads)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -460,8 +561,8 @@ computed on the server from the car's box (`server/Zombies.luau`).
 python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
-Runs every `tests/*_test.luau` (logic with the 2.6 real estate and the 3.0 places, cargo, roads, cargun, icons, levels,
-jobs25, traffic, audio, missions) and compiles every module. Needs the standalone Luau CLI
+Runs every `tests/*_test.luau` (logic with the 2.6 real estate, the 3.0 places and the 3.1 lost packages, cargo,
+roads, cargun, icons, levels, jobs25, traffic, audio, missions, challenges, gear) and compiles every module. Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
@@ -472,7 +573,14 @@ tab gives every property (or one), takes them all, sets the home (or the depot),
 fills, adds $50,000 to or empties the company safe (UNLOCK also gives every property and, without a home, the most
 expensive mansion as the home). The **Missions** tab starts any of the 100 missions now (locks ignored; a running job
 is cancelled, a NIGHT ONLY one turns the clock to night), sets every mission to 3 stars and every campaign done (no
-money; UNLOCK does it too) or clears the progress (commands `missionStart`, `missionsAll`, `missionsReset`). It
+money; UNLOCK does it too) or clears the progress (commands `missionStart`, `missionsAll`, `missionsReset`); 3.1:
+it gives every campaign's exclusive reward and title too. The **Challenges, secrets** tab (3.1) marks every challenge
+done with its money and title, every campaign's reward and Dead End (`challengesAll`), finds every lost package
+(`secretsAll`: no money each, then the Phantom reward), starts over (`challengesReset`: the stats, packages, places,
+titles and rewards cleared, the exclusive guns and paints taken back; the challenges your profile still reaches, such
+as kills, level, missions, money earned, stay done without paying again, and the campaign rewards come back on the
+next join) and gives and shows any title (`title <name>`, `none`: no title; a reward's title comes without its
+reward, which is still given when earned). It
 is there for a Studio Play test, for the owner of a user-owned place and for the user ids in `Config.Admin.UserIds`;
 the server checks every command again.
 

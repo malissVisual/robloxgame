@@ -8,16 +8,17 @@
 --   Zombies.onKillInfo     a zombie / bandit on foot killed: headshot, brute, bandit, run over, splash
 --   BanditCars.onKillInfo  a bandit car destroyed (by a gun, a ram or a blast)
 --   Jobs.onStat            waves, HOLD OUT won, pieces / passengers / horses delivered, the missions' finish stats
--- Kills from a seat are told apart here (Vehicles.seatedIn): the driver of a car with a roof gun = a car gun kill,
--- a passenger seat = a gunner kill. The distance driven is sampled every second from the driver's car (a jump of
--- over TELEPORT_JUMP studs is a teleport, not driving), the places visited every two seconds (VISIT_RADIUS of a
--- Map.Places point). server/Missions.luau calls Challenges.campaignDone and Challenges.check itself.
+-- Kills from a seat are told apart by what made them (Kill.from, server/Gun.luau): the roof gun = a car gun kill, a
+-- passenger's gun out of the window = a gunner kill (a mine or a fire is neither). The distance driven is sampled
+-- every second from the driver's car (a jump of over TELEPORT_JUMP studs is a teleport, not driving), the places
+-- visited every two seconds (VISIT_RADIUS of a Map.Places point). server/Missions.luau calls Challenges.campaignDone and Challenges.check itself.
 --
 -- Checking. Every change marks the player dirty; a light loop checks them (twice a second at most), and every
 -- CHECK_EVERY s everybody (the profile-derived stats: money earned, level, cars bought ...). A challenge reached is
 -- marked done, pays its money, gives its title and sends "unlocked". Every challenge done gives
--- Config.Rewards.Challenges once (Dead End), every secret found Config.Rewards.Secrets once (Phantom). A reward's title
--- is its "given" mark: a reward is given when its title is not earned yet.
+-- Config.Rewards.Challenges once (Dead End), every secret found Config.Rewards.Secrets once (Phantom). profile.rewards
+-- marks each reward given (a campaign id, "secrets", "challenges"); its title alone does not (the admin title command
+-- gives any title).
 --
 -- The "Challenges" remote (shared/Net.luau):
 --   client → server  ("open")                 send me the state
@@ -52,10 +53,10 @@ export type Kill = {
 	bandit: boolean?, -- a bandit / gunner on foot
 	headshot: boolean?,
 	cause: string?, -- "gun" (a direct hit), "car" (rammed / run over), "splash" (a blast or a fire), "other"
+	from: string?, -- fired from a car seat (server/Gun.luau): "cargun" (the roof gun), "window" (a passenger's gun)
 }
 
--- A Map.Secrets entry (stream "secrets-world" writes the list).
-type SecretDef = { id: string, place: string, hint: string, x: number, y: number, z: number }
+type SecretDef = Map.Secret
 
 local STATE_GAP = 0.5 -- seconds between two states to one player (at most twice a second)
 local LOOP_EVERY = 0.25 -- the loop's beat
@@ -68,7 +69,8 @@ local SAVE_DELAY = 10 -- seconds after something worth keeping until it is saved
 local ACTION_GAP = 0.3 -- seconds between two requests of one player
 local TITLE_DISTANCE = 80 -- studs: the title over a head is seen this far
 local TITLE_GOLD = Color3.fromRGB(255, 205, 80)
-local SECRET_SLACK = 12 -- studs beyond a prompt's reach still accepted (lag)
+local SECRET_SLACK = 4 -- studs beyond a prompt's reach still accepted (lag)
+local SECRET_RISE = 7 -- studs up or down from the package at most: a roof or a ledge is climbed, not reached from below
 
 -- The stats the profile gives (shared/Challenges.luau Challenges.value), next to the counters.
 local DERIVED = {
@@ -99,6 +101,7 @@ local loaded: { [Player]: boolean } = {} -- the save is here and the join was ha
 local lastSent: { [Player]: number } = {} -- os.clock() of the last state
 local lastSignature: { [Player]: string } = {} -- what the last state said (a change sends it again)
 local lastAction: { [Player]: { [string]: number } } = {} -- per action ("open", "title"): a spam guard
+local titleQueued: { [Player]: { title: string? } } = {} -- a "title" too soon: the latest one, applied after the gap
 local saveQueued: { [Player]: boolean } = {}
 local driving: { [Player]: { car: Vehicles.Car, at: Vector3, carry: number } } = {}
 local secretPrompts: { [ProximityPrompt]: string } = {} -- World.SecretPrompts: prompt → secret id
@@ -117,10 +120,8 @@ local function say(player: Player, text: string)
 	(notice :: RemoteEvent):FireClient(player, text)
 end
 
--- [fallback: Map.Secrets is written by stream "secrets-world"; without it there are no secrets]
 local function secretList(): { SecretDef }
-	local list = (Map :: any).Secrets
-	return if type(list) == "table" then list :: { SecretDef } else {}
+	return Map.Secrets
 end
 
 local function findSecret(id: string): SecretDef?
@@ -264,12 +265,13 @@ local function markDirty(player: Player)
 	dirty[player] = true
 end
 
--- A campaign's reward (Config.Rewards.Campaigns), once: given = its title earned. True when given now.
+-- A campaign's reward (Config.Rewards.Campaigns), once (profile.rewards[campaignId]). True when given now.
 local function campaignReward(player: Player, profile: PlayerData.Profile, campaignId: string): boolean
 	local reward = Config.Rewards.Campaigns[campaignId]
-	if not reward or profile.titles[reward.title] then
+	if not reward or profile.rewards[campaignId] then
 		return false
 	end
+	profile.rewards[campaignId] = true
 	giveItem(profile, reward.weapon, reward.paint)
 	giveTitle(player, profile, reward.title)
 	local campaign = MissionData.findCampaign(campaignId)
@@ -285,12 +287,13 @@ local function campaignReward(player: Player, profile: PlayerData.Profile, campa
 end
 
 -- The final rewards: every secret found (Config.Rewards.Secrets) and every challenge done (Config.Rewards.Challenges),
--- each once. True when something was given.
+-- each once (profile.rewards.secrets, .challenges). True when something was given.
 local function finalRewards(player: Player, profile: PlayerData.Profile): boolean
 	local given = false
 	local secrets = Config.Rewards.Secrets
 	local everySecret, found, total = allSecrets(profile)
-	if everySecret and not profile.titles[secrets.title] then
+	if everySecret and not profile.rewards.secrets then
+		profile.rewards.secrets = true
 		giveItem(profile, nil, secrets.paint)
 		giveTitle(player, profile, secrets.title)
 		PlayerData.addMoney(player, secrets.money)
@@ -308,7 +311,8 @@ local function finalRewards(player: Player, profile: PlayerData.Profile): boolea
 	end
 	local last = Config.Rewards.Challenges
 	local done, all = ChallengeData.doneCount(profile :: any)
-	if all > 0 and done >= all and not profile.titles[last.title] then
+	if all > 0 and done >= all and not profile.rewards.challenges then
+		profile.rewards.challenges = true
 		giveItem(profile, last.weapon, nil)
 		giveTitle(player, profile, last.title)
 		PlayerData.addMoney(player, last.money)
@@ -393,8 +397,8 @@ local function stateOf(profile: PlayerData.Profile): { [string]: any }
 		end
 	end
 	local campaigns: { [string]: boolean } = {}
-	for id, reward in Config.Rewards.Campaigns do
-		if profile.titles[reward.title] then
+	for id in Config.Rewards.Campaigns do
+		if profile.rewards[id] then
 			campaigns[id] = true
 		end
 	end
@@ -409,8 +413,8 @@ local function stateOf(profile: PlayerData.Profile): { [string]: any }
 		title = profile.title,
 		rewards = {
 			campaigns = campaigns,
-			secrets = profile.titles[Config.Rewards.Secrets.title] == true,
-			challenges = profile.titles[Config.Rewards.Challenges.title] == true,
+			secrets = profile.rewards.secrets == true,
+			challenges = profile.rewards.challenges == true,
 		},
 	}
 end
@@ -429,6 +433,7 @@ local function signature(state: { [string]: any }, profile: PlayerData.Profile):
 	table.insert(parts, tostring(count(profile.secrets)))
 	table.insert(parts, tostring(count(profile.visited)))
 	table.insert(parts, tostring(count(profile.titles)))
+	table.insert(parts, tostring(count(profile.rewards)))
 	table.insert(parts, profile.title or "-")
 	table.insert(parts, tostring(state.secretsTotal))
 	return table.concat(parts, "|")
@@ -492,16 +497,11 @@ function Challenges.onKill(player: Player, info: Kill)
 	if cause == "splash" then
 		Challenges.add(player, "explosions", 1)
 	end
-	if cause ~= "car" then
-		-- From a seat: the driver fires the roof gun (Economy.fireMode: the car gun first), a passenger out of the window.
-		local car, isDriver = Vehicles.seatedIn(player)
-		if car then
-			if isDriver and car.gunId ~= nil then
-				Challenges.add(player, "carGunKills", 1)
-			elseif not isDriver then
-				Challenges.add(player, "gunnerKills", 1)
-			end
-		end
+	-- From a seat (what fired, not where the killer sits now: a mine or a fire that kills later is neither).
+	if info.from == "cargun" then
+		Challenges.add(player, "carGunKills", 1)
+	elseif info.from == "window" then
+		Challenges.add(player, "gunnerKills", 1)
 	end
 end
 
@@ -570,7 +570,8 @@ local function onPrompt(prompt: ProximityPrompt, player: Player)
 		end
 		id = attribute
 	end
-	-- Within reach of the package (the client could fire it from anywhere).
+	-- Within reach of the package (the client could fire it from anywhere), and level with it: a package on a roof or
+	-- a ledge is opened up there, not from the ground under it (the prompt needs no line of sight).
 	local parent = prompt.Parent
 	local at: Vector3? = if parent and parent:IsA("BasePart") then parent.Position
 		elseif parent and parent:IsA("Attachment") then parent.WorldPosition
@@ -580,7 +581,8 @@ local function onPrompt(prompt: ProximityPrompt, player: Player)
 	if not at or not root or not root:IsA("BasePart") then
 		return
 	end
-	if (root.Position - at).Magnitude > prompt.MaxActivationDistance + SECRET_SLACK then
+	local offset = root.Position - at
+	if offset.Magnitude > prompt.MaxActivationDistance + SECRET_SLACK or math.abs(offset.Y) > SECRET_RISE then
 		return
 	end
 	foundSecret(player, id :: string)
@@ -644,8 +646,8 @@ end
 -- ── The remote ─────────────────────────────────────────────────────────────
 
 local function onRequest(player: Player, action: any, arg: any)
-	if type(action) ~= "string" then
-		return
+	if action ~= "open" and action ~= "title" then
+		return -- only these two (an unknown one never reaches the spam guard's table)
 	end
 	local now = os.clock()
 	local last = lastAction[player]
@@ -655,15 +657,32 @@ local function onRequest(player: Player, action: any, arg: any)
 	end
 	if last[action] and now - last[action] < ACTION_GAP then
 		if action == "open" then
-			markDirty(player) -- answered by the loop a moment later
+			-- Answered by the loop a moment later, in full (another listener of the client may be asking).
+			lastSignature[player] = nil
+			markDirty(player)
+		elseif action == "title" then
+			-- The client already shows it equipped: the latest one is applied once the gap is over.
+			local waiting = titleQueued[player] ~= nil
+			titleQueued[player] = { title = arg }
+			if not waiting then
+				task.delay(ACTION_GAP - (now - last[action]) + 0.02, function()
+					local queued = titleQueued[player]
+					titleQueued[player] = nil
+					if queued and player.Parent then
+						onRequest(player, "title", queued.title)
+					end
+				end)
+			end
 		end
 		return
 	end
 	last[action] = now
 	local profile = PlayerData.get(player)
 	if not profile then
-		say(player, "Still loading...")
-		return
+		if action == "title" then
+			say(player, "Still loading...")
+		end
+		return -- the state goes out once the save has loaded (onLoaded)
 	end
 	if action == "open" then
 		sendState(player, true)
@@ -683,6 +702,13 @@ end
 
 -- ── Joining ────────────────────────────────────────────────────────────────
 
+-- A reward given before profile.rewards marked it: its title and its item are both yours.
+local function hadReward(profile: PlayerData.Profile, title: string, weapon: string?, paint: string?): boolean
+	return profile.titles[title] == true
+		and (weapon == nil or profile.weapons[weapon] == true)
+		and (paint == nil or profile.paints[paint] == true)
+end
+
 -- The save is here: the rewards of campaigns finished before 3.1, the title over the head, the state.
 local function onLoaded(player: Player)
 	local profile = PlayerData.get(player)
@@ -690,6 +716,19 @@ local function onLoaded(player: Player)
 		return
 	end
 	loaded[player] = true
+	-- Early 3.1 saves had no profile.rewards (the title was the mark): never give those twice.
+	for id, reward in Config.Rewards.Campaigns do
+		if hadReward(profile, reward.title, reward.weapon, reward.paint) then
+			profile.rewards[id] = true
+		end
+	end
+	local secrets, last = Config.Rewards.Secrets, Config.Rewards.Challenges
+	if hadReward(profile, secrets.title, nil, secrets.paint) then
+		profile.rewards.secrets = true
+	end
+	if hadReward(profile, last.title, last.weapon, nil) then
+		profile.rewards.challenges = true
+	end
 	local given = false
 	for id, done in profile.campaigns do
 		if done and campaignReward(player, profile, id) then
@@ -765,18 +804,22 @@ function Challenges.adminSecrets(player: Player): number
 	return #secretList()
 end
 
--- Start over: the stats, secrets, challenges, places, titles cleared and the exclusive guns and paints taken back.
--- (The campaigns stay done: their rewards come back on the next join.)
-function Challenges.adminReset(player: Player)
+-- Start over: the stats, secrets, challenges, places, titles and rewards cleared and the exclusive guns and paints
+-- taken back. What the profile itself still reaches (kills, money earned, level, missions, stars, cars, properties ...)
+-- cannot be cleared here: those challenges stay done, quietly (their title kept, no money, no popup), so a reset
+-- never pays them twice. Returns how many stayed done. (The campaigns stay done: their rewards come back on the next
+-- join.)
+function Challenges.adminReset(player: Player): number
 	local profile = PlayerData.get(player)
 	if not profile then
-		return
+		return 0
 	end
 	table.clear(profile.stats)
 	table.clear(profile.secrets)
 	table.clear(profile.challenges)
 	table.clear(profile.visited)
 	table.clear(profile.titles)
+	table.clear(profile.rewards)
 	profile.title = nil
 	for _, weapon in Config.Weapons do
 		if weapon.exclusive then
@@ -799,14 +842,35 @@ function Challenges.adminReset(player: Player)
 		end
 	end
 	driving[player] = nil
+	-- The ones still reached, done again without a payout (a few passes: a title can reach the "titles" one).
+	local kept = 0
+	local like = profile :: any
+	for _ = 1, 3 do
+		local more = false
+		for _, def in ChallengeData.List do
+			if not profile.challenges[def.id] and ChallengeData.value(like, def.stat) >= def.goal then
+				profile.challenges[def.id] = true
+				if def.title then
+					profile.titles[def.title] = true
+				end
+				kept += 1
+				more = true
+			end
+		end
+		if not more then
+			break
+		end
+	end
 	updateTag(player)
 	Vehicles.repaint(player)
 	PlayerData.notify(player)
 	sendState(player, true)
 	saveSoon(player)
+	return kept
 end
 
--- A title given and shown ("none" or "": no title shown, the earned ones stay). The title, or nil.
+-- A title given and shown ("none" or "": no title shown, the earned ones stay). The title, or nil. A reward's title
+-- comes without its reward (profile.rewards): the reward is still given when it is earned.
 function Challenges.adminTitle(player: Player, title: string): string?
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -897,14 +961,8 @@ function Challenges.start()
 	getRemote().OnServerEvent:Connect(onRequest)
 	-- The secret packages World built (World.SecretPrompts); late or unlisted ones are known by their name and
 	-- attribute (onPrompt).
-	-- [fallback: World.SecretPrompts is written by stream "secrets-world"; without it the attribute is enough]
-	local prompts = (World :: any).SecretPrompts
-	if type(prompts) == "table" then
-		for _, entry in prompts :: { { prompt: ProximityPrompt, id: string } } do
-			if typeof(entry.prompt) == "Instance" and type(entry.id) == "string" then
-				secretPrompts[entry.prompt] = entry.id
-			end
-		end
+	for _, entry in World.SecretPrompts do
+		secretPrompts[entry.prompt] = entry.id
 	end
 	ProximityPromptService.PromptTriggered:Connect(onPrompt)
 
@@ -930,6 +988,7 @@ function Challenges.start()
 		lastSent[player] = nil
 		lastSignature[player] = nil
 		lastAction[player] = nil
+		titleQueued[player] = nil
 		driving[player] = nil
 		-- saveQueued stays until its delay runs (it checks player.Parent): PlayerData.release saves anyway.
 	end)

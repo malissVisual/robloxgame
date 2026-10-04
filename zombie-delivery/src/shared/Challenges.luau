@@ -66,11 +66,7 @@ local CAMPAIGNS_TOTAL = #Missions.Campaigns -- 10
 local _, STARS_TOTAL = Missions.stars({}) -- 300 (3 per mission)
 local PLACES_TOTAL = #Map.Places -- 29
 local MAX_LEVEL = Config.Levels.MaxLevel -- 15
--- The lost packages (Map.Secrets, written by stream "secrets-world").
--- [3.1 fallback: until Map.Secrets lands in Map this reads nil and the spec's count, 30, is used. Once Map.Secrets is
--- typed, the cast can go: `#Map.Secrets`.]
-local secretList = (Map :: any).Secrets :: { any }?
-local SECRETS_TOTAL = if secretList and #secretList > 0 then #secretList else 30
+local SECRETS_TOTAL = #Map.Secrets -- 30 (the lost packages)
 
 -- The list, category by category, easy to hard. Money runs from 200 (minutes) to 20,000 (the long game); about ten
 -- give a title, four are hidden (??? until done). There is no "every challenge" challenge: finishing all of them is

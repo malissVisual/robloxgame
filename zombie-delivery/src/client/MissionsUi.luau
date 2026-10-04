@@ -24,7 +24,8 @@
 --   * 3.1: the Challenges remote's "unlocked" as a celebratory card in the Hud's top stack (Hud.topSlot("unlocked"),
 --     the 3.0 cleared card's style), one at a time from a queue: a strip for a new place, a card for a lost package
 --     or a challenge, a BIG card with a glow and confetti for a campaign's, every package's and every challenge's
---     reward (those wait until the DELIVERY result and the cleared card are closed). A click dismisses one.
+--     reward. They all wait while the DELIVERY result, the cleared card (or one on its way) or this window is up, so
+--     nothing covers them. A click dismisses one.
 --   * During a mission a compact banner in the Hud's top stack (Hud.topSlot("mission")): "MISSION 3/10 · Name", the
 --     twists, the CO-OP crew count and the HOLD OUT countdown. It follows your own job (the Job remote's `mission`)
 --     or, for a crew member, the leader's (CrewState status.mission).
@@ -303,6 +304,8 @@ Extras.tab = "missions" -- the window's page: "missions" | "challenges" | "secre
 Extras.hasState = false
 Extras.remote = nil :: RemoteEvent?
 Extras.secretCache = nil :: { SecretEntry }?
+Extras.clearedPending = 0 -- "cleared" cards on their way (waiting for the DELIVERY result to close): popups wait too
+Extras.pumpPopups = nil :: (() -> ())? -- shows the next waiting popup (set by the popups' block)
 Extras.state = {
 	values = {},
 	done = {},
@@ -366,21 +369,15 @@ function Extras.categoryIcon(id: string): string
 	return "⭐"
 end
 
--- The lost packages (Map.Secrets, written by stream "secrets-world").
--- [fallback: Map.Secrets is not in the contract's Map; read it untyped, an empty list while it is missing]
+-- The lost packages (Map.Secrets).
 function Extras.secretList(): { SecretEntry }
 	local cached = Extras.secretCache
 	if cached then
 		return cached
 	end
 	local list: { SecretEntry } = {}
-	local raw = (Map :: any).Secrets
-	if type(raw) == "table" then
-		for _, entry in raw do
-			if type(entry) == "table" and type(entry.id) == "string" then
-				table.insert(list, { id = entry.id, place = tostring(entry.place or ""), hint = tostring(entry.hint or "") })
-			end
-		end
+	for _, entry in Map.Secrets do
+		table.insert(list, { id = entry.id, place = entry.place, hint = entry.hint })
 	end
 	Extras.secretCache = list
 	return list
@@ -1701,7 +1698,8 @@ function Extras.campaignCard(parent: Instance, campaign: Campaign, order: number
 	})
 end
 
--- Equip a title (nil = none): the server checks it is yours; the page shows it at once.
+-- Equip a title (nil = none): the server checks it is yours (a quick second click is applied after its spam gap, and
+-- its state corrects the page if it refuses); the page shows it at once.
 function Extras.equip(title: string?)
 	Extras.ask("title", title)
 	Extras.state.title = title
@@ -2141,6 +2139,11 @@ local function hideCleared()
 	if refs.cleared then
 		refs.cleared.Visible = false
 	end
+	-- 3.1: a popup waiting for the card follows at once (deferred: NEXT MISSION opens the window first).
+	local pumpPopups = Extras.pumpPopups
+	if pumpPopups then
+		task.defer(pumpPopups)
+	end
 end
 
 local function buildCleared()
@@ -2350,24 +2353,17 @@ end
 
 do -- (its own block: the locals below stay out of the 200-register limit)
 	type Popup = { card: any, duration: number, loops: { Tween }, color: Color3, big: boolean }
-	type Queued = { u: { [string]: any }, at: number }
+	type Queued = { u: { [string]: any } }
 
 	local queue: { Queued } = {}
 	local busy = false
 	local waiting = false
 	local BIG: { [string]: boolean } = { campaign = true, secrets = true, challenges = true }
 	local MERGE: { [string]: boolean } = { challenge = true, secret = true, place = true }
-	local MAX_WAIT = 45 -- seconds a big one waits for the result window and the cleared card at most
-
-	-- Not now: the interface is off, or (a big one) the DELIVERY result or the cleared card is up.
-	local function blocked(item: Queued): boolean
-		if not hudOn() then
-			return true
-		end
-		if not BIG[item.u.kind] or os.clock() - item.at > MAX_WAIT then
-			return false
-		end
-		return Hud.resultOpen() or (refs.cleared ~= nil and refs.cleared.Visible == true)
+	-- Not now: the interface is off, or something would cover the popup: the DELIVERY result, the cleared card (or
+	-- one on its way: the server sends a campaign's reward before its "cleared"), or this window (MissionsUi.isOpen).
+	local function blocked(): boolean
+		return not hudOn() or Hud.resultOpen() or Extras.clearedPending > 0 or MissionsUi.isOpen()
 	end
 
 	local function line(parent: Instance, text: string, order: number, size: number, font: Enum.Font, color: Color3): any
@@ -2549,14 +2545,11 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 		if busy or #queue == 0 then
 			return
 		end
-		for index, item in queue do
-			if not blocked(item) then
-				table.remove(queue, index)
-				show(item)
-				return
-			end
+		if not blocked() then
+			show(table.remove(queue, 1) :: Queued)
+			return
 		end
-		-- Only ones that must wait: look again soon.
+		-- They must wait: look again soon.
 		if not waiting then
 			waiting = true
 			task.delay(0.5, function()
@@ -2565,6 +2558,7 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 			end)
 		end
 	end
+	Extras.pumpPopups = pump
 
 	-- The Challenges remote's "unlocked" (U in the 3.1 spec).
 	function Extras.unlocked(u: any)
@@ -2595,9 +2589,9 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 			end
 			local first = table.clone(u)
 			first.batch = 1
-			table.insert(queue, { u = first, at = os.clock() })
+			table.insert(queue, { u = first })
 		else
-			table.insert(queue, { u = u, at = os.clock() })
+			table.insert(queue, { u = u })
 		end
 		pump()
 	end
@@ -2767,12 +2761,15 @@ function MissionsUi.start()
 			applyState(data)
 		elseif kind == "cleared" then
 			-- The Hud's DELIVERY result comes first: the card waits until it is closed (not over its pay and buttons).
+			-- 3.1: the unlock popups wait for it from now on (Extras.clearedPending), not only once it shows.
+			Extras.clearedPending += 1
 			task.spawn(function()
 				task.wait(0.2)
 				local waited = 0
 				while Hud.resultOpen() and waited < 120 do
 					waited += task.wait(0.25)
 				end
+				Extras.clearedPending -= 1
 				showCleared(data)
 			end)
 		elseif type(kind) == "table" then

@@ -41,6 +41,7 @@ type Bandit = {
 	sees: boolean, -- a clear line to the target
 	lastHitBy: Player?,
 	lastCause: string?, -- 3.1: how lastHitBy hit it: "gun", "car" (rammed), "splash" (BanditCars.onKillInfo)
+	lastFrom: string?, -- 3.1: and from which car seat's gun ("cargun", "window"; nil = none)
 	offSince: number?, -- the target has had no job since (they drive off)
 }
 
@@ -54,9 +55,9 @@ local folder: Instance = workspace
 BanditCars.onKill = function(_player: Player) end
 BanditCars.onCarDamaged = function(_player: Player, _amount: number) end
 BanditCars.onSteal = function(_player: Player, _share: number) end
--- 3.1: a bandit car destroyed and how (cause "gun", "car" or "splash"), for the challenges' counters
--- (server/Challenges.luau; Main wires it).
-BanditCars.onKillInfo = nil :: ((player: Player, info: { cause: string }) -> ())?
+-- 3.1: a bandit car destroyed and how (cause "gun", "car" or "splash"; from: the car seat's gun, "cargun" or
+-- "window", see Zombies.KillInfo), for the challenges' counters (server/Challenges.luau; Main wires it).
+BanditCars.onKillInfo = nil :: ((player: Player, info: { cause: string, from: string? }) -> ())?
 -- Is the player still worth chasing (on a job)? When not, the bandits give up once they fall behind.
 BanditCars.wanted = function(_player: Player): boolean
 	return true
@@ -135,7 +136,7 @@ local function explode(b: Bandit, killer: Player?)
 		BanditCars.onKill(killer)
 		local onKillInfo = BanditCars.onKillInfo
 		if onKillInfo then
-			task.spawn(onKillInfo, killer, { cause = b.lastCause or "gun" })
+			task.spawn(onKillInfo, killer, { cause = b.lastCause or "gun", from = b.lastFrom })
 		end
 	end
 	task.delay(6, function()
@@ -143,14 +144,16 @@ local function explode(b: Bandit, killer: Player?)
 	end)
 end
 
--- Returns true when it blew up. cause (3.1): "car" (rammed), "splash" (a blast or a fire); nil = a gun's hit.
-function BanditCars.damage(b: Bandit, amount: number, by: Player?, cause: string?): boolean
+-- Returns true when it blew up. cause (3.1): "car" (rammed), "splash" (a blast or a fire); nil = a gun's hit. from
+-- (3.1): the gun fired from a car seat ("cargun", "window").
+function BanditCars.damage(b: Bandit, amount: number, by: Player?, cause: string?, from: string?): boolean
 	if b.dead or amount <= 0 then
 		return false
 	end
 	if by then
 		b.lastHitBy = by
 		b.lastCause = cause or "gun"
+		b.lastFrom = from
 	end
 	b.health -= amount
 	b.npc.model:SetAttribute("Health", math.max(0, math.ceil(b.health)))
@@ -171,13 +174,13 @@ function BanditCars.fromPart(part: Instance): Bandit?
 	return nil
 end
 
--- Blasts and fires (grenade launcher, molotov, mine). Returns how many blew up.
-function BanditCars.damageArea(center: Vector3, radius: number, damage: number, by: Player?): number
+-- Blasts and fires (grenade launcher, molotov, mine). Returns how many blew up. from: a car gun's blast ("cargun").
+function BanditCars.damageArea(center: Vector3, radius: number, damage: number, by: Player?, from: string?): number
 	local destroyed = 0
 	for _, b in table.clone(bandits) do
 		local distance = (b.npc.chassis.Position - center).Magnitude
 		if distance <= radius + 4 then
-			if BanditCars.damage(b, damage * (1 - 0.5 * math.clamp(distance / (radius + 4), 0, 1)), by, "splash") then
+			if BanditCars.damage(b, damage * (1 - 0.5 * math.clamp(distance / (radius + 4), 0, 1)), by, "splash", from) then
 				destroyed += 1
 			end
 		end
@@ -239,6 +242,7 @@ local function spawnAt(player: Player, cf: CFrame, waypoint: Vector3): boolean
 		sees = false,
 		lastHitBy = nil,
 		lastCause = nil,
+		lastFrom = nil,
 		offSince = nil,
 	})
 	return true

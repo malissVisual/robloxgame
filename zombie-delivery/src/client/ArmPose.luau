@@ -191,6 +191,8 @@ local function showGun(character: Model, visible: boolean)
 				for _, part in hidden:GetDescendants() do
 					if part:IsA("BasePart") then
 						part.LocalTransparencyModifier = 0
+					elseif part:IsA("Light") then
+						part.Enabled = true -- a glowing gun (GunModels piece.glow: Dead End)
 					end
 				end
 			end
@@ -204,6 +206,8 @@ local function showGun(character: Model, visible: boolean)
 		for _, part in parts do
 			if part:IsA("BasePart") then
 				part.LocalTransparencyModifier = 1
+			elseif part:IsA("Light") then
+				part.Enabled = false -- a hidden part's light would still shine
 			end
 		end
 	end

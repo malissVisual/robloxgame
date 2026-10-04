@@ -109,10 +109,10 @@ end
 BanditCars.wanted = Jobs.active
 -- 3.1, the challenges' counters (server/Challenges.luau): how the kills happened, and what the jobs tell.
 Zombies.onKillInfo = function(player, info)
-	Challenges.onKill(player, { kind = info.kind, bandit = info.bandit, headshot = info.headshot, cause = info.cause })
+	Challenges.onKill(player, { kind = info.kind, bandit = info.bandit, headshot = info.headshot, cause = info.cause, from = info.from })
 end
 BanditCars.onKillInfo = function(player, info)
-	Challenges.onKill(player, { car = true, cause = info.cause })
+	Challenges.onKill(player, { car = true, cause = info.cause, from = info.from })
 end
 Jobs.onStat = Challenges.add
 -- The bandits, gunners and soldiers only go after players on a job (or in its crew); zombies after everybody.

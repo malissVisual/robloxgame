@@ -41,7 +41,8 @@ end
 
 -- One round hits `result`: the damage it deals (a blast, a zombie with its headshot, a bandit car). Returns the enemy
 -- model a piercing round may go on through (nil: it stops here) and whether passing it is free (a body already dead).
-local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stats: Economy.WeaponStats): (Model?, boolean)
+-- from (3.1): the roof gun ("cargun") or a passenger's gun out of the window ("window"); the challenges count its kills.
+local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stats: Economy.WeaponStats, from: string?): (Model?, boolean)
 	local hit = Net.get("Hit")
 	if stats.splash > 0 then
 		local blast = Instance.new("Explosion")
@@ -50,8 +51,8 @@ local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stat
 		blast.BlastRadius = stats.splash
 		blast.Position = result.Position
 		blast.Parent = workspace
-		local killed = Zombies.damageArea(result.Position, stats.splash, stats.damage, player)
-		killed += BanditCars.damageArea(result.Position, stats.splash, stats.damage, player)
+		local killed = Zombies.damageArea(result.Position, stats.splash, stats.damage, player, from)
+		killed += BanditCars.damageArea(result.Position, stats.splash, stats.damage, player, from)
 		hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, killed > 0)
 		return nil, false
 	end
@@ -66,7 +67,7 @@ local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stat
 		if crit then
 			damage = if zombie.kind == "brute" then stats.damage * Config.Horde.HeadshotMultiplier * 2 else zombie.humanoid.Health + 1
 		end
-		local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40 })
+		local killed = Zombies.damage(zombie, damage, player, { crit = crit, push = dir * 40, from = from })
 		hit:FireClient(player, result.Position, math.floor(damage + 0.5), crit, killed)
 		return zombie.model, false
 	end
@@ -75,7 +76,7 @@ local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stat
 		if banditCar.dead then
 			return banditCar.npc.model, true
 		end
-		local destroyed = BanditCars.damage(banditCar, stats.damage, player)
+		local destroyed = BanditCars.damage(banditCar, stats.damage, player, nil, from)
 		hit:FireClient(player, result.Position, math.floor(stats.damage + 0.5), false, destroyed)
 		return banditCar.npc.model, false
 	end
@@ -105,6 +106,8 @@ local function onFire(player: Player, target: any)
 	end
 	local carGun = if mode == "cargun" and carGunId then Economy.findCarGun(carGunId) else nil
 	local stats = if carGun then Economy.carGunStats(carGun.id, profile.upgrades) else Economy.weaponStats(profile.weapon, profile.upgrades)
+	-- The car seat's gun, for the challenges (Zombies.KillInfo): the roof gun, or a passenger's out of the window.
+	local from = if mode == "cargun" or (mode == "window" and not driving) then mode else nil
 	local now = os.clock()
 	if lastShot[player] and now - lastShot[player] < stats.interval * 0.8 then
 		return -- faster than the gun can fire (a little slack for the network)
@@ -158,7 +161,7 @@ local function onFire(player: Player, target: any)
 				break
 			end
 			finish = result.Position
-			local through, free = hitPart(player, result, dir, stats)
+			local through, free = hitPart(player, result, dir, stats, from)
 			if not through or (left <= 0 and not free) then
 				break
 			end

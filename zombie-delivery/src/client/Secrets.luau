@@ -260,11 +260,15 @@ function Secrets.start()
 		return
 	end
 	started = true
-	Net.get("Challenges").OnClientEvent:Connect(function(kind: any, payload: any)
+	local remote = Net.get("Challenges")
+	remote.OnClientEvent:Connect(function(kind: any, payload: any)
 		if kind == "state" then
 			setState(payload)
 		end
 	end)
+	-- Ask for the state: the one the server sent on join may have gone to an earlier listener of the remote (a queued
+	-- event reaches only the first one), and it is sent again only when it changes.
+	remote:FireServer("open")
 	task.spawn(function()
 		local folder = childOf(childOf(workspace, "World"), "Secrets")
 		folder.ChildAdded:Connect(track)
