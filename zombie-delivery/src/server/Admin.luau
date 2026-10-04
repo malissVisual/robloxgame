@@ -1,7 +1,8 @@
 --!strict
 -- The admin tools for testing (Config.Admin): unlock everything, money, any car or gun, teleport to any landmark,
 -- start any job, finish the current stop, god mode, spawn enemies, a bandit car, clear the enemies, the driver level,
--- time of day (day / night), heal, the real estate (give, take, set the home, teleport) and the company's safe. Admins (a Studio Play test, the owner of a user-owned place,
+-- time of day (day / night), heal, the real estate (give, take, set the home, teleport), the company's safe and the
+-- missions (start any, all at 3 stars, reset). Admins (a Studio Play test, the owner of a user-owned place,
 -- Config.Admin.UserIds) get the player attribute "Admin" (the client shows the panel, client/AdminPanel.luau); every
 -- command is checked here again.
 --
@@ -29,6 +30,10 @@
 --   setHome    id | "depot"   the home you spawn at (an owned mansion / villa / house)
 --   estateTeleport id         you to the property (its spawn spot inside, or the road at its plot)
 --   businessCash amount?      your company's safe (Config.Business): + amount, or filled up to SafeCap
+--   missionStart id           any mission (shared/Missions.luau) now, locks ignored (a running job is cancelled; a
+--                             NIGHT ONLY mission turns the clock to night)
+--   missionsAll               every mission at 3 stars, every campaign rewarded (no money); unlockAll does it too
+--   missionsReset             the mission progress and the campaign rewards cleared
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,6 +45,7 @@ local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
+local MissionData = require(Shared.Missions)
 
 local Server = script.Parent
 local World = require(Server.World)
@@ -50,6 +56,7 @@ local BanditCars = require(Server.BanditCars)
 local Jobs = require(Server.Jobs)
 local DayNight = require(Server.DayNight)
 local Estate = require(Server.Estate)
+local Missions = require(Server.Missions)
 
 local Admin = {}
 
@@ -142,7 +149,9 @@ local function unlockAll(player: Player)
 	Estate.give(player, "all")
 	-- The top driver level: nothing is locked any more (PlayerData.setLevel fires Changed).
 	local level = PlayerData.setLevel(player, Config.Levels.MaxLevel)
-	say(player, `ADMIN: every car, gun, paint, property and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
+	-- Every mission done at 3 stars (no money).
+	Missions.adminAll(player)
+	say(player, `ADMIN: every car, gun, paint, property, mission and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
 end
 
 -- The driver level: the XP becomes exactly what that level needs.
@@ -468,6 +477,35 @@ local function finishStop(player: Player)
 	say(player, if Jobs.adminFinishStop(player) then "ADMIN: stop finished." else "ADMIN: nothing to finish at this stop.")
 end
 
+-- ── Missions (server/Missions.luau) ────────────────────────────────────────
+
+local function missionStart(player: Player, arg: any)
+	local def = if type(arg) == "string" then MissionData.find(arg) else nil
+	if not def then
+		say(player, "ADMIN: unknown mission.")
+		return
+	end
+	if Jobs.active(player) then
+		Jobs.fail(player, "Cancelled for an admin mission.")
+	end
+	-- A NIGHT ONLY mission: make it night first.
+	if def.twists and table.find(def.twists, "night") and not DayNight.isNight() then
+		DayNight.setClock(22)
+	end
+	local ok, why = Missions.adminStart(player, def.id)
+	say(player, if ok then `ADMIN: mission started: {def.name}.` else `ADMIN: {why or "the mission could not start"}`)
+end
+
+local function missionsAll(player: Player)
+	local count = Missions.adminAll(player)
+	say(player, `ADMIN: {count} missions at 3 stars, every campaign done (no money paid).`)
+end
+
+local function missionsReset(player: Player)
+	Missions.adminReset(player)
+	say(player, "ADMIN: mission progress cleared. Every campaign starts at mission 1 again.")
+end
+
 -- ── God mode and healing ───────────────────────────────────────────────────
 
 local function shield(player: Player)
@@ -651,6 +689,9 @@ local COMMANDS: { [string]: (Player, any) -> () } = {
 	setHome = setHome,
 	estateTeleport = estateTeleport,
 	businessCash = businessCash,
+	missionStart = missionStart,
+	missionsAll = missionsAll,
+	missionsReset = missionsReset,
 }
 
 local function onCommand(player: Player, name: any, arg: any)

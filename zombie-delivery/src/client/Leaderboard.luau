@@ -1,7 +1,7 @@
 --!strict
 -- The leaderboard window: the best couriers on this server (L, or the TOP button in the HUD's button column). Every
--- player with their place, name, rank name, driver level (and how far into it), deliveries and money earned, best
--- first: by level, then money earned (the server sorts, server/Ranking.luau). Your own row is outlined, the ones out
+-- player with their place, name, rank name, driver level (and how far into it), mission stars (3.0), deliveries and
+-- money earned, best first: by level, then mission stars, then money earned (the server sorts, server/Ranking.luau). Your own row is outlined, the ones out
 -- on a job are tagged. While it is open it asks the server again every few seconds; closed it costs nothing.
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks Leaderboard.isOpen()).
 
@@ -53,10 +53,12 @@ end
 -- The column header and the cells of a row share these places (x offsets from the right edge).
 local COLUMNS = {
 	place = { x = 8, w = 44 },
-	level = { right = 330, w = 120 },
+	level = { right = 420, w = 120 },
+	stars = { right = 292, w = 84 },
 	deliveries = { right = 200, w = 90 },
 	earned = { right = 104, w = 96 },
 }
+local STAR_GOLD = Color3.fromRGB(255, 205, 80)
 
 -- The same rule as the Hud's windows (Ui.scaleFor), so the board matches them on every screen.
 local function updateScale()
@@ -75,13 +77,13 @@ local function build()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = 2,
 	}, player:WaitForChild("PlayerGui"))
-	window = Ui.panel(gui, UDim2.fromOffset(660, 500), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	window = Ui.panel(gui, UDim2.fromOffset(750, 500), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
 	window.Visible = false
 	window.BackgroundTransparency = 0.05
 	scale = Ui.make("UIScale", {}, window)
 	Ui.stroke(window, C.panelLight:Lerp(C.text, 0.2), 1)
 	Ui.label(window, "🏆  TOP COURIERS", UDim2.new(1, -70, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBold })
-	Ui.label(window, "This server · by driver level, then money earned · L", UDim2.new(1, -90, 0, 18), {
+	Ui.label(window, "This server · by driver level, then mission stars, then money earned · L", UDim2.new(1, -90, 0, 18), {
 		Position = UDim2.fromOffset(20, 46),
 		TextSize = 14,
 		Font = Enum.Font.GothamMedium,
@@ -112,6 +114,7 @@ local function build()
 	title("#", UDim2.fromOffset(COLUMNS.place.x, 0), COLUMNS.place.w, Enum.TextXAlignment.Center)
 	title("COURIER", UDim2.fromOffset(62, 0), 200, Enum.TextXAlignment.Left)
 	title("LEVEL", UDim2.new(1, -COLUMNS.level.right, 0, 0), COLUMNS.level.w, Enum.TextXAlignment.Left)
+	title("STARS", UDim2.new(1, -COLUMNS.stars.right, 0, 0), COLUMNS.stars.w, Enum.TextXAlignment.Right)
 	title("DELIVERIES", UDim2.new(1, -COLUMNS.deliveries.right, 0, 0), COLUMNS.deliveries.w, Enum.TextXAlignment.Right)
 	title("EARNED", UDim2.new(1, -COLUMNS.earned.right, 0, 0), COLUMNS.earned.w, Enum.TextXAlignment.Right)
 
@@ -203,6 +206,16 @@ local function row(entry: any, place: number)
 	local back, fill = Ui.bar(levelCell, UDim2.new(1, -16, 0, 6), C.yellow)
 	back.Position = UDim2.fromOffset(0, 30)
 	fill.Size = UDim2.fromScale(math.clamp(tonumber(entry.progress) or 0, 0, 1), 1)
+	-- The mission stars (the gold of a full 300 when every mission has 3).
+	local stars = tonumber(entry.stars) or 0
+	local starsMax = tonumber(entry.starsMax) or 0
+	Ui.label(frame, `★ {stars}`, UDim2.fromOffset(COLUMNS.stars.w, 44), {
+		Position = UDim2.new(1, -COLUMNS.stars.right, 0, 6),
+		TextSize = 18,
+		Font = Enum.Font.GothamBlack,
+		TextColor3 = if starsMax > 0 and stars >= starsMax then STAR_GOLD elseif stars > 0 then C.yellow else C.dim,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	})
 	Ui.label(frame, tostring(entry.deliveries or 0), UDim2.fromOffset(COLUMNS.deliveries.w, 44), {
 		Position = UDim2.new(1, -COLUMNS.deliveries.right, 0, 6),
 		TextSize = 18,
@@ -229,17 +242,19 @@ local function render()
 		return
 	end
 	local myPlace: number? = nil
+	local myStars = 0
 	for place, entry in rows do
 		row(entry, place)
 		if entry.userId == player.UserId then
 			myPlace = place
+			myStars = tonumber(entry.stars) or 0
 		end
 	end
 	-- Your place, and the XP the next level needs.
 	local xp = tonumber(player:GetAttribute("Xp")) or 0
 	local level = Levels.levelFor(xp)
 	local next = if level < Config.Levels.MaxLevel then ` · {Levels.xpFor(level + 1) - xp} XP to level {level + 1}` else " · top level"
-	summary.Text = if myPlace then `You: #{myPlace} of {#rows} · LV {level} {Levels.rank(level)}{next}` else `{#rows} couriers on this server`
+	summary.Text = if myPlace then `You: #{myPlace} of {#rows} · LV {level} {Levels.rank(level)} · ★ {myStars}{next}` else `{#rows} couriers on this server`
 end
 
 local function onRows(list: any)
