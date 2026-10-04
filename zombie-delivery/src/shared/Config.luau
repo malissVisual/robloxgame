@@ -740,8 +740,8 @@ export type BusinessDef = {
 Config.DayNight = {
 	DayLength = 960, -- seconds for a whole day (24 h of game time)
 	StartHour = 9, -- the clock when the server starts
-	NightFrom = 19.5, -- the night: from this hour …
-	NightTo = 6, -- … until this one
+	NightFrom = 18.25, -- the night: from this hour (the default Roblox sun sets at about 18:00) …
+	NightTo = 6.25, -- … until this one (sunrise at about 6:00-6:15)
 	NightPay = 1.4, -- pay multiplier for a job finished at night
 	NightWaves = 1.5, -- wave size multiplier at night
 	NightRoam = 1.6, -- roaming zombies multiplier at night
@@ -1153,8 +1153,8 @@ Config.Jobs = {
 		winter = { giver = "cook", receiver = "shopkeeper" },
 		horses = { giver = "rancher", receiver = "rancher" },
 		fuelrun = { giver = "worker", receiver = "shopkeeper" },
-		cashrun = { giver = "clerk", receiver = "officer" },
-		ambulance = { giver = "townsperson", receiver = "doctor" }, -- the patient walks in by themselves (board)
+		cashrun = { giver = "banker", receiver = "soldier" }, -- Mr. Gold, the bank manager; Sergeant Hayes as at the base
+		ambulance = { giver = "townsperson", receiver = "nurse" }, -- Nurse Ada; the patient walks in by themselves (board)
 		pizzarush = { giver = "cook", receiver = "townsperson" },
 	} :: { [string]: { giver: string, receiver: string } },
 	-- The special jobs on the job board (JobTypeDef.board, or no employer): the chance of a first and of a second

@@ -1415,13 +1415,14 @@ function Cargo.update(session: Session, dt: number)
 		render(session)
 	end
 
-	-- Dead, gone, sitting: the piece falls where it was.
+	-- Dead, gone, sitting, out of the crew: the piece falls where it was.
 	local dropped = false
 	for player, held in table.clone(session.held) do
 		local character = held.character
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
 		local root = rootOf(character)
 		local fine = player.Parent ~= nil and player.Character == character and humanoid ~= nil and humanoid.Health > 0 and root ~= nil and humanoid.SeatPart == nil
+			and session.info.allowed(player) -- left or was removed from the crew: put it down
 		if fine and root then
 			if root ~= held.root then
 				-- The body was rebuilt (the avatar loaded): hold it in the new one.

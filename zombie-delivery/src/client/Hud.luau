@@ -268,12 +268,20 @@ function Hud.anyWindowOpen(): boolean
 	return false
 end
 
+-- Set by client/Main.client.luau: closes the windows outside the HUD too (the crew window).
+Hud.onCloseWindows = nil :: (() -> ())?
+
 local function closeWindows()
 	for _, w in windows do
 		w.Visible = false
 	end
 	Leaderboard.close()
+	local cb = Hud.onCloseWindows
+	if cb then
+		cb()
+	end
 end
+Hud.closeWindows = closeWindows
 -- One window at a time: the leaderboard (L) closes the HUD's windows too.
 Leaderboard.onOpen = closeWindows
 
@@ -593,6 +601,11 @@ function Hud.setOffers(list: { any })
 			Ui.label(c, extra .. offer.jobType.description, UDim2.new(1, -260, 0, 34), { Position = UDim2.fromOffset(124, typeY), TextColor3 = C.dim, TextSize = 13, Font = Enum.Font.GothamMedium })
 		end
 		Ui.label(c, Ui.money(offer.pay), UDim2.fromOffset(110, 30), { Position = UDim2.new(1, -244, 0, 36), TextColor3 = C.money, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Right })
+		local nightRate = tonumber(offer.nightPay)
+		if nightRate and nightRate > 1 then
+			-- It is night: finished now, the job pays this many times more (Config.DayNight.NightPay).
+			Ui.label(c, string.format("🌙 NIGHT ×%.1f", nightRate), UDim2.fromOffset(110, 16), { Position = UDim2.new(1, -244, 0, 66), TextColor3 = C.yellow, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Right })
+		end
 		if lockLevel then
 			local lock = Ui.button(c, `🔒 LEVEL {lockLevel}`, UDim2.fromOffset(110, 46), C.grey, function()
 				local what = if offer.jobType then `The {offer.jobType.name}` else `{offer.tierName} jobs`
@@ -1128,16 +1141,20 @@ function Hud.showResult(r: any)
 		line(`Cargo condition {math.floor(r.condition * 100 + 0.5)}%`, Ui.money(payout.conditionPay), nil, 6)
 		line("Speed bonus", "+" .. Ui.money(payout.fastBonus), nil, 7)
 		line(`Enemies killed ({r.kills})`, "+" .. Ui.money(payout.killBonus), nil, 8)
+		local nightBonus = tonumber(payout.nightBonus) or 0
+		if nightBonus > 0 then
+			line("Night bonus", "+" .. Ui.money(nightBonus), nil, 9)
+		end
 		local crewBonus = tonumber(r.crewBonus) or 0
 		if riders > 0 and crewBonus > 0 then
-			line(`Crew bonus ({riders} in the crew)`, "+" .. Ui.money(crewBonus), nil, 9)
+			line(`Crew bonus ({riders} in the crew)`, "+" .. Ui.money(crewBonus), nil, 10)
 		elseif riders > 0 and crewBonus < 0 then
-			line(`Shared with the crew ({riders})`, "-" .. Ui.money(-crewBonus), C.dim, 9)
+			line(`Shared with the crew ({riders})`, "-" .. Ui.money(-crewBonus), C.dim, 10)
 		end
-		line("TOTAL", Ui.money(r.total), C.yellow, 10)
+		line("TOTAL", Ui.money(r.total), C.yellow, 11)
 		local employer = r.employer
 		if employer then
-			line(`{employer.name}: {employer.done} jobs done`, nil, Color3.fromRGB(255, 200, 60), 11)
+			line(`{employer.name}: {employer.done} jobs done`, nil, Color3.fromRGB(255, 200, 60), 12)
 			-- The next reward of that employer (the gun comes first, then the vehicle).
 			local done = tonumber(employer.done) or 0
 			local gunAt = tonumber(employer.weaponAt)
@@ -1145,16 +1162,16 @@ function Hud.showResult(r: any)
 				elseif type(employer.needed) == "number" and done < employer.needed and employer.reward ~= "" then `{employer.needed - done} more for the {employer.reward}`
 				else nil
 			if nextUp then
-				line(nextUp, nil, C.dim, 12)
+				line(nextUp, nil, C.dim, 13)
 			end
 		end
 		local newCar = r.unlockedCar or (employer and employer.unlocked)
 		if newCar then
-			line(`🚚 NEW CAR: the {newCar} is yours!`, nil, C.green, 13)
+			line(`🚚 NEW CAR: the {newCar} is yours!`, nil, C.green, 14)
 		end
 		if type(r.unlockedWeapon) == "string" then
 			local gun = Economy.findWeapon(r.unlockedWeapon)
-			line(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`, nil, C.green, 14)
+			line(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`, nil, C.green, 15)
 		end
 	else
 		line("DELIVERY FAILED", nil, C.red, 1)

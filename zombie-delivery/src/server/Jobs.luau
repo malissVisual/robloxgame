@@ -1288,6 +1288,7 @@ function Jobs.crewStatus(owner: Player): { [string]: any }?
 		total = offer.total,
 		wave = job.wave,
 		timed = offer.jobType ~= nil and offer.jobType.timeLimit ~= nil,
+		crewCount = job.crewCount, -- paid besides the owner: the invited crew and whoever rode along
 	}
 end
 

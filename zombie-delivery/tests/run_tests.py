@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons) in the standalone Luau CLI: every
-tests/*_test.luau file, each must print "ALL CHECKS PASSED".
+Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes) in the
+standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS PASSED".
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 """

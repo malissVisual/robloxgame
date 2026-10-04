@@ -275,7 +275,7 @@ local function renderWorld()
 		{ hour = 9, label = "09:00 Morning" },
 		{ hour = 12, label = "12:00 Noon" },
 		{ hour = 15, label = "15:00 Afternoon" },
-		{ hour = 18.6, label = "18:36 Dusk" },
+		{ hour = 17.75, label = "17:45 Dusk" },
 		{ hour = 20, label = "20:00 Evening" },
 		{ hour = 22, label = "22:00 Night" },
 	}

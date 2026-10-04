@@ -26,6 +26,7 @@
 -- the stars) a traffic car behind them can turn out to be a bandit pickup now and then: it vanishes and
 -- BanditCars.chase spawns the pickup on that spot, heading the same way. Never more than one chasing at a time.
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -357,7 +358,24 @@ local function wreck(car: Car, push: Vector3)
 	car.z += shove.Z
 	car.chassis.CFrame = carFrame(car.x, car.z, car.hx, car.hz) * spin * car.offset
 	for _, d in car.model:GetDescendants() do
-		if d:IsA("BasePart") and d.Transparency < 1 then
+		if not d:IsA("BasePart") then
+			continue
+		end
+		if CollectionService:HasTag(d, DayNight.Tag) then
+			-- A lamp of the car: off for good (DayNight would light it again at the next dusk).
+			CollectionService:RemoveTag(d, DayNight.Tag)
+			d.Material = Enum.Material.SmoothPlastic
+			local dim = d:GetAttribute("DimColor")
+			if typeof(dim) == "Color3" then
+				d.Color = dim
+			end
+			for _, l in d:GetChildren() do
+				if l:IsA("Light") then
+					l.Enabled = false
+				end
+			end
+		end
+		if d.Transparency < 1 then
 			d.Color = d.Color:Lerp(Color3.fromRGB(30, 28, 26), 0.55)
 		end
 	end
@@ -396,18 +414,31 @@ end
 local function gatherObstacles()
 	obstacleCount = 0
 	for _, car in cars do
-		addObstacle(car.x, car.z, car.half, car)
+		-- A wreck is not traffic: the cars behind it wait and turn around, never give way into it.
+		addObstacle(car.x, car.z, car.half, if car.wrecked then false else car)
 	end
+	-- Player cars and bandit cars as three points along their middle (nose, centre, tail), each with half the width:
+	-- a car standing across the road blocks both lanes.
 	for _, playerCar in Vehicles.all() do
-		local p = playerCar.chassis.Position
-		addObstacle(p.X, p.Z, playerCar.size.Z / 2, false)
+		local frame = playerCar.chassis.CFrame
+		local p = frame.Position
+		local r = playerCar.size.X / 2
+		local along = frame.LookVector * math.max(playerCar.size.Z / 2 - r, 0)
+		addObstacle(p.X, p.Z, r, false)
+		addObstacle(p.X + along.X, p.Z + along.Z, r, false)
+		addObstacle(p.X - along.X, p.Z - along.Z, r, false)
 	end
 	local bandits = workspace:FindFirstChild("BanditCars")
 	if bandits then
 		for _, model in bandits:GetChildren() do
 			local chassis = if model:IsA("Model") then model.PrimaryPart else nil
 			if chassis then
-				addObstacle(chassis.Position.X, chassis.Position.Z, 6.5, false)
+				local frame = chassis.CFrame
+				local p = frame.Position
+				local along = frame.LookVector * (6.5 - 3.5)
+				addObstacle(p.X, p.Z, 3.5, false)
+				addObstacle(p.X + along.X, p.Z + along.Z, 3.5, false)
+				addObstacle(p.X - along.X, p.Z - along.Z, 3.5, false)
 			end
 		end
 	end
@@ -424,13 +455,13 @@ local function gatherObstacles()
 	end
 end
 
--- The speed the car may drive with what is ahead in its lane (and whether a traffic car is what stops it).
-local function clearance(car: Car, limit: number): (number, boolean)
+-- The speed the car may drive with what is ahead in its lane (and the traffic car that stops it, if one does).
+local function clearance(car: Car, limit: number): (number, Car?)
 	local look = 8 + car.half + car.speed * 1.1
-	local byTraffic = false
+	local blocker: Car? = nil
 	local now = os.clock()
 	if now < car.ghostUntil then
-		return limit, false
+		return limit, nil
 	end
 	local giveWay = now < car.giveWayUntil
 	for n = 1, obstacleCount do
@@ -452,10 +483,10 @@ local function clearance(car: Car, limit: number): (number, boolean)
 		local allowed = math.max(gap, 0) * 1.3
 		if allowed < limit then
 			limit = allowed
-			byTraffic = other ~= false
+			blocker = if other then other :: Car else nil -- false: not a traffic car
 		end
 	end
-	return limit, byTraffic
+	return limit, blocker
 end
 
 local function moveCar(car: Car, g: TrafficLanes.Graph, dt: number)
@@ -468,10 +499,16 @@ local function moveCar(car: Car, g: TrafficLanes.Graph, dt: number)
 			target = math.min(target, car.cruise * turn.speed + remaining * 0.7)
 		end
 	end
-	local limit, byTraffic = clearance(car, target)
+	local limit, blocker = clearance(car, target)
+	local byTraffic = blocker ~= nil
 	if limit < 1 then
 		car.waited += dt
-		if byTraffic and car.waited > GIVE_WAY then
+		if
+			blocker
+			and car.waited > GIVE_WAY
+			and car.hx * blocker.hx + car.hz * blocker.hz < 0.5 -- across its way, not the car ahead in its queue
+			and os.clock() >= blocker.giveWayUntil -- that one is not already going: only one of the two goes
+		then
 			-- Two cars waiting for each other (a junction): this one drives through.
 			car.giveWayUntil = os.clock() + 2.5
 			car.waited = 0
@@ -541,7 +578,16 @@ local function checkCrashes()
 			end
 			local box = car.chassis.CFrame
 			local size = car.size
-			if inBox(box, size, p, reach) or inBox(box, size, p + along, reach) or inBox(box, size, p - along, reach) then
+			-- The driver hit it where their screen showed it: one animator step and about half a ping behind the
+			-- server (client/TrafficAnimator.luau), so the box is also tried that far back along its heading.
+			local lag = car.speed * (TICK + 0.15)
+			local back = if lag > 0.5 then box - Vector3.new(car.hx, 0, car.hz) * lag else nil
+			if
+				inBox(box, size, p, reach)
+				or inBox(box, size, p + along, reach)
+				or inBox(box, size, p - along, reach)
+				or (back ~= nil and (inBox(back, size, p, reach) or inBox(back, size, p + along, reach) or inBox(back, size, p - along, reach)))
+			then
 				local relative = Vector3.new(car.x - p.X, 0, car.z - p.Z)
 				wreck(car, if relative.Magnitude > 0.1 then relative.Unit * fast else Vector3.zero)
 			end
@@ -829,6 +875,18 @@ local function manageCars(g: TrafficLanes.Graph, list: { Viewer }, now: number)
 					break
 				end
 			end
+			if not crowded then
+				-- Nor on a parked car, a bandit car, a wreck or somebody on foot (gathered this step).
+				for n = 1, obstacleCount do
+					if obstacleCar[n] == false then
+						local r = obstacleR[n] + 12
+						if (obstacleX[n] - x) ^ 2 + (obstacleZ[n] - z) ^ 2 < r * r then
+							crowded = true
+							break
+						end
+					end
+				end
+			end
 			if not crowded and spawnCar(g, edge, s) then
 				spawned += 1
 				break
@@ -934,12 +992,9 @@ local function banditCheck(list: { Viewer }, now: number)
 		end
 		local x, z, hx, hz = pick.x, pick.z, pick.hx, pick.hz
 		removeCar(pick)
-		-- BanditCars.chase puts the pickup SpawnBehind studs behind `position` (heading the way it faces): ask for
-		-- the spot ahead of the traffic car, so it appears where the car was, driving on the same way.
-		local heading = Vector3.new(hx, 0, hz)
-		local position = Vector3.new(x, Map.RoadTop, z) + heading * Config.BanditCar.SpawnBehind
+		-- The pickup appears right where the car was, in its lane, driving on the same way.
 		banditAt[player] = now + rng:NextNumber(BANDIT_GAP[1], BANDIT_GAP[2])
-		if BanditCars.chase(player, position, heading * 30) then
+		if BanditCars.chaseAt(player, carFrame(x, z, hx, hz)) then
 			Net.get("Notice"):FireClient(player, "That car was no civilian: BANDITS on your tail!")
 		end
 	end

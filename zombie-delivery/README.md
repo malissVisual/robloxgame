@@ -3,8 +3,9 @@
 A second Roblox game in this repository (Merge Blades lives in the root). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
 across the map while bandits shoot at you from roadblocks and zombies chase you, carry it to the receiver under fire,
-get paid, and buy better cars, guns, car guns, items and upgrades. Friends ride along
-in your passenger seats, shoot out of the windows and share the pay.
+get paid, earn XP and climb the driver ranks, and buy better cars, guns, car guns, items and upgrades. The clock runs
+from day into night (darker, more zombies, better pay), civilian traffic and people on foot fill the streets, and
+friends join your crew: they ride along in your passenger seats or follow in their own car, shoot and share the pay.
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -37,6 +38,8 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | Jobs / map / backpack | J / M / B | the buttons |
+| Crew panel (invite / accept / leave) | K | CREW button |
+| Leaderboard | L | TOP button |
 | Get in your car / ride in a friend's car | E / R | the prompt |
 | Get out | Space | jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
@@ -70,8 +73,13 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
    * ★ near and quiet · ★★ bandit roadblocks · ★★★ across the city, gunners and brutes · ★★★★ INSANE: the far places.
    * Modifiers on the far jobs: RUSH (less time), FRAGILE (hits cost double), HEAVY LOAD (slower car), WANTED
      (bigger, faster zombie waves), each pays more.
-   * Sometimes the **Winter Run** is on the board: through the tunnel and over the **frozen lake** (the car slides on
-     the ice) to the Ski Lodge.
+   * Some special jobs come and go on the board (`Config.Jobs.BoardSpecials`):
+     * **Winter Run**: through the tunnel and over the **frozen lake** (the car slides on the ice) to the Ski Lodge.
+     * **Cash Transport** (★★★★, level 5): sacks of cash from the **First Zombie Bank** in the army's Armored Truck to
+       the Military Base vault. Every bandit in town wants it: twice as many roadblocks and chases.
+     * **Pizza Rush** (★, level 1): one hot pizza from Luigi's to a hungry customer, 3 minutes on the clock.
+   * A locked job shows **🔒 LEVEL N** instead of ACCEPT: the danger levels need a driver level (★ 1, ★★ 2, ★★★ 4,
+     ★★★★ 6), and so do some special jobs (see **Driver levels**).
    * **Work for the people who run things** (the WORK HERE boards, ★ yellow on the map). They lend you their vehicle
      for the job; after enough jobs the vehicle is yours, and some of them also give you a **gun** (not sold anywhere):
      * **Sunny Hill School** (Suburbs): School Run, pick up kids at 3 homes → **School Bus** after 3 jobs
@@ -83,6 +91,9 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
      * **Silver Spur Ranch** (off the West Highway): Horse Transport, two horses to the Riverside Riding School →
        **Ranch Revolver** after 2 jobs, **Livestock Truck** after 4
      * **Gas Station** (North Highway): Fuel Run, fuel barrels from the Harbor Fuel Depot → **Fuel Truck** after 3
+     * **City Clinic** (Downtown, south-west of the depot; level 3): Ambulance Run, pick up a patient at their home in
+       the clinic's ambulance and rush them to the clinic within 2½ minutes (the patient shuffles in and out by
+       themselves, slowly) → **Ambulance** after 3
 4. **Enemies**:
    * **Without a job** (free roam) only **zombies** are around: 6 – 10 walkers and runners (rarely a brute) shamble
      around you, 150 – 320 studs away, wherever you are out of the safe zone. They wander slowly until they notice
@@ -97,7 +108,8 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
      wait while you are in the safe zone or handle the cargo on foot at a stop (then a few come on foot instead,
      bandits among them). When the job ends its zombies just roam on.
    * **Bandit pickups** come after you on the road (from ★★ up), ram you and shoot from the bed; destroy them with
-     guns, ramming, mines or molotovs ($75). **Bandits** and **gunners** on foot set up roadblocks ahead of you and
+     guns, ramming, mines or molotovs ($75). Now and then a **civilian car** behind you is no civilian: it turns into
+     a bandit pickup right where it was (during a ★★+ job, out of the safe zone, one at a time). **Bandits** and **gunners** on foot set up roadblocks ahead of you and
      shoot your car. Bandits next to your car **steal whole pieces** of your cargo.
    * Zombies: run them over or shoot them (a **headshot kills** at once, a brute takes 4×); they grab a slow car and
      bite it until you shoot them off. The crosshair is a **dot** that turns white over an enemy; an **X** shows only
@@ -105,10 +117,38 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
    A wrecked car (or dying) does **not** end the job: a wreck ruins 25 % of the pieces in it (at least one), press
    CAR for a new car (the company vehicle on a special job) and keep going while the time lasts.
 5. The pay: the job's pay × the share of the pieces delivered × cargo condition (50 – 100 %), + 25 % for finishing
-   in the first half of the time, + $3 per enemy killed; an ordinary delivery also pays $15 per piece. The job fails
-   only if nothing arrived. Every kill also pays on the spot, and so do the **supply crates** (? on the map).
-6. **Crews**: friends press R at your car to ride along. Their kills count for your job, each passenger gets half of
-   the pay and you +15 % per passenger.
+   in the first half of the time, + $3 per enemy killed; an ordinary delivery also pays $15 per piece. Finished **at
+   night** it pays up to × 1.4 on top (the **Night bonus** line of the result; the job board tags the offers
+   🌙 NIGHT × 1.4 while it is night). The job fails only if nothing arrived. Every kill also pays on the spot, and so
+   do the **supply crates** (? on the map). Every job also gives **XP** (see **Driver levels**), a failed one a
+   quarter of it.
+6. **Crews**: press **K** (or **CREW**) and invite a player (up to `Config.Crew.MaxMembers` = 3 members; they get
+   30 s to answer on the invitation card). You can invite with or without a job. Members work on your job: they
+   carry the cargo, their kills count, the purple GPS leads them to your next stop and the panel shows your job and
+   its clock. Friends who press R at your car to ride along are paid the same way. Every member and rider gets half
+   of the pay and the same XP, you get +15 % per member: nobody loses money (the panel shows the split of the base
+   pay). The crew breaks up when your job ends, when you break it up, or for a member who leaves (LEAVE), is removed
+   (REMOVE) or takes a job of their own; a piece a former member was carrying drops where they stand.
+
+**Driver levels.** Every delivery gives XP: stars × 60 + 10 per piece delivered + 4 per kill, × 1.25 at night; a
+failed job gives 25 % (once something was done). 15 levels, each with a rank name (Rookie Courier, Courier, Runner,
+Road Rat, Road Warrior, Veteran Driver, Wasteland Trucker at 8, Convoy Captain at 10, Dead End Legend at 12, King of
+the Road at 15). The levels unlock things, which show **🔒 LEVEL N** until then:
+
+* the danger levels on the job board: ★★ at level 2, ★★★ at 4, ★★★★ at 6
+* special jobs: Ambulance Run 3, Cash Transport 5 (Pizza Rush from 1)
+* cars: Pickup 2, Muscle Car 4
+* guns: SMG 2, Shotgun 3, Hunting Rifle 5, Minigun 8, Grenade Launcher 10
+* car guns: Roof Machine Gun 3, Roof Minigun 7, Roof Grenade Launcher 9
+
+The HUD shows your level, rank and XP bar; the result window the XP of the job (and LEVEL UP). The player list shows
+**Level** (leaderstats). **L** (or **TOP**) opens the server's leaderboard: everybody's level, rank, deliveries and
+money earned, best first, the ones out on a job tagged.
+
+**Day and night.** The clock runs: a whole day takes 16 minutes (`Config.DayNight`, the server starts at 09:00).
+Night is from 18:15 to 06:15, lined up with the Roblox sun: the sky goes dark (the look fades in over dusk and out
+over dawn), the **street lamps**, the lit windows and every car's **headlights** come on. At night the jobs pay
+× 1.4, the waves are × 1.5 bigger and × 1.6 as many zombies roam (smoothly in between at dusk and dawn).
 
 ## The world
 
@@ -117,15 +157,26 @@ containers, the docks on the sea, the **Harbor Fuel Depot** south of the warehou
 **Riding School Lane**, the **Riverside Riding School** by the river, the **North Highway** past the **Gas Station** (an
 employer now) through the **Mount Rot tunnel** to the snowy north: the **Military Base** and, over the frozen lake, the
 **Ski Lodge**; the **West Highway** to the **Radio Station** and the **Old Farm**, with the **Ranch Road** off it to
-**Silver Spur Ranch**. The minimap (bottom left; top left on touch screens) turns with the camera; it and the big map
+**Silver Spur Ranch**. Downtown also has the **First Zombie Bank** (just north of the safe zone, on 6th Ave: the Cash
+Transport loads at its steps) and the **City Clinic** (south-west of the depot, the emergency canopy on 4th Ave).
+
+**Traffic and pedestrians.** Civilian cars drive the roads around every player (on the right, slowing for the turns,
+a random road at every junction; none in the winter, on the ice road or in the tunnel) and people walk the city's
+sidewalks and cross the streets (fewer at night; they run from zombies). The cars stop for anything in their lane
+(your car, a bandit, somebody on foot) and turn around after a while behind something that stays. Ram one at speed
+and it is a smoking wreck, towed away later. They appear out of sight and vanish far away, with caps per player and
+per server (`Config.Traffic`); during a job a bandit pickup can hide among them.
+
+The minimap (bottom left; top left on touch screens) turns with the camera; it and the big map
 (M) show it all. The big map lists every shop, employer and far place with what you can do there: click one to set
 the **GPS**. The route there is drawn along the roads on both maps (yellow to the job's next stop, purple to the GPS
 point), with an arrow over your car and a light beam. Big icons over the buildings show them in the world.
 
 ## Content
 
-* **Cars**: at Dead End Motors the Old Van (free), the Pickup and the Muscle Car; earned by working: School Bus,
-  Armored Truck, Ice Cream Truck, Moving Truck, Monster Truck, Livestock Truck, Fuel Truck.
+* **Cars**: at Dead End Motors the Old Van (free), the Pickup (level 2) and the Muscle Car (level 4); earned by
+  working: School Bus, Armored Truck, Ice Cream Truck, Moving Truck, Monster Truck, Livestock Truck, Fuel Truck,
+  Ambulance.
 * **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher, each with its own model in
   your hand (`shared/GunModels.luau`, the bandits carry the same pistol and rifle): a muzzle flash and a recoil kick on
   every shot, the tracers start at the muzzle. A headshot kills. Earned by working, not sold: the **Ranch Revolver**
@@ -166,22 +217,27 @@ background from there too. The car guns have no icon (they keep their emoji).
 ```
 src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo spots), Roads (the road graph and the
               GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
-              AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo)
+              AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
+              Levels (XP, levels, rank names), TrafficLanes (the traffic's lanes, turns and sidewalks)
 src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats,
               cargo slots, the roof turret of a car gun), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
               the window), Jobs (job board, stops, special jobs, crews, the zombie waves), Cargo (the cargo you carry, lead or board at a
               stop, the pieces in the vehicle), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
-              purchases), Admin (the admin commands, checked on the server)
+              purchases), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
+              the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
+              the crew state), Ranking (the leaderboard rows)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
               Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
               prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
-              Weather, Ui
+              Weather (the day and night look), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
+              job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
-              seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon)
+              seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
+              (XP and ranks), jobs25 (the 2.5 jobs and places), traffic (lanes, turns, spawn spots, sidewalks)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -204,16 +260,17 @@ computed on the server from the car's box (`server/Zombies.luau`).
 python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
-Runs every `tests/*_test.luau` (logic, cargo, roads, cargun, icons). Needs the standalone Luau CLI
+Runs every `tests/*_test.luau` (logic, cargo, roads, cargun, icons, levels, jobs25, traffic). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
-cars, puts any car gun on your car (or none), guns and enemies, teleports to every place, starts any job, sets the time of day, heals, finishes the current
-stop and switches god mode. It
+cars, puts any car gun on your car (or none), guns and enemies, teleports to every place, starts any job, sets the
+driver level (the LV buttons, LEVEL -1 / +1; UNLOCK also sets the top level), sets the time of day (dusk, night,
+dawn … through `DayNight.setClock`), heals, finishes the current stop and switches god mode. It
 is there for a Studio Play test, for the owner of a user-owned place and for the user ids in `Config.Admin.UserIds`;
 the server checks every command again.
 
 ## Ideas for later
 
-More special jobs (an armoured cash transport, a hospital run with a patient, a pizza
-rush with a timer per stop), night shifts, sounds and music, hiring AI couriers that earn while you are away.
+Sounds and music, traffic lights at the junctions, hiring AI couriers that earn while you are away, a crew
+leaderboard.

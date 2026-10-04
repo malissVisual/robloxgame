@@ -196,6 +196,58 @@ end
 
 -- ── Spawning ───────────────────────────────────────────────────────────────
 
+-- The pickup itself, on that spot and heading, after `player`.
+local function spawnAt(player: Player, cf: CFrame, waypoint: Vector3): boolean
+	local npc = Vehicles.buildNpc(DEF, cf)
+	npc.model.Name = "Bandit Pickup"
+	npc.model:SetAttribute("Bandit", true)
+	npc.model:SetAttribute("Health", DEF.health)
+	npc.model:SetAttribute("MaxHealth", DEF.health)
+	npc.model.Parent = folder
+	local mass = npc.chassis.AssemblyMass
+	npc.linear.MaxForce = mass * 160
+	npc.angular.MaxTorque = mass * 6000
+	pcall(function()
+		npc.chassis:SetNetworkOwner(nil)
+	end)
+	table.insert(bandits, {
+		npc = npc,
+		target = player,
+		health = DEF.health,
+		dead = false,
+		born = os.clock(),
+		speed = 0,
+		waypoint = waypoint,
+		nextThink = 0,
+		nextShot = os.clock() + 2,
+		nextSwipe = 0,
+		nextRammed = 0,
+		gun = 1,
+		stuck = 0,
+		reverseUntil = 0,
+		sees = false,
+		lastHitBy = nil,
+		offSince = nil,
+	})
+	return true
+end
+
+-- Is a traffic car (server/Traffic.luau, the folder workspace.Traffic) on that spot? Read from the folder, not the
+-- module (Traffic requires this one).
+local function trafficNear(spot: Vector3): boolean
+	local traffic = workspace:FindFirstChild("Traffic")
+	if not traffic then
+		return false
+	end
+	for _, model in traffic:GetChildren() do
+		local pp = if model:IsA("Model") then model.PrimaryPart else nil
+		if pp and flat(pp.Position - spot).Magnitude < 12 then
+			return true
+		end
+	end
+	return false
+end
+
 -- A bandit pickup on the road behind the player, coming after them.
 function BanditCars.chase(player: Player, position: Vector3, heading: Vector3?): boolean
 	local back = if heading and flat(heading).Magnitude > 5 then -flat(heading).Unit else Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)).Unit
@@ -203,47 +255,21 @@ function BanditCars.chase(player: Player, position: Vector3, heading: Vector3?):
 		local guess = position + back * Tuning.SpawnBehind + Vector3.new(rng:NextNumber(-40, 40), 0, rng:NextNumber(-40, 40))
 		local x, z, dx, dz = Map.nearestRoad(guess.X, guess.Z)
 		local spot = Vector3.new(x, World.RoadTop + 0.5, z)
-		if Map.isSafe(x, z) or Map.onIce(x, z) or (flat(spot - position)).Magnitude < 110 then
+		if Map.isSafe(x, z) or Map.onIce(x, z) or (flat(spot - position)).Magnitude < 110 or trafficNear(spot) then
 			continue
 		end
 		local along = Vector3.new(dx, 0, dz)
 		if along:Dot(position - spot) < 0 then
 			along = -along
 		end
-		local npc = Vehicles.buildNpc(DEF, CFrame.lookAt(spot, spot + along))
-		npc.model.Name = "Bandit Pickup"
-		npc.model:SetAttribute("Bandit", true)
-		npc.model:SetAttribute("Health", DEF.health)
-		npc.model:SetAttribute("MaxHealth", DEF.health)
-		npc.model.Parent = folder
-		local mass = npc.chassis.AssemblyMass
-		npc.linear.MaxForce = mass * 160
-		npc.angular.MaxTorque = mass * 6000
-		pcall(function()
-			npc.chassis:SetNetworkOwner(nil)
-		end)
-		table.insert(bandits, {
-			npc = npc,
-			target = player,
-			health = DEF.health,
-			dead = false,
-			born = os.clock(),
-			speed = 0,
-			waypoint = position,
-			nextThink = 0,
-			nextShot = os.clock() + 2,
-			nextSwipe = 0,
-			nextRammed = 0,
-			gun = 1,
-			stuck = 0,
-			reverseUntil = 0,
-			sees = false,
-			lastHitBy = nil,
-			offSince = nil,
-		})
-		return true
+		return spawnAt(player, CFrame.lookAt(spot, spot + along), position)
 	end
 	return false
+end
+
+-- The pickup exactly there (a traffic car that turns out to be bandits: server/Traffic.luau), heading its way.
+function BanditCars.chaseAt(player: Player, cf: CFrame): boolean
+	return spawnAt(player, cf + Vector3.new(0, World.RoadTop + 0.5 - cf.Position.Y, 0), cf.Position + cf.LookVector * 40)
 end
 
 function BanditCars.clearFor(player: Player)

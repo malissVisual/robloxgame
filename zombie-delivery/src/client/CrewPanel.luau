@@ -36,6 +36,9 @@ local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: sto
 
 local CrewPanel = {}
 
+-- Set by client/Main.client.luau: runs right before the window opens (closes the HUD's windows and the leaderboard).
+CrewPanel.onOpen = nil :: (() -> ())?
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -323,14 +326,15 @@ end
 
 -- The pay split: a bar (the leader's part and every member's) and the numbers.
 local function renderSplit(names: { string }, preview: boolean)
-	local count = math.max(#names, 1)
-	local ownerShare, memberShare = Economy.crewSplit(100, count)
 	local split = crew and crew.split
+	-- The server counts the riders in the owner's car too (they are paid like members).
+	local count = math.max(#names, if type(split) == "table" and type(split.members) == "number" then split.members else 0, 1)
+	local ownerShare, memberShare = Economy.crewSplit(100, count)
 	local ownerPay = if type(split) == "table" and type(split.ownerPay) == "number" and split.members == count then split.ownerPay else nil
 	local memberPay = if type(split) == "table" and type(split.memberPay) == "number" and split.members == count then split.memberPay else nil
 
 	local frame = row(102)
-	Ui.label(frame, if preview then "PAY SPLIT  ·  with one member" else "PAY SPLIT", UDim2.new(1, -28, 0, 20), {
+	Ui.label(frame, if preview and count == 1 then "PAY SPLIT  ·  with one member" else "PAY SPLIT", UDim2.new(1, -28, 0, 20), {
 		Position = UDim2.fromOffset(14, 6),
 		TextSize = 14,
 		Font = Enum.Font.GothamBlack,
@@ -350,7 +354,7 @@ local function renderSplit(names: { string }, preview: boolean)
 	local leaderIsMe = crew ~= nil and type(crew.owner) == "table" and crew.owner.userId == player.UserId
 	local parts = { { share = ownerShare, color = C.yellow, text = if preview or leaderIsMe then "LEADER (YOU)" else "LEADER" } }
 	for index = 1, count do
-		table.insert(parts, { share = memberShare, color = if index % 2 == 1 then C.blue else C.green, text = names[index] or "MEMBER" })
+		table.insert(parts, { share = memberShare, color = if index % 2 == 1 then C.blue else C.green, text = names[index] or (if index > #names and not preview then "RIDER" else "MEMBER") })
 	end
 	for _, part in parts do
 		local width = part.share / total
@@ -370,7 +374,7 @@ local function renderSplit(names: { string }, preview: boolean)
 		})
 		x += width
 	end
-	local numbers = if ownerPay and memberPay then `Leader {Ui.money(ownerPay)}  ·  each member {Ui.money(memberPay)}`
+	local numbers = if ownerPay and memberPay then `Base pay: leader {Ui.money(ownerPay)}  ·  each {Ui.money(memberPay)}  (+ bonuses)`
 		else `Leader {ownerShare} %  ·  each member {memberShare} % of the job's pay`
 	Ui.label(frame, numbers, UDim2.new(1, -28, 0, 20), {
 		Position = UDim2.fromOffset(14, 54),
@@ -570,6 +574,13 @@ end
 local function setOpen(open: boolean)
 	if not window then
 		return
+	end
+	if open then
+		-- One window at a time.
+		local cb = CrewPanel.onOpen
+		if cb then
+			cb()
+		end
 	end
 	window.Visible = open
 	if open then
@@ -1037,6 +1048,10 @@ function CrewPanel.start()
 	end)
 
 	stateRemote:FireServer()
+end
+
+function CrewPanel.close()
+	setOpen(false)
 end
 
 function CrewPanel.isOpen(): boolean

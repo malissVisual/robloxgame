@@ -188,9 +188,10 @@ end
 --   role       "owner" | "member" | nil (no crew yet)
 --   owner      { userId, name, level, rank } (the crew's leader; also set for an owner without members yet)
 --   members    { { userId, name, level, rank } }
---   split      { owner, member, members } % of the job's pay for the owner and for each member with `members`
---              members (at least 1: the preview before anybody joined; Economy.crewSplit, nobody loses money, the
---              shares come on top), ownerPay / memberPay in $ when the job's status tells its pay (`pay`)
+--   split      { owner, member, members, riders } % of the job's pay for the owner and for each member with
+--              `members` paid besides the owner (at least 1: the preview before anybody joined; riders = those of them
+--              who only rode along, Jobs' crewCount; Economy.crewSplit, nobody loses money, the shares come on top),
+--              ownerPay / memberPay in $ of the base pay when the job's status tells it (`pay`, before the bonuses)
 --   status     the owner's job (Crew.statusOf: name, step, position, stars, endsAt …) or nil
 --   invites    incoming: { { userId, name, job?, expiresAt } }
 --   pending    outgoing: { { userId, name, expiresAt } }
@@ -215,10 +216,11 @@ local function stateFor(player: Player): { [string]: any }?
 	for _, member in membersOf(lead) do
 		table.insert(members, entry(member))
 	end
-	local count = math.max(#members, 1)
-	local ownerShare, memberShare = Economy.crewSplit(100, count)
-	local split: { [string]: any } = { owner = ownerShare, member = memberShare, members = count }
 	local status = statusFor(lead)
+	-- Jobs pays everybody who rode in the owner's car too (status.crewCount), not only the invited members.
+	local count = math.max(#members, if status and type(status.crewCount) == "number" then status.crewCount else 0, 1)
+	local ownerShare, memberShare = Economy.crewSplit(100, count)
+	local split: { [string]: any } = { owner = ownerShare, member = memberShare, members = count, riders = math.max(count - #members, 0) }
 	if status and type(status.pay) == "number" then
 		local ownerPay, memberPay = Economy.crewSplit(status.pay, count)
 		split.ownerPay = ownerPay
