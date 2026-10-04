@@ -15,12 +15,21 @@ local Hud = require(Client.Hud)
 local Menu = require(Client.Menu)
 local Weather = require(Client.Weather)
 
-Drive.start()
-Shooting.start()
-ZombieAnimator.start()
-CarVisuals.start()
-Weather.start()
-Hud.start()
+-- Every part starts on its own: one that fails (see the Output) does not take the others down.
+local function safely(name: string, start: () -> ())
+	local ok, err = pcall(function()
+		start()
+	end)
+	if not ok then
+		warn(`[Client] {name} failed to start: {err}`)
+	end
+end
+safely("Drive", Drive.start)
+safely("Shooting", Shooting.start)
+safely("ZombieAnimator", ZombieAnimator.start)
+safely("CarVisuals", CarVisuals.start)
+safely("Weather", Weather.start)
+safely("Hud", Hud.start)
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)
@@ -34,9 +43,20 @@ Net.get("Notice").OnClientEvent:Connect(Hud.toast)
 Net.get("OpenShop").OnClientEvent:Connect(Hud.openShop)
 Net.get("Boost").OnClientEvent:Connect(Drive.boost)
 
-Menu.show(function()
-	Hud.setVisible(true)
+local function play()
+	pcall(function()
+		Hud.setVisible(true)
+	end)
 	Net.get("Play"):FireServer()
+end
+local ok, err = pcall(function()
+	Menu.show(play)
 end)
+if not ok then
+	-- No start screen: straight into the game.
+	warn(`[Client] the start screen failed: {err}`)
+	workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+	play()
+end
 
 Net.get("RequestState"):FireServer()

@@ -95,14 +95,24 @@ Vehicles.onWrecked = function(player, car, reason)
 	end
 end
 
-PlayerData.start()
-Vehicles.start()
-Zombies.start()
-Jobs.start()
-Gun.start()
-Items.start()
-Shops.start()
-BanditCars.start()
+-- Every service starts on its own: one that fails (see the Output) does not take the others down.
+local function safely(name: string, start: () -> ())
+	local ok, err = pcall(function()
+		start()
+	end)
+	if not ok then
+		warn(`[Server] {name} failed to start: {err}`)
+	end
+end
+safely("PlayerData", PlayerData.start)
+safely("Vehicles", Vehicles.start)
+safely("Zombies", Zombies.start)
+safely("Jobs", Jobs.start)
+safely("Gun", Gun.start)
+safely("Items", Items.start)
+safely("Shops", Shops.start)
+safely("BanditCars", BanditCars.start)
+print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
 local playing: { [Player]: boolean } = {}

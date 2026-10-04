@@ -5,6 +5,7 @@
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Ui = require(script.Parent.Ui)
 
@@ -53,9 +54,16 @@ local function fly()
 	end)
 end
 
+-- Freezes / frees your character while the start screen is up. Never waits long (a missing PlayerModule must not
+-- hold the start screen up).
 local function controls(enabled: boolean)
 	pcall(function()
-		local playerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule") :: ModuleScript) :: any
+		local scripts = player:WaitForChild("PlayerScripts", 5)
+		local module = scripts and scripts:WaitForChild("PlayerModule", 5)
+		if not module or not module:IsA("ModuleScript") then
+			return
+		end
+		local playerModule = require(module) :: any
 		local c = playerModule:GetControls()
 		if enabled then
 			c:Enable()
@@ -87,6 +95,8 @@ function Menu.show(onPlay: () -> ())
 			Position = UDim2.fromScale(0, if info[1] == 0 then 0 else 0.55),
 			BackgroundColor3 = Color3.new(0, 0, 0),
 			BorderSizePixel = 0,
+			Active = false,
+			ZIndex = 1,
 		}, gui)
 		Ui.make("UIGradient", {
 			Rotation = 90 + info[2],
@@ -99,6 +109,7 @@ function Menu.show(onPlay: () -> ())
 		Position = UDim2.fromScale(0.5, 0.45),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
+		ZIndex = 5, -- above the dark edges, so nothing covers PLAY
 	}, gui)
 	local camera = workspace.CurrentCamera
 	local viewport = if camera then camera.ViewportSize else Vector2.new(1280, 720)
@@ -124,6 +135,7 @@ function Menu.show(onPlay: () -> ())
 	local play = Ui.button(center, "PLAY", UDim2.fromOffset(300, 84), Color3.fromRGB(70, 190, 90), function() end)
 	play.Position = UDim2.fromOffset(230, 262)
 	play.TextSize = 46
+	play.ZIndex = 10
 	-- A slow pulse.
 	TweenService:Create(play, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { BackgroundColor3 = Color3.fromRGB(100, 225, 120) }):Play()
 
@@ -132,32 +144,37 @@ function Menu.show(onPlay: () -> ())
 		Size = UDim2.new(1, 0, 0, 24),
 		Position = UDim2.new(0, 0, 1, -34),
 		BackgroundTransparency = 1,
-		Text = "WASD drive · hold left mouse shoot · F auto-aim · 1-5 items · M map · J jobs · B backpack",
+		Text = "PLAY (or Enter) · WASD drive · hold left mouse shoot · F auto-aim · 1-5 items · M map · J jobs · B backpack",
 		TextSize = 16,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Color3.fromRGB(200, 200, 200),
 		TextStrokeTransparency = 0.4,
 	}, gui)
 
+	-- The black fade only shows (and only exists in front of PLAY) after PLAY was pressed.
 	local fade = Ui.make("Frame", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
 		BackgroundTransparency = 1,
+		Visible = false,
+		Active = false,
 		ZIndex = 50,
 	}, gui)
 
-	controls(false)
-	fly()
-
 	local pressed = false
-	play.Activated:Connect(function()
+	local keyConnection: RBXScriptConnection? = nil
+	local function start()
 		if pressed then
 			return
 		end
 		pressed = true
+		if keyConnection then
+			keyConnection:Disconnect()
+		end
+		fade.Visible = true
 		local t = TweenService:Create(fade, TweenInfo.new(0.4), { BackgroundTransparency = 0 })
 		t:Play()
-		t.Completed:Wait()
+		task.wait(0.45)
 		flying = false
 		for _, child in gui:GetChildren() do
 			if child ~= fade then
@@ -173,16 +190,30 @@ function Menu.show(onPlay: () -> ())
 				cam.CameraSubject = humanoid
 			end
 		end
-		controls(true)
-		onPlay()
+		task.spawn(controls, true)
+		local ok, err = pcall(function()
+			onPlay()
+		end)
+		if not ok then
+			warn("[Menu] starting the game failed: " .. tostring(err))
+		end
 		task.wait(0.6)
-		local out = TweenService:Create(fade, TweenInfo.new(0.6), { BackgroundTransparency = 1 })
-		out:Play()
-		out.Completed:Wait()
+		TweenService:Create(fade, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
+		task.wait(0.65)
 		gui:Destroy()
 		gui = nil
 		infoLabel = nil
+	end
+	play.Activated:Connect(start)
+	keyConnection = UserInputService.InputBegan:Connect(function(input)
+		local key = input.KeyCode
+		if key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter or key == Enum.KeyCode.ButtonA then
+			task.spawn(start)
+		end
 	end)
+
+	task.spawn(controls, false)
+	fly()
 end
 
 return Menu
