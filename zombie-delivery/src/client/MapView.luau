@@ -1,12 +1,14 @@
 --!strict
--- The minimap (top left, always on) and the big map (M). Both are drawn once from shared/Map.luau (land, water,
--- the mountain, roads, blocks, the shops and the far places) and carry live markers: you (an arrow), the other
--- players, the delivery target (a star; on the minimap it sticks to the edge when it is out of view) and the supply
--- crates near you.
+-- The minimap (always on: bottom left on a computer, top left on a touch screen) and the big map (M / MAP).
+-- Both are drawn once from shared/Map.luau: land, winter, water, the mountain, roads, blocks and an icon for every
+-- landmark (shops, employers, far places). Live markers: you (an arrow), other players, bandit cars (red !),
+-- supply crates (?), the delivery target (★) and your GPS point (◆; both stick to the minimap's edge when far).
+-- The big map lists every landmark with what you can do there; click one to set the GPS.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -20,36 +22,47 @@ local B = Map.Bounds
 local WORLD_W = B.x1 - B.x0
 local WORLD_H = B.z1 - B.z0
 
-type ShopIcon = { text: string, color: Color3 }
-local SHOP_ICONS: { [string]: ShopIcon } = {
-	depot = { text = "📦", color = Color3.fromRGB(255, 190, 60) },
-	dealer = { text = "🚗", color = Color3.fromRGB(255, 90, 70) },
-	guns = { text = "🔫", color = Color3.fromRGB(255, 150, 60) },
-	mechanic = { text = "🔧", color = Color3.fromRGB(110, 180, 255) },
-	supplies = { text = "🛒", color = Color3.fromRGB(120, 230, 110) },
-}
-local SHOP_COLORS = {
-	depot = Color3.fromRGB(150, 110, 40),
-	dealer = Color3.fromRGB(140, 50, 44),
-	guns = Color3.fromRGB(140, 80, 40),
-	mechanic = Color3.fromRGB(50, 90, 140),
-	supplies = Color3.fromRGB(60, 120, 60),
-}
-local DISTRICT_COLORS = {
+local MINI = 230
+local MINI_SCALE = 0.6 -- px per stud: the minimap shows about 380 studs across
+local BIG_SCALE = 0.16 -- the big map is drawn at this scale and then fitted to the screen
+local LIST_W = 320
+
+local BLOCK_COLORS = {
 	downtown = Color3.fromRGB(86, 86, 92),
 	harbor = Color3.fromRGB(96, 88, 78),
 	suburbs = Color3.fromRGB(78, 98, 64),
 }
-
-type Canvas = {
-	content: any,
-	scale: number,
-	markers: any, -- the layer of the live markers inside the content
+local KIND_COLORS = {
+	shop = Color3.fromRGB(70, 170, 90),
+	employer = Color3.fromRGB(210, 150, 30),
+	place = Color3.fromRGB(150, 80, 200),
 }
+
+type Canvas = { content: any, scale: number, markers: any }
+
+-- Set by Hud: the GPS was set (landmark) or cleared (nil).
+MapView.onWaypoint = function(_landmark: Map.Landmark?) end
+
+local target: Vector3? = nil
+local waypoint: Vector3? = nil
+
+function MapView.setTarget(position: Vector3?)
+	target = position
+end
+
+function MapView.setWaypoint(position: Vector3?)
+	waypoint = position
+end
+
+-- ── Drawing ────────────────────────────────────────────────────────────────
+
+local function point(x: number, z: number, scale: number): UDim2
+	return UDim2.fromOffset((x - B.x0) * scale, (z - B.z0) * scale)
+end
 
 local function rect(parent: any, x0: number, z0: number, x1: number, z1: number, scale: number, color: Color3, z: number): any
 	return Ui.make("Frame", {
-		Position = UDim2.fromOffset((x0 - B.x0) * scale, (z0 - B.z0) * scale),
+		Position = point(x0, z0, scale),
 		Size = UDim2.fromOffset((x1 - x0) * scale, (z1 - z0) * scale),
 		BackgroundColor3 = color,
 		BorderSizePixel = 0,
@@ -57,30 +70,9 @@ local function rect(parent: any, x0: number, z0: number, x1: number, z1: number,
 	}, parent)
 end
 
-local function point(x: number, z: number, scale: number): UDim2
-	return UDim2.fromOffset((x - B.x0) * scale, (z - B.z0) * scale)
-end
-
-local function icon(parent: any, text: string, color: Color3, size: number, z: number): any
-	local label = Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(size, size),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = color,
-		BackgroundTransparency = 0.1,
-		Text = text,
-		TextScaled = true,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.new(1, 1, 1),
-		ZIndex = z,
-	}, parent)
-	Ui.corner(label, size)
-	Ui.stroke(label, Color3.new(0, 0, 0), 1.5)
-	return label
-end
-
-local function caption(parent: any, text: string, x: number, z: number, scale: number, size: number, color: Color3, zIndex: number)
+local function caption(parent: any, text: string, x: number, z: number, scale: number, size: number, color: Color3)
 	Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(160, size + 4),
+		Size = UDim2.fromOffset(200, size + 4),
 		Position = point(x, z, scale),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
@@ -88,46 +80,59 @@ local function caption(parent: any, text: string, x: number, z: number, scale: n
 		TextSize = size,
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = color,
-		TextStrokeTransparency = 0.3,
-		ZIndex = zIndex,
+		TextStrokeTransparency = 0.2,
+		ZIndex = 7,
 	}, parent)
 end
 
--- Draws the whole world into a frame at `scale` pixels per stud.
-local function draw(parent: any, scale: number, labels: boolean): Canvas
+local function landmarkIcon(parent: any, landmark: Map.Landmark, scale: number, size: number, clickable: boolean): any
+	local icon = Ui.make(if clickable then "TextButton" else "TextLabel", {
+		Size = UDim2.fromOffset(size, size),
+		Position = point(landmark.x, landmark.z, scale),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = KIND_COLORS[landmark.kind] or Color3.new(0.3, 0.3, 0.3),
+		Text = landmark.icon,
+		TextScaled = true,
+		Font = Enum.Font.GothamBlack,
+		TextColor3 = Color3.new(1, 1, 1),
+		ZIndex = 9,
+	}, parent)
+	Ui.corner(icon, size)
+	Ui.stroke(icon, Color3.new(1, 1, 1), 1.5)
+	return icon
+end
+
+-- The whole world into a frame at `scale` pixels per stud.
+local function draw(parent: any, scale: number, big: boolean): Canvas
 	local content = Ui.make("Frame", {
 		Size = UDim2.fromOffset(WORLD_W * scale, WORLD_H * scale),
 		BackgroundColor3 = Color3.fromRGB(64, 70, 52),
 		BorderSizePixel = 0,
 		ZIndex = 1,
 	}, parent)
-	rect(content, B.x0, B.z0, Map.River.x0, Map.WinterZ, scale, Color3.fromRGB(196, 202, 208), 2) -- winter
-	local lake = Map.Lake
-	rect(content, lake.x0, lake.z0, lake.x1, lake.z1, scale, Color3.fromRGB(150, 200, 225), 3)
+	rect(content, B.x0, B.z0, Map.River.x0, Map.WinterZ, scale, Color3.fromRGB(196, 202, 208), 2)
 	local water = Color3.fromRGB(44, 86, 112)
 	rect(content, Map.River.x0, B.z0, Map.River.x1, B.z1, scale, water, 2)
 	rect(content, Map.Sea.x0, B.z0, B.x1, B.z1, scale, water, 2)
-	-- The mountain.
+	local lake = Map.Lake
+	rect(content, lake.x0, lake.z0, lake.x1, lake.z1, scale, Color3.fromRGB(150, 200, 225), 3)
 	local m = Map.Mountain
-	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.fromRGB(104, 98, 88), 3)
+	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.fromRGB(110, 102, 92), 3)
 	Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, hill)
-	-- Yards.
 	for _, yard in Map.Yards do
-		rect(content, yard.x0, yard.z0, yard.x1, yard.z1, scale, Color3.fromRGB(96, 96, 96), 3)
+		rect(content, yard.x0, yard.z0, yard.x1, yard.z1, scale, Color3.fromRGB(100, 100, 100), 3)
 	end
-	-- Blocks.
 	local half = Map.BlockSize / 2
 	for _, d in Map.Districts do
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
 				local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
-				local special = if d.id == "downtown" then Map.SpecialBlocks[`{i},{j}`] else nil
-				local color = if special then SHOP_COLORS[special] else DISTRICT_COLORS[d.style]
-				rect(content, cx - half, cz - half, cx + half, cz + half, scale, color or DISTRICT_COLORS.downtown, 3)
+				local special = Map.special(d.id, i, j)
+				local color = if special then Color3.fromRGB(120, 110, 70) else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
+				rect(content, cx - half, cz - half, cx + half, cz + half, scale, color, 3)
 			end
 		end
 	end
-	-- Roads.
 	for _, s in Map.Segments do
 		local dx, dz = s.bx - s.ax, s.bz - s.az
 		local length = math.sqrt(dx * dx + dz * dz)
@@ -145,38 +150,19 @@ local function draw(parent: any, scale: number, labels: boolean): Canvas
 			ZIndex = 4,
 		}, content)
 	end
-	-- The safe zone.
 	local safeHalf = Config.City.SafeHalf
 	local safe = rect(content, -safeHalf, -safeHalf, safeHalf, safeHalf, scale, Color3.new(0, 0, 0), 5)
 	safe.BackgroundTransparency = 1
 	Ui.make("UIStroke", { Color = Color3.fromRGB(80, 255, 140), Thickness = 2 }, safe)
-	-- Shops and places.
-	local iconSize = math.clamp(scale * 70, 14, 26)
-	for id, shop in Map.Shops do
-		local info = SHOP_ICONS[id]
-		if info then
-			icon(content, info.text, info.color, iconSize, 6).Position = point(shop.x, shop.z, scale)
-		end
-	end
-	for _, place in Map.Places do
-		icon(content, "📍", Color3.fromRGB(200, 60, 200), iconSize, 6).Position = point(place.x, place.z, scale)
-		if labels then
-			caption(content, place.name, place.x, place.z + 34 / scale * 0.6, scale, 13, Color3.fromRGB(255, 200, 255), 7)
-		end
-	end
-	if labels then
+	if big then
 		for _, d in Map.Districts do
 			local x0, x1, z0 = Map.districtEdges(d)
-			caption(content, d.name:upper(), (x0 + x1) / 2, z0 - 40, scale, 16, Color3.fromRGB(255, 230, 160), 7)
+			caption(content, d.name:upper(), (x0 + x1) / 2, z0 - 60, scale, 14, Color3.fromRGB(255, 230, 160))
 		end
-		for _, s in Map.Connectors do
-			if s.name and s.kind == "bridge" then
-				caption(content, s.name, (s.ax + s.bx) / 2, s.az - 40, scale, 12, Color3.fromRGB(230, 200, 160), 7)
-			end
-		end
-		caption(content, "TUNNEL", m.x + 70, m.z, scale, 13, Color3.fromRGB(230, 230, 230), 7)
-		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 30, scale, 13, Color3.fromRGB(40, 80, 110), 7)
-		caption(content, "WINTER", 0, Map.WinterZ - 60, scale, 16, Color3.fromRGB(60, 70, 80), 7)
+		caption(content, "TUNNEL", m.x + 80, m.z, scale, 11, Color3.fromRGB(230, 230, 230))
+		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 40, scale, 11, Color3.fromRGB(40, 80, 110))
+		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, Color3.fromRGB(60, 70, 80))
+		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, Color3.fromRGB(80, 255, 140))
 	end
 	local markers = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 8 }, content)
 	return { content = content, scale = scale, markers = markers }
@@ -184,66 +170,29 @@ end
 
 -- ── Live markers ───────────────────────────────────────────────────────────
 
-local function arrow(parent: any, size: number, color: Color3): any
+local function symbol(parent: any, text: string, size: number, color: Color3, zIndex: number): any
 	return Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(size, size),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Text = "▲",
+		Text = text,
 		TextScaled = true,
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = color,
 		TextStrokeTransparency = 0,
-		ZIndex = 20,
-	}, parent)
-end
-
-local function star(parent: any, size: number): any
-	return Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(size, size),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundTransparency = 1,
-		Text = "★",
-		TextScaled = true,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.fromRGB(255, 220, 40),
-		TextStrokeTransparency = 0,
 		Visible = false,
-		ZIndex = 21,
+		ZIndex = zIndex,
 	}, parent)
 end
 
-local target: Vector3? = nil
-
-function MapView.setTarget(position: Vector3?)
-	target = position
-end
-
--- Where am I and which way do I face.
-local function myPose(): (Vector3?, Vector3)
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local camera = workspace.CurrentCamera
-	local look = if camera then camera.CFrame.LookVector else Vector3.new(0, 0, -1)
-	if root then
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local seat = humanoid and humanoid.SeatPart
-		local facing = if seat then seat.CFrame.LookVector else root.CFrame.LookVector
-		return root.Position, facing
-	end
-	return nil, look
-end
-
-local function heading(facing: Vector3): number
-	return math.deg(math.atan2(facing.X, -facing.Z))
-end
-
--- A pool of small dots for the other players and the crates.
-type Pool = { parent: any, items: { any }, make: () -> any }
+type Pool = { items: { any }, make: () -> any }
 local function pool(parent: any, make: (any) -> any): Pool
-	return { parent = parent, items = {}, make = function()
-		return make(parent)
-	end }
+	return {
+		items = {},
+		make = function()
+			return make(parent)
+		end,
+	}
 end
 local function take(p: Pool, index: number): any
 	local item = p.items[index]
@@ -260,131 +209,136 @@ local function hideFrom(p: Pool, index: number)
 	end
 end
 
-local function playerDot(parent: any): any
-	local dot = Ui.make("Frame", {
-		Size = UDim2.fromOffset(10, 10),
+local function dot(parent: any, color: Color3, text: string, size: number): any
+	local d = Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(size, size),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(80, 170, 255),
-		ZIndex = 19,
-	}, parent)
-	Ui.corner(dot, 5)
-	Ui.stroke(dot, Color3.new(1, 1, 1), 1.5)
-	Ui.make("TextLabel", {
-		Name = "Label",
-		Size = UDim2.fromOffset(120, 14),
-		Position = UDim2.new(0.5, 0, 0, -10),
-		AnchorPoint = Vector2.new(0.5, 1),
-		BackgroundTransparency = 1,
-		TextSize = 12,
-		Font = Enum.Font.GothamBold,
-		TextColor3 = Color3.fromRGB(180, 220, 255),
-		TextStrokeTransparency = 0.3,
-		ZIndex = 19,
-	}, dot)
-	return dot
-end
-
-local function crateDot(parent: any): any
-	local dot = Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(12, 12),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(255, 200, 40),
-		Text = "?",
-		TextScaled = true,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.new(0, 0, 0),
-		ZIndex = 18,
-	}, parent)
-	Ui.corner(dot, 3)
-	return dot
-end
-
-local function enemyDot(parent: any): any
-	local dot = Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(14, 14),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(220, 40, 40),
-		Text = "!",
+		BackgroundColor3 = color,
+		Text = text,
 		TextScaled = true,
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = Color3.new(1, 1, 1),
-		ZIndex = 19,
+		ZIndex = 18,
 	}, parent)
-	Ui.corner(dot, 7)
-	Ui.stroke(dot, Color3.new(0, 0, 0), 1.5)
-	return dot
+	Ui.corner(d, size)
+	Ui.stroke(d, Color3.new(0, 0, 0), 1.5)
+	return d
 end
 
--- The bandit cars chasing somebody (red "!").
-local function updateEnemies(canvas: Canvas, enemies: Pool)
-	local n = 0
-	local folder = workspace:FindFirstChild("BanditCars")
-	if folder then
-		for _, car in folder:GetChildren() do
-			local chassis = if car:IsA("Model") then car.PrimaryPart else nil
-			if chassis and ((car:GetAttribute("Health") or 0) :: number) > 0 then
-				n += 1
-				take(enemies, n).Position = point(chassis.Position.X, chassis.Position.Z, canvas.scale)
-			end
-		end
-	end
-	hideFrom(enemies, n + 1)
+type Layer = { canvas: Canvas, players: Pool, crates: Pool, enemies: Pool }
+
+local function layer(canvas: Canvas): Layer
+	return {
+		canvas = canvas,
+		players = pool(canvas.markers, function(parent)
+			return dot(parent, Color3.fromRGB(70, 160, 255), "", 12)
+		end),
+		crates = pool(canvas.markers, function(parent)
+			return dot(parent, Color3.fromRGB(230, 180, 30), "?", 12)
+		end),
+		enemies = pool(canvas.markers, function(parent)
+			return dot(parent, Color3.fromRGB(220, 40, 40), "!", 14)
+		end),
+	}
 end
 
-local function updateMarkers(canvas: Canvas, players: Pool, crates: Pool)
+local function updateLayer(l: Layer)
+	local scale = l.canvas.scale
 	local n = 0
 	for _, other in Players:GetPlayers() do
-		if other == player then
-			continue
-		end
 		local character = other.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if root then
+		if other ~= player and root then
 			n += 1
-			local dot = take(players, n)
-			dot.Position = point(root.Position.X, root.Position.Z, canvas.scale)
-			local label = dot:FindFirstChild("Label")
-			if label then
-				label.Text = other.DisplayName
-			end
+			take(l.players, n).Position = point(root.Position.X, root.Position.Z, scale)
 		end
 	end
-	hideFrom(players, n + 1)
-	local c = 0
+	hideFrom(l.players, n + 1)
+	n = 0
 	local loot = workspace:FindFirstChild("Loot")
 	if loot then
 		for _, crate in loot:GetChildren() do
 			if crate:IsA("BasePart") then
-				c += 1
-				take(crates, c).Position = point(crate.Position.X, crate.Position.Z, canvas.scale)
+				n += 1
+				take(l.crates, n).Position = point(crate.Position.X, crate.Position.Z, scale)
 			end
 		end
 	end
-	hideFrom(crates, c + 1)
+	hideFrom(l.crates, n + 1)
+	n = 0
+	local bandits = workspace:FindFirstChild("BanditCars")
+	if bandits then
+		for _, car in bandits:GetChildren() do
+			local chassis = if car:IsA("Model") then car.PrimaryPart else nil
+			if chassis and ((car:GetAttribute("Health") or 0) :: number) > 0 then
+				n += 1
+				take(l.enemies, n).Position = point(chassis.Position.X, chassis.Position.Z, scale)
+			end
+		end
+	end
+	hideFrom(l.enemies, n + 1)
+end
+
+-- Where am I and which way do I face.
+local function myPose(): (Vector3?, Vector3)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return nil, Vector3.new(0, 0, -1)
+	end
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	return root.Position, if seat then seat.CFrame.LookVector else root.CFrame.LookVector
+end
+
+local function heading(facing: Vector3): number
+	return math.deg(math.atan2(facing.X, -facing.Z))
 end
 
 -- ── The minimap ────────────────────────────────────────────────────────────
 
-local MINI = 210
-local MINI_SCALE = 0.42
-
 local mini: any = nil
-local miniCanvas: Canvas? = nil
+local miniLayer: Layer? = nil
 local miniMe: any = nil
 local miniStar: any = nil
-local miniPlayers: Pool? = nil
-local miniCrates: Pool? = nil
-local miniEnemies: Pool? = nil
+local miniGps: any = nil
+
+-- A marker inside the minimap, or pinned to its edge when the point is out of view.
+local function pin(marker: any, from: Vector3, at: Vector3?, scale: number)
+	if not at then
+		marker.Visible = false
+		return
+	end
+	local dx = (at.X - from.X) * scale
+	local dy = (at.Z - from.Z) * scale
+	local limit = MINI / 2 - 12
+	local distance = math.sqrt(dx * dx + dy * dy)
+	if distance > limit then
+		dx, dy = dx / distance * limit, dy / distance * limit
+	end
+	marker.Position = UDim2.fromOffset(MINI / 2 + dx, MINI / 2 + dy)
+	marker.Visible = true
+end
 
 -- ── The big map ────────────────────────────────────────────────────────────
 
 local big: any = nil
-local bigCanvas: Canvas? = nil
+local bigScale: any = nil
+local bigLayer: Layer? = nil
 local bigMe: any = nil
 local bigStar: any = nil
-local bigPlayers: Pool? = nil
-local bigCrates: Pool? = nil
-local bigEnemies: Pool? = nil
+local bigGps: any = nil
+
+local function fitBig()
+	local camera = workspace.CurrentCamera
+	if not camera or not big then
+		return
+	end
+	local viewport = camera.ViewportSize
+	local w = WORLD_W * BIG_SCALE + LIST_W + 30
+	local h = WORLD_H * BIG_SCALE + 56
+	bigScale.Scale = math.clamp(math.min(viewport.X * 0.96 / w, viewport.Y * 0.9 / h), 0.3, 1.6)
+end
 
 function MapView.isOpen(): boolean
 	return big ~= nil and big.Visible
@@ -392,6 +346,7 @@ end
 
 function MapView.toggle()
 	if big then
+		fitBig()
 		big.Visible = not big.Visible
 	end
 end
@@ -405,84 +360,121 @@ function MapView.setVisible(visible: boolean)
 	end
 end
 
-local function updateMini(position: Vector3, facing: Vector3)
-	local canvas = miniCanvas
-	if not canvas or not mini.Visible then
-		return
-	end
-	local px, py = (position.X - B.x0) * canvas.scale, (position.Z - B.z0) * canvas.scale
-	canvas.content.Position = UDim2.fromOffset(MINI / 2 - px, MINI / 2 - py)
-	miniMe.Rotation = heading(facing)
-	if miniPlayers and miniCrates then
-		updateMarkers(canvas, miniPlayers, miniCrates)
-	end
-	if miniEnemies then
-		updateEnemies(canvas, miniEnemies)
-	end
-	-- The target: inside the view, or pinned to the edge.
-	if target then
-		local dx = (target.X - position.X) * canvas.scale
-		local dy = (target.Z - position.Z) * canvas.scale
-		local limit = MINI / 2 - 10
-		local distance = math.sqrt(dx * dx + dy * dy)
-		if distance > limit then
-			dx, dy = dx / distance * limit, dy / distance * limit
-		end
-		miniStar.Position = UDim2.fromOffset(MINI / 2 + dx, MINI / 2 + dy)
-		miniStar.Visible = true
-	else
-		miniStar.Visible = false
-	end
+local function setGps(landmark: Map.Landmark?)
+	waypoint = if landmark then Vector3.new(landmark.x, Map.RoadTop, landmark.z) else nil
+	MapView.onWaypoint(landmark)
 end
 
-local function updateBig(position: Vector3, facing: Vector3)
-	local canvas = bigCanvas
-	if not canvas or not big.Visible then
-		return
+local function buildList(parent: any)
+	local list = Ui.make("ScrollingFrame", {
+		Size = UDim2.new(0, LIST_W, 1, -56),
+		Position = UDim2.new(1, -LIST_W - 8, 0, 48),
+		BackgroundColor3 = Color3.fromRGB(30, 32, 38),
+		BorderSizePixel = 0,
+		ScrollBarThickness = 6,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+		ZIndex = 41,
+	}, parent)
+	Ui.corner(list, 8)
+	Ui.padding(list, 6)
+	Ui.list(list, true, 6)
+	local order = 0
+	local function title(text: string, color: Color3)
+		order += 1
+		Ui.label(list, text, UDim2.new(1, -8, 0, 22), { LayoutOrder = order, TextColor3 = color, TextSize = 16, Font = Enum.Font.GothamBlack, ZIndex = 42 })
 	end
-	bigMe.Position = point(position.X, position.Z, canvas.scale)
-	bigMe.Rotation = heading(facing)
-	if bigPlayers and bigCrates then
-		updateMarkers(canvas, bigPlayers, bigCrates)
+	local function entry(landmark: Map.Landmark)
+		order += 1
+		local button = Ui.make("TextButton", {
+			Size = UDim2.new(1, -8, 0, 52),
+			BackgroundColor3 = Color3.fromRGB(46, 50, 58),
+			Text = "",
+			AutoButtonColor = true,
+			LayoutOrder = order,
+			ZIndex = 42,
+		}, list)
+		Ui.corner(button, 8)
+		Ui.label(button, landmark.icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(4, 6), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 43 })
+		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 15, Font = Enum.Font.GothamBlack, ZIndex = 43 })
+		Ui.label(button, landmark.description, UDim2.new(1, -54, 0, 26), {
+			Position = UDim2.fromOffset(50, 24),
+			TextSize = 12,
+			Font = Enum.Font.GothamMedium,
+			TextColor3 = Color3.fromRGB(190, 195, 200),
+			ZIndex = 43,
+		})
+		button.Activated:Connect(function()
+			setGps(landmark)
+			big.Visible = false
+		end)
 	end
-	if bigEnemies then
-		updateEnemies(canvas, bigEnemies)
-	end
-	if target then
-		bigStar.Position = point(target.X, target.Z, canvas.scale)
-		bigStar.Visible = true
-	else
-		bigStar.Visible = false
+	title("Click a place to set the GPS", Color3.fromRGB(255, 255, 255))
+	local clear = Ui.button(list, "CLEAR GPS", UDim2.new(1, -8, 0, 32), Color3.fromRGB(90, 96, 104), function()
+		setGps(nil)
+	end)
+	order += 1
+	clear.LayoutOrder = order
+	clear.ZIndex = 42
+	type Group = { kind: string, title: string, color: Color3 }
+	local groups: { Group } = {
+		{ kind = "shop", title = "SHOPS  (in the safe zone)", color = KIND_COLORS.shop },
+		{ kind = "employer", title = "WORK  (earn their vehicle)", color = KIND_COLORS.employer },
+		{ kind = "place", title = "FAR PLACES", color = KIND_COLORS.place },
+	}
+	for _, group in groups do
+		title(group.title, group.color)
+		for _, landmark in Map.Landmarks do
+			if landmark.kind == group.kind then
+				entry(landmark)
+			end
+		end
 	end
 end
 
 function MapView.start(gui: any, scaleOf: (any) -> any)
-	-- Minimap: a round-cornered window that clips the drawn world.
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+	-- Minimap.
 	mini = Ui.make("CanvasGroup", {
 		Name = "Minimap",
 		Size = UDim2.fromOffset(MINI, MINI),
-		Position = UDim2.fromOffset(16, 92),
+		Position = if touch then UDim2.fromOffset(16, 92) else UDim2.new(0, 16, 1, -16),
+		AnchorPoint = if touch then Vector2.zero else Vector2.new(0, 1),
 		BackgroundColor3 = Color3.fromRGB(20, 22, 26),
 		BorderSizePixel = 0,
 	}, gui)
 	Ui.corner(mini, 14)
 	scaleOf(mini)
 	local canvas = draw(mini, MINI_SCALE, false)
-	miniCanvas = canvas
-	miniPlayers = pool(canvas.markers, playerDot)
-	miniCrates = pool(canvas.markers, crateDot)
-	miniEnemies = pool(canvas.markers, enemyDot)
-	miniMe = arrow(mini, 22, Color3.fromRGB(255, 255, 255))
+	for _, landmark in Map.Landmarks do
+		landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false)
+	end
+	miniLayer = layer(canvas)
+	miniMe = symbol(mini, "▲", 24, Color3.new(1, 1, 1), 20)
 	miniMe.Position = UDim2.fromScale(0.5, 0.5)
-	miniStar = star(mini, 24)
-	local border = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 30 }, mini)
-	Ui.corner(border, 14)
-	Ui.make("UIStroke", { Color = Color3.fromRGB(255, 196, 50), Thickness = 2 }, border)
+	miniMe.Visible = true
+	miniStar = symbol(mini, "★", 26, Color3.fromRGB(255, 220, 40), 21)
+	miniGps = symbol(mini, "◆", 22, Color3.fromRGB(90, 200, 255), 21)
+	local frame = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 30 }, mini)
+	Ui.corner(frame, 14)
+	Ui.make("UIStroke", { Color = Color3.fromRGB(255, 196, 50), Thickness = 2 }, frame)
 	Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(MINI, 16),
+		Size = UDim2.fromOffset(20, 20),
+		Position = UDim2.new(0.5, -10, 0, 2),
+		BackgroundTransparency = 1,
+		Text = "N",
+		TextSize = 16,
+		Font = Enum.Font.GothamBlack,
+		TextColor3 = Color3.new(1, 1, 1),
+		TextStrokeTransparency = 0,
+		ZIndex = 31,
+	}, mini)
+	Ui.make("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 16),
 		Position = UDim2.new(0, 0, 1, -18),
 		BackgroundTransparency = 1,
-		Text = "M = big map",
+		Text = if touch then "MAP button = big map" else "M = big map & GPS",
 		TextSize = 12,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Color3.fromRGB(230, 230, 230),
@@ -490,55 +482,89 @@ function MapView.start(gui: any, scaleOf: (any) -> any)
 		ZIndex = 31,
 	}, mini)
 
-	-- Big map: fits the screen.
-	local camera = workspace.CurrentCamera
-	local viewport = if camera then camera.ViewportSize else Vector2.new(1280, 720)
-	local scale = math.min((viewport.X * 0.8) / WORLD_W, (viewport.Y * 0.8) / WORLD_H)
+	-- Big map: drawn at a fixed scale, fitted to the screen with a UIScale when it opens.
+	local mapW, mapH = WORLD_W * BIG_SCALE, WORLD_H * BIG_SCALE
 	big = Ui.make("Frame", {
 		Name = "BigMap",
-		Size = UDim2.fromOffset(WORLD_W * scale + 16, WORLD_H * scale + 52),
+		Size = UDim2.fromOffset(mapW + LIST_W + 30, mapH + 56),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundColor3 = Color3.fromRGB(20, 22, 26),
 		Visible = false,
 		ZIndex = 40,
 	}, gui)
+	bigScale = Ui.make("UIScale", {}, big)
 	Ui.corner(big, 12)
 	Ui.stroke(big, Color3.fromRGB(255, 196, 50), 2)
 	Ui.make("TextLabel", {
 		Size = UDim2.new(1, -60, 0, 36),
-		Position = UDim2.fromOffset(12, 4),
+		Position = UDim2.fromOffset(12, 6),
 		BackgroundTransparency = 1,
-		Text = "MAP   ▲ you   ★ delivery   ! bandit car   ? supply crate   📍 far places",
+		Text = "MAP   ▲ you   ★ delivery   ◆ GPS   ! bandit car   ? crate",
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextSize = 18,
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = Color3.fromRGB(255, 196, 50),
+		ZIndex = 41,
 	}, big)
 	local close = Ui.button(big, "X", UDim2.fromOffset(34, 34), Color3.fromRGB(230, 70, 60), function()
 		big.Visible = false
 	end)
 	close.Position = UDim2.new(1, -42, 0, 6)
+	close.ZIndex = 42
 	local holder = Ui.make("Frame", {
-		Size = UDim2.fromOffset(WORLD_W * scale, WORLD_H * scale),
-		Position = UDim2.fromOffset(8, 44),
+		Size = UDim2.fromOffset(mapW, mapH),
+		Position = UDim2.fromOffset(8, 48),
 		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		ZIndex = 40,
 	}, big)
-	local bc = draw(holder, scale, true)
-	bigCanvas = bc
-	bigPlayers = pool(bc.markers, playerDot)
-	bigCrates = pool(bc.markers, crateDot)
-	bigEnemies = pool(bc.markers, enemyDot)
-	bigMe = arrow(bc.markers, 22, Color3.fromRGB(255, 255, 255))
-	bigStar = star(bc.markers, 28)
+	local bc = draw(holder, BIG_SCALE, true)
+	for _, landmark in Map.Landmarks do
+		local icon = landmarkIcon(bc.markers, landmark, BIG_SCALE, 24, true)
+		icon.Activated:Connect(function()
+			setGps(landmark)
+			big.Visible = false
+		end)
+	end
+	bigLayer = layer(bc)
+	bigMe = symbol(bc.markers, "▲", 24, Color3.new(1, 1, 1), 20)
+	bigStar = symbol(bc.markers, "★", 28, Color3.fromRGB(255, 220, 40), 21)
+	bigGps = symbol(bc.markers, "◆", 24, Color3.fromRGB(90, 200, 255), 21)
+	buildList(big)
+
+	local camera = workspace.CurrentCamera
+	if camera then
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitBig)
+	end
 
 	RunService.RenderStepped:Connect(function()
 		local position, facing = myPose()
 		if not position then
 			return
 		end
-		updateMini(position, facing)
-		updateBig(position, facing)
+		if mini.Visible and miniLayer then
+			local px, py = (position.X - B.x0) * MINI_SCALE, (position.Z - B.z0) * MINI_SCALE
+			miniLayer.canvas.content.Position = UDim2.fromOffset(MINI / 2 - px, MINI / 2 - py)
+			miniMe.Rotation = heading(facing)
+			updateLayer(miniLayer)
+			pin(miniStar, position, target, MINI_SCALE)
+			pin(miniGps, position, waypoint, MINI_SCALE)
+		end
+		if big.Visible and bigLayer then
+			bigMe.Visible = true
+			bigMe.Position = point(position.X, position.Z, BIG_SCALE)
+			bigMe.Rotation = heading(facing)
+			updateLayer(bigLayer)
+			bigStar.Visible = target ~= nil
+			if target then
+				bigStar.Position = point(target.X, target.Z, BIG_SCALE)
+			end
+			bigGps.Visible = waypoint ~= nil
+			if waypoint then
+				bigGps.Position = point(waypoint.X, waypoint.Z, BIG_SCALE)
+			end
+		end
 	end)
 end
 

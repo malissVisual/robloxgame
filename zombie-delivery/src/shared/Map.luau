@@ -123,14 +123,24 @@ Map.Districts = {
 	},
 } :: { District }
 
--- Downtown blocks that are not ordinary city blocks.
+-- Blocks that are not ordinary city blocks: the depot, the shops and the employers' buildings.
 Map.SpecialBlocks = {
-	["0,0"] = "depot",
-	["1,0"] = "dealer",
-	["-1,0"] = "guns",
-	["0,1"] = "mechanic",
-	["0,-1"] = "supplies",
-} :: { [string]: string }
+	downtown = {
+		["0,0"] = "depot",
+		["1,0"] = "dealer",
+		["-1,0"] = "guns",
+		["0,1"] = "mechanic",
+		["0,-1"] = "supplies",
+		["2,1"] = "movers",
+	},
+	suburbs = { ["0,2"] = "school" },
+	harbor = { ["1,0"] = "frosty" },
+} :: { [string]: { [string]: string } }
+
+function Map.special(districtId: string, i: number, j: number): string?
+	local blocks = Map.SpecialBlocks[districtId]
+	return if blocks then blocks[`{i},{j}`] else nil
+end
 
 -- The shops (their block centres); you must stand within Radius of one to use it.
 Map.Shops = {
@@ -160,7 +170,65 @@ Map.Places = {
 	{ id = "docks", name = "Harbor Docks", x = 1626, z = 0, nx = 0, nz = 0 },
 	{ id = "gas", name = "Gas Station", x = 146, z = -900, nx = 0, nz = 0 },
 	{ id = "lodge", name = "Ski Lodge", x = -655, z = -2200, nx = 0, nz = 0 },
+	{ id = "school", name = "Sunny Hill School", x = 0, z = 900 + 2 * CELL - BLOCK / 2 - 6, nx = 0, nz = -1 },
+	{ id = "frosty", name = "Frosty's Ice Cream", x = 1080 + CELL - BLOCK / 2 - 6, z = 0, nx = -1, nz = 0 },
+	{ id = "movers", name = "Big Move Movers", x = 2 * CELL + BLOCK / 2 + 6, z = CELL, nx = 1, nz = 0 },
 } :: { Place }
+
+-- Where each employer's board stands (walk up to it to work for them).
+-- (keyed by Config.Employers ids)
+Map.EmployerSpots = {
+	school = { x = 0, z = 900 + 2 * CELL - BLOCK / 2 + 8 },
+	icecream = { x = 1080 + CELL - BLOCK / 2 + 8, z = 0 },
+	movers = { x = 2 * CELL + BLOCK / 2 - 8, z = CELL },
+	army = { x = 330, z = -2385 },
+	farm = { x = -1790, z = 560 },
+} :: { [string]: { x: number, z: number } }
+Map.EmployerRadius = 40
+
+export type Landmark = { id: string, name: string, icon: string, x: number, z: number, kind: string, description: string }
+
+-- Everything worth driving to, for the map's list and the GPS.
+local landmarks: { Landmark } = {
+	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Job board, switch cars, repairs. The safe zone." },
+	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Buy cars." },
+	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Buy guns." },
+	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, free repairs." },
+	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Repair kits, medkits, nitro, molotovs, mines." },
+}
+for _, employer in Config.Employers do
+	local spot = Map.EmployerSpots[employer.id]
+	local reward = ""
+	for _, car in Config.Cars do
+		if car.id == employer.reward then
+			reward = car.name
+		end
+	end
+	if spot then
+		table.insert(landmarks, {
+			id = employer.id,
+			name = employer.name,
+			icon = employer.icon,
+			x = spot.x,
+			z = spot.z,
+			kind = "employer",
+			description = `Work here. After {employer.needed} jobs the {reward} is yours.`,
+		})
+	end
+end
+for _, info in {
+	{ "lodge", "⛷️", "Far north, across the frozen lake." },
+	{ "gas", "⛽", "On the North Highway." },
+	{ "radio", "📡", "At the end of the Radio Road." },
+	{ "docks", "⚓", "The harbor, on the sea." },
+} do
+	for _, place in Map.Places do
+		if place.id == info[1] then
+			table.insert(landmarks, { id = place.id, name = place.name, icon = info[2], x = place.x, z = place.z, kind = "place", description = info[3] })
+		end
+	end
+end
+Map.Landmarks = landmarks
 
 -- ── Roads ──────────────────────────────────────────────────────────────────
 
@@ -318,7 +386,7 @@ function Map.addresses(): { Address }
 	for _, d in Map.Districts do
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
-				if d.id == "downtown" and Map.SpecialBlocks[`{i},{j}`] then
+				if Map.special(d.id, i, j) then
 					continue
 				end
 				local first = math.floor(rand() * 4) + 1

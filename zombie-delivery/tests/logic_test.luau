@@ -188,23 +188,43 @@ check("company cars are not for sale", (function()
 	end
 	return Economy.findCar("icecream") ~= nil and (Economy.findCar("icecream") :: any).company == true
 end)())
+local function placeExists(id: string?): boolean
+	if not id then
+		return true
+	end
+	for _, place in Map.Places do
+		if place.id == id then
+			return true
+		end
+	end
+	return false
+end
 check("job types use real cars and places", (function()
 	for _, t in Config.JobTypes do
 		if t.vehicle and not Economy.findCar(t.vehicle) then
 			return false
 		end
-		if t.place then
-			local found = false
-			for _, place in Map.Places do
-				found = found or place.id == t.place
-			end
-			if not found then
-				return false
-			end
+		if not placeExists(t.pickupAt) or not placeExists(t.dropAt) or t.drops < 1 then
+			return false
 		end
 	end
 	return true
 end)())
+check("every employer has a job, a reward car and a board", (function()
+	for _, e in Config.Employers do
+		local found = false
+		for _, t in Config.JobTypes do
+			found = found or (t.id == e.jobType and t.employer == e.id)
+		end
+		local car = Economy.findCar(e.reward)
+		local spot = Map.EmployerSpots[e.id]
+		if not found or not car or not car.company or car.employer ~= e.id or not spot then
+			return false
+		end
+	end
+	return true
+end)())
+check("landmarks list the shops and the employers", #Map.Landmarks >= 5 + #Config.Employers)
 check("bandits shoot", Config.Zombies.bandit.ranged == true and (Config.Zombies.bandit.range or 0) > 0)
 
 local district, i, j = Map.blockAt(Map.Cell, 0)

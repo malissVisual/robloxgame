@@ -22,6 +22,7 @@ local WALK_TOP = Map.WalkTop
 World.RoadTop = ROAD_TOP
 World.DepotSpawn = Vector3.new(0, WALK_TOP + 3, 26)
 World.ShopPrompts = {} :: { { prompt: ProximityPrompt, shop: string } }
+World.EmployerPrompts = {} :: { { prompt: ProximityPrompt, employer: string } }
 World.DealerSlots = {} :: { CFrame }
 World.RepairSpots = { Vector3.new(0, 0, 0) } :: { Vector3 }
 
@@ -598,6 +599,124 @@ local function buildSafeZone(parent: Instance)
 	end
 end
 
+-- ── The employers ──────────────────────────────────────────────────────────
+
+local buildSchool: (Instance, number, number) -> ()
+local buildFrosty: (Instance, number, number) -> ()
+local buildMovers: (Instance, number, number) -> ()
+
+-- A notice board with a "Work here" prompt (server/Shops.luau opens the employer's window).
+local function employerBoard(parent: Instance, employer: string, facing: Vector3)
+	local spot = Map.EmployerSpots[employer]
+	if not spot then
+		return
+	end
+	local base = Vector3.new(spot.x, WALK_TOP, spot.z)
+	local frame = CFrame.lookAt(base, base + facing)
+	part(parent, "BoardPost", Vector3.new(0.6, 6, 0.6), frame * CFrame.new(-3, 3, 0), Color3.fromRGB(80, 60, 40), Enum.Material.Wood)
+	part(parent, "BoardPost", Vector3.new(0.6, 6, 0.6), frame * CFrame.new(3, 3, 0), Color3.fromRGB(80, 60, 40), Enum.Material.Wood)
+	local board = part(parent, "WorkBoard", Vector3.new(7, 4, 0.4), frame * CFrame.new(0, 5, 0), Color3.fromRGB(240, 200, 60), Enum.Material.Wood)
+	sign(parent, "WORK HERE", Vector3.new(6, 1.6, 0.1), frame * CFrame.new(0, 5.6, -0.3), Color3.fromRGB(30, 30, 30), Color3.fromRGB(240, 200, 60))
+	local name = employer
+	for _, def in Config.Employers do
+		if def.id == employer then
+			name = def.name
+		end
+	end
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "EmployerPrompt"
+	p.ActionText = "Work here"
+	p.ObjectText = name
+	p.HoldDuration = 0
+	p.MaxActivationDistance = 14
+	p.RequiresLineOfSight = false
+	p:SetAttribute("Employer", employer)
+	p.Parent = board
+	table.insert(World.EmployerPrompts, { prompt = p, employer = employer })
+end
+
+function buildSchool(parent: Instance, cx: number, cz: number)
+	local school = folder(parent, "SunnyHillSchool")
+	sidewalk(school, cx, cz)
+	local facing = Vector3.new(0, 0, -1)
+	local frame = shopFrame(cx, cz, facing, 10)
+	building(school, frame, 80, 50, 18, Color3.fromRGB(200, 120, 80), Enum.Material.Brick, 12, 10)
+	sign(school, "SUNNY HILL SCHOOL", Vector3.new(50, 6, 0.5), frame * CFrame.new(0, 22.5, -25), Color3.fromRGB(255, 230, 120))
+	-- The playground behind.
+	for n = -1, 1 do
+		local x = cx + n * 14
+		part(school, "SwingFrame", Vector3.new(0.6, 9, 0.6), CFrame.new(x - 4, WALK_TOP + 4.5, cz + 44), Color3.fromRGB(200, 60, 60), Enum.Material.Metal)
+		part(school, "SwingFrame", Vector3.new(0.6, 9, 0.6), CFrame.new(x + 4, WALK_TOP + 4.5, cz + 44), Color3.fromRGB(200, 60, 60), Enum.Material.Metal)
+		part(school, "SwingTop", Vector3.new(9, 0.6, 0.6), CFrame.new(x, WALK_TOP + 9, cz + 44), Color3.fromRGB(200, 60, 60), Enum.Material.Metal)
+	end
+	part(school, "FlagPole", Vector3.new(0.5, 22, 0.5), CFrame.new(cx + 30, WALK_TOP + 11, cz - 34), Color3.fromRGB(220, 220, 220), Enum.Material.Metal)
+	employerBoard(school, "school", facing)
+end
+
+function buildFrosty(parent: Instance, cx: number, cz: number)
+	local frosty = folder(parent, "FrostysIceCream")
+	sidewalk(frosty, cx, cz, Color3.fromRGB(150, 150, 146))
+	local facing = Vector3.new(-1, 0, 0)
+	local frame = shopFrame(cx, cz, facing, 12)
+	building(frosty, frame, 80, 50, 18, Color3.fromRGB(250, 230, 240), Enum.Material.SmoothPlastic, 24, 14)
+	sign(frosty, "FROSTY'S ICE CREAM", Vector3.new(50, 6, 0.5), frame * CFrame.new(0, 22.5, -25), Color3.fromRGB(255, 90, 170), Color3.fromRGB(250, 250, 255))
+	-- A giant cone on the roof.
+	local roof = (frame * CFrame.new(0, 19, 8)).Position
+	local cone = part(frosty, "Cone", Vector3.new(14, 6, 6), CFrame.new(roof + Vector3.new(0, 7, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(220, 170, 110), Enum.Material.SmoothPlastic)
+	cone.Shape = Enum.PartType.Cylinder
+	local scoop = part(frosty, "Scoop", Vector3.new(9, 9, 9), CFrame.new(roof + Vector3.new(0, 16, 0)), Color3.fromRGB(255, 150, 200), Enum.Material.SmoothPlastic)
+	scoop.Shape = Enum.PartType.Ball
+	employerBoard(frosty, "icecream", facing)
+end
+
+function buildMovers(parent: Instance, cx: number, cz: number)
+	local movers = folder(parent, "BigMoveMovers")
+	sidewalk(movers, cx, cz, Color3.fromRGB(130, 130, 126))
+	local facing = Vector3.new(1, 0, 0)
+	local frame = shopFrame(cx, cz, facing, 12)
+	building(movers, frame, 80, 50, 20, Color3.fromRGB(230, 120, 40), Enum.Material.Metal, 28, 15)
+	sign(movers, "BIG MOVE MOVERS", Vector3.new(50, 6, 0.5), frame * CFrame.new(0, 24.5, -25), Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 90, 30))
+	for _ = 1, 8 do
+		local size = rng:NextNumber(3, 5)
+		part(movers, "Box", Vector3.new(size, size, size), frame * CFrame.new(rng:NextNumber(-30, 30), size / 2 + 0.3, rng:NextNumber(0, 18)), Color3.fromRGB(190, 150, 100), Enum.Material.Cardboard)
+	end
+	employerBoard(movers, "movers", facing)
+end
+
+-- A big icon with the name over every shop, employer and far place, seen from afar (the way to find things).
+local function buildLandmarkTags(parent: Instance)
+	local tags = folder(parent, "LandmarkTags")
+	local colors = { shop = Color3.fromRGB(120, 230, 110), employer = Color3.fromRGB(255, 200, 60), place = Color3.fromRGB(230, 160, 255) }
+	for _, landmark in Map.Landmarks do
+		local anchor = part(tags, "Tag", Vector3.new(0.2, 0.2, 0.2), CFrame.new(landmark.x, 34, landmark.z), Color3.new(0, 0, 0))
+		anchor.Transparency = 1
+		anchor.CanCollide = false
+		anchor.CanQuery = false
+		local gui = Instance.new("BillboardGui")
+		gui.Size = UDim2.fromOffset(220, 70)
+		gui.AlwaysOnTop = true
+		gui.MaxDistance = 700
+		gui.LightInfluence = 0
+		gui.Parent = anchor
+		local icon = Instance.new("TextLabel")
+		icon.Size = UDim2.new(1, 0, 0.6, 0)
+		icon.BackgroundTransparency = 1
+		icon.Text = landmark.icon
+		icon.TextScaled = true
+		icon.Parent = gui
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, 0, 0.4, 0)
+		label.Position = UDim2.fromScale(0, 0.6)
+		label.BackgroundTransparency = 1
+		label.Text = landmark.name
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBlack
+		label.TextColor3 = colors[landmark.kind] or Color3.new(1, 1, 1)
+		label.TextStrokeTransparency = 0.2
+		label.Parent = gui
+	end
+end
+
 local function buildDistrict(parent: Instance, d: Map.District)
 	local district = folder(parent, d.name)
 	buildDistrictRoads(district, d)
@@ -605,8 +724,17 @@ local function buildDistrict(parent: Instance, d: Map.District)
 	for i = d.i0, d.i1 do
 		for j = d.j0, d.j1 do
 			local cx, cz = d.ox + i * CELL, d.oz + j * CELL
-			local special = d.id == "downtown" and Map.SpecialBlocks[`{i},{j}`]
-			if special then
+			local special = Map.special(d.id, i, j)
+			if special == "school" then
+				buildSchool(district, cx, cz)
+				continue
+			elseif special == "frosty" then
+				buildFrosty(district, cx, cz)
+				continue
+			elseif special == "movers" then
+				buildMovers(district, cx, cz)
+				continue
+			elseif special then
 				continue
 			end
 			if d.style == "downtown" then
@@ -819,6 +947,7 @@ local function buildBase(parent: Instance)
 	part(base, "Wall", Vector3.new(piece, 12, 3), CFrame.new(yard.x0 + piece / 2, 6, yard.z1), wall, Enum.Material.Concrete)
 	part(base, "Wall", Vector3.new(piece, 12, 3), CFrame.new(yard.x1 - piece / 2, 6, yard.z1), wall, Enum.Material.Concrete)
 	placeSign(base, "MILITARY BASE · KEEP OUT", cx, yard.z1 + 14, Vector3.new(0, 0, 1), Color3.fromRGB(255, 80, 60))
+	employerBoard(base, "army", Vector3.new(0, 0, 1))
 	for _, corner in { { yard.x0 + 12, yard.z0 + 12 }, { yard.x1 - 12, yard.z0 + 12 }, { yard.x0 + 12, yard.z1 - 12 }, { yard.x1 - 12, yard.z1 - 12 } } do
 		watchtower(base, corner[1], corner[2])
 	end
@@ -897,6 +1026,7 @@ local function buildFarm(parent: Instance)
 		deco(part(farm, "Fence", Vector3.new(yard.x1 - yard.x0, 3, 0.5), CFrame.new(cx, ROAD_TOP + 1.5, side), Color3.fromRGB(150, 120, 80), Enum.Material.WoodPlanks)).CanCollide = true
 	end
 	placeSign(farm, "OLD FARM", yard.x1 + 12, cz + 40, Vector3.new(1, 0, 0), Color3.fromRGB(255, 220, 120))
+	employerBoard(farm, "farm", Vector3.new(1, 0, 0))
 end
 
 local function crane(parent: Instance, x: number, z: number)
@@ -1178,6 +1308,9 @@ function World.build()
 	end)
 	piece("boundary", function()
 		buildBoundary(world)
+	end)
+	piece("landmark tags", function()
+		buildLandmarkTags(world)
 	end)
 	piece("lighting", setLighting)
 end

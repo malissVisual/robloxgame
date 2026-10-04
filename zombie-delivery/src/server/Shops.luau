@@ -216,6 +216,11 @@ function Shops.start()
 			openShop:FireClient(player, entry.shop, nil)
 		end)
 	end
+	for _, entry in World.EmployerPrompts do
+		entry.prompt.Triggered:Connect(function(player)
+			openShop:FireClient(player, "employer", entry.employer)
+		end)
+	end
 	buildShowroom()
 	Net.get("Buy").OnServerEvent:Connect(onBuy)
 	Net.get("Equip").OnServerEvent:Connect(onEquip)

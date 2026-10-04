@@ -193,7 +193,7 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 	end
 	local pay = Economy.jobPay(tier, distance, modifier and modifier.payMultiplier)
 	if jobType then
-		pay += jobType.payPerStop * jobType.stops
+		pay += jobType.payPerStop * #stops
 	end
 	return {
 		tier = tierIndex,
@@ -227,45 +227,45 @@ local function ordinaryOffer(from: Vector3, tierIndex: number): Offer?
 	return finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), pick(JobsConfig.Cargo[tierIndex]), customer, nil)
 end
 
-local function specialOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
+-- A special job's stops from its definition: the pick-ups (at a place, or homes around you), then the deliveries
+-- (the last one at a place, or addresses on the way).
+local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	local stops: { Stop } = {}
-	local customer = "Many customers"
-	if jobType.id == "icecream" then
-		-- Four stops one after another, starting not far away.
-		local avoid: { Map.Address } = {}
-		local x, z = from.X, from.Z
-		for n = 1, jobType.stops do
-			local address = addressAround(x, z, if n == 1 then 150 else 120, if n == 1 then 450 else 300, 0, avoid)
-			if not address then
-				return nil
-			end
-			table.insert(avoid, address)
-			table.insert(stops, { address = address, kind = "drop", hold = jobType.unloadTime, label = `SELL ICE CREAM ({n}/{jobType.stops}) at {address.name}` })
-			x, z = address.x, address.z
-		end
-	elseif jobType.id == "moving" then
-		local house = addressAround(from.X, from.Z, 200, 600, 0, {})
-		if not house then
+	local avoid: { Map.Address } = {}
+	local x, z = from.X, from.Z
+	for n = 1, jobType.pickups do
+		local address = if jobType.pickupAt then placeAddress(jobType.pickupAt) else addressAround(x, z, if n == 1 then 120 else 90, if n == 1 then 450 else 280, 0, avoid)
+		if not address then
 			return nil
 		end
-		local newHome = addressAround(house.x, house.z, 500, 1100, 0, { house })
-		if not newHome then
-			return nil
-		end
-		customer = "The Novak family"
-		table.insert(stops, { address = house, kind = "pickup", hold = jobType.loadTime, label = `LOAD THE FURNITURE at {house.name}` })
-		table.insert(stops, { address = newHome, kind = "drop", hold = jobType.unloadTime, label = `UNLOAD at the new home, {newHome.name}` })
-	else
-		local place = if jobType.place then placeAddress(jobType.place) else nil
-		local pickup = addressAround(from.X, from.Z, JobsConfig.PickupMinDistance, JobsConfig.PickupMaxDistance, 0, {})
-		if not place or not pickup then
-			return nil
-		end
-		customer = place.name
-		table.insert(stops, { address = pickup, kind = "pickup", hold = jobType.loadTime, label = `PICK UP the {jobType.cargo}, {pickup.name}` })
-		table.insert(stops, { address = place, kind = "drop", hold = jobType.unloadTime, label = `DELIVER to the {place.name}` })
+		table.insert(avoid, address)
+		local count = if jobType.pickups > 1 then ` ({n}/{jobType.pickups})` else ""
+		table.insert(stops, { address = address, kind = "pickup", hold = jobType.loadTime, label = `{jobType.pickupLabel}{count} at {address.name}` })
+		x, z = address.x, address.z
 	end
-	return finishOffer(jobType.tier, stops, routeLength(from.X, from.Z, stops), jobType.cargo, customer, jobType)
+	for n = 1, jobType.drops do
+		local last = n == jobType.drops
+		local address = if last and jobType.dropAt then placeAddress(jobType.dropAt) else addressAround(x, z, if jobType.drops > 1 then 150 else 450, if jobType.drops > 1 then 450 else 1100, 0, avoid)
+		if not address then
+			return nil
+		end
+		table.insert(avoid, address)
+		local count = if jobType.drops > 1 then ` ({n}/{jobType.drops})` else ""
+		table.insert(stops, { address = address, kind = "drop", hold = jobType.unloadTime, label = `{jobType.dropLabel} {address.name}{count}` })
+		x, z = address.x, address.z
+	end
+	local customer = "Customers"
+	if jobType.employer then
+		for _, employer in Config.Employers do
+			if employer.id == jobType.employer then
+				customer = employer.name
+			end
+		end
+	elseif jobType.dropAt then
+		customer = stops[#stops].address.name
+	end
+	local offer = finishOffer(jobType.tier, stops, routeLength(from.X, from.Z, stops), jobType.cargo, customer, jobType)
+	return offer
 end
 
 local function describe(index: number, offer: Offer): { [string]: any }
@@ -295,9 +295,18 @@ end
 function Jobs.makeOffers(player: Player)
 	local from = playerPosition(player)
 	local list: { Offer } = {}
-	local special = specialOffer(from, pick(Config.JobTypes))
-	if special then
-		table.insert(list, special)
+	-- Sometimes a special job without an employer (the Winter Run) is on the board too.
+	local boardJobs: { Config.JobTypeDef } = {}
+	for _, jobType in Config.JobTypes do
+		if not jobType.employer then
+			table.insert(boardJobs, jobType)
+		end
+	end
+	if #boardJobs > 0 and rng:NextNumber() < 0.4 then
+		local special = jobOffer(from, pick(boardJobs))
+		if special then
+			table.insert(list, special)
+		end
 	end
 	for tierIndex = 1, #JobsConfig.Tiers do
 		local offer = ordinaryOffer(from, tierIndex)
@@ -336,30 +345,18 @@ local function endJob(player: Player, job: Job)
 	end
 end
 
-local function accept(player: Player, index: any)
-	if jobs[player] then
-		notice:FireClient(player, "Finish your current delivery first.")
-		return
-	end
-	local list = offers[player]
-	if not list or type(index) ~= "number" then
-		return
-	end
-	local offer = list[index]
-	if not offer then
-		return
-	end
+local function startJob(player: Player, offer: Offer): boolean
 	local jobType = offer.jobType
 	if jobType and jobType.vehicle then
-		-- The company lends its vehicle, right next to you.
+		-- The employer lends its vehicle, right next to you.
 		local err = Vehicles.spawn(player, true, jobType.vehicle)
 		if err then
 			notice:FireClient(player, err)
-			return
+			return false
 		end
 	elseif not Vehicles.get(player) then
 		notice:FireClient(player, "Call your car first (CAR button).")
-		return
+		return false
 	end
 	offers[player] = nil
 	jobs[player] = {
@@ -379,6 +376,56 @@ local function accept(player: Player, index: any)
 	Vehicles.setSpeedMultiplier(player, if offer.modifier then offer.modifier.speedMultiplier else 1)
 	send(player)
 	notice:FireClient(player, if jobType then `{jobType.name}: {offer.stops[1].label}` else offer.stops[1].label)
+	return true
+end
+
+local function accept(player: Player, index: any)
+	if jobs[player] then
+		notice:FireClient(player, "Finish your current delivery first.")
+		return
+	end
+	local list = offers[player]
+	if not list or type(index) ~= "number" then
+		return
+	end
+	local offer = list[index]
+	if offer then
+		startJob(player, offer)
+	end
+end
+
+-- Work for an employer: taken at their board.
+local function acceptEmployer(player: Player, employerId: any)
+	if type(employerId) ~= "string" then
+		return
+	end
+	if jobs[player] then
+		notice:FireClient(player, "Finish your current delivery first.")
+		return
+	end
+	local employer: Config.EmployerDef? = nil
+	for _, def in Config.Employers do
+		if def.id == employerId then
+			employer = def
+		end
+	end
+	local spot = Map.EmployerSpots[employerId]
+	local position = playerPosition(player)
+	if not employer or not spot or Vector3.new(position.X - spot.x, 0, position.Z - spot.z).Magnitude > Map.EmployerRadius + 20 then
+		return
+	end
+	local jobType: Config.JobTypeDef? = nil
+	for _, def in Config.JobTypes do
+		if def.id == employer.jobType then
+			jobType = def
+		end
+	end
+	local offer = jobType and jobOffer(position, jobType)
+	if not offer then
+		notice:FireClient(player, "No work right now, try again.")
+		return
+	end
+	startJob(player, offer)
 end
 
 function Jobs.fail(player: Player, reason: string)
@@ -398,12 +445,30 @@ local function complete(player: Player, job: Job, car: Vehicles.Car)
 	local payout = Economy.payout(offer.pay, job.condition, job.endsAt - workspace:GetServerTimeNow(), offer.time, job.kills)
 	local driverTotal, share = Economy.crewSplit(payout.total, #crew)
 	local profile = PlayerData.get(player)
+	local employerInfo: { [string]: any }? = nil
 	if profile then
 		profile.deliveries += 1
+		-- Work for an employer: after enough jobs their vehicle is yours.
+		local employerId = offer.jobType and offer.jobType.employer
+		for _, employer in Config.Employers do
+			if employer.id == employerId then
+				local done = (profile.rep[employer.id] or 0) + 1
+				profile.rep[employer.id] = done
+				local unlocked: string? = nil
+				local rewardCar = Economy.findCar(employer.reward)
+				if rewardCar and not profile.cars[rewardCar.id] and done >= employer.needed then
+					profile.cars[rewardCar.id] = true
+					unlocked = rewardCar.name
+					notice:FireClient(player, `{employer.name} gives you the {rewardCar.name}! Switch to it at the depot garage.`)
+				end
+				employerInfo = { name = employer.name, done = done, needed = employer.needed, reward = if rewardCar then rewardCar.name else "", unlocked = unlocked }
+			end
+		end
 	end
 	PlayerData.addMoney(player, driverTotal)
 	send(player)
 	resultRemote:FireClient(player, {
+		employer = employerInfo,
 		success = true,
 		cargo = offer.cargo,
 		customer = offer.customer,
@@ -626,6 +691,7 @@ function Jobs.start()
 		end
 	end)
 	Net.get("AcceptJob").OnServerEvent:Connect(accept)
+	Net.get("AcceptEmployer").OnServerEvent:Connect(acceptEmployer)
 	Net.get("CancelJob").OnServerEvent:Connect(function(player)
 		Jobs.fail(player, "Delivery cancelled.")
 	end)

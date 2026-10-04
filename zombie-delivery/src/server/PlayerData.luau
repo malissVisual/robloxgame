@@ -21,6 +21,7 @@ export type Profile = {
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
 	carPaint: { [string]: string }, -- car id → paint id
+	rep: { [string]: number }, -- jobs done for each employer (Config.Employers)
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -51,6 +52,7 @@ local function newProfile(): Profile
 		items = { repair = 1, molotov = 2 },
 		paints = { factory = true },
 		carPaint = {},
+		rep = {},
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -109,6 +111,11 @@ local function applySaved(profile: Profile, saved: any)
 			if type(carId) == "string" and type(paintId) == "string" and Economy.findCar(carId) and profile.paints[paintId] then
 				profile.carPaint[carId] = paintId
 			end
+		end
+	end
+	if type(saved.rep) == "table" then
+		for _, employer in Config.Employers do
+			profile.rep[employer.id] = number(saved.rep[employer.id], 0, 100000)
 		end
 	end
 	if type(saved.car) == "string" and profile.cars[saved.car] then
@@ -203,6 +210,7 @@ function PlayerData.save(player: Player)
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,
+		rep = profile.rep,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

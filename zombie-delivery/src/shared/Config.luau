@@ -32,7 +32,8 @@ export type CarDef = {
 	ramPower: number, -- multiplies the damage of running a zombie over
 	color: { number },
 	description: string,
-	company: boolean?, -- a company vehicle: not for sale, the special jobs lend it to you
+	company: boolean?, -- not for sale: an employer lends it for their jobs and gives it to you after a few of them
+	employer: string?, -- who (Config.Employers)
 }
 
 Config.Cars = {
@@ -78,7 +79,7 @@ Config.Cars = {
 	{
 		id = "armored",
 		name = "Armored Truck",
-		price = 9000,
+		price = 0,
 		style = "armored",
 		maxSpeed = 66,
 		accel = 26,
@@ -86,12 +87,14 @@ Config.Cars = {
 		health = 1000,
 		ramPower = 1.8,
 		color = { 80, 96, 70 },
-		description = "A tank with a cargo bay. Two gunners on the roof. 3 passengers.",
+		description = "The army's truck. Two gunners on the roof. 3 passengers.",
+		company = true,
+		employer = "army",
 	},
 	{
 		id = "bus",
 		name = "School Bus",
-		price = 14000,
+		price = 0,
 		style = "bus",
 		maxSpeed = 62,
 		accel = 22,
@@ -99,12 +102,14 @@ Config.Cars = {
 		health = 1300,
 		ramPower = 2.0,
 		color = { 245, 190, 30 },
-		description = "Bring the whole crew. 5 passengers.",
+		description = "The school's bus. Bring the whole crew. 5 passengers.",
+		company = true,
+		employer = "school",
 	},
 	{
 		id = "monster",
 		name = "Monster Truck",
-		price = 22000,
+		price = 0,
 		style = "monster",
 		maxSpeed = 86,
 		accel = 40,
@@ -112,7 +117,9 @@ Config.Cars = {
 		health = 1400,
 		ramPower = 2.5,
 		color = { 60, 130, 220 },
-		description = "Huge wheels. Zombies are just speed bumps. 3 passengers.",
+		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
+		company = true,
+		employer = "farm",
 	},
 	-- Company vehicles (the special jobs lend them, Config.JobTypes).
 	{
@@ -126,8 +133,9 @@ Config.Cars = {
 		health = 650,
 		ramPower = 1.3,
 		color = { 250, 240, 245 },
-		description = "The company's ice cream truck.",
+		description = "Frosty's ice cream truck. 1 passenger.",
 		company = true,
+		employer = "icecream",
 	},
 	{
 		id = "movingtruck",
@@ -140,8 +148,9 @@ Config.Cars = {
 		health = 900,
 		ramPower = 1.6,
 		color = { 230, 120, 40 },
-		description = "The company's moving truck.",
+		description = "Big Move's moving truck. 1 passenger.",
 		company = true,
+		employer = "movers",
 	},
 } :: { CarDef }
 
@@ -633,57 +642,150 @@ export type JobTypeDef = {
 	id: string,
 	name: string,
 	description: string,
-	vehicle: string?, -- the company lends you this car for the job
-	stops: number, -- deliveries after the pickup
-	loadTime: number, -- 0 = no pickup (the truck is already loaded)
+	vehicle: string?, -- the employer lends this car for the job
+	employer: string?, -- taken at the employer's place (Config.Employers), not on the job board
+	pickups: number, -- pick-up stops (0 = the vehicle starts loaded)
+	pickupAt: string?, -- the pick-up is at this place (shared/Map.luau Places), else around you
+	drops: number, -- delivery stops
+	dropAt: string?, -- the last delivery is at this place, else an address
+	loadTime: number,
 	unloadTime: number,
 	payPerStop: number, -- on top of the tier's pay
 	tier: number, -- the danger level (enemies)
-	place: string?, -- the destination is this named place (shared/Map.luau)
 	cargo: string,
+	pickupLabel: string,
+	dropLabel: string,
 }
 
--- Special jobs: one of them is on the job board next to the ordinary deliveries.
+-- Special jobs. The ones with an employer are taken at the employer's place; the others show up on the job board.
 Config.JobTypes = {
+	{
+		id = "schoolrun",
+		name = "School Run",
+		description = "Pick the kids up at three homes and bring them to Sunny Hill School in the school bus.",
+		vehicle = "bus",
+		employer = "school",
+		pickups = 3,
+		pickupAt = nil,
+		drops = 1,
+		dropAt = "school",
+		loadTime = 3,
+		unloadTime = 5,
+		payPerStop = 60,
+		tier = 2,
+		cargo = "Kids",
+		pickupLabel = "PICK UP THE KIDS",
+		dropLabel = "DROP THE KIDS AT",
+	},
+	{
+		id = "armysupply",
+		name = "Army Supply",
+		description = "Load ammo at the Harbor Docks and drive it in the army's armored truck through the tunnel to the base.",
+		vehicle = "armored",
+		employer = "army",
+		pickups = 1,
+		pickupAt = "docks",
+		drops = 1,
+		dropAt = "base",
+		loadTime = 5,
+		unloadTime = 6,
+		payPerStop = 250,
+		tier = 4,
+		cargo = "Ammo Crates",
+		pickupLabel = "LOAD THE AMMO",
+		dropLabel = "DELIVER THE AMMO TO",
+	},
 	{
 		id = "icecream",
 		name = "Ice Cream Route",
-		description = "The company lends you its ice cream truck: sell at 4 stops, hold still while the kids buy.",
+		description = "Load up at Frosty's and sell ice cream at 4 stops. Hold still while the kids buy.",
 		vehicle = "icecream",
-		stops = 4,
-		loadTime = 0,
+		employer = "icecream",
+		pickups = 1,
+		pickupAt = "frosty",
+		drops = 4,
+		dropAt = nil,
+		loadTime = 3,
 		unloadTime = 3,
-		payPerStop = 70,
+		payPerStop = 60,
 		tier = 2,
-		place = nil,
 		cargo = "Ice Cream",
+		pickupLabel = "LOAD THE ICE CREAM",
+		dropLabel = "SELL ICE CREAM AT",
 	},
 	{
 		id = "moving",
 		name = "Moving Day",
-		description = "Load a family's furniture into the company's moving truck and bring it to their new home.",
+		description = "Load a family's furniture at their house and unload it at their new home.",
 		vehicle = "movingtruck",
-		stops = 1,
+		employer = "movers",
+		pickups = 1,
+		pickupAt = nil,
+		drops = 1,
+		dropAt = nil,
 		loadTime = 8,
 		unloadTime = 8,
-		payPerStop = 250,
+		payPerStop = 120,
 		tier = 2,
-		place = nil,
 		cargo = "Furniture",
+		pickupLabel = "LOAD THE FURNITURE",
+		dropLabel = "UNLOAD AT THE NEW HOME,",
+	},
+	{
+		id = "farmrun",
+		name = "Farm Run",
+		description = "Load fresh food at the Old Farm and bring it to two markets in the city.",
+		vehicle = "monster",
+		employer = "farm",
+		pickups = 1,
+		pickupAt = "farm",
+		drops = 2,
+		dropAt = nil,
+		loadTime = 5,
+		unloadTime = 4,
+		payPerStop = 150,
+		tier = 3,
+		cargo = "Fresh Food",
+		pickupLabel = "LOAD THE FOOD",
+		dropLabel = "DELIVER TO THE MARKET AT",
 	},
 	{
 		id = "winter",
 		name = "Winter Run",
 		description = "Through the tunnel to the Ski Lodge, over the frozen lake. The ice is slippery!",
 		vehicle = nil,
-		stops = 1,
+		employer = nil,
+		pickups = 1,
+		pickupAt = nil,
+		drops = 1,
+		dropAt = "lodge",
 		loadTime = 3,
 		unloadTime = 4,
-		payPerStop = 400,
+		payPerStop = 200,
 		tier = 4,
-		place = "lodge",
 		cargo = "Hot Soup",
+		pickupLabel = "PICK UP THE SOUP",
+		dropLabel = "DELIVER TO",
 	},
 } :: { JobTypeDef }
+
+export type EmployerDef = {
+	id: string,
+	name: string,
+	icon: string,
+	jobType: string,
+	reward: string, -- the car you get to keep
+	needed: number, -- jobs done for them before they give it to you
+	pitch: string,
+}
+
+-- People who run something in the world. Work for them: after a few jobs their vehicle is yours.
+Config.Employers = {
+	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bus", needed = 3, pitch = "Our bus driver ran away. Drive the kids to school!" },
+	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "armored", needed = 3, pitch = "We need ammo from the docks. Bring it through the tunnel." },
+	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "icecream", needed = 3, pitch = "People still want ice cream. Sell it for us!" },
+	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "movingtruck", needed = 3, pitch = "Families are getting out of town. Move their things." },
+	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, pitch = "The city is hungry. Take my monster truck to the markets." },
+} :: { EmployerDef }
 
 return Config

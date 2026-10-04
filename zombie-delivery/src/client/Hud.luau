@@ -65,7 +65,14 @@ end
 
 -- ── Money ──────────────────────────────────────────────────────────────────
 
-local moneyPanel = scaled(Ui.panel(gui, UDim2.fromOffset(210, 66), UDim2.fromOffset(16, 16)))
+-- On a computer the chat sits top left: money goes bottom left above the minimap. On a touch screen top left.
+local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local moneyPanel = scaled(Ui.panel(
+	gui,
+	UDim2.fromOffset(230, 66),
+	if touchLayout then UDim2.fromOffset(16, 16) else UDim2.new(0, 16, 1, -256),
+	if touchLayout then Vector2.zero else Vector2.new(0, 1)
+))
 Ui.padding(moneyPanel, 8)
 local moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 32), { TextColor3 = C.money, TextSize = 30, Font = Enum.Font.GothamBlack })
 local statsLabel = Ui.label(moneyPanel, "", UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 34), TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
@@ -305,7 +312,7 @@ local function renderShop()
 	elseif shopId == "depot" then
 		note(shop.body, "Your cars. Buy new ones at Dead End Motors (next door, east).", C.dim, 1)
 		for order, def in Config.Cars do
-			if not state.cars[def.id] or def.company then
+			if not state.cars[def.id] then
 				continue
 			end
 			local c = card(shop.body, 84, order + 1)
@@ -397,9 +404,64 @@ local function renderShop()
 	end
 end
 
+-- ── Employers ──────────────────────────────────────────────────────────────
+
+local employerWindow = window("WORK", Vector2.new(560, 420))
+
+local function openEmployer(id: string)
+	closeWindows()
+	local employer: Config.EmployerDef? = nil
+	for _, def in Config.Employers do
+		if def.id == id then
+			employer = def
+		end
+	end
+	if not employer or not state then
+		return
+	end
+	local jobType: Config.JobTypeDef? = nil
+	for _, def in Config.JobTypes do
+		if def.id == employer.jobType then
+			jobType = def
+		end
+	end
+	local reward = Economy.findCar(employer.reward)
+	local body = employerWindow.body
+	Ui.clear(body)
+	employerWindow.title.Text = `{employer.icon}  {employer.name:upper()}`
+	employerWindow.frame.Visible = true
+	Ui.label(body, `"{employer.pitch}"`, UDim2.new(1, -10, 0, 44), { LayoutOrder = 1, TextColor3 = C.text, TextSize = 17, Font = Enum.Font.GothamMedium })
+	if jobType then
+		Ui.label(body, `{jobType.name}: {jobType.description}`, UDim2.new(1, -10, 0, 44), { LayoutOrder = 2, TextColor3 = C.dim, TextSize = 15, Font = Enum.Font.GothamMedium })
+		Ui.label(body, `Danger {string.rep("★", jobType.tier)} · they lend you their {if reward then reward.name else "vehicle"} for the job`, UDim2.new(1, -10, 0, 22), { LayoutOrder = 3, TextColor3 = STAR_COLORS[jobType.tier] or C.red, TextSize = 15 })
+	end
+	local done = state.rep[employer.id] or 0
+	local owned = reward ~= nil and state.cars[reward.id] == true
+	local progress = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 48), BackgroundTransparency = 1, LayoutOrder = 4 }, body)
+	Ui.label(progress, if owned then `The {if reward then reward.name else "vehicle"} is yours! Keep working here for good pay.` else `Jobs done: {done}/{employer.needed}. Then the {if reward then reward.name else "vehicle"} is yours to keep!`, UDim2.new(1, 0, 0, 22), {
+		TextColor3 = if owned then C.green else C.yellow,
+		TextSize = 16,
+	})
+	local back, fill = Ui.bar(progress, UDim2.new(1, 0, 0, 14), C.yellow)
+	back.Position = UDim2.fromOffset(0, 28)
+	fill.Size = UDim2.fromScale(math.clamp(done / employer.needed, 0, 1), 1)
+	if job then
+		Ui.label(body, "Finish your current delivery first.", UDim2.new(1, -10, 0, 24), { LayoutOrder = 5, TextColor3 = C.red, TextSize = 16 })
+	else
+		local take = Ui.button(body, "TAKE THE JOB", UDim2.fromOffset(240, 50), C.green, function()
+			Net.get("AcceptEmployer"):FireServer(employer.id)
+			employerWindow.frame.Visible = false
+		end)
+		take.LayoutOrder = 6
+	end
+end
+
 function Hud.openShop(id: string, focus: string?)
 	if id == "jobs" then
 		openJobs()
+		return
+	elseif id == "employer" then
+		openEmployer(focus or "")
 		return
 	end
 	closeWindows()
@@ -444,9 +506,20 @@ local function renderBackpack()
 			end)
 		end
 	elseif backpackTab == "cars" then
-		note(backpack.body, "Switch cars at the depot garage, buy new ones at Dead End Motors.", C.dim, 1)
+		note(backpack.body, "Switch cars at the depot garage. Buy at Dead End Motors, or earn one by working (M = map).", C.dim, 1)
 		for order, def in Config.Cars do
-			if state.cars[def.id] and not def.company then
+			if not state.cars[def.id] and def.employer then
+				-- Not yours yet: who gives it to you.
+				local c = card(backpack.body, 84, order + 1)
+				for _, employer in Config.Employers do
+					if employer.id == def.employer then
+						local done = state.rep[employer.id] or 0
+						cardText(c, `{def.name}  (locked)`, `Work for {employer.name}: {done}/{employer.needed} jobs`, def.description)
+					end
+				end
+				continue
+			end
+			if state.cars[def.id] then
 				local c = card(backpack.body, 84, order + 1)
 				cardText(c, def.name, carStats(def), def.description)
 				if state.car == def.id then
@@ -512,6 +585,13 @@ function Hud.showResult(r: any)
 			line(`Crew bonus ({r.crew} riding)`, "+" .. Ui.money(r.crewBonus), nil, 7)
 		end
 		line("TOTAL", Ui.money(r.total), C.yellow, 8)
+		local employer = r.employer
+		if employer then
+			line(`{employer.name}: {math.min(employer.done, employer.needed)}/{employer.needed} jobs`, nil, Color3.fromRGB(255, 200, 60), 9)
+			if employer.unlocked then
+				line(`NEW CAR: the {employer.unlocked} is yours!`, nil, C.green, 9)
+			end
+		end
 	else
 		line("DELIVERY FAILED", nil, C.red, 1)
 		Ui.label(result.body, r.reason or "", UDim2.new(1, -10, 0, 60), { LayoutOrder = 2, TextColor3 = C.text })
@@ -719,6 +799,53 @@ local function hideGuide()
 end
 hideGuide()
 
+local function placeGuide(p: Vector3, color: Color3)
+	for _, part in { beacon, ring } do
+		part.Color = color
+	end
+	for _, a in arrowParts do
+		a.part.Color = color
+	end
+	labelText.TextColor3 = color
+	beacon.CFrame = CFrame.new(p + Vector3.new(0, 120, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	ring.CFrame = CFrame.new(p + Vector3.new(0, 0.15, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	label.CFrame = CFrame.new(p + Vector3.new(0, 10, 0))
+end
+
+local function pointArrow(from: Model?, flat: Vector3)
+	if from and from.PrimaryPart and flat.Magnitude > 1 then
+		local origin = from.PrimaryPart.Position + Vector3.new(0, 11, 0)
+		local frame = CFrame.lookAt(origin, origin + flat.Unit)
+		for _, a in arrowParts do
+			a.part.CFrame = frame * a.offset
+		end
+	else
+		for _, a in arrowParts do
+			a.part.CFrame = HIDDEN
+		end
+	end
+end
+
+-- The GPS: a place picked on the big map (the job's target goes first).
+local GPS_COLOR = Color3.fromRGB(90, 200, 255)
+local gps: { position: Vector3, name: string }? = nil
+
+MapView.onWaypoint = function(landmark)
+	if landmark then
+		gps = { position = Vector3.new(landmark.x, Map.RoadTop, landmark.z), name = landmark.name }
+		Hud.toast(`GPS: {landmark.name}`)
+	else
+		gps = nil
+	end
+	if not job then
+		if gps then
+			placeGuide(gps.position, GPS_COLOR)
+		else
+			hideGuide()
+		end
+	end
+end
+
 local function myPosition(): Vector3?
 	local car = Drive.seatedCar() or Drive.myCar()
 	if car and car.PrimaryPart then
@@ -752,6 +879,9 @@ function Hud.setJob(newJob: any)
 		hideGuide()
 		loadBack.Visible = false
 		MapView.setTarget(nil)
+		if gps then
+			placeGuide(gps.position, GPS_COLOR)
+		end
 		return
 	end
 	local pickup = job.stage == "pickup"
@@ -764,18 +894,8 @@ function Hud.setJob(newJob: any)
 	conditionFill.BackgroundColor3 = if job.condition > 0.6 then C.yellow elseif job.condition > 0.3 then Color3.fromRGB(255, 140, 40) else C.red
 	conditionText.Text = `Cargo condition {math.floor(job.condition * 100 + 0.5)}%`
 	jobKills.Text = `Zombies killed: {job.kills}   ·   Pay {Ui.money(job.pay)}`
-	local color = if pickup then PICKUP_COLOR else C.yellow
-	for _, p in { beacon, ring } do
-		p.Color = color
-	end
-	for _, a in arrowParts do
-		a.part.Color = color
-	end
-	labelText.TextColor3 = color
 	local p = job.position
-	beacon.CFrame = CFrame.new(p + Vector3.new(0, 120, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	ring.CFrame = CFrame.new(p + Vector3.new(0, 0.15, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	label.CFrame = CFrame.new(p + Vector3.new(0, 10, 0))
+	placeGuide(p, if pickup then PICKUP_COLOR else C.yellow)
 	MapView.setTarget(p)
 	-- Loading / unloading progress.
 	local progress = job.progress or 0
@@ -869,17 +989,21 @@ RunService.RenderStepped:Connect(function()
 			local verb = if job.stage == "pickup" then "load" else "unload"
 			jobInfo.Text = `{distance} m · stop in the circle and hold still to {verb}`
 			labelText.Text = (if job.stage == "pickup" then `PICK UP\n` else `{job.customer}\n`) .. `{distance} m`
-			local arrowFrom = seatedIn or car
-			if arrowFrom and arrowFrom.PrimaryPart and flat.Magnitude > 1 then
-				local origin = arrowFrom.PrimaryPart.Position + Vector3.new(0, 11, 0)
-				local frame = CFrame.lookAt(origin, origin + flat.Unit)
-				for _, a in arrowParts do
-					a.part.CFrame = frame * a.offset
-				end
+			pointArrow(seatedIn or car, flat)
+		end
+	elseif gps then
+		local position = myPosition()
+		if position then
+			local flat = Vector3.new(gps.position.X - position.X, 0, gps.position.Z - position.Z)
+			local distance = math.floor(flat.Magnitude)
+			labelText.Text = `{gps.name}\n{distance} m`
+			if distance < 30 then
+				Hud.toast(`You are at {gps.name}.`)
+				gps = nil
+				MapView.setWaypoint(nil)
+				hideGuide()
 			else
-				for _, a in arrowParts do
-					a.part.CFrame = HIDDEN
-				end
+				pointArrow(seatedIn or car, flat)
 			end
 		end
 	end

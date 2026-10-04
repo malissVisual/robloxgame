@@ -28,6 +28,7 @@ local NAMES = {
 	"Boost", -- server → client: nitro (seconds, speed multiplier)
 	"OpenShop", -- server → client: a shop prompt was used (shop id, focused item id or nil)
 	"Paint", -- client → server: buy / apply a paint job on the equipped car (paint id)
+	"AcceptEmployer", -- client → server: take a job from the employer whose board you stand at (employer id)
 }
 
 local folder: Folder
