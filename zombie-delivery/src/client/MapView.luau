@@ -7,7 +7,7 @@
 -- Like GTA, the way there is drawn along the roads (shared/Roads.luau): yellow to the job's target, purple to the
 -- GPS point. A route is worked out again when the target changes or you leave it by more than ROUTE_OFF studs, and
 -- the part behind you is cut off as you drive. The minimap turns with the camera (north marker on its edge) and
--- zooms out a little at speed; it updates MINI_HZ times a second.
+-- zooms out a little at speed; it moves every frame and redraws its tiles and routes MINI_HZ times a second.
 -- The big map lists every landmark with what you can do there; click one to set the GPS.
 
 local Players = game:GetService("Players")
@@ -540,7 +540,8 @@ local function pin(marker: any, from: Vector3, at: Vector3?, scale: number)
 	marker.Visible = true
 end
 
-local function updateMini(position: Vector3, facing: Vector3, speed: number)
+-- Every frame: the turn, the position and the pins; `heavy` (MINI_HZ) also redraws the tiles and the routes.
+local function updateMini(position: Vector3, facing: Vector3, speed: number, heavy: boolean, dt: number)
 	local canvas = miniCanvas
 	if not canvas or not miniLayer then
 		return
@@ -556,7 +557,7 @@ local function updateMini(position: Vector3, facing: Vector3, speed: number)
 	miniRotor.Rotation = -cameraHeading
 	-- Zoom out a little at speed.
 	local wanted = 1 - (1 - ZOOM_OUT) * math.clamp((speed - 30) / 80, 0, 1)
-	zoom += (wanted - zoom) * 0.12
+	zoom += (wanted - zoom) * (1 - 0.88 ^ (dt * MINI_HZ))
 	if math.abs(miniZoom.Scale - zoom) > 0.002 then
 		miniZoom.Scale = zoom
 	end
@@ -570,9 +571,11 @@ local function updateMini(position: Vector3, facing: Vector3, speed: number)
 			icon.Rotation = cameraHeading
 		end
 	end
-	updateLayer(miniLayer, cameraHeading)
-	drawLine(canvas.gps, gpsRoute, MINI_SCALE)
-	drawLine(canvas.job, jobRoute, MINI_SCALE)
+	if heavy then
+		updateLayer(miniLayer, cameraHeading)
+		drawLine(canvas.gps, gpsRoute, MINI_SCALE)
+		drawLine(canvas.job, jobRoute, MINI_SCALE)
+	end
 	local scale = MINI_SCALE * zoom
 	pin(miniStar, position, target, scale)
 	pin(miniGps, position, waypoint, scale)
@@ -716,18 +719,20 @@ local function updateBig(position: Vector3, facing: Vector3)
 	end
 end
 
-local function refresh()
+local function refresh(heavy: boolean, dt: number)
 	local position, facing, speed = myPose()
 	if not position then
 		return
 	end
-	local now = os.clock()
-	updateRoute(jobRoute, position, now)
-	updateRoute(gpsRoute, position, now)
-	if mini.Visible then
-		updateMini(position, facing, speed)
+	if heavy then
+		local now = os.clock()
+		updateRoute(jobRoute, position, now)
+		updateRoute(gpsRoute, position, now)
 	end
-	if big.Visible then
+	if mini.Visible then
+		updateMini(position, facing, speed, heavy, dt)
+	end
+	if heavy and big.Visible then
 		updateBig(position, facing)
 	end
 end
@@ -741,7 +746,7 @@ function MapView.toggle()
 		fitBig()
 		big.Visible = not big.Visible
 		if big.Visible then
-			refresh()
+			refresh(true, 0)
 		end
 	end
 end
@@ -900,12 +905,12 @@ function MapView.start(gui: any, column: any)
 	local elapsed = 0
 	RunService.RenderStepped:Connect(function(dt)
 		elapsed += dt
-		if elapsed < 1 / MINI_HZ then
-			return
+		local heavy = elapsed >= 1 / MINI_HZ
+		if heavy then
+			elapsed = math.min(elapsed - 1 / MINI_HZ, 1 / MINI_HZ)
 		end
-		elapsed = math.min(elapsed - 1 / MINI_HZ, 1 / MINI_HZ)
 		if mini.Visible or big.Visible then
-			refresh()
+			refresh(heavy, dt)
 		end
 	end)
 end

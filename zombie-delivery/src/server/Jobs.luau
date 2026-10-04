@@ -163,6 +163,7 @@ local function payload(job: Job): { [string]: any }
 		carrying = status.carrying,
 		person = status.person,
 		pile = status.pile,
+		looseAt = status.looseAt, -- a piece put down (G): pick it up again
 		piece = offer.piece,
 		pieces = offer.plural,
 		itemKind = offer.kind,

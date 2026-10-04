@@ -429,7 +429,7 @@ end
 
 local function downtownBlock(parent: Instance, cx: number, cz: number, centerFactor: number)
 	sidewalk(parent, cx, cz)
-	local inset = 6
+	local inset = 10 -- the towers end 10+ studs inside the block: room for a receiver and the pieces at an address
 	local lot = (BLOCK - inset * 2) / 2
 	for a = 0, 1 do
 		for b = 0, 1 do
@@ -457,20 +457,21 @@ end
 
 local function harborBlock(parent: Instance, cx: number, cz: number)
 	sidewalk(parent, cx, cz, Color3.fromRGB(120, 120, 116))
-	-- A warehouse on one half, stacked containers on the other.
+	-- A warehouse on one half, stacked containers on the other; both stay 10 studs inside the block's edge (an
+	-- address's receiver and pieces stand there).
 	local flip = if rng:NextNumber() < 0.5 then -1 else 1
-	local w, d, h = BLOCK - 14, BLOCK / 2 - 8, rng:NextNumber(16, 24)
-	local wz = cz + flip * (BLOCK / 4)
+	local w, d, h = BLOCK - 26, BLOCK / 2 - 14, rng:NextNumber(16, 24)
+	local wz = cz + flip * (BLOCK / 4 - 3)
 	part(parent, "Warehouse", Vector3.new(w, h, d), CFrame.new(cx, WALK_TOP + h / 2, wz), Color3.fromRGB(110 + rng:NextInteger(-20, 20), 100, 90), Enum.Material.CorrodedMetal)
 	part(parent, "WarehouseRoof", Vector3.new(w + 2, 1.5, d + 2), CFrame.new(cx, WALK_TOP + h + 0.75, wz), Color3.fromRGB(70, 70, 74), Enum.Material.Metal)
 	sign(parent, "WAREHOUSE " .. tostring(rng:NextInteger(1, 40)), Vector3.new(24, 4, 0.4), CFrame.new(cx, WALK_TOP + h - 3, wz - flip * (d / 2 + 0.3)) * CFrame.Angles(0, if flip > 0 then 0 else math.pi, 0), Color3.fromRGB(240, 240, 240), Color3.fromRGB(60, 60, 64))
-	local sz = cz - flip * (BLOCK / 4)
+	local sz = cz - flip * (BLOCK / 4 - 5)
 	for row = -1, 1, 2 do
 		for col = -2, 2 do
 			if rng:NextNumber() < 0.75 then
 				local stack = rng:NextInteger(1, 3)
 				for level = 0, stack - 1 do
-					container(parent, CFrame.new(cx + col * 9.5, WALK_TOP + 4.25 + level * 8.6, sz + row * 11) * CFrame.Angles(0, math.rad(rng:NextNumber(-2, 2)), 0))
+					container(parent, CFrame.new(cx + col * 9.5, WALK_TOP + 4.25 + level * 8.6, sz + row * 10.5) * CFrame.Angles(0, math.rad(rng:NextNumber(-2, 2)), 0))
 				end
 			end
 		end

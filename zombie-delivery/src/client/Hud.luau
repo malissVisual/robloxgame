@@ -1349,6 +1349,10 @@ local function footTarget(): (Vector3?, string?, boolean)
 	local pickup = job.stage == "pickup"
 	local holding = myCarrying() ~= nil
 	local aboard = inVehicle() or 0
+	if not holding and typeof(job.looseAt) == "Vector3" then
+		-- A piece put down (G): the step says to pick it up again first.
+		return job.looseAt, if handling == "lead" then "CATCH IT" else "PICK IT UP", false
+	end
 	local toVehicle = if pickup then holding else (not holding and aboard > 0)
 	if toVehicle then
 		local car = Drive.myCar()

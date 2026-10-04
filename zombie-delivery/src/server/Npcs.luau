@@ -59,6 +59,8 @@ type State = {
 
 local states: { [Model]: State } = {}
 local templates: { [string]: Model } = {}
+local baseRigs: { [boolean]: Model } = {} -- the plain R15 rigs (adult, child) every look is dressed on
+local warmed = false
 local folder: Folder? = nil
 local started = false
 
@@ -66,11 +68,38 @@ local function rgb(c: { number }?, fallback: Color3): Color3
 	return if c then Color3.fromRGB(c[1], c[2], c[3]) else fallback
 end
 
+-- The two base rigs, made once (CreateHumanoidModelFromDescription yields: World.build waits for it at server start,
+-- so Npcs.spawn never yields later in the Jobs Heartbeat). A failed load means blocky people, without retries.
+local function warmBases()
+	if warmed then
+		return
+	end
+	warmed = true
+	for _, child in { false, true } do
+		local ok, rig = pcall(function()
+			local d = Instance.new("HumanoidDescription")
+			if child then
+				d.HeightScale = 0.72
+				d.WidthScale = 0.78
+				d.DepthScale = 0.78
+				d.HeadScale = 0.95
+			end
+			return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
+		end)
+		if ok and rig then
+			baseRigs[child] = rig
+		else
+			warn(`[Npcs] no R15 base rig, using blocks: {rig}`)
+		end
+	end
+end
+
 -- Lazy: World.build places the employers before Npcs.start runs.
 local function init(): Folder
 	if folder and folder.Parent then
 		return folder
 	end
+	warmBases()
 	for _, name in { GROUP, "Car", "EnemyCar", "Zombie", "Bullet", "Corpse" } do
 		pcall(function()
 			PhysicsService:RegisterCollisionGroup(name)
@@ -320,28 +349,15 @@ local function r15Body(look: Look): Model?
 	if cached then
 		return cached:Clone()
 	end
-	local ok, result = pcall(function()
-		local d = Instance.new("HumanoidDescription")
-		local skin = rgb(look.skin, Color3.fromRGB(241, 194, 160))
-		d.HeadColor = skin
-		d.LeftArmColor = skin
-		d.RightArmColor = skin
-		d.TorsoColor = rgb(look.shirt, skin)
-		d.LeftLegColor = rgb(look.pants, skin)
-		d.RightLegColor = rgb(look.pants, skin)
-		if look.child then
-			d.HeightScale = 0.72
-			d.WidthScale = 0.78
-			d.DepthScale = 0.78
-			d.HeadScale = 0.95
-		end
-		return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
-	end)
-	if not ok or not result then
-		warn(`[Npcs] no R15 body, using blocks: {result}`)
-		return nil
+	local base = baseRigs[look.child == true]
+	if not base then
+		return nil -- no base rig: blockyBody, no yield
 	end
-	local model = result :: Model
+	local model = base:Clone()
+	local colors = model:FindFirstChildOfClass("BodyColors")
+	if colors then
+		colors:Destroy() -- dress() paints every body part; the base rig's colours must not paint over it
+	end
 	dress(model, look)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then

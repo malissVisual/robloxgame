@@ -95,6 +95,7 @@ export type Session = {
 	carPrompt: ProximityPrompt?,
 	shown: { Model },
 	ended: boolean,
+	busy: number, -- people being spawned right now (Npcs.spawn may yield): the stop is not done meanwhile
 }
 
 export type Status = {
@@ -107,6 +108,7 @@ export type Status = {
 	carrying: string?,
 	person: string?,
 	pile: Vector3?,
+	looseAt: Vector3?, -- a piece put down (G) that has to be picked up again
 	progress: number,
 }
 
@@ -511,6 +513,19 @@ local function say(npc: Model?, text: string)
 	end
 end
 
+-- A person for this stop. Should the spawn yield and the job end or move on meanwhile, the person goes again (nil).
+local function spawnFor(session: Session, look: Npcs.Look, at: CFrame): Model?
+	local stop = session.stop
+	session.busy += 1
+	local npc = Npcs.spawn(look, at)
+	session.busy -= 1
+	if session.ended or session.stop ~= stop then
+		npc:Destroy()
+		return nil
+	end
+	return npc
+end
+
 -- ── The session ─────────────────────────────────────────────────────────────
 
 local function newPiece(session: Session): Piece
@@ -592,6 +607,14 @@ local function render(session: Session)
 	table.clear(session.shown)
 	local car = session.car
 	if not car or car.wrecked then
+		-- No vehicle any more: the horses still loaded stand on the ground, not welded to a wreck about to go.
+		for _, piece in session.load do
+			local horse = piece.horse
+			if horse and horse.Parent then
+				local at = horse:GetPivot()
+				Animals.stable(horse, CFrame.new(onGround(at.Position)) * at.Rotation)
+			end
+		end
 		return
 	end
 	car.model:SetAttribute("CargoCount", #session.load)
@@ -605,9 +628,13 @@ local function render(session: Session)
 			if stall then
 				Animals.stable(horse, car.chassis.CFrame * stall, car.chassis)
 			end
-		elseif slot then
+		elseif #slots > 0 then
+			-- More pieces than slots: the extra ones ride on top.
+			local layer = (index - 1) // #slots
+			local base = slots[(index - 1) % #slots + 1]
 			local model = buildLook(piece.look, piece.variant)
-			weldTo(model, car.chassis, car.chassis.CFrame * slot)
+			local _, size = model:GetBoundingBox()
+			weldTo(model, car.chassis, car.chassis.CFrame * base * CFrame.new(0, layer * size.Y, 0))
 			model.Parent = car.model
 			table.insert(session.shown, model)
 		end
@@ -647,7 +674,7 @@ local function take(session: Session, player: Player, piece: Piece): boolean
 		local part = horsePart(horse)
 		if part then
 			local letGo = prompt(part, "Let go", "Horse", Enum.KeyCode.G, 0)
-			letGo.MaxActivationDistance = 9 -- the horse walks a few studs behind
+			letGo.MaxActivationDistance = 13 -- the horse walks ~9 studs behind
 			held.prompt = letGo
 		end
 	else
@@ -720,6 +747,12 @@ end
 
 local function allowed(session: Session, player: Player): boolean
 	if session.ended then
+		return false
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart then
+		tell(player, "Get out first.")
 		return false
 	end
 	if session.info.allowed(player) then
@@ -875,7 +908,7 @@ local function onCar(session: Session, player: Player)
 			Animals.stable(horse, nil)
 			local behind = (car.chassis.CFrame * CFrame.new(0, 0, car.size.Z / 2 + 5)).Position
 			local spot = onGround(Vector3.new(behind.X, car.chassis.Position.Y - 2, behind.Z))
-			horse:PivotTo(CFrame.lookAt(spot, spot + car.chassis.CFrame.LookVector))
+			Animals.stable(horse, CFrame.lookAt(spot, spot + car.chassis.CFrame.LookVector)) -- hooves at spot, anchored
 		end
 		if not take(session, player, piece) then
 			table.insert(session.load, piece)
@@ -919,7 +952,10 @@ local function build(session: Session)
 	local base = onGround(plan.pile)
 	local right = plan.facing:Cross(Vector3.yAxis)
 	if plan.person then
-		local npc = Npcs.spawn(plan.person, CFrame.lookAt(base, base + plan.facing))
+		local npc = spawnFor(session, plan.person, CFrame.lookAt(base, base + plan.facing))
+		if not npc then
+			return
+		end
 		session.person = npc
 		table.insert(session.props, npc)
 	end
@@ -961,7 +997,10 @@ local function build(session: Session)
 		elseif plan.mode == "board" then
 			local spot = onGround(base + right * (1.5 + n * 1.8) - plan.facing * 0.5)
 			local name = KID_NAMES[piece.variant % #KID_NAMES + 1]
-			piece.npc = Npcs.spawn(Npcs.look("kid", name, nil), CFrame.lookAt(spot, spot + plan.facing))
+			piece.npc = spawnFor(session, Npcs.look("kid", name, nil), CFrame.lookAt(spot, spot + plan.facing))
+			if not piece.npc then
+				return
+			end
 		end
 		table.insert(session.pile, piece)
 	end
@@ -1118,7 +1157,11 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 			local door = Vehicles.cargoEntry(car)
 			local spot = onGround(door)
 			local name = KID_NAMES[piece.variant % #KID_NAMES + 1]
-			piece.npc = Npcs.spawn(Npcs.look("kid", name, nil), CFrame.lookAt(spot, Vector3.new(plan.pile.X, spot.Y, plan.pile.Z)))
+			piece.npc = spawnFor(session, Npcs.look("kid", name, nil), CFrame.lookAt(spot, Vector3.new(plan.pile.X, spot.Y, plan.pile.Z)))
+			if not piece.npc then
+				table.insert(session.load, piece)
+				return
+			end
 			say(piece.npc, line(LINES.kidOff))
 			walkKid(session, piece, onGround(plan.pile))
 			session.info.changed()
@@ -1141,7 +1184,10 @@ local function updateServe(session: Session, plan: Plan, dt: number)
 		session.customers = true
 		for n, z in { 0.5, 3.5 } do
 			local spot = onGround((car.chassis.CFrame * CFrame.new(car.size.X / 2 + 2.6, 0, z)).Position)
-			local npc = Npcs.spawn(Npcs.look("kid", KID_NAMES[rng:NextInteger(1, #KID_NAMES)], nil), CFrame.lookAt(spot, spot - car.chassis.CFrame.RightVector))
+			local npc = spawnFor(session, Npcs.look("kid", KID_NAMES[rng:NextInteger(1, #KID_NAMES)], nil), CFrame.lookAt(spot, spot - car.chassis.CFrame.RightVector))
+			if not npc then
+				return
+			end
 			table.insert(session.props, npc)
 			task.delay(n * 0.6, say, npc, line(LINES.customer))
 		end
@@ -1194,6 +1240,7 @@ function Cargo.begin(owner: Player, info: Info): Session
 		carPrompt = nil,
 		shown = {},
 		ended = false,
+		busy = 0,
 	}
 	return session
 end
@@ -1289,7 +1336,7 @@ end
 -- Is the current stop done (everything loaded / handed over / served)?
 function Cargo.stopDone(session: Session): boolean
 	local plan = session.plan
-	if not plan then
+	if not plan or session.busy > 0 then
 		return false
 	end
 	if plan.mode == "serve" then
@@ -1308,10 +1355,11 @@ end
 function Cargo.remaining(session: Session): number
 	local pile = #session.pile
 	local plan = session.plan
-	if plan and plan.stage == "pickup" and not session.built then
-		pile = plan.needed
+	if plan and plan.stage == "pickup" and (not session.built or session.busy > 0) then
+		pile = math.max(pile, plan.needed)
 	end
-	return #session.load + heldCount(session) + #session.loose + pile + #session.walking
+	local spawning = if plan and plan.stage ~= "pickup" then session.busy else 0 -- a kid getting off right now
+	return #session.load + heldCount(session) + #session.loose + pile + #session.walking + spawning
 end
 
 -- Bandits at the car carry a piece off (not the kids). Returns the piece's name, or nil.
@@ -1360,6 +1408,16 @@ function Cargo.status(session: Session): Status
 	elseif plan and plan.needed > 0 then
 		progress = math.clamp(session.moved / plan.needed, 0, 1)
 	end
+	local looseAt: Vector3? = nil
+	local first = session.loose[1]
+	if first then
+		local model = first.piece.model
+		if first.handle then
+			looseAt = first.handle.Position
+		elseif model then
+			looseAt = model:GetPivot().Position
+		end
+	end
 	return {
 		inCar = #session.load,
 		delivered = session.moved,
@@ -1370,6 +1428,7 @@ function Cargo.status(session: Session): Status
 		carrying = if held then held.piece.kind else nil,
 		person = if plan and plan.person then plan.person.name else nil,
 		pile = if plan and handling then plan.pile else nil,
+		looseAt = looseAt,
 		progress = progress,
 	}
 end

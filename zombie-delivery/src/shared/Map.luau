@@ -222,6 +222,7 @@ local rawSpots: { [string]: { park: { number }, pile: { number } } } = {
 	base = { park = { 282, -2420 }, pile = { 268, -2430 } }, -- the ammo bunker inside the gate
 	lodge = { park = { -684, -2208 }, pile = { -699, -2200 } }, -- at the lodge door
 	school = { park = { 14, 1124 }, pile = { 20, 1140 } }, -- the school gate
+	movers = { park = { 349, 172 }, pile = { 337, 172 } }, -- the loading door, away from the WORK HERE board
 }
 for id, spot in rawSpots do
 	local dx, dz = spot.park[1] - spot.pile[1], spot.park[2] - spot.pile[2]

@@ -208,6 +208,13 @@ local function teleport(player: Player, arg: any)
 	if vehicle and driving and vehicle.owner == player then
 		local ground = Vector3.new(rx, World.RoadTop, rz)
 		local height = rideHeight(vehicle)
+		-- The client drives the car: it must have the ground there before the car arrives (StreamingEnabled).
+		pcall(function()
+			player:RequestStreamAroundAsync(ground, 5)
+		end)
+		if not vehicle.model.Parent or vehicle.owner ~= player then
+			return
+		end
 		vehicle.model:PivotTo(CFrame.lookAt(ground + Vector3.new(0, height + 0.5, 0), ground + Vector3.new(0, height + 0.5, 0) + along))
 		vehicle.chassis.AssemblyLinearVelocity = Vector3.zero
 		vehicle.chassis.AssemblyAngularVelocity = Vector3.zero
@@ -216,7 +223,14 @@ local function teleport(player: Player, arg: any)
 	end
 	-- On foot (or riding along: get up first). A yard or a road at the place itself, else the road next to it.
 	local x, z = rx, rz
-	if Map.onRoad(landmark.x, landmark.z) then
+	if landmark.kind == "employer" then
+		-- The point is the WORK HERE board itself: stand a few studs off it, toward the road.
+		local d = Vector3.new(rx - landmark.x, 0, rz - landmark.z)
+		if d.Magnitude > 1 then
+			local p = Vector3.new(landmark.x, 0, landmark.z) + d.Unit * math.min(8, d.Magnitude)
+			x, z = p.X, p.Z
+		end
+	elseif Map.onRoad(landmark.x, landmark.z) then
 		x, z = landmark.x, landmark.z
 	end
 	if humanoid.SeatPart then
@@ -232,6 +246,12 @@ local function teleport(player: Player, arg: any)
 		return
 	end
 	local at = Vector3.new(x, World.RoadTop + 3.5, z)
+	pcall(function()
+		player:RequestStreamAroundAsync(at, 5)
+	end)
+	if player.Character ~= character or not character.Parent then
+		return
+	end
 	character:PivotTo(CFrame.lookAt(at, at + along))
 	root.AssemblyLinearVelocity = Vector3.zero
 	say(player, `ADMIN: {landmark.name}.`)

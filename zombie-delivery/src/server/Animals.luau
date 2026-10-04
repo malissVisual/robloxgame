@@ -16,8 +16,8 @@ local Animals = {}
 local GROUP = "Animal"
 local ROOT_Y = 3.9 -- the root's centre over the ground (the middle of the body)
 local ROOT_SIZE = Vector3.new(1.6, 1.6, 3)
-local FOLLOW = 5 -- studs behind the leader
-local ROPE = 7 -- the lead rope's length (it sags when the horse is closer)
+local FOLLOW = 9 -- studs behind the leader (the nose reaches ~6.3 in front of the root)
+local ROPE = 6 -- the lead rope's length (it sags when the horse is closer)
 local WALK_SPEED = 7
 
 -- Coats: body, mane and tail.
@@ -497,6 +497,8 @@ function Animals.stable(horse: Model, at: CFrame?, weldTo: BasePart?)
 	if h.stall then
 		h.stall:Destroy()
 		h.stall = nil
+		h.humanoid.PlatformStand = false
+		h.root.Massless = false
 	end
 	h.humanoid:MoveTo(h.root.Position)
 	h.root.Anchored = true
