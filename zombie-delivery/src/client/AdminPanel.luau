@@ -2,7 +2,8 @@
 -- The admin panel (P or the small ADMIN button top right; only for players with the "Admin" attribute, see
 -- server/Admin.luau, which checks every command again). One window with sections on the left: unlock, driver level &
 -- money, cars, guns, teleport (every Map.Landmarks place), jobs (every special job and the ordinary tiers), enemies,
--- world (time of day: day and night, server/DayNight.luau) and player (god mode, heal, finish the stop). The answers
+-- estate & company (give / take properties, the home, teleport to a property, the company's safe), world (time of
+-- day: day and night, server/DayNight.luau) and player (god mode, heal, finish the stop). The answers
 -- come back as toasts (the Notice remote), and in the window's title bar while it is open (the toasts are behind it).
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
 
@@ -104,6 +105,7 @@ local SECTIONS = {
 	{ "teleport", "Teleport" },
 	{ "jobs", "Jobs" },
 	{ "enemies", "Enemies" },
+	{ "estate", "Estate, company" },
 	{ "world", "World" },
 	{ "player", "Player" },
 }
@@ -265,6 +267,75 @@ local function renderEnemies()
 	end)
 end
 
+-- The real estate (Config.Estate) and the company's safe (Config.Business). The player attributes Estates
+-- ("id,id,…") and Home (server/Estate.luau) mark what you own: yellow = your home, green = owned.
+local ESTATE_KINDS = { mansion = "🏰", villa = "🏡", house = "🏠", garage = "🅿️", office = "🏢" }
+
+local function renderEstate()
+	local owned: { [string]: boolean } = {}
+	local list = player:GetAttribute("Estates")
+	if type(list) == "string" then
+		for id in string.gmatch(list, "[^,]+") do
+			owned[id] = true
+		end
+	end
+	local home = player:GetAttribute("Home")
+	local slots = tonumber(player:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots
+	heading("Real estate", `Homes, garages and offices for free (green = yours, yellow = your home). Car slots now: {slots}. Players open the list with H or the ESTATE button.`)
+	local all = grid(200)
+	action(all, "GIVE EVERY PROPERTY", C.yellow, function()
+		send("giveEstate", "all")
+	end).TextColor3 = Color3.new(0, 0, 0)
+	action(all, "TAKE THEM ALL AWAY", C.red, function()
+		send("clearEstate")
+	end)
+	action(all, "SPAWN AT THE DEPOT", C.grey, function()
+		send("setHome", "depot")
+	end)
+	heading("Give a property", "Click: it is yours (no money). A first home becomes your home.")
+	local cells = grid(232)
+	for _, def in Config.Estate.Properties do
+		local mine = owned[def.id] == true
+		local color = if home == def.id then C.yellow elseif mine then C.green else C.blue
+		local button = action(cells, `{ESTATE_KINDS[def.kind] or "🏠"} {def.name}`, color, function()
+			send("giveEstate", def.id)
+		end)
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 6) }, button)
+	end
+	heading("Set the home", "You spawn there after every death (and after PLAY). It is given first if you do not own it.")
+	local homes = grid(232)
+	for _, def in Config.Estate.Properties do
+		if def.kind == "mansion" or def.kind == "villa" or def.kind == "house" then
+			local on = home == def.id
+			local button = action(homes, `{if on then "★ " else ""}{def.name}`, if on then C.yellow else C.panelLight, function()
+				send("setHome", def.id)
+			end)
+			button.TextColor3 = if on then Color3.new(0, 0, 0) else C.text
+		end
+	end
+	heading("Teleport to a property", "Inside at its door (homes, offices), else the road at its plot.")
+	local places = grid(232)
+	for _, def in Config.Estate.Properties do
+		local button = action(places, `{ESTATE_KINDS[def.kind] or "🏠"} {def.name}`, Color3.fromRGB(150, 90, 200), function()
+			send("estateTeleport", def.id)
+		end)
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 6) }, button)
+	end
+	heading("Company safe", `Your company's earnings wait in the safe (up to {Ui.money(Config.Business.SafeCap)}) until you COLLECT them at the office computer.`)
+	local safe = grid(200)
+	action(safe, "FILL THE SAFE", C.green, function()
+		send("businessCash")
+	end)
+	action(safe, "+" .. Ui.money(50_000), C.green, function()
+		send("businessCash", 50_000)
+	end)
+	action(safe, "EMPTY THE SAFE", C.grey, function()
+		send("businessCash", -Config.Business.SafeCap)
+	end)
+end
+
 local function renderWorld()
 	local night = Config.DayNight
 	heading("Time of day", string.format("The clock runs (a day is %d min). Night from %02d:%02d to %02d:%02d: dark, more zombies, bigger waves, better pay, the lamps and headlights on.", math.floor(night.DayLength / 60), math.floor(night.NightFrom), math.floor(night.NightFrom % 1 * 60), math.floor(night.NightTo), math.floor(night.NightTo % 1 * 60)))
@@ -313,6 +384,7 @@ local RENDERERS: { [string]: () -> () } = {
 	teleport = renderTeleport,
 	jobs = renderJobs,
 	enemies = renderEnemies,
+	estate = renderEstate,
 	world = renderWorld,
 	player = renderPlayer,
 }
@@ -392,7 +464,7 @@ local function build()
 	Ui.list(tabs, true, 6)
 	for index, entry in SECTIONS do
 		local id = entry[1]
-		local button = Ui.button(tabs, entry[2], UDim2.new(1, 0, 0, 46), C.panelLight, function()
+		local button = Ui.button(tabs, entry[2], UDim2.new(1, 0, 0, 42), C.panelLight, function()
 			section = id
 			render()
 		end)
@@ -464,6 +536,13 @@ function AdminPanel.start()
 			render()
 		end
 	end)
+	for _, name in { "Estates", "Home", "CarSlots" } do
+		player:GetAttributeChangedSignal(name):Connect(function()
+			if window.Visible and section == "estate" then
+				render()
+			end
+		end)
+	end
 	player:GetAttributeChangedSignal("Level"):Connect(function()
 		if window.Visible and section == "unlock" then
 			render()

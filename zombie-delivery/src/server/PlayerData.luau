@@ -1,6 +1,8 @@
 --!strict
 -- The player's progress: money, the cars and guns they own, the equipped ones, the car guns on their roofs, the upgrade
--- levels, the driver XP (the level and the rank come from it, shared/Levels.luau) and lifetime stats.
+-- levels, the driver XP (the level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the
+-- properties, the home you spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades,
+-- the safe; server/Business.luau) and lifetime stats.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -80,6 +82,63 @@ local function number(value: any, default: number, high: number): number
 	return math.clamp(math.floor(value), 0, high)
 end
 
+-- ── Real estate and the company (2.6) ───────────────────────────────────────
+
+local HOME_KINDS = { mansion = true, villa = true, house = true }
+
+local function findEstate(id: string): Config.EstateDef?
+	for _, def in Config.Estate.Properties do
+		if def.id == id then
+			return def
+		end
+	end
+	return nil
+end
+
+-- The most couriers any office allows (a saved count above it is cut down).
+local function maxCouriers(): number
+	local most = 0
+	for _, def in Config.Estate.Properties do
+		most = math.max(most, def.couriers or 0)
+	end
+	return most
+end
+
+-- The properties (only Config.Estate ids), the home (an owned mansion / villa / house) and the company (couriers,
+-- upgrade levels, the safe, the last payout's time; all clamped). Saves from before 2.6 keep newProfile's defaults.
+local function applyEstate(profile: Profile, saved: { [any]: any })
+	if type(saved.properties) == "table" then
+		for id, owned in saved.properties do
+			if owned == true and type(id) == "string" and findEstate(id) then
+				profile.properties[id] = true
+			end
+		end
+	end
+	local home = saved.home
+	if type(home) == "string" and profile.properties[home] then
+		local def = findEstate(home)
+		if def and HOME_KINDS[def.kind] then
+			profile.home = home
+		end
+	end
+	local business = saved.business
+	if type(business) == "table" then
+		local company = profile.business
+		company.couriers = number(business.couriers, 0, maxCouriers())
+		if type(business.upgrades) == "table" then
+			for _, def in Config.Business.Upgrades do
+				local level = number(business.upgrades[def.id], 0, def.maxLevel)
+				if level > 0 then
+					company.upgrades[def.id] = level
+				end
+			end
+		end
+		company.safe = number(business.safe, 0, Config.Business.SafeCap)
+		-- A time in the future (a clock that was wrong) would pay nothing for hours: it becomes now.
+		company.lastTick = number(business.lastTick, 0, os.time())
+	end
+end
+
 -- Saved data is checked, never trusted.
 local function applySaved(profile: Profile, saved: any)
 	if type(saved) ~= "table" then
@@ -141,6 +200,7 @@ local function applySaved(profile: Profile, saved: any)
 			profile.rep[employer.id] = number(saved.rep[employer.id], 0, 100000)
 		end
 	end
+	applyEstate(profile, saved)
 	if type(saved.car) == "string" and profile.cars[saved.car] then
 		profile.car = saved.car
 	end
@@ -256,6 +316,9 @@ function PlayerData.save(player: Player)
 		carGuns = profile.carGuns,
 		rep = profile.rep,
 		xp = profile.xp,
+		properties = profile.properties,
+		home = profile.home,
+		business = profile.business,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
