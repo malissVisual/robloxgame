@@ -32,8 +32,15 @@
 --   businessCash amount?      your company's safe (Config.Business): + amount, or filled up to SafeCap
 --   missionStart id           any mission (shared/Missions.luau) now, locks ignored (a running job is cancelled; a
 --                             NIGHT ONLY mission turns the clock to night)
---   missionsAll               every mission at 3 stars, every campaign rewarded (no money); unlockAll does it too
+--   missionsAll               every mission at 3 stars, every campaign rewarded (no money; 3.1: its exclusive gun or
+--                             paint and title); unlockAll does it too
 --   missionsReset             the mission progress and the campaign rewards cleared
+--   challengesAll             3.1: every challenge done (its money and title), every campaign's reward and the last
+--                             one (Dead End) (server/Challenges.luau)
+--   secretsAll                every lost package found (no money each) and their reward (Phantom)
+--   challengesReset           the challenges' stats, secrets, places, titles cleared, the exclusive guns and paints
+--                             taken back (the campaigns stay done: their rewards come back on the next join)
+--   title      name           that title given and shown over your head ("none": no title shown)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -57,6 +64,7 @@ local Jobs = require(Server.Jobs)
 local DayNight = require(Server.DayNight)
 local Estate = require(Server.Estate)
 local Missions = require(Server.Missions)
+local Challenges = require(Server.Challenges)
 
 local Admin = {}
 
@@ -149,8 +157,11 @@ local function unlockAll(player: Player)
 	Estate.give(player, "all")
 	-- The top driver level: nothing is locked any more (PlayerData.setLevel fires Changed).
 	local level = PlayerData.setLevel(player, Config.Levels.MaxLevel)
-	-- Every mission done at 3 stars (no money).
+	-- Every mission done at 3 stars (no money), and (3.1) every campaign's exclusive reward and title.
 	Missions.adminAll(player)
+	for _, campaign in MissionData.Campaigns do
+		Challenges.campaignDone(player, campaign.id)
+	end
 	say(player, `ADMIN: every car, gun, paint, property, mission and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
 end
 
@@ -498,12 +509,42 @@ end
 
 local function missionsAll(player: Player)
 	local count = Missions.adminAll(player)
-	say(player, `ADMIN: {count} missions at 3 stars, every campaign done (no money paid).`)
+	-- 3.1: every campaign's exclusive reward too (a gun or a paint and a title).
+	for _, campaign in MissionData.Campaigns do
+		Challenges.campaignDone(player, campaign.id)
+	end
+	say(player, `ADMIN: {count} missions at 3 stars, every campaign done with its reward (no money paid).`)
 end
 
 local function missionsReset(player: Player)
 	Missions.adminReset(player)
 	say(player, "ADMIN: mission progress cleared. Every campaign starts at mission 1 again.")
+end
+
+-- ── Challenges, secrets, titles (3.1, server/Challenges.luau) ─────────────
+
+local function challengesAll(player: Player)
+	local count = Challenges.adminAll(player)
+	say(player, `ADMIN: {count} challenges done, every campaign reward and Dead End given.`)
+end
+
+local function secretsAll(player: Player)
+	local count = Challenges.adminSecrets(player)
+	say(player, if count > 0 then `ADMIN: all {count} lost packages found.` else "ADMIN: there are no lost packages on the map yet.")
+end
+
+local function challengesReset(player: Player)
+	Challenges.adminReset(player)
+	say(player, "ADMIN: challenges, stats, secrets, places and titles cleared, exclusive guns and paints taken back.")
+end
+
+local function setTitle(player: Player, arg: any)
+	if type(arg) ~= "string" or #arg > 40 then
+		say(player, "ADMIN: which title?")
+		return
+	end
+	local title = Challenges.adminTitle(player, arg)
+	say(player, if title then `ADMIN: your title: {title}.` else "ADMIN: no title shown.")
 end
 
 -- ── God mode and healing ───────────────────────────────────────────────────
@@ -692,6 +733,10 @@ local COMMANDS: { [string]: (Player, any) -> () } = {
 	missionStart = missionStart,
 	missionsAll = missionsAll,
 	missionsReset = missionsReset,
+	challengesAll = challengesAll,
+	secretsAll = secretsAll,
+	challengesReset = challengesReset,
+	title = setTitle,
 }
 
 local function onCommand(player: Player, name: any, arg: any)

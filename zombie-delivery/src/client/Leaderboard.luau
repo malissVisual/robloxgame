@@ -1,7 +1,7 @@
 --!strict
 -- The leaderboard window: the best couriers on this server (L, or the TOP button in the HUD's button column). Every
 -- player with their place, name, rank name, driver level (and how far into it), mission stars (3.0), deliveries and
--- money earned, best first: by level, then mission stars, then money earned (the server sorts, server/Ranking.luau). Your own row is outlined, the ones out
+-- money earned (and the title they show, 3.1), best first: by level, then mission stars, then money earned (the server sorts, server/Ranking.luau). Your own row is outlined, the ones out
 -- on a job are tagged. While it is open it asks the server again every few seconds; closed it costs nothing.
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks Leaderboard.isOpen()).
 
@@ -186,10 +186,21 @@ local function row(entry: any, place: number)
 		TextColor3 = C.dim,
 		LayoutOrder = 1,
 	})
+	-- 3.1: the title they show (server/Challenges.luau), in gold after the rank name.
+	if type(entry.title) == "string" and entry.title ~= "" then
+		Ui.label(line, `« {entry.title} »`, UDim2.new(0, 0, 1, 0), {
+			AutomaticSize = Enum.AutomaticSize.X,
+			TextWrapped = false,
+			TextSize = 13,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = STAR_GOLD,
+			LayoutOrder = 2,
+		})
+	end
 	if entry.onJob then
 		local chip = Ui.chip(line, "ON A JOB", C.green, Color3.new(0.04, 0.05, 0.04))
 		chip.TextSize = 11
-		chip.LayoutOrder = 2
+		chip.LayoutOrder = 3
 	end
 	-- The level and how far into it.
 	local level = tonumber(entry.level) or 1

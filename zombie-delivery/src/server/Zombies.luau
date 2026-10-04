@@ -75,6 +75,10 @@ local rewardRemote = Net.get("Reward")
 Zombies.onKill = function(_player: Player, _zombie: Zombie) end
 Zombies.onCarDamaged = function(_player: Player, _amount: number) end
 Zombies.onSteal = function(_player: Player, _share: number) end
+-- 3.1: how a kill happened, for the challenges' counters (server/Challenges.luau; Main wires it). cause = "gun" (a
+-- direct hit), "car" (run over), "splash" (a blast or a fire) or "other" (it just died, e.g. its humanoid).
+export type KillInfo = { kind: string, bandit: boolean, headshot: boolean, cause: string }
+Zombies.onKillInfo = nil :: ((player: Player, info: KillInfo) -> ())?
 -- Do the people (ZombieDef.jobOnly: bandits, gunners, soldiers) go after this player? Main: on a job or riding in
 -- one's crew (Jobs.involved); Admin adds the players who called enemies. Zombies go after everybody.
 Zombies.hunts = function(_player: Player): boolean
@@ -477,8 +481,9 @@ local function remove(z: Zombie)
 	end
 end
 
--- killer = nil: no reward (despawn, the safe zone). push = velocity for the flying parts.
-local function kill(z: Zombie, killer: Player?, push: Vector3?)
+-- killer = nil: no reward (despawn, the safe zone). push = velocity for the flying parts. cause and headshot: how
+-- (Zombies.onKillInfo).
+local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, headshot: boolean?)
 	if z.dead then
 		return
 	end
@@ -504,13 +509,23 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?)
 		PlayerData.addMoney(killer, z.def.reward)
 		rewardRemote:FireClient(killer, z.root.Position + Vector3.new(0, 4, 0), z.def.reward)
 		Zombies.onKill(killer, z)
+		local onKillInfo = Zombies.onKillInfo
+		if onKillInfo then
+			task.spawn(onKillInfo, killer, {
+				kind = z.kind,
+				bandit = z.def.ranged == true,
+				headshot = headshot == true,
+				cause = cause or "other",
+			})
+		end
 	end
 	task.delay(6, function()
 		z.model:Destroy()
 	end)
 end
 
-export type HitInfo = { crit: boolean?, push: Vector3? }
+-- cause (3.1): "car" (run over), "splash" (a blast or a fire); nil = a gun's hit.
+export type HitInfo = { crit: boolean?, push: Vector3?, cause: string? }
 
 -- Returns true when the hit killed it.
 function Zombies.damage(z: Zombie, amount: number, by: Player?, info: HitInfo?): boolean
@@ -523,7 +538,7 @@ function Zombies.damage(z: Zombie, amount: number, by: Player?, info: HitInfo?):
 	end
 	local health = z.humanoid.Health - amount
 	if health <= 0 then
-		kill(z, by, info and info.push)
+		kill(z, by, info and info.push, if info then info.cause or "gun" else "gun", info ~= nil and info.crit == true)
 		return true
 	end
 	z.humanoid.Health = health
@@ -870,7 +885,7 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 		local velocity = car.chassis.AssemblyLinearVelocity
 		local push = velocity * 0.9 + Vector3.new(0, 25, 0)
 		local health = z.humanoid.Health
-		local killed = Zombies.damage(z, Economy.ramDamage(speed, car.stats.ramPower), car.owner, { push = push })
+		local killed = Zombies.damage(z, Economy.ramDamage(speed, car.stats.ramPower), car.owner, { push = push, cause = "car" })
 		if not killed then
 			-- Something big: the car bounces off it and takes a dent.
 			bump:FireClient(car.owner, Horde.RamSlowdown)
@@ -1214,7 +1229,7 @@ function Zombies.damageArea(center: Vector3, radius: number, damage: number, by:
 		if distance <= radius then
 			local share = 1 - 0.5 * distance / radius
 			local push = if distance > 0.1 then offset.Unit * 40 + Vector3.new(0, 30, 0) else Vector3.new(0, 40, 0)
-			if Zombies.damage(z, damage * share, by, { push = push }) then
+			if Zombies.damage(z, damage * share, by, { push = push, cause = "splash" }) then
 				killed += 1
 			end
 		end

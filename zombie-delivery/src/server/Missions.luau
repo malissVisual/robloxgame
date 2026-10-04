@@ -17,6 +17,9 @@
 --                      crew, owner }) a mission is done: the banner (then the state follows)
 -- A player who opened the window once gets the state again whenever it changes on its own (a mission starts or
 -- ends, they join or leave a crew, they level up): a light check every second, nothing per frame.
+--
+-- 3.1: a campaign finished gives its exclusive reward too (Challenges.campaignDone: a gun or a paint and a title), and
+-- every credit checks the challenges (Challenges.check: missions, stars, campaigns).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,6 +34,7 @@ local Server = script.Parent
 local PlayerData = require(Server.PlayerData)
 local Jobs = require(Server.Jobs)
 local Crew = require(Server.Crew)
+local Challenges = require(Server.Challenges)
 
 local Missions = {}
 
@@ -280,6 +284,10 @@ local function credit(player: Player, def: MissionData.MissionDef, stars: number
 	else
 		PlayerData.notify(player)
 	end
+	-- 3.1: the campaign's exclusive reward (Config.Rewards.Campaigns), once.
+	if campaignDone and campaign then
+		Challenges.campaignDone(player, campaign.id)
+	end
 	local level, levelUp = PlayerData.level(player), false
 	if xp > 0 then
 		level, levelUp = PlayerData.addXp(player, xp)
@@ -351,6 +359,7 @@ function Missions.onComplete(owner: Player, missionId: string, stars: number, me
 		elseif result then
 			getRemote():FireClient(player, "cleared", result)
 			Missions.send(player)
+			Challenges.check(player) -- 3.1: missions, stars, campaigns (and the counters Jobs just told)
 		end
 	end
 end

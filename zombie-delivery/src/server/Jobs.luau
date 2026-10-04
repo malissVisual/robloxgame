@@ -47,6 +47,10 @@
 -- besides the owner, crewOf: MaxMembers at most), recounted when the crew changes. Done: the rating (Missions.rate)
 -- goes into the result and to Jobs.onMissionComplete (server/Missions.luau pays the rewards and saves the stars) with
 -- the crew who are there at the finish.
+--
+-- 3.1, the challenges (server/Challenges.luau): Jobs.onStat (wired in Main) hears the waves that came, a HOLD OUT won,
+-- the pieces delivered (and the people boarded, the horses) for the owner and the crew, and at a mission's finish
+-- co-op, night, 3 stars, a rush and a NO SHOOTING mission without a shot for who was there.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -140,6 +144,9 @@ type Job = {
 	defendWave: number,
 	nextDefendWave: number,
 	quietNotice: { [Player]: number }, -- quiet: when the shooter was last warned
+	-- 3.1, the challenges' counters (Jobs.onStat):
+	shots: number, -- shots of the job's people (counted on a quiet mission: NO SHOOTING finished without one)
+	piecesCounted: number, -- the delivered pieces already told to Jobs.onStat
 }
 
 -- What a DeliveryResult says about the XP (shared/Levels.luau), the owner's and every member's own.
@@ -710,6 +717,26 @@ local function crewOf(job: Job, owner: Player): { Player }
 	return list
 end
 
+-- ── 3.1: the challenges' counters (server/Challenges.luau, wired in Main) ───
+
+-- Set by Main: count a stat (shared/Challenges.luau Counters) for a player. Never blocks the job (task.spawn).
+Jobs.onStat = nil :: ((player: Player, stat: string, amount: number) -> ())?
+
+local function stat(player: Player, name: string, amount: number)
+	local hook = Jobs.onStat
+	if hook and amount > 0 then
+		task.spawn(hook, player, name, amount)
+	end
+end
+
+-- The same stat for the owner and everybody paid with them (crewOf).
+local function statCrew(owner: Player, job: Job, name: string, amount: number)
+	stat(owner, name, amount)
+	for _, member in crewOf(job, owner) do
+		stat(member, name, amount)
+	end
+end
+
 -- Is `who` with the owner: in the owner's car, or within Config.Crew.RiderRange of them (on foot or in a car of their
 -- own following along)?
 local function withOwner(owner: Player, who: Player): boolean
@@ -849,6 +876,8 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		defendWave = 0,
 		nextDefendWave = 0,
 		quietNotice = {},
+		shots = 0,
+		piecesCounted = 0,
 	}
 	jobs[player] = job
 	-- No pick-up: the vehicle starts loaded.
@@ -1104,9 +1133,33 @@ local function complete(player: Player, job: Job)
 			mission = missionResult,
 		}, giveXp(member, xp)))
 	end
+	local missionId = offer.mission
+	-- 3.1: the missions' counters for who finished it (the owner and the crew there), before the rewards check them.
+	if missionId then
+		local finishers = table.clone(present)
+		table.insert(finishers, 1, player)
+		local timed = offer.jobType ~= nil and offer.jobType.timeLimit ~= nil
+		local quiet = offer.twists.quiet == true and job.shots == 0
+		for _, who in finishers do
+			if #finishers > 1 then
+				stat(who, "coopMissions", 1)
+			end
+			if night then
+				stat(who, "nightMissions", 1)
+			end
+			if stars >= 3 then
+				stat(who, "perfect", 1)
+			end
+			if timed then
+				stat(who, "rushes", 1)
+			end
+			if quiet then
+				stat(who, "quietMissions", 1)
+			end
+		end
+	end
 	-- The mission's rewards and stars (server/Missions.luau), after the pay: the owner and everybody paid with them.
 	local onMission = Jobs.onMissionComplete
-	local missionId = offer.mission
 	if missionId and onMission then
 		local ok, err = pcall(function()
 			onMission(player, missionId, stars, present)
@@ -1187,6 +1240,7 @@ function Jobs.onShot(player: Player)
 	if not owner or not job or not job.offer.twists.quiet then
 		return
 	end
+	job.shots += 1
 	job.condition = math.max(0, job.condition - Config.Missions.QuietCost)
 	job.dirty = true
 	local now = os.clock()
@@ -1352,6 +1406,7 @@ local function sendWave(player: Player, job: Job, tier: Config.TierDef, position
 	job.wave = number
 	job.waveIn = Economy.waveEvery(tier, multiplier) * rng:NextNumber(0.9, 1.1)
 	job.dirty = true
+	statCrew(player, job, "waves", 1)
 	notice:FireClient(player, `WAVE {number} · {made} {if made == 1 then "zombie" else "zombies"}`)
 end
 
@@ -1450,12 +1505,14 @@ local function defendStep(player: Player, job: Job, tier: Config.TierDef, stop: 
 		end
 		if made > 0 then
 			job.defendWave = number
+			statCrew(player, job, "waves", 1)
 			tellJob(player, `HOLD THE LINE! {made} {if made == 1 then "zombie" else "zombies"} coming at you`)
 		end
 	end
 	if left <= 0 then
 		job.defendDone = true
 		job.dirty = true
+		statCrew(player, job, "defends", 1) -- HOLD OUT won
 		Cargo.setBlocked(job.cargo, false)
 		tellJob(player, "The area is safe! Unload, quick!")
 	end
@@ -1572,6 +1629,17 @@ local function update(dt: number)
 		end
 		recount(player, job)
 		Cargo.update(session, step)
+		-- 3.1: the pieces delivered since the last tick (any, the people who board, the horses).
+		if session.deliveredTotal > job.piecesCounted then
+			local pieces = session.deliveredTotal - job.piecesCounted
+			job.piecesCounted = session.deliveredTotal
+			statCrew(player, job, "pieces", pieces)
+			if offer.kind == "horse" then
+				statCrew(player, job, "horses", pieces)
+			elseif Cargo.isPeople(offer.kind) then
+				statCrew(player, job, "passengers", pieces)
+			end
+		end
 		if not jobs[player] then
 			continue
 		end

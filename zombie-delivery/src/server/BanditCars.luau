@@ -40,6 +40,7 @@ type Bandit = {
 	reverseUntil: number,
 	sees: boolean, -- a clear line to the target
 	lastHitBy: Player?,
+	lastCause: string?, -- 3.1: how lastHitBy hit it: "gun", "car" (rammed), "splash" (BanditCars.onKillInfo)
 	offSince: number?, -- the target has had no job since (they drive off)
 }
 
@@ -53,6 +54,9 @@ local folder: Instance = workspace
 BanditCars.onKill = function(_player: Player) end
 BanditCars.onCarDamaged = function(_player: Player, _amount: number) end
 BanditCars.onSteal = function(_player: Player, _share: number) end
+-- 3.1: a bandit car destroyed and how (cause "gun", "car" or "splash"), for the challenges' counters
+-- (server/Challenges.luau; Main wires it).
+BanditCars.onKillInfo = nil :: ((player: Player, info: { cause: string }) -> ())?
 -- Is the player still worth chasing (on a job)? When not, the bandits give up once they fall behind.
 BanditCars.wanted = function(_player: Player): boolean
 	return true
@@ -129,18 +133,25 @@ local function explode(b: Bandit, killer: Player?)
 		Net.get("Reward"):FireClient(killer, npc.chassis.Position + Vector3.new(0, 6, 0), Tuning.Reward)
 		Net.get("Notice"):FireClient(killer, `Bandit car destroyed! +${Tuning.Reward}`)
 		BanditCars.onKill(killer)
+		local onKillInfo = BanditCars.onKillInfo
+		if onKillInfo then
+			task.spawn(onKillInfo, killer, { cause = b.lastCause or "gun" })
+		end
 	end
 	task.delay(6, function()
 		npc.model:Destroy()
 	end)
 end
 
--- Returns true when it blew up.
-function BanditCars.damage(b: Bandit, amount: number, by: Player?): boolean
+-- Returns true when it blew up. cause (3.1): "car" (rammed), "splash" (a blast or a fire); nil = a gun's hit.
+function BanditCars.damage(b: Bandit, amount: number, by: Player?, cause: string?): boolean
 	if b.dead or amount <= 0 then
 		return false
 	end
-	b.lastHitBy = by or b.lastHitBy
+	if by then
+		b.lastHitBy = by
+		b.lastCause = cause or "gun"
+	end
 	b.health -= amount
 	b.npc.model:SetAttribute("Health", math.max(0, math.ceil(b.health)))
 	if b.health <= 0 then
@@ -166,7 +177,7 @@ function BanditCars.damageArea(center: Vector3, radius: number, damage: number, 
 	for _, b in table.clone(bandits) do
 		local distance = (b.npc.chassis.Position - center).Magnitude
 		if distance <= radius + 4 then
-			if BanditCars.damage(b, damage * (1 - 0.5 * math.clamp(distance / (radius + 4), 0, 1)), by) then
+			if BanditCars.damage(b, damage * (1 - 0.5 * math.clamp(distance / (radius + 4), 0, 1)), by, "splash") then
 				destroyed += 1
 			end
 		end
@@ -227,6 +238,7 @@ local function spawnAt(player: Player, cf: CFrame, waypoint: Vector3): boolean
 		reverseUntil = 0,
 		sees = false,
 		lastHitBy = nil,
+		lastCause = nil,
 		offSince = nil,
 	})
 	return true
@@ -435,7 +447,7 @@ local function drive(b: Bandit, dt: number, now: number)
 		end
 		if relative > 25 and now >= b.nextRammed then
 			b.nextRammed = now + 0.6
-			if BanditCars.damage(b, relative * Tuning.RamDamagePerSpeed * playerCar.stats.ramPower, playerCar.owner) then
+			if BanditCars.damage(b, relative * Tuning.RamDamagePerSpeed * playerCar.stats.ramPower, playerCar.owner, "car") then
 				return
 			end
 		end
