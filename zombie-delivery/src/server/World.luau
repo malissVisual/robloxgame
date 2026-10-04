@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Icons = require(Shared.Icons)
 local Map = require(Shared.Map)
 
 local Npcs = require(script.Parent.Npcs)
@@ -819,12 +820,24 @@ local function buildLandmarkTags(parent: Instance)
 		gui.MaxDistance = 700
 		gui.LightInfluence = 0
 		gui.Parent = anchor
-		local icon = Instance.new("TextLabel")
-		icon.Size = UDim2.new(1, 0, 0.6, 0)
-		icon.BackgroundTransparency = 1
-		icon.Text = landmark.icon
-		icon.TextScaled = true
-		icon.Parent = gui
+		-- The landmark's icon (shared/Icons.luau) in its kind's colour, or its emoji while the icon's id is empty.
+		local art = Icons.get(Icons.landmark(landmark.id))
+		if art then
+			local icon = Instance.new("ImageLabel")
+			icon.Size = UDim2.new(1, 0, 0.6, 0)
+			icon.BackgroundTransparency = 1
+			icon.Image = art
+			icon.ScaleType = Enum.ScaleType.Fit
+			icon.ImageColor3 = colors[landmark.kind] or Color3.new(1, 1, 1)
+			icon.Parent = gui
+		else
+			local icon = Instance.new("TextLabel")
+			icon.Size = UDim2.new(1, 0, 0.6, 0)
+			icon.BackgroundTransparency = 1
+			icon.Text = landmark.icon
+			icon.TextScaled = true
+			icon.Parent = gui
+		end
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.new(1, 0, 0.4, 0)
 		label.Position = UDim2.fromScale(0, 0.6)

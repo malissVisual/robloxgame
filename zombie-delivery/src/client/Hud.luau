@@ -16,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
+local Icons = require(Shared.Icons)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
@@ -68,8 +69,9 @@ end
 
 -- ── Cargo ──────────────────────────────────────────────────────────────────
 
--- How one piece of each kind of cargo (Config.JobTypes itemKind) looks in the interface.
-type ItemInfo = { icon: string, one: string, many: string }
+-- How one piece of each kind of cargo (Config.JobTypes itemKind) looks in the interface: the emoji, the names and
+-- (art) its icon in shared/Icons.luau, shown instead of the emoji once the icon's id is filled in.
+type ItemInfo = { icon: string, one: string, many: string, art: string? }
 local ITEMS: { [string]: ItemInfo } = {
 	crate = { icon = "📦", one = "crate", many = "crates" },
 	ammo = { icon = "🧰", one = "ammo box", many = "ammo boxes" },
@@ -83,7 +85,21 @@ local ITEMS: { [string]: ItemInfo } = {
 }
 
 local function itemInfo(kind: string?): ItemInfo
-	return ITEMS[kind or "crate"] or { icon = "📦", one = kind or "piece", many = (kind or "piece") .. "s" }
+	local info = ITEMS[kind or "crate"] or { icon = "📦", one = kind or "piece", many = (kind or "piece") .. "s" }
+	return { icon = info.icon, one = info.one, many = info.many, art = Icons.cargo(kind or "crate") }
+end
+
+-- The icon of a job's pieces: an ordinary delivery's business has its own look (pizza, parcel, medicine; matched by
+-- the piece's name, Config.Jobs.Businesses), else the kind's.
+local function cargoArt(kind: string?, piece: any): string?
+	if type(piece) == "string" then
+		for _, business in Config.Jobs.Businesses do
+			if business.piece == piece and business.kind == kind then
+				return Icons.cargo(business.look) or Icons.cargo(kind)
+			end
+		end
+	end
+	return Icons.cargo(kind or "crate")
 end
 
 -- What your hands hold right now (the Carrying attribute the server sets; the job payload as a fallback).
@@ -124,7 +140,7 @@ local function jobCargo(): ItemInfo
 	end
 	local one = if type(job.piece) == "string" and job.piece ~= "" then job.piece else info.one
 	local many = if type(job.pieces) == "string" and job.pieces ~= "" then job.pieces else info.many
-	return { icon = info.icon, one = one, many = many }
+	return { icon = info.icon, one = one, many = many, art = cargoArt(jobItemKind(), job.piece) }
 end
 
 -- What is in your hands, named like the job names it when it is the job's cargo.
@@ -306,6 +322,83 @@ local function note(parent: any, text: string, color: Color3, order: number)
 	Ui.label(parent, text, UDim2.new(1, -10, 0, 22), { LayoutOrder = order, AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = color, TextSize = 15, Font = Enum.Font.GothamMedium })
 end
 
+-- ── Icons ──────────────────────────────────────────────────────────────────
+-- The icon set (shared/Icons.luau). While an icon's id is empty everything below draws exactly what the interface
+-- always drew (the emoji); a filled-in id swaps the emoji for the picture.
+
+-- The picture on the left of a shop / backpack card (the icon, else the emoji; nothing when there is neither).
+-- Returns where the card's text starts (nil = the usual place).
+local function cardIcon(c: any, iconName: string?, fallback: string?, y: number): number?
+	if fallback == nil and not Icons.get(iconName) then
+		return nil
+	end
+	Ui.icon(c, iconName, fallback or "", UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, y), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
+	return 70
+end
+
+-- A line of text with an icon in it: before .. icon .. after. Without the icon's id it is the one label it always
+-- was (the emoji inside the text); with it a row of the text before, the icon (tinted like the text) and the rest.
+local ROW_KEYS = { Position = true, AnchorPoint = true, LayoutOrder = true }
+local function iconText(parent: any, iconName: string?, emoji: string, before: string, after: string, size: UDim2, props: { [string]: any }): any
+	if not Icons.get(iconName) then
+		return Ui.label(parent, before .. emoji .. after, size, props)
+	end
+	local row = Ui.make("Frame", { Size = size, BackgroundTransparency = 1, ClipsDescendants = true }, parent)
+	local textProps: { [string]: any } = {}
+	for key, value in props do
+		if ROW_KEYS[key] then
+			row[key] = value
+		else
+			textProps[key] = value
+		end
+	end
+	if textProps.AutomaticSize == Enum.AutomaticSize.Y then
+		textProps.AutomaticSize = nil
+	end
+	if textProps.ZIndex then
+		row.ZIndex = textProps.ZIndex
+	end
+	Ui.make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 4),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, row)
+	local textSize = tonumber(textProps.TextSize) or 18
+	local function part(text: string, order: number)
+		if text == "" then
+			return
+		end
+		local label = Ui.label(row, text, UDim2.new(0, 0, 1, 0), textProps)
+		label.AutomaticSize = Enum.AutomaticSize.X
+		label.TextWrapped = false
+		label.LayoutOrder = order
+	end
+	part((before:gsub("%s+$", "")), 1)
+	Ui.icon(row, iconName, emoji, UDim2.fromOffset(textSize + 4, textSize + 4), { LayoutOrder = 2, ImageColor3 = textProps.TextColor3 or C.text, ZIndex = textProps.ZIndex })
+	part((after:gsub("^%s+", "")), 3)
+	return row
+end
+
+-- A chip (Ui.chip) with an icon in front of its text; without the icon's id the chip it always was, the emoji first.
+local function iconChip(parent: any, iconName: string?, emoji: string, text: string, color: Color3, textColor: Color3): any
+	if not Icons.get(iconName) then
+		return Ui.chip(parent, `{emoji} {text}`, color, textColor)
+	end
+	local chip = Ui.make("Frame", { Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = color, BorderSizePixel = 0 }, parent)
+	Ui.corner(chip, 6)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, chip)
+	Ui.make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 4),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, chip)
+	Ui.icon(chip, iconName, emoji, UDim2.fromOffset(18, 18), { LayoutOrder = 1, ImageColor3 = textColor })
+	Ui.label(chip, text, UDim2.new(0, 0, 1, 0), { AutomaticSize = Enum.AutomaticSize.X, TextWrapped = false, TextColor3 = textColor, Font = Enum.Font.GothamBold, TextSize = 14, LayoutOrder = 2 })
+	return chip
+end
+
 -- ── Job board ──────────────────────────────────────────────────────────────
 
 local jobs = window("JOB BOARD", Vector2.new(600, 470))
@@ -388,7 +481,7 @@ function Hud.setOffers(list: { any })
 			local info = itemInfo(offer.itemKind)
 			local name = if count == 1 then (offer.piece or info.one) else (offer.piecesName or info.many)
 			local how = OFFER_HANDLING[offer.handling or ""]
-			Ui.label(c, `{info.icon} {count} {name}` .. (if how then ` · {how}` else ""), UDim2.new(1, -260, 0, 18), {
+			iconText(c, cargoArt(offer.itemKind, offer.piece), info.icon, "", ` {count} {name}` .. (if how then ` · {how}` else ""), UDim2.new(1, -260, 0, 18), {
 				Position = UDim2.fromOffset(124, 72),
 				TextColor3 = C.text,
 				TextSize = 14,
@@ -495,7 +588,7 @@ local function renderShop()
 		note(shop.body, "Guns for your hands. One-handed ones (pistol, revolver, SMG) also fire out of a car window; car guns are at Wrench Garage.", C.dim, 1)
 		for order, def in Config.Weapons do
 			local c = card(shop.body, 84, order + 1)
-			cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description)
+			cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
 			if state.weapon == def.id then
 				cardButton(c, "IN HAND", C.grey, false, function() end)
 			elseif state.weapons[def.id] then
@@ -518,8 +611,7 @@ local function renderShop()
 		for order, def in Config.Items do
 			local c = card(shop.body, 90, order + 1)
 			local have = state.items[def.id] or 0
-			Ui.label(c, def.icon, UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, 18), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
-			cardText(c, def.name, `{Ui.money(def.price)} each · you have {have}/{def.max}`, def.description, 70)
+			cardText(c, def.name, `{Ui.money(def.price)} each · you have {have}/{def.max}`, def.description, cardIcon(c, Icons.item(def.id), def.icon, 18))
 			cardButton(c, `BUY 1  {Ui.money(def.price)}`, C.green, here and money >= def.price and have < def.max, function()
 				Net.get("Buy"):FireServer("item", def.id, 1)
 			end, 1)
@@ -614,9 +706,10 @@ local HANDLING_TEXT: { [string]: string } = {
 }
 
 -- A reward row of the employer window: what, a bar of the jobs done toward it, yours or not yet.
-local function rewardRow(parent: any, order: number, icon: string, name: string, done: number, at: number, owned: boolean)
+-- (iconName: the reward's icon in shared/Icons.luau, nil = the emoji `icon`.)
+local function rewardRow(parent: any, order: number, iconName: string?, icon: string, name: string, done: number, at: number, owned: boolean)
 	local row = card(parent, 64, order, owned)
-	Ui.label(row, icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(12, 12), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
+	Ui.icon(row, iconName, icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(12, 12), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
 	Ui.label(row, name, UDim2.new(1, -200, 0, 24), { Position = UDim2.fromOffset(64, 8), TextSize = 19, Font = Enum.Font.GothamBlack })
 	Ui.label(row, if owned then "YOURS" else `{math.min(done, at)}/{at} jobs`, UDim2.fromOffset(120, 24), {
 		Position = UDim2.new(1, -132, 0, 8),
@@ -661,7 +754,7 @@ local function openEmployer(id: string)
 		local info = itemInfo(jobType.itemKind)
 		local how = HANDLING_TEXT[jobType.load] or "loaded for you"
 		local about = card(body, 80, 3)
-		Ui.label(about, `{info.icon}  {jobType.name}`, UDim2.new(1, -150, 0, 24), { Position = UDim2.fromOffset(12, 8), TextSize = 19, Font = Enum.Font.GothamBlack })
+		iconText(about, info.art, info.icon, "", `  {jobType.name}`, UDim2.new(1, -150, 0, 24), { Position = UDim2.fromOffset(12, 8), TextSize = 19, Font = Enum.Font.GothamBlack })
 		Ui.label(about, `Danger {string.rep("★", jobType.tier)}`, UDim2.fromOffset(130, 24), {
 			Position = UDim2.new(1, -142, 0, 8),
 			TextXAlignment = Enum.TextXAlignment.Right,
@@ -684,10 +777,10 @@ local function openEmployer(id: string)
 	})
 	local done = state.rep[employer.id] or 0
 	if reward then
-		rewardRow(body, 5, "🚚", reward.name, done, employer.needed, state.cars[reward.id] == true)
+		rewardRow(body, 5, nil, "🚚", reward.name, done, employer.needed, state.cars[reward.id] == true)
 	end
 	if gun and employer.weaponAt then
-		rewardRow(body, 6, "🔫", gun.name, done, employer.weaponAt, state.weapons[gun.id] == true)
+		rewardRow(body, 6, Icons.weapon(gun.id), "🔫", gun.name, done, employer.weaponAt, state.weapons[gun.id] == true)
 	end
 	if job then
 		Ui.label(body, "Finish your current delivery first.", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = C.red, TextSize = 16 })
@@ -745,20 +838,24 @@ local function cargoCard(parent: any)
 	local c = card(parent, if lost > 0 then 118 else 96, -1, true)
 	Ui.label(c, "ON THIS JOB", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(12, 8), TextColor3 = C.yellow, TextSize = 14 })
 	local held = if holding then heldInfo(holding) else nil
-	Ui.label(c, if held then `✋  In your hands: {held.icon} {held.one}` else "✋  Your hands are free", UDim2.new(1, -24, 0, 24), {
+	iconText(c, if held then held.art else nil, if held then held.icon else "", if held then "✋  In your hands: " else "✋  Your hands are free", if held then ` {held.one}` else "", UDim2.new(1, -24, 0, 24), {
 		Position = UDim2.fromOffset(12, 30),
 		TextSize = 18,
 		TextColor3 = if held then C.text else C.dim,
 	})
 	local vehicle = if carDef then carDef.name else "your vehicle"
-	local text = if aboard == nil then `🚚  {vehicle}: {job.cargo}`
-		elseif aboard > 0 then `🚚  In the {vehicle}: {aboard} × {info.icon} {if aboard == 1 then info.one else info.many}`
-		else `🚚  The {vehicle} is empty`
+	-- The text before the cargo's icon, the icon and the text after it (only "in the vehicle" has the icon).
+	local before, emoji, after = `🚚  {vehicle}: {job.cargo}`, "", ""
+	if aboard ~= nil and aboard > 0 then
+		before, emoji, after = `🚚  In the {vehicle}: {aboard} × `, info.icon, ` {if aboard == 1 then info.one else info.many}`
+	elseif aboard ~= nil then
+		before = `🚚  The {vehicle} is empty`
+	end
 	if type(job.total) == "number" then
 		local arrived = tonumber(job.deliveredTotal)
-		text ..= if arrived then `  ·  {arrived}/{job.total} delivered` else `  ·  {job.total} in all`
+		after ..= if arrived then `  ·  {arrived}/{job.total} delivered` else `  ·  {job.total} in all`
 	end
-	Ui.label(c, text, UDim2.new(1, -24, 0, 24), { Position = UDim2.fromOffset(12, 60), TextSize = 16, TextColor3 = C.text, Font = Enum.Font.GothamMedium })
+	iconText(c, if emoji ~= "" then info.art else nil, emoji, before, after, UDim2.new(1, -24, 0, 24), { Position = UDim2.fromOffset(12, 60), TextSize = 16, TextColor3 = C.text, Font = Enum.Font.GothamMedium })
 	if lost > 0 then
 		Ui.label(c, `⚠  Lost on the way: {lost} {if lost == 1 then info.one else info.many}`, UDim2.new(1, -24, 0, 20), {
 			Position = UDim2.fromOffset(12, 88),
@@ -783,8 +880,7 @@ function renderBackpack()
 		for order, def in Config.Items do
 			local c = card(backpack.body, 84, order + 1)
 			local have = state.items[def.id] or 0
-			Ui.label(c, def.icon, UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, 16), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
-			cardText(c, `{def.name}  x{have}`, `Key {order}`, def.description, 70)
+			cardText(c, `{def.name}  x{have}`, `Key {order}`, def.description, cardIcon(c, Icons.item(def.id), def.icon, 16))
 			cardButton(c, "USE", C.green, have > 0, function()
 				useItem(def.id)
 			end)
@@ -816,7 +912,7 @@ function renderBackpack()
 		for order, def in Config.Weapons do
 			if state.weapons[def.id] then
 				local c = card(backpack.body, 84, order + 1)
-				cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description)
+				cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
 				if state.weapon == def.id then
 					cardButton(c, "IN HAND", C.grey, false, function() end)
 				else
@@ -1043,7 +1139,8 @@ local function renderWeapons()
 		local slot = Ui.make("Frame", { Size = UDim2.fromOffset(140, 58), BackgroundColor3 = C.panelLight, BackgroundTransparency = 0.1 }, row)
 		Ui.corner(slot, 10)
 		Ui.stroke(slot, C.blue, 2.5)
-		Ui.label(slot, if carGun.splash > 0 then "💥" else "🔫", UDim2.new(1, 0, 0, 30), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
+		-- (The car guns have no icon of their own: Icons.weapon gives nil, the emoji stays.)
+		Ui.icon(slot, Icons.weapon(carGun.id), if carGun.splash > 0 then "💥" else "🔫", UDim2.new(1, 0, 0, 30), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
 		local name = Ui.label(slot, SHORT_NAMES[carGun.id] or carGun.name, UDim2.new(1, -4, 0, 18), {
 			Position = UDim2.fromOffset(2, 34),
 			TextXAlignment = Enum.TextXAlignment.Center,
@@ -1091,10 +1188,11 @@ local function renderWeapons()
 		}, rows[(index - 1) // PER_ROW + 1])
 		Ui.corner(slot, 10)
 		Ui.stroke(slot, if current and usable then C.yellow else C.grey, if current then 2.5 else 1)
-		Ui.label(slot, if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.new(1, 0, 0, 30), {
+		Ui.icon(slot, Icons.weapon(def.id), if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.new(1, 0, 0, 30), {
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextTransparency = if usable then 0 else 0.65,
+			ImageTransparency = if usable then 0 else 0.65,
 		})
 		local name = Ui.label(slot, SHORT_NAMES[def.id] or def.name, UDim2.new(1, -4, 0, 18), {
 			Position = UDim2.fromOffset(2, 34),
@@ -1133,11 +1231,12 @@ end
 Ui.list(hotbar, false, 8)
 local hotbarCounts: { [string]: any } = {}
 for index, def in Config.Items do
+	local art = Icons.item(def.id)
 	local slot = Ui.make("TextButton", {
 		Size = UDim2.fromOffset(64, 64),
 		BackgroundColor3 = C.panel,
 		BackgroundTransparency = 0.15,
-		Text = def.icon,
+		Text = if Icons.get(art) then "" else def.icon, -- the emoji until the item's icon is filled in
 		TextSize = 30,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Color3.new(1, 1, 1),
@@ -1146,6 +1245,9 @@ for index, def in Config.Items do
 	}, hotbar)
 	Ui.corner(slot, 10)
 	Ui.stroke(slot, C.yellow, 1.5)
+	if Icons.get(art) then
+		Ui.icon(slot, art, def.icon, UDim2.fromOffset(34, 34), { Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) })
+	end
 	Ui.label(slot, tostring(index), UDim2.fromOffset(16, 16), { Position = UDim2.fromOffset(4, 2), TextSize = 13, TextColor3 = C.yellow })
 	hotbarCounts[def.id] = Ui.label(slot, "0", UDim2.new(1, -6, 0, 16), {
 		Position = UDim2.new(0, 0, 1, -18),
@@ -1276,11 +1378,11 @@ local function renderCargoRow()
 	if not show then
 		return
 	end
-	local info = itemInfo(kind)
+	local info = jobCargo() -- the job's cargo (its kind is `kind`)
 	local byHand = handling == "carry" or handling == "lead"
 	if holding then
 		local held = heldInfo(holding)
-		Ui.chip(cargoRow, `{held.icon} {if holding == "horse" then "Leading a" else "Holding"} {held.one}`, C.yellow, Color3.new(0, 0, 0)).LayoutOrder = 1
+		iconChip(cargoRow, held.art, held.icon, `{if holding == "horse" then "Leading a" else "Holding"} {held.one}`, C.yellow, Color3.new(0, 0, 0)).LayoutOrder = 1
 	elseif byHand then
 		Ui.chip(cargoRow, "✋ Hands free", C.panelLight, C.dim).LayoutOrder = 1
 	end
@@ -1292,11 +1394,12 @@ local function renderCargoRow()
 		Ui.list(stop, false, 2)
 		Ui.label(stop, if pickup then "Loaded " else "Delivered ", UDim2.new(0, 0, 1, 0), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextColor3 = C.dim, TextWrapped = false, LayoutOrder = 0 })
 		for i = 1, math.min(needed, 8) do
-			Ui.label(stop, info.icon, UDim2.new(0, 20, 1, 0), {
+			Ui.icon(stop, info.art, info.icon, UDim2.new(0, 20, 1, 0), {
 				LayoutOrder = i,
 				TextSize = 16,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextTransparency = if i <= done then 0 else 0.7,
+				ImageTransparency = if i <= done then 0 else 0.7,
 			})
 		end
 		Ui.label(stop, ` {math.min(done, needed)}/{needed}`, UDim2.new(0, 0, 1, 0), {

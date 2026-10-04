@@ -17,6 +17,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Icons = require(Shared.Icons)
 local Map = require(Shared.Map)
 local Roads = require(Shared.Roads)
 local Ui = require(script.Parent.Ui)
@@ -162,13 +163,16 @@ local function caption(parent: any, text: string, x: number, z: number, scale: n
 	}, parent)
 end
 
+-- A landmark's marker: a disc in its kind's colour with the landmark's icon (shared/Icons.luau) on it, or its emoji
+-- while the icon's id is empty.
 local function landmarkIcon(parent: any, landmark: Map.Landmark, scale: number, size: number, clickable: boolean): any
+	local art = Icons.landmark(landmark.id)
 	local icon = Ui.make(if clickable then "TextButton" else "TextLabel", {
 		Size = UDim2.fromOffset(size, size),
 		Position = point(landmark.x, landmark.z, scale),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundColor3 = KIND_COLORS[landmark.kind] or Color3.new(0.3, 0.3, 0.3),
-		Text = landmark.icon,
+		Text = if Icons.get(art) then "" else landmark.icon,
 		TextScaled = true,
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = Color3.new(1, 1, 1),
@@ -176,6 +180,13 @@ local function landmarkIcon(parent: any, landmark: Map.Landmark, scale: number, 
 	}, parent)
 	Ui.corner(icon, size)
 	Ui.stroke(icon, Color3.new(1, 1, 1), 1.5)
+	if Icons.get(art) then
+		Ui.icon(icon, art, landmark.icon, UDim2.fromScale(0.72, 0.72), {
+			Position = UDim2.fromScale(0.5, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			ZIndex = 9,
+		})
+	end
 	return icon
 end
 
@@ -795,7 +806,13 @@ local function buildList(parent: any)
 			ZIndex = 42,
 		}, list)
 		Ui.corner(button, 8)
-		Ui.label(button, landmark.icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(4, 6), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 43 })
+		Ui.icon(button, Icons.landmark(landmark.id), landmark.icon, UDim2.fromOffset(40, 40), {
+			Position = UDim2.fromOffset(4, 6),
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 43,
+			ImageColor3 = KIND_COLORS[landmark.kind] or Color3.new(1, 1, 1),
+		})
 		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 15, Font = Enum.Font.GothamBlack, ZIndex = 43 })
 		Ui.label(button, landmark.description, UDim2.new(1, -54, 0, 26), {
 			Position = UDim2.fromOffset(50, 24),

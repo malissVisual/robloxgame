@@ -7,7 +7,7 @@ get paid, and buy better cars, guns, car guns, items and upgrades. Friends ride 
 in your passenger seats, shoot out of the windows and share the pay.
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
-empty place and sync.
+empty place and sync. The icon set and the logo are optional (see **Graphics**).
 
 ## Running
 
@@ -145,12 +145,28 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
 
+## Graphics
+
+The art is in `zombie-delivery/art/`: white silhouette icons for the guns (`weapons/`), the cargo and the items
+(`cargo/`) and the map markers (`map/`), the logo (`logo/zombie_delivery_logo.png`) and the start menu's background
+(`ui/menu_background.png`); the SVG sources sit next to the PNGs. The game shows them once their Roblox asset ids are
+filled in; until then it shows the emoji and the text wordmark it always did.
+
+1. In Studio: **View → Asset Manager → Bulk Import**, pick the PNGs (not the SVGs) and upload them.
+2. Right-click each uploaded image → **Copy Asset ID**.
+3. Paste it into `src/shared/Icons.luau` (`Icons.Ids`, the one place for every id) as `"rbxassetid://<number>"`, under
+   the name of the file without `.png` (`art/cargo/item_medkit.png` → `item_medkit`), and sync.
+
+The interface tints the white icons (`ImageColor3`); `Ui.icon` (client) draws an icon or its emoji fallback, the
+landmark tags over the buildings (server) use the same ids, and `client/Theme.luau` takes the logo and the menu
+background from there too. The car guns have no icon (they keep their emoji).
+
 ## Code
 
 ```
 src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo spots), Roads (the road graph and the
               GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
-              AnimationConstraint), GunModels (the guns in the hands)
+              AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo)
 src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats,
               cargo slots, the roof turret of a car gun), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
@@ -165,7 +181,7 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               Weather, Ui
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
-              seat)
+              seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -188,7 +204,7 @@ computed on the server from the car's box (`server/Zombies.luau`).
 python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
-Runs every `tests/*_test.luau` (logic, cargo, roads, cargun). Needs the standalone Luau CLI
+Runs every `tests/*_test.luau` (logic, cargo, roads, cargun, icons). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns

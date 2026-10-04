@@ -1,7 +1,9 @@
 --!strict
 -- Small helpers for building the interface in code.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
 local Theme = require(script.Parent.Theme)
 local Ui = {}
 Ui.Colors = Theme.Colors
@@ -126,6 +128,39 @@ function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Colo
 	Ui.corner(chip, 6)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, chip)
 	return chip
+end
+
+-- An icon from the icon set (shared/Icons.luau): an ImageLabel when its asset id is filled in, else a label with the
+-- emoji / text fallback (what the interface always showed). props go to whichever it is: the Text* and Font ones only
+-- to the fallback label, the Image* and ScaleType ones only to the image (ImageColor3 tints the white icon; white
+-- when not given), the rest (Position, AnchorPoint, LayoutOrder, ZIndex, ...) to both.
+function Ui.icon(parent: Instance, iconName: string?, fallback: string, size: UDim2, props: { [string]: any }?): GuiObject
+	local id = Icons.get(iconName)
+	local given: { [string]: any } = props or {}
+	if not id then
+		local textProps: { [string]: any } = {}
+		for key, value in given do
+			if string.sub(key, 1, 5) ~= "Image" and key ~= "ScaleType" then
+				textProps[key] = value
+			end
+		end
+		return Ui.label(parent, fallback, size, textProps)
+	end
+	local image = Ui.make("ImageLabel", {
+		Name = iconName,
+		Size = size,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Image = id,
+		ScaleType = Enum.ScaleType.Fit,
+		ImageColor3 = Color3.new(1, 1, 1),
+	}, parent)
+	for key, value in given do
+		if string.sub(key, 1, 4) ~= "Text" and key ~= "Font" and key ~= "RichText" then
+			image[key] = value
+		end
+	end
+	return image
 end
 
 function Ui.bar(parent: Instance, size: UDim2, color: Color3): (any, any)

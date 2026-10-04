@@ -1,5 +1,8 @@
 --!strict
 -- Dead End Dispatch: all visual tokens live here. Does not contain gameplay state.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
+
 local Theme = {}
 
 Theme.Colors = {
@@ -22,10 +25,10 @@ Theme.HeadingFont = Enum.Font.GothamBold
 Theme.DisplayFont = Enum.Font.GothamBlack
 
 -- Optional Roblox assets. Empty IDs keep the live city flyover and native wordmark.
--- Upload art/ui/menu_background.png and the previously supplied logo, then set IDs here.
+-- The ids are pasted in shared/Icons.luau (zombie_delivery_logo, menu_background), the one place for every picture.
 Theme.Images = {
-	logo = "",
-	menuBackground = "",
+	logo = Icons.get("zombie_delivery_logo") or "",
+	menuBackground = Icons.get("menu_background") or "",
 }
 
 function Theme.textOn(color: Color3): Color3
