@@ -10,6 +10,12 @@
 -- person or the vehicle's back, an arrow).
 -- Driver levels (shared/Levels.luau): what your level does not reach yet shows LEVEL N (cars at the dealer, guns,
 -- car guns, the job board's locked offers, an employer's job); the server refuses it anyway.
+-- The button column (JOBS, MAP, BAG, CAR, TOP, CREW, ESTATE): CREW and ESTATE run the hooks Hud.onCrew
+-- (client/CrewPanel.luau) and Hud.onEstate (client/EstateUi.luau), set by the client's Main; Hud.setBadge and
+-- Hud.flashButton mark a button (the crew's invitations). Hud.topSlot gives other modules a place in the top centre
+-- stack (the crew strip and the invitation card). Calling your car (the CarCall remote, server/CarCall.luau): a status
+-- line "Your car is on the way · 9 s" in the top stack, a marker over the car in the world and on the maps.
+-- Where everything sits on a computer and on a touch screen, so nothing overlaps: see ── Layout ── below.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +31,7 @@ local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
+local Theme = require(script.Parent.Theme)
 local Drive = require(script.Parent.Drive)
 local Shooting = require(script.Parent.Shooting)
 local MapView = require(script.Parent.MapView)
@@ -44,22 +51,36 @@ local gui = Ui.make("ScreenGui", {
 	Enabled = false,
 }, player:WaitForChild("PlayerGui"))
 
--- Every top-level panel gets a UIScale so the interface fits phones too.
+-- Every top-level panel gets a UIScale so the interface fits phones too. The windows and the loading bar take the
+-- screen's scale (Ui.scaleFor); the panels of the layout get theirs from layout() (── Layout ──).
 local scales: { any } = {}
 local function scaled(frame: any): any
 	table.insert(scales, Ui.make("UIScale", {}, frame))
 	return frame
 end
-local function updateScale()
-	local camera = workspace.CurrentCamera
-	if not camera then
+-- A panel placed by layout(): its own UIScale, not in the list above.
+local function placed(frame: any): any
+	Ui.make("UIScale", { Name = "LayoutScale" }, frame)
+	return frame
+end
+local function setScale(frame: any, value: number)
+	local s = frame:FindFirstChild("LayoutScale")
+	if s and s:IsA("UIScale") and math.abs(s.Scale - value) > 0.001 then
+		s.Scale = value
+	end
+end
+-- Lays the HUD out again (defined in ── Layout ──; panels that change their size ask for it).
+local layoutQueued = false
+local layout: () -> () = function() end
+local function requestLayout()
+	if layoutQueued then
 		return
 	end
-	local size = camera.ViewportSize
-	local value = math.clamp(math.min(size.X / 1150, size.Y / 680), 0.55, 1.1)
-	for _, s in scales do
-		s.Scale = math.max(value, tonumber(s:GetAttribute("MinimumScale")) or 0)
-	end
+	layoutQueued = true
+	task.defer(function()
+		layoutQueued = false
+		layout()
+	end)
 end
 
 local function myRoot(): BasePart?
@@ -184,12 +205,13 @@ end
 -- ── Money ──────────────────────────────────────────────────────────────────
 
 -- On a computer the chat sits top left: money goes bottom left above the minimap. On a touch screen top left.
-local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local touchLayout = Ui.touchLayout()
 -- Money and the minimap share one column (one scale), so they can never overlap.
 local MONEY_HEIGHT = 110 -- money, the stats, the level and the XP bar
-local leftStack = scaled(Ui.make("Frame", {
+local LEFT_W, LEFT_H = 230, MONEY_HEIGHT + 8 + 230 -- (the minimap is 230 × 230, client/MapView.luau)
+local leftStack = placed(Ui.make("Frame", {
 	Name = "LeftStack",
-	Size = UDim2.fromOffset(230, MONEY_HEIGHT + 8 + 230),
+	Size = UDim2.fromOffset(LEFT_W, LEFT_H),
 	Position = if touchLayout then UDim2.fromOffset(16, 16) else UDim2.new(0, 16, 1, -16),
 	AnchorPoint = if touchLayout then Vector2.zero else Vector2.new(0, 1),
 	BackgroundTransparency = 1,
@@ -225,26 +247,90 @@ local xpLabel = Ui.label(moneyPanel, "", UDim2.fromOffset(84, 16), {
 local xpBack, xpFill = Ui.bar(moneyPanel, UDim2.new(1, -90, 0, 7), C.yellow)
 xpBack.Position = UDim2.fromOffset(0, 82)
 
--- ── Toasts ─────────────────────────────────────────────────────────────────
+-- ── Top stack ──────────────────────────────────────────────────────────────
+-- Top centre, one column that grows downward (a UIListLayout: a hidden entry takes no room, so nothing overlaps):
+--   1 the job panel (your own job)
+--   2 the crew slot (a member's view of the leader's job, an invitation: client/CrewPanel.luau, through Hud.topSlot)
+--   3 the car call line ("Your car is on the way · 9 s")
+--   4 the level-up banner
+--   5 the toasts (the newest last, MAX_TOASTS at most)
+-- The job panel, the crew strip and the invitation card never show at the same time (a job of your own, a crew
+-- member without one, neither); the rest stacks under whichever shows.
 
-local toasts = scaled(Ui.make("Frame", {
-	Size = UDim2.fromOffset(520, 200),
-	Position = UDim2.new(0.5, 0, 0, 200),
+local TOP_W = 540
+local topStack = placed(Ui.make("Frame", {
+	Name = "TopStack",
+	Size = UDim2.fromOffset(TOP_W, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	Position = UDim2.new(0.5, 0, 0, 14),
 	AnchorPoint = Vector2.new(0.5, 0),
 	BackgroundTransparency = 1,
 }, gui))
-Ui.list(toasts, true, 6, Enum.HorizontalAlignment.Center)
+Ui.list(topStack, true, 8, Enum.HorizontalAlignment.Center)
+
+local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, carcall = 3, levelup = 4, toasts = 5 }
+local slots: { [string]: Frame } = {}
+
+-- A place in the top stack for another module's panel, by name ("crew"; an unknown name goes under the toasts).
+-- The slot is as wide as the stack and as tall as what is visible in it (its children top down by LayoutOrder,
+-- centred). It is scaled with the stack: the panels in it take no UIScale of their own.
+function Hud.topSlot(name: string): Frame
+	local existing = slots[name]
+	if existing then
+		return existing
+	end
+	local count = 0
+	for _ in slots do
+		count += 1
+	end
+	local slot: Frame = Ui.make("Frame", {
+		Name = `Slot_{name}`,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = SLOT_ORDER[name] or (10 + count),
+	}, topStack)
+	Ui.list(slot, true, 8, Enum.HorizontalAlignment.Center)
+	slots[name] = slot
+	return slot
+end
+
+-- ── Toasts ─────────────────────────────────────────────────────────────────
+
+local toasts = Hud.topSlot("toasts")
+local MAX_TOASTS = if touchLayout then 2 else 3
+local toastOrder = 0
 
 function Hud.toast(text: string)
-	local label = Ui.label(toasts, text, UDim2.fromOffset(500, 34), {
+	-- Too many: the oldest goes (they never pile up into the middle of the screen).
+	local shown: { any } = {}
+	for _, child in toasts:GetChildren() do
+		if child:IsA("TextLabel") and child:GetAttribute("Leaving") ~= true then
+			table.insert(shown, child)
+		end
+	end
+	table.sort(shown, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	for index = 1, #shown - MAX_TOASTS + 1 do
+		shown[index]:Destroy()
+	end
+	toastOrder += 1
+	local label = Ui.label(toasts, text, UDim2.new(1, -40, 0, 34), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 0.25,
 		BackgroundColor3 = C.panel,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextSize = 18,
+		LayoutOrder = toastOrder,
 	})
 	Ui.corner(label, 8)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }, label)
 	task.delay(3, function()
+		if not label.Parent then
+			return
+		end
+		label:SetAttribute("Leaving", true)
 		TweenService:Create(label, TweenInfo.new(0.4), { TextTransparency = 1, BackgroundTransparency = 1 }):Play()
 		task.wait(0.45)
 		label:Destroy()
@@ -1229,53 +1315,154 @@ end
 
 -- ── Buttons ────────────────────────────────────────────────────────────────
 
-local side = scaled(Ui.make("Frame", {
-	Size = UDim2.fromOffset(150, 5 * 52 + 4 * 10),
-	Position = UDim2.new(1, -16, 0.42, 0),
-	AnchorPoint = Vector2.new(1, 0.5),
-	BackgroundTransparency = 1,
-}, gui))
-if touchLayout then
-	local sideScale = side:FindFirstChildOfClass("UIScale")
-	if sideScale then sideScale:SetAttribute("MinimumScale", 44 / 52) end
-end
-Ui.list(side, true, 10)
-Ui.button(side, "JOBS  [J]", UDim2.fromOffset(150, 52), C.yellow, function()
+-- The right column: every button is the Hud's own (other modules hook in: Hud.onCrew, Hud.onEstate). layout()
+-- arranges them in one column, two or four (a UIGridLayout) to fit the room between the top right corner and the
+-- weapon bar (computer) or the FIRE button (touch).
+
+-- Set by client/Main.client.luau: CREW opens / closes the crew window (CrewPanel.toggle), ESTATE the list of every
+-- property (EstateUi.toggleList). Unset, the button says what it is for (CrewPanel.start sets onCrew by itself too).
+Hud.onCrew = nil :: (() -> ())?
+Hud.onEstate = nil :: (() -> ())?
+
+local function toggleJobs()
 	if jobs.frame.Visible then
 		jobs.frame.Visible = false
 	else
 		openJobs()
 	end
-end).TextColor3 = Color3.new(0, 0, 0)
-Ui.button(side, "MAP  [M]", UDim2.fromOffset(150, 52), C.panelLight, function()
-	MapView.toggle()
-end)
-Ui.button(side, "BAG  [B]", UDim2.fromOffset(150, 52), C.panelLight, toggleBackpack)
-Ui.button(side, "TOP  [L]", UDim2.fromOffset(150, 52), C.panelLight, function()
-	Leaderboard.toggle()
-end)
-Ui.button(side, "CAR", UDim2.fromOffset(150, 52), C.panelLight, function()
-	Net.get("SpawnCar"):FireServer()
-end)
+end
+
+type ButtonDef = { id: string, text: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
+local BUTTONS: { ButtonDef } = {
+	{ id = "jobs", text = "JOBS", key = "J", color = C.yellow, onClick = toggleJobs },
+	{ id = "map", text = "MAP", key = "M", color = C.panelLight, onClick = function()
+		MapView.toggle()
+	end },
+	{ id = "bag", text = "BAG", key = "B", color = C.panelLight, onClick = function()
+		toggleBackpack()
+	end },
+	{ id = "car", text = "CAR", color = C.panelLight, stroke = C.blue, onClick = function()
+		Net.get("SpawnCar"):FireServer()
+	end },
+	{ id = "top", text = "TOP", key = "L", color = C.panelLight, onClick = function()
+		Leaderboard.toggle()
+	end },
+	{ id = "crew", text = "CREW", key = "K", color = C.panelLight, stroke = Theme.Gps, onClick = function()
+		local cb = Hud.onCrew
+		if cb then
+			cb()
+		else
+			Hud.toast("The crew panel is not here yet. [fallback: Hud.onCrew is not set]")
+		end
+	end },
+	{ id = "estate", text = "ESTATE", key = "H", color = C.panelLight, stroke = C.money, onClick = function()
+		local cb = Hud.onEstate
+		if cb then
+			cb()
+		else
+			Hud.toast("Real estate is not open yet. [fallback: Hud.onEstate is not set]")
+		end
+	end },
+}
+
+local buttonGrid = placed(Ui.make("Frame", {
+	Name = "HudButtons",
+	Size = UDim2.fromOffset(150, 7 * 46),
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -16, 0, 96),
+	BackgroundTransparency = 1,
+}, gui))
+local buttonLayout = Ui.make("UIGridLayout", {
+	CellSize = UDim2.fromOffset(150, 46),
+	CellPadding = UDim2.fromOffset(8, 8),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	FillDirection = Enum.FillDirection.Vertical,
+	StartCorner = Enum.StartCorner.TopRight,
+}, buttonGrid)
+local hudButtons: { [string]: any } = {}
+local buttonStrokes: { [string]: Color3 } = {}
+
+for order, def in BUTTONS do
+	local text = if def.key and not touchLayout then `{def.text}  [{def.key}]` else def.text
+	local button = Ui.button(buttonGrid, text, UDim2.fromOffset(150, 46), def.color, def.onClick)
+	button.Name = `{def.id}Button`
+	button.LayoutOrder = order
+	if def.color == C.yellow then
+		button.TextColor3 = Color3.new(0, 0, 0)
+	end
+	if def.stroke then
+		Ui.stroke(button, def.stroke, 1.5).Transparency = 0
+	end
+	buttonStrokes[def.id] = if def.stroke then def.stroke else def.color:Lerp(Color3.new(1, 1, 1), 0.25)
+	-- A count in a red dot on the corner (Hud.setBadge).
+	local badge = Ui.make("TextLabel", {
+		Name = "Badge",
+		Size = UDim2.fromOffset(24, 24),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -4, 0, 4),
+		BackgroundColor3 = C.red,
+		BorderSizePixel = 0,
+		Text = "",
+		TextColor3 = Color3.new(1, 1, 1),
+		Font = Enum.Font.GothamBlack,
+		TextSize = 14,
+		Visible = false,
+		ZIndex = 3,
+	}, button)
+	Ui.corner(badge, 12)
+	hudButtons[def.id] = button
+end
+
+-- A red dot with a count on a HUD button ("crew": the invitations waiting); 0 hides it.
+function Hud.setBadge(id: string, count: number)
+	local button = hudButtons[id]
+	local badge = button and button:FindFirstChild("Badge")
+	if badge and badge:IsA("TextLabel") then
+		badge.Visible = count > 0
+		badge.Text = if count > 9 then "9+" else tostring(count)
+	end
+end
+
+-- The border of a HUD button lights up in `color` for `seconds` (an invitation just came: the CREW button).
+function Hud.flashButton(id: string, color: Color3?, seconds: number?)
+	local button = hudButtons[id]
+	local stroke = button and button:FindFirstChild("UiBorder")
+	if not (stroke and stroke:IsA("UIStroke")) then
+		return
+	end
+	stroke.Color = color or C.yellow
+	stroke.Transparency = 0
+	task.delay(seconds or 1.5, function()
+		stroke.Color = buttonStrokes[id] or Theme.Border
+	end)
+end
 
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
 -- The inventory bar: items (keys 1-5) and above them the guns you own (Q switches). Bottom right on a computer,
--- bottom centre on a touch screen (the FIRE button is bottom right there).
-local hotbar = scaled(Ui.make("Frame", {
-	Size = UDim2.fromOffset(5 * 64 + 4 * 8, 64),
+-- bottom centre on a touch screen (the FIRE button is bottom right there). layout() places them.
+local BAR_W = 5 * 64 + 4 * 8
+local HOTBAR_H = 64
+-- The guns line up toward the screen's edge on a computer (bottom right), around the middle on a touch screen.
+local BAR_ALIGN = if touchLayout then Enum.HorizontalAlignment.Center else Enum.HorizontalAlignment.Right
+local hotbar = placed(Ui.make("Frame", {
+	Name = "Hotbar",
+	Size = UDim2.fromOffset(BAR_W, HOTBAR_H),
 	Position = if touchLayout then UDim2.new(0.5, 0, 1, -112) else UDim2.new(1, -16, 1, -16),
 	AnchorPoint = if touchLayout then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 	BackgroundTransparency = 1,
 }, gui))
-local weaponBar = scaled(Ui.make("Frame", {
-	Size = UDim2.fromOffset(5 * 64 + 4 * 8, 78),
+local weaponBar = placed(Ui.make("Frame", {
+	Name = "WeaponBar",
+	Size = UDim2.fromOffset(BAR_W, 78),
 	Position = if touchLayout then UDim2.new(0.5, 0, 1, -184) else UDim2.new(1, -16, 1, -88),
 	AnchorPoint = if touchLayout then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 	BackgroundTransparency = 1,
 }, gui))
+-- The weapon bar grows upward with a second row of guns: the column above it moves.
+weaponBar:GetPropertyChangedSignal("Size"):Connect(requestLayout)
 local weaponTitle = Ui.label(weaponBar, "WEAPON  ·  Q to switch", UDim2.new(1, 0, 0, 16), {
-	TextXAlignment = Enum.TextXAlignment.Right,
+	TextXAlignment = if touchLayout then Enum.TextXAlignment.Center else Enum.TextXAlignment.Right,
 	TextSize = 13,
 	TextColor3 = C.yellow,
 	TextStrokeTransparency = 0.4,
@@ -1343,7 +1530,7 @@ local function renderWeapons()
 		weaponBar.Size = UDim2.fromOffset(5 * 64 + 4 * 8, 18 + 58)
 		weaponRow.Size = UDim2.new(1, 0, 0, 58)
 		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 58), BackgroundTransparency = 1 }, weaponRow)
-		Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right }, row)
+		Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = BAR_ALIGN }, row)
 		local slot = Ui.make("Frame", { Size = UDim2.fromOffset(140, 58), BackgroundColor3 = C.panelLight, BackgroundTransparency = 0.1 }, row)
 		Ui.corner(slot, 10)
 		Ui.stroke(slot, C.blue, 2.5)
@@ -1376,7 +1563,7 @@ local function renderWeapons()
 		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 58), Position = UDim2.fromOffset(0, (r - 1) * 64), BackgroundTransparency = 1 }, weaponRow)
 		Ui.make("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			HorizontalAlignment = BAR_ALIGN,
 			Padding = UDim.new(0, 6),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}, row)
@@ -1467,9 +1654,11 @@ for index, def in Config.Items do
 	end)
 end
 
--- FIRE for touch screens (auto-aim).
-local fire = scaled(Ui.make("TextButton", {
-	Size = UDim2.fromOffset(110, 110),
+-- FIRE for touch screens (auto-aim). layout() keeps it above Roblox's jump button.
+local FIRE_SIZE = 110
+local fire = placed(Ui.make("TextButton", {
+	Name = "Fire",
+	Size = UDim2.fromOffset(FIRE_SIZE, FIRE_SIZE),
 	Position = UDim2.new(1, -40, 1, -190),
 	AnchorPoint = Vector2.new(1, 1),
 	BackgroundColor3 = C.red,
@@ -1495,7 +1684,9 @@ end)
 
 -- ── Car panel ──────────────────────────────────────────────────────────────
 
-local carPanel = scaled(Ui.panel(gui, UDim2.fromOffset(380, 86), UDim2.new(0.5, 0, 1, -18), Vector2.new(0.5, 1)))
+local CAR_W, CAR_H = 380, 86
+local carPanel = placed(Ui.panel(gui, UDim2.fromOffset(CAR_W, CAR_H), UDim2.new(0.5, 0, 1, -18), Vector2.new(0.5, 1)))
+carPanel.Name = "CarPanel"
 Ui.padding(carPanel, 10)
 local carName = Ui.label(carPanel, "", UDim2.new(0.6, 0, 0, 24), { TextSize = 20, Font = Enum.Font.GothamBlack })
 local speedLabel = Ui.label(carPanel, "", UDim2.new(0.4, 0, 0, 24), {
@@ -1511,9 +1702,13 @@ local healthText = Ui.label(carPanel, "", UDim2.new(1, 0, 0, 18), {
 	Position = UDim2.fromOffset(0, 44), TextXAlignment = Enum.TextXAlignment.Left,
 	TextSize = 13, TextColor3 = C.dim, ZIndex = 2,
 })
+-- What to do right now, in a line over the car panel (layout() gives it the width between the panels around it;
+-- a long one wraps upward).
 local hint = Ui.label(gui, "", UDim2.fromOffset(640, 22), {
+	Name = "Hint",
 	Position = UDim2.new(0.5, 0, 1, if touchLayout then -262 else -104),
 	AnchorPoint = Vector2.new(0.5, 1),
+	AutomaticSize = Enum.AutomaticSize.Y,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	TextColor3 = C.dim,
 	TextSize = 15,
@@ -1522,10 +1717,11 @@ local hint = Ui.label(gui, "", UDim2.fromOffset(640, 22), {
 })
 
 -- ── Job panel ──────────────────────────────────────────────────────────────
--- Top centre: the job and the clock, what to do now (big), the stop and the person, the cargo (in your hands,
--- at this stop, in the vehicle) and the cargo's condition.
+-- Top centre (the first entry of the top stack): the job and the clock, what to do now (big), the stop and the
+-- person, the cargo (in your hands, at this stop, in the vehicle) and the cargo's condition.
 
-local jobPanel = scaled(Ui.panel(gui, UDim2.fromOffset(540, 0), UDim2.new(0.5, 0, 0, 14), Vector2.new(0.5, 0)))
+local jobPanel = Ui.panel(Hud.topSlot("job"), UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
+jobPanel.Name = "JobPanel"
 jobPanel.AutomaticSize = Enum.AutomaticSize.Y
 jobPanel.Visible = false
 Ui.padding(jobPanel, 12)
@@ -1555,8 +1751,9 @@ local conditionText = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
 	TextXAlignment = Enum.TextXAlignment.Left, TextSize = 14, TextColor3 = C.dim, ZIndex = 2,
 })
 
--- Loading / unloading / boarding bar in the middle of the screen.
-local loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, 26), C.blue)
+-- Loading / unloading / boarding bar under the middle of the screen (layout() keeps it over the bottom panels).
+local LOAD_H = 26
+local loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, LOAD_H), C.blue)
 scaled(loadBack)
 loadBack.AnchorPoint = Vector2.new(0.5, 0.5)
 loadBack.Position = UDim2.fromScale(0.5, 0.62)
@@ -1811,21 +2008,21 @@ local function footTarget(): (Vector3?, string?, boolean)
 end
 
 -- ── Level up ───────────────────────────────────────────────────────────────
--- A banner at the top (where the job panel is; a level-up mostly comes as the job ends): LEVEL UP, the new level and
--- rank, what it unlocks; the XP bar flashes. Under the windows, so it never hides the delivery result.
+-- A banner in the top stack (under the job panel; a level-up mostly comes as the job ends): LEVEL UP, the new level
+-- and rank, what it unlocks; the XP bar flashes. Under the windows, so it never hides the delivery result.
 
-local levelUpFrame = scaled(Ui.make("CanvasGroup", {
-	Size = UDim2.fromOffset(440, 0),
+local levelUpFrame = Ui.make("CanvasGroup", {
+	Name = "LevelUp",
+	Size = UDim2.new(0.82, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
-	Position = UDim2.new(0.5, 0, 0, 14),
-	AnchorPoint = Vector2.new(0.5, 0),
 	BackgroundColor3 = C.panel,
 	BackgroundTransparency = 0.04,
 	BorderSizePixel = 0,
 	GroupTransparency = 1,
 	Visible = false,
 	ZIndex = 4,
-}, gui))
+}, Hud.topSlot("levelup"))
+local levelUpPop = Ui.make("UIScale", { Scale = 1 }, levelUpFrame)
 Ui.corner(levelUpFrame, 10)
 Ui.stroke(levelUpFrame, C.yellow, 2)
 Ui.padding(levelUpFrame, 12)
@@ -1838,6 +2035,7 @@ Ui.label(levelUpFrame, "⬆  LEVEL UP!", UDim2.new(1, 0, 0, 40), {
 	LayoutOrder = 1,
 })
 local levelUpTitle = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 26), {
+	AutomaticSize = Enum.AutomaticSize.Y, -- a long rank wraps on a narrow stack
 	TextSize = 22,
 	Font = Enum.Font.GothamBlack,
 	TextXAlignment = Enum.TextXAlignment.Center,
@@ -1866,8 +2064,10 @@ local function showLevelUp(from: number, to: number)
 	levelUpStamp += 1
 	local mine = levelUpStamp
 	levelUpFrame.Visible = true
-	levelUpFrame.Position = UDim2.new(0.5, 0, 0, -10)
-	TweenService:Create(levelUpFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { GroupTransparency = 0, Position = UDim2.new(0.5, 0, 0, 14) }):Play()
+	levelUpPop.Scale = 0.8
+	local pop = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	TweenService:Create(levelUpFrame, pop, { GroupTransparency = 0 }):Play()
+	TweenService:Create(levelUpPop, pop, { Scale = 1 }):Play()
 	-- The XP bar and the LV chip flash white.
 	xpFill.BackgroundColor3 = Color3.new(1, 1, 1)
 	levelChip.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -1920,6 +2120,522 @@ local function refreshLevel()
 	if before ~= nil and shop.frame.Visible then
 		renderShop()
 	end
+end
+
+-- ── Car call ───────────────────────────────────────────────────────────────
+-- The CarCall remote (server/CarCall.luau): (seconds left, the car's model) while a chauffeur drives your car to
+-- you, nil when it is there or the call is over (a string instead of the model, or a table { seconds, car, reason },
+-- is understood too). The top stack shows "Your car is on the way · 9 s" with a bar and how far it is, a marker
+-- floats over the car (MapView pins it on the maps) and the CAR button counts down. The count runs on here between
+-- two messages (a loop at 10 Hz, only while a call is on); a call that never ends gives up CALL_STALE s late.
+
+local CALL_COLOR = C.blue
+local CALL_DONE_SHOWN = 3 -- seconds "Your car is here" stays
+local CALL_STALE = 20
+
+local callLine = Ui.panel(Hud.topSlot("carcall"), UDim2.new(0.78, 0, 0, 42), UDim2.new(), nil)
+callLine.Name = "CarCall"
+callLine.Visible = false
+local callStroke = Ui.stroke(callLine, CALL_COLOR, 1.5)
+local callText = Ui.label(callLine, "", UDim2.new(1, -110, 0, 26), {
+	Position = UDim2.fromOffset(12, 4),
+	TextSize = 17,
+	Font = Enum.Font.GothamBlack,
+	TextWrapped = false,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+})
+local callDistance = Ui.label(callLine, "", UDim2.fromOffset(90, 26), {
+	Position = UDim2.new(1, -102, 0, 4),
+	TextXAlignment = Enum.TextXAlignment.Right,
+	TextSize = 15,
+	TextColor3 = C.dim,
+	Font = Enum.Font.GothamMedium,
+	TextWrapped = false,
+})
+local callBack, callFill = Ui.bar(callLine, UDim2.new(1, -24, 0, 5), CALL_COLOR)
+callBack.Position = UDim2.new(0, 12, 1, -10)
+
+-- The marker over the car in the world (seen through walls, like the delivery label).
+local callMarker = Ui.make("BillboardGui", {
+	Name = "CarCallMarker",
+	Size = UDim2.fromOffset(200, 64),
+	StudsOffsetWorldSpace = Vector3.new(0, 7, 0),
+	AlwaysOnTop = true,
+	LightInfluence = 0,
+	MaxDistance = 3000,
+	ResetOnSpawn = false,
+	Enabled = false,
+}, player:WaitForChild("PlayerGui"))
+local MARKER_COLOR = CALL_COLOR:Lerp(Color3.new(1, 1, 1), 0.35)
+local markerText = Ui.label(callMarker, "", UDim2.new(1, 0, 0, 24), {
+	TextXAlignment = Enum.TextXAlignment.Center,
+	TextSize = 19,
+	Font = Enum.Font.GothamBlack,
+	TextColor3 = MARKER_COLOR,
+	TextStrokeTransparency = 0.2,
+	TextWrapped = false,
+})
+local markerSub = Ui.label(callMarker, "", UDim2.new(1, 0, 0, 16), {
+	Position = UDim2.fromOffset(0, 24),
+	TextXAlignment = Enum.TextXAlignment.Center,
+	TextSize = 14,
+	Font = Enum.Font.GothamBold,
+	TextColor3 = C.text,
+	TextStrokeTransparency = 0.3,
+	TextWrapped = false,
+})
+Ui.label(callMarker, "▼", UDim2.new(1, 0, 0, 22), {
+	Position = UDim2.fromOffset(0, 42),
+	TextXAlignment = Enum.TextXAlignment.Center,
+	TextSize = 20,
+	Font = Enum.Font.GothamBlack,
+	TextColor3 = MARKER_COLOR,
+	TextStrokeTransparency = 0.2,
+})
+
+type CarCallState = { arriveAt: number, total: number, car: Model?, doneAt: number?, doneText: string? }
+local call: CarCallState? = nil
+local callLoop = false
+
+local function carPart(car: Model?): BasePart?
+	if not car or not car.Parent then
+		return nil
+	end
+	return car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart")
+end
+
+local function setCarButton(text: string)
+	local button = hudButtons.car
+	if button and button.Text ~= text then
+		button.Text = text
+	end
+end
+
+local function hideCall()
+	callLine.Visible = false
+	callMarker.Enabled = false
+	callMarker.Adornee = nil
+	setCarButton("CAR")
+	MapView.setCar(nil)
+end
+
+-- One beat of the call: the line, the marker, the button. False when there is nothing more to show.
+local function updateCall(): boolean
+	local current = call
+	if not current then
+		hideCall()
+		return false
+	end
+	local now = os.clock()
+	local doneAt = current.doneAt
+	if (doneAt and now > doneAt) or (not doneAt and now > current.arriveAt + CALL_STALE) then
+		call = nil
+		hideCall()
+		return false
+	end
+	local part = carPart(current.car)
+	local root = myRoot()
+	local distance = if part and root then math.floor(Vector3.new(part.Position.X - root.Position.X, 0, part.Position.Z - root.Position.Z).Magnitude + 0.5) else nil
+	callLine.Visible = true
+	callDistance.Text = if distance then `{distance} m` else ""
+	if doneAt then
+		callText.Text = current.doneText or "✔  Your car is here"
+		callStroke.Color = if current.doneText then C.yellow else C.green
+		callFill.BackgroundColor3 = if current.doneText then C.yellow else C.green
+		callFill.Size = UDim2.fromScale(1, 1)
+		markerText.Text = "🚗  YOUR CAR"
+		markerSub.Text = if distance then `here · {distance} m` else "here"
+		setCarButton("CAR")
+	else
+		local left = math.max(0, math.ceil(current.arriveAt - now))
+		callText.Text = if left > 0 then `🚗  Your car is on the way · {left} s` else "🚗  Your car is almost here"
+		callStroke.Color = CALL_COLOR
+		callFill.BackgroundColor3 = CALL_COLOR
+		callFill.Size = UDim2.fromScale(math.clamp(1 - (current.arriveAt - now) / current.total, 0, 1), 1)
+		markerText.Text = "🚗  YOUR CAR"
+		markerSub.Text = (if left > 0 then `{left} s` else "arriving") .. (if distance then `  ·  {distance} m` else "")
+		setCarButton(if left <= 0 then "CAR" elseif touchLayout then `CAR {left}s` else `CAR · {left} s`)
+	end
+	if callMarker.Adornee ~= part then
+		callMarker.Adornee = part
+	end
+	callMarker.Enabled = part ~= nil and gui.Enabled
+	return true
+end
+
+local function onCarCall(first: any, second: any)
+	local seconds, car, reason = first, second, nil
+	if type(first) == "table" then
+		seconds = first.seconds or first.left or first.eta
+		car = first.car or first.model
+		reason = first.reason or first.text
+	end
+	if type(second) == "string" then
+		reason = second
+	end
+	local model: Model? = if typeof(car) == "Instance" and car:IsA("Model") then car else nil
+	local now = os.clock()
+	local old = call
+	local running = old ~= nil and old.doneAt == nil
+	if type(seconds) == "number" and seconds >= 0 then
+		call = {
+			arriveAt = now + seconds,
+			-- The bar fills over the whole trip: the first message says how long it is.
+			total = if running and old then math.max(old.total, seconds, 1) else math.max(seconds, 1),
+			car = model or (if running and old then old.car else nil),
+		}
+	elseif old or reason then
+		call = {
+			arriveAt = now,
+			total = 1,
+			car = model or (if old then old.car else nil),
+			doneAt = now + CALL_DONE_SHOWN,
+			doneText = if type(reason) == "string" and reason ~= "" then `🚗  {reason}` else nil,
+		}
+	else
+		return
+	end
+	MapView.setCar(if call then call.car else nil)
+	if callLoop then
+		return
+	end
+	callLoop = true
+	task.spawn(function()
+		while true do
+			local ok, more = pcall(updateCall)
+			if not ok then
+				warn(`[Hud] car call: {more}`)
+				call = nil
+				pcall(hideCall)
+				break
+			end
+			if not more then
+				break
+			end
+			task.wait(0.1)
+		end
+		callLoop = false
+	end)
+end
+
+-- ── Layout ─────────────────────────────────────────────────────────────────
+-- Everything outside the windows is placed from the size of the screen: the ScreenGui's area under Roblox's top
+-- bar, W × H pixels, and one scale S = Ui.scaleFor(W × H) (1 at 1150 × 680, from 0.55 on phones to 1.1). It runs
+-- again when the screen changes, the weapon bar grows a row, or the ADMIN button comes or goes. The regions:
+--
+--   COMPUTER (keyboard and mouse)                       TOUCH, held sideways (phone or tablet, no keyboard)
+--   ┌──────────────────────────────────────────────┐    ┌──────────────────────────────────────────────┐
+--   │ chat     ┌── top stack ──┐            ADMIN  │    │ money   ┌── top stack ──┐          ADMIN    │
+--   │ (Roblox) │ job / crew    │         ┌───────┐ │    │ minimap │ job / crew    │       ┌────┬────┐ │
+--   │          │ car call      │         │ JOBS  │ │    │         │ car call      │       │JOBS│TOP │ │
+--   │          │ level up      │         │ MAP   │ │    │         │ level up      │       │ …  │ …  │ │
+--   │          │ toasts        │         │ …     │ │    │         │ toasts        │       └────┴────┘ │
+--   │          └───────────────┘         │ESTATE │ │    │         └───────────────┘                  │
+--   │ money          (loading bar)       └───────┘ │    │ (thumb-     (loading bar)           (FIRE)  │
+--   │ minimap        hint           weapon bar     │    │  stick)   hint        weapon bar            │
+--   │                car panel      hotbar         │    │           car panel   hotbar        (jump)  │
+--   └──────────────────────────────────────────────┘    └──────────────────────────────────────────────┘
+--
+--   TOUCH, held upright: money and minimap top left, the buttons (two columns) top right, the top stack under them;
+--   at the bottom one column (hint, weapon bar, hotbar, car panel) left of FIRE and the jump button.
+--
+--   * Margins 16 px, gaps 8 px. The ADMIN button (client/AdminPanel.luau, 90 × 32 at 16 px from the right, 56 from
+--     the top, unscaled) keeps the top right corner (down to ADMIN_BOTTOM) while it shows (admins, Studio).
+--   * Left: money + minimap, one column (LEFT_W × LEFT_H × S): bottom left on a computer (the chat is top left),
+--     top left on touch (the thumbstick is bottom left).
+--   * Bottom right, computer: the hotbar in the corner, the weapon bar on it (one or two rows of guns). Touch: the
+--     FIRE button just over Roblox's jump button (70 px at 95 / 90 px from the corner on a small screen, 120 px at
+--     170 / 210 px on a big one).
+--   * Bottom centre, computer: the car panel centred between the minimap and the bars (smaller when it has to), the
+--     hint over it. Touch: the car panel with the hint over it and, beside it (sideways) or over it (upright), the
+--     weapon bar over the hotbar; moved left of FIRE / the jump button, or over them when that is not enough.
+--   * The buttons: right edge, from the top (under ADMIN) down to the weapon bar (computer) or FIRE (touch). One
+--     column when it fits at a scale of at least 0.6 (computer) or 0.7 (touch: the buttons are 100 × 48 there and
+--     never smaller than 0.8 of that), else two columns, else four (two rows). A computer centres them in the room.
+--   * Top stack: centred, TOP_W × S wide (narrower down to TOP_MIN_W before it gets smaller), between the minimap (touch) and the buttons / ADMIN, and as tall as the
+--     room over the bottom panels allows (TOP_EST_H: a two-line job panel and the car call line, with the loading
+--     bar's room under it); smaller when it has to. On a touch screen with no room beside the buttons (upright) it
+--     goes under the minimap and the buttons.
+--   * The loading bar: at 62 % of the height, under the top stack and over the panels at the bottom.
+
+local MARGIN = 16
+local GAP = 8
+local ADMIN_BOTTOM = 96 -- client/AdminPanel.luau: the ADMIN button at (1, -16, 0, 56), 90 × 32, unscaled
+local ADMIN_LEFT = 16 + 90 + GAP
+local BUTTON_W, BUTTON_H = 150, 46
+local TOUCH_BUTTON_W, TOUCH_BUTTON_H = 88, 48
+local BUTTON_GAP = 8
+local TOUCH_BUTTON_MIN = 0.8
+local TOP_EST_H = 240 -- the top stack's usual height (unscaled): a two-line job panel and the car call line
+local TOP_MIN_W = 400 -- a narrow span first makes the top stack narrower (down to this), then smaller
+local HINT_LINES = if touchLayout then 2 else 1 -- the hint may wrap (upward) this far
+
+type Box = { x0: number, y0: number, x1: number, y1: number }
+
+local function box(x0: number, y0: number, x1: number, y1: number): Box
+	return { x0 = x0, y0 = y0, x1 = x1, y1 = y1 }
+end
+
+-- The top edge of the highest box that starts at or under `y` and shares columns with x0 .. x1 (else `floor`).
+local function ceilingBelow(boxes: { Box }, x0: number, x1: number, y: number, floor: number): number
+	local limit = floor
+	for _, b in boxes do
+		if b.y0 >= y and math.min(b.x1, x1) - math.max(b.x0, x0) > 0 then
+			limit = math.min(limit, b.y0)
+		end
+	end
+	return limit
+end
+
+local function screenArea(): Vector2
+	local size = gui.AbsoluteSize
+	if size.X < 2 or size.Y < 2 then
+		return Ui.screenSize()
+	end
+	return size
+end
+
+-- The ADMIN button shows (the same rule as client/AdminPanel.luau).
+local function adminButtonShown(): boolean
+	return player:GetAttribute("Admin") == true or (Config.Admin.InStudio and RunService:IsStudio())
+end
+
+-- The columns of buttons to try, the first that fits wins.
+local function columnChoices(width: number, height: number): { number }
+	if touchLayout and width < height then
+		return { 2, 1, 4 }
+	end
+	return { 1, 2, 4 }
+end
+
+layout = function()
+	local size = screenArea()
+	local W, H = size.X, size.Y
+	local S = Ui.scaleFor(size)
+	for _, s in scales do
+		s.Scale = S
+	end
+	-- What the top stack and the loading bar must stay above.
+	local below: { Box } = {}
+
+	-- Left: money and the minimap.
+	setScale(leftStack, S)
+	local left: Box
+	if touchLayout then
+		leftStack.AnchorPoint = Vector2.zero
+		leftStack.Position = UDim2.fromOffset(MARGIN, MARGIN)
+		left = box(MARGIN, MARGIN, MARGIN + LEFT_W * S, MARGIN + LEFT_H * S)
+	else
+		leftStack.AnchorPoint = Vector2.new(0, 1)
+		leftStack.Position = UDim2.new(0, MARGIN, 1, -MARGIN)
+		left = box(MARGIN, H - MARGIN - LEFT_H * S, MARGIN + LEFT_W * S, H - MARGIN)
+		table.insert(below, left)
+	end
+
+	-- Bottom right: the bars (computer), or FIRE over the jump button (touch). cornerLeft: where that corner begins.
+	local admin = adminButtonShown()
+	local rightTop = if admin then ADMIN_BOTTOM else MARGIN
+	local rightBottom: number
+	local cornerLeft: number
+	local fireTop = H
+	local fireSize = FIRE_SIZE * S
+	local weaponH = weaponBar.Size.Y.Offset
+	setScale(fire, S)
+	setScale(hotbar, S)
+	setScale(weaponBar, S)
+	fire.AnchorPoint = Vector2.new(1, 1)
+	if touchLayout then
+		local small = math.min(W, H) <= 500
+		local jumpSize = if small then 70 else 120
+		local jump = box(W - (if small then 95 else 170), H - (if small then 90 else 210), 0, 0)
+		jump.x1, jump.y1 = jump.x0 + jumpSize, jump.y0 + jumpSize
+		local fireBottom = jump.y0 - 10
+		fire.Position = UDim2.fromOffset(W - 40, fireBottom)
+		local fireBox = box(W - 40 - fireSize, fireBottom - fireSize, W - 40, fireBottom)
+		table.insert(below, fireBox)
+		table.insert(below, jump)
+		fireTop = fireBox.y0
+		rightBottom = fireBox.y0 - GAP
+		cornerLeft = math.min(jump.x0, fireBox.x0) - GAP
+	else
+		hotbar.AnchorPoint = Vector2.new(1, 1)
+		hotbar.Position = UDim2.new(1, -MARGIN, 1, -MARGIN)
+		local hotTop = H - MARGIN - HOTBAR_H * S
+		weaponBar.AnchorPoint = Vector2.new(1, 1)
+		weaponBar.Position = UDim2.new(1, -MARGIN, 0, hotTop - GAP)
+		local weaponTop = hotTop - GAP - weaponH * S
+		table.insert(below, box(W - MARGIN - BAR_W * S, weaponTop, W - MARGIN, H - MARGIN))
+		rightBottom = weaponTop - 12
+		cornerLeft = W - MARGIN - BAR_W * S
+		if UserInputService.TouchEnabled then
+			-- A touch screen with a keyboard: FIRE left of the bars.
+			fire.Position = UDim2.fromOffset(cornerLeft - 12, H - MARGIN)
+			local fireBox = box(cornerLeft - 12 - fireSize, H - MARGIN - fireSize, cornerLeft - 12, H - MARGIN)
+			table.insert(below, fireBox)
+			cornerLeft = fireBox.x0
+		end
+	end
+
+	-- Bottom centre: the car panel with the hint over it (touch: and the bars).
+	local carScale = S
+	local carX: number
+	local carBottom: number
+	local hintWidth: number
+	local hintBottom: number? = nil -- nil: just over the car panel
+	if touchLayout then
+		local carW, barW = CAR_W * S, BAR_W * S
+		local sideBySide = W >= H
+		local groupW = if sideBySide then carW + GAP + barW else math.max(carW, barW)
+		local cx = W / 2
+		if cx + groupW / 2 > cornerLeft then
+			-- Left of FIRE and the jump button …
+			cx = math.max(MARGIN + groupW / 2, cornerLeft - groupW / 2)
+		end
+		local bottom = H - GAP
+		if cx + groupW / 2 > cornerLeft then
+			-- … or over them.
+			bottom = fireTop - GAP
+		end
+		local barX: number
+		local barBottom: number
+		if sideBySide then
+			carX = cx - groupW / 2 + carW / 2
+			barX = cx + groupW / 2 - barW / 2
+			barBottom = bottom
+			hintWidth = carW
+		else
+			carX, barX = cx, cx
+			barBottom = bottom - CAR_H * S - 6
+			hintWidth = groupW
+		end
+		carBottom = bottom
+		hotbar.AnchorPoint = Vector2.new(0.5, 1)
+		hotbar.Position = UDim2.fromOffset(barX, barBottom)
+		local weaponBottom = barBottom - HOTBAR_H * S - 6
+		weaponBar.AnchorPoint = Vector2.new(0.5, 1)
+		weaponBar.Position = UDim2.fromOffset(barX, weaponBottom)
+		local weaponTop = weaponBottom - weaponH * S
+		table.insert(below, box(barX - barW / 2, weaponTop, barX + barW / 2, barBottom))
+		if not sideBySide then
+			-- Upright: the hint goes over the weapon bar.
+			hintBottom = weaponTop - 4
+		end
+	else
+		local spanLeft, spanRight = left.x1 + 12, cornerLeft - 12
+		carScale = math.clamp((spanRight - spanLeft) / CAR_W, 0.4, S)
+		local half = CAR_W * carScale / 2
+		carX = math.clamp(W / 2, spanLeft + half, math.max(spanLeft + half, spanRight - half))
+		carBottom = H - 18
+		hintWidth = math.max(half * 2, 2 * math.min(carX - spanLeft, spanRight - carX))
+	end
+	setScale(carPanel, carScale)
+	carPanel.AnchorPoint = Vector2.new(0.5, 1)
+	carPanel.Position = UDim2.fromOffset(carX, carBottom)
+	local carTop = carBottom - CAR_H * carScale
+	table.insert(below, box(carX - CAR_W * carScale / 2, carTop, carX + CAR_W * carScale / 2, carBottom))
+	local hintAt = hintBottom or carTop - 6
+	local hintSize = math.max(11, math.floor(15 * S + 0.5))
+	hint.TextSize = hintSize
+	hint.Size = UDim2.fromOffset(hintWidth, 0)
+	hint.Position = UDim2.fromOffset(carX, hintAt)
+	table.insert(below, box(carX - hintWidth / 2, hintAt - HINT_LINES * (hintSize + 3), carX + hintWidth / 2, hintAt))
+
+	-- The buttons.
+	local bw = if touchLayout then TOUCH_BUTTON_W else BUTTON_W
+	local bh = if touchLayout then TOUCH_BUTTON_H else BUTTON_H
+	local base = if touchLayout then math.max(S, TOUCH_BUTTON_MIN) else S
+	local minScale = if touchLayout then 0.7 else 0.6
+	local room = math.max(0, rightBottom - rightTop)
+	local count = #BUTTONS
+	local function gridSize(columns: number): (number, number)
+		local rows = math.ceil(count / columns)
+		return columns * bw + (columns - 1) * BUTTON_GAP, rows * bh + (rows - 1) * BUTTON_GAP
+	end
+	local columns, buttonScale = 0, 0
+	for _, choice in columnChoices(W, H) do
+		local _, h = gridSize(choice)
+		local fit = math.min(base, room / h)
+		if fit >= minScale then
+			columns, buttonScale = choice, fit
+			break
+		end
+	end
+	if columns == 0 then
+		-- Very little room: the flattest grid, as big as it fits.
+		local _, h = gridSize(4)
+		columns, buttonScale = 4, math.clamp(room / h, 0.45, base)
+	end
+	local gw, gh = gridSize(columns)
+	buttonGrid.Size = UDim2.fromOffset(gw, gh)
+	buttonLayout.CellSize = UDim2.fromOffset(bw, bh)
+	buttonLayout.CellPadding = UDim2.fromOffset(BUTTON_GAP, BUTTON_GAP)
+	if columns >= 4 then
+		-- Rows: JOBS MAP BAG CAR / TOP CREW ESTATE.
+		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+		buttonLayout.StartCorner = Enum.StartCorner.TopLeft
+		buttonLayout.FillDirectionMaxCells = columns
+	else
+		-- Columns from the screen's edge: JOBS MAP BAG CAR | TOP CREW ESTATE.
+		buttonLayout.FillDirection = Enum.FillDirection.Vertical
+		buttonLayout.StartCorner = Enum.StartCorner.TopRight
+		buttonLayout.FillDirectionMaxCells = math.ceil(count / columns)
+	end
+	for _, button in hudButtons do
+		button.TextSize = if touchLayout then 16 else 18
+	end
+	setScale(buttonGrid, buttonScale)
+	local gridTop = if touchLayout then rightTop else rightTop + math.max(0, (room - gh * buttonScale) / 2)
+	buttonGrid.AnchorPoint = Vector2.new(1, 0)
+	buttonGrid.Position = UDim2.fromOffset(W - MARGIN, gridTop)
+	local grid = box(W - MARGIN - gw * buttonScale, gridTop, W - MARGIN, gridTop + gh * buttonScale)
+
+	-- The top stack: as big as the span (spanL .. spanR from y) and the room under it allow.
+	local loadRoom = GAP + LOAD_H * S + GAP
+	local function fit(y: number, spanL: number, spanR: number): (number, number, number)
+		local span = spanR - spanL
+		local width = math.clamp(span / S, TOP_MIN_W, TOP_W)
+		local scale = math.min(S, span / width)
+		local half = width * scale / 2
+		local cx = math.clamp(W / 2, spanL + half, math.max(spanL + half, spanR - half))
+		local floor = ceilingBelow(below, cx - half, cx + half, y, H)
+		scale = math.min(scale, (floor - loadRoom - y) / TOP_EST_H)
+		return scale, cx, width
+	end
+	local topY = 14
+	local spanL, spanR = MARGIN, W - MARGIN
+	if touchLayout then
+		spanL = left.x1 + GAP
+	end
+	local gridHigh = grid.y0 < H * 0.45
+	if gridHigh then
+		spanR = math.min(spanR, grid.x0 - GAP)
+	end
+	if admin then
+		spanR = math.min(spanR, W - ADMIN_LEFT)
+	end
+	local topScale, topX, topWidth = fit(topY, spanL, spanR)
+	if touchLayout and topScale < S * 0.8 then
+		-- No room beside the minimap and the buttons (upright): under them, the whole width.
+		local y = math.max(left.y1, if gridHigh then grid.y1 else 0) + GAP
+		local scale, x, width = fit(y, MARGIN, W - MARGIN)
+		if scale > topScale then
+			topY, topScale, topX, topWidth = y, scale, x, width
+		end
+	end
+	topScale = math.max(topScale, 0.3)
+	setScale(topStack, topScale)
+	topStack.Size = UDim2.fromOffset(topWidth, 0)
+	topStack.Position = UDim2.fromOffset(topX, topY)
+
+	-- The loading bar: at 62 % of the height, under the top stack, over the bottom panels.
+	local loadHalf = LOAD_H * S / 2
+	local topBottom = topY + TOP_EST_H * topScale
+	local loadFloor = ceilingBelow(below, W / 2 - 170 * S, W / 2 + 170 * S, topBottom, H)
+	local loadY = math.min(H * 0.62, loadFloor - GAP - loadHalf)
+	if loadY - loadHalf < topBottom + GAP then
+		loadY = math.min(topBottom + GAP + loadHalf, loadFloor - GAP - loadHalf)
+	end
+	loadBack.Position = UDim2.fromOffset(W / 2, loadY)
 end
 
 -- ── Updates ────────────────────────────────────────────────────────────────
@@ -1984,6 +2700,10 @@ end
 function Hud.setVisible(visible: boolean)
 	gui.Enabled = visible
 	MapView.setVisible(visible)
+	if visible then
+		requestLayout()
+	end
+	callMarker.Enabled = visible and call ~= nil and callMarker.Adornee ~= nil
 end
 
 local lastShop: string? = nil
@@ -2136,14 +2856,24 @@ RunService.RenderStepped:Connect(function()
 end)
 
 function Hud.start()
-	updateScale()
+	layout()
 	refreshLevel()
 	player:GetAttributeChangedSignal("Xp"):Connect(refreshLevel)
+	-- The layout follows the screen (a resized window, a phone turned), and the ADMIN button.
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(requestLayout)
 	local camera = workspace.CurrentCamera
 	if camera then
-		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(requestLayout)
 	end
+	player:GetAttributeChangedSignal("Admin"):Connect(requestLayout)
 	MapView.start(gui, leftStack)
+	-- Calling your car (server/CarCall.luau).
+	local ok, err = pcall(function()
+		Net.get("CarCall").OnClientEvent:Connect(onCarCall)
+	end)
+	if not ok then
+		warn(`[Hud] no CarCall remote: {err}`)
+	end
 	-- Keys.
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or not gui.Enabled or UserInputService:GetFocusedTextBox() then

@@ -1,12 +1,47 @@
 --!strict
 -- Small helpers for building the interface in code.
 
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
 local Theme = require(script.Parent.Theme)
 local Ui = {}
 Ui.Colors = Theme.Colors
+Ui.Gps = Theme.Gps -- the GPS purple (the routes, the crew)
+
+-- ── Screen ────────────────────────────────────────────────────────────────
+-- One rule for the size of the interface everywhere (the HUD, its windows, the crew window, the leaderboard): 1 at
+-- 1150 × 680 pixels, smaller on phones (at least 0.55), a little bigger on big screens (at most 1.1).
+Ui.ScaleBase = Vector2.new(1150, 680)
+Ui.MinScale = 0.55
+Ui.MaxScale = 1.1
+
+-- The scale for a screen of `size` pixels (the ScreenGui's area, under Roblox's top bar).
+function Ui.scaleFor(size: Vector2): number
+	return math.clamp(math.min(size.X / Ui.ScaleBase.X, size.Y / Ui.ScaleBase.Y), Ui.MinScale, Ui.MaxScale)
+end
+
+-- The area a ScreenGui (IgnoreGuiInset off) has: the viewport under Roblox's top bar.
+function Ui.screenSize(): Vector2
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return Ui.ScaleBase
+	end
+	local inset = GuiService:GetGuiInset()
+	return Vector2.new(camera.ViewportSize.X, math.max(1, camera.ViewportSize.Y - inset.Y))
+end
+
+-- The scale of this screen right now.
+function Ui.screenScale(): number
+	return Ui.scaleFor(Ui.screenSize())
+end
+
+-- A phone or a tablet without a keyboard: the touch layout (the thumbstick, the jump button, the FIRE button).
+function Ui.touchLayout(): boolean
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+end
 
 -- Instance.new + properties + parent. Returns any, so the caller can use the class's properties freely.
 function Ui.make(className: string, props: { [string]: any }, parent: Instance?): any

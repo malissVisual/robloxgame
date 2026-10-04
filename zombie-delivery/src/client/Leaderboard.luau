@@ -58,13 +58,11 @@ local COLUMNS = {
 	earned = { right = 104, w = 96 },
 }
 
+-- The same rule as the Hud's windows (Ui.scaleFor), so the board matches them on every screen.
 local function updateScale()
-	local camera = workspace.CurrentCamera
-	if not camera or not scale then
-		return
+	if scale then
+		scale.Scale = Ui.screenScale()
 	end
-	local size = camera.ViewportSize
-	scale.Scale = math.clamp(math.min(size.X / 1150, size.Y / 680), 0.55, 1.1)
 end
 
 local function build()
