@@ -97,6 +97,34 @@ local LOOKS: { [string]: { pieces: { Piece }, muzzle: Vector3 } } = {
 			{ size = v(0.14, 0.2, 0.5), at = v(-0.26, 0.2, 0.0), color = Color3.fromRGB(190, 150, 60), material = METAL }, -- belt
 		},
 	},
+	revolver = {
+		muzzle = v(0, 0.26, -1.25),
+		pieces = {
+			{ size = v(0.14, 0.14, 0.95), at = v(0, 0.26, -0.75), color = STEEL, material = METAL, tube = true }, -- barrel
+			{ size = v(0.12, 0.08, 0.9), at = v(0, 0.16, -0.72), color = STEEL, material = METAL }, -- ejector rod
+			{ size = v(0.34, 0.34, 0.42), at = v(0, 0.22, -0.12), color = GUNMETAL, material = METAL, tube = true }, -- cylinder
+			{ size = v(0.22, 0.3, 0.55), at = v(0, 0.24, 0.18), color = GUNMETAL, material = METAL }, -- frame
+			{ size = v(0.06, 0.12, 0.14), at = v(0, 0.42, 0.38), color = BLACK, material = METAL, tilt = -30 }, -- hammer
+			{ size = v(0.24, 0.62, 0.3), at = v(0, -0.2, 0.3), color = WOOD, material = Enum.Material.Wood, tilt = 22 }, -- grip
+			{ size = v(0.05, 0.16, 0.3), at = v(0, -0.02, 0.0), color = GUNMETAL, material = METAL }, -- trigger guard
+			{ size = v(0.05, 0.08, 0.06), at = v(0, 0.36, -1.18), color = STEEL, material = METAL }, -- front sight
+		},
+	},
+	carbine = {
+		muzzle = v(0, 0.28, -2.25),
+		pieces = {
+			{ size = v(0.3, 0.36, 1.4), at = v(0, 0.24, -0.35), color = BLACK, material = METAL }, -- receiver
+			{ size = v(0.3, 0.3, 0.85), at = v(0, 0.24, -1.4), color = OLIVE, material = PLASTIC }, -- handguard
+			{ size = v(0.12, 0.12, 0.55), at = v(0, 0.28, -1.95), color = GUNMETAL, material = METAL, tube = true }, -- barrel
+			{ size = v(0.18, 0.18, 0.22), at = v(0, 0.28, -2.15), color = BLACK, material = METAL, tube = true }, -- flash hider
+			{ size = v(0.1, 0.14, 1.2), at = v(0, 0.48, -0.6), color = BLACK, material = METAL }, -- top rail
+			{ size = v(0.12, 0.2, 0.12), at = v(0, 0.6, 0.0), color = BLACK, material = METAL }, -- rear sight
+			{ size = v(0.08, 0.24, 0.1), at = v(0, 0.56, -1.7), color = BLACK, material = METAL }, -- front sight
+			{ size = v(0.22, 0.55, 0.28), at = v(0, -0.18, 0.15), color = BLACK, material = PLASTIC, tilt = 14 }, -- grip
+			{ size = v(0.2, 0.7, 0.3), at = v(0, -0.3, -0.55), color = GUNMETAL, material = METAL, tilt = -14 }, -- magazine
+			{ size = v(0.24, 0.42, 1.0), at = v(0, 0.12, 0.95), color = OLIVE, material = PLASTIC }, -- stock
+		},
+	},
 	launcher = {
 		muzzle = v(0, 0.36, -2.45),
 		pieces = {

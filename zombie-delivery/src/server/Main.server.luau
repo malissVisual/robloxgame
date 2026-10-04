@@ -23,6 +23,10 @@ local Gun = require(Server.Gun)
 local Items = require(Server.Items)
 local Shops = require(Server.Shops)
 local BanditCars = require(Server.BanditCars)
+local Cargo = require(Server.Cargo)
+local Npcs = require(Server.Npcs)
+local Animals = require(Server.Animals)
+local Admin = require(Server.Admin)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -118,6 +122,10 @@ safely("Gun", Gun.start)
 safely("Items", Items.start)
 safely("Shops", Shops.start)
 safely("BanditCars", BanditCars.start)
+safely("Npcs", Npcs.start)
+safely("Animals", Animals.start)
+safely("Cargo", Cargo.start)
+safely("Admin", Admin.start)
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).

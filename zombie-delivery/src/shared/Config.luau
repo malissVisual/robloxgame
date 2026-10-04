@@ -6,13 +6,20 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "1.8"
+Config.Version = "2.0"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
 Config.StudioStartMoney = 25000 -- a Play test in Studio (no saves) starts rich, to try the shops
 Config.AutosaveSeconds = 60
 Config.SpawnCarCooldown = 4
+
+-- Who may open the admin panel (F7 / the ADMIN button, server/Admin.luau): everybody in a Studio Play test, the
+-- game's owner (game.CreatorId) and these user ids.
+Config.Admin = {
+	InStudio = true,
+	UserIds = {} :: { number },
+}
 
 Config.City = {
 	BlockSize = 110,
@@ -155,6 +162,36 @@ Config.Cars = {
 		company = true,
 		employer = "movers",
 	},
+	{
+		id = "livestock",
+		name = "Livestock Truck",
+		price = 0,
+		style = "livestock",
+		maxSpeed = 56,
+		accel = 22,
+		turn = 1.5,
+		health = 1000,
+		ramPower = 1.7,
+		color = { 150, 90, 50 },
+		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
+		company = true,
+		employer = "ranch",
+	},
+	{
+		id = "fueltruck",
+		name = "Fuel Truck",
+		price = 0,
+		style = "fueltruck",
+		maxSpeed = 60,
+		accel = 24,
+		turn = 1.6,
+		health = 950,
+		ramPower = 1.6,
+		color = { 220, 60, 50 },
+		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
+		company = true,
+		employer = "gas",
+	},
 } :: { CarDef }
 
 export type WeaponDef = {
@@ -169,6 +206,7 @@ export type WeaponDef = {
 	splash: number, -- radius of the blast (0 = none)
 	color: { number }, -- tracer colour
 	description: string,
+	earned: string?, -- not sold: this employer (Config.Employers) gives it to you after some jobs
 }
 
 Config.Weapons = {
@@ -249,6 +287,35 @@ Config.Weapons = {
 		splash = 14,
 		color = { 255, 110, 60 },
 		description = "Every shot is a small explosion.",
+	},
+	-- Earned, not sold (Config.Employers weapon rewards).
+	{
+		id = "revolver",
+		name = "Ranch Revolver",
+		price = 0,
+		damage = 42,
+		fireRate = 1.6,
+		range = 170,
+		pellets = 1,
+		spread = 0.3,
+		splash = 0,
+		color = { 255, 220, 160 },
+		description = "Six shots of frontier justice. A gift from Silver Spur Ranch.",
+		earned = "ranch",
+	},
+	{
+		id = "carbine",
+		name = "Army Carbine",
+		price = 0,
+		damage = 22,
+		fireRate = 7,
+		range = 200,
+		pellets = 1,
+		spread = 1,
+		splash = 0,
+		color = { 255, 235, 150 },
+		description = "Army issue, steady full auto. The base gives it to the couriers it trusts.",
+		earned = "army",
 	},
 } :: { WeaponDef }
 
@@ -658,6 +725,18 @@ export type JobTypeDef = {
 	cargo: string,
 	pickupLabel: string,
 	dropLabel: string,
+	-- How the cargo gets in and out (server/Cargo.luau):
+	--   carry  get out, pick one piece up (E), carry it in your hands to the car's back and load it (E); at the
+	--          drop take it out of the car and carry it to the receiver
+	--   lead   animals: lead one at a time on a rope (E) into the vehicle; at the drop lead them out to the receiver
+	--   board  passengers walk in and out by themselves while you wait parked in the circle
+	--   serve  park in the circle and hold still while the customers come (the old way)
+	load: string,
+	unload: string,
+	items: number, -- pieces of cargo for the whole job (split over the drops)
+	itemKind: string, -- the look of one piece: crate | ammo | sack | barrel | icebox | furniture | soup | horse | kid
+	giver: string, -- the person (an R15 NPC) who hands the cargo over at the pick-up
+	receiver: string, -- the person who takes it at the drop
 }
 
 -- Special jobs. The ones with an employer are taken at the employer's place; the others show up on the job board.
@@ -679,6 +758,12 @@ Config.JobTypes = {
 		cargo = "Kids",
 		pickupLabel = "PICK UP THE KIDS",
 		dropLabel = "DROP THE KIDS AT",
+		load = "board",
+		unload = "board",
+		items = 6,
+		itemKind = "kid",
+		giver = "A parent",
+		receiver = "Ms. Parker, the teacher",
 	},
 	{
 		id = "armysupply",
@@ -697,6 +782,12 @@ Config.JobTypes = {
 		cargo = "Ammo Crates",
 		pickupLabel = "LOAD THE AMMO",
 		dropLabel = "DELIVER THE AMMO TO",
+		load = "carry",
+		unload = "carry",
+		items = 4,
+		itemKind = "ammo",
+		giver = "Rocco, the dock foreman",
+		receiver = "Sergeant Hayes",
 	},
 	{
 		id = "icecream",
@@ -715,6 +806,12 @@ Config.JobTypes = {
 		cargo = "Ice Cream",
 		pickupLabel = "LOAD THE ICE CREAM",
 		dropLabel = "SELL ICE CREAM AT",
+		load = "carry",
+		unload = "serve",
+		items = 3,
+		itemKind = "icebox",
+		giver = "Frosty",
+		receiver = "Kids with pocket money",
 	},
 	{
 		id = "moving",
@@ -733,6 +830,12 @@ Config.JobTypes = {
 		cargo = "Furniture",
 		pickupLabel = "LOAD THE FURNITURE",
 		dropLabel = "UNLOAD AT THE NEW HOME,",
+		load = "carry",
+		unload = "carry",
+		items = 4,
+		itemKind = "furniture",
+		giver = "The Novak family",
+		receiver = "The Novak family",
 	},
 	{
 		id = "farmrun",
@@ -751,6 +854,12 @@ Config.JobTypes = {
 		cargo = "Fresh Food",
 		pickupLabel = "LOAD THE FOOD",
 		dropLabel = "DELIVER TO THE MARKET AT",
+		load = "carry",
+		unload = "carry",
+		items = 4,
+		itemKind = "sack",
+		giver = "Old Man Jenkins, the farmer",
+		receiver = "The market grocer",
 	},
 	{
 		id = "winter",
@@ -769,6 +878,60 @@ Config.JobTypes = {
 		cargo = "Hot Soup",
 		pickupLabel = "PICK UP THE SOUP",
 		dropLabel = "DELIVER TO",
+		load = "carry",
+		unload = "carry",
+		items = 2,
+		itemKind = "soup",
+		giver = "The diner cook",
+		receiver = "Ingrid, the lodge keeper",
+	},
+	{
+		id = "horses",
+		name = "Horse Transport",
+		description = "Lead two horses from Silver Spur Ranch into the livestock truck and bring them to the Riverside Riding School.",
+		vehicle = "livestock",
+		employer = "ranch",
+		pickups = 1,
+		pickupAt = "ranch",
+		drops = 1,
+		dropAt = "stables",
+		loadTime = 3,
+		unloadTime = 3,
+		payPerStop = 180,
+		tier = 2,
+		cargo = "Horses",
+		pickupLabel = "LEAD THE HORSES IN AT",
+		dropLabel = "LEAD THE HORSES OUT AT",
+		load = "lead",
+		unload = "lead",
+		items = 2,
+		itemKind = "horse",
+		giver = "Walt, the rancher",
+		receiver = "Emma, the riding instructor",
+	},
+	{
+		id = "fuelrun",
+		name = "Fuel Run",
+		description = "Load fuel barrels at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
+		vehicle = "fueltruck",
+		employer = "gas",
+		pickups = 1,
+		pickupAt = "fueldepot",
+		drops = 1,
+		dropAt = "gas",
+		loadTime = 3,
+		unloadTime = 3,
+		payPerStop = 160,
+		tier = 3,
+		cargo = "Fuel Barrels",
+		pickupLabel = "LOAD THE BARRELS AT",
+		dropLabel = "REFILL THE PUMPS AT",
+		load = "carry",
+		unload = "carry",
+		items = 4,
+		itemKind = "barrel",
+		giver = "Hank, the depot worker",
+		receiver = "Rosa, the station owner",
 	},
 } :: { JobTypeDef }
 
@@ -780,15 +943,20 @@ export type EmployerDef = {
 	reward: string, -- the car you get to keep
 	needed: number, -- jobs done for them before they give it to you
 	pitch: string,
+	weapon: string?, -- a gun they give you (Config.Weapons, earned = this employer) …
+	weaponAt: number?, -- … after this many jobs
+	person: string, -- who runs it (the R15 NPC at their board)
 }
 
 -- People who run something in the world. Work for them: after a few jobs their vehicle is yours.
 Config.Employers = {
-	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bus", needed = 3, pitch = "Our bus driver ran away. Drive the kids to school!" },
-	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "armored", needed = 3, pitch = "We need ammo from the docks. Bring it through the tunnel." },
-	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "icecream", needed = 3, pitch = "People still want ice cream. Sell it for us!" },
-	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "movingtruck", needed = 3, pitch = "Families are getting out of town. Move their things." },
-	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, pitch = "The city is hungry. Take my monster truck to the markets." },
+	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bus", needed = 3, person = "Principal Moore", pitch = "Our bus driver ran away. Drive the kids to school!" },
+	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "armored", needed = 4, weapon = "carbine", weaponAt = 2, person = "Captain Reyes", pitch = "We need ammo from the docks. Bring it through the tunnel." },
+	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "icecream", needed = 3, person = "Frosty", pitch = "People still want ice cream. Sell it for us!" },
+	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "movingtruck", needed = 3, person = "Dana, the boss", pitch = "Families are getting out of town. Move their things." },
+	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, person = "Old Man Jenkins", pitch = "The city is hungry. Take my monster truck to the markets." },
+	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "livestock", needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My horses are sold to the riding school. Lead them into the truck gently, and keep the bandits off them." },
+	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Rosa, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
 
 return Config

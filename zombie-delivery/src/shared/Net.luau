@@ -30,6 +30,7 @@ local NAMES = {
 	"Paint", -- client → server: buy / apply a paint job on the equipped car (paint id)
 	"AcceptEmployer", -- client → server: take a job from the employer whose board you stand at (employer id)
 	"Aiming", -- client → server: aiming on foot or not (the gun arm goes up / down for everybody)
+	"Admin", -- client → server: an admin command (name, argument) — only for admins (server/Admin.luau)
 }
 
 local folder: Folder
