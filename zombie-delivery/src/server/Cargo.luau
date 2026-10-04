@@ -9,14 +9,21 @@
 --   lead   the same with horses: "Lead" takes one on the rope (Carrying = "horse"), "Load" puts it in a stall.
 --   board  park in the circle and wait: the kids walk from the house to the bus door (and at the school out of it),
 --          a patient shuffles slowly from home to the ambulance (bandaged, on a stretcher inside) and at the clinic
---          over to the doctor.
+--          over to the doctor; survivors (3.0, the missions) walk in at a normal pace, dirty, a backpack on.
 --   serve  park in the circle and hold still while the customers buy (the ice cream route).
 -- "Put down" (G) drops what you hold where you stand (to shoot); it also drops when the carrier dies, leaves or sits.
 -- Only the job's owner and their crew (who rode in the owner's car, or joined it by invitation: server/Crew.luau) may
 -- use the prompts, checked here (Info.allowed).
+--
+-- 3.0, the missions' twists: Info.lift (heavy pieces: carried alone they slow you to Config.Missions.LiftSlowSpeed,
+-- the character attribute CarrySpeed tells the client; with a crew mate within LiftHelpRange the normal step), and
+-- Cargo.setBlocked (the defend twist: at the last drop nothing is unloaded until the area is held). The mission
+-- cargo has its own looks (water, generator, battery, tnt, documents, electronics, weapons, painting, mail, tires,
+-- plants, survivor).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -51,6 +58,7 @@ export type Info = {
 	handles: boolean, -- some stop is carry / lead (the vehicle gets the Load prompt)
 	allowed: (Player) -> boolean, -- the owner and the crew
 	changed: () -> (), -- something to send to the HUD
+	lift: boolean?, -- the lift twist: heavy pieces, carried alone you walk at Config.Missions.LiftSlowSpeed
 }
 
 type Piece = {
@@ -99,6 +107,9 @@ export type Session = {
 	shown: { Model },
 	ended: boolean,
 	busy: number, -- people being spawned right now (Npcs.spawn may yield): the stop is not done meanwhile
+	blocked: boolean, -- the defend twist: nothing is unloaded at this stop until the area is held (Cargo.setBlocked)
+	slowed: { [Player]: Model }, -- the lift twist: carriers walking slowly right now (their character, CarrySpeed set)
+	liftTold: boolean, -- the lift twist's hint was given
 }
 
 export type Status = {
@@ -121,6 +132,7 @@ local notice = Net.get("Notice")
 
 local KID_NAMES = { "Tommy", "Lily", "Max", "Sophie", "Leo", "Mia", "Ben", "Zoe", "Sam", "Ava", "Noah", "Ella" }
 local PATIENT_NAMES = { "Mr. Brown", "Mrs. Lopez", "Old Pete", "Mr. Dvorak", "Mrs. Chen", "Mr. Okafor", "Miss Hart", "Mr. Svoboda" }
+local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Priya", "Dmitri", "Hannah", "Carlos", "June", "Bogdan", "Amara", "Wes", "Lena" }
 -- Npcs' walk animation (server/Npcs.luau WALK): a patient's steps are slowed to their shuffle.
 local WALK_ANIMATION = "rbxassetid://507777826"
 local LINES = {
@@ -134,6 +146,8 @@ local LINES = {
 	customer = { "Vanilla, please!", "Chocolate!", "Two scoops!", "Strawberry, please!" },
 	patientOn = { "Ow... careful with me.", "Is it far to the clinic?", "Thank you for coming...", "I feel dizzy..." },
 	patientOff = { "Am I going to be okay?", "Thank you, driver...", "Is that the doctor?" },
+	survivorOn = { "Go, go, go!", "You came back for us!", "Is there room for my bag?", "I haven't slept in days..." },
+	survivorOff = { "We made it!", "Real walls. Real food!", "Thank you, driver!", "Is this place safe?" },
 }
 
 local function line(list: { string }): string
@@ -174,12 +188,13 @@ end
 -- Do the pieces of this kind walk in and out by themselves (the kids, the patients)? They cannot be stolen; a wreck or
 -- bandits at the vehicle scare them (the job's condition drops) instead.
 function Cargo.isPeople(kind: string): boolean
-	return kind == "kid" or kind == "patient"
+	return kind == "kid" or kind == "patient" or kind == "survivor"
 end
 
--- The look of a person at a stop: Npcs.look, plus the roles Npcs does not know (the clinic's doctor, a patient).
+-- The look of a person at a stop: Npcs.look, plus the roles Npcs does not know (the clinic's doctor, a patient, a
+-- survivor).
 function Cargo.look(role: string, name: string, title: string?): Npcs.Look
-	local look = Npcs.look(if role == "doctor" or role == "patient" then "townsperson" else role, name, title)
+	local look = Npcs.look(if role == "doctor" or role == "patient" or role == "survivor" then "townsperson" else role, name, title)
 	if role == "doctor" then
 		-- A white coat over light blue scrubs.
 		look.hat = "none"
@@ -193,6 +208,14 @@ function Cargo.look(role: string, name: string, title: string?): Npcs.Look
 		look.vest, look.apron, look.boots = nil, nil, false
 		look.shortSleeves = true
 		look.shoes = { 200, 200, 204 }
+	elseif role == "survivor" then
+		-- Weeks out there: a dirty jacket, worn jeans, a beanie (the backpack comes with Cargo's dressSurvivor).
+		local jackets = { { 104, 92, 66 }, { 88, 96, 74 }, { 120, 84, 60 }, { 76, 82, 92 } }
+		look.hat, look.hatColor = "beanie", { 70, 64, 58 }
+		look.shirt = jackets[#name % #jackets + 1]
+		look.pants, look.vest, look.apron, look.coat, look.tie = { 72, 78, 92 }, nil, nil, nil, nil
+		look.shortSleeves, look.boots, look.bandage = false, true, false
+		look.shoes = { 58, 48, 40 }
 	end
 	return look
 end
@@ -274,6 +297,174 @@ end
 
 local FRONT_BACK = { Enum.NormalId.Front, Enum.NormalId.Back }
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder standing up
+
+-- The missions' cargo (3.0, Config.Cargo.Kinds), built into `model` like buildLook's (the bottom centre is the pivot,
+-- the front is -Z; the first part is the main one). False for a look it does not know.
+local function missionLook(model: Model, look: string, variant: number): boolean
+	local black = Color3.new(0, 0, 0)
+	local function block(name: string, size: Vector3, at: Vector3, color: Color3, material: Enum.Material): Part
+		return newPart(model, name, size, CFrame.new(at), color, material)
+	end
+	-- A cylinder `length` long: standing up, or lying along Z (a disc facing the front, a stick front to back) or X.
+	local function cylinder(name: string, length: number, diameter: number, at: Vector3, color: Color3, material: Enum.Material, axis: string?): Part
+		local turn = if axis == "z" then CFrame.Angles(0, math.rad(90), 0) elseif axis == "x" then CFrame.identity else UPRIGHT
+		local p = newPart(model, name, Vector3.new(length, diameter, diameter), CFrame.new(at) * turn, color, material)
+		p.Shape = Enum.PartType.Cylinder
+		return p
+	end
+	local function ball(name: string, diameter: number, at: Vector3, color: Color3, material: Enum.Material): Part
+		local p = block(name, Vector3.new(diameter, diameter, diameter), at, color, material)
+		p.Shape = Enum.PartType.Ball
+		return p
+	end
+
+	if look == "water" then
+		-- A big water jug: clear plastic, the water inside, a blue cap.
+		local body = cylinder("Body", 1.9, 1.5, Vector3.new(0, 0.95, 0), rgb(176, 214, 240), Enum.Material.Glass)
+		body.Transparency = 0.4
+		cylinder("Water", 1.55, 1.34, Vector3.new(0, 0.82, 0), rgb(70, 150, 230), Enum.Material.SmoothPlastic).Transparency = 0.2
+		for _, y in { 0.45, 1.45 } do
+			cylinder("Ring", 0.12, 1.56, Vector3.new(0, y, 0), rgb(150, 196, 232), Enum.Material.Glass).Transparency = 0.3
+		end
+		cylinder("Neck", 0.35, 0.6, Vector3.new(0, 2.07, 0), rgb(176, 214, 240), Enum.Material.Glass).Transparency = 0.3
+		cylinder("Cap", 0.22, 0.7, Vector3.new(0, 2.33, 0), rgb(40, 90, 200), Enum.Material.SmoothPlastic)
+	elseif look == "generator" then
+		-- An orange generator in a black tube frame: the fuel tank on top, the control panel at the front.
+		local frame = rgb(36, 36, 40)
+		local body = block("Body", Vector3.new(2.5, 1.4, 1.6), Vector3.new(0, 0.95, 0), rgb(232, 132, 32), Enum.Material.SmoothPlastic)
+		block("Tank", Vector3.new(1.6, 0.42, 1.2), Vector3.new(-0.2, 1.86, 0), rgb(220, 120, 26), Enum.Material.SmoothPlastic)
+		cylinder("FuelCap", 0.14, 0.4, Vector3.new(0.3, 2.13, 0), frame, Enum.Material.Metal)
+		for _, z in { -0.85, 0.85 } do
+			block("Skid", Vector3.new(2.9, 0.22, 0.22), Vector3.new(0, 0.11, z), frame, Enum.Material.Metal)
+			block("Rail", Vector3.new(2.9, 0.18, 0.18), Vector3.new(0, 2.05, z), frame, Enum.Material.Metal)
+			for _, x in { -1.36, 1.36 } do
+				block("Post", Vector3.new(0.18, 2.0, 0.18), Vector3.new(x, 1.08, z), frame, Enum.Material.Metal)
+			end
+		end
+		block("Panel", Vector3.new(0.9, 0.7, 0.05), Vector3.new(0.6, 0.95, -0.82), frame, Enum.Material.Metal)
+		block("Socket", Vector3.new(0.2, 0.2, 0.05), Vector3.new(0.4, 0.95, -0.85), rgb(240, 240, 235), Enum.Material.SmoothPlastic)
+		block("Lamp", Vector3.new(0.14, 0.14, 0.05), Vector3.new(0.85, 1.15, -0.85), rgb(90, 255, 90), Enum.Material.Neon)
+		cylinder("Exhaust", 0.6, 0.28, Vector3.new(-1.45, 1.35, 0.4), rgb(120, 120, 126), Enum.Material.Metal, "x")
+		stencil(body, "POWER", frame, { Enum.NormalId.Back })
+	elseif look == "battery" then
+		-- A heavy battery pack: the terminals, a yellow band, 12V.
+		local body = block("Body", Vector3.new(2.0, 1.3, 1.3), Vector3.new(0, 0.65, 0), rgb(36, 38, 42), Enum.Material.SmoothPlastic)
+		block("Top", Vector3.new(2.05, 0.15, 1.35), Vector3.new(0, 1.37, 0), rgb(62, 64, 70), Enum.Material.SmoothPlastic)
+		block("Band", Vector3.new(2.02, 0.2, 1.32), Vector3.new(0, 1.15, 0), rgb(240, 200, 40), Enum.Material.SmoothPlastic)
+		cylinder("Plus", 0.28, 0.34, Vector3.new(-0.62, 1.58, -0.3), rgb(210, 40, 36), Enum.Material.Metal)
+		cylinder("Minus", 0.28, 0.34, Vector3.new(0.62, 1.58, -0.3), rgb(150, 150, 156), Enum.Material.Metal)
+		block("Handle", Vector3.new(1.0, 0.12, 0.25), Vector3.new(0, 1.62, 0.3), rgb(24, 24, 26), Enum.Material.SmoothPlastic)
+		stencil(body, "12V", rgb(240, 200, 40), FRONT_BACK)
+	elseif look == "tnt" then
+		-- A dynamite crate: red sticks bundled on the lid, a fuse, DANGER.
+		local wood = rgb(150, 104, 62)
+		local body = block("Body", Vector3.new(2.2, 1.5, 1.5), Vector3.new(0, 0.75, 0), wood, Enum.Material.WoodPlanks)
+		local dark = wood:Lerp(black, 0.35)
+		for _, y in { 0.12, 1.38 } do
+			block("Rim", Vector3.new(2.3, 0.25, 1.6), Vector3.new(0, y, 0), dark, Enum.Material.Wood)
+		end
+		for n, z in { -0.36, 0, 0.36 } do
+			cylinder("Stick", 1.5, 0.34, Vector3.new(0.05 * n, 1.68, z), rgb(200, 36, 30), Enum.Material.SmoothPlastic, "x")
+		end
+		block("Band", Vector3.new(0.22, 0.4, 1.14), Vector3.new(0, 1.7, 0), rgb(30, 30, 30), Enum.Material.Fabric)
+		block("Fuse", Vector3.new(0.5, 0.08, 0.08), Vector3.new(1.0, 1.82, 0), rgb(40, 34, 30), Enum.Material.Fabric)
+		stencil(body, "TNT", rgb(210, 30, 24), FRONT_BACK)
+		stencil(body, "DANGER", rgb(210, 30, 24), { Enum.NormalId.Left, Enum.NormalId.Right })
+	elseif look == "documents" then
+		-- A briefcase with gold clasps and a TOP SECRET tag.
+		local leather = if variant % 2 == 0 then rgb(74, 48, 30) else rgb(32, 32, 36)
+		local dark = leather:Lerp(black, 0.35)
+		block("Body", Vector3.new(2.0, 1.4, 0.55), Vector3.new(0, 0.7, 0), leather, Enum.Material.Leather)
+		block("Seam", Vector3.new(2.04, 0.08, 0.59), Vector3.new(0, 1.12, 0), dark, Enum.Material.Leather)
+		block("Handle", Vector3.new(0.72, 0.14, 0.18), Vector3.new(0, 1.62, 0), dark, Enum.Material.Leather)
+		for _, x in { -0.32, 0.32 } do
+			block("Grip", Vector3.new(0.12, 0.24, 0.18), Vector3.new(x, 1.5, 0), dark, Enum.Material.Leather)
+		end
+		for _, x in { -0.65, 0.65 } do
+			block("Clasp", Vector3.new(0.22, 0.16, 0.05), Vector3.new(x, 1.12, -0.3), rgb(222, 180, 60), Enum.Material.Metal)
+		end
+		local tag = block("Tag", Vector3.new(0.8, 0.42, 0.03), Vector3.new(0.45, 0.55, -0.29), rgb(240, 236, 220), Enum.Material.SmoothPlastic)
+		stencil(tag, "TOP SECRET", rgb(200, 30, 30), { Enum.NormalId.Front })
+	elseif look == "electronics" then
+		-- A grey crate of radio parts: a circuit board at the front, a blinking light, an antenna.
+		local body = block("Body", Vector3.new(2.2, 1.5, 1.6), Vector3.new(0, 0.75, 0), rgb(112, 120, 112), Enum.Material.Metal)
+		block("Lid", Vector3.new(2.3, 0.2, 1.7), Vector3.new(0, 1.6, 0), rgb(82, 88, 82), Enum.Material.Metal)
+		block("Board", Vector3.new(1.1, 0.7, 0.05), Vector3.new(-0.4, 0.8, -0.82), rgb(40, 124, 62), Enum.Material.SmoothPlastic)
+		for n = 0, 2 do
+			block("Chip", Vector3.new(0.2, 0.16, 0.04), Vector3.new(-0.75 + n * 0.32, 0.9, -0.86), rgb(26, 26, 28), Enum.Material.SmoothPlastic)
+		end
+		block("Led", Vector3.new(0.14, 0.14, 0.04), Vector3.new(0.6, 1.2, -0.82), rgb(255, 64, 40), Enum.Material.Neon)
+		cylinder("Knob", 0.12, 0.3, Vector3.new(0.6, 0.7, -0.84), rgb(30, 30, 32), Enum.Material.SmoothPlastic, "z")
+		block("Antenna", Vector3.new(0.08, 0.9, 0.08), Vector3.new(0.85, 2.15, 0.5), rgb(40, 40, 44), Enum.Material.Metal)
+		stencil(body, "RADIO PARTS", rgb(240, 240, 230), { Enum.NormalId.Back })
+	elseif look == "weapons" then
+		-- A long hard case (rifles inside), army green, the latches at the back.
+		local body = block("Body", Vector3.new(3.2, 0.9, 1.3), Vector3.new(0, 0.45, 0), rgb(42, 46, 36), Enum.Material.SmoothPlastic)
+		block("Lid", Vector3.new(3.24, 0.12, 1.34), Vector3.new(0, 0.62, 0), rgb(58, 64, 50), Enum.Material.SmoothPlastic)
+		for _, x in { -1.0, 0, 1.0 } do
+			block("Latch", Vector3.new(0.25, 0.25, 0.06), Vector3.new(x, 0.6, 0.68), rgb(150, 150, 156), Enum.Material.Metal)
+		end
+		block("Handle", Vector3.new(0.8, 0.12, 0.2), Vector3.new(0, 0.97, 0), rgb(20, 20, 22), Enum.Material.SmoothPlastic)
+		for _, x in { -0.5, 0.5 } do
+			block("Grip", Vector3.new(0.12, 0.3, 0.2), Vector3.new(x, 0.8, 0), rgb(20, 20, 22), Enum.Material.SmoothPlastic)
+		end
+		stencil(body, "ARMY", rgb(222, 204, 124), { Enum.NormalId.Front })
+	elseif look == "painting" then
+		-- A framed painting (hills and a sun), cardboard corners against the knocks.
+		local canvases = { rgb(90, 140, 200), rgb(220, 150, 90), rgb(120, 90, 160) }
+		block("Frame", Vector3.new(2.6, 2.0, 0.25), Vector3.new(0, 1.0, 0), rgb(200, 160, 62), Enum.Material.Wood)
+		block("Canvas", Vector3.new(2.2, 1.6, 0.05), Vector3.new(0, 1.0, -0.14), canvases[variant % #canvases + 1], Enum.Material.SmoothPlastic)
+		block("Hill", Vector3.new(2.2, 0.5, 0.04), Vector3.new(0, 0.45, -0.17), rgb(70, 130, 64), Enum.Material.SmoothPlastic)
+		block("Hill", Vector3.new(1.0, 0.75, 0.04), Vector3.new(-0.55, 0.55, -0.18), rgb(56, 110, 54), Enum.Material.SmoothPlastic)
+		cylinder("Sun", 0.04, 0.45, Vector3.new(0.6, 1.4, -0.18), rgb(250, 212, 80), Enum.Material.SmoothPlastic, "z")
+		for _, x in { -1.2, 1.2 } do
+			for _, y in { 0.15, 1.85 } do
+				block("Corner", Vector3.new(0.42, 0.42, 0.36), Vector3.new(x, y, 0), rgb(196, 158, 108), Enum.Material.Cardboard)
+			end
+		end
+	elseif look == "mail" then
+		-- A canvas mail sack, letters sticking out of the top.
+		local canvas = if variant % 2 == 0 then rgb(70, 92, 142) else rgb(150, 140, 110)
+		local body = block("Body", Vector3.new(1.7, 1.6, 1.2), Vector3.new(0, 0.8, 0), canvas, Enum.Material.Fabric)
+		block("Top", Vector3.new(1.2, 0.5, 0.85), Vector3.new(0, 1.85, 0), canvas, Enum.Material.Fabric)
+		block("Tie", Vector3.new(1.25, 0.14, 0.9), Vector3.new(0, 1.7, 0), rgb(150, 110, 60), Enum.Material.Fabric)
+		for n, x in { -0.25, 0.2 } do
+			newPart(model, "Letter", Vector3.new(0.6, 0.42, 0.04), CFrame.new(x, 2.18, 0.05 * n) * CFrame.Angles(0, 0, math.rad(if n == 1 then 14 else -10)), rgb(245, 240, 226), Enum.Material.SmoothPlastic)
+		end
+		stencil(body, "MAIL", rgb(240, 240, 240), FRONT_BACK)
+	elseif look == "tires" then
+		-- Two or three tires stacked flat.
+		for n = 0, 1 + variant % 2 do
+			local y = 0.3 + n * 0.62
+			cylinder("Tire", 0.6, 2.0, Vector3.new(0, y, 0), rgb(30, 30, 32), Enum.Material.Rubber)
+			cylinder("Rim", 0.62, 0.95, Vector3.new(0, y, 0), rgb(176, 176, 182), Enum.Material.Metal)
+		end
+	elseif look == "plants" then
+		-- A tray of seedlings in dark soil.
+		block("Tray", Vector3.new(2.2, 0.4, 1.5), Vector3.new(0, 0.2, 0), rgb(56, 48, 40), Enum.Material.SmoothPlastic)
+		block("Soil", Vector3.new(2.0, 0.08, 1.3), Vector3.new(0, 0.42, 0), rgb(82, 58, 38), Enum.Material.Ground)
+		local greens = { rgb(84, 160, 70), rgb(110, 180, 80), rgb(70, 140, 60) }
+		for i = 0, 2 do
+			for j = 0, 1 do
+				local x, z = -0.7 + i * 0.7, -0.35 + j * 0.7
+				block("Stem", Vector3.new(0.08, 0.5, 0.08), Vector3.new(x, 0.7, z), rgb(70, 120, 50), Enum.Material.Grass)
+				ball("Leaves", 0.5, Vector3.new(x, 1.0, z), greens[(i + j + variant) % #greens + 1], Enum.Material.Grass)
+			end
+		end
+	elseif look == "survivor" then
+		-- A survivor in the vehicle: a dirty jacket, a beanie, the backpack they never put down.
+		local jackets = { rgb(104, 92, 66), rgb(88, 96, 74), rgb(120, 84, 60), rgb(76, 82, 92) }
+		local skins = { rgb(255, 214, 180), rgb(200, 150, 110), rgb(140, 95, 65), rgb(240, 190, 150) }
+		block("Body", Vector3.new(1.5, 1.4, 0.8), Vector3.new(0, 0.7, 0), jackets[variant % #jackets + 1], Enum.Material.Fabric)
+		ball("Head", 1.0, Vector3.new(0, 1.95, 0), skins[variant % #skins + 1], Enum.Material.SmoothPlastic)
+		block("Beanie", Vector3.new(1.02, 0.4, 1.02), Vector3.new(0, 2.33, 0.03), rgb(70, 64, 58), Enum.Material.Fabric)
+		block("Backpack", Vector3.new(1.1, 1.1, 0.5), Vector3.new(0, 0.85, 0.62), rgb(62, 82, 52), Enum.Material.Fabric)
+		block("Dirt", Vector3.new(0.5, 0.3, 0.03), Vector3.new(-0.3, 0.6, -0.41), rgb(70, 56, 40), Enum.Material.Fabric)
+	else
+		return false
+	end
+	return true
+end
 
 -- A piece of cargo built at the origin: the bottom centre is the pivot, the front is -Z.
 local function buildLook(look: string, variant: number): Model
@@ -465,7 +656,7 @@ local function buildLook(look: string, variant: number): Model
 		local head = block("Head", Vector3.new(0.9, 0.9, 0.9), Vector3.new(0, 1.45, 0), skins[variant % #skins + 1], Enum.Material.SmoothPlastic)
 		head.Shape = Enum.PartType.Ball
 		block("Hair", Vector3.new(0.92, 0.3, 0.92), Vector3.new(0, 1.8, 0.05), rgb(70, 45, 25), Enum.Material.Fabric)
-	else
+	elseif not missionLook(model, look, variant) then
 		crate(Vector3.new(2.2, 2, 2.2), rgb(163, 120, 74))
 	end
 
@@ -588,12 +779,16 @@ local function isPatient(session: Session): boolean
 	return session.info.kind == "patient"
 end
 
+local function isSurvivor(session: Session): boolean
+	return session.info.kind == "survivor"
+end
+
 -- A cosmetic part welded onto a body part (no mass, no collisions, not hit by rays).
-local function strap(npc: Model, on: BasePart, name: string, size: Vector3, offset: CFrame, shape: Enum.PartType?)
+local function strap(npc: Model, on: BasePart, name: string, size: Vector3, offset: CFrame, shape: Enum.PartType?, color: Color3?)
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
-	p.Color = Color3.fromRGB(250, 250, 246)
+	p.Color = color or Color3.fromRGB(250, 250, 246)
 	p.Material = Enum.Material.Fabric
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
@@ -644,8 +839,30 @@ local function shuffle(npc: Model)
 	end
 end
 
--- A kid or a patient of this piece, standing at `at`. Nil when the stop moved on meanwhile (spawnFor).
+-- A survivor: a backpack with a rolled blanket, a smudge of dirt on the face. They walk at the normal pace.
+local function dressSurvivor(npc: Model)
+	local torso = npc:FindFirstChild("UpperTorso") or npc:FindFirstChild("Torso")
+	if torso and torso:IsA("BasePart") then
+		local t = torso.Size
+		strap(npc, torso, "Backpack", Vector3.new(t.X * 0.8, t.Y * 0.9, 0.55), CFrame.new(0, 0, t.Z / 2 + 0.27), nil, Color3.fromRGB(62, 82, 52))
+		strap(npc, torso, "Bedroll", Vector3.new(t.X * 0.9, 0.42, 0.42), CFrame.new(0, t.Y * 0.5 + 0.12, t.Z / 2 + 0.3), Enum.PartType.Cylinder, Color3.fromRGB(150, 60, 50))
+	end
+	local head = npc:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		local h = head.Size
+		strap(npc, head, "Dirt", Vector3.new(h.X * 0.3, h.Y * 0.18, 0.05), CFrame.new(h.X * 0.18, -h.Y * 0.15, -h.Z / 2 - 0.01), nil, Color3.fromRGB(96, 74, 52))
+	end
+end
+
+-- A kid, a patient or a survivor of this piece, standing at `at`. Nil when the stop moved on meanwhile (spawnFor).
 local function spawnRider(session: Session, piece: Piece, at: CFrame): Model?
+	if isSurvivor(session) then
+		local npc = spawnFor(session, Cargo.look("survivor", SURVIVOR_NAMES[piece.variant % #SURVIVOR_NAMES + 1], "Survivor"), at)
+		if npc then
+			dressSurvivor(npc)
+		end
+		return npc
+	end
 	if isPatient(session) then
 		local npc = spawnFor(session, Cargo.look("patient", PATIENT_NAMES[piece.variant % #PATIENT_NAMES + 1], "Patient"), at)
 		if npc then
@@ -712,7 +929,7 @@ local function refresh(session: Session)
 	local car = session.car
 	if carPrompt and car then
 		local handling = plan ~= nil and (plan.mode == "carry" or plan.mode == "lead")
-		local takeOut = handling and plan ~= nil and plan.stage == "drop" and #session.load > 0
+		local takeOut = handling and plan ~= nil and plan.stage == "drop" and #session.load > 0 and not session.blocked
 		carPrompt.Enabled = heldCount(session) > 0 or takeOut
 		carPrompt.ActionText = if takeOut then (if horse then "Lead out" else "Take out") else (if horse then "Lead in" else "Load")
 		carPrompt.ObjectText = `{capital(Vehicles.cargoNoun(car))}: {#session.load} inside`
@@ -723,7 +940,7 @@ local function refresh(session: Session)
 			pilePrompt.Enabled = #session.pile > 0
 			pilePrompt.ObjectText = `{capital(if horse then "horse" else session.info.piece)} ({#session.pile} left)`
 		else
-			pilePrompt.Enabled = session.moved < neededNow(session)
+			pilePrompt.Enabled = session.moved < neededNow(session) and not session.blocked
 			pilePrompt.ObjectText = if plan.person then plan.person.name else "Receiver"
 		end
 	end
@@ -771,8 +988,60 @@ local function render(session: Session)
 	end
 end
 
+-- The lift twist (Info.lift): a heavy piece carried alone slows the carrier down. The character attribute CarrySpeed
+-- tells the client's walk (client/CameraRig.luau) the speed; the server's WalkSpeed is set too, as a fallback.
+local function restoreSpeed(session: Session, player: Player)
+	local character = session.slowed[player]
+	if not character then
+		return
+	end
+	session.slowed[player] = nil
+	character:SetAttribute("CarrySpeed", nil)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and character.Parent then
+		humanoid.WalkSpeed = StarterPlayer.CharacterWalkSpeed
+	end
+end
+
+-- Is somebody else of the job (the owner or a crew mate) close enough to help carry a heavy piece?
+local function liftHelped(session: Session, player: Player, at: Vector3): boolean
+	for _, other in Players:GetPlayers() do
+		if other ~= player and session.info.allowed(other) then
+			local root = rootOf(other.Character)
+			local humanoid = other.Character and other.Character:FindFirstChildOfClass("Humanoid")
+			if root and humanoid and humanoid.Health > 0 and (root.Position - at).Magnitude <= Config.Missions.LiftHelpRange then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Every tick: who carries a heavy piece alone walks at LiftSlowSpeed, with help at the normal step.
+local function updateLift(session: Session)
+	for player, held in session.held do
+		local alone = held.piece.horse == nil and not liftHelped(session, player, held.root.Position)
+		if alone and session.slowed[player] ~= held.character then
+			restoreSpeed(session, player)
+			session.slowed[player] = held.character
+			held.character:SetAttribute("CarrySpeed", Config.Missions.LiftSlowSpeed)
+			local humanoid = held.character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = Config.Missions.LiftSlowSpeed
+			end
+			if not session.liftTold then
+				session.liftTold = true
+				tell(player, `Heavy! Alone you can barely walk. Get a crew mate within {Config.Missions.LiftHelpRange} studs to carry it faster.`)
+			end
+		elseif not alone and session.slowed[player] then
+			restoreSpeed(session, player)
+		end
+	end
+end
+
 local function clearHeld(session: Session, player: Player): Held?
 	local held = session.held[player]
+	restoreSpeed(session, player)
 	if not held then
 		return nil
 	end
@@ -967,6 +1236,10 @@ local function onPile(session: Session, player: Player)
 		return
 	end
 	if plan.stage == "drop" then
+		if session.blocked then
+			tell(player, "Hold out first! Nothing gets unloaded until the area is safe.")
+			return
+		end
 		if not session.held[player] then
 			local car = session.car
 			tell(player, `Take {article(session.info.piece)} out of the {if car then Vehicles.cargoNoun(car) else "vehicle"} first (E at the back).`)
@@ -1026,6 +1299,10 @@ local function onCar(session: Session, player: Player)
 		return
 	end
 	if plan and plan.stage == "drop" and (plan.mode == "carry" or plan.mode == "lead") then
+		if session.blocked then
+			tell(player, "Hold out first! Nothing gets unloaded until the area is safe.")
+			return
+		end
 		local piece = table.remove(session.load)
 		if not piece then
 			tell(player, `The {Vehicles.cargoNoun(car)} is empty.`)
@@ -1235,7 +1512,9 @@ local function kidArrived(session: Session, piece: Piece, stop: number, timedOut
 		session.moved += 1
 		session.deliveredTotal += 1
 		if session.moved >= neededNow(session) then
-			say(session.person, if isPatient(session) then "We'll take it from here. You saved a life!" else "Good morning, everybody! Inside, quick!")
+			say(session.person, if isPatient(session) then "We'll take it from here. You saved a life!"
+				elseif isSurvivor(session) then "Everybody inside! You're safe now."
+				else "Good morning, everybody! Inside, quick!")
 		end
 	end
 	session.info.changed()
@@ -1275,14 +1554,16 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 		if piece then
 			session.nextKid = now + Tuning.KidGap
 			if session.moved == 0 and #session.walking == 0 then
-				say(session.person, if isPatient(session) then "There's the ambulance! Easy now, one step at a time." else "There's the bus! Off you go.")
+				say(session.person, if isPatient(session) then "There's the ambulance! Easy now, one step at a time."
+					elseif isSurvivor(session) then "That's our ride! Go, go, go!"
+					else "There's the bus! Off you go.")
 			end
 			if piece.npc then
-				say(piece.npc, line(if isPatient(session) then LINES.patientOn else LINES.kidOn))
+				say(piece.npc, line(if isPatient(session) then LINES.patientOn elseif isSurvivor(session) then LINES.survivorOn else LINES.kidOn))
 			end
 			walkKid(session, piece, Vehicles.cargoEntry(car))
 		end
-	elseif session.moved + #session.walking < neededNow(session) then
+	elseif not session.blocked and session.moved + #session.walking < neededNow(session) then
 		local piece = table.remove(session.load)
 		if piece then
 			session.nextKid = now + Tuning.KidGap
@@ -1294,7 +1575,7 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 				table.insert(session.load, piece)
 				return
 			end
-			say(piece.npc, line(if isPatient(session) then LINES.patientOff else LINES.kidOff))
+			say(piece.npc, line(if isPatient(session) then LINES.patientOff elseif isSurvivor(session) then LINES.survivorOff else LINES.kidOff))
 			walkKid(session, piece, onGround(plan.pile))
 			session.info.changed()
 		end
@@ -1302,6 +1583,9 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 end
 
 local function updateServe(session: Session, plan: Plan, dt: number)
+	if session.blocked then
+		return
+	end
 	local car = parkedCar(session)
 	local holding = car ~= nil and Vehicles.isDriving(session.owner)
 	if not holding or not car then
@@ -1373,8 +1657,22 @@ function Cargo.begin(owner: Player, info: Info): Session
 		shown = {},
 		ended = false,
 		busy = 0,
+		blocked = false,
+		slowed = {},
+		liftTold = false,
 	}
 	return session
+end
+
+-- The defend twist (server/Jobs.luau): while blocked, nothing is unloaded at the current stop (no Take out, no Hand
+-- over, the passengers stay in, no serving); the stop is not done.
+function Cargo.setBlocked(session: Session, blocked: boolean)
+	if session.blocked == blocked then
+		return
+	end
+	session.blocked = blocked
+	refresh(session)
+	session.info.changed()
 end
 
 -- Pieces that start in the vehicle (an ice cream truck that starts loaded, the admin tools).
@@ -1441,6 +1739,9 @@ function Cargo.update(session: Session, dt: number)
 	if dropped then
 		session.info.changed()
 	end
+	if session.info.lift then
+		updateLift(session)
+	end
 
 	local plan = session.plan
 	if not plan then
@@ -1459,6 +1760,8 @@ function Cargo.update(session: Session, dt: number)
 			say(session.person, "Finally! Bring it over here.")
 		elseif plan.mode == "board" and isPatient(session) then
 			say(session.person, if plan.stage == "pickup" then "Over here! Please hurry, it's bad." else "Bring the patient to me, quick!")
+		elseif plan.mode == "board" and isSurvivor(session) then
+			say(session.person, if plan.stage == "pickup" then "Over here! We've been holding out for days!" else "Bring them in, we've got beds ready!")
 		end
 	end
 	if plan.mode == "board" then
@@ -1471,7 +1774,7 @@ end
 -- Is the current stop done (everything loaded / handed over / served)?
 function Cargo.stopDone(session: Session): boolean
 	local plan = session.plan
-	if not plan or session.busy > 0 then
+	if not plan or session.busy > 0 or session.blocked then
 		return false
 	end
 	if plan.mode == "serve" then
@@ -1599,9 +1902,11 @@ function Cargo.step(session: Session): (string, string)
 			return mode, `Park in the {circle} circle`
 		end
 		local needed = neededNow(session)
-		if isPatient(session) then
-			local patients = if needed == 1 then "the patient gets" else "the patients get"
-			return mode, `Wait while {patients} {if plan.stage == "pickup" then "in" else "out"} ({session.moved}/{needed})`
+		if isPatient(session) or isSurvivor(session) then
+			local riders = if isSurvivor(session) then (if needed == 1 then "the survivor gets" else "the survivors get")
+				elseif needed == 1 then "the patient gets"
+				else "the patients get"
+			return mode, `Wait while {riders} {if plan.stage == "pickup" then "in" else "out"} ({session.moved}/{needed})`
 		end
 		if plan.stage == "pickup" then
 			return mode, `Wait while the kids get on ({session.moved}/{needed})`

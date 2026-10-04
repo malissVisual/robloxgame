@@ -19,7 +19,8 @@
 -- Crew: friends who ride in the owner's car, and the players the owner invited into the job (server/Crew.luau
 -- Crew.members), help (their kills count, they may carry the cargo) and get paid too: every crew member gets half of
 -- the payout and the owner +15 % per member (Economy.crewSplit). Each gets their own DeliveryResult with the whole
--- split; the crew breaks up when the job ends (Crew.disband). Jobs.crewStatus tells the members what the owner does.
+-- split. Since 3.0 the crew stays together after the job (friends play mission after mission; server/Crew.luau breaks
+-- it up when they leave, are kicked or quit). Jobs.crewStatus tells the members what the owner does.
 --
 -- 2.5: special jobs on the board (JobTypeDef.board: the Cash Transport, the Pizza Rush; the Winter Run) next to the
 -- employers' ones (the City Clinic's Ambulance Run). A rush has a fixed clock (timeLimit); bandits want some cargo
@@ -27,6 +28,22 @@
 -- bigger and the pay higher (Config.DayNight). Driver levels (shared/Levels.luau): every finished or failed job gives
 -- XP to the owner and the crew; danger levels and jobs above your level show on the board LOCKED, the server refuses
 -- them.
+--
+-- 3.0, the missions (shared/Missions.luau, server/Missions.luau checks and calls Jobs.startMission): a mission is a
+-- special job with the giver's and receiver's looks of its own, no random modifier, the pay × its twists
+-- (Missions.twistPay) and the twists (Config.Missions):
+--   defend    at the last drop nothing is unloaded (Cargo.setBlocked) until somebody of the job held the area on foot
+--             within DefendRadius of the receiver for defendTime s (leaving pauses it); waves come around the stop
+--   lift      heavy pieces: carried alone you walk slowly (server/Cargo.luau, Info.lift)
+--   quiet     every shot of the job's people costs QuietCost condition (server/Gun.luau Gun.onShot → Jobs.onShot)
+--   guarded   a horde waits at every stop, not only at the last one
+--   night     it starts only at night (Jobs.startMission)
+--   gunner    kills from the passenger seats of the owner's car count GunnerKillBonus times in the kill bonus
+--   spotless  below SpotlessFail condition the mission fails at once
+--   hunted    the bandits come HuntedBoost times as often (a ★ mission gets the ★★ bandits)
+-- A co-op mission pays × Economy.coopPay and its enemies are × Economy.coopEnemies of the crew (riders and members
+-- besides the owner), recounted when the crew changes. Done: the rating (Missions.rate) goes into the result and to
+-- Jobs.onMissionComplete (server/Missions.luau pays the rewards and saves the stars).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,6 +54,7 @@ local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
+local Missions = require(Shared.Missions)
 local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
@@ -46,6 +64,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Cargo = require(script.Parent.Cargo)
 local DayNight = require(script.Parent.DayNight)
 local Crew = require(script.Parent.Crew)
+local Gun = require(script.Parent.Gun)
 
 type Stop = {
 	address: Map.Address,
@@ -78,6 +97,11 @@ type Offer = {
 	total: number, -- pieces in the whole job
 	level: number, -- the driver level it needs (Economy.jobLevel)
 	boost: number, -- bandits want this cargo: roadblocks and chases this many times as often (1 = normal)
+	-- 3.0, the missions (empty / nil / false for every other job):
+	mission: string?, -- the mission id (shared/Missions.luau)
+	twists: { [string]: boolean }, -- the job type's twists (Config.Missions.Twists)
+	coop: boolean, -- a co-op mission: pay and enemies grow with the crew
+	defendTime: number, -- defend: seconds to hold out at the last drop
 }
 
 type Job = {
@@ -101,6 +125,17 @@ type Job = {
 	footWarned: boolean,
 	lastStep: string,
 	crewCount: number, -- paid crew members besides the owner (riders and invited), as last counted
+	-- 3.0, the missions' twists:
+	enemyScale: number, -- co-op: the enemies × this (Economy.coopEnemies of crewCount), 1 otherwise
+	gunnerKills: number, -- gunner: kills from the passenger seats of the owner's car
+	guarded: { [number]: boolean }, -- guarded: the stops whose horde was spawned
+	defendLeft: number?, -- defend: seconds still to hold out (nil = not started)
+	defendDone: boolean,
+	defendInside: boolean, -- somebody holds the area right now
+	defendWho: string, -- the receiver's name (the HUD's hint)
+	defendWave: number,
+	nextDefendWave: number,
+	quietNotice: { [Player]: number }, -- quiet: when the shooter was last warned
 }
 
 -- What a DeliveryResult says about the XP (shared/Levels.luau), the owner's and every member's own.
@@ -145,12 +180,67 @@ local function article(noun: string): string
 	return if string.find("aeiou", first, 1, true) then "an " .. noun else "a " .. noun
 end
 
+-- A job type's twists (Config.Missions.Twists ids), empty for most.
+local function twistList(jobType: Config.JobTypeDef?): { string }
+	local list: { string } = if jobType and jobType.twists then jobType.twists else {}
+	return list
+end
+
+-- The defend twist holding out right now: the HUD's hint ("HOLD OUT 0:23 · …"), else nil.
+local function defendHint(job: Job): string?
+	local left = job.defendLeft
+	if not left or job.defendDone then
+		return nil
+	end
+	local clock = Economy.clock(left)
+	if job.defendInside then
+		return `HOLD OUT {clock} · keep them off {job.defendWho}!`
+	end
+	return `HOLD OUT {clock} · get back to {job.defendWho} on foot!`
+end
+
+-- What to do now (Cargo.step), the defend countdown instead while holding out.
+local function stepOf(job: Job): (string, string)
+	local handling, step = Cargo.step(job.cargo)
+	return handling, defendHint(job) or step
+end
+
+-- The mission part of the job payload and of Jobs.crewStatus, nil for every other job: id, name, campaign, number,
+-- twists, coop, defendLeft (seconds, while holding out), and for the HUD crew, coopPay, gunnerKills.
+local function missionInfo(job: Job): { [string]: any }?
+	local offer = job.offer
+	local id = offer.mission
+	if not id then
+		return nil
+	end
+	local def = Missions.find(id)
+	local jobType = offer.jobType
+	local twists: { string } = {}
+	for _, twist in twistList(jobType) do
+		table.insert(twists, twist)
+	end
+	local holding = job.defendLeft ~= nil and not job.defendDone
+	return {
+		id = id,
+		name = if jobType then jobType.name else id,
+		campaign = if def then def.campaign else nil,
+		number = if def then def.number else nil,
+		twists = twists,
+		coop = offer.coop,
+		defendLeft = if holding then math.max(0, math.ceil(job.defendLeft or 0)) else nil,
+		defendHolding = if holding then job.defendInside else nil, -- somebody is in the area (the clock runs)
+		crew = job.crewCount,
+		coopPay = if offer.coop then Economy.coopPay(job.crewCount) else nil,
+		gunnerKills = if offer.twists.gunner then job.gunnerKills else nil,
+	}
+end
+
 local function payload(job: Job): { [string]: any }
 	local offer = job.offer
 	local stop = offer.stops[job.stop]
 	local last = offer.stops[#offer.stops]
 	local status = Cargo.status(job.cargo)
-	local handling, step = Cargo.step(job.cargo)
+	local handling, step = stepOf(job)
 	job.lastStep = step
 	return {
 		stars = offer.tier,
@@ -192,6 +282,7 @@ local function payload(job: Job): { [string]: any }
 		banditBoost = offer.boost,
 		night = DayNight.isNight(), -- the pay and the waves are up
 		crewCount = job.crewCount,
+		mission = missionInfo(job), -- 3.0: the mission (nil for any other job)
 	}
 end
 
@@ -328,7 +419,9 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 	local tier = JobsConfig.Tiers[tierIndex]
 	local timeLimit = if jobType then jobType.timeLimit else nil
 	local modifier: Config.ModifierDef? = nil
-	if rng:NextNumber() < tier.modifierChance then
+	-- A mission is told as it is written: no random modifier.
+	local mission = if jobType then jobType.mission else nil
+	if not mission and rng:NextNumber() < tier.modifierChance then
 		-- A rush keeps its fixed clock: no modifier that changes the time or the car's speed.
 		local choices: { Config.ModifierDef } = {}
 		for _, candidate in JobsConfig.Modifiers do
@@ -345,12 +438,25 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 	for _, stop in stops do
 		handling += if stop.mode == "serve" then stop.hold else Economy.handlingTime(stop.mode, stop.needed)
 	end
+	-- The twists (the missions): they pay more (Missions.twistPay); hunted cargo draws the bandits; holding out at
+	-- the last drop gets its time on the clock.
+	local twists: { [string]: boolean } = {}
+	for _, twist in twistList(jobType) do
+		twists[twist] = true
+	end
+	local defendTime = if twists.defend and jobType then math.max(5, jobType.defendTime or 30) else 0
+	local basePay = Economy.jobPay(tier, distance, modifier and modifier.payMultiplier) + extraPay
+	local pay = if jobType and next(twists) then math.floor(basePay * Missions.twistPay(jobType) / 5 + 0.5) * 5 else basePay
+	local boost = math.max(1, if jobType and jobType.banditBoost then jobType.banditBoost else 1)
+	if twists.hunted then
+		boost *= Config.Missions.HuntedBoost
+	end
 	return {
 		tier = tierIndex,
 		stops = stops,
 		distance = distance,
-		pay = Economy.jobPay(tier, distance, modifier and modifier.payMultiplier) + extraPay,
-		time = timeLimit or (Economy.timeLimit(distance, modifier and modifier.timeMultiplier) + handling),
+		pay = pay,
+		time = (timeLimit or (Economy.timeLimit(distance, modifier and modifier.timeMultiplier) + handling)) + defendTime,
 		cargo = cargo,
 		customer = customer,
 		jobType = jobType,
@@ -361,7 +467,11 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 		plural = pieces.plural,
 		total = pieces.total,
 		level = Economy.jobLevel(jobType, tierIndex),
-		boost = math.max(1, if jobType and jobType.banditBoost then jobType.banditBoost else 1),
+		boost = boost,
+		mission = mission,
+		twists = twists,
+		coop = jobType ~= nil and jobType.coop == true,
+		defendTime = defendTime,
 	}
 end
 
@@ -405,9 +515,10 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	local stops: { Stop } = {}
 	local avoid: { Map.Address } = {}
 	local x, z = from.X, from.Z
+	-- The looks: the job type's own (the missions), else Config.Jobs.People, else townspeople.
 	local roles = JobsConfig.People[jobType.id] or { giver = "townsperson", receiver = "townsperson" }
-	local giver = personFrom(jobType.giver, roles.giver)
-	local receiver = personFrom(jobType.receiver, roles.receiver)
+	local giver = personFrom(jobType.giver, jobType.giverRole or roles.giver)
+	local receiver = personFrom(jobType.receiver, jobType.receiverRole or roles.receiver)
 	local loads = Economy.splitPieces(jobType.items, jobType.pickups)
 	-- A rush (a fixed clock) stays in reach: the pick-up close by, the drop a short drive on.
 	local rush = jobType.timeLimit ~= nil
@@ -585,7 +696,7 @@ local function endJob(player: Player, job: Job, linger: boolean)
 	Cargo.finish(job.cargo, linger)
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
 	Vehicles.setSpeedMultiplier(player, 1)
-	Crew.disband(player) -- the crew breaks up with the job
+	-- 3.0: the crew stays together (no Crew.disband): the next mission is one START away.
 	-- A company vehicle goes back; your own car comes to you.
 	local jobType = job.offer.jobType
 	if jobType and jobType.vehicle then
@@ -600,18 +711,30 @@ local function endJob(player: Player, job: Job, linger: boolean)
 	end
 end
 
-local function startJob(player: Player, offer: Offer): boolean
+-- The names of a job's twists ("HOT ZONE + HUNTED"), "" without any.
+local function twistNames(offer: Offer): string
+	local names: { string } = {}
+	local jobType = offer.jobType
+	for _, twist in twistList(jobType) do
+		local twistInfo = Config.Missions.Twists[twist]
+		if twistInfo then
+			table.insert(names, twistInfo.name)
+		end
+	end
+	return table.concat(names, " + ")
+end
+
+-- Starts the job. False and why not (no notice: the caller tells the player).
+local function startJob(player: Player, offer: Offer): (boolean, string?)
 	local jobType = offer.jobType
 	if jobType and jobType.vehicle then
 		-- The employer lends its vehicle, right next to you.
 		local err = Vehicles.spawn(player, true, jobType.vehicle)
 		if err then
-			notice:FireClient(player, err)
-			return false
+			return false, err
 		end
 	elseif not Vehicles.get(player) then
-		notice:FireClient(player, "Call your car first (CAR button).")
-		return false
+		return false, "Call your car first (CAR button)."
 	end
 	offers[player] = nil
 	local crew: { [Player]: boolean } = {}
@@ -639,7 +762,9 @@ local function startJob(player: Player, offer: Offer): boolean
 				current.dirty = true
 			end
 		end,
+		lift = offer.twists.lift == true,
 	})
+	local crewCount = #Crew.members(player)
 	job = {
 		offer = offer,
 		endsAt = workspace:GetServerTimeNow() + offer.time,
@@ -661,7 +786,17 @@ local function startJob(player: Player, offer: Offer): boolean
 		nextFoot = 0,
 		footWarned = false,
 		lastStep = "",
-		crewCount = #Crew.members(player),
+		crewCount = crewCount,
+		enemyScale = if offer.coop then Economy.coopEnemies(crewCount) else 1,
+		gunnerKills = 0,
+		guarded = {},
+		defendLeft = nil,
+		defendDone = false,
+		defendInside = false,
+		defendWho = "the receiver",
+		defendWave = 0,
+		nextDefendWave = 0,
+		quietNotice = {},
 	}
 	jobs[player] = job
 	-- No pick-up: the vehicle starts loaded.
@@ -669,9 +804,18 @@ local function startJob(player: Player, offer: Offer): boolean
 		Cargo.fill(session, offer.total)
 	end
 	Cargo.setStop(session, planOf(offer.stops[1]))
+	-- Defend: the last drop unloads only after holding out (a job of one drop: from the start).
+	if offer.twists.defend and #offer.stops == 1 then
+		Cargo.setBlocked(session, true)
+	end
 	Vehicles.setSpeedMultiplier(player, if offer.modifier then offer.modifier.speedMultiplier else 1)
 	send(player)
-	local text = if jobType then `{jobType.name}: {offer.stops[1].label}` else offer.stops[1].label
+	local title = if jobType then jobType.name else ""
+	if offer.mission then
+		local twists = twistNames(offer)
+		title = `MISSION: {title}{if twists ~= "" then ` ({twists})` else ""}{if offer.coop then " · CO-OP" else ""}`
+	end
+	local text = if jobType then `{title}: {offer.stops[1].label}` else offer.stops[1].label
 	if jobType and jobType.timeLimit then
 		text ..= ` · {math.floor(offer.time / 60)}:{string.format("%02d", offer.time % 60)} on the clock!`
 	elseif offer.boost > 1 then
@@ -680,9 +824,22 @@ local function startJob(player: Player, offer: Offer): boolean
 	notice:FireClient(player, text)
 	-- The invited crew hears about it too (their HUD follows the owner's job: server/Crew.luau, Jobs.crewStatus).
 	for _, member in Crew.members(player) do
-		notice:FireClient(member, `{player.DisplayName} took a job: {if jobType then jobType.name else offer.cargo}. Help them out!`)
+		if offer.mission then
+			notice:FireClient(member, `{title} with {player.DisplayName}. Help them out!`)
+		else
+			notice:FireClient(member, `{player.DisplayName} took a job: {if jobType then jobType.name else offer.cargo}. Help them out!`)
+		end
 	end
-	return true
+	return true, nil
+end
+
+-- startJob for the job board and the employers: a refusal is told to the player.
+local function startOrTell(player: Player, offer: Offer): boolean
+	local ok, err = startJob(player, offer)
+	if not ok and err then
+		notice:FireClient(player, err)
+	end
+	return ok
 end
 
 -- Can this player take a job of their own now? (Not with one running, not in somebody else's crew, not above their
@@ -714,7 +871,7 @@ local function accept(player: Player, index: any)
 		return
 	end
 	if canTake(player, offer.level) then
-		startJob(player, offer)
+		startOrTell(player, offer)
 	end
 end
 
@@ -738,7 +895,7 @@ local function acceptEmployer(player: Player, employerId: any)
 		notice:FireClient(player, "No work right now, try again.")
 		return
 	end
-	startJob(player, offer)
+	startOrTell(player, offer)
 end
 
 -- XP for a job (Levels.jobXp, PlayerData.addXp): what the DeliveryResult says about it.
@@ -784,15 +941,24 @@ function Jobs.fail(player: Player, reason: string)
 end
 
 local function complete(player: Player, job: Job)
-	local crew = crewOf(job, player) -- before endJob: it breaks the crew up
+	local crew = crewOf(job, player) -- before endJob: the riders' seats and the members as they are now
+	local timeLeft = job.endsAt - workspace:GetServerTimeNow()
 	endJob(player, job, true)
 	local offer = job.offer
 	local delivered = job.cargo.deliveredTotal
-	local pay = Economy.cargoPay(offer.pay, delivered, offer.total)
+	-- A co-op mission pays more for every crew member besides the owner (everybody's share grows with it).
+	local coopPay = if offer.coop then Economy.coopPay(#crew) else 1
+	local pay = Economy.cargoPay(math.floor(offer.pay * coopPay + 0.5), delivered, offer.total)
 	-- Finished at night: the pay is up (smoothly at dusk and dawn).
 	local nightPay = Economy.nightScale(Config.DayNight.NightPay, DayNight.nightFactor())
 	local night = DayNight.isNight()
-	local payout = Economy.payout(pay, job.condition, job.endsAt - workspace:GetServerTimeNow(), offer.time, job.kills, nightPay)
+	-- The gunner twist: a kill from a passenger seat counts GunnerKillBonus times in the kill bonus.
+	local payout = Economy.payout(pay, job.condition, timeLeft, offer.time, Economy.paidKills(job.kills, job.gunnerKills), nightPay)
+	-- A mission is rated (1 – 3 stars): the cargo's condition and the clock left.
+	local stars = Missions.rate(job.condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0)
+	local missionResult = if offer.mission
+		then { id = offer.mission, name = if offer.jobType then offer.jobType.name else offer.mission, stars = stars }
+		else nil
 	local driverTotal, share = Economy.crewSplit(payout.total, #crew)
 	-- The split, for everybody's result: the owner first.
 	local split = { { name = player.DisplayName, pay = driverTotal } }
@@ -857,6 +1023,8 @@ local function complete(player: Player, job: Job)
 		piece = offer.piece,
 		piecesName = offer.plural,
 		unlockedWeapon = unlockedWeapon,
+		mission = missionResult, -- 3.0: { id, name, stars } of a mission
+		coopPay = if offer.coop then coopPay else nil, -- a co-op mission: the pay × this for the crew
 	}, giveXp(player, xp)))
 	for _, member in crew do
 		local memberProfile = PlayerData.get(member)
@@ -874,7 +1042,19 @@ local function complete(player: Player, job: Job)
 			night = night,
 			crew = split,
 			total = share,
+			mission = missionResult,
 		}, giveXp(member, xp)))
+	end
+	-- The mission's rewards and stars (server/Missions.luau), after the pay: the owner and everybody paid with them.
+	local onMission = Jobs.onMissionComplete
+	local missionId = offer.mission
+	if missionId and onMission then
+		local ok, err = pcall(function()
+			onMission(player, missionId, stars, crew)
+		end)
+		if not ok then
+			warn(`[Jobs] onMissionComplete failed: {err}`)
+		end
 	end
 end
 
@@ -908,10 +1088,48 @@ end
 function Jobs.onKill(player: Player)
 	local owner = jobOwner(player)
 	local job = owner and jobs[owner]
-	if job then
+	if owner and job then
 		job.kills += 1
 		job.dirty = true
+		-- The gunner twist: a kill from a passenger seat of the owner's car (never the driver's).
+		if job.offer.twists.gunner then
+			local car, driving = Vehicles.seatedIn(player)
+			if car and not driving and car.owner == owner then
+				job.gunnerKills += 1
+			end
+		end
 	end
+end
+
+-- Spotless: below Config.Missions.SpotlessFail the mission fails at once. True when it failed.
+local function spotlessFailed(player: Player, job: Job): boolean
+	if not job.offer.twists.spotless or job.condition >= Config.Missions.SpotlessFail or jobs[player] ~= job then
+		return false
+	end
+	Jobs.fail(player, `SPOTLESS failed: the cargo is down to {math.floor(job.condition * 100)} % (it had to stay above {math.floor(Config.Missions.SpotlessFail * 100 + 0.5)} %).`)
+	return true
+end
+
+-- A shot by anybody (server/Gun.luau Gun.onShot). The quiet twist: every shot of the job's people (the owner, the
+-- crew, the riders) costs cargo condition; the dynamite goes off at 0.
+function Jobs.onShot(player: Player)
+	local owner = jobOwner(player)
+	local job = owner and jobs[owner]
+	if not owner or not job or not job.offer.twists.quiet then
+		return
+	end
+	job.condition = math.max(0, job.condition - Config.Missions.QuietCost)
+	job.dirty = true
+	local now = os.clock()
+	if now - (job.quietNotice[player] or 0) > 2.5 then
+		job.quietNotice[player] = now
+		notice:FireClient(player, `Careful! Dynamite! Every shot costs {math.floor(Config.Missions.QuietCost * 100 + 0.5)} % of the cargo.`)
+	end
+	if job.condition <= 0 then
+		Jobs.fail(owner, "BOOM! The dynamite went off. No shooting meant NO SHOOTING.")
+		return
+	end
+	spotlessFailed(owner, job)
 end
 
 -- The company vehicle the job lent (CAR brings it back after a wreck), or nil for your own car.
@@ -926,7 +1144,9 @@ local function loseCondition(player: Player, job: Job, share: number, reason: st
 	job.dirty = true
 	if job.condition <= 0 then
 		Jobs.fail(player, reason)
+		return
 	end
+	spotlessFailed(player, job)
 end
 
 -- Bandits next to the car carry the cargo off, piece by piece (the kids and a patient only get scared).
@@ -938,11 +1158,16 @@ function Jobs.steal(player: Player, share: number)
 	local now = os.clock()
 	if Cargo.isPeople(job.offer.kind) then
 		local patient = job.offer.kind == "patient"
+		local survivor = job.offer.kind == "survivor"
 		if now - job.stealNotice > 4 then
 			job.stealNotice = now
-			notice:FireClient(player, if patient then "Bandits at the ambulance! Get the patient out of here!" else "Bandits at the bus! The kids are scared, get them out of here!")
+			notice:FireClient(player, if patient then "Bandits at the ambulance! Get the patient out of here!"
+				elseif survivor then "Bandits at the car! The survivors are panicking, get them out of here!"
+				else "Bandits at the bus! The kids are scared, get them out of here!")
 		end
-		loseCondition(player, job, share, if patient then "The bandits got to the ambulance. The patient didn't make it." else "The bandits scared the kids away!")
+		loseCondition(player, job, share, if patient then "The bandits got to the ambulance. The patient didn't make it."
+			elseif survivor then "The bandits dragged the survivors off!"
+			else "The bandits scared the kids away!")
 		return
 	end
 	if now - job.stealNotice > 4 then
@@ -968,7 +1193,9 @@ function Jobs.onCarWrecked(player: Player)
 	notice:FireClient(player, "Your car is wrecked! Press CAR and keep going, the clock is ticking.")
 	if Cargo.isPeople(job.offer.kind) then
 		if Cargo.status(job.cargo).inCar > 0 then
-			local reason = if job.offer.kind == "patient" then "The crash was too much for the patient." else "The crash scared the kids away."
+			local reason = if job.offer.kind == "patient" then "The crash was too much for the patient."
+				elseif job.offer.kind == "survivor" then "The crash was too much for the survivors."
+				else "The crash scared the kids away."
 			loseCondition(player, job, Config.BanditCar.WreckCargoLoss, reason)
 		end
 		return
@@ -1032,6 +1259,10 @@ local function advance(player: Player, job: Job)
 	job.footSince = nil
 	local nextStop = offer.stops[job.stop]
 	Cargo.setStop(job.cargo, planOf(nextStop))
+	-- Defend: the last drop unloads only after holding out there.
+	if offer.twists.defend and job.stop == #offer.stops and not job.defendDone then
+		Cargo.setBlocked(job.cargo, true)
+	end
 	job.dirty = true
 	notice:FireClient(player, if stop.kind == "pickup" then `All loaded! Now: {nextStop.label}` else `Done! Next: {nextStop.label}`)
 end
@@ -1040,8 +1271,10 @@ end
 -- waits a little and the number does not go up, so the waves never stack.
 local function sendWave(player: Player, job: Job, tier: Config.TierDef, position: Vector3, heading: Vector3?, multiplier: number)
 	local number = job.wave + 1
-	local room = Economy.waveAlive(tier, multiplier) - Zombies.countFor(player, true) -- the roadblocks' bandits do not count
-	local size = math.min(Economy.waveSize(tier, number, multiplier), room)
+	-- Co-op: the wave and the cap of the alive ones grow with the crew (job.enemyScale), not how often they come.
+	local scale = job.enemyScale
+	local room = Economy.waveAlive(tier, multiplier * scale) - Zombies.countFor(player, true) -- the roadblocks' bandits do not count
+	local size = math.min(math.floor(Economy.waveSize(tier, number, multiplier) * scale + 0.5), room)
 	local made = if size > 0 then Zombies.spawnAround(player, position, heading, size, tier.waveKinds) else 0
 	if made <= 0 then
 		job.waveIn = JobsConfig.WavePostpone
@@ -1051,6 +1284,173 @@ local function sendWave(player: Player, job: Job, tier: Config.TierDef, position
 	job.waveIn = Economy.waveEvery(tier, multiplier) * rng:NextNumber(0.9, 1.1)
 	job.dirty = true
 	notice:FireClient(player, `WAVE {number} · {made} {if made == 1 then "zombie" else "zombies"}`)
+end
+
+-- Tells the owner and the invited crew.
+local function tellJob(player: Player, text: string)
+	notice:FireClient(player, text)
+	for _, member in Crew.members(player) do
+		notice:FireClient(member, text)
+	end
+end
+
+-- The hordes waiting at the stops: the last one's (the tier's guardHorde), and with the guarded twist one at every
+-- stop (Economy.guardedHorde), spawned when the owner gets within GuardTriggerDistance. Co-op: × job.enemyScale.
+local function spawnHordes(player: Player, job: Job, tier: Config.TierDef, stop: Stop, lastStop: boolean, flatDistance: number)
+	if flatDistance >= JobsConfig.GuardTriggerDistance then
+		return
+	end
+	local outward = Vector3.new(stop.address.nx, 0, stop.address.nz)
+	if job.offer.twists.guarded then
+		if job.guarded[job.stop] then
+			return
+		end
+		job.guarded[job.stop] = true
+		job.guards = job.guards or lastStop
+		local count = Economy.guardedHorde(tier, job.enemyScale)
+		if lastStop then
+			count = math.max(count, math.floor(tier.guardHorde * job.enemyScale + 0.5))
+		end
+		Zombies.spawnGuards(player, stop.park, outward, count, tier.kinds)
+		tellJob(player, `HOT ZONE! {count} of them are waiting at the stop.`)
+	elseif lastStop and not job.guards and tier.guardHorde > 0 then
+		job.guards = true
+		Zombies.spawnGuards(player, stop.park, outward, math.floor(tier.guardHorde * job.enemyScale + 0.5), tier.kinds)
+	end
+end
+
+-- Does somebody of the job (the owner, the invited crew, whoever rode along) stand on foot, alive, within the
+-- defend radius of `at`?
+local function holdingArea(player: Player, job: Job, at: Vector3): boolean
+	local people = crewOf(job, player)
+	table.insert(people, player)
+	for _, who in people do
+		local character = who.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if humanoid and root and humanoid.Health > 0 and humanoid.SeatPart == nil then
+			if Vector3.new(root.Position.X - at.X, 0, root.Position.Z - at.Z).Magnitude <= Config.Missions.DefendRadius then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- The defend twist at the last drop (Cargo.setBlocked holds the unloading): it starts when the owner (or somebody of
+-- the job on foot) gets within DefendRadius of the receiver; the clock runs while somebody holds the area on foot;
+-- a wave comes around the stop every DefendWaveEvery s meanwhile. Held long enough: the unloading goes on.
+local function defendStep(player: Player, job: Job, tier: Config.TierDef, stop: Stop, position: Vector3, now: number, step: number, multiplier: number)
+	local tuning = Config.Missions
+	local inside = holdingArea(player, job, stop.pile)
+	if job.defendLeft == nil then
+		local near = Vector3.new(position.X - stop.pile.X, 0, position.Z - stop.pile.Z).Magnitude <= tuning.DefendRadius
+		if not inside and not near then
+			return
+		end
+		job.defendLeft = job.offer.defendTime
+		job.defendWho = if stop.person then stop.person.name else "the receiver"
+		job.nextDefendWave = now + 3
+		job.dirty = true
+		tellJob(player, `HOLD OUT! Keep {job.defendWho} safe for {Economy.clock(job.offer.defendTime)}: stay on foot within {tuning.DefendRadius} studs.`)
+	end
+	local before = math.ceil(job.defendLeft or 0)
+	if inside ~= job.defendInside then
+		job.defendInside = inside
+		job.dirty = true
+	end
+	if not inside then
+		return -- leaving the area pauses the clock (and the waves: they do not pile up for nobody)
+	end
+	local left = (job.defendLeft or 0) - step
+	job.defendLeft = left
+	if math.ceil(left) ~= before then
+		job.dirty = true
+	end
+	if now >= job.nextDefendWave and left > 2 then
+		job.nextDefendWave = now + tuning.DefendWaveEvery * rng:NextNumber(0.9, 1.1)
+		local number = job.defendWave + 1
+		local room = Economy.waveAlive(tier, multiplier * job.enemyScale) - Zombies.countFor(player, true)
+		local size = math.min(math.floor(Economy.waveSize(tier, number, multiplier) * job.enemyScale + 0.5), room)
+		local made = 0
+		for _ = 1, math.max(0, size) do
+			local spot = Zombies.findSpot(stop.park, nil, 55, 110)
+			if spot and Zombies.spawn(Economy.pickKind(tier.waveKinds, rng:NextNumber()), spot, player, false) then
+				made += 1
+			end
+		end
+		if made > 0 then
+			job.defendWave = number
+			tellJob(player, `HOLD THE LINE! {made} {if made == 1 then "zombie" else "zombies"} coming at you`)
+		end
+	end
+	if left <= 0 then
+		job.defendDone = true
+		job.dirty = true
+		Cargo.setBlocked(job.cargo, false)
+		tellJob(player, "The area is safe! Unload, quick!")
+	end
+end
+
+-- On foot at a stop: a few come at you, far enough to put it down and shoot (G). Co-op: more of them.
+local function footWave(player: Player, job: Job, tier: Config.TierDef, stop: Stop, now: number, multiplier: number)
+	local wave = Tuning.FootWaves[job.offer.tier] or Tuning.FootWaves[1]
+	if not job.footSince then
+		job.footSince = now
+		job.nextFoot = now + Tuning.FootGrace
+	end
+	if wave.count > 0 and now >= job.nextFoot and not World.isSafe(stop.park) then
+		job.nextFoot = now + wave.every / multiplier * rng:NextNumber(0.85, 1.15)
+		if Zombies.countFor(player) < wave.max * multiplier * job.enemyScale then
+			Zombies.spawnAround(player, stop.park, nil, math.max(1, math.floor(wave.count * job.enemyScale + 0.5)), tier.kinds)
+			if not job.footWarned then
+				job.footWarned = true
+				notice:FireClient(player, "They are coming for you! Put it down (G) to shoot.")
+			end
+		end
+	end
+end
+
+-- On the road: the zombie waves (paused in the safe zone), the bandit cars and the roadblocks.
+local function roadEnemies(player: Player, job: Job, tier: Config.TierDef, position: Vector3, heading: Vector3?, now: number, step: number, multiplier: number, nightWaves: number)
+	local offer = job.offer
+	job.footSince = nil
+	if not World.isSafe(position) then
+		-- The zombie waves: the clock runs only out here, never in the safe zone or on foot at a stop.
+		job.waveIn -= step
+		if job.waveIn <= 0 then
+			sendWave(player, job, tier, position, heading, multiplier * nightWaves)
+		end
+	end
+	-- Wanted cargo (banditBoost, the hunted twist): the bandit cars and the roadblocks come that many times as often.
+	-- Hunted on a ★ job (no bandits there): the ★★ bandits.
+	local bandits = multiplier * offer.boost
+	local banditTier = if offer.twists.hunted and tier.chaseEvery <= 0 then JobsConfig.Tiers[2] or tier else tier
+	local driving = Vehicles.isDriving(player)
+	if driving and banditTier.chaseEvery > 0 and now >= job.nextChase and not World.isSafe(position) then
+		job.nextChase = now + banditTier.chaseEvery / bandits * rng:NextNumber(0.8, 1.2)
+		if BanditCars.countFor(player) < banditTier.chaseMax and BanditCars.chase(player, position, heading) then
+			notice:FireClient(player, "Bandits are on your tail! Shoot them or lose them!")
+		end
+	end
+	if driving and banditTier.ambushEvery > 0 and now >= job.nextAmbush and not World.isSafe(position) then
+		job.nextAmbush = now + banditTier.ambushEvery / bandits * rng:NextNumber(0.8, 1.2)
+		ambush(player, position, heading, math.max(1, math.floor(banditTier.ambushSize * job.enemyScale + 0.5)))
+	end
+end
+
+-- The crew changed (riders, members): co-op scales the enemies with it, and says so.
+local function recount(player: Player, job: Job)
+	local crewCount = #crewOf(job, player)
+	if crewCount == job.crewCount then
+		return
+	end
+	job.crewCount = crewCount
+	job.dirty = true
+	if job.offer.coop then
+		job.enemyScale = Economy.coopEnemies(crewCount)
+		tellJob(player, `CO-OP: crew of {crewCount + 1} · pay × {string.format("%.2f", Economy.coopPay(crewCount))} · enemies × {string.format("%.2f", job.enemyScale)}`)
+	end
 end
 
 local elapsed = 0
@@ -1082,9 +1482,14 @@ local function update(dt: number)
 		local session = job.cargo
 		if serverNow > job.endsAt then
 			local reason = if offer.kind == "patient" then "Too late! The patient couldn't wait any longer."
+				elseif offer.kind == "survivor" then "Too late! The survivors couldn't hold out any longer."
 				elseif offer.look == "pizza" and offer.jobType then `Too late! The pizza went cold and {offer.customer} gave up on you.`
 				else `Too late! {offer.customer} gave up on you.`
 			Jobs.fail(player, reason)
+			continue
+		end
+		-- Spotless: the cargo got too damaged (car hits, bandits, shots).
+		if spotlessFailed(player, job) then
 			continue
 		end
 
@@ -1094,11 +1499,7 @@ local function update(dt: number)
 				job.crew[rider] = true
 			end
 		end
-		local crewCount = #crewOf(job, player)
-		if crewCount ~= job.crewCount then
-			job.crewCount = crewCount
-			job.dirty = true
-		end
+		recount(player, job)
 		Cargo.update(session, step)
 		if not jobs[player] then
 			continue
@@ -1129,55 +1530,20 @@ local function update(dt: number)
 		end
 
 		local flatDistance = Vector3.new(position.X - stop.park.X, 0, position.Z - stop.park.Z).Magnitude
-		if lastStop and not job.guards and tier.guardHorde > 0 and flatDistance < JobsConfig.GuardTriggerDistance then
-			job.guards = true
-			Zombies.spawnGuards(player, stop.park, Vector3.new(stop.address.nx, 0, stop.address.nz), tier.guardHorde, tier.kinds)
-		end
+		spawnHordes(player, job, tier, stop, lastStop, flatDistance)
 
 		local multiplier = if modifier then modifier.spawnMultiplier else 1
+		if offer.twists.defend and lastStop and not job.defendDone then
+			defendStep(player, job, tier, stop, position, now, step, multiplier * nightWaves)
+		end
 		if Cargo.onFoot(session) then
-			-- Handling the cargo on foot: a few come at you, far enough to put it down and shoot (G).
-			local wave = Tuning.FootWaves[offer.tier] or Tuning.FootWaves[1]
-			if not job.footSince then
-				job.footSince = now
-				job.nextFoot = now + Tuning.FootGrace
-			end
-			if wave.count > 0 and now >= job.nextFoot and not World.isSafe(stop.park) then
-				job.nextFoot = now + wave.every / multiplier * rng:NextNumber(0.85, 1.15)
-				if Zombies.countFor(player) < wave.max * multiplier then
-					Zombies.spawnAround(player, stop.park, nil, wave.count, tier.kinds)
-					if not job.footWarned then
-						job.footWarned = true
-						notice:FireClient(player, "They are coming for you! Put it down (G) to shoot.")
-					end
-				end
-			end
+			footWave(player, job, tier, stop, now, multiplier)
 		else
-			job.footSince = nil
-			if not World.isSafe(position) then
-				-- The zombie waves: the clock runs only out here, never in the safe zone or on foot at a stop.
-				job.waveIn -= step
-				if job.waveIn <= 0 then
-					sendWave(player, job, tier, position, heading, multiplier * nightWaves)
-				end
-			end
-			-- Wanted cargo (banditBoost): the bandit cars and the roadblocks come that many times as often.
-			local bandits = multiplier * offer.boost
-			local driving = Vehicles.isDriving(player)
-			if driving and tier.chaseEvery > 0 and now >= job.nextChase and not World.isSafe(position) then
-				job.nextChase = now + tier.chaseEvery / bandits * rng:NextNumber(0.8, 1.2)
-				if BanditCars.countFor(player) < tier.chaseMax and BanditCars.chase(player, position, heading) then
-					notice:FireClient(player, "Bandits are on your tail! Shoot them or lose them!")
-				end
-			end
-			if driving and tier.ambushEvery > 0 and now >= job.nextAmbush and not World.isSafe(position) then
-				job.nextAmbush = now + tier.ambushEvery / bandits * rng:NextNumber(0.8, 1.2)
-				ambush(player, position, heading, tier.ambushSize)
-			end
+			roadEnemies(player, job, tier, position, heading, now, step, multiplier, nightWaves)
 		end
 
 		-- The HUD's instruction changes with what you do (parking, getting out): send it when it does.
-		local _, text = Cargo.step(session)
+		local _, text = stepOf(job)
 		if text ~= job.lastStep then
 			job.dirty = true
 		end
@@ -1192,24 +1558,40 @@ end
 -- Set by Main: a mission was finished (the owner, the mission id, the rating 1 – 3, everybody paid with the owner).
 Jobs.onMissionComplete = nil :: ((owner: Player, missionId: string, stars: number, members: { Player }) -> ())?
 
--- Start a mission for the player now (server/Missions.luau checked that it is open). False and why not.
--- [contract stub: stream "missions-jobs" implements it with the twists]
+-- A mission's offer from where the player is (its stops, the pay × the twists, its clock), marked as the mission.
+local function missionOffer(player: Player, def: Config.JobTypeDef): Offer?
+	local offer = jobOffer(playerPosition(player), def)
+	if offer then
+		offer.mission = def.mission or def.id
+	end
+	return offer
+end
+
+-- Start a mission for the player now (server/Missions.luau checked that it is open and the level). Refused with a
+-- job running, in somebody else's crew, or a night mission by day. False and why not (the caller tells the player).
 function Jobs.startMission(player: Player, def: Config.JobTypeDef): (boolean, string?)
-	local current = jobs[player]
-	if current then
+	if jobs[player] then
 		return false, "Finish your current delivery first."
 	end
-	local offer = jobOffer(playerPosition(player), def)
+	local owner = Crew.ownerOf(player)
+	if owner and owner ~= player then
+		return false, `You are in {owner.DisplayName}'s crew: your crew leader picks the mission.`
+	end
+	if table.find(twistList(def), "night") and not DayNight.isNight() then
+		return false, "Come back after dark: this one only works at night."
+	end
+	local offer = missionOffer(player, def)
 	if not offer then
 		return false, "No route for this mission from here, try again."
 	end
-	return startJob(player, offer), nil
+	return startJob(player, offer)
 end
 
 -- ── Admin tools (server/Admin.luau) ────────────────────────────────────────
 
--- Start any job now, next to the player: a Config.JobTypes id (with its vehicle), or "ordinary" / "ordinary1" …
--- "ordinary4" (also "tier1" …) for a job-board delivery of that danger level. A running job is cancelled.
+-- Start any job now, next to the player: a Config.JobTypes id (with its vehicle), a mission id (shared/Missions.luau,
+-- no locks, no night check), or "ordinary" / "ordinary1" … "ordinary4" (also "tier1" …) for a job-board delivery of
+-- that danger level. A running job is cancelled.
 function Jobs.adminStart(player: Player, jobTypeId: string): boolean
 	if type(jobTypeId) ~= "string" then
 		return false
@@ -1230,13 +1612,14 @@ function Jobs.adminStart(player: Player, jobTypeId: string): boolean
 		end
 	else
 		local jobType = Economy.findJobType(jobTypeId)
-		offer = if jobType then jobOffer(from, jobType) else nil
+		local mission = Missions.find(jobTypeId)
+		offer = if jobType then jobOffer(from, jobType) elseif mission then missionOffer(player, mission) else nil
 	end
 	if not offer then
 		notice:FireClient(player, `Cannot start "{jobTypeId}" here (unknown job or a missing place).`)
 		return false
 	end
-	return startJob(player, offer)
+	return startOrTell(player, offer)
 end
 
 -- Finish the current stop at once (loaded / delivered / served); the next tick moves on to the next stop.
@@ -1245,12 +1628,19 @@ function Jobs.adminFinishStop(player: Player): boolean
 	if not job then
 		return false
 	end
+	-- Defend: held out at once.
+	if job.offer.twists.defend and job.stop == #job.offer.stops and not job.defendDone then
+		job.defendDone = true
+		Cargo.setBlocked(job.cargo, false)
+	end
 	local done = Cargo.adminFinish(job.cargo)
 	job.dirty = true
 	return done
 end
 
 function Jobs.start()
+	-- The quiet twist hears every shot (Gun does not require Jobs: no cycle).
+	Gun.onShot = Jobs.onShot
 	Net.get("RequestOffers").OnServerEvent:Connect(function(player)
 		if not jobs[player] then
 			Jobs.makeOffers(player)
@@ -1271,6 +1661,7 @@ function Jobs.start()
 		end
 		for _, other in jobs do
 			other.crew[player] = nil
+			other.quietNotice[player] = nil
 		end
 	end)
 	RunService.Heartbeat:Connect(update)
@@ -1282,8 +1673,8 @@ end
 
 -- What the invited crew sees of the owner's job (server/Crew.luau Crew.statusOf, wired in Main), or nil without one:
 -- name, step (the current stop: what to do there), position (its circle, for the GPS), stars, endsAt; and more for
--- the HUD: hint (the owner's on-foot step), stage, stopIndex / stopCount, cargo, pay, delivered / total, wave,
--- timed.
+-- the HUD: hint (the owner's on-foot step, the defend countdown), stage, stopIndex / stopCount, cargo, pay,
+-- delivered / total, wave, timed; mission (3.0, as in the job payload) on a mission.
 function Jobs.crewStatus(owner: Player): { [string]: any }?
 	local job = jobs[owner]
 	if not job then
@@ -1308,6 +1699,7 @@ function Jobs.crewStatus(owner: Player): { [string]: any }?
 		wave = job.wave,
 		timed = offer.jobType ~= nil and offer.jobType.timeLimit ~= nil,
 		crewCount = job.crewCount, -- paid besides the owner: the invited crew and whoever rode along
+		mission = missionInfo(job),
 	}
 end
 
