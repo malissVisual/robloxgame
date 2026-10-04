@@ -106,7 +106,7 @@ local SECTIONS = {
 local render: () -> ()
 
 local function renderUnlock()
-	heading("Unlock", "Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, and every employer's jobs counted as done.")
+	heading("Unlock", "Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, every employer's jobs counted as done, and a Roof Minigun on every car that can carry a car gun.")
 	local row = grid(200)
 	action(row, "UNLOCK EVERYTHING", C.yellow, function()
 		send("unlockAll")

@@ -4,7 +4,7 @@
 --
 --   Dead End Motors     cars (the showroom models have their own prompts)
 --   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
---   Wrench Garage       upgrades and paint jobs (and free repairs inside)
+--   Wrench Garage       upgrades, paint jobs and car guns (one on the roof of the equipped car; free repairs inside)
 --   Last Stop Supplies  consumables
 --   Depot Garage        switch between your cars
 --   Job Board           the depot's job board
@@ -100,6 +100,29 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		profile.weapons[id] = true
 		profile.weapon = id
 		notice:FireClient(player, `{def.name} is yours, ready to fire!`)
+		PlayerData.notify(player)
+	elseif kind == "cargun" then
+		-- A roof gun for the equipped car: it replaces the one there (no refund).
+		local def = Economy.findCarGun(id)
+		local carDef = Economy.findCar(profile.car)
+		if not def or not carDef or refuse(player, "mechanic") then
+			return
+		end
+		if not Economy.canMount(carDef.id) then
+			notice:FireClient(player, `The {carDef.name} can't carry a gun.`)
+			return
+		end
+		if profile.carGuns[carDef.id] == def.id then
+			notice:FireClient(player, `Your {carDef.name} already has the {def.name}.`)
+			return
+		end
+		if not PlayerData.spend(player, def.price) then
+			notice:FireClient(player, "Not enough money.")
+			return
+		end
+		profile.carGuns[carDef.id] = def.id
+		notice:FireClient(player, `{def.name} mounted on your {carDef.name}! The driver fires it.`)
+		Vehicles.refreshGun(player)
 		PlayerData.notify(player)
 	elseif kind == "item" then
 		local def = Economy.findItem(id)

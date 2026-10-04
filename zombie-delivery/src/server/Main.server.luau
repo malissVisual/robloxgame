@@ -67,6 +67,7 @@ local function sendState(player: Player)
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,
+		carGuns = profile.carGuns,
 		rep = profile.rep,
 		deliveries = profile.deliveries,
 		kills = profile.kills,

@@ -1,5 +1,6 @@
 --!strict
--- The player's progress: money, the cars and guns they own, the equipped ones, the upgrade levels and lifetime stats.
+-- The player's progress: money, the cars and guns they own, the equipped ones, the car guns on their roofs, the upgrade
+-- levels and lifetime stats.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -21,6 +22,7 @@ export type Profile = {
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
 	carPaint: { [string]: string }, -- car id → paint id
+	carGuns: { [string]: string }, -- car id → the car gun on its roof (Config.CarGuns); no entry = none
 	rep: { [string]: number }, -- jobs done for each employer (Config.Employers)
 	deliveries: number,
 	kills: number,
@@ -52,6 +54,7 @@ local function newProfile(): Profile
 		items = { repair = 1, molotov = 2 },
 		paints = { factory = true },
 		carPaint = {},
+		carGuns = {}, -- every car starts without a gun
 		rep = {},
 		deliveries = 0,
 		kills = 0,
@@ -110,6 +113,14 @@ local function applySaved(profile: Profile, saved: any)
 		for carId, paintId in saved.carPaint do
 			if type(carId) == "string" and type(paintId) == "string" and Economy.findCar(carId) and profile.paints[paintId] then
 				profile.carPaint[carId] = paintId
+			end
+		end
+	end
+	-- Older saves have none: { } (no car gun anywhere).
+	if type(saved.carGuns) == "table" then
+		for carId, gunId in saved.carGuns do
+			if type(carId) == "string" and type(gunId) == "string" and profile.cars[carId] and Economy.canMount(carId) and Economy.findCarGun(gunId) then
+				profile.carGuns[carId] = gunId
 			end
 		end
 	end
@@ -210,6 +221,7 @@ function PlayerData.save(player: Player)
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,
+		carGuns = profile.carGuns,
 		rep = profile.rep,
 		deliveries = profile.deliveries,
 		kills = profile.kills,

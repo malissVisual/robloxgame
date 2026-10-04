@@ -9,6 +9,11 @@
 --
 -- The visible tyres hang on Motor6Ds that every client spins and steers (client/CarVisuals.luau).
 -- Other players ride along in the passenger seats (the "Ride" prompt) and shoot from there (server/Gun.luau).
+--
+-- A car has no roof gun until one is bought at Wrench Garage (Config.CarGuns, profile.carGuns, only on the cars with
+-- CarDef.mount). Then a turret with that gun's look sits on the roof: the model "CarGun" inside the car, its "Barrel"
+-- part holds the "Muzzle" attachment (client/Shooting.luau draws the tracers from there), and the car model carries
+-- the attribute CarGun = the gun's id (the clients read it).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,9 +34,10 @@ export type Car = {
 	chassis: Part,
 	seat: VehicleSeat,
 	passengers: { Seat },
-	turret: Weld,
-	turretBase: CFrame,
-	muzzle: Attachment,
+	turret: Weld?, -- the roof gun's turning joint; nil = no car gun on this car
+	turretBase: CFrame, -- where a roof gun sits (relative to the chassis), with a gun or without
+	muzzle: Attachment?,
+	gunId: string?, -- the car gun installed (Config.CarGuns)
 	paintParts: { BasePart },
 	size: Vector3, -- the hull (width, height, length) for ramming and latching
 	stats: Economy.CarStats,
@@ -390,15 +396,118 @@ type Built = {
 	chassis: Part,
 	seat: VehicleSeat?,
 	passengers: { Seat },
-	turret: Weld,
+	turret: Weld?,
 	turretBase: CFrame,
-	muzzle: Attachment,
+	muzzle: Attachment?,
 	paintParts: { BasePart },
 	size: Vector3,
 }
 
--- Builds the body. display = a showroom model (anchored, no seats, no movers).
-local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean): Built
+-- ── The roof guns ──────────────────────────────────────────────────────────
+-- Every car gun's look, in "mount space": the centre of the turret's ring at the roof, -Z forward, Y up. The ring
+-- (a flat cylinder 1 stud high) turns; every piece is welded to it. The "Barrel" piece holds the muzzle.
+
+local GUNMETAL = Color3.fromRGB(60, 60, 64)
+local OLIVE = Color3.fromRGB(78, 92, 56)
+local BRASS = Color3.fromRGB(196, 156, 64)
+local METAL = Enum.Material.Metal
+
+type GunPiece = {
+	name: string,
+	size: Vector3, -- a cylinder's length is X
+	at: CFrame, -- in mount space
+	color: Color3,
+	material: Enum.Material?,
+	cylinder: boolean?,
+}
+type GunLook = { pieces: { GunPiece }, muzzle: Vector3 }
+
+local ALONG_Z = CFrame.Angles(0, math.rad(90), 0) -- turns a cylinder's axis (X) to lie along the barrel (Z)
+
+local function gunLook(gunId: string): GunLook
+	local pieces: { GunPiece } = {}
+	local function add(name: string, size: Vector3, at: CFrame, color: Color3, cylinder: boolean?, material: Enum.Material?)
+		table.insert(pieces, { name = name, size = size, at = at, color = color, cylinder = cylinder, material = material })
+	end
+	if gunId == "roofminigun" then
+		-- A rotary cluster: six barrels around a spindle, two clamps, the motor behind, an ammo drum on the side.
+		local y = 1
+		add("Housing", Vector3.new(0.95, 0.95, 1.3), CFrame.new(0, y, 0.45), DARK)
+		add("Barrel", Vector3.new(0.25, 0.25, 3.2), CFrame.new(0, y, -1.4), DARK)
+		for n = 0, 5 do
+			local angle = n * math.pi / 3
+			add("RotaryBarrel", Vector3.new(3, 0.2, 0.2), CFrame.new(math.cos(angle) * 0.3, y + math.sin(angle) * 0.3, -1.5) * ALONG_Z, GUNMETAL, true)
+		end
+		add("Clamp", Vector3.new(0.2, 0.95, 0.95), CFrame.new(0, y, -2.75) * ALONG_Z, DARK, true)
+		add("Clamp", Vector3.new(0.2, 0.95, 0.95), CFrame.new(0, y, -0.9) * ALONG_Z, DARK, true)
+		add("AmmoDrum", Vector3.new(0.7, 1.3, 1.3), CFrame.new(1, 0.95, 0.45), OLIVE, true)
+		add("Feed", Vector3.new(0.5, 0.18, 0.35), CFrame.new(0.55, y + 0.15, 0.45), BRASS)
+		return { pieces = pieces, muzzle = Vector3.new(0, y, -3.1) }
+	elseif gunId == "rooflauncher" then
+		-- One fat tube with rings, the breech behind it and a sight.
+		local y = 1.15
+		add("Barrel", Vector3.new(3.4, 1.2, 1.2), CFrame.new(0, y, -1.1) * ALONG_Z, OLIVE, true)
+		add("Ring", Vector3.new(0.3, 1.4, 1.4), CFrame.new(0, y, -2.7) * ALONG_Z, DARK, true)
+		add("Ring", Vector3.new(0.3, 1.4, 1.4), CFrame.new(0, y, 0.4) * ALONG_Z, DARK, true)
+		add("Breech", Vector3.new(1, 1, 0.8), CFrame.new(0, y, 0.95), DARK)
+		add("Sight", Vector3.new(0.15, 0.5, 0.3), CFrame.new(0.55, y + 0.75, -0.6), GUNMETAL)
+		return { pieces = pieces, muzzle = Vector3.new(0, y, -2.9) }
+	end
+	-- roofmg (and the bandits' pickup): a slim barrel in a cooling jacket on a receiver, an ammo box on the side.
+	local y = 0.9
+	add("Receiver", Vector3.new(0.7, 0.6, 1.6), CFrame.new(0, y, 0.1), DARK)
+	add("Barrel", Vector3.new(0.28, 0.28, 3), CFrame.new(0, y, -2.2), GUNMETAL)
+	add("Jacket", Vector3.new(1.4, 0.45, 0.45), CFrame.new(0, y, -1.3) * ALONG_Z, DARK, true)
+	add("AmmoBox", Vector3.new(0.8, 0.75, 1), CFrame.new(0.8, 0.8, 0.2), OLIVE)
+	add("Belt", Vector3.new(0.45, 0.12, 0.35), CFrame.new(0.38, y + 0.2, 0), BRASS)
+	add("Handles", Vector3.new(0.9, 0.15, 0.15), CFrame.new(0, y, 1), GUNMETAL)
+	return { pieces = pieces, muzzle = Vector3.new(0, y, -3.8) }
+end
+
+-- Builds a roof gun on the car: the model "CarGun" with the ring on a Weld (the server turns its C0, Vehicles.aim)
+-- and the gun's pieces welded to the ring. Returns the joint and the muzzle.
+local function buildTurret(model: Model, chassis: BasePart, turretBase: CFrame, gunId: string): (Weld, Attachment)
+	local holder = Instance.new("Model")
+	holder.Name = "CarGun"
+	holder:SetAttribute("Gun", gunId)
+	holder.Parent = model
+	local mount = chassis.CFrame * turretBase
+	local base = newPart(holder, "Turret", Vector3.new(1, 2.2, 2.2), mount * CFrame.Angles(0, 0, math.rad(90)), DARK, METAL)
+	base.Shape = Enum.PartType.Cylinder
+	base.CanCollide = false
+	base.Massless = true
+	local turret = Instance.new("Weld")
+	turret.Name = "TurretWeld"
+	turret.Part0 = chassis
+	turret.Part1 = base
+	turret.C0 = turretBase
+	turret.C1 = CFrame.Angles(0, 0, math.rad(90)):Inverse()
+	turret.Parent = base
+	local look = gunLook(gunId)
+	local barrel: BasePart = base
+	for _, piece in look.pieces do
+		local p = newPart(holder, piece.name, piece.size, mount * piece.at, piece.color, piece.material or METAL)
+		if piece.cylinder then
+			p.Shape = Enum.PartType.Cylinder
+		end
+		p.CanCollide = false
+		p.CanQuery = false
+		p.Massless = true
+		weld(base, p)
+		if piece.name == "Barrel" then
+			barrel = p
+		end
+	end
+	local muzzle = Instance.new("Attachment")
+	muzzle.Name = "Muzzle"
+	muzzle.Parent = barrel
+	muzzle.WorldCFrame = mount * CFrame.new(look.muzzle)
+	return turret, muzzle
+end
+
+-- Builds the body. display = a showroom model (anchored, no seats, no movers). gunId = the car gun on its roof (nil:
+-- none).
+local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?): Built
 	local style = STYLES[def.style] or STYLES.van
 	local accent = if def.style == "icecream" then Color3.fromRGB(255, 120, 180) elseif def.style == "bus" then Color3.fromRGB(200, 30, 30) else color:Lerp(Color3.new(1, 1, 1), 0.45)
 
@@ -510,27 +619,12 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		weld(chassis, tail)
 	end
 
-	-- The roof gun: a base that turns (a Weld whose C0 the server rotates) and a barrel.
+	-- The roof gun, only when one is installed.
 	local turretBase = CFrame.new(0, CHASSIS_HEIGHT / 2 + style.roof, 0.5)
-	local base = newPart(model, "Turret", Vector3.new(1, 2.2, 2.2), chassisCF * turretBase * CFrame.Angles(0, 0, math.rad(90)), DARK, Enum.Material.Metal)
-	base.Shape = Enum.PartType.Cylinder
-	base.CanCollide = false
-	base.Massless = true
-	local turret = Instance.new("Weld")
-	turret.Name = "TurretWeld"
-	turret.Part0 = chassis
-	turret.Part1 = base
-	turret.C0 = turretBase
-	turret.C1 = CFrame.Angles(0, 0, math.rad(90)):Inverse()
-	turret.Parent = base
-	local barrel = newPart(model, "Barrel", Vector3.new(0.5, 0.5, 3.4), base.CFrame * CFrame.Angles(0, 0, math.rad(-90)) * CFrame.new(0, 0.3, -1.7), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
-	barrel.CanCollide = false
-	barrel.Massless = true
-	weld(base, barrel)
-	local muzzle = Instance.new("Attachment")
-	muzzle.Name = "Muzzle"
-	muzzle.Position = Vector3.new(0, 0, -1.8)
-	muzzle.Parent = barrel
+	local turret: Weld?, muzzle: Attachment? = nil, nil
+	if gunId then
+		turret, muzzle = buildTurret(model, chassis, turretBase, gunId)
+	end
 
 	local built: Built = {
 		model = model,
@@ -645,7 +739,7 @@ end
 export type NpcCar = {
 	model: Model,
 	chassis: Part,
-	turret: Weld,
+	turret: Weld, -- the bandits' pickup always has a roof machine gun
 	turretBase: CFrame,
 	size: Vector3,
 	linear: LinearVelocity,
@@ -673,7 +767,7 @@ end
 
 -- A car for the enemies, driven by the server (server/BanditCars.luau): no seats, no prompts, bandit figures inside.
 function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
-	local built = build(def, rgb(def.color), ground, false)
+	local built = build(def, rgb(def.color), ground, false, "roofmg")
 	local model = built.model
 	local spots: { CFrame } = {}
 	local seat = built.seat
@@ -705,7 +799,7 @@ function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
 	return {
 		model = model,
 		chassis = built.chassis,
-		turret = built.turret,
+		turret = built.turret :: Weld,
 		turretBase = built.turretBase,
 		size = built.size,
 		linear = built.chassis:FindFirstChild("Drive") :: LinearVelocity,
@@ -901,6 +995,16 @@ function Vehicles.cargoEntry(car: Car): Vector3
 	return Vector3.new(point.X, car.chassis.Position.Y - CHASSIS_HEIGHT / 2 - styleOf(car).clearance, point.Z)
 end
 
+-- The car gun that goes on this car of the player's: the one in their profile, if the car can carry one.
+local function gunFor(player: Player, carId: string): string?
+	local profile = PlayerData.get(player)
+	local gunId = profile and profile.carGuns[carId]
+	if gunId and Economy.canMount(carId) and Economy.findCarGun(gunId) then
+		return gunId
+	end
+	return nil
+end
+
 function Vehicles.remove(player: Player)
 	local car = cars[player]
 	if car then
@@ -952,7 +1056,8 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	end
 	local ground = CFrame.lookAt(position, position + direction)
 	local stats = Economy.carStats(def.id, profile.upgrades)
-	local built = build(def, paintColor(def, if def.company then nil else profile.carPaint[def.id]), ground, false)
+	local gunId = gunFor(player, def.id)
+	local built = build(def, paintColor(def, if def.company then nil else profile.carPaint[def.id]), ground, false, gunId)
 	local seat = built.seat :: VehicleSeat
 	local car: Car = {
 		owner = player,
@@ -964,6 +1069,7 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 		turret = built.turret,
 		turretBase = built.turretBase,
 		muzzle = built.muzzle,
+		gunId = gunId,
 		paintParts = built.paintParts,
 		size = built.size,
 		stats = stats,
@@ -976,6 +1082,7 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	car.model:SetAttribute("OwnerName", player.DisplayName)
 	car.model:SetAttribute("CarId", def.id)
 	car.model:SetAttribute("SpeedMult", 1)
+	car.model:SetAttribute("CarGun", gunId)
 	writeAttributes(car)
 	car.model.Parent = workspace:FindFirstChild("Cars") or workspace
 	cars[player] = car
@@ -1032,6 +1139,32 @@ function Vehicles.repaint(player: Player)
 	for _, p in car.paintParts do
 		p.Color = color
 	end
+end
+
+-- A car gun bought (or changed): the live car gets the turret that fits it now, or loses the one it should not have.
+function Vehicles.refreshGun(player: Player)
+	local car = Vehicles.get(player)
+	if not car then
+		return
+	end
+	local want = gunFor(player, car.id)
+	if want == car.gunId and (want == nil) == (car.model:FindFirstChild("CarGun") == nil) then
+		return
+	end
+	local old = car.model:FindFirstChild("CarGun")
+	if old then
+		old:Destroy()
+	end
+	car.turret, car.muzzle, car.gunId = nil, nil, nil
+	if want then
+		car.turret, car.muzzle = buildTurret(car.model, car.chassis, car.turretBase, want)
+		car.gunId = want
+		-- The new parts joined the car's assembly: the driver's client keeps simulating it.
+		pcall(function()
+			car.chassis:SetNetworkOwner(player)
+		end)
+	end
+	car.model:SetAttribute("CarGun", want)
 end
 
 -- A job modifier (HEAVY LOAD) slows the car down; the owner's client reads the attribute.
@@ -1098,11 +1231,24 @@ function Vehicles.repair(car: Car, share: number)
 	car.model:SetAttribute("Health", math.ceil(car.health))
 end
 
--- Points the roof gun at a world position.
+-- Points the roof gun (if the car has one) at a world position.
 function Vehicles.aim(car: Car, target: Vector3)
+	local turret = car.turret
+	if not turret then
+		return
+	end
 	local localTarget = car.chassis.CFrame:PointToObjectSpace(target)
 	local yaw = math.atan2(-localTarget.X, -localTarget.Z)
-	car.turret.C0 = car.turretBase * CFrame.Angles(0, yaw, 0)
+	turret.C0 = car.turretBase * CFrame.Angles(0, yaw, 0)
+end
+
+-- Where a shot out of the side window of this seat starts: beside the seat, at head height, just outside the body
+-- (client/Shooting.luau draws the tracer from the same point).
+function Vehicles.windowPoint(car: Car, seat: BasePart): Vector3
+	local frame = car.chassis.CFrame
+	local at = frame:PointToObjectSpace(seat.Position)
+	local side = if at.X >= 0 then 1 else -1
+	return (frame * CFrame.new(side * (car.chassis.Size.X / 2 + 0.6), at.Y + 2.6, at.Z)).Position
 end
 
 function Vehicles.start()

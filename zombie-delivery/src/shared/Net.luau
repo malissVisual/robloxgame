@@ -14,12 +14,12 @@ local NAMES = {
 	"CancelJob", -- client → server: give the active job up
 	"Job", -- server → client: the active job ({ … } or nil when none)
 	"DeliveryResult", -- server → client: { success, reason?, payout? }
-	"Fire", -- client → server: the roof gun fired at a point (Vector3)
+	"Fire", -- client → server: a shot at a point (Vector3): the hand gun, out of the window or the car gun
 	"Tracer", -- server → clients: (from, to, color, shooter userId)
 	"Hit", -- server → client: the shooter's hit marker (position, damage, crit, killed)
 	"Reward", -- server → client: money popped from a kill (position, amount)
 	"Bump", -- server → client: the car hit something heavy, keep this share of the speed
-	"Buy", -- client → server: buy (kind = "car" | "weapon" | "item", id, amount for items)
+	"Buy", -- client → server: buy (kind = "car" | "weapon" | "item" | "cargun", id, amount for items)
 	"Equip", -- client → server: equip (kind, id)
 	"Upgrade", -- client → server: next level of an upgrade track (id)
 	"Notice", -- server → client: a short toast (text)

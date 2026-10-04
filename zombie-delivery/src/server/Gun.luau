@@ -1,7 +1,11 @@
 --!strict
--- The guns. The client says where it shoots (Fire, a point in the world), the server checks the fire rate, turns
--- the roof turret (the driver), shoots from the seat (a passenger) or from the hand (on foot), raycasts every pellet
--- and deals the damage to zombies, bandits and bandit cars (a head hit is a crit, the grenade launcher blows up).
+-- The guns. The client says where it shoots (Fire, a point in the world), the server decides what fires
+-- (Economy.fireMode), checks the fire rate, raycasts every pellet and deals the damage to zombies, bandits and bandit
+-- cars (a head hit is a crit, the grenade launchers blow up):
+--   on foot      the gun in your hand
+--   driver       the car gun on the roof, if the car has one (the turret turns to the target)
+--   any seat     otherwise a one-handed gun (pistol, revolver, SMG) out of the side window; a two-handed gun does not
+--                fire from a car at all (the shot is ignored, the client shows a hint)
 -- Nobody shoots with full hands: a character carrying cargo (the Carrying attribute, server/Cargo.luau) cannot fire.
 
 local Players = game:GetService("Players")
@@ -45,7 +49,14 @@ local function onFire(player: Player, target: any)
 	if character and character:GetAttribute("Carrying") ~= nil then
 		return -- the hands are full (a crate, a horse's rope): put it down first
 	end
-	local stats = Economy.weaponStats(profile.weapon, profile.upgrades)
+	-- What fires: the car gun (the server's own record of what is on this car), a gun out of the window, or nothing.
+	local carGunId = if car and driving then car.gunId else nil
+	local mode = Economy.fireMode(seatPart ~= nil, driving, profile.weapon, carGunId)
+	if not mode or (mode ~= "hand" and not car) then
+		return -- a two-handed gun in a car seat
+	end
+	local carGun = if mode == "cargun" and carGunId then Economy.findCarGun(carGunId) else nil
+	local stats = if carGun then Economy.carGunStats(carGun.id, profile.upgrades) else Economy.weaponStats(profile.weapon, profile.upgrades)
 	local now = os.clock()
 	if lastShot[player] and now - lastShot[player] < stats.interval * 0.8 then
 		return -- faster than the gun can fire (a little slack for the network)
@@ -53,11 +64,11 @@ local function onFire(player: Player, target: any)
 	lastShot[player] = now
 
 	local origin: Vector3
-	if car and driving then
+	if car and carGun then
 		Vehicles.aim(car, target)
-		origin = (car.chassis.CFrame * car.turretBase).Position + Vector3.new(0, 0.4, 0)
-	elseif seatPart then
-		origin = seatPart.Position + Vector3.new(0, 3, 0) -- leaning out of the window
+		origin = (car.chassis.CFrame * car.turretBase).Position + Vector3.new(0, 1, 0)
+	elseif car and seatPart then
+		origin = Vehicles.windowPoint(car, seatPart) -- leaning out of the side window
 	else
 		origin = root.Position + Vector3.new(0, 1.5, 0) -- on foot, from the hand
 	end
@@ -74,8 +85,8 @@ local function onFire(player: Player, target: any)
 	params.FilterDescendantsInstances = exclude
 	params.CollisionGroup = "Bullet"
 
-	local def = Economy.findWeapon(profile.weapon) or Config.Weapons[1]
-	local color = Color3.fromRGB(def.color[1], def.color[2], def.color[3])
+	local look: { number } = if carGun then carGun.color else (Economy.findWeapon(profile.weapon) or Config.Weapons[1]).color
+	local color = Color3.fromRGB(look[1], look[2], look[3])
 	local tracer = Net.get("Tracer")
 	local hit = Net.get("Hit")
 	for _ = 1, stats.pellets do

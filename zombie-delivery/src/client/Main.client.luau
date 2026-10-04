@@ -38,6 +38,7 @@ safely("CameraRig", CameraRig.start)
 safely("ArmPose", ArmPose.start)
 safely("AdminPanel", AdminPanel.start)
 safely("AnimalAnimator", AnimalAnimator.start)
+Shooting.notify = Hud.toast
 CameraRig.mouseNeeded = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen()
 end

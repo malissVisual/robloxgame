@@ -3,7 +3,7 @@
 A second Roblox game in this repository (Merge Blades lives in the root). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
 across the map while bandits shoot at you from roadblocks and zombies chase you, carry it to the receiver under fire,
-get paid, and buy better cars, guns, items and upgrades. Friends ride along
+get paid, and buy better cars, guns, car guns, items and upgrades. Friends ride along
 in your passenger seats, shoot out of the windows and share the pay.
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
@@ -31,7 +31,7 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Sprint (on foot; the body speeds up and slows down with weight, leans into the run, and out of a sprint the gun comes up slower) | hold Shift | – |
 | Aim (GTA style: the mouse is locked, the camera follows it, crosshair in the middle) | move the mouse | – |
 | Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
-| Shoot (driver: roof gun, passenger: out of the window, on foot: the gun in your hand) | left mouse | FIRE |
+| Shoot (on foot: the gun in your hand; driver: the car gun on the roof if the car has one, else a one-handed gun out of the window; passenger: a one-handed gun out of the window) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
 | Switch gun | Q (or click the weapon bar) | the weapon bar |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
@@ -45,10 +45,19 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 
 While you carry something (or lead a horse) you cannot shoot, sprint or drive, and you walk slower.
 
+**Guns and cars.** You buy guns for your hands (Lead & Co.); you start with the pistol. From a car seat (driver or
+passenger) only a **one-handed** gun fires, out of the side window: the **pistol, the revolver and the SMG**. The
+two-handed ones (shotgun, rifle, carbine, minigun, grenade launcher) do not fire from a car (a short hint says so; the
+weapon bar greys them out and tags the others WINDOW). **Car guns** are something else: bolted on the roof at
+**Wrench Garage** (CAR GUNS tab), one per car, and the driver fires them (the turret turns to the target, the weapon bar
+shows it). A car starts with none. They fit the Old Van, the Pickup, the Muscle Car, the Armored Truck and the Monster
+Truck, not the work vehicles (bus, ice cream, moving, livestock, fuel truck). A driver without a car gun shoots a
+one-handed gun out of the window (a drive-by); passengers always use their own gun.
+
 1. The **start screen** flies over the city; **PLAY** starts the game and brings your car.
 2. You start at the **depot** in the middle of Downtown. Around it is the **safe zone** (green line) with the shops:
    **Dead End Motors** (cars, walk among the showroom cars), **Lead & Co.** (guns), **Wrench Garage** (upgrades, paint
-   jobs, free repairs inside), **Last Stop Supplies** (items). Walk in and use the counter.
+   jobs, car guns, free repairs inside), **Last Stop Supplies** (items). Walk in and use the counter.
 3. **JOBS** (or the job board at the depot): one special job and one delivery of every danger level.
    * Every delivery has stops: **pick up** at the blue circle, **deliver** at the yellow one. Park in the circle, **get
      out** and handle the cargo yourself: **Pick up** (E) a piece from the giver's pile, carry it to the back of the
@@ -107,8 +116,13 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 * **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher, each with its own model in
   your hand (`shared/GunModels.luau`, the bandits carry the same pistol and rifle): a muzzle flash and a recoil kick on
   every shot, the tracers start at the muzzle. A headshot kills. Earned by working, not sold: the **Ranch Revolver**
-  (Silver Spur Ranch) and the **Army Carbine** (Military Base).
-* **Upgrades** (Wrench Garage, 5 levels each): Engine, Handling, Armor, Ram Plow, Gun Damage, Fire Rate; paint jobs.
+  (Silver Spur Ranch) and the **Army Carbine** (Military Base). One-handed (they also fire out of a car window):
+  Pistol, Ranch Revolver, SMG.
+* **Car guns** (Wrench Garage, on the roof of the equipped car, one per car; a new one replaces the old one, no
+  refund): Roof Machine Gun (a slim barrel with an ammo box), Roof Minigun (a rotary barrel cluster), Roof Grenade
+  Launcher (a fat tube). The Gun Damage and Fire Rate upgrades work for them too.
+* **Upgrades** (Wrench Garage, 5 levels each): Engine, Handling, Armor, Ram Plow, Gun Damage, Fire Rate; paint jobs;
+  car guns.
 * **Items** (Last Stop Supplies): Repair Kit, Medkit, Nitro, Molotov, Landmine.
 * **Enemies**: Bandit, Gunner, Walker, Runner, Brute, Soldier.
 * **People**: the employers, givers, receivers and kids are R15 NPCs that talk, turn to you and walk; the ranch's
@@ -121,20 +135,22 @@ All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map
 
 ```
 src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo spots), Roads (the road graph and the
-              GPS routes), Economy (prices, stats, pay), Net (remotes), Joints (Motor6D or AnimationConstraint),
-              GunModels (the guns in the hands)
+              GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
+              AnimationConstraint), GunModels (the guns in the hands)
 src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats,
-              cargo slots), Zombies (zombies and bandits, roadblocks), BanditCars (the chasing pickups, driven by the
-              server), Gun (shots, server checked), Jobs (job board, stops, special jobs, crews), Cargo (the cargo you
-              carry, lead or board at a stop, the pieces in the vehicle), Npcs (the R15 people: givers, receivers,
-              kids, employers), Animals (the horses: build, walk, lead rope, stalls), Items (consumables, supply
-              crates), Shops (counters, showroom, purchases), Admin (the admin commands, checked on the server)
+              cargo slots, the roof turret of a car gun), Zombies (zombies and bandits, roadblocks), BanditCars (the
+              chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
+              the window), Jobs (job board, stops, special jobs, crews), Cargo (the cargo you carry, lead or board at a
+              stop, the pieces in the vehicle), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
+              horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
+              purchases), Admin (the admin commands, checked on the server)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
               Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
               prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
               Weather, Ui
-tests/        run_tests.py runs every *_test.luau: logic (Economy, Map), cargo (pieces and pay), roads (the GPS)
+tests/        run_tests.py runs every *_test.luau: logic (Economy, Map), cargo (pieces and pay), roads (the GPS),
+              cargun (car guns, one-handed guns, which cars mount a gun, what fires from a seat)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -157,10 +173,11 @@ computed on the server from the car's box (`server/Zombies.luau`).
 python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
-Runs every `tests/*_test.luau` (logic, cargo, roads). Needs the standalone Luau CLI
+Runs every `tests/*_test.luau` (logic, cargo, roads, cargun). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
-**Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
+**Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything (with a Roof Minigun on
+every car that takes one), gives money, spawns
 cars, guns and enemies, teleports to every place, starts any job, sets the time of day, heals, finishes the current
 stop and switches god mode. It
 is there for a Studio Play test, for the owner of a user-owned place and for the user ids in `Config.Admin.UserIds`;

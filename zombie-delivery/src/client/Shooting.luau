@@ -1,10 +1,13 @@
 --!strict
--- The gun on the client. On foot (the pistol in your hand) or in any seat of a car (the driver fires the roof gun,
--- a passenger out of the window) hold
--- the left mouse button to shoot where the mouse points, or hold FIRE (the round button, or F) to shoot the nearest
--- zombie (the ones hanging on your car first). The server checks every shot (server/Gun.luau); here are the inputs,
--- the tracers, the hit feedback (with the dot in client/CameraRig.luau) and the money pop-ups. Nothing fires while
--- your hands hold cargo.
+-- The gun on the client. Hold the left mouse button to shoot where the mouse points, or hold FIRE (the round button,
+-- or F) to shoot the nearest zombie (the ones hanging on your car first). What fires (Economy.fireMode, the server
+-- decides the same in server/Gun.luau):
+--   on foot      the gun in your hand
+--   driver       the car gun on the roof, when the car has one (the car model's CarGun attribute)
+--   any seat     otherwise a one-handed gun (pistol, revolver, SMG) out of the side window; a two-handed gun does not
+--                fire from a car: no shot, no tracer, a short hint instead
+-- Here are the inputs, the tracers, the hit feedback (with the dot in client/CameraRig.luau) and the money pop-ups.
+-- Nothing fires while your hands hold cargo.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -14,6 +17,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local Drive = require(script.Parent.Drive)
@@ -42,6 +46,23 @@ end
 
 function Shooting.setAutoHeld(held: boolean)
 	autoHeld = held
+end
+
+-- Set by Main: shows a short text (a toast).
+Shooting.notify = function(_text: string) end
+
+-- The car gun installed on a car model (its CarGun attribute, set by server/Vehicles.luau), or nil.
+function Shooting.carGunOf(car: Model?): Config.CarGunDef?
+	local id = car and car:GetAttribute("CarGun")
+	return if type(id) == "string" then Economy.findCarGun(id) else nil
+end
+
+-- What a shot of the local player fires right now: "hand" | "cargun" | "window" | nil (a two-handed gun in a car),
+-- and the car gun when it is that.
+function Shooting.mode(): (string?, Config.CarGunDef?)
+	local car, driving = Drive.seatedCar()
+	local carGun = if car and driving then Shooting.carGunOf(car) else nil
+	return Economy.fireMode(car ~= nil, driving, weapon, if carGun then carGun.id else nil), carGun
 end
 
 -- ── Effects ────────────────────────────────────────────────────────────────
@@ -226,20 +247,46 @@ end
 
 -- ── Aiming ─────────────────────────────────────────────────────────────────
 
-local function muzzle(car: Model, driving: boolean): Vector3?
-	if not driving then
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local seat = humanoid and humanoid.SeatPart
-		return if seat then seat.Position + Vector3.new(0, 3, 0) else nil
-	end
-	local barrel = car:FindFirstChild("Barrel")
-	local attachment = barrel and barrel:FindFirstChild("Muzzle")
-	if attachment and attachment:IsA("Attachment") then
-		return attachment.WorldPosition
-	end
+-- Where a shot from the car starts: the car gun's muzzle (the "Muzzle" attachment on the CarGun model's "Barrel"),
+-- or out of the side window beside my seat (the same point as server/Vehicles.luau windowPoint).
+local function muzzle(car: Model, fromRoof: boolean): Vector3?
 	local chassis = car.PrimaryPart
-	return if chassis then chassis.Position + Vector3.new(0, 6, 0) else nil
+	if fromRoof then
+		local gun = car:FindFirstChild("CarGun")
+		local barrel = gun and gun:FindFirstChild("Barrel")
+		local attachment = barrel and barrel:FindFirstChild("Muzzle")
+		if attachment and attachment:IsA("Attachment") then
+			return attachment.WorldPosition
+		end
+		return if chassis then chassis.Position + Vector3.new(0, 6, 0) else nil
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	if not seat then
+		return nil
+	end
+	if not chassis or not chassis:IsA("BasePart") then
+		return seat.Position + Vector3.new(0, 2.6, 0)
+	end
+	local at = chassis.CFrame:PointToObjectSpace(seat.Position)
+	local side = if at.X >= 0 then 1 else -1
+	return (chassis.CFrame * CFrame.new(side * (chassis.Size.X / 2 + 0.6), at.Y + 2.6, at.Z)).Position
+end
+
+-- A two-handed gun in a car seat: say why nothing fires (not more often than every few seconds).
+local lastRefusal = 0
+local function refuse(driving: boolean)
+	local now = os.clock()
+	if now - lastRefusal < 3 then
+		return
+	end
+	lastRefusal = now
+	local def = Economy.findWeapon(weapon)
+	local name = if def then def.name else "That gun"
+	Shooting.notify(if driving
+		then `{name}: too big to fire from a car. Pistol, revolver or SMG out of the window, or mount a car gun at Wrench Garage.`
+		else `{name}: too big to fire from a car. Switch to a pistol, revolver or SMG (Q) to shoot out of the window.`)
 end
 
 local function mouseTarget(car: Model?): Vector3
@@ -330,6 +377,12 @@ local function step()
 	if not car and CameraRig.carrying() then
 		return
 	end
+	-- What fires: the hand gun, the car gun, a one-handed gun out of the window, or nothing (two-handed, in a car).
+	local mode, carGun = Shooting.mode()
+	if not mode then
+		refuse(driving)
+		return
+	end
 	-- On foot: start raising the gun, the shot comes once it is up.
 	if not CameraRig.canShoot() then
 		CameraRig.noteFire()
@@ -343,13 +396,14 @@ local function step()
 	end
 	-- On foot: from the gun in your hand.
 	local gunMuzzle = if car then nil else handMuzzle(character)
-	local from = if car then muzzle(car, driving)
+	local from = if car then muzzle(car, carGun ~= nil)
 		elseif gunMuzzle then gunMuzzle.WorldPosition
 		else root.Position + Vector3.new(0, 1.5, 0) + root.CFrame.LookVector
 	if not from then
 		return
 	end
-	local stats = Economy.weaponStats(weapon, upgrades)
+	-- The rate, range and tracer colour of what really fires.
+	local stats = if carGun then Economy.carGunStats(carGun.id, upgrades) else Economy.weaponStats(weapon, upgrades)
 	local target: Vector3? = nil
 	if autoHeld then
 		target = autoTarget(from, stats.range)
@@ -370,7 +424,8 @@ local function step()
 		muzzleFlash(character, gunMuzzle)
 	end
 	local def = Economy.findWeapon(weapon)
-	local color = if def then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) else Color3.new(1, 1, 0.6)
+	local look: { number }? = if carGun then carGun.color elseif def then def.color else nil
+	local color = if look then Color3.fromRGB(look[1], look[2], look[3]) else Color3.new(1, 1, 0.6)
 	local direction = (target - from)
 	local reach = math.min(direction.Magnitude, stats.range)
 	if reach > 0.5 then

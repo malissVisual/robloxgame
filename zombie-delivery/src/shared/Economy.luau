@@ -1,6 +1,6 @@
 --!strict
--- The maths of money and stats: what an upgrade costs, what a car / gun does with the upgrades,
--- what a job pays. Pure functions (no Roblox API), shared by the server, the client UI and the tests.
+-- The maths of money and stats: what an upgrade costs, what a car / gun / car gun does with the upgrades, what
+-- fires from a car seat, what a job pays. Pure functions (no Roblox API), shared by the server, the client UI and the tests.
 
 local Config = require(script.Parent.Config)
 
@@ -47,6 +47,45 @@ function Economy.findWeapon(id: string): Config.WeaponDef?
 		if weapon.id == id then
 			return weapon
 		end
+	end
+	return nil
+end
+
+function Economy.findCarGun(id: string): Config.CarGunDef?
+	for _, gun in Config.CarGuns do
+		if gun.id == id then
+			return gun
+		end
+	end
+	return nil
+end
+
+-- A pistol, the revolver, the SMG: fired with one hand, so also out of a car window.
+function Economy.oneHanded(weaponId: string): boolean
+	local def = Economy.findWeapon(weaponId)
+	return def ~= nil and def.oneHanded == true
+end
+
+-- Does a car gun fit on this car's roof (CarDef.mount)?
+function Economy.canMount(carId: string): boolean
+	local def = Economy.findCar(carId)
+	return def ~= nil and def.mount == true
+end
+
+-- What a shot is fired from:
+--   "hand"    on foot, the gun in your hand
+--   "cargun"  the driver of a car with a car gun installed (carGunId): the roof turret
+--   "window"  any seat, a one-handed gun out of the side window (the driver too, when the car has no car gun)
+--   nil       a two-handed gun in a seat: it does not fire
+function Economy.fireMode(seated: boolean, driving: boolean, weaponId: string, carGunId: string?): string?
+	if not seated then
+		return "hand"
+	end
+	if driving and carGunId ~= nil and Economy.findCarGun(carGunId) ~= nil then
+		return "cargun"
+	end
+	if Economy.oneHanded(weaponId) then
+		return "window"
 	end
 	return nil
 end
@@ -123,6 +162,19 @@ end
 
 function Economy.weaponStats(weaponId: string, upgrades: Upgrades): WeaponStats
 	local def = Economy.findWeapon(weaponId) or Config.Weapons[1]
+	return {
+		damage = def.damage * Economy.multiplier(upgrades, "damage"),
+		interval = 1 / (def.fireRate * Economy.multiplier(upgrades, "firerate")),
+		range = def.range,
+		pellets = def.pellets,
+		spread = def.spread,
+		splash = def.splash,
+	}
+end
+
+-- A car gun with the Gun Damage / Fire Rate upgrades, like weaponStats.
+function Economy.carGunStats(gunId: string, upgrades: Upgrades): WeaponStats
+	local def = Economy.findCarGun(gunId) or Config.CarGuns[1]
 	return {
 		damage = def.damage * Economy.multiplier(upgrades, "damage"),
 		interval = 1 / (def.fireRate * Economy.multiplier(upgrades, "firerate")),

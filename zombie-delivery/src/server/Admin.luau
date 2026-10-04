@@ -6,7 +6,8 @@
 --
 -- Commands over the "Admin" remote (name, arg):
 --   unlockAll                 every car (company ones too), every gun (earned ones too), every paint, 10 of each
---                             item, every employer's progress at the top (their rewards count as earned)
+--                             item, every employer's progress at the top (their rewards count as earned), the Roof
+--                             Minigun on every car that can carry a car gun
 --   maxUpgrades               every upgrade track at its last level
 --   money      amount         + money
 --   car        car id         that car, now, next to you
@@ -108,6 +109,12 @@ local function unlockAll(player: Player)
 	for _, paint in Config.Paints do
 		profile.paints[paint.id] = true
 	end
+	-- The Roof Minigun on every car you own that can carry a car gun.
+	for _, car in Config.Cars do
+		if profile.cars[car.id] and Economy.canMount(car.id) then
+			profile.carGuns[car.id] = "roofminigun"
+		end
+	end
 	for _, item in Config.Items do
 		profile.items[item.id] = math.max(profile.items[item.id] or 0, math.min(10, item.max))
 	end
@@ -116,7 +123,8 @@ local function unlockAll(player: Player)
 		profile.rep[employer.id] = math.max(profile.rep[employer.id] or 0, employer.needed, employer.weaponAt or 0)
 	end
 	PlayerData.notify(player)
-	say(player, "ADMIN: every car, gun, paint and employer reward unlocked, 10 of each item.")
+	Vehicles.refreshGun(player)
+	say(player, "ADMIN: every car, gun, paint and employer reward unlocked, 10 of each item, a Roof Minigun on every car that takes one.")
 end
 
 local function maxUpgrades(player: Player)

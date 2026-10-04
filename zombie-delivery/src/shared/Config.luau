@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.0.1"
+Config.Version = "2.1"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -44,11 +44,13 @@ export type CarDef = {
 	description: string,
 	company: boolean?, -- not for sale: an employer lends it for their jobs and gives it to you after a few of them
 	employer: string?, -- who (Config.Employers)
+	mount: boolean?, -- a car gun (Config.CarGuns) fits on its roof; the company / work vehicles carry none
 }
 
 Config.Cars = {
 	{
 		id = "van",
+		mount = true,
 		name = "Old Van",
 		price = 0,
 		style = "van",
@@ -62,6 +64,7 @@ Config.Cars = {
 	},
 	{
 		id = "pickup",
+		mount = true,
 		name = "Pickup",
 		price = 1500,
 		style = "pickup",
@@ -75,6 +78,7 @@ Config.Cars = {
 	},
 	{
 		id = "muscle",
+		mount = true,
 		name = "Muscle Car",
 		price = 4000,
 		style = "muscle",
@@ -88,6 +92,7 @@ Config.Cars = {
 	},
 	{
 		id = "armored",
+		mount = true,
 		name = "Armored Truck",
 		price = 0,
 		style = "armored",
@@ -118,6 +123,7 @@ Config.Cars = {
 	},
 	{
 		id = "monster",
+		mount = true,
 		name = "Monster Truck",
 		price = 0,
 		style = "monster",
@@ -207,11 +213,13 @@ export type WeaponDef = {
 	color: { number }, -- tracer colour
 	description: string,
 	earned: string?, -- not sold: this employer (Config.Employers) gives it to you after some jobs
+	oneHanded: boolean?, -- fires out of a car window too (any seat); the two-handed guns only on foot
 }
 
 Config.Weapons = {
 	{
 		id = "pistol",
+		oneHanded = true,
 		name = "Pistol",
 		price = 0,
 		damage = 20,
@@ -225,6 +233,7 @@ Config.Weapons = {
 	},
 	{
 		id = "smg",
+		oneHanded = true,
 		name = "SMG",
 		price = 2000,
 		damage = 13,
@@ -291,6 +300,7 @@ Config.Weapons = {
 	-- Earned, not sold (Config.Employers weapon rewards).
 	{
 		id = "revolver",
+		oneHanded = true,
 		name = "Ranch Revolver",
 		price = 0,
 		damage = 42,
@@ -319,6 +329,64 @@ Config.Weapons = {
 	},
 } :: { WeaponDef }
 
+-- Car guns: bolted on the roof at Wrench Garage (one per car, on the cars with CarDef.mount), fired by the driver.
+-- A car starts without one. The Gun Damage / Fire Rate upgrades work for them too (Economy.carGunStats).
+export type CarGunDef = {
+	id: string,
+	name: string,
+	price: number,
+	damage: number, -- per pellet
+	fireRate: number, -- shots / s
+	range: number,
+	pellets: number,
+	spread: number, -- degrees
+	splash: number, -- radius of the blast (0 = none)
+	color: { number }, -- tracer colour
+	description: string,
+}
+
+Config.CarGuns = {
+	{
+		id = "roofmg",
+		name = "Roof Machine Gun",
+		price = 3500,
+		damage = 14,
+		fireRate = 8,
+		range = 180,
+		pellets = 1,
+		spread = 1.5,
+		splash = 0,
+		color = { 255, 210, 110 },
+		description = "A belt-fed gun on a ring mount, an ammo box on the side.",
+	},
+	{
+		id = "roofminigun",
+		name = "Roof Minigun",
+		price = 12000,
+		damage = 16,
+		fireRate = 16,
+		range = 180,
+		pellets = 1,
+		spread = 2.5,
+		splash = 0,
+		color = { 120, 220, 255 },
+		description = "Six spinning barrels. Nothing on the road survives it.",
+	},
+	{
+		id = "rooflauncher",
+		name = "Roof Grenade Launcher",
+		price = 15000,
+		damage = 80,
+		fireRate = 1,
+		range = 160,
+		pellets = 1,
+		spread = 1,
+		splash = 14,
+		color = { 255, 110, 60 },
+		description = "A fat tube that lobs grenades. Clears a roadblock in one shot.",
+	},
+} :: { CarGunDef }
+
 export type UpgradeDef = {
 	id: string,
 	name: string,
@@ -334,8 +402,8 @@ Config.Upgrades = {
 	{ id = "handling", name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 250, costGrowth = 1.7, perLevel = 0.08 },
 	{ id = "armor", name = "Armor", description = "+15% car health", maxLevel = 5, baseCost = 300, costGrowth = 1.8, perLevel = 0.15 },
 	{ id = "plow", name = "Ram Plow", description = "+30% ram damage", maxLevel = 5, baseCost = 250, costGrowth = 1.75, perLevel = 0.30 },
-	{ id = "damage", name = "Gun Damage", description = "+20% gun damage", maxLevel = 5, baseCost = 400, costGrowth = 1.85, perLevel = 0.20 },
-	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second", maxLevel = 5, baseCost = 400, costGrowth = 1.85, perLevel = 0.12 },
+	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 400, costGrowth = 1.85, perLevel = 0.20 },
+	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 400, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
 
 export type ItemDef = {

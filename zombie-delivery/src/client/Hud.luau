@@ -2,7 +2,8 @@
 -- The interface: money, the minimap (client/MapView.luau), the car panel (health, speed, nitro), the active job
 -- (what to do now, the person, the cargo in your hands / at this stop / in the vehicle, the timer, the cargo's
 -- condition, the loading bar), the JOBS / MAP / BAG / CAR buttons, the hotbar (items, keys 1-5), the job board,
--- the employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold), the
+-- the employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold; the car
+-- guns at Wrench Garage), the weapon bar (your guns, or the car gun while you drive a car that has one), the
 -- backpack (with the job's cargo), the delivery result, toasts, the FIRE button for touch screens and the way to
 -- the target (the park circle with a beam, on foot the pile / the person or the vehicle's back, an arrow).
 
@@ -189,6 +190,7 @@ Ui.list(toasts, true, 6, Enum.HorizontalAlignment.Center)
 
 function Hud.toast(text: string)
 	local label = Ui.label(toasts, text, UDim2.fromOffset(500, 34), {
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 0.25,
 		BackgroundColor3 = C.panel,
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -300,7 +302,7 @@ local function tabs(parent: any, list: { { string } }, selected: string, onPick:
 end
 
 local function note(parent: any, text: string, color: Color3, order: number)
-	Ui.label(parent, text, UDim2.new(1, -10, 0, 22), { LayoutOrder = order, TextColor3 = color, TextSize = 15, Font = Enum.Font.GothamMedium })
+	Ui.label(parent, text, UDim2.new(1, -10, 0, 22), { LayoutOrder = order, AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = color, TextSize = 15, Font = Enum.Font.GothamMedium })
 end
 
 -- ── Job board ──────────────────────────────────────────────────────────────
@@ -424,6 +426,24 @@ local function carStats(def: Config.CarDef): string
 	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower}`
 end
 
+-- Damage, rate, range (and pellets, blast) of a hand gun or a car gun.
+local function gunStats(def: { damage: number, pellets: number, fireRate: number, range: number, splash: number }): string
+	local pellets = if def.pellets > 1 then ` x{def.pellets}` else ""
+	local splash = if def.splash > 0 then ` · Blast {def.splash}` else ""
+	return `Damage {def.damage}{pellets} · {def.fireRate}/s · Range {def.range}{splash}`
+end
+
+-- The cars a car gun fits on (CarDef.mount), by name.
+local function mountableCars(): string
+	local names = {}
+	for _, def in Config.Cars do
+		if def.mount then
+			table.insert(names, def.name)
+		end
+	end
+	return table.concat(names, ", ")
+end
+
 local function renderShop()
 	Ui.clear(shop.body)
 	if not state then
@@ -471,11 +491,10 @@ local function renderShop()
 			end
 		end
 	elseif shopId == "guns" then
+		note(shop.body, "Guns for your hands. One-handed ones (pistol, revolver, SMG) also fire out of a car window; car guns are at Wrench Garage.", C.dim, 1)
 		for order, def in Config.Weapons do
 			local c = card(shop.body, 84, order + 1)
-			local pellets = if def.pellets > 1 then ` x{def.pellets}` else ""
-			local splash = if def.splash > 0 then ` · Blast {def.splash}` else ""
-			cardText(c, def.name, `Damage {def.damage}{pellets} · {def.fireRate}/s · Range {def.range}{splash}`, def.description)
+			cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description)
 			if state.weapon == def.id then
 				cardButton(c, "IN HAND", C.grey, false, function() end)
 			elseif state.weapons[def.id] then
@@ -508,7 +527,7 @@ local function renderShop()
 			end, 2)
 		end
 	elseif shopId == "mechanic" then
-		tabs(shop.body, { { "upgrades", "UPGRADES" }, { "paint", "PAINT" } }, mechanicTab, function(id)
+		tabs(shop.body, { { "upgrades", "UPGRADES" }, { "paint", "PAINT" }, { "carguns", "CAR GUNS" } }, mechanicTab, function(id)
 			mechanicTab = id
 			renderShop()
 		end)
@@ -525,6 +544,32 @@ local function renderShop()
 					end)
 				else
 					cardButton(c, "MAX", C.grey, false, function() end)
+				end
+			end
+		elseif mechanicTab == "carguns" then
+			-- One gun on the roof of the car you have equipped; the driver fires it.
+			local carDef = Economy.findCar(state.car)
+			local carName = if carDef then carDef.name else "car"
+			local canMount = carDef ~= nil and carDef.mount == true
+			local carGuns = state.carGuns or {}
+			local installed: string? = if canMount then carGuns[state.car] else nil
+			if canMount then
+				local current = if installed then Economy.findCarGun(installed) else nil
+				note(shop.body, `CAR GUNS for your {carName}: {if current then current.name else "no gun yet"}. On the roof, the driver fires it. A new one replaces the old one (no refund); Gun Damage and Fire Rate upgrades work for car guns too.`, C.dim, 1)
+			else
+				note(shop.body, `This vehicle can't carry a gun (your {carName}). Car guns fit: {mountableCars()}.`, C.red, 1)
+			end
+			for order, def in Config.CarGuns do
+				local c = card(shop.body, 84, order + 1, installed == def.id)
+				cardText(c, def.name, `{gunStats(def)} · {Ui.money(def.price)}`, def.description)
+				if installed == def.id then
+					cardButton(c, "INSTALLED", C.grey, false, function() end)
+				elseif not canMount then
+					cardButton(c, "CAN'T MOUNT", C.grey, false, function() end)
+				else
+					cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
+						Net.get("Buy"):FireServer("cargun", def.id)
+					end)
 				end
 			end
 		else
@@ -758,7 +803,9 @@ function renderBackpack()
 			end
 			if state.cars[def.id] then
 				local c = card(backpack.body, 84, order + 1)
-				cardText(c, def.name, carStats(def), def.description)
+				local gunId = if def.mount and state.carGuns then state.carGuns[def.id] else nil
+				local gun = if gunId then Economy.findCarGun(gunId) else nil
+				cardText(c, def.name, carStats(def) .. (if gun then ` · 🔫 {gun.name}` else ""), def.description)
 				if state.car == def.id then
 					cardButton(c, "DRIVING", C.grey, false, function() end)
 				end
@@ -768,7 +815,7 @@ function renderBackpack()
 		for order, def in Config.Weapons do
 			if state.weapons[def.id] then
 				local c = card(backpack.body, 84, order + 1)
-				cardText(c, def.name, `Damage {def.damage} · {def.fireRate}/s · Range {def.range}`, def.description)
+				cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description)
 				if state.weapon == def.id then
 					cardButton(c, "IN HAND", C.grey, false, function() end)
 				else
@@ -918,7 +965,7 @@ local weaponBar = scaled(Ui.make("Frame", {
 	AnchorPoint = if touchLayout then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 	BackgroundTransparency = 1,
 }, gui))
-Ui.label(weaponBar, "WEAPON  ·  Q to switch", UDim2.new(1, 0, 0, 16), {
+local weaponTitle = Ui.label(weaponBar, "WEAPON  ·  Q to switch", UDim2.new(1, 0, 0, 16), {
 	TextXAlignment = Enum.TextXAlignment.Right,
 	TextSize = 13,
 	TextColor3 = C.yellow,
@@ -939,13 +986,70 @@ local SHORT_NAMES: { [string]: string } = {
 	launcher = "LAUNCHER",
 	revolver = "REVOLVER",
 	carbine = "CARBINE",
+	roofmg = "ROOF MG",
+	roofminigun = "ROOF MINIGUN",
+	rooflauncher = "ROOF LAUNCHER",
 }
+
+-- What the weapon bar shows depends on where you are: on foot your guns; driving a car with a car gun that gun; in
+-- any other seat your guns, the one-handed ones tagged WINDOW, the two-handed ones greyed out (they do not fire).
+local function seatView(): (boolean, Config.CarGunDef?)
+	local seatedIn, driving = Drive.seatedCar()
+	return seatedIn ~= nil, if seatedIn and driving then Shooting.carGunOf(seatedIn) else nil
+end
+
+local function weaponBarKey(): string
+	local seated, carGun = seatView()
+	return `{seated}|{if carGun then carGun.id else ""}`
+end
+local shownWeaponBar = ""
+
+-- A small tag in the top left corner of a weapon slot.
+local function slotTag(slot: any, text: string, color: Color3)
+	local tag = Ui.label(slot, text, UDim2.fromOffset(0, 13), {
+		Position = UDim2.fromOffset(3, 3),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = color,
+		TextColor3 = Color3.new(0, 0, 0),
+		TextSize = 9,
+		TextWrapped = false,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 2,
+	})
+	Ui.corner(tag, 4)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 3) }, tag)
+end
 
 local function renderWeapons()
 	Ui.clear(weaponRow)
+	shownWeaponBar = weaponBarKey()
 	if not state then
 		return
 	end
+	local seated, carGun = seatView()
+	if carGun then
+		-- Driving a car with a car gun: that is what fires.
+		weaponTitle.Text = "CAR GUN  ·  on the roof"
+		weaponBar.Size = UDim2.fromOffset(5 * 64 + 4 * 8, 18 + 58)
+		weaponRow.Size = UDim2.new(1, 0, 0, 58)
+		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 58), BackgroundTransparency = 1 }, weaponRow)
+		Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right }, row)
+		local slot = Ui.make("Frame", { Size = UDim2.fromOffset(140, 58), BackgroundColor3 = Color3.fromRGB(20, 46, 76), BackgroundTransparency = 0.1 }, row)
+		Ui.corner(slot, 10)
+		Ui.stroke(slot, C.blue, 2.5)
+		Ui.label(slot, if carGun.splash > 0 then "💥" else "🔫", UDim2.new(1, 0, 0, 30), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
+		local name = Ui.label(slot, SHORT_NAMES[carGun.id] or carGun.name, UDim2.new(1, -4, 0, 18), {
+			Position = UDim2.fromOffset(2, 34),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextScaled = true,
+			TextColor3 = Color3.fromRGB(150, 210, 255),
+		})
+		Ui.make("UITextSizeConstraint", { MaxTextSize = 12 }, name)
+		slotTag(slot, "ROOF", Color3.fromRGB(150, 210, 255))
+		return
+	end
+	weaponTitle.Text = if seated then "WEAPON  ·  one-handed out of the window" else "WEAPON  ·  Q to switch"
 	local owned: { Config.WeaponDef } = {}
 	for _, def in Config.Weapons do
 		if state.weapons[def.id] then
@@ -970,24 +1074,33 @@ local function renderWeapons()
 	end
 	for index, def in owned do
 		local current = state.weapon == def.id
+		-- In a car seat only the one-handed guns fire (out of the window); the others are greyed out.
+		local usable = not seated or def.oneHanded == true
 		local slot = Ui.make("TextButton", {
 			Size = UDim2.fromOffset(if current then 96 else 70, 58),
-			BackgroundColor3 = if current then Color3.fromRGB(70, 60, 20) else C.panel,
-			BackgroundTransparency = 0.1,
+			BackgroundColor3 = if current and usable then Color3.fromRGB(70, 60, 20) else C.panel,
+			BackgroundTransparency = if usable then 0.1 else 0.45,
 			Text = "",
 			LayoutOrder = index,
 			AutoButtonColor = true,
 		}, rows[(index - 1) // PER_ROW + 1])
 		Ui.corner(slot, 10)
-		Ui.stroke(slot, if current then C.yellow else C.grey, if current then 2.5 else 1)
-		Ui.label(slot, if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.new(1, 0, 0, 30), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
+		Ui.stroke(slot, if current and usable then C.yellow else C.grey, if current then 2.5 else 1)
+		Ui.label(slot, if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.new(1, 0, 0, 30), {
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextTransparency = if usable then 0 else 0.65,
+		})
 		local name = Ui.label(slot, SHORT_NAMES[def.id] or def.name, UDim2.new(1, -4, 0, 18), {
 			Position = UDim2.fromOffset(2, 34),
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextScaled = true,
-			TextColor3 = if current then C.yellow else C.text,
+			TextColor3 = if not usable then C.grey elseif current then C.yellow else C.text,
 		})
 		Ui.make("UITextSizeConstraint", { MaxTextSize = 12 }, name)
+		if seated and usable then
+			slotTag(slot, "WINDOW", C.green)
+		end
 		slot.Activated:Connect(function()
 			Net.get("Equip"):FireServer("weapon", def.id)
 		end)
@@ -1466,6 +1579,11 @@ RunService.RenderStepped:Connect(function()
 		healthText.Text = "Press CAR to get one"
 	end
 
+	-- Got in / out, or the car gun changed: the weapon bar shows what fires now.
+	if weaponBarKey() ~= shownWeaponBar then
+		renderWeapons()
+	end
+
 	local touch = UserInputService.TouchEnabled
 	fire.Visible = touch
 	-- Which shop am I in?
@@ -1495,7 +1613,9 @@ RunService.RenderStepped:Connect(function()
 		hint.Text = `{Map.Shops[inShop].name}: walk to the counter and press E`
 		hint.TextColor3 = C.green
 	elseif seatedIn and not driving then
-		hint.Text = "Riding along: right mouse aims, left mouse shoots · Space gets out"
+		local gun = if state then Economy.findWeapon(state.weapon) else nil
+		hint.Text = if gun and not gun.oneHanded then `Riding along: the {gun.name} is too big for the window · Q to a pistol, revolver or SMG`
+			else "Riding along: right mouse aims, left mouse shoots out of the window · Space gets out"
 		hint.TextColor3 = Color3.fromRGB(140, 210, 255)
 	elseif safe and not job then
 		hint.Text = "SAFE ZONE · shops around the depot · JOBS to start a delivery"
