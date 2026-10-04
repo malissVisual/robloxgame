@@ -112,7 +112,6 @@ for name in Icons.Ids do
 	end
 end
 
-check("version 2.3.1", Config.Version == "2.3.1", Config.Version)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

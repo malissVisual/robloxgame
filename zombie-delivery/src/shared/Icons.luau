@@ -62,7 +62,7 @@ Icons.Ids = {
 	map_radio = "rbxassetid://119834540744939",
 	map_docks = "rbxassetid://83445442717149",
 	-- Colour images: the wordmark on the start menu (art/logo) and its background (art/ui).
-	zombie_delivery_logo = "",
+	zombie_delivery_logo = "rbxassetid://104053473081511",
 	menu_background = "rbxassetid://138860042447767",
 } :: { [string]: string }
 
