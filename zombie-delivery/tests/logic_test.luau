@@ -227,6 +227,146 @@ end)())
 check("landmarks list the shops and the employers", #Map.Landmarks >= 5 + #Config.Employers)
 check("bandits shoot", Config.Zombies.bandit.ranged == true and (Config.Zombies.bandit.range or 0) > 0)
 
+-- Zombie Delivery 2.0: the ranch, the riding school, the fuel depot, where the cargo is loaded ------------------
+
+local function findPlace(id: string): Map.Place?
+	for _, place in Map.Places do
+		if place.id == id then
+			return place
+		end
+	end
+	return nil
+end
+for _, id in { "ranch", "stables", "fueldepot" } do
+	local place = findPlace(id)
+	check(`new place {id} exists, in a yard`, place ~= nil and Map.inYard(place.x, place.z) ~= nil)
+end
+check("the ranch and the gas station have a board", Map.EmployerSpots.ranch ~= nil and Map.EmployerSpots.gas ~= nil)
+
+-- Every special job's pick-up and drop place has a cargo spot.
+check("special jobs have cargo spots", (function()
+	for _, t in Config.JobTypes do
+		for _, id in { t.pickupAt, t.dropAt } do
+			if id and not Map.CargoSpots[id] then
+				print("  no cargo spot:", id)
+				return false
+			end
+		end
+	end
+	return true
+end)())
+local function inBounds(x: number, z: number): boolean
+	return x > b.x0 and x < b.x1 and z > b.z0 and z < b.z1
+end
+local spotsOk = true
+for id, spot in Map.CargoSpots do
+	local park, pile = spot.park, spot.pile
+	local gap = math.sqrt((park.x - pile.x) ^ 2 + (park.z - pile.z) ^ 2)
+	local facingLength = math.sqrt(spot.facing.x ^ 2 + spot.facing.z ^ 2)
+	local toPark = ((park.x - pile.x) * spot.facing.x + (park.z - pile.z) * spot.facing.z) / gap
+	local place = findPlace(id)
+	local problem: string? = nil
+	if not place then
+		problem = "not a place"
+	elseif not inBounds(park.x, park.z) or not inBounds(pile.x, pile.z) then
+		problem = "out of bounds"
+	elseif Map.inWater(park.x, park.z) or Map.inWater(pile.x, pile.z) or Map.onIce(pile.x, pile.z) then
+		problem = "in water"
+	elseif not Map.onRoad(park.x, park.z) then
+		problem = "park is not on a road or a yard"
+	elseif gap < 8 or gap > 20 then
+		problem = `pile {gap} studs from the park`
+	elseif math.abs(facingLength - 1) > 1e-6 or toPark < 0.99 then
+		problem = "facing does not point at the park"
+	elseif math.sqrt((place.x - park.x) ^ 2 + (place.z - park.z) ^ 2) > 90 and (Map.inYard(park.x, park.z) == nil or Map.inYard(park.x, park.z) ~= Map.inYard(place.x, place.z)) then
+		problem = "far from its place"
+	end
+	if problem then
+		spotsOk = false
+		print("  bad cargo spot:", id, problem)
+	end
+end
+check("cargo spots: park on a road, pile 8-20 studs away on dry land, facing the park", spotsOk)
+
+-- The country roads start on another road (a T-junction) and end in their yard.
+local function onSegment(s: Map.Segment, x: number, z: number): boolean
+	local dx, dz = s.bx - s.ax, s.bz - s.az
+	local length2 = dx * dx + dz * dz
+	local t = math.clamp(((x - s.ax) * dx + (z - s.az) * dz) / length2, 0, 1)
+	return (x - s.ax - dx * t) ^ 2 + (z - s.az - dz * t) ^ 2 < 1e-6
+end
+for _, name in { "Ranch Road", "Riding School Lane" } do
+	local road: Map.Segment? = nil
+	for _, s in Map.Connectors do
+		if s.name == name then
+			road = s
+		end
+	end
+	local connected, reachesYard = false, false
+	if road then
+		for _, s in Map.Segments do
+			if s ~= road and (onSegment(s, road.ax, road.az) or onSegment(s, road.bx, road.bz)) then
+				connected = true
+			end
+		end
+		reachesYard = Map.inYard(road.bx, road.bz) ~= nil
+	end
+	check(`{name} joins the road network and reaches its yard`, connected and reachesYard)
+end
+check("the ranch road leaves the West Highway", (function()
+	for _, s in Map.Connectors do
+		if s.name == "West Highway" and onSegment(s, -900, Map.Cell * 1.5) then
+			return true
+		end
+	end
+	return false
+end)())
+check("yards are dry, apart and in bounds", (function()
+	for _, yard in Map.Yards do
+		for _, x in { yard.x0, yard.x1 } do
+			for _, z in { yard.z0, yard.z1 } do
+				if Map.inWater(x, z) or not inBounds(x, z) then
+					return false
+				end
+			end
+		end
+		for _, other in Map.Yards do
+			if other ~= yard and yard.x0 < other.x1 and other.x0 < yard.x1 and yard.z0 < other.z1 and other.z0 < yard.z1 then
+				return false
+			end
+		end
+	end
+	return true
+end)())
+check("clearings are dry and off the roads", (function()
+	for _, area in Map.Clearings do
+		local cx, cz = (area.x0 + area.x1) / 2, (area.z0 + area.z1) / 2
+		if Map.onRoad(cx, cz) or Map.inWater(area.x0, cz) or Map.inWater(area.x1, cz) then
+			return false
+		end
+	end
+	return true
+end)())
+check("landmark ids are unique", (function()
+	local seen = {}
+	for _, landmark in Map.Landmarks do
+		if seen[landmark.id] then
+			print("  duplicate landmark:", landmark.id)
+			return false
+		end
+		seen[landmark.id] = true
+	end
+	return seen.ranch == true and seen.gas == true and seen.stables == true and seen.fueldepot == true
+end)())
+check("employer landmarks tell the car and the gun reward", (function()
+	for _, landmark in Map.Landmarks do
+		if landmark.id == "ranch" then
+			return landmark.description:find("Ranch Revolver", 1, true) ~= nil and landmark.description:find("Livestock", 1, true) ~= nil
+		end
+	end
+	return false
+end)())
+
 local district, i, j = Map.blockAt(Map.Cell, 0)
 check("blockAt finds the dealer block", district ~= nil and district.id == "downtown" and i == 1 and j == 0)
 check("blockAt on a road is nil", (Map.blockAt(Map.Cell / 2, 0)) == nil)
