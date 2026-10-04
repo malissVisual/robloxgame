@@ -20,6 +20,14 @@
 -- carry SpotLights (two on a player's car, one on an NPC car: cheap). The ambulance has a roof light bar: its lenses
 -- are tagged "SirenLight" and flash on every client (client/Weather.luau) while the car's attribute Siren is true
 -- (a company ambulance lent for a job, or Vehicles.setSiren).
+--
+-- Calling the car (the CAR button: Vehicles.spawn without force) goes to server/CarCall.luau through the hook
+-- Vehicles.callCar: a chauffeur drives it to you. While a chauffeur drives a car (car.chauffeured) the SERVER owns
+-- and drives it, its Drive / Ride prompts wait in the folder "ParkedPrompts" (client/CarVisuals.luau only looks on
+-- the chassis) and nobody gets in; Vehicles.handOver gives it to its owner (the prompts come back, the owner's
+-- client owns it again). The instant cases stay instant (force: PLAY, a respawn, a car bought or equipped, a job's
+-- vehicle): next to you and seated, or, when you spawn at home, parked at your home's garage drive-out spot (the
+-- hook Vehicles.homeGarage).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -52,6 +60,8 @@ export type Car = {
 	health: number,
 	wrecked: boolean,
 	latched: { [number]: boolean }, -- taken latch slots
+	chauffeured: boolean, -- a chauffeur drives it to its owner (server/CarCall.luau): server-owned, no prompts
+	born: number, -- os.clock() when it was placed
 }
 
 local Vehicles = {}
@@ -1031,13 +1041,13 @@ local function watchPrompts(car: Car)
 	end
 	drive.Triggered:Connect(function(player)
 		local humanoid = humanoidOf(player)
-		if player == car.owner and not car.wrecked and not car.seat.Occupant and humanoid and not handsFull(player) then
+		if player == car.owner and not car.wrecked and not car.chauffeured and not car.seat.Occupant and humanoid and not handsFull(player) then
 			car.seat:Sit(humanoid)
 		end
 	end)
 	ride.Triggered:Connect(function(player)
 		local humanoid = humanoidOf(player)
-		if player == car.owner or car.wrecked or not humanoid or humanoid.SeatPart or handsFull(player) then
+		if player == car.owner or car.wrecked or car.chauffeured or not humanoid or humanoid.SeatPart or handsFull(player) then
 			return
 		end
 		for _, seat in car.passengers do
@@ -1162,33 +1172,66 @@ function Vehicles.remove(player: Player)
 	end
 end
 
--- Puts the player's equipped car on the nearest road and seats them. Returns an error text when it cannot.
--- force skips the cooldown (a car just bought or equipped); carId = a company vehicle lent for a job.
-function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string?
-	local profile = PlayerData.get(player)
-	if not profile then
-		return "Still loading..."
-	end
-	local now = os.clock()
-	if not force and lastSpawn[player] and now - lastSpawn[player] < Config.SpawnCarCooldown then
-		return "Wait a moment before calling the car again."
-	end
-	local def = Economy.findCar(carId or profile.car) or Config.Cars[1]
-	local character = player.Character
-	local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local from = if rootPart then rootPart.Position else World.DepotSpawn
-	local look = if rootPart then rootPart.CFrame.LookVector else Vector3.new(0, 0, 1)
+-- ── Placing a car ──────────────────────────────────────────────────────────
 
-	Vehicles.remove(player)
-	lastSpawn[player] = now
+-- Set by server/CarCall.luau: the CAR button (Vehicles.spawn without force) calls the car instead of placing it.
+-- Returns an error text, or nil when a chauffeur is on the way.
+Vehicles.callCar = nil :: ((player: Player, carId: string?) -> string?)?
+-- Set by server/CarCall.luau: where an instant car (force) goes when the player spawns at home (the home garage's
+-- drive-out spot), or nil for the usual spot next to them.
+Vehicles.homeGarage = function(_player: Player): CFrame?
+	return nil
+end
 
-	local x, z, dx, dz = Map.nearestRoad(from.X, from.Z)
-	local direction = Vector3.new(dx, 0, dz)
-	if direction:Dot(look) < 0 then
-		direction = -direction
+-- What a ray looking for the ground must not see: the cars, the people, the enemies, the loot.
+local function groundIgnore(): { Instance }
+	local list: { Instance } = {}
+	for _, name in { "Cars", "Traffic", "BanditCars", "Npcs", "Zombies", "Animals", "Loot", "Showroom" } do
+		local folder = workspace:FindFirstChild(name)
+		if folder then
+			table.insert(list, folder)
+		end
 	end
-	-- Step along the road if another car stands there.
-	local position = Vector3.new(x, World.RoadTop + 0.5, z)
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(list, player.Character)
+		end
+	end
+	return list
+end
+
+-- The top of the ground at (x, z): a road, a bridge, a hill road, a driveway (looking down from well above refY).
+-- Under the mountain (the tunnel) and where nothing is found: the road level.
+function Vehicles.groundY(x: number, z: number, refY: number?): number
+	local mountain = Map.Mountain
+	if (x - mountain.x) ^ 2 + (z - mountain.z) ^ 2 < (mountain.radius + 30) ^ 2 then
+		return World.RoadTop
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = groundIgnore()
+	params.IgnoreWater = true
+	params.RespectCanCollide = true
+	local top = math.max(refY or World.RoadTop, World.RoadTop) + 90
+	local origin = Vector3.new(x, top, z)
+	-- Look past what nothing drives on: a sign board, a beam, a steep face (a few tries down through them).
+	for _ = 1, 5 do
+		local hit = workspace:Raycast(origin, Vector3.new(0, Map.WaterLevel - 6 - origin.Y, 0), params)
+		if not hit then
+			break
+		end
+		local part = hit.Instance
+		local broad = not part:IsA("BasePart") or part:IsA("Terrain") or math.min(part.Size.X, part.Size.Z) >= 3
+		if hit.Normal.Y > 0.6 and broad then
+			return if hit.Position.Y > Map.WaterLevel - 2 then hit.Position.Y else World.RoadTop
+		end
+		origin = hit.Position - Vector3.new(0, 0.05, 0)
+	end
+	return World.RoadTop
+end
+
+-- Moves a spot along `direction` until no other car stands there (a few tries).
+local function freeSpot(position: Vector3, direction: Vector3, step: number): Vector3
 	for _ = 1, 6 do
 		local free = true
 		for _, other in cars do
@@ -1200,19 +1243,43 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 		if free then
 			break
 		end
-		position += direction * 28
+		position += direction * step
 	end
-	local ground = CFrame.lookAt(position, position + direction)
+	return position
+end
+
+-- The cooldown of the CAR button: an error text while it runs, else nil (and it starts again).
+function Vehicles.cooldown(player: Player): string?
+	local now = os.clock()
+	if lastSpawn[player] and now - lastSpawn[player] < Config.SpawnCarCooldown then
+		return "Wait a moment before calling the car again."
+	end
+	lastSpawn[player] = now
+	return nil
+end
+
+-- Builds the player's car (their equipped one, or carId: a company vehicle lent for a job) standing on `ground`
+-- (its position on the ground, facing its LookVector) and makes it theirs; the old one goes. seat: the player gets
+-- in at once. chauffeured: a chauffeur drives it (server/CarCall.luau): the server owns it and nobody gets in until
+-- Vehicles.handOver. Returns nil when the profile is not loaded yet.
+function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?): Car?
+	local profile = PlayerData.get(player)
+	if not profile then
+		return nil
+	end
+	local def = Economy.findCar(carId or profile.car) or Config.Cars[1]
+	Vehicles.remove(player)
+
 	local stats = Economy.carStats(def.id, profile.upgrades)
 	local gunId = gunFor(player, def.id)
 	local built = build(def, paintColor(def, if def.company then nil else profile.carPaint[def.id]), ground, false, gunId)
-	local seat = built.seat :: VehicleSeat
+	local driverSeat = built.seat :: VehicleSeat
 	local car: Car = {
 		owner = player,
 		id = def.id,
 		model = built.model,
 		chassis = built.chassis,
-		seat = seat,
+		seat = driverSeat,
 		passengers = built.passengers,
 		turret = built.turret,
 		turretBase = built.turretBase,
@@ -1224,6 +1291,8 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 		health = stats.health,
 		wrecked = false,
 		latched = {},
+		chauffeured = chauffeured == true,
+		born = os.clock(),
 	}
 	car.model.Name = `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
@@ -1233,10 +1302,23 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	car.model:SetAttribute("CarGun", gunId)
 	-- A company vehicle lent for a job runs with its lights flashing (the ambulance's light bar).
 	car.model:SetAttribute("Siren", carId ~= nil and def.company == true)
+	car.model:SetAttribute("Chauffeured", car.chauffeured)
 	writeAttributes(car)
+	if car.chauffeured then
+		-- Out of reach while the chauffeur drives (client/CarVisuals.luau looks for them on the chassis only).
+		local parked = Instance.new("Folder")
+		parked.Name = "ParkedPrompts"
+		parked.Parent = car.model
+		for _, name in { "DrivePrompt", "RidePrompt" } do
+			local prompt = car.chassis:FindFirstChild(name)
+			if prompt then
+				prompt.Parent = parked
+			end
+		end
+	end
 	car.model.Parent = workspace:FindFirstChild("Cars") or workspace
 	cars[player] = car
-	watchSeat(car, seat, -1, true)
+	watchSeat(car, driverSeat, -1, true)
 	for _, p in car.passengers do
 		watchSeat(car, p, 1, false)
 	end
@@ -1250,18 +1332,113 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	angular.MaxTorque = mass * 6000
 
 	pcall(function()
-		car.chassis:SetNetworkOwner(player)
+		car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
 	end)
 
+	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.Health > 0 and not carrying(character) then
+	if seat and not car.chauffeured and humanoid and humanoid.Health > 0 and not carrying(character) then
 		task.defer(function()
 			if not car.wrecked then
-				seat:Sit(humanoid)
+				driverSeat:Sit(humanoid)
 			end
 		end)
 	end
-	return nil
+	return car
+end
+
+-- The chauffeur got out: the car is its owner's now (the prompts come back, the owner's client drives it again).
+function Vehicles.handOver(car: Car)
+	if not car.chauffeured then
+		return
+	end
+	car.chauffeured = false
+	car.model:SetAttribute("Chauffeured", false)
+	if car.wrecked or not car.chassis.Parent then
+		return
+	end
+	local parked = car.model:FindFirstChild("ParkedPrompts")
+	if parked then
+		for _, prompt in parked:GetChildren() do
+			prompt.Parent = car.chassis
+		end
+		parked:Destroy()
+	end
+	local linear = car.chassis:FindFirstChild("Drive")
+	if linear and linear:IsA("LinearVelocity") then
+		linear.PlaneVelocity = Vector2.zero
+	end
+	local angular = car.chassis:FindFirstChild("Steer")
+	if angular and angular:IsA("AngularVelocity") then
+		angular.AngularVelocity = Vector3.zero
+	end
+	pcall(function()
+		car.chassis:SetNetworkOwner(car.owner)
+	end)
+end
+
+-- The car right next to the player on the nearest road, and they get in: the old instant way (a force spawn away
+-- from home, the chauffeur's fallback). Returns an error text when it cannot.
+function Vehicles.placeNear(player: Player, carId: string?): string?
+	if not PlayerData.get(player) then
+		return "Still loading..."
+	end
+	local character = player.Character
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local from = if rootPart then rootPart.Position else World.DepotSpawn
+	local look = if rootPart then rootPart.CFrame.LookVector else Vector3.new(0, 0, 1)
+	Vehicles.remove(player) -- the old car is not in the way of the new one
+
+	local x, z, dx, dz = Map.nearestRoad(from.X, from.Z)
+	local direction = Vector3.new(dx, 0, dz)
+	if direction:Dot(look) < 0 then
+		direction = -direction
+	end
+	-- Step along the road if another car stands there.
+	local spot = freeSpot(Vector3.new(x, World.RoadTop, z), direction, 28)
+	local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, from.Y) + 0.5, spot.Z)
+	local car = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + direction), true)
+	return if car then nil else "Still loading..."
+end
+
+-- Gets the player their car. Without force it is the CAR button: a chauffeur brings it (server/CarCall.luau, which
+-- also runs the cooldown), unless they sit in their own car (that one is reset right there, as before). force (PLAY,
+-- a respawn, a car just bought or equipped, a job's vehicle) is instant: parked at the home garage when they spawn
+-- at home, else next to them and seated. carId = a company vehicle lent for a job. Returns an error text when it
+-- cannot.
+function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string?
+	if not PlayerData.get(player) then
+		return "Still loading..."
+	end
+	if not force then
+		local inCar = Vehicles.seatedIn(player)
+		local call = Vehicles.callCar
+		if call and not (inCar and inCar.owner == player) then
+			return call(player, carId)
+		end
+		local err = Vehicles.cooldown(player)
+		if err then
+			return err
+		end
+		return Vehicles.placeNear(player, carId)
+	end
+	lastSpawn[player] = os.clock()
+	local home = Vehicles.homeGarage(player)
+	if home then
+		local look = Vector3.new(home.LookVector.X, 0, home.LookVector.Z)
+		look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
+		Vehicles.remove(player) -- the old car is not in the way; a co-owner's car is (step out to the road)
+		local spot = freeSpot(home.Position, look, 16)
+		local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, home.Position.Y) + 0.5, spot.Z)
+		local car = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + look), false)
+		if not car then
+			return "Still loading..."
+		end
+		local def = Economy.findCar(car.id)
+		Net.get("Notice"):FireClient(player, `Your {if def then def.name else "car"} is parked in front of your garage.`)
+		return nil
+	end
+	return Vehicles.placeNear(player, carId)
 end
 
 -- New upgrades / a new car equipped: the live car takes the new numbers (health keeps its share).
@@ -1309,9 +1486,10 @@ function Vehicles.refreshGun(player: Player)
 	if want then
 		car.turret, car.muzzle = buildTurret(car.model, car.chassis, car.turretBase, want)
 		car.gunId = want
-		-- The new parts joined the car's assembly: the driver's client keeps simulating it.
+		-- The new parts joined the car's assembly: the driver's client keeps simulating it (the server while a
+		-- chauffeur drives it).
 		pcall(function()
-			car.chassis:SetNetworkOwner(player)
+			car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
 		end)
 	end
 	car.model:SetAttribute("CarGun", want)
