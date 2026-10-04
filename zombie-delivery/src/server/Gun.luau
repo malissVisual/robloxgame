@@ -7,6 +7,8 @@
 --   any seat     otherwise a one-handed gun (pistol, revolver, SMG) out of the side window; a two-handed gun does not
 --                fire from a car at all (the shot is ignored, the client shows a hint)
 -- Nobody shoots with full hands: a character carrying cargo (the Carrying attribute, server/Cargo.luau) cannot fire.
+-- Every shot that really fires is told to Gun.onShot (3.0: the quiet twist of a mission costs cargo condition per shot;
+-- server/Jobs.luau sets it, Gun does not require Jobs).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +23,9 @@ local BanditCars = require(script.Parent.BanditCars)
 local PlayerData = require(script.Parent.PlayerData)
 
 local Gun = {}
+
+-- Set by server/Jobs.luau (Jobs.onShot): a player fired a shot (every trigger pull that passed the checks, once).
+Gun.onShot = nil :: ((player: Player) -> ())?
 
 local lastShot: { [Player]: number } = {}
 local rng = Random.new()
@@ -64,6 +69,10 @@ local function onFire(player: Player, target: any)
 	lastShot[player] = now
 	-- The calm zombies nearby hear it (server/Zombies.luau, Config.Horde.Roam.gunHearing).
 	Zombies.noise(player, root.Position)
+	local onShot = Gun.onShot
+	if onShot then
+		task.spawn(onShot, player)
+	end
 
 	local origin: Vector3
 	if car and carGun then

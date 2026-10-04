@@ -349,4 +349,37 @@ function Economy.pickKind(kinds: { [string]: number }, r: number): string
 	return names[#names] or "walker"
 end
 
+-- ── Missions (3.0, Config.Missions; server/Jobs.luau) ─────────────────────
+
+-- A co-op mission (MissionDef.coop) with `members` crew members besides the owner: the pay × this (for everybody).
+function Economy.coopPay(members: number): number
+	return 1 + Config.Missions.CoopPayPerMember * math.max(0, members)
+end
+
+-- … and the enemies (wave sizes, foot waves, hordes) × this.
+function Economy.coopEnemies(members: number): number
+	return 1 + Config.Missions.CoopEnemyPerMember * math.max(0, members)
+end
+
+-- The guarded twist: the horde waiting at every stop of a mission of this danger level (GuardedHorde × the tier's
+-- stars / 2, at least GuardedHorde), × the co-op enemy multiplier.
+function Economy.guardedHorde(tier: Config.TierDef, multiplier: number?): number
+	local base = Config.Missions.GuardedHorde
+	local count = math.max(base, math.floor(base * tier.stars / 2 + 0.5))
+	return math.max(1, math.floor(count * (multiplier or 1) + 0.5))
+end
+
+-- The kills a payout counts (Economy.payout's kills × KillBonus): the gunner twist makes every kill from a passenger
+-- seat of the owner's car worth GunnerKillBonus kills.
+function Economy.paidKills(kills: number, gunnerKills: number): number
+	local extra = math.max(0, Config.Missions.GunnerKillBonus - 1) * math.clamp(gunnerKills, 0, math.max(0, kills))
+	return math.max(0, kills) + extra
+end
+
+-- "0:23": a countdown on the HUD (the defend twist's HOLD OUT).
+function Economy.clock(seconds: number): string
+	local s = math.max(0, math.ceil(seconds))
+	return `{s // 60}:{string.format("%02d", s % 60)}`
+end
+
 return Economy
