@@ -122,6 +122,17 @@ end
 local LANDMARK_ALIASES: { [string]: string } = {
 	frosty = "icecream", -- Frosty's Ice Cream as a place (Map.Places); the employer is "icecream"
 	base = "army", -- the Military Base as a place; the employer is "army"
+	-- The real estate (2.6) has no map icons of its own: the closest ones.
+	sunsethills = "lodge", -- a house (the Hilltop Mansion)
+	oceanview = "lodge", -- the other mansions and the villas that stand on their own
+	pinecrest = "lodge",
+	lakeside = "lodge",
+	sunset = "lodge",
+	dispatchtower = "depot", -- where your delivery company is run from
+	harborpoint = "depot",
+	garage_harbor = "dealer", -- a car
+	garage_north = "dealer",
+	garage_downtown = "dealer",
 }
 -- Landmarks with no map icon of their own yet: another icon's full name.
 local LANDMARK_BORROWED: { [string]: string } = {

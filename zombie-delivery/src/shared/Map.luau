@@ -11,6 +11,13 @@
 --   Harbor     the Harbor Fuel Depot south of the warehouses
 --   Downtown   the First Zombie Bank just north of the safe zone (on 6th Ave, the way to the North Highway) and
 --              the City Clinic south-west of the depot
+--   Real estate (Config.Estate, Map.EstatePlots), spread over the map: the Hilltop Mansion in Sunset Hills above the
+--              city (up the winding Sunset Drive, north-east of Downtown), Ocean View on the sea cliffs north of the
+--              Harbor, Pinecrest in the pines off the West Highway, the Lakeside Villa by the frozen lake, the Sunset
+--              Villa down a quiet lane in the west, houses on different Suburbs streets and one at the edge of town,
+--              three garages (the Harbor Lockup, the Highway Garage on the North Highway, Downtown Parking) and the two
+--              office towers (Dispatch Tower downtown, Harbor Point in the Harbor) with the offices on their upper
+--              floors (Map.Towers)
 --
 -- It also holds the shape of the night over the clock (Map.nightFactor): the server runs the clock
 -- (server/DayNight.luau), every client draws the look from the same numbers (client/Weather.luau).
@@ -141,9 +148,15 @@ Map.SpecialBlocks = {
 		["2,1"] = "movers",
 		["1,-2"] = "bank", -- First Zombie Bank: its front on 6th Ave, just out of the safe zone
 		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
+		["-1,-1"] = "dispatchtower", -- Dispatch Tower (the offices), in the safe zone
+		["1,1"] = "parking", -- Downtown Parking (a garage), in the safe zone
 	},
 	suburbs = { ["0,2"] = "school" },
-	harbor = { ["1,0"] = "frosty" },
+	harbor = {
+		["1,0"] = "frosty",
+		["3,-1"] = "harborpoint", -- Harbor Point (an office), by the docks
+		["0,-3"] = "lockup", -- the Harbor Lockup (a garage), where the Old Bridge comes over
+	},
 } :: { [string]: { [string]: string } }
 
 function Map.special(districtId: string, i: number, j: number): string?
@@ -248,6 +261,126 @@ for id, spot in rawSpots do
 end
 Map.CargoSpots = cargoSpots
 
+-- ── Real estate (Zombie Delivery 2.6) ──────────────────────────────────────
+-- Where every property of Config.Estate stands (the same ids). server/World.luau builds them from this; the server's
+-- Estate / CarCall / Business use the spots World registers (World.EstateSpawns, EstateGarages, EstatePrompts,
+-- OfficePrompts); the client's EstateUi sets the GPS to them.
+--
+-- A plot's local frame: the origin is the centre of the main building on the ground, its front (the door, the garage
+-- doors) faces `facing`, toward its road. The lot reaches `w` / 2 to either side, `front` studs forward (the front
+-- wall; the driveway runs on from there to the road) and `back` studs back (the garden, the pool).
+--
+--   Mansions      Hilltop: on top of Sunset Hills north-east of Downtown, up the winding Sunset Drive (it carries
+--                 on from 8th Ave at Downtown's north edge), facing the city. Ocean View: on the sea cliffs north of
+--                 the Harbor, at the end of Cliff Road (Dock 4 on). Pinecrest: in the pines south of the West
+--                 Highway, at the end of Pine Lane.
+--   Villas        Lakeside: by the frozen lake, on the Lodge Road (in the snow). Sunset: at the end of Sunset Lane,
+--                 a quiet lane west off the Radio Road.
+--   Houses        three on ordinary lots of different Suburbs blocks and streets (the rest of their block stays as
+--                 it is), Birch Cottage at the edge of town, at the end of Birch Lane west of the Suburbs
+--   Garages       the Harbor Lockup (a Harbor block), the Highway Garage (by the North Highway), Downtown Parking
+--                 (a downtown block in the safe zone)
+--   Offices       rooms on the upper floors of the two towers (Map.Towers); the lobby's elevator takes you up
+
+Map.SunsetHills = { id = "sunsethills", name = "Sunset Hills", x0 = 360, z0 = -1290, x1 = 745, z1 = -690 } :: Area
+
+export type EstatePlot = {
+	x: number,
+	z: number,
+	facing: { x: number, z: number }, -- a unit direction along X or Z
+	district: string, -- sunsethills | coast | countryside | north | west | suburbs | harbor | downtown | highway
+	w: number,
+	front: number,
+	back: number,
+	tower: string?, -- offices: their tower (Map.Towers id) and floor (1 = the lobby)
+	floor: number?,
+}
+
+export type Tower = {
+	id: string,
+	name: string,
+	x: number, -- the centre of the tower on the ground
+	z: number,
+	facing: { x: number, z: number }, -- its entrance faces this way
+	floors: number, -- floor 1 is the lobby; the roof terrace is on top of the last floor
+	floorHeight: number,
+	w: number, -- square, this wide
+	district: string,
+}
+
+local function facingOf(x: number, z: number): { x: number, z: number }
+	return { x = x, z = z }
+end
+
+-- The two office towers. Every office is a floor of one of them (Map.EstatePlots[id].tower / floor).
+Map.Towers = {
+	dispatchtower = { id = "dispatchtower", name = "Dispatch Tower", x = -CELL, z = -CELL, facing = facingOf(1, 0), floors = 14, floorHeight = 12, w = 64, district = "downtown" },
+	harborpoint = { id = "harborpoint", name = "Harbor Point", x = 1080 + 3 * CELL, z = -CELL, facing = facingOf(-1, 0), floors = 12, floorHeight = 12, w = 56, district = "harbor" },
+} :: { [string]: Tower }
+
+-- How high a tower floor's floor is above the ground (floor 1, the lobby: 0; the roof: floor `floors + 1`).
+function Map.floorHeight(tower: Tower, floor: number): number
+	return (floor - 1) * tower.floorHeight
+end
+
+-- A Suburbs lot: block (i, j), lot (a, b) in it (the same 2 x 2 lots server/World.luau lays out, SUBURB_INSET
+-- inside the block's edge). Returns the lot's middle.
+local SUBURB_INSET = 5
+local SUBURB_LOT = (BLOCK - SUBURB_INSET * 2) / 2
+Map.SuburbInset = SUBURB_INSET
+Map.SuburbLot = SUBURB_LOT
+function Map.suburbLot(i: number, j: number, a: number, b: number): (number, number)
+	local suburbs = Map.Districts[3]
+	local x = suburbs.ox + i * CELL - BLOCK / 2 + SUBURB_INSET + SUBURB_LOT * (a + 0.5)
+	local z = suburbs.oz + j * CELL - BLOCK / 2 + SUBURB_INSET + SUBURB_LOT * (b + 0.5)
+	return x, z
+end
+-- A house for sale on a Suburbs lot: it faces the nearer street (north for b = 0, south for b = 1) and stands
+-- 5 studs forward of the lot's middle.
+local function suburbHouse(i: number, j: number, a: number, b: number): EstatePlot
+	local x, z = Map.suburbLot(i, j, a, b)
+	local fz = if b == 0 then -1 else 1
+	return { x = x, z = z + fz * 5, facing = facingOf(0, fz), district = "suburbs", w = 44, front = 10, back = 27 }
+end
+
+local function office(tower: Tower, floor: number): EstatePlot
+	local half = tower.w / 2
+	return { x = tower.x, z = tower.z, facing = tower.facing, district = tower.district, w = tower.w, front = half, back = half, tower = tower.id, floor = floor }
+end
+
+Map.EstatePlots = {
+	-- The mansions, each in its own part of the map.
+	hilltop = { x = 520, z = -1186, facing = facingOf(0, 1), district = "sunsethills", w = 110, front = 23, back = 66 },
+	oceanview = { x = 1486, z = -720, facing = facingOf(-1, 0), district = "coast", w = 110, front = 23, back = 66 },
+	pinecrest = { x = -1550, z = 806, facing = facingOf(0, -1), district = "countryside", w = 110, front = 23, back = 66 },
+	-- The villas.
+	lakeside = { x = -60, z = -2157, facing = facingOf(0, -1), district = "north", w = 78, front = 17, back = 40 },
+	sunset = { x = -1460, z = -100, facing = facingOf(1, 0), district = "west", w = 78, front = 17, back = 30 },
+	-- The houses: Suburbs lots on three different streets, and Birch Cottage at the edge of town.
+	maple = suburbHouse(-1, 0, 0, 0),
+	oak = suburbHouse(1, 1, 1, 0),
+	elm = suburbHouse(-2, 1, 0, 1),
+	birch = { x = -513, z = 900 + 2.5 * CELL, facing = facingOf(1, 0), district = "suburbs", w = 44, front = 10, back = 27 },
+	-- The garages.
+	garage_harbor = { x = 1049, z = -432, facing = facingOf(-1, 0), district = "harbor", w = 52, front = 12, back = 12 },
+	garage_north = { x = 119, z = -722, facing = facingOf(-1, 0), district = "highway", w = 52, front = 13, back = 13 },
+	garage_downtown = { x = CELL, z = CELL - 4, facing = facingOf(0, 1), district = "downtown", w = 90, front = 34, back = 34 },
+	-- The offices.
+	office_harbor = office(Map.Towers.harborpoint, 7),
+	office_tower = office(Map.Towers.dispatchtower, 8),
+	office_penthouse = office(Map.Towers.dispatchtower, 14),
+} :: { [string]: EstatePlot }
+
+-- A point given in a plot's local frame on the map: `right` to the right of somebody looking out of the front door,
+-- `back` behind the centre (the front wall is at back = -front).
+function Map.plotPoint(plot: EstatePlot, right: number, back: number): (number, number)
+	local fx, fz = plot.facing.x, plot.facing.z
+	return plot.x - fz * right - fx * back, plot.z + fx * right - fz * back
+end
+
+-- Where a car comes out of a property's garage (homes and garages): this far in front of the front wall.
+Map.GarageApron = 8
+
 export type Landmark = { id: string, name: string, icon: string, x: number, z: number, kind: string, description: string }
 
 -- Everything worth driving to, for the map's list and the GPS.
@@ -317,6 +450,38 @@ for _, info in {
 		end
 	end
 end
+-- Zombie Delivery 2.6, the real estate: Sunset Hills (on Sunset Drive), the other mansions and the villas (at their
+-- gates), the two towers (at their doors) and the garages (at their doors). The houses in the Suburbs are found
+-- through the ESTATE list (client/EstateUi.luau).
+do
+	local function towerDoor(tower: Tower): (number, number)
+		local out = tower.w / 2 + 12
+		return tower.x + tower.facing.x * out, tower.z + tower.facing.z * out
+	end
+	local dispatchX, dispatchZ = towerDoor(Map.Towers.dispatchtower)
+	local harborX, harborZ = towerDoor(Map.Towers.harborpoint)
+	table.insert(landmarks, { id = "sunsethills", name = "Sunset Hills", icon = "🏡", x = 600, z = -900, kind = "place", description = "Above the city, north-east of Downtown: the winding Sunset Drive up to the Hilltop Mansion, the whole city at your feet. A home to spawn at and a garage for eight." })
+	table.insert(landmarks, { id = "dispatchtower", name = "Dispatch Tower", icon = "🏢", x = dispatchX, z = dispatchZ, kind = "place", description = "Downtown, by the depot. Offices for sale on the 8th floor and the penthouse: run your own delivery company. Take the elevator in the lobby." })
+	table.insert(landmarks, { id = "harborpoint", name = "Harbor Point", icon = "🏙️", x = harborX, z = harborZ, kind = "place", description = "In the Harbor, by the docks. An office for sale on the 7th floor: start your own delivery company. Take the elevator in the lobby." })
+	local WHERE: { [string]: string } = {
+		oceanview = "On the sea cliffs north of the Harbor, up Cliff Road.",
+		pinecrest = "In the pines south of the West Highway, down Pine Lane.",
+		lakeside = "Far north by the frozen lake, on the Lodge Road.",
+		sunset = "In the west, at the end of Sunset Lane off the Radio Road.",
+	}
+	for _, def in Config.Estate.Properties do
+		local plot = Map.EstatePlots[def.id]
+		if not plot then
+			continue
+		end
+		local x, z = Map.plotPoint(plot, 0, -(plot.front + Map.GarageApron))
+		if def.kind == "garage" then
+			table.insert(landmarks, { id = def.id, name = def.name, icon = "🅿️", x = x, z = z, kind = "place", description = `For sale. {def.description}` })
+		elseif WHERE[def.id] then
+			table.insert(landmarks, { id = def.id, name = def.name, icon = if def.kind == "villa" then "🏠" else "🏰", x = x, z = z, kind = "place", description = `{WHERE[def.id]} For sale. {def.description}` })
+		end
+	end
+end
 Map.Landmarks = landmarks
 
 -- ── Day and night ──────────────────────────────────────────────────────────
@@ -377,6 +542,15 @@ line({ { Map.Lake.x1, -2200 }, { -530, -2200 } }, HIGHWAY, "ice", "Ice Road")
 -- Country roads: they start on another road's centre line (a T-junction) and end at their yard.
 line({ { -900, 1.5 * CELL }, { -900, 700 } }, ROAD, "street", "Ranch Road")
 line({ { 2.5 * CELL, 900 + 0.5 * CELL }, { 580, 900 + 0.5 * CELL } }, ROAD, "street", "Riding School Lane")
+-- The real estate's roads (2.6). Sunset Drive carries on from 8th Ave at Downtown's north edge and winds up Sunset
+-- Hills to the Hilltop Mansion's turning circle; the lanes are short dead ends to the other homes.
+Map.SunsetDrive = { { 3.5 * CELL, -downtownEdge + ROAD / 2 }, { 504, -760 }, { 600, -850 }, { 600, -960 }, { 520, -1050 }, { 520, -1140 } }
+line(Map.SunsetDrive, ROAD, "street", "Sunset Drive")
+line({ { 1080 + 2.5 * CELL, -3.5 * CELL }, { 1080 + 2.5 * CELL, -820 } }, ROAD, "street", "Cliff Road") -- Ocean View
+line({ { -1550, 520 }, { -1550, 760 } }, ROAD, "street", "Pine Lane") -- Pinecrest, off the West Highway
+line({ { -1100, -100 }, { -1420, -100 } }, ROAD, "street", "Sunset Lane") -- the Sunset Villa, off the Radio Road
+line({ { -2.5 * CELL, 900 + 2.5 * CELL }, { -480, 900 + 2.5 * CELL } }, ROAD, "street", "Birch Lane") -- Birch Cottage
+Map.EstateRoads = { "Sunset Drive", "Cliff Road", "Pine Lane", "Sunset Lane", "Birch Lane" }
 
 Map.Connectors = connectors
 

@@ -7,11 +7,21 @@
 -- Every employer stands at their WORK HERE board (an R15 person from server/Npcs.luau); horses graze at the ranch and
 -- the riding school (server/Animals.luau).
 --
+-- Zombie Delivery 2.6, the real estate (Config.Estate, laid out in Map.EstatePlots): Sunset Hills up the winding
+-- Sunset Drive (terrain hills, the gate) with the Hilltop Mansion, the other mansions and the villas each in their own
+-- spot (the sea cliffs with a pier, the pines, the frozen lake with a jetty, a lane in the west), the houses for sale
+-- on their Suburbs lots and at the edge of town, the Harbor Lockup, the Highway Garage, Downtown Parking and the two
+-- office towers (Dispatch Tower, Harbor Point) with their lobbies, office floors, roof terraces and elevator pads.
+-- It registers the FOR SALE signs' prompts (World.EstatePrompts), the home spawns (World.EstateSpawns), the garages'
+-- drive-out spots (World.EstateGarages) and the office computers (World.OfficePrompts) for server/Estate, CarCall and
+-- Business.
+--
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
 -- (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
 
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -38,6 +48,21 @@ World.EmployerPrompts = {} :: { { prompt: ProximityPrompt, employer: string } }
 World.EmployerNpcs = {} :: { [string]: Model } -- the person at each WORK HERE board (Config.Employers id)
 World.DealerSlots = {} :: { CFrame }
 World.RepairSpots = { Vector3.new(0, 0, 0) } :: { Vector3 }
+-- The real estate (2.6; filled by World.build, see "Real estate" below):
+-- the FOR SALE signs' prompts (a ProximityPrompt "EstatePrompt", attribute Estate = the Config.Estate id; an office
+-- has one in the lobby and one in the office)
+World.EstatePrompts = {} :: { { prompt: ProximityPrompt, estate: string } }
+-- homes: the character's spot just inside the front door, facing in (at a HumanoidRootPart's height, like
+-- DepotSpawn); offices: in the office, in front of the elevators
+World.EstateSpawns = {} :: { [string]: CFrame }
+-- homes and garages: in front of the garage door, facing the road, at the height Vehicles.spawn builds a car at on a
+-- road (the ground + 0.5)
+World.EstateGarages = {} :: { [string]: CFrame }
+-- the office computers (a ProximityPrompt "OfficePrompt", attribute Office = the Config.Estate id)
+World.OfficePrompts = {} :: { { prompt: ProximityPrompt, office: string } }
+-- the status line of every FOR SALE sign (a TextLabel "Status" on the EstatePrompt's parent; "FOR SALE\n$x" to start
+-- with, server/Estate.luau may write the owners there)
+World.EstateSigns = {} :: { [string]: { TextLabel } }
 
 local rng = Random.new(Config.City.Seed)
 
@@ -397,6 +422,12 @@ local function buildGround(world: Instance)
 	end
 end
 
+-- The real estate's builders, used by the districts below (defined in "Real estate").
+local buildEstateHouse: (Instance, number, number) -> boolean
+local buildLockup: (Instance, number, number) -> ()
+local buildParking: (Instance, number, number) -> ()
+local buildTowerBlock: (Instance, string, number, number) -> ()
+
 -- ── Districts ──────────────────────────────────────────────────────────────
 
 local function buildDistrictRoads(parent: Instance, d: Map.District)
@@ -556,15 +587,18 @@ local function suburbsBlock(parent: Instance, cx: number, cz: number)
 			local lx = cx - BLOCK / 2 + inset + lot * (a + 0.5)
 			local lz = cz - BLOCK / 2 + inset + lot * (b + 0.5)
 			deco(part(parent, "Lawn", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(76, 100, 54), Enum.Material.Grass))
-			-- The house faces the nearer road (north or south).
+			-- The house faces the nearer road (north or south). A house for sale (Map.EstatePlots) has its own lot.
 			local facing = if b == 0 then Vector3.new(0, 0, -1) else Vector3.new(0, 0, 1)
 			local origin = Vector3.new(lx, WALK_TOP, lz - facing.Z * 4)
-			if rng:NextNumber() < 0.85 then
+			local forSale = buildEstateHouse(parent, lx, lz) -- its lawn and back fence as on every lot
+			if forSale then
+				-- (its own house, drive and sign)
+			elseif rng:NextNumber() < 0.85 then
 				house(parent, CFrame.lookAt(origin, origin + facing))
 			else
 				wreck(parent, CFrame.new(lx, WALK_TOP, lz) * CFrame.Angles(0, rng:NextNumber(0, 6), 0))
 			end
-			if rng:NextNumber() < 0.6 then
+			if not forSale and rng:NextNumber() < 0.6 then
 				tree(parent, lx + rng:NextNumber(-lot / 3, lot / 3), lz + facing.Z * (lot / 2 - 5))
 			end
 			-- A low fence at the back of the lot.
@@ -1097,6 +1131,15 @@ local function buildDistrict(parent: Instance, d: Map.District)
 				continue
 			elseif special == "clinic" then
 				buildClinic(district, cx, cz)
+				continue
+			elseif special == "dispatchtower" or special == "harborpoint" then
+				buildTowerBlock(district, special, cx, cz)
+				continue
+			elseif special == "parking" then
+				buildParking(district, cx, cz)
+				continue
+			elseif special == "lockup" then
+				buildLockup(district, cx, cz)
 				continue
 			elseif special then
 				continue
@@ -1908,6 +1951,1355 @@ local function buildWinter(parent: Instance)
 	placeSign(winter, "THIN ICE · DRIVE SLOW", 300 - 40, -2170, Vector3.new(0, 0, 1), Color3.fromRGB(255, 120, 100))
 end
 
+-- ── Real estate (Zombie Delivery 2.6) ──────────────────────────────────────
+-- The properties of Config.Estate where Map.EstatePlots puts them, spread over the map: the Hilltop Mansion in Sunset
+-- Hills above the city, Ocean View on the sea cliffs north of the Harbor, Pinecrest in the western pines, the Lakeside
+-- Villa by the frozen lake (in the snow), the Sunset Villa down its quiet lane in the west, the houses on their
+-- Suburbs lots and Birch Cottage at the edge of town, the three garages, the offices in Dispatch Tower and Harbor
+-- Point. Every building has a simple walkable inside (rooms with doorways, furniture, lights; a staircase in the
+-- mansions), a garage for its cars, a FOR SALE sign with an "EstatePrompt" (World.EstatePrompts), the spawn inside the
+-- front door (World.EstateSpawns) and the spot in front of the garage where a car comes out (World.EstateGarages).
+-- The towers' floors are joined by elevator pads (step on one: you ride to the floor written over it); every office
+-- has its computer with an "OfficePrompt" (World.OfficePrompts) and its spawn in front of the elevators.
+--
+-- The buildings are drawn in a local frame (CFrame.lookAt from the plot's centre on the ground toward its front):
+-- +X is the right of somebody looking out of the front door, -Z the front, +Z the back (Map.plotPoint's frame).
+--
+-- The builders live in their own function (defineRealEstate, run right after it): the main chunk of this file has
+-- many locals already and Luau allows 200 per function.
+
+local buildSunsetHills: (Instance) -> ()
+local buildEstate: (Instance) -> ()
+local nearAnyLot: (number, number, number) -> boolean
+
+local function defineRealEstate()
+	local ESTATE: { [string]: Config.EstateDef } = {}
+	for _, def in Config.Estate.Properties do
+		ESTATE[def.id] = def
+	end
+	local estateRng = Random.new(Config.City.Seed + 26) -- the estate's own dice (the rest of the world keeps its own)
+	local GARAGE_APRON = Map.GarageApron
+	local PAD_TOP = ROAD_TOP + 0.05 -- the lots outside the blocks: a grass pad just over the road
+
+	-- "$6,000,000"
+	local function dollars(amount: number): string
+		local digits = tostring(math.floor(amount))
+		local grouped = string.reverse((string.gsub(string.reverse(digits), "(%d%d%d)", "%1,")))
+		if string.sub(grouped, 1, 1) == "," then
+			grouped = string.sub(grouped, 2)
+		end
+		return "$" .. grouped
+	end
+
+	-- Builds one property and only warns if it fails (the rest of the world goes on).
+	local function attempt(what: string, build: () -> ())
+		local ok, err = pcall(function()
+			build()
+		end)
+		if not ok then
+			warn(`[World] {what} failed: {err}`)
+		end
+	end
+
+	local function plotFrame(plot: Map.EstatePlot, y: number): CFrame
+		local origin = Vector3.new(plot.x, y, plot.z)
+		return CFrame.lookAt(origin, origin + Vector3.new(plot.facing.x, 0, plot.facing.z))
+	end
+
+	-- How far the road is in front of the front wall (a plot faces its road): the driveway's length.
+	local function frontReach(plot: Map.EstatePlot): number
+		for k = 0, 60 do
+			local x, z = Map.plotPoint(plot, 0, -plot.front - k)
+			if Map.onRoad(x, z) then
+				return k
+			end
+		end
+		return 12
+	end
+
+	-- A box in a local frame f, between two corners.
+	local function box(parent: Instance, name: string, f: CFrame, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, color: Color3, material: Enum.Material?): Part
+		return part(parent, name, Vector3.new(math.abs(x1 - x0), math.abs(y1 - y0), math.abs(z1 - z0)), f * CFrame.new((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), color, material)
+	end
+
+	type Opening = { at: number, width: number, bottom: number, top: number, glass: boolean? }
+
+	local GLASS = Color3.fromRGB(160, 200, 220)
+
+	-- A straight wall in f: along X (at z = `at`, from a0 to a1) or along Z (at x = `at`), from y0 to y1, `thick` thick,
+	-- with openings (doorways; windows get a pane of glass). The openings' bottom and top are above y0.
+	local function wall(parent: Instance, f: CFrame, alongX: boolean, a0: number, a1: number, at: number, y0: number, y1: number, openings: { Opening }?, color: Color3, material: Enum.Material?, thick: number?, lit: boolean?)
+		local t = thick or 1
+		local function piece(name: string, s0: number, s1: number, b: number, top: number, depth: number): Part?
+			if s1 - s0 < 0.05 or top - b < 0.05 then
+				return nil
+			end
+			if alongX then
+				return box(parent, name, f, s0, b, at - depth / 2, s1, top, at + depth / 2, color, material)
+			end
+			return box(parent, name, f, at - depth / 2, b, s0, at + depth / 2, top, s1, color, material)
+		end
+		local list = table.clone(openings or {})
+		table.sort(list, function(p: Opening, q: Opening)
+			return p.at < q.at
+		end)
+		local cursor = a0
+		for _, o in list do
+			local s0, s1 = o.at - o.width / 2, o.at + o.width / 2
+			piece("Wall", cursor, s0, y0, y1, t)
+			piece("Wall", s0, s1, y0, y0 + o.bottom, t)
+			piece("Wall", s0, s1, y0 + o.top, y1, t)
+			if o.glass then
+				local pane = piece("Window", s0, s1, y0 + o.bottom, y0 + o.top, 0.3)
+				if pane then
+					pane.Color = GLASS
+					pane.Material = Enum.Material.Glass
+					pane.Transparency = 0.5
+					if lit then
+						DayNight.nightLight(pane, Color3.fromRGB(255, 214, 140), GLASS, "Glass")
+					end
+				end
+			end
+			cursor = s1
+		end
+		piece("Wall", cursor, a1, y0, y1, t)
+	end
+
+	-- A floor slab (top at `top`, `thick` thick) over a rectangle, with a hole cut out (a stairwell).
+	local function slabWithHole(parent: Instance, f: CFrame, x0: number, z0: number, x1: number, z1: number, top: number, thick: number, hx0: number, hz0: number, hx1: number, hz1: number, color: Color3, material: Enum.Material)
+		local y0 = top - thick
+		box(parent, "Floor", f, x0, y0, z0, hx0, top, z1, color, material)
+		box(parent, "Floor", f, hx1, y0, z0, x1, top, z1, color, material)
+		box(parent, "Floor", f, hx0, y0, z0, hx1, top, hz0, color, material)
+		box(parent, "Floor", f, hx0, y0, hz1, hx1, top, z1, color, material)
+	end
+
+	-- Steps along +Z from z0, from floor y0 up to y1 (1 stud or less each), `width` wide around x.
+	local function stairs(parent: Instance, f: CFrame, x: number, z0: number, y0: number, y1: number, width: number, run: number, color: Color3)
+		local count = math.ceil((y1 - y0) / 0.95)
+		local rise = (y1 - y0) / count
+		for k = 1, count do
+			box(parent, "Step", f, x - width / 2, y0, z0 + (k - 1) * run, x + width / 2, y0 + k * rise, z0 + k * run, color, Enum.Material.WoodPlanks)
+		end
+	end
+
+	-- A light panel in the ceiling (always on, like the shops').
+	local function ceilingLight(parent: Instance, f: CFrame, x: number, y: number, z: number, range: number)
+		local panel = deco(part(parent, "CeilingLight", Vector3.new(3, 0.2, 3), f * CFrame.new(x, y - 0.1, z), Color3.fromRGB(255, 244, 220), Enum.Material.Neon))
+		light(panel, range, 0.9, Color3.fromRGB(255, 236, 205))
+	end
+
+	-- ── Furniture: `cf` stands on the floor, the piece's front looks along cf.LookVector ────────────────────────────
+
+	local function sofa(parent: Instance, cf: CFrame, color: Color3, length: number?)
+		local w = length or 8
+		part(parent, "Sofa", Vector3.new(w, 1.8, 3.2), cf * CFrame.new(0, 0.9, 0), color, Enum.Material.Fabric)
+		part(parent, "SofaBack", Vector3.new(w, 2.4, 0.8), cf * CFrame.new(0, 2.4, 1.2), color, Enum.Material.Fabric)
+		for _, side in { -1, 1 } do
+			part(parent, "SofaArm", Vector3.new(0.8, 2.6, 3.2), cf * CFrame.new(side * (w / 2 - 0.4), 1.3, 0), color:Lerp(Color3.new(0, 0, 0), 0.12), Enum.Material.Fabric)
+		end
+	end
+
+	local function bed(parent: Instance, cf: CFrame, blanket: Color3)
+		-- the head at the back (+Z), you get in from the front
+		part(parent, "BedFrame", Vector3.new(6, 1.4, 9), cf * CFrame.new(0, 0.7, 0), Color3.fromRGB(110, 80, 56), Enum.Material.Wood)
+		part(parent, "Mattress", Vector3.new(5.6, 0.8, 8.4), cf * CFrame.new(0, 1.8, 0), Color3.fromRGB(236, 234, 228), Enum.Material.Fabric)
+		deco(part(parent, "Blanket", Vector3.new(5.8, 0.2, 5), cf * CFrame.new(0, 2.25, -1.6), blanket, Enum.Material.Fabric))
+		deco(part(parent, "Pillow", Vector3.new(4, 0.5, 1.4), cf * CFrame.new(0, 2.45, 3.2), Color3.fromRGB(250, 250, 248), Enum.Material.Fabric))
+		part(parent, "Headboard", Vector3.new(6.4, 4.4, 0.6), cf * CFrame.new(0, 2.2, 4.7), Color3.fromRGB(90, 64, 46), Enum.Material.Wood)
+	end
+
+	local function diningSet(parent: Instance, cf: CFrame, length: number, wood: Color3)
+		part(parent, "Table", Vector3.new(length, 0.4, 4), cf * CFrame.new(0, 3, 0), wood, Enum.Material.Wood)
+		part(parent, "TableLeg", Vector3.new(length - 2, 2.8, 1), cf * CFrame.new(0, 1.4, 0), wood:Lerp(Color3.new(0, 0, 0), 0.2), Enum.Material.Wood)
+		local seats = math.max(1, math.floor(length / 4))
+		for n = 1, seats do
+			local x = (n - (seats + 1) / 2) * 3.6
+			for _, side in { -1, 1 } do
+				local chair = cf * CFrame.new(x, 0, side * 3.2)
+				part(parent, "Chair", Vector3.new(2, 0.4, 2), chair * CFrame.new(0, 1.9, 0), wood, Enum.Material.Wood)
+				part(parent, "ChairBack", Vector3.new(2, 2.4, 0.3), chair * CFrame.new(0, 3.1, side * 0.9), wood, Enum.Material.Wood)
+			end
+		end
+	end
+
+	local function kitchen(parent: Instance, cf: CFrame, length: number, top: Color3)
+		-- a counter row (the cook stands in front), the fridge at its right end
+		part(parent, "Counter", Vector3.new(length, 3.6, 2.6), cf * CFrame.new(0, 1.8, 0), Color3.fromRGB(236, 236, 232), Enum.Material.SmoothPlastic)
+		part(parent, "Worktop", Vector3.new(length + 0.2, 0.3, 2.8), cf * CFrame.new(0, 3.75, 0), top, Enum.Material.Marble)
+		deco(part(parent, "Hob", Vector3.new(2.4, 0.08, 1.8), cf * CFrame.new(-length / 4, 3.94, 0), Color3.fromRGB(24, 24, 26), Enum.Material.Glass))
+		deco(part(parent, "Sink", Vector3.new(2.2, 0.08, 1.6), cf * CFrame.new(length / 4, 3.94, 0), Color3.fromRGB(170, 176, 182), Enum.Material.Metal))
+		part(parent, "Fridge", Vector3.new(3, 7, 2.6), cf * CFrame.new(length / 2 + 1.6, 3.5, 0), Color3.fromRGB(210, 214, 218), Enum.Material.Metal)
+	end
+
+	local function tv(parent: Instance, cf: CFrame)
+		part(parent, "TvStand", Vector3.new(6, 1.8, 1.6), cf * CFrame.new(0, 0.9, 0), Color3.fromRGB(50, 44, 40), Enum.Material.Wood)
+		local screen = part(parent, "Tv", Vector3.new(5.4, 3.2, 0.3), cf * CFrame.new(0, 3.6, 0.3), Color3.fromRGB(16, 18, 22), Enum.Material.Glass)
+		screen.Reflectance = 0.1
+	end
+
+	local function plant(parent: Instance, cf: CFrame, size: number?)
+		local s = size or 1
+		cylinder(parent, "Pot", 1.6 * s, 1.6 * s, cf * CFrame.new(0, 0.8 * s, 0) * UPRIGHT, Color3.fromRGB(170, 110, 80), Enum.Material.Slate)
+		local leaves = deco(part(parent, "Leaves", Vector3.new(2.8, 3.2, 2.8) * s, cf * CFrame.new(0, 3 * s, 0), Color3.fromRGB(64, 120, 58), Enum.Material.Grass))
+		leaves.Shape = Enum.PartType.Ball
+	end
+
+	local function bookshelf(parent: Instance, cf: CFrame)
+		part(parent, "Bookshelf", Vector3.new(5, 7, 1.4), cf * CFrame.new(0, 3.5, 0.2), Color3.fromRGB(120, 86, 58), Enum.Material.Wood)
+		for row = 0, 2 do
+			deco(part(parent, "Books", Vector3.new(4.4, 1.3, 0.2), cf * CFrame.new(0, 1.4 + row * 2, -0.55), Color3.fromHSV(estateRng:NextNumber(), 0.45, 0.6), Enum.Material.SmoothPlastic))
+		end
+	end
+
+	local function rug(parent: Instance, cf: CFrame, w: number, d: number, color: Color3)
+		deco(part(parent, "Rug", Vector3.new(w, 0.06, d), cf * CFrame.new(0, 0.03, 0), color, Enum.Material.Fabric))
+	end
+
+	local function coffeeTable(parent: Instance, cf: CFrame)
+		part(parent, "CoffeeTable", Vector3.new(4, 0.3, 2.4), cf * CFrame.new(0, 1.5, 0), Color3.fromRGB(90, 66, 48), Enum.Material.Wood)
+		part(parent, "CoffeeTableBase", Vector3.new(3, 1.35, 1.6), cf * CFrame.new(0, 0.68, 0), Color3.fromRGB(70, 52, 38), Enum.Material.Wood)
+	end
+
+	local function bathroom(parent: Instance, tub: CFrame, toilet: CFrame, sink: CFrame)
+		local white = Color3.fromRGB(240, 242, 244)
+		part(parent, "Bathtub", Vector3.new(3.6, 2.2, 6.4), tub * CFrame.new(0, 1.1, 0), white, Enum.Material.SmoothPlastic)
+		deco(part(parent, "BathWater", Vector3.new(2.8, 0.1, 5.6), tub * CFrame.new(0, 2, 0), Color3.fromRGB(150, 200, 230), Enum.Material.Glass)).Transparency = 0.3
+		part(parent, "Toilet", Vector3.new(1.6, 1.6, 2.2), toilet * CFrame.new(0, 0.8, 0), white, Enum.Material.SmoothPlastic)
+		part(parent, "ToiletTank", Vector3.new(1.8, 2, 0.8), toilet * CFrame.new(0, 2, 1.2), white, Enum.Material.SmoothPlastic)
+		part(parent, "Washbasin", Vector3.new(2.6, 3, 1.8), sink * CFrame.new(0, 1.5, 0), white, Enum.Material.Marble)
+		deco(part(parent, "Mirror", Vector3.new(2.4, 2.4, 0.1), sink * CFrame.new(0, 5, 0.95), Color3.fromRGB(200, 220, 230), Enum.Material.Glass)).Reflectance = 0.4
+	end
+
+	local function lounger(parent: Instance, cf: CFrame)
+		part(parent, "Lounger", Vector3.new(2.4, 0.6, 6), cf * CFrame.new(0, 0.9, 0), Color3.fromRGB(240, 240, 236), Enum.Material.Fabric)
+		part(parent, "LoungerBack", Vector3.new(2.4, 0.4, 2.4), cf * CFrame.new(0, 1.6, 2.2) * CFrame.Angles(math.rad(35), 0, 0), Color3.fromRGB(240, 240, 236), Enum.Material.Fabric)
+		part(parent, "LoungerBase", Vector3.new(2, 0.6, 5), cf * CFrame.new(0, 0.3, 0), Color3.fromRGB(150, 120, 90), Enum.Material.Wood)
+	end
+
+	local function parasol(parent: Instance, cf: CFrame, color: Color3)
+		part(parent, "ParasolPole", Vector3.new(0.3, 8, 0.3), cf * CFrame.new(0, 4, 0), Color3.fromRGB(220, 220, 220), Enum.Material.Metal)
+		deco(cylinder(parent, "Parasol", 0.4, 8, cf * CFrame.new(0, 8, 0) * UPRIGHT, color, Enum.Material.Fabric))
+	end
+
+	-- A palm tree (Sunset Hills, by the pools and the sea).
+	local function palm(parent: Instance, x: number, z: number, y: number)
+		local height = estateRng:NextNumber(14, 20)
+		local lean = estateRng:NextNumber(-0.15, 0.15)
+		local top = Vector3.new(x + lean * height, y + height, z + lean * height * 0.5)
+		local foot = Vector3.new(x, y, z)
+		part(parent, "PalmTrunk", Vector3.new(1.2, 1.2, height), CFrame.lookAt((foot + top) / 2, top), Color3.fromRGB(130, 104, 74), Enum.Material.Wood)
+		for n = 0, 5 do
+			local angle = n * math.pi / 3 + estateRng:NextNumber(-0.2, 0.2)
+			local dir = Vector3.new(math.cos(angle), -0.35, math.sin(angle))
+			deco(part(parent, "PalmLeaf", Vector3.new(2.4, 0.2, 8), CFrame.lookAt(top + dir * 3.6, top + dir * 8), Color3.fromRGB(70, 130, 60), Enum.Material.Grass))
+		end
+	end
+
+	-- A pine (no snow): Pinecrest's pines and the hills'.
+	local function pine(parent: Instance, x: number, z: number, y: number)
+		local height = estateRng:NextNumber(14, 22)
+		cylinder(parent, "Trunk", height, 1.3, CFrame.new(x, y + height / 2, z) * UPRIGHT, Color3.fromRGB(78, 58, 42), Enum.Material.Wood)
+		for n = 0, 2 do
+			local size = 11 - n * 3
+			local ball = deco(part(parent, "Needles", Vector3.new(size, size * 0.9, size), CFrame.new(x, y + height * 0.42 + n * 4, z), Color3.fromRGB(38, 70, 44), Enum.Material.Grass))
+			ball.Shape = Enum.PartType.Ball
+		end
+	end
+
+	local function hedge(parent: Instance, f: CFrame, x0: number, z0: number, x1: number, z1: number, height: number)
+		box(parent, "Hedge", f, x0, 0, z0, x1, height, z1, Color3.fromRGB(60, 104, 52), Enum.Material.Grass)
+	end
+
+	-- ── Signs and prompts ──────────────────────────────────────────────────────
+
+	-- A FOR SALE sign on two posts: the property's name on top, the board under it (the EstatePrompt's parent) says
+	-- "FOR SALE · $price" (server/Estate.luau writes the owners there). `cf` stands on the ground, the text looks along
+	-- cf.LookVector (toward the road).
+	local SIGN_RED = Color3.fromRGB(196, 40, 36)
+	local function forSaleSign(parent: Instance, id: string, cf: CFrame, small: boolean?): Part?
+		local def = ESTATE[id]
+		if not def then
+			return nil
+		end
+		local k = if small then 0.7 else 1
+		local height = 7 * k
+		for _, side in { -1, 1 } do
+			part(parent, "SignPost", Vector3.new(0.45, height, 0.45), cf * CFrame.new(side * 3.4 * k, height / 2, 0.3), Color3.fromRGB(235, 235, 235), Enum.Material.Wood)
+		end
+		sign(parent, string.upper(def.name), Vector3.new(7.6 * k, 1.4 * k, 0.25), cf * CFrame.new(0, height - 0.2 * k, 0), Color3.fromRGB(255, 220, 120), Color3.fromRGB(34, 34, 40))
+		local board = part(parent, "EstateSign", Vector3.new(7.6 * k, 3.4 * k, 0.35), cf * CFrame.new(0, height - 2.9 * k, 0), Color3.fromRGB(250, 250, 248), Enum.Material.SmoothPlastic)
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "Plate"
+		gui.Face = Enum.NormalId.Front
+		gui.PixelsPerStud = 30
+		gui.LightInfluence = 0
+		gui.Parent = board
+		local label = Instance.new("TextLabel")
+		label.Name = "Status"
+		label.Size = UDim2.new(1, -12, 1, -8)
+		label.Position = UDim2.fromOffset(6, 4)
+		label.BackgroundTransparency = 1
+		label.Text = `FOR SALE\n{dollars(def.price)}`
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBlack
+		label.TextColor3 = SIGN_RED
+		label.Parent = gui
+		local signs = World.EstateSigns[id] or {}
+		table.insert(signs, label)
+		World.EstateSigns[id] = signs
+
+		local p = Instance.new("ProximityPrompt")
+		p.Name = "EstatePrompt"
+		p.ActionText = "View listing"
+		p.ObjectText = def.name
+		p.HoldDuration = 0
+		p.MaxActivationDistance = 12
+		p.RequiresLineOfSight = false
+		p:SetAttribute("Estate", id)
+		p.Parent = board
+		table.insert(World.EstatePrompts, { prompt = p, estate = id })
+		return board
+	end
+
+	-- The garage of a home or a garage building: `doors` doors of 10 studs (2 stud pillars between) in the front wall,
+	-- `depth` deep. `cf` is the middle of the front wall on the floor, looking out. Returns the spot in front of it where
+	-- a car comes out (World.EstateGarages): in front of a door, facing out, at a car's height over the ground.
+	local function garageBlock(parent: Instance, cf: CFrame, doors: number, depth: number, height: number, color: Color3, material: Enum.Material): CFrame
+		local gw = doors * 12 + 2
+		local half = gw / 2
+		local concrete = Color3.fromRGB(128, 128, 126)
+		box(parent, "GarageFloor", cf, -half, -0.3, 0, half, 0, depth, concrete, Enum.Material.Concrete)
+		box(parent, "GarageWall", cf, -half, 0, depth - 1, half, height, depth, color, material)
+		box(parent, "GarageWall", cf, -half, 0, 0, -half + 1, height, depth - 1, color, material)
+		box(parent, "GarageWall", cf, half - 1, 0, 0, half, height, depth - 1, color, material)
+		for n = 0, doors do
+			local x = -half + 1 + n * 12
+			box(parent, "GaragePillar", cf, x - 1, 0, 0, x + 1, height, 1, color, material)
+			if n > 0 and n < doors then
+				-- the line between two bays
+				deco(box(parent, "BayLine", cf, x - 0.15, 0, 2, x + 0.15, 0.05, depth - 2, Color3.fromRGB(230, 230, 230)))
+			end
+		end
+		box(parent, "GarageLintel", cf, -half, 9, 0, half, height, 1, color, material)
+		for n = 1, doors do
+			local x = -half + n * 12 - 4
+			deco(cylinder(parent, "GarageDoorRoll", 10, 1.3, cf * CFrame.new(x, 9.6, 1.6), Color3.fromRGB(200, 200, 196), Enum.Material.DiamondPlate))
+		end
+		box(parent, "GarageRoof", cf, -half - 0.5, height, -0.5, half + 0.5, height + 0.8, depth + 0.5, color:Lerp(Color3.new(0, 0, 0), 0.35), Enum.Material.Metal)
+		ceilingLight(parent, cf, 0, height, depth / 2, math.max(gw, depth))
+		local x = if doors % 2 == 0 then 6 else 0
+		return cf * CFrame.new(x, 0.58, -GARAGE_APRON) -- over the driveway (0.08), like a car on a road
+	end
+
+	-- A lot outside the city blocks: a grass pad over the plot's lot and its front yard down to the road.
+	local function lotPad(parent: Instance, f: CFrame, plot: Map.EstatePlot, reach: number, color: Color3?, material: Enum.Material?)
+		-- f stands on the pad's top (PAD_TOP)
+		box(parent, "Lot", f, -plot.w / 2, -PAD_TOP, -plot.front - reach + 0.3, plot.w / 2, 0, plot.back, color or Color3.fromRGB(86, 116, 60), material or Enum.Material.Grass)
+	end
+
+	local function driveway(parent: Instance, f: CFrame, x0: number, x1: number, z0: number, z1: number, color: Color3?)
+		box(parent, "Driveway", f, x0, 0, z0, x1, 0.08, z1, color or Color3.fromRGB(150, 146, 138), Enum.Material.Pavement)
+	end
+
+	local function registerHome(id: string, f: CFrame, doorX: number, doorZ: number, floorY: number)
+		-- just inside the front door, facing in
+		World.EstateSpawns[id] = f * CFrame.new(doorX, floorY + 3, doorZ + 5) * CFrame.Angles(0, math.pi, 0)
+	end
+
+	-- ── Homes ──────────────────────────────────────────────────────────────────
+
+	type HomeStyle = {
+		wall: Color3,
+		wallMaterial: Enum.Material,
+		inner: Color3,
+		floor: Color3,
+		floorMaterial: Enum.Material,
+		roof: Color3,
+		accent: Color3, -- sofas, blankets, the parasols
+		gable: boolean, -- a pitched roof (else flat with a parapet)
+		glassy: boolean, -- big windows
+		doors: number, -- garage doors
+	}
+
+	local HOME_STYLES: { [string]: HomeStyle } = {
+		hilltop = { wall = Color3.fromRGB(242, 240, 234), wallMaterial = Enum.Material.SmoothPlastic, inner = Color3.fromRGB(236, 232, 224), floor = Color3.fromRGB(214, 206, 192), floorMaterial = Enum.Material.Marble, roof = Color3.fromRGB(60, 62, 68), accent = Color3.fromRGB(40, 96, 150), gable = false, glassy = true, doors = 4 },
+		oceanview = { wall = Color3.fromRGB(214, 226, 232), wallMaterial = Enum.Material.SmoothPlastic, inner = Color3.fromRGB(240, 242, 244), floor = Color3.fromRGB(196, 176, 150), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(70, 80, 92), accent = Color3.fromRGB(30, 140, 160), gable = false, glassy = true, doors = 4 },
+		pinecrest = { wall = Color3.fromRGB(150, 146, 136), wallMaterial = Enum.Material.Slate, inner = Color3.fromRGB(226, 216, 196), floor = Color3.fromRGB(140, 100, 68), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(70, 56, 48), accent = Color3.fromRGB(150, 60, 50), gable = true, glassy = false, doors = 3 },
+		lakeside = { wall = Color3.fromRGB(70, 74, 82), wallMaterial = Enum.Material.SmoothPlastic, inner = Color3.fromRGB(236, 234, 228), floor = Color3.fromRGB(180, 160, 130), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(40, 42, 46), accent = Color3.fromRGB(220, 160, 60), gable = false, glassy = true, doors = 2 },
+		sunset = { wall = Color3.fromRGB(246, 244, 238), wallMaterial = Enum.Material.Plaster, inner = Color3.fromRGB(244, 236, 222), floor = Color3.fromRGB(200, 150, 110), floorMaterial = Enum.Material.Slate, roof = Color3.fromRGB(176, 90, 60), accent = Color3.fromRGB(230, 120, 70), gable = false, glassy = false, doors = 2 },
+		maple = { wall = Color3.fromRGB(200, 214, 226), wallMaterial = Enum.Material.WoodPlanks, inner = Color3.fromRGB(240, 236, 226), floor = Color3.fromRGB(160, 120, 84), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(70, 74, 86), accent = Color3.fromRGB(80, 120, 170), gable = true, glassy = false, doors = 1 },
+		oak = { wall = Color3.fromRGB(150, 80, 62), wallMaterial = Enum.Material.Brick, inner = Color3.fromRGB(236, 226, 206), floor = Color3.fromRGB(150, 110, 76), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(64, 58, 54), accent = Color3.fromRGB(90, 130, 80), gable = true, glassy = false, doors = 1 },
+		birch = { wall = Color3.fromRGB(236, 220, 180), wallMaterial = Enum.Material.WoodPlanks, inner = Color3.fromRGB(246, 238, 220), floor = Color3.fromRGB(170, 130, 90), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(120, 60, 46), accent = Color3.fromRGB(200, 90, 80), gable = true, glassy = false, doors = 1 },
+		elm = { wall = Color3.fromRGB(196, 206, 176), wallMaterial = Enum.Material.WoodPlanks, inner = Color3.fromRGB(240, 238, 228), floor = Color3.fromRGB(150, 116, 86), floorMaterial = Enum.Material.WoodPlanks, roof = Color3.fromRGB(90, 70, 60), accent = Color3.fromRGB(120, 100, 160), gable = true, glassy = false, doors = 1 },
+	}
+
+	-- A flat roof with a low parapet (or a pitched one) over a box x0..x1, z0..z1 at height `top`.
+	local function homeRoof(parent: Instance, f: CFrame, x0: number, z0: number, x1: number, z1: number, top: number, style: HomeStyle)
+		if style.gable then
+			box(parent, "Ceiling", f, x0, top - 0.6, z0, x1, top, z1, style.inner, Enum.Material.SmoothPlastic)
+			gableRoof(parent, f * CFrame.new((x0 + x1) / 2, top, (z0 + z1) / 2), x1 - x0 + 3, z1 - z0 + 3, math.min(9, (z1 - z0) * 0.3), style.roof)
+			return
+		end
+		box(parent, "Roof", f, x0 - 1.5, top - 0.6, z0 - 1.5, x1 + 1.5, top + 0.6, z1 + 1.5, style.roof, Enum.Material.Concrete)
+		for _, edge in { { x0 - 1.5, z0 - 1.5, x1 + 1.5, z0 - 0.5 }, { x0 - 1.5, z1 + 0.5, x1 + 1.5, z1 + 1.5 }, { x0 - 1.5, z0 - 0.5, x0 - 0.5, z1 + 0.5 }, { x1 + 0.5, z0 - 0.5, x1 + 1.5, z1 + 0.5 } } do
+			box(parent, "Parapet", f, edge[1], top + 0.6, edge[2], edge[3], top + 1.6, edge[4], style.wall, style.wallMaterial)
+		end
+	end
+
+	-- A pool on a terrace: the rim, the water (you wade in it) and its tiled floor. x0..x1, z0..z1 is the water.
+	local function pool(parent: Instance, f: CFrame, x0: number, z0: number, x1: number, z1: number, y: number)
+		local rim = Color3.fromRGB(226, 222, 212)
+		box(parent, "PoolRim", f, x0 - 1.2, y, z0 - 1.2, x1 + 1.2, y + 0.8, z0, rim, Enum.Material.Limestone)
+		box(parent, "PoolRim", f, x0 - 1.2, y, z1, x1 + 1.2, y + 0.8, z1 + 1.2, rim, Enum.Material.Limestone)
+		box(parent, "PoolRim", f, x0 - 1.2, y, z0, x0, y + 0.8, z1, rim, Enum.Material.Limestone)
+		box(parent, "PoolRim", f, x1, y, z0, x1 + 1.2, y + 0.8, z1, rim, Enum.Material.Limestone)
+		deco(box(parent, "PoolTiles", f, x0, y, z0, x1, y + 0.05, z1, Color3.fromRGB(70, 160, 200), Enum.Material.SmoothPlastic))
+		local water = deco(box(parent, "PoolWater", f, x0, y + 0.1, z0, x1, y + 0.6, z1, Color3.fromRGB(80, 190, 230), Enum.Material.Glass))
+		water.Transparency = 0.35
+		local glow = Instance.new("SurfaceLight")
+		glow.Face = Enum.NormalId.Top
+		glow.Range = 10
+		glow.Brightness = 1.2
+		glow.Color = Color3.fromRGB(120, 220, 255)
+		glow.Parent = water
+		DayNight.nightLight(glow)
+	end
+
+	-- A wooden pier from the garden out over the water (the lakeside villa's on the river, Ocean View's on the sea).
+	local function pier(parent: Instance, from: Vector3, to: Vector3)
+		local frame = CFrame.lookAt((from + to) / 2, to)
+		local length = (to - from).Magnitude
+		part(parent, "Pier", Vector3.new(6, 0.6, length), frame, Color3.fromRGB(150, 116, 80), Enum.Material.WoodPlanks)
+		for z = -length / 2 + 4, length / 2 - 2, 10 do
+			for _, side in { -1, 1 } do
+				cylinder(parent, "PierPost", 12, 0.9, frame * CFrame.new(side * 2.6, -5.5, z) * UPRIGHT, Color3.fromRGB(110, 86, 60), Enum.Material.Wood)
+			end
+		end
+		local post = deco(part(parent, "PierLamp", Vector3.new(0.8, 0.8, 0.8), frame * CFrame.new(2.6, 3.4, length / 2 - 1), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+		part(parent, "PierLampPost", Vector3.new(0.3, 3, 0.3), frame * CFrame.new(2.6, 1.6, length / 2 - 1), Color3.fromRGB(40, 40, 44), Enum.Material.Metal)
+		light(post, 20, 1.2, Color3.fromRGB(255, 214, 150))
+		DayNight.nightLight(post, Color3.fromRGB(255, 220, 150), Color3.fromRGB(150, 140, 110), "Glass")
+	end
+
+	-- A mansion: two floors (a living room, the hall with the stairs, the kitchen and the dining room downstairs; two
+	-- bedrooms and a bathroom upstairs), the garage wing for `doors` x 2 cars, a terrace with the pool behind.
+	local function mansion(parent: Instance, id: string, plot: Map.EstatePlot, style: HomeStyle)
+		local home = folder(parent, ESTATE[id].name)
+		local f = plotFrame(plot, PAD_TOP)
+		local reach = frontReach(plot)
+		lotPad(home, f, plot, reach)
+		local W = plot.w
+		local X0, X1 = -W / 2, -W / 2 + 58 -- the house
+		local Z0, Z1 = -23, 23
+		local L1, L2, TOP = 0.3, 13.6, 26
+		local wallC, wallM, inner = style.wall, style.wallMaterial, style.inner
+		local doorX = (X0 + X1) / 2
+		local glassW = if style.glassy then 14 else 9
+		-- Floors.
+		box(home, "Floor", f, X0, 0, Z0, X1, L1, Z1, style.floor, style.floorMaterial)
+		local holeX0, holeX1, holeZ0, holeZ1 = X0 + 23, X0 + 29, -3, 19
+		slabWithHole(home, f, X0 + 1, Z0 + 1, X1 - 1, Z1 - 1, L2, 0.6, holeX0, holeZ0, holeX1, holeZ1, style.floor, style.floorMaterial)
+		stairs(home, f, (holeX0 + holeX1) / 2, -2, L1, L2, 6, 1.45, style.floor:Lerp(Color3.new(0, 0, 0), 0.15))
+		-- Outer walls, both floors.
+		for storey = 1, 2 do
+			local y0 = if storey == 1 then L1 else L2
+			local y1 = if storey == 1 then L2 - 0.6 else TOP
+			local front: { Opening } = {
+				{ at = X0 + 10, width = glassW, bottom = 2.5, top = 10, glass = true },
+				{ at = X1 - 11, width = glassW, bottom = 2.5, top = 10, glass = true },
+			}
+			if storey == 1 then
+				table.insert(front, { at = doorX, width = 6, bottom = 0, top = 9 })
+			else
+				table.insert(front, { at = doorX, width = 8, bottom = 2.5, top = 10, glass = true })
+			end
+			wall(home, f, true, X0, X1, Z0 + 0.5, y0, y1, front, wallC, wallM, 1, storey == 1)
+			local back: { Opening } = {
+				{ at = X0 + 10, width = glassW + 2, bottom = if storey == 1 then 1 else 2.5, top = 10.5, glass = true },
+				{ at = X1 - 11, width = 10, bottom = 5, top = 10, glass = true },
+			}
+			if storey == 1 then
+				table.insert(back, { at = doorX, width = 6, bottom = 0, top = 9 }) -- out to the terrace
+			end
+			wall(home, f, true, X0, X1, Z1 - 0.5, y0, y1, back, wallC, wallM, 1, storey == 2)
+			wall(home, f, false, Z0 + 1, Z1 - 1, X0 + 0.5, y0, y1, {
+				{ at = -12, width = 8, bottom = 2.5, top = 10, glass = true },
+				{ at = 12, width = 8, bottom = 2.5, top = 10, glass = true },
+			}, wallC, wallM)
+			wall(home, f, false, Z0 + 1, Z1 - 1, X1 - 0.5, y0, y1, nil, wallC, wallM)
+		end
+		-- Inner walls: downstairs living | hall | kitchen; upstairs bedroom | landing | bedroom and bathroom.
+		local A, B = X0 + 21, X0 + 37
+		wall(home, f, false, Z0 + 1, Z1 - 1, A, L1, L2 - 0.6, { { at = 0, width = 8, bottom = 0, top = 9.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
+		wall(home, f, false, Z0 + 1, Z1 - 1, B, L1, L2 - 0.6, { { at = 0, width = 8, bottom = 0, top = 9.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
+		wall(home, f, false, Z0 + 1, Z1 - 1, A, L2, TOP, { { at = 8, width = 5, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
+		wall(home, f, false, Z0 + 1, Z1 - 1, B, L2, TOP, { { at = -6, width = 5, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
+		wall(home, f, true, B + 0.3, X1 - 1, 6, L2, TOP, { { at = B + 6, width = 4, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
+		homeRoof(home, f, X0, Z0, X1, Z1, TOP + 0.6, style)
+		-- Lights.
+		for _, spot in { { (X0 + A) / 2, -8 }, { (X0 + A) / 2, 10 }, { (A + B) / 2, -14 }, { (B + X1) / 2, -6 }, { (B + X1) / 2, 12 } } do
+			ceilingLight(home, f, spot[1], L2 - 0.6, spot[2], 26)
+		end
+		for _, spot in { { (X0 + A) / 2, 0 }, { (A + B) / 2, 4 }, { (B + X1) / 2, -8 }, { (B + X1) / 2, 14 } } do
+			ceilingLight(home, f, spot[1], TOP, spot[2], 22)
+		end
+		-- Downstairs.
+		local livingX = (X0 + A) / 2
+		rug(home, f * CFrame.new(livingX, L1, 0), 14, 18, style.accent:Lerp(Color3.new(1, 1, 1), 0.5))
+		tv(home, f * CFrame.new(X0 + 2, L1, 0) * CFrame.Angles(0, -math.pi / 2, 0))
+		sofa(home, f * CFrame.new(A - 4.5, L1, 0) * CFrame.Angles(0, math.pi / 2, 0), style.accent, 10)
+		coffeeTable(home, f * CFrame.new(livingX + 1, L1, 0))
+		bookshelf(home, f * CFrame.new(A - 1.3, L1, -15) * CFrame.Angles(0, math.pi / 2, 0))
+		plant(home, f * CFrame.new(X0 + 3, L1, Z0 + 3))
+		plant(home, f * CFrame.new(X0 + 3, L1, Z1 - 3))
+		rug(home, f * CFrame.new(doorX, L1, Z0 + 6), 6, 8, Color3.fromRGB(150, 60, 50))
+		plant(home, f * CFrame.new(B - 3, L1, Z0 + 3), 1.2)
+		local kitchenX = (B + X1) / 2
+		kitchen(home, f * CFrame.new(kitchenX - 3, L1, Z1 - 2.6), 12, Color3.fromRGB(230, 226, 220))
+		diningSet(home, f * CFrame.new(kitchenX, L1, -7), 9, Color3.fromRGB(120, 86, 60))
+		plant(home, f * CFrame.new(X1 - 3, L1, Z0 + 3))
+		-- Upstairs.
+		bed(home, f * CFrame.new(livingX, L2, Z1 - 7), style.accent)
+		rug(home, f * CFrame.new(livingX, L2, 4), 10, 8, style.accent:Lerp(Color3.new(1, 1, 1), 0.6))
+		bookshelf(home, f * CFrame.new(A - 1.3, L2, -14) * CFrame.Angles(0, math.pi / 2, 0))
+		plant(home, f * CFrame.new(X0 + 3, L2, Z0 + 3))
+		bed(home, f * CFrame.new(kitchenX + 2, L2, 0.7), style.accent:Lerp(Color3.new(1, 1, 1), 0.3))
+		plant(home, f * CFrame.new(X1 - 3, L2, Z0 + 3))
+		bathroom(home, f * CFrame.new(kitchenX + 2, L2, Z1 - 4.5) * CFrame.Angles(0, math.pi / 2, 0), f * CFrame.new(B + 3, L2, Z1 - 3), f * CFrame.new(X1 - 2.4, L2, 14) * CFrame.Angles(0, math.pi / 2, 0))
+		-- The garage wing at the right, its doors on the front.
+		local gw = style.doors * 12 + 2
+		local gx = W / 2 - gw / 2
+		World.EstateGarages[id] = garageBlock(home, f * CFrame.new(gx, 0, Z0), style.doors, 30, 12.5, wallC, wallM)
+		driveway(home, f, gx - gw / 2 + 2, gx + gw / 2 - 2, Z0 - reach, Z0)
+		driveway(home, f, doorX - 3, doorX + 3, Z0 - reach, Z0, Color3.fromRGB(196, 188, 172))
+		-- The terrace and the pool.
+		local deck = Color3.fromRGB(196, 176, 150)
+		box(home, "Terrace", f, X0, 0, Z1, X1, 0.5, Z1 + 22, deck, Enum.Material.WoodPlanks)
+		pool(home, f, X0 + 6, Z1 + 6, X0 + 40, Z1 + 18, 0.5)
+		lounger(home, f * CFrame.new(X1 - 13, 0.5, Z1 + 12))
+		lounger(home, f * CFrame.new(X1 - 8, 0.5, Z1 + 12))
+		parasol(home, f * CFrame.new(X1 - 3, 0.5, Z1 + 12), style.accent)
+		-- The garden: hedges round the back, palms or pines, a lantern at the door.
+		hedge(home, f, -W / 2, plot.back - 2, W / 2, plot.back, 4)
+		hedge(home, f, -W / 2, Z1 + 22, -W / 2 + 2, plot.back - 2, 4)
+		hedge(home, f, W / 2 - 2, Z1 + 22, W / 2, plot.back - 2, 4)
+		for _, spot in { { -W / 2 + 5, Z1 + 30 }, { W / 2 - 6, Z1 + 32 }, { X0 + 20, Z1 + 34 }, { -W / 2 + 6, Z0 - 6 } } do
+			local p = (f * CFrame.new(spot[1], 0, spot[2])).Position
+			if style.gable then
+				pine(home, p.X, p.Z, p.Y)
+			else
+				palm(home, p.X, p.Z, p.Y)
+			end
+		end
+		for _, side in { -1, 1 } do
+			local lantern = deco(part(home, "Lantern", Vector3.new(0.9, 1.6, 0.9), f * CFrame.new(doorX + side * 4.5, L1 + 7, Z0 - 0.6), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+			DayNight.nightLight(lantern, Color3.fromRGB(255, 220, 150), Color3.fromRGB(150, 140, 110), "Glass")
+		end
+		sign(home, string.upper(ESTATE[id].name), Vector3.new(20, 2, 0.3), f * CFrame.new(doorX, L2 - 1.4, Z0 - 0.2), style.accent:Lerp(Color3.new(1, 1, 1), 0.4), style.roof)
+		registerHome(id, f, doorX, Z0, L1)
+		forSaleSign(home, id, f * CFrame.new(-W / 2 + 8, 0, Z0 - reach + 3))
+	end
+
+	-- A villa: one floor (a living room with the kitchen, a bedroom, a bathroom), a garage for `doors` x 2 cars, a
+	-- terrace with a small pool behind.
+	local function villa(parent: Instance, id: string, plot: Map.EstatePlot, style: HomeStyle): CFrame
+		local home = folder(parent, ESTATE[id].name)
+		local f = plotFrame(plot, PAD_TOP)
+		local reach = frontReach(plot)
+		local winter = Map.isWinter(plot.x, plot.z)
+		if winter then
+			lotPad(home, f, plot, reach, Color3.fromRGB(232, 236, 240), Enum.Material.Snow)
+		else
+			lotPad(home, f, plot, reach)
+		end
+		local W = plot.w
+		local X0, X1 = -W / 2, -W / 2 + 48
+		local Z0, Z1 = -17, 17
+		local L1, TOP = 0.3, 12
+		local wallC, wallM, inner = style.wall, style.wallMaterial, style.inner
+		local doorX = X0 + 24
+		local P = X1 - 15 -- the wall between the living room and the bedroom side
+		box(home, "Floor", f, X0, 0, Z0, X1, L1, Z1, style.floor, style.floorMaterial)
+		wall(home, f, true, X0, X1, Z0 + 0.5, L1, TOP, {
+			{ at = doorX, width = 6, bottom = 0, top = 9 },
+			{ at = X0 + 9, width = if style.glassy then 14 else 10, bottom = 2, top = 10, glass = true },
+			{ at = X1 - 5, width = 6, bottom = 5, top = 9, glass = true },
+		}, wallC, wallM, 1, true)
+		wall(home, f, true, X0, X1, Z1 - 0.5, L1, TOP, {
+			{ at = X0 + 16, width = 20, bottom = 0.5, top = 10.5, glass = true },
+			{ at = X1 - 7, width = 8, bottom = 2.5, top = 10, glass = true },
+		}, wallC, wallM)
+		wall(home, f, false, Z0 + 1, Z1 - 1, X0 + 0.5, L1, TOP, { { at = 8, width = 10, bottom = 2.5, top = 10, glass = true } }, wallC, wallM)
+		wall(home, f, false, Z0 + 1, Z1 - 1, X1 - 0.5, L1, TOP, nil, wallC, wallM)
+		wall(home, f, false, Z0 + 1, Z1 - 1, P, L1, TOP, { { at = 6, width = 4.5, bottom = 0, top = 8.5 }, { at = -10, width = 4.5, bottom = 0, top = 8.5 } }, inner, Enum.Material.SmoothPlastic, 0.6)
+		wall(home, f, true, P + 0.3, X1 - 1, -3, L1, TOP, nil, inner, Enum.Material.SmoothPlastic, 0.6)
+		homeRoof(home, f, X0, Z0, X1, Z1, TOP + 0.6, style)
+		ceilingLight(home, f, X0 + 10, TOP, 0, 26)
+		ceilingLight(home, f, X0 + 24, TOP, 0, 26)
+		ceilingLight(home, f, (P + X1) / 2, TOP, 8, 18)
+		ceilingLight(home, f, (P + X1) / 2, TOP, -10, 16)
+		-- The living room and the kitchen.
+		kitchen(home, f * CFrame.new(X0 + 2.4, L1, -10) * CFrame.Angles(0, -math.pi / 2, 0), 9, Color3.fromRGB(40, 40, 44))
+		diningSet(home, f * CFrame.new(X0 + 13, L1, -7), 6, Color3.fromRGB(140, 104, 72))
+		rug(home, f * CFrame.new(P - 9, L1, 5), 10, 8, style.accent:Lerp(Color3.new(1, 1, 1), 0.5))
+		tv(home, f * CFrame.new(P - 1.2, L1, 5) * CFrame.Angles(0, math.pi / 2, 0))
+		sofa(home, f * CFrame.new(P - 14, L1, 5) * CFrame.Angles(0, -math.pi / 2, 0), style.accent)
+		coffeeTable(home, f * CFrame.new(P - 8.5, L1, 5) * CFrame.Angles(0, math.pi / 2, 0))
+		plant(home, f * CFrame.new(X0 + 3, L1, Z1 - 3))
+		plant(home, f * CFrame.new(P - 3, L1, Z0 + 3), 1.2)
+		-- The bedroom and the bathroom.
+		bed(home, f * CFrame.new(X1 - 6, L1, 8) * CFrame.Angles(0, math.pi / 2, 0), style.accent)
+		bathroom(home, f * CFrame.new(X1 - 4.5, L1, -11) * CFrame.Angles(0, math.pi / 2, 0), f * CFrame.new(P + 2.5, L1, -14), f * CFrame.new(X1 - 2.4, L1, -5.5) * CFrame.Angles(0, math.pi / 2, 0))
+		-- The garage.
+		local gw = style.doors * 12 + 2
+		local gx = W / 2 - gw / 2
+		World.EstateGarages[id] = garageBlock(home, f * CFrame.new(gx, 0, Z0), style.doors, 28, 11, wallC, wallM)
+		driveway(home, f, gx - gw / 2 + 2, gx + gw / 2 - 2, Z0 - reach, Z0)
+		driveway(home, f, doorX - 3, doorX + 3, Z0 - reach, Z0, Color3.fromRGB(196, 188, 172))
+		-- The terrace and the pool.
+		box(home, "Terrace", f, X0, 0, Z1, X1, 0.5, Z1 + 11, Color3.fromRGB(206, 196, 180), Enum.Material.Limestone)
+		pool(home, f, X0 + 4, Z1 + 3, X0 + 22, Z1 + 9, 0.5)
+		lounger(home, f * CFrame.new(X0 + 28, 0.5, Z1 + 5.5))
+		parasol(home, f * CFrame.new(X0 + 32, 0.5, Z1 + 6), style.accent)
+		hedge(home, f, -W / 2, plot.back - 2, W / 2, plot.back, 3.5)
+		for _, spot in { { -W / 2 + 4, Z0 - 6 }, { W / 2 - 4, plot.back - 6 }, { -W / 2 + 4, plot.back - 6 } } do
+			local p = (f * CFrame.new(spot[1], 0, spot[2])).Position
+			if winter then
+				tree(home, p.X, p.Z, p.Y) -- a snowy pine
+			else
+				palm(home, p.X, p.Z, p.Y)
+			end
+		end
+		local lantern = deco(part(home, "Lantern", Vector3.new(0.9, 1.6, 0.9), f * CFrame.new(doorX + 4.5, L1 + 7, Z0 - 0.6), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+		DayNight.nightLight(lantern, Color3.fromRGB(255, 220, 150), Color3.fromRGB(150, 140, 110), "Glass")
+		registerHome(id, f, doorX, Z0, L1)
+		forSaleSign(home, id, f * CFrame.new(X0 + 8, 0, Z0 - reach + 3))
+		return f
+	end
+
+	-- A house on its Suburbs lot: a living room with the kitchen, a bedroom, a bathroom, a one-door garage, a pitched
+	-- roof. Maple Street's is two storeys high outside (the upstairs is not furnished), Oak Lane's has a porch, Birch
+	-- Cottage a chimney.
+	local function estateHouse(parent: Instance, id: string, plot: Map.EstatePlot, style: HomeStyle)
+		local home = folder(parent, ESTATE[id].name)
+		local onBlock = Map.blockAt(plot.x, plot.z) ~= nil -- a Suburbs lot (else its own lot at the edge of town)
+		local base = if onBlock then WALK_TOP else PAD_TOP
+		local f = plotFrame(plot, base)
+		local reach = if onBlock then 0 else frontReach(plot)
+		if not onBlock then
+			lotPad(home, f, plot, reach)
+			hedge(home, f, -plot.w / 2, plot.back - 1.5, plot.w / 2, plot.back, 3)
+			for _, spot in { { -plot.w / 2 - 6, 0 }, { plot.w / 2 + 6, 12 }, { -plot.w / 2 + 4, plot.back + 6 } } do
+				local p = (f * CFrame.new(spot[1], 0, spot[2])).Position
+				tree(home, p.X, p.Z, p.Y)
+			end
+		end
+		local X0, X1 = -22, 8
+		local Z0, Z1 = -10, 10
+		local L1 = 0.3
+		local TOP = if id == "maple" then 19 else 11
+		local wallC, wallM, inner = style.wall, style.wallMaterial, style.inner
+		local doorX = X0 + 8
+		local P = X0 + 14 -- living room | bedroom and bathroom
+		box(home, "Floor", f, X0, 0, Z0, X1, L1, Z1, style.floor, style.floorMaterial)
+		local frontWindows: { Opening } = {
+			{ at = doorX, width = 5, bottom = 0, top = 8 },
+			{ at = X0 + 3.5, width = 4, bottom = 3, top = 8, glass = true },
+			{ at = P + 6, width = 5, bottom = 4, top = 8, glass = true },
+		}
+		wall(home, f, true, X0, X1, Z0 + 0.5, L1, 11, frontWindows, wallC, wallM, 1, true)
+		wall(home, f, true, X0, X1, Z1 - 0.5, L1, 11, { { at = X0 + 6, width = 6, bottom = 4.4, top = 8, glass = true }, { at = P + 7, width = 6, bottom = 3, top = 8, glass = true } }, wallC, wallM)
+		wall(home, f, false, Z0 + 1, Z1 - 1, X0 + 0.5, L1, 11, { { at = 0, width = 6, bottom = 3, top = 8, glass = true } }, wallC, wallM)
+		wall(home, f, false, Z0 + 1, Z1 - 1, X1 - 0.5, L1, 11, nil, wallC, wallM)
+		wall(home, f, false, Z0 + 1, Z1 - 1, P, L1, 11, { { at = 4.5, width = 4, bottom = 0, top = 8 }, { at = -5, width = 4, bottom = 0, top = 8 } }, inner, Enum.Material.SmoothPlastic, 0.5)
+		wall(home, f, true, P + 0.25, X1 - 1, 0, L1, 11, nil, inner, Enum.Material.SmoothPlastic, 0.5)
+		if TOP > 11 then
+			-- the upper storey (outside only): its walls, windows that light up at night
+			box(home, "Ceiling", f, X0 + 1, 10.6, Z0 + 1, X1 - 1, 11.2, Z1 - 1, inner, Enum.Material.SmoothPlastic)
+			wall(home, f, true, X0, X1, Z0 + 0.5, 11, TOP, { { at = X0 + 6, width = 5, bottom = 2, top = 6, glass = true }, { at = X1 - 8, width = 5, bottom = 2, top = 6, glass = true } }, wallC, wallM, 1, true)
+			wall(home, f, true, X0, X1, Z1 - 0.5, 11, TOP, nil, wallC, wallM)
+			wall(home, f, false, Z0 + 1, Z1 - 1, X0 + 0.5, 11, TOP, nil, wallC, wallM)
+			wall(home, f, false, Z0 + 1, Z1 - 1, X1 - 0.5, 11, TOP, nil, wallC, wallM)
+		end
+		homeRoof(home, f, X0, Z0, X1, Z1, TOP, style)
+		ceilingLight(home, f, X0 + 7, 10.4, 0, 18)
+		ceilingLight(home, f, (P + X1) / 2, 10.4, 5, 12)
+		-- Inside.
+		kitchen(home, f * CFrame.new(X0 + 5, L1, Z1 - 2.4), 6, Color3.fromRGB(200, 196, 190))
+		diningSet(home, f * CFrame.new(X0 + 10, L1, 1.5), 4, Color3.fromRGB(140, 104, 72))
+		sofa(home, f * CFrame.new(X0 + 3, L1, -6) * CFrame.Angles(0, -math.pi / 2, 0), style.accent, 6)
+		plant(home, f * CFrame.new(P - 2, L1, Z0 + 2), 0.8)
+		bed(home, f * CFrame.new(X1 - 6, L1, 5) * CFrame.Angles(0, math.pi / 2, 0), style.accent)
+		local white = Color3.fromRGB(240, 242, 244)
+		part(home, "Shower", Vector3.new(3.4, 0.3, 3.4), f * CFrame.new(X1 - 2.8, L1 + 0.15, -6.5), white, Enum.Material.SmoothPlastic)
+		deco(part(home, "ShowerGlass", Vector3.new(0.2, 7, 3.4), f * CFrame.new(X1 - 4.6, L1 + 3.5, -6.5), GLASS, Enum.Material.Glass)).Transparency = 0.5
+		part(home, "Toilet", Vector3.new(1.6, 1.6, 2.2), f * CFrame.new(P + 2, L1 + 0.8, -7.8), white, Enum.Material.SmoothPlastic)
+		part(home, "Washbasin", Vector3.new(2.4, 3, 1.6), f * CFrame.new(P + 5.5, L1 + 1.5, -1.3), white, Enum.Material.Marble)
+		-- The garage, the drive, the path.
+		local gx = X1 + 7
+		World.EstateGarages[id] = garageBlock(home, f * CFrame.new(gx, 0, Z0), 1, 20, 10, wallC, wallM)
+		-- the block's edge (the house stands 5 forward of its lot's middle), or the road in front of its own lot
+		local lotFront = if onBlock then -(Map.SuburbLot / 2 - 5) - Map.SuburbInset else -plot.front - reach + 0.3
+		driveway(home, f, gx - 5, gx + 5, lotFront, Z0)
+		driveway(home, f, doorX - 2, doorX + 2, lotFront, Z0, Color3.fromRGB(200, 192, 176))
+		if id == "oak" then
+			box(home, "Porch", f, doorX - 6, 0, Z0 - 5, doorX + 6, 0.4, Z0, Color3.fromRGB(150, 110, 76), Enum.Material.WoodPlanks)
+			for _, side in { -1, 1 } do
+				part(home, "PorchPost", Vector3.new(0.6, 8.6, 0.6), f * CFrame.new(doorX + side * 5.4, 4.7, Z0 - 4.4), Color3.fromRGB(240, 240, 236), Enum.Material.Wood)
+			end
+			box(home, "PorchRoof", f, doorX - 6.5, 9, Z0 - 5.5, doorX + 6.5, 9.6, Z0, style.roof, Enum.Material.Slate)
+		elseif id == "birch" then
+			box(home, "Chimney", f, X0 + 3, TOP - 2, 2, X0 + 6, TOP + 7, 5, Color3.fromRGB(140, 80, 62), Enum.Material.Brick)
+		end
+		local lantern = deco(part(home, "Lantern", Vector3.new(0.8, 1.4, 0.8), f * CFrame.new(doorX + 3.4, L1 + 6.5, Z0 - 0.6), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+		DayNight.nightLight(lantern, Color3.fromRGB(255, 220, 150), Color3.fromRGB(150, 140, 110), "Glass")
+		registerHome(id, f, doorX, Z0, L1)
+		forSaleSign(home, id, f * CFrame.new(-3, 0, lotFront + 3), true)
+	end
+
+	-- The houses for sale on the Suburbs lots (suburbsBlock asks while it lays out the lots).
+	local HOUSE_PLOTS: { { id: string, plot: Map.EstatePlot } } = {}
+	for _, def in Config.Estate.Properties do
+		local plot = Map.EstatePlots[def.id]
+		if plot and def.kind == "house" and Map.blockAt(plot.x, plot.z) ~= nil then
+			table.insert(HOUSE_PLOTS, { id = def.id, plot = plot })
+		end
+	end
+
+	-- The house for sale on the Suburbs lot centred here, if any.
+	local function houseOnLot(lx: number, lz: number): (string?, Map.EstatePlot?)
+		for _, entry in HOUSE_PLOTS do
+			if math.abs(entry.plot.x - lx) < 2 and math.abs(entry.plot.z - lz) < Map.SuburbLot / 2 then
+				return entry.id, entry.plot
+			end
+		end
+		return nil, nil
+	end
+
+	buildEstateHouse = function(parent: Instance, lx: number, lz: number): boolean
+		local id, plot = houseOnLot(lx, lz)
+		if not id or not plot then
+			return false
+		end
+		local style = HOME_STYLES[id] or HOME_STYLES.elm
+		attempt(`house {id}`, function()
+			estateHouse(parent, id, plot, style)
+		end)
+		return true
+	end
+
+	-- ── Garages ────────────────────────────────────────────────────────────────
+
+	-- The Harbor Lockup: a rusty row of four lock-ups on a Harbor block, containers stacked behind.
+	buildLockup = function(parent: Instance, cx: number, cz: number)
+		local lockup = folder(parent, "HarborLockup")
+		sidewalk(lockup, cx, cz, Color3.fromRGB(120, 120, 116))
+		local plot = Map.EstatePlots.garage_harbor
+		if not plot then
+			return
+		end
+		local f = plotFrame(plot, WALK_TOP)
+		local color = Color3.fromRGB(176, 104, 54)
+		World.EstateGarages.garage_harbor = garageBlock(lockup, f * CFrame.new(0, 0, -plot.front), 4, plot.front + plot.back, 11, color, Enum.Material.CorrodedMetal)
+		sign(lockup, "HARBOR LOCKUP", Vector3.new(30, 3, 0.4), f * CFrame.new(0, 13.6, -plot.front - 0.3), Color3.fromRGB(255, 220, 120), Color3.fromRGB(50, 50, 54))
+		-- containers on the rest of the block, behind the lock-ups
+		for row = 0, 1 do
+			for col = -2, 2 do
+				if estateRng:NextNumber() < 0.8 then
+					local stack = estateRng:NextInteger(1, 3)
+					for level = 0, stack - 1 do
+						container(lockup, f * CFrame.new(col * 10, 4.25 + level * 8.6, plot.back + 18 + row * 22) * CFrame.Angles(0, math.rad(estateRng:NextNumber(-2, 2)), 0))
+					end
+				end
+			end
+		end
+		forSaleSign(lockup, "garage_harbor", f * CFrame.new(20, 0, -plot.front - 9))
+	end
+
+	-- Downtown Parking: an open parking deck in the safe zone, six bays under a roof deck.
+	buildParking = function(parent: Instance, cx: number, cz: number)
+		local parking = folder(parent, "DowntownParking")
+		sidewalk(parking, cx, cz, Color3.fromRGB(110, 110, 112))
+		local plot = Map.EstatePlots.garage_downtown
+		if not plot then
+			return
+		end
+		local f = plotFrame(plot, WALK_TOP)
+		local half, front, back = plot.w / 2, plot.front, plot.back
+		local concrete = Color3.fromRGB(150, 150, 146)
+		local H = 11
+		box(parking, "Deck", f, -half, 0, -front, half, 0.25, back, Color3.fromRGB(60, 60, 64), Enum.Material.Asphalt)
+		wall(parking, f, true, -half, half, back - 0.5, 0, H + 1.2, nil, concrete, Enum.Material.Concrete)
+		for _, side in { -1, 1 } do
+			wall(parking, f, false, -front, back - 1, side * (half - 0.5), 0, H + 1.2, { { at = 0, width = 44, bottom = 3.5, top = 9 } }, concrete, Enum.Material.Concrete)
+		end
+		for n = 0, 6 do
+			local x = -half + 1 + n * (plot.w - 2) / 6
+			box(parking, "Pillar", f, x - 1, 0, -front, x + 1, H, -front + 2, concrete, Enum.Material.Concrete)
+			if n > 0 and n < 6 then
+				deco(box(parking, "BayLine", f, x - 0.15, 0.25, -front + 3, x + 0.15, 0.3, back - 22, Color3.fromRGB(240, 240, 240)))
+			end
+		end
+		box(parking, "Lintel", f, -half, 9.5, -front, half, H, -front + 2, Color3.fromRGB(46, 90, 170), Enum.Material.SmoothPlastic)
+		box(parking, "RoofDeck", f, -half, H, -front, half, H + 1, back, concrete, Enum.Material.Concrete)
+		for _, edge in { { -half, -front, half, -front + 1 }, { -half, -front + 1, -half + 1, back - 1 }, { half - 1, -front + 1, half, back - 1 } } do
+			box(parking, "Parapet", f, edge[1], H + 1, edge[2], edge[3], H + 2.4, edge[4], concrete, Enum.Material.Concrete)
+		end
+		sign(parking, "DOWNTOWN PARKING", Vector3.new(40, 1.4, 0.3), f * CFrame.new(0, 10.25, -front - 0.2), Color3.fromRGB(255, 255, 255), Color3.fromRGB(46, 90, 170))
+		-- a tall P on a post at the corner
+		part(parking, "SignPost", Vector3.new(1, 22, 1), f * CFrame.new(-half + 3, 11, -front - 6), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+		local pSign = part(parking, "ParkingSign", Vector3.new(6, 6, 0.6), f * CFrame.new(-half + 3, 21, -front - 6), Color3.fromRGB(46, 90, 170), Enum.Material.SmoothPlastic)
+		sign(parking, "P", Vector3.new(5, 5, 0.1), pSign.CFrame * CFrame.new(0, 0, -0.36), Color3.fromRGB(255, 255, 255), Color3.fromRGB(46, 90, 170))
+		for _, x in { -half / 2, half / 2 } do
+			ceilingLight(parking, f, x, H, -4, 40)
+		end
+		World.EstateGarages.garage_downtown = f * CFrame.new((plot.w - 2) / 12, 0.5, -front - GARAGE_APRON)
+		forSaleSign(parking, "garage_downtown", f * CFrame.new(half - 6, 0, -front - 14))
+	end
+
+	-- The Highway Garage by the North Highway: four bays and an apron down to the road.
+	local function buildHighwayGarage(parent: Instance)
+		local plot = Map.EstatePlots.garage_north
+		if not plot then
+			return
+		end
+		local garage = folder(parent, "HighwayGarage")
+		local f = plotFrame(plot, PAD_TOP)
+		local reach = frontReach(plot)
+		lotPad(garage, f, plot, reach, Color3.fromRGB(120, 120, 116), Enum.Material.Concrete)
+		local color = Color3.fromRGB(70, 100, 130)
+		World.EstateGarages.garage_north = garageBlock(garage, f * CFrame.new(0, 0, -plot.front), 4, plot.front + plot.back, 12, color, Enum.Material.Metal)
+		sign(garage, "HIGHWAY GARAGE", Vector3.new(30, 3, 0.4), f * CFrame.new(0, 14.6, -plot.front - 0.3), Color3.fromRGB(120, 200, 255), Color3.fromRGB(34, 36, 40))
+		for n = 0, 4 do
+			cylinder(garage, "Tire", 1.4, 3.2, f * CFrame.new(-plot.w / 2 - 3, 0.7 + n * 1.45, plot.back - 4) * UPRIGHT, Color3.fromRGB(25, 25, 25), Enum.Material.Rubber)
+		end
+		barrel(garage, (f * CFrame.new(plot.w / 2 + 3, 0, plot.back - 3)).Position, Color3.fromRGB(170, 50, 40))
+		barrel(garage, (f * CFrame.new(plot.w / 2 + 3, 0, plot.back - 6.5)).Position, Color3.fromRGB(60, 90, 150))
+		forSaleSign(garage, "garage_north", f * CFrame.new(plot.w / 2 - 4, 0, -plot.front - reach + 3))
+	end
+
+	-- ── The towers ─────────────────────────────────────────────────────────────
+	-- A tower is a hollow shell with real rooms only where you can go: the lobby, the office floors and the roof. Every
+	-- room floor has a row of elevator doors on its back wall (the roof: on the lift's kiosk), one per other stop, a
+	-- glowing pad in front of each: step on it and you ride to the floor written over the door. You arrive in front of
+	-- the doors of that floor (World.EstateSpawns for an office floor).
+
+	type TowerLook = { body: Color3, material: Enum.Material, trim: Color3, glass: Color3 }
+	local TOWER_LOOKS: { [string]: TowerLook } = {
+		dispatchtower = { body = Color3.fromRGB(64, 70, 84), material = Enum.Material.Concrete, trim = Color3.fromRGB(255, 186, 60), glass = Color3.fromRGB(110, 160, 196) },
+		harborpoint = { body = Color3.fromRGB(176, 182, 186), material = Enum.Material.Concrete, trim = Color3.fromRGB(70, 200, 220), glass = Color3.fromRGB(120, 190, 210) },
+	}
+
+	local lastRide: { [Player]: number } = {}
+	Players.PlayerRemoving:Connect(function(player)
+		lastRide[player] = nil
+	end)
+
+	-- A pad that takes whoever steps on it to `target` (a character's root frame). Not from a seat, not twice a second.
+	local function ridePad(pad: BasePart, target: CFrame)
+		pad.CanTouch = true
+		pad.Touched:Connect(function(hit)
+			local character = hit.Parent
+			if not character or not character:IsA("Model") then
+				return
+			end
+			local player = Players:GetPlayerFromCharacter(character)
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if not player or not humanoid or humanoid.Health <= 0 or humanoid.SeatPart ~= nil then
+				return
+			end
+			local now = os.clock()
+			if now - (lastRide[player] or 0) < 1.5 then
+				return
+			end
+			lastRide[player] = now
+			character:PivotTo(target)
+		end)
+	end
+
+	type Stop = { floor: number, label: string, y: number, backZ: number }
+
+	-- The elevator doors and pads of one stop: one per other stop, along the wall at backZ (facing -Z).
+	local function elevatorBank(parent: Instance, f: CFrame, here: number, stops: { Stop }, arrivals: { CFrame }, look: TowerLook)
+		local stop = stops[here]
+		local count = #stops - 1
+		local k = 0
+		for index, other in stops do
+			if index == here then
+				continue
+			end
+			k += 1
+			local x = (k - (count + 1) / 2) * 12
+			local y, z = stop.y, stop.backZ
+			box(parent, "ElevatorFrame", f, x - 5, y, z - 0.3, x + 5, y + 10.2, z, look.body:Lerp(Color3.new(0, 0, 0), 0.4), Enum.Material.Metal)
+			for _, side in { -1, 1 } do
+				box(parent, "ElevatorDoor", f, x + side * 0.05, y, z - 0.6, x + side * 4, y + 9, z - 0.3, Color3.fromRGB(190, 194, 198), Enum.Material.Metal)
+			end
+			sign(parent, other.label, Vector3.new(9, 1.1, 0.1), f * CFrame.new(x, y + 9.6, z - 0.4), look.trim, Color3.fromRGB(24, 26, 30))
+			local pad = box(parent, "ElevatorPad", f, x - 4, y, z - 6, x + 4, y + 0.15, z - 0.8, look.trim, Enum.Material.Neon)
+			pad.CanCollide = false
+			pad.Transparency = 0.25
+			pad:SetAttribute("ElevatorTo", other.label)
+			ridePad(pad, arrivals[index])
+		end
+	end
+
+	-- An office floor: a desk with the company computer (the OfficePrompt), a meeting table, a lounge, the FOR SALE sign.
+	local function officeRoom(parent: Instance, f: CFrame, y: number, half: number, id: string, look: TowerLook)
+		local def = ESTATE[id]
+		deco(box(parent, "Carpet", f, -half + 1, y, -half + 1, half - 1, y + 0.05, half - 1, Color3.fromRGB(70, 74, 86), Enum.Material.Fabric))
+		-- the boss's desk by the front windows; the computer looks at the chair
+		local desk = f * CFrame.new(-half + 16, y, -half + 14)
+		part(parent, "Desk", Vector3.new(9, 0.4, 3.8), desk * CFrame.new(0, 3.2, 0), Color3.fromRGB(56, 44, 36), Enum.Material.Wood)
+		for _, side in { -1, 1 } do
+			part(parent, "DeskSide", Vector3.new(0.4, 3, 3.6), desk * CFrame.new(side * 4.2, 1.5, 0), Color3.fromRGB(40, 32, 26), Enum.Material.Wood)
+		end
+		local front = part(parent, "DeskFront", Vector3.new(8, 2.4, 0.3), desk * CFrame.new(0, 1.8, 1.7), Color3.fromRGB(40, 32, 26), Enum.Material.Wood)
+		front.CanCollide = false
+		part(parent, "MonitorStand", Vector3.new(0.4, 1, 0.4), desk * CFrame.new(0, 3.9, 0.6), Color3.fromRGB(30, 30, 32), Enum.Material.Metal)
+		local computer = part(parent, "Computer", Vector3.new(4, 2.4, 0.3), desk * CFrame.new(0, 5.4, 0.6), Color3.fromRGB(20, 22, 26), Enum.Material.SmoothPlastic)
+		local screen = Instance.new("SurfaceGui")
+		screen.Face = Enum.NormalId.Front
+		screen.PixelsPerStud = 40
+		screen.LightInfluence = 0
+		screen.Parent = computer
+		local text = Instance.new("TextLabel")
+		text.Size = UDim2.new(1, -8, 1, -8)
+		text.Position = UDim2.fromOffset(4, 4)
+		text.BackgroundColor3 = Color3.fromRGB(10, 26, 18)
+		text.Text = "DISPATCH\nyour couriers · your safe"
+		text.TextScaled = true
+		text.Font = Enum.Font.Code
+		text.TextColor3 = Color3.fromRGB(110, 255, 150)
+		text.Parent = screen
+		deco(part(parent, "Keyboard", Vector3.new(2.6, 0.1, 0.9), desk * CFrame.new(0, 3.45, -0.6), Color3.fromRGB(40, 40, 44), Enum.Material.SmoothPlastic))
+		local chair = desk * CFrame.new(0, 0, -3)
+		part(parent, "OfficeChair", Vector3.new(2.4, 0.6, 2.4), chair * CFrame.new(0, 2, 0), Color3.fromRGB(30, 30, 34), Enum.Material.Fabric)
+		part(parent, "OfficeChairBack", Vector3.new(2.4, 3, 0.4), chair * CFrame.new(0, 3.8, -1.1), Color3.fromRGB(30, 30, 34), Enum.Material.Fabric)
+		part(parent, "OfficeChairFoot", Vector3.new(0.4, 1.7, 0.4), chair * CFrame.new(0, 0.85, 0), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+		local p = Instance.new("ProximityPrompt")
+		p.Name = "OfficePrompt"
+		p.ActionText = "Run your company"
+		p.ObjectText = if def then def.name else "Office"
+		p.HoldDuration = 0
+		p.MaxActivationDistance = 10
+		p.RequiresLineOfSight = false
+		p:SetAttribute("Office", id)
+		p.Parent = computer
+		table.insert(World.OfficePrompts, { prompt = p, office = id })
+		-- the meeting table, the lounge, shelves and plants
+		diningSet(parent, f * CFrame.new(-half + 16, y, 6) * CFrame.Angles(0, math.pi / 2, 0), 10, Color3.fromRGB(230, 230, 226))
+		sofa(parent, f * CFrame.new(half - 6, y, -half + 14) * CFrame.Angles(0, math.pi / 2, 0), look.trim:Lerp(Color3.new(0, 0, 0), 0.35), 10)
+		coffeeTable(parent, f * CFrame.new(half - 12, y, -half + 14) * CFrame.Angles(0, math.pi / 2, 0))
+		rug(parent, f * CFrame.new(half - 11, y + 0.05, -half + 14), 12, 14, Color3.fromRGB(196, 186, 170))
+		for _, side in { -1, 1 } do
+			bookshelf(parent, f * CFrame.new(side * (half - 5), y, half - 2.2))
+			plant(parent, f * CFrame.new(side * (half - 3), y, -half + 3), 1.3)
+		end
+		sign(parent, if def then string.upper(def.name) else "OFFICE", Vector3.new(16, 2, 0.2), f * CFrame.new(0, y + 9, -half + 1.2) * CFrame.Angles(0, math.pi, 0), look.trim, Color3.fromRGB(24, 26, 30))
+		-- the FOR SALE sign, facing the elevators
+		forSaleSign(parent, id, f * CFrame.new(10, y, half - 24) * CFrame.Angles(0, math.pi, 0), true)
+		ceilingLight(parent, f, -half / 2, y + 11, 0, 34)
+		ceilingLight(parent, f, half / 2, y + 11, 0, 34)
+	end
+
+	local function buildTower(parent: Instance, tower: Map.Tower)
+		local look = TOWER_LOOKS[tower.id] or TOWER_LOOKS.dispatchtower
+		local model = folder(parent, tower.name)
+		local f = plotFrame({ x = tower.x, z = tower.z, facing = tower.facing, district = tower.district, w = tower.w, front = tower.w / 2, back = tower.w / 2 }, WALK_TOP)
+		local W, H = tower.w, tower.floorHeight
+		local half = W / 2
+		-- The offices on this tower's floors.
+		local offices: { [number]: string } = {}
+		for _, def in Config.Estate.Properties do
+			local plot = Map.EstatePlots[def.id]
+			if plot and plot.tower == tower.id and plot.floor then
+				offices[plot.floor] = def.id
+			end
+		end
+		local stops: { Stop } = { { floor = 1, label = "LOBBY", y = 0.4, backZ = half - 1 } }
+		for floor = 2, tower.floors do
+			local id = offices[floor]
+			if id then
+				local label = if floor == tower.floors then `{floor}F · PENTHOUSE` else `{floor}F · OFFICE`
+				table.insert(stops, { floor = floor, label = label, y = Map.floorHeight(tower, floor) + 0.4, backZ = half - 1 })
+			end
+		end
+		local roofY = tower.floors * H + 0.4
+		table.insert(stops, { floor = tower.floors + 1, label = "ROOF", y = roofY, backZ = half - 13 })
+		local arrivals: { CFrame } = {}
+		for index, stop in stops do
+			arrivals[index] = f * CFrame.new(0, stop.y + 3, stop.backZ - 14)
+		end
+		local room: { [number]: boolean } = { [1] = true }
+		for floor in offices do
+			room[floor] = true
+		end
+
+		-- The shell: real walls with windows on the room floors, plain bands with window strips in between.
+		local body, material = look.body, look.material
+		local floor = 1
+		while floor <= tower.floors do
+			local y0 = Map.floorHeight(tower, floor)
+			if room[floor] then
+				local y1 = y0 + H
+				local glassOpening: { Opening } = { { at = 0, width = W - 10, bottom = 1.4, top = 10.4, glass = true } }
+				if floor == 1 then
+					wall(model, f, true, -half, half, -half + 0.5, y0, y1, {
+						{ at = 0, width = 10, bottom = 0, top = 9.5 },
+						{ at = -(half / 2 + 3), width = half - 12, bottom = 0.4, top = 9.5, glass = true },
+						{ at = half / 2 + 3, width = half - 12, bottom = 0.4, top = 9.5, glass = true },
+					}, body, material)
+				else
+					wall(model, f, true, -half, half, -half + 0.5, y0, y1, glassOpening, body, material)
+				end
+				wall(model, f, true, -half, half, half - 0.5, y0, y1, nil, body, material)
+				for _, side in { -1, 1 } do
+					wall(model, f, false, -half + 1, half - 1, side * (half - 0.5), y0, y1, glassOpening, body, material)
+				end
+				-- its floor; its ceiling unless the floor above is a room too (that one lays its own floor)
+				box(model, "Floor", f, -half + 1, y0 - 0.6, -half + 1, half - 1, y0 + 0.4, half - 1, Color3.fromRGB(176, 172, 166), Enum.Material.Marble)
+				if floor < tower.floors and not room[floor + 1] then
+					box(model, "Ceiling", f, -half + 1, y1 - 0.6, -half + 1, half - 1, y1 + 0.4, half - 1, Color3.fromRGB(226, 226, 222), Enum.Material.SmoothPlastic)
+				end
+				floor += 1
+			else
+				local last = floor
+				while last + 1 <= tower.floors and not room[last + 1] do
+					last += 1
+				end
+				local y1 = Map.floorHeight(tower, last) + H
+				wall(model, f, true, -half, half, -half + 0.5, y0, y1, nil, body, material)
+				wall(model, f, true, -half, half, half - 0.5, y0, y1, nil, body, material)
+				for _, side in { -1, 1 } do
+					wall(model, f, false, -half + 1, half - 1, side * (half - 0.5), y0, y1, nil, body, material)
+				end
+				for level = floor, last do
+					local y = Map.floorHeight(tower, level) + 6
+					for side = 0, 3 do
+						local window = deco(part(model, "Window", Vector3.new(W - 6, 5, 0.3), f * CFrame.Angles(0, side * math.pi / 2, 0) * CFrame.new(0, y, -half - 0.1), Color3.fromRGB(30, 38, 48), Enum.Material.Glass))
+						if estateRng:NextNumber() < 0.3 then
+							nightWindow(window)
+						end
+					end
+				end
+				floor = last + 1
+			end
+		end
+		-- Corner trims up the whole height.
+		local height = tower.floors * H
+		for _, sx in { -1, 1 } do
+			for _, sz in { -1, 1 } do
+				box(model, "Trim", f, sx * half - 1.2, 0, sz * half - 1.2, sx * half + 1.2, height + 1.5, sz * half + 1.2, body:Lerp(Color3.new(0, 0, 0), 0.25), Enum.Material.Metal)
+			end
+		end
+		-- The roof: the slab, a glass railing, the lift's kiosk, a helipad, an antenna with a beacon, the name.
+		box(model, "Roof", f, -half, height - 0.6, -half, half, height + 0.4, half, Color3.fromRGB(120, 120, 118), Enum.Material.Concrete)
+		for _, edge in { { -half, -half, half, -half + 0.6 }, { -half, half - 0.6, half, half }, { -half, -half + 0.6, -half + 0.6, half - 0.6 }, { half - 0.6, -half + 0.6, half, half - 0.6 } } do
+			local rail = box(model, "Railing", f, edge[1], height + 0.4, edge[2], edge[3], height + 4, edge[4], GLASS, Enum.Material.Glass)
+			rail.Transparency = 0.5
+		end
+		local roofStop = stops[#stops]
+		local kioskHalf = (#stops - 1) * 6 + 2
+		box(model, "LiftKiosk", f, -kioskHalf, height + 0.4, roofStop.backZ, kioskHalf, height + 12, half - 3, body, material)
+		box(model, "LiftKioskRoof", f, -kioskHalf - 1, height + 12, roofStop.backZ - 1, kioskHalf + 1, height + 12.8, half - 2, look.trim, Enum.Material.Metal)
+		local helipad = cylinder(model, "Helipad", 0.2, 22, f * CFrame.new(0, height + 0.5, -half + 15) * UPRIGHT, Color3.fromRGB(60, 62, 66), Enum.Material.Concrete)
+		helipad.CanCollide = false
+		sign(model, "H", Vector3.new(8, 8, 0.05), f * CFrame.new(0, height + 0.62, -half + 15) * CFrame.Angles(-math.pi / 2, 0, 0), Color3.fromRGB(255, 255, 255), Color3.fromRGB(60, 62, 66))
+		part(model, "Antenna", Vector3.new(0.8, 26, 0.8), f * CFrame.new(-half + 6, height + 13, half - 6), Color3.fromRGB(180, 180, 184), Enum.Material.Metal)
+		local beacon = deco(part(model, "Beacon", Vector3.new(1.6, 1.6, 1.6), f * CFrame.new(-half + 6, height + 26.6, half - 6), Color3.fromRGB(140, 30, 30), Enum.Material.Glass))
+		light(beacon, 40, 2, Color3.fromRGB(255, 50, 50))
+		DayNight.nightLight(beacon, Color3.fromRGB(255, 40, 40), Color3.fromRGB(140, 30, 30), "Glass")
+		-- the name on top, lit at night (front and back)
+		for _, back in { false, true } do
+			local turn = if back then CFrame.Angles(0, math.pi, 0) else CFrame.new()
+			local at = f * turn * CFrame.new(0, height + 8, -half + 2)
+			for _, side in { -1, 1 } do
+				part(model, "SignPost", Vector3.new(0.6, 8, 0.6), at * CFrame.new(side * (half - 8), -4, 0.4), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+			end
+			sign(model, string.upper(tower.name), Vector3.new(W - 12, 5, 0.4), at, look.trim, Color3.fromRGB(20, 22, 26))
+		end
+		local crown = deco(box(model, "Crown", f, -half - 1.3, height + 0.4, -half - 1.3, half + 1.3, height + 1.2, half + 1.3, look.trim:Lerp(Color3.new(0, 0, 0), 0.5), Enum.Material.Metal))
+		DayNight.nightLight(crown, look.trim, crown.Color, "Metal")
+		-- The entrance: a canopy with the name, lanterns, a plaza.
+		box(model, "Canopy", f, -9, 10.2, -half - 6, 9, 10.8, -half, look.trim:Lerp(Color3.new(0, 0, 0), 0.3), Enum.Material.Metal)
+		sign(model, string.upper(tower.name), Vector3.new(24, 2.2, 0.3), f * CFrame.new(0, 11.2, -half - 0.3), look.trim, Color3.fromRGB(20, 22, 26))
+		local canopyLight = deco(box(model, "CanopyLight", f, -6, 10, -half - 4, 6, 10.2, -half - 2, Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+		light(canopyLight, 26, 1.4, Color3.fromRGB(255, 226, 170))
+		DayNight.nightLight(canopyLight, Color3.fromRGB(255, 230, 170), Color3.fromRGB(150, 140, 110), "Glass")
+		deco(box(model, "Plaza", f, -half, 0, -half - 14, half, 0.06, -half, Color3.fromRGB(176, 170, 160), Enum.Material.Slate))
+		for _, side in { -1, 1 } do
+			box(model, "Planter", f, side * (half - 8) - 4, 0, -half - 12, side * (half - 8) + 4, 1.6, -half - 4, Color3.fromRGB(110, 106, 100), Enum.Material.Concrete)
+			local p = (f * CFrame.new(side * (half - 8), 1.6, -half - 8)).Position
+			tree(model, p.X, p.Z, p.Y)
+		end
+
+		-- The lobby: the reception, a waiting corner, plants, the office directory (the offices' listings).
+		local lobbyY = stops[1].y
+		deco(box(model, "LobbyRug", f, -6, lobbyY, -half + 1, 6, lobbyY + 0.05, half - 8, Color3.fromRGB(150, 40, 40), Enum.Material.Fabric))
+		local reception = f * CFrame.new(-half + 14, lobbyY, -6)
+		part(model, "Reception", Vector3.new(14, 4, 3), reception * CFrame.new(0, 2, 0), Color3.fromRGB(60, 50, 44), Enum.Material.Wood)
+		part(model, "ReceptionTop", Vector3.new(14.4, 0.3, 3.4), reception * CFrame.new(0, 4.15, 0), Color3.fromRGB(226, 222, 214), Enum.Material.Marble)
+		sign(model, string.upper(tower.name), Vector3.new(12, 1.6, 0.1), reception * CFrame.new(0, 2.4, -1.56), look.trim, Color3.fromRGB(24, 26, 30))
+		bystander("clerk", "Mia, the receptionist", tower.name, reception * CFrame.new(0, 0, 3.4))
+		sofa(model, f * CFrame.new(half - 6, lobbyY, -8) * CFrame.Angles(0, math.pi / 2, 0), look.trim:Lerp(Color3.new(0, 0, 0), 0.3), 10)
+		coffeeTable(model, f * CFrame.new(half - 12, lobbyY, -8) * CFrame.Angles(0, math.pi / 2, 0))
+		for _, spot in { { -half + 3, -half + 3 }, { half - 3, -half + 3 }, { half - 3, 6 } } do
+			plant(model, f * CFrame.new(spot[1], lobbyY, spot[2]), 1.4)
+		end
+		local listing = 0
+		for floorNo = 2, tower.floors do
+			local id = offices[floorNo]
+			if id then
+				forSaleSign(model, id, f * CFrame.new(-half + 1.5, lobbyY, 4 + listing * 10) * CFrame.Angles(0, -math.pi / 2, 0), true)
+				listing += 1
+			end
+		end
+		ceilingLight(model, f, -half / 2, H - 0.6, 0, 36)
+		ceilingLight(model, f, half / 2, H - 0.6, 0, 36)
+
+		-- The offices.
+		for floorNo, id in offices do
+			officeRoom(model, f, Map.floorHeight(tower, floorNo) + 0.4, half, id, look)
+		end
+		-- The elevators: every stop's doors and pads, the arrival spots.
+		for index, stop in stops do
+			elevatorBank(model, f, index, stops, arrivals, look)
+			local id = offices[stop.floor]
+			if id then
+				World.EstateSpawns[id] = arrivals[index]
+			end
+		end
+	end
+
+	-- The tower's block: a plaza sidewalk; the tower itself.
+	buildTowerBlock = function(parent: Instance, towerId: string, cx: number, cz: number)
+		local tower = Map.Towers[towerId]
+		local block = folder(parent, if tower then tower.name else towerId)
+		sidewalk(block, cx, cz, Color3.fromRGB(160, 156, 150))
+		if tower then
+			attempt(tower.name, function()
+				buildTower(block, tower)
+			end)
+		end
+	end
+
+	-- ── Sunset Hills and the homes ─────────────────────────────────────────────
+	-- Sunset Hills above the city (north-east of Downtown): the hills (terrain, cut away under the lot and the road), the
+	-- gate on Sunset Drive, its lamps and turning circle, pines on the slopes. The mansions and the villas stand each in
+	-- their own spot (buildHomes): the Hilltop Mansion up here, Ocean View on the coast with rocks, palms and a pier on
+	-- the sea, Pinecrest among the pines, the Lakeside Villa with a jetty onto the frozen lake, the Sunset Villa.
+
+	type Hill = { x: number, z: number, radius: number, depth: number }
+	local HILLS: { Hill } = {
+		{ x = 410, z = -900, radius = 120, depth = 85 },
+		{ x = 420, z = -1080, radius = 110, depth = 78 },
+		{ x = 670, z = -770, radius = 100, depth = 76 },
+		{ x = 610, z = -1310, radius = 130, depth = 90 },
+		{ x = 690, z = -1080, radius = 90, depth = 72 },
+	}
+
+	local function inLot(plot: Map.EstatePlot, x: number, z: number, margin: number): boolean
+		local ax, az = Map.plotPoint(plot, -plot.w / 2 - margin, -plot.front - margin - 20)
+		local bx, bz = Map.plotPoint(plot, plot.w / 2 + margin, plot.back + margin)
+		return x > math.min(ax, bx) and x < math.max(ax, bx) and z > math.min(az, bz) and z < math.max(az, bz)
+	end
+
+	nearAnyLot = function(x: number, z: number, margin: number): boolean
+		for _, plot in Map.EstatePlots do
+			if inLot(plot, x, z, margin) then
+				return true
+			end
+		end
+		return false
+	end
+
+	buildSunsetHills = function(world: Instance)
+		local hills = folder(world, "SunsetHills")
+		local terrain = workspace.Terrain
+		local drive: { Map.Segment } = {}
+		for _, s in Map.Connectors do
+			if s.name == "Sunset Drive" then
+				table.insert(drive, s)
+			end
+		end
+		local function nearDrive(x: number, z: number, margin: number): boolean
+			for _, s in drive do
+				local dx, dz = s.bx - s.ax, s.bz - s.az
+				local t = math.clamp(((x - s.ax) * dx + (z - s.az) * dz) / (dx * dx + dz * dz), 0, 1)
+				if math.sqrt((x - s.ax - dx * t) ^ 2 + (z - s.az - dz * t) ^ 2) < s.width / 2 + margin then
+					return true
+				end
+			end
+			return false
+		end
+		-- The hills, then the lots and the road cut out of them; pines on the slopes.
+		for _, hill in HILLS do
+			terrain:FillBall(Vector3.new(hill.x, -hill.depth, hill.z), hill.radius, Enum.Material.Grass)
+		end
+		for _, plot in Map.EstatePlots do
+			if plot.district == "sunsethills" then
+				local ax, az = Map.plotPoint(plot, -plot.w / 2 - 6, -plot.front - 40)
+				local bx, bz = Map.plotPoint(plot, plot.w / 2 + 6, plot.back + 6)
+				local x0, x1 = math.min(ax, bx), math.max(ax, bx)
+				local z0, z1 = math.min(az, bz), math.max(az, bz)
+				terrain:FillBlock(CFrame.new((x0 + x1) / 2, 40.5, (z0 + z1) / 2), Vector3.new(x1 - x0, 80, z1 - z0), Enum.Material.Air)
+			end
+		end
+		for _, s in drive do
+			local frame, length = segmentFrame(s, 40.5)
+			terrain:FillBlock(frame, Vector3.new(s.width + 16, 80, length + 16), Enum.Material.Air)
+		end
+		for _, hill in HILLS do
+			local ground = math.sqrt(hill.radius ^ 2 - hill.depth ^ 2)
+			for _ = 1, 9 do
+				local angle = estateRng:NextNumber(0, math.pi * 2)
+				local d = estateRng:NextNumber(0, ground * 0.8)
+				local x, z = hill.x + math.cos(angle) * d, hill.z + math.sin(angle) * d
+				if Map.inWater(x, z) or nearAnyLot(x, z, 8) or nearDrive(x, z, 10) then
+					continue
+				end
+				pine(hills, x, z, -hill.depth + math.sqrt(hill.radius ^ 2 - d * d) - 1)
+			end
+		end
+		-- The gate where the drive leaves Downtown: stone pillars, an arch with the name both ways, lanterns.
+		local start, second = Map.SunsetDrive[1], Map.SunsetDrive[2]
+		local a, b = Vector3.new(start[1], 0, start[2]), Vector3.new(second[1], 0, second[2])
+		local gate = CFrame.lookAt(a + (b - a).Unit * 70, b) -- looking up the drive
+		local stone = Color3.fromRGB(196, 170, 140)
+		for _, side in { -1, 1 } do
+			local pillar = gate * CFrame.new(side * (ROAD / 2 + 4), 0, 0)
+			part(hills, "GatePillar", Vector3.new(5, 22, 5), pillar * CFrame.new(0, 11, 0), stone, Enum.Material.Sandstone)
+			part(hills, "GatePillarCap", Vector3.new(6, 1.2, 6), pillar * CFrame.new(0, 22.6, 0), stone:Lerp(Color3.new(1, 1, 1), 0.2), Enum.Material.Sandstone)
+			local lantern = deco(part(hills, "Lantern", Vector3.new(1.4, 2.2, 1.4), pillar * CFrame.new(0, 24.4, 0), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
+			light(lantern, 30, 1.4, Color3.fromRGB(255, 200, 140))
+			DayNight.nightLight(lantern, Color3.fromRGB(255, 210, 140), Color3.fromRGB(150, 140, 110), "Glass")
+			for k = 1, 3 do
+				local p = (pillar * CFrame.new(side * (6 + k * 7), 0, estateRng:NextNumber(-3, 3))).Position
+				pine(hills, p.X, p.Z, 0)
+			end
+		end
+		part(hills, "GateArch", Vector3.new(ROAD + 14, 3, 4), gate * CFrame.new(0, 21, 0), stone, Enum.Material.Sandstone)
+		for _, way in { 1, -1 } do
+			sign(hills, "SUNSET HILLS", Vector3.new(ROAD + 6, 3.4, 0.3), gate * CFrame.Angles(0, if way == 1 then math.pi else 0, 0) * CFrame.new(0, 21, -2.2), Color3.fromRGB(255, 170, 90), Color3.fromRGB(60, 34, 30))
+		end
+		-- Lamps along the drive (not on a driveway), the turning circle at its end.
+		for n, s in drive do
+			local frame, length = segmentFrame(s, ROAD_TOP)
+			local count = math.max(1, math.floor(length / 70))
+			for k = 1, count do
+				local side = if (n + k) % 2 == 0 then 1 else -1
+				local p = (frame * CFrame.new(side * (s.width / 2 + 3), 0, (k / (count + 1) - 0.5) * length)).Position
+				if Map.inYard(p.X, p.Z) or nearAnyLot(p.X, p.Z, 2) then
+					continue
+				end
+				lamp(hills, p.X, p.Z, 0, frame.RightVector * -side, k % 2 == 0)
+			end
+		end
+		local last = Map.SunsetDrive[#Map.SunsetDrive]
+		cylinder(hills, "TurningCircle", 0.4, ROAD * 1.6, CFrame.new(last[1], ROAD_TOP - 0.25, last[2]) * UPRIGHT, ASPHALT, Enum.Material.Asphalt)
+	end
+
+	-- Every mansion and villa where Map.EstatePlots puts it, with what its spot calls for.
+	local function buildHomes(world: Instance)
+		local homes = folder(world, "Homes")
+		for _, def in Config.Estate.Properties do
+			local plot = Map.EstatePlots[def.id]
+			local style = HOME_STYLES[def.id]
+			if not plot or not style or (def.kind ~= "mansion" and def.kind ~= "villa") then
+				continue
+			end
+			attempt(def.name, function()
+				if def.kind == "mansion" then
+					mansion(homes, def.id, plot, style)
+				else
+					villa(homes, def.id, plot, style)
+				end
+			end)
+		end
+		-- Ocean View: a pier on the sea behind the garden, palms and rocks along the cliff edge.
+		local oceanview = Map.EstatePlots.oceanview
+		if oceanview then
+			attempt("Ocean View's coast", function()
+				local bx, bz = Map.plotPoint(oceanview, -10, oceanview.back)
+				pier(homes, Vector3.new(bx, 0.6, bz), Vector3.new(Map.Sea.x0 + 70, 0.6, bz))
+				for _, dz in { -44, -22, 18, 40 } do
+					palm(homes, Map.Sea.x0 - 14, bz + dz, 0)
+				end
+				for k = 1, 9 do
+					local z = bz - 100 + k * 20
+					if math.abs(z - bz) < 10 then
+						continue -- the pier
+					end
+					local rock = part(homes, "Rock", Vector3.new(estateRng:NextNumber(6, 12), estateRng:NextNumber(4, 9), estateRng:NextNumber(6, 12)), CFrame.new(Map.Sea.x0 - 4, 1, z) * CFrame.Angles(estateRng:NextNumber(-0.3, 0.3), estateRng:NextNumber(0, 3), estateRng:NextNumber(-0.3, 0.3)), Color3.fromRGB(120, 112, 104), Enum.Material.Rock)
+					rock.CanCollide = true
+				end
+			end)
+		end
+		-- The Lakeside Villa: a jetty from its side garden out onto the frozen lake.
+		local lakeside = Map.EstatePlots.lakeside
+		if lakeside then
+			attempt("the Lakeside jetty", function()
+				local sx, sz = Map.plotPoint(lakeside, -lakeside.w / 2, 12)
+				pier(homes, Vector3.new(sx, 0.6, sz), Vector3.new(Map.Lake.x1 - 40, 0.6, sz))
+			end)
+		end
+		-- Pinecrest: a pine wood all around the lot.
+		local pinecrest = Map.EstatePlots.pinecrest
+		if pinecrest then
+			for _ = 1, 26 do
+				local right = estateRng:NextNumber(-pinecrest.w / 2 - 50, pinecrest.w / 2 + 50)
+				local back = estateRng:NextNumber(-pinecrest.front - 10, pinecrest.back + 50)
+				local x, z = Map.plotPoint(pinecrest, right, back)
+				local rx, rz = Map.nearestRoad(x, z)
+				if inLot(pinecrest, x, z, 6) or math.sqrt((x - rx) ^ 2 + (z - rz) ^ 2) < ROAD / 2 + 8 then
+					continue
+				end
+				pine(homes, x, z, 0)
+			end
+		end
+	end
+
+	-- The real estate outside the blocks: the mansions and the villas, the houses on their own lots (Birch Cottage) and
+	-- the Highway Garage. (The houses on the Suburbs lots, the lockup, the parking house and the towers are built with
+	-- their districts, Sunset Hills' drive and hills by buildSunsetHills.)
+	buildEstate = function(world: Instance)
+		local estate = folder(world, "Estate")
+		buildHomes(estate)
+		for _, def in Config.Estate.Properties do
+			local plot = Map.EstatePlots[def.id]
+			if plot and def.kind == "house" and Map.blockAt(plot.x, plot.z) == nil then
+				attempt(`house {def.id}`, function()
+					estateHouse(estate, def.id, plot, HOME_STYLES[def.id] or HOME_STYLES.elm)
+				end)
+			end
+		end
+		attempt("Highway Garage", function()
+			buildHighwayGarage(estate)
+		end)
+		-- Every property got its spots? (A failed build leaves a fallback in front of the plot, so nothing breaks.)
+		for _, def in Config.Estate.Properties do
+			local plot = Map.EstatePlots[def.id]
+			if not plot then
+				continue
+			end
+			local ground = groundAt(plot.x, plot.z)
+			local fx, fz = Map.plotPoint(plot, 0, -plot.front - GARAGE_APRON)
+			local out = Vector3.new(plot.facing.x, 0, plot.facing.z)
+			if def.kind ~= "office" and not World.EstateGarages[def.id] then
+				warn(`[World] {def.id}: no garage spot, using the front of the plot`)
+				World.EstateGarages[def.id] = CFrame.lookAt(Vector3.new(fx, ground + 0.5, fz), Vector3.new(fx, ground + 0.5, fz) + out)
+			end
+			if (def.kind ~= "garage") and not World.EstateSpawns[def.id] then
+				warn(`[World] {def.id}: no spawn, using the front of the plot`)
+				World.EstateSpawns[def.id] = CFrame.lookAt(Vector3.new(fx, ground + 3, fz), Vector3.new(fx, ground + 3, fz) - out)
+			end
+		end
+	end
+end
+defineRealEstate()
+
 -- ── Scattered things ───────────────────────────────────────────────────────
 
 local function insideDistrict(x: number, z: number, margin: number): boolean
@@ -1941,7 +3333,8 @@ local function buildForests(parent: Instance)
 		end
 		local x = rng:NextNumber(b.x0 + 40, b.x1 - 40)
 		local z = rng:NextNumber(b.z0 + 40, b.z1 - 40)
-		if Map.inWater(x, z) or insideDistrict(x, z, 20) or nearArea(Map.Yards, x, z, 30) or nearArea(Map.Clearings, x, z, 14) or Map.onIce(x, z) then
+		if Map.inWater(x, z) or insideDistrict(x, z, 20) or nearArea(Map.Yards, x, z, 30) or nearArea(Map.Clearings, x, z, 14) or Map.onIce(x, z)
+			or nearArea({ Map.SunsetHills }, x, z, 10) or nearAnyLot(x, z, 12) then
 			continue
 		end
 		if (Vector3.new(x - m.x, 0, z - m.z)).Magnitude < m.radius + 60 then
@@ -1974,7 +3367,7 @@ local function buildRoadWrecks(parent: Instance)
 		local s = segments[rng:NextInteger(1, #segments)]
 		local t = rng:NextNumber(0.1, 0.9)
 		local x, z = s.ax + (s.bx - s.ax) * t, s.az + (s.bz - s.az) * t
-		if Map.isSafe(x, z) or s.kind == "bridge" or s.name == "Ranch Road" or s.name == "Riding School Lane" or not clearOfSpots(x, z, 40) then
+		if Map.isSafe(x, z) or s.kind == "bridge" or s.name == "Ranch Road" or s.name == "Riding School Lane" or table.find(Map.EstateRoads, s.name or "") ~= nil or nearAnyLot(x, z, 30) or not clearOfSpots(x, z, 40) then
 			continue
 		end
 		local dx, dz = s.bx - s.ax, s.bz - s.az
@@ -2081,6 +3474,12 @@ function World.build()
 	end
 	piece("roads and bridges", function()
 		buildConnectors(world)
+	end)
+	piece("Sunset Hills", function()
+		buildSunsetHills(world)
+	end)
+	piece("estate", function()
+		buildEstate(world)
 	end)
 	piece("mountain", function()
 		buildMountain(world)

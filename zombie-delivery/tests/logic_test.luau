@@ -558,6 +558,395 @@ end)())
 check("night numbers make sense", dn.DayLength >= 120 and dn.NightFrom > 12 and dn.NightTo < 12 and dn.NightPay > 1
 	and dn.NightWaves >= 1 and dn.NightRoam >= 1 and not Map.isNight(dn.StartHour))
 
+-- Zombie Delivery 2.6: the real estate (Map.EstatePlots, Map.Towers, Sunset Hills) ------------------------------
+
+local Roads = require("./Roads")
+local estate = Config.Estate.Properties
+local defs: { [string]: Config.EstateDef } = {}
+local kinds: { [string]: number } = {}
+for _, def in estate do
+	defs[def.id] = def
+	kinds[def.kind] = (kinds[def.kind] or 0) + 1
+end
+check("3 mansions, 2 villas, 4 houses, 3 garages, 3 offices", kinds.mansion == 3 and kinds.villa == 2 and kinds.house == 4
+	and kinds.garage == 3 and kinds.office == 3)
+check("every property has a plot, every plot a property", (function()
+	for _, def in estate do
+		if not Map.EstatePlots[def.id] then
+			print("  no plot:", def.id)
+			return false
+		end
+	end
+	for id in Map.EstatePlots do
+		if not defs[id] then
+			print("  plot of nothing:", id)
+			return false
+		end
+	end
+	return true
+end)())
+
+-- The lot of a plot as a box on the map (the facings run along X or Z, so it is axis-aligned).
+local function lotBox(plot: Map.EstatePlot, grow: number): (number, number, number, number)
+	local ax, az = Map.plotPoint(plot, -plot.w / 2 - grow, -plot.front - grow)
+	local bx, bz = Map.plotPoint(plot, plot.w / 2 + grow, plot.back + grow)
+	return math.min(ax, bx), math.min(az, bz), math.max(ax, bx), math.max(az, bz)
+end
+-- Somewhere on the lot (u, v from 0 to 1 across and along it).
+local function onLot(plot: Map.EstatePlot, u: number, v: number): (number, number)
+	return Map.plotPoint(plot, -plot.w / 2 + plot.w * u, -plot.front + (plot.front + plot.back) * v)
+end
+local function toSegmentDistance(s: Map.Segment, x: number, z: number): number
+	local dx, dz = s.bx - s.ax, s.bz - s.az
+	local length2 = dx * dx + dz * dz
+	local t = if length2 > 0 then math.clamp(((x - s.ax) * dx + (z - s.az) * dz) / length2, 0, 1) else 0
+	return math.sqrt((x - s.ax - dx * t) ^ 2 + (z - s.az - dz * t) ^ 2)
+end
+local function distanceToRoad(x: number, z: number): number
+	local rx, rz = Map.nearestRoad(x, z)
+	return math.sqrt((x - rx) ^ 2 + (z - rz) ^ 2)
+end
+
+for id, plot in Map.EstatePlots do
+	local def = defs[id]
+	local problem: string? = nil
+	local fx, fz = plot.facing.x, plot.facing.z
+	if math.abs(fx) + math.abs(fz) ~= 1 or fx * fz ~= 0 then
+		problem = "facing is not along X or Z"
+	end
+	-- The whole lot: in bounds, dry, off the roads, the ice and the yards.
+	for a = 0, 8 do
+		for c = 0, 8 do
+			local x, z = onLot(plot, a / 8, c / 8)
+			if problem then
+				break
+			elseif not inBounds(x, z) or x < b.x0 + 20 or x > b.x1 - 20 or z < b.z0 + 20 or z > b.z1 - 20 then
+				problem = `out of bounds at {x}, {z}`
+			elseif Map.inWater(x, z) or Map.onIce(x, z) then
+				problem = `in the water at {x}, {z}`
+			elseif Map.onRoad(x, z) then
+				problem = `on a road at {x}, {z}`
+			elseif not plot.tower and Map.inYard(x, z) then
+				problem = `in a yard at {x}, {z}`
+			end
+		end
+	end
+	-- Its road: straight out of the front, a few strides from the door.
+	local reaches = false
+	for k = 0, 45, 1 do
+		local x, z = Map.plotPoint(plot, 0, -plot.front - k)
+		if Map.onRoad(x, z) then
+			reaches = true
+			break
+		end
+	end
+	if not problem and not reaches then
+		problem = "no road in front"
+	end
+	-- Homes and garages: the car comes out of the garage onto its road.
+	if not problem and def and def.kind ~= "office" then
+		local gx, gz = Map.plotPoint(plot, 0, -plot.front - Map.GarageApron)
+		if distanceToRoad(gx, gz) > 40 or Map.inWater(gx, gz) then
+			problem = `garage apron {math.floor(distanceToRoad(gx, gz))} studs from the road`
+		end
+	end
+	if problem then
+		print("  bad plot:", id, problem)
+	end
+	check(`plot {id}: in bounds, dry, off the roads, a road in front`, problem == nil, problem)
+end
+
+check("plots do not overlap (but offices share their tower)", (function()
+	local list = {}
+	for id, plot in Map.EstatePlots do
+		table.insert(list, { id = id, plot = plot })
+	end
+	for n, a in list do
+		for m = n + 1, #list do
+			local other = list[m]
+			if a.plot.tower and a.plot.tower == other.plot.tower then
+				continue
+			end
+			local ax0, az0, ax1, az1 = lotBox(a.plot, 2)
+			local bx0, bz0, bx1, bz1 = lotBox(other.plot, 2)
+			if ax0 < bx1 and bx0 < ax1 and az0 < bz1 and bz0 < az1 then
+				print("  overlap:", a.id, other.id)
+				return false
+			end
+		end
+	end
+	return true
+end)())
+
+local hills = Map.SunsetHills
+local function inHills(x: number, z: number): boolean
+	return x >= hills.x0 and x <= hills.x1 and z >= hills.z0 and z <= hills.z1
+end
+local function plotDistance(a: Map.EstatePlot, c: Map.EstatePlot): number
+	return math.sqrt((a.x - c.x) ^ 2 + (a.z - c.z) ^ 2)
+end
+check("Sunset Hills holds the Hilltop Mansion and at most one mansion and one villa", (function()
+	local count = { mansion = 0, villa = 0, other = 0 }
+	for _, def in estate do
+		local plot = Map.EstatePlots[def.id]
+		if plot and plot.district == "sunsethills" then
+			local x0, z0, x1, z1 = lotBox(plot, 0)
+			if not inHills(x0, z0) or not inHills(x1, z1) then
+				print("  not inside the hills:", def.id)
+				return false
+			end
+			local k = if def.kind == "mansion" or def.kind == "villa" then def.kind else "other"
+			count[k] += 1
+		end
+	end
+	local hilltop = Map.EstatePlots.hilltop
+	return hilltop ~= nil and hilltop.district == "sunsethills" and count.mansion == 1 and count.villa <= 1 and count.other == 0
+end)())
+check("the homes are spread: every mansion and villa in its own area, far apart", (function()
+	local homes: { { id: string, plot: Map.EstatePlot } } = {}
+	local areas: { [string]: boolean } = {}
+	for _, def in estate do
+		local plot = Map.EstatePlots[def.id]
+		if plot and (def.kind == "mansion" or def.kind == "villa") then
+			if areas[plot.district] and plot.district ~= "sunsethills" then
+				print("  two homes in", plot.district)
+				return false
+			end
+			areas[plot.district] = true
+			table.insert(homes, { id = def.id, plot = plot })
+		end
+	end
+	for n, a in homes do
+		for m = n + 1, #homes do
+			local c = homes[m]
+			if plotDistance(a.plot, c.plot) < 500 then
+				print("  too close:", a.id, c.id, plotDistance(a.plot, c.plot))
+				return false
+			end
+		end
+	end
+	return #homes == 5
+end)())
+check("a mansion on the coast, one in the countryside, a villa by the frozen lake", (function()
+	local ocean, pines, lake = Map.EstatePlots.oceanview, Map.EstatePlots.pinecrest, Map.EstatePlots.lakeside
+	if not ocean or not pines or not lake then
+		return false
+	end
+	local ox1 = math.max((Map.plotPoint(ocean, 0, ocean.back)), (Map.plotPoint(ocean, 0, -ocean.front)))
+	local lx0 = math.min((Map.plotPoint(lake, -lake.w / 2, 0)), (Map.plotPoint(lake, lake.w / 2, 0)))
+	return Map.Sea.x0 - ox1 < 150 and ocean.x > Map.River.x1 and Map.blockAt(ocean.x, ocean.z) == nil
+		and pines.x < -1200 and Map.blockAt(pines.x, pines.z) == nil
+		and lx0 - Map.Lake.x1 < 40 and lx0 > Map.Lake.x1 and math.abs(lake.z - (Map.Lake.z0 + Map.Lake.z1) / 2) < 200
+end)())
+check("Sunset Hills is dry, in bounds and off the other yards", not Map.inWater(hills.x0, hills.z0) and not Map.inWater(hills.x1 - 15, hills.z1)
+	and inBounds(hills.x0, hills.z0) and inBounds(hills.x1, hills.z1) and (function()
+		for _, yard in Map.Yards do
+			if yard.x0 < hills.x1 and hills.x0 < yard.x1 and yard.z0 < hills.z1 and hills.z0 < yard.z1 then
+				return false
+			end
+		end
+		return true
+	end)())
+check("the houses: on Suburbs blocks (inside their block) or at the edge of town, each on its own street", (function()
+	local streets: { [string]: boolean } = {}
+	local suburbs = Map.Districts[3]
+	local sx0, sx1, sz0, sz1 = Map.districtEdges(suburbs)
+	for _, def in estate do
+		local plot = Map.EstatePlots[def.id]
+		if def.kind ~= "house" or not plot then
+			continue
+		end
+		local d, i, j = Map.blockAt(plot.x, plot.z)
+		if d then
+			if d.id ~= "suburbs" or Map.special(d.id, i, j) then
+				print("  on a special block:", def.id)
+				return false
+			end
+			local x0, z0, x1, z1 = lotBox(plot, 0)
+			local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
+			local half = Map.BlockSize / 2
+			if x0 < cx - half or x1 > cx + half or z0 < cz - half or z1 > cz + half then
+				print("  off its block:", def.id)
+				return false
+			end
+		elseif plot.x < sx0 - 250 or plot.x > sx1 + 250 or plot.z < sz0 - 250 or plot.z > sz1 + 250 then
+			print("  not at the edge of town:", def.id)
+			return false
+		end
+		-- the road in front of it: its centre line (a street along X is keyed by its z, along Z by its x)
+		local fx, fz = Map.plotPoint(plot, 0, -plot.front - 12)
+		local rx, rz, dx = Map.nearestRoad(fx, fz)
+		local key = if math.abs(dx) > 0.5 then `z{math.floor(rz + 0.5)}` else `x{math.floor(rx + 0.5)}`
+		if streets[key] then
+			print("  two houses on one street:", def.id, key)
+			return false
+		end
+		streets[key] = true
+	end
+	return true
+end)())
+check("the garages: at the harbor, on the North Highway and downtown", (function()
+	local lockup, parking = Map.EstatePlots.garage_harbor, Map.EstatePlots.garage_downtown
+	local north = Map.EstatePlots.garage_north
+	if not lockup or not parking or not north then
+		return false
+	end
+	local d1, i1, j1 = Map.blockAt(lockup.x, lockup.z)
+	local d2, i2, j2 = Map.blockAt(parking.x, parking.z)
+	local onHighway = false
+	for _, s in Map.Connectors do
+		local gx, gz = Map.plotPoint(north, 0, -north.front - Map.GarageApron)
+		if s.name == "North Highway" and toSegmentDistance(s, gx, gz) < s.width / 2 + 12 then
+			onHighway = true
+		end
+	end
+	return d1 ~= nil and d1.id == "harbor" and Map.special("harbor", i1, j1) == "lockup"
+		and d2 ~= nil and d2.id == "downtown" and Map.special("downtown", i2, j2) == "parking" and onHighway
+end)())
+check("the towers: 10+ floors, on their own block, the offices on their upper floors", (function()
+	local count = 0
+	for id, tower in Map.Towers do
+		count += 1
+		local d, i, j = Map.blockAt(tower.x, tower.z)
+		if tower.floors < 10 or tower.id ~= id or not d or Map.special(d.id, i, j) ~= id or tower.w > Map.BlockSize - 20 then
+			print("  bad tower:", id)
+			return false
+		end
+	end
+	local floors: { [string]: boolean } = {}
+	for _, def in estate do
+		local plot = Map.EstatePlots[def.id]
+		if def.kind == "office" then
+			local tower = plot and plot.tower and Map.Towers[plot.tower]
+			local floor = plot and plot.floor
+			if not plot or not tower or not floor or floor < 2 or floor > tower.floors or floors[`{tower.id}:{floor}`] then
+				print("  bad office:", def.id)
+				return false
+			end
+			floors[`{tower.id}:{floor}`] = true
+			if plot.x ~= tower.x or plot.z ~= tower.z then
+				return false
+			end
+		end
+	end
+	return count == 2 and Map.Towers.dispatchtower ~= nil and Map.Towers.harborpoint ~= nil
+		and Map.floorHeight(Map.Towers.dispatchtower, 1) == 0 and Map.floorHeight(Map.Towers.dispatchtower, 3) == 2 * Map.Towers.dispatchtower.floorHeight
+end)())
+check("the penthouse is the top floor", (function()
+	local plot = Map.EstatePlots.office_penthouse
+	local tower = plot and plot.tower and Map.Towers[plot.tower]
+	return tower ~= nil and plot.floor == tower.floors
+end)())
+
+-- Sunset Drive: joins the network at Downtown, stays dry and in bounds, winds up into the hills. The lanes to the other
+-- homes join the network too.
+do
+	local pieces: { Map.Segment } = {}
+	for _, s in Map.Connectors do
+		if s.name == "Sunset Drive" then
+			table.insert(pieces, s)
+		end
+	end
+	local function joins(s: Map.Segment): boolean
+		for _, o in Map.Segments do
+			if o.name ~= s.name and onSegment(o, s.ax, s.az) then
+				return true
+			end
+		end
+		return false
+	end
+	local first = pieces[1]
+	check("Sunset Drive joins Downtown's roads", #pieces >= 5 and first ~= nil and joins(first))
+	local dry, bends = true, 0
+	for n, s in pieces do
+		for t = 0, 1, 0.1 do
+			local x, z = s.ax + (s.bx - s.ax) * t, s.az + (s.bz - s.az) * t
+			if Map.inWater(x, z) or not inBounds(x, z) or Map.inYard(x, z) then
+				dry = false
+			end
+		end
+		local nextPiece = pieces[n + 1]
+		if nextPiece then
+			if nextPiece.ax ~= s.bx or nextPiece.az ~= s.bz then
+				dry = false -- a gap
+			end
+			local ux, uz = s.bx - s.ax, s.bz - s.az
+			local vx, vz = nextPiece.bx - nextPiece.ax, nextPiece.bz - nextPiece.az
+			if math.abs(ux * vz - uz * vx) > 1e-6 then
+				bends += 1
+			end
+		end
+	end
+	check("Sunset Drive is dry, in bounds and winds", dry and bends >= 4, bends)
+	local last = pieces[#pieces]
+	check("Sunset Drive ends in the hills", last ~= nil and inHills(last.bx, last.bz))
+	-- No other road through the hills.
+	local crossed = false
+	for _, s in Map.Segments do
+		if s.name ~= "Sunset Drive" and (inHills(s.ax, s.az) or inHills(s.bx, s.bz)) then
+			crossed = true
+		end
+	end
+	check("the hills are the drive's alone", not crossed)
+	for _, name in Map.EstateRoads do
+		local found, ok = false, true
+		for _, s in Map.Connectors do
+			if s.name == name then
+				if not found and not joins(s) then
+					ok = false
+				end
+				found = true
+				for t = 0, 1, 0.1 do
+					local x, z = s.ax + (s.bx - s.ax) * t, s.az + (s.bz - s.az) * t
+					if Map.inWater(x, z) or not inBounds(x, z) or Map.inYard(x, z) then
+						ok = false
+					end
+				end
+			end
+		end
+		check(`{name} joins the network, dry and in bounds`, found and ok)
+	end
+end
+
+check("every property is reachable by road from the depot", (function()
+	for id, plot in Map.EstatePlots do
+		local x, z = Map.plotPoint(plot, 0, -plot.front - Map.GarageApron)
+		local route = Roads.route(0, 26, x, z)
+		local gap = distanceToRoad(x, z)
+		local straight = math.sqrt(x * x + (z - 26) ^ 2)
+		if #route < 2 or gap > 45 or Roads.length(route) > 3 * straight + 600 then
+			print("  no route to:", id, gap, Roads.length(route))
+			return false
+		end
+	end
+	return true
+end)())
+check("the estate is on the map: Sunset Hills, the homes on their own, the towers and the garages are landmarks", (function()
+	local found = {}
+	for _, landmark in Map.Landmarks do
+		found[landmark.id] = landmark
+	end
+	for _, id in { "sunsethills", "dispatchtower", "harborpoint", "garage_harbor", "garage_north", "garage_downtown", "oceanview", "pinecrest", "lakeside", "sunset" } do
+		local landmark = found[id]
+		if not landmark or not inBounds(landmark.x, landmark.z) or Map.inWater(landmark.x, landmark.z) or distanceToRoad(landmark.x, landmark.z) > 40 then
+			print("  missing or off the road:", id)
+			return false
+		end
+	end
+	local hillsMark = found.sunsethills
+	return hillsMark ~= nil and inHills(hillsMark.x, hillsMark.z)
+end)())
+check("the suburbs lots match the lots of the blocks", (function()
+	local x, z = Map.suburbLot(0, 0, 0, 0)
+	return near(x, -Map.BlockSize / 2 + Map.SuburbInset + Map.SuburbLot / 2) and near(z, 900 - Map.BlockSize / 2 + Map.SuburbInset + Map.SuburbLot / 2)
+end)())
+check("plotPoint: right and back of the front", (function()
+	local plot: Map.EstatePlot = { x = 10, z = 20, facing = { x = 0, z = -1 }, district = "test", w = 10, front = 5, back = 5 }
+	local rx, rz = Map.plotPoint(plot, 3, 0) -- looking north, the right is east
+	local bx, bz = Map.plotPoint(plot, 0, 4) -- behind is south
+	return near(rx, 13) and near(rz, 20) and near(bx, 10) and near(bz, 24)
+end)())
+
 local district, i, j = Map.blockAt(Map.Cell, 0)
 check("blockAt finds the dealer block", district ~= nil and district.id == "downtown" and i == 1 and j == 0)
 check("blockAt on a road is nil", (Map.blockAt(Map.Cell / 2, 0)) == nil)
