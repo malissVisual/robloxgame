@@ -38,7 +38,9 @@ safely("CameraRig", CameraRig.start)
 safely("ArmPose", ArmPose.start)
 safely("AdminPanel", AdminPanel.start)
 safely("AnimalAnimator", AnimalAnimator.start)
-CameraRig.mouseNeeded = Hud.anyWindowOpen
+CameraRig.mouseNeeded = function(): boolean
+	return Hud.anyWindowOpen() or AdminPanel.isOpen()
+end
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)
