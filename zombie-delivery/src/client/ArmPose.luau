@@ -16,8 +16,8 @@ local CameraRig = require(script.Parent.CameraRig)
 
 local ArmPose = {}
 
-local RAISE_TIME = 0.2 -- seconds for the arms to come up
-local LOWER_TIME = 0.3
+local RAISE_TIME = 0.1 -- seconds for the arms to come up (snappy)
+local LOWER_TIME = 0.18
 local blends: { [Model]: number } = {}
 -- Per joint: the Transform written last frame, and the animation's own value under it. A joint that still holds
 -- our value was not written by the Animator this frame (throttled, or no track moves it): the last animation

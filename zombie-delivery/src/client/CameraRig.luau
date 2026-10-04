@@ -34,7 +34,7 @@ local aimSince = 0 -- when the gun started going up (shots wait until it is up)
 local WALK_SPEED = 10
 local SPRINT_SPEED = 22
 local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
-local RAISE_TIME = 0.25
+local RAISE_TIME = 0.12
 local armPitch = 0 -- how far up (+) or down the gun arm points: from the shoulder to what is under the crosshair
 local smoothFocus: Vector3? = nil -- the camera's focus follows smoothly (no shaking with every bump of the car)
 local SENSITIVITY = 0.0032
@@ -220,7 +220,7 @@ local function update(dt: number)
 
 	-- Aiming: right mouse held, shooting, or a shot a moment ago (on foot only).
 	local wantAim = locked and not car and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
-	aimBlend = lerp(aimBlend, if wantAim or carAim then 1 else 0, math.min(1, dt * 10))
+	aimBlend = lerp(aimBlend, if wantAim or carAim then 1 else 0, math.min(1, dt * 16))
 	if wantAim and not aimingSent then
 		aimSince = now
 	end
@@ -289,7 +289,7 @@ local function update(dt: number)
 		local offset = target - shoulder
 		-- Something very close under the crosshair (or the ground at your feet): keep the arms level-ish.
 		local goal = if offset.Magnitude > 4 then math.asin(math.clamp(offset.Unit.Y, -1, 1)) else 0
-		armPitch = lerp(armPitch, math.clamp(goal, -0.6, 0.95), math.min(1, dt * 15))
+		armPitch = lerp(armPitch, math.clamp(goal, -0.6, 0.95), math.min(1, dt * 25))
 	else
 		armPitch = 0
 	end
@@ -300,7 +300,7 @@ local function update(dt: number)
 		local look = root.CFrame.LookVector
 		local current = math.atan2(-look.X, -look.Z)
 		local diff = (yaw - current + math.pi) % (2 * math.pi) - math.pi
-		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, current + diff * math.min(1, dt * 18), 0)
+		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, current + diff * math.min(1, dt * 30), 0)
 	else
 		humanoid.AutoRotate = true
 	end
