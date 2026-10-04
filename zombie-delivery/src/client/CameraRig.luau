@@ -2,8 +2,8 @@
 -- GTA-style aiming on a computer: the mouse is locked in the middle of the screen, the mouse moves the camera
 -- (behind you on foot, behind the car when driving), a crosshair shows where the gun hits (red over an enemy).
 -- On foot it plays like GTA: a calm walk (Shift sprints), the character turns where it goes; aiming (right mouse)
--- it stops, turns to the crosshair and raises the gun (shots wait until it is up), the camera moves in over the
--- shoulder; shooting from the hip (left mouse) slows it to a step. When a window is open (map, shop, backpack, job
+-- or shooting (left mouse) it slows to a careful step, turns to the crosshair and raises the gun (shots wait until
+-- it is up, client/ArmPose.luau), the camera moves in over the shoulder. When a window is open (map, shop, backpack, job
 -- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera.
 
 local Players = game:GetService("Players")
@@ -33,7 +33,7 @@ local shiftHeld = false -- sprint
 local aimSince = 0 -- when the gun started going up (shots wait until it is up)
 local WALK_SPEED = 10
 local SPRINT_SPEED = 22
-local HIP_FIRE_SPEED = 5
+local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local RAISE_TIME = 0.25
 local smoothFocus: Vector3? = nil -- the camera's focus follows smoothly (no shaking with every bump of the car)
 local SENSITIVITY = 0.0032
@@ -132,12 +132,23 @@ local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
 end
 
--- Tell the server (the gun arm goes up / down for everybody).
+-- Tell the server (the gun arm goes up / down for everybody, and follows where you aim up or down).
+local pitchSent = 0
+local pitchSentAt = 0
 local function sendAiming(aiming: boolean)
-	if aiming ~= aimingSent then
+	local now = os.clock()
+	local pitchMoved = aiming and math.abs(pitch - pitchSent) > 0.08 and now - pitchSentAt > 0.2
+	if aiming ~= aimingSent or pitchMoved then
 		aimingSent = aiming
-		Net.get("Aiming"):FireServer(aiming)
+		pitchSent = pitch
+		pitchSentAt = now
+		Net.get("Aiming"):FireServer(aiming, pitch)
 	end
+end
+
+-- ArmPose: is the local character aiming, and how far up or down (radians, + is up).
+function CameraRig.aimPose(): (boolean, number)
+	return enabled and supported and aimingSent, pitch
 end
 
 -- On foot the gun must be up before it fires (it takes RAISE_TIME after you start aiming); in a car always.
@@ -214,12 +225,9 @@ local function update(dt: number)
 	end
 	sendAiming(wantAim)
 
-	-- On foot: walk, sprint with Shift, stand still to aim (right mouse), a slow step while firing from the hip.
+	-- On foot: walk, sprint with Shift, a careful step with the gun up (aiming or shooting).
 	if not car then
-		humanoid.WalkSpeed = if rmbHeld and locked then 0
-			elseif wantAim then HIP_FIRE_SPEED
-			elseif shiftHeld then SPRINT_SPEED
-			else WALK_SPEED
+		humanoid.WalkSpeed = if wantAim then AIM_WALK_SPEED elseif shiftHeld then SPRINT_SPEED else WALK_SPEED
 	end
 
 	local rotation = CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)

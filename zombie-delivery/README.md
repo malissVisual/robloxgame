@@ -29,7 +29,7 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Drive / walk | WASD / arrows | thumbstick |
 | Sprint (on foot) | hold Shift | – |
 | Aim (GTA style: the mouse is locked, the camera follows it, crosshair in the middle) | move the mouse | – |
-| Aim (on foot you stop, raise the gun and shoot once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
+| Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (driver: roof gun, passenger: out of the window, on foot: the gun in your hand) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
 | Switch gun | Q (or click the weapon bar) | the weapon bar |
@@ -101,6 +101,7 @@ src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, 
               Gun (shots, server checked), Jobs (job board, stops, special jobs, crews), Items (consumables, supply
               crates), Shops (counters, showroom, purchases)
 src/client/   Main, Menu (start screen), Hud (interface), MapView (minimap, big map), CameraRig (GTA-style aim camera),
+              ArmPose (the arms come up to aim, seen by everybody),
               Drive (car controller, ice),
               Shooting (aim, tracers, hit numbers), CarVisuals (tyres, prompts, name tags), ZombieAnimator, Weather, Ui
 tests/        logic test of Economy and Map

@@ -5,7 +5,6 @@ local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
-local TweenService = game:GetService("TweenService")
 
 -- Shift sprints (client/CameraRig.luau): Roblox's own Shift Lock would fight it.
 StarterPlayer.EnableMouseLockOption = false
@@ -161,27 +160,18 @@ local GUN_LOOKS: { [string]: { GunPiece } } = {
 	},
 }
 local heldWeapon: { [Player]: string } = {}
-local shoulderRest: { [Motor6D]: CFrame } = {}
 
--- Aiming on foot: the gun arm goes up (everybody sees it), and down again.
-local function setAiming(player: Player, aiming: any)
+-- Aiming on foot: the clients raise the gun arm (client/ArmPose.luau) of every character marked Aiming, pointed
+-- AimPitch up or down.
+local function setAiming(player: Player, aiming: any, aimPitch: any)
 	local character = player.Character
-	local upper = character and character:FindFirstChild("RightUpperArm")
-	local shoulder = upper and upper:FindFirstChild("RightShoulder")
-	if not shoulder or not shoulder:IsA("Motor6D") then
+	if not character then
 		return
 	end
-	local rest = shoulderRest[shoulder]
-	if not rest then
-		rest = shoulder.C0
-		shoulderRest[shoulder] = rest
-		shoulder.Destroying:Connect(function()
-			shoulderRest[shoulder] = nil
-		end)
+	character:SetAttribute("Aiming", aiming == true)
+	if type(aimPitch) == "number" and aimPitch == aimPitch then
+		character:SetAttribute("AimPitch", math.clamp(aimPitch, -1.2, 1.2))
 	end
-	-- The arm goes up (and down) smoothly.
-	local goal = if aiming == true then rest * CFrame.Angles(math.rad(85), 0, 0) else rest
-	TweenService:Create(shoulder, TweenInfo.new(if aiming == true then 0.22 else 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = goal }):Play()
 end
 
 local function giveHandGun(player: Player, character: Model)
