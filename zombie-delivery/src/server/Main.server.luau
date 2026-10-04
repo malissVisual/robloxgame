@@ -11,6 +11,7 @@ StarterPlayer.EnableMouseLockOption = false
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
+local GunModels = require(Shared.GunModels)
 
 local Server = script.Parent
 local World = require(Server.World)
@@ -133,35 +134,6 @@ local function giveCar(player: Player)
 	end
 end
 
--- The gun you have equipped, in your hand, the arm raised to aim (everybody sees it). You can shoot on foot too.
-type GunPiece = { size: Vector3, offset: Vector3, color: Color3, material: Enum.Material }
-local DARK = Color3.fromRGB(48, 48, 54)
-local GUN_LOOKS: { [string]: { GunPiece } } = {
-	pistol = {
-		{ size = Vector3.new(0.34, 0.5, 1.6), offset = Vector3.new(0, 0.2, -0.4), color = DARK, material = Enum.Material.Metal },
-		{ size = Vector3.new(0.3, 0.7, 0.4), offset = Vector3.new(0, -0.25, 0.1), color = Color3.fromRGB(70, 55, 45), material = Enum.Material.Wood },
-	},
-	smg = {
-		{ size = Vector3.new(0.35, 0.55, 2), offset = Vector3.new(0, 0.2, -0.6), color = DARK, material = Enum.Material.Metal },
-		{ size = Vector3.new(0.25, 0.8, 0.35), offset = Vector3.new(0, -0.35, -0.5), color = Color3.fromRGB(60, 60, 64), material = Enum.Material.Metal },
-	},
-	shotgun = {
-		{ size = Vector3.new(0.3, 0.35, 3.2), offset = Vector3.new(0, 0.2, -1.2), color = DARK, material = Enum.Material.Metal },
-		{ size = Vector3.new(0.32, 0.5, 1.1), offset = Vector3.new(0, 0.05, 0.6), color = Color3.fromRGB(110, 70, 40), material = Enum.Material.Wood },
-	},
-	rifle = {
-		{ size = Vector3.new(0.25, 0.3, 3.8), offset = Vector3.new(0, 0.2, -1.4), color = Color3.fromRGB(70, 60, 50), material = Enum.Material.Wood },
-		{ size = Vector3.new(0.3, 0.3, 1.1), offset = Vector3.new(0, 0.55, -0.6), color = DARK, material = Enum.Material.Metal },
-	},
-	minigun = {
-		{ size = Vector3.new(0.9, 0.9, 3), offset = Vector3.new(0, 0.3, -1.1), color = Color3.fromRGB(80, 80, 86), material = Enum.Material.DiamondPlate },
-		{ size = Vector3.new(0.5, 0.7, 0.8), offset = Vector3.new(0, -0.3, 0), color = DARK, material = Enum.Material.Metal },
-	},
-	launcher = {
-		{ size = Vector3.new(0.7, 0.7, 3), offset = Vector3.new(0, 0.35, -1), color = Color3.fromRGB(70, 90, 50), material = Enum.Material.Metal },
-		{ size = Vector3.new(0.25, 0.6, 0.3), offset = Vector3.new(0, -0.2, -0.2), color = DARK, material = Enum.Material.Metal },
-	},
-}
 -- Aiming on foot: the clients raise the gun arm (client/ArmPose.luau) of every character marked Aiming, pointed
 -- AimPitch up or down.
 local function setAiming(player: Player, aiming: any, aimPitch: any)
@@ -201,31 +173,7 @@ local function buildHandGun(character: Model, hand: BasePart, weapon: string)
 	if old then
 		old:Destroy()
 	end
-	local model = Instance.new("Model")
-	model.Name = "HandGun"
-	model:SetAttribute("Weapon", weapon)
-	-- Along the arm: down at your side when walking, forward when the arms come up to aim (client/ArmPose.luau).
-	-- An R15 hand is small: the grip is just under it; an R6 arm is 2 studs long: the grip is at its end.
-	local below = if hand.Name == "Right Arm" then hand.Size.Y / 2 + 0.1 else 0.4
-	local grip = hand.CFrame * CFrame.new(0, -below, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-	for _, piece in GUN_LOOKS[weapon] or GUN_LOOKS.pistol do
-		local p = Instance.new("Part")
-		p.Name = "GunPart"
-		p.Size = piece.size
-		p.Color = piece.color
-		p.Material = piece.material
-		p.CanCollide = false
-		p.CanQuery = false
-		p.CanTouch = false
-		p.Massless = true
-		p.CFrame = grip * CFrame.new(piece.offset)
-		local w = Instance.new("WeldConstraint")
-		w.Part0 = hand
-		w.Part1 = p
-		w.Parent = p
-		p.Parent = model
-	end
-	model.Parent = character
+	GunModels.build(weapon, hand, GunModels.gripOn(hand)).Parent = character
 end
 
 -- The gun you have equipped, in your hand (everybody sees it). Safe to call any time: it only builds when the gun

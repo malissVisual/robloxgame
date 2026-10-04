@@ -19,6 +19,7 @@ local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Joints = require(Shared.Joints)
+local GunModels = require(Shared.GunModels)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
@@ -243,14 +244,11 @@ local function template(kind: string, def: Config.ZombieDef): Model?
 		end
 	end
 	if bandit and hand then
-		local grip = hand.CFrame * CFrame.new(0, -0.4, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-		local gun = limb(model, "Gun", Vector3.new(0.3, 0.45, if kind == "gunner" then 3.2 else 1.6) * s, Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
-		gun.Massless = true
-		gun.CFrame = grip * CFrame.new(0, 0.15, if kind == "gunner" then -1.2 else -0.4)
-		local w = Instance.new("WeldConstraint")
-		w.Part0 = hand
-		w.Part1 = gun
-		w.Parent = gun
+		-- The same guns the players carry: a gunner a scoped rifle, a bandit a pistol.
+		local weapon = if kind == "gunner" then "rifle" else "pistol"
+		local gun = GunModels.build(weapon, hand, GunModels.gripOn(hand), s)
+		gun.Name = "Gun"
+		gun.Parent = model
 	end
 	-- Bandits hold the gun up: the clients raise both arms over the walk (client/ZombieAnimator.luau), so it works
 	-- for Motor6D and AnimationConstraint joints alike (the gun follows the hand).

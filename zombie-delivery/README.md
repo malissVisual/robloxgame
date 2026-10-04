@@ -27,7 +27,7 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Input | PC | Touch |
 |---|---|---|
 | Drive / walk | WASD / arrows | thumbstick |
-| Sprint (on foot) | hold Shift | – |
+| Sprint (on foot; the body speeds up and slows down with weight, leans into the run, and out of a sprint the gun comes up slower) | hold Shift | – |
 | Aim (GTA style: the mouse is locked, the camera follows it, crosshair in the middle) | move the mouse | – |
 | Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (driver: roof gun, passenger: out of the window, on foot: the gun in your hand) | left mouse | FIRE |
@@ -84,7 +84,9 @@ one to set the **GPS** (an arrow over your car and a light beam). Big icons over
 
 * **Cars**: at Dead End Motors the Old Van (free), the Pickup and the Muscle Car; earned by working: School Bus,
   Armored Truck, Ice Cream Truck, Moving Truck, Monster Truck.
-* **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher. Head hits are ×2.
+* **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher, each with its own model in
+  your hand (`shared/GunModels.luau`, the bandits carry the same pistol and rifle): a muzzle flash and a recoil kick on
+  every shot, the tracers start at the muzzle. A headshot kills.
 * **Upgrades** (Wrench Garage, 5 levels each): Engine, Handling, Armor, Ram Plow, Gun Damage, Fire Rate; paint jobs.
 * **Items** (Last Stop Supplies): Repair Kit, Medkit, Nitro, Molotov, Landmine.
 * **Enemies**: Bandit, Gunner, Walker, Runner, Brute, Soldier.
@@ -96,7 +98,7 @@ All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map
 
 ```
 src/shared/   Config (all numbers), Map (world layout, roads, addresses), Economy (prices, stats, pay), Net (remotes),
-              Joints (Motor6D or AnimationConstraint)
+              Joints (Motor6D or AnimationConstraint), GunModels (the guns in the hands)
 src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats),
               Zombies (zombies and bandits, roadblocks), BanditCars (the chasing pickups, driven by the server),
               Gun (shots, server checked), Jobs (job board, stops, special jobs, crews), Items (consumables, supply

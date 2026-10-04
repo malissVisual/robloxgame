@@ -17,6 +17,7 @@ local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local Drive = require(script.Parent.Drive)
 local CameraRig = require(script.Parent.CameraRig)
+local ArmPose = require(script.Parent.ArmPose)
 
 local Shooting = {}
 
@@ -182,6 +183,52 @@ function Shooting.hitmarker(kind: string)
 	end
 end
 
+-- The muzzle of the gun in a character's hand (on foot), if it is close enough to be the real one.
+local function handMuzzle(character: Model?): Attachment?
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local gun = character and character:FindFirstChild("HandGun")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not gun or not humanoid or humanoid.SeatPart or not root or not root:IsA("BasePart") then
+		return nil
+	end
+	local found = gun:FindFirstChild("Muzzle", true)
+	if found and found:IsA("Attachment") and (found.WorldPosition - root.Position).Magnitude < 8 then
+		return found
+	end
+	return nil
+end
+
+-- A shot from a gun in the hand: the flash at the muzzle, the arms kick (once per shot: a shotgun's pellets
+-- arrive as several tracers).
+local lastFlash: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+local function muzzleFlash(character: Model, at: Attachment)
+	local now = os.clock()
+	if now - (lastFlash[character] or 0) < 0.05 then
+		return
+	end
+	lastFlash[character] = now
+	local flash = Instance.new("Part")
+	flash.Anchored = true
+	flash.CanCollide = false
+	flash.CanQuery = false
+	flash.CanTouch = false
+	flash.CastShadow = false
+	flash.Shape = Enum.PartType.Ball
+	flash.Material = Enum.Material.Neon
+	flash.Color = Color3.fromRGB(255, 210, 120)
+	flash.Size = Vector3.new(0.55, 0.55, 0.55)
+	flash.CFrame = at.WorldCFrame
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 190, 110)
+	light.Range = 12
+	light.Brightness = 3
+	light.Parent = flash
+	flash.Parent = effects
+	TweenService:Create(flash, TweenInfo.new(0.06), { Transparency = 1, Size = Vector3.new(0.9, 0.9, 0.9) }):Play()
+	Debris:AddItem(flash, 0.08)
+	ArmPose.kick(character)
+end
+
 -- ── Aiming ─────────────────────────────────────────────────────────────────
 
 local function muzzle(car: Model, driving: boolean): Vector3?
@@ -295,8 +342,11 @@ local function step()
 	if not humanoid or not root or humanoid.Health <= 0 then
 		return
 	end
-	-- On foot: from the pistol in your hand.
-	local from = if car then muzzle(car, driving) else root.Position + Vector3.new(0, 1.5, 0) + root.CFrame.LookVector
+	-- On foot: from the gun in your hand.
+	local gunMuzzle = if car then nil else handMuzzle(character)
+	local from = if car then muzzle(car, driving)
+		elseif gunMuzzle then gunMuzzle.WorldPosition
+		else root.Position + Vector3.new(0, 1.5, 0) + root.CFrame.LookVector
 	if not from then
 		return
 	end
@@ -317,6 +367,9 @@ local function step()
 	nextShot = now + stats.interval
 	CameraRig.noteFire()
 	fireRemote:FireServer(target)
+	if gunMuzzle and character then
+		muzzleFlash(character, gunMuzzle)
+	end
 	local def = Economy.findWeapon(weapon)
 	local color = if def then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) else Color3.new(1, 1, 0.6)
 	local direction = (target - from)
@@ -348,6 +401,14 @@ function Shooting.start()
 
 	Net.get("Tracer").OnClientEvent:Connect(function(from: Vector3, to: Vector3, color: Color3, shooter: number)
 		if shooter ~= player.UserId then
+			-- From the gun in their hand as this client shows it (the server shoots from their shoulder).
+			local other = Players:GetPlayerByUserId(shooter)
+			local character = other and other.Character
+			local at = handMuzzle(character)
+			if at and character and (at.WorldPosition - from).Magnitude < 8 then
+				from = at.WorldPosition
+				muzzleFlash(character, at)
+			end
 			Shooting.tracer(from, to, color)
 		end
 	end)
