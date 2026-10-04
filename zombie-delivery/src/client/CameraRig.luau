@@ -1,8 +1,9 @@
 --!strict
 -- GTA-style aiming on a computer: the mouse is locked in the middle of the screen, the mouse moves the camera
 -- (behind you on foot, behind the car when driving), a crosshair shows where the gun hits (red over an enemy).
--- On foot it plays like GTA: walking and running the character turns where it goes; aiming (right mouse) or
--- shooting (left mouse) it turns to the crosshair, the camera moves in over the shoulder and the gun arm goes up. When a window is open (map, shop, backpack, job
+-- On foot it plays like GTA: a calm walk (Shift sprints), the character turns where it goes; aiming (right mouse)
+-- it stops, turns to the crosshair and raises the gun (shots wait until it is up), the camera moves in over the
+-- shoulder; shooting from the hip (left mouse) slows it to a step. When a window is open (map, shop, backpack, job
 -- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera.
 
 local Players = game:GetService("Players")
@@ -28,6 +29,12 @@ local lmbHeld = false -- shooting
 local lastFire = 0
 local aimBlend = 0 -- 0 = walking camera, 1 = over the shoulder
 local aimingSent = false
+local shiftHeld = false -- sprint
+local aimSince = 0 -- when the gun started going up (shots wait until it is up)
+local WALK_SPEED = 10
+local SPRINT_SPEED = 22
+local HIP_FIRE_SPEED = 5
+local RAISE_TIME = 0.25
 local smoothFocus: Vector3? = nil -- the camera's focus follows smoothly (no shaking with every bump of the car)
 local SENSITIVITY = 0.0032
 
@@ -133,6 +140,14 @@ local function sendAiming(aiming: boolean)
 	end
 end
 
+-- On foot the gun must be up before it fires (it takes RAISE_TIME after you start aiming); in a car always.
+function CameraRig.canShoot(): boolean
+	if not enabled or not supported or Drive.seatedCar() then
+		return true
+	end
+	return aimingSent and os.clock() - aimSince >= RAISE_TIME
+end
+
 -- Shooting module: a shot was fired (the character turns to the aim for a moment).
 function CameraRig.noteFire()
 	lastFire = os.clock()
@@ -194,7 +209,18 @@ local function update(dt: number)
 	-- Aiming: right mouse held, shooting, or a shot a moment ago (on foot only).
 	local wantAim = locked and not car and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
 	aimBlend = lerp(aimBlend, if wantAim or carAim then 1 else 0, math.min(1, dt * 10))
+	if wantAim and not aimingSent then
+		aimSince = now
+	end
 	sendAiming(wantAim)
+
+	-- On foot: walk, sprint with Shift, stand still to aim (right mouse), a slow step while firing from the hip.
+	if not car then
+		humanoid.WalkSpeed = if rmbHeld and locked then 0
+			elseif wantAim then HIP_FIRE_SPEED
+			elseif shiftHeld then SPRINT_SPEED
+			else WALK_SPEED
+	end
 
 	local rotation = CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
 	local focus: Vector3
@@ -272,6 +298,8 @@ function CameraRig.start()
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
 			altHeld = true
+		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+			shiftHeld = true
 		elseif processed then
 			return
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -283,6 +311,8 @@ function CameraRig.start()
 	UserInputService.InputEnded:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
 			altHeld = false
+		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+			shiftHeld = false
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
 			rmbHeld = false
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then

@@ -4,6 +4,11 @@
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+local TweenService = game:GetService("TweenService")
+
+-- Shift sprints (client/CameraRig.luau): Roblox's own Shift Lock would fight it.
+StarterPlayer.EnableMouseLockOption = false
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
@@ -174,7 +179,9 @@ local function setAiming(player: Player, aiming: any)
 			shoulderRest[shoulder] = nil
 		end)
 	end
-	shoulder.C0 = if aiming == true then rest * CFrame.Angles(math.rad(85), 0, 0) else rest
+	-- The arm goes up (and down) smoothly.
+	local goal = if aiming == true then rest * CFrame.Angles(math.rad(85), 0, 0) else rest
+	TweenService:Create(shoulder, TweenInfo.new(if aiming == true then 0.22 else 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { C0 = goal }):Play()
 end
 
 local function giveHandGun(player: Player, character: Model)

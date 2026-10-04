@@ -26,9 +26,10 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 
 | Input | PC | Touch |
 |---|---|---|
-| Drive | WASD / arrows | thumbstick |
+| Drive / walk | WASD / arrows | thumbstick |
+| Sprint (on foot) | hold Shift | – |
 | Aim (GTA style: the mouse is locked, the camera follows it, crosshair in the middle) | move the mouse | – |
-| Aim (on foot over the shoulder, the gun goes up; in a car the camera moves in for a drive-by) | hold right mouse | – |
+| Aim (on foot you stop, raise the gun and shoot once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (driver: roof gun, passenger: out of the window, on foot: the gun in your hand) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
 | Switch gun | Q (or click the weapon bar) | the weapon bar |

@@ -284,6 +284,11 @@ local function step()
 	if now < nextShot then
 		return
 	end
+	-- On foot: start raising the gun, the shot comes once it is up.
+	if not CameraRig.canShoot() then
+		CameraRig.noteFire()
+		return
+	end
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
