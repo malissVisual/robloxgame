@@ -7,10 +7,13 @@
 --          attribute Carrying = its kind, the model is welded in front of the chest), "Load" at the back of the
 --          vehicle puts it in a cargo slot. At the drop "Take out" at the back, then "Hand over" at the receiver.
 --   lead   the same with horses: "Lead" takes one on the rope (Carrying = "horse"), "Load" puts it in a stall.
---   board  park in the circle and wait: the kids walk from the house to the bus door (and at the school out of it).
+--   board  park in the circle and wait: the kids walk from the house to the bus door (and at the school out of it),
+--          a patient shuffles slowly from home to the ambulance (bandaged, on a stretcher inside) and at the clinic
+--          over to the doctor.
 --   serve  park in the circle and hold still while the customers buy (the ice cream route).
 -- "Put down" (G) drops what you hold where you stand (to shoot); it also drops when the carrier dies, leaves or sits.
--- Only the job's owner and their crew (who rode in the owner's car) may use the prompts, checked here.
+-- Only the job's owner and their crew (who rode in the owner's car, or joined it by invitation: server/Crew.luau) may
+-- use the prompts, checked here (Info.allowed).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,7 +43,7 @@ export type Plan = {
 
 -- What the job is about, given when it starts.
 export type Info = {
-	kind: string, -- the Carrying kind: crate | ammo | sack | barrel | icebox | furniture | soup | horse | kid
+	kind: string, -- the Carrying kind: crate | ammo | sack | barrel | icebox | furniture | soup | horse | kid | patient …
 	look: string, -- the model of a piece
 	piece: string, -- "ammo crate"
 	plural: string,
@@ -117,6 +120,9 @@ local rng = Random.new()
 local notice = Net.get("Notice")
 
 local KID_NAMES = { "Tommy", "Lily", "Max", "Sophie", "Leo", "Mia", "Ben", "Zoe", "Sam", "Ava", "Noah", "Ella" }
+local PATIENT_NAMES = { "Mr. Brown", "Mrs. Lopez", "Old Pete", "Mr. Dvorak", "Mrs. Chen", "Mr. Okafor", "Miss Hart", "Mr. Svoboda" }
+-- Npcs' walk animation (server/Npcs.luau WALK): a patient's steps are slowed to their shuffle.
+local WALK_ANIMATION = "rbxassetid://507777826"
 local LINES = {
 	take = { "Careful, it's heavy!", "Lift with your legs!", "Got it?", "Easy, that one's fragile.", "Watch your back out there." },
 	horse = { "Easy now, she's gentle.", "Walk him slowly up the ramp.", "Keep the rope short." },
@@ -126,6 +132,8 @@ local LINES = {
 	kidOn = { "Bye mom!", "Hi driver!", "Can I sit at the back?" },
 	kidOff = { "Bye!", "Thanks for the ride!", "School, yay..." },
 	customer = { "Vanilla, please!", "Chocolate!", "Two scoops!", "Strawberry, please!" },
+	patientOn = { "Ow... careful with me.", "Is it far to the clinic?", "Thank you for coming...", "I feel dizzy..." },
+	patientOff = { "Am I going to be okay?", "Thank you, driver...", "Is that the doctor?" },
 }
 
 local function line(list: { string }): string
@@ -161,6 +169,32 @@ function Cargo.carrying(character: Model?): string?
 	end
 	local value = character:GetAttribute("Carrying")
 	return if type(value) == "string" then value else nil
+end
+
+-- Do the pieces of this kind walk in and out by themselves (the kids, the patients)? They cannot be stolen; a wreck or
+-- bandits at the vehicle scare them (the job's condition drops) instead.
+function Cargo.isPeople(kind: string): boolean
+	return kind == "kid" or kind == "patient"
+end
+
+-- The look of a person at a stop: Npcs.look, plus the roles Npcs does not know (the clinic's doctor, a patient).
+function Cargo.look(role: string, name: string, title: string?): Npcs.Look
+	local look = Npcs.look(if role == "doctor" or role == "patient" then "townsperson" else role, name, title)
+	if role == "doctor" then
+		-- A white coat over light blue scrubs.
+		look.hat = "none"
+		look.shirt, look.pants, look.apron = { 236, 240, 244 }, { 110, 160, 190 }, { 246, 248, 250 }
+		look.vest, look.shortSleeves, look.boots = nil, false, false
+		look.shoes = { 230, 232, 236 }
+	elseif role == "patient" then
+		-- A pale hospital gown and slippers (the bandages come with Cargo's dressPatient).
+		look.hat = "none"
+		look.shirt, look.pants = { 168, 200, 222 }, { 168, 200, 222 }
+		look.vest, look.apron, look.boots = nil, nil, false
+		look.shortSleeves = true
+		look.shoes = { 200, 200, 204 }
+	end
+	return look
 end
 
 -- ── The ground ─────────────────────────────────────────────────────────────
@@ -354,9 +388,33 @@ local function buildLook(look: string, variant: number): Model
 		end
 		block("Logo", Vector3.new(0.9, 0.04, 0.9), Vector3.new(0, 0.34 * (3 + variant % 2) + 0.01, 0), rgb(200, 40, 30), Enum.Material.SmoothPlastic)
 	elseif look == "gold" then
-		block("Body", Vector3.new(2, 1.2, 1.4), Vector3.new(0, 0.6, 0), rgb(60, 62, 66), Enum.Material.DiamondPlate)
+		-- A strongbox (the bank's gold, the cash transport's sacks of cash ride in these).
+		local body = block("Body", Vector3.new(2, 1.2, 1.4), Vector3.new(0, 0.6, 0), rgb(60, 62, 66), Enum.Material.DiamondPlate)
 		block("Trim", Vector3.new(2.05, 0.15, 1.45), Vector3.new(0, 1.2, 0), rgb(230, 180, 50), Enum.Material.Metal)
 		block("Lock", Vector3.new(0.4, 0.4, 0.05), Vector3.new(0, 0.8, -0.72), rgb(230, 180, 50), Enum.Material.Metal)
+		stencil(body, "$", rgb(230, 180, 50), { Enum.NormalId.Back })
+	elseif look == "patient" then
+		-- The patient on a stretcher under a blanket, the head toward the front (the ambulance's stretcher bay).
+		local metal = rgb(186, 190, 196)
+		local skins = { rgb(255, 214, 180), rgb(200, 150, 110), rgb(140, 95, 65), rgb(240, 190, 150) }
+		block("Body", Vector3.new(2.2, 0.35, 5.2), Vector3.new(0, 1.3, 0), rgb(245, 245, 245), Enum.Material.SmoothPlastic)
+		block("Frame", Vector3.new(2.3, 0.15, 5.4), Vector3.new(0, 1.05, 0), metal, Enum.Material.Metal)
+		for _, z in { -2.2, 2.2 } do
+			block("Leg", Vector3.new(1.9, 0.75, 0.15), Vector3.new(0, 0.6, z), metal, Enum.Material.Metal)
+			for _, x in { -0.85, 0.85 } do
+				local wheel = block("Wheel", Vector3.new(0.4, 0.4, 0.4), Vector3.new(x, 0.2, z), rgb(40, 40, 44), Enum.Material.SmoothPlastic)
+				wheel.Shape = Enum.PartType.Ball
+			end
+		end
+		block("Blanket", Vector3.new(2.0, 0.5, 3.6), Vector3.new(0, 1.72, 0.6), rgb(70, 120, 190), Enum.Material.Fabric)
+		for _, size in { Vector3.new(0.8, 0.04, 0.25), Vector3.new(0.25, 0.04, 0.8) } do
+			block("Cross", size, Vector3.new(0, 1.98, 0.6), rgb(210, 30, 30), Enum.Material.SmoothPlastic)
+		end
+		block("Pillow", Vector3.new(1.5, 0.3, 0.9), Vector3.new(0, 1.62, -2.0), rgb(250, 250, 250), Enum.Material.Fabric)
+		local head = block("Head", Vector3.new(0.9, 0.9, 0.9), Vector3.new(0, 2.05, -1.9), skins[variant % #skins + 1], Enum.Material.SmoothPlastic)
+		head.Shape = Enum.PartType.Ball
+		local bandage = newPart(model, "Bandage", Vector3.new(0.3, 0.95, 0.95), CFrame.new(0, 2.25, -1.9) * UPRIGHT, rgb(250, 250, 248), Enum.Material.Fabric)
+		bandage.Shape = Enum.PartType.Cylinder
 	elseif look == "cake" then
 		block("Body", Vector3.new(1.8, 1.8, 1.8), Vector3.new(0, 0.9, 0), rgb(250, 248, 245), Enum.Material.SmoothPlastic)
 		local pink = rgb(240, 120, 170)
@@ -524,6 +582,78 @@ local function spawnFor(session: Session, look: Npcs.Look, at: CFrame): Model?
 		return nil
 	end
 	return npc
+end
+
+local function isPatient(session: Session): boolean
+	return session.info.kind == "patient"
+end
+
+-- A cosmetic part welded onto a body part (no mass, no collisions, not hit by rays).
+local function strap(npc: Model, on: BasePart, name: string, size: Vector3, offset: CFrame, shape: Enum.PartType?)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.Color = Color3.fromRGB(250, 250, 246)
+	p.Material = Enum.Material.Fabric
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	if shape then
+		p.Shape = shape
+	end
+	p.CFrame = on.CFrame * offset
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = on
+	weld.Part1 = p
+	weld.Parent = p
+	p.Parent = npc
+end
+
+-- A patient: a bandage round the head, an arm in a sling, and a slow shuffle.
+local function dressPatient(npc: Model)
+	local head = npc:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		local h = math.min(head.Size.X, head.Size.Y, head.Size.Z)
+		strap(npc, head, "Bandage", Vector3.new(h * 0.3, h * 1.1, h * 1.1), CFrame.new(0, h * 0.2, 0) * UPRIGHT, Enum.PartType.Cylinder)
+	end
+	local torso = npc:FindFirstChild("UpperTorso") or npc:FindFirstChild("Torso")
+	if torso and torso:IsA("BasePart") then
+		local t = torso.Size
+		strap(npc, torso, "Sling", Vector3.new(t.X * 1.08, t.Y * 0.16, t.Z * 1.12), CFrame.Angles(0, 0, math.rad(38)))
+	end
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = Tuning.PatientWalkSpeed
+	end
+end
+
+-- Slows the walk animation Npcs.walkTo just started down to the patient's shuffle.
+local function shuffle(npc: Model)
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		return
+	end
+	for _, track in animator:GetPlayingAnimationTracks() do
+		if track.Animation and track.Animation.AnimationId == WALK_ANIMATION then
+			track:AdjustSpeed(Tuning.PatientWalkSpeed / 11)
+		end
+	end
+end
+
+-- A kid or a patient of this piece, standing at `at`. Nil when the stop moved on meanwhile (spawnFor).
+local function spawnRider(session: Session, piece: Piece, at: CFrame): Model?
+	if isPatient(session) then
+		local npc = spawnFor(session, Cargo.look("patient", PATIENT_NAMES[piece.variant % #PATIENT_NAMES + 1], "Patient"), at)
+		if npc then
+			dressPatient(npc)
+		end
+		return npc
+	end
+	return spawnFor(session, Npcs.look("kid", KID_NAMES[piece.variant % #KID_NAMES + 1], nil), at)
 end
 
 -- ── The session ─────────────────────────────────────────────────────────────
@@ -996,8 +1126,7 @@ local function build(session: Session)
 			piece.horse = Animals.horse(CFrame.lookAt(spot, spot + plan.facing))
 		elseif plan.mode == "board" then
 			local spot = onGround(base + right * (1.5 + n * 1.8) - plan.facing * 0.5)
-			local name = KID_NAMES[piece.variant % #KID_NAMES + 1]
-			piece.npc = spawnFor(session, Npcs.look("kid", name, nil), CFrame.lookAt(spot, spot + plan.facing))
+			piece.npc = spawnRider(session, piece, CFrame.lookAt(spot, spot + plan.facing))
 			if not piece.npc then
 				return
 			end
@@ -1071,7 +1200,7 @@ local function clearStop(session: Session, linger: boolean)
 	end
 end
 
--- ── Kids and customers ─────────────────────────────────────────────────────
+-- ── Kids, patients and customers ───────────────────────────────────────────
 
 local function kidArrived(session: Session, piece: Piece, stop: number, timedOut: boolean)
 	local index = table.find(session.walking, piece)
@@ -1106,7 +1235,7 @@ local function kidArrived(session: Session, piece: Piece, stop: number, timedOut
 		session.moved += 1
 		session.deliveredTotal += 1
 		if session.moved >= neededNow(session) then
-			say(session.person, "Good morning, everybody! Inside, quick!")
+			say(session.person, if isPatient(session) then "We'll take it from here. You saved a life!" else "Good morning, everybody! Inside, quick!")
 		end
 	end
 	session.info.changed()
@@ -1123,13 +1252,17 @@ local function walkKid(session: Session, piece: Piece, target: Vector3)
 	Npcs.walkTo(npc, target, function(ok: boolean)
 		-- Could not get there in time (a curb, a car in the way): close enough, count it.
 		kidArrived(session, piece, stop, not ok)
-	end, Tuning.WalkTimeout)
+	end, if isPatient(session) then Tuning.PatientWalkTimeout else Tuning.WalkTimeout)
+	if isPatient(session) then
+		shuffle(npc)
+	end
 end
 
 local function updateBoard(session: Session, plan: Plan, now: number)
 	-- Walkers who never arrive (stuck on a curb) count as arrived after a while.
 	for _, piece in table.clone(session.walking) do
-		if piece.walkingSince and now - piece.walkingSince > Tuning.WalkTimeout + 1 then
+		local timeout = if isPatient(session) then Tuning.PatientWalkTimeout else Tuning.WalkTimeout
+		if piece.walkingSince and now - piece.walkingSince > timeout + 1 then
 			kidArrived(session, piece, session.stop, true)
 		end
 	end
@@ -1142,10 +1275,10 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 		if piece then
 			session.nextKid = now + Tuning.KidGap
 			if session.moved == 0 and #session.walking == 0 then
-				say(session.person, "There's the bus! Off you go.")
+				say(session.person, if isPatient(session) then "There's the ambulance! Easy now, one step at a time." else "There's the bus! Off you go.")
 			end
 			if piece.npc then
-				say(piece.npc, line(LINES.kidOn))
+				say(piece.npc, line(if isPatient(session) then LINES.patientOn else LINES.kidOn))
 			end
 			walkKid(session, piece, Vehicles.cargoEntry(car))
 		end
@@ -1156,13 +1289,12 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 			render(session)
 			local door = Vehicles.cargoEntry(car)
 			local spot = onGround(door)
-			local name = KID_NAMES[piece.variant % #KID_NAMES + 1]
-			piece.npc = spawnFor(session, Npcs.look("kid", name, nil), CFrame.lookAt(spot, Vector3.new(plan.pile.X, spot.Y, plan.pile.Z)))
+			piece.npc = spawnRider(session, piece, CFrame.lookAt(spot, Vector3.new(plan.pile.X, spot.Y, plan.pile.Z)))
 			if not piece.npc then
 				table.insert(session.load, piece)
 				return
 			end
-			say(piece.npc, line(LINES.kidOff))
+			say(piece.npc, line(if isPatient(session) then LINES.patientOff else LINES.kidOff))
 			walkKid(session, piece, onGround(plan.pile))
 			session.info.changed()
 		end
@@ -1324,6 +1456,8 @@ function Cargo.update(session: Session, dt: number)
 			say(session.person, if plan.needed == 1 then `Over here! One {session.info.piece}, handle it with care.` else `Over here! {plan.needed} {session.info.plural} to load.`)
 		elseif plan.stage == "drop" and handling then
 			say(session.person, "Finally! Bring it over here.")
+		elseif plan.mode == "board" and isPatient(session) then
+			say(session.person, if plan.stage == "pickup" then "Over here! Please hurry, it's bad." else "Bring the patient to me, quick!")
 		end
 	end
 	if plan.mode == "board" then
@@ -1362,9 +1496,9 @@ function Cargo.remaining(session: Session): number
 	return #session.load + heldCount(session) + #session.loose + pile + #session.walking + spawning
 end
 
--- Bandits at the car carry a piece off (not the kids). Returns the piece's name, or nil.
+-- Bandits at the car carry a piece off (not the kids or a patient). Returns the piece's name, or nil.
 function Cargo.steal(session: Session): string?
-	if session.info.kind == "kid" or #session.load == 0 then
+	if Cargo.isPeople(session.info.kind) or #session.load == 0 then
 		return nil
 	end
 	local piece = table.remove(session.load) :: Piece
@@ -1380,7 +1514,7 @@ end
 
 -- A wreck: `share` of the load is ruined (at least one piece). The rest moves to the next vehicle. Returns how many.
 function Cargo.wreck(session: Session, share: number): number
-	if session.info.kind == "kid" or #session.load == 0 then
+	if Cargo.isPeople(session.info.kind) or #session.load == 0 then
 		return 0
 	end
 	local count = math.clamp(math.floor(#session.load * share + 0.5), 1, #session.load)
@@ -1464,6 +1598,10 @@ function Cargo.step(session: Session): (string, string)
 			return mode, `Park in the {circle} circle`
 		end
 		local needed = neededNow(session)
+		if isPatient(session) then
+			local patients = if needed == 1 then "the patient gets" else "the patients get"
+			return mode, `Wait while {patients} {if plan.stage == "pickup" then "in" else "out"} ({session.moved}/{needed})`
+		end
 		if plan.stage == "pickup" then
 			return mode, `Wait while the kids get on ({session.moved}/{needed})`
 		end

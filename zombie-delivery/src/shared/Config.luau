@@ -1153,11 +1153,18 @@ Config.Jobs = {
 		winter = { giver = "cook", receiver = "shopkeeper" },
 		horses = { giver = "rancher", receiver = "rancher" },
 		fuelrun = { giver = "worker", receiver = "shopkeeper" },
+		cashrun = { giver = "clerk", receiver = "officer" },
+		ambulance = { giver = "townsperson", receiver = "doctor" }, -- the patient walks in by themselves (board)
+		pizzarush = { giver = "cook", receiver = "townsperson" },
 	} :: { [string]: { giver: string, receiver: string } },
+	-- The special jobs on the job board (JobTypeDef.board, or no employer): the chance of a first and of a second
+	-- special card next to the ordinary deliveries every time the board is filled.
+	BoardSpecials = { 0.65, 0.3 },
 }
 
 -- Cargo on foot (server/Cargo.luau): pick a piece up (E), carry it in your hands, load it into the back of the vehicle
--- (E); at the drop take it out and carry it to the receiver. Horses are led on a rope, kids walk by themselves.
+-- (E); at the drop take it out and carry it to the receiver. Horses are led on a rope, kids and patients walk by
+-- themselves (the patients slowly).
 Config.Cargo = {
 	-- The pieces of the special jobs (Config.JobTypes itemKind): the name and the model.
 	Kinds = {
@@ -1184,8 +1191,10 @@ Config.Cargo = {
 	HoldDuration = 0.25, -- hold E this long to pick up / load / hand over
 	MaxCarSpeed = 6, -- the vehicle must stand to load or unload it
 	StealPieceRate = 3, -- bandits at the car: their steal share x this fills a meter, every full one = a piece gone
-	KidGap = 0.9, -- seconds between the kids getting on / off
+	KidGap = 0.9, -- seconds between the kids (or patients) getting on / off
 	WalkTimeout = 14, -- a kid walking longer than this counts as arrived
+	PatientWalkSpeed = 4.5, -- a patient shuffles slowly to the ambulance (the kids walk at 9)
+	PatientWalkTimeout = 20, -- … and gets longer before it counts as arrived anyway
 	Linger = 5, -- the people of a finished stop stay this long
 	-- Enemies on foot while you handle the cargo at a stop (per danger tier): the first ones come FootGrace s after
 	-- you get there, then `count` every `every` s while fewer than `max` of yours are alive.

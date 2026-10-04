@@ -31,6 +31,7 @@ export type Payout = {
 	conditionPay: number,
 	fastBonus: number,
 	killBonus: number,
+	nightBonus: number, -- finished at night (Config.DayNight.NightPay)
 	total: number,
 }
 
@@ -280,8 +281,9 @@ function Economy.serveLeft(total: number, stops: number, served: number): number
 	return math.ceil(total * math.max(0, stops - served) / stops - 1e-9)
 end
 
--- condition 0 … 1 (cargo health), timeLeft and timeLimit in seconds.
-function Economy.payout(pay: number, condition: number, timeLeft: number, timeLimit: number, kills: number): Payout
+-- condition 0 … 1 (cargo health), timeLeft and timeLimit in seconds. nightMultiplier (Economy.nightScale of
+-- Config.DayNight.NightPay, 1 by day) adds the night bonus on top of everything else.
+function Economy.payout(pay: number, condition: number, timeLeft: number, timeLimit: number, kills: number, nightMultiplier: number?): Payout
 	local jobs = Config.Jobs
 	local share = jobs.MinCondition + (1 - jobs.MinCondition) * math.clamp(condition, 0, 1)
 	local conditionPay = math.floor(pay * share + 0.5)
@@ -290,13 +292,42 @@ function Economy.payout(pay: number, condition: number, timeLeft: number, timeLi
 		fastBonus = math.floor(pay * jobs.FastBonus + 0.5)
 	end
 	local killBonus = math.max(0, kills) * jobs.KillBonus
+	local subtotal = conditionPay + fastBonus + killBonus
+	local nightBonus = math.max(0, math.floor(subtotal * ((nightMultiplier or 1) - 1) + 0.5))
 	return {
 		base = pay,
 		conditionPay = conditionPay,
 		fastBonus = fastBonus,
 		killBonus = killBonus,
-		total = conditionPay + fastBonus + killBonus,
+		nightBonus = nightBonus,
+		total = subtotal + nightBonus,
 	}
+end
+
+-- A night multiplier (Config.DayNight NightPay / NightWaves / NightRoam) at this much night: factor 0 (day) = 1,
+-- factor 1 (deep night) = the full multiplier, smoothly in between at dusk and dawn (DayNight.nightFactor).
+function Economy.nightScale(multiplier: number, factor: number): number
+	return 1 + (multiplier - 1) * math.clamp(factor, 0, 1)
+end
+
+-- The driver level a job needs: the job type's own level; a board special without one (the Winter Run) needs its
+-- danger tier's level, like an ordinary delivery of that tier; an employer's job without one is open to everybody
+-- who walks up to their board.
+function Economy.jobLevel(jobType: Config.JobTypeDef?, tierIndex: number): number
+	local tier = Config.Jobs.Tiers[tierIndex]
+	local tierLevel = if tier then tier.level else 1
+	if not jobType then
+		return tierLevel
+	end
+	if jobType.level then
+		return jobType.level
+	end
+	return if jobType.employer and not jobType.board then 1 else tierLevel
+end
+
+-- Is this job type on the job board (a special without an employer, or one marked board)?
+function Economy.onBoard(jobType: Config.JobTypeDef): boolean
+	return jobType.board == true or jobType.employer == nil
 end
 
 -- Weighted pick from { kind = weight }, r in [0, 1).

@@ -10,7 +10,8 @@
 -- Who goes after whom:
 --   * roamers (Config.Horde.Roam, zombie kinds only) appear around every player without a job and shamble around
 --     their spot; the world's own zombies (residents) do the same. They hunt a player who comes close, shoots nearby
---     or hits them, and calm down when they lose them. Wave zombies (server/Jobs.luau) hunt from the start.
+--     or hits them, and calm down when they lose them. Wave zombies (server/Jobs.luau) hunt from the start. At night
+--     there are more roamers (Config.DayNight.NightRoam, scaled by DayNight.nightFactor).
 --   * people (ZombieDef.jobOnly: bandits, gunners, the base's soldiers) only go after players on a job
 --     (Zombies.hunts, set by Main): without one they stand guard, never shoot, chase, grab or steal.
 --
@@ -30,6 +31,7 @@ local GunModels = require(Shared.GunModels)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
+local DayNight = require(script.Parent.DayNight)
 
 local Horde = Config.Horde
 local Roam = Horde.Roam
@@ -1271,6 +1273,8 @@ end
 local function keepRoamers()
 	local now = os.clock()
 	local radius = Roam.far + 40
+	-- More of them at night (smoothly at dusk and dawn).
+	local night = Economy.nightScale(Config.DayNight.NightRoam, DayNight.nightFactor())
 	for _, player in Players:GetPlayers() do
 		if #zombies >= Horde.MaxTotal - Roam.reserve then
 			return -- the rest is for the jobs' waves
@@ -1286,13 +1290,14 @@ local function keepRoamers()
 		end
 		local center = rootPart.Position
 		local entry = roamWant[player]
-		local want: number
+		local base: number
 		if entry and now < entry.at then
-			want = entry.n
+			base = entry.n
 		else
-			want = rng:NextInteger(Roam.min, Roam.max)
-			roamWant[player] = { n = want, at = now + Roam.rethink }
+			base = rng:NextInteger(Roam.min, Roam.max)
+			roamWant[player] = { n = base, at = now + Roam.rethink }
 		end
+		local want = math.floor(base * night + 0.5)
 		-- Anybody's roamers count (two friends together share them).
 		local around = 0
 		for _, z in zombies do
