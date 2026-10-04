@@ -17,6 +17,8 @@ Theme.Colors = {
 	blue = Color3.fromRGB(117, 175, 185),
 	grey = Color3.fromRGB(79, 95, 82),
 }
+-- The GPS purple: the GPS route on the maps, the crew (its strip, window and tags) and the CREW button.
+Theme.Gps = Color3.fromRGB(176, 92, 255)
 Theme.Border = Color3.fromRGB(78, 94, 81)
 Theme.Radius = 8
 Theme.PanelTransparency = 0.06

@@ -1,7 +1,7 @@
 --!strict
 -- The crew panel: invite a player into your job, answer invitations, see your crew and the pay shares.
 --
--- K or the CREW button (in the Hud's button column) opens a window with:
+-- K or the CREW button (the Hud's own, in its button column: Hud.onCrew = CrewPanel.toggle) opens a window with:
 --   * what your crew does right now (the leader's job: its step, the clock, how far the stop is),
 --   * your crew (the leader and the members, level and distance; the leader may take a member out),
 --   * the pay split (Economy.crewSplit: the leader +15 % per member, each member half the pay, on top),
@@ -9,11 +9,14 @@
 --   * every other player on the server (name, level, distance) with INVITE,
 --   * LEAVE (the leader: break the crew up).
 -- Outside the window:
+--   * the number of invitations waiting on the CREW button (Hud.setBadge), which flashes when one comes,
 --   * an invitation card at the top (ACCEPT / DECLINE right there, or K for the panel),
 --   * for a member: the leader's job at the top (like your own job panel, in the GPS purple), the GPS set to the
 --     leader's next stop (MapView.setWaypoint: the purple route on the minimap and the big map) and a purple beam
 --     over it in the world,
 --   * a small tag over your crewmates' heads.
+-- The card and the member's strip sit in the Hud's top stack (Hud.topSlot("crew"), under Roblox's top bar, scaled
+-- with it), so they never overlap the job panel, the car call line, the level-up banner or the toasts.
 -- The server (server/Crew.luau) checks everything; this module only asks and shows. While the window is open the
 -- mouse is free (Main: CameraRig.mouseNeeded checks CrewPanel.isOpen()).
 
@@ -28,9 +31,10 @@ local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
 local MapView = require(script.Parent.MapView)
+local Hud = require(script.Parent.Hud)
 
 local C = Ui.Colors
-local GPS = Color3.fromRGB(176, 92, 255) -- the GPS purple of the maps (client/MapView.luau)
+local GPS = Ui.Gps -- the GPS purple of the maps (client/MapView.luau)
 local HIDDEN = CFrame.new(0, -1000, 0)
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: stood up
 
@@ -51,8 +55,6 @@ local answerRemote: RemoteEvent? = nil
 local gui: any = nil
 local window: any = nil
 local body: any = nil
-local openButton: any = nil
-local badge: any = nil
 local strip: any = nil -- a member's view of the leader's job (top centre)
 local stripTitle: any = nil
 local stripTimer: any = nil
@@ -63,7 +65,7 @@ local cardTitle: any = nil
 local cardTimer: any = nil
 local cardText: any = nil
 local cardFrom: number? = nil -- whose invitation the card shows
-local scales: { any } = {}
+local scale: any = nil -- the window's UIScale
 local beam: Part? = nil -- the purple beam over the leader's next stop (members)
 local gpsSet: Vector3? = nil -- the waypoint this module set (nil = none of ours)
 local tags: { [number]: { gui: BillboardGui, head: Instance? } } = {} -- userId → the tag over a crewmate
@@ -180,22 +182,11 @@ local function answer(first: any, second: any?)
 	end
 end
 
+-- The same rule as the Hud's windows (Ui.scaleFor), so the window matches them on every screen.
 local function updateScale()
-	local camera = workspace.CurrentCamera
-	if not camera then
-		return
+	if scale then
+		scale.Scale = Ui.screenScale()
 	end
-	local size = camera.ViewportSize
-	-- The same rule as the Hud, so the panels match it on every screen.
-	local value = math.clamp(math.min(size.X / 1150, size.Y / 680), 0.55, 1.1)
-	for _, s in scales do
-		s.Scale = value
-	end
-end
-
-local function scaled(frame: any): any
-	table.insert(scales, Ui.make("UIScale", {}, frame))
-	return frame
 end
 
 -- ── The window ─────────────────────────────────────────────────────────────
@@ -717,13 +708,9 @@ local function updateTags()
 	end
 end
 
+-- How many invitations wait: a red dot with the count on the Hud's CREW button.
 local function updateBadge()
-	if not badge then
-		return
-	end
-	local count = #listOf("invites")
-	badge.Visible = count > 0
-	badge.Text = tostring(count)
+	Hud.setBadge("crew", #listOf("invites"))
 end
 
 -- What the open window shows of a state (not the clock or the distances, those run live): an unchanged one is
@@ -781,52 +768,6 @@ end
 
 -- ── Building ───────────────────────────────────────────────────────────────
 
--- The CREW button goes into the Hud's button column (JOBS, MAP, BAG, CAR) when it is there; the column grows to
--- fit. Else a button of its own, top right.
-local function buildButton()
-	local column: Instance? = nil
-	local hud = playerGui:FindFirstChild("ZombieDeliveryHud")
-	if hud then
-		for _, child in hud:GetChildren() do
-			for _, button in child:GetChildren() do
-				if button:IsA("TextButton") and string.sub(button.Text, 1, 4) == "JOBS" then
-					column = child
-				end
-			end
-		end
-	end
-	local function toggle()
-		setOpen(not window.Visible)
-	end
-	if column and column:IsA("Frame") then
-		openButton = Ui.button(column, "CREW  [K]", UDim2.fromOffset(150, 52), C.panelLight, toggle)
-		openButton.LayoutOrder = 100
-		column.AutomaticSize = Enum.AutomaticSize.Y
-	else
-		openButton = Ui.button(gui, "CREW  [K]", UDim2.fromOffset(120, 40), C.panelLight, toggle)
-		openButton.AnchorPoint = Vector2.new(1, 0)
-		openButton.Position = UDim2.new(1, -16, 0, 100)
-		openButton.TextSize = 16
-		scaled(openButton)
-	end
-	Ui.stroke(openButton, GPS, 1.5)
-	-- How many invitations wait (a red dot with the count).
-	badge = Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(24, 24),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -4, 0, 4),
-		BackgroundColor3 = C.red,
-		BorderSizePixel = 0,
-		Text = "",
-		TextColor3 = Color3.new(1, 1, 1),
-		Font = Enum.Font.GothamBlack,
-		TextSize = 14,
-		Visible = false,
-		ZIndex = 3,
-	}, openButton)
-	Ui.corner(badge, 12)
-end
-
 local function build()
 	gui = Ui.make("ScreenGui", {
 		Name = "ZombieDeliveryCrew",
@@ -837,7 +778,8 @@ local function build()
 	}, playerGui)
 
 	-- The window.
-	window = scaled(Ui.panel(gui, UDim2.fromOffset(620, 560), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5)))
+	window = Ui.panel(gui, UDim2.fromOffset(620, 560), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	scale = Ui.make("UIScale", {}, window)
 	window.Visible = false
 	window.BackgroundTransparency = 0.05
 	window.ZIndex = 5
@@ -864,8 +806,12 @@ local function build()
 	}, window)
 	Ui.list(body, true, 8)
 
-	-- A member's view of the leader's job: top centre, where your own job panel would be (a member has none).
-	strip = scaled(Ui.panel(gui, UDim2.fromOffset(500, 0), UDim2.new(0.5, 0, 0, 14), Vector2.new(0.5, 0)))
+	-- A member's view of the leader's job: the top stack's crew slot, where your own job panel would be (a member
+	-- has none). As wide as the job panel; the slot is scaled with the stack.
+	local slot = Hud.topSlot("crew")
+	strip = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
+	strip.Name = "CrewStrip"
+	strip.LayoutOrder = 1
 	strip.AutomaticSize = Enum.AutomaticSize.Y
 	strip.Visible = false
 	Ui.padding(strip, 12)
@@ -892,8 +838,10 @@ local function build()
 	})
 	stripInfo = Ui.label(strip, "", UDim2.new(1, 0, 0, 18), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
 
-	-- The invitation card: top centre too (shown only without a job of your own and without a crew).
-	card = scaled(Ui.panel(gui, UDim2.fromOffset(500, 0), UDim2.new(0.5, 0, 0, 14), Vector2.new(0.5, 0)))
+	-- The invitation card: in the crew slot too (shown only without a job of your own and without a crew).
+	card = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
+	card.Name = "CrewInvitation"
+	card.LayoutOrder = 2
 	card.AutomaticSize = Enum.AutomaticSize.Y
 	card.Visible = false
 	Ui.padding(card, 12)
@@ -935,8 +883,6 @@ local function build()
 		TextColor3 = C.dim,
 	})
 
-	buildButton()
-
 	-- The purple beam over the leader's next stop (a member's guide in the world, like the job's own beam).
 	local part = Instance.new("Part")
 	part.Name = "CrewBeam"
@@ -959,6 +905,10 @@ end
 
 function CrewPanel.start()
 	build()
+	-- The Hud's CREW button opens the window (client/Main.client.luau sets the same; this keeps it working alone).
+	if Hud.onCrew == nil then
+		Hud.onCrew = CrewPanel.toggle
+	end
 	updateScale()
 	local camera = workspace.CurrentCamera
 	if camera then
@@ -971,15 +921,7 @@ function CrewPanel.start()
 	stateRemote.OnClientEvent:Connect(apply)
 	-- An invitation: the card shows it with the next state (it comes with the invitation); the CREW button flashes.
 	Net.get("CrewInvite").OnClientEvent:Connect(function()
-		if openButton then
-			local stroke = openButton:FindFirstChild("UiBorder")
-			if stroke and stroke:IsA("UIStroke") then
-				stroke.Color = C.yellow
-				task.delay(1.5, function()
-					stroke.Color = GPS
-				end)
-			end
-		end
+		Hud.flashButton("crew", C.yellow, 1.5)
 	end)
 	Net.get("Job").OnClientEvent:Connect(function(job: any)
 		ownJob = job ~= nil
@@ -1052,6 +994,13 @@ end
 
 function CrewPanel.close()
 	setOpen(false)
+end
+
+-- Opens the window, or closes it when it is open (K, the Hud's CREW button through Hud.onCrew).
+function CrewPanel.toggle()
+	if window then
+		setOpen(not window.Visible)
+	end
 end
 
 function CrewPanel.isOpen(): boolean

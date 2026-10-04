@@ -2,8 +2,8 @@
 -- The minimap (always on: bottom left on a computer, top left on a touch screen) and the big map (M / MAP).
 -- Both are drawn once from shared/Map.luau: land, winter, water, the mountain, blocks, roads (highways and bridges
 -- stand out) and an icon for every landmark (shops, employers, far places). Live markers: you (an arrow), other
--- players, bandit cars (red !), supply crates (?), the delivery target (★) and your GPS point (◆; both stick to the
--- minimap's edge when far).
+-- players, bandit cars (red !), supply crates (?), the delivery target (★), your GPS point (◆) and the car a chauffeur
+-- is bringing you (🚗, MapView.setCar from client/Hud.luau; the three stick to the minimap's edge when far).
 -- Like GTA, the way there is drawn along the roads (shared/Roads.luau): yellow to the job's target, purple to the
 -- GPS point. A route is worked out again when the target changes or you leave it by more than ROUTE_OFF studs, and
 -- the part behind you is cut off as you drive. The minimap turns with the camera (north marker on its edge) and
@@ -54,7 +54,8 @@ local C = {
 	iceRoad = Color3.fromRGB(184, 228, 244),
 	safe = Color3.fromRGB(153, 212, 125),
 	job = Ui.Colors.yellow,
-	gps = Color3.fromRGB(176, 92, 255),
+	gps = Ui.Gps,
+	car = Ui.Colors.blue, -- the car on its way (the Hud's car call line is blue too)
 	routeEdge = Color3.fromRGB(20, 18, 24),
 	accent = Ui.Colors.yellow,
 }
@@ -97,6 +98,20 @@ MapView.onWaypoint = function(_landmark: Map.Landmark?) end
 
 local target: Vector3? = nil
 local waypoint: Vector3? = nil
+local calledCar: Model? = nil
+
+-- The car on its way to you (the CarCall remote), nil = none: a marker on both maps until it is cleared.
+function MapView.setCar(car: Model?)
+	calledCar = car
+end
+
+local function calledCarPosition(): Vector3?
+	local car = calledCar
+	if not car or not car.Parent then
+		return nil
+	end
+	return car:GetPivot().Position
+end
 
 -- A new goal for a route (Hud repeats the same target with every job update: that is not a change).
 local function setGoal(route: Route, goal: Vector3?)
@@ -518,6 +533,7 @@ local miniIcons: { any } = {}
 local miniMe: any = nil
 local miniStar: any = nil
 local miniGps: any = nil
+local miniCar: any = nil
 local miniNorth: any = nil
 local cameraHeading = 0
 local iconHeading = math.huge
@@ -590,6 +606,7 @@ local function updateMini(position: Vector3, facing: Vector3, speed: number, hea
 	local scale = MINI_SCALE * zoom
 	pin(miniStar, position, target, scale)
 	pin(miniGps, position, waypoint, scale)
+	pin(miniCar, position, calledCarPosition(), scale)
 	local nx, ny = clampToEdge(turn(0, -MINI, -cameraHeading))
 	miniNorth.Position = UDim2.fromOffset(MINI / 2 + nx, MINI / 2 + ny)
 end
@@ -658,6 +675,9 @@ local function buildMini(column: any, touch: boolean)
 	miniMe.Visible = true
 	miniStar = symbol(group, "★", 26, C.job, 23)
 	miniGps = symbol(group, "◆", 20, C.gps, 23)
+	miniCar = dot(group, C.car, "🚗", 20)
+	miniCar.ZIndex = 23
+	miniCar.Visible = false
 	miniNorth = Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -697,6 +717,7 @@ local bigLayer: Layer? = nil
 local bigMe: any = nil
 local bigStar: any = nil
 local bigGps: any = nil
+local bigCar: any = nil
 
 local function fitBig()
 	local camera = workspace.CurrentCamera
@@ -727,6 +748,11 @@ local function updateBig(position: Vector3, facing: Vector3)
 	bigGps.Visible = waypoint ~= nil
 	if waypoint then
 		bigGps.Position = point(waypoint.X, waypoint.Z, BIG_SCALE)
+	end
+	local car = calledCarPosition()
+	bigCar.Visible = car ~= nil
+	if car then
+		bigCar.Position = point(car.X, car.Z, BIG_SCALE)
 	end
 end
 
@@ -905,6 +931,9 @@ local function buildBig(gui: any)
 	bigMe = symbol(canvas.markers, "▲", 24, Color3.new(1, 1, 1), 20)
 	bigStar = symbol(canvas.markers, "★", 28, C.job, 21)
 	bigGps = symbol(canvas.markers, "◆", 24, C.gps, 21)
+	bigCar = dot(canvas.markers, C.car, "🚗", 22)
+	bigCar.ZIndex = 21
+	bigCar.Visible = false
 	buildList(big)
 end
 
