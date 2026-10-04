@@ -5,6 +5,9 @@
 
 local Config = {}
 
+-- Shown on the start screen: tells which version Studio really runs (bump it with every update).
+Config.Version = "0.8"
+
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
 Config.StudioStartMoney = 25000 -- a Play test in Studio (no saves) starts rich, to try the shops

@@ -67,12 +67,17 @@ end
 
 -- On a computer the chat sits top left: money goes bottom left above the minimap. On a touch screen top left.
 local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local moneyPanel = scaled(Ui.panel(
-	gui,
-	UDim2.fromOffset(230, 66),
-	if touchLayout then UDim2.fromOffset(16, 16) else UDim2.new(0, 16, 1, -256),
-	if touchLayout then Vector2.zero else Vector2.new(0, 1)
-))
+-- Money and the minimap share one column (one scale), so they can never overlap.
+local leftStack = scaled(Ui.make("Frame", {
+	Name = "LeftStack",
+	Size = UDim2.fromOffset(230, 66 + 8 + 230),
+	Position = if touchLayout then UDim2.fromOffset(16, 16) else UDim2.new(0, 16, 1, -16),
+	AnchorPoint = if touchLayout then Vector2.zero else Vector2.new(0, 1),
+	BackgroundTransparency = 1,
+}, gui))
+Ui.list(leftStack, true, 8)
+local moneyPanel = Ui.panel(leftStack, UDim2.fromOffset(230, 66), UDim2.new())
+moneyPanel.LayoutOrder = 1
 Ui.padding(moneyPanel, 8)
 local moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 32), { TextColor3 = C.money, TextSize = 30, Font = Enum.Font.GothamBlack })
 local statsLabel = Ui.label(moneyPanel, "", UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 34), TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
@@ -1108,7 +1113,7 @@ function Hud.start()
 	if camera then
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
 	end
-	MapView.start(gui, scaled)
+	MapView.start(gui, leftStack)
 	-- Keys.
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or not gui.Enabled or UserInputService:GetFocusedTextBox() then

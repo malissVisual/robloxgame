@@ -432,20 +432,19 @@ local function buildList(parent: any)
 	end
 end
 
-function MapView.start(gui: any, scaleOf: (any) -> any)
+-- column: the frame the minimap goes into (under the money panel, laid out by Hud).
+function MapView.start(gui: any, column: any)
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 	-- Minimap.
 	mini = Ui.make("CanvasGroup", {
 		Name = "Minimap",
 		Size = UDim2.fromOffset(MINI, MINI),
-		Position = if touch then UDim2.fromOffset(16, 92) else UDim2.new(0, 16, 1, -16),
-		AnchorPoint = if touch then Vector2.zero else Vector2.new(0, 1),
 		BackgroundColor3 = Color3.fromRGB(20, 22, 26),
 		BorderSizePixel = 0,
-	}, gui)
+		LayoutOrder = 2,
+	}, column)
 	Ui.corner(mini, 14)
-	scaleOf(mini)
 	local canvas = draw(mini, MINI_SCALE, false)
 	for _, landmark in Map.Landmarks do
 		landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false)

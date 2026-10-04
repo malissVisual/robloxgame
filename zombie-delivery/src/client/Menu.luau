@@ -7,6 +7,8 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local Ui = require(script.Parent.Ui)
 
 local Menu = {}
@@ -149,6 +151,18 @@ function Menu.show(onPlay: () -> ())
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Color3.fromRGB(200, 200, 200),
 		TextStrokeTransparency = 0.4,
+	}, gui)
+
+	Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(200, 20),
+		Position = UDim2.new(1, -12, 1, -8),
+		AnchorPoint = Vector2.new(1, 1),
+		BackgroundTransparency = 1,
+		Text = `version {Config.Version}`,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Color3.fromRGB(180, 180, 180),
 	}, gui)
 
 	-- The black fade only shows (and only exists in front of PLAY) after PLAY was pressed.
