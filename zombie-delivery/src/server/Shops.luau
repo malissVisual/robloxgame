@@ -1,6 +1,7 @@
 --!strict
 -- The shops in the safe zone around the depot. You walk in and use the prompt at the counter (it opens the shop on
--- your screen); the purchases are checked here, also that you really stand in that shop.
+-- your screen); the purchases are checked here, also that you really stand in that shop and that your driver level
+-- (shared/Levels.luau) is high enough for what you buy (the level field of Config.Cars, Weapons and CarGuns).
 --
 --   Dead End Motors     cars (the showroom models have their own prompts)
 --   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
@@ -14,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
+local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local World = require(script.Parent.World)
@@ -44,6 +46,16 @@ local function refuse(player: Player, shop: string): boolean
 	return true
 end
 
+-- Is this above the player's driver level? Then it says so and refuses (true).
+local function tooLow(player: Player, name: string, level: number?): boolean
+	local mine = PlayerData.level(player)
+	if level == nil or mine >= level then
+		return false
+	end
+	notice:FireClient(player, `The {name} needs driver level {level} ({Levels.rank(level)}). You are level {mine}: deliveries give XP.`)
+	return true
+end
+
 local function equipCar(player: Player, id: string)
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -69,7 +81,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 	end
 	if kind == "car" then
 		local def = Economy.findCar(id)
-		if not def or def.company or profile.cars[id] or refuse(player, "dealer") then
+		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or tooLow(player, def.name, def.level) then
 			return
 		end
 		if not PlayerData.spend(player, def.price) then
@@ -90,7 +102,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			notice:FireClient(player, `The {def.name} is not for sale. Work for {if employer then employer.name else "its owner"} to earn it.`)
 			return
 		end
-		if refuse(player, "guns") then
+		if refuse(player, "guns") or tooLow(player, def.name, def.level) then
 			return
 		end
 		if not PlayerData.spend(player, def.price) then
@@ -114,6 +126,9 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		end
 		if profile.carGuns[carDef.id] == def.id then
 			notice:FireClient(player, `Your {carDef.name} already has the {def.name}.`)
+			return
+		end
+		if tooLow(player, def.name, def.level) then
 			return
 		end
 		if not PlayerData.spend(player, def.price) then
@@ -223,7 +238,8 @@ local function buildShowroom()
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
-		label.Text = `{def.name}\n{if def.price > 0 then "$" .. def.price else "FREE"}`
+		local price = if def.price > 0 then "$" .. def.price else "FREE"
+		label.Text = if def.level and def.level > 1 then `{def.name}\n{price} · LEVEL {def.level}+` else `{def.name}\n{price}`
 		label.TextScaled = true
 		label.Font = Enum.Font.GothamBlack
 		label.TextColor3 = Color3.fromRGB(255, 220, 120)

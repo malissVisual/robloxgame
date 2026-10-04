@@ -1,9 +1,9 @@
 --!strict
 -- The admin panel (P or the small ADMIN button top right; only for players with the "Admin" attribute, see
--- server/Admin.luau, which checks every command again). One window with sections on the left: unlock & money,
--- cars, guns, teleport (every Map.Landmarks place), jobs (every special job and the ordinary tiers), enemies, world
--- (time of day) and player (god mode, heal, finish the stop). The answers come back as toasts (the Notice remote),
--- and in the window's title bar while it is open (the toasts are behind it).
+-- server/Admin.luau, which checks every command again). One window with sections on the left: unlock, driver level &
+-- money, cars, guns, teleport (every Map.Landmarks place), jobs (every special job and the ordinary tiers), enemies,
+-- world (time of day: day and night, server/DayNight.luau) and player (god mode, heal, finish the stop). The answers
+-- come back as toasts (the Notice remote), and in the window's title bar while it is open (the toasts are behind it).
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -14,6 +14,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
@@ -97,7 +98,7 @@ end
 -- ── Sections ───────────────────────────────────────────────────────────────
 
 local SECTIONS = {
-	{ "unlock", "Unlock & money" },
+	{ "unlock", "Unlock, level, $" },
 	{ "cars", "Cars" },
 	{ "guns", "Guns" },
 	{ "teleport", "Teleport" },
@@ -110,13 +111,37 @@ local SECTIONS = {
 local render: () -> ()
 
 local function renderUnlock()
-	heading("Unlock", "Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, and every employer's jobs counted as done. Car guns: Cars tab.")
+	heading("Unlock", `Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, every employer's jobs counted as done and driver level {Config.Levels.MaxLevel}. Car guns: Cars tab.`)
 	local row = grid(200)
 	action(row, "UNLOCK EVERYTHING", C.yellow, function()
 		send("unlockAll")
 	end).TextColor3 = Color3.new(0, 0, 0)
 	action(row, "MAX UPGRADES", C.blue, function()
 		send("maxUpgrades")
+	end)
+	local level = tonumber(player:GetAttribute("Level")) or 1
+	heading(`Driver level: {level} · {Levels.rank(level)}`, "Sets the XP to exactly what the level needs. The levels unlock the danger levels on the job board, special jobs, cars, guns and car guns.")
+	local levels = grid(80)
+	local picks: { number } = {}
+	for _, n in { 1, 2, 3, 4, 5, 6, 8, 10, 12 } do
+		if n < Config.Levels.MaxLevel then
+			table.insert(picks, n)
+		end
+	end
+	table.insert(picks, Config.Levels.MaxLevel)
+	for _, n in picks do
+		local on = n == level
+		local button = action(levels, `LV {n}`, if on then C.yellow else C.blue, function()
+			send("setLevel", n)
+		end)
+		button.TextColor3 = if on then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
+	end
+	local steps = grid(150)
+	action(steps, "LEVEL -1", C.grey, function()
+		send("setLevel", math.max(1, level - 1))
+	end)
+	action(steps, "LEVEL +1", C.green, function()
+		send("setLevel", math.min(Config.Levels.MaxLevel, level + 1))
 	end)
 	heading("Money")
 	local amounts = grid(150)
@@ -241,7 +266,8 @@ local function renderEnemies()
 end
 
 local function renderWorld()
-	heading("Time of day")
+	local night = Config.DayNight
+	heading("Time of day", string.format("The clock runs (a day is %d min). Night from %02d:%02d to %02d:%02d: dark, more zombies, bigger waves, better pay, the lamps and headlights on.", math.floor(night.DayLength / 60), math.floor(night.NightFrom), math.floor(night.NightFrom % 1 * 60), math.floor(night.NightTo), math.floor(night.NightTo % 1 * 60)))
 	local cells = grid(150)
 	local times: { { hour: number, label: string } } = {
 		{ hour = 0, label = "00:00 Midnight" },
@@ -255,7 +281,8 @@ local function renderWorld()
 	}
 	for _, entry in times do
 		local hour = entry.hour
-		action(cells, entry.label, if hour >= 7 and hour <= 17 then C.blue else Color3.fromRGB(60, 60, 110), function()
+		local dark = hour >= night.NightFrom or hour < night.NightTo
+		action(cells, entry.label, if dark then Color3.fromRGB(60, 60, 110) elseif hour >= 7 and hour <= 17 then C.blue else Color3.fromRGB(150, 100, 70), function()
 			send("time", hour)
 		end)
 	end
@@ -434,6 +461,11 @@ function AdminPanel.start()
 	player:GetAttributeChangedSignal("Admin"):Connect(refreshButton)
 	player:GetAttributeChangedSignal("God"):Connect(function()
 		if window.Visible and section == "player" then
+			render()
+		end
+	end)
+	player:GetAttributeChangedSignal("Level"):Connect(function()
+		if window.Visible and section == "unlock" then
 			render()
 		end
 	end)

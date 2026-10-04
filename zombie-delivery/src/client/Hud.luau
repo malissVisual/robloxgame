@@ -1,11 +1,15 @@
 --!strict
--- The interface: money, the minimap (client/MapView.luau), the car panel (health, speed, nitro), the active job
--- (what to do now, the person, the cargo in your hands / at this stop / in the vehicle, the timer, the cargo's
--- condition, the loading bar), the JOBS / MAP / BAG / CAR buttons, the hotbar (items, keys 1-5), the job board,
--- the employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold; the car
--- guns at Wrench Garage), the weapon bar (your guns, or the car gun while you drive a car that has one), the
--- backpack (with the job's cargo), the delivery result, toasts, the FIRE button for touch screens and the way to
--- the target (the park circle with a beam, on foot the pile / the person or the vehicle's back, an arrow).
+-- The interface: money and the driver level (the LV chip, the rank, the XP bar; a flash on a level-up), the minimap
+-- (client/MapView.luau), the car panel (health, speed, nitro), the active job (what to do now, the person, the cargo
+-- in your hands / at this stop / in the vehicle, the timer, the cargo's condition, the loading bar), the JOBS / MAP /
+-- BAG / TOP / CAR buttons (TOP: the leaderboard, client/Leaderboard.luau), the hotbar (items, keys 1-5), the job
+-- board, the employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold;
+-- the car guns at Wrench Garage), the weapon bar (your guns, or the car gun while you drive a car that has one), the
+-- backpack (with the job's cargo), the delivery result (with the XP, a level-up and the crew's pay split), toasts,
+-- the FIRE button for touch screens and the way to the target (the park circle with a beam, on foot the pile / the
+-- person or the vehicle's back, an arrow).
+-- Driver levels (shared/Levels.luau): what your level does not reach yet shows LEVEL N (cars at the dealer, guns,
+-- car guns, the job board's locked offers, an employer's job); the server refuses it anyway.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,12 +21,14 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Icons = require(Shared.Icons)
+local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
 local Drive = require(script.Parent.Drive)
 local Shooting = require(script.Parent.Shooting)
 local MapView = require(script.Parent.MapView)
+local Leaderboard = require(script.Parent.Leaderboard)
 
 local C = Ui.Colors
 local Hud = {}
@@ -180,19 +186,44 @@ end
 -- On a computer the chat sits top left: money goes bottom left above the minimap. On a touch screen top left.
 local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 -- Money and the minimap share one column (one scale), so they can never overlap.
+local MONEY_HEIGHT = 110 -- money, the stats, the level and the XP bar
 local leftStack = scaled(Ui.make("Frame", {
 	Name = "LeftStack",
-	Size = UDim2.fromOffset(230, 66 + 8 + 230),
+	Size = UDim2.fromOffset(230, MONEY_HEIGHT + 8 + 230),
 	Position = if touchLayout then UDim2.fromOffset(16, 16) else UDim2.new(0, 16, 1, -16),
 	AnchorPoint = if touchLayout then Vector2.zero else Vector2.new(0, 1),
 	BackgroundTransparency = 1,
 }, gui))
 Ui.list(leftStack, true, 8)
-local moneyPanel = Ui.panel(leftStack, UDim2.fromOffset(230, 66), UDim2.new())
+local moneyPanel = Ui.panel(leftStack, UDim2.fromOffset(230, MONEY_HEIGHT), UDim2.new())
 moneyPanel.LayoutOrder = 1
 Ui.padding(moneyPanel, 8)
 local moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 32), { TextColor3 = C.money, TextSize = 30, Font = Enum.Font.GothamBlack })
 local statsLabel = Ui.label(moneyPanel, "", UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 34), TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
+-- The driver level: a LV chip and the rank name, under them the XP bar and the XP into this level.
+local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 54), BackgroundTransparency = 1, ClipsDescendants = true }, moneyPanel)
+Ui.list(levelRow, false, 6)
+local levelChip = Ui.chip(levelRow, "LV 1", C.yellow, Color3.new(0.04, 0.05, 0.04))
+levelChip.Font = Enum.Font.GothamBlack
+levelChip.TextSize = 13
+levelChip.LayoutOrder = 1
+local rankLabel = Ui.label(levelRow, "", UDim2.new(0, 0, 1, 0), {
+	AutomaticSize = Enum.AutomaticSize.X,
+	TextWrapped = false,
+	TextSize = 13,
+	TextColor3 = C.yellow,
+	LayoutOrder = 2,
+})
+local xpLabel = Ui.label(moneyPanel, "", UDim2.fromOffset(84, 16), {
+	Position = UDim2.new(1, -84, 0, 77),
+	TextXAlignment = Enum.TextXAlignment.Right,
+	TextSize = 12,
+	TextColor3 = C.dim,
+	Font = Enum.Font.GothamMedium,
+	TextWrapped = false,
+})
+local xpBack, xpFill = Ui.bar(moneyPanel, UDim2.new(1, -90, 0, 7), C.yellow)
+xpBack.Position = UDim2.fromOffset(0, 82)
 
 -- ── Toasts ─────────────────────────────────────────────────────────────────
 
@@ -241,7 +272,10 @@ local function closeWindows()
 	for _, w in windows do
 		w.Visible = false
 	end
+	Leaderboard.close()
 end
+-- One window at a time: the leaderboard (L) closes the HUD's windows too.
+Leaderboard.onOpen = closeWindows
 
 type Window = { frame: any, body: any, title: any }
 
@@ -320,6 +354,64 @@ end
 
 local function note(parent: any, text: string, color: Color3, order: number)
 	Ui.label(parent, text, UDim2.new(1, -10, 0, 22), { LayoutOrder = order, AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = color, TextSize = 15, Font = Enum.Font.GothamMedium })
+end
+
+-- ── Driver level ───────────────────────────────────────────────────────────
+-- The XP comes with the player attribute Xp (server/PlayerData.luau), or the state's xp; nil until the save loaded.
+
+local function myXp(): number?
+	local xp = tonumber(player:GetAttribute("Xp"))
+	if xp == nil and state and type(state.xp) == "number" then
+		xp = state.xp
+	end
+	return xp
+end
+
+local function myLevel(): number
+	return Levels.levelFor(myXp() or 0)
+end
+
+-- The level something needs (its level field) when yours is lower, else nil.
+local function lockedAt(level: number?): number?
+	return if level ~= nil and level > myLevel() then level else nil
+end
+
+-- A card's button for something your level does not reach yet.
+local function lockButton(c: any, level: number): any
+	local button = cardButton(c, `🔒 LEVEL {level}`, C.grey, false, function() end)
+	button.TextColor3 = C.dim
+	return button
+end
+
+-- What a level unlocks, in words: danger levels, special jobs, cars, guns and car guns.
+local function unlocksAt(level: number): { string }
+	local list: { string } = {}
+	for _, tier in Config.Jobs.Tiers do
+		if tier.level == level and level > 1 then
+			table.insert(list, `{string.rep("★", tier.stars)} {tier.name} jobs`)
+		end
+	end
+	for _, def in Config.JobTypes do
+		if def.level == level and level > 1 then
+			table.insert(list, def.name)
+		end
+	end
+	for _, def in Config.Cars do
+		if def.level == level and not def.company then
+			table.insert(list, def.name)
+		end
+	end
+	for _, def in Config.Weapons do
+		if def.level == level and not def.earned then
+			table.insert(list, def.name)
+		end
+	end
+	for _, def in Config.CarGuns do
+		if def.level == level then
+			table.insert(list, def.name)
+		end
+	end
+	return list
 end
 
 -- ── Icons ──────────────────────────────────────────────────────────────────
@@ -453,7 +545,12 @@ function Hud.setOffers(list: { any })
 			typeY = y
 			y += 36
 		end
-		local c = card(jobs.body, math.max(104, y + 4), order, offer.jobType ~= nil)
+		-- Above your driver level: offered, but locked (the server refuses it too).
+		local lockLevel = if offer.locked == true then (tonumber(offer.level) or myLevel() + 1) else nil
+		local c = card(jobs.body, math.max(104, y + 4), order, offer.jobType ~= nil and lockLevel == nil)
+		if lockLevel then
+			c.BackgroundColor3 = C.panel
+		end
 		Ui.label(c, string.rep("★", offer.stars), UDim2.fromOffset(110, 26), { Position = UDim2.fromOffset(12, 6), TextColor3 = color, TextSize = 24 })
 		Ui.label(c, offer.tierName:upper(), UDim2.fromOffset(110, 18), { Position = UDim2.fromOffset(12, 32), TextColor3 = color, TextSize = 14 })
 		if offer.modifier then
@@ -496,11 +593,21 @@ function Hud.setOffers(list: { any })
 			Ui.label(c, extra .. offer.jobType.description, UDim2.new(1, -260, 0, 34), { Position = UDim2.fromOffset(124, typeY), TextColor3 = C.dim, TextSize = 13, Font = Enum.Font.GothamMedium })
 		end
 		Ui.label(c, Ui.money(offer.pay), UDim2.fromOffset(110, 30), { Position = UDim2.new(1, -244, 0, 36), TextColor3 = C.money, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Right })
-		local accept = Ui.button(c, "ACCEPT", UDim2.fromOffset(110, 46), C.green, function()
-			Net.get("AcceptJob"):FireServer(offer.index)
-			jobs.frame.Visible = false
-		end)
-		accept.Position = UDim2.new(1, -122, 0.5, -23)
+		if lockLevel then
+			local lock = Ui.button(c, `🔒 LEVEL {lockLevel}`, UDim2.fromOffset(110, 46), C.grey, function()
+				local what = if offer.jobType then `The {offer.jobType.name}` else `{offer.tierName} jobs`
+				Hud.toast(`{what} need{if offer.jobType then "s" else ""} driver level {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.`)
+			end)
+			lock.TextColor3 = C.dim
+			lock.TextSize = 15
+			lock.Position = UDim2.new(1, -122, 0.5, -23)
+		else
+			local accept = Ui.button(c, "ACCEPT", UDim2.fromOffset(110, 46), C.green, function()
+				Net.get("AcceptJob"):FireServer(offer.index)
+				jobs.frame.Visible = false
+			end)
+			accept.Position = UDim2.new(1, -122, 0.5, -23)
+		end
 	end
 	local refresh = Ui.button(jobs.body, "NEW OFFERS", UDim2.fromOffset(180, 40), C.grey, function()
 		jobsMessage("Calling the dispatcher...")
@@ -555,13 +662,16 @@ local function renderShop()
 				continue
 			end
 			local c = card(shop.body, 84, order + 1, def.id == shopFocus)
-			cardText(c, def.name, carStats(def), def.description)
+			local lock = if state.cars[def.id] then nil else lockedAt(def.level)
+			cardText(c, def.name, carStats(def) .. (if lock then ` · from level {lock}` else ""), def.description)
 			if state.car == def.id then
 				cardButton(c, "YOUR CAR", C.grey, false, function() end)
 			elseif state.cars[def.id] then
 				cardButton(c, "TAKE IT", C.blue, here, function()
 					Net.get("Equip"):FireServer("car", def.id)
 				end)
+			elseif lock then
+				lockButton(c, lock)
 			else
 				cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 					Net.get("Buy"):FireServer("car", def.id)
@@ -588,7 +698,8 @@ local function renderShop()
 		note(shop.body, "Guns for your hands. One-handed ones (pistol, revolver, SMG) also fire out of a car window; car guns are at Wrench Garage.", C.dim, 1)
 		for order, def in Config.Weapons do
 			local c = card(shop.body, 84, order + 1)
-			cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
+			local lock = if state.weapons[def.id] or def.earned then nil else lockedAt(def.level)
+			cardText(c, def.name, gunStats(def) .. (if def.oneHanded then " · One-handed" else "") .. (if lock then ` · from level {lock}` else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
 			if state.weapon == def.id then
 				cardButton(c, "IN HAND", C.grey, false, function() end)
 			elseif state.weapons[def.id] then
@@ -601,6 +712,8 @@ local function renderShop()
 				local button = cardButton(c, `Earned at {if employer then employer.name else def.earned}`, C.grey, false, function() end)
 				button.TextSize = 13
 				button.TextWrapped = true
+			elseif lock then
+				lockButton(c, lock)
 			else
 				cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 					Net.get("Buy"):FireServer("weapon", def.id)
@@ -654,11 +767,14 @@ local function renderShop()
 			end
 			for order, def in Config.CarGuns do
 				local c = card(shop.body, 84, order + 1, installed == def.id)
-				cardText(c, def.name, `{gunStats(def)} · {Ui.money(def.price)}`, def.description)
+				local lock = if installed == def.id then nil else lockedAt(def.level)
+				cardText(c, def.name, `{gunStats(def)} · {Ui.money(def.price)}` .. (if lock then ` · from level {lock}` else ""), def.description)
 				if installed == def.id then
 					cardButton(c, "INSTALLED", C.grey, false, function() end)
 				elseif not canMount then
 					cardButton(c, "CAN'T MOUNT", C.grey, false, function() end)
+				elseif lock then
+					lockButton(c, lock)
 				else
 					cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 						Net.get("Buy"):FireServer("cargun", def.id)
@@ -754,9 +870,10 @@ local function openEmployer(id: string)
 		local info = itemInfo(jobType.itemKind)
 		local how = HANDLING_TEXT[jobType.load] or "loaded for you"
 		local about = card(body, 80, 3)
-		iconText(about, info.art, info.icon, "", `  {jobType.name}`, UDim2.new(1, -150, 0, 24), { Position = UDim2.fromOffset(12, 8), TextSize = 19, Font = Enum.Font.GothamBlack })
-		Ui.label(about, `Danger {string.rep("★", jobType.tier)}`, UDim2.fromOffset(130, 24), {
-			Position = UDim2.new(1, -142, 0, 8),
+		iconText(about, info.art, info.icon, "", `  {jobType.name}`, UDim2.new(1, -190, 0, 24), { Position = UDim2.fromOffset(12, 8), TextSize = 19, Font = Enum.Font.GothamBlack })
+		local needs = if jobType.level and jobType.level > 1 then `LV {jobType.level}+ · ` else ""
+		Ui.label(about, `{needs}Danger {string.rep("★", jobType.tier)}`, UDim2.fromOffset(170, 24), {
+			Position = UDim2.new(1, -182, 0, 8),
 			TextXAlignment = Enum.TextXAlignment.Right,
 			TextColor3 = STAR_COLORS[jobType.tier] or C.red,
 			TextSize = 15,
@@ -782,8 +899,20 @@ local function openEmployer(id: string)
 	if gun and employer.weaponAt then
 		rewardRow(body, 6, Icons.weapon(gun.id), "🔫", gun.name, done, employer.weaponAt, state.weapons[gun.id] == true)
 	end
+	local lock = if jobType then lockedAt(jobType.level) else nil
 	if job then
 		Ui.label(body, "Finish your current delivery first.", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = C.red, TextSize = 16 })
+	elseif lock then
+		local button = Ui.button(body, `🔒 LEVEL {lock}`, UDim2.fromOffset(240, 50), C.grey, function() end)
+		button.TextColor3 = C.dim
+		button.LayoutOrder = 7
+		Ui.label(body, `{employer.person} hires drivers from level {lock} ({Levels.rank(lock)}) on. You are level {myLevel()}: deliveries give XP.`, UDim2.new(1, -10, 0, 0), {
+			LayoutOrder = 8,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			TextColor3 = C.dim,
+			TextSize = 14,
+			Font = Enum.Font.GothamMedium,
+		})
 	else
 		local take = Ui.button(body, "TAKE THE JOB", UDim2.fromOffset(240, 50), C.green, function()
 			Net.get("AcceptEmployer"):FireServer(employer.id)
@@ -948,17 +1077,34 @@ end
 
 local result = window("DELIVERY", Vector2.new(460, 540))
 
+-- The crew of a job (r.crew): a number (riders, older payloads) or the list of everyone paid { { name, pay } }
+-- (the owner too; an entry may say owner = true).
+local function crewList(r: any): { { name: string, pay: number, owner: boolean } }
+	local list = {}
+	if type(r.crew) == "table" then
+		for _, entry in r.crew do
+			if type(entry) == "table" and entry.name ~= nil then
+				table.insert(list, { name = tostring(entry.name), pay = tonumber(entry.pay) or 0, owner = entry.owner == true })
+			end
+		end
+	end
+	return list
+end
+
 function Hud.showResult(r: any)
 	closeWindows()
 	Ui.clear(result.body)
 	result.frame.Visible = true
-	local function line(text: string, value: string?, color: Color3?, order: number)
+	local function line(text: string, value: string?, color: Color3?, order: number): any
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 28), BackgroundTransparency = 1, LayoutOrder = order }, result.body)
 		Ui.label(row, text, UDim2.new(1, if value then -110 else 0, 1, 0), { TextColor3 = color or C.text, TextSize = 18 })
 		if value then
 			Ui.label(row, value, UDim2.new(0, 110, 1, 0), { Position = UDim2.new(1, -110, 0, 0), TextColor3 = color or C.money, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Right })
 		end
+		return row
 	end
+	local crew = crewList(r)
+	local riders = if type(r.crew) == "number" then r.crew else math.max(0, #crew - 1)
 	if r.success and r.rider then
 		line("CREW DELIVERY!", nil, C.green, 1)
 		line(`You helped {r.driver} deliver {r.cargo}.`, nil, C.dim, 2)
@@ -982,8 +1128,11 @@ function Hud.showResult(r: any)
 		line(`Cargo condition {math.floor(r.condition * 100 + 0.5)}%`, Ui.money(payout.conditionPay), nil, 6)
 		line("Speed bonus", "+" .. Ui.money(payout.fastBonus), nil, 7)
 		line(`Enemies killed ({r.kills})`, "+" .. Ui.money(payout.killBonus), nil, 8)
-		if r.crew > 0 then
-			line(`Crew bonus ({r.crew} riding)`, "+" .. Ui.money(r.crewBonus), nil, 9)
+		local crewBonus = tonumber(r.crewBonus) or 0
+		if riders > 0 and crewBonus > 0 then
+			line(`Crew bonus ({riders} in the crew)`, "+" .. Ui.money(crewBonus), nil, 9)
+		elseif riders > 0 and crewBonus < 0 then
+			line(`Shared with the crew ({riders})`, "-" .. Ui.money(-crewBonus), C.dim, 9)
 		end
 		line("TOTAL", Ui.money(r.total), C.yellow, 10)
 		local employer = r.employer
@@ -1011,21 +1160,60 @@ function Hud.showResult(r: any)
 		line("DELIVERY FAILED", nil, C.red, 1)
 		Ui.label(result.body, r.reason or "", UDim2.new(1, -10, 0, 60), { LayoutOrder = 2, TextColor3 = C.text })
 	end
+	-- The XP of the job, the level bar and a level-up with what it unlocks.
+	local xp = tonumber(r.xp)
+	if xp and xp > 0 then
+		local level = tonumber(r.level) or myLevel()
+		local rank = if type(r.rank) == "string" then r.rank else Levels.rank(level)
+		line(if r.success then "Driver XP" else "Driver XP (a failed job still counts)", `+{xp} XP`, C.yellow, 30)
+		local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 22), BackgroundTransparency = 1, LayoutOrder = 31 }, result.body)
+		Ui.label(row, `LV {level} · {rank}`, UDim2.new(0.5, 0, 1, 0), { TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = false })
+		local back, fill = Ui.bar(row, UDim2.new(0.5, 0, 0, 8), C.yellow)
+		back.Position = UDim2.new(0.5, 0, 0.5, -4)
+		local mine = myXp()
+		fill.Size = UDim2.fromScale(if mine then Levels.progress(mine) else 0, 1)
+		if r.levelUp == true then
+			line(`⬆ LEVEL UP! Level {level}: {rank}`, nil, C.green, 32)
+			local unlocked = unlocksAt(level)
+			if #unlocked > 0 then
+				Ui.label(result.body, `Unlocked: {table.concat(unlocked, " · ")}`, UDim2.new(1, -10, 0, 0), {
+					LayoutOrder = 33,
+					AutomaticSize = Enum.AutomaticSize.Y,
+					TextColor3 = C.green,
+					TextSize = 15,
+					Font = Enum.Font.GothamMedium,
+				})
+			end
+		end
+	end
+	-- The crew's pay split: everyone paid on this job.
+	if #crew > 1 then
+		line(`CREW PAY · split between {#crew}`, nil, C.yellow, 40)
+		for index, entry in crew do
+			local me = entry.name == player.DisplayName or entry.name == player.Name
+			local row = line(`{if entry.owner then "🚚" else "👤"}  {entry.name}{if me then "  (you)" else ""}`, Ui.money(entry.pay), if me then C.yellow else C.text, 40 + index)
+			if me then
+				row.BackgroundTransparency = 0
+				row.BackgroundColor3 = C.panelLight
+				Ui.corner(row, 6)
+			end
+		end
+	end
 	local ok = Ui.button(result.body, "OK", UDim2.fromOffset(160, 44), C.blue, function()
 		result.frame.Visible = false
 	end)
-	ok.LayoutOrder = 20
+	ok.LayoutOrder = 90
 	local next = Ui.button(result.body, "NEXT JOB", UDim2.fromOffset(160, 44), C.green, function()
 		result.frame.Visible = false
 		openJobs()
 	end)
-	next.LayoutOrder = 21
+	next.LayoutOrder = 91
 end
 
 -- ── Buttons ────────────────────────────────────────────────────────────────
 
 local side = scaled(Ui.make("Frame", {
-	Size = UDim2.fromOffset(150, 250),
+	Size = UDim2.fromOffset(150, 5 * 52 + 4 * 10),
 	Position = UDim2.new(1, -16, 0.42, 0),
 	AnchorPoint = Vector2.new(1, 0.5),
 	BackgroundTransparency = 1,
@@ -1046,6 +1234,9 @@ Ui.button(side, "MAP  [M]", UDim2.fromOffset(150, 52), C.panelLight, function()
 	MapView.toggle()
 end)
 Ui.button(side, "BAG  [B]", UDim2.fromOffset(150, 52), C.panelLight, toggleBackpack)
+Ui.button(side, "TOP  [L]", UDim2.fromOffset(150, 52), C.panelLight, function()
+	Leaderboard.toggle()
+end)
 Ui.button(side, "CAR", UDim2.fromOffset(150, 52), C.panelLight, function()
 	Net.get("SpawnCar"):FireServer()
 end)
@@ -1602,12 +1793,125 @@ local function footTarget(): (Vector3?, string?, boolean)
 	return pile, person, false
 end
 
+-- ── Level up ───────────────────────────────────────────────────────────────
+-- A banner at the top (where the job panel is; a level-up mostly comes as the job ends): LEVEL UP, the new level and
+-- rank, what it unlocks; the XP bar flashes. Under the windows, so it never hides the delivery result.
+
+local levelUpFrame = scaled(Ui.make("CanvasGroup", {
+	Size = UDim2.fromOffset(440, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	Position = UDim2.new(0.5, 0, 0, 14),
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = C.panel,
+	BackgroundTransparency = 0.04,
+	BorderSizePixel = 0,
+	GroupTransparency = 1,
+	Visible = false,
+	ZIndex = 4,
+}, gui))
+Ui.corner(levelUpFrame, 10)
+Ui.stroke(levelUpFrame, C.yellow, 2)
+Ui.padding(levelUpFrame, 12)
+Ui.list(levelUpFrame, true, 4, Enum.HorizontalAlignment.Center)
+Ui.label(levelUpFrame, "⬆  LEVEL UP!", UDim2.new(1, 0, 0, 40), {
+	TextSize = 36,
+	Font = Enum.Font.GothamBlack,
+	TextColor3 = C.yellow,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	LayoutOrder = 1,
+})
+local levelUpTitle = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 26), {
+	TextSize = 22,
+	Font = Enum.Font.GothamBlack,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	LayoutOrder = 2,
+})
+local levelUpUnlocks = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 0), {
+	AutomaticSize = Enum.AutomaticSize.Y,
+	TextSize = 15,
+	Font = Enum.Font.GothamMedium,
+	TextColor3 = C.green,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	LayoutOrder = 3,
+})
+local levelUpStamp = 0
+
+local function showLevelUp(from: number, to: number)
+	local unlocked: { string } = {}
+	for level = from + 1, to do
+		for _, name in unlocksAt(level) do
+			table.insert(unlocked, name)
+		end
+	end
+	local rank = Levels.rank(to)
+	levelUpTitle.Text = `LEVEL {to}  ·  {rank:upper()}`
+	levelUpUnlocks.Text = if #unlocked > 0 then `Unlocked: {table.concat(unlocked, " · ")}` else "Better jobs, cars and guns wait on the next levels."
+	levelUpStamp += 1
+	local mine = levelUpStamp
+	levelUpFrame.Visible = true
+	levelUpFrame.Position = UDim2.new(0.5, 0, 0, -10)
+	TweenService:Create(levelUpFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { GroupTransparency = 0, Position = UDim2.new(0.5, 0, 0, 14) }):Play()
+	-- The XP bar and the LV chip flash white.
+	xpFill.BackgroundColor3 = Color3.new(1, 1, 1)
+	levelChip.BackgroundColor3 = Color3.new(1, 1, 1)
+	TweenService:Create(xpFill, TweenInfo.new(1.2), { BackgroundColor3 = C.yellow }):Play()
+	TweenService:Create(levelChip, TweenInfo.new(1.2), { BackgroundColor3 = C.yellow }):Play()
+	Hud.toast(`LEVEL {to}! You are a {rank} now.`)
+	task.delay(4.5, function()
+		if levelUpStamp ~= mine then
+			return
+		end
+		TweenService:Create(levelUpFrame, TweenInfo.new(0.5), { GroupTransparency = 1 }):Play()
+		task.wait(0.55)
+		if levelUpStamp == mine then
+			levelUpFrame.Visible = false
+		end
+	end)
+end
+
+-- The level shown (nil until the save loaded: the first value is no level-up).
+local shownLevel: number? = nil
+
+-- The LV chip, the rank, the XP bar; a level-up flashes and the open shop shows what it unlocked.
+local function refreshLevel()
+	local xp = myXp()
+	if xp == nil then
+		levelChip.Text = "LV 1"
+		rankLabel.Text = Levels.rank(1)
+		xpLabel.Text = ""
+		xpFill.Size = UDim2.fromScale(0, 1)
+		return
+	end
+	local level = Levels.levelFor(xp)
+	levelChip.Text = `LV {level}`
+	rankLabel.Text = Levels.rank(level)
+	if level >= Config.Levels.MaxLevel then
+		xpLabel.Text = "MAX"
+	else
+		local from = Levels.xpFor(level)
+		xpLabel.Text = `{math.floor(xp - from)}/{Levels.xpFor(level + 1) - from} XP`
+	end
+	xpFill.Size = UDim2.fromScale(Levels.progress(xp), 1)
+	local before = shownLevel
+	if before == level then
+		return
+	end
+	shownLevel = level
+	if before ~= nil and level > before then
+		showLevelUp(before, level)
+	end
+	if before ~= nil and shop.frame.Visible then
+		renderShop()
+	end
+end
+
 -- ── Updates ────────────────────────────────────────────────────────────────
 
 function Hud.setState(newState: any)
 	state = newState
 	moneyLabel.Text = Ui.money(state.money)
 	statsLabel.Text = `Deliveries {state.deliveries} · Kills {state.kills}`
+	refreshLevel()
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
 	end
@@ -1816,6 +2120,8 @@ end)
 
 function Hud.start()
 	updateScale()
+	refreshLevel()
+	player:GetAttributeChangedSignal("Xp"):Connect(refreshLevel)
 	local camera = workspace.CurrentCamera
 	if camera then
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
