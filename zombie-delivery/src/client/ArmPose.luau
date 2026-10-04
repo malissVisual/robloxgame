@@ -22,8 +22,10 @@ local blends: { [Model]: number } = {}
 -- Per joint: the Transform written last frame, and the animation's own value under it. A joint that still holds
 -- our value was not written by the Animator this frame (throttled, or no track moves it): the last animation
 -- value is the base then, so the pose never piles up on itself and an arm never stays stuck up.
-local written: { [Instance]: CFrame } = setmetatable({}, { __mode = "k" }) :: any
-local animated: { [Instance]: CFrame } = setmetatable({}, { __mode = "k" }) :: any
+-- (Plain tables, cleaned up when a joint goes away: Roblox may collect an Instance's Lua handle from a weak table
+-- while the Instance still exists.)
+local written: { [Instance]: CFrame } = {}
+local animated: { [Instance]: CFrame } = {}
 local reported = false
 
 local function lay(joint: any, goal: CFrame, t: number)
@@ -129,6 +131,12 @@ local function step(dt: number)
 	for character in blends do
 		if not character.Parent then
 			blends[character] = nil
+		end
+	end
+	for joint in written do
+		if not joint.Parent then
+			written[joint] = nil
+			animated[joint] = nil
 		end
 	end
 end
