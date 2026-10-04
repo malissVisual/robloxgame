@@ -808,7 +808,7 @@ export type EstateDef = {
 }
 
 Config.Estate = {
-	BaseCarSlots = 3, -- the depot's lot: cars you can own without any garage
+	BaseCarSlots = 2, -- the depot's lot: cars you can own without any garage (more need a home or a garage)
 	SellBack = 0.6, -- selling returns this share of the price
 	Properties = {
 		{ id = "hilltop", name = "Hilltop Mansion", kind = "mansion", price = 6000000, garageSlots = 8, level = 10, description = "The top of Sunset Hills: the whole city at your feet, an infinity pool and a garage for eight." },

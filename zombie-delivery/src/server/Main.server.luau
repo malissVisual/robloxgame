@@ -272,6 +272,10 @@ Net.get("RequestState").OnServerEvent:Connect(function(player)
 end)
 
 Net.get("SpawnCar").OnServerEvent:Connect(function(player)
+	if CarCall.busy(player) then
+		notice:FireClient(player, "Your car is already on the way.")
+		return
+	end
 	if Jobs.active(player) and Vehicles.get(player) then
 		notice:FireClient(player, "Your car is still out there. Find it!")
 		return

@@ -50,8 +50,14 @@ safely("BusinessUi", BusinessUi.start)
 safely("TrafficAnimator", TrafficAnimator.start)
 Shooting.notify = Hud.toast
 -- One window at a time: every HUD window, the leaderboard and the crew window close the others.
-Hud.onCloseWindows = CrewPanel.close
+Hud.onCloseWindows = function()
+	CrewPanel.close()
+	EstateUi.close()
+	BusinessUi.close()
+end
 CrewPanel.onOpen = Hud.closeWindows
+EstateUi.onOpen = Hud.closeWindows
+Hud.onEstate = EstateUi.toggleList
 CameraRig.mouseNeeded = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen()
 end
