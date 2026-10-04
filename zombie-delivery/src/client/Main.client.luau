@@ -17,6 +17,7 @@ local Weather = require(Client.Weather)
 local CameraRig = require(Client.CameraRig)
 local ArmPose = require(Client.ArmPose)
 local AdminPanel = require(Client.AdminPanel)
+local AnimalAnimator = require(Client.AnimalAnimator)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -36,6 +37,7 @@ safely("Hud", Hud.start)
 safely("CameraRig", CameraRig.start)
 safely("ArmPose", ArmPose.start)
 safely("AdminPanel", AdminPanel.start)
+safely("AnimalAnimator", AnimalAnimator.start)
 CameraRig.mouseNeeded = Hud.anyWindowOpen
 
 Net.get("State").OnClientEvent:Connect(function(state)
