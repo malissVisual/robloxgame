@@ -135,9 +135,12 @@ end
 
 -- The gun you have equipped, in your hand, the arm raised to aim (everybody sees it). You can shoot on foot too.
 type GunPiece = { size: Vector3, offset: Vector3, color: Color3, material: Enum.Material }
-local DARK = Color3.fromRGB(30, 30, 34)
+local DARK = Color3.fromRGB(48, 48, 54)
 local GUN_LOOKS: { [string]: { GunPiece } } = {
-	pistol = { { size = Vector3.new(0.3, 0.45, 1.3), offset = Vector3.new(0, 0.15, -0.3), color = DARK, material = Enum.Material.Metal } },
+	pistol = {
+		{ size = Vector3.new(0.34, 0.5, 1.6), offset = Vector3.new(0, 0.2, -0.4), color = DARK, material = Enum.Material.Metal },
+		{ size = Vector3.new(0.3, 0.7, 0.4), offset = Vector3.new(0, -0.25, 0.1), color = Color3.fromRGB(70, 55, 45), material = Enum.Material.Wood },
+	},
 	smg = {
 		{ size = Vector3.new(0.35, 0.55, 2), offset = Vector3.new(0, 0.2, -0.6), color = DARK, material = Enum.Material.Metal },
 		{ size = Vector3.new(0.25, 0.8, 0.35), offset = Vector3.new(0, -0.35, -0.5), color = Color3.fromRGB(60, 60, 64), material = Enum.Material.Metal },

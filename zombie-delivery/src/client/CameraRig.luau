@@ -35,6 +35,7 @@ local WALK_SPEED = 10
 local SPRINT_SPEED = 22
 local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local RAISE_TIME = 0.25
+local armPitch = 0 -- how far up (+) or down the gun arm points: from the shoulder to what is under the crosshair
 local smoothFocus: Vector3? = nil -- the camera's focus follows smoothly (no shaking with every bump of the car)
 local SENSITIVITY = 0.0032
 
@@ -137,18 +138,18 @@ local pitchSent = 0
 local pitchSentAt = 0
 local function sendAiming(aiming: boolean)
 	local now = os.clock()
-	local pitchMoved = aiming and math.abs(pitch - pitchSent) > 0.08 and now - pitchSentAt > 0.2
+	local pitchMoved = aiming and math.abs(armPitch - pitchSent) > 0.08 and now - pitchSentAt > 0.2
 	if aiming ~= aimingSent or pitchMoved then
 		aimingSent = aiming
-		pitchSent = pitch
+		pitchSent = armPitch
 		pitchSentAt = now
-		Net.get("Aiming"):FireServer(aiming, pitch)
+		Net.get("Aiming"):FireServer(aiming, armPitch)
 	end
 end
 
 -- ArmPose: is the local character aiming, and how far up or down (radians, + is up).
 function CameraRig.aimPose(): (boolean, number)
-	return enabled and supported and aimingSent, pitch
+	return enabled and supported and aimingSent, armPitch
 end
 
 -- On foot the gun must be up before it fires (it takes RAISE_TIME after you start aiming); in a car always.
@@ -269,6 +270,29 @@ local function update(dt: number)
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector)
 	camera.FieldOfView = lerp(70, 55, aimBlend)
+
+	-- The gun arm points from the shoulder at whatever is under the crosshair (not simply where the camera looks:
+	-- a camera looking down from above would point the arms at your feet).
+	if wantAim then
+		local ray = camera:ViewportPointToRay(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+		local aimParams = RaycastParams.new()
+		aimParams.FilterType = Enum.RaycastFilterType.Exclude
+		local aimExclude: { Instance } = { character }
+		local effects = workspace:FindFirstChild("LocalEffects")
+		if effects then
+			table.insert(aimExclude, effects)
+		end
+		aimParams.FilterDescendantsInstances = aimExclude
+		local aimHit = workspace:Raycast(ray.Origin, ray.Direction * 600, aimParams)
+		local target = if aimHit then aimHit.Position else ray.Origin + ray.Direction * 600
+		local shoulder = root.Position + Vector3.new(0, 1.5, 0)
+		local offset = target - shoulder
+		-- Something very close under the crosshair (or the ground at your feet): keep the arms level-ish.
+		local goal = if offset.Magnitude > 4 then math.asin(math.clamp(offset.Unit.Y, -1, 1)) else 0
+		armPitch = lerp(armPitch, math.clamp(goal, -0.6, 0.95), math.min(1, dt * 15))
+	else
+		armPitch = 0
+	end
 
 	-- On foot: the character turns where it walks (the Humanoid does it), or toward the aim while aiming.
 	if wantAim then
