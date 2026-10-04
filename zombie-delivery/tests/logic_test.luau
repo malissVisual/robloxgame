@@ -61,6 +61,96 @@ check("pickKind r=0.99", Economy.pickKind({ walker = 1, runner = 1 }, 0.99) == "
 check("pickKind weights", Economy.pickKind({ walker = 9, brute = 1 }, 0.05) == "brute")
 check("pickKind empty", Economy.pickKind({}, 0.5) == "walker")
 
+-- Zombie waves, roamers, the people who only go after players on a job -----------
+
+local tiers = Config.Jobs.Tiers
+check("waves grow and are capped in every tier", (function()
+	for _, tier in tiers do
+		if Economy.waveSize(tier, 1) ~= tier.waveBase or tier.waveGrow <= 0 then
+			return false
+		end
+		local last = 0
+		for n = 1, 30 do
+			local size = Economy.waveSize(tier, n)
+			if size < last or size > tier.waveMax then
+				return false
+			end
+			last = size
+		end
+		if last ~= tier.waveMax or Economy.waveSize(tier, 2) <= Economy.waveSize(tier, 1) then
+			return false
+		end
+		if tier.waveMax > tier.waveAlive or tier.waveEvery <= 0 then
+			return false -- a whole wave must fit under the cap of the alive ones
+		end
+	end
+	return true
+end)())
+check("wave 3 of tier 2", Economy.waveSize(tiers[2], 3) == math.min(tiers[2].waveBase + 2 * tiers[2].waveGrow, tiers[2].waveMax))
+check("tiers get harder: bigger, faster waves, more alive", (function()
+	for i = 2, #tiers do
+		local a, b = tiers[i - 1], tiers[i]
+		if not (b.waveEvery < a.waveEvery and b.waveBase >= a.waveBase and b.waveMax > a.waveMax and b.waveAlive > a.waveAlive) then
+			return false
+		end
+		for n = 1, 8 do
+			if Economy.waveSize(b, n) <= Economy.waveSize(a, n) then
+				return false
+			end
+		end
+	end
+	return true
+end)())
+local wanted = Economy.findModifier("horde")
+check("WANTED: bigger and faster waves", wanted ~= nil and (function()
+	local m = (wanted :: Config.ModifierDef).spawnMultiplier
+	for _, tier in tiers do
+		if Economy.waveSize(tier, 3, m) <= Economy.waveSize(tier, 3) or Economy.waveEvery(tier, m) >= Economy.waveEvery(tier)
+			or Economy.waveAlive(tier, m) <= Economy.waveAlive(tier) or Economy.waveSize(tier, 99, m) > Economy.waveAlive(tier, m) then
+			return false
+		end
+	end
+	return true
+end)())
+check("the first wave comes ~15 s after accepting", Config.Jobs.FirstWave >= 10 and Config.Jobs.FirstWave <= 20)
+check("the people only go after players on a job", Config.Zombies.bandit.jobOnly == true and Config.Zombies.gunner.jobOnly == true
+	and Config.Zombies.soldier.jobOnly == true and not Config.Zombies.walker.jobOnly and not Config.Zombies.runner.jobOnly
+	and not Config.Zombies.brute.jobOnly)
+check("every ranged enemy is one of the people", (function()
+	for _, def in Config.Zombies do
+		if def.ranged and not def.jobOnly then
+			return false
+		end
+	end
+	return true
+end)())
+local roam = Config.Horde.Roam
+check("roamers are zombies only (no bandit, gunner, soldier)", (function()
+	local any = false
+	for kind, weight in roam.kinds do
+		local def = Config.Zombies[kind]
+		if not def or def.jobOnly or def.ranged or kind == "bandit" or kind == "gunner" or kind == "soldier" or weight <= 0 then
+			return false
+		end
+		any = true
+	end
+	return any
+end)())
+check("the waves are zombies only", (function()
+	for _, tier in tiers do
+		for kind in tier.waveKinds do
+			local def = Config.Zombies[kind]
+			if not def or def.ranged or kind == "bandit" or kind == "gunner" then
+				return false
+			end
+		end
+	end
+	return true
+end)())
+check("roam numbers make sense", roam.min >= 1 and roam.min <= roam.max and roam.near < roam.far and roam.far < roam.despawn
+	and roam.aggro < roam.gunHearing and roam.aggroCar <= roam.aggroCarMax and roam.chase > roam.aggroCarMax
+	and roam.reserve < Config.Horde.MaxTotal and roam.think >= 0.2 and roam.think <= 0.5)
+
 check("every car has a style and a price", (function()
 	local last = -1
 	for _, car in Config.Cars do

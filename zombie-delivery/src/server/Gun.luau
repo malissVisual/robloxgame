@@ -62,6 +62,8 @@ local function onFire(player: Player, target: any)
 		return -- faster than the gun can fire (a little slack for the network)
 	end
 	lastShot[player] = now
+	-- The calm zombies nearby hear it (server/Zombies.luau, Config.Horde.Roam.gunHearing).
+	Zombies.noise(player, root.Position)
 
 	local origin: Vector3
 	if car and carGun then

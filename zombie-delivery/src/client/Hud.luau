@@ -1532,7 +1532,8 @@ function Hud.setJob(newJob: any)
 	jobStroke.Color = stageColor
 	conditionFill.Size = UDim2.fromScale(math.clamp(job.condition, 0, 1), 1)
 	conditionFill.BackgroundColor3 = if job.condition > 0.6 then C.yellow elseif job.condition > 0.3 then Color3.fromRGB(255, 140, 40) else C.red
-	conditionText.Text = `Cargo {math.floor(job.condition * 100 + 0.5)}%  ·  Pay {Ui.money(job.pay)}  ·  Kills {job.kills}`
+	local wave = if type(job.wave) == "number" and job.wave > 0 then `  ·  Wave {job.wave}` else ""
+	conditionText.Text = `Cargo {math.floor(job.condition * 100 + 0.5)}%  ·  Pay {Ui.money(job.pay)}  ·  Kills {job.kills}{wave}`
 	renderCargoRow()
 	MapView.setTarget(job.position)
 	-- Loading / unloading / boarding progress.

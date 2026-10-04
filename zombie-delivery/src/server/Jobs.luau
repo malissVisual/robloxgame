@@ -9,9 +9,12 @@
 -- business would really send (Config.Jobs.Businesses: the pharmacy's medicine boxes to the doctor, the bakery's
 -- bread sacks to the camp cook ...), 1 – 3 pieces. Every piece handled on foot adds time to the clock.
 --
--- The enemies keep coming: zombies and, from ★★ up, bandit roadblocks and bandit cars on the road; at the stops a few
--- come at you on foot (Config.Cargo.FootWaves). Bandits at the car steal pieces, a wreck ruins some (the rest moves
--- to the next car). The pay scales with the pieces delivered and their condition.
+-- The enemies keep coming: zombie WAVES (Config tiers wave*: bigger and more often the higher the danger, the first
+-- one Config.Jobs.FirstWave s after you accept) and, from ★★ up, bandit roadblocks and bandit cars on the road; at
+-- the stops a few come at you on foot (Config.Cargo.FootWaves), bandits among them. The waves wait while you are in
+-- the safe zone or handle the cargo on foot. Bandits only ever go after players on a job (Zombies.hunts); without a
+-- job only the roaming zombies are around (server/Zombies.luau). Bandits at the car steal pieces, a wreck ruins some
+-- (the rest moves to the next car). The pay scales with the pieces delivered and their condition.
 --
 -- Crew: friends who ride in the owner's car help (their kills count, they may carry the cargo) and get paid too:
 -- every crew member gets half of the payout and the driver +15 % per member (Economy.crewSplit).
@@ -71,7 +74,8 @@ type Job = {
 	kills: number,
 	stop: number, -- index into offer.stops
 	guards: boolean, -- the horde at the last stop was spawned
-	nextSpawn: number,
+	wave: number, -- zombie waves so far
+	waveIn: number, -- seconds of driving until the next one (counts down only while the waves are not paused)
 	nextAmbush: number,
 	nextChase: number,
 	dirty: boolean, -- something changed, send it
@@ -91,7 +95,6 @@ local Jobs = {}
 
 local offers: { [Player]: { Offer } } = {}
 local jobs: { [Player]: Job } = {}
-local nextAmbient: { [Player]: number } = {}
 local rng = Random.new()
 
 local jobRemote = Net.get("Job")
@@ -148,6 +151,7 @@ local function payload(job: Job): { [string]: any }
 		timeLimit = offer.time,
 		condition = job.condition,
 		kills = job.kills,
+		wave = job.wave, -- zombie waves so far
 		pay = offer.pay,
 		modifier = info(offer.modifier),
 		jobType = info(offer.jobType),
@@ -500,6 +504,7 @@ end
 local function endJob(player: Player, job: Job, linger: boolean)
 	jobs[player] = nil
 	Cargo.finish(job.cargo, linger)
+	Zombies.release(player) -- its zombies roam on, its bandits stand down
 	Vehicles.setSpeedMultiplier(player, 1)
 	-- A company vehicle goes back; your own car comes to you.
 	local jobType = job.offer.jobType
@@ -561,7 +566,8 @@ local function startJob(player: Player, offer: Offer): boolean
 		kills = 0,
 		stop = 1,
 		guards = false,
-		nextSpawn = os.clock() + 3,
+		wave = 0,
+		waveIn = JobsConfig.FirstWave,
 		nextAmbush = os.clock() + 12,
 		nextChase = os.clock() + 20,
 		dirty = false,
@@ -737,6 +743,11 @@ local function jobOwner(player: Player): Player?
 	return nil
 end
 
+-- On a job, or in the crew of one (the people go after them: Zombies.hunts).
+function Jobs.involved(player: Player): boolean
+	return jobOwner(player) ~= nil
+end
+
 function Jobs.onKill(player: Player)
 	local owner = jobOwner(player)
 	local job = owner and jobs[owner]
@@ -866,6 +877,23 @@ local function advance(player: Player, job: Job)
 	notice:FireClient(player, if stop.kind == "pickup" then `All loaded! Now: {nextStop.label}` else `Done! Next: {nextStop.label}`)
 end
 
+-- The next zombie wave around you and ahead of you. No room (too many of yours alive, or the server is full): it
+-- waits a little and the number does not go up, so the waves never stack.
+local function sendWave(player: Player, job: Job, tier: Config.TierDef, position: Vector3, heading: Vector3?, multiplier: number)
+	local number = job.wave + 1
+	local room = Economy.waveAlive(tier, multiplier) - Zombies.countFor(player, true) -- the roadblocks' bandits do not count
+	local size = math.min(Economy.waveSize(tier, number, multiplier), room)
+	local made = if size > 0 then Zombies.spawnAround(player, position, heading, size, tier.waveKinds) else 0
+	if made <= 0 then
+		job.waveIn = JobsConfig.WavePostpone
+		return
+	end
+	job.wave = number
+	job.waveIn = Economy.waveEvery(tier, multiplier) * rng:NextNumber(0.9, 1.1)
+	job.dirty = true
+	notice:FireClient(player, `WAVE {number} · {made} {if made == 1 then "zombie" else "zombies"}`)
+end
+
 local elapsed = 0
 
 local function update(dt: number)
@@ -884,17 +912,7 @@ local function update(dt: number)
 		local heading = if car then car.chassis.AssemblyLinearVelocity else nil
 
 		if not job then
-			-- A few enemies around even without a job (not for passengers: the driver's are enough).
-			local ambient = Config.Horde.Ambient
-			local ridingCar, driving = Vehicles.seatedIn(player)
-			local passenger = ridingCar ~= nil and not driving
-			if not passenger and now >= (nextAmbient[player] or 0) and not World.isSafe(position) then
-				nextAmbient[player] = now + ambient.every
-				if Zombies.countFor(player) < ambient.max then
-					Zombies.spawnAround(player, position, heading, ambient.count, ambient.kinds)
-				end
-			end
-			continue
+			continue -- free roam: only the roaming zombies (server/Zombies.luau), no bandits
 		end
 
 		local offer = job.offer
@@ -967,11 +985,11 @@ local function update(dt: number)
 			end
 		else
 			job.footSince = nil
-			if now >= job.nextSpawn and not World.isSafe(position) then
-				job.nextSpawn = now + tier.spawnEvery / multiplier
-				local room = math.floor(tier.maxZombies * multiplier) - Zombies.countFor(player)
-				if room > 0 then
-					Zombies.spawnAround(player, position, heading, math.min(room, tier.spawnCount), tier.kinds)
+			if not World.isSafe(position) then
+				-- The zombie waves: the clock runs only out here, never in the safe zone or on foot at a stop.
+				job.waveIn -= step
+				if job.waveIn <= 0 then
+					sendWave(player, job, tier, position, heading, multiplier)
 				end
 			end
 			local driving = Vehicles.isDriving(player)
@@ -1060,7 +1078,6 @@ function Jobs.start()
 			jobs[player] = nil
 			Cargo.finish(job.cargo, false)
 		end
-		nextAmbient[player] = nil
 		for _, other in jobs do
 			other.crew[player] = nil
 		end

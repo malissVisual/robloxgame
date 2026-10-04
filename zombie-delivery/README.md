@@ -69,7 +69,7 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
      Every piece to handle adds time to the clock.
    * ★ near and quiet · ★★ bandit roadblocks · ★★★ across the city, gunners and brutes · ★★★★ INSANE: the far places.
    * Modifiers on the far jobs: RUSH (less time), FRAGILE (hits cost double), HEAVY LOAD (slower car), WANTED
-     (twice the enemies), each pays more.
+     (bigger, faster zombie waves), each pays more.
    * Sometimes the **Winter Run** is on the board: through the tunnel and over the **frozen lake** (the car slides on
      the ice) to the Ski Lodge.
    * **Work for the people who run things** (the WORK HERE boards, ★ yellow on the map). They lend you their vehicle
@@ -83,12 +83,25 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
      * **Silver Spur Ranch** (off the West Highway): Horse Transport, two horses to the Riverside Riding School →
        **Ranch Revolver** after 2 jobs, **Livestock Truck** after 4
      * **Gas Station** (North Highway): Fuel Run, fuel barrels from the Harbor Fuel Depot → **Fuel Truck** after 3
-4. **Enemies**: **bandit pickups** come after you on the road (from ★★ up), ram you and shoot from the bed; destroy
-   them with guns, ramming, mines or molotovs ($75). **Bandits** and **gunners** on foot set up roadblocks ahead of
-   you, camp at the far places and shoot your car. Bandits next to your car **steal whole pieces** of your cargo.
-   Zombies (walkers, runners, brutes, soldiers at the base) are rarer: run them over or shoot them (a **headshot
-   kills** at once, a brute takes 4×); they grab a slow car and bite it until you shoot them off. The crosshair is a
-   **dot** that turns white over an enemy; an **X** shows only on a headshot.
+4. **Enemies**:
+   * **Without a job** (free roam) only **zombies** are around: 6 – 10 walkers and runners (rarely a brute) shamble
+     around you, 150 – 320 studs away, wherever you are out of the safe zone. They wander slowly until they notice
+     you: on foot within ~55 studs, a car further the faster (the louder) it goes, a **gunshot** within ~120 studs,
+     or a hit. Then they hunt you, and give up a few seconds after they lose you. Kills pay as always.
+   * **Bandits only come during a job.** Bandits, gunners and the soldiers at the military base never go after a
+     player without a job: the camps at the far places and the base stand guard. Take a job and they wake up.
+   * **During a job** the zombies come in **WAVES** (a toast says "WAVE 3 · 7 zombies", the job panel shows the
+     wave): the first one ~15 s after you accept, around you and ahead of the car, then bigger and bigger ones.
+     ★ Easy: 2 → 5 zombies every ~40 s · ★★ Risky: 3 → 7 every ~32 s · ★★★ Deadly: 4 → 10 every ~26 s, brutes and
+     soldiers · ★★★★ INSANE: 6 → 14 every ~20 s (a cap of alive ones per tier; WANTED: bigger and faster). The waves
+     wait while you are in the safe zone or handle the cargo on foot at a stop (then a few come on foot instead,
+     bandits among them). When the job ends its zombies just roam on.
+   * **Bandit pickups** come after you on the road (from ★★ up), ram you and shoot from the bed; destroy them with
+     guns, ramming, mines or molotovs ($75). **Bandits** and **gunners** on foot set up roadblocks ahead of you and
+     shoot your car. Bandits next to your car **steal whole pieces** of your cargo.
+   * Zombies: run them over or shoot them (a **headshot kills** at once, a brute takes 4×); they grab a slow car and
+     bite it until you shoot them off. The crosshair is a **dot** that turns white over an enemy; an **X** shows only
+     on a headshot.
    A wrecked car (or dying) does **not** end the job: a wreck ruins 25 % of the pieces in it (at least one), press
    CAR for a new car (the company vehicle on a special job) and keep going while the time lasts.
 5. The pay: the job's pay × the share of the pieces delivered × cargo condition (50 – 100 %), + 25 % for finishing
@@ -124,7 +137,8 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 * **Upgrades** (Wrench Garage, 5 levels each): Engine, Handling, Armor, Ram Plow, Gun Damage, Fire Rate; paint jobs;
   car guns.
 * **Items** (Last Stop Supplies): Repair Kit, Medkit, Nitro, Molotov, Landmine.
-* **Enemies**: Bandit, Gunner, Walker, Runner, Brute, Soldier.
+* **Enemies**: Walker, Runner, Brute (zombies, around you all the time, in waves during a job); Bandit, Gunner,
+  Soldier (people: only during a job).
 * **People**: the employers, givers, receivers and kids are R15 NPCs that talk, turn to you and walk; the ranch's
   **horses** graze, walk on a rope and ride in the livestock truck's stalls.
 
@@ -138,9 +152,9 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
               AnimationConstraint), GunModels (the guns in the hands)
 src/server/   Main (wiring, PLAY), World (builds the world), PlayerData (saves, leaderstats), Vehicles (cars, seats,
-              cargo slots, the roof turret of a car gun), Zombies (zombies and bandits, roadblocks), BanditCars (the
-              chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
-              the window), Jobs (job board, stops, special jobs, crews), Cargo (the cargo you carry, lead or board at a
+              cargo slots, the roof turret of a car gun), Zombies (zombies and bandits, roadblocks, the roamers,
+              who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
+              the window), Jobs (job board, stops, special jobs, crews, the zombie waves), Cargo (the cargo you carry, lead or board at a
               stop, the pieces in the vehicle), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases), Admin (the admin commands, checked on the server)
@@ -149,8 +163,9 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
               prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
               Weather, Ui
-tests/        run_tests.py runs every *_test.luau: logic (Economy, Map), cargo (pieces and pay), roads (the GPS),
-              cargun (car guns, one-handed guns, which cars mount a gun, what fires from a seat)
+tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
+              and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
+              seat)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis

@@ -16,8 +16,9 @@
 --   job        job type id    any Config.JobTypes id or "ordinary1" … "ordinary4" (Jobs.adminStart)
 --   finishStop                the current stop is done (Jobs.adminFinishStop)
 --   god        boolean?       toggle (or set) invulnerable: you and your car
---   spawn      kind | { kind, count }   enemies (Config.Zombies) near you
---   banditCar                 a bandit pickup chasing you
+--   spawn      kind | { kind, count }   enemies (Config.Zombies) near you; bandits, gunners and soldiers go after
+--                             you for ADMIN_HUNT s even without a job (Zombies.hunts)
+--   banditCar                 a bandit pickup chasing you (even without a job, BanditCars.wanted)
 --   clear                     kill / remove the enemies around you and the ones after you
 --   time       hour           Lighting.ClockTime
 --   heal                      you and your car full
@@ -48,11 +49,13 @@ local rng = Random.new()
 
 local CLEAR_RADIUS = 350 -- "clear" kills every enemy this close
 local MAX_SPAWN = 10 -- enemies per "spawn"
+local ADMIN_HUNT = 300 -- seconds the people an admin called (bandits, gunners, soldiers) go after them without a job
 local GOD_FIELD = "AdminGod" -- the invisible ForceField of god mode (Humanoid:TakeDamage does nothing through it)
 
 local god: { [Player]: boolean } = {}
 local lastCommand: { [Player]: number } = {}
--- Bandit cars an admin called stay after them even without a job (BanditCars.wanted), until this time.
+-- Bandit cars and bandits an admin called stay after them even without a job (BanditCars.wanted, Zombies.hunts),
+-- until this time.
 local chaseUntil: { [Player]: number } = {}
 
 function Admin.isAdmin(player: Player): boolean
@@ -393,6 +396,9 @@ local function spawnEnemies(player: Player, arg: any)
 		say(player, "ADMIN: enemies burn in the safe zone. Leave it first.")
 		return
 	end
+	if Config.Zombies[kind].jobOnly then
+		chaseUntil[player] = math.max(chaseUntil[player] or 0, os.clock() + ADMIN_HUNT)
+	end
 	local made = 0
 	for _ = 1, count do
 		local spot = Zombies.findSpot(root.Position, nil, 30, 70)
@@ -529,11 +535,19 @@ function Admin.start()
 	Net.get("Admin").OnServerEvent:Connect(onCommand)
 	RunService.Heartbeat:Connect(keepGods)
 
-	-- Bandit cars an admin called keep chasing without a job (Main set BanditCars.wanted = Jobs.active before this).
+	-- Bandit cars and bandits an admin called keep after them without a job (Main set BanditCars.wanted = Jobs.active
+	-- and Zombies.hunts = Jobs.involved before this).
+	local function called(player: Player): boolean
+		local untilTime = chaseUntil[player]
+		return untilTime ~= nil and os.clock() < untilTime
+	end
 	local wanted = BanditCars.wanted
 	BanditCars.wanted = function(player: Player): boolean
-		local untilTime = chaseUntil[player]
-		return wanted(player) or (untilTime ~= nil and os.clock() < untilTime)
+		return wanted(player) or called(player)
+	end
+	local hunts = Zombies.hunts
+	Zombies.hunts = function(player: Player): boolean
+		return hunts(player) or called(player)
 	end
 end
 

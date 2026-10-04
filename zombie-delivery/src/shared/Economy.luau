@@ -1,6 +1,7 @@
 --!strict
 -- The maths of money and stats: what an upgrade costs, what a car / gun / car gun does with the upgrades, what
--- fires from a car seat, what a job pays. Pure functions (no Roblox API), shared by the server, the client UI and the tests.
+-- fires from a car seat, what a job pays, how big its zombie waves are. Pure functions (no Roblox API), shared by
+-- the server, the client UI and the tests.
 
 local Config = require(script.Parent.Config)
 
@@ -191,6 +192,22 @@ function Economy.ramDamage(speed: number, ramPower: number): number
 		return 0
 	end
 	return speed * Config.Horde.RamDamagePerSpeed * ramPower
+end
+
+-- A job's zombie waves (Config TierDef wave*). multiplier = the modifier's spawnMultiplier (WANTED: 2, else 1):
+-- the waves get √multiplier bigger and come √multiplier as often (about multiplier × the zombies), and the cap of
+-- the alive ones grows by multiplier.
+function Economy.waveSize(tier: Config.TierDef, wave: number, multiplier: number?): number
+	local size = math.min(tier.waveBase + tier.waveGrow * (math.max(1, math.floor(wave)) - 1), tier.waveMax)
+	return math.max(1, math.floor(size * math.sqrt(multiplier or 1) + 0.5))
+end
+
+function Economy.waveEvery(tier: Config.TierDef, multiplier: number?): number
+	return tier.waveEvery / math.sqrt(multiplier or 1)
+end
+
+function Economy.waveAlive(tier: Config.TierDef, multiplier: number?): number
+	return math.floor(tier.waveAlive * (multiplier or 1) + 0.5)
 end
 
 -- payMultiplier / timeMultiplier come from the job's modifier (1 without one).

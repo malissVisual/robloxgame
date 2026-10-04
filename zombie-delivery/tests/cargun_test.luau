@@ -118,7 +118,11 @@ check("passenger: never the car gun", Economy.fireMode(true, false, "pistol", "r
 check("passenger: no rifle", Economy.fireMode(true, false, "rifle", "roofmg") == nil)
 check("passenger: no carbine", Economy.fireMode(true, false, "carbine", nil) == nil)
 
-check("version 2.1+", string.sub(Config.Version, 1, 3) == "2.1", Config.Version)
+check("version 2.1+", (function()
+	local major, minor = string.match(Config.Version, "^(%d+)%.(%d+)")
+	local a, b = tonumber(major) or 0, tonumber(minor) or 0
+	return a > 2 or (a == 2 and b >= 1)
+end)(), Config.Version)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

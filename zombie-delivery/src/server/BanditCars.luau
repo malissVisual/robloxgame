@@ -5,7 +5,8 @@
 --
 -- The server drives them: the same movers as the players' cars (LinearVelocity + AngularVelocity on the chassis),
 -- set every frame. The AI aims straight at you when it sees you, otherwise it follows the road that leads your way,
--- and backs up when it is stuck.
+-- and backs up when it is stuck. Once you have no job (BanditCars.wanted) they stop shooting, ramming and stealing,
+-- drive off and vanish.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,6 +40,7 @@ type Bandit = {
 	reverseUntil: number,
 	sees: boolean, -- a clear line to the target
 	lastHitBy: Player?,
+	offSince: number?, -- the target has had no job since (they drive off)
 }
 
 local BanditCars = {}
@@ -237,6 +239,7 @@ function BanditCars.chase(player: Player, position: Vector3, heading: Vector3?):
 			reverseUntil = 0,
 			sees = false,
 			lastHitBy = nil,
+			offSince = nil,
 		})
 		return true
 	end
@@ -311,7 +314,13 @@ local function drive(b: Bandit, dt: number, now: number)
 
 	-- Gone too far, lived too long, the target is gone: vanish.
 	local distance = if targetPosition then flat(targetPosition - position).Magnitude else math.huge
-	local givenUp = not BanditCars.wanted(b.target) and distance > 120
+	local wanted = BanditCars.wanted(b.target)
+	if wanted then
+		b.offSince = nil
+	elseif not b.offSince then
+		b.offSince = now
+	end
+	local givenUp = not wanted and (distance > 120 or now - (b.offSince or now) > 20)
 	if givenUp or not b.target.Parent or distance > Tuning.DespawnDistance or position.Y < -7 or (now - b.born > Tuning.Lifetime and distance > 200) then
 		remove(b)
 		npc.model:Destroy()
@@ -326,6 +335,11 @@ local function drive(b: Bandit, dt: number, now: number)
 	if now >= b.nextThink then
 		b.nextThink = now + 0.25
 		think(b, targetPosition, targetVelocity, targetModel)
+		if not wanted then
+			-- No job, no business: away from you.
+			local away = flat(position - targetPosition)
+			b.waypoint = position + (if away.Magnitude > 1 then away.Unit else flat(chassis.CFrame.LookVector)) * 60
+		end
 	end
 
 	-- Steering toward the waypoint.
@@ -343,7 +357,7 @@ local function drive(b: Bandit, dt: number, now: number)
 	-- Speed: race when far, match when close, slow in sharp turns, back up when stuck.
 	local actual = chassis.AssemblyLinearVelocity:Dot(look)
 	local target = if distance > 140 then Tuning.CatchUpSpeed else DEF.maxSpeed
-	if distance < 40 then
+	if distance < 40 and wanted then
 		target = math.min(target, flat(targetVelocity).Magnitude + 12)
 	end
 	if math.abs(angle) > 1.1 then
@@ -371,13 +385,13 @@ local function drive(b: Bandit, dt: number, now: number)
 	local grip = math.clamp(math.abs(b.speed) / 12, 0, 1)
 	npc.angular.AngularVelocity = Vector3.new(0, yaw * grip * (if b.speed >= 0 then 1 else -1), 0)
 
-	-- Alongside your car they reach over and take your cargo.
-	if car and distance < 16 then
+	-- Alongside your car they reach over and take your cargo (only from somebody on a job, like everything below).
+	if wanted and car and distance < 16 then
 		BanditCars.onSteal(b.target, Tuning.StealPerSecond * dt)
 	end
 
 	-- Shooting.
-	if b.sees and distance < Tuning.Range and now >= b.nextShot then
+	if wanted and b.sees and distance < Tuning.Range and now >= b.nextShot then
 		b.nextShot = now + Tuning.FireEvery * rng:NextNumber(0.8, 1.2)
 		shoot(b, targetPosition, targetVelocity, car, humanoid)
 	end
@@ -388,7 +402,7 @@ local function drive(b: Bandit, dt: number, now: number)
 			continue
 		end
 		local relative = flat(playerCar.chassis.AssemblyLinearVelocity - chassis.AssemblyLinearVelocity).Magnitude
-		if playerCar.owner == b.target and now >= b.nextSwipe then
+		if wanted and playerCar.owner == b.target and now >= b.nextSwipe then
 			b.nextSwipe = now + 1.2
 			Vehicles.damage(playerCar, Tuning.SwipeDamage, "The bandits rammed your car to pieces!")
 			BanditCars.onCarDamaged(playerCar.owner, Tuning.SwipeDamage)

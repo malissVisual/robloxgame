@@ -97,6 +97,8 @@ BanditCars.onSteal = function(player, share)
 	Jobs.steal(player, share)
 end
 BanditCars.wanted = Jobs.active
+-- The bandits, gunners and soldiers only go after players on a job (or in its crew); zombies after everybody.
+Zombies.hunts = Jobs.involved
 Vehicles.onWrecked = function(player, car, reason)
 	Zombies.releaseCar(car)
 	if Jobs.active(player) then

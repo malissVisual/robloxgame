@@ -7,6 +7,13 @@
 --   * a player on foot gets bitten
 --   * the depot (the safe zone) is never entered, zombies hanging on a car die when it drives in
 --
+-- Who goes after whom:
+--   * roamers (Config.Horde.Roam, zombie kinds only) appear around every player without a job and shamble around
+--     their spot; the world's own zombies (residents) do the same. They hunt a player who comes close, shoots nearby
+--     or hits them, and calm down when they lose them. Wave zombies (server/Jobs.luau) hunt from the start.
+--   * people (ZombieDef.jobOnly: bandits, gunners, the base's soldiers) only go after players on a job
+--     (Zombies.hunts, set by Main): without one they stand guard, never shoot, chase, grab or steal.
+--
 -- The limbs are animated on the clients (client/ZombieAnimator.luau), the server only moves the bodies.
 
 local Players = game:GetService("Players")
@@ -25,6 +32,7 @@ local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
 
 local Horde = Config.Horde
+local Roam = Horde.Roam
 
 export type Zombie = {
 	id: number,
@@ -45,6 +53,12 @@ export type Zombie = {
 	slot: number?,
 	weld: WeldConstraint?,
 	lastHitBy: Player?,
+	home: Vector3, -- where it wanders around / stands guard
+	roamer: boolean, -- roams around the players (Config.Horde.Roam), or a job's zombie after the job
+	hunting: boolean, -- a roamer or a resident zombie that noticed somebody (else it wanders)
+	lostSince: number?, -- hunting, but nobody in reach since
+	nextWander: number,
+	walkSpeed: number, -- its full speed (it shambles slower while it wanders)
 }
 
 local Zombies = {}
@@ -59,6 +73,11 @@ local rewardRemote = Net.get("Reward")
 Zombies.onKill = function(_player: Player, _zombie: Zombie) end
 Zombies.onCarDamaged = function(_player: Player, _amount: number) end
 Zombies.onSteal = function(_player: Player, _share: number) end
+-- Do the people (ZombieDef.jobOnly: bandits, gunners, soldiers) go after this player? Main: on a job or riding in
+-- one's crew (Jobs.involved); Admin adds the players who called enemies. Zombies go after everybody.
+Zombies.hunts = function(_player: Player): boolean
+	return true
+end
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -412,6 +431,29 @@ end
 
 -- ── Life and death ─────────────────────────────────────────────────────────
 
+-- The zombies that wander and hunt only what they notice: roamers and the world's own zombies (never the people).
+local function roams(z: Zombie): boolean
+	return (z.roamer or z.resident) and z.def.jobOnly ~= true
+end
+
+-- Back to wandering around where it is now, at a shamble.
+local function calm(z: Zombie, position: Vector3)
+	z.hunting = false
+	z.lostSince = nil
+	z.home = position
+	z.humanoid.WalkSpeed = math.min(Roam.wanderSpeed, z.walkSpeed)
+end
+
+-- It noticed somebody: full speed.
+local function wake(z: Zombie)
+	if z.hunting then
+		return
+	end
+	z.hunting = true
+	z.lostSince = nil
+	z.humanoid.WalkSpeed = z.walkSpeed
+end
+
 local function unlatch(z: Zombie)
 	local car = z.car
 	if car and z.slot then
@@ -474,6 +516,9 @@ function Zombies.damage(z: Zombie, amount: number, by: Player?, info: HitInfo?):
 		return false
 	end
 	z.lastHitBy = by or z.lastHitBy
+	if roams(z) then
+		wake(z) -- shot, burnt or run into: now it hunts
+	end
 	local health = z.humanoid.Health - amount
 	if health <= 0 then
 		kill(z, by, info and info.push)
@@ -506,7 +551,8 @@ function Zombies.fromPart(part: Instance): Zombie?
 	return nil
 end
 
-function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean?, resident: boolean?): Zombie?
+-- roamer = one of the zombies around a player without a job (Config.Horde.Roam): it wanders until it notices you.
+function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean?, resident: boolean?, roamer: boolean?): Zombie?
 	if #zombies >= Horde.MaxTotal then
 		return nil
 	end
@@ -532,7 +578,16 @@ function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean
 		slot = nil,
 		weld = nil,
 		lastHitBy = nil,
+		home = at,
+		roamer = roamer == true and def.jobOnly ~= true,
+		hunting = false,
+		lostSince = nil,
+		nextWander = 0,
+		walkSpeed = humanoid.WalkSpeed,
 	}
+	if roams(z) then
+		calm(z, at)
+	end
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model.Parent = workspace:FindFirstChild("Zombies") or workspace
 	pcall(function()
@@ -582,13 +637,16 @@ function Zombies.findSpot(center: Vector3, heading: Vector3?, minDistance: numbe
 	return nil
 end
 
-function Zombies.spawnAround(owner: Player, center: Vector3, heading: Vector3?, count: number, kinds: { [string]: number })
+-- Returns how many really appeared (no road spot, or the server's cap reached).
+function Zombies.spawnAround(owner: Player, center: Vector3, heading: Vector3?, count: number, kinds: { [string]: number }): number
+	local made = 0
 	for _ = 1, count do
 		local spot = Zombies.findSpot(center, heading)
-		if spot then
-			Zombies.spawn(Economy.pickKind(kinds, rng:NextNumber()), spot, owner, false)
+		if spot and Zombies.spawn(Economy.pickKind(kinds, rng:NextNumber()), spot, owner, false) then
+			made += 1
 		end
 	end
+	return made
 end
 
 -- A horde waiting at a delivery address. outward = the unit vector from the block to the road (they never stand
@@ -606,10 +664,12 @@ function Zombies.spawnGuards(owner: Player, at: Vector3, outward: Vector3, count
 	end
 end
 
-function Zombies.countFor(owner: Player): number
+-- The enemies a player's job brought (not the roamers around them). zombiesOnly = without the bandits and gunners
+-- (the soldiers bite, they count).
+function Zombies.countFor(owner: Player, zombiesOnly: boolean?): number
 	local n = 0
 	for _, z in zombies do
-		if z.owner == owner then
+		if z.owner == owner and not z.roamer and not (zombiesOnly and z.def.ranged) then
 			n += 1
 		end
 	end
@@ -626,12 +686,62 @@ function Zombies.releaseCar(car: Vehicles.Car)
 	end
 end
 
--- The player left: their zombies go too.
+local roamWant: { [Player]: { n: number, at: number } } = {}
+local noiseAt: { [Player]: number } = {}
+
+-- The player left (or an admin cleared): their zombies go too.
 function Zombies.clearOwner(owner: Player)
 	for _, z in table.clone(zombies) do
 		if z.owner == owner then
 			remove(z)
 			z.model:Destroy()
+		end
+	end
+	roamWant[owner] = nil
+	noiseAt[owner] = nil
+end
+
+-- The job is over: its enemies stop being special. Its zombies roam on (they keep after you until they lose you,
+-- then wander); its people (roadblocks, the ones from the stops, the guards) belong to nobody and stand where they
+-- are until they despawn, far from everybody.
+function Zombies.release(owner: Player)
+	for _, z in zombies do
+		if z.owner ~= owner or z.dead or z.resident or z.roamer then
+			continue
+		end
+		if z.def.jobOnly then
+			z.owner = nil
+			z.home = z.root.Position
+		else
+			z.roamer = true
+			if z.guard then
+				z.guard = false
+				calm(z, z.root.Position)
+			else
+				z.home = z.root.Position
+				z.hunting = true
+				z.lostSince = nil
+			end
+		end
+	end
+end
+
+-- A shot at `at`: the calm zombies that hear it come to look (once per Roam.think per player, a minigun is loud
+-- enough as it is).
+function Zombies.noise(player: Player, at: Vector3)
+	local now = os.clock()
+	if now - (noiseAt[player] or 0) < Roam.think then
+		return
+	end
+	noiseAt[player] = now
+	local safe = World.isSafe(at)
+	for _, z in zombies do
+		if not z.dead and not z.hunting and not z.car and roams(z) and (z.root.Position - at).Magnitude < Roam.gunHearing then
+			wake(z)
+			z.nextPath = now + 0.3
+			if not safe then
+				z.humanoid:MoveTo(at)
+			end
 		end
 	end
 end
@@ -689,14 +799,31 @@ local function latch(z: Zombie, car: Vehicles.Car): boolean
 	return true
 end
 
-type Target = { position: Vector3, velocity: Vector3, car: Vehicles.Car?, humanoid: Humanoid? }
+-- player = whose car it is, or who stands there.
+type Target = { position: Vector3, velocity: Vector3, car: Vehicles.Car?, humanoid: Humanoid?, player: Player }
+
+-- Zombies.hunts for every player, asked a few times a second (not for every enemy in every frame).
+local hunted: { [Player]: boolean } = {}
+local nextHuntCheck = 0
+
+local function refreshHunted(now: number)
+	if now < nextHuntCheck then
+		return
+	end
+	nextHuntCheck = now + 0.25
+	table.clear(hunted)
+	for _, player in Players:GetPlayers() do
+		local ok, result = pcall(Zombies.hunts, player)
+		hunted[player] = ok and result == true
+	end
+end
 
 local function gatherTargets(): { Target }
 	local targets: { Target } = {}
 	for _, car in Vehicles.all() do
 		local position = car.chassis.Position
 		if not World.isSafe(position) then
-			table.insert(targets, { position = position, velocity = car.chassis.AssemblyLinearVelocity, car = car })
+			table.insert(targets, { position = position, velocity = car.chassis.AssemblyLinearVelocity, car = car, player = car.owner })
 		end
 	end
 	for _, player in Players:GetPlayers() do
@@ -704,7 +831,7 @@ local function gatherTargets(): { Target }
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if humanoid and rootPart and humanoid.Health > 0 and not humanoid.SeatPart and not World.isSafe(rootPart.Position) then
-			table.insert(targets, { position = rootPart.Position, velocity = rootPart.AssemblyLinearVelocity, humanoid = humanoid })
+			table.insert(targets, { position = rootPart.Position, velocity = rootPart.AssemblyLinearVelocity, humanoid = humanoid, player = player })
 		end
 	end
 	return targets
@@ -753,6 +880,9 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 	end
 	if z.def.ranged then
 		return -- bandits do not grab cars, they shoot them
+	end
+	if z.def.jobOnly and not hunted[car.owner] then
+		return -- a soldier leaves the car of somebody without a job alone
 	end
 	-- Brutes are too heavy to hang on a car, they hit it from the ground.
 	if z.kind ~= "brute" and latch(z, car) then
@@ -854,8 +984,79 @@ local function cleanRoadblocks()
 	end
 end
 
+-- ── Who notices whom ───────────────────────────────────────────────────────
+
+local function flatSpeed(v: Vector3): number
+	return Vector3.new(v.X, 0, v.Z).Magnitude
+end
+
+-- The nearest target within reach. people = only the players they go after (Zombies.hunts).
+local function nearestTarget(position: Vector3, targets: { Target }, reach: number, people: boolean): (Target?, number)
+	local best: Target? = nil
+	local bestDistance = reach
+	for _, t in targets do
+		if people and not hunted[t.player] then
+			continue
+		end
+		local d = (t.position - position).Magnitude
+		if d < bestDistance then
+			best, bestDistance = t, d
+		end
+	end
+	return best, bestDistance
+end
+
+-- A calm zombie notices a player on foot within Roam.aggro, a car further the faster (the louder) it goes.
+local function noticed(position: Vector3, targets: { Target }): (Target?, number)
+	local best: Target? = nil
+	local bestDistance = math.huge
+	for _, t in targets do
+		local reach = if t.car then math.min(Roam.aggroCar + flatSpeed(t.velocity) * Roam.aggroPerSpeed, Roam.aggroCarMax) else Roam.aggro
+		local d = (t.position - position).Magnitude
+		if d < reach and d < bestDistance then
+			best, bestDistance = t, d
+		end
+	end
+	return best, bestDistance
+end
+
+-- A slow shamble around its spot: a few steps, or it just stands there for a while.
+local function wander(z: Zombie, position: Vector3, now: number)
+	if now < z.nextWander then
+		return
+	end
+	z.nextWander = now + rng:NextNumber(2.5, 6)
+	if rng:NextNumber() < Roam.idleChance then
+		z.humanoid:MoveTo(position)
+		return
+	end
+	local angle = rng:NextNumber(0, math.pi * 2)
+	local goal = z.home + Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(4, Roam.wander)
+	if not World.isSafe(goal) then
+		z.humanoid:MoveTo(goal)
+	end
+end
+
+-- People with nobody to go after: they stand guard (at the camps, the base, a roadblock), now and then a step or two.
+local function standGuard(z: Zombie, position: Vector3, now: number)
+	z.nextPath = now + rng:NextNumber(1.5, 3)
+	if z.guard then
+		return -- a roadblock or a stop's guards: they wait right there
+	end
+	local away = Vector3.new(position.X - z.home.X, 0, position.Z - z.home.Z).Magnitude
+	if away > 30 then
+		z.humanoid:MoveTo(if z.resident then z.home else position) -- back to the post (a camp's), or just stop
+	elseif rng:NextNumber() < 0.25 then
+		local angle = rng:NextNumber(0, math.pi * 2)
+		z.humanoid:MoveTo(z.home + Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(1, 6))
+	else
+		z.humanoid:MoveTo(position)
+	end
+end
+
 local function step()
 	local now = os.clock()
+	refreshHunted(now)
 	local targets = gatherTargets()
 	local cars = Vehicles.all()
 	for _, z in table.clone(zombies) do
@@ -864,7 +1065,7 @@ local function step()
 		end
 		local position = z.root.Position
 		if not z.car then
-			animate(z.model, z.root, z.def.speed > 20)
+			animate(z.model, z.root, z.humanoid.WalkSpeed > 20) -- a wandering runner walks
 		end
 
 		-- Hanging on a car: bite it, die in the depot.
@@ -875,6 +1076,10 @@ local function step()
 				z.humanoid.PlatformStand = false
 			elseif World.isSafe(car.chassis.Position) then
 				kill(z, nil, car.chassis.AssemblyLinearVelocity + Vector3.new(0, 20, 0))
+			elseif z.def.jobOnly and not hunted[car.owner] then
+				-- The job is over: a soldier lets go.
+				unlatch(z)
+				z.humanoid.PlatformStand = false
 			elseif now >= z.nextAttack then
 				z.nextAttack = now + z.def.attackEvery
 				Vehicles.damage(car, z.def.damage)
@@ -884,7 +1089,7 @@ local function step()
 		end
 
 		-- Too far from everybody: gone.
-		if position.Y < -8 or (not z.resident and nearestPlayerDistance(position) > Horde.DespawnDistance) then
+		if position.Y < -8 or (not z.resident and nearestPlayerDistance(position) > (if z.roamer then Roam.despawn else Horde.DespawnDistance)) then
 			-- drowned in the river / the sea, or nobody around
 			remove(z)
 			z.model:Destroy()
@@ -915,21 +1120,46 @@ local function step()
 		z.nextPath = now + Horde.RepathEvery * rng:NextNumber(0.8, 1.2)
 
 		-- Chase the nearest target.
-		local best: Target? = nil
 		local ranged = z.def.ranged == true
 		local range = z.def.range or 0
-		local bestDistance = if ranged then range + 40 elseif z.guard then 90 elseif z.resident then 160 else 400
-		for _, t in targets do
-			local d = (t.position - position).Magnitude
-			if d < bestDistance then
-				best, bestDistance = t, d
+		local best: Target?, bestDistance: number
+		if roams(z) then
+			if not z.hunting then
+				-- Calm: shamble around its spot and look around now and then.
+				z.nextPath = now + Roam.think * rng:NextNumber(0.8, 1.2)
+				best, bestDistance = noticed(position, targets)
+				if not best then
+					wander(z, position, now)
+					continue
+				end
+				wake(z)
+			else
+				best, bestDistance = nearestTarget(position, targets, Roam.chase, false)
+				if not best then
+					-- Lost them: it goes on where it was heading for a while, then calms down.
+					local since = z.lostSince or now
+					z.lostSince = since
+					if now - since >= Roam.giveUp then
+						calm(z, position)
+					end
+					continue
+				end
+				z.lostSince = nil
+			end
+		else
+			local reach = if ranged then range + 40 elseif z.guard then 90 elseif z.resident then 160 else 400
+			best, bestDistance = nearestTarget(position, targets, reach, z.def.jobOnly == true)
+			if not best then
+				if z.def.jobOnly then
+					standGuard(z, position, now)
+				elseif not z.guard then
+					z.nextPath = now + rng:NextNumber(2, 4) -- shamble around
+					z.humanoid:MoveTo(position + Vector3.new(rng:NextNumber(-20, 20), 0, rng:NextNumber(-20, 20)))
+				end
+				continue
 			end
 		end
 		if not best then
-			if not z.guard then
-				z.nextPath = now + rng:NextNumber(2, 4) -- shamble around
-				z.humanoid:MoveTo(position + Vector3.new(rng:NextNumber(-20, 20), 0, rng:NextNumber(-20, 20)))
-			end
 			continue
 		end
 		z.guard = false
@@ -1036,6 +1266,49 @@ local function keepResidents()
 	end
 end
 
+-- ── Roamers: zombies around every player without a job ────────────────────
+
+local function keepRoamers()
+	local now = os.clock()
+	local radius = Roam.far + 40
+	for _, player in Players:GetPlayers() do
+		if #zombies >= Horde.MaxTotal - Roam.reserve then
+			return -- the rest is for the jobs' waves
+		end
+		if Zombies.hunts(player) then
+			continue -- on a job: the waves come instead
+		end
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not humanoid or not rootPart or humanoid.Health <= 0 or World.isSafe(rootPart.Position) then
+			continue
+		end
+		local center = rootPart.Position
+		local entry = roamWant[player]
+		local want: number
+		if entry and now < entry.at then
+			want = entry.n
+		else
+			want = rng:NextInteger(Roam.min, Roam.max)
+			roamWant[player] = { n = want, at = now + Roam.rethink }
+		end
+		-- Anybody's roamers count (two friends together share them).
+		local around = 0
+		for _, z in zombies do
+			if not z.dead and roams(z) and (z.root.Position - center).Magnitude < radius then
+				around += 1
+			end
+		end
+		for _ = 1, math.min(want - around, Roam.batch) do
+			local spot = Zombies.findSpot(center, nil, Roam.near, Roam.far)
+			if spot then
+				Zombies.spawn(Economy.pickKind(Roam.kinds, rng:NextNumber()), spot, player, false, false, true)
+			end
+		end
+	end
+end
+
 function Zombies.all(): { Zombie }
 	return zombies
 end
@@ -1053,6 +1326,17 @@ function Zombies.start()
 			keepResidents()
 			cleanRoadblocks()
 			task.wait(Horde.Residents.respawn / 5)
+		end
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(Roam.every)
+			local ok, err = pcall(function()
+				keepRoamers()
+			end)
+			if not ok then
+				warn(`[Zombies] roamers: {err}`)
+			end
 		end
 	end)
 end

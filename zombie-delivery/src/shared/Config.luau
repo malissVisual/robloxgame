@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "2.1.2"
+Config.Version = "2.2"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -512,6 +512,9 @@ export type ZombieDef = {
 	shotDamage: number?,
 	fireEvery: number?,
 	accuracy: number?, -- hit chance at a standing target (less at speed)
+	-- People (bandits, gunners, the base's soldiers): they only go after players on a job (Zombies.hunts). Without
+	-- one they stand guard; they never roam (Config.Horde.Roam).
+	jobOnly: boolean?,
 }
 
 Config.Zombies = {
@@ -550,6 +553,7 @@ Config.Zombies = {
 		skin = { 110, 140, 95 },
 		shirt = { 72, 88, 50 },
 		pants = { 60, 70, 44 },
+		jobOnly = true,
 	},
 	bandit = {
 		name = "Bandit",
@@ -563,6 +567,7 @@ Config.Zombies = {
 		shirt = { 30, 30, 34 },
 		pants = { 50, 60, 90 },
 		ranged = true,
+		jobOnly = true,
 		range = 95,
 		shotDamage = 7,
 		fireEvery = 1.3,
@@ -580,6 +585,7 @@ Config.Zombies = {
 		shirt = { 120, 30, 30 },
 		pants = { 40, 40, 40 },
 		ranged = true,
+		jobOnly = true,
 		range = 150,
 		shotDamage = 12,
 		fireEvery = 1.8,
@@ -615,8 +621,32 @@ Config.Horde = {
 	RamSlowdown = 0.35, -- the car keeps this much speed after hitting a zombie that survives
 	RamSelfDamage = 0.12, -- the car takes this share of a survivor's health as damage
 	HeadshotMultiplier = 2,
-	-- When nobody has a job a few zombies still wander around a player (and pay for kills).
-	Ambient = { every = 7, count = 1, max = 5, kinds = { walker = 0.6, runner = 0.1, bandit = 0.3 } },
+	-- Free roam: zombies (never bandits) shamble around every player who has no job and is out of the safe zone. They
+	-- wander slowly around their spot and start hunting a player who comes close (a fast car is heard from further)
+	-- or fires a gun nearby; out of reach for `giveUp` s they calm down again. Kills pay as always.
+	Roam = {
+		min = 6, -- keep min … max roamers around each player (a new number every `rethink` s)
+		max = 10,
+		rethink = 30,
+		near = 150, -- they appear this far from the player …
+		far = 320, -- … and no further; they count as "around" the player within far + 40
+		every = 1, -- seconds between the checks, `batch` appear at a time
+		batch = 2,
+		reserve = 25, -- of Horde.MaxTotal, kept free for the jobs' waves
+		despawn = 420, -- a roamer this far from every player goes (Horde.DespawnDistance for the others)
+		kinds = { walker = 0.72, runner = 0.23, brute = 0.05 },
+		wander = 18, -- studs around its spot
+		wanderSpeed = 5, -- the shamble (it runs at its full speed once it hunts)
+		idleChance = 0.4, -- how often it just stands for a while instead of a few steps
+		think = 0.4, -- seconds between its looks around while calm
+		aggro = 55, -- hunts a player on foot this close
+		aggroCar = 45, -- a car: aggroCar + speed × aggroPerSpeed, at most aggroCarMax (a fast car is loud)
+		aggroPerSpeed = 1,
+		aggroCarMax = 110,
+		gunHearing = 120, -- a shot this close wakes it
+		chase = 200, -- keeps hunting while a target is this close …
+		giveUp = 8, -- … and calms down after this many seconds without one
+	},
 	-- Zombies that live in the world all the time (they never despawn, the dead come back).
 	Residents = { count = 36, respawn = 25 },
 }
@@ -628,11 +658,18 @@ export type TierDef = {
 	maxDistance: number,
 	basePay: number,
 	payPerStud: number,
-	spawnEvery: number,
-	spawnCount: number,
-	maxZombies: number,
-	kinds: { [string]: number },
-	guardHorde: number, -- zombies waiting at the destination
+	-- The zombie waves of a job (server/Jobs.luau): the first one Config.Jobs.FirstWave s after you accept, then one
+	-- every waveEvery s while you drive (not in the safe zone, not while you handle cargo on foot). Wave n has
+	-- waveBase + waveGrow × (n − 1) zombies, at most waveMax, and never more than waveAlive of yours alive
+	-- (Economy.waveSize / waveEvery / waveAlive; WANTED makes them bigger and faster).
+	waveEvery: number,
+	waveBase: number,
+	waveGrow: number,
+	waveMax: number,
+	waveAlive: number,
+	waveKinds: { [string]: number }, -- zombies only: the bandits come with roadblocks, chases and at the stops
+	kinds: { [string]: number }, -- the ones that come on foot at the stops (Config.Cargo.FootWaves) and the guards
+	guardHorde: number, -- enemies waiting at the destination
 	modifierChance: number,
 	ambushEvery: number, -- seconds between bandit roadblocks ahead of you (0 = none)
 	ambushSize: number,
@@ -687,6 +724,8 @@ Config.Jobs = {
 	GuardTriggerDistance = 230,
 	CrewDriverBonus = 0.15, -- the driver gets +15 % of the payout for every passenger
 	CrewShare = 0.5, -- every passenger gets half of the payout (on top, nobody loses money)
+	FirstWave = 15, -- seconds from accepting a job to its first zombie wave (see the tiers)
+	WavePostpone = 5, -- a wave with no room (too many of yours alive) waits this long and tries again
 	Tiers = {
 		{
 			stars = 1,
@@ -695,9 +734,12 @@ Config.Jobs = {
 			maxDistance = 650,
 			basePay = 80,
 			payPerStud = 0.2,
-			spawnEvery = 8,
-			spawnCount = 1,
-			maxZombies = 6,
+			waveEvery = 40,
+			waveBase = 2,
+			waveGrow = 1,
+			waveMax = 5,
+			waveAlive = 7,
+			waveKinds = { walker = 0.85, runner = 0.15 },
 			kinds = { walker = 0.75, runner = 0.1, bandit = 0.15 },
 			guardHorde = 0,
 			modifierChance = 0,
@@ -713,9 +755,12 @@ Config.Jobs = {
 			maxDistance = 1200,
 			basePay = 140,
 			payPerStud = 0.3,
-			spawnEvery = 6,
-			spawnCount = 2,
-			maxZombies = 10,
+			waveEvery = 32,
+			waveBase = 3,
+			waveGrow = 1,
+			waveMax = 7,
+			waveAlive = 11,
+			waveKinds = { walker = 0.65, runner = 0.3, brute = 0.05 },
 			kinds = { walker = 0.4, runner = 0.2, bandit = 0.4 },
 			guardHorde = 4,
 			modifierChance = 0.25,
@@ -731,9 +776,12 @@ Config.Jobs = {
 			maxDistance = 2000,
 			basePay = 260,
 			payPerStud = 0.45,
-			spawnEvery = 5,
-			spawnCount = 2,
-			maxZombies = 14,
+			waveEvery = 26,
+			waveBase = 4,
+			waveGrow = 2,
+			waveMax = 10,
+			waveAlive = 16,
+			waveKinds = { walker = 0.45, runner = 0.33, brute = 0.12, soldier = 0.1 },
 			kinds = { walker = 0.25, runner = 0.2, bandit = 0.35, gunner = 0.1, brute = 0.1 },
 			guardHorde = 7,
 			modifierChance = 0.5,
@@ -749,9 +797,12 @@ Config.Jobs = {
 			maxDistance = 99999,
 			basePay = 500,
 			payPerStud = 0.6,
-			spawnEvery = 4,
-			spawnCount = 3,
-			maxZombies = 18,
+			waveEvery = 20,
+			waveBase = 6,
+			waveGrow = 2,
+			waveMax = 14,
+			waveAlive = 22,
+			waveKinds = { walker = 0.3, runner = 0.35, brute = 0.15, soldier = 0.2 },
 			kinds = { walker = 0.15, runner = 0.15, soldier = 0.15, bandit = 0.3, gunner = 0.15, brute = 0.1 },
 			guardHorde = 10,
 			modifierChance = 1,
@@ -765,7 +816,7 @@ Config.Jobs = {
 		{ id = "rush", name = "RUSH", description = "30% less time", payMultiplier = 1.4, timeMultiplier = 0.7, spawnMultiplier = 1, conditionMultiplier = 1, speedMultiplier = 1 },
 		{ id = "fragile", name = "FRAGILE", description = "Every hit costs double cargo condition", payMultiplier = 1.35, timeMultiplier = 1, spawnMultiplier = 1, conditionMultiplier = 2, speedMultiplier = 1 },
 		{ id = "heavy", name = "HEAVY LOAD", description = "Your car is 20% slower", payMultiplier = 1.3, timeMultiplier = 1.15, spawnMultiplier = 1, conditionMultiplier = 1, speedMultiplier = 0.8 },
-		{ id = "horde", name = "WANTED", description = "Twice the enemies, bandits want your cargo", payMultiplier = 1.5, timeMultiplier = 1, spawnMultiplier = 2, conditionMultiplier = 1, speedMultiplier = 1 },
+		{ id = "horde", name = "WANTED", description = "Bigger, faster zombie waves, bandits want your cargo", payMultiplier = 1.5, timeMultiplier = 1, spawnMultiplier = 2, conditionMultiplier = 1, speedMultiplier = 1 },
 	} :: { ModifierDef },
 	-- How often (and how many) the bandits set up a roadblock ahead of you, see the tiers. A roadblock is a car across
 	-- the road with bandits around it.
