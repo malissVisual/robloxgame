@@ -18,6 +18,12 @@
 --              three garages (the Harbor Lockup, the Highway Garage on the North Highway, Downtown Parking) and the two
 --              office towers (Dispatch Tower downtown, Harbor Point in the Harbor) with the offices on their upper
 --              floors (Map.Towers)
+--   Missions   (3.0) fifteen more places for the mission campaigns (shared/Missions.luau): on downtown blocks the
+--              Corner Pharmacy, FreshMart, Fire Station 9, Precinct 13 and City Hall, the Harbor Warehouse on a Harbor
+--              block; out of town, each in its own yard at the end of a short road, the Old Airfield (south-west), the
+--              Power Plant (south of the Harbor), the Water Works (by the river), the Biotech Lab and the Train Yard
+--              (north of Downtown), Blackrock Prison (far north-west), Lighthouse Point (on the coast north of Ocean
+--              View), the Survivor Camp (on the Radio Road) and the Stadium Shelter (south of the Suburbs)
 --
 -- It also holds the shape of the night over the clock (Map.nightFactor): the server runs the clock
 -- (server/DayNight.luau), every client draws the look from the same numbers (client/Weather.luau).
@@ -150,12 +156,19 @@ Map.SpecialBlocks = {
 		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
 		["-1,-1"] = "dispatchtower", -- Dispatch Tower (the offices), in the safe zone
 		["1,1"] = "parking", -- Downtown Parking (a garage), in the safe zone
+		-- 3.0, the missions' places in town (all just outside the safe zone):
+		["0,-3"] = "cityhall", -- City Hall: north of the depot, its steps down to the street in front (south)
+		["-2,-2"] = "police", -- Precinct 13: its front and the patrol cars on the street to the south
+		["2,-1"] = "firestation", -- Fire Station 9: the truck bays open to the avenue on the east
+		["1,3"] = "pharmacy", -- the Corner Pharmacy: its door on the street to the north
+		["-3,1"] = "market", -- FreshMart: the car park and the doors on the avenue to the east
 	},
 	suburbs = { ["0,2"] = "school" },
 	harbor = {
 		["1,0"] = "frosty",
 		["3,-1"] = "harborpoint", -- Harbor Point (an office), by the docks
 		["0,-3"] = "lockup", -- the Harbor Lockup (a garage), where the Old Bridge comes over
+		["2,2"] = "warehouse", -- the Harbor Warehouse (3.0): its roller doors on the avenue to the west
 	},
 } :: { [string]: { [string]: string } }
 
@@ -185,6 +198,16 @@ Map.Yards = {
 	{ id = "ranch", name = "Silver Spur Ranch", x0 = -1010, z0 = 700, x1 = -790, z1 = 880 },
 	{ id = "stables", name = "Riverside Riding School", x0 = 580, z0 = 890, x1 = 745, z1 = 1060 },
 	{ id = "fueldepot", name = "Harbor Fuel Depot", x0 = 1290, z0 = 521, x1 = 1640, z1 = 720 },
+	-- 3.0, the missions' places out of town (Map.PlaceRoads lead to the ones that are not on a road already).
+	{ id = "airfield", name = "Old Airfield", x0 = -1760, z0 = 1150, x1 = -1240, z1 = 1380 },
+	{ id = "powerplant", name = "Power Plant", x0 = 1015, z0 = 521, x1 = 1270, z1 = 760 },
+	{ id = "waterworks", name = "Water Works", x0 = 430, z0 = 690, x1 = 745, z1 = 870 },
+	{ id = "lab", name = "Biotech Lab", x0 = -420, z0 = -1150, x1 = -150, z1 = -950 },
+	{ id = "prison", name = "Blackrock Prison", x0 = -1800, z0 = -1260, x1 = -1400, z1 = -900 },
+	{ id = "lighthouse", name = "Lighthouse Point", x0 = 1520, z0 = -1180, x1 = 1650, z1 = -980 },
+	{ id = "trainyard", name = "Train Yard", x0 = -580, z0 = -900, x1 = -100, z1 = -740 },
+	{ id = "camp", name = "Survivor Camp", x0 = -1080, z0 = -360, x1 = -860, z1 = -140 },
+	{ id = "stadium", name = "Stadium Shelter", x0 = -200, z0 = 1277, x1 = 200, z1 = 1440 },
 } :: { Area }
 
 -- Open ground next to the yards that must stay free of trees (the ranch paddock, the riding arena).
@@ -210,6 +233,23 @@ Map.Places = {
 	-- Downtown, on the road in front of their blocks (outside the safe zone, so they are addresses too).
 	{ id = "bank", name = "First Zombie Bank", x = CELL - BLOCK / 2 - 6, z = -2 * CELL, nx = -1, nz = 0 },
 	{ id = "clinic", name = "City Clinic", x = -2 * CELL + BLOCK / 2 + 6, z = 2 * CELL + 12, nx = 1, nz = 0 },
+	-- 3.0, the missions' places. In town: on the road in front of their blocks (Map.SpecialBlocks).
+	{ id = "pharmacy", name = "Corner Pharmacy", x = CELL, z = 3 * CELL - BLOCK / 2 - 6, nx = 0, nz = -1 },
+	{ id = "market", name = "FreshMart Supermarket", x = -3 * CELL + BLOCK / 2 + 6, z = CELL, nx = 1, nz = 0 },
+	{ id = "warehouse", name = "Harbor Warehouse", x = 1080 + 2 * CELL - BLOCK / 2 - 6, z = 2 * CELL, nx = -1, nz = 0 },
+	{ id = "firestation", name = "Fire Station 9", x = 2 * CELL + BLOCK / 2 + 6, z = -CELL, nx = 1, nz = 0 },
+	{ id = "police", name = "Precinct 13", x = -2 * CELL, z = -2 * CELL + BLOCK / 2 + 6, nx = 0, nz = 1 },
+	{ id = "cityhall", name = "City Hall", x = 0, z = -3 * CELL + BLOCK / 2 + 6, nx = 0, nz = 1 },
+	-- Out of town: in their yards, just in from the road.
+	{ id = "airfield", name = "Old Airfield", x = -1400, z = 1185, nx = 0, nz = 0 },
+	{ id = "powerplant", name = "Power Plant", x = 1100, z = 548, nx = 0, nz = 0 },
+	{ id = "waterworks", name = "Water Works", x = 452, z = 780, nx = 0, nz = 0 },
+	{ id = "lab", name = "Biotech Lab", x = -172, z = -1000, nx = 0, nz = 0 },
+	{ id = "prison", name = "Blackrock Prison", x = -1600, z = -925, nx = 0, nz = 0 },
+	{ id = "lighthouse", name = "Lighthouse Point", x = 1545, z = -1080, nx = 0, nz = 0 },
+	{ id = "trainyard", name = "Train Yard", x = -216, z = -765, nx = 0, nz = 0 },
+	{ id = "camp", name = "Survivor Camp", x = -1058, z = -250, nx = 0, nz = 0 },
+	{ id = "stadium", name = "Stadium Shelter", x = 0, z = 1300, nx = 0, nz = 0 },
 } :: { Place }
 
 -- Where each employer's board stands (walk up to it to work for them).
@@ -249,6 +289,24 @@ local rawSpots: { [string]: { park: { number }, pile: { number } } } = {
 	movers = { park = { 349, 172 }, pile = { 337, 172 } }, -- the loading door, away from the WORK HERE board
 	bank = { park = { 76, -292 }, pile = { 93, -292 } }, -- at the curb below the bank's steps (6th Ave)
 	clinic = { park = { -219, 300 }, pile = { -237, 300 } }, -- under the emergency canopy (4th Ave)
+	-- 3.0: every place has one now (the missions load and unload anywhere)
+	radio = { park = { -1126, -590 }, pile = { -1140, -598 } }, -- at the station's door
+	-- 3.0, the missions' places (server/World.luau keeps its props off these spots)
+	pharmacy = { park = { 156, 366 }, pile = { 156, 381 } }, -- at the curb by the pharmacy's door
+	market = { park = { -366, 128 }, pile = { -382, 128 } }, -- the delivery bay beside the car park
+	warehouse = { park = { 1302, 270 }, pile = { 1318, 270 } }, -- in front of the open roller door
+	firestation = { park = { 354, -116 }, pile = { 339, -116 } }, -- beside the truck bays
+	police = { park = { -300, -222 }, pile = { -300, -238 } }, -- at the foot of the precinct's steps
+	cityhall = { park = { -16, -366 }, pile = { -16, -382 } }, -- at the foot of City Hall's steps
+	airfield = { park = { -1430, 1200 }, pile = { -1446, 1208 } }, -- the freight pallets by the hangar
+	powerplant = { park = { 1080, 560 }, pile = { 1068, 572 } }, -- the loading dock inside the gate
+	waterworks = { park = { 470, 770 }, pile = { 484, 760 } }, -- by the pump house
+	lab = { park = { -190, -992 }, pile = { -204, -984 } }, -- the delivery door of the lab
+	prison = { park = { -1580, -930 }, pile = { -1566, -940 } }, -- outside the gate, by the guard post
+	lighthouse = { park = { 1550, -1068 }, pile = { 1564, -1060 } }, -- by the keeper's cottage
+	trainyard = { park = { -232, -775 }, pile = { -246, -783 } }, -- the freight platform
+	camp = { park = { -1050, -240 }, pile = { -1036, -232 } }, -- inside the barricade's gap
+	stadium = { park = { 40, 1298 }, pile = { 52, 1308 } }, -- the relief tents by the gate
 }
 for id, spot in rawSpots do
 	local dx, dz = spot.park[1] - spot.pile[1], spot.park[2] - spot.pile[2]
@@ -443,6 +501,22 @@ for _, info in {
 	{ "stables", "🐎", "By the river, down Riding School Lane from the Suburbs. The ranch horses go here." },
 	{ "fueldepot", "🛢️", "South of the Harbor. Fuel barrels for the Gas Station." },
 	{ "bank", "🏦", "Downtown, just north of the safe zone. The cash transports load here." },
+	-- 3.0, the missions' places
+	{ "pharmacy", "💊", "Downtown, south of the depot. Pills, bandages and the last vaccines in town." },
+	{ "market", "🛒", "Downtown, west of the depot. FreshMart: not so fresh any more, but still open." },
+	{ "warehouse", "📦", "In the Harbor. Roller doors, forklifts and crates of everything." },
+	{ "firestation", "🚒", "Downtown, east of the depot. Fire Station 9: red trucks, brave crews." },
+	{ "police", "🚓", "Downtown, north-west of the depot. Precinct 13: what is left of the law." },
+	{ "cityhall", "🏛️", "Downtown, north of the depot. The mayor still holds office here." },
+	{ "airfield", "✈️", "Far south-west, down the Airfield Road off the West Highway. A runway and an old plane." },
+	{ "powerplant", "⚡", "South of the Harbor. The chimneys that keep the city's lights on." },
+	{ "waterworks", "💧", "By the river, south-east of Downtown. Clean water for everybody." },
+	{ "lab", "🧪", "North of Downtown, off the North Highway. Biotech Lab: they are working on a cure." },
+	{ "prison", "⛓️", "Far north-west, at the end of Blackrock Road. Walls, towers, a gate." },
+	{ "lighthouse", "🗼", "On the coast north of Ocean View, past the end of Cliff Road." },
+	{ "trainyard", "🚂", "Just north of Downtown. Rails, wagons and the freight platform." },
+	{ "camp", "⛺", "West of Downtown, on the Radio Road. Tents and barricades: survivors live here." },
+	{ "stadium", "🏟️", "South of the Suburbs. The stadium is a shelter now: tents on the field." },
 } do
 	for _, place in Map.Places do
 		if place.id == info[1] then
@@ -551,6 +625,16 @@ line({ { -1550, 520 }, { -1550, 760 } }, ROAD, "street", "Pine Lane") -- Pinecre
 line({ { -1100, -100 }, { -1420, -100 } }, ROAD, "street", "Sunset Lane") -- the Sunset Villa, off the Radio Road
 line({ { -2.5 * CELL, 900 + 2.5 * CELL }, { -480, 900 + 2.5 * CELL } }, ROAD, "street", "Birch Lane") -- Birch Cottage
 Map.EstateRoads = { "Sunset Drive", "Cliff Road", "Pine Lane", "Sunset Lane", "Birch Lane" }
+-- The roads to the missions' places out of town (3.0). Each starts on another road's centre line (a T-junction or the
+-- end of a road) and ends at the edge of its yard. (The Power Plant, the Survivor Camp and the Stadium Shelter lie
+-- right along a road and need none.)
+line({ { -1400, 520 }, { -1400, 1150 } }, ROAD, "street", "Airfield Road") -- off the West Highway's bend
+line({ { 2.5 * CELL, 780 }, { 430, 780 } }, ROAD, "street", "Waterworks Road") -- off the street to the Suburbs
+line({ { 0.5 * CELL, -1000 }, { -150, -1000 } }, ROAD, "street", "Lab Road") -- off the North Highway's bend
+line({ { -1100, -380 }, { -1600, -380 }, { -1600, -900 } }, ROAD, "street", "Blackrock Road") -- off the Radio Road
+line({ { 1080 + 2.5 * CELL, -820 }, { 1080 + 2.5 * CELL, -1080 }, { 1520, -1080 } }, ROAD, "street", "Lighthouse Road") -- on from Cliff Road
+line({ { -1.5 * CELL, -4.5 * CELL }, { -1.5 * CELL, -740 } }, ROAD, "street", "Rail Yard Road") -- north from Downtown's edge
+Map.PlaceRoads = { "Airfield Road", "Waterworks Road", "Lab Road", "Blackrock Road", "Lighthouse Road", "Rail Yard Road" }
 
 Map.Connectors = connectors
 

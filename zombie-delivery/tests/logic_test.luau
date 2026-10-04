@@ -947,6 +947,380 @@ check("plotPoint: right and back of the front", (function()
 	return near(rx, 13) and near(rz, 20) and near(bx, 10) and near(bz, 24)
 end)())
 
+-- Zombie Delivery 3.0: the missions' fifteen new places ------------------------------------------------------------
+
+local Icons = require("./Icons")
+local TOWN_PLACES = { "pharmacy", "market", "warehouse", "firestation", "police", "cityhall" }
+local YARD_PLACES = { "airfield", "powerplant", "waterworks", "lab", "prison", "lighthouse", "trainyard", "camp", "stadium" }
+local function yardById(id: string): Map.Area?
+	for _, yard in Map.Yards do
+		if yard.id == id then
+			return yard
+		end
+	end
+	return nil
+end
+-- Is any road's asphalt (its centre line ± half its width + `slack`) at this point? (The yards do not count.)
+local function onAsphalt(x: number, z: number, slack: number): boolean
+	for _, s in Map.Segments do
+		if toSegmentDistance(s, x, z) <= s.width / 2 + slack then
+			return true
+		end
+	end
+	return false
+end
+local function overlaps(ax0: number, az0: number, ax1: number, az1: number, bx0: number, bz0: number, bx1: number, bz1: number): boolean
+	return ax0 < bx1 and bx0 < ax1 and az0 < bz1 and bz0 < az1
+end
+
+check("the fifteen mission places are places", (function()
+	local missing = {}
+	for _, list in { TOWN_PLACES, YARD_PLACES } do
+		for _, id in list do
+			if not findPlace(id) then
+				table.insert(missing, id)
+			end
+		end
+	end
+	if #missing > 0 then
+		print("  missing places:", table.concat(missing, ", "))
+	end
+	return #missing == 0 and #TOWN_PLACES + #YARD_PLACES == 15
+end)())
+
+-- Every place, old and new: in bounds, dry, off the ice, on a road (or in its yard), out of the safe zone (it is an
+-- address); the missions' places also close to the road network (the old far places lie deep in their big yards).
+local missionPlace: { [string]: boolean } = {}
+for _, list in { TOWN_PLACES, YARD_PLACES } do
+	for _, id in list do
+		missionPlace[id] = true
+	end
+end
+for _, place in Map.Places do
+	local problem: string? = nil
+	local gap = distanceToRoad(place.x, place.z)
+	if not inBounds(place.x, place.z) or place.x < b.x0 + 40 or place.x > b.x1 - 40 or place.z < b.z0 + 40 or place.z > b.z1 - 40 then
+		problem = "out of bounds"
+	elseif Map.inWater(place.x, place.z) or Map.onIce(place.x, place.z) then
+		problem = "in the water / on the ice"
+	elseif not Map.onRoad(place.x, place.z) then
+		problem = "not on a road or in a yard"
+	elseif missionPlace[place.id] and gap > 45 then
+		problem = `{math.floor(gap)} studs from the road network`
+	elseif Map.isSafe(place.x, place.z) then
+		problem = "in the safe zone"
+	end
+	check(`place {place.id}: in bounds, on land, on or by a road`, problem == nil, problem)
+end
+check("the places stand apart (60+ studs) and have unique ids and names", (function()
+	local ids, names = {}, {}
+	for n, a in Map.Places do
+		if ids[a.id] or names[a.name] then
+			print("  duplicate:", a.id, a.name)
+			return false
+		end
+		ids[a.id], names[a.name] = true, true
+		for m = n + 1, #Map.Places do
+			local c = Map.Places[m]
+			if math.sqrt((a.x - c.x) ^ 2 + (a.z - c.z) ^ 2) < 60 then
+				print("  too close:", a.id, c.id)
+				return false
+			end
+		end
+	end
+	return true
+end)())
+check("every place has a cargo spot, every cargo spot a place", (function()
+	for _, place in Map.Places do
+		if not Map.CargoSpots[place.id] then
+			print("  no cargo spot:", place.id)
+			return false
+		end
+	end
+	for id in Map.CargoSpots do
+		if not findPlace(id) then
+			return false
+		end
+	end
+	return true
+end)())
+
+-- The ones in town: on a block of their own (Map.SpecialBlocks, nothing else there), the place on the road in front of
+-- it, the pile on the block's sidewalk, out of the safe zone.
+for _, id in TOWN_PLACES do
+	local place = findPlace(id)
+	local spot = Map.CargoSpots[id]
+	local problem: string? = nil
+	if not place or not spot then
+		problem = "no place or cargo spot"
+	else
+		local d, bi, bj = Map.blockAt(place.x - place.nx * 20, place.z - place.nz * 20)
+		local pd, pi, pj = Map.blockAt(spot.pile.x, spot.pile.z)
+		if math.abs(place.nx) + math.abs(place.nz) ~= 1 then
+			problem = "no front (nx, nz)"
+		elseif not d or Map.special(d.id, bi, bj) ~= id then
+			problem = "not in front of its own block"
+		elseif id == "warehouse" and d.id ~= "harbor" or id ~= "warehouse" and d.id ~= "downtown" then
+			problem = `in the wrong district ({d.id})`
+		elseif not onAsphalt(place.x, place.z, 0) or onAsphalt(place.x - place.nx * 20, place.z - place.nz * 20, 0) then
+			problem = "does not face its road"
+		elseif not pd or pd ~= d or pi ~= bi or pj ~= bj then
+			problem = "the pile is not on its block"
+		elseif Map.inYard(place.x, place.z) then
+			problem = "in a yard"
+		elseif Map.EmployerSpots[id] then
+			problem = "on an employer's spot"
+		end
+		if not problem and d then
+			-- Nothing else uses the block: no tower, no estate lot.
+			local cx, cz = d.ox + bi * Map.Cell, d.oz + bj * Map.Cell
+			local half = Map.BlockSize / 2
+			for other, plot in Map.EstatePlots do
+				local x0, z0, x1, z1 = lotBox(plot, 0)
+				if overlaps(x0, z0, x1, z1, cx - half, cz - half, cx + half, cz + half) then
+					problem = `shares its block with {other}`
+				end
+			end
+			for _, tower in Map.Towers do
+				local td, ti, tj = Map.blockAt(tower.x, tower.z)
+				if td == d and ti == bi and tj == bj then
+					problem = `shares its block with {tower.id}`
+				end
+			end
+		end
+	end
+	check(`town place {id}: its own block, the front on the road, the pile on the block`, problem == nil, problem)
+end
+check("the special blocks are each used once", (function()
+	local seen = {}
+	for districtId, blocks in Map.SpecialBlocks do
+		for key, id in blocks do
+			if seen[id] then
+				print("  twice:", id, districtId, key)
+				return false
+			end
+			seen[id] = true
+		end
+	end
+	return true
+end)())
+
+-- The ones out of town: a yard of their own (the place in it), dry, in bounds, out of the winter, off the roads, the
+-- districts, the estate, Sunset Hills, the clearings, the mountain, the lake and the other yards.
+local hillsArea = Map.SunsetHills
+for _, id in YARD_PLACES do
+	local place = findPlace(id)
+	local yard = yardById(id)
+	local problem: string? = nil
+	if not place or not yard then
+		problem = "no place or yard"
+	else
+		local inside = Map.inYard(place.x, place.z)
+		if not inside or inside.id ~= id then
+			problem = "the place is not in its yard"
+		elseif yard.x1 - yard.x0 < 100 or yard.z1 - yard.z0 < 100 then
+			problem = "the yard is too small"
+		end
+		-- The whole yard: in bounds (20 in), dry, not on the ice, not in the winter, not on a district's blocks.
+		for a = 0, 10 do
+			for c = 0, 10 do
+				local x, z = yard.x0 + (yard.x1 - yard.x0) * a / 10, yard.z0 + (yard.z1 - yard.z0) * c / 10
+				if problem then
+					break
+				elseif x < b.x0 + 20 or x > b.x1 - 20 or z < b.z0 + 20 or z > b.z1 - 20 then
+					problem = `out of bounds at {x}, {z}`
+				elseif Map.inWater(x, z) or Map.onIce(x, z) or Map.isWinter(x, z) then
+					problem = `water, ice or snow at {x}, {z}`
+				elseif (Map.blockAt(x, z)) ~= nil then
+					problem = `on a city block at {x}, {z}`
+				end
+			end
+		end
+		-- No road through it: only the ends of its own road reach in (half a road), so 24 in from the edge is clear.
+		for a = 0, 12 do
+			for c = 0, 12 do
+				local x = yard.x0 + 24 + (yard.x1 - yard.x0 - 48) * a / 12
+				local z = yard.z0 + 24 + (yard.z1 - yard.z0 - 48) * c / 12
+				if not problem and onAsphalt(x, z, 0) then
+					problem = `a road runs through it at {x}, {z}`
+				end
+			end
+		end
+		-- Off the districts (their outer roads too), the estate's lots, Sunset Hills, the clearings, the lake.
+		if not problem then
+			for _, d in Map.Districts do
+				local x0, x1, z0, z1 = Map.districtEdges(d)
+				local r = Map.RoadWidth / 2
+				if overlaps(yard.x0, yard.z0, yard.x1, yard.z1, x0 - r, z0 - r, x1 + r, z1 + r) then
+					problem = `on the district {d.id}`
+				end
+			end
+			for other, plot in Map.EstatePlots do
+				local x0, z0, x1, z1 = lotBox(plot, 10)
+				if overlaps(yard.x0, yard.z0, yard.x1, yard.z1, x0, z0, x1, z1) then
+					problem = `on the estate lot {other}`
+				end
+			end
+			local lake = Map.Lake
+			if overlaps(yard.x0, yard.z0, yard.x1, yard.z1, hillsArea.x0, hillsArea.z0, hillsArea.x1, hillsArea.z1) then
+				problem = "in Sunset Hills"
+			elseif overlaps(yard.x0, yard.z0, yard.x1, yard.z1, lake.x0, lake.z0, lake.x1, lake.z1) then
+				problem = "on the lake"
+			end
+			for _, area in Map.Clearings do
+				if overlaps(yard.x0, yard.z0, yard.x1, yard.z1, area.x0, area.z0, area.x1, area.z1) then
+					problem = `on the clearing {area.id}`
+				end
+			end
+			for _, other in Map.Yards do
+				if other ~= yard and overlaps(yard.x0, yard.z0, yard.x1, yard.z1, other.x0 - 10, other.z0 - 10, other.x1 + 10, other.z1 + 10) then
+					problem = `within 10 studs of the yard {other.id}`
+				end
+			end
+			-- The mountain (with the rock around it, Map.Mountain.radius + 260 covers the side balls World adds).
+			local mountainArea = Map.Mountain
+			local nx = math.clamp(mountainArea.x, yard.x0, yard.x1)
+			local nz = math.clamp(mountainArea.z, yard.z0, yard.z1)
+			if math.sqrt((nx - mountainArea.x) ^ 2 + (nz - mountainArea.z) ^ 2) < mountainArea.radius + 260 then
+				problem = "on the mountain"
+			end
+		end
+		-- The cargo spot is in the yard.
+		local spot = Map.CargoSpots[id]
+		if not problem and (not spot or Map.inYard(spot.park.x, spot.park.z) ~= yard or Map.inYard(spot.pile.x, spot.pile.z) ~= yard) then
+			problem = "the cargo spot is not in the yard"
+		end
+	end
+	check(`yard place {id}: its own yard, dry, off the roads, blocks, estate and other yards`, problem == nil, problem)
+end
+
+-- Their roads: join the network, stay dry, in bounds, off the blocks, the estate and the other yards, and end in their
+-- yard; every yard place is on its road or a road runs along its edge.
+do
+	local ends: { [string]: string } = { ["Airfield Road"] = "airfield", ["Waterworks Road"] = "waterworks", ["Lab Road"] = "lab",
+		["Blackrock Road"] = "prison", ["Lighthouse Road"] = "lighthouse", ["Rail Yard Road"] = "trainyard" }
+	check("the places' roads are listed", #Map.PlaceRoads == 6 and (function()
+		for _, name in Map.PlaceRoads do
+			if not ends[name] then
+				return false
+			end
+		end
+		return true
+	end)())
+	for _, name in Map.PlaceRoads do
+		local pieces: { Map.Segment } = {}
+		for _, s in Map.Connectors do
+			if s.name == name then
+				table.insert(pieces, s)
+			end
+		end
+		local problem: string? = nil
+		local first, last = pieces[1], pieces[#pieces]
+		if not first or not last then
+			problem = "no road"
+		else
+			local joined = false
+			for _, o in Map.Segments do
+				if o.name ~= name and onSegment(o, first.ax, first.az) then
+					joined = true
+				end
+			end
+			if not joined then
+				problem = "does not start on another road"
+			end
+			local yard = yardById(ends[name])
+			local endYard = Map.inYard(last.bx, last.bz)
+			if not problem and (not yard or endYard ~= yard) then
+				problem = "does not end in its yard"
+			end
+			for n, s in pieces do
+				if n > 1 and (pieces[n - 1].bx ~= s.ax or pieces[n - 1].bz ~= s.az) then
+					problem = "a gap"
+				end
+				local length = math.sqrt((s.bx - s.ax) ^ 2 + (s.bz - s.az) ^ 2)
+				for t = 0, length, 5 do
+					local x, z = s.ax + (s.bx - s.ax) * t / length, s.az + (s.bz - s.az) * t / length
+					if problem then
+						break
+					elseif Map.inWater(x, z) or not inBounds(x, z) or Map.onIce(x, z) then
+						problem = `water or out of bounds at {x}, {z}`
+					elseif (Map.blockAt(x, z)) ~= nil then
+						problem = `through a city block at {x}, {z}`
+					elseif Map.inYard(x, z) and Map.inYard(x, z) ~= yard then
+						problem = `through another yard at {x}, {z}`
+					else
+						for other, plot in Map.EstatePlots do
+							local x0, z0, x1, z1 = lotBox(plot, Map.RoadWidth / 2 + 4)
+							if x > x0 and x < x1 and z > z0 and z < z1 then
+								problem = `through the estate lot {other}`
+							end
+						end
+						if x > hillsArea.x0 and x < hillsArea.x1 and z > hillsArea.z0 and z < hillsArea.z1 then
+							problem = "through Sunset Hills"
+						end
+					end
+				end
+			end
+		end
+		check(`{name} joins the network, dry, off the blocks and the estate, ends in its yard`, problem == nil, problem)
+	end
+	for _, id in YARD_PLACES do
+		local yard = yardById(id)
+		local touches = false
+		if yard then
+			-- Some road's asphalt reaches the yard's edge (its own road ends there, or a road runs along it).
+			for a = 0, 40 do
+				for _, edge in { { yard.x0 + (yard.x1 - yard.x0) * a / 40, yard.z0 - 1 }, { yard.x0 + (yard.x1 - yard.x0) * a / 40, yard.z1 + 1 },
+					{ yard.x0 - 1, yard.z0 + (yard.z1 - yard.z0) * a / 40 }, { yard.x1 + 1, yard.z0 + (yard.z1 - yard.z0) * a / 40 } } do
+					if onAsphalt(edge[1], edge[2], 0) then
+						touches = true
+					end
+				end
+			end
+		end
+		check(`yard place {id} is reached by a road`, touches)
+	end
+end
+
+check("the mission places are reachable by road from the depot, both ways", (function()
+	for _, list in { TOWN_PLACES, YARD_PLACES } do
+		for _, id in list do
+			local place = findPlace(id)
+			if not place then
+				return false
+			end
+			local there = Roads.route(0, 26, place.x, place.z)
+			local back = Roads.route(place.x, place.z, 0, 26)
+			local straight = math.sqrt(place.x ^ 2 + (place.z - 26) ^ 2)
+			if #there < 2 or #back < 2 or Roads.length(there) > 3 * straight + 600 then
+				print("  no route to:", id, Roads.length(there))
+				return false
+			end
+		end
+	end
+	return true
+end)())
+check("the mission places are landmarks with an icon, by their road", (function()
+	local found: { [string]: Map.Landmark } = {}
+	for _, landmark in Map.Landmarks do
+		found[landmark.id] = landmark
+	end
+	for _, list in { TOWN_PLACES, YARD_PLACES } do
+		for _, id in list do
+			local landmark = found[id]
+			local icon = Icons.landmark(id)
+			if not landmark or landmark.kind ~= "place" or landmark.icon == "" or #landmark.description < 20
+				or distanceToRoad(landmark.x, landmark.z) > 45 or not icon or Icons.Ids[icon] == nil then
+				print("  bad landmark:", id)
+				return false
+			end
+		end
+	end
+	return true
+end)())
+check("the old places keep their spots", findPlace("bank") ~= nil and Map.CargoSpots.bank ~= nil and Map.special("downtown", 1, -2) == "bank"
+	and Map.special("downtown", -2, 2) == "clinic" and yardById("fueldepot") ~= nil and Map.CargoSpots.radio ~= nil)
+
 local district, i, j = Map.blockAt(Map.Cell, 0)
 check("blockAt finds the dealer block", district ~= nil and district.id == "downtown" and i == 1 and j == 0)
 check("blockAt on a road is nil", (Map.blockAt(Map.Cell / 2, 0)) == nil)

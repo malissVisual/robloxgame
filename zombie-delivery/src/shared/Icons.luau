@@ -146,11 +146,28 @@ local LANDMARK_ALIASES: { [string]: string } = {
 	garage_harbor = "dealer", -- a car
 	garage_north = "dealer",
 	garage_downtown = "dealer",
+	-- The missions' places (3.0) have no map icons of their own either: the closest ones.
+	market = "supplies", -- a shop full of things
+	airfield = "army",
+	powerplant = "fueldepot", -- energy
+	prison = "guns",
+	lighthouse = "docks", -- the sea
+	trainyard = "movers", -- freight
+	cityhall = "school", -- a public building with a flag
 }
 -- Landmarks with no map icon of their own yet: another icon's full name.
 local LANDMARK_BORROWED: { [string]: string } = {
 	bank = "cargo_crate",
 	clinic = "cargo_medicine",
+	-- 3.0, the missions' places
+	pharmacy = "item_medkit",
+	warehouse = "cargo_parcel",
+	firestation = "item_molotov", -- the flame
+	police = "weapon_revolver",
+	waterworks = "cargo_barrel",
+	lab = "cargo_medicine",
+	camp = "cargo_soup",
+	stadium = "cargo_kid", -- people sheltering there
 }
 
 function Icons.landmark(landmarkId: string?): string?
