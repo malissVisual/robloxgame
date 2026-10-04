@@ -3,7 +3,8 @@
 -- server/Admin.luau, which checks every command again). One window with sections on the left: unlock, driver level &
 -- money, cars, guns, teleport (every Map.Landmarks place), jobs (every special job and the ordinary tiers), enemies,
 -- estate & company (give / take properties, the home, teleport to a property, the company's safe), world (time of
--- day: day and night, server/DayNight.luau) and player (god mode, heal, finish the stop). The answers
+-- day: day and night, server/DayNight.luau), missions (start any of the 100, all at 3 stars, reset; shared/Missions.luau)
+-- and player (god mode, heal, finish the stop). The answers
 -- come back as toasts (the Notice remote), and in the window's title bar while it is open (the toasts are behind it).
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
 
@@ -18,6 +19,7 @@ local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
+local MissionData = require(Shared.Missions)
 local Ui = require(script.Parent.Ui)
 
 local C = Ui.Colors
@@ -35,6 +37,7 @@ local scale: any = nil
 local tabButtons: { [string]: any } = {}
 local section = "unlock"
 local spawnCount = 1
+local missionProgress: { [string]: number } = {} -- your best ratings (the Missions remote's "state"), for the colours
 
 -- In a Studio Play test everybody is an admin (Config.Admin.InStudio): the panel opens even before the server's
 -- "Admin" attribute arrives. The server checks every command again anyway.
@@ -107,6 +110,7 @@ local SECTIONS = {
 	{ "enemies", "Enemies" },
 	{ "estate", "Estate, company" },
 	{ "world", "World" },
+	{ "missions", "Missions" },
 	{ "player", "Player" },
 }
 
@@ -359,6 +363,49 @@ local function renderWorld()
 	end
 end
 
+-- The missions (shared/Missions.luau): start any one now (locks ignored), every one at 3 stars, or start over.
+-- Done ones show their best rating (green), 👥 = co-op, then the twist icons.
+local function renderMissions()
+	local got, most = MissionData.stars(missionProgress, nil)
+	heading(`Missions · {got} / {most} ★`, "Players open the MISSIONS window with U. Here: everything done at 3 stars (no money; UNLOCK EVERYTHING does it too), or the progress cleared to play the campaigns again.")
+	local row = grid(200)
+	action(row, "ALL MISSIONS 3 ★", C.yellow, function()
+		send("missionsAll")
+	end).TextColor3 = Color3.new(0, 0, 0)
+	action(row, "RESET MISSIONS", C.red, function()
+		send("missionsReset")
+	end)
+	for _, campaign in MissionData.Campaigns do
+		local done = MissionData.done(missionProgress, campaign.id)
+		local rgb = campaign.color
+		local color = Color3.fromRGB(rgb[1] or 200, rgb[2] or 200, rgb[3] or 200)
+		heading(`{campaign.icon} {campaign.name} · LV {campaign.level} · {done}/10`, `{campaign.client}. Click a mission: it starts now (a running job is cancelled; NIGHT ONLY turns the clock to night).`)
+		local cells = grid(232)
+		for _, def in MissionData.ofCampaign(campaign.id) do
+			local best = missionProgress[def.id] or 0
+			local twists = ""
+			local twistList: { string } = def.twists or {}
+			for _, twist in twistList do
+				local info = Config.Missions.Twists[twist]
+				twists ..= if info then info.icon else ""
+			end
+			local mark = if best > 0 then " " .. string.rep("★", best) else ""
+			local button = action(cells, `{def.number}. {def.name}{if def.coop then " 👥" else ""} {twists}{mark}`, if best > 0 then C.green else C.panelLight, function()
+				send("missionStart", def.id)
+			end)
+			button.TextXAlignment = Enum.TextXAlignment.Left
+			button.TextColor3 = if best > 0 then Color3.new(0, 0, 0) else C.text
+			-- The campaign's colour on the button's own border (one UIStroke per button).
+			local border = button:FindFirstChildOfClass("UIStroke")
+			if border then
+				border.Color = color
+				border.Thickness = 1.5
+			end
+			Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 6) }, button)
+		end
+	end
+end
+
 local function renderPlayer()
 	local on = player:GetAttribute("God") == true
 	heading("God mode", "You and your car take no damage (a car in the water is put back on the road).")
@@ -386,6 +433,7 @@ local RENDERERS: { [string]: () -> () } = {
 	enemies = renderEnemies,
 	estate = renderEstate,
 	world = renderWorld,
+	missions = renderMissions,
 	player = renderPlayer,
 }
 
@@ -464,9 +512,12 @@ local function build()
 	Ui.list(tabs, true, 6)
 	for index, entry in SECTIONS do
 		local id = entry[1]
-		local button = Ui.button(tabs, entry[2], UDim2.new(1, 0, 0, 42), C.panelLight, function()
+		local button = Ui.button(tabs, entry[2], UDim2.new(1, 0, 0, 38), C.panelLight, function()
 			section = id
 			render()
+			if id == "missions" then
+				Net.get("Missions"):FireServer("open")
+			end
 		end)
 		button.TextSize = 16
 		button.LayoutOrder = index
@@ -533,6 +584,21 @@ function AdminPanel.start()
 	player:GetAttributeChangedSignal("Admin"):Connect(refreshButton)
 	player:GetAttributeChangedSignal("God"):Connect(function()
 		if window.Visible and section == "player" then
+			render()
+		end
+	end)
+	-- Your mission ratings (the same "state" the MISSIONS window gets), asked when the Missions tab opens.
+	Net.get("Missions").OnClientEvent:Connect(function(kind: any, state: any)
+		if kind ~= "state" or type(state) ~= "table" or type(state.progress) ~= "table" then
+			return
+		end
+		missionProgress = {}
+		for id, stars in state.progress do
+			if type(id) == "string" and type(stars) == "number" then
+				missionProgress[id] = stars
+			end
+		end
+		if window.Visible and section == "missions" then
 			render()
 		end
 	end)

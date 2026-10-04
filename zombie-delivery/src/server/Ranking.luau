@@ -1,8 +1,8 @@
 --!strict
 -- The server's leaderboard: the best couriers on this server. A client asks over the Leaderboard remote (the window,
 -- client/Leaderboard.luau, asks when it opens and every few seconds while it stays open) and gets every player's row:
--- name, level, rank, XP, deliveries, kills, money earned and whether they are out on a job. Sorted by level, then
--- money earned, then deliveries. Rows are built from the profiles (server/PlayerData.luau) on demand: nothing runs
+-- name, level, rank, XP, mission stars (3.0, shared/Missions.luau), deliveries, kills, money earned and whether they are
+-- out on a job. Sorted by level, then mission stars, then money earned, then deliveries. Rows are built from the profiles (server/PlayerData.luau) on demand: nothing runs
 -- while nobody looks.
 
 local Players = game:GetService("Players")
@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Levels = require(Shared.Levels)
+local Missions = require(Shared.Missions)
 local Net = require(Shared.Net)
 
 local Server = script.Parent
@@ -26,6 +27,8 @@ export type Row = {
 	rank: string,
 	xp: number,
 	progress: number, -- 0 … 1 into the level
+	stars: number, -- the mission stars collected (the best rating of every mission, summed)
+	starsMax: number, -- the most there are
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -35,10 +38,13 @@ export type Row = {
 local MIN_GAP = 0.5 -- seconds between two answers to one player (a spammed remote costs nothing)
 local lastAsk: { [Player]: number } = {}
 
--- Better first: level, then money earned, then deliveries, then the name (stable).
+-- Better first: level, then mission stars, then money earned, then deliveries, then the name (stable).
 local function better(a: Row, b: Row): boolean
 	if a.level ~= b.level then
 		return a.level > b.level
+	end
+	if a.stars ~= b.stars then
+		return a.stars > b.stars
 	end
 	if a.earned ~= b.earned then
 		return a.earned > b.earned
@@ -58,6 +64,7 @@ function Ranking.rows(): { Row }
 			continue
 		end
 		local level = Levels.levelFor(profile.xp)
+		local stars, starsMax = Missions.stars(profile.missions, nil)
 		table.insert(rows, {
 			userId = player.UserId,
 			name = player.DisplayName,
@@ -66,6 +73,8 @@ function Ranking.rows(): { Row }
 			rank = Levels.rank(level),
 			xp = profile.xp,
 			progress = Levels.progress(profile.xp),
+			stars = stars,
+			starsMax = starsMax,
 			deliveries = profile.deliveries,
 			kills = profile.kills,
 			earned = profile.earned,
