@@ -450,6 +450,24 @@ local function renderPlayer()
 	action(quick, "FINISH THIS STOP", C.blue, function()
 		send("finishStop")
 	end)
+	-- 4.0.5: start over as a new player (asks twice: it cannot be undone).
+	heading("Start over", "Your save goes back to a new player's: $, level, cars, missions, the map and the tutorial. You are taken out of the game; join again (in Studio: Play again). A Studio test without saving already starts fresh every time.")
+	local reset = grid(200)
+	local armedUntil = 0
+	local button: any
+	button = action(reset, "RESET MY SAVE", C.red, function()
+		if os.clock() < armedUntil then
+			send("resetSave")
+			return
+		end
+		armedUntil = os.clock() + 4
+		button.Text = "SURE? PRESS AGAIN"
+		task.delay(4, function()
+			if button.Parent then
+				button.Text = "RESET MY SAVE"
+			end
+		end)
+	end)
 end
 
 local RENDERERS: { [string]: () -> () } = {
