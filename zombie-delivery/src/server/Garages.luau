@@ -14,8 +14,9 @@
 -- The "Garage" remote (shared/Net.luau):
 --   client → server  ("take", car id)  take that car out here
 --                    ("refresh")      send the window again (when it is open)
---   server → client  (GarageState)    { open, at, name, depot, cars = { { id, name, capacity, health, upgrades,
---                                      equipped, out, company, here } }, slots, used }: open = the prompt was used
+--   server → client  (GarageState)    { open, at, center, range, name, depot, cars = { { id, name, capacity, health,
+--                                      upgrades, equipped, out, company, here } }, slots, used }: open = the prompt
+--                                      was used; center / range = where a swap is accepted (flat distance)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -166,9 +167,15 @@ local function stateFor(player: Player, at: string, open: boolean): { [string]: 
 			here = keptAt(player, at, def.id),
 		})
 	end
+	-- Where a swap counts as "here" (Garages.where): the client closes the window outside it.
+	local depot = Map.Shops.depot
+	local spot = if at == DEPOT then nil else World.EstateGarages[at]
+	local center = if spot then spot.Position elseif depot then Vector3.new(depot.x, 0, depot.z) else nil
 	return {
 		open = open,
 		at = at,
+		center = center,
+		range = if at == DEPOT then Map.ShopRadius else GARAGE_RANGE,
 		name = placeName(at),
 		depot = at == DEPOT,
 		cars = cars,
@@ -230,7 +237,19 @@ function Garages.take(player: Player, carId: string): string?
 	PlayerData.notify(player)
 	local err: string? = nil
 	if spot then
-		if not Vehicles.placeAt(player, nil, spot) then
+		-- Not on top of the player: from the driver's seat they get into the new car; on foot on the drive-out spot
+		-- they step to the post first.
+		local seatedCar = Vehicles.seatedIn(player)
+		local seated = live ~= nil and seatedCar == live
+		local root = rootOf(player)
+		local character = player.Character
+		if not seated and root and character then
+			local rel = spot:PointToObjectSpace(root.Position)
+			if math.abs(rel.X) < 6 and math.abs(rel.Z) < 12 then
+				character:PivotTo(spot * CFrame.new(-7, 3, 0))
+			end
+		end
+		if not Vehicles.placeAt(player, nil, spot, seated) then
 			err = "Still loading..."
 		end
 	else

@@ -461,9 +461,10 @@ keeps them all; they wait at the depot lot, and the save cannot buy more until i
 **Switching cars** happens **only at a garage**: walk to the **🅿 GARAGE** post at the drive-out spot of a garage you
 own (or of your home; only your own show it) and press E, or use the Depot Garage terminal for the depot lot (the
 starting van, the company vehicles, an older save's extra cars). The garage window (client/GarageUi.luau) lists your
-cars: name, 📦 capacity, 🔧 health, the upgrades, **TAKE OUT**. The car you drive is parked inside (its damage kept),
-the chosen one stands at the door. Not during a delivery. Anywhere else the dealer says IN GARAGE and the server
-"Switch cars at one of your garages". **CAR** still brings your equipped car anywhere (the chauffeur).
+cars: name, 📦 capacity, 🔧 health, the upgrades, **TAKE OUT** (it closes when you walk out of the garage's range).
+The car you drive is parked inside (its damage kept), the chosen one stands at the door (from the driver's seat you
+sit in it). Not during a delivery. Anywhere else the dealer says IN GARAGE and the server "Switch cars at one of your
+garages". **CAR** still brings your equipped car anywhere (the chauffeur).
 
 **Damage stays** (`profile.carHealth`, saved): every car keeps its share of health when it is parked, called or
 respawned; a wrecked car comes back (CAR) at 20 % (`Config.Repair.WreckedHealth`). There are **no free repairs** any
@@ -476,8 +477,9 @@ two bays, on the map with a wrench). Drive into a bay (yellow lines, BAY 1 · RE
 after 1.5 s the mechanics take the car: it is locked on the lift (anchored, the back closed, passengers out) for
 **20 – 60 s** by the damage (`Economy.repairTime`), the HUD shows a timer card and the bay's billboard the time
 left; then it is as good as new: "Your Old Van is repaired". The fee is paid at the end, **$20 – $300** by the
-damage (`Economy.repairFee`; you need the money at the start). Getting back in, calling the car away or switching
-cars cancels it, nothing to pay. A job's clock keeps running meanwhile (your choice). Any car can be repaired, a
+damage (`Economy.repairFee`; you need the money at the start and still at the end, else the repair is cancelled; damage
+the car takes on the lift counts too). Getting back in, calling the car away or switching cars cancels it, nothing to
+pay. A job's clock keeps running meanwhile (your choice). Any car can be repaired, a
 lent company vehicle too.
 
 ## Challenges, secrets and rewards

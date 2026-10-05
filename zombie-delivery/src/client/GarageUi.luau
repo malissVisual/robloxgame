@@ -28,7 +28,7 @@ GarageUi.onOpen = nil :: (() -> ())?
 
 local player = Players.LocalPlayer
 local WIDTH, HEIGHT = 560, 440
-local WALK_AWAY = 45 -- studs from where the window was opened
+local WALK_AWAY = 45 -- studs from where the window was opened (when the server sends no center / range)
 local REPAIR_COLOR = Color3.fromRGB(170, 218, 137)
 
 local gui: ScreenGui? = nil
@@ -198,7 +198,10 @@ local function open()
 		while running == mine and window.Visible do
 			task.wait(0.4)
 			local here = rootPosition()
-			if running == mine and here and openedAt and Vector3.new(here.X - openedAt.X, 0, here.Z - openedAt.Z).Magnitude > WALK_AWAY then
+			-- Out of the range where the server takes a swap (Garages.where), the window closes.
+			local center = if state and typeof(state.center) == "Vector3" then state.center else openedAt
+			local range = if state and type(state.range) == "number" then state.range else WALK_AWAY
+			if running == mine and here and center and Vector3.new(here.X - center.X, 0, here.Z - center.Z).Magnitude > range then
 				GarageUi.close()
 			end
 		end

@@ -4,7 +4,8 @@
 -- the lift (Vehicles.setRepairing: anchored, its passengers step out) and repaired in Economy.repairTime(missing)
 -- seconds (20 – 60 s, by the damage); then it is as good as new and the fee (Economy.repairFee, $20 – $300 by the
 -- damage) is paid. Getting back in (Vehicles.beforeDrive), calling the car away, a garage swap or a wreck cancels it
--- (nothing to pay: the fee is charged at the end). The bay's billboard shows who is being repaired and the time
+-- (nothing to pay: the fee is charged at the end; then the damage the car took on the lift counts too, and without
+-- the money the repair is cancelled). The bay's billboard shows who is being repaired and the time
 -- left; the owner's HUD gets the "Repair" remote (client/GarageUi.luau): ({ car, shop, seconds, total, fee }) when it
 -- starts, (nil) when it ends. A job's clock keeps running while you wait: your choice.
 -- Any car can be repaired, a company vehicle lent for a job too (at the same fee). There are no free repairs.
@@ -201,14 +202,7 @@ local function begin(player: Player, car: Vehicles.Car, bay: Bay)
 	local job: Running = { car = car, bay = bay, total = total, endsAt = now + total, fee = fee, name = carName(car) }
 	running[player] = job
 	takenBy[bay] = player
-	-- The passengers step out; the car goes on the lift.
-	for _, seat in car.passengers do
-		local occupant = seat.Occupant
-		if occupant then
-			occupant.Sit = false
-			occupant.Jump = true
-		end
-	end
+	-- The car goes on the lift (Vehicles.setRepairing: its passengers step out).
 	if Vehicles.backOpen(car) then
 		Vehicles.setBack(car, false)
 	end
@@ -220,15 +214,17 @@ end
 
 local function finish(player: Player, job: Running)
 	local car = job.car
-	local profile = PlayerData.get(player)
-	local paid = job.fee
-	if profile then
-		paid = math.min(job.fee, profile.money)
-		PlayerData.spend(player, paid)
+	-- The fee in full, never less: the damage the car took on the lift costs too, and money spent while waiting is
+	-- not there any more (no repair then).
+	local fee = math.max(job.fee, Economy.repairFee(missingOf(car)))
+	if not PlayerData.spend(player, fee) then
+		release(player, job)
+		notice:FireClient(player, `The repair of your {job.name} costs {money(fee)}: not enough money. Repair cancelled.`)
+		return
 	end
 	Vehicles.repair(car, 1)
 	release(player, job)
-	notice:FireClient(player, `Your {job.name} is repaired ({money(paid)}). As good as new!`)
+	notice:FireClient(player, `Your {job.name} is repaired ({money(fee)}). As good as new!`)
 end
 
 local function step()

@@ -926,8 +926,20 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		if err then
 			return false, err
 		end
-	elseif not Vehicles.get(player) then
-		return false, "Call your car first (CAR button)."
+	else
+		local car = Vehicles.get(player)
+		if not car then
+			return false, "Call your car first (CAR button)."
+		end
+		-- 3.4: still in the company vehicle of the last job (endJob brings your own car 2 s later): the job was
+		-- checked against your equipped car (slotsShort, Missions), so that one does it, right here.
+		local profile = PlayerData.get(player)
+		if profile and car.id ~= profile.car then
+			local err = Vehicles.spawn(player, true)
+			if err then
+				return false, err
+			end
+		end
 	end
 	offers[player] = nil
 	local crew: { [Player]: boolean } = {}

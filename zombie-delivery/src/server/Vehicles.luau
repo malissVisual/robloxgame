@@ -1793,7 +1793,7 @@ local function watchPrompts(car: Car)
 	end)
 	ride.Triggered:Connect(function(player)
 		local humanoid = humanoidOf(player)
-		if player == car.owner or car.wrecked or car.chauffeured or not humanoid or humanoid.SeatPart or handsFull(player) then
+		if player == car.owner or car.wrecked or car.chauffeured or car.repairing or not humanoid or humanoid.SeatPart or handsFull(player) then
 			return
 		end
 		for _, seat in car.passengers do
@@ -2026,8 +2026,9 @@ end
 -- 3.4, set by server/Repair.luau: the owner gets back into a car on the lift (the repair is cancelled).
 Vehicles.beforeDrive = function(_player: Player, _car: Car) end
 
--- 3.4: a car on the lift of a repair bay: anchored where it stands (nobody pushes or drives it) and marked for the
--- clients (the attribute Repairing); off again, the owner's client drives it as before.
+-- 3.4: a car on the lift of a repair bay: anchored where it stands (nobody pushes or drives it, its passengers step
+-- out and nobody rides along until it is done) and marked for the clients (the attribute Repairing); off again, the
+-- owner's client drives it as before.
 function Vehicles.setRepairing(car: Car, on: boolean)
 	if car.repairing == on or car.wrecked or not car.chassis.Parent then
 		car.repairing = on
@@ -2038,7 +2039,11 @@ function Vehicles.setRepairing(car: Car, on: boolean)
 	car.chassis.AssemblyLinearVelocity = Vector3.zero
 	car.chassis.AssemblyAngularVelocity = Vector3.zero
 	car.chassis.Anchored = on
-	if not on then
+	if on then
+		for _, seat in car.passengers do
+			eject(seat) -- the SeatWeld goes too: nobody stays in a car on the lift
+		end
+	else
 		pcall(function()
 			car.chassis:SetNetworkOwner(if car.chauffeured then nil else car.owner)
 		end)
@@ -2344,14 +2349,15 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 end
 
 -- The car parked at a garage's drive-out spot (a home's garage, 3.4: any garage you take a car out of), facing the
--- road, the player not in it. Returns the car, or nil while the save loads.
-function Vehicles.placeAt(player: Player, carId: string?, spot: CFrame): Car?
+-- road, the player not in it (seat: they get in, 3.4: a swap from the driver's seat). Returns the car, or nil while
+-- the save loads.
+function Vehicles.placeAt(player: Player, carId: string?, spot: CFrame, seat: boolean?): Car?
 	local look = Vector3.new(spot.LookVector.X, 0, spot.LookVector.Z)
 	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
 	Vehicles.remove(player) -- the old car is not in the way; a co-owner's car is (step out to the road)
 	local at = freeSpot(spot.Position, look, 16)
 	local position = Vector3.new(at.X, Vehicles.groundY(at.X, at.Z, spot.Position.Y) + 0.5, at.Z)
-	return Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + look), false)
+	return Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + look), seat == true)
 end
 
 -- 3.3, Quick Hands: how long the holds of this car's back and its cargo prompts take (its loading level).

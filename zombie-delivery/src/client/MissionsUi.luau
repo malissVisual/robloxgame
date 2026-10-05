@@ -438,11 +438,12 @@ function Extras.lockLine(campaign: Campaign): string
 	return `🔒 LEVEL {campaign.level}`
 end
 
--- 3.4: the cargo slots this mission needs when my car is too small for it (it lends no vehicle), else nil.
+-- 3.4: the cargo slots this mission needs when my car is too small for it (it lends no vehicle), else nil. Not in
+-- somebody else's crew: the leader's car does the mission (the server checks that one).
 function Extras.slotsShort(def: MissionDef): number?
 	local need = Economy.cargoNeed(def.load, def.items)
 	local holds = Extras.capacity
-	if def.vehicle or need <= 0 or holds == nil or need <= holds then
+	if def.vehicle or crewOwner ~= nil or need <= 0 or holds == nil or need <= holds then
 		return nil
 	end
 	return need
