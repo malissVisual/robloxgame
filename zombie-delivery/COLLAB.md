@@ -4,7 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- (nothing right now)
+- Codex · UI concept and interactive desktop/touch prototype on `codex/ui-concept` · design/ui-concept/ and COLLAB.md only; no live HUD or gameplay edits · since 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
