@@ -20,6 +20,17 @@
 -- Cargo.setBlocked (the defend twist: at the last drop nothing is unloaded until the area is held). The mission
 -- cargo has its own looks (water, generator, battery, tnt, documents, electronics, weapons, painting, mail, tires,
 -- plants, survivor).
+--
+-- 3.2, the back that opens (server/Vehicles.luau: doors, a tailgate, a trunk lid, a ramp): carry and lead go through
+-- it. "Load" and "Take out" only work while it is open, and opening or closing it needs empty hands (Vehicles'
+-- BackPrompt, for the owner and the job's crew: the hook Vehicles.backAllowed). So a piece is picked up, put down (G)
+-- at the car, the back opened (E), the piece picked up again (E) and loaded (E); when the stop is done the back is
+-- closed (E) before the car can drive. Unloading the same way round. The BackPrompt and the Load prompt sit at the
+-- same spot and take turns (one E at a time): the Load / Take out prompt while there is something to put in or take
+-- out, else the BackPrompt. board and serve do not use the back (the people get in by themselves).
+-- Info.pair (3.2, the DUO missions' pair twist): a piece only moves with two: no other job member within
+-- Config.Missions.Duo.PairRange of you, no pick-up; the partner gone for PAIR_GRACE s while you carry, it goes down.
+-- Cargo.setBlocked takes a reason (the DUO switches twist blocks a pick-up as well as a drop).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -59,6 +70,7 @@ export type Info = {
 	allowed: (Player) -> boolean, -- the owner and the crew
 	changed: () -> (), -- something to send to the HUD
 	lift: boolean?, -- the lift twist: heavy pieces, carried alone you walk at Config.Missions.LiftSlowSpeed
+	pair: boolean?, -- 3.2, the pair twist: a piece moves only with another job member close (Config.Missions.Duo)
 }
 
 type Piece = {
@@ -108,6 +120,8 @@ export type Session = {
 	ended: boolean,
 	busy: number, -- people being spawned right now (Npcs.spawn may yield): the stop is not done meanwhile
 	blocked: boolean, -- the defend twist: nothing is unloaded at this stop until the area is held (Cargo.setBlocked)
+	blockedReason: string?, -- 3.2: what to tell while blocked (nil: the defend twist's "Hold out first!")
+	pairAlone: { [Player]: number }, -- 3.2, the pair twist: since when (os.clock) the carrier has nobody close
 	slowed: { [Player]: Model }, -- the lift twist: carriers walking slowly right now (their character, CarrySpeed set)
 	liftTold: boolean, -- the lift twist's hint was given
 }
@@ -129,6 +143,8 @@ export type Status = {
 local folder: Instance = workspace
 local rng = Random.new()
 local notice = Net.get("Notice")
+local active: { [Player]: Session } = {} -- the running sessions by owner (the back's hooks find them here)
+local PAIR_GRACE = 1.5 -- the pair twist: seconds a carrier may be without the partner before the piece goes down
 
 local KID_NAMES = { "Tommy", "Lily", "Max", "Sophie", "Leo", "Mia", "Ben", "Zoe", "Sam", "Ava", "Noah", "Ella" }
 local PATIENT_NAMES = { "Mr. Brown", "Mrs. Lopez", "Old Pete", "Mr. Dvorak", "Mrs. Chen", "Mr. Okafor", "Miss Hart", "Mr. Svoboda" }
@@ -922,22 +938,68 @@ local function ownerPosition(session: Session): Vector3?
 	return if root then root.Position else nil
 end
 
+-- 3.2: does a piece still have to come out of the vehicle at this drop (not taken out, put down or handed over yet)?
+local function toTakeOut(session: Session): boolean
+	local plan = session.plan
+	if not plan or plan.stage ~= "drop" or (plan.mode ~= "carry" and plan.mode ~= "lead") or session.blocked then
+		return false
+	end
+	return #session.load > 0 and session.moved + heldCount(session) + #session.loose < neededNow(session)
+end
+
+-- 3.2: the vehicle has a back that opens and it is closed (nothing goes in or out).
+local function backShut(session: Session): boolean
+	local car = session.car
+	return car ~= nil and Vehicles.hasBack(car) and not Vehicles.backOpen(car)
+end
+
+-- 3.2: the vehicle's back is open.
+local function backOpen(session: Session): boolean
+	local car = session.car
+	return car ~= nil and Vehicles.hasBack(car) and Vehicles.backOpen(car)
+end
+
+-- 3.2: has the back still a use at this stop (pieces to load or to take out, somebody carrying)? Else: close it.
+local function backNeeded(session: Session): boolean
+	local plan = session.plan
+	if not plan or (plan.mode ~= "carry" and plan.mode ~= "lead") then
+		return false
+	end
+	local busy = heldCount(session) > 0 or #session.loose > 0
+	if plan.stage == "pickup" then
+		return busy or not session.built or #session.pile > 0
+	end
+	return busy or (#session.load > 0 and session.moved < neededNow(session))
+end
+
 local function refresh(session: Session)
 	local plan = session.plan
 	local horse = session.info.kind == "horse"
 	local carPrompt = session.carPrompt
 	local car = session.car
 	if carPrompt and car then
-		local handling = plan ~= nil and (plan.mode == "carry" or plan.mode == "lead")
-		local takeOut = handling and plan ~= nil and plan.stage == "drop" and #session.load > 0 and not session.blocked
-		carPrompt.Enabled = heldCount(session) > 0 or takeOut
+		local takeOut = toTakeOut(session)
+		-- 3.2: only through an open back.
+		carPrompt.Enabled = (heldCount(session) > 0 or takeOut) and not backShut(session)
 		carPrompt.ActionText = if takeOut then (if horse then "Lead out" else "Take out") else (if horse then "Lead in" else "Load")
 		carPrompt.ObjectText = `{capital(Vehicles.cargoNoun(car))}: {#session.load} inside`
+	end
+	-- 3.2: one E at the back at a time. A piece put down that goes into the vehicle is picked up again only once the
+	-- back is open; the BackPrompt (the same spot as the Load prompt) waits while the Load / Take out prompt or such a
+	-- piece has something to do.
+	local intoCar = plan ~= nil and (plan.stage == "pickup" or session.moved >= neededNow(session))
+	local shut = backShut(session)
+	for _, loose in session.loose do
+		loose.prompt.Enabled = not (intoCar and shut)
+	end
+	local backPrompt = car and Vehicles.backPrompt(car)
+	if backPrompt then
+		backPrompt.Enabled = not (carPrompt ~= nil and carPrompt.Enabled) and not (intoCar and not shut and #session.loose > 0)
 	end
 	local pilePrompt = session.pilePrompt
 	if pilePrompt and plan then
 		if plan.stage == "pickup" then
-			pilePrompt.Enabled = #session.pile > 0
+			pilePrompt.Enabled = #session.pile > 0 and not session.blocked
 			pilePrompt.ObjectText = `{capital(if horse then "horse" else session.info.piece)} ({#session.pile} left)`
 		else
 			pilePrompt.Enabled = session.moved < neededNow(session) and not session.blocked
@@ -1003,18 +1065,37 @@ local function restoreSpeed(session: Session, player: Player)
 	end
 end
 
--- Is somebody else of the job (the owner or a crew mate) close enough to help carry a heavy piece?
-local function liftHelped(session: Session, player: Player, at: Vector3): boolean
+-- Is somebody else of the job (the owner or a crew mate), alive and on foot, within `range` of `at`?
+local function partnerNear(session: Session, player: Player, at: Vector3, range: number): boolean
 	for _, other in Players:GetPlayers() do
 		if other ~= player and session.info.allowed(other) then
 			local root = rootOf(other.Character)
 			local humanoid = other.Character and other.Character:FindFirstChildOfClass("Humanoid")
-			if root and humanoid and humanoid.Health > 0 and (root.Position - at).Magnitude <= Config.Missions.LiftHelpRange then
+			if root and humanoid and humanoid.Health > 0 and humanoid.SeatPart == nil and (root.Position - at).Magnitude <= range then
 				return true
 			end
 		end
 	end
 	return false
+end
+
+-- Is somebody else of the job close enough to help carry a heavy piece (the lift twist)?
+local function liftHelped(session: Session, player: Player, at: Vector3): boolean
+	return partnerNear(session, player, at, Config.Missions.LiftHelpRange)
+end
+
+-- 3.2, the pair twist (Info.pair): a piece (not a horse) only moves with somebody else of the job within PairRange.
+-- True (and the player told) when this player may not lift one now.
+local function pairRefused(session: Session, player: Player): boolean
+	if not session.info.pair or session.info.kind == "horse" then
+		return false
+	end
+	local root = rootOf(player.Character)
+	if root and partnerNear(session, player, root.Position, Config.Missions.Duo.PairRange) then
+		return false
+	end
+	tell(player, "Pair lift: you need your partner on the other side.")
+	return true
 end
 
 -- Every tick: who carries a heavy piece alone walks at LiftSlowSpeed, with help at the normal step.
@@ -1161,6 +1242,31 @@ local function allowed(session: Session, player: Player): boolean
 	return false
 end
 
+-- 3.2, the pair twist, every tick: a carrier whose partner is gone for longer than PAIR_GRACE puts the piece down.
+-- True when a piece went down.
+local function updatePair(session: Session): boolean
+	local now = os.clock()
+	local dropped = false
+	for player, held in table.clone(session.held) do
+		if held.piece.horse or partnerNear(session, player, held.root.Position, Config.Missions.Duo.PairRange) then
+			session.pairAlone[player] = nil
+		elseif not session.pairAlone[player] then
+			session.pairAlone[player] = now
+		elseif now - session.pairAlone[player] > PAIR_GRACE then
+			session.pairAlone[player] = nil
+			putDown(session, player)
+			dropped = true
+			tell(player, `Your partner is gone: you put the {session.info.piece} down. Pair lift: carry it together!`)
+		end
+	end
+	for player in table.clone(session.pairAlone) do
+		if not session.held[player] then
+			session.pairAlone[player] = nil
+		end
+	end
+	return dropped
+end
+
 local function handsFull(session: Session, player: Player): boolean
 	if not session.held[player] and not Cargo.carrying(player.Character) then
 		return false
@@ -1170,7 +1276,7 @@ local function handsFull(session: Session, player: Player): boolean
 end
 
 onLoose = function(session: Session, player: Player, loose: Loose)
-	if not allowed(session, player) or handsFull(session, player) then
+	if not allowed(session, player) or handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
 	local index = table.find(session.loose, loose)
@@ -1230,16 +1336,21 @@ local function handOver(session: Session, player: Player)
 	refresh(session)
 end
 
+-- What to tell while the stop is blocked (Cargo.setBlocked).
+local function blockedText(session: Session): string
+	return session.blockedReason or "Hold out first! Nothing gets unloaded until the area is safe."
+end
+
 local function onPile(session: Session, player: Player)
 	local plan = session.plan
 	if not plan or not allowed(session, player) then
 		return
 	end
+	if session.blocked then
+		tell(player, blockedText(session))
+		return
+	end
 	if plan.stage == "drop" then
-		if session.blocked then
-			tell(player, "Hold out first! Nothing gets unloaded until the area is safe.")
-			return
-		end
 		if not session.held[player] then
 			local car = session.car
 			tell(player, `Take {article(session.info.piece)} out of the {if car then Vehicles.cargoNoun(car) else "vehicle"} first (E at the back).`)
@@ -1249,7 +1360,7 @@ local function onPile(session: Session, player: Player)
 		session.info.changed()
 		return
 	end
-	if handsFull(session, player) then
+	if handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
 	local piece = table.remove(session.pile)
@@ -1276,6 +1387,11 @@ local function onCar(session: Session, player: Player)
 		return
 	end
 	local held = session.held[player]
+	if backShut(session) then
+		-- 3.2: only through an open back (a race with somebody closing it).
+		tell(player, if held then `Put it down (G) and {Vehicles.backVerb(car, true)} (E).` else `{capital(Vehicles.backVerb(car, true))} first (E).`)
+		return
+	end
 	if held then
 		clearHeld(session, player)
 		local piece = held.piece
@@ -1300,7 +1416,10 @@ local function onCar(session: Session, player: Player)
 	end
 	if plan and plan.stage == "drop" and (plan.mode == "carry" or plan.mode == "lead") then
 		if session.blocked then
-			tell(player, "Hold out first! Nothing gets unloaded until the area is safe.")
+			tell(player, blockedText(session))
+			return
+		end
+		if pairRefused(session, player) then
 			return
 		end
 		local piece = table.remove(session.load)
@@ -1327,10 +1446,14 @@ local function onCar(session: Session, player: Player)
 	tell(player, `Pick up {article(session.info.piece)} first.`)
 end
 
-local function attachCar(session: Session)
+local function attachCar(session: Session, old: Vehicles.Car?)
 	if session.carPrompt then
 		session.carPrompt:Destroy()
 		session.carPrompt = nil
+	end
+	local oldBack = old and Vehicles.backPrompt(old)
+	if oldBack then
+		oldBack.Enabled = true -- not this job's car any more: its back opens and closes freely
 	end
 	local car = session.car
 	if not car or not session.info.handles then
@@ -1546,7 +1669,7 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 		end
 	end
 	local car = parkedCar(session)
-	if not car or now < session.nextKid then
+	if not car or now < session.nextKid or session.blocked then
 		return
 	end
 	if plan.stage == "pickup" then
@@ -1563,7 +1686,7 @@ local function updateBoard(session: Session, plan: Plan, now: number)
 			end
 			walkKid(session, piece, Vehicles.cargoEntry(car))
 		end
-	elseif not session.blocked and session.moved + #session.walking < neededNow(session) then
+	elseif session.moved + #session.walking < neededNow(session) then
 		local piece = table.remove(session.load)
 		if piece then
 			session.nextKid = now + Tuning.KidGap
@@ -1658,19 +1781,26 @@ function Cargo.begin(owner: Player, info: Info): Session
 		ended = false,
 		busy = 0,
 		blocked = false,
+		blockedReason = nil,
+		pairAlone = {},
 		slowed = {},
 		liftTold = false,
 	}
+	active[owner] = session
 	return session
 end
 
 -- The defend twist (server/Jobs.luau): while blocked, nothing is unloaded at the current stop (no Take out, no Hand
--- over, the passengers stay in, no serving); the stop is not done.
-function Cargo.setBlocked(session: Session, blocked: boolean)
-	if session.blocked == blocked then
+-- over, the passengers stay in, no serving); the stop is not done. 3.2: a pick-up can be blocked too (nothing is
+-- picked up, nobody gets on: the DUO switches twist, server/DuoGates.luau), and `reason` is what the players are told
+-- (the HUD's hint near the stop; nil: the defend twist's "Hold out first!").
+function Cargo.setBlocked(session: Session, blocked: boolean, reason: string?)
+	local text = if blocked then reason else nil
+	if session.blocked == blocked and session.blockedReason == text then
 		return
 	end
 	session.blocked = blocked
+	session.blockedReason = text
 	refresh(session)
 	session.info.changed()
 end
@@ -1708,8 +1838,9 @@ function Cargo.update(session: Session, dt: number)
 	end
 	local car = Vehicles.get(session.owner)
 	if car ~= session.car then
+		local old = session.car
 		session.car = car
-		attachCar(session)
+		attachCar(session, old)
 		render(session)
 	end
 
@@ -1735,6 +1866,9 @@ function Cargo.update(session: Session, dt: number)
 			putDown(session, player)
 			dropped = true
 		end
+	end
+	if session.info.pair and updatePair(session) then
+		dropped = true
 	end
 	if dropped then
 		session.info.changed()
@@ -1885,6 +2019,14 @@ function Cargo.step(session: Session): (string, string)
 	local seatedCar, driving = Vehicles.seatedIn(owner)
 	local position = ownerPosition(session)
 	local near = position ~= nil and flat(position, plan.park) < Tuning.ApproachDistance
+	if session.blocked and near then
+		return plan.mode, blockedText(session)
+	end
+	-- 3.2: the back is open and nothing more goes in or out here: close it, the car does not drive open.
+	if car and backOpen(session) and not held and (not near or not backNeeded(session)) then
+		local close = capital(Vehicles.backVerb(car, false))
+		return if near then plan.mode else "drive", if seatedCar then `Get out and {Vehicles.backVerb(car, false)} (E)` else `{close} (E), then drive on`
+	end
 	if not held and not near and heldCount(session) == 0 then
 		return "drive", `Drive to the {circle} circle`
 	end
@@ -1914,32 +2056,46 @@ function Cargo.step(session: Session): (string, string)
 		return mode, `Wait while the kids get off ({session.moved}/{needed})`
 	end
 	local horse = session.info.kind == "horse"
+	-- 3.2: the back is closed: open it first (with empty hands), load or take out after.
+	local shut = car ~= nil and backShut(session)
+	local open = if car then Vehicles.backVerb(car, true) else ""
+	local two = if session.info.pair and not horse then " together" else "" -- the pair twist
+	local intoCar = plan.stage == "pickup" or session.moved >= neededNow(session)
 	if held then
-		if plan.stage == "pickup" or session.moved >= neededNow(session) then
-			return mode, if horse then `Lead the horse into the {noun} (E)` else `Load it into the back of the {noun} (E)`
+		if intoCar then
+			if shut then
+				return mode, if horse then `Let the horse go (G) and {open} (E)` else `Put it down (G) and {open} (E)`
+			end
+			return mode, if horse then `Lead the horse into the {noun} (E)` else `Load it into the back of the {noun}{two} (E)`
 		end
-		return mode, if horse then `Lead the horse to {who} (E)` else `Carry it to {who} (E)`
+		return mode, if horse then `Lead the horse to {who} (E)` else `Carry it to {who}{two} (E)`
 	end
 	if driving and not parked then
 		return mode, `Park in the {circle} circle`
 	end
 	if #session.loose > 0 then
-		return mode, if horse then "Catch the horse you let go (E)" else `Pick up the {piece} you put down (E)`
+		if shut and intoCar then
+			return mode, `{capital(open)} (E), then {if horse then "lead the horse in" else `pick up the {piece} again`}`
+		end
+		return mode, if horse then "Catch the horse you let go (E)" else `Pick up the {piece} you put down{two} (E)`
 	end
 	if plan.stage == "pickup" then
 		if #session.pile > 0 or not session.built then
 			if seatedCar then
-				return mode, if horse then `Get out and take a horse from {who} (E)` else `Get out and pick up {article(piece)} (E)`
+				return mode, if horse then `Get out and take a horse from {who} (E)` else `Get out and pick up {article(piece)}{two} (E)`
 			end
-			return mode, if horse then `Take a horse from {who} (E)` else `Pick up {article(piece)} from {who} (E)`
+			return mode, if horse then `Take a horse from {who} (E)` else `Pick up {article(piece)} from {who}{two} (E)`
 		end
 		return mode, "Wait for your crew to load"
 	end
 	if #session.load > 0 and session.moved < neededNow(session) then
+		if shut then
+			return mode, if seatedCar then `Get out and {open} (E)` else `{capital(open)} (E)`
+		end
 		if seatedCar then
 			return mode, if horse then `Get out and lead a horse out of the {noun} (E)` else `Get out and take {article(piece)} out of the {noun} (E)`
 		end
-		return mode, if horse then `Lead a horse out of the {noun} (E)` else `Take {article(piece)} out of the {noun} (E)`
+		return mode, if horse then `Lead a horse out of the {noun} (E)` else `Take {article(piece)} out of the {noun}{two} (E)`
 	end
 	return mode, "Wait for your crew"
 end
@@ -2088,12 +2244,33 @@ function Cargo.finish(session: Session, linger: boolean?)
 	if car and car.model.Parent then
 		car.model:SetAttribute("CargoCount", 0)
 		car.model:SetAttribute("CargoKind", nil)
+		local backPrompt = Vehicles.backPrompt(car)
+		if backPrompt then
+			backPrompt.Enabled = true -- the back is the owner's own again
+		end
 	end
+	if active[session.owner] == session then
+		active[session.owner] = nil
+	end
+	table.clear(session.pairAlone)
 	clearStop(session, linger == true)
 	session.plan = nil
 end
 
 function Cargo.start()
+	-- 3.2, the back that opens: the job's crew may open and close the owner's car too, and every change updates the
+	-- job's prompts (one E at the back at a time) and the HUD's hint.
+	Vehicles.backAllowed = function(player: Player, car: Vehicles.Car): boolean
+		local session = active[car.owner]
+		return session ~= nil and not session.ended and session.info.allowed(player)
+	end
+	Vehicles.backChanged = function(car: Vehicles.Car)
+		local session = active[car.owner]
+		if session and not session.ended and session.car == car then
+			refresh(session)
+			session.info.changed()
+		end
+	end
 	local existing = workspace:FindFirstChild("Cargo")
 	if existing then
 		folder = existing

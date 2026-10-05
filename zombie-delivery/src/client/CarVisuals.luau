@@ -2,6 +2,8 @@
 -- What every client does for every car: spins the tyres with the speed and turns the front ones, shows only the
 -- prompt that fits (Drive on your own car, Ride along on a friend's car with a free seat) and puts the owner's
 -- name over other players' cars.
+-- 3.2: swings the back that opens (rear doors, a tailgate, a trunk lid, a ramp: the Motor6Ds "BackHinge" on the
+-- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,11 +13,13 @@ local Drive = require(script.Parent.Drive)
 local CarVisuals = {}
 
 type Wheel = { motor: Motor6D, front: boolean, radius: number }
-type CarState = { wheels: { Wheel }, spin: number, steer: number, tagged: boolean }
+type Hinge = { motor: Motor6D, axis: Vector3, angle: number } -- angle: the open turn in radians
+type CarState = { wheels: { Wheel }, hinges: { Hinge }, back: number, spin: number, steer: number, tagged: boolean }
 
 local player = Players.LocalPlayer
 local states: { [Model]: CarState } = {}
 local RANGE = 260
+local BACK_TIME = 0.45 -- seconds for the back to swing open or shut
 
 local function stateOf(car: Model): CarState?
 	local state = states[car]
@@ -27,6 +31,7 @@ local function stateOf(car: Model): CarState?
 		return nil
 	end
 	local wheels: { Wheel } = {}
+	local hinges: { Hinge } = {}
 	for _, child in chassis:GetChildren() do
 		if child:IsA("Motor6D") and child.Name == "WheelMotor" then
 			table.insert(wheels, {
@@ -34,9 +39,16 @@ local function stateOf(car: Model): CarState?
 				front = child:GetAttribute("Front") == true,
 				radius = (child:GetAttribute("Radius") or 1.3) :: number,
 			})
+		elseif child:IsA("Motor6D") and child.Name == "BackHinge" then
+			local angle = child:GetAttribute("Angle")
+			table.insert(hinges, {
+				motor = child,
+				axis = if child:GetAttribute("Axis") == "X" then Vector3.xAxis else Vector3.yAxis,
+				angle = math.rad(if type(angle) == "number" then angle else 90),
+			})
 		end
 	end
-	state = { wheels = wheels, spin = 0, steer = 0, tagged = false }
+	state = { wheels = wheels, hinges = hinges, back = 0, spin = 0, steer = 0, tagged = false }
 	states[car] = state
 	car.Destroying:Connect(function()
 		states[car] = nil
@@ -138,6 +150,23 @@ local function step(dt: number)
 			wheel.motor.Transform = turn * CFrame.Angles(spin, 0, 0)
 		end
 		state.spin -= forward / 1.3 * dt
+
+		-- 3.2: the back swings toward BackOpen (eased); held there every frame while it is open.
+		if #state.hinges > 0 then
+			local target = if car:GetAttribute("BackOpen") == true then 1 else 0
+			local before = state.back
+			if before ~= target then
+				state.back = if target > before then math.min(target, before + dt / BACK_TIME) else math.max(target, before - dt / BACK_TIME)
+			end
+			if state.back > 0 or before > 0 then
+				local t = state.back * state.back * (3 - 2 * state.back)
+				for _, hinge in state.hinges do
+					if hinge.motor.Parent then
+						hinge.motor.Transform = CFrame.fromAxisAngle(hinge.axis, hinge.angle * t)
+					end
+				end
+			end
+		end
 	end
 end
 
