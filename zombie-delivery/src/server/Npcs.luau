@@ -8,8 +8,11 @@
 -- Outfits are made of colours and a few parts (no clothing assets): the body parts are coloured like a shirt, pants
 -- and shoes, with a hat, hair, a vest or an apron welded on (Npcs.look gives every role its own look). A standing
 -- person's root is anchored (no physics); walkTo unanchors it and lets the Humanoid walk. People are in their own
--- collision group: cars, enemies and bullets pass through them. The joints may be AnimationConstraints (Avatar Joint
--- Upgrade): nothing here touches them, the animations do.
+-- collision group: cars, enemies, bullets and the other people pass through them. The joints may be
+-- AnimationConstraints (Avatar Joint Upgrade): nothing here touches them, the animations do.
+-- 3.10, the passers-by (server/Traffic.luau): Npcs.pace sets a walking speed with the legs to match (the run
+-- animation when running), and a walk may flow on into the next one without a halt (`through`) and give up when it
+-- makes no progress (`stuck`) instead of pushing against a wall.
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -42,6 +45,9 @@ export type Look = {
 local GROUP = "Npc"
 local IDLE = "rbxassetid://507766388"
 local WALK = "rbxassetid://507777826"
+local RUN = "rbxassetid://507767714" -- Roblox's R15 run (Npcs.pace, 3.10)
+local STRIDE = 12.8 -- studs / s of a full-size body at the walk's or the run's own speed (Roblox's Animate: 16 / 1.25)
+local RUN_FROM = 10 -- studs / s: from here on the run animation
 local GREET_RANGE = 14 -- turn to a player this close
 local NAME_RANGE = 60
 
@@ -52,7 +58,10 @@ type State = {
 	head: BasePart?,
 	idle: AnimationTrack?,
 	walk: AnimationTrack?,
-	walkRate: number, -- the walk animation's speed (fits the stride to the walk speed and the body size)
+	run: AnimationTrack?, -- loaded on the first Npcs.pace that runs
+	gait: AnimationTrack?, -- the one played while moving (the walk unless Npcs.pace set the run)
+	moving: boolean,
+	walkRate: number, -- the gait's speed (fits the stride to the walk speed and the body size)
 	walkToken: number,
 	home: CFrame, -- the way it stands when nobody is around (set by spawn, face and walkTo)
 	turn: Tween?,
@@ -641,20 +650,24 @@ function Npcs.glance(npc: Model, point: Vector3)
 end
 
 local function play(state: State, walking: boolean)
+	state.moving = walking
+	local gait = state.gait or state.walk
+	local walk, run = state.walk, state.run
+	if walk and walk.IsPlaying and (not walking or walk ~= gait) then
+		walk:Stop(0.25)
+	end
+	if run and run.IsPlaying and (not walking or run ~= gait) then
+		run:Stop(0.25)
+	end
 	if walking then
-		if state.walk and not state.walk.IsPlaying then
-			state.walk:Play(0.25, 1, state.walkRate)
+		if gait and not gait.IsPlaying then
+			gait:Play(0.25, 1, state.walkRate)
 		end
 		if state.idle and state.idle.IsPlaying then
 			state.idle:Stop(0.25)
 		end
-	else
-		if state.walk and state.walk.IsPlaying then
-			state.walk:Stop(0.25)
-		end
-		if state.idle and not state.idle.IsPlaying then
-			state.idle:Play(0.25)
-		end
+	elseif state.idle and not state.idle.IsPlaying then
+		state.idle:Play(0.25)
 	end
 end
 
@@ -674,8 +687,16 @@ local function stand(state: State)
 	play(state, false)
 end
 
+-- 3.10, how a walk goes (all optional):
+--   through   on arrival it does not stop: `arrived(true)` comes while still moving, and the caller walks on with
+--             the next walkTo (a route of several points, no halt at each) or calls Npcs.stop
+--   stuck     seconds without getting closer (half a stud) before it gives up (`arrived(false)`), instead of
+--             pushing against a wall until the timeout
+--   near      how close counts as there (default 1.6)
+export type WalkOptions = { through: boolean?, stuck: number?, near: number? }
+
 -- Walk to a point (walk animation), then call `arrived` (false if it could not get there within `timeout` s).
-function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, timeout: number?)
+function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, timeout: number?, options: WalkOptions?)
 	local state = states[npc]
 	if not state then
 		if arrived then
@@ -713,18 +734,31 @@ function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, ti
 		root:SetNetworkOwner(nil)
 	end)
 	play(state, true)
+	local near = if options and options.near then options.near else 1.6
+	local stuck = if options then options.stuck else nil
+	local through = options ~= nil and options.through == true
 	task.spawn(function()
 		local startedAt = os.clock()
 		local ordered = -10
 		local ok = false
+		local best, progressAt = distance, startedAt
 		while npc.Parent and state.walkToken == token do
 			local p = root.Position
-			if Vector3.new(point.X - p.X, 0, point.Z - p.Z).Magnitude < 1.6 then
+			local gap = Vector3.new(point.X - p.X, 0, point.Z - p.Z).Magnitude
+			if gap < near then
 				ok = true
 				break
 			end
-			if os.clock() - startedAt > limit then
+			local now = os.clock()
+			if now - startedAt > limit then
 				break
+			end
+			if stuck then
+				if gap < best - 0.5 then
+					best, progressAt = gap, now
+				elseif now - progressAt > stuck then
+					break
+				end
 			end
 			-- MoveTo gives up after 8 s: order it again now and then.
 			if os.clock() - ordered > 4 then
@@ -736,7 +770,9 @@ function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, ti
 		if not npc.Parent or state.walkToken ~= token then
 			return
 		end
-		stand(state)
+		if not (ok and through) then
+			stand(state)
+		end
 		if arrived then
 			arrived(ok)
 		end
@@ -801,6 +837,34 @@ local function loadTrack(animator: Animator, id: string): AnimationTrack?
 	return nil
 end
 
+-- 3.10: how fast somebody moves, with the legs to match: Roblox's own Animate script plays the walk at
+-- speed × 1.25 / 16 (STRIDE studs/s at the animation's own speed, for a full-size body), and from RUN_FROM up the
+-- run. A passer-by strolls at about 5 (no jog), runs from a zombie at 13. Takes effect at once, walking or not.
+function Npcs.pace(npc: Model, speed: number)
+	local state = states[npc]
+	local humanoid = state and state.humanoid
+	if not state or not humanoid then
+		return
+	end
+	humanoid.WalkSpeed = speed
+	local running = speed >= RUN_FROM
+	if running and not state.run then
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if animator then
+			state.run = loadTrack(animator, RUN)
+		end
+	end
+	local gait = if running and state.run then state.run else state.walk
+	state.gait = gait
+	state.walkRate = speed / (STRIDE * state.scale)
+	if state.moving then
+		play(state, true)
+		if gait then
+			gait:AdjustSpeed(state.walkRate)
+		end
+	end
+end
+
 -- A person standing at `at` (feet on the ground at at.Position, facing at.LookVector). Parented to workspace.Npcs.
 function Npcs.spawn(look: Look, at: CFrame): Model
 	local parent = init()
@@ -828,6 +892,7 @@ function Npcs.spawn(look: Look, at: CFrame): Model
 		humanoid = humanoid,
 		root = root,
 		head = head,
+		moving = false,
 		walkRate = 1,
 		walkToken = 0,
 		home = root.CFrame,

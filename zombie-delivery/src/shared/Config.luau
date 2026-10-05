@@ -1131,6 +1131,12 @@ Config.Traffic = {
 	SpawnMax = 260,
 	Despawn = 340,
 	CarSpeed = 34,
+	-- 3.10, people on foot: a calm stroll, each their own (studs/s; the legs match: Roblox's walk animation is a pure
+	-- walk below about 5.3, a jog at 8), a run from a zombie, and how a stuck walk ends.
+	WalkSpeed = { 4.4, 5.4 },
+	RunSpeed = 13,
+	StuckAfter = 3, -- seconds without getting closer: the walk is given up (back the other way)
+	StuckLimit = 3, -- walks given up in a row: the person goes, when nobody looks
 	-- Groups: people standing in a loose circle on a sidewalk, talking; after a while they break up and walk off.
 	GroupChance = 0.4, -- share of the new people that come as a group (when there is room for two)
 	GroupSize = { 2, 4 },
