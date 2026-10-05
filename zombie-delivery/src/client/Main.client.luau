@@ -57,6 +57,7 @@ safely("MissionsUi", MissionsUi.start)
 safely("WeaponWheel", WeaponWheel.start)
 safely("Secrets", Secrets.start)
 Shooting.notify = Hud.toast
+Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
 WeaponWheel.notify = Hud.toast
 Hud.onSound = Sounds.cycle

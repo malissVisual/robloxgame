@@ -919,8 +919,7 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	}
 	-- 3.2, the pair twist (stream C: Cargo.Info.pair). FALLBACK: set untyped, so a Cargo.Info without the field still
 	-- type-checks; once it has it this can be a plain field above.
-	local untypedInfo: any = cargoInfo
-	untypedInfo.pair = offer.twists.pair == true
+	cargoInfo.pair = offer.twists.pair == true
 	local session = Cargo.begin(player, cargoInfo)
 	local crewCount = #Crew.members(player)
 	local members: { [Player]: boolean } = {}

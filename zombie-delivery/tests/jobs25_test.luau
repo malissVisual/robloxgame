@@ -44,7 +44,7 @@ if cashrun and ambulance and pizzarush and winter and army then
 	check("ambulance from level 3", Economy.jobLevel(ambulance, ambulance.tier) == 3)
 	check("pizza rush from level 1", Economy.jobLevel(pizzarush, pizzarush.tier) == 1)
 	check("a board special without a level needs its tier's", Economy.jobLevel(winter, winter.tier) == Config.Jobs.Tiers[winter.tier].level)
-	check("an employer's job without a level is open", Economy.jobLevel(army, army.tier) == 1)
+	check("army supply from level 7 (3.2)", Economy.jobLevel(army, army.tier) == 7)
 end
 
 check("the new jobs have their people", (function()

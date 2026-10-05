@@ -430,8 +430,8 @@ do
 		table.insert(spans, `duo {duo[1].level} … {duo[10].level}`)
 	end
 	check("the levels grow from the campaign's to the next one's", #spans == 0, offenders(spans))
-	check("levelOf: First Shift 1 → 2, Iron Supply 6 → 8", Missions.levelOf("dispatch", 1) == 1 and Missions.levelOf("dispatch", 10) == 2
-		and Missions.levelOf("army", 1) == 6 and Missions.levelOf("army", 5) == 7 and Missions.levelOf("army", 10) == 8)
+	check("levelOf: First Shift 1 → 2, Iron Supply 8 → 9", Missions.levelOf("dispatch", 1) == 1 and Missions.levelOf("dispatch", 10) == 2
+		and Missions.levelOf("army", 1) == 8 and Missions.levelOf("army", 5) == 8 and Missions.levelOf("army", 10) == 9)
 	local last = story[#story]
 	check("the last campaign ends at the top level", Missions.levelOf(last.id, 10) == Config.Levels.MaxLevel)
 	local first = Missions.find("dispatch_1")
@@ -475,7 +475,7 @@ do
 	check("Exodus opens with every story finale (the DUO campaign not needed)", Missions.unlocked("exodus_1", all, 14))
 	check("finished: the finale counts", Missions.finished(firstShift, "dispatch") and not Missions.finished({ dispatch_9 = 3 }, "dispatch"))
 	local campaignOpen, campaignWhy = Missions.campaignOpen("market", { clinic_10 = 1 }, 2)
-	check("campaignOpen: the level after the chain", not campaignOpen and string.find(campaignWhy or "", "level 3", 1, true) ~= nil, campaignWhy)
+	check("campaignOpen: the level after the chain", not campaignOpen and string.find(campaignWhy or "", "level 4", 1, true) ~= nil, campaignWhy)
 	local clinic4 = Missions.find("clinic_4")
 	if clinic4 and clinic4.level and clinic4.level > 2 then
 		open = Missions.unlocked("clinic_4", { clinic_3 = 2 }, clinic4.level - 1)

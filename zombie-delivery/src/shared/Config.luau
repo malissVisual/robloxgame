@@ -1567,6 +1567,7 @@ Config.JobTypes = {
 		name = "Army Supply",
 		description = "Load ammo at the Harbor Docks and drive it in the army's armored truck through the tunnel to the base.",
 		vehicle = "armored",
+		level = 7, -- 3.2: the armored truck it earns can carry a car gun
 		employer = "army",
 		pickups = 1,
 		pickupAt = "docks",
