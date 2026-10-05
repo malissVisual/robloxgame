@@ -600,9 +600,9 @@ function Ui.closeButton(parent: Instance, onClick: () -> ()): any
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Text = "✕",
-		TextColor3 = K.secondary,
+		TextColor3 = K.text, -- 4.0.2: the one way out shown (ESC is Roblox's own menu key)
 		Font = Theme.HeadingFont,
-		TextSize = 16,
+		TextSize = 22,
 		AutoButtonColor = false,
 	}, parent)
 	local mark = Ui.make("Frame", {
@@ -616,7 +616,7 @@ function Ui.closeButton(parent: Instance, onClick: () -> ()): any
 	}, close)
 	local tweens: { [string]: Tween } = {}
 	local function hover(on: boolean)
-		play(tweens, "text", close, HOVER_INFO, { TextColor3 = if on then K.text else K.secondary })
+		play(tweens, "text", close, HOVER_INFO, { TextColor3 = if on then K.red else K.text })
 		play(tweens, "mark", mark, HOVER_INFO, { BackgroundTransparency = if on then 0 else 1 })
 	end
 	close.MouseEnter:Connect(function() hover(true) end)
@@ -986,7 +986,8 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 		BackgroundTransparency = 1,
 	}, surface)
 
-	-- The slim footer: ESC · CLOSE on the left, the context (the caller's) on the right, a thin line over it.
+	-- The slim footer: the context (the caller's) on the right, a thin line over it. (4.0.2: no "ESC · CLOSE" on the
+	-- left any more: ESC is Roblox's menu; the ✕ in the header closes, and so does the window's own key, J for the jobs.)
 	local footer = Ui.make("Frame", {
 		Name = "Footer",
 		Size = UDim2.new(1, 0, 0, footerH),
@@ -1001,8 +1002,10 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 		Position = UDim2.new(0, 24, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		TextSize = 11,
+		Visible = false,
 	})
 	local escText = Ui.label(footer, if touch then "TAP ✕ TO CLOSE" else "CLOSE", UDim2.fromOffset(150, 20), {
+		Visible = false,
 		Position = UDim2.new(0, if touch then 54 else 68, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Font = Theme.HeadingFont,

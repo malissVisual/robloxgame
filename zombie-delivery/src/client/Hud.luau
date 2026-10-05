@@ -647,6 +647,7 @@ end
 -- (CrewPanel.toggle), ESTATE the list of every property (EstateUi.toggleList), MISSIONS the missions window, SOUND the
 -- sound setting. Unset, the button says what it is for (CrewPanel.start sets onCrew by itself too).
 Hud.onJobs = nil :: (() -> ())? -- 3.6 client/DispatchUi.luau: the Dispatch board (J / JOBS)
+Hud.onJobsKey = nil :: (() -> ())? -- 4.0.2: the J key: opens the board, or closes it when it is open (Main)
 Hud.onCrew = nil :: (() -> ())?
 Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
@@ -3636,7 +3637,12 @@ function Hud.start()
 		if key == Enum.KeyCode.M then
 			MapView.toggle()
 		elseif key == Enum.KeyCode.J then
-			openDispatch()
+			local toggle = Hud.onJobsKey
+			if toggle then
+				toggle()
+			else
+				openDispatch()
+			end
 		else -- (Q: the weapon wheel, client/WeaponWheel.luau)
 			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five }
 			local index = table.find(numbers, key)

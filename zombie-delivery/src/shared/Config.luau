@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.0.1"
+Config.Version = "4.0.2"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -1396,7 +1396,7 @@ Config.Missions = {
 
 Config.Jobs = {
 	DeliverRadius = 18,
-	RefreshSeconds = 180, -- 3.7: the board gets new offers on its own this often (no refresh button)
+	RefreshSeconds = 120, -- 3.7: the board gets new offers on its own this often (no refresh button); 4.0.2: 2 min
 	-- 3.7: the tutorial's first delivery (Jobs.startTutorialJob): an easy ★ one close to the depot, for the Old Van.
 	TutorialPieces = 2, -- pieces at most (the Old Van's 2 slots)
 	TutorialPickupMax = 400, -- studs (manhattan) from the player to the pick-up at most (the nearest homes to the depot: ~330)
