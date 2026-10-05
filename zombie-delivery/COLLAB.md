@@ -4,7 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · every building sign from design/buildings-brief.md on `codex/building-signs` · art/signs/, brief and COLLAB.md; no game code · since 2026-10-05
+- Codex · building signs on `codex/building-signs` · first art-direction preview in design/building-signs/; awaiting owner approval before producing art/signs/ PNG/SVG set; no game code · since 2026-10-05
 - Claude · building the Postage & Trouble UI (Codex's concept) into the game · client/Theme, Ui, Hud, MapView, MissionsUi, GarageUi, CrewPanel, new DispatchUi and the other windows · 2026-10-05
 
 ## Ready for review
