@@ -1,47 +1,48 @@
 --!strict
 -- Small helpers for building the interface in code.
 --
--- 3.6, "Postage & Trouble" (design/ui-concept/): light paper and lavender surfaces with plum ink, pastel actions,
--- shipping-ticket shapes. The helpers every module uses keep their signatures and wear the new look:
+-- 3.8, the contract UI (design/ui-contract/, approved by the owner; it replaces 3.6's "Postage & Trouble"): charcoal
+-- rectangles, compact white type, fine grey lines, small precise red accents. No tilts, stubs, lifts, bounces or
+-- pastels. The helpers keep their 3.6 signatures, so every module that calls them wears the new look:
 --
 --   Ui.panel(parent, size, position, anchor?) -> Frame
---       a paper card (the HUD's cards): cream, a 12 px corner, a thin lavender line.
+--       a charcoal card (the HUD's cards): a scrim (Theme.PanelTransparency), square, a fine line.
 --   Ui.button(parent, text, size, color, onClick) -> TextButton
---       an action. `color` says what it means and becomes its pastel face (Theme.soft): yellow / green / money are
---       the sage MAIN action (an arrow on its right when there is room), red rose, blue sky, grey disabled, the GPS
---       purple lilac; any other colour is washed toward paper. A soft shadow under it (the lip), hover lightens it,
---       press sinks it (0.97, the lip gone). Setting .BackgroundColor3 later (a caller's enabled / selected state)
---       gets the same treatment, and a .TextColor3 that would not read on the face (old white-on-colour text) falls
---       back to ink.
---   Ui.ghostButton(parent, text, size, accent?, onClick) -> TextButton   a quiet secondary action (paper, a line).
---   Ui.closeButton(parent, onClick) -> TextButton   round, ✕, turns 90° and grows on hover, shrinks on press.
---   Ui.chip(parent, text, color?, textColor?) -> TextLabel   a small badge on the pastel face of `color`.
---   Ui.keyChip(parent, key, size, accent?, props?) -> TextLabel   a key ("M", "ESC") on a paper chip with a line.
---   Ui.caps(parent, text, size, props?) -> TextLabel   a small caps label (12 px, the secondary ink).
---   Ui.bar(parent, size, color) -> (back, fill)   a thin bar on a lavender track.
+--       a flat rectangle with a fine line. `color` says what it means (Theme.soft): yellow / green / money are the
+--       MAIN action (raised charcoal, a thin red rule along its bottom, an arrow when there is room), red / blue /
+--       grey / the GPS purple get a dark face with that meaning's thin accent; any other colour a charcoal face
+--       barely tinted by it. Hover (100 – 140 ms) brightens the face and the label and shows the underline; press
+--       dips its opacity. Setting .BackgroundColor3 later (a caller's enabled / selected state) gets the same
+--       treatment, and a .TextColor3 that would not read on the face (old dark ink) falls back to the light text.
+--   Ui.ghostButton(parent, text, size, accent?, onClick) -> TextButton   a plain text action (no surface).
+--   Ui.closeButton(parent, onClick) -> TextButton   a small "✕" (44 × 44 to hit); hover brightens it, red underline.
+--   Ui.chip(parent, text, color?, textColor?) -> TextLabel   a compact tag: dark face, the meaning's fine outline.
+--   Ui.keyChip(parent, key, size, accent?, props?) -> TextLabel   a key ("M", "ESC") in a square outline.
+--   Ui.caps(parent, text, size, props?) -> TextLabel   a small caps label (12 px, the secondary text).
+--   Ui.bar(parent, size, color) -> (back, fill)   a thin square bar on a dark track.
 --
--- New in 3.6 (for the HUD, the Dispatch board, the garage, the missions):
+-- The 3.6 shapes, flattened in 3.8:
 --   Ui.window(parent, title, subtitle, icon?, size?) -> (frame, content, chrome)
---       a lavender window: a header (the icon in a round sage badge, the title, the subtitle, the round close
---       button), the content area and a footer (ESC chip, "Close window", a context line on the right). `frame` is
+--       a charcoal rectangle: a header (a red marker and the subtitle as a small caps label, the title, a thin line,
+--       a small ✕), the content area and a slim footer (the ESC key, "CLOSE", a context line on the right). `frame` is
 --       what you size, move, scale (UIScale) and show; put your things in `content`. chrome: { frame, surface,
---       header, content, footer, icon, title, subtitle, close, esc, escText, context, onClose }. The close button and
+--       header, content, footer, icon, title, subtitle, close, esc, escText, context, onClose }. The close action and
 --       ESC (or the gamepad's B, or opening the Roblox menu) call chrome.onClose when it is set, else hide `frame`.
 --       Ui.WindowHeader / Ui.WindowFooter are the heights (px at scale 1) the content area leaves for the chrome.
 --   Ui.ticket(parent, size, position, anchor?, stubWidth?, tilt?, notch?) -> (card, body, stub)
---       a paper ticket with a soft lip and (with stubWidth) a perforated stub; `notch` colours the two half-round
---       notches (the surface behind the ticket; default the window lavender).
---   Ui.tactile(target, lift?, hoverScale?)   hover lifts / straightens / grows, press sinks (follows a target the
---       caller moves later; a target in a layout only grows and straightens).
+--       a flat row card. `tilt` and `notch` are ignored (kept for the callers); with stubWidth the right column is
+--       the stub, behind a fine line (no perforation). Ui.selectRow(card, on) gives it the selected look: a quiet
+--       highlight and a narrow red rule on its left.
+--   Ui.tactile(target, lift?, hoverScale?)   a hover brightens the target's surface (no lift, no tilt, no growth).
 --   Ui.tag(parent, text, index, size?, onClick?) -> (tag, parts)
---       a tilted pastel tag (the consumables): the face of Theme.Postage.tags[index], tilted ±4° by index, the
---       tactile hover (lift 9, scale 1.12). parts: { key (top left), count (bottom right), label (the name that
---       shows above it on hover / gamepad focus), lip }.
+--       a compact square tile (the consumables): a dark face, a fine line, the name over it on hover / gamepad focus.
+--       parts: { key (top left), count (bottom right), label, lip (the hover underline) }.
 --   Ui.dial(parent, diameter, position?, anchor?) -> Dial
---       a round cream dial with ticks (the speed dial): { frame, face (a CanvasGroup), title, value, unit,
---       caption, percent, barBack, barFill, pips, pipsLabel, needle, setNeedle(fraction), setBar(fraction, color?),
---       setPips(filled, total, text?), setDim(on) }.
---   Ui.dashes(parent, vertical, count, color, size, position) -> Frame   a dashed line (perforations, separators).
+--       the same API as 3.6's speed dial, drawn as compact text (no circle, no ticks; the needle is hidden).
+--   Ui.dashes(parent, vertical, count, color, size, position) -> Frame   a fine solid line (count is ignored).
+--
+-- Touch: on the touch layout a button, a ghost button, a close action or a tag smaller than 44 px gets invisible
+-- margins around it, so its hit area is at least 44 × 44 screen pixels (the drawing stays compact).
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -51,8 +52,8 @@ local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Ico
 local Theme = require(script.Parent.Theme)
 local Ui = {}
 Ui.Colors = Theme.Colors
-Ui.Gps = Theme.Gps -- the GPS purple (the routes, the crew)
-local P = Theme.Postage
+Ui.Gps = Theme.Gps -- the GPS purple (the routes on the maps)
+local K = Theme.Contract
 
 -- ── Screen ────────────────────────────────────────────────────────────────
 -- One rule for the size of the interface everywhere (the HUD, its windows, the crew window, the leaderboard): 1 at
@@ -60,6 +61,7 @@ local P = Theme.Postage
 Ui.ScaleBase = Vector2.new(1150, 680)
 Ui.MinScale = 0.55
 Ui.MaxScale = 1.1
+Ui.MinTouch = 44 -- screen px: the smallest hit area on the touch layout
 
 -- The scale for a screen of `size` pixels (the ScreenGui's area, under Roblox's top bar).
 function Ui.scaleFor(size: Vector2): number
@@ -103,8 +105,8 @@ function Ui.corner(parent: Instance, radius: number?)
 end
 
 -- Reuse the border when a caller highlights a panel; avoid overlapping double strokes.
--- 3.2: the quiet border (Theme.Border, the default) is see-through (Theme.BorderTransparency); an accent colour is
--- solid. A caller may still set .Transparency on what it returns.
+-- The quiet border (Theme.Border, the default) uses Theme.BorderTransparency; an accent colour is solid. A caller may
+-- still set .Transparency on what it returns.
 function Ui.stroke(parent: Instance, color: Color3?, thickness: number?): any
 	local border: any = parent:FindFirstChild("UiBorder")
 	if not border then
@@ -130,13 +132,13 @@ function Ui.list(parent: Instance, vertical: boolean, gap: number, align: Enum.H
 	}, parent)
 end
 
--- 3.6: a paper card (the HUD's cards; the windows use Ui.window).
+-- A charcoal card (the HUD's cards; the windows use Ui.window).
 function Ui.panel(parent: Instance, size: UDim2, position: UDim2, anchor: Vector2?): any
 	local frame = Ui.make("Frame", {
 		Size = size,
 		Position = position,
 		AnchorPoint = anchor or Vector2.zero,
-		BackgroundColor3 = P.paper,
+		BackgroundColor3 = K.charcoal,
 		BackgroundTransparency = Theme.PanelTransparency,
 		BorderSizePixel = 0,
 	}, parent)
@@ -145,41 +147,31 @@ function Ui.panel(parent: Instance, size: UDim2, position: UDim2, anchor: Vector
 	return frame
 end
 
--- A dashed line: `count` dashes along a frame of `size` at `position` (horizontal unless `vertical`). The perforations
--- of the tickets and the line under a window's header.
+-- 3.8: a fine solid line (3.6 drew it dashed; `count` is ignored) of `size` at `position`.
 function Ui.dashes(parent: Instance, vertical: boolean, count: number, color: Color3, size: UDim2, position: UDim2): any
+	local _ = vertical and count
 	local line = Ui.make("Frame", { Name = "Dashes", Size = size, Position = position, BackgroundTransparency = 1 }, parent)
-	local share = 1 / (count * 2)
-	for i = 0, count - 1 do
-		Ui.make("Frame", {
-			Size = if vertical then UDim2.fromScale(1, share) else UDim2.fromScale(share, 1),
-			Position = if vertical then UDim2.fromScale(0, (i * 2 + 0.5) * share) else UDim2.fromScale((i * 2 + 0.5) * share, 0),
-			BackgroundColor3 = color,
-			BorderSizePixel = 0,
-		}, line)
-	end
+	Ui.make("Frame", { Name = "Line", Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BorderSizePixel = 0 }, line)
 	return line
 end
 
 -- ── The small pieces ──────────────────────────────────────────────────────
 
--- A thin accent bar down the left edge of a card (the gun card's): `inset` px in, a little shorter than the card.
--- It sits outside any layout of the card: give the card's content a frame of its own when it has a UIListLayout.
+-- A thin accent rule down the left edge of a card: `inset` px in, a little shorter than the card. It sits outside any
+-- layout of the card: give the card's content a frame of its own when it has a UIListLayout.
 function Ui.edge(parent: Instance, color: Color3, inset: number?): any
-	local edge = Ui.make("Frame", {
+	return Ui.make("Frame", {
 		Name = "Edge",
-		Size = UDim2.new(0, 3, 1, -16),
+		Size = UDim2.new(0, 2, 1, -16),
 		Position = UDim2.new(0, inset or 7, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundColor3 = color,
 		BorderSizePixel = 0,
 		ZIndex = 2,
 	}, parent)
-	Ui.corner(edge, 2)
-	return edge
 end
 
--- A small caps label (HeadingFont, upper case, the secondary ink): the names of things, the units, the keys.
+-- A small caps label (HeadingFont, upper case, the secondary text): the names of things, the units, the keys.
 function Ui.caps(parent: Instance, text: string, size: UDim2, props: { [string]: any }?): any
 	local label = Ui.label(parent, string.upper(text), size, {
 		Font = Theme.HeadingFont,
@@ -196,21 +188,20 @@ function Ui.caps(parent: Instance, text: string, size: UDim2, props: { [string]:
 	return label
 end
 
--- A key on a paper chip with a thin line ("M", "Q", "K", "ESC"); the accent (made readable) for its letter.
+-- A key in a square outline ("M", "Q", "K", "ESC"): the light text (or the accent, made readable) on a charcoal scrim.
 function Ui.keyChip(parent: Instance, key: string, size: number, accent: Color3?, props: { [string]: any }?): any
 	local chip = Ui.label(parent, key, UDim2.fromOffset(size, size), {
 		Name = "Key",
-		BackgroundTransparency = 0,
-		BackgroundColor3 = P.paper,
+		BackgroundTransparency = 0.3,
+		BackgroundColor3 = K.charcoal,
 		Font = Theme.HeadingFont,
-		TextSize = math.max(12, math.floor(size * 0.55)),
-		TextColor3 = Theme.readable(accent or P.ink2, P.paper),
+		TextSize = math.max(11, math.floor(size * 0.5)),
+		TextColor3 = Theme.readable(accent or K.text, K.charcoal),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextWrapped = false,
 	})
-	Ui.corner(chip, math.max(4, math.floor(size / 4)))
-	local line = Ui.stroke(chip, P.line, 1)
-	line.Transparency = 0
+	local line = Ui.stroke(chip, K.text, 1)
+	line.Transparency = 0.35
 	if props then
 		for key2, value in props do
 			chip[key2] = value
@@ -251,15 +242,174 @@ local function click(onClick: () -> ())
 	onClick()
 end
 
-local PRESS_INFO = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local HOVER_INFO = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local PRESS_INFO = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local WHITE = Color3.new(1, 1, 1)
 
--- The button's own UIScale for the press (nil when the caller scales the button with a UIScale of its own).
-local function pressScale(button: GuiObject): UIScale?
-	local scale = button:FindFirstChildOfClass("UIScale")
-	if scale then
-		return if scale.Name == "Press" then scale else nil
+local function isPress(input: InputObject): boolean
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+end
+
+-- Plays a tween and remembers it in `slot` (cancelling the one before), so a fast hover / leave does not stack.
+local function play(slots: { [string]: Tween }, slot: string, object: Instance, info: TweenInfo, goal: { [string]: any })
+	local before = slots[slot]
+	if before then
+		before:Cancel()
 	end
-	return Ui.make("UIScale", { Name = "Press", Scale = 1 }, button)
+	local tween = TweenService:Create(object, info, goal)
+	slots[slot] = tween
+	tween:Play()
+end
+
+local function cancelAll(slots: { [string]: Tween })
+	for _, tween in slots do
+		tween:Cancel()
+	end
+	table.clear(slots)
+end
+
+-- The press feedback: a charcoal veil over the control that dips its opacity for a moment.
+local function pressVeil(button: GuiObject): Frame
+	return Ui.make("Frame", {
+		Name = "PressVeil",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = K.charcoal,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = button.ZIndex,
+	}, button)
+end
+
+-- Touch: invisible margins (outside the drawing) so `button`'s hit area is at least Ui.MinTouch screen px each way.
+-- A tap on a margin runs `fire`. Only on the touch layout; re-measured when the button's screen size changes.
+local function touchMargins(button: GuiObject, fire: () -> ())
+	if not Ui.touchLayout() then
+		return
+	end
+	local margins: { [string]: any } = {}
+	for _, side in { "Top", "Bottom", "Left", "Right" } do
+		local margin = Ui.make("TextButton", {
+			Name = "Hit" .. side,
+			BackgroundTransparency = 1,
+			Text = "",
+			AutoButtonColor = false,
+			Selectable = false,
+			Visible = false,
+			ZIndex = button.ZIndex,
+		}, button)
+		margin.Activated:Connect(fire)
+		margins[side] = margin
+	end
+	-- The nearby controls a margin must not reach into: the buttons beside it (its siblings) and the ones in its
+	-- siblings (a row of holders).
+	local function neighbours(): { GuiObject }
+		local list: { GuiObject } = {}
+		local parent = button.Parent
+		if not parent then
+			return list
+		end
+		for _, other in parent:GetChildren() do
+			if other ~= button and other:IsA("GuiObject") and other.Visible then
+				if other:IsA("GuiButton") then
+					table.insert(list, other)
+				end
+				for _, inner in other:GetChildren() do
+					if inner:IsA("GuiButton") and inner.Visible then
+						table.insert(list, inner)
+					end
+				end
+			end
+		end
+		return list
+	end
+	local function measure()
+		local shown = button.AbsoluteSize
+		if shown.X <= 0 or shown.Y <= 0 then
+			return
+		end
+		-- The UIScales above it: screen px per local px (from the offset part of the size, when it has one).
+		local unitX = if button.Size.X.Offset > 0 and button.Size.X.Scale == 0 then shown.X / button.Size.X.Offset else 1
+		local unitY = if button.Size.Y.Offset > 0 and button.Size.Y.Scale == 0 then shown.Y / button.Size.Y.Offset else 1
+		local needY = math.max(0, (Ui.MinTouch - shown.Y) / 2)
+		local needX = math.max(0, (Ui.MinTouch - shown.X) / 2)
+		-- Each side grows at most halfway to the next control on that side (screen px), so it never takes its taps.
+		local room = { Top = needY, Bottom = needY, Left = needX, Right = needX }
+		if needX > 0 or needY > 0 then
+			local at = button.AbsolutePosition
+			local x1, y1, x2, y2 = at.X, at.Y, at.X + shown.X, at.Y + shown.Y
+			for _, other in neighbours() do
+				local p, s = other.AbsolutePosition, other.AbsoluteSize
+				local ox1, oy1, ox2, oy2 = p.X, p.Y, p.X + s.X, p.Y + s.Y
+				if ox1 < x2 + needX and ox2 > x1 - needX then -- in the same column: above or below
+					if oy2 <= y1 then
+						room.Top = math.min(room.Top, (y1 - oy2) / 2)
+					elseif oy1 >= y2 then
+						room.Bottom = math.min(room.Bottom, (oy1 - y2) / 2)
+					end
+				end
+				if oy1 < y2 + needY and oy2 > y1 - needY then -- in the same row: left or right
+					if ox2 <= x1 then
+						room.Left = math.min(room.Left, (x1 - ox2) / 2)
+					elseif ox1 >= x2 then
+						room.Right = math.min(room.Right, (ox1 - x2) / 2)
+					end
+				end
+			end
+		end
+		local top, bottom = room.Top / math.max(0.05, unitY), room.Bottom / math.max(0.05, unitY)
+		local left, right = room.Left / math.max(0.05, unitX), room.Right / math.max(0.05, unitX)
+		margins.Top.Visible, margins.Bottom.Visible = top > 0.5, bottom > 0.5
+		margins.Left.Visible, margins.Right.Visible = left > 0.5, right > 0.5
+		margins.Top.Size = UDim2.new(1, 0, 0, top)
+		margins.Top.Position = UDim2.fromOffset(0, -top)
+		margins.Bottom.Size = UDim2.new(1, 0, 0, bottom)
+		margins.Bottom.Position = UDim2.new(0, 0, 1, 0)
+		margins.Left.Size = UDim2.new(0, left, 1, 0)
+		margins.Left.Position = UDim2.fromOffset(-left, 0)
+		margins.Right.Size = UDim2.new(0, right, 1, 0)
+		margins.Right.Position = UDim2.new(1, 0, 0, 0)
+	end
+	-- Re-measured when it changes size and when its neighbours change (a layout filled in later); not every frame.
+	local queued = false
+	local function later()
+		if queued then
+			return
+		end
+		queued = true
+		task.delay(0.1, function()
+			queued = false
+			if button.Parent then
+				measure()
+			end
+		end)
+	end
+	button:GetPropertyChangedSignal("AbsoluteSize"):Connect(later)
+	button:GetPropertyChangedSignal("ZIndex"):Connect(function()
+		for _, margin in margins do
+			margin.ZIndex = button.ZIndex
+		end
+	end)
+	local watched: { RBXScriptConnection } = {}
+	local function watchParent()
+		for _, connection in watched do
+			connection:Disconnect()
+		end
+		table.clear(watched)
+		local parent = button.Parent
+		if parent then
+			table.insert(watched, parent.ChildAdded:Connect(later))
+			table.insert(watched, parent.ChildRemoved:Connect(later))
+		end
+		later()
+	end
+	button.AncestryChanged:Connect(watchParent)
+	button.Destroying:Connect(function()
+		for _, connection in watched do
+			connection:Disconnect()
+		end
+		table.clear(watched)
+	end)
+	watchParent()
 end
 
 function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, onClick: () -> ()): any
@@ -275,24 +425,23 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 		AutoButtonColor = false,
 	}, parent)
 	Ui.corner(button, Theme.Radius)
-	local border = Ui.stroke(button, look.lip, 1)
-	border.Transparency = 0.35
-	-- The soft shadow: a darker band along the bottom (a Frame cannot cast a real one; children draw on top).
+	local border = Ui.stroke(button, K.rule, 1)
+	border.Transparency = 0
+	-- The thin rule along the bottom: the main action's red accent (always), every other action's hover underline.
 	local lip = Ui.make("Frame", {
 		Name = "Lip",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.fromScale(0.5, 1),
-		Size = UDim2.new(1, -2 * Theme.Radius, 0, 3),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 2),
 		BackgroundColor3 = look.lip,
+		BackgroundTransparency = if look.main then 0 else 1,
 		BorderSizePixel = 0,
-		Visible = not look.quiet,
 	}, button)
-	Ui.corner(lip, 2)
 	-- The main action's arrow (only while the text leaves room for it).
 	local arrow = Ui.make("TextLabel", {
 		Name = "Arrow",
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -10, 0.5, -1),
+		Position = UDim2.new(1, -10, 0.5, 0),
 		Size = UDim2.fromOffset(16, 16),
 		BackgroundTransparency = 1,
 		Text = "→",
@@ -301,14 +450,13 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 		TextColor3 = look.text,
 		Visible = false,
 	}, button)
+	local veil = pressVeil(button)
+	local tweens: { [string]: Tween } = {}
 
-	local hovered, pressed = false, false
+	local hovered = false
 	local applied = look.face -- the face this button set last (a caller's own colour differs from it)
 	local function face(): Color3
-		return if pressed and look.main then P.sagePress
-			elseif hovered and look.main then P.sageHover
-			elseif hovered then look.face:Lerp(Color3.new(1, 1, 1), 0.35)
-			else look.face
+		return if hovered and not look.quiet then look.face:Lerp(WHITE, 0.07) else look.face
 	end
 	local function refreshArrow()
 		local room = button.AbsoluteSize.X - button.TextBounds.X
@@ -316,11 +464,14 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 		arrow.TextColor3 = button.TextColor3
 		arrow.ZIndex = button.ZIndex
 		lip.ZIndex = button.ZIndex
+		veil.ZIndex = button.ZIndex
 	end
 	local function paint()
 		applied = face()
 		button.BackgroundColor3 = applied
-		lip.Visible = not look.quiet and not pressed
+		lip.BackgroundColor3 = if look.main or look.lip ~= K.rule then look.lip else K.text
+		play(tweens, "lip", lip, HOVER_INFO, { BackgroundTransparency = if look.main or (hovered and not look.quiet) then 0 else 1 })
+		border.Color = if hovered and not look.quiet then K.line else K.rule
 	end
 	-- A caller set .BackgroundColor3 (its enabled / selected state): wear that colour's face.
 	button:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
@@ -330,14 +481,13 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 		end
 		look = Theme.soft(now)
 		paint()
-		if button:GetAttribute("KeepStroke") ~= true then
-			border.Color = look.lip
-			lip.BackgroundColor3 = look.lip
+		if button:GetAttribute("KeepStroke") == true then
+			border.Color = K.rule
 		end
 		button.TextColor3 = Theme.readable(button.TextColor3, look.face)
 		refreshArrow()
 	end)
-	-- A caller's text colour that would not read on the face (old white-on-colour text): the face's ink.
+	-- A caller's text colour that would not read on the face (old dark ink): the face's text.
 	button:GetPropertyChangedSignal("TextColor3"):Connect(function()
 		local fixed = Theme.readable(button.TextColor3, look.face)
 		if not Theme.same(fixed, button.TextColor3) then
@@ -349,140 +499,136 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 	button:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshArrow)
 	button:GetPropertyChangedSignal("ZIndex"):Connect(refreshArrow)
 
-	local feedback: Tween? = nil
-	local function sink(on: boolean)
-		pressed = on
-		paint()
-		local scale = pressScale(button)
-		if scale then
-			if feedback then
-				feedback:Cancel()
-			end
-			local tween = TweenService:Create(scale, PRESS_INFO, { Scale = if on then 0.97 else 1 })
-			feedback = tween
-			tween:Play()
-		end
+	local function press(on: boolean)
+		play(tweens, "press", veil, PRESS_INFO, { BackgroundTransparency = if on then 0.55 else 1 })
 	end
 	local function hover(on: boolean)
 		hovered = on
-		if not on then
-			pressed = false
-		end
 		paint()
-		border.Transparency = if on then 0 else 0.35
 	end
 	button.MouseEnter:Connect(function() hover(true) end)
 	button.MouseLeave:Connect(function()
 		hover(false)
-		sink(false)
+		press(false)
 	end)
 	button.SelectionGained:Connect(function() hover(true) end)
 	button.SelectionLost:Connect(function() hover(false) end)
 	button.InputBegan:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			sink(true)
+		if isPress(input) then
+			press(true)
 		end
 	end)
 	button.InputEnded:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			sink(false)
+		if isPress(input) then
+			press(false)
 		end
 	end)
 	button.Destroying:Connect(function()
-		if feedback then
-			feedback:Cancel()
-		end
+		cancelAll(tweens)
 	end)
-	button.Activated:Connect(function()
+	local function fire()
 		click(onClick)
-	end)
+	end
+	button.Activated:Connect(fire)
+	touchMargins(button, fire)
 	task.defer(refreshArrow)
 	return button
 end
 
--- A quiet button: paper, a thin line (the accent's, else lavender), the text in the accent (made readable) or ink.
--- For the secondary actions (close, tabs, refresh, OK) next to the main ones.
+-- A plain text action: no surface, the label in the accent (made readable) or the light text; hover brightens it and
+-- shows a thin underline. For the secondary actions (back, decline, OK, controls) next to the main one.
 function Ui.ghostButton(parent: Instance, text: string, size: UDim2, accent: Color3?, onClick: () -> ()): any
 	local button = Ui.button(parent, text, size, Ui.Colors.panelLight, onClick)
 	button:SetAttribute("KeepStroke", true)
-	button.TextColor3 = Theme.readable(accent or Ui.Colors.text, P.ticket)
-	local border = Ui.stroke(button, accent or P.line, 1)
-	border.Transparency = if accent then 0.35 else 0
-	local lip = button:FindFirstChild("Lip")
-	if lip and lip:IsA("GuiObject") then
-		lip.BackgroundColor3 = P.track
+	button.BackgroundTransparency = 1
+	button.TextColor3 = Theme.readable(accent or K.secondary, K.charcoal)
+	local border = button:FindFirstChild("UiBorder")
+	if border and border:IsA("UIStroke") then
+		border.Enabled = false
 	end
+	-- The underline sits under the label, a little in from the edges.
+	local lip = button:FindFirstChild("Lip")
+	if lip and lip:IsA("Frame") then
+		lip.Size = UDim2.new(1, -24, 0, 1)
+		lip.Position = UDim2.new(0, 12, 1, -6)
+	end
+	local resting = button.TextColor3
+	button:GetPropertyChangedSignal("TextColor3"):Connect(function()
+		if not Theme.same(button.TextColor3, K.text) then
+			resting = button.TextColor3
+		end
+	end)
+	local function hover(on: boolean)
+		button.TextColor3 = if on then K.text else resting
+	end
+	button.MouseEnter:Connect(function() hover(true) end)
+	button.MouseLeave:Connect(function() hover(false) end)
+	button.SelectionGained:Connect(function() hover(true) end)
+	button.SelectionLost:Connect(function() hover(false) end)
+	hover(false)
 	return button
 end
 
--- A window's close button: round, ✕; it turns 90° and grows on hover, shrinks on press (index.html .close).
+-- A window's close action: a small "✕" in the secondary text (a 44 × 44 hit area); hover / focus brightens it and
+-- shows a red underline, press dips it.
 function Ui.closeButton(parent: Instance, onClick: () -> ()): any
 	local close = Ui.make("TextButton", {
 		Name = "Close",
-		Size = UDim2.fromOffset(36, 36),
+		Size = UDim2.fromOffset(44, 44),
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -12, 0, 12),
-		BackgroundColor3 = P.closeFace,
+		Position = UDim2.new(1, -8, 0, 8),
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Text = "✕",
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		Font = Theme.HeadingFont,
 		TextSize = 16,
 		AutoButtonColor = false,
 	}, parent)
-	Ui.corner(close, 18)
-	local ring = Ui.stroke(close, P.closeLip, 2)
-	ring.Transparency = 0
-	local scale = Ui.make("UIScale", { Name = "Press", Scale = 1 }, close)
-	local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local playing: { Tween } = {}
-	local function to(rotation: number, size: number)
-		for _, tween in playing do
-			tween:Cancel()
-		end
-		table.clear(playing)
-		local a = TweenService:Create(close, info, { Rotation = rotation })
-		local b = TweenService:Create(scale, info, { Scale = size })
-		table.insert(playing, a)
-		table.insert(playing, b)
-		a:Play()
-		b:Play()
+	local mark = Ui.make("Frame", {
+		Name = "Underline",
+		Size = UDim2.fromOffset(14, 2),
+		Position = UDim2.new(0.5, 0, 0.5, 12),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = K.red,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+	}, close)
+	local tweens: { [string]: Tween } = {}
+	local function hover(on: boolean)
+		play(tweens, "text", close, HOVER_INFO, { TextColor3 = if on then K.text else K.secondary })
+		play(tweens, "mark", mark, HOVER_INFO, { BackgroundTransparency = if on then 0 else 1 })
 	end
-	close.MouseEnter:Connect(function() to(90, 1.1) end)
+	close.MouseEnter:Connect(function() hover(true) end)
 	close.MouseLeave:Connect(function()
-		to(0, 1)
-		ring.Thickness = 2
+		hover(false)
+		close.TextTransparency = 0
 	end)
-	close.SelectionGained:Connect(function() to(90, 1.1) end)
-	close.SelectionLost:Connect(function() to(0, 1) end)
+	close.SelectionGained:Connect(function() hover(true) end)
+	close.SelectionLost:Connect(function() hover(false) end)
 	close.InputBegan:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			to(90, 0.92)
-			ring.Thickness = 0
+		if isPress(input) then
+			close.TextTransparency = 0.45
 		end
 	end)
 	close.InputEnded:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			to(90, 1.1)
-			ring.Thickness = 2
-		elseif input.UserInputType == Enum.UserInputType.Touch then
-			to(0, 1)
-			ring.Thickness = 2
+		if isPress(input) then
+			close.TextTransparency = 0
 		end
 	end)
 	close.Destroying:Connect(function()
-		for _, tween in playing do
-			tween:Cancel()
-		end
+		cancelAll(tweens)
 	end)
-	close.Activated:Connect(function()
+	local function fire()
 		click(onClick)
-	end)
+	end
+	close.Activated:Connect(fire)
+	touchMargins(close, fire)
 	return close
 end
 
--- A small rounded badge that grows with its text (cargo counts, rewards), on the pastel face of `color`; a
--- `textColor` that would not read on it falls back to ink.
+-- A compact tag that grows with its text (cargo counts, rewards): a dark face (Theme.soft of `color`) with a fine
+-- outline in the meaning's accent; a `textColor` that would not read on it falls back to the light text.
 function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Color3?): any
 	local look = Theme.soft(color or Ui.Colors.panelLight)
 	local chip = Ui.make("TextLabel", {
@@ -494,10 +640,12 @@ function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Colo
 		Text = text,
 		TextColor3 = Theme.readable(textColor or look.text, look.face),
 		Font = Theme.HeadingFont,
-		TextSize = 14,
+		TextSize = 12,
 	}, parent)
-	Ui.corner(chip, 4)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, chip)
+	Ui.corner(chip, Theme.Radius)
+	local outline = Ui.stroke(chip, look.lip, 1)
+	outline.Transparency = if look.quiet or look.lip == K.rule then 0 else 0.4
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, chip)
 	-- A caller's later colours get the same treatment.
 	chip:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
 		if Theme.isFace(chip.BackgroundColor3) or Theme.same(chip.BackgroundColor3, look.face) then
@@ -505,6 +653,7 @@ function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Colo
 		end
 		look = Theme.soft(chip.BackgroundColor3)
 		chip.BackgroundColor3 = look.face
+		outline.Color = look.lip
 		chip.TextColor3 = Theme.readable(chip.TextColor3, look.face)
 	end)
 	chip:GetPropertyChangedSignal("TextColor3"):Connect(function()
@@ -549,12 +698,10 @@ function Ui.icon(parent: Instance, iconName: string?, fallback: string, size: UD
 	return image
 end
 
--- A thin bar: `color` on a lavender track.
+-- A thin square bar: `color` on a dark track.
 function Ui.bar(parent: Instance, size: UDim2, color: Color3): (any, any)
-	local back = Ui.make("Frame", { Size = size, BackgroundColor3 = P.track, BorderSizePixel = 0 }, parent)
-	Ui.corner(back, 4)
+	local back = Ui.make("Frame", { Size = size, BackgroundColor3 = K.track, BorderSizePixel = 0 }, parent)
 	local fill = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BorderSizePixel = 0 }, back)
-	Ui.corner(fill, 4)
 	return back, fill
 end
 
@@ -566,35 +713,36 @@ function Ui.clear(parent: Instance)
 	end
 end
 
--- ── 3.6 Postage & Trouble shapes (design/ui-concept/) ─────────────────────
+-- ── Rows (3.6's tickets, flat since 3.8) ──────────────────────────────────
 
--- A paper ticket: a cream card with a soft lip under it, an optional slight tilt, and (with `stubWidth`) a perforated
--- stub on its right (a dashed line with two half-round notches in `notch`, the colour behind the ticket). Returns the
--- card, its body (content area) and the stub (nil without one). Hit areas stay rectangular; the shape is only drawn.
+-- A flat row card: a dark surface (the caller may recolour it), a fine line, no tilt, no shadow. With `stubWidth` the
+-- right column (the stub) sits behind a fine vertical line. Returns the card, its body (content area) and the stub
+-- (nil without one). The card sits in a transparent holder named "Ticket" (its .Parent), the thing a layout places.
 function Ui.ticket(parent: Instance, size: UDim2, position: UDim2, anchor: Vector2?, stubWidth: number?, tilt: number?, notch: Color3?): (any, any, any)
+	local _ = tilt and notch -- 3.8: no tilt, no die-cut notches
 	local holder = Ui.make("Frame", {
 		Name = "Ticket",
 		Size = size,
 		Position = position,
 		AnchorPoint = anchor or Vector2.zero,
 		BackgroundTransparency = 1,
-		Rotation = tilt or 0,
 	}, parent)
-	local shadow = Ui.make("Frame", {
-		Name = "Shadow",
-		Size = UDim2.fromScale(1, 1),
-		Position = UDim2.fromOffset(0, 5),
-		BackgroundColor3 = P.closeLip,
-		BorderSizePixel = 0,
-	}, holder)
-	Ui.corner(shadow, 6)
 	local card = Ui.make("Frame", {
 		Name = "Card",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = P.paper,
+		BackgroundColor3 = K.row,
 		BorderSizePixel = 0,
 	}, holder)
-	Ui.corner(card, 6)
+	Ui.stroke(card, K.rule, 1).Transparency = 0
+	-- The selected row's narrow red rule (Ui.selectRow shows it).
+	Ui.make("Frame", {
+		Name = "Rule",
+		Size = UDim2.new(0, 3, 1, 0),
+		BackgroundColor3 = K.red,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 3,
+	}, card)
 	local stubW = stubWidth or 0
 	local body = Ui.make("Frame", {
 		Name = "Body",
@@ -609,88 +757,84 @@ function Ui.ticket(parent: Instance, size: UDim2, position: UDim2, anchor: Vecto
 			Position = UDim2.new(1, -stubW, 0, 0),
 			BackgroundTransparency = 1,
 		}, card)
-		-- the perforation: a dashed line and a notch top and bottom
-		Ui.dashes(card, true, 12, P.line, UDim2.new(0, 1, 1, 0), UDim2.new(1, -stubW, 0, 0))
-		for _, y in { 0, 1 } do
-			local hole = Ui.make("Frame", {
-				Name = "Notch",
-				Size = UDim2.fromOffset(12, 12),
-				Position = UDim2.new(1, -stubW, y, 0),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = notch or P.lavender,
-				BorderSizePixel = 0,
-			}, card)
-			Ui.corner(hole, 6)
-		end
+		Ui.make("Frame", {
+			Name = "Divider",
+			Size = UDim2.new(0, 1, 1, -24),
+			Position = UDim2.new(1, -stubW, 0, 12),
+			BackgroundColor3 = K.rule,
+			BorderSizePixel = 0,
+		}, card)
 	end
 	return card, body, stub
 end
 
--- Tactile hover / press for a button (or any GuiObject inside one): hover lifts it (`lift` px), straightens a tilt
--- and grows it (`hoverScale`), press sinks it 2 px and scales to 0.97, release springs back. Touch taps activate at
--- once (no hover step). It follows a target the caller moves later (its resting place is re-read whenever it is at
--- rest); in a layout only the scale and the tilt move. The tweens are cancelled when the object is destroyed.
+-- The selected look of a row (a Ui.ticket card, or any frame): a quiet highlight and a narrow red rule on its left
+-- (keyboard / gamepad selection gets the same). Off: back to the row surface.
+function Ui.selectRow(card: GuiObject, on: boolean)
+	local rule = card:FindFirstChild("Rule")
+	if not rule then
+		rule = Ui.make("Frame", {
+			Name = "Rule",
+			Size = UDim2.new(0, 3, 1, 0),
+			BackgroundColor3 = K.red,
+			BorderSizePixel = 0,
+			ZIndex = card.ZIndex + 2,
+		}, card)
+	end
+	if rule and rule:IsA("GuiObject") then
+		rule.Visible = on
+	end
+	card.BackgroundColor3 = if on then K.raised else K.row
+end
+
+-- Hover for a row or a control (or any GuiObject inside one): its surface brightens a little (100 – 140 ms), with no
+-- lift, tilt or growth. A transparent holder (Ui.ticket's) brightens its "Card". `lift` and `hoverScale` are ignored
+-- (kept for the callers). Touch taps activate at once (no hover step). The tween is cancelled when it is destroyed.
 function Ui.tactile(target: GuiObject, lift: number?, hoverScale: number?)
-	local scale = target:FindFirstChildOfClass("UIScale") or Ui.make("UIScale", { Name = "Press", Scale = 1 }, target)
-	local home = target.Position
-	local tilt = target.Rotation
-	local up = lift or 5
-	local big = hoverScale or 1.04
-	local info = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local playing: { Tween } = {}
-	local away = false -- moved off its resting place by us
-	local function to(position: UDim2, rotation: number, size: number, resting: boolean)
-		if not away then
-			-- At rest: wherever the caller put it (and tilted it) is home now.
-			home = target.Position
-			tilt = target.Rotation
+	local _ = lift and hoverScale
+	if target:FindFirstChild("PressVeil") then
+		return -- a Ui.button: it has its own hover
+	end
+	local surface: GuiObject = target
+	if target.BackgroundTransparency >= 1 then
+		local card = target:FindFirstChild("Card")
+		if card and card:IsA("GuiObject") then
+			surface = card
 		end
-		-- Still away until the rest tween finishes: a hover during it must not take the half-way spot as home.
-		away = true
-		for _, tween in playing do
-			tween:Cancel()
-		end
-		table.clear(playing)
-		local a = TweenService:Create(target, info, { Position = if resting then home else position, Rotation = if resting then tilt else rotation })
-		local b = TweenService:Create(scale, info, { Scale = size })
-		table.insert(playing, a)
-		table.insert(playing, b)
-		if resting then
-			a.Completed:Connect(function(state: Enum.PlaybackState)
-				if state == Enum.PlaybackState.Completed then
-					away = false
+	end
+	local tweens: { [string]: Tween } = {}
+	local resting: Color3? = nil -- the caller's colour, while we brighten it
+	local lit: Color3? = nil
+	local function hover(on: boolean)
+		if on then
+			if resting == nil then
+				resting = surface.BackgroundColor3
+			end
+			local base = resting :: Color3
+			local goal = base:Lerp(WHITE, 0.05)
+			lit = goal
+			play(tweens, "face", surface, HOVER_INFO, { BackgroundColor3 = goal })
+		else
+			local base = resting
+			resting = nil
+			local mine = lit
+			local running: Tween? = tweens.face
+			if base and mine then
+				-- Only undo our own brightening (a caller that recoloured it meanwhile keeps its colour).
+				local ours = Theme.same(surface.BackgroundColor3, mine)
+					or (if running then running.PlaybackState == Enum.PlaybackState.Playing else false)
+				if ours then
+					play(tweens, "face", surface, HOVER_INFO, { BackgroundColor3 = base })
 				end
-			end)
+			end
 		end
-		a:Play()
-		b:Play()
 	end
-	local function rest()
-		to(home, tilt, 1, true)
-	end
-	local function hover()
-		to(home - UDim2.fromOffset(0, up), 0, big, false)
-	end
-	target.MouseEnter:Connect(hover)
-	target.MouseLeave:Connect(rest)
-	target.SelectionGained:Connect(hover)
-	target.SelectionLost:Connect(rest)
-	target.InputBegan:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			to(home + UDim2.fromOffset(0, 2), 0, 0.97, false)
-		end
-	end)
-	target.InputEnded:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			hover()
-		elseif input.UserInputType == Enum.UserInputType.Touch then
-			rest()
-		end
-	end)
+	target.MouseEnter:Connect(function() hover(true) end)
+	target.MouseLeave:Connect(function() hover(false) end)
+	target.SelectionGained:Connect(function() hover(true) end)
+	target.SelectionLost:Connect(function() hover(false) end)
 	target.Destroying:Connect(function()
-		for _, tween in playing do
-			tween:Cancel()
-		end
+		cancelAll(tweens)
 	end)
 end
 
@@ -739,9 +883,20 @@ local function shown(object: GuiObject): boolean
 	return false
 end
 
--- A lavender window (dispatch.png, garage.png): see the top of this file. `icon`: an Icons name or an emoji.
+-- Keeps a label in upper case (the small caps labels a caller may set later).
+local function upperCase(label: TextLabel)
+	label.Text = string.upper(label.Text)
+	label:GetPropertyChangedSignal("Text"):Connect(function()
+		local upper = string.upper(label.Text)
+		if upper ~= label.Text then
+			label.Text = upper
+		end
+	end)
+end
+
+-- A charcoal window: see the top of this file. `icon` (an Icons name or an emoji) is kept in a hidden badge for the
+-- callers that still reach it (chrome.icon); the header is type only.
 function Ui.window(parent: Instance, title: string, subtitle: string, icon: string?, size: UDim2?): (any, any, WindowChrome)
-	local radius = Theme.WindowRadius
 	local frame = Ui.make("Frame", {
 		Name = "Window",
 		Size = size or UDim2.fromOffset(760, 520),
@@ -749,68 +904,60 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 	}, parent)
-	-- The offset shadow (8, 8) and the surface.
-	local shadow = Ui.make("Frame", {
-		Name = "Shadow",
-		Size = UDim2.fromScale(1, 1),
-		Position = UDim2.fromOffset(8, 8),
-		BackgroundColor3 = P.windowShadow,
-		BackgroundTransparency = 0.4,
-		BorderSizePixel = 0,
-	}, frame)
-	Ui.corner(shadow, radius)
 	local surface = Ui.make("Frame", {
 		Name = "Surface",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = P.lavender,
+		BackgroundColor3 = K.charcoal,
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true, -- clicks on the window do not reach the world
 	}, frame)
-	Ui.corner(surface, radius)
+	Ui.stroke(surface, K.rule, 1).Transparency = 0
 
-	-- The header: the icon badge, the title and the subtitle, the close button, a dashed line under it.
+	-- The header: a red marker and the small caps label (the subtitle), the title, a thin line, the ✕.
 	local headerH, footerH = Ui.WindowHeader, Ui.WindowFooter
-	local header = Ui.make("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, headerH), BackgroundColor3 = P.header, BorderSizePixel = 0 }, surface)
-	Ui.corner(header, radius)
-	Ui.make("Frame", { Name = "Square", Size = UDim2.new(1, 0, 0, radius), Position = UDim2.new(0, 0, 1, -radius), BackgroundColor3 = P.header, BorderSizePixel = 0 }, header)
-	Ui.dashes(header, false, 64, P.dash, UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 1, -1))
-	local badge = Ui.make("Frame", {
-		Name = "Badge",
-		Size = UDim2.fromOffset(42, 42),
-		Position = UDim2.new(0, 22, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = P.brand,
+	local header = Ui.make("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, headerH), BackgroundTransparency = 1, BorderSizePixel = 0 }, surface)
+	Ui.make("Frame", {
+		Name = "Line",
+		Size = UDim2.new(1, -48, 0, 1),
+		Position = UDim2.new(0, 24, 1, -1),
+		BackgroundColor3 = K.rule,
 		BorderSizePixel = 0,
 	}, header)
-	Ui.corner(badge, 21)
-	Ui.stroke(badge, P.brandLine, 1).Transparency = 0
+	Ui.make("Frame", {
+		Name = "Marker",
+		Size = UDim2.fromOffset(7, 7),
+		Position = UDim2.fromOffset(24, 21),
+		BackgroundColor3 = K.red,
+		BorderSizePixel = 0,
+	}, header)
+	local badge = Ui.make("Frame", { Name = "Badge", Size = UDim2.fromOffset(24, 24), BackgroundTransparency = 1, Visible = false }, header)
 	local iconObject = Ui.icon(badge, icon, icon or "", UDim2.fromOffset(24, 24), {
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		TextSize = 20,
+		TextSize = 18,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextColor3 = P.ink2,
-		ImageColor3 = P.ink2,
+		TextColor3 = K.secondary,
+		ImageColor3 = K.secondary,
 	})
-	local titleLabel = Ui.label(header, title, UDim2.new(1, -150, 0, 30), {
-		Name = "Title",
-		Position = UDim2.fromOffset(78, 12),
-		Font = Theme.DisplayFont,
-		TextSize = 25,
-		TextColor3 = P.ink,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local subtitleLabel = Ui.label(header, subtitle, UDim2.new(1, -150, 0, 18), {
+	local subtitleLabel = Ui.label(header, subtitle, UDim2.new(1, -120, 0, 16), {
 		Name = "Subtitle",
-		Position = UDim2.fromOffset(79, 44),
-		Font = Theme.Font,
-		TextSize = 14,
-		TextColor3 = P.ink2,
+		Position = UDim2.fromOffset(40, 17),
+		Font = Theme.HeadingFont,
+		TextSize = 12,
+		TextColor3 = K.secondary,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
+	upperCase(subtitleLabel)
+	local titleLabel = Ui.label(header, title, UDim2.new(1, -120, 0, 30), {
+		Name = "Title",
+		Position = UDim2.fromOffset(24, 36),
+		Font = Theme.DisplayFont,
+		TextSize = 22,
+		TextColor3 = K.text,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	upperCase(titleLabel)
 
 	local content = Ui.make("Frame", {
 		Name = "Content",
@@ -819,39 +966,37 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 		BackgroundTransparency = 1,
 	}, surface)
 
-	-- The footer: ESC · Close window on the left, the context (the caller's) on the right.
+	-- The slim footer: ESC · CLOSE on the left, the context (the caller's) on the right, a thin line over it.
 	local footer = Ui.make("Frame", {
 		Name = "Footer",
 		Size = UDim2.new(1, 0, 0, footerH),
 		Position = UDim2.new(0, 0, 1, -footerH),
-		BackgroundColor3 = P.footer,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 	}, surface)
-	Ui.corner(footer, radius)
-	Ui.make("Frame", { Name = "Square", Size = UDim2.new(1, 0, 0, radius), BackgroundColor3 = P.footer, BorderSizePixel = 0 }, footer)
-	Ui.make("Frame", { Name = "Line", Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = P.footerLine, BorderSizePixel = 0 }, footer)
+	Ui.make("Frame", { Name = "Line", Size = UDim2.new(1, -48, 0, 1), Position = UDim2.fromOffset(24, 0), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, footer)
 	local touch = Ui.touchLayout()
-	local esc = Ui.keyChip(footer, if touch then "✕" else "ESC", 24, P.ink2, {
-		Size = UDim2.fromOffset(if touch then 24 else 38, 24),
-		Position = UDim2.new(0, 24, 0.5, 1),
+	local esc = Ui.keyChip(footer, if touch then "✕" else "ESC", 22, K.secondary, {
+		Size = UDim2.fromOffset(if touch then 22 else 34, 22),
+		Position = UDim2.new(0, 24, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
-		TextSize = 12,
+		TextSize = 11,
 	})
-	local escText = Ui.label(footer, if touch then "Tap ✕ to close" else "Close window", UDim2.fromOffset(150, 20), {
-		Position = UDim2.new(0, if touch then 56 else 70, 0.5, 1),
+	local escText = Ui.label(footer, if touch then "TAP ✕ TO CLOSE" else "CLOSE", UDim2.fromOffset(150, 20), {
+		Position = UDim2.new(0, if touch then 54 else 68, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
-		Font = Theme.Font,
-		TextSize = 12,
-		TextColor3 = P.ink2,
+		Font = Theme.HeadingFont,
+		TextSize = 11,
+		TextColor3 = K.secondary,
 		TextWrapped = false,
 	})
 	local context = Ui.label(footer, "", UDim2.new(1, -260, 0, 20), {
 		Name = "Context",
-		Position = UDim2.new(1, -24, 0.5, 1),
+		Position = UDim2.new(1, -24, 0.5, 0),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Font = Theme.HeadingFont,
 		TextSize = 12,
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -863,7 +1008,7 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 		Ui.closeWindow(chrome)
 	end)
 	close.AnchorPoint = Vector2.new(1, 0.5)
-	close.Position = UDim2.new(1, -26, 0.5, 0)
+	close.Position = UDim2.new(1, -14, 0.5, 0)
 	chrome = {
 		frame = frame,
 		surface = surface,
@@ -902,39 +1047,39 @@ end
 
 export type TagParts = { key: TextLabel, count: TextLabel, label: TextLabel, lip: Frame }
 
--- A tilted pastel tag (on-route.png, hover-item.png): see the top of this file. `text` is its face (an emoji; set it
--- to "" and put an Ui.icon in it for a picture).
+-- A compact square tile (the consumables): see the top of this file. `text` is its face (an emoji; set it to "" and
+-- put an Ui.icon in it for a picture).
 function Ui.tag(parent: Instance, text: string, index: number, size: UDim2?, onClick: (() -> ())?): (any, TagParts)
-	local faces = P.tags
-	local odd = index % 2 == 1
+	local _ = index -- 3.8: every tile wears the same face (3.6 alternated pastels and tilts by index)
 	local tag = Ui.make("TextButton", {
 		Name = "Tag",
 		Size = size or UDim2.fromOffset(46, 50),
-		BackgroundColor3 = faces[(index - 1) % #faces + 1],
+		BackgroundColor3 = K.charcoal,
+		BackgroundTransparency = 0.15,
 		BorderSizePixel = 0,
-		Rotation = if odd then -4 else 4,
 		Text = text,
-		TextColor3 = P.ink2,
+		TextColor3 = K.text,
 		Font = Theme.HeadingFont,
-		TextSize = 22,
+		TextSize = 20,
 		AutoButtonColor = false,
 	}, parent)
-	Ui.corner(tag, 10)
+	Ui.stroke(tag, K.rule, 1).Transparency = 0
+	-- The hover / focus underline (the red edge marker).
 	local lip = Ui.make("Frame", {
 		Name = "Lip",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.fromScale(0.5, 1),
-		Size = UDim2.new(1, -16, 0, 3),
-		BackgroundColor3 = P.closeLip,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 2),
+		BackgroundColor3 = K.red,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 	}, tag)
-	Ui.corner(lip, 2)
 	local key = Ui.label(tag, "", UDim2.fromOffset(16, 14), {
 		Name = "KeyNumber",
 		Position = UDim2.fromOffset(4, 2),
 		Font = Theme.MonoFont,
-		TextSize = 12,
-		TextColor3 = P.ink2,
+		TextSize = 11,
+		TextColor3 = K.secondary,
 		TextWrapped = false,
 	})
 	local count = Ui.label(tag, "", UDim2.fromOffset(24, 14), {
@@ -942,48 +1087,64 @@ function Ui.tag(parent: Instance, text: string, index: number, size: UDim2?, onC
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, -4, 1, -4),
 		Font = Theme.MonoFont,
-		TextSize = 12,
-		TextColor3 = P.ink2,
+		TextSize = 11,
+		TextColor3 = K.text,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextWrapped = false,
 	})
-	-- The name over it: shows on hover / gamepad focus (index.html .item:after).
-	local label = Ui.label(tag, "", UDim2.fromOffset(0, 26), {
+	-- The name over it: shows on hover / gamepad focus.
+	local label = Ui.label(tag, "", UDim2.fromOffset(0, 24), {
 		Name = "Label",
 		AutomaticSize = Enum.AutomaticSize.X,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, -10),
-		BackgroundTransparency = 0,
-		BackgroundColor3 = P.ticket,
+		Position = UDim2.new(0.5, 0, 0, -8),
+		BackgroundTransparency = 0.1,
+		BackgroundColor3 = K.charcoal,
 		Font = Theme.HeadingFont,
 		TextSize = 12,
-		TextColor3 = P.ink2,
+		TextColor3 = K.text,
 		TextWrapped = false,
-		Rotation = -2,
 		Visible = false,
 		ZIndex = 5,
 	})
-	Ui.corner(label, 6)
-	Ui.stroke(label, P.line, 1).Transparency = 0
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, label)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, label)
+	local tweens: { [string]: Tween } = {}
 	local function name(on: boolean)
 		label.Visible = on and label.Text ~= ""
-		lip.Visible = not on
+		play(tweens, "lip", lip, HOVER_INFO, { BackgroundTransparency = if on then 0 else 1 })
 	end
 	tag.MouseEnter:Connect(function() name(true) end)
-	tag.MouseLeave:Connect(function() name(false) end)
+	tag.MouseLeave:Connect(function()
+		name(false)
+		tag.TextTransparency = 0
+	end)
 	tag.SelectionGained:Connect(function() name(true) end)
 	tag.SelectionLost:Connect(function() name(false) end)
-	Ui.tactile(tag, 9, 1.12)
+	tag.InputBegan:Connect(function(input: InputObject)
+		if isPress(input) then
+			tag.TextTransparency = 0.4
+		end
+	end)
+	tag.InputEnded:Connect(function(input: InputObject)
+		if isPress(input) then
+			tag.TextTransparency = 0
+		end
+	end)
+	tag.Destroying:Connect(function()
+		cancelAll(tweens)
+	end)
+	Ui.tactile(tag)
 	if onClick then
-		tag.Activated:Connect(function()
+		local function fire()
 			click(onClick)
-		end)
+		end
+		tag.Activated:Connect(fire)
+		touchMargins(tag, fire)
 	end
 	return tag, { key = key, count = count, label = label, lip = lip }
 end
 
--- ── The dial (the speed dial) ─────────────────────────────────────────────
+-- ── The dial (3.6's speed dial, compact text since 3.8) ───────────────────
 
 export type Dial = {
 	frame: Frame,
@@ -1004,10 +1165,9 @@ export type Dial = {
 	setDim: (on: boolean) -> (),
 }
 
-local DIAL_SWEEP = 120 -- degrees either side of the top: the ticks and the needle's travel
-
--- A round cream dial (on-route.png, index.html .vehicle): see the top of this file. Sizes are for a `diameter` of
--- 210 px and scale with it (no text under 12 px).
+-- The 3.6 dial's API as a compact, right-aligned text group in a `diameter` square (the space the old dial took):
+-- the title in small caps, the value with its unit, the condition (caption, percent, a thin bar), the slots as small
+-- squares and their line. No circle and no ticks; the needle exists but stays hidden. No text under 12 px.
 function Ui.dial(parent: Instance, diameter: number, position: UDim2?, anchor: Vector2?): Dial
 	local d = diameter
 	local s = d / 210
@@ -1021,71 +1181,33 @@ function Ui.dial(parent: Instance, diameter: number, position: UDim2?, anchor: V
 		AnchorPoint = anchor or Vector2.zero,
 		BackgroundTransparency = 1,
 	}, parent)
-	local shadow = Ui.make("Frame", {
-		Name = "Shadow",
-		Size = UDim2.fromScale(1, 1),
-		Position = UDim2.fromOffset(0, math.floor(7 * s)),
-		BackgroundColor3 = P.closeLip,
-		BackgroundTransparency = 0.35,
-		BorderSizePixel = 0,
-	}, frame)
-	Ui.corner(shadow, math.floor(d / 2))
 	local face = Ui.make("CanvasGroup", {
 		Name = "Face",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = P.paper,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		GroupTransparency = 0,
 	}, frame)
-	Ui.corner(face, math.floor(d / 2))
-	-- The ticks: every 15° over the top two thirds of the rim.
-	local tickR = d / 2 - 10 * s - 4
-	for angle = -DIAL_SWEEP, DIAL_SWEEP, 15 do
-		local a = math.rad(angle)
-		Ui.make("Frame", {
-			Name = "Tick",
-			Size = UDim2.fromOffset(2, math.max(5, math.floor(8 * s))),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, math.sin(a) * tickR, 0.5, -math.cos(a) * tickR),
-			Rotation = angle,
-			BackgroundColor3 = P.dash,
-			BorderSizePixel = 0,
-		}, face)
-	end
-	local needleLength = math.floor(30 * s)
-	local needleR = d / 2 - 10 * s - needleLength / 2
-	local needle = Ui.make("Frame", {
-		Name = "Needle",
-		Size = UDim2.fromOffset(2, needleLength),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = P.violet,
-		BorderSizePixel = 0,
-	}, face)
+	local needle = Ui.make("Frame", { Name = "Needle", Size = UDim2.fromOffset(2, 2), BackgroundTransparency = 1, Visible = false }, face)
 	local function setNeedle(fraction: number)
-		local angle = -DIAL_SWEEP + 2 * DIAL_SWEEP * math.clamp(fraction, 0, 1)
-		local a = math.rad(angle)
-		needle.Position = UDim2.new(0.5, math.sin(a) * needleR, 0.5, -math.cos(a) * needleR)
-		needle.Rotation = angle
+		needle:SetAttribute("Fraction", math.clamp(fraction, 0, 1))
 	end
-	setNeedle(0)
-
-	local title = Ui.caps(face, "", UDim2.new(0.7, 0, 0, px(14)), {
+	local right = Enum.TextXAlignment.Right
+	local title = Ui.caps(face, "", UDim2.new(1, 0, 0, px(14)), {
 		Name = "Title",
-		Position = UDim2.fromScale(0.5, 0.17),
-		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0, 0.2),
 		TextSize = px(12),
-		TextXAlignment = Enum.TextXAlignment.Center,
+		TextXAlignment = right,
 	})
 	local speedRow = Ui.make("Frame", {
 		Name = "Speed",
-		Size = UDim2.new(0.8, 0, 0, math.floor(64 * s)),
-		Position = UDim2.fromScale(0.5, 0.25),
-		AnchorPoint = Vector2.new(0.5, 0),
+		Size = UDim2.new(1, 0, 0, math.floor(44 * s)),
+		Position = UDim2.new(0, 0, 0.2, px(16)),
 		BackgroundTransparency = 1,
 	}, face)
 	Ui.make("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		VerticalAlignment = Enum.VerticalAlignment.Bottom,
 		Padding = UDim.new(0, math.floor(4 * s)),
 		SortOrder = Enum.SortOrder.LayoutOrder,
@@ -1093,70 +1215,67 @@ function Ui.dial(parent: Instance, diameter: number, position: UDim2?, anchor: V
 	local value = Ui.label(speedRow, "0", UDim2.fromScale(0, 1), {
 		Name = "Value",
 		AutomaticSize = Enum.AutomaticSize.X,
-		Font = Theme.DisplayFont,
-		TextSize = math.floor(60 * s),
-		TextColor3 = P.ink,
+		Font = Theme.HeadingFont,
+		TextSize = math.max(18, math.floor(36 * s)),
+		TextColor3 = K.text,
 		TextWrapped = false,
-		TextXAlignment = Enum.TextXAlignment.Center,
+		TextXAlignment = right,
 		LayoutOrder = 1,
 	})
-	local unit = Ui.label(speedRow, "KM/H", UDim2.fromOffset(0, px(14) + math.floor(8 * s)), {
+	local unit = Ui.label(speedRow, "KM/H", UDim2.fromOffset(0, px(14) + math.floor(6 * s)), {
 		Name = "Unit",
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.HeadingFont,
 		TextSize = px(12),
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		TextWrapped = false,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		LayoutOrder = 2,
 	})
-	local inset = math.floor(30 * s)
-	local caption = Ui.caps(face, "Vehicle condition", UDim2.new(1, -2 * inset - 40, 0, px(14)), {
+	local caption = Ui.caps(face, "Vehicle condition", UDim2.new(1, -48, 0, px(14)), {
 		Name = "Caption",
-		Position = UDim2.new(0, inset, 0.58, 0),
+		Position = UDim2.new(0, 0, 0.58, 0),
 	})
 	caption.TextSize = px(12)
 	local percent = Ui.label(face, "", UDim2.fromOffset(44, px(14)), {
 		Name = "Percent",
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -inset, 0.58, 0),
+		Position = UDim2.new(1, 0, 0.58, 0),
 		Font = Theme.HeadingFont,
 		TextSize = px(12),
-		TextColor3 = P.ink,
-		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = K.text,
+		TextXAlignment = right,
 		TextWrapped = false,
 	})
-	local barBack, barFill = Ui.bar(face, UDim2.new(1, -2 * inset, 0, math.max(4, math.floor(5 * s))), P.lilacLip)
+	local barBack, barFill = Ui.bar(face, UDim2.new(1, 0, 0, 2), K.text)
 	barBack.Name = "Condition"
-	barBack.Position = UDim2.new(0, inset, 0.67, 0)
+	barBack.Position = UDim2.new(0, 0, 0.58, px(14) + 6)
 	local pips = Ui.make("Frame", {
 		Name = "Pips",
-		Size = UDim2.new(1, -2 * inset, 0, math.max(8, math.floor(10 * s))),
-		Position = UDim2.new(0.5, 0, 0.74, 0),
-		AnchorPoint = Vector2.new(0.5, 0),
+		Size = UDim2.new(1, 0, 0, math.max(6, math.floor(8 * s))),
+		Position = UDim2.new(0, 0, 0.74, 0),
 		BackgroundTransparency = 1,
 	}, face)
 	Ui.make("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		Padding = UDim.new(0, 3),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, pips)
-	local pipsLabel = Ui.label(face, "", UDim2.new(1, -2 * inset, 0, px(14)), {
+	local pipsLabel = Ui.label(face, "", UDim2.new(1, 0, 0, px(14)), {
 		Name = "PipsLabel",
-		Position = UDim2.new(0.5, 0, 0.8, 0),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Font = Theme.MonoFont,
+		Position = UDim2.new(0, 0, 0.8, 0),
+		Font = Theme.HeadingFont,
 		TextSize = px(12),
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Center,
+		TextColor3 = K.secondary,
+		TextXAlignment = right,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 
 	local function setBar(fraction: number, color: Color3?)
 		barFill.Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1)
-		barFill.BackgroundColor3 = color or P.lilacLip
+		barFill.BackgroundColor3 = color or K.text
 		percent.Text = `{math.floor(math.clamp(fraction, 0, 1) * 100 + 0.5)}%`
 	end
 	local shownPips = ""
@@ -1165,17 +1284,17 @@ function Ui.dial(parent: Instance, diameter: number, position: UDim2?, anchor: V
 		if signature ~= shownPips then
 			shownPips = signature
 			Ui.clear(pips)
-			local width = if total > 8 then math.max(6, math.floor(9 * s)) else math.max(8, math.floor(13 * s))
+			local width = if total > 8 then math.max(5, math.floor(7 * s)) else math.max(7, math.floor(10 * s))
 			for i = 1, math.max(0, math.floor(total)) do
 				local full = i <= filled
 				local pip = Ui.make("Frame", {
 					Size = UDim2.new(0, width, 1, 0),
-					BackgroundColor3 = if full then P.lilacLip else P.paper,
+					BackgroundColor3 = K.text,
+					BackgroundTransparency = if full then 0 else 1,
 					BorderSizePixel = 0,
 					LayoutOrder = i,
 				}, pips)
-				Ui.corner(pip, 2)
-				Ui.stroke(pip, if full then P.lilacLip else P.line, 1).Transparency = 0
+				Ui.stroke(pip, if full then K.text else K.line, 1).Transparency = 0
 			end
 		end
 		pipsLabel.Text = text or `{filled} / {total} cargo slots`

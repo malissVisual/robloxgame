@@ -16,8 +16,8 @@
 -- Every button only asks the server (hire / fire / upgrade / collect); the server checks everything. The window
 -- closes when you walk away from the computer, when another window opens or when the interface goes off.
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks BusinessUi.isOpen()).
--- 3.6 (Postage & Trouble): the lavender window (Ui.window), paper cards and rows, the dispatch radio a paper slip
--- typed in the mono font, the welcome-back card a paper ticket.
+-- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window), flat cards and rows, the dispatch radio
+-- a dark slip, the welcome-back card a charcoal card with a thin money-green rule.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -281,7 +281,7 @@ local function card(parent: any, x: number, width: number, title: string): any
 		BackgroundColor3 = P.ticket,
 		BorderSizePixel = 0,
 	}, parent)
-	Ui.corner(frame, 8)
+	Ui.corner(frame)
 	Ui.stroke(frame, P.line, 1).Transparency = 0
 	Ui.caps(frame, title, UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 8) })
 	return frame
@@ -422,7 +422,7 @@ local function build()
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 1), PaddingLeft = UDim.new(0, 1), PaddingRight = UDim.new(0, 6) }, upgrades)
 	for order, def in B.Upgrades do
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 84), BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = order }, upgrades)
-		Ui.corner(row, 8)
+		Ui.corner(row)
 		Ui.stroke(row, P.line, 1).Transparency = 0
 		Ui.label(row, def.name, UDim2.new(1, -20, 0, 20), { Position = UDim2.fromOffset(10, 6), TextSize = 16, Font = Theme.DisplayFont, TextWrapped = false })
 		local level = Ui.label(row, "", UDim2.fromOffset(70, 20), {
@@ -438,7 +438,7 @@ local function build()
 		local pips = {}
 		for i = 1, def.maxLevel do
 			local pip = Ui.make("Frame", { Size = UDim2.fromOffset(16, 10), BackgroundColor3 = P.track, BorderSizePixel = 0, LayoutOrder = i }, pipBox)
-			Ui.corner(pip, 3)
+			Ui.corner(pip)
 			table.insert(pips, pip)
 		end
 		local id = def.id
@@ -457,7 +457,7 @@ local function build()
 		BackgroundColor3 = P.paper,
 		BorderSizePixel = 0,
 	}, content)
-	Ui.corner(radioBox, 8)
+	Ui.corner(radioBox)
 	Ui.stroke(radioBox, P.line, 1).Transparency = 0
 	Ui.caps(radioBox, "📻 Dispatch radio", UDim2.fromOffset(200, 16), { Position = UDim2.fromOffset(10, 5), TextColor3 = C.green })
 	refs.radio = {}
@@ -473,12 +473,13 @@ local function build()
 		table.insert(refs.radio, line)
 	end
 
-	-- ── The welcome-back card ── (a paper ticket)
+	-- ── The welcome-back card ── (a charcoal card with a thin money-green rule)
 	welcomeCard = Ui.panel(gui, UDim2.fromOffset(460, 168), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
 	welcomeCard.Visible = false
 	welcomeCard.BackgroundTransparency = 0
 	welcomeScale = Ui.make("UIScale", {}, welcomeCard)
-	Ui.stroke(welcomeCard, C.money, 1.5)
+	Ui.stroke(welcomeCard, P.line, 1)
+	Ui.edge(welcomeCard, C.money, 0)
 	Ui.caps(welcomeCard, "Welcome back, boss", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(16, 12), TextSize = 13, TextColor3 = C.green })
 	refs.welcomeText = Ui.label(welcomeCard, "", UDim2.new(1, -32, 0, 54), {
 		Position = UDim2.fromOffset(16, 30),
@@ -605,7 +606,7 @@ local function rebuildRows()
 	local now = os.clock()
 	for i = 1, hired do
 		local frame = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 60), BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = i }, road)
-		Ui.corner(frame, 8)
+		Ui.corner(frame)
 		Ui.stroke(frame, P.line, 1).Transparency = 0
 		local iconBox = Ui.make("Frame", { Size = UDim2.fromOffset(34, 34), Position = UDim2.fromOffset(10, 10), BackgroundTransparency = 1 }, frame)
 		local name = courierName(i)
@@ -683,7 +684,7 @@ local function render()
 			BorderSizePixel = 0,
 			LayoutOrder = i,
 		}, refs.seats)
-		Ui.corner(seat, 3)
+		Ui.corner(seat)
 	end
 	refs.crewInfo.Text = if hired > seats then `{hired - seats} without a desk: they do not earn` elseif hired >= seats and seats > 0 then "Every desk is taken" else `Hiring costs {Ui.money(B.CourierCost)}`
 	local canHire = at and hasOffice and hired < seats
@@ -916,8 +917,8 @@ local function showWelcome(info: any)
 	refs.welcomeInfo.Text = `{duration(seconds)} away · it is in the safe at {tostring(state and state.officeName or "your office")}.{if full then " The safe is full!" else ""}`
 	refs.welcomeGps.Visible = state ~= nil and typeof(state.officePos) == "Vector3"
 	welcomeCard.Visible = true
-	welcomeCard.Position = UDim2.new(0.5, 0, 0.5, -30)
-	TweenService:Create(welcomeCard, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	welcomeCard.Position = UDim2.new(0.5, 0, 0.5, -8)
+	TweenService:Create(welcomeCard, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
 	welcomeToken += 1
 	local mine = welcomeToken
 	task.delay(WELCOME_SECONDS, function()

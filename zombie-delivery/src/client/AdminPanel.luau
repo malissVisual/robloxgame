@@ -7,8 +7,8 @@
 -- challenges (3.1: all done, every lost package found, start over, any title; server/Challenges.luau) and player (god mode, heal, finish the stop). The answers
 -- come back as toasts (the Notice remote), and in the window's title bar while it is open (the toasts are behind it).
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
--- 3.6 (Postage & Trouble): the lavender window (Ui.window) with the sections as a sidebar of tabs; the answers show in
--- its footer.
+-- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window) with the sections as a sidebar of flat
+-- tabs (the selected one with the red rule); the answers show in its footer.
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -474,8 +474,8 @@ render = function()
 	order = 0
 	for id, button in tabButtons do
 		local selected = id == section
-		-- The concept's filter tabs: the selected one cream paper, the others lavender.
-		button.BackgroundColor3 = if selected then P.ticket else P.lavenderDeep
+		-- The section tabs: the selected one raised with the narrow red rule, the others quiet rows.
+		Ui.selectRow(button, selected)
 		button.TextColor3 = if selected then C.text else C.dim
 	end
 	local renderer = RENDERERS[section]
@@ -519,17 +519,12 @@ local function build()
 	chrome.onClose = function()
 		setOpen(false)
 	end
-	-- The admin's badge is rose: these buttons change the game.
-	local badge = chrome.icon.Parent
-	if badge and badge:IsA("Frame") then
-		badge.BackgroundColor3 = P.rose
-	end
 	scale = Ui.make("UIScale", {}, window)
 	-- The server's last answer, in the footer (the toasts are behind the window).
 	status = chrome.context
 	status.TextColor3 = C.text
 
-	-- The sections: a lavender sidebar of tabs (the Dispatch board's filters).
+	-- The sections: a recessed sidebar of tabs (the Dispatch board's filters).
 	local sidebar = Ui.make("Frame", {
 		Name = "Sidebar",
 		Size = UDim2.new(0, 190, 1, 0),
@@ -578,7 +573,7 @@ local function build()
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 10), PaddingRight = UDim.new(0, 8) }, content)
 
 	-- The small button top right (under Roblox's own buttons).
-	-- A quiet rose pill (only admins see it), the red is just its edge and text.
+	-- A quiet dark action (only admins see it), the red is just its accent and text.
 	openButton = Ui.button(gui, "🛠  ADMIN", UDim2.fromOffset(96, 32), C.red, function()
 		setOpen(not window.Visible)
 	end)

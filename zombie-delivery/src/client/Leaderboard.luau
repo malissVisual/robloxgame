@@ -81,7 +81,7 @@ local function build()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = 2,
 	}, player:WaitForChild("PlayerGui"))
-	-- 3.6: the lavender window (Ui.window), the rows are paper tickets with the money earned in the stub.
+	-- 3.8: the charcoal window (Ui.window), slim flat rows with the money earned in a column on the right.
 	local content
 	window, content, chrome = Ui.window(gui, "Top couriers", "This server · by driver level, then mission stars, then money earned", "🏆", UDim2.fromOffset(760, 580))
 	window.Visible = false
@@ -101,7 +101,7 @@ local function build()
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Font = Theme.HeadingFont,
 	})
-	Ui.corner(summary, 6)
+	Ui.corner(summary)
 	Ui.stroke(summary, P.line, 1).Transparency = 0
 
 	-- The column titles.
@@ -126,7 +126,7 @@ local function build()
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, content)
-	Ui.list(body, true, 12)
+	Ui.list(body, true, 6)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingLeft = UDim.new(0, 4), PaddingBottom = UDim.new(0, 8) }, body)
 
 	updateScale()
@@ -140,11 +140,12 @@ end
 
 local function row(entry: any, place: number)
 	local mine = entry.userId == player.UserId
-	-- 3.6: a paper ticket (your own one outlined in the crew violet), the money earned in its stub.
-	local frame = Ui.ticket(body, UDim2.new(1, -16, 0, 56), UDim2.new(), nil, EARNED_STUB, 0, P.lavender)
+	-- 3.8: a flat row (your own one with the quiet highlight and the narrow red rule), the money earned in its column
+	-- behind a fine line.
+	local frame = Ui.ticket(body, UDim2.new(1, -16, 0, 56), UDim2.new(), nil, EARNED_STUB)
 	frame.Parent.LayoutOrder = place
 	if mine then
-		Ui.stroke(frame, P.violet, 1.5)
+		Ui.selectRow(frame, true)
 	end
 	-- The place: the first three on medal badges.
 	local medal = MEDALS[place]
@@ -157,7 +158,7 @@ local function row(entry: any, place: number)
 		BackgroundTransparency = if medal then 0 else 1,
 		BackgroundColor3 = if medal then Theme.soft(medal).face else P.paper,
 	})
-	Ui.corner(badge, 20)
+	Ui.corner(badge)
 	if medal then
 		Ui.stroke(badge, medal, 1.5)
 	end
@@ -214,7 +215,7 @@ local function row(entry: any, place: number)
 		Font = Theme.DisplayFont,
 		TextColor3 = if level >= Config.Levels.MaxLevel then MEDALS[1] else C.text,
 	})
-	local back, fill = Ui.bar(levelCell, UDim2.new(1, -16, 0, 6), P.violet)
+	local back, fill = Ui.bar(levelCell, UDim2.new(1, -16, 0, 3), P.violet)
 	back.Position = UDim2.fromOffset(0, 30)
 	fill.Size = UDim2.fromScale(math.clamp(tonumber(entry.progress) or 0, 0, 1), 1)
 	-- The mission stars (the gold of a full 300 when every mission has 3).

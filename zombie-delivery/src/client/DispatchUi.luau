@@ -1,6 +1,6 @@
 --!strict
--- The Dispatch board (3.6, Postage & Trouble, design/ui-concept/ previews dispatch.png / hover-ticket.png): the job
--- board as a lavender window of die-cut delivery tickets. J, the JOBS menu entry, the depot counter and the result
+-- The Dispatch board: the job board as a charcoal window of delivery briefings (3.8, the contract UI,
+-- design/ui-contract/; it replaced 3.6's die-cut tickets). J, the JOBS menu entry, the depot counter and the result
 -- window's NEXT JOB open it (Main sets Hud.onJobs = DispatchUi.open; another window opening closes it).
 --
 --   * Opening asks the server for the board (RequestOffers): it sends the current offers, sorted ★ → ★★★★, and when
@@ -11,16 +11,17 @@
 --     replaced or locked one is refused there with its own notice).
 --   * Left column: AVAILABLE RUNS filters (All jobs / Deliveries / Special jobs, with counts) and a card for your
 --     car (its name at its stage, cargo slots, condition): your vehicle sets your job capacity.
---   * A ticket per offer: a numbered icon spine, the danger label ("RISKY · ★★") with the twists as chips (the
---     modifier, SPECIAL, RUSH CLOCK for a timed job, BANDITS when the cargo is wanted), the title (the special job's
---     name, else the cargo and the customer), the route (the first stop → the last address, its district), the stops,
---     the distance, the cargo slots and the time, the pieces and how they move (and a company vehicle), the
---     modifier's and the special job's descriptions; the payout stub (the pay, NIGHT ×n while night pay is up) with
---     ACCEPT JOB →. Hover lifts the ticket (Ui.tactile).
---   * Locked tickets are hatched and say why and what to do: above your driver level ("🔒 LEVEL 4", the level and
---     rank needed), or more pieces than your car holds ("📦 NEEDS 6 SLOTS", what your car holds and
---     Economy.roomAdvice: the next stage at Wrench Garage, or a bigger car from your garage). Their button toasts
---     the same reason, like the old board did.
+--   * A briefing row per offer: a numbered spine with the cargo's icon, the risk label ("RISKY · ★★") with the
+--     twists as compact tags (the modifier, SPECIAL, RUSH CLOCK for a timed job, BANDITS when the cargo is wanted),
+--     the title (the special job's name, else the cargo and the customer), then labelled lines: ROUTE (the first stop
+--     → the last address, its district, the stops, the distance), CARGO (the pieces, how they move, the cargo slots,
+--     a company vehicle), DEADLINE (the time, fixed on a rush clock), RISK (the modifier's description) and JOB (the
+--     special job's); the payout column on the right (PAYOUT, the pay, NIGHT ×n while night pay is up) with
+--     ACCEPT JOB →. Hover brightens the row (Ui.tactile).
+--   * Locked rows say why and what to do under a red LOCKED label: above your driver level ("🔒 LEVEL 4", the level
+--     and rank needed), or more pieces than your car holds ("📦 NEEDS 6 SLOTS", what your car holds and
+--     Economy.roomAdvice: the next stage at Wrench Garage, or a bigger car from your garage). Their button flashes the
+--     remedy and toasts the same reason, like the old board did.
 --   * On a delivery the board shows that job and GIVE UP THIS DELIVERY (CancelJob) instead of offers.
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
@@ -43,7 +44,8 @@ local Theme = require(script.Parent.Theme)
 local Drive = require(script.Parent.Drive)
 local Hud = require(script.Parent.Hud)
 
-local P = Theme.Postage
+local K = Theme.Contract
+local C = Theme.Colors
 local DispatchUi = {}
 
 -- Set by Main: opening this window closes the others.
@@ -54,18 +56,18 @@ local player = Players.LocalPlayer
 -- Sizes at scale 1 (the 1150 × 680 reference; Ui.screenScale scales the whole window).
 local MAX_W, MAX_H, MIN_W, MIN_H = 1000, 600, 640, 380
 local SIDEBAR = 220
-local SPINE, STUB, GAP = 70, 160, 14
+local SPINE, STUB, GAP = 64, 160, 8
+local LABEL_W = 78 -- the small caps label column of a briefing line (ROUTE, CARGO, DEADLINE ...)
 local MONO = Theme.MonoFont
 
--- Surfaces mixed from the Postage tokens (no new raw colours): the sidebar, the filters, the hatching, the lips.
-local SIDE = P.lavender:Lerp(P.lavenderDeep, 0.75)
-local FILTER_IDLE = P.lavender:Lerp(P.lavenderDeep, 0.35)
-local FILTER_HOVER = P.lavender:Lerp(P.ticket, 0.35)
-local HATCH_BASE = P.lavender:Lerp(P.ticket, 0.3)
-local HATCH_LINE = P.lavender:Lerp(P.ticket, 0.8)
-local NOTE = P.lavenderDeep:Lerp(P.paper, 0.45)
-local ROSE = P.danger:Lerp(P.paper, 0.78)
-local SEPARATOR = `<font color="#{P.line:ToHex()}">  |  </font>`
+-- 3.8: the contract surfaces (Theme.Contract): the sidebar sunk, the rows a step above charcoal, a locked row a step
+-- below, the remedy note with a red rule.
+local SIDE = K.recessed
+local ROW = K.row
+local LOCKED_ROW = Theme.Postage.hatch
+local NOTE = Theme.Postage.note
+local FLASH = Theme.Postage.rose
+local SEPARATOR = `<font color="#{K.line:ToHex()}">  /  </font>`
 
 -- How one piece of each kind of cargo looks (the same names and emoji the old board used; Hud's ITEMS).
 local KINDS: { [string]: { icon: string, one: string, many: string } } = {
@@ -118,9 +120,9 @@ end
 
 -- ── Small pieces ───────────────────────────────────────────────────────────
 
--- A label in ink (Ui.label with the Postage defaults).
+-- A label in the contract text (Ui.label with the board's defaults).
 local function text(parent: Instance, value: string, size: UDim2, props: { [string]: any }?): any
-	local label = Ui.label(parent, value, size, { TextColor3 = P.ink, Font = Theme.Font, TextSize = 14 })
+	local label = Ui.label(parent, value, size, { TextColor3 = K.text, Font = Theme.Font, TextSize = 14 })
 	if props then
 		for key, v in props do
 			label[key] = v
@@ -140,53 +142,32 @@ local function onPress(button: any, fn: () -> ())
 	end)
 end
 
--- A small chip that grows with its text (the twists on a ticket).
-local function chip(parent: Instance, value: string, face: Color3, order: number): any
-	local label = text(parent, value, UDim2.fromOffset(0, 20), {
+-- A compact tag that grows with its text (the twists on a row): a fine outline in `accent` (red for a danger), the
+-- text in caps.
+local function chip(parent: Instance, value: string, accent: Color3, order: number): any
+	local label = text(parent, string.upper(value), UDim2.fromOffset(0, 20), {
 		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundTransparency = 0,
-		BackgroundColor3 = face,
+		BackgroundTransparency = 1,
 		Font = Theme.HeadingFont,
-		TextSize = 12,
+		TextSize = 11,
+		TextColor3 = if accent == K.red then K.red else K.secondary,
 		TextWrapped = false,
 		LayoutOrder = order,
 	})
-	Ui.corner(label, 4)
+	Ui.stroke(label, accent, 1).Transparency = if accent == K.red then 0.25 else 0
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, label)
 	return label
 end
 
--- A pastel action with a lip under it (the concept's ACCEPT JOB): hover raises it 3 px, press sinks it (Ui.tactile).
--- `face` nil: the disabled (locked) look, flat, no lip.
-local function lipButton(parent: Instance, label: string, size: UDim2, position: UDim2, face: Color3?, fn: () -> ()): any
-	if face then
-		local lip = Ui.make("Frame", {
-			Size = size,
-			Position = position + UDim2.fromOffset(0, 4),
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = P.sageLip,
-			BorderSizePixel = 0,
-		}, parent)
-		Ui.corner(lip, 6)
-	end
-	local button = Ui.make("TextButton", {
-		Size = size,
-		Position = position,
-		AnchorPoint = Vector2.new(0.5, 0),
-		BackgroundColor3 = face or P.lavenderDeep,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = label,
-		TextColor3 = if face then P.ink else P.ink2,
-		Font = Theme.HeadingFont,
-		TextSize = 14,
-		TextWrapped = true,
-	}, parent)
-	Ui.corner(button, 6)
-	onPress(button, fn)
-	if face then
-		Ui.tactile(button, 3, 1.02)
-	end
+-- The row's action (Ui.button: a flat rectangle, a fine line, hover brightens it and shows its underline, press dips
+-- it). `color` nil: the locked look (disabled grey; it still answers with the reason). Placed by its top centre.
+local function action(parent: Instance, label: string, size: UDim2, position: UDim2, color: Color3?, fn: () -> ()): any
+	local button = Ui.button(parent, label, size, color or C.grey, fn)
+	button.Position = position
+	button.AnchorPoint = Vector2.new(0.5, 0)
+	button.TextSize = 13
+	button.TextWrapped = true
+	button.ZIndex = 2
 	return button
 end
 
@@ -289,15 +270,15 @@ local function setFilterLook(id: string, hover: boolean)
 	if not entry then
 		return
 	end
+	-- The selected filter: a quiet highlight and the narrow red rule; hover / focus brightens the label and shows a
+	-- thin underline (120 ms).
 	local active = filter == id
-	local face = if active then P.ticket elseif hover then FILTER_HOVER else FILTER_IDLE
-	entry.button.BackgroundColor3 = face
-	entry.tip.BackgroundColor3 = face
-	entry.name.TextColor3 = if active then P.ink else P.ink2
+	entry.button.BackgroundTransparency = if active then 0 else 1
+	entry.rule.Visible = active
 	entry.name.Font = if active then Theme.HeadingFont else Theme.Font
-	TweenService:Create(entry.name, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-		Position = UDim2.fromOffset(if hover then 18 else 12, 0),
-	}):Play()
+	local info = TweenInfo.new(0.12, Enum.EasingStyle.Quad)
+	TweenService:Create(entry.name, info, { TextColor3 = if active or hover then K.text else K.secondary }):Play()
+	TweenService:Create(entry.underline, info, { BackgroundTransparency = if hover and not active then 0.2 else 1 }):Play()
 end
 
 local renderList: () -> () = function() end
@@ -307,37 +288,41 @@ local function buildFilters(side: any)
 		local button = Ui.make("TextButton", {
 			Size = UDim2.new(1, -16, 0, 44),
 			Position = UDim2.fromOffset(0, 40 + (order - 1) * 52),
-			BackgroundColor3 = FILTER_IDLE,
+			BackgroundColor3 = K.raised,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			AutoButtonColor = false,
 			Text = "",
 		}, side)
-		-- the arrow tip on its right (the concept's clipped tab)
-		local tip = Ui.make("Frame", {
-			Size = UDim2.fromOffset(31, 31),
-			Position = UDim2.fromScale(1, 0.5),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Rotation = 45,
-			BackgroundColor3 = FILTER_IDLE,
+		local rule = Ui.make("Frame", {
+			Size = UDim2.new(0, 3, 1, 0),
+			BackgroundColor3 = K.red,
 			BorderSizePixel = 0,
-			ZIndex = 0, -- under the tab's name and count
+			Visible = false,
 		}, button)
-		local name = text(button, def.name, UDim2.new(1, -40, 1, 0), {
-			Position = UDim2.fromOffset(12, 0),
-			TextSize = 15,
-			TextColor3 = P.ink2,
+		local name = text(button, def.name, UDim2.new(1, -52, 1, 0), {
+			Position = UDim2.fromOffset(14, 0),
+			TextSize = 14,
+			TextColor3 = K.secondary,
 			TextWrapped = false,
 		})
+		local underline = Ui.make("Frame", {
+			Size = UDim2.new(1, -52, 0, 1),
+			Position = UDim2.new(0, 14, 1, -10),
+			BackgroundColor3 = K.text,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+		}, button)
 		local count = text(button, "", UDim2.new(0, 30, 1, 0), {
-			Position = UDim2.new(1, -2, 0, 0),
+			Position = UDim2.new(1, -10, 0, 0),
 			AnchorPoint = Vector2.new(1, 0),
-			Font = Theme.HeadingFont,
-			TextSize = 14,
-			TextColor3 = P.ink2,
+			Font = MONO,
+			TextSize = 13,
+			TextColor3 = K.secondary,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			ZIndex = 2,
 		})
-		filterButtons[def.id] = { button = button, tip = tip, name = name, count = count }
+		filterButtons[def.id] = { button = button, rule = rule, underline = underline, name = name, count = count }
 		local id = def.id
 		button.MouseEnter:Connect(function()
 			setFilterLook(id, true)
@@ -366,29 +351,29 @@ local function buildCarCard(side: any)
 	local card = Ui.make("Frame", {
 		Size = UDim2.new(1, -16, 0, 166),
 		Position = UDim2.fromOffset(0, 40 + #FILTERS * 52 + 12),
-		BackgroundColor3 = P.lavender,
+		BackgroundColor3 = ROW,
 		BorderSizePixel = 0,
 	}, side)
-	Ui.corner(card, 12)
 	refs.carCard = card
-	Ui.make("UIStroke", { Color = P.line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, card)
-	Ui.icon(card, "map_dealer", "🚐", UDim2.fromOffset(30, 26), {
+	Ui.make("UIStroke", { Color = K.rule, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, card)
+	Ui.icon(card, "map_dealer", "🚐", UDim2.fromOffset(22, 20), {
 		Position = UDim2.fromOffset(14, 12),
-		ImageColor3 = P.ink2,
+		ImageColor3 = K.secondary,
 		TextScaled = true,
 	})
+	Ui.caps(card, "Your vehicle", UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(44, 12), TextSize = 11 })
 	refs.carName = text(card, "", UDim2.new(1, -28, 0, 22), {
 		Position = UDim2.fromOffset(14, 42),
 		Font = Theme.HeadingFont,
-		TextSize = 17,
+		TextSize = 16,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	refs.carStats = text(card, "", UDim2.new(1, -28, 0, 18), { Position = UDim2.fromOffset(14, 66), TextColor3 = P.ink2, TextWrapped = false })
-	refs.carHealth = text(card, "", UDim2.new(1, -28, 0, 18), { Position = UDim2.fromOffset(14, 86), TextColor3 = P.ink2, TextWrapped = false })
+	refs.carStats = text(card, "", UDim2.new(1, -28, 0, 18), { Position = UDim2.fromOffset(14, 66), TextColor3 = K.secondary, TextWrapped = false })
+	refs.carHealth = text(card, "", UDim2.new(1, -28, 0, 18), { Position = UDim2.fromOffset(14, 86), TextColor3 = K.secondary, TextWrapped = false })
 	refs.carNote = text(card, "Your vehicle sets your job capacity.", UDim2.new(1, -28, 0, 52), {
 		Position = UDim2.fromOffset(14, 108),
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		TextSize = 13,
 		TextYAlignment = Enum.TextYAlignment.Top,
 	})
@@ -411,14 +396,14 @@ local function build()
 	refs.backdrop = Ui.make("Frame", {
 		Size = UDim2.new(1, 0, 1, 80),
 		Position = UDim2.fromOffset(0, -80),
-		BackgroundColor3 = P.veil,
+		BackgroundColor3 = Theme.Postage.veil,
 		BackgroundTransparency = 0.5,
 		BorderSizePixel = 0,
 		Active = true,
 	}, made)
 	-- The window (Ui.window): the header with the badge, the title and the subtitle, the round ✕, the footer with ESC
 	-- (ESC, the gamepad's B and the Roblox menu close it) and the car and the driver on the right.
-	local window, content, chrome = Ui.window(made, "Dispatch board", "Choose your next run. Make every trip count.", "📋", UDim2.fromOffset(MAX_W, MAX_H))
+	local window, content, chrome = Ui.window(made, "Dispatch board", "Delivery contracts · choose your next run", "📋", UDim2.fromOffset(MAX_W, MAX_H))
 	chrome.onClose = function()
 		DispatchUi.close()
 	end
@@ -429,13 +414,15 @@ local function build()
 	local side = Ui.make("Frame", {
 		Size = UDim2.new(0, SIDEBAR, 1, 0),
 		BackgroundColor3 = SIDE,
+		BackgroundTransparency = 0.2,
 		BorderSizePixel = 0,
 	}, content)
+	Ui.make("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, side)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 18), PaddingTop = UDim.new(0, 18) }, side)
 	text(side, "AVAILABLE RUNS", UDim2.new(1, -16, 0, 16), {
 		Font = Theme.HeadingFont,
-		TextSize = 12,
-		TextColor3 = P.ink2,
+		TextSize = 11,
+		TextColor3 = K.secondary,
 		TextWrapped = false,
 	})
 	buildFilters(side)
@@ -446,13 +433,13 @@ local function build()
 		Position = UDim2.fromOffset(SIDEBAR, 0),
 		BackgroundTransparency = 1,
 	}, content)
-	refs.caption = text(main, "", UDim2.new(0.4, 0, 0, 30), { Position = UDim2.fromOffset(24, 12), TextColor3 = P.ink2, TextWrapped = false })
+	refs.caption = text(main, "", UDim2.new(0.4, 0, 0, 30), { Position = UDim2.fromOffset(24, 12), TextColor3 = K.secondary, TextWrapped = false })
 	refs.capacity = text(main, "", UDim2.new(0.6, -200, 0, 30), {
 		Position = UDim2.new(1, -176, 0, 12),
 		AnchorPoint = Vector2.new(1, 0),
 		Font = Theme.HeadingFont,
 		TextSize = 12,
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextWrapped = false,
 	})
@@ -462,7 +449,7 @@ local function build()
 		AnchorPoint = Vector2.new(1, 0),
 		Font = MONO,
 		TextSize = 12,
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextWrapped = false,
 	})
@@ -471,8 +458,8 @@ local function build()
 		Position = UDim2.fromOffset(24, 50),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 6,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = K.line,
 		ScrollBarImageTransparency = 0.4,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
@@ -521,7 +508,7 @@ local function refreshChrome()
 	refs.carName.Text = name
 	refs.carStats.Text = `📦 {slots} cargo {if slots == 1 then "slot" else "slots"}`
 	refs.carHealth.Text = `🔧 {percent}% condition`
-	refs.carHealth.TextColor3 = if condition < 0.35 then P.danger else P.ink2
+	refs.carHealth.TextColor3 = if condition < 0.35 then K.red else K.secondary
 	refs.carNote.Text = if condition < 0.5 then "Your vehicle sets your job capacity. A repair bay fixes it." else "Your vehicle sets your job capacity."
 	refs.capacity.Text = `YOUR CAPACITY · {slots} {if slots == 1 then "SLOT" else "SLOTS"}`
 	local level = myLevel()
@@ -547,59 +534,13 @@ end
 local function message(value: string)
 	Ui.clear(refs.list)
 	text(refs.list, value, UDim2.new(1, 0, 0, 60), {
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		TextSize = 15,
 		TextXAlignment = Enum.TextXAlignment.Center,
 	})
 end
 
--- Diagonal hatching over a locked ticket (thin rotated stripes, clipped to it).
-local function hatch(card: any, w: number, h: number)
-	card.BackgroundColor3 = HATCH_BASE
-	local area = Ui.make("Frame", {
-		Name = "Hatch",
-		Size = UDim2.new(1, -4, 1, -4),
-		Position = UDim2.fromOffset(2, 2),
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		ZIndex = 0, -- under the ticket's text and perforations
-	}, card)
-	local length = h * 1.45 + 6
-	for x = -h, w, 12 do
-		Ui.make("Frame", {
-			Size = UDim2.fromOffset(3, length),
-			Position = UDim2.new(0, x + h / 2, 0.5, 0),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Rotation = 45,
-			BackgroundColor3 = HATCH_LINE,
-			BorderSizePixel = 0,
-		}, area)
-	end
-end
-
--- The ticket's die-cut notches take the list's lavender (the contract's Ui.ticket paints them ink), and two more
--- half-round cut-outs sit in the middle of its left and right edges.
-local function notches(card: any)
-	for _, child in card:GetChildren() do
-		if child:IsA("Frame") and child.Size == UDim2.fromOffset(12, 12) then
-			child.BackgroundColor3 = P.lavender
-			child.ZIndex = 3
-		end
-	end
-	for _, x in { 0, 1 } do
-		local cut = Ui.make("Frame", {
-			Size = UDim2.fromOffset(18, 18),
-			Position = UDim2.fromScale(x, 0.5),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = P.lavender,
-			BorderSizePixel = 0,
-			ZIndex = 3,
-		}, card)
-		Ui.corner(cut, 9)
-	end
-end
-
--- The spine: the cargo's icon (tilted) and the ticket's number.
+-- The spine: the row's number over the cargo's icon (white, upright), a fine line on its right.
 local function spine(card: any, offer: any, number: number)
 	local kind = if type(offer.itemKind) == "string" then offer.itemKind else "crate"
 	local art = Icons.cargo(kind)
@@ -611,29 +552,28 @@ local function spine(card: any, offer: any, number: number)
 			end
 		end
 	end
+	text(card, string.format("%02d", number), UDim2.fromOffset(SPINE, 16), {
+		Position = UDim2.fromOffset(0, 16),
+		Font = MONO,
+		TextSize = 13,
+		TextColor3 = K.secondary,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 2,
+	})
 	local emoji = if offer.timed then "⚡" else (KINDS[kind] or KINDS.crate).icon
-	Ui.icon(card, art, emoji, UDim2.fromOffset(32, 32), {
-		Position = UDim2.new(0, SPINE / 2, 0.5, -10),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Rotation = -4,
-		ImageColor3 = P.ink2,
+	Ui.icon(card, art, emoji, UDim2.fromOffset(28, 28), {
+		Position = UDim2.fromOffset(SPINE / 2, 44),
+		AnchorPoint = Vector2.new(0.5, 0),
+		ImageColor3 = K.text,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ZIndex = 2,
 	})
-	text(card, string.format("%02d", number), UDim2.fromOffset(SPINE, 16), {
-		Position = UDim2.new(0, 0, 0.5, 14),
-		Font = MONO,
-		TextSize = 13,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		ZIndex = 2,
-	})
-	Ui.dashes(card, true, 14, P.line, UDim2.new(0, 1, 1, -16), UDim2.new(0, SPINE, 0, 8))
+	Ui.make("Frame", { Size = UDim2.new(0, 1, 1, -24), Position = UDim2.fromOffset(SPINE, 12), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, card)
 end
 
--- The danger label and the twists, in a row at the top of the ticket body (clipped to it: on a narrow board the
--- last chips are cut off rather than run over the perforation into the payout stub).
+-- The risk label and the twists, in a row at the top of the row's body (clipped to it: on a narrow board the last
+-- tags are cut off rather than run into the payout column).
 local function dangerRow(body: any, offer: any)
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 14), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 2 }, body)
 	Ui.make("UIListLayout", {
@@ -645,154 +585,156 @@ local function dangerRow(body: any, offer: any)
 	local stars = tonumber(offer.stars) or 1
 	text(row, `{string.upper(tostring(offer.tierName or "Job"))} · {string.rep("★", stars)}`, UDim2.fromOffset(0, 20), {
 		AutomaticSize = Enum.AutomaticSize.X,
-		Font = MONO,
-		TextSize = 13,
-		TextColor3 = if stars >= 3 then P.danger else P.ink2,
+		Font = Theme.HeadingFont,
+		TextSize = 12,
+		TextColor3 = if stars >= 3 then K.red else K.secondary,
 		TextWrapped = false,
 		LayoutOrder = 1,
 	})
 	if offer.modifier then
-		chip(row, `⚠ {offer.modifier.name}`, ROSE, 2)
+		chip(row, `⚠ {offer.modifier.name}`, K.red, 2)
 	end
 	if isSpecial(offer) then
-		chip(row, "SPECIAL", P.lavenderDeep, 3)
+		chip(row, "SPECIAL", K.rule, 3)
 	end
 	if offer.timed then
-		chip(row, "⏱ RUSH CLOCK", P.lavenderDeep, 4)
+		chip(row, "⏱ RUSH CLOCK", K.rule, 4)
 	end
 	local boost = tonumber(offer.banditBoost)
 	if boost and boost > 1 then
-		chip(row, "🎯 BANDITS WANT IT", ROSE, 5)
+		chip(row, "🎯 BANDITS WANT IT", K.red, 5)
 	end
 end
 
--- The lines of the body under the title; returns where the next thing goes.
-local function details(body: any, offer: any, w: number): number
-	local y = 66
-	text(body, `{offer.first or "Pick up"}  →  {offer.address or "?"}, {offer.district or ""}`, UDim2.new(1, 0, 0, 18), {
+-- One briefing line: a small caps label (ROUTE, CARGO ...) and its value, wrapped to `w` (or one line cut short when
+-- `wrap` is false). Returns its height.
+local function brief(body: any, label: string, value: string, y: number, w: number, wrap: boolean, props: { [string]: any }?): number
+	local h = if wrap then math.max(18, textHeight(value, 14, Theme.Font, w - LABEL_W)) else 18
+	Ui.caps(body, label, UDim2.fromOffset(LABEL_W - 8, 18), {
 		Position = UDim2.fromOffset(0, y),
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextSize = 11,
+		TextColor3 = if label == "Risk" then K.red else K.secondary,
 		ZIndex = 2,
 	})
-	y += 20
-	local slots = tonumber(offer.slots) or 0
-	local stops = tonumber(offer.stops) or 1
-	local parts: { string } = {}
-	if stops > 1 then
-		table.insert(parts, `{stops} stops`)
-	end
-	table.insert(parts, `{tonumber(offer.distance) or 0} m`)
-	table.insert(parts, if slots > 0 then `📦 {slots} cargo {if slots == 1 then "slot" else "slots"}` else "no cargo slots")
-	table.insert(parts, `⏱ {Ui.clock(tonumber(offer.time) or 0)}{if offer.timed then " fixed" else ""}`)
-	text(body, table.concat(parts, SEPARATOR), UDim2.new(1, 0, 0, 18), {
-		Position = UDim2.fromOffset(0, y),
-		TextColor3 = P.ink2,
+	local line = text(body, value, UDim2.new(1, -LABEL_W, 0, h), {
+		Position = UDim2.fromOffset(LABEL_W, y),
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextWrapped = wrap,
+		TextTruncate = if wrap then Enum.TextTruncate.None else Enum.TextTruncate.AtEnd,
 		RichText = true,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
 		ZIndex = 2,
 	})
-	y += 20
-	-- The cargo: how many pieces, how they move, and a company vehicle the job lends.
-	local count = tonumber(offer.pieces)
-	if (count and count > 0) or offer.vehicle then
-		local kind = KINDS[offer.itemKind or "crate"] or { icon = "📦", one = tostring(offer.itemKind), many = `{offer.itemKind}s` }
-		local words: { string } = {}
-		if count and count > 0 then
-			local name = if count == 1 then (offer.piece or kind.one) else (offer.piecesName or kind.many)
-			local how = HANDLING[offer.handling or ""]
-			table.insert(words, `{kind.icon} {count} {name}` .. (if how then ` · {how}` else ""))
+	if props then
+		for key, v in props do
+			line[key] = v
 		end
-		if offer.vehicle then
-			table.insert(words, `🚚 company vehicle: {offer.vehicle}`)
-		end
-		text(body, table.concat(words, SEPARATOR), UDim2.new(1, 0, 0, 18), {
-			Position = UDim2.fromOffset(0, y),
-			RichText = true,
-			TextWrapped = false,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			ZIndex = 2,
-		})
-		y += 20
 	end
+	return h + 4
+end
+
+-- The briefing under the title (route, cargo, deadline, risk, the special job); returns where the next thing goes.
+local function details(body: any, offer: any, w: number): number
+	local y = 70
+	-- ROUTE: the first stop → the last address, its district; the stops and the distance.
+	local stops = tonumber(offer.stops) or 1
+	local route = string.gsub(`{offer.first or "Pick up"}  →  {offer.address or "?"}, {offer.district or ""}`, "[&<>]", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;" })
+	local legs = `{if stops > 1 then `{stops} stops{SEPARATOR}` else ""}{tonumber(offer.distance) or 0} m`
+	y += brief(body, "Route", `{route}{SEPARATOR}{legs}`, y, w, false)
+	-- CARGO: the pieces and how they move, the cargo slots, a company vehicle the job lends.
+	local slots = tonumber(offer.slots) or 0
+	local count = tonumber(offer.pieces)
+	local kind = KINDS[offer.itemKind or "crate"] or { icon = "📦", one = tostring(offer.itemKind), many = `{offer.itemKind}s` }
+	local words: { string } = {}
+	if count and count > 0 then
+		local name = if count == 1 then (offer.piece or kind.one) else (offer.piecesName or kind.many)
+		local how = HANDLING[offer.handling or ""]
+		table.insert(words, `{kind.icon} {count} {name}` .. (if how then ` · {how}` else ""))
+	end
+	table.insert(words, if slots > 0 then `{slots} cargo {if slots == 1 then "slot" else "slots"}` else "no cargo slots")
+	if offer.vehicle then
+		table.insert(words, `🚚 company vehicle: {offer.vehicle}`)
+	end
+	y += brief(body, "Cargo", table.concat(words, SEPARATOR), y, w, false)
+	-- DEADLINE: the time for the run (fixed on a rush clock).
+	local deadline = `⏱ {Ui.clock(tonumber(offer.time) or 0)}{if offer.timed then " · fixed, the rush clock does not wait" else ""}`
+	y += brief(body, "Deadline", deadline, y, w, true, { Font = MONO })
+	-- RISK: the modifier's description (red label; the words say what it is).
 	if offer.modifier and offer.modifier.description then
-		local line = `⚠ {offer.modifier.name}: {offer.modifier.description}`
-		local h = textHeight(line, 14, Theme.Font, w)
-		text(body, line, UDim2.new(1, 0, 0, h), { Position = UDim2.fromOffset(0, y), TextColor3 = P.danger, ZIndex = 2 })
-		y += h + 2
+		y += brief(body, "Risk", `{offer.modifier.name}: {offer.modifier.description}`, y, w, true, { TextColor3 = K.text })
 	end
 	if offer.jobType and offer.jobType.description then
-		local h = textHeight(offer.jobType.description, 14, Theme.Font, w)
-		text(body, offer.jobType.description, UDim2.new(1, 0, 0, h), { Position = UDim2.fromOffset(0, y), TextColor3 = P.ink2, ZIndex = 2 })
-		y += h + 2
+		y += brief(body, "Job", offer.jobType.description, y, w, true, { TextColor3 = K.secondary })
 	end
 	return y
 end
 
--- The remedy under a locked ticket's details (a soft box across the body); returns where the next thing goes and the box.
+-- The remedy under a locked row's briefing (a note with a red rule on its left); returns where the next thing goes
+-- and the note.
 local function remedy(body: any, value: string, y: number, w: number): (number, any)
-	local h = textHeight(value, 14, Theme.Font, w - 24) + 16
+	local h = textHeight(value, 14, Theme.Font, w - 28) + 16
 	local box = text(body, value, UDim2.new(1, 0, 0, h), {
 		Position = UDim2.fromOffset(0, y + 6),
 		BackgroundTransparency = 0,
 		BackgroundColor3 = NOTE,
-		TextColor3 = P.ink,
+		TextColor3 = K.text,
 		ZIndex = 2,
 	})
-	Ui.corner(box, 4)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, box)
+	Ui.make("Frame", { Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 3 }, box)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 12) }, box)
 	return y + 6 + h, box
 end
 
--- The payout stub: the pay, night pay, and the action (ACCEPT JOB →, or the lock's reason). A locked button flashes
--- the ticket's remedy note (`note`): the HUD's toasts sit under this board's ScreenGui and its veil.
+-- The payout column: PAYOUT, the pay, night pay, and the action (ACCEPT JOB →, or the lock's reason). A locked button
+-- flashes the row's remedy note (`note`): the HUD's toasts sit under this board's ScreenGui and its veil.
 local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, note: any?)
 	local function flash()
 		if note then
-			note.BackgroundColor3 = ROSE
+			note.BackgroundColor3 = FLASH
 			TweenService:Create(note, TweenInfo.new(0.8, Enum.EasingStyle.Quad), { BackgroundColor3 = NOTE }):Play()
 		end
 	end
 	local touch = Ui.touchLayout()
-	text(stub, Ui.money(tonumber(offer.pay) or 0), UDim2.new(1, -16, 0, 32), {
-		Position = UDim2.new(0.5, 0, 0.5, -48),
+	Ui.caps(stub, "Payout", UDim2.new(1, -28, 0, 14), {
+		Position = UDim2.new(0.5, 0, 0.5, -66),
 		AnchorPoint = Vector2.new(0.5, 0),
-		Font = Theme.DisplayFont,
-		TextSize = 26,
-		TextXAlignment = Enum.TextXAlignment.Center,
+		TextSize = 11,
+		ZIndex = 2,
+	})
+	text(stub, Ui.money(tonumber(offer.pay) or 0), UDim2.new(1, -28, 0, 30), {
+		Position = UDim2.new(0.5, 0, 0.5, -50),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Font = Theme.HeadingFont,
+		TextSize = 24,
 		TextWrapped = false,
 		ZIndex = 2,
 	})
 	local nightRate = tonumber(offer.nightPay)
 	if nightRate and nightRate > 1 then
 		-- It is night: finished now, the job pays this many times more (Config.DayNight.NightPay).
-		text(stub, string.format("🌙 NIGHT ×%.1f", nightRate), UDim2.new(1, -16, 0, 16), {
-			Position = UDim2.new(0.5, 0, 0.5, -16),
+		text(stub, string.format("🌙 NIGHT ×%.1f", nightRate), UDim2.new(1, -28, 0, 16), {
+			Position = UDim2.new(0.5, 0, 0.5, -18),
 			AnchorPoint = Vector2.new(0.5, 0),
 			Font = Theme.HeadingFont,
-			TextSize = 12,
-			TextColor3 = P.ink2,
-			TextXAlignment = Enum.TextXAlignment.Center,
+			TextSize = 11,
+			TextColor3 = K.secondary,
 			ZIndex = 2,
 		})
 	end
-	local size = UDim2.new(1, -28, 0, if touch then 48 else 42)
+	local size = UDim2.new(1, -28, 0, if touch then 48 else 44)
 	local at = UDim2.new(0.5, 0, 0.5, 4)
 	if lockLevel then
-		lipButton(stub, `🔒 LEVEL {lockLevel}`, size, at, nil, function()
+		action(stub, `🔒 LEVEL {lockLevel}`, size, at, nil, function()
 			flash()
 			local what = if offer.jobType then `The {offer.jobType.name}` else `{offer.tierName} jobs`
 			Hud.toast(`{what} need{if offer.jobType then "s" else ""} driver level {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.`)
 		end)
 	elseif why then
-		lipButton(stub, `📦 NEEDS {offer.slots} SLOTS`, size, at, nil, function()
+		action(stub, `📦 NEEDS {offer.slots} SLOTS`, size, at, nil, function()
 			flash()
 			Hud.toast(why)
 		end)
 	else
-		lipButton(stub, "ACCEPT JOB  →", size, at, P.sage, function()
+		action(stub, "ACCEPT JOB", size, at, C.yellow, function()
 			Net.get("AcceptJob"):FireServer(offer.index)
 			-- It leaves the board on the server once started: not shown again before the board comes back.
 			local list = offers
@@ -807,7 +749,7 @@ end
 
 -- The list's width at scale 1 (the window minus the sidebar, the margins and the scroll bar).
 local function listWidth(): number
-	return width - SIDEBAR - 24 - 20 - 6
+	return width - SIDEBAR - 24 - 20 - 4
 end
 
 local function offerTicket(offer: any, number: number)
@@ -817,27 +759,27 @@ local function offerTicket(offer: any, number: number)
 	local lockLevel = if offer.locked == true then (tonumber(offer.level) or myLevel() + 1) else nil
 	local why = if lockLevel == nil and offer.tooBig == true then roomRemedy(offer) else nil
 	local note = if lockLevel then `Unlocks at LEVEL {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.` else why
-	-- The slot in the list gets its height once the body is built (the ticket fills it).
-	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 128), BackgroundTransparency = 1, LayoutOrder = number }, refs.list)
-	local card: any, body: any, stub: any = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB, 0)
+	-- The slot in the list gets its height once the body is built (the row fills it).
+	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 140), BackgroundTransparency = 1, LayoutOrder = number }, refs.list)
+	local card: any, body: any, stub: any = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB)
 	local holder = card.Parent
-	card.BackgroundColor3 = P.ticket
+	card.BackgroundColor3 = if note then LOCKED_ROW else ROW
 	body.ZIndex = 2
 	stub.ZIndex = 2
-	notches(card)
 	spine(card, offer, number)
 	local column = Ui.make("Frame", {
 		Size = UDim2.new(1, -(SPINE + 30), 1, 0),
-		Position = UDim2.fromOffset(SPINE + 14, 0),
+		Position = UDim2.fromOffset(SPINE + 16, 0),
 		BackgroundTransparency = 1,
 		ZIndex = 2,
 	}, body)
 	dangerRow(column, offer)
 	local title = if offer.jobType then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo} for {offer.customer}`
-	text(column, title, UDim2.new(1, 0, 0, 28), {
-		Position = UDim2.fromOffset(0, 36),
-		Font = Theme.DisplayFont,
-		TextSize = 21,
+	text(column, title, UDim2.new(1, 0, 0, 26), {
+		Position = UDim2.fromOffset(0, 38),
+		Font = Theme.HeadingFont,
+		TextSize = 18,
+		TextColor3 = if note then K.secondary else K.text,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		ZIndex = 2,
@@ -845,43 +787,46 @@ local function offerTicket(offer: any, number: number)
 	local after = details(column, offer, bodyW)
 	local noteBox: any = nil
 	if note then
+		Ui.caps(column, "Locked", UDim2.fromOffset(80, 14), {
+			Position = UDim2.new(1, 0, 0, 17),
+			AnchorPoint = Vector2.new(1, 0),
+			TextSize = 11,
+			TextColor3 = K.red,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			ZIndex = 2,
+		})
 		after, noteBox = remedy(column, note, after, bodyW)
 	end
-	local h = math.max(128, after + 16)
+	local h = math.max(140, after + 16)
 	slot.Size = UDim2.new(1, 0, 0, h)
-	if note then
-		hatch(card, w, h)
-	end
 	payStub(stub, offer, lockLevel, why, noteBox)
-	Ui.tactile(holder, 5, 1)
+	Ui.tactile(holder)
 end
 
 -- On a delivery: that job, and giving it up.
 local function jobTicket()
 	Ui.clear(refs.list)
 	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 132), BackgroundTransparency = 1 }, refs.list)
-	local card, body, stub = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB + 60, 0)
-	card.BackgroundColor3 = P.paper
-	notches(card)
+	local card, body, stub = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB + 60)
+	Ui.selectRow(card, true) -- the job you are on: the selected look (the red rule)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 24), PaddingTop = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, body)
-	text(body, "ON A DELIVERY", UDim2.new(1, 0, 0, 18), { Font = MONO, TextSize = 13, TextColor3 = P.ink2 })
+	Ui.caps(body, "On a delivery", UDim2.new(1, 0, 0, 16), { TextSize = 11 })
 	text(body, `{job.cargo or "Cargo"} → {job.customer or "the customer"}`, UDim2.new(1, 0, 0, 30), {
 		Position = UDim2.fromOffset(0, 22),
-		Font = Theme.DisplayFont,
-		TextSize = 21,
+		Font = Theme.HeadingFont,
+		TextSize = 20,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	text(body, `You are delivering {job.cargo or "cargo"} to {job.customer or "a customer"}. Finish it first, or give it up.`, UDim2.new(1, 0, 0, 40), {
 		Position = UDim2.fromOffset(0, 56),
-		TextColor3 = P.ink2,
+		TextColor3 = K.secondary,
 		TextYAlignment = Enum.TextYAlignment.Top,
 	})
-	local give = lipButton(stub, "GIVE UP THIS DELIVERY", UDim2.new(1, -28, 0, 48), UDim2.new(0.5, 0, 0.5, -24), ROSE, function()
+	action(stub, "GIVE UP THIS DELIVERY", UDim2.new(1, -28, 0, 48), UDim2.new(0.5, 0, 0.5, -24), C.red, function()
 		Net.get("CancelJob"):FireServer()
 		DispatchUi.close()
 	end)
-	give.TextColor3 = P.ink
 end
 
 renderList = function()
