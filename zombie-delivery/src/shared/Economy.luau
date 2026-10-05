@@ -264,20 +264,35 @@ function Economy.carTitle(carId: string, levels: Upgrades?): string
 	return if stageDef and stageDef.name ~= def.name then `{def.name} · {stageDef.name}` else def.name
 end
 
--- A 3.4 save's Cargo Rack (`rack` levels, +1 slot each, bought) becomes a stage: the first one that holds at least
--- the slots the rack added over stage 0 (never fewer slots than were paid for), at most the car's last stage.
-function Economy.stageForRack(carId: string, rack: number): number
-	if rack <= 0 then
-		return 0
-	end
-	local base = Economy.stageCapacity(carId, 0)
+-- 3.4's cargo slots of the cars you could buy (their capacity before the stages): what a 3.4 save's car held.
+local LEGACY_CAPACITY: { [string]: number } = {
+	van = 4,
+	courier = 4,
+	highroof = 6,
+	pickup = 4,
+	boxtruck = 6,
+	muscle = 2,
+	armorvan = 4,
+	rallyvan = 4,
+}
+
+-- A 3.4 save's car becomes a stage: the first one that holds at least the slots it had then (its 3.4 capacity plus
+-- its Cargo Rack, `rack` levels, +1 slot each, bought: never fewer than were paid for); when no stage holds that many,
+-- the first one with the car's most room (0 when no stage adds any, as on the Rally Van).
+function Economy.legacyStage(carId: string, rack: number): number
 	local last = Economy.maxStage(carId)
-	for stage = 1, last do
-		if Economy.stageCapacity(carId, stage) - base >= rack then
+	local had = (LEGACY_CAPACITY[carId] or Economy.stageCapacity(carId, 0)) + math.max(0, rack)
+	local best = 0
+	for stage = 0, last do
+		local capacity = Economy.stageCapacity(carId, stage)
+		if capacity >= had then
 			return stage
 		end
+		if capacity > Economy.stageCapacity(carId, best) then
+			best = stage
+		end
 	end
-	return last
+	return best
 end
 
 -- What would make room for `need` pieces when this car (at `stage`) holds fewer: its first stage that holds them (built

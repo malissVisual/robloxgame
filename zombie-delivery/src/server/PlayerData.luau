@@ -253,10 +253,8 @@ local function applySaved(profile: Profile, saved: any)
 						into[def.id] = level
 					end
 				end
-				-- 3.5: the car's stage; a 3.4 save's Cargo Rack (levels.rack, gone) becomes the stage that covers the
-				-- slots it paid for (Economy.stageForRack), once: the rack is not saved again.
+				-- 3.5: the car's stage (a 3.4 save's cars get theirs below).
 				local stage = number(levels.stage, 0, Economy.maxStage(carId))
-				stage = math.max(stage, Economy.stageForRack(carId, number(levels.rack, 0, 3)))
 				if stage > 0 then
 					into.stage = stage
 				end
@@ -271,6 +269,23 @@ local function applySaved(profile: Profile, saved: any)
 			profile.upgrades[def.id] = number(saved.upgrades[def.id], 0, def.maxLevel)
 		end
 		Economy.migrateCarUpgrades(profile.upgrades, profile.cars, profile.carUpgrades)
+	end
+	-- 3.5: a save from before the stages (no carStages) keeps the room of every car it owns: each becomes the stage that
+	-- holds at least the slots it had in 3.4 (Economy.legacyStage: its capacity then plus its Cargo Rack, levels.rack,
+	-- gone), once: the rack is not saved again.
+	if saved.carStages ~= true then
+		local old = if type(saved.carUpgrades) == "table" then saved.carUpgrades else {}
+		for carId in profile.cars do
+			if Economy.canUpgrade(carId) then
+				local levels = old[carId]
+				local stage = Economy.legacyStage(carId, if type(levels) == "table" then number(levels.rack, 0, 3) else 0)
+				if stage > 0 then
+					local into: { [string]: number } = profile.carUpgrades[carId] or {}
+					into.stage = math.max(into.stage or 0, stage)
+					profile.carUpgrades[carId] = into
+				end
+			end
+		end
 	end
 	-- 3.4: the damage of every car (a share of its health, for cars you own).
 	if type(saved.carHealth) == "table" then
@@ -433,6 +448,7 @@ function PlayerData.save(player: Player)
 		rep = profile.rep,
 		xp = profile.xp,
 		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on (applySaved converts older saves once)
+		carStages = true, -- 3.5: the cars' room is their stages (applySaved moves a 3.4 save's cars once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,

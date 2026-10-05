@@ -1,7 +1,7 @@
 --!strict
 -- 3.4: cargo capacity (Config.Cars capacity, Economy.capacity / cargoNeed), what every job and every mission needs
 -- against the cars that do them, the repair shop's time and fee (Economy.repairTime / repairFee).
--- 3.5: the stages (Config.Cars stages, Economy.stageOf / stageCapacity / stageForRack …) instead of the Cargo Rack:
+-- 3.5: the stages (Config.Cars stages, Economy.stageOf / stageCapacity / legacyStage …) instead of the Cargo Rack:
 -- the Old Van grows 2 → 3 → 4 and no further, the Box Truck is the only way to 6 and more, every job and mission fits
 -- a car (and a stage) you can have at its level, the early campaigns the Old Van.
 -- (That every car's capacity is its body's slot count, and every stage's its look's, is checked by run_tests.py:
@@ -88,14 +88,29 @@ check("advice: a bigger vehicle beyond the last stage", string.find(Economy.room
 check("need: carried and led pieces count", Economy.cargoNeed("carry", 5) == 5 and Economy.cargoNeed("lead", 2) == 2)
 check("need: passengers and serving need no slot", Economy.cargoNeed("board", 8) == 0 and Economy.cargoNeed("serve", 6) == 0)
 
--- A 3.4 save's Cargo Rack becomes the stage that covers the slots it paid for (capped at the last stage).
-check("rack 0: stage 0", Economy.stageForRack("van", 0) == 0)
-check("rack 1: the Work Van (+1)", Economy.stageForRack("van", 1) == 1)
-check("rack 2: the Cargo Van (+2, never fewer slots than paid for)", Economy.stageForRack("van", 2) == 2)
-check("rack 3: the Cargo Van (the last stage)", Economy.stageForRack("van", 3) == 2)
-check("rack on the Box Truck: +1 → stage 1, +2 → stage 2", Economy.stageForRack("boxtruck", 1) == 1 and Economy.stageForRack("boxtruck", 2) == 2)
-check("rack on a car with one stage: its last stage", Economy.stageForRack("highroof", 3) == 1 and Economy.stageForRack("rallyvan", 2) == 1)
-check("rack on a company vehicle: nothing", Economy.stageForRack("ambulance", 2) == 0)
+-- A 3.4 save's car becomes the first stage that holds the slots it had (its 3.4 capacity + its Cargo Rack); when none
+-- holds that many, the first stage with the car's most room (0 when no stage adds any).
+check("Old Van, no rack (4 in 3.4): the Cargo Van", Economy.legacyStage("van", 0) == 2)
+check("Old Van with a rack: the Cargo Van (the most a van holds)", Economy.legacyStage("van", 1) == 2 and Economy.legacyStage("van", 3) == 2)
+check("Box Truck (6): rack 0 → stage 0, +1 → stage 1, +2 and +3 → stage 2", Economy.legacyStage("boxtruck", 0) == 0
+	and Economy.legacyStage("boxtruck", 1) == 1 and Economy.legacyStage("boxtruck", 2) == 2 and Economy.legacyStage("boxtruck", 3) == 2)
+check("Muscle Car (2) and Armored Van (4): the stage that holds it", Economy.legacyStage("muscle", 0) == 1 and Economy.legacyStage("armorvan", 0) == 1)
+check("High-Roof, Courier, Pickup: their last stage (the most they hold)", Economy.legacyStage("highroof", 0) == 1
+	and Economy.legacyStage("courier", 2) == 1 and Economy.legacyStage("pickup", 1) == 1)
+check("Rally Van: no stage adds room, stays at stage 0", Economy.legacyStage("rallyvan", 0) == 0 and Economy.legacyStage("rallyvan", 3) == 0)
+check("a company vehicle: nothing", Economy.legacyStage("ambulance", 2) == 0)
+local legacyOk = true
+for _, def in Config.Cars do
+	for rack = 0, 3 do
+		local stage = Economy.legacyStage(def.id, rack)
+		local capacity = Economy.stageCapacity(def.id, stage)
+		if stage < 0 or stage > Economy.maxStage(def.id)
+			or (capacity < Economy.stageCapacity(def.id, 0) + rack and capacity < Economy.maxCapacity(def.id)) then
+			legacyOk = false
+		end
+	end
+end
+check("every car, rack 0 – 3: one of its stages, the rack on top of stage 0 or its most room", legacyOk)
 
 -- The level a load of `need` pieces can first be carried at: a dealer car at a stage that holds it (the later of the
 -- car's level and the stage's), nil when nothing holds it.

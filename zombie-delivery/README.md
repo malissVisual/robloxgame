@@ -415,7 +415,7 @@ end, hood and first window; rebuilt when you upgrade):
   car's level counts).
 
 * ~~Cargo Rack~~ (3.4, gone in 3.5): the car's **stages** give the room now, each with its own look (see **Stages
-  and the cars' roles**). A 3.4 save's rack levels became the stage that covers the slots they paid for.
+  and the cars' roles**). A 3.4 save's cars became the stage that holds the slots they had (see there).
 
 The kit is cosmetic: welded, massless, no collisions, not hit by bullets, a few parts; the stats come from the levels
 (`Economy.carStats` with the car's own levels).
@@ -526,8 +526,14 @@ roof, a roof pod); the car gun moves up onto a high roof.
   the plain body. A few dozen small parts at most.
 * **The traffic** drives the vans at random stages (rusty, work, cargo vans …); bandit cars and the showroom are built
   the same way.
-* **Older saves**: a 3.4 Cargo Rack became the stage that covers the slots it paid for (`Economy.stageForRack`: rack 1
-  → the Work Van, rack 2 – 3 → the Cargo Van; at most the car's last stage), once, when the save loads.
+* **Older saves**: every car a 3.4 save owns becomes the first stage that holds the slots it had in 3.4 (its 3.4
+  capacity plus its Cargo Rack; `Economy.legacyStage`), once, when the save loads (the save's `carStages` marks it
+  done), whatever your level: the Old Van (4 in 3.4) the **Cargo Van**, the Muscle Car the Street Machine, the Armored
+  Van the Fortress Van, the Box Truck with a rack of 1 the Liftgate Truck, of 2 – 3 the Freight Hauler. Where no stage
+  holds that much, the car gets the first stage with its most room, and **holds less than in 3.4**: the Old Van with
+  a rack 4 (was 5 – 7), the Courier Van and the Pickup 3 (were 4+), the High-Roof Van 5 (was 6+), the Box Truck with
+  rack 3 8 (was 9), the Rally Van 2 (was 4+: its only stage adds no room, so it stays at stage 0), the Armored Van and
+  the Muscle Car with a rack 4 and 2. That is the 3.5 rule (4 is where a van ends); the bigger loads need the Box Truck.
 * **Admin** (P): UNLOCK EVERYTHING and MAX UPGRADES + STAGES put every car you own at its last stage too.
 
 **Dead End Motors** (server/World.luau `buildDealer`, server/Shops.luau): no more lot with every car lined up by the

@@ -659,7 +659,7 @@ export type UpgradeDef = {
 -- holds of the back and the cargo shorter (Economy.loadHold).
 -- 3.4: you keep your first car and upgrade it, so the first levels of the car tracks are cheap (a few deliveries)
 -- and the last ones dear. 3.5: the Cargo Rack (+1 slot a level) is gone: the car's STAGES (CarDef.stages) give the
--- room now; a 3.4 save's rack levels became the stage that covers the slots it paid for (Economy.stageForRack).
+-- room now; a 3.4 save's cars became the stage that holds the slots they had, rack included (Economy.legacyStage).
 Config.Upgrades = {
 	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 400, costGrowth = 2.0, perLevel = 0.08 },
 	{ id = "handling", car = true, name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
