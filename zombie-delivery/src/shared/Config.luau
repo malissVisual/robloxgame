@@ -1214,7 +1214,9 @@ Config.Estate = {
 -- Calling your car (server/CarCall.luau): it does not appear out of thin air: a chauffeur drives it to you along
 -- the roads from out of sight, parks next to you, gets out, walks away and fades.
 Config.CarCall = {
-	ArriveWithin = 15, -- seconds; a car that is stuck is placed next to you at this point
+	ArriveWithin = 15, -- seconds: about how long a trip should take (how far away the car may start)
+	StuckFor = 10, -- 3.9.1: seconds without getting closer (a red light counts as getting on) before it is rescued
+	MaxTime = 75, -- and the longest a whole trip may take
 	SpawnMin = 110, -- studs from you, along the roads
 	SpawnMax = 200,
 	Speed = 55,

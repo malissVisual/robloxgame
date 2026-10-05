@@ -218,8 +218,10 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
    along the roads from out of sight, 110 – 200 studs away (or out of your nearest garage within 400 studs), brakes for
    traffic, overtakes what blocks the lane, parks at your curb, gets out, walks off and fades; then it is yours (walk
    to it, E). The HUD shows "Your car is on the way · N s" with a bar, a marker over the car and on the maps, and the
-   CAR entry of the … menu counts down. If it is not there within **15 s** (`Config.CarCall.ArriveWithin`) the car is placed next
-   to you and you sit in it, the old way. If the car is wrecked on the way the HUD says so (press CAR again); a respawn
+   CAR entry of the … menu counts down. Since 3.9.1 the chauffeur stops at red traffic lights and waits in the queue
+   like everybody; it takes the time it takes. Only a car that gets no closer for **10 s** (`Config.CarCall.StuckFor`)
+   is rescued: out of your sight it is put back on a road out of sight and drives on; the second time it is placed
+   next to you and you sit in it, the old way. If the car is wrecked on the way the HUD says so (press CAR again); a respawn
    cancels the call and brings the car the instant way. Sitting in your own car, CAR still resets it on the spot
    (to unflip or unstick it).
 5. The pay: the job's pay × the share of the pieces delivered × cargo condition (50 – 100 %), + 25 % for finishing
