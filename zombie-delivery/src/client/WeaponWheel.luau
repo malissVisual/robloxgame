@@ -4,6 +4,8 @@
 -- The look (GTA-like, in the Dead End Dispatch colours): a dark ring cut into one segment per gun, the segment under
 -- the mouse lit with a pointer from the middle, and in the middle the gun's picture, name and bars for its damage,
 -- fire rate and range. It pops open (a short scale and fade).
+-- 3.6 (Postage & Trouble): a cream paper ring over a soft plum veil, a lavender middle, the segment under the mouse
+-- lit lilac with an ink pointer, the gun in your hands and the bars in the crew violet.
 -- In a car seat the two-handed guns are greyed out (only one-handed guns fire out of a window). While the wheel is
 -- open the mouse is free (Main adds WeaponWheel.isOpen to CameraRig.mouseNeeded) and a click does not shoot.
 -- Keyboard and mouse only: touch screens keep the BAG and the weapon bar.
@@ -35,7 +37,10 @@ local RING_IN = 118
 local SLOT_R = (RING_OUT + RING_IN) / 2
 local ICON = 58
 local DEAD_ZONE = 60 -- the mouse this close to the middle: no gun picked (letting go keeps yours)
-local LIT = C.yellow
+local P = Theme.Postage
+local LIT = P.violet -- the gun under the mouse / in your hands (text, icons, the bars)
+local GLOW = P.lilac -- the lit segment's face
+local POINTER = P.ink -- the pointer toward the gun under the mouse
 
 local player = Players.LocalPlayer
 local state: any = nil
@@ -149,12 +154,12 @@ local function build(): Parts
 	screen.DisplayOrder = 20
 	screen.Enabled = false
 	screen.Parent = player:WaitForChild("PlayerGui")
-	-- A dark veil over the world; clicks land here (not on the world), so a click while choosing never shoots.
+	-- A soft plum veil over the world; clicks land here (not on the world), so a click while choosing never shoots.
 	local cover = Ui.make("TextButton", {
 		Name = "Cover",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.45,
+		BackgroundColor3 = P.veil,
+		BackgroundTransparency = 0.5,
 		Text = "",
 		AutoButtonColor = false,
 	}, screen)
@@ -177,23 +182,22 @@ local function build(): Parts
 		GroupTransparency = 0,
 	}, root)
 
-	-- The ring: an outer disc, a thin gold rim, and the darker hole in the middle.
-	local outer = circle(group, "Outer", 2 * RING_OUT, C.panel, 0.12)
-	local rim = Ui.stroke(outer, LIT, 2)
-	rim.Transparency = 0.55
-	-- The lit segment: a soft gold disc with a bright rim behind the gun under the mouse.
-	local glow = circle(group, "Glow", RING_OUT - RING_IN - 6, LIT, 0.82)
-	Ui.stroke(glow, LIT, 2).Transparency = 0.15
+	-- The ring: a cream paper disc with a thin lavender rim, and the lavender middle.
+	local outer = circle(group, "Outer", 2 * RING_OUT, P.paper, 0)
+	Ui.stroke(outer, P.line, 2).Transparency = 0
+	-- The lit segment: a soft lilac disc with a violet rim behind the gun under the mouse.
+	local glow = circle(group, "Glow", RING_OUT - RING_IN - 6, GLOW, 0)
+	Ui.stroke(glow, LIT, 2).Transparency = 0.2
 	glow.Visible = false
 	local segments = Ui.make("Frame", { Name = "Segments", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, group)
-	local inner = circle(group, "Inner", 2 * RING_IN, Color3.fromRGB(10, 14, 13), 0.05)
-	Ui.stroke(inner, C.grey, 1.5).Transparency = 0.2
-	-- The pointer: a gold diamond on the inner edge, turned toward the gun under the mouse.
+	local inner = circle(group, "Inner", 2 * RING_IN, P.lavender, 0)
+	Ui.stroke(inner, P.line, 1.5).Transparency = 0
+	-- The pointer: an ink diamond on the inner edge, turned toward the gun under the mouse.
 	local pointer = Ui.make("Frame", {
 		Name = "Pointer",
 		Size = UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = LIT,
+		BackgroundColor3 = POINTER,
 		BorderSizePixel = 0,
 		Rotation = 45,
 		Visible = false,
@@ -224,29 +228,28 @@ local function build(): Parts
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 	})
-	Ui.make("UITextSizeConstraint", { MaxTextSize = 12 }, centreTag)
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 13 }, centreTag)
 	local bars: { { fill: Frame, value: TextLabel } } = {}
 	for index, label in { "DAMAGE", "RATE", "RANGE" } do
-		local y = 22 + (index - 1) * 17
+		local y = 22 + (index - 1) * 18
 		local row = Ui.make("Frame", {
 			Name = label,
-			Size = UDim2.fromOffset(150, 12),
+			Size = UDim2.fromOffset(160, 14),
 			Position = UDim2.new(0.5, 0, 0.5, y),
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
 		}, group)
-		Ui.label(row, label, UDim2.fromOffset(52, 12), {
+		Ui.label(row, label, UDim2.fromOffset(60, 14), {
 			Font = Theme.HeadingFont,
 			TextColor3 = C.dim,
-			TextScaled = true,
+			TextSize = 12,
 			TextXAlignment = Enum.TextXAlignment.Left,
 		})
 		local track = Ui.make("Frame", {
-			Size = UDim2.fromOffset(70, 6),
-			Position = UDim2.new(0, 54, 0.5, 0),
+			Size = UDim2.fromOffset(66, 6),
+			Position = UDim2.new(0, 62, 0.5, 0),
 			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundColor3 = C.grey,
-			BackgroundTransparency = 0.35,
+			BackgroundColor3 = P.track,
 			BorderSizePixel = 0,
 		}, row)
 		Ui.corner(track, 3)
@@ -256,25 +259,29 @@ local function build(): Parts
 			BorderSizePixel = 0,
 		}, track)
 		Ui.corner(fill, 3)
-		local value = Ui.label(row, "", UDim2.fromOffset(24, 12), {
-			Position = UDim2.new(0, 128, 0, 0),
-			Font = Theme.HeadingFont,
+		local value = Ui.label(row, "", UDim2.fromOffset(30, 14), {
+			Position = UDim2.new(0, 132, 0, 0),
+			Font = Theme.MonoFont,
 			TextColor3 = C.text,
-			TextScaled = true,
+			TextSize = 12,
+			TextWrapped = false,
 			TextXAlignment = Enum.TextXAlignment.Left,
 		})
 		table.insert(bars, { fill = fill, value = value })
 	end
 	-- Under the ring: what to do.
-	local hint = Ui.label(group, "MOVE THE MOUSE  ·  LET GO OF Q TO TAKE IT", UDim2.fromOffset(2 * RING_OUT, 18), {
+	local hint = Ui.label(group, "MOVE THE MOUSE  ·  LET GO OF Q TO TAKE IT", UDim2.fromOffset(2 * RING_OUT, 26), {
 		Position = UDim2.new(0.5, 0, 1, -6),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Font = Theme.HeadingFont,
 		TextColor3 = C.dim,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = P.pill, -- over the veil: a cream pill behind the text
 	})
-	Ui.make("UITextSizeConstraint", { MaxTextSize = 13 }, hint)
+	Ui.corner(hint, 13)
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 14 }, hint)
 
 	for _, def in Config.Weapons do
 		maxDamage = math.max(maxDamage, def.damage * def.pellets)
@@ -378,8 +385,8 @@ local function fill(p: Parts)
 			Position = UDim2.new(0.5, math.cos(edge) * SLOT_R, 0.5, math.sin(edge) * SLOT_R),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Rotation = math.deg(edge),
-			BackgroundColor3 = C.grey,
-			BackgroundTransparency = 0.25,
+			BackgroundColor3 = P.line,
+			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
 		}, p.segments)
 		local usable = not seated or def.oneHanded == true
@@ -398,7 +405,7 @@ local function fill(p: Parts)
 		})
 		local current = state and state.weapon == def.id
 		tint(icon, if not usable then C.grey elseif current then LIT else C.text, if usable then 0 else 0.5)
-		local name = Ui.label(holder, string.upper(def.name), UDim2.new(1, 0, 0, 14), {
+		local name = Ui.label(holder, string.upper(def.name), UDim2.new(1, 0, 0, 15), {
 			Position = UDim2.new(0.5, 0, 1, -16),
 			AnchorPoint = Vector2.new(0.5, 0),
 			Font = Theme.HeadingFont,
@@ -406,7 +413,7 @@ local function fill(p: Parts)
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextColor3 = if not usable then C.grey elseif current then LIT else C.dim,
 		})
-		Ui.make("UITextSizeConstraint", { MaxTextSize = 11 }, name)
+		Ui.make("UITextSizeConstraint", { MaxTextSize = 12 }, name)
 		if current then
 			-- A small dot under the gun in your hands.
 			local dot = circle(holder, "Equipped", 6, LIT, 0)
@@ -449,12 +456,12 @@ local function pick()
 		local slot = slots[chosen]
 		local x, y = math.cos(slot.angle), math.sin(slot.angle)
 		p.glow.Visible = true
-		p.glow.BackgroundColor3 = if slot.usable then LIT else C.red
+		p.glow.BackgroundColor3 = if slot.usable then GLOW else P.rose
 		TweenService:Create(p.glow, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
 			Position = UDim2.new(0.5, x * SLOT_R, 0.5, y * SLOT_R),
 		}):Play()
 		p.pointer.Visible = true
-		p.pointer.BackgroundColor3 = if slot.usable then LIT else C.red
+		p.pointer.BackgroundColor3 = if slot.usable then POINTER else C.red
 		p.pointer.Position = UDim2.new(0.5, x * (RING_IN + 2), 0.5, y * (RING_IN + 2))
 		showCentre(p, slot.def, slot.usable)
 	else

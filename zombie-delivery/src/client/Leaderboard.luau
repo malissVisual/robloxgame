@@ -14,8 +14,10 @@ local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
+local Theme = require(script.Parent.Theme)
 
 local C = Ui.Colors
+local P = Theme.Postage
 local Leaderboard = {}
 
 -- Set by the HUD: opening the board closes the HUD's windows (one window at a time).
@@ -23,10 +25,11 @@ Leaderboard.onOpen = nil :: (() -> ())?
 
 local player = Players.LocalPlayer
 local REFRESH = 3 -- seconds between two requests while the window is open
-local MEDALS = { Color3.fromRGB(255, 205, 80), Color3.fromRGB(200, 210, 220), Color3.fromRGB(215, 140, 80) }
+local MEDALS = { P.gold, P.silver, P.bronze } -- 3.6: the medal inks (their badges wear Theme.soft faces)
 
 local gui: any = nil
 local window: any = nil
+local chrome: any = nil
 local scale: any = nil
 local body: any = nil
 local summary: any = nil
@@ -53,12 +56,13 @@ end
 -- The column header and the cells of a row share these places (x offsets from the right edge).
 local COLUMNS = {
 	place = { x = 8, w = 44 },
-	level = { right = 420, w = 120 },
-	stars = { right = 292, w = 84 },
-	deliveries = { right = 200, w = 90 },
-	earned = { right = 104, w = 96 },
+	level = { right = 440, w = 120 },
+	stars = { right = 312, w = 84 },
+	deliveries = { right = 220, w = 90 },
+	earned = { right = 110, w = 102 }, -- in the ticket's stub (EARNED_STUB)
 }
-local STAR_GOLD = Color3.fromRGB(255, 205, 80)
+local STAR_GOLD = P.gold
+local EARNED_STUB = 118 -- 3.6: the EARNED column is the ticket's stub
 
 -- The same rule as the Hud's windows (Ui.scaleFor), so the board matches them on every screen.
 local function updateScale()
@@ -77,58 +81,53 @@ local function build()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = 2,
 	}, player:WaitForChild("PlayerGui"))
-	window = Ui.panel(gui, UDim2.fromOffset(750, 500), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	-- 3.6: the lavender window (Ui.window), the rows are paper tickets with the money earned in the stub.
+	local content
+	window, content, chrome = Ui.window(gui, "Top couriers", "This server · by driver level, then mission stars, then money earned", "🏆", UDim2.fromOffset(760, 580))
 	window.Visible = false
-	window.BackgroundTransparency = 0.05
-	scale = Ui.make("UIScale", {}, window)
-	Ui.stroke(window, C.panelLight:Lerp(C.text, 0.2), 1)
-	Ui.label(window, "🏆  TOP COURIERS", UDim2.new(1, -70, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBold })
-	Ui.label(window, "This server · by driver level, then mission stars, then money earned · L", UDim2.new(1, -90, 0, 18), {
-		Position = UDim2.fromOffset(20, 46),
-		TextSize = 14,
-		Font = Enum.Font.GothamMedium,
-		TextColor3 = C.dim,
-	})
-	local close = Ui.button(window, "X", UDim2.fromOffset(40, 40), C.red, function()
+	chrome.onClose = function()
 		Leaderboard.close()
-	end)
-	close.Position = UDim2.new(1, -50, 0, 8)
+	end
+	chrome.context.Text = "L · TOP · refreshes every few seconds"
+	scale = Ui.make("UIScale", {}, window)
 
 	-- You: your place and what the next level needs.
-	summary = Ui.label(window, "", UDim2.new(1, -36, 0, 30), {
-		Position = UDim2.fromOffset(18, 70),
+	summary = Ui.label(content, "", UDim2.new(1, -48, 0, 32), {
+		Position = UDim2.fromOffset(24, 14),
 		BackgroundTransparency = 0,
-		BackgroundColor3 = C.panelLight,
+		BackgroundColor3 = P.ticket,
 		TextSize = 15,
-		TextColor3 = C.yellow,
+		TextColor3 = C.text,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Font = Enum.Font.GothamBold,
+		Font = Theme.HeadingFont,
 	})
 	Ui.corner(summary, 6)
+	Ui.stroke(summary, P.line, 1).Transparency = 0
 
 	-- The column titles.
-	local header = Ui.make("Frame", { Size = UDim2.new(1, -46, 0, 20), Position = UDim2.fromOffset(18, 108), BackgroundTransparency = 1 }, window)
+	local header = Ui.make("Frame", { Size = UDim2.new(1, -56, 0, 20), Position = UDim2.fromOffset(24, 56), BackgroundTransparency = 1 }, content)
 	local function title(text: string, position: UDim2, width: number, align: Enum.TextXAlignment)
-		Ui.label(header, text, UDim2.new(0, width, 1, 0), { Position = position, TextSize = 12, TextColor3 = C.dim, TextXAlignment = align })
+		Ui.caps(header, text, UDim2.new(0, width, 1, 0), { Position = position, TextXAlignment = align })
 	end
 	title("#", UDim2.fromOffset(COLUMNS.place.x, 0), COLUMNS.place.w, Enum.TextXAlignment.Center)
 	title("COURIER", UDim2.fromOffset(62, 0), 200, Enum.TextXAlignment.Left)
 	title("LEVEL", UDim2.new(1, -COLUMNS.level.right, 0, 0), COLUMNS.level.w, Enum.TextXAlignment.Left)
 	title("STARS", UDim2.new(1, -COLUMNS.stars.right, 0, 0), COLUMNS.stars.w, Enum.TextXAlignment.Right)
 	title("DELIVERIES", UDim2.new(1, -COLUMNS.deliveries.right, 0, 0), COLUMNS.deliveries.w, Enum.TextXAlignment.Right)
-	title("EARNED", UDim2.new(1, -COLUMNS.earned.right, 0, 0), COLUMNS.earned.w, Enum.TextXAlignment.Right)
+	title("EARNED", UDim2.new(1, -COLUMNS.earned.right, 0, 0), COLUMNS.earned.w, Enum.TextXAlignment.Center)
 
 	body = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -28, 1, -144),
-		Position = UDim2.fromOffset(14, 132),
+		Size = UDim2.new(1, -36, 1, -86),
+		Position = UDim2.fromOffset(20, 80),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = P.ink2,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-	}, window)
-	Ui.list(body, true, 6)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2) }, body)
+	}, content)
+	Ui.list(body, true, 12)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingLeft = UDim.new(0, 4), PaddingBottom = UDim.new(0, 8) }, body)
 
 	updateScale()
 	local camera = workspace.CurrentCamera
@@ -141,33 +140,34 @@ end
 
 local function row(entry: any, place: number)
 	local mine = entry.userId == player.UserId
-	local frame = Ui.make("Frame", {
-		Size = UDim2.new(1, -10, 0, 56),
-		BackgroundColor3 = C.panelLight,
-		BorderSizePixel = 0,
-		LayoutOrder = place,
-	}, body)
-	Ui.corner(frame, 8)
-	Ui.stroke(frame, if mine then C.yellow else C.panelLight:Lerp(C.text, 0.13), if mine then 1.5 else 1)
-	-- The place: the first three in medal colours.
+	-- 3.6: a paper ticket (your own one outlined in the crew violet), the money earned in its stub.
+	local frame = Ui.ticket(body, UDim2.new(1, -16, 0, 56), UDim2.new(), nil, EARNED_STUB, 0, P.lavender)
+	frame.Parent.LayoutOrder = place
+	if mine then
+		Ui.stroke(frame, P.violet, 1.5)
+	end
+	-- The place: the first three on medal badges.
 	local medal = MEDALS[place]
-	local badge = Ui.label(frame, tostring(place), UDim2.fromOffset(COLUMNS.place.w, 40), {
-		Position = UDim2.fromOffset(COLUMNS.place.x, 8),
+	local badge = Ui.label(frame, tostring(place), UDim2.fromOffset(40, 40), {
+		Position = UDim2.fromOffset(COLUMNS.place.x + 2, 8),
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextSize = if medal then 22 else 18,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = if medal then Color3.new(0.04, 0.05, 0.04) else C.dim,
+		TextSize = if medal then 20 else 17,
+		Font = if medal then Theme.DisplayFont else Theme.MonoFont,
+		TextColor3 = if medal then C.text else C.dim,
 		BackgroundTransparency = if medal then 0 else 1,
-		BackgroundColor3 = medal or C.panel,
+		BackgroundColor3 = if medal then Theme.soft(medal).face else P.paper,
 	})
 	Ui.corner(badge, 20)
+	if medal then
+		Ui.stroke(badge, medal, 1.5)
+	end
 	-- Name and rank name (and the job tag).
 	local name = `{entry.name}{if mine then "  (you)" else ""}`
 	Ui.label(frame, name, UDim2.new(1, -(62 + COLUMNS.level.right + 10), 0, 24), {
 		Position = UDim2.fromOffset(62, 6),
 		TextSize = 18,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = if mine then C.yellow else C.text,
+		Font = Theme.DisplayFont,
+		TextColor3 = if mine then P.violet else C.text,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
@@ -182,7 +182,7 @@ local function row(entry: any, place: number)
 		AutomaticSize = Enum.AutomaticSize.X,
 		TextWrapped = false,
 		TextSize = 13,
-		Font = Enum.Font.GothamMedium,
+		Font = Theme.Font,
 		TextColor3 = C.dim,
 		LayoutOrder = 1,
 	})
@@ -192,14 +192,14 @@ local function row(entry: any, place: number)
 			AutomaticSize = Enum.AutomaticSize.X,
 			TextWrapped = false,
 			TextSize = 13,
-			Font = Enum.Font.GothamBold,
+			Font = Theme.HeadingFont,
 			TextColor3 = STAR_GOLD,
 			LayoutOrder = 2,
 		})
 	end
 	if entry.onJob then
-		local chip = Ui.chip(line, "ON A JOB", C.green, Color3.new(0.04, 0.05, 0.04))
-		chip.TextSize = 11
+		local chip = Ui.chip(line, "ON A JOB", C.green)
+		chip.TextSize = 12
 		chip.LayoutOrder = 3
 	end
 	-- The level and how far into it.
@@ -211,10 +211,10 @@ local function row(entry: any, place: number)
 	}, frame)
 	Ui.label(levelCell, `LV {level}`, UDim2.new(1, 0, 0, 24), {
 		TextSize = 20,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.DisplayFont,
 		TextColor3 = if level >= Config.Levels.MaxLevel then MEDALS[1] else C.text,
 	})
-	local back, fill = Ui.bar(levelCell, UDim2.new(1, -16, 0, 6), C.yellow)
+	local back, fill = Ui.bar(levelCell, UDim2.new(1, -16, 0, 6), P.violet)
 	back.Position = UDim2.fromOffset(0, 30)
 	fill.Size = UDim2.fromScale(math.clamp(tonumber(entry.progress) or 0, 0, 1), 1)
 	-- The mission stars (the gold of a full 300 when every mission has 3).
@@ -223,23 +223,26 @@ local function row(entry: any, place: number)
 	Ui.label(frame, `★ {stars}`, UDim2.fromOffset(COLUMNS.stars.w, 44), {
 		Position = UDim2.new(1, -COLUMNS.stars.right, 0, 6),
 		TextSize = 18,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.DisplayFont,
 		TextColor3 = if starsMax > 0 and stars >= starsMax then STAR_GOLD elseif stars > 0 then C.yellow else C.dim,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
 	Ui.label(frame, tostring(entry.deliveries or 0), UDim2.fromOffset(COLUMNS.deliveries.w, 44), {
 		Position = UDim2.new(1, -COLUMNS.deliveries.right, 0, 6),
 		TextSize = 18,
+		Font = Theme.MonoFont,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
-	Ui.label(frame, Ui.money(tonumber(entry.earned) or 0), UDim2.fromOffset(COLUMNS.earned.w, 44), {
-		Position = UDim2.new(1, -COLUMNS.earned.right, 0, 6),
+	-- The money earned: the stub, like a ticket's payout.
+	local earned = Ui.label(frame, Ui.money(tonumber(entry.earned) or 0), UDim2.fromOffset(EARNED_STUB - 16, 40), {
+		Position = UDim2.new(1, -EARNED_STUB + 8, 0, 8),
 		TextSize = 18,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.MonoFont,
 		TextColor3 = C.money,
-		TextXAlignment = Enum.TextXAlignment.Right,
+		TextXAlignment = Enum.TextXAlignment.Center,
 		TextScaled = true,
 	})
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 20, MinTextSize = 12 }, earned)
 end
 
 local function render()
@@ -248,7 +251,7 @@ local function render()
 	end
 	Ui.clear(body)
 	if #rows == 0 then
-		Ui.label(body, "Asking the dispatcher...", UDim2.new(1, -10, 0, 60), { TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Center })
+		Ui.label(body, "Asking the dispatcher...", UDim2.new(1, -10, 0, 60), { TextColor3 = C.dim, Font = Theme.Font, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Center })
 		summary.Text = ""
 		return
 	end
