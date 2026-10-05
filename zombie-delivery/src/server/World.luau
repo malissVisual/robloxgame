@@ -58,7 +58,7 @@ World.DepotSpawn = Vector3.new(0, WALK_TOP + 3, 26)
 World.ShopPrompts = {} :: { { prompt: ProximityPrompt, shop: string } }
 World.EmployerPrompts = {} :: { { prompt: ProximityPrompt, employer: string } }
 World.EmployerNpcs = {} :: { [string]: Model } -- the person at each WORK HERE board (Config.Employers id)
-World.DealerSlots = {} :: { CFrame }
+World.DealerSlots = {} :: { CFrame } -- 3.5: the showroom's three turntables inside Dead End Motors
 -- 3.4, the repair bays (Map.RepairShops; server/Repair.luau): where a car stands to be repaired. cframe = the bay's
 -- middle on the floor, its -Z toward the door (the way out); size = the bay's width (X) and length (Z); anchor = the
 -- part over it that carries the timer's billboard.
@@ -695,18 +695,22 @@ local function buildDealer(parent: Instance)
 	local frame = shopFrame(cx, cz, facing, 22)
 	building(shop, frame, w, d, h, Color3.fromRGB(40, 44, 52), Enum.Material.Metal, 16, 12, true)
 	sign(shop, "DEAD END MOTORS", Vector3.new(60, 7, 0.5), frame * CFrame.new(0, h + 4.5, -d / 2), Color3.fromRGB(255, 80, 60))
-	counter(shop, frame, d, "dealer", "Dead End Motors")
-	-- Display spots: three inside, six on the lot in front (3.3: eight cars at the dealer).
-	for _, x in { -26, 0, 26 } do
-		local pad = cylinder(shop, "Turntable", 0.3, 18, frame * CFrame.new(x, 0.45, 4) * UPRIGHT, Color3.fromRGB(200, 200, 205), Enum.Material.Metal)
-		pad.CanCollide = false
-		table.insert(World.DealerSlots, frame * CFrame.new(x, 0.6, 4))
+	-- 3.5: the cars are sold from the catalog at the sales counter (the dealer window); no lot of every car outside.
+	local desk = counter(shop, frame, d, "dealer", "Dead End Motors")
+	local catalog = desk:FindFirstChildOfClass("ProximityPrompt")
+	if catalog then
+		catalog.ActionText = "Car catalog"
 	end
-	for _, z in { -45, -27, -9, 9, 27, 45 } do
-		local spot = CFrame.lookAt(Vector3.new(cx - 40, WALK_TOP, z), Vector3.new(cx - 80, WALK_TOP, z))
+	sign(shop, "SALES · CAR CATALOG", Vector3.new(18, 2.4, 0.3), frame * CFrame.new(0, 7.5, d / 2 - 1.2), Color3.fromRGB(255, 220, 120))
+	-- The showroom: three turntables well inside, spread over the floor and turned a little toward the door
+	-- (server/Shops.luau puts a display car on each).
+	for n, x in { -25, 0, 25 } do
+		local spot = frame * CFrame.new(x, 0.6, 6) * CFrame.Angles(0, math.rad((n - 2) * 20), 0)
+		local pad = cylinder(shop, "Turntable", 0.3, 19, frame * CFrame.new(x, 0.45, 6) * UPRIGHT, Color3.fromRGB(200, 200, 205), Enum.Material.Metal)
+		pad.CanCollide = false
 		table.insert(World.DealerSlots, spot)
 	end
-	-- Flags on the lot.
+	-- Flags by the street.
 	for _, z in { -52, 52 } do
 		part(shop, "FlagPole", Vector3.new(0.5, 16, 0.5), CFrame.new(cx - 52, WALK_TOP + 8, z), Color3.fromRGB(200, 200, 200), Enum.Material.Metal)
 		deco(part(shop, "Flag", Vector3.new(0.2, 4, 7), CFrame.new(cx - 52, WALK_TOP + 13.5, z + 3.6), Color3.fromRGB(255, 80, 60), Enum.Material.Fabric))

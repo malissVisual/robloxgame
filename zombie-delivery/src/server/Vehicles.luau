@@ -48,14 +48,20 @@
 -- with the car and rebuilt when the levels change (Vehicles.refreshStats). Quick Hands (the loading track) shortens
 -- the BackPrompt's hold (Vehicles.loadHold; server/Cargo.luau uses it for the cargo prompts of the job's car).
 --
--- 3.4: cargo capacity. A car takes Config.Cars capacity pieces (= its STYLES cargo slots) + its Cargo Rack (the
--- "rack" car track): a roof rack in the UpgradeKit (rackOf: over the cargo space, behind the roof gun) with one more
--- slot per level ON it (Vehicles.cargoSlots lists the body's slots, then the rack's). The car's damage stays with it:
+-- 3.4: cargo capacity. A car takes Config.Cars capacity pieces (= its STYLES cargo slots). The car's damage stays with it:
 -- its share of health is kept per car in profile.carHealth (remember: every hit, every repair, when it is parked); a
 -- car comes back as damaged as it went, a wrecked one with Config.Repair.WreckedHealth. A company vehicle lent for a
 -- job (Car.lent) always comes fresh from its employer. No free repairs any more (the depot yard and Wrench Garage
 -- healed before 3.4): server/Repair.luau runs the repair bays (Vehicles.setRepairing locks the car on the lift; the
 -- hook Vehicles.beforeDrive tells it the owner got back in).
+--
+-- 3.5, the stages (Config.Cars stages, the car's stage in profile.carUpgrades[carId].stage): every stage after 0 has
+-- a LOOK (LOOKS below, styleFor): boxes added to the style's body (painted like it when they are "body"), cosmetic
+-- trim added, boxes and trim with some tags taken off (the Old Van's rust, primer patches and loose bumper go at the
+-- Work Van), its own cargo slots (as many as the stage holds: tests/run_tests.py counts them), and maybe a new roof
+-- height for the gun. Stage 0 is the plain style (the Old Van's is the Rusty Van). A new stage builds the live car
+-- again where it stands (Vehicles.refreshStats → rebuild). The traffic drives the vans at random stages. The 3.4
+-- Cargo Rack (a roof rack with extra slots in the UpgradeKit) is gone: a 3.4 save got the stage that covers it.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -91,7 +97,7 @@ export type Car = {
 	chauffeured: boolean, -- a chauffeur drives it to its owner (server/CarCall.luau): server-owned, no prompts
 	born: number, -- os.clock() when it was placed
 	kit: string, -- 3.3: the car-track levels its UpgradeKit shows (kitKey)
-	rack: number, -- 3.4: its Cargo Rack level (the extra cargo slots on the roof)
+	stage: number, -- 3.5: the stage its body was built at (Config.Cars stages; 0 for a company vehicle)
 	lent: boolean, -- 3.4: a company vehicle lent for a job: its damage is not kept
 	repairing: boolean, -- 3.4: on the lift of a repair bay (server/Repair.luau): anchored, nobody drives it
 }
@@ -107,7 +113,10 @@ Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
 local DARK = Color3.fromRGB(34, 34, 38)
 local GLASS = Color3.fromRGB(150, 190, 210)
 
-type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue | lightbar | hole | amber
+-- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue |
+-- lightbar | hole | amber; 3.5: rust | primer | chrome | lamp | tyre. tag (3.5): a stage's look takes off the boxes
+-- with the tags it names (LOOKS drop).
+type Box = { size: Vector3, offset: Vector3, kind: string, tag: string? }
 
 -- 3.2: one leaf of the back (a door, a tailgate, a lid, a ramp), relative to the chassis top centre, closed.
 type Leaf = {
@@ -145,10 +154,12 @@ type Style = {
 	cargo: CargoSpec, -- relative to the chassis top centre
 	back: Back?, -- 3.2: the back that opens (nil: the bus, nobody loads it by hand)
 	armored: boolean?, -- 3.3: plates and grilles of its own: the Armor upgrade adds none (buildKit)
+	trim: { Box }?, -- 3.5: cosmetic boxes (no collisions, not hit by rays): rust, ladders, racks, lamps …
+	hoodBusy: boolean?, -- 3.5: something sits on the hood already (a blower): the Engine upgrade adds no scoop
 }
 
-local function box(size: Vector3, offset: Vector3, kind: string): Box
-	return { size = size, offset = offset, kind = kind }
+local function box(size: Vector3, offset: Vector3, kind: string, tag: string?): Box
+	return { size = size, offset = offset, kind = kind, tag = tag }
 end
 
 local function cargo(noun: string, length: number, width: number, slots: { Vector3 }, entry: Vector3?): CargoSpec
@@ -295,9 +306,18 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(6.6, 4.4, 4), Vector3.new(0, 2.2, -2), "glass"), -- cabin
 			box(Vector3.new(6.6, 0.6, 4), Vector3.new(0, 4.7, -2), "body"), -- cabin roof
 			box(Vector3.new(6.6, 5, 6.4), Vector3.new(0, 2.5, 3.2), "body"), -- cargo box
-			box(Vector3.new(6.8, 0.8, 0.6), Vector3.new(0, 0.4, -6.6), "dark"), -- bumper
+			box(Vector3.new(6.8, 0.7, 0.5), Vector3.new(0.25, 0.3, -6.6), "rust", "bumper"), -- 3.5: a loose, rusty bumper
 		},
-		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.5, 0, 1.6), Vector3.new(1.5, 0, 1.6), Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6) }),
+		-- 3.5, the Rusty Van (stage 0): rust patches and grey primer over the dents (the Work Van paints them over).
+		trim = {
+			box(Vector3.new(0.06, 1.1, 1.6), Vector3.new(-3.32, 1.3, 4.7), "rust", "rust"),
+			box(Vector3.new(0.06, 0.8, 1.1), Vector3.new(3.32, 3.7, 2.2), "rust", "rust"),
+			box(Vector3.new(0.06, 0.7, 0.9), Vector3.new(3.32, 1.1, -5.5), "rust", "rust"),
+			box(Vector3.new(1.3, 0.06, 0.9), Vector3.new(1.7, 2.03, -5.5), "rust", "rust"),
+			box(Vector3.new(0.08, 0.9, 1.3), Vector3.new(-3.33, 2.7, 1.4), "primer", "primer"),
+			box(Vector3.new(0.08, 0.7, 1.0), Vector3.new(3.33, 1.5, 5.2), "primer", "primer"),
+		},
+		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6) }),
 		back = rearDoors(6.6, DOOR_SILL, 4.8, 6.4, function(side: number): { Box }
 			return { box(Vector3.new(2.2, 1.2, 0.06), Vector3.new(-side * 0.25, 0.825, 0.12), "glass") } -- rear windows
 		end),
@@ -319,7 +339,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(0.4, 1.6, 5.4), Vector3.new(3, 0.8, 3.8), "body"),
 			box(Vector3.new(6.8, 0.9, 0.7), Vector3.new(0, 0.3, -6.7), "dark"),
 		},
-		cargo = cargo("pickup", 13, 6.4, { Vector3.new(-1.4, 0, 5.1), Vector3.new(1.4, 0, 5.1), Vector3.new(0, 0, 3.6), Vector3.new(0, 2.1, 5.1) }),
+		cargo = cargo("pickup", 13, 6.4, { Vector3.new(-1.4, 0, 5.1), Vector3.new(1.4, 0, 5.1) }),
 		back = tailgate("tailgate", Vector3.new(5.6, 1.6, 0.4), Vector3.new(0, 0.8, 6.3), 92, nil, {
 			box(Vector3.new(5.0, 0.25, 0.08), Vector3.new(0, 0.45, 0.22), "dark"), -- the latch bar
 		}),
@@ -340,7 +360,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(0.9, 1.42, 0), "accent"), -- stripes
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(-0.9, 1.42, 0), "accent"),
 		},
-		cargo = cargo("car", 13.5, 6.4, { Vector3.new(-1.2, 0.3, 5), Vector3.new(1.2, 0.3, 5) }),
+		cargo = cargo("car", 13.5, 6.4, { Vector3.new(0, 0.3, 5) }),
 		-- The trunk lid on the rear deck, hinged at its front edge; the spoiler and the stripes ride on it.
 		back = {
 			noun = "trunk",
@@ -610,7 +630,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(1.1, 0.3, 0.6), Vector3.new(-0.95, 4.75, -2.9), "amber"),
 			box(Vector3.new(1.1, 0.3, 0.6), Vector3.new(0.95, 4.75, -2.9), "amber"),
 		},
-		cargo = cargo("van", 12, 6.2, { Vector3.new(-1.4, 0, 1.6), Vector3.new(1.4, 0, 1.6), Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
+		cargo = cargo("van", 12, 6.2, { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
 		back = rearDoors(6.2, DOOR_SILL, 4.1, 6.0, function(side: number): { Box }
 			return { box(Vector3.new(2.0, 1.0, 0.06), Vector3.new(-side * 0.25, 0.6, 0.12), "glass") } -- rear windows
 		end),
@@ -640,8 +660,6 @@ local STYLES: { [string]: Style } = {
 			Vector3.new(1.6, 0, 2.6),
 			Vector3.new(-1.6, 0, 5.4),
 			Vector3.new(1.6, 0, 5.4),
-			Vector3.new(-1.6, 2.3, 5.4), -- the tall box stacks
-			Vector3.new(1.6, 2.3, 5.4),
 		}),
 		back = rearDoors(6.8, DOOR_SILL, 6.4, 7.0, function(side: number): { Box }
 			return {
@@ -664,13 +682,13 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(7.2, 2.4, 2.4), Vector3.new(0, 1.2, -7.3), "body"), -- hood
 			box(Vector3.new(7.2, 4.6, 3.4), Vector3.new(0, 2.3, -4.4), "glass"), -- cab
 			box(Vector3.new(7.2, 0.8, 3.4), Vector3.new(0, 5.0, -4.4), "body"), -- cab roof
-			box(Vector3.new(6.6, 1.4, 1.6), Vector3.new(0, 6.1, -3.9), "body"), -- wind deflector
+			box(Vector3.new(6.6, 1.4, 1.6), Vector3.new(0, 6.1, -3.9), "body", "deflector"), -- wind deflector
 			box(Vector3.new(7.6, 7.6, 10.4), Vector3.new(0, 4.0, 3.0), "body"), -- the box
 			box(Vector3.new(7.7, 0.9, 9.8), Vector3.new(0, 1.6, 3.0), "accent"), -- a stripe down the box
 			box(Vector3.new(7.8, 0.4, 10.4), Vector3.new(0, 0.2, 3.0), "dark"), -- the bottom rail
 			box(Vector3.new(0.3, 7.6, 0.3), Vector3.new(-3.85, 4.0, -2.05), "rail"), -- the box's front corner posts
 			box(Vector3.new(0.3, 7.6, 0.3), Vector3.new(3.85, 4.0, -2.05), "rail"),
-			box(Vector3.new(7.6, 0.8, 0.6), Vector3.new(0, 0.4, -8.8), "dark"), -- bumper
+			box(Vector3.new(7.6, 0.8, 0.6), Vector3.new(0, 0.4, -8.8), "dark", "bumper"), -- bumper
 		},
 		cargo = cargo("truck", 17, 7.4, {
 			Vector3.new(-1.8, 0.4, -0.2),
@@ -723,7 +741,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(0.16, 0.16, 3.4), Vector3.new(3.58, 3.3, -2.45), "rail"),
 			box(Vector3.new(7.0, 0.8, 0.6), Vector3.new(0, 0.4, -7.0), "dark"), -- bumper under the plate
 		},
-		cargo = cargo("van", 14.5, 7.0, { Vector3.new(-1.7, 0, 2.2), Vector3.new(1.7, 0, 2.2), Vector3.new(-1.7, 0, 5.2), Vector3.new(1.7, 0, 5.2) }),
+		cargo = cargo("van", 14.5, 7.0, { Vector3.new(-1.7, 0, 5.2), Vector3.new(1.7, 0, 5.2), Vector3.new(-1.7, 0, 2.2) }),
 		back = rearDoors(7.0, DOOR_SILL, 4.9, 7.25, function(side: number): { Box }
 			return {
 				box(Vector3.new(3.4, 0.9, 0.08), Vector3.new(0, -1.2, 0.13), "plate"), -- a plate over each door
@@ -760,7 +778,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(3.4, 1.3, 4.65), "dark"),
 			box(Vector3.new(6.8, 0.7, 0.5), Vector3.new(0, 0.35, -6.75), "dark"), -- bumper
 		},
-		cargo = cargo("van", 13.2, 6.6, { Vector3.new(-1.4, 0, 1.5), Vector3.new(1.4, 0, 1.5), Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
+		cargo = cargo("van", 13.2, 6.6, { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
 		back = rearDoors(6.6, DOOR_SILL, 3.7, 6.6, function(side: number): { Box }
 			return {
 				box(Vector3.new(2.1, 0.9, 0.06), Vector3.new(-side * 0.25, 0.6, 0.12), "glass"), -- rear windows
@@ -772,6 +790,282 @@ local STYLES: { [string]: Style } = {
 
 local CHASSIS_HEIGHT = 1.2
 local FRICTIONLESS = PhysicalProperties.new(0.7, 0, 0, 100, 1)
+
+-- ── 3.5, the stages' looks ─────────────────────────────────────────────────
+-- What a stage (Config.Cars stages look) does to its car's style: `drop` takes off the style's boxes and trim with
+-- those tags, `boxes` adds solid body boxes (a "body" box is painted like the body), `trim` adds cosmetic ones,
+-- `slots` are the cargo slots at this stage (as many as the stage's capacity, so the loading fits: tests/run_tests.py
+-- counts them), `roof` a new height for the roof gun (over a high roof). Every look keeps the style's back.
+
+type Look = {
+	drop: { string }?,
+	boxes: { Box }?,
+	trim: { Box }?,
+	slots: { Vector3 },
+	roof: number?,
+	hoodBusy: boolean?,
+}
+
+-- The lists one after the other in a new list.
+local function join(...: { Box }): { Box }
+	local list: { Box } = {}
+	for _, part in { ... } do
+		for _, b in part do
+			table.insert(list, b)
+		end
+	end
+	return list
+end
+
+-- A ladder standing on the side of a body at x (facing out), centred on z, from `foot` up to `top`.
+local function ladder(x: number, z: number, foot: number, top: number): { Box }
+	local height = top - foot
+	local list = {
+		box(Vector3.new(0.14, height, 0.14), Vector3.new(x, foot + height / 2, z - 0.35), "chrome"),
+		box(Vector3.new(0.14, height, 0.14), Vector3.new(x, foot + height / 2, z + 0.35), "chrome"),
+	}
+	for n = 1, math.floor(height / 0.8) do
+		table.insert(list, box(Vector3.new(0.12, 0.12, 0.7), Vector3.new(x, foot + n * 0.8 - 0.3, z), "chrome"))
+	end
+	return list
+end
+
+-- Shelves behind the rear doors (seen when they open): boards and uprights on the dark opening at the back face z.
+local function shelves(z: number, half: number, rows: { number }): { Box }
+	local list: { Box } = {}
+	for _, side in { -1, 1 } do
+		for _, y in rows do
+			table.insert(list, box(Vector3.new(1.2, 0.1, 0.04), Vector3.new(side * (half - 0.75), y, z), "wood"))
+		end
+		table.insert(list, box(Vector3.new(0.1, rows[#rows] - rows[1] + 0.8, 0.04), Vector3.new(side * (half - 1.4), (rows[1] + rows[#rows]) / 2, z), "wood"))
+	end
+	return list
+end
+
+-- Four mud flaps behind the wheels (y = their middle over the chassis top).
+local function mudFlaps(x: number, y: number, front: number, rear: number, kind: string): { Box }
+	local list: { Box } = {}
+	for _, side in { -1, 1 } do
+		for _, z in { front, rear } do
+			table.insert(list, box(Vector3.new(1.0, 1.2, 0.1), Vector3.new(side * x, y, z), kind))
+		end
+	end
+	return list
+end
+
+-- The Old Van's Work Van: clean (no rust, no primer), a chrome bumper, a step at the back, a ladder up the right
+-- side, shelves in the back.
+local VAN_WORK_TRIM = join({
+	box(Vector3.new(5.0, 0.3, 0.6), Vector3.new(0, 0.2, 6.75), "dark"), -- the rear step
+}, ladder(3.55, 0.9, 0.7, 5.3), shelves(6.48, 3.05, { 1.9, 2.9, 3.9 }))
+local VAN_CLEAN = { "rust", "primer", "bumper" }
+local VAN_BUMPER = box(Vector3.new(6.9, 0.8, 0.6), Vector3.new(0, 0.4, -6.65), "chrome")
+
+-- The box truck's Liftgate Truck: a chrome bumper, the liftgate folded under the back, marker lights on the box.
+local LIFT_TRIM = {
+	box(Vector3.new(7.0, 0.25, 1.1), Vector3.new(0, -0.25, 8.95), "plate"), -- the liftgate's platform
+	box(Vector3.new(0.25, 1.3, 0.25), Vector3.new(-3.3, 0.3, 8.6), "dark"),
+	box(Vector3.new(0.25, 1.3, 0.25), Vector3.new(3.3, 0.3, 8.6), "dark"),
+	box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(-3.75, 7.65, -2.0), "amber"), -- marker lights
+	box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(3.75, 7.65, -2.0), "amber"),
+	box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(-3.75, 7.65, 8.0), "amber"),
+	box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(3.75, 7.65, 8.0), "amber"),
+	box(Vector3.new(7.0, 0.12, 0.04), Vector3.new(0, 2.7, 8.28), "wood"), -- the stacked row's shelf
+}
+local TRUCK_BUMPER = box(Vector3.new(7.8, 0.8, 0.6), Vector3.new(0, 0.4, -8.8), "chrome")
+
+local LOOKS: { [string]: Look } = {
+	van_work = {
+		drop = VAN_CLEAN,
+		boxes = { VAN_BUMPER },
+		trim = VAN_WORK_TRIM,
+		slots = { Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6), Vector3.new(-1.5, 0, 1.6) },
+	},
+	-- The Cargo Van: the Work Van with a high roof (a roof rack on it, the gun goes up), a light bar, mud flaps.
+	van_cargo = {
+		drop = VAN_CLEAN,
+		boxes = { VAN_BUMPER, box(Vector3.new(6.4, 1.3, 6.3), Vector3.new(0, 5.65, 3.2), "body") }, -- the high roof
+		trim = join({
+			box(Vector3.new(5.0, 0.3, 0.6), Vector3.new(0, 0.2, 6.75), "dark"), -- the rear step
+			-- The roof rack on the high roof: two rails on four legs, three cross bars.
+			box(Vector3.new(0.2, 0.2, 4.2), Vector3.new(-2.9, 6.75, 4.1), "dark"),
+			box(Vector3.new(0.2, 0.2, 4.2), Vector3.new(2.9, 6.75, 4.1), "dark"),
+			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(-2.9, 6.45, 2.2), "dark"),
+			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(2.9, 6.45, 2.2), "dark"),
+			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(-2.9, 6.45, 6.0), "dark"),
+			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(2.9, 6.45, 6.0), "dark"),
+			box(Vector3.new(5.8, 0.15, 0.25), Vector3.new(0, 6.75, 2.3), "dark"),
+			box(Vector3.new(5.8, 0.15, 0.25), Vector3.new(0, 6.75, 4.1), "dark"),
+			box(Vector3.new(5.8, 0.15, 0.25), Vector3.new(0, 6.75, 5.9), "dark"),
+			-- The light bar on the cabin roof.
+			box(Vector3.new(3.4, 0.3, 0.7), Vector3.new(0, 5.15, -2.8), "dark"),
+			box(Vector3.new(1.2, 0.3, 0.6), Vector3.new(-1.0, 5.45, -2.8), "amber"),
+			box(Vector3.new(1.2, 0.3, 0.6), Vector3.new(1.0, 5.45, -2.8), "amber"),
+		}, ladder(3.55, 0.9, 0.7, 6.3), shelves(6.48, 3.05, { 1.9, 2.9, 3.9 }), mudFlaps(2.75, -1.05, -3.15, 6.15, "tyre")),
+		slots = { Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6), Vector3.new(-1.5, 0, 1.6), Vector3.new(1.5, 0, 1.6) },
+		roof = 6.8,
+	},
+	-- The Express Courier: a body-coloured roof pod behind the gun, a checker stripe down both sides.
+	courier_express = {
+		boxes = { box(Vector3.new(4.4, 0.8, 3.4), Vector3.new(0, 4.7, 3.9), "body") },
+		trim = (function(): { Box }
+			local list: { Box } = {}
+			for _, side in { -1, 1 } do
+				for n = 0, 5 do
+					table.insert(list, box(Vector3.new(0.06, 0.5, 0.9), Vector3.new(side * 3.12, 2.75, 0.75 + n * 0.9), if n % 2 == 0 then "dark" else "logo"))
+				end
+			end
+			return list
+		end)(),
+		slots = { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4), Vector3.new(-1.4, 0, 1.6) },
+	},
+	-- The Tall Hauler: a ladder rack on the roof with a spare wheel, side steps, a stacked shelf in the back.
+	highroof_hauler = {
+		trim = {
+			box(Vector3.new(0.2, 0.2, 4.8), Vector3.new(-3.0, 7.15, 4.2), "dark"),
+			box(Vector3.new(0.2, 0.2, 4.8), Vector3.new(3.0, 7.15, 4.2), "dark"),
+			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(-3.0, 6.82, 2.0), "dark"),
+			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(3.0, 6.82, 2.0), "dark"),
+			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(-3.0, 6.82, 6.4), "dark"),
+			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(3.0, 6.82, 6.4), "dark"),
+			box(Vector3.new(6.0, 0.15, 0.25), Vector3.new(0, 7.15, 2.0), "dark"),
+			box(Vector3.new(6.0, 0.15, 0.25), Vector3.new(0, 7.15, 4.2), "dark"),
+			box(Vector3.new(6.0, 0.15, 0.25), Vector3.new(0, 7.15, 6.4), "dark"),
+			box(Vector3.new(2.2, 0.6, 2.2), Vector3.new(0, 7.55, 4.9), "tyre"), -- the spare wheel
+			box(Vector3.new(1.0, 0.64, 1.0), Vector3.new(0, 7.55, 4.9), "chrome"),
+			box(Vector3.new(0.5, 0.2, 2.8), Vector3.new(-3.6, -0.15, -2.4), "dark"), -- side steps
+			box(Vector3.new(0.5, 0.2, 2.8), Vector3.new(3.6, -0.15, -2.4), "dark"),
+			box(Vector3.new(6.0, 0.12, 0.04), Vector3.new(0, 2.3, 7.08), "wood"), -- the stacked shelf
+		},
+		slots = { Vector3.new(-1.6, 0, 2.6), Vector3.new(1.6, 0, 2.6), Vector3.new(-1.6, 0, 5.4), Vector3.new(1.6, 0, 5.4), Vector3.new(-1.6, 2.3, 5.4) },
+	},
+	-- The Ranch Pickup: a roll bar behind the cab with two spotlights, chrome rails on the bed.
+	pickup_ranch = {
+		trim = {
+			box(Vector3.new(0.25, 4.2, 0.25), Vector3.new(-2.8, 2.1, 1.7), "dark"),
+			box(Vector3.new(0.25, 4.2, 0.25), Vector3.new(2.8, 2.1, 1.7), "dark"),
+			box(Vector3.new(5.85, 0.25, 0.25), Vector3.new(0, 4.2, 1.7), "dark"),
+			box(Vector3.new(0.7, 0.5, 0.35), Vector3.new(-1.6, 4.55, 1.7), "lamp"),
+			box(Vector3.new(0.7, 0.5, 0.35), Vector3.new(1.6, 4.55, 1.7), "lamp"),
+			box(Vector3.new(0.2, 0.2, 5.0), Vector3.new(-3.0, 1.75, 3.9), "chrome"),
+			box(Vector3.new(0.2, 0.2, 5.0), Vector3.new(3.0, 1.75, 3.9), "chrome"),
+		},
+		slots = { Vector3.new(-1.4, 0, 5.1), Vector3.new(1.4, 0, 5.1), Vector3.new(0, 0, 3.6) },
+	},
+	boxtruck_lift = {
+		drop = { "bumper" },
+		boxes = { TRUCK_BUMPER },
+		trim = LIFT_TRIM,
+		slots = {
+			Vector3.new(-1.8, 0.4, -0.2),
+			Vector3.new(1.8, 0.4, -0.2),
+			Vector3.new(-1.8, 0.4, 3.2),
+			Vector3.new(1.8, 0.4, 3.2),
+			Vector3.new(-1.8, 0.4, 6.4),
+			Vector3.new(1.8, 0.4, 6.4),
+			Vector3.new(-1.8, 2.8, 6.4), -- the stacked row
+		},
+	},
+	-- The Freight Hauler: the Liftgate Truck with a tall wind deflector over the cab and side skirts.
+	boxtruck_freight = {
+		drop = { "bumper", "deflector" },
+		boxes = { TRUCK_BUMPER, box(Vector3.new(6.8, 2.2, 2.0), Vector3.new(0, 6.5, -3.9), "body") },
+		trim = join(LIFT_TRIM, {
+			box(Vector3.new(0.15, 1.1, 6.0), Vector3.new(-3.85, -0.35, 1.5), "dark"),
+			box(Vector3.new(0.15, 1.1, 6.0), Vector3.new(3.85, -0.35, 1.5), "dark"),
+		}),
+		slots = {
+			Vector3.new(-1.8, 0.4, -0.2),
+			Vector3.new(1.8, 0.4, -0.2),
+			Vector3.new(-1.8, 0.4, 3.2),
+			Vector3.new(1.8, 0.4, 3.2),
+			Vector3.new(-1.8, 0.4, 6.4),
+			Vector3.new(1.8, 0.4, 6.4),
+			Vector3.new(-1.8, 2.8, 6.4), -- the stacked row
+			Vector3.new(1.8, 2.8, 6.4),
+		},
+	},
+	-- The Street Machine: a blower through the hood (no scoop from the Engine upgrade), side pipes, a wider trunk.
+	muscle_street = {
+		trim = {
+			box(Vector3.new(1.4, 0.7, 1.4), Vector3.new(0, 1.75, -4.6), "rail"),
+			box(Vector3.new(1.6, 0.35, 0.9), Vector3.new(0, 2.27, -4.6), "chrome"),
+			box(Vector3.new(0.3, 0.3, 4.5), Vector3.new(-3.35, 0.15, -0.6), "chrome"),
+			box(Vector3.new(0.3, 0.3, 4.5), Vector3.new(3.35, 0.15, -0.6), "chrome"),
+		},
+		slots = { Vector3.new(-1.2, 0.3, 5), Vector3.new(1.2, 0.3, 5) },
+		hoodBusy = true,
+	},
+	-- The Fortress Van: a shield round the roof gun, lockers on the sides, a spare wheel on the roof.
+	armorvan_fortress = {
+		trim = {
+			box(Vector3.new(3.2, 1.1, 0.2), Vector3.new(0, 5.75, -0.9), "plate"),
+			box(Vector3.new(0.2, 0.9, 2.2), Vector3.new(-1.75, 5.65, 0.4), "plate"),
+			box(Vector3.new(0.2, 0.9, 2.2), Vector3.new(1.75, 5.65, 0.4), "plate"),
+			box(Vector3.new(0.25, 1.0, 2.6), Vector3.new(-3.72, 2.55, 4.8), "rail"),
+			box(Vector3.new(0.25, 1.0, 2.6), Vector3.new(3.72, 2.55, 4.8), "rail"),
+			box(Vector3.new(2.2, 0.55, 2.2), Vector3.new(0, 5.38, 5.7), "tyre"),
+			box(Vector3.new(1.0, 0.57, 1.0), Vector3.new(0, 5.38, 5.7), "chrome"),
+		},
+		slots = { Vector3.new(-1.7, 0, 5.2), Vector3.new(1.7, 0, 5.2), Vector3.new(-1.7, 0, 2.2), Vector3.new(1.7, 0, 2.2) },
+	},
+	-- The Works Rally: a light pod over the windscreen, a roof scoop, mud flaps (cosmetic: no more room).
+	rally_works = {
+		trim = join({
+			box(Vector3.new(3.8, 0.35, 0.5), Vector3.new(0, 4.1, -3.6), "dark"),
+			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(-1.4, 4.15, -3.9), "lamp"),
+			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(-0.47, 4.15, -3.9), "lamp"),
+			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(0.47, 4.15, -3.9), "lamp"),
+			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(1.4, 4.15, -3.9), "lamp"),
+			box(Vector3.new(1.4, 0.45, 1.6), Vector3.new(0, 4.12, -1.4), "dark"),
+		}, mudFlaps(2.6, -0.95, -3.05, 6.2, "accent")),
+		slots = { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) },
+	},
+}
+
+-- The style of a car at a stage: its STYLES body with the stage's look on it (cached per look), the plain style for
+-- stage 0, a car without stages or a look that is missing.
+local lookStyles: { [string]: Style } = {}
+local function styleFor(def: Config.CarDef, stage: number?): Style
+	local base = STYLES[def.style] or STYLES.van
+	local stageDef = Economy.stageDef(def.id, math.clamp(stage or 0, 0, Economy.maxStage(def.id)))
+	local lookId = stageDef and stageDef.look
+	local look = if lookId then LOOKS[lookId] else nil
+	if not lookId or not look then
+		return base
+	end
+	local cached = lookStyles[lookId]
+	if cached then
+		return cached
+	end
+	local dropped: { [string]: boolean } = {}
+	local tags: { string } = look.drop or {}
+	for _, tag in tags do
+		dropped[tag] = true
+	end
+	local function keep(list: { Box }?, extra: { Box }?): { Box }
+		local out: { Box } = {}
+		local from: { Box } = list or {}
+		local added: { Box } = extra or {}
+		for _, b in from do
+			if not (b.tag and dropped[b.tag]) then
+				table.insert(out, b)
+			end
+		end
+		for _, b in added do
+			table.insert(out, b)
+		end
+		return out
+	end
+	local style = table.clone(base)
+	style.boxes = keep(base.boxes, look.boxes)
+	style.trim = keep(base.trim, look.trim)
+	style.cargo = { slots = look.slots, noun = base.cargo.noun, door = base.cargo.door, entry = base.cargo.entry }
+	style.roof = look.roof or base.roof
+	style.hoodBusy = look.hoodBusy or base.hoodBusy
+	lookStyles[lookId] = style
+	return style
+end
 
 -- The lights' colours: lit at night (Neon), dim by day.
 local HEAD_LIT, HEAD_DIM = Color3.fromRGB(255, 246, 214), Color3.fromRGB(196, 202, 206)
@@ -983,6 +1277,16 @@ local function boxLook(kind: string, color: Color3, accent: Color3): (Color3, En
 		return Color3.fromRGB(16, 16, 18), Enum.Material.SmoothPlastic
 	elseif kind == "amber" then
 		return Color3.fromRGB(255, 168, 36), Enum.Material.Glass
+	elseif kind == "rust" then
+		return Color3.fromRGB(132, 74, 38), Enum.Material.CorrodedMetal
+	elseif kind == "primer" then
+		return Color3.fromRGB(146, 146, 138), Enum.Material.SmoothPlastic
+	elseif kind == "chrome" then
+		return Color3.fromRGB(196, 198, 204), Enum.Material.Metal
+	elseif kind == "lamp" then
+		return Color3.fromRGB(255, 244, 214), Enum.Material.Glass
+	elseif kind == "tyre" then
+		return Color3.fromRGB(24, 24, 24), Enum.Material.Rubber
 	elseif SIREN_DIM[kind] then
 		return SIREN_DIM[kind], Enum.Material.SmoothPlastic
 	end
@@ -1107,57 +1411,7 @@ end
 
 -- The levels the kit shows, as a key (rebuilt only when it changes).
 local function kitKey(levels: Economy.Upgrades): string
-	return `{Economy.level(levels, "plow")}/{Economy.level(levels, "armor")}/{Economy.level(levels, "engine")}/{Economy.level(levels, "rack")}`
-end
-
--- 3.4, the Cargo Rack: a roof rack over the cargo space (behind the roof gun's place), high enough to clear the body
--- and the pieces under it; its slots (bottom centres, relative to the chassis top like the style's) sit on it: a row
--- of three across, or two at the back and one in front when it is long enough.
-type Rack = { y: number, roof: number, z0: number, z1: number, half: number, slots: { Vector3 } }
-local racks: { [Style]: Rack } = {}
-local function rackOf(style: Style): Rack
-	local cached = racks[style]
-	if cached then
-		return cached
-	end
-	local zs: { number } = {}
-	local lowest = 0
-	for _, slot in style.cargo.slots do
-		table.insert(zs, slot.Z)
-		lowest = math.max(lowest, slot.Y)
-	end
-	local zMin, zMax = math.min(table.unpack(zs)), math.max(table.unpack(zs))
-	local z0 = math.max(zMin - 1.3, 2.0) -- behind the roof gun (turretBase z 0.5)
-	local z1 = math.min(zMax + 1.3, style.length / 2 - 0.4)
-	if z1 - z0 < 3 then
-		z0 = z1 - 3
-	end
-	-- The body's top over that stretch (the middle of the car), and over the pieces below.
-	local roof = 0
-	for _, b in style.boxes do
-		local bz0, bz1 = b.offset.Z - b.size.Z / 2, b.offset.Z + b.size.Z / 2
-		if b.kind ~= "hole" and b.kind ~= "ball" and bz1 > z0 and bz0 < z1 and math.abs(b.offset.X) < b.size.X / 2 + 1 then
-			roof = math.max(roof, b.offset.Y + b.size.Y / 2)
-		end
-	end
-	local y = math.max(roof, lowest + 2.6) + 0.45
-	local half = style.width / 2 - 0.45
-	local slots: { Vector3 } = {}
-	local top = y + 0.12
-	if z1 - z0 >= 5.2 then
-		table.insert(slots, Vector3.new(-1.4, top, z1 - 1.3))
-		table.insert(slots, Vector3.new(1.4, top, z1 - 1.3))
-		table.insert(slots, Vector3.new(0, top, z1 - 3.9))
-	else
-		local x = math.min(2.2, half - 1.0)
-		local z = (z0 + z1) / 2
-		table.insert(slots, Vector3.new(-x, top, z))
-		table.insert(slots, Vector3.new(x, top, z))
-		table.insert(slots, Vector3.new(0, top, z))
-	end
-	local rack: Rack = { y = y, roof = roof, z0 = z0, z1 = z1, half = half, slots = slots }
-	racks[style] = rack
-	return rack
+	return `{Economy.level(levels, "plow")}/{Economy.level(levels, "armor")}/{Economy.level(levels, "engine")}`
 end
 
 -- (Re)builds the kit of a player's car for these car-track levels.
@@ -1169,8 +1423,7 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	local plow = Economy.level(levels, "plow")
 	local armor = Economy.level(levels, "armor")
 	local engine = Economy.level(levels, "engine")
-	local rackLevel = Economy.level(levels, "rack")
-	if plow < 1 and armor < 1 and engine < 3 and rackLevel < 1 then
+	if plow < 1 and armor < 1 and engine < 3 then
 		return
 	end
 	local folder = Instance.new("Folder")
@@ -1266,7 +1519,7 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 
 	-- Engine from 3: a scoop on the hood (taller at 5) and two exhaust pipes under the back.
 	if engine >= 3 then
-		if hull.hood then
+		if hull.hood and not style.hoodBusy then
 			local tall = 0.45 + 0.1 * (engine - 3)
 			local length = math.min(hull.hoodLen * 0.55, 2.2)
 			add("HoodScoop", Vector3.new(2.2, tall, length), Vector3.new(0, hull.hoodTop + tall / 2, hull.hoodZ), KIT_STEEL, Enum.Material.Metal)
@@ -1281,52 +1534,14 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 		end
 	end
 
-	-- 3.4, Cargo Rack: a roof rack over the cargo space, its extra slots on it (Vehicles.cargoSlots). Two side rails
-	-- on four legs, cross bars (one more per level) and, from level 2, a low fence round it; level 3 a ladder up the side.
-	if rackLevel >= 1 then
-		local r = rackOf(style)
-		local length = r.z1 - r.z0
-		local mid = (r.z0 + r.z1) / 2
-		local legs = r.y - r.roof
-		for _, side in { -1, 1 } do
-			add("RackRail", Vector3.new(0.22, 0.22, length), Vector3.new(side * r.half, r.y, mid), KIT_STEEL, Enum.Material.Metal)
-			for _, z in { r.z0 + 0.3, r.z1 - 0.3 } do
-				if legs > 0.05 then
-					add("RackLeg", Vector3.new(0.22, legs, 0.22), Vector3.new(side * r.half, r.roof + legs / 2, z), KIT_STEEL, Enum.Material.Metal)
-				end
-			end
-			if rackLevel >= 2 then
-				add("RackFence", Vector3.new(0.16, 0.16, length), Vector3.new(side * r.half, r.y + 0.55, mid), KIT_CHROME, Enum.Material.Metal)
-				for _, z in { r.z0 + 0.3, mid, r.z1 - 0.3 } do
-					add("RackPost", Vector3.new(0.14, 0.55, 0.14), Vector3.new(side * r.half, r.y + 0.28, z), KIT_CHROME, Enum.Material.Metal)
-				end
-			end
-		end
-		local bars = 2 + rackLevel
-		for n = 0, bars - 1 do
-			local z = r.z0 + 0.3 + (length - 0.6) * n / (bars - 1)
-			add("RackBar", Vector3.new(r.half * 2, 0.16, 0.3), Vector3.new(0, r.y, z), KIT_STEEL, Enum.Material.Metal)
-		end
-		if rackLevel >= 3 then
-			-- A ladder up the right side at the rack's front end (clear of the back that opens).
-			local x = style.width / 2 + 0.18
-			local foot = 0.6
-			local height = r.y - foot
-			for _, dz in { -0.35, 0.35 } do
-				add("RackLadder", Vector3.new(0.12, height, 0.12), Vector3.new(x, foot + height / 2, r.z0 + 0.8 + dz), KIT_CHROME, Enum.Material.Metal)
-			end
-			for n = 1, math.floor(height / 0.8) do
-				add("RackRung", Vector3.new(0.1, 0.1, 0.7), Vector3.new(x, foot + n * 0.8, r.z0 + 0.8), KIT_CHROME, Enum.Material.Metal)
-			end
-		end
-	end
 	folder.Parent = model
 end
 
 -- Builds the body. display = a showroom model (anchored, no seats, no movers). gunId = the car gun on its roof (nil:
--- none). oneBeam: only one headlight carries a SpotLight (the NPC cars: cheaper).
-local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?, oneBeam: boolean?): Built
-	local style = STYLES[def.style] or STYLES.van
+-- none). oneBeam: only one headlight carries a SpotLight (the NPC cars: cheaper). stage (3.5): the car's stage, its
+-- look (styleFor; nil: stage 0).
+local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?, oneBeam: boolean?, stage: number?): Built
+	local style = styleFor(def, stage)
 	local accent = if def.style == "icecream"
 		then Color3.fromRGB(255, 120, 180)
 		elseif def.style == "bus" or def.style == "ambulance" or def.style == "boxtruck" then Color3.fromRGB(205, 30, 34)
@@ -1376,6 +1591,14 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		end
 		weld(chassis, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
+	end
+	-- 3.5: the cosmetic trim (the Rusty Van's rust, a stage's ladder, racks, lamps …); body-coloured trim is painted.
+	local trim: { Box } = style.trim or {}
+	for _, b in trim do
+		local p = trimPart(model, "Trim", b, top * CFrame.new(b.offset), chassis, color, accent)
+		if b.kind == "body" then
+			table.insert(paintParts, p)
+		end
 	end
 
 	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
@@ -1573,9 +1796,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	return built
 end
 
--- A showroom model for the dealer (anchored, no seats).
-function Vehicles.displayModel(def: Config.CarDef, ground: CFrame): Model
-	local built = build(def, rgb(def.color), ground, true)
+-- A showroom model for the dealer (anchored, no seats); 3.5: at a stage (its look).
+function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?): Model
+	local built = build(def, rgb(def.color), ground, true, nil, nil, stage)
 	return built.model
 end
 
@@ -1665,9 +1888,10 @@ local DRIVER_SKINS = { Color3.fromRGB(255, 224, 196), Color3.fromRGB(214, 160, 1
 
 -- A civilian car for the traffic (server/Traffic.luau): an ordinary style in `color` (default: its factory colour),
 -- no gun, no seats, no prompts, a driver at the wheel, one headlight beam. It keeps its movers ("Drive", "Steer")
--- like an NPC car; anchor it to step it by CFrame. Its parts are in the "Car" collision group.
-function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?): TrafficCar
-	local built = build(def, color or rgb(def.color), ground, false, nil, true)
+-- like an NPC car; anchor it to step it by CFrame. Its parts are in the "Car" collision group. 3.5: at a stage (its
+-- look; the traffic picks one at random).
+function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?, stage: number?): TrafficCar
+	local built = build(def, color or rgb(def.color), ground, false, nil, true, stage)
 	local model = built.model
 	local seat = built.seat
 	local rng = Random.new()
@@ -1869,29 +2093,22 @@ end
 
 local function styleOf(car: Car): Style
 	local def = Economy.findCar(car.id)
-	return (def and STYLES[def.style]) or STYLES.van
+	return if def then styleFor(def, car.stage) else STYLES.van
 end
 
 -- Where the loaded pieces ride, relative to the chassis: the bottom centre of a piece, facing the front.
--- 3.4: the body's slots first, then one on the roof rack per Cargo Rack level (Economy.capacity counts the same).
+-- 3.5: the slots of the car's stage (its look's: as many as Economy.capacity counts).
 function Vehicles.cargoSlots(car: Car): { CFrame }
 	local list = {}
-	local style = styleOf(car)
-	for _, slot in style.cargo.slots do
+	for _, slot in styleOf(car).cargo.slots do
 		table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + slot))
-	end
-	if car.rack > 0 then
-		local onRack = rackOf(style).slots
-		for n = 1, math.min(car.rack, #onRack) do
-			table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + onRack[n]))
-		end
 	end
 	return list
 end
 
--- 3.4: how many pieces the car takes at once (its slots, the rack's included).
+-- 3.4: how many pieces the car takes at once (3.5: at its stage).
 function Vehicles.capacity(car: Car): number
-	return Economy.capacity(car.id, if car.rack > 0 then { rack = car.rack } else {})
+	return Economy.capacity(car.id, { stage = car.stage })
 end
 
 -- What the HUD calls the cargo space: "Load it into the back of the {noun}".
@@ -2169,9 +2386,10 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local share = if lent then 1 else math.clamp(profile.carHealth[def.id] or 1, 0.05, 1)
 	local gunId = gunFor(player, def.id)
 	local paintId = if def.company then nil else profile.carPaint[def.id]
-	local built = build(def, paintColor(def, paintId), ground, false, gunId)
+	local stage = if def.company then 0 else Economy.stageOf(def.id, levels) -- 3.5: its stage's look
+	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage)
 	applyPaint(built.paintParts, def, paintId)
-	buildKit(built.model, built.chassis, STYLES[def.style] or STYLES.van, levels)
+	buildKit(built.model, built.chassis, styleFor(def, stage), levels)
 	local driverSeat = built.seat :: VehicleSeat
 	local car: Car = {
 		owner = player,
@@ -2193,7 +2411,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		chauffeured = chauffeured == true,
 		born = os.clock(),
 		kit = kitKey(levels),
-		rack = if def.company then 0 else Economy.level(levels, "rack"),
+		stage = stage,
 		lent = lent,
 		repairing = false,
 	}
@@ -2201,6 +2419,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	car.model:SetAttribute("OwnerId", player.UserId)
 	car.model:SetAttribute("OwnerName", player.DisplayName)
 	car.model:SetAttribute("CarId", def.id)
+	car.model:SetAttribute("Stage", stage)
 	car.model:SetAttribute("SpeedMult", 1)
 	car.model:SetAttribute("CarGun", gunId)
 	-- A company vehicle lent for a job runs with its lights flashing (the ambulance's light bar).
@@ -2367,8 +2586,26 @@ function Vehicles.loadHold(car: Car): number
 	return Economy.loadHold(Config.Cargo.HoldDuration, levels)
 end
 
+-- 3.5: a new stage is a new body: the live car is built again where it stands (its damage kept: Vehicles.remove
+-- remembers it), the owner back behind the wheel when they sat there (the passengers step out). Not while a chauffeur
+-- drives it or it is on a repair lift (the shop waits for those). Returns whether it was rebuilt.
+local function rebuild(car: Car): boolean
+	if car.chauffeured or car.repairing or car.wrecked or car.lent then
+		return false
+	end
+	local player = car.owner
+	local frame = car.chassis.CFrame
+	local look = Vector3.new(frame.LookVector.X, 0, frame.LookVector.Z)
+	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
+	local base = STYLES[(Economy.findCar(car.id) or Config.Cars[1]).style] or STYLES.van
+	local position = frame.Position - Vector3.new(0, base.clearance + CHASSIS_HEIGHT / 2, 0)
+	local occupant = car.seat.Occupant
+	local seated = occupant ~= nil and Players:GetPlayerFromCharacter(occupant.Parent) == player
+	return Vehicles.spawnAt(player, car.id, CFrame.lookAt(position, position + look), seated) ~= nil
+end
+
 -- New upgrades / a new car equipped: the live car takes the new numbers (health keeps its share), and (3.3) its
--- upgrade kit and its back's hold follow its car-track levels.
+-- upgrade kit and its back's hold follow its car-track levels; 3.5: a new stage builds it again (rebuild).
 function Vehicles.refreshStats(player: Player)
 	local car = Vehicles.get(player)
 	local profile = PlayerData.get(player)
@@ -2376,10 +2613,12 @@ function Vehicles.refreshStats(player: Player)
 		return
 	end
 	local levels = Economy.carLevels(profile.carUpgrades, car.id)
+	if not car.lent and Economy.stageOf(car.id, levels) ~= car.stage and rebuild(car) then
+		return
+	end
 	local share = car.health / car.stats.health
 	car.stats = Economy.carStats(car.id, levels)
 	car.health = car.stats.health * share
-	car.rack = if Economy.canUpgrade(car.id) then Economy.level(levels, "rack") else 0
 	writeAttributes(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then

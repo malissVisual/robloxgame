@@ -10,7 +10,8 @@
 --   unlockAll                 every car (company ones too), every gun (earned ones too), every paint, 10 of each
 --                             item, every employer's progress at the top (their rewards count as earned), every
 --                             property (the biggest mansion as the home if you have none) and the top driver level
---   maxUpgrades               every upgrade track at its last level (3.3: the car tracks of every car you own)
+--   maxUpgrades               every upgrade track at its last level (3.3: the car tracks of every car you own; 3.5:
+--                             and every such car at its last stage)
 --   money      amount         + money
 --   setLevel   level          the driver level (1 … Config.Levels.MaxLevel): XP = exactly what that level needs
 --   car        car id         that car, now, next to you
@@ -134,8 +135,16 @@ end
 
 -- ── Unlocks and money ──────────────────────────────────────────────────────
 
--- Every upgrade track at its last level: the gun tracks, and (3.3) the car tracks of every car you own that takes them.
+-- Every upgrade track at its last level: the gun tracks, and (3.3) the car tracks of every car you own that takes them;
+-- 3.5: every such car at its last stage too.
 local function maxAllUpgrades(profile: PlayerData.Profile)
+	for carId, owned in profile.cars do
+		if owned and Economy.canUpgrade(carId) and Economy.maxStage(carId) > 0 then
+			local levels: { [string]: number } = profile.carUpgrades[carId] or {}
+			levels.stage = Economy.maxStage(carId)
+			profile.carUpgrades[carId] = levels
+		end
+	end
 	for _, upgrade in Config.Upgrades do
 		if upgrade.car then
 			for carId, owned in profile.cars do
@@ -185,7 +194,7 @@ local function unlockAll(player: Player)
 	for _, campaign in MissionData.Campaigns do
 		Challenges.campaignDone(player, campaign.id)
 	end
-	say(player, `ADMIN: every car (its upgrades maxed), gun, paint, property, mission and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
+	say(player, `ADMIN: every car (its upgrades and stages maxed), gun, paint, property, mission and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
 end
 
 -- The driver level: the XP becomes exactly what that level needs.
@@ -237,7 +246,7 @@ local function maxUpgrades(player: Player)
 	maxAllUpgrades(profile)
 	PlayerData.notify(player)
 	Vehicles.refreshStats(player)
-	say(player, "ADMIN: every upgrade of every car you own (and the gun upgrades) at its last level.")
+	say(player, "ADMIN: every upgrade and the last stage of every car you own (and the gun upgrades) at its last level.")
 end
 
 local function money(player: Player, arg: any)

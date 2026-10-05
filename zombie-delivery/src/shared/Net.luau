@@ -21,7 +21,7 @@ local NAMES = {
 	"Bump", -- server → client: the car hit something heavy, keep this share of the speed
 	"Buy", -- client → server: buy (kind = "car" | "weapon" | "item" | "cargun", id, amount for items)
 	"Equip", -- client → server: equip (kind, id)
-	"Upgrade", -- client → server: next level of an upgrade track (id)
+	"Upgrade", -- client → server: next level of an upgrade track (id; 3.5: "stage" = the equipped car's next stage)
 	"Notice", -- server → client: a short toast (text)
 	"Play", -- client → server: PLAY was pressed on the start screen (the car comes now)
 	"UseItem", -- client → server: use a consumable (id, aimed point or nil)

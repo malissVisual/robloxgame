@@ -32,6 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local TrafficLanes = require(Shared.TrafficLanes)
@@ -78,7 +79,7 @@ local WALK_ANIM = "rbxassetid://507777826" -- server/Npcs.luau's walk (sped up w
 -- The bodies: the dealer's cars mostly, now and then a work truck (Config.Cars ids, weight).
 local BODIES: { { id: string, weight: number } } = {
 	{ id = "van", weight = 4 },
-	{ id = "courier", weight = 2 }, -- 3.3: the new vans drive past too (their backs welded shut, no kit)
+	{ id = "courier", weight = 2 }, -- 3.3: the new vans drive past too (their backs welded shut, no kit; 3.5: any stage)
 	{ id = "highroof", weight = 1.5 },
 	{ id = "pickup", weight = 4 },
 	{ id = "boxtruck", weight = 1 },
@@ -296,7 +297,9 @@ local function spawnCar(g: TrafficLanes.Graph, edge: number, s: number): Car?
 	local piece = TrafficLanes.lane(g, edge)
 	local x, z, hx, hz = TrafficLanes.at(piece, s)
 	local ground = carFrame(x, z, hx, hz)
-	local ok, npc = pcall(Vehicles.buildTraffic, def, ground)
+	-- 3.5: at a random stage (a Rusty Van, a Work Van, a Cargo Van …).
+	local stage = math.floor(rand() * (Economy.maxStage(def.id) + 1))
+	local ok, npc = pcall(Vehicles.buildTraffic, def, ground, nil, stage)
 	if not ok then
 		warn(`[Traffic] no car: {npc}`)
 		return nil

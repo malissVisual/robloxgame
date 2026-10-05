@@ -3,13 +3,16 @@
 -- your screen); the purchases are checked here, also that you really stand in that shop and that your driver level
 -- (shared/Levels.luau) is high enough for what you buy (the level field of Config.Cars, Weapons and CarGuns).
 --
---   Dead End Motors     cars (the showroom models have their own prompts); every car needs a free car slot
---                       (Estate.carSlots: homes and garages add them; the employers' company cars take none).
---                       3.4: a bought car goes into your garage: take it out there (server/Garages.luau)
+--   Dead End Motors     cars, from the catalog at the sales counter (3.5: no lot of every car outside any more; a
+--                       small showroom inside shows three of them, World.DealerSlots, each with a "Look" prompt that
+--                       opens the catalog on it); every car needs a free car slot (Estate.carSlots: homes and garages
+--                       add them; the employers' company cars take none). 3.4: a bought car goes into your garage:
+--                       take it out there (server/Garages.luau)
 --   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
---   Wrench Garage       upgrades (3.3: the car tracks for the equipped car, 3.4 with the Cargo Rack; the gun tracks
---                       for all guns), paint jobs and car guns (one on the roof of the equipped car); 3.4: its repair
---                       bays are server/Repair.luau's (no free repairs any more)
+--   Wrench Garage       upgrades (3.3: the car tracks for the equipped car; the gun tracks for all guns), 3.5: the
+--                       car's next STAGE (the "Upgrade" remote with id "stage": Config.Cars stages, its own look),
+--                       paint jobs and car guns (one on the roof of the equipped car); 3.4: its repair bays are
+--                       server/Repair.luau's (no free repairs any more)
 --   Last Stop Supplies  consumables
 --   Depot Garage        3.4: the depot lot's garage window (server/Garages.luau: the starting van, company vehicles)
 --   Job Board           the depot's job board
@@ -27,6 +30,8 @@ local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
 local Estate = require(script.Parent.Estate)
 local Garages = require(script.Parent.Garages)
+local Jobs = require(script.Parent.Jobs)
+local CarCall = require(script.Parent.CarCall)
 
 local Shops = {}
 
@@ -192,9 +197,55 @@ local function onEquip(player: Player, kind: any, id: any)
 	end
 end
 
+-- 3.5: the next stage of the equipped car (Config.Cars stages): its price, its driver level, not during a delivery
+-- (the car is built again with its new look) nor while it is on a repair lift.
+local function buyStage(player: Player, profile: PlayerData.Profile)
+	local carDef = Economy.findCar(profile.car)
+	if not carDef or not Economy.canUpgrade(carDef.id) then
+		notice:FireClient(player, "A company vehicle has no stages. Take one of your own cars out of your garage.")
+		return
+	end
+	local levels = Economy.carLevels(profile.carUpgrades, carDef.id)
+	local stage = Economy.stageOf(carDef.id, levels)
+	local nextStage = Economy.stageDef(carDef.id, stage + 1)
+	if not nextStage then
+		notice:FireClient(player, `Your {Economy.carTitle(carDef.id, levels)} is at its last stage. More room needs a bigger vehicle (Dead End Motors).`)
+		return
+	end
+	if tooLow(player, nextStage.name, nextStage.level) then
+		return
+	end
+	if Jobs.active(player) then
+		notice:FireClient(player, "Finish your delivery first: the mechanics rebuild the car.")
+		return
+	end
+	local live = Vehicles.get(player)
+	if live and live.repairing then
+		notice:FireClient(player, "Your car is on the lift: wait for the repair first.")
+		return
+	end
+	if not PlayerData.spend(player, nextStage.price) then
+		notice:FireClient(player, "Not enough money.")
+		return
+	end
+	if CarCall.busy(player) then
+		CarCall.cancel(player) -- the call ends (the car goes): CAR brings it again, rebuilt
+	end
+	levels.stage = stage + 1
+	profile.carUpgrades[carDef.id] = levels
+	local was = Economy.stageDef(carDef.id, stage)
+	notice:FireClient(player, `Your {if was then was.name else carDef.name} is a {nextStage.name} now: {Economy.capacity(carDef.id, levels)} cargo slots.`)
+	Vehicles.refreshStats(player)
+	PlayerData.notify(player)
+end
+
 local function onUpgrade(player: Player, id: any)
 	local profile = PlayerData.get(player)
 	if not profile or type(id) ~= "string" or refuse(player, "mechanic") then
+		return
+	end
+	if id == "stage" then
+		buyStage(player, profile)
 		return
 	end
 	-- 3.3: a car track upgrades the equipped car only (its own levels, its own price); a gun track all your guns.
@@ -249,34 +300,40 @@ local function onPaint(player: Player, id: any)
 	PlayerData.notify(player)
 end
 
--- The showroom: every car on its spot with a price tag and a prompt.
+-- 3.5, the showroom: three cars inside the dealership (World.DealerSlots), not every car on a lot. Each one is shown
+-- at a stage of its own (the Old Van as a Cargo Van: what your van becomes), with a tag and a "Look" prompt that
+-- opens the catalog on it. Every car is bought from the catalog (the sales counter, or any display car).
+local SHOWROOM: { { car: string, stage: number } } = {
+	{ car = "van", stage = 2 },
+	{ car = "boxtruck", stage = 0 },
+	{ car = "rallyvan", stage = 0 },
+}
+
 local function buildShowroom()
 	local folder = Instance.new("Folder")
 	folder.Name = "Showroom"
 	folder.Parent = workspace
-	local index = 0
-	for _, def in Config.Cars do
-		if def.company then
-			continue -- the job board lends those
-		end
-		index += 1
+	for index, entry in SHOWROOM do
+		local def = Economy.findCar(entry.car)
 		local slot = World.DealerSlots[index]
-		if not slot then
-			break
+		if not def or not slot then
+			continue
 		end
-		local model = Vehicles.displayModel(def, slot)
+		local model = Vehicles.displayModel(def, slot, entry.stage)
 		model.Parent = folder
 		local chassis = model.PrimaryPart :: BasePart
+		local stage = Economy.stageDef(def.id, entry.stage)
 		local tag = Instance.new("BillboardGui")
-		tag.Size = UDim2.fromOffset(170, 50)
-		tag.StudsOffset = Vector3.new(0, 9, 0)
-		tag.MaxDistance = 90
+		tag.Size = UDim2.fromOffset(190, 60)
+		tag.StudsOffset = Vector3.new(0, 10, 0)
+		tag.MaxDistance = 70
 		tag.Parent = chassis
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
-		local price = if def.price > 0 then "$" .. def.price else "FREE"
-		label.Text = if def.level and def.level > 1 then `{def.name}\n{price} · LEVEL {def.level}+` else `{def.name}\n{price}`
+		local price = if def.price > 0 then "$" .. def.price else "BUILD YOURS AT WRENCH GARAGE"
+		local name = if stage and stage.name ~= def.name then `{stage.name} ({def.name}, stage {entry.stage})` else def.name
+		label.Text = if def.level and def.level > 1 then `{name}\n{price} · LEVEL {def.level}+` else `{name}\n{price}`
 		label.TextScaled = true
 		label.Font = Enum.Font.GothamBlack
 		label.TextColor3 = Color3.fromRGB(255, 220, 120)

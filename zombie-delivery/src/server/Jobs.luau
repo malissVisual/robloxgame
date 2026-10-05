@@ -60,10 +60,11 @@
 --             pulled them together; with defend at the same drop both must be done (blockStop).
 --
 -- 3.4, cargo capacity: a job's pieces carried or led by hand (Economy.cargoNeed) must fit the vehicle that does it:
--- the company vehicle a special job lends, else your equipped car with its Cargo Rack (Economy.capacity). The board
--- shows a job too big for your car locked ("NEEDS N SLOTS · your Old Van holds 4") and accepting it is refused
+-- the company vehicle a special job lends, else your equipped car at its stage (3.5, Economy.capacity). The board
+-- shows a job too big for your car locked ("NEEDS N SLOTS · your Old Van holds 2") and accepting it is refused
 -- (slotsShort). The ordinary deliveries of the dangerous levels are sometimes bulk orders (Config.Jobs.BulkChance /
--- BulkExtra): more pieces, more pay, a bigger car.
+-- BulkExtra): more pieces, more pay, a bigger car. 3.5: a ★ delivery carries at most Config.Jobs.EasyMaxPieces (the
+-- Rusty Van's 2 slots).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -551,7 +552,10 @@ local function ordinaryOffer(from: Vector3, tierIndex: number): Offer?
 	local placeId = placeIdOf(drop)
 	local receiver = (placeId and JobsConfig.PlacePeople[placeId]) or pick(business.receivers)
 	local count = rng:NextInteger(business.pieces[1], business.pieces[2] or business.pieces[1])
-	-- 3.4: a bulk order now and then on the dangerous levels: more pieces (a bigger car or a Cargo Rack).
+	if tierIndex == 1 then
+		count = math.min(count, JobsConfig.EasyMaxPieces) -- 3.5: a ★ delivery fits the Rusty Van
+	end
+	-- 3.4: a bulk order now and then on the dangerous levels: more pieces (3.5: a later stage or a bigger car).
 	local extra = JobsConfig.BulkExtra[tierIndex]
 	if extra and extra[2] > 0 and rng:NextNumber() < (JobsConfig.BulkChance[tierIndex] or 0) then
 		count += rng:NextInteger(extra[1], extra[2])
@@ -637,7 +641,7 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 end
 
 -- 3.4: the cargo slots a job needs, what the vehicle that would do it holds and that vehicle's name: the company
--- vehicle the job lends, else the player's equipped car (with its Cargo Rack).
+-- vehicle the job lends, else the player's equipped car (3.5: at its stage).
 local function slotsFor(player: Player, offer: Offer): (number, number, string)
 	local jobType = offer.jobType
 	local need = Economy.cargoNeed(if jobType then jobType.load else "carry", offer.total)
@@ -657,7 +661,10 @@ local function slotsShort(player: Player, offer: Offer): string?
 	if need <= holds then
 		return nil
 	end
-	return `This job needs {need} cargo slots: your {name} holds {holds}. Upgrade its Cargo Rack (Wrench Garage) or take a bigger car out of your garage.`
+	local profile = PlayerData.get(player)
+	local carId = if profile then profile.car else Config.Cars[1].id
+	local stage = Economy.stageOf(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else nil)
+	return `This job needs {need} cargo slots: your {name} holds {holds}. {Economy.roomAdvice(carId, stage, need)}`
 end
 
 -- One card of the job board. A job above the player's level is shown LOCKED (locked, level): accepting it is refused.

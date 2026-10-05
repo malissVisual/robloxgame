@@ -47,7 +47,7 @@ local lastAction: { [Player]: number } = {}
 local opened: { [Player]: string } = {} -- where the player's window was opened (a garage id or "depot")
 
 -- Short names of the car tracks for the window's upgrade line.
-local SHORT: { [string]: string } = { engine = "Engine", handling = "Handling", armor = "Armor", plow = "Plow", loading = "Hands", rack = "Rack" }
+local SHORT: { [string]: string } = { engine = "Engine", handling = "Handling", armor = "Armor", plow = "Plow", loading = "Hands" }
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
@@ -157,7 +157,7 @@ local function stateFor(player: Player, at: string, open: boolean): { [string]: 
 		local levels = Economy.carLevels(profile.carUpgrades, def.id)
 		table.insert(cars, {
 			id = def.id,
-			name = def.name,
+			name = Economy.carTitle(def.id, levels), -- 3.5: with its stage ("Old Van · Work Van")
 			capacity = Economy.capacity(def.id, levels),
 			health = healthOf(player, def.id),
 			upgrades = if def.company then "company vehicle" else upgradeLine(levels),

@@ -29,8 +29,8 @@
 -- partner leaves later). The state says crewSize (your crew's members) so the window knows before START.
 --
 -- 3.4, cargo capacity: a mission with more pieces carried or led by hand (Economy.cargoNeed) than your equipped car
--- holds (Economy.capacity: its slots and its Cargo Rack) is refused at START with what it needs, unless it lends a
--- vehicle. The state says capacity and carName so the window can tell before START.
+-- holds (Economy.capacity: 3.5, the slots of its stage) is refused at START with what it needs, unless it lends a
+-- vehicle. The state says capacity, carName (3.5: carId, carStage) so the window can tell before START.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -123,6 +123,8 @@ local function stateFor(player: Player): { [string]: any }?
 		crewSize = #Crew.members(player),
 		capacity = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car)), -- 3.4
 		carName = (Economy.findCar(profile.car) or Config.Cars[1]).name,
+		carId = profile.car, -- 3.5: the car and its stage (the window's advice: Economy.roomAdvice)
+		carStage = Economy.stageOf(profile.car, Economy.carLevels(profile.carUpgrades, profile.car)),
 	}
 end
 
@@ -207,7 +209,8 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 		local holds = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car))
 		if need > holds then
 			local car = Economy.findCar(profile.car) or Config.Cars[1]
-			return `This mission needs a vehicle with {need} slots (your {car.name} holds {holds}). Upgrade its Cargo Rack or switch cars at your garage.`
+			local stage = Economy.stageOf(car.id, Economy.carLevels(profile.carUpgrades, car.id))
+			return `This mission needs a vehicle with {need} slots (your {car.name} holds {holds}). {Economy.roomAdvice(car.id, stage, need)}`
 		end
 	end
 	if def.duo then

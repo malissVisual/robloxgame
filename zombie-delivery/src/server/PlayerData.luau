@@ -1,10 +1,10 @@
 --!strict
 -- The player's progress: money, the cars and guns they own, the equipped ones, the car guns on their roofs, the upgrade
--- levels (3.3: the car tracks per car in carUpgrades, the gun tracks for all guns in upgrades), the damage of every
--- car (3.4, carHealth: a parked car keeps it until a repair shop fixes it), the driver XP (the
--- level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the properties, the home you
--- spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades, the safe;
--- server/Business.luau) and lifetime stats.
+-- levels (3.3: the car tracks per car in carUpgrades, the gun tracks for all guns in upgrades; 3.5: a car's stage is
+-- carUpgrades[carId].stage), the damage of every car (3.4, carHealth: a parked car keeps it until a repair shop fixes
+-- it), the driver XP (the level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the
+-- properties, the home you spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades,
+-- the safe; server/Business.luau) and lifetime stats.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -28,7 +28,7 @@ export type Profile = {
 	weapons: { [string]: boolean },
 	weapon: string,
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
-	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car)
+	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car); 3.5: + stage
 	carHealth: { [string]: number }, -- 3.4: car id → its share of health (0 … 1) while parked; no entry = as new
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
@@ -252,6 +252,13 @@ local function applySaved(profile: Profile, saved: any)
 					if level > 0 then
 						into[def.id] = level
 					end
+				end
+				-- 3.5: the car's stage; a 3.4 save's Cargo Rack (levels.rack, gone) becomes the stage that covers the
+				-- slots it paid for (Economy.stageForRack), once: the rack is not saved again.
+				local stage = number(levels.stage, 0, Economy.maxStage(carId))
+				stage = math.max(stage, Economy.stageForRack(carId, number(levels.rack, 0, 3)))
+				if stage > 0 then
+					into.stage = stage
 				end
 				if next(into) ~= nil then
 					profile.carUpgrades[carId] = into

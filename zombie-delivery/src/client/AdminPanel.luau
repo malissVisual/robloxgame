@@ -122,12 +122,12 @@ local SECTIONS = {
 local render: () -> ()
 
 local function renderUnlock()
-	heading("Unlock", `Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, every employer's jobs counted as done, every owned car's upgrades maxed and driver level {Config.Levels.MaxLevel}. Car guns: Cars tab.`)
+	heading("Unlock", `Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, every employer's jobs counted as done, every owned car's upgrades and stages maxed and driver level {Config.Levels.MaxLevel}. Car guns: Cars tab.`)
 	local row = grid(200)
 	action(row, "UNLOCK EVERYTHING", C.yellow, function()
 		send("unlockAll")
 	end).TextColor3 = Color3.new(0, 0, 0)
-	action(row, "MAX UPGRADES", C.blue, function()
+	action(row, "MAX UPGRADES + STAGES", C.blue, function()
 		send("maxUpgrades")
 	end)
 	local level = tonumber(player:GetAttribute("Level")) or 1
