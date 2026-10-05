@@ -8,14 +8,15 @@ Read `README.md` first. It describes the whole game: missions, challenges, the H
 ## The repository
 - The game is in `zombie-delivery/` and is synced into Roblox Studio by Rojo (`node tools/rojo-sync.js zombie-delivery`).
 - Merge Blades is archived in `archive/merge-blades/`. Do not change it unless the owner asks. The root project targets Zombie Delivery, and the shared synchronizer stays in `tools/rojo-sync.js`.
-- The owner pulls one branch, **`claude/adoring-mendel-v77f7v`**. Only work that lands there reaches the game.
+- The owner pulls **`main`** (the default branch). Only work that lands on `main` reaches the game. Claude's working
+  branch is `claude/adoring-mendel-v77f7v`; every finished version goes from there to `main` through a pull request.
 
 ## How we work together
 1. **Before starting, read `COLLAB.md`.** Pick a task from "Ideas / next", or write your own in "In progress" with your name (Codex / Claude), the files you will touch and the date. Commit that change to the board first, so the other helper sees it.
 2. **One file, one helper at a time.** Do not edit a file the other helper lists under "In progress". If you must, write a note under "Questions / handoff" instead.
 3. **Branches:**
-   - **Codex** works on its own branch `codex/<topic>` (e.g. `codex/hud-icons`), based on the latest `claude/adoring-mendel-v77f7v`. It pushes there and writes the branch under "Ready for review".
-   - **Claude** reviews the branch, runs the checks, fixes small things, merges it into `claude/adoring-mendel-v77f7v` and moves the entry to "Done".
+   - **Codex** works on its own branch `codex/<topic>` (e.g. `codex/hud-icons`), based on the latest `main`. It pushes there and writes the branch under "Ready for review".
+   - **Claude** reviews the branch, runs the checks, fixes small things, merges it into `claude/adoring-mendel-v77f7v`, brings that to `main` (a pull request) and moves the entry to "Done".
    - Claude works on `claude/adoring-mendel-v77f7v` directly and lists bigger work in "In progress" too.
 4. **Small commits** with a clear message (`Zombie Delivery <version>: what changed`). The `Config.Version` bump is done by whoever merges.
 5. **When done**, move your entry to "Ready for review" (Codex) or "Done" (Claude). Write in one or two lines what changed and what to test in Studio.
