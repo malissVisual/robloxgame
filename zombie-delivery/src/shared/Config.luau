@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.0.3"
+Config.Version = "4.0.4"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -1018,6 +1018,7 @@ Config.Zombies = {
 
 -- Zombies around the cars.
 Config.Horde = {
+	SpotTime = 0.7, -- 4.0.4: a bandit has to see you this long (a clear line, nothing in between) before it fires
 	MaxTotal = 95, -- in the whole server
 	SpawnMin = 70, -- studs from the target
 	SpawnMax = 130,

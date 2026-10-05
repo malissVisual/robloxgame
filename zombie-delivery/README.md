@@ -63,6 +63,10 @@ Version 3.7 is the **first day on the job**:
 - **Light pieces** (pizza, parcels, mail, medicine …) can be carried **two at a time**. With one in your hands you can
   still open the back; with two your hands are full: put one down with **G**, or let a crew mate open it
   (`Config.Cargo.LightLooks`).
+Version 4.0.4: dying on a job or a mission brings you back **near where you fell** (the nearest sidewalk), not home;
+nobody shoots **through walls** any more (your shots start at the muzzle and stop at a wall in front of it; the
+bandits need a clear line from their head and must have you in sight `Config.Horde.SpotTime` (0.7 s) before they fire;
+behind a wall they move round for a line instead of shooting into it).
 Version 3.8 is **the contract UI**: Codex's approved direction (`design/ui-contract/`) replaces the 3.6 paper look
 everywhere: compact white type, charcoal, fine lines and red accents, a quiet HUD around the world (see **The HUD**).
 Version 3.9 puts **the gun away**: you no longer walk around with it in your hand.

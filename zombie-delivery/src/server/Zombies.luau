@@ -61,6 +61,7 @@ export type Zombie = {
 	lostSince: number?, -- hunting, but nobody in reach since
 	nextWander: number,
 	walkSpeed: number, -- its full speed (it shambles slower while it wanders)
+	seenSince: number?, -- 4.0.4, a bandit: since when it has a clear line to its target (it fires only after Horde.SpotTime)
 }
 
 local Zombies = {}
@@ -920,19 +921,26 @@ end
 local tracer = Net.get("Tracer")
 local BANDIT_TRACER = Color3.fromRGB(255, 80, 60)
 
--- A bandit's shot: needs a clear line, hits less often at a fast target.
-function shoot(z: Zombie, target: Target)
-	local position = z.root.Position
-	local flat = Vector3.new(target.position.X, position.Y, target.position.Z)
-	z.root.CFrame = CFrame.lookAt(position, flat)
-	local from = position + Vector3.new(0, 1.2 * z.def.scale, 0) + z.root.CFrame.LookVector * 2
+-- 4.0.4: does this bandit see its target: a clear line from its head (not from a point in front of it, which can be on
+-- the far side of a wall it stands at) to the target, nothing solid in between?
+local function seesTarget(z: Zombie, target: Target): (boolean, Vector3, Vector3)
+	local from = z.root.Position + Vector3.new(0, 1.2 * z.def.scale, 0)
 	local aim = target.position + Vector3.new(0, 1.5, 0)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { workspace:FindFirstChild("Zombies") or z.model }
 	local result = workspace:Raycast(from, aim - from, params)
 	local targetModel: Instance? = if target.car then target.car.model elseif target.humanoid then target.humanoid.Parent else nil
-	if result and not (targetModel and result.Instance:IsDescendantOf(targetModel)) then
+	return result == nil or (targetModel ~= nil and result.Instance:IsDescendantOf(targetModel)), from, aim
+end
+
+-- A bandit's shot: needs a clear line, hits less often at a fast target.
+function shoot(z: Zombie, target: Target)
+	local position = z.root.Position
+	local flat = Vector3.new(target.position.X, position.Y, target.position.Z)
+	z.root.CFrame = CFrame.lookAt(position, flat)
+	local clear, from, aim = seesTarget(z, target)
+	if not clear then
 		return -- no clear line of fire
 	end
 	local speed = Vector3.new(target.velocity.X, 0, target.velocity.Z).Magnitude
@@ -1187,20 +1195,36 @@ local function step()
 		if ranged then
 			-- Bandits: get within range, stand and shoot.
 			if bestDistance > range * 0.85 then
+				z.seenSince = nil
 				local goal = position + (best.position - position).Unit * (bestDistance - range * 0.6)
 				if not World.isSafe(goal) then
 					z.humanoid:MoveTo(goal)
 				end
-			else
+			elseif seesTarget(z, best) then
 				z.humanoid:MoveTo(position)
 				-- Right next to a car: they grab what they can from the cargo.
 				local targetCar = best.car
 				if targetCar and bestDistance < 14 then
 					Zombies.onSteal(targetCar.owner, Config.BanditCar.StealPerSecond * Horde.RepathEvery)
 				end
-				if now >= z.nextAttack then
+				-- 4.0.4: it fires only once it has had you in sight a moment (no snap shots through a doorway).
+				z.seenSince = z.seenSince or now
+				if now >= z.nextAttack and now - (z.seenSince :: number) >= Horde.SpotTime then
 					z.nextAttack = now + (z.def.fireEvery or 1.5) * rng:NextNumber(0.85, 1.15)
 					shoot(z, best)
+				end
+			else
+				-- 4.0.4: a wall in the way: no shots into it. Move round for a line: closer, and a step to the side.
+				z.seenSince = nil
+				local toward = best.position - position
+				local flatToward = Vector3.new(toward.X, 0, toward.Z)
+				if flatToward.Magnitude > 1 then
+					local dir = flatToward.Unit
+					local side = Vector3.new(-dir.Z, 0, dir.X) * (if z.id % 2 == 0 then 1 else -1)
+					local goal = position + dir * math.min(12, flatToward.Magnitude * 0.5) + side * 10
+					if not World.isSafe(goal) then
+						z.humanoid:MoveTo(goal)
+					end
 				end
 			end
 			continue
