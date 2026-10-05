@@ -38,6 +38,15 @@ Config.Explore = {
 	Radius = 180, -- studs around you that are uncovered
 	Every = 1, -- seconds between two checks of where you are
 	PlaceRadius = 70, -- this close to a place (a shop, an employer, a mission place) and it is discovered
+	-- The grid covers Map.Bounds and this much more on every side (the world's walls stand on Map.Bounds).
+	Pad = 60,
+	-- A new player (or a save from before 3.7) starts with the cells over this square around the depot uncovered
+	-- (the safe zone, Config.City.SafeHalf, and a little more): nobody starts lost.
+	StartHalf = 240,
+	-- A jump farther than this between two checks is a teleport (the admin, a home spawn): the way between is not
+	-- uncovered. Shorter (a fast car): the cells along the way are.
+	Teleport = 600,
+	Banner = 3, -- seconds the "NEW LOCATION DISCOVERED" banner stays (client/Discovery.luau; shorter while more wait)
 }
 
 -- Who may open the admin panel (P / the ADMIN button, server/Admin.luau): everybody in a Studio Play test, the

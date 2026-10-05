@@ -1188,52 +1188,6 @@ function buildClinic(parent: Instance, cx: number, cz: number)
 	bystander("nurse", "Nurse Kim", "City Clinic", frame * CFrame.new(-8, 0, front - 6))
 end
 
--- A big icon with the name over every shop, employer and far place, seen from afar (the way to find things).
-local function buildLandmarkTags(parent: Instance)
-	local tags = folder(parent, "LandmarkTags")
-	local colors = { shop = Color3.fromRGB(120, 230, 110), employer = Color3.fromRGB(255, 200, 60), place = Color3.fromRGB(230, 160, 255) }
-	for _, landmark in Map.Landmarks do
-		local anchor = part(tags, "Tag", Vector3.new(0.2, 0.2, 0.2), CFrame.new(landmark.x, 34, landmark.z), Color3.new(0, 0, 0))
-		anchor.Transparency = 1
-		anchor.CanCollide = false
-		anchor.CanQuery = false
-		local gui = Instance.new("BillboardGui")
-		gui.Size = UDim2.fromOffset(220, 70)
-		gui.AlwaysOnTop = true
-		gui.MaxDistance = 700
-		gui.LightInfluence = 0
-		gui.Parent = anchor
-		-- The landmark's icon (shared/Icons.luau) in its kind's colour, or its emoji while the icon's id is empty.
-		local art = Icons.get(Icons.landmark(landmark.id))
-		if art then
-			local icon = Instance.new("ImageLabel")
-			icon.Size = UDim2.new(1, 0, 0.6, 0)
-			icon.BackgroundTransparency = 1
-			icon.Image = art
-			icon.ScaleType = Enum.ScaleType.Fit
-			icon.ImageColor3 = colors[landmark.kind] or Color3.new(1, 1, 1)
-			icon.Parent = gui
-		else
-			local icon = Instance.new("TextLabel")
-			icon.Size = UDim2.new(1, 0, 0.6, 0)
-			icon.BackgroundTransparency = 1
-			icon.Text = landmark.icon
-			icon.TextScaled = true
-			icon.Parent = gui
-		end
-		local label = Instance.new("TextLabel")
-		label.Size = UDim2.new(1, 0, 0.4, 0)
-		label.Position = UDim2.fromScale(0, 0.6)
-		label.BackgroundTransparency = 1
-		label.Text = landmark.name
-		label.TextScaled = true
-		label.Font = Enum.Font.GothamBlack
-		label.TextColor3 = colors[landmark.kind] or Color3.new(1, 1, 1)
-		label.TextStrokeTransparency = 0.2
-		label.Parent = gui
-	end
-end
-
 local function buildDistrict(parent: Instance, d: Map.District)
 	local district = folder(parent, d.name)
 	buildDistrictRoads(district, d)
@@ -5133,9 +5087,8 @@ function World.build()
 	piece("boundary", function()
 		buildBoundary(world)
 	end)
-	piece("landmark tags", function()
-		buildLandmarkTags(world)
-	end)
+	-- (3.7: no more floating landmark tags over the buildings: their signs say what they are, and you find the places
+	-- on the map you discover; client/MapView.luau, server/Explore.luau.)
 	piece("lost packages", function()
 		buildSecrets(world)
 	end)
