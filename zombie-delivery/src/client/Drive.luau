@@ -2,6 +2,8 @@
 -- Drives the local player's car. The client is the car's network owner, so it sets the chassis movers itself:
 -- the LinearVelocity "Drive" (speed along the car's nose) and the AngularVelocity "Steer" (turning).
 -- Input comes from the VehicleSeat (WASD / arrows, gamepad, the mobile thumbstick), with a WASD fallback.
+-- 3.2: while the car's back is open (the attribute BackOpen, server/Vehicles.luau) the throttle stays at 0 and a
+-- toast says to close it first (Drive.notify, set by Main to Hud.toast).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +19,21 @@ local speed = 0 -- signed, along the nose
 local steerInput = 0
 local boostUntil = 0
 local boostMultiplier = 1
+local backToldAt = -math.huge -- the "close the back" toast, at most every few seconds
+
+-- Set by Main (Hud.toast). The fallback is Roblox's own notification.
+Drive.notify = nil :: ((text: string) -> ())?
+
+local function tell(text: string)
+	local notify = Drive.notify
+	if notify then
+		notify(text)
+		return
+	end
+	pcall(function()
+		game:GetService("StarterGui"):SetCore("SendNotification", { Title = "Zombie Delivery", Text = text, Duration = 3 })
+	end)
+end
 
 function Drive.myCar(): Model?
 	local cars = workspace:FindFirstChild("Cars")
@@ -127,6 +144,15 @@ local function step(dt: number)
 		end
 		if steer == 0 then
 			steer = keyAxis({ Enum.KeyCode.D, Enum.KeyCode.Right }, { Enum.KeyCode.A, Enum.KeyCode.Left })
+		end
+		-- 3.2: the back is open: the car stays where it is.
+		if throttle ~= 0 and car:GetAttribute("BackOpen") == true then
+			throttle = 0
+			local now = os.clock()
+			if now - backToldAt > 4 then
+				backToldAt = now
+				tell("Close the back first: get out and press E at the back.")
+			end
 		end
 	end
 

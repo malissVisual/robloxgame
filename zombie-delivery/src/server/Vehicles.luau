@@ -28,6 +28,17 @@
 -- client owns it again). The instant cases stay instant (force: PLAY, a respawn, a car bought or equipped, a job's
 -- vehicle): next to you and seated, or, when you spawn at home, parked at your home's garage drive-out spot (the
 -- hook Vehicles.homeGarage).
+--
+-- 3.2, the back that opens: every car that takes cargo by hand (all but the bus) has one, its Style.back: two rear
+-- doors (the vans and the box trucks), a tailgate (the pickup, the monster truck, the fuel truck's flatbed), a trunk
+-- lid (the muscle car), a horse ramp (the livestock truck). Each leaf hangs on a Motor6D "BackHinge" on the chassis
+-- (C0 = the hinge line, set once when it is built; closed = no Transform; the attributes Axis and Angle = the open
+-- turn). The car model's attribute BackOpen says where it is and every client swings the leaves there
+-- (client/CarVisuals.luau). The "BackPrompt" at the back (Open doors / Close doors …) opens and closes it: on foot,
+-- empty hands, the car standing, the owner or who the hook Vehicles.backAllowed lets (server/Cargo.luau: the job's
+-- crew). While it is open nobody gets behind the wheel (the Drive prompt refuses) and the driver's client holds the
+-- throttle (client/Drive.luau); server/Cargo.luau loads and unloads only through an open back. A new car (a
+-- chauffeur's, a respawn) starts closed. The NPC and traffic cars and the showroom models have the leaves welded shut.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -75,7 +86,20 @@ Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
 local DARK = Color3.fromRGB(34, 34, 38)
 local GLASS = Color3.fromRGB(150, 190, 210)
 
-type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue | lightbar
+type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue | lightbar | hole
+
+-- 3.2: one leaf of the back (a door, a tailgate, a lid, a ramp), relative to the chassis top centre, closed.
+type Leaf = {
+	size: Vector3,
+	center: Vector3,
+	hinge: Vector3, -- a point on the hinge line
+	axis: string, -- "Y": a door swinging out sideways | "X": a tailgate or a ramp dropping, a lid rising
+	angle: number, -- degrees of the open turn about the axis
+	kind: string?, -- its look (a Box kind), default body (painted)
+	trim: { Box }?, -- welded onto the leaf: offsets from the leaf's centre
+}
+-- noun: doors | tailgate | trunk | ramp; hole: the dark opening the leaves cover (the body behind them is solid).
+type Back = { noun: string, leaves: { Leaf }, hole: Box? }
 
 -- Where the cargo rides (server/Cargo.luau): the slots are the bottom centres of the pieces (facing the front),
 -- the door is where you load at the back, the entry is where passengers (the school kids) get in.
@@ -98,6 +122,7 @@ type Style = {
 	head: Vector2?, -- the headlights' height and z (default: 1.2 up, on the front end)
 	boxes: { Box }, -- relative to the chassis top centre (offset = centre of the box)
 	cargo: CargoSpec, -- relative to the chassis top centre
+	back: Back?, -- 3.2: the back that opens (nil: the bus, nobody loads it by hand)
 }
 
 local function box(size: Vector3, offset: Vector3, kind: string): Box
@@ -113,6 +138,37 @@ local function cargo(noun: string, length: number, width: number, slots: { Vecto
 	}
 end
 
+-- 3.2: two rear doors over the back face of a box (`width` wide, from `bottom` to `top`, the face at z = `rear`),
+-- hinged at the outer edges, swinging out to the sides. trim(side): what else sits on that side's door (-1 left).
+-- The doors start above the tail lights (DOOR_SILL): those stay on the body below them.
+local DOOR_SILL = 0.95
+local function rearDoors(width: number, bottom: number, top: number, rear: number, trim: ((side: number) -> { Box })?): Back
+	local leafWidth = width / 2 - 0.05
+	local height = top - bottom
+	local y = (bottom + top) / 2
+	local leaves: { Leaf } = {}
+	for _, side in { -1, 1 } do
+		local extra: { Box } = if trim then trim(side) else {}
+		-- A handle at the inner edge of every door.
+		table.insert(extra, box(Vector3.new(0.3, 0.9, 0.1), Vector3.new(-side * (leafWidth / 2 - 0.45), -0.3, 0.13), "dark"))
+		table.insert(leaves, {
+			size = Vector3.new(leafWidth, height, 0.2),
+			center = Vector3.new(side * (width / 2 - leafWidth / 2), y, rear + 0.1),
+			hinge = Vector3.new(side * width / 2, y, rear + 0.2),
+			axis = "Y",
+			angle = side * 120,
+			trim = extra,
+		})
+	end
+	return { noun = "doors", leaves = leaves, hole = box(Vector3.new(width - 0.5, height - 0.3, 0.05), Vector3.new(0, y, rear + 0.04), "hole") }
+end
+
+-- 3.2: a tailgate (or a ramp) hinged at its bottom back edge, dropping backward by `angle` degrees.
+local function tailgate(noun: string, size: Vector3, center: Vector3, angle: number, kind: string?, trim: { Box }?): Back
+	local hinge = Vector3.new(center.X, center.Y - size.Y / 2, center.Z + size.Z / 2)
+	return { noun = noun, leaves = { { size = size, center = center, hinge = hinge, axis = "X", angle = angle, kind = kind, trim = trim } } }
+end
+
 -- The slatted stall box of the livestock truck: posts and boards on both sides, the horses show between them.
 local function stallBoxes(): { Box }
 	local list = {
@@ -123,7 +179,6 @@ local function stallBoxes(): { Box }
 		box(Vector3.new(7.6, 0.4, 13.6), Vector3.new(0, 0.2, 3), "dark"), -- stall floor
 		box(Vector3.new(7.6, 7.6, 0.5), Vector3.new(0, 3.8, -3.65), "body"), -- front wall
 		box(Vector3.new(0.25, 3.2, 12.4), Vector3.new(0, 2, 3.2), "rail"), -- divider between the two stalls
-		box(Vector3.new(7.2, 6.6, 0.35), Vector3.new(0, 3.5, 9.8), "wood"), -- the ramp, folded up
 		box(Vector3.new(7.6, 0.4, 0.5), Vector3.new(0, 7.6, 9.8), "dark"),
 	}
 	for _, x in { -3.65, 3.65 } do
@@ -148,7 +203,6 @@ local function flatbedBoxes(): { Box }
 		box(Vector3.new(7.2, 0.5, 7.2), Vector3.new(0, 0.25, 4.4), "plate"), -- the flatbed
 		box(Vector3.new(7.2, 3.4, 0.3), Vector3.new(0, 2.2, 1), "rail"), -- headboard
 		box(Vector3.new(7.2, 0.3, 0.3), Vector3.new(0, 1.9, 4.2), "rail"), -- the rack between the rows
-		box(Vector3.new(7.2, 0.5, 0.3), Vector3.new(0, 0.8, 7.9), "accent"), -- tail rail
 		box(Vector3.new(0.3, 2.4, 1.4), Vector3.new(-3.5, 1.4, -1.6), "white"), -- hazard plates on the doors
 		box(Vector3.new(0.3, 2.4, 1.4), Vector3.new(3.5, 1.4, -1.6), "white"),
 	}
@@ -175,9 +229,6 @@ local function ambulanceBoxes(): { Box }
 		box(Vector3.new(7.5, 0.3, 8.6), Vector3.new(0, 5.6, 3.2), "accent"), -- thin stripe up top
 		box(Vector3.new(7.2, 0.8, 0.6), Vector3.new(0, 0.4, -7.6), "dark"), -- bumper
 		box(Vector3.new(7.6, 0.3, 0.5), Vector3.new(0, 0.15, 7.6), "dark"), -- rear step
-		box(Vector3.new(0.15, 5.4, 0.12), Vector3.new(0, 3.2, 7.56), "dark"), -- the rear doors' seam
-		box(Vector3.new(2.4, 1.6, 0.1), Vector3.new(-1.5, 4.4, 7.55), "glass"), -- rear windows
-		box(Vector3.new(2.4, 1.6, 0.1), Vector3.new(1.5, 4.4, 7.55), "glass"),
 		box(Vector3.new(5.8, 0.4, 1.3), Vector3.new(0, 5.2, -3.4), "lightbar"), -- the light bar on the cab roof
 		box(Vector3.new(2.5, 0.6, 1.1), Vector3.new(-1.45, 5.7, -3.4), "sirenred"),
 		box(Vector3.new(2.5, 0.6, 1.1), Vector3.new(1.45, 5.7, -3.4), "sirenblue"),
@@ -189,8 +240,20 @@ local function ambulanceBoxes(): { Box }
 		table.insert(list, box(Vector3.new(0.1, 2.4, 0.8), Vector3.new(x, 4.1, 3.6), "cross"))
 		table.insert(list, box(Vector3.new(0.1, 0.8, 2.4), Vector3.new(x, 4.1, 3.6), "cross"))
 	end
-	table.insert(list, box(Vector3.new(1.4, 0.45, 0.1), Vector3.new(1.5, 2.8, 7.56), "cross"))
-	table.insert(list, box(Vector3.new(0.45, 1.4, 0.1), Vector3.new(1.5, 2.8, 7.56), "cross"))
+	return list
+end
+
+-- 3.2: the ambulance's rear doors carry the windows, the red stripes round the back and a red cross on the right one.
+local function ambulanceDoor(side: number): { Box }
+	local list = {
+		box(Vector3.new(2.4, 1.6, 0.06), Vector3.new(-side * 0.375, 0.875, 0.12), "glass"),
+		box(Vector3.new(3.65, 0.9, 0.06), Vector3.new(0, -1.625, 0.12), "accent"),
+		box(Vector3.new(3.65, 0.3, 0.06), Vector3.new(0, 2.075, 0.12), "accent"),
+	}
+	if side > 0 then
+		table.insert(list, box(Vector3.new(1.4, 0.45, 0.08), Vector3.new(-0.375, -0.725, 0.15), "cross"))
+		table.insert(list, box(Vector3.new(0.45, 1.4, 0.08), Vector3.new(-0.375, -0.725, 0.15), "cross"))
+	end
 	return list
 end
 
@@ -213,6 +276,9 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(6.8, 0.8, 0.6), Vector3.new(0, 0.4, -6.6), "dark"), -- bumper
 		},
 		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.5, 0, 1.6), Vector3.new(1.5, 0, 1.6), Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6) }),
+		back = rearDoors(6.6, DOOR_SILL, 4.8, 6.4, function(side: number): { Box }
+			return { box(Vector3.new(2.2, 1.2, 0.06), Vector3.new(-side * 0.25, 0.825, 0.12), "glass") } -- rear windows
+		end),
 	},
 	pickup = {
 		width = 6.4,
@@ -229,10 +295,12 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(6.4, 0.6, 4), Vector3.new(0, 4.3, -0.9), "body"),
 			box(Vector3.new(0.4, 1.6, 5.4), Vector3.new(-3, 0.8, 3.8), "body"), -- bed walls
 			box(Vector3.new(0.4, 1.6, 5.4), Vector3.new(3, 0.8, 3.8), "body"),
-			box(Vector3.new(6.4, 1.6, 0.4), Vector3.new(0, 0.8, 6.3), "body"),
 			box(Vector3.new(6.8, 0.9, 0.7), Vector3.new(0, 0.3, -6.7), "dark"),
 		},
 		cargo = cargo("pickup", 13, 6.4, { Vector3.new(-1.4, 0, 5.1), Vector3.new(1.4, 0, 5.1), Vector3.new(0, 0, 3.6), Vector3.new(0, 2.1, 5.1) }),
+		back = tailgate("tailgate", Vector3.new(5.6, 1.6, 0.4), Vector3.new(0, 0.8, 6.3), 92, nil, {
+			box(Vector3.new(5.0, 0.25, 0.08), Vector3.new(0, 0.45, 0.22), "dark"), -- the latch bar
+		}),
 	},
 	muscle = {
 		width = 6.4,
@@ -247,13 +315,31 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(6.4, 1.4, 13.5), Vector3.new(0, 0.7, 0), "body"),
 			box(Vector3.new(5.6, 2.2, 5), Vector3.new(0, 2.5, 0.6), "glass"),
 			box(Vector3.new(5.6, 0.4, 4), Vector3.new(0, 3.4, 0.8), "body"),
-			box(Vector3.new(6.4, 0.3, 1.4), Vector3.new(0, 2.6, 6.2), "dark"), -- spoiler
-			box(Vector3.new(0.4, 1.2, 0.4), Vector3.new(-2.6, 2, 6.2), "dark"),
-			box(Vector3.new(0.4, 1.2, 0.4), Vector3.new(2.6, 2, 6.2), "dark"),
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(0.9, 1.42, 0), "accent"), -- stripes
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(-0.9, 1.42, 0), "accent"),
 		},
 		cargo = cargo("car", 13.5, 6.4, { Vector3.new(-1.2, 0.3, 5), Vector3.new(1.2, 0.3, 5) }),
+		-- The trunk lid on the rear deck, hinged at its front edge; the spoiler and the stripes ride on it.
+		back = {
+			noun = "trunk",
+			leaves = {
+				{
+					size = Vector3.new(6.0, 0.12, 3.0),
+					center = Vector3.new(0, 1.46, 5.0),
+					hinge = Vector3.new(0, 1.52, 3.5),
+					axis = "X",
+					angle = -65,
+					trim = {
+						box(Vector3.new(6.4, 0.3, 1.4), Vector3.new(0, 1.14, 1.2), "dark"), -- spoiler
+						box(Vector3.new(0.4, 1.2, 0.4), Vector3.new(-2.6, 0.54, 1.2), "dark"),
+						box(Vector3.new(0.4, 1.2, 0.4), Vector3.new(2.6, 0.54, 1.2), "dark"),
+						box(Vector3.new(1.6, 0.03, 3.0), Vector3.new(0.9, 0.07, 0), "accent"), -- the stripes
+						box(Vector3.new(1.6, 0.03, 3.0), Vector3.new(-0.9, 0.07, 0), "accent"),
+					},
+				},
+			},
+			hole = box(Vector3.new(5.6, 0.02, 2.8), Vector3.new(0, 1.45, 5.0), "hole"),
+		},
 	},
 	icecream = {
 		width = 6.8,
@@ -276,6 +362,9 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(7, 0.8, 0.6), Vector3.new(0, 0.4, -7.1), "dark"),
 		},
 		cargo = cargo("truck", 14, 6.8, { Vector3.new(-1.6, 0, 1.4), Vector3.new(1.6, 0, 1.4), Vector3.new(-1.6, 0, 4.6), Vector3.new(1.6, 0, 4.6) }),
+		back = rearDoors(6.8, DOOR_SILL, 5.4, 7.0, function(_side: number): { Box }
+			return { box(Vector3.new(3.35, 0.65, 0.06), Vector3.new(0, -1.9, 0.12), "accent") } -- the pink stripe goes round
+		end),
 	},
 	armored = {
 		width = 7.4,
@@ -298,6 +387,12 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(7.6, 1.2, 0.4), Vector3.new(0, 6.6, 7), "plate"), -- roof rail for the gunners
 		},
 		cargo = cargo("truck", 15, 7.4, { Vector3.new(-1.8, 0, 2), Vector3.new(1.8, 0, 2), Vector3.new(-1.8, 0, 5.2), Vector3.new(1.8, 0, 5.2) }),
+		back = rearDoors(7.4, DOOR_SILL, 5.8, 7.3, function(_side: number): { Box }
+			return {
+				box(Vector3.new(3.65, 1, 0.08), Vector3.new(0, -1.775, 0.13), "plate"), -- the armour plates go on over the doors
+				box(Vector3.new(3.65, 1, 0.08), Vector3.new(0, 1.025, 0.13), "plate"),
+			}
+		end),
 	},
 	bus = {
 		width = 8,
@@ -359,6 +454,9 @@ local STYLES: { [string]: Style } = {
 			Vector3.new(-1.8, 0, 6.2),
 			Vector3.new(1.8, 0, 6.2),
 		}),
+		back = rearDoors(7.6, DOOR_SILL, 7.8, 8.2, function(_side: number): { Box }
+			return { box(Vector3.new(3.7, 0.25, 0.06), Vector3.new(0, 2.625, 0.12), "dark") } -- the top rail
+		end),
 	},
 	monster = {
 		width = 8,
@@ -378,8 +476,11 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(8.4, 1.2, 1), Vector3.new(0, 0.2, -7.2), "plate"),
 			box(Vector3.new(1, 1.4, 12), Vector3.new(-3.2, -0.6, 0), "accent"), -- frame rails
 			box(Vector3.new(1, 1.4, 12), Vector3.new(3.2, -0.6, 0), "accent"),
+			box(Vector3.new(0.3, 1.0, 5), Vector3.new(-3.35, 2.3, 4), "body"), -- 3.2: rails round the bed
+			box(Vector3.new(0.3, 1.0, 5), Vector3.new(3.35, 2.3, 4), "body"),
 		},
 		cargo = cargo("truck", 14, 8, { Vector3.new(-2.2, 1.8, 5.6), Vector3.new(0, 1.8, 5.6), Vector3.new(2.2, 1.8, 5.6), Vector3.new(0, 3.8, 5.6) }),
+		back = tailgate("tailgate", Vector3.new(6.4, 1.0, 0.25), Vector3.new(0, 2.3, 6.375), 92),
 	},
 	livestock = {
 		width = 7.6,
@@ -392,6 +493,14 @@ local STYLES: { [string]: Style } = {
 		roof = 8.4,
 		boxes = stallBoxes(),
 		cargo = cargo("truck", 20, 7.6, { Vector3.new(-1.8, 0.4, 3.2), Vector3.new(1.8, 0.4, 3.2) }),
+		-- The ramp, folded up at the back: lowered it reaches the ground, the cleats on its inside face up.
+		back = tailgate("ramp", Vector3.new(6.8, 6.6, 0.35), Vector3.new(0, 3.5, 9.8), 112, "wood", {
+			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, -2.4, -0.22), "rail"),
+			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, -1.2, -0.22), "rail"),
+			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, 0, -0.22), "rail"),
+			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, 1.2, -0.22), "rail"),
+			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, 2.4, -0.22), "rail"),
+		}),
 	},
 	fueltruck = {
 		width = 7.2,
@@ -404,6 +513,9 @@ local STYLES: { [string]: Style } = {
 		roof = 5.2,
 		boxes = flatbedBoxes(),
 		cargo = cargo("truck", 16, 7.2, { Vector3.new(-1.7, 0.5, 2.6), Vector3.new(1.7, 0.5, 2.6), Vector3.new(-1.7, 0.5, 6), Vector3.new(1.7, 0.5, 6) }),
+		back = tailgate("tailgate", Vector3.new(6.4, 1.6, 0.25), Vector3.new(0, 1.3, 7.875), 95, "accent", {
+			box(Vector3.new(6.4, 0.3, 0.08), Vector3.new(0, 0.2, 0.15), "rail"),
+		}),
 	},
 	ambulance = {
 		width = 7,
@@ -417,6 +529,7 @@ local STYLES: { [string]: Style } = {
 		boxes = ambulanceBoxes(),
 		-- The patient lies on the stretcher in the back; they get in through the rear doors.
 		cargo = cargo("ambulance", 15, 7, { Vector3.new(0, 0.6, 3.6) }, Vector3.new(0, 0, 15 / 2 + 2.5)),
+		back = rearDoors(7.4, DOOR_SILL, 6.1, 7.5, ambulanceDoor),
 	},
 }
 
@@ -607,6 +720,96 @@ local function buildTurret(model: Model, chassis: BasePart, turretBase: CFrame, 
 	return turret, muzzle
 end
 
+-- The colour and the material of a Box kind on a car painted `color` (its accent colour: `accent`).
+local function boxLook(kind: string, color: Color3, accent: Color3): (Color3, Enum.Material)
+	if kind == "dark" or kind == "lightbar" then
+		return DARK, Enum.Material.Metal
+	elseif kind == "glass" then
+		return GLASS, Enum.Material.Glass
+	elseif kind == "accent" then
+		return accent, Enum.Material.SmoothPlastic
+	elseif kind == "plate" then
+		return color:Lerp(DARK, 0.5), Enum.Material.DiamondPlate
+	elseif kind == "white" then
+		return Color3.fromRGB(220, 180, 120), Enum.Material.SmoothPlastic
+	elseif kind == "ball" then
+		return Color3.fromRGB(255, 150, 200), Enum.Material.SmoothPlastic
+	elseif kind == "logo" then
+		return Color3.fromRGB(240, 240, 240), Enum.Material.SmoothPlastic
+	elseif kind == "wood" then
+		return Color3.fromRGB(128, 92, 58), Enum.Material.WoodPlanks
+	elseif kind == "rail" then
+		return Color3.fromRGB(70, 72, 76), Enum.Material.Metal
+	elseif kind == "cross" then
+		return Color3.fromRGB(205, 30, 34), Enum.Material.SmoothPlastic
+	elseif kind == "hole" then
+		return Color3.fromRGB(16, 16, 18), Enum.Material.SmoothPlastic
+	elseif SIREN_DIM[kind] then
+		return SIREN_DIM[kind], Enum.Material.SmoothPlastic
+	end
+	return color, Enum.Material.SmoothPlastic
+end
+
+-- A cosmetic part of the car (no mass, no collisions, not hit by rays), welded to `to` (nil: not welded).
+local function trimPart(model: Model, name: string, b: Box, at: CFrame, to: BasePart?, color: Color3, accent: Color3): Part
+	local c, material = boxLook(b.kind, color, accent)
+	local p = newPart(model, name, b.size, at, c, material)
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	if b.kind == "glass" then
+		p.Transparency = 0.45
+	end
+	if to then
+		weld(to, p)
+	end
+	return p
+end
+
+-- 3.2: the back that opens (Style.back): every leaf with its trim, the dark opening behind. working (a player's car):
+-- each leaf hangs on a Motor6D "BackHinge" that the clients turn (client/CarVisuals.luau), else it is welded shut.
+-- The body-coloured leaves join paintParts.
+local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
+	if back.hole then
+		trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), chassis, color, accent)
+	end
+	for _, leaf in back.leaves do
+		local kind = leaf.kind or "body"
+		local p = trimPart(model, "BackDoor", box(leaf.size, leaf.center, kind), top * CFrame.new(leaf.center), if working then nil else chassis, color, accent)
+		if kind == "body" then
+			table.insert(paintParts, p)
+		end
+		local trim: { Box } = leaf.trim or {}
+		for _, b in trim do
+			local t = trimPart(model, "BackTrim", b, top * CFrame.new(leaf.center + b.offset), p, color, accent)
+			if b.kind == "body" then
+				table.insert(paintParts, t)
+			end
+		end
+		if working then
+			-- Hinged, not welded: Part1 = chassis * C0 * Transform * C1:Inverse(), closed with no Transform.
+			local hinge = Instance.new("Motor6D")
+			hinge.Name = "BackHinge"
+			hinge.Part0 = chassis
+			hinge.Part1 = p
+			hinge.C0 = CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + leaf.hinge)
+			hinge.C1 = CFrame.new(leaf.hinge - leaf.center)
+			hinge:SetAttribute("Axis", leaf.axis)
+			hinge:SetAttribute("Angle", leaf.angle)
+			hinge.Parent = chassis
+		end
+	end
+end
+
+-- The Open / Close text of the back's prompt.
+local function backAction(noun: string, open: boolean): string
+	if noun == "ramp" then
+		return if open then "Raise ramp" else "Lower ramp"
+	end
+	return `{if open then "Close" else "Open"} {noun}`
+end
+
 -- Builds the body. display = a showroom model (anchored, no seats, no movers). gunId = the car gun on its roof (nil:
 -- none). oneBeam: only one headlight carries a SpotLight (the NPC cars: cheaper).
 local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?, oneBeam: boolean?): Built
@@ -630,32 +833,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	local top = chassisCF * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
 	local height = CHASSIS_HEIGHT
 	for _, b in style.boxes do
-		local c, material = color, Enum.Material.SmoothPlastic
-		if b.kind == "dark" then
-			c, material = DARK, Enum.Material.Metal
-		elseif b.kind == "glass" then
-			c, material = GLASS, Enum.Material.Glass
-		elseif b.kind == "accent" then
-			c = accent
-		elseif b.kind == "plate" then
-			c, material = color:Lerp(DARK, 0.5), Enum.Material.DiamondPlate
-		elseif b.kind == "white" then
-			c = Color3.fromRGB(220, 180, 120)
-		elseif b.kind == "ball" then
-			c = Color3.fromRGB(255, 150, 200)
-		elseif b.kind == "logo" then
-			c = Color3.fromRGB(240, 240, 240)
-		elseif b.kind == "wood" then
-			c, material = Color3.fromRGB(128, 92, 58), Enum.Material.WoodPlanks
-		elseif b.kind == "rail" then
-			c, material = Color3.fromRGB(70, 72, 76), Enum.Material.Metal
-		elseif b.kind == "cross" then
-			c = Color3.fromRGB(205, 30, 34)
-		elseif b.kind == "lightbar" then
-			c, material = DARK, Enum.Material.Metal
-		elseif SIREN_DIM[b.kind] then
-			c = SIREN_DIM[b.kind]
-		end
+		local c, material = boxLook(b.kind, color, accent)
 		local name = if b.kind == "glass" then "Cabin" elseif b.kind == "lightbar" then "LightBar" elseif SIREN_DIM[b.kind] then "SirenLens" else "Body"
 		local p = newPart(model, name, b.size, top * CFrame.new(b.offset), c, material)
 		p.Massless = true
@@ -685,6 +863,11 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		end
 		weld(chassis, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
+	end
+
+	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
+	if style.back then
+		buildBack(model, chassis, top, style.back, not display and not oneBeam, color, accent, paintParts)
 	end
 
 	-- Wheels: an invisible welded frictionless collider (the car slides on it) and a visible tyre on a Motor6D.
@@ -843,6 +1026,19 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	entry.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + style.cargo.entry
 	entry.Parent = chassis
 	model:SetAttribute("CargoCount", 0)
+	-- 3.2: the prompt that opens and closes the back (a player's car only: the NPC cars lose every prompt).
+	if style.back and not oneBeam then
+		local backPrompt = Instance.new("ProximityPrompt")
+		backPrompt.Name = "BackPrompt"
+		backPrompt.ActionText = backAction(style.back.noun, false)
+		backPrompt.ObjectText = def.name
+		backPrompt.HoldDuration = Config.Cargo.HoldDuration
+		backPrompt.MaxActivationDistance = 9
+		backPrompt.RequiresLineOfSight = false
+		backPrompt.KeyboardKeyCode = Enum.KeyCode.E
+		backPrompt.Parent = door
+		model:SetAttribute("BackOpen", false)
+	end
 
 	-- Prompts: the owner drives, everybody else rides (the clients show only the one that fits them).
 	type PromptInfo = { name: string, action: string, key: Enum.KeyCode }
@@ -1067,6 +1263,11 @@ local function watchPrompts(car: Car)
 		return if humanoid and humanoid.Health > 0 then humanoid else nil
 	end
 	drive.Triggered:Connect(function(player)
+		-- 3.2: not with the back open (it must be closed before the car goes anywhere).
+		if player == car.owner and Vehicles.backOpen(car) then
+			Net.get("Notice"):FireClient(player, `Close the back first: {Vehicles.backVerb(car, false)} (E at the back).`)
+			return
+		end
 		local humanoid = humanoidOf(player)
 		if player == car.owner and not car.wrecked and not car.chauffeured and not car.seat.Occupant and humanoid and not handsFull(player) then
 			car.seat:Sit(humanoid)
@@ -1178,6 +1379,95 @@ function Vehicles.cargoEntry(car: Car): Vector3
 	local entry = car.chassis:FindFirstChild("CargoEntry")
 	local point = if entry and entry:IsA("Attachment") then entry.WorldPosition else car.chassis.Position
 	return Vector3.new(point.X, car.chassis.Position.Y - CHASSIS_HEIGHT / 2 - styleOf(car).clearance, point.Z)
+end
+
+-- ── The back that opens (3.2) ──────────────────────────────────────────────
+
+-- Set by server/Cargo.luau: may this player (not the owner) open and close the back of this car (the job's crew)?
+Vehicles.backAllowed = function(_player: Player, _car: Car): boolean
+	return false
+end
+-- Set by server/Cargo.luau: the back of this car was opened or closed (the job's prompts and hints follow).
+Vehicles.backChanged = function(_car: Car) end
+
+-- The prompt that opens and closes the back; nil: no back (the bus) or wrecked (the prompts burnt).
+function Vehicles.backPrompt(car: Car): ProximityPrompt?
+	local door = Vehicles.cargoDoor(car)
+	local prompt = door and door:FindFirstChild("BackPrompt")
+	return if prompt and prompt:IsA("ProximityPrompt") then prompt else nil
+end
+
+-- Has this car a back that opens (doors, a tailgate, a trunk, a ramp)?
+function Vehicles.hasBack(car: Car): boolean
+	return not car.wrecked and Vehicles.backPrompt(car) ~= nil
+end
+
+function Vehicles.backOpen(car: Car): boolean
+	return car.model:GetAttribute("BackOpen") == true
+end
+
+-- What the back is: doors | tailgate | trunk | ramp ("" without one).
+function Vehicles.backNoun(car: Car): string
+	local back = styleOf(car).back
+	return if back then back.noun else ""
+end
+
+-- "open the back doors", "close the tailgate", "lower the ramp" … (opening: the way it goes now).
+function Vehicles.backVerb(car: Car, opening: boolean): string
+	local noun = Vehicles.backNoun(car)
+	if noun == "ramp" then
+		return if opening then "lower the ramp" else "raise the ramp"
+	end
+	return `{if opening then "open" else "close"} the {if noun == "doors" then "back doors" else noun}`
+end
+
+-- Opens or closes the back (the clients swing it, client/CarVisuals.luau). Nothing happens without a back.
+function Vehicles.setBack(car: Car, open: boolean)
+	if not Vehicles.hasBack(car) or Vehicles.backOpen(car) == open then
+		return
+	end
+	car.model:SetAttribute("BackOpen", open)
+	local prompt = Vehicles.backPrompt(car)
+	if prompt then
+		prompt.ActionText = backAction(Vehicles.backNoun(car), open)
+	end
+	Vehicles.backChanged(car)
+end
+
+-- The BackPrompt pressed: open or close it. On foot, empty hands, the car standing; the owner or the job's crew.
+local function toggleBack(car: Car, player: Player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if car.wrecked or car.chauffeured or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	local notice = Net.get("Notice")
+	if humanoid.SeatPart then
+		notice:FireClient(player, "Get out first.")
+		return
+	end
+	if player ~= car.owner and not Vehicles.backAllowed(player, car) then
+		notice:FireClient(player, "This is not your car.")
+		return
+	end
+	local open = Vehicles.backOpen(car)
+	local held = carrying(character)
+	if held then
+		local first = if held == "horse" then "Let the horse go (G)" else "Put it down (G)"
+		notice:FireClient(player, `Your hands are full. {first}, then {Vehicles.backVerb(car, not open)} (E).`)
+		return
+	end
+	if Vehicles.speed(car) > Config.Cargo.MaxCarSpeed then
+		notice:FireClient(player, "Stop the vehicle first.")
+		return
+	end
+	Vehicles.setBack(car, not open)
+	-- Somebody waits at the wheel: they cannot drive until it is closed again.
+	local driver = car.seat.Occupant
+	local other = driver and Players:GetPlayerFromCharacter(driver.Parent)
+	if not open and other and other ~= player then
+		notice:FireClient(other, `{player.DisplayName} opened the back: you can't drive until it is closed.`)
+	end
 end
 
 -- The car gun that goes on this car of the player's: the one in their profile, if the car can carry one.
@@ -1335,6 +1625,12 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	writeAttributes(car)
 	-- Connect the prompts while they are still on the chassis (the connections follow them into ParkedPrompts and back).
 	watchPrompts(car)
+	local backPrompt = Vehicles.backPrompt(car)
+	if backPrompt then
+		backPrompt.Triggered:Connect(function(by: Player)
+			toggleBack(car, by)
+		end)
+	end
 	if car.chauffeured then
 		-- Out of reach while the chauffeur drives (client/CarVisuals.luau looks for them on the chassis only).
 		local parked = Instance.new("Folder")
@@ -1387,6 +1683,7 @@ function Vehicles.handOver(car: Car)
 	if car.wrecked or not car.chassis.Parent then
 		return
 	end
+	Vehicles.setBack(car, false) -- the chauffeur leaves it closed
 	local parked = car.model:FindFirstChild("ParkedPrompts")
 	if parked then
 		for _, prompt in parked:GetChildren() do
