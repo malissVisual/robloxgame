@@ -8,7 +8,8 @@
 -- to the crosshair and raises the gun (shots wait until it is up, client/ArmPose.luau; out of a sprint the body
 -- first slows down and the gun comes up slower), the camera moves in over the shoulder. When a window is open (map, shop, backpack, job
 -- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera (and walk at
--- Config.Movement.Walk; a gamepad without a mouse sprints with the left stick click there too).
+-- Config.Movement.Walk; a gamepad without a mouse sprints with the left stick click there too; 4.2: a touch screen with
+-- the SPRINT toggle, CameraRig.setTouchSprint).
 -- With cargo in your hands (the Carrying attribute, server/Cargo.luau) there is no aiming, no sprint and a slower step.
 -- 3.9: with the gun holstered (B, client/Holster.luau) there is no aiming either; the first right or left click draws
 -- the gun (the left one does not shoot then), and the gun comes up as usual from there.
@@ -44,6 +45,8 @@ local aimBlend = 0 -- 0 = walking camera, 1 = over the shoulder
 local aimingSent = false
 local shiftHeld = false -- sprint
 local padSprint = false -- a gamepad's left stick click: sprint until you stop (or run out of breath)
+local touchSprint = false -- 4.2: the touch SPRINT toggle (client/TouchControls.luau): on until tapped off or out of breath
+local sprintingNow = false -- the last step's answer (the SPRINT button lights while you really run)
 local aimSince = 0 -- when the gun started going up (shots wait until it is up)
 local WALK_SPEED = Config.Movement.Walk -- 3.7: 14 (3.2.4: 12)
 local SPRINT_SPEED = Config.Movement.Sprint -- 3.7: 28 (3.2.4: 25)
@@ -483,10 +486,15 @@ local function touchSpeed()
 		if padSprint and humanoid.MoveDirection.Magnitude < 0.1 then
 			padSprint = false
 		end
-		local sprinting = Stamina.update(dt, padSprint and not handsFull, moving)
+		-- 4.2: the touch toggle stays on while you stand (no breath goes then); a seat, death or an empty breath end it.
+		if touchSprint and (seated or humanoid.Health <= 0 or not Stamina.canSprintNow()) then
+			touchSprint = false
+		end
+		local sprinting = Stamina.update(dt, (padSprint or touchSprint) and not handsFull, moving)
 		if padSprint and not sprinting then
 			padSprint = false
 		end
+		sprintingNow = sprinting and moving
 		if seated then
 			written = nil
 			return
@@ -561,6 +569,17 @@ function CameraRig.start()
 		lmbHeld = false
 	end)
 	RunService:BindToRenderStep("ZombieDeliveryCamera", Enum.RenderPriority.Camera.Value + 1, update)
+end
+
+-- 4.2: the touch SPRINT toggle (client/TouchControls.luau): on, you sprint whenever you move and have breath (the
+-- same breath, Stamina.update); it turns itself off when the breath runs dry, in a seat or on death.
+function CameraRig.setTouchSprint(on: boolean)
+	touchSprint = on and Stamina.canSprintNow()
+end
+
+-- Is the touch SPRINT toggle on, and do you really sprint right now?
+function CameraRig.touchSprint(): (boolean, boolean)
+	return touchSprint, sprintingNow
 end
 
 -- The point under the crosshair (locked) for the guns and the thrown items.

@@ -88,6 +88,31 @@ function Ui.touchLayout(): boolean
 	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end
 
+-- 4.2, a gamepad: is it what was used last (not the mouse, the keys or a finger)?
+function Ui.gamepadActive(): boolean
+	local last = UserInputService:GetLastInputType()
+	return last.Name:sub(1, 7) == "Gamepad"
+end
+
+-- 4.2: a window or a list that opens puts the gamepad's selection on its main action (`target`), so A takes it and
+-- the stick moves on from there. Only while a gamepad is in use: the mouse, the keys and touch never see a selection.
+function Ui.gamepadFocus(target: GuiObject?)
+	if not target or not Ui.gamepadActive() then
+		return
+	end
+	pcall(function()
+		GuiService.SelectedObject = target
+	end)
+end
+
+-- 4.2: a window that closes lets go of the gamepad's selection inside it.
+function Ui.gamepadRelease(container: Instance?)
+	local selected = GuiService.SelectedObject
+	if selected and container and selected:IsDescendantOf(container) then
+		GuiService.SelectedObject = nil
+	end
+end
+
 -- Instance.new + properties + parent. Returns any, so the caller can use the class's properties freely.
 function Ui.make(className: string, props: { [string]: any }, parent: Instance?): any
 	local instance: any = Instance.new(className)

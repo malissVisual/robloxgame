@@ -74,6 +74,7 @@ Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
 WeaponWheel.notify = Hud.toast
+Hud.onWeaponWheel = WeaponWheel.openTouch -- 4.2, touch: a tap on the weapon line opens the wheel
 Hud.onSound = Sounds.cycle
 -- One window at a time: every HUD window, the leaderboard and the crew window close the others.
 Hud.onCloseWindows = function()

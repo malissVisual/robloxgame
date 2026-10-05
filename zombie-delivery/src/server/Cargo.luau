@@ -3113,6 +3113,31 @@ function Cargo.start()
 		end
 	end
 	Equipment.start()
+
+	-- 4.2: the touch PUT DOWN / LET GO / SET DOWN button (client/TouchControls.luau) does what the G prompt in your
+	-- hands does: the pushed tool first (Equipment: stow or set down), else the top piece (or the horse) of whatever
+	-- job you carry for. Only your own hands, a few times a second at most.
+	local lastPut: { [Player]: number } = {}
+	Net.get("PutDown").OnServerEvent:Connect(function(player: Player)
+		local now = os.clock()
+		if now - (lastPut[player] or 0) < 0.25 then
+			return
+		end
+		lastPut[player] = now
+		if Equipment.letGo(player) then
+			return
+		end
+		for _, session in active do
+			if session.held[player] then
+				putDown(session, player)
+				session.info.changed()
+				return
+			end
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(player: Player)
+		lastPut[player] = nil
+	end)
 end
 
 return Cargo

@@ -16,6 +16,8 @@
 -- the door opens at once, the body slides out to your door's side in AlightSeconds and the controls come back.
 -- Out of a fast car (Config.Cargo.AlightSlideMaxSpeed) you are put out at the door at once, as before.
 --
+-- 4.2, touch: an EXIT button while you sit in a car (CarBoarding.exit, the same CarDoor "out" as E).
+--
 -- E in a seat: while you sit in a car the other prompts around you are hidden (the door prompts and the back's already
 -- are, client/CarVisuals.luau), so E means "get out"; a prompt meant for a driver (the 🅿 GARAGE posts, or any prompt
 -- with the attribute Seated = true) keeps E while it shows, and Space gets you out then. Gamepad: X (the prompts'
@@ -407,16 +409,36 @@ local function seatedPromptShown(): boolean
 	return false
 end
 
-local function onExit(_name: string, state: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
-	if state ~= Enum.UserInputState.Begin or not seatedIn or UserInputService:GetFocusedTextBox() or seatedPromptShown() then
-		return Enum.ContextActionResult.Pass
+-- Out of the car seat you sit in (E's way: the server unseats you at your door). False when you sit in none.
+local function askOut(): boolean
+	if not seatedIn then
+		return false
 	end
 	local now = os.clock()
 	if now - lastExit >= 0.4 then
 		lastExit = now
 		Net.get("CarDoor"):FireServer("out")
 	end
+	return true
+end
+
+local function onExit(_name: string, state: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
+	if state ~= Enum.UserInputState.Begin or not seatedIn or UserInputService:GetFocusedTextBox() or seatedPromptShown() then
+		return Enum.ContextActionResult.Pass
+	end
+	askOut()
 	return Enum.ContextActionResult.Sink
+end
+
+-- 4.2: the touch EXIT button (client/TouchControls.luau): out the way E gets you out. (Roblox's jump button still
+-- does too, through the seat's own jump, like Space.)
+function CarBoarding.exit(): boolean
+	return askOut()
+end
+
+-- Do you sit in a car seat now (the EXIT button shows)?
+function CarBoarding.seated(): boolean
+	return seatedIn ~= nil and move == nil
 end
 
 local function inCarSeat(seat: BasePart?): boolean

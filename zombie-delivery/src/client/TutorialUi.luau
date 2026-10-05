@@ -10,6 +10,8 @@
 --     after the ticket), with "FIRST DAY" and SKIP (it asks first). During the job it follows the Job payload
 --     (TutorialSteps.jobStep): the same state the ticket shows, never ahead of it.
 --   * A marker over Marge (TALK TO MARGE ▼) while she has something for you (welcome, retry).
+-- 4.2, a phone: the dialog sits in the middle at a readable size (at least 0.8, as wide as the screen allows), its
+-- actions and the hint's SKIP a finger tall (ACTION_H); a tap anywhere on it still continues.
 -- Everything lives in ScreenGuis that survive a respawn. The style is the approved "contract" direction
 -- (design/ui-contract on codex/ui-contract): white text over a subtle charcoal scrim, fine lines, small red accents,
 -- flat square shapes, the Theme fonts and colours (Theme.Contract).
@@ -32,6 +34,8 @@ local TutorialUi = {}
 -- The contract tokens (design/ui-contract/README.md), from Theme since 3.8.
 local CONTRACT = Theme.Contract
 local DIALOG_W = 540
+local TOUCH = Ui.touchLayout() -- 4.2: a phone or a tablet without a keyboard
+local ACTION_H = if TOUCH then 56 else 44 -- the actions' height (unscaled): 44 px or more for a finger at 0.8
 local ACTION = "TutorialContinue"
 local KEYS = { Enum.KeyCode.Space, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter, Enum.KeyCode.ButtonA }
 
@@ -51,7 +55,7 @@ local view: any = {} -- the instances (one table: few locals)
 -- A plain text action: caps, a thin red line under it on hover; at least 44 px tall for a finger.
 local function textAction(parent: Instance, text: string, color: Color3, order: number, onClick: () -> ()): any
 	local button = Ui.make("TextButton", {
-		Size = UDim2.fromOffset(0, 44),
+		Size = UDim2.fromOffset(0, ACTION_H),
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 1,
 		AutoButtonColor = false,
@@ -99,8 +103,8 @@ local function buildDialog(advance: () -> (), second: () -> ())
 		Name = "Dialog",
 		Size = UDim2.fromOffset(DIALOG_W, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -150),
+		AnchorPoint = if TOUCH then Vector2.new(0.5, 0.5) else Vector2.new(0.5, 1),
+		Position = if TOUCH then UDim2.fromScale(0.5, 0.55) else UDim2.new(0.5, 0, 1, -150),
 		BackgroundColor3 = CONTRACT.charcoal,
 		BackgroundTransparency = 0.12,
 		BorderSizePixel = 0,
@@ -132,10 +136,10 @@ local function buildDialog(advance: () -> (), second: () -> ())
 	})
 	Ui.make("Frame", { Name = "Sep", Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = CONTRACT.line, BackgroundTransparency = 0.6, BorderSizePixel = 0, LayoutOrder = 4 }, panel)
 
-	local footer = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 5 }, panel)
+	local footer = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, 0, 0, ACTION_H), BackgroundTransparency = 1, LayoutOrder = 5 }, panel)
 	local left = Ui.make("Frame", { Size = UDim2.fromScale(0.5, 1), BackgroundTransparency = 1 }, footer)
 	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 14), SortOrder = Enum.SortOrder.LayoutOrder }, left)
-	view.pageLabel = Ui.label(left, "", UDim2.fromOffset(0, 44), {
+	view.pageLabel = Ui.label(left, "", UDim2.fromOffset(0, ACTION_H), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.MonoFont,
 		TextSize = 12,
@@ -153,7 +157,7 @@ local function buildDialog(advance: () -> (), second: () -> ())
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, right)
 	view.primary = textAction(right, "", CONTRACT.text, 1, advance)
-	view.keyHint = Ui.label(right, if Ui.touchLayout() then "" else "SPACE", UDim2.fromOffset(0, 44), {
+	view.keyHint = Ui.label(right, if TOUCH then "" else "SPACE", UDim2.fromOffset(0, ACTION_H), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.MonoFont,
 		TextSize = 11,
@@ -190,7 +194,8 @@ local function buildHint(onSkip: () -> ())
 	local skip = textAction(top, "SKIP", CONTRACT.secondary, 1, onSkip)
 	skip.AnchorPoint = Vector2.new(1, 0.5)
 	skip.Position = UDim2.new(1, 0, 0.5, 0)
-	skip.Size = UDim2.fromOffset(0, 28)
+	skip.Size = UDim2.fromOffset(0, if TOUCH then 44 else 28) -- 4.2: a finger's height on touch (it reaches over the line)
+	skip.ZIndex = 2
 	view.hintText = Ui.label(body, "", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Font = Theme.Font,
@@ -245,6 +250,9 @@ local function refresh()
 	elseif phase ~= nil then
 		text = TutorialSteps.hint(phase, nil)
 	end
+	if TOUCH then
+		text = TutorialSteps.forTouch(text) -- 4.2: no keys on a touch screen
+	end
 	if view.hint then
 		view.hintText.Text = text
 		view.hint.Visible = text ~= ""
@@ -296,13 +304,19 @@ local function render()
 	local count = #dialog.pages
 	local last = current.page >= count
 	view.speaker.Text = dialog.speaker
-	view.line.Text = dialog.pages[current.page] or ""
+	local line = dialog.pages[current.page] or ""
+	view.line.Text = if TOUCH then TutorialSteps.forTouch(line) else line
 	view.pageLabel.Text = if count > 1 then `{current.page} / {count}` else ""
 	view.primary.Text = if last then dialog.primary else "CONTINUE"
 	local second = dialog.secondary
 	view.second.Text = second or ""
 	view.second.Visible = second ~= nil
-	view.scale.Scale = Ui.screenScale()
+	local scale = Ui.screenScale()
+	if TOUCH then
+		-- 4.2: readable on a phone (the HUD's 0.55 would make 10 px text), never wider than the screen.
+		scale = math.min(math.max(scale, 0.8), (Ui.screenSize().X - 32) / DIALOG_W)
+	end
+	view.scale.Scale = scale
 end
 
 local function close()
