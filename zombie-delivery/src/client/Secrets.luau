@@ -18,6 +18,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
+local Theme = require(script.Parent.Theme)
 
 local Secrets = {}
 
@@ -180,7 +181,7 @@ local function wake(pkg: Package)
 		sparkle.SpreadAngle = Vector2.new(180, 180)
 		sparkle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.28), NumberSequenceKeypoint.new(1, 0) })
 		sparkle.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
-		sparkle.Color = ColorSequence.new(Color3.fromRGB(255, 226, 140))
+		sparkle.Color = ColorSequence.new(Theme.Postage.gold:Lerp(Theme.Contract.text, 0.35)) -- a warm gold (the reward colour)
 		sparkle.LightEmission = 1
 		sparkle.Acceleration = Vector3.new(0, 0.6, 0)
 		sparkle.Parent = box

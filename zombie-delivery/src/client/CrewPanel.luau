@@ -22,8 +22,9 @@
 -- with it), so they never overlap the job panel, the car call line, the level-up banner or the toasts.
 -- The server (server/Crew.luau) checks everything; this module only asks and shows. While the window is open the
 -- mouse is free (Main: CameraRig.mouseNeeded checks CrewPanel.isOpen()).
--- 3.6 (Postage & Trouble): the lavender window (Ui.window), paper rows, the pay split on pastel faces; the strip and
--- the invitation card are paper cards with the crew violet; the tags over heads are cream pills.
+-- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window), flat rows, the pay split on dark
+-- faces; the strip and the invitation card are charcoal scrims with a thin rule on their left (white for the strip,
+-- red for an invitation waiting); the tags over heads are compact charcoal labels with light text.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,9 +42,10 @@ local MapView = require(script.Parent.MapView)
 local Hud = require(script.Parent.Hud)
 
 local C = Ui.Colors
-local P = Theme.Postage
-local GPS = Ui.Gps -- the GPS purple of the maps (client/MapView.luau): strokes and edges
-local VIOLET = P.violet -- the crew's colour for text on paper
+local P = Theme.Postage -- 3.8: remapped to the contract values (see Theme)
+local K = Theme.Contract
+local GPS = Ui.Gps -- the GPS purple of the maps (client/MapView.luau): the route beam; on a row it means "highlight"
+local VIOLET = P.violet -- the crew's text accent (3.8: a light accent on charcoal)
 local HIDDEN = CFrame.new(0, -1000, 0)
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: stood up
 
@@ -296,8 +298,14 @@ local function row(height: number, highlight: Color3?): any
 		BorderSizePixel = 0,
 		LayoutOrder = nextOrder(),
 	}, body)
-	Ui.corner(frame, 8)
-	Ui.stroke(frame, highlight or P.line, if highlight then 1.5 else 1).Transparency = 0
+	Ui.corner(frame)
+	Ui.stroke(frame, P.line, 1).Transparency = 0
+	-- 3.8: a highlighted row is raised with a narrow rule on its left (red for the GPS / crew highlight, else the
+	-- caller's colour, e.g. the leader's amber).
+	if highlight then
+		frame.BackgroundColor3 = K.raised
+		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = if highlight == GPS then K.red else highlight, BorderSizePixel = 0 }, frame)
+	end
 	return frame
 end
 
@@ -433,7 +441,7 @@ local function renderSplit(names: { string }, preview: boolean)
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 	}, frame)
-	Ui.corner(bar, 6)
+	Ui.corner(bar)
 	local total = ownerShare + memberShare * count
 	local x = 0
 	local leaderIsMe = crew ~= nil and type(crew.owner) == "table" and crew.owner.userId == player.UserId
@@ -849,13 +857,13 @@ local function updateTags()
 				MaxDistance = 500,
 				ResetOnSpawn = false,
 			}, playerGui)
-			-- Over the world: a cream pill behind the violet name.
+			-- Over the world: a compact charcoal label behind the light name.
 			local pill = Ui.label(billboard, "", UDim2.fromScale(0, 1), {
 				Name = "Text",
 				AutomaticSize = Enum.AutomaticSize.X,
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.fromScale(0.5, 0),
-				BackgroundTransparency = 0,
+				BackgroundTransparency = 0.2,
 				BackgroundColor3 = P.pill,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextSize = 14,
@@ -863,7 +871,7 @@ local function updateTags()
 				TextColor3 = VIOLET,
 				TextWrapped = false,
 			})
-			Ui.corner(pill, 13)
+			Ui.corner(pill)
 			Ui.stroke(pill, P.line, 1).Transparency = 0
 			Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, pill)
 			tag = { gui = billboard, head = nil }
@@ -966,11 +974,6 @@ local function build()
 		setOpen(false)
 	end
 	chrome.context.Text = "K · CREW · crews stay together after the job"
-	-- The crew's badge is lilac (the crew violet).
-	local badge = chrome.icon.Parent
-	if badge and badge:IsA("Frame") then
-		badge.BackgroundColor3 = P.lilac
-	end
 	body = Ui.make("ScrollingFrame", {
 		Size = UDim2.new(1, -28, 1, -20),
 		Position = UDim2.fromOffset(16, 12),
@@ -986,16 +989,16 @@ local function build()
 
 	-- A member's view of the leader's job: the top stack's crew slot, where your own job panel would be (a member
 	-- has none). As wide as the job panel; the slot is scaled with the stack.
-	-- 3.2: the Hud's job panel style (an accent edge, small caps over a DisplayFont step), in the GPS purple; 3.6: on
-	-- paper (Ui.panel), the text in the crew violet.
+	-- 3.2: the Hud's job panel style (an accent edge, small caps over a bold step); 3.8: a charcoal scrim (Ui.panel)
+	-- with a thin white rule on its left, the text light.
 	local slot = Hud.topSlot("crew")
 	strip = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 	strip.Name = "CrewStrip"
 	strip.LayoutOrder = 1
 	strip.AutomaticSize = Enum.AutomaticSize.Y
 	strip.Visible = false
-	Ui.stroke(strip, GPS, 1.5).Transparency = 0.35
-	Ui.edge(strip, GPS)
+	strip.BackgroundTransparency = K.scrim
+	Ui.edge(strip, K.text, 0)
 	local stripBody = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, strip)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 11) }, stripBody)
 	Ui.list(stripBody, true, 4)
@@ -1026,14 +1029,14 @@ local function build()
 	})
 
 	-- The invitation card: in the crew slot too (shown only without a job of your own and without a crew).
-	-- 3.2: the same card with the purple edge; ACCEPT the one main (sage) button, DECLINE quiet.
+	-- 3.8: the same card with a red rule (it waits for your answer); ACCEPT the one main action, DECLINE plain text.
 	card = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 	card.Name = "CrewInvitation"
 	card.LayoutOrder = 2
 	card.AutomaticSize = Enum.AutomaticSize.Y
 	card.Visible = false
-	Ui.stroke(card, GPS, 1.5).Transparency = 0.2
-	Ui.edge(card, GPS)
+	card.BackgroundTransparency = 0.15
+	Ui.edge(card, K.red, 0)
 	local cardBody = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, card)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, cardBody)
 	Ui.list(cardBody, true, 6)

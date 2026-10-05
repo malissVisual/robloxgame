@@ -93,10 +93,11 @@ end
 
 -- ── The banner ─────────────────────────────────────────────────────────────
 
-local TEXT = Color3.fromRGB(242, 242, 240) -- #F2F2F0
-local CHARCOAL = Color3.fromRGB(20, 23, 28) -- #14171C
-local LINE = Color3.fromRGB(133, 139, 147) -- #858B93
-local RED = Color3.fromRGB(215, 74, 70) -- #D74A46
+-- The contract colours (Theme.Contract).
+local TEXT = Theme.Contract.text
+local CHARCOAL = Theme.Contract.charcoal
+local LINE = Theme.Contract.line
+local RED = Theme.Contract.red
 
 local BANNER_W, BANNER_H = 420, 92
 local FADE_IN, FADE_OUT = 0.35, 0.45

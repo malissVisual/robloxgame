@@ -4,8 +4,9 @@
 -- The look (GTA-like, in the Dead End Dispatch colours): a dark ring cut into one segment per gun, the segment under
 -- the mouse lit with a pointer from the middle, and in the middle the gun's picture, name and bars for its damage,
 -- fire rate and range. It pops open (a short scale and fade).
--- 3.6 (Postage & Trouble): a cream paper ring over a soft plum veil, a lavender middle, the segment under the mouse
--- lit lilac with an ink pointer, the gun in your hands and the bars in the crew violet.
+-- 3.8 (the contract UI, design/ui-contract/): flat charcoal segments with fine grey separators over a charcoal veil,
+-- white icons and names, the segment under the mouse raised with a red rim and a red pointer (a gun you cannot use
+-- there: a dark red face and the reason in words), thin white bars in the middle. It opens with a short fade.
 -- In a car seat the two-handed guns are greyed out (only one-handed guns fire out of a window). While the wheel is
 -- open the mouse is free (Main adds WeaponWheel.isOpen to CameraRig.mouseNeeded) and a click does not shoot.
 -- Keyboard and mouse only: touch screens keep the BAG and the weapon bar.
@@ -37,10 +38,11 @@ local RING_IN = 118
 local SLOT_R = (RING_OUT + RING_IN) / 2
 local ICON = 58
 local DEAD_ZONE = 60 -- the mouse this close to the middle: no gun picked (letting go keeps yours)
-local P = Theme.Postage
-local LIT = P.violet -- the gun under the mouse / in your hands (text, icons, the bars)
-local GLOW = P.lilac -- the lit segment's face
-local POINTER = P.ink -- the pointer toward the gun under the mouse
+local P = Theme.Postage -- 3.8: remapped to the contract values (see Theme)
+local K = Theme.Contract
+local LIT = K.text -- the gun under the mouse / in your hands (text, icons, the bars)
+local GLOW = K.raised -- the lit segment's face
+local SELECTED = K.red -- the lit segment's rim and the pointer toward it
 
 local player = Players.LocalPlayer
 local state: any = nil
@@ -154,7 +156,7 @@ local function build(): Parts
 	screen.DisplayOrder = 20
 	screen.Enabled = false
 	screen.Parent = player:WaitForChild("PlayerGui")
-	-- A soft plum veil over the world; clicks land here (not on the world), so a click while choosing never shoots.
+	-- A charcoal veil over the world; clicks land here (not on the world), so a click while choosing never shoots.
 	local cover = Ui.make("TextButton", {
 		Name = "Cover",
 		Size = UDim2.fromScale(1, 1),
@@ -182,22 +184,22 @@ local function build(): Parts
 		GroupTransparency = 0,
 	}, root)
 
-	-- The ring: a cream paper disc with a thin lavender rim, and the lavender middle.
-	local outer = circle(group, "Outer", 2 * RING_OUT, P.paper, 0)
-	Ui.stroke(outer, P.line, 2).Transparency = 0
-	-- The lit segment: a soft lilac disc with a violet rim behind the gun under the mouse.
+	-- The ring: a flat charcoal band with a fine grey rim, and the darker middle.
+	local outer = circle(group, "Outer", 2 * RING_OUT, K.charcoal, 0.08)
+	Ui.stroke(outer, P.line, 1).Transparency = 0
+	-- The lit segment: a raised charcoal disc with a red rim behind the gun under the mouse.
 	local glow = circle(group, "Glow", RING_OUT - RING_IN - 6, GLOW, 0)
-	Ui.stroke(glow, LIT, 2).Transparency = 0.2
+	Ui.stroke(glow, SELECTED, 1.5).Transparency = 0
 	glow.Visible = false
 	local segments = Ui.make("Frame", { Name = "Segments", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, group)
-	local inner = circle(group, "Inner", 2 * RING_IN, P.lavender, 0)
-	Ui.stroke(inner, P.line, 1.5).Transparency = 0
-	-- The pointer: an ink diamond on the inner edge, turned toward the gun under the mouse.
+	local inner = circle(group, "Inner", 2 * RING_IN, K.recessed, 0.04)
+	Ui.stroke(inner, P.line, 1).Transparency = 0
+	-- The pointer: a small red square on the inner edge, turned toward the gun under the mouse.
 	local pointer = Ui.make("Frame", {
 		Name = "Pointer",
-		Size = UDim2.fromOffset(16, 16),
+		Size = UDim2.fromOffset(10, 10),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = POINTER,
+		BackgroundColor3 = SELECTED,
 		BorderSizePixel = 0,
 		Rotation = 45,
 		Visible = false,
@@ -246,19 +248,19 @@ local function build(): Parts
 			TextXAlignment = Enum.TextXAlignment.Left,
 		})
 		local track = Ui.make("Frame", {
-			Size = UDim2.fromOffset(66, 6),
+			Size = UDim2.fromOffset(66, 3),
 			Position = UDim2.new(0, 62, 0.5, 0),
 			AnchorPoint = Vector2.new(0, 0.5),
 			BackgroundColor3 = P.track,
 			BorderSizePixel = 0,
 		}, row)
-		Ui.corner(track, 3)
+		Ui.corner(track)
 		local fill = Ui.make("Frame", {
 			Size = UDim2.fromScale(0, 1),
 			BackgroundColor3 = LIT,
 			BorderSizePixel = 0,
 		}, track)
-		Ui.corner(fill, 3)
+		Ui.corner(fill)
 		local value = Ui.label(row, "", UDim2.fromOffset(30, 14), {
 			Position = UDim2.new(0, 132, 0, 0),
 			Font = Theme.MonoFont,
@@ -278,9 +280,9 @@ local function build(): Parts
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		BackgroundTransparency = 0,
-		BackgroundColor3 = P.pill, -- over the veil: a cream pill behind the text
+		BackgroundColor3 = P.pill, -- over the veil: a charcoal label behind the text
 	})
-	Ui.corner(hint, 13)
+	Ui.corner(hint)
 	Ui.make("UITextSizeConstraint", { MaxTextSize = 14 }, hint)
 
 	for _, def in Config.Weapons do
@@ -448,9 +450,7 @@ local function pick()
 		local current = state and state.weapon == slot.id
 		tint(slot.icon, if not slot.usable then (if on then C.red else C.grey) elseif on or current then LIT else C.text, if slot.usable then 0 else 0.5)
 		slot.name.TextColor3 = if not slot.usable then (if on then C.red else C.grey) elseif on then LIT else (if current then LIT else C.dim)
-		TweenService:Create(slot.holder, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
-			Size = if on then UDim2.fromOffset(slot.width * 1.18, (ICON + 26) * 1.18) else UDim2.fromOffset(slot.width, ICON + 26),
-		}):Play()
+		-- 3.8: no growth on hover; the raised face, the red rim and the pointer mark the choice.
 	end
 	if chosen then
 		local slot = slots[chosen]
@@ -461,7 +461,7 @@ local function pick()
 			Position = UDim2.new(0.5, x * SLOT_R, 0.5, y * SLOT_R),
 		}):Play()
 		p.pointer.Visible = true
-		p.pointer.BackgroundColor3 = if slot.usable then POINTER else C.red
+		p.pointer.BackgroundColor3 = SELECTED
 		p.pointer.Position = UDim2.new(0.5, x * (RING_IN + 2), 0.5, y * (RING_IN + 2))
 		showCentre(p, slot.def, slot.usable)
 	else

@@ -3,16 +3,16 @@
 --
 --   * The garage window (the "Garage" remote, server/Garages.luau): opened by the 🅿 GARAGE prompt at one of your
 --     garages (or the depot lot's terminal). It closes when you walk away, when another window opens, with ✕ or ESC.
---     3.6 (Postage & Trouble, design/ui-concept/previews/garage.png): the lavender window. On the left a drawing of
---     the selected car (its silhouette by style, in its own colour; no new assets), its role, and two boxes: the
---     cargo capacity and the free garage slots. On the right every car you own as a paper card: the name, an ACTIVE /
+--     3.8 (the contract UI, design/ui-contract/): the charcoal window. On the left a drawing of the selected car (its
+--     silhouette by style, in its own colour; no new assets), its role, and two boxes: the cargo capacity and the free
+--     garage slots. On the right every car you own as a flat row (the shown one with the red rule): the name, an ACTIVE /
 --     PARKED HERE / IN ANOTHER GARAGE tag, the cargo slots and upgrades, the vehicle condition with a bar, and the
 --     action: TAKE OUT VEHICLE for a car kept here (the one you drive is parked in its place), FIND REPAIR BAY for the
 --     damaged one you drive (the GPS to the nearest repair shop, Map.RepairShops: a route, never a remote repair).
 --     A click on a card shows that car on the left. Under the cards: where repairs happen.
 --   * The GARAGE prompts and their tags are shown only at your own garages (the player attribute "Estates", set by
 --     server/Estate.luau): somebody else's garage has nothing for you.
---   * The repair timer (the "Repair" remote, server/Repair.luau): a compact paper card in the HUD's top stack
+--   * The repair timer (the "Repair" remote, server/Repair.luau): a compact charcoal scrim in the HUD's top stack
 --     (Hud.topSlot("repair")) while the mechanics work on your car: the car, the shop, the seconds left, the fee and
 --     a bar.
 -- While the window is open the mouse is free (Main: CameraRig.mouseNeeded checks GarageUi.isOpen()).
@@ -31,7 +31,8 @@ local Hud = require(script.Parent.Hud)
 local MapView = require(script.Parent.MapView)
 
 local C = Ui.Colors
-local P = Theme.Postage
+local P = Theme.Postage -- 3.8: remapped to the contract values (see Theme)
+local K = Theme.Contract
 local GarageUi = {}
 
 -- Set by Main: opening this window closes the HUD's windows (one window at a time).
@@ -68,18 +69,19 @@ end
 
 -- ── Small pieces (the window is Ui.window) ──────────────────────────────────
 
--- A small tag ("ACTIVE", "PARKED HERE"): a pastel face, ink caps.
+-- A compact tag ("ACTIVE", "PARKED HERE"): a dark face, a fine outline, caps.
 local function tag(parent: Instance, text: string, face: Color3, ink: Color3): any
 	local label = Ui.label(parent, text, UDim2.new(0, 0, 0, 22), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 0,
 		BackgroundColor3 = face,
 		Font = Theme.HeadingFont,
-		TextSize = 12,
+		TextSize = 11,
 		TextColor3 = ink,
 		TextWrapped = false,
 	})
-	Ui.corner(label, 4)
+	Ui.corner(label)
+	Ui.stroke(label, P.line, 1).Transparency = 0
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, label)
 	return label
 end
@@ -128,10 +130,10 @@ local function drawCar(holder: Instance, carId: string)
 	local def = Economy.findCar(carId)
 	local shape = SHAPES[STYLE_SHAPE[if def then def.style else ""] or "van"]
 	local paint = carColor(carId)
-	local shade = paint:Lerp(P.ink, 0.35)
-	local glass = P.ink:Lerp(P.violet, 0.15)
+	local shade = paint:Lerp(K.charcoal, 0.35)
+	local glass = K.charcoal:Lerp(K.line, 0.3)
 	local shadow = Ui.make("Frame", { Position = UDim2.fromOffset(10, 124), Size = UDim2.fromOffset(280, 16), BackgroundColor3 = P.shadow, BackgroundTransparency = 0.75, BorderSizePixel = 0 }, holder)
-	Ui.corner(shadow, 9)
+	Ui.corner(shadow)
 	local body = shape.body
 	block(holder, body, paint, 8, 2)
 	block(holder, { body[1], body[2] + body[4] * 0.62, body[3], body[4] * 0.38 }, shade, 6, 3)
@@ -149,10 +151,10 @@ local function drawCar(holder: Instance, carId: string)
 		block(holder, { body[1] + 6, body[2] - 6, body[3] - 12, 8 }, shade, 3, 4)
 	end
 	-- The headlight and the wheels (a tyre, a rim).
-	block(holder, { cab[1] + cab[3] - 10, cab[2] + cab[4] * 0.5, 8, 10 }, P.paper, 3, 5)
+	block(holder, { cab[1] + cab[3] - 10, cab[2] + cab[4] * 0.5, 8, 10 }, K.text, 3, 5)
 	for _, x in shape.wheels do
 		local r = shape.wheel
-		block(holder, { x - r, WHEEL_Y - r, r * 2, r * 2 }, P.ink, r, 5)
+		block(holder, { x - r, WHEEL_Y - r, r * 2, r * 2 }, P.veil, r, 5)
 		block(holder, { x - r * 0.45, WHEEL_Y - r * 0.45, r * 0.9, r * 0.9 }, P.line, r, 6)
 	end
 end
@@ -181,18 +183,10 @@ local function build()
 		GarageUi.close()
 	end
 
-	-- The left side: the drawing on a soft glow, its caption, the two boxes.
-	local left = Ui.make("Frame", { Name = "Preview", Size = UDim2.new(0.47, 0, 1, 0), BackgroundColor3 = P.lavender:Lerp(P.paper, 0.55), BorderSizePixel = 0 }, content)
+	-- The left side: the drawing over a fine floor line, its caption, the two boxes.
+	local left = Ui.make("Frame", { Name = "Preview", Size = UDim2.new(0.47, 0, 1, 0), BackgroundColor3 = K.row, BorderSizePixel = 0 }, content)
 	Ui.make("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0), BackgroundColor3 = P.line, BorderSizePixel = 0 }, left)
-	local glow = Ui.make("Frame", {
-		Size = UDim2.fromOffset(340, 220),
-		Position = UDim2.new(0.5, 0, 0, 120),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = P.lavenderDeep,
-		BorderSizePixel = 0,
-	}, left)
-	Ui.corner(glow, 110)
-	Ui.make("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(0.7, 0.6), NumberSequenceKeypoint.new(1, 1) }) }, glow)
+	Ui.make("Frame", { Size = UDim2.new(1, -40, 0, 1), Position = UDim2.fromOffset(20, 178), BackgroundColor3 = P.line, BorderSizePixel = 0 }, left)
 	refs.drawing = Ui.make("Frame", { Size = UDim2.fromOffset(300, 150), Position = UDim2.new(0.5, 0, 0, 44), AnchorPoint = Vector2.new(0.5, 0), BackgroundTransparency = 1 }, left)
 	refs.carName = Ui.label(left, "", UDim2.new(1, -40, 0, 22), {
 		Position = UDim2.fromOffset(20, 204),
@@ -217,7 +211,7 @@ local function build()
 			BackgroundColor3 = P.lavender,
 			BorderSizePixel = 0,
 		}, boxes)
-		Ui.corner(box, 8)
+		Ui.corner(box)
 		Ui.stroke(box, P.line, 1).Transparency = 0
 		Ui.caps(box, if index == 1 then "Cargo capacity" else "Free garage slots", UDim2.new(1, -24, 0, 16), {
 			Position = UDim2.fromOffset(12, 14),
@@ -334,9 +328,13 @@ local function carCard(car: any, order: number)
 		Text = "",
 		LayoutOrder = order,
 	}, refs.list)
-	Ui.corner(card, 12)
+	Ui.corner(card)
 	local isShown = selected == id or (selected == nil and active)
-	Ui.stroke(card, if active then P.violet elseif isShown then P.ink2 else P.line, if active or isShown then 2 else 1).Transparency = 0
+	Ui.stroke(card, P.line, 1).Transparency = 0
+	if isShown then
+		Ui.selectRow(card, true) -- the car shown on the left: the quiet highlight and the narrow red rule
+	end
+	Ui.tactile(card)
 	card.Activated:Connect(function()
 		local click = Ui.onClick
 		if click then
@@ -392,7 +390,7 @@ local function carCard(car: any, order: number)
 			TextColor3 = P.ink2,
 		})
 	elseif car.here then
-		button = Ui.button(card, "TAKE OUT VEHICLE  →", UDim2.new(1, -32, 0, 44), P.sage, function()
+		button = Ui.button(card, "TAKE OUT VEHICLE", UDim2.new(1, -32, 0, 44), P.sage, function()
 			getRemote():FireServer("take", id)
 		end)
 	else
@@ -407,9 +405,8 @@ local function carCard(car: any, order: number)
 	end
 	if button then
 		button.Position = UDim2.fromOffset(16, 108)
-		button.TextSize = 15
+		button.TextSize = 14
 		button.TextColor3 = P.ink
-		Ui.tactile(button, 3, 1.02)
 	end
 end
 
@@ -470,7 +467,7 @@ render = function()
 		table.insert(shops, shop.name)
 	end
 	local note = Ui.make("Frame", { Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = P.tags[4], BorderSizePixel = 0, LayoutOrder = 100 }, refs.list)
-	Ui.corner(note, 8)
+	Ui.corner(note)
 	Ui.padding(note, 12)
 	local repairs = `Repairs take place at {table.concat(shops, " or ")}. Park in a bay, get out and let the mechanic work.`
 	Ui.label(note, if state.depot then `The depot lot keeps your starting van and the company vehicles; your other cars wait in your garages. {repairs}` else repairs, UDim2.new(1, 0, 0, 0), {
@@ -602,9 +599,8 @@ local function buildRepairCard()
 	if repairCard then
 		return
 	end
-	repairCard = Ui.make("Frame", { Name = "Repair", Size = UDim2.new(0.78, 0, 0, 44), BackgroundColor3 = P.paper, BorderSizePixel = 0, Visible = false }, Hud.topSlot("repair"))
-	Ui.corner(repairCard, 12)
-	Ui.stroke(repairCard, P.line, 1.5).Transparency = 0
+	repairCard = Ui.make("Frame", { Name = "Repair", Size = UDim2.new(0.78, 0, 0, 44), BackgroundColor3 = K.charcoal, BackgroundTransparency = K.scrim, BorderSizePixel = 0, Visible = false }, Hud.topSlot("repair"))
+	Ui.corner(repairCard)
 	Ui.edge(repairCard, REPAIR_ACCENT)
 	repairRefs.text = Ui.label(repairCard, "", UDim2.new(1, -112, 0, 24), {
 		Position = UDim2.fromOffset(18, 5),

@@ -122,11 +122,11 @@ function Stamina.start()
 	local Ui = require(script.Parent.Ui)
 	local Theme = require(script.Parent.Theme)
 	local player = Players.LocalPlayer
-	-- The contract colours (Color3 is Roblox's: here, not at the top level).
-	local TEXT = Color3.fromRGB(242, 242, 240) -- #F2F2F0
-	local SECONDARY = Color3.fromRGB(196, 199, 203) -- #C4C7CB
-	local CHARCOAL = Color3.fromRGB(20, 23, 28) -- #14171C
-	local RED = Color3.fromRGB(215, 74, 70) -- #D74A46
+	-- The contract colours (Theme.Contract; read here, not at the top level: the tests load this module without Roblox).
+	local TEXT = Theme.Contract.text
+	local SECONDARY = Theme.Contract.secondary
+	local CHARCOAL = Theme.Contract.charcoal
+	local RED = Theme.Contract.red
 
 	-- A new character starts rested.
 	player.CharacterAdded:Connect(function()

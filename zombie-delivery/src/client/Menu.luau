@@ -2,8 +2,9 @@
 -- The start screen: the camera drifts over the city (the zombies roam the streets), the title, your company's
 -- money and deliveries, and PLAY. PLAY fades to black, gives the camera back to your character and asks the server
 -- for your car.
--- 3.6 (Postage & Trouble): the card is a cream paper ticket, slightly tilted, over a soft lavender wash; PLAY is the
--- sage main action; the controls are a second ticket.
+-- 3.8 (the contract UI, design/ui-contract/): the card is a flat charcoal rectangle with a thin red rule, over a
+-- charcoal scrim that fades out to the right (the city stays the main view); PLAY is the main action (a red rule
+-- under it); the controls are a second card.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -103,7 +104,7 @@ function Menu.show(onPlay: () -> ())
 			ScaleType = Enum.ScaleType.Crop, BackgroundTransparency = 1, ZIndex = 1,
 		}, gui)
 	end
-	-- An unobtrusive lavender wash lets real-time world scenery remain the focal point.
+	-- A localized charcoal scrim (opaque on the left, gone on the right) keeps the real-time city the focal point.
 	local veil = Ui.make("Frame", {
 		Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.lavender,
 		BackgroundTransparency = 0.45, BorderSizePixel = 0, Active = false, ZIndex = 2,
@@ -119,16 +120,17 @@ function Menu.show(onPlay: () -> ())
 		BackgroundTransparency = 1, ZIndex = 5,
 	}, gui)
 	local menuScale = Ui.make("UIScale", {}, center)
-	-- The shift card: a paper ticket, tilted a little like the objective ticket on the road.
-	local face = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new(), nil, nil, -0.6)
+	-- The shift card: a flat charcoal rectangle, a thin red rule down its left edge.
+	local face = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
+	face.BackgroundColor3 = P.lavender
+	face.BackgroundTransparency = 0.06
 	local faceTicket = face.Parent
 	faceTicket.Name = "ShiftCard"
 	faceTicket.ZIndex = 5
-	local rail = Ui.make("Frame", {
-		Size = UDim2.new(0, 4, 1, -48), Position = UDim2.fromOffset(0, 24),
-		BackgroundColor3 = P.violet, BorderSizePixel = 0, ZIndex = 6,
+	Ui.make("Frame", {
+		Size = UDim2.new(0, 3, 1, -48), Position = UDim2.fromOffset(0, 24),
+		BackgroundColor3 = C.red, BorderSizePixel = 0, ZIndex = 6,
 	}, face)
-	Ui.corner(rail, 2)
 	Ui.caps(face, "Dead End Dispatch   ·   delivery company", UDim2.fromOffset(510, 20), {
 		Position = UDim2.fromOffset(24, 22), TextSize = 14, ZIndex = 6,
 	})
@@ -165,6 +167,8 @@ function Menu.show(onPlay: () -> ())
 
 	-- Controls live on a separate card so the start screen remains readable on phones.
 	local help = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
+	help.BackgroundColor3 = P.lavender
+	help.BackgroundTransparency = 0.06
 	local helpTicket = help.Parent
 	helpTicket.Name = "ControlsCard"
 	helpTicket.ZIndex, helpTicket.Visible = 15, false
@@ -194,7 +198,7 @@ function Menu.show(onPlay: () -> ())
 			BackgroundColor3 = P.lavender, BackgroundTransparency = if i % 2 == 0 then 1 else 0.2,
 			BorderSizePixel = 0, ZIndex = 16,
 		}, help)
-		Ui.corner(row, 5)
+		Ui.corner(row)
 		Ui.label(row, entry[1], UDim2.fromOffset(128, 44), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = P.violet, ZIndex = 17 })
 		Ui.label(row, entry[2], UDim2.fromOffset(366, 44), { Position = UDim2.fromOffset(140, 0), TextSize = 16, Font = Theme.Font, ZIndex = 17 })
 		table.insert(rows, row)
@@ -206,13 +210,13 @@ function Menu.show(onPlay: () -> ())
 	local enterHint = Ui.label(face, if touchLayout then "Tap PLAY to begin" else "Press ENTER to begin", UDim2.fromOffset(244, 44), {
 		Position = UDim2.fromOffset(292, 430), TextSize = 15, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
 	})
-	-- Over the world: a cream pill behind the text.
+	-- Over the world: a compact charcoal label behind the text.
 	local version = Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.new(1, -12, 1, -10), AnchorPoint = Vector2.new(1, 1),
 		BackgroundTransparency = 0, BackgroundColor3 = P.pill, Text = `version {Config.Version}`,
 		TextSize = 14, Font = Theme.MonoFont, TextColor3 = C.dim, ZIndex = 6,
 	}, gui)
-	Ui.corner(version, 12)
+	Ui.corner(version)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, version)
 
 	local viewportConnection: RBXScriptConnection? = nil

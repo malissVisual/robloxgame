@@ -12,7 +12,7 @@
 --   * A marker over Marge (TALK TO MARGE ▼) while she has something for you (welcome, retry).
 -- Everything lives in ScreenGuis that survive a respawn. The style is the approved "contract" direction
 -- (design/ui-contract on codex/ui-contract): white text over a subtle charcoal scrim, fine lines, small red accents,
--- flat square shapes, the Theme fonts. Its colours are kept here (CONTRACT) until Theme gets them.
+-- flat square shapes, the Theme fonts and colours (Theme.Contract).
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -29,14 +29,8 @@ local CameraRig = require(script.Parent.CameraRig)
 
 local TutorialUi = {}
 
--- The contract tokens (design/ui-contract/README.md).
-local CONTRACT = {
-	text = Color3.fromRGB(242, 242, 240), -- #F2F2F0
-	secondary = Color3.fromRGB(196, 199, 203), -- #C4C7CB
-	charcoal = Color3.fromRGB(20, 23, 28), -- #14171C
-	line = Color3.fromRGB(133, 139, 147), -- #858B93
-	red = Color3.fromRGB(215, 74, 70), -- #D74A46
-}
+-- The contract tokens (design/ui-contract/README.md), from Theme since 3.8.
+local CONTRACT = Theme.Contract
 local DIALOG_W = 540
 local ACTION = "TutorialContinue"
 local KEYS = { Enum.KeyCode.Space, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter, Enum.KeyCode.ButtonA }
