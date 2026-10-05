@@ -114,12 +114,12 @@ end
 local _, mostStars = Missions.stars({})
 local secretList = (Map :: any).Secrets :: { any }?
 local secretsTotal = if secretList and #secretList > 0 then #secretList else 30
-check("every campaign done", has("campaigns", #Missions.Campaigns) and #Missions.Campaigns == 10)
-check("every star (300)", has("stars", mostStars) and mostStars == 300, mostStars)
+check("every campaign done (11: ten stories and the DUO campaign)", has("campaigns", #Missions.Campaigns) and #Missions.Campaigns == 11, #Missions.Campaigns)
+check("every star (330, from the data)", has("stars", mostStars) and mostStars == 3 * #Missions.List and mostStars == 330, mostStars)
 check("every secret (#Map.Secrets)", has("secrets", secretsTotal), secretsTotal)
 check("every place (#Map.Places)", has("visited", #Map.Places), #Map.Places)
 check("level 15", has("level", 15) and Config.Levels.MaxLevel == 15)
-check("every mission (100)", has("missions", #Missions.List) and #Missions.List == 100)
+check("every mission (110)", has("missions", #Missions.List) and #Missions.List == 110, #Missions.List)
 do
 	local bad = {}
 	for _, def in List do

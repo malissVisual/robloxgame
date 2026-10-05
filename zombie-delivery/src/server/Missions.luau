@@ -12,7 +12,8 @@
 --   server → client  ("state", MissionsState)
 --                      progress = { [mission id] = best stars }, campaigns = { [campaign id] = true } (rewarded),
 --                      level, stars, starsMax, active = the mission running (yours, or your crew leader's) or nil,
---                      crewOwner = your crew leader's name when you are in somebody's crew, else nil
+--                      crewOwner = your crew leader's name when you are in somebody's crew, else nil,
+--                      crewSize = the members of your own crew (3.2: the DUO missions need Config.Missions.Duo.MinCrew)
 --                    ("cleared", { id, name, stars, best, newStars, reward, starBonus, xp, campaignDone, campaignReward,
 --                      crew, owner }) a mission is done: the banner (then the state follows)
 -- A player who opened the window once gets the state again whenever it changes on its own (a mission starts or
@@ -20,6 +21,12 @@
 --
 -- 3.1: a campaign finished gives its exclusive reward too (Challenges.campaignDone: a gun or a paint and a title), and
 -- every credit checks the challenges (Challenges.check: missions, stars, campaigns).
+--
+-- 3.2: a mission is open only when its campaign's required campaigns are finished (shared/Missions.luau unlocked:
+-- the chain of stories, their finales) and at its own level. A DUO mission (MissionDef.duo) starts only with at least
+-- Config.Missions.Duo.MinCrew crew members (Crew.members) online and within StartRange of you; otherwise START is
+-- refused with "DUO mission: invite a friend first (K) and bring them here." (server/Jobs.luau fails it when the
+-- partner leaves later). The state says crewSize (your crew's members) so the window knows before START.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -108,6 +115,7 @@ local function stateFor(player: Player): { [string]: any }?
 		starsMax = starsMax,
 		active = activeOf(player),
 		crewOwner = if owner and owner.Parent then owner.DisplayName else nil,
+		crewSize = #Crew.members(player),
 	}
 end
 
@@ -119,7 +127,7 @@ local function signature(player: Player): string
 	if profile then
 		stars = MissionData.stars(profile.missions, nil)
 	end
-	return `{activeOf(player) or "-"}|{if owner then owner.UserId else 0}|{PlayerData.level(player)}|{stars}`
+	return `{activeOf(player) or "-"}|{if owner then owner.UserId else 0}|{PlayerData.level(player)}|{stars}|{#Crew.members(player)}`
 end
 
 -- The progress a player's MISSIONS window shows (sent on "open", after every change).
@@ -143,6 +151,30 @@ end
 
 -- ── Starting ───────────────────────────────────────────────────────────────
 
+-- Where a player is (their character; in a car the seat carries them along), nil without one.
+local function whereIs(player: Player): Vector3?
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	return if root then root.Position else nil
+end
+
+-- 3.2: a DUO mission needs MinCrew members of your crew online and within StartRange of you. nil = yes, else why not.
+local function duoRefusal(player: Player): string?
+	local tuning = Config.Missions.Duo
+	local here = whereIs(player)
+	local near = 0
+	for _, member in Crew.members(player) do
+		local there = whereIs(member)
+		if here and there and Vector3.new(here.X - there.X, 0, here.Z - there.Z).Magnitude <= tuning.StartRange then
+			near += 1
+		end
+	end
+	if near >= tuning.MinCrew then
+		return nil
+	end
+	return "DUO mission: invite a friend first (K) and bring them here."
+end
+
 -- Can this player start the mission now? nil = yes, else why not (for the Notice).
 local function refusal(player: Player, def: MissionData.MissionDef): string?
 	local profile = PlayerData.get(player)
@@ -159,6 +191,9 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 	local open, why = MissionData.unlocked(def.id, profile.missions, Levels.levelFor(profile.xp))
 	if not open then
 		return why or "This mission is locked."
+	end
+	if def.duo then
+		return duoRefusal(player)
 	end
 	return nil
 end

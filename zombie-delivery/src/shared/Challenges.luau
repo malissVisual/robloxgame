@@ -61,9 +61,9 @@ Challenges.Categories = {
 } :: { { id: string, name: string } }
 
 -- The goals that depend on the game's data (they grow with it, the descriptions follow).
-local MISSIONS_TOTAL = #Missions.List -- 100
-local CAMPAIGNS_TOTAL = #Missions.Campaigns -- 10
-local _, STARS_TOTAL = Missions.stars({}) -- 300 (3 per mission)
+local MISSIONS_TOTAL = #Missions.List -- 110 (3.2: with the DUO campaign)
+local CAMPAIGNS_TOTAL = #Missions.Campaigns -- 11 (ten stories and the DUO campaign)
+local _, STARS_TOTAL = Missions.stars({}) -- 330 (3 per mission)
 local PLACES_TOTAL = #Map.Places -- 29
 local MAX_LEVEL = Config.Levels.MaxLevel -- 15
 local SECRETS_TOTAL = #Map.Secrets -- 30 (the lost packages)

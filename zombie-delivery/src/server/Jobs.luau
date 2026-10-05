@@ -51,6 +51,13 @@
 -- 3.1, the challenges (server/Challenges.luau): Jobs.onStat (wired in Main) hears the waves that came, a HOLD OUT won,
 -- the pieces delivered (and the people boarded, the horses) for the owner and the crew with them, and at a mission's
 -- finish co-op, night, 3 stars, a rush and a NO SHOOTING mission without a shot for who was there.
+--
+-- 3.2, the DUO missions (MissionDef.duo, Config.Missions.Duo; server/Missions.luau checks the crew at START): the
+-- mission fails ("Your partner left.") when the invited crew drops below MinCrew after it had them. Their twists:
+--   pair      heavy pieces only move with two (server/Cargo.luau, Info.pair: no job mate within PairRange, no pick-up)
+--   switches  the gated stop (the last drop, or every pick-up with MissionDef.gates = "pickup") gets two levers
+--             (server/DuoGates.luau) and stays blocked (Cargo.setBlocked) until two different players of the job
+--             pulled them together; with defend at the same drop both must be done (blockStop).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -72,6 +79,7 @@ local Cargo = require(script.Parent.Cargo)
 local DayNight = require(script.Parent.DayNight)
 local Crew = require(script.Parent.Crew)
 local Gun = require(script.Parent.Gun)
+local DuoGates = require(script.Parent.DuoGates)
 
 type Stop = {
 	address: Map.Address,
@@ -109,6 +117,9 @@ type Offer = {
 	twists: { [string]: boolean }, -- the job type's twists (Config.Missions.Twists)
 	coop: boolean, -- a co-op mission: pay and enemies grow with the crew
 	defendTime: number, -- defend: seconds to hold out at the last drop
+	-- 3.2, the DUO missions:
+	duo: boolean, -- only with a crew: fails when the partner leaves
+	gates: string?, -- switches: "drop" (the last drop) | "pickup" (every pick-up), nil without the twist
 }
 
 type Job = {
@@ -147,6 +158,12 @@ type Job = {
 	-- 3.1, the challenges' counters (Jobs.onStat):
 	shots: number, -- shots of the job's people (counted on a quiet mission: NO SHOOTING finished without one)
 	piecesCounted: number, -- the delivered pieces already told to Jobs.onStat
+	-- 3.2, the DUO missions:
+	owner: Player,
+	allowed: (Player) -> boolean, -- who handles the cargo and pulls the levers: the owner and the crew
+	duoTeamed: boolean, -- the crew had MinCrew members (from then on fewer fails the mission)
+	gateClosed: boolean, -- switches: this stop's gate is still shut (server/DuoGates.luau)
+	gatePulled: number, -- switches: levers down right now (the HUD)
 }
 
 -- What a DeliveryResult says about the XP (shared/Levels.luau), the owner's and every member's own.
@@ -210,10 +227,12 @@ local function defendHint(job: Job): string?
 	return `HOLD OUT {clock} · get back to {job.defendWho} on foot!`
 end
 
--- What to do now (Cargo.step), the defend countdown instead while holding out.
+-- What to do now (Cargo.step), the defend countdown instead while holding out, then (3.2) the twin-lever gate while it
+-- is shut and you are at the stop.
 local function stepOf(job: Job): (string, string)
 	local handling, step = Cargo.step(job.cargo)
-	return handling, defendHint(job) or step
+	local gate = if job.gateClosed and handling ~= "drive" then DuoGates.hint(job.owner) else nil
+	return handling, defendHint(job) or gate or step
 end
 
 -- The mission part of the job payload and of Jobs.crewStatus, nil for every other job: id, name, campaign, number,
@@ -243,6 +262,8 @@ local function missionInfo(job: Job): { [string]: any }?
 		crew = job.crewCount,
 		coopPay = if offer.coop then Economy.coopPay(job.crewCount) else nil,
 		gunnerKills = if offer.twists.gunner then job.gunnerKills else nil,
+		duo = if offer.duo then true else nil, -- 3.2: a DUO mission
+		gatePulled = if job.gateClosed then job.gatePulled else nil, -- 3.2: switches, the gate shut: levers down (0 – 2)
 	}
 end
 
@@ -426,6 +447,12 @@ end
 
 type CargoInfo = { kind: string, look: string, piece: string, plural: string, total: number }
 
+-- 3.2: where a switches mission's gate stands (MissionDef.gates): "pickup" or "drop" (the default).
+local function gatesOf(mission: string?): string
+	local def = if mission then Missions.find(mission) else nil
+	return if def and def.gates == "pickup" then "pickup" else "drop"
+end
+
 local function finishOffer(tierIndex: number, stops: { Stop }, distance: number, cargo: string, customer: string, jobType: Config.JobTypeDef?, pieces: CargoInfo, extraPay: number): Offer
 	local tier = JobsConfig.Tiers[tierIndex]
 	local timeLimit = if jobType then jobType.timeLimit else nil
@@ -488,6 +515,8 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 		twists = twists,
 		coop = jobType ~= nil and jobType.coop == true,
 		defendTime = defendTime,
+		duo = jobType ~= nil and jobType.duo == true,
+		gates = if twists.switches then gatesOf(mission) else nil,
 	}
 end
 
@@ -771,6 +800,7 @@ end
 local function endJob(player: Player, job: Job, linger: boolean)
 	jobs[player] = nil
 	Cargo.finish(job.cargo, linger)
+	DuoGates.clear(player) -- 3.2: the twin-lever gate, if any
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
 	Vehicles.setSpeedMultiplier(player, 1)
 	-- 3.0: the crew stays together (no Crew.disband): the next mission is one START away.
@@ -801,6 +831,51 @@ local function twistNames(offer: Offer): string
 	return table.concat(names, " + ")
 end
 
+-- 3.2: the stop is blocked (Cargo.setBlocked) while a defend is still to hold there or its twin-lever gate is shut
+-- (at the same last drop both count). The reason goes as setBlocked's third argument for a Cargo that takes one
+-- (stream C's `reason`); FALLBACK: called untyped, so a Cargo.setBlocked(session, blocked) without it ignores it.
+local function blockStop(job: Job)
+	local offer = job.offer
+	local defending = offer.twists.defend == true and job.stop == #offer.stops and not job.defendDone
+	local blocked = defending or job.gateClosed
+	local reason = if defending then "Hold out first! Nothing gets unloaded until the area is safe."
+		elseif job.gateClosed then "Pull both levers together first! One of you on each lever."
+		else nil
+	local setBlocked: any = Cargo.setBlocked
+	setBlocked(job.cargo, blocked, reason)
+end
+
+-- 3.2, switches: does the job's stop `index` have a twin-lever gate?
+local function gatedStop(offer: Offer, index: number): boolean
+	local stop = offer.stops[index]
+	if not offer.gates or not stop then
+		return false
+	end
+	if offer.gates == "pickup" then
+		return stop.kind == "pickup"
+	end
+	return index == #offer.stops
+end
+
+-- 3.2, switches: the gate of the job's current stop (server/DuoGates.luau), built when the job gets to it; the one of
+-- the stop before goes.
+local function placeGate(player: Player, job: Job)
+	DuoGates.clear(player)
+	job.gateClosed = false
+	job.gatePulled = 0
+	if not gatedStop(job.offer, job.stop) then
+		return
+	end
+	local stop = job.offer.stops[job.stop]
+	job.gateClosed = true
+	DuoGates.build(player, tostring(job.stop), stop.pile, stop.facing, job.allowed, function()
+		local current = jobs[player]
+		if current then
+			current.dirty = true
+		end
+	end)
+end
+
 -- Starts the job. False and why not (no notice: the caller tells the player).
 local function startJob(player: Player, offer: Offer): (boolean, string?)
 	local jobType = offer.jobType
@@ -822,17 +897,18 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		end
 	end
 	local job: Job
-	local session = Cargo.begin(player, {
+	local function allowed(other: Player): boolean
+		-- The owner, who rode along, and the invited crew.
+		return other == player or crew[other] == true or isMember(player, other)
+	end
+	local cargoInfo: Cargo.Info = {
 		kind = offer.kind,
 		look = offer.look,
 		piece = offer.piece,
 		plural = offer.plural,
 		total = offer.total,
 		handles = handles,
-		allowed = function(other: Player): boolean
-			-- The owner, who rode along, and the invited crew.
-			return other == player or crew[other] == true or isMember(player, other)
-		end,
+		allowed = allowed,
 		changed = function()
 			local current = jobs[player]
 			if current then
@@ -840,7 +916,12 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 			end
 		end,
 		lift = offer.twists.lift == true,
-	})
+	}
+	-- 3.2, the pair twist (stream C: Cargo.Info.pair). FALLBACK: set untyped, so a Cargo.Info without the field still
+	-- type-checks; once it has it this can be a plain field above.
+	local untypedInfo: any = cargoInfo
+	untypedInfo.pair = offer.twists.pair == true
+	local session = Cargo.begin(player, cargoInfo)
 	local crewCount = #Crew.members(player)
 	local members: { [Player]: boolean } = {}
 	for _, member in Crew.members(player) do
@@ -881,6 +962,11 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		quietNotice = {},
 		shots = 0,
 		piecesCounted = 0,
+		owner = player,
+		allowed = allowed,
+		duoTeamed = crewCount >= Config.Missions.Duo.MinCrew,
+		gateClosed = false,
+		gatePulled = 0,
 	}
 	jobs[player] = job
 	-- No pick-up: the vehicle starts loaded.
@@ -888,16 +974,16 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		Cargo.fill(session, offer.total)
 	end
 	Cargo.setStop(session, planOf(offer.stops[1]))
-	-- Defend: the last drop unloads only after holding out (a job of one drop: from the start).
-	if offer.twists.defend and #offer.stops == 1 then
-		Cargo.setBlocked(session, true)
-	end
+	-- Defend: the last drop unloads only after holding out (a job of one drop: from the start). 3.2, switches: the
+	-- first stop's gate if it has one.
+	placeGate(player, job)
+	blockStop(job)
 	Vehicles.setSpeedMultiplier(player, if offer.modifier then offer.modifier.speedMultiplier else 1)
 	send(player)
 	local title = if jobType then jobType.name else ""
 	if offer.mission then
 		local twists = twistNames(offer)
-		title = `MISSION: {title}{if twists ~= "" then ` ({twists})` else ""}{if offer.coop then " · CO-OP" else ""}`
+		title = `MISSION: {title}{if twists ~= "" then ` ({twists})` else ""}{if offer.duo then " · DUO" elseif offer.coop then " · CO-OP" else ""}`
 	end
 	local text = if jobType then `{title}: {offer.stops[1].label}` else offer.stops[1].label
 	if jobType and jobType.timeLimit then
@@ -1385,12 +1471,12 @@ local function advance(player: Player, job: Job)
 	job.footSince = nil
 	local nextStop = offer.stops[job.stop]
 	Cargo.setStop(job.cargo, planOf(nextStop))
-	-- Defend: the last drop unloads only after holding out there.
-	if offer.twists.defend and job.stop == #offer.stops and not job.defendDone then
-		Cargo.setBlocked(job.cargo, true)
-	end
+	-- Defend: the last drop unloads only after holding out there. 3.2, switches: this stop's gate if it has one.
+	placeGate(player, job)
+	blockStop(job)
 	job.dirty = true
-	notice:FireClient(player, if stop.kind == "pickup" then `All loaded! Now: {nextStop.label}` else `Done! Next: {nextStop.label}`)
+	local gate = if job.gateClosed then " · 🎛 TWIN SWITCHES: pull both levers there together!" else ""
+	notice:FireClient(player, if stop.kind == "pickup" then `All loaded! Now: {nextStop.label}{gate}` else `Done! Next: {nextStop.label}{gate}`)
 end
 
 -- The next zombie wave around you and ahead of you. No room (too many of yours alive, or the server is full): it
@@ -1516,8 +1602,8 @@ local function defendStep(player: Player, job: Job, tier: Config.TierDef, stop: 
 		job.defendDone = true
 		job.dirty = true
 		statCrew(player, job, "defends", 1) -- HOLD OUT won
-		Cargo.setBlocked(job.cargo, false)
-		tellJob(player, "The area is safe! Unload, quick!")
+		blockStop(job)
+		tellJob(player, if job.gateClosed then "The area is safe! Now pull both levers together to open the gate!" else "The area is safe! Unload, quick!")
 	end
 end
 
@@ -1621,6 +1707,15 @@ local function update(dt: number)
 		if spotlessFailed(player, job) then
 			continue
 		end
+		-- 3.2, DUO: the partner must stay in the crew (they left it, or the game).
+		if offer.duo then
+			if #Crew.members(player) >= Config.Missions.Duo.MinCrew then
+				job.duoTeamed = true
+			elseif job.duoTeamed then
+				Jobs.fail(player, "Your partner left.")
+				continue
+			end
+		end
 
 		-- Everybody who rides in the owner's car is crew (they may carry the cargo, their kills count) while they
 		-- stay with it.
@@ -1645,6 +1740,21 @@ local function update(dt: number)
 		end
 		if not jobs[player] then
 			continue
+		end
+		-- 3.2, switches: the gate's levers (the HUD), and the stop goes on once it is open.
+		if job.gateClosed then
+			local pulled = DuoGates.pulled(player)
+			if pulled ~= job.gatePulled then
+				job.gatePulled = pulled
+				job.dirty = true
+			end
+			if DuoGates.isOpen(player) then
+				job.gateClosed = false
+				job.dirty = true
+				blockStop(job)
+				local here = offer.stops[job.stop]
+				tellJob(player, if here.kind == "pickup" then "The gate is open! Load up, partners!" else "The gate is open! Unload, quick!")
+			end
 		end
 
 		local stop = offer.stops[job.stop]
@@ -1773,8 +1883,13 @@ function Jobs.adminFinishStop(player: Player): boolean
 	-- Defend: held out at once.
 	if job.offer.twists.defend and job.stop == #job.offer.stops and not job.defendDone then
 		job.defendDone = true
-		Cargo.setBlocked(job.cargo, false)
 	end
+	-- 3.2, switches: the gate opened at once.
+	if job.gateClosed then
+		DuoGates.forceOpen(player)
+		job.gateClosed = false
+	end
+	blockStop(job)
 	local done = Cargo.adminFinish(job.cargo)
 	job.dirty = true
 	return done
@@ -1801,6 +1916,7 @@ function Jobs.start()
 			Cargo.finish(job.cargo, false)
 			Crew.disband(player)
 		end
+		DuoGates.clear(player)
 		for _, other in jobs do
 			other.crew[player] = nil
 			other.members[player] = nil

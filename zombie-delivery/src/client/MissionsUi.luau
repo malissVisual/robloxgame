@@ -1,8 +1,10 @@
 --!strict
--- The MISSIONS window (3.0, key U and the Hud's MISSIONS button), in the Dead End Dispatch look: the ten campaigns of
--- shared/Missions.luau, a hundred story jobs, taken from anywhere.
+-- The MISSIONS window (3.0, key U and the Hud's MISSIONS button), in the Dead End Dispatch look: the campaigns of
+-- shared/Missions.luau (3.2: ten stories and the DUO campaign, 110 story jobs; every count comes from the data), taken
+-- from anywhere.
 --
---   * Left: the ten campaigns (icon, name, the client, missions done X/10, stars; a locked one says "LEVEL N").
+--   * Left: the campaigns (icon, name, the client, missions done X/10, stars; a locked one says what it waits for:
+--     "🔒 Finish Code Red first · LEVEL 5", or "🔒 LEVEL 5"; the DUO campaign has a 🤝 DUO badge).
 --   * Right: the selected campaign's pitch and progress, then its ten missions as cards: the number, the name, the
 --     status (locked / open / done with ★★☆), the twist chips (icon and name; hovering one shows what it does), the
 --     CO-OP badge, the tier, the cargo, the lent vehicle and a pay hint. A card opens below itself: the client's
@@ -10,7 +12,10 @@
 --     else's crew sees "Your crew leader picks the mission" instead (server/Missions.luau checks everything).
 --   * A co-op card has FIND CREW: it puts you on the crew board (the CrewBoard remote) and opens the crew panel
 --     through MissionsUi.onFindCrew (Main may wire it; without it CrewPanel.open is called directly).
---   * The header: every star you have (X / 300) and the filter tabs ALL / CO-OP.
+--   * The header: every star you have (X / 330) and the filter tabs ALL / CO-OP.
+--   * 3.2: a locked mission card says its own level ("🔒 LEVEL 7"); a DUO mission has the 🤝 DUO chip (only with a
+--     crew: Config.Missions.Duo.MinCrew members with you at START). START on one without a crew says why and FIND
+--     CREW is right next to it; the banner shows DUO and the TWIN SWITCHES levers (gatePulled 0 – 2).
 --   * The campaign's header also shows its 3.1 reward (Config.Rewards.Campaigns: an exclusive gun or paint and a title).
 -- 3.1, the other tabs (the Challenges remote's "state"; ("open") is sent when one of them shows):
 --   * CHALLENGES: the final reward on top (Dead End, a dark silhouette with ??? until earned, "Complete every
@@ -76,7 +81,7 @@ local NOTICE_TIME = 4
 local CLEARED_TIME = 22 -- seconds the celebration card stays
 local DARK = Color3.fromRGB(9, 14, 11)
 local TWIST_COLOR = Color3.fromRGB(64, 52, 30)
-local SUBTITLE = "Ten stories · a hundred jobs · play them with your crew · U"
+local SUBTITLE = `{#Missions.Campaigns} stories · {#Missions.List} jobs · play them with your crew · U`
 local CARGO_EMOJI: { [string]: string } = {
 	crate = "📦", ammo = "🧨", sack = "🛍️", barrel = "🛢️", icebox = "🧊", furniture = "🛋️", soup = "🍲", horse = "🐴",
 	kid = "🧒", patient = "🤕", pizza = "🍕", parcel = "📦", medicine = "💊", vaccine = "💉", sample = "🧪",
@@ -211,8 +216,9 @@ local function statusOf(def: MissionDef): (string, string?)
 	return if best(def.id) > 0 then "done" else "open", nil
 end
 
+-- 3.2: shut until the campaigns it requires are finished and you have its level (Missions.campaignOpen).
 local function campaignLocked(campaign: Campaign): boolean
-	return myLevel() < campaign.level
+	return not (Missions.campaignOpen(campaign.id, progress, myLevel()))
 end
 
 local function visible(def: MissionDef): boolean
@@ -239,7 +245,8 @@ end
 local function currentCampaign(): string
 	local fallback = Missions.Campaigns[1].id
 	for _, campaign in Missions.Campaigns do
-		if not campaignLocked(campaign) then
+		-- 3.2: the story first (the DUO campaign is a side story for when you have a crew).
+		if not campaignLocked(campaign) and not campaign.duo then
 			fallback = campaign.id
 			local done, total = Missions.done(progress, campaign.id)
 			if done < total then
@@ -262,8 +269,14 @@ local function nextMission(id: string): MissionDef?
 	end
 	for index, campaign in Missions.Campaigns do
 		if campaign.id == def.campaign then
-			local after = Missions.Campaigns[index + 1]
-			return if after then Missions.ofCampaign(after.id)[1] else nil
+			-- 3.2: the next story campaign (the DUO one is a side story you pick yourself).
+			for after = index + 1, #Missions.Campaigns do
+				local candidate = Missions.Campaigns[after]
+				if not candidate.duo then
+					return Missions.ofCampaign(candidate.id)[1]
+				end
+			end
+			return nil
 		end
 	end
 	return nil
@@ -306,6 +319,9 @@ Extras.remote = nil :: RemoteEvent?
 Extras.secretCache = nil :: { SecretEntry }?
 Extras.clearedPending = 0 -- "cleared" cards on their way (waiting for the DELIVERY result to close): popups wait too
 Extras.pumpPopups = nil :: (() -> ())? -- shows the next waiting popup (set by the popups' block)
+Extras.crewSize = 0 -- 3.2: members of my own crew (the server's state, CrewState as the owner): DUO missions need some
+Extras.DUO_COLOR = Color3.fromRGB(236, 92, 60) -- 3.2: the DUO badge (the Partners in Crime colour)
+Extras.DUO_REFUSAL = "DUO mission: invite a friend first (K) and bring them here."
 Extras.state = {
 	values = {},
 	done = {},
@@ -405,6 +421,22 @@ function Extras.itemColor(reward: RewardItem): Color3
 		rgb = if def then def.color else nil
 	end
 	return if rgb then Color3.fromRGB(rgb[1] or 255, rgb[2] or 255, rgb[3] or 255) else C.yellow
+end
+
+-- 3.2: what a locked campaign waits for, short: "🔒 Finish Code Red first · LEVEL 5" or "🔒 LEVEL 5".
+function Extras.lockLine(campaign: Campaign): string
+	local missing = Missions.missing(campaign.id, progress)
+	local first = missing[1]
+	if first then
+		local more = if #missing > 1 then ` +{#missing - 1}` else ""
+		return `🔒 Finish {first.name}{more} first · LEVEL {campaign.level}`
+	end
+	return `🔒 LEVEL {campaign.level}`
+end
+
+-- 3.2: is a DUO mission short of a crew right now (not in somebody else's crew: the leader decides there)?
+function Extras.needsCrew(def: MissionDef): boolean
+	return def.duo == true and crewOwner == nil and Extras.crewSize < Config.Missions.Duo.MinCrew
 end
 
 -- A campaign's reward as a line: "Reyes' Carbine + title “Quartermaster”" (nil for a campaign without one).
@@ -599,6 +631,21 @@ local function coopChip(parent: any, order: number?): any
 	return chip
 end
 
+-- 3.2: the 🤝 DUO chip (a card, a campaign row), what it means on hover.
+function Extras.duoChip(parent: Instance, order: number?): any
+	local chip = Ui.chip(parent, "🤝 DUO", Extras.DUO_COLOR, Color3.new(1, 1, 1))
+	chip.TextSize = 11
+	chip.LayoutOrder = order or 0
+	local need = Config.Missions.Duo.MinCrew
+	chip.MouseEnter:Connect(function()
+		showTip(chip, "🤝  DUO", `Only with a crew: {need} {if need == 1 then "partner" else "partners"} with you at START (invite with K). Made for two: pair lifts and twin levers. If your partner leaves, the mission fails.`)
+	end)
+	chip.MouseLeave:Connect(function()
+		hideTip(chip)
+	end)
+	return chip
+end
+
 -- ── Building the window ────────────────────────────────────────────────────
 
 local render: () -> ()
@@ -700,7 +747,7 @@ local function build()
 		MissionsUi.close()
 	end)
 	close.Position = UDim2.new(1, -50, 0, 8)
-	refs.stars = Ui.label(window, "★ 0 / 300", UDim2.fromOffset(150, 30), {
+	refs.stars = Ui.label(window, `★ 0 / {#Missions.List * 3}`, UDim2.fromOffset(150, 30), {
 		Position = UDim2.new(1, -210, 0, 12),
 		TextSize = 22,
 		Font = Theme.DisplayFont,
@@ -831,7 +878,13 @@ local function campaignRow(campaign: Campaign, order: number)
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextTransparency = if locked then 0.5 else 0,
 	})
-	Ui.label(row, campaign.name, UDim2.new(1, -66, 0, 20), {
+	if campaign.duo then
+		local badge = Extras.duoChip(row)
+		badge.Size = UDim2.fromOffset(0, 16)
+		badge.AnchorPoint = Vector2.new(1, 0)
+		badge.Position = UDim2.new(1, -8, 0, 7)
+	end
+	Ui.label(row, campaign.name, UDim2.new(1, if campaign.duo then -130 else -66, 0, 20), {
 		Position = UDim2.fromOffset(56, 6),
 		TextSize = 16,
 		Font = Theme.DisplayFont,
@@ -847,7 +900,7 @@ local function campaignRow(campaign: Campaign, order: number)
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	local line = if locked then `🔒 LEVEL {campaign.level}`
+	local line = if locked then Extras.lockLine(campaign)
 		elseif done >= total and total > 0 then `🏆 DONE · ★ {got}/{most}`
 		else `{done}/{total} done · ★ {got}/{most}`
 	if filter == "coop" then
@@ -914,7 +967,9 @@ local function campaignHeader(campaign: Campaign, order: number)
 	})
 	local locked = campaignLocked(campaign)
 	local finished = done >= total and total > 0
-	local status = if locked then `🔒 Opens at driver level {campaign.level} (you are level {myLevel()}).`
+	local missing = Missions.missing(campaign.id, progress)
+	local waitsFor = if #missing > 0 then `{Missions.missingText(missing)}  ·  ` else ""
+	local status = if locked then `🔒 {waitsFor}Opens at driver level {campaign.level} (you are level {myLevel()}).`
 		elseif finished then `🏆 Campaign complete! The {Ui.money(campaign.reward)} campaign reward is yours.`
 		else `{done}/{total} done  ·  finish all ten for {Ui.money(campaign.reward)}  ·  every new star pays {Ui.money(T.StarBonus)}`
 	Ui.label(frame, status, UDim2.new(1, 0, 0, 0), {
@@ -924,6 +979,17 @@ local function campaignHeader(campaign: Campaign, order: number)
 		TextColor3 = if locked then C.red elseif finished then C.yellow else C.money,
 		LayoutOrder = 4,
 	})
+	-- 3.2: the DUO campaign: only with a crew.
+	if campaign.duo then
+		local need = Config.Missions.Duo.MinCrew
+		Ui.label(frame, `🤝 DUO: every mission needs a crew: {need} {if need == 1 then "partner" else "partners"} with you at START. Invite a friend with K.`, UDim2.new(1, 0, 0, 0), {
+			AutomaticSize = Enum.AutomaticSize.Y,
+			TextSize = 13,
+			Font = Theme.HeadingFont,
+			TextColor3 = Extras.DUO_COLOR:Lerp(C.text, 0.35),
+			LayoutOrder = 5,
+		})
+	end
 	-- 3.1: the campaign's own reward (an exclusive gun or paint and a title).
 	local rewardLine = Extras.rewardLine(campaign.id)
 	if rewardLine then
@@ -933,11 +999,11 @@ local function campaignHeader(campaign: Campaign, order: number)
 			TextSize = 13,
 			Font = Theme.HeadingFont,
 			TextColor3 = if earned then C.green else Extras.GOLD,
-			LayoutOrder = 5,
+			LayoutOrder = 6,
 		})
 	end
 	local back, fill = Ui.bar(frame, UDim2.new(1, 0, 0, 6), color)
-	back.LayoutOrder = 6
+	back.LayoutOrder = 7
 	fill.Size = UDim2.fromScale(if total > 0 then done / total else 0, 1)
 end
 
@@ -1018,7 +1084,10 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 	if status == "done" then
 		statusText, statusColor = Ui.stars(stars), C.yellow
 	elseif status == "locked" then
-		statusText, statusColor = "🔒 LOCKED", C.dim
+		-- 3.2: a mission above your level says which (a campaign still shut says it on its row and header).
+		local needLevel = def.level or 0
+		local campaignShut = campaignLocked(campaign)
+		statusText, statusColor = if needLevel > myLevel() and not campaignShut then `🔒 LEVEL {needLevel}` else "🔒 LOCKED", C.dim
 	elseif status == "active" then
 		statusText, statusColor = "▶ PLAYING", GPS:Lerp(C.text, 0.3)
 	end
@@ -1039,7 +1108,10 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 			count += 1
 		end
 	end
-	if def.coop then
+	if def.duo then
+		Extras.duoChip(chips, 10)
+		count += 1
+	elseif def.coop then
 		coopChip(chips, 10)
 		count += 1
 	end
@@ -1154,12 +1226,14 @@ local function actionRow(parent: any, def: MissionDef, order: number)
 			note = "You are on this mission right now."
 		elseif ownJob then
 			note = "Finish your current delivery first."
+		elseif Extras.needsCrew(def) then
+			note = `🤝 {Extras.DUO_REFUSAL}`
 		elseif table.find(twistsOf(def), "night") and workspace:GetAttribute("Night") == false then
 			note = "🌙 Night only: come back after dark."
 		end
 	end
 	if def.coop and not member then
-		local find = Ui.button(row, "🔎 FIND CREW", UDim2.fromOffset(150, 42), GPS, function()
+		local find = Ui.button(row, "🔎 FIND CREW", UDim2.fromOffset(150, 42), if Extras.needsCrew(def) then Extras.DUO_COLOR else GPS, function()
 			MissionsUi.findCrew(id)
 		end)
 		find.TextSize = 15
@@ -1209,7 +1283,11 @@ local function missionDetail(def: MissionDef, campaign: Campaign, order: number)
 			line += 1
 		end
 	end
-	if def.coop then
+	if def.duo then
+		local need = Config.Missions.Duo.MinCrew
+		detailLine(frame, `<b>🤝 DUO</b>  Only with a crew: {need} {if need == 1 then "partner" else "partners"} with you at START. +{math.floor(T.CoopPayPerMember * 100 + 0.5)} % pay and +{math.floor(T.CoopEnemyPerMember * 100 + 0.5)} % enemies for every crew member. If your partner leaves, the mission fails.`, Extras.DUO_COLOR:Lerp(C.text, 0.4), line, 13)
+		line += 1
+	elseif def.coop then
 		detailLine(frame, `<b>👥 CO-OP</b>  +{math.floor(T.CoopPayPerMember * 100 + 0.5)} % pay and +{math.floor(T.CoopEnemyPerMember * 100 + 0.5)} % enemies for every crew member. Playable alone; your crew earns the stars too.`, GPS:Lerp(C.text, 0.45), line, 13)
 		line += 1
 	end
@@ -2019,6 +2097,11 @@ function MissionsUi.startMission(id: string)
 		say(why or "Locked.", C.red)
 		return
 	end
+	-- 3.2: a DUO mission without a crew: why, and FIND CREW is next to START (the server checks the range too).
+	if Extras.needsCrew(def) then
+		say(Extras.DUO_REFUSAL, C.red)
+		return
+	end
 	pendingStart = id
 	say(`Starting "{def.name}"…`, C.yellow)
 	ask("start", id)
@@ -2110,7 +2193,8 @@ local function updateBanner()
 	refs.bannerTitle.Text = `{if campaign then campaign.icon else "🎯"}  MISSION {if number then `{number}/10` else ""}  ·  {name}`
 	Ui.stroke(banner, if campaign then colorOf(campaign) else C.yellow, 1.5)
 	local coop = mission.coop == true or (def ~= nil and def.coop == true)
-	refs.bannerCrew.Text = if coop then `👥 CO-OP ×{members + 1}` else (if members > 0 then `👥 ×{members + 1}` else "")
+	local duo = mission.duo == true or (def ~= nil and def.duo == true)
+	refs.bannerCrew.Text = if duo then `🤝 DUO ×{members + 1}` elseif coop then `👥 CO-OP ×{members + 1}` else (if members > 0 then `👥 ×{members + 1}` else "")
 	local parts = {}
 	local twists = if type(mission.twists) == "table" then mission.twists elseif def then twistsOf(def) else {}
 	for _, twist in twists do
@@ -2126,6 +2210,12 @@ local function updateBanner()
 	refs.bannerDefend.Visible = left ~= nil and left > 0
 	if left and left > 0 then
 		refs.bannerDefend.Text = `🛡 HOLD OUT {Ui.clock(math.ceil(left))}  ·  stay near the receiver`
+		refs.bannerDefend.TextColor3 = C.red
+	elseif type(mission.gatePulled) == "number" then
+		-- 3.2, TWIN SWITCHES: the gate here is shut until both levers are pulled together.
+		refs.bannerDefend.Visible = true
+		refs.bannerDefend.Text = `🎛 PULL BOTH LEVERS TOGETHER  ·  {math.clamp(mission.gatePulled, 0, 2)}/2`
+		refs.bannerDefend.TextColor3 = C.yellow
 	end
 end
 
@@ -2659,6 +2749,7 @@ local function applyState(data: any)
 	serverLevel = if type(data.level) == "number" then data.level else nil
 	active = if type(data.active) == "string" then data.active else nil
 	crewOwner = if type(data.crewOwner) == "string" then data.crewOwner else nil
+	Extras.crewSize = if type(data.crewSize) == "number" then data.crewSize else 0
 	hasState = true
 	-- Opened before the first state (a slow load): pick where the player is in the story now.
 	if blindPick then
@@ -2705,6 +2796,12 @@ local function onCrewState(state: any)
 	local owner = if member and type(state.owner) == "table" then state.owner.name else nil
 	local changed = (owner ~= nil) ~= (crewOwner ~= nil)
 	crewOwner = if type(owner) == "string" then owner else nil
+	-- 3.2: my own crew's size (the DUO missions), quicker than the next Missions state.
+	local size = if type(state) == "table" and state.role == "owner" and type(state.members) == "table" then #state.members else 0
+	if size ~= Extras.crewSize then
+		Extras.crewSize = size
+		changed = true
+	end
 	if changed and refs.window and refs.window.Visible then
 		queueRender()
 	end
