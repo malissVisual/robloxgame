@@ -72,6 +72,7 @@ Hud.onCloseWindows = function()
 	BusinessUi.close()
 	MissionsUi.close()
 	GarageUi.close()
+	DispatchUi.close()
 end
 CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows
