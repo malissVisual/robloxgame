@@ -382,134 +382,7 @@ function Extras.ask(action: string, arg: any?)
 	(Extras.remote :: RemoteEvent):FireServer(action, arg)
 end
 
--- ── 3.6: the Postage & Trouble shapes this window uses ─────────────────────
-
--- The lavender window (Ui.window, stream B of 3.6). FALLBACK (3.6 stream D): while Ui.window is not in this build,
--- the same chrome is drawn here: a header (icon badge, title, subtitle, a round close button that turns on hover),
--- the content, a footer (ESC chip, "Close window", a context line). Returns (frame, content, chrome) like Ui.window;
--- chrome.onClose is called by ✕, ESC, the gamepad's B and the Roblox menu opening. Delete the fallback once
--- Ui.window has landed (client/GarageUi.luau has the same one).
-function Extras.window(parent: Instance, title: string, subtitle: string, icon: string, size: UDim2): (any, any, any)
-	local helper = (Ui :: any).window
-	if type(helper) == "function" then
-		return helper(parent, title, subtitle, icon, size)
-	end
-	local headerH, footerH = 78, 40
-	local frame = Ui.make("Frame", { Name = "Window", Size = size, Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1 }, parent)
-	local shadow = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.fromOffset(8, 8), BackgroundColor3 = P.line, BorderSizePixel = 0 }, frame)
-	Ui.corner(shadow, 22)
-	local surface = Ui.make("Frame", { Name = "Surface", Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.lavender, BorderSizePixel = 0, Active = true }, frame)
-	Ui.corner(surface, 22)
-	local header = Ui.make("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, headerH), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, surface)
-	Ui.corner(header, 22)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), Position = UDim2.new(0, 0, 1, -22), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, header)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = P.line, BorderSizePixel = 0 }, header)
-	local badge = Ui.make("Frame", { Size = UDim2.fromOffset(42, 42), Position = UDim2.new(0, 22, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = P.sage, BorderSizePixel = 0 }, header)
-	Ui.corner(badge, 21)
-	local made: any = { frame = frame, surface = surface, header = header }
-	made.icon = Ui.label(badge, icon, UDim2.fromScale(1, 1), { TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = P.ink2 })
-	made.title = Ui.label(header, title, UDim2.new(1, -150, 0, 30), {
-		Position = UDim2.fromOffset(78, 12),
-		Font = Theme.DisplayFont,
-		TextSize = 25,
-		TextColor3 = P.ink,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	made.subtitle = Ui.label(header, subtitle, UDim2.new(1, -150, 0, 18), {
-		Position = UDim2.fromOffset(79, 44),
-		Font = Theme.Font,
-		TextSize = 14,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	made.content = Ui.make("Frame", { Name = "Content", Size = UDim2.new(1, 0, 1, -(headerH + footerH)), Position = UDim2.fromOffset(0, headerH), BackgroundTransparency = 1 }, surface)
-	local footer = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, 0, 0, footerH), Position = UDim2.new(0, 0, 1, -footerH), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, surface)
-	made.footer = footer
-	Ui.corner(footer, 22)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, footer)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = P.line, BorderSizePixel = 0 }, footer)
-	local touch = Ui.touchLayout()
-	made.esc = Ui.label(footer, if touch then "✕" else "ESC", UDim2.fromOffset(if touch then 24 else 38, 24), {
-		Position = UDim2.new(0, 24, 0.5, 1),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundTransparency = 0,
-		BackgroundColor3 = P.paper,
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-	})
-	Ui.corner(made.esc, 5)
-	Ui.stroke(made.esc, P.line, 1).Transparency = 0
-	Ui.label(footer, if touch then "Tap ✕ to close" else "Close window", UDim2.fromOffset(150, 20), {
-		Position = UDim2.new(0, if touch then 56 else 70, 0.5, 1),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Font = Theme.Font,
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-	})
-	made.context = Ui.label(footer, "", UDim2.new(1, -260, 0, 20), {
-		Position = UDim2.new(1, -24, 0.5, 1),
-		AnchorPoint = Vector2.new(1, 0.5),
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		RichText = true,
-	})
-	local function close()
-		local onClose = made.onClose
-		if onClose then
-			onClose()
-		else
-			frame.Visible = false
-		end
-	end
-	-- The round close button: paper, ✕, turns 90° on hover.
-	local closeButton = Ui.make("TextButton", {
-		Size = UDim2.fromOffset(36, 36),
-		Position = UDim2.new(1, -26, 0.5, 0),
-		AnchorPoint = Vector2.new(1, 0.5),
-		BackgroundColor3 = P.paper,
-		BorderSizePixel = 0,
-		Text = "✕",
-		TextColor3 = P.ink2,
-		TextSize = 16,
-		Font = Theme.HeadingFont,
-		AutoButtonColor = false,
-	}, header)
-	Ui.corner(closeButton, 18)
-	Ui.stroke(closeButton, P.line, 1).Transparency = 0
-	local turn = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	closeButton.MouseEnter:Connect(function()
-		TweenService:Create(closeButton, turn, { Rotation = 90 }):Play()
-	end)
-	closeButton.MouseLeave:Connect(function()
-		TweenService:Create(closeButton, turn, { Rotation = 0 }):Play()
-	end)
-	closeButton.Activated:Connect(close)
-	made.close = closeButton
-	local function escape()
-		if frame.Visible and frame:IsDescendantOf(game) and not UserInputService:GetFocusedTextBox() then
-			close()
-		end
-	end
-	local keys = UserInputService.InputBegan:Connect(function(input: InputObject)
-		if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB then
-			escape()
-		end
-	end)
-	local menu = game:GetService("GuiService").MenuOpened:Connect(escape)
-	frame.Destroying:Connect(function()
-		keys:Disconnect()
-		menu:Disconnect()
-	end)
-	return frame, made.content, made
-end
+-- ── 3.6: the Postage & Trouble shapes this window uses (the window, the dashes and the bars are Ui's) ──
 
 -- A pastel chip that grows with its text (the twists, CO-OP, DUO, "needs N slots", EQUIPPED): `kind` is one of
 -- Extras.CHIP.
@@ -553,21 +426,6 @@ function Extras.hatch(frame: GuiObject)
 	})
 end
 
--- A dashed line (the perforation of a ticket): `count` dashes along a frame of `size` at `position`.
-function Extras.dashes(parent: Instance, vertical: boolean, count: number, size: UDim2, position: UDim2): any
-	local holder = Ui.make("Frame", { Name = "Dashes", Size = size, Position = position, BackgroundTransparency = 1 }, parent)
-	for index = 0, count - 1 do
-		local at = (index + 0.25) / count
-		Ui.make("Frame", {
-			Size = if vertical then UDim2.new(1, 0, 0.5 / count, 0) else UDim2.new(0.5 / count, 0, 1, 0),
-			Position = if vertical then UDim2.fromScale(0, at) else UDim2.fromScale(at, 0),
-			BackgroundColor3 = P.line,
-			BorderSizePixel = 0,
-		}, holder)
-	end
-	return holder
-end
-
 -- A page tab or a filter (a paper pill when on, quiet lavender when off): Extras.paintTab sets which.
 function Extras.tabButton(parent: Instance, text: string, width: number, order: number, onClick: () -> ()): any
 	local button = Ui.make("TextButton", {
@@ -600,13 +458,6 @@ function Extras.paintTab(button: any, on: boolean)
 	if stroke then
 		stroke.Color = if on then P.ink2 else P.line
 	end
-end
-
--- A thin bar on a lavender track.
-function Extras.bar(parent: Instance, size: UDim2, color: Color3): (any, any)
-	local back, fill = Ui.bar(parent, size, color)
-	back.BackgroundColor3 = P.lavenderDeep
-	return back, fill
 end
 
 -- A colour as RichText's "#RRGGBB".
@@ -982,7 +833,7 @@ local function build()
 		DisplayOrder = 3,
 	}, player:WaitForChild("PlayerGui"))
 	refs.gui = gui
-	local window, content, chrome = Extras.window(gui, "Missions", SUBTITLE, "🎯", UDim2.fromOffset(BASE_W, BASE_H))
+	local window, content, chrome = Ui.window(gui, "Missions", SUBTITLE, "🎯", UDim2.fromOffset(BASE_W, BASE_H))
 	window.Visible = false
 	refs.window = window
 	refs.chrome = chrome
@@ -1161,7 +1012,7 @@ local function campaignRow(campaign: Campaign, order: number)
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	local back, fill = Extras.bar(row, UDim2.new(1, -66, 0, 4), color)
+	local back, fill = Ui.bar(row, UDim2.new(1, -66, 0, 4), color)
 	back.Position = UDim2.new(0, 56, 1, -9)
 	fill.Size = UDim2.fromScale(if total > 0 then done / total else 0, 1)
 end
@@ -1243,7 +1094,7 @@ local function campaignHeader(campaign: Campaign, order: number)
 			LayoutOrder = 6,
 		})
 	end
-	local back, fill = Extras.bar(frame, UDim2.new(1, 0, 0, 6), color)
+	local back, fill = Ui.bar(frame, UDim2.new(1, 0, 0, 6), color)
 	back.LayoutOrder = 7
 	fill.Size = UDim2.fromScale(if total > 0 then done / total else 0, 1)
 end
@@ -1321,7 +1172,7 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 		TextColor3 = if stars > 0 then Theme.textOn(color) else P.ink,
 		TextXAlignment = Enum.TextXAlignment.Center,
 	})
-	Extras.dashes(card, true, 8, UDim2.new(0, 1, 1, -16), UDim2.fromOffset(SPINE_W, 8))
+	Ui.dashes(card, true, 8, P.line, UDim2.new(0, 1, 1, -16), UDim2.fromOffset(SPINE_W, 8))
 	-- The body: the label (the tier, the finale), the name, the chips, the cargo line.
 	local x = SPINE_W + 12
 	local bodyW = -(x + STUB_W + 10)
@@ -1372,7 +1223,7 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	-- The stub: a perforation with a notch top and bottom, the pay, the status.
-	Extras.dashes(card, true, 8, UDim2.new(0, 1, 1, -16), UDim2.new(1, -STUB_W, 0, 8))
+	Ui.dashes(card, true, 8, P.line, UDim2.new(0, 1, 1, -16), UDim2.new(1, -STUB_W, 0, 8))
 	for _, y in { 0, 1 } do
 		local notch = Ui.make("Frame", {
 			Size = UDim2.fromOffset(12, 12),
@@ -1700,7 +1551,7 @@ function Extras.finalCard(parent: Instance, order: number, info: {
 		RichText = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 	})
-	local back, fill = Extras.bar(frame, UDim2.new(1, -152, 0, 8), if info.earned then C.green else color)
+	local back, fill = Ui.bar(frame, UDim2.new(1, -152, 0, 8), if info.earned then C.green else color)
 	back.Position = UDim2.fromOffset(138, 116)
 	fill.Size = UDim2.fromScale(math.clamp(info.share, 0, 1), 1)
 end
@@ -1754,7 +1605,7 @@ function Extras.challengeRow(parent: Instance, def: Challenges.ChallengeDef, ord
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	if not secret then
-		local back, fill = Extras.bar(row, UDim2.new(1, -336, 0, 6), if isDone then C.green else P.violet)
+		local back, fill = Ui.bar(row, UDim2.new(1, -336, 0, 6), if isDone then C.green else P.violet)
 		back.Position = UDim2.fromOffset(64, 52)
 		fill.Size = UDim2.fromScale(math.clamp(value / math.max(def.goal, 1), 0, 1), 1)
 		Ui.label(row, `{Extras.num(math.min(value, def.goal))} / {Extras.num(def.goal)}`, UDim2.fromOffset(98, 16), {
@@ -1947,7 +1798,7 @@ function Extras.secretsPage(parent: Instance)
 		TextColor3 = C.money,
 		LayoutOrder = 3,
 	})
-	local back, fill = Extras.bar(head, UDim2.new(1, 0, 0, 6), P.violet)
+	local back, fill = Ui.bar(head, UDim2.new(1, 0, 0, 6), P.violet)
 	back.LayoutOrder = 4
 	fill.Size = UDim2.fromScale(if total > 0 then found / total else 0, 1)
 	-- The reward for all of them.
@@ -2461,7 +2312,7 @@ local function buildBanner()
 		TextColor3 = P.danger,
 	})
 	-- The stub: a perforation, the mission's number.
-	Extras.dashes(banner, true, 6, UDim2.new(0, 1, 1, -12), UDim2.new(1, -66, 0, 6))
+	Ui.dashes(banner, true, 6, P.line, UDim2.new(0, 1, 1, -12), UDim2.new(1, -66, 0, 6))
 	refs.bannerNumber = Ui.label(banner, "", UDim2.new(0, 62, 0, 24), {
 		Position = UDim2.new(1, -64, 0.5, -4),
 		AnchorPoint = Vector2.new(0, 0.5),

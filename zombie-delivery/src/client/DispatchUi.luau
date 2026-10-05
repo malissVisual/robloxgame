@@ -1,7 +1,7 @@
 --!strict
 -- The Dispatch board (3.6, Postage & Trouble, design/ui-concept/ previews dispatch.png / hover-ticket.png): the job
 -- board as a lavender window of die-cut delivery tickets. J, the JOBS menu entry, the depot counter and the result
--- window's NEXT JOB open it (Main sets Hud.onJobs = DispatchUi.toggle).
+-- window's NEXT JOB open it (Main sets Hud.onJobs = DispatchUi.open; another window opening closes it).
 --
 --   * Opening asks the server for offers (RequestOffers) and shows "Calling the dispatcher..." until they come
 --     (Offers → DispatchUi.setOffers, wired in Main). ACCEPT JOB fires AcceptJob with the offer's index and closes;
@@ -20,16 +20,14 @@
 --     the same reason, like the old board did.
 --   * On a delivery the board shows that job and GIVE UP THIS DELIVERY (CancelJob) instead of offers.
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
--- The window is built on first open (lazy) in a ScreenGui of its own, scaled like every window (Ui.screenScale) and
--- sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
+-- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
+-- (Ui.screenScale) and sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
 -- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()).
 
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -52,9 +50,9 @@ local player = Players.LocalPlayer
 
 -- Sizes at scale 1 (the 1150 × 680 reference; Ui.screenScale scales the whole window).
 local MAX_W, MAX_H, MIN_W, MIN_H = 1000, 600, 640, 380
-local HEADER, FOOTER, SIDEBAR = 80, 46, 220
+local SIDEBAR = 220
 local SPINE, STUB, GAP = 70, 160, 14
-local MONO = Enum.Font.RobotoMono
+local MONO = Theme.MonoFont
 
 -- Surfaces mixed from the Postage tokens (no new raw colours): the sidebar, the filters, the hatching, the lips.
 local SIDE = P.lavender:Lerp(P.lavenderDeep, 0.75)
@@ -63,8 +61,6 @@ local FILTER_HOVER = P.lavender:Lerp(P.ticket, 0.35)
 local HATCH_BASE = P.lavender:Lerp(P.ticket, 0.3)
 local HATCH_LINE = P.lavender:Lerp(P.ticket, 0.8)
 local NOTE = P.lavenderDeep:Lerp(P.paper, 0.45)
-local SAGE_LIP = P.sage:Lerp(P.ink2, 0.3)
-local ROUND = P.ticket:Lerp(P.lavender, 0.5)
 local ROSE = P.danger:Lerp(P.paper, 0.78)
 local SEPARATOR = `<font color="#{P.line:ToHex()}">  |  </font>`
 
@@ -154,21 +150,6 @@ local function chip(parent: Instance, value: string, face: Color3, order: number
 	return label
 end
 
--- A dashed line: `count` short dashes along a frame (perforations and separators).
-local function dashes(parent: Instance, vertical: boolean, count: number, size: UDim2, position: UDim2): any
-	local line = Ui.make("Frame", { Size = size, Position = position, BackgroundTransparency = 1 }, parent)
-	for i = 0, count - 1 do
-		local at = (i * 2 + 0.5) / (count * 2)
-		Ui.make("Frame", {
-			Size = if vertical then UDim2.new(0, 1, 1 / (count * 2), 0) else UDim2.new(1 / (count * 2), 0, 0, 1),
-			Position = if vertical then UDim2.fromScale(0, at) else UDim2.fromScale(at, 0),
-			BackgroundColor3 = P.line,
-			BorderSizePixel = 0,
-		}, line)
-	end
-	return line
-end
-
 -- A pastel action with a lip under it (the concept's ACCEPT JOB): hover raises it 3 px, press sinks it (Ui.tactile).
 -- `face` nil: the disabled (locked) look, flat, no lip.
 local function lipButton(parent: Instance, label: string, size: UDim2, position: UDim2, face: Color3?, fn: () -> ()): any
@@ -177,7 +158,7 @@ local function lipButton(parent: Instance, label: string, size: UDim2, position:
 			Size = size,
 			Position = position + UDim2.fromOffset(0, 4),
 			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = SAGE_LIP,
+			BackgroundColor3 = P.sageLip,
 			BorderSizePixel = 0,
 		}, parent)
 		Ui.corner(lip, 6)
@@ -407,147 +388,6 @@ local function buildCarCard(side: any)
 	})
 end
 
--- The round ✕: turns 90° and grows on hover, shrinks on press.
-local function buildClose(header: any)
-	local holder = Ui.make("Frame", {
-		Size = UDim2.fromOffset(40, 40),
-		Position = UDim2.new(1, -22, 0.5, -2),
-		AnchorPoint = Vector2.new(1, 0.5),
-		BackgroundTransparency = 1,
-	}, header)
-	local lip = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.fromOffset(0, 4), BackgroundColor3 = P.line, BorderSizePixel = 0 }, holder)
-	Ui.corner(lip, 20)
-	local close = Ui.make("TextButton", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = ROUND,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "✕",
-		TextColor3 = P.ink2,
-		Font = Theme.HeadingFont,
-		TextSize = 17,
-	}, holder)
-	Ui.corner(close, 20)
-	local scale = Ui.make("UIScale", { Scale = 1 }, close)
-	local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local function look(rotation: number, size: number)
-		TweenService:Create(close, info, { Rotation = rotation }):Play()
-		TweenService:Create(scale, info, { Scale = size }):Play()
-	end
-	close.MouseEnter:Connect(function()
-		look(90, 1.1)
-	end)
-	close.MouseLeave:Connect(function()
-		look(0, 1)
-	end)
-	close.SelectionGained:Connect(function()
-		look(90, 1.1)
-	end)
-	close.SelectionLost:Connect(function()
-		look(0, 1)
-	end)
-	close.MouseButton1Down:Connect(function()
-		look(90, 0.92)
-	end)
-	onPress(close, function()
-		look(0, 1)
-		DispatchUi.close()
-	end)
-	refs.close = close
-end
-
-local function buildChrome(window: any)
-	local shadow = Ui.make("Frame", {
-		Size = UDim2.fromScale(1, 1),
-		Position = UDim2.fromOffset(8, 8),
-		BackgroundColor3 = P.shadow,
-		BackgroundTransparency = 0.75,
-		BorderSizePixel = 0,
-	}, window)
-	Ui.corner(shadow, 22)
-	local surface = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.lavender, BorderSizePixel = 0 }, window)
-	Ui.corner(surface, 22)
-	refs.surface = surface
-	-- Header: the icon badge, the title, the subtitle, the close button, a dashed rule.
-	local header = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, HEADER), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0, ZIndex = 2 }, surface)
-	Ui.corner(header, 22)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 1, -24), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, header)
-	local badge = Ui.make("Frame", {
-		Size = UDim2.fromOffset(46, 46),
-		Position = UDim2.new(0, 24, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = P.sage,
-		BorderSizePixel = 0,
-	}, header)
-	Ui.corner(badge, 23)
-	Ui.make("UIStroke", { Color = SAGE_LIP, Thickness = 1, Transparency = 0.3 }, badge)
-	Ui.icon(badge, "map_depot", "📋", UDim2.fromOffset(26, 26), {
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		ImageColor3 = P.ink2,
-		TextScaled = true,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	text(header, "Dispatch board", UDim2.new(1, -180, 0, 32), {
-		Position = UDim2.fromOffset(84, 12),
-		Font = Theme.DisplayFont,
-		TextSize = 26,
-		TextWrapped = false,
-	})
-	refs.subtitle = text(header, "Choose your next run. Make every trip count.", UDim2.new(1, -180, 0, 20), {
-		Position = UDim2.fromOffset(85, 46),
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	dashes(header, false, 60, UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 1, -1))
-	buildClose(header)
-	-- Footer: ESC chip, "Close window", the car and the driver on the right.
-	local footer = Ui.make("Frame", {
-		Size = UDim2.new(1, 0, 0, FOOTER),
-		Position = UDim2.new(0, 0, 1, -FOOTER),
-		BackgroundColor3 = P.lavenderDeep,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-	}, surface)
-	Ui.corner(footer, 22)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, footer)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = P.line, BorderSizePixel = 0 }, footer)
-	local esc = Ui.make("TextButton", {
-		Size = UDim2.fromOffset(150, 30),
-		Position = UDim2.new(0, 22, 0.5, 1),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundTransparency = 1,
-		Text = "",
-	}, footer)
-	local key = text(esc, "ESC", UDim2.fromOffset(42, 24), {
-		Position = UDim2.fromScale(0, 0.5),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundTransparency = 0,
-		BackgroundColor3 = P.lavender,
-		Font = Theme.HeadingFont,
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	Ui.corner(key, 6)
-	Ui.make("UIStroke", { Color = P.ink2, Thickness = 1, Transparency = 0.45, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, key)
-	text(esc, "Close window", UDim2.new(1, -52, 1, 0), { Position = UDim2.fromOffset(52, 0), TextSize = 13, TextColor3 = P.ink2, TextWrapped = false })
-	onPress(esc, function()
-		DispatchUi.close()
-	end)
-	refs.context = text(footer, "", UDim2.new(1, -220, 1, 0), {
-		Position = UDim2.new(1, -22, 0, 1),
-		AnchorPoint = Vector2.new(1, 0),
-		Font = Theme.HeadingFont,
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-end
-
 local function build()
 	if gui then
 		return
@@ -565,28 +405,26 @@ local function build()
 	refs.backdrop = Ui.make("Frame", {
 		Size = UDim2.new(1, 0, 1, 80),
 		Position = UDim2.fromOffset(0, -80),
-		BackgroundColor3 = P.shadow,
+		BackgroundColor3 = P.veil,
 		BackgroundTransparency = 0.5,
 		BorderSizePixel = 0,
 		Active = true,
 	}, made)
-	local window = Ui.make("Frame", {
-		Size = UDim2.fromOffset(MAX_W, MAX_H),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundTransparency = 1,
-		Active = true,
-	}, made)
+	-- The window (Ui.window): the header with the badge, the title and the subtitle, the round ✕, the footer with ESC
+	-- (ESC, the gamepad's B and the Roblox menu close it) and the car and the driver on the right.
+	local window, content, chrome = Ui.window(made, "Dispatch board", "Choose your next run. Make every trip count.", "📋", UDim2.fromOffset(MAX_W, MAX_H))
+	chrome.onClose = function()
+		DispatchUi.close()
+	end
 	refs.window = window
 	refs.scale = Ui.make("UIScale", {}, window)
-	buildChrome(window)
+	refs.context = chrome.context
 	-- The sidebar: AVAILABLE RUNS and your car.
 	local side = Ui.make("Frame", {
-		Size = UDim2.new(0, SIDEBAR, 1, -(HEADER + FOOTER)),
-		Position = UDim2.fromOffset(0, HEADER),
+		Size = UDim2.new(0, SIDEBAR, 1, 0),
 		BackgroundColor3 = SIDE,
 		BorderSizePixel = 0,
-	}, refs.surface)
+	}, content)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 18), PaddingTop = UDim.new(0, 18) }, side)
 	text(side, "AVAILABLE RUNS", UDim2.new(1, -16, 0, 16), {
 		Font = Theme.HeadingFont,
@@ -598,10 +436,10 @@ local function build()
 	buildCarCard(side)
 	-- The tickets: a caption row and the scrolling list.
 	local main = Ui.make("Frame", {
-		Size = UDim2.new(1, -SIDEBAR, 1, -(HEADER + FOOTER)),
-		Position = UDim2.fromOffset(SIDEBAR, HEADER),
+		Size = UDim2.new(1, -SIDEBAR, 1, 0),
+		Position = UDim2.fromOffset(SIDEBAR, 0),
 		BackgroundTransparency = 1,
-	}, refs.surface)
+	}, content)
 	refs.caption = text(main, "", UDim2.new(0.4, 0, 0, 30), { Position = UDim2.fromOffset(24, 12), TextColor3 = P.ink2, TextWrapped = false })
 	refs.capacity = text(main, "", UDim2.new(0.6, -200, 0, 30), {
 		Position = UDim2.new(1, -176, 0, 12),
@@ -644,17 +482,6 @@ local function build()
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 16), PaddingRight = UDim.new(0, 20) }, list)
 	Ui.list(list, true, GAP)
 	refs.list = list
-	-- ESC, the gamepad's B and the Roblox menu close the board.
-	UserInputService.InputBegan:Connect(function(input)
-		if open and (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) then
-			DispatchUi.close()
-		end
-	end)
-	GuiService.MenuOpened:Connect(function()
-		if open then
-			DispatchUi.close()
-		end
-	end)
 	local camera = workspace.CurrentCamera
 	if camera then
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
@@ -686,7 +513,7 @@ local function fit()
 	height = math.floor(math.clamp(screen.Y / scale - 36, MIN_H, MAX_H))
 	refs.window.Size = UDim2.fromOffset(width, height)
 	-- A short window (a phone) drops the car card: the capacity line and the footer still name the car.
-	refs.carCard.Visible = height - HEADER - FOOTER >= 18 + 40 + #FILTERS * 52 + 12 + 166
+	refs.carCard.Visible = height - Ui.WindowHeader - Ui.WindowFooter >= 18 + 40 + #FILTERS * 52 + 12 + 166
 end
 
 -- The car card, the capacity, the counts and the footer.
@@ -804,7 +631,7 @@ local function spine(card: any, offer: any, number: number)
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ZIndex = 2,
 	})
-	dashes(card, true, 14, UDim2.new(0, 1, 1, -16), UDim2.new(0, SPINE, 0, 8))
+	Ui.dashes(card, true, 14, P.line, UDim2.new(0, 1, 1, -16), UDim2.new(0, SPINE, 0, 8))
 end
 
 -- The danger label and the twists, in a row at the top of the ticket body.
@@ -1106,27 +933,8 @@ function DispatchUi.refresh()
 	renderList()
 end
 
--- [fallback, reported: Main's Hud.onCloseWindows does not close this window yet] One window at a time: when another
--- window opens (Hud.closeWindows), the board closes too. Main sets that hook after start(), so it is wrapped here, on
--- open (once; again only if something replaced it). Harmless once Main closes the board itself.
-local closeHook: (() -> ())? = nil
-local function hookCloseWindows()
-	local found = Hud.onCloseWindows
-	if found == nil or found == closeHook then
-		return
-	end
-	local current: () -> () = found
-	local function hook()
-		current()
-		DispatchUi.close()
-	end
-	closeHook = hook
-	Hud.onCloseWindows = hook
-end
-
 function DispatchUi.open()
 	build()
-	hookCloseWindows()
 	local hook = DispatchUi.onOpen
 	if hook then
 		pcall(hook)

@@ -11,8 +11,9 @@
 -- The big map lists every landmark with what you can do there; click one to set the GPS.
 -- 3.6, "Postage & Trouble" (design/ui-concept/): the minimap sits in a paper frame; over its top edge the way you face
 -- and where you are ("N · HARBOR") and an EXPAND M chip that opens the big map; under it the next turn of the route
--- ("↰ Left onto Maple St · 120 m", the job's route, else the GPS's; with neither the address you are at). The big map
--- is a lavender window like the HUD's.
+-- ("↰ Left onto Maple St · 120 m", the job's route, else the GPS's; with neither the address you are at). The map
+-- itself is paper too: cream land, pastel blocks and water, white streets on a plum edge, the routes and markers vivid
+-- on an ink edge. The big map is a lavender window like the HUD's.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -46,29 +47,32 @@ local LIST_W = 320
 local ROUTE_OFF = 40 -- studs off the route before it is worked out again
 local ROUTE_GAP = 0.5 -- seconds between two routes to the same target
 
+-- 3.6: a paper map (design/ui-concept/): cream land, lavender and sand blocks, pastel water, white streets with a
+-- plum edge, butter highways; the routes and the markers stay vivid over it, on an ink edge.
+local P = Theme.Postage
 local C = {
-	land = Color3.fromRGB(39, 52, 43),
-	snow = Color3.fromRGB(176, 186, 196),
-	water = Color3.fromRGB(41, 78, 86),
-	shore = Color3.fromRGB(64, 112, 140),
-	ice = Color3.fromRGB(150, 196, 220),
-	yard = Color3.fromRGB(82, 84, 88),
-	special = Color3.fromRGB(96, 88, 62),
-	roadEdge = Color3.fromRGB(22, 24, 28),
-	road = Color3.fromRGB(125, 138, 121),
-	highway = Color3.fromRGB(226, 230, 209),
-	bridge = Color3.fromRGB(184, 128, 78),
-	iceRoad = Color3.fromRGB(184, 228, 244),
-	safe = Color3.fromRGB(153, 212, 125),
+	land = Color3.fromRGB(232, 225, 208),
+	snow = Color3.fromRGB(244, 245, 250),
+	water = Color3.fromRGB(178, 206, 224),
+	shore = Color3.fromRGB(132, 170, 200),
+	ice = Color3.fromRGB(208, 230, 242),
+	yard = Color3.fromRGB(206, 197, 202),
+	special = Color3.fromRGB(232, 214, 176),
+	roadEdge = Color3.fromRGB(150, 132, 160),
+	road = Color3.fromRGB(255, 252, 245),
+	highway = Color3.fromRGB(246, 222, 156),
+	bridge = Color3.fromRGB(206, 156, 112),
+	iceRoad = Color3.fromRGB(214, 240, 250),
+	safe = Color3.fromRGB(96, 150, 70),
 	job = Color3.fromRGB(245, 179, 79), -- the delivery's gold (the Hud's 3D guide too)
 	gps = Ui.Gps,
-	car = Theme.Postage.violet, -- the car on its way (the Hud's car call line is violet too)
-	routeEdge = Color3.fromRGB(20, 18, 24),
+	car = P.violet, -- the car on its way (the Hud's car call line is violet too)
+	routeEdge = P.ink,
 }
 local BLOCK_COLORS = {
-	downtown = Color3.fromRGB(66, 68, 74),
-	harbor = Color3.fromRGB(72, 68, 62),
-	suburbs = Color3.fromRGB(60, 74, 54),
+	downtown = Color3.fromRGB(214, 204, 222),
+	harbor = Color3.fromRGB(220, 208, 198),
+	suburbs = Color3.fromRGB(210, 222, 198),
 }
 local KIND_COLORS = {
 	shop = Color3.fromRGB(110, 160, 88),
@@ -179,7 +183,8 @@ local function caption(parent: any, text: string, x: number, z: number, scale: n
 		TextSize = size,
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = color,
-		TextStrokeTransparency = 0.2,
+		TextStrokeColor3 = P.paper,
+		TextStrokeTransparency = 0.25,
 		ZIndex = 8,
 	}, parent)
 end
@@ -192,15 +197,15 @@ local function landmarkIcon(parent: any, landmark: Map.Landmark, scale: number, 
 		Size = UDim2.fromOffset(size, size),
 		Position = point(landmark.x, landmark.z, scale),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = KIND_COLORS[landmark.kind] or Color3.new(0.3, 0.3, 0.3),
+		BackgroundColor3 = KIND_COLORS[landmark.kind] or P.ink2,
 		Text = if Icons.get(art) then "" else landmark.icon,
 		TextScaled = true,
 		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextColor3 = P.paper,
 		ZIndex = 9,
 	}, parent)
 	Ui.corner(icon, size)
-	Ui.stroke(icon, Color3.new(1, 1, 1), 1.5)
+	Ui.stroke(icon, P.paper, 1.5)
 	if Icons.get(art) then
 		Ui.icon(icon, art, landmark.icon, UDim2.fromScale(0.72, 0.72), {
 			Position = UDim2.fromScale(0.5, 0.5),
@@ -292,16 +297,16 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 	rounded(rect(content, lake.x0, lake.z0, lake.x1, lake.z1, scale, C.ice, 3), math.floor(40 * scale))
 	local m = Map.Mountain
 	-- (white: the gradient gives the colour, lit from the north-west)
-	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, Color3.new(1, 1, 1), 3)
+	local hill = rect(content, m.x - m.radius, m.z - m.radius, m.x + m.radius, m.z + m.radius, scale, P.paper, 3)
 	Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, hill)
 	Ui.make("UIGradient", {
-		Color = ColorSequence.new(Color3.fromRGB(150, 142, 132), Color3.fromRGB(70, 66, 60)),
+		Color = ColorSequence.new(Color3.fromRGB(226, 216, 206), Color3.fromRGB(176, 160, 162)),
 		Rotation = 45,
 	}, hill)
 	for _, yard in Map.Yards do
 		rounded(rect(content, yard.x0, yard.z0, yard.x1, yard.z1, scale, C.yard, 3), math.max(2, math.floor(12 * scale)))
 	end
-	-- Blocks, a little lighter than the ground; the special ones warmer.
+	-- Blocks, lavender, sand or sage on the cream ground; the special ones warmer.
 	local half = Map.BlockSize / 2
 	local blockRadius = math.max(2, math.floor(8 * scale))
 	for _, d in Map.Districts do
@@ -313,7 +318,7 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 			end
 		end
 	end
-	-- Roads: all the dark edges first, then the fills, so the junctions are clean.
+	-- Roads: all the plum edges first, then the fills, so the junctions are clean.
 	local border = if big then 1.5 else 3
 	for pass = 1, 2 do
 		for _, s in Map.Segments do
@@ -334,17 +339,17 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		end
 	end
 	local safeHalf = Config.City.SafeHalf
-	local safe = rect(content, -safeHalf, -safeHalf, safeHalf, safeHalf, scale, Color3.new(0, 0, 0), 6)
+	local safe = rect(content, -safeHalf, -safeHalf, safeHalf, safeHalf, scale, P.ink, 6)
 	safe.BackgroundTransparency = 1
 	Ui.make("UIStroke", { Color = C.safe, Thickness = if big then 2 else 1.5, Transparency = 0.25 }, safe)
 	if big then
 		for _, d in Map.Districts do
 			local x0, x1, z0 = Map.districtEdges(d)
-			caption(content, d.name:upper(), (x0 + x1) / 2, z0 - 60, scale, 14, Color3.fromRGB(255, 230, 160))
+			caption(content, d.name:upper(), (x0 + x1) / 2, z0 - 60, scale, 14, P.ink)
 		end
-		caption(content, "TUNNEL", m.x + 80, m.z, scale, 11, Color3.fromRGB(230, 230, 230))
-		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 40, scale, 11, Color3.fromRGB(40, 80, 110))
-		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, Color3.fromRGB(60, 70, 80))
+		caption(content, "TUNNEL", m.x + 80, m.z, scale, 11, P.ink2)
+		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 40, scale, 11, Theme.Colors.blue)
+		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, P.ink2)
 		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.safe)
 	end
 	-- The routes (the GPS under the job), then the markers on top.
@@ -405,6 +410,7 @@ local function symbol(parent: any, text: string, size: number, color: Color3, zI
 		TextScaled = true,
 		Font = Enum.Font.GothamBlack,
 		TextColor3 = color,
+		TextStrokeColor3 = P.ink,
 		TextStrokeTransparency = 0,
 		Visible = false,
 		ZIndex = zIndex,
@@ -443,11 +449,11 @@ local function dot(parent: any, color: Color3, text: string, size: number): any
 		Text = text,
 		TextScaled = true,
 		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextColor3 = Theme.textOn(color),
 		ZIndex = 18,
 	}, parent)
 	Ui.corner(d, size)
-	Ui.stroke(d, Color3.new(0, 0, 0), 1.5)
+	Ui.stroke(d, P.ink, 1.5)
 	return d
 end
 
@@ -457,13 +463,13 @@ local function layer(canvas: Canvas): Layer
 	return {
 		canvas = canvas,
 		players = pool(canvas.markers, function(parent)
-			return dot(parent, Color3.fromRGB(70, 160, 255), "", 12)
+			return dot(parent, Theme.Colors.blue, "", 12)
 		end),
 		crates = pool(canvas.markers, function(parent)
 			return dot(parent, Color3.fromRGB(230, 180, 30), "?", 12)
 		end),
 		enemies = pool(canvas.markers, function(parent)
-			return dot(parent, Color3.fromRGB(220, 40, 40), "!", 14)
+			return dot(parent, P.danger, "!", 14)
 		end),
 	}
 end
@@ -744,7 +750,6 @@ local function updateMini(position: Vector3, facing: Vector3, speed: number, hea
 end
 
 local function buildMini(column: any, touch: boolean)
-	local P = Theme.Postage
 	local size = MapView.MiniSize
 	mini = Ui.make("Frame", {
 		Name = "Minimap",
@@ -784,13 +789,13 @@ local function buildMini(column: any, touch: boolean)
 		table.insert(miniIcons, landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false))
 	end
 	miniLayer = layer(canvas)
-	-- Soft shading at the top (under the header) and the bottom.
+	-- Soft paper shading at the top (under the header) and the bottom.
 	for _, side in { { 0, 90 }, { 1, -90 } } do
 		local shade = Ui.make("Frame", {
 			Size = UDim2.new(1, 0, 0, 36),
 			Position = UDim2.fromScale(0, side[1]),
 			AnchorPoint = Vector2.new(0, side[1]),
-			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundColor3 = P.paper,
 			BorderSizePixel = 0,
 			ZIndex = 20,
 		}, group)
@@ -800,9 +805,9 @@ local function buildMini(column: any, touch: boolean)
 		}, shade)
 	end
 	-- You: an arrow in the middle, pointing the way you face.
-	miniMe = symbol(group, "▲", 22, Color3.new(1, 1, 1), 22)
+	miniMe = symbol(group, "▲", 22, P.ink, 22)
 	miniMe.Position = UDim2.fromScale(0.5, 0.5)
-	miniMe.TextStrokeColor3 = Color3.fromRGB(10, 10, 14)
+	miniMe.TextStrokeColor3 = P.paper
 	miniMe.Visible = true
 	miniStar = symbol(group, "★", 26, C.job, 23)
 	miniGps = symbol(group, "◆", 20, C.gps, 23)
@@ -982,10 +987,10 @@ local function buildList(parent: any)
 	local list = Ui.make("ScrollingFrame", {
 		Size = UDim2.new(0, LIST_W, 1, -56),
 		Position = UDim2.new(1, -LIST_W - 8, 0, 48),
-		BackgroundColor3 = Theme.Postage.lavenderDeep,
+		BackgroundColor3 = P.lavenderDeep,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 4,
-		ScrollBarImageColor3 = Theme.Postage.violet,
+		ScrollBarImageColor3 = P.violet,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ZIndex = 41,
@@ -1000,33 +1005,33 @@ local function buildList(parent: any)
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -8, 0, 20), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 42 }, list)
 		local dotFrame = Ui.make("Frame", { Size = UDim2.fromOffset(8, 8), Position = UDim2.new(0, 2, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 42 }, row)
 		Ui.corner(dotFrame, 4)
-		Ui.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextColor3 = Theme.Postage.ink, TextSize = 12, ZIndex = 42 })
+		Ui.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextColor3 = P.ink, TextSize = 12, ZIndex = 42 })
 	end
 	local function entry(landmark: Map.Landmark)
 		order += 1
 		local button = Ui.make("TextButton", {
 			Size = UDim2.new(1, -8, 0, 52),
-			BackgroundColor3 = Theme.Postage.ticket,
+			BackgroundColor3 = P.ticket,
 			Text = "",
 			AutoButtonColor = true,
 			LayoutOrder = order,
 			ZIndex = 42,
 		}, list)
 		Ui.corner(button, 10)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = Theme.Postage.line, Thickness = 1 }, button)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, button)
 		Ui.icon(button, Icons.landmark(landmark.id), landmark.icon, UDim2.fromOffset(40, 40), {
 			Position = UDim2.fromOffset(4, 6),
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			ZIndex = 43,
-			ImageColor3 = KIND_COLORS[landmark.kind] or Color3.new(1, 1, 1),
+			ImageColor3 = KIND_COLORS[landmark.kind] or P.ink2,
 		})
-		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 14, Font = Theme.DisplayFont, TextColor3 = Theme.Postage.ink, ZIndex = 43, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 14, Font = Theme.DisplayFont, TextColor3 = P.ink, ZIndex = 43, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		Ui.label(button, landmark.description, UDim2.new(1, -54, 0, 26), {
 			Position = UDim2.fromOffset(50, 24),
 			TextSize = 12,
 			Font = Enum.Font.GothamMedium,
-			TextColor3 = Theme.Postage.ink2,
+			TextColor3 = P.ink2,
 			ZIndex = 43,
 		})
 		button.Activated:Connect(function()
@@ -1034,7 +1039,7 @@ local function buildList(parent: any)
 			big.Visible = false
 		end)
 	end
-	title("Click a place to set the GPS", Theme.Postage.violet)
+	title("Click a place to set the GPS", P.violet)
 	local clear = Ui.ghostButton(list, "◆  CLEAR GPS", UDim2.new(1, -8, 0, 32), C.gps, function()
 		setGps(nil)
 	end)
@@ -1069,24 +1074,24 @@ local function buildBig(gui: any)
 		Size = UDim2.fromOffset(mapW + LIST_W + 30, mapH + 56),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Theme.Postage.lavender,
+		BackgroundColor3 = P.lavender,
 		Visible = false,
 		ZIndex = 40,
 	}, gui)
 	bigScale = Ui.make("UIScale", {}, big)
 	-- 3.6: the lavender window of the HUD (client/Hud.luau), the legend in ink with the markers' colours.
 	Ui.corner(big, 22)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = Theme.Postage.line, Thickness = 1.5 }, big)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1.5 }, big)
 	Ui.make("TextLabel", {
 		Size = UDim2.new(1, -60, 0, 36),
 		Position = UDim2.fromOffset(12, 6),
 		BackgroundTransparency = 1,
 		RichText = true,
-		Text = `Map   <font size="14">▲ you   <font color="{hex(C.job)}">★━</font> delivery   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="#D04040">!</font> bandit car   ? crate</font>`,
+		Text = `Map   <font size="14">▲ you   <font color="{hex(C.job)}">★━</font> delivery   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="{hex(P.danger)}">!</font> bandit car   ? crate</font>`,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextSize = 22,
 		Font = Theme.DisplayFont,
-		TextColor3 = Theme.Postage.ink,
+		TextColor3 = P.ink,
 		ZIndex = 41,
 	}, big)
 	local close = Ui.closeButton(big, function()
@@ -1111,7 +1116,8 @@ local function buildBig(gui: any)
 		end)
 	end
 	bigLayer = layer(canvas)
-	bigMe = symbol(canvas.markers, "▲", 24, Color3.new(1, 1, 1), 20)
+	bigMe = symbol(canvas.markers, "▲", 24, P.ink, 20)
+	bigMe.TextStrokeColor3 = P.paper
 	bigStar = symbol(canvas.markers, "★", 28, C.job, 21)
 	bigGps = symbol(canvas.markers, "◆", 24, C.gps, 21)
 	bigCar = dot(canvas.markers, C.car, "🚗", 22)

@@ -17,10 +17,8 @@
 --     a bar.
 -- While the window is open the mouse is free (Main: CameraRig.mouseNeeded checks GarageUi.isOpen()).
 
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Economy = require(Shared.Economy)
@@ -41,7 +39,6 @@ GarageUi.onOpen = nil :: (() -> ())?
 
 local player = Players.LocalPlayer
 local WIDTH, HEIGHT = 860, 540 -- the window at scale 1 (Ui.screenScale)
-local HEADER_H, FOOTER_H = 78, 40 -- the window chrome (Ui.WindowHeader / Ui.WindowFooter)
 local WALK_AWAY = 45 -- studs from where the window was opened (when the server sends no center / range)
 local REPAIR_ACCENT = C.green -- the repair card's edge and bar (a "fixed / good" ink once Theme.Colors is remapped)
 
@@ -69,133 +66,7 @@ local function rootPosition(): Vector3?
 	return if root and root:IsA("BasePart") then root.Position else nil
 end
 
--- ── The window chrome ──────────────────────────────────────────────────────
-
--- The lavender window (Ui.window, stream B of 3.6). FALLBACK (3.6 stream D): while Ui.window is not in this build,
--- the same chrome is drawn here: a header (icon badge, title, subtitle, a round close button that turns on hover),
--- the content, a footer (ESC chip, "Close window", a context line). Returns (frame, content, chrome) like Ui.window;
--- chrome.onClose is called by ✕, ESC, the gamepad's B and the Roblox menu opening. Delete the fallback once
--- Ui.window has landed.
-local function newWindow(parent: Instance, title: string, subtitle: string, icon: string, size: UDim2): (any, any, any)
-	local helper = (Ui :: any).window
-	if type(helper) == "function" then
-		return helper(parent, title, subtitle, icon, size)
-	end
-	local frame = Ui.make("Frame", { Name = "Window", Size = size, Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1 }, parent)
-	local shadow = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.fromOffset(8, 8), BackgroundColor3 = P.line, BorderSizePixel = 0 }, frame)
-	Ui.corner(shadow, 22)
-	local surface = Ui.make("Frame", { Name = "Surface", Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.lavender, BorderSizePixel = 0, Active = true }, frame)
-	Ui.corner(surface, 22)
-	local header = Ui.make("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, HEADER_H), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, surface)
-	Ui.corner(header, 22)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), Position = UDim2.new(0, 0, 1, -22), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, header)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = P.line, BorderSizePixel = 0 }, header)
-	local badge = Ui.make("Frame", { Size = UDim2.fromOffset(42, 42), Position = UDim2.new(0, 22, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = P.sage, BorderSizePixel = 0 }, header)
-	Ui.corner(badge, 21)
-	local iconLabel = Ui.label(badge, icon, UDim2.fromScale(1, 1), { TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = P.ink2 })
-	local titleLabel = Ui.label(header, title, UDim2.new(1, -150, 0, 30), {
-		Position = UDim2.fromOffset(78, 12),
-		Font = Theme.DisplayFont,
-		TextSize = 25,
-		TextColor3 = P.ink,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local subtitleLabel = Ui.label(header, subtitle, UDim2.new(1, -150, 0, 18), {
-		Position = UDim2.fromOffset(79, 44),
-		Font = Theme.Font,
-		TextSize = 14,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local content = Ui.make("Frame", { Name = "Content", Size = UDim2.new(1, 0, 1, -(HEADER_H + FOOTER_H)), Position = UDim2.fromOffset(0, HEADER_H), BackgroundTransparency = 1 }, surface)
-	local footer = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, 0, 0, FOOTER_H), Position = UDim2.new(0, 0, 1, -FOOTER_H), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, surface)
-	Ui.corner(footer, 22)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundColor3 = P.lavenderDeep, BorderSizePixel = 0 }, footer)
-	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = P.line, BorderSizePixel = 0 }, footer)
-	local touch = Ui.touchLayout()
-	local esc = Ui.label(footer, if touch then "✕" else "ESC", UDim2.fromOffset(if touch then 24 else 38, 24), {
-		Position = UDim2.new(0, 24, 0.5, 1),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundTransparency = 0,
-		BackgroundColor3 = P.paper,
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-	})
-	Ui.corner(esc, 5)
-	Ui.stroke(esc, P.line, 1).Transparency = 0
-	Ui.label(footer, if touch then "Tap ✕ to close" else "Close window", UDim2.fromOffset(150, 20), {
-		Position = UDim2.new(0, if touch then 56 else 70, 0.5, 1),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Font = Theme.Font,
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-	})
-	local context = Ui.label(footer, "", UDim2.new(1, -260, 0, 20), {
-		Position = UDim2.new(1, -24, 0.5, 1),
-		AnchorPoint = Vector2.new(1, 0.5),
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		RichText = true,
-	})
-	local made: any = { frame = frame, surface = surface, header = header, content = content, footer = footer, icon = iconLabel, title = titleLabel, subtitle = subtitleLabel, esc = esc, context = context }
-	local function close()
-		local onClose = made.onClose
-		if onClose then
-			onClose()
-		else
-			frame.Visible = false
-		end
-	end
-	-- The round close button: paper, ✕, turns 90° on hover.
-	local closeButton = Ui.make("TextButton", {
-		Size = UDim2.fromOffset(36, 36),
-		Position = UDim2.new(1, -26, 0.5, 0),
-		AnchorPoint = Vector2.new(1, 0.5),
-		BackgroundColor3 = P.paper,
-		BorderSizePixel = 0,
-		Text = "✕",
-		TextColor3 = P.ink2,
-		TextSize = 16,
-		Font = Theme.HeadingFont,
-		AutoButtonColor = false,
-	}, header)
-	Ui.corner(closeButton, 18)
-	Ui.stroke(closeButton, P.line, 1).Transparency = 0
-	local TweenService = game:GetService("TweenService")
-	local turn = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	closeButton.MouseEnter:Connect(function()
-		TweenService:Create(closeButton, turn, { Rotation = 90 }):Play()
-	end)
-	closeButton.MouseLeave:Connect(function()
-		TweenService:Create(closeButton, turn, { Rotation = 0 }):Play()
-	end)
-	closeButton.Activated:Connect(close)
-	made.close = closeButton
-	local function escape()
-		if frame.Visible and frame:IsDescendantOf(game) and not UserInputService:GetFocusedTextBox() then
-			close()
-		end
-	end
-	local keys = UserInputService.InputBegan:Connect(function(input: InputObject)
-		if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB then
-			escape()
-		end
-	end)
-	local menu = GuiService.MenuOpened:Connect(escape)
-	frame.Destroying:Connect(function()
-		keys:Disconnect()
-		menu:Disconnect()
-	end)
-	return frame, content, made
-end
+-- ── Small pieces (the window is Ui.window) ──────────────────────────────────
 
 -- A small tag ("ACTIVE", "PARKED HERE"): a pastel face, ink caps.
 local function tag(parent: Instance, text: string, face: Color3, ink: Color3): any
@@ -211,13 +82,6 @@ local function tag(parent: Instance, text: string, face: Color3, ink: Color3): a
 	Ui.corner(label, 4)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, label)
 	return label
-end
-
--- A thin bar on a lavender track.
-local function bar(parent: Instance, size: UDim2, color: Color3): (any, any)
-	local back, fill = Ui.bar(parent, size, color)
-	back.BackgroundColor3 = P.lavenderDeep
-	return back, fill
 end
 
 -- ── The car drawing (garage.png's van, from frames) ────────────────────────
@@ -310,7 +174,7 @@ local function build()
 	}, player:WaitForChild("PlayerGui"))
 	gui = made
 	local content
-	window, content, chrome = newWindow(made, "Your garage", "", "🅿", UDim2.fromOffset(WIDTH, HEIGHT))
+	window, content, chrome = Ui.window(made, "Your garage", "", "🅿", UDim2.fromOffset(WIDTH, HEIGHT))
 	window.Visible = false
 	scale = window:FindFirstChildOfClass("UIScale") or Ui.make("UIScale", {}, window)
 	chrome.onClose = function()
@@ -513,7 +377,7 @@ local function carCard(car: any, order: number)
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	local back, fill = bar(card, UDim2.new(1, -32, 0, 5), color)
+	local back, fill = Ui.bar(card, UDim2.new(1, -32, 0, 5), color)
 	back.Position = UDim2.fromOffset(16, 90)
 	fill.Size = UDim2.fromScale(health, 1)
 	-- The action.
@@ -757,7 +621,7 @@ local function buildRepairCard()
 		TextColor3 = P.ink,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
-	local back, fill = bar(repairCard, UDim2.new(1, -36, 0, 4), REPAIR_ACCENT)
+	local back, fill = Ui.bar(repairCard, UDim2.new(1, -36, 0, 4), REPAIR_ACCENT)
 	back.Position = UDim2.new(0, 18, 1, -10)
 	repairRefs.fill = fill
 end

@@ -24,6 +24,8 @@ Theme.Postage = {
 	line = Color3.fromRGB(205, 190, 214), -- perforations, dashed separators, thin strokes
 	shadow = Color3.fromRGB(58, 40, 70), -- the soft drop shadow under paper
 	danger = Color3.fromRGB(196, 72, 84), -- warnings (always with an icon or text, never colour alone)
+	good = Color3.fromRGB(78, 112, 58), -- success as ink on paper ("Owned", "Your car is here", a full bar)
+	warn = Color3.fromRGB(170, 104, 36), -- a middle state as ink or a bar (half condition, "the car could not come")
 	tags = { -- the consumable tags, alternating
 		Color3.fromRGB(240, 232, 248),
 		Color3.fromRGB(250, 240, 222),

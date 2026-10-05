@@ -49,11 +49,8 @@ local MapView = require(script.Parent.MapView)
 local Leaderboard = require(script.Parent.Leaderboard)
 
 local C = Ui.Colors
--- 3.6: the Postage tokens (Theme.Postage) and, marked [fallback], the ones it does not have yet (stream B: please add
--- them to Theme.Postage): good (success ink on paper), warn (a middle state, with text).
-local P: any = table.clone(Theme.Postage)
-P.good = (Theme.Postage :: any).good or Color3.fromRGB(78, 112, 58) -- [fallback]
-P.warn = (Theme.Postage :: any).warn or Color3.fromRGB(170, 104, 36) -- [fallback]
+-- 3.6: the Postage tokens (Theme.Postage: paper, lavender, the inks, sage, good / warn / danger, track, pill ...).
+local P = Theme.Postage
 local Hud = {}
 
 local player = Players.LocalPlayer
@@ -266,7 +263,6 @@ local xpBack
 xpBack, xpFill = Ui.bar(levelRow, UDim2.new(0.5, -8, 0, 5), P.violet)
 xpBack.Position = UDim2.new(0.5, 8, 0.5, 0)
 xpBack.AnchorPoint = Vector2.new(0, 0.5)
-xpBack.BackgroundColor3 = P.lavenderDeep
 xpLabel = Ui.caps(moneyCard, "", UDim2.fromOffset(0, 26), {
 	AutomaticSize = Enum.AutomaticSize.X,
 	Position = UDim2.new(1, 14, 0.5, 0), -- to the right of the card
@@ -308,7 +304,6 @@ local healthBack
 healthBack, view.healthFill = Ui.bar(health, UDim2.new(1, -84, 0, 5), P.violet)
 healthBack.Position = UDim2.new(0, 36, 0.5, 0)
 healthBack.AnchorPoint = Vector2.new(0, 0.5)
-healthBack.BackgroundColor3 = P.lavenderDeep
 view.healthText = Ui.label(health, "100", UDim2.fromOffset(40, HEALTH_HEIGHT), {
 	Position = UDim2.new(1, -10, 0, 0),
 	AnchorPoint = Vector2.new(1, 0),
@@ -497,113 +492,17 @@ Leaderboard.onOpen = closeWindows
 
 type Window = { frame: any, body: any, title: any, subtitle: any, icon: any, footer: any }
 
--- 3.6: the concept's window (design/ui-concept/previews/garage.png, dispatch.png): a lavender surface; a header with
--- an icon in a sage circle, the title (DisplayFont, ink) and a subtitle; the round close button (Ui.closeButton); the
--- body scrolls; a footer with ESC · Close window and the context on the right (window.footer, set by each window).
+-- 3.6: the concept's window (Ui.window, design/ui-concept/previews/garage.png): a lavender surface; a header with an
+-- icon in a sage circle, the title and a subtitle, the round close button; the body scrolls; a footer with ESC · Close
+-- window and the context on the right (window.footer, set by each window).
 local function window(title: string, size: Vector2, icon: string, subtitle: string): Window
-	local frame = scaled(Ui.make("Frame", {
-		Size = UDim2.fromOffset(size.X, size.Y),
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = P.lavender,
-		BorderSizePixel = 0,
-		Visible = false,
-		ZIndex = 5,
-	}, gui))
-	Ui.corner(frame, 22)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1.5 }, frame)
-	-- The header and the footer: a band each (rounded on the window's side only: a square filler covers the inner
-	-- corners) and a thin line between them and the body.
-	local refs: { any } = {}
-	for index, band in { { 0, 72, 0 }, { 1, 38, 1 } } do
-		local strip = Ui.make("Frame", {
-			Size = UDim2.new(1, 0, 0, band[2]),
-			Position = UDim2.fromScale(0, band[1]),
-			AnchorPoint = Vector2.new(0, band[3]),
-			BackgroundColor3 = P.lavenderDeep,
-			BorderSizePixel = 0,
-		}, frame)
-		Ui.corner(strip, 22)
-		Ui.make("Frame", {
-			Size = UDim2.new(1, 0, 0.5, 0),
-			Position = UDim2.fromScale(0, 1 - band[1]),
-			AnchorPoint = Vector2.new(0, 1 - band[1]),
-			BackgroundColor3 = P.lavenderDeep,
-			BorderSizePixel = 0,
-		}, strip)
-		Ui.make("Frame", {
-			Size = UDim2.new(1, 0, 0, 1),
-			Position = UDim2.fromScale(0, 1 - band[1]),
-			AnchorPoint = Vector2.new(0, band[1]),
-			BackgroundColor3 = P.line,
-			BorderSizePixel = 0,
-		}, strip)
-		refs[index] = strip
-	end
-	local header, footer = refs[1], refs[2]
-	local iconLabel = Ui.label(header, icon, UDim2.fromOffset(44, 44), {
-		Position = UDim2.fromOffset(18, 14),
-		BackgroundTransparency = 0,
-		BackgroundColor3 = P.sage,
-		TextScaled = true,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	Ui.corner(iconLabel, 22)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, iconLabel)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 9), PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, iconLabel)
-	local titleLabel = Ui.label(header, title, UDim2.new(1, -140, 0, 30), {
-		Position = UDim2.fromOffset(74, 10),
-		TextSize = 24,
-		Font = Theme.DisplayFont,
-		TextColor3 = P.ink,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local subtitleLabel = Ui.label(header, subtitle, UDim2.new(1, -140, 0, 18), {
-		Position = UDim2.fromOffset(74, 41),
-		TextSize = 14,
-		Font = Theme.Font,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local close = Ui.closeButton(frame, function()
-		frame.Visible = false
-	end)
-	close.AnchorPoint = Vector2.new(1, 0.5)
-	close.Position = UDim2.new(1, -18, 0, 36)
-	close.ZIndex = 3
-	-- The footer: ESC (a tap on ✕ on a touch screen) and the window's context.
-	local esc = Ui.label(footer, if touchLayout then "✕" else "ESC", UDim2.fromOffset(0, 22), {
-		AutomaticSize = Enum.AutomaticSize.X,
-		Position = UDim2.new(0, 18, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		TextSize = 12,
-		TextColor3 = P.ink2,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-	})
-	Ui.corner(esc, 6)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, esc)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, esc)
-	Ui.label(footer, "Close window", UDim2.fromOffset(120, 22), {
-		Position = UDim2.new(0, 66, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		TextSize = 12,
-		Font = Theme.Font,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-	})
-	local context = Ui.caps(footer, "", UDim2.new(1, -220, 0, 22), {
-		Position = UDim2.new(1, -18, 0.5, 0),
-		AnchorPoint = Vector2.new(1, 0.5),
-		TextSize = 12,
-		TextColor3 = P.ink,
-		TextXAlignment = Enum.TextXAlignment.Right,
-	})
+	local frame, content, chrome = Ui.window(gui, title, subtitle, icon, UDim2.fromOffset(size.X, size.Y))
+	scaled(frame)
+	frame.Visible = false
+	frame.ZIndex = 5
 	local body = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -28, 1, -128),
-		Position = UDim2.fromOffset(14, 82),
+		Size = UDim2.new(1, -28, 1, -12),
+		Position = UDim2.fromOffset(14, 6),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 4,
@@ -611,11 +510,11 @@ local function window(title: string, size: Vector2, icon: string, subtitle: stri
 		ScrollBarImageTransparency = 0.4,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-	}, frame)
+	}, content)
 	Ui.list(body, true, 10)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 4) }, body)
 	table.insert(windows, frame)
-	return { frame = frame, body = body, title = titleLabel, subtitle = subtitleLabel, icon = iconLabel, footer = context }
+	return { frame = frame, body = body, title = chrome.title, subtitle = chrome.subtitle, icon = chrome.icon, footer = chrome.context }
 end
 
 -- 3.6: a list row is a paper ticket: a soft shadow under it, and (unless `plain`) a perforation with two notches
@@ -859,12 +758,9 @@ function openDispatch()
 	if cb then
 		cb()
 	else
-		Hud.toast("The dispatch board is not here yet. [fallback: Hud.onJobs is not set]")
+		Hud.toast("The dispatch board is not ready yet.")
 	end
 end
-
--- Main still sends the Offers here: the Dispatch board shows them (DispatchUi.setOffers).
-function Hud.setOffers(_list: { any }) end
 end
 
 -- ── Shops ──────────────────────────────────────────────────────────────────
@@ -1074,8 +970,8 @@ local function renderShop()
 			local need = if def.earned or def.exclusive then nil else needs(def, state.weapons[def.id] == true)
 			local exclusive = def.exclusive
 			if exclusive and exclusive == "challenges" and not state.weapons[def.id] then
-				-- The gun nobody else has: a dark silhouette, nothing given away.
-				Ui.icon(c, Icons.weapon(def.id), "❔", UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, 17), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = Color3.new(0, 0, 0) })
+				-- The gun nobody else has: an ink silhouette, nothing given away.
+				Ui.icon(c, Icons.weapon(def.id), "❔", UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, 17), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = P.ink })
 				cardText(c, "???", "Damage ??? · ???/s · Range ???", "Nobody has ever seen it. Some say it waits for the courier who does everything.", 70)
 			else
 				cardText(c, def.name, gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else "") .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
@@ -1236,7 +1132,7 @@ local function renderShop()
 				local swatchColor = if def.color then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) elseif carDef then Color3.fromRGB(carDef.color[1], carDef.color[2], carDef.color[3]) else C.grey
 				local swatch = Ui.make("Frame", { Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, if def.exclusive then 20 else 13), BackgroundColor3 = swatchColor }, c)
 				Ui.corner(swatch, 8)
-				Ui.stroke(swatch, if def.material == "Neon" then swatchColor:Lerp(Color3.new(1, 1, 1), 0.5) else Color3.new(0, 0, 0), 2)
+				Ui.stroke(swatch, if def.material == "Neon" then swatchColor:Lerp(P.paper, 0.5) else P.ink, 2)
 				Ui.label(c, def.name, UDim2.new(1, -260, 0, 26), { Position = UDim2.fromOffset(70, 8), TextSize = 20, Font = Enum.Font.GothamBlack, TextColor3 = P.ink })
 				-- The finish (PaintDef.material) after the price: "Owned · Neon finish".
 				local finish = if def.material then ` · {def.material} finish` else ""
@@ -1295,7 +1191,6 @@ local function rewardRow(parent: any, order: number, iconName: string?, icon: st
 	})
 	local back, fill = Ui.bar(row, UDim2.new(1, -78, 0, 10), if owned then P.good else P.violet)
 	back.Position = UDim2.fromOffset(64, 40)
-	back.BackgroundColor3 = P.lavenderDeep
 	fill.Size = UDim2.fromScale(if owned then 1 else math.clamp(done / math.max(at, 1), 0, 1), 1)
 end
 
@@ -1673,7 +1568,6 @@ function Hud.showResult(r: any)
 		Ui.label(row, `LV {level} · {rank}`, UDim2.new(0.5, 0, 1, 0), { TextColor3 = P.ink2, TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = false })
 		local back, fill = Ui.bar(row, UDim2.new(0.5, 0, 0, 5), P.violet)
 		back.Position = UDim2.new(0.5, 0, 0.5, -2)
-		back.BackgroundColor3 = P.lavenderDeep
 		local mine = myXp()
 		fill.Size = UDim2.fromScale(if mine then Levels.progress(mine) else 0, 1)
 		if r.levelUp == true then
@@ -1740,7 +1634,7 @@ local function hook(name: string, cb: (() -> ())?)
 	if cb then
 		cb()
 	else
-		Hud.toast(`The {name} is not here yet. [fallback: its Hud hook is not set]`)
+		Hud.toast(`The {name} is not ready yet.`)
 	end
 end
 local giveUpAt = 0 -- the first press of GIVE UP (a second one within 4 s gives the job up)
@@ -2255,7 +2149,7 @@ fire = placed(Ui.make("TextButton", {
 	AutoButtonColor = true,
 }, gui))
 Ui.corner(fire, FIRE_SIZE // 2)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.violet, Thickness = 3 }, fire)
+Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.sageLip, Thickness = 3 }, fire)
 fire.InputBegan:Connect(function(input: InputObject)
 	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 		Shooting.setAutoHeld(true)
@@ -2336,7 +2230,6 @@ d.condText = Ui.label(group, "", UDim2.fromOffset(60, 14), {
 local condBack
 condBack, d.condFill = Ui.bar(group, UDim2.fromOffset(DIAL - 68, 5), P.violet)
 condBack.Position = UDim2.fromOffset(34, 140)
-condBack.BackgroundColor3 = P.lavenderDeep
 d.pips = Ui.make("Frame", { Size = UDim2.fromOffset(DIAL - 60, 10), Position = UDim2.fromOffset(30, 151), BackgroundTransparency = 1 }, group)
 Ui.list(d.pips, false, 3, Enum.HorizontalAlignment.Center)
 d.slots = centred("", 164, 14, { Font = Theme.Font, TextSize = 12, TextColor3 = P.ink2 })
@@ -2606,9 +2499,9 @@ function view.checkIdle(now: number)
 end
 
 -- Loading / unloading / boarding bar under the middle of the screen (layout() keeps it over the bottom panels): a
--- cream pill, a sage fill inside it, the words over it in ink.
+-- cream pill, a sage fill (its deeper lip shade, so it shows on the cream) inside it, the words over it in ink.
 LOAD_H = 28
-loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, LOAD_H), P.sage)
+loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, LOAD_H), P.sageLip)
 scaled(loadBack)
 loadBack.AnchorPoint = Vector2.new(0.5, 0.5)
 loadBack.Position = UDim2.fromScale(0.5, 0.62)
@@ -2657,14 +2550,24 @@ ring.Shape = Enum.PartType.Cylinder
 pileRing = guidePart("PileRing", Vector3.new(0.2, 7, 7), 0.35)
 pileRing.Shape = Enum.PartType.Cylinder
 label = guidePart("Label", Vector3.new(0.2, 0.2, 0.2), 1)
-local labelGui = Ui.make("BillboardGui", { Size = UDim2.fromOffset(260, 60), AlwaysOnTop = true, LightInfluence = 0, MaxDistance = 100000 }, label)
-labelText = Ui.label(labelGui, "", UDim2.fromScale(1, 1), {
+-- 3.6: the words (who, how far) in ink on a cream pill lined in the guide's colour: they read over a night street and
+-- a sunny one alike.
+local labelGui = Ui.make("BillboardGui", { Size = UDim2.fromOffset(260, 64), AlwaysOnTop = true, LightInfluence = 0, MaxDistance = 100000 }, label)
+labelText = Ui.label(labelGui, "", UDim2.new(), {
+	AutomaticSize = Enum.AutomaticSize.XY,
+	Position = UDim2.fromScale(0.5, 0.5),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundTransparency = 0.04,
+	BackgroundColor3 = P.pill,
 	TextXAlignment = Enum.TextXAlignment.Center,
-	TextColor3 = view.guideColor,
-	TextSize = 20,
-	Font = Enum.Font.GothamBlack,
-	TextStrokeTransparency = 0.2,
+	TextColor3 = P.ink,
+	TextSize = 17,
+	Font = Theme.DisplayFont,
+	TextWrapped = false,
 })
+Ui.corner(labelText, 12)
+Ui.stroke(labelText, view.guideColor, 2.5)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4) }, labelText)
 -- The arrow: a shaft and two sides of a head, pointing along -Z of its frame.
 local arrowParts = {
 	{ part = guidePart("ArrowShaft", Vector3.new(0.6, 0.4, 3.6), 0), offset = CFrame.new(0, 0, 0.8) },
@@ -2697,7 +2600,7 @@ local function paintGuide(color: Color3)
 	for _, a in arrowParts do
 		a.part.Color = color
 	end
-	labelText.TextColor3 = color
+	Ui.stroke(labelText, color, 2.5)
 end
 
 -- The park circle at p with the beam over it (or a thin beam over the pile / the person at `beamAt`), the label
@@ -2965,7 +2868,6 @@ local callDistance = Ui.caps(callLine, "", UDim2.fromOffset(84, 24), {
 })
 local callBack, callFill = Ui.bar(callLine, UDim2.new(1, -32, 0, 3), CALL_COLOR)
 callBack.Position = UDim2.new(0, 18, 1, -9)
-callBack.BackgroundColor3 = P.lavenderDeep
 
 -- The marker over the car in the world (seen through walls, like the delivery label).
 callMarker = Ui.make("BillboardGui", {
@@ -2978,22 +2880,30 @@ callMarker = Ui.make("BillboardGui", {
 	ResetOnSpawn = false,
 	Enabled = false,
 }, player:WaitForChild("PlayerGui"))
-local MARKER_COLOR = CALL_COLOR:Lerp(Color3.new(1, 1, 1), 0.35)
-local markerText = Ui.label(callMarker, "", UDim2.new(1, 0, 0, 24), {
+-- 3.6: on a cream pill with a violet line (it reads over a night street and a sunny one), the ▼ under it.
+local markerPill = Ui.make("Frame", {
+	Size = UDim2.new(1, -20, 0, 42),
+	Position = UDim2.fromOffset(10, 0),
+	BackgroundColor3 = P.pill,
+	BackgroundTransparency = 0.04,
+	BorderSizePixel = 0,
+}, callMarker)
+Ui.corner(markerPill, 12)
+Ui.stroke(markerPill, CALL_COLOR, 2)
+local markerText = Ui.label(markerPill, "", UDim2.new(1, 0, 0, 22), {
+	Position = UDim2.fromOffset(0, 3),
 	TextXAlignment = Enum.TextXAlignment.Center,
-	TextSize = 19,
-	Font = Enum.Font.GothamBlack,
-	TextColor3 = MARKER_COLOR,
-	TextStrokeTransparency = 0.2,
+	TextSize = 17,
+	Font = Theme.DisplayFont,
+	TextColor3 = P.ink,
 	TextWrapped = false,
 })
-local markerSub = Ui.label(callMarker, "", UDim2.new(1, 0, 0, 16), {
+local markerSub = Ui.label(markerPill, "", UDim2.new(1, 0, 0, 14), {
 	Position = UDim2.fromOffset(0, 24),
 	TextXAlignment = Enum.TextXAlignment.Center,
-	TextSize = 14,
-	Font = Enum.Font.GothamBold,
-	TextColor3 = P.paper,
-	TextStrokeTransparency = 0.3,
+	TextSize = 12,
+	Font = Theme.HeadingFont,
+	TextColor3 = P.ink2,
 	TextWrapped = false,
 })
 Ui.label(callMarker, "▼", UDim2.new(1, 0, 0, 22), {
@@ -3001,8 +2911,9 @@ Ui.label(callMarker, "▼", UDim2.new(1, 0, 0, 22), {
 	TextXAlignment = Enum.TextXAlignment.Center,
 	TextSize = 20,
 	Font = Enum.Font.GothamBlack,
-	TextColor3 = MARKER_COLOR,
-	TextStrokeTransparency = 0.2,
+	TextColor3 = CALL_COLOR,
+	TextStrokeColor3 = P.pill,
+	TextStrokeTransparency = 0,
 })
 
 local callLoop = false
