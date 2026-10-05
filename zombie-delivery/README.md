@@ -27,6 +27,13 @@ Version 3.3 brings **five more vans** to buy between the Old Van and the endgame
 the Box Truck, the Armored Van and the Rally Van) and **upgrades you can see**: the car upgrades now belong to one
 car and show on it (a bull bar, armor plates and window grilles, a hood scoop and twin pipes), and a new one, **Quick
 Hands**, makes the loading quicker (see **The vans and the upgrades you can see**).
+Version 3.4 makes the cars **real and earned**: every car has a **cargo capacity** (the Old Van holds 4 pieces, the
+High-Roof Van and the Box Truck 6) and a new **Cargo Rack** upgrade adds a slot per level on a roof rack you can see;
+a job or a mission with more pieces than your car holds waits until your car is big enough. You keep your first van
+and upgrade it (the first levels are cheap). Damage stays with a car until a **repair shop** fixes it (Wrench Garage
+and the new Rust Bridge Repairs: drive into a bay, get out, wait up to a minute, pay a small fee), and every car
+beyond the starting van needs a **garage** slot: the first garage comes at level 2, and you **switch cars only at your
+garages** (see **Cars, cargo, garages and the repair shop**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -96,7 +103,8 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
    the home's garage (walk to it and press E); without one the car is placed next to you and you sit in it.
 2. Without a home you start at the **depot** in the middle of Downtown. Around it is the **safe zone** (green line) with the shops:
    **Dead End Motors** (cars, walk among the showroom cars), **Lead & Co.** (guns), **Wrench Garage** (upgrades, paint
-   jobs, car guns, free repairs inside), **Last Stop Supplies** (items). Walk in and use the counter.
+   jobs, car guns and, 3.4, two **repair bays**), **Last Stop Supplies** (items). Walk in and use the counter. The
+   depot's **Depot Garage** terminal is your starting van's lot (3.4: your other cars wait in your garages).
 3. **JOBS** (or the job board at the depot): one special job and one delivery of every danger level.
    * Every delivery has stops: **pick up** at the blue circle, **deliver** at the yellow one. Park in the circle, **get
      out** and handle the cargo yourself: **Pick up** (E) a piece from the giver's pile, carry it to the back of the
@@ -117,6 +125,8 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
      * **Pizza Rush** (★, level 1): one hot pizza from Luigi's to a hungry customer, 3 minutes on the clock.
    * A locked job shows **🔒 LEVEL N** instead of ACCEPT: the danger levels need a driver level (★ 1, ★★ 2, ★★★ 4,
      ★★★★ 7), and so do the special jobs and (3.2) the employers' jobs (see **Driver levels and the progression**).
+   * 3.4: a job with more pieces than your car holds shows **📦 NEEDS N SLOTS** ("your Old Van holds 4") instead of
+     ACCEPT; the dangerous levels sometimes send a **bulk order** (★★ up to 5 pieces, ★★★ up to 6, ★★★★ up to 8).
    * **Work for the people who run things** (the WORK HERE boards, ★ yellow on the map). They lend you their vehicle
      for the job; after enough jobs the vehicle is yours, and some of them also give you a **gun** (not sold anywhere):
      * **Sunny Hill School** (Suburbs; level 2): School Run, pick up kids at 3 homes → **School Bus** after 3 jobs
@@ -192,9 +202,9 @@ until then:
 | Level | Opens |
 |---|---|
 | 1 | the Old Van, the Pistol, ★ jobs, Pizza Rush, First Shift |
-| 2 | **the Courier Van** ($3,500), ★★ jobs, School Run, Ice Cream Route, Code Red |
+| 2 | **the Courier Van** ($3,500), ★★ jobs, School Run, Ice Cream Route, Code Red, **the Rented Lockup** ($2,500, 3.4) |
 | 3 | **the High-Roof Van** ($7,000), the SMG ($4,000), Moving Day, Ambulance Run |
-| 4 | **the Pickup** ($12,000), the Shotgun ($7,500), ★★★ jobs, Fuel Run, Empty Shelves, the DUO campaign |
+| 4 | **the Pickup** ($12,000), the Shotgun ($7,500), ★★★ jobs, Fuel Run, Empty Shelves, the DUO campaign, **the Southside Garage** ($12,000, 3.4) |
 | 5 | the Roof Machine Gun ($9,000), Horse Transport, Cash Transport, the Harbor Lockup garage |
 | 6 | **the Box Truck** ($22,000), the Hunting Rifle ($15,000), Smoke and Sirens, the Highway Garage, the Elm Bungalow |
 | 7 | ★★★★ INSANE jobs, Army Supply, Winter Run, Downtown Parking, Birch Cottage |
@@ -212,7 +222,7 @@ until then:
   vehicles come with their employer's job level. The Wrench Garage upgrades cost twice their 3.1 price.
 * **Guns**: Pistol 1, SMG 3, Shotgun 4, Hunting Rifle 6, Minigun 10, Grenade Launcher 12. **Car guns**: Roof Machine
   Gun 5, Roof Minigun 10, Roof Grenade Launcher 12.
-* **Real estate** (the endgame): garages 5 – 7, houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
+* **Real estate** (the endgame): garages 2 – 7 (3.4: the two small ones early), houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
   the offices 12, 14 and 15, each also needing a campaign's finale (Iron Supply, Dirty Money, Last Convoy; the ESTATE
   list says "Finish Iron Supply first"). Hiring a courier costs $40,000.
 * **The XP curve** (`Config.Levels`): level 2 needs 575 XP, every next step × 1.2; level 15 needs 34,037 XP. The first
@@ -372,8 +382,8 @@ van, the high-roof van and the box truck also drive past in the traffic.
 | **Armored Van** | 10 | $55,000 | 74 | 900 | × 1.6 | 2 | steel plates on the box, the hood and the nose, grilles over the windows |
 | **Rally Van** | 12 | $80,000 | 92 | 420 | × 1.1 | 1 | lowered, big wheels under flares, stripes, a roof spoiler |
 
-A car needs a free car slot: since 3.3 you have **3** without a garage (the van and two more), a garage from level 5
-adds more (see **Real estate and your company**).
+A car needs a free car slot: since 3.4 the depot holds only your starting van, every further car needs a garage slot
+(see **Cars, cargo, garages and the repair shop**).
 
 **The upgrades belong to one car.** At Wrench Garage the car tracks (Engine, Handling, Armor, Ram Plow, Quick Hands)
 upgrade the car you have equipped (`profile.carUpgrades[carId]`; the window says "Upgrades for: Courier Van", the price
@@ -389,12 +399,88 @@ end, hood and first window; rebuilt when you upgrade):
 * **Armor** from level 1: steel plates along both sides between the wheels, taller with the level (a rim from 4); from
   level 3 **grilles** over the windscreen and the front side windows (the Armored Van has its own).
 * **Engine** from level 3: a **hood scoop** (taller at 5) and **twin exhaust pipes** under the back.
-* **Quick Hands** (new, 3 levels, $600 · $1,080 · $1,940): **−15 % per level** of the time to open the back and to pick
+* **Quick Hands** (new, 3 levels; 3.4: $400 · $800 · $1,600): **−15 % per level** of the time to open the back and to pick
   up, load, take out and hand over (the holds of the BackPrompt and the cargo prompts, `Economy.loadHold`; the job's
   car's level counts).
 
+* **Cargo Rack** (3.4, 3 levels, $300 · $750 · $1,880): **+1 cargo slot per level**: a roof rack over the cargo
+  space (behind the roof gun) on four legs, a cross bar more per level, a low fence from level 2, a ladder up the side
+  at 3. The extra slots are on it: the pieces you load beyond the body's slots ride on the roof.
+
 The kit is cosmetic: welded, massless, no collisions, not hit by bullets, a few parts; the stats come from the levels
 (`Economy.carStats` with the car's own levels).
+
+## Cars, cargo, garages and the repair shop
+
+Version 3.4: a car is something you **earn and keep**. You get the Old Van at the start and you upgrade it; a new car
+needs a garage, and a damaged one a mechanic.
+
+**Cargo capacity** (`Config.Cars` capacity = the car body's cargo slots in server/Vehicles.luau `STYLES`, checked by
+`tests/run_tests.py`; `Economy.capacity`, `Economy.cargoNeed`). Only what you **carry or lead by hand** takes a slot
+(all of a job's pieces ride at once: every pick-up comes before the drops); passengers (board) and the ice cream
+route (serve) take none.
+
+| Car | Capacity | + Cargo Rack 3 |
+|---|---|---|
+| Old Van, Courier Van, Pickup, Armored Van, Rally Van | 4 | 7 |
+| **High-Roof Van**, **Box Truck** | **6** | **9** |
+| Muscle Car | 2 | 5 |
+| the company vehicles: Armored Truck 8, Moving Truck 10, Monster Truck 6, Fuel Truck 6, Ice Cream Truck 6, Livestock Truck 2 (two stalls), Ambulance 1, School Bus 8 (seats) | | no rack |
+
+* **The job board** (server/Jobs.luau): every offer knows its pieces; one with more than your equipped car holds
+  shows **📦 NEEDS N SLOTS** and "NEEDS 6 SLOTS · your Old Van holds 4" (the server refuses it too). The ordinary
+  deliveries are 1 – 3 pieces; the dangerous levels sometimes send a **bulk order** (`Config.Jobs.BulkChance` /
+  `BulkExtra`: ★★ 20 % +1 – 2, ★★★ 45 % +2 – 3, ★★★★ 60 % +3 – 5), more pay per piece, a bigger car. A ★ job always
+  fits the Old Van, and so does a ★★ one without a bulk order.
+* **A special job or a mission that lends a vehicle** uses that vehicle's room (the company vehicles got the slots
+  their jobs need: the Armored Truck, the Moving Truck, the Monster Truck, the Fuel Truck and the Ice Cream Truck
+  carry a second layer; the horse missions bring two horses, the two stalls of the Livestock Truck).
+* **Missions** (server/Missions.luau): one with more pieces than your car holds is refused at START: "This mission
+  needs a vehicle with 6 slots (your Old Van holds 4). Upgrade its Cargo Rack or switch cars at your garage." The
+  MISSIONS window shows a red **📦 needs N slots** chip and line. First Shift, Code Red and Empty Shelves need at most
+  6 (the Old Van with two rack levels; Rush Hour of the Dead and Supermarket Sweep carry 6 now), the later ones up to
+  8 (Cooling Water, The Cure and Landing Gear: a High-Roof Van or a Box Truck with two rack levels).
+  `tests/capacity_test.luau` lists what every one of the 110 missions needs.
+
+**Garages and slots** (`Config.Estate`, server/Estate.luau, server/Garages.luau). The depot holds only your starting
+van (`BaseCarSlots` = **1**); every other car needs a slot of a garage or a home's garage. The first garages come early:
+
+| Garage | Level | Price | Slots | Where |
+|---|---|---|---|---|
+| **Rented Lockup** | 2 | $2,500 | +1 | south of Downtown, on a street down to the Suburbs (just west of the depot's line) |
+| **Southside Garage** | 4 | $12,000 | +2 | south of Downtown, on the street to the Suburbs east of it |
+| Harbor Lockup | 5 | $25,000 | +4 | the Harbor |
+| Highway Garage | 6 | $45,000 | +4 | the North Highway |
+| Downtown Parking | 7 | $70,000 | +6 | Downtown, in the safe zone |
+
+So the Courier Van (level 2) needs the Rented Lockup first. Dead End Motors refuses a car without a free slot: "No
+free garage slot. Buy or rent a garage (ESTATE, H) first." (the card says 🅿 NEEDS A GARAGE). A bought car goes into
+your garage. The company vehicles the employers give you take no slot. **An older save** with more cars than slots
+keeps them all; they wait at the depot lot, and the save cannot buy more until it has room.
+
+**Switching cars** happens **only at a garage**: walk to the **🅿 GARAGE** post at the drive-out spot of a garage you
+own (or of your home; only your own show it) and press E, or use the Depot Garage terminal for the depot lot (the
+starting van, the company vehicles, an older save's extra cars). The garage window (client/GarageUi.luau) lists your
+cars: name, 📦 capacity, 🔧 health, the upgrades, **TAKE OUT** (it closes when you walk out of the garage's range).
+The car you drive is parked inside (its damage kept), the chosen one stands at the door (from the driver's seat you
+sit in it). Not during a delivery. Anywhere else the dealer says IN GARAGE and the server "Switch cars at one of your
+garages". **CAR** still brings your equipped car anywhere (the chauffeur).
+
+**Damage stays** (`profile.carHealth`, saved): every car keeps its share of health when it is parked, called or
+respawned; a wrecked car comes back (CAR) at 20 % (`Config.Repair.WreckedHealth`). There are **no free repairs** any
+more (the depot yard and Wrench Garage healed before 3.4). The **Repair Kit** (Last Stop Supplies, 40 %) stays the
+emergency fix on the road. A company vehicle lent for a job always comes fresh from its employer.
+
+**The repair shops** (server/Repair.luau, `Config.Repair`, `Map.RepairShops`): **Wrench Garage** (two bays straight in
+from the wide door) and **Rust Bridge Repairs** (a new workshop on the Harbor block where the Rust Bridge comes over,
+two bays, on the map with a wrench). Drive into a bay (yellow lines, BAY 1 · REPAIRS over it), stop and **get out**:
+after 1.5 s the mechanics take the car: it is locked on the lift (anchored, the back closed, passengers out) for
+**20 – 60 s** by the damage (`Economy.repairTime`), the HUD shows a timer card and the bay's billboard the time
+left; then it is as good as new: "Your Old Van is repaired". The fee is paid at the end, **$20 – $300** by the
+damage (`Economy.repairFee`; you need the money at the start and still at the end, else the repair is cancelled; damage
+the car takes on the lift counts too). Getting back in, calling the car away or switching cars cancels it, nothing to
+pay. A job's clock keeps running meanwhile (your choice). Any car can be repaired, a
+lent company vehicle too.
 
 ## Challenges, secrets and rewards
 
@@ -480,7 +566,7 @@ driver level, car slots or couriers, who owns it on this server, GPS. Each prope
 the property** (within reach of its sign or on its lot; away from it the BUY button turns into GO THERE TO BUY and
 sets the GPS) with the money you made, if your driver level is high enough (3.2: the real estate is the endgame, and
 the offices also need a campaign finished: `EstateDef.requires`, checked in `Estate.buy`, shown in the list and on
-the plates as "Finish Iron Supply first"). Every player owns their own copy: two
+the plates as "Finish Iron Supply first"; 3.4: the two small garages come at levels 2 and 4). Every player owns their own copy: two
 owners of the same mansion both use it. Everything you own is saved.
 
 | Property | Kind | Where | Price | Level | Car slots / couriers |
@@ -494,6 +580,8 @@ owners of the same mansion both use it. Everything you own is saved.
 | 7 Oak Lane | house | a Suburbs lot | $220,000 | 8 | 2 cars |
 | Birch Cottage | house | the west edge of the Suburbs, at the end of Birch Lane | $150,000 | 7 | 2 cars |
 | Elm Bungalow | house | a Suburbs lot | $90,000 | 6 | 1 car |
+| Rented Lockup (3.4) | garage | south of Downtown, on the way to the Suburbs | $2,500 | 2 | 1 car |
+| Southside Garage (3.4) | garage | south of Downtown, on the way to the Suburbs | $12,000 | 4 | 2 cars |
 | Harbor Lockup | garage | the Harbor | $25,000 | 5 | 4 cars |
 | Highway Garage | garage | on the North Highway | $45,000 | 6 | 4 cars |
 | Downtown Parking | garage | Downtown, in the safe zone | $70,000 | 7 | 6 cars |
@@ -504,10 +592,11 @@ owners of the same mansion both use it. Everything you own is saved.
 * **Homes** (mansions, villas, houses) are furnished, two storeys for the big ones. Your first home becomes **your
   home** at once; SET AS HOME picks another one, SPAWN AT THE DEPOT none. You spawn at your home after PLAY and after
   every death, and the car you get then waits in front of its garage.
-* **Car slots**: you can own `Config.Estate.BaseCarSlots` = **3** cars without any property (3.3: the van and two
-  more); every home and garage
-  adds its garage's slots. Buying a car at Dead End Motors needs a free slot (the dealer tells you to look at ESTATE
-  otherwise). Company vehicles earned by working do not count, and cars you already own are never taken away.
+* **Car slots**: you can own `Config.Estate.BaseCarSlots` = **1** car without any property (3.4: the starting van,
+  on the depot lot); every home and garage adds its garage's slots. Buying a car at Dead End Motors needs a free slot
+  (the dealer tells you to buy or rent a garage otherwise). Company vehicles earned by working do not count, and cars
+  you already own are never taken away. 3.4: you switch cars at your garages (see **Cars, cargo, garages and the
+  repair shop**).
 * **Selling** (SELL, click twice to confirm) pays back **60 %** of the price (`Config.Estate.SellBack`). The home you
   spawn at cannot be sold until you set another home or the depot.
 * **Offices** are in the two towers: **Dispatch Tower** (14 floors, Downtown, next to the depot) and **Harbor Point**
@@ -556,6 +645,10 @@ helipads), **Ocean View** on the sea cliffs (Cliff Road), **Pinecrest** in the w
 **Lakeside Villa** by the frozen lake, the **Sunset Villa** off the Radio Road (Sunset Lane), **Birch Cottage** (Birch
 Lane), the houses for sale on Suburbs lots and the three garages (Harbor Lockup, Highway Garage, Downtown Parking). All
 of them are on the map's list with GPS.
+
+New in 3.4: the **Rented Lockup** and the **Southside Garage** south of Downtown on the streets down to the Suburbs,
+**Rust Bridge Repairs** (a repair shop on the Harbor block where the Rust Bridge comes over) and the repair bays in
+Wrench Garage; a 🅿 GARAGE post at every home's and garage's drive-out spot (only your own show it).
 
 **Traffic and pedestrians.** Civilian cars drive the roads around every player (on the right, slowing for the turns,
 a random road at every junction; none in the winter, on the ice road or in the tunnel) and people walk the city's
@@ -613,14 +706,15 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
   refund): Roof Machine Gun (a slim barrel with an ammo box), Roof Minigun (a rotary barrel cluster), Roof Grenade
   Launcher (a fat tube). The Gun Damage and Fire Rate upgrades work for them too.
 * **Upgrades** (Wrench Garage): for the equipped car (3.3: each car its own) Engine, Handling, Armor, Ram Plow (5
-  levels) and Quick Hands (3 levels), the visible ones on the car; for all your guns Gun Damage, Fire Rate (5 levels);
-  paint jobs; car guns.
-* **Items** (Last Stop Supplies): Repair Kit, Medkit, Nitro, Molotov, Landmine.
+  levels), Quick Hands and (3.4) the Cargo Rack (3 levels), the visible ones on the car; for all your guns Gun Damage,
+  Fire Rate (5 levels); paint jobs; car guns. Repairs (3.4): the repair bays of Wrench Garage and Rust Bridge Repairs.
+* **Items** (Last Stop Supplies): Repair Kit (the emergency fix on the road), Medkit, Nitro, Molotov, Landmine.
 * **Enemies**: Walker, Runner, Brute (zombies, around you all the time, in waves during a job); Bandit, Gunner,
   Soldier (people: only during a job).
 * **People**: the employers, givers, receivers and kids are R15 NPCs that talk, turn to you and walk; the ranch's
   **horses** graze, walk on a rope and ride in the livestock truck's stalls; your **chauffeur** brings your car.
-* **Real estate** (`Config.Estate`): 3 mansions, 2 villas, 4 houses, 3 garages, 3 offices. **Your company**
+* **Real estate** (`Config.Estate`): 3 mansions, 2 villas, 4 houses, 5 garages (3.4: + the Rented Lockup and the
+  Southside Garage), 3 offices. **Your company**
   (`Config.Business`): couriers, 3 upgrades, the safe.
 * **Missions** (`shared/Missions.luau`, 3.0; 3.2: + the DUO campaign): 11 campaigns × 10 missions, 10 twists, 56
   co-op missions, 15 new places;
@@ -678,14 +772,16 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               chain `requires`, the computed mission levels levelOf, the DUO campaign), Challenges (3.1: the 42 challenges, the
               counters, value / progress / doneCount / allTitles)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
-              elevators, FOR SALE signs and office computers), PlayerData (saves, leaderstats; the save also holds the
-              properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once), Vehicles (cars,
+              elevators, FOR SALE signs and office computers; 3.4: the repair bays, the GARAGE posts), PlayerData (saves, leaderstats; the save also holds the
+              properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once; 3.4: every
+              car's damage), Vehicles (cars,
               seats, cargo slots, the roof turret of a car gun, the instant spawns and the home garage spot; 3.2: the
               back that opens, its hinges, BackOpen and the BackPrompt; 3.3: the five new vans' bodies, the
-              UpgradeKit of the car's upgrades, Quick Hands' hold), Zombies (zombies and bandits, roadblocks, the roamers,
+              UpgradeKit of the car's upgrades, Quick Hands' hold; 3.4: the Cargo Rack and its roof slots, every car's
+              damage kept, the car on a repair lift), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
               the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves; 3.2: the DUO
-              rules, drives DuoGates), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
+              rules, drives DuoGates; 3.4: the cargo slots on the board, the bulk orders), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
               3.2: loading through the back, the pair lift), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
@@ -693,7 +789,9 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               the crew state), Ranking (the leaderboard rows), Estate (buying, selling, the home, car slots, the home
               respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your
               company: couriers, upgrades, the safe, online and offline earnings, the office computer), Missions (3.0: the
-              MISSIONS window's state, START checked, the rewards, stars and crew credit when one is done), Challenges
+              MISSIONS window's state, START checked, the rewards, stars and crew credit when one is done; 3.4: the
+              cargo slots at START), Garages (3.4: your cars at your garages, the garage window's TAKE OUT, the depot
+              lot), Repair (3.4: the repair bays, the timer, the fee), Challenges
               (3.1: counts the stats from the other modules' hooks, the distance and the places visited, checks and
               pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
               the head, the Challenges remote)
@@ -706,7 +804,9 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
               card), Sounds (the music and every sound effect, N / SOUND), WeaponWheel (hold Q), MissionsUi (3.0: the MISSIONS window (U),
               the mission banner in the top stack, the celebration card; 3.1: the CHALLENGES, SECRETS and REWARDS
-              tabs and the unlock popups; 3.2: the lock texts, the DUO badge, FIND CREW), Secrets (3.1: hides the lost packages you found, animates the others nearby)
+              tabs and the unlock popups; 3.2: the lock texts, the DUO badge, FIND CREW; 3.4: the 📦 needs N slots
+              chip), Secrets (3.1: hides the lost packages you found, animates the others nearby), GarageUi (3.4: the
+              garage window, only your own GARAGE prompts, the repair timer card)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
@@ -723,7 +823,10 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               steps stay quick holds; 3.3: logic checks the car tracks per car, Quick Hands and the old saves'
               migration, levels the five new vans (levels and prices together), cargun that every dealer car takes
               a car gun, and run_tests.py reads Vehicles.luau's STYLES: every car has a body, every dealer car cargo
-              slots and a back
+              slots and a back; 3.4: capacity (the capacities and the rack, what every job and every one of the 110
+              missions needs against the car that does it, the early campaigns in the Old Van with two rack levels,
+              none over the Box Truck with a full rack; the repair's time and fee; the garages), run_tests.py checks
+              every car's capacity is its body's slot count, levels the early garages, logic the cheap first levels
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -751,7 +854,7 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 
 Runs every `tests/*_test.luau` (logic with the 2.6 real estate, the 3.0 places and the 3.1 lost packages, cargo,
 roads, cargun, icons, levels with the 3.2 progression, jobs25, traffic, audio, missions with the 3.2 campaign chain
-and DUO campaign, challenges, gear) and compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
+and DUO campaign, challenges, gear, and the 3.4 capacity test) and compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
 function, as Studio compiles). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 

@@ -20,8 +20,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - A short tutorial for new players: the first job, carrying, the back doors, Q for the weapon wheel.
 - More sounds: door open/close, levers (DUO), van horn per van.
 - Balance pass: playtest First Shift → Iron Supply with the 3.2 level curve and note what feels slow or too easy.
+- Map icons for the repair shop and the garages (they borrow `map_mechanic` and `map_dealer`, see `LANDMARK_ALIASES`).
+- Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 3.4 cargo capacity (Old Van 4, High-Roof / Box Truck 6, the Cargo Rack +1 a level on a visible roof rack; jobs and missions too big for your car are locked), the repair shop (bays in Wrench Garage and the new Rust Bridge Repairs, 20 – 60 s, $20 – $300, damage kept per car, no free repairs), garages you earn (the depot holds the starting van, Rented Lockup at level 2, Southside Garage at 4; switch cars only at your 🅿 GARAGE posts). Test in Studio: drive a damaged van into a Wrench Garage bay and get out; buy the Rented Lockup, then the Courier Van, and take it out there; a ★★★ bulk order with the Old Van.
 - Codex · Merge Blades archived to `archive/merge-blades/`, the repository root is Zombie Delivery (`codex/cloud-setup`, merged by Claude). The default branch now has Zombie Delivery (PR #1).
 - Claude · 3.3 five more vans, upgrades per car you can see, Quick Hands.
 - Claude · 3.2 progression (levels for cars, estate and offices), campaign chain, DUO campaign, back doors loading, HUD restyle.

@@ -184,7 +184,25 @@ for _, def in Config.Estate.Properties do
 		check(`{def.id}: requires a real campaign ({campaignId})`, Missions.findCampaign(campaignId) ~= nil)
 	end
 end
-check("garages from level 5 - 7", lowest.garage >= 5 and highest.garage <= 7, `{lowest.garage} - {highest.garage}`)
+-- 3.4: the first garage comes early (the Courier Van at level 2 needs its slot), the big ones stay up to 7.
+check("garages from level 2 - 7", lowest.garage == 2 and highest.garage <= 7, `{lowest.garage} - {highest.garage}`)
+check("the first garage is cheap (a few deliveries)", cheapest.garage <= 3000, cheapest.garage)
+do
+	-- Every dealer car can be bought at its level: a garage open by then gives it a slot (the depot holds only the
+	-- starting van). You keep and upgrade a car more than you collect them: more cars need the bigger garages.
+	for _, def in Config.Cars do
+		if def.company or def.price == 0 then
+			continue
+		end
+		local slots = Config.Estate.BaseCarSlots
+		for _, estate in Config.Estate.Properties do
+			if estate.kind == "garage" and (estate.level or 1) <= (def.level or 1) then
+				slots += estate.garageSlots
+			end
+		end
+		check(`{def.id}: a garage open by level {def.level or 1} has a slot for it`, slots >= 2, slots)
+	end
+end
 check("houses from level 6", lowest.house >= 6, lowest.house)
 check("villas at 10 - 11", lowest.villa >= 10 and highest.villa <= 11, `{lowest.villa} - {highest.villa}`)
 check("mansions at 13 - 15", lowest.mansion >= 13 and highest.mansion == MAX, `{lowest.mansion} - {highest.mansion}`)

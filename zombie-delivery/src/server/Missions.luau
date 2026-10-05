@@ -27,12 +27,17 @@
 -- Config.Missions.Duo.MinCrew crew members (Crew.members) online and within StartRange of you; otherwise START is
 -- refused with "DUO mission: invite a friend first (K) and bring them here." (server/Jobs.luau fails it when the
 -- partner leaves later). The state says crewSize (your crew's members) so the window knows before START.
+--
+-- 3.4, cargo capacity: a mission with more pieces carried or led by hand (Economy.cargoNeed) than your equipped car
+-- holds (Economy.capacity: its slots and its Cargo Rack) is refused at START with what it needs, unless it lends a
+-- vehicle. The state says capacity and carName so the window can tell before START.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local MissionData = require(Shared.Missions)
 local Net = require(Shared.Net)
@@ -116,6 +121,8 @@ local function stateFor(player: Player): { [string]: any }?
 		active = activeOf(player),
 		crewOwner = if owner and owner.Parent then owner.DisplayName else nil,
 		crewSize = #Crew.members(player),
+		capacity = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car)), -- 3.4
+		carName = (Economy.findCar(profile.car) or Config.Cars[1]).name,
 	}
 end
 
@@ -123,11 +130,13 @@ end
 local function signature(player: Player): string
 	local owner = Crew.ownerOf(player)
 	local stars = 0
+	local car = "-"
 	local profile = PlayerData.get(player)
 	if profile then
 		stars = MissionData.stars(profile.missions, nil)
+		car = `{profile.car}:{Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car))}`
 	end
-	return `{activeOf(player) or "-"}|{if owner then owner.UserId else 0}|{PlayerData.level(player)}|{stars}|{#Crew.members(player)}`
+	return `{activeOf(player) or "-"}|{if owner then owner.UserId else 0}|{PlayerData.level(player)}|{stars}|{#Crew.members(player)}|{car}`
 end
 
 -- The progress a player's MISSIONS window shows (sent on "open", after every change).
@@ -191,6 +200,15 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 	local open, why = MissionData.unlocked(def.id, profile.missions, Levels.levelFor(profile.xp))
 	if not open then
 		return why or "This mission is locked."
+	end
+	-- 3.4: the pieces must fit your car (a mission that lends a vehicle brings its own room).
+	local need = Economy.cargoNeed(def.load, def.items)
+	if not def.vehicle and need > 0 then
+		local holds = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car))
+		if need > holds then
+			local car = Economy.findCar(profile.car) or Config.Cars[1]
+			return `This mission needs a vehicle with {need} slots (your {car.name} holds {holds}). Upgrade its Cargo Rack or switch cars at your garage.`
+		end
 	end
 	if def.duo then
 		return duoRefusal(player)

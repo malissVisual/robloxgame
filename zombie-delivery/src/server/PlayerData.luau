@@ -1,6 +1,7 @@
 --!strict
 -- The player's progress: money, the cars and guns they own, the equipped ones, the car guns on their roofs, the upgrade
--- levels (3.3: the car tracks per car in carUpgrades, the gun tracks for all guns in upgrades), the driver XP (the
+-- levels (3.3: the car tracks per car in carUpgrades, the gun tracks for all guns in upgrades), the damage of every
+-- car (3.4, carHealth: a parked car keeps it until a repair shop fixes it), the driver XP (the
 -- level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the properties, the home you
 -- spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades, the safe;
 -- server/Business.luau) and lifetime stats.
@@ -28,6 +29,7 @@ export type Profile = {
 	weapon: string,
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
 	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car)
+	carHealth: { [string]: number }, -- 3.4: car id → its share of health (0 … 1) while parked; no entry = as new
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
 	carPaint: { [string]: string }, -- car id → paint id
@@ -75,6 +77,7 @@ local function newProfile(): Profile
 		weapon = Config.Weapons[1].id,
 		upgrades = {},
 		carUpgrades = {},
+		carHealth = {},
 		items = { repair = 1, molotov = 2 },
 		paints = { factory = true },
 		carPaint = {},
@@ -262,6 +265,14 @@ local function applySaved(profile: Profile, saved: any)
 		end
 		Economy.migrateCarUpgrades(profile.upgrades, profile.cars, profile.carUpgrades)
 	end
+	-- 3.4: the damage of every car (a share of its health, for cars you own).
+	if type(saved.carHealth) == "table" then
+		for carId, share in saved.carHealth do
+			if type(carId) == "string" and profile.cars[carId] and type(share) == "number" and share == share then
+				profile.carHealth[carId] = math.clamp(share, 0, 1)
+			end
+		end
+	end
 	if type(saved.items) == "table" then
 		for _, def in Config.Items do
 			profile.items[def.id] = number(saved.items[def.id], 0, def.max)
@@ -407,6 +418,7 @@ function PlayerData.save(player: Player)
 		weapon = profile.weapon,
 		upgrades = profile.upgrades,
 		carUpgrades = profile.carUpgrades,
+		carHealth = profile.carHealth,
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,
