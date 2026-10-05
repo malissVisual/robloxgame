@@ -50,7 +50,7 @@ job is locked and what to do about it, and every window the same lavender window
 Version 3.7 is the **first day on the job**:
 - **Marge, the dispatcher at the depot,** greets a new player, gives the first job and explains each step until it is
   delivered (`server/Tutorial.luau`, `client/TutorialUi.luau`; SKIP is always there).
-- **The job board fills itself:** every `Config.Jobs.RefreshSeconds` (3 min) with a countdown instead of a refresh
+- **The job board fills itself:** every `Config.Jobs.RefreshSeconds` (4.0.2: 2 min) with a countdown instead of a refresh
   button. It is sorted from ★ (level 1, on top) to the best jobs at the bottom.
 - **A faster walk (14) and sprint (28),** but the sprint has a **breath** (about 6 s) shown by a thin bar
   (`client/Stamina.luau`, `Config.Movement`).
@@ -125,7 +125,7 @@ for testing). A published game starts with `Config.StartMoney` and saves to the 
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | JOBS in the … menu / MAP / BAG in the … menu |
 | The "…" menu (JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP) | click … | tap … |
-| Close a window, the big map or the … menu | ESC (gamepad B) | ✕ |
+| Close a window, the big map or the … menu | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
 | Call your car (or reset it while you sit in it) | CAR in the … menu | CAR in the … menu |
 | Give up the delivery | GIVE UP in the … menu, twice (or on the Dispatch board) | the same |
 | Music and sound (on / music off / all off) | N | SOUND in the … menu |

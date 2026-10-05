@@ -88,7 +88,14 @@ CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows
 MissionsUi.onOpen = Hud.closeWindows
 DispatchUi.onOpen = Hud.closeWindows
-Hud.onJobs = DispatchUi.open -- (the depot counter and NEXT JOB must not close an open board; ESC or ✕ closes it)
+Hud.onJobs = DispatchUi.open -- (the depot counter and NEXT JOB must not close an open board; ✕ or J closes it)
+Hud.onJobsKey = function() -- 4.0.2: J opens the board, J again closes it
+	if DispatchUi.isOpen() then
+		DispatchUi.close()
+	else
+		DispatchUi.open()
+	end
+end
 GarageUi.onOpen = Hud.closeWindows
 Hud.onEstate = EstateUi.toggleList
 Hud.onMissions = MissionsUi.toggle
