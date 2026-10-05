@@ -756,7 +756,10 @@ local function buildGuns(parent: Instance)
 	local facing = Vector3.new(1, 0, 0)
 	local w, d, h = 60, 46, 16
 	local frame = shopFrame(cx, cz, facing, 18)
-	building(shop, frame, w, d, h, Color3.fromRGB(110, 70, 50), Enum.Material.Brick, 12, 10)
+	building(shop, frame, w, d, h, Color3.fromRGB(65, 58, 56), Enum.Material.Brick, 12, 10)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Guns), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "LEAD & CO.  GUNS", Vector3.new(44, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(255, 200, 80), nil, "guns", 10)
 	counter(shop, frame, d, "guns", "Lead & Co.")
 	-- Guns on the wall.
