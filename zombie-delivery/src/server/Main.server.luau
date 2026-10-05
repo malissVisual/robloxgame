@@ -293,6 +293,7 @@ Net.get("Play").OnServerEvent:Connect(function(player)
 	CarCall.onPlay(player)
 	Estate.onPlay(player)
 	giveCar(player)
+	Tutorial.onPlay(player) -- 3.7: a new player's welcome (after StartDelay)
 end)
 
 Net.get("RequestState").OnServerEvent:Connect(function(player)

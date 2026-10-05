@@ -32,6 +32,12 @@ Config.Tutorial = {
 	NpcName = "Marge",
 	NpcTitle = "Dispatcher",
 	Reward = 50, -- money for finishing the tutorial's job (on top of its pay)
+	NpcSpot = { -4, -20 }, -- where she stands, studs from the depot's centre (Map.Shops.depot): by the job board, facing the yard
+	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
+	StartDelay = 1.5, -- seconds after your car came (PLAY pressed) before she speaks: the start screen fades out first
+	DoneDelay = 2.5, -- seconds after the delivery before her last pages (the delivery's result shows first)
+	RetryAfter = 1.5, -- a tutorial job gone this long without a result (a special job ended, an admin): offered again
+	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
 }
 
 -- 3.7: the map you discover (shared/Explore.luau, server/Explore.luau, client/MapView.luau, the minimap in Hud).
