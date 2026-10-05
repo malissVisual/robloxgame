@@ -3060,7 +3060,7 @@ function Cargo.start()
 					loose.tool = nil
 					local model = loose.piece.model
 					if model then
-						setDown(model, dropFrame(session, tool.last))
+						setDown(model, dropFrame(session, tool.last + Vector3.new(0, 3, 0))) -- (dropFrame wants a root's height)
 					end
 				end
 			end
@@ -3103,7 +3103,7 @@ function Cargo.start()
 					touched = true
 					local model = loose.piece.model
 					if model then
-						setDown(model, dropFrame(session, tool.last))
+						setDown(model, dropFrame(session, tool.last + Vector3.new(0, 3, 0))) -- (dropFrame wants a root's height)
 					end
 				end
 			end

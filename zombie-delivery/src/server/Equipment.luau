@@ -16,8 +16,9 @@
 --   let it go        G: at your car's open back an empty trolley is stowed ("Stow trolley"), at its truck a jack too,
 --                    on its spot a dock's jack is parked; anywhere else it is set down standing ("Take ..." again) with
 --                    what is on it. Death, leaving and sitting set it down.
---   left behind      a tool set down with nobody within Config.Cargo.ToolNearby goes home quietly after
---                    TrolleyReturnSeconds / JackReturnSeconds (what was on it goes on the ground first, server/Cargo).
+--   left behind      a tool set down with nobody who may take it within Config.Cargo.ToolNearby goes home quietly
+--                    after TrolleyReturnSeconds / JackReturnSeconds (what was on it goes on the ground first,
+--                    server/Cargo). A crew member still pushing the owner's tool after the job lets go of it.
 --
 -- Cargo owns the pieces on a tool (it counts them exactly like the ones in the hands): the hooks below tell it when a
 -- tool is taken, set down or goes home.
@@ -524,8 +525,8 @@ takeTool = function(player: Player, tool: Tool)
 	if not character or not humanoid or not root or humanoid.Health <= 0 or tool.state == "pushed" or tool.state == "gone" then
 		return
 	end
-	if humanoid.SeatPart then
-		tell(player, "Get out first.")
+	if humanoid.SeatPart or character:GetAttribute("Boarding") ~= nil then
+		tell(player, "Get out first.") -- (3.10: on the way into a seat too)
 		return
 	end
 	local current = pushing[player]
@@ -648,6 +649,7 @@ letGo = function(player: Player)
 		local character = tool.character
 		undress(character)
 		goHome(tool)
+		Equipment.released(player, tool) -- (the cargo prompts' words: no trolley any more)
 		return
 	end
 	release(player)
@@ -838,12 +840,13 @@ local function syncCars()
 	end
 end
 
--- Is anybody (on foot or in a car) within Config.Cargo.ToolNearby of the tool?
+-- Is anybody who may take the tool (Equipment.mayTake: a car's owner and the job's crew, the load's own delivery) on
+-- foot or in a car within Config.Cargo.ToolNearby of it? (A stranger standing by keeps nothing from going home.)
 local function somebodyNear(tool: Tool): boolean
 	local at = tool.last.Position
 	for _, player in Players:GetPlayers() do
 		local root = rootOf(player.Character)
-		if root and (root.Position - at).Magnitude <= Tuning.ToolNearby then
+		if root and (root.Position - at).Magnitude <= Tuning.ToolNearby and Equipment.mayTake(player, tool) then
 			return true
 		end
 	end
@@ -873,6 +876,13 @@ local function tick()
 			and humanoid.SeatPart == nil and root ~= nil and root == tool.root and tool.rootWeld ~= nil and tool.rootWeld.Parent ~= nil
 		if not fine then
 			release(player)
+			continue
+		end
+		-- A crew member with the owner's tool once the job is over (or out of the crew): they let go of it there.
+		local owner = tool.owner
+		if owner and owner ~= player and not Equipment.mayTake(player, tool) then
+			release(player)
+			tell(player, `The job is over: {owner.DisplayName}'s {nameOf(tool)} stays here.`)
 			continue
 		end
 		if root then

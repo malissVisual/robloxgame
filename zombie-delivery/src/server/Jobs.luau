@@ -112,6 +112,7 @@ type Stop = {
 	facing: Vector3,
 	person: Config.PersonDef?,
 	staging: { Vector3 }?, -- 4.0, pallet: where the pallets wait / are set down (Cargo.Plan.staging)
+	dock: string?, -- 4.0, pallet: its Map.FreightDocks hub (pick-up) or Map.ReceivingDocks id (drop): placeDocks
 }
 
 type Offer = {
@@ -459,6 +460,7 @@ local function newStop(address: Map.Address, kind: string, mode: string, needed:
 		facing = facing,
 		person = person,
 		staging = nil,
+		dock = nil,
 	}
 end
 
@@ -605,10 +607,73 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?): 
 end
 
 -- 4.0, the Freight Run (JobTypeDef load "pallet"): 1 … items pallets from a loading dock of its hub (shared/Map.luau
--- FreightDocks[pickupAt], the docks taken in turn) to the receiving dock of one of its dropChoices (Map.ReceivingDocks):
--- the truck's circle in the dock's bay, the foreman on the dock, the pallets on the dock floor (Stop.staging); at the
--- drop the person by the pad, the pallets set down on the pad. Pays its stops and PalletPay a pallet.
-local nextDock = 0
+-- FreightDocks[pickupAt]) to the receiving dock of one of its dropChoices (Map.ReceivingDocks): the truck's circle in
+-- the dock's bay, the foreman on the dock, the pallets on the dock floor (Stop.staging); at the drop the person by the
+-- pad, the pallets set down on the pad. Pays its stops and PalletPay a pallet.
+--
+-- The dock and the pad are taken when the job starts (placeDocks), one no running Freight Run uses (docksInUse:
+-- "warehouse:2:1" = the hub, the dock, the row; "market:1:1" = a receiving pad), so two runs never share the staging
+-- spots and the "Lift pallet" prompts. All of them busy: a second row (DockRow out on the dock floor toward its edge,
+-- PadRow beside the pad away from the receiver); all of those busy too: the first one's second row, shared.
+local docksInUse: { [string]: Player } = {}
+local DockRow = 13.5
+local PadRow = 5
+
+-- The first free dock of `count` at `id` (by number, then row): its number, its row and its docksInUse key.
+local function freeDock(id: string, count: number): (number, number, string)
+	for row = 1, 2 do
+		for n = 1, count do
+			local key = `{id}:{n}:{row}`
+			if not docksInUse[key] then
+				return n, row, key
+			end
+		end
+	end
+	return 1, 2, `{id}:1:2`
+end
+
+-- Gives back the docks and pads `player`'s job took (all of them, or those at `id`).
+local function freeDocks(player: Player, id: string?)
+	for taken, who in docksInUse do
+		if who == player and (id == nil or string.sub(taken, 1, #id + 1) == `{id}:`) then
+			docksInUse[taken] = nil
+		end
+	end
+end
+
+-- Puts a Freight Run's stop at dock `n` (a pick-up: its bay, its staging spots, "(dock n)") or at its receiving pad
+-- (a drop: the pad's spots), in row `row`.
+local function dockStop(stop: Stop, n: number, row: number)
+	local id = stop.dock or ""
+	local hub = Map.FreightDocks[id]
+	local receiving = Map.ReceivingDocks[id]
+	local staging: { Vector3 } = {}
+	if stop.kind == "pickup" and hub then
+		local dock = hub.docks[n]
+		local floor = Map.WalkTop + hub.height
+		stop.park = Vector3.new(dock.park.x, World.RoadTop, dock.park.z)
+		stop.facing = Vector3.new(dock.facing.x, 0, dock.facing.z).Unit
+		local shift = if row > 1 then stop.facing * DockRow else Vector3.zero
+		for _, spot in dock.staging do
+			table.insert(staging, Vector3.new(spot.x, floor, spot.z) + shift)
+		end
+		stop.label = `{(string.gsub(stop.label, "%s*%(dock %d+%)$", ""))} (dock {n})`
+	elseif receiving then
+		local first, last = receiving.spots[1], receiving.spots[#receiving.spots]
+		local side = Vector3.new(last.z - first.z, 0, first.x - last.x)
+		side = if side.Magnitude > 0.1 then side.Unit else Vector3.xAxis
+		local away = Vector3.new(receiving.receiver.x - (first.x + last.x) / 2, 0, receiving.receiver.z - (first.z + last.z) / 2)
+		if side:Dot(away) > 0 then
+			side = -side
+		end
+		local shift = if row > 1 then side * PadRow else Vector3.zero
+		for _, spot in receiving.spots do
+			table.insert(staging, Vector3.new(spot.x, Map.WalkTop, spot.z) + shift)
+		end
+	end
+	stop.staging = staging
+end
+
 local function freightOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	local hubId = jobType.pickupAt or "warehouse"
 	local hub = Map.FreightDocks[hubId]
@@ -627,40 +692,33 @@ local function freightOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	local drop = placeAddress(dropId) :: Map.Address
 	local receiving = Map.ReceivingDocks[dropId]
 	local count = rng:NextInteger(1, math.max(1, jobType.items))
-	nextDock = nextDock % #hub.docks + 1
-	local dock = hub.docks[nextDock]
 	local roles = JobsConfig.People[jobType.id] or { giver = "foreman", receiver = "worker" }
 	local giver = personFrom(jobType.giver, jobType.giverRole or roles.giver)
 	local receiver = JobsConfig.FreightReceivers[dropId] or personFrom(jobType.receiver, jobType.receiverRole or roles.receiver)
 	-- The pick-up: the dock's bay, the foreman and the pallets up on the dock floor.
+	-- (The dock free now; placeDocks takes one when the job starts.)
 	local floor = Map.WalkTop + hub.height
 	local label = string.gsub(jobType.pickupLabel, "%s+AT$", "")
-	local load = newStop(pickup, "pickup", "pallet", count, `{label} at {pickup.name} (dock {nextDock})`, giver)
-	load.park = Vector3.new(dock.park.x, World.RoadTop, dock.park.z)
+	local load = newStop(pickup, "pickup", "pallet", count, `{label} at {pickup.name}`, giver)
 	load.pile = Vector3.new(hub.giver.x, floor, hub.giver.z)
-	load.facing = Vector3.new(dock.facing.x, 0, dock.facing.z).Unit
-	local staging: { Vector3 } = {}
-	for _, spot in dock.staging do
-		table.insert(staging, Vector3.new(spot.x, floor, spot.z))
-	end
-	load.staging = staging
+	load.dock = hubId
+	local dockNumber, dockRow = freeDock(hubId, #hub.docks)
+	dockStop(load, dockNumber, dockRow)
 	load.hold = jobType.loadTime
 	-- The drop: the place's circle, the person by the pad, the pad.
 	local unload = newStop(drop, "drop", "pallet", count, `{jobType.dropLabel} {drop.name}`, receiver)
-	local pad: { Vector3 } = {}
+	unload.dock = dropId
+	dockStop(unload, 1, 1)
 	local middle = Vector3.zero
 	for _, spot in receiving.spots do
-		local at = Vector3.new(spot.x, Map.WalkTop, spot.z)
-		table.insert(pad, at)
-		middle += at
+		middle += Vector3.new(spot.x, Map.WalkTop, spot.z)
 	end
-	middle /= math.max(1, #pad)
+	middle /= math.max(1, #receiving.spots)
 	unload.pile = Vector3.new(receiving.receiver.x, Map.WalkTop, receiving.receiver.z)
 	local toward = Vector3.new(middle.X - unload.pile.X, 0, middle.Z - unload.pile.Z)
 	if toward.Magnitude > 0.1 then
 		unload.facing = toward.Unit
 	end
-	unload.staging = pad
 	unload.hold = jobType.unloadTime
 	local stops: { Stop } = { load, unload }
 	local kind = Tuning.Kinds.pallet or Tuning.Kinds.crate
@@ -1090,6 +1148,7 @@ end
 
 local function endJob(player: Player, job: Job, linger: boolean)
 	jobs[player] = nil
+	freeDocks(player) -- 4.0: its loading dock and receiving pad
 	Cargo.finish(job.cargo, linger)
 	DuoGates.clear(player) -- 3.2: the twin-lever gate, if any
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
@@ -1165,6 +1224,26 @@ local function placeGate(player: Player, job: Job)
 			current.dirty = true
 		end
 	end)
+end
+
+-- 4.0: a Freight Run takes its loading dock and its receiving pad now (freeDock, dockStop; given back by endJob). The
+-- stops are copied first: the board's offer shares them.
+local function placeDocks(player: Player, offer: Offer)
+	local stops = table.clone(offer.stops)
+	for index, original in stops do
+		local id = original.dock
+		local hub = if id then Map.FreightDocks[id] else nil
+		if id and (hub or Map.ReceivingDocks[id]) then
+			local stop = table.clone(original)
+			local n, row, key = freeDock(id, if hub and stop.kind == "pickup" then #hub.docks else 1)
+			if not docksInUse[key] then
+				docksInUse[key] = player
+			end
+			dockStop(stop, n, row)
+			stops[index] = stop
+		end
+	end
+	offer.stops = stops
 end
 
 -- Starts the job. False and why not (no notice: the caller tells the player).
@@ -1270,6 +1349,7 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		gatePulled = 0,
 	}
 	jobs[player] = job
+	placeDocks(player, offer)
 	-- No pick-up: the vehicle starts loaded.
 	if offer.stops[1].kind ~= "pickup" then
 		Cargo.fill(session, offer.total)
@@ -1806,6 +1886,9 @@ local function advance(player: Player, job: Job)
 	local stop = offer.stops[job.stop]
 	job.stop += 1
 	job.footSince = nil
+	if stop.dock and stop.kind == "pickup" then
+		freeDocks(player, stop.dock) -- 4.0: loaded, the loading dock is free for the next Freight Run
+	end
 	local nextStop = offer.stops[job.stop]
 	Cargo.setStop(job.cargo, planOf(nextStop))
 	-- Defend: the last drop unloads only after holding out there. 3.2, switches: this stop's gate if it has one.
@@ -2258,6 +2341,7 @@ function Jobs.start()
 		local job = jobs[player]
 		if job then
 			jobs[player] = nil
+			freeDocks(player)
 			Cargo.finish(job.cargo, false)
 			Crew.disband(player)
 		end

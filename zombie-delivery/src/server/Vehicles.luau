@@ -951,7 +951,7 @@ local STYLES: { [string]: Style } = {
 		passengers = { Vector3.new(2.4, 2.2, -12.4) },
 		roof = 9.4,
 		dual = true,
-		jack = Vector3.new(-3.4, 0.6, 13.8),
+		jack = Vector3.new(-3.4, 0.6, 12.8), -- (its grip 2.1 behind: inside the shut roll-up door at 15)
 		boxes = freightBoxes(),
 		trim = freightTrim(),
 		cargo = cargo("truck", 30, 9, {
@@ -2561,7 +2561,9 @@ local function handsFull(player: Player): boolean
 		return false
 	end
 	local pushing = player.Character and player.Character:GetAttribute("Pushing")
-	Net.get("Notice"):FireClient(player, if pushing == "trolley" then "Stow the trolley first (G at the open back) or set it down (G)."
+	local loaded = player.Character ~= nil and player.Character:GetAttribute("CarryCount") ~= nil -- (pieces on the trolley)
+	Net.get("Notice"):FireClient(player, if pushing == "trolley" and loaded then "Load them first (E at the back) or set the trolley down (G)."
+		elseif pushing == "trolley" then "Stow the trolley first (G at the open back) or set it down (G)."
 		elseif pushing == "jack" then "Set the pallet jack down first (G)."
 		elseif held == "horse" then "Load the horse first (E at the back of the truck)."
 		else "Load it first (E at the back of the vehicle).")
@@ -2640,6 +2642,12 @@ end
 -- The move is over: into the seat (the door shuts from now: its DoorCloseAt). The attributes stay a moment, so the
 -- client sees the seat before they go.
 local function finishBoarding(player: Player, b: Boarder)
+	-- 4.0: something in the hands by now (a piece, a trolley taken on the way in): no seat, the move is cancelled
+	-- (handsFull says why).
+	if handsFull(player) then
+		cancelBoarding(player, b)
+		return
+	end
 	endBoarding(player, b)
 	b.humanoid.PlatformStand = false
 	local seat = b.seat

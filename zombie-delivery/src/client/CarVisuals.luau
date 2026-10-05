@@ -40,6 +40,7 @@ type CarState = {
 	steer: number,
 	tagged: boolean,
 	backReach: number?, -- the BackPrompt's own reach (the server's), before it was hidden here
+	trolleyReach: number?, -- 4.0: the same for the trolley's "Take trolley" (server/Equipment.luau, TrolleyTake)
 	smoke: ParticleEmitter?, -- 4.0: the exhaust smoke (made when first needed)
 }
 
@@ -116,6 +117,7 @@ local function stateOf(car: Model): CarState?
 		steer = 0,
 		tagged = false,
 		backReach = nil,
+		trolleyReach = nil,
 		smoke = nil,
 	}
 	states[car] = state
@@ -244,15 +246,27 @@ local function step(dt: number)
 		-- out of reach for everybody else, so a stranger's car does not take the E. (Enabled is the server's: one E at a time.)
 		local door = chassis:FindFirstChild("CargoDoor")
 		local back = door and door:FindFirstChild("BackPrompt")
+		local crew = car:GetAttribute("BackCrew")
+		-- (3.10: not from a seat: E there gets you out.)
+		local usable = seatedIn == nil and (mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil))
 		if back and back:IsA("ProximityPrompt") then
-			local crew = car:GetAttribute("BackCrew")
-			-- (3.10: not from a seat: E there gets you out.)
-			local usable = seatedIn == nil and (mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil))
 			local reach: number = state.backReach or back.MaxActivationDistance
 			state.backReach = reach
 			local want = if usable then reach else 0
 			if back.MaxActivationDistance ~= want then
 				back.MaxActivationDistance = want
+			end
+		end
+		-- 4.0: the trolley's "Take trolley" (server/Equipment.luau, the chassis' TrolleyTake) the same way, and only with
+		-- empty hands (the server refuses everybody else anyway).
+		local take = chassis:FindFirstChild("TrolleyTake")
+		local takePrompt = take and take:FindFirstChildOfClass("ProximityPrompt")
+		if takePrompt then
+			local reach: number = state.trolleyReach or takePrompt.MaxActivationDistance
+			state.trolleyReach = reach
+			local want = if usable and not handsFull then reach else 0
+			if takePrompt.MaxActivationDistance ~= want then
+				takePrompt.MaxActivationDistance = want
 			end
 		end
 		if not mine and not state.tagged and car:GetAttribute("OwnerId") ~= nil then
