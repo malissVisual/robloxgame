@@ -14,7 +14,7 @@ local NAMES = {
 	"CancelJob", -- client → server: give the active job up
 	"Job", -- server → client: the active job ({ … } or nil when none)
 	"DeliveryResult", -- server → client: { success, reason?, payout? }
-	"Fire", -- client → server: a shot at a point (Vector3): the hand gun, out of the window or the car gun
+	"Fire", -- client → server: a shot at a point (Vector3): the hand gun, out of the window or the car gun; 3.8.2: + the part of a zombie hanging on a car when that is what was aimed at (server/Gun.luau latchedHit)
 	"Tracer", -- server → clients: (from, to, color, shooter userId)
 	"Hit", -- server → client: the shooter's hit marker (position, damage, crit, killed)
 	"Reward", -- server → client: money popped from a kill (position, amount)

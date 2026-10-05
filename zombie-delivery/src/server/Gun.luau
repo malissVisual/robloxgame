@@ -42,7 +42,8 @@ end
 -- One round hits `result`: the damage it deals (a blast, a zombie with its headshot, a bandit car). Returns the enemy
 -- model a piercing round may go on through (nil: it stops here) and whether passing it is free (a body already dead).
 -- from (3.1): the roof gun ("cargun") or a passenger's gun out of the window ("window"); the challenges count its kills.
-local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stats: Economy.WeaponStats, from: string?): (Model?, boolean)
+type Hit = { Instance: Instance, Position: Vector3 } -- a RaycastResult, or a hit decided without a ray (latchedHit)
+local function hitPart(player: Player, result: Hit, dir: Vector3, stats: Economy.WeaponStats, from: string?): (Model?, boolean)
 	local hit = Net.get("Hit")
 	if stats.splash > 0 then
 		local blast = Instance.new("Explosion")
@@ -83,7 +84,25 @@ local function hitPart(player: Player, result: RaycastResult, dir: Vector3, stat
 	return nil, false
 end
 
-local function onFire(player: Player, target: any)
+-- A zombie hanging on a car that the client aimed at (client/Shooting.luau sends the part): a hit without a ray. The
+-- car runs on its driver's machine, so the server sees the car and the zombie welded to it a little behind, and a shot
+-- out of the window starts right beside it: the server's ray would miss (or start inside it) what the player clearly
+-- hit. Trusted only for a living zombie hanging on the car you sit in, or within the gun's range of you on foot.
+local function latchedHit(aimed: any, car: Vehicles.Car?, root: BasePart, range: number): BasePart?
+	if typeof(aimed) ~= "Instance" or not aimed:IsA("BasePart") then
+		return nil
+	end
+	local zombie = Zombies.fromPart(aimed)
+	if not zombie or zombie.dead or not zombie.car then
+		return nil
+	end
+	if car then
+		return if zombie.car == car then aimed else nil
+	end
+	return if (zombie.root.Position - root.Position).Magnitude <= range + 8 then aimed else nil
+end
+
+local function onFire(player: Player, target: any, aimed: any)
 	if typeof(target) ~= "Vector3" or target ~= target then
 		return
 	end
@@ -145,6 +164,14 @@ local function onFire(player: Player, target: any)
 	local look: { number } = if carGun then carGun.color else (Economy.findWeapon(profile.weapon) or Config.Weapons[1]).color
 	local color = Color3.fromRGB(look[1], look[2], look[3])
 	local tracer = Net.get("Tracer")
+	local onCar = latchedHit(aimed, car, root, stats.range)
+	if onCar then
+		for _ = 1, stats.pellets do
+			hitPart(player, { Instance = onCar, Position = onCar.Position }, direction, stats, from)
+			tracer:FireAllClients(origin, onCar.Position, color, player.UserId)
+		end
+		return
+	end
 	for _ = 1, stats.pellets do
 		local dir = spreadDirection(direction, stats.spread)
 		-- 3.1: a piercing round (WeaponDef.pierce) goes on through that many more enemies, each taking the full

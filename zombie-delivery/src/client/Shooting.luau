@@ -289,7 +289,18 @@ local function refuse(driving: boolean)
 		else `{name}: too big to fire from a car. Switch to a pistol, revolver or SMG (Q) to shoot out of the window.`)
 end
 
-local function mouseTarget(car: Model?): Vector3
+-- A zombie hanging on a car (server/Zombies.luau latch: the LatchedTo attribute): the part aimed at goes to the server
+-- with the shot. The car (and the zombie on it) runs on the driver's machine, the server sees it a little behind, and a
+-- shot from the window starts right next to it: the server's own ray would miss what you clearly hit here.
+local function latchedPart(instance: Instance?): BasePart?
+	if not instance or not instance:IsA("BasePart") then
+		return nil
+	end
+	local model = instance:FindFirstAncestorOfClass("Model")
+	return if model and model:GetAttribute("LatchedTo") ~= nil then instance else nil
+end
+
+local function mouseTarget(car: Model?): (Vector3, BasePart?)
 	local camera = workspace.CurrentCamera
 	local location = UserInputService:GetMouseLocation()
 	-- Locked mouse (GTA aiming): the crosshair in the middle of the screen.
@@ -305,16 +316,20 @@ local function mouseTarget(car: Model?): Vector3
 	end
 	params.FilterDescendantsInstances = exclude
 	local result = workspace:Raycast(ray.Origin, ray.Direction * 600, params)
-	return if result then result.Position else ray.Origin + ray.Direction * 600
+	if result then
+		return result.Position, latchedPart(result.Instance)
+	end
+	return ray.Origin + ray.Direction * 600, nil
 end
 
 -- The nearest living zombie in range, the ones hanging on my car first. Aims at the chest.
-local function autoTarget(from: Vector3, range: number): Vector3?
+local function autoTarget(from: Vector3, range: number): (Vector3?, BasePart?)
 	local folder = workspace:FindFirstChild("Zombies")
 	if not folder then
 		return nil
 	end
 	local best: Vector3? = nil
+	local bestPart: BasePart? = nil -- the best one's torso when it hangs on a car (latchedPart)
 	local bestScore = math.huge
 	for _, model in folder:GetChildren() do
 		local humanoid = model:FindFirstChildOfClass("Humanoid")
@@ -328,6 +343,7 @@ local function autoTarget(from: Vector3, range: number): Vector3?
 				end
 				if score < bestScore then
 					best, bestScore = torso.Position, score
+					bestPart = latchedPart(torso)
 				end
 			end
 		end
@@ -341,11 +357,12 @@ local function autoTarget(from: Vector3, range: number): Vector3?
 				local distance = (chassis.Position - from).Magnitude
 				if distance <= range and distance - 300 < bestScore then
 					best, bestScore = chassis.Position + Vector3.new(0, 2, 0), distance - 300
+					bestPart = nil
 				end
 			end
 		end
 	end
-	return best
+	return best, bestPart
 end
 
 -- Where a thrown item lands: the mouse on a computer, the nearest zombie (or 40 studs ahead) on a touch screen.
@@ -359,9 +376,9 @@ function Shooting.aimPoint(): Vector3?
 	end
 	if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
 		local look = if car and car.PrimaryPart then car.PrimaryPart.CFrame.LookVector elseif root then root.CFrame.LookVector else Vector3.zAxis
-		return autoTarget(from, 80) or from + look * 40
+		return (autoTarget(from, 80)) or from + look * 40
 	end
-	return mouseTarget(car)
+	return (mouseTarget(car))
 end
 
 local function step()
@@ -405,21 +422,22 @@ local function step()
 	-- The rate, range and tracer colour of what really fires.
 	local stats = if carGun then Economy.carGunStats(carGun.id, upgrades) else Economy.weaponStats(weapon, upgrades)
 	local target: Vector3? = nil
+	local aimed: BasePart? = nil -- a zombie on a car under the aim (latchedPart)
 	if autoHeld then
-		target = autoTarget(from, stats.range)
+		target, aimed = autoTarget(from, stats.range)
 		if not target then
 			local forward = if car and car.PrimaryPart then car.PrimaryPart.CFrame.LookVector else root.CFrame.LookVector
 			target = from + forward * stats.range
 		end
 	else
-		target = mouseTarget(car)
+		target, aimed = mouseTarget(car)
 	end
 	if not target then
 		return
 	end
 	nextShot = now + stats.interval
 	CameraRig.noteFire()
-	fireRemote:FireServer(target)
+	fireRemote:FireServer(target, aimed)
 	if gunMuzzle and character then
 		muzzleFlash(character, gunMuzzle)
 	end
