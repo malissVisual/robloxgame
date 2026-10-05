@@ -11,6 +11,8 @@ StarterPlayer.EnableMouseLockOption = false
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
+local Config = require(Shared.Config)
+StarterPlayer.CharacterWalkSpeed = Config.Movement.Walk -- 3.7: the walk of client/CameraRig.luau (server/Cargo.luau falls back to it)
 local GunModels = require(Shared.GunModels)
 
 local Server = script.Parent
