@@ -31,6 +31,11 @@ Hands**, makes the loading quicker (see **The vans and the upgrades you can see*
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
 
+## Working on the game with AI helpers
+
+Claude Code and Codex both work on this game and share the work through the repository: the rules are in
+[`AGENTS.md`](AGENTS.md), the task board is [`COLLAB.md`](COLLAB.md) (who works on what, branches to review).
+
 ## Running
 
 ```bash
