@@ -13,6 +13,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Codex · `codex/location-guns` · approved cinematic guns facade in `BuildingLooks/Guns.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: doorway, weapon counter, racks and security windows.
 - Codex · `codex/location-mechanic` · approved cinematic mechanic facade in `BuildingLooks/Mechanic.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: both repair bays, timer signs and large-van entry.
 - Codex · `codex/location-supplies` · approved cinematic supplies facade in `BuildingLooks/Supplies.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: entry, counter and shelves under the olive awning.
+- Codex · `codex/location-warehouse` · approved cinematic warehouse facade in `BuildingLooks/Warehouse.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: all three open doors, two freight docks, pallet jacks and the forklift secret.
 - Codex · `codex/location-kit` · common nonblocking architecture renderer, approved reference and geometry/runtime validator; merge before the six location branches. Logic suite and Studio-mode compilation pass. Studio: day/night lighting and `Architecture` folders; no gameplay changes in this foundation.
 
 ## Questions / handoff

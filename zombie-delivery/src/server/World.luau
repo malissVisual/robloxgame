@@ -4016,7 +4016,7 @@ local function defineMissionPlaces()
 		local facing = Vector3.new(-1, 0, 0)
 		local w, d, h = 100, 56, 22
 		local frame = shopFrame(cx, cz, facing, 20)
-		local color = Color3.fromRGB(70, 104, 130)
+		local color = Color3.fromRGB(60, 73, 82)
 		-- The open door is in line with the cargo spot (the pile in front of it).
 		local spot = Map.CargoSpots.warehouse
 		local openX = if spot then (frame:PointToObjectSpace(Vector3.new(spot.pile.x, WALK_TOP, spot.pile.z))).X else 18
@@ -4027,6 +4027,9 @@ local function defineMissionPlaces()
 		end
 		table.insert(openings, { x = 40, w = 4, h = 7 }) -- the office door
 		shell(warehouse, frame, w, d, h, color, Enum.Material.CorrodedMetal, openings)
+		-- Follow the real cargo-aligned openings; all three roller doors and both freight docks remain functional.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(warehouse, frame, require(script.Parent.BuildingLooks.Warehouse)(doors), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		local front = -d / 2
 		for _, x in doors do
 			-- 4.0: every roller door up: the old mission door and the two loading docks (freightHub below).
