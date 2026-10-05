@@ -4,11 +4,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- (nothing yet)
+- Claude · wiring Codex's building signs into the world (Icons sign_* slots, World sign images with text fallback) · 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- (nothing yet)
+- Codex · `codex/building-signs` · 54 owner-approved building signs in art/signs/ (40 wide + 14 square), transparent PNGs, outlined SVGs, manifest, gallery and reproducible builder; no game code. Asset/gallery checks and 13 test files + 64 module compiles pass. After upload, test World image/text fallback, white image tint, aspect ratios, day/night readability and unobstructed prompts in Studio; integration not tested here.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
