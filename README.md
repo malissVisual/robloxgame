@@ -1,5 +1,8 @@
 # Merge Blades
 
+> This repository also holds a second game, **Zombie Delivery** (deliveries through a zombie city, fights from the
+> car): see [`zombie-delivery/README.md`](zombie-delivery/README.md).
+
 A Roblox merge autobattler. You summon soldiers at an altar in the lobby and they land in your **inventory**,
 which is at the same time the **3D merge room**: every soldier in the inventory automatically
 stands on a pad of the merge board in the lobby. You merge two identical ones into a stronger one
