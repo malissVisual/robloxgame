@@ -743,6 +743,37 @@ function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, ti
 	end)
 end
 
+-- Stop walking right where it is (it stands, anchored, facing the way it went); the walk's `arrived` is not called.
+-- (3.9: a passer-by stopping at a shop window or for a word with somebody.)
+function Npcs.stop(npc: Model)
+	local state = states[npc]
+	if not state or not state.humanoid then
+		return
+	end
+	state.walkToken += 1
+	stand(state)
+end
+
+-- A small gesture on the spot while talking (3.9), with no animation asset: a nod, or the weight shifted to one side
+-- and back. Only standing; the next turn (Npcs.face, a greeting) or walk takes over from it.
+function Npcs.gesture(npc: Model)
+	local state = states[npc]
+	if not state or not state.root.Anchored then
+		return
+	end
+	local turning = state.turn
+	if turning and turning.PlaybackState == Enum.PlaybackState.Playing then
+		return
+	end
+	local root = state.root
+	local goal = if math.random() < 0.5
+		then root.CFrame * CFrame.Angles(-0.09, 0, 0)
+		else root.CFrame * CFrame.Angles(0, (math.random() - 0.5) * 0.6, (math.random() - 0.5) * 0.08)
+	local tween = TweenService:Create(root, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true), { CFrame = goal })
+	state.turn = tween
+	tween:Play()
+end
+
 function Npcs.remove(npc: Model)
 	local state = states[npc]
 	if state then
