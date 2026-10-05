@@ -276,6 +276,17 @@ local function applySaved(profile: Profile, saved: any)
 		end
 		Economy.migrateCarUpgrades(profile.upgrades, profile.cars, profile.carUpgrades)
 	end
+	-- 4.0: the Old Van got two more stages (Rusty, Patched, Work, Long Cargo): a 3.5 – 3.10 save (carStages, no
+	-- vanStages) keeps the room it had: its old Work Van (stage 1, 3 slots) is the Work Van (2) now, its old Cargo Van
+	-- (2, 4 slots) the Long Cargo Van (3); Economy.migrateStage40, once. (A 3.4 save gets its stage below, on the new ones.)
+	if saved.carStages == true and saved.vanStages ~= true then
+		for carId, levels in profile.carUpgrades do
+			local stage = levels.stage
+			if stage and stage > 0 then
+				levels.stage = Economy.migrateStage40(carId, stage)
+			end
+		end
+	end
 	-- 3.5: a save from before the stages (no carStages) keeps the room of every car it owns: each becomes the stage that
 	-- holds at least the slots it had in 3.4 (Economy.legacyStage: its capacity then plus its Cargo Rack, levels.rack,
 	-- gone), once: the rack is not saved again.
@@ -455,6 +466,7 @@ function PlayerData.save(player: Player)
 		xp = profile.xp,
 		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on (applySaved converts older saves once)
 		carStages = true, -- 3.5: the cars' room is their stages (applySaved moves a 3.4 save's cars once)
+		vanStages = true, -- 4.0: the Old Van's four stages (applySaved moves a 3.5 – 3.10 save's van stage once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,

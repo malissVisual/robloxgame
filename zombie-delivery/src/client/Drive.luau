@@ -4,6 +4,9 @@
 -- Input comes from the VehicleSeat (WASD / arrows, gamepad, the mobile thumbstick), with a WASD fallback.
 -- 3.2: while the car's back is open (the attribute BackOpen, server/Vehicles.luau) the throttle stays at 0 and a
 -- toast says to close it first (Drive.notify, set by Main to Hud.toast).
+-- 4.0: pulling away follows a torque curve (shared/Economy.luau Economy.torque): a heavy van (the Rusty Van: accel 11)
+-- pulls away slowly from a standstill, is strongest in the mid-range and creeps up to its top speed; the speed always
+-- changes smoothly (no jumps). Braking and coasting stay as they were.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,6 +14,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Map = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Map"))
+local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
 
 local Drive = {}
 
@@ -220,6 +224,9 @@ local function step(dt: number)
 		rate = accel * 0.7 -- coasting
 	elseif math.abs(speed) > 1 and math.sign(target) ~= math.sign(speed) then
 		rate = accel * 2.5 -- braking
+	elseif math.abs(target) > math.abs(speed) then
+		-- 4.0: pulling away, the torque curve: soft from a standstill, strong in the mid-range, soft again at the top.
+		rate = accel * Economy.torque(math.abs(speed) / math.max(1, maxSpeed))
 	end
 	speed = moveToward(speed, target, rate * dt)
 

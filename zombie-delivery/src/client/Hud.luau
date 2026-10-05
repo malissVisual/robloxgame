@@ -678,10 +678,12 @@ local function carStats(def: Config.CarDef, levels: { [string]: number }?): stri
 		local stats = Economy.carStats(def.id, levels)
 		local stage = Economy.stageDef(def.id, Economy.stageOf(def.id, levels))
 		local prefix = if stage and stage.name ~= def.name then `{stage.name} · ` else ""
-		return `{prefix}Speed {math.floor(stats.maxSpeed + 0.5)} · Health {stats.health} · 📦 {Economy.capacity(def.id, levels)} slots`
+		local pallets = Economy.palletsOf(def.id, Economy.stageOf(def.id, levels)) -- 4.0
+		return `{prefix}Speed {math.floor(stats.maxSpeed + 0.5)} · Health {stats.health} · 📦 {Economy.capacity(def.id, levels)} slots{if pallets > 0 then ` · {pallets} pallet{if pallets > 1 then "s" else ""}` else ""}`
 	end
 	local most = Economy.maxCapacity(def.id)
-	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower} · 📦 {if most > def.capacity then `{def.capacity} → {most}` else def.capacity} slots`
+	local pallets = Economy.palletsOf(def.id, Economy.maxStage(def.id)) -- 4.0: what it takes at its last stage
+	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower} · 📦 {if most > def.capacity then `{def.capacity} → {most}` else def.capacity} slots{if pallets > 0 then ` · {pallets} pallet{if pallets > 1 then "s" else ""}` else ""}`
 end
 
 -- Damage, rate, range (and pellets, blast) of a hand gun or a car gun.
@@ -809,7 +811,7 @@ local function renderShop()
 		end
 		local full = owned >= (tonumber(player:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots)
 		-- 3.5: not "the next van": every car has a role, and its own stages at Wrench Garage (📦 from → to).
-		note(shop.body, "The catalog. Every car has a role and builds up in stages at Wrench Garage (📦 slots from → to). A van ends at 4 slots: more needs the High-Roof Van or the Box Truck.", C.dim, 1)
+		note(shop.body, "The catalog. Every car has a role and builds up in stages at Wrench Garage (📦 slots from → to; more room makes the body longer). A van ends at 4 slots: more needs the High-Roof Van, the Box Truck or the Freight Truck (pallets).", C.dim, 1)
 		for order, def in Config.Cars do
 			if def.company then
 				continue
@@ -924,7 +926,7 @@ local function renderShop()
 			local carOk = upCar ~= nil and Economy.canUpgrade(upCar.id)
 			local carLevels = Economy.carLevels(state.carUpgrades, state.car)
 			if carOk then
-				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (bull bar, plates, scoop); a STAGE rebuilds the car itself. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
+				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (new tyres and rims, a bull bar, plates, a scoop, the trolley in the back); a STAGE rebuilds the car itself. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
 			else
 				note(shop.body, `Your {if upCar then upCar.name else "vehicle"} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`, C.red, 1)
 			end
@@ -979,6 +981,8 @@ local function renderShop()
 					local cost = Economy.upgradeCost(def.id, level)
 					if def.car and not carOk then
 						cardButton(c, "COMPANY CAR", C.grey, false, function() end)
+					elseif def.car and not Economy.upgradeFits(state.car, def.id) then
+						cardButton(c, "VANS & TRUCKS", C.grey, false, function() end) -- 4.0: the Hand Trolley
 					elseif cost then
 						cardButton(c, `UPGRADE {Ui.money(cost)}`, C.green, here and money >= cost, function()
 							Net.get("Upgrade"):FireServer(def.id)
