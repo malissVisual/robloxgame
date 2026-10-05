@@ -1425,7 +1425,7 @@ Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
 Hud.onMissions = nil :: (() -> ())? -- client/MissionsUi.luau: the MISSIONS window
 
-type ButtonDef = { id: string, text: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
+type ButtonDef = { id: string, text: string, icon: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
 local BUTTONS: { ButtonDef }, buttonGrid: any, buttonLayout: any, hudButtons: { [string]: any }
 do -- (its own block: the locals below stay out of the 200-register limit)
 local function toggleJobs()
@@ -1438,26 +1438,26 @@ end
 
 -- (type declared above)
 BUTTONS = {
-	{ id = "jobs", text = "JOBS", key = "J", color = C.yellow, onClick = toggleJobs },
-	{ id = "missions", text = "MISSIONS", key = "U", color = C.panelLight, stroke = C.yellow, onClick = function()
+	{ id = "jobs", icon = "📋", text = "JOBS", key = "J", color = C.yellow, onClick = toggleJobs },
+	{ id = "missions", icon = "⭐", text = "MISSIONS", key = "U", color = C.panelLight, stroke = C.yellow, onClick = function()
 		local cb = Hud.onMissions
 		if cb then
 			cb()
 		end
 	end },
-	{ id = "map", text = "MAP", key = "M", color = C.panelLight, onClick = function()
+	{ id = "map", icon = "🗺️", text = "MAP", key = "M", color = C.panelLight, onClick = function()
 		MapView.toggle()
 	end },
-	{ id = "bag", text = "BAG", key = "B", color = C.panelLight, onClick = function()
+	{ id = "bag", icon = "🎒", text = "BAG", key = "B", color = C.panelLight, onClick = function()
 		toggleBackpack()
 	end },
-	{ id = "car", text = "CAR", color = C.panelLight, stroke = C.blue, onClick = function()
+	{ id = "car", icon = "🚗", text = "CAR", color = C.panelLight, stroke = C.blue, onClick = function()
 		Net.get("SpawnCar"):FireServer()
 	end },
-	{ id = "top", text = "TOP", key = "L", color = C.panelLight, onClick = function()
+	{ id = "top", icon = "🏆", text = "TOP", key = "L", color = C.panelLight, onClick = function()
 		Leaderboard.toggle()
 	end },
-	{ id = "crew", text = "CREW", key = "K", color = C.panelLight, stroke = Theme.Gps, onClick = function()
+	{ id = "crew", icon = "👥", text = "CREW", key = "K", color = C.panelLight, stroke = Theme.Gps, onClick = function()
 		local cb = Hud.onCrew
 		if cb then
 			cb()
@@ -1465,7 +1465,7 @@ BUTTONS = {
 			Hud.toast("The crew panel is not here yet. [fallback: Hud.onCrew is not set]")
 		end
 	end },
-	{ id = "estate", text = "ESTATE", key = "H", color = C.panelLight, stroke = C.money, onClick = function()
+	{ id = "estate", icon = "🏠", text = "ESTATE", key = "H", color = C.panelLight, stroke = C.money, onClick = function()
 		local cb = Hud.onEstate
 		if cb then
 			cb()
@@ -1473,7 +1473,7 @@ BUTTONS = {
 			Hud.toast("Real estate is not open yet. [fallback: Hud.onEstate is not set]")
 		end
 	end },
-	{ id = "sound", text = "SOUND", key = "N", color = C.panelLight, onClick = function()
+	{ id = "sound", icon = "🔊", text = "SOUND", key = "N", color = C.panelLight, onClick = function()
 		local cb = Hud.onSound
 		if cb then
 			cb()
@@ -1483,13 +1483,13 @@ BUTTONS = {
 
 buttonGrid = placed(Ui.make("Frame", {
 	Name = "HudButtons",
-	Size = UDim2.fromOffset(150, 9 * 46),
+	Size = UDim2.fromOffset(52, 9 * 52),
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 96),
 	BackgroundTransparency = 1,
 }, gui))
 buttonLayout = Ui.make("UIGridLayout", {
-	CellSize = UDim2.fromOffset(150, 46),
+	CellSize = UDim2.fromOffset(52, 52),
 	CellPadding = UDim2.fromOffset(8, 8),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	FillDirection = Enum.FillDirection.Vertical,
@@ -1498,34 +1498,105 @@ buttonLayout = Ui.make("UIGridLayout", {
 hudButtons = {}
 local buttonStrokes: { [string]: Color3 } = {}
 
+-- The icon rail: a square glass button per entry, its emoji in the middle, the key in the corner (computer) or the
+-- name under the icon (touch); on a computer the name slides out to the left while the mouse is on it.
 for order, def in BUTTONS do
-	local text = if def.key and not touchLayout then `{def.text}  [{def.key}]` else def.text
-	local button = Ui.button(buttonGrid, text, UDim2.fromOffset(150, 46), def.color, def.onClick)
-	button.Name = `{def.id}Button`
-	button.LayoutOrder = order
-	if def.color == C.yellow then
-		button.TextColor3 = Color3.new(0, 0, 0)
+	local accent = def.stroke or (if def.color == C.yellow then C.yellow else nil)
+	local button = Ui.make("TextButton", {
+		Name = `{def.id}Button`,
+		Size = if touchLayout then UDim2.fromOffset(62, 62) else UDim2.fromOffset(52, 52), -- layout() sets the cells
+		BackgroundColor3 = C.panel,
+		BackgroundTransparency = 0.18,
+		Text = "",
+		AutoButtonColor = false,
+		LayoutOrder = order,
+	}, buttonGrid)
+	Ui.corner(button, 12)
+	local border = Ui.stroke(button, accent or C.grey, if accent then 1.5 else 1)
+	border.Transparency = if accent then 0.15 else 0.45
+	buttonStrokes[def.id] = accent or C.grey
+	Ui.label(button, def.icon, if touchLayout then UDim2.new(1, 0, 0.62, 0) else UDim2.fromScale(1, 1), {
+		Name = "Icon",
+		TextScaled = true,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Enum.Font.GothamBold,
+	})
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, if touchLayout then 2 else 9), PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, button)
+	if touchLayout then
+		local name = Ui.label(button, def.text, UDim2.new(1, 0, 0.32, 0), {
+			Position = UDim2.fromScale(0, 0.66),
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Font = Theme.HeadingFont,
+			TextColor3 = accent or C.dim,
+		})
+		Ui.make("UITextSizeConstraint", { MaxTextSize = 11 }, name)
+	else
+		if def.key then
+			-- The key, small in the bottom right corner.
+			local key = Ui.label(button, def.key, UDim2.fromOffset(14, 14), {
+				Position = UDim2.new(1, 7, 1, 7),
+				AnchorPoint = Vector2.new(1, 1),
+				BackgroundTransparency = 0,
+				BackgroundColor3 = Color3.fromRGB(10, 14, 13),
+				TextSize = 10,
+				Font = Theme.HeadingFont,
+				TextColor3 = accent or C.dim,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				ZIndex = 2,
+			})
+			Ui.corner(key, 4)
+		end
+		-- The name: a pill to the left of the button while the mouse is on it.
+		local tip = Ui.label(button, if def.key then `{def.text}  ·  {def.key}` else def.text, UDim2.fromOffset(0, 26), {
+			Name = "Tip",
+			AutomaticSize = Enum.AutomaticSize.X,
+			Position = UDim2.new(0, -18, 0.5, 0),
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 0.08,
+			BackgroundColor3 = C.panel,
+			TextSize = 13,
+			Font = Theme.HeadingFont,
+			TextColor3 = accent or C.text,
+			Visible = false,
+			ZIndex = 4,
+		})
+		Ui.corner(tip, 8)
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, tip)
+		button.MouseEnter:Connect(function()
+			tip.Visible = true
+			button.BackgroundColor3 = C.panelLight
+			border.Transparency = 0
+		end)
+		button.MouseLeave:Connect(function()
+			tip.Visible = false
+			button.BackgroundColor3 = C.panel
+			border.Transparency = if accent then 0.15 else 0.45
+		end)
 	end
-	if def.stroke then
-		Ui.stroke(button, def.stroke, 1.5).Transparency = 0
-	end
-	buttonStrokes[def.id] = if def.stroke then def.stroke else def.color:Lerp(Color3.new(1, 1, 1), 0.25)
+	button.Activated:Connect(function()
+		local click = Ui.onClick
+		if click then
+			click()
+		end
+		def.onClick()
+	end)
 	-- A count in a red dot on the corner (Hud.setBadge).
 	local badge = Ui.make("TextLabel", {
 		Name = "Badge",
-		Size = UDim2.fromOffset(24, 24),
+		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -4, 0, 4),
+		Position = UDim2.new(1, 5, 0, -5),
 		BackgroundColor3 = C.red,
 		BorderSizePixel = 0,
 		Text = "",
 		TextColor3 = Color3.new(1, 1, 1),
 		Font = Enum.Font.GothamBlack,
-		TextSize = 14,
+		TextSize = 12,
 		Visible = false,
 		ZIndex = 3,
 	}, button)
-	Ui.corner(badge, 12)
+	Ui.corner(badge, 10)
 	hudButtons[def.id] = button
 end
 
@@ -1550,20 +1621,19 @@ function Hud.flashButton(id: string, color: Color3?, seconds: number?)
 	stroke.Transparency = 0
 	task.delay(seconds or 1.5, function()
 		stroke.Color = buttonStrokes[id] or Theme.Border
+		stroke.Transparency = 0.15
 	end)
 end
 end
 
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
--- The inventory bar: items (keys 1-5) and above them the guns you own (Q switches). Bottom right on a computer,
+-- The inventory bar: items (keys 1-5) and above them the gun card (the gun in your hands; hold Q: the wheel). Bottom right on a computer,
 -- bottom centre on a touch screen (the FIRE button is bottom right there). layout() places them.
 local BAR_W: any, HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, hotbarCounts: any, FIRE_SIZE: any, fire: any
 do -- (its own block: the locals below stay out of the 200-register limit)
-BAR_W = 5 * 64 + 4 * 8
-HOTBAR_H = 64
--- The guns line up toward the screen's edge on a computer (bottom right), around the middle on a touch screen.
-local BAR_ALIGN = if touchLayout then Enum.HorizontalAlignment.Center else Enum.HorizontalAlignment.Right
+BAR_W = 5 * 54 + 4 * 6
+HOTBAR_H = 54
 hotbar = placed(Ui.make("Frame", {
 	Name = "Hotbar",
 	Size = UDim2.fromOffset(BAR_W, HOTBAR_H),
@@ -1573,38 +1643,17 @@ hotbar = placed(Ui.make("Frame", {
 }, gui))
 weaponBar = placed(Ui.make("Frame", {
 	Name = "WeaponBar",
-	Size = UDim2.fromOffset(BAR_W, 78),
+	Size = UDim2.fromOffset(BAR_W, 66),
 	Position = if touchLayout then UDim2.new(0.5, 0, 1, -184) else UDim2.new(1, -16, 1, -88),
 	AnchorPoint = if touchLayout then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 	BackgroundTransparency = 1,
 }, gui))
 -- The weapon bar grows upward with a second row of guns: the column above it moves.
 weaponBar:GetPropertyChangedSignal("Size"):Connect(requestLayout)
-local weaponTitle = Ui.label(weaponBar, "WEAPON  ·  hold Q: wheel", UDim2.new(1, 0, 0, 16), {
-	TextXAlignment = if touchLayout then Enum.TextXAlignment.Center else Enum.TextXAlignment.Right,
-	TextSize = 13,
-	TextColor3 = C.yellow,
-	TextStrokeTransparency = 0.4,
-})
 local weaponRow = Ui.make("Frame", {
-	Size = UDim2.new(1, 0, 0, 58),
-	Position = UDim2.fromOffset(0, 18),
+	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
 }, weaponBar)
-
-local SHORT_NAMES: { [string]: string } = {
-	pistol = "PISTOL",
-	smg = "SMG",
-	shotgun = "SHOTGUN",
-	rifle = "RIFLE",
-	minigun = "MINIGUN",
-	launcher = "LAUNCHER",
-	revolver = "REVOLVER",
-	carbine = "CARBINE",
-	roofmg = "ROOF MG",
-	roofminigun = "ROOF MINIGUN",
-	rooflauncher = "ROOF LAUNCHER",
-}
 
 -- What the weapon bar shows depends on where you are: on foot your guns; driving a car with a car gun that gun; in
 -- any other seat your guns, the one-handed ones tagged WINDOW, the two-handed ones greyed out (they do not fire).
@@ -1619,108 +1668,92 @@ function weaponBarKey(): string
 end
 shownWeaponBar = ""
 
--- A small tag in the top left corner of a weapon slot.
-local function slotTag(slot: any, text: string, color: Color3)
-	local tag = Ui.label(slot, text, UDim2.fromOffset(0, 13), {
-		Position = UDim2.fromOffset(3, 3),
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundTransparency = 0,
-		BackgroundColor3 = color,
-		TextColor3 = Color3.new(0, 0, 0),
-		TextSize = 9,
-		TextWrapped = false,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		ZIndex = 2,
-	})
-	Ui.corner(tag, 4)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 3) }, tag)
-end
-
+-- The gun card: what is in your hands (or on the roof), big and clear; the other guns are on the weapon wheel
+-- (hold Q, client/WeaponWheel.luau) or a tap of Q / of the card away. A coloured edge says what fires: gold your gun,
+-- blue the car gun, red a two-handed gun in a car seat (it does not fire there).
 function renderWeapons()
 	Ui.clear(weaponRow)
 	shownWeaponBar = weaponBarKey()
+	weaponBar.Size = UDim2.fromOffset(BAR_W, 66)
 	if not state then
 		return
 	end
 	local seated, carGun = seatView()
-	if carGun then
-		-- Driving a car with a car gun: that is what fires.
-		weaponTitle.Text = "CAR GUN  ·  on the roof"
-		weaponBar.Size = UDim2.fromOffset(5 * 64 + 4 * 8, 18 + 58)
-		weaponRow.Size = UDim2.new(1, 0, 0, 58)
-		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 58), BackgroundTransparency = 1 }, weaponRow)
-		Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = BAR_ALIGN }, row)
-		local slot = Ui.make("Frame", { Size = UDim2.fromOffset(140, 58), BackgroundColor3 = C.panelLight, BackgroundTransparency = 0.1 }, row)
-		Ui.corner(slot, 10)
-		Ui.stroke(slot, C.blue, 2.5)
-		-- (The car guns have no icon of their own: Icons.weapon gives nil, the emoji stays.)
-		Ui.icon(slot, Icons.weapon(carGun.id), if carGun.splash > 0 then "💥" else "🔫", UDim2.new(1, 0, 0, 30), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
-		local name = Ui.label(slot, SHORT_NAMES[carGun.id] or carGun.name, UDim2.new(1, -4, 0, 18), {
-			Position = UDim2.fromOffset(2, 34),
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextScaled = true,
-			TextColor3 = Color3.fromRGB(150, 210, 255),
-		})
-		Ui.make("UITextSizeConstraint", { MaxTextSize = 12 }, name)
-		slotTag(slot, "ROOF", Color3.fromRGB(150, 210, 255))
+	local gun = if carGun then nil else Economy.findWeapon(state.weapon)
+	local def: any = carGun or gun
+	if not def then
 		return
 	end
-	weaponTitle.Text = if seated then "WEAPON  ·  one-handed out of the window" else "WEAPON  ·  hold Q: wheel"
-	local owned: { Config.WeaponDef } = {}
-	for _, def in Config.Weapons do
-		if state.weapons[def.id] then
-			table.insert(owned, def)
-		end
+	local usable = carGun ~= nil or not seated or (gun ~= nil and gun.oneHanded == true)
+	local accent = if carGun then C.blue elseif not usable then C.red else C.yellow
+	local card = Ui.make("TextButton", {
+		Name = "GunCard",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C.panel,
+		BackgroundTransparency = 0.12,
+		Text = "",
+		AutoButtonColor = false,
+	}, weaponRow)
+	Ui.corner(card, 12)
+	Ui.stroke(card, accent, 1.5).Transparency = 0.25
+	local edge = Ui.make("Frame", {
+		Size = UDim2.new(0, 4, 1, -20),
+		Position = UDim2.new(0, 8, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = accent,
+		BorderSizePixel = 0,
+	}, card)
+	Ui.corner(edge, 2)
+	local icon = Ui.icon(card, Icons.weapon(def.id), if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.fromOffset(62, 40), {
+		Position = UDim2.new(0, 20, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		TextScaled = true,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	})
+	if icon:IsA("ImageLabel") then
+		icon.ImageColor3 = if usable then C.text else C.grey
 	end
-	-- Five guns a row; more (the earned ones too) take a second row and the bar grows upward.
-	local PER_ROW = 5
-	local rowCount = math.max(1, math.ceil(#owned / PER_ROW))
-	weaponBar.Size = UDim2.fromOffset(5 * 64 + 4 * 8, 18 + rowCount * 64 - 6)
-	weaponRow.Size = UDim2.new(1, 0, 0, rowCount * 64 - 6)
-	local rows = {}
-	for r = 1, rowCount do
-		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 58), Position = UDim2.fromOffset(0, (r - 1) * 64), BackgroundTransparency = 1 }, weaponRow)
-		Ui.make("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = BAR_ALIGN,
-			Padding = UDim.new(0, 6),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		}, row)
-		rows[r] = row
+	local name = Ui.label(card, string.upper(def.name), UDim2.new(1, -150, 0, 22), {
+		Position = UDim2.fromOffset(92, 11),
+		Font = Theme.DisplayFont,
+		TextScaled = true,
+		TextColor3 = if usable then C.text else C.grey,
+	})
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 18 }, name)
+	local damage = math.floor(def.damage * def.pellets)
+	local where = if carGun then "ON THE ROOF" elseif not usable then "ON FOOT ONLY" elseif seated then "OUT OF THE WINDOW" else `{damage} DMG  ·  {def.fireRate}/S`
+	Ui.label(card, where, UDim2.new(1, -150, 0, 14), {
+		Position = UDim2.fromOffset(92, 37),
+		Font = Theme.HeadingFont,
+		TextSize = 11,
+		TextColor3 = if carGun then C.blue elseif not usable then C.red elseif seated then C.green else C.dim,
+	})
+	if not carGun and not touchLayout then
+		-- Q, how to switch.
+		local key = Ui.label(card, "Q", UDim2.fromOffset(30, 30), {
+			Position = UDim2.new(1, -14, 0.5, -6),
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 0,
+			BackgroundColor3 = Color3.fromRGB(10, 14, 13),
+			Font = Theme.DisplayFont,
+			TextSize = 15,
+			TextColor3 = C.yellow,
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		Ui.corner(key, 8)
+		Ui.stroke(key, C.yellow, 1).Transparency = 0.5
+		Ui.label(card, "HOLD", UDim2.fromOffset(40, 10), {
+			Position = UDim2.new(1, -9, 1, -8),
+			AnchorPoint = Vector2.new(1, 1),
+			Font = Theme.HeadingFont,
+			TextSize = 9,
+			TextColor3 = C.dim,
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
 	end
-	for index, def in owned do
-		local current = state.weapon == def.id
-		-- In a car seat only the one-handed guns fire (out of the window); the others are greyed out.
-		local usable = not seated or def.oneHanded == true
-		local slot = Ui.make("TextButton", {
-			Size = UDim2.fromOffset(if current then 96 else 70, 58),
-			BackgroundColor3 = if current and usable then C.panelLight else C.panel,
-			BackgroundTransparency = if usable then 0.1 else 0.45,
-			Text = "",
-			LayoutOrder = index,
-			AutoButtonColor = true,
-		}, rows[(index - 1) // PER_ROW + 1])
-		Ui.corner(slot, 10)
-		Ui.stroke(slot, if current and usable then C.yellow else C.grey, if current then 2.5 else 1)
-		Ui.icon(slot, Icons.weapon(def.id), if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.new(1, 0, 0, 30), {
-			TextScaled = true,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextTransparency = if usable then 0 else 0.65,
-			ImageTransparency = if usable then 0 else 0.65,
-		})
-		local name = Ui.label(slot, SHORT_NAMES[def.id] or def.name, UDim2.new(1, -4, 0, 18), {
-			Position = UDim2.fromOffset(2, 34),
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextScaled = true,
-			TextColor3 = if not usable then C.grey elseif current then C.yellow else C.text,
-		})
-		Ui.make("UITextSizeConstraint", { MaxTextSize = 12 }, name)
-		if seated and usable then
-			slotTag(slot, "WINDOW", C.green)
-		end
-		slot.Activated:Connect(function()
-			Net.get("Equip"):FireServer("weapon", def.id)
-		end)
+	if not carGun then
+		-- A tap (touch) or a click: the next gun.
+		card.Activated:Connect(nextWeapon)
 	end
 end
 
@@ -1742,30 +1775,32 @@ function nextWeapon()
 	local index = table.find(owned, state.weapon) or 0
 	Net.get("Equip"):FireServer("weapon", owned[index % #owned + 1])
 end
-Ui.list(hotbar, false, 8)
+Ui.list(hotbar, false, 6)
 hotbarCounts = {}
 for index, def in Config.Items do
 	local art = Icons.item(def.id)
 	local slot = Ui.make("TextButton", {
-		Size = UDim2.fromOffset(64, 64),
+		Size = UDim2.fromOffset(54, 54),
 		BackgroundColor3 = C.panel,
-		BackgroundTransparency = 0.15,
+		BackgroundTransparency = 0.18,
 		Text = if Icons.get(art) then "" else def.icon, -- the emoji until the item's icon is filled in
-		TextSize = 30,
+		TextSize = 26,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Color3.new(1, 1, 1),
 		LayoutOrder = index,
 		AutoButtonColor = true,
 	}, hotbar)
-	Ui.corner(slot, 10)
-	Ui.stroke(slot, C.yellow, 1.5)
+	Ui.corner(slot, 12)
+	Ui.stroke(slot, C.grey, 1).Transparency = 0.4
 	if Icons.get(art) then
-		Ui.icon(slot, art, def.icon, UDim2.fromOffset(34, 34), { Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) })
+		Ui.icon(slot, art, def.icon, UDim2.fromOffset(28, 28), { Position = UDim2.fromScale(0.5, 0.48), AnchorPoint = Vector2.new(0.5, 0.5) })
 	end
-	Ui.label(slot, tostring(index), UDim2.fromOffset(16, 16), { Position = UDim2.fromOffset(4, 2), TextSize = 13, TextColor3 = C.yellow })
-	hotbarCounts[def.id] = Ui.label(slot, "0", UDim2.new(1, -6, 0, 16), {
-		Position = UDim2.new(0, 0, 1, -18),
-		TextSize = 14,
+	Ui.label(slot, tostring(index), UDim2.fromOffset(14, 14), { Position = UDim2.fromOffset(5, 3), TextSize = 11, Font = Theme.HeadingFont, TextColor3 = C.dim })
+	hotbarCounts[def.id] = Ui.label(slot, "0", UDim2.new(1, -6, 0, 14), {
+		Position = UDim2.new(0, 0, 1, -16),
+		TextSize = 12,
+		Font = Theme.HeadingFont,
+		TextColor3 = C.yellow,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
 	slot.Activated:Connect(function()
@@ -2498,8 +2533,8 @@ local MARGIN = 16
 local GAP = 8
 local ADMIN_BOTTOM = 96 -- client/AdminPanel.luau: the ADMIN button at (1, -16, 0, 56), 90 × 32, unscaled
 local ADMIN_LEFT = 16 + 90 + GAP
-local BUTTON_W, BUTTON_H = 150, 46
-local TOUCH_BUTTON_W, TOUCH_BUTTON_H = 88, 48
+local BUTTON_W, BUTTON_H = 52, 52
+local TOUCH_BUTTON_W, TOUCH_BUTTON_H = 62, 62
 local BUTTON_GAP = 8
 local TOUCH_BUTTON_MIN = 0.8
 local TOP_EST_H = 320 -- the top stack's usual height (unscaled): a two-line job panel, the mission banner (up to 80) and the car call line
@@ -2715,9 +2750,6 @@ layout = function()
 		buttonLayout.FillDirection = Enum.FillDirection.Vertical
 		buttonLayout.StartCorner = Enum.StartCorner.TopRight
 		buttonLayout.FillDirectionMaxCells = math.ceil(count / columns)
-	end
-	for _, button in hudButtons do
-		button.TextSize = if touchLayout then 16 else 18
 	end
 	setScale(buttonGrid, buttonScale)
 	-- On a computer the grid sits at the bottom of its room (on the weapon bar), clear of Roblox's player list

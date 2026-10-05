@@ -576,12 +576,16 @@ local function build()
 	Ui.list(content, true, 8)
 
 	-- The small button top right (under Roblox's own buttons).
-	openButton = Ui.button(gui, "ADMIN", UDim2.fromOffset(90, 32), C.red, function()
+	-- A quiet dark pill (only admins see it), the red is just its edge and text.
+	openButton = Ui.button(gui, "🛠  ADMIN", UDim2.fromOffset(90, 32), C.panel, function()
 		setOpen(not window.Visible)
 	end)
 	openButton.AnchorPoint = Vector2.new(1, 0)
 	openButton.Position = UDim2.new(1, -16, 0, 56)
-	openButton.TextSize = 15
+	openButton.TextSize = 13
+	openButton.TextColor3 = C.red
+	openButton.BackgroundTransparency = 0.2
+	Ui.stroke(openButton, C.red, 1).Transparency = 0.3
 	openButton.Visible = false
 	Ui.make("UIScale", {}, openButton)
 end
