@@ -185,6 +185,7 @@ local CARGO_ALIASES: { [string]: string } = {
 	tires = "crate",
 	plants = "sack",
 	survivor = "kid",
+	pallet = "crate", -- 4.0, freight: a pallet of boxes
 }
 
 -- A piece of cargo: a kind (crate, ammo, sack, barrel, icebox, furniture, soup, horse, kid) or a look (pizza, parcel,

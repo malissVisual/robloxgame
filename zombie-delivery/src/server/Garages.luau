@@ -47,7 +47,7 @@ local lastAction: { [Player]: number } = {}
 local opened: { [Player]: string } = {} -- where the player's window was opened (a garage id or "depot")
 
 -- Short names of the car tracks for the window's upgrade line.
-local SHORT: { [string]: string } = { engine = "Engine", handling = "Handling", armor = "Armor", plow = "Plow", loading = "Hands" }
+local SHORT: { [string]: string } = { engine = "Engine", handling = "Tyres", armor = "Armor", plow = "Plow", loading = "Hands", trolley = "Trolley" }
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
@@ -245,7 +245,9 @@ function Garages.take(player: Player, carId: string): string?
 		local character = player.Character
 		if not seated and root and character then
 			local rel = spot:PointToObjectSpace(root.Position)
-			if math.abs(rel.X) < 6 and math.abs(rel.Z) < 12 then
+			-- (a long truck stands farther out: Vehicles.driveOut; the spot looks out of the door, -Z in its space)
+			local out, length = Vehicles.driveOut(player, nil)
+			if math.abs(rel.X) < 6 and math.abs(rel.Z + out) < math.max(12, length / 2 + 2) then
 				character:PivotTo(spot * CFrame.new(-7, 3, 0))
 			end
 		end

@@ -26,12 +26,12 @@ check("upgrade maxed", Economy.upgradeCost("engine", 5) == nil)
 check("unknown upgrade", Economy.upgradeCost("nope", 0) == nil)
 
 local van = Economy.carStats("van", {})
-check("van base speed", van.maxSpeed == 60 and van.health == 300 and van.ramPower == 1)
+check("van base speed (4.0: the slow Rusty Van)", van.maxSpeed == 42 and van.accel == 11 and van.health == 300 and van.ramPower == 1)
 local tuned = Economy.carStats("van", { engine = 2, armor = 1, plow = 3 })
-check("engine upgrade", near(tuned.maxSpeed, 60 * 1.16), tuned.maxSpeed)
+check("engine upgrade", near(tuned.maxSpeed, 42 * 1.16) and near(tuned.accel, 11 * 1.16), tuned.maxSpeed)
 check("armor upgrade", tuned.health == math.floor(300 * 1.15), tuned.health)
 check("plow upgrade", near(tuned.ramPower, 1.9), tuned.ramPower)
-check("unknown car falls back", Economy.carStats("spaceship", {}).maxSpeed == 60)
+check("unknown car falls back", Economy.carStats("spaceship", {}).maxSpeed == Config.Cars[1].maxSpeed)
 
 local pistol = Economy.weaponStats("pistol", {})
 check("pistol interval", near(pistol.interval, 1 / 3), pistol.interval)
@@ -184,7 +184,7 @@ check("Quick Hands: 3 levels, -15 % each", quick ~= nil and quick.maxLevel == 3 
 check("Quick Hands is priced like the others", Economy.upgradeCost("loading", 0) == 400 and Economy.upgradeCost("loading", 3) == nil, Economy.upgradeCost("loading", 0))
 -- 3.4: the starting van is upgraded, not replaced: every car track's first level costs a few deliveries.
 for _, def in Config.Upgrades do
-	if def.car then
+	if def.car and def.id ~= "trolley" then -- (4.0: the Hand Trolley is one tool, not a track: about $600)
 		check(`{def.id}: the first level is cheap`, (Economy.upgradeCost(def.id, 0) :: number) <= 400, Economy.upgradeCost(def.id, 0))
 	end
 end
@@ -195,7 +195,7 @@ check("Quick Hands never below 40 %", Economy.loadHold(1, { loading = 99 }) >= 0
 local perCar = { van = { engine = 2 }, courier = { armor = 1 } }
 check("a car's own levels", Economy.carLevels(perCar, "van").engine == 2 and Economy.carLevels(perCar, "courier").engine == nil)
 check("a car without levels: none", next(Economy.carLevels(perCar, "muscle")) == nil and next(Economy.carLevels(nil, "van")) == nil)
-check("the stats read the car's own levels", near(Economy.carStats("van", Economy.carLevels(perCar, "van")).maxSpeed, 60 * 1.16)
+check("the stats read the car's own levels", near(Economy.carStats("van", Economy.carLevels(perCar, "van")).maxSpeed, 42 * 1.16)
 	and Economy.carStats("courier", Economy.carLevels(perCar, "courier")).maxSpeed == (Economy.findCar("courier") :: Config.CarDef).maxSpeed)
 check("the dealer's cars take upgrades", Economy.canUpgrade("van") and Economy.canUpgrade("rallyvan") and Economy.canUpgrade("muscle"))
 check("company vehicles take none", not Economy.canUpgrade("ambulance") and not Economy.canUpgrade("bus") and not Economy.canUpgrade("nope"))

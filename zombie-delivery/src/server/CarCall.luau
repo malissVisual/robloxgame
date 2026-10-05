@@ -314,7 +314,9 @@ local function garageStart(player: Player, P: Vector3): Start?
 		end
 		local look = flat(spot.LookVector)
 		look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
-		local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, spot.Y) + 0.5, spot.Z)
+		local out = Vehicles.driveOut(player, nil) -- (a long truck stands farther out: not in the door's lintel)
+		local x, z = spot.X + look.X * out, spot.Z + look.Z * out
+		local position = Vector3.new(x, Vehicles.groundY(x, z, spot.Y) + 0.5, z)
 		local mine = Vehicles.get(player)
 		if carNear(position, 10, if mine then mine.model else nil) then
 			continue -- a co-owner's car stands in the way

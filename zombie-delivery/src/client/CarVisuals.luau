@@ -12,6 +12,8 @@
 -- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
 -- The back's prompt shows only to the owner and the crew of the owner's job (the attribute BackCrew, server/Cargo.luau).
 -- 3.6: the owner's name sits on a cream pill in ink (Theme.Postage.pill), readable over a night street and a sunny one.
+-- 4.0: the Rusty Van's exhaust smokes (the car's attribute Smoky, server/Vehicles.luau: till Engine level 1): a cheap
+-- ParticleEmitter at its Attachment "Exhaust", made the first time it is near, puffing more at idle than on the move.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +40,8 @@ type CarState = {
 	steer: number,
 	tagged: boolean,
 	backReach: number?, -- the BackPrompt's own reach (the server's), before it was hidden here
+	trolleyReach: number?, -- 4.0: the same for the trolley's "Take trolley" (server/Equipment.luau, TrolleyTake)
+	smoke: ParticleEmitter?, -- 4.0: the exhaust smoke (made when first needed)
 }
 
 local player = Players.LocalPlayer
@@ -113,12 +117,35 @@ local function stateOf(car: Model): CarState?
 		steer = 0,
 		tagged = false,
 		backReach = nil,
+		trolleyReach = nil,
+		smoke = nil,
 	}
 	states[car] = state
 	car.Destroying:Connect(function()
 		states[car] = nil
 	end)
 	return state
+end
+
+-- 4.0: a thin grey-blue puff out of the exhaust pipe, drifting back and up.
+local SMOKE_RANGE = 140
+local function makeSmoke(at: Attachment): ParticleEmitter
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Name = "ExhaustSmoke"
+	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	smoke.Color = ColorSequence.new(Color3.fromRGB(120, 122, 128), Color3.fromRGB(170, 170, 172))
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1.8) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Lifetime = NumberRange.new(1.0, 1.6)
+	smoke.Speed = NumberRange.new(1.5, 2.5)
+	smoke.SpreadAngle = Vector2.new(18, 18)
+	smoke.EmissionDirection = Enum.NormalId.Back -- out of the back of the car
+	smoke.Acceleration = Vector3.new(0, 1.4, 0)
+	smoke.Drag = 1
+	smoke.LightInfluence = 1
+	smoke.Rate = 0
+	smoke.Parent = at
+	return smoke
 end
 
 local function nameTag(car: Model, chassis: BasePart)
@@ -219,10 +246,10 @@ local function step(dt: number)
 		-- out of reach for everybody else, so a stranger's car does not take the E. (Enabled is the server's: one E at a time.)
 		local door = chassis:FindFirstChild("CargoDoor")
 		local back = door and door:FindFirstChild("BackPrompt")
+		local crew = car:GetAttribute("BackCrew")
+		-- (3.10: not from a seat: E there gets you out.)
+		local usable = seatedIn == nil and (mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil))
 		if back and back:IsA("ProximityPrompt") then
-			local crew = car:GetAttribute("BackCrew")
-			-- (3.10: not from a seat: E there gets you out.)
-			local usable = seatedIn == nil and (mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil))
 			local reach: number = state.backReach or back.MaxActivationDistance
 			state.backReach = reach
 			local want = if usable then reach else 0
@@ -230,13 +257,43 @@ local function step(dt: number)
 				back.MaxActivationDistance = want
 			end
 		end
+		-- 4.0: the trolley's "Take trolley" (server/Equipment.luau, the chassis' TrolleyTake) the same way, and only with
+		-- empty hands (the server refuses everybody else anyway).
+		local take = chassis:FindFirstChild("TrolleyTake")
+		local takePrompt = take and take:FindFirstChildOfClass("ProximityPrompt")
+		if takePrompt then
+			local reach: number = state.trolleyReach or takePrompt.MaxActivationDistance
+			state.trolleyReach = reach
+			local want = if usable and not handsFull then reach else 0
+			if takePrompt.MaxActivationDistance ~= want then
+				takePrompt.MaxActivationDistance = want
+			end
+		end
 		if not mine and not state.tagged and car:GetAttribute("OwnerId") ~= nil then
 			state.tagged = true
 			nameTag(car, chassis)
 		end
 
+		-- 4.0: the smoking exhaust, near the camera only.
+		local distance = (chassis.Position - eye).Magnitude
+		local smoky = car:GetAttribute("Smoky") == true and distance < SMOKE_RANGE
+		local smoke = state.smoke
+		if smoky and not smoke then
+			local exhaust = chassis:FindFirstChild("Exhaust")
+			if exhaust and exhaust:IsA("Attachment") then
+				smoke = makeSmoke(exhaust)
+				state.smoke = smoke
+			end
+		end
+		if smoke then
+			local rate = if not smoky then 0 elseif chassis.AssemblyLinearVelocity.Magnitude < 6 then 7 else 2.5
+			if smoke.Rate ~= rate then
+				smoke.Rate = rate
+			end
+		end
+
 		-- Wheels.
-		if (chassis.Position - eye).Magnitude > RANGE then
+		if distance > RANGE then
 			continue
 		end
 		local forward = chassis.AssemblyLinearVelocity:Dot(chassis.CFrame.LookVector)

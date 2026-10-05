@@ -40,6 +40,20 @@
 -- it. G puts down ONE piece (the top one), so two in hand → G → one in hand → open the back yourself. Load puts both
 -- in at once; at a drop Take out with one light piece in hand takes a second, and Hand over gives the receiver all
 -- you carry (as many as they still need). The character attribute CarryCount says how many you hold.
+--
+-- 4.0, freight and equipment (shared/Freight.luau has the rules, server/Equipment.luau the tools themselves):
+--   the hand trolley  pushed (Pushing = "trolley"), it is the player's Held with `tool` set: up to TrolleyPieces of
+--                     any kind but people, horses and pallets ride on its toe plate. "Load onto trolley" (E) at the
+--                     pile takes as many as fit, the pieces on the ground one each; "Load all" at the open back puts
+--                     them in (as many as the vehicle has room for), at a drop "Take out" fills it and "Hand over"
+--                     gives the receiver all of them. G sets the trolley down: its pieces stay on it (Loose with
+--                     `tool`, counted like every piece put down) and come along when it is taken again; when it goes
+--                     home on its own they go on the ground. One count for every piece, wherever it is.
+--   pallets           the mode "pallet" (the Freight Run): the pallets wait on the dock (Plan.staging) as Loose
+--                     pieces, "Lift pallet" (E) only with a pallet jack (Pushing = "jack", one pallet), "Load pallet"
+--                     at the open back of a vehicle that takes pallets (Freight.palletsOf: their places on its floor,
+--                     palletFrames), at the drop "Unload pallet" onto the jack and "Set down pallet" at the receiving
+--                     dock's pad. The hints (Cargo.step) say what to do with a tool in every state.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -47,10 +61,12 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Freight = require(Shared.Freight)
 local Net = require(Shared.Net)
 local Vehicles = require(script.Parent.Vehicles)
 local Npcs = require(script.Parent.Npcs)
 local Animals = require(script.Parent.Animals)
+local Equipment = require(script.Parent.Equipment)
 
 local Tuning = Config.Cargo
 local Cargo = {}
@@ -66,6 +82,7 @@ export type Plan = {
 	person: Npcs.Look?, -- the giver / the receiver
 	hold: number, -- serve: seconds to hold still
 	keep: number, -- serve: pieces left in the vehicle after this stop
+	staging: { Vector3 }?, -- 4.0, pallet: where the pallets wait (pick-up) or are set down (drop), on the ground
 }
 
 -- What the job is about, given when it starts.
@@ -94,8 +111,10 @@ type Piece = {
 }
 
 -- 3.7: pieces, bottom first (two light pieces stacked; one otherwise). The prompt (Put down / Let go) sits on the top one.
-type Held = { pieces: { Piece }, character: Model, root: BasePart, prompt: ProximityPrompt?, last: CFrame }
-type Loose = { piece: Piece, prompt: ProximityPrompt, handle: Part? }
+-- 4.0: `tool` = on the trolley or the jack the player pushes (no prompt: the tool's own G).
+type Held = { pieces: { Piece }, character: Model, root: BasePart, prompt: ProximityPrompt?, last: CFrame, tool: Equipment.Tool? }
+-- 4.0: `tool` = on a trolley or a jack set down somewhere (its prompt off: the pieces come along with the tool).
+type Loose = { piece: Piece, prompt: ProximityPrompt, handle: Part?, tool: Equipment.Tool? }
 
 export type Session = {
 	owner: Player,
@@ -255,7 +274,7 @@ groundParams.FilterType = Enum.RaycastFilterType.Exclude
 -- The height of the walkable ground at x, z (near `around`): not a roof, a tree or a car.
 local function groundY(x: number, z: number, around: number): number
 	local skip: { Instance } = { folder }
-	for _, name in { "Cars", "Zombies", "Npcs", "Animals", "Effects", "Loot", "Showroom" } do
+	for _, name in { "Cars", "Zombies", "Npcs", "Animals", "Effects", "Loot", "Showroom", "Equipment" } do
 		local child = workspace:FindFirstChild(name)
 		if child then
 			table.insert(skip, child)
@@ -487,6 +506,34 @@ local function missionLook(model: Model, look: string, variant: number): boolean
 		block("Beanie", Vector3.new(1.02, 0.4, 1.02), Vector3.new(0, 2.33, 0.03), rgb(70, 64, 58), Enum.Material.Fabric)
 		block("Backpack", Vector3.new(1.1, 1.1, 0.5), Vector3.new(0, 0.85, 0.62), rgb(62, 82, 52), Enum.Material.Fabric)
 		block("Dirt", Vector3.new(0.5, 0.3, 0.03), Vector3.new(-0.3, 0.6, -0.41), rgb(70, 56, 40), Enum.Material.Fabric)
+	elseif look == "pallet" then
+		-- 4.0: a wooden pallet with eight boxes in shrink wrap, about 4 × 4 × 4. A pallet jack's forks go in from the
+		-- front between the stringers. The wrap is the main part (you walk round it, the prompt sits on it).
+		local wrap = block("Body", Vector3.new(3.9, 3.2, 3.9), Vector3.new(0, 2.24, 0), rgb(214, 226, 232), Enum.Material.SmoothPlastic)
+		wrap.Transparency = 0.55
+		wrap.Reflectance = 0.15
+		local wood = rgb(176, 136, 88)
+		for _, x in { -1.75, 0, 1.75 } do
+			block("Stringer", Vector3.new(0.4, 0.5, 4), Vector3.new(x, 0.25, 0), wood:Lerp(black, 0.15), Enum.Material.WoodPlanks)
+		end
+		for n = 0, 4 do
+			block("Board", Vector3.new(4, 0.12, 0.66), Vector3.new(0, 0.56, -1.6 + n * 0.8), wood, Enum.Material.WoodPlanks)
+		end
+		local colors = { rgb(196, 158, 108), rgb(60, 110, 170), rgb(90, 150, 80), rgb(200, 70, 50) }
+		local color = colors[variant % #colors + 1]
+		local cardboard = rgb(196, 158, 108)
+		for layer = 0, 1 do
+			for i, x in { -0.96, 0.96 } do
+				for j, z in { -0.96, 0.96 } do
+					block("Box", Vector3.new(1.86, 1.55, 1.86), Vector3.new(x, 1.41 + layer * 1.57, z), if (i + j + layer) % 2 == 0 then color else cardboard, Enum.Material.Cardboard)
+				end
+			end
+		end
+		for _, x in { -1, 1 } do
+			block("Strap", Vector3.new(0.14, 3.24, 3.96), Vector3.new(x, 2.24, 0), rgb(40, 40, 44), Enum.Material.Fabric)
+		end
+		local sheet = block("Sheet", Vector3.new(1.4, 1, 0.04), Vector3.new(0.9, 2.6, -1.98), rgb(245, 245, 240), Enum.Material.SmoothPlastic)
+		stencil(sheet, "FREIGHT", rgb(30, 30, 34), { Enum.NormalId.Front })
 	else
 		return false
 	end
@@ -944,14 +991,49 @@ local function heldCount(session: Session): number
 	return n
 end
 
+-- The tool the player pushes (4.0: "trolley" | "jack"), or nil.
+local function toolOf(player: Player): string?
+	local tool = Equipment.pushing(player)
+	return if tool then tool.kind else nil
+end
+
 -- 3.7: how many pieces of this job one player may hold: two of a light look, else one (a horse, a person, a lift or
--- pair job's piece).
-local function handsMax(session: Session): number
+-- pair job's piece). 4.0: with a tool (`player` given): a trolley's TrolleyPieces, a jack's one pallet, 0 when the
+-- piece does not go on it (or a pallet in the hands: shared/Freight.luau handsMax).
+local function handsMax(session: Session, player: Player?): number
 	local info = session.info
-	if info.kind == "horse" or info.lift or info.pair or Cargo.isPeople(info.kind) or not Tuning.LightLooks[info.look] then
-		return 1
+	return Freight.handsMax(info.kind, info.look, info.lift, info.pair, if player then toolOf(player) else nil)
+end
+
+-- 4.0: is this job's cargo pallets (the Freight Run)?
+local function isPallet(session: Session): boolean
+	return Freight.isPallet(session.info.kind)
+end
+
+-- Is this a stop where the cargo is handled on foot (carried, led, 4.0: moved on a pallet jack)?
+local function handled(mode: string): boolean
+	return mode == "carry" or mode == "lead" or mode == "pallet"
+end
+
+-- 4.0: the pieces lying somewhere on the ground (not on a trolley or a jack set down).
+local function looseOnGround(session: Session): number
+	local n = 0
+	for _, loose in session.loose do
+		if not loose.tool then
+			n += 1
+		end
 	end
-	return math.max(1, Tuning.HandsMax)
+	return n
+end
+
+-- 4.0: does somebody of the job push a tool of this kind right now (the prompts' words)?
+local function crewPushes(session: Session, kind: string): boolean
+	for _, player in Players:GetPlayers() do
+		if toolOf(player) == kind and session.info.allowed(player) then
+			return true
+		end
+	end
+	return false
 end
 
 -- The pieces this drop can still get: what it needs, or less when pieces were lost on the way.
@@ -999,7 +1081,7 @@ end
 -- Only at the stop: elsewhere (the drive there) the back has to close.
 local function toTakeOut(session: Session): boolean
 	local plan = session.plan
-	if not plan or plan.stage ~= "drop" or (plan.mode ~= "carry" and plan.mode ~= "lead") or session.blocked or not atStop(session) then
+	if not plan or plan.stage ~= "drop" or not handled(plan.mode) or session.blocked or not atStop(session) then
 		return false
 	end
 	return #session.load > 0 and session.moved + heldCount(session) + #session.loose < neededNow(session)
@@ -1020,7 +1102,7 @@ end
 -- 3.2: has the back still a use at this stop (pieces to load or to take out, somebody carrying)? Else: close it.
 local function backNeeded(session: Session): boolean
 	local plan = session.plan
-	if not plan or (plan.mode ~= "carry" and plan.mode ~= "lead") then
+	if not plan or not handled(plan.mode) then
 		return false
 	end
 	local busy = heldCount(session) > 0 or #session.loose > 0
@@ -1053,6 +1135,8 @@ end
 local function refresh(session: Session)
 	local plan = session.plan
 	local horse = session.info.kind == "horse"
+	local pallet = isPallet(session)
+	local trolley = not pallet and not horse and crewPushes(session, "trolley") -- 4.0: the words for a trolley
 	local carPrompt = session.carPrompt
 	local car = session.car
 	if carPrompt and car then
@@ -1061,31 +1145,78 @@ local function refresh(session: Session)
 		-- drop that still needs it you carry it on (with one light piece in hand Take out gives you a second).
 		local loadable = plan == nil or plan.stage == "pickup" or session.moved >= neededNow(session)
 		carPrompt.Enabled = (takeOut or (heldCount(session) > 0 and loadable)) and not backShut(session)
-		carPrompt.ActionText = if takeOut then (if horse then "Lead out" else "Take out") else (if horse then "Lead in" else "Load")
+		if pallet then
+			carPrompt.ActionText = if takeOut then "Unload pallet" else "Load pallet"
+		elseif trolley then
+			carPrompt.ActionText = if takeOut then "Take out" else "Load all"
+		else
+			carPrompt.ActionText = if takeOut then (if horse then "Lead out" else "Take out") else (if horse then "Lead in" else "Load")
+		end
 		carPrompt.ObjectText = `{capital(Vehicles.cargoNoun(car))}: {#session.load} inside`
 	end
 	-- 3.2: one E at the back at a time. A piece put down that goes into the vehicle is picked up again only once the
 	-- back is open; the BackPrompt (the same spot as the Load prompt) waits while the Load / Take out prompt or such a
-	-- piece has something to do.
+	-- piece has something to do. 4.0: the pieces on a tool set down have no prompt (they come with the tool); a pallet
+	-- waits on the dock, far from the back: lifted any time.
 	local intoCar = plan ~= nil and (plan.stage == "pickup" or session.moved >= neededNow(session))
 	local shut = backShut(session)
+	local jack = pallet and crewPushes(session, "jack")
 	for _, loose in session.loose do
-		loose.prompt.Enabled = not (intoCar and shut)
+		loose.prompt.Enabled = loose.tool == nil and (pallet or not (intoCar and shut))
+		if pallet then
+			loose.prompt.ActionText = if jack then "Lift pallet" else "Too heavy: use a pallet jack"
+		elseif loose.handle == nil then
+			loose.prompt.ActionText = if trolley then "Load onto trolley" else "Pick up"
+		end
 	end
 	local backPrompt = car and Vehicles.backPrompt(car)
 	if backPrompt then
-		backPrompt.Enabled = not (carPrompt ~= nil and carPrompt.Enabled) and not (intoCar and not shut and #session.loose > 0)
+		local nearBack = if pallet then 0 else looseOnGround(session)
+		backPrompt.Enabled = not (carPrompt ~= nil and carPrompt.Enabled) and not (intoCar and not shut and nearBack > 0)
 	end
 	local pilePrompt = session.pilePrompt
 	if pilePrompt and plan then
 		if plan.stage == "pickup" then
 			pilePrompt.Enabled = #session.pile > 0 and not session.blocked
 			pilePrompt.ObjectText = `{capital(if horse then "horse" else session.info.piece)} ({#session.pile} left)`
+			pilePrompt.ActionText = if horse then "Lead" elseif trolley then "Load onto trolley" else "Pick up"
 		else
 			pilePrompt.Enabled = session.moved < neededNow(session) and not session.blocked
 			pilePrompt.ObjectText = if plan.person then plan.person.name else "Receiver"
+			pilePrompt.ActionText = if pallet then "Set down pallet" else "Hand over"
 		end
 	end
+end
+
+-- 4.0: where `count` pallets stand in the vehicle, relative to its chassis: its own pallet places (Attachments
+-- PalletSlot1, PalletSlot2 … on the chassis, if a body has them), else the middle of its 2×2 slot groups (slots 1–4,
+-- 5–8 …; Freight.palletSpots), then a row behind. Kept generic for a trailer later.
+local function palletFrames(car: Vehicles.Car, count: number): { CFrame }
+	local out: { CFrame } = {}
+	local own = true
+	for index = 1, count do
+		local slot = car.chassis:FindFirstChild(`PalletSlot{index}`)
+		if not slot or not slot:IsA("Attachment") then
+			own = false
+			break
+		end
+		table.insert(out, slot.CFrame)
+	end
+	if own then
+		return out
+	end
+	table.clear(out)
+	local points: { Freight.Point } = {}
+	for _, slot in Vehicles.cargoSlots(car) do
+		table.insert(points, { x = slot.Position.X, y = slot.Position.Y, z = slot.Position.Z })
+	end
+	for _, spot in Freight.palletSpots(points, count) do
+		table.insert(out, CFrame.new(spot.x, spot.y, spot.z))
+	end
+	for _ = #out + 1, count do
+		table.insert(out, CFrame.new(0, car.size.Y / 2, 0)) -- a vehicle without cargo slots: on the chassis
+	end
+	return out
 end
 
 -- Show the load in the vehicle: every piece in its slot (the horses in their stalls).
@@ -1108,6 +1239,17 @@ local function render(session: Session)
 	end
 	car.model:SetAttribute("CargoCount", #session.load)
 	car.model:SetAttribute("CargoKind", if #session.load > 0 then session.info.kind else nil)
+	if isPallet(session) then
+		-- 4.0: the pallets on the floor, in their places (palletFrames).
+		local frames = palletFrames(car, #session.load)
+		for index, piece in session.load do
+			local model = buildLook(piece.look, piece.variant)
+			weldTo(model, car.chassis, car.chassis.CFrame * frames[index])
+			model.Parent = car.model
+			table.insert(session.shown, model)
+		end
+		return
+	end
 	local slots = Vehicles.cargoSlots(car)
 	for index, piece in session.load do
 		local slot = slots[index]
@@ -1217,11 +1359,45 @@ local function clearHeld(session: Session, player: Player): Held?
 	if held.prompt then
 		held.prompt:Destroy()
 	end
+	if held.tool and Equipment.pushing(player) == held.tool then
+		Equipment.restore(player) -- 4.0: still pushing it, empty now
+	end
 	return held
 end
 
 local onLoose: (Session, Player, Loose) -> ()
 local putDown: (Session, Player, boolean?) -> ()
+
+-- 4.0: the pieces on a trolley's toe plate (side by side, then on top: Freight.trolleyStack) or the pallet on a jack's
+-- forks, from the tool's deck (Equipment.deck). Welded to the tool (`weld`) while it is pushed, else standing there.
+local function stackOnTool(tool: Equipment.Tool, pieces: { Piece }, weld: boolean)
+	local base, deck = Equipment.deck(tool)
+	local heights: { number } = {}
+	for _, piece in pieces do
+		local model = piece.model or buildPiece(piece)
+		piece.model = model
+		local h = pieceSize(model)
+		table.insert(heights, h)
+	end
+	local spots = Freight.trolleyStack(heights)
+	for index, piece in pieces do
+		local model = piece.model :: Model
+		local _, depth = pieceSize(model)
+		-- A pallet's top boards rest on the forks (its stringers clear the ground); a piece stands on the toe plate
+		-- against the frame.
+		local at = if tool.kind == "jack" then deck * CFrame.new(0, -0.33, 0) else deck * CFrame.new(spots[index].x, spots[index].y, -(depth / 2 + 0.1))
+		if weld and base then
+			weldTo(model, base, at)
+		else
+			setDown(model, at)
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") then
+					d.CanCollide = false
+				end
+			end
+		end
+	end
+end
 
 -- 3.7: the hands changed: the pieces stacked, the Put down (Let go) prompt on the top one, the character's attributes
 -- (Carrying = the kind, CarryCount, CarryHands = 1 while a light piece leaves a hand free, CarrySpeed with two).
@@ -1232,6 +1408,17 @@ local function armHands(session: Session, player: Player, held: Held)
 	end
 	local count = #held.pieces
 	local top = held.pieces[count]
+	local tool = held.tool
+	if tool then
+		-- 4.0: on the trolley or the jack (its own G sets it down): a hand stays free for the back's doors.
+		stackOnTool(tool, held.pieces, true)
+		local character = held.character
+		character:SetAttribute("Carrying", top.kind)
+		character:SetAttribute("CarryCount", count)
+		character:SetAttribute("CarryHands", 1)
+		character:SetAttribute("CarrySpeed", Freight.walkSpeed(tool.kind, count))
+		return
+	end
 	local made: ProximityPrompt? = nil
 	local horse = top.horse
 	if horse then
@@ -1291,8 +1478,12 @@ local function take(session: Session, player: Player, piece: Piece): boolean
 		return false
 	end
 	local existing = session.held[player]
-	if existing and (existing.character ~= character or piece.horse or existing.pieces[1].horse or #existing.pieces >= handsMax(session)) then
+	local tool = Equipment.pushing(player)
+	if existing and (existing.character ~= character or existing.tool ~= tool or piece.horse or existing.pieces[1].horse or #existing.pieces >= handsMax(session, player)) then
 		return false
+	end
+	if handsMax(session, player) <= 0 then
+		return false -- 4.0: a pallet without a jack, a crate on a jack, a horse on a trolley (handsFull said why)
 	end
 	local horse = piece.horse
 	if horse then
@@ -1303,7 +1494,7 @@ local function take(session: Session, player: Player, piece: Piece): boolean
 		piece.model = model
 		model.Parent = folder
 	end
-	local held: Held = existing or { pieces = {}, character = character, root = root, prompt = nil, last = root.CFrame }
+	local held: Held = existing or { pieces = {}, character = character, root = root, prompt = nil, last = root.CFrame, tool = tool }
 	session.held[player] = held
 	table.insert(held.pieces, piece)
 	armHands(session, player, held)
@@ -1340,6 +1531,15 @@ putDown = function(session: Session, player: Player, all: boolean?)
 	local held = session.held[player]
 	if not held then
 		return
+	end
+	if held.tool then
+		-- 4.0: the tool goes down with everything on it (Equipment.released → toolReleased puts them there).
+		if Equipment.pushing(player) == held.tool then
+			Equipment.setDown(player)
+			return
+		end
+		held.tool = nil -- (not pushed any more: they all go on the ground below)
+		all = true
 	end
 	local last = held.last
 	for _ = 1, if all then #held.pieces else 1 do
@@ -1422,16 +1622,30 @@ local function updatePair(session: Session): boolean
 end
 
 -- Can the player not take another piece of this job (3.7: one light piece in hand leaves room for a second)?
+-- 4.0: on a trolley up to TrolleyPieces, on a jack one pallet; a pallet never by hand (Freight.refusal says why).
 local function handsFull(session: Session, player: Player): boolean
-	local held = session.held[player]
-	if held then
-		if #held.pieces < handsMax(session) then
-			return false
-		end
-		tell(player, if #held.pieces > 1 then `Your hands are full: two {session.info.plural}.` else "Your hands are full.")
+	local info = session.info
+	local tool = toolOf(player)
+	local max = handsMax(session, player)
+	if max <= 0 then
+		tell(player, Freight.refusal(info.kind, info.lift, info.pair, tool))
 		return true
 	end
-	if not Cargo.carrying(player.Character) then
+	local held = session.held[player]
+	if held then
+		if #held.pieces < max then
+			return false
+		end
+		if tool == "jack" then
+			tell(player, "The jack carries one pallet at a time.")
+		elseif tool == "trolley" then
+			tell(player, `The trolley is full: {#held.pieces} {info.plural}.`)
+		else
+			tell(player, if #held.pieces > 1 then `Your hands are full: two {info.plural}.` else "Your hands are full.")
+		end
+		return true
+	end
+	if tool or not Cargo.carrying(player.Character) then
 		return false
 	end
 	tell(player, "Your hands are full.")
@@ -1439,7 +1653,7 @@ local function handsFull(session: Session, player: Player): boolean
 end
 
 onLoose = function(session: Session, player: Player, loose: Loose)
-	if not allowed(session, player) or handsFull(session, player) or pairRefused(session, player) then
+	if loose.tool or not allowed(session, player) or handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
 	if not table.find(session.loose, loose) or not take(session, player, loose.piece) then
@@ -1465,6 +1679,16 @@ local function stackFrame(plan: Plan, index: number, side: number): CFrame
 	local spot = plan.pile + right * side * (3 + col * 2.8) - plan.facing * (row * 2.8 + 0.5)
 	spot = onGround(spot)
 	return CFrame.lookAt(spot, spot + plan.facing) * CFrame.Angles(0, math.rad(rng:NextNumber(-12, 12)), 0)
+end
+
+-- 4.0: where pallet `index` stands at a stop: its staging spot (the dock, the receiving pad), else in a row beside the
+-- person.
+local function palletSpot(plan: Plan, index: number): CFrame
+	local staging = plan.staging
+	local right = plan.facing:Cross(Vector3.yAxis)
+	local spot = if staging and #staging > 0 then staging[(index - 1) % #staging + 1] else plan.pile + right * (4 + (index - 1) * 4.6)
+	spot = onGround(spot)
+	return CFrame.lookAt(spot, spot + plan.facing)
 end
 
 local function handOver(session: Session, player: Player)
@@ -1498,7 +1722,7 @@ local function handOver(session: Session, player: Player)
 		else
 			local model = piece.model or buildPiece(piece)
 			piece.model = nil
-			setDown(model, stackFrame(plan, session.moved, -1))
+			setDown(model, if isPallet(session) then palletSpot(plan, session.moved) else stackFrame(plan, session.moved, -1))
 			table.insert(session.props, model)
 		end
 	end
@@ -1529,7 +1753,9 @@ local function onPile(session: Session, player: Player)
 	if plan.stage == "drop" then
 		if not session.held[player] then
 			local car = session.car
-			tell(player, `Take {article(session.info.piece)} out of the {if car then Vehicles.cargoNoun(car) else "vehicle"} first (E at the back).`)
+			local noun = if car then Vehicles.cargoNoun(car) else "vehicle"
+			tell(player, if isPallet(session) then `Unload a pallet from the {noun} onto a pallet jack first (E at the back).`
+				else `Take {article(session.info.piece)} out of the {noun} first (E at the back).`)
 			return
 		end
 		handOver(session, player)
@@ -1539,15 +1765,25 @@ local function onPile(session: Session, player: Player)
 	if handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
-	local piece = table.remove(session.pile)
-	if not piece then
-		return
-	end
-	if take(session, player, piece) then
-		say(session.person, if piece.horse then line(LINES.horse) else line(LINES.take))
-	else
-		table.insert(session.pile, piece)
-	end
+	-- 4.0: onto a trolley as many as fit at once (the hands: one).
+	local loaded = 0
+	repeat
+		local piece = table.remove(session.pile)
+		if not piece then
+			break
+		end
+		if take(session, player, piece) then
+			loaded += 1
+			if loaded == 1 then
+				say(session.person, if piece.horse then line(LINES.horse) else line(LINES.take))
+			end
+		else
+			table.insert(session.pile, piece)
+			break
+		end
+		local held = session.held[player]
+	until not held or not held.tool or #held.pieces >= handsMax(session, player)
+	refresh(session)
 	session.info.changed()
 end
 
@@ -1564,18 +1800,46 @@ local function onCar(session: Session, player: Player)
 		return
 	end
 	local held = session.held[player]
+	local pallet = isPallet(session)
+	local noun = Vehicles.cargoNoun(car)
 	if backShut(session) then
 		-- 3.2: only through an open back (a race with somebody closing it). 3.7: a light piece leaves a hand free.
+		-- 4.0: so does a tool (one hand on its handle).
 		local open = Vehicles.backVerb(car, true)
-		local full = held ~= nil and (#held.pieces > 1 or handsMax(session) == 1)
+		local full = held ~= nil and held.tool == nil and (#held.pieces > 1 or handsMax(session) == 1)
 		tell(player, if full then `Put it down (G) and {open} (E).` else `{capital(open)} first (E).`)
 		return
 	end
-	local handling = plan ~= nil and plan.stage == "drop" and (plan.mode == "carry" or plan.mode == "lead")
+	local handling = plan ~= nil and plan.stage == "drop" and handled(plan.mode)
 	if held and (not handling or session.moved >= neededNow(session)) then
-		clearHeld(session, player)
+		-- 4.0: as many as the vehicle has room for (a pallet: only a vehicle that takes pallets); the rest stay on
+		-- the trolley. The hands' pieces go in as before.
+		local moving: { Piece } = held.pieces
+		if held.tool then
+			local room = if pallet then Freight.palletRoom(Freight.palletsOf(car.id, car.stage), #session.load)
+				else Freight.pieceRoom(Vehicles.capacity(car), #session.load)
+			if room <= 0 then
+				local takes = if pallet then Freight.palletsOf(car.id, car.stage) else 0
+				tell(player, if pallet and takes <= 0 then `This {noun} takes no pallets. {Freight.palletAdvice(1)}`
+					elseif pallet then `The {noun} is full: it takes {takes} {if takes == 1 then "pallet" else "pallets"}.`
+					else `The {noun} is full.`)
+				return
+			end
+			moving = {}
+			for _ = 1, math.min(room, #held.pieces) do
+				local piece = release(session, player)
+				if piece then
+					table.insert(moving, 1, piece)
+				end
+			end
+			if session.held[player] then
+				tell(player, `The {noun} is full: {#(session.held[player] :: Held).pieces} stay on the trolley.`)
+			end
+		else
+			clearHeld(session, player)
+		end
 		local before = session.moved
-		for _, piece in held.pieces do
+		for _, piece in moving do
 			local horse = piece.horse
 			if horse then
 				Animals.lead(horse, nil)
@@ -1607,11 +1871,18 @@ local function onCar(session: Session, player: Player)
 		end
 		local who = if plan.person then plan.person.name else "the receiver"
 		if #session.load == 0 then
-			tell(player, `The {Vehicles.cargoNoun(car)} is empty.`)
+			tell(player, `The {noun} is empty.`)
 			return
 		end
-		if held and #held.pieces >= handsMax(session) then
-			tell(player, `Hands full: carry {if #held.pieces > 1 then "them" else "it"} to {who} (E).`)
+		local max = handsMax(session, player)
+		if max <= 0 then
+			tell(player, Freight.refusal(session.info.kind, session.info.lift, session.info.pair, toolOf(player)))
+			return
+		end
+		if held and #held.pieces >= max then
+			tell(player, if pallet then `The jack carries one pallet: set it down at the receiving dock (E).`
+				elseif held.tool then `The trolley is full: push it to {who} (E).`
+				else `Hands full: carry {if #held.pieces > 1 then "them" else "it"} to {who} (E).`)
 			return
 		end
 		if not toTakeOut(session) then
@@ -1621,24 +1892,29 @@ local function onCar(session: Session, player: Player)
 		if pairRefused(session, player) then
 			return
 		end
-		local piece = table.remove(session.load) :: Piece
-		render(session)
-		local horse = piece.horse
-		if horse then
-			-- Down the ramp: the horse stands behind the truck, on the rope.
-			Animals.stable(horse, nil)
-			local behind = (car.chassis.CFrame * CFrame.new(0, 0, car.size.Z / 2 + 5)).Position
-			local spot = onGround(Vector3.new(behind.X, car.chassis.Position.Y - 2, behind.Z))
-			Animals.stable(horse, CFrame.lookAt(spot, spot + car.chassis.CFrame.LookVector)) -- hooves at spot, anchored
-		end
-		if not take(session, player, piece) then
-			table.insert(session.load, piece)
+		-- One piece (3.7: a second light one into a free hand); 4.0: onto a trolley as many as fit and are needed.
+		repeat
+			local piece = table.remove(session.load) :: Piece
 			render(session)
-		end
+			local horse = piece.horse
+			if horse then
+				-- Down the ramp: the horse stands behind the truck, on the rope.
+				Animals.stable(horse, nil)
+				local behind = (car.chassis.CFrame * CFrame.new(0, 0, car.size.Z / 2 + 5)).Position
+				local spot = onGround(Vector3.new(behind.X, car.chassis.Position.Y - 2, behind.Z))
+				Animals.stable(horse, CFrame.lookAt(spot, spot + car.chassis.CFrame.LookVector)) -- hooves at spot, anchored
+			end
+			if not take(session, player, piece) then
+				table.insert(session.load, piece)
+				render(session)
+				break
+			end
+			local now = session.held[player]
+		until not now or not now.tool or #now.pieces >= max or not toTakeOut(session)
 		session.info.changed()
 		return
 	end
-	tell(player, `Pick up {article(session.info.piece)} first.`)
+	tell(player, if pallet then "Lift a pallet with a pallet jack first." else `Pick up {article(session.info.piece)} first.`)
 end
 
 local function attachCar(session: Session, old: Vehicles.Car?)
@@ -1684,7 +1960,27 @@ local function build(session: Session)
 		session.person = npc
 		table.insert(session.props, npc)
 	end
-	if plan.mode == "carry" or plan.mode == "lead" then
+	local pallet = plan.mode == "pallet"
+	if pallet and plan.stage == "pickup" then
+		-- 4.0: the pallets wait on the dock (Plan.staging), each with its own "Lift pallet" (a Loose piece: lifted with
+		-- a jack, loaded, counted like every piece put down).
+		for n = 1, plan.needed do
+			local piece = newPiece(session)
+			local model = buildPiece(piece)
+			setDown(model, palletSpot(plan, n))
+			piece.model = model
+			local main = model.PrimaryPart :: BasePart
+			local loose: Loose = { piece = piece, prompt = prompt(main, "Lift pallet", "Pallet", nil, holdFor(session)), handle = nil, tool = nil }
+			loose.prompt.MaxActivationDistance = Tuning.PromptDistance - 2
+			loose.prompt.Triggered:Connect(function(by)
+				onLoose(session, by, loose)
+			end)
+			table.insert(session.loose, loose)
+		end
+		refresh(session)
+		return
+	end
+	if handled(plan.mode) then
 		local part = Instance.new("Part")
 		part.Name = "CargoPile"
 		part.Size = Vector3.new(1, 1, 1)
@@ -1694,11 +1990,20 @@ local function build(session: Session)
 		part.CanQuery = false
 		part.CanTouch = false
 		part.Position = base + right * 1.5 + Vector3.new(0, 2.5, 0)
+		local staging = plan.staging
+		if pallet and staging and #staging > 0 then
+			-- The receiving dock's pad: "Set down pallet" in its middle.
+			local middle = Vector3.zero
+			for _, spot in staging do
+				middle += spot
+			end
+			part.Position = onGround(middle / #staging) + Vector3.new(0, 2.5, 0)
+		end
 		part.Parent = folder
 		session.pilePart = part
 		table.insert(session.props, part)
 		local horse = plan.mode == "lead"
-		local action = if plan.stage == "pickup" then (if horse then "Lead" else "Pick up") else "Hand over"
+		local action = if plan.stage == "pickup" then (if horse then "Lead" else "Pick up") elseif pallet then "Set down pallet" else "Hand over"
 		local p = prompt(part, action, "", nil, holdFor(session))
 		p.MaxActivationDistance = Tuning.PromptDistance + 2
 		p.Triggered:Connect(function(player)
@@ -2052,6 +2357,7 @@ function Cargo.update(session: Session, dt: number)
 		local root = rootOf(character)
 		local fine = player.Parent ~= nil and player.Character == character and humanoid ~= nil and humanoid.Health > 0 and root ~= nil and humanoid.SeatPart == nil
 			and session.info.allowed(player) -- left or was removed from the crew: put it down
+			and (held.tool == nil or (Equipment.pushing(player) == held.tool and root == held.root)) -- 4.0: the tool let go
 		if fine and root then
 			if root ~= held.root then
 				-- The body was rebuilt (the avatar loaded): hold it in the new one.
@@ -2092,8 +2398,10 @@ function Cargo.update(session: Session, dt: number)
 	end
 	if session.built and not session.greeted and position and flat(position, plan.pile) < 45 then
 		session.greeted = true
-		local handling = plan.mode == "carry" or plan.mode == "lead"
-		if plan.stage == "pickup" and handling then
+		local handling = handled(plan.mode)
+		if plan.mode == "pallet" then
+			say(session.person, if plan.stage == "pickup" then `{plan.needed} {if plan.needed == 1 then "pallet" else "pallets"} on the dock. Grab a pallet jack!` else "Set them down on the marked pad, please!")
+		elseif plan.stage == "pickup" and handling then
 			say(session.person, if plan.needed == 1 then `Over here! One {session.info.piece}, handle it with care.` else `Over here! {plan.needed} {session.info.plural} to load.`)
 		elseif plan.stage == "drop" and handling then
 			say(session.person, "Finally! Bring it over here.")
@@ -2178,7 +2486,7 @@ end
 function Cargo.status(session: Session): Status
 	local plan = session.plan
 	local held = session.held[session.owner]
-	local handling = plan ~= nil and (plan.mode == "carry" or plan.mode == "lead")
+	local handling = plan ~= nil and handled(plan.mode)
 	local progress = 0
 	if plan and plan.mode == "serve" then
 		progress = math.clamp(session.hold / math.max(plan.hold, 0.1), 0, 1)
@@ -2210,6 +2518,164 @@ function Cargo.status(session: Session): Status
 	}
 end
 
+-- 4.0: the hints with a trolley or a pallet jack, and every step of a pallet stop (Cargo.step asks first). Nil: the
+-- usual hints. The handling is "drive" or "carry" (the HUD knows those: a pallet stop is carried, on a jack).
+local function toolStep(session: Session, plan: Plan, near: boolean): (string?, string?)
+	local owner = session.owner
+	local tool = Equipment.pushing(owner)
+	local pallet = plan.mode == "pallet"
+	local pickup = plan.stage == "pickup"
+	local held = session.held[owner]
+	local car = session.car
+	local noun = if car then Vehicles.cargoNoun(car) else "vehicle"
+	local circle = if pickup then "blue" else "yellow"
+	local seatedCar = Vehicles.seatedIn(owner)
+	local who = if plan.person then plan.person.name else "the receiver"
+	local shut = car ~= nil and backShut(session)
+	local open = if car then Vehicles.backVerb(car, true) else "open the back"
+	local kind = if tool then tool.kind else nil
+	local name = if kind == "jack" then "pallet jack" else "trolley"
+	local count = if held and held.tool then #held.pieces else 0
+	local onTool = #session.loose - looseOnGround(session) -- pieces on a tool set down somewhere
+	local here = if near then "carry" else "drive"
+	local info = session.info
+	-- Putting a tool away: at its home G does it; a car's own goes back into the car, a dock's jack is set down.
+	local function putAway(): string
+		if Equipment.atHome(owner) then
+			return if tool and tool.spot then "Park the pallet jack (G)" else `Stow the {name} (G)`
+		end
+		if tool and tool.owner ~= nil then
+			if shut and tool.owner == owner then
+				return `{capital(open)} (E), then stow the {name} inside (G)`
+			end
+			return `Push the {name} to the back of the {noun} and stow it (G)`
+		end
+		return `Set the {name} down (G)`
+	end
+	if tool then
+		if pallet and kind == "trolley" then
+			return here, `Pallets need a pallet jack: {string.lower(string.sub(putAway(), 1, 1))}{string.sub(putAway(), 2)}`
+		end
+		if not handled(plan.mode) then
+			return here, putAway()
+		end
+		if handsMax(session, owner) <= 0 then
+			return here, Freight.refusal(info.kind, info.lift, info.pair, kind)
+		end
+		if count == 0 and (not near or not backNeeded(session)) then
+			return here, putAway()
+		end
+	end
+	if not near then
+		if pallet and held == nil then
+			return "drive", if pickup then `Drive to the warehouse: back up to the loading dock (the {circle} circle)` else `Drive to the receiving dock (the {circle} circle)`
+		end
+		return nil, nil
+	end
+	local stage = `({session.moved}/{neededNow(session)} {if pickup then "loaded" else "delivered"})`
+	if pallet then
+		local dock = if pickup then "loading dock" else "receiving dock"
+		if seatedCar then
+			if not parkedCar(session) then
+				return "carry", `Back the truck up to the {dock}: park in the {circle} circle`
+			end
+			return "carry", if pickup then "Get out and take a pallet jack (E)" else "Get out and take a pallet jack (E): the dock's, or your truck's own"
+		end
+		if not pickup and not atStop(session) and session.moved < neededNow(session) then
+			if car and backOpen(session) then
+				return "carry", `{capital(Vehicles.backVerb(car, false))} (E), then back up to the {dock} (the {circle} circle)`
+			end
+			return "carry", `Back up to the {dock}: park in the {circle} circle`
+		end
+		if kind == "jack" and count > 0 then
+			if not pickup then
+				return "carry", `Push the pallet to the receiving dock: Set down pallet (E) {stage}`
+			end
+			if car and Freight.palletsOf(car.id, car.stage) <= 0 then
+				return "carry", `Your {noun} takes no pallets: a pallet needs a truck. Cancel and come back with one.`
+			end
+			if shut then
+				return "carry", `{capital(open)} (E), then push the pallet in`
+			end
+			return "carry", `Push the pallet into the {noun}: Load pallet (E) {stage}`
+		end
+		if onTool > 0 then
+			return "carry", if kind == "jack" then "A pallet waits on another jack: set this one down (G) and take that one (E)" else "Take the pallet jack again (E): a pallet is on it"
+		end
+		if pickup then
+			if looseOnGround(session) > 0 then
+				return "carry", if kind == "jack" then `Lift a pallet with the jack (E) {stage}` else "Take a pallet jack (E), then lift a pallet (E)"
+			end
+			return "carry", "Wait for your crew to load"
+		end
+		if #session.load > 0 and session.moved < neededNow(session) then
+			if kind ~= "jack" then
+				return "carry", "Take a pallet jack (E): the dock's, or your truck's own"
+			end
+			if shut then
+				return "carry", `{capital(open)} (E), then unload a pallet`
+			end
+			return "carry", `Pull a pallet out onto the jack: Unload pallet (E) {stage}`
+		end
+		return "carry", "Wait for your crew"
+	end
+	if plan.mode ~= "carry" or seatedCar then
+		return nil, nil
+	end
+	local plural = info.plural
+	local piece = info.piece
+	if kind == "trolley" then
+		local max = handsMax(session, owner)
+		if pickup then
+			if count > 0 then
+				if #session.pile > 0 and count < max then
+					return "carry", `Load more onto the trolley (E) at {who} ({count}/{max}), or push it to the {noun}`
+				elseif looseOnGround(session) > 0 and count < max then
+					return "carry", `Load the {piece} you put down onto the trolley (E)`
+				elseif shut then
+					return "carry", `{capital(open)} (E), then Load all (E)`
+				end
+				return "carry", `Push the trolley to the back: Load all into the {noun} (E)`
+			end
+			if #session.pile > 0 then
+				return "carry", `Load the {plural} onto the trolley (E) at {who}`
+			elseif looseOnGround(session) > 0 then
+				return "carry", `Load the {piece} you put down onto the trolley (E)`
+			end
+			return nil, nil
+		end
+		if count > 0 then
+			if toTakeOut(session) and count < max then
+				return "carry", `Push the trolley to {who}: Hand over (E), or take out more (E)`
+			end
+			return "carry", `Push the trolley to {who}: Hand over (E)`
+		end
+		if looseOnGround(session) > 0 then
+			return "carry", `Load the {piece} you put down onto the trolley (E)`
+		end
+		if #session.load > 0 and session.moved < neededNow(session) and atStop(session) then
+			return "carry", if shut then `{capital(open)} (E), then take them out onto the trolley` else `Take the {plural} out onto the trolley (E)`
+		end
+		return nil, nil
+	end
+	if kind or held then
+		return nil, nil
+	end
+	-- On foot with empty hands: the trolley left somewhere with pieces on it, or the car's trolley would help.
+	if onTool > 0 then
+		return "carry", `Take the trolley again (E): {onTool} {if onTool == 1 then piece else plural} on it`
+	end
+	local trolley = Equipment.trolleyOf(owner)
+	if trolley and trolley.state == "home" and Freight.trolleyTakes(info.kind, info.lift, info.pair) then
+		if pickup and #session.pile >= 3 then
+			return "carry", `Take the trolley (E at the back of the {noun}) for {math.min(#session.pile, Tuning.TrolleyPieces)} at once, or pick up {article(piece)} (E)`
+		elseif not pickup and atStop(session) and #session.load >= 3 and session.moved + 3 <= neededNow(session) then
+			return "carry", `Take the trolley (E at the back of the {noun}), then take the {plural} out onto it`
+		end
+	end
+	return nil, nil
+end
+
 -- What to do now, for the HUD: (handling, step). handling = drive | carry | lead | board | serve.
 function Cargo.step(session: Session): (string, string)
 	local plan = session.plan
@@ -2225,20 +2691,25 @@ function Cargo.step(session: Session): (string, string)
 	local position = ownerPosition(session)
 	local near = position ~= nil and flat(position, plan.park) < Tuning.ApproachDistance
 	if session.blocked and near then
-		return plan.mode, blockedText(session)
+		return if plan.mode == "pallet" then "carry" else plan.mode, blockedText(session)
+	end
+	-- 4.0: a trolley, a pallet jack, the pallets: their own hints first.
+	local toolHandling, toolText = toolStep(session, plan, near)
+	if toolHandling and toolText then
+		return toolHandling, toolText
 	end
 	-- 3.2: the back is open and nothing more goes in or out here: close it, the car does not drive open. A serve or
 	-- board stop needs no back: its own hint first while near, the nag once away.
 	local noBack = plan.mode == "serve" or plan.mode == "board"
 	if car and backOpen(session) and not held and (not near or (not noBack and not backNeeded(session))) then
 		local close = capital(Vehicles.backVerb(car, false))
-		return if near then plan.mode else "drive", if seatedCar then `Get out and {Vehicles.backVerb(car, false)} (E)` else `{close} (E), then drive on`
+		return if not near then "drive" elseif plan.mode == "pallet" then "carry" else plan.mode, if seatedCar then `Get out and {Vehicles.backVerb(car, false)} (E)` else `{close} (E), then drive on`
 	end
 	if not held and not near and heldCount(session) == 0 then
 		return "drive", `Drive to the {circle} circle`
 	end
 	local parked = parkedCar(session) ~= nil
-	local mode = plan.mode
+	local mode = if plan.mode == "pallet" then "carry" else plan.mode -- (the HUD knows carry)
 	local who = if plan.person then plan.person.name else "the receiver"
 	local piece = session.info.piece
 	if mode == "serve" then
@@ -2334,7 +2805,7 @@ end
 -- Is anybody of the job handling cargo on foot at the current stop (the enemies come on foot then)?
 function Cargo.onFoot(session: Session): boolean
 	local plan = session.plan
-	if not plan or (plan.mode ~= "carry" and plan.mode ~= "lead") then
+	if not plan or not handled(plan.mode) then
 		return false
 	end
 	if heldCount(session) > 0 then
@@ -2515,6 +2986,133 @@ function Cargo.start()
 		created.Parent = workspace
 		folder = created
 	end
+
+	-- 4.0, the tools (server/Equipment.luau): the pieces on them are this module's, counted like any other.
+	local function changed(session: Session)
+		refresh(session)
+		session.info.changed()
+	end
+	-- The pieces on a tool set down stand on it (no prompt of their own: they come along with the tool).
+	local function placeOnTool(session: Session, tool: Equipment.Tool)
+		local pieces: { Piece } = {}
+		for _, loose in session.loose do
+			if loose.tool == tool then
+				table.insert(pieces, loose.piece)
+			end
+		end
+		if #pieces > 0 then
+			stackOnTool(tool, pieces, false)
+		end
+	end
+	Equipment.loadOf = function(tool: Equipment.Tool): number
+		local n = 0
+		for _, session in active do
+			for _, held in session.held do
+				if held.tool == tool then
+					n += #held.pieces
+				end
+			end
+			for _, loose in session.loose do
+				if loose.tool == tool then
+					n += 1
+				end
+			end
+		end
+		return n
+	end
+	Equipment.mayTake = function(player: Player, tool: Equipment.Tool): (boolean, string?)
+		local owner = tool.owner
+		if owner and owner ~= player then
+			local session = active[owner]
+			if not session or session.ended or not session.info.allowed(player) then
+				return false, `That is {owner.DisplayName}'s. Only their crew may use it.`
+			end
+		end
+		for _, session in active do
+			for _, loose in session.loose do
+				if loose.tool == tool and not session.info.allowed(player) then
+					return false, "What is on it is somebody else's delivery."
+				end
+			end
+		end
+		return true, nil
+	end
+	-- Taken: what was left on it comes along (the player's Held on the tool).
+	Equipment.taken = function(player: Player, tool: Equipment.Tool)
+		for _, session in active do
+			if session.ended then
+				continue
+			end
+			local touched = false
+			for _, loose in table.clone(session.loose) do
+				if loose.tool ~= tool then
+					continue
+				end
+				touched = true
+				if session.info.allowed(player) and take(session, player, loose.piece) then
+					local index = table.find(session.loose, loose)
+					if index then
+						table.remove(session.loose, index)
+					end
+					loose.prompt:Destroy()
+				else
+					-- (mayTake checked it: should not happen) it stays, on the ground instead
+					loose.tool = nil
+					local model = loose.piece.model
+					if model then
+						setDown(model, dropFrame(session, tool.last + Vector3.new(0, 3, 0))) -- (dropFrame wants a root's height)
+					end
+				end
+			end
+			if touched or session.info.allowed(player) then
+				changed(session)
+			end
+		end
+	end
+	-- Set down (G, death, leaving, sitting): what is on it stays on it, as pieces put down.
+	Equipment.released = function(player: Player, tool: Equipment.Tool)
+		for _, session in active do
+			local held = session.held[player]
+			if held and held.tool == tool then
+				clearHeld(session, player)
+				for _, piece in held.pieces do
+					local model = piece.model or buildPiece(piece)
+					piece.model = model
+					local main = model.PrimaryPart :: BasePart
+					local loose: Loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece), nil, holdFor(session)), handle = nil, tool = tool }
+					loose.prompt.Enabled = false
+					loose.prompt.Triggered:Connect(function(by)
+						onLoose(session, by, loose)
+					end)
+					table.insert(session.loose, loose)
+				end
+				placeOnTool(session, tool)
+				changed(session)
+			elseif not session.ended and session.info.allowed(player) then
+				refresh(session) -- (the prompts' words: no trolley any more)
+			end
+		end
+	end
+	-- Going home on its own: what is on it goes on the ground where it stood.
+	Equipment.returned = function(tool: Equipment.Tool)
+		for _, session in active do
+			local touched = false
+			for _, loose in session.loose do
+				if loose.tool == tool then
+					loose.tool = nil
+					touched = true
+					local model = loose.piece.model
+					if model then
+						setDown(model, dropFrame(session, tool.last + Vector3.new(0, 3, 0))) -- (dropFrame wants a root's height)
+					end
+				end
+			end
+			if touched then
+				changed(session)
+			end
+		end
+	end
+	Equipment.start()
 end
 
 return Cargo

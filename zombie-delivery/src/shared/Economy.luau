@@ -295,6 +295,88 @@ function Economy.legacyStage(carId: string, rack: number): number
 	return best
 end
 
+-- 4.0: the Old Van got two more stages (Rusty → Patched → Work → Long Cargo). A save from 3.5 – 3.10 (before the
+-- profile's vanStages mark) keeps the room it had: its stage then becomes the first stage now that holds as many slots
+-- (the old stages' capacities below: Work 3 → the Work Van, Cargo 4 → the Long Cargo Van). Cars not listed keep their
+-- stage. (A 3.4 save goes through legacyStage instead, already on the new stages.)
+local STAGES_39: { [string]: { number } } = {
+	van = { 2, 3, 4 },
+}
+
+function Economy.migrateStage40(carId: string, stage: number): number
+	local old = STAGES_39[carId]
+	if not old or stage <= 0 then
+		return stage
+	end
+	local had = old[math.min(math.floor(stage), #old - 1) + 1]
+	for next = 0, Economy.maxStage(carId) do
+		if Economy.stageCapacity(carId, next) >= had then
+			return math.max(next, math.min(math.floor(stage), Economy.maxStage(carId)))
+		end
+	end
+	return Economy.maxStage(carId)
+end
+
+-- 4.0, freight: the pallets a car takes at a stage (StageDef.pallets wins over CarDef.pallets; 0: none).
+function Economy.palletsOf(carId: string, stage: number?): number
+	local def = Economy.findCar(carId)
+	if not def then
+		return 0
+	end
+	local stageDef = Economy.stageDef(carId, math.clamp(math.floor(stage or 0), 0, Economy.maxStage(carId)))
+	if stageDef and stageDef.pallets ~= nil then
+		return stageDef.pallets
+	end
+	return def.pallets or 0
+end
+
+-- 4.0: may this car take this car track? Every car you own takes them (Economy.canUpgrade), the Hand Trolley only
+-- the vans and trucks (CarDef.trolley).
+function Economy.upgradeFits(carId: string, upgradeId: string): boolean
+	local def = Economy.findCar(carId)
+	if not def or not Economy.canUpgrade(carId) then
+		return false
+	end
+	if upgradeId == "trolley" then
+		return def.trolley == true
+	end
+	return true
+end
+
+-- 4.0: does the car carry its Hand Trolley (bought, level 1, and a car that takes one)? The Attachment TrolleyMount
+-- and the folded trolley sit inside its back then (server/Vehicles.luau); server/Cargo.luau hands it out.
+function Economy.hasTrolley(carId: string, levels: Upgrades?): boolean
+	return levels ~= nil and Economy.level(levels, "trolley") >= 1 and Economy.upgradeFits(carId, "trolley")
+end
+
+-- 4.0, the torque curve of a car pulling away (client/Drive.luau): how much of its accel it has at `share` (0 … 1) of
+-- its top speed. A heavy van pulls away slowly from a standstill, is strongest in the mid-range and creeps up to its
+-- top speed: 0.55 at rest, up to 1.35 by a third of the top speed, flat to 70 %, down to 0.4 at the top.
+function Economy.torque(share: number): number
+	local s = math.clamp(share, 0, 1)
+	if s < 0.3 then
+		return 0.55 + (1.35 - 0.55) * s / 0.3
+	elseif s < 0.7 then
+		return 1.35
+	end
+	return 1.35 - (1.35 - 0.4) * (s - 0.7) / 0.3
+end
+
+-- 4.0: the seconds from a standstill to `share` (default 0.97) of the top speed on that curve (stepped like the
+-- client does, 60 times a second).
+function Economy.timeToTop(maxSpeed: number, accel: number, share: number?): number
+	if maxSpeed <= 0 or accel <= 0 then
+		return 0
+	end
+	local goal = maxSpeed * (share or 0.97)
+	local speed, t, dt = 0, 0, 1 / 60
+	while speed < goal and t < 120 do
+		speed = math.min(maxSpeed, speed + accel * Economy.torque(speed / maxSpeed) * dt)
+		t += dt
+	end
+	return t
+end
+
 -- What would make room for `need` pieces when this car (at `stage`) holds fewer: its first stage that holds them (built
 -- at Wrench Garage), else the dealer's cars that can (at some stage of theirs). For the "too big for your car" texts.
 function Economy.roomAdvice(carId: string, stage: number, need: number): string
@@ -346,16 +428,17 @@ function Economy.repairFee(missing: number): number
 end
 
 -- The car's stats with ITS car-track levels (3.3: Economy.carLevels of profile.carUpgrades).
--- 3.5: with its stage's small bonus (StageDef health, speed) before the upgrades multiply.
+-- 3.5: with its stage's small bonus (StageDef health, speed) before the upgrades multiply; 4.0: and its accel.
 function Economy.carStats(carId: string, upgrades: Upgrades): CarStats
 	local def = Economy.findCar(carId) or Config.Cars[1]
 	local engine = Economy.multiplier(upgrades, "engine")
 	local stage = Economy.stageDef(def.id, Economy.stageOf(def.id, upgrades))
 	local speed = def.maxSpeed + (if stage then stage.speed or 0 else 0)
+	local accel = def.accel + (if stage then stage.accel or 0 else 0)
 	local health = def.health + (if stage then stage.health or 0 else 0)
 	return {
 		maxSpeed = speed * engine,
-		accel = def.accel * engine,
+		accel = accel * engine,
 		turn = def.turn * Economy.multiplier(upgrades, "handling"),
 		health = math.floor(health * Economy.multiplier(upgrades, "armor")),
 		ramPower = def.ramPower * Economy.multiplier(upgrades, "plow"),

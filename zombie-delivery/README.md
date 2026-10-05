@@ -263,15 +263,15 @@ until then:
 
 | Level | Opens |
 |---|---|
-| 1 | the Old Van, the Pistol, ★ jobs, Pizza Rush, First Shift |
-| 2 | **the Courier Van** ($3,500), the Old Van's **Work Van** stage ($400, 3.5), ★★ jobs, School Run, Ice Cream Route, Code Red, **the Rented Lockup** ($2,500, 3.4) |
+| 1 | the Old Van, the Pistol, ★ jobs, Pizza Rush, First Shift, the Old Van's **Patched Van** stage ($250, 4.0) |
+| 2 | **the Courier Van** ($3,500), the Old Van's **Work Van** stage ($700, 4.0), ★★ jobs, School Run, Ice Cream Route, Code Red, **the Rented Lockup** ($2,500, 3.4) |
 | 3 | **the High-Roof Van** ($7,000), the Express Courier stage ($1,200), the SMG ($4,000), Moving Day, Ambulance Run |
-| 4 | **the Pickup** ($12,000), the Old Van's **Cargo Van** stage ($1,600, 3.5), the Shotgun ($7,500), ★★★ jobs, Fuel Run, Empty Shelves, the DUO campaign, **the Southside Garage** ($12,000, 3.4) |
+| 4 | **the Pickup** ($12,000), the Old Van's **Long Cargo Van** stage ($2,200, 4.0), the Shotgun ($7,500), ★★★ jobs, Fuel Run, Empty Shelves, the DUO campaign, **the Southside Garage** ($12,000, 3.4) |
 | 5 | the Tall Hauler stage ($3,000), the Roof Machine Gun ($9,000), Horse Transport, Cash Transport, the Harbor Lockup garage |
 | 6 | **the Box Truck** ($22,000), the Ranch Pickup stage ($2,500), the Hunting Rifle ($15,000), Smoke and Sirens, the Highway Garage, the Elm Bungalow |
 | 7 | ★★★★ INSANE jobs, Army Supply, Winter Run, Downtown Parking, Birch Cottage |
 | 8 | **the Muscle Car** ($40,000), the Liftgate Truck stage ($7,500), Farm Run (the Monster Truck), Iron Supply, 7 Oak Lane |
-| 9 | the Street Machine stage ($6,000), Lights Out, 12 Maple Street |
+| 9 | **the Freight Truck** ($45,000, 4.0), the Street Machine stage ($6,000), Lights Out, 12 Maple Street |
 | 10 | **the Armored Van** ($55,000), the Freight Hauler stage ($15,000), the Minigun ($40,000), the Roof Minigun ($45,000), Wild West End, the Sunset Villa |
 | 11 | the Fortress Van stage ($14,000), the Lakeside Villa |
 | 12 | **the Rally Van** ($80,000), the Grenade Launcher ($60,000), the Roof Grenade Launcher ($55,000), Patient Zero, the Harbor Point Office (+ Iron Supply finished) |
@@ -280,9 +280,10 @@ until then:
 | 15 | the Hilltop Mansion, the Dispatch Tower Penthouse (+ Last Convoy finished) |
 
 * **Cars**: the Old Van at 1 (free), the Courier Van at 2, the High-Roof Van at 3, the Pickup at 4, the Box Truck at 6,
-  the Muscle Car at 8, the Armored Van at 10 and the Rally Van at 12 (3.3; level and price rise together). The company
-  vehicles come with their employer's job level. The Wrench Garage upgrades cost twice their 3.1 price. 3.5: the
-  **stages** open by level too: the Work Van at 2, the Cargo Van at 4 (see **Stages and the cars' roles**).
+  the Muscle Car at 8, the Freight Truck at 9 (4.0), the Armored Van at 10 and the Rally Van at 12 (3.3; level and
+  price rise together). The company vehicles come with their employer's job level. The Wrench Garage upgrades cost
+  twice their 3.1 price. 3.5: the **stages** open by level too; 4.0: the Patched Van at 1, the Work Van at 2, the Long
+  Cargo Van at 4 (see **Stages and the cars' roles**).
 * **Guns**: Pistol 1, SMG 3, Shotgun 4, Hunting Rifle 6, Minigun 10, Grenade Launcher 12. **Car guns**: Roof Machine
   Gun 5, Roof Minigun 10, Roof Grenade Launcher 12.
 * **Real estate** (the endgame): garages 2 – 7 (3.4: the two small ones early), houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
@@ -401,6 +402,7 @@ Since 3.2 every vehicle that takes cargo by hand has a **back that opens** (`Sty
 | Vehicle | The back |
 |---|---|
 | Old Van, Courier Van, High-Roof Van, Box Truck, Armored Van, Rally Van, Ice Cream Truck, Armored Truck, Moving Truck, Ambulance | two rear doors |
+| Freight Truck (4.0) | a roll-up door (one slatted leaf that turns up and in under the roof: "Open roll-up door") |
 | Pickup, Monster Truck (new bed rails), Fuel Truck (the flatbed) | a tailgate |
 | Muscle Car | a trunk lid (the spoiler rides on it) |
 | Livestock Truck | a horse ramp down to the ground |
@@ -425,6 +427,41 @@ The loading at a **carry** or **lead** stop:
 The holds are short (`Config.Cargo.HoldDuration`), so the extra steps add a few seconds per stop. **board** stops
 (the bus, the ambulance's patients, the survivors) and **serve** stops (the ice cream) do not use the back.
 
+## Freight: the hand trolley, pallets and the warehouse (4.0)
+
+The rules are in `shared/Freight.luau` (pure, tested in `tests/freight_test.luau`), the tools in
+`server/Equipment.luau`, the pieces in `server/Cargo.luau`, the numbers in `Config.Cargo` (TrolleyPieces …
+PalletPay).
+
+- **The hand trolley** (a car with the Hand Trolley upgrade: its `TrolleyMount`). "Take trolley" (E) at the mount
+  while the back is open, at the back corner while it is shut. You push it (character attributes `Pushing =
+  "trolley"`, `Carrying`, `CarryHands = 1`, `CarrySpeed` 10 empty / 8.5 loaded): no gun, no sprint, a hand free for
+  the doors. "Load onto trolley" (E) at the pile loads as many as fit (4, any kind but people, horses and pallets;
+  not on a lift or pair mission), "Load all" at the open back puts them in (as many as there is room for), at a drop
+  "Take out" fills it and "Hand over" gives them all. **G**: at your car's open back "Stow trolley", anywhere else
+  "Set down trolley" (it stands there, its pieces on it, "Take trolley" again). Left with nobody within 40 studs it
+  goes back to the car after 60 s (its pieces go on the ground). Death, leaving and sitting set it down. The pieces
+  on a trolley count exactly like the ones in your hands (`Held.tool`) or put down (`Loose.tool`).
+- **Pallets** (the cargo kind `pallet`, about 4×4×4 of shrink-wrapped boxes) never go by hand ("Too heavy: use a
+  pallet jack"). **The pallet jack** (ještěrka): on the jack spots of the warehouse docks and of every receiving
+  dock, and in the Freight Truck (`JackMount`, inside its back). `Pushing = "jack"`, walk 6. "Lift pallet" (E), "Load
+  pallet" at the open back of a vehicle that takes pallets (`Economy.palletsOf`; a pallet uses 4 slots and stands on
+  its 2×2 slot group, or the chassis' `PalletSlotN` attachments if a body has them), at the drop "Unload pallet" and
+  "Set down pallet" on the receiving pad. G parks a dock's jack on its spot, stows the truck's, else sets it down; a
+  jack left alone goes back after 90 s.
+- **The Harbor Warehouse** is a freight hub (`Map.FreightDocks`): two loading docks with a raised dock floor (a
+  truck's load floor), ramps, dock plates and bumpers, painted bays, staging squares inside the doors, two jack
+  spots, forklifts and pallet racks. The old mission door and its cargo spot stay as they were (the forklift and
+  the lost package moved south). **Receiving docks** (`Map.ReceivingDocks`): FreshMart, Big Move Movers and the Power
+  Plant, a marked pad with a RECEIVING sign and the place's own jack.
+- **The Freight Run** (`Config.JobTypes` "freightrun", ★★★, level 6): 1 – 3 pallets from a dock to a receiving dock,
+  good pay (+ `PalletPay` a pallet). On every board from its level; without a vehicle that takes its pallets it shows
+  locked "NEEDS N PALLETS". Ordinary jobs with 4+ carried pieces say on their card that a trolley helps.
+- **Later: a semi truck with a trailer.** Nothing here is tied to one truck: a hub is a list of docks (a longer bay
+  is one more dock with its own park and staging), a vehicle says how many pallets it takes (`palletsOf`) and where
+  they stand (its slot groups or `PalletSlotN` attachments, else a row behind the last), and a trailer's body can
+  carry its own `JackMount`.
+
 ## The vans and the upgrades you can see
 
 Version 3.3 (`Config.Cars`, `Config.Upgrades`, server/Vehicles.luau `STYLES` and `buildKit`).
@@ -436,19 +473,20 @@ van, the high-roof van and the box truck also drive past in the traffic.
 
 | Car | Level | Price | Top speed | Health | Ram | Passengers | The look |
 |---|---|---|---|---|---|---|---|
-| Old Van | 1 | free | 60 | 300 | × 1.0 | 1 | the start (3.5: rusty, it grows in stages) |
+| Old Van | 1 | free | 42 (4.0; 60 before) | 300 | × 1.0 | 1 | the start (3.5: rusty, it grows in stages; 4.0: slow off the line, four stages) |
 | **Courier Van** | 2 | $3,500 | 70 | 320 | × 1.0 | 1 | compact and low, a sliding-door line, an amber light bar on the roof |
 | **High-Roof Van** | 3 | $7,000 | 62 | 450 | × 1.1 | 2 | a tall roof, windows down the box, a jump seat |
 | Pickup | 4 | $12,000 | 72 | 420 | × 1.15 | 3 | |
 | **Box Truck** | 6 | $22,000 | 64 | 650 | × 1.4 | 2 | a cab and a big separate box, a wind deflector, a red stripe |
 | Muscle Car | 8 | $40,000 | 95 | 340 | × 1.0 | 1 | |
+| **Freight Truck** (4.0) | 9 | $45,000 | 45 | 900 | × 2.0 | 1 | a cab-over truck with a long box, a roll-up door, twin rear tyres (see **Freight vehicles and the upgrades you see**) |
 | **Armored Van** | 10 | $55,000 | 74 | 900 | × 1.6 | 2 | steel plates on the box, the hood and the nose, grilles over the windows |
 | **Rally Van** | 12 | $80,000 | 98 | 420 | × 1.1 | 1 | lowered, big wheels under flares, stripes, a roof spoiler |
 
 A car needs a free car slot: since 3.4 the depot holds only your starting van, every further car needs a garage slot
 (see **Cars, cargo, garages and the repair shop**).
 
-**The upgrades belong to one car.** At Wrench Garage the car tracks (Engine, Handling, Armor, Ram Plow, Quick Hands)
+**The upgrades belong to one car.** At Wrench Garage the car tracks (Engine, Tyres & Suspension, Armor, Ram Plow, Quick Hands; 4.0: the Hand Trolley)
 upgrade the car you have equipped (`profile.carUpgrades[carId]`; the window says "Upgrades for: Courier Van", the price
 grows with that car's level); a new car starts stock. Gun Damage and Fire Rate stay for all your guns and car guns
 ("For all your guns"). The employers' company vehicles cannot be upgraded. An older save's upgrades (they were for
@@ -461,7 +499,13 @@ end, hood and first window; rebuilt when you upgrade):
   a plow blade under it from level 3 and rubber pads at 5.
 * **Armor** from level 1: steel plates along both sides between the wheels, taller with the level (a rim from 4); from
   level 3 **grilles** over the windscreen and the front side windows (the Armored Van has its own).
-* **Engine** from level 3: a **hood scoop** (taller at 5) and **twin exhaust pipes** under the back.
+* **Engine** from level 3: a **hood scoop** (taller at 5) and **twin exhaust pipes** under the back. 4.0: level 1 stops
+  the Rusty Van's **smoking exhaust**.
+* **Tyres & Suspension** (4.0; the id stays `handling`, +8 % steering a level): from level 1 **new black tyres** with a
+  tread ring (bald grey ones before, on the Rusty and the Patched Van), from 3 **alloy rims** (silver discs), at 5 a
+  **lower stance** (the body sits 0.25 lower: the car is built again).
+* **Hand Trolley** (4.0, one level, $600, only the vans and trucks: `CarDef.trolley`): folded **inside the back doors**
+  (seen when they open) on the Attachment `TrolleyMount`; take it out to carry up to 4 pieces at once (server/Cargo.luau).
 * **Quick Hands** (new, 3 levels; 3.4: $400 · $800 · $1,600): **−15 % per level** of the time to open the back and to pick
   up, load, take out and hand over (the holds of the BackPrompt and the cargo prompts, `Economy.loadHold`; the job's
   car's level counts).
@@ -486,18 +530,18 @@ Livestock Truck 2 (two stalls), Ambulance 1, School Bus 8 (seats); they have no 
 
 * **The job board** (server/Jobs.luau): every offer knows its pieces; one with more than your equipped car holds
   shows **📦 NEEDS N SLOTS** and "NEEDS 4 SLOTS · your Old Van holds 2" (the server refuses it too) and tells you what
-  would hold it: "Build it up at Wrench Garage: as a Cargo Van it holds 4." or "That needs a bigger vehicle: the Box
-  Truck (your garage, or Dead End Motors)." (`Economy.roomAdvice`). The ordinary deliveries are 1 – 3 pieces, a ★ one
+  would hold it: "Build it up at Wrench Garage: as a Long Cargo Van it holds 4." or "That needs a bigger vehicle: the Box
+  Truck or the Freight Truck (your garage, or Dead End Motors)." (`Economy.roomAdvice`). The ordinary deliveries are 1 – 3 pieces, a ★ one
   never more than 2 (`Config.Jobs.EasyMaxPieces`: the Rusty Van); the dangerous levels sometimes send a **bulk order**
   (`Config.Jobs.BulkChance` / `BulkExtra`: ★★ 20 % +1, ★★★ 45 % +1 – 2, ★★★★ 60 % +3 – 6), more pay per piece, a
-  bigger car. A ★ job always fits the Rusty Van, a ★★ one the Work Van (a bulk order the Cargo Van).
+  bigger car. A ★ job always fits the Rusty Van, a ★★ one the Work Van (a bulk order the Long Cargo Van).
 * **A special job or a mission that lends a vehicle** uses that vehicle's room (the horse missions bring two horses,
   the two stalls of the Livestock Truck).
 * **Missions** (server/Missions.luau): one with more pieces than your car holds is refused at START: "This mission
-  needs a vehicle with 4 slots (your Old Van holds 3). Build it up at Wrench Garage: as a Cargo Van it holds 4." The
+  needs a vehicle with 4 slots (your Old Van holds 3). Build it up at Wrench Garage: as a Long Cargo Van it holds 4." The
   MISSIONS window shows a red **📦 needs N slots** chip and line. 3.5: **First Shift** fits the Rusty Van (2) at level
-  1 and the Work Van (3) at level 2; **Code Red** and **Empty Shelves** (and the DUO campaign) need at most the Cargo
-  Van (4); later a few **big loads** (5 – 8 pieces, and the mission says so: Oil Fire 5, Mess Hall 6, Cooling Water 6,
+  1 and the Work Van (3) at level 2; **Code Red** and **Empty Shelves** (and the DUO campaign) need at most the Long
+  Cargo Van (4); later a few **big loads** (5 – 8 pieces, and the mission says so: Oil Fire 5, Mess Hall 6, Cooling Water 6,
   Wagon Wheels 6, Heavy Business 5, The Cure 8, Landing Gear 8) need a Tall Hauler or the Box Truck. Every mission
   fits a car (and a stage) you can have by its level. `tests/capacity_test.luau` lists what every one of the 110
   missions needs and from which level a car holds it.
@@ -552,48 +596,105 @@ van". Every car you can buy has **stages** (stage 0 is the car as sold), bought 
 Garage** for the car you drive: the UPGRADES tab shows a **STAGE card** with the next stage's name, its price, its
 level lock, what it adds and **before → after** (📦 slots, health, speed). A stage is kept with the car
 (`profile.carUpgrades[carId].stage`) and **changes its look**: the mechanics rebuild the car where it stands (not
-during a delivery, not on a repair lift). The upgrades (Engine, Handling, Armor, Ram Plow, Quick Hands) stay as they
-were and their UpgradeKit (bull bar, plates, scoop) fits every stage; the paint covers the new body panels too (a high
+during a delivery, not on a repair lift). The upgrades (Engine, Tyres & Suspension, Armor, Ram Plow, Quick Hands, the
+Hand Trolley) stay as they were and their UpgradeKit (tyres, bull bar, plates, scoop, the trolley) fits every stage; the paint covers the new body panels too (a high
 roof, a roof pod); the car gun moves up onto a high roof.
 
 | Car | Role | Stages: name · 📦 slots · price · level |
 |---|---|---|
-| **Old Van** (free) | your first van: it grows with you | **Rusty Van** 2 (rust, primer over the dents, a loose bumper) → **Work Van** 3 · $400 · 2 (clean paint, a chrome bumper, a rear step, a ladder up the side, shelves behind the doors; +30 health, +1 speed) → **Cargo Van** 4 · $1,600 · 4 (a high roof with a roof rack, a light bar, mud flaps; +70 health, −1 speed) |
+| **Old Van** (free) | your first van: it grows with you | 4.0: **Rusty Van** 2 (max 42, accel 11: big corroded rust patches, a primer-grey driver's door, a dented crooked bumper, a cracked windscreen, bald grey tyres, a yellowed dim headlight, a smoking exhaust) → **Patched Van** 2 · $250 · 1 (the rust ground off and primed grey, a straight new bumper; 48 / 15, +20 health) → **Work Van** 3 · $700 · 2 (**1.5 studs longer**; clean paint, a chrome bumper, a new windscreen and lamps, new tyres, a rear step, a ladder, shelves; 54 / 19, +40 health) → **Long Cargo Van** 4 · $2,200 · 4 (**3.5 studs longer** with a high roof, a roof rack, a light bar, mud flaps; 56 / 21, +70 health) |
 | **Courier Van** (2, $3,500) | fast and nimble: the rush jobs | Courier Van 2 → **Express Courier** 3 · $1,200 · 3 (a roof pod, a checker stripe; +2 speed) |
 | **High-Roof Van** (3, $7,000) | tougher, the in-between | High-Roof Van 4 → **Tall Hauler** 5 · $3,000 · 5 (a ladder rack with a spare wheel, side steps, a stacked shelf; +60 health) |
 | **Pickup** (4, $12,000) | the crew car: two friends shoot from the bed | Pickup 2 → **Ranch Pickup** 3 · $2,500 · 6 (a roll bar with spotlights, chrome bed rails; +50 health) |
-| **Box Truck** (6, $22,000) | the big one: the only way to 6 and more | Box Truck 6 → **Liftgate Truck** 7 · $7,500 · 8 (a liftgate, marker lights, a chrome bumper; +80 health) → **Freight Hauler** 8 · $15,000 · 10 (a tall wind deflector, side skirts; +150 health, −2 speed) |
+| **Box Truck** (6, $22,000) | the big one: the only way to 6 and more | Box Truck 6 → **Liftgate Truck** 7 · $7,500 · 8 (a liftgate, marker lights, a chrome bumper; +80 health) → **Freight Hauler** 8 · $15,000 · 10 (4.0: **a box 3 studs longer**, four rows on the floor, **takes a pallet**; a tall wind deflector, side skirts; +150 health, −2 speed) |
 | **Muscle Car** (8, $40,000) | the getaway car: one piece, all speed | Muscle Car 1 → **Street Machine** 2 · $6,000 · 9 (a blower through the hood, side pipes; +3 speed) |
+| **Freight Truck** (9, $45,000, 4.0) | warehouse freight: pallets and 12 slots | Freight Truck 12 slots or **3 pallets** (one stage) |
 | **Armored Van** (10, $55,000) | very tough: the car-gun platform | Armored Van 3 → **Fortress Van** 4 · $14,000 · 11 (a gun shield round the roof gun, side lockers, a spare wheel; +200 health, −2 speed) |
 | **Rally Van** (12, $80,000) | the fastest van (98): rush jobs | Rally Van 2 → **Works Rally** 2 · $10,000 · 13 (a light pod, a roof scoop, mud flaps; +3 speed, cosmetic: no more room) |
 | the company vehicles | lent for their jobs | no stages, their own fixed room |
 
 * **4 is where a van ends**: the Old Van, the Courier Van, the Pickup and the Armored Van stop at 3 – 4, the High-Roof
-  Van at 5; only the **Box Truck** carries 6 – 8. `tests/capacity_test.luau` checks it.
+  Van at 5; only the **Box Truck** carries 6 – 8 and (4.0) the **Freight Truck** 12. `tests/capacity_test.luau` checks it.
 * **The looks** (server/Vehicles.luau `LOOKS`, built by `styleFor` on top of the car's `STYLES` body and cached): a look
-  `drop`s boxes and trim by tag (the Rusty Van's `rust`, `primer` and loose `bumper`; the Box Truck's `bumper` and
-  `deflector`), adds solid `boxes` (a "body" box is painted like the body) and cosmetic `trim` (no collisions, not hit
+  `drop`s boxes and trim by tag (the Rusty Van's `rust`, `primer`, `crack` and loose `bumper`; the Box Truck's `bumper`
+  and `deflector`), 4.0: may `stretch` the body (see **Freight vehicles and the upgrades you see**) and be `fresh` (the
+  Rusty Van's faults fixed), adds solid `boxes` (a "body" box is painted like the body) and cosmetic `trim` (no collisions, not hit
   by rays), has its own cargo **slots** (exactly as many as the stage holds: `tests/run_tests.py` counts them, so the
   loading through the back always has a place for every piece) and maybe a new `roof` height for the gun. Stage 0 is
   the plain body. A few dozen small parts at most.
-* **The traffic** drives the vans at random stages (rusty, work, cargo vans …); bandit cars and the showroom are built
-  the same way.
+* **The traffic** drives the vans at random stages (rusty, patched, work, long cargo vans …); bandit cars and the
+  showroom are built the same way. It never drives the Freight Truck.
 * **Older saves**: every car a 3.4 save owns becomes the first stage that holds the slots it had in 3.4 (its 3.4
   capacity plus its Cargo Rack; `Economy.legacyStage`), once, when the save loads (the save's `carStages` marks it
-  done), whatever your level: the Old Van (4 in 3.4) the **Cargo Van**, the Muscle Car the Street Machine, the Armored
+  done), whatever your level: the Old Van (4 in 3.4) the **Long Cargo Van** (4.0), the Muscle Car the Street Machine, the Armored
   Van the Fortress Van, the Box Truck with a rack of 1 the Liftgate Truck, of 2 – 3 the Freight Hauler. Where no stage
   holds that much, the car gets the first stage with its most room, and **holds less than in 3.4**: the Old Van with
   a rack 4 (was 5 – 7), the Courier Van and the Pickup 3 (were 4+), the High-Roof Van 5 (was 6+), the Box Truck with
   rack 3 8 (was 9), the Rally Van 2 (was 4+: its only stage adds no room, so it stays at stage 0), the Armored Van and
   the Muscle Car with a rack 4 and 2. That is the 3.5 rule (4 is where a van ends); the bigger loads need the Box Truck.
+* **4.0 saves**: a 3.5 – 3.10 save's Old Van keeps its room on the new stages, once (`Economy.migrateStage40`; the save's
+  `vanStages` marks it done): its Work Van (old stage 1, 3 slots) is the **Work Van** (stage 2), its Cargo Van (old
+  stage 2, 4 slots) the **Long Cargo Van** (stage 3); a Rusty Van stays the Rusty Van. A 3.4 save goes straight onto
+  the new stages (`legacyStage`).
 * **Admin** (P): UNLOCK EVERYTHING and MAX UPGRADES + STAGES put every car you own at its last stage too.
 
 **Dead End Motors** (server/World.luau `buildDealer`, server/Shops.luau): no more lot with every car lined up by the
 street. You buy from the **car catalog** at the sales counter (the dealer window: every car's card with its role and
-📦 from → to its last stage, BUY, 🔒 LEVEL, 🅿 NEEDS A GARAGE); inside, three display cars stand well apart on
-turntables, turned a little toward the door: the Old Van as a **Cargo Van** (what your van becomes, "BUILD YOURS AT
+📦 from → to its last stage, 4.0: the pallets it takes, BUY, 🔒 LEVEL, 🅿 NEEDS A GARAGE; the catalog's note: "more
+room makes the body longer … more needs the High-Roof Van, the Box Truck or the Freight Truck (pallets)"); inside, three
+display cars stand well apart on turntables, turned a little toward the door: the Old Van as a **Long Cargo Van** (what
+your van becomes, "BUILD YOURS AT
 WRENCH GARAGE"), the **Box Truck** and the **Rally Van**; their "Look" prompt opens the catalog on that car. A bought
 car waits in your garage as before (take it out at a 🅿 GARAGE post); every car beyond the starting van needs a slot.
+
+## Freight vehicles and the upgrades you see
+
+Version 4.0, **Freight** (the vehicles: `Config.Cars`, `Config.Upgrades`, `shared/Economy.luau`, server/Vehicles.luau,
+client/Drive.luau, client/CarVisuals.luau; the warehouse, the trolley and the pallet jack in use: server/Cargo.luau).
+
+**A slow start.** The Old Van starts as a heavy, tired **Rusty Van**: top speed 42, accel 11, about **3.6 s** to its top
+speed. Pulling away follows a **torque curve** (`Economy.torque`, client/Drive.luau): 55 % of its accel from a
+standstill, 135 % in the mid-range, a soft creep to the top (40 % there); the speed always changes smoothly. Every
+stage adds speed and acceleration (`StageDef.speed`, `StageDef.accel`): Patched Van 48 / 15 (3.0 s), Work Van 54 / 19
+(2.7 s), Long Cargo Van 56 / 21 (2.5 s); the **Engine** (+8 % speed and accel a level) is the other way up.
+`Economy.timeToTop` gives the seconds; `tests/vehicles40_test.luau` checks them.
+
+**A real rusty van.** The Rusty Van has big orange-brown corroded patches (CorrodedMetal: the sills, the arches, the
+hood, the roof), a **primer-grey driver's door** from another van, a dented **crooked bumper**, a **cracked
+windscreen** (thin dark lines from a stone chip), **bald grey tyres**, a **yellowed dim headlight** (a weak yellow beam
+at night) and a little **exhaust smoke** at idle (`Smoky` attribute; client/CarVisuals.luau puffs it at the
+Attachment `Exhaust`, more standing than moving, only near the camera). The Patched Van grinds the rust off and primes
+it grey and gets a straight bumper; the Work Van is clean (`Look.fresh`: new windscreen, lamps, tyres, no smoke).
+
+**More room makes the car bigger.** A stage's look can **stretch** the body (`Look.stretch`, `stretchStyle`): the
+style's boxes behind its `split` (the middle of the cargo box) move back, the long boxes across it get longer, and the
+rear axle, the back doors, the rear lights, the cargo slots, the CargoDoor and back prompt, the TrolleyMount and the
+seats and doors behind the split move with them; the whole car then moves forward by half the stretch, so the chassis
+(and its wheel colliders) stays centred and both axles move out. The Work Van is **1.5 studs** longer, the Long Cargo
+Van **3.5** (and a high roof), the Box Truck's Freight Hauler **3** (and takes a pallet). A stretched look is a style of
+its own, cached per look, so its doors (3.10 boarding) are cached with it.
+
+**The Freight Truck** (`"freight"`, style `"freighttruck"`, level 9, $45,000 at Dead End Motors): a cab-over truck,
+9 wide, 30 long, 12 high, a long box with its **loading floor at dock height** (about 3.4 studs over the ground), **12
+slots** in three 2 × 2 **pallet bays** front to back, or **3 pallets** (`CarDef.pallets`), a **roll-up door**, twin
+rear tyres (6 wheels, `Style.dual`), side skirts, a fuel tank, an exhaust stack, marker lights. Slow and heavy (max 45,
+accel 12, turn 1.2, health 900, ram × 2), **no car gun**, one passenger. Its own **pallet jack** stands inside at the
+back (the Attachment `JackMount`; server/Cargo.luau builds it). The traffic never drives it. At a garage it comes out
+further from the door (`Vehicles.placeAt`: the back a stud clear of the wall).
+
+**The contract** (Config, Economy):
+
+* `CarDef.pallets` / `StageDef.pallets` (the stage's wins), `Economy.palletsOf(carId, stage)`: the Freight Truck 3, the
+  Box Truck 1 at its last stage, the Moving Truck 1. A pallet fills `Config.Cargo.PalletSlots` (4) slots: a car's
+  first slots are a 2 × 2 group at the front of its box.
+* `CarDef.trolley`: the Old Van, the Courier Van, the High-Roof Van, the Box Truck and the Freight Truck may buy the
+  **Hand Trolley** (`Economy.upgradeFits`, `Economy.hasTrolley`; Wrench Garage refuses it for the others, the card says
+  VANS & TRUCKS). With it the car has the Attachment `TrolleyMount` inside the back and the folded trolley there (the
+  model `FoldedTrolley` in the UpgradeKit).
+
+**You see the upgrades** (the UpgradeKit, rebuilt when a level changes): Tyres & Suspension's new tyres and tread
+rings (1), alloy rims (3) and lower stance (5); the Engine's end of the smoke (1), scoop and pipes (3); the Armor's
+plates and grilles; the Ram Plow's bull bar; the folded Hand Trolley in the back.
 
 ## Challenges, secrets and rewards
 
@@ -862,7 +963,8 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 
 * **Cars**: at Dead End Motors (3.5: the car catalog at the counter, three display cars inside) the Old Van (free), the Courier Van
   (level 2, $3,500), the High-Roof Van (3, $7,000), the Pickup (4, $12,000), the Box Truck (6, $22,000), the Muscle Car
-  (8, $40,000), the Armored Van (10, $55,000) and the Rally Van (12, $80,000), each with 1 – 2 stages (3.5); earned by
+  (8, $40,000), the Freight Truck (9, $45,000, 4.0), the Armored Van (10, $55,000) and the Rally Van (12, $80,000),
+  each with 1 – 3 stages (3.5; 4.0: the Old Van's Patched, Work and Long Cargo Van); earned by
   working: School Bus, Armored Truck, Ice Cream Truck, Moving Truck, Monster Truck, Livestock Truck, Fuel Truck,
   Ambulance.
 * **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher, each with its own model in
@@ -881,8 +983,9 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 * **Car guns** (Wrench Garage, on the roof of the equipped car, one per car; a new one replaces the old one, no
   refund): Roof Machine Gun (a slim barrel with an ammo box), Roof Minigun (a rotary barrel cluster), Roof Grenade
   Launcher (a fat tube). The Gun Damage and Fire Rate upgrades work for them too.
-* **Upgrades** (Wrench Garage): for the equipped car (3.3: each car its own) Engine, Handling, Armor, Ram Plow (5
-  levels), Quick Hands (3 levels; 3.5: the Cargo Rack is gone) and the car's **STAGE** (3.5), the visible ones on the
+* **Upgrades** (Wrench Garage): for the equipped car (3.3: each car its own) Engine, Tyres & Suspension (4.0), Armor,
+  Ram Plow (5 levels), Quick Hands (3 levels; 3.5: the Cargo Rack is gone), the Hand Trolley (4.0, vans and trucks) and
+  the car's **STAGE** (3.5), the visible ones on the
   car; for all your guns Gun Damage, Fire Rate (5 levels); paint jobs; car guns. Repairs (3.4): the repair bays of
   Wrench Garage and Rust Bridge Repairs.
 * **Items** (Last Stop Supplies): Repair Kit (the emergency fix on the road), Medkit, Nitro, Molotov, Landmine.
@@ -949,7 +1052,8 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               chain `requires`, the computed mission levels levelOf, the DUO campaign), Challenges (3.1: the 42 challenges, the
               counters, value / progress / doneCount / allTitles), Melee (3.9: punch or strike, the cone in front of
               you, the arm's swing curve), Boarding (3.10: getting in and out: the timing, the curve, the hand's
-              reach, the doors' swing, the Boarding attribute)
+              reach, the doors' swing, the Boarding attribute), Freight (4.0: who takes what on a trolley or a jack, the
+              walks, pallet room and places, the lock and the tip)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers; 3.4: the repair bays, the GARAGE posts), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once; 3.4: every
@@ -957,12 +1061,15 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               seats, cargo slots, the roof turret of a car gun, the instant spawns and the home garage spot; 3.2: the
               back that opens, its hinges, BackOpen and the BackPrompt; 3.3: the five new vans' bodies, the
               UpgradeKit of the car's upgrades, Quick Hands' hold; 3.4: every car's damage kept, the car on a repair
-              lift; 3.5: the stages' LOOKS, styleFor, the rebuild on a new stage; 3.10: getting in (the seat reserved,
+              lift; 3.5: the stages' LOOKS, styleFor, the rebuild on a new stage; 4.0: the stretch, the Rusty Van's
+              faults, the Freight Truck, the tyres and the folded trolley in the kit, TrolleyMount / JackMount /
+              Exhaust; 3.10: getting in (the seat reserved,
               seated on time or cancelled), out (the CarDoor remote), the doors' DoorOpenAt / DoorCloseAt), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
               the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves; 3.2: the DUO
               rules, drives DuoGates; 3.4: the cargo slots on the board, the bulk orders), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
-              3.2: loading through the back, the pair lift), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
+              3.2: loading through the back, the pair lift; 4.0: pieces on a trolley, pallets on a jack, the tools' hints), Equipment (4.0: the
+              hand trolley and the pallet jacks: take, push, stow, set down, go home), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases; 3.5: the three display cars, the stages), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
@@ -980,8 +1087,8 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
-              Drive (car controller, ice; 3.2: no throttle with the back open), Shooting (aim, crosshair, tracers, hit
-              numbers), CarVisuals (tyres, prompts, name tags; 3.2: swings the back, its prompt only for the crew), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
+              Drive (car controller, ice; 3.2: no throttle with the back open; 4.0: the torque curve), Shooting (aim, crosshair, tracers, hit
+              numbers), CarVisuals (tyres, prompts, name tags; 3.2: swings the back, its prompt only for the crew; 4.0: the exhaust smoke), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
               Weather (the day and night look; 3.0.1: the readable night, the town glow, your own light), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels; 3.9: colours the traffic lights), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
@@ -1015,7 +1122,8 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               campaigns the Old Van, the big loads say so, the rack migration), run_tests.py checks every car's
               capacity is its body's slot count (3.5: and every stage's its look's), levels the early garages, logic the cheap first levels;
               3.9: melee (the punch and the strike, the reach cone, the swing curve); 3.10: boarding (the move's timing,
-              a late start, the curve, the hand, the doors' swing)
+              a late start, the curve, the hand, the doors' swing); 4.0: freight (the trolley and jack rules, pallet
+              places, the Freight Run, the warehouse and receiving docks)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -1043,7 +1151,9 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 
 Runs every `tests/*_test.luau` (logic with the 2.6 real estate, the 3.0 places and the 3.1 lost packages, cargo,
 roads, cargun, icons, levels with the 3.2 progression, jobs25, traffic, audio, missions with the 3.2 campaign chain
-and DUO campaign, challenges, gear, the 3.4 capacity test and the 3.9 melee test) and compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
+and DUO campaign, challenges, gear, the 3.4 capacity test, the 3.9 melee test and the 4.0 vehicles40 test: the slow
+van and its stages, the torque curve, the van's save migration, the pallets, the Hand Trolley, the Freight Truck) and
+compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
 function, as Studio compiles). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 

@@ -256,10 +256,21 @@ local function onUpgrade(player: Player, id: any)
 		notice:FireClient(player, `The {name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`)
 		return
 	end
+	-- 4.0: the Hand Trolley fits only the vans and trucks (CarDef.trolley).
+	if carTrack and carDef and not Economy.upgradeFits(carDef.id, id) then
+		local def = Economy.findUpgrade(id)
+		notice:FireClient(player, `The {if def then def.name else id} doesn't fit the {carDef.name}: vans and trucks only.`)
+		return
+	end
 	local levels = if carTrack and carDef then Economy.carLevels(profile.carUpgrades, carDef.id) else profile.upgrades
 	local level = Economy.level(levels, id)
 	local cost = Economy.upgradeCost(id, level)
 	if not cost then
+		return
+	end
+	-- 4.0: Tyres & Suspension 5 lowers the body, a rebuild of the car (like a stage): not in the middle of a job.
+	if id == "handling" and level + 1 >= 5 and Jobs.active(player) then
+		notice:FireClient(player, "Finish your delivery first: the mechanics lower the car.")
 		return
 	end
 	if not PlayerData.spend(player, cost) then
@@ -301,10 +312,10 @@ local function onPaint(player: Player, id: any)
 end
 
 -- 3.5, the showroom: three cars inside the dealership (World.DealerSlots), not every car on a lot. Each one is shown
--- at a stage of its own (the Old Van as a Cargo Van: what your van becomes), with a tag and a "Look" prompt that
+-- at a stage of its own (the Old Van as a Long Cargo Van: what your van becomes), with a tag and a "Look" prompt that
 -- opens the catalog on it. Every car is bought from the catalog (the sales counter, or any display car).
 local SHOWROOM: { { car: string, stage: number } } = {
-	{ car = "van", stage = 2 },
+	{ car = "van", stage = 3 }, -- 4.0: the Long Cargo Van
 	{ car = "boxtruck", stage = 0 },
 	{ car = "rallyvan", stage = 0 },
 }

@@ -308,7 +308,7 @@ do
 		boosted += if def.banditBoost then 1 else 0
 	end
 	for kind in Config.Cargo.Kinds do
-		if not kinds[kind] then
+		if not kinds[kind] and kind ~= "pallet" then -- (4.0: the pallets are the Freight Run's, not a mission's)
 			table.insert(unused, kind)
 		end
 	end
