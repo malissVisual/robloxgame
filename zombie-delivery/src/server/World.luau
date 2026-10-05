@@ -849,7 +849,10 @@ local function buildRepairShop(parent: Instance, cx: number, cz: number)
 	local facing = if info then Vector3.new(info.facing.x, 0, info.facing.z) else Vector3.new(-1, 0, 0)
 	local w, d, h = 60, 48, 18
 	local frame = shopFrame(cx, cz, facing, 12)
-	building(shop, frame, w, d, h, Color3.fromRGB(150, 84, 48), Enum.Material.CorrodedMetal, 34, 14)
+	building(shop, frame, w, d, h, Color3.fromRGB(118, 70, 46), Enum.Material.CorrodedMetal, 34, 14)
+	-- Approved-style facade only (a plate girder over the bay door); the bays, tyres and sign post stay as they were.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Repairs), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "RUST BRIDGE REPAIRS", Vector3.new(44, 5, 0.5), frame * CFrame.new(0, h + 3.5, -d / 2), Color3.fromRGB(255, 180, 90), nil, "repairs", 10)
 	for index, x in { -8.5, 8.5 } do
 		repairBay(shop, frame, x, -3, h, "repairs", "Rust Bridge Repairs", index)
@@ -2930,8 +2933,11 @@ local function defineRealEstate()
 			return
 		end
 		local f = plotFrame(plot, WALK_TOP)
-		local color = Color3.fromRGB(176, 104, 54)
+		local color = Color3.fromRGB(132, 80, 50)
 		World.EstateGarages.garage_harbor = garageBlock(lockup, f * CFrame.new(0, 0, -plot.front), 4, plot.front + plot.back, 11, color, Enum.Material.CorrodedMetal)
+		-- Approved-style facade only; the doors, the drive-out spot and the FOR SALE sign stay clear.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(lockup, f, require(script.Parent.BuildingLooks.GarageHarbor), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		sign(lockup, "HARBOR LOCKUP", Vector3.new(30, 3, 0.4), f * CFrame.new(0, 13.6, -plot.front - 0.3), Color3.fromRGB(255, 220, 120), Color3.fromRGB(50, 50, 54), "garage_harbor", 10)
 		-- containers on the rest of the block, behind the lock-ups
 		for row = 0, 1 do
@@ -2977,6 +2983,9 @@ local function defineRealEstate()
 			box(parking, "Parapet", f, edge[1], H + 1, edge[2], edge[3], H + 2.4, edge[4], concrete, Enum.Material.Concrete)
 		end
 		sign(parking, "DOWNTOWN PARKING", Vector3.new(40, 1.4, 0.3), f * CFrame.new(0, 10.25, -front - 0.2), Color3.fromRGB(255, 255, 255), Color3.fromRGB(46, 90, 170))
+		-- Approved-style facade only: precast fins, spandrel and deck lamps; the six bays stay open under the lintel.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(parking, f, require(script.Parent.BuildingLooks.Parking), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		-- a tall P on a post at the corner
 		part(parking, "SignPost", Vector3.new(1, 22, 1), f * CFrame.new(-half + 3, 11, -front - 6), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
 		local pSign = part(parking, "ParkingSign", Vector3.new(6, 6, 0.6), f * CFrame.new(-half + 3, 21, -front - 6), Color3.fromRGB(46, 90, 170), Enum.Material.SmoothPlastic)
@@ -2998,8 +3007,11 @@ local function defineRealEstate()
 		local f = plotFrame(plot, PAD_TOP)
 		local reach = frontReach(plot)
 		lotPad(garage, f, plot, reach, Color3.fromRGB(120, 120, 116), Enum.Material.Concrete)
-		local color = Color3.fromRGB(70, 100, 130)
+		local color = Color3.fromRGB(52, 70, 88)
 		World.EstateGarages.garage_north = garageBlock(garage, f * CFrame.new(0, 0, -plot.front), 4, plot.front + plot.back, 12, color, Enum.Material.Metal)
+		-- Approved-style facade only; the doors, the drive-out spot and the FOR SALE sign stay clear.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(garage, f, require(script.Parent.BuildingLooks.GarageNorth), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		sign(garage, "HIGHWAY GARAGE", Vector3.new(30, 3, 0.4), f * CFrame.new(0, 14.6, -plot.front - 0.3), Color3.fromRGB(120, 200, 255), Color3.fromRGB(34, 36, 40), "garage_north", 10)
 		for n = 0, 4 do
 			cylinder(garage, "Tire", 1.4, 3.2, f * CFrame.new(-plot.w / 2 - 3, 0.7 + n * 1.45, plot.back - 4) * UPRIGHT, Color3.fromRGB(25, 25, 25), Enum.Material.Rubber)
@@ -3019,7 +3031,13 @@ local function defineRealEstate()
 		local f = plotFrame(plot, PAD_TOP)
 		local reach = frontReach(plot)
 		lotPad(garage, f, plot, reach, Color3.fromRGB(116, 116, 112), Enum.Material.Concrete)
-		World.EstateGarages[id] = garageBlock(garage, f * CFrame.new(0, 0, -plot.front), doors, plot.front + plot.back, 11, color, material)
+		-- the walls a shade darker, toward the approved palette
+		local wallColor = color:Lerp(Color3.fromRGB(38, 43, 47), 0.25)
+		World.EstateGarages[id] = garageBlock(garage, f * CFrame.new(0, 0, -plot.front), doors, plot.front + plot.back, 11, wallColor, material)
+		-- Approved-style facade only; the doors, the drive-out spot and the FOR SALE sign stay clear.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		local look = if id == "garage_south" then require(script.Parent.BuildingLooks.GarageSouth) else require(script.Parent.BuildingLooks.GarageRented)
+		Kit.build(garage, f, look, { part = part, deco = deco, nightLight = DayNight.nightLight })
 		sign(garage, string.upper(title), Vector3.new(doors * 12, 2.4, 0.4), f * CFrame.new(0, 13, -plot.front - 0.3), signColor, Color3.fromRGB(34, 36, 40), id, 9)
 		barrel(garage, (f * CFrame.new(plot.w / 2 - 2, 0, plot.back - 2)).Position, Color3.fromRGB(90, 110, 60))
 		forSaleSign(garage, id, f * CFrame.new(plot.w / 2 - 3, 0, -plot.front - reach + 3), true)
@@ -3275,6 +3293,10 @@ local function defineRealEstate()
 		light(canopyLight, 26, 1.4, Color3.fromRGB(255, 226, 170))
 		DayNight.nightLight(canopyLight, Color3.fromRGB(255, 230, 170), Color3.fromRGB(150, 140, 110), "Glass")
 		deco(box(model, "Plaza", f, -half, 0, -half - 14, half, 0.06, -half, Color3.fromRGB(176, 170, 160), Enum.Material.Slate))
+		-- Approved-style lobby front and crown; the elevators, the offices and the name boards stay as they are.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		local architecture = if tower.id == "harborpoint" then require(script.Parent.BuildingLooks.HarborPoint) else require(script.Parent.BuildingLooks.DispatchTower)
+		Kit.build(model, f, architecture, { part = part, deco = deco, nightLight = DayNight.nightLight })
 		for _, side in { -1, 1 } do
 			box(model, "Planter", f, side * (half - 8) - 4, 0, -half - 12, side * (half - 8) + 4, 1.6, -half - 4, Color3.fromRGB(110, 106, 100), Enum.Material.Concrete)
 			local p = (f * CFrame.new(side * (half - 8), 1.6, -half - 8)).Position
