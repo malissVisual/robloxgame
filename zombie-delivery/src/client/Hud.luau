@@ -211,7 +211,7 @@ end
 -- ── Money ──────────────────────────────────────────────────────────────────
 
 -- On a computer the chat sits top left: money goes bottom left above the minimap. On a touch screen top left.
-local touchLayout: any, LEFT_H: any, LEFT_W: any, leftStack: any, moneyLabel: any, statsLabel: any, levelChip: any, rankLabel: any, xpLabel: any, xpBack: any, xpFill: any
+local touchLayout: any, LEFT_H: any, LEFT_W: any, leftStack: any, moneyLabel: any, levelChip: any, rankLabel: any, xpLabel: any, xpBack: any, xpFill: any
 do -- (its own block: the locals below stay out of the 200-register limit)
 touchLayout = Ui.touchLayout()
 -- Money and the minimap share one column (one scale), so they can never overlap.
@@ -225,8 +225,7 @@ leftStack = placed(Ui.make("Frame", {
 	BackgroundTransparency = 1,
 }, gui))
 Ui.list(leftStack, true, 8)
--- 3.2: one glass card. The money big (DisplayFont, a subtle gold) with the deliveries and kills in small caps beside
--- it; under it the level: a round LV badge (gold ring), the rank, the XP into this level and a thin gold bar.
+-- 3.2: one glass card. The money big (DisplayFont, a subtle gold); under it the level: a round LV badge (gold ring), the rank, the XP into this level and a thin gold bar.
 local moneyPanel = Ui.panel(leftStack, UDim2.fromOffset(230, MONEY_HEIGHT), UDim2.new())
 moneyPanel.LayoutOrder = 1
 Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, moneyPanel)
@@ -240,11 +239,6 @@ moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 30), {
 	TextScaled = true,
 })
 Ui.make("UITextSizeConstraint", { MaxTextSize = 28 }, moneyLabel)
-statsLabel = Ui.caps(moneyPanel, "", UDim2.new(1, 0, 0, 12), {
-	Position = UDim2.fromOffset(0, 0),
-	TextXAlignment = Enum.TextXAlignment.Right,
-	TextSize = 10,
-})
 -- The driver level: the badge, the rank and the XP, the bar.
 local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 1, -40), BackgroundTransparency = 1 }, moneyPanel)
 levelChip = Ui.label(levelRow, "1", UDim2.fromOffset(38, 38), {
@@ -2991,7 +2985,6 @@ end
 function Hud.setState(newState: any)
 	state = newState
 	moneyLabel.Text = Ui.money(state.money)
-	statsLabel.Text = `📦 {state.deliveries}   💀 {state.kills}`
 	refreshLevel()
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
