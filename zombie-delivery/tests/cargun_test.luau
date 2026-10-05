@@ -97,10 +97,11 @@ end
 table.sort(mountable)
 check("mountable cars", table.concat(mountable, ",") == "armored,armorvan,boxtruck,courier,highroof,monster,muscle,pickup,rallyvan,van", table.concat(mountable, ","))
 for _, def in Config.Cars do
-	if not def.company then
+	if not def.company and def.id ~= "freight" then
 		check(`every dealer car carries a car gun: {def.id}`, Economy.canMount(def.id))
 	end
 end
+check("4.0: the Freight Truck carries no car gun", not Economy.canMount("freight"))
 for _, id in { "bus", "icecream", "movingtruck", "livestock", "fueltruck" } do
 	check(`{id} cannot mount a gun`, not Economy.canMount(id))
 end

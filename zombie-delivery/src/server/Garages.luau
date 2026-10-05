@@ -47,7 +47,7 @@ local lastAction: { [Player]: number } = {}
 local opened: { [Player]: string } = {} -- where the player's window was opened (a garage id or "depot")
 
 -- Short names of the car tracks for the window's upgrade line.
-local SHORT: { [string]: string } = { engine = "Engine", handling = "Handling", armor = "Armor", plow = "Plow", loading = "Hands" }
+local SHORT: { [string]: string } = { engine = "Engine", handling = "Tyres", armor = "Armor", plow = "Plow", loading = "Hands", trolley = "Trolley" }
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character

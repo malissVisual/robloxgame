@@ -91,6 +91,9 @@ def styles_check():
                 continue
             else:
                 slots = slot_count(looks[look.group(1)], "slots = {")
+                # 4.0: a look that stretches the body belongs to a style that says where it grows (split = z).
+                if "stretch = " in looks[look.group(1)] and "split = " not in body:
+                    bad.append(f"{car_id} {name}: look {look.group(1)} stretches, style {style} has no split")
             if slots != held:
                 bad.append(f"{car_id} {name}: capacity {held} but {slots} cargo slots")
             most = max(most, slots)

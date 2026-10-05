@@ -12,6 +12,8 @@
 -- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
 -- The back's prompt shows only to the owner and the crew of the owner's job (the attribute BackCrew, server/Cargo.luau).
 -- 3.6: the owner's name sits on a cream pill in ink (Theme.Postage.pill), readable over a night street and a sunny one.
+-- 4.0: the Rusty Van's exhaust smokes (the car's attribute Smoky, server/Vehicles.luau: till Engine level 1): a cheap
+-- ParticleEmitter at its Attachment "Exhaust", made the first time it is near, puffing more at idle than on the move.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +40,7 @@ type CarState = {
 	steer: number,
 	tagged: boolean,
 	backReach: number?, -- the BackPrompt's own reach (the server's), before it was hidden here
+	smoke: ParticleEmitter?, -- 4.0: the exhaust smoke (made when first needed)
 }
 
 local player = Players.LocalPlayer
@@ -113,12 +116,34 @@ local function stateOf(car: Model): CarState?
 		steer = 0,
 		tagged = false,
 		backReach = nil,
+		smoke = nil,
 	}
 	states[car] = state
 	car.Destroying:Connect(function()
 		states[car] = nil
 	end)
 	return state
+end
+
+-- 4.0: a thin grey-blue puff out of the exhaust pipe, drifting back and up.
+local SMOKE_RANGE = 140
+local function makeSmoke(at: Attachment): ParticleEmitter
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Name = "ExhaustSmoke"
+	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	smoke.Color = ColorSequence.new(Color3.fromRGB(120, 122, 128), Color3.fromRGB(170, 170, 172))
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1.8) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Lifetime = NumberRange.new(1.0, 1.6)
+	smoke.Speed = NumberRange.new(1.5, 2.5)
+	smoke.SpreadAngle = Vector2.new(18, 18)
+	smoke.EmissionDirection = Enum.NormalId.Back -- out of the back of the car
+	smoke.Acceleration = Vector3.new(0, 1.4, 0)
+	smoke.Drag = 1
+	smoke.LightInfluence = 1
+	smoke.Rate = 0
+	smoke.Parent = at
+	return smoke
 end
 
 local function nameTag(car: Model, chassis: BasePart)
@@ -235,8 +260,26 @@ local function step(dt: number)
 			nameTag(car, chassis)
 		end
 
+		-- 4.0: the smoking exhaust, near the camera only.
+		local distance = (chassis.Position - eye).Magnitude
+		local smoky = car:GetAttribute("Smoky") == true and distance < SMOKE_RANGE
+		local smoke = state.smoke
+		if smoky and not smoke then
+			local exhaust = chassis:FindFirstChild("Exhaust")
+			if exhaust and exhaust:IsA("Attachment") then
+				smoke = makeSmoke(exhaust)
+				state.smoke = smoke
+			end
+		end
+		if smoke then
+			local rate = if not smoky then 0 elseif chassis.AssemblyLinearVelocity.Magnitude < 6 then 7 else 2.5
+			if smoke.Rate ~= rate then
+				smoke.Rate = rate
+			end
+		end
+
 		-- Wheels.
-		if (chassis.Position - eye).Magnitude > RANGE then
+		if distance > RANGE then
 			continue
 		end
 		local forward = chassis.AssemblyLinearVelocity:Dot(chassis.CFrame.LookVector)

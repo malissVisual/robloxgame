@@ -107,6 +107,12 @@ export type CarDef = {
 	-- (server/Vehicles.luau STYLES cargo; tests/run_tests.py checks they match). 3.5: the slots of stage 0.
 	role: string?, -- 3.5: what the car is for, in a few words (the dealer's card, the README's table)
 	stages: { StageDef }?, -- 3.5: the stages bought at Wrench Garage; stages[1] is stage 0 (the car as it is sold)
+	-- 4.0, freight: how many PALLETS it takes (nil: none). A pallet fills Config.Cargo.PalletSlots of its cargo slots
+	-- (the first ones: a car's slots begin with a 2 x 2 group at the front of the box; the Freight Truck's are three
+	-- such bays, front to back). A stage's own `pallets` wins (StageDef.pallets); Economy.palletsOf(carId, stage).
+	pallets: number?,
+	-- 4.0: may it take the Hand Trolley (Config.Upgrades "trolley": the vans and the trucks)? Economy.upgradeFits.
+	trolley: boolean?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -120,7 +126,9 @@ export type StageDef = {
 	capacity: number, -- the cargo slots at this stage (= its look's slots; tests/run_tests.py checks it)
 	health: number?, -- + health over the car's own (before the Armor upgrade)
 	speed: number?, -- + top speed in studs / s (may be negative: a high roof is heavier)
-	look: string?, -- the look in server/Vehicles.luau LOOKS (nil: the plain body)
+	accel: number?, -- 4.0: + acceleration in studs / s² (the Old Van's stages rebuild a slow, heavy van)
+	look: string?, -- the look in server/Vehicles.luau LOOKS (nil: the plain body; 4.0: a look may stretch the body)
+	pallets: number?, -- 4.0: the pallets it takes at this stage (wins over CarDef.pallets; Economy.palletsOf)
 	adds: string, -- what it adds, in a few words (the STAGE card)
 }
 
@@ -137,30 +145,40 @@ export type StageDef = {
 -- High-Roof Van the tougher in-between, the Box Truck the big one (6 – 8 slots, the only way to 6 and more), the
 -- Armored Van the car-gun platform, the Rally Van the fastest, the Pickup the crew car, the Muscle Car the getaway
 -- car. Each has one or two small stages of its own.
+-- 4.0, Freight: the Old Van starts SLOW (max 42, accel 11: about 3.5 s to its top speed through a gentle torque curve,
+-- Economy.torque, client/Drive.luau) and has a longer way up: Rusty Van (2) → Patched Van (2, $250) → Work Van (3,
+-- $700, a body 1.5 studs longer) → Long Cargo Van (4, $2,200, 3.5 studs longer, a high roof). Every stage adds speed
+-- and acceleration (StageDef speed, accel); the Engine upgrade is the other way up. A stage's look may STRETCH the body
+-- (server/Vehicles.luau Look.stretch): more room makes the car bigger. The Box Truck's last stage is longer too and
+-- takes a pallet. The Freight Truck (level 9: 12 slots or 3 pallets, a roll-up door, its own pallet jack) is the big
+-- one; the Moving Truck takes a pallet. CarDef.trolley marks the vans and trucks that may take the Hand Trolley.
 Config.Cars = {
 	{
 		id = "van",
 		mount = true,
+		trolley = true,
 		name = "Old Van",
 		price = 0,
 		style = "van",
-		maxSpeed = 60,
-		accel = 26,
+		maxSpeed = 42,
+		accel = 11,
 		turn = 1.8,
 		health = 300,
 		capacity = 2,
 		ramPower = 1.0,
 		color = { 214, 196, 160 },
 		role = "Your first van: it grows with you",
-		description = "Rusty, dented and yours. Build it up at Wrench Garage: a Work Van (3 slots), then a Cargo Van (4). 1 passenger.",
+		description = "Rusty, dented, slow off the line, and yours. Build it up at Wrench Garage: a Patched Van, a Work Van (3 slots, a longer body), then a Long Cargo Van (4, a high roof). 1 passenger.",
 		stages = {
-			{ name = "Rusty Van", price = 0, capacity = 2, adds = "rust patches, primer over the dents, a loose bumper" },
-			{ name = "Work Van", price = 400, level = 2, capacity = 3, health = 30, speed = 1, look = "van_work", adds = "clean paint, a new bumper, a side ladder, shelves in the back" },
-			{ name = "Cargo Van", price = 1600, level = 4, capacity = 4, health = 70, speed = -1, look = "van_cargo", adds = "a high roof with a roof rack, a light bar, mud flaps" },
+			{ name = "Rusty Van", price = 0, capacity = 2, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
+			{ name = "Patched Van", price = 250, level = 1, capacity = 2, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
+			{ name = "Work Van", price = 700, level = 2, capacity = 3, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
+			{ name = "Long Cargo Van", price = 2200, level = 4, capacity = 4, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
 		},
 	},
 	{
 		id = "courier",
+		trolley = true,
 		level = 2,
 		mount = true,
 		name = "Courier Van",
@@ -182,6 +200,7 @@ Config.Cars = {
 	},
 	{
 		id = "highroof",
+		trolley = true,
 		level = 3,
 		mount = true,
 		name = "High-Roof Van",
@@ -224,6 +243,7 @@ Config.Cars = {
 	},
 	{
 		id = "boxtruck",
+		trolley = true,
 		level = 6,
 		mount = true,
 		name = "Box Truck",
@@ -237,11 +257,11 @@ Config.Cars = {
 		ramPower = 1.4,
 		color = { 238, 238, 232 },
 		role = "The big one: the only way to 6 and more",
-		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler. The big loads need it. 2 passengers.",
+		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler (a longer box that takes a pallet). The big loads need it. 2 passengers.",
 		stages = {
 			{ name = "Box Truck", price = 0, capacity = 6, adds = "" },
 			{ name = "Liftgate Truck", price = 7500, level = 8, capacity = 7, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
-			{ name = "Freight Hauler", price = 15000, level = 10, capacity = 8, health = 150, speed = -2, look = "boxtruck_freight", adds = "a tall wind deflector, side skirts, a second stacked row" },
+			{ name = "Freight Hauler", price = 15000, level = 10, capacity = 8, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
 		},
 	},
 	{
@@ -263,6 +283,27 @@ Config.Cars = {
 		stages = {
 			{ name = "Muscle Car", price = 0, capacity = 1, adds = "" },
 			{ name = "Street Machine", price = 6000, level = 9, capacity = 2, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a bigger trunk" },
+		},
+	},
+	{
+		id = "freight",
+		level = 9,
+		trolley = true,
+		pallets = 3,
+		name = "Freight Truck",
+		price = 45000,
+		style = "freighttruck",
+		maxSpeed = 45,
+		accel = 12,
+		turn = 1.2,
+		health = 900,
+		capacity = 12,
+		ramPower = 2.0,
+		color = { 46, 88, 150 },
+		role = "Warehouse freight: pallets and 12 slots",
+		description = "A cab-over truck with a long box, a roll-up door and a loading floor at dock height: 12 slots or 3 pallets, its own pallet jack inside. Slow and heavy, no car gun. 1 passenger.",
+		stages = {
+			{ name = "Freight Truck", price = 0, capacity = 12, adds = "" },
 		},
 	},
 	{
@@ -376,6 +417,7 @@ Config.Cars = {
 	},
 	{
 		id = "movingtruck",
+		pallets = 1,
 		name = "Moving Truck",
 		price = 0,
 		style = "movingtruck",
@@ -386,7 +428,7 @@ Config.Cars = {
 		capacity = 10,
 		ramPower = 1.6,
 		color = { 230, 120, 40 },
-		description = "Big Move's moving truck. 1 passenger.",
+		description = "Big Move's moving truck: a tall box that takes a pallet. 1 passenger.",
 		company = true,
 		employer = "movers",
 	},
@@ -718,12 +760,18 @@ export type UpgradeDef = {
 -- 3.4: you keep your first car and upgrade it, so the first levels of the car tracks are cheap (a few deliveries)
 -- and the last ones dear. 3.5: the Cargo Rack (+1 slot a level) is gone: the car's STAGES (CarDef.stages) give the
 -- room now; a 3.4 save's cars became the stage that holds the slots they had, rack included (Economy.legacyStage).
+-- 4.0, the upgrades you see: Engine level 1 stops the Rusty Van's smoking exhaust; Handling is Tyres & Suspension now
+-- (the id stays, for the saves): new black tyres with a tread ring from level 1 (bald grey ones before, on the Rusty
+-- and the Patched Van), alloy rims from 3, a lower stance at 5. The Hand Trolley (one level, only on the cars with
+-- CarDef.trolley: Economy.upgradeFits) rides folded inside the back doors (the Attachment TrolleyMount on the
+-- chassis); server/Cargo.luau lets you take it out and carry up to 4 pieces at once.
 Config.Upgrades = {
-	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 400, costGrowth = 2.0, perLevel = 0.08 },
-	{ id = "handling", car = true, name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
+	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 1: no more exhaust smoke · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 400, costGrowth = 2.0, perLevel = 0.08 },
+	{ id = "handling", car = true, name = "Tyres & Suspension", description = "+8% steering · Lv 1: new tyres with tread · Lv 3: alloy rims · Lv 5: a lower stance", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
 	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
 	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
 	{ id = "loading", car = true, name = "Quick Hands", description = "−15% time to open the back, load and unload", maxLevel = 3, baseCost = 400, costGrowth = 2.0, perLevel = 0.15 },
+	{ id = "trolley", car = true, name = "Hand Trolley", description = "Carry up to 4 pieces at once · it rides folded inside the back doors (vans and trucks)", maxLevel = 1, baseCost = 600, costGrowth = 1, perLevel = 0 },
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }

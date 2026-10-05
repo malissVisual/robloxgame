@@ -158,7 +158,7 @@ for _, def in Config.Cars do
 		dealer += 1
 	end
 end
-check("eight cars at the dealer", dealer == 8, dealer)
+check("nine cars at the dealer (4.0: the Freight Truck)", dealer == 9, dealer)
 check("the courier van is cheap, a few missions' money", car("courier").price <= rewardsUpTo(2) and car("courier").price > rewardsUpTo(1), car("courier").price)
 check("the rally van is the dealer's last and dearest", car("rallyvan").price >= 2 * car("muscle").price, car("rallyvan").price)
 check("the armored van is tough, the rally van fast", car("armorvan").health >= 2 * car("van").health and car("rallyvan").maxSpeed > car("pickup").maxSpeed)
