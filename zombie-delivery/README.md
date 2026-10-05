@@ -123,6 +123,10 @@ git pull + the sync.
 
 A Play test in Studio starts like a new player, with `Config.StudioStartMoney` ($150; the admin panel, P, gives money
 for testing). A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
+Since 4.2 a save is locked to the server that plays it (UpdateAsync, `Config.SaveLockWait` / `SaveLockStale`): a quick
+rejoin on another server waits up to 15 s for the last server's leave save, a stale server never overwrites newer
+data, leave and shutdown saves retry, and a save that cannot be read on a live server kicks with "please rejoin" instead
+of letting you play a profile that would not be saved.
 
 ## How to play
 
