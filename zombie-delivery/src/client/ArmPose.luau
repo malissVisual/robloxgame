@@ -9,13 +9,20 @@
 -- Cargo: every character with the Carrying attribute (server/Cargo.luau; players and the people in workspace.Npcs)
 -- holds it: both upper arms forward-down, the forearms forward under the box at chest height (the gun in the hand
 -- is hidden meanwhile); "horse" is a lead: the right hand a little forward on the rope. Blended in and out too.
+-- 3.9: a holstered gun (the Holstered attribute, server/CloseCombat.luau; yours as client/Holster.luau shows it) is
+-- hidden the same way on foot, so the arms hang empty. A melee swing (V) moves the right arm on top of whatever else
+-- it does: a quick wind-up and a punch forward, or an overhead strike with the gun, about Config.Melee.SwingTime long
+-- (shared/Melee.luau swing). The others' swings come from their MeleeAt / MeleeKind attributes, yours starts on the
+-- key press (Holster.localSwing; your MeleeAt is not played again).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
+local Melee = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Melee"))
 local CameraRig = require(script.Parent.CameraRig)
+local Holster = require(script.Parent.Holster)
 
 local ArmPose = {}
 
@@ -58,9 +65,9 @@ local function baseOf(joint: any): CFrame
 	return live
 end
 
--- The joint goes from the animation toward `aim` (by aimT) and then toward `carry` (by carryT); either may be nil.
--- Both 0 gives the joint back to the animation.
-local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carryT: number)
+-- The joint goes from the animation toward `aim` (by aimT), then toward `carry` (by carryT), then (3.9) toward the
+-- melee `swing` (by swingT); any may be nil. All 0 gives the joint back to the animation.
+local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carryT: number, swing: CFrame?, swingT: number?)
 	if not joint or not joint.Parent then
 		return
 	end
@@ -71,6 +78,9 @@ local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carry
 	end
 	if carry and carryT > 0 then
 		out = out:Lerp(carry, carryT)
+	end
+	if swing and swingT and swingT > 0 then
+		out = out:Lerp(swing, swingT)
 	end
 	if out == base then
 		joint.Transform = base
@@ -143,16 +153,63 @@ local function carryGoals(kind: string?): ArmGoals
 	}
 end
 
--- Both poses on a character: aim (t 0..1, pitch in radians, + is up) and carry (t 0..1, the kind held).
-local function pose(character: Model, aimT: number, pitch: number, carryT: number, kind: string?)
+-- 3.9, the melee swing of the right arm (R15): per kind the wind-up and the hit; the arm goes from one to the other
+-- (Melee.swing's k). A punch pulls the fist back, bent, and drives it straight forward a little inward; a strike with
+-- the gun raises it over the shoulder and chops it down and forward, the wrist snapping the gun's butt ahead.
+type SwingShape = { wind: ArmGoals, hit: ArmGoals, r6Wind: number, r6Hit: number }
+local SWINGS: { [string]: SwingShape } = {
+	punch = {
+		wind = {
+			rs = CFrame.Angles(0, math.rad(-8), 0) * CFrame.Angles(math.rad(-22), 0, 0),
+			re = CFrame.Angles(math.rad(100), 0, 0),
+			rw = CFrame.identity,
+		},
+		hit = {
+			rs = CFrame.Angles(0, math.rad(14), 0) * CFrame.Angles(math.rad(88), 0, 0),
+			re = CFrame.Angles(math.rad(6), 0, 0),
+			rw = CFrame.identity,
+		},
+		r6Wind = math.rad(-25), -- R6: the shoulder about Z (+ is forward)
+		r6Hit = math.rad(95),
+	},
+	gun = {
+		wind = {
+			rs = CFrame.Angles(0, math.rad(10), 0) * CFrame.Angles(math.rad(150), 0, 0),
+			re = CFrame.Angles(math.rad(70), 0, 0),
+			rw = CFrame.Angles(math.rad(20), 0, 0),
+		},
+		hit = {
+			rs = CFrame.Angles(0, math.rad(14), 0) * CFrame.Angles(math.rad(68), 0, 0),
+			re = CFrame.Angles(math.rad(14), 0, 0),
+			rw = CFrame.Angles(math.rad(-35), 0, 0),
+		},
+		r6Wind = math.rad(160),
+		r6Hit = math.rad(65),
+	},
+}
+
+-- Where the swing is: t 0..1 (how far it is laid on), k 0..1 (wind-up → hit), the kind.
+type Swing = { t: number, k: number, kind: string }
+local NO_SWING: Swing = { t = 0, k = 0, kind = "punch" }
+
+local function between(a: CFrame?, b: CFrame?, k: number): CFrame?
+	return if a and b then a:Lerp(b, k) else a or b
+end
+
+-- Every pose on a character: aim (t 0..1, pitch in radians, + is up), carry (t 0..1, the kind held) and the swing.
+local function pose(character: Model, aimT: number, pitch: number, carryT: number, kind: string?, swing: Swing?)
 	local kick = kicks[character] or 0
 	local up = math.rad(90) + pitch + kick * 0.11
 	local c: ArmGoals = carryGoals(if carryT > 0 then kind else nil)
+	local sw = swing or NO_SWING
+	local shape = if sw.t > 0 then SWINGS[sw.kind] or SWINGS.punch else nil
 	if character:FindFirstChild("UpperTorso") then
 		-- R15: an arm hangs down (-Y); turning about X lifts it forward (-Z), about Y swings it in or out.
-		lay(jointIn(character, "RightUpperArm", "RightShoulder"), CFrame.Angles(0, math.rad(8), 0) * CFrame.Angles(up, 0, 0), aimT, c.rs, carryT)
-		lay(jointIn(character, "RightLowerArm", "RightElbow"), CFrame.Angles(kick * 0.08, 0, 0), aimT, c.re, carryT)
-		lay(jointIn(character, "RightHand", "RightWrist"), CFrame.identity, aimT, c.rw, carryT)
+		local w: ArmGoals = if shape then shape.wind else {}
+		local h: ArmGoals = if shape then shape.hit else {}
+		lay(jointIn(character, "RightUpperArm", "RightShoulder"), CFrame.Angles(0, math.rad(8), 0) * CFrame.Angles(up, 0, 0), aimT, c.rs, carryT, between(w.rs, h.rs, sw.k), sw.t)
+		lay(jointIn(character, "RightLowerArm", "RightElbow"), CFrame.Angles(kick * 0.08, 0, 0), aimT, c.re, carryT, between(w.re, h.re, sw.k), sw.t)
+		lay(jointIn(character, "RightHand", "RightWrist"), CFrame.identity, aimT, c.rw, carryT, between(w.rw, h.rw, sw.k), sw.t)
 		lay(jointIn(character, "LeftUpperArm", "LeftShoulder"), CFrame.Angles(0, math.rad(-38), 0) * CFrame.Angles(up - math.rad(8), 0, 0), aimT, c.ls, carryT)
 		lay(jointIn(character, "LeftLowerArm", "LeftElbow"), CFrame.Angles(math.rad(12), 0, 0), aimT, c.le, carryT)
 		lay(jointIn(character, "LeftHand", "LeftWrist"), CFrame.identity, aimT, c.lw, carryT)
@@ -164,7 +221,8 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 		local lead = kind == "horse"
 		local rightCarry = if carryT > 0 then CFrame.Angles(0, 0, math.rad(if lead then 25 else 75)) else nil
 		local leftCarry = if carryT > 0 and not lead then CFrame.Angles(0, 0, -math.rad(75)) else nil
-		lay(Joints.find(torso, "Right Shoulder"), CFrame.Angles(0, 0, up), aimT, rightCarry, carryT)
+		local rightSwing = if shape then CFrame.Angles(0, 0, shape.r6Wind + (shape.r6Hit - shape.r6Wind) * sw.k) else nil
+		lay(Joints.find(torso, "Right Shoulder"), CFrame.Angles(0, 0, up), aimT, rightCarry, carryT, rightSwing, sw.t)
 		lay(Joints.find(torso, "Left Shoulder"), CFrame.Angles(0, 0, -(up - math.rad(10))), aimT, leftCarry, carryT)
 	end
 end
@@ -180,7 +238,8 @@ local function carryingOf(character: Model): string?
 	return if type(value) == "string" and value ~= "" then value else nil
 end
 
--- The gun in the hand is hidden (on this client) while the hands hold cargo, and comes back after.
+-- The gun in the hand is hidden (on this client) while the hands hold cargo or (3.9) it is holstered on foot, and comes
+-- back after. Every client does it for every character, so everybody sees it away.
 local function showGun(character: Model, visible: boolean)
 	local gun = character:FindFirstChild("HandGun")
 	local hidden = hiddenGuns[character]
@@ -271,31 +330,76 @@ local function ease(blend: number): number
 	return 1 - (1 - blend) * (1 - blend)
 end
 
--- One character this frame: the aim and the carry pose blend in or out and go onto the joints.
-local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: boolean, pitch: number, raise: number, dt: number)
+-- 3.9: the swing a character's arm is in (the others': their MeleeAt / MeleeKind attributes; yours: Holster). A new
+-- MeleeAt plays from the moment it arrives here (a late attribute still shows the whole swing); an old one (you joined
+-- later, it came back into view) does not play.
+type Seen = { value: number, start: number }
+local seenSwings: { [Model]: Seen } = {}
+local swung: { [Model]: boolean } = {} -- swinging last frame (the arm goes back to the animation once it ends)
+
+local function swingOf(character: Model, mine: boolean): Swing
+	if mine then
+		local at, kind = Holster.localSwing()
+		if not at then
+			return NO_SWING
+		end
+		local t, k = Melee.swing(os.clock() - at)
+		return if t > 0 then { t = t, k = k, kind = kind } else NO_SWING
+	end
+	local value = character:GetAttribute("MeleeAt")
+	if type(value) ~= "number" then
+		return NO_SWING
+	end
+	local seen = seenSwings[character]
+	local start: number
+	if seen and seen.value == value then
+		start = seen.start
+	else
+		local fresh = workspace:GetServerTimeNow() - value < 1
+		start = if fresh then os.clock() else -math.huge
+		seenSwings[character] = { value = value, start = start }
+	end
+	local t, k = Melee.swing(os.clock() - start)
+	if t <= 0 then
+		return NO_SWING
+	end
+	local kind = character:GetAttribute("MeleeKind")
+	return { t = t, k = k, kind = if type(kind) == "string" then kind else "punch" }
+end
+
+-- One character this frame: the aim and the carry pose blend in or out and go onto the joints, the swing on top.
+-- holstered (3.9): the gun in the hand is hidden while on foot.
+local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: boolean, pitch: number, raise: number, dt: number, holstered: boolean?, swing: Swing?)
 	local alive = humanoid ~= nil and humanoid.Health > 0 and not humanoid.Sit
 	local kind = if alive then carryingOf(character) else nil
 	-- Hands full: no gun.
 	if kind or not alive then
 		aiming = false
 	end
-	if kind then
+	if kind or (holstered and humanoid ~= nil and not humanoid.Sit) then
 		showGun(character, false)
 	elseif hiddenGuns[character] then
 		showGun(character, true)
 	end
+	local sw = if alive and not kind and swing and swing.t > 0 then swing else nil
 	local blend = blends[character] or 0
 	blend = if aiming then math.min(1, blend + dt / raise) else math.max(0, blend - dt / LOWER_TIME)
 	local carry = carries[character]
 	local carryBlend = if carry then carry.t else 0
 	carryBlend = if kind then math.min(1, carryBlend + dt / CARRY_IN) else math.max(0, carryBlend - dt / CARRY_OUT)
-	if blend <= 0 and carryBlend <= 0 then
-		if blends[character] or carry then
+	if blend <= 0 and carryBlend <= 0 and not sw then
+		if blends[character] or carry or swung[character] then
 			pose(character, 0, 0, 0, nil) -- back to the animation alone
 			blends[character] = nil
 			carries[character] = nil
+			swung[character] = nil
 		end
 		return
+	end
+	if sw then
+		swung[character] = true
+	else
+		swung[character] = nil
 	end
 	if blend > 0 then
 		blends[character] = blend
@@ -315,7 +419,7 @@ local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: bool
 	else
 		carries[character] = nil
 	end
-	pose(character, ease(blend), math.clamp(pitch, -1.1, 1.1), ease(carryBlend), held)
+	pose(character, ease(blend), math.clamp(pitch, -1.1, 1.1), ease(carryBlend), held, sw)
 end
 
 local function step(dt: number)
@@ -342,7 +446,9 @@ local function step(dt: number)
 		end
 		-- Yours come up slower out of a sprint (CameraRig decides); the others' at the normal pace.
 		local raise = if player == me then math.max(0.1, CameraRig.raiseTime() - 0.05) else RAISE_TIME
-		poseCharacter(character, humanoid, aiming, pitch, raise, dt)
+		-- 3.9: the holster (yours as you just chose it) and the melee swing.
+		local holstered = if player == me then Holster.holstered() else character:GetAttribute("Holstered") == true
+		poseCharacter(character, humanoid, aiming, pitch, raise, dt, holstered, swingOf(character, player == me))
 	end
 	-- The people of the world (givers, receivers) carry too.
 	local npcs = workspace:FindFirstChild("Npcs")
@@ -367,6 +473,16 @@ local function step(dt: number)
 	for character in hiddenGuns do
 		if not character.Parent then
 			hiddenGuns[character] = nil
+		end
+	end
+	for character in seenSwings do
+		if not character.Parent then
+			seenSwings[character] = nil
+		end
+	end
+	for character in swung do
+		if not character.Parent then
+			swung[character] = nil
 		end
 	end
 	for character in blends do

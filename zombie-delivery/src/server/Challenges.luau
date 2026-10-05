@@ -52,7 +52,7 @@ export type Kill = {
 	kind: string?, -- the Config.Zombies kind
 	bandit: boolean?, -- a bandit / gunner on foot
 	headshot: boolean?,
-	cause: string?, -- "gun" (a direct hit), "car" (rammed / run over), "splash" (a blast or a fire), "other"
+	cause: string?, -- "gun" (a direct hit), "car" (rammed / run over), "splash" (a blast or a fire), "melee" (3.9), "other"
 	from: string?, -- fired from a car seat (server/Gun.luau): "cargun" (the roof gun), "window" (a passenger's gun)
 }
 

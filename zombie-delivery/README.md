@@ -65,6 +65,15 @@ Version 3.7 is the **first day on the job**:
   (`Config.Cargo.LightLooks`).
 Version 3.8 is **the contract UI**: Codex's approved direction (`design/ui-contract/`) replaces the 3.6 paper look
 everywhere: compact white type, charcoal, fine lines and red accents, a quiet HUD around the world (see **The HUD**).
+Version 3.9 puts **the gun away**: you no longer walk around with it in your hand.
+- **B holsters or draws the gun.** Holstered, the gun is gone from your hand for everybody and the arms hang normally.
+  You start holstered after every spawn. Aiming (right mouse) or shooting (left mouse, F, FIRE) while holstered draws
+  it on that first press without firing; picking a gun (Q, the weapon wheel) draws it too. In a car nothing changes.
+- **V fights hand to hand:** holstered a **punch** (weak, quick), with the gun out a **strike** with it (a
+  pistol-whip, a rifle butt: harder, slower). It hits the nearest zombie or bandit right in front of you and pushes it
+  back; everybody sees the arm swing (`Config.Melee`, `shared/Melee.luau`, `server/CloseCombat.luau`,
+  `client/Holster.luau`).
+- **The bag moved to I.**
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -98,10 +107,12 @@ for testing). A published game starts with `Config.StartMoney` and saves to the 
 | Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (on foot: the gun in your hand; driver: the car gun on the roof if the car has one, else a one-handed gun out of the window; passenger: a one-handed gun out of the window) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
+| Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire) | B (gamepad: d-pad down) | DRAW / HOLSTER over FIRE |
+| Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V | PUNCH / STRIKE over FIRE |
 | Switch gun | hold Q: the weapon wheel (point at a gun, let go); tap Q: the next gun; or click the weapon label | the weapon label |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 (or click a tag) | the tags |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
-| The Dispatch board (the jobs) / map / backpack | J / M / B | JOBS in the … menu / MAP / BAG in the … menu |
+| The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | JOBS in the … menu / MAP / BAG in the … menu |
 | The "…" menu (JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP) | click … | tap … |
 | Close a window, the big map or the … menu | ESC (gamepad B) | ✕ |
 | Call your car (or reset it while you sit in it) | CAR in the … menu | CAR in the … menu |
@@ -758,7 +769,7 @@ what each part shows is the same.
 | Upper left | ■ DELIVERY CONTRACT (type, stars, stop), the destination in caps, the objectives as checkboxes, a rule, the time left (red under 30 s) / EST. pay; the tutorial's hint, the crew strip and the toasts sit under it |
 | Upper right | MAP [M] · CREW [K] · MENU (every other action: JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
-| Lower right | the gun and [Q], or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [B] |
+| Lower right | the gun and [Q] (3.9 on foot: HANDS · [B] DRAW · [V] PUNCH, or the gun · [B] HOLSTER · [V] STRIKE), or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [I] |
 | Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it |
 | In the world | a small red waypoint with the place and the distance |
 
@@ -798,7 +809,7 @@ pastel face. Everything is laid out from the screen size, so nothing overlaps on
   them is a cream pill: what to do right now ("Get out and open the back (E)").
 * **The utilities** (on a computer over the weapon label, clear of Roblox's player list; on touch top right): **MAP**
   (M), **CREW** (K) and a round **…** that opens the menu with every other action and its key: **JOBS** (J),
-  **MISSIONS** (U), **BAG** (B), **CAR** (calls your car; it counts down while the car is on the way), **TOP** (L),
+  **MISSIONS** (U), **BAG** (I; B before 3.9), **CAR** (calls your car; it counts down while the car is on the way), **TOP** (L),
   **ESTATE** (H), **SOUND** (N) and, while a job runs, **GIVE UP** (press it twice). A computer shows a button's name
   and key on hover; a touch screen keeps the names under the buttons. The ADMIN button (admins only) keeps its corner.
 * **The Dispatch board** (J, JOBS, the depot counter, NEXT JOB; `client/DispatchUi.luau`): the job board as a lavender
@@ -915,7 +926,8 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               (where each sound and music loop sits in the two audio assets), Missions (3.0: the campaigns and missions,
               unlocking, the rating, the stars, the twists' pay; 3.2: 11 campaigns and 110 missions, the campaign
               chain `requires`, the computed mission levels levelOf, the DUO campaign), Challenges (3.1: the 42 challenges, the
-              counters, value / progress / doneCount / allTitles)
+              counters, value / progress / doneCount / allTitles), Melee (3.9: punch or strike, the cone in front of
+              you, the arm's swing curve)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers; 3.4: the repair bays, the GARAGE posts), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once; 3.4: every
@@ -939,7 +951,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               lot), Repair (3.4: the repair bays, the timer, the fee), Challenges
               (3.1: counts the stats from the other modules' hooks, the distance and the places visited, checks and
               pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
-              the head, the Challenges remote)
+              the head, the Challenges remote), CloseCombat (3.9: the holster, the Holstered attribute, the melee
+              checked and dealt: the nearest enemy in the cone, MeleeAt / MeleeKind for the swing)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
@@ -953,7 +966,9 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               the mission banner in the top stack, the celebration card; 3.1: the CHALLENGES, SECRETS and REWARDS
               tabs and the unlock popups; 3.2: the lock texts, the DUO badge, FIND CREW; 3.4: the 📦 needs N slots
               chip), Secrets (3.1: hides the lost packages you found, animates the others nearby), GarageUi (3.4: the
-              garage window, only your own GARAGE prompts, the repair timer card)
+              garage window, only your own GARAGE prompts, the repair timer card), Holster (3.9: B holsters / draws,
+              V punches or strikes, the first aim or shot draws a holstered gun; ArmPose hides a holstered gun and
+              swings the arm)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
@@ -974,7 +989,8 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               needs against the car that does it; the repair's time and fee; the garages; 3.5: the stages, the Old Van
               2 → 3 → 4, 6+ only in the Box Truck, every mission fits a car and a stage by its level, the early
               campaigns the Old Van, the big loads say so, the rack migration), run_tests.py checks every car's
-              capacity is its body's slot count (3.5: and every stage's its look's), levels the early garages, logic the cheap first levels
+              capacity is its body's slot count (3.5: and every stage's its look's), levels the early garages, logic the cheap first levels;
+              3.9: melee (the punch and the strike, the reach cone, the swing curve)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -987,7 +1003,7 @@ come back and the owner's client gets the car.
 **Joints**: since Roblox's Avatar Joint Upgrade (default in every place since 2026) an R15 character's joints are
 `AnimationConstraint`s, not `Motor6D`s (same names, but C0 / C1 are read-only). Everything that poses or ragdolls a
 body goes through `shared/Joints.luau` (both kinds) and writes `Transform` in `RunService.PreSimulation`, after the
-animations: the aiming arms (`client/ArmPose.luau`), the bandits' raised guns, the ragdolls. The horses are not
+animations: the aiming arms (`client/ArmPose.luau`; 3.9: the melee swing too), the bandits' raised guns, the ragdolls. The horses are not
 characters: they have their own `Motor6D`s, swung on the clients by `client/AnimalAnimator.luau`.
 
 **Enemies** are R15 bodies made from a HumanoidDescription (blocky custom rigs as the fallback) animated by their
@@ -1002,7 +1018,7 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 
 Runs every `tests/*_test.luau` (logic with the 2.6 real estate, the 3.0 places and the 3.1 lost packages, cargo,
 roads, cargun, icons, levels with the 3.2 progression, jobs25, traffic, audio, missions with the 3.2 campaign chain
-and DUO campaign, challenges, gear, and the 3.4 capacity test) and compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
+and DUO campaign, challenges, gear, the 3.4 capacity test and the 3.9 melee test) and compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
 function, as Studio compiles). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 

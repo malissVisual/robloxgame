@@ -23,8 +23,11 @@
 -- accents (the contract marker, the destination, urgent states); the colours and the small pieces are in
 -- client/HudContract.luau (P below). Upper left the contract group, upper right MAP [M] CREW [K] MENU, lower left the
 -- cash and rank over the monochrome minimap and a thin health bar, lower right the weapon (or the cargo in your hands)
--- and the vehicle line ("OLD VAN / 72% / CARGO 3 OF 4", the speed while driving) over INVENTORY [B], lower centre one
+-- and the vehicle line ("OLD VAN / 72% / CARGO 3 OF 4", the speed while driving) over INVENTORY [I], lower centre one
 -- contextual action in a key box with a fine progress line. The windows' rows are slim charcoal rows.
+-- 3.9: the bag moved to I (B holsters / draws the gun, V punches or strikes: client/Holster.luau); on foot the weapon
+-- line says HANDS · [B] DRAW · [V] PUNCH or the gun · [B] HOLSTER · [V] STRIKE; a touch screen gets PUNCH / STRIKE
+-- and DRAW / HOLSTER buttons over FIRE.
 -- A shop card whose def has `requires` (a campaign, or a list of them) shows "🔒 FINISH IRON SUPPLY" until it is done.
 
 local Players = game:GetService("Players")
@@ -1511,7 +1514,7 @@ end
 -- ── Buttons ────────────────────────────────────────────────────────────────
 
 -- 3.8, the actions (upper right): the quiet text actions MAP [M], CREW [K] and MENU. MENU opens a slim charcoal list of
--- every other action with its key: JOBS (J), MISSIONS (U), BAG (B), CAR, TOP (L), ESTATE (H), SOUND (N) and, while a
+-- every other action with its key: JOBS (J), MISSIONS (U), BAG (I; 3.9, B before), CAR, TOP (L), ESTATE (H), SOUND (N) and, while a
 -- job runs, GIVE UP (twice). Hover brightens an action and draws a thin red line under it; a touch screen drops the
 -- keys and keeps 44 px hit areas. Other modules hook in (Hud.onJobs, Hud.onCrew, Hud.onEstate, Hud.onMissions,
 -- Hud.onSound). layout() scales and places the row: on a computer left of (or under) Roblox's player list, on touch
@@ -1541,7 +1544,7 @@ BUTTONS = {
 	{ id = "missions", menu = true, icon = "⭐", text = "MISSIONS", key = "U", onClick = function()
 		hook("missions window", Hud.onMissions)
 	end },
-	{ id = "bag", menu = true, icon = "🎒", text = "BAG", key = "B", onClick = function()
+	{ id = "bag", menu = true, icon = "🎒", text = "BAG", key = "I", onClick = function()
 		toggleBackpack()
 	end },
 	{ id = "car", menu = true, icon = "🚗", text = "CAR", onClick = function()
@@ -1790,7 +1793,7 @@ end
 
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
--- 3.8, the lower right column (one frame, view.right; layout() scales and places it), bottom up: INVENTORY [B] with
+-- 3.8, the lower right column (one frame, view.right; layout() scales and places it), bottom up: INVENTORY [I] with
 -- the consumables (keys 1-5 and their counts; hidden while you carry), the vehicle line (── Car panel ──), a thin
 -- rule, and the weapon (a small icon, the gun's name and state, Q) or, while you carry, the cargo in your hands and
 -- what carrying stops ("2 × PIZZA BOXES / HANDS FULL · NO GUN, NO SPRINT"). Hidden pieces take no room.
@@ -1825,10 +1828,13 @@ local weaponRow = Ui.make("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
 }, weaponBar)
+local Holster = require(script.Parent.Holster) -- 3.9: the gun away (B) and the melee (V)
+local touchHands: any = {} -- 3.9: the touch buttons over FIRE (melee, holster), made with FIRE below
 
 -- What the weapon line shows depends on where you are: on foot your gun; driving a car with a car gun that gun; in any
 -- other seat your gun, WINDOW READY when it is one-handed, ON FOOT ONLY when it is not (it does not fire there);
 -- with cargo in your hands the cargo and what carrying stops; while the cargo loads, HOLSTERED and dimmed.
+-- 3.9, on foot: the gun holstered (B) shows HANDS and [B] DRAW · [V] PUNCH, the gun out [B] HOLSTER · [V] STRIKE.
 local function seatView(): (boolean, Config.CarGunDef?)
 	local seatedIn, driving = Drive.seatedCar()
 	return seatedIn ~= nil, if seatedIn and driving then Shooting.carGunOf(seatedIn) else nil
@@ -1848,7 +1854,7 @@ end
 function weaponBarKey(): string
 	local seated, carGun = seatView()
 	local holding = myCarrying()
-	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}`
+	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}`
 end
 shownWeaponBar = ""
 
@@ -1870,10 +1876,19 @@ end
 function renderWeapons()
 	Ui.clear(weaponRow)
 	shownWeaponBar = weaponBarKey()
+	local holding = myCarrying()
+	-- 3.9: the touch buttons over FIRE: on foot with free hands, PUNCH / STRIKE and DRAW / HOLSTER as it is now.
+	local seatedNow = seatView()
+	local away = Holster.holstered()
+	if touchHands.melee then
+		touchHands.melee.Visible = not seatedNow and not holding
+		touchHands.melee.Text = if away then "PUNCH" else "STRIKE"
+		touchHands.holster.Visible = not seatedNow and not holding
+		touchHands.holster.Text = if away then "DRAW" else "HOLSTER"
+	end
 	if not state then
 		return
 	end
-	local holding = myCarrying()
 	if holding then
 		-- 3.8: the cargo in your hands and the restriction, never a usable-looking gun.
 		local held = heldInfo(holding)
@@ -1902,11 +1917,15 @@ function renderWeapons()
 	end
 	local usable = carGun ~= nil or not seated or (gun ~= nil and gun.oneHanded == true)
 	local holstered = carGun == nil and loading()
+	-- 3.9: on foot the holster (B) and the melee (V): empty hands, or the gun with what B and V do now.
+	local hands = not seated and not holstered and away
 	local status = if holstered then "Holstered"
 		elseif carGun then "On the roof"
 		elseif not usable then "⚠ On foot only"
 		elseif seated then "Window ready"
-		else "Ready"
+		elseif touchLayout then (if hands then "Holstered · tap DRAW or PUNCH" else "Ready · tap STRIKE")
+		elseif hands then "[B] Draw · [V] Punch"
+		else "[B] Holster · [V] Strike"
 	local group = Ui.make("CanvasGroup", {
 		Name = "GunLine",
 		Size = UDim2.fromScale(1, 1),
@@ -1914,13 +1933,13 @@ function renderWeapons()
 		GroupTransparency = if holstered or not usable then 0.45 else 0,
 	}, weaponRow)
 	local top = lineRow(group, 24)
-	Ui.icon(top, Icons.weapon(def.id), if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.fromOffset(34, 22), {
+	Ui.icon(top, if hands then nil else Icons.weapon(def.id), if hands then "✊" elseif def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.fromOffset(34, 22), {
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ImageColor3 = P.ink,
 		LayoutOrder = 1,
 	})
-	P.text(top, string.upper(def.name), UDim2.fromOffset(0, 24), {
+	P.text(top, if hands then "HANDS" else string.upper(def.name), UDim2.fromOffset(0, 24), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.HeadingFont,
 		TextSize = 16,
@@ -1958,11 +1977,12 @@ function nextWeapon()
 		return
 	end
 	local index = table.find(owned, state.weapon) or 0
+	Holster.drawIfHolstered() -- 3.9: the gun picked comes into the hand (as on the weapon wheel)
 	Net.get("Equip"):FireServer("weapon", owned[index % #owned + 1])
 end
 
 -- The inventory: the consumables as compact tokens (the key, the item's small icon, the count; the name over it on
--- hover or gamepad focus; a click or a tap uses it), and INVENTORY [B] (the backpack) under them.
+-- hover or gamepad focus; a click or a tap uses it), and INVENTORY [I] (the backpack) under them.
 hotbar = Ui.make("Frame", {
 	Name = "Hotbar",
 	Size = UDim2.fromOffset(RIGHT_W, HOTBAR_H),
@@ -2044,7 +2064,7 @@ for index, def in Config.Items do
 		useItem(def.id)
 	end)
 end
-P.action(hotbar, if touchLayout then "INVENTORY" else "INVENTORY  [B]", {
+P.action(hotbar, if touchLayout then "INVENTORY" else "INVENTORY  [I]", {
 	Name = "Inventory",
 	Size = UDim2.fromOffset(0, if touchLayout then 44 else 22),
 	Position = UDim2.new(1, -2, 0, 32),
@@ -2085,6 +2105,30 @@ fire.InputEnded:Connect(function(input: InputObject)
 		Shooting.setAutoHeld(false)
 	end
 end)
+-- 3.9: the hands on a touch screen, stacked over FIRE (its children: they move, scale and hide with it): PUNCH /
+-- STRIKE (the melee, client/Holster.luau) right over it and DRAW / HOLSTER over that. renderWeapons sets their words
+-- and shows them on foot with free hands.
+local function handButton(name: string, text: string, height: number, above: number, onClick: () -> ()): any
+	local button = Ui.make("TextButton", {
+		Name = name,
+		Size = UDim2.fromOffset(FIRE_SIZE, height),
+		Position = UDim2.new(1, 0, 0, -above),
+		AnchorPoint = Vector2.new(1, 1),
+		BackgroundColor3 = P.surface,
+		BackgroundTransparency = 0.35,
+		Text = text,
+		TextColor3 = P.ink,
+		Font = Theme.HeadingFont,
+		TextSize = if height > 36 then 16 else 13,
+		AutoButtonColor = false,
+		Visible = false,
+	}, fire)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.ink, Thickness = 1, Transparency = 0.3 }, button)
+	button.Activated:Connect(onClick)
+	return button
+end
+touchHands.melee = handButton("Melee", "PUNCH", 44, 8, Holster.melee)
+touchHands.holster = handButton("Holster", "DRAW", 30, 60, Holster.toggle)
 end
 
 -- ── Car panel ──────────────────────────────────────────────────────────────
@@ -3576,6 +3620,12 @@ function Hud.start()
 			escape()
 			return
 		end
+		if key == Enum.KeyCode.I then
+			-- 3.9: the bag (B holsters the gun now, client/Holster.luau). Before the processed check: Roblox's own camera
+			-- binds I (zoom in) and may mark it processed; a text box with the focus was ruled out above.
+			toggleBackpack()
+			return
+		end
 		if processed then
 			return
 		end
@@ -3583,8 +3633,6 @@ function Hud.start()
 			MapView.toggle()
 		elseif key == Enum.KeyCode.J then
 			openDispatch()
-		elseif key == Enum.KeyCode.B then
-			toggleBackpack()
 		else -- (Q: the weapon wheel, client/WeaponWheel.luau)
 			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five }
 			local index = table.find(numbers, key)

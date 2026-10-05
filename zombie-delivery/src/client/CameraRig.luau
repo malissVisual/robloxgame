@@ -10,6 +10,8 @@
 -- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera (and walk at
 -- Config.Movement.Walk; a gamepad without a mouse sprints with the left stick click there too).
 -- With cargo in your hands (the Carrying attribute, server/Cargo.luau) there is no aiming, no sprint and a slower step.
+-- 3.9: with the gun holstered (B, client/Holster.luau) there is no aiming either; the first right or left click draws
+-- the gun (the left one does not shoot then), and the gun comes up as usual from there.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -21,6 +23,7 @@ local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local Drive = require(script.Parent.Drive)
 local Stamina = require(script.Parent.Stamina)
+local Holster = require(script.Parent.Holster)
 
 local CameraRig = {}
 
@@ -325,7 +328,7 @@ local function update(dt: number)
 	end
 
 	-- Aiming: right mouse held, shooting, or a shot a moment ago (on foot only).
-	local wantAim = locked and not car and not handsFull and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
+	local wantAim = locked and not car and not handsFull and not Holster.holstered() and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
 	aimBlend = lerp(aimBlend, if wantAim or carAim then 1 else 0, math.min(1, dt * 10))
 	if wantAim and not aimingSent then
 		aimSince = now
@@ -506,9 +509,11 @@ function CameraRig.start()
 		elseif processed then
 			return
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+			Holster.pressDraws(input) -- 3.9: holstered, the gun comes out and goes up
 			rmbHeld = true
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-			lmbHeld = true
+			-- 3.9: holstered, this click only draws the gun (no shot, no aim)
+			lmbHeld = not Holster.pressDraws(input)
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)

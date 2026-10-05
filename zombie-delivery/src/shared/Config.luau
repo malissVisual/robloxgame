@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.8"
+Config.Version = "3.9"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -24,6 +24,21 @@ Config.Movement = {
 	MinToSprint = 0.25, -- an empty breath: Shift sprints again only once this share is back (no stutter)
 	Low = 0.2, -- the breath bar turns red at this share or less (and while out of breath)
 	HideAfter = 1.5, -- seconds the bar stays after the breath is full again, then it fades out
+}
+
+-- 3.9: the gun goes away (B: holster / draw) and the hands fight (V: melee). Holstered (the default after every spawn)
+-- the hands are empty, V punches; with the gun out V strikes with it (a pistol-whip, a rifle butt). The server checks
+-- every swing (server/CloseCombat.luau) and hits the nearest living zombie or bandit in a short cone in front of you
+-- (shared/Melee.luau); everybody sees the right arm swing (client/ArmPose.luau). No headshots; kills count as usual.
+Config.Melee = {
+	Reach = 5.5, -- studs from your root to the enemy's root, along the ground
+	HalfAngle = 70, -- degrees to either side of where you swing
+	Height = 5, -- studs up or down at most (a body on a ledge above you is out of reach)
+	SwingTime = 0.25, -- seconds the arm swings forward and back (client/ArmPose.luau)
+	Kinds = {
+		punch = { damage = 12, cooldown = 0.55, push = 22 }, -- the fist (holstered)
+		gun = { damage = 22, cooldown = 0.8, push = 38 }, -- the gun in the hand
+	} :: { [string]: { damage: number, cooldown: number, push: number } },
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
