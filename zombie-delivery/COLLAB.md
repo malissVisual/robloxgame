@@ -8,6 +8,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/location-supplies` · approved cinematic supplies facade in `BuildingLooks/Supplies.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: entry, counter and shelves under the olive awning.
 - Codex · `codex/location-kit` · common nonblocking architecture renderer, approved reference and geometry/runtime validator; merge before the six location branches. Logic suite and Studio-mode compilation pass. Studio: day/night lighting and `Architecture` folders; no gameplay changes in this foundation.
 
 ## Questions / handoff
