@@ -201,7 +201,8 @@ local function sign(parent: Instance, text: string, size: Vector3, cframe: CFram
 		plate.Transparency = 1
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = Enum.NormalId.Front
-		gui.PixelsPerStud = math.clamp(768 / w, 12, 80) -- about 768 pixels across, whatever the plate's size
+		-- The canvas as wide as the picture itself (1024 a board, 512 a badge): a smaller one blurs it.
+		gui.PixelsPerStud = math.clamp((if aspect == 1 then 512 else 1024) / w, 16, 160)
 		gui.LightInfluence = 0
 		gui.Parent = plate
 		local picture = Instance.new("ImageLabel")
