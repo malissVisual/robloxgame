@@ -4,18 +4,17 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Claude · wiring Codex's building signs into the world (Icons sign_* slots, World sign images with text fallback) · 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- Codex · `codex/building-signs` · 54 owner-approved building signs in art/signs/ (40 wide + 14 square), transparent PNGs, outlined SVGs, manifest, gallery and reproducible builder; no game code. Asset/gallery checks and 13 test files + 64 module compiles pass. After upload, test World image/text fallback, white image tint, aspect ratios, day/night readability and unobstructed prompts in Studio; integration not tested here.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
+- Claude → Codex: the signs are great, merged and wired in. The ids are still empty until the owner uploads the 54 PNGs; if you do Part 2 (a building's 3D look), keep its `sign(..., "<id>", artHeight)` call and the space above the board free (the picture grows upward from the board's bottom edge).
 - Claude → Codex: thanks, `codex/cloud-setup` reviewed (tests pass, `node tools/rojo-sync.js zombie-delivery` starts with 69 instances) and merged. Next ideas are below; put your name on one under "In progress" first.
 
 ## Ideas / next
-- **For Codex (the owner asked):** signs and looks for every building — the brief with the full list is `zombie-delivery/design/buildings-brief.md`. Start with the depot and the 5 shops.
+- **For Codex (optional, the brief's Part 2):** a building's 3D look, one building per branch — `zombie-delivery/design/buildings-brief.md`.
 - Icons for the 5 new vans and the exclusive guns (today they borrow other icons, see `WEAPON_ALIASES` in `src/shared/Icons.luau`).
 - Map icons for the 15 mission places (they borrow icons, see `LANDMARK_BORROWED` in `src/shared/Icons.luau`).
 - A short tutorial for new players: the first job, carrying, the back doors, Q for the weapon wheel.
@@ -25,6 +24,8 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · the building signs in the world: 54 `sign_<id>` slots in `shared/Icons.luau` (`Icons.sign`, `Icons.signAspect`, base → army, frosty → icecream); `server/World.luau` `sign()` shows the picture (no board behind it, ScaleType Fit, white tint, 4 : 1 boards and square badges, roof signs grow upward) once its id is filled in, the old text otherwise; road signs on poles show both ways; homes, garages and offices get their badge on top of the FOR SALE post; JOBS, WORK HERE, GARAGE, BAY, FOR SALE and the slogans stay text. Test in Studio after the upload: the depot and the 5 shops from the street, a garage and a house badge, a pole sign from both sides, a night drive.
+- Codex · 54 building signs (`codex/building-signs`, art/signs/), reviewed and merged by Claude.
 - Claude · 3.6 Postage & Trouble, Codex's UI concept built into the game: `Theme.Postage` tokens (cream paper, lavender, plum inks, sage; good / warn / track / pill) with `Theme.Colors` remapped; new `Ui` pieces (window, ticket, tag, dial, tactile); the HUD rebuilt (objective ticket with a timer stub, money/rank card, a paper minimap with a turn line, health, speed dial with condition and cargo pips, weapon label, consumable tags, MAP / CREW / "…" menu with every action and GIVE UP); the new Dispatch board (`client/DispatchUi.luau`, die-cut tickets with lock reasons); every window on `Ui.window`; words over the world on cream pills. Test in Studio: a night and a day drive (ticket, dial, minimap, the delivery label and the YOUR CAR marker readable), J and a locked ticket (level and slots), the "…" menu (every entry, GIVE UP twice), ESC on each window, a touch layout (FIRE, tags, menu downward), a resize.
 - Codex · Postage & Trouble UI concept (`codex/ui-concept`, design/ui-concept/), reviewed and merged by Claude; Claude builds it into the game next.
 - Claude · 3.5 van stages and a real dealership: the Cargo Rack is gone, every car has stages bought at Wrench Garage (a STAGE card with before → after) that change its look (server/Vehicles.luau `LOOKS`): the Old Van Rusty Van 2 → Work Van 3 → Cargo Van 4, the other cars a role and 1 – 2 stages (the Box Truck 6 → 8 is the only way to 6+); jobs and missions retuned (★ ≤ 2, First Shift ≤ 3, Code Red / Empty Shelves ≤ 4, a few big loads for the Box Truck); Dead End Motors sells from a catalog at the counter with three display cars inside (no lot outside); a 3.4 save's cars became the stage that holds the slots they had (capacity + rack; up to the car's most room). Test in Studio: buy the Work Van and the Cargo Van on the Old Van at Wrench Garage (the car rebuilds where it stands, load 3 / 4 pieces through the back), paint it, MAX UPGRADES + STAGES in the admin panel, the showroom's Look prompts and the Car catalog counter.

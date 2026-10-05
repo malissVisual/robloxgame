@@ -17,7 +17,7 @@ local function check(name: string, ok: boolean, detail: any?)
 	end
 end
 
--- The names in art/assets.json and art/ui/assets.json (copied here: the test reads nothing from disk).
+-- The names in art/assets.json, art/ui/assets.json and art/signs/assets.json (copied here: the test reads nothing from disk).
 local ART = {
 	"weapon_pistol", "weapon_smg", "weapon_shotgun", "weapon_rifle", "weapon_minigun", "weapon_launcher",
 	"weapon_revolver", "weapon_carbine",
@@ -29,6 +29,16 @@ local ART = {
 	"map_docks",
 	"zombie_delivery_logo",
 	"menu_background", -- art/ui/assets.json (with the logo again)
+	-- art/signs/assets.json (the building signs)
+	"sign_depot", "sign_dealer", "sign_guns", "sign_mechanic", "sign_supplies", "sign_repairs", "sign_garage_rented",
+	"sign_garage_south", "sign_garage_harbor", "sign_garage_north", "sign_garage_downtown", "sign_school", "sign_army",
+	"sign_icecream", "sign_movers", "sign_farm", "sign_ranch", "sign_clinic", "sign_gas", "sign_bank", "sign_pharmacy",
+	"sign_market", "sign_firestation", "sign_police", "sign_cityhall", "sign_dispatchtower", "sign_harborpoint",
+	"sign_docks", "sign_warehouse", "sign_fueldepot", "sign_powerplant", "sign_waterworks", "sign_trainyard",
+	"sign_radio", "sign_lodge", "sign_stables", "sign_airfield", "sign_lab", "sign_prison", "sign_lighthouse",
+	"sign_camp", "sign_stadium", "sign_hilltop", "sign_oceanview", "sign_pinecrest", "sign_lakeside", "sign_sunset",
+	"sign_maple", "sign_oak", "sign_birch", "sign_elm", "sign_office_harbor", "sign_office_tower",
+	"sign_office_penthouse",
 }
 
 -- Every picture has its id slot, and the set has nothing else.
@@ -43,7 +53,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("44 pictures", count == 44, count)
+check("98 pictures", count == 98, count)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)
@@ -100,6 +110,28 @@ for id in Map.Shops do
 	check(`shop {id} has a map icon`, exists(Icons.landmark(id)))
 end
 check("an unknown landmark: none", Icons.landmark("moon") == nil)
+
+-- The building signs: every shop, employer, tower and home has one (two places share their employer's), the garages
+-- and the homes are square badges, the rest 4 : 1 boards.
+for id in Map.Shops do
+	check(`shop {id} has a sign`, exists(Icons.sign(id)))
+end
+for _, employer in Config.Employers do
+	check(`employer {employer.id} has a sign`, exists(Icons.sign(employer.id)))
+end
+for id in Map.Towers do
+	check(`tower {id} has a sign`, exists(Icons.sign(id)) and Icons.signAspect(id) == 4)
+end
+for _, def in Config.Estate.Properties do
+	check(`estate {def.id} has a sign`, exists(Icons.sign(def.id)))
+	local square = def.kind ~= "office"
+	check(`estate {def.id}: its sign's shape`, Icons.signAspect(def.id) == (if square then 1 else 4), Icons.signAspect(def.id))
+end
+check("the base uses the army's sign", Icons.sign("base") == "sign_army")
+check("frosty uses the ice cream sign", Icons.sign("frosty") == "sign_icecream")
+check("the depot's sign is a board", Icons.signAspect("depot") == 4)
+check("an unknown building: no sign", Icons.sign("moon") == nil and Icons.sign(nil) == nil)
+check("a sign while its id is empty: the text", Icons.Ids.sign_depot ~= "" or Icons.get(Icons.sign("depot")) == nil)
 
 -- Every map icon is used by a landmark.
 local used = {}
