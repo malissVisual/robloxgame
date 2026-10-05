@@ -22,6 +22,8 @@ Config.Movement = {
 	Recover = 4, -- seconds to get the whole breath back (standing or walking)
 	RecoverDelay = 0.8, -- the breath starts coming back this long after the sprint stops
 	MinToSprint = 0.25, -- an empty breath: Shift sprints again only once this share is back (no stutter)
+	Low = 0.2, -- the breath bar turns red at this share or less (and while out of breath)
+	HideAfter = 1.5, -- seconds the bar stays after the breath is full again, then it fades out
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
