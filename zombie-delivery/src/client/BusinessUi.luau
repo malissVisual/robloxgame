@@ -16,6 +16,8 @@
 -- Every button only asks the server (hire / fire / upgrade / collect); the server checks everything. The window
 -- closes when you walk away from the computer, when another window opens or when the interface goes off.
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks BusinessUi.isOpen()).
+-- 3.6 (Postage & Trouble): the lavender window (Ui.window), paper cards and rows, the dispatch radio a paper slip
+-- typed in the mono font, the welcome-back card a paper ticket.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,12 +38,14 @@ local CrewPanel = require(Client.CrewPanel)
 local EstateUi = require(Client.EstateUi)
 
 local C = Ui.Colors
+local P = Theme.Postage
 local B = Config.Business
 local BusinessUi = {}
 
 local player = Players.LocalPlayer
 
-local WIDTH, HEIGHT = 800, 600
+local WIDTH, HEIGHT = 800, 640
+local CONTENT_H = HEIGHT - Ui.WindowHeader - Ui.WindowFooter -- the content area under the window's header
 local STEP = 0.05 -- seconds between two animation steps while the window is open
 local TYPE_SPEED = 90 -- characters per second of the status lines
 local WALK_AWAY = 30 -- studs from where the window opened: it closes
@@ -91,6 +95,7 @@ local receivedAt = 0
 local money = 0
 local gui: any = nil
 local window: any = nil
+local chrome: any = nil
 local scale: any = nil
 local welcomeCard: any = nil
 local welcomeScale: any = nil
@@ -273,21 +278,20 @@ local function card(parent: any, x: number, width: number, title: string): any
 	local frame = Ui.make("Frame", {
 		Size = UDim2.fromOffset(width, 136),
 		Position = UDim2.fromOffset(x, 0),
-		BackgroundColor3 = C.panelLight,
+		BackgroundColor3 = P.ticket,
 		BorderSizePixel = 0,
 	}, parent)
 	Ui.corner(frame, 8)
-	Ui.stroke(frame, C.panelLight:Lerp(C.text, 0.13), 1)
-	Ui.label(frame, title, UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 8), TextSize = 12, TextColor3 = C.dim })
+	Ui.stroke(frame, P.line, 1).Transparency = 0
+	Ui.caps(frame, title, UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 8) })
 	return frame
 end
 
 local function sectionTitle(parent: any, text: string, position: UDim2, width: UDim): any
-	return Ui.label(parent, text, UDim2.new(width.Scale, width.Offset, 0, 18), {
+	return Ui.caps(parent, text, UDim2.new(width.Scale, width.Offset, 0, 18), {
 		Position = position,
 		TextSize = 13,
-		TextColor3 = C.yellow,
-		Font = Enum.Font.GothamBlack,
+		TextColor3 = C.text,
 	})
 end
 
@@ -306,43 +310,26 @@ local function build()
 	}, player:WaitForChild("PlayerGui"))
 
 	-- ── The window ──
-	window = Ui.panel(gui, UDim2.fromOffset(WIDTH, HEIGHT), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	local content
+	window, content, chrome = Ui.window(gui, "Your company", "", "🏢", UDim2.fromOffset(WIDTH, HEIGHT))
 	window.Visible = false
-	window.BackgroundTransparency = 0.04
-	scale = Ui.make("UIScale", {}, window)
-	Ui.stroke(window, C.panelLight:Lerp(C.text, 0.2), 1)
-	-- A thin "screen" line on top: it is a computer.
-	local top = Ui.make("Frame", { Size = UDim2.new(1, -16, 0, 3), Position = UDim2.fromOffset(8, 0), BackgroundColor3 = C.yellow, BorderSizePixel = 0 }, window)
-	Ui.corner(top, 2)
-	refs.title = Ui.label(window, "🏢  YOUR COMPANY", UDim2.new(1, -80, 0, 40), {
-		Position = UDim2.fromOffset(18, 8),
-		TextSize = 26,
-		Font = Enum.Font.GothamBlack,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	refs.subtitle = Ui.label(window, "", UDim2.new(1, -90, 0, 18), {
-		Position = UDim2.fromOffset(20, 46),
-		TextSize = 14,
-		Font = Theme.Font,
-		TextColor3 = C.dim,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local close = Ui.button(window, "X", UDim2.fromOffset(40, 40), C.red, function()
+	chrome.onClose = function()
 		BusinessUi.close()
-	end)
-	close.Position = UDim2.new(1, -50, 0, 10)
+	end
+	chrome.context.Text = "Office computer · walk away to close"
+	scale = Ui.make("UIScale", {}, window)
+	refs.title = chrome.title
+	refs.subtitle = chrome.subtitle
 
 	-- ── The three cards ──
-	local cards = Ui.make("Frame", { Size = UDim2.new(1, -36, 0, 136), Position = UDim2.fromOffset(18, 74), BackgroundTransparency = 1 }, window)
+	local cards = Ui.make("Frame", { Size = UDim2.new(1, -36, 0, 136), Position = UDim2.fromOffset(18, 12), BackgroundTransparency = 1 }, content)
 	local cardWidth = math.floor((WIDTH - 36 - 2 * 10) / 3)
 
 	local safeCard = card(cards, 0, cardWidth, "COMPANY SAFE")
 	refs.safe = Ui.label(safeCard, "$0", UDim2.new(1, -24, 0, 32), {
 		Position = UDim2.fromOffset(12, 24),
 		TextSize = 28,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.MonoFont,
 		TextColor3 = C.money,
 		TextScaled = true,
 	})
@@ -359,11 +346,11 @@ local function build()
 	refs.rate = Ui.label(earnCard, "+$0 / min", UDim2.new(1, -24, 0, 32), {
 		Position = UDim2.fromOffset(12, 24),
 		TextSize = 26,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.MonoFont,
 		TextColor3 = C.text,
 		TextScaled = true,
 	})
-	refs.multiplier = Ui.label(earnCard, "", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 60), TextSize = 13, TextColor3 = C.yellow })
+	refs.multiplier = Ui.label(earnCard, "", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 60), TextSize = 13, TextColor3 = P.violet })
 	refs.earnInfo = Ui.label(earnCard, "", UDim2.new(1, -24, 0, 50), {
 		Position = UDim2.fromOffset(12, 80),
 		TextSize = 12,
@@ -376,7 +363,7 @@ local function build()
 	refs.count = Ui.label(crewCard, "0 / 0", UDim2.new(0, 110, 0, 32), {
 		Position = UDim2.fromOffset(12, 24),
 		TextSize = 28,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.MonoFont,
 	})
 	refs.seats = Ui.make("Frame", { Size = UDim2.new(1, -24, 0, 12), Position = UDim2.fromOffset(12, 62), BackgroundTransparency = 1 }, crewCard)
 	Ui.list(refs.seats, false, 3)
@@ -393,12 +380,12 @@ local function build()
 	refs.fire.TextSize = 15
 
 	-- ── On the road (left) and upgrades (right) ──
-	local listTop = 222
-	local radioHeight = 70
-	local listHeight = HEIGHT - listTop - radioHeight - 24
+	local listTop = 160
+	local radioHeight = 76
+	local listHeight = CONTENT_H - (listTop + 22) - radioHeight - 22
 	local leftWidth = math.floor((WIDTH - 36) * 0.58)
-	sectionTitle(window, "ON THE ROAD", UDim2.fromOffset(20, listTop), UDim.new(0, leftWidth))
-	refs.roadNote = Ui.label(window, "", UDim2.fromOffset(leftWidth - 120, 18), {
+	sectionTitle(content, "ON THE ROAD", UDim2.fromOffset(20, listTop), UDim.new(0, leftWidth))
+	refs.roadNote = Ui.label(content, "", UDim2.fromOffset(leftWidth - 120, 18), {
 		Position = UDim2.fromOffset(18 + 120, listTop),
 		TextSize = 12,
 		Font = Theme.Font,
@@ -411,35 +398,38 @@ local function build()
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 5,
+		ScrollBarImageColor3 = P.ink2,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-	}, window)
+	}, content)
 	Ui.list(refs.road, true, 6)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 1), PaddingLeft = UDim.new(0, 1), PaddingRight = UDim.new(0, 8) }, refs.road)
 
 	local rightX = 18 + leftWidth + 12
 	local rightWidth = WIDTH - 18 - rightX
-	sectionTitle(window, "UPGRADES", UDim2.fromOffset(rightX + 2, listTop), UDim.new(0, rightWidth))
+	sectionTitle(content, "UPGRADES", UDim2.fromOffset(rightX + 2, listTop), UDim.new(0, rightWidth))
 	local upgrades = Ui.make("ScrollingFrame", {
 		Size = UDim2.fromOffset(rightWidth, listHeight),
 		Position = UDim2.fromOffset(rightX, listTop + 22),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 5,
+		ScrollBarImageColor3 = P.ink2,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-	}, window)
+	}, content)
 	Ui.list(upgrades, true, 6)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 1), PaddingLeft = UDim.new(0, 1), PaddingRight = UDim.new(0, 6) }, upgrades)
 	for order, def in B.Upgrades do
-		local row = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 84), BackgroundColor3 = C.panelLight, BorderSizePixel = 0, LayoutOrder = order }, upgrades)
+		local row = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 84), BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = order }, upgrades)
 		Ui.corner(row, 8)
-		Ui.stroke(row, C.panelLight:Lerp(C.text, 0.13), 1)
-		Ui.label(row, def.name, UDim2.new(1, -20, 0, 20), { Position = UDim2.fromOffset(10, 6), TextSize = 16, Font = Enum.Font.GothamBlack, TextWrapped = false })
-		local level = Ui.label(row, "", UDim2.fromOffset(60, 20), {
-			Position = UDim2.new(1, -70, 0, 6),
+		Ui.stroke(row, P.line, 1).Transparency = 0
+		Ui.label(row, def.name, UDim2.new(1, -20, 0, 20), { Position = UDim2.fromOffset(10, 6), TextSize = 16, Font = Theme.DisplayFont, TextWrapped = false })
+		local level = Ui.label(row, "", UDim2.fromOffset(70, 20), {
+			Position = UDim2.new(1, -80, 0, 6),
 			TextSize = 13,
-			TextColor3 = C.yellow,
+			Font = Theme.MonoFont,
+			TextColor3 = P.violet,
 			TextXAlignment = Enum.TextXAlignment.Right,
 		})
 		Ui.label(row, def.description, UDim2.new(1, -20, 0, 16), { Position = UDim2.fromOffset(10, 27), TextSize = 12, Font = Theme.Font, TextColor3 = C.dim, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
@@ -447,7 +437,7 @@ local function build()
 		Ui.list(pipBox, false, 4)
 		local pips = {}
 		for i = 1, def.maxLevel do
-			local pip = Ui.make("Frame", { Size = UDim2.fromOffset(16, 10), BackgroundColor3 = C.grey, BorderSizePixel = 0, LayoutOrder = i }, pipBox)
+			local pip = Ui.make("Frame", { Size = UDim2.fromOffset(16, 10), BackgroundColor3 = P.track, BorderSizePixel = 0, LayoutOrder = i }, pipBox)
 			Ui.corner(pip, 3)
 			table.insert(pips, pip)
 		end
@@ -460,35 +450,36 @@ local function build()
 		upgradeRows[def.id] = { level = level, pips = pips, button = button }
 	end
 
-	-- ── Dispatch radio ──
+	-- ── Dispatch radio ── (a paper slip, typed)
 	local radioBox = Ui.make("Frame", {
 		Size = UDim2.new(1, -36, 0, radioHeight),
-		Position = UDim2.new(0, 18, 1, -(radioHeight + 14)),
-		BackgroundColor3 = Color3.fromRGB(10, 16, 13),
+		Position = UDim2.new(0, 18, 1, -(radioHeight + 12)),
+		BackgroundColor3 = P.paper,
 		BorderSizePixel = 0,
-	}, window)
+	}, content)
 	Ui.corner(radioBox, 8)
-	Ui.stroke(radioBox, C.panelLight:Lerp(C.text, 0.13), 1)
-	Ui.label(radioBox, "📻 DISPATCH RADIO", UDim2.fromOffset(160, 16), { Position = UDim2.fromOffset(10, 5), TextSize = 11, TextColor3 = C.green, Font = Enum.Font.GothamBlack })
+	Ui.stroke(radioBox, P.line, 1).Transparency = 0
+	Ui.caps(radioBox, "📻 Dispatch radio", UDim2.fromOffset(200, 16), { Position = UDim2.fromOffset(10, 5), TextColor3 = C.green })
 	refs.radio = {}
 	for i = 1, 3 do
-		local line = Ui.label(radioBox, "", UDim2.new(1, -20, 0, 15), {
-			Position = UDim2.fromOffset(10, 4 + i * 16),
+		local line = Ui.label(radioBox, "", UDim2.new(1, -20, 0, 16), {
+			Position = UDim2.fromOffset(10, 6 + i * 17),
 			TextSize = 13,
-			Font = Enum.Font.Code,
-			TextColor3 = C.green,
+			Font = Theme.MonoFont,
+			TextColor3 = C.text,
 			TextWrapped = false,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
 		table.insert(refs.radio, line)
 	end
 
-	-- ── The welcome-back card ──
+	-- ── The welcome-back card ── (a paper ticket)
 	welcomeCard = Ui.panel(gui, UDim2.fromOffset(460, 168), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
 	welcomeCard.Visible = false
+	welcomeCard.BackgroundTransparency = 0
 	welcomeScale = Ui.make("UIScale", {}, welcomeCard)
 	Ui.stroke(welcomeCard, C.money, 1.5)
-	Ui.label(welcomeCard, "WELCOME BACK, BOSS", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(16, 12), TextSize = 13, TextColor3 = C.yellow, Font = Enum.Font.GothamBlack })
+	Ui.caps(welcomeCard, "Welcome back, boss", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(16, 12), TextSize = 13, TextColor3 = C.green })
 	refs.welcomeText = Ui.label(welcomeCard, "", UDim2.new(1, -32, 0, 54), {
 		Position = UDim2.fromOffset(16, 30),
 		TextSize = 20,
@@ -509,7 +500,7 @@ local function build()
 	end)
 	refs.welcomeGps.Position = UDim2.new(0, 16, 1, -46)
 	refs.welcomeGps.TextSize = 15
-	local ok = Ui.button(welcomeCard, "OK", UDim2.fromOffset(90, 34), C.panelLight:Lerp(C.text, 0.15), function()
+	local ok = Ui.ghostButton(welcomeCard, "OK", UDim2.fromOffset(90, 34), nil, function()
 		welcomeCard.Visible = false
 	end)
 	ok.Position = UDim2.new(1, -106, 1, -46)
@@ -613,15 +604,15 @@ local function rebuildRows()
 	end
 	local now = os.clock()
 	for i = 1, hired do
-		local frame = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 60), BackgroundColor3 = C.panelLight, BorderSizePixel = 0, LayoutOrder = i }, road)
+		local frame = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 60), BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = i }, road)
 		Ui.corner(frame, 8)
-		Ui.stroke(frame, C.panelLight:Lerp(C.text, 0.12), 1)
+		Ui.stroke(frame, P.line, 1).Transparency = 0
 		local iconBox = Ui.make("Frame", { Size = UDim2.fromOffset(34, 34), Position = UDim2.fromOffset(10, 10), BackgroundTransparency = 1 }, frame)
 		local name = courierName(i)
 		Ui.label(frame, `Courier {name}`, UDim2.new(1, -170, 0, 20), {
 			Position = UDim2.fromOffset(54, 6),
 			TextSize = 15,
-			Font = Enum.Font.GothamBlack,
+			Font = Theme.DisplayFont,
 			TextWrapped = false,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
@@ -636,7 +627,7 @@ local function rebuildRows()
 		local tagBox = Ui.make("Frame", { Size = UDim2.fromOffset(110, 20), Position = UDim2.new(1, -118, 0, 6), BackgroundTransparency = 1 }, frame)
 		Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right }, tagBox)
 		local tag = Ui.chip(tagBox, "", C.blue)
-		tag.TextSize = 11
+		tag.TextSize = 12
 		local back, fill = Ui.bar(frame, UDim2.new(1, -66, 0, 4), C.blue)
 		back.Position = UDim2.fromOffset(54, 49)
 		local courier: Courier = { name = name, phases = {}, index = 1, started = now, ends = now, shown = 0, look = nil, kind = nil, row = nil }
@@ -664,7 +655,7 @@ local function render()
 		return
 	end
 	local hasOffice = state.office ~= nil
-	refs.title.Text = `🏢  {string.upper(tostring(state.company or "Your company"))}`
+	refs.title.Text = tostring(state.company or "Your company")
 	refs.subtitle.Text = if hasOffice
 		then `{state.officeName} · office computer{if state.atOffice then "" else " · walk up to the computer to manage"}`
 		else "You have no office. Buy one in a tower to run your company."
@@ -688,7 +679,7 @@ local function render()
 	for i = 1, math.max(seats, hired) do
 		local seat = Ui.make("Frame", {
 			Size = UDim2.fromOffset(if math.max(seats, hired) > 8 then 10 else 16, 10),
-			BackgroundColor3 = if i <= working then C.yellow elseif i <= hired then C.red else C.grey,
+			BackgroundColor3 = if i <= working then P.violet elseif i <= hired then C.red else P.track,
 			BorderSizePixel = 0,
 			LayoutOrder = i,
 		}, refs.seats)
@@ -706,7 +697,7 @@ local function render()
 			local level = upgradeLevel(def.id)
 			row.level.Text = `LV {level}/{def.maxLevel}`
 			for i, pip in row.pips do
-				pip.BackgroundColor3 = if i <= level then C.yellow else C.grey
+				pip.BackgroundColor3 = if i <= level then P.violet else P.track
 			end
 			if level >= def.maxLevel then
 				paintButton(row.button, "MAX", C.green, false)
@@ -921,7 +912,7 @@ local function showWelcome(info: any)
 	end
 	local seconds = tonumber(info.seconds) or 0
 	local full = state and (tonumber(state.safe) or 0) >= (tonumber(state.safeCap) or B.SafeCap)
-	refs.welcomeText.Text = `While you were away your company made <font color="#AADA89">{Ui.money(amount)}</font>`
+	refs.welcomeText.Text = `While you were away your company made <font color="#{C.money:ToHex()}">{Ui.money(amount)}</font>`
 	refs.welcomeInfo.Text = `{duration(seconds)} away · it is in the safe at {tostring(state and state.officeName or "your office")}.{if full then " The safe is full!" else ""}`
 	refs.welcomeGps.Visible = state ~= nil and typeof(state.officePos) == "Vector3"
 	welcomeCard.Visible = true

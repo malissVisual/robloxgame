@@ -2,6 +2,8 @@
 -- The start screen: the camera drifts over the city (the zombies roam the streets), the title, your company's
 -- money and deliveries, and PLAY. PLAY fades to black, gives the camera back to your character and asks the server
 -- for your car.
+-- 3.6 (Postage & Trouble): the card is a cream paper ticket, slightly tilted, over a soft lavender wash; PLAY is the
+-- sage main action; the controls are a second ticket.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -94,16 +96,17 @@ function Menu.show(onPlay: () -> ())
 	}, player:WaitForChild("PlayerGui"))
 
 	local C = Theme.Colors
+	local P = Theme.Postage
 	if Theme.Images.menuBackground ~= "" then
 		Ui.make("ImageLabel", {
 			Name = "MenuArtwork", Size = UDim2.fromScale(1, 1), Image = Theme.Images.menuBackground,
 			ScaleType = Enum.ScaleType.Crop, BackgroundTransparency = 1, ZIndex = 1,
 		}, gui)
 	end
-	-- An unobtrusive veil lets real-time world scenery remain the focal point.
+	-- An unobtrusive lavender wash lets real-time world scenery remain the focal point.
 	local veil = Ui.make("Frame", {
-		Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.panel,
-		BackgroundTransparency = 0.35, BorderSizePixel = 0, Active = false, ZIndex = 2,
+		Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.lavender,
+		BackgroundTransparency = 0.45, BorderSizePixel = 0, Active = false, ZIndex = 2,
 	}, gui)
 	Ui.make("UIGradient", {
 		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.8) }),
@@ -116,22 +119,24 @@ function Menu.show(onPlay: () -> ())
 		BackgroundTransparency = 1, ZIndex = 5,
 	}, gui)
 	local menuScale = Ui.make("UIScale", {}, center)
-	local face = Ui.panel(center, UDim2.fromScale(1, 1), UDim2.new())
-	face.Name = "ShiftCard"
-	face.ZIndex = 5
+	-- The shift card: a paper ticket, tilted a little like the objective ticket on the road.
+	local face = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new(), nil, nil, -0.6)
+	local faceTicket = face.Parent
+	faceTicket.Name = "ShiftCard"
+	faceTicket.ZIndex = 5
 	local rail = Ui.make("Frame", {
 		Size = UDim2.new(0, 4, 1, -48), Position = UDim2.fromOffset(0, 24),
-		BackgroundColor3 = C.yellow, BorderSizePixel = 0, ZIndex = 6,
+		BackgroundColor3 = P.violet, BorderSizePixel = 0, ZIndex = 6,
 	}, face)
 	Ui.corner(rail, 2)
-	Ui.label(face, "DEAD END DISPATCH   /   DELIVERY COMPANY", UDim2.fromOffset(510, 20), {
-		Position = UDim2.fromOffset(24, 22), TextSize = 14, TextColor3 = C.dim, ZIndex = 6,
+	Ui.caps(face, "Dead End Dispatch   ·   delivery company", UDim2.fromOffset(510, 20), {
+		Position = UDim2.fromOffset(24, 22), TextSize = 14, ZIndex = 6,
 	})
 	local topTitle = Ui.label(face, "ZOMBIE", UDim2.fromOffset(510, 76), {
 		Position = UDim2.fromOffset(24, 60), TextSize = 64, Font = Theme.DisplayFont, ZIndex = 6,
 	})
 	local bottomTitle = Ui.label(face, "DELIVERY", UDim2.fromOffset(510, 76), {
-		Position = UDim2.fromOffset(24, 128), TextSize = 64, TextColor3 = C.yellow, Font = Theme.DisplayFont, ZIndex = 6,
+		Position = UDim2.fromOffset(24, 128), TextSize = 64, TextColor3 = P.violet, Font = Theme.DisplayFont, ZIndex = 6,
 	})
 	if Theme.Images.logo ~= "" then
 		topTitle.Visible, bottomTitle.Visible = false, false
@@ -141,13 +146,13 @@ function Menu.show(onPlay: () -> ())
 		}, face)
 	end
 	local tagline = Ui.label(face, "Deliver. Survive. Get paid.", UDim2.fromOffset(510, 30), {
-		Position = UDim2.fromOffset(24, 216), TextSize = 22, TextColor3 = C.dim, ZIndex = 6,
+		Position = UDim2.fromOffset(24, 216), TextSize = 22, Font = Theme.Font, TextColor3 = C.dim, ZIndex = 6,
 	})
 	local company = Ui.panel(face, UDim2.fromOffset(512, 64), UDim2.fromOffset(24, 264))
-	company.BackgroundColor3 = C.panelLight
+	company.BackgroundColor3 = P.lavender
 	company.ZIndex = 6
-	Ui.label(company, "YOUR COMPANY", UDim2.fromOffset(488, 16), {
-		Position = UDim2.fromOffset(12, 10), TextSize = 12, TextColor3 = C.dim, ZIndex = 7,
+	Ui.caps(company, "Your company", UDim2.fromOffset(488, 16), {
+		Position = UDim2.fromOffset(12, 10), ZIndex = 7,
 	})
 	infoLabel = Ui.label(company, "Loading your company...", UDim2.fromOffset(488, 24), {
 		Position = UDim2.fromOffset(12, 30), TextSize = 17, ZIndex = 7,
@@ -159,14 +164,15 @@ function Menu.show(onPlay: () -> ())
 	play.ZIndex = 7
 
 	-- Controls live on a separate card so the start screen remains readable on phones.
-	local help = Ui.panel(center, UDim2.fromScale(1, 1), UDim2.new())
-	help.Name = "ControlsCard"
-	help.ZIndex, help.Visible = 15, false
-	Ui.label(help, "CONTROLS", UDim2.fromOffset(460, 38), {
-		Position = UDim2.fromOffset(24, 22), TextSize = 28, TextColor3 = C.yellow, ZIndex = 16,
+	local help = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
+	local helpTicket = help.Parent
+	helpTicket.Name = "ControlsCard"
+	helpTicket.ZIndex, helpTicket.Visible = 15, false
+	Ui.label(help, "Controls", UDim2.fromOffset(460, 38), {
+		Position = UDim2.fromOffset(24, 22), TextSize = 28, Font = Theme.DisplayFont, ZIndex = 16,
 	})
-	local closeHelp = Ui.button(help, "BACK", UDim2.fromOffset(116, 48), C.panelLight, function()
-		help.Visible, face.Visible = false, true
+	local closeHelp = Ui.ghostButton(help, "‹  BACK", UDim2.fromOffset(116, 48), nil, function()
+		helpTicket.Visible, faceTicket.Visible = false, true
 	end)
 	closeHelp.Position, closeHelp.ZIndex = UDim2.fromOffset(420, 20), 16
 	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -185,26 +191,29 @@ function Menu.show(onPlay: () -> ())
 	for i, entry in controlsText do
 		local row = Ui.make("Frame", {
 			Size = UDim2.fromOffset(512, 44), Position = UDim2.fromOffset(24, 84 + (i - 1) * 46),
-			BackgroundColor3 = C.panelLight, BackgroundTransparency = if i % 2 == 0 then 1 else 0.3,
+			BackgroundColor3 = P.lavender, BackgroundTransparency = if i % 2 == 0 then 1 else 0.2,
 			BorderSizePixel = 0, ZIndex = 16,
 		}, help)
 		Ui.corner(row, 5)
-		Ui.label(row, entry[1], UDim2.fromOffset(128, 44), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = C.yellow, ZIndex = 17 })
+		Ui.label(row, entry[1], UDim2.fromOffset(128, 44), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = P.violet, ZIndex = 17 })
 		Ui.label(row, entry[2], UDim2.fromOffset(366, 44), { Position = UDim2.fromOffset(140, 0), TextSize = 16, Font = Theme.Font, ZIndex = 17 })
 		table.insert(rows, row)
 	end
-	local controlsButton = Ui.button(face, "CONTROLS", UDim2.fromOffset(240, 44), C.panelLight, function()
-		help.Visible, face.Visible = true, false
+	local controlsButton = Ui.ghostButton(face, "CONTROLS", UDim2.fromOffset(240, 44), nil, function()
+		helpTicket.Visible, faceTicket.Visible = true, false
 	end)
 	controlsButton.Position, controlsButton.ZIndex = UDim2.fromOffset(24, 430), 7
 	local enterHint = Ui.label(face, if touchLayout then "Tap PLAY to begin" else "Press ENTER to begin", UDim2.fromOffset(244, 44), {
 		Position = UDim2.fromOffset(292, 430), TextSize = 15, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
 	})
-	Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(200, 20), Position = UDim2.new(1, -12, 1, -8), AnchorPoint = Vector2.new(1, 1),
-		BackgroundTransparency = 1, Text = `version {Config.Version}`, TextXAlignment = Enum.TextXAlignment.Right,
-		TextSize = 14, Font = Theme.Font, TextColor3 = C.dim, ZIndex = 6,
+	-- Over the world: a cream pill behind the text.
+	local version = Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.new(1, -12, 1, -10), AnchorPoint = Vector2.new(1, 1),
+		BackgroundTransparency = 0, BackgroundColor3 = P.pill, Text = `version {Config.Version}`,
+		TextSize = 14, Font = Theme.MonoFont, TextColor3 = C.dim, ZIndex = 6,
 	}, gui)
+	Ui.corner(version, 12)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, version)
 
 	local viewportConnection: RBXScriptConnection? = nil
 	local cameraConnection: RBXScriptConnection? = nil
@@ -213,7 +222,7 @@ function Menu.show(onPlay: () -> ())
 		local v = if camera then camera.ViewportSize else Vector2.new(1280, 720)
 		local compact = v.Y < 480
 		local narrow = v.X < 600 and not compact
-		local height = if compact then 440 elseif narrow and help.Visible then 820 elseif narrow then 650 else 500
+		local height = if compact then 440 elseif narrow and helpTicket.Visible then 820 elseif narrow then 650 else 500
 		local factor = math.max(0.35, math.min((v.X - 32) / 560, (v.Y - 64) / height, 1.05))
 		menuScale.Scale = factor
 		center.Size = UDim2.fromOffset(560, height)
@@ -256,12 +265,12 @@ function Menu.show(onPlay: () -> ())
 	end
 	cameraConnection = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
 	watchCamera()
-	help:GetPropertyChangedSignal("Visible"):Connect(fitMenu)
+	helpTicket:GetPropertyChangedSignal("Visible"):Connect(fitMenu)
 
 	-- The black fade only shows (and only exists in front of PLAY) after PLAY was pressed.
 	local fade = Ui.make("Frame", {
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundColor3 = P.veil,
 		BackgroundTransparency = 1,
 		Visible = false,
 		Active = false,

@@ -7,6 +7,8 @@
 -- challenges (3.1: all done, every lost package found, start over, any title; server/Challenges.luau) and player (god mode, heal, finish the stop). The answers
 -- come back as toasts (the Notice remote), and in the window's title bar while it is open (the toasts are behind it).
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()).
+-- 3.6 (Postage & Trouble): the lavender window (Ui.window) with the sections as a sidebar of tabs; the answers show in
+-- its footer.
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -22,8 +24,10 @@ local Net = require(Shared.Net)
 local MissionData = require(Shared.Missions)
 local ChallengeData = require(Shared.Challenges)
 local Ui = require(script.Parent.Ui)
+local Theme = require(script.Parent.Theme)
 
 local C = Ui.Colors
+local P = Theme.Postage
 local AdminPanel = {}
 
 local player = Players.LocalPlayer
@@ -67,13 +71,13 @@ local function nextOrder(): number
 end
 
 local function heading(text: string, hint: string?)
-	Ui.label(content, text, UDim2.new(1, -10, 0, 26), { LayoutOrder = nextOrder(), TextSize = 19, Font = Enum.Font.GothamBlack, TextColor3 = C.yellow })
+	Ui.label(content, text, UDim2.new(1, -10, 0, 26), { LayoutOrder = nextOrder(), TextSize = 18, Font = Theme.DisplayFont, TextColor3 = C.text })
 	if hint then
 		Ui.label(content, hint, UDim2.new(1, -10, 0, 0), {
 			LayoutOrder = nextOrder(),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			TextSize = 14,
-			Font = Enum.Font.GothamMedium,
+			Font = Theme.Font,
 			TextColor3 = C.dim,
 		})
 	end
@@ -126,7 +130,7 @@ local function renderUnlock()
 	local row = grid(200)
 	action(row, "UNLOCK EVERYTHING", C.yellow, function()
 		send("unlockAll")
-	end).TextColor3 = Color3.new(0, 0, 0)
+	end)
 	action(row, "MAX UPGRADES + STAGES", C.blue, function()
 		send("maxUpgrades")
 	end)
@@ -142,10 +146,9 @@ local function renderUnlock()
 	table.insert(picks, Config.Levels.MaxLevel)
 	for _, n in picks do
 		local on = n == level
-		local button = action(levels, `LV {n}`, if on then C.yellow else C.blue, function()
+		action(levels, `LV {n}`, if on then C.yellow else C.blue, function()
 			send("setLevel", n)
 		end)
-		button.TextColor3 = if on then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
 	end
 	local steps = grid(150)
 	action(steps, "LEVEL -1", C.grey, function()
@@ -167,12 +170,9 @@ local function renderCars()
 	heading("Spawn a car", "It comes right now on the road next to you (yellow = an employer's company vehicle).")
 	local cells = grid(150)
 	for _, def in Config.Cars do
-		local button = action(cells, def.name, if def.company then C.yellow else C.blue, function()
+		action(cells, def.name, if def.company then C.yellow else C.blue, function()
 			send("car", def.id)
 		end)
-		if def.company then
-			button.TextColor3 = Color3.new(0, 0, 0)
-		end
 	end
 	heading("Car gun on your car", "The gun on the roof of the car you drive (every dealer car, the monster truck, the armored truck). Without one you shoot out of the window: pistol, revolver or SMG only.")
 	local gunCells = grid(150)
@@ -190,19 +190,16 @@ local function renderGuns()
 	heading("Give a gun", "You get it and it goes straight into your hand (yellow = earned from an employer).")
 	local cells = grid(150)
 	for _, def in Config.Weapons do
-		local button = action(cells, def.name, if def.earned then C.yellow else C.blue, function()
+		action(cells, def.name, if def.earned then C.yellow else C.blue, function()
 			send("weapon", def.id)
 		end)
-		if def.earned then
-			button.TextColor3 = Color3.new(0, 0, 0)
-		end
 	end
 end
 
 local KIND_COLORS: { [string]: Color3 } = {
 	shop = C.blue,
-	employer = Color3.fromRGB(200, 150, 30),
-	place = Color3.fromRGB(150, 90, 200),
+	employer = P.gold,
+	place = P.violet,
 }
 
 local function renderTeleport()
@@ -223,11 +220,11 @@ local function renderJobs()
 	for _, def in Config.JobTypes do
 		action(special, def.name, C.yellow, function()
 			send("job", def.id)
-		end).TextColor3 = Color3.new(0, 0, 0)
+		end)
 	end
 	heading("Ordinary deliveries", "A job-board delivery of that danger level, from here.")
 	local ordinary = grid(150)
-	local colors = { C.green, C.yellow, C.red, Color3.fromRGB(200, 80, 255) }
+	local colors = { C.green, C.yellow, C.red, P.violet }
 	for index, tier in Config.Jobs.Tiers do
 		action(ordinary, `{string.rep("★", tier.stars)} {tier.name}`, colors[index] or C.grey, function()
 			send("job", `ordinary{index}`)
@@ -245,11 +242,10 @@ local function renderEnemies()
 	local counts = grid(80)
 	for _, n in { 1, 3, 5, 10 } do
 		local on = spawnCount == n
-		local button = action(counts, `×{n}`, if on then C.yellow else C.grey, function()
+		action(counts, `×{n}`, if on then C.yellow else C.grey, function()
 			spawnCount = n
 			render()
 		end)
-		button.TextColor3 = if on then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
 	end
 	heading("Spawn near you", "On the roads 30-70 studs away (they burn in the safe zone).")
 	local kinds = {}
@@ -262,7 +258,7 @@ local function renderEnemies()
 	local cells = grid(150)
 	for _, kind in kinds do
 		local def = Config.Zombies[kind]
-		action(cells, def.name, if def.ranged then Color3.fromRGB(170, 70, 50) else Color3.fromRGB(90, 130, 70), function()
+		action(cells, def.name, if def.ranged then C.red else C.green, function()
 			send("spawn", { kind = kind, count = spawnCount })
 		end)
 	end
@@ -294,7 +290,7 @@ local function renderEstate()
 	local all = grid(200)
 	action(all, "GIVE EVERY PROPERTY", C.yellow, function()
 		send("giveEstate", "all")
-	end).TextColor3 = Color3.new(0, 0, 0)
+	end)
 	action(all, "TAKE THEM ALL AWAY", C.red, function()
 		send("clearEstate")
 	end)
@@ -317,16 +313,15 @@ local function renderEstate()
 	for _, def in Config.Estate.Properties do
 		if def.kind == "mansion" or def.kind == "villa" or def.kind == "house" then
 			local on = home == def.id
-			local button = action(homes, `{if on then "★ " else ""}{def.name}`, if on then C.yellow else C.panelLight, function()
+			action(homes, `{if on then "★ " else ""}{def.name}`, if on then C.yellow else C.panelLight, function()
 				send("setHome", def.id)
 			end)
-			button.TextColor3 = if on then Color3.new(0, 0, 0) else C.text
 		end
 	end
 	heading("Teleport to a property", "Inside at its door (homes, offices), else the road at its plot.")
 	local places = grid(232)
 	for _, def in Config.Estate.Properties do
-		local button = action(places, `{ESTATE_KINDS[def.kind] or "🏠"} {def.name}`, Color3.fromRGB(150, 90, 200), function()
+		local button = action(places, `{ESTATE_KINDS[def.kind] or "🏠"} {def.name}`, P.violet, function()
 			send("estateTeleport", def.id)
 		end)
 		button.TextXAlignment = Enum.TextXAlignment.Left
@@ -362,7 +357,7 @@ local function renderWorld()
 	for _, entry in times do
 		local hour = entry.hour
 		local dark = hour >= night.NightFrom or hour < night.NightTo
-		action(cells, entry.label, if dark then Color3.fromRGB(60, 60, 110) elseif hour >= 7 and hour <= 17 then C.blue else Color3.fromRGB(150, 100, 70), function()
+		action(cells, entry.label, if dark then P.violet elseif hour >= 7 and hour <= 17 then C.blue else P.bronze, function()
 			send("time", hour)
 		end)
 	end
@@ -376,7 +371,7 @@ local function renderMissions()
 	local row = grid(200)
 	action(row, "ALL MISSIONS 3 ★", C.yellow, function()
 		send("missionsAll")
-	end).TextColor3 = Color3.new(0, 0, 0)
+	end)
 	action(row, "RESET MISSIONS", C.red, function()
 		send("missionsReset")
 	end)
@@ -399,7 +394,6 @@ local function renderMissions()
 				send("missionStart", def.id)
 			end)
 			button.TextXAlignment = Enum.TextXAlignment.Left
-			button.TextColor3 = if best > 0 then Color3.new(0, 0, 0) else C.text
 			-- The campaign's colour on the button's own border (one UIStroke per button).
 			local border = button:FindFirstChildOfClass("UIStroke")
 			if border then
@@ -421,7 +415,7 @@ local function renderChallenges()
 	local row = grid(200)
 	action(row, "ALL CHALLENGES", C.yellow, function()
 		send("challengesAll")
-	end).TextColor3 = Color3.new(0, 0, 0)
+	end)
 	action(row, "ALL SECRETS FOUND", C.blue, function()
 		send("secretsAll")
 	end)
@@ -430,16 +424,14 @@ local function renderChallenges()
 	end)
 	heading(`Title: {state.title or "none"}`, "Given and shown over your head and on the leaderboard (TOP).")
 	local titles = grid(232)
-	local none = action(titles, "NO TITLE", if state.title == nil then C.yellow else C.grey, function()
+	action(titles, "NO TITLE", if state.title == nil then C.yellow else C.grey, function()
 		send("title", "none")
 	end)
-	none.TextColor3 = if state.title == nil then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
 	for _, title in ChallengeData.allTitles() do
 		local on = state.title == title
-		local button = action(titles, title, if on then C.yellow elseif state.titles[title] then C.green else C.panelLight, function()
+		action(titles, title, if on then C.yellow elseif state.titles[title] then C.green else C.panelLight, function()
 			send("title", title)
 		end)
-		button.TextColor3 = if on or state.titles[title] then Color3.new(0, 0, 0) else C.text
 	end
 end
 
@@ -447,10 +439,9 @@ local function renderPlayer()
 	local on = player:GetAttribute("God") == true
 	heading("God mode", "You and your car take no damage (a car in the water is put back on the road).")
 	local row = grid(200)
-	local button = action(row, if on then "GOD MODE: ON" else "GOD MODE: OFF", if on then C.yellow else C.grey, function()
+	action(row, if on then "GOD MODE: ON" else "GOD MODE: OFF", if on then C.yellow else C.grey, function()
 		send("god", not on)
 	end)
-	button.TextColor3 = if on then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
 	heading("Quick")
 	local quick = grid(200)
 	action(quick, "HEAL ME AND MY CAR", C.green, function()
@@ -483,8 +474,9 @@ render = function()
 	order = 0
 	for id, button in tabButtons do
 		local selected = id == section
-		button.BackgroundColor3 = if selected then C.yellow else C.panelLight
-		button.TextColor3 = if selected then Color3.new(0, 0, 0) else C.text
+		-- The concept's filter tabs: the selected one cream paper, the others lavender.
+		button.BackgroundColor3 = if selected then P.ticket else P.lavenderDeep
+		button.TextColor3 = if selected then C.text else C.dim
 	end
 	local renderer = RENDERERS[section]
 	if renderer then
@@ -521,36 +513,42 @@ local function build()
 		DisplayOrder = 5,
 	}, player:WaitForChild("PlayerGui"))
 
-	window = Ui.panel(gui, UDim2.fromOffset(760, 520), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	local inner, chrome
+	window, inner, chrome = Ui.window(gui, "Admin", "Testing tools · only admins see this · P", "🛠", UDim2.fromOffset(780, 580))
 	window.Visible = false
-	window.BackgroundTransparency = 0.05
-	scale = Ui.make("UIScale", {}, window)
-	Ui.stroke(window, C.red, 2)
-	Ui.label(window, "ADMIN", UDim2.new(0, 200, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBlack, TextColor3 = C.red })
-	Ui.label(window, "testing tools · P", UDim2.new(1, -300, 0, 44), { Position = UDim2.fromOffset(130, 8), TextSize = 15, Font = Enum.Font.GothamMedium, TextColor3 = C.dim })
-	status = Ui.label(window, "", UDim2.new(1, -360, 0, 20), {
-		Position = UDim2.fromOffset(300, 20),
-		TextSize = 14,
-		Font = Enum.Font.GothamMedium,
-		TextColor3 = C.yellow,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local close = Ui.button(window, "X", UDim2.fromOffset(40, 40), C.red, function()
+	chrome.onClose = function()
 		setOpen(false)
-	end)
-	close.Position = UDim2.new(1, -50, 0, 8)
+	end
+	-- The admin's badge is rose: these buttons change the game.
+	local badge = chrome.icon.Parent
+	if badge and badge:IsA("Frame") then
+		badge.BackgroundColor3 = P.rose
+	end
+	scale = Ui.make("UIScale", {}, window)
+	-- The server's last answer, in the footer (the toasts are behind the window).
+	status = chrome.context
+	status.TextColor3 = C.text
 
-	local tabs = Ui.make("Frame", {
-		Size = UDim2.new(0, 160, 1, -68),
-		Position = UDim2.fromOffset(14, 56),
+	-- The sections: a lavender sidebar of tabs (the Dispatch board's filters).
+	local sidebar = Ui.make("Frame", {
+		Name = "Sidebar",
+		Size = UDim2.new(0, 190, 1, 0),
+		BackgroundColor3 = P.lavenderDeep,
+		BorderSizePixel = 0,
+	}, inner)
+	local tabs = Ui.make("ScrollingFrame", {
+		Size = UDim2.new(1, -24, 1, -20),
+		Position = UDim2.fromOffset(14, 12),
 		BackgroundTransparency = 1,
-	}, window)
+		BorderSizePixel = 0,
+		ScrollBarThickness = 0,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+	}, sidebar)
 	Ui.list(tabs, true, 6)
 	for index, entry in SECTIONS do
 		local id = entry[1]
-		local button = Ui.button(tabs, entry[2], UDim2.new(1, 0, 0, 34), C.panelLight, function()
+		local button = Ui.button(tabs, entry[2], UDim2.new(1, -4, 0, 34), P.lavenderDeep, function()
 			section = id
 			render()
 			if id == "missions" then
@@ -559,33 +557,35 @@ local function build()
 				Net.get("Challenges"):FireServer("open")
 			end
 		end)
-		button.TextSize = 16
+		button.TextSize = 15
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 8) }, button)
 		button.LayoutOrder = index
 		tabButtons[id] = button
 	end
 
 	content = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -200, 1, -68),
-		Position = UDim2.fromOffset(188, 56),
+		Size = UDim2.new(1, -220, 1, -24),
+		Position = UDim2.fromOffset(208, 12),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = P.ink2,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-	}, window)
+	}, inner)
 	Ui.list(content, true, 8)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 10), PaddingRight = UDim.new(0, 8) }, content)
 
 	-- The small button top right (under Roblox's own buttons).
-	-- A quiet dark pill (only admins see it), the red is just its edge and text.
-	openButton = Ui.button(gui, "🛠  ADMIN", UDim2.fromOffset(90, 32), C.panel, function()
+	-- A quiet rose pill (only admins see it), the red is just its edge and text.
+	openButton = Ui.button(gui, "🛠  ADMIN", UDim2.fromOffset(96, 32), C.red, function()
 		setOpen(not window.Visible)
 	end)
 	openButton.AnchorPoint = Vector2.new(1, 0)
 	openButton.Position = UDim2.new(1, -16, 0, 56)
 	openButton.TextSize = 13
 	openButton.TextColor3 = C.red
-	openButton.BackgroundTransparency = 0.2
-	Ui.stroke(openButton, C.red, 1).Transparency = 0.3
 	openButton.Visible = false
 	Ui.make("UIScale", {}, openButton)
 end
