@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · six approved cinematic Roblox building looks, one branch per building; shared kit on `codex/location-kit` · server/BuildingLooks/, six World builders sequentially, building validation and design/location-looks/ · since 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/locations-preview` · all six location branches combined for the local Roblox place preview; review/merge the individual branches listed below. Studio Play still required; compiled and geometry-checked in cloud.
 - Codex · `codex/location-depot` · approved cinematic depot facade in `BuildingLooks/Depot.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: JOBS, garage switching, Marge, spawn and van exit.
 - Codex · `codex/location-dealer` · approved cinematic dealer facade in `BuildingLooks/Dealer.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: three indoor display cars, catalog and glass readability.
 - Codex · `codex/location-guns` · approved cinematic guns facade in `BuildingLooks/Guns.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: doorway, weapon counter, racks and security windows.
