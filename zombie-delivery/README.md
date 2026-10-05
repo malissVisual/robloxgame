@@ -1,6 +1,6 @@
 # Zombie Delivery
 
-A second Roblox game in this repository (Merge Blades lives in the root). **You run a delivery company** in a world
+The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
 across the map while bandits shoot at you from roadblocks and zombies chase you, carry it to the receiver under fire,
 get paid, earn XP and climb the driver ranks, and buy better cars, guns, car guns, items and upgrades. The clock runs

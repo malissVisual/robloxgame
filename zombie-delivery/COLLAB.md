@@ -4,11 +4,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · cloud setup and Merge Blades archive on `codex/cloud-setup` · root AGENTS/README/project/Mac launchers, archive/merge-blades/, zombie-delivery/AGENTS.md and README.md, COLLAB.md; shared tools/rojo-sync.js stays in place · since 2026-10-05
+- (nothing right now)
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- (nothing yet)
+- Codex · `codex/cloud-setup` (base `7c0788d`, 2026-10-05) · Merge Blades archived unchanged in `archive/merge-blades/`; root project/README/Mac launchers target Zombie Delivery; both AGENTS files updated. Verified 12 test files, compilation of 61 modules, builds of both games and full sync tree via `node tools/rojo-sync.js zombie-delivery` from repo root; shared script and game code unchanged. Studio: connect with the same command and Play; also check the root Mac sync-only launchers (no automatic pull/plugin installation; originals preserved in archive).
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
