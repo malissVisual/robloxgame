@@ -670,13 +670,17 @@ end
 local function buildDepot(parent: Instance)
 	local depot = folder(parent, "Depot")
 	sidewalk(depot, 0, 0, Color3.fromRGB(120, 120, 116))
-	local wallColor = Color3.fromRGB(170, 120, 60)
+	local wallColor = Color3.fromRGB(56, 61, 65)
 	local depth, width, height = 40, 80, 22
 	local backZ = -BLOCK / 2 + 6
 	part(depot, "Back", Vector3.new(width, height, 2), CFrame.new(0, WALK_TOP + height / 2, backZ + 1), wallColor, Enum.Material.Metal)
 	part(depot, "Left", Vector3.new(2, height, depth), CFrame.new(-width / 2 + 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
 	part(depot, "Right", Vector3.new(2, height, depth), CFrame.new(width / 2 - 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
-	part(depot, "Roof", Vector3.new(width, 2, depth), CFrame.new(0, WALK_TOP + height + 1, backZ + depth / 2), Color3.fromRGB(90, 70, 50), Enum.Material.Metal)
+	part(depot, "Roof", Vector3.new(width, 2, depth), CFrame.new(0, WALK_TOP + height + 1, backZ + depth / 2), Color3.fromRGB(34, 38, 42), Enum.Material.Metal)
+	-- Approved architecture; the depot terminals, cargo and spawn stay in their original places.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local frame = CFrame.new(0, WALK_TOP, backZ + depth / 2) * CFrame.Angles(0, math.pi, 0)
+	Kit.build(depot, frame, require(script.Parent.BuildingLooks.Depot), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(depot, "ZOMBIE DELIVERY CO.", Vector3.new(60, 8, 1), CFrame.new(0, WALK_TOP + height + 6, backZ + depth - 2) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(255, 190, 60), nil, "depot", 12)
 	for n = 1, 10 do
 		local s = rng:NextNumber(3, 5)
