@@ -28,6 +28,22 @@ with tempfile.TemporaryDirectory() as tmp:
             ok = False
 # 3.3: the car bodies (server/Vehicles.luau STYLES, not loadable outside Roblox) read as text: every Config.Cars style
 # has a body; every dealer car's body takes cargo (at least 2 slots) and has a back that opens (the 3.2 loading).
+# 3.4: every car's capacity (Config.Cars capacity) is exactly its body's cargo slots (the slot list of cargo(...)).
+def slot_count(body):
+    start = body.find("cargo = cargo(")
+    if start < 0:
+        return 0
+    open_at = body.index("{", start)
+    depth, end = 0, open_at
+    for end in range(open_at, len(body)):
+        if body[end] == "{":
+            depth += 1
+        elif body[end] == "}":
+            depth -= 1
+            if depth == 0:
+                break
+    return len(re.findall(r"Vector3\.new", body[open_at:end]))
+
 def styles_check():
     root = os.path.dirname(HERE)
     config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
@@ -45,15 +61,19 @@ def styles_check():
         if body is None:
             bad.append(f"{car_id}: no style {style}")
             continue
+        count = slot_count(body)
+        capacity = re.search(r"\bcapacity = (\d+)", entry)
+        if not capacity:
+            bad.append(f"{car_id}: no capacity")
+        elif int(capacity.group(1)) != count:
+            bad.append(f"{car_id}: capacity {capacity.group(1)} but {count} cargo slots in style {style}")
         if "company = true" in entry:
             continue
-        slots = re.search(r"cargo = cargo\((.*?)\n\t\t(back|\})", body, re.S)
-        count = len(re.findall(r"Vector3\.new", slots.group(1))) if slots else 0
         if count < 2:
             bad.append(f"{car_id}: {count} cargo slots")
         if "back = " not in body:
             bad.append(f"{car_id}: no back")
-    print("== styles: " + (f"every car has a body, every dealer car cargo slots and a back ({len(blocks)} styles)" if not bad else "; ".join(bad)))
+    print("== styles: " + (f"every car has a body, every dealer car cargo slots and a back, every capacity its slots ({len(blocks)} styles)" if not bad else "; ".join(bad)))
     return not bad
 
 if not styles_check():

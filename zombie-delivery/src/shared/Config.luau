@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.3"
+Config.Version = "3.4"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -27,7 +27,6 @@ Config.City = {
 	HighwayWidth = 40,
 	Seed = 7331,
 	SafeHalf = 235, -- the safe zone around the depot: a square, |x| and |z| below this
-	RepairRadius = 55, -- the car is repaired this close to the depot or inside the mechanic's garage
 }
 
 export type CarDef = {
@@ -46,6 +45,8 @@ export type CarDef = {
 	level: number?, -- the driver level (Config.Levels) needed to buy it
 	employer: string?, -- who (Config.Employers)
 	mount: boolean?, -- a car gun (Config.CarGuns) fits on its roof; the company / work vehicles carry none
+	capacity: number, -- 3.4: cargo slots (the pieces carried or led by hand it takes at once), = its body's slots
+	-- (server/Vehicles.luau STYLES cargo; tests/run_tests.py checks they match). The Cargo Rack adds to it.
 }
 
 -- 3.2, the progression (Config.Levels): the van is where you start, the pickup opens at level 4, the muscle car at 8
@@ -53,6 +54,9 @@ export type CarDef = {
 -- 3.3: five more vans in between, each with its own body (server/Vehicles.luau STYLES): the Courier Van at 2, the
 -- High-Roof Van at 3, the Box Truck at 6, the Armored Van at 10 and the Rally Van at 12. The dealer's cars stay in
 -- the order of their level (and price): the showroom and the dealer window list them this way.
+-- 3.4: every car has a capacity (cargo slots): the vans 4, the High-Roof Van and the Box Truck 6, the Muscle Car 2;
+-- a job or a mission with more pieces than your car holds waits until you have a bigger car or a Cargo Rack
+-- (Config.Upgrades "rack": +1 slot per level). The employers' vehicles hold what their jobs need.
 Config.Cars = {
 	{
 		id = "van",
@@ -64,6 +68,7 @@ Config.Cars = {
 		accel = 26,
 		turn = 1.8,
 		health = 300,
+		capacity = 4,
 		ramPower = 1.0,
 		color = { 214, 196, 160 },
 		description = "Slow and rusty, but it is yours. 1 passenger.",
@@ -79,6 +84,7 @@ Config.Cars = {
 		accel = 30,
 		turn = 1.95,
 		health = 340,
+		capacity = 4,
 		ramPower = 1.0,
 		color = { 232, 170, 40 },
 		description = "Small, low and quick off the line, an amber light bar on the roof. 1 passenger.",
@@ -94,6 +100,7 @@ Config.Cars = {
 		accel = 27,
 		turn = 1.75,
 		health = 450,
+		capacity = 6,
 		ramPower = 1.1,
 		color = { 168, 186, 200 },
 		description = "Stand up inside. A tall roof, thicker walls and a jump seat for a friend. 2 passengers.",
@@ -109,6 +116,7 @@ Config.Cars = {
 		accel = 32,
 		turn = 2.0,
 		health = 420,
+		capacity = 4,
 		ramPower = 1.15,
 		color = { 196, 60, 50 },
 		description = "Two friends ride in the bed and shoot. 3 passengers.",
@@ -124,6 +132,7 @@ Config.Cars = {
 		accel = 26,
 		turn = 1.6,
 		health = 650,
+		capacity = 6,
 		ramPower = 1.4,
 		color = { 238, 238, 232 },
 		description = "A cab and a big box behind it. Slow to stop, hard to kill, room for six. 2 passengers.",
@@ -139,6 +148,7 @@ Config.Cars = {
 		accel = 46,
 		turn = 2.3,
 		health = 340,
+		capacity = 2,
 		ramPower = 1.0,
 		color = { 30, 30, 36 },
 		description = "Outruns every zombie. Do not crash. 1 passenger.",
@@ -154,6 +164,7 @@ Config.Cars = {
 		accel = 34,
 		turn = 1.8,
 		health = 900,
+		capacity = 4,
 		ramPower = 1.6,
 		color = { 72, 78, 84 },
 		description = "Steel plates, grilles on the windows. The bullets knock, nobody answers. 2 passengers.",
@@ -169,6 +180,7 @@ Config.Cars = {
 		accel = 44,
 		turn = 2.2,
 		health = 420,
+		capacity = 4,
 		ramPower = 1.1,
 		color = { 30, 90, 200 },
 		description = "Lowered, striped, a spoiler and big wheels: a van that thinks it is a race car. 1 passenger.",
@@ -183,6 +195,7 @@ Config.Cars = {
 		accel = 26,
 		turn = 1.6,
 		health = 1000,
+		capacity = 8,
 		ramPower = 1.8,
 		color = { 80, 96, 70 },
 		description = "The army's truck. Two gunners on the roof. 3 passengers.",
@@ -198,6 +211,7 @@ Config.Cars = {
 		accel = 22,
 		turn = 1.4,
 		health = 1300,
+		capacity = 8,
 		ramPower = 2.0,
 		color = { 245, 190, 30 },
 		description = "The school's bus. Bring the whole crew. 5 passengers.",
@@ -214,6 +228,7 @@ Config.Cars = {
 		accel = 40,
 		turn = 1.9,
 		health = 1400,
+		capacity = 6,
 		ramPower = 2.5,
 		color = { 60, 130, 220 },
 		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
@@ -230,6 +245,7 @@ Config.Cars = {
 		accel = 28,
 		turn = 1.9,
 		health = 650,
+		capacity = 6,
 		ramPower = 1.3,
 		color = { 250, 240, 245 },
 		description = "Frosty's ice cream truck. 1 passenger.",
@@ -245,6 +261,7 @@ Config.Cars = {
 		accel = 22,
 		turn = 1.5,
 		health = 900,
+		capacity = 10,
 		ramPower = 1.6,
 		color = { 230, 120, 40 },
 		description = "Big Move's moving truck. 1 passenger.",
@@ -260,6 +277,7 @@ Config.Cars = {
 		accel = 22,
 		turn = 1.5,
 		health = 1000,
+		capacity = 2,
 		ramPower = 1.7,
 		color = { 150, 90, 50 },
 		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
@@ -275,6 +293,7 @@ Config.Cars = {
 		accel = 30,
 		turn = 1.8,
 		health = 800,
+		capacity = 1,
 		ramPower = 1.4,
 		color = { 245, 245, 245 },
 		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
@@ -290,6 +309,7 @@ Config.Cars = {
 		accel = 24,
 		turn = 1.6,
 		health = 950,
+		capacity = 6,
 		ramPower = 1.6,
 		color = { 220, 60, 50 },
 		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
@@ -573,12 +593,16 @@ export type UpgradeDef = {
 -- car tracks show on the car (server/Vehicles.luau): Ram Plow a bull bar (bigger with the level), Armor side plates
 -- (and window grilles from level 3), Engine a hood scoop and twin exhaust pipes from level 3. Quick Hands makes the
 -- holds of the back and the cargo shorter (Economy.loadHold).
+-- 3.4: you keep your first car and upgrade it, so the first levels of the car tracks are cheap (a few deliveries)
+-- and the last ones dear; the Cargo Rack adds a cargo slot per level (a roof rack with the extra slots on it,
+-- Economy.capacity) for $300 · $750 · $1,880.
 Config.Upgrades = {
-	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 700, costGrowth = 1.8, perLevel = 0.08 },
-	{ id = "handling", car = true, name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 500, costGrowth = 1.7, perLevel = 0.08 },
-	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 600, costGrowth = 1.8, perLevel = 0.15 },
-	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 500, costGrowth = 1.75, perLevel = 0.30 },
-	{ id = "loading", car = true, name = "Quick Hands", description = "−15% time to open the back, load and unload", maxLevel = 3, baseCost = 600, costGrowth = 1.8, perLevel = 0.15 },
+	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 400, costGrowth = 2.0, perLevel = 0.08 },
+	{ id = "handling", car = true, name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
+	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
+	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
+	{ id = "loading", car = true, name = "Quick Hands", description = "−15% time to open the back, load and unload", maxLevel = 3, baseCost = 400, costGrowth = 2.0, perLevel = 0.15 },
+	{ id = "rack", car = true, name = "Cargo Rack", description = "+1 cargo slot per level · a roof rack", maxLevel = 3, baseCost = 300, costGrowth = 2.5, perLevel = 1 },
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
@@ -996,9 +1020,13 @@ Config.Crew = {
 -- spawn and its garage keeps cars; garages add car slots; an office runs your own delivery company
 -- (Config.Business). Every player owns their own copy (saved in the profile): two owners of the same mansion on one
 -- server both use it. Where each one stands is in shared/Map.luau (Map.EstatePlots, same ids).
--- 3.2: mostly the endgame. A garage from level 5 (3.3: a fourth car needs a slot), a house from 6,
--- the villas at 10 – 11, the mansions at 13 – 15; the offices (your company, Config.Business) at 12 – 15 and only
--- after a campaign's finale (requires): the first one after Iron Supply, the penthouse after the Last Convoy.
+-- 3.2: mostly the endgame. A house from 6, the villas at 10 – 11, the mansions at 13 – 15; the offices (your
+-- company, Config.Business) at 12 – 15 and only after a campaign's finale (requires): the first one after Iron
+-- Supply, the penthouse after the Last Convoy.
+-- 3.4, cars are earned and kept in garages: the depot's lot holds only your starting van (BaseCarSlots = 1), every
+-- further car needs a slot of a garage or a home. The first garages come early: the Rented Lockup (level 2, one
+-- slot: the Courier Van needs it) and the Southside Garage (level 4, two slots), then the bigger ones. Your cars wait
+-- in your garages: you switch cars only at one of them (server/Garages.luau; the depot lot for the starting van).
 export type EstateDef = {
 	id: string,
 	name: string,
@@ -1012,7 +1040,7 @@ export type EstateDef = {
 }
 
 Config.Estate = {
-	BaseCarSlots = 3, -- the depot's lot: cars you can own without any garage (more need a home or a garage); 3.3: 3 (the van + two more)
+	BaseCarSlots = 1, -- the depot's lot: cars you can own without any garage (more need a home or a garage); 3.4: 1 (the starting van)
 	SellBack = 0.6, -- selling returns this share of the price
 	Properties = {
 		{ id = "hilltop", name = "Hilltop Mansion", kind = "mansion", price = 6000000, garageSlots = 8, level = 15, description = "The top of Sunset Hills: the whole city at your feet, an infinity pool and a garage for eight." },
@@ -1024,6 +1052,8 @@ Config.Estate = {
 		{ id = "oak", name = "7 Oak Lane", kind = "house", price = 220000, garageSlots = 2, level = 8, description = "A brick house with a porch and a double garage." },
 		{ id = "birch", name = "Birch Cottage", kind = "house", price = 150000, garageSlots = 2, level = 7, description = "A cosy cottage at the edge of town, garage for two." },
 		{ id = "elm", name = "Elm Bungalow", kind = "house", price = 90000, garageSlots = 1, level = 6, description = "A small bungalow: your first home, one car fits in the garage." },
+		{ id = "garage_rented", name = "Rented Lockup", kind = "garage", price = 2500, garageSlots = 1, level = 2, description = "A rented lock-up between Downtown and the Suburbs: one car slot, your first garage." },
+		{ id = "garage_south", name = "Southside Garage", kind = "garage", price = 12000, garageSlots = 2, level = 4, description = "A two-bay garage south of Downtown, on the road to the Suburbs: two more car slots." },
 		{ id = "garage_harbor", name = "Harbor Lockup", kind = "garage", price = 25000, garageSlots = 4, level = 5, description = "A rented lock-up at the harbor: four more car slots." },
 		{ id = "garage_north", name = "Highway Garage", kind = "garage", price = 45000, garageSlots = 4, level = 6, description = "A garage on the North Highway: four more car slots." },
 		{ id = "garage_downtown", name = "Downtown Parking", kind = "garage", price = 70000, garageSlots = 6, level = 7, description = "A floor of the downtown parking house: six more car slots." },
@@ -1041,6 +1071,23 @@ Config.CarCall = {
 	SpawnMax = 200,
 	Speed = 55,
 	DriverFade = 2.5,
+}
+
+-- 3.4, the repair shops (server/Repair.luau, the bays: Map.RepairShops, built by server/World.luau): drive into a
+-- bay, stop and get out; the mechanics take the car (it cannot be driven), and after the time it is as good as new.
+-- The time and the fee grow with the damage (Economy.repairTime / repairFee); the fee is paid at the end, getting
+-- back in (or calling the car away) cancels it for free. There is no free repair anywhere any more: the Repair Kit
+-- (Config.Items) is the emergency fix on the road. A car keeps its damage when it is parked (profile.carHealth) and a
+-- wrecked one comes back with WreckedHealth.
+Config.Repair = {
+	Seconds = 60, -- a car from (almost) nothing to full health
+	MinSeconds = 20, -- the lightest damage
+	FeeMin = 20, -- the lightest damage
+	FeeFull = 300, -- a car from nothing to full health
+	MinMissing = 0.02, -- less damage than this share: nothing to repair
+	StandStill = 1.5, -- seconds the empty car stands in the bay before the mechanics start
+	MaxSpeed = 2, -- studs / s: the car stands
+	WreckedHealth = 0.2, -- a wrecked car comes back with this share of its health
 }
 
 -- Your delivery company (server/Business.luau), run from an office computer: hire couriers who make deliveries for
@@ -1262,6 +1309,11 @@ Config.Jobs = {
 	-- How often (and how many) the bandits set up a roadblock ahead of you, see the tiers. A roadblock is a car across
 	-- the road with bandits around it.
 	AmbushDistance = 170,
+	-- 3.4: bigger loads on the dangerous jobs (cargo capacity, Config.Cars capacity): an ordinary delivery of danger
+	-- level n is a bulk order with BulkChance[n], its pieces + BulkExtra[n] (min, max). ★ never (3 pieces at most:
+	-- every car takes them), ★★ rarely (5 at most), ★★★ up to 6, ★★★★ up to 8 (a big van or a Cargo Rack).
+	BulkChance = { 0, 0.2, 0.45, 0.6 } :: { number },
+	BulkExtra = { { 0, 0 }, { 1, 2 }, { 2, 3 }, { 3, 5 } } :: { { number } },
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
 	Businesses = {
 		{

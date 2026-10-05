@@ -4,12 +4,14 @@
 -- (shared/Levels.luau) is high enough for what you buy (the level field of Config.Cars, Weapons and CarGuns).
 --
 --   Dead End Motors     cars (the showroom models have their own prompts); every car needs a free car slot
---                       (Estate.carSlots: homes and garages add them; the employers' company cars take none)
+--                       (Estate.carSlots: homes and garages add them; the employers' company cars take none).
+--                       3.4: a bought car goes into your garage: take it out there (server/Garages.luau)
 --   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
---   Wrench Garage       upgrades (3.3: the car tracks for the equipped car, the gun tracks for all guns), paint jobs
---                       and car guns (one on the roof of the equipped car; free repairs inside)
+--   Wrench Garage       upgrades (3.3: the car tracks for the equipped car, 3.4 with the Cargo Rack; the gun tracks
+--                       for all guns), paint jobs and car guns (one on the roof of the equipped car); 3.4: its repair
+--                       bays are server/Repair.luau's (no free repairs any more)
 --   Last Stop Supplies  consumables
---   Depot Garage        switch between your cars
+--   Depot Garage        3.4: the depot lot's garage window (server/Garages.luau: the starting van, company vehicles)
 --   Job Board           the depot's job board
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,21 +25,14 @@ local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
-local Jobs = require(script.Parent.Jobs)
 local Estate = require(script.Parent.Estate)
+local Garages = require(script.Parent.Garages)
 
 local Shops = {}
 
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
 
--- 3.2: the lowest level a garage or a home can be bought at (the car slot message says it).
-local GARAGE_LEVEL = Config.Levels.MaxLevel
-for _, def in Config.Estate.Properties do
-	if def.garageSlots > 0 then
-		GARAGE_LEVEL = math.min(GARAGE_LEVEL, def.level or 1)
-	end
-end
 
 local function nearShop(player: Player, shop: string): boolean
 	local info = Map.Shops[shop]
@@ -75,26 +70,19 @@ local function noSlot(player: Player): boolean
 	if used < slots then
 		return false
 	end
-	notice:FireClient(player, `No free car slot: {used} cars, {slots} slots. Buy a garage (from level {GARAGE_LEVEL}) or a home for more (ESTATE, H).`)
+	notice:FireClient(player, `No free garage slot ({used} cars, {slots} slots). Buy or rent a garage (ESTATE, H) first.`)
 	return true
 end
 
-local function equipCar(player: Player, id: string)
+-- 3.4: the name of a garage of the player's (the first one in the list), for "it waits in your Rented Lockup".
+local function aGarage(player: Player): string
 	local profile = PlayerData.get(player)
-	if not profile then
-		return
+	for _, def in Config.Estate.Properties do
+		if profile and profile.properties[def.id] and def.garageSlots > 0 then
+			return def.name
+		end
 	end
-	profile.car = id
-	PlayerData.notify(player)
-	-- Swap the car right away, unless it is out on a job.
-	if Jobs.active(player) then
-		notice:FireClient(player, "Your new car comes after this delivery.")
-		return
-	end
-	local err = Vehicles.spawn(player, true)
-	if err then
-		notice:FireClient(player, err)
-	end
+	return "garage"
 end
 
 local function onBuy(player: Player, kind: any, id: any, amount: any)
@@ -112,8 +100,9 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			return
 		end
 		profile.cars[id] = true
-		notice:FireClient(player, `You bought the {def.name}!`)
-		equipCar(player, id)
+		-- 3.4: it goes into your garage (cars are kept in garages): take it out there.
+		notice:FireClient(player, `You bought the {def.name}! It waits in your {aGarage(player)}: take it out at the 🅿 GARAGE post there (E).`)
+		PlayerData.notify(player)
 	elseif kind == "weapon" then
 		local def = Economy.findWeapon(id)
 		if not def or profile.weapons[id] then
@@ -191,12 +180,12 @@ local function onEquip(player: Player, kind: any, id: any)
 	if not profile or type(id) ~= "string" then
 		return
 	end
-	if kind == "car" and profile.cars[id] and profile.car ~= id then
-		if not nearShop(player, "depot") and not nearShop(player, "dealer") then
-			notice:FireClient(player, "Switch cars at the depot garage.")
-			return
+	if kind == "car" and profile.cars[id] then
+		-- 3.4: cars are switched only at a garage of yours (or the depot lot for the starting van).
+		local err = Garages.take(player, id)
+		if err then
+			notice:FireClient(player, err)
 		end
-		equipCar(player, id)
 	elseif kind == "weapon" and profile.weapons[id] then
 		profile.weapon = id
 		PlayerData.notify(player)
@@ -213,7 +202,7 @@ local function onUpgrade(player: Player, id: any)
 	local carDef = Economy.findCar(profile.car)
 	if carTrack and (not carDef or not Economy.canUpgrade(carDef.id)) then
 		local name = if carDef then carDef.name else "this vehicle"
-		notice:FireClient(player, `The {name} is a company vehicle: it can't be upgraded. Take one of your own cars (depot garage).`)
+		notice:FireClient(player, `The {name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`)
 		return
 	end
 	local levels = if carTrack and carDef then Economy.carLevels(profile.carUpgrades, carDef.id) else profile.upgrades
@@ -309,6 +298,10 @@ end
 function Shops.start()
 	for _, entry in World.ShopPrompts do
 		entry.prompt.Triggered:Connect(function(player)
+			if entry.shop == "depot" then
+				Garages.open(player, "depot") -- 3.4: the depot lot's garage window
+				return
+			end
 			openShop:FireClient(player, entry.shop, nil)
 		end)
 	end

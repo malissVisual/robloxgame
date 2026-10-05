@@ -47,6 +47,15 @@
 -- level 3. Cosmetic: welded, massless, no collisions, not hit by rays, their own colours (never painted). It is built
 -- with the car and rebuilt when the levels change (Vehicles.refreshStats). Quick Hands (the loading track) shortens
 -- the BackPrompt's hold (Vehicles.loadHold; server/Cargo.luau uses it for the cargo prompts of the job's car).
+--
+-- 3.4: cargo capacity. A car takes Config.Cars capacity pieces (= its STYLES cargo slots) + its Cargo Rack (the
+-- "rack" car track): a roof rack in the UpgradeKit (rackOf: over the cargo space, behind the roof gun) with one more
+-- slot per level ON it (Vehicles.cargoSlots lists the body's slots, then the rack's). The car's damage stays with it:
+-- its share of health is kept per car in profile.carHealth (remember: every hit, every repair, when it is parked); a
+-- car comes back as damaged as it went, a wrecked one with Config.Repair.WreckedHealth. A company vehicle lent for a
+-- job (Car.lent) always comes fresh from its employer. No free repairs any more (the depot yard and Wrench Garage
+-- healed before 3.4): server/Repair.luau runs the repair bays (Vehicles.setRepairing locks the car on the lift; the
+-- hook Vehicles.beforeDrive tells it the owner got back in).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -82,6 +91,9 @@ export type Car = {
 	chauffeured: boolean, -- a chauffeur drives it to its owner (server/CarCall.luau): server-owned, no prompts
 	born: number, -- os.clock() when it was placed
 	kit: string, -- 3.3: the car-track levels its UpgradeKit shows (kitKey)
+	rack: number, -- 3.4: its Cargo Rack level (the extra cargo slots on the roof)
+	lent: boolean, -- 3.4: a company vehicle lent for a job: its damage is not kept
+	repairing: boolean, -- 3.4: on the lift of a repair bay (server/Repair.luau): anchored, nobody drives it
 }
 
 local Vehicles = {}
@@ -371,7 +383,14 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(2.6, 2.6, 2.6), Vector3.new(0, 8.4, 4.6), "ball"), -- the scoop
 			box(Vector3.new(7, 0.8, 0.6), Vector3.new(0, 0.4, -7.1), "dark"),
 		},
-		cargo = cargo("truck", 14, 6.8, { Vector3.new(-1.6, 0, 1.4), Vector3.new(1.6, 0, 1.4), Vector3.new(-1.6, 0, 4.6), Vector3.new(1.6, 0, 4.6) }),
+		cargo = cargo("truck", 14, 6.8, {
+			Vector3.new(-1.6, 0, 1.4),
+			Vector3.new(1.6, 0, 1.4),
+			Vector3.new(-1.6, 0, 4.6),
+			Vector3.new(1.6, 0, 4.6),
+			Vector3.new(-1.6, 2.5, 1.4), -- 3.4: a shelf over the front pair
+			Vector3.new(1.6, 2.5, 1.4),
+		}),
 		back = rearDoors(6.8, DOOR_SILL, 5.4, 7.0, function(_side: number): { Box }
 			return { box(Vector3.new(3.35, 0.65, 0.06), Vector3.new(0, -1.9, 0.12), "accent") } -- the pink stripe goes round
 		end),
@@ -396,7 +415,16 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(8, 2.4, 1), Vector3.new(0, 0.9, -7.8), "plate"), -- ram plate
 			box(Vector3.new(7.6, 1.2, 0.4), Vector3.new(0, 6.6, 7), "plate"), -- roof rail for the gunners
 		},
-		cargo = cargo("truck", 15, 7.4, { Vector3.new(-1.8, 0, 2), Vector3.new(1.8, 0, 2), Vector3.new(-1.8, 0, 5.2), Vector3.new(1.8, 0, 5.2) }),
+		cargo = cargo("truck", 15, 7.4, {
+			Vector3.new(-1.8, 0, 2),
+			Vector3.new(1.8, 0, 2),
+			Vector3.new(-1.8, 0, 5.2),
+			Vector3.new(1.8, 0, 5.2),
+			Vector3.new(-1.8, 2.6, 2), -- 3.4: stacked on top (the army's big loads)
+			Vector3.new(1.8, 2.6, 2),
+			Vector3.new(-1.8, 2.6, 5.2),
+			Vector3.new(1.8, 2.6, 5.2),
+		}),
 		back = rearDoors(7.4, DOOR_SILL, 5.8, 7.3, function(_side: number): { Box }
 			return {
 				box(Vector3.new(3.65, 1, 0.08), Vector3.new(0, -1.775, 0.13), "plate"), -- the armour plates go on over the doors
@@ -463,6 +491,10 @@ local STYLES: { [string]: Style } = {
 			Vector3.new(1.8, 0, 2.8),
 			Vector3.new(-1.8, 0, 6.2),
 			Vector3.new(1.8, 0, 6.2),
+			Vector3.new(-1.8, 3.6, -0.6), -- 3.4: a second layer in the tall box
+			Vector3.new(1.8, 3.6, -0.6),
+			Vector3.new(-1.8, 3.6, 2.8),
+			Vector3.new(1.8, 3.6, 2.8),
 		}),
 		back = rearDoors(7.6, DOOR_SILL, 7.8, 8.2, function(_side: number): { Box }
 			return { box(Vector3.new(3.7, 0.25, 0.06), Vector3.new(0, 2.625, 0.12), "dark") } -- the top rail
@@ -489,7 +521,14 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(0.3, 1.0, 5), Vector3.new(-3.35, 2.3, 4), "body"), -- 3.2: rails round the bed
 			box(Vector3.new(0.3, 1.0, 5), Vector3.new(3.35, 2.3, 4), "body"),
 		},
-		cargo = cargo("truck", 14, 8, { Vector3.new(-2.2, 1.8, 5.6), Vector3.new(0, 1.8, 5.6), Vector3.new(2.2, 1.8, 5.6), Vector3.new(0, 3.8, 5.6) }),
+		cargo = cargo("truck", 14, 8, {
+			Vector3.new(-2.2, 1.8, 5.6),
+			Vector3.new(0, 1.8, 5.6),
+			Vector3.new(2.2, 1.8, 5.6),
+			Vector3.new(0, 3.8, 5.6),
+			Vector3.new(-2.2, 3.8, 5.6), -- 3.4: piled higher in the bed
+			Vector3.new(2.2, 3.8, 5.6),
+		}),
 		back = tailgate("tailgate", Vector3.new(6.4, 1.0, 0.25), Vector3.new(0, 2.3, 6.375), 92),
 	},
 	livestock = {
@@ -522,7 +561,14 @@ local STYLES: { [string]: Style } = {
 		passengers = { Vector3.new(1.5, 0.5, -1) },
 		roof = 5.2,
 		boxes = flatbedBoxes(),
-		cargo = cargo("truck", 16, 7.2, { Vector3.new(-1.7, 0.5, 2.6), Vector3.new(1.7, 0.5, 2.6), Vector3.new(-1.7, 0.5, 6), Vector3.new(1.7, 0.5, 6) }),
+		cargo = cargo("truck", 16, 7.2, {
+			Vector3.new(-1.7, 0.5, 2.6),
+			Vector3.new(1.7, 0.5, 2.6),
+			Vector3.new(-1.7, 0.5, 6),
+			Vector3.new(1.7, 0.5, 6),
+			Vector3.new(-1.7, 3.3, 2.6), -- 3.4: a second row on top, against the headboard
+			Vector3.new(1.7, 3.3, 2.6),
+		}),
 		back = tailgate("tailgate", Vector3.new(6.4, 1.6, 0.25), Vector3.new(0, 1.3, 7.875), 95, "accent", {
 			box(Vector3.new(6.4, 0.3, 0.08), Vector3.new(0, 0.2, 0.15), "rail"),
 		}),
@@ -1061,7 +1107,57 @@ end
 
 -- The levels the kit shows, as a key (rebuilt only when it changes).
 local function kitKey(levels: Economy.Upgrades): string
-	return `{Economy.level(levels, "plow")}/{Economy.level(levels, "armor")}/{Economy.level(levels, "engine")}`
+	return `{Economy.level(levels, "plow")}/{Economy.level(levels, "armor")}/{Economy.level(levels, "engine")}/{Economy.level(levels, "rack")}`
+end
+
+-- 3.4, the Cargo Rack: a roof rack over the cargo space (behind the roof gun's place), high enough to clear the body
+-- and the pieces under it; its slots (bottom centres, relative to the chassis top like the style's) sit on it: a row
+-- of three across, or two at the back and one in front when it is long enough.
+type Rack = { y: number, roof: number, z0: number, z1: number, half: number, slots: { Vector3 } }
+local racks: { [Style]: Rack } = {}
+local function rackOf(style: Style): Rack
+	local cached = racks[style]
+	if cached then
+		return cached
+	end
+	local zs: { number } = {}
+	local lowest = 0
+	for _, slot in style.cargo.slots do
+		table.insert(zs, slot.Z)
+		lowest = math.max(lowest, slot.Y)
+	end
+	local zMin, zMax = math.min(table.unpack(zs)), math.max(table.unpack(zs))
+	local z0 = math.max(zMin - 1.3, 2.0) -- behind the roof gun (turretBase z 0.5)
+	local z1 = math.min(zMax + 1.3, style.length / 2 - 0.4)
+	if z1 - z0 < 3 then
+		z0 = z1 - 3
+	end
+	-- The body's top over that stretch (the middle of the car), and over the pieces below.
+	local roof = 0
+	for _, b in style.boxes do
+		local bz0, bz1 = b.offset.Z - b.size.Z / 2, b.offset.Z + b.size.Z / 2
+		if b.kind ~= "hole" and b.kind ~= "ball" and bz1 > z0 and bz0 < z1 and math.abs(b.offset.X) < b.size.X / 2 + 1 then
+			roof = math.max(roof, b.offset.Y + b.size.Y / 2)
+		end
+	end
+	local y = math.max(roof, lowest + 2.6) + 0.45
+	local half = style.width / 2 - 0.45
+	local slots: { Vector3 } = {}
+	local top = y + 0.12
+	if z1 - z0 >= 5.2 then
+		table.insert(slots, Vector3.new(-1.4, top, z1 - 1.3))
+		table.insert(slots, Vector3.new(1.4, top, z1 - 1.3))
+		table.insert(slots, Vector3.new(0, top, z1 - 3.9))
+	else
+		local x = math.min(2.2, half - 1.0)
+		local z = (z0 + z1) / 2
+		table.insert(slots, Vector3.new(-x, top, z))
+		table.insert(slots, Vector3.new(x, top, z))
+		table.insert(slots, Vector3.new(0, top, z))
+	end
+	local rack: Rack = { y = y, roof = roof, z0 = z0, z1 = z1, half = half, slots = slots }
+	racks[style] = rack
+	return rack
 end
 
 -- (Re)builds the kit of a player's car for these car-track levels.
@@ -1073,7 +1169,8 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	local plow = Economy.level(levels, "plow")
 	local armor = Economy.level(levels, "armor")
 	local engine = Economy.level(levels, "engine")
-	if plow < 1 and armor < 1 and engine < 3 then
+	local rackLevel = Economy.level(levels, "rack")
+	if plow < 1 and armor < 1 and engine < 3 and rackLevel < 1 then
 		return
 	end
 	local folder = Instance.new("Folder")
@@ -1180,6 +1277,46 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 		if not (back and back.noun == "ramp") then
 			for _, side in { -1, 1 } do
 				add("Exhaust", Vector3.new(1.0, 0.42, 0.42), Vector3.new(side * (style.width / 2 - 1.3), -0.75, style.length / 2 + 0.3), KIT_CHROME, Enum.Material.Metal, true)
+			end
+		end
+	end
+
+	-- 3.4, Cargo Rack: a roof rack over the cargo space, its extra slots on it (Vehicles.cargoSlots). Two side rails
+	-- on four legs, cross bars (one more per level) and, from level 2, a low fence round it; level 3 a ladder up the side.
+	if rackLevel >= 1 then
+		local r = rackOf(style)
+		local length = r.z1 - r.z0
+		local mid = (r.z0 + r.z1) / 2
+		local legs = r.y - r.roof
+		for _, side in { -1, 1 } do
+			add("RackRail", Vector3.new(0.22, 0.22, length), Vector3.new(side * r.half, r.y, mid), KIT_STEEL, Enum.Material.Metal)
+			for _, z in { r.z0 + 0.3, r.z1 - 0.3 } do
+				if legs > 0.05 then
+					add("RackLeg", Vector3.new(0.22, legs, 0.22), Vector3.new(side * r.half, r.roof + legs / 2, z), KIT_STEEL, Enum.Material.Metal)
+				end
+			end
+			if rackLevel >= 2 then
+				add("RackFence", Vector3.new(0.16, 0.16, length), Vector3.new(side * r.half, r.y + 0.55, mid), KIT_CHROME, Enum.Material.Metal)
+				for _, z in { r.z0 + 0.3, mid, r.z1 - 0.3 } do
+					add("RackPost", Vector3.new(0.14, 0.55, 0.14), Vector3.new(side * r.half, r.y + 0.28, z), KIT_CHROME, Enum.Material.Metal)
+				end
+			end
+		end
+		local bars = 2 + rackLevel
+		for n = 0, bars - 1 do
+			local z = r.z0 + 0.3 + (length - 0.6) * n / (bars - 1)
+			add("RackBar", Vector3.new(r.half * 2, 0.16, 0.3), Vector3.new(0, r.y, z), KIT_STEEL, Enum.Material.Metal)
+		end
+		if rackLevel >= 3 then
+			-- A ladder up the right side at the rack's front end (clear of the back that opens).
+			local x = style.width / 2 + 0.18
+			local foot = 0.6
+			local height = r.y - foot
+			for _, dz in { -0.35, 0.35 } do
+				add("RackLadder", Vector3.new(0.12, height, 0.12), Vector3.new(x, foot + height / 2, r.z0 + 0.8 + dz), KIT_CHROME, Enum.Material.Metal)
+			end
+			for n = 1, math.floor(height / 0.8) do
+				add("RackRung", Vector3.new(0.1, 0.1, 0.7), Vector3.new(x, foot + n * 0.8, r.z0 + 0.8), KIT_CHROME, Enum.Material.Metal)
 			end
 		end
 	end
@@ -1646,6 +1783,11 @@ local function watchPrompts(car: Car)
 		end
 		local humanoid = humanoidOf(player)
 		if player == car.owner and not car.wrecked and not car.chauffeured and not car.seat.Occupant and humanoid and not handsFull(player) then
+			-- 3.4: back in a car on the lift of a repair bay: the repair is cancelled (server/Repair.luau).
+			if car.repairing then
+				Vehicles.beforeDrive(player, car)
+				Vehicles.setRepairing(car, false) -- (in case nobody was running it)
+			end
 			car.seat:Sit(humanoid)
 		end
 	end)
@@ -1731,12 +1873,25 @@ local function styleOf(car: Car): Style
 end
 
 -- Where the loaded pieces ride, relative to the chassis: the bottom centre of a piece, facing the front.
+-- 3.4: the body's slots first, then one on the roof rack per Cargo Rack level (Economy.capacity counts the same).
 function Vehicles.cargoSlots(car: Car): { CFrame }
 	local list = {}
-	for _, slot in styleOf(car).cargo.slots do
+	local style = styleOf(car)
+	for _, slot in style.cargo.slots do
 		table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + slot))
 	end
+	if car.rack > 0 then
+		local onRack = rackOf(style).slots
+		for n = 1, math.min(car.rack, #onRack) do
+			table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + onRack[n]))
+		end
+	end
 	return list
+end
+
+-- 3.4: how many pieces the car takes at once (its slots, the rack's included).
+function Vehicles.capacity(car: Car): number
+	return Economy.capacity(car.id, if car.rack > 0 then { rack = car.rack } else {})
 end
 
 -- What the HUD calls the cargo space: "Load it into the back of the {noun}".
@@ -1856,10 +2011,48 @@ local function gunFor(player: Player, carId: string): string?
 	return nil
 end
 
+-- 3.4: keeps the car's share of health in the profile (profile.carHealth, saved): it comes back as damaged as it
+-- went. Not a lent company vehicle (it goes back to its employer).
+local function remember(car: Car)
+	if car.lent then
+		return
+	end
+	local profile = PlayerData.get(car.owner)
+	if profile then
+		profile.carHealth[car.id] = math.clamp(car.health / math.max(1, car.stats.health), 0, 1)
+	end
+end
+
+-- 3.4, set by server/Repair.luau: the owner gets back into a car on the lift (the repair is cancelled).
+Vehicles.beforeDrive = function(_player: Player, _car: Car) end
+
+-- 3.4: a car on the lift of a repair bay: anchored where it stands (nobody pushes or drives it) and marked for the
+-- clients (the attribute Repairing); off again, the owner's client drives it as before.
+function Vehicles.setRepairing(car: Car, on: boolean)
+	if car.repairing == on or car.wrecked or not car.chassis.Parent then
+		car.repairing = on
+		return
+	end
+	car.repairing = on
+	car.model:SetAttribute("Repairing", on)
+	car.chassis.AssemblyLinearVelocity = Vector3.zero
+	car.chassis.AssemblyAngularVelocity = Vector3.zero
+	car.chassis.Anchored = on
+	if not on then
+		pcall(function()
+			car.chassis:SetNetworkOwner(if car.chauffeured then nil else car.owner)
+		end)
+	end
+end
+
+-- The player's car leaves the world (a new one, a garage, leaving the game): parked as it is (its damage kept).
 function Vehicles.remove(player: Player)
 	local car = cars[player]
 	if car then
 		cars[player] = nil
+		if not car.wrecked then
+			remember(car)
+		end
 		car.wrecked = true
 		car.model:Destroy()
 	end
@@ -1966,6 +2159,9 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	-- 3.3: this car's own car-track levels (a company vehicle has none).
 	local levels = Economy.carLevels(profile.carUpgrades, def.id)
 	local stats = Economy.carStats(def.id, levels)
+	-- 3.4: your own car comes as damaged as it was parked (profile.carHealth); a lent company vehicle comes fresh.
+	local lent = carId ~= nil and def.company == true and carId ~= profile.car
+	local share = if lent then 1 else math.clamp(profile.carHealth[def.id] or 1, 0.05, 1)
 	local gunId = gunFor(player, def.id)
 	local paintId = if def.company then nil else profile.carPaint[def.id]
 	local built = build(def, paintColor(def, paintId), ground, false, gunId)
@@ -1986,12 +2182,15 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		paintParts = built.paintParts,
 		size = built.size,
 		stats = stats,
-		health = stats.health,
+		health = math.max(1, stats.health * share),
 		wrecked = false,
 		latched = {},
 		chauffeured = chauffeured == true,
 		born = os.clock(),
 		kit = kitKey(levels),
+		rack = if def.company then 0 else Economy.level(levels, "rack"),
+		lent = lent,
+		repairing = false,
 	}
 	car.model.Name = `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
@@ -2133,12 +2332,7 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	lastSpawn[player] = os.clock()
 	local home = Vehicles.homeGarage(player)
 	if home then
-		local look = Vector3.new(home.LookVector.X, 0, home.LookVector.Z)
-		look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
-		Vehicles.remove(player) -- the old car is not in the way; a co-owner's car is (step out to the road)
-		local spot = freeSpot(home.Position, look, 16)
-		local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, home.Position.Y) + 0.5, spot.Z)
-		local car = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + look), false)
+		local car = Vehicles.placeAt(player, carId, home)
 		if not car then
 			return "Still loading..."
 		end
@@ -2147,6 +2341,17 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 		return nil
 	end
 	return Vehicles.placeNear(player, carId)
+end
+
+-- The car parked at a garage's drive-out spot (a home's garage, 3.4: any garage you take a car out of), facing the
+-- road, the player not in it. Returns the car, or nil while the save loads.
+function Vehicles.placeAt(player: Player, carId: string?, spot: CFrame): Car?
+	local look = Vector3.new(spot.LookVector.X, 0, spot.LookVector.Z)
+	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
+	Vehicles.remove(player) -- the old car is not in the way; a co-owner's car is (step out to the road)
+	local at = freeSpot(spot.Position, look, 16)
+	local position = Vector3.new(at.X, Vehicles.groundY(at.X, at.Z, spot.Position.Y) + 0.5, at.Z)
+	return Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + look), false)
 end
 
 -- 3.3, Quick Hands: how long the holds of this car's back and its cargo prompts take (its loading level).
@@ -2168,6 +2373,7 @@ function Vehicles.refreshStats(player: Player)
 	local share = car.health / car.stats.health
 	car.stats = Economy.carStats(car.id, levels)
 	car.health = car.stats.health * share
+	car.rack = if Economy.canUpgrade(car.id) then Economy.level(levels, "rack") else 0
 	writeAttributes(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then
@@ -2273,6 +2479,13 @@ local function wreck(car: Car, reason: string)
 		linear:Destroy()
 	end
 	car.model:SetAttribute("Health", 0)
+	-- 3.4: it comes back (CAR) badly damaged: a trip to a repair shop.
+	local profile = PlayerData.get(car.owner)
+	if profile and not car.lent then
+		profile.carHealth[car.id] = Config.Repair.WreckedHealth
+	end
+	car.repairing = false
+	car.chassis.Anchored = false
 	Vehicles.onWrecked(car.owner, car, reason)
 	task.delay(5, function()
 		if cars[car.owner] == car then
@@ -2290,6 +2503,8 @@ function Vehicles.damage(car: Car, amount: number, reason: string?)
 	car.model:SetAttribute("Health", math.ceil(car.health))
 	if car.health <= 0 then
 		wreck(car, reason or "Your car was destroyed!")
+	else
+		remember(car)
 	end
 end
 
@@ -2299,6 +2514,7 @@ function Vehicles.repair(car: Car, share: number)
 	end
 	car.health = math.min(car.stats.health, car.health + car.stats.health * share)
 	car.model:SetAttribute("Health", math.ceil(car.health))
+	remember(car)
 end
 
 -- Points the roof gun (if the car has one) at a world position.
@@ -2326,16 +2542,13 @@ function Vehicles.start()
 		Vehicles.remove(player)
 		lastSpawn[player] = nil
 	end)
-	RunService.Heartbeat:Connect(function(dt)
+	RunService.Heartbeat:Connect(function()
 		for _, car in cars do
 			if car.wrecked then
 				continue
 			end
 			local position = car.chassis.Position
-			-- Repairs in the depot yard and in Wrench Garage: 15 % of the health per second.
-			if car.health < car.stats.health and World.canRepair(position) then
-				Vehicles.repair(car, 0.15 * dt)
-			end
+			-- (3.4: no free repairs any more: the repair bays, server/Repair.luau.)
 			-- Drove into the water (or off the world).
 			if position.Y < -7 then
 				Vehicles.damage(car, math.huge, "Your car sank!")

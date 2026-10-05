@@ -16,6 +16,8 @@
 --   * 3.2: a locked mission card says its own level ("🔒 LEVEL 7"); a DUO mission has the 🤝 DUO chip (only with a
 --     crew: Config.Missions.Duo.MinCrew members with you at START). START on one without a crew says why and FIND
 --     CREW is right next to it; the banner shows DUO and the TWIN SWITCHES levers (gatePulled 0 – 2).
+--   * 3.4: a mission with more cargo than your car holds (the state's capacity and carName, Economy.cargoNeed) has a
+--     red "📦 needs N slots" chip, a line in its card and START says why (unless it lends a vehicle).
 --   * The campaign's header also shows its 3.1 reward (Config.Rewards.Campaigns: an exclusive gun or paint and a title).
 -- 3.1, the other tabs (the Challenges remote's "state"; ("open") is sent when one of them shows):
 --   * CHALLENGES: the final reward on top (Dead End, a dark silhouette with ??? until earned, "Complete every
@@ -322,6 +324,8 @@ Extras.pumpPopups = nil :: (() -> ())? -- shows the next waiting popup (set by t
 Extras.crewSize = 0 -- 3.2: members of my own crew (the server's state, CrewState as the owner): DUO missions need some
 Extras.DUO_COLOR = Color3.fromRGB(236, 92, 60) -- 3.2: the DUO badge (the Partners in Crime colour)
 Extras.DUO_REFUSAL = "DUO mission: invite a friend first (K) and bring them here."
+Extras.capacity = nil :: number? -- 3.4: the cargo slots of my equipped car (its Cargo Rack included; the server's state)
+Extras.carName = "car"
 Extras.state = {
 	values = {},
 	done = {},
@@ -432,6 +436,21 @@ function Extras.lockLine(campaign: Campaign): string
 		return `🔒 Finish {first.name}{more} first · LEVEL {campaign.level}`
 	end
 	return `🔒 LEVEL {campaign.level}`
+end
+
+-- 3.4: the cargo slots this mission needs when my car is too small for it (it lends no vehicle), else nil.
+function Extras.slotsShort(def: MissionDef): number?
+	local need = Economy.cargoNeed(def.load, def.items)
+	local holds = Extras.capacity
+	if def.vehicle or need <= 0 or holds == nil or need <= holds then
+		return nil
+	end
+	return need
+end
+
+-- 3.4: what START says when the car is too small (the server's words).
+function Extras.slotsText(need: number): string
+	return `This mission needs a vehicle with {need} slots (your {Extras.carName} holds {Extras.capacity or 0}). Upgrade its Cargo Rack or switch cars at your garage.`
 end
 
 -- 3.2: is a DUO mission short of a crew right now (not in somebody else's crew: the leader decides there)?
@@ -1115,6 +1134,14 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 		coopChip(chips, 10)
 		count += 1
 	end
+	-- 3.4: your car is too small for it: the slots it needs.
+	local short = Extras.slotsShort(def)
+	if short then
+		local chip = Ui.chip(chips, `📦 needs {short} slots`, C.red, Color3.new(1, 1, 1))
+		chip.LayoutOrder = 11
+		chip.TextSize = 12
+		count += 1
+	end
 	if count == 0 then
 		Ui.label(chips, "a plain delivery", UDim2.new(1, 0, 1, 0), { TextSize = 12, Font = Theme.Font, TextColor3 = C.dim })
 	end
@@ -1228,6 +1255,8 @@ local function actionRow(parent: any, def: MissionDef, order: number)
 			note = "Finish your current delivery first."
 		elseif Extras.needsCrew(def) then
 			note = `🤝 {Extras.DUO_REFUSAL}`
+		elseif Extras.slotsShort(def) then
+			note = `📦 needs {Extras.slotsShort(def)} slots: your {Extras.carName} holds {Extras.capacity or 0}.`
 		elseif table.find(twistsOf(def), "night") and workspace:GetAttribute("Night") == false then
 			note = "🌙 Night only: come back after dark."
 		end
@@ -1272,8 +1301,14 @@ local function missionDetail(def: MissionDef, campaign: Campaign, order: number)
 		table.insert(facts, `🏴 bandits want it: ×{def.banditBoost}`)
 	end
 	local vehicle = vehicleName(def.vehicle)
-	table.insert(facts, if vehicle then `🚚 lent: {esc(vehicle)}` else "🚗 your own car")
+	local slotsNeed = Economy.cargoNeed(def.load, def.items)
+	table.insert(facts, if vehicle then `🚚 lent: {esc(vehicle)}` elseif slotsNeed > 0 then `🚗 your own car · 📦 {slotsNeed} slots` else "🚗 your own car")
 	detailLine(frame, table.concat(facts, "   ·   "), C.dim, 4, 13)
+	-- 3.4: too much cargo for the car you have.
+	local short = Extras.slotsShort(def)
+	if short then
+		detailLine(frame, `<b>📦 needs {short} slots</b>  {esc(Extras.slotsText(short))}`, C.red, 19, 13)
+	end
 	-- The twists, explained (touch players have no hover).
 	local line = 5
 	for _, twist in twistsOf(def) do
@@ -2102,6 +2137,11 @@ function MissionsUi.startMission(id: string)
 		say(Extras.DUO_REFUSAL, C.red)
 		return
 	end
+	local short = Extras.slotsShort(def)
+	if short then
+		say(Extras.slotsText(short), C.red)
+		return
+	end
 	pendingStart = id
 	say(`Starting "{def.name}"…`, C.yellow)
 	ask("start", id)
@@ -2750,6 +2790,8 @@ local function applyState(data: any)
 	active = if type(data.active) == "string" then data.active else nil
 	crewOwner = if type(data.crewOwner) == "string" then data.crewOwner else nil
 	Extras.crewSize = if type(data.crewSize) == "number" then data.crewSize else 0
+	Extras.capacity = if type(data.capacity) == "number" then data.capacity else nil
+	Extras.carName = if type(data.carName) == "string" then data.carName else "car"
 	hasState = true
 	-- Opened before the first state (a slow load): pick where the player is in the story now.
 	if blindPick then

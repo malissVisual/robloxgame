@@ -15,7 +15,8 @@
 --              city (up the winding Sunset Drive, north-east of Downtown), Ocean View on the sea cliffs north of the
 --              Harbor, Pinecrest in the pines off the West Highway, the Lakeside Villa by the frozen lake, the Sunset
 --              Villa down a quiet lane in the west, houses on different Suburbs streets and one at the edge of town,
---              three garages (the Harbor Lockup, the Highway Garage on the North Highway, Downtown Parking) and the two
+--              five garages (3.4: the Rented Lockup and the Southside Garage between Downtown and the Suburbs; the
+--              Harbor Lockup, the Highway Garage on the North Highway, Downtown Parking) and the two
 --              office towers (Dispatch Tower downtown, Harbor Point in the Harbor) with the offices on their upper
 --              floors (Map.Towers)
 --   Missions   (3.0) fifteen more places for the mission campaigns (shared/Missions.luau): on downtown blocks the
@@ -25,6 +26,7 @@
 --              (north of Downtown), Blackrock Prison (far north-west), Lighthouse Point (on the coast north of Ocean
 --              View), the Survivor Camp (on the Radio Road) and the Stadium Shelter (south of the Suburbs)
 --   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
+--   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
 --
 -- It also holds the shape of the night over the clock (Map.nightFactor): the server runs the clock
 -- (server/DayNight.luau), every client draws the look from the same numbers (client/Weather.luau).
@@ -180,6 +182,7 @@ Map.SpecialBlocks = {
 		["3,-1"] = "harborpoint", -- Harbor Point (an office), by the docks
 		["0,-3"] = "lockup", -- the Harbor Lockup (a garage), where the Old Bridge comes over
 		["2,2"] = "warehouse", -- the Harbor Warehouse (3.0): its roller doors on the avenue to the west
+		["0,1"] = "repairs", -- Rust Bridge Repairs (3.4, a repair shop): where the Rust Bridge comes over
 	},
 } :: { [string]: { [string]: string } }
 
@@ -197,6 +200,15 @@ Map.Shops = {
 	supplies = { name = "Last Stop Supplies", x = 0, z = -CELL },
 } :: { [string]: { name: string, x: number, z: number } }
 Map.ShopRadius = 80
+
+-- 3.4, the repair shops (server/Repair.luau): Wrench Garage in Downtown and Rust Bridge Repairs on a Harbor block
+-- (Map.SpecialBlocks "repairs"). server/World.luau builds their repair bays (World.RepairBays); the bays face the
+-- road in front (`facing`, a unit direction along X or Z), the cars drive in through the wide door.
+export type RepairShop = { id: string, name: string, x: number, z: number, facing: { x: number, z: number } }
+Map.RepairShops = {
+	{ id = "mechanic", name = "Wrench Garage", x = 0, z = CELL, facing = { x = 0, z = -1 } },
+	{ id = "repairs", name = "Rust Bridge Repairs", x = 1080, z = CELL, facing = { x = -1, z = 0 } },
+} :: { RepairShop }
 
 -- Flat open areas at the ends of the highways.
 Map.Yards = {
@@ -394,7 +406,8 @@ Map.CargoSpots = cargoSpots
 --   Houses        three on ordinary lots of different Suburbs blocks and streets (the rest of their block stays as
 --                 it is), Birch Cottage at the edge of town, at the end of Birch Lane west of the Suburbs
 --   Garages       the Harbor Lockup (a Harbor block), the Highway Garage (by the North Highway), Downtown Parking
---                 (a downtown block in the safe zone)
+--                 (a downtown block in the safe zone); 3.4: the Rented Lockup and the Southside Garage south of
+--                 Downtown, on the streets to the Suburbs
 --   Offices       rooms on the upper floors of the two towers (Map.Towers); the lobby's elevator takes you up
 
 Map.SunsetHills = { id = "sunsethills", name = "Sunset Hills", x0 = 360, z0 = -1290, x1 = 745, z1 = -690 } :: Area
@@ -476,7 +489,10 @@ Map.EstatePlots = {
 	oak = suburbHouse(1, 1, 1, 0),
 	elm = suburbHouse(-2, 1, 0, 1),
 	birch = { x = -513, z = 900 + 2.5 * CELL, facing = facingOf(1, 0), district = "suburbs", w = 44, front = 10, back = 27 },
-	-- The garages.
+	-- The garages. 3.4: the two small ones come first (the Rented Lockup and the Southside Garage, both on the stretch
+	-- between Downtown and the Suburbs, each on its own street), then the bigger ones.
+	garage_rented = { x = -30, z = 738, facing = facingOf(-1, 0), district = "southside", w = 24, front = 9, back = 9 },
+	garage_south = { x = 172, z = 738, facing = facingOf(1, 0), district = "southside", w = 32, front = 11, back = 11 },
 	garage_harbor = { x = 1049, z = -432, facing = facingOf(-1, 0), district = "harbor", w = 52, front = 12, back = 12 },
 	garage_north = { x = 119, z = -722, facing = facingOf(-1, 0), district = "highway", w = 52, front = 13, back = 13 },
 	garage_downtown = { x = CELL, z = CELL - 4, facing = facingOf(0, 1), district = "downtown", w = 90, front = 34, back = 34 },
@@ -500,10 +516,11 @@ export type Landmark = { id: string, name: string, icon: string, x: number, z: n
 
 -- Everything worth driving to, for the map's list and the GPS.
 local landmarks: { Landmark } = {
-	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Job board, switch cars, repairs. The safe zone." },
+	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Job board, your starting van's lot. The safe zone." },
 	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Buy cars." },
 	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Buy guns." },
-	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, free repairs." },
+	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, car guns and two repair bays: drive in, get out, wait." },
+	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
 	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Repair kits, medkits, nitro, molotovs, mines." },
 }
 -- Where each employer is, in a few words (the map's list).

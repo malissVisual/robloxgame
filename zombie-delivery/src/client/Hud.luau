@@ -315,7 +315,7 @@ topStack = placed(Ui.make("Frame", {
 }, gui))
 Ui.list(topStack, true, 8, Enum.HorizontalAlignment.Center)
 
-local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, mission = 3, carcall = 4, levelup = 5, toasts = 6 }
+local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, mission = 3, carcall = 4, repair = 4, levelup = 5, toasts = 6 }
 local slots: { [string]: Frame } = {}
 
 -- A place in the top stack for another module's panel, by name ("crew"; an unknown name goes under the toasts).
@@ -817,6 +817,23 @@ function Hud.setOffers(list: { any })
 			lock.TextColor3 = C.dim
 			lock.TextSize = 15
 			lock.Position = UDim2.new(1, -122, 0.5, -23)
+		elseif offer.tooBig == true then
+			-- 3.4: more pieces than your car holds (the server refuses it too).
+			c.BackgroundColor3 = C.panel
+			local why = `This job needs {offer.slots} cargo slots: your {offer.carName} holds {offer.capacity}. Upgrade its Cargo Rack (Wrench Garage) or take a bigger car out of your garage.`
+			local short = Ui.ghostButton(c, `📦 NEEDS {offer.slots} SLOTS`, UDim2.fromOffset(110, 46), C.red, function()
+				Hud.toast(why)
+			end)
+			short.TextSize = 12
+			short.TextWrapped = true
+			short.Position = UDim2.new(1, -122, 0.5, -23)
+			Ui.label(c, `NEEDS {offer.slots} SLOTS · your {offer.carName} holds {offer.capacity}`, UDim2.fromOffset(240, 16), {
+				Position = UDim2.new(1, -252, 1, -20),
+				TextColor3 = C.red,
+				TextSize = 12,
+				Font = Enum.Font.GothamBold,
+				TextXAlignment = Enum.TextXAlignment.Right,
+			})
 		else
 			local accept = Ui.button(c, "ACCEPT", UDim2.fromOffset(110, 46), C.green, function()
 				Net.get("AcceptJob"):FireServer(offer.index)
@@ -841,7 +858,7 @@ local shopFocus: string? = nil
 local mechanicTab = "upgrades"
 
 local function carStats(def: Config.CarDef): string
-	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower}`
+	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower} · 📦 {def.capacity} slots`
 end
 
 -- Damage, rate, range (and pellets, blast) of a hand gun or a car gun.
@@ -950,6 +967,15 @@ local function renderShop()
 		note(shop.body, "Walk into the shop to buy here.", C.red, 1)
 	end
 	if shopId == "dealer" then
+		-- 3.4: every car you own takes a garage slot (the company vehicles none); a new one needs a free one.
+		local owned = 0
+		for id, yes in state.cars do
+			local def = Economy.findCar(id)
+			if yes and def and not def.company then
+				owned += 1
+			end
+		end
+		local full = owned >= (tonumber(player:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots)
 		for order, def in Config.Cars do
 			if def.company then
 				continue
@@ -961,13 +987,20 @@ local function renderShop()
 			if state.car == def.id then
 				cardButton(c, "YOUR CAR", C.grey, false, function() end)
 			elseif state.cars[def.id] then
-				cardButton(c, "TAKE IT", C.blue, here, function()
-					Net.get("Equip"):FireServer("car", def.id)
+				-- 3.4: your cars wait in your garages; you switch them only there.
+				cardButton(c, "IN GARAGE", C.grey, true, function()
+					Hud.toast("Switch cars at one of your garages (🅿 GARAGE), or at the depot lot for your starting van.")
 				end)
 			elseif lock then
 				lockButton(c, lock)
 			elseif need then
 				needsButton(c, need)
+			elseif full then
+				local garage = cardButton(c, "🅿 NEEDS A GARAGE", C.grey, true, function()
+					Hud.toast("No free garage slot. Buy or rent a garage (ESTATE, H) first.")
+				end)
+				garage.TextSize = 12
+				garage.TextColor3 = C.dim
 			else
 				cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 					Net.get("Buy"):FireServer("car", def.id)
@@ -975,7 +1008,7 @@ local function renderShop()
 			end
 		end
 	elseif shopId == "depot" then
-		note(shop.body, "Your cars. Buy new ones at Dead End Motors (next door, east).", C.dim, 1)
+		note(shop.body, "Your cars. The depot lot keeps your starting van; the others wait in your garages (🅿 GARAGE). Buy new ones at Dead End Motors (next door, east).", C.dim, 1)
 		for order, def in Config.Cars do
 			if not state.cars[def.id] then
 				continue
@@ -1054,9 +1087,9 @@ local function renderShop()
 			local carOk = upCar ~= nil and Economy.canUpgrade(upCar.id)
 			local carLevels = Economy.carLevels(state.carUpgrades, state.car)
 			if carOk then
-				note(shop.body, `Upgrades for: {if upCar then upCar.name else "your car"}. They stay on this car and show on it (bull bar, plates, scoop). Repairs in here are free.`, C.dim, 1)
+				note(shop.body, `Upgrades for: {if upCar then upCar.name else "your car"} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (bull bar, plates, scoop, roof rack). Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
 			else
-				note(shop.body, `Your {if upCar then upCar.name else "vehicle"} is a company vehicle: it can't be upgraded. Take one of your own cars at the depot garage.`, C.red, 1)
+				note(shop.body, `Your {if upCar then upCar.name else "vehicle"} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`, C.red, 1)
 			end
 			local row = 1
 			for pass = 1, 2 do
@@ -1366,7 +1399,7 @@ function renderBackpack()
 			end)
 		end
 	elseif backpackTab == "cars" then
-		note(backpack.body, "Switch cars at the depot garage. Buy at Dead End Motors, or earn one by working (M = map).", C.dim, 1)
+		note(backpack.body, "Switch cars at one of your garages (🅿 GARAGE), the starting van at the depot lot. Repairs: Wrench Garage and Rust Bridge Repairs. Buy at Dead End Motors, or earn one by working (M = map).", C.dim, 1)
 		for order, def in Config.Cars do
 			if not state.cars[def.id] and def.employer then
 				-- Not yours yet: who gives it to you.
@@ -1382,7 +1415,7 @@ function renderBackpack()
 				local c = card(backpack.body, 84, order + 1)
 				local gunId = if def.mount and state.carGuns then state.carGuns[def.id] else nil
 				local gun = if gunId then Economy.findCarGun(gunId) else nil
-				cardText(c, def.name, carStats(def) .. (if gun then ` · 🔫 {gun.name}` else ""), def.description)
+				cardText(c, def.name, carStats(def) .. (if gun then ` · 🔫 {gun.name}` else "") .. (if type(state.carHealth) == "table" and type(state.carHealth[def.id]) == "number" and state.carHealth[def.id] < 0.995 then ` · 🔧 {math.floor(state.carHealth[def.id] * 100 + 0.5)}%` else ""), def.description)
 				if state.car == def.id then
 					cardButton(c, "DRIVING", C.grey, false, function() end)
 				end

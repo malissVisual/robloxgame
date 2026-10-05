@@ -36,6 +36,8 @@ local CarCall = require(Server.CarCall)
 local Business = require(Server.Business)
 local Missions = require(Server.Missions)
 local Challenges = require(Server.Challenges)
+local Garages = require(Server.Garages)
+local Repair = require(Server.Repair)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -74,6 +76,7 @@ local function sendState(player: Player)
 		weapon = profile.weapon,
 		upgrades = profile.upgrades,
 		carUpgrades = profile.carUpgrades, -- 3.3: the car tracks per car (the garage shows the equipped car's)
+		carHealth = profile.carHealth, -- 3.4: every parked car's share of health (the backpack's cars tab)
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,
@@ -123,7 +126,7 @@ Vehicles.onWrecked = function(player, car, reason)
 	if Jobs.active(player) then
 		Jobs.onCarWrecked(player)
 	else
-		notice:FireClient(player, `{reason} Press CAR for a new one.`)
+		notice:FireClient(player, `{reason} Press CAR: it comes back badly damaged (a repair shop fixes it).`)
 	end
 end
 
@@ -160,6 +163,8 @@ safely("Business", Business.start)
 Jobs.onMissionComplete = Missions.onComplete
 safely("Missions", Missions.start)
 safely("Challenges", Challenges.start)
+safely("Garages", Garages.start) -- 3.4: your cars in your garages, switched only there
+safely("Repair", Repair.start) -- 3.4: the repair bays (no free repairs any more)
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).

@@ -877,7 +877,7 @@ local function buildList(parent: any)
 	clear.ZIndex = 42
 	type Group = { kind: string, title: string, color: Color3 }
 	local groups: { Group } = {
-		{ kind = "shop", title = "SHOPS  (in the safe zone)", color = KIND_COLORS.shop },
+		{ kind = "shop", title = "SHOPS AND REPAIRS", color = KIND_COLORS.shop },
 		{ kind = "employer", title = "WORK  (earn their vehicle)", color = KIND_COLORS.employer },
 		{ kind = "place", title = "FAR PLACES", color = KIND_COLORS.place },
 	}

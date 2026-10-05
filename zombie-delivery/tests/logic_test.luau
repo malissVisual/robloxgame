@@ -20,8 +20,8 @@ end
 
 -- Economy ---------------------------------------------------------------------
 
-check("upgrade cost level 0", Economy.upgradeCost("engine", 0) == 700, Economy.upgradeCost("engine", 0))
-check("upgrade cost grows", (Economy.upgradeCost("engine", 1) :: number) > 700)
+check("upgrade cost level 0", Economy.upgradeCost("engine", 0) == 400, Economy.upgradeCost("engine", 0))
+check("upgrade cost grows", (Economy.upgradeCost("engine", 1) :: number) > 400)
 check("upgrade maxed", Economy.upgradeCost("engine", 5) == nil)
 check("unknown upgrade", Economy.upgradeCost("nope", 0) == nil)
 
@@ -181,7 +181,13 @@ for _, id in { "damage", "firerate", "nope" } do
 end
 local quick = Economy.findUpgrade("loading")
 check("Quick Hands: 3 levels, -15 % each", quick ~= nil and quick.maxLevel == 3 and near(quick.perLevel, 0.15) and quick.name == "Quick Hands")
-check("Quick Hands is priced like the others", Economy.upgradeCost("loading", 0) == 600 and Economy.upgradeCost("loading", 3) == nil, Economy.upgradeCost("loading", 0))
+check("Quick Hands is priced like the others", Economy.upgradeCost("loading", 0) == 400 and Economy.upgradeCost("loading", 3) == nil, Economy.upgradeCost("loading", 0))
+-- 3.4: the starting van is upgraded, not replaced: every car track's first level costs a few deliveries.
+for _, def in Config.Upgrades do
+	if def.car then
+		check(`{def.id}: the first level is cheap`, (Economy.upgradeCost(def.id, 0) :: number) <= 400, Economy.upgradeCost(def.id, 0))
+	end
+end
 check("no Quick Hands: the plain hold", near(Economy.loadHold(0.25, {}), 0.25))
 check("Quick Hands 1: 15 % shorter", near(Economy.loadHold(0.25, { loading = 1 }), 0.25 * 0.85))
 check("Quick Hands 3: 45 % shorter", near(Economy.loadHold(0.25, { loading = 3 }), 0.25 * 0.55))
@@ -205,7 +211,7 @@ check("migration: a higher level of the car's own stays", carUps.courier.plow ==
 check("migration: no level 0 entries", carUps.van.armor == nil)
 check("migration: not the company vehicle", carUps.ambulance == nil)
 check("migration: only once (nothing left to move)", not Economy.migrateCarUpgrades(oldUpgrades, { van = true }, carUps))
-check("three car slots without a garage", Config.Estate.BaseCarSlots == 3, Config.Estate.BaseCarSlots)
+check("one car slot without a garage (3.4: the starting van)", Config.Estate.BaseCarSlots == 1, Config.Estate.BaseCarSlots)
 check("launcher splash", Economy.weaponStats("launcher", {}).splash == 14)
 check("items exist", Economy.findItem("nitro") ~= nil and Economy.findItem("nope") == nil)
 check("paints exist", Economy.findPaint("factory") ~= nil and (Economy.findPaint("factory") :: any).price == 0)
@@ -604,8 +610,8 @@ for _, def in estate do
 	defs[def.id] = def
 	kinds[def.kind] = (kinds[def.kind] or 0) + 1
 end
-check("3 mansions, 2 villas, 4 houses, 3 garages, 3 offices", kinds.mansion == 3 and kinds.villa == 2 and kinds.house == 4
-	and kinds.garage == 3 and kinds.office == 3)
+check("3 mansions, 2 villas, 4 houses, 5 garages, 3 offices", kinds.mansion == 3 and kinds.villa == 2 and kinds.house == 4
+	and kinds.garage == 5 and kinds.office == 3)
 check("every property has a plot, every plot a property", (function()
 	for _, def in estate do
 		if not Map.EstatePlots[def.id] then
@@ -962,7 +968,7 @@ check("the estate is on the map: Sunset Hills, the homes on their own, the tower
 	for _, landmark in Map.Landmarks do
 		found[landmark.id] = landmark
 	end
-	for _, id in { "sunsethills", "dispatchtower", "harborpoint", "garage_harbor", "garage_north", "garage_downtown", "oceanview", "pinecrest", "lakeside", "sunset" } do
+	for _, id in { "sunsethills", "dispatchtower", "harborpoint", "garage_harbor", "garage_north", "garage_downtown", "garage_rented", "garage_south", "oceanview", "pinecrest", "lakeside", "sunset" } do
 		local landmark = found[id]
 		if not landmark or not inBounds(landmark.x, landmark.z) or Map.inWater(landmark.x, landmark.z) or distanceToRoad(landmark.x, landmark.z) > 40 then
 			print("  missing or off the road:", id)

@@ -205,6 +205,40 @@ function Economy.migrateCarUpgrades(upgrades: Upgrades, cars: { [string]: boolea
 	return moved
 end
 
+-- 3.4, cargo capacity: how many pieces carried or led by hand the car takes at once: its cargo slots
+-- (CarDef.capacity) + its Cargo Rack (the "rack" track, +perLevel each level; not on a company vehicle).
+function Economy.capacity(carId: string, levels: Upgrades?): number
+	local def = Economy.findCar(carId)
+	if not def then
+		return 0
+	end
+	local rack = Economy.findUpgrade("rack")
+	local extra = 0
+	if rack and levels and not def.company then
+		extra = math.clamp(Economy.level(levels, "rack"), 0, rack.maxLevel) * rack.perLevel
+	end
+	return def.capacity + math.floor(extra)
+end
+
+-- 3.4: the cargo slots a job needs: its pieces when they are carried or led in by hand (all of them ride at once:
+-- every pick-up comes before the drops); passengers (board) and a truck that only sells (serve) need none.
+function Economy.cargoNeed(load: string, items: number): number
+	return if load == "carry" or load == "lead" then math.max(0, items) else 0
+end
+
+-- 3.4, the repair shop (Config.Repair): the seconds and the fee for a car missing this share (0 … 1) of its health.
+function Economy.repairTime(missing: number): number
+	local r = Config.Repair
+	local share = math.clamp(missing, 0, 1)
+	return math.floor(r.MinSeconds + (r.Seconds - r.MinSeconds) * share + 0.5)
+end
+
+function Economy.repairFee(missing: number): number
+	local r = Config.Repair
+	local share = math.clamp(missing, 0, 1)
+	return math.floor((r.FeeMin + (r.FeeFull - r.FeeMin) * share) / 5 + 0.5) * 5
+end
+
 -- The car's stats with ITS car-track levels (3.3: Economy.carLevels of profile.carUpgrades).
 function Economy.carStats(carId: string, upgrades: Upgrades): CarStats
 	local def = Economy.findCar(carId) or Config.Cars[1]

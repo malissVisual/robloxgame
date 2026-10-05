@@ -157,6 +157,9 @@ local LANDMARK_ALIASES: { [string]: string } = {
 	garage_harbor = "dealer", -- a car
 	garage_north = "dealer",
 	garage_downtown = "dealer",
+	garage_rented = "dealer", -- 3.4, the small garages
+	garage_south = "dealer",
+	repairs = "mechanic", -- 3.4, the second repair shop: a wrench like Wrench Garage
 	-- The missions' places (3.0) have no map icons of their own either: the closest ones.
 	market = "supplies", -- a shop full of things
 	airfield = "army",

@@ -58,6 +58,12 @@
 --   switches  the gated stop (the last drop, or every pick-up with MissionDef.gates = "pickup") gets two levers
 --             (server/DuoGates.luau) and stays blocked (Cargo.setBlocked) until two different players of the job
 --             pulled them together; with defend at the same drop both must be done (blockStop).
+--
+-- 3.4, cargo capacity: a job's pieces carried or led by hand (Economy.cargoNeed) must fit the vehicle that does it:
+-- the company vehicle a special job lends, else your equipped car with its Cargo Rack (Economy.capacity). The board
+-- shows a job too big for your car locked ("NEEDS N SLOTS · your Old Van holds 4") and accepting it is refused
+-- (slotsShort). The ordinary deliveries of the dangerous levels are sometimes bulk orders (Config.Jobs.BulkChance /
+-- BulkExtra): more pieces, more pay, a bigger car.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -545,6 +551,11 @@ local function ordinaryOffer(from: Vector3, tierIndex: number): Offer?
 	local placeId = placeIdOf(drop)
 	local receiver = (placeId and JobsConfig.PlacePeople[placeId]) or pick(business.receivers)
 	local count = rng:NextInteger(business.pieces[1], business.pieces[2] or business.pieces[1])
+	-- 3.4: a bulk order now and then on the dangerous levels: more pieces (a bigger car or a Cargo Rack).
+	local extra = JobsConfig.BulkExtra[tierIndex]
+	if extra and extra[2] > 0 and rng:NextNumber() < (JobsConfig.BulkChance[tierIndex] or 0) then
+		count += rng:NextInteger(extra[1], extra[2])
+	end
 	local customer = if drop.poi then `{receiver.name}, {drop.name}` else receiver.name
 	local stops: { Stop } = {
 		newStop(pickup, "pickup", "carry", count, `PICK UP at the {business.place}, {pickup.name}`, business.giver),
@@ -625,14 +636,44 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	return finishOffer(jobType.tier, stops, route, jobType.cargo, customer, jobType, pieces, jobType.payPerStop * #stops)
 end
 
+-- 3.4: the cargo slots a job needs, what the vehicle that would do it holds and that vehicle's name: the company
+-- vehicle the job lends, else the player's equipped car (with its Cargo Rack).
+local function slotsFor(player: Player, offer: Offer): (number, number, string)
+	local jobType = offer.jobType
+	local need = Economy.cargoNeed(if jobType then jobType.load else "carry", offer.total)
+	if jobType and jobType.vehicle then
+		local lent = Economy.findCar(jobType.vehicle)
+		return need, Economy.capacity(jobType.vehicle, {}), if lent then lent.name else jobType.vehicle
+	end
+	local profile = PlayerData.get(player)
+	local carId = if profile then profile.car else Config.Cars[1].id
+	local def = Economy.findCar(carId)
+	return need, Economy.capacity(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else {}), if def then def.name else "car"
+end
+
+-- 3.4: why the player's car is too small for this job, or nil when it fits.
+local function slotsShort(player: Player, offer: Offer): string?
+	local need, holds, name = slotsFor(player, offer)
+	if need <= holds then
+		return nil
+	end
+	return `This job needs {need} cargo slots: your {name} holds {holds}. Upgrade its Cargo Rack (Wrench Garage) or take a bigger car out of your garage.`
+end
+
 -- One card of the job board. A job above the player's level is shown LOCKED (locked, level): accepting it is refused.
-local function describe(index: number, offer: Offer, playerLevel: number, nightPay: number): { [string]: any }
+-- 3.4: so is a job with more pieces than the car holds (slots, capacity, carName, tooBig).
+local function describe(index: number, offer: Offer, playerLevel: number, nightPay: number, player: Player): { [string]: any }
 	local last = offer.stops[#offer.stops]
 	local jobType = offer.jobType
 	local vehicle = if jobType and jobType.vehicle then Economy.findCar(jobType.vehicle) else nil
+	local need, holds, carName = slotsFor(player, offer)
 	return {
 		locked = offer.level > playerLevel,
 		level = offer.level,
+		slots = need,
+		capacity = holds,
+		carName = carName,
+		tooBig = need > holds,
 		special = jobType ~= nil, -- a special job (a board special: Cash Transport, Pizza Rush, Winter Run)
 		timed = jobType ~= nil and jobType.timeLimit ~= nil, -- a rush: `time` is a fixed clock
 		banditBoost = offer.boost, -- > 1: bandits want this cargo
@@ -695,7 +736,7 @@ function Jobs.makeOffers(player: Player)
 	local nightPay = Economy.nightScale(Config.DayNight.NightPay, DayNight.nightFactor())
 	local out = {}
 	for index, offer in list do
-		table.insert(out, describe(index, offer, level, nightPay))
+		table.insert(out, describe(index, offer, level, nightPay, player))
 	end
 	Net.get("Offers"):FireClient(player, out)
 end
@@ -1040,6 +1081,11 @@ local function accept(player: Player, index: any)
 		return
 	end
 	if canTake(player, offer.level) then
+		local short = slotsShort(player, offer)
+		if short then
+			notice:FireClient(player, short)
+			return
+		end
 		startOrTell(player, offer)
 	end
 end
@@ -1157,7 +1203,7 @@ local function complete(player: Player, job: Job)
 			if rewardCar and not profile.cars[rewardCar.id] and done >= employer.needed then
 				PlayerData.giveCar(player, rewardCar.id)
 				unlocked = rewardCar.name
-				notice:FireClient(player, `{employer.name} gives you the {rewardCar.name}! Switch to it at the depot garage.`)
+				notice:FireClient(player, `{employer.name} gives you the {rewardCar.name}! It needs no garage slot: take it out at the depot lot or one of your garages.`)
 			end
 			local weapon = if employer.weapon then Economy.findWeapon(employer.weapon) else nil
 			if weapon and done >= (employer.weaponAt or employer.needed) and not profile.weapons[weapon.id] then

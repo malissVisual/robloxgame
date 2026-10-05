@@ -24,6 +24,10 @@
 -- Zombie Delivery 3.1, the lost packages (Map.Secrets, see "The lost packages" below): a worn cardboard box hidden at
 -- every place, with its prompt (World.SecretPrompts) for server/Challenges.luau.
 --
+-- Zombie Delivery 3.4: the repair bays (World.RepairBays: two in Wrench Garage, two in Rust Bridge Repairs on a Harbor
+-- block) for server/Repair.luau, the two small garages (the Rented Lockup, the Southside Garage) and a GARAGE prompt at
+-- every home's and garage's drive-out spot (World.GaragePrompts) for server/Garages.luau. No free repairs any more.
+--
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
 -- (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
@@ -55,7 +59,14 @@ World.ShopPrompts = {} :: { { prompt: ProximityPrompt, shop: string } }
 World.EmployerPrompts = {} :: { { prompt: ProximityPrompt, employer: string } }
 World.EmployerNpcs = {} :: { [string]: Model } -- the person at each WORK HERE board (Config.Employers id)
 World.DealerSlots = {} :: { CFrame }
-World.RepairSpots = { Vector3.new(0, 0, 0) } :: { Vector3 }
+-- 3.4, the repair bays (Map.RepairShops; server/Repair.luau): where a car stands to be repaired. cframe = the bay's
+-- middle on the floor, its -Z toward the door (the way out); size = the bay's width (X) and length (Z); anchor = the
+-- part over it that carries the timer's billboard.
+export type RepairBay = { shop: string, name: string, index: number, cframe: CFrame, size: Vector3, anchor: BasePart }
+World.RepairBays = {} :: { RepairBay }
+-- 3.4: the GARAGE prompts at the drive-out spot of every home and garage (a ProximityPrompt "GaragePrompt", attribute
+-- Garage = the Config.Estate id; server/Garages.luau answers them, client/GarageUi.luau shows only your own)
+World.GaragePrompts = {} :: { { prompt: ProximityPrompt, estate: string } }
 -- The real estate (2.6; filled by World.build, see "Real estate" below):
 -- the FOR SALE signs' prompts (a ProximityPrompt "EstatePrompt", attribute Estate = the Config.Estate id; an office
 -- has one in the lobby and one in the office)
@@ -718,6 +729,49 @@ local function buildGuns(parent: Instance)
 	end
 end
 
+-- 3.4: a repair bay inside a shop (frame: the building's, -Z out through the door): yellow lines on the floor, a
+-- lift plate (flat, it does not lift the car), a hanging sign with the bay's number, a tool board and a lamp. The bay
+-- is registered for server/Repair.luau (World.RepairBays) with the part its timer hangs on.
+local BAY_W, BAY_L = 13, 30
+local function repairBay(parent: Instance, frame: CFrame, x: number, z: number, h: number, shopId: string, shopName: string, index: number)
+	local bay = frame * CFrame.new(x, 0, z)
+	local yellow = Color3.fromRGB(240, 196, 40)
+	for _, side in { -1, 1 } do
+		deco(part(parent, "BayLine", Vector3.new(0.3, 0.06, BAY_L), bay * CFrame.new(side * BAY_W / 2, 0.33, 0), yellow, Enum.Material.SmoothPlastic))
+	end
+	deco(part(parent, "BayLine", Vector3.new(BAY_W, 0.06, 0.3), bay * CFrame.new(0, 0.33, BAY_L / 2), yellow, Enum.Material.SmoothPlastic))
+	deco(part(parent, "LiftPlate", Vector3.new(7, 0.05, 16), bay * CFrame.new(0, 0.32, 0), Color3.fromRGB(150, 150, 156), Enum.Material.DiamondPlate))
+	for _, side in { -1, 1 } do
+		deco(part(parent, "LiftArm", Vector3.new(0.6, 0.06, 13), bay * CFrame.new(side * 2.6, 0.36, 0), Color3.fromRGB(200, 170, 40), Enum.Material.DiamondPlate))
+	end
+	-- The hanging sign: "BAY 1 · REPAIRS", facing the door, on two chains.
+	local signAt = bay * CFrame.new(0, h - 4.5, -BAY_L / 2 + 2)
+	for _, side in { -1, 1 } do
+		deco(part(parent, "Chain", Vector3.new(0.15, 3.4, 0.15), signAt * CFrame.new(side * 3.6, 2.8, 0), Color3.fromRGB(60, 60, 64), Enum.Material.Metal))
+	end
+	sign(parent, `BAY {index} · REPAIRS`, Vector3.new(9, 2, 0.3), signAt, Color3.fromRGB(255, 220, 120), Color3.fromRGB(34, 36, 40))
+	-- The tool board on the wall side and a work lamp.
+	local outer = if x < 0 then -1 else 1
+	local board = part(parent, "ToolBoard", Vector3.new(0.3, 4, 8), bay * CFrame.new(outer * (BAY_W / 2 + 2.2), 4, 4), Color3.fromRGB(150, 120, 80), Enum.Material.WoodPlanks)
+	for n = -1, 1 do
+		deco(part(parent, "Wrench", Vector3.new(0.2, 1.6, 0.3), board.CFrame * CFrame.new(-outer * 0.25, 0.4, n * 2.2), Color3.fromRGB(180, 182, 188), Enum.Material.Metal))
+	end
+	deco(part(parent, "ToolChest", Vector3.new(2.4, 3, 1.6), bay * CFrame.new(outer * (BAY_W / 2 + 1.6), 1.8, 10), Color3.fromRGB(190, 40, 34), Enum.Material.Metal))
+	local lamp = deco(part(parent, "BayLamp", Vector3.new(4, 0.3, 1), bay * CFrame.new(0, h - 1.2, 2), Color3.fromRGB(255, 245, 220), Enum.Material.Neon))
+	light(lamp, 22, 1.1, Color3.fromRGB(255, 240, 220))
+	-- The billboard's anchor: an invisible part high over the bay (server/Repair.luau puts the timer on it).
+	local anchor: BasePart = deco(part(parent, "BayTimer", Vector3.new(1, 1, 1), bay * CFrame.new(0, h - 3, 0), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic))
+	anchor.Transparency = 1
+	table.insert(World.RepairBays, {
+		shop = shopId,
+		name = shopName,
+		index = index,
+		cframe = bay * CFrame.new(0, 0.3, 0),
+		size = Vector3.new(BAY_W, 0, BAY_L),
+		anchor = anchor,
+	})
+end
+
 local function buildMechanic(parent: Instance)
 	local shop = folder(parent, "WrenchGarage")
 	local cx, cz = Map.Shops.mechanic.x, Map.Shops.mechanic.z
@@ -726,13 +780,39 @@ local function buildMechanic(parent: Instance)
 	local w, d, h = 70, 60, 20
 	local frame = shopFrame(cx, cz, facing, 12)
 	building(shop, frame, w, d, h, Color3.fromRGB(70, 90, 120), Enum.Material.Metal, 34, 15)
-	sign(shop, "WRENCH GARAGE  TUNING · PAINT", Vector3.new(56, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(120, 200, 255))
+	sign(shop, "WRENCH GARAGE  TUNING · PAINT · REPAIRS", Vector3.new(60, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(120, 200, 255))
 	counter(shop, frame, d, "mechanic", "Wrench Garage")
-	part(shop, "Lift", Vector3.new(10, 0.6, 18), frame * CFrame.new(-18, 0.6, 2), Color3.fromRGB(200, 170, 40), Enum.Material.DiamondPlate)
+	-- 3.4: two repair bays straight in from the wide door (they replace the old lift; no free repairs any more).
+	for index, x in { -8.5, 8.5 } do
+		repairBay(shop, frame, x, -6, h, "mechanic", "Wrench Garage", index)
+	end
 	for n = 0, 3 do
 		cylinder(shop, "Tire", 1.4, 3.2, frame * CFrame.new(28, 1.6 + n * 1.5, 18) * UPRIGHT, Color3.fromRGB(25, 25, 25), Enum.Material.Rubber)
 	end
-	table.insert(World.RepairSpots, (frame * CFrame.new(0, 0, 0)).Position)
+end
+
+-- 3.4: Rust Bridge Repairs, the second repair shop, on the Harbor block where the Rust Bridge comes over: a corrugated
+-- workshop facing the avenue, two repair bays, tyres and drums outside.
+local function buildRepairShop(parent: Instance, cx: number, cz: number)
+	local shop = folder(parent, "RustBridgeRepairs")
+	sidewalk(shop, cx, cz, Color3.fromRGB(110, 110, 108))
+	local info = Map.RepairShops[2]
+	local facing = if info then Vector3.new(info.facing.x, 0, info.facing.z) else Vector3.new(-1, 0, 0)
+	local w, d, h = 60, 48, 18
+	local frame = shopFrame(cx, cz, facing, 12)
+	building(shop, frame, w, d, h, Color3.fromRGB(150, 84, 48), Enum.Material.CorrodedMetal, 34, 14)
+	sign(shop, "RUST BRIDGE REPAIRS", Vector3.new(44, 5, 0.5), frame * CFrame.new(0, h + 3.5, -d / 2), Color3.fromRGB(255, 180, 90))
+	for index, x in { -8.5, 8.5 } do
+		repairBay(shop, frame, x, -3, h, "repairs", "Rust Bridge Repairs", index)
+	end
+	-- Outside: a tyre stack and two drums by the door, a wrench sign on a post.
+	for n = 0, 3 do
+		cylinder(shop, "Tire", 1.4, 3.2, frame * CFrame.new(-w / 2 + 3, 0.7 + n * 1.45, -d / 2 - 4) * UPRIGHT, Color3.fromRGB(25, 25, 25), Enum.Material.Rubber)
+	end
+	barrel(shop, (frame * CFrame.new(w / 2 - 3, 0, -d / 2 - 3)).Position, Color3.fromRGB(60, 90, 150))
+	barrel(shop, (frame * CFrame.new(w / 2 - 6, 0, -d / 2 - 3)).Position, Color3.fromRGB(170, 50, 40))
+	part(shop, "SignPost", Vector3.new(0.6, 12, 0.6), frame * CFrame.new(-w / 2 + 2, 6, -d / 2 - 10), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+	sign(shop, "🔧 REPAIRS", Vector3.new(8, 3, 0.3), frame * CFrame.new(-w / 2 + 2, 12.5, -d / 2 - 10), Color3.fromRGB(255, 220, 120))
 end
 
 local function buildSupplies(parent: Instance)
@@ -1155,6 +1235,9 @@ local function buildDistrict(parent: Instance, d: Map.District)
 				continue
 			elseif special == "lockup" then
 				buildLockup(district, cx, cz)
+				continue
+			elseif special == "repairs" then
+				buildRepairShop(district, cx, cz)
 				continue
 			elseif special and buildMissionBlock(district, special, cx, cz) then
 				continue
@@ -2798,6 +2881,22 @@ local function defineRealEstate()
 		forSaleSign(garage, "garage_north", f * CFrame.new(plot.w / 2 - 4, 0, -plot.front - reach + 3))
 	end
 
+	-- 3.4, the small garages south of Downtown: a lot pad, a lock-up of `doors` bays, its name over the door.
+	local function buildSmallGarage(parent: Instance, id: string, doors: number, title: string, color: Color3, material: Enum.Material, signColor: Color3)
+		local plot = Map.EstatePlots[id]
+		if not plot then
+			return
+		end
+		local garage = folder(parent, title)
+		local f = plotFrame(plot, PAD_TOP)
+		local reach = frontReach(plot)
+		lotPad(garage, f, plot, reach, Color3.fromRGB(116, 116, 112), Enum.Material.Concrete)
+		World.EstateGarages[id] = garageBlock(garage, f * CFrame.new(0, 0, -plot.front), doors, plot.front + plot.back, 11, color, material)
+		sign(garage, string.upper(title), Vector3.new(doors * 12, 2.4, 0.4), f * CFrame.new(0, 13, -plot.front - 0.3), signColor, Color3.fromRGB(34, 36, 40))
+		barrel(garage, (f * CFrame.new(plot.w / 2 - 2, 0, plot.back - 2)).Position, Color3.fromRGB(90, 110, 60))
+		forSaleSign(garage, id, f * CFrame.new(plot.w / 2 - 3, 0, -plot.front - reach + 3), true)
+	end
+
 	-- ── The towers ─────────────────────────────────────────────────────────────
 	-- A tower is a hollow shell with real rooms only where you can go: the lobby, the office floors and the roof. Every
 	-- room floor has a row of elevator doors on its back wall (the roof: on the lift's kiosk), one per other stop, a
@@ -3297,6 +3396,12 @@ local function defineRealEstate()
 		attempt("Highway Garage", function()
 			buildHighwayGarage(estate)
 		end)
+		attempt("Rented Lockup", function()
+			buildSmallGarage(estate, "garage_rented", 1, "Rented Lockup", Color3.fromRGB(150, 150, 140), Enum.Material.CorrodedMetal, Color3.fromRGB(255, 220, 120))
+		end)
+		attempt("Southside Garage", function()
+			buildSmallGarage(estate, "garage_south", 2, "Southside Garage", Color3.fromRGB(120, 140, 110), Enum.Material.Brick, Color3.fromRGB(170, 230, 140))
+		end)
 		-- Every property got its spots? (A failed build leaves a fallback in front of the plot, so nothing breaks.)
 		for _, def in Config.Estate.Properties do
 			local plot = Map.EstatePlots[def.id]
@@ -3313,6 +3418,37 @@ local function defineRealEstate()
 			if (def.kind ~= "garage") and not World.EstateSpawns[def.id] then
 				warn(`[World] {def.id}: no spawn, using the front of the plot`)
 				World.EstateSpawns[def.id] = CFrame.lookAt(Vector3.new(fx, ground + 3, fz), Vector3.new(fx, ground + 3, fz) - out)
+			end
+			-- 3.4: the GARAGE prompt on a post beside the drive-out spot (server/Garages.luau: take another car out).
+			local spot = World.EstateGarages[def.id]
+			if spot and def.garageSlots > 0 then
+				local post = deco(part(estate, "GaragePost", Vector3.new(0.6, 5, 0.6), spot * CFrame.new(-7, 2.1, 0), Color3.fromRGB(60, 60, 64), Enum.Material.Metal))
+				local tag = Instance.new("BillboardGui")
+				tag.Name = "GarageTag"
+				tag.Size = UDim2.fromOffset(110, 28)
+				tag.StudsOffset = Vector3.new(0, 3.6, 0)
+				tag.MaxDistance = 70
+				tag.LightInfluence = 0
+				tag.Parent = post
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundColor3 = Color3.fromRGB(20, 28, 26)
+				label.BackgroundTransparency = 0.25
+				label.Text = "🅿 GARAGE"
+				label.TextScaled = true
+				label.Font = Enum.Font.GothamBlack
+				label.TextColor3 = Color3.fromRGB(120, 200, 255)
+				label.Parent = tag
+				local garagePrompt = Instance.new("ProximityPrompt")
+				garagePrompt.Name = "GaragePrompt"
+				garagePrompt.ActionText = "Garage"
+				garagePrompt.ObjectText = def.name
+				garagePrompt.HoldDuration = 0
+				garagePrompt.MaxActivationDistance = 16
+				garagePrompt.RequiresLineOfSight = false
+				garagePrompt:SetAttribute("Garage", def.id)
+				garagePrompt.Parent = post
+				table.insert(World.GaragePrompts, { prompt = garagePrompt, estate = def.id })
 			end
 		end
 	end
@@ -4970,16 +5106,6 @@ end
 
 function World.isSafe(position: Vector3): boolean
 	return Map.isSafe(position.X, position.Z)
-end
-
--- In the depot yard or inside Wrench Garage.
-function World.canRepair(position: Vector3): boolean
-	for _, spot in World.RepairSpots do
-		if Vector3.new(position.X - spot.X, 0, position.Z - spot.Z).Magnitude < Config.City.RepairRadius then
-			return true
-		end
-	end
-	return false
 end
 
 return World
