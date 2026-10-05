@@ -1,7 +1,7 @@
 --!strict
 -- The minimap (always on: bottom left on a computer, top left on a touch screen) and the big map (M / MAP).
 -- Both are drawn once from shared/Map.luau: land, winter, water, the mountain, blocks, roads (highways and bridges
--- stand out) and an icon for every landmark (shops, employers, far places). Live markers: you (an arrow), other
+-- stand out) and an icon for every landmark you know (shops, employers, far places; 3.7). Live markers: you (an arrow), other
 -- players, bandit cars (red !), supply crates (?), the delivery target (★), your GPS point (◆) and the car a chauffeur
 -- is bringing you (🚗, MapView.setCar from client/Hud.luau; the three stick to the minimap's edge when far).
 -- Like GTA, the way there is drawn along the roads (shared/Roads.luau): yellow to the job's target, purple to the
@@ -9,6 +9,11 @@
 -- the part behind you is cut off as you drive. The minimap turns with the camera (north marker on its edge) and
 -- zooms out a little at speed; it moves every frame and redraws its tiles and routes MINI_HZ times a second.
 -- The big map lists every landmark with what you can do there; click one to set the GPS.
+-- 3.7, the map you discover (client/Discovery.luau, shared/Explore.luau): both maps are fog (charcoal, the roads hidden
+-- under it) except the cells you have uncovered, and they show only the landmarks you know (on the maps and in the
+-- list). The fog is drawn as one frame per run of fogged cells in a grid row (a soft rounded frame under it for the
+-- edge), pooled per row; when cells are uncovered only their rows are drawn again. The job's star and route, the GPS,
+-- you, your car on its way and the live markers stay over the fog: you must find your delivery.
 -- 3.6, "Postage & Trouble" (design/ui-concept/): the minimap sits in a paper frame; over its top edge the way you face
 -- and where you are ("N · HARBOR") and an EXPAND M chip that opens the big map; under it the next turn of the route
 -- ("↰ Left onto Maple St · 120 m", the job's route, else the GPS's; with neither the address you are at). The map
@@ -27,6 +32,7 @@ local Map = require(Shared.Map)
 local Roads = require(Shared.Roads)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
+local Discovery = require(script.Parent.Discovery)
 
 local MapView = {}
 
@@ -68,7 +74,10 @@ local C = {
 	gps = Ui.Gps,
 	car = P.violet, -- the car on its way (the Hud's car call line is violet too)
 	routeEdge = P.ink,
+	fog = Color3.fromRGB(58, 62, 70), -- 3.7: what you have not seen yet (charcoal grey, the contract's scrim family)
 }
+local FOG_CORE = 0.04 -- the fog's transparency (the roads under it all but hidden)
+local FOG_SOFT = 0.55 -- its soft edge
 local BLOCK_COLORS = {
 	downtown = Color3.fromRGB(214, 204, 222),
 	harbor = Color3.fromRGB(220, 208, 198),
@@ -82,7 +91,9 @@ local KIND_COLORS = {
 
 -- A route line on one canvas: two pools of rotated frames (a dark edge under the colour), drawn from `step` on.
 type Line = { edges: { any }, fills: { any }, parent: any, color: Color3, width: number, full: number, cut: number }
-type Canvas = { content: any, scale: number, markers: any, job: Line, gps: Line }
+-- 3.7: the fog on one canvas: per grid row a pool of frames (a core and its soft edge for every run of fogged cells).
+type Fog = { layer: any, scale: number, feather: number, rows: { [number]: { any } } }
+type Canvas = { content: any, scale: number, markers: any, job: Line, gps: Line, fog: Fog }
 
 -- A route to a goal (the job's target or the GPS point).
 type Route = {
@@ -185,7 +196,7 @@ local function caption(parent: any, text: string, x: number, z: number, scale: n
 		TextColor3 = color,
 		TextStrokeColor3 = P.paper,
 		TextStrokeTransparency = 0.25,
-		ZIndex = 8,
+		ZIndex = 7, -- (under the fog, 8)
 	}, parent)
 end
 
@@ -352,19 +363,98 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, P.ink2)
 		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.safe)
 	end
+	-- 3.7: the fog over the map (ZIndex 8), the routes and the markers over the fog.
+	local fog: Fog = {
+		layer = Ui.make("Frame", { Name = "Fog", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 8 }, content),
+		scale = scale,
+		feather = math.max(3, math.floor(Discovery.cellSize * scale * 0.2)),
+		rows = {},
+	}
 	-- The routes (the GPS under the job), then the markers on top.
-	local routes = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 7 }, content)
+	local routes = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 9 }, content)
 	local gpsLayer = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 1 }, routes)
 	local jobLayer = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 2 }, routes)
 	local width = if big then 4 else 7
-	local markers = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 9 }, content)
+	local markers = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 10 }, content)
 	return {
 		content = content,
 		scale = scale,
 		markers = markers,
 		job = newLine(jobLayer, C.job, width),
 		gps = newLine(gpsLayer, C.gps, width),
+		fog = fog,
 	}
+end
+
+-- ── Fog (3.7) ──────────────────────────────────────────────────────────────
+
+-- The n-th run's frames in a row's pool: its core and its soft edge (made the first time).
+local function fogFrames(fog: Fog, list: { any }, n: number): (any, any)
+	local core, soft = list[n * 2 - 1], list[n * 2]
+	if not core then
+		soft = Ui.make("Frame", { BackgroundColor3 = C.fog, BackgroundTransparency = FOG_SOFT, BorderSizePixel = 0, ZIndex = 1 }, fog.layer)
+		Ui.make("UICorner", { CornerRadius = UDim.new(0, fog.feather) }, soft)
+		core = Ui.make("Frame", { BackgroundColor3 = C.fog, BackgroundTransparency = FOG_CORE, BorderSizePixel = 0, ZIndex = 2 }, fog.layer)
+		list[n * 2 - 1], list[n * 2] = core, soft
+	end
+	core.Visible = true
+	soft.Visible = true
+	return core, soft
+end
+
+-- One grid row of fog: a frame for every run of fogged cells (a full row of fog is one frame), the rest hidden.
+local function drawFogRow(fog: Fog, cz: number)
+	local G = Discovery.grid
+	local list = fog.rows[cz]
+	if not list then
+		list = {}
+		fog.rows[cz] = list
+	end
+	local scale, f = fog.scale, fog.feather
+	local cellPx = G.Size * scale
+	local z0 = G.Z0 + cz * G.Size
+	local n = 0
+	local cx = 0
+	while cx < G.Cols do
+		if Discovery.uncoveredCell(cx, cz) then
+			cx += 1
+			continue
+		end
+		local from = cx
+		while cx < G.Cols and not Discovery.uncoveredCell(cx, cz) do
+			cx += 1
+		end
+		n += 1
+		local core, soft = fogFrames(fog, list, n)
+		local at = point(G.X0 + from * G.Size, z0, scale)
+		local w = (cx - from) * cellPx
+		core.Position = at
+		core.Size = UDim2.fromOffset(w, cellPx + 1) -- (1 px over the next row: no seam between the rows)
+		soft.Position = at - UDim2.fromOffset(f, f)
+		soft.Size = UDim2.fromOffset(w + 2 * f, cellPx + 2 * f)
+	end
+	for k = n * 2 + 1, #list do
+		list[k].Visible = false
+	end
+end
+
+-- The fog again: every row (cells nil) or only the rows of these cells.
+local function drawFog(fog: Fog, cells: { number }?)
+	local G = Discovery.grid
+	if not cells then
+		for cz = 0, G.Rows - 1 do
+			drawFogRow(fog, cz)
+		end
+		return
+	end
+	local rows: { [number]: boolean } = {}
+	for _, index in cells do
+		local cz = index // G.Cols
+		if not rows[cz] then
+			rows[cz] = true
+			drawFogRow(fog, cz)
+		end
+	end
 end
 
 -- ── Routes ─────────────────────────────────────────────────────────────────
@@ -556,6 +646,35 @@ local turnAt = 0
 local cameraHeading = 0
 local iconHeading = math.huge
 local zoom = 1
+
+-- 3.7: everything that shows a landmark (its icon on either map, its row in the big map's list) and the list's group
+-- titles: shown only once the landmark is known (client/Discovery.luau).
+local landmarkViews: { { id: string, view: any } } = {}
+local groupViews: { { kind: string, view: any } } = {}
+local discoveredLabel: any = nil
+
+local function refreshKnown()
+	for _, entry in landmarkViews do
+		local visible = Discovery.knows(entry.id)
+		if entry.view.Visible ~= visible then
+			entry.view.Visible = visible
+		end
+	end
+	for _, group in groupViews do
+		local any = false
+		for _, landmark in Map.Landmarks do
+			if landmark.kind == group.kind and Discovery.knows(landmark.id) then
+				any = true
+				break
+			end
+		end
+		group.view.Visible = any
+	end
+	if discoveredLabel then
+		local n, total = Discovery.knownCount()
+		discoveredLabel.Text = `{n} / {total} places discovered`
+	end
+end
 
 -- A screen offset from the minimap's centre (pixels, y down) turned by `degrees` clockwise.
 local function turn(x: number, y: number, degrees: number): (number, number)
@@ -787,7 +906,10 @@ local function buildMini(column: any, touch: boolean)
 	local canvas = draw(miniRotor, MINI_SCALE, false)
 	miniCanvas = canvas
 	for _, landmark in Map.Landmarks do
-		table.insert(miniIcons, landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false))
+		local icon = landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false)
+		icon.Visible = false -- (until it is known: refreshKnown)
+		table.insert(miniIcons, icon)
+		table.insert(landmarkViews, { id = landmark.id, view = icon })
 	end
 	miniLayer = layer(canvas)
 	-- Soft paper shading at the top (under the header) and the bottom.
@@ -977,6 +1099,7 @@ function MapView.setVisible(visible: boolean)
 	if big and not visible then
 		big.Visible = false
 	end
+	Discovery.setShown(visible) -- 3.7: the "new location" banners wait while the HUD is hidden
 end
 
 local function setGps(landmark: Map.Landmark?)
@@ -1006,7 +1129,8 @@ local function buildList(parent: any)
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -8, 0, 20), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 42 }, list)
 		local dotFrame = Ui.make("Frame", { Size = UDim2.fromOffset(8, 8), Position = UDim2.new(0, 2, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 42 }, row)
 		Ui.corner(dotFrame, 4)
-		Ui.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextColor3 = P.ink, TextSize = 12, ZIndex = 42 })
+		local label = Ui.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextColor3 = P.ink, TextSize = 12, ZIndex = 42 })
+		return row, label
 	end
 	local function entry(landmark: Map.Landmark)
 		order += 1
@@ -1039,8 +1163,13 @@ local function buildList(parent: any)
 			setGps(landmark)
 			big.Visible = false
 		end)
+		button.Visible = false -- (until it is known: refreshKnown)
+		table.insert(landmarkViews, { id = landmark.id, view = button })
 	end
 	title("Click a place to set the GPS", P.violet)
+	-- 3.7: how much of the map's places you know (the rest you find by driving around).
+	local _, counter = title("", C.fog)
+	discoveredLabel = counter
 	local clear = Ui.ghostButton(list, "◆  CLEAR GPS", UDim2.new(1, -8, 0, 32), C.gps, function()
 		setGps(nil)
 	end)
@@ -1054,7 +1183,8 @@ local function buildList(parent: any)
 		{ kind = "place", title = "FAR PLACES", color = KIND_COLORS.place },
 	}
 	for _, group in groups do
-		title(group.title, group.color)
+		local row = title(group.title, group.color)
+		table.insert(groupViews, { kind = group.kind, view = row })
 		for _, landmark in Map.Landmarks do
 			if landmark.kind == group.kind then
 				entry(landmark)
@@ -1088,7 +1218,7 @@ local function buildBig(gui: any)
 		Position = UDim2.fromOffset(12, 6),
 		BackgroundTransparency = 1,
 		RichText = true,
-		Text = `Map   <font size="14">▲ you   <font color="{hex(C.job)}">★━</font> delivery   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="{hex(P.danger)}">!</font> bandit car   ? crate</font>`,
+		Text = `Map   <font size="14">▲ you   <font color="{hex(C.job)}">★━</font> delivery   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="{hex(P.danger)}">!</font> bandit car   ? crate   <font color="{hex(C.fog)}">■</font> unexplored</font>`,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextSize = 22,
 		Font = Theme.DisplayFont,
@@ -1115,6 +1245,8 @@ local function buildBig(gui: any)
 			setGps(landmark)
 			big.Visible = false
 		end)
+		icon.Visible = false -- (until it is known: refreshKnown)
+		table.insert(landmarkViews, { id = landmark.id, view = icon })
 	end
 	bigLayer = layer(canvas)
 	bigMe = symbol(canvas.markers, "▲", 24, P.ink, 20)
@@ -1132,6 +1264,20 @@ function MapView.start(gui: any, column: any)
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	buildMini(column, touch)
 	buildBig(gui)
+
+	-- 3.7: the fog and the known landmarks, now (all fog until the server's state comes) and whenever cells are
+	-- uncovered (only their rows are drawn again).
+	local function onDiscovery(cells: { number }?)
+		if miniCanvas then
+			drawFog(miniCanvas.fog, cells)
+		end
+		if bigCanvas then
+			drawFog(bigCanvas.fog, cells)
+		end
+		refreshKnown()
+	end
+	Discovery.changed:Connect(onDiscovery)
+	onDiscovery(nil)
 
 	local camera = workspace.CurrentCamera
 	if camera then
