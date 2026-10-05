@@ -35,8 +35,8 @@ local aimBlend = 0 -- 0 = walking camera, 1 = over the shoulder
 local aimingSent = false
 local shiftHeld = false -- sprint
 local aimSince = 0 -- when the gun started going up (shots wait until it is up)
-local WALK_SPEED = 10
-local SPRINT_SPEED = 22
+local WALK_SPEED = 12 -- 3.2.4: a little brisker
+local SPRINT_SPEED = 25
 local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
 
