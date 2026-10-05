@@ -1722,6 +1722,30 @@ Config.Cargo = {
 		{ every = 13, count = 2, max = 7 },
 		{ every = 10, count = 2, max = 9 },
 	} :: { { every: number, count: number, max: number } },
+	-- 3.7, two in your hands (server/Cargo.luau): a piece of a light look (the model, not the kind: the pizzeria sends
+	-- "crate" kind pizza stacks) can be carried two at a time, stacked. One light piece leaves a hand free: you open and
+	-- close the back yourself (server/Vehicles.luau reads the character attribute CarryHands = 1). Two pieces (or one
+	-- heavy piece, a horse) fill both hands: put one down (G, one at a time) or let a crew mate open it. Everything not
+	-- listed is heavy (crates, barrels, ammo, furniture, coolers, people, horses) and goes one at a time; so does every
+	-- piece of a job with the lift or the pair twist.
+	LightLooks = {
+		pizza = true,
+		parcel = true,
+		mail = true,
+		bread = true,
+		medicine = true,
+		documents = true,
+		cake = true,
+		groceries = true,
+		plants = true,
+	} :: { [string]: boolean },
+	HandsMax = 2, -- light pieces in one player's hands at most
+	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)
+	-- 3.7, the car doors (server/Vehicles.luau, client/CarVisuals.luau): the E to get in shows only at a door (the driver's
+	-- on the left, the passengers' on their side), this close; the door swings out this far and stays open this long.
+	DoorReach = 5,
+	DoorSwing = 70, -- degrees
+	DoorOpenSeconds = 1.1,
 }
 
 export type JobTypeDef = {

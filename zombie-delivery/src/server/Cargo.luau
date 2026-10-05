@@ -32,6 +32,14 @@
 -- Config.Missions.Duo.PairRange of you, no pick-up; the partner gone for PAIR_GRACE s while you carry, it goes down.
 -- Cargo.setBlocked takes a reason (the DUO switches twist blocks a pick-up as well as a drop).
 -- 3.3, Quick Hands (the loading upgrade of the job's car): the holds of the prompts here are shorter (holdFor).
+-- 3.7, two in your hands: a light piece (Config.Cargo.LightLooks: a pizza stack, a parcel, a mail sack …) can be
+-- carried two at a time (Config.Cargo.HandsMax), stacked in front of the chest, a little slower (TwoPieceSpeed, the
+-- CarrySpeed attribute). Heavy pieces, horses and every piece of a lift or pair job stay one at a time (handsMax).
+-- With one light piece a hand is free (the character attribute CarryHands = 1): you open and close the back yourself
+-- (server/Vehicles.luau); two pieces or a heavy one fill both (CarryHands = 2): put one down or let a crew mate open
+-- it. G puts down ONE piece (the top one), so two in hand → G → one in hand → open the back yourself. Load puts both
+-- in at once; at a drop Take out with one light piece in hand takes a second, and Hand over gives the receiver all
+-- you carry (as many as they still need). The character attribute CarryCount says how many you hold.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -85,7 +93,8 @@ type Piece = {
 	walkingSince: number?,
 }
 
-type Held = { piece: Piece, character: Model, root: BasePart, prompt: ProximityPrompt?, last: CFrame }
+-- 3.7: pieces, bottom first (two light pieces stacked; one otherwise). The prompt (Put down / Let go) sits on the top one.
+type Held = { pieces: { Piece }, character: Model, root: BasePart, prompt: ProximityPrompt?, last: CFrame }
 type Loose = { piece: Piece, prompt: ProximityPrompt, handle: Part? }
 
 export type Session = {
@@ -739,13 +748,34 @@ local function setDown(model: Model, at: CFrame)
 	model.Parent = folder
 end
 
--- In front of the chest: the piece's middle at chest height, its back against the body.
-local function carryFrame(model: Model): CFrame
+-- A piece's height and depth (buildLook measured them).
+local function pieceSize(model: Model): (number, number)
 	local height = model:GetAttribute("Height")
 	local depth = model:GetAttribute("Depth")
-	local h = if type(height) == "number" then height else 2
-	local d = if type(depth) == "number" then depth else 2
-	return CFrame.new(0, 1.1 - h / 2, -(0.6 + d / 2))
+	return if type(height) == "number" then height else 2, if type(depth) == "number" then depth else 2
+end
+
+-- In front of the chest: one piece's middle at chest height, its back against the body; 3.7: two stacked, the first
+-- at the bottom, the stack a little lower so you still see over it.
+local function stackHeld(held: Held)
+	local total, depth = 0, 0
+	for _, piece in held.pieces do
+		local model = piece.model
+		if model then
+			local h, d = pieceSize(model)
+			total += h
+			depth = math.max(depth, d)
+		end
+	end
+	local y = 1.1 - total / 2 - (if #held.pieces > 1 then 0.25 else 0)
+	for _, piece in held.pieces do
+		local model = piece.model
+		if model then
+			weldTo(model, held.root, held.root.CFrame * CFrame.new(0, y, -(0.6 + depth / 2)))
+			local h = pieceSize(model)
+			y += h
+		end
+	end
 end
 
 local function prompt(parent: Instance, action: string, object: string, key: Enum.KeyCode?, hold: number?): ProximityPrompt
@@ -905,12 +935,23 @@ local function newPiece(session: Session): Piece
 	return { kind = session.info.kind, look = session.info.look, variant = session.nextVariant, origin = session.stop }
 end
 
+-- The pieces in hands (3.7: a player may hold two).
 local function heldCount(session: Session): number
 	local n = 0
-	for _ in session.held do
-		n += 1
+	for _, held in session.held do
+		n += #held.pieces
 	end
 	return n
+end
+
+-- 3.7: how many pieces of this job one player may hold: two of a light look, else one (a horse, a person, a lift or
+-- pair job's piece).
+local function handsMax(session: Session): number
+	local info = session.info
+	if info.kind == "horse" or info.lift or info.pair or Cargo.isPeople(info.kind) or not Tuning.LightLooks[info.look] then
+		return 1
+	end
+	return math.max(1, Tuning.HandsMax)
 end
 
 -- The pieces this drop can still get: what it needs, or less when pieces were lost on the way.
@@ -1016,8 +1057,10 @@ local function refresh(session: Session)
 	local car = session.car
 	if carPrompt and car then
 		local takeOut = toTakeOut(session)
-		-- 3.2: only through an open back.
-		carPrompt.Enabled = (heldCount(session) > 0 or takeOut) and not backShut(session)
+		-- 3.2: only through an open back. 3.7: what you hold goes in at a pick-up (or a drop that has everything); at a
+		-- drop that still needs it you carry it on (with one light piece in hand Take out gives you a second).
+		local loadable = plan == nil or plan.stage == "pickup" or session.moved >= neededNow(session)
+		carPrompt.Enabled = (takeOut or (heldCount(session) > 0 and loadable)) and not backShut(session)
 		carPrompt.ActionText = if takeOut then (if horse then "Lead out" else "Take out") else (if horse then "Lead in" else "Load")
 		carPrompt.ObjectText = `{capital(Vehicles.cargoNoun(car))}: {#session.load} inside`
 	end
@@ -1138,7 +1181,7 @@ end
 -- Every tick: who carries a heavy piece alone walks at LiftSlowSpeed, with help at the normal step.
 local function updateLift(session: Session)
 	for player, held in session.held do
-		local alone = held.piece.horse == nil and not liftHelped(session, player, held.root.Position)
+		local alone = held.pieces[1].horse == nil and not liftHelped(session, player, held.root.Position)
 		if alone and session.slowed[player] ~= held.character then
 			restoreSpeed(session, player)
 			session.slowed[player] = held.character
@@ -1164,8 +1207,12 @@ local function clearHeld(session: Session, player: Player): Held?
 		return nil
 	end
 	session.held[player] = nil
-	if held.character.Parent then
-		held.character:SetAttribute("Carrying", nil)
+	local character = held.character
+	if character.Parent then
+		character:SetAttribute("Carrying", nil)
+		character:SetAttribute("CarryCount", nil)
+		character:SetAttribute("CarryHands", nil)
+		character:SetAttribute("CarrySpeed", nil)
 	end
 	if held.prompt then
 		held.prompt:Destroy()
@@ -1174,91 +1221,161 @@ local function clearHeld(session: Session, player: Player): Held?
 end
 
 local onLoose: (Session, Player, Loose) -> ()
-local putDown: (Session, Player) -> ()
+local putDown: (Session, Player, boolean?) -> ()
 
--- Into the hands (or on the rope).
-local function take(session: Session, player: Player, piece: Piece): boolean
-	local character = player.Character
-	local root = rootOf(character)
-	if not character or not root then
-		return false
+-- 3.7: the hands changed: the pieces stacked, the Put down (Let go) prompt on the top one, the character's attributes
+-- (Carrying = the kind, CarryCount, CarryHands = 1 while a light piece leaves a hand free, CarrySpeed with two).
+local function armHands(session: Session, player: Player, held: Held)
+	if held.prompt then
+		held.prompt:Destroy()
+		held.prompt = nil
 	end
-	local held: Held = { piece = piece, character = character, root = root, prompt = nil, last = root.CFrame }
-	local horse = piece.horse
+	local count = #held.pieces
+	local top = held.pieces[count]
+	local made: ProximityPrompt? = nil
+	local horse = top.horse
 	if horse then
-		Animals.stable(horse, nil)
-		Animals.lead(horse, character)
 		local part = horsePart(horse)
 		if part then
 			local letGo = prompt(part, "Let go", "Horse", Enum.KeyCode.G, 0)
 			letGo.MaxActivationDistance = 13 -- the horse walks ~9 studs behind
-			held.prompt = letGo
+			made = letGo
 		end
 	else
-		local model = piece.model or buildPiece(piece)
-		piece.model = model
-		model.Parent = folder
-		weldTo(model, root, root.CFrame * carryFrame(model))
-		local main = model.PrimaryPart
+		stackHeld(held)
+		local main = top.model and top.model.PrimaryPart
 		if main then
-			local down = prompt(main, "Put down", capital(session.info.piece), Enum.KeyCode.G, 0)
+			local down = prompt(main, if count > 1 then "Put one down" else "Put down", capital(session.info.piece), Enum.KeyCode.G, 0)
 			down.MaxActivationDistance = 4 -- only for the one holding it
-			held.prompt = down
+			made = down
 		end
 	end
-	local p = held.prompt
-	if p then
-		p.Triggered:Connect(function(by)
+	if made then
+		held.prompt = made
+		made.Triggered:Connect(function(by)
 			if by == player and session.held[player] == held then
 				putDown(session, player)
 				session.info.changed()
 			end
 		end)
 	end
+	local character = held.character
+	character:SetAttribute("Carrying", top.kind)
+	character:SetAttribute("CarryCount", count)
+	character:SetAttribute("CarryHands", if count == 1 and handsMax(session) > 1 then 1 else 2)
+	if not session.info.lift then
+		character:SetAttribute("CarrySpeed", if count > 1 then Tuning.TwoPieceSpeed else nil)
+	end
+end
+
+-- 3.7: the top piece leaves the hands (the last one: the hands are empty again). Returns it, still where it was.
+local function release(session: Session, player: Player): Piece?
+	local held = session.held[player]
+	if not held then
+		return nil
+	end
+	local piece = table.remove(held.pieces)
+	if #held.pieces == 0 then
+		clearHeld(session, player)
+	else
+		armHands(session, player, held)
+	end
+	return piece
+end
+
+-- Into the hands (or on the rope); 3.7: a second light piece goes on top of the first. False when it does not fit.
+local function take(session: Session, player: Player, piece: Piece): boolean
+	local character = player.Character
+	local root = rootOf(character)
+	if not character or not root then
+		return false
+	end
+	local existing = session.held[player]
+	if existing and (existing.character ~= character or piece.horse or existing.pieces[1].horse or #existing.pieces >= handsMax(session)) then
+		return false
+	end
+	local horse = piece.horse
+	if horse then
+		Animals.stable(horse, nil)
+		Animals.lead(horse, character)
+	else
+		local model = piece.model or buildPiece(piece)
+		piece.model = model
+		model.Parent = folder
+	end
+	local held: Held = existing or { pieces = {}, character = character, root = root, prompt = nil, last = root.CFrame }
 	session.held[player] = held
-	character:SetAttribute("Carrying", piece.kind)
+	table.insert(held.pieces, piece)
+	armHands(session, player, held)
 	refresh(session)
 	return true
 end
 
--- Drop what the player holds right where they are; anybody of the crew can pick it up again.
-putDown = function(session: Session, player: Player)
-	local held = clearHeld(session, player)
+-- 3.7: where a piece put down goes: in front of where the carrier stood, beside the ones already lying there.
+local function dropFrame(session: Session, last: CFrame): CFrame
+	local look = last.LookVector
+	local ahead = Vector3.new(look.X, 0, look.Z)
+	local spot = last.Position
+	for _, side in { 0, 2.4, -2.4, 4.8 } do
+		local front = last * CFrame.new(side, 0, -2.2)
+		spot = onGround(Vector3.new(front.Position.X, last.Position.Y - 3, front.Position.Z))
+		local free = true
+		for _, loose in session.loose do
+			local model = loose.piece.model
+			if model and model.Parent and flat(model:GetPivot().Position, spot) < 1.8 then
+				free = false
+				break
+			end
+		end
+		if free then
+			break
+		end
+	end
+	return CFrame.lookAt(spot, spot + ahead)
+end
+
+-- Drop what the player holds right where they are; anybody of the crew can pick it up again. 3.7: one piece (the top
+-- one: G again for the next), or all of them (`all`: the carrier died, left, sat down, lost the partner).
+putDown = function(session: Session, player: Player, all: boolean?)
+	local held = session.held[player]
 	if not held then
 		return
 	end
-	local piece = held.piece
-	local front = held.last * CFrame.new(0, 0, -2.2)
-	local spot = onGround(Vector3.new(front.Position.X, held.last.Position.Y - 3, front.Position.Z))
-	local look = held.last.LookVector
-	local frame = CFrame.lookAt(spot, spot + Vector3.new(look.X, 0, look.Z))
-	local loose: Loose
-	local horse = piece.horse
-	if horse then
-		Animals.lead(horse, nil)
-		local at = horse:GetPivot().Position
-		local handle = Instance.new("Part")
-		handle.Name = "LooseHorse"
-		handle.Size = Vector3.new(1, 1, 1)
-		handle.Transparency = 1
-		handle.Anchored = true
-		handle.CanCollide = false
-		handle.CanQuery = false
-		handle.CanTouch = false
-		handle.Position = if at.Magnitude > 0 then at + Vector3.new(0, 3, 0) else spot + Vector3.new(0, 3, 0)
-		handle.Parent = folder
-		loose = { piece = piece, prompt = prompt(handle, "Lead", "Horse", nil, holdFor(session)), handle = handle }
-	else
-		local model = piece.model or buildPiece(piece)
-		piece.model = model
-		setDown(model, frame)
-		local main = model.PrimaryPart :: BasePart
-		loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece), nil, holdFor(session)), handle = nil }
+	local last = held.last
+	for _ = 1, if all then #held.pieces else 1 do
+		local piece = release(session, player)
+		if not piece then
+			break
+		end
+		local frame = dropFrame(session, last)
+		local loose: Loose
+		local horse = piece.horse
+		if horse then
+			Animals.lead(horse, nil)
+			local at = horse:GetPivot().Position
+			local handle = Instance.new("Part")
+			handle.Name = "LooseHorse"
+			handle.Size = Vector3.new(1, 1, 1)
+			handle.Transparency = 1
+			handle.Anchored = true
+			handle.CanCollide = false
+			handle.CanQuery = false
+			handle.CanTouch = false
+			handle.Position = if at.Magnitude > 0 then at + Vector3.new(0, 3, 0) else frame.Position + Vector3.new(0, 3, 0)
+			handle.Parent = folder
+			loose = { piece = piece, prompt = prompt(handle, "Lead", "Horse", nil, holdFor(session)), handle = handle }
+		else
+			local model = piece.model or buildPiece(piece)
+			piece.model = model
+			setDown(model, frame)
+			local main = model.PrimaryPart :: BasePart
+			loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece), nil, holdFor(session)), handle = nil }
+		end
+		loose.prompt.Triggered:Connect(function(by)
+			onLoose(session, by, loose)
+		end)
+		table.insert(session.loose, loose)
 	end
-	loose.prompt.Triggered:Connect(function(by)
-		onLoose(session, by, loose)
-	end)
-	table.insert(session.loose, loose)
 	refresh(session)
 end
 
@@ -1285,13 +1402,13 @@ local function updatePair(session: Session): boolean
 	local now = os.clock()
 	local dropped = false
 	for player, held in table.clone(session.held) do
-		if held.piece.horse or partnerNear(session, player, held.root.Position, Config.Missions.Duo.PairRange) then
+		if held.pieces[1].horse or partnerNear(session, player, held.root.Position, Config.Missions.Duo.PairRange) then
 			session.pairAlone[player] = nil
 		elseif not session.pairAlone[player] then
 			session.pairAlone[player] = now
 		elseif now - session.pairAlone[player] > PAIR_GRACE then
 			session.pairAlone[player] = nil
-			putDown(session, player)
+			putDown(session, player, true)
 			dropped = true
 			tell(player, `Your partner is gone: you put the {session.info.piece} down. Pair lift: carry it together!`)
 		end
@@ -1304,8 +1421,17 @@ local function updatePair(session: Session): boolean
 	return dropped
 end
 
+-- Can the player not take another piece of this job (3.7: one light piece in hand leaves room for a second)?
 local function handsFull(session: Session, player: Player): boolean
-	if not session.held[player] and not Cargo.carrying(player.Character) then
+	local held = session.held[player]
+	if held then
+		if #held.pieces < handsMax(session) then
+			return false
+		end
+		tell(player, if #held.pieces > 1 then `Your hands are full: two {session.info.plural}.` else "Your hands are full.")
+		return true
+	end
+	if not Cargo.carrying(player.Character) then
 		return false
 	end
 	tell(player, "Your hands are full.")
@@ -1316,16 +1442,18 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 	if not allowed(session, player) or handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
-	local index = table.find(session.loose, loose)
-	if not index then
-		return
+	if not table.find(session.loose, loose) or not take(session, player, loose.piece) then
+		return -- (3.7: a piece that does not fit the hands stays where it lies)
 	end
-	table.remove(session.loose, index)
+	local index = table.find(session.loose, loose)
+	if index then
+		table.remove(session.loose, index)
+	end
 	loose.prompt:Destroy()
 	if loose.handle then
 		loose.handle:Destroy()
 	end
-	take(session, player, loose.piece)
+	refresh(session)
 	session.info.changed()
 end
 
@@ -1344,32 +1472,43 @@ local function handOver(session: Session, player: Player)
 	if not plan then
 		return
 	end
+	local everything = `{if plan.person then plan.person.name else "They"} has everything. Put it back in the vehicle.`
 	if session.moved >= neededNow(session) then
-		tell(player, `{if plan.person then plan.person.name else "They"} has everything. Put it back in the vehicle.`)
+		tell(player, everything)
 		return
 	end
-	local held = clearHeld(session, player)
-	if not held then
-		return
+	-- 3.7: everything in your hands goes (two light pieces at once), as many as they still need.
+	local gave = 0
+	while session.held[player] and session.moved < neededNow(session) do
+		local piece = release(session, player)
+		if not piece then
+			break
+		end
+		gave += 1
+		session.moved += 1
+		session.deliveredTotal += 1
+		local horse = piece.horse
+		if horse then
+			-- The receiver takes the rope: the horse walks over to the paddock behind them.
+			Animals.lead(horse, nil)
+			local right = plan.facing:Cross(Vector3.yAxis)
+			local paddock = plan.pile - plan.facing * 9 + right * (session.moved * 5 - 7)
+			Animals.walkTo(horse, onGround(paddock))
+			table.insert(session.propHorses, horse)
+		else
+			local model = piece.model or buildPiece(piece)
+			piece.model = nil
+			setDown(model, stackFrame(plan, session.moved, -1))
+			table.insert(session.props, model)
+		end
 	end
-	local piece = held.piece
-	session.moved += 1
-	session.deliveredTotal += 1
-	local horse = piece.horse
-	if horse then
-		-- The receiver takes the rope: the horse walks over to the paddock behind them.
-		Animals.lead(horse, nil)
-		local right = plan.facing:Cross(Vector3.yAxis)
-		local paddock = plan.pile - plan.facing * 9 + right * (session.moved * 5 - 7)
-		Animals.walkTo(horse, onGround(paddock))
-		table.insert(session.propHorses, horse)
-	else
-		local model = piece.model or buildPiece(piece)
-		piece.model = nil
-		setDown(model, stackFrame(plan, session.moved, -1))
-		table.insert(session.props, model)
+	if gave == 0 then
+		return
 	end
 	say(session.person, if session.moved >= neededNow(session) then line(LINES.done) else line(LINES.thanks))
+	if session.held[player] then
+		tell(player, everything)
+	end
 	refresh(session)
 end
 
@@ -1412,7 +1551,8 @@ local function onPile(session: Session, player: Player)
 	session.info.changed()
 end
 
--- The back of the vehicle: load what you hold, or take a piece out at a drop.
+-- The back of the vehicle: load what you hold, or take a piece out at a drop. 3.7: everything in your hands goes in
+-- at once; at a drop with one light piece in hand you take out a second.
 local function onCar(session: Session, player: Player)
 	local plan = session.plan
 	local car = session.car
@@ -1425,33 +1565,38 @@ local function onCar(session: Session, player: Player)
 	end
 	local held = session.held[player]
 	if backShut(session) then
-		-- 3.2: only through an open back (a race with somebody closing it).
-		tell(player, if held then `Put it down (G) and {Vehicles.backVerb(car, true)} (E).` else `{capital(Vehicles.backVerb(car, true))} first (E).`)
+		-- 3.2: only through an open back (a race with somebody closing it). 3.7: a light piece leaves a hand free.
+		local open = Vehicles.backVerb(car, true)
+		local full = held ~= nil and (#held.pieces > 1 or handsMax(session) == 1)
+		tell(player, if full then `Put it down (G) and {open} (E).` else `{capital(open)} first (E).`)
 		return
 	end
-	if held then
+	local handling = plan ~= nil and plan.stage == "drop" and (plan.mode == "carry" or plan.mode == "lead")
+	if held and (not handling or session.moved >= neededNow(session)) then
 		clearHeld(session, player)
-		local piece = held.piece
-		local horse = piece.horse
-		if horse then
-			Animals.lead(horse, nil)
-		elseif piece.model then
-			piece.model:Destroy()
-			piece.model = nil
-		end
-		table.insert(session.load, piece)
-		if plan and plan.stage == "pickup" and piece.origin == session.stop then
-			session.moved += 1
-			if session.moved >= plan.needed then
-				say(session.person, line(LINES.loaded))
+		local before = session.moved
+		for _, piece in held.pieces do
+			local horse = piece.horse
+			if horse then
+				Animals.lead(horse, nil)
+			elseif piece.model then
+				piece.model:Destroy()
+				piece.model = nil
 			end
+			table.insert(session.load, piece)
+			if plan and plan.stage == "pickup" and piece.origin == session.stop then
+				session.moved += 1
+			end
+		end
+		if plan and plan.stage == "pickup" and before < plan.needed and session.moved >= plan.needed then
+			say(session.person, line(LINES.loaded))
 		end
 		render(session)
 		refresh(session)
 		session.info.changed()
 		return
 	end
-	if plan and plan.stage == "drop" and (plan.mode == "carry" or plan.mode == "lead") then
+	if handling and plan then
 		if session.blocked then
 			tell(player, blockedText(session))
 			return
@@ -1460,14 +1605,23 @@ local function onCar(session: Session, player: Player)
 			tell(player, "Drive to the stop first.")
 			return
 		end
-		if pairRefused(session, player) then
-			return
-		end
-		local piece = table.remove(session.load)
-		if not piece then
+		local who = if plan.person then plan.person.name else "the receiver"
+		if #session.load == 0 then
 			tell(player, `The {Vehicles.cargoNoun(car)} is empty.`)
 			return
 		end
+		if held and #held.pieces >= handsMax(session) then
+			tell(player, `Hands full: carry {if #held.pieces > 1 then "them" else "it"} to {who} (E).`)
+			return
+		end
+		if not toTakeOut(session) then
+			tell(player, `{capital(who)} gets no more: carry what you have.`)
+			return
+		end
+		if pairRefused(session, player) then
+			return
+		end
+		local piece = table.remove(session.load) :: Piece
 		render(session)
 		local horse = piece.horse
 		if horse then
@@ -1902,14 +2056,13 @@ function Cargo.update(session: Session, dt: number)
 			if root ~= held.root then
 				-- The body was rebuilt (the avatar loaded): hold it in the new one.
 				held.root = root
-				local model = held.piece.model
-				if model then
-					weldTo(model, root, root.CFrame * carryFrame(model))
+				if held.pieces[1].horse == nil then
+					stackHeld(held)
 				end
 			end
 			held.last = root.CFrame
 		else
-			putDown(session, player)
+			putDown(session, player, true)
 			dropped = true
 		end
 	end
@@ -2049,7 +2202,7 @@ function Cargo.status(session: Session): Status
 		total = session.info.total,
 		deliveredTotal = session.deliveredTotal,
 		lost = session.lost,
-		carrying = if held then held.piece.kind else nil,
+		carrying = if held then held.pieces[1].kind else nil,
 		person = if plan and plan.person then plan.person.name else nil,
 		pile = if plan and handling then plan.pile else nil,
 		looseAt = looseAt,
@@ -2116,13 +2269,30 @@ function Cargo.step(session: Session): (string, string)
 	local two = if session.info.pair and not horse then " together" else "" -- the pair twist
 	local intoCar = plan.stage == "pickup" or session.moved >= neededNow(session)
 	if held then
+		-- 3.7: one light piece leaves a hand free (open the back, take a second one); two fill both hands.
+		local count = #held.pieces
+		local it = if count > 1 then "them" else "it"
+		local free = count < handsMax(session)
 		if intoCar then
 			if shut then
-				return mode, if horse then `Let the horse go (G) and {open} (E)` else `Put it down (G) and {open} (E)`
+				if horse then
+					return mode, `Let the horse go (G) and {open} (E)`
+				elseif free then
+					return mode, `{capital(open)} (E) with your free hand`
+				elseif count > 1 then
+					return mode, `Hands full: put one down (G) and {open} (E), or a crew mate opens it`
+				end
+				return mode, `Put it down (G) and {open} (E)`
 			end
-			return mode, if horse then `Lead the horse into the {noun} (E)` else `Load it into the back of the {noun}{two} (E)`
+			if free and plan.stage == "pickup" and #session.pile > 0 then
+				return mode, `Load it into the {noun} (E), or pick up a second {piece}`
+			end
+			return mode, if horse then `Lead the horse into the {noun} (E)` else `Load {it} into the back of the {noun}{two} (E)`
 		end
-		return mode, if horse then `Lead the horse to {who} (E)` else `Carry it to {who}{two} (E)`
+		if free and toTakeOut(session) then
+			return mode, `Carry it to {who} (E), or take out a second {piece}`
+		end
+		return mode, if horse then `Lead the horse to {who} (E)` else `Carry {it} to {who}{two} (E)`
 	end
 	if driving and not parked then
 		return mode, `Park in the {circle} circle`
@@ -2182,15 +2352,16 @@ function Cargo.adminFinish(session: Session): boolean
 	end
 	for player in table.clone(session.held) do
 		local held = clearHeld(session, player)
-		if held then
-			if held.piece.horse then
-				Animals.lead(held.piece.horse, nil)
+		local pieces: { Piece } = if held then held.pieces else {}
+		for _, piece in pieces do
+			if piece.horse then
+				Animals.lead(piece.horse, nil)
 			end
-			if held.piece.model then
-				held.piece.model:Destroy()
-				held.piece.model = nil
+			if piece.model then
+				piece.model:Destroy()
+				piece.model = nil
 			end
-			table.insert(session.load, held.piece)
+			table.insert(session.load, piece)
 		end
 	end
 	for _, loose in session.loose do
@@ -2263,13 +2434,14 @@ function Cargo.finish(session: Session, linger: boolean?)
 	end
 	for player in table.clone(session.held) do
 		local held = clearHeld(session, player)
-		if held then
-			if held.piece.horse then
-				Animals.lead(held.piece.horse, nil)
-				Animals.remove(held.piece.horse)
+		local pieces: { Piece } = if held then held.pieces else {}
+		for _, piece in pieces do
+			if piece.horse then
+				Animals.lead(piece.horse, nil)
+				Animals.remove(piece.horse)
 			end
-			if held.piece.model then
-				held.piece.model:Destroy()
+			if piece.model then
+				piece.model:Destroy()
 			end
 		end
 	end

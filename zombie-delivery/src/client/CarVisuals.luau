@@ -1,7 +1,11 @@
 --!strict
 -- What every client does for every car: spins the tyres with the speed and turns the front ones, shows only the
--- prompt that fits (Drive on your own car, Ride along on a friend's car with a free seat) and puts the owner's
--- name over other players' cars.
+-- prompts that fit (Drive at your own car's driver's door, Ride along at a friend's car's door with a free seat
+-- behind it; 3.7: every door has its own, server/Vehicles.luau doorsOf) and puts the owner's name over other players'
+-- cars.
+-- 3.7: swings the cabin doors (the Motor6Ds "DoorHinge") open while their attribute OpenUntil (a server time) lies
+-- ahead, then shut: somebody got in or out. No door prompts while a chauffeur drives the car (Chauffeured) or your
+-- hands are full (the Carrying attribute: you could not get in anyway).
 -- 3.2: swings the back that opens (rear doors, a tailgate, a trunk lid, a ramp: the Motor6Ds "BackHinge" on the
 -- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
 -- The back's prompt shows only to the owner and the crew of the owner's job (the attribute BackCrew, server/Cargo.luau).
@@ -17,9 +21,13 @@ local CarVisuals = {}
 
 type Wheel = { motor: Motor6D, front: boolean, radius: number }
 type Hinge = { motor: Motor6D, axis: Vector3, angle: number } -- angle: the open turn in radians
+type DoorHinge = { motor: Motor6D, angle: number, open: number } -- open: 0 shut … 1 open
+type DoorPrompt = { prompt: ProximityPrompt, driver: boolean, seats: { Seat } }
 type CarState = {
 	wheels: { Wheel },
 	hinges: { Hinge },
+	doorHinges: { DoorHinge },
+	doorPrompts: { DoorPrompt },
 	back: number,
 	spin: number,
 	steer: number,
@@ -31,6 +39,7 @@ local player = Players.LocalPlayer
 local states: { [Model]: CarState } = {}
 local RANGE = 260
 local BACK_TIME = 0.45 -- seconds for the back to swing open or shut
+local DOOR_TIME = 0.3 -- seconds for a cabin door to swing open or shut
 
 local function stateOf(car: Model): CarState?
 	local state = states[car]
@@ -43,6 +52,18 @@ local function stateOf(car: Model): CarState?
 	end
 	local wheels: { Wheel } = {}
 	local hinges: { Hinge } = {}
+	local doorHinges: { DoorHinge } = {}
+	local doorPrompts: { DoorPrompt } = {}
+	-- 3.7: the seats behind each door (their attribute Door).
+	local seatsAt: { [number]: { Seat } } = {}
+	for _, child in car:GetChildren() do
+		local index = child:GetAttribute("Door")
+		if child:IsA("Seat") and type(index) == "number" then
+			local list = seatsAt[index] or {}
+			seatsAt[index] = list
+			table.insert(list, child)
+		end
+	end
 	for _, child in chassis:GetChildren() do
 		if child:IsA("Motor6D") and child.Name == "WheelMotor" then
 			table.insert(wheels, {
@@ -57,9 +78,32 @@ local function stateOf(car: Model): CarState?
 				axis = if child:GetAttribute("Axis") == "X" then Vector3.xAxis else Vector3.yAxis,
 				angle = math.rad(if type(angle) == "number" then angle else 90),
 			})
+		elseif child:IsA("Motor6D") and child.Name == "DoorHinge" then
+			local angle = child:GetAttribute("Angle")
+			table.insert(doorHinges, { motor = child, angle = math.rad(if type(angle) == "number" then angle else 70), open = 0 })
+		elseif child:IsA("Attachment") and string.sub(child.Name, 1, 4) == "Door" then
+			local prompt = child:FindFirstChildOfClass("ProximityPrompt")
+			local index = prompt and prompt:GetAttribute("Door")
+			if prompt then
+				table.insert(doorPrompts, {
+					prompt = prompt,
+					driver = prompt.Name == "DrivePrompt",
+					seats = if type(index) == "number" then seatsAt[index] or {} else {},
+				})
+			end
 		end
 	end
-	state = { wheels = wheels, hinges = hinges, back = 0, spin = 0, steer = 0, tagged = false, backReach = nil }
+	state = {
+		wheels = wheels,
+		hinges = hinges,
+		doorHinges = doorHinges,
+		doorPrompts = doorPrompts,
+		back = 0,
+		spin = 0,
+		steer = 0,
+		tagged = false,
+		backReach = nil,
+	}
 	states[car] = state
 	car.Destroying:Connect(function()
 		states[car] = nil
@@ -100,9 +144,9 @@ local function nameTag(car: Model, chassis: BasePart)
 	padding.Parent = label
 end
 
-local function freeSeat(car: Model): boolean
-	for _, child in car:GetChildren() do
-		if child:IsA("Seat") and child.Name == "PassengerSeat" and child.Occupant == nil then
+local function freeSeat(seats: { Seat }): boolean
+	for _, seat in seats do
+		if seat.Occupant == nil then
 			return true
 		end
 	end
@@ -129,6 +173,9 @@ local function step(dt: number)
 	end
 	local eye = camera.CFrame.Position
 	local seatedIn = Drive.seatedCar()
+	local character = player.Character
+	local handsFull = character ~= nil and character:GetAttribute("Carrying") ~= nil
+	local now = workspace:GetServerTimeNow()
 	for _, car in allCars() do
 		if not car:IsA("Model") then
 			continue
@@ -140,14 +187,15 @@ local function step(dt: number)
 		end
 		local mine = car:GetAttribute("OwnerId") == player.UserId
 
-		-- Prompts.
-		local drive = chassis:FindFirstChild("DrivePrompt")
-		if drive and drive:IsA("ProximityPrompt") then
-			drive.Enabled = mine and seatedIn ~= car
-		end
-		local ride = chassis:FindFirstChild("RidePrompt")
-		if ride and ride:IsA("ProximityPrompt") then
-			ride.Enabled = not mine and seatedIn == nil and freeSeat(car)
+		-- Prompts: 3.7, one at every door.
+		local enterable = car:GetAttribute("Chauffeured") ~= true and not handsFull and (car:GetAttribute("Health") or 0) > 0
+		for _, entry in state.doorPrompts do
+			local want = if entry.driver
+				then enterable and mine and seatedIn ~= car
+				else enterable and not mine and seatedIn == nil and car:GetAttribute("Repairing") ~= true and freeSeat(entry.seats)
+			if entry.prompt.Enabled ~= want then
+				entry.prompt.Enabled = want
+			end
 		end
 		-- 3.2: the back's prompt only for the owner and the crew of the owner's job (the car's BackCrew, server/Cargo.luau);
 		-- out of reach for everybody else, so a stranger's car does not take the E. (Enabled is the server's: one E at a time.)
@@ -189,6 +237,20 @@ local function step(dt: number)
 			wheel.motor.Transform = turn * CFrame.Angles(spin, 0, 0)
 		end
 		state.spin -= forward / 1.3 * dt
+
+		-- 3.7: the cabin doors swing open while OpenUntil lies ahead, then shut (eased; held while open).
+		for _, swing in state.doorHinges do
+			local until_ = swing.motor:GetAttribute("OpenUntil")
+			local target = if type(until_) == "number" and now < until_ then 1 else 0
+			local before = swing.open
+			if before ~= target then
+				swing.open = if target > before then math.min(target, before + dt / DOOR_TIME) else math.max(target, before - dt / DOOR_TIME)
+			end
+			if (swing.open > 0 or before > 0) and swing.motor.Parent then
+				local t = swing.open * swing.open * (3 - 2 * swing.open)
+				swing.motor.Transform = CFrame.fromAxisAngle(Vector3.yAxis, swing.angle * t)
+			end
+		end
 
 		-- 3.2: the back swings toward BackOpen (eased); held there every frame while it is open.
 		if #state.hinges > 0 then
