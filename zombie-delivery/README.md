@@ -425,6 +425,41 @@ The loading at a **carry** or **lead** stop:
 The holds are short (`Config.Cargo.HoldDuration`), so the extra steps add a few seconds per stop. **board** stops
 (the bus, the ambulance's patients, the survivors) and **serve** stops (the ice cream) do not use the back.
 
+## Freight: the hand trolley, pallets and the warehouse (4.0)
+
+The rules are in `shared/Freight.luau` (pure, tested in `tests/freight_test.luau`), the tools in
+`server/Equipment.luau`, the pieces in `server/Cargo.luau`, the numbers in `Config.Cargo` (TrolleyPieces …
+PalletPay).
+
+- **The hand trolley** (a car with the Hand Trolley upgrade: its `TrolleyMount`). "Take trolley" (E) at the mount
+  while the back is open, at the back corner while it is shut. You push it (character attributes `Pushing =
+  "trolley"`, `Carrying`, `CarryHands = 1`, `CarrySpeed` 10 empty / 8.5 loaded): no gun, no sprint, a hand free for
+  the doors. "Load onto trolley" (E) at the pile loads as many as fit (4, any kind but people, horses and pallets;
+  not on a lift or pair mission), "Load all" at the open back puts them in (as many as there is room for), at a drop
+  "Take out" fills it and "Hand over" gives them all. **G**: at your car's open back "Stow trolley", anywhere else
+  "Set down trolley" (it stands there, its pieces on it, "Take trolley" again). Left with nobody within 40 studs it
+  goes back to the car after 60 s (its pieces go on the ground). Death, leaving and sitting set it down. The pieces
+  on a trolley count exactly like the ones in your hands (`Held.tool`) or put down (`Loose.tool`).
+- **Pallets** (the cargo kind `pallet`, about 4×4×4 of shrink-wrapped boxes) never go by hand ("Too heavy: use a
+  pallet jack"). **The pallet jack** (ještěrka): on the jack spots of the warehouse docks and of every receiving
+  dock, and in the Freight Truck (`JackMount`, inside its back). `Pushing = "jack"`, walk 6. "Lift pallet" (E), "Load
+  pallet" at the open back of a vehicle that takes pallets (`Economy.palletsOf`; a pallet uses 4 slots and stands on
+  its 2×2 slot group, or the chassis' `PalletSlotN` attachments if a body has them), at the drop "Unload pallet" and
+  "Set down pallet" on the receiving pad. G parks a dock's jack on its spot, stows the truck's, else sets it down; a
+  jack left alone goes back after 90 s.
+- **The Harbor Warehouse** is a freight hub (`Map.FreightDocks`): two loading docks with a raised dock floor (a
+  truck's load floor), ramps, dock plates and bumpers, painted bays, staging squares inside the doors, two jack
+  spots, forklifts and pallet racks. The old mission door and its cargo spot stay as they were (the forklift and
+  the lost package moved south). **Receiving docks** (`Map.ReceivingDocks`): FreshMart, Big Move Movers and the Power
+  Plant, a marked pad with a RECEIVING sign and the place's own jack.
+- **The Freight Run** (`Config.JobTypes` "freightrun", ★★★, level 6): 1 – 3 pallets from a dock to a receiving dock,
+  good pay (+ `PalletPay` a pallet). On every board from its level; without a vehicle that takes its pallets it shows
+  locked "NEEDS N PALLETS". Ordinary jobs with 4+ carried pieces say on their card that a trolley helps.
+- **Later: a semi truck with a trailer.** Nothing here is tied to one truck: a hub is a list of docks (a longer bay
+  is one more dock with its own park and staging), a vehicle says how many pallets it takes (`palletsOf`) and where
+  they stand (its slot groups or `PalletSlotN` attachments, else a row behind the last), and a trailer's body can
+  carry its own `JackMount`.
+
 ## The vans and the upgrades you can see
 
 Version 3.3 (`Config.Cars`, `Config.Upgrades`, server/Vehicles.luau `STYLES` and `buildKit`).
@@ -949,7 +984,8 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               chain `requires`, the computed mission levels levelOf, the DUO campaign), Challenges (3.1: the 42 challenges, the
               counters, value / progress / doneCount / allTitles), Melee (3.9: punch or strike, the cone in front of
               you, the arm's swing curve), Boarding (3.10: getting in and out: the timing, the curve, the hand's
-              reach, the doors' swing, the Boarding attribute)
+              reach, the doors' swing, the Boarding attribute), Freight (4.0: who takes what on a trolley or a jack, the
+              walks, pallet room and places, the lock and the tip)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers; 3.4: the repair bays, the GARAGE posts), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once; 3.4: every
@@ -962,7 +998,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
               the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves; 3.2: the DUO
               rules, drives DuoGates; 3.4: the cargo slots on the board, the bulk orders), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
-              3.2: loading through the back, the pair lift), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
+              3.2: loading through the back, the pair lift; 4.0: pieces on a trolley, pallets on a jack, the tools' hints), Equipment (4.0: the
+              hand trolley and the pallet jacks: take, push, stow, set down, go home), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases; 3.5: the three display cars, the stages), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
@@ -1015,7 +1052,8 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               campaigns the Old Van, the big loads say so, the rack migration), run_tests.py checks every car's
               capacity is its body's slot count (3.5: and every stage's its look's), levels the early garages, logic the cheap first levels;
               3.9: melee (the punch and the strike, the reach cone, the swing curve); 3.10: boarding (the move's timing,
-              a late start, the curve, the hand, the doors' swing)
+              a late start, the curve, the hand, the doors' swing); 4.0: freight (the trolley and jack rules, pallet
+              places, the Freight Run, the warehouse and receiving docks)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis

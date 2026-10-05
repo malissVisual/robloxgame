@@ -1468,7 +1468,8 @@ Config.Jobs = {
 	-- 3.4: bigger loads on the dangerous jobs (cargo capacity, Config.Cars capacity): an ordinary delivery of danger
 	-- level n is a bulk order with BulkChance[n], its pieces + BulkExtra[n] (min, max).
 	-- 3.5 (the stages): ★ never, and at most EasyMaxPieces (the Rusty Van's 2 slots); ★★ (3 at most: the Work Van)
-	-- rarely 4 (the Cargo Van); ★★★ up to 5 (a Tall Hauler or a Box Truck); ★★★★ up to 8 (a Freight Hauler).
+	-- rarely 4 (the Long Cargo Van); ★★★ up to 5 (a Tall Hauler or a Box Truck); ★★★★ up to 8 (a Freight Hauler).
+	-- 4.0: pallets are the Freight Run's (Config.JobTypes "freightrun"), never an ordinary delivery's.
 	EasyMaxPieces = 2,
 	BulkChance = { 0, 0.2, 0.45, 0.6 } :: { number },
 	BulkExtra = { { 0, 0 }, { 1, 1 }, { 1, 2 }, { 3, 6 } } :: { { number } },
@@ -1717,7 +1718,14 @@ Config.Jobs = {
 		cashrun = { giver = "banker", receiver = "soldier" }, -- Mr. Gold, the bank manager; Sergeant Hayes as at the base
 		ambulance = { giver = "townsperson", receiver = "nurse" }, -- Nurse Ada; the patient walks in by themselves (board)
 		pizzarush = { giver = "cook", receiver = "townsperson" },
+		freightrun = { giver = "foreman", receiver = "worker" }, -- 4.0: the dock foreman; FreightReceivers at the drop
 	} :: { [string]: { giver: string, receiver: string } },
+	-- 4.0, the Freight Run: who takes the pallets at each receiving dock (shared/Map.luau ReceivingDocks).
+	FreightReceivers = {
+		market = { name = "Rita", title = "FreshMart stock room", role = "clerk" },
+		movers = { name = "Kofi", title = "Big Move Movers", role = "mover" },
+		powerplant = { name = "Ivan", title = "Power Plant stores", role = "worker" },
+	} :: { [string]: PersonDef },
 	-- The special jobs on the job board (JobTypeDef.board, or no employer): the chance of a first and of a second
 	-- special card next to the ordinary deliveries every time the board is filled.
 	BoardSpecials = { 0.65, 0.3 },
@@ -1763,9 +1771,11 @@ Config.Cargo = {
 		tires = { piece = "tire stack", plural = "tire stacks", look = "tires" },
 		plants = { piece = "seedling tray", plural = "seedling trays", look = "plants" },
 		survivor = { piece = "survivor", plural = "survivors", look = "survivor" }, -- board: they walk in themselves
+		-- 4.0, freight (shared/Freight.luau): a wooden pallet of shrink-wrapped boxes, moved only with a pallet jack
+		pallet = { piece = "pallet", plural = "pallets", look = "pallet" },
 	} :: { [string]: { piece: string, plural: string, look: string } },
 	-- Extra seconds on the clock for every piece handled at a stop (loading and unloading each count).
-	TimePerPiece = { carry = 9, lead = 14, board = 4, serve = 0 } :: { [string]: number },
+	TimePerPiece = { carry = 9, lead = 14, board = 4, serve = 0, pallet = 20 } :: { [string]: number },
 	PayPerPiece = 15, -- an ordinary delivery pays this per piece on top of the tier's pay
 	SpawnDistance = 300, -- the people and the cargo appear when the job's owner is this close to the stop
 	ApproachDistance = 80, -- closer than this the HUD says what to do on foot and the enemies come on foot
@@ -1830,6 +1840,24 @@ Config.Cargo = {
 	BoardMaxSpeed = 8, -- studs / s: the car faster than this, getting in is cancelled (you stand at the door)
 	AlightSlideMaxSpeed = 14, -- studs / s: out of a car faster than this you are put out at once (no slide)
 	BoardRange = 16, -- studs: farther than this from the seat when it is time to sit, getting in is cancelled
+	-- 4.0, freight and equipment (shared/Freight.luau, server/Equipment.luau, server/Cargo.luau). The hand trolley of a
+	-- car with the "trolley" upgrade (Stream V: its TrolleyMount) takes TrolleyPieces pieces of any kind but people,
+	-- horses and pallets; a pallet (Kinds.pallet) moves only on a pallet jack, one at a time, into a vehicle that takes
+	-- pallets (Economy.palletsOf), where it uses PalletSlots of the cargo slots.
+	TrolleyPieces = 4,
+	TrolleySpeed = 10, -- the walk (studs / s, the CarrySpeed attribute) pushing an empty trolley
+	TrolleyLoadedSpeed = 8.5, -- … a loaded one
+	JackSpeed = 6, -- … the pallet jack (empty or with a pallet)
+	TrolleyColumnGap = 2.3, -- two pieces side by side on the trolley's toe plate: their middles this far apart
+	PalletSlots = 4, -- the cargo slots a pallet uses
+	PalletSpacing = 4.3, -- pallets in a row in a vehicle without its own pallet slots (shared/Freight.luau palletSpots)
+	SlotDepth = 3.4, -- how deep a cargo slot is (the pallets start half a slot in front of the front slot's middle)
+	ToolReach = 9, -- G stows the trolley / the truck's jack this close to its mount
+	ToolNearby = 40, -- a tool left with nobody this close goes home after …
+	TrolleyReturnSeconds = 60, -- … this long (the trolley to its car's mount)
+	JackReturnSeconds = 90, -- … or this long (a pallet jack to its parking spot or its truck)
+	TrolleyTipPieces = 4, -- the job card says a trolley helps from this many pieces carried
+	PalletPay = 120, -- a Freight Run pays this per pallet on top of its pay
 }
 
 export type JobTypeDef = {
@@ -1873,6 +1901,9 @@ export type JobTypeDef = {
 	giverRole: string?, -- the look of the giver (server/Npcs.luau roles), else Config.Jobs.People / "townsperson"
 	receiverRole: string?, -- the look of the receiver
 	mission: string?, -- the mission id (shared/Missions.luau) when this job is a mission
+	-- 4.0, freight (load = unload = "pallet": shared/Map.luau FreightDocks / ReceivingDocks): the drop is one of these
+	-- places (their receiving docks), and the job takes 1 … items pallets.
+	dropChoices: { string }?,
 }
 
 -- Special jobs. The ones with an employer are taken at the employer's place; the others show up on the job board.
@@ -2155,6 +2186,37 @@ Config.JobTypes = {
 		giver = "Luigi, the pizza chef",
 		receiver = "A hungry customer",
 		timeLimit = 180,
+	},
+	-- 4.0, freight: pallets from the Harbor Warehouse's loading docks to a receiving dock. A pallet moves only with a
+	-- pallet jack (one waits at every dock and every receiving dock, the Freight Truck carries its own) and goes only
+	-- into a vehicle that takes pallets (Economy.palletsOf): the board shows it locked "NEEDS N PALLETS" for any other.
+	-- On the board (sorted by its stars) from its level, every time (server/Jobs.luau makeBoard); 1 … items pallets.
+	{
+		id = "freightrun",
+		name = "Freight Run",
+		description = "Pallets from the Harbor Warehouse's loading docks to a receiving dock. Back up to the dock, lift each pallet with a pallet jack and push it into your truck.",
+		vehicle = nil,
+		employer = nil,
+		board = true,
+		level = 6,
+		pickups = 1,
+		pickupAt = "warehouse",
+		drops = 1,
+		dropAt = nil,
+		dropChoices = { "market", "movers", "powerplant" },
+		loadTime = 6,
+		unloadTime = 6,
+		payPerStop = 220,
+		tier = 3,
+		cargo = "Freight",
+		pickupLabel = "LOAD THE PALLETS AT",
+		dropLabel = "DELIVER THE PALLETS TO",
+		load = "pallet",
+		unload = "pallet",
+		items = 3,
+		itemKind = "pallet",
+		giver = "Gus, the dock foreman",
+		receiver = "The stock room",
 	},
 } :: { JobTypeDef }
 

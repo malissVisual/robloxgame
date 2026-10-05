@@ -303,7 +303,7 @@ Map.Secrets = {
 	-- The missions' places in town (3.0).
 	{ id = "secret_pharmacy", place = "pharmacy", hint = "Right under the green cross, against the wall.", x = 116, y = 0.6, z = 414 },
 	{ id = "secret_market", place = "market", hint = "Between the grocery pallets at the delivery bay.", x = -411, y = 0.7, z = 109 },
-	{ id = "secret_warehouse", place = "warehouse", hint = "The yellow forklift parked out front is hiding something behind its back.", x = 1353, y = 0.6, z = 310 },
+	{ id = "secret_warehouse", place = "warehouse", hint = "The yellow forklift parked out front is hiding something behind its back.", x = 1345, y = 0.6, z = 252 }, -- 4.0: moved off the loading docks
 	{ id = "secret_firestation", place = "firestation", hint = "Tucked behind the red hydrant on the corner. No hose needed.", x = 316, y = 0.6, z = -104 },
 	{ id = "secret_police", place = "police", hint = "Between the two parked patrol cars. Nobody is watching.", x = -258, y = 0.6, z = -258 },
 	{ id = "secret_cityhall", place = "cityhall", hint = "Make a wish at the fountain, then look on its far side, toward the hall.", x = 22, y = 0.6, z = -401.5 },
@@ -387,6 +387,95 @@ for id, spot in rawSpots do
 	}
 end
 Map.CargoSpots = cargoSpots
+
+-- ── Freight (Zombie Delivery 4.0) ──────────────────────────────────────────
+-- Where the pallets of the Freight Run (Config.JobTypes "freightrun", shared/Freight.luau) are loaded and set down.
+-- server/World.luau builds the docks, server/Jobs.luau puts a job's stops there, server/Equipment.luau parks the pallet
+-- jacks on their spots. Generic on purpose: a hub is a list of docks (a semi truck's longer bay is one more dock with
+-- its own park and staging), a vehicle says itself how many pallets it takes (Economy.palletsOf).
+--
+-- A hub: raised dock platforms (`height` over the sidewalk: a truck's load floor) along a building; at each dock a
+-- truck backs into its painted bay (`park`, the circle; `facing`, the way a truck backed in faces: away from the
+-- dock) until its back touches the dock `edge`; the job's pallets wait on the dock floor (`staging`). The pallet jacks
+-- stand on their spots (`jacks`, `facing` the way the forks point); the dock foreman stands at `giver`.
+export type FreightDock = {
+	park: { x: number, z: number },
+	facing: { x: number, z: number },
+	edge: { x: number, z: number },
+	staging: { { x: number, z: number } },
+}
+export type JackSpot = { x: number, z: number, facing: { x: number, z: number } }
+export type FreightHub = {
+	place: string, -- the Map.Places id
+	height: number, -- the dock floor over the sidewalk (WalkTop)
+	platform: { x0: number, z0: number, x1: number, z1: number }, -- the raised dock floor
+	giver: { x: number, z: number },
+	docks: { FreightDock },
+	jacks: { JackSpot },
+}
+
+-- The Harbor Warehouse (its block: the centre 1368, 288; the front wall at x = 1360 facing the avenue to the west;
+-- the old mission door at z = 270 with its cargo spot stays as it was): two loading docks at the doors z = 294 and
+-- z = 318, the platform 2.4 over the sidewalk reaching 10 out and 16 in, the pallets staged inside the doors.
+Map.FreightDocks = {
+	warehouse = {
+		place = "warehouse",
+		height = 2.4,
+		platform = { x0 = 1350, z0 = 286, x1 = 1376, z1 = 326 },
+		giver = { x = 1355, z = 306 },
+		docks = {
+			{
+				park = { x = 1333, z = 294 },
+				facing = { x = -1, z = 0 },
+				edge = { x = 1350, z = 294 },
+				staging = { { x = 1366, z = 290 }, { x = 1366, z = 298 }, { x = 1371.5, z = 290 }, { x = 1371.5, z = 298 } },
+			},
+			{
+				park = { x = 1333, z = 318 },
+				facing = { x = -1, z = 0 },
+				edge = { x = 1350, z = 318 },
+				staging = { { x = 1366, z = 314 }, { x = 1366, z = 322 }, { x = 1371.5, z = 314 }, { x = 1371.5, z = 322 } },
+			},
+		},
+		jacks = {
+			{ x = 1366, z = 304, facing = { x = -1, z = 0 } },
+			{ x = 1366, z = 308, facing = { x = -1, z = 0 } },
+		},
+	},
+} :: { [string]: FreightHub }
+
+-- A receiving dock (the Freight Run's drop): a marked pad by a back door where the pallets are set down (`spots`, in
+-- that order), the person who takes them at `receiver` (facing the pad), the place's own pallet jack on its spot
+-- (every truck can unload, not only the Freight Truck with its own jack). The circle is the place's cargo spot park.
+export type ReceivingDock = {
+	place: string,
+	spots: { { x: number, z: number } },
+	receiver: { x: number, z: number },
+	jack: JackSpot,
+}
+Map.ReceivingDocks = {
+	-- FreshMart: on its car park by the delivery bay (the store faces east, the pile at -382, 128).
+	market = {
+		place = "market",
+		spots = { { x = -395, z = 123.5 }, { x = -395, z = 128 }, { x = -395, z = 132.5 } },
+		receiver = { x = -389, z = 138 },
+		jack = { x = -402, z = 140, facing = { x = 0, z = -1 } },
+	},
+	-- Big Move Movers: in front of the orange shed's loading door (the shed faces east, its front at x = 301).
+	movers = {
+		place = "movers",
+		spots = { { x = 318, z = 167.5 }, { x = 318, z = 172 }, { x = 318, z = 176.5 } },
+		receiver = { x = 326, z = 180 },
+		jack = { x = 309, z = 180, facing = { x = 0, z = -1 } },
+	},
+	-- The Power Plant: the stores by the loading dock inside the gate.
+	powerplant = {
+		place = "powerplant",
+		spots = { { x = 1051.5, z = 566 }, { x = 1056, z = 566 }, { x = 1060.5, z = 566 } },
+		receiver = { x = 1064, z = 574 },
+		jack = { x = 1048, z = 575, facing = { x = 1, z = 0 } },
+	},
+} :: { [string]: ReceivingDock }
 
 -- ── Real estate (Zombie Delivery 2.6) ──────────────────────────────────────
 -- Where every property of Config.Estate stands (the same ids). server/World.luau builds them from this; the server's

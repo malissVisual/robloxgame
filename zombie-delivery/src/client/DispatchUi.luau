@@ -88,6 +88,7 @@ local HANDLING: { [string]: string } = {
 	lead = "led on a rope",
 	board = "they get on",
 	serve = "sold from the truck",
+	pallet = "moved on a pallet jack", -- 4.0, the Freight Run
 }
 
 local FILTERS = {
@@ -665,6 +666,10 @@ local function details(body: any, offer: any, w: number): number
 	if offer.jobType and offer.jobType.description then
 		y += brief(body, "Job", offer.jobType.description, y, w, true, { TextColor3 = K.secondary })
 	end
+	-- 4.0: the server's tip (a hand trolley helps with 4+ pieces).
+	if type(offer.tip) == "string" then
+		y += brief(body, "Tip", offer.tip, y, w, true, { TextColor3 = K.secondary })
+	end
 	return y
 end
 
@@ -729,7 +734,8 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			Hud.toast(`{what} need{if offer.jobType then "s" else ""} driver level {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.`)
 		end)
 	elseif why then
-		action(stub, `📦 NEEDS {offer.slots} SLOTS`, size, at, nil, function()
+		-- 4.0: a Freight Run is locked by pallets (the server's lockButton: "NEEDS N PALLETS").
+		action(stub, if type(offer.lockButton) == "string" then offer.lockButton else `📦 NEEDS {offer.slots} SLOTS`, size, at, nil, function()
 			flash()
 			Hud.toast(why)
 		end)
@@ -757,7 +763,7 @@ local function offerTicket(offer: any, number: number)
 	local bodyW = w - SPINE - STUB - 30
 	-- Above your driver level: offered, but locked (the server refuses it too). Else too many pieces for the car.
 	local lockLevel = if offer.locked == true then (tonumber(offer.level) or myLevel() + 1) else nil
-	local why = if lockLevel == nil and offer.tooBig == true then roomRemedy(offer) else nil
+	local why = if lockLevel == nil and offer.tooBig == true then (if type(offer.lockText) == "string" then offer.lockText else roomRemedy(offer)) else nil
 	local note = if lockLevel then `Unlocks at LEVEL {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.` else why
 	-- The slot in the list gets its height once the body is built (the row fills it).
 	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 140), BackgroundTransparency = 1, LayoutOrder = number }, refs.list)

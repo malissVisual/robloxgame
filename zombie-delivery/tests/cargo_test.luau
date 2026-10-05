@@ -81,7 +81,7 @@ check("businesses send 1 - 3 pieces you can carry, to somebody", (function()
 end)())
 
 check("special jobs have a piece kind, people and a handling", (function()
-	local modes = { carry = true, lead = true, board = true, serve = true }
+	local modes = { carry = true, lead = true, board = true, serve = true, pallet = true } -- 4.0: pallet (the Freight Run)
 	for _, jobType in Config.JobTypes do
 		if not Config.Cargo.Kinds[jobType.itemKind] or not Config.Jobs.People[jobType.id] then
 			print("  bad job type " .. jobType.id)

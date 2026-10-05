@@ -3899,7 +3899,101 @@ local function defineMissionPlaces()
 		palletStack(market, CFrame.new(x0 + 24, WALK_TOP, cz - 30), Vector3.new(1.6, 1.2, 1.6), Color3.fromRGB(110, 170, 70), 2, 2, 1, Enum.Material.Cardboard)
 	end
 
+	-- 4.0, freight (shared/Map.luau FreightDocks): the hub's raised dock floor (a truck's load floor over the sidewalk,
+	-- reaching in through the doors), its yellow edge with rubber bumpers and a steel dock plate at every dock, ramps
+	-- down at both ends, the painted bays a truck backs into with DOCK n on the dock's face, the staging squares on the
+	-- floor inside, the pallet jacks' parking boxes (server/Equipment.luau puts the jacks there) and pallet racks.
+	local YELLOW = Color3.fromRGB(240, 196, 40)
+	local function freightHub(parent: Instance)
+		local hub = Map.FreightDocks.warehouse
+		if not hub then
+			return
+		end
+		local p = hub.platform
+		local top = WALK_TOP + hub.height
+		box(parent, "DockFloor", CFrame.identity, p.x0, WALK_TOP - 0.2, p.z0, p.x1, top, p.z1, Color3.fromRGB(150, 148, 140), Enum.Material.Concrete)
+		deco(part(parent, "DockEdge", Vector3.new(0.6, 0.06, p.z1 - p.z0), CFrame.new(p.x0 + 0.3, top + 0.03, (p.z0 + p.z1) / 2), YELLOW, Enum.Material.SmoothPlastic))
+		-- The ramps down to the apron at both ends (a person walks up; the trucks stay in their bays).
+		local x0, x1 = p.x0, math.min(p.x1, p.x0 + 10)
+		for _, ramp in { { from = p.z1, to = p.z1 + 10 }, { from = p.z0, to = p.z0 - 8 } } do
+			local length = math.abs(ramp.to - ramp.from)
+			local slope = math.atan(hub.height / length)
+			local down = if ramp.to > ramp.from then 1 else -1
+			local middle = Vector3.new((x0 + x1) / 2, WALK_TOP + hub.height / 2 - 0.25, (ramp.from + ramp.to) / 2)
+			part(parent, "DockRamp", Vector3.new(x1 - x0, 0.5, math.sqrt(length * length + hub.height * hub.height)), CFrame.new(middle) * CFrame.Angles(down * slope, 0, 0), Color3.fromRGB(140, 138, 130), Enum.Material.Concrete)
+		end
+		for n, dock in hub.docks do
+			local z = dock.edge.z
+			local edge = dock.edge.x
+			-- The bay: two yellow lines out to the road and a stop line, DOCK n on the dock's face.
+			for _, side in { -6.5, 6.5 } do
+				patch(parent, "BayLine", edge - 34, z + side - 0.2, edge - 1, z + side + 0.2, WALK_TOP, YELLOW)
+			end
+			patch(parent, "BayStop", edge - 2.2, z - 6.5, edge - 1.8, z + 6.5, WALK_TOP, Color3.fromRGB(230, 230, 230))
+			local face = Vector3.new(edge - 0.12, WALK_TOP + 1.0, z)
+			sign(parent, `DOCK {n}`, Vector3.new(3.4, 1.2, 0.2), CFrame.lookAt(face, face + Vector3.new(-1, 0, 0)), Color3.fromRGB(30, 30, 34), YELLOW)
+			for _, side in { -3.4, 3.4 } do
+				part(parent, "DockBumper", Vector3.new(0.7, 1.4, 1.2), CFrame.new(edge - 0.35, top - 0.9, z + side), Color3.fromRGB(26, 26, 28), Enum.Material.Rubber)
+			end
+			deco(part(parent, "DockPlate", Vector3.new(1.6, 0.12, 6), CFrame.new(edge - 0.7, top - 0.08, z) * CFrame.Angles(0, 0, math.rad(-6)), Color3.fromRGB(160, 162, 168), Enum.Material.DiamondPlate))
+			-- The staging squares where the job's pallets wait.
+			for _, spot in dock.staging do
+				patch(parent, "StagingBox", spot.x - 2.3, spot.z - 2.3, spot.x + 2.3, spot.z + 2.3, top, Color3.fromRGB(120, 118, 112), Enum.Material.SmoothPlastic)
+			end
+		end
+		for _, jack in hub.jacks do
+			patch(parent, "JackBox", jack.x - 3.2, jack.z - 1.3, jack.x + 3.2, jack.z + 1.3, top, YELLOW)
+		end
+		-- Pallet racks along the north wall inside: orange uprights, two levels of beams, pallets on them.
+		local rackZ = p.z1 + 7
+		for x = p.x0 + 16, p.x0 + 46, 10 do
+			part(parent, "RackUpright", Vector3.new(0.4, 11, 0.4), CFrame.new(x, WALK_TOP + 5.5, rackZ - 1.5), Color3.fromRGB(230, 120, 30), Enum.Material.Metal)
+			part(parent, "RackUpright", Vector3.new(0.4, 11, 0.4), CFrame.new(x, WALK_TOP + 5.5, rackZ + 1.5), Color3.fromRGB(230, 120, 30), Enum.Material.Metal)
+		end
+		for _, y in { 4.5, 9 } do
+			for _, side in { -1.5, 1.5 } do
+				part(parent, "RackBeam", Vector3.new(30.4, 0.4, 0.3), CFrame.new(p.x0 + 31, WALK_TOP + y, rackZ + side), Color3.fromRGB(40, 90, 170), Enum.Material.Metal)
+			end
+			for x = p.x0 + 21, p.x0 + 41, 10 do
+				palletStack(parent, CFrame.new(x, WALK_TOP + y + 0.2, rackZ), Vector3.new(1.5, 1.4, 1.2), if y < 5 then Color3.fromRGB(196, 158, 108) else Color3.fromRGB(90, 150, 80), 2, 2, 1, Enum.Material.Cardboard)
+			end
+		end
+		palletStack(parent, CFrame.new(p.x0 + 21, WALK_TOP, rackZ), Vector3.new(1.5, 1.4, 1.2), Color3.fromRGB(200, 70, 50), 2, 2, 2, Enum.Material.Cardboard)
+	end
+
+	-- 4.0: the receiving docks of the Freight Run (shared/Map.luau ReceivingDocks): a yellow-lined pad with hatching
+	-- where the pallets are set down, a RECEIVING sign on a post, the place's pallet jack's parking box.
+	local function receivingDocks(parent: Instance)
+		for id, dock in Map.ReceivingDocks do
+			local f = folder(parent, `Receiving_{id}`)
+			local yard = Map.inYard(dock.receiver.x, dock.receiver.z)
+			local ground = if yard then ROAD_TOP else WALK_TOP
+			local x0, z0, x1, z1 = math.huge, math.huge, -math.huge, -math.huge
+			for _, spot in dock.spots do
+				x0, z0 = math.min(x0, spot.x - 2.4), math.min(z0, spot.z - 2.4)
+				x1, z1 = math.max(x1, spot.x + 2.4), math.max(z1, spot.z + 2.4)
+			end
+			patch(f, "ReceivingPad", x0, z0, x1, z1, ground, Color3.fromRGB(70, 70, 74), Enum.Material.SmoothPlastic)
+			for _, edge in { { x0, z0, x1, z0 + 0.4 }, { x0, z1 - 0.4, x1, z1 }, { x0, z0, x0 + 0.4, z1 }, { x1 - 0.4, z0, x1, z1 } } do
+				patch(f, "PadLine", edge[1], edge[2], edge[3], edge[4], ground + 0.02, YELLOW)
+			end
+			for _, spot in dock.spots do
+				deco(part(f, "PadHatch", Vector3.new(0.3, 0.06, 3.6), CFrame.new(spot.x, ground + 0.1, spot.z) * CFrame.Angles(0, math.rad(45), 0), YELLOW, Enum.Material.SmoothPlastic))
+			end
+			local post = Vector3.new(x1 + 1, ground, z1 + 1)
+			part(f, "SignPost", Vector3.new(0.4, 6, 0.4), CFrame.new(post + Vector3.new(0, 3, 0)), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+			local face = post + Vector3.new(0, 5.4, 0)
+			local look = Vector3.new(dock.receiver.x - (x0 + x1) / 2, 0, dock.receiver.z - (z0 + z1) / 2)
+			look = if look.Magnitude > 0.1 then look.Unit else Vector3.new(1, 0, 0)
+			sign(f, "RECEIVING · PALLETS", Vector3.new(6, 1.4, 0.2), CFrame.lookAt(face, face + look), Color3.fromRGB(30, 30, 34), YELLOW)
+			local jack = dock.jack
+			local long = math.abs(jack.facing.x) > 0.5 -- the jack lies along its forks
+			patch(f, "JackBox", jack.x - (if long then 3.2 else 1.3), jack.z - (if long then 1.3 else 3.2), jack.x + (if long then 3.2 else 1.3), jack.z + (if long then 1.3 else 3.2), ground, YELLOW)
+		end
+	end
+
 	-- The Harbor Warehouse: a long metal shed with three roller doors (one up, pallets inside), a forklift, dock lights.
+	-- 4.0: a freight hub (freightHub): all three doors up, two of them loading docks.
 	local function buildWarehouse(parent: Instance, cx: number, cz: number)
 		local warehouse = folder(parent, "HarborWarehouse")
 		sidewalk(warehouse, cx, cz, Color3.fromRGB(120, 120, 116))
@@ -3918,10 +4012,11 @@ local function defineMissionPlaces()
 		table.insert(openings, { x = 40, w = 4, h = 7 }) -- the office door
 		shell(warehouse, frame, w, d, h, color, Enum.Material.CorrodedMetal, openings)
 		local front = -d / 2
-		for n, x in doors do
-			rollerDoor(warehouse, frame, x, front, 16, 14, n == 3, Color3.fromRGB(196, 170, 60))
+		for _, x in doors do
+			-- 4.0: every roller door up: the old mission door and the two loading docks (freightHub below).
+			rollerDoor(warehouse, frame, x, front, 16, 14, true, Color3.fromRGB(196, 170, 60))
 			local lamp_ = deco(part(warehouse, "DockLight", Vector3.new(1.4, 0.8, 1.2), frame * CFrame.new(x, 15.4, front - 0.8), Color3.fromRGB(150, 140, 110), Enum.Material.Glass))
-			nightLamp(lamp_, Color3.fromRGB(255, 226, 160), if n == 3 then 30 else nil)
+			nightLamp(lamp_, Color3.fromRGB(255, 226, 160), 30)
 		end
 		sign(warehouse, "HARBOR WAREHOUSE", Vector3.new(40, 4, 0.4), frame * CFrame.new(-12, 18.6, front - 0.4), Color3.fromRGB(255, 255, 255), Color3.fromRGB(40, 50, 60), "warehouse")
 		nightWindow(deco(part(warehouse, "OfficeWindow", Vector3.new(8, 3, 0.2), frame * CFrame.new(40, 10, front - 0.15), WINDOW_DIM, Enum.Material.Glass)))
@@ -3932,14 +4027,22 @@ local function defineMissionPlaces()
 			box(warehouse, "Rack", frame, -44, 0, z, 30, 0.6, z + 3, Color3.fromRGB(220, 130, 30), Enum.Material.Metal)
 			box(warehouse, "Rack", frame, -44, 6, z, 30, 6.6, z + 3, Color3.fromRGB(220, 130, 30), Enum.Material.Metal)
 		end
-		-- A forklift on the apron, away from the pile.
-		local lift = frame * CFrame.new(openX - 40, 0, front - 12)
-		part(warehouse, "Forklift", Vector3.new(4, 3, 6), lift * CFrame.new(0, 2, 0), Color3.fromRGB(230, 170, 30), Enum.Material.Metal)
-		part(warehouse, "ForkliftCage", Vector3.new(3.6, 3.4, 3.4), lift * CFrame.new(0, 5.2, 0.8), Color3.fromRGB(40, 40, 44), Enum.Material.Metal).Transparency = 0.5
-		part(warehouse, "ForkliftMast", Vector3.new(3.6, 7, 0.5), lift * CFrame.new(0, 3.5, -3.2), Color3.fromRGB(50, 50, 54), Enum.Material.Metal)
-		for _, x in { -1, 1 } do
-			part(warehouse, "Fork", Vector3.new(0.4, 0.2, 3.4), lift * CFrame.new(x, 0.5, -5), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+		-- Forklifts: one parked on the apron south of the docks (its back to the wall: the lost package hides
+		-- there, Map.Secrets), one inside with a pallet up on its forks (4.0).
+		local function forklift(lift: CFrame, raised: number)
+			part(warehouse, "Forklift", Vector3.new(4, 3, 6), lift * CFrame.new(0, 2, 0), Color3.fromRGB(230, 170, 30), Enum.Material.Metal)
+			part(warehouse, "ForkliftCage", Vector3.new(3.6, 3.4, 3.4), lift * CFrame.new(0, 5.2, 0.8), Color3.fromRGB(40, 40, 44), Enum.Material.Metal).Transparency = 0.5
+			part(warehouse, "ForkliftMast", Vector3.new(3.6, 7, 0.5), lift * CFrame.new(0, 3.5, -3.2), Color3.fromRGB(50, 50, 54), Enum.Material.Metal)
+			for _, x in { -1, 1 } do
+				part(warehouse, "Fork", Vector3.new(0.4, 0.2, 3.4), lift * CFrame.new(x, 0.5 + raised, -5), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
+			end
+			if raised > 0 then
+				palletStack(warehouse, lift * CFrame.new(0, raised + 0.6, -5), Vector3.new(1.6, 1.4, 1.6), Color3.fromRGB(70, 110, 160), 2, 2, 2, Enum.Material.Cardboard)
+			end
 		end
+		forklift(frame * CFrame.new(openX + 18, 0, front - 20), 0)
+		forklift(frame * CFrame.new(-6, 0, 6), 3.5)
+		freightHub(warehouse)
 	end
 
 	-- Fire Station 9: red brick, three truck bays on the avenue (two open with the trucks), the hose tower behind.
@@ -4828,6 +4931,9 @@ local function defineMissionPlaces()
 				entry.build(places)
 			end)
 		end
+		attempt("Receiving docks", function()
+			receivingDocks(folder(places, "ReceivingDocks"))
+		end)
 	end
 end
 defineMissionPlaces()

@@ -97,6 +97,7 @@ local DayNight = require(script.Parent.DayNight)
 local Crew = require(script.Parent.Crew)
 local Gun = require(script.Parent.Gun)
 local DuoGates = require(script.Parent.DuoGates)
+local Freight = require(Shared.Freight)
 
 type Stop = {
 	address: Map.Address,
@@ -110,6 +111,7 @@ type Stop = {
 	pile: Vector3, -- where the person and the cargo are
 	facing: Vector3,
 	person: Config.PersonDef?,
+	staging: { Vector3 }?, -- 4.0, pallet: where the pallets wait / are set down (Cargo.Plan.staging)
 }
 
 type Offer = {
@@ -456,6 +458,7 @@ local function newStop(address: Map.Address, kind: string, mode: string, needed:
 		pile = pile,
 		facing = facing,
 		person = person,
+		staging = nil,
 	}
 end
 
@@ -601,9 +604,76 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?): 
 	return finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), business.cargo, customer, nil, pieces, Tuning.PayPerPiece * count, easy)
 end
 
+-- 4.0, the Freight Run (JobTypeDef load "pallet"): 1 … items pallets from a loading dock of its hub (shared/Map.luau
+-- FreightDocks[pickupAt], the docks taken in turn) to the receiving dock of one of its dropChoices (Map.ReceivingDocks):
+-- the truck's circle in the dock's bay, the foreman on the dock, the pallets on the dock floor (Stop.staging); at the
+-- drop the person by the pad, the pallets set down on the pad. Pays its stops and PalletPay a pallet.
+local nextDock = 0
+local function freightOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
+	local hubId = jobType.pickupAt or "warehouse"
+	local hub = Map.FreightDocks[hubId]
+	local pickup = placeAddress(hubId)
+	local choices: { string } = {}
+	local listed: { string } = jobType.dropChoices or {}
+	for _, id in listed do
+		if Map.ReceivingDocks[id] and placeAddress(id) then
+			table.insert(choices, id)
+		end
+	end
+	if not hub or not pickup or #hub.docks == 0 or #choices == 0 then
+		return nil
+	end
+	local dropId = pick(choices)
+	local drop = placeAddress(dropId) :: Map.Address
+	local receiving = Map.ReceivingDocks[dropId]
+	local count = rng:NextInteger(1, math.max(1, jobType.items))
+	nextDock = nextDock % #hub.docks + 1
+	local dock = hub.docks[nextDock]
+	local roles = JobsConfig.People[jobType.id] or { giver = "foreman", receiver = "worker" }
+	local giver = personFrom(jobType.giver, jobType.giverRole or roles.giver)
+	local receiver = JobsConfig.FreightReceivers[dropId] or personFrom(jobType.receiver, jobType.receiverRole or roles.receiver)
+	-- The pick-up: the dock's bay, the foreman and the pallets up on the dock floor.
+	local floor = Map.WalkTop + hub.height
+	local label = string.gsub(jobType.pickupLabel, "%s+AT$", "")
+	local load = newStop(pickup, "pickup", "pallet", count, `{label} at {pickup.name} (dock {nextDock})`, giver)
+	load.park = Vector3.new(dock.park.x, World.RoadTop, dock.park.z)
+	load.pile = Vector3.new(hub.giver.x, floor, hub.giver.z)
+	load.facing = Vector3.new(dock.facing.x, 0, dock.facing.z).Unit
+	local staging: { Vector3 } = {}
+	for _, spot in dock.staging do
+		table.insert(staging, Vector3.new(spot.x, floor, spot.z))
+	end
+	load.staging = staging
+	load.hold = jobType.loadTime
+	-- The drop: the place's circle, the person by the pad, the pad.
+	local unload = newStop(drop, "drop", "pallet", count, `{jobType.dropLabel} {drop.name}`, receiver)
+	local pad: { Vector3 } = {}
+	local middle = Vector3.zero
+	for _, spot in receiving.spots do
+		local at = Vector3.new(spot.x, Map.WalkTop, spot.z)
+		table.insert(pad, at)
+		middle += at
+	end
+	middle /= math.max(1, #pad)
+	unload.pile = Vector3.new(receiving.receiver.x, Map.WalkTop, receiving.receiver.z)
+	local toward = Vector3.new(middle.X - unload.pile.X, 0, middle.Z - unload.pile.Z)
+	if toward.Magnitude > 0.1 then
+		unload.facing = toward.Unit
+	end
+	unload.staging = pad
+	unload.hold = jobType.unloadTime
+	local stops: { Stop } = { load, unload }
+	local kind = Tuning.Kinds.pallet or Tuning.Kinds.crate
+	local pieces: CargoInfo = { kind = jobType.itemKind, look = kind.look, piece = kind.piece, plural = kind.plural, total = count }
+	return finishOffer(jobType.tier, stops, routeLength(from.X, from.Z, stops), jobType.cargo, `{receiver.name}, {drop.name}`, jobType, pieces, jobType.payPerStop * #stops + Tuning.PalletPay * count)
+end
+
 -- A special job's stops from its definition: the pick-ups (at a place, or homes around you), then the deliveries
 -- (the last one at a place, or addresses on the way). The pieces are split over the pick-ups and over the drops.
 local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
+	if jobType.load == "pallet" then
+		return freightOffer(from, jobType)
+	end
 	local stops: { Stop } = {}
 	local avoid: { Map.Address } = {}
 	local x, z = from.X, from.Z
@@ -687,8 +757,26 @@ local function slotsFor(player: Player, offer: Offer): (number, number, string)
 	return need, Economy.capacity(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else {}), if def then def.name else "car"
 end
 
--- 3.4: why the player's car is too small for this job, or nil when it fits.
+-- 4.0: a Freight Run's pallets, how many the player's equipped car takes at its stage (Freight.palletsOf) and its name.
+local function palletsFor(player: Player, offer: Offer): (number, number, string)
+	local profile = PlayerData.get(player)
+	local carId = if profile then profile.car else Config.Cars[1].id
+	local def = Economy.findCar(carId)
+	local stage = Economy.stageOf(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else nil)
+	return offer.total, Freight.palletsOf(carId, stage), if def then def.name else "car"
+end
+
+-- 3.4: why the player's car is too small for this job, or nil when it fits. 4.0: a Freight Run needs a vehicle that
+-- takes its pallets.
 local function slotsShort(player: Player, offer: Offer): string?
+	if Freight.isPallet(offer.kind) then
+		local pallets, takes, carName = palletsFor(player, offer)
+		if pallets <= takes then
+			return nil
+		end
+		local text = Freight.lockText(pallets, carName, takes)
+		return text
+	end
 	local need, holds, name = slotsFor(player, offer)
 	if need <= holds then
 		return nil
@@ -725,13 +813,30 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 	local vehicle = if jobType and jobType.vehicle then Economy.findCar(jobType.vehicle) else nil
 	local need, holds, carName = slotsFor(player, offer)
 	local distance, time = fromHere(offer, from)
+	local tooBig = need > holds
+	-- 4.0: a Freight Run is locked by pallets ("NEEDS N PALLETS", the board's lockText / lockButton), its slots are
+	-- the pallets' (Config.Cargo.PalletSlots each).
+	local lockText: string?, lockButton: string? = nil, nil
+	local pallets = Freight.isPallet(offer.kind)
+	if pallets then
+		local count, takes, name = palletsFor(player, offer)
+		need, holds, carName = count * Tuning.PalletSlots, takes * Tuning.PalletSlots, name
+		tooBig = count > takes
+		if tooBig then
+			lockText, lockButton = Freight.lockText(count, name, takes)
+		end
+	end
 	return {
 		locked = offer.level > playerLevel,
 		level = offer.level,
 		slots = need,
 		capacity = holds,
 		carName = carName,
-		tooBig = need > holds,
+		tooBig = tooBig,
+		lockText = lockText,
+		lockButton = lockButton,
+		pallets = if pallets then offer.total else nil,
+		tip = Freight.trolleyTip(offer.kind, offer.total, offer.stops[1].mode), -- 4.0: "a hand trolley helps"
 		special = jobType ~= nil, -- a special job (a board special: Cash Transport, Pizza Rush, Winter Run)
 		timed = jobType ~= nil and jobType.timeLimit ~= nil, -- a rush: `time` is a fixed clock
 		banditBoost = offer.boost, -- > 1: bandits want this cargo
@@ -785,8 +890,17 @@ local function makeBoard(player: Player): Board
 	-- of them, each with its chance (Config.Jobs.BoardSpecials), a different one each, locked ones included (the
 	-- card says from which level).
 	local boardJobs: { Config.JobTypeDef } = {}
+	local level = PlayerData.level(player)
 	for _, jobType in Config.JobTypes do
-		if Economy.onBoard(jobType) then
+		if jobType.load == "pallet" then
+			-- 4.0: the Freight Run is on every board from its level (locked "NEEDS N PALLETS" without a truck for it).
+			if level >= Economy.jobLevel(jobType, jobType.tier) then
+				local freight = jobOffer(from, jobType)
+				if freight then
+					table.insert(list, freight)
+				end
+			end
+		elseif Economy.onBoard(jobType) then
 			table.insert(boardJobs, jobType)
 		end
 	end
@@ -880,6 +994,7 @@ local function planOf(stop: Stop): Cargo.Plan
 		person = if person then Cargo.look(person.role, person.name, person.title) else nil,
 		hold = stop.hold,
 		keep = stop.keep,
+		staging = stop.staging,
 	}
 end
 
@@ -1079,7 +1194,7 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	local crew: { [Player]: boolean } = {}
 	local handles = false
 	for _, stop in offer.stops do
-		if stop.mode == "carry" or stop.mode == "lead" then
+		if stop.mode == "carry" or stop.mode == "lead" or stop.mode == "pallet" then -- (4.0: pallets on a jack)
 			handles = true
 		end
 	end
