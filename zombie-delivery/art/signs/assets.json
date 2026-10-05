@@ -1,0 +1,710 @@
+{
+  "assets": [
+    {
+      "name": "sign_depot",
+      "file": "sign_depot.png",
+      "source": "sign_depot.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Starting area: ZOMBIE DELIVERY CO. building name board",
+      "building_id": "depot",
+      "aliases": [],
+      "label": "ZOMBIE DELIVERY CO."
+    },
+    {
+      "name": "sign_dealer",
+      "file": "sign_dealer.png",
+      "source": "sign_dealer.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Starting area: Dead End Motors building name board",
+      "building_id": "dealer",
+      "aliases": [],
+      "label": "Dead End Motors"
+    },
+    {
+      "name": "sign_guns",
+      "file": "sign_guns.png",
+      "source": "sign_guns.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Starting area: Lead & Co. building name board",
+      "building_id": "guns",
+      "aliases": [],
+      "label": "Lead & Co."
+    },
+    {
+      "name": "sign_mechanic",
+      "file": "sign_mechanic.png",
+      "source": "sign_mechanic.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Starting area: Wrench Garage building name board",
+      "building_id": "mechanic",
+      "aliases": [],
+      "label": "Wrench Garage"
+    },
+    {
+      "name": "sign_supplies",
+      "file": "sign_supplies.png",
+      "source": "sign_supplies.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Starting area: Last Stop Supplies building name board",
+      "building_id": "supplies",
+      "aliases": [],
+      "label": "Last Stop Supplies"
+    },
+    {
+      "name": "sign_repairs",
+      "file": "sign_repairs.png",
+      "source": "sign_repairs.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Repairs and garages: Rust Bridge Repairs building name board",
+      "building_id": "repairs",
+      "aliases": [],
+      "label": "Rust Bridge Repairs"
+    },
+    {
+      "name": "sign_garage_rented",
+      "file": "sign_garage_rented.png",
+      "source": "sign_garage_rented.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Repairs and garages: Rented Lockup building name board",
+      "building_id": "garage_rented",
+      "aliases": [],
+      "label": "Rented Lockup"
+    },
+    {
+      "name": "sign_garage_south",
+      "file": "sign_garage_south.png",
+      "source": "sign_garage_south.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Repairs and garages: Southside Garage building name board",
+      "building_id": "garage_south",
+      "aliases": [],
+      "label": "Southside Garage"
+    },
+    {
+      "name": "sign_garage_harbor",
+      "file": "sign_garage_harbor.png",
+      "source": "sign_garage_harbor.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Repairs and garages: Harbor Lockup building name board",
+      "building_id": "garage_harbor",
+      "aliases": [],
+      "label": "Harbor Lockup"
+    },
+    {
+      "name": "sign_garage_north",
+      "file": "sign_garage_north.png",
+      "source": "sign_garage_north.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Repairs and garages: Highway Garage building name board",
+      "building_id": "garage_north",
+      "aliases": [],
+      "label": "Highway Garage"
+    },
+    {
+      "name": "sign_garage_downtown",
+      "file": "sign_garage_downtown.png",
+      "source": "sign_garage_downtown.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Repairs and garages: Downtown Parking building name board",
+      "building_id": "garage_downtown",
+      "aliases": [],
+      "label": "Downtown Parking"
+    },
+    {
+      "name": "sign_school",
+      "file": "sign_school.png",
+      "source": "sign_school.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: Sunny Hill School building name board",
+      "building_id": "school",
+      "aliases": [],
+      "label": "Sunny Hill School"
+    },
+    {
+      "name": "sign_army",
+      "file": "sign_army.png",
+      "source": "sign_army.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: Military Base building name board",
+      "building_id": "army",
+      "aliases": [
+        "base"
+      ],
+      "label": "Military Base"
+    },
+    {
+      "name": "sign_icecream",
+      "file": "sign_icecream.png",
+      "source": "sign_icecream.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: Frosty's Ice Cream building name board",
+      "building_id": "icecream",
+      "aliases": [
+        "frosty"
+      ],
+      "label": "Frosty's Ice Cream"
+    },
+    {
+      "name": "sign_movers",
+      "file": "sign_movers.png",
+      "source": "sign_movers.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: Big Move Movers building name board",
+      "building_id": "movers",
+      "aliases": [],
+      "label": "Big Move Movers"
+    },
+    {
+      "name": "sign_farm",
+      "file": "sign_farm.png",
+      "source": "sign_farm.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: Old Farm building name board",
+      "building_id": "farm",
+      "aliases": [],
+      "label": "Old Farm"
+    },
+    {
+      "name": "sign_ranch",
+      "file": "sign_ranch.png",
+      "source": "sign_ranch.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: Silver Spur Ranch building name board",
+      "building_id": "ranch",
+      "aliases": [],
+      "label": "Silver Spur Ranch"
+    },
+    {
+      "name": "sign_clinic",
+      "file": "sign_clinic.png",
+      "source": "sign_clinic.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: City Clinic building name board",
+      "building_id": "clinic",
+      "aliases": [],
+      "label": "City Clinic"
+    },
+    {
+      "name": "sign_gas",
+      "file": "sign_gas.png",
+      "source": "sign_gas.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Employers: Gas Station building name board",
+      "building_id": "gas",
+      "aliases": [],
+      "label": "Gas Station"
+    },
+    {
+      "name": "sign_bank",
+      "file": "sign_bank.png",
+      "source": "sign_bank.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: First Zombie Bank building name board",
+      "building_id": "bank",
+      "aliases": [],
+      "label": "First Zombie Bank"
+    },
+    {
+      "name": "sign_pharmacy",
+      "file": "sign_pharmacy.png",
+      "source": "sign_pharmacy.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: Corner Pharmacy building name board",
+      "building_id": "pharmacy",
+      "aliases": [],
+      "label": "Corner Pharmacy"
+    },
+    {
+      "name": "sign_market",
+      "file": "sign_market.png",
+      "source": "sign_market.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: FreshMart Supermarket building name board",
+      "building_id": "market",
+      "aliases": [],
+      "label": "FreshMart Supermarket"
+    },
+    {
+      "name": "sign_firestation",
+      "file": "sign_firestation.png",
+      "source": "sign_firestation.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: Fire Station 9 building name board",
+      "building_id": "firestation",
+      "aliases": [],
+      "label": "Fire Station 9"
+    },
+    {
+      "name": "sign_police",
+      "file": "sign_police.png",
+      "source": "sign_police.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: Precinct 13 building name board",
+      "building_id": "police",
+      "aliases": [],
+      "label": "Precinct 13"
+    },
+    {
+      "name": "sign_cityhall",
+      "file": "sign_cityhall.png",
+      "source": "sign_cityhall.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: City Hall building name board",
+      "building_id": "cityhall",
+      "aliases": [],
+      "label": "City Hall"
+    },
+    {
+      "name": "sign_dispatchtower",
+      "file": "sign_dispatchtower.png",
+      "source": "sign_dispatchtower.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: Dispatch Tower building name board",
+      "building_id": "dispatchtower",
+      "aliases": [],
+      "label": "Dispatch Tower"
+    },
+    {
+      "name": "sign_harborpoint",
+      "file": "sign_harborpoint.png",
+      "source": "sign_harborpoint.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "City: Harbor Point building name board",
+      "building_id": "harborpoint",
+      "aliases": [],
+      "label": "Harbor Point"
+    },
+    {
+      "name": "sign_docks",
+      "file": "sign_docks.png",
+      "source": "sign_docks.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Harbor and industry: Harbor Docks building name board",
+      "building_id": "docks",
+      "aliases": [],
+      "label": "Harbor Docks"
+    },
+    {
+      "name": "sign_warehouse",
+      "file": "sign_warehouse.png",
+      "source": "sign_warehouse.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Harbor and industry: Harbor Warehouse building name board",
+      "building_id": "warehouse",
+      "aliases": [],
+      "label": "Harbor Warehouse"
+    },
+    {
+      "name": "sign_fueldepot",
+      "file": "sign_fueldepot.png",
+      "source": "sign_fueldepot.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Harbor and industry: Harbor Fuel Depot building name board",
+      "building_id": "fueldepot",
+      "aliases": [],
+      "label": "Harbor Fuel Depot"
+    },
+    {
+      "name": "sign_powerplant",
+      "file": "sign_powerplant.png",
+      "source": "sign_powerplant.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Harbor and industry: Power Plant building name board",
+      "building_id": "powerplant",
+      "aliases": [],
+      "label": "Power Plant"
+    },
+    {
+      "name": "sign_waterworks",
+      "file": "sign_waterworks.png",
+      "source": "sign_waterworks.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Harbor and industry: Water Works building name board",
+      "building_id": "waterworks",
+      "aliases": [],
+      "label": "Water Works"
+    },
+    {
+      "name": "sign_trainyard",
+      "file": "sign_trainyard.png",
+      "source": "sign_trainyard.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Harbor and industry: Train Yard building name board",
+      "building_id": "trainyard",
+      "aliases": [],
+      "label": "Train Yard"
+    },
+    {
+      "name": "sign_radio",
+      "file": "sign_radio.png",
+      "source": "sign_radio.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Radio Station building name board",
+      "building_id": "radio",
+      "aliases": [],
+      "label": "Radio Station"
+    },
+    {
+      "name": "sign_lodge",
+      "file": "sign_lodge.png",
+      "source": "sign_lodge.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Ski Lodge building name board",
+      "building_id": "lodge",
+      "aliases": [],
+      "label": "Ski Lodge"
+    },
+    {
+      "name": "sign_stables",
+      "file": "sign_stables.png",
+      "source": "sign_stables.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Riverside Riding School building name board",
+      "building_id": "stables",
+      "aliases": [],
+      "label": "Riverside Riding School"
+    },
+    {
+      "name": "sign_airfield",
+      "file": "sign_airfield.png",
+      "source": "sign_airfield.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Old Airfield building name board",
+      "building_id": "airfield",
+      "aliases": [],
+      "label": "Old Airfield"
+    },
+    {
+      "name": "sign_lab",
+      "file": "sign_lab.png",
+      "source": "sign_lab.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Biotech Lab building name board",
+      "building_id": "lab",
+      "aliases": [],
+      "label": "Biotech Lab"
+    },
+    {
+      "name": "sign_prison",
+      "file": "sign_prison.png",
+      "source": "sign_prison.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Blackrock Prison building name board",
+      "building_id": "prison",
+      "aliases": [],
+      "label": "Blackrock Prison"
+    },
+    {
+      "name": "sign_lighthouse",
+      "file": "sign_lighthouse.png",
+      "source": "sign_lighthouse.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Lighthouse Point building name board",
+      "building_id": "lighthouse",
+      "aliases": [],
+      "label": "Lighthouse Point"
+    },
+    {
+      "name": "sign_camp",
+      "file": "sign_camp.png",
+      "source": "sign_camp.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Survivor Camp building name board",
+      "building_id": "camp",
+      "aliases": [],
+      "label": "Survivor Camp"
+    },
+    {
+      "name": "sign_stadium",
+      "file": "sign_stadium.png",
+      "source": "sign_stadium.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Out of town: Stadium Shelter building name board",
+      "building_id": "stadium",
+      "aliases": [],
+      "label": "Stadium Shelter"
+    },
+    {
+      "name": "sign_hilltop",
+      "file": "sign_hilltop.png",
+      "source": "sign_hilltop.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: Hilltop Mansion building name board",
+      "building_id": "hilltop",
+      "aliases": [],
+      "label": "Hilltop Mansion"
+    },
+    {
+      "name": "sign_oceanview",
+      "file": "sign_oceanview.png",
+      "source": "sign_oceanview.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: Ocean View Mansion building name board",
+      "building_id": "oceanview",
+      "aliases": [],
+      "label": "Ocean View Mansion"
+    },
+    {
+      "name": "sign_pinecrest",
+      "file": "sign_pinecrest.png",
+      "source": "sign_pinecrest.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: Pinecrest Mansion building name board",
+      "building_id": "pinecrest",
+      "aliases": [],
+      "label": "Pinecrest Mansion"
+    },
+    {
+      "name": "sign_lakeside",
+      "file": "sign_lakeside.png",
+      "source": "sign_lakeside.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: Lakeside Villa building name board",
+      "building_id": "lakeside",
+      "aliases": [],
+      "label": "Lakeside Villa"
+    },
+    {
+      "name": "sign_sunset",
+      "file": "sign_sunset.png",
+      "source": "sign_sunset.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: Sunset Villa building name board",
+      "building_id": "sunset",
+      "aliases": [],
+      "label": "Sunset Villa"
+    },
+    {
+      "name": "sign_maple",
+      "file": "sign_maple.png",
+      "source": "sign_maple.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: 12 Maple Street building name board",
+      "building_id": "maple",
+      "aliases": [],
+      "label": "12 Maple Street"
+    },
+    {
+      "name": "sign_oak",
+      "file": "sign_oak.png",
+      "source": "sign_oak.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: 7 Oak Lane building name board",
+      "building_id": "oak",
+      "aliases": [],
+      "label": "7 Oak Lane"
+    },
+    {
+      "name": "sign_birch",
+      "file": "sign_birch.png",
+      "source": "sign_birch.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: Birch Cottage building name board",
+      "building_id": "birch",
+      "aliases": [],
+      "label": "Birch Cottage"
+    },
+    {
+      "name": "sign_elm",
+      "file": "sign_elm.png",
+      "source": "sign_elm.svg",
+      "size": [
+        512,
+        512
+      ],
+      "intended_use": "Real estate: Elm Bungalow building name board",
+      "building_id": "elm",
+      "aliases": [],
+      "label": "Elm Bungalow"
+    },
+    {
+      "name": "sign_office_harbor",
+      "file": "sign_office_harbor.png",
+      "source": "sign_office_harbor.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Real estate: Harbor Point Office building name board",
+      "building_id": "office_harbor",
+      "aliases": [],
+      "label": "Harbor Point Office"
+    },
+    {
+      "name": "sign_office_tower",
+      "file": "sign_office_tower.png",
+      "source": "sign_office_tower.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Real estate: Dispatch Tower, 8th floor building name board",
+      "building_id": "office_tower",
+      "aliases": [],
+      "label": "Dispatch Tower, 8th floor"
+    },
+    {
+      "name": "sign_office_penthouse",
+      "file": "sign_office_penthouse.png",
+      "source": "sign_office_penthouse.svg",
+      "size": [
+        1024,
+        256
+      ],
+      "intended_use": "Real estate: Dispatch Tower Penthouse building name board",
+      "building_id": "office_penthouse",
+      "aliases": [],
+      "label": "Dispatch Tower Penthouse"
+    }
+  ]
+}

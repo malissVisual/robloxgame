@@ -4,12 +4,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · building signs on `codex/building-signs` · first art-direction preview in design/building-signs/; awaiting owner approval before producing art/signs/ PNG/SVG set; no game code · since 2026-10-05
 - Claude · building the Postage & Trouble UI (Codex's concept) into the game · client/Theme, Ui, Hud, MapView, MissionsUi, GarageUi, CrewPanel, new DispatchUi and the other windows · 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- (nothing yet)
+- Codex · `codex/building-signs` · 54 owner-approved building signs in art/signs/ (40 wide + 14 square), transparent PNGs, outlined SVGs, manifest, gallery and reproducible builder; no game code. Asset/gallery checks and 13 test files + 64 module compiles pass. After upload, test World image/text fallback, white image tint, aspect ratios, day/night readability and unobstructed prompts in Studio; integration not tested here.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
