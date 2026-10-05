@@ -9,8 +9,9 @@
 -- there: a dark red face and the reason in words), thin white bars in the middle. It opens with a short fade.
 -- In a car seat the two-handed guns are greyed out (only one-handed guns fire out of a window). While the wheel is
 -- open the mouse is free (Main adds WeaponWheel.isOpen to CameraRig.mouseNeeded) and a click does not shoot.
--- Keyboard and mouse only: touch screens keep the BAG and the weapon bar.
 -- 3.9: picking a gun (the wheel or a tap of Q) draws it when it is holstered (B, client/Holster.luau).
+-- 4.2, touch: a tap on the HUD's weapon line opens the wheel (WeaponWheel.openTouch, Main sets Hud.onWeaponWheel);
+-- a tap on a gun takes it, a tap anywhere else closes it. A gamepad's d-pad up takes the next gun (like a tap of Q).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -73,6 +74,7 @@ local open = false
 local pressedAt: number? = nil
 local hovered: string? = nil
 local maxDamage, maxRate, maxRange = 1, 1, 1
+local touchMode = false -- 4.2: opened by a tap (no mouse to point with: the guns are tapped)
 
 function WeaponWheel.isOpen(): boolean
 	return open
@@ -425,6 +427,21 @@ local function fill(p: Parts)
 			dot.Position = UDim2.new(0.5, 0, 1, 2)
 		end
 		table.insert(slots, { id = def.id, def = def, usable = usable, angle = angle, icon = icon, name = name, holder = holder, width = width })
+		if touchMode then
+			-- 4.2: a tap on the gun takes it (the whole slot is the finger's target).
+			local tap = Ui.make("TextButton", {
+				Name = "Tap",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Text = "",
+				ZIndex = 3,
+			}, holder)
+			local id = def.id
+			tap.Activated:Connect(function()
+				hovered = id
+				WeaponWheel.close(true)
+			end)
+		end
 	end
 end
 
@@ -483,6 +500,7 @@ local function openWheel()
 		return
 	end
 	local p = parts or build()
+	p.hint.Text = if touchMode then "TAP A GUN  ·  TAP OUTSIDE TO CLOSE" else "MOVE THE MOUSE  ·  LET GO OF Q TO TAKE IT"
 	fill(p)
 	hovered = "" -- force the first highlight
 	local camera = workspace.CurrentCamera
@@ -498,7 +516,22 @@ local function openWheel()
 	TweenService:Create(p.scale, info, { Scale = target }):Play()
 	TweenService:Create(p.group, info, { GroupTransparency = 0 }):Play()
 	TweenService:Create(p.cover, info, { BackgroundTransparency = 0.45 }):Play()
-	pick()
+	if not touchMode then
+		pick()
+	else
+		local mine = state and defOf(state.weapon)
+		showCentre(p, mine, true)
+	end
+end
+
+-- 4.2, touch: the HUD's weapon line was tapped: the wheel opens; a tap on a gun takes it, elsewhere closes it.
+function WeaponWheel.openTouch()
+	if open then
+		WeaponWheel.close(false)
+		return
+	end
+	touchMode = true
+	openWheel()
 end
 
 -- Close the wheel; `take`: equip the gun under the mouse (a usable one).
@@ -526,9 +559,6 @@ function WeaponWheel.close(take: boolean?)
 end
 
 function WeaponWheel.start()
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return
-	end
 	Net.get("State").OnClientEvent:Connect(function(newState: any)
 		if type(newState) == "table" then
 			state = newState
@@ -536,12 +566,42 @@ function WeaponWheel.start()
 			if open and p then
 				fill(p)
 				hovered = ""
-				pick()
+				if not touchMode then
+					pick()
+				end
 			end
 		end
 	end)
+	-- Held Q opens it; while open the slot under the mouse is lit (the mouse's way); death closes it (both ways).
+	RunService.RenderStepped:Connect(function()
+		local since = pressedAt
+		if not open and since and os.clock() - since >= HOLD then
+			touchMode = false
+			openWheel()
+		end
+		if open then
+			if not touchMode then
+				pick()
+			end
+			local character = player.Character
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if not humanoid or humanoid.Health <= 0 then
+				WeaponWheel.close(false)
+			end
+		end
+	end)
+	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+		return -- (a touch screen has no Q: the weapon line opens the wheel, WeaponWheel.openTouch)
+	end
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if input.KeyCode ~= Enum.KeyCode.Q or processed or UserInputService:GetFocusedTextBox() then
+		if processed or UserInputService:GetFocusedTextBox() then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.DPadUp then
+			nextWeapon() -- 4.2, a gamepad: the next gun
+			return
+		end
+		if input.KeyCode ~= Enum.KeyCode.Q then
 			return
 		end
 		pressedAt = os.clock()
@@ -556,20 +616,6 @@ function WeaponWheel.start()
 			WeaponWheel.close(true)
 		elseif since and os.clock() - since < HOLD then
 			nextWeapon()
-		end
-	end)
-	RunService.RenderStepped:Connect(function()
-		local since = pressedAt
-		if not open and since and os.clock() - since >= HOLD then
-			openWheel()
-		end
-		if open then
-			pick()
-			local character = player.Character
-			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-			if not humanoid or humanoid.Health <= 0 then
-				WeaponWheel.close(false)
-			end
 		end
 	end)
 end

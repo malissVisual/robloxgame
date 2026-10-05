@@ -85,6 +85,10 @@ end
 
 local current = Stamina.new()
 local movement: Tuning? = nil
+-- 4.2, a touch layout: where the HUD put its contextual action (Stamina.place: the bar's bottom centre, px), so the bar
+-- sits right over it between the thumbstick and the touch buttons. Unset (a computer): the bottom centre, as before.
+local anchor: Vector2? = nil
+local anchorMoved = false
 
 local function tuningNow(): Tuning
 	local found = movement
@@ -100,6 +104,21 @@ end
 function Stamina.update(dt: number, wantSprint: boolean, moving: boolean): boolean
 	current = Stamina.step(current, dt, wantSprint, moving, tuningNow())
 	return current.sprinting
+end
+
+-- 4.2: may a sprint start now (not out of breath)? The touch SPRINT toggle turns off when this says no.
+function Stamina.canSprintNow(): boolean
+	return Stamina.canSprint(current)
+end
+
+-- 4.2: Hud's layout() on a touch layout: the bar's bottom centre (in the HUD's pixels; both ScreenGuis sit under the
+-- top bar inside the safe area).
+function Stamina.place(x: number, bottom: number)
+	local at = Vector2.new(math.floor(x + 0.5), math.floor(bottom + 0.5))
+	if anchor ~= at then
+		anchor = at
+		anchorMoved = true
+	end
 end
 
 -- The local player's breath right now (0 .. 1).
@@ -179,10 +198,11 @@ function Stamina.start()
 	local laidFor = Vector2.zero
 	local function layout()
 		local size = Ui.screenSize()
-		if size == laidFor then
+		if size == laidFor and not anchorMoved then
 			return
 		end
 		laidFor = size
+		anchorMoved = false
 		local s = Ui.screenScale()
 		local width = math.floor(120 * math.clamp(s, 0.8, 1.1) + 0.5)
 		local thick = math.max(3, math.floor(4 * s + 0.5))
@@ -190,6 +210,10 @@ function Stamina.start()
 		holder.Size = UDim2.fromOffset(width, thick + textSize + 6)
 		-- 3.8: just over the contract HUD's contextual action (its top is about 16 + 114 · s from the bottom)
 		holder.Position = UDim2.new(0.5, 0, 1, -math.floor(16 + 126 * s + 0.5))
+		local at = anchor
+		if at then
+			holder.Position = UDim2.fromOffset(at.X, at.Y) -- 4.2: over the HUD's contextual action (touch)
+		end
 		track.Size = UDim2.fromOffset(width, thick)
 		caption.TextSize = textSize
 		caption.Size = UDim2.fromOffset(width * 2, textSize)

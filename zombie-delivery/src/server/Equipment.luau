@@ -672,6 +672,16 @@ function Equipment.setDown(player: Player)
 	release(player)
 end
 
+-- 4.2: what G on the pushed tool does (stow it at its home, else set it down), for the touch button (Net "PutDown",
+-- server/Cargo.luau). False when the player pushes nothing.
+function Equipment.letGo(player: Player): boolean
+	if not pushing[player] then
+		return false
+	end
+	letGo(player)
+	return true
+end
+
 -- Where the load stands on a tool, in the world (its toe plate or forks), and the part to weld it to.
 function Equipment.deck(tool: Tool): (BasePart?, CFrame)
 	local base = tool.base

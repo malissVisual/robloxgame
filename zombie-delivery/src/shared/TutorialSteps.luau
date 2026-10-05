@@ -191,4 +191,15 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 	return nil
 end
 
+-- 4.2, a touch screen (no keys): her words without the keys. "(E)" / "(J)" go (the prompts and the buttons are
+-- tapped), "Press J." goes (her board dialog opens the board itself), "G puts it down" names the PUT DOWN button and
+-- "Hold Q to pick a gun" the weapon line (client/TutorialUi.luau asks on a touch layout only).
+function TutorialSteps.forTouch(line: string): string
+	local out = string.gsub(line, "%s*%([EGJQUKHLMI]%)", "")
+	out = string.gsub(out, "%s*Press [A-Z]%.", "")
+	out = string.gsub(out, "G puts it down", "PUT DOWN sets it down")
+	out = string.gsub(out, "Hold Q to pick a gun", "Tap your gun's line to pick a gun")
+	return out
+end
+
 return TutorialSteps
