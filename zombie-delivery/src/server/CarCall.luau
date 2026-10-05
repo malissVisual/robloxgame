@@ -13,8 +13,11 @@
 --   3. It parks beside you (on your road's lane; a little before you when you stand in it), the chauffeur gets out
 --      of the driver's door, says a line, walks ~15 studs away and fades out over Config.CarCall.DriverFade s.
 --      The car is then yours as always (Vehicles.handOver: the prompts come back, your client owns it again).
---   4. Not there within Config.CarCall.ArriveWithin s (stuck, blocked, you ran off): the chauffeur vanishes and the
---      car is placed next to you, seated, the old instant way (Vehicles.placeNear).
+--   4. 3.9.1: it waits at the red traffic lights (shared/Crossings.luau) like the traffic, behind the queue (no
+--      overtaking it). As long as it gets on (or waits at a light) it takes the time it takes; only when it makes no
+--      progress for Config.CarCall.StuckFor s (or the whole trip passes MaxTime) is it rescued: once it is put back on
+--      a road out of your sight and drives again, the second time the chauffeur vanishes and the car is placed next to
+--      you, the old instant way (Vehicles.placeNear).
 --
 -- Network ownership: while the chauffeur drives, the SERVER owns the car (SetNetworkOwner(nil)) and sets its movers
 -- (the LinearVelocity "Drive" and AngularVelocity "Steer") every Heartbeat; its Drive / Ride prompts are parked, so
@@ -42,6 +45,7 @@ local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Roads = require(Shared.Roads)
+local Crossings = require(Shared.Crossings)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local Npcs = require(script.Parent.Npcs)
@@ -72,7 +76,11 @@ type Delivery = {
 	goalZ: number,
 	left: number, -- studs still to go (to the stop)
 	started: number,
-	deadline: number,
+	progressAt: number, -- 3.9.1: when it last got closer (or waited at a red light)
+	bestLeft: number, -- the least `left` so far (since the last re-plan)
+	atLight: boolean, -- stopping or waiting for a red light ahead
+	relocated: boolean, -- put back on a road once already
+	rideOffset: CFrame, -- the car's pivot over its start spot (how high it rides): a rescue puts it on a new spot so
 	speed: number, -- signed, along the nose
 	target: Vector3, -- the steering point
 	limit: number, -- the speed the turns and what is ahead allow
@@ -524,7 +532,7 @@ end
 -- ── The client's status line ───────────────────────────────────────────────
 
 local function secondsLeft(d: Delivery, now: number): number
-	local eta = math.min(d.deadline - now, math.max(d.left, 0) / (Tuning.Speed * 0.75) + 1)
+	local eta = math.max(d.left, 0) / (Tuning.Speed * 0.75) + 1
 	return math.max(1, math.ceil(eta))
 end
 
@@ -579,6 +587,42 @@ local function fallback(d: Delivery)
 	end
 	local err = Vehicles.placeNear(d.player, d.carId)
 	Net.get("Notice"):FireClient(d.player, err or `Your chauffeur got held up: your {d.name} is right here.`)
+end
+
+-- 3.9.1: stuck (no progress for Config.CarCall.StuckFor s, or the trip passed MaxTime). While you can see the car
+-- it gets more time (no car vanishes in front of you); out of your sight it is put back on a road out of sight, on a
+-- fresh route, and drives on; the second time the old way (fallback).
+local function rescue(d: Delivery, now: number)
+	local root = rootOf(d.player)
+	if d.relocated or not root or now - d.started >= Tuning.MaxTime then
+		fallback(d)
+		return
+	end
+	local P = root.Position
+	local eye = P + Vector3.new(0, 2.5, 0)
+	local ignore = sightIgnore()
+	local chassis = d.car.chassis
+	if inSight(eye, chassis.Position + Vector3.new(0, 3, 0), ignore) and now - d.started < Tuning.MaxTime then
+		d.progressAt = now - Tuning.StuckFor / 2 -- a few more seconds to sort itself out
+		return
+	end
+	local start = roadStart(P)
+	if not start or inSight(eye, start.ground.Position + Vector3.new(0, 3, 0), ignore) then
+		fallback(d)
+		return
+	end
+	d.relocated = true
+	-- On the new spot as a car spawned there rides (the chauffeur, welded to it, comes along).
+	d.car.model:PivotTo(start.ground * d.rideOffset)
+	chassis.AssemblyLinearVelocity = Vector3.zero
+	chassis.AssemblyAngularVelocity = Vector3.zero
+	d.route, d.step, d.speed = start.route, 1, 0
+	d.goalX, d.goalZ = P.X, P.Z
+	d.stopShort, d.side = parkingFor(start.route, start.yard, P, d.car)
+	d.left = Roads.length(start.route) - d.stopShort
+	d.bestLeft, d.progressAt, d.started = d.left, now, now
+	d.stuck, d.blocked, d.reverseUntil, d.overtakeUntil = 0, 0, 0, 0
+	d.target = start.ground.Position + start.ground.LookVector * 10
 end
 
 -- ── Driving ────────────────────────────────────────────────────────────────
@@ -659,6 +703,31 @@ local function reroute(d: Delivery, position: Vector3, P: Vector3)
 	d.parking = nil
 end
 
+-- 3.9.1, the traffic lights (shared/Crossings.luau): the gap from the car's nose to the stop line (before the
+-- crosswalk) of the next light junction ahead when that light says stop (red, or amber it can still stop for), or nil.
+local junctions = Crossings.junctions()
+local STOP_LINE = Crossings.Distance + Crossings.Width / 2 + 1.5 -- from a junction's middle
+local function lightAhead(position: Vector3, look: Vector3, halfL: number, speed: number): number?
+	local nearest: Crossings.Junction? = nil
+	local nearestGap = math.huge
+	for _, j in junctions do
+		local rx, rz = j.x - position.X, j.z - position.Z
+		local forward = rx * look.X + rz * look.Z
+		local gap = forward - STOP_LINE - halfL
+		if gap > -1 and gap < nearestGap and forward < 110 and math.abs(rx * look.Z - rz * look.X) < Map.RoadWidth / 2 then
+			nearest, nearestGap = j, gap
+		end
+	end
+	if not nearest then
+		return nil
+	end
+	local state = Crossings.state(workspace:GetServerTimeNow(), nearest.offset, Crossings.axisOf(look.X, look.Z))
+	if state == "green" or (state == "amber" and nearestGap < speed * speed / (2 * Config.Traffic.AmberBrake)) then
+		return nil
+	end
+	return nearestGap
+end
+
 -- The decisions, THINK times a second: the route, the steering point, the speed the road ahead allows.
 local function think(d: Delivery, now: number)
 	local chassis = d.car.chassis
@@ -679,6 +748,11 @@ local function think(d: Delivery, now: number)
 	end
 	d.step = k
 	d.left = remaining(d.route, k, px, pz) - d.stopShort
+	-- Progress (3.9.1): closer than ever since the last plan; a new plan (you walked off) starts the count again.
+	if d.left < d.bestLeft - 4 or d.left > d.bestLeft + 30 then
+		d.bestLeft = d.left
+		d.progressAt = now
+	end
 
 	local look = flat(chassis.CFrame.LookVector)
 	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, -1)
@@ -702,8 +776,19 @@ local function think(d: Delivery, now: number)
 	local turn = if toFar.Magnitude > 1 then math.acos(math.clamp(look:Dot(toFar.Unit), -1, 1)) else 0
 	local limit = Tuning.Speed * (1 - math.min(turn, 1.4) / 1.4 * 0.62)
 
+	-- A red light ahead: stop at its line, like the traffic; waiting there is progress too.
+	local stopAt = lightAhead(position, look, d.car.size.Z / 2, speed)
+	d.atLight = stopAt ~= nil
+	if stopAt then
+		limit = math.min(limit, math.sqrt(2 * BRAKE_PLAN * math.max(stopAt - 0.5, 0)))
+	end
+
 	-- Something in the lane: brake for it, overtake when it stays.
 	local gap = obstacleGap(d, position, look)
+	-- Waiting at a red light (at its line, or in the queue before it) is getting on; stuck far before it is not.
+	if stopAt and (stopAt < 15 or gap ~= nil) then
+		d.progressAt = now
+	end
 	if gap then
 		local allowed = math.max(0, (gap - 3) * 1.4)
 		if now < d.overtakeUntil and gap > 1 then
@@ -713,7 +798,7 @@ local function think(d: Delivery, now: number)
 		local actual = chassis.AssemblyLinearVelocity:Dot(look)
 		if allowed < 3 and math.abs(actual) < 2 then
 			d.blocked += THINK
-			if d.blocked > 1.2 and now >= d.overtakeUntil then
+			if d.blocked > 1.2 and now >= d.overtakeUntil and not d.atLight then -- (never past a queue at a red light)
 				d.blocked = 0
 				d.overtakeUntil = now + 3.5
 				if gap < 3 then
@@ -811,8 +896,8 @@ local function step(dt: number)
 			abort(d, if car.wrecked or not car.chassis.Parent then "Your car didn't make it" else "Car call cancelled")
 			continue
 		end
-		if now >= d.deadline and not d.parking then
-			fallback(d)
+		if not d.parking and (now - d.progressAt > Tuning.StuckFor or now - d.started > Tuning.MaxTime) then
+			rescue(d, now)
 			continue
 		end
 		if now >= d.nextThink then
@@ -872,7 +957,11 @@ function CarCall.call(player: Player, carId: string?): string?
 		goalZ = P.Z,
 		left = 0,
 		started = now,
-		deadline = now + Tuning.ArriveWithin,
+		progressAt = now,
+		bestLeft = math.huge,
+		atLight = false,
+		relocated = false,
+		rideOffset = start.ground:ToObjectSpace(car.model:GetPivot()),
 		speed = 0,
 		target = start.ground.Position + start.ground.LookVector * 10,
 		limit = 0,

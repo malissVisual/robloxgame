@@ -14,6 +14,9 @@
 -- it does: a quick wind-up and a punch forward, or an overhead strike with the gun, about Config.Melee.SwingTime long
 -- (shared/Melee.luau swing). The others' swings come from their MeleeAt / MeleeKind attributes, yours starts on the
 -- key press (Holster.localSwing; your MeleeAt is not played again).
+-- 3.10: getting into a car the right hand goes to the door's handle, getting out it pushes the door (the character's
+-- BoardAt / BoardReach and AlightAt / AlightReach attributes, server/Vehicles.luau; the curve is shared/Boarding.luau
+-- reach), laid on the right arm like the swing; everybody sees it, yours too from the same attributes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +24,7 @@ local RunService = game:GetService("RunService")
 
 local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
 local Melee = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Melee"))
+local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
 
@@ -186,6 +190,22 @@ local SWINGS: { [string]: SwingShape } = {
 		r6Wind = math.rad(160),
 		r6Hit = math.rad(65),
 	},
+	-- 3.10: the hand on a car door's handle (forward, a little out, the elbow soft, the wrist turned to grip); the
+	-- same pose from start to end (only how far it is laid on changes).
+	reach = {
+		wind = {
+			rs = CFrame.Angles(0, math.rad(-12), 0) * CFrame.Angles(math.rad(68), 0, 0),
+			re = CFrame.Angles(math.rad(24), 0, 0),
+			rw = CFrame.Angles(math.rad(-18), 0, 0),
+		},
+		hit = {
+			rs = CFrame.Angles(0, math.rad(-12), 0) * CFrame.Angles(math.rad(68), 0, 0),
+			re = CFrame.Angles(math.rad(24), 0, 0),
+			rw = CFrame.Angles(math.rad(-18), 0, 0),
+		},
+		r6Wind = math.rad(72),
+		r6Hit = math.rad(72),
+	},
 }
 
 -- Where the swing is: t 0..1 (how far it is laid on), k 0..1 (wind-up → hit), the kind.
@@ -337,18 +357,48 @@ type Seen = { value: number, start: number }
 local seenSwings: { [Model]: Seen } = {}
 local swung: { [Model]: boolean } = {} -- swinging last frame (the arm goes back to the animation once it ends)
 
+-- 3.10: the hand on the handle (getting in) or on the door (getting out), from the later of BoardAt and AlightAt;
+-- played from the moment it arrives here, like a swing.
+local seenReaches: { [Model]: Seen } = {}
+
+local function reachOf(character: Model): Swing
+	local value: number? = nil
+	local out = false
+	local into = character:GetAttribute("BoardAt")
+	if type(into) == "number" and character:GetAttribute("BoardReach") == true then
+		value = into
+	end
+	local away = character:GetAttribute("AlightAt")
+	if type(away) == "number" and character:GetAttribute("AlightReach") == true and (value == nil or away > value) then
+		value, out = away, true
+	end
+	if value == nil then
+		return NO_SWING
+	end
+	local seen = seenReaches[character]
+	local start: number
+	if seen and seen.value == value then
+		start = seen.start
+	else
+		start = if workspace:GetServerTimeNow() - value < 1 then os.clock() else -math.huge
+		seenReaches[character] = { value = value, start = start }
+	end
+	local t = Boarding.reach(os.clock() - start, out)
+	return if t > 0 then { t = t, k = 1, kind = "reach" } else NO_SWING
+end
+
 local function swingOf(character: Model, mine: boolean): Swing
 	if mine then
 		local at, kind = Holster.localSwing()
 		if not at then
-			return NO_SWING
+			return reachOf(character)
 		end
 		local t, k = Melee.swing(os.clock() - at)
-		return if t > 0 then { t = t, k = k, kind = kind } else NO_SWING
+		return if t > 0 then { t = t, k = k, kind = kind } else reachOf(character)
 	end
 	local value = character:GetAttribute("MeleeAt")
 	if type(value) ~= "number" then
-		return NO_SWING
+		return reachOf(character)
 	end
 	local seen = seenSwings[character]
 	local start: number
@@ -361,7 +411,7 @@ local function swingOf(character: Model, mine: boolean): Swing
 	end
 	local t, k = Melee.swing(os.clock() - start)
 	if t <= 0 then
-		return NO_SWING
+		return reachOf(character)
 	end
 	local kind = character:GetAttribute("MeleeKind")
 	return { t = t, k = k, kind = if type(kind) == "string" then kind else "punch" }
@@ -478,6 +528,11 @@ local function step(dt: number)
 	for character in seenSwings do
 		if not character.Parent then
 			seenSwings[character] = nil
+		end
+	end
+	for character in seenReaches do
+		if not character.Parent then
+			seenReaches[character] = nil
 		end
 	end
 	for character in swung do

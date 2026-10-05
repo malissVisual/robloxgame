@@ -12,6 +12,9 @@
 -- With cargo in your hands (the Carrying attribute, server/Cargo.luau) there is no aiming, no sprint and a slower step.
 -- 3.9: with the gun holstered (B, client/Holster.luau) there is no aiming either; the first right or left click draws
 -- the gun (the left one does not shoot then), and the gun comes up as usual from there.
+-- 3.10: getting in or out of a car (client/CarBoarding.luau moves the body, Drive.boardingCar) the camera eases between
+-- the walk's view and the car's over CAR_BLEND seconds instead of jumping, and the walk (speed, turning, aiming) is
+-- left alone meanwhile.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -66,6 +69,10 @@ local RAISE_TIME = 0.25
 local armPitch = 0 -- how far up (+) or down the gun arm points: from the shoulder to what is under the crosshair
 local smoothFocus: Vector3? = nil -- the camera's focus follows smoothly (no shaking with every bump of the car)
 local SENSITIVITY = 0.0032
+-- 3.10: 0 = the walk's view, 1 = the car's; the car it eases toward or away from.
+local CAR_BLEND = 0.45
+local carBlend = 0
+local viewCar: Model? = nil
 
 -- Set by Main: is a window open that needs the mouse?
 CameraRig.mouseNeeded = function(): boolean
@@ -308,6 +315,8 @@ local function update(dt: number)
 	UserInputService.MouseIconEnabled = not locked
 
 	local car, driving = Drive.seatedCar()
+	local boardCar, into = Drive.boardingCar() -- 3.10: getting in or out right now
+	local busy = boardCar ~= nil
 	local now = os.clock()
 	-- Cargo in the hands (on foot): the aim inputs do nothing.
 	local handsFull = car == nil and carryingOf(character) ~= nil
@@ -328,7 +337,7 @@ local function update(dt: number)
 	end
 
 	-- Aiming: right mouse held, shooting, or a shot a moment ago (on foot only).
-	local wantAim = locked and not car and not handsFull and not Holster.holstered() and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
+	local wantAim = locked and not car and not busy and not handsFull and not Holster.holstered() and (rmbHeld or lmbHeld or now - lastFire < 0.7) and humanoid.Health > 0
 	aimBlend = lerp(aimBlend, if wantAim or carAim then 1 else 0, math.min(1, dt * 10))
 	if wantAim and not aimingSent then
 		aimSince = now
@@ -346,7 +355,7 @@ local function update(dt: number)
 	if padSprint and not sprinting then
 		padSprint = false -- out of breath: click again once it is back
 	end
-	if not car then
+	if not car and not busy then
 		local target = if wantAim then AIM_WALK_SPEED
 			elseif handsFull then carrySpeed(character)
 			elseif sprinting then SPRINT_SPEED
@@ -357,19 +366,32 @@ local function update(dt: number)
 	end
 
 	local rotation = CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
-	local focus: Vector3
-	local back: Vector3
+	-- Walking: behind, a little to the side. Aiming: close over the right shoulder.
+	local focus = root.Position + Vector3.new(0, lerp(2.2, 1.8, aimBlend), 0)
+	local back = Vector3.new(lerp(0.8, 2.3, aimBlend), lerp(1.2, 0.5, aimBlend), lerp(11, 6.5, aimBlend) * zoom)
 	local exclude: { Instance } = { character }
-	if car and car.PrimaryPart then
-		local size = car:GetExtentsSize()
-		focus = car.PrimaryPart.Position + Vector3.new(0, size.Y * 0.6 + 2, 0)
+	-- 3.10: in a car (or getting in) the view eases over to the car's; getting out it eases back.
+	local near = car or boardCar
+	if near then
+		viewCar = near
+	end
+	local carGoal = if car or (boardCar and into) then 1 else 0
+	carBlend = if carGoal > carBlend then math.min(carGoal, carBlend + dt / CAR_BLEND) else math.max(carGoal, carBlend - dt / CAR_BLEND)
+	local shown = viewCar
+	if shown and (carBlend <= 0 or not shown.Parent) then
+		viewCar = nil
+		shown = nil
+	end
+	local chassis = shown and shown.PrimaryPart
+	if shown and chassis then
+		local size = shown:GetExtentsSize()
+		local carFocus = chassis.Position + Vector3.new(0, size.Y * 0.6 + 2, 0)
 		-- Behind the car; aiming: closer, over the right side of the roof.
-		back = Vector3.new(lerp(0, 3, aimBlend), lerp(2, 0.8, aimBlend), lerp(size.Z * 0.7 + 9, size.Z * 0.3 + 4, aimBlend) * zoom)
-		table.insert(exclude, car)
-	else
-		focus = root.Position + Vector3.new(0, lerp(2.2, 1.8, aimBlend), 0)
-		-- Walking: behind, a little to the side. Aiming: close over the right shoulder.
-		back = Vector3.new(lerp(0.8, 2.3, aimBlend), lerp(1.2, 0.5, aimBlend), lerp(11, 6.5, aimBlend) * zoom)
+		local carBack = Vector3.new(lerp(0, 3, aimBlend), lerp(2, 0.8, aimBlend), lerp(size.Z * 0.7 + 9, size.Z * 0.3 + 4, aimBlend) * zoom)
+		local k = carBlend * carBlend * (3 - 2 * carBlend)
+		focus = focus:Lerp(carFocus, k)
+		back = back:Lerp(carBack, k)
+		table.insert(exclude, shown)
 	end
 	-- Only the world stops the camera, not things that move around (a horse on the rope right behind you too).
 	for _, name in { "LocalEffects", "DeliveryGuide", "Zombies", "Cars", "BanditCars", "Loot", "Effects", "Npcs", "Animals", "Traffic" } do
@@ -426,7 +448,7 @@ local function update(dt: number)
 		local current = math.atan2(-look.X, -look.Z)
 		local diff = (yaw - current + math.pi) % (2 * math.pi) - math.pi
 		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, current + diff * math.min(1, dt * 18), 0)
-	else
+	elseif not busy then
 		humanoid.AutoRotate = true
 	end
 

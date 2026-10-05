@@ -3494,7 +3494,7 @@ RunService.RenderStepped:Connect(function()
 		setHint(Map.Shops[inShop].name, "walk to the counter", "E")
 	elseif seatedIn and not driving then
 		local gun = if state then Economy.findWeapon(state.weapon) else nil
-		setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · Q to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · Space gets out")
+		setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · Q to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
 	elseif safe and not job then
 		setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
 	elseif not car then

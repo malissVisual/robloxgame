@@ -33,6 +33,7 @@ local Stamina = require(Client.Stamina)
 local Discovery = require(Client.Discovery)
 local TutorialUi = require(Client.TutorialUi)
 local Holster = require(Client.Holster)
+local CarBoarding = require(Client.CarBoarding)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -68,6 +69,7 @@ safely("Stamina", Stamina.start) -- 3.7: the sprint's breath
 safely("Discovery", Discovery.start) -- 3.7: the map you discover
 safely("TutorialUi", TutorialUi.start) -- 3.7: the first-day tutorial
 safely("Holster", Holster.start) -- 3.9: B holsters / draws the gun, V punches or strikes
+safely("CarBoarding", CarBoarding.start) -- 3.10: getting in and out of a car (E at a door, E or Space in a seat)
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
