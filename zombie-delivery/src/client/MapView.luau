@@ -9,6 +9,10 @@
 -- the part behind you is cut off as you drive. The minimap turns with the camera (north marker on its edge) and
 -- zooms out a little at speed; it moves every frame and redraws its tiles and routes MINI_HZ times a second.
 -- The big map lists every landmark with what you can do there; click one to set the GPS.
+-- 3.6, "Postage & Trouble" (design/ui-concept/): the minimap sits in a paper frame; over its top edge the way you face
+-- and where you are ("N · HARBOR") and an EXPAND M chip that opens the big map; under it the next turn of the route
+-- ("↰ Left onto Maple St · 120 m", the job's route, else the GPS's; with neither the address you are at). The big map
+-- is a lavender window like the HUD's.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,10 +34,12 @@ local B = Map.Bounds
 local WORLD_W = B.x1 - B.x0
 local WORLD_H = B.z1 - B.z0
 
-local MINI = 230
-local MINI_SCALE = 0.6 -- px per stud: the minimap shows about 380 studs across
+local MINI_W, MINI_H = 222, 144 -- the map's window (the paper frame around it is 230 wide)
+local TURN_H = 26 -- the turn line under it
+local MINI_SCALE = 0.6 -- px per stud: the minimap shows about 370 studs across
 local MINI_HZ = 20
-local MINI_EDGE = MINI / 2 - 13 -- markers pinned to the edge stay this far from the centre (a square)
+local TURN_HZ = 4 -- the header and the turn line, times a second
+local EDGE_X, EDGE_Y = MINI_W / 2 - 13, MINI_H / 2 - 13 -- markers pinned to the edge stay this far from the centre
 local ZOOM_OUT = 0.72 -- the minimap's zoom at full speed
 local BIG_SCALE = 0.16 -- the big map is drawn at this scale and then fitted to the screen
 local LIST_W = 320
@@ -54,11 +60,10 @@ local C = {
 	bridge = Color3.fromRGB(184, 128, 78),
 	iceRoad = Color3.fromRGB(184, 228, 244),
 	safe = Color3.fromRGB(153, 212, 125),
-	job = Ui.Colors.yellow,
+	job = Color3.fromRGB(245, 179, 79), -- the delivery's gold (the Hud's 3D guide too)
 	gps = Ui.Gps,
-	car = Ui.Colors.blue, -- the car on its way (the Hud's car call line is blue too)
+	car = Theme.Postage.violet, -- the car on its way (the Hud's car call line is violet too)
 	routeEdge = Color3.fromRGB(20, 18, 24),
-	accent = Ui.Colors.yellow,
 }
 local BLOCK_COLORS = {
 	downtown = Color3.fromRGB(66, 68, 74),
@@ -66,8 +71,8 @@ local BLOCK_COLORS = {
 	suburbs = Color3.fromRGB(60, 74, 54),
 }
 local KIND_COLORS = {
-	shop = Ui.Colors.green,
-	employer = Ui.Colors.yellow,
+	shop = Color3.fromRGB(110, 160, 88),
+	employer = Color3.fromRGB(214, 150, 52),
 	place = Color3.fromRGB(150, 80, 200),
 }
 
@@ -525,6 +530,9 @@ end
 
 -- ── The minimap ────────────────────────────────────────────────────────────
 
+-- 3.6: the minimap's whole size (the paper frame, the map, the turn line): client/Hud.luau stacks it under the money.
+MapView.MiniSize = Vector2.new(230, 4 + MINI_H + 4 + TURN_H + 4)
+
 local mini: any = nil -- the holder (what setVisible hides)
 local miniCanvas: Canvas? = nil
 local miniLayer: Layer? = nil
@@ -536,6 +544,9 @@ local miniStar: any = nil
 local miniGps: any = nil
 local miniCar: any = nil
 local miniNorth: any = nil
+local miniWhere: any = nil -- the header: "N · HARBOR"
+local miniTurn: any = nil -- the line under the map: the next turn
+local turnAt = 0
 local cameraHeading = 0
 local iconHeading = math.huge
 local zoom = 1
@@ -547,11 +558,11 @@ local function turn(x: number, y: number, degrees: number): (number, number)
 	return x * c - y * s, x * s + y * c
 end
 
--- An offset kept inside the minimap's square (on its edge when too far).
+-- An offset kept inside the minimap's window (on its edge when too far).
 local function clampToEdge(x: number, y: number): (number, number, boolean)
-	local far = math.max(math.abs(x), math.abs(y))
-	if far > MINI_EDGE then
-		return x / far * MINI_EDGE, y / far * MINI_EDGE, true
+	local far = math.max(math.abs(x) / EDGE_X, math.abs(y) / EDGE_Y)
+	if far > 1 then
+		return x / far, y / far, true
 	end
 	return x, y, false
 end
@@ -564,8 +575,123 @@ local function pin(marker: any, from: Vector3, at: Vector3?, scale: number)
 	end
 	local x, y = turn((at.X - from.X) * scale, (at.Z - from.Z) * scale, -cameraHeading)
 	x, y = clampToEdge(x, y)
-	marker.Position = UDim2.fromOffset(MINI / 2 + x, MINI / 2 + y)
+	marker.Position = UDim2.fromOffset(MINI_W / 2 + x, MINI_H / 2 + y)
 	marker.Visible = true
+end
+
+-- ── The header and the turn line ──────────────────────────────────────────
+
+-- The road at (x, z) going along (dx, dz): a named one (a bridge, a highway, a country road), else the district's
+-- street (along X) or avenue (along Z), named like the addresses (shared/Map.luau Map.addresses).
+local function roadName(x: number, z: number, dx: number, dz: number): string?
+	local way = math.sqrt(dx * dx + dz * dz)
+	if way <= 0 then
+		return nil
+	end
+	for _, s in Map.Segments do
+		local name = s.name
+		if not name then
+			continue
+		end
+		local sx, sz = s.bx - s.ax, s.bz - s.az
+		local length2 = sx * sx + sz * sz
+		if length2 <= 0 then
+			continue
+		end
+		local t = math.clamp(((x - s.ax) * sx + (z - s.az) * sz) / length2, 0, 1)
+		local px, pz = s.ax + sx * t, s.az + sz * t
+		if (x - px) ^ 2 + (z - pz) ^ 2 < s.width ^ 2 and math.abs(sx * dx + sz * dz) / (math.sqrt(length2) * way) > 0.7 then
+			return name
+		end
+	end
+	for _, d in Map.Districts do
+		local x0, x1, z0, z1 = Map.districtEdges(d)
+		if x >= x0 - 12 and x <= x1 + 12 and z >= z0 - 12 and z <= z1 + 12 then
+			if math.abs(dx) >= math.abs(dz) then
+				local k = math.floor((z - d.oz) / Map.Cell)
+				return d.streets[(k - d.j0 + 1) % #d.streets + 1]
+			end
+			local k = math.floor((x - d.ox) / Map.Cell)
+			return d.avenues[(k - d.i0 + 1) % #d.avenues + 1]
+		end
+	end
+	return nil
+end
+
+-- The next turn of a route from where you are on it: "↰ Left onto Maple St · 120 m" (nil without a route).
+local function nextTurn(route: Route): string?
+	local points = route.points
+	if not points or #points < 2 then
+		return nil
+	end
+	local step = math.clamp(route.step, 1, #points - 1)
+	local dx, dz = points[step + 1].x - route.cutX, points[step + 1].z - route.cutZ
+	local ahead = math.sqrt(dx * dx + dz * dz)
+	for k = step + 1, #points - 1 do
+		local nx, nz = points[k + 1].x - points[k].x, points[k + 1].z - points[k].z
+		local length = math.sqrt(nx * nx + nz * nz)
+		local before = math.sqrt(dx * dx + dz * dz)
+		if length >= 1 and before >= 0.5 then
+			-- (a, b) → the sine of the angle between them: > 0 turns right (x east, z south).
+			local side = (dx * nz - dz * nx) / (before * length)
+			if math.abs(side) > 0.5 then
+				local name = roadName(points[k].x + nx / length * 12, points[k].z + nz / length * 12, nx, nz)
+				local metres = math.floor(ahead / 5 + 0.5) * 5
+				local way = if side > 0 then "↱ Right" else "↰ Left"
+				return `{way} {if name then `onto {name}` else "at the junction"} · {metres} m`
+			end
+		end
+		if length >= 1 then
+			dx, dz = nx, nz
+		end
+		ahead += length
+	end
+	if ahead < 25 then
+		return "◎ Arriving"
+	end
+	return `↑ Straight on · {math.floor(ahead / 5 + 0.5) * 5} m`
+end
+
+-- Where a point is, in a word or two: a district, a place out of town, the winter, else the open road.
+local function placeName(x: number, z: number): string
+	for _, d in Map.Districts do
+		local x0, x1, z0, z1 = Map.districtEdges(d)
+		if x >= x0 and x <= x1 and z >= z0 and z <= z1 then
+			return d.name
+		end
+	end
+	for _, place in Map.Places do
+		if (place.x - x) ^ 2 + (place.z - z) ^ 2 < 200 ^ 2 then
+			return place.name
+		end
+	end
+	return if Map.isWinter(x, z) then "Winter" else "Open road"
+end
+
+local COMPASS = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" }
+
+-- The header and the turn line (TURN_HZ times a second): the way you face and where you are; the job's route's next
+-- turn, else the GPS route's, else the nearest address.
+local function updateTurn(position: Vector3)
+	local face = COMPASS[math.floor(((cameraHeading % 360) + 22.5) / 45) % 8 + 1]
+	local where = `{face} · {string.upper(placeName(position.X, position.Z))}`
+	if miniWhere.Text ~= where then
+		miniWhere.Text = where
+	end
+	local line = nextTurn(jobRoute) or nextTurn(gpsRoute)
+	if not line then
+		local best, bestD = nil :: Map.Address?, 160 ^ 2
+		for _, address in Map.addresses() do
+			local d2 = (address.x - position.X) ^ 2 + (address.z - position.Z) ^ 2
+			if d2 < bestD then
+				best, bestD = address, d2
+			end
+		end
+		line = if best then `⌂ Near {best.name}` else `⌂ {placeName(position.X, position.Z)}`
+	end
+	if miniTurn.Text ~= line then
+		miniTurn.Text = line
+	end
 end
 
 -- Every frame: the turn, the position and the pins; `heavy` (MINI_HZ) also redraws the tiles and the routes.
@@ -603,42 +729,43 @@ local function updateMini(position: Vector3, facing: Vector3, speed: number, hea
 		updateLayer(miniLayer, cameraHeading)
 		drawLine(canvas.gps, gpsRoute, MINI_SCALE)
 		drawLine(canvas.job, jobRoute, MINI_SCALE)
+		local now = os.clock()
+		if now >= turnAt then
+			turnAt = now + 1 / TURN_HZ
+			updateTurn(position)
+		end
 	end
 	local scale = MINI_SCALE * zoom
 	pin(miniStar, position, target, scale)
 	pin(miniGps, position, waypoint, scale)
 	pin(miniCar, position, calledCarPosition(), scale)
-	local nx, ny = clampToEdge(turn(0, -MINI, -cameraHeading))
-	miniNorth.Position = UDim2.fromOffset(MINI / 2 + nx, MINI / 2 + ny)
+	local nx, ny = clampToEdge(turn(0, -MINI_H, -cameraHeading))
+	miniNorth.Position = UDim2.fromOffset(MINI_W / 2 + nx, MINI_H / 2 + ny)
 end
 
 local function buildMini(column: any, touch: boolean)
+	local P = Theme.Postage
+	local size = MapView.MiniSize
 	mini = Ui.make("Frame", {
 		Name = "Minimap",
-		Size = UDim2.fromOffset(MINI, MINI),
+		Size = UDim2.fromOffset(size.X, size.Y),
 		BackgroundTransparency = 1,
 		LayoutOrder = 2,
 	}, column)
-	-- 3.2: the HUD's glass around it, a rim of dark glass with a quiet stroke (the money card's look).
-	local rim = Ui.make("Frame", {
-		Name = "Rim",
-		Size = UDim2.new(1, 8, 1, 8),
-		Position = UDim2.fromOffset(-4, -4),
-		BackgroundColor3 = Ui.Colors.panel,
-		BackgroundTransparency = Theme.PanelTransparency,
-		BorderSizePixel = 0,
-		ZIndex = 1,
-	}, mini)
-	Ui.corner(rim, 20)
-	Ui.stroke(rim)
-	-- The map is a CanvasGroup: it clips the turning content to its rounded square.
+	-- 3.6: a paper frame with a soft shadow; the map in its window, the turn line on a lavender strip under it.
+	local shadow = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.fromOffset(3, 5), BackgroundColor3 = P.shadow, BackgroundTransparency = 0.8, BorderSizePixel = 0, ZIndex = 1 }, mini)
+	Ui.corner(shadow, 14)
+	local paper = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.paper, BorderSizePixel = 0, ZIndex = 1 }, mini)
+	Ui.corner(paper, 14)
+	-- The map is a CanvasGroup: it clips the turning content to its rounded window.
 	local group = Ui.make("CanvasGroup", {
-		Size = UDim2.fromScale(1, 1),
+		Size = UDim2.fromOffset(MINI_W, MINI_H),
+		Position = UDim2.fromOffset(4, 4),
 		BackgroundColor3 = C.land,
 		BorderSizePixel = 0,
 		ZIndex = 2,
 	}, mini)
-	Ui.corner(group, 16)
+	Ui.corner(group, 11)
 	local zoomFrame = Ui.make("Frame", {
 		Size = UDim2.fromOffset(0, 0),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -657,10 +784,10 @@ local function buildMini(column: any, touch: boolean)
 		table.insert(miniIcons, landmarkIcon(canvas.markers, landmark, MINI_SCALE, 22, false))
 	end
 	miniLayer = layer(canvas)
-	-- Soft shading at the top and the bottom.
+	-- Soft shading at the top (under the header) and the bottom.
 	for _, side in { { 0, 90 }, { 1, -90 } } do
 		local shade = Ui.make("Frame", {
-			Size = UDim2.new(1, 0, 0, 46),
+			Size = UDim2.new(1, 0, 0, 36),
 			Position = UDim2.fromScale(0, side[1]),
 			AnchorPoint = Vector2.new(0, side[1]),
 			BackgroundColor3 = Color3.new(0, 0, 0),
@@ -682,42 +809,79 @@ local function buildMini(column: any, touch: boolean)
 	miniCar = dot(group, C.car, "🚗", 20)
 	miniCar.ZIndex = 23
 	miniCar.Visible = false
-	-- The compass: N in a dark disc on the edge, toward the north (it goes round as the map turns).
+	-- The compass: N in a small ink disc on the edge, toward the north (it goes round as the map turns).
 	miniNorth = Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0, 13),
-		BackgroundColor3 = Theme.Ink,
+		BackgroundColor3 = P.ink,
 		BackgroundTransparency = 0.1,
 		Text = "N",
 		TextSize = 12,
 		Font = Theme.DisplayFont,
-		TextColor3 = Ui.Colors.red,
+		TextColor3 = P.paper,
 		ZIndex = 24,
 	}, group)
 	Ui.corner(miniNorth, 10)
-	Ui.make("UIStroke", { Color = Ui.Colors.red, Thickness = 1, Transparency = 0.35 }, miniNorth)
-	-- The key for the big map: a small dark pill at the bottom, under the markers (the star / N pinned to the bottom
-	-- edge stay on top of it), over the shading.
-	local key = Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(0, 16),
+	-- The header over the map's top edge: where you are on an ink pill, EXPAND M on a violet one (a click: the big map).
+	miniWhere = Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(0, 20),
 		AutomaticSize = Enum.AutomaticSize.X,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -6),
-		BackgroundColor3 = Theme.Ink,
-		BackgroundTransparency = 0.3,
-		Text = if touch then "MAP  ·  BIG MAP & GPS" else "M  ·  BIG MAP & GPS",
-		TextSize = 10,
+		Position = UDim2.fromOffset(10, 10),
+		BackgroundColor3 = P.ink,
+		BackgroundTransparency = 0.2,
+		Text = "N",
+		TextSize = 12,
 		Font = Theme.HeadingFont,
-		TextColor3 = Ui.Colors.dim,
-		ZIndex = 21,
-	}, group)
-	Ui.corner(key, 8)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, key)
-	-- The frame around it: a thin line on the map's edge.
-	local border = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 3 }, mini)
-	Ui.corner(border, 16)
-	Ui.make("UIStroke", { Color = Theme.Border, Thickness = 1, Transparency = 0.2 }, border)
+		TextColor3 = P.paper,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 4,
+	}, mini)
+	Ui.corner(miniWhere, 8)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, miniWhere)
+	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(130, 20) }, miniWhere)
+	local expand = Ui.make("TextButton", {
+		Size = UDim2.fromOffset(0, 22),
+		AutomaticSize = Enum.AutomaticSize.X,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -10, 0, 9),
+		BackgroundColor3 = P.violet,
+		Text = if touch then "EXPAND" else "EXPAND  M",
+		TextSize = 12,
+		Font = Theme.HeadingFont,
+		TextColor3 = P.paper,
+		AutoButtonColor = true,
+		ZIndex = 4,
+	}, mini)
+	Ui.corner(expand, 8)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, expand)
+	expand.Activated:Connect(function()
+		MapView.toggle()
+	end)
+	-- The turn line under the map.
+	local strip = Ui.make("Frame", {
+		Size = UDim2.fromOffset(MINI_W, TURN_H),
+		Position = UDim2.fromOffset(4, 4 + MINI_H + 4),
+		BackgroundColor3 = P.lavenderDeep,
+		BorderSizePixel = 0,
+		ZIndex = 2,
+	}, mini)
+	Ui.corner(strip, 9)
+	miniTurn = Ui.make("TextLabel", {
+		Size = UDim2.new(1, -20, 1, 0),
+		Position = UDim2.fromOffset(10, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		TextSize = 14,
+		TextScaled = true,
+		Font = Theme.HeadingFont,
+		TextColor3 = P.ink,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 3,
+	}, strip)
+	-- A long street name shrinks a little before it would be cut.
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 12 }, miniTurn)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }, miniTurn)
 end
 
 -- ── The big map ────────────────────────────────────────────────────────────
@@ -818,11 +982,10 @@ local function buildList(parent: any)
 	local list = Ui.make("ScrollingFrame", {
 		Size = UDim2.new(0, LIST_W, 1, -56),
 		Position = UDim2.new(1, -LIST_W - 8, 0, 48),
-		BackgroundColor3 = Ui.Colors.panelLight,
-		BackgroundTransparency = 0.5,
+		BackgroundColor3 = Theme.Postage.lavenderDeep,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 4,
-		ScrollBarImageColor3 = Ui.Colors.dim,
+		ScrollBarImageColor3 = Theme.Postage.violet,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ZIndex = 41,
@@ -833,21 +996,24 @@ local function buildList(parent: any)
 	local order = 0
 	local function title(text: string, color: Color3)
 		order += 1
-		Ui.caps(list, text, UDim2.new(1, -8, 0, 20), { LayoutOrder = order, TextColor3 = color, TextSize = 12, ZIndex = 42 })
+		-- 3.6: ink on the lavender; the kind's colour in a dot before it.
+		local row = Ui.make("Frame", { Size = UDim2.new(1, -8, 0, 20), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 42 }, list)
+		local dotFrame = Ui.make("Frame", { Size = UDim2.fromOffset(8, 8), Position = UDim2.new(0, 2, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 42 }, row)
+		Ui.corner(dotFrame, 4)
+		Ui.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextColor3 = Theme.Postage.ink, TextSize = 12, ZIndex = 42 })
 	end
 	local function entry(landmark: Map.Landmark)
 		order += 1
 		local button = Ui.make("TextButton", {
 			Size = UDim2.new(1, -8, 0, 52),
-			BackgroundColor3 = Ui.Colors.panel,
-			BackgroundTransparency = 0.2,
+			BackgroundColor3 = Theme.Postage.ticket,
 			Text = "",
 			AutoButtonColor = true,
 			LayoutOrder = order,
 			ZIndex = 42,
 		}, list)
 		Ui.corner(button, 10)
-		Ui.stroke(button)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = Theme.Postage.line, Thickness = 1 }, button)
 		Ui.icon(button, Icons.landmark(landmark.id), landmark.icon, UDim2.fromOffset(40, 40), {
 			Position = UDim2.fromOffset(4, 6),
 			TextScaled = true,
@@ -855,12 +1021,12 @@ local function buildList(parent: any)
 			ZIndex = 43,
 			ImageColor3 = KIND_COLORS[landmark.kind] or Color3.new(1, 1, 1),
 		})
-		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 14, Font = Theme.DisplayFont, ZIndex = 43, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 14, Font = Theme.DisplayFont, TextColor3 = Theme.Postage.ink, ZIndex = 43, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		Ui.label(button, landmark.description, UDim2.new(1, -54, 0, 26), {
 			Position = UDim2.fromOffset(50, 24),
 			TextSize = 12,
 			Font = Enum.Font.GothamMedium,
-			TextColor3 = Ui.Colors.dim,
+			TextColor3 = Theme.Postage.ink2,
 			ZIndex = 43,
 		})
 		button.Activated:Connect(function()
@@ -868,7 +1034,7 @@ local function buildList(parent: any)
 			big.Visible = false
 		end)
 	end
-	title("Click a place to set the GPS", Ui.Colors.text)
+	title("Click a place to set the GPS", Theme.Postage.violet)
 	local clear = Ui.ghostButton(list, "◆  CLEAR GPS", UDim2.new(1, -8, 0, 32), C.gps, function()
 		setGps(nil)
 	end)
@@ -903,30 +1069,30 @@ local function buildBig(gui: any)
 		Size = UDim2.fromOffset(mapW + LIST_W + 30, mapH + 56),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Ui.Colors.panel,
-		BackgroundTransparency = Theme.WindowTransparency,
+		BackgroundColor3 = Theme.Postage.lavender,
 		Visible = false,
 		ZIndex = 40,
 	}, gui)
 	bigScale = Ui.make("UIScale", {}, big)
-	Ui.corner(big, Theme.PanelRadius)
-	Ui.stroke(big, Ui.Colors.panelLight:Lerp(Ui.Colors.text, 0.2), 1).Transparency = 0.3
+	-- 3.6: the lavender window of the HUD (client/Hud.luau), the legend in ink with the markers' colours.
+	Ui.corner(big, 22)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = Theme.Postage.line, Thickness = 1.5 }, big)
 	Ui.make("TextLabel", {
 		Size = UDim2.new(1, -60, 0, 36),
 		Position = UDim2.fromOffset(12, 6),
 		BackgroundTransparency = 1,
 		RichText = true,
-		Text = `MAP   ▲ you   <font color="{hex(C.job)}">★ delivery ━</font>   <font color="{hex(C.gps)}">◆ GPS ━</font>   <font color="#FF5050">!</font> bandit car   ? crate`,
+		Text = `Map   <font size="14">▲ you   <font color="{hex(C.job)}">★━</font> delivery   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="#D04040">!</font> bandit car   ? crate</font>`,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextSize = 17,
+		TextSize = 22,
 		Font = Theme.DisplayFont,
-		TextColor3 = Ui.Colors.text,
+		TextColor3 = Theme.Postage.ink,
 		ZIndex = 41,
 	}, big)
 	local close = Ui.closeButton(big, function()
 		big.Visible = false
 	end)
-	close.Position = UDim2.new(1, -8, 0, 6)
+	close.Position = UDim2.new(1, -10, 0, 6)
 	close.ZIndex = 42
 	local holder = Ui.make("Frame", {
 		Size = UDim2.fromOffset(mapW, mapH),
