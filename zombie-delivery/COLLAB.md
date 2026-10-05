@@ -4,11 +4,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- (nothing yet)
+- Claude · building the Postage & Trouble UI (Codex's concept) into the game · client/Theme, Ui, Hud, MapView, MissionsUi, GarageUi, CrewPanel, new DispatchUi and the other windows · 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- Codex · `codex/ui-concept` · Postage & Trouble: soft colors, die-cut delivery tickets, circular speed dial, tactile hover/press; interactive five-screen desktop/touch concept and previews in design/ui-concept/ (game code unchanged). Browser interactions/layout pass; 13 test files pass, 64 modules compile at -O0 -g2. Review in browser first; before implementing, test readability, native controls/insets, hover/focus/tap, cargo holds and garage-only vehicle take-out in Studio (not tested here).
+- (nothing yet)
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
@@ -24,6 +24,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Codex · Postage & Trouble UI concept (`codex/ui-concept`, design/ui-concept/), reviewed and merged by Claude; Claude builds it into the game next.
 - Claude · 3.5 van stages and a real dealership: the Cargo Rack is gone, every car has stages bought at Wrench Garage (a STAGE card with before → after) that change its look (server/Vehicles.luau `LOOKS`): the Old Van Rusty Van 2 → Work Van 3 → Cargo Van 4, the other cars a role and 1 – 2 stages (the Box Truck 6 → 8 is the only way to 6+); jobs and missions retuned (★ ≤ 2, First Shift ≤ 3, Code Red / Empty Shelves ≤ 4, a few big loads for the Box Truck); Dead End Motors sells from a catalog at the counter with three display cars inside (no lot outside); a 3.4 save's cars became the stage that holds the slots they had (capacity + rack; up to the car's most room). Test in Studio: buy the Work Van and the Cargo Van on the Old Van at Wrench Garage (the car rebuilds where it stands, load 3 / 4 pieces through the back), paint it, MAX UPGRADES + STAGES in the admin panel, the showroom's Look prompts and the Car catalog counter.
 - Claude · 3.4 cargo capacity (Old Van 4, High-Roof / Box Truck 6, the Cargo Rack +1 a level on a visible roof rack; jobs and missions too big for your car are locked), the repair shop (bays in Wrench Garage and the new Rust Bridge Repairs, 20 – 60 s, $20 – $300, damage kept per car, no free repairs), garages you earn (the depot holds the starting van, Rented Lockup at level 2, Southside Garage at 4; switch cars only at your 🅿 GARAGE posts). Test in Studio: drive a damaged van into a Wrench Garage bay and get out; buy the Rented Lockup, then the Courier Van, and take it out there; a ★★★ bulk order with the Old Van.
 - Codex · Merge Blades archived to `archive/merge-blades/`, the repository root is Zombie Delivery (`codex/cloud-setup`, merged by Claude). The default branch now has Zombie Delivery (PR #1).
