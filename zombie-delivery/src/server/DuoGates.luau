@@ -210,7 +210,7 @@ local function buildLever(gate: Gate, name: string, base: Vector3, right: Vector
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Pull"
 	prompt.ObjectText = name
-	prompt.HoldDuration = 0.15
+	prompt.HoldDuration = 0 -- 4.0.1: at once
 	prompt.MaxActivationDistance = 9
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = post

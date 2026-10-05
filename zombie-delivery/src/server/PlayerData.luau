@@ -252,6 +252,12 @@ local function applySaved(profile: Profile, saved: any)
 	if type(saved.carUpgrades) == "table" then
 		for carId, levels in saved.carUpgrades do
 			if type(carId) == "string" and type(levels) == "table" and profile.cars[carId] and Economy.canUpgrade(carId) then
+				-- 4.0.1: Quick Hands (the loading track, $400 · $800 · $1,600) is gone with the holds: its price back, once
+				-- (it is not saved again).
+				local quick = number(levels.loading, 0, 3)
+				if quick > 0 then
+					profile.money += 400 * (2 ^ quick - 1)
+				end
 				local into: { [string]: number } = {}
 				for _, def in Config.Upgrades do
 					local level = if def.car then number(levels[def.id], 0, def.maxLevel) else 0

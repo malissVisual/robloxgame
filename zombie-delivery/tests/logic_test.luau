@@ -173,25 +173,22 @@ check("handling upgrade", near(Economy.carStats("van", { handling = 5 }).turn, 1
 
 -- 3.3: the car tracks are per car, the gun tracks for all guns; Quick Hands; the old saves' migration ----------
 
-for _, id in { "engine", "handling", "armor", "plow", "loading" } do
+for _, id in { "engine", "handling", "armor", "plow" } do
 	check(`{id} is a car track`, Economy.isCarUpgrade(id))
 end
 for _, id in { "damage", "firerate", "nope" } do
 	check(`{id} is not a car track`, not Economy.isCarUpgrade(id))
 end
-local quick = Economy.findUpgrade("loading")
-check("Quick Hands: 3 levels, -15 % each", quick ~= nil and quick.maxLevel == 3 and near(quick.perLevel, 0.15) and quick.name == "Quick Hands")
-check("Quick Hands is priced like the others", Economy.upgradeCost("loading", 0) == 400 and Economy.upgradeCost("loading", 3) == nil, Economy.upgradeCost("loading", 0))
+-- 4.0.1: Quick Hands is gone (the holds are instant).
+check("no Quick Hands any more", Economy.findUpgrade("loading") == nil)
+check("the holds are instant", Config.Cargo.HoldDuration == 0)
 -- 3.4: the starting van is upgraded, not replaced: every car track's first level costs a few deliveries.
 for _, def in Config.Upgrades do
 	if def.car and def.id ~= "trolley" then -- (4.0: the Hand Trolley is one tool, not a track: about $600)
 		check(`{def.id}: the first level is cheap`, (Economy.upgradeCost(def.id, 0) :: number) <= 400, Economy.upgradeCost(def.id, 0))
 	end
 end
-check("no Quick Hands: the plain hold", near(Economy.loadHold(0.25, {}), 0.25))
-check("Quick Hands 1: 15 % shorter", near(Economy.loadHold(0.25, { loading = 1 }), 0.25 * 0.85))
-check("Quick Hands 3: 45 % shorter", near(Economy.loadHold(0.25, { loading = 3 }), 0.25 * 0.55))
-check("Quick Hands never below 40 %", Economy.loadHold(1, { loading = 99 }) >= 0.4 - 1e-9)
+check("an old save's Quick Hands level changes no hold", near(Economy.loadHold(0.25, { loading = 3 }), 0.25))
 local perCar = { van = { engine = 2 }, courier = { armor = 1 } }
 check("a car's own levels", Economy.carLevels(perCar, "van").engine == 2 and Economy.carLevels(perCar, "courier").engine == nil)
 check("a car without levels: none", next(Economy.carLevels(perCar, "muscle")) == nil and next(Economy.carLevels(nil, "van")) == nil)

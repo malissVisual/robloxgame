@@ -5173,7 +5173,7 @@ local function buildSecrets(world: Instance)
 		p.Name = "SecretPrompt"
 		p.ActionText = "Open"
 		p.ObjectText = "Lost package"
-		p.HoldDuration = 0.5
+		p.HoldDuration = 0 -- 4.0.1: at once, like every pick-up
 		p.MaxActivationDistance = 9
 		p.RequiresLineOfSight = false
 		p:SetAttribute("Secret", secret.id)

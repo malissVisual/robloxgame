@@ -112,7 +112,7 @@ check("foot waves for every tier", #Config.Cargo.FootWaves >= #Config.Jobs.Tiers
 -- 3.2, the back that opens (server/Vehicles.luau, server/Cargo.luau) ---------------------------------------------
 -- Per stop it adds: put the piece down, open the back, pick the piece up again, close the back. Four short holds:
 -- with the walking it stays a few seconds a stop, not a minute.
-check("the back's extra steps are quick holds", Config.Cargo.HoldDuration > 0 and Config.Cargo.HoldDuration * 4 <= 1.2, Config.Cargo.HoldDuration)
+check("the back's extra steps are instant (4.0.1: no holds)", Config.Cargo.HoldDuration == 0, Config.Cargo.HoldDuration)
 check("the back is opened standing (load speed)", Config.Cargo.MaxCarSpeed > 0 and Config.Cargo.MaxCarSpeed <= 10, Config.Cargo.MaxCarSpeed)
 check("the extra steps fit the time per piece", Config.Cargo.TimePerPiece.carry >= 4 * Config.Cargo.HoldDuration + 3, Config.Cargo.TimePerPiece.carry)
 
