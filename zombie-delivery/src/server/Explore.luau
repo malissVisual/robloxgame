@@ -36,6 +36,7 @@ local CFG = Config.Explore
 type State = {
 	set: Grid.Set,
 	last: Vector3?, -- where the player was at the last check
+	character: Model?, -- whose position `last` is: a new character (a respawn) is not a drive from the death spot
 }
 
 local states: { [Player]: State } = {}
@@ -124,6 +125,10 @@ local function check(player: Player)
 	if not position then
 		state.last = nil
 		return
+	end
+	if state.character ~= player.Character then
+		state.character = player.Character
+		state.last = nil
 	end
 	local fresh: { number } = {}
 	-- The way since the last check (a fast car), in steps of the radius; the point itself last.
