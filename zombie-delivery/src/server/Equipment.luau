@@ -809,6 +809,8 @@ local function syncCars()
 			if kind == "trolley" and car.model:GetAttribute("TrolleyOut") ~= out then
 				car.model:SetAttribute("TrolleyOut", out)
 				showFolded(car.model, not out)
+			elseif kind == "trolley" and out then
+				showFolded(car.model, false) -- (a new upgrade kit while it is out: hidden again)
 			end
 			-- The truck's jack rides inside its back: taken only through the open back.
 			local home = list[owner]
