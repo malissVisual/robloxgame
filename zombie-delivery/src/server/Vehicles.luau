@@ -2926,6 +2926,12 @@ function Vehicles.speed(car: Car): number
 	return Vector3.new(v.X, 0, v.Z).Magnitude
 end
 
+-- 4.2: the speed a ram may count. The driver's client owns the car's physics, so a hacked velocity must not kill
+-- everything in one touch: never more than the car's top speed with room for a downhill run.
+function Vehicles.ramSpeed(car: Car): number
+	return math.min(Vehicles.speed(car), car.stats.maxSpeed * 1.7 + 10) -- (nitro is +60%)
+end
+
 -- ── Cargo (server/Cargo.luau) ───────────────────────────────────────────────
 
 local function styleOf(car: Car): Style

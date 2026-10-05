@@ -94,9 +94,40 @@ local function sendState(player: Player)
 	})
 end
 
+-- 4.2: the whole profile goes at most every 0.15 s per player. Every kill's money fires Changed, and a horde fight
+-- sent the full state many times a second; the burst now goes as one, the last state always arrives.
+local queueState: (Player) -> ()
+do
+	local sentAt: { [Player]: number } = {}
+	local pending: { [Player]: boolean } = {}
+	local function flush(player: Player)
+		pending[player] = nil
+		if player.Parent then
+			sentAt[player] = os.clock()
+			sendState(player)
+		end
+	end
+	queueState = function(player: Player)
+		if pending[player] then
+			return
+		end
+		pending[player] = true
+		local wait = (sentAt[player] or 0) + 0.15 - os.clock()
+		if wait > 0 then
+			task.delay(wait, flush, player)
+		else
+			task.defer(flush, player)
+		end
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		sentAt[player] = nil
+		pending[player] = nil
+	end)
+end
+
 -- ── Wiring ─────────────────────────────────────────────────────────────────
 
-PlayerData.Changed:Connect(sendState)
+PlayerData.Changed:Connect(queueState)
 
 Zombies.onKill = function(player)
 	Jobs.onKill(player)
@@ -200,7 +231,11 @@ local function setAiming(player: Player, aiming: any, aimPitch: any)
 	-- 3.9: a holstered gun is not held up (server/CloseCombat.luau; the remotes come in order, a draw before its aim).
 	character:SetAttribute("Aiming", aiming == true and character:GetAttribute("Holstered") ~= true)
 	if type(aimPitch) == "number" and aimPitch == aimPitch then
-		character:SetAttribute("AimPitch", math.clamp(aimPitch, -1.2, 1.2))
+		-- (rounded, and set only on a change: every set replicates to all clients)
+		local pitch = math.round(math.clamp(aimPitch, -1.2, 1.2) * 50) / 50
+		if character:GetAttribute("AimPitch") ~= pitch then
+			character:SetAttribute("AimPitch", pitch)
+		end
 	end
 end
 
@@ -338,10 +373,20 @@ Net.get("Play").OnServerEvent:Connect(function(player)
 	Tutorial.onPlay(player) -- 3.7: a new player's welcome (after StartDelay)
 end)
 
-Net.get("RequestState").OnServerEvent:Connect(function(player)
-	sendState(player)
-	Jobs.sendTo(player)
-end)
+do
+	local asked: { [Player]: number } = {}
+	Net.get("RequestState").OnServerEvent:Connect(function(player)
+		if os.clock() - (asked[player] or -1) < 0.5 then
+			return -- (a client asks once on start; a flood would send the whole profile each time)
+		end
+		asked[player] = os.clock()
+		queueState(player)
+		Jobs.sendTo(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		asked[player] = nil
+	end)
+end
 
 Net.get("SpawnCar").OnServerEvent:Connect(function(player)
 	if CarCall.busy(player) then

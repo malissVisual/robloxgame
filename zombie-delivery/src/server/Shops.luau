@@ -166,7 +166,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		if not def or refuse(player, "supplies") then
 			return
 		end
-		local count = if type(amount) == "number" then math.clamp(math.floor(amount), 1, 10) else 1
+		local count = if type(amount) == "number" and amount == amount and math.abs(amount) < math.huge then math.clamp(math.floor(amount), 1, 10) else 1
 		count = math.min(count, def.max - (profile.items[id] or 0))
 		if count <= 0 then
 			notice:FireClient(player, `You cannot carry more {def.name}s.`)

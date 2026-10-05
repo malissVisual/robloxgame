@@ -365,6 +365,37 @@ local function key(player: Player): string
 	return "Player_" .. player.UserId
 end
 
+-- 4.2: is the save held by another live server (a lock it refreshed lately)?
+local function lockedElsewhere(old: any): boolean
+	if type(old) ~= "table" or type(old.lock) ~= "table" then
+		return false
+	end
+	local lock = old.lock
+	return lock.job ~= game.JobId and type(lock.at) == "number" and os.time() - lock.at < Config.SaveLockStale
+end
+
+-- Reads the save and locks it to this server in one UpdateAsync. "locked" = another server still holds it (its
+-- leave save is on the way); force takes it over all the same. Returns success, the save, locked.
+local function readAndLock(dataStore: DataStore, player: Player, force: boolean): (boolean, any, boolean)
+	local saved: any, locked = nil, false
+	local success, err = pcall(function()
+		dataStore:UpdateAsync(key(player), function(old: any): any
+			saved, locked = old, false
+			if not force and lockedElsewhere(old) then
+				locked = true
+				return nil -- leave it as it is
+			end
+			local data: { [any]: any } = if type(old) == "table" then table.clone(old) else {}
+			data.lock = { job = game.JobId, at = os.time() }
+			return data
+		end)
+	end)
+	if not success then
+		warn(`[PlayerData] load failed: {err}`)
+	end
+	return success, saved, locked
+end
+
 function PlayerData.load(player: Player)
 	local profile = newProfile()
 	local ok = true
@@ -372,22 +403,33 @@ function PlayerData.load(player: Player)
 	if dataStore then
 		local saved: any = nil
 		ok = false
-		for attempt = 1, 3 do
-			local success, result = pcall(function()
-				return dataStore:GetAsync(key(player))
-			end)
-			if success then
+		local failures, waited = 0, 0
+		while player.Parent do
+			local success, result, locked = readAndLock(dataStore, player, waited >= Config.SaveLockWait)
+			if success and not locked then
 				saved = result
 				ok = true
 				break
+			elseif success then
+				task.wait(2) -- the last server is still writing its leave save
+				waited += 2
+			else
+				failures += 1
+				if failures >= 3 or RunService:IsStudio() then
+					break -- (Studio without API access: play without saving, right away)
+				end
+				task.wait(failures)
 			end
-			warn(`[PlayerData] load failed ({attempt}/3): {result}`)
-			if RunService:IsStudio() then
-				break -- Studio without API access: play without saving, right away
-			end
-			task.wait(attempt)
 		end
 		applySaved(profile, saved)
+		if not ok and player.Parent and not RunService:IsStudio() then
+			-- Never let a live player play on a profile that cannot be saved: they would lose all of it.
+			player:Kick("Your save could not be loaded right now (Roblox data service). Please rejoin in a moment.")
+			return
+		end
+	end
+	if not player.Parent then
+		return -- left while loading: nothing to keep (and no lock to release: the next join takes it after the wait)
 	end
 	-- Never overwrite a save we could not read.
 	canSave[player] = ok and dataStore ~= nil
@@ -449,11 +491,18 @@ local function updateLeaderstats(player: Player)
 end
 changed.Event:Connect(updateLeaderstats)
 
-function PlayerData.save(player: Player)
+local saving = 0 -- saves in flight (BindToClose waits for them)
+local finished: { [Player]: boolean } = {} -- the final save (leave or shutdown) has started: no more saves
+
+-- final = the player leaves (or the server closes): the lock is released and a failed write is tried again.
+function PlayerData.save(player: Player, final: boolean?)
 	local profile = profiles[player]
 	local dataStore = store
-	if not profile or not dataStore or not canSave[player] then
+	if not profile or not dataStore or not canSave[player] or finished[player] then
 		return
+	end
+	if final then
+		finished[player] = true
 	end
 	local data = {
 		money = profile.money,
@@ -490,13 +539,34 @@ function PlayerData.save(player: Player)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
+		lock = if final then nil else { job = game.JobId, at = os.time() }, -- 4.2: this server plays it (nil = free)
 	}
-	local success, err = pcall(function()
-		dataStore:SetAsync(key(player), data)
-	end)
-	if not success then
-		warn(`[PlayerData] save failed: {err}`)
+	saving += 1
+	for attempt = 1, if final then 4 else 1 do
+		local taken = false
+		local success, err = pcall(function()
+			dataStore:UpdateAsync(key(player), function(old: any): any
+				taken = false
+				if type(old) == "table" and type(old.lock) == "table" and old.lock.job ~= game.JobId then
+					taken = true -- another server took the save over (we were stale): never overwrite its newer data
+					return nil
+				end
+				return data
+			end)
+		end)
+		if success and taken then
+			warn(`[PlayerData] {player.Name}'s save is held by another server; this server stops saving it`)
+			canSave[player] = false
+			break
+		elseif success then
+			break
+		end
+		warn(`[PlayerData] save failed ({attempt}): {err}`)
+		if final and attempt < 4 then
+			task.wait(attempt)
+		end
 	end
+	saving -= 1
 end
 
 -- 4.0.5, the admin's RESET MY SAVE: the profile starts over as a new player's (the tutorial, the fog, $ and all) and is
@@ -514,9 +584,10 @@ function PlayerData.resetSave(player: Player)
 end
 
 function PlayerData.release(player: Player)
-	PlayerData.save(player)
+	PlayerData.save(player, true)
 	profiles[player] = nil
 	canSave[player] = nil
+	finished[player] = nil
 end
 
 -- 3.7: was this player's save read (so their profile is really theirs)? False while a DataStore failure plays them
@@ -529,9 +600,14 @@ function PlayerData.get(player: Player): Profile?
 	return profiles[player]
 end
 
+-- A real, finite number: NaN or ±inf from a remote would poison the money and the items for good.
+local function finite(n: any): boolean
+	return type(n) == "number" and n == n and n > -math.huge and n < math.huge
+end
+
 function PlayerData.addMoney(player: Player, amount: number)
 	local profile = profiles[player]
-	if not profile or amount <= 0 then
+	if not profile or not finite(amount) or amount <= 0 then
 		return
 	end
 	profile.money += math.floor(amount)
@@ -542,7 +618,7 @@ end
 -- Takes the money if there is enough; true when paid.
 function PlayerData.spend(player: Player, amount: number): boolean
 	local profile = profiles[player]
-	if not profile or amount < 0 or profile.money < amount then
+	if not profile or not finite(amount) or amount < 0 or profile.money < amount then
 		return false
 	end
 	profile.money -= amount
@@ -554,10 +630,10 @@ end
 function PlayerData.addItem(player: Player, id: string, amount: number): boolean
 	local profile = profiles[player]
 	local def = Economy.findItem(id)
-	if not profile or not def then
+	if not profile or not def or not finite(amount) then
 		return false
 	end
-	local count = (profile.items[id] or 0) + amount
+	local count = (profile.items[id] or 0) + math.floor(amount)
 	if count < 0 or count > def.max then
 		return false
 	end
@@ -648,10 +724,15 @@ function PlayerData.start()
 	end
 	Players.PlayerRemoving:Connect(PlayerData.release)
 	game:BindToClose(function()
-		for _, player in Players:GetPlayers() do
-			task.spawn(PlayerData.save, player)
+		for player in profiles do
+			task.spawn(PlayerData.save, player, true)
 		end
-		task.wait(2)
+		-- Wait for every save in flight (the leave saves too), not a fixed time: up to 25 s of the 30 Roblox gives.
+		local deadline = os.clock() + 25
+		task.wait()
+		while saving > 0 and os.clock() < deadline do
+			task.wait(0.25)
+		end
 	end)
 	task.spawn(function()
 		while true do

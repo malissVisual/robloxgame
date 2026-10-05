@@ -2091,6 +2091,132 @@ end
 local elapsed = 0
 local boardElapsed = 0
 
+local lastUpdateWarn = -math.huge
+
+-- One player's tick of update (below): the job's timer, crew, cargo, waves and bandits.
+local function updatePlayer(player: Player, step: number, now: number, serverNow: number, nightWaves: number)
+	local job = jobs[player]
+	local car = Vehicles.get(player)
+	local position = playerPosition(player)
+	local heading = if car then car.chassis.AssemblyLinearVelocity else nil
+
+	if not job then
+		return -- free roam: only the roaming zombies (server/Zombies.luau), no bandits
+	end
+
+	local offer = job.offer
+	local tier = JobsConfig.Tiers[offer.tier]
+	local modifier = offer.modifier
+	local session = job.cargo
+	if serverNow > job.endsAt then
+		local reason = if offer.kind == "patient" then "Too late! The patient couldn't wait any longer."
+			elseif offer.kind == "survivor" then "Too late! The survivors couldn't hold out any longer."
+			elseif offer.look == "pizza" and offer.jobType then `Too late! The pizza went cold and {offer.customer} gave up on you.`
+			else `Too late! {offer.customer} gave up on you.`
+		Jobs.fail(player, reason)
+		return
+	end
+	-- Spotless: the cargo got too damaged (car hits, bandits, shots).
+	if spotlessFailed(player, job) then
+		return
+	end
+	-- 3.2, DUO: the partner must stay in the crew (they left it, or the game).
+	if offer.duo then
+		if #Crew.members(player) >= Config.Missions.Duo.MinCrew then
+			job.duoTeamed = true
+		elseif job.duoTeamed then
+			Jobs.fail(player, "Your partner left.")
+			return
+		end
+	end
+
+	-- Everybody who rides in the owner's car is crew (they may carry the cargo, their kills count) while they
+	-- stay with it.
+	pruneRiders(player, job)
+	if car then
+		for _, rider in Vehicles.passengersOf(car) do
+			job.crew[rider] = true
+		end
+	end
+	recount(player, job)
+	Cargo.update(session, step)
+	-- 3.1: the pieces delivered since the last tick (any, the people who board, the horses).
+	if session.deliveredTotal > job.piecesCounted then
+		local pieces = session.deliveredTotal - job.piecesCounted
+		job.piecesCounted = session.deliveredTotal
+		statCrew(player, job, "pieces", pieces)
+		if offer.kind == "horse" then
+			statCrew(player, job, "horses", pieces)
+		elseif Cargo.isPeople(offer.kind) then
+			statCrew(player, job, "passengers", pieces)
+		end
+	end
+	if not jobs[player] then
+		return
+	end
+	-- 3.2, switches: the gate's levers (the HUD), and the stop goes on once it is open.
+	if job.gateClosed then
+		local pulled = DuoGates.pulled(player)
+		if pulled ~= job.gatePulled then
+			job.gatePulled = pulled
+			job.dirty = true
+		end
+		if DuoGates.isOpen(player) then
+			job.gateClosed = false
+			job.dirty = true
+			blockStop(job)
+			local here = offer.stops[job.stop]
+			tellJob(player, if here.kind == "pickup" then "The gate is open! Load up, partners!" else "The gate is open! Unload, quick!")
+		end
+	end
+
+	local stop = offer.stops[job.stop]
+	local lastStop = job.stop == #offer.stops
+
+	-- The last stop done, or nothing left anywhere to deliver (stolen, wrecked): what arrived is paid, nothing
+	-- arrived fails.
+	local done = Cargo.stopDone(session)
+	local finished = done and lastStop
+	if finished or Cargo.remaining(session) + futurePieces(job) == 0 then
+		if session.deliveredTotal <= 0 then
+			Jobs.fail(player, "All of your cargo is gone!")
+		else
+			if not finished then
+				notice:FireClient(player, "Nothing left to deliver. You get paid for what arrived.")
+			end
+			complete(player, job)
+		end
+		return
+	end
+	if done then
+		advance(player, job)
+		stop = offer.stops[job.stop]
+		lastStop = job.stop == #offer.stops
+	end
+
+	local flatDistance = Vector3.new(position.X - stop.park.X, 0, position.Z - stop.park.Z).Magnitude
+	spawnHordes(player, job, tier, stop, lastStop, flatDistance)
+
+	local multiplier = if modifier then modifier.spawnMultiplier else 1
+	if offer.twists.defend and lastStop and not job.defendDone then
+		defendStep(player, job, tier, stop, position, now, step, multiplier * nightWaves)
+	end
+	if Cargo.onFoot(session) then
+		footWave(player, job, tier, stop, now, multiplier)
+	else
+		roadEnemies(player, job, tier, position, heading, now, step, multiplier, nightWaves)
+	end
+
+	-- The HUD's instruction changes with what you do (parking, getting out): send it when it does.
+	local _, text = stepOf(job)
+	if text ~= job.lastStep then
+		job.dirty = true
+	end
+	if job.dirty then
+		send(player)
+	end
+end
+
 local function update(dt: number)
 	elapsed += dt
 	if elapsed < 0.2 then
@@ -2109,125 +2235,11 @@ local function update(dt: number)
 	-- Bigger and more frequent waves at night (Economy.waveSize / waveEvery / waveAlive take it like WANTED does).
 	local nightWaves = Economy.nightScale(Config.DayNight.NightWaves, DayNight.nightFactor())
 	for _, player in Players:GetPlayers() do
-		local job = jobs[player]
-		local car = Vehicles.get(player)
-		local position = playerPosition(player)
-		local heading = if car then car.chassis.AssemblyLinearVelocity else nil
-
-		if not job then
-			continue -- free roam: only the roaming zombies (server/Zombies.luau), no bandits
-		end
-
-		local offer = job.offer
-		local tier = JobsConfig.Tiers[offer.tier]
-		local modifier = offer.modifier
-		local session = job.cargo
-		if serverNow > job.endsAt then
-			local reason = if offer.kind == "patient" then "Too late! The patient couldn't wait any longer."
-				elseif offer.kind == "survivor" then "Too late! The survivors couldn't hold out any longer."
-				elseif offer.look == "pizza" and offer.jobType then `Too late! The pizza went cold and {offer.customer} gave up on you.`
-				else `Too late! {offer.customer} gave up on you.`
-			Jobs.fail(player, reason)
-			continue
-		end
-		-- Spotless: the cargo got too damaged (car hits, bandits, shots).
-		if spotlessFailed(player, job) then
-			continue
-		end
-		-- 3.2, DUO: the partner must stay in the crew (they left it, or the game).
-		if offer.duo then
-			if #Crew.members(player) >= Config.Missions.Duo.MinCrew then
-				job.duoTeamed = true
-			elseif job.duoTeamed then
-				Jobs.fail(player, "Your partner left.")
-				continue
-			end
-		end
-
-		-- Everybody who rides in the owner's car is crew (they may carry the cargo, their kills count) while they
-		-- stay with it.
-		pruneRiders(player, job)
-		if car then
-			for _, rider in Vehicles.passengersOf(car) do
-				job.crew[rider] = true
-			end
-		end
-		recount(player, job)
-		Cargo.update(session, step)
-		-- 3.1: the pieces delivered since the last tick (any, the people who board, the horses).
-		if session.deliveredTotal > job.piecesCounted then
-			local pieces = session.deliveredTotal - job.piecesCounted
-			job.piecesCounted = session.deliveredTotal
-			statCrew(player, job, "pieces", pieces)
-			if offer.kind == "horse" then
-				statCrew(player, job, "horses", pieces)
-			elseif Cargo.isPeople(offer.kind) then
-				statCrew(player, job, "passengers", pieces)
-			end
-		end
-		if not jobs[player] then
-			continue
-		end
-		-- 3.2, switches: the gate's levers (the HUD), and the stop goes on once it is open.
-		if job.gateClosed then
-			local pulled = DuoGates.pulled(player)
-			if pulled ~= job.gatePulled then
-				job.gatePulled = pulled
-				job.dirty = true
-			end
-			if DuoGates.isOpen(player) then
-				job.gateClosed = false
-				job.dirty = true
-				blockStop(job)
-				local here = offer.stops[job.stop]
-				tellJob(player, if here.kind == "pickup" then "The gate is open! Load up, partners!" else "The gate is open! Unload, quick!")
-			end
-		end
-
-		local stop = offer.stops[job.stop]
-		local lastStop = job.stop == #offer.stops
-
-		-- The last stop done, or nothing left anywhere to deliver (stolen, wrecked): what arrived is paid, nothing
-		-- arrived fails.
-		local done = Cargo.stopDone(session)
-		local finished = done and lastStop
-		if finished or Cargo.remaining(session) + futurePieces(job) == 0 then
-			if session.deliveredTotal <= 0 then
-				Jobs.fail(player, "All of your cargo is gone!")
-			else
-				if not finished then
-					notice:FireClient(player, "Nothing left to deliver. You get paid for what arrived.")
-				end
-				complete(player, job)
-			end
-			continue
-		end
-		if done then
-			advance(player, job)
-			stop = offer.stops[job.stop]
-			lastStop = job.stop == #offer.stops
-		end
-
-		local flatDistance = Vector3.new(position.X - stop.park.X, 0, position.Z - stop.park.Z).Magnitude
-		spawnHordes(player, job, tier, stop, lastStop, flatDistance)
-
-		local multiplier = if modifier then modifier.spawnMultiplier else 1
-		if offer.twists.defend and lastStop and not job.defendDone then
-			defendStep(player, job, tier, stop, position, now, step, multiplier * nightWaves)
-		end
-		if Cargo.onFoot(session) then
-			footWave(player, job, tier, stop, now, multiplier)
-		else
-			roadEnemies(player, job, tier, position, heading, now, step, multiplier, nightWaves)
-		end
-
-		-- The HUD's instruction changes with what you do (parking, getting out): send it when it does.
-		local _, text = stepOf(job)
-		if text ~= job.lastStep then
-			job.dirty = true
-		end
-		if job.dirty then
-			send(player)
+		-- 4.2: one player's error must not stop everybody else's timers, waves and cargo (warned once a minute).
+		local ok, err = pcall(updatePlayer :: any, player, step, now, serverNow, nightWaves)
+		if not ok and now - lastUpdateWarn > 60 then
+			lastUpdateWarn = now
+			warn(`[Jobs] update failed for {player.Name}: {err}`)
 		end
 	end
 end
