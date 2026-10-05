@@ -276,7 +276,7 @@ local function step()
 		if not empty or not still then
 			waiting[player] = nil
 			if not empty and still then
-				say(player, `out{bay.index}{bay.shop}`, `Repair bay {bay.index}: get out and wait (Space). {Economy.repairTime(missingOf(car))} s, {money(Economy.repairFee(missingOf(car)))}.`)
+				say(player, `out{bay.index}{bay.shop}`, `Repair bay {bay.index}: get out (E) and wait. {Economy.repairTime(missingOf(car))} s, {money(Economy.repairFee(missingOf(car)))}.`)
 			end
 			continue
 		end

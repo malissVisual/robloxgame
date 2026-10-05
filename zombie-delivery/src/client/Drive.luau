@@ -70,6 +70,37 @@ function Drive.seatedCar(): (Model?, boolean)
 	return nil, false
 end
 
+-- 3.10: getting in or out (client/CarBoarding.luau moves the body; client/CameraRig.luau eases the camera between
+-- the walk and the car meanwhile and leaves the walk alone). into: getting in (false: getting out).
+local boardingCar: Model? = nil
+local boardingInto = false
+-- Getting out, the local door opens at once (before the server's DoorOpenAt arrives): client/CarVisuals.luau.
+local heldCar: Model? = nil
+local heldDoor = 0
+local heldUntil = 0
+
+function Drive.setBoarding(car: Model?, into: boolean)
+	boardingCar = car
+	boardingInto = into
+end
+
+function Drive.boardingCar(): (Model?, boolean)
+	local car = boardingCar
+	if car and not car.Parent then
+		boardingCar = nil
+		return nil, false
+	end
+	return car, boardingInto
+end
+
+function Drive.holdDoor(car: Model, door: number, seconds: number)
+	heldCar, heldDoor, heldUntil = car, door, os.clock() + seconds
+end
+
+function Drive.doorHeld(car: Model, door: number): boolean
+	return heldCar == car and heldDoor == door and os.clock() < heldUntil
+end
+
 function Drive.speed(): number
 	return speed
 end

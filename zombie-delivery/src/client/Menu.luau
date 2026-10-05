@@ -191,7 +191,7 @@ function Menu.show(onPlay: () -> ())
 		{ "HANDS", "B: holster / draw    ·    V: punch / strike" },
 		{ "CARGO", "E: pick up / load    ·    G: put down" }, { "EQUIPMENT", "Q: switch weapon    ·    1–5: items" },
 		{ "WINDOWS", "J: jobs    ·    M: map    ·    I: bag" }, { "MOUSE", "Alt: free cursor" },
-		{ "VEHICLE", "E / R: enter    ·    Space: exit" }, { "ADMIN", "P: admin (when authorized)" },
+		{ "VEHICLE", "E: get in / get out    ·    Space: out too" }, { "ADMIN", "P: admin (when authorized)" },
 	}
 	local rows = {}
 	for i, entry in controlsText do

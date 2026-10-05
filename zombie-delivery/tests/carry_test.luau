@@ -67,14 +67,15 @@ check("two pieces walk slower than the walk", Tuning.TwoPieceSpeed > 3 and Tunin
 
 -- The doors ---------------------------------------------------------------------
 
--- The prompts stand 1.4 studs outside the body (server/Vehicles.luau doorsOf). On the narrowest body (the courier
+-- The prompts stand DoorStandOut (1.4) studs outside the body (server/Vehicles.luau doorsOf). On the narrowest body (the courier
 -- van, 6.2 wide) somebody standing against the passenger side (at least 0.5 out) is 3.1 + 1.4 + 3.1 + 0.5 = 8.1
 -- studs from the driver's prompt: the reach must stay under that, so the driver's E never shows there.
 local NARROWEST = 6.2
-local apart = NARROWEST / 2 + 1.4 + NARROWEST / 2 + 0.5
+local apart = NARROWEST / 2 + Tuning.DoorStandOut + NARROWEST / 2 + 0.5
 check("the driver's E stays on the driver's side", Tuning.DoorReach < apart and Tuning.DoorReach >= 3, `{Tuning.DoorReach} vs {apart}`)
 check("a door swings out, not round", Tuning.DoorSwing >= 45 and Tuning.DoorSwing <= 90, Tuning.DoorSwing)
-check("a door stays open long enough to see it", Tuning.DoorOpenSeconds >= 0.6 and Tuning.DoorOpenSeconds <= 3, Tuning.DoorOpenSeconds)
+-- 3.10: the door follows getting in and out (tests/boarding_test.luau): open quickly, shut quickly behind you.
+check("a door swings open and shut quickly", Tuning.DoorSwingSeconds > 0 and Tuning.DoorSwingSeconds <= 0.3 and Tuning.DoorShutSeconds > 0 and Tuning.DoorShutSeconds <= 0.3, `{Tuning.DoorSwingSeconds} / {Tuning.DoorShutSeconds}`)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

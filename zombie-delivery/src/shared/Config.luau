@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.9"
+Config.Version = "3.10"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -1806,13 +1806,28 @@ Config.Cargo = {
 	HandsMax = 2, -- light pieces in one player's hands at most
 	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)
 	-- 3.7, the car doors (server/Vehicles.luau, client/CarVisuals.luau): the E to get in shows only at a door (the driver's
-	-- on the left, the passengers' on their side), this close; the door swings out this far and stays open this long.
+	-- on the left, the passengers' on their side), this close; the door swings out this far.
 	DoorReach = 5,
 	DriverDoorReach = 7, -- the owner's door: parked flush against a wall you still reach it from the front corner (the
 	-- passenger side of the narrowest car is 8+ away, so "Drive" still never shows there)
 	SeatReach = 3.5, -- a seat with no door (a bed, a roof gunner, a jump seat): close, so its E never takes the back's E
 	DoorSwing = 70, -- degrees
-	DoorOpenSeconds = 1.1,
+	-- 3.10, getting in and out (shared/Boarding.luau, client/CarBoarding.luau, server/Vehicles.luau): E at a door, a step
+	-- to the handle (BoardStepSeconds, the hand on it, the door swings open), a slide in through the door, the server
+	-- seats you BoardSeconds after the E and the door shuts behind you; E (or Space) in a seat slides you out at your
+	-- door in AlightSeconds. A seat with no door (a bed, a roof, a jump seat) is a short climb in an arc.
+	BoardSeconds = 0.5,
+	BoardStepSeconds = 0.15, -- to the handle, of BoardSeconds
+	AlightSeconds = 0.35,
+	DoorSwingSeconds = 0.18, -- a cabin door swinging open
+	DoorShutSeconds = 0.2, -- and shut
+	DoorStandOut = 1.4, -- where you stand at a door: this far out from the body (the prompt's attachment too)
+	BoardSitLift = 1.5, -- seated, the root sits this far over the seat's top (where the slide in ends)
+	BoardDuck = 14, -- degrees: the body ducks forward this much through the door
+	ClimbArc = 1.6, -- studs: a doorless seat's climb goes this much over the higher end
+	BoardMaxSpeed = 8, -- studs / s: the car faster than this, getting in is cancelled (you stand at the door)
+	AlightSlideMaxSpeed = 14, -- studs / s: out of a car faster than this you are put out at once (no slide)
+	BoardRange = 16, -- studs: farther than this from the seat when it is time to sit, getting in is cancelled
 }
 
 export type JobTypeDef = {
