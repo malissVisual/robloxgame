@@ -1414,9 +1414,9 @@ end
 
 -- ── Buttons ────────────────────────────────────────────────────────────────
 
--- The right column: every button is the Hud's own (other modules hook in: Hud.onCrew, Hud.onEstate). layout()
--- arranges them in one column, two or four (a UIGridLayout) to fit the room between the top right corner and the
--- weapon bar (computer) or the FIRE button (touch).
+-- The right column: every button is the Hud's own (other modules hook in: Hud.onCrew, Hud.onEstate, Hud.onMissions,
+-- Hud.onSound). layout() scales and places the block between the top right corner and the weapon card (computer)
+-- or the FIRE button (touch).
 
 -- Set by client/Main.client.luau: CREW opens / closes the crew window (CrewPanel.toggle), ESTATE the list of every
 -- property (EstateUi.toggleList). Unset, the button says what it is for (CrewPanel.start sets onCrew by itself too).
@@ -1425,8 +1425,8 @@ Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
 Hud.onMissions = nil :: (() -> ())? -- client/MissionsUi.luau: the MISSIONS window
 
-type ButtonDef = { id: string, text: string, icon: string, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
-local BUTTONS: { ButtonDef }, buttonGrid: any, buttonLayout: any, hudButtons: { [string]: any }
+type ButtonDef = { id: string, text: string, icon: string, main: boolean?, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
+local BUTTONS: { ButtonDef }, buttonGrid: any, hudButtons: { [string]: any }
 do -- (its own block: the locals below stay out of the 200-register limit)
 local function toggleJobs()
 	if jobs.frame.Visible then
@@ -1438,20 +1438,20 @@ end
 
 -- (type declared above)
 BUTTONS = {
-	{ id = "jobs", icon = "📋", text = "JOBS", key = "J", color = C.yellow, onClick = toggleJobs },
-	{ id = "missions", icon = "⭐", text = "MISSIONS", key = "U", color = C.panelLight, stroke = C.yellow, onClick = function()
+	{ id = "jobs", main = true, icon = "📋", text = "JOBS", key = "J", color = C.yellow, onClick = toggleJobs },
+	{ id = "missions", main = true, icon = "⭐", text = "MISSIONS", key = "U", color = C.panelLight, stroke = C.yellow, onClick = function()
 		local cb = Hud.onMissions
 		if cb then
 			cb()
 		end
 	end },
-	{ id = "map", icon = "🗺️", text = "MAP", key = "M", color = C.panelLight, onClick = function()
+	{ id = "map", main = true, icon = "🗺️", text = "MAP", key = "M", color = C.panelLight, onClick = function()
 		MapView.toggle()
 	end },
 	{ id = "bag", icon = "🎒", text = "BAG", key = "B", color = C.panelLight, onClick = function()
 		toggleBackpack()
 	end },
-	{ id = "car", icon = "🚗", text = "CAR", color = C.panelLight, stroke = C.blue, onClick = function()
+	{ id = "car", main = true, icon = "🚗", text = "CAR", color = C.panelLight, stroke = C.blue, onClick = function()
 		Net.get("SpawnCar"):FireServer()
 	end },
 	{ id = "top", icon = "🏆", text = "TOP", key = "L", color = C.panelLight, onClick = function()
@@ -1481,74 +1481,108 @@ BUTTONS = {
 	end },
 }
 
+-- One block at the right edge: the main buttons (main = true) wide, with their icon, name and key; under them the
+-- others as small icons in rows of three (the name slides out on hover). Its unscaled size is the grid's Size;
+-- layout() only scales and places it.
+local RAIL_W, MAIN_H, SMALL, RAIL_GAP, GROUP_GAP = 158, 44, 46, 8, 12
+local SMALL_GAP = (RAIL_W - 3 * SMALL) / 2
+local mainCount, smallCount = 0, 0
+for _, def in BUTTONS do
+	if def.main then
+		mainCount += 1
+	else
+		smallCount += 1
+	end
+end
+local smallRows = math.ceil(smallCount / 3)
+local railH = mainCount * MAIN_H + math.max(0, mainCount - 1) * RAIL_GAP + (if smallRows > 0 then GROUP_GAP + smallRows * SMALL + (smallRows - 1) * RAIL_GAP else 0)
 buttonGrid = placed(Ui.make("Frame", {
 	Name = "HudButtons",
-	Size = UDim2.fromOffset(52, 9 * 52),
+	Size = UDim2.fromOffset(RAIL_W, railH),
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 96),
 	BackgroundTransparency = 1,
 }, gui))
-buttonLayout = Ui.make("UIGridLayout", {
-	CellSize = UDim2.fromOffset(52, 52),
-	CellPadding = UDim2.fromOffset(8, 8),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-	FillDirection = Enum.FillDirection.Vertical,
-	StartCorner = Enum.StartCorner.TopRight,
-}, buttonGrid)
+local mainTop = 0
+local smallTop = mainCount * MAIN_H + math.max(0, mainCount - 1) * RAIL_GAP + GROUP_GAP
+local mainIndex, smallIndex = 0, 0
 hudButtons = {}
 local buttonStrokes: { [string]: Color3 } = {}
 
--- The icon rail: a square glass button per entry, its emoji in the middle, the key in the corner (computer) or the
--- name under the icon (touch); on a computer the name slides out to the left while the mouse is on it.
+-- Every button: dark glass, its emoji; a coloured edge for the ones that matter most (JOBS, MISSIONS, CAR, CREW,
+-- ESTATE); the key in a small chip.
 for order, def in BUTTONS do
 	local accent = def.stroke or (if def.color == C.yellow then C.yellow else nil)
+	local main = def.main == true
+	local position: UDim2
+	if main then
+		position = UDim2.fromOffset(0, mainTop + mainIndex * (MAIN_H + RAIL_GAP))
+		mainIndex += 1
+	else
+		-- Rows of three, the last row toward the screen's edge.
+		local row = smallIndex // 3
+		local inRow = math.min(3, smallCount - row * 3)
+		local col = smallIndex % 3 + (3 - inRow)
+		position = UDim2.fromOffset(col * (SMALL + SMALL_GAP), smallTop + row * (SMALL + RAIL_GAP))
+		smallIndex += 1
+	end
 	local button = Ui.make("TextButton", {
 		Name = `{def.id}Button`,
-		Size = if touchLayout then UDim2.fromOffset(62, 62) else UDim2.fromOffset(52, 52), -- layout() sets the cells
-		BackgroundColor3 = C.panel,
-		BackgroundTransparency = 0.18,
+		Size = if main then UDim2.fromOffset(RAIL_W, MAIN_H) else UDim2.fromOffset(SMALL, SMALL),
+		Position = position,
+		BackgroundColor3 = if main and def.color == C.yellow then Color3.fromRGB(46, 38, 22) else C.panel,
+		BackgroundTransparency = 0.15,
 		Text = "",
 		AutoButtonColor = false,
 		LayoutOrder = order,
 	}, buttonGrid)
-	Ui.corner(button, 12)
+	Ui.corner(button, if main then 10 else 12)
 	local border = Ui.stroke(button, accent or C.grey, if accent then 1.5 else 1)
-	border.Transparency = if accent then 0.15 else 0.45
+	local restBorder = if accent then 0.2 else 0.45
+	border.Transparency = restBorder
 	buttonStrokes[def.id] = accent or C.grey
-	Ui.label(button, def.icon, if touchLayout then UDim2.new(1, 0, 0.62, 0) else UDim2.fromScale(1, 1), {
-		Name = "Icon",
-		TextScaled = true,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Font = Enum.Font.GothamBold,
-	})
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, if touchLayout then 2 else 9), PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, button)
-	if touchLayout then
-		local name = Ui.label(button, def.text, UDim2.new(1, 0, 0.32, 0), {
-			Position = UDim2.fromScale(0, 0.66),
+	local restColor = button.BackgroundColor3
+	if main then
+		Ui.label(button, def.icon, UDim2.fromOffset(26, 26), {
+			Name = "Icon",
+			Position = UDim2.new(0, 10, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		Ui.label(button, def.text, UDim2.new(1, -78, 1, 0), {
+			Position = UDim2.fromOffset(44, 0),
+			Font = Theme.DisplayFont,
+			TextSize = 15,
+			TextColor3 = accent or C.text,
+		})
+	else
+		Ui.label(button, def.icon, UDim2.fromScale(1, 1), {
+			Name = "Icon",
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		Ui.make("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, button)
+	end
+	if def.key and not touchLayout then
+		-- The key: a chip on the right of a main button, in the corner of a small one.
+		local key = Ui.label(button, def.key, if main then UDim2.fromOffset(22, 22) else UDim2.fromOffset(15, 15), {
+			Position = if main then UDim2.new(1, -10, 0.5, 0) else UDim2.new(1, 8, 1, 8),
+			AnchorPoint = if main then Vector2.new(1, 0.5) else Vector2.new(1, 1),
+			BackgroundTransparency = 0,
+			BackgroundColor3 = Color3.fromRGB(10, 14, 13),
+			TextSize = if main then 12 else 10,
 			Font = Theme.HeadingFont,
 			TextColor3 = accent or C.dim,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 2,
 		})
-		Ui.make("UITextSizeConstraint", { MaxTextSize = 11 }, name)
-	else
-		if def.key then
-			-- The key, small in the bottom right corner.
-			local key = Ui.label(button, def.key, UDim2.fromOffset(14, 14), {
-				Position = UDim2.new(1, 7, 1, 7),
-				AnchorPoint = Vector2.new(1, 1),
-				BackgroundTransparency = 0,
-				BackgroundColor3 = Color3.fromRGB(10, 14, 13),
-				TextSize = 10,
-				Font = Theme.HeadingFont,
-				TextColor3 = accent or C.dim,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				ZIndex = 2,
-			})
-			Ui.corner(key, 4)
-		end
-		-- The name: a pill to the left of the button while the mouse is on it.
-		local tip = Ui.label(button, if def.key then `{def.text}  ·  {def.key}` else def.text, UDim2.fromOffset(0, 26), {
+		Ui.corner(key, if main then 6 else 4)
+	end
+	-- A small icon's name: a pill to the left while the mouse is on it.
+	local tip: any = nil
+	if not main and not touchLayout then
+		tip = Ui.label(button, if def.key then `{def.text}  ·  {def.key}` else def.text, UDim2.fromOffset(0, 26), {
 			Name = "Tip",
 			AutomaticSize = Enum.AutomaticSize.X,
 			Position = UDim2.new(0, -18, 0.5, 0),
@@ -1563,17 +1597,21 @@ for order, def in BUTTONS do
 		})
 		Ui.corner(tip, 8)
 		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, tip)
-		button.MouseEnter:Connect(function()
-			tip.Visible = true
-			button.BackgroundColor3 = C.panelLight
-			border.Transparency = 0
-		end)
-		button.MouseLeave:Connect(function()
-			tip.Visible = false
-			button.BackgroundColor3 = C.panel
-			border.Transparency = if accent then 0.15 else 0.45
-		end)
 	end
+	button.MouseEnter:Connect(function()
+		if tip then
+			tip.Visible = true
+		end
+		button.BackgroundColor3 = C.panelLight
+		border.Transparency = 0
+	end)
+	button.MouseLeave:Connect(function()
+		if tip then
+			tip.Visible = false
+		end
+		button.BackgroundColor3 = restColor
+		border.Transparency = restBorder
+	end)
 	button.Activated:Connect(function()
 		local click = Ui.onClick
 		if click then
@@ -1586,7 +1624,7 @@ for order, def in BUTTONS do
 		Name = "Badge",
 		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, 5, 0, -5),
+		Position = UDim2.new(1, -2, 0, 2),
 		BackgroundColor3 = C.red,
 		BorderSizePixel = 0,
 		Text = "",
@@ -1621,7 +1659,7 @@ function Hud.flashButton(id: string, color: Color3?, seconds: number?)
 	stroke.Transparency = 0
 	task.delay(seconds or 1.5, function()
 		stroke.Color = buttonStrokes[id] or Theme.Border
-		stroke.Transparency = 0.15
+		stroke.Transparency = 0.2
 	end)
 end
 end
@@ -2520,9 +2558,9 @@ end
 --   * Bottom centre, computer: the car panel centred between the minimap and the bars (smaller when it has to), the
 --     hint over it. Touch: the car panel with the hint over it and, beside it (sideways) or over it (upright), the
 --     weapon bar over the hotbar; moved left of FIRE / the jump button, or over them when that is not enough.
---   * The buttons: right edge, from the top (under ADMIN) down to the weapon bar (computer) or FIRE (touch). One
---     column when it fits at a scale of at least 0.6 (computer) or 0.7 (touch: the buttons are 100 × 48 there and
---     never smaller than 0.8 of that), else two columns, else four (two rows). A computer centres them in the room.
+--   * The buttons: one block at the right edge (the main ones wide with their names, the others small icons under
+--     them), between the top (under ADMIN) and the weapon card (computer: it sits on the card) or FIRE (touch), as
+--     big as that room allows.
 --   * Top stack: centred, TOP_W × S wide (narrower down to TOP_MIN_W before it gets smaller), between the minimap (touch) and the buttons / ADMIN, and as tall as the
 --     room over the bottom panels allows (TOP_EST_H: a two-line job panel, the mission banner and the car call line, with the loading
 --     bar's room under it); smaller when it has to. On a touch screen with no room beside the buttons (upright) it
@@ -2533,9 +2571,6 @@ local MARGIN = 16
 local GAP = 8
 local ADMIN_BOTTOM = 96 -- client/AdminPanel.luau: the ADMIN button at (1, -16, 0, 56), 90 × 32, unscaled
 local ADMIN_LEFT = 16 + 90 + GAP
-local BUTTON_W, BUTTON_H = 52, 52
-local TOUCH_BUTTON_W, TOUCH_BUTTON_H = 62, 62
-local BUTTON_GAP = 8
 local TOUCH_BUTTON_MIN = 0.8
 local TOP_EST_H = 320 -- the top stack's usual height (unscaled): a two-line job panel, the mission banner (up to 80) and the car call line
 local TOP_MIN_W = 400 -- a narrow span first makes the top stack narrower (down to this), then smaller
@@ -2569,14 +2604,6 @@ end
 -- The ADMIN button shows (the same rule as client/AdminPanel.luau).
 local function adminButtonShown(): boolean
 	return player:GetAttribute("Admin") == true or (Config.Admin.InStudio and RunService:IsStudio())
-end
-
--- The columns of buttons to try, the first that fits wins.
-local function columnChoices(width: number, height: number): { number }
-	if touchLayout and width < height then
-		return { 2, 1, 4 }
-	end
-	return { 1, 2, 4 }
 end
 
 layout = function()
@@ -2711,46 +2738,11 @@ layout = function()
 	hint.Position = UDim2.fromOffset(carX, hintAt)
 	table.insert(below, box(carX - hintWidth / 2, hintAt - HINT_LINES * (hintSize + 3), carX + hintWidth / 2, hintAt))
 
-	-- The buttons.
-	local bw = if touchLayout then TOUCH_BUTTON_W else BUTTON_W
-	local bh = if touchLayout then TOUCH_BUTTON_H else BUTTON_H
+	-- The buttons: one block (its Size is the unscaled block), as big as the room at the right edge allows.
 	local base = if touchLayout then math.max(S, TOUCH_BUTTON_MIN) else S
-	local minScale = if touchLayout then 0.7 else 0.6
+	local gw, gh = buttonGrid.Size.X.Offset, buttonGrid.Size.Y.Offset
 	local room = math.max(0, rightBottom - rightTop)
-	local count = #BUTTONS
-	local function gridSize(columns: number): (number, number)
-		local rows = math.ceil(count / columns)
-		return columns * bw + (columns - 1) * BUTTON_GAP, rows * bh + (rows - 1) * BUTTON_GAP
-	end
-	local columns, buttonScale = 0, 0
-	for _, choice in columnChoices(W, H) do
-		local _, h = gridSize(choice)
-		local fit = math.min(base, room / h)
-		if fit >= minScale then
-			columns, buttonScale = choice, fit
-			break
-		end
-	end
-	if columns == 0 then
-		-- Very little room: the flattest grid, as big as it fits.
-		local _, h = gridSize(4)
-		columns, buttonScale = 4, math.clamp(room / h, 0.45, base)
-	end
-	local gw, gh = gridSize(columns)
-	buttonGrid.Size = UDim2.fromOffset(gw, gh)
-	buttonLayout.CellSize = UDim2.fromOffset(bw, bh)
-	buttonLayout.CellPadding = UDim2.fromOffset(BUTTON_GAP, BUTTON_GAP)
-	if columns >= 4 then
-		-- Rows: JOBS MISSIONS MAP BAG / CAR TOP CREW ESTATE / SOUND.
-		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
-		buttonLayout.StartCorner = Enum.StartCorner.TopLeft
-		buttonLayout.FillDirectionMaxCells = columns
-	else
-		-- Columns from the screen's edge: JOBS MISSIONS MAP BAG CAR | TOP CREW ESTATE SOUND.
-		buttonLayout.FillDirection = Enum.FillDirection.Vertical
-		buttonLayout.StartCorner = Enum.StartCorner.TopRight
-		buttonLayout.FillDirectionMaxCells = math.ceil(count / columns)
-	end
+	local buttonScale = math.clamp(room / gh, 0.45, base)
 	setScale(buttonGrid, buttonScale)
 	-- On a computer the grid sits at the bottom of its room (on the weapon bar), clear of Roblox's player list
 	-- (leaderstats) in the top-right corner.
