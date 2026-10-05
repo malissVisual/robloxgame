@@ -496,6 +496,8 @@ end
 
 local function openWheel()
 	if #owned() < 2 then
+		-- Forget the held Q too: RenderStepped would open (and toast) again every frame while it stays down.
+		pressedAt = nil
 		say("Buy more guns at Lead & Co., or earn them by working.")
 		return
 	end
@@ -586,6 +588,8 @@ function WeaponWheel.start()
 			local character = player.Character
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 			if not humanoid or humanoid.Health <= 0 then
+				-- (and forget a held Q, or the next frame would open it again)
+				pressedAt = nil
 				WeaponWheel.close(false)
 			end
 		end
