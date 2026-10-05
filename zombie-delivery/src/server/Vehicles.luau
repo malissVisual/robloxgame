@@ -2560,7 +2560,11 @@ local function handsFull(player: Player): boolean
 	if not held then
 		return false
 	end
-	Net.get("Notice"):FireClient(player, if held == "horse" then "Load the horse first (E at the back of the truck)." else "Load it first (E at the back of the vehicle).")
+	local pushing = player.Character and player.Character:GetAttribute("Pushing")
+	Net.get("Notice"):FireClient(player, if pushing == "trolley" then "Stow the trolley first (G at the open back) or set it down (G)."
+		elseif pushing == "jack" then "Set the pallet jack down first (G)."
+		elseif held == "horse" then "Load the horse first (E at the back of the truck)."
+		else "Load it first (E at the back of the vehicle).")
 	return true
 end
 

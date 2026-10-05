@@ -54,6 +54,9 @@ local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
 -- server/Cargo.luau sets the character's CarrySpeed attribute).
 local function carrySpeed(character: Model): number
 	local lift = character:GetAttribute("CarrySpeed")
+	if type(lift) == "number" and character:GetAttribute("Pushing") ~= nil then
+		return lift -- 4.0: a trolley rolls a little faster than a crate is carried (server/Equipment.luau)
+	end
 	return if type(lift) == "number" then math.min(lift, CARRY_SPEED) else CARRY_SPEED
 end
 -- The body has weight: the speed builds up and bleeds off instead of jumping (studs per second, per second).

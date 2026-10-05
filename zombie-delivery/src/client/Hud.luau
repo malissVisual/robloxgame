@@ -2710,7 +2710,9 @@ function footTarget(): (Vector3?, string?, boolean)
 		return nil, nil, false
 	end
 	local pickup = job.stage == "pickup"
-	local holding = myCarrying() ~= nil
+	-- (an empty trolley or pallet jack, 4.0 Pushing, holds nothing yet)
+	local me = player.Character
+	local holding = myCarrying() ~= nil and not (me and me:GetAttribute("Pushing") ~= nil and me:GetAttribute("CarryCount") == nil)
 	local aboard = inVehicle() or 0
 	if not holding and typeof(job.looseAt) == "Vector3" then
 		-- A piece put down (G): the step says to pick it up again first.
