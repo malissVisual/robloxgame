@@ -1,16 +1,16 @@
 --!strict
 -- The game's pictures (the icon set and the logo): THE ONE PLACE to paste their Roblox asset ids. Pure data and a few
 -- helpers, used by the client (client/Ui.luau Ui.icon, client/Theme.luau, Hud, MapView) and the server (the landmark
--- tags in server/World.luau).
+-- tags and the building signs in server/World.luau).
 --
 -- How to fill it in:
 --   1. In Studio open View → Asset Manager, then Bulk Import, and pick the PNGs from zombie-delivery/art/
---      (weapons/, cargo/, map/, logo/zombie_delivery_logo.png, ui/menu_background.png). The file name without .png is
---      the name below (art/cargo/item_medkit.png → item_medkit).
+--      (weapons/, cargo/, map/, logo/zombie_delivery_logo.png, ui/menu_background.png, signs/sign_*.png). The file
+--      name without .png is the name below (art/cargo/item_medkit.png → item_medkit).
 --   2. Right-click an uploaded image → Copy Asset ID.
 --   3. Paste it here as "rbxassetid://<the number>", e.g. weapon_pistol = "rbxassetid://1234567890".
 -- An empty id means "not uploaded": the game then shows the emoji / text it always showed. The icons are white
--- silhouettes; the interface tints them (ImageColor3). The logo and the menu background are colour images.
+-- silhouettes; the interface tints them (ImageColor3). The logo, the menu background and the signs are colour images.
 
 local Icons = {}
 
@@ -64,6 +64,21 @@ Icons.Ids = {
 	-- Colour images: the wordmark on the start menu (art/logo) and its background (art/ui).
 	zombie_delivery_logo = "rbxassetid://104053473081511",
 	menu_background = "rbxassetid://138860042447767",
+	-- Building signs (art/signs: 1024 x 256 boards, 512 x 512 badges), colour images on the buildings (server/World).
+	sign_depot = "", sign_dealer = "", sign_guns = "", sign_mechanic = "",
+	sign_supplies = "", sign_repairs = "", sign_garage_rented = "", sign_garage_south = "",
+	sign_garage_harbor = "", sign_garage_north = "", sign_garage_downtown = "", sign_school = "",
+	sign_army = "", sign_icecream = "", sign_movers = "", sign_farm = "",
+	sign_ranch = "", sign_clinic = "", sign_gas = "", sign_bank = "",
+	sign_pharmacy = "", sign_market = "", sign_firestation = "", sign_police = "",
+	sign_cityhall = "", sign_dispatchtower = "", sign_harborpoint = "", sign_docks = "",
+	sign_warehouse = "", sign_fueldepot = "", sign_powerplant = "", sign_waterworks = "",
+	sign_trainyard = "", sign_radio = "", sign_lodge = "", sign_stables = "",
+	sign_airfield = "", sign_lab = "", sign_prison = "", sign_lighthouse = "",
+	sign_camp = "", sign_stadium = "", sign_hilltop = "", sign_oceanview = "",
+	sign_pinecrest = "", sign_lakeside = "", sign_sunset = "", sign_maple = "",
+	sign_oak = "", sign_birch = "", sign_elm = "", sign_office_harbor = "",
+	sign_office_tower = "", sign_office_penthouse = "",
 } :: { [string]: string }
 
 -- The asset id of an icon, or nil while it is empty (not uploaded) or unknown.
@@ -193,6 +208,43 @@ function Icons.landmark(landmarkId: string?): string?
 		return if Icons.Ids[borrowed] ~= nil then borrowed else nil
 	end
 	return named("map_", LANDMARK_ALIASES[landmarkId] or landmarkId)
+end
+
+-- The building signs (art/signs). The square badges (512 x 512): the garages and the homes; every other sign is a
+-- wide board (1024 x 256, 4 : 1). Two places use their employer's sign.
+local SQUARE_SIGNS: { [string]: boolean } = {
+	garage_rented = true,
+	garage_south = true,
+	garage_harbor = true,
+	garage_north = true,
+	garage_downtown = true,
+	hilltop = true,
+	oceanview = true,
+	pinecrest = true,
+	lakeside = true,
+	sunset = true,
+	maple = true,
+	oak = true,
+	birch = true,
+	elm = true,
+}
+local SIGN_ALIASES: { [string]: string } = {
+	base = "army", -- the Military Base as a place
+	frosty = "icecream", -- Frosty's Ice Cream as a place
+}
+
+-- The sign of a building (Map / Config id: a shop, an employer, a place, a tower, a home, a garage, an office).
+function Icons.sign(buildingId: string?): string?
+	if buildingId == nil then
+		return nil
+	end
+	return named("sign_", SIGN_ALIASES[buildingId] or buildingId)
+end
+
+-- How wide a building's sign is for its height: 1 for a square badge, 4 for a board.
+function Icons.signAspect(buildingId: string?): number
+	local name = Icons.sign(buildingId)
+	return if name ~= nil and SQUARE_SIGNS[string.sub(name, 6)] then 1 else 4
 end
 
 return Icons

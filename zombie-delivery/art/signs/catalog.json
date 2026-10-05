@@ -1,0 +1,787 @@
+{
+  "palette": {
+    "ink": "#493750",
+    "paper": "#FAF4E4",
+    "lavender": "#D3BDD9",
+    "sage": "#B9CC98",
+    "teal": "#37686A",
+    "coral": "#E4968C",
+    "blue": "#B3D1D7",
+    "rust": "#AE7655",
+    "tape": "#DCC09B"
+  },
+  "signs": [
+    {
+      "id": "depot",
+      "name": "ZOMBIE DELIVERY CO.",
+      "lines": [
+        "ZOMBIE",
+        "DELIVERY CO."
+      ],
+      "slogan": "STILL DELIVERING.",
+      "group": "Starting area",
+      "shape": "ticket",
+      "symbol": "parcel",
+      "color": "paper",
+      "accent": "lavender"
+    },
+    {
+      "id": "dealer",
+      "name": "Dead End Motors",
+      "lines": [
+        "DEAD END",
+        "MOTORS"
+      ],
+      "slogan": "SECOND LIFE. FOUR WHEELS.",
+      "group": "Starting area",
+      "shape": "arrow",
+      "symbol": "van",
+      "color": "teal",
+      "accent": "coral",
+      "light": true
+    },
+    {
+      "id": "guns",
+      "name": "Lead & Co.",
+      "lines": [
+        "LEAD & CO."
+      ],
+      "slogan": "GUNS & GOOD INTENTIONS",
+      "group": "Starting area",
+      "shape": "shield",
+      "symbol": "ammo",
+      "color": "coral",
+      "accent": "sage"
+    },
+    {
+      "id": "mechanic",
+      "name": "Wrench Garage",
+      "lines": [
+        "WRENCH",
+        "GARAGE"
+      ],
+      "slogan": "WE FIX WHAT IS LEFT",
+      "group": "Starting area",
+      "shape": "gear",
+      "symbol": "wrench",
+      "color": "sage",
+      "accent": "paper"
+    },
+    {
+      "id": "supplies",
+      "name": "Last Stop Supplies",
+      "lines": [
+        "LAST STOP",
+        "SUPPLIES"
+      ],
+      "slogan": "BEFORE YOUR NEXT BAD IDEA",
+      "group": "Starting area",
+      "shape": "tag",
+      "symbol": "supplies",
+      "color": "lavender",
+      "accent": "sage"
+    },
+    {
+      "id": "repairs",
+      "name": "Rust Bridge Repairs",
+      "lines": [
+        "RUST BRIDGE",
+        "REPAIRS"
+      ],
+      "slogan": "RUST NEVER SLEEPS. WE DO.",
+      "group": "Repairs and garages",
+      "shape": "bridge",
+      "symbol": "bridge",
+      "color": "coral",
+      "accent": "paper"
+    },
+    {
+      "id": "garage_rented",
+      "name": "Rented Lockup",
+      "lines": [
+        "RENTED",
+        "LOCKUP"
+      ],
+      "slogan": "YOUR VAN. UNDER COVER.",
+      "group": "Repairs and garages",
+      "shape": "padlock",
+      "symbol": "parking",
+      "color": "paper",
+      "accent": "lavender",
+      "square": true
+    },
+    {
+      "id": "garage_south",
+      "name": "Southside Garage",
+      "lines": [
+        "SOUTHSIDE",
+        "GARAGE"
+      ],
+      "slogan": "PARK. BREATHE. REPEAT.",
+      "group": "Repairs and garages",
+      "shape": "garage",
+      "symbol": "parking",
+      "color": "sage",
+      "accent": "coral",
+      "square": true
+    },
+    {
+      "id": "garage_harbor",
+      "name": "Harbor Lockup",
+      "lines": [
+        "HARBOR",
+        "LOCKUP"
+      ],
+      "slogan": "SAFE FROM MOST THINGS",
+      "group": "Repairs and garages",
+      "shape": "shield",
+      "symbol": "anchor",
+      "color": "blue",
+      "accent": "paper",
+      "square": true
+    },
+    {
+      "id": "garage_north",
+      "name": "Highway Garage",
+      "lines": [
+        "HIGHWAY",
+        "GARAGE"
+      ],
+      "slogan": "NEXT EXIT: YOUR VAN",
+      "group": "Repairs and garages",
+      "shape": "route",
+      "symbol": "parking",
+      "color": "teal",
+      "accent": "sage",
+      "light": true,
+      "square": true
+    },
+    {
+      "id": "garage_downtown",
+      "name": "Downtown Parking",
+      "lines": [
+        "DOWNTOWN",
+        "PARKING"
+      ],
+      "slogan": "A LITTLE ROOM TO PARK",
+      "group": "Repairs and garages",
+      "shape": "ticket",
+      "symbol": "parking",
+      "color": "lavender",
+      "accent": "paper",
+      "square": true
+    },
+    {
+      "id": "school",
+      "name": "Sunny Hill School",
+      "lines": [
+        "SUNNY HILL",
+        "SCHOOL"
+      ],
+      "slogan": "SMALL MINDS. BIG FUTURES.",
+      "group": "Employers",
+      "shape": "pencil",
+      "symbol": "sun",
+      "color": "paper",
+      "accent": "coral"
+    },
+    {
+      "id": "army",
+      "aliases": [
+        "base"
+      ],
+      "name": "Military Base",
+      "lines": [
+        "MILITARY",
+        "BASE"
+      ],
+      "slogan": "DELIVERIES AT THE GATE",
+      "group": "Employers",
+      "shape": "shield",
+      "symbol": "helmet",
+      "color": "sage",
+      "accent": "paper"
+    },
+    {
+      "id": "icecream",
+      "aliases": [
+        "frosty"
+      ],
+      "name": "Frosty's Ice Cream",
+      "lines": [
+        "FROSTY'S",
+        "ICE CREAM"
+      ],
+      "slogan": "COLD TREATS. WARM BRAINS.",
+      "group": "Employers",
+      "shape": "scallop",
+      "symbol": "icecream",
+      "color": "lavender",
+      "accent": "coral"
+    },
+    {
+      "id": "movers",
+      "name": "Big Move Movers",
+      "lines": [
+        "BIG MOVE",
+        "MOVERS"
+      ],
+      "slogan": "WE CARRY YOUR BAGGAGE",
+      "group": "Employers",
+      "shape": "crate",
+      "symbol": "moving",
+      "color": "blue",
+      "accent": "coral"
+    },
+    {
+      "id": "farm",
+      "name": "Old Farm",
+      "lines": [
+        "OLD FARM"
+      ],
+      "slogan": "STILL GROWING SOMETHING",
+      "group": "Employers",
+      "shape": "barn",
+      "symbol": "corn",
+      "color": "sage",
+      "accent": "paper"
+    },
+    {
+      "id": "ranch",
+      "name": "Silver Spur Ranch",
+      "lines": [
+        "SILVER SPUR",
+        "RANCH"
+      ],
+      "slogan": "FOUR LEGS. NO FUEL.",
+      "group": "Employers",
+      "shape": "western",
+      "symbol": "horse",
+      "color": "paper",
+      "accent": "teal"
+    },
+    {
+      "id": "clinic",
+      "name": "City Clinic",
+      "lines": [
+        "CITY CLINIC"
+      ],
+      "slogan": "WE STILL HAVE A PULSE",
+      "group": "Employers",
+      "shape": "medical",
+      "symbol": "medical",
+      "color": "blue",
+      "accent": "coral"
+    },
+    {
+      "id": "gas",
+      "name": "Gas Station",
+      "lines": [
+        "GAS STATION"
+      ],
+      "slogan": "LAST GOOD DROP",
+      "group": "Employers",
+      "shape": "arrow",
+      "symbol": "pump",
+      "color": "coral",
+      "accent": "paper"
+    },
+    {
+      "id": "bank",
+      "name": "First Zombie Bank",
+      "lines": [
+        "FIRST ZOMBIE",
+        "BANK"
+      ],
+      "slogan": "YOUR SAVINGS SURVIVED",
+      "group": "City",
+      "shape": "civic",
+      "symbol": "bank",
+      "color": "paper",
+      "accent": "sage"
+    },
+    {
+      "id": "pharmacy",
+      "name": "Corner Pharmacy",
+      "lines": [
+        "CORNER",
+        "PHARMACY"
+      ],
+      "slogan": "A LITTLE LESS DEAD",
+      "group": "City",
+      "shape": "medical",
+      "symbol": "pills",
+      "color": "sage",
+      "accent": "paper"
+    },
+    {
+      "id": "market",
+      "name": "FreshMart Supermarket",
+      "lines": [
+        "FRESHMART",
+        "SUPERMARKET"
+      ],
+      "slogan": "FRESH-ISH. STILL OPEN.",
+      "group": "City",
+      "shape": "tag",
+      "symbol": "basket",
+      "color": "paper",
+      "accent": "sage"
+    },
+    {
+      "id": "firestation",
+      "name": "Fire Station 9",
+      "lines": [
+        "FIRE STATION",
+        "9"
+      ],
+      "slogan": "BRAVE ENOUGH TO SHOW UP",
+      "group": "City",
+      "shape": "shield",
+      "symbol": "fire",
+      "color": "coral",
+      "accent": "paper"
+    },
+    {
+      "id": "police",
+      "name": "Precinct 13",
+      "lines": [
+        "PRECINCT",
+        "13"
+      ],
+      "slogan": "WHAT IS LEFT OF THE LAW",
+      "group": "City",
+      "shape": "shield",
+      "symbol": "badge",
+      "color": "blue",
+      "accent": "paper"
+    },
+    {
+      "id": "cityhall",
+      "name": "City Hall",
+      "lines": [
+        "CITY HALL"
+      ],
+      "slogan": "STILL TAKING COMPLAINTS",
+      "group": "City",
+      "shape": "civic",
+      "symbol": "hall",
+      "color": "lavender",
+      "accent": "paper"
+    },
+    {
+      "id": "dispatchtower",
+      "name": "Dispatch Tower",
+      "lines": [
+        "DISPATCH",
+        "TOWER"
+      ],
+      "slogan": "YOUR NEXT BIG DELIVERY",
+      "group": "City",
+      "shape": "ticket",
+      "symbol": "tower",
+      "color": "lavender",
+      "accent": "sage"
+    },
+    {
+      "id": "harborpoint",
+      "name": "Harbor Point",
+      "lines": [
+        "HARBOR",
+        "POINT"
+      ],
+      "slogan": "OFFICES ABOVE THE CHAOS",
+      "group": "City",
+      "shape": "bridge",
+      "symbol": "tower",
+      "color": "blue",
+      "accent": "paper"
+    },
+    {
+      "id": "docks",
+      "name": "Harbor Docks",
+      "lines": [
+        "HARBOR",
+        "DOCKS"
+      ],
+      "slogan": "WATCH YOUR STEP",
+      "group": "Harbor and industry",
+      "shape": "bridge",
+      "symbol": "anchor",
+      "color": "teal",
+      "accent": "paper",
+      "light": true
+    },
+    {
+      "id": "warehouse",
+      "name": "Harbor Warehouse",
+      "lines": [
+        "HARBOR",
+        "WAREHOUSE"
+      ],
+      "slogan": "STACK IT. SEND IT.",
+      "group": "Harbor and industry",
+      "shape": "crate",
+      "symbol": "crates",
+      "color": "paper",
+      "accent": "lavender"
+    },
+    {
+      "id": "fueldepot",
+      "name": "Harbor Fuel Depot",
+      "lines": [
+        "HARBOR FUEL",
+        "DEPOT"
+      ],
+      "slogan": "PLEASE DO NOT SPARK",
+      "group": "Harbor and industry",
+      "shape": "industrial",
+      "symbol": "barrel",
+      "color": "coral",
+      "accent": "paper"
+    },
+    {
+      "id": "powerplant",
+      "name": "Power Plant",
+      "lines": [
+        "POWER PLANT"
+      ],
+      "slogan": "KEEPING THE LIGHTS ON-ISH",
+      "group": "Harbor and industry",
+      "shape": "industrial",
+      "symbol": "bolt",
+      "color": "sage",
+      "accent": "lavender"
+    },
+    {
+      "id": "waterworks",
+      "name": "Water Works",
+      "lines": [
+        "WATER WORKS"
+      ],
+      "slogan": "EVERY DROP STILL COUNTS",
+      "group": "Harbor and industry",
+      "shape": "scallop",
+      "symbol": "water",
+      "color": "blue",
+      "accent": "paper"
+    },
+    {
+      "id": "trainyard",
+      "name": "Train Yard",
+      "lines": [
+        "TRAIN YARD"
+      ],
+      "slogan": "MIND THE VERY BIG GAP",
+      "group": "Harbor and industry",
+      "shape": "crate",
+      "symbol": "train",
+      "color": "teal",
+      "accent": "coral",
+      "light": true
+    },
+    {
+      "id": "radio",
+      "name": "Radio Station",
+      "lines": [
+        "RADIO",
+        "STATION"
+      ],
+      "slogan": "STILL ON THE AIR",
+      "group": "Out of town",
+      "shape": "wave",
+      "symbol": "radio",
+      "color": "lavender",
+      "accent": "paper"
+    },
+    {
+      "id": "lodge",
+      "name": "Ski Lodge",
+      "lines": [
+        "SKI LODGE"
+      ],
+      "slogan": "COLD OUTSIDE. WARM INSIDE.",
+      "group": "Out of town",
+      "shape": "mountain",
+      "symbol": "mountain",
+      "color": "paper",
+      "accent": "blue"
+    },
+    {
+      "id": "stables",
+      "name": "Riverside Riding School",
+      "lines": [
+        "RIVERSIDE",
+        "RIDING SCHOOL"
+      ],
+      "slogan": "HOLD YOUR HORSES",
+      "group": "Out of town",
+      "shape": "western",
+      "symbol": "horse",
+      "color": "sage",
+      "accent": "lavender"
+    },
+    {
+      "id": "airfield",
+      "name": "Old Airfield",
+      "lines": [
+        "OLD AIRFIELD"
+      ],
+      "slogan": "DELIVERIES CLEARED TO LAND",
+      "group": "Out of town",
+      "shape": "arrow",
+      "symbol": "plane",
+      "color": "blue",
+      "accent": "paper"
+    },
+    {
+      "id": "lab",
+      "name": "Biotech Lab",
+      "lines": [
+        "BIOTECH LAB"
+      ],
+      "slogan": "PROBABLY UNDER CONTROL",
+      "group": "Out of town",
+      "shape": "hex",
+      "symbol": "flask",
+      "color": "lavender",
+      "accent": "sage"
+    },
+    {
+      "id": "prison",
+      "name": "Blackrock Prison",
+      "lines": [
+        "BLACKROCK",
+        "PRISON"
+      ],
+      "slogan": "DELIVERIES ONLY. NO STAYS.",
+      "group": "Out of town",
+      "shape": "barred",
+      "symbol": "lock",
+      "color": "teal",
+      "accent": "paper",
+      "light": true
+    },
+    {
+      "id": "lighthouse",
+      "name": "Lighthouse Point",
+      "lines": [
+        "LIGHTHOUSE",
+        "POINT"
+      ],
+      "slogan": "A LITTLE LIGHT LEFT",
+      "group": "Out of town",
+      "shape": "bridge",
+      "symbol": "lighthouse",
+      "color": "paper",
+      "accent": "teal"
+    },
+    {
+      "id": "camp",
+      "name": "Survivor Camp",
+      "lines": [
+        "SURVIVOR",
+        "CAMP"
+      ],
+      "slogan": "ONE MORE DAY TOGETHER",
+      "group": "Out of town",
+      "shape": "mountain",
+      "symbol": "tent",
+      "color": "sage",
+      "accent": "coral"
+    },
+    {
+      "id": "stadium",
+      "name": "Stadium Shelter",
+      "lines": [
+        "STADIUM",
+        "SHELTER"
+      ],
+      "slogan": "EVERYONE GETS A SEAT",
+      "group": "Out of town",
+      "shape": "stadium",
+      "symbol": "stadium",
+      "color": "blue",
+      "accent": "lavender"
+    },
+    {
+      "id": "hilltop",
+      "name": "Hilltop Mansion",
+      "lines": [
+        "HILLTOP",
+        "MANSION"
+      ],
+      "slogan": "ABOVE IT ALL",
+      "group": "Real estate",
+      "shape": "civic",
+      "symbol": "mansion",
+      "color": "paper",
+      "accent": "lavender",
+      "square": true
+    },
+    {
+      "id": "oceanview",
+      "name": "Ocean View Mansion",
+      "lines": [
+        "OCEAN VIEW",
+        "MANSION"
+      ],
+      "slogan": "ROOM WITH A VIEW",
+      "group": "Real estate",
+      "shape": "scallop",
+      "symbol": "mansion",
+      "color": "blue",
+      "accent": "paper",
+      "square": true
+    },
+    {
+      "id": "pinecrest",
+      "name": "Pinecrest Mansion",
+      "lines": [
+        "PINECREST",
+        "MANSION"
+      ],
+      "slogan": "A QUIETER CORNER",
+      "group": "Real estate",
+      "shape": "shield",
+      "symbol": "pine",
+      "color": "sage",
+      "accent": "paper",
+      "square": true
+    },
+    {
+      "id": "lakeside",
+      "name": "Lakeside Villa",
+      "lines": [
+        "LAKESIDE",
+        "VILLA"
+      ],
+      "slogan": "STILL WATERS",
+      "group": "Real estate",
+      "shape": "scallop",
+      "symbol": "house",
+      "color": "blue",
+      "accent": "lavender",
+      "square": true
+    },
+    {
+      "id": "sunset",
+      "name": "Sunset Villa",
+      "lines": [
+        "SUNSET",
+        "VILLA"
+      ],
+      "slogan": "HOME BEFORE DARK",
+      "group": "Real estate",
+      "shape": "route",
+      "symbol": "sun",
+      "color": "coral",
+      "accent": "paper",
+      "square": true
+    },
+    {
+      "id": "maple",
+      "name": "12 Maple Street",
+      "lines": [
+        "MAPLE",
+        "STREET"
+      ],
+      "number": "12",
+      "slogan": "HOME SWEET HOME",
+      "group": "Real estate",
+      "shape": "mailbox",
+      "symbol": "leaf",
+      "color": "paper",
+      "accent": "coral",
+      "square": true
+    },
+    {
+      "id": "oak",
+      "name": "7 Oak Lane",
+      "lines": [
+        "OAK",
+        "LANE"
+      ],
+      "number": "7",
+      "slogan": "A PLACE TO COME BACK",
+      "group": "Real estate",
+      "shape": "mailbox",
+      "symbol": "leaf",
+      "color": "sage",
+      "accent": "paper",
+      "square": true
+    },
+    {
+      "id": "birch",
+      "name": "Birch Cottage",
+      "lines": [
+        "BIRCH",
+        "COTTAGE"
+      ],
+      "slogan": "SMALL HOUSE. BIG RELIEF.",
+      "group": "Real estate",
+      "shape": "barn",
+      "symbol": "leaf",
+      "color": "paper",
+      "accent": "sage",
+      "square": true
+    },
+    {
+      "id": "elm",
+      "name": "Elm Bungalow",
+      "lines": [
+        "ELM",
+        "BUNGALOW"
+      ],
+      "slogan": "ONE FLOOR. ONE SAFE SPOT.",
+      "group": "Real estate",
+      "shape": "barn",
+      "symbol": "house",
+      "color": "lavender",
+      "accent": "paper",
+      "square": true
+    },
+    {
+      "id": "office_harbor",
+      "name": "Harbor Point Office",
+      "lines": [
+        "HARBOR POINT",
+        "OFFICE"
+      ],
+      "slogan": "ZOMBIE DELIVERY CO. / SUITE 7",
+      "group": "Real estate",
+      "shape": "ticket",
+      "symbol": "briefcase",
+      "color": "blue",
+      "accent": "paper"
+    },
+    {
+      "id": "office_tower",
+      "name": "Dispatch Tower, 8th floor",
+      "lines": [
+        "DISPATCH TOWER",
+        "SUITE 8"
+      ],
+      "slogan": "ZOMBIE DELIVERY CO. / 8TH FLOOR",
+      "group": "Real estate",
+      "shape": "ticket",
+      "symbol": "briefcase",
+      "color": "lavender",
+      "accent": "paper"
+    },
+    {
+      "id": "office_penthouse",
+      "name": "Dispatch Tower Penthouse",
+      "lines": [
+        "DISPATCH TOWER",
+        "PENTHOUSE"
+      ],
+      "slogan": "ZOMBIE DELIVERY CO. / TOP FLOOR",
+      "group": "Real estate",
+      "shape": "civic",
+      "symbol": "briefcase",
+      "color": "paper",
+      "accent": "lavender"
+    }
+  ]
+}
