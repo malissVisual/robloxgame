@@ -309,6 +309,8 @@ topStack = placed(Ui.make("Frame", {
 	BackgroundTransparency = 1,
 }, gui))
 Ui.list(topStack, true, 8)
+-- (a toast or a banner under the contract makes the column taller: lay out again for its real height)
+topStack:GetPropertyChangedSignal("AbsoluteSize"):Connect(requestLayout)
 
 local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, mission = 3, carcall = 4, repair = 4, levelup = 5, toasts = 6 }
 local slots: { [string]: Frame } = {}
@@ -2304,7 +2306,8 @@ local function split(text: string): (string, string)
 	local words = string.split(text, " ")
 	local cut = #words + 1
 	for index, word in words do
-		if word:upper() ~= word then
+		-- (a house number starts the place: "UNLOAD AT THE NEW HOME, 42 Maple St")
+		if word:upper() ~= word or string.match(word, "^%d") then
 			cut = index
 			break
 		end
@@ -3225,19 +3228,25 @@ layout = function()
 		menu.Position = UDim2.new(1, 0, 1, 4)
 	end
 
+	-- The column's real height (unscaled): the contract with the toasts, the banners and the hints under it.
+	local stackScale = topStack:FindFirstChild("LayoutScale")
+	local tall = TOP_EST_H
+	if stackScale and stackScale:IsA("UIScale") and stackScale.Scale > 0.01 then
+		tall = math.max(TOP_EST_H, topStack.AbsoluteSize.Y / stackScale.Scale)
+	end
 	-- The contract column: as big as the span (from x0 to x1 at y) and the room under it allow.
 	local function fit(y: number, x0: number, x1: number): (number, number)
 		local span = x1 - x0
 		local width = math.clamp(span / S, TOP_MIN_W, TOP_W)
 		local scale = math.min(S, span / width)
 		local floor = ceilingBelow(below, x0, x0 + width * scale, y, H)
-		scale = math.min(scale, (floor - GAP - y) / TOP_EST_H)
+		scale = math.min(scale, (floor - GAP - y) / tall)
 		return scale, width
 	end
 	-- Its right end: the row of actions when the row is beside it (else the screen's edge, or ADMIN).
 	local function rightLimit(y: number): number
 		local limit = W - MARGIN
-		if grid.y1 > y and grid.y0 < y + TOP_EST_H * S then
+		if grid.y1 > y and grid.y0 < y + tall * S then
 			limit = math.min(limit, grid.x0 - GAP)
 		end
 		if admin then
@@ -3270,7 +3279,8 @@ layout = function()
 			topX, topY, topScale, topWidth = MARGIN, y, scale, width
 		end
 	end
-	topScale = math.max(topScale, 0.3)
+	-- Never smaller than readable (the 3.7 floor 0.3 made 4 px text): rather overlap the lower panels a little.
+	topScale = math.max(topScale, 0.7 * S)
 	setScale(topStack, topScale)
 	topStack.Size = UDim2.fromOffset(topWidth, 0)
 	topStack.Position = UDim2.fromOffset(topX, topY)
