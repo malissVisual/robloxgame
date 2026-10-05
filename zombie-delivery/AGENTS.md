@@ -7,7 +7,7 @@ Read `README.md` first. It describes the whole game: missions, challenges, the H
 
 ## The repository
 - The game is in `zombie-delivery/` and is synced into Roblox Studio by Rojo (`node tools/rojo-sync.js zombie-delivery`).
-- The repository root holds another game, Merge Blades. Do not touch it.
+- Merge Blades is archived in `archive/merge-blades/`. Do not change it unless the owner asks. The root project targets Zombie Delivery, and the shared synchronizer stays in `tools/rojo-sync.js`.
 - The owner pulls one branch, **`claude/adoring-mendel-v77f7v`**. Only work that lands there reaches the game.
 
 ## How we work together

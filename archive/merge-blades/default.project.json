@@ -1,21 +1,24 @@
 {
-  "name": "ZombieDelivery",
+  "name": "MergeBlades",
   "tree": {
     "$className": "DataModel",
+
     "ReplicatedStorage": {
       "Shared": {
-        "$path": "zombie-delivery/src/shared"
+        "$path": "src/shared"
       }
     },
+
     "ServerScriptService": {
       "Server": {
-        "$path": "zombie-delivery/src/server"
+        "$path": "src/server"
       }
     },
+
     "StarterPlayer": {
       "StarterPlayerScripts": {
         "Client": {
-          "$path": "zombie-delivery/src/client"
+          "$path": "src/client"
         }
       }
     }
