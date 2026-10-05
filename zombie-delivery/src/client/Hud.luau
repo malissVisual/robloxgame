@@ -393,7 +393,8 @@ function Hud.toast(text: string)
 		TextTransparency = 1,
 		LayoutOrder = 2,
 	})
-	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(440, math.huge) }, label)
+	-- 340: with the padding, the dot and the gap the pill stays inside the narrowest top stack (TOP_MIN_W 400).
+	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(340, math.huge) }, label)
 	-- In: slide down and fade in. Out: up and away.
 	local function fade(info: TweenInfo, y: number, gone: boolean)
 		local t = if gone then 1 else 0

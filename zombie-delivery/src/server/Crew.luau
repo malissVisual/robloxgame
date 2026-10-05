@@ -187,12 +187,13 @@ local function missionCopy(value: any): { [string]: any }?
 			copy[key] = value[key]
 		end
 	end
-	for _, key in { "number", "defendLeft" } do
+	for _, key in { "number", "defendLeft", "gatePulled" } do -- 3.2: gatePulled, the DUO switches' lever count
 		if type(value[key]) == "number" then
 			copy[key] = value[key]
 		end
 	end
 	copy.coop = value.coop == true
+	copy.duo = value.duo == true -- 3.2
 	local twists = {}
 	if type(value.twists) == "table" then
 		for _, twist in value.twists do

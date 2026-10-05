@@ -1447,12 +1447,25 @@ function Missions.missingText(missing: { Campaign }): string
 	return `Finish {first.name}'s finale first (and {#missing - 1} more {if #missing == 2 then "campaign" else "campaigns"}).`
 end
 
+-- 3.2: has the player cleared any mission of a campaign (started it, maybe before 3.2 had the prerequisites)?
+function Missions.started(progress: { [string]: number }, campaignId: string): boolean
+	for number = 1, FINALE do
+		if (progress[`{campaignId}_{number}`] or 0) >= 1 then
+			return true
+		end
+	end
+	return false
+end
+
 -- 3.2: is a campaign open for a player of `level` with `progress`? The campaigns it requires done (their finales),
--- then its level. Says why not.
+-- then its level. Says why not. A campaign already started stays open (a 3.1 save: no prerequisites, an older curve).
 function Missions.campaignOpen(campaignId: string, progress: { [string]: number }, level: number): (boolean, string?)
 	local campaign = Missions.findCampaign(campaignId)
 	if not campaign then
 		return false, "Unknown campaign."
+	end
+	if Missions.started(progress, campaignId) then
+		return true, nil
 	end
 	local missing = Missions.missing(campaignId, progress)
 	if #missing > 0 then
@@ -1466,7 +1479,7 @@ end
 
 -- Is the mission open for a player of `level` with `progress` ({ [mission id] = best stars })? Its campaign (3.2: the
 -- campaigns it requires finished, its level), the mission's own level, and the mission before it in the campaign
--- done. Says why not.
+-- done. Says why not. A mission already cleared needs no level (replays for stars on a 3.1 save).
 function Missions.unlocked(id: string, progress: { [string]: number }, level: number): (boolean, string?)
 	local def = Missions.find(id)
 	if not def then
@@ -1476,7 +1489,7 @@ function Missions.unlocked(id: string, progress: { [string]: number }, level: nu
 	if not open then
 		return false, why
 	end
-	if def.level and level < def.level then
+	if def.level and level < def.level and (progress[id] or 0) < 1 then
 		return false, `This mission needs level {def.level}.`
 	end
 	if def.number > 1 then

@@ -4,6 +4,7 @@
 -- name over other players' cars.
 -- 3.2: swings the back that opens (rear doors, a tailgate, a trunk lid, a ramp: the Motor6Ds "BackHinge" on the
 -- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
+-- The back's prompt shows only to the owner and the crew of the owner's job (the attribute BackCrew, server/Cargo.luau).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,7 +15,15 @@ local CarVisuals = {}
 
 type Wheel = { motor: Motor6D, front: boolean, radius: number }
 type Hinge = { motor: Motor6D, axis: Vector3, angle: number } -- angle: the open turn in radians
-type CarState = { wheels: { Wheel }, hinges: { Hinge }, back: number, spin: number, steer: number, tagged: boolean }
+type CarState = {
+	wheels: { Wheel },
+	hinges: { Hinge },
+	back: number,
+	spin: number,
+	steer: number,
+	tagged: boolean,
+	backReach: number?, -- the BackPrompt's own reach (the server's), before it was hidden here
+}
 
 local player = Players.LocalPlayer
 local states: { [Model]: CarState } = {}
@@ -48,7 +57,7 @@ local function stateOf(car: Model): CarState?
 			})
 		end
 	end
-	state = { wheels = wheels, hinges = hinges, back = 0, spin = 0, steer = 0, tagged = false }
+	state = { wheels = wheels, hinges = hinges, back = 0, spin = 0, steer = 0, tagged = false, backReach = nil }
 	states[car] = state
 	car.Destroying:Connect(function()
 		states[car] = nil
@@ -123,6 +132,20 @@ local function step(dt: number)
 		local ride = chassis:FindFirstChild("RidePrompt")
 		if ride and ride:IsA("ProximityPrompt") then
 			ride.Enabled = not mine and seatedIn == nil and freeSeat(car)
+		end
+		-- 3.2: the back's prompt only for the owner and the crew of the owner's job (the car's BackCrew, server/Cargo.luau);
+		-- out of reach for everybody else, so a stranger's car does not take the E. (Enabled is the server's: one E at a time.)
+		local door = chassis:FindFirstChild("CargoDoor")
+		local back = door and door:FindFirstChild("BackPrompt")
+		if back and back:IsA("ProximityPrompt") then
+			local crew = car:GetAttribute("BackCrew")
+			local usable = mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil)
+			local reach: number = state.backReach or back.MaxActivationDistance
+			state.backReach = reach
+			local want = if usable then reach else 0
+			if back.MaxActivationDistance ~= want then
+				back.MaxActivationDistance = want
+			end
 		end
 		if not mine and not state.tagged and car:GetAttribute("OwnerId") ~= nil then
 			state.tagged = true

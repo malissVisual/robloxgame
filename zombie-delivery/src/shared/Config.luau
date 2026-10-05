@@ -157,7 +157,6 @@ Config.Cars = {
 		description = "Frosty's ice cream truck. 1 passenger.",
 		company = true,
 		employer = "icecream",
-		level = 2,
 	},
 	{
 		id = "movingtruck",
@@ -856,14 +855,18 @@ Config.DayNight = {
 -- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
 -- on the job board (Jobs.Tiers level), cars, guns and car guns (their level field), some special jobs, the
 -- campaigns (shared/Missions.luau) and the real estate.
--- 3.2, the progression: the XP of the whole campaign path (100 missions, first clears) is about 43 000; level 15
--- needs 41 438 (XpBase 700 × 1.2^n). Playing only the campaigns you reach level 4 after First Shift (the pickup),
--- level 8 around Empty Shelves / Smoke and Sirens (the muscle car), 12 – 13 by Patient Zero; the last levels
--- (Dirty Money, Last Convoy) need the job board, the replays for stars and the DUO campaign on top: the endgame.
+-- 3.2, the progression: the first clears of the whole story path (the 100 non-DUO missions' job XP × FirstClearXp,
+-- no kills) give about 32 000 XP; level 15 needs 34 037 (XpBase 575 × 1.2^n). Played in order with about 10 kills a
+-- mission (+40 XP) no mission is ever above your level: level 4 after First Shift (the pickup), 8 after Empty Shelves
+-- (the muscle car), 13 after Wild West End, 14 by the end of Dirty Money and 15 inside Last Convoy. Without the kills
+-- you come short around Patient Zero (a few hundred XP: a couple of board jobs). The DUO campaign, the job board
+-- and the replays for stars come on top. 3.1 saves (the old curve, Legacy) keep their level (PlayerData, Curve).
 Config.Levels = {
 	MaxLevel = 15,
-	XpBase = 700, -- XP needed for level 2; every next level needs XpGrowth times more (shared/Levels.luau xpFor)
+	XpBase = 575, -- XP needed for level 2; every next level needs XpGrowth times more (shared/Levels.luau xpFor)
 	XpGrowth = 1.2,
+	Curve = 2, -- 3.2: the version of the curve a save's XP is on (PlayerData saves it as xpCurve; older: Legacy)
+	Legacy = { XpBase = 120, XpGrowth = 1.35 }, -- the 3.1 curve: such saves move to the same level here (Levels.fromLegacy)
 	XpPerStar = 60, -- a finished delivery: stars × this …
 	XpPerPiece = 10, -- … + per piece delivered …
 	XpPerKill = 4, -- … + per enemy killed during the job
@@ -1601,6 +1604,7 @@ Config.JobTypes = {
 		unloadTime = 3,
 		payPerStop = 60,
 		tier = 2,
+		level = 2, -- 3.2: Risky, like the board's tier 2
 		cargo = "Ice Cream",
 		pickupLabel = "LOAD THE ICE CREAM",
 		dropLabel = "SELL ICE CREAM AT",

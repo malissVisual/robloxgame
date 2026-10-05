@@ -57,7 +57,44 @@ for _, def in Missions.List do
 	end
 end
 local top = Levels.xpFor(MAX)
-check("the campaigns give 60 - 115 % of the top level's XP (no kills)", campaignXp >= top * 0.6 and campaignXp <= top * 1.15, `{math.floor(campaignXp)} of {top}`)
+check("the campaigns give 85 - 100 % of the top level's XP (no kills)", campaignXp >= top * 0.85 and campaignXp <= top, `{math.floor(campaignXp)} of {top}`)
+-- Played in order with about 10 kills a mission, no story mission is ever above your level, and you end at the top.
+do
+	local xp, blocked = 0, nil :: string?
+	for _, campaign in Missions.Campaigns do
+		if not campaign.duo then
+			for _, def in Missions.ofCampaign(campaign.id) do
+				if not blocked and Levels.levelFor(xp) < def.level then
+					blocked = `{def.id} needs {def.level}, you are {Levels.levelFor(xp)}`
+				end
+				xp += Levels.jobXp(def.tier, def.items, 10, false, true) * Config.Missions.FirstClearXp
+			end
+		end
+	end
+	check("the story path with ~10 kills a mission never waits for a level", blocked == nil, blocked)
+	check("the story path with ~10 kills reaches the top level", Levels.levelFor(xp) == MAX, Levels.levelFor(xp))
+end
+-- 3.1 saves (the old curve) keep their level and their share of the way to the next.
+do
+	local legacy = Config.Levels.Legacy
+	local function oldXpFor(level: number): number
+		local total = 0
+		for n = 2, level do
+			total += math.floor(legacy.XpBase * legacy.XpGrowth ^ (n - 2) + 0.5)
+		end
+		return total
+	end
+	local same = true
+	for level = 1, MAX do
+		if Levels.levelFor(Levels.fromLegacy(oldXpFor(level))) ~= level then
+			same = false
+		end
+	end
+	check("an old save keeps its level on the new curve", same)
+	local halfway = Levels.fromLegacy(math.floor((oldXpFor(10) + oldXpFor(11)) / 2))
+	check("an old save keeps its share of the level", Levels.levelFor(halfway) == 10 and math.abs(Levels.progress(halfway) - 0.5) < 0.02, Levels.progress(halfway))
+	check("the move never takes XP away", Levels.fromLegacy(10 ^ 6) == 10 ^ 6 and Levels.fromLegacy(0) == 0)
+end
 check("level 2 takes a few deliveries, not one", Levels.xpFor(2) >= 4 * Levels.jobXp(1, 2, 5, false, true), Levels.xpFor(2))
 check("the last level is the longest step", Levels.xpFor(MAX) - Levels.xpFor(MAX - 1) > Levels.xpFor(MAX - 1) - Levels.xpFor(MAX - 2))
 

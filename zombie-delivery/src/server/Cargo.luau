@@ -124,6 +124,7 @@ export type Session = {
 	pairAlone: { [Player]: number }, -- 3.2, the pair twist: since when (os.clock) the carrier has nobody close
 	slowed: { [Player]: Model }, -- the lift twist: carriers walking slowly right now (their character, CarrySpeed set)
 	liftTold: boolean, -- the lift twist's hint was given
+	atStop: boolean, -- 3.2: the vehicle stood in the stop's circle at the last tick (Take out only there)
 }
 
 export type Status = {
@@ -938,10 +939,18 @@ local function ownerPosition(session: Session): Vector3?
 	return if root then root.Position else nil
 end
 
+-- 3.2: the vehicle stands in the stop's circle (moving or not). Away from it the E at the back only opens and closes it.
+local function atStop(session: Session): boolean
+	local car = session.car
+	local plan = session.plan
+	return car ~= nil and plan ~= nil and flat(car.chassis.Position, plan.park) <= Config.Jobs.DeliverRadius
+end
+
 -- 3.2: does a piece still have to come out of the vehicle at this drop (not taken out, put down or handed over yet)?
+-- Only at the stop: elsewhere (the drive there) the back has to close.
 local function toTakeOut(session: Session): boolean
 	local plan = session.plan
-	if not plan or plan.stage ~= "drop" or (plan.mode ~= "carry" and plan.mode ~= "lead") or session.blocked then
+	if not plan or plan.stage ~= "drop" or (plan.mode ~= "carry" and plan.mode ~= "lead") or session.blocked or not atStop(session) then
 		return false
 	end
 	return #session.load > 0 and session.moved + heldCount(session) + #session.loose < neededNow(session)
@@ -970,6 +979,26 @@ local function backNeeded(session: Session): boolean
 		return busy or not session.built or #session.pile > 0
 	end
 	return busy or (#session.load > 0 and session.moved < neededNow(session))
+end
+
+-- 3.2: who besides the owner may use the back right now (the job's crew), on the car for client/CarVisuals.luau:
+-- the BackPrompt shows only to them, so a stranger's car does not take the E at a shared stop.
+local function shareBack(session: Session, car: Vehicles.Car?)
+	if not car or not car.model.Parent then
+		return
+	end
+	local ids: { string } = {}
+	if not session.ended then
+		for _, player in Players:GetPlayers() do
+			if player ~= session.owner and session.info.allowed(player) then
+				table.insert(ids, tostring(player.UserId))
+			end
+		end
+	end
+	local list = if #ids > 0 then table.concat(ids, ",") else nil
+	if car.model:GetAttribute("BackCrew") ~= list then
+		car.model:SetAttribute("BackCrew", list)
+	end
 end
 
 local function refresh(session: Session)
@@ -1419,6 +1448,10 @@ local function onCar(session: Session, player: Player)
 			tell(player, blockedText(session))
 			return
 		end
+		if not atStop(session) then
+			tell(player, "Drive to the stop first.")
+			return
+		end
 		if pairRefused(session, player) then
 			return
 		end
@@ -1785,6 +1818,7 @@ function Cargo.begin(owner: Player, info: Info): Session
 		pairAlone = {},
 		slowed = {},
 		liftTold = false,
+		atStop = false,
 	}
 	active[owner] = session
 	return session
@@ -1842,7 +1876,11 @@ function Cargo.update(session: Session, dt: number)
 		session.car = car
 		attachCar(session, old)
 		render(session)
+		if old then
+			old.model:SetAttribute("BackCrew", nil)
+		end
 	end
+	shareBack(session, car)
 
 	-- Dead, gone, sitting, out of the crew: the piece falls where it was.
 	local dropped = false
@@ -1880,6 +1918,12 @@ function Cargo.update(session: Session, dt: number)
 	local plan = session.plan
 	if not plan then
 		return
+	end
+	-- 3.2: arriving at / leaving the stop switches the E at the back between Take out and the doors.
+	local here = atStop(session)
+	if here ~= session.atStop then
+		session.atStop = here
+		refresh(session)
 	end
 	local position = ownerPosition(session)
 	if not session.built and position and flat(position, plan.park) < Tuning.SpawnDistance then
@@ -2022,8 +2066,10 @@ function Cargo.step(session: Session): (string, string)
 	if session.blocked and near then
 		return plan.mode, blockedText(session)
 	end
-	-- 3.2: the back is open and nothing more goes in or out here: close it, the car does not drive open.
-	if car and backOpen(session) and not held and (not near or not backNeeded(session)) then
+	-- 3.2: the back is open and nothing more goes in or out here: close it, the car does not drive open. A serve or
+	-- board stop needs no back: its own hint first while near, the nag once away.
+	local noBack = plan.mode == "serve" or plan.mode == "board"
+	if car and backOpen(session) and not held and (not near or (not noBack and not backNeeded(session))) then
 		local close = capital(Vehicles.backVerb(car, false))
 		return if near then plan.mode else "drive", if seatedCar then `Get out and {Vehicles.backVerb(car, false)} (E)` else `{close} (E), then drive on`
 	end
@@ -2089,6 +2135,13 @@ function Cargo.step(session: Session): (string, string)
 		return mode, "Wait for your crew to load"
 	end
 	if #session.load > 0 and session.moved < neededNow(session) then
+		if not atStop(session) then
+			-- 3.2: Take out only with the vehicle in the circle.
+			if car and backOpen(session) and not seatedCar then
+				return mode, `{capital(Vehicles.backVerb(car, false))} (E), then park in the {circle} circle`
+			end
+			return mode, `Park in the {circle} circle`
+		end
 		if shut then
 			return mode, if seatedCar then `Get out and {open} (E)` else `{capital(open)} (E)`
 		end
@@ -2244,6 +2297,8 @@ function Cargo.finish(session: Session, linger: boolean?)
 	if car and car.model.Parent then
 		car.model:SetAttribute("CargoCount", 0)
 		car.model:SetAttribute("CargoKind", nil)
+		Vehicles.setBack(car, false) -- 3.2: the next job starts with the back shut (a preloaded drop would offer Take out)
+		car.model:SetAttribute("BackCrew", nil)
 		local backPrompt = Vehicles.backPrompt(car)
 		if backPrompt then
 			backPrompt.Enabled = true -- the back is the owner's own again

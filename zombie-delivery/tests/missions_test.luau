@@ -481,6 +481,14 @@ do
 		open = Missions.unlocked("clinic_4", { clinic_3 = 2 }, clinic4.level - 1)
 		check("a mission above your level is locked", not open)
 	end
+	-- 3.1 saves: a campaign already started stays open (no finale before it, a lower level), a cleared mission
+	-- replays at any level; the next new mission still needs its own level.
+	local oldSave = { army_1 = 2, army_2 = 1 }
+	check("a started campaign stays open without its prerequisites", (Missions.campaignOpen("army", oldSave, 1)))
+	check("… its next mission opens at its level", (Missions.unlocked("army_3", oldSave, Missions.levelOf("army", 3))))
+	check("… a cleared mission replays below its level", (Missions.unlocked("army_2", oldSave, 1)))
+	check("… a new mission above your level stays locked", not Missions.unlocked("army_3", oldSave, Missions.levelOf("army", 3) - 1))
+	check("started: any cleared mission", Missions.started(oldSave, "army") and not Missions.started(oldSave, "power"))
 	open, why = Missions.unlocked("nope_1", none, 15)
 	check("an unknown mission is refused", not open and why ~= nil)
 end

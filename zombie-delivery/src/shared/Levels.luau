@@ -6,14 +6,36 @@ local Config = require(script.Parent.Config)
 
 local Levels = {}
 
--- Total XP needed to reach `level` (level 1 = 0).
-function Levels.xpFor(level: number): number
-	local L = Config.Levels
+-- Total XP needed to reach `level` on a curve (base, growth).
+local function curveXp(level: number, base: number, growth: number): number
 	local total = 0
-	for n = 2, math.clamp(level, 1, L.MaxLevel) do
-		total += math.floor(L.XpBase * L.XpGrowth ^ (n - 2) + 0.5)
+	for n = 2, math.clamp(level, 1, Config.Levels.MaxLevel) do
+		total += math.floor(base * growth ^ (n - 2) + 0.5)
 	end
 	return total
+end
+
+-- Total XP needed to reach `level` (level 1 = 0).
+function Levels.xpFor(level: number): number
+	return curveXp(level, Config.Levels.XpBase, Config.Levels.XpGrowth)
+end
+
+-- 3.2: XP saved on the 3.1 curve (Config.Levels.Legacy) moved onto the current one: the same level and the same share
+-- of the way to the next, never less than saved. PlayerData converts a save once (no xpCurve = Config.Levels.Curve).
+function Levels.fromLegacy(xp: number): number
+	local legacy = Config.Levels.Legacy
+	local max = Config.Levels.MaxLevel
+	local level = 1
+	while level < max and xp >= curveXp(level + 1, legacy.XpBase, legacy.XpGrowth) do
+		level += 1
+	end
+	local moved = Levels.xpFor(level)
+	if level < max then
+		local from, to = curveXp(level, legacy.XpBase, legacy.XpGrowth), curveXp(level + 1, legacy.XpBase, legacy.XpGrowth)
+		local share = math.clamp((xp - from) / math.max(1, to - from), 0, 1)
+		moved += math.floor((Levels.xpFor(level + 1) - moved) * share)
+	end
+	return math.max(xp, moved)
 end
 
 -- The level reached with this much XP.

@@ -697,7 +697,8 @@ local function buildMini(column: any, touch: boolean)
 	}, group)
 	Ui.corner(miniNorth, 10)
 	Ui.make("UIStroke", { Color = Ui.Colors.red, Thickness = 1, Transparency = 0.35 }, miniNorth)
-	-- The key for the big map: a small dark pill at the bottom.
+	-- The key for the big map: a small dark pill at the bottom, under the markers (the star / N pinned to the bottom
+	-- edge stay on top of it), over the shading.
 	local key = Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(0, 16),
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -709,7 +710,7 @@ local function buildMini(column: any, touch: boolean)
 		TextSize = 10,
 		Font = Theme.HeadingFont,
 		TextColor3 = Ui.Colors.dim,
-		ZIndex = 25,
+		ZIndex = 21,
 	}, group)
 	Ui.corner(key, 8)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, key)

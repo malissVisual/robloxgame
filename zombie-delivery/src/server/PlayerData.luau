@@ -217,6 +217,9 @@ local function applySaved(profile: Profile, saved: any)
 	profile.kills = number(saved.kills, 0, 2 ^ 50)
 	profile.earned = number(saved.earned, 0, 2 ^ 50)
 	profile.xp = number(saved.xp, 0, 2 ^ 50) -- older saves have no xp: 0 (level 1)
+	if saved.xpCurve ~= Config.Levels.Curve then
+		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
+	end
 	if type(saved.cars) == "table" then
 		for id, owned in saved.cars do
 			if owned == true and type(id) == "string" and Economy.findCar(id) then
@@ -386,6 +389,7 @@ function PlayerData.save(player: Player)
 		carGuns = profile.carGuns,
 		rep = profile.rep,
 		xp = profile.xp,
+		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on (applySaved converts older saves once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,

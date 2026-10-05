@@ -17,7 +17,12 @@ plant …) wait at the end of new roads (see **Missions**). Version 3.0.1 made t
 the town glowing back, your own soft light). Version 3.1 gives every place and every mission **a reason to keep
 playing**: **42 challenges**, **30 lost packages** hidden at the places, and rewards nobody can buy: every campaign
 gives a **title** and an **exclusive gun or paint**, every package found the Phantom paint, and every challenge done
-**Dead End**, the gun nobody else has (see **Challenges, secrets and rewards**).
+**Dead End**, the gun nobody else has (see **Challenges, secrets and rewards**). Version 3.2 is about **progression**:
+a real level curve where the cars, guns, campaigns and real estate open one after another and the mansions, the
+offices and your company are the **endgame**; every campaign now needs the one before it; a new **DUO campaign** of 10
+missions only for two (pair lifts, twin switches); every cargo vehicle gets a **back that opens** (doors, a tailgate,
+a trunk lid, a ramp) and the loading goes through it; and the rest of the **HUD** gets the glass look of the 3.1
+right side (see **Driver levels and the progression**, **Missions**, **The DUO campaign**, **Loading through the back**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -33,8 +38,8 @@ node tools/rojo-sync.js zombie-delivery
 `zombie-delivery/spust-zombie-delivery.cmd` (Windows) or `zombie-delivery/spust-zombie-delivery.command` (Mac):
 git pull + the sync.
 
-A Play test in Studio without API access cannot save, so it starts with `Config.StudioStartMoney` ($25,000) to try the
-shops. A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
+A Play test in Studio without API access cannot save, so it starts with `Config.StudioStartMoney` ($250,000) to try
+the shops. A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
 
 ## How to play
 
@@ -56,6 +61,7 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Get in your car / ride in a friend's car | E / R | the prompt |
 | Get out | Space | jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
+| Open / close the back (doors, tailgate, trunk, ramp; 3.2: with empty hands, the car standing) | hold E at the back | the prompt |
 | Put down / Let go (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | the prompt |
 | Open a lost package (3.1) | hold E | the prompt |
 | Real estate list (every property, buy, sell, set your home, GPS) | H | ESTATE button |
@@ -64,7 +70,8 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Ride a tower elevator (step on a pad under a floor sign) | walk onto it | walk onto it |
 | Admin panel (testing tools; only for admins: a Studio Play test, the place's owner, `Config.Admin.UserIds`) | P | the ADMIN button |
 
-While you carry something (or lead a horse) you cannot shoot, sprint or drive, and you walk slower.
+While you carry something (or lead a horse) you cannot shoot, sprint or drive, and you walk slower. A car with its
+back open does not drive (3.2).
 
 **Guns and cars.** You buy guns for your hands (Lead & Co.); you start with the pistol. From a car seat (driver or
 passenger) only a **one-handed** gun fires, out of the side window: the **pistol, the revolver and the SMG**. The
@@ -84,8 +91,9 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
 3. **JOBS** (or the job board at the depot): one special job and one delivery of every danger level.
    * Every delivery has stops: **pick up** at the blue circle, **deliver** at the yellow one. Park in the circle, **get
      out** and handle the cargo yourself: **Pick up** (E) a piece from the giver's pile, carry it to the back of the
-     vehicle and **Load** it (E); the loaded pieces ride visibly in the vehicle. At the drop **Take out** (E at the
-     back), carry it to the receiver and **Hand over** (E). Horses are **led on a rope** into the truck's stalls and
+     vehicle, put it down (G), **open the back** (E), pick it up again and **Load** it (E); the loaded pieces ride
+     visibly in the vehicle; **close the back** (E) and drive on. At the drop open the back, **Take out** (E), carry
+     it to the receiver and **Hand over** (E), and close it again (see **Loading through the back**). Horses are **led on a rope** into the truck's stalls and
      out again. Kids **walk** to the school bus and get on by themselves, and off again at the school: just park and
      wait. The ice cream route is the only stop where you hold still in the circle while the kids buy.
    * While you are on foot at a stop the enemies come **on foot** too: put the piece down (G), shoot, pick it up again.
@@ -99,18 +107,19 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
        the Military Base vault. Every bandit in town wants it: twice as many roadblocks and chases.
      * **Pizza Rush** (★, level 1): one hot pizza from Luigi's to a hungry customer, 3 minutes on the clock.
    * A locked job shows **🔒 LEVEL N** instead of ACCEPT: the danger levels need a driver level (★ 1, ★★ 2, ★★★ 4,
-     ★★★★ 6), and so do some special jobs (see **Driver levels**).
+     ★★★★ 7), and so do the special jobs and (3.2) the employers' jobs (see **Driver levels and the progression**).
    * **Work for the people who run things** (the WORK HERE boards, ★ yellow on the map). They lend you their vehicle
      for the job; after enough jobs the vehicle is yours, and some of them also give you a **gun** (not sold anywhere):
-     * **Sunny Hill School** (Suburbs): School Run, pick up kids at 3 homes → **School Bus** after 3 jobs
-     * **Military Base** (north, through the tunnel): Army Supply, ammo from the docks → **Army Carbine** after 2 jobs,
-       **Armored Truck** after 4
-     * **Frosty's Ice Cream** (Harbor): Ice Cream Route, sell at 4 stops → **Ice Cream Truck** after 3
-     * **Big Move Movers** (Downtown): Moving Day, furniture to a new home → **Moving Truck** after 3
-     * **Old Farm** (west): Farm Run, food to two city markets → **Monster Truck** after 3
-     * **Silver Spur Ranch** (off the West Highway): Horse Transport, two horses to the Riverside Riding School →
-       **Ranch Revolver** after 2 jobs, **Livestock Truck** after 4
-     * **Gas Station** (North Highway): Fuel Run, fuel barrels from the Harbor Fuel Depot → **Fuel Truck** after 3
+     * **Sunny Hill School** (Suburbs; level 2): School Run, pick up kids at 3 homes → **School Bus** after 3 jobs
+     * **Military Base** (north, through the tunnel; level 7): Army Supply, ammo from the docks → **Army Carbine**
+       after 2 jobs, **Armored Truck** after 4
+     * **Frosty's Ice Cream** (Harbor; level 2): Ice Cream Route, sell at 4 stops → **Ice Cream Truck** after 3
+     * **Big Move Movers** (Downtown; level 3): Moving Day, furniture to a new home → **Moving Truck** after 3
+     * **Old Farm** (west; level 8): Farm Run, food to two city markets → **Monster Truck** after 3
+     * **Silver Spur Ranch** (off the West Highway; level 5): Horse Transport, two horses to the Riverside Riding
+       School → **Ranch Revolver** after 2 jobs, **Livestock Truck** after 4
+     * **Gas Station** (North Highway; level 4): Fuel Run, fuel barrels from the Harbor Fuel Depot → **Fuel Truck**
+       after 3
      * **City Clinic** (Downtown, south-west of the depot; level 3): Ambulance Run, pick up a patient at their home in
        the clinic's ambulance and rush them to the clinic within 2½ minutes (the patient shuffles in and out by
        themselves, slowly) → **Ambulance** after 3
@@ -163,16 +172,48 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
    CREW in the crew window) lists the players who want a crew, for one mission or any, with INVITE; your own toggle
    puts you on it, and FIND CREW on a co-op mission does that and opens the window.
 
-**Driver levels.** Every delivery gives XP: stars × 60 + 10 per piece delivered + 4 per kill, × 1.25 at night; a
-failed job gives 25 % (once something was done). 15 levels, each with a rank name (Rookie Courier, Courier, Runner,
-Road Rat, Road Warrior, Veteran Driver, Wasteland Trucker at 8, Convoy Captain at 10, Dead End Legend at 12, King of
-the Road at 15). The levels unlock things, which show **🔒 LEVEL N** until then:
+**Driver levels and the progression.** Every delivery gives XP: stars × 60 + 10 per piece delivered + 4 per kill,
+× 1.25 at night; a failed job gives 25 % (once something was done). 15 levels, each with a rank name (Rookie Courier,
+Courier, Runner, Road Rat, Road Warrior, Veteran Driver, Wasteland Trucker at 8, Convoy Captain at 10, Dead End Legend
+at 12, King of the Road at 15). Since 3.2 the levels are a real progression (it is not a game about buying things):
+the levels open the gear one step after another, the campaigns open one after another (see **Missions**), and the
+real estate and your company come at the very end. Everything locked shows **🔒 LEVEL N** (or **FINISH <CAMPAIGN>**)
+until then:
 
-* the danger levels on the job board: ★★ at level 2, ★★★ at 4, ★★★★ at 6
-* special jobs: Ambulance Run 3, Cash Transport 5 (Pizza Rush from 1)
-* cars: Pickup 2, Muscle Car 4
-* guns: SMG 2, Shotgun 3, Hunting Rifle 5, Minigun 8, Grenade Launcher 10
-* car guns: Roof Machine Gun 3, Roof Minigun 7, Roof Grenade Launcher 9
+| Level | Opens |
+|---|---|
+| 1 | the Old Van, the Pistol, ★ jobs, Pizza Rush, First Shift |
+| 2 | ★★ jobs, School Run, Ice Cream Route, Code Red |
+| 3 | the SMG ($4,000), Moving Day, Ambulance Run |
+| 4 | **the Pickup** ($12,000), the Shotgun ($7,500), ★★★ jobs, Fuel Run, Empty Shelves, the DUO campaign |
+| 5 | the Roof Machine Gun ($9,000), Horse Transport, Cash Transport, the Harbor Lockup garage |
+| 6 | the Hunting Rifle ($15,000), Smoke and Sirens, the Highway Garage, the Elm Bungalow |
+| 7 | ★★★★ INSANE jobs, Army Supply, Winter Run, Downtown Parking, Birch Cottage |
+| 8 | **the Muscle Car** ($40,000), Farm Run (the Monster Truck), Iron Supply, 7 Oak Lane |
+| 9 | Lights Out, 12 Maple Street |
+| 10 | the Minigun ($40,000), the Roof Minigun ($45,000), Wild West End, the Sunset Villa |
+| 11 | the Lakeside Villa |
+| 12 | the Grenade Launcher ($60,000), the Roof Grenade Launcher ($55,000), Patient Zero, the Harbor Point Office (+ Iron Supply finished) |
+| 13 | Dirty Money, the Pinecrest Mansion |
+| 14 | Last Convoy, the Ocean View Mansion, the Dispatch Tower office (+ Dirty Money finished) |
+| 15 | the Hilltop Mansion, the Dispatch Tower Penthouse (+ Last Convoy finished) |
+
+* **Cars**: the Old Van at 1 (free), the Pickup at 4, the Muscle Car at 8. The company vehicles come with their
+  employer's job level. The Wrench Garage upgrades cost twice their 3.1 price.
+* **Guns**: Pistol 1, SMG 3, Shotgun 4, Hunting Rifle 6, Minigun 10, Grenade Launcher 12. **Car guns**: Roof Machine
+  Gun 5, Roof Minigun 10, Roof Grenade Launcher 12.
+* **Real estate** (the endgame): garages 5 – 7, houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
+  the offices 12, 14 and 15, each also needing a campaign's finale (Iron Supply, Dirty Money, Last Convoy; the ESTATE
+  list says "Finish Iron Supply first"). Hiring a courier costs $40,000.
+* **The XP curve** (`Config.Levels`): level 2 needs 575 XP, every next step × 1.2; level 15 needs 34,037 XP. The first
+  clears of the 100 story missions (their job XP × 1.5) give about 32,000; with the kills on the way you never wait for
+  a level on the story path: level 4 after First Shift, 8 after Empty Shelves, 13 after Wild West End, 14 by the end
+  of Dirty Money and 15 inside Last Convoy. Without kills you come a little short around Patient Zero (a couple of
+  board jobs). The job board, the replays for stars and the DUO campaign come on top.
+* **Old saves**: a 3.1 save keeps its level: its XP (on the old 120 × 1.35 curve) is moved once to the same level and
+  the same share of the next one on the new curve (`Levels.fromLegacy`; the save's `xpCurve` marks it done). A
+  campaign you already started stays open even without the campaign before it, and a mission you already cleared can
+  be replayed for stars at any level. Gear you own stays yours.
 
 The HUD shows your level, rank and XP bar; the result window the XP of the job (and LEVEL UP). The player list shows
 **Level** (leaderstats). **L** (or **TOP**) opens the server's leaderboard: everybody's level, rank, deliveries and
@@ -188,27 +229,34 @@ your client only), so a zombie is never hidden in the black; and the street lamp
 
 ## Missions
 
-Press **U** (or **MISSIONS**) anywhere: the window lists the **10 campaigns** of **10 missions** each
-(`shared/Missions.luau`), with the total stars (X / 300) on top and ALL / CO-OP tabs. Every campaign has a client,
-a story, a colour and the driver level it opens at; its missions open **one after another** (finish one, any rating,
-and the next is open; some need a higher level of their own). Click a mission for its card: the briefing in the
+Press **U** (or **MISSIONS**) anywhere: the window lists the **11 campaigns** of **10 missions** each
+(`shared/Missions.luau`; 3.2: the 10 story campaigns and the DUO one), with the total stars (X / 330, every count
+computed from the data) on top and ALL / CO-OP tabs. Every campaign has a client, a story, a colour and the driver
+level it opens at; its missions open **one after another** (finish one, any rating, and the next is open).
+
+**The campaign chain** (3.2, `Campaign.requires`, `Missions.unlocked` / `campaignOpen` / `missing`): every story
+campaign needs the **finale** (mission 10) of the one before it, and then its level; Last Convoy needs all nine. A
+locked campaign says what it waits for ("🔒 Finish Code Red first · LEVEL 4"). Inside a campaign the missions' own
+levels grow from the campaign's level (mission 1) to the next campaign's (mission 10), computed in `add()`
+(`Missions.levelOf`), so the rank matters all the way; a mission above your level shows its own LEVEL lock. Click a mission for its card: the briefing in the
 client's words, the twists, the cargo, the vehicle, the danger level and the pay, and **START**. The mission starts
 right where you are (the pick-up is near you, or at its fixed place); a member of somebody's crew sees "your crew
 leader picks the mission" instead (the leader's START takes the crew along). A NIGHT ONLY mission starts only after
 dark.
 
-| Campaign | Client | Level | Campaign reward |
-|---|---|---|---|
-| 📦 First Shift | Marge, the dispatcher | 1 | $2,500 |
-| 🏥 Code Red | Dr. Novak, the City Clinic | 2 | $4,000 |
-| 🛒 Empty Shelves | Mr. Patel, FreshMart | 3 | $5,500 |
-| 🚒 Smoke and Sirens | Chief Ramirez, Fire Station 9 | 4 | $7,000 |
-| 🪖 Iron Supply | Captain Reyes, the Military Base | 5 | $9,000 |
-| ⚡ Lights Out | Engineer Volkov, the Power Plant | 6 | $11,000 |
-| 🐴 Wild West End | Walt, the rancher | 7 | $13,000 |
-| 🧪 Patient Zero | Dr. Ito, the Biotech Lab | 9 | $16,000 |
-| 💰 Dirty Money | Vinnie, the fixer | 11 | $20,000 |
-| 🚌 Last Convoy | Mayor Grant, City Hall | 13 | $30,000 |
+| Campaign | Client | Needs finished | Level (missions 1 → 10) | Campaign reward |
+|---|---|---|---|---|
+| 📦 First Shift | Marge, the dispatcher | – | 1 → 2 | $2,500 |
+| 🏥 Code Red | Dr. Novak, the City Clinic | First Shift | 2 → 4 | $4,000 |
+| 🛒 Empty Shelves | Mr. Patel, FreshMart | Code Red | 4 → 6 | $5,500 |
+| 🤝 Partners in Crime (DUO) | Rosa & Rico, the twins | First Shift | 4 → 8 | $7,500 |
+| 🚒 Smoke and Sirens | Chief Ramirez, Fire Station 9 | Empty Shelves | 6 → 8 | $7,000 |
+| 🪖 Iron Supply | Captain Reyes, the Military Base | Smoke and Sirens | 8 → 9 | $9,000 |
+| ⚡ Lights Out | Engineer Volkov, the Power Plant | Iron Supply | 9 → 10 | $11,000 |
+| 🐴 Wild West End | Walt, the rancher | Lights Out | 10 → 12 | $13,000 |
+| 🧪 Patient Zero | Dr. Ito, the Biotech Lab | Wild West End | 12 → 13 | $16,000 |
+| 💰 Dirty Money | Vinnie, the fixer | Patient Zero | 13 → 14 | $20,000 |
+| 🚌 Last Convoy | Mayor Grant, City Hall | all nine story campaigns | 14 → 15 | $30,000 |
 
 * **Stars** (`Missions.rate`): done = ★; the cargo still at 75 % or more = ★★; and 30 % or more of the clock left =
   ★★★. Your best rating per mission is saved.
@@ -228,16 +276,71 @@ dark.
   | 🎯 SHOTGUN SEAT | kills from the passenger seats pay triple | × 1.1 |
   | 💎 SPOTLESS | below 60 % cargo the mission fails at once | × 1.4 |
   | 🏴 HUNTED | bandit cars and roadblocks come 2.5 times as often | × 1.35 |
+  | 🤝 PAIR LIFT (3.2, DUO only) | the pieces only move with two: no pick-up or take-out without another job member within 10 studs, and the piece goes down when the partner is gone for 1.5 s | × 1.3 |
+  | 🎛 TWIN SWITCHES (3.2, DUO only) | two levers 22 studs apart at the stop: two different players pull them within 1.5 s of each other to open the gate | × 1.25 |
 
-* **Co-op** (46 of the missions, tagged CO-OP; they can still be played alone): for every crew mate besides you
+* **Co-op** (56 of the missions, tagged CO-OP; outside the DUO campaign they can still be played alone): for every crew mate besides you
   (members and riders, `MaxMembers` at most) the pay is × (1 + 0.25 per mate) for everybody and the enemies (waves,
   foot waves, hordes) × (1 + 0.35 per mate), recounted when the crew changes (a toast says so).
 * **The crew gets the stars too** (`Config.Missions.CrewCredit`): the members and riders with you at the finish get
   the rating, the first clear and the campaign as if it were theirs, if the mission is open for them (its campaign,
   its level, the mission before it); otherwise only their share of the pay.
-* During a mission a **banner** in the HUD's top stack shows "MISSION 3/10 · Name", the twists, the crew count and
-  the HOLD OUT countdown; the crew members' strip shows it too.
+* During a mission a **banner** in the HUD's top stack shows "MISSION 3/10 · Name", the twists, the crew count, the
+  HOLD OUT countdown and (3.2) the TWIN SWITCHES lever count; the crew members' strip and banner show it too.
 * The leaderboard (L) has a **STARS** column (ties on the level go to the stars).
+
+### The DUO campaign
+
+**Partners in Crime** (3.2, 🤝, Rosa & Rico, the twins; level 4, after First Shift's finale) is ten missions **only
+for a crew** (`duo = true`, all co-op), told for two: Double Act, Flood Gate, Shotgun Wedding, Two Keys, Heavy
+Current, Lock Step, Cold Hands, Crossed Wires, Mirror Run and the finale Partners in Crime (levels 4 → 8). They use
+the two new twists often and mix in HOLD OUT, SHOTGUN SEAT, TWO-MAN LIFT, HOT ZONE and HUNTED.
+
+* **Start rule** (server/Missions.luau): START needs at least `Config.Missions.Duo.MinCrew` = 1 crew member online
+  and within `StartRange` = 120 studs; otherwise "DUO mission: invite a friend first (K) and bring them here." (the
+  card shows FIND CREW). If the crew drops below that during the mission (a partner leaves the crew or the game),
+  the mission fails: "Your partner left."
+* **Pair lift** (`pair`): Jobs passes `Info.pair` to Cargo; a piece is picked up, carried or taken out only while
+  another job member is within `PairRange` = 10 studs ("Pair lift: you need your partner on the other side.");
+  alone for more than 1.5 s, the piece goes down.
+* **Twin switches** (`switches`, `server/DuoGates.luau`): at the last drop (or every pick-up of a mission with
+  `gates = "pickup"`) a gate with two lever posts `LeverApart` = 22 studs apart blocks the stop
+  (`Cargo.setBlocked`, the hint "Pull both levers together!"). A pull holds its lever down for `LeverWindow` = 1.5 s;
+  both down at once, pulled by **two different players**, and the boom swings up and the stop opens. The gate goes
+  when the stop is done or the job ends.
+* **Reward**: $7,500, the **Tandem Twin** paint (metal) and the title **Partners in Crime**. The DUO campaign is a
+  side story: Last Convoy does not need it. The MISSIONS window tags its row and cards 🤝 DUO.
+
+## Loading through the back
+
+Since 3.2 every vehicle that takes cargo by hand has a **back that opens** (`Style.back` in server/Vehicles.luau):
+
+| Vehicle | The back |
+|---|---|
+| Old Van, Ice Cream Truck, Armored Truck, Moving Truck, Ambulance | two rear doors |
+| Pickup, Monster Truck (new bed rails), Fuel Truck (the flatbed) | a tailgate |
+| Muscle Car | a trunk lid (the spoiler rides on it) |
+| Livestock Truck | a horse ramp down to the ground |
+
+The leaves hang on Motor6Ds "BackHinge"; the server sets the car's `BackOpen` attribute and every client swings them
+(client/CarVisuals.luau, an eased 0.45 s). Traffic, bandit, NPC and showroom cars have them welded shut. The
+**BackPrompt** at the back ("Open doors" / "Close doors", "Open tailgate", "Lower ramp" …) needs **empty hands**, the
+car standing, and the owner or the job's crew (it shows only to them).
+
+The loading at a **carry** or **lead** stop:
+
+1. Pick up a piece at the pile (E) and walk to the car. With the back shut the hint says "Put it down (G) and open
+   the back doors (E)".
+2. Put it down (G), open the back (E), pick the piece up again (E) and **Load** it (E): Load and Take out only work
+   through an open back, and the BackPrompt and the Load prompt take turns on the one E.
+3. When the stop's pieces are in: "Close the back doors (E), then drive on". **A car with its back open does not
+   drive**: the Drive prompt refuses the owner, client/Drive.luau holds the throttle and toasts "Close the back
+   first"; the chauffeur closes it at the hand-over, a new car starts closed, and a job's end closes it too.
+4. At the drop the same way round: park in the circle, open the back, **Take out** (only with the car in the stop's
+   circle), carry it to the receiver, Hand over, close the back.
+
+The holds are short (`Config.Cargo.HoldDuration`), so the extra steps add a few seconds per stop. **board** stops
+(the bus, the ambulance's patients, the survivors) and **serve** stops (the ice cream) do not use the back.
 
 ## Challenges, secrets and rewards
 
@@ -260,6 +363,7 @@ theirs on the next join.
 | 🧪 Patient Zero | Toxic Glow paint (neon) | Cure Runner |
 | 💰 Dirty Money | **Vinnie's Golden Pistol** (gun, one-handed) | Made Man |
 | 🚌 Last Convoy | Sunrise Chrome paint (foil) | Last Convoy Captain |
+| 🤝 Partners in Crime (3.2) | Tandem Twin paint (metal) | Partners in Crime |
 
 **The lost packages.** A worn cardboard box with tape, a faint glow and a "?" seen within 25 studs is hidden at every
 one of the 29 places, plus one more up on the stadium stands: **30** in all (`Map.Secrets`, built by
@@ -278,7 +382,7 @@ give a title, and 4 are **hidden** (??? until done):
 |---|---|
 | ⚔️ Combat | First Blood (10 kills · $200), Sharpshooter (25 headshots · $500), The Bigger They Are (10 brutes · $800), Bandit Bounty (25 bandits on foot · $1,500), Demolition Crew (50 explosion kills · $1,500), Horde Breaker (500 kills · $2,000), Headhunter (250 headshots · $4,000 · Headhunter), Giant Slayer (100 brutes · $6,000 · Giant Slayer), The Undertaker (5,000 kills · $15,000 · The Undertaker) |
 | 🚗 Driving | Sunday Driver (25,000 studs · $300), Speed Bump (run over 50 · $600), Highway Patrol (10 bandit cars · $2,000), Mounted Mayhem (100 car gun kills · $2,500), Long Haul (250,000 studs · $3,000), Road Warrior (1,000,000 studs · $12,000 · Road Warrior) |
-| 🎯 Missions | On the Clock (5 missions · $500), Story Time (1 campaign · $1,000), Night Shift (15 at night · $2,000), Hold the Line (10 HOLD OUT won · $2,000), Wave Rider (100 waves · $2,000), Trusted Courier (25 missions · $2,500), Flawless (25 at 3 stars · $2,500), Star Collector (100 stars · $3,000), Top of the Ladder (level 15 · $10,000), Legendary Courier (all 100 missions · $15,000 · Legendary Courier), Saviour of the City (all 10 campaigns · $20,000), Three-Star General (all 300 stars · $20,000 · Three-Star General); hidden: Ghost Courier (a NO SHOOTING mission without a shot · $2,000 · The Ghost), Horse Whisperer (25 horses · $2,500 · Horse Whisperer), Against the Clock (10 timed missions · $3,000) |
+| 🎯 Missions | On the Clock (5 missions · $500), Story Time (1 campaign · $1,000), Night Shift (15 at night · $2,000), Hold the Line (10 HOLD OUT won · $2,000), Wave Rider (100 waves · $2,000), Trusted Courier (25 missions · $2,500), Flawless (25 at 3 stars · $2,500), Star Collector (100 stars · $3,000), Top of the Ladder (level 15 · $10,000), Legendary Courier (all 110 missions · $15,000 · Legendary Courier), Saviour of the City (all 11 campaigns · $20,000), Three-Star General (all 330 stars · $20,000 · Three-Star General); hidden: Ghost Courier (a NO SHOOTING mission without a shot · $2,000 · The Ghost), Horse Whisperer (25 horses · $2,500 · Horse Whisperer), Against the Clock (10 timed missions · $3,000) |
 | 🧭 Explorer | Sightseer (5 places · $300), Lost and Found (1 package · $300), Package Sniffer (10 packages · $2,500), Cartographer (all 29 places · $5,000 · Cartographer), Every Last Box (all 30 packages · $10,000) |
 | 🤝 Co-op | Better Together (1 mission with a crew mate · $300), Riding Shotgun (50 kills from a passenger seat · $1,500), Crew Chief (25 missions with a crew mate · $4,000 · Crew Chief) |
 | 💰 Wealth | First Paycheck (earn $10,000 · $300), Home Sweet Home (1 property · $1,000), Car Collector (5 cars · $2,000); hidden: Millionaire (earn $1,000,000 · $10,000 · Millionaire) |
@@ -306,7 +410,7 @@ to your name on the leaderboard (TOP). Your first title is shown at once.
   when done; the hidden ones read ??? until then.
 * **SECRETS**: found X/30 and the money so far, every place with ✓ for its package or its hint ("Visit <place>
   first" before you have been there), and the Phantom card.
-* **REWARDS**: the ten campaign rewards (earned, or "finish <campaign>"; a click opens the campaign), your titles with
+* **REWARDS**: the eleven campaign rewards (earned, or "finish <campaign>"; a click opens the campaign), your titles with
   EQUIP, and the exclusive guns and paints.
 * The MISSIONS tab's campaign header shows the campaign's reward too ("Reward: Reyes' Carbine + title Quartermaster").
 * **Popups** at the top centre, one at a time: a strip for a new place, a card for a package or a challenge (its money
@@ -320,26 +424,28 @@ Press **H** (or **ESTATE**) for the list of every property (filters ALL / HOMES 
 driver level, car slots or couriers, who owns it on this server, GPS. Each property has a **FOR SALE** sign in front
 (E opens its listing; the board shows OWNED and the owners' names once somebody on the server has it). You **buy at
 the property** (within reach of its sign or on its lot; away from it the BUY button turns into GO THERE TO BUY and
-sets the GPS) with the money you made, if your driver level is high enough. Every player owns their own copy: two
+sets the GPS) with the money you made, if your driver level is high enough (3.2: the real estate is the endgame, and
+the offices also need a campaign finished: `EstateDef.requires`, checked in `Estate.buy`, shown in the list and on
+the plates as "Finish Iron Supply first"). Every player owns their own copy: two
 owners of the same mansion both use it. Everything you own is saved.
 
 | Property | Kind | Where | Price | Level | Car slots / couriers |
 |---|---|---|---|---|---|
-| Hilltop Mansion | mansion | the top of **Sunset Hills** (north-east of Downtown, up the winding Sunset Drive) | $6,000,000 | 10 | 8 cars |
-| Ocean View Mansion | mansion | on the sea cliffs north of the Harbor, up Cliff Road (a private pier) | $4,500,000 | 9 | 8 cars |
-| Pinecrest Mansion | mansion | in the pines south of the West Highway, down Pine Lane | $3,000,000 | 8 | 6 cars |
-| Lakeside Villa | villa | far north by the frozen lake, on the Lodge Road (a jetty onto the ice) | $1,500,000 | 7 | 4 cars |
-| Sunset Villa | villa | in the west, at the end of Sunset Lane off the Radio Road | $1,000,000 | 6 | 4 cars |
-| 12 Maple Street | house | a Suburbs lot | $400,000 | 4 | 2 cars |
-| 7 Oak Lane | house | a Suburbs lot | $300,000 | 3 | 2 cars |
-| Birch Cottage | house | the west edge of the Suburbs, at the end of Birch Lane | $200,000 | 2 | 2 cars |
-| Elm Bungalow | house | a Suburbs lot | $150,000 | 1 | 1 car |
-| Harbor Lockup | garage | the Harbor | $50,000 | 1 | 4 cars |
-| Highway Garage | garage | on the North Highway | $80,000 | 2 | 4 cars |
-| Downtown Parking | garage | Downtown, in the safe zone | $120,000 | 3 | 6 cars |
-| Harbor Point Office | office | **Harbor Point** tower (the Harbor, by the docks), 7th floor | $500,000 | 5 | 3 couriers |
-| Dispatch Tower, 8th floor | office | **Dispatch Tower** (Downtown, by the depot), 8th floor | $900,000 | 7 | 6 couriers |
-| Dispatch Tower Penthouse | office | Dispatch Tower, the top (14th) floor | $2,500,000 | 11 | 12 couriers |
+| Hilltop Mansion | mansion | the top of **Sunset Hills** (north-east of Downtown, up the winding Sunset Drive) | $6,000,000 | 15 | 8 cars |
+| Ocean View Mansion | mansion | on the sea cliffs north of the Harbor, up Cliff Road (a private pier) | $4,500,000 | 14 | 8 cars |
+| Pinecrest Mansion | mansion | in the pines south of the West Highway, down Pine Lane | $3,000,000 | 13 | 6 cars |
+| Lakeside Villa | villa | far north by the frozen lake, on the Lodge Road (a jetty onto the ice) | $1,500,000 | 11 | 4 cars |
+| Sunset Villa | villa | in the west, at the end of Sunset Lane off the Radio Road | $1,000,000 | 10 | 4 cars |
+| 12 Maple Street | house | a Suburbs lot | $300,000 | 9 | 2 cars |
+| 7 Oak Lane | house | a Suburbs lot | $220,000 | 8 | 2 cars |
+| Birch Cottage | house | the west edge of the Suburbs, at the end of Birch Lane | $150,000 | 7 | 2 cars |
+| Elm Bungalow | house | a Suburbs lot | $90,000 | 6 | 1 car |
+| Harbor Lockup | garage | the Harbor | $25,000 | 5 | 4 cars |
+| Highway Garage | garage | on the North Highway | $45,000 | 6 | 4 cars |
+| Downtown Parking | garage | Downtown, in the safe zone | $70,000 | 7 | 6 cars |
+| Harbor Point Office | office | **Harbor Point** tower (the Harbor, by the docks), 7th floor | $500,000 | 12 + Iron Supply | 3 couriers |
+| Dispatch Tower, 8th floor | office | **Dispatch Tower** (Downtown, by the depot), 8th floor | $900,000 | 14 + Dirty Money | 6 couriers |
+| Dispatch Tower Penthouse | office | Dispatch Tower, the top (14th) floor | $2,500,000 | 15 + Last Convoy | 12 couriers |
 
 * **Homes** (mansions, villas, houses) are furnished, two storeys for the big ones. Your first home becomes **your
   home** at once; SET AS HOME picks another one, SPAWN AT THE DEPOT none. You spawn at your home after PLAY and after
@@ -357,7 +463,7 @@ owners of the same mansion both use it. Everything you own is saved.
 **Your delivery company.** Owning an office starts it; the office with the most courier seats runs it. Use the
 **computer** on your office desk (E, "Run your company"; you must stand at it):
 
-* **Couriers**: HIRE costs $25,000 each (`Config.Business.CourierCost`), up to the office's seats (3, 6 or 12); FIRE
+* **Couriers**: HIRE costs $40,000 each (`Config.Business.CourierCost`), up to the office's seats (3, 6 or 12); FIRE
   gives no refund. A courier earns **$120 per minute** while you are on the server. Couriers above the seats (after
   selling the bigger office) stay on the payroll but earn nothing (NO DESK).
 * **Upgrades** (5 levels each, the price grows per level): Better vans (+15 % per level, from $60,000), Dispatch
@@ -410,6 +516,19 @@ MAP, BAG, CAR, TOP, CREW, ESTATE** on the right edge in 1, 2 or 4 columns (on a 
 ADMIN button above them for admins); the weapon bar and the hotbar bottom right; the car panel and the hint at the
 bottom centre. On touch FIRE sits above the jump button and the panels move left of it.
 
+**The 3.2 restyle**: the whole HUD now has the look of the 3.1 right side: dark glass panels (`Theme.PanelTransparency`
+0.15, corner 12), a quiet stroke (solid only for an accent), DisplayFont headings, small caps labels and gold as the one
+accent (`Ui.edge`, `Ui.caps`, `Ui.keyChip`, `Ui.ghostButton`, `Ui.closeButton`). The left column is one money / level
+card (the money big in a subtle gold, deliveries and kills in small caps, a round LV badge with a gold ring, the rank,
+the XP and a thin bar); the minimap has a glass rim, a thin stroke, a compass N and a small BIG MAP pill (the GPS
+lines as before). In the top stack the job panel, the car call line and the level-up banner are compact glass cards
+with an accent edge; the toasts are pills that slide in and out; the crew strip and the invitation card match. The car
+panel is a speedometer card (the speed big, KM/H, the car's name in caps, a thin health bar); the hint is a glass pill
+with an icon (hidden when empty). The windows (job board, shops, backpack, employer, result, big map) keep their
+layout with DisplayFont titles on a gold rule, a quiet close button, lighter cards (a gold edge on the highlighted
+one), gold / ghost tabs and ghost buttons for what you cannot press; a shop card shows FINISH <CAMPAIGN> for a def
+with `requires`.
+
 The minimap (bottom left; top left on touch screens) turns with the camera; it and the big map
 (M) show it all. The big map lists every shop, employer and far place with what you can do there: click one to set
 the **GPS**. The route there is drawn along the roads on both maps (yellow to the job's next stop, purple to the GPS
@@ -417,7 +536,7 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 
 ## Content
 
-* **Cars**: at Dead End Motors the Old Van (free), the Pickup (level 2) and the Muscle Car (level 4); earned by
+* **Cars**: at Dead End Motors the Old Van (free), the Pickup (level 4, $12,000) and the Muscle Car (level 8, $40,000); earned by
   working: School Bus, Armored Truck, Ice Cream Truck, Moving Truck, Monster Truck, Livestock Truck, Fuel Truck,
   Ambulance.
 * **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher, each with its own model in
@@ -445,11 +564,12 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
   **horses** graze, walk on a rope and ride in the livestock truck's stalls; your **chauffeur** brings your car.
 * **Real estate** (`Config.Estate`): 3 mansions, 2 villas, 4 houses, 3 garages, 3 offices. **Your company**
   (`Config.Business`): couriers, 3 upgrades, the safe.
-* **Missions** (`shared/Missions.luau`, 3.0): 10 campaigns × 10 missions, 8 twists, 46 co-op missions, 15 new places;
+* **Missions** (`shared/Missions.luau`, 3.0; 3.2: + the DUO campaign): 11 campaigns × 10 missions, 10 twists, 56
+  co-op missions, 15 new places;
   new cargo (water, generators, batteries, TNT, documents, electronics, weapons, paintings, mail, tyres, plants) and
   survivors who walk aboard by themselves.
 * **Challenges, secrets, rewards** (3.1): 42 challenges (`shared/Challenges.luau`), 30 lost packages (`Map.Secrets`),
-  10 campaign rewards, the Phantom and Dead End rewards, 11 + 12 titles (`Config.Rewards`).
+  11 campaign rewards (3.2: the DUO one), the Phantom and Dead End rewards, 11 + 13 titles (`Config.Rewards`).
 
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
@@ -494,17 +614,20 @@ SoundSheet; upload them again).
 src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo spots), Roads (the road graph and the
               GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
               AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
-              Levels (XP, levels, rank names), TrafficLanes (the traffic's lanes, turns and sidewalks), SoundSheet
-              (where each sound and music loop sits in the two audio assets), Missions (3.0: the 10 campaigns and 100
-              missions, unlocking, the rating, the stars, the twists' pay), Challenges (3.1: the 42 challenges, the
+              Levels (XP, levels, rank names; 3.2: fromLegacy, the old saves' XP), TrafficLanes (the traffic's lanes, turns and sidewalks), SoundSheet
+              (where each sound and music loop sits in the two audio assets), Missions (3.0: the campaigns and missions,
+              unlocking, the rating, the stars, the twists' pay; 3.2: 11 campaigns and 110 missions, the campaign
+              chain `requires`, the computed mission levels levelOf, the DUO campaign), Challenges (3.1: the 42 challenges, the
               counters, value / progress / doneCount / allTitles)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers), PlayerData (saves, leaderstats; the save also holds the
-              properties, the home and the business), Vehicles (cars, seats, cargo slots, the roof turret of a car gun,
-              the instant spawns and the home garage spot), Zombies (zombies and bandits, roadblocks, the roamers,
+              properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once), Vehicles (cars,
+              seats, cargo slots, the roof turret of a car gun, the instant spawns and the home garage spot; 3.2: the
+              back that opens, its hinges, BackOpen and the BackPrompt), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
-              the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves), Cargo (the cargo you carry, lead or board at a
-              stop, the pieces in the vehicle), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
+              the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves; 3.2: the DUO
+              rules, drives DuoGates), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
+              3.2: loading through the back, the pair lift), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
@@ -517,25 +640,28 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               the head, the Challenges remote)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
-              Drive (car controller, ice), Shooting (aim, crosshair, tracers, hit numbers), CarVisuals (tyres,
-              prompts, name tags), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
+              Drive (car controller, ice; 3.2: no throttle with the back open), Shooting (aim, crosshair, tracers, hit
+              numbers), CarVisuals (tyres, prompts, name tags; 3.2: swings the back, its prompt only for the crew), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),
               Weather (the day and night look; 3.0.1: the readable night, the town glow, your own light), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
               card), Sounds (the music and every sound effect, N / SOUND), WeaponWheel (hold Q), MissionsUi (3.0: the MISSIONS window (U),
               the mission banner in the top stack, the celebration card; 3.1: the CHALLENGES, SECRETS and REWARDS
-              tabs and the unlock popups), Secrets (3.1: hides the lost packages you found, animates the others nearby)
+              tabs and the unlock popups; 3.2: the lock texts, the DUO badge, FIND CREW), Secrets (3.1: hides the lost packages you found, animates the others nearby)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
-              (XP and ranks), jobs25 (the 2.5 jobs and places), traffic (lanes, turns, spawn spots, sidewalks); the
+              (XP and ranks; 3.2: the whole progression: the gear and estate levels, the XP curve against the story
+              path, the old saves keep their level), jobs25 (the 2.5 jobs and places), traffic (lanes, turns, spawn spots, sidewalks); the
               2.6 real estate checks are in logic (every property placed, no overlaps, the towers and offices, the
               roads to every property, the landmarks) and so are the 3.0 places (every one placed, on its road, with
-              its cargo spot); audio (every sound has its region, every gun its shot); missions (the 10 campaigns and
-              100 missions valid against Config and Map, the design rules, unlocked, rate, stars, twistPay); 3.1:
+              its cargo spot); audio (every sound has its region, every gun its shot); missions (the 11 campaigns and
+              110 missions valid against Config and Map, the design rules, unlocked, rate, stars, twistPay; 3.2: the
+              campaign chain, the computed levels, the DUO rules, the old saves' started campaigns); 3.1:
               challenges (the list, the must-have goals, the titles, the hidden ones, the helpers on a fake profile),
               gear (piercing rounds, the paint finishes, every exclusive item a reward) and the lost packages in logic
-              (one per place, near it, in bounds, dry, off the roads)
+              (one per place, near it, in bounds, dry, off the roads); 3.2: cargo also checks the back's extra
+              steps stay quick holds
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -562,7 +688,9 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 ```
 
 Runs every `tests/*_test.luau` (logic with the 2.6 real estate, the 3.0 places and the 3.1 lost packages, cargo,
-roads, cargun, icons, levels, jobs25, traffic, audio, missions, challenges, gear) and compiles every module. Needs the standalone Luau CLI
+roads, cargun, icons, levels with the 3.2 progression, jobs25, traffic, audio, missions with the 3.2 campaign chain
+and DUO campaign, challenges, gear) and compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
+function, as Studio compiles). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
@@ -571,7 +699,7 @@ driver level (the LV buttons, LEVEL -1 / +1; UNLOCK also sets the top level), se
 dawn … through `DayNight.setClock`), heals, finishes the current stop and switches god mode. The **Estate, company**
 tab gives every property (or one), takes them all, sets the home (or the depot), teleports to any property and
 fills, adds $50,000 to or empties the company safe (UNLOCK also gives every property and, without a home, the most
-expensive mansion as the home). The **Missions** tab starts any of the 100 missions now (locks ignored; a running job
+expensive mansion as the home). The **Missions** tab starts any of the 110 missions now (locks ignored; a running job
 is cancelled, a NIGHT ONLY one turns the clock to night), sets every mission to 3 stars and every campaign done (no
 money; UNLOCK does it too) or clears the progress (commands `missionStart`, `missionsAll`, `missionsReset`); 3.1:
 it gives every campaign's exclusive reward and title too. The **Challenges, secrets** tab (3.1) marks every challenge
