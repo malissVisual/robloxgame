@@ -3581,6 +3581,12 @@ local function wreck(car: Car, reason: string)
 	if linear then
 		linear:Destroy()
 	end
+	-- The turning goes too: client/Drive.luau stops writing it once "Drive" is gone, and the burnt car span on
+	-- at its last steer rate.
+	local angular = car.chassis:FindFirstChild("Steer")
+	if angular then
+		angular:Destroy()
+	end
 	car.model:SetAttribute("Health", 0)
 	-- 3.4: it comes back (CAR) badly damaged: a trip to a repair shop.
 	local profile = PlayerData.get(car.owner)

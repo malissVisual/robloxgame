@@ -148,6 +148,14 @@ end
 -- Is an enemy (a living zombie, bandit or bandit car) right under the dot?
 local enemyParams = RaycastParams.new()
 enemyParams.FilterType = Enum.RaycastFilterType.Exclude
+-- The camera's own rays (the wall check and the aim), made once: only their exclude lists change each frame.
+local wallParams = RaycastParams.new()
+wallParams.FilterType = Enum.RaycastFilterType.Exclude
+local aimParams = RaycastParams.new()
+aimParams.FilterType = Enum.RaycastFilterType.Exclude
+-- The shown car's size (GetExtentsSize walks every part), measured once per car.
+local extentsCar: Model? = nil
+local extentsSize = Vector3.zero
 
 local function hostile(hit: Instance): boolean
 	local model: Instance? = hit:FindFirstAncestorOfClass("Model")
@@ -390,7 +398,11 @@ local function update(dt: number)
 	end
 	local chassis = shown and shown.PrimaryPart
 	if shown and chassis then
-		local size = shown:GetExtentsSize()
+		if extentsCar ~= shown then
+			extentsCar = shown
+			extentsSize = shown:GetExtentsSize()
+		end
+		local size = extentsSize
 		local carFocus = chassis.Position + Vector3.new(0, size.Y * 0.6 + 2, 0)
 		-- Behind the car; aiming: closer, over the right side of the roof.
 		local carBack = Vector3.new(lerp(0, 3, aimBlend), lerp(2, 0.8, aimBlend), lerp(size.Z * 0.7 + 9, size.Z * 0.3 + 4, aimBlend) * zoom)
@@ -415,10 +427,8 @@ local function update(dt: number)
 	smoothFocus = focus
 	local desired = focus + rotation:VectorToWorldSpace(back)
 	-- Do not go through walls.
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = exclude
-	local hit = workspace:Raycast(focus, desired - focus, params)
+	wallParams.FilterDescendantsInstances = exclude
+	local hit = workspace:Raycast(focus, desired - focus, wallParams)
 	local position = if hit then hit.Position + (focus - desired).Unit * 0.6 else desired
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector)
@@ -428,8 +438,6 @@ local function update(dt: number)
 	-- a camera looking down from above would point the arms at your feet).
 	if wantAim then
 		local ray = camera:ViewportPointToRay(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-		local aimParams = RaycastParams.new()
-		aimParams.FilterType = Enum.RaycastFilterType.Exclude
 		local aimExclude: { Instance } = { character }
 		local effects = workspace:FindFirstChild("LocalEffects")
 		if effects then

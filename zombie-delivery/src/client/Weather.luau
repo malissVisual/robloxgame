@@ -191,12 +191,16 @@ function Weather.start()
 	local lastNight, lastWinter, lastCity = -1, -1, -1
 	local city = 0 -- 0 … 1: the town glow (follows the camera, eases over ~1 s)
 	local lookClock, flashClock, beat = 0, 0, 0
-	local aura = Instance.new("PointLight")
-	aura.Name = "NightAura"
-	aura.Range = AURA_RANGE
-	aura.Color = Color3.fromRGB(200, 214, 255)
-	aura.Shadows = false
-	aura.Brightness = 0
+	local function newAura(): PointLight
+		local light = Instance.new("PointLight")
+		light.Name = "NightAura"
+		light.Range = AURA_RANGE
+		light.Color = Color3.fromRGB(200, 214, 255)
+		light.Shadows = false
+		light.Brightness = 0
+		return light
+	end
+	local aura = newAura()
 
 	-- The look for this night factor and winter blend: written only when it changed (the clock crawls).
 	local function applyLook(f: number)
@@ -204,7 +208,15 @@ function Weather.start()
 		local character = Players.LocalPlayer.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 		if root and aura.Parent ~= root then
-			aura.Parent = root
+			-- A destroyed root takes the light with it (its Parent is locked then): setting it would throw every
+			-- tick and freeze the day/night look, so a fresh light is made instead.
+			local light = aura
+			if not pcall(function()
+				light.Parent = root
+			end) then
+				aura = newAura()
+				aura.Parent = root
+			end
 		end
 		aura.Brightness = AURA_BRIGHTNESS * f
 		aura.Enabled = f > 0.02

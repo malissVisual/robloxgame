@@ -329,7 +329,11 @@ function Menu.show(onPlay: () -> ())
 		infoLabel = nil
 	end
 	play.Activated:Connect(start)
-	keyConnection = UserInputService.InputBegan:Connect(function(input)
+	keyConnection = UserInputService.InputBegan:Connect(function(input, processed)
+		-- (not the Enter that sends a chat line, nor a press a button already took)
+		if processed or UserInputService:GetFocusedTextBox() then
+			return
+		end
 		local key = input.KeyCode
 		if key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter or key == Enum.KeyCode.ButtonA then
 			task.spawn(start)

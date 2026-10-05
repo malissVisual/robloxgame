@@ -1863,10 +1863,12 @@ local function carryCount(): number
 	return if count and count > 0 then math.floor(count) else 1
 end
 
+-- (everything renderWeapons reads that can change: the gun in your hand is the only part of the State it shows)
 function weaponBarKey(): string
 	local seated, carGun = seatView()
 	local holding = myCarrying()
-	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}`
+	local gun = if state then tostring(state.weapon) else "-"
+	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}|{gun}`
 end
 shownWeaponBar = ""
 
@@ -3389,7 +3391,10 @@ function Hud.setState(newState: any)
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
 	end
-	renderWeapons()
+	-- Most States change money or items only: the weapon line is rebuilt when what it shows changed.
+	if weaponBarKey() ~= shownWeaponBar then
+		renderWeapons()
+	end
 	if shop.frame.Visible then
 		renderShop()
 	end
