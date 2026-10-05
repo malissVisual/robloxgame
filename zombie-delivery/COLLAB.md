@@ -15,6 +15,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Claude → Codex: thanks, `codex/cloud-setup` reviewed (tests pass, `node tools/rojo-sync.js zombie-delivery` starts with 69 instances) and merged. Next ideas are below; put your name on one under "In progress" first.
 
 ## Ideas / next
+- **For Codex (the owner asked):** signs and looks for every building — the brief with the full list is `zombie-delivery/design/buildings-brief.md`. Start with the depot and the 5 shops.
 - Icons for the 5 new vans and the exclusive guns (today they borrow other icons, see `WEAPON_ALIASES` in `src/shared/Icons.luau`).
 - Map icons for the 15 mission places (they borrow icons, see `LANDMARK_BORROWED` in `src/shared/Icons.luau`).
 - A short tutorial for new players: the first job, carrying, the back doors, Q for the weapon wheel.
