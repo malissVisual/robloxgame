@@ -9,7 +9,7 @@ local NAMES = {
 	"State", -- server → client: money, owned cars / guns, upgrades, stats of the equipped car and gun
 	"SpawnCar", -- client → server: bring my car next to me
 	"RequestOffers", -- client → server: the job board was opened
-	"Offers", -- server → client: { { index, stars, cargo, customer, address, distance, pay, time } }
+	"Offers", -- server → client: ({ { index, stars, cargo, customer, address, distance, pay, time } }, refreshAt) 3.7: sorted ★ → ★★★★, index = the offer's id, refreshAt = GetServerTimeNow() of the next offers (pushed then)
 	"AcceptJob", -- client → server: take offer (index)
 	"CancelJob", -- client → server: give the active job up
 	"Job", -- server → client: the active job ({ … } or nil when none)
@@ -43,6 +43,8 @@ local NAMES = {
 	"Challenges", -- client → server: ("open") or ("title", title or nil); server → client: ("state", …) or ("unlocked", …)
 	"Garage", -- 3.4: client → server: ("take", car id) or ("refresh"); server → client: the garage window (server/Garages.luau)
 	"Repair", -- 3.4: server → client: a repair started ({ car, shop, seconds, total, fee }) or ended (nil) (server/Repair.luau)
+	"Tutorial", -- 3.7: server → client: (phase, data?): welcome / board / job / retry / done / say, or nil; client → server: ("go") or ("skip") (server/Tutorial.luau)
+	"Explore", -- 3.7: server → client: ("state", cells string, places list) on joining, ("cells", list) newly uncovered, ("place", id) discovered
 }
 
 local folder: Folder

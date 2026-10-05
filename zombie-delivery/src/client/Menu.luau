@@ -182,7 +182,7 @@ function Menu.show(onPlay: () -> ())
 		{ "WEAPONS", "Tap the weapon bar" }, { "ITEMS", "Tap the hotbar" },
 		{ "NAVIGATE", "JOBS / MAP / BAG / CAR buttons" }, { "EXIT CAR", "Jump button" },
 	} else {
-		{ "MOVE", "WASD / arrows    ·    Shift: sprint" }, { "COMBAT", "Mouse: aim    ·    RMB: aim    ·    LMB: shoot" },
+		{ "MOVE", "WASD / arrows    ·    Shift: sprint (breath)" }, { "COMBAT", "Mouse: aim    ·    RMB: aim    ·    LMB: shoot" },
 		{ "CARGO", "E: pick up / load    ·    G: put down" }, { "EQUIPMENT", "Q: switch weapon    ·    1–5: items" },
 		{ "WINDOWS", "J: jobs    ·    M: map    ·    B: bag" }, { "MOUSE", "Alt: free cursor" },
 		{ "VEHICLE", "E / R: enter    ·    Space: exit" }, { "ADMIN", "P: admin (when authorized)" },

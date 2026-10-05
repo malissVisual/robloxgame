@@ -2,22 +2,25 @@
 -- GTA-style aiming on a computer: the mouse is locked in the middle of the screen, the mouse moves the camera
 -- (behind you on foot, behind the car when driving), a dot in the middle shows where the gun hits (dim over nothing,
 -- white over an enemy, a pulse on a hit, red on a kill).
--- On foot it plays like GTA: a calm walk (Shift sprints), the speed builds up and bleeds off (the body has weight),
+-- On foot it plays like GTA: a calm walk (Shift sprints while you have breath, client/Stamina.luau; a gamepad clicks
+-- the left stick), the speed builds up and bleeds off (the body has weight),
 -- the character turns where it goes; aiming (right mouse) or shooting (left mouse) it slows to a careful step, turns
 -- to the crosshair and raises the gun (shots wait until it is up, client/ArmPose.luau; out of a sprint the body
 -- first slows down and the gun comes up slower), the camera moves in over the shoulder. When a window is open (map, shop, backpack, job
--- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera.
+-- board …) or while you hold Alt the mouse is free to click. Touch screens keep the normal Roblox camera (and walk at
+-- Config.Movement.Walk; a gamepad without a mouse sprints with the left stick click there too).
 -- With cargo in your hands (the Carrying attribute, server/Cargo.luau) there is no aiming, no sprint and a slower step.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local Drive = require(script.Parent.Drive)
+local Stamina = require(script.Parent.Stamina)
 
 local CameraRig = {}
 
@@ -34,9 +37,10 @@ local lastFire = 0
 local aimBlend = 0 -- 0 = walking camera, 1 = over the shoulder
 local aimingSent = false
 local shiftHeld = false -- sprint
+local padSprint = false -- a gamepad's left stick click: sprint until you stop (or run out of breath)
 local aimSince = 0 -- when the gun started going up (shots wait until it is up)
-local WALK_SPEED = 12 -- 3.2.4: a little brisker
-local SPRINT_SPEED = 25
+local WALK_SPEED = Config.Movement.Walk -- 3.7: 14 (3.2.4: 12)
+local SPRINT_SPEED = Config.Movement.Sprint -- 3.7: 28 (3.2.4: 25)
 local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
 
@@ -47,7 +51,9 @@ local function carrySpeed(character: Model): number
 	return if type(lift) == "number" then math.min(lift, CARRY_SPEED) else CARRY_SPEED
 end
 -- The body has weight: the speed builds up and bleeds off instead of jumping (studs per second, per second).
-local SPEED_UP = 26
+-- 3.7: up a little with the wider walk-to-sprint gap (14 to 28 still takes half a second); running out of breath
+-- drops you from a sprint to the walk in about 0.4 s.
+local SPEED_UP = 28
 local SLOW_DOWN = 38
 local speed = WALK_SPEED
 -- Out of a sprint the gun comes up slower: first the body slows, then the arms find the aim.
@@ -258,6 +264,16 @@ function CameraRig.noteFire()
 	lastFire = os.clock()
 end
 
+-- Does the character really go somewhere (the breath drains only then)? Input held and a speed to show for it:
+-- running against a wall does not cost breath.
+local function movingOn(humanoid: Humanoid, root: BasePart): boolean
+	if humanoid.MoveDirection.Magnitude < 0.1 then
+		return false
+	end
+	local v = root.AssemblyLinearVelocity
+	return Vector3.new(v.X, 0, v.Z).Magnitude > 3
+end
+
 local function update(dt: number)
 	local camera = workspace.CurrentCamera
 	if not camera then
@@ -317,11 +333,20 @@ local function update(dt: number)
 	end
 	sendAiming(wantAim)
 
-	-- On foot: walk, sprint with Shift, a careful step with the gun up (aiming or shooting).
+	-- On foot: walk, sprint with Shift while the breath lasts (client/Stamina.luau), a careful step with the gun up
+	-- (aiming or shooting). Carrying or aiming there is no sprint, and the breath comes back.
+	local moving = car == nil and humanoid.Health > 0 and movingOn(humanoid, root)
+	if padSprint and humanoid.MoveDirection.Magnitude < 0.1 then
+		padSprint = false -- the stick let go: the gamepad's sprint ends
+	end
+	local sprinting = Stamina.update(dt, car == nil and not wantAim and not handsFull and (shiftHeld or padSprint), moving)
+	if padSprint and not sprinting then
+		padSprint = false -- out of breath: click again once it is back
+	end
 	if not car then
 		local target = if wantAim then AIM_WALK_SPEED
 			elseif handsFull then carrySpeed(character)
-			elseif shiftHeld then SPRINT_SPEED
+			elseif sprinting then SPRINT_SPEED
 			else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
@@ -406,29 +431,52 @@ local function update(dt: number)
 	updateCrosshair(dt, showDot, showDot and enemyUnderCrosshair(camera, character, car))
 end
 
--- Touch screens keep the Roblox camera and walk; only the slower step with cargo in the hands is set here.
-local function touchCarrySpeed()
-	local slowed = false
-	RunService.Heartbeat:Connect(function()
+-- Touch screens (and a gamepad without a mouse) keep the Roblox camera and walk; the speed is set here: the walk of
+-- Config.Movement, the slower step with cargo in the hands, and a gamepad's sprint (left stick click) on the breath.
+-- WalkSpeed is only written when it changes (the server's fallback, server/Cargo.luau, is not fought every frame).
+local function touchSpeed()
+	local written: number? = nil
+	local writtenFor: Humanoid? = nil -- a new character (a respawn) gets its speed again
+	UserInputService.InputBegan:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.ButtonL3 then
+			padSprint = true
+		end
+	end)
+	RunService.Heartbeat:Connect(function(dt: number)
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if not humanoid then
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not character or not humanoid or not root then
 			return
 		end
 		local seated = humanoid.SeatPart ~= nil
-		if carryingOf(character) and not seated then
-			humanoid.WalkSpeed = carrySpeed(character)
-			slowed = true
-		elseif slowed then
-			slowed = false
-			humanoid.WalkSpeed = StarterPlayer.CharacterWalkSpeed
+		local handsFull = not seated and carryingOf(character) ~= nil
+		local moving = not seated and humanoid.Health > 0 and movingOn(humanoid, root)
+		if padSprint and humanoid.MoveDirection.Magnitude < 0.1 then
+			padSprint = false
+		end
+		local sprinting = Stamina.update(dt, padSprint and not handsFull, moving)
+		if padSprint and not sprinting then
+			padSprint = false
+		end
+		if seated then
+			written = nil
+			return
+		end
+		local target = if handsFull then carrySpeed(character) elseif sprinting then SPRINT_SPEED else WALK_SPEED
+		local rate = if target > speed then SPEED_UP else SLOW_DOWN
+		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
+		if speed ~= written or humanoid ~= writtenFor then
+			written = speed
+			writtenFor = humanoid
+			humanoid.WalkSpeed = speed
 		end
 	end)
 end
 
 function CameraRig.start()
 	if not supported then
-		touchCarrySpeed()
+		touchSpeed()
 		return
 	end
 	makeCrosshair()
@@ -449,6 +497,8 @@ function CameraRig.start()
 			altHeld = true
 		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
 			shiftHeld = true
+		elseif input.KeyCode == Enum.KeyCode.ButtonL3 then
+			padSprint = true
 		elseif processed then
 			return
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -472,6 +522,7 @@ function CameraRig.start()
 	UserInputService.WindowFocusReleased:Connect(function()
 		altHeld = false
 		shiftHeld = false
+		padSprint = false
 		rmbHeld = false
 		lmbHeld = false
 	end)

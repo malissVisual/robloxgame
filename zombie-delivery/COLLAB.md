@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude · 3.8, Codex's contract UI (`codex/ui-contract`) · Theme, Ui, Hud, MapView and every window · 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
@@ -24,6 +25,8 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 3.7 the first day on the job: Marge the dispatcher's tutorial (`server/Tutorial`, `client/TutorialUi`, `shared/TutorialSteps`), the job board refills every 3 min (no button) sorted ★ → ★★★★, walk 14 / sprint 28 with a breath bar (`client/Stamina`), the discovered map (fog on both maps, NEW LOCATION banner, no floating landmark tags; `shared/Explore`, `server/Explore`, `client/Discovery`), car doors (E only at a door, the driver left, passengers right, doors swing), two light pieces in your hands (one free hand opens the back). Test in Studio: a new player's PLAY (Marge, the first job, the hints), the board countdown, a 6 s sprint, driving out of Downtown (fog, banners), getting in on both sides with two players, a pizza job with two pieces.
+- Codex · the contract UI direction (`codex/ui-contract`, design/ui-contract/), reviewed and merged by Claude; Claude builds it as 3.8.
 - Claude · the building signs in the world: 54 `sign_<id>` slots in `shared/Icons.luau` (`Icons.sign`, `Icons.signAspect`, base → army, frosty → icecream); `server/World.luau` `sign()` shows the picture (no board behind it, ScaleType Fit, white tint, 4 : 1 boards and square badges, roof signs grow upward) once its id is filled in, the old text otherwise; road signs on poles show both ways; homes, garages and offices get their badge on top of the FOR SALE post; JOBS, WORK HERE, GARAGE, BAY, FOR SALE and the slogans stay text. Test in Studio after the upload: the depot and the 5 shops from the street, a garage and a house badge, a pole sign from both sides, a night drive.
 - Codex · 54 building signs (`codex/building-signs`, art/signs/), reviewed and merged by Claude.
 - Claude · 3.6 Postage & Trouble, Codex's UI concept built into the game: `Theme.Postage` tokens (cream paper, lavender, plum inks, sage; good / warn / track / pill) with `Theme.Colors` remapped; new `Ui` pieces (window, ticket, tag, dial, tactile); the HUD rebuilt (objective ticket with a timer stub, money/rank card, a paper minimap with a turn line, health, speed dial with condition and cargo pips, weapon label, consumable tags, MAP / CREW / "…" menu with every action and GIVE UP); the new Dispatch board (`client/DispatchUi.luau`, die-cut tickets with lock reasons); every window on `Ui.window`; words over the world on cream pills. Test in Studio: a night and a day drive (ticket, dial, minimap, the delivery label and the YOUR CAR marker readable), J and a locked ticket (level and slots), the "…" menu (every entry, GIVE UP twice), ESC on each window, a touch layout (FIRE, tags, menu downward), a resize.

@@ -47,6 +47,22 @@ cream paper and powder lavender with dark plum ink instead of the dark glass. Th
 with its timer on a perforated stub, the car a round **speed dial** with its condition and cargo pips, the items
 tilted **tags** that lift under the mouse, the job board a new **Dispatch board** of die-cut tickets that says why a
 job is locked and what to do about it, and every window the same lavender window (see **The HUD**).
+Version 3.7 is the **first day on the job**:
+- **Marge, the dispatcher at the depot,** greets a new player, gives the first job and explains each step until it is
+  delivered (`server/Tutorial.luau`, `client/TutorialUi.luau`; SKIP is always there).
+- **The job board fills itself:** every `Config.Jobs.RefreshSeconds` (3 min) with a countdown instead of a refresh
+  button. It is sorted from ★ (level 1, on top) to the best jobs at the bottom.
+- **A faster walk (14) and sprint (28),** but the sprint has a **breath** (about 6 s) shown by a thin bar
+  (`client/Stamina.luau`, `Config.Movement`).
+- **The map is discovered:** the map and the minimap stay fogged until you have been near, a **NEW LOCATION
+  DISCOVERED** banner names each place you find, and the floating markers over the buildings are gone, so the
+  buildings' signs and the map tell you what is where (`shared/Explore.luau`, `server/Explore.luau`,
+  `client/Discovery.luau`). The job's destination and route always show through the fog.
+- **Cars have doors:** **E** shows only at a door. The driver's door is on the left, passengers get in on the right,
+  and the door swings open and shut.
+- **Light pieces** (pizza, parcels, mail, medicine …) can be carried **two at a time**. With one in your hands you can
+  still open the back; with two your hands are full: put one down with **G**, or let a crew mate open it
+  (`Config.Cargo.LightLooks`).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -202,7 +218,7 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
 6. **Crews**: press **K** (or **CREW**) and invite a player (up to `Config.Crew.MaxMembers` = 3 members; they get
    30 s to answer on the invitation card). You can invite with or without a job. Members work on your job: they
    carry the cargo, their kills count, the purple GPS leads them to your next stop and the panel shows your job and
-   its clock. Friends who press R at your car to ride along are paid the same way while they stay with the job (in
+   its clock. Friends who press E at your car's passenger door to ride along are paid the same way while they stay with the job (in
    your car, or on foot within `Config.Crew.RiderRange` = 250 studs of you); at most `MaxMembers` are paid, the
    members first. Every member and rider gets half of the pay and the same XP, you get +15 % per member: nobody
    loses money (the panel shows the split of the base pay). Since 3.0 the crew **stays together** when a job ends:

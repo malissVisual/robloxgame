@@ -6,13 +6,56 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.6"
+Config.Version = "3.7"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
 Config.StudioStartMoney = 150 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
 Config.AutosaveSeconds = 60
 Config.SpawnCarCooldown = 4
+
+-- 3.7: walking, the sprint and its breath (client/CameraRig.luau, client/Stamina.luau).
+Config.Movement = {
+	Walk = 14, -- studs per second (3.2.4: 12)
+	Sprint = 28, -- with Shift (3.2.4: 25)
+	Stamina = 6, -- seconds of sprint on a full breath
+	Recover = 4, -- seconds to get the whole breath back (standing or walking)
+	RecoverDelay = 0.8, -- the breath starts coming back this long after the sprint stops
+	MinToSprint = 0.25, -- an empty breath: Shift sprints again only once this share is back (no stutter)
+	Low = 0.2, -- the breath bar turns red at this share or less (and while out of breath)
+	HideAfter = 1.5, -- seconds the bar stays after the breath is full again, then it fades out
+}
+
+-- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
+-- player, gives them the first job and explains each step until it is delivered.
+Config.Tutorial = {
+	NpcName = "Marge",
+	NpcTitle = "Dispatcher",
+	Reward = 50, -- money for finishing the tutorial's job (on top of its pay)
+	NpcSpot = { -4, -20 }, -- where she stands, studs from the depot's centre (Map.Shops.depot): by the job board, facing the yard
+	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
+	StartDelay = 1.5, -- seconds after your car came (PLAY pressed) before she speaks: the start screen fades out first
+	DoneDelay = 2.5, -- seconds after the delivery before her last pages (the delivery's result shows first)
+	RetryAfter = 1.5, -- a tutorial job gone this long without a result (a special job ended, an admin): offered again
+	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
+}
+
+-- 3.7: the map you discover (shared/Explore.luau, server/Explore.luau, client/MapView.luau, the minimap in Hud).
+Config.Explore = {
+	Cell = 120, -- the map is a grid of cells this many studs wide; you uncover the ones around you
+	Radius = 180, -- studs around you that are uncovered
+	Every = 1, -- seconds between two checks of where you are
+	PlaceRadius = 70, -- this close to a place (a shop, an employer, a mission place) and it is discovered
+	-- The grid covers Map.Bounds and this much more on every side (the world's walls stand on Map.Bounds).
+	Pad = 60,
+	-- A new player (or a save from before 3.7) starts with the cells over this square around the depot uncovered
+	-- (the safe zone, Config.City.SafeHalf, and a little more): nobody starts lost.
+	StartHalf = 240,
+	-- A jump farther than this between two checks is a teleport (the admin, a home spawn): the way between is not
+	-- uncovered. Shorter (a fast car): the cells along the way are.
+	Teleport = 600,
+	Banner = 3, -- seconds the "NEW LOCATION DISCOVERED" banner stays (client/Discovery.luau; shorter while more wait)
+}
 
 -- Who may open the admin panel (P / the ADMIN button, server/Admin.luau): everybody in a Studio Play test, the
 -- game's owner (game.CreatorId) and these user ids.
@@ -1255,6 +1298,12 @@ Config.Missions = {
 
 Config.Jobs = {
 	DeliverRadius = 18,
+	RefreshSeconds = 180, -- 3.7: the board gets new offers on its own this often (no refresh button)
+	-- 3.7: the tutorial's first delivery (Jobs.startTutorialJob): an easy ★ one close to the depot, for the Old Van.
+	TutorialPieces = 2, -- pieces at most (the Old Van's 2 slots)
+	TutorialPickupMax = 400, -- studs (manhattan) from the player to the pick-up at most (the nearest homes to the depot: ~330)
+	TutorialDropMax = 450, -- studs from the pick-up to the drop at most (the ★ tier's minDistance at least)
+	TutorialTries = 6, -- deliveries made for it; the shortest one is given
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
 	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).
 	-- The serve stops (ice cream) are the old way: hold still in the circle for the job type's unloadTime.
@@ -1695,6 +1744,33 @@ Config.Cargo = {
 		{ every = 13, count = 2, max = 7 },
 		{ every = 10, count = 2, max = 9 },
 	} :: { { every: number, count: number, max: number } },
+	-- 3.7, two in your hands (server/Cargo.luau): a piece of a light look (the model, not the kind: the pizzeria sends
+	-- "crate" kind pizza stacks) can be carried two at a time, stacked. One light piece leaves a hand free: you open and
+	-- close the back yourself (server/Vehicles.luau reads the character attribute CarryHands = 1). Two pieces (or one
+	-- heavy piece, a horse) fill both hands: put one down (G, one at a time) or let a crew mate open it. Everything not
+	-- listed is heavy (crates, barrels, ammo, furniture, coolers, people, horses) and goes one at a time; so does every
+	-- piece of a job with the lift or the pair twist.
+	LightLooks = {
+		pizza = true,
+		parcel = true,
+		mail = true,
+		bread = true,
+		medicine = true,
+		documents = true,
+		cake = true,
+		groceries = true,
+		plants = true,
+	} :: { [string]: boolean },
+	HandsMax = 2, -- light pieces in one player's hands at most
+	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)
+	-- 3.7, the car doors (server/Vehicles.luau, client/CarVisuals.luau): the E to get in shows only at a door (the driver's
+	-- on the left, the passengers' on their side), this close; the door swings out this far and stays open this long.
+	DoorReach = 5,
+	DriverDoorReach = 7, -- the owner's door: parked flush against a wall you still reach it from the front corner (the
+	-- passenger side of the narrowest car is 8+ away, so "Drive" still never shows there)
+	SeatReach = 3.5, -- a seat with no door (a bed, a roof gunner, a jump seat): close, so its E never takes the back's E
+	DoorSwing = 70, -- degrees
+	DoorOpenSeconds = 1.1,
 }
 
 export type JobTypeDef = {

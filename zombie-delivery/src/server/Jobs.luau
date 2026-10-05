@@ -65,6 +65,16 @@
 -- (slotsShort). The ordinary deliveries of the dangerous levels are sometimes bulk orders (Config.Jobs.BulkChance /
 -- BulkExtra): more pieces, more pay, a bigger car. 3.5: a ★ delivery carries at most Config.Jobs.EasyMaxPieces (the
 -- Rusty Van's 2 slots).
+--
+-- 3.7, the board on a timer: a player's offers stay put (boards, by UserId: leaving and coming back does not reroll
+-- them) and are made again only every Config.Jobs.RefreshSeconds. Opening the board (RequestOffers) sends the current
+-- ones and when the next ones come (refreshAt); when that time comes the server makes new ones and pushes them
+-- (refreshBoards, never during a job). There is no other way to new offers: an accepted offer just leaves the board,
+-- and cancelling it does not bring a new board. The board is sorted ★ → ★★★★ (boardOrder: the specials at their
+-- stars, the locked ones too); AcceptJob sends the offer's id (Offer.id), so a new board or a taken offer never makes
+-- it take another one. An offer keeps its pay while you move about; its clock grows by the longer drive when you take
+-- it from farther away (fromHere). Jobs.startTutorialJob gives a new player an easy first delivery the same way
+-- (takeOffer), and Jobs.onDelivered tells server/Tutorial.luau how a job ended.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -127,7 +137,13 @@ type Offer = {
 	-- 3.2, the DUO missions:
 	duo: boolean, -- only with a crew: fails when the partner leaves
 	gates: string?, -- switches: "drop" (the last drop) | "pickup" (every pick-up), nil without the twist
+	-- 3.7, the board on a timer:
+	id: number, -- the board's id of the offer (AcceptJob sends it), 0 off the board
+	approach: number, -- the drive (manhattan) to the first stop from where it was offered: `distance` and `time` count it
 }
+
+-- 3.7: a player's job board: its offers (sorted, boardOrder) until refreshAt (workspace:GetServerTimeNow()).
+type Board = { list: { Offer }, refreshAt: number }
 
 type Job = {
 	offer: Offer,
@@ -180,7 +196,8 @@ type CargoSpot = { pile: { x: number, z: number }, park: { x: number, z: number 
 
 local Jobs = {}
 
-local offers: { [Player]: { Offer } } = {}
+local boards: { [number]: Board } = {} -- 3.7: by UserId, so leaving and coming back does not reroll the board
+local nextOfferId = 0
 local jobs: { [Player]: Job } = {}
 local rng = Random.new()
 
@@ -460,13 +477,14 @@ local function gatesOf(mission: string?): string
 	return if def and def.gates == "pickup" then "pickup" else "drop"
 end
 
-local function finishOffer(tierIndex: number, stops: { Stop }, distance: number, cargo: string, customer: string, jobType: Config.JobTypeDef?, pieces: CargoInfo, extraPay: number): Offer
+-- `plain` (3.7, the tutorial's delivery): never a random modifier.
+local function finishOffer(tierIndex: number, stops: { Stop }, distance: number, cargo: string, customer: string, jobType: Config.JobTypeDef?, pieces: CargoInfo, extraPay: number, plain: boolean?): Offer
 	local tier = JobsConfig.Tiers[tierIndex]
 	local timeLimit = if jobType then jobType.timeLimit else nil
 	local modifier: Config.ModifierDef? = nil
 	-- A mission is told as it is written: no random modifier.
 	local mission = if jobType then jobType.mission else nil
-	if not mission and rng:NextNumber() < tier.modifierChance then
+	if not mission and not plain and rng:NextNumber() < tier.modifierChance then
 		-- A rush keeps its fixed clock: no modifier that changes the time or the car's speed.
 		local choices: { Config.ModifierDef } = {}
 		for _, candidate in JobsConfig.Modifiers do
@@ -524,27 +542,38 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 		defendTime = defendTime,
 		duo = jobType ~= nil and jobType.duo == true,
 		gates = if twists.switches then gatesOf(mission) else nil,
+		id = 0,
+		approach = 0,
 	}
 end
 
 -- An ordinary delivery: a business that fits the danger level sends 1 – 3 pieces to somebody who needs them.
-local function ordinaryOffer(from: Vector3, tierIndex: number): Offer?
+-- 3.7, `easy` (the tutorial's first delivery, Jobs.startTutorialJob): carried pieces only (no people, no horses), at
+-- most Config.Jobs.TutorialPieces, the pick-up within TutorialPickupMax, the drop within TutorialDropMax of it, never
+-- a bulk order or a modifier.
+local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?): Offer?
 	local tier = JobsConfig.Tiers[tierIndex]
 	local businesses: { Config.BusinessDef } = {}
 	for _, business in JobsConfig.Businesses do
-		if table.find(business.tiers, tierIndex) then
+		local handy = not easy or (not Cargo.isPeople(business.kind) and business.kind ~= "horse")
+		if table.find(business.tiers, tierIndex) and handy then
 			table.insert(businesses, business)
 		end
 	end
 	if #businesses == 0 then
+		if easy then
+			return nil
+		end
 		businesses = JobsConfig.Businesses
 	end
 	local business = pick(businesses)
-	local pickup = addressAround(from.X, from.Z, JobsConfig.PickupMinDistance, JobsConfig.PickupMaxDistance, 0, {})
+	local pickupMax = if easy then math.max(JobsConfig.PickupMinDistance, JobsConfig.TutorialPickupMax) else JobsConfig.PickupMaxDistance
+	local pickup = addressAround(from.X, from.Z, JobsConfig.PickupMinDistance, pickupMax, 0, {})
 	if not pickup then
 		return nil
 	end
-	local drop = addressAround(pickup.x, pickup.z, tier.minDistance, tier.maxDistance, if tierIndex >= 3 then 3 else 0, { pickup })
+	local dropMax = if easy then math.clamp(JobsConfig.TutorialDropMax, tier.minDistance, tier.maxDistance) else tier.maxDistance
+	local drop = addressAround(pickup.x, pickup.z, tier.minDistance, dropMax, if tierIndex >= 3 and not easy then 3 else 0, { pickup })
 	if not drop then
 		return nil
 	end
@@ -555,9 +584,12 @@ local function ordinaryOffer(from: Vector3, tierIndex: number): Offer?
 	if tierIndex == 1 then
 		count = math.min(count, JobsConfig.EasyMaxPieces) -- 3.5: a ★ delivery fits the Rusty Van
 	end
+	if easy then
+		count = math.max(1, math.min(count, JobsConfig.TutorialPieces))
+	end
 	-- 3.4: a bulk order now and then on the dangerous levels: more pieces (3.5: a later stage or a bigger car).
 	local extra = JobsConfig.BulkExtra[tierIndex]
-	if extra and extra[2] > 0 and rng:NextNumber() < (JobsConfig.BulkChance[tierIndex] or 0) then
+	if not easy and extra and extra[2] > 0 and rng:NextNumber() < (JobsConfig.BulkChance[tierIndex] or 0) then
 		count += rng:NextInteger(extra[1], extra[2])
 	end
 	local customer = if drop.poi then `{receiver.name}, {drop.name}` else receiver.name
@@ -566,7 +598,7 @@ local function ordinaryOffer(from: Vector3, tierIndex: number): Offer?
 		newStop(drop, "drop", "carry", count, `DELIVER to {receiver.name}, {drop.name}`, receiver),
 	}
 	local pieces: CargoInfo = { kind = business.kind, look = business.look, piece = business.piece, plural = business.plural, total = count }
-	return finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), business.cargo, customer, nil, pieces, Tuning.PayPerPiece * count)
+	return finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), business.cargo, customer, nil, pieces, Tuning.PayPerPiece * count, easy)
 end
 
 -- A special job's stops from its definition: the pick-ups (at a place, or homes around you), then the deliveries
@@ -667,13 +699,32 @@ local function slotsShort(player: Player, offer: Offer): string?
 	return `This job needs {need} cargo slots: your {name} holds {holds}. {Economy.roomAdvice(carId, stage, need)}`
 end
 
+-- 3.7: the drive from `from` to the offer's first stop (manhattan, like the route).
+local function approachFrom(from: Vector3, offer: Offer): number
+	local first = offer.stops[1].address
+	return Map.manhattan(from.X, from.Z, first.x, first.z)
+end
+
+-- 3.7: a board offer waits up to Config.Jobs.RefreshSeconds while you move about: its distance and its clock taken
+-- from `from`. The pay stays what the board promised (moving about never makes it pay more); the clock gets the time
+-- of the longer drive to the first stop when you are farther from it than where it was offered (the job's own time
+-- rule, Economy.timeLimit's TimePerStud × the modifier's), and never less than it was offered with.
+local function fromHere(offer: Offer, from: Vector3): (number, number)
+	local extra = approachFrom(from, offer) - offer.approach
+	local modifier = offer.modifier
+	local slower = math.max(0, extra) * JobsConfig.TimePerStud * (if modifier then modifier.timeMultiplier else 1)
+	return math.max(0, offer.distance + extra), offer.time + math.floor(slower + 0.5)
+end
+
 -- One card of the job board. A job above the player's level is shown LOCKED (locked, level): accepting it is refused.
--- 3.4: so is a job with more pieces than the car holds (slots, capacity, carName, tooBig).
-local function describe(index: number, offer: Offer, playerLevel: number, nightPay: number, player: Player): { [string]: any }
+-- 3.4: so is a job with more pieces than the car holds (slots, capacity, carName, tooBig). 3.7: `index` is the offer's
+-- id (AcceptJob sends it back), its distance and time are from where the player is now (fromHere).
+local function describe(offer: Offer, from: Vector3, playerLevel: number, nightPay: number, player: Player): { [string]: any }
 	local last = offer.stops[#offer.stops]
 	local jobType = offer.jobType
 	local vehicle = if jobType and jobType.vehicle then Economy.findCar(jobType.vehicle) else nil
 	local need, holds, carName = slotsFor(player, offer)
+	local distance, time = fromHere(offer, from)
 	return {
 		locked = offer.level > playerLevel,
 		level = offer.level,
@@ -685,7 +736,7 @@ local function describe(index: number, offer: Offer, playerLevel: number, nightP
 		timed = jobType ~= nil and jobType.timeLimit ~= nil, -- a rush: `time` is a fixed clock
 		banditBoost = offer.boost, -- > 1: bandits want this cargo
 		nightPay = if nightPay > 1.001 then nightPay else nil, -- it is night now: finished now, it pays this many times
-		index = index,
+		index = offer.id,
 		stars = offer.tier,
 		tierName = JobsConfig.Tiers[offer.tier].name,
 		cargo = offer.cargo,
@@ -695,9 +746,9 @@ local function describe(index: number, offer: Offer, playerLevel: number, nightP
 		district = last.address.district,
 		stops = #offer.stops,
 		position = last.park,
-		distance = math.floor(offer.distance),
+		distance = math.floor(distance),
 		pay = offer.pay,
-		time = offer.time,
+		time = time,
 		modifier = info(offer.modifier),
 		jobType = info(jobType),
 		vehicle = if vehicle then vehicle.name else nil,
@@ -709,7 +760,25 @@ local function describe(index: number, offer: Offer, playerLevel: number, nightP
 	}
 end
 
-function Jobs.makeOffers(player: Player)
+-- 3.7: the board's order: ★ on top, then ★★, ★★★, ★★★★ (the specials at their stars, the locked ones in their place);
+-- at the same stars the lower driver level first, the ordinary delivery before a special; else as they were made.
+local function boardOrder(a: Offer, b: Offer): boolean
+	if a.tier ~= b.tier then
+		return a.tier < b.tier
+	end
+	if a.level ~= b.level then
+		return a.level < b.level
+	end
+	local aSpecial, bSpecial = a.jobType ~= nil, b.jobType ~= nil
+	if aSpecial ~= bSpecial then
+		return bSpecial
+	end
+	return a.id < b.id
+end
+
+-- A new board for the player, from where they are now: up to two board specials and one ordinary delivery of every
+-- danger level, sorted (boardOrder), each with its id; it stays until refreshAt (Config.Jobs.RefreshSeconds).
+local function makeBoard(player: Player): Board
 	local from = playerPosition(player)
 	local list: { Offer } = {}
 	-- Board specials (JobTypeDef.board, or no employer: the Cash Transport, the Pizza Rush, the Winter Run): up to two
@@ -738,14 +807,59 @@ function Jobs.makeOffers(player: Player)
 			table.insert(list, offer)
 		end
 	end
-	offers[player] = list
+	for _, offer in list do
+		nextOfferId += 1
+		offer.id = nextOfferId
+		offer.approach = approachFrom(from, offer)
+	end
+	table.sort(list, boardOrder)
+	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, JobsConfig.RefreshSeconds) }
+	boards[player.UserId] = board
+	return board
+end
+
+-- The player's board as it is now: the current one, or a new one when it expired (or there was none yet).
+local function boardOf(player: Player): Board
+	local board = boards[player.UserId]
+	if not board or workspace:GetServerTimeNow() >= board.refreshAt then
+		board = makeBoard(player)
+	end
+	return board
+end
+
+-- Sends the board (Net "Offers": the cards, and when the next offers come: refreshAt, server time).
+local function sendBoard(player: Player, board: Board)
+	local from = playerPosition(player)
 	local level = PlayerData.level(player)
 	local nightPay = Economy.nightScale(Config.DayNight.NightPay, DayNight.nightFactor())
 	local out = {}
-	for index, offer in list do
-		table.insert(out, describe(index, offer, level, nightPay, player))
+	for _, offer in board.list do
+		table.insert(out, describe(offer, from, level, nightPay, player))
 	end
-	Net.get("Offers"):FireClient(player, out)
+	Net.get("Offers"):FireClient(player, out, board.refreshAt)
+end
+
+-- A new board now, sent to the player (3.7: the client cannot ask for this; RequestOffers sends the current board).
+function Jobs.makeOffers(player: Player)
+	sendBoard(player, makeBoard(player))
+end
+
+-- 3.7: every second (update): a board whose time is up gets new offers, pushed to its player (open or not, so the
+-- board shows them at once). Not during a job: the first tick after it. Boards of players who left go when they expire.
+local function refreshBoards(now: number)
+	local here: { [number]: boolean } = {}
+	for _, player in Players:GetPlayers() do
+		here[player.UserId] = true
+		local board = boards[player.UserId]
+		if board and now >= board.refreshAt and not jobs[player] then
+			sendBoard(player, makeBoard(player))
+		end
+	end
+	for userId, board in boards do
+		if not here[userId] and now >= board.refreshAt then
+			boards[userId] = nil
+		end
+	end
 end
 
 -- ── Running a job ──────────────────────────────────────────────────────────
@@ -803,6 +917,20 @@ local function stat(player: Player, name: string, amount: number)
 	local hook = Jobs.onStat
 	if hook and amount > 0 then
 		task.spawn(hook, player, name, amount)
+	end
+end
+
+-- 3.7, set by server/Tutorial.luau: a job of `player` ended, told to the owner only (not the crew). `ok` true when it
+-- was delivered and paid (complete, also when only part of the cargo arrived), false when it failed or was cancelled
+-- (Jobs.fail: the clock, the cargo gone, GIVE UP). Every job the player owns: the board's, an employer's, a mission,
+-- the tutorial's (one job at a time, so the one that ends is the one started). Not called when the owner leaves the
+-- game with it or an admin start replaces it. Never blocks the job (task.spawn).
+Jobs.onDelivered = nil :: ((player: Player, ok: boolean) -> ())?
+
+local function tellDelivered(player: Player, ok: boolean)
+	local hook = Jobs.onDelivered
+	if hook then
+		task.spawn(hook, player, ok)
 	end
 end
 
@@ -948,7 +1076,6 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 			end
 		end
 	end
-	offers[player] = nil
 	local crew: { [Player]: boolean } = {}
 	local handles = false
 	for _, stop in offer.stops do
@@ -1090,22 +1217,51 @@ local function canTake(player: Player, level: number): boolean
 	return true
 end
 
-local function accept(player: Player, index: any)
-	local list = offers[player]
-	local offer = if list and type(index) == "number" then list[index] else nil
-	if not offer then
-		if jobs[player] then
-			notice:FireClient(player, "Finish your current delivery first.")
-		end
+-- Takes an offer the way the job board does (3.7: the tutorial's delivery too): the checks (canTake, slotsShort) and
+-- startJob, every refusal told to the player.
+local function takeOffer(player: Player, offer: Offer): boolean
+	if not canTake(player, offer.level) then
+		return false
+	end
+	local short = slotsShort(player, offer)
+	if short then
+		notice:FireClient(player, short)
+		return false
+	end
+	return startOrTell(player, offer)
+end
+
+-- AcceptJob: the offer with that id (3.7) on the player's board. Taken from where the player is now (fromHere: the
+-- same pay, more time for a longer drive to it); once started it leaves the board (the rest stay until refreshAt).
+local function accept(player: Player, id: any)
+	if jobs[player] then
+		notice:FireClient(player, "Finish your current delivery first.")
 		return
 	end
-	if canTake(player, offer.level) then
-		local short = slotsShort(player, offer)
-		if short then
-			notice:FireClient(player, short)
-			return
+	local board = boards[player.UserId]
+	if type(id) ~= "number" or not board then
+		return
+	end
+	local offer: Offer? = nil
+	for _, candidate in board.list do
+		if candidate.id == id then
+			offer = candidate
+			break
 		end
-		startOrTell(player, offer)
+	end
+	if not offer then
+		-- Taken already, or the board got new offers meanwhile: the board as it is now.
+		notice:FireClient(player, "That job is no longer on the board.")
+		sendBoard(player, boardOf(player))
+		return
+	end
+	local taken = table.clone(offer)
+	taken.distance, taken.time = fromHere(offer, playerPosition(player))
+	if takeOffer(player, taken) then
+		local at = table.find(board.list, offer)
+		if at then
+			table.remove(board.list, at)
+		end
 	end
 end
 
@@ -1172,6 +1328,7 @@ function Jobs.fail(player: Player, reason: string)
 			stars = offer.tier,
 		}, giveXp(member, xp)))
 	end
+	tellDelivered(player, false) -- 3.7: Jobs.onDelivered
 end
 
 local function complete(player: Player, job: Job)
@@ -1321,6 +1478,7 @@ local function complete(player: Player, job: Job)
 			warn(`[Jobs] onMissionComplete failed: {err}`)
 		end
 	end
+	tellDelivered(player, true) -- 3.7: Jobs.onDelivered, after the pay
 end
 
 -- The job a player is on right now: their own, the one of the crew they were invited into, or the one of the car they
@@ -1733,6 +1891,7 @@ local function recount(player: Player, job: Job)
 end
 
 local elapsed = 0
+local boardElapsed = 0
 
 local function update(dt: number)
 	elapsed += dt
@@ -1743,6 +1902,12 @@ local function update(dt: number)
 	elapsed = 0
 	local now = os.clock()
 	local serverNow = workspace:GetServerTimeNow()
+	-- 3.7: the boards' timers, once a second.
+	boardElapsed += step
+	if boardElapsed >= 1 then
+		boardElapsed = 0
+		refreshBoards(serverNow)
+	end
 	-- Bigger and more frequent waves at night (Economy.waveSize / waveEvery / waveAlive take it like WANTED does).
 	local nightWaves = Economy.nightScale(Config.DayNight.NightWaves, DayNight.nightFactor())
 	for _, player in Players:GetPlayers() do
@@ -1962,9 +2127,10 @@ end
 function Jobs.start()
 	-- The quiet twist hears every shot (Gun does not require Jobs: no cycle).
 	Gun.onShot = Jobs.onShot
+	-- 3.7: opening the board sends the current offers; new ones only when they expired (or there were none yet).
 	Net.get("RequestOffers").OnServerEvent:Connect(function(player)
 		if not jobs[player] then
-			Jobs.makeOffers(player)
+			sendBoard(player, boardOf(player))
 		end
 	end)
 	Net.get("AcceptJob").OnServerEvent:Connect(accept)
@@ -1973,7 +2139,7 @@ function Jobs.start()
 		Jobs.fail(player, "Delivery cancelled.")
 	end)
 	Players.PlayerRemoving:Connect(function(player)
-		offers[player] = nil
+		-- 3.7: the board (boards, by UserId) stays until it expires (refreshBoards): coming back does not reroll it.
 		local job = jobs[player]
 		if job then
 			jobs[player] = nil
@@ -1988,6 +2154,33 @@ function Jobs.start()
 		end
 	end)
 	RunService.Heartbeat:Connect(update)
+end
+
+-- 3.7: the tutorial's first job (server/Tutorial.luau): the easiest ordinary offer near the player, started as if
+-- accepted from the board (takeOffer). False when the player has a job already or no offer could be made. Made for a
+-- brand-new player at the depot with the Old Van: a ★ delivery of a business's carried pieces (ordinaryOffer easy: at
+-- most Config.Jobs.TutorialPieces, no people or horses, no modifier or bulk, the pick-up close by), the shortest of
+-- TutorialTries. It does not touch the job board.
+function Jobs.startTutorialJob(player: Player): boolean
+	if jobs[player] then
+		return false
+	end
+	-- A brand-new driver may not have called the car yet: it comes first (startJob needs it).
+	if not Vehicles.get(player) and Vehicles.spawn(player, true) ~= nil then
+		return false
+	end
+	local from = playerPosition(player)
+	local best: Offer? = nil
+	for _ = 1, math.max(1, JobsConfig.TutorialTries) do
+		local offer = ordinaryOffer(from, 1, true)
+		if offer and (not best or offer.distance < best.distance) then
+			best = offer
+		end
+	end
+	if not best then
+		return false
+	end
+	return takeOffer(player, best)
 end
 
 function Jobs.sendTo(player: Player)

@@ -2708,8 +2708,9 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 		if kind == "place" then
 			-- A thin strip, like a toast.
 			Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, card)
-			local text = if batch then `🧭  {batch} NEW PLACES DISCOVERED{if count ~= "" then ` ({string.sub(count, 3)})` else ""}`
-				else `🧭  NEW PLACE DISCOVERED: <b>{name}</b>{if count ~= "" then ` ({string.sub(count, 3)})` else ""}`
+			-- 3.7: "discovered" is the map's banner now (client/Discovery.luau); this strip counts the places visited.
+			local text = if batch then `🧭  {batch} PLACES VISITED{if count ~= "" then ` ({string.sub(count, 3)})` else ""}`
+				else `🧭  PLACE VISITED: <b>{name}</b>{if count ~= "" then ` ({string.sub(count, 3)})` else ""}`
 			line(card, text, 1, 15, Theme.HeadingFont, P.ink)
 			return { card = card, duration = 3.5, loops = loops, color = color, big = false }
 		end

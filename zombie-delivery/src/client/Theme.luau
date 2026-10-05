@@ -66,6 +66,22 @@ Theme.Postage = {
 }
 local P = Theme.Postage
 
+-- 3.7+, the contract UI (Codex's design/ui-contract/, approved by the owner): compact white type over the world, a
+-- localized charcoal scrim or window surface, fine grey lines and small precise red accents (the contract marker, the
+-- destination, urgent feedback). Success and damage keep their meaning (good / warn), always with a word or an icon.
+Theme.Contract = {
+	text = Color3.fromRGB(242, 242, 240), -- #F2F2F0 main text and icons
+	secondary = Color3.fromRGB(196, 199, 203), -- #C4C7CB supporting text
+	charcoal = Color3.fromRGB(20, 23, 28), -- #14171C readability backing, window surfaces
+	raised = Color3.fromRGB(30, 34, 41), -- a selected row / hovered surface on charcoal
+	line = Color3.fromRGB(133, 139, 147), -- #858B93 fine separators (use with transparency)
+	red = Color3.fromRGB(215, 74, 70), -- #D74A46 contract, destination, urgent
+	good = Color3.fromRGB(126, 196, 120), -- success as text / a full bar on charcoal
+	warn = Color3.fromRGB(228, 170, 82), -- a middle state on charcoal
+	scrim = 0.35, -- the charcoal scrim's transparency behind HUD text groups
+	lineAlpha = 0.45, -- the fine lines' transparency
+}
+
 -- The semantic colours, remapped for the light surfaces: `panel` / `panelLight` are surfaces (lavender, cream
 -- paper), `text` / `dim` the plum inks, and the accents (money, yellow, red, green, blue, grey) are inks that read
 -- on cream and lavender (at least 3:1). As a button's or a chip's face they become their pastel (Theme.soft).

@@ -49,6 +49,8 @@ export type Profile = {
 	titles: { [string]: boolean }, -- titles earned
 	rewards: { [string]: boolean }, -- Config.Rewards given (a campaign id, "secrets", "challenges"): each once
 	title: string?, -- the title shown over your head and on the leaderboard (an earned one)
+	tutorial: boolean, -- 3.7: the first-day tutorial is done (or skipped); older saves with a delivery count as done
+	explored: string, -- 3.7: the map cells uncovered (shared/Explore.luau encodes them)
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -96,6 +98,8 @@ local function newProfile(): Profile
 		titles = {},
 		rewards = {},
 		title = nil,
+		tutorial = false,
+		explored = "",
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -223,6 +227,8 @@ local function applySaved(profile: Profile, saved: any)
 	profile.kills = number(saved.kills, 0, 2 ^ 50)
 	profile.earned = number(saved.earned, 0, 2 ^ 50)
 	profile.xp = number(saved.xp, 0, 2 ^ 50) -- older saves have no xp: 0 (level 1)
+	profile.tutorial = saved.tutorial == true or profile.deliveries > 0 -- 3.7: a player who delivered before needs no tutorial
+	profile.explored = if type(saved.explored) == "string" and #saved.explored <= 65536 then saved.explored else ""
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
 	end
@@ -461,6 +467,8 @@ function PlayerData.save(player: Player)
 		titles = profile.titles,
 		rewards = profile.rewards,
 		title = profile.title,
+		tutorial = profile.tutorial,
+		explored = profile.explored,
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -477,6 +485,12 @@ function PlayerData.release(player: Player)
 	PlayerData.save(player)
 	profiles[player] = nil
 	canSave[player] = nil
+end
+
+-- 3.7: was this player's save read (so their profile is really theirs)? False while a DataStore failure plays them
+-- on a fresh, unsaved profile (and in Studio without API access).
+function PlayerData.loaded(player: Player): boolean
+	return canSave[player] == true
 end
 
 function PlayerData.get(player: Player): Profile?

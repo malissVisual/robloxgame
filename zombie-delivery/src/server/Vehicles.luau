@@ -8,7 +8,8 @@
 -- server only reads where the car is and how fast it goes (ramming, deliveries).
 --
 -- The visible tyres hang on Motor6Ds that every client spins and steers (client/CarVisuals.luau).
--- Other players ride along in the passenger seats (the "Ride" prompt) and shoot from there (server/Gun.luau).
+-- Other players ride along in the passenger seats (a "Ride along" prompt at their door, 3.7) and shoot from there
+-- (server/Gun.luau).
 --
 -- A car has no roof gun until one is bought at Wrench Garage (Config.CarGuns, profile.carGuns, only on the cars with
 -- CarDef.mount). Then a turret with that gun's look sits on the roof: the model "CarGun" inside the car, its "Barrel"
@@ -22,12 +23,11 @@
 -- (a company ambulance lent for a job, or Vehicles.setSiren).
 --
 -- Calling the car (the CAR button: Vehicles.spawn without force) goes to server/CarCall.luau through the hook
--- Vehicles.callCar: a chauffeur drives it to you. While a chauffeur drives a car (car.chauffeured) the SERVER owns
--- and drives it, its Drive / Ride prompts wait in the folder "ParkedPrompts" (client/CarVisuals.luau only looks on
--- the chassis) and nobody gets in; Vehicles.handOver gives it to its owner (the prompts come back, the owner's
--- client owns it again). The instant cases stay instant (force: PLAY, a respawn, a car bought or equipped, a job's
--- vehicle): next to you and seated, or, when you spawn at home, parked at your home's garage drive-out spot (the
--- hook Vehicles.homeGarage).
+-- Vehicles.callCar: a chauffeur drives it to you. While a chauffeur drives a car (car.chauffeured, the attribute
+-- Chauffeured) the SERVER owns and drives it, nobody gets in (the door prompts refuse, the clients hide them);
+-- Vehicles.handOver gives it to its owner (the chauffeur's door swings, the owner's client owns it again). The
+-- instant cases stay instant (force: PLAY, a respawn, a car bought or equipped, a job's vehicle): next to you and
+-- seated, or, when you spawn at home, parked at your home's garage drive-out spot (the hook Vehicles.homeGarage).
 --
 -- 3.2, the back that opens: every car that takes cargo by hand (all but the bus) has one, its Style.back: two rear
 -- doors (the vans and the box trucks), a tailgate (the pickup, the monster truck, the fuel truck's flatbed), a trunk
@@ -35,10 +35,10 @@
 -- (C0 = the hinge line, set once when it is built; closed = no Transform; the attributes Axis and Angle = the open
 -- turn). The car model's attribute BackOpen says where it is and every client swings the leaves there
 -- (client/CarVisuals.luau). The "BackPrompt" at the back (Open doors / Close doors …) opens and closes it: on foot,
--- empty hands, the car standing, the owner or who the hook Vehicles.backAllowed lets (server/Cargo.luau: the job's
--- crew). While it is open nobody gets behind the wheel (the Drive prompt refuses) and the driver's client holds the
--- throttle (client/Drive.luau); server/Cargo.luau loads and unloads only through an open back. A new car (a
--- chauffeur's, a respawn) starts closed. The NPC and traffic cars and the showroom models have the leaves welded shut.
+-- a hand free (3.7), the car standing, the owner or who the hook Vehicles.backAllowed lets (server/Cargo.luau: the
+-- job's crew). While it is open nobody gets behind the wheel (the Drive prompt refuses) and the driver's client
+-- holds the throttle (client/Drive.luau); server/Cargo.luau loads and unloads only through an open back. A new car
+-- (a chauffeur's, a respawn) starts closed. The NPC and traffic cars and the showroom models have the leaves welded shut.
 --
 -- 3.3: five more vans (courier, highroof, boxtruck, armorvan, rallyvan: their STYLES below) and the upgrades you can
 -- see. A player's car carries the "UpgradeKit" (buildKit) for ITS car-track levels (profile.carUpgrades, Economy
@@ -62,6 +62,14 @@
 -- height for the gun. Stage 0 is the plain style (the Old Van's is the Rusty Van). A new stage builds the live car
 -- again where it stands (Vehicles.refreshStats → rebuild). The traffic drives the vans at random stages. The 3.4
 -- Cargo Rack (a roof rack with extra slots in the UpgradeKit) is gone: a 3.4 save got the stage that covers it.
+--
+-- 3.7, the doors (doorsOf below): you get in at a door. The E shows only there and only close (Config.Cargo.DoorReach):
+-- "Drive" at the driver's door on the left for the owner, "Ride along" at a passenger door (the front passenger's on
+-- the right, a rear seat's at its own side, the bus's folding door) for everybody else, so a passenger on the right
+-- never gets the driver's seat. The seats never take you by touch (CanTouch off), only through these prompts. A cabin
+-- door swings open as you get in or out (the Motor6D "DoorHinge", client/CarVisuals.luau) and you step out at your
+-- own door. 3.7 too, a free hand: one light piece in your hands (the character attribute CarryHands = 1, server/
+-- Cargo.luau) and you open and close the back yourself; two pieces or a heavy one, put one down first (G).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -100,6 +108,7 @@ export type Car = {
 	stage: number, -- 3.5: the stage its body was built at (Config.Cars stages; 0 for a company vehicle)
 	lent: boolean, -- 3.4: a company vehicle lent for a job: its damage is not kept
 	repairing: boolean, -- 3.4: on the lift of a repair bay (server/Repair.luau): anchored, nobody drives it
+	doors: { CarDoor }, -- 3.7: its doors (doorsOf): index 1 is the driver's
 }
 
 local Vehicles = {}
@@ -156,6 +165,8 @@ type Style = {
 	armored: boolean?, -- 3.3: plates and grilles of its own: the Armor upgrade adds none (buildKit)
 	trim: { Box }?, -- 3.5: cosmetic boxes (no collisions, not hit by rays): rust, ladders, racks, lamps …
 	hoodBusy: boolean?, -- 3.5: something sits on the hood already (a blower): the Engine upgrade adds no scoop
+	rideDoor: number?, -- 3.7: every passenger gets in through one door on the right at this z (the bus)
+	doorTrim: { Box }?, -- 3.7: on both front doors' panels: offsets from the panel's centre, +x outward
 }
 
 local function box(size: Vector3, offset: Vector3, kind: string, tag: string?): Box
@@ -236,8 +247,7 @@ local function flatbedBoxes(): { Box }
 		box(Vector3.new(7.2, 0.5, 7.2), Vector3.new(0, 0.25, 4.4), "plate"), -- the flatbed
 		box(Vector3.new(7.2, 3.4, 0.3), Vector3.new(0, 2.2, 1), "rail"), -- headboard
 		box(Vector3.new(7.2, 0.3, 0.3), Vector3.new(0, 1.9, 4.2), "rail"), -- the rack between the rows
-		box(Vector3.new(0.3, 2.4, 1.4), Vector3.new(-3.5, 1.4, -1.6), "white"), -- hazard plates on the doors
-		box(Vector3.new(0.3, 2.4, 1.4), Vector3.new(3.5, 1.4, -1.6), "white"),
+		-- (3.7: the hazard plates ride on the doors now: Style.doorTrim)
 	}
 	for _, x in { -3.45, 3.45 } do
 		table.insert(list, box(Vector3.new(0.3, 0.4, 7), Vector3.new(x, 2.3, 4.4), "accent")) -- stake rails
@@ -466,6 +476,7 @@ local STYLES: { [string]: Style } = {
 			Vector3.new(-2.4, 0.5, 3),
 			Vector3.new(2.4, 0.5, 3),
 		},
+		rideDoor = -9.6, -- the folding door at the front right (where the kids get on: the cargo entry)
 		roof = 7,
 		boxes = {
 			box(Vector3.new(8, 3, 24), Vector3.new(0, 1.5, 0), "body"),
@@ -581,6 +592,7 @@ local STYLES: { [string]: Style } = {
 		passengers = { Vector3.new(1.5, 0.5, -1) },
 		roof = 5.2,
 		boxes = flatbedBoxes(),
+		doorTrim = { box(Vector3.new(0.06, 1.6, 1.3), Vector3.new(0.06, 0.05, -0.45), "white") }, -- the hazard plates
 		cargo = cargo("truck", 16, 7.2, {
 			Vector3.new(-1.7, 0.5, 2.6),
 			Vector3.new(1.7, 0.5, 2.6),
@@ -1537,6 +1549,160 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	folder.Parent = model
 end
 
+-- ── 3.7, the doors ─────────────────────────────────────────────────────────
+-- You get in at a door, not anywhere round the car: the driver's door on the left (every style seats the driver on
+-- the left, -X; the front is -Z), the front passenger's on the right, a seat further back (a pickup's or a monster
+-- truck's bed, the army truck's roof gunners, a van's jump seat) at its own side, and the bus's passengers all through
+-- its folding door at the front right (Style.rideDoor). Seats side by side at one door share it (the box truck's
+-- middle seat). A door of the cabin has a panel that swings open (a hinged, massless, non-colliding part painted like
+-- the body, over the lower half of the cabin's side glass: the window shows above it); the others only a prompt.
+-- Each door has an Attachment "Door{n}" on the chassis just outside it with the prompt in it: the DrivePrompt at the
+-- driver's door, a RidePrompt at every passenger door (the attribute Door = n; its seats carry the same attribute).
+-- The prompts reach only Config.Cargo.DoorReach, so on the passenger side the driver's E never shows.
+
+export type CarDoor = {
+	side: number, -- -1 left, 1 right
+	z: number, -- the middle of the door along the car (also where you step out)
+	driver: boolean,
+	seats: { number }, -- the passenger seats (Style.passengers / Car.passengers indices) behind it; none at the driver's
+	outside: number, -- the outer face of the body there (|x|, relative to the chassis centre line)
+	promptY: number, -- the prompt's height over the chassis top
+	panel: Box?, -- the door panel (relative to the chassis top centre, closed); nil: no panel, only the prompt
+	hinge: Vector3?, -- the panel's front outer edge, where it turns out
+	trim: { Box }, -- on the panel: offsets from its centre
+}
+
+local DOOR_THICK = 0.1
+local DOOR_FRONT, DOOR_BACK = 1.3, 1.2 -- the panel reaches this far before and behind the seat's middle
+local DOOR_SOLID: { [string]: boolean } = { body = true, glass = true, plate = true } -- the shell a door sits on
+local DOOR_STRIPES: { [string]: boolean } = { accent = true, dark = true, logo = true } -- side stripes go on over it
+
+local doorCache: { [Style]: { CarDoor } } = setmetatable({}, { __mode = "k" }) :: any
+
+-- The highest point of the wheels between z0 and z1 (over the chassis top), -inf when no wheel is there.
+local function wheelTop(style: Style, z0: number, z1: number): number
+	local wz = style.length / 2 - style.wheel - 0.5
+	local centreY = style.wheel - style.clearance - CHASSIS_HEIGHT
+	local top = -math.huge
+	for _, wheelZ in { -wz, wz } do
+		local d = math.abs(math.clamp(wheelZ, z0, z1) - wheelZ)
+		if d < style.wheel then
+			top = math.max(top, centreY + math.sqrt(style.wheel * style.wheel - d * d))
+		end
+	end
+	return top
+end
+
+-- The style's doors (cached per style; a stage's look is a style of its own).
+local function doorsOf(style: Style): { CarDoor }
+	local cached = doorCache[style]
+	if cached then
+		return cached
+	end
+	local hull = hullOf(style)
+	local list: { CarDoor } = {}
+	local function add(side: number, z: number, driver: boolean, cabin: boolean): CarDoor
+		local front, back = z - DOOR_FRONT, z + DOOR_BACK
+		-- Over the wheel arch, up to the waist (the hood's top; the bus's lower body); a monster truck's door sits high
+		-- over its tyres.
+		local bottom = math.max(0.1, wheelTop(style, front, back) + 0.05)
+		local top = math.max(math.min(hull.hoodTop, 3) + 0.05, bottom + 1.2)
+		-- On the outside of the shell there (the cabin, a bed wall, a plate; not the frame of a monster truck).
+		local outside = 0
+		for _, b in style.boxes do
+			local y0, y1 = b.offset.Y - b.size.Y / 2, b.offset.Y + b.size.Y / 2
+			local z0, z1 = b.offset.Z - b.size.Z / 2, b.offset.Z + b.size.Z / 2
+			if DOOR_SOLID[b.kind] and y1 > bottom and y0 < top and z1 > front and z0 < back then
+				outside = math.max(outside, side * b.offset.X + b.size.X / 2)
+			end
+		end
+		outside = if outside > 0 then outside else style.width / 2
+		local door: CarDoor = {
+			side = side,
+			z = z,
+			driver = driver,
+			seats = {},
+			outside = outside,
+			promptY = math.max(0.4, 3 - style.clearance - CHASSIS_HEIGHT),
+			panel = nil,
+			hinge = nil,
+			trim = {},
+		}
+		if cabin then
+			local height, length = top - bottom, back - front
+			local centre = Vector3.new(side * (outside + DOOR_THICK / 2), (bottom + top) / 2, (front + back) / 2)
+			door.panel = box(Vector3.new(DOOR_THICK, height, length), centre, "body")
+			door.hinge = Vector3.new(side * (outside + DOOR_THICK), centre.Y, front)
+			-- The handle near the back edge, under the window.
+			table.insert(door.trim, box(Vector3.new(0.1, 0.16, 0.55), Vector3.new(side * (DOOR_THICK / 2 + 0.05), height / 2 - 0.45, length / 2 - 0.55), "dark"))
+			-- A stripe round the body (as wide as the car) goes on over the door.
+			for _, b in style.boxes do
+				local y0, y1 = math.max(bottom, b.offset.Y - b.size.Y / 2), math.min(top, b.offset.Y + b.size.Y / 2)
+				local z0, z1 = math.max(front, b.offset.Z - b.size.Z / 2), math.min(back, b.offset.Z + b.size.Z / 2)
+				if DOOR_STRIPES[b.kind] and b.size.X >= style.width - 0.5 and y1 - y0 > 0.05 and z1 - z0 > 0.05 then
+					local at = Vector3.new(side * (DOOR_THICK / 2 + 0.02), (y0 + y1) / 2 - centre.Y, (z0 + z1) / 2 - centre.Z)
+					table.insert(door.trim, box(Vector3.new(0.04, y1 - y0, z1 - z0), at, b.kind))
+				end
+			end
+			if driver or #list == 1 then
+				local extra: { Box } = style.doorTrim or {}
+				for _, b in extra do
+					table.insert(door.trim, box(b.size, Vector3.new(side * b.offset.X, b.offset.Y, b.offset.Z), b.kind))
+				end
+			end
+		end
+		table.insert(list, door)
+		return door
+	end
+	add(if style.seat.X > 0 then 1 else -1, style.seat.Z, true, true)
+	for index, position in style.passengers do
+		local side = if style.rideDoor then 1 elseif position.X < -0.3 then -1 else 1
+		local z = style.rideDoor or position.Z
+		local found: CarDoor? = nil
+		for _, door in list do
+			if not door.driver and door.side == side and math.abs(door.z - z) < 1.2 then
+				found = door
+				break
+			end
+		end
+		local door = found or add(side, z, false, style.rideDoor ~= nil or inGlass(style, position + Vector3.new(0, 1.6, 0)))
+		table.insert(door.seats, index)
+	end
+	doorCache[style] = list
+	return list
+end
+
+-- The door panels: hinged on a player's car (Motor6D "DoorHinge", the attributes Axis, Angle and Door; the clients
+-- swing it while its attribute OpenUntil, a server time, lies ahead: client/CarVisuals.luau), else welded shut.
+local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
+	for index, door in doorsOf(style) do
+		local panel, hingeAt = door.panel, door.hinge
+		if not panel or not hingeAt then
+			continue
+		end
+		local p = trimPart(model, "CarDoor", panel, top * CFrame.new(panel.offset), if working then nil else chassis, color, accent)
+		table.insert(paintParts, p)
+		for _, b in door.trim do
+			local t = trimPart(model, "DoorTrim", b, top * CFrame.new(panel.offset + b.offset), p, color, accent)
+			if b.kind == "body" then
+				table.insert(paintParts, t)
+			end
+		end
+		if working then
+			local hinge = Instance.new("Motor6D")
+			hinge.Name = "DoorHinge"
+			hinge.Part0 = chassis
+			hinge.Part1 = p
+			hinge.C0 = CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + hingeAt)
+			hinge.C1 = CFrame.new(hingeAt - panel.offset)
+			hinge:SetAttribute("Axis", "Y")
+			hinge:SetAttribute("Angle", door.side * Config.Cargo.DoorSwing) -- out to its side, the back edge first
+			hinge:SetAttribute("Door", index)
+			hinge.Parent = chassis
+		end
+	end
+end
+
 -- Builds the body. display = a showroom model (anchored, no seats, no movers). gunId = the car gun on its roof (nil:
 -- none). oneBeam: only one headlight carries a SpotLight (the NPC cars: cheaper). stage (3.5): the car's stage, its
 -- look (styleFor; nil: stage 0).
@@ -1605,6 +1771,8 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	if style.back then
 		buildBack(model, chassis, top, style.back, not display and not oneBeam, color, accent, paintParts)
 	end
+	-- 3.7: the cabin doors: hinged on a player's car, welded shut on a showroom model or an NPC car.
+	buildDoors(model, chassis, top, style, not display and not oneBeam, color, accent, paintParts)
 
 	-- Wheels: an invisible welded frictionless collider (the car slides on it) and a visible tyre on a Motor6D.
 	local wheelY = style.wheel - chassisY
@@ -1701,7 +1869,8 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		return built
 	end
 
-	-- The driver's seat (only the owner may sit in it, see watchSeats) and the passenger seats.
+	-- The driver's seat (only the owner may sit in it, see watchSeats) and the passenger seats. Nobody sits down by
+	-- touching one (CanTouch off): only through a door's prompt (3.7) and Seat:Sit.
 	local seat = Instance.new("VehicleSeat")
 	seat.Name = "DriverSeat"
 	seat.Size = Vector3.new(2, 0.4, 2)
@@ -1713,9 +1882,17 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	seat.MaxSpeed = 0 -- the legacy motor is unused, client/Drive.luau drives the car
 	seat.HeadsUpDisplay = false
 	seat.CollisionGroup = "Car"
+	seat:SetAttribute("Door", 1)
 	seat.Parent = model
 	weld(chassis, seat)
 	built.seat = seat
+	local doors = doorsOf(style)
+	local doorOf: { [number]: number } = {}
+	for index, door in doors do
+		for _, n in door.seats do
+			doorOf[n] = index
+		end
+	end
 	for n, position in style.passengers do
 		local p = Instance.new("Seat")
 		p.Name = "PassengerSeat"
@@ -1727,6 +1904,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		p.Massless = true
 		p.CollisionGroup = "Car"
 		p:SetAttribute("Index", n)
+		p:SetAttribute("Door", doorOf[n] or 1)
 		p.Parent = model
 		weld(chassis, p)
 		table.insert(built.passengers, p)
@@ -1776,22 +1954,25 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		model:SetAttribute("BackOpen", false)
 	end
 
-	-- Prompts: the owner drives, everybody else rides (the clients show only the one that fits them).
-	type PromptInfo = { name: string, action: string, key: Enum.KeyCode }
-	local promptInfos: { PromptInfo } = {
-		{ name = "DrivePrompt", action = "Drive", key = Enum.KeyCode.E },
-		{ name = "RidePrompt", action = "Ride along", key = Enum.KeyCode.R },
-	}
-	for _, info in promptInfos do
+	-- Prompts, 3.7 one at every door (doorsOf): the owner drives (the driver's door), everybody else rides along (a
+	-- passenger door with a free seat); the clients show only the ones that fit them (client/CarVisuals.luau).
+	for index, carDoor in doors do
+		local at = Instance.new("Attachment")
+		at.Name = `Door{index}`
+		at.Position = Vector3.new(carDoor.side * (carDoor.outside + 1.4), CHASSIS_HEIGHT / 2 + carDoor.promptY, carDoor.z)
+		at.Parent = chassis
 		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = info.name
-		prompt.ActionText = info.action
+		prompt.Name = if carDoor.driver then "DrivePrompt" else "RidePrompt"
+		prompt.ActionText = if carDoor.driver then "Drive" else "Ride along"
 		prompt.ObjectText = def.name
 		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = 14
+		prompt.MaxActivationDistance = if carDoor.driver then Config.Cargo.DriverDoorReach
+			elseif carDoor.panel == nil then Config.Cargo.SeatReach
+			else Config.Cargo.DoorReach
 		prompt.RequiresLineOfSight = false
-		prompt.KeyboardKeyCode = info.key
-		prompt.Parent = chassis
+		prompt.KeyboardKeyCode = Enum.KeyCode.E
+		prompt:SetAttribute("Door", index)
+		prompt.Parent = at
 	end
 	return built
 end
@@ -1963,8 +2144,19 @@ local function eject(seat: Seat | VehicleSeat)
 	end
 end
 
--- Whoever gets out steps out next to the car, not inside the cabin.
-local function watchSeat(car: Car, seat: Seat | VehicleSeat, side: number, driver: boolean)
+-- 3.7: swings a door of the car open for a moment (the clients animate it: client/CarVisuals.luau); a door without a
+-- panel (a bed, the roof) has nothing to swing.
+local function openDoor(car: Car, index: number)
+	for _, child in car.chassis:GetChildren() do
+		if child.Name == "DoorHinge" and child:GetAttribute("Door") == index then
+			child:SetAttribute("OpenUntil", workspace:GetServerTimeNow() + Config.Cargo.DoorOpenSeconds)
+		end
+	end
+end
+
+-- Whoever gets out steps out next to the car at their own door (3.7: the door swings open), not inside the cabin.
+local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driver: boolean)
+	local door = car.doors[index] or car.doors[1]
 	local sitting: Humanoid? = nil
 	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
 		local occupant = seat.Occupant
@@ -1982,51 +2174,83 @@ local function watchSeat(car: Car, seat: Seat | VehicleSeat, side: number, drive
 		sitting = nil
 		local character = left and left.Parent
 		if left and character and character:IsA("Model") and left.Health > 0 then
+			if not car.wrecked then
+				openDoor(car, index)
+			end
 			task.defer(function()
 				if character.Parent and car.chassis.Parent then
-					character:PivotTo(car.chassis.CFrame * CFrame.new(side * (car.size.X / 2 + 3), 2, -1))
+					character:PivotTo(car.chassis.CFrame * CFrame.new(door.side * (car.size.X / 2 + 3), 2, door.z))
 				end
 			end)
 		end
 	end)
 end
 
+-- 3.7: is the player standing at this door (the prompt's reach, and a little slack for the lag)?
+local function atDoor(car: Car, index: number, humanoid: Humanoid): boolean
+	local at = car.chassis:FindFirstChild(`Door{index}`)
+	local root = humanoid.RootPart
+	if not at or not at:IsA("Attachment") or not root then
+		return false
+	end
+	local prompt = at:FindFirstChildOfClass("ProximityPrompt")
+	local reach = if prompt then prompt.MaxActivationDistance else Config.Cargo.DoorReach
+	return (root.Position - at.WorldPosition).Magnitude <= reach + 6
+end
+
+-- 3.7: the prompts at the doors: the driver's door seats the owner, a passenger door the next free seat behind it.
 local function watchPrompts(car: Car)
-	local drive = car.chassis:FindFirstChild("DrivePrompt") :: ProximityPrompt
-	local ride = car.chassis:FindFirstChild("RidePrompt") :: ProximityPrompt
 	local function humanoidOf(player: Player): Humanoid?
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		return if humanoid and humanoid.Health > 0 then humanoid else nil
 	end
-	drive.Triggered:Connect(function(player)
-		-- 3.2: not with the back open (it must be closed before the car goes anywhere).
-		if player == car.owner and Vehicles.backOpen(car) then
-			Net.get("Notice"):FireClient(player, `Close the back first: {Vehicles.backVerb(car, false)} (E at the back).`)
-			return
+	for index, door in car.doors do
+		local at = car.chassis:FindFirstChild(`Door{index}`)
+		local prompt = at and at:FindFirstChildOfClass("ProximityPrompt")
+		if not prompt then
+			continue
 		end
-		local humanoid = humanoidOf(player)
-		if player == car.owner and not car.wrecked and not car.chauffeured and not car.seat.Occupant and humanoid and not handsFull(player) then
-			-- 3.4: back in a car on the lift of a repair bay: the repair is cancelled (server/Repair.luau).
-			if car.repairing then
-				Vehicles.beforeDrive(player, car)
-				Vehicles.setRepairing(car, false) -- (in case nobody was running it)
-			end
-			car.seat:Sit(humanoid)
+		if door.driver then
+			prompt.Triggered:Connect(function(player)
+				-- 3.2: not with the back open (it must be closed before the car goes anywhere).
+				if player == car.owner and Vehicles.backOpen(car) then
+					Net.get("Notice"):FireClient(player, `Close the back first: {Vehicles.backVerb(car, false)} (E at the back).`)
+					return
+				end
+				local humanoid = humanoidOf(player)
+				if player == car.owner and not car.wrecked and not car.chauffeured and not car.seat.Occupant and humanoid and not humanoid.SeatPart
+					and atDoor(car, index, humanoid) and not handsFull(player) then
+					-- 3.4: back in a car on the lift of a repair bay: the repair is cancelled (server/Repair.luau).
+					if car.repairing then
+						Vehicles.beforeDrive(player, car)
+						Vehicles.setRepairing(car, false) -- (in case nobody was running it)
+					end
+					openDoor(car, index)
+					car.seat:Sit(humanoid)
+				end
+			end)
+		else
+			prompt.Triggered:Connect(function(player)
+				local humanoid = humanoidOf(player)
+				if player == car.owner or car.wrecked or car.chauffeured or car.repairing or not humanoid or humanoid.SeatPart then
+					return
+				end
+				if not atDoor(car, index, humanoid) or handsFull(player) then
+					return
+				end
+				for _, n in door.seats do
+					local seat = car.passengers[n]
+					if seat and not seat.Occupant then
+						openDoor(car, index)
+						seat:Sit(humanoid)
+						return
+					end
+				end
+				Net.get("Notice"):FireClient(player, "No free seat at this door.")
+			end)
 		end
-	end)
-	ride.Triggered:Connect(function(player)
-		local humanoid = humanoidOf(player)
-		if player == car.owner or car.wrecked or car.chauffeured or car.repairing or not humanoid or humanoid.SeatPart or handsFull(player) then
-			return
-		end
-		for _, seat in car.passengers do
-			if not seat.Occupant then
-				seat:Sit(humanoid)
-				return
-			end
-		end
-	end)
+	end
 end
 
 function Vehicles.get(player: Player): Car?
@@ -2182,11 +2406,12 @@ function Vehicles.setBack(car: Car, open: boolean)
 	Vehicles.backChanged(car)
 end
 
--- The BackPrompt pressed: open or close it. On foot, empty hands, the car standing; the owner or the job's crew.
+-- The BackPrompt pressed: open or close it. On foot, a hand free (3.7: empty hands, or one light piece in them:
+-- the character attribute CarryHands = 1 from server/Cargo.luau), the car standing; the owner or the job's crew.
 local function toggleBack(car: Car, player: Player)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if car.wrecked or car.chauffeured or not humanoid or humanoid.Health <= 0 then
+	if car.wrecked or car.chauffeured or not character or not humanoid or humanoid.Health <= 0 then
 		return
 	end
 	local notice = Net.get("Notice")
@@ -2200,9 +2425,16 @@ local function toggleBack(car: Car, player: Player)
 	end
 	local open = Vehicles.backOpen(car)
 	local held = carrying(character)
-	if held then
-		local first = if held == "horse" then "Let the horse go (G)" else "Put it down (G)"
-		notice:FireClient(player, `Your hands are full. {first}, then {Vehicles.backVerb(car, not open)} (E).`)
+	if held and (held == "horse" or character:GetAttribute("CarryHands") ~= 1) then
+		local verb = Vehicles.backVerb(car, not open)
+		local count = character:GetAttribute("CarryCount")
+		if held == "horse" then
+			notice:FireClient(player, `Your hands are full. Let the horse go (G), then {verb} (E).`)
+		elseif type(count) == "number" and count >= 2 then
+			notice:FireClient(player, `Hands full: put a piece down with G, then {verb} (E). Or a crew mate opens it for you.`)
+		else
+			notice:FireClient(player, `Your hands are full. Put it down (G), then {verb} (E).`)
+		end
 		return
 	end
 	if Vehicles.speed(car) > Config.Cargo.MaxCarSpeed then
@@ -2390,6 +2622,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage)
 	applyPaint(built.paintParts, def, paintId)
 	buildKit(built.model, built.chassis, styleFor(def, stage), levels)
+	local doors = doorsOf(styleFor(def, stage))
 	local driverSeat = built.seat :: VehicleSeat
 	local car: Car = {
 		owner = player,
@@ -2414,6 +2647,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		stage = stage,
 		lent = lent,
 		repairing = false,
+		doors = doors,
 	}
 	car.model.Name = `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
@@ -2426,7 +2660,6 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	car.model:SetAttribute("Siren", carId ~= nil and def.company == true)
 	car.model:SetAttribute("Chauffeured", car.chauffeured)
 	writeAttributes(car)
-	-- Connect the prompts while they are still on the chassis (the connections follow them into ParkedPrompts and back).
 	watchPrompts(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then
@@ -2435,23 +2668,12 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 			toggleBack(car, by)
 		end)
 	end
-	if car.chauffeured then
-		-- Out of reach while the chauffeur drives (client/CarVisuals.luau looks for them on the chassis only).
-		local parked = Instance.new("Folder")
-		parked.Name = "ParkedPrompts"
-		parked.Parent = car.model
-		for _, name in { "DrivePrompt", "RidePrompt" } do
-			local prompt = car.chassis:FindFirstChild(name)
-			if prompt then
-				prompt.Parent = parked
-			end
-		end
-	end
 	car.model.Parent = workspace:FindFirstChild("Cars") or workspace
 	cars[player] = car
-	watchSeat(car, driverSeat, -1, true)
+	watchSeat(car, driverSeat, 1, true)
 	for _, p in car.passengers do
-		watchSeat(car, p, 1, false)
+		local door = p:GetAttribute("Door")
+		watchSeat(car, p, if type(door) == "number" then door else 1, false)
 	end
 
 	-- Heavy enough to plough through, light enough to stop against a wall.
@@ -2477,7 +2699,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	return car
 end
 
--- The chauffeur got out: the car is its owner's now (the prompts come back, the owner's client drives it again).
+-- The chauffeur got out: the car is its owner's now (its doors take you in again, the owner's client drives it).
 function Vehicles.handOver(car: Car)
 	if not car.chauffeured then
 		return
@@ -2488,13 +2710,7 @@ function Vehicles.handOver(car: Car)
 		return
 	end
 	Vehicles.setBack(car, false) -- the chauffeur leaves it closed
-	local parked = car.model:FindFirstChild("ParkedPrompts")
-	if parked then
-		for _, prompt in parked:GetChildren() do
-			prompt.Parent = car.chassis
-		end
-		parked:Destroy()
-	end
+	openDoor(car, 1) -- 3.7: the chauffeur got out of the driver's door (server/CarCall.luau steps them out there)
 	local linear = car.chassis:FindFirstChild("Drive")
 	if linear and linear:IsA("LinearVelocity") then
 		linear.PlaneVelocity = Vector2.zero

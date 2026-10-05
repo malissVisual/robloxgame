@@ -29,6 +29,9 @@ local WeaponWheel = require(Client.WeaponWheel)
 local DispatchUi = require(Client.DispatchUi)
 local Secrets = require(Client.Secrets)
 local GarageUi = require(Client.GarageUi)
+local Stamina = require(Client.Stamina)
+local Discovery = require(Client.Discovery)
+local TutorialUi = require(Client.TutorialUi)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -60,6 +63,9 @@ safely("WeaponWheel", WeaponWheel.start)
 safely("DispatchUi", DispatchUi.start)
 safely("Secrets", Secrets.start)
 safely("GarageUi", GarageUi.start) -- 3.4: the garage window, your garages' prompts, the repair timer
+safely("Stamina", Stamina.start) -- 3.7: the sprint's breath
+safely("Discovery", Discovery.start) -- 3.7: the map you discover
+safely("TutorialUi", TutorialUi.start) -- 3.7: the first-day tutorial
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
