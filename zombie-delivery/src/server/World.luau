@@ -997,7 +997,10 @@ function buildSchool(parent: Instance, cx: number, cz: number)
 	sidewalk(school, cx, cz)
 	local facing = Vector3.new(0, 0, -1)
 	local frame = shopFrame(cx, cz, facing, 10)
-	building(school, frame, 80, 50, 18, Color3.fromRGB(200, 120, 80), Enum.Material.Brick, 12, 10)
+	building(school, frame, 80, 50, 18, Color3.fromRGB(164, 92, 68), Enum.Material.Brick, 12, 10)
+	-- 4.1, the cinematic facade (BuildingLooks/School): decoration only, the board and the gate stay as they were.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(school, frame, require(script.Parent.BuildingLooks.School), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(school, "SUNNY HILL SCHOOL", Vector3.new(50, 6, 0.5), frame * CFrame.new(0, 22.5, -25), Color3.fromRGB(255, 230, 120), nil, "school", 10)
 	-- The playground behind.
 	for n = -1, 1 do
@@ -1007,6 +1010,7 @@ function buildSchool(parent: Instance, cx: number, cz: number)
 		part(school, "SwingTop", Vector3.new(9, 0.6, 0.6), CFrame.new(x, WALK_TOP + 9, cz + 44), Color3.fromRGB(200, 60, 60), Enum.Material.Metal)
 	end
 	part(school, "FlagPole", Vector3.new(0.5, 22, 0.5), CFrame.new(cx + 30, WALK_TOP + 11, cz - 34), Color3.fromRGB(220, 220, 220), Enum.Material.Metal)
+	deco(part(school, "Flag", Vector3.new(6, 3.6, 0.2), CFrame.new(cx + 26.8, WALK_TOP + 19.8, cz - 34), Color3.fromRGB(196, 150, 60), Enum.Material.Fabric))
 	employerBoard(school, "school", facing)
 end
 
@@ -1015,7 +1019,10 @@ function buildFrosty(parent: Instance, cx: number, cz: number)
 	sidewalk(frosty, cx, cz, Color3.fromRGB(150, 150, 146))
 	local facing = Vector3.new(-1, 0, 0)
 	local frame = shopFrame(cx, cz, facing, 12)
-	building(frosty, frame, 80, 50, 18, Color3.fromRGB(250, 230, 240), Enum.Material.SmoothPlastic, 24, 14)
+	building(frosty, frame, 80, 50, 18, Color3.fromRGB(232, 206, 216), Enum.Material.Concrete, 24, 14)
+	-- 4.1, the cinematic facade (BuildingLooks/Frosty): decoration only.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(frosty, frame, require(script.Parent.BuildingLooks.Frosty), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(frosty, "FROSTY'S ICE CREAM", Vector3.new(50, 6, 0.5), frame * CFrame.new(0, 22.5, -25), Color3.fromRGB(255, 90, 170), Color3.fromRGB(250, 250, 255), "icecream", 10)
 	-- A giant cone on the roof.
 	local roof = (frame * CFrame.new(0, 19, 8)).Position
@@ -1031,7 +1038,10 @@ function buildMovers(parent: Instance, cx: number, cz: number)
 	sidewalk(movers, cx, cz, Color3.fromRGB(130, 130, 126))
 	local facing = Vector3.new(1, 0, 0)
 	local frame = shopFrame(cx, cz, facing, 12)
-	building(movers, frame, 80, 50, 20, Color3.fromRGB(230, 120, 40), Enum.Material.Metal, 28, 15)
+	building(movers, frame, 80, 50, 20, Color3.fromRGB(186, 96, 42), Enum.Material.Metal, 28, 15)
+	-- 4.1, the cinematic facade (BuildingLooks/Movers): decoration only, the loading door and the receiving dock stay clear.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(movers, frame, require(script.Parent.BuildingLooks.Movers), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(movers, "BIG MOVE MOVERS", Vector3.new(50, 6, 0.5), frame * CFrame.new(0, 24.5, -25), Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 90, 30), "movers", 10)
 	for _ = 1, 8 do
 		local size = rng:NextNumber(3, 5)
@@ -1067,6 +1077,9 @@ function buildBank(parent: Instance, cx: number, cz: number)
 	local w, d, h = 72, 56, 24
 	local frame = shopFrame(cx, cz, facing, 14)
 	building(bank, frame, w, d, h, MARBLE, Enum.Material.Marble, 12, 14)
+	-- 4.1, the cinematic facade behind the portico (BuildingLooks/Bank): decoration only.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(bank, frame, require(script.Parent.BuildingLooks.Bank), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	local front = -d / 2
 	-- The portico: a platform with a step, six columns, the beam with the name and the pediment over it.
 	part(bank, "Portico", Vector3.new(48, 1.2, 10), frame * CFrame.new(0, 0.6, front - 5), MARBLE, Enum.Material.Marble)
@@ -1149,6 +1162,9 @@ function buildClinic(parent: Instance, cx: number, cz: number)
 	local frame = CFrame.lookAt(origin, origin + facing)
 	local w, d, h = 84, 56, 26
 	building(clinic, frame, w, d, h, CLINIC_WHITE, Enum.Material.Concrete, 14, 11)
+	-- 4.1, the cinematic facade (BuildingLooks/Clinic): decoration only, the ambulance bay stays clear.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(clinic, frame, require(script.Parent.BuildingLooks.Clinic), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	local front = -d / 2
 	sign(clinic, "CITY CLINIC", Vector3.new(44, 5, 0.5), frame * CFrame.new(0, h + 4, front), CLINIC_RED, Color3.fromRGB(250, 250, 250), "clinic", 10)
 	-- Window bands on both floors (they glow cold white at night), a red cross on the front.
@@ -1781,7 +1797,11 @@ local function buildGas(parent: Instance)
 	for _, dz in { -9, 9 } do
 		part(gas, "Pump", Vector3.new(2.5, 5, 4), CFrame.new(cx - 10, ROAD_TOP + 2.5, cz + dz), Color3.fromRGB(230, 230, 230), Enum.Material.Metal)
 	end
-	part(gas, "Shop", Vector3.new(26, 12, 30), CFrame.new(cx + 34, ROAD_TOP + 6, cz), Color3.fromRGB(200, 190, 170), Enum.Material.Concrete)
+	part(gas, "Shop", Vector3.new(26, 12, 30), CFrame.new(cx + 34, ROAD_TOP + 6, cz), Color3.fromRGB(128, 126, 118), Enum.Material.Concrete)
+	-- 4.1, the shop's cinematic front toward the pumps (BuildingLooks/Gas): decoration only.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local shopFront = CFrame.lookAt(Vector3.new(cx + 34, ROAD_TOP, cz), Vector3.new(cx + 33, ROAD_TOP, cz))
+	Kit.build(gas, shopFront, require(script.Parent.BuildingLooks.Gas), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(gas, "GAS", Vector3.new(14, 6, 0.5), CFrame.lookAt(Vector3.new(cx - 10, ROAD_TOP + 19, cz + 24.5), Vector3.new(cx - 10, ROAD_TOP + 19, cz + 30)), Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 40, 40), "gas")
 	-- The underground tank's filler caps by the shop: the fuel barrels are emptied here (Map.CargoSpots.gas).
 	local spot = Map.CargoSpots.gas
@@ -3840,7 +3860,10 @@ local function defineMissionPlaces()
 		local facing = Vector3.new(0, 0, -1)
 		local w, d, h = 64, 48, 15
 		local frame = shopFrame(cx, cz, facing, 8) -- the front wall 16 in from the block's middle
-		building(shop, frame, w, d, h, Color3.fromRGB(238, 238, 230), Enum.Material.SmoothPlastic, 10, 9)
+		building(shop, frame, w, d, h, Color3.fromRGB(214, 216, 208), Enum.Material.Concrete, 10, 9)
+		-- 4.1, the cinematic facade (BuildingLooks/Pharmacy): decoration only.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(shop, frame, require(script.Parent.BuildingLooks.Pharmacy), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		local front = -d / 2
 		for _, x in { -19, 19 } do
 			local pane = deco(part(shop, "ShopWindow", Vector3.new(20, 7, 0.2), frame * CFrame.new(x, 4.5, front - 0.6), WINDOW_DIM, Enum.Material.Glass))
@@ -3897,8 +3920,11 @@ local function defineMissionPlaces()
 		-- The back wall just inside the sidewalk ring (TrafficLanes.SidewalkInset: the walkers pass behind it), the
 		-- front where the car park starts.
 		local frame = shopFrame(cx, cz, facing, 25)
-		local wallColor = Color3.fromRGB(226, 220, 204)
+		local wallColor = Color3.fromRGB(186, 176, 158)
 		building(market, frame, w, d, h, wallColor, Enum.Material.Brick, 14, 10)
+		-- 4.1, the cinematic facade (BuildingLooks/Market): decoration only, the car park and receiving dock stay clear.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(market, frame, require(script.Parent.BuildingLooks.Market), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		local front = -d / 2
 		for _, x in { -27, 27 } do
 			local pane = deco(part(market, "ShopWindow", Vector3.new(32, 8, 0.2), frame * CFrame.new(x, 5, front - 0.6), WINDOW_DIM, Enum.Material.Glass))
@@ -4093,7 +4119,7 @@ local function defineMissionPlaces()
 		local facing = Vector3.new(1, 0, 0)
 		local w, d, h = 84, 46, 20
 		local frame = shopFrame(cx, cz, facing, 8)
-		local brick = Color3.fromRGB(168, 52, 42)
+		local brick = Color3.fromRGB(138, 50, 42)
 		local spot = Map.CargoSpots.firestation
 		local pileX = if spot then (frame:PointToObjectSpace(Vector3.new(spot.pile.x, WALK_TOP, spot.pile.z))).X else 28
 		-- The bays away from the pile (the person door beside it).
@@ -4105,6 +4131,12 @@ local function defineMissionPlaces()
 		end
 		table.insert(openings, { x = -side * 32, w = 4, h = 7 })
 		shell(station, frame, w, d, h, brick, Enum.Material.Brick, openings)
+		-- 4.1, the cinematic facade (BuildingLooks/FireStation): decoration only; its bay frames follow this layout
+		-- (the pile on the +x side), so it is dressed only while the bays are where the blueprint has them.
+		if side == -1 then
+			local Kit = require(script.Parent.BuildingLooks.Kit)
+			Kit.build(station, frame, require(script.Parent.BuildingLooks.FireStation), { part = part, deco = deco, nightLight = DayNight.nightLight })
+		end
 		local front = -d / 2
 		for n, x in bays do
 			rollerDoor(station, frame, x, front, 16, 14, n < 3, Color3.fromRGB(220, 60, 50))
@@ -4134,7 +4166,10 @@ local function defineMissionPlaces()
 		local facing = Vector3.new(0, 0, 1)
 		local w, d, h = 78, 44, 18
 		local frame = shopFrame(cx, cz, facing, 10)
-		building(precinct, frame, w, d, h, Color3.fromRGB(118, 128, 142), Enum.Material.Concrete, 10, 9)
+		building(precinct, frame, w, d, h, Color3.fromRGB(90, 100, 114), Enum.Material.Concrete, 10, 9)
+		-- 4.1, the cinematic facade (BuildingLooks/Police): decoration only.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(precinct, frame, require(script.Parent.BuildingLooks.Police), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		local front = -d / 2
 		part(precinct, "Steps", Vector3.new(22, 1, 5), frame * CFrame.new(0, 0.5, front - 2.5), CONCRETE, Enum.Material.Concrete)
 		part(precinct, "Step", Vector3.new(22, 0.5, 2), frame * CFrame.new(0, 0.25, front - 6), CONCRETE, Enum.Material.Concrete)
@@ -4170,6 +4205,9 @@ local function defineMissionPlaces()
 		local w, d, h = 86, 48, 24
 		local frame = shopFrame(cx, cz, facing, 16)
 		building(hall, frame, w, d, h, SANDSTONE, Enum.Material.Sandstone, 12, 14)
+		-- 4.1, the cinematic facade behind the portico (BuildingLooks/CityHall): decoration only.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(hall, frame, require(script.Parent.BuildingLooks.CityHall), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		local front = -d / 2
 		-- The portico: a platform up two steps, six columns, the beam with the name, the pediment.
 		part(hall, "Portico", Vector3.new(66, 1.6, 12), frame * CFrame.new(0, 0.8, front - 6), SANDSTONE, Enum.Material.Sandstone)
