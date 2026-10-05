@@ -4,7 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- (nothing right now)
+- Codex · cloud setup and Merge Blades archive on `codex/cloud-setup` · root AGENTS/README/project/Mac launchers, archive/merge-blades/, zombie-delivery/AGENTS.md and README.md, COLLAB.md; shared tools/rojo-sync.js stays in place · since 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
