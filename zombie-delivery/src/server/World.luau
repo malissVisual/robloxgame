@@ -670,13 +670,17 @@ end
 local function buildDepot(parent: Instance)
 	local depot = folder(parent, "Depot")
 	sidewalk(depot, 0, 0, Color3.fromRGB(120, 120, 116))
-	local wallColor = Color3.fromRGB(170, 120, 60)
+	local wallColor = Color3.fromRGB(56, 61, 65)
 	local depth, width, height = 40, 80, 22
 	local backZ = -BLOCK / 2 + 6
 	part(depot, "Back", Vector3.new(width, height, 2), CFrame.new(0, WALK_TOP + height / 2, backZ + 1), wallColor, Enum.Material.Metal)
 	part(depot, "Left", Vector3.new(2, height, depth), CFrame.new(-width / 2 + 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
 	part(depot, "Right", Vector3.new(2, height, depth), CFrame.new(width / 2 - 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
-	part(depot, "Roof", Vector3.new(width, 2, depth), CFrame.new(0, WALK_TOP + height + 1, backZ + depth / 2), Color3.fromRGB(90, 70, 50), Enum.Material.Metal)
+	part(depot, "Roof", Vector3.new(width, 2, depth), CFrame.new(0, WALK_TOP + height + 1, backZ + depth / 2), Color3.fromRGB(34, 38, 42), Enum.Material.Metal)
+	-- Approved architecture; the depot terminals, cargo and spawn stay in their original places.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local frame = CFrame.new(0, WALK_TOP, backZ + depth / 2) * CFrame.Angles(0, math.pi, 0)
+	Kit.build(depot, frame, require(script.Parent.BuildingLooks.Depot), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(depot, "ZOMBIE DELIVERY CO.", Vector3.new(60, 8, 1), CFrame.new(0, WALK_TOP + height + 6, backZ + depth - 2) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(255, 190, 60), nil, "depot", 12)
 	for n = 1, 10 do
 		local s = rng:NextNumber(3, 5)
@@ -726,6 +730,9 @@ local function buildDealer(parent: Instance)
 	local w, d, h = 84, 52, 18
 	local frame = shopFrame(cx, cz, facing, 22)
 	building(shop, frame, w, d, h, Color3.fromRGB(40, 44, 52), Enum.Material.Metal, 16, 12, true)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Dealer), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "DEAD END MOTORS", Vector3.new(60, 7, 0.5), frame * CFrame.new(0, h + 4.5, -d / 2), Color3.fromRGB(255, 80, 60), nil, "dealer", 12)
 	-- 3.5: the cars are sold from the catalog at the sales counter (the dealer window); no lot of every car outside.
 	local desk = counter(shop, frame, d, "dealer", "Dead End Motors")
@@ -756,7 +763,10 @@ local function buildGuns(parent: Instance)
 	local facing = Vector3.new(1, 0, 0)
 	local w, d, h = 60, 46, 16
 	local frame = shopFrame(cx, cz, facing, 18)
-	building(shop, frame, w, d, h, Color3.fromRGB(110, 70, 50), Enum.Material.Brick, 12, 10)
+	building(shop, frame, w, d, h, Color3.fromRGB(65, 58, 56), Enum.Material.Brick, 12, 10)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Guns), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "LEAD & CO.  GUNS", Vector3.new(44, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(255, 200, 80), nil, "guns", 10)
 	counter(shop, frame, d, "guns", "Lead & Co.")
 	-- Guns on the wall.
@@ -815,7 +825,10 @@ local function buildMechanic(parent: Instance)
 	local facing = Vector3.new(0, 0, -1)
 	local w, d, h = 70, 60, 20
 	local frame = shopFrame(cx, cz, facing, 12)
-	building(shop, frame, w, d, h, Color3.fromRGB(70, 90, 120), Enum.Material.Metal, 34, 15)
+	building(shop, frame, w, d, h, Color3.fromRGB(48, 60, 67), Enum.Material.Metal, 34, 15)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Mechanic), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "WRENCH GARAGE  TUNING · PAINT · REPAIRS", Vector3.new(60, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(120, 200, 255), nil, "mechanic", 12)
 	counter(shop, frame, d, "mechanic", "Wrench Garage")
 	-- 3.4: two repair bays straight in from the wide door (they replace the old lift; no free repairs any more).
@@ -858,7 +871,10 @@ local function buildSupplies(parent: Instance)
 	local facing = Vector3.new(0, 0, 1)
 	local w, d, h = 64, 44, 14
 	local frame = shopFrame(cx, cz, facing, 18)
-	building(shop, frame, w, d, h, Color3.fromRGB(90, 110, 80), Enum.Material.Concrete, 12, 10)
+	building(shop, frame, w, d, h, Color3.fromRGB(77, 82, 77), Enum.Material.Concrete, 12, 10)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Supplies), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "LAST STOP SUPPLIES", Vector3.new(48, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(140, 255, 120), nil, "supplies", 11)
 	counter(shop, frame, d, "supplies", "Last Stop Supplies")
 	for row = -1, 1, 2 do
@@ -4000,7 +4016,7 @@ local function defineMissionPlaces()
 		local facing = Vector3.new(-1, 0, 0)
 		local w, d, h = 100, 56, 22
 		local frame = shopFrame(cx, cz, facing, 20)
-		local color = Color3.fromRGB(70, 104, 130)
+		local color = Color3.fromRGB(60, 73, 82)
 		-- The open door is in line with the cargo spot (the pile in front of it).
 		local spot = Map.CargoSpots.warehouse
 		local openX = if spot then (frame:PointToObjectSpace(Vector3.new(spot.pile.x, WALK_TOP, spot.pile.z))).X else 18
@@ -4011,6 +4027,9 @@ local function defineMissionPlaces()
 		end
 		table.insert(openings, { x = 40, w = 4, h = 7 }) -- the office door
 		shell(warehouse, frame, w, d, h, color, Enum.Material.CorrodedMetal, openings)
+		-- Follow the real cargo-aligned openings; all three roller doors and both freight docks remain functional.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(warehouse, frame, require(script.Parent.BuildingLooks.Warehouse)(doors), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		local front = -d / 2
 		for _, x in doors do
 			-- 4.0: every roller door up: the old mission door and the two loading docks (freightHub below).
