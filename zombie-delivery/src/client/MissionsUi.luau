@@ -1051,9 +1051,12 @@ local function campaignHeader(campaign: Campaign, order: number)
 	}, refs.missions)
 	Extras.paper(frame, P.paper, P.line, 1, 12)
 	Ui.edge(frame, color)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) }, frame)
-	Ui.list(frame, true, 4)
-	local title = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 1 }, frame)
+	-- (4.0.3: the content in a frame of its own: the edge must not be a list item; a scale-tall item in an auto-sized
+	-- list makes the card grow without end)
+	local body = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, frame)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) }, body)
+	Ui.list(body, true, 4)
+	local title = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 1 }, body)
 	Ui.label(title, `{campaign.icon}  {campaign.name}`, UDim2.new(1, -150, 1, 0), {
 		TextSize = 22,
 		Font = Theme.DisplayFont,
@@ -1068,8 +1071,8 @@ local function campaignHeader(campaign: Campaign, order: number)
 		TextColor3 = C.yellow,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
-	Ui.caps(frame, campaign.client, UDim2.new(1, 0, 0, 16), { TextSize = 12, TextColor3 = P.ink2, LayoutOrder = 2 })
-	Ui.label(frame, campaign.pitch, UDim2.new(1, 0, 0, 0), {
+	Ui.caps(body, campaign.client, UDim2.new(1, 0, 0, 16), { TextSize = 12, TextColor3 = P.ink2, LayoutOrder = 2 })
+	Ui.label(body, campaign.pitch, UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		TextSize = 14,
 		Font = Theme.Font,
@@ -1083,7 +1086,7 @@ local function campaignHeader(campaign: Campaign, order: number)
 	local status = if locked then `🔒 {waitsFor}Opens at driver level {campaign.level} (you are level {myLevel()}).`
 		elseif finished then `🏆 Campaign complete! The {Ui.money(campaign.reward)} campaign reward is yours.`
 		else `{done}/{total} done  ·  finish all ten for {Ui.money(campaign.reward)}  ·  every new star pays {Ui.money(T.StarBonus)}`
-	Ui.label(frame, status, UDim2.new(1, 0, 0, 0), {
+	Ui.label(body, status, UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		TextSize = 14,
 		Font = Theme.HeadingFont,
@@ -1093,7 +1096,7 @@ local function campaignHeader(campaign: Campaign, order: number)
 	-- 3.2: the DUO campaign: only with a crew.
 	if campaign.duo then
 		local need = Config.Missions.Duo.MinCrew
-		Ui.label(frame, `🤝 DUO: every mission needs a crew: {need} {if need == 1 then "partner" else "partners"} with you at START. Invite a friend with K.`, UDim2.new(1, 0, 0, 0), {
+		Ui.label(body, `🤝 DUO: every mission needs a crew: {need} {if need == 1 then "partner" else "partners"} with you at START. Invite a friend with K.`, UDim2.new(1, 0, 0, 0), {
 			AutomaticSize = Enum.AutomaticSize.Y,
 			TextSize = 14,
 			Font = Theme.HeadingFont,
@@ -1105,7 +1108,7 @@ local function campaignHeader(campaign: Campaign, order: number)
 	local rewardLine = Extras.rewardLine(campaign.id)
 	if rewardLine then
 		local earned = Extras.state.campaigns[campaign.id] == true
-		Ui.label(frame, if earned then `🎁 Reward: {rewardLine}  ·  ✓ yours` else `🎁 Reward: {rewardLine}`, UDim2.new(1, 0, 0, 0), {
+		Ui.label(body, if earned then `🎁 Reward: {rewardLine}  ·  ✓ yours` else `🎁 Reward: {rewardLine}`, UDim2.new(1, 0, 0, 0), {
 			AutomaticSize = Enum.AutomaticSize.Y,
 			TextSize = 14,
 			Font = Theme.HeadingFont,
@@ -1113,7 +1116,7 @@ local function campaignHeader(campaign: Campaign, order: number)
 			LayoutOrder = 6,
 		})
 	end
-	local back, fill = Ui.bar(frame, UDim2.new(1, 0, 0, 6), color)
+	local back, fill = Ui.bar(body, UDim2.new(1, 0, 0, 6), color)
 	back.LayoutOrder = 7
 	fill.Size = UDim2.fromScale(if total > 0 then done / total else 0, 1)
 end
@@ -2660,41 +2663,44 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 		Ui.stroke(card, color, 1).Transparency = 0
 		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0 }, card)
 		Ui.make("UIScale", { Name = "Pop", Scale = 0.97 }, card)
+		-- 4.0.3: the content in a frame of its own: the rule (scale-tall) must not be an item of the card's list, or
+		-- the auto-sized card grows without end (it did: a tall card with the rule down its middle that never went).
+		local body = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, card)
 		local count = if tonumber(u.count) and tonumber(u.total) then `  {u.count}/{u.total}` else ""
 		if kind == "place" then
 			-- A thin strip, like a toast.
-			Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, card)
+			Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, body)
 			-- 3.7: "discovered" is the map's banner now (client/Discovery.luau); this strip counts the places visited.
 			local text = if batch then `🧭  {batch} PLACES VISITED{if count ~= "" then ` ({string.sub(count, 3)})` else ""}`
 				else `🧭  PLACE VISITED: <b>{name}</b>{if count ~= "" then ` ({string.sub(count, 3)})` else ""}`
-			line(card, text, 1, 15, Theme.HeadingFont, P.ink)
+			line(body, text, 1, 15, Theme.HeadingFont, P.ink)
 			return { card = card, duration = 3.5, loops = loops, color = color, big = false }
 		end
-		Ui.padding(card, if big then 16 else 12)
-		Ui.list(card, true, if big then 6 else 4, Enum.HorizontalAlignment.Center)
+		Ui.padding(body, if big then 16 else 12)
+		Ui.list(body, true, if big then 6 else 4, Enum.HorizontalAlignment.Center)
 		if kind == "secret" then
-			line(card, if batch then `📦  {batch} LOST PACKAGES{count}` else `📦  LOST PACKAGE{count}`, 1, 21, Theme.DisplayFont, C.yellow)
+			line(body, if batch then `📦  {batch} LOST PACKAGES{count}` else `📦  LOST PACKAGE{count}`, 1, 21, Theme.DisplayFont, C.yellow)
 			if name ~= "" and not batch then
-				line(card, name, 2, 14, Theme.HeadingFont, P.ink2)
+				line(body, name, 2, 14, Theme.HeadingFont, P.ink2)
 			end
 			if money > 0 then
-				line(card, `+{Ui.money(money)}`, 3, 21, Theme.DisplayFont, C.money)
+				line(body, `+{Ui.money(money)}`, 3, 21, Theme.DisplayFont, C.money)
 			end
 			return { card = card, duration = 4.5, loops = loops, color = color, big = false }
 		elseif kind == "challenge" then
 			local def = if type(u.id) == "string" then Challenges.find(u.id) else nil
-			line(card, if batch then "🏅  CHALLENGES COMPLETE" else "🏅  CHALLENGE COMPLETE", 1, 14, Theme.DisplayFont, C.green)
-			line(card, if batch then `{batch} challenges done` else name, 2, 23, Theme.DisplayFont, P.ink)
+			line(body, if batch then "🏅  CHALLENGES COMPLETE" else "🏅  CHALLENGE COMPLETE", 1, 14, Theme.DisplayFont, C.green)
+			line(body, if batch then `{batch} challenges done` else name, 2, 23, Theme.DisplayFont, P.ink)
 			if def and not batch then
-				line(card, esc(def.description), 3, 14, Theme.Font, P.ink2)
+				line(body, esc(def.description), 3, 14, Theme.Font, P.ink2)
 			end
 			if money > 0 then
-				line(card, `+{Ui.money(money)}`, 4, 20, Theme.DisplayFont, C.money)
+				line(body, `+{Ui.money(money)}`, 4, 20, Theme.DisplayFont, C.money)
 			end
 			if title then
-				line(card, `🎖 New title: “{title}”`, 5, 14, Theme.HeadingFont, Extras.GOLD)
+				line(body, `🎖 New title: “{title}”`, 5, 14, Theme.HeadingFont, Extras.GOLD)
 			end
-			line(card, `{Extras.count(Extras.state.done)}/{#Challenges.List} challenges  ·  MISSIONS (U) → CHALLENGES`, 6, 12, Theme.HeadingFont, P.ink2)
+			line(body, `{Extras.count(Extras.state.done)}/{#Challenges.List} challenges  ·  MISSIONS (U) → CHALLENGES`, 6, 12, Theme.HeadingFont, P.ink2)
 			return { card = card, duration = 5, loops = loops, color = color, big = false }
 		end
 		-- BIG: a campaign's reward, every lost package's, every challenge's.
@@ -2703,20 +2709,20 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 			elseif kind == "secrets" then "📦  EVERY LOST PACKAGE FOUND"
 			elseif kind == "challenges" then "☠  EVERY CHALLENGE COMPLETE"
 			else `🏆  {string.upper(name)}`
-		line(card, ribbon, 1, 15, Theme.DisplayFont, P.violet)
-		glowArt(card, reward, color, loops)
-		line(card, "EXCLUSIVE  ·  nobody can buy this", 3, 12, Theme.DisplayFont, P.violet)
-		line(card, if reward then esc(Extras.itemName(reward)) else name, 4, 30, Theme.DisplayFont, P.ink)
+		line(body, ribbon, 1, 15, Theme.DisplayFont, P.violet)
+		glowArt(body, reward, color, loops)
+		line(body, "EXCLUSIVE  ·  nobody can buy this", 3, 12, Theme.DisplayFont, P.violet)
+		line(body, if reward then esc(Extras.itemName(reward)) else name, 4, 30, Theme.DisplayFont, P.ink)
 		if title then
-			line(card, `🎖 Title: “{title}”`, 5, 16, Theme.HeadingFont, Extras.GOLD)
+			line(body, `🎖 Title: “{title}”`, 5, 16, Theme.HeadingFont, Extras.GOLD)
 		end
 		if money > 0 then
-			line(card, `+{Ui.money(money)}`, 6, 20, Theme.DisplayFont, C.money)
+			line(body, `+{Ui.money(money)}`, 6, 20, Theme.DisplayFont, C.money)
 		end
 		local hint = if reward and reward.weapon then "Switch to it with Q, or equip it at the Gun Shop."
 			elseif reward and reward.paint then "Paint a car with it at Wrench Garage."
 			else ""
-		line(card, `{hint}  Titles: MISSIONS (U) → REWARDS.`, 7, 12, Theme.HeadingFont, P.ink2)
+		line(body, `{hint}  Titles: MISSIONS (U) → REWARDS.`, 7, 12, Theme.HeadingFont, P.ink2)
 		return { card = card, duration = 9, loops = loops, color = color, big = true }
 	end
 
