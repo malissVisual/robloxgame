@@ -20,8 +20,9 @@ KNOWN = {"depot", "dealer", "guns", "mechanic", "supplies", "warehouse"}
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("luau")
+    parser.add_argument("--blueprints", type=Path, default=DATA, help="Validate staged blueprints before integrating World")
     args = parser.parse_args()
-    blueprints = [p for p in sorted(DATA.glob("*.luau")) if p.name != "Kit.luau"]
+    blueprints = [p for p in sorted(args.blueprints.glob("*.luau")) if p.name != "Kit.luau"]
     renderer = (DATA / "Kit.luau").read_text()
     assert "context.deco(context.part(" in renderer and "item.CanTouch = false" in renderer
     assert "Heartbeat" not in re.sub(r"--[^\n]*", "", renderer.split("function Kit.build", 1)[1])

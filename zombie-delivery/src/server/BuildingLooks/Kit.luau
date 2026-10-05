@@ -53,6 +53,7 @@ function Kit.build(parent: Instance, frame: CFrame, blueprint: Blueprint, contex
 			local gui = Instance.new("SurfaceGui")
 			gui.Name = "Wayfinding"
 			gui.Face = Enum.NormalId.Front
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 			gui.PixelsPerStud = 40
 			gui.LightInfluence = 0.15
 			gui.Parent = item

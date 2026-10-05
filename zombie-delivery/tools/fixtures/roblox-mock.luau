@@ -17,6 +17,7 @@ Mock.UDim2 = { fromScale = function(x, y) return { X = x, Y = y } end }
 Mock.Enum = {
 	Material = { Metal = "Metal", Concrete = "Concrete", Brick = "Brick", Glass = "Glass", SmoothPlastic = "SmoothPlastic", Wood = "Wood", WoodPlanks = "WoodPlanks", Slate = "Slate", CorrodedMetal = "CorrodedMetal", Rubber = "Rubber" },
 	PartType = { Cylinder = "Cylinder" }, NormalId = { Front = "Front" }, Font = { GothamMedium = "GothamMedium" },
+	SurfaceGuiSizingMode = { PixelsPerStud = "PixelsPerStud" },
 }
 local Frame = {}
 Frame.__index = Frame
