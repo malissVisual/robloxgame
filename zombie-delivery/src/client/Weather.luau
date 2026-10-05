@@ -190,7 +190,7 @@ function Weather.start()
 	local winter = 0 -- 0 … 1: how far the winter look is blended in (fades over ~2 s)
 	local lastNight, lastWinter, lastCity = -1, -1, -1
 	local city = 0 -- 0 … 1: the town glow (follows the camera, eases over ~1 s)
-	local lookClock, tagClock, flashClock, beat = 0, 0, 0, 0
+	local lookClock, flashClock, beat = 0, 0, 0
 	local aura = Instance.new("PointLight")
 	aura.Name = "NightAura"
 	aura.Range = AURA_RANGE
@@ -246,21 +246,6 @@ function Weather.start()
 		end
 		local position = camera.CFrame.Position
 		cloud.CFrame = CFrame.new(position + Vector3.new(0, 40, 0))
-		-- The big icons over the landmarks: only from afar (up close the buildings' own signs say it).
-		tagClock += dt
-		if tagClock > 0.25 then
-			tagClock = 0
-			local world = workspace:FindFirstChild("World")
-			local tags = world and world:FindFirstChild("LandmarkTags")
-			if tags then
-				for _, tag in tags:GetChildren() do
-					local gui = tag:FindFirstChildOfClass("BillboardGui")
-					if gui and tag:IsA("BasePart") then
-						gui.Enabled = Vector3.new(tag.Position.X - position.X, 0, tag.Position.Z - position.Z).Magnitude > 110
-					end
-				end
-			end
-		end
 		-- The light bars.
 		flashClock += dt
 		if flashClock > FLASH_EVERY then
