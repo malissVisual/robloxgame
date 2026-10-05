@@ -9,6 +9,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/ui-contract` · owner approved the cinematic delivery-contract HUD (Hitman-inspired) in design/ui-contract/: compact white type/red accents, quiet hover/focus, no pastel tickets or bulky metal plates; supersedes the earlier UI direction, preserves building signs. Reference + implementation brief only; for Claude to implement, then test day/night readability, carrying/driving, every menu and native controls in Studio.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
