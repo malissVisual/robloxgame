@@ -5,11 +5,13 @@
 -- 3.2: swings the back that opens (rear doors, a tailgate, a trunk lid, a ramp: the Motor6Ds "BackHinge" on the
 -- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
 -- The back's prompt shows only to the owner and the crew of the owner's job (the attribute BackCrew, server/Cargo.luau).
+-- 3.6: the owner's name sits on a cream pill in ink (Theme.Postage.pill), readable over a night street and a sunny one.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Drive = require(script.Parent.Drive)
+local Theme = require(script.Parent.Theme)
 
 local CarVisuals = {}
 
@@ -74,14 +76,28 @@ local function nameTag(car: Model, chassis: BasePart)
 	gui.LightInfluence = 0
 	gui.Parent = chassis
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
+	label.AutomaticSize = Enum.AutomaticSize.X
+	label.Size = UDim2.fromScale(0, 1)
+	label.Position = UDim2.fromScale(0.5, 0)
+	label.AnchorPoint = Vector2.new(0.5, 0)
+	label.BackgroundColor3 = Theme.Postage.pill
+	label.BackgroundTransparency = 0.05
 	label.Text = `{car:GetAttribute("OwnerName") or "?"}'s car`
-	label.TextColor3 = Color3.fromRGB(140, 210, 255)
-	label.TextStrokeTransparency = 0.3
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 16
+	label.TextColor3 = Theme.Postage.ink
+	label.Font = Theme.HeadingFont
+	label.TextSize = 15
 	label.Parent = gui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = label
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Theme.Postage.line
+	stroke.Parent = label
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 10)
+	padding.PaddingRight = UDim.new(0, 10)
+	padding.Parent = label
 end
 
 local function freeSeat(car: Model): boolean

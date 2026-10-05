@@ -42,6 +42,11 @@ needs a bigger vehicle. The other cars are not "the next van" but have a **role*
 High-Roof Van, the Box Truck as the only way to 6 – 8 pieces, the Armored Van as the car-gun platform …), each with one
 or two small stages of its own. **Dead End Motors** sells from a **catalog** at its sales counter: no more lot of
 every car outside, three display cars stand inside (see **Stages and the cars' roles**).
+Version 3.6, **Postage & Trouble**, is a new interface built from **Codex's concept** (`design/ui-concept/`): light
+cream paper and powder lavender with dark plum ink instead of the dark glass. The job is a tilted **delivery ticket**
+with its timer on a perforated stub, the car a round **speed dial** with its condition and cargo pips, the items
+tilted **tags** that lift under the mouse, the job board a new **Dispatch board** of die-cut tickets that says why a
+job is locked and what to do about it, and every window the same lavender window (see **The HUD**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -75,20 +80,25 @@ for testing). A published game starts with `Config.StartMoney` and saves to the 
 | Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (on foot: the gun in your hand; driver: the car gun on the roof if the car has one, else a one-handed gun out of the window; passenger: a one-handed gun out of the window) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
-| Switch gun | hold Q: the weapon wheel (point at a gun, let go); tap Q: the next gun; or click the weapon bar | the weapon bar |
-| Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
+| Switch gun | hold Q: the weapon wheel (point at a gun, let go); tap Q: the next gun; or click the weapon label | the weapon label |
+| Items (repair, medkit, nitro, molotov, mine) | 1 – 5 (or click a tag) | the tags |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
-| Jobs / map / backpack | J / M / B | the buttons |
-| Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS button |
-| Crew panel (invite / accept / leave / kick, the crew board) | K | CREW button |
-| Leaderboard | L | TOP button |
+| The Dispatch board (the jobs) / map / backpack | J / M / B | JOBS in the … menu / MAP / BAG in the … menu |
+| The "…" menu (JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP) | click … | tap … |
+| Close a window, the big map or the … menu | ESC (gamepad B) | ✕ |
+| Call your car (or reset it while you sit in it) | CAR in the … menu | CAR in the … menu |
+| Give up the delivery | GIVE UP in the … menu, twice (or on the Dispatch board) | the same |
+| Music and sound (on / music off / all off) | N | SOUND in the … menu |
+| Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS in the … menu |
+| Crew panel (invite / accept / leave / kick, the crew board) | K | CREW |
+| Leaderboard | L | TOP in the … menu |
 | Get in your car / ride in a friend's car | E / R | the prompt |
 | Get out | Space | jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
 | Open / close the back (doors, tailgate, trunk, ramp; 3.2: with empty hands, the car standing) | hold E at the back | the prompt |
 | Put down / Let go (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | the prompt |
 | Open a lost package (3.1) | hold E | the prompt |
-| Real estate list (every property, buy, sell, set your home, GPS) | H | ESTATE button |
+| Real estate list (every property, buy, sell, set your home, GPS) | H | ESTATE in the … menu |
 | View a property's listing (at its FOR SALE sign) | E | the prompt |
 | Run your company (at your office's computer: hire, upgrades, collect the safe) | E | the prompt |
 | Ride a tower elevator (step on a pad under a floor sign) | walk onto it | walk onto it |
@@ -100,8 +110,8 @@ back open does not drive (3.2).
 **Guns and cars.** You buy guns for your hands (Lead & Co.); you start with the pistol. From a car seat (driver or
 passenger) only a **one-handed** gun fires, out of the side window: the **pistol, the revolver and the SMG**. The
 two-handed ones (shotgun, rifle, carbine, minigun, grenade launcher) do not fire from a car (a short hint says so; the
-weapon bar greys them out and tags the others WINDOW). **Car guns** are something else: bolted on the roof at
-**Wrench Garage** (CAR GUNS tab), one per car, and the driver fires them (the turret turns to the target, the weapon bar
+weapon label says ON FOOT ONLY for them and WINDOW READY for the others). **Car guns** are something else: bolted on the roof at
+**Wrench Garage** (CAR GUNS tab), one per car, and the driver fires them (the turret turns to the target, the weapon label
 shows it). A car starts with none. They fit every car of the dealer (3.3: the five new vans too), the Armored Truck and
 the Monster Truck, not the work vehicles (bus, ice cream, moving, livestock, fuel truck). A driver without a car gun shoots a
 one-handed gun out of the window (a drive-by); passengers always use their own gun.
@@ -179,7 +189,7 @@ one-handed gun out of the window (a drive-by); passengers always use their own g
    along the roads from out of sight, 110 – 200 studs away (or out of your nearest garage within 400 studs), brakes for
    traffic, overtakes what blocks the lane, parks at your curb, gets out, walks off and fades; then it is yours (walk
    to it, E). The HUD shows "Your car is on the way · N s" with a bar, a marker over the car and on the maps, and the
-   CAR button counts down. If it is not there within **15 s** (`Config.CarCall.ArriveWithin`) the car is placed next
+   CAR entry of the … menu counts down. If it is not there within **15 s** (`Config.CarCall.ArriveWithin`) the car is placed next
    to you and you sit in it, the old way. If the car is wrecked on the way the HUD says so (press CAR again); a respawn
    cancels the call and brings the car the instant way. Sitting in your own car, CAR still resets it on the spot
    (to unflip or unstick it).
@@ -718,28 +728,66 @@ sidewalks and cross the streets (fewer at night; they run from zombies). The car
 and it is a smoking wreck, towed away later. They appear out of sight and vanish far away, with caps per player and
 per server (`Config.Traffic`); during a job a bandit pickup can hide among them.
 
-**The HUD** (laid out from the screen size, so nothing overlaps on a PC or a phone): money and the minimap bottom
-left on a PC (top left on touch screens, clear of the thumbstick); the job panel, the crew strip, the mission banner,
-the car call line, the level-up banner and the toasts in one stack at the top centre; the buttons **JOBS, MISSIONS,
-MAP, BAG, CAR, TOP, CREW, ESTATE** on the right edge in 1, 2 or 4 columns (on a PC down at the weapon bar, clear of Roblox's player list; the
-ADMIN button above them for admins); the weapon bar and the hotbar bottom right; the car panel and the hint at the
-bottom centre. On touch FIRE sits above the jump button and the panels move left of it.
+## The HUD
 
-**The 3.2 restyle**: the whole HUD now has the look of the 3.1 right side: dark glass panels (`Theme.PanelTransparency`
-0.15, corner 12), a quiet stroke (solid only for an accent), DisplayFont headings, small caps labels and gold as the one
-accent (`Ui.edge`, `Ui.caps`, `Ui.keyChip`, `Ui.ghostButton`, `Ui.closeButton`). The left column is one money / level
-card (the money big in a subtle gold, deliveries and kills in small caps, a round LV badge with a gold ring, the rank,
-the XP and a thin bar); the minimap has a glass rim, a thin stroke, a compass N and a small BIG MAP pill (the GPS
-lines as before). In the top stack the job panel, the car call line and the level-up banner are compact glass cards
-with an accent edge; the toasts are pills that slide in and out; the crew strip and the invitation card match. The car
-panel is a speedometer card (the speed big, KM/H, the car's name in caps, a thin health bar); the hint is a glass pill
-with an icon (hidden when empty). The windows (job board, shops, backpack, employer, result, big map) keep their
-layout with DisplayFont titles on a gold rule, a quiet close button, lighter cards (a gold edge on the highlighted
-one), gold / ghost tabs and ghost buttons for what you cannot press; a shop card shows FINISH <CAMPAIGN> for a def
-with `requires`.
+3.6, **Postage & Trouble**: the interface follows **Codex's concept** (`design/ui-concept/`: `index.html` and the
+`previews/`): soft courier colours, light cream paper and powder-lavender surfaces with dark plum ink, pastels only on
+surfaces (never for the important words), shipping-ticket shapes and buttons that lift under the mouse and sink when
+pressed. Every colour is a token in `client/Theme.luau` (`Theme.Postage`: paper, ticket, lavender, the two inks, sage
+for the main action, violet for the crew and the GPS, good / warn / danger, the bar track, the cream pill behind
+words over the world); the old names (`Theme.Colors`) are now inks that read on paper, and `Theme.soft` gives each its
+pastel face. Everything is laid out from the screen size, so nothing overlaps on a PC or a phone:
 
-The minimap (bottom left; top left on touch screens) turns with the camera; it and the big map
-(M) show it all. The big map lists every shop, employer and far place with what you can do there: click one to set
+* **The objective ticket** (top centre): a slightly tilted paper delivery ticket. Small caps say the stage
+  (DELIVERY IN PROGRESS, PICKUP · STEP 1 OF 3, the danger stars, a modifier), the stop is big, a pin line gives the job,
+  the stop and the distance, and under it the cargo slots (loaded / your car's) and the estimated pay, plus what went
+  wrong (cargo condition, pieces lost, a wave). The timer sits in the perforated stub on the right and turns red in the
+  last seconds. With no job and nothing else on top a small **OFF DUTY** ticket opens the Dispatch board. The same
+  stack, under the ticket, holds the crew strip (a member sees the leader's job), the mission banner, the car call
+  line, the repair timer, the level-up banner and the toasts: only what matters right now shows.
+* **The money and rank card** (bottom left; top left on touch, clear of the thumbstick): the level in a lavender
+  circle, the money big over AVAILABLE CASH, the rank and a thin XP bar (the XP numbers on hover, or a tap).
+* **The minimap** under it, in a paper frame: the map itself is paper too (cream land, pastel blocks and water, white
+  streets on a plum edge, butter highways) with the routes and markers vivid on an ink edge. Over its top edge the way
+  you face and where you are ("N · HARBOR") and an EXPAND M chip; under it the **turn line**: the next turn of the
+  route ("↰ Left onto Maple St · 120 m"; with no route, the address you are at).
+* **Health** under the minimap: a heart, a thin bar (violet, red when low) and the number, on a cream pill.
+* **The speed dial** (bottom right): a round cream instrument with ticks and a violet needle, the car's name (its
+  stage's), the speed big over KM/H, the **vehicle condition** (a bar and the %, amber then red as it drops) and the
+  **cargo pips** (one per slot, the loaded ones filled, "3 / 4 cargo slots"). On foot it dims and keeps the parked car's
+  condition; without a car it says how to get one.
+* **The weapon label** on top of the dial: the gun in your hands (or the car gun while you drive a car that has one),
+  WINDOW READY when it fires from a car seat, the key Q (hold Q: the weapon wheel). Click it for the next gun.
+* **The consumable tags** (bottom centre): repair, medkit, nitro, molotov, mine as tilted pastel tags with their key
+  (1 – 5) and how many you have; under the mouse a tag lifts, straightens, grows and shows its name. The **hint** over
+  them is a cream pill: what to do right now ("Get out and open the back (E)").
+* **The utilities** (on a computer over the weapon label, clear of Roblox's player list; on touch top right): **MAP**
+  (M), **CREW** (K) and a round **…** that opens the menu with every other action and its key: **JOBS** (J),
+  **MISSIONS** (U), **BAG** (B), **CAR** (calls your car; it counts down while the car is on the way), **TOP** (L),
+  **ESTATE** (H), **SOUND** (N) and, while a job runs, **GIVE UP** (press it twice). A computer shows a button's name
+  and key on hover; a touch screen keeps the names under the buttons. The ADMIN button (admins only) keeps its corner.
+* **The Dispatch board** (J, JOBS, the depot counter, NEXT JOB; `client/DispatchUi.luau`): the job board as a lavender
+  window of die-cut delivery tickets. On the left the filters (All jobs / Deliveries / Special jobs, with counts) and a
+  card for your car (its cargo slots and condition: your vehicle sets your job capacity). Every ticket has a numbered
+  icon spine, the danger and the twists as chips (the modifier, SPECIAL, RUSH CLOCK, BANDITS), the title, the route,
+  the stops, the distance, the cargo slots and the time, and a payout stub with **ACCEPT JOB →** (NIGHT × 1.4 while
+  night pay is up). Hover lifts a ticket. A locked ticket is hatched and says why and what to do: **🔒 LEVEL N** (the
+  level and rank you need) or **📦 NEEDS N SLOTS** (what your car holds, and the next stage at Wrench Garage or a
+  bigger car from your garage). On a delivery the board shows that job and GIVE UP THIS DELIVERY. ↻ NEW OFFERS asks
+  for fresh ones; the server checks every offer again.
+* **The window style** (`Ui.window`, every window: the shops, the backpack, the employers, the delivery result, the
+  Dispatch board, Missions, the garage, the crew, real estate, the company, the leaderboard, the admin panel): a
+  lavender surface with a soft offset shadow; a header with an icon in a sage circle, the title, a subtitle and a round
+  ✕ that turns on hover; a dashed line under the header; a footer with ESC · Close window and the window's context on
+  the right. The rows are paper tickets, the main action is sage (`Ui.button`, with a lip that sinks when pressed), a
+  locked one quiet lavender with the reason on it. One window at a time; ESC (or the gamepad's B) closes it.
+* **Over the 3D world** the words sit on a cream pill in ink, so they read over a night street and a sunny one: the
+  delivery label over the target (lined in the route's colour), the YOUR CAR marker of a car call, the owner's name over
+  other players' cars and the crew tags. The crosshair dot and the hit numbers keep their outline.
+
+On touch FIRE (sage, big) sits over the jump button and the dial and the weapon label move left of it.
+
+The big map (M, or EXPAND) lists every shop, employer and far place with what you can do there: click one to set
 the **GPS**. The route there is drawn along the roads on both maps (yellow to the job's next stop, purple to the GPS
 point), with an arrow over your car and a light beam. Big icons over the buildings show them in the world.
 
@@ -858,6 +906,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
               the head, the Challenges remote)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
+              Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
+              DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
               Drive (car controller, ice; 3.2: no throttle with the back open), Shooting (aim, crosshair, tracers, hit
               numbers), CarVisuals (tyres, prompts, name tags; 3.2: swings the back, its prompt only for the crew), ZombieAnimator, AnimalAnimator (the horses' legs, neck and tail), AdminPanel (P),

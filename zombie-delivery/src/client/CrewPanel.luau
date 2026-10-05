@@ -22,6 +22,8 @@
 -- with it), so they never overlap the job panel, the car call line, the level-up banner or the toasts.
 -- The server (server/Crew.luau) checks everything; this module only asks and shows. While the window is open the
 -- mouse is free (Main: CameraRig.mouseNeeded checks CrewPanel.isOpen()).
+-- 3.6 (Postage & Trouble): the lavender window (Ui.window), paper rows, the pay split on pastel faces; the strip and
+-- the invitation card are paper cards with the crew violet; the tags over heads are cream pills.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,7 +41,9 @@ local MapView = require(script.Parent.MapView)
 local Hud = require(script.Parent.Hud)
 
 local C = Ui.Colors
-local GPS = Ui.Gps -- the GPS purple of the maps (client/MapView.luau)
+local P = Theme.Postage
+local GPS = Ui.Gps -- the GPS purple of the maps (client/MapView.luau): strokes and edges
+local VIOLET = P.violet -- the crew's colour for text on paper
 local HIDDEN = CFrame.new(0, -1000, 0)
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: stood up
 
@@ -63,6 +67,7 @@ local board: { any } = {}
 
 local gui: any = nil
 local window: any = nil
+local chrome: any = nil
 local body: any = nil
 local strip: any = nil -- a member's view of the leader's job (top centre)
 local stripTitle: any = nil
@@ -271,7 +276,7 @@ local function nextOrder(): number
 end
 
 local function heading(text: string)
-	Ui.label(body, text, UDim2.new(1, -10, 0, 24), { LayoutOrder = nextOrder(), TextSize = 16, Font = Enum.Font.GothamBlack, TextColor3 = C.yellow })
+	Ui.caps(body, text, UDim2.new(1, -10, 0, 24), { LayoutOrder = nextOrder(), TextSize = 14, TextColor3 = C.dim })
 end
 
 local function note(text: string, color: Color3?)
@@ -279,7 +284,7 @@ local function note(text: string, color: Color3?)
 		LayoutOrder = nextOrder(),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		TextSize = 14,
-		Font = Enum.Font.GothamMedium,
+		Font = Theme.Font,
 		TextColor3 = color or C.dim,
 	})
 end
@@ -287,12 +292,12 @@ end
 local function row(height: number, highlight: Color3?): any
 	local frame = Ui.make("Frame", {
 		Size = UDim2.new(1, -10, 0, height),
-		BackgroundColor3 = C.panelLight,
+		BackgroundColor3 = P.ticket,
 		BorderSizePixel = 0,
 		LayoutOrder = nextOrder(),
 	}, body)
 	Ui.corner(frame, 8)
-	Ui.stroke(frame, highlight or C.panelLight:Lerp(C.text, 0.13), if highlight then 1.5 else 1)
+	Ui.stroke(frame, highlight or P.line, if highlight then 1.5 else 1).Transparency = 0
 	return frame
 end
 
@@ -302,7 +307,7 @@ local function rowText(frame: any, name: string, sub: string, nameColor: Color3?
 	Ui.label(frame, name, UDim2.new(1, width, 0, 24), {
 		Position = UDim2.fromOffset(14, 6),
 		TextSize = 18,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.DisplayFont,
 		TextColor3 = nameColor or C.text,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -310,7 +315,7 @@ local function rowText(frame: any, name: string, sub: string, nameColor: Color3?
 	return Ui.label(frame, sub, UDim2.new(1, width, 0, 18), {
 		Position = UDim2.fromOffset(14, 31),
 		TextSize = 14,
-		Font = Enum.Font.GothamMedium,
+		Font = Theme.Font,
 		TextColor3 = C.dim,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -363,20 +368,20 @@ local function renderJob(myRole: string?)
 		Position = UDim2.new(1, -104, 0, 6),
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextSize = 20,
-		Font = Enum.Font.GothamBlack,
+		Font = Theme.MonoFont,
 	})
 	Ui.label(frame, tostring(job.step or ""), UDim2.new(1, -28, 0, 24), {
 		Position = UDim2.fromOffset(14, 30),
 		TextSize = 19,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = GPS:Lerp(C.text, 0.35),
+		Font = Theme.DisplayFont,
+		TextColor3 = VIOLET,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	local info = Ui.label(frame, "", UDim2.new(1, -28, 0, 18), {
 		Position = UDim2.fromOffset(14, 58),
 		TextSize = 14,
-		Font = Enum.Font.GothamMedium,
+		Font = Theme.Font,
 		TextColor3 = C.dim,
 	})
 	local twistLabel = if mission
@@ -417,14 +422,14 @@ local function renderSplit(names: { string }, preview: boolean)
 	Ui.label(frame, if preview and count == 1 then "PAY SPLIT  ·  with one member" else "PAY SPLIT", UDim2.new(1, -28, 0, 20), {
 		Position = UDim2.fromOffset(14, 6),
 		TextSize = 14,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = C.yellow,
+		Font = Theme.HeadingFont,
+		TextColor3 = C.dim,
 	})
-	-- The bar: every part as wide as its share of everything paid out.
+	-- The bar: every part as wide as its share of everything paid out (pastel faces, ink names).
 	local bar = Ui.make("Frame", {
-		Size = UDim2.new(1, -28, 0, 18),
+		Size = UDim2.new(1, -28, 0, 20),
 		Position = UDim2.fromOffset(14, 30),
-		BackgroundColor3 = Color3.fromRGB(10, 16, 13),
+		BackgroundColor3 = P.track,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 	}, frame)
@@ -432,9 +437,9 @@ local function renderSplit(names: { string }, preview: boolean)
 	local total = ownerShare + memberShare * count
 	local x = 0
 	local leaderIsMe = crew ~= nil and type(crew.owner) == "table" and crew.owner.userId == player.UserId
-	local parts = { { share = ownerShare, color = C.yellow, text = if preview or leaderIsMe then "LEADER (YOU)" else "LEADER" } }
+	local parts = { { share = ownerShare, color = P.butter, text = if preview or leaderIsMe then "LEADER (YOU)" else "LEADER" } }
 	for index = 1, count do
-		table.insert(parts, { share = memberShare, color = if index % 2 == 1 then C.blue else C.green, text = names[index] or (if index > #names and not preview then "RIDER" else "MEMBER") })
+		table.insert(parts, { share = memberShare, color = if index % 2 == 1 then P.sky else P.sage, text = names[index] or (if index > #names and not preview then "RIDER" else "MEMBER") })
 	end
 	for _, part in parts do
 		local width = part.share / total
@@ -446,9 +451,9 @@ local function renderSplit(names: { string }, preview: boolean)
 		}, bar)
 		Ui.label(piece, part.text, UDim2.fromScale(1, 1), {
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextSize = 11,
-			Font = Enum.Font.GothamBlack,
-			TextColor3 = Color3.fromRGB(9, 14, 11),
+			TextSize = 12,
+			Font = Theme.HeadingFont,
+			TextColor3 = C.text,
 			TextWrapped = false,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
@@ -459,14 +464,14 @@ local function renderSplit(names: { string }, preview: boolean)
 	Ui.label(frame, numbers, UDim2.new(1, -28, 0, 20), {
 		Position = UDim2.fromOffset(14, 54),
 		TextSize = 16,
-		Font = Enum.Font.GothamBold,
+		Font = Theme.HeadingFont,
 		TextColor3 = C.money,
 	})
 	local bonus = math.floor(Config.Jobs.CrewDriverBonus * 100 + 0.5)
 	Ui.label(frame, `The leader +{bonus} % per member, every member a share on top: nobody loses money.`, UDim2.new(1, -28, 0, 16), {
 		Position = UDim2.fromOffset(14, 78),
 		TextSize = 13,
-		Font = Enum.Font.GothamMedium,
+		Font = Theme.Font,
 		TextColor3 = C.dim,
 	})
 end
@@ -844,15 +849,23 @@ local function updateTags()
 				MaxDistance = 500,
 				ResetOnSpawn = false,
 			}, playerGui)
-			Ui.label(billboard, "", UDim2.fromScale(1, 1), {
+			-- Over the world: a cream pill behind the violet name.
+			local pill = Ui.label(billboard, "", UDim2.fromScale(0, 1), {
 				Name = "Text",
+				AutomaticSize = Enum.AutomaticSize.X,
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(0.5, 0),
+				BackgroundTransparency = 0,
+				BackgroundColor3 = P.pill,
 				TextXAlignment = Enum.TextXAlignment.Center,
-				TextSize = 15,
-				Font = Enum.Font.GothamBlack,
-				TextColor3 = GPS:Lerp(C.text, 0.3),
-				TextStrokeTransparency = 0.35,
+				TextSize = 14,
+				Font = Theme.HeadingFont,
+				TextColor3 = VIOLET,
 				TextWrapped = false,
 			})
+			Ui.corner(pill, 13)
+			Ui.stroke(pill, P.line, 1).Transparency = 0
+			Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, pill)
 			tag = { gui = billboard, head = nil }
 			tags[userId] = tag
 		end
@@ -944,37 +957,37 @@ local function build()
 	}, playerGui)
 
 	-- The window.
-	window = Ui.panel(gui, UDim2.fromOffset(620, 560), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	local content
+	window, content, chrome = Ui.window(gui, "Crew", "Work together · share the pay", "👥", UDim2.fromOffset(640, 620))
 	scale = Ui.make("UIScale", {}, window)
 	window.Visible = false
-	window.BackgroundTransparency = 0.05
 	window.ZIndex = 5
-	Ui.stroke(window, GPS, 2)
-	Ui.label(window, "CREW", UDim2.new(0, 120, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBlack, TextColor3 = GPS:Lerp(C.text, 0.25) })
-	Ui.label(window, "work together · share the pay · K", UDim2.new(1, -220, 0, 44), {
-		Position = UDim2.fromOffset(112, 8),
-		TextSize = 15,
-		Font = Enum.Font.GothamMedium,
-		TextColor3 = C.dim,
-	})
-	local close = Ui.button(window, "X", UDim2.fromOffset(40, 40), C.red, function()
+	chrome.onClose = function()
 		setOpen(false)
-	end)
-	close.Position = UDim2.new(1, -50, 0, 8)
+	end
+	chrome.context.Text = "K · CREW · crews stay together after the job"
+	-- The crew's badge is lilac (the crew violet).
+	local badge = chrome.icon.Parent
+	if badge and badge:IsA("Frame") then
+		badge.BackgroundColor3 = P.lilac
+	end
 	body = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -28, 1, -64),
-		Position = UDim2.fromOffset(14, 54),
+		Size = UDim2.new(1, -28, 1, -20),
+		Position = UDim2.fromOffset(16, 12),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = P.ink2,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-	}, window)
+	}, content)
 	Ui.list(body, true, 8)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 10) }, body)
 
 	-- A member's view of the leader's job: the top stack's crew slot, where your own job panel would be (a member
 	-- has none). As wide as the job panel; the slot is scaled with the stack.
-	-- 3.2: the Hud's job panel style (glass, an accent edge, small caps over a DisplayFont step), in the GPS purple.
+	-- 3.2: the Hud's job panel style (an accent edge, small caps over a DisplayFont step), in the GPS purple; 3.6: on
+	-- paper (Ui.panel), the text in the crew violet.
 	local slot = Hud.topSlot("crew")
 	strip = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 	strip.Name = "CrewStrip"
@@ -989,14 +1002,14 @@ local function build()
 	local header = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, stripBody)
 	stripTitle = Ui.caps(header, "", UDim2.new(1, -86, 1, 0), {
 		TextSize = 12,
-		TextColor3 = GPS:Lerp(C.text, 0.35),
+		TextColor3 = VIOLET,
 	})
 	stripTimer = Ui.label(header, "", UDim2.new(0, 86, 1, 0), {
 		Position = UDim2.new(1, -86, 0, 0),
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextSize = 20,
 		TextWrapped = false,
-		Font = Theme.DisplayFont,
+		Font = Theme.MonoFont,
 	})
 	stripStep = Ui.label(stripBody, "", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
@@ -1013,7 +1026,7 @@ local function build()
 	})
 
 	-- The invitation card: in the crew slot too (shown only without a job of your own and without a crew).
-	-- 3.2: the same glass card with the purple edge; ACCEPT the one bright button, DECLINE quiet.
+	-- 3.2: the same card with the purple edge; ACCEPT the one main (sage) button, DECLINE quiet.
 	card = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 	card.Name = "CrewInvitation"
 	card.LayoutOrder = 2
@@ -1025,13 +1038,13 @@ local function build()
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, cardBody)
 	Ui.list(cardBody, true, 6)
 	local cardHeader = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, cardBody)
-	cardTitle = Ui.caps(cardHeader, "", UDim2.new(1, -86, 1, 0), { TextSize = 12, TextColor3 = GPS:Lerp(C.text, 0.35) })
+	cardTitle = Ui.caps(cardHeader, "", UDim2.new(1, -86, 1, 0), { TextSize = 12, TextColor3 = VIOLET })
 	cardTimer = Ui.label(cardHeader, "", UDim2.new(0, 86, 1, 0), {
 		Position = UDim2.new(1, -86, 0, 0),
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextSize = 17,
 		TextWrapped = false,
-		Font = Theme.DisplayFont,
+		Font = Theme.MonoFont,
 	})
 	cardText = Ui.label(cardBody, "", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
@@ -1058,7 +1071,7 @@ local function build()
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	Ui.caps(buttons, if touch then "or CREW for the panel" else "K: the crew panel · Alt frees the mouse", UDim2.new(1, -270, 1, 0), {
 		LayoutOrder = 3,
-		TextSize = 10,
+		TextSize = 12,
 		TextWrapped = true,
 		TextTruncate = Enum.TextTruncate.None,
 	})

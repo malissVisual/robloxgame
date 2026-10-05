@@ -16,6 +16,8 @@
 -- answers every action with a Notice; while the window is open it shows in the subtitle too (the toasts are behind
 -- the window). The money comes with the State remote, the level with the player attribute "Level".
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks EstateUi.isOpen()).
+-- 3.6 (Postage & Trouble): the lavender window (Ui.window: header, ESC footer), the properties as paper rows with a
+-- perforated status column, the filters as tabs.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,6 +35,7 @@ local Theme = require(script.Parent.Theme)
 local MapView = require(script.Parent.MapView)
 
 local C = Ui.Colors
+local P = Theme.Postage
 local EstateUi = {}
 
 -- Set by the HUD: opening this window closes the HUD's windows (one window at a time).
@@ -40,7 +43,8 @@ EstateUi.onOpen = nil :: (() -> ())?
 
 local player = Players.LocalPlayer
 
-local BASE_W, BASE_H = 720, 560 -- the window's design size (smaller on small screens, see updateScale)
+local BASE_W, BASE_H = 740, 620 -- the window's design size (smaller on small screens, see updateScale)
+local SUBTITLE = "Homes, garages and offices · H"
 local NARROW = 600 -- below this design width: two fact columns, a slimmer row
 local NEAR = 100 -- studs from a plot's middle where BUY works without the sign (server: 110)
 local CONFIRM = 3 -- seconds a SELL click waits for the second one
@@ -61,8 +65,8 @@ local KINDS: { [string]: Kind } = {
 	mansion = { name = "Mansion", icon = "🏰", color = C.yellow },
 	villa = { name = "Villa", icon = "🏡", color = C.blue },
 	house = { name = "House", icon = "🏠", color = C.green },
-	garage = { name = "Garage", icon = "🅿️", color = Color3.fromRGB(190, 196, 180) },
-	office = { name = "Office", icon = "🏢", color = Color3.fromRGB(186, 140, 232) },
+	garage = { name = "Garage", icon = "🅿️", color = C.grey },
+	office = { name = "Office", icon = "🏢", color = P.violet },
 }
 local HOME_KINDS = { mansion = true, villa = true, house = true }
 local FILTERS = {
@@ -72,8 +76,7 @@ local FILTERS = {
 	{ id = "office", label = "OFFICES" },
 	{ id = "owned", label = "OWNED" },
 }
-local GPS_COLOR = Color3.fromRGB(176, 92, 255) -- the GPS route's purple (client/MapView.luau)
-local DARK = Color3.fromRGB(9, 14, 11)
+local GPS_COLOR = Theme.Gps -- the GPS route's purple (client/MapView.luau); a button wears its lilac face
 
 local state: State = { owned = {}, home = nil, office = nil, slots = Config.Estate.BaseCarSlots, used = 0, owners = {}, finished = {} }
 local money = 0
@@ -81,6 +84,7 @@ local remote: RemoteEvent? = nil
 
 local gui: any = nil
 local window: any = nil
+local chrome: any = nil
 local scale: any = nil
 local subtitle: any = nil
 local summary: any = nil
@@ -220,7 +224,7 @@ local function say(text: string, color: Color3?)
 	subtitle.TextColor3 = color or C.yellow
 	task.delay(NOTICE_TIME, function()
 		if noticeStamp == mine and subtitle then
-			subtitle.Text = "Homes, garages and offices · H"
+			subtitle.Text = SUBTITLE
 			subtitle.TextColor3 = C.dim
 		end
 	end)
@@ -275,7 +279,7 @@ local function updateScale()
 		return
 	end
 	local size = camera.ViewportSize
-	local s = math.clamp(math.min(size.X / 780, size.Y / 620), 0.6, 1.1)
+	local s = math.clamp(math.min(size.X / 800, size.Y / 680), 0.6, 1.1)
 	scale.Scale = s
 	local w = math.floor(math.min(BASE_W, (size.X - 16) / s))
 	local h = math.floor(math.min(BASE_H, (size.Y - 16) / s))
@@ -296,48 +300,34 @@ local function build()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = 2,
 	}, player:WaitForChild("PlayerGui"))
-	window = Ui.panel(gui, UDim2.fromOffset(BASE_W, BASE_H), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	local content
+	window, content, chrome = Ui.window(gui, "Real estate", SUBTITLE, "🏠", UDim2.fromOffset(BASE_W, BASE_H))
 	window.Visible = false
-	window.BackgroundTransparency = 0.05
-	window.ClipsDescendants = true
-	scale = Ui.make("UIScale", {}, window)
-	Ui.stroke(window, C.panelLight:Lerp(C.text, 0.2), 1)
-	Ui.label(window, "🏠  REAL ESTATE", UDim2.new(1, -80, 0, 44), {
-		Position = UDim2.fromOffset(18, 6),
-		TextSize = 26,
-		Font = Theme.DisplayFont,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	subtitle = Ui.label(window, "Homes, garages and offices · H", UDim2.new(1, -80, 0, 18), {
-		Position = UDim2.fromOffset(20, 46),
-		TextSize = 14,
-		Font = Theme.Font,
-		TextColor3 = C.dim,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	local close = Ui.button(window, "X", UDim2.fromOffset(40, 40), C.red, function()
+	chrome.onClose = function()
 		EstateUi.close()
-	end)
-	close.Position = UDim2.new(1, -50, 0, 8)
+	end
+	chrome.context.Text = "H · the FOR SALE signs sell · GPS shows the way"
+	content.ClipsDescendants = true
+	scale = Ui.make("UIScale", {}, window)
+	subtitle = chrome.subtitle
 
 	-- Your car slots, home, properties and money.
-	summary = Ui.label(window, "", UDim2.new(1, -36, 0, 30), {
-		Position = UDim2.fromOffset(18, 70),
+	summary = Ui.label(content, "", UDim2.new(1, -40, 0, 32), {
+		Position = UDim2.fromOffset(20, 12),
 		BackgroundTransparency = 0,
-		BackgroundColor3 = C.panelLight,
+		BackgroundColor3 = P.ticket,
 		TextSize = 15,
-		TextColor3 = C.yellow,
+		TextColor3 = C.text,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Font = Theme.HeadingFont,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	Ui.corner(summary, 6)
+	Ui.stroke(summary, P.line, 1).Transparency = 0
 
 	-- The list page: the filters and the rows.
-	listPage = Ui.make("Frame", { Size = UDim2.new(1, -28, 1, -122), Position = UDim2.fromOffset(14, 110), BackgroundTransparency = 1 }, window)
+	listPage = Ui.make("Frame", { Size = UDim2.new(1, -36, 1, -60), Position = UDim2.fromOffset(18, 54), BackgroundTransparency = 1 }, content)
 	filterBar = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1 }, listPage)
 	Ui.list(filterBar, false, 6)
 	body = Ui.make("ScrollingFrame", {
@@ -346,23 +336,25 @@ local function build()
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = P.ink2,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, listPage)
-	Ui.list(body, true, 6)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingBottom = UDim.new(0, 4) }, body)
+	Ui.list(body, true, 8)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingBottom = UDim.new(0, 8) }, body)
 
 	-- The listing page: one property.
 	listingPage = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -28, 1, -122),
-		Position = UDim2.fromOffset(14, 110),
+		Size = UDim2.new(1, -36, 1, -60),
+		Position = UDim2.fromOffset(18, 54),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = P.ink2,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		Visible = false,
-	}, window)
+	}, content)
 	Ui.list(listingPage, true, 10)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 6) }, listingPage)
 
@@ -391,13 +383,14 @@ local function renderFilters()
 	local width = if designWidth < NARROW then 86 else 100
 	for index, entry in FILTERS do
 		local on = filter == entry.id
-		local button = Ui.button(filterBar, entry.label, UDim2.fromOffset(width, 32), if on then C.yellow else C.panelLight, function()
+		-- The concept's filter tabs: the chosen one cream paper, the others lavender.
+		local button = Ui.button(filterBar, entry.label, UDim2.fromOffset(width, 32), if on then P.ticket else P.lavenderDeep, function()
 			filter = entry.id
 			render()
 		end)
 		button.TextSize = 14
 		button.LayoutOrder = index
-		button.TextColor3 = if on then DARK else C.text
+		button.TextColor3 = if on then C.text else C.dim
 	end
 end
 
@@ -407,16 +400,25 @@ local function row(def: Config.EstateDef, order: number)
 	local kind = kindOf(def)
 	local narrow = designWidth < NARROW
 	local right = if narrow then 190 else 236 -- the status column and the GPS button
+	-- A paper row (a ticket): the status column behind a perforation.
 	local frame = Ui.make("TextButton", {
 		Size = UDim2.new(1, -10, 0, 64),
-		BackgroundColor3 = C.panelLight,
+		BackgroundColor3 = P.ticket,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "",
 		LayoutOrder = order,
 	}, body)
-	Ui.corner(frame, 8)
-	Ui.stroke(frame, if isHome then C.yellow elseif mine then C.green else C.panelLight:Lerp(C.text, 0.13), if isHome or mine then 1.5 else 1)
+	Ui.corner(frame, 6)
+	local edge = Ui.stroke(frame, if isHome then C.yellow elseif mine then C.green else P.line, if isHome or mine then 1.5 else 1)
+	edge.Transparency = 0
+	Ui.dashes(frame, true, 6, P.line, UDim2.new(0, 1, 1, -16), UDim2.new(1, -right - 10, 0, 8))
+	frame.MouseEnter:Connect(function()
+		frame.BackgroundColor3 = P.paper
+	end)
+	frame.MouseLeave:Connect(function()
+		frame.BackgroundColor3 = P.ticket
+	end)
 	frame.Activated:Connect(function()
 		EstateUi.openListing(def.id, false)
 	end)
@@ -540,9 +542,11 @@ local function nextOrder(): number
 end
 
 local function fact(parent: any, caption: string, value: string, color: Color3, hint: string?)
-	local cell = Ui.make("Frame", { BackgroundColor3 = C.panelLight, BorderSizePixel = 0, LayoutOrder = nextOrder() }, parent)
+	-- The concept's stat box: lavender, a thin line.
+	local cell = Ui.make("Frame", { BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = nextOrder() }, parent)
 	Ui.corner(cell, 8)
-	Ui.label(cell, caption, UDim2.new(1, -16, 0, 16), { Position = UDim2.fromOffset(8, 6), TextSize = 11, Font = Theme.HeadingFont, TextColor3 = C.dim })
+	Ui.stroke(cell, P.line, 1).Transparency = 0
+	Ui.caps(cell, caption, UDim2.new(1, -16, 0, 16), { Position = UDim2.fromOffset(8, 6) })
 	Ui.label(cell, value, UDim2.new(1, -16, 0, 24), {
 		Position = UDim2.fromOffset(8, 22),
 		TextSize = 20,
@@ -554,7 +558,7 @@ local function fact(parent: any, caption: string, value: string, color: Color3, 
 	if hint then
 		Ui.label(cell, hint, UDim2.new(1, -16, 0, 14), {
 			Position = UDim2.fromOffset(8, 48),
-			TextSize = 11,
+			TextSize = 12,
 			Font = Theme.Font,
 			TextColor3 = C.dim,
 			TextWrapped = false,
@@ -587,7 +591,7 @@ local function renderListing()
 
 	-- Back to the list.
 	local top = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1, LayoutOrder = nextOrder() }, listingPage)
-	local back = Ui.button(top, "‹  ALL PROPERTIES", UDim2.fromOffset(190, 32), C.panelLight, function()
+	local back = Ui.ghostButton(top, "‹  ALL PROPERTIES", UDim2.fromOffset(190, 32), nil, function()
 		page = "list"
 		render()
 	end)
@@ -612,7 +616,7 @@ local function renderListing()
 	local chips = Ui.make("Frame", { Size = UDim2.new(1, -86, 0, 24), Position = UDim2.fromOffset(86, 46), BackgroundTransparency = 1, ClipsDescendants = true }, hero)
 	Ui.list(chips, false, 6)
 	local function chip(text: string, color: Color3)
-		local c = Ui.chip(chips, text, color, Theme.textOn(color))
+		local c = Ui.chip(chips, text, color)
 		c.TextSize = 12
 		c.LayoutOrder = nextOrder()
 	end
