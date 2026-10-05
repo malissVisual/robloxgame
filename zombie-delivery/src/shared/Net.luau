@@ -43,6 +43,8 @@ local NAMES = {
 	"Challenges", -- client → server: ("open") or ("title", title or nil); server → client: ("state", …) or ("unlocked", …)
 	"Garage", -- 3.4: client → server: ("take", car id) or ("refresh"); server → client: the garage window (server/Garages.luau)
 	"Repair", -- 3.4: server → client: a repair started ({ car, shop, seconds, total, fee }) or ended (nil) (server/Repair.luau)
+	"Tutorial", -- 3.7: server → client: (step, data?) the tutorial's current step or nil (done); client → server: ("skip") (server/Tutorial.luau)
+	"Explore", -- 3.7: server → client: ("state", cells string, places list) on joining, ("cells", list) newly uncovered, ("place", id) discovered
 }
 
 local folder: Folder

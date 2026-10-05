@@ -1990,6 +1990,13 @@ function Jobs.start()
 	RunService.Heartbeat:Connect(update)
 end
 
+-- 3.7: the tutorial's first job (server/Tutorial.luau): the easiest ordinary offer near the player, started as if
+-- accepted from the board. False when the player has a job already or no offer could be made. (Contract stub: the
+-- jobs stream implements it.)
+function Jobs.startTutorialJob(player: Player): boolean
+	return false
+end
+
 function Jobs.sendTo(player: Player)
 	send(player)
 end

@@ -14,6 +14,32 @@ Config.StudioStartMoney = 150 -- a Play test in Studio (no saves) starts like a 
 Config.AutosaveSeconds = 60
 Config.SpawnCarCooldown = 4
 
+-- 3.7: walking, the sprint and its breath (client/CameraRig.luau, client/Stamina.luau).
+Config.Movement = {
+	Walk = 14, -- studs per second (3.2.4: 12)
+	Sprint = 28, -- with Shift (3.2.4: 25)
+	Stamina = 6, -- seconds of sprint on a full breath
+	Recover = 4, -- seconds to get the whole breath back (standing or walking)
+	RecoverDelay = 0.8, -- the breath starts coming back this long after the sprint stops
+	MinToSprint = 0.25, -- an empty breath: Shift sprints again only once this share is back (no stutter)
+}
+
+-- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
+-- player, gives them the first job and explains each step until it is delivered.
+Config.Tutorial = {
+	NpcName = "Marge",
+	NpcTitle = "Dispatcher",
+	Reward = 50, -- money for finishing the tutorial's job (on top of its pay)
+}
+
+-- 3.7: the map you discover (shared/Explore.luau, server/Explore.luau, client/MapView.luau, the minimap in Hud).
+Config.Explore = {
+	Cell = 120, -- the map is a grid of cells this many studs wide; you uncover the ones around you
+	Radius = 180, -- studs around you that are uncovered
+	Every = 1, -- seconds between two checks of where you are
+	PlaceRadius = 70, -- this close to a place (a shop, an employer, a mission place) and it is discovered
+}
+
 -- Who may open the admin panel (P / the ADMIN button, server/Admin.luau): everybody in a Studio Play test, the
 -- game's owner (game.CreatorId) and these user ids.
 Config.Admin = {
@@ -1255,6 +1281,7 @@ Config.Missions = {
 
 Config.Jobs = {
 	DeliverRadius = 18,
+	RefreshSeconds = 180, -- 3.7: the board gets new offers on its own this often (no refresh button)
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
 	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).
 	-- The serve stops (ice cream) are the old way: hold still in the circle for the job type's unloadTime.

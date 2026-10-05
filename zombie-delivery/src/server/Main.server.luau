@@ -38,6 +38,8 @@ local Missions = require(Server.Missions)
 local Challenges = require(Server.Challenges)
 local Garages = require(Server.Garages)
 local Repair = require(Server.Repair)
+local Explore = require(Server.Explore)
+local Tutorial = require(Server.Tutorial)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -165,6 +167,8 @@ safely("Missions", Missions.start)
 safely("Challenges", Challenges.start)
 safely("Garages", Garages.start) -- 3.4: your cars in your garages, switched only there
 safely("Repair", Repair.start) -- 3.4: the repair bays (no free repairs any more)
+safely("Explore", Explore.start) -- 3.7: the map you discover
+safely("Tutorial", Tutorial.start) -- 3.7: the first-day tutorial
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).

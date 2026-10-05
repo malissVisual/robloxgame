@@ -4,6 +4,8 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude · 3.7: jobs refresh on a timer and sorted ★ → ★★★★, a tutorial with the dispatcher, faster walk + a sprint with breath, the map you discover (no markers until found), car doors (E only at a door, driver / passenger side, doors open and close), one light piece in one hand opens the back · Jobs, DispatchUi, Vehicles, Cargo, CameraRig, MapView, Hud, World, PlayerData, new Tutorial / Explore / Discovery / Stamina · 2026-10-05
+- Claude · then Codex's contract UI (`codex/ui-contract`) on top of 3.7 · Theme, Ui, Hud and every window · 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
