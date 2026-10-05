@@ -16,8 +16,8 @@
 -- answers every action with a Notice; while the window is open it shows in the subtitle too (the toasts are behind
 -- the window). The money comes with the State remote, the level with the player attribute "Level".
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks EstateUi.isOpen()).
--- 3.6 (Postage & Trouble): the lavender window (Ui.window: header, ESC footer), the properties as paper rows with a
--- perforated status column, the filters as tabs.
+-- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window: header, ESC footer), the properties as
+-- flat rows with the status column behind a fine line, the filters as flat tabs (the chosen one with a red rule).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -323,7 +323,7 @@ local function build()
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	Ui.corner(summary, 6)
+	Ui.corner(summary)
 	Ui.stroke(summary, P.line, 1).Transparency = 0
 
 	-- The list page: the filters and the rows.
@@ -383,14 +383,17 @@ local function renderFilters()
 	local width = if designWidth < NARROW then 86 else 100
 	for index, entry in FILTERS do
 		local on = filter == entry.id
-		-- The concept's filter tabs: the chosen one cream paper, the others lavender.
-		local button = Ui.button(filterBar, entry.label, UDim2.fromOffset(width, 32), if on then P.ticket else P.lavenderDeep, function()
+		-- The filter tabs: the chosen one raised with a red rule under it, the others quiet.
+		local button = Ui.button(filterBar, entry.label, UDim2.fromOffset(width, 32), if on then P.paper else P.lavenderDeep, function()
 			filter = entry.id
 			render()
 		end)
-		button.TextSize = 14
+		button.TextSize = 13
 		button.LayoutOrder = index
 		button.TextColor3 = if on then C.text else C.dim
+		if on then
+			Ui.make("Frame", { Name = "Rule", AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = C.red, BorderSizePixel = 0, ZIndex = 2 }, button)
+		end
 	end
 end
 
@@ -400,7 +403,7 @@ local function row(def: Config.EstateDef, order: number)
 	local kind = kindOf(def)
 	local narrow = designWidth < NARROW
 	local right = if narrow then 190 else 236 -- the status column and the GPS button
-	-- A paper row (a ticket): the status column behind a perforation.
+	-- A flat row: the status column behind a fine line; your home / a property you own has a narrow rule on its left.
 	local frame = Ui.make("TextButton", {
 		Size = UDim2.new(1, -10, 0, 64),
 		BackgroundColor3 = P.ticket,
@@ -409,9 +412,12 @@ local function row(def: Config.EstateDef, order: number)
 		Text = "",
 		LayoutOrder = order,
 	}, body)
-	Ui.corner(frame, 6)
-	local edge = Ui.stroke(frame, if isHome then C.yellow elseif mine then C.green else P.line, if isHome or mine then 1.5 else 1)
+	Ui.corner(frame)
+	local edge = Ui.stroke(frame, P.line, 1)
 	edge.Transparency = 0
+	if isHome or mine then
+		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = if isHome then C.yellow else C.green, BorderSizePixel = 0, ZIndex = 2 }, frame)
+	end
 	Ui.dashes(frame, true, 6, P.line, UDim2.new(0, 1, 1, -16), UDim2.new(1, -right - 10, 0, 8))
 	frame.MouseEnter:Connect(function()
 		frame.BackgroundColor3 = P.paper
@@ -544,7 +550,7 @@ end
 local function fact(parent: any, caption: string, value: string, color: Color3, hint: string?)
 	-- The concept's stat box: lavender, a thin line.
 	local cell = Ui.make("Frame", { BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = nextOrder() }, parent)
-	Ui.corner(cell, 8)
+	Ui.corner(cell)
 	Ui.stroke(cell, P.line, 1).Transparency = 0
 	Ui.caps(cell, caption, UDim2.new(1, -16, 0, 16), { Position = UDim2.fromOffset(8, 6) })
 	Ui.label(cell, value, UDim2.new(1, -16, 0, 24), {

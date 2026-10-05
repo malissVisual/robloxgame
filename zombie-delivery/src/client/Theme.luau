@@ -1,74 +1,18 @@
 --!strict
 -- Dead End Dispatch: all visual tokens live here. Does not contain gameplay state.
--- 3.6, "Postage & Trouble" (Codex's concept, design/ui-concept/): the whole interface is light now. Cream paper and
--- powder-lavender surfaces with dark plum ink, pastel actions (sage for the main one), shipping-ticket shapes. The
--- semantic colours (Theme.Colors: panel, text, yellow, red ...) keep their names and meaning, so every module that
--- used them gets the new look; they are now inks readable on the light surfaces, and Theme.soft turns one into the
--- pastel surface a button or a chip of that meaning wears (Ui.button / Ui.chip do it for you).
+-- 3.8, the contract UI (Codex's design/ui-contract/, approved by the owner; it replaces 3.6's "Postage & Trouble"):
+-- charcoal rectangles, compact white type, fine grey lines and small precise red accents. Theme.Contract holds the
+-- tokens. The semantic colours (Theme.Colors: panel, text, yellow, red ...) keep their names and meaning, so every
+-- module that used them gets the new look; Theme.soft turns one into the flat dark face a button or a chip of that
+-- meaning wears (Ui.button / Ui.chip do it for you). Theme.Postage stays for old references, remapped (see there).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
 
 local Theme = {}
 
--- 3.6, "Postage & Trouble": soft courier colours. Light cream and powder-lavender surfaces with dark plum ink; pastels
--- on surfaces, never for critical text. Use these through Theme, not raw Color3s.
-Theme.Postage = {
-	paper = Color3.fromRGB(250, 244, 228), -- #FAF4E4 the current objective ticket, cards on the HUD
-	ticket = Color3.fromRGB(252, 247, 237), -- #FCF7ED job cards, list rows
-	lavender = Color3.fromRGB(238, 230, 243), -- #EEE6F3 window surfaces
-	lavenderDeep = Color3.fromRGB(226, 214, 236), -- selected rows, the sidebar
-	ink = Color3.fromRGB(73, 55, 80), -- #493750 objectives, prices, big values
-	ink2 = Color3.fromRGB(116, 97, 125), -- #74617D routes, labels, explanations
-	sage = Color3.fromRGB(229, 237, 206), -- #E5EDCE the main action (ACCEPT, TAKE OUT)
-	violet = Color3.fromRGB(132, 102, 153), -- #846699 crew / GPS identity, key chips
-	line = Color3.fromRGB(205, 190, 214), -- perforations, dashed separators, thin strokes
-	shadow = Color3.fromRGB(58, 40, 70), -- the soft drop shadow under paper
-	danger = Color3.fromRGB(196, 72, 84), -- warnings (always with an icon or text, never colour alone)
-	good = Color3.fromRGB(78, 112, 58), -- success as ink on paper ("Owned", "Your car is here", a full bar)
-	warn = Color3.fromRGB(170, 104, 36), -- a middle state as ink or a bar (half condition, "the car could not come")
-	tags = { -- the consumable tags, alternating
-		Color3.fromRGB(240, 232, 248),
-		Color3.fromRGB(250, 240, 222),
-		Color3.fromRGB(228, 240, 214),
-		Color3.fromRGB(248, 226, 232),
-		Color3.fromRGB(224, 236, 246),
-	},
-	-- 3.6 (stream B): the window chrome and the button faces (index.html, the "Postage & Trouble" block).
-	header = Color3.fromRGB(228, 215, 238), -- #E4D7EE a window's header
-	footer = Color3.fromRGB(233, 221, 247), -- #E9DDF7 a window's footer
-	footerLine = Color3.fromRGB(195, 170, 218), -- #C3AADA the line over the footer
-	dash = Color3.fromRGB(205, 185, 219), -- #CDB9DB the dashed line under the header
-	windowShadow = Color3.fromRGB(198, 177, 213), -- #C6B1D5 the window's offset shadow
-	brand = Color3.fromRGB(228, 235, 208), -- #E4EBD0 the icon circle in a window's header
-	brandLine = Color3.fromRGB(196, 203, 170), -- #C4CBAA its ring
-	closeFace = Color3.fromRGB(243, 235, 249), -- #F3EBF9 the round close button
-	closeLip = Color3.fromRGB(207, 185, 219), -- #CFB9DB its shadow
-	sageLip = Color3.fromRGB(188, 202, 152), -- #BCCA98 the main action's shadow
-	sageHover = Color3.fromRGB(239, 245, 221), -- #EFF5DD the main action under the mouse
-	sagePress = Color3.fromRGB(220, 230, 193), -- #DCE6C1 the main action pressed
-	rose = Color3.fromRGB(246, 223, 228), -- a red (danger) action's face
-	roseLip = Color3.fromRGB(221, 176, 186),
-	sky = Color3.fromRGB(223, 234, 245), -- a blue (info, GPS-to) action's face
-	skyLip = Color3.fromRGB(174, 197, 220),
-	butter = Color3.fromRGB(248, 236, 204), -- a gold (special, earned) chip's face
-	butterLip = Color3.fromRGB(222, 199, 150),
-	lilac = Color3.fromRGB(234, 222, 246), -- a violet (crew) action's face
-	lilacLip = Color3.fromRGB(196, 172, 220),
-	disabled = Color3.fromRGB(233, 223, 239), -- #E9DFEF a locked / disabled action
-	track = Color3.fromRGB(230, 218, 237), -- #E6DAED the empty part of a bar
-	hatch = Color3.fromRGB(239, 232, 242), -- #EFE8F2 a locked ticket (hatched)
-	note = Color3.fromRGB(238, 234, 221), -- #EEEADD a written remedy under a locked ticket
-	gold = Color3.fromRGB(178, 128, 30), -- medals, titles, the star gold as ink
-	silver = Color3.fromRGB(128, 132, 146),
-	bronze = Color3.fromRGB(168, 102, 56),
-	veil = Color3.fromRGB(42, 30, 52), -- the dim veil over the world behind a modal / the wheel
-	pill = Color3.fromRGB(250, 244, 228), -- the cream pill behind text that floats over the 3D world
-}
-local P = Theme.Postage
-
--- 3.7+, the contract UI (Codex's design/ui-contract/, approved by the owner): compact white type over the world, a
--- localized charcoal scrim or window surface, fine grey lines and small precise red accents (the contract marker, the
--- destination, urgent feedback). Success and damage keep their meaning (good / warn), always with a word or an icon.
+-- 3.7+, the contract UI: compact white type over the world, a localized charcoal scrim or window surface, fine grey
+-- lines and small precise red accents (the contract marker, the destination, urgent feedback). Success and damage keep
+-- their meaning (good / warn), always with a word or an icon.
 Theme.Contract = {
 	text = Color3.fromRGB(242, 242, 240), -- #F2F2F0 main text and icons
 	secondary = Color3.fromRGB(196, 199, 203), -- #C4C7CB supporting text
@@ -80,38 +24,105 @@ Theme.Contract = {
 	warn = Color3.fromRGB(228, 170, 82), -- a middle state on charcoal
 	scrim = 0.35, -- the charcoal scrim's transparency behind HUD text groups
 	lineAlpha = 0.45, -- the fine lines' transparency
+	-- 3.8 (the windows): the steps around charcoal, and the line already mixed over charcoal (a solid colour for the
+	-- places that cannot take a transparency, e.g. a stroke a caller sets to Transparency 0).
+	row = Color3.fromRGB(25, 29, 35), -- a list row / card on a charcoal window
+	recessed = Color3.fromRGB(15, 17, 21), -- a sunk area (a sidebar, an inactive tab, a disabled action)
+	track = Color3.fromRGB(52, 57, 64), -- the empty part of a bar
+	rule = Color3.fromRGB(82, 87, 93), -- Contract.line at lineAlpha over charcoal: a fine solid separator
 }
+local K = Theme.Contract
 
--- The semantic colours, remapped for the light surfaces: `panel` / `panelLight` are surfaces (lavender, cream
--- paper), `text` / `dim` the plum inks, and the accents (money, yellow, red, green, blue, grey) are inks that read
--- on cream and lavender (at least 3:1). As a button's or a chip's face they become their pastel (Theme.soft).
-Theme.Colors = {
-	panel = P.lavender,
-	panelLight = P.ticket,
-	text = P.ink,
-	dim = P.ink2,
-	money = Color3.fromRGB(78, 118, 52),
-	yellow = Color3.fromRGB(166, 104, 24), -- the old gold accent, now an amber ink
-	red = Color3.fromRGB(190, 64, 78),
-	green = Color3.fromRGB(84, 124, 58),
-	blue = Color3.fromRGB(56, 112, 148),
-	grey = Color3.fromRGB(138, 124, 148),
+-- 3.6's "Postage & Trouble" tokens, kept so every module that still names them compiles. 3.8: nothing shows the
+-- cream / lavender / pastel look any more. Each field is remapped to the contract value of the same ROLE (a surface to
+-- a charcoal step, an ink to the light text, an accent to red / good / warn, a pastel face to a flat dark face), so
+-- the old references restyle themselves consistently. The names are legacy: `paper` is a raised charcoal card, `ink`
+-- the light text, `sage` the main action's face, `violet` a light accent, `lavenderDeep` a recessed surface. The values
+-- are deliberately distinct (sometimes by a step) so Theme.soft can tell the meanings apart. New code uses
+-- Theme.Contract.
+Theme.Postage = {
+	paper = K.raised, -- a card that stands out on charcoal; the active tab (was the cream ticket)
+	ticket = K.row, -- job cards, list rows
+	lavender = K.charcoal, -- window surfaces
+	lavenderDeep = K.recessed, -- a sidebar, an inactive tab, a disabled action
+	ink = K.text, -- objectives, prices, big values
+	ink2 = K.secondary, -- routes, labels, explanations
+	sage = Color3.fromRGB(33, 37, 45), -- the main action's face (ACCEPT, TAKE OUT); its accent is the red rule
+	violet = Color3.fromRGB(228, 230, 233), -- the old crew / GPS accent as ink: a light accent, bars and key letters
+	line = K.rule, -- separators, thin strokes
+	shadow = Color3.fromRGB(0, 0, 0), -- (no drop shadows any more)
+	danger = K.red, -- warnings (always with an icon or text, never colour alone)
+	good = K.good, -- success ("Owned", "Your car is here", a full bar)
+	warn = K.warn, -- a middle state (half condition, "the car could not come")
+	tags = { -- the consumable tags and the tinted rows: dark, barely tinted faces (no pastels)
+		Color3.fromRGB(34, 38, 46),
+		Color3.fromRGB(40, 37, 31),
+		Color3.fromRGB(30, 40, 33),
+		Color3.fromRGB(42, 30, 32),
+		Color3.fromRGB(29, 36, 45),
+	},
+	header = K.charcoal, -- a window's header
+	footer = K.charcoal, -- a window's footer
+	footerLine = K.rule, -- the line over the footer
+	dash = K.rule, -- the line under the header
+	windowShadow = K.charcoal, -- (no offset shadow any more)
+	brand = K.raised, -- (the header badge is gone)
+	brandLine = K.rule,
+	closeFace = K.charcoal, -- the close action (plain text now)
+	closeLip = K.rule, -- a quiet line
+	sageLip = K.red, -- the main action's thin red rule
+	sageHover = Color3.fromRGB(44, 49, 58), -- the main action under the mouse
+	sagePress = Color3.fromRGB(26, 29, 35), -- the main action pressed
+	rose = Color3.fromRGB(46, 27, 29), -- a red (danger) action's face: charcoal with a hint of red
+	roseLip = K.red,
+	sky = Color3.fromRGB(28, 35, 44), -- a blue (info, GPS-to) action's face
+	skyLip = Color3.fromRGB(138, 166, 190),
+	butter = Color3.fromRGB(44, 39, 27), -- a gold (special, earned) chip's face
+	butterLip = Color3.fromRGB(214, 178, 92),
+	lilac = Color3.fromRGB(35, 36, 46), -- a crew action's face
+	lilacLip = Color3.fromRGB(205, 208, 214),
+	disabled = Color3.fromRGB(27, 30, 35), -- a locked / disabled action
+	track = K.track, -- the empty part of a bar
+	hatch = Color3.fromRGB(23, 26, 31), -- a locked row
+	note = Color3.fromRGB(31, 33, 38), -- a written remedy under a locked row
+	gold = Color3.fromRGB(214, 178, 92), -- medals, titles, the star gold as text on charcoal
+	silver = Color3.fromRGB(186, 191, 199),
+	bronze = Color3.fromRGB(198, 134, 86),
+	veil = Color3.fromRGB(8, 10, 13), -- the dim veil over the world behind a modal / the wheel
+	pill = K.charcoal, -- the charcoal scrim behind text that floats over the 3D world
 }
--- The GPS purple: the GPS route on the maps, the crew (its strip, window and tags) and the CREW button. It stays vivid
--- (the route over the map and the beam in the world); on paper use Theme.Postage.violet for text.
+local P = Theme.Postage
+
+-- The semantic colours every module uses: `panel` / `panelLight` are surfaces (charcoal, a row), `text` / `dim` the
+-- light inks, and the accents read on charcoal (at least 3:1). As a button's or a chip's face they become a flat dark
+-- face (Theme.soft); their colour stays in the text or the thin accent.
+Theme.Colors = {
+	panel = K.charcoal,
+	panelLight = K.row,
+	text = K.text,
+	dim = K.secondary,
+	money = Color3.fromRGB(132, 200, 122), -- money reads as good (a step apart from green)
+	yellow = K.warn, -- the old gold accent: amber as text; as a button it is the main action
+	red = K.red,
+	green = K.good,
+	blue = Color3.fromRGB(138, 166, 190), -- a cool grey-blue (info)
+	grey = K.line,
+}
+-- The GPS purple: the GPS route on the maps and the beam in the world (they stay vivid over the scene). On a window
+-- the crew's text uses Theme.Postage.violet (a light accent now).
 Theme.Gps = Color3.fromRGB(176, 92, 255)
 Theme.Border = P.line
-Theme.Radius = 8 -- buttons and the default corner
-Theme.PanelTransparency = 0.04 -- the HUD's cards: paper, nearly solid (3.2's dark glass is gone)
-Theme.PanelRadius = 12
-Theme.BorderTransparency = 0.2 -- the quiet stroke (Border); an accent stroke is solid
-Theme.WindowTransparency = 0
-Theme.WindowRadius = 18 -- the lavender windows
-Theme.Ink = P.ink -- key chips, badges and text on the pastel faces
+Theme.Radius = 2 -- buttons and the default corner: flat, square geometry (0 – 2 px)
+Theme.PanelTransparency = 0.12 -- the HUD's cards: a charcoal scrim
+Theme.PanelRadius = 2
+Theme.BorderTransparency = 0 -- the quiet stroke (Border is already the line mixed over charcoal)
+Theme.WindowTransparency = 0.02
+Theme.WindowRadius = 0 -- the charcoal windows: a plain rectangle
+Theme.Ink = P.ink -- key chips, badges and text on the dark faces
 Theme.Font = Enum.Font.GothamMedium
 Theme.HeadingFont = Enum.Font.GothamBold
-Theme.DisplayFont = Enum.Font.GothamBlack
-Theme.MonoFont = Enum.Font.RobotoMono -- the ticket numbers: timers, payouts, key numbers, "3 / 4 slots"
+Theme.DisplayFont = Enum.Font.GothamBold -- 3.8: no Black weight; titles are bold with restraint
+Theme.MonoFont = Enum.Font.GothamMedium -- 3.8: numbers stay in the Gotham family (timers, payouts, "3 / 4 slots")
 
 -- Optional Roblox assets. Empty IDs keep the live city flyover and native wordmark.
 -- The ids are pasted in shared/Icons.luau (zombie_delivery_logo, menu_background), the one place for every picture.
@@ -134,13 +145,13 @@ function Theme.contrast(a: Color3, b: Color3): number
 	return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05)
 end
 
--- The ink for text on `color`: plum on light surfaces, cream paper on dark ones.
+-- The text for `color`: the light contract text on dark faces (all of them now), charcoal on a light one.
 function Theme.textOn(color: Color3): Color3
-	return if Theme.contrast(P.ink, color) >= Theme.contrast(P.paper, color) then P.ink else P.paper
+	return if Theme.contrast(K.text, color) >= Theme.contrast(K.charcoal, color) then K.text else K.charcoal
 end
 
--- `text` if it reads on `surface` (at least 3:1), else the ink that does (textOn). Ui.button and Ui.chip use it so a
--- caller's old white-on-colour text never ends up white on a pastel.
+-- `text` if it reads on `surface` (at least 3:1), else the text that does (textOn). Ui.button and Ui.chip use it so a
+-- caller's old dark ink never ends up dark on charcoal.
 function Theme.readable(text: Color3, surface: Color3): Color3
 	return if Theme.contrast(text, surface) >= 3 then text else Theme.textOn(surface)
 end
@@ -149,9 +160,11 @@ local function key(color: Color3): string
 	return string.format("%d,%d,%d", math.round(color.R * 255), math.round(color.G * 255), math.round(color.B * 255))
 end
 
+-- face: the flat surface; lip: its thin accent (the main action's red rule, a meaning's edge); text: its label;
+-- main: the one clear action of a window; quiet: disabled / secondary (no accent).
 export type Soft = { face: Color3, lip: Color3, text: Color3, main: boolean, quiet: boolean }
 
--- The pastel faces of the semantic colours: what a button or a chip of that meaning wears.
+-- The flat faces of the semantic colours: what a button or a chip of that meaning wears.
 local SOFT: { [string]: Soft } = {}
 local FACES: { [string]: boolean } = {}
 local function soft(colors: { Color3 }, face: Color3, lip: Color3, text: Color3, main: boolean, quiet: boolean)
@@ -161,29 +174,31 @@ local function soft(colors: { Color3 }, face: Color3, lip: Color3, text: Color3,
 	FACES[key(face)] = true
 end
 local C = Theme.Colors
--- The old (3.5) values too: a module that still writes one of them gets the new face.
-soft({ C.yellow, C.green, C.money, P.sage, Color3.fromRGB(245, 179, 79), Color3.fromRGB(139, 186, 116), Color3.fromRGB(170, 218, 137) }, P.sage, P.sageLip, P.ink, true, false)
-soft({ C.red, P.danger, Color3.fromRGB(231, 112, 92) }, P.rose, P.roseLip, P.ink, false, false)
-soft({ C.blue, Color3.fromRGB(117, 175, 185) }, P.sky, P.skyLip, P.ink, false, false)
-soft({ C.grey, P.disabled, Color3.fromRGB(79, 95, 82) }, P.disabled, P.disabled, P.ink2, false, true)
-soft({ Theme.Gps, P.violet, P.lilac }, P.lilac, P.lilacLip, P.ink, false, false)
-soft({ P.gold, P.butter }, P.butter, P.butterLip, P.ink, false, false)
-soft({ C.panelLight, P.paper, Color3.fromRGB(34, 45, 40) }, P.ticket, P.closeLip, P.ink, false, false)
-soft({ C.panel, P.lavenderDeep, Color3.fromRGB(20, 28, 26) }, P.lavenderDeep, P.closeLip, P.ink, false, false)
+-- The old (3.5 dark, 3.6 pastel) values too: a module that still writes one of them gets the new face.
+soft({ C.yellow, C.green, C.money, P.sage, Color3.fromRGB(245, 179, 79), Color3.fromRGB(139, 186, 116), Color3.fromRGB(170, 218, 137), Color3.fromRGB(229, 237, 206) }, P.sage, P.sageLip, K.text, true, false)
+soft({ C.red, P.rose, Color3.fromRGB(231, 112, 92), Color3.fromRGB(196, 72, 84), Color3.fromRGB(190, 64, 78) }, P.rose, P.roseLip, K.text, false, false)
+soft({ C.blue, P.sky, Color3.fromRGB(117, 175, 185), Color3.fromRGB(56, 112, 148) }, P.sky, P.skyLip, K.text, false, false)
+soft({ C.grey, P.disabled, Color3.fromRGB(79, 95, 82), Color3.fromRGB(138, 124, 148) }, P.disabled, P.disabled, K.secondary, false, true)
+soft({ Theme.Gps, P.violet, P.lilac }, P.lilac, P.lilacLip, K.text, false, false)
+soft({ P.gold, P.butter, Color3.fromRGB(178, 128, 30) }, P.butter, P.butterLip, K.text, false, false)
+soft({ P.paper }, P.paper, K.text, K.text, false, false) -- an active tab / a highlighted card: raised, a white rule
+soft({ C.panelLight, Color3.fromRGB(34, 45, 40), Color3.fromRGB(252, 247, 237), Color3.fromRGB(250, 244, 228) }, P.ticket, P.line, K.text, false, false)
+soft({ C.panel, P.lavenderDeep, Color3.fromRGB(20, 28, 26), Color3.fromRGB(238, 230, 243), Color3.fromRGB(226, 214, 236) }, P.lavenderDeep, P.line, K.secondary, false, true)
 
--- The pastel face, its shadow (lip) and its ink for an action or a chip of `color`. The semantic colours have their
--- own faces (yellow / green / money: the sage main action; red: rose; blue: sky; grey: disabled; the GPS purple:
--- lilac); any other colour is washed toward paper (it keeps its hue: a campaign's, a kind's).
+-- The flat face, its thin accent (lip) and its text for an action or a chip of `color`. The semantic colours have
+-- their own faces (yellow / green / money: the main action, raised charcoal with a red rule; red: charcoal with a
+-- hint of red; blue: with a hint of grey-blue; grey: disabled; the GPS purple: crew); any other colour becomes a
+-- charcoal face barely tinted by it, with the colour itself as the accent (a campaign's, a kind's).
 function Theme.soft(color: Color3): Soft
 	local known = SOFT[key(color)]
 	if known then
 		return known
 	end
-	local face = color:Lerp(P.paper, 0.68)
-	return { face = face, lip = color:Lerp(P.paper, 0.35), text = Theme.textOn(face), main = false, quiet = false }
+	local face = color:Lerp(K.charcoal, 0.84)
+	return { face = face, lip = color, text = Theme.textOn(face), main = false, quiet = false }
 end
 
--- Is `color` one of the pastel faces Theme.soft hands out (so it is not washed again)?
+-- Is `color` one of the flat faces Theme.soft hands out (so it is not mapped again)?
 function Theme.isFace(color: Color3): boolean
 	return FACES[key(color)] == true
 end

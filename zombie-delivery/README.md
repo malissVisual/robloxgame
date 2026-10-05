@@ -63,6 +63,8 @@ Version 3.7 is the **first day on the job**:
 - **Light pieces** (pizza, parcels, mail, medicine …) can be carried **two at a time**. With one in your hands you can
   still open the back; with two your hands are full: put one down with **G**, or let a crew mate open it
   (`Config.Cargo.LightLooks`).
+Version 3.8 is **the contract UI**: Codex's approved direction (`design/ui-contract/`) replaces the 3.6 paper look
+everywhere: compact white type, charcoal, fine lines and red accents, a quiet HUD around the world (see **The HUD**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -745,6 +747,23 @@ and it is a smoking wreck, towed away later. They appear out of sight and vanish
 per server (`Config.Traffic`); during a job a bandit pickup can hide among them.
 
 ## The HUD
+
+3.8, **the contract UI** (Codex's `design/ui-contract/`, approved by the owner): the world is the main view, the
+interface is compact white type over a subtle charcoal scrim, fine grey lines and small red accents (`Theme.Contract`
+in `client/Theme.luau`; `client/HudContract.luau` holds the HUD's pieces). It replaces the 3.6 look described below;
+what each part shows is the same.
+
+| Where | What |
+|---|---|
+| Upper left | ■ DELIVERY CONTRACT (type, stars, stop), the destination in caps, the objectives as checkboxes, a rule, the time left (red under 30 s) / EST. pay; the tutorial's hint, the crew strip and the toasts sit under it |
+| Upper right | MAP [M] · CREW [K] · MENU (every other action: JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news |
+| Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
+| Lower right | the gun and [Q], or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [B] |
+| Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it |
+| In the world | a small red waypoint with the place and the distance |
+
+Every window is a charcoal rectangle (a small caps label, the title, a thin line, slim rows, one main action with a red
+rule); the job board reads like a delivery briefing (route, cargo, deadline, risk, payout, the lock and its remedy).
 
 3.6, **Postage & Trouble**: the interface follows **Codex's concept** (`design/ui-concept/`: `index.html` and the
 `previews/`): soft courier colours, light cream paper and powder-lavender surfaces with dark plum ink, pastels only on
