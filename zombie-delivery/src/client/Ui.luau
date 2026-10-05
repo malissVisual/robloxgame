@@ -337,6 +337,20 @@ local function touchMargins(button: GuiObject, fire: () -> ())
 		if needX > 0 or needY > 0 then
 			local at = button.AbsolutePosition
 			local x1, y1, x2, y2 = at.X, at.Y, at.X + shown.X, at.Y + shown.Y
+			-- Not out of its own row: a button in a row frame (a list of rows, each with its KICK / INVITE) stops at the
+			-- row's edge, so a tap just under it never reaches the next row's button.
+			local holder = button.Parent
+			if holder and holder:IsA("GuiObject") then
+				local hp, hs = holder.AbsolutePosition, holder.AbsoluteSize
+				if hs.Y > shown.Y + 1 then
+					room.Top = math.min(room.Top, math.max(0, y1 - hp.Y))
+					room.Bottom = math.min(room.Bottom, math.max(0, hp.Y + hs.Y - y2))
+				end
+				if hs.X > shown.X + 1 then
+					room.Left = math.min(room.Left, math.max(0, x1 - hp.X))
+					room.Right = math.min(room.Right, math.max(0, hp.X + hs.X - x2))
+				end
+			end
 			for _, other in neighbours() do
 				local p, s = other.AbsolutePosition, other.AbsoluteSize
 				local ox1, oy1, ox2, oy2 = p.X, p.Y, p.X + s.X, p.Y + s.Y
@@ -479,7 +493,13 @@ function Ui.button(parent: Instance, text: string, size: UDim2, color: Color3, o
 		if Theme.same(now, applied) then
 			return
 		end
-		look = Theme.soft(now)
+		local nextLook = Theme.soft(now)
+		if nextLook == look then
+			-- the same meaning again (a window's step() repaints every 0.05 s): keep the face, no new tween
+			button.BackgroundColor3 = applied
+			return
+		end
+		look = nextLook
 		paint()
 		if button:GetAttribute("KeepStroke") == true then
 			border.Color = K.rule

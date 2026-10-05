@@ -2475,7 +2475,7 @@ local function buildCleared()
 		end
 	end)
 	refs.clearedNext.LayoutOrder = 1
-	local ok = Ui.button(buttons, "OK", UDim2.fromOffset(110, 42), P.lavenderDeep, function()
+	local ok = Ui.button(buttons, "OK", UDim2.fromOffset(110, 42), C.blue, function()
 		hideCleared()
 	end)
 	ok.LayoutOrder = 2
