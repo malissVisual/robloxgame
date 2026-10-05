@@ -46,7 +46,7 @@ shops. A published game starts with `Config.StartMoney` and saves to the DataSto
 | Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (on foot: the gun in your hand; driver: the car gun on the roof if the car has one, else a one-handed gun out of the window; passenger: a one-handed gun out of the window) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
-| Switch gun | Q (or click the weapon bar) | the weapon bar |
+| Switch gun | hold Q: the weapon wheel (point at a gun, let go); tap Q: the next gun; or click the weapon bar | the weapon bar |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 | the hotbar |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | Jobs / map / backpack | J / M / B | the buttons |
@@ -522,7 +522,7 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               Weather (the day and night look; 3.0.1: the readable night, the town glow, your own light), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
-              card), Sounds (the music and every sound effect, N / SOUND), MissionsUi (3.0: the MISSIONS window (U),
+              card), Sounds (the music and every sound effect, N / SOUND), WeaponWheel (hold Q), MissionsUi (3.0: the MISSIONS window (U),
               the mission banner in the top stack, the celebration card; 3.1: the CHALLENGES, SECRETS and REWARDS
               tabs and the unlock popups), Secrets (3.1: hides the lost packages you found, animates the others nearby)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces

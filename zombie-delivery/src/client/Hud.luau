@@ -1580,7 +1580,7 @@ weaponBar = placed(Ui.make("Frame", {
 }, gui))
 -- The weapon bar grows upward with a second row of guns: the column above it moves.
 weaponBar:GetPropertyChangedSignal("Size"):Connect(requestLayout)
-local weaponTitle = Ui.label(weaponBar, "WEAPON  ·  Q to switch", UDim2.new(1, 0, 0, 16), {
+local weaponTitle = Ui.label(weaponBar, "WEAPON  ·  hold Q: wheel", UDim2.new(1, 0, 0, 16), {
 	TextXAlignment = if touchLayout then Enum.TextXAlignment.Center else Enum.TextXAlignment.Right,
 	TextSize = 13,
 	TextColor3 = C.yellow,
@@ -1665,7 +1665,7 @@ function renderWeapons()
 		slotTag(slot, "ROOF", Color3.fromRGB(150, 210, 255))
 		return
 	end
-	weaponTitle.Text = if seated then "WEAPON  ·  one-handed out of the window" else "WEAPON  ·  Q to switch"
+	weaponTitle.Text = if seated then "WEAPON  ·  one-handed out of the window" else "WEAPON  ·  hold Q: wheel"
 	local owned: { Config.WeaponDef } = {}
 	for _, def in Config.Weapons do
 		if state.weapons[def.id] then
@@ -1724,7 +1724,7 @@ function renderWeapons()
 	end
 end
 
--- Q: the next gun you own.
+-- The next gun you own (tap Q: client/WeaponWheel.luau has its own; hold Q opens the wheel).
 function nextWeapon()
 	if not state then
 		return
@@ -3028,9 +3028,7 @@ function Hud.start()
 			end
 		elseif key == Enum.KeyCode.B then
 			toggleBackpack()
-		elseif key == Enum.KeyCode.Q then
-			nextWeapon()
-		else
+		else -- (Q: the weapon wheel, client/WeaponWheel.luau)
 			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five }
 			local index = table.find(numbers, key)
 			if index and Config.Items[index] then
