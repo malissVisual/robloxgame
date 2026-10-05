@@ -9,7 +9,7 @@ local NAMES = {
 	"State", -- server → client: money, owned cars / guns, upgrades, stats of the equipped car and gun
 	"SpawnCar", -- client → server: bring my car next to me
 	"RequestOffers", -- client → server: the job board was opened
-	"Offers", -- server → client: { { index, stars, cargo, customer, address, distance, pay, time } }
+	"Offers", -- server → client: ({ { index, stars, cargo, customer, address, distance, pay, time } }, refreshAt) 3.7: sorted ★ → ★★★★, index = the offer's id, refreshAt = GetServerTimeNow() of the next offers (pushed then)
 	"AcceptJob", -- client → server: take offer (index)
 	"CancelJob", -- client → server: give the active job up
 	"Job", -- server → client: the active job ({ … } or nil when none)
