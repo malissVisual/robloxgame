@@ -880,7 +880,19 @@ bubble) until they break up and walk off; walkers stop at a shop window or for a
 cross a street only over the **crosswalks** painted next to the junctions, and at the districts' four-way junctions
 **traffic lights** run one cycle (12 s green, 3 s amber, 1 s all red per way): the traffic cars stop at the line on red
 (and on amber when they can), the people cross on their walk phase. Every client colours the lights itself from the
-server's clock (`shared/Crossings.luau`); your own car, the bandits and the chauffeur do not have to stop.
+server's clock (`shared/Crossings.luau`); the chauffeur of a called car stops too, your own car and the bandits do not have to.
+
+New in 4.1, **the cinematic looks**: every building with a facade wears the same restrained, wet-city style as Codex's
+six approved locations (`design/location-looks/`): concrete, charcoal metal, brick and glazing, fascias and canopies,
+window reveals with caps and sills, pilasters, roof extracts, a narrow red accent line, small wayfinding plates and warm
+practical lamps that glow at night. Each building is a pure-data blueprint in `src/server/BuildingLooks/<Name>.luau`
+that `BuildingLooks/Kit.luau` renders as anchored decoration (no collision, no ray hits), so doors, prompts, cargo
+spots, signs and car paths are unchanged. Forty buildings have one: the depot, the shops, the employers (School,
+Frosty's, Movers, Clinic, Gas Station, Bank, Pharmacy, FreshMart), the city (Fire Station, Precinct 13, City Hall), the
+garages, the repair shop, Downtown Parking, the Dispatch Tower and Harbor Point, and out of town the Fuel Depot, Power
+Plant, Water Works, Train Yard, Radio Station, Ski Lodge, Riding School, Ranch, Farm, Military Base, Airfield, Biotech
+Lab, Prison, Lighthouse and Stadium. `tools/check-building-looks.py` keeps every blueprint inside its footprint, off the
+door openings (`Blueprint.entries`) and the name boards, under 80 parts and 2 light beams.
 
 ## The HUD
 
