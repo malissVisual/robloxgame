@@ -1966,7 +1966,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		prompt.ActionText = if carDoor.driver then "Drive" else "Ride along"
 		prompt.ObjectText = def.name
 		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = Config.Cargo.DoorReach
+		prompt.MaxActivationDistance = if carDoor.driver then Config.Cargo.DriverDoorReach
+			elseif carDoor.panel == nil then Config.Cargo.SeatReach
+			else Config.Cargo.DoorReach
 		prompt.RequiresLineOfSight = false
 		prompt.KeyboardKeyCode = Enum.KeyCode.E
 		prompt:SetAttribute("Door", index)
@@ -2191,7 +2193,9 @@ local function atDoor(car: Car, index: number, humanoid: Humanoid): boolean
 	if not at or not at:IsA("Attachment") or not root then
 		return false
 	end
-	return (root.Position - at.WorldPosition).Magnitude <= Config.Cargo.DoorReach + 6
+	local prompt = at:FindFirstChildOfClass("ProximityPrompt")
+	local reach = if prompt then prompt.MaxActivationDistance else Config.Cargo.DoorReach
+	return (root.Position - at.WorldPosition).Magnitude <= reach + 6
 end
 
 -- 3.7: the prompts at the doors: the driver's door seats the owner, a passenger door the next free seat behind it.

@@ -327,7 +327,12 @@ local function show(kind: string, dialog: TutorialSteps.Dialog?)
 	render()
 	view.dialogGui.Enabled = true
 	freeMouse()
-	ContextActionService:BindActionAtPriority(ACTION, sink, false, Enum.ContextActionPriority.High.Value + 10, table.unpack(KEYS))
+	-- Space / Enter / A turn her pages only when you are talking to her: the radio (retry, done) comes on its own,
+	-- maybe mid-jump or mid-drive, so it takes a click or a tap (its last page would start a job).
+	ContextActionService:UnbindAction(ACTION)
+	if kind ~= "retry" and kind ~= "done" then
+		ContextActionService:BindActionAtPriority(ACTION, sink, false, Enum.ContextActionPriority.High.Value + 10, table.unpack(KEYS))
+	end
 end
 
 -- What the last page's actions do.

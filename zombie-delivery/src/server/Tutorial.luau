@@ -56,7 +56,10 @@ local started = false
 -- Does this player still have the tutorial ahead? (A Studio test runs it only with Config.Tutorial.InStudio.)
 local function pending(player: Player): boolean
 	local profile = PlayerData.get(player)
-	return profile ~= nil and not profile.tutorial and (Tuning.InStudio or not RunService:IsStudio())
+	-- (Outside Studio only a save that was read: a veteran whose save failed to load gets no first day.)
+	return profile ~= nil
+		and not profile.tutorial
+		and if RunService:IsStudio() then Tuning.InStudio else PlayerData.loaded(player)
 end
 
 local function send(player: Player, phase: string?, data: { [string]: any }?)

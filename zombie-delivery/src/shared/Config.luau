@@ -1766,6 +1766,9 @@ Config.Cargo = {
 	-- 3.7, the car doors (server/Vehicles.luau, client/CarVisuals.luau): the E to get in shows only at a door (the driver's
 	-- on the left, the passengers' on their side), this close; the door swings out this far and stays open this long.
 	DoorReach = 5,
+	DriverDoorReach = 7, -- the owner's door: parked flush against a wall you still reach it from the front corner (the
+	-- passenger side of the narrowest car is 8+ away, so "Drive" still never shows there)
+	SeatReach = 3.5, -- a seat with no door (a bed, a roof gunner, a jump seat): close, so its E never takes the back's E
 	DoorSwing = 70, -- degrees
 	DoorOpenSeconds = 1.1,
 }

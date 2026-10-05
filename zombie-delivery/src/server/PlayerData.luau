@@ -487,6 +487,12 @@ function PlayerData.release(player: Player)
 	canSave[player] = nil
 end
 
+-- 3.7: was this player's save read (so their profile is really theirs)? False while a DataStore failure plays them
+-- on a fresh, unsaved profile (and in Studio without API access).
+function PlayerData.loaded(player: Player): boolean
+	return canSave[player] == true
+end
+
 function PlayerData.get(player: Player): Profile?
 	return profiles[player]
 end
