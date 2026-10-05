@@ -4,11 +4,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · UI concept and interactive desktop/touch prototype on `codex/ui-concept` · design/ui-concept/ and COLLAB.md only; no live HUD or gameplay edits · since 2026-10-05
+- (nothing yet)
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- (nothing yet)
+- Codex · `codex/ui-concept` · Postage & Trouble: soft colors, die-cut delivery tickets, circular speed dial, tactile hover/press; interactive five-screen desktop/touch concept and previews in design/ui-concept/ (game code unchanged). Browser interactions/layout pass; 13 test files pass, 64 modules compile at -O0 -g2. Review in browser first; before implementing, test readability, native controls/insets, hover/focus/tap, cargo holds and garage-only vehicle take-out in Studio (not tested here).
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
