@@ -3620,13 +3620,11 @@ function Hud.start()
 			escape()
 			return
 		end
-		if key == Enum.KeyCode.I then
-			-- 3.9: the bag (B holsters the gun now, client/Holster.luau). Before the processed check: Roblox's own camera
-			-- binds I (zoom in) and may mark it processed; a text box with the focus was ruled out above.
-			toggleBackpack()
+		if processed then
 			return
 		end
-		if processed then
+		if key == Enum.KeyCode.I then
+			toggleBackpack() -- 3.9: the bag (B holsters the gun now, client/Holster.luau)
 			return
 		end
 		if key == Enum.KeyCode.M then

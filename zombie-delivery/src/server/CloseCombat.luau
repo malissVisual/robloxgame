@@ -78,6 +78,8 @@ local function onMelee(player: Player, direction: any)
 	local from = root.Position
 	local best: Zombies.Zombie? = nil
 	local bestDistance = math.huge
+	local sight = RaycastParams.new()
+	sight.FilterType = Enum.RaycastFilterType.Exclude
 	for _, z in Zombies.all() do
 		if z.dead or not z.root.Parent then
 			continue
@@ -85,7 +87,11 @@ local function onMelee(player: Player, direction: any)
 		local at = z.root.Position
 		local distance = Melee.reach(from.X, from.Y, from.Z, dir.X, dir.Z, at.X, at.Y, at.Z)
 		if distance and distance < bestDistance then
-			best, bestDistance = z, distance
+			-- Not through a wall, a door or a car: nothing solid between the two (only for the few in reach).
+			sight.FilterDescendantsInstances = { character, z.model }
+			if not workspace:Raycast(from, at - from, sight) then
+				best, bestDistance = z, distance
+			end
 		end
 	end
 	if not best then

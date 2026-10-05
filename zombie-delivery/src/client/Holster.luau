@@ -151,9 +151,10 @@ function Holster.start()
 			return
 		end
 		local key = input.KeyCode
-		if key == Enum.KeyCode.B or key == Enum.KeyCode.DPadDown then
+		-- (a gamepad: d-pad right holsters, d-pad left swings; d-pad down is Roblox's emote menu)
+		if key == Enum.KeyCode.B or key == Enum.KeyCode.DPadRight then
 			Holster.toggle()
-		elseif key == Enum.KeyCode.V then
+		elseif key == Enum.KeyCode.V or key == Enum.KeyCode.DPadLeft then
 			Holster.melee()
 		end
 	end)

@@ -251,7 +251,7 @@ function Menu.show(onPlay: () -> ())
 		enterHint.Position = UDim2.fromOffset(292, controlY)
 		closeHelp.Size = UDim2.fromOffset(116, math.max(48, 44 / factor))
 		for i, row in rows do
-			local gap = if compact then 41 elseif narrow then 86 else 46
+			local gap = if compact then 38 elseif narrow then 82 else 46 -- (3.9: nine rows still fit the card)
 			local rowHeight = if narrow then 80 else 44
 			row.Position = UDim2.fromOffset(24, 84 + (i - 1) * gap)
 			row.Size = UDim2.fromOffset(512, rowHeight)
