@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · six approved cinematic Roblox building looks, one branch per building; shared kit on `codex/location-kit` · server/BuildingLooks/, six World builders sequentially, building validation and design/location-looks/ · since 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
