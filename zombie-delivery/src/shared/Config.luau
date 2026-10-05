@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.8"
+Config.Version = "3.9"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -24,6 +24,21 @@ Config.Movement = {
 	MinToSprint = 0.25, -- an empty breath: Shift sprints again only once this share is back (no stutter)
 	Low = 0.2, -- the breath bar turns red at this share or less (and while out of breath)
 	HideAfter = 1.5, -- seconds the bar stays after the breath is full again, then it fades out
+}
+
+-- 3.9: the gun goes away (B: holster / draw) and the hands fight (V: melee). Holstered (the default after every spawn)
+-- the hands are empty, V punches; with the gun out V strikes with it (a pistol-whip, a rifle butt). The server checks
+-- every swing (server/CloseCombat.luau) and hits the nearest living zombie or bandit in a short cone in front of you
+-- (shared/Melee.luau); everybody sees the right arm swing (client/ArmPose.luau). No headshots; kills count as usual.
+Config.Melee = {
+	Reach = 5.5, -- studs from your root to the enemy's root, along the ground
+	HalfAngle = 70, -- degrees to either side of where you swing
+	Height = 5, -- studs up or down at most (a body on a ledge above you is out of reach)
+	SwingTime = 0.25, -- seconds the arm swings forward and back (client/ArmPose.luau)
+	Kinds = {
+		punch = { damage = 12, cooldown = 0.55, push = 22 }, -- the fist (holstered)
+		gun = { damage = 22, cooldown = 0.8, push = 38 }, -- the gun in the hand
+	} :: { [string]: { damage: number, cooldown: number, push: number } },
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
@@ -1103,15 +1118,42 @@ Config.Levels = {
 
 -- Traffic (server/Traffic.luau): civilian cars driving the roads and people walking the sidewalks, near the players
 -- only (they appear out of sight and disappear far away).
+-- 3.9, living streets: more people (many of them standing and chatting in small groups, which costs no walking),
+-- walkers who stop at a shop window or for a word with somebody, crosswalks (the only places people cross) and
+-- traffic lights at the city's four-way junctions (shared/Crossings.luau: one cycle every client computes itself).
 Config.Traffic = {
 	CarsPerPlayer = 6,
 	MaxCars = 24,
-	PedestriansPerPlayer = 8,
-	MaxPedestrians = 30,
+	PedestriansPerPlayer = 13, -- around one player by day (3.8: 8); at night NightPeople of it
+	MaxPedestrians = 48, -- on the whole server (3.8: 30)
+	NightPeople = 0.4,
 	SpawnMin = 120,
 	SpawnMax = 260,
 	Despawn = 340,
 	CarSpeed = 34,
+	-- Groups: people standing in a loose circle on a sidewalk, talking; after a while they break up and walk off.
+	GroupChance = 0.4, -- share of the new people that come as a group (when there is room for two)
+	GroupSize = { 2, 4 },
+	GroupTime = { 25, 60 }, -- seconds a group stands
+	TalkEvery = { 2.5, 5 }, -- seconds between a group's turns to the speaker / gestures
+	SayChance = 0.3, -- of those turns, a line in a speech bubble
+	-- Walkers stopping.
+	WindowChance = 0.012, -- per half second of walking along a block: stop at a shop window
+	WindowTime = { 3, 7 },
+	MeetChance = 0.35, -- two walkers passing each other stop for a word
+	MeetTime = { 4, 8 },
+	MeetCooldown = 40,
+	-- Crossing the street (only over a crosswalk, next to a junction).
+	CrossChance = 0.28, -- at a corner
+	CrossTime = 6, -- seconds of walk phase still left to step out (the crossing takes about 5)
+	CrossWait = 30, -- seconds waiting at the curb before going on round the block instead
+	CrossGap = 40, -- no lights: no traffic car this close coming toward the crosswalk
+	-- Traffic lights: green for one axis, amber, all red, then the other axis (one cycle = 2 × the three).
+	LightGreen = 12,
+	LightAmber = 3,
+	LightAllRed = 1,
+	StopBack = 7, -- the stop line, this far before the end of a lane (just before the crosswalk)
+	AmberBrake = 20, -- studs/s²: on amber a car stops when it can at this, else drives on
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).

@@ -7,6 +7,8 @@
 --   any seat     otherwise a one-handed gun (pistol, revolver, SMG) out of the side window; a two-handed gun does not
 --                fire from a car at all (the shot is ignored, the client shows a hint)
 -- Nobody shoots with full hands: a character carrying cargo (the Carrying attribute, server/Cargo.luau) cannot fire.
+-- 3.9: on foot nothing fires while the gun is holstered (the Holstered attribute, server/CloseCombat.luau); in a car
+-- seat the holster changes nothing.
 -- Every shot that really fires is told to Gun.onShot (3.0: the quiet twist of a mission costs cargo condition per shot;
 -- server/Jobs.luau sets it, Gun does not require Jobs).
 
@@ -122,6 +124,9 @@ local function onFire(player: Player, target: any, aimed: any)
 	local mode = Economy.fireMode(seatPart ~= nil, driving, profile.weapon, carGunId)
 	if not mode or (mode ~= "hand" and not car) then
 		return -- a two-handed gun in a car seat
+	end
+	if mode == "hand" and character and character:GetAttribute("Holstered") == true then
+		return -- 3.9: the gun is away (B draws it; server/CloseCombat.luau)
 	end
 	local carGun = if mode == "cargun" and carGunId then Economy.findCarGun(carGunId) else nil
 	local stats = if carGun then Economy.carGunStats(carGun.id, profile.upgrades) else Economy.weaponStats(profile.weapon, profile.upgrades)

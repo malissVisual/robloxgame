@@ -76,7 +76,8 @@ Zombies.onKill = function(_player: Player, _zombie: Zombie) end
 Zombies.onCarDamaged = function(_player: Player, _amount: number) end
 Zombies.onSteal = function(_player: Player, _share: number) end
 -- 3.1: how a kill happened, for the challenges' counters (server/Challenges.luau; Main wires it). cause = "gun" (a
--- direct hit), "car" (run over), "splash" (a blast or a fire) or "other" (it just died, e.g. its humanoid); from = what
+-- direct hit), "car" (run over), "splash" (a blast or a fire), "melee" (3.9: a punch or a gun strike,
+-- server/CloseCombat.luau) or "other" (it just died, e.g. its humanoid); from = what
 -- fired from a car seat (server/Gun.luau: "cargun" the roof gun, "window" a passenger's gun; nil = anything else).
 export type KillInfo = { kind: string, bandit: boolean, headshot: boolean, cause: string, from: string? }
 Zombies.onKillInfo = nil :: ((player: Player, info: KillInfo) -> ())?
@@ -526,7 +527,7 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 	end)
 end
 
--- cause (3.1): "car" (run over), "splash" (a blast or a fire); nil = a gun's hit. from (3.1): the gun fired from a car
+-- cause (3.1): "car" (run over), "splash" (a blast or a fire), "melee" (3.9); nil = a gun's hit. from (3.1): the gun fired from a car
 -- seat ("cargun", "window"; Zombies.KillInfo).
 export type HitInfo = { crit: boolean?, push: Vector3?, cause: string?, from: string? }
 

@@ -32,6 +32,7 @@ local GarageUi = require(Client.GarageUi)
 local Stamina = require(Client.Stamina)
 local Discovery = require(Client.Discovery)
 local TutorialUi = require(Client.TutorialUi)
+local Holster = require(Client.Holster)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -66,6 +67,7 @@ safely("GarageUi", GarageUi.start) -- 3.4: the garage window, your garages' prom
 safely("Stamina", Stamina.start) -- 3.7: the sprint's breath
 safely("Discovery", Discovery.start) -- 3.7: the map you discover
 safely("TutorialUi", TutorialUi.start) -- 3.7: the first-day tutorial
+safely("Holster", Holster.start) -- 3.9: B holsters / draws the gun, V punches or strikes
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
@@ -110,6 +112,7 @@ local function play()
 	pcall(function()
 		Hud.setVisible(true)
 		CameraRig.setEnabled(true)
+		Holster.setEnabled(true)
 		Sounds.setInGame(true)
 	end)
 	Net.get("Play"):FireServer()

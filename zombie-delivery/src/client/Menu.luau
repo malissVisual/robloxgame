@@ -181,26 +181,28 @@ function Menu.show(onPlay: () -> ())
 	closeHelp.Position, closeHelp.ZIndex = UDim2.fromOffset(420, 20), 16
 	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local controlsText: { { string } } = if touchLayout then {
-		{ "MOVE", "Left thumbstick" }, { "SHOOT", "FIRE button" },
+		{ "MOVE", "Left thumbstick" }, { "SHOOT", "FIRE button (draws the gun first)" },
+		{ "HANDS", "DRAW / PUNCH buttons over FIRE" },
 		{ "CARGO", "Tap prompts to pick up and load" }, { "PUT DOWN", "PUT DOWN / LET GO button" },
 		{ "WEAPONS", "Tap the weapon bar" }, { "ITEMS", "Tap the hotbar" },
 		{ "NAVIGATE", "JOBS / MAP / BAG / CAR buttons" }, { "EXIT CAR", "Jump button" },
 	} else {
 		{ "MOVE", "WASD / arrows    ·    Shift: sprint (breath)" }, { "COMBAT", "Mouse: aim    ·    RMB: aim    ·    LMB: shoot" },
+		{ "HANDS", "B: holster / draw    ·    V: punch / strike" },
 		{ "CARGO", "E: pick up / load    ·    G: put down" }, { "EQUIPMENT", "Q: switch weapon    ·    1–5: items" },
-		{ "WINDOWS", "J: jobs    ·    M: map    ·    B: bag" }, { "MOUSE", "Alt: free cursor" },
+		{ "WINDOWS", "J: jobs    ·    M: map    ·    I: bag" }, { "MOUSE", "Alt: free cursor" },
 		{ "VEHICLE", "E / R: enter    ·    Space: exit" }, { "ADMIN", "P: admin (when authorized)" },
 	}
 	local rows = {}
 	for i, entry in controlsText do
 		local row = Ui.make("Frame", {
-			Size = UDim2.fromOffset(512, 44), Position = UDim2.fromOffset(24, 84 + (i - 1) * 46),
+			Size = UDim2.fromOffset(512, 40), Position = UDim2.fromOffset(24, 84 + (i - 1) * 42), -- 3.9: nine rows fit
 			BackgroundColor3 = P.lavender, BackgroundTransparency = if i % 2 == 0 then 1 else 0.2,
 			BorderSizePixel = 0, ZIndex = 16,
 		}, help)
 		Ui.corner(row)
-		Ui.label(row, entry[1], UDim2.fromOffset(128, 44), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = P.violet, ZIndex = 17 })
-		Ui.label(row, entry[2], UDim2.fromOffset(366, 44), { Position = UDim2.fromOffset(140, 0), TextSize = 16, Font = Theme.Font, ZIndex = 17 })
+		Ui.label(row, entry[1], UDim2.fromOffset(128, 40), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = P.violet, ZIndex = 17 })
+		Ui.label(row, entry[2], UDim2.fromOffset(366, 40), { Position = UDim2.fromOffset(140, 0), TextSize = 16, Font = Theme.Font, ZIndex = 17 })
 		table.insert(rows, row)
 	end
 	local controlsButton = Ui.ghostButton(face, "CONTROLS", UDim2.fromOffset(240, 44), nil, function()
@@ -249,7 +251,7 @@ function Menu.show(onPlay: () -> ())
 		enterHint.Position = UDim2.fromOffset(292, controlY)
 		closeHelp.Size = UDim2.fromOffset(116, math.max(48, 44 / factor))
 		for i, row in rows do
-			local gap = if compact then 41 elseif narrow then 86 else 46
+			local gap = if compact then 38 elseif narrow then 82 else 46 -- (3.9: nine rows still fit the card)
 			local rowHeight = if narrow then 80 else 44
 			row.Position = UDim2.fromOffset(24, 84 + (i - 1) * gap)
 			row.Size = UDim2.fromOffset(512, rowHeight)

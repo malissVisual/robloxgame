@@ -10,6 +10,7 @@
 -- In a car seat the two-handed guns are greyed out (only one-handed guns fire out of a window). While the wheel is
 -- open the mouse is free (Main adds WeaponWheel.isOpen to CameraRig.mouseNeeded) and a click does not shoot.
 -- Keyboard and mouse only: touch screens keep the BAG and the weapon bar.
+-- 3.9: picking a gun (the wheel or a tap of Q) draws it when it is holstered (B, client/Holster.luau).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,6 +23,7 @@ local Config = require(Shared.Config)
 local Icons = require(Shared.Icons)
 local Net = require(Shared.Net)
 local Drive = require(script.Parent.Drive)
+local Holster = require(script.Parent.Holster)
 local Theme = require(script.Parent.Theme)
 local Ui = require(script.Parent.Ui)
 
@@ -97,6 +99,7 @@ local function say(text: string)
 end
 
 local function equip(id: string)
+	Holster.drawIfHolstered() -- 3.9: picking a gun takes it in the hand (on foot; client/Holster.luau)
 	if state and state.weapon ~= id then
 		Net.get("Equip"):FireServer("weapon", id)
 	end

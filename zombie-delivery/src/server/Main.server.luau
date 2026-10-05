@@ -42,6 +42,7 @@ local Garages = require(Server.Garages)
 local Repair = require(Server.Repair)
 local Explore = require(Server.Explore)
 local Tutorial = require(Server.Tutorial)
+local CloseCombat = require(Server.CloseCombat)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -171,6 +172,7 @@ safely("Garages", Garages.start) -- 3.4: your cars in your garages, switched onl
 safely("Repair", Repair.start) -- 3.4: the repair bays (no free repairs any more)
 safely("Explore", Explore.start) -- 3.7: the map you discover
 safely("Tutorial", Tutorial.start) -- 3.7: the first-day tutorial
+safely("CloseCombat", CloseCombat.start) -- 3.9: the holster (B) and the melee (V)
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
@@ -194,7 +196,8 @@ local function setAiming(player: Player, aiming: any, aimPitch: any)
 	if not character then
 		return
 	end
-	character:SetAttribute("Aiming", aiming == true)
+	-- 3.9: a holstered gun is not held up (server/CloseCombat.luau; the remotes come in order, a draw before its aim).
+	character:SetAttribute("Aiming", aiming == true and character:GetAttribute("Holstered") ~= true)
 	if type(aimPitch) == "number" and aimPitch == aimPitch then
 		character:SetAttribute("AimPitch", math.clamp(aimPitch, -1.2, 1.2))
 	end

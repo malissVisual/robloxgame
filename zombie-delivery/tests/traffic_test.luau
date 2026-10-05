@@ -286,4 +286,197 @@ do
 	check(`a spawn spot takes under 1 ms ({math.floor(each * 1e6)} µs)`, each < 0.001)
 end
 
+-- ── 3.9: crosswalks and traffic lights (shared/Crossings.luau) ─────────────
+
+local Config = require("./Config")
+local Crossings = require("./Crossings")
+local T = Config.Traffic
+
+-- The light cycle: one axis at a time, amber after green, an all-red moment between them, the same every cycle.
+do
+	local cycle = Crossings.cycle()
+	check("the cycle is green + amber + all red, twice", cycle == 2 * (T.LightGreen + T.LightAmber + T.LightAllRed), cycle)
+	local s1 = Crossings.state(0, 0, 1)
+	local s2 = Crossings.state(0, 0, 2)
+	local a1 = Crossings.state(T.LightGreen + 0.5, 0, 1)
+	local r1 = Crossings.state(T.LightGreen + T.LightAmber + 0.5, 0, 1)
+	local g2 = Crossings.state(cycle / 2 + 0.5, 0, 2)
+	check("axis 1 starts green while axis 2 is red", s1 == "green" and s2 == "red", `{s1} {s2}`)
+	check("then amber, then red", a1 == "amber" and r1 == "red", `{a1} {r1}`)
+	check("axis 2 is green in the second half", g2 == "green", g2)
+	local conflict, allRed, walkWindow, walkWrong, badLeft = 0, 0, 0, 0, 0
+	local greenTime = { 0, 0 }
+	local step = 0.05
+	for _, offset in { 0, 4, 13.5, cycle - 1 } do
+		local t = 1000
+		while t < 1000 + cycle do
+			local a, leftA = Crossings.state(t, offset, 1)
+			local b, leftB = Crossings.state(t, offset, 2)
+			if a ~= "red" and b ~= "red" then
+				conflict += 1
+			end
+			if a == "red" and b == "red" then
+				allRed += step
+			end
+			if a == "green" then
+				greenTime[1] += step
+			end
+			if b == "green" then
+				greenTime[2] += step
+			end
+			-- The state lasts exactly as long as it says.
+			local later = Crossings.state(t + leftA - 0.01, offset, 1)
+			if later ~= a or leftA <= 0 or leftB <= 0 then
+				badLeft += 1
+			end
+			-- Somebody may walk over the road along X only while its traffic (axis 1) is red long enough.
+			if Crossings.walk(t, offset, true) then
+				walkWindow += step
+				if a ~= "red" or Crossings.state(t + T.CrossTime - 0.01, offset, 1) ~= "red" then
+					walkWrong += 1
+				end
+			end
+			t += step
+		end
+	end
+	check("never green or amber both ways at once", conflict == 0, conflict)
+	check("an all-red moment between the axes", math.abs(allRed / 4 - 2 * T.LightAllRed) < 0.2, allRed / 4)
+	check("both axes get their green", math.abs(greenTime[1] / 4 - T.LightGreen) < 0.2 and math.abs(greenTime[2] / 4 - T.LightGreen) < 0.2, `{greenTime[1] / 4} {greenTime[2] / 4}`)
+	check("a state lasts as long as it says", badLeft == 0, badLeft)
+	check("people walk only on red for the traffic, with time to get over", walkWrong == 0, walkWrong)
+	check("a walk window every cycle", walkWindow / 4 >= cycle / 2 - T.LightGreen - T.CrossTime, walkWindow / 4)
+	check("the cycle repeats", Crossings.state(7, 3, 2) == Crossings.state(7 + cycle * 5, 3, 2))
+end
+
+-- The junctions with lights: the four-way crossings inside the districts, each one node of the lane graph.
+do
+	local junctions = Crossings.junctions()
+	local expected = 0
+	for _, d in Map.Districts do
+		expected += (d.i1 - d.i0) * (d.j1 - d.j0)
+	end
+	check(`traffic lights at every four-way junction inside the districts ({#junctions})`, #junctions == expected and expected >= 80, expected)
+	local lights = Crossings.nodeLights(g)
+	local mapped = 0
+	for _ in lights do
+		mapped += 1
+	end
+	check("every light junction is a four-way node of the lane graph", mapped == #junctions, mapped)
+	local offRoad, offsets = 0, {}
+	for index, j in junctions do
+		if not Map.onRoad(j.x, j.z) or Crossings.junctionAt(j.x, j.z) ~= index or j.offset < 0 or j.offset >= Crossings.cycle() then
+			offRoad += 1
+		end
+		offsets[j.offset] = true
+	end
+	local kinds = 0
+	for _ in offsets do
+		kinds += 1
+	end
+	check("junctions on the roads, found by position, offsets in the cycle", offRoad == 0, offRoad)
+	check("not every light switches at once", kinds >= 4, kinds)
+	-- Every lane into a light junction stops before the crosswalk.
+	local tooClose = 0
+	for n, _ in lights do
+		for _, e in g.out[n] do
+			local inbound = g.reverse[e]
+			local piece = TrafficLanes.lane(g, inbound)
+			local ex, ez = TrafficLanes.at(piece, piece.length - T.StopBack)
+			local d = math.max(math.abs(ex - g.x[n]), math.abs(ez - g.z[n]))
+			if d < Crossings.Distance + Crossings.Width / 2 or piece.length < T.StopBack + 20 then
+				tooClose += 1
+			end
+		end
+	end
+	check("the stop lines are before the crosswalks", tooClose == 0, tooClose)
+	-- The poles stand on the block corners, off the road and off the people's path.
+	local badPole = 0
+	for _, j in junctions do
+		for _, side in { 1, -1 } do
+			local px, pz = j.x + side * Crossings.PoleCorner, j.z - side * Crossings.PoleCorner
+			local ring = Crossings.Distance
+			if Map.blockAt(px, pz) == nil or Map.onRoad(px, pz) or math.abs(math.abs(px - j.x) - ring) < 2 or math.abs(math.abs(pz - j.z) - ring) < 2 then
+				badPole += 1
+			end
+		end
+	end
+	check("light poles on the block corners, clear of the walkers", badPole == 0, badPole)
+end
+
+-- The crosswalks: on the road next to a junction, just outside its box, where every pedestrian crossing goes over.
+do
+	local list = Crossings.crosswalks()
+	local bad, inBox, wrongLight, onSpot = 0, 0, 0, 0
+	local half = Map.RoadWidth / 2
+	for _, c in list do
+		-- across the whole road, on the asphalt at both curbs
+		local ax, az = if c.alongX then c.x else c.x - half + 1, if c.alongX then c.z - half + 1 else c.z
+		local bx, bz = if c.alongX then c.x else c.x + half - 1, if c.alongX then c.z + half - 1 else c.z
+		if not Map.onRoad(c.x, c.z) or not Map.onRoad(ax, az) or not Map.onRoad(bx, bz) then
+			bad += 1
+		end
+		-- next to its junction, along its road, outside the junction box
+		local along = if c.alongX then math.abs(c.x - c.jx) else math.abs(c.z - c.jz)
+		local beside = if c.alongX then math.abs(c.z - c.jz) else math.abs(c.x - c.jx)
+		if math.abs(along - Crossings.Distance) > 1e-6 or beside > 1e-6 then
+			bad += 1
+		end
+		if along - Crossings.Width / 2 <= half then
+			inBox += 1
+		end
+		if c.light ~= (Crossings.junctionAt(c.jx, c.jz) or 0) then
+			wrongLight += 1
+		end
+		for _, spot in Map.CargoSpots do
+			for _, p in { spot.park, spot.pile } do
+				if math.abs(p.x - c.x) < half and math.abs(p.z - c.z) < half then
+					onSpot += 1
+				end
+			end
+		end
+	end
+	check(`crosswalks over the whole road, next to a junction ({#list})`, bad == 0 and #list > 300, bad)
+	check("crosswalks outside the junction box", inBox == 0, inBox)
+	check("a crosswalk at a light junction has its light", wrongLight == 0, wrongLight)
+	check("no crosswalk on a cargo spot", onSpot == 0, onSpot)
+	local lit = 0
+	for _, c in list do
+		if c.light > 0 then
+			lit += 1
+		end
+	end
+	check("most crosswalks have lights", lit > #list / 2, lit)
+	-- the stripes stay on the road, clear of the centre line
+	local stripesOk = true
+	for _, x in Crossings.Stripes do
+		if math.abs(x) + Crossings.StripeWidth / 2 > half - 1 or math.abs(x) - Crossings.StripeWidth / 2 < 0.4 then
+			stripesOk = false
+		end
+	end
+	check("the stripes are on the road, off the centre line", stripesOk)
+	-- every crossing from a corner over the street goes over a crosswalk (bar the few by a cargo spot)
+	local crossings, missing = 0, 0
+	for _, d in Map.Districts do
+		for i = d.i0, d.i1 do
+			for j = d.j0, d.j1 do
+				for k = 1, 4 do
+					for _, alongX in { true, false } do
+						local k2, i2, j2 = TrafficLanes.across(d, i, j, k, alongX)
+						if k2 then
+							crossings += 1
+							local ax, az = TrafficLanes.corner(d, i, j, k)
+							local bx, bz = TrafficLanes.corner(d, i2, j2, k2)
+							local c = Crossings.at((ax + bx) / 2, (az + bz) / 2)
+							if not c or c.alongX ~= (math.abs(bz - az) > math.abs(bx - ax)) then
+								missing += 1
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	check(`every street crossing has its crosswalk ({crossings} crossings)`, missing <= 8 and crossings == 2 * #list + 2 * missing, `{missing} missing`)
+end
+
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

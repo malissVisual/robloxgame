@@ -8,8 +8,17 @@
 -- frame, so when the chassis holds something other than what was written last, the server's update has arrived in
 -- between. It writes before the physics too (PreSimulation), so your car collides with the car where you see it.
 -- Far away (beyond RANGE) the cars are left as the server places them.
+--
+-- 3.9, the traffic lights' colours: every lens on the light poles (server/World.luau, tag Crossings.Tag) is moved to
+-- its red / amber / green slot and coloured here, from the one cycle in shared/Crossings.luau and
+-- workspace:GetServerTimeNow() (the server's cars stop by the same function); nothing comes over the network. A few
+-- times a second, and a lens is only written when its colour changes (or it streams in again).
 
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Crossings = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Crossings"))
 
 local TrafficAnimator = {}
 
@@ -169,11 +178,65 @@ local function watch(folder: Instance)
 	end)
 end
 
+-- ── Traffic lights ─────────────────────────────────────────────────────────
+
+type Lens = { axis: number, offset: number, base: CFrame, shown: string? }
+
+local LIGHTS_EVERY = 0.2
+local lenses: { [BasePart]: Lens } = {}
+
+local function addLens(item: Instance)
+	if not item:IsA("BasePart") then
+		return
+	end
+	local axis, offset, base = item:GetAttribute("Axis"), item:GetAttribute("Offset"), item:GetAttribute("Base")
+	if type(axis) == "number" and type(offset) == "number" and typeof(base) == "CFrame" then
+		lenses[item] = { axis = axis, offset = offset, base = base, shown = nil }
+	end
+end
+
+local function updateLights()
+	local now = workspace:GetServerTimeNow()
+	for part, lens in lenses do
+		local state = Crossings.state(now, lens.offset, lens.axis)
+		if state ~= lens.shown then
+			lens.shown = state
+			local color = Crossings.LensColor[state]
+			part.CFrame = lens.base + Vector3.new(0, Crossings.LensSlot[state], 0)
+			part.Color = Color3.fromRGB(color[1], color[2], color[3])
+		end
+	end
+end
+
+local function startLights()
+	for _, item in CollectionService:GetTagged(Crossings.Tag) do
+		addLens(item)
+	end
+	CollectionService:GetInstanceAddedSignal(Crossings.Tag):Connect(addLens)
+	CollectionService:GetInstanceRemovedSignal(Crossings.Tag):Connect(function(item)
+		if item:IsA("BasePart") then
+			lenses[item] = nil
+		end
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(LIGHTS_EVERY)
+			local ok, err = pcall(function()
+				updateLights()
+			end)
+			if not ok then
+				warn(`[TrafficAnimator] lights: {err}`)
+			end
+		end
+	end)
+end
+
 function TrafficAnimator.start()
 	if started then
 		return
 	end
 	started = true
+	startLights()
 	task.spawn(function()
 		local folder = workspace:WaitForChild("Traffic", 60)
 		if not folder then

@@ -8,6 +8,8 @@
 --                fire from a car: no shot, no tracer, a short hint instead
 -- Here are the inputs, the tracers, the hit feedback (with the dot in client/CameraRig.luau) and the money pop-ups.
 -- Nothing fires while your hands hold cargo.
+-- 3.9: on foot nothing fires while the gun is holstered (client/Holster.luau): the first press of the left mouse, F or
+-- FIRE draws it instead (that press does not shoot).
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -23,6 +25,7 @@ local Net = require(Shared.Net)
 local Drive = require(script.Parent.Drive)
 local CameraRig = require(script.Parent.CameraRig)
 local ArmPose = require(script.Parent.ArmPose)
+local Holster = require(script.Parent.Holster)
 
 local Shooting = {}
 
@@ -45,7 +48,8 @@ function Shooting.setState(state: any)
 end
 
 function Shooting.setAutoHeld(held: boolean)
-	autoHeld = held
+	-- 3.9: a holstered gun comes out first; this press does not fire.
+	autoHeld = held and not Holster.drawIfHolstered()
 end
 
 -- Set by Main: shows a short text (a toast).
@@ -390,8 +394,8 @@ local function step()
 	if now < nextShot then
 		return
 	end
-	-- Cargo in the hands: no shooting (the server ignores it too).
-	if not car and CameraRig.carrying() then
+	-- Cargo in the hands, or the gun holstered (3.9): no shooting (the server ignores it too).
+	if not car and (CameraRig.carrying() or Holster.holstered()) then
 		return
 	end
 	-- What fires: the hand gun, the car gun, a one-handed gun out of the window, or nothing (two-handed, in a car).
@@ -456,10 +460,11 @@ function Shooting.start()
 		if processed then
 			return
 		end
+		-- 3.9: holstered, the press draws the gun and does not fire (client/Holster.luau).
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			mouseHeld = true
+			mouseHeld = not Holster.pressDraws(input)
 		elseif input.KeyCode == Enum.KeyCode.F or input.KeyCode == Enum.KeyCode.ButtonR2 then
-			autoHeld = true
+			autoHeld = not Holster.pressDraws(input)
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)
