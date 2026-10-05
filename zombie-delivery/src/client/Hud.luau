@@ -16,6 +16,12 @@
 -- stack (the crew strip and the invitation card). Calling your car (the CarCall remote, server/CarCall.luau): a status
 -- line "Your car is on the way · 9 s" in the top stack, a marker over the car in the world and on the maps.
 -- Where everything sits on a computer and on a touch screen, so nothing overlaps: see ── Layout ── below.
+-- 3.2: one style everywhere, the one the right side got in 3.1.3 – 3.1.4 (Theme / Ui: Ui.panel's dark glass, the thin
+-- quiet stroke, Ui.edge's accent bar, Ui.caps' small caps, DisplayFont for the big things, gold the one accent): the
+-- money and level card (a round LV badge, a thin XP bar), the minimap's glass rim and compass (MapView), the job
+-- panel, the car call line and the level-up banner as compact cards with an accent edge, the toasts as pills that
+-- slide in, the car panel as a speedometer, the hint as a pill, and the windows' glass, cards, tabs and quiet buttons.
+-- A shop card whose def has `requires` (a campaign, or a list of them) shows "🔒 FINISH IRON SUPPLY" until it is done.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -209,7 +215,7 @@ local touchLayout: any, LEFT_H: any, LEFT_W: any, leftStack: any, moneyLabel: an
 do -- (its own block: the locals below stay out of the 200-register limit)
 touchLayout = Ui.touchLayout()
 -- Money and the minimap share one column (one scale), so they can never overlap.
-local MONEY_HEIGHT = 110 -- money, the stats, the level and the XP bar
+local MONEY_HEIGHT = 104 -- money, the stats, the level and the XP bar
 LEFT_W, LEFT_H = 230, MONEY_HEIGHT + 8 + 230 -- (the minimap is 230 × 230, client/MapView.luau)
 leftStack = placed(Ui.make("Frame", {
 	Name = "LeftStack",
@@ -219,35 +225,59 @@ leftStack = placed(Ui.make("Frame", {
 	BackgroundTransparency = 1,
 }, gui))
 Ui.list(leftStack, true, 8)
+-- 3.2: one glass card. The money big (DisplayFont, a subtle gold) with the deliveries and kills in small caps beside
+-- it; under it the level: a round LV badge (gold ring), the rank, the XP into this level and a thin gold bar.
 local moneyPanel = Ui.panel(leftStack, UDim2.fromOffset(230, MONEY_HEIGHT), UDim2.new())
 moneyPanel.LayoutOrder = 1
-Ui.padding(moneyPanel, 8)
-moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 32), { TextColor3 = C.money, TextSize = 30, Font = Enum.Font.GothamBlack })
-statsLabel = Ui.label(moneyPanel, "", UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 34), TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
--- The driver level: a LV chip and the rank name, under them the XP bar and the XP into this level.
-local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 54), BackgroundTransparency = 1, ClipsDescendants = true }, moneyPanel)
-Ui.list(levelRow, false, 6)
-levelChip = Ui.chip(levelRow, "LV 1", C.yellow, Color3.new(0.04, 0.05, 0.04))
-levelChip.Font = Enum.Font.GothamBlack
-levelChip.TextSize = 13
-levelChip.LayoutOrder = 1
-rankLabel = Ui.label(levelRow, "", UDim2.new(0, 0, 1, 0), {
-	AutomaticSize = Enum.AutomaticSize.X,
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, moneyPanel)
+Ui.caps(moneyPanel, "Cash", UDim2.new(1, 0, 0, 12), { TextColor3 = C.dim })
+moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 30), {
+	Position = UDim2.fromOffset(0, 12),
+	TextColor3 = C.yellow:Lerp(C.text, 0.35),
+	TextSize = 28,
+	Font = Theme.DisplayFont,
 	TextWrapped = false,
-	TextSize = 13,
-	TextColor3 = C.yellow,
-	LayoutOrder = 2,
+	TextScaled = true,
 })
-xpLabel = Ui.label(moneyPanel, "", UDim2.fromOffset(84, 16), {
-	Position = UDim2.new(1, -84, 0, 77),
+Ui.make("UITextSizeConstraint", { MaxTextSize = 28 }, moneyLabel)
+statsLabel = Ui.caps(moneyPanel, "", UDim2.new(1, 0, 0, 12), {
+	Position = UDim2.fromOffset(0, 0),
 	TextXAlignment = Enum.TextXAlignment.Right,
-	TextSize = 12,
-	TextColor3 = C.dim,
-	Font = Enum.Font.GothamMedium,
+	TextSize = 10,
+})
+-- The driver level: the badge, the rank and the XP, the bar.
+local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 1, -40), BackgroundTransparency = 1 }, moneyPanel)
+levelChip = Ui.label(levelRow, "1", UDim2.fromOffset(38, 38), {
+	Position = UDim2.new(0, 0, 0.5, 0),
+	AnchorPoint = Vector2.new(0, 0.5),
+	BackgroundTransparency = 0,
+	BackgroundColor3 = Theme.Ink,
+	Font = Theme.DisplayFont,
+	TextSize = 17,
+	TextColor3 = C.yellow,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	TextYAlignment = Enum.TextYAlignment.Bottom,
 	TextWrapped = false,
 })
-xpBack, xpFill = Ui.bar(moneyPanel, UDim2.new(1, -90, 0, 7), C.yellow)
-xpBack.Position = UDim2.fromOffset(0, 82)
+Ui.corner(levelChip, 19)
+Ui.stroke(levelChip, C.yellow, 1.5)
+Ui.make("UIPadding", { PaddingBottom = UDim.new(0, 6) }, levelChip)
+Ui.caps(levelChip, "LV", UDim2.new(1, 0, 0, 9), { Position = UDim2.new(0, 0, 0, 5), TextSize = 8, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Center })
+rankLabel = Ui.label(levelRow, "", UDim2.new(1, -48, 0, 16), {
+	Position = UDim2.fromOffset(48, 2),
+	TextWrapped = false,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+	TextSize = 14,
+	Font = Theme.HeadingFont,
+	TextColor3 = C.text,
+})
+xpLabel = Ui.caps(levelRow, "", UDim2.new(1, -48, 0, 12), {
+	Position = UDim2.fromOffset(48, 20),
+	TextSize = 10,
+})
+xpBack, xpFill = Ui.bar(levelRow, UDim2.new(1, -48, 0, 4), C.yellow)
+xpBack.Position = UDim2.new(0, 48, 1, -4)
+xpBack.BackgroundColor3 = Theme.Ink
 end
 
 -- ── Top stack ──────────────────────────────────────────────────────────────
@@ -310,11 +340,12 @@ toasts = Hud.topSlot("toasts")
 local MAX_TOASTS = if touchLayout then 2 else 3
 local toastOrder = 0
 
+-- 3.2: a toast is a glass pill (a gold dot, the text) that slides down into its place and fades away up again.
 function Hud.toast(text: string)
 	-- Too many: the oldest goes (they never pile up into the middle of the screen).
 	local shown: { any } = {}
 	for _, child in toasts:GetChildren() do
-		if child:IsA("TextLabel") and child:GetAttribute("Leaving") ~= true then
+		if child:GetAttribute("Toast") == true and child:GetAttribute("Leaving") ~= true then
 			table.insert(shown, child)
 		end
 	end
@@ -325,24 +356,61 @@ function Hud.toast(text: string)
 		shown[index]:Destroy()
 	end
 	toastOrder += 1
-	local label = Ui.label(toasts, text, UDim2.new(1, -40, 0, 34), {
+	-- The holder keeps the place in the stack; the pill inside it moves.
+	local holder = Ui.make("Frame", {
+		Name = "Toast",
+		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 0.25,
-		BackgroundColor3 = C.panel,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextSize = 18,
+		BackgroundTransparency = 1,
 		LayoutOrder = toastOrder,
+	}, toasts)
+	holder:SetAttribute("Toast", true)
+	local pill = Ui.make("Frame", {
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, -14),
+		BackgroundColor3 = C.panel,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+	}, holder)
+	Ui.corner(pill, 16)
+	local border = Ui.stroke(pill)
+	border.Transparency = 1
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 16), PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7) }, pill)
+	Ui.make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, pill)
+	local dot = Ui.make("Frame", { Size = UDim2.fromOffset(6, 6), BackgroundColor3 = C.yellow, BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = 1 }, pill)
+	Ui.corner(dot, 3)
+	local label = Ui.label(pill, text, UDim2.fromOffset(0, 0), {
+		AutomaticSize = Enum.AutomaticSize.XY,
+		TextSize = 16,
+		Font = Theme.HeadingFont,
+		TextTransparency = 1,
+		LayoutOrder = 2,
 	})
-	Ui.corner(label, 8)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }, label)
+	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(440, math.huge) }, label)
+	-- In: slide down and fade in. Out: up and away.
+	local function fade(info: TweenInfo, y: number, gone: boolean)
+		local t = if gone then 1 else 0
+		TweenService:Create(pill, info, { Position = UDim2.new(0.5, 0, 0, y), BackgroundTransparency = if gone then 1 else Theme.PanelTransparency }):Play()
+		TweenService:Create(border, info, { Transparency = if gone then 1 else Theme.BorderTransparency }):Play()
+		TweenService:Create(dot, info, { BackgroundTransparency = t }):Play()
+		TweenService:Create(label, info, { TextTransparency = t }):Play()
+	end
+	fade(TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), 0, false)
 	task.delay(3, function()
-		if not label.Parent then
+		if not holder.Parent then
 			return
 		end
-		label:SetAttribute("Leaving", true)
-		TweenService:Create(label, TweenInfo.new(0.4), { TextTransparency = 1, BackgroundTransparency = 1 }):Play()
-		task.wait(0.45)
-		label:Destroy()
+		holder:SetAttribute("Leaving", true)
+		fade(TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), -10, true)
+		task.wait(0.4)
+		holder:Destroy()
 	end)
 end
 end
@@ -383,23 +451,35 @@ Leaderboard.onOpen = closeWindows
 
 type Window = { frame: any, body: any, title: any }
 
+-- 3.2: glass like the HUD (a little more solid), the title in DisplayFont with a short gold rule under it, a quiet
+-- ✕ in the corner.
 local function window(title: string, size: Vector2): Window
 	local frame = scaled(Ui.panel(gui, UDim2.fromOffset(size.X, size.Y), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5)))
 	frame.Visible = false
-	frame.BackgroundTransparency = 0.05
+	frame.BackgroundTransparency = Theme.WindowTransparency
 	frame.ZIndex = 5
-	Ui.stroke(frame, C.panelLight:Lerp(C.text, 0.2), 1)
-	local titleLabel = Ui.label(frame, title, UDim2.new(1, -70, 0, 44), { Position = UDim2.fromOffset(18, 6), TextSize = 26, Font = Enum.Font.GothamBold, TextColor3 = C.text })
-	local close = Ui.button(frame, "X", UDim2.fromOffset(40, 40), C.red, function()
+	Ui.stroke(frame, C.panelLight:Lerp(C.text, 0.2), 1).Transparency = 0.3
+	local titleLabel = Ui.label(frame, title, UDim2.new(1, -70, 0, 40), {
+		Position = UDim2.fromOffset(20, 8),
+		TextSize = 24,
+		Font = Theme.DisplayFont,
+		TextColor3 = C.text,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	local rule = Ui.make("Frame", { Size = UDim2.fromOffset(36, 3), Position = UDim2.fromOffset(20, 48), BackgroundColor3 = C.yellow, BorderSizePixel = 0 }, frame)
+	Ui.corner(rule, 2)
+	Ui.closeButton(frame, function()
 		frame.Visible = false
 	end)
-	close.Position = UDim2.new(1, -50, 0, 8)
 	local body = Ui.make("ScrollingFrame", {
 		Size = UDim2.new(1, -28, 1, -64),
 		Position = UDim2.fromOffset(14, 54),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 6,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = C.dim,
+		ScrollBarImageTransparency = 0.4,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, frame)
@@ -412,33 +492,41 @@ local function card(parent: any, height: number, order: number, highlight: boole
 	local frame = Ui.make("Frame", {
 		Size = UDim2.new(1, -10, 0, height),
 		BackgroundColor3 = C.panelLight,
+		BackgroundTransparency = 0.25,
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Ui.corner(frame, 8)
-	Ui.stroke(frame, C.panelLight:Lerp(C.text, 0.13), 1)
+	Ui.corner(frame, 10)
+	Ui.stroke(frame)
 	if highlight then
-		Ui.stroke(frame, C.yellow, 1.5)
+		-- The one that matters here: a gold stroke and the gold edge.
+		Ui.stroke(frame, C.yellow, 1.5).Transparency = 0.2
+		Ui.edge(frame, C.yellow, 4)
 	end
 	return frame
 end
 
 -- name / stats / description on the left of a card.
 local function cardText(c: any, name: string, stats: string, description: string, left: number?)
-	local x = left or 14
-	Ui.label(c, name, UDim2.new(1, -190 - x, 0, 26), { Position = UDim2.fromOffset(x, 6), TextSize = 21, Font = Enum.Font.GothamBlack })
-	Ui.label(c, stats, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 34), TextColor3 = C.yellow, TextSize = 15 })
-	Ui.label(c, description, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 56), TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
+	local x = left or 16
+	Ui.label(c, name, UDim2.new(1, -190 - x, 0, 26), { Position = UDim2.fromOffset(x, 7), TextSize = 19, Font = Theme.DisplayFont, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+	Ui.label(c, stats, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 34), TextColor3 = C.yellow, TextSize = 13, Font = Theme.HeadingFont })
+	Ui.label(c, description, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 55), TextColor3 = C.dim, TextSize = 13, Font = Theme.Font })
 end
 
 local function cardButton(parent: any, text: string, color: Color3, enabled: boolean, onClick: () -> (), slot: number?): any
-	local button = Ui.button(parent, text, UDim2.fromOffset(150, 40), if enabled then color else C.grey, function()
+	-- 3.2: what you cannot press is a quiet glass button with dim text, not a grey block.
+	local function press()
 		if enabled then
 			onClick()
 		end
-	end)
+	end
+	local button = if enabled then Ui.button(parent, text, UDim2.fromOffset(150, 40), color, press) else Ui.ghostButton(parent, text, UDim2.fromOffset(150, 40), nil, press)
 	button.AutoButtonColor = enabled
-	button.TextSize = 16
+	button.TextSize = 15
+	if not enabled then
+		button.TextColor3 = C.dim
+	end
 	local n = slot or 0
 	button.Position = UDim2.new(1, -162, 0, if n == 0 then 22 else 2 + (n - 1) * 44)
 	return button
@@ -448,16 +536,21 @@ local function tabs(parent: any, list: { { string } }, selected: string, onPick:
 	local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 40), BackgroundTransparency = 1, LayoutOrder = 0 }, parent)
 	Ui.list(row, false, 8)
 	for _, entry in list do
+		-- 3.2: the open tab gold, the others quiet glass.
 		local on = entry[1] == selected
-		local button = Ui.button(row, entry[2], UDim2.fromOffset(140, 38), if on then C.yellow else C.grey, function()
-			onPick(entry[1])
-		end)
-		button.TextColor3 = if on then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
+		local button = if on then Ui.button(row, entry[2], UDim2.fromOffset(140, 36), C.yellow, function()
+				onPick(entry[1])
+			end)
+			else Ui.ghostButton(row, entry[2], UDim2.fromOffset(140, 36), nil, function()
+				onPick(entry[1])
+			end)
+		button.TextSize = 14
+		button.TextColor3 = if on then Theme.Ink else C.dim
 	end
 end
 
 local function note(parent: any, text: string, color: Color3, order: number)
-	Ui.label(parent, text, UDim2.new(1, -10, 0, 22), { LayoutOrder = order, AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = color, TextSize = 15, Font = Enum.Font.GothamMedium })
+	Ui.label(parent, text, UDim2.new(1, -10, 0, 22), { LayoutOrder = order, AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = color, TextSize = 14, Font = Theme.Font })
 end
 
 -- ── Driver level ───────────────────────────────────────────────────────────
@@ -613,7 +706,7 @@ function openJobs()
 	if job then
 		Ui.clear(jobs.body)
 		Ui.label(jobs.body, `You are delivering {job.cargo} to {job.customer}. Finish it first, or give it up.`, UDim2.new(1, -10, 0, 60), { TextColor3 = C.text })
-		Ui.button(jobs.body, "GIVE UP THIS DELIVERY", UDim2.fromOffset(280, 46), C.red, function()
+		Ui.ghostButton(jobs.body, "GIVE UP THIS DELIVERY", UDim2.fromOffset(280, 46), C.red, function()
 			Net.get("CancelJob"):FireServer()
 			jobs.frame.Visible = false
 		end)
@@ -658,7 +751,7 @@ function Hud.setOffers(list: { any })
 			c.BackgroundColor3 = C.panel
 		end
 		Ui.label(c, string.rep("★", offer.stars), UDim2.fromOffset(110, 26), { Position = UDim2.fromOffset(12, 6), TextColor3 = color, TextSize = 24 })
-		Ui.label(c, offer.tierName:upper(), UDim2.fromOffset(110, 18), { Position = UDim2.fromOffset(12, 32), TextColor3 = color, TextSize = 14 })
+		Ui.caps(c, offer.tierName, UDim2.fromOffset(110, 14), { Position = UDim2.fromOffset(12, 34), TextColor3 = color })
 		if offer.modifier then
 			local chip = Ui.label(c, offer.modifier.name, UDim2.fromOffset(100, 22), {
 				Position = UDim2.fromOffset(12, 56),
@@ -670,7 +763,7 @@ function Hud.setOffers(list: { any })
 			Ui.corner(chip, 6)
 		end
 		local headline = if offer.jobType then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo} → {offer.customer}`
-		Ui.label(c, headline, UDim2.new(1, -260, 0, 24), { Position = UDim2.fromOffset(124, 6), TextSize = 18, TextColor3 = if offer.jobType then Color3.fromRGB(130, 200, 255) else C.text })
+		Ui.label(c, headline, UDim2.new(1, -260, 0, 24), { Position = UDim2.fromOffset(124, 6), TextSize = 17, Font = Theme.DisplayFont, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextColor3 = if offer.jobType then Color3.fromRGB(130, 200, 255) else C.text })
 		Ui.label(c, `First: {offer.first}`, UDim2.new(1, -260, 0, 18), { Position = UDim2.fromOffset(124, 32), TextColor3 = Color3.fromRGB(130, 200, 255), TextSize = 14, Font = Enum.Font.GothamMedium })
 		Ui.label(c, `{offer.stops} stops · last: {offer.address}, {offer.district} · {offer.distance} m · {Ui.clock(offer.time)}`, UDim2.new(1, -260, 0, 18), {
 			Position = UDim2.fromOffset(124, 52),
@@ -698,14 +791,14 @@ function Hud.setOffers(list: { any })
 			local extra = if offer.vehicle then `Company vehicle: {offer.vehicle}. ` else ""
 			Ui.label(c, extra .. offer.jobType.description, UDim2.new(1, -260, 0, 34), { Position = UDim2.fromOffset(124, typeY), TextColor3 = C.dim, TextSize = 13, Font = Enum.Font.GothamMedium })
 		end
-		Ui.label(c, Ui.money(offer.pay), UDim2.fromOffset(110, 30), { Position = UDim2.new(1, -244, 0, 36), TextColor3 = C.money, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Right })
+		Ui.label(c, Ui.money(offer.pay), UDim2.fromOffset(110, 30), { Position = UDim2.new(1, -244, 0, 36), TextColor3 = C.money, TextSize = 22, Font = Theme.DisplayFont, TextXAlignment = Enum.TextXAlignment.Right })
 		local nightRate = tonumber(offer.nightPay)
 		if nightRate and nightRate > 1 then
 			-- It is night: finished now, the job pays this many times more (Config.DayNight.NightPay).
 			Ui.label(c, string.format("🌙 NIGHT ×%.1f", nightRate), UDim2.fromOffset(110, 16), { Position = UDim2.new(1, -244, 0, 66), TextColor3 = C.yellow, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Right })
 		end
 		if lockLevel then
-			local lock = Ui.button(c, `🔒 LEVEL {lockLevel}`, UDim2.fromOffset(110, 46), C.grey, function()
+			local lock = Ui.ghostButton(c, `🔒 LEVEL {lockLevel}`, UDim2.fromOffset(110, 46), nil, function()
 				local what = if offer.jobType then `The {offer.jobType.name}` else `{offer.tierName} jobs`
 				Hud.toast(`{what} need{if offer.jobType then "s" else ""} driver level {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.`)
 			end)
@@ -720,7 +813,7 @@ function Hud.setOffers(list: { any })
 			accept.Position = UDim2.new(1, -122, 0.5, -23)
 		end
 	end
-	local refresh = Ui.button(jobs.body, "NEW OFFERS", UDim2.fromOffset(180, 40), C.grey, function()
+	local refresh = Ui.ghostButton(jobs.body, "↻  NEW OFFERS", UDim2.fromOffset(180, 40), C.yellow, function()
 		jobsMessage("Calling the dispatcher...")
 		offersRemote:FireServer()
 	end)
@@ -803,6 +896,41 @@ local function renderShop()
 		button.TextWrapped = true
 		button.TextColor3 = C.text
 	end
+	-- 3.2: a def may need a campaign finished first (`requires`: a campaign id or a list of them; the server checks
+	-- it too). The first one not finished yet, as "Finish Iron Supply", else nil.
+	local function needs(def: any, owned: boolean): string?
+		local list: any = def.requires
+		if owned or list == nil then
+			return nil
+		end
+		if type(list) == "string" then
+			list = { list }
+		end
+		if type(list) ~= "table" then
+			return nil
+		end
+		local Missions = require(Shared.Missions)
+		for _, id in list do
+			if type(id) ~= "string" or (type(state.campaigns) == "table" and state.campaigns[id] == true) then
+				continue
+			end
+			local missions = Missions.ofCampaign(id)
+			local finale = missions[#missions]
+			if not (finale and type(state.missions) == "table" and state.missions[finale.id]) then
+				local campaign = Missions.findCampaign(id)
+				return `Finish {if campaign then campaign.name else id}`
+			end
+		end
+		return nil
+	end
+	local function needsButton(c: any, text: string)
+		local button = cardButton(c, `🔒 {string.upper(text)}`, C.grey, false, function() end)
+		button.TextSize = 12
+		button.TextWrapped = true
+		button.Activated:Connect(function()
+			Hud.toast(`{text} first: it opens with that campaign (MISSIONS, U).`)
+		end)
+	end
 	local money = state.money
 	local here = nearShop(shopId)
 	shop.title.Text = (Map.Shops[shopId] and Map.Shops[shopId].name or "SHOP"):upper()
@@ -816,7 +944,8 @@ local function renderShop()
 			end
 			local c = card(shop.body, 84, order + 1, def.id == shopFocus)
 			local lock = if state.cars[def.id] then nil else lockedAt(def.level)
-			cardText(c, def.name, carStats(def) .. (if lock then ` · from level {lock}` else ""), def.description)
+			local need = needs(def, state.cars[def.id] == true)
+			cardText(c, def.name, carStats(def) .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
 			if state.car == def.id then
 				cardButton(c, "YOUR CAR", C.grey, false, function() end)
 			elseif state.cars[def.id] then
@@ -825,6 +954,8 @@ local function renderShop()
 				end)
 			elseif lock then
 				lockButton(c, lock)
+			elseif need then
+				needsButton(c, need)
 			else
 				cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 					Net.get("Buy"):FireServer("car", def.id)
@@ -852,13 +983,14 @@ local function renderShop()
 		for order, def in Config.Weapons do
 			local c = card(shop.body, 84, order + 1)
 			local lock = if state.weapons[def.id] or def.earned or def.exclusive then nil else lockedAt(def.level)
+			local need = if def.earned or def.exclusive then nil else needs(def, state.weapons[def.id] == true)
 			local exclusive = def.exclusive
 			if exclusive and exclusive == "challenges" and not state.weapons[def.id] then
 				-- The gun nobody else has: a dark silhouette, nothing given away.
 				Ui.icon(c, Icons.weapon(def.id), "❔", UDim2.fromOffset(50, 50), { Position = UDim2.fromOffset(10, 17), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = Color3.new(0, 0, 0) })
 				cardText(c, "???", "Damage ??? · ???/s · Range ???", "Nobody has ever seen it. Some say it waits for the courier who does everything.", 70)
 			else
-				cardText(c, def.name, gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else "") .. (if lock then ` · from level {lock}` else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
+				cardText(c, def.name, gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else "") .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
 			end
 			if exclusive and state.weapons[def.id] then
 				badge(c, "★ EXCLUSIVE", Ui.Gps, 2)
@@ -879,6 +1011,8 @@ local function renderShop()
 				button.TextWrapped = true
 			elseif lock then
 				lockButton(c, lock)
+			elseif need then
+				needsButton(c, need)
 			else
 				cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 					Net.get("Buy"):FireServer("weapon", def.id)
@@ -933,13 +1067,16 @@ local function renderShop()
 			for order, def in Config.CarGuns do
 				local c = card(shop.body, 84, order + 1, installed == def.id)
 				local lock = if installed == def.id then nil else lockedAt(def.level)
-				cardText(c, def.name, `{gunStats(def)} · {Ui.money(def.price)}` .. (if lock then ` · from level {lock}` else ""), def.description)
+				local need = needs(def, installed == def.id)
+				cardText(c, def.name, `{gunStats(def)} · {Ui.money(def.price)}` .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
 				if installed == def.id then
 					cardButton(c, "INSTALLED", C.grey, false, function() end)
 				elseif not canMount then
 					cardButton(c, "CAN'T MOUNT", C.grey, false, function() end)
 				elseif lock then
 					lockButton(c, lock)
+				elseif need then
+					needsButton(c, need)
 				else
 					cardButton(c, `BUY {Ui.money(def.price)}`, C.green, here and money >= def.price, function()
 						Net.get("Buy"):FireServer("cargun", def.id)
@@ -1066,10 +1203,9 @@ local function openEmployer(id: string)
 			TextYAlignment = Enum.TextYAlignment.Top,
 		})
 	end
-	Ui.label(body, `REWARDS  ·  they lend you the {if reward then reward.name else "vehicle"} for every job`, UDim2.new(1, -10, 0, 22), {
+	Ui.caps(body, `Rewards  ·  they lend you the {if reward then reward.name else "vehicle"} for every job`, UDim2.new(1, -10, 0, 22), {
 		LayoutOrder = 4,
-		TextColor3 = C.dim,
-		TextSize = 14,
+		TextSize = 12,
 	})
 	local done = state.rep[employer.id] or 0
 	if reward then
@@ -1082,7 +1218,7 @@ local function openEmployer(id: string)
 	if job then
 		Ui.label(body, "Finish your current delivery first.", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = C.red, TextSize = 16 })
 	elseif lock then
-		local button = Ui.button(body, `🔒 LEVEL {lock}`, UDim2.fromOffset(240, 50), C.grey, function() end)
+		local button = Ui.ghostButton(body, `🔒 LEVEL {lock}`, UDim2.fromOffset(240, 50), nil, function() end)
 		button.TextColor3 = C.dim
 		button.LayoutOrder = 7
 		Ui.label(body, `{employer.person} hires drivers from level {lock} ({Levels.rank(lock)}) on. You are level {myLevel()}: deliveries give XP.`, UDim2.new(1, -10, 0, 0), {
@@ -1288,10 +1424,22 @@ function Hud.showResult(r: any)
 	Ui.clear(result.body)
 	result.frame.Visible = true
 	local function line(text: string, value: string?, color: Color3?, order: number): any
-		local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 28), BackgroundTransparency = 1, LayoutOrder = order }, result.body)
-		Ui.label(row, text, UDim2.new(1, if value then -110 else 0, 1, 0), { TextColor3 = color or C.text, TextSize = 18 })
+		-- 3.2: the headline (order 1) and the TOTAL big in DisplayFont, the other lines calmer.
+		local big = order == 1 or text == "TOTAL"
+		local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, if order == 1 then 36 else 26), BackgroundTransparency = 1, LayoutOrder = order }, result.body)
+		Ui.label(row, text, UDim2.new(1, if value then -120 else 0, 1, 0), {
+			TextColor3 = color or C.text,
+			TextSize = if order == 1 then 28 elseif big then 20 else 16,
+			Font = if big then Theme.DisplayFont else Theme.HeadingFont,
+		})
 		if value then
-			Ui.label(row, value, UDim2.new(0, 110, 1, 0), { Position = UDim2.new(1, -110, 0, 0), TextColor3 = color or C.money, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Right })
+			Ui.label(row, value, UDim2.new(0, 120, 1, 0), {
+				Position = UDim2.new(1, -120, 0, 0),
+				TextColor3 = color or C.money,
+				TextSize = if big then 20 else 16,
+				Font = if big then Theme.DisplayFont else Theme.HeadingFont,
+				TextXAlignment = Enum.TextXAlignment.Right,
+			})
 		end
 		return row
 	end
@@ -1364,8 +1512,9 @@ function Hud.showResult(r: any)
 		line(if r.success then "Driver XP" else "Driver XP (a failed job still counts)", `+{xp} XP`, C.yellow, 30)
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 22), BackgroundTransparency = 1, LayoutOrder = 31 }, result.body)
 		Ui.label(row, `LV {level} · {rank}`, UDim2.new(0.5, 0, 1, 0), { TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = false })
-		local back, fill = Ui.bar(row, UDim2.new(0.5, 0, 0, 8), C.yellow)
-		back.Position = UDim2.new(0.5, 0, 0.5, -4)
+		local back, fill = Ui.bar(row, UDim2.new(0.5, 0, 0, 5), C.yellow)
+		back.Position = UDim2.new(0.5, 0, 0.5, -2)
+		back.BackgroundColor3 = Theme.Ink
 		local mine = myXp()
 		fill.Size = UDim2.fromScale(if mine then Levels.progress(mine) else 0, 1)
 		if r.levelUp == true then
@@ -1395,11 +1544,11 @@ function Hud.showResult(r: any)
 			end
 		end
 	end
-	local ok = Ui.button(result.body, "OK", UDim2.fromOffset(160, 44), C.blue, function()
+	local ok = Ui.ghostButton(result.body, "OK", UDim2.fromOffset(160, 44), nil, function()
 		result.frame.Visible = false
 	end)
 	ok.LayoutOrder = 90
-	local next = Ui.button(result.body, "NEXT JOB", UDim2.fromOffset(160, 44), C.green, function()
+	local next = Ui.button(result.body, "NEXT JOB  →", UDim2.fromOffset(160, 44), C.yellow, function()
 		result.frame.Visible = false
 		openJobs()
 	end)
@@ -1877,37 +2026,50 @@ end
 
 -- ── Car panel ──────────────────────────────────────────────────────────────
 
-local CAR_W, CAR_H = 380, 86
+-- 3.2: a speedometer card. The speed big on the left (DisplayFont, gold while the nitro burns) over KM/H; on the right
+-- the car's name in small caps, a thin health bar and the health.
+local CAR_W, CAR_H = 340, 76
 local carPanel = placed(Ui.panel(gui, UDim2.fromOffset(CAR_W, CAR_H), UDim2.new(0.5, 0, 1, -18), Vector2.new(0.5, 1)))
 carPanel.Name = "CarPanel"
-Ui.padding(carPanel, 10)
-local carName = Ui.label(carPanel, "", UDim2.new(0.6, 0, 0, 24), { TextSize = 20, Font = Enum.Font.GothamBlack })
-local speedLabel = Ui.label(carPanel, "", UDim2.new(0.4, 0, 0, 24), {
-	Position = UDim2.fromScale(0.6, 0),
+local speedLabel = Ui.label(carPanel, "", UDim2.fromOffset(92, 40), {
+	Position = UDim2.fromOffset(12, 8),
 	TextXAlignment = Enum.TextXAlignment.Right,
-	TextColor3 = C.yellow,
-	TextSize = 20,
-	Font = Enum.Font.GothamBlack,
+	TextColor3 = C.text,
+	TextScaled = true,
+	TextWrapped = false,
+	Font = Theme.DisplayFont,
 })
-local healthBack, healthFill = Ui.bar(carPanel, UDim2.new(1, 0, 0, 8), C.green)
-healthBack.Position = UDim2.fromOffset(0, 32)
-local healthText = Ui.label(carPanel, "", UDim2.new(1, 0, 0, 18), {
-	Position = UDim2.fromOffset(0, 44), TextXAlignment = Enum.TextXAlignment.Left,
-	TextSize = 13, TextColor3 = C.dim, ZIndex = 2,
-})
--- What to do right now, in a line over the car panel (layout() gives it the width between the panels around it;
--- a long one wraps upward).
-local hint = Ui.label(gui, "", UDim2.fromOffset(640, 22), {
+Ui.make("UITextSizeConstraint", { MaxTextSize = 38 }, speedLabel)
+local carName = Ui.caps(carPanel, "", UDim2.new(1, -140, 0, 14), { Position = UDim2.fromOffset(126, 14), TextSize = 12, TextColor3 = C.text })
+local healthBack, healthFill = Ui.bar(carPanel, UDim2.new(1, -140, 0, 5), C.green)
+healthBack.Position = UDim2.fromOffset(126, 35)
+healthBack.BackgroundColor3 = Theme.Ink
+local healthText = Ui.caps(carPanel, "", UDim2.new(1, -140, 0, 12), { Position = UDim2.fromOffset(126, 48), TextSize = 10, ZIndex = 2 })
+do -- (the static parts: their locals stay in here, out of the 200-register limit)
+	Ui.caps(carPanel, "km/h", UDim2.fromOffset(92, 12), { Position = UDim2.fromOffset(12, 50), TextSize = 10, TextXAlignment = Enum.TextXAlignment.Right })
+	Ui.make("Frame", { Size = UDim2.fromOffset(1, 46), Position = UDim2.new(0, 114, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = C.grey, BackgroundTransparency = 0.4, BorderSizePixel = 0 }, carPanel)
+end
+-- What to do right now, a glass pill over the car panel (layout() gives it the most width it may take, its "Max"
+-- constraint; a long one wraps upward). Hidden while it has nothing to say.
+local hint = Ui.label(gui, "", UDim2.fromOffset(0, 0), {
 	Name = "Hint",
 	Position = UDim2.new(0.5, 0, 1, if touchLayout then -262 else -104),
 	AnchorPoint = Vector2.new(0.5, 1),
-	AutomaticSize = Enum.AutomaticSize.Y,
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BackgroundTransparency = Theme.PanelTransparency,
+	BackgroundColor3 = C.panel,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	TextColor3 = C.dim,
 	TextSize = 15,
-	TextStrokeTransparency = 0.5,
-	Font = Enum.Font.GothamMedium,
+	Font = Theme.HeadingFont,
+	Visible = false,
 })
+do
+	Ui.corner(hint, 12)
+	Ui.stroke(hint)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }, hint)
+	Ui.make("UISizeConstraint", { Name = "Max", MaxSize = Vector2.new(640, math.huge) }, hint)
+end
 
 -- ── Job panel ──────────────────────────────────────────────────────────────
 -- Top centre (the first entry of the top stack): the job and the clock, what to do now (big), the stop and the
@@ -1915,45 +2077,59 @@ local hint = Ui.label(gui, "", UDim2.fromOffset(640, 22), {
 
 local jobPanel: any, jobStroke: any, jobTitle: any, jobTimer: any, jobStep: any, jobInfo: any, conditionBack: any, conditionFill: any, conditionText: any, LOAD_H: any, loadFill: any, loadBack: any, loadText: any, cargoSignature: any, renderCargoRow: any
 do -- (its own block: the locals below stay out of the 200-register limit)
+-- 3.2: a compact glass card with an accent edge (blue to pick up, gold to deliver): the job in small caps and the clock,
+-- what to do now (DisplayFont), the stop line, the cargo chips, a thin condition bar and the pay line with icons.
 jobPanel = Ui.panel(Hud.topSlot("job"), UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 jobPanel.Name = "JobPanel"
 jobPanel.AutomaticSize = Enum.AutomaticSize.Y
 jobPanel.Visible = false
-Ui.padding(jobPanel, 12)
-jobStroke = Ui.stroke(jobPanel, C.yellow, 2)
-Ui.list(jobPanel, true, 6)
-local jobHeader = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, jobPanel)
-jobTitle = Ui.label(jobHeader, "", UDim2.new(1, -80, 1, 0), { TextSize = 15, TextColor3 = C.dim, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
-jobTimer = Ui.label(jobHeader, "", UDim2.new(0, 80, 1, 0), {
-	Position = UDim2.new(1, -80, 0, 0),
+jobStroke = Ui.stroke(jobPanel, C.yellow, 1.5)
+jobStroke.Transparency = 0.35
+Ui.edge(jobPanel, C.yellow)
+-- The content in a frame of its own (the edge stays out of its list).
+local jobContent = Ui.make("Frame", { Name = "Content", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, jobPanel)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 11) }, jobContent)
+Ui.list(jobContent, true, 5)
+local jobHeader = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, jobContent)
+jobTitle = Ui.caps(jobHeader, "", UDim2.new(1, -86, 1, 0), { TextSize = 12 })
+jobTimer = Ui.label(jobHeader, "", UDim2.new(0, 86, 1, 0), {
+	Position = UDim2.new(1, -86, 0, 0),
 	TextXAlignment = Enum.TextXAlignment.Right,
-	TextSize = 22,
-	Font = Enum.Font.GothamBlack,
+	TextSize = 20,
+	TextWrapped = false,
+	Font = Theme.DisplayFont,
 })
-jobStep = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
+jobStep = Ui.label(jobContent, "", UDim2.new(1, 0, 0, 0), {
 	AutomaticSize = Enum.AutomaticSize.Y,
 	LayoutOrder = 2,
-	TextSize = 24,
-	Font = Enum.Font.GothamBlack,
+	TextSize = 20,
+	Font = Theme.DisplayFont,
 })
-jobInfo = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 18), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 15, Font = Enum.Font.GothamMedium })
-local cargoRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = 4, Visible = false }, jobPanel)
+jobInfo = Ui.label(jobContent, "", UDim2.new(1, 0, 0, 16), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 13, Font = Theme.HeadingFont, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+local cargoRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, LayoutOrder = 4, Visible = false }, jobContent)
 Ui.list(cargoRow, false, 6)
-conditionBack, conditionFill = Ui.bar(jobPanel, UDim2.new(1, 0, 0, 8), C.yellow)
+conditionBack, conditionFill = Ui.bar(jobContent, UDim2.new(1, 0, 0, 4), C.yellow)
 conditionBack.LayoutOrder = 5
-conditionText = Ui.label(jobPanel, "", UDim2.new(1, 0, 0, 0), {
+conditionBack.BackgroundColor3 = Theme.Ink
+conditionText = Ui.label(jobContent, "", UDim2.new(1, 0, 0, 0), {
 	AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 6,
-	TextXAlignment = Enum.TextXAlignment.Left, TextSize = 14, TextColor3 = C.dim, ZIndex = 2,
+	TextXAlignment = Enum.TextXAlignment.Left, TextSize = 12, TextColor3 = C.dim, Font = Theme.HeadingFont, ZIndex = 2,
 })
 
--- Loading / unloading / boarding bar under the middle of the screen (layout() keeps it over the bottom panels).
+-- Loading / unloading / boarding bar under the middle of the screen (layout() keeps it over the bottom panels): a
+-- glass pill, the fill inside it, the words over it.
 LOAD_H = 26
 loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, LOAD_H), C.blue)
 scaled(loadBack)
 loadBack.AnchorPoint = Vector2.new(0.5, 0.5)
 loadBack.Position = UDim2.fromScale(0.5, 0.62)
 loadBack.Visible = false
-loadText = Ui.label(loadBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 16, ZIndex = 2, Font = Enum.Font.GothamBlack })
+loadBack.BackgroundColor3 = C.panel
+loadBack.BackgroundTransparency = Theme.PanelTransparency
+loadBack:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, LOAD_H // 2)
+loadFill:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, LOAD_H // 2)
+Ui.stroke(loadBack)
+loadText = Ui.label(loadBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 14, ZIndex = 2, Font = Theme.DisplayFont, TextStrokeTransparency = 0.6 })
 
 cargoSignature = ""
 
@@ -2217,36 +2393,38 @@ local levelUpFrame = Ui.make("CanvasGroup", {
 	Size = UDim2.new(0.82, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundColor3 = C.panel,
-	BackgroundTransparency = 0.04,
+	BackgroundTransparency = Theme.PanelTransparency,
 	BorderSizePixel = 0,
 	GroupTransparency = 1,
 	Visible = false,
 	ZIndex = 4,
 }, Hud.topSlot("levelup"))
+-- 3.2: the HUD's glass with a gold stroke; LEVEL UP in small caps over the level (DisplayFont, gold), the rank, then
+-- what it unlocks.
 local levelUpPop = Ui.make("UIScale", { Scale = 1 }, levelUpFrame)
-Ui.corner(levelUpFrame, 10)
-Ui.stroke(levelUpFrame, C.yellow, 2)
-Ui.padding(levelUpFrame, 12)
-Ui.list(levelUpFrame, true, 4, Enum.HorizontalAlignment.Center)
-Ui.label(levelUpFrame, "⬆  LEVEL UP!", UDim2.new(1, 0, 0, 40), {
-	TextSize = 36,
-	Font = Enum.Font.GothamBlack,
+Ui.corner(levelUpFrame, Theme.PanelRadius)
+Ui.stroke(levelUpFrame, C.yellow, 1.5)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, levelUpFrame)
+Ui.list(levelUpFrame, true, 2, Enum.HorizontalAlignment.Center)
+Ui.caps(levelUpFrame, "⬆  Level up", UDim2.new(1, 0, 0, 14), {
+	TextSize = 12,
 	TextColor3 = C.yellow,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	LayoutOrder = 1,
 })
-local levelUpTitle = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 26), {
+local levelUpTitle = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 30), {
 	AutomaticSize = Enum.AutomaticSize.Y, -- a long rank wraps on a narrow stack
-	TextSize = 22,
-	Font = Enum.Font.GothamBlack,
+	TextSize = 26,
+	Font = Theme.DisplayFont,
+	TextColor3 = C.yellow,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	LayoutOrder = 2,
 })
 local levelUpUnlocks = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 0), {
 	AutomaticSize = Enum.AutomaticSize.Y,
-	TextSize = 15,
-	Font = Enum.Font.GothamMedium,
-	TextColor3 = C.green,
+	TextSize = 13,
+	Font = Theme.HeadingFont,
+	TextColor3 = C.dim,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	LayoutOrder = 3,
 })
@@ -2261,7 +2439,7 @@ local function showLevelUp(from: number, to: number)
 	end
 	local rank = Levels.rank(to)
 	levelUpTitle.Text = `LEVEL {to}  ·  {rank:upper()}`
-	levelUpUnlocks.Text = if #unlocked > 0 then `Unlocked: {table.concat(unlocked, " · ")}` else "Better jobs, cars and guns wait on the next levels."
+	levelUpUnlocks.Text = if #unlocked > 0 then `🔓  {table.concat(unlocked, "  ·  ")}` else "Better jobs, missions and cars wait on the next levels."
 	levelUpStamp += 1
 	local mine = levelUpStamp
 	levelUpFrame.Visible = true
@@ -2269,11 +2447,12 @@ local function showLevelUp(from: number, to: number)
 	local pop = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	TweenService:Create(levelUpFrame, pop, { GroupTransparency = 0 }):Play()
 	TweenService:Create(levelUpPop, pop, { Scale = 1 }):Play()
-	-- The XP bar and the LV chip flash white.
+	-- The XP bar flashes white, the LV badge gold.
 	xpFill.BackgroundColor3 = Color3.new(1, 1, 1)
-	levelChip.BackgroundColor3 = Color3.new(1, 1, 1)
+	levelChip.BackgroundColor3 = C.yellow
+	levelChip.TextColor3 = Theme.Ink
 	TweenService:Create(xpFill, TweenInfo.new(1.2), { BackgroundColor3 = C.yellow }):Play()
-	TweenService:Create(levelChip, TweenInfo.new(1.2), { BackgroundColor3 = C.yellow }):Play()
+	TweenService:Create(levelChip, TweenInfo.new(1.2), { BackgroundColor3 = Theme.Ink, TextColor3 = C.yellow }):Play()
 	Hud.toast(`LEVEL {to}! You are a {rank} now.`)
 	task.delay(4.5, function()
 		if levelUpStamp ~= mine then
@@ -2294,20 +2473,20 @@ local shownLevel: number? = nil
 function refreshLevel()
 	local xp = myXp()
 	if xp == nil then
-		levelChip.Text = "LV 1"
+		levelChip.Text = "1"
 		rankLabel.Text = Levels.rank(1)
 		xpLabel.Text = ""
 		xpFill.Size = UDim2.fromScale(0, 1)
 		return
 	end
 	local level = Levels.levelFor(xp)
-	levelChip.Text = `LV {level}`
+	levelChip.Text = tostring(level)
 	rankLabel.Text = Levels.rank(level)
 	if level >= Config.Levels.MaxLevel then
-		xpLabel.Text = "MAX"
+		xpLabel.Text = "MAX LEVEL"
 	else
 		local from = Levels.xpFor(level)
-		xpLabel.Text = `{math.floor(xp - from)}/{Levels.xpFor(level + 1) - from} XP`
+		xpLabel.Text = `{math.floor(xp - from)} / {Levels.xpFor(level + 1) - from} XP  ·  NEXT LV {level + 1}`
 	end
 	xpFill.Size = UDim2.fromScale(Levels.progress(xp), 1)
 	local before = shownLevel
@@ -2341,27 +2520,28 @@ local CALL_COLOR = C.blue
 local CALL_DONE_SHOWN = 3 -- seconds "Your car is here" stays
 local CALL_STALE = 20
 
-local callLine = Ui.panel(Hud.topSlot("carcall"), UDim2.new(0.78, 0, 0, 42), UDim2.new(), nil)
+-- 3.2: a compact glass card, the blue accent edge and stroke (green when the car is here), a thin bar at the bottom.
+local callLine = Ui.panel(Hud.topSlot("carcall"), UDim2.new(0.78, 0, 0, 40), UDim2.new(), nil)
 callLine.Name = "CarCall"
 callLine.Visible = false
 local callStroke = Ui.stroke(callLine, CALL_COLOR, 1.5)
-local callText = Ui.label(callLine, "", UDim2.new(1, -110, 0, 26), {
-	Position = UDim2.fromOffset(12, 4),
-	TextSize = 17,
-	Font = Enum.Font.GothamBlack,
+callStroke.Transparency = 0.35
+local callEdge = Ui.edge(callLine, CALL_COLOR)
+local callText = Ui.label(callLine, "", UDim2.new(1, -112, 0, 24), {
+	Position = UDim2.fromOffset(18, 5),
+	TextSize = 15,
+	Font = Theme.DisplayFont,
 	TextWrapped = false,
 	TextTruncate = Enum.TextTruncate.AtEnd,
 })
-local callDistance = Ui.label(callLine, "", UDim2.fromOffset(90, 26), {
-	Position = UDim2.new(1, -102, 0, 4),
+local callDistance = Ui.caps(callLine, "", UDim2.fromOffset(84, 24), {
+	Position = UDim2.new(1, -96, 0, 5),
 	TextXAlignment = Enum.TextXAlignment.Right,
-	TextSize = 15,
-	TextColor3 = C.dim,
-	Font = Enum.Font.GothamMedium,
-	TextWrapped = false,
+	TextSize = 12,
 })
-local callBack, callFill = Ui.bar(callLine, UDim2.new(1, -24, 0, 5), CALL_COLOR)
-callBack.Position = UDim2.new(0, 12, 1, -10)
+local callBack, callFill = Ui.bar(callLine, UDim2.new(1, -32, 0, 3), CALL_COLOR)
+callBack.Position = UDim2.new(0, 18, 1, -9)
+callBack.BackgroundColor3 = Theme.Ink
 
 -- The marker over the car in the world (seen through walls, like the delivery label).
 callMarker = Ui.make("BillboardGui", {
@@ -2448,6 +2628,7 @@ local function updateCall(): boolean
 		callText.Text = current.doneText or "✔  Your car is here"
 		callStroke.Color = if current.doneText then C.yellow else C.green
 		callFill.BackgroundColor3 = if current.doneText then C.yellow else C.green
+		callEdge.BackgroundColor3 = callFill.BackgroundColor3
 		callFill.Size = UDim2.fromScale(1, 1)
 		markerText.Text = "🚗  YOUR CAR"
 		markerSub.Text = if distance then `here · {distance} m` else "here"
@@ -2457,6 +2638,7 @@ local function updateCall(): boolean
 		callText.Text = if left > 0 then `🚗  Your car is on the way · {left} s` else "🚗  Your car is almost here"
 		callStroke.Color = CALL_COLOR
 		callFill.BackgroundColor3 = CALL_COLOR
+		callEdge.BackgroundColor3 = CALL_COLOR
 		callFill.Size = UDim2.fromScale(math.clamp(1 - (current.arriveAt - now) / current.total, 0, 1), 1)
 		markerText.Text = "🚗  YOUR CAR"
 		markerSub.Text = (if left > 0 then `{left} s` else "arriving") .. (if distance then `  ·  {distance} m` else "")
@@ -2734,9 +2916,12 @@ layout = function()
 	local hintAt = hintBottom or carTop - 6
 	local hintSize = math.max(11, math.floor(15 * S + 0.5))
 	hint.TextSize = hintSize
-	hint.Size = UDim2.fromOffset(hintWidth, 0)
+	local hintMax = hint:FindFirstChild("Max")
+	if hintMax and hintMax:IsA("UISizeConstraint") then
+		hintMax.MaxSize = Vector2.new(math.max(120, hintWidth), math.huge)
+	end
 	hint.Position = UDim2.fromOffset(carX, hintAt)
-	table.insert(below, box(carX - hintWidth / 2, hintAt - HINT_LINES * (hintSize + 3), carX + hintWidth / 2, hintAt))
+	table.insert(below, box(carX - hintWidth / 2, hintAt - HINT_LINES * (hintSize + 3) - 10, carX + hintWidth / 2, hintAt))
 
 	-- The buttons: one block (its Size is the unscaled block), as big as the room at the right edge allows.
 	local base = if touchLayout then math.max(S, TOUCH_BUTTON_MIN) else S
@@ -2805,7 +2990,7 @@ end
 function Hud.setState(newState: any)
 	state = newState
 	moneyLabel.Text = Ui.money(state.money)
-	statsLabel.Text = `Deliveries {state.deliveries} · Kills {state.kills}`
+	statsLabel.Text = `📦 {state.deliveries}   💀 {state.kills}`
 	refreshLevel()
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
@@ -2839,14 +3024,18 @@ function Hud.setJob(newJob: any)
 	local stageColor = if pickup then PICKUP_COLOR else C.yellow
 	local modifier = if job.modifier then `  [{job.modifier.name}]` else ""
 	local name = if job.jobType then job.jobType.name else `{job.cargo} → {job.customer}`
-	jobTitle.Text = `{string.rep("★", job.stars)}  {name}{modifier}`
+	jobTitle.Text = string.upper(`{string.rep("★", job.stars)}  {name}{modifier}`)
 	jobStep.Text = if type(job.step) == "string" and job.step ~= "" then job.step else job.stopLabel
 	jobStep.TextColor3 = stageColor
 	jobStroke.Color = stageColor
+	local edge = jobPanel:FindFirstChild("Edge")
+	if edge and edge:IsA("Frame") then
+		edge.BackgroundColor3 = stageColor
+	end
 	conditionFill.Size = UDim2.fromScale(math.clamp(job.condition, 0, 1), 1)
 	conditionFill.BackgroundColor3 = if job.condition > 0.6 then C.yellow elseif job.condition > 0.3 then Color3.fromRGB(255, 140, 40) else C.red
-	local wave = if type(job.wave) == "number" and job.wave > 0 then `  ·  Wave {job.wave}` else ""
-	conditionText.Text = `Cargo {math.floor(job.condition * 100 + 0.5)}%  ·  Pay {Ui.money(job.pay)}  ·  Kills {job.kills}{wave}`
+	local wave = if type(job.wave) == "number" and job.wave > 0 then `   ·   🌊 Wave {job.wave}` else ""
+	conditionText.Text = `📦 {math.floor(job.condition * 100 + 0.5)}%   ·   💵 {Ui.money(job.pay)}   ·   💀 {job.kills}{wave}`
 	renderCargoRow()
 	MapView.setTarget(job.position)
 	-- Loading / unloading / boarding progress.
@@ -2880,21 +3069,24 @@ RunService.RenderStepped:Connect(function()
 	local seatedIn, driving = Drive.seatedCar()
 	if car then
 		local def = Economy.findCar(tostring(car:GetAttribute("CarId")))
-		carName.Text = if def then def.name else "Car"
+		carName.Text = string.upper(if def then def.name else "Car")
 		local health = (car:GetAttribute("Health") or 0) :: number
 		local maxHealth = math.max(1, (car:GetAttribute("MaxHealth") or 1) :: number)
 		local share = math.clamp(health / maxHealth, 0, 1)
 		healthFill.Size = UDim2.fromScale(share, 1)
 		healthFill.BackgroundColor3 = if share > 0.5 then C.green elseif share > 0.25 then Color3.fromRGB(255, 160, 40) else C.red
-		healthText.Text = `{math.ceil(health)} / {math.floor(maxHealth)}`
+		healthText.Text = `HEALTH  {math.ceil(health)} / {math.floor(maxHealth)}`
 		local chassis = car.PrimaryPart
 		local v = if chassis then chassis.AssemblyLinearVelocity else Vector3.zero
-		speedLabel.Text = (if Drive.boosting() then "⚡ " else "") .. `{math.floor(Vector3.new(v.X, 0, v.Z).Magnitude)} km/h`
+		local boost = Drive.boosting()
+		speedLabel.Text = (if boost then "⚡" else "") .. tostring(math.floor(Vector3.new(v.X, 0, v.Z).Magnitude))
+		speedLabel.TextColor3 = if boost then C.yellow else C.text
 	else
-		carName.Text = "No car"
-		speedLabel.Text = ""
+		carName.Text = "NO CAR"
+		speedLabel.Text = "–"
+		speedLabel.TextColor3 = C.dim
 		healthFill.Size = UDim2.fromScale(0, 1)
-		healthText.Text = "Press CAR to get one"
+		healthText.Text = "PRESS CAR TO GET ONE"
 	end
 
 	-- Got in / out, or the car gun changed: the weapon bar shows what fires now.
@@ -2924,29 +3116,30 @@ RunService.RenderStepped:Connect(function()
 	if holding then
 		-- G is the server's "Put down" / "Let go" prompt key (server/Cargo.luau); touch screens tap the prompt.
 		local key = if touch then "tap PUT DOWN" else "G puts it down"
-		hint.Text = if holding == "horse" then `Leading a horse: no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}`
-			else `Hands full: no gun, no sprint · E loads / hands over · {key} to shoot`
+		hint.Text = if holding == "horse" then `🐴  Leading a horse: no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}`
+			else `✋  Hands full: no gun, no sprint · E loads / hands over · {key} to shoot`
 		hint.TextColor3 = C.yellow
 	elseif inShop then
-		hint.Text = `{Map.Shops[inShop].name}: walk to the counter and press E`
+		hint.Text = `🏪  {Map.Shops[inShop].name}: walk to the counter and press E`
 		hint.TextColor3 = C.green
 	elseif seatedIn and not driving then
 		local gun = if state then Economy.findWeapon(state.weapon) else nil
-		hint.Text = if gun and not gun.oneHanded then `Riding along: the {gun.name} is too big for the window · Q to a pistol, revolver or SMG`
-			else "Riding along: right mouse aims, left mouse shoots out of the window · Space gets out"
+		hint.Text = if gun and not gun.oneHanded then `🪟  Riding along: the {gun.name} is too big for the window · Q to a pistol, revolver or SMG`
+			else "🪟  Riding along: right mouse aims, left mouse shoots out of the window · Space gets out"
 		hint.TextColor3 = Color3.fromRGB(140, 210, 255)
 	elseif safe and not job then
-		hint.Text = "SAFE ZONE · shops around the depot · JOBS to start a delivery"
+		hint.Text = "🛡️  SAFE ZONE · shops around the depot · JOBS to start a delivery"
 		hint.TextColor3 = C.green
 	elseif not car then
-		hint.Text = "Press CAR to call your car"
+		hint.Text = "🚗  Press CAR to call your car"
 		hint.TextColor3 = C.dim
 	elseif not seatedIn and not job then
-		hint.Text = if touch then "On foot: FIRE shoots · E at your car to drive" else "On foot: right mouse aims, left mouse shoots · E at your car to drive"
+		hint.Text = if touch then "🚶  On foot: FIRE shoots · E at your car to drive" else "🚶  On foot: right mouse aims, left mouse shoots · E at your car to drive"
 		hint.TextColor3 = C.dim
 	else
 		hint.Text = ""
 	end
+	hint.Visible = hint.Text ~= ""
 	if inShop ~= lastShop then
 		lastShop = inShop
 		if shop.frame.Visible then
@@ -2985,7 +3178,7 @@ RunService.RenderStepped:Connect(function()
 		if position then
 			local flat = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
 			local distance = math.floor(flat.Magnitude)
-			jobInfo.Text = `Stop {job.stopIndex}/{job.stopCount}` .. (if person then `  ·  👤 {person}` else "") .. `  ·  {distance} m`
+			jobInfo.Text = `📍 Stop {job.stopIndex}/{job.stopCount}` .. (if person then `   ·   👤 {person}` else "") .. `   ·   {distance} m`
 			labelText.Text = if footText then `{footText}\n{distance} m` else (if pickup then "PICK UP" else string.upper(person or job.customer)) .. `\n{distance} m`
 			local chassis = if seatedIn then seatedIn.PrimaryPart else nil
 			if chassis then

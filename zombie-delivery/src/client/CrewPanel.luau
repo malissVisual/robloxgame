@@ -34,6 +34,7 @@ local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Missions = require(Shared.Missions)
 local Ui = require(script.Parent.Ui)
+local Theme = require(script.Parent.Theme)
 local MapView = require(script.Parent.MapView)
 local Hud = require(script.Parent.Hud)
 
@@ -783,10 +784,10 @@ local function updateStrip()
 		return
 	end
 	local mission = missionOf(job)
-	stripTitle.Text = if mission then `👥  CREW  ·  {missionTitle(mission)}` else `👥  CREW  ·  {stars(job.stars)}{tostring(job.name or "")}`
+	stripTitle.Text = string.upper(if mission then `👥  CREW  ·  {missionTitle(mission)}` else `👥  CREW  ·  {stars(job.stars)}{tostring(job.name or "")}`)
 	stripMission.Visible = mission ~= nil
 	if mission then
-		stripMission.Text = missionLine(mission)
+		stripMission.Text = string.upper(missionLine(mission))
 	end
 	local left = if type(job.endsAt) == "number" then job.endsAt - now() else nil
 	stripTimer.Text = if left then Ui.clock(left) else ""
@@ -973,88 +974,93 @@ local function build()
 
 	-- A member's view of the leader's job: the top stack's crew slot, where your own job panel would be (a member
 	-- has none). As wide as the job panel; the slot is scaled with the stack.
+	-- 3.2: the Hud's job panel style (glass, an accent edge, small caps over a DisplayFont step), in the GPS purple.
 	local slot = Hud.topSlot("crew")
 	strip = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 	strip.Name = "CrewStrip"
 	strip.LayoutOrder = 1
 	strip.AutomaticSize = Enum.AutomaticSize.Y
 	strip.Visible = false
-	Ui.padding(strip, 12)
-	Ui.stroke(strip, GPS, 2)
-	Ui.list(strip, true, 4)
-	local header = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, strip)
-	stripTitle = Ui.label(header, "", UDim2.new(1, -80, 1, 0), {
-		TextSize = 15,
+	Ui.stroke(strip, GPS, 1.5).Transparency = 0.35
+	Ui.edge(strip, GPS)
+	local stripBody = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, strip)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 11) }, stripBody)
+	Ui.list(stripBody, true, 4)
+	local header = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, stripBody)
+	stripTitle = Ui.caps(header, "", UDim2.new(1, -86, 1, 0), {
+		TextSize = 12,
 		TextColor3 = GPS:Lerp(C.text, 0.35),
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		TextWrapped = false,
 	})
-	stripTimer = Ui.label(header, "", UDim2.new(0, 80, 1, 0), {
-		Position = UDim2.new(1, -80, 0, 0),
+	stripTimer = Ui.label(header, "", UDim2.new(0, 86, 1, 0), {
+		Position = UDim2.new(1, -86, 0, 0),
 		TextXAlignment = Enum.TextXAlignment.Right,
-		TextSize = 22,
-		Font = Enum.Font.GothamBlack,
+		TextSize = 20,
+		TextWrapped = false,
+		Font = Theme.DisplayFont,
 	})
-	stripStep = Ui.label(strip, "", UDim2.new(1, 0, 0, 0), {
+	stripStep = Ui.label(stripBody, "", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
-		TextSize = 21,
-		Font = Enum.Font.GothamBlack,
+		TextSize = 19,
+		Font = Theme.DisplayFont,
 	})
-	stripInfo = Ui.label(strip, "", UDim2.new(1, 0, 0, 18), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 14, Font = Enum.Font.GothamMedium })
-	stripMission = Ui.label(strip, "", UDim2.new(1, 0, 0, 18), {
+	stripInfo = Ui.label(stripBody, "", UDim2.new(1, 0, 0, 16), { LayoutOrder = 3, TextColor3 = C.dim, TextSize = 13, Font = Theme.HeadingFont, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+	stripMission = Ui.caps(stripBody, "", UDim2.new(1, 0, 0, 16), {
 		LayoutOrder = 4,
 		Visible = false,
 		TextColor3 = C.yellow,
-		TextSize = 14,
-		Font = Enum.Font.GothamBold,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextSize = 12,
 	})
 
 	-- The invitation card: in the crew slot too (shown only without a job of your own and without a crew).
+	-- 3.2: the same glass card with the purple edge; ACCEPT the one bright button, DECLINE quiet.
 	card = Ui.panel(slot, UDim2.new(1, 0, 0, 0), UDim2.new(), nil)
 	card.Name = "CrewInvitation"
 	card.LayoutOrder = 2
 	card.AutomaticSize = Enum.AutomaticSize.Y
 	card.Visible = false
-	Ui.padding(card, 12)
-	Ui.stroke(card, GPS, 2)
-	Ui.list(card, true, 6)
-	local cardHeader = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, card)
-	cardTitle = Ui.label(cardHeader, "", UDim2.new(1, -80, 1, 0), { TextSize = 15, TextColor3 = GPS:Lerp(C.text, 0.35), TextWrapped = false })
-	cardTimer = Ui.label(cardHeader, "", UDim2.new(0, 80, 1, 0), {
-		Position = UDim2.new(1, -80, 0, 0),
+	Ui.stroke(card, GPS, 1.5).Transparency = 0.2
+	Ui.edge(card, GPS)
+	local cardBody = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, card)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, cardBody)
+	Ui.list(cardBody, true, 6)
+	local cardHeader = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, cardBody)
+	cardTitle = Ui.caps(cardHeader, "", UDim2.new(1, -86, 1, 0), { TextSize = 12, TextColor3 = GPS:Lerp(C.text, 0.35) })
+	cardTimer = Ui.label(cardHeader, "", UDim2.new(0, 86, 1, 0), {
+		Position = UDim2.new(1, -86, 0, 0),
 		TextXAlignment = Enum.TextXAlignment.Right,
-		TextSize = 18,
-		Font = Enum.Font.GothamBlack,
+		TextSize = 17,
+		TextWrapped = false,
+		Font = Theme.DisplayFont,
 	})
-	cardText = Ui.label(card, "", UDim2.new(1, 0, 0, 0), {
+	cardText = Ui.label(cardBody, "", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
-		TextSize = 19,
-		Font = Enum.Font.GothamBlack,
+		TextSize = 18,
+		Font = Theme.DisplayFont,
 	})
-	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, LayoutOrder = 3 }, card)
-	Ui.list(buttons, false, 10)
-	local accept = Ui.button(buttons, "ACCEPT", UDim2.fromOffset(140, 40), C.green, function()
+	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = 3 }, cardBody)
+	Ui.list(buttons, false, 8)
+	local accept = Ui.button(buttons, "✔  ACCEPT", UDim2.fromOffset(130, 36), C.green, function()
 		if cardFrom then
 			answer(cardFrom, true)
 		end
 	end)
 	accept.LayoutOrder = 1
-	local decline = Ui.button(buttons, "DECLINE", UDim2.fromOffset(140, 40), C.red, function()
+	accept.TextSize = 15
+	local decline = Ui.ghostButton(buttons, "DECLINE", UDim2.fromOffset(110, 36), C.red, function()
 		if cardFrom then
 			answer(cardFrom, false)
 		end
 	end)
 	decline.LayoutOrder = 2
+	decline.TextSize = 15
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	Ui.label(buttons, if touch then "or CREW for the panel" else "K: the crew panel · Alt frees the mouse", UDim2.new(1, -300, 1, 0), {
+	Ui.caps(buttons, if touch then "or CREW for the panel" else "K: the crew panel · Alt frees the mouse", UDim2.new(1, -270, 1, 0), {
 		LayoutOrder = 3,
-		TextSize = 13,
-		Font = Enum.Font.GothamMedium,
-		TextColor3 = C.dim,
+		TextSize = 10,
+		TextWrapped = true,
+		TextTruncate = Enum.TextTruncate.None,
 	})
 
 	-- The purple beam over the leader's next stop (a member's guide in the world, like the job's own beam).
