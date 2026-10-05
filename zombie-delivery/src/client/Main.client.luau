@@ -26,6 +26,7 @@ local TrafficAnimator = require(Client.TrafficAnimator)
 local Sounds = require(Client.Sounds)
 local MissionsUi = require(Client.MissionsUi)
 local WeaponWheel = require(Client.WeaponWheel)
+local DispatchUi = require(Client.DispatchUi)
 local Secrets = require(Client.Secrets)
 local GarageUi = require(Client.GarageUi)
 
@@ -56,6 +57,7 @@ safely("TrafficAnimator", TrafficAnimator.start)
 safely("Sounds", Sounds.start)
 safely("MissionsUi", MissionsUi.start)
 safely("WeaponWheel", WeaponWheel.start)
+safely("DispatchUi", DispatchUi.start)
 safely("Secrets", Secrets.start)
 safely("GarageUi", GarageUi.start) -- 3.4: the garage window, your garages' prompts, the repair timer
 Shooting.notify = Hud.toast
@@ -74,21 +76,25 @@ end
 CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows
 MissionsUi.onOpen = Hud.closeWindows
+DispatchUi.onOpen = Hud.closeWindows
+Hud.onJobs = DispatchUi.toggle
 GarageUi.onOpen = Hud.closeWindows
 Hud.onEstate = EstateUi.toggleList
 Hud.onMissions = MissionsUi.toggle
 MissionsUi.onFindCrew = CrewPanel.open
 CameraRig.mouseNeeded = function(): boolean
-	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or GarageUi.isOpen()
+	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
 end
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)
 	Hud.setState(state)
+	DispatchUi.setState(state)
 	Menu.setState(state)
 end)
 Net.get("Job").OnClientEvent:Connect(Hud.setJob)
 Net.get("Offers").OnClientEvent:Connect(Hud.setOffers)
+Net.get("Offers").OnClientEvent:Connect(DispatchUi.setOffers)
 Net.get("DeliveryResult").OnClientEvent:Connect(Hud.showResult)
 Net.get("Notice").OnClientEvent:Connect(Hud.toast)
 Net.get("OpenShop").OnClientEvent:Connect(Hud.openShop)

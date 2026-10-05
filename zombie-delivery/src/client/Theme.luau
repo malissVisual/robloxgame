@@ -40,6 +40,29 @@ Theme.Images = {
 	menuBackground = Icons.get("menu_background") or "",
 }
 
+-- 3.6, "Postage & Trouble" (Codex's concept, design/ui-concept/): soft courier colours. Light cream and powder-lavender
+-- surfaces with dark plum ink; pastels on surfaces, never for critical text. Use these through Theme, not raw Color3s.
+Theme.Postage = {
+	paper = Color3.fromRGB(250, 244, 228), -- #FAF4E4 the current objective ticket, cards on the HUD
+	ticket = Color3.fromRGB(252, 247, 237), -- #FCF7ED job cards, list rows
+	lavender = Color3.fromRGB(238, 230, 243), -- #EEE6F3 window surfaces
+	lavenderDeep = Color3.fromRGB(226, 214, 236), -- window headers, footers, selected rows
+	ink = Color3.fromRGB(73, 55, 80), -- #493750 objectives, prices, big values
+	ink2 = Color3.fromRGB(116, 97, 125), -- #74617D routes, labels, explanations
+	sage = Color3.fromRGB(229, 237, 206), -- #E5EDCE the main action (ACCEPT, TAKE OUT)
+	violet = Color3.fromRGB(132, 102, 153), -- #846699 crew / GPS identity, key chips
+	line = Color3.fromRGB(205, 190, 214), -- perforations, dashed separators, thin strokes
+	shadow = Color3.fromRGB(58, 40, 70), -- the soft drop shadow under paper
+	danger = Color3.fromRGB(196, 72, 84), -- warnings (always with an icon or text, never colour alone)
+	tags = { -- the consumable tags, alternating
+		Color3.fromRGB(240, 232, 248),
+		Color3.fromRGB(250, 240, 222),
+		Color3.fromRGB(228, 240, 214),
+		Color3.fromRGB(248, 226, 232),
+		Color3.fromRGB(224, 236, 246),
+	},
+}
+
 function Theme.textOn(color: Color3): Color3
 	local function linear(v: number): number
 		return if v <= 0.04045 then v / 12.92 else ((v + 0.055) / 1.055) ^ 2.4

@@ -1694,6 +1694,7 @@ Hud.onCrew = nil :: (() -> ())?
 Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
 Hud.onMissions = nil :: (() -> ())? -- client/MissionsUi.luau: the MISSIONS window
+Hud.onJobs = nil :: (() -> ())? -- 3.6 client/DispatchUi.luau: the Dispatch board (J / JOBS); unset: the old board
 
 type ButtonDef = { id: string, text: string, icon: string, main: boolean?, key: string?, color: Color3, stroke: Color3?, onClick: () -> () }
 local BUTTONS: { ButtonDef }, buttonGrid: any, hudButtons: { [string]: any }

@@ -305,6 +305,127 @@ function Ui.clear(parent: Instance)
 	end
 end
 
+-- ── 3.6 Postage & Trouble shapes (design/ui-concept/) ─────────────────────
+
+-- A paper ticket: a cream card with a soft shadow, an optional slight tilt, and (with `stubWidth`) a perforated stub on
+-- its right (a dashed line with two half-round notches). Returns the card, its body (content area) and the stub (nil
+-- without one). Hit areas stay rectangular; the shape is only drawn.
+function Ui.ticket(parent: Instance, size: UDim2, position: UDim2, anchor: Vector2?, stubWidth: number?, tilt: number?): (any, any, any)
+	local P = Theme.Postage
+	local holder = Ui.make("Frame", {
+		Name = "Ticket",
+		Size = size,
+		Position = position,
+		AnchorPoint = anchor or Vector2.zero,
+		BackgroundTransparency = 1,
+		Rotation = tilt or 0,
+	}, parent)
+	local shadow = Ui.make("Frame", {
+		Name = "Shadow",
+		Size = UDim2.fromScale(1, 1),
+		Position = UDim2.fromOffset(3, 5),
+		BackgroundColor3 = P.shadow,
+		BackgroundTransparency = 0.8,
+		BorderSizePixel = 0,
+	}, holder)
+	Ui.corner(shadow, 6)
+	local card = Ui.make("Frame", {
+		Name = "Card",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = P.paper,
+		BorderSizePixel = 0,
+	}, holder)
+	Ui.corner(card, 6)
+	local stubW = stubWidth or 0
+	local body = Ui.make("Frame", {
+		Name = "Body",
+		Size = UDim2.new(1, -stubW, 1, 0),
+		BackgroundTransparency = 1,
+	}, card)
+	local stub: any = nil
+	if stubW > 0 then
+		stub = Ui.make("Frame", {
+			Name = "Stub",
+			Size = UDim2.new(0, stubW, 1, 0),
+			Position = UDim2.new(1, -stubW, 0, 0),
+			BackgroundTransparency = 1,
+		}, card)
+		-- the perforation: a dashed line and a notch top and bottom
+		for i = 0, 11 do
+			Ui.make("Frame", {
+				Size = UDim2.new(0, 1, 1 / 24, 0),
+				Position = UDim2.new(1, -stubW, (i * 2 + 0.5) / 24, 0),
+				BackgroundColor3 = P.line,
+				BorderSizePixel = 0,
+			}, card)
+		end
+		for _, y in { 0, 1 } do
+			local notch = Ui.make("Frame", {
+				Size = UDim2.fromOffset(12, 12),
+				Position = UDim2.new(1, -stubW, y, 0),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = P.ink,
+				BorderSizePixel = 0,
+			}, card)
+			Ui.corner(notch, 6)
+		end
+	end
+	return card, body, stub
+end
+
+-- Tactile hover / press for a button (or any GuiObject inside one): hover lifts it (`lift` px) and straightens a tilt,
+-- press sinks it 2 px and scales to 0.97, release springs back. Touch taps activate at once (no hover step). The
+-- tweens are cancelled when the object is destroyed.
+function Ui.tactile(target: GuiObject, lift: number?, hoverScale: number?)
+	local TweenService = game:GetService("TweenService")
+	local scale = target:FindFirstChildOfClass("UIScale") or Ui.make("UIScale", { Scale = 1 }, target)
+	local home = target.Position
+	local tilt = target.Rotation
+	local up = lift or 5
+	local big = hoverScale or 1.04
+	local info = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local playing: { Tween } = {}
+	local function to(position: UDim2, rotation: number, size: number)
+		for _, tween in playing do
+			tween:Cancel()
+		end
+		table.clear(playing)
+		local a = TweenService:Create(target, info, { Position = position, Rotation = rotation })
+		local b = TweenService:Create(scale, info, { Scale = size })
+		table.insert(playing, a)
+		table.insert(playing, b)
+		a:Play()
+		b:Play()
+	end
+	local function rest()
+		to(home, tilt, 1)
+	end
+	local function hover()
+		to(home - UDim2.fromOffset(0, up), 0, big)
+	end
+	target.MouseEnter:Connect(hover)
+	target.MouseLeave:Connect(rest)
+	target.SelectionGained:Connect(hover)
+	target.SelectionLost:Connect(rest)
+	target.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			to(home + UDim2.fromOffset(0, 2), 0, 0.97)
+		end
+	end)
+	target.InputEnded:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			hover()
+		elseif input.UserInputType == Enum.UserInputType.Touch then
+			rest()
+		end
+	end)
+	target.Destroying:Connect(function()
+		for _, tween in playing do
+			tween:Cancel()
+		end
+	end)
+end
+
 function Ui.money(amount: number): string
 	local text = tostring(math.floor(amount))
 	local formatted = text:reverse():gsub("(%d%d%d)", "%1,"):reverse()
