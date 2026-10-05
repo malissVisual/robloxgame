@@ -1,31 +1,30 @@
 --!strict
--- The interface: money and the driver level (the level circle, the rank, the XP bar; a flash on a level-up), the
--- minimap (client/MapView.luau) and your health, the speed dial (the car's speed, its condition, the cargo slots), the
--- active job (the objective ticket: what to do now, the route, the slots, the pay, the timer in its stub; the loading
--- bar), the utilities (MAP, CREW and the "…" menu with every other action), the consumable tags (items, keys 1-5),
--- the employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold; the car
--- guns at Wrench Garage), the weapon label (your gun, or the car gun while you drive a car that has one), the
--- backpack (with the job's cargo), the delivery result (with the XP, a level-up and the crew's pay split), toasts, the
--- FIRE button for touch screens and the way to the target (the park circle with a beam, on foot the pile / the person
--- or the vehicle's back, an arrow).
+-- The interface: money and the driver level (the rank, a hairline XP line; the numbers on hover; a banner on a
+-- level-up), the minimap (client/MapView.luau) and your health, the vehicle (speed, condition, cargo slots), the
+-- active job (the contract group: what it is, where, the objectives, the deadline and the pay; the hold progress),
+-- the actions (MAP, CREW and MENU with every other action and its key), the consumables (items, keys 1-5), the
+-- employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold; the car guns at
+-- Wrench Garage), the weapon (your gun, or the car gun while you drive a car that has one), the backpack (with the
+-- job's cargo), the delivery result (with the XP, a level-up and the crew's pay split), toasts, the FIRE button for
+-- touch screens and the way to the target (the park circle with a beam, on foot the pile / the person or the
+-- vehicle's back, an arrow, a small waypoint with the name and the distance).
 -- Driver levels (shared/Levels.luau): what your level does not reach yet shows LEVEL N (cars at the dealer, guns,
 -- car guns, an employer's job); the server refuses it anyway.
 -- The job board is client/DispatchUi.luau (3.6): J, the JOBS entry, the depot counter and NEXT JOB run Hud.onJobs.
 -- CREW, ESTATE, MISSIONS, SOUND run the hooks Hud.onCrew (client/CrewPanel.luau), Hud.onEstate (client/EstateUi.luau),
 -- Hud.onMissions (client/MissionsUi.luau) and Hud.onSound (client/Sounds.luau), set by the client's Main; Hud.setBadge
--- and Hud.flashButton mark a button (the crew's invitations). Hud.topSlot gives other modules a place in the top centre
--- stack (the crew strip and the invitation card, the mission banner, the repair timer). Calling your car (the CarCall
--- remote, server/CarCall.luau): a status line "Your car is on the way · 9 s" in the top stack, a marker over the car
--- in the world and on the maps.
+-- and Hud.flashButton mark an action (the crew's invitations). Hud.topSlot gives other modules a place in the contract
+-- column, under the contract group (the tutorial's hint, the crew strip and the invitation card, the mission banner,
+-- the repair timer). Calling your car (the CarCall remote, server/CarCall.luau): a status line "Your car is on the
+-- way · 9 s" in that column, a marker over the car in the world and on the maps.
 -- Where everything sits on a computer and on a touch screen, so nothing overlaps: see ── Layout ── below.
--- 3.6, "Postage & Trouble" (Codex's concept, design/ui-concept/): light cream paper and powder lavender with dark plum
--- ink (Theme.Postage, through P below). The objective is a slightly tilted delivery ticket with a perforated timer stub
--- (Ui.ticket); the money and rank on a paper card over the minimap's paper frame; the weapon on a rounded label over a
--- round cream speed dial; the items as tilted pastel tags that lift, straighten and grow under the mouse (Ui.tactile);
--- MAP, CREW and a round "…" menu with every other action and its key; the windows lavender with a header (an icon
--- circle, the title, a subtitle, a round close button that turns on hover) and a footer (ESC, the context), their rows
--- paper tickets. Not everything at once: the ticket shows the job, or a small OFF DUTY ticket when the top stack is
--- empty.
+-- 3.8, the contract UI (Codex's design/ui-contract/, approved by the owner): the world is the main view. Compact white
+-- type over the scene on a localized charcoal scrim (or a text stroke), flat square shapes, fine lines and small red
+-- accents (the contract marker, the destination, urgent states); the colours and the small pieces are in
+-- client/HudContract.luau (P below). Upper left the contract group, upper right MAP [M] CREW [K] MENU, lower left the
+-- cash and rank over the monochrome minimap and a thin health bar, lower right the weapon (or the cargo in your hands)
+-- and the vehicle line ("OLD VAN / 72% / CARGO 3 OF 4", the speed while driving) over INVENTORY [B], lower centre one
+-- contextual action in a key box with a fine progress line. The windows' rows are slim charcoal rows.
 -- A shop card whose def has `requires` (a campaign, or a list of them) shows "🔒 FINISH IRON SUPPLY" until it is done.
 
 local Players = game:GetService("Players")
@@ -49,8 +48,10 @@ local MapView = require(script.Parent.MapView)
 local Leaderboard = require(script.Parent.Leaderboard)
 
 local C = Ui.Colors
--- 3.6: the Postage tokens (Theme.Postage: paper, lavender, the inks, sage, good / warn / danger, track, pill ...).
-local P = Theme.Postage
+-- 3.8: the contract palette and its small pieces (client/HudContract.luau: ink, ink2, line, danger, good, warn,
+-- accent, surface, raised; P.text, P.caps, P.scrim, P.rule, P.bar, P.keyBox, P.action, P.button, P.row, P.tag ...).
+-- One local for both: Hud.luau sits at the 200-register limit.
+local P = require(script.Parent.HudContract)
 local Hud = {}
 
 local player = Players.LocalPlayer
@@ -60,6 +61,7 @@ local job: any = nil
 local gui = Ui.make("ScreenGui", {
 	Name = "ZombieDeliveryHud",
 	ResetOnSpawn = false,
+	ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets, -- clear of a phone's notch, rounded corners and Roblox's top bar
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	Enabled = false,
 }, player:WaitForChild("PlayerGui"))
@@ -209,17 +211,18 @@ end
 
 -- ── Money ──────────────────────────────────────────────────────────────────
 
--- On a computer the chat sits top left: money goes bottom left above the minimap. On a touch screen top left.
--- `view` holds the refs of the 3.6 pieces that change often (the health row, the dial, the ticket, the menu, the
--- tags): one table instead of a local each (Hud.luau sits at the 200-register limit).
+-- Lower left on a computer (the chat is top left), top left on a touch screen (the thumbstick is bottom left): the
+-- cash and the rank, the minimap, the health row. `view` holds the refs of the pieces that change often (the health
+-- row, the vehicle, the contract group, the menu, the inventory): one table instead of a local each (Hud.luau sits at
+-- the 200-register limit).
 local touchLayout: any, LEFT_H: any, LEFT_W: any, leftStack: any, moneyLabel: any, levelChip: any, rankLabel: any, xpLabel: any, view: any, xpFill: any
 do -- (its own block: the locals below stay out of the 200-register limit)
 touchLayout = Ui.touchLayout()
 view = {}
--- Money, the minimap and the health row share one column (one scale), so they can never overlap.
-local MONEY_HEIGHT, HEALTH_HEIGHT = 76, 24
-LEFT_W = 230
-LEFT_H = MONEY_HEIGHT + 8 + MapView.MiniSize.Y + 8 + HEALTH_HEIGHT
+-- The cash line, the minimap and the health row share one column (one scale), so they can never overlap.
+local MONEY_HEIGHT, HEALTH_HEIGHT = 30, 18
+LEFT_W = MapView.MiniSize.X
+LEFT_H = MONEY_HEIGHT + 6 + MapView.MiniSize.Y + 6 + HEALTH_HEIGHT
 leftStack = placed(Ui.make("Frame", {
 	Name = "LeftStack",
 	Size = UDim2.fromOffset(LEFT_W, LEFT_H),
@@ -227,57 +230,32 @@ leftStack = placed(Ui.make("Frame", {
 	AnchorPoint = if touchLayout then Vector2.zero else Vector2.new(0, 1),
 	BackgroundTransparency = 1,
 }, gui))
-Ui.list(leftStack, true, 8)
--- 3.6: a paper card (the concept's wallet): the level in a lavender circle, the money big over AVAILABLE CASH, the
--- rank and a thin XP bar along the bottom; the XP numbers only on hover (or a tap on a touch screen), in a pill
--- beside the card (3.2.3).
-local moneyCard = Ui.ticket(leftStack, UDim2.fromOffset(LEFT_W, MONEY_HEIGHT), UDim2.new())
-local moneyHolder = moneyCard.Parent
-moneyHolder.LayoutOrder = 1
-levelChip = Ui.label(moneyCard, "1", UDim2.fromOffset(40, 40), {
-	Position = UDim2.fromOffset(12, 9),
-	BackgroundTransparency = 0,
-	BackgroundColor3 = P.lavender,
-	Font = Theme.DisplayFont,
-	TextSize = 17,
-	TextColor3 = P.ink,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	TextWrapped = false,
-	Rotation = -8,
-})
-Ui.corner(levelChip, 20)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1.5 }, levelChip)
-moneyLabel = Ui.label(moneyCard, "$0", UDim2.new(1, -74, 0, 28), {
-	Position = UDim2.fromOffset(62, 7),
-	TextColor3 = P.ink,
-	TextSize = 26,
-	Font = Theme.DisplayFont,
-	TextWrapped = false,
-	TextScaled = true,
-})
-Ui.make("UITextSizeConstraint", { MaxTextSize = 26 }, moneyLabel)
-Ui.caps(moneyCard, "Available cash", UDim2.new(1, -74, 0, 14), { Position = UDim2.fromOffset(62, 35), TextSize = 12, TextColor3 = P.ink2 })
-local levelRow = Ui.make("Frame", { Size = UDim2.new(1, -24, 0, 16), Position = UDim2.new(0, 12, 1, -21), BackgroundTransparency = 1 }, moneyCard)
-rankLabel = Ui.caps(levelRow, "", UDim2.new(0.62, 0, 1, 0), { TextSize = 12, TextColor3 = P.ink, TextScaled = true })
-Ui.make("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 9 }, rankLabel) -- (the longer ranks shrink a little)
+Ui.list(leftStack, true, 6)
+-- 3.8: "$12,480 / LV 7 ROAD RAT" in compact white type, a hairline of the XP under it; the XP numbers only on hover
+-- (or a tap on a touch screen), quietly to the right of the line (3.1.4+).
+local moneyHolder = Ui.make("Frame", { Name = "Cash", Size = UDim2.fromOffset(LEFT_W, MONEY_HEIGHT), BackgroundTransparency = 1, LayoutOrder = 1 }, leftStack)
+P.scrim(moneyHolder, 0.5, { Size = UDim2.new(1, 24, 1, 0), Position = UDim2.fromOffset(-8, 0) })
+local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1 }, moneyHolder)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+	Padding = UDim.new(0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, line)
+moneyLabel = P.text(line, "$0", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 16, LayoutOrder = 1 })
+P.text(line, "/", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 14, TextColor3 = P.ink2, LayoutOrder = 2 })
+levelChip = P.caps(line, "LV 1", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextColor3 = P.ink, LayoutOrder = 3 })
+rankLabel = P.caps(line, "", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, LayoutOrder = 4 })
 local xpBack
-xpBack, xpFill = Ui.bar(levelRow, UDim2.new(0.38, -8, 0, 5), P.violet)
-xpBack.Position = UDim2.new(0.62, 8, 0.5, 0)
-xpBack.AnchorPoint = Vector2.new(0, 0.5)
-xpLabel = Ui.caps(moneyCard, "", UDim2.fromOffset(0, 26), {
+xpBack, xpFill = P.bar(moneyHolder, UDim2.new(1, 0, 0, 2), P.ink2)
+xpBack.Position = UDim2.fromOffset(0, 25)
+xpLabel = P.caps(moneyHolder, "", UDim2.fromOffset(0, 22), {
 	AutomaticSize = Enum.AutomaticSize.X,
-	Position = UDim2.new(1, 14, 0.5, 0), -- to the right of the card
-	AnchorPoint = Vector2.new(0, 0.5),
-	BackgroundTransparency = 0,
-	BackgroundColor3 = P.paper,
+	Position = UDim2.new(1, 12, 0, 0), -- to the right of the line
 	TextSize = 12,
-	TextColor3 = P.ink,
 	Visible = false,
 	ZIndex = 5,
 })
-Ui.corner(xpLabel, 8)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, xpLabel)
-Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, xpLabel)
 moneyHolder.MouseEnter:Connect(function()
 	xpLabel.Visible = xpLabel.Text ~= ""
 end)
@@ -290,63 +268,54 @@ moneyHolder.InputBegan:Connect(function(input: InputObject)
 	end
 end)
 -- (the minimap goes between them: LayoutOrder 2, client/MapView.luau)
--- Your health under the minimap: a heart, a thin bar and the number, on a cream pill (it floats over the world).
-local health = Ui.make("Frame", {
-	Name = "Health",
-	Size = UDim2.fromOffset(LEFT_W, HEALTH_HEIGHT),
-	BackgroundColor3 = P.paper,
-	BackgroundTransparency = 0.1,
-	BorderSizePixel = 0,
-	LayoutOrder = 3,
-}, leftStack)
-Ui.corner(health, 12)
-Ui.label(health, "♥", UDim2.fromOffset(22, HEALTH_HEIGHT), { Position = UDim2.fromOffset(8, 0), TextSize = 15, TextColor3 = P.danger, TextXAlignment = Enum.TextXAlignment.Center })
+-- Your health under the minimap: a plus, a thin bar and the number.
+local health = Ui.make("Frame", { Name = "Health", Size = UDim2.fromOffset(LEFT_W, HEALTH_HEIGHT), BackgroundTransparency = 1, LayoutOrder = 3 }, leftStack)
+P.text(health, "+", UDim2.fromOffset(14, HEALTH_HEIGHT), { Font = Theme.HeadingFont, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center })
 local healthBack
-healthBack, view.healthFill = Ui.bar(health, UDim2.new(1, -84, 0, 5), P.violet)
-healthBack.Position = UDim2.new(0, 36, 0.5, 0)
+healthBack, view.healthFill = P.bar(health, UDim2.new(1, -66, 0, 2), P.ink)
+healthBack.Position = UDim2.new(0, 22, 0.5, 0)
 healthBack.AnchorPoint = Vector2.new(0, 0.5)
-view.healthText = Ui.label(health, "100", UDim2.fromOffset(40, HEALTH_HEIGHT), {
-	Position = UDim2.new(1, -10, 0, 0),
+view.healthText = P.text(health, "100", UDim2.fromOffset(38, HEALTH_HEIGHT), {
+	Position = UDim2.new(1, 0, 0, 0),
 	AnchorPoint = Vector2.new(1, 0),
+	Font = Theme.MonoFont,
 	TextSize = 14,
-	Font = Theme.DisplayFont,
-	TextColor3 = P.ink,
 	TextXAlignment = Enum.TextXAlignment.Right,
-	TextWrapped = false,
 })
 view.health = -1 -- the health shown (the row redraws only when it changes)
 end
 
 -- ── Top stack ──────────────────────────────────────────────────────────────
--- Top centre, one column that grows downward (a UIListLayout: a hidden entry takes no room, so nothing overlaps):
---   1 the objective ticket (your own job; with none and nothing else on top, the small OFF DUTY ticket)
---   2 the crew slot (a member's view of the leader's job, an invitation: client/CrewPanel.luau, through Hud.topSlot)
+-- 3.8: the contract column, upper left (under the native chat on a computer; right of the minimap column on a touch
+-- screen), one column that grows downward (a UIListLayout: a hidden entry takes no room, so nothing overlaps):
+--   1 the contract group (your own job; with none and nothing else on top, the small OFF DUTY line)
+--   2 the tutorial's hint (client/TutorialUi.luau sets its slot's order 2), the crew slot (a member's view of the
+--     leader's job, an invitation: client/CrewPanel.luau, through Hud.topSlot)
 --   3 the mission banner (3.0: client/MissionsUi.luau)
 --   4 the car call line ("Your car is on the way · 9 s") or the repair timer (client/GarageUi.luau)
 --   5 the level-up banner
 --   6 the toasts (the newest last, MAX_TOASTS at most)
--- The ticket, the crew strip and the invitation card never show at the same time (a job of your own, a crew
--- member without one, neither); the rest stacks under whichever shows.
+-- The contract group, the crew strip and the invitation card never show at the same time (a job of your own, a crew
+-- member without one, neither); the rest stacks under whichever shows. Everything is left-aligned.
 
 local TOP_W: any, topStack: any
 do -- (its own block: the locals below stay out of the 200-register limit)
-TOP_W = 440 -- 3.6: the objective ticket's width (the concept's 424 px)
+TOP_W = 380 -- the column's width at scale 1
 topStack = placed(Ui.make("Frame", {
 	Name = "TopStack",
 	Size = UDim2.fromOffset(TOP_W, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
-	Position = UDim2.new(0.5, 0, 0, 14),
-	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromOffset(16, 14),
 	BackgroundTransparency = 1,
 }, gui))
-Ui.list(topStack, true, 8, Enum.HorizontalAlignment.Center)
+Ui.list(topStack, true, 8)
 
 local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, mission = 3, carcall = 4, repair = 4, levelup = 5, toasts = 6 }
 local slots: { [string]: Frame } = {}
 
--- A place in the top stack for another module's panel, by name ("crew"; an unknown name goes under the toasts).
--- The slot is as wide as the stack and as tall as what is visible in it (its children top down by LayoutOrder,
--- centred). It is scaled with the stack: the panels in it take no UIScale of their own.
+-- A place in the contract column for another module's panel, by name ("crew"; an unknown name goes under the toasts).
+-- The slot is as wide as the column and as tall as what is visible in it (its children top down by LayoutOrder,
+-- left-aligned). It is scaled with the column: the panels in it take no UIScale of their own.
 function Hud.topSlot(name: string): Frame
 	local existing = slots[name]
 	if existing then
@@ -363,7 +332,7 @@ function Hud.topSlot(name: string): Frame
 		BackgroundTransparency = 1,
 		LayoutOrder = SLOT_ORDER[name] or (10 + count),
 	}, topStack)
-	Ui.list(slot, true, 8, Enum.HorizontalAlignment.Center)
+	Ui.list(slot, true, 8)
 	slots[name] = slot
 	return slot
 end
@@ -377,10 +346,10 @@ toasts = Hud.topSlot("toasts")
 local MAX_TOASTS = if touchLayout then 2 else 3
 local toastOrder = 0
 
--- 3.6: a toast is a paper pill (a violet dot, the ink text, a thin line around it) that slides down into its place and
--- fades away up again.
+-- 3.8: a toast is a compact charcoal strip (a thin white rule on its left, white text) that fades in and, after 3 s,
+-- out again. No movement.
 function Hud.toast(text: string)
-	-- Too many: the oldest goes (they never pile up into the middle of the screen).
+	-- Too many: the oldest goes (they never pile up down the screen).
 	local shown: { any } = {}
 	for _, child in toasts:GetChildren() do
 		if child:GetAttribute("Toast") == true and child:GetAttribute("Leaving") ~= true then
@@ -394,62 +363,38 @@ function Hud.toast(text: string)
 		shown[index]:Destroy()
 	end
 	toastOrder += 1
-	-- The holder keeps the place in the stack; the pill inside it moves.
-	local holder = Ui.make("Frame", {
+	local strip = Ui.make("CanvasGroup", {
 		Name = "Toast",
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		LayoutOrder = toastOrder,
-	}, toasts)
-	holder:SetAttribute("Toast", true)
-	local pill = Ui.make("Frame", {
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, -14),
-		BackgroundColor3 = P.paper,
-		BackgroundTransparency = 1,
+		BackgroundColor3 = P.surface,
+		BackgroundTransparency = 0.22,
 		BorderSizePixel = 0,
-	}, holder)
-	Ui.corner(pill, 14)
-	local border = Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 1 }, pill)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 16), PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7) }, pill)
-	Ui.make("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 10),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, pill)
-	local dot = Ui.make("Frame", { Size = UDim2.fromOffset(6, 6), BackgroundColor3 = P.violet, BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = 1 }, pill)
-	Ui.corner(dot, 3)
-	local label = Ui.label(pill, text, UDim2.fromOffset(0, 0), {
+		GroupTransparency = 1,
+		LayoutOrder = toastOrder,
+	}, toasts)
+	strip:SetAttribute("Toast", true)
+	-- (the padding moves the children: the rule goes back out to the edge)
+	Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 2, 1, 14), Position = UDim2.fromOffset(-14, -7), BackgroundColor3 = P.ink, BorderSizePixel = 0 }, strip)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7) }, strip)
+	local label = Ui.label(strip, text, UDim2.fromOffset(0, 0), {
 		AutomaticSize = Enum.AutomaticSize.XY,
-		TextSize = 15,
-		Font = Theme.HeadingFont,
+		TextSize = 14,
+		Font = Theme.Font,
 		TextColor3 = P.ink,
-		TextTransparency = 1,
-		LayoutOrder = 2,
+		TextWrapped = true,
 	})
-	-- 320: with the padding, the dot and the gap the pill stays inside the narrowest top stack (TOP_MIN_W 380).
-	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(320, math.huge) }, label)
-	-- In: slide down and fade in. Out: up and away.
-	local function fade(info: TweenInfo, y: number, gone: boolean)
-		local t = if gone then 1 else 0
-		TweenService:Create(pill, info, { Position = UDim2.new(0.5, 0, 0, y), BackgroundTransparency = if gone then 1 else 0.04 }):Play()
-		TweenService:Create(border, info, { Transparency = t }):Play()
-		TweenService:Create(dot, info, { BackgroundTransparency = t }):Play()
-		TweenService:Create(label, info, { TextTransparency = t }):Play()
-	end
-	fade(TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), 0, false)
+	-- 340: with the padding it stays inside the narrowest contract column.
+	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(340, math.huge) }, label)
+	P.fade(strip, true, 0.18)
 	task.delay(3, function()
-		if not holder.Parent then
+		if not strip.Parent then
 			return
 		end
-		holder:SetAttribute("Leaving", true)
-		fade(TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), -10, true)
-		task.wait(0.4)
-		holder:Destroy()
+		strip:SetAttribute("Leaving", true)
+		P.fade(strip, false, 0.3)
+		task.wait(0.35)
+		strip:Destroy()
 	end)
 end
 end
@@ -461,7 +406,7 @@ local windows: { any } = {}
 -- Does the interface need the mouse right now (a window or the big map is open)?
 function Hud.anyWindowOpen(): boolean
 	if MapView.isOpen() or (view and view.menu and view.menu.Visible) then
-		return true -- (the "…" menu frees the mouse like a window: CAR and GIVE UP have no key)
+		return true -- (the MENU list frees the mouse like a window: CAR and GIVE UP have no key)
 	end
 	for _, w in windows do
 		if w.Visible then
@@ -479,7 +424,7 @@ local function closeWindows()
 		w.Visible = false
 	end
 	if view.menu then
-		view.menu.Visible = false -- (the "…" menu, 3.6)
+		view.menu.Visible = false -- (the MENU list)
 	end
 	Leaderboard.close()
 	local cb = Hud.onCloseWindows
@@ -493,9 +438,8 @@ Leaderboard.onOpen = closeWindows
 
 type Window = { frame: any, body: any, title: any, subtitle: any, icon: any, footer: any }
 
--- 3.6: the concept's window (Ui.window, design/ui-concept/previews/garage.png): a lavender surface; a header with an
--- icon in a sage circle, the title and a subtitle, the round close button; the body scrolls; a footer with ESC · Close
--- window and the context on the right (window.footer, set by each window).
+-- The window (Ui.window: its chrome, the header with the title and the subtitle, the close button, the footer with
+-- ESC and the context on the right, window.footer) with a scrolling body of slim rows.
 local function window(title: string, size: Vector2, icon: string, subtitle: string): Window
 	local frame, content, chrome = Ui.window(gui, title, subtitle, icon, UDim2.fromOffset(size.X, size.Y))
 	scaled(frame)
@@ -506,112 +450,63 @@ local function window(title: string, size: Vector2, icon: string, subtitle: stri
 		Position = UDim2.fromOffset(14, 6),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 4,
-		ScrollBarImageColor3 = P.violet,
-		ScrollBarImageTransparency = 0.4,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = P.line,
+		ScrollBarImageTransparency = 0.3,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, content)
-	Ui.list(body, true, 10)
+	Ui.list(body, true, 6)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 4) }, body)
 	table.insert(windows, frame)
 	return { frame = frame, body = body, title = chrome.title, subtitle = chrome.subtitle, icon = chrome.icon, footer = chrome.context }
 end
 
--- 3.6: a list row is a paper ticket: a soft shadow under it, and (unless `plain`) a perforation with two notches
--- left of the button column. Returns the ticket (its children are placed like the old card's).
+-- 3.8: a list row is a slim charcoal row (P.row); the one that matters here (`highlight`) raised with a narrow red rule
+-- on its left. (`plain` is kept for the callers: every row is plain now.) Its children are placed like the old card's.
 local function card(parent: any, height: number, order: number, highlight: boolean?, plain: boolean?): any
-	local holder = Ui.make("Frame", {
-		Size = UDim2.new(1, -12, 0, height),
-		BackgroundTransparency = 1,
-		LayoutOrder = order,
-	}, parent)
-	local shadow = Ui.make("Frame", {
-		Size = UDim2.fromScale(1, 1),
-		Position = UDim2.fromOffset(0, 4),
-		BackgroundColor3 = P.line,
-		BorderSizePixel = 0,
-	}, holder)
-	Ui.corner(shadow, 8)
-	local frame = Ui.make("Frame", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = P.ticket,
-		BorderSizePixel = 0,
-	}, holder)
-	Ui.corner(frame, 8)
-	if not plain then
-		Ui.make("Frame", { Size = UDim2.new(0, 1, 1, -16), Position = UDim2.new(1, -174, 0, 8), BackgroundColor3 = P.line, BorderSizePixel = 0 }, frame)
-		for _, y in { 0, 1 } do
-			local notch = Ui.make("Frame", {
-				Size = UDim2.fromOffset(12, 12),
-				Position = UDim2.new(1, -174, y, 0),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = P.lavender,
-				BorderSizePixel = 0,
-			}, frame)
-			Ui.corner(notch, 6)
-		end
-	end
-	if highlight then
-		-- The one that matters here: a violet line around it and a violet edge.
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.violet, Thickness = 1.5 }, frame)
-		Ui.edge(frame, P.violet, 5)
-	end
-	return frame
+	local _ = plain
+	return P.row(parent, height, order, highlight)
 end
 
 -- name / stats / description on the left of a card.
 local function cardText(c: any, name: string, stats: string, description: string, left: number?)
 	local x = left or 16
-	Ui.label(c, name, UDim2.new(1, -190 - x, 0, 26), { Position = UDim2.fromOffset(x, 6), TextSize = 19, Font = Theme.DisplayFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	Ui.label(c, stats, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 33), TextColor3 = P.violet, TextSize = 14, Font = Theme.HeadingFont, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	Ui.label(c, description, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 55), TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
+	Ui.label(c, name, UDim2.new(1, -190 - x, 0, 24), { Position = UDim2.fromOffset(x, 7), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+	Ui.label(c, stats, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 33), TextColor3 = P.ink, TextTransparency = 0.15, TextSize = 13, Font = Theme.Font, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+	Ui.label(c, description, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 55), TextColor3 = P.ink2, TextSize = 13, Font = Theme.Font })
 end
 
--- The button of a card, right of its perforation: the main action sage (a secondary one, `color` C.blue, lavender),
--- what you cannot press a quiet lavender one with the reason in it.
+-- The button of a card, in the column on its right: the main action a light face (a secondary one, `color` C.blue or
+-- C.grey, an outline), what you cannot press a dim one with the reason in it.
 local function cardButton(parent: any, text: string, color: Color3, enabled: boolean, onClick: () -> (), slot: number?): any
 	local function press()
 		if enabled then
 			onClick()
 		end
 	end
-	local button = if enabled then Ui.button(parent, text, UDim2.fromOffset(150, 42), if color == C.blue then P.lavenderDeep else P.sage, press) else Ui.ghostButton(parent, text, UDim2.fromOffset(150, 42), nil, press)
-	button.AutoButtonColor = enabled
-	button.TextSize = 15
-	button.TextColor3 = if enabled then P.ink else P.ink2
-	if not enabled then
-		button.BackgroundColor3 = P.lavenderDeep
-		button.BackgroundTransparency = 0
-		Ui.stroke(button, P.line, 1).Transparency = 0
-	end
+	local kind: P.ButtonKind = if not enabled then "off" elseif color == C.blue or color == C.grey then "quiet" else "main"
+	local button = P.button(parent, text, UDim2.fromOffset(150, 40), kind, press)
+	button.TextSize = 14
 	local n = slot or 0
 	button.Position = UDim2.new(1, -162, 0, if n == 0 then 21 else 2 + (n - 1) * 44)
 	return button
 end
 
+-- The tabs of a window: the open one a light face, the others outlined.
 local function tabs(parent: any, list: { { string } }, selected: string, onPick: (string) -> ())
 	local row = Ui.make("Frame", { Size = UDim2.new(1, -12, 0, 40), BackgroundTransparency = 1, LayoutOrder = 0 }, parent)
-	Ui.list(row, false, 8)
+	Ui.list(row, false, 6)
 	for _, entry in list do
-		-- 3.6: the open tab sage, the others quiet lavender.
 		local on = entry[1] == selected
-		local button = if on then Ui.button(row, entry[2], UDim2.fromOffset(140, 36), P.sage, function()
-				onPick(entry[1])
-			end)
-			else Ui.ghostButton(row, entry[2], UDim2.fromOffset(140, 36), nil, function()
-				onPick(entry[1])
-			end)
-		button.TextSize = 14
-		button.TextColor3 = if on then P.ink else P.ink2
-		if not on then
-			button.BackgroundColor3 = P.lavenderDeep
-			button.BackgroundTransparency = 0
-		end
+		local button = P.button(row, entry[2], UDim2.fromOffset(132, 36), if on then "main" else "quiet", function()
+			onPick(entry[1])
+		end)
+		button.TextSize = 13
 	end
 end
 
--- A line of text in a window (C.red: a warning, in the danger ink).
+-- A line of text in a window (C.red: a warning, in the contract red).
 local function note(parent: any, text: string, color: Color3, order: number)
 	Ui.label(parent, text, UDim2.new(1, -12, 0, 22), { LayoutOrder = order, AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = if color == C.red then P.danger else P.ink2, TextSize = 14, Font = Theme.Font })
 end
@@ -824,12 +719,10 @@ local function renderShop()
 		end
 		return "REWARD", "a reward"
 	end
-	local function badge(c: any, text: string, color: Color3, y: number)
-		-- 3.6: an exclusive (Ui.Gps) on violet with paper text, a reward on sage with ink.
-		local chip = Ui.chip(c, text, if color == Ui.Gps then P.violet else P.sage, if color == Ui.Gps then P.paper else P.ink)
-		chip.Size = UDim2.fromOffset(0, 18)
+		local function badge(c: any, text: string, color: Color3, y: number)
+		-- 3.8: a small outlined tag over the button: an exclusive (Ui.Gps) in white, a reward in the warm good.
+		local chip = P.tag(c, text, if color == Ui.Gps then P.ink else P.warn)
 		chip.Position = UDim2.new(1, -162, 0, y)
-		chip.TextSize = 12
 		chip.ZIndex = 3
 	end
 	local function rewardCard(c: any, exclusive: string)
@@ -845,9 +738,8 @@ local function renderShop()
 		local chip, how = rewardHow(exclusive)
 		badge(c, if chip == "???" then "???  SECRET" else "🏆 REWARD", C.yellow, 2)
 		local button = cardButton(c, how, C.grey, false, function() end)
-		button.TextSize = 13
+		button.TextSize = 12
 		button.TextWrapped = true
-		button.TextColor3 = P.ink
 	end
 	-- 3.2: a def may need a campaign finished first (`requires`: a campaign id or a list of them; the server checks
 	-- it too). The first one not finished yet, as "Finish Iron Supply", else nil.
@@ -922,7 +814,7 @@ local function renderShop()
 			local need = needs(def, state.cars[def.id] == true)
 			cardText(c, def.name, carStats(def) .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
 			if def.role then
-				Ui.label(c, `ROLE · {string.upper(def.role)}`, UDim2.new(1, -206, 0, 16), { Position = UDim2.fromOffset(16, 78), TextColor3 = P.violet, TextSize = 12, Font = Theme.HeadingFont })
+				Ui.label(c, `ROLE · {string.upper(def.role)}`, UDim2.new(1, -206, 0, 16), { Position = UDim2.fromOffset(16, 78), TextColor3 = P.ink2, TextSize = 11, Font = Theme.HeadingFont })
 			end
 			if state.car == def.id then
 				cardButton(c, "YOUR CAR", C.grey, false, function() end)
@@ -1132,12 +1024,11 @@ local function renderShop()
 				local c = card(shop.body, if def.exclusive then 84 else 70, order + 1)
 				local swatchColor = if def.color then Color3.fromRGB(def.color[1], def.color[2], def.color[3]) elseif carDef then Color3.fromRGB(carDef.color[1], carDef.color[2], carDef.color[3]) else C.grey
 				local swatch = Ui.make("Frame", { Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, if def.exclusive then 20 else 13), BackgroundColor3 = swatchColor }, c)
-				Ui.corner(swatch, 8)
-				Ui.stroke(swatch, if def.material == "Neon" then swatchColor:Lerp(P.paper, 0.5) else P.ink, 2)
-				Ui.label(c, def.name, UDim2.new(1, -260, 0, 26), { Position = UDim2.fromOffset(70, 8), TextSize = 20, Font = Enum.Font.GothamBlack, TextColor3 = P.ink })
+				Ui.stroke(swatch, if def.material == "Neon" then swatchColor:Lerp(P.ink, 0.5) else P.line, 1)
+				Ui.label(c, def.name, UDim2.new(1, -260, 0, 24), { Position = UDim2.fromOffset(70, 9), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink })
 				-- The finish (PaintDef.material) after the price: "Owned · Neon finish".
 				local finish = if def.material then ` · {def.material} finish` else ""
-				Ui.label(c, (if state.paints[def.id] then "Owned" elseif def.exclusive then "Never sold" else Ui.money(def.price)) .. finish, UDim2.new(1, -260, 0, 20), { Position = UDim2.fromOffset(70, 36), TextColor3 = P.violet, TextSize = 15 })
+				Ui.label(c, (if state.paints[def.id] then "Owned" elseif def.exclusive then "Never sold" else Ui.money(def.price)) .. finish, UDim2.new(1, -260, 0, 20), { Position = UDim2.fromOffset(70, 36), TextColor3 = P.ink2, TextSize = 13, Font = Theme.Font })
 				local exclusive = def.exclusive
 				if exclusive then
 					if state.paints[def.id] then
@@ -1182,15 +1073,15 @@ local HANDLING_TEXT: { [string]: string } = {
 local function rewardRow(parent: any, order: number, iconName: string?, icon: string, name: string, done: number, at: number, owned: boolean)
 	local row = card(parent, 64, order, owned, true)
 	Ui.icon(row, iconName, icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(12, 12), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = P.ink })
-	Ui.label(row, name, UDim2.new(1, -200, 0, 24), { Position = UDim2.fromOffset(64, 8), TextSize = 19, Font = Enum.Font.GothamBlack, TextColor3 = P.ink })
+	Ui.label(row, name, UDim2.new(1, -200, 0, 24), { Position = UDim2.fromOffset(64, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink })
 	Ui.label(row, if owned then "YOURS" else `{math.min(done, at)}/{at} jobs`, UDim2.fromOffset(120, 24), {
 		Position = UDim2.new(1, -132, 0, 8),
 		TextXAlignment = Enum.TextXAlignment.Right,
-		TextColor3 = if owned then P.good else P.violet,
-		TextSize = 17,
-		Font = Enum.Font.GothamBlack,
+		TextColor3 = if owned then P.good else P.ink2,
+		TextSize = 15,
+		Font = Theme.MonoFont,
 	})
-	local back, fill = Ui.bar(row, UDim2.new(1, -78, 0, 10), if owned then P.good else P.violet)
+	local back, fill = P.bar(row, UDim2.new(1, -78, 0, 3), if owned then P.good else P.accent)
 	back.Position = UDim2.fromOffset(64, 40)
 	fill.Size = UDim2.fromScale(if owned then 1 else math.clamp(done / math.max(at, 1), 0, 1), 1)
 end
@@ -1217,7 +1108,7 @@ local function openEmployer(id: string)
 	employerWindow.footer.Text = `{state.rep[employer.id] or 0} jobs done here`
 	employerWindow.frame.Visible = true
 	-- The person who runs it, and what they say.
-	Ui.label(body, employer.person, UDim2.new(1, -10, 0, 20), { LayoutOrder = 1, TextColor3 = P.violet, TextSize = 15 })
+	Ui.label(body, string.upper(employer.person), UDim2.new(1, -10, 0, 20), { LayoutOrder = 1, TextColor3 = P.ink2, TextSize = 12, Font = Theme.HeadingFont })
 	Ui.label(body, `"{employer.pitch}"`, UDim2.new(1, -10, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
@@ -1229,12 +1120,12 @@ local function openEmployer(id: string)
 		local info = itemInfo(jobType.itemKind)
 		local how = HANDLING_TEXT[jobType.load] or "loaded for you"
 		local about = card(body, 80, 3, false, true)
-		iconText(about, info.art, info.icon, "", `  {jobType.name}`, UDim2.new(1, -190, 0, 24), { Position = UDim2.fromOffset(12, 8), TextSize = 19, Font = Enum.Font.GothamBlack, TextColor3 = P.ink })
+		iconText(about, info.art, info.icon, "", `  {jobType.name}`, UDim2.new(1, -190, 0, 24), { Position = UDim2.fromOffset(12, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink })
 		local needs = if jobType.level and jobType.level > 1 then `LV {jobType.level}+ · ` else ""
 		Ui.label(about, `{needs}Danger {string.rep("★", jobType.tier)}`, UDim2.fromOffset(170, 24), {
 			Position = UDim2.new(1, -182, 0, 8),
 			TextXAlignment = Enum.TextXAlignment.Right,
-			TextColor3 = if jobType.tier >= 3 then P.danger else P.violet,
+			TextColor3 = if jobType.tier >= 3 then P.danger else P.ink2,
 			TextSize = 15,
 		})
 		local who = if jobType.giver == jobType.receiver then `for {jobType.giver}` else `from {jobType.giver} to {jobType.receiver}`
@@ -1260,12 +1151,9 @@ local function openEmployer(id: string)
 	end
 	local lock = if jobType then lockedAt(jobType.level) else nil
 	if job then
-		Ui.label(body, "Finish your current delivery first (or give it up: the … menu).", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = P.danger, TextSize = 16 })
+		Ui.label(body, "Finish your current delivery first (or give it up: MENU).", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = P.danger, TextSize = 16 })
 	elseif lock then
-		local button = Ui.ghostButton(body, `🔒 LEVEL {lock}`, UDim2.fromOffset(240, 50), nil, function() end)
-		button.TextColor3 = P.ink2
-		button.BackgroundColor3 = P.lavenderDeep
-		button.BackgroundTransparency = 0
+		local button = P.button(body, `🔒 LEVEL {lock}`, UDim2.fromOffset(240, 46), "off", function() end)
 		button.LayoutOrder = 7
 		Ui.label(body, `{employer.person} hires drivers from level {lock} ({Levels.rank(lock)}) on. You are level {myLevel()}: deliveries give XP.`, UDim2.new(1, -10, 0, 0), {
 			LayoutOrder = 8,
@@ -1275,11 +1163,10 @@ local function openEmployer(id: string)
 			Font = Enum.Font.GothamMedium,
 		})
 	else
-		local take = Ui.button(body, "TAKE THE JOB", UDim2.fromOffset(240, 50), P.sage, function()
+		local take = P.button(body, "TAKE THE JOB", UDim2.fromOffset(240, 46), "main", function()
 			Net.get("AcceptEmployer"):FireServer(employer.id)
 			employerWindow.frame.Visible = false
 		end)
-		take.TextColor3 = P.ink
 		take.LayoutOrder = 7
 	end
 end
@@ -1330,7 +1217,7 @@ local function cargoCard(parent: any)
 	local carDef = car and Economy.findCar(tostring(car:GetAttribute("CarId")))
 	local lost = tonumber(job.lost) or 0
 	local c = card(parent, if lost > 0 then 118 else 96, -1, true, true)
-	Ui.caps(c, "On this job", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(16, 8), TextColor3 = P.violet, TextSize = 13 })
+	Ui.caps(c, "On this job", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(16, 8), TextColor3 = P.ink2, TextSize = 12 })
 	local held = if holding then heldInfo(holding) else nil
 	iconText(c, if held then held.art else nil, if held then held.icon else "", if held then "✋  In your hands: " else "✋  Your hands are free", if held then ` {held.one}` else "", UDim2.new(1, -24, 0, 24), {
 		Position = UDim2.fromOffset(16, 30),
@@ -1410,10 +1297,8 @@ function renderBackpack()
 				cardText(c, def.name, gunStats(def) .. (if def.pierce then ` · Pierces {def.pierce}` else "") .. (if def.oneHanded then " · One-handed" else ""), def.description, cardIcon(c, Icons.weapon(def.id), nil, 17))
 				if def.exclusive then
 					-- 3.1: a reward nobody can buy (Config.Rewards).
-					local chip = Ui.chip(c, "★ EXCLUSIVE", P.violet, P.paper)
-					chip.Size = UDim2.fromOffset(0, 18)
+					local chip = P.tag(c, "★ EXCLUSIVE", P.ink)
 					chip.Position = UDim2.new(1, -162, 0, 2)
-					chip.TextSize = 12
 				end
 				if state.weapon == def.id then
 					cardButton(c, "IN HAND", C.grey, false, function() end)
@@ -1476,23 +1361,25 @@ function Hud.showResult(r: any)
 	result.icon.Text = if r.success then "📦" else "⚠"
 	result.subtitle.Text = if r.cargo then `{r.cargo}{if r.customer then ` for {r.customer}` else ""}` else ""
 	result.footer.Text = "Next job · the Dispatch board"
+	-- 3.8: a short accent rule over the headline: the good green, or the red when it failed.
+	P.rule(result.body, UDim2.fromOffset(48, 2), { LayoutOrder = 0, BackgroundColor3 = if r.success then P.good else P.danger, BackgroundTransparency = 0 })
 	local function line(text: string, value: string?, color: Color3?, order: number): any
-		-- 3.2: the headline (order 1) and the TOTAL big in DisplayFont, the other lines calmer. 3.6: in ink on the
-		-- lavender (green: good news, red: bad, gold: the money and the XP, dim: the details).
+		-- 3.2: the headline (order 1) and the TOTAL bigger, the other lines calmer. 3.8: light text on the charcoal
+		-- (green: good news, red: bad, white: the money and the XP, dim: the details).
 		local big = order == 1 or text == "TOTAL"
-		local ink = if color == C.green then P.good elseif color == C.red then P.danger elseif color == C.yellow then P.violet elseif color == C.dim then P.ink2 else P.ink
+		local ink = if color == C.green then P.good elseif color == C.red then P.danger elseif color == C.yellow then P.ink elseif color == C.dim then P.ink2 else P.ink
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -12, 0, if order == 1 then 36 else 26), BackgroundTransparency = 1, LayoutOrder = order }, result.body)
 		Ui.label(row, text, UDim2.new(1, if value then -120 else 0, 1, 0), {
 			TextColor3 = ink,
-			TextSize = if order == 1 then 28 elseif big then 20 else 16,
-			Font = if big then Theme.DisplayFont else Theme.HeadingFont,
+			TextSize = if order == 1 then 24 elseif big then 18 else 15,
+			Font = if big then Theme.HeadingFont else Theme.Font,
 		})
 		if value then
 			Ui.label(row, value, UDim2.new(0, 120, 1, 0), {
 				Position = UDim2.new(1, -120, 0, 0),
 				TextColor3 = ink,
-				TextSize = if big then 20 else 16,
-				Font = if big then Theme.DisplayFont else Theme.HeadingFont,
+				TextSize = if big then 18 else 15,
+				Font = Theme.MonoFont,
 				TextXAlignment = Enum.TextXAlignment.Right,
 			})
 		end
@@ -1567,7 +1454,7 @@ function Hud.showResult(r: any)
 		line(if r.success then "Driver XP" else "Driver XP (a failed job still counts)", `+{xp} XP`, C.yellow, 30)
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 22), BackgroundTransparency = 1, LayoutOrder = 31 }, result.body)
 		Ui.label(row, `LV {level} · {rank}`, UDim2.new(0.5, 0, 1, 0), { TextColor3 = P.ink2, TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = false })
-		local back, fill = Ui.bar(row, UDim2.new(0.5, 0, 0, 5), P.violet)
+		local back, fill = P.bar(row, UDim2.new(0.5, 0, 0, 2), P.accent)
 		back.Position = UDim2.new(0.5, 0, 0.5, -2)
 		local mine = myXp()
 		fill.Size = UDim2.fromScale(if mine then Levels.progress(mine) else 0, 1)
@@ -1592,25 +1479,25 @@ function Hud.showResult(r: any)
 			local me = entry.name == player.DisplayName or entry.name == player.Name
 			local row = line(`{if entry.owner then "🚚" else "👤"}  {entry.name}{if me then "  (you)" else ""}`, Ui.money(entry.pay), if me then C.yellow else C.text, 40 + index)
 			if me then
+				-- You: a quiet charcoal highlight and a narrow red rule.
 				row.BackgroundTransparency = 0
-				row.BackgroundColor3 = P.lavenderDeep
-				Ui.corner(row, 6)
+				row.BackgroundColor3 = P.raised
+				Ui.make("Frame", { Name = "Selected", Size = UDim2.new(0, 2, 1, 0), Position = UDim2.fromOffset(-6, 0), BackgroundColor3 = P.danger, BorderSizePixel = 0 }, row)
 			end
 		end
 	end
-	local ok = Ui.ghostButton(result.body, "OK", UDim2.fromOffset(160, 44), nil, function()
-		result.frame.Visible = false
-	end)
-	ok.LayoutOrder = 90
-	ok.TextColor3 = P.ink2
-	ok.BackgroundColor3 = P.lavenderDeep
-	ok.BackgroundTransparency = 0
-	local next = Ui.button(result.body, "NEXT JOB  →", UDim2.fromOffset(160, 44), P.sage, function()
+	-- One clear action (NEXT JOB) and a quiet OK, side by side.
+	local actions = Ui.make("Frame", { Size = UDim2.new(1, -12, 0, 44), BackgroundTransparency = 1, LayoutOrder = 90 }, result.body)
+	Ui.list(actions, false, 8)
+	local next = P.button(actions, "NEXT JOB  →", UDim2.fromOffset(170, 44), "main", function()
 		result.frame.Visible = false
 		openDispatch()
 	end)
-	next.TextColor3 = P.ink
-	next.LayoutOrder = 91
+	next.LayoutOrder = 1
+	local ok = P.button(actions, "OK", UDim2.fromOffset(110, 44), "quiet", function()
+		result.frame.Visible = false
+	end)
+	ok.LayoutOrder = 2
 end
 
 -- Is the DELIVERY result window open (client/MissionsUi.luau waits with its celebration card until it is closed)?
@@ -1621,12 +1508,12 @@ end
 
 -- ── Buttons ────────────────────────────────────────────────────────────────
 
--- 3.6, the utilities (the concept's top right): MAP and CREW as soft square buttons and a round "…" that opens the
--- menu with every other action and its key: JOBS (J), MISSIONS (U), BAG (B), CAR, TOP (L), ESTATE (H), SOUND (N) and,
--- while a job runs, GIVE UP (twice). A computer shows a button's name and key over it on hover; a touch screen keeps
--- the names under the buttons. Other modules hook in (Hud.onJobs, Hud.onCrew, Hud.onEstate, Hud.onMissions,
--- Hud.onSound). layout() scales and places the row: top right on a touch screen, on a computer clear of Roblox's
--- player list (leaderstats), just over the weapon label; the menu opens toward the middle of the screen.
+-- 3.8, the actions (upper right): the quiet text actions MAP [M], CREW [K] and MENU. MENU opens a slim charcoal list of
+-- every other action with its key: JOBS (J), MISSIONS (U), BAG (B), CAR, TOP (L), ESTATE (H), SOUND (N) and, while a
+-- job runs, GIVE UP (twice). Hover brightens an action and draws a thin red line under it; a touch screen drops the
+-- keys and keeps 44 px hit areas. Other modules hook in (Hud.onJobs, Hud.onCrew, Hud.onEstate, Hud.onMissions,
+-- Hud.onSound). layout() scales and places the row: on a computer left of (or under) Roblox's player list, on touch
+-- top right under ADMIN; the list opens downward.
 
 type ButtonDef = { id: string, text: string, icon: string, menu: boolean?, key: string?, onClick: () -> () }
 local BUTTONS: { ButtonDef }, buttonGrid: any, hudButtons: { [string]: any }
@@ -1683,195 +1570,151 @@ BUTTONS = {
 	end },
 }
 
--- The row: MAP, CREW, "…" (UTIL px squares, GAP apart; on touch a name pill under each).
-local UTIL, GAP, NAME_H = 46, 8, if touchLayout then 20 else 0
+-- The row: MAP [M]  CREW [K]  MENU, right-aligned in a frame of a fixed size (layout() reads it).
+local ROW_W, ROW_H = if touchLayout then 210 else 250, 44
 buttonGrid = placed(Ui.make("Frame", {
 	Name = "HudButtons",
-	Size = UDim2.fromOffset(3 * UTIL + 2 * GAP, UTIL + 6 + NAME_H),
+	Size = UDim2.fromOffset(ROW_W, ROW_H),
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 16),
 	BackgroundTransparency = 1,
-	ZIndex = 2, -- over the weapon label and FIRE: the open menu draws on top and takes the taps
+	ZIndex = 2, -- the open list draws on top and takes the taps
 }, gui))
+-- (the actions in a row of their own: the list under MENU is not laid out with them)
+local actions = Ui.make("Frame", { Name = "Row", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, buttonGrid)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	HorizontalAlignment = Enum.HorizontalAlignment.Right,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+	Padding = UDim.new(0, if touchLayout then 6 else 14),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, actions)
 hudButtons = {}
 
--- The menu: a lavender card of entries (two columns), hidden until "…".
-local CELL_W, CELL_H = 150, 40
+-- The list under MENU: a charcoal surface, a thin line, one slim row per action (its key on the right).
+-- (a touch screen: two columns of 44 px rows, so the list stays short under the row)
+local COLUMNS = if touchLayout then 2 else 1
+local ENTRY_W, ENTRY_H = if touchLayout then 150 else 220, if touchLayout then 44 else 34
 local menu = Ui.make("Frame", {
 	Name = "Menu",
-	Size = UDim2.fromOffset(2 * CELL_W + 6 + 20, 0),
+	Size = UDim2.fromOffset(COLUMNS * ENTRY_W + (COLUMNS - 1) * 4 + 12, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
-	AnchorPoint = Vector2.new(1, 1),
-	Position = UDim2.new(1, 0, 0, -10),
-	BackgroundColor3 = P.lavender,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, 0, 1, 4),
+	BackgroundColor3 = P.surface,
+	BackgroundTransparency = 0.08,
 	BorderSizePixel = 0,
 	Visible = false,
 	ZIndex = 6,
 }, buttonGrid)
-Ui.corner(menu, 16)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1.5 }, menu)
-Ui.padding(menu, 10)
-Ui.make("UIGridLayout", {
-	CellSize = UDim2.fromOffset(CELL_W, CELL_H),
-	CellPadding = UDim2.fromOffset(6, 6),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, menu)
+Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = P.lineAlpha }, menu)
+Ui.padding(menu, 6)
+if COLUMNS > 1 then
+	Ui.make("UIGridLayout", { CellSize = UDim2.fromOffset(ENTRY_W, ENTRY_H), CellPadding = UDim2.fromOffset(4, 4), SortOrder = Enum.SortOrder.LayoutOrder }, menu)
+else
+	Ui.list(menu, true, 2)
+end
 view.menu = menu
+view.badges = {} -- the counts on the menu's entries (MENU shows a dot while any is on)
 
--- A soft square (or the round "…") for the row, with a shadow under it; hover lifts it (Ui.tactile).
-local function utility(def: ButtonDef?, index: number): any
-	local x = (index - 1) * (UTIL + GAP)
-	local shadow = Ui.make("Frame", {
-		Size = UDim2.fromOffset(UTIL, UTIL),
-		Position = UDim2.fromOffset(x, 4),
-		BackgroundColor3 = P.line,
-		BorderSizePixel = 0,
-	}, buttonGrid)
-	local button = Ui.make("TextButton", {
+-- A quiet action of the row ("MAP  [M]"; a touch screen drops the key).
+local function utility(def: ButtonDef?, order: number): any
+	local text = if def then def.text else "MENU"
+	local button = P.action(actions, if def and def.key and not touchLayout then `{text}  [{def.key}]` else text, {
 		Name = if def then `{def.id}Button` else "moreButton",
-		Size = UDim2.fromOffset(UTIL, UTIL),
-		Position = UDim2.fromOffset(x, 0),
-		BackgroundColor3 = if def then P.lavender else P.tags[4],
-		Text = if def then def.icon else "•••",
-		TextScaled = def ~= nil,
-		TextSize = 16,
-		Font = Theme.DisplayFont,
-		TextColor3 = P.ink,
-		AutoButtonColor = false,
-	}, buttonGrid)
-	local round = if def then 14 else UTIL // 2
-	Ui.corner(shadow, round)
-	Ui.corner(button, round)
-	Ui.stroke(button, P.line, 1).Transparency = 0.4
-	if def then
-		Ui.make("UIPadding", { PaddingTop = UDim.new(0, 11), PaddingBottom = UDim.new(0, 11), PaddingLeft = UDim.new(0, 11), PaddingRight = UDim.new(0, 11) }, button)
-	end
-	Ui.tactile(button, 4, 1.04)
-	local name = if def then def.text else "MORE"
-	if touchLayout then
-		-- A touch screen has no hover: the name stays under the button, on a paper pill (it floats over the world).
-		local pill = Ui.caps(buttonGrid, name, UDim2.fromOffset(UTIL + 4, 16), {
-			Position = UDim2.fromOffset(x + UTIL / 2, UTIL + 8),
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundTransparency = 0.1,
-			BackgroundColor3 = P.paper,
-			TextSize = 12,
-			TextColor3 = P.ink,
-			TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		Ui.corner(pill, 8)
-	else
-		-- A computer: the name and the key over the button while the mouse is on it.
-		local tip = Ui.caps(button, if def and def.key then `{name} · {def.key}` else name, UDim2.fromOffset(0, 24), {
-			AutomaticSize = Enum.AutomaticSize.X,
-			Position = UDim2.new(0.5, 0, 0, -16),
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundTransparency = 0,
-			BackgroundColor3 = P.paper,
-			TextSize = 12,
-			TextColor3 = P.ink,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			Visible = false,
-			ZIndex = 4,
-		})
-		Ui.corner(tip, 8)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, tip)
-		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, tip)
-		button.MouseEnter:Connect(function()
-			tip.Visible = not menu.Visible
-		end)
-		button.MouseLeave:Connect(function()
-			tip.Visible = false
-		end)
-	end
+		Size = UDim2.fromOffset(0, ROW_H),
+		LayoutOrder = order,
+		ZIndex = 3,
+	})
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }, button)
+	Ui.make("UISizeConstraint", { MinSize = Vector2.new(44, 44) }, button)
 	return button
 end
 
--- A count in a red dot on the corner (Hud.setBadge); the button's UIPadding moves its children, so out by that much.
-local function badgeOn(button: any)
-	local pad = button:FindFirstChildOfClass("UIPadding")
-	local badge = Ui.make("TextLabel", {
-		Name = "Badge",
-		Size = UDim2.fromOffset(20, 20),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, (if pad then pad.PaddingRight.Offset else 0) - 2, 0, 2 - (if pad then pad.PaddingTop.Offset else 0)),
-		BackgroundColor3 = P.danger,
+-- An entry of the list: the name on the left, the key on the right; hover: a raised row, a red rule, white text.
+local function entry(def: ButtonDef, order: number): any
+	local button = Ui.make("TextButton", {
+		Name = `{def.id}Button`,
+		Size = UDim2.fromOffset(ENTRY_W, ENTRY_H),
+		BackgroundColor3 = P.raised,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Text = "",
-		TextColor3 = P.paper,
-		Font = Enum.Font.GothamBlack,
-		TextSize = 12,
-		Visible = false,
-		ZIndex = 3,
-	}, button)
-	Ui.corner(badge, 10)
+		AutoButtonColor = false,
+		Text = def.text,
+		Font = Theme.HeadingFont,
+		TextSize = 13,
+		TextColor3 = if def.id == "giveup" then P.danger else P.ink2,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		LayoutOrder = order,
+		ZIndex = 7,
+	}, menu)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 10) }, button)
+	local edge = Ui.make("Frame", { Name = "Edge", Size = UDim2.new(0, 2, 1, 0), Position = UDim2.fromOffset(-12, 0), BackgroundColor3 = P.red, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 8 }, button)
+	if def.key and not touchLayout then
+		P.caps(button, def.key, UDim2.fromOffset(24, ENTRY_H), {
+			Position = UDim2.new(1, 0, 0, 0),
+			AnchorPoint = Vector2.new(1, 0),
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextStrokeTransparency = 1,
+			ZIndex = 8,
+		})
+	end
+	P.hover(button, edge)
+	button.MouseEnter:Connect(function()
+		button.BackgroundTransparency = 0
+	end)
+	button.MouseLeave:Connect(function()
+		button.BackgroundTransparency = 1
+	end)
+	button.SelectionGained:Connect(function()
+		button.BackgroundTransparency = 0
+	end)
+	button.SelectionLost:Connect(function()
+		button.BackgroundTransparency = 1
+	end)
+	return button
 end
 
-local index = 0
+local order = 0
 local entries = 0
-for order, def in BUTTONS do
+for _, def in BUTTONS do
+	order += 1
 	local button: any
 	if def.menu then
-		-- An entry of the menu: the icon and the name on paper, the key in a chip on the right.
 		entries += 1
-		button = Ui.make("TextButton", {
-			Name = `{def.id}Button`,
-			BackgroundColor3 = P.ticket,
-			Text = `{def.icon}  {def.text}`,
-			TextSize = 14,
-			Font = Theme.HeadingFont,
-			TextColor3 = P.ink,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			AutoButtonColor = false,
-			LayoutOrder = order,
-			ZIndex = 7,
-		}, menu)
-		Ui.corner(button, 10)
-		Ui.stroke(button, P.line, 1).Transparency = 0.4
-		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, if def.key and not touchLayout then 34 else 8) }, button)
-		if def.key and not touchLayout then
-			local key = Ui.label(button, def.key, UDim2.fromOffset(22, 22), {
-				Position = UDim2.new(1, 26, 0.5, 0),
-				AnchorPoint = Vector2.new(1, 0.5),
-				TextSize = 12,
-				TextColor3 = P.ink2,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				ZIndex = 8,
-			})
-			Ui.corner(key, 6)
-			Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, key)
+		if def.id == "giveup" then
+			-- A thin line before GIVE UP (it shows only while a job runs, with its line).
+			view.giveUpRule = P.rule(if COLUMNS > 1 then nil :: any else menu, UDim2.fromOffset(ENTRY_W, 1), { LayoutOrder = order, Visible = false })
+			order += 1
 		end
-		button.MouseEnter:Connect(function()
-			button.BackgroundColor3 = P.sage
-		end)
-		button.MouseLeave:Connect(function()
-			button.BackgroundColor3 = P.ticket
-		end)
+		button = entry(def, order)
 		if def.id == "giveup" then
 			button.Visible = false -- only while a job runs (Hud.setJob)
-			button.TextColor3 = P.danger
 		end
+		P.dot(button, { Position = UDim2.new(1, -30, 0.5, 0), ZIndex = 9 })
 	else
-		index += 1
-		button = utility(def, index)
+		button = utility(def, order)
+		P.dot(button)
 	end
 	button.Activated:Connect(function()
-		local click = Ui.onClick
-		if click then
-			click()
+		if def.menu then
+			local click = Ui.onClick
+			if click then
+				click()
+			end
 		end
 		if def.menu and def.id ~= "giveup" then
 			menu.Visible = false
 		end
 		def.onClick()
 	end)
-	badgeOn(button)
 	hudButtons[def.id] = button
 end
-view.menuHeight = math.ceil(entries / 2) * (CELL_H + 6) - 6 + 20 -- px at scale 1, GIVE UP shown
--- "…": opens and closes the menu.
-local more = utility(nil, index + 1)
+view.menuHeight = math.ceil(entries / COLUMNS) * (ENTRY_H + 4) + 16 -- px at scale 1, GIVE UP shown
+-- MENU: opens and closes the list.
+local more = utility(nil, order + 1)
+P.dot(more)
 more.Activated:Connect(function()
 	local click = Ui.onClick
 	if click then
@@ -1881,65 +1724,109 @@ more.Activated:Connect(function()
 end)
 hudButtons.more = more
 
--- A red dot with a count on a HUD button ("crew": the invitations waiting); 0 hides it.
+-- MENU wears a dot while any of its entries has a count.
+local function menuDot()
+	local any = 0
+	for _, count in view.badges do
+		any += count
+	end
+	local badge = more:FindFirstChild("Badge")
+	if badge and badge:IsA("TextLabel") then
+		badge.Visible = any > 0
+		badge.Text = ""
+	end
+end
+
+-- A small red dot with a count on an action or a menu entry ("crew": the invitations waiting); 0 hides it.
 function Hud.setBadge(id: string, count: number)
 	local button = hudButtons[id]
 	local badge = button and button:FindFirstChild("Badge")
 	if badge and badge:IsA("TextLabel") then
 		badge.Visible = count > 0
-		badge.Text = if count > 9 then "9+" else tostring(count)
+		badge.Text = if count > 9 then "9+" elseif count > 1 then tostring(count) else ""
+		badge.Size = UDim2.fromOffset(if count > 9 then 20 else 14, 14)
+	end
+	local def: ButtonDef? = nil
+	for _, d in BUTTONS do
+		if d.id == id then
+			def = d
+		end
+	end
+	if def and def.menu then
+		view.badges[id] = math.max(0, count)
+		menuDot()
 	end
 end
 
--- The border of a HUD button lights up in `color` for `seconds` (an invitation just came: the CREW button).
+-- An action lights up in `color` for `seconds` (an invitation just came: CREW): its text white and its line in that
+-- colour. An entry inside the closed list lights MENU instead.
 function Hud.flashButton(id: string, color: Color3?, seconds: number?)
 	local button = hudButtons[id]
-	local stroke = button and button:FindFirstChild("UiBorder")
-	if not (stroke and stroke:IsA("UIStroke")) then
+	if not button then
 		return
 	end
-	stroke.Color = color or P.violet
-	stroke.Thickness = 2.5
-	stroke.Transparency = 0
+	if not menu.Visible and button.Parent == menu then
+		button = more
+	end
+	local line = button:FindFirstChild("Underline") or button:FindFirstChild("Edge")
+	if not (line and line:IsA("Frame")) then
+		return
+	end
+	line.BackgroundColor3 = color or P.red
+	line.BackgroundTransparency = 0
+	button.TextColor3 = P.ink
 	task.delay(seconds or 1.5, function()
-		stroke.Color = P.line
-		stroke.Thickness = 1
-		stroke.Transparency = 0.4
+		line.BackgroundColor3 = P.red
+		line.BackgroundTransparency = 1
+		local rest = button:GetAttribute("RestColor")
+		if typeof(rest) == "Color3" then
+			button.TextColor3 = rest
+		end
 	end)
 end
 end
 
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
--- 3.6: the consumable tags (items, keys 1-5) bottom centre, and the weapon label (the gun in your hands; hold Q: the
--- wheel) on top of the speed dial, bottom right (on a touch screen left of FIRE). layout() places them.
-local BAR_W: any, HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, hotbarCounts: any, FIRE_SIZE: any, fire: any
+-- 3.8, the lower right column (one frame, view.right; layout() scales and places it), bottom up: INVENTORY [B] with
+-- the consumables (keys 1-5 and their counts; hidden while you carry), the vehicle line (── Car panel ──), a thin
+-- rule, and the weapon (a small icon, the gun's name and state, Q) or, while you carry, the cargo in your hands and
+-- what carrying stops ("2 × PIZZA BOXES / HANDS FULL · NO GUN, NO SPRINT"). Hidden pieces take no room.
+local HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, hotbarCounts: any, FIRE_SIZE: any, fire: any
 do -- (its own block: the locals below stay out of the 200-register limit)
-local TAG_W, TAG_H, TAG_GAP = 48, 54, 12
-BAR_W = #Config.Items * TAG_W + (#Config.Items - 1) * TAG_GAP
-HOTBAR_H = TAG_H + 8
-hotbar = placed(Ui.make("Frame", {
-	Name = "Hotbar",
-	Size = UDim2.fromOffset(BAR_W, HOTBAR_H),
-	Position = UDim2.new(0.5, 0, 1, -16),
-	AnchorPoint = Vector2.new(0.5, 1),
-	BackgroundTransparency = 1,
-}, gui))
-weaponBar = placed(Ui.make("Frame", {
-	Name = "WeaponBar",
-	Size = UDim2.fromOffset(236, 58),
-	Position = UDim2.new(1, -16, 1, -230),
+local RIGHT_W = 300
+HOTBAR_H = if touchLayout then 76 else 54
+local right = placed(Ui.make("Frame", {
+	Name = "RightStack",
+	Size = UDim2.fromOffset(RIGHT_W, 190),
+	Position = UDim2.new(1, -16, 1, -16),
 	AnchorPoint = Vector2.new(1, 1),
 	BackgroundTransparency = 1,
 }, gui))
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Vertical,
+	HorizontalAlignment = Enum.HorizontalAlignment.Right,
+	VerticalAlignment = Enum.VerticalAlignment.Bottom,
+	Padding = UDim.new(0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, right)
+-- (no backing: the column's text wears the faint charcoal stroke of P.text, the world stays open)
+view.right = right
+weaponBar = Ui.make("Frame", {
+	Name = "WeaponBar",
+	Size = UDim2.fromOffset(RIGHT_W, 40),
+	BackgroundTransparency = 1,
+	LayoutOrder = 1,
+}, right)
+view.rightRule = P.rule(right, UDim2.fromOffset(RIGHT_W - 70, 1), { LayoutOrder = 2 })
 local weaponRow = Ui.make("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
 }, weaponBar)
 
--- What the weapon label shows depends on where you are: on foot your gun; driving a car with a car gun that gun; in
--- any other seat your gun, WINDOW READY when it is one-handed, ON FOOT ONLY when it is not (it does not fire there);
--- with cargo in your hands, or while the cargo loads, HOLSTERED and dimmed.
+-- What the weapon line shows depends on where you are: on foot your gun; driving a car with a car gun that gun; in any
+-- other seat your gun, WINDOW READY when it is one-handed, ON FOOT ONLY when it is not (it does not fire there);
+-- with cargo in your hands the cargo and what carrying stops; while the cargo loads, HOLSTERED and dimmed.
 local function seatView(): (boolean, Config.CarGunDef?)
 	local seatedIn, driving = Drive.seatedCar()
 	return seatedIn ~= nil, if seatedIn and driving then Shooting.carGunOf(seatedIn) else nil
@@ -1949,18 +1836,60 @@ local function loading(): boolean
 	return myCarrying() ~= nil or (job ~= nil and (tonumber(job.progress) or 0) > 0)
 end
 
+-- How many pieces are in your hands (the character's CarryCount, 3.7; one when it is not set).
+local function carryCount(): number
+	local character = player.Character
+	local count = character and tonumber(character:GetAttribute("CarryCount"))
+	return if count and count > 0 then math.floor(count) else 1
+end
+
 function weaponBarKey(): string
 	local seated, carGun = seatView()
-	return `{seated}|{if carGun then carGun.id else ""}|{loading()}`
+	local holding = myCarrying()
+	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}`
 end
 shownWeaponBar = ""
 
--- The weapon label (the concept's curved label): the gun's icon, its state in small caps over its name, and Q in a
--- round chip (hold it: the weapon wheel, client/WeaponWheel.luau). A click or a tap on it takes the next gun.
+-- A right-aligned row of parts (the weapon line): one horizontal list, its children in LayoutOrder.
+local function lineRow(parent: any, height: number, gap: number?): any
+	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, height), BackgroundTransparency = 1 }, parent)
+	Ui.make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, gap or 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, row)
+	return row
+end
+
+-- The weapon line: the gun's small icon, its name and its state in small caps, Q in a key box (hold it: the weapon
+-- wheel, client/WeaponWheel.luau). A click or a tap on it takes the next gun. While you carry: the cargo instead.
 function renderWeapons()
 	Ui.clear(weaponRow)
 	shownWeaponBar = weaponBarKey()
 	if not state then
+		return
+	end
+	local holding = myCarrying()
+	if holding then
+		-- 3.8: the cargo in your hands and the restriction, never a usable-looking gun.
+		local held = heldInfo(holding)
+		local count = carryCount()
+		local top = lineRow(weaponRow, 22)
+		iconText(top, held.art, held.icon, "", "", UDim2.fromOffset(22, 22), { TextSize = 16, TextColor3 = P.ink, LayoutOrder = 1 })
+		P.text(top, string.upper(`{count} × {if count == 1 then held.one else held.many}`), UDim2.fromOffset(0, 22), {
+			AutomaticSize = Enum.AutomaticSize.X,
+			Font = Theme.HeadingFont,
+			TextSize = 16,
+			LayoutOrder = 2,
+		})
+		local note = P.caps(weaponRow, if holding == "horse" then "Leading · no gun, no sprint" else "Hands full · no gun, no sprint", UDim2.new(1, 0, 0, 16), {
+			Position = UDim2.fromOffset(0, 24),
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextColor3 = P.warn,
+		})
+		note.Name = "Restriction"
 		return
 	end
 	local seated, carGun = seatView()
@@ -1976,49 +1905,34 @@ function renderWeapons()
 		elseif not usable then "⚠ On foot only"
 		elseif seated then "Window ready"
 		else "Ready"
-	local card = Ui.make("CanvasGroup", {
-		Name = "GunCard",
+	local group = Ui.make("CanvasGroup", {
+		Name = "GunLine",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = P.lavender,
-		BorderSizePixel = 0,
-		GroupTransparency = if holstered or not usable then 0.4 else 0,
+		BackgroundTransparency = 1,
+		GroupTransparency = if holstered or not usable then 0.45 else 0,
 	}, weaponRow)
-	Ui.corner(card, 22)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, card)
-	Ui.icon(card, Icons.weapon(def.id), if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.fromOffset(44, 32), {
-		Position = UDim2.new(0, 14, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
+	local top = lineRow(group, 24)
+	Ui.icon(top, Icons.weapon(def.id), if def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.fromOffset(34, 22), {
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ImageColor3 = P.ink,
+		LayoutOrder = 1,
 	})
-	local right = if carGun or touchLayout then 16 else 50
-	Ui.caps(card, status, UDim2.new(1, -66 - right, 0, 14), {
-		Position = UDim2.fromOffset(66, 10),
-		TextSize = 12,
+	P.text(top, string.upper(def.name), UDim2.fromOffset(0, 24), {
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Theme.HeadingFont,
+		TextSize = 16,
+		LayoutOrder = 2,
+	})
+	if not carGun and not touchLayout then
+		-- Q: how to switch (hold: the wheel).
+		P.keyBox(top, "Q", 20, { LayoutOrder = 3 })
+	end
+	P.caps(group, status, UDim2.new(1, 0, 0, 14), {
+		Position = UDim2.fromOffset(0, 26),
+		TextXAlignment = Enum.TextXAlignment.Right,
 		TextColor3 = if not usable and not holstered then P.danger else P.ink2,
 	})
-	local name = Ui.label(card, def.name, UDim2.new(1, -66 - right, 0, 24), {
-		Position = UDim2.fromOffset(66, 25),
-		Font = Theme.DisplayFont,
-		TextScaled = true,
-		TextWrapped = false,
-		TextColor3 = P.ink,
-	})
-	Ui.make("UITextSizeConstraint", { MaxTextSize = 19 }, name)
-	if not carGun and not touchLayout then
-		-- Q, how to switch: a round chip with a thin line (hold: the wheel).
-		local key = Ui.label(card, "Q", UDim2.fromOffset(28, 28), {
-			Position = UDim2.new(1, -14, 0.5, 0),
-			AnchorPoint = Vector2.new(1, 0.5),
-			Font = Theme.HeadingFont,
-			TextSize = 13,
-			TextColor3 = P.ink2,
-			TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		Ui.corner(key, 14)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1.5 }, key)
-	end
 	if not carGun then
 		-- A tap (touch) or a click: the next gun.
 		local tap = Ui.make("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 2 }, weaponRow)
@@ -2045,89 +1959,82 @@ function nextWeapon()
 	Net.get("Equip"):FireServer("weapon", owned[index % #owned + 1])
 end
 
--- The consumable tags: soft pastel tags, tilted one way and the other; under the mouse (or selected) a tag lifts 9 px,
--- straightens and grows to 1.12 with its name over it, a press sinks it (Ui.tactile). The key top left, the count
--- bottom right.
-Ui.list(hotbar, false, TAG_GAP)
-local list = hotbar:FindFirstChildOfClass("UIListLayout")
-if list then
-	list.VerticalAlignment = Enum.VerticalAlignment.Bottom
-end
+-- The inventory: the consumables as compact tokens (the key, the item's small icon, the count; the name over it on
+-- hover or gamepad focus; a click or a tap uses it), and INVENTORY [B] (the backpack) under them.
+hotbar = Ui.make("Frame", {
+	Name = "Hotbar",
+	Size = UDim2.fromOffset(RIGHT_W, HOTBAR_H),
+	BackgroundTransparency = 1,
+	LayoutOrder = 4,
+}, right)
+local tokens = lineRow(hotbar, 30, 4)
+tokens.Name = "Items"
 hotbarCounts = {}
 for index, def in Config.Items do
-	local slot = Ui.make("Frame", { Size = UDim2.fromOffset(TAG_W, HOTBAR_H), BackgroundTransparency = 1, LayoutOrder = index }, hotbar)
-	local tilt = if index % 2 == 1 then -4 else 4
-	local shadow = Ui.make("Frame", {
-		Size = UDim2.fromOffset(TAG_W, TAG_H),
-		Position = UDim2.new(0, 0, 1, 0),
-		AnchorPoint = Vector2.new(0, 1),
-		Rotation = tilt,
-		BackgroundColor3 = P.line,
-		BorderSizePixel = 0,
-	}, slot)
-	Ui.corner(shadow, 11)
-	local tag = Ui.make("TextButton", {
+	local token = Ui.make("TextButton", {
 		Name = `{def.id}Tag`,
-		Size = UDim2.fromOffset(TAG_W, TAG_H),
-		Position = UDim2.new(0, 0, 1, -5),
-		AnchorPoint = Vector2.new(0, 1),
-		Rotation = tilt,
-		BackgroundColor3 = P.tags[(index - 1) % #P.tags + 1],
+		Size = UDim2.fromOffset(if touchLayout then 44 else 48, 30),
+		BackgroundColor3 = P.raised,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
 		Text = "",
 		AutoButtonColor = false,
-		ZIndex = 2,
-	}, slot)
-	Ui.corner(tag, 11)
-	Ui.icon(tag, Icons.item(def.id), def.icon, UDim2.fromOffset(26, 26), {
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
+		LayoutOrder = index,
+	}, tokens)
+	local outline = Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.7 }, token)
+	if not touchLayout then
+		P.caps(token, tostring(index), UDim2.fromOffset(12, 12), { Position = UDim2.fromOffset(3, 1), TextSize = 10, TextStrokeTransparency = 1 })
+	end
+	Ui.icon(token, Icons.item(def.id), def.icon, UDim2.fromOffset(18, 18), {
+		Position = UDim2.new(0, if touchLayout then 5 else 13, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ImageColor3 = P.ink,
-		ZIndex = 2,
 	})
-	Ui.label(tag, tostring(index), UDim2.fromOffset(14, 14), { Position = UDim2.fromOffset(5, 3), TextSize = 12, Font = Theme.HeadingFont, TextColor3 = P.ink2, ZIndex = 2 })
-	hotbarCounts[def.id] = Ui.label(tag, "0", UDim2.new(1, -6, 0, 14), {
-		Position = UDim2.new(0, 0, 1, -16),
-		TextSize = 12,
-		Font = Theme.HeadingFont,
-		TextColor3 = P.ink,
+	local count = P.text(token, "0", UDim2.fromOffset(16, 30), {
+		Position = UDim2.new(1, -4, 0, 0),
+		AnchorPoint = Vector2.new(1, 0),
+		Font = Theme.MonoFont,
+		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Right,
-		ZIndex = 2,
 	})
-	-- The name over the tag while the mouse is on it.
-	local name = Ui.caps(tag, def.name, UDim2.fromOffset(0, 24), {
+	-- None left: the token dims (its name still says what it is).
+	count:GetPropertyChangedSignal("Text"):Connect(function()
+		count.TextTransparency = if count.Text == "0" then 0.5 else 0
+	end)
+	count.TextTransparency = 0.5
+	hotbarCounts[def.id] = count
+	-- The name over the token while the mouse (or the gamepad) is on it.
+	local name = P.caps(token, def.name, UDim2.fromOffset(0, 18), {
 		AutomaticSize = Enum.AutomaticSize.X,
-		Position = UDim2.new(0.5, 0, 0, -10),
-		AnchorPoint = Vector2.new(0.5, 1),
-		BackgroundTransparency = 0,
-		BackgroundColor3 = P.paper,
-		TextSize = 12,
+		Position = UDim2.new(1, 0, 0, -6),
+		AnchorPoint = Vector2.new(1, 1),
+		BackgroundColor3 = P.surface,
+		BackgroundTransparency = 0.15,
 		TextColor3 = P.ink,
 		Visible = false,
 		ZIndex = 5,
 	})
-	Ui.corner(name, 7)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, name)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, name)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, name)
 	local function show(on: boolean)
 		name.Visible = on and not touchLayout
-		tag.ZIndex = if on then 4 else 2
+		outline.Transparency = if on then 0.1 else 0.7
+		token.BackgroundTransparency = if on then 0.3 else 1
 	end
-	tag.MouseEnter:Connect(function()
+	token.MouseEnter:Connect(function()
 		show(true)
 	end)
-	tag.MouseLeave:Connect(function()
+	token.MouseLeave:Connect(function()
 		show(false)
 	end)
-	tag.SelectionGained:Connect(function()
+	token.SelectionGained:Connect(function()
 		show(true)
 	end)
-	tag.SelectionLost:Connect(function()
+	token.SelectionLost:Connect(function()
 		show(false)
 	end)
-	Ui.tactile(tag, 9, 1.12)
-	tag.Activated:Connect(function()
+	token.Activated:Connect(function()
 		local click = Ui.onClick
 		if click then
 			click()
@@ -2135,31 +2042,44 @@ for index, def in Config.Items do
 		useItem(def.id)
 	end)
 end
+P.action(hotbar, if touchLayout then "INVENTORY" else "INVENTORY  [B]", {
+	Name = "Inventory",
+	Size = UDim2.fromOffset(0, if touchLayout then 44 else 22),
+	Position = UDim2.new(1, -2, 0, 32),
+	AnchorPoint = Vector2.new(1, 0),
+	TextSize = 12,
+}, function()
+	toggleBackpack()
+end)
 
--- FIRE for touch screens (auto-aim): big, sage, on the right; layout() keeps it above Roblox's jump button.
-FIRE_SIZE = 110
+-- FIRE for touch screens (auto-aim): a square with a thin line on a charcoal backing; layout() keeps it above
+-- Roblox's jump button.
+FIRE_SIZE = 96
 fire = placed(Ui.make("TextButton", {
 	Name = "Fire",
 	Size = UDim2.fromOffset(FIRE_SIZE, FIRE_SIZE),
 	Position = UDim2.new(1, -40, 1, -190),
 	AnchorPoint = Vector2.new(1, 1),
-	BackgroundColor3 = P.sage,
+	BackgroundColor3 = P.surface,
+	BackgroundTransparency = 0.35,
 	Text = "FIRE",
 	TextColor3 = P.ink,
-	Font = Theme.DisplayFont,
-	TextSize = 26,
+	Font = Theme.HeadingFont,
+	TextSize = 20,
 	Visible = false,
-	AutoButtonColor = true,
+	AutoButtonColor = false,
 }, gui))
-Ui.corner(fire, FIRE_SIZE // 2)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.sageLip, Thickness = 3 }, fire)
+Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.ink, Thickness = 1, Transparency = 0.2 }, fire)
+Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = P.red, BorderSizePixel = 0 }, fire)
 fire.InputBegan:Connect(function(input: InputObject)
 	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		fire.BackgroundTransparency = 0.15 -- (pressed)
 		Shooting.setAutoHeld(true)
 	end
 end)
 fire.InputEnded:Connect(function(input: InputObject)
 	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		fire.BackgroundTransparency = 0.35
 		Shooting.setAutoHeld(false)
 	end
 end)
@@ -2167,129 +2087,165 @@ end
 
 -- ── Car panel ──────────────────────────────────────────────────────────────
 
--- 3.6: the speed dial (the concept's round instrument): a cream disc with ticks and a violet pointer; the car's name
--- (its stage's), the speed big over KM/H, the vehicle's condition (a bar and the %) and its cargo slots (a pip each,
--- the loaded ones filled, "3 / 4 cargo slots"). On foot it dims and keeps the parked car's condition; without a car it
--- says how to get one. RenderStepped fills it (view.dial; only what changed).
+-- 3.8, the vehicle line in the lower right column (no round dial): while you drive the speed in compact type with its
+-- unit, then "OLD VAN / 72% / CARGO 3 OF 4" (the car's or its stage's name, its condition, occupied / total cargo
+-- slots at its stage). On foot it stays as a quieter line with PARKED; without a car it says how to get one.
+-- RenderStepped fills it (view.vehicle; only what changed).
 local carPanel: any, hint: any
 do -- (its own block: the locals below stay out of the 200-register limit)
-local DIAL = 196
-local R = DIAL / 2
-carPanel = placed(Ui.make("Frame", {
-	Name = "SpeedDial",
-	Size = UDim2.fromOffset(DIAL, DIAL),
-	Position = UDim2.new(1, -16, 1, -16),
-	AnchorPoint = Vector2.new(1, 1),
+carPanel = Ui.make("Frame", {
+	Name = "Vehicle",
+	Size = UDim2.fromOffset(view.right.Size.X.Offset, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1,
-}, gui))
-local shadow = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.fromOffset(0, 6), BackgroundColor3 = P.line, BorderSizePixel = 0 }, carPanel)
-Ui.corner(shadow, DIAL)
-local group = Ui.make("CanvasGroup", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.paper, BorderSizePixel = 0 }, carPanel)
-Ui.corner(group, DIAL)
--- The ticks: from -135° to 135° every 15°, a longer one every 45°.
-for k = 0, 18 do
-	local angle = math.rad(-135 + k * 15)
-	local major = k % 3 == 0
-	local r = R - (if major then 12 else 10)
-	Ui.make("Frame", {
-		Size = UDim2.fromOffset(2, if major then 10 else 6),
-		Position = UDim2.fromOffset(R + math.sin(angle) * r, R - math.cos(angle) * r),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Rotation = math.deg(angle),
-		BackgroundColor3 = if major then P.ink2 else P.line,
-		BorderSizePixel = 0,
-	}, group)
-end
--- The pointer: a short violet bar on the tick ring, turned with the speed (its holder turns about the centre).
-local needle = Ui.make("Frame", { Size = UDim2.fromOffset(DIAL - 12, DIAL - 12), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, Rotation = -135 }, group)
-local pointer = Ui.make("Frame", { Size = UDim2.fromOffset(4, 18), Position = UDim2.new(0.5, 0, 0, 0), AnchorPoint = Vector2.new(0.5, 0), BackgroundColor3 = P.violet, BorderSizePixel = 0 }, needle)
-Ui.corner(pointer, 2)
-local function centred(text: string, y: number, h: number, props: { [string]: any }): any
-	local label = Ui.label(group, text, UDim2.fromOffset(DIAL - 60, h), {
-		Position = UDim2.fromOffset(30, y),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	for key, value in props do
-		label[key] = value
-	end
-	return label
-end
-local d: any = { group = group, needle = needle }
-d.name = centred("", 38, 14, { Font = Theme.HeadingFont, TextSize = 12, TextColor3 = P.ink2 })
-d.speed = centred("–", 52, 50, { Font = Theme.DisplayFont, TextSize = 50, TextColor3 = P.ink })
-d.unit = centred("KM/H", 102, 14, { Font = Theme.HeadingFont, TextSize = 12, TextColor3 = P.ink2 })
-Ui.caps(group, "Condition", UDim2.fromOffset(80, 14), { Position = UDim2.fromOffset(34, 122), TextSize = 12, TextColor3 = P.ink2 })
-d.condText = Ui.label(group, "", UDim2.fromOffset(60, 14), {
-	Position = UDim2.fromOffset(DIAL - 34, 122),
-	AnchorPoint = Vector2.new(1, 0),
-	TextSize = 12,
-	Font = Theme.HeadingFont,
+	LayoutOrder = 3,
+}, view.right)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Vertical,
+	HorizontalAlignment = Enum.HorizontalAlignment.Right,
+	Padding = UDim.new(0, 2),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, carPanel)
+local v: any = {}
+v.speedRow = Ui.make("Frame", { Name = "Speed", Size = UDim2.fromOffset(view.right.Size.X.Offset, 30), BackgroundTransparency = 1, LayoutOrder = 1, Visible = false }, carPanel)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	HorizontalAlignment = Enum.HorizontalAlignment.Right,
+	VerticalAlignment = Enum.VerticalAlignment.Bottom,
+	Padding = UDim.new(0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, v.speedRow)
+v.speed = P.text(v.speedRow, "0", UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 28, LayoutOrder = 1 })
+v.unit = P.caps(v.speedRow, "KM/H", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2 })
+v.line = P.caps(carPanel, "", UDim2.fromOffset(view.right.Size.X.Offset, 18), {
+	TextSize = 13,
 	TextColor3 = P.ink,
 	TextXAlignment = Enum.TextXAlignment.Right,
-	TextWrapped = false,
+	RichText = true,
+	LayoutOrder = 2,
 })
-local condBack
-condBack, d.condFill = Ui.bar(group, UDim2.fromOffset(DIAL - 68, 5), P.violet)
-condBack.Position = UDim2.fromOffset(34, 140)
-d.pips = Ui.make("Frame", { Size = UDim2.fromOffset(DIAL - 60, 10), Position = UDim2.fromOffset(30, 151), BackgroundTransparency = 1 }, group)
-Ui.list(d.pips, false, 3, Enum.HorizontalAlignment.Center)
-d.slots = centred("", 164, 14, { Font = Theme.Font, TextSize = 12, TextColor3 = P.ink2 })
-d.shown = "" -- what the dial shows (the slow parts redraw only when it changes)
-view.dial = d
+v.shown = "" -- what the line shows (it redraws only when it changes)
+view.vehicle = v
 
--- The cargo slots: one pip per slot (at most 12 drawn), the loaded ones filled.
-function view.drawPips(capacity: number, loaded: number)
-	Ui.clear(d.pips)
-	for n = 1, math.min(capacity, 12) do
-		local pip = Ui.make("Frame", {
-			Size = UDim2.fromOffset(12, 9),
-			BackgroundColor3 = if n <= loaded then P.violet else P.paper,
-			BorderSizePixel = 0,
-			LayoutOrder = n,
-		}, d.pips)
-		Ui.corner(pip, 2)
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if n <= loaded then P.violet else P.line, Thickness = 1 }, pip)
+-- Every frame (RenderStepped): your car (nil: none out) and the car you sit in. The line redraws only when its
+-- words change; the speed only while you are inside.
+function view.drawVehicle(car: Model?, seatedIn: Model?)
+	if not car then
+		if v.shown ~= "none" then
+			v.shown = "none"
+			v.speedRow.Visible = false
+			v.line.Text = "NO CAR  /  MENU → CAR"
+			v.line.TextTransparency = 0.2
+		end
+		return
 	end
-	d.slots.Text = if capacity > 0 then `{math.min(loaded, capacity)} / {capacity} cargo slots` else "no cargo slots"
+	local carId = tostring(car:GetAttribute("CarId"))
+	local stage = tonumber(car:GetAttribute("Stage")) or 0
+	local health = (car:GetAttribute("Health") or 0) :: number
+	local maxHealth = math.max(1, (car:GetAttribute("MaxHealth") or 1) :: number)
+	local share = math.clamp(health / maxHealth, 0, 1)
+	local capacity = Economy.stageCapacity(carId, stage)
+	local loaded = tonumber(car:GetAttribute("CargoCount")) or inVehicle() or 0
+	local inside = seatedIn == car
+	local pct = math.floor(share * 100 + 0.5)
+	local shown = `{carId}|{stage}|{pct}|{capacity}|{loaded}|{inside}`
+	if v.shown ~= shown then
+		v.shown = shown
+		local def = Economy.findCar(carId)
+		local stageDef = Economy.stageDef(carId, stage)
+		local name = string.upper(if stageDef then stageDef.name elseif def then def.name else "Car")
+		-- The condition: white, the warm warn under half, the red with a ⚠ from a quarter down.
+		local tint = if share <= 0.25 then P.danger elseif share <= 0.5 then P.warn else P.ink
+		local condition = `<font color="{P.hex(tint)}">{if share <= 0.25 then "⚠ " else ""}{pct}%</font>`
+		local cargo = if capacity > 0 then `CARGO {math.min(loaded, capacity)} OF {capacity}` else "NO CARGO SLOTS"
+		v.line.Text = `{view.esc(name)}  /  {condition}  /  {cargo}{if inside then "" else "  /  PARKED"}`
+		v.line.TextTransparency = if inside then 0 else 0.2
+		v.speedRow.Visible = inside
+	end
+	if inside then
+		local chassis = car.PrimaryPart
+		local velocity = if chassis then chassis.AssemblyLinearVelocity else Vector3.zero
+		local text = (if Drive.boosting() then "⚡" else "") .. tostring(math.floor(Vector3.new(velocity.X, 0, velocity.Z).Magnitude))
+		if v.speed.Text ~= text then
+			v.speed.Text = text
+		end
+	end
 end
 
--- What to do right now: a cream pill over the tags (layout() gives it the most width it may take, its "Max"
--- constraint; a long one wraps upward), the main line in ink and, under it, a quieter line (RichText). Hidden while it
+-- The contextual action, lower centre (layout() places and scales it): one key in a square outline, the action in
+-- white caps, a short instruction under it, and a fine progress line while a hold runs (the loading, unloading,
+-- boarding or serving the server reports: Hud.setJob's progress). The centre of the world stays clear. Hidden while it
 -- has nothing to say.
-hint = Ui.label(gui, "", UDim2.fromOffset(0, 0), {
+hint = placed(Ui.make("Frame", {
 	Name = "Hint",
-	Position = UDim2.new(0.5, 0, 1, -104),
-	AnchorPoint = Vector2.new(0.5, 1),
+	Size = UDim2.fromOffset(0, 0),
 	AutomaticSize = Enum.AutomaticSize.XY,
-	BackgroundTransparency = 0.06,
-	BackgroundColor3 = P.paper,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	TextColor3 = P.ink,
-	TextSize = 15,
-	Font = Theme.HeadingFont,
-	RichText = true,
+	Position = UDim2.new(0.5, 0, 1, -40),
+	AnchorPoint = Vector2.new(0.5, 1),
+	BackgroundTransparency = 1,
 	Visible = false,
+}, gui))
+Ui.make("UISizeConstraint", { Name = "Max", MaxSize = Vector2.new(480, math.huge) }, hint)
+-- A soft charcoal backing, strongest in the middle (the action reads over a bright street).
+-- (it fills the hint exactly; the column's padding makes the room around the words)
+local glow = Ui.make("Frame", { Name = "Scrim", Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.surface, BorderSizePixel = 0, ZIndex = 0 }, hint)
+Ui.make("UIGradient", {
+	Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.22, 0.5),
+		NumberSequenceKeypoint.new(0.78, 0.5),
+		NumberSequenceKeypoint.new(1, 1),
+	}),
+}, glow)
+local column = Ui.make("Frame", { Name = "Column", Size = UDim2.fromOffset(0, 0), AutomaticSize = Enum.AutomaticSize.XY, BackgroundTransparency = 1 }, hint)
+Ui.list(column, true, 6)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 34), PaddingRight = UDim.new(0, 34), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, column)
+local row = Ui.make("Frame", { Name = "Row", Size = UDim2.fromOffset(0, 0), AutomaticSize = Enum.AutomaticSize.XY, BackgroundTransparency = 1, LayoutOrder = 1 }, column)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+	Padding = UDim.new(0, 12),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, row)
+local a: any = {}
+a.key = P.keyBox(row, "E", 30, { LayoutOrder = 1, Visible = false })
+local words = Ui.make("Frame", { Size = UDim2.fromOffset(0, 0), AutomaticSize = Enum.AutomaticSize.XY, BackgroundTransparency = 1, LayoutOrder = 2 }, row)
+Ui.list(words, true, 2)
+a.main = P.text(words, "", UDim2.fromOffset(0, 0), {
+	AutomaticSize = Enum.AutomaticSize.XY,
+	Font = Theme.HeadingFont,
+	TextSize = 15,
+	TextWrapped = true,
+	LayoutOrder = 1,
 })
-Ui.corner(hint, 12)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1 }, hint)
-Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }, hint)
-Ui.make("UISizeConstraint", { Name = "Max", MaxSize = Vector2.new(560, math.huge) }, hint)
+Ui.make("UISizeConstraint", { MaxSize = Vector2.new(360, math.huge) }, a.main)
+a.sub = P.caps(words, "", UDim2.fromOffset(0, 0), {
+	AutomaticSize = Enum.AutomaticSize.XY,
+	TextWrapped = true,
+	TextTruncate = Enum.TextTruncate.None,
+	Visible = false,
+	LayoutOrder = 2,
+})
+Ui.make("UISizeConstraint", { MaxSize = Vector2.new(360, math.huge) }, a.sub)
+a.column = column
+a.shown = ""
+view.action = a
 end
 
 -- ── Job panel ──────────────────────────────────────────────────────────────
--- 3.6: the objective ticket, top centre (the first entry of the top stack): a paper delivery ticket tilted -0.6° with a
--- perforated stub (Ui.ticket). On it: the stage in small caps (DELIVERY IN PROGRESS / PICKUP · STEP 1 OF 3, the danger
--- stars, a modifier), the stop (big), a pin line (the job, the stop, the distance), the cargo slots (loaded / your
--- car's), the estimated pay and what went wrong (cargo condition, pieces lost, a wave). The timer sits in the stub.
--- What to do right now (the job's step: "Get out and open the back (E)") is the hint over the tags.
--- With no job and nothing else on top: a small OFF DUTY ticket that opens the Dispatch board.
+-- 3.8, the contract group (upper left, the first entry of the contract column), replacing the 3.6 tilted ticket and
+-- its timer stub. On a soft charcoal scrim:
+--   ■ DELIVERY CONTRACT · PIZZA RUN · ★★ · STOP 1/2     (a mission: ■ MISSION 3 · NAME)
+--   THE DESTINATION                                      (the stop's place, large white caps)
+--   □ the objectives: the stop's action and its pieces ("Pick up: 0 of 3 pizza boxes loaded"), the modifier, and
+--     what went wrong (pieces lost, a battered cargo: a ⚠ and words, never the colour alone)
+--   ─────
+--   04:36 REMAINING / EST. $640 / 420 M                  (the time red when it runs short; night pay, a wave)
+-- What to do right now (the job's step: "Get out and open the back (E)") is the contextual action, lower centre.
+-- With no job and nothing else in the column: a small OFF DUTY line that opens the Dispatch board.
 
 local LOAD_H: any, loadFill: any, loadBack: any, loadText: any
 do -- (its own block: the locals below stay out of the 200-register limit)
-local TextService = game:GetService("TextService")
-local STUB = 96
 local slot = Hud.topSlot("job")
 local t: any = {}
 view.ticket = t
@@ -2298,191 +2254,196 @@ view.ticket = t
 function view.esc(text: string): string
 	return (text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
 end
-function view.hex(color: Color3): string
-	return string.format("#%02X%02X%02X", math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5))
-end
+view.hex = P.hex
 
--- The ticket's holder in the stack (the stack lays it out; the ticket inside it is free to tilt).
-t.wrap = Ui.make("Frame", { Name = "JobTicket", Size = UDim2.new(1, 0, 0, 116), BackgroundTransparency = 1, Visible = false, LayoutOrder = 1 }, slot)
-local ticketCard, body, stub = Ui.ticket(t.wrap, UDim2.new(1, -8, 1, -6), UDim2.fromOffset(4, 0), nil, STUB, -0.6)
-t.card = ticketCard
-Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 12) }, body)
-t.label = Ui.caps(body, "", UDim2.fromOffset(0, 18), {
-	AutomaticSize = Enum.AutomaticSize.X,
-	TextSize = 12,
-	TextColor3 = P.ink2,
-	BackgroundColor3 = P.lavenderDeep,
-	BackgroundTransparency = 1,
-})
-Ui.corner(t.label, 9)
-Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, t.label)
-Ui.make("UISizeConstraint", { MaxSize = Vector2.new(TOP_W - STUB - 40, 18) }, t.label)
-t.title = Ui.label(body, "", UDim2.new(1, 0, 0, 24), {
-	Position = UDim2.fromOffset(0, 22),
-	TextSize = 20,
-	Font = Theme.DisplayFont,
-	TextColor3 = P.ink,
-	TextYAlignment = Enum.TextYAlignment.Top,
-	TextTruncate = Enum.TextTruncate.AtEnd,
-})
-t.pin = Ui.label(body, "", UDim2.new(1, 0, 0, 18), {
-	Position = UDim2.fromOffset(0, 50),
-	TextSize = 14,
-	Font = Theme.Font,
-	TextColor3 = P.ink2,
-	TextWrapped = false,
-	TextTruncate = Enum.TextTruncate.AtEnd,
-})
-t.meta = Ui.label(body, "", UDim2.new(1, 0, 0, 18), {
-	Position = UDim2.fromOffset(0, 74),
-	TextSize = 14,
+-- The group's holder in the column (the column lays it out).
+t.wrap = Ui.make("Frame", { Name = "Contract", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, Visible = false, LayoutOrder = 1 }, slot)
+P.scrim(t.wrap, 0.6)
+local body = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, t.wrap)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, body)
+Ui.list(body, true, 5)
+local labelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = 1 }, body)
+P.marker(labelRow, 8, { Position = UDim2.new(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5) })
+t.label = P.caps(labelRow, "", UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0) })
+t.title = P.text(body, "", UDim2.new(1, 0, 0, 0), {
+	AutomaticSize = Enum.AutomaticSize.Y,
 	Font = Theme.HeadingFont,
-	TextColor3 = P.ink,
-	RichText = true,
-	TextWrapped = false,
-	TextTruncate = Enum.TextTruncate.AtEnd,
+	TextSize = 22,
+	TextWrapped = true,
+	LayoutOrder = 2,
 })
--- The stub: a clock and the time left, big.
-Ui.label(stub, "⏱", UDim2.new(1, 0, 0, 18), { Position = UDim2.new(0, 0, 0.5, -26), TextSize = 15, TextColor3 = P.ink2, TextXAlignment = Enum.TextXAlignment.Center })
-t.timer = Ui.label(stub, "", UDim2.new(1, -8, 0, 30), {
-	Position = UDim2.new(0, 4, 0.5, -6),
-	TextSize = 24,
-	Font = Theme.DisplayFont,
-	TextColor3 = P.ink,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	TextWrapped = false,
-	TextScaled = true,
-})
-Ui.make("UITextSizeConstraint", { MaxTextSize = 24 }, t.timer)
-t.lines = 1
-t.meta0 = ""
-
--- The title in one line or two (the ticket grows): measured at the stack's width (layout() calls it too).
-function view.fitTicket()
-	local width = math.max(100, topStack.Size.X.Offset - 8 - STUB - 30)
-	local size = TextService:GetTextSize(t.title.Text, 20, Theme.DisplayFont, Vector2.new(width, 1000))
-	local lines = if size.Y > 26 then 2 else 1
-	if lines == t.lines then
-		return
-	end
-	t.lines = lines
-	local extra = (lines - 1) * 23
-	t.title.Size = UDim2.new(1, 0, 0, 24 + extra)
-	t.pin.Position = UDim2.fromOffset(0, 50 + extra)
-	t.meta.Position = UDim2.fromOffset(0, 74 + extra)
-	t.wrap.Size = UDim2.new(1, 0, 0, 116 + extra)
+P.rule(body, UDim2.new(1, 0, 0, 1), { LayoutOrder = 3 })
+local list = Ui.make("Frame", { Name = "Objectives", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 4 }, body)
+Ui.list(list, true, 3)
+-- The objective rows (a pool of four): a square box (filled when done) and the words; a warning has no box but a ⚠.
+t.rows = {}
+for n = 1, 4 do
+	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = n, Visible = false }, list)
+	local box = Ui.make("Frame", { Name = "Box", Size = UDim2.fromOffset(10, 10), Position = UDim2.fromOffset(1, 5), BackgroundColor3 = P.ink, BackgroundTransparency = 1, BorderSizePixel = 0 }, row)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.ink, Thickness = 1, Transparency = 0.1 }, box)
+	local text = P.text(row, "", UDim2.new(1, -20, 0, 0), {
+		Position = UDim2.fromOffset(20, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		TextSize = 14,
+		TextWrapped = true,
+		LineHeight = 1.05,
+	})
+	table.insert(t.rows, { row = row, box = box, text = text })
 end
+P.rule(body, UDim2.new(0.82, 0, 0, 1), { LayoutOrder = 5 })
+t.timer = P.caps(body, "", UDim2.new(1, 0, 0, 18), { TextSize = 13, RichText = true, LayoutOrder = 6 })
+t.meta0 = ""
+t.clock0 = ""
 
--- "DELIVER to Bob, 42 Maple St" → "Deliver to Bob, 42 Maple St": the label's shouted words in sentence case.
-local function sentence(text: string): string
+-- (the title wraps by itself now; layout() still calls this)
+function view.fitTicket() end
+
+-- "DELIVER to Bob, 42 Maple St" → "DELIVER", "Bob, 42 Maple St": the label's shouted words (the action) and the rest
+-- (the place; a leading "at" / "to" / "for" dropped).
+local function split(text: string): (string, string)
 	local words = string.split(text, " ")
+	local cut = #words + 1
 	for index, word in words do
 		if word:upper() ~= word then
+			cut = index
 			break
 		end
-		words[index] = word:lower()
 	end
-	local joined = table.concat(words, " ")
-	return joined:sub(1, 1):upper() .. joined:sub(2)
+	local action = table.concat(words, " ", 1, cut - 1)
+	local place = table.concat(words, " ", cut)
+	-- "DELIVER THE AMMO TO" + "Military Base": the action without its "to" / "at" / "for".
+	for _, tail in { " TO", " AT", " FOR" } do
+		if #action > #tail and string.sub(action, -#tail) == tail then
+			action = string.sub(action, 1, -#tail - 1)
+		end
+	end
+	local first = string.lower(words[cut] or "")
+	if first == "at" or first == "to" or first == "for" then
+		place = table.concat(words, " ", cut + 1)
+	end
+	return action, place
 end
 
--- The parts of the ticket that change with a job update (Hud.setJob).
+local function sentence(text: string): string
+	local lower = string.lower(text)
+	return lower:sub(1, 1):upper() .. lower:sub(2)
+end
+
+-- One objective row: kind "todo" (an empty box), "done" (a filled box), "warn" (a ⚠, the contract red), "quiet".
+local function objective(n: number, kind: string?, text: string?)
+	local r = t.rows[n]
+	if not r then
+		return
+	end
+	r.row.Visible = kind ~= nil
+	if not kind then
+		return
+	end
+	r.box.Visible = kind == "todo" or kind == "done"
+	r.box.BackgroundTransparency = if kind == "done" then 0 else 1
+	r.text.Position = UDim2.fromOffset(if r.box.Visible then 20 else 0, 0)
+	r.text.Size = UDim2.new(1, if r.box.Visible then -20 else 0, 0, 0)
+	r.text.Text = text or ""
+	r.text.TextColor3 = if kind == "warn" then P.danger elseif kind == "quiet" then P.ink2 else P.ink
+	r.text.TextTransparency = if kind == "done" then 0.35 else 0
+end
+
+-- The parts of the group that change with a job update (Hud.setJob).
 function view.fillTicket()
 	if not job then
 		return
 	end
-	local pickup = job.stage == "pickup"
 	local index, count = tonumber(job.stopIndex) or 1, tonumber(job.stopCount) or 1
-	local stage = if pickup then `Pickup · step {index} of {count}` elseif index < count then `Drop-off · step {index} of {count}` else "Delivery in progress"
 	local stars = string.rep("★", tonumber(job.stars) or 0)
-	t.label.Text = string.upper(`{if pickup then "" else "•  "}{stage}  ·  {stars}{if job.modifier then `  ·  {job.modifier.name}` else ""}`)
-	t.label.TextColor3 = if pickup then P.violet else P.ink2
-	t.label.BackgroundTransparency = if pickup then 0 else 1
-	t.title.Text = sentence(tostring(job.stopLabel or job.cargo or ""))
-	view.fitTicket()
+	local mission = job.mission
+	local kind = if type(mission) == "table" and mission.number then `Mission {mission.number} · {mission.name or ""}`
+		else `Delivery contract · {if job.jobType then job.jobType.name else tostring(job.cargo or "")}`
+	t.label.Text = string.upper(`{kind}{if stars ~= "" then ` · {stars}` else ""}{if count > 1 then ` · stop {index}/{count}` else ""}`)
+	local action, place = split(tostring(job.stopLabel or job.cargo or ""))
+	t.title.Text = string.upper(if place ~= "" then place else action)
+	t.action = if place ~= "" and action ~= "" then sentence(action) elseif job.stage == "pickup" then "Pick up" else "Deliver"
+	t.meta0 = "" -- (the objectives are drawn again on the next frame)
 end
 
--- The ticket's live parts (every frame from RenderStepped): the timer, the pin line, the meta line.
+-- The group's live parts (every frame from RenderStepped): the deadline line and, when they change, the objectives.
 function view.tickTicket(distance: number?)
 	if not job then
 		return
 	end
 	local left = job.endsAt - workspace:GetServerTimeNow()
 	local clock = Ui.clock(left)
-	if t.timer.Text ~= clock then
-		t.timer.Text = clock
-		t.timer.TextColor3 = if left < 15 then P.danger else P.ink
+	local urgent = left < 30
+	local wave = tonumber(job.wave) or 0
+	local footer = `{clock}|{urgent}|{job.pay}|{distance}|{job.night}|{wave}`
+	if footer ~= t.clock0 then
+		t.clock0 = footer
+		local parts = { `<font color="{P.hex(if urgent then P.danger else P.ink)}">{clock}</font> REMAINING`, `EST. {Ui.money(job.pay)}` }
+		if job.night == true then
+			table.insert(parts, "NIGHT PAY")
+		end
+		if wave > 0 then
+			table.insert(parts, `WAVE {wave}`)
+		end
+		if distance then
+			table.insert(parts, `{distance} M`)
+		end
+		t.timer.Text = table.concat(parts, "  /  ")
 	end
-	local name = if job.jobType then job.jobType.name else tostring(job.cargo)
-	local person = if type(job.person) == "string" and job.person ~= "" then `  ·  {job.person}` else ""
-	local pin = `📍 {name}{person}  ·  stop {job.stopIndex}/{job.stopCount}{if distance then `  ·  {distance} m` else ""}`
-	if t.pin.Text ~= pin then
-		t.pin.Text = pin
-	end
-	-- What went wrong first (the line is cut at its end), then 📦 loaded / slots (by hand only), the pay, the rest.
-	local car = Drive.myCar()
-	local carId = car and tostring(car:GetAttribute("CarId"))
-	local capacity = if car and carId then Economy.stageCapacity(carId, tonumber(car:GetAttribute("Stage")) or 0) else 0
-	local byHand = job.handling == "carry" or job.handling == "lead" or (job.handling == "drive" and type(job.total) == "number" and job.total > 0)
-	local aboard = inVehicle() or 0
+	-- The objectives: the stop's action and its pieces, the modifier, then what went wrong.
+	local needed = tonumber(job.needed) or 0
+	local done = tonumber(job.delivered) or 0
 	local lost = tonumber(job.lost) or 0
 	local condition = tonumber(job.condition) or 1
-	local wave = tonumber(job.wave) or 0
-	local signature = `{byHand}|{aboard}|{capacity}|{job.pay}|{lost}|{math.floor(condition * 100 + 0.5)}|{wave}|{job.night}`
+	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}`
 	if signature == t.meta0 then
 		return
 	end
 	t.meta0 = signature
-	local danger = view.hex(P.danger)
-	local quiet = view.hex(P.ink2)
-	local parts: { string } = {}
+	local cargo = jobCargo()
+	local n = 0
+	local function add(kind: string, text: string)
+		n += 1
+		objective(n, kind, text)
+	end
+	if needed > 0 and job.handling ~= "drive" then
+		local verb = if job.stage == "pickup" then "loaded" else "delivered"
+		add(if done >= needed then "done" else "todo", `{t.action}: {math.min(done, needed)} of {needed} {if needed == 1 then cargo.one else cargo.many} {verb}`)
+	else
+		add("todo", tostring(t.action))
+	end
+	local modifier = job.modifier
+	if type(modifier) == "table" and modifier.name then
+		add("todo", `{sentence(tostring(modifier.name))}: {string.lower(tostring(modifier.description or ""))}`)
+	end
 	if lost > 0 then
-		table.insert(parts, `<font color="{danger}">⚠ {lost} lost</font>`)
+		add("warn", `⚠  {lost} {if lost == 1 then cargo.one else cargo.many} lost`)
 	end
 	if condition < 0.4 then
-		table.insert(parts, `<font color="{danger}">⚠ cargo {math.floor(condition * 100 + 0.5)}%</font>`)
+		add("warn", `⚠  Cargo condition {math.floor(condition * 100 + 0.5)}%`)
+	elseif condition < 0.995 and n < 4 then
+		add("quiet", `Cargo condition {math.floor(condition * 100 + 0.5)}%`)
 	end
-	if byHand and capacity > 0 then
-		table.insert(parts, `📦 {aboard} / {capacity} <font color="{quiet}">slots</font>`)
+	for k = n + 1, #t.rows do
+		objective(k, nil, nil)
 	end
-	table.insert(parts, `EST. {Ui.money(job.pay)}` .. (if job.night == true then ` <font color="{quiet}">🌙 night</font>` else ""))
-	if condition < 0.995 and condition >= 0.4 then
-		table.insert(parts, `<font color="{quiet}">cargo {math.floor(condition * 100 + 0.5)}%</font>`)
-	end
-	if wave > 0 then
-		table.insert(parts, `<font color="{quiet}">🌊 wave {wave}</font>`)
-	end
-	t.meta.Text = table.concat(parts, "   ")
 end
 
--- The OFF DUTY ticket: no job, nothing else on top. A click (a tap) opens the Dispatch board.
-local idle = Ui.make("TextButton", { Name = "OffDuty", Size = UDim2.fromOffset(310, 60), BackgroundTransparency = 1, Text = "", Visible = false, LayoutOrder = 2 }, slot)
-local idleCard, idleBody, idleStub = Ui.ticket(idle, UDim2.new(1, -8, 1, -6), UDim2.fromOffset(4, 0), nil, 64, -0.6)
-Ui.caps(idleBody, "•  Off duty", UDim2.new(1, -24, 0, 14), { Position = UDim2.fromOffset(16, 10), TextSize = 12, TextColor3 = P.ink2 })
-Ui.label(idleBody, "Pick a run at the Dispatch board", UDim2.new(1, -24, 0, 20), { Position = UDim2.fromOffset(16, 26), TextSize = 14, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-local chip = Ui.label(idleStub, if touchLayout then "OPEN" else "J", UDim2.fromOffset(if touchLayout then 48 else 28, 26), {
-	Position = UDim2.fromScale(0.5, 0.5),
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundTransparency = 0,
-	BackgroundColor3 = P.violet,
-	TextSize = 13,
-	Font = Theme.HeadingFont,
-	TextColor3 = P.paper,
-	TextXAlignment = Enum.TextXAlignment.Center,
-})
-Ui.corner(chip, 8)
-Ui.tactile(idleCard.Parent, 4, 1.03)
-idle.Activated:Connect(function()
-	local click = Ui.onClick
-	if click then
-		click()
-	end
-	openDispatch()
-end)
+-- The OFF DUTY line: no job, nothing else in the column. A click (a tap) opens the Dispatch board.
+local idle = Ui.make("Frame", { Name = "OffDuty", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, Visible = false, LayoutOrder = 2 }, slot)
+local idleRow = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, idle)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+	Padding = UDim.new(0, 10),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, idleRow)
+P.marker(idleRow, 8, { BackgroundColor3 = P.ink2, LayoutOrder = 1 })
+P.caps(idleRow, "Off duty", UDim2.fromOffset(0, 44), { AutomaticSize = Enum.AutomaticSize.X, TextColor3 = P.ink, LayoutOrder = 2 })
+P.action(idleRow, if touchLayout then "DISPATCH BOARD" else "PICK A RUN  [J]", { LayoutOrder = 3, TextSize = 12 }, openDispatch)
 t.idle = idle
 t.idleAt = 0
 
--- Shows the OFF DUTY ticket when the top stack has nothing on it (no job; no crew strip, invitation or mission banner).
+-- Shows the OFF DUTY line when the column has nothing on it (no job; no crew strip, invitation or mission banner).
 function view.checkIdle(now: number)
 	if now < t.idleAt then
 		return
@@ -2503,32 +2464,33 @@ function view.checkIdle(now: number)
 	end
 end
 
--- Loading / unloading / boarding bar under the middle of the screen (layout() keeps it over the bottom panels): a
--- cream pill, a sage fill (its deeper lip shade, so it shows on the cream) inside it, the words over it in ink.
-LOAD_H = 28
-loadBack, loadFill = Ui.bar(gui, UDim2.fromOffset(340, LOAD_H), P.sageLip)
-scaled(loadBack)
-loadBack.AnchorPoint = Vector2.new(0.5, 0.5)
-loadBack.Position = UDim2.fromScale(0.5, 0.62)
-loadBack.Visible = false
-loadBack.BackgroundColor3 = P.paper
-loadBack:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, LOAD_H // 2)
-loadFill:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, LOAD_H // 2)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1.5 }, loadBack)
-loadText = Ui.label(loadBack, "", UDim2.fromScale(1, 1), { TextXAlignment = Enum.TextXAlignment.Center, TextSize = 14, ZIndex = 2, Font = Theme.DisplayFont, TextColor3 = P.ink })
+-- The hold progress (loading / unloading / boarding / serving, from the server's Job payload): a fine line under the
+-- contextual action and its words in small caps. loadBack is the holder (shown while it runs), loadFill the line.
+LOAD_H = 20
+local column = view.action.column
+loadBack = Ui.make("Frame", { Name = "Progress", Size = UDim2.new(1, 0, 0, LOAD_H), BackgroundTransparency = 1, Visible = false, LayoutOrder = 3 }, column)
+local track
+track, loadFill = P.bar(loadBack, UDim2.new(1, 0, 0, 2), P.ink)
+track.Position = UDim2.fromOffset(0, 2)
+loadText = P.caps(loadBack, "", UDim2.new(1, 0, 0, 14), { Position = UDim2.fromOffset(0, 6), TextSize = 11 })
+-- (the bar's holder keeps a width when the words above it are short)
+Ui.make("UISizeConstraint", { MinSize = Vector2.new(220, LOAD_H) }, loadBack)
 end
 
 -- ── The way to the target ──────────────────────────────────────────────────
 -- The park circle (a ring and a light beam) and, on foot during a carry step, a small ring at the pile / the
--- person with a thin beam over their head; a floating label and an arrow (over the car, or over your head on foot).
+-- person with a thin beam over their head; a floating waypoint and an arrow (over the car, or over your head on foot).
+-- 3.8: the contract's red for the job's stop, white for the pile / the person / the vehicle's back and the GPS point.
+-- The waypoint is small and monochrome: a red (or white) square, the name in white caps, the distance under it, and a
+-- fine line down to the spot.
 
 local beacon: any, ring: any, pileRing: any, label: any, labelText: any, HIDDEN: any, PICKUP_COLOR: any, PILE_COLOR: any, UPRIGHT: any, hideGuide: any, placeGuide: any, pointArrow: any, GPS_COLOR: any, gps: any, myPosition: any, footTarget: any
 do -- (its own block: the locals below stay out of the 200-register limit)
 local guide = Instance.new("Folder")
 guide.Name = "DeliveryGuide"
 guide.Parent = workspace
--- The delivery's gold (the 3D guide's own colour, like the route on the maps: client/MapView.luau).
-view.guideColor = Color3.fromRGB(245, 179, 79)
+-- The job's stop: the contract red (like the job's route on the maps: client/MapView.luau).
+view.guideColor = P.red
 
 local function guidePart(name: string, size: Vector3, transparency: number): Part
 	local p = Instance.new("Part")
@@ -2555,24 +2517,37 @@ ring.Shape = Enum.PartType.Cylinder
 pileRing = guidePart("PileRing", Vector3.new(0.2, 7, 7), 0.35)
 pileRing.Shape = Enum.PartType.Cylinder
 label = guidePart("Label", Vector3.new(0.2, 0.2, 0.2), 1)
--- 3.6: the words (who, how far) in ink on a cream pill lined in the guide's colour: they read over a night street and
--- a sunny one alike.
-local labelGui = Ui.make("BillboardGui", { Size = UDim2.fromOffset(260, 64), AlwaysOnTop = true, LightInfluence = 0, MaxDistance = 100000 }, label)
-labelText = Ui.label(labelGui, "", UDim2.new(), {
-	AutomaticSize = Enum.AutomaticSize.XY,
-	Position = UDim2.fromScale(0.5, 0.5),
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundTransparency = 0.04,
-	BackgroundColor3 = P.pill,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	TextColor3 = P.ink,
-	TextSize = 17,
-	Font = Theme.DisplayFont,
-	TextWrapped = false,
+-- 3.8: the waypoint over the spot. Its bottom (a small dot at the end of a fine line) sits on the label point; over it
+-- the square in the guide's colour, the name in white caps and the distance (view.mark writes both). White on a faint
+-- charcoal stroke: it reads over a night street and a sunny one alike.
+local labelGui = Ui.make("BillboardGui", { Size = UDim2.fromOffset(240, 78), SizeOffset = Vector2.new(0, 0.5), AlwaysOnTop = true, LightInfluence = 0, MaxDistance = 100000 }, label)
+local words = Ui.make("Frame", { Size = UDim2.fromOffset(0, 40), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.fromScale(0.5, 0), AnchorPoint = Vector2.new(0.5, 0), BackgroundTransparency = 1 }, labelGui)
+Ui.make("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	VerticalAlignment = Enum.VerticalAlignment.Top,
+	Padding = UDim.new(0, 7),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, words)
+view.markSquare = P.marker(words, 8, { LayoutOrder = 1 })
+Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4) }, words)
+labelText = P.text(words, "", UDim2.fromOffset(0, 36), {
+	AutomaticSize = Enum.AutomaticSize.X,
+	Font = Theme.HeadingFont,
+	TextSize = 14,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	TextStrokeTransparency = 0.45,
+	RichText = true,
+	LineHeight = 1.1,
+	LayoutOrder = 2,
 })
-Ui.corner(labelText, 12)
-Ui.stroke(labelText, view.guideColor, 2.5)
-Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4) }, labelText)
+-- The fine line down to the spot and the dot at its end.
+Ui.make("Frame", { Name = "Stem", Size = UDim2.fromOffset(1, 30), Position = UDim2.new(0.5, 0, 1, -4), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = P.ink, BackgroundTransparency = 0.2, BorderSizePixel = 0 }, labelGui)
+Ui.make("Frame", { Name = "Dot", Size = UDim2.fromOffset(4, 4), Position = UDim2.new(0.5, 0, 1, 0), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = P.ink, BorderSizePixel = 0 }, labelGui)
+
+-- The waypoint's words: the name in caps over the distance.
+function view.mark(name: string, distance: number): string
+	return `{view.esc(string.upper(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
+end
 -- The arrow: a shaft and two sides of a head, pointing along -Z of its frame.
 local arrowParts = {
 	{ part = guidePart("ArrowShaft", Vector3.new(0.6, 0.4, 3.6), 0), offset = CFrame.new(0, 0, 0.8) },
@@ -2580,8 +2555,8 @@ local arrowParts = {
 	{ part = guidePart("ArrowRight", Vector3.new(0.6, 0.4, 2.6), 0), offset = CFrame.lookAt(Vector3.new(0.84, 0, -0.6), Vector3.new(0, 0, -1.6)) },
 }
 HIDDEN = CFrame.new(0, -1000, 0)
-PICKUP_COLOR = Color3.fromRGB(110, 190, 255)
-PILE_COLOR = Color3.fromRGB(120, 235, 140)
+PICKUP_COLOR = P.red -- (a pick-up is the job's stop too; the waypoint says PICK UP)
+PILE_COLOR = P.ink -- the pile, the person, the vehicle's back: white
 UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: stood up
 
 function hideGuide()
@@ -2605,7 +2580,7 @@ local function paintGuide(color: Color3)
 	for _, a in arrowParts do
 		a.part.Color = color
 	end
-	Ui.stroke(labelText, color, 2.5)
+	view.markSquare.BackgroundColor3 = color
 end
 
 -- The park circle at p with the beam over it (or a thin beam over the pile / the person at `beamAt`), the label
@@ -2639,7 +2614,7 @@ function pointArrow(origin: Vector3?, flat: Vector3, scale: number)
 end
 
 -- The GPS: a place picked on the big map (the job's target goes first).
-GPS_COLOR = Color3.fromRGB(176, 92, 255) -- the purple of the GPS route on the maps (client/MapView.luau)
+GPS_COLOR = P.ink -- white, like the GPS route on the maps (client/MapView.luau)
 gps = nil
 
 MapView.onWaypoint = function(landmark)
@@ -2714,48 +2689,40 @@ end
 end
 
 -- ── Level up ───────────────────────────────────────────────────────────────
--- A banner in the top stack (under the job panel; a level-up mostly comes as the job ends): LEVEL UP, the new level
--- and rank, what it unlocks; the XP bar flashes. Under the windows, so it never hides the delivery result.
+-- A banner in the contract column (under the contract group; a level-up mostly comes as the job ends): LEVEL UP, the
+-- new level and rank, what it unlocks; the XP line flashes. Under the windows, so it never hides the delivery result.
+-- 3.8: a charcoal strip with a thin good-green rule on its left, white type; it fades in and out (no bounce).
 
 local refreshLevel: () -> ()
 do -- (a block of its own: its locals stay out of the module's 200-register limit)
 local levelUpFrame = Ui.make("CanvasGroup", {
 	Name = "LevelUp",
-	Size = UDim2.new(0.82, 0, 0, 0),
+	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
-	BackgroundColor3 = P.paper,
+	BackgroundColor3 = P.surface,
+	BackgroundTransparency = 0.2,
 	BorderSizePixel = 0,
 	GroupTransparency = 1,
 	Visible = false,
 	ZIndex = 4,
 }, Hud.topSlot("levelup"))
--- 3.6: paper with a violet line around it; LEVEL UP in small caps over the level (DisplayFont, ink), the rank, then
--- what it unlocks.
-local levelUpPop = Ui.make("UIScale", { Scale = 1 }, levelUpFrame)
-Ui.corner(levelUpFrame, 12)
-Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.violet, Thickness = 1.5 }, levelUpFrame)
-Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, levelUpFrame)
-Ui.list(levelUpFrame, true, 2, Enum.HorizontalAlignment.Center)
-Ui.caps(levelUpFrame, "⬆  Level up", UDim2.new(1, 0, 0, 14), {
-	TextSize = 12,
-	TextColor3 = P.violet,
-	TextXAlignment = Enum.TextXAlignment.Center,
-	LayoutOrder = 1,
-})
-local levelUpTitle = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 30), {
-	AutomaticSize = Enum.AutomaticSize.Y, -- a long rank wraps on a narrow stack
-	TextSize = 26,
-	Font = Theme.DisplayFont,
+Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = P.good, BorderSizePixel = 0 }, levelUpFrame)
+local levelUpBody = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, levelUpFrame)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10) }, levelUpBody)
+Ui.list(levelUpBody, true, 3)
+P.caps(levelUpBody, "⬆  Level up", UDim2.new(1, 0, 0, 14), { TextColor3 = P.good, TextStrokeTransparency = 1, LayoutOrder = 1 })
+local levelUpTitle = Ui.label(levelUpBody, "", UDim2.new(1, 0, 0, 0), {
+	AutomaticSize = Enum.AutomaticSize.Y, -- a long rank wraps on a narrow column
+	TextSize = 20,
+	Font = Theme.HeadingFont,
 	TextColor3 = P.ink,
-	TextXAlignment = Enum.TextXAlignment.Center,
 	LayoutOrder = 2,
 })
-local levelUpUnlocks = Ui.label(levelUpFrame, "", UDim2.new(1, 0, 0, 0), {
+local levelUpUnlocks = Ui.label(levelUpBody, "", UDim2.new(1, 0, 0, 0), {
 	AutomaticSize = Enum.AutomaticSize.Y,
-	TextSize = 14,
-	Font = Theme.HeadingFont,
+	TextSize = 13,
+	Font = Theme.Font,
 	TextColor3 = P.ink2,
-	TextXAlignment = Enum.TextXAlignment.Center,
 	LayoutOrder = 3,
 })
 local levelUpStamp = 0
@@ -2768,48 +2735,40 @@ local function showLevelUp(from: number, to: number)
 		end
 	end
 	local rank = Levels.rank(to)
-	levelUpTitle.Text = `LEVEL {to}  ·  {rank:upper()}`
+	levelUpTitle.Text = `LEVEL {to}  /  {rank:upper()}`
 	levelUpUnlocks.Text = if #unlocked > 0 then `🔓  {table.concat(unlocked, "  ·  ")}` else "Better jobs, missions and cars wait on the next levels."
 	levelUpStamp += 1
 	local mine = levelUpStamp
-	levelUpFrame.Visible = true
-	levelUpPop.Scale = 0.8
-	local pop = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	TweenService:Create(levelUpFrame, pop, { GroupTransparency = 0 }):Play()
-	TweenService:Create(levelUpPop, pop, { Scale = 1 }):Play()
-	-- The XP bar and the level circle flash sage.
-	xpFill.BackgroundColor3 = P.sage
-	levelChip.BackgroundColor3 = P.sage
-	TweenService:Create(xpFill, TweenInfo.new(1.2), { BackgroundColor3 = P.violet }):Play()
-	TweenService:Create(levelChip, TweenInfo.new(1.2), { BackgroundColor3 = P.lavender }):Play()
+	P.fade(levelUpFrame, true, 0.25)
+	-- The XP line and the level flash the good green.
+	xpFill.BackgroundColor3 = P.good
+	levelChip.TextColor3 = P.good
+	TweenService:Create(xpFill, TweenInfo.new(1.2), { BackgroundColor3 = P.ink2 }):Play()
+	TweenService:Create(levelChip, TweenInfo.new(1.2), { TextColor3 = P.ink }):Play()
 	Hud.toast(`LEVEL {to}! You are a {rank} now.`)
 	task.delay(4.5, function()
 		if levelUpStamp ~= mine then
 			return
 		end
-		TweenService:Create(levelUpFrame, TweenInfo.new(0.5), { GroupTransparency = 1 }):Play()
-		task.wait(0.55)
-		if levelUpStamp == mine then
-			levelUpFrame.Visible = false
-		end
+		P.fade(levelUpFrame, false, 0.5)
 	end)
 end
 
 -- The level shown (nil until the save loaded: the first value is no level-up).
 local shownLevel: number? = nil
 
--- The level circle, the rank, the XP bar; a level-up flashes and the open shop shows what it unlocked.
+-- The level, the rank, the XP line; a level-up flashes and the open shop shows what it unlocked.
 function refreshLevel()
 	local xp = myXp()
 	if xp == nil then
-		levelChip.Text = "1"
+		levelChip.Text = "LV 1"
 		rankLabel.Text = string.upper(Levels.rank(1))
 		xpLabel.Text = ""
 		xpFill.Size = UDim2.fromScale(0, 1)
 		return
 	end
 	local level = Levels.levelFor(xp)
-	levelChip.Text = tostring(level)
+	levelChip.Text = `LV {level}`
 	rankLabel.Text = string.upper(Levels.rank(level))
 	if level >= Config.Levels.MaxLevel then
 		xpLabel.Text = "MAX LEVEL"
@@ -2845,36 +2804,34 @@ local callMarker: any
 local onCarCall: (any, any) -> ()
 -- (A block of its own: its locals do not count toward the module's 200-register limit.)
 do
-local CALL_COLOR = P.violet
+local CALL_COLOR = P.ink -- white while it comes; the good green when it is here, warn when it could not come
 local CALL_DONE_SHOWN = 3 -- seconds "Your car is here" stays
 local CALL_STALE = 20
 
--- 3.6: a compact paper card, a violet edge and line (green when the car is here), a thin bar at the bottom.
-local callLine = Ui.make("Frame", { Size = UDim2.new(0.78, 0, 0, 42), BackgroundColor3 = P.paper, BorderSizePixel = 0 }, Hud.topSlot("carcall"))
-Ui.corner(callLine, 12)
+-- 3.8: a compact charcoal strip with a thin rule on its left (its colour says how it goes), white text, the distance
+-- in small caps on the right and a fine line along the bottom that fills as the car comes.
+local callLine = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 38), BackgroundColor3 = P.surface, BackgroundTransparency = 0.22, BorderSizePixel = 0 }, Hud.topSlot("carcall"))
 callLine.Name = "CarCall"
 callLine.Visible = false
-local callStroke = Ui.stroke(callLine, CALL_COLOR, 1.5)
-callStroke.Transparency = 0.35
-local callEdge = Ui.edge(callLine, CALL_COLOR)
+local callStroke = Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = CALL_COLOR, Thickness = 1, Transparency = 0.85 }, callLine)
+local callEdge = Ui.make("Frame", { Name = "Edge", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = CALL_COLOR, BorderSizePixel = 0 }, callLine)
 local callText = Ui.label(callLine, "", UDim2.new(1, -112, 0, 24), {
-	Position = UDim2.fromOffset(18, 5),
-	TextSize = 15,
-	Font = Theme.DisplayFont,
+	Position = UDim2.fromOffset(14, 4),
+	TextSize = 14,
+	Font = Theme.HeadingFont,
 	TextColor3 = P.ink,
 	TextWrapped = false,
 	TextTruncate = Enum.TextTruncate.AtEnd,
 })
-local callDistance = Ui.caps(callLine, "", UDim2.fromOffset(84, 24), {
-	Position = UDim2.new(1, -96, 0, 5),
+local callDistance = P.caps(callLine, "", UDim2.fromOffset(84, 24), {
+	Position = UDim2.new(1, -96, 0, 4),
 	TextXAlignment = Enum.TextXAlignment.Right,
-	TextSize = 12,
-	TextColor3 = P.ink2,
+	TextStrokeTransparency = 1,
 })
-local callBack, callFill = Ui.bar(callLine, UDim2.new(1, -32, 0, 3), CALL_COLOR)
-callBack.Position = UDim2.new(0, 18, 1, -9)
+local callBack, callFill = P.bar(callLine, UDim2.new(1, -28, 0, 2), CALL_COLOR)
+callBack.Position = UDim2.new(0, 14, 1, -7)
 
--- The marker over the car in the world (seen through walls, like the delivery label).
+-- The marker over the car in the world (seen through walls, like the delivery waypoint).
 callMarker = Ui.make("BillboardGui", {
 	Name = "CarCallMarker",
 	Size = UDim2.fromOffset(200, 64),
@@ -2885,40 +2842,34 @@ callMarker = Ui.make("BillboardGui", {
 	ResetOnSpawn = false,
 	Enabled = false,
 }, player:WaitForChild("PlayerGui"))
--- 3.6: on a cream pill with a violet line (it reads over a night street and a sunny one), the ▼ under it.
+-- 3.8: white caps on a faint charcoal stroke (it reads over a night street and a sunny one), the time and the
+-- distance under it, a small ▼ in the line's colour.
 local markerPill = Ui.make("Frame", {
 	Size = UDim2.new(1, -20, 0, 42),
 	Position = UDim2.fromOffset(10, 0),
-	BackgroundColor3 = P.pill,
-	BackgroundTransparency = 0.04,
+	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
 }, callMarker)
-Ui.corner(markerPill, 12)
-Ui.stroke(markerPill, CALL_COLOR, 2)
-local markerText = Ui.label(markerPill, "", UDim2.new(1, 0, 0, 22), {
+local markerText = P.text(markerPill, "", UDim2.new(1, 0, 0, 22), {
 	Position = UDim2.fromOffset(0, 3),
 	TextXAlignment = Enum.TextXAlignment.Center,
-	TextSize = 17,
-	Font = Theme.DisplayFont,
-	TextColor3 = P.ink,
-	TextWrapped = false,
+	TextSize = 15,
+	Font = Theme.HeadingFont,
+	TextStrokeTransparency = 0.45,
 })
-local markerSub = Ui.label(markerPill, "", UDim2.new(1, 0, 0, 14), {
+local markerSub = P.caps(markerPill, "", UDim2.new(1, 0, 0, 14), {
 	Position = UDim2.fromOffset(0, 24),
 	TextXAlignment = Enum.TextXAlignment.Center,
-	TextSize = 12,
-	Font = Theme.HeadingFont,
-	TextColor3 = P.ink2,
-	TextWrapped = false,
+	TextStrokeTransparency = 0.45,
 })
-Ui.label(callMarker, "▼", UDim2.new(1, 0, 0, 22), {
+Ui.label(callMarker, "▼", UDim2.new(1, 0, 0, 18), {
 	Position = UDim2.fromOffset(0, 42),
 	TextXAlignment = Enum.TextXAlignment.Center,
-	TextSize = 20,
-	Font = Enum.Font.GothamBlack,
+	TextSize = 14,
+	Font = Theme.HeadingFont,
 	TextColor3 = CALL_COLOR,
-	TextStrokeColor3 = P.pill,
-	TextStrokeTransparency = 0,
+	TextStrokeColor3 = P.surface,
+	TextStrokeTransparency = 0.45,
 })
 
 local callLoop = false
@@ -2931,10 +2882,10 @@ local function carPart(car: Model?): BasePart?
 end
 
 local function setCarButton(text: string)
-	-- (the CAR entry of the "…" menu: its icon, then the text)
+	-- (the CAR entry of the MENU list)
 	local button = hudButtons.car
-	if button and button.Text ~= `🚗  {text}` then
-		button.Text = `🚗  {text}`
+	if button and button.Text ~= text then
+		button.Text = text
 	end
 end
 
@@ -2971,7 +2922,7 @@ local function updateCall(): boolean
 		callFill.BackgroundColor3 = if current.doneText then P.warn else P.good
 		callEdge.BackgroundColor3 = callFill.BackgroundColor3
 		callFill.Size = UDim2.fromScale(1, 1)
-		markerText.Text = "🚗  YOUR CAR"
+		markerText.Text = "YOUR CAR"
 		markerSub.Text = if distance then `here · {distance} m` else "here"
 		setCarButton("CAR")
 	else
@@ -2981,7 +2932,7 @@ local function updateCall(): boolean
 		callFill.BackgroundColor3 = CALL_COLOR
 		callEdge.BackgroundColor3 = CALL_COLOR
 		callFill.Size = UDim2.fromScale(math.clamp(1 - (current.arriveAt - now) / current.total, 0, 1), 1)
-		markerText.Text = "🚗  YOUR CAR"
+		markerText.Text = "YOUR CAR"
 		markerSub.Text = (if left > 0 then `{left} s` else "arriving") .. (if distance then `  ·  {distance} m` else "")
 		setCarButton(if left <= 0 then "CAR" elseif touchLayout then `CAR {left}s` else `CAR · {left} s`)
 	end
@@ -3053,47 +3004,50 @@ end
 -- ── Layout ─────────────────────────────────────────────────────────────────
 -- Everything outside the windows is placed from the size of the screen: the ScreenGui's area under Roblox's top
 -- bar, W × H pixels, and one scale S = Ui.scaleFor(W × H) (1 at 1150 × 680, from 0.55 on phones to 1.1). It runs
--- again when the screen changes or the ADMIN button comes or goes. 3.6, the concept's regions:
+-- again when the screen changes, the native chat window moves or resizes, players come and go (the player list
+-- grows) or the ADMIN button comes or goes. 3.8, the contract composition:
 --
 --   COMPUTER (keyboard and mouse)                       TOUCH, held sideways (phone or tablet, no keyboard)
 --   ┌──────────────────────────────────────────────┐    ┌──────────────────────────────────────────────┐
---   │ chat     ┌── top stack ──┐   (player list)   │    │ money   ┌── top stack ──┐   MAP CREW …      │
---   │ (Roblox) │ ticket / crew │                   │    │ minimap │ ticket / crew │                   │
---   │          │ car call      │                   │    │ health  │ car call      │                   │
---   │          │ level up      │      MAP CREW …   │    │         │ toasts        │                   │
---   │          │ toasts        │      ┌weapon───┐  │    │         └───────────────┘                   │
---   │ money    └───────────────┘      └─────────┘  │    │            (loading bar)  ┌weapon┐  (FIRE)   │
---   │ minimap        (loading bar)      ╭─────╮    │    │ (thumb-        hint       ╭─────╮           │
---   │ health        hint                │dial │    │    │  stick)     tags 1-5     │dial │   (jump)   │
---   │               tags 1-5            ╰─────╯    │    │                          ╰─────╯           │
---   └──────────────────────────────────────────────┘    └──────────────────────────────────────────────┘
+--   │ (chat)                MAP CREW MENU (players)│    │ cash    ■ CONTRACT          MAP CREW MENU    │
+--   │ ■ CONTRACT                                   │    │ minimap DESTINATION                          │
+--   │ DESTINATION                                  │    │ health  □ objectives                         │
+--   │ □ objectives                                 │    │         04:36 / EST.  (column)               │
+--   │ 04:36 REMAINING / EST.                       │    │                                  ┌weapon─┐  │
+--   │ (column: tutorial, crew, ...)       ┌weapon─┐│    │ (thumb-                          │vehicle│(FIRE)
+--   │ cash / rank                         │vehicle││    │  stick)     [E] ACTION           │items  │(jump)
+--   │ minimap         [E] ACTION          │items  ││    │             ─────                └───────┘  │
+--   │ + health        ─────               └───────┘│    └──────────────────────────────────────────────┘
+--   └──────────────────────────────────────────────┘
 --
 --   * Margins 16 px, gaps 8 px. The ADMIN button (client/AdminPanel.luau, 90 × 32 at 16 px from the right, 56 from
 --     the top, unscaled) keeps the top right corner (down to ADMIN_BOTTOM) while it shows (admins, Studio).
---   * Left: money + minimap + health, one column (LEFT_W × LEFT_H × S): bottom left on a computer (the chat is top
+--   * Left: cash + minimap + health, one column (LEFT_W × LEFT_H × S): bottom left on a computer (the chat is top
 --     left), top left on touch (the thumbstick is bottom left).
---   * Bottom right: the speed dial in the corner, the weapon label on it. Touch: the FIRE button just over Roblox's jump
---     button (70 px at 95 / 90 px from the corner on a small screen, 120 px at 170 / 210 px on a big one), the dial and
---     the weapon label left of them. A touch screen with a keyboard: FIRE left of the dial.
---   * Bottom centre: the tags between the left column (touch: the thumbstick's corner) and the dial, the hint over them
---     (over the dial when there is no room).
---   * The utilities (MAP, CREW, "…"): a computer has the player list (leaderstats) top right, so they sit just over the
---     weapon label and the menu opens upward; on touch top right (under ADMIN) and the menu opens downward.
---   * Top stack: centred, TOP_W × S wide (narrower down to TOP_MIN_W before it gets smaller), between the minimap
---     (touch) and the utilities / ADMIN, and as tall as the room over the bottom panels allows (TOP_EST_H: the ticket,
---     the mission banner and the car call line, with the loading bar's room under it); smaller when it has to. On a
---     touch screen with no room beside them (upright) it goes under the minimap and the utilities.
---   * The loading bar: at 62 % of the height, under the top stack and over the panels at the bottom.
+--   * Upper left: the contract column, under the native chat window on a computer (its rectangle from
+--     TextChatService's ChatWindowConfiguration; right of it when there is no room under it), right of the minimap
+--     column on touch (under it when a screen held upright has no room beside it). TOP_W × S wide (narrower down to
+--     TOP_MIN_W before it gets smaller) and as tall as the room over the lower panels allows (TOP_EST_H).
+--   * Upper right: MAP CREW MENU. A computer has Roblox's player list (leaderstats) top right: the row sits left of
+--     it (PLAYER_LIST_W), or under it when the screen is too narrow. On touch top right, under ADMIN. MENU's list opens
+--     downward (upward when it would leave the screen).
+--   * Lower right: the weapon / cargo line, the vehicle line and the inventory, right-aligned in one column. Touch:
+--     the FIRE button just over Roblox's jump button (70 px at 95 / 90 px from the corner on a small screen, 120 px at
+--     170 / 210 px on a big one), the column left of them. A touch screen with a keyboard: FIRE left of the column.
+--   * Lower centre: the contextual action (key box, words, the fine hold progress line), its bottom HINT_BOTTOM × S over
+--     the margin, between the left column (touch: the thumbstick's corner) and the right column. client/Stamina.luau's
+--     breath bar sits higher (16 + 170 × S from the bottom), clear of it.
 
 do -- (its own block: the locals below stay out of the 200-register limit)
 local MARGIN = 16
 local GAP = 8
 local ADMIN_BOTTOM = 96 -- client/AdminPanel.luau: the ADMIN button at (1, -16, 0, 56), 90 × 32, unscaled
-local ADMIN_LEFT = 16 + 90 + GAP
 local TOUCH_BUTTON_MIN = 0.8
-local TOP_EST_H = 300 -- the top stack's usual height (unscaled): the ticket, the mission banner (up to 80) and the car call line
-local TOP_MIN_W = 380 -- a narrow span first makes the top stack narrower (down to this), then smaller
-local HINT_LINES = 2 -- the hint: a main line and a quiet one
+local TOP_EST_H = 200 -- the contract column's usual height (unscaled): the group with its objectives, a hint or a line under it
+local TOP_MIN_W = 300 -- a narrow span first makes the contract column narrower (down to this), then smaller
+local PLAYER_LIST_W = 370 -- Roblox's player list with this game's three leaderstats (px, not scaled by us)
+local HINT_BOTTOM = 18 -- the contextual action's bottom over the margin (unscaled)
+local HINT_W = 480 -- its widest (unscaled)
 
 type Box = { x0: number, y0: number, x1: number, y1: number }
 
@@ -3125,6 +3079,38 @@ local function adminButtonShown(): boolean
 	return player:GetAttribute("Admin") == true or (Config.Admin.InStudio and RunService:IsStudio())
 end
 
+-- Is a native Roblox interface on (StarterGui:GetCoreGuiEnabled; on when it cannot be asked)?
+local function coreOn(kind: Enum.CoreGuiType): boolean
+	local ok, on = pcall(function()
+		return game:GetService("StarterGui"):GetCoreGuiEnabled(kind)
+	end)
+	return not ok or on == true
+end
+
+-- The native chat window's rectangle on a computer (TextChatService's ChatWindowConfiguration), nil when there is
+-- none. Its coordinates may count Roblox's top bar; taken as they are, the column only ends up a little lower.
+local function chatBox(): Box?
+	if touchLayout or not coreOn(Enum.CoreGuiType.Chat) then
+		return nil
+	end
+	local ok, found = pcall(function(): Box?
+		local TextChatService = game:GetService("TextChatService")
+		if TextChatService.ChatVersion ~= Enum.ChatVersion.TextChatService then
+			return box(0, 0, 400, 200) -- the legacy chat: top left, about this big
+		end
+		local config = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
+		if not config or not config.Enabled then
+			return nil
+		end
+		local position, size = config.AbsolutePosition, config.AbsoluteSize
+		if size.X < 1 or size.Y < 1 then
+			return nil
+		end
+		return box(position.X, position.Y, position.X + size.X, position.Y + size.Y)
+	end)
+	return if ok then found else nil
+end
+
 layout = function()
 	local size = screenArea()
 	local W, H = size.X, size.Y
@@ -3132,10 +3118,10 @@ layout = function()
 	for _, s in scales do
 		s.Scale = S
 	end
-	-- What the top stack and the loading bar must stay above.
+	-- What the contract column and the action must stay clear of.
 	local below: { Box } = {}
 
-	-- Left: money, the minimap and the health row.
+	-- Left: the cash line, the minimap and the health row.
 	setScale(leftStack, S)
 	local left: Box
 	if touchLayout then
@@ -3149,15 +3135,13 @@ layout = function()
 		table.insert(below, left)
 	end
 
-	-- Bottom right: FIRE over the jump button (touch); the dial and the weapon label. cornerLeft: where they begin.
+	-- Lower right: FIRE over the jump button (touch); the column of the weapon, the vehicle and the inventory.
 	local admin = adminButtonShown()
-	local rightTop = if admin then ADMIN_BOTTOM else MARGIN
+	local right = view.right
+	local rightW, rightH = right.Size.X.Offset * S, right.Size.Y.Offset * S
 	local fireSize = FIRE_SIZE * S
-	local dialSize = carPanel.Size.X.Offset * S
-	local weaponW, weaponH = weaponBar.Size.X.Offset * S, weaponBar.Size.Y.Offset * S
 	setScale(fire, S)
-	setScale(carPanel, S)
-	setScale(weaponBar, S)
+	setScale(right, S)
 	fire.AnchorPoint = Vector2.new(1, 1)
 	local columnRight = W - MARGIN
 	local columnBottom = H - MARGIN
@@ -3177,116 +3161,113 @@ layout = function()
 		-- Roblox's thumbstick lives in the bottom left corner: nothing of ours goes there.
 		thumb = box(0, H - (if small then 190 else 260), math.max(if small then 170 else 230, W * 0.22), H)
 	elseif UserInputService.TouchEnabled then
-		-- A touch screen with a keyboard: FIRE left of the dial.
-		fire.Position = UDim2.fromOffset(W - MARGIN - math.max(dialSize, weaponW) - 12, H - MARGIN)
-		local fireBox = box(W - MARGIN - math.max(dialSize, weaponW) - 12 - fireSize, H - MARGIN - fireSize, W - MARGIN - math.max(dialSize, weaponW) - 12, H - MARGIN)
-		table.insert(below, fireBox)
+		-- A touch screen with a keyboard: FIRE left of the column.
+		local fireRight = W - MARGIN - rightW - 12
+		fire.Position = UDim2.fromOffset(fireRight, H - MARGIN)
+		table.insert(below, box(fireRight - fireSize, H - MARGIN - fireSize, fireRight, H - MARGIN))
 	end
-	carPanel.AnchorPoint = Vector2.new(1, 1)
-	carPanel.Position = UDim2.fromOffset(columnRight - 8 * S, columnBottom)
-	local dialTop = columnBottom - dialSize
-	weaponBar.AnchorPoint = Vector2.new(1, 1)
-	weaponBar.Position = UDim2.fromOffset(columnRight, dialTop - GAP)
-	local weaponTop = dialTop - GAP - weaponH
-	local columnLeft = columnRight - math.max(weaponW, dialSize)
-	local column = box(columnLeft, weaponTop, columnRight, columnBottom)
+	right.AnchorPoint = Vector2.new(1, 1)
+	right.Position = UDim2.fromOffset(columnRight, columnBottom)
+	local column = box(columnRight - rightW, columnBottom - rightH, columnRight, columnBottom)
 	table.insert(below, column)
-	local cornerLeft = columnLeft
+	local cornerLeft = column.x0
 	for _, b in below do
 		if b ~= left and b.y1 > H * 0.5 then
 			cornerLeft = math.min(cornerLeft, b.x0)
 		end
 	end
 
-	-- Bottom centre: the tags with the hint over them.
-	local spanLeft = (if thumb then thumb.x1 else left.x1) + 12
+	-- Lower centre: the contextual action, between the left column (or the thumbstick) and the right one.
+	setScale(hint, S)
+	local spanLeft = (if thumb then thumb.x1 elseif touchLayout then MARGIN else left.x1) + 12
 	local spanRight = cornerLeft - 12
-	local tagScale = math.clamp((spanRight - spanLeft) / BAR_W, 0.45, S)
-	local tagsX = math.clamp(W / 2, spanLeft + BAR_W * tagScale / 2, math.max(spanLeft + BAR_W * tagScale / 2, spanRight - BAR_W * tagScale / 2))
-	local tagsBottom = H - (if touchLayout then GAP else MARGIN)
-	if spanRight - spanLeft < BAR_W * tagScale then
-		-- No room between them: over the dial's column, right-aligned with it.
-		tagsX = columnRight - BAR_W * tagScale / 2
-		tagsBottom = weaponTop - GAP
-	end
-	setScale(hotbar, tagScale)
-	hotbar.AnchorPoint = Vector2.new(0.5, 1)
-	hotbar.Position = UDim2.fromOffset(tagsX, tagsBottom)
-	local tagsTop = tagsBottom - HOTBAR_H * tagScale
-	table.insert(below, box(tagsX - BAR_W * tagScale / 2, tagsTop, tagsX + BAR_W * tagScale / 2, tagsBottom))
-	local hintWidth = math.max(BAR_W * tagScale, 2 * math.min(tagsX - spanLeft, spanRight - tagsX))
-	local hintAt = tagsTop - 48 * tagScale -- room for a lifted tag's name (lift 9, 10 + 24 px pill at 1.12, 4 spare)
-	local hintSize = math.max(11, math.floor(15 * S + 0.5))
-	hint.TextSize = hintSize
-	view.hintSub = math.max(10, math.floor(13 * S + 0.5))
+	local hintW = math.max(160, math.min(HINT_W * S, spanRight - spanLeft))
 	local hintMax = hint:FindFirstChild("Max")
 	if hintMax and hintMax:IsA("UISizeConstraint") then
-		hintMax.MaxSize = Vector2.new(math.max(140, hintWidth), math.huge)
+		hintMax.MaxSize = Vector2.new(hintW / S, math.huge)
 	end
-	hint.Position = UDim2.fromOffset(tagsX, hintAt)
-	table.insert(below, box(tagsX - hintWidth / 2, hintAt - HINT_LINES * (hintSize + 4) - 12, tagsX + hintWidth / 2, hintAt))
+	local hintX = math.clamp(W / 2, spanLeft + hintW / 2, math.max(spanLeft + hintW / 2, spanRight - hintW / 2))
+	local hintBottom = H - (if touchLayout then GAP else MARGIN) - HINT_BOTTOM * S
+	hint.AnchorPoint = Vector2.new(0.5, 1)
+	hint.Position = UDim2.fromOffset(hintX, hintBottom)
+	table.insert(below, box(hintX - hintW / 2, hintBottom - 96 * S, hintX + hintW / 2, hintBottom))
 
-	-- The utilities: a row (its Size is the unscaled row), over the weapon label (computer) or top right (touch).
+	-- Upper right: MAP CREW MENU (its Size is the unscaled row).
 	local base = if touchLayout then math.max(S, TOUCH_BUTTON_MIN) else S
 	local gw, gh = buttonGrid.Size.X.Offset, buttonGrid.Size.Y.Offset
-	local buttonScale: number
-	local gridTop: number
-	if touchLayout then
-		buttonScale = math.clamp(base, 0.45, base)
-		gridTop = rightTop
-	else
-		local room = math.max(0, weaponTop - 12 - rightTop)
-		buttonScale = math.clamp(room / gh, 0.45, base)
-		gridTop = math.max(rightTop, weaponTop - 12 - gh * buttonScale)
-	end
+	local buttonScale = math.clamp(base, 0.45, base)
 	setScale(buttonGrid, buttonScale)
+	local rowW, rowH = gw * buttonScale, gh * buttonScale
+	local rowRight, rowTop = W - MARGIN, if admin then ADMIN_BOTTOM else MARGIN
+	if not touchLayout then
+		rowTop = 4 -- (in line with the top of the chat and the player list)
+		if coreOn(Enum.CoreGuiType.PlayerList) then
+			if W - MARGIN - PLAYER_LIST_W - rowW >= MARGIN + TOP_MIN_W * S + 24 then
+				rowRight = W - MARGIN - PLAYER_LIST_W -- left of the player list
+			else
+				-- Too narrow: under the player list (about 40 px a player and its header).
+				local listBottom = math.min(H * 0.45, 52 + 40 * #Players:GetPlayers())
+				rowTop = math.max(listBottom, if admin then ADMIN_BOTTOM else 0) + GAP
+			end
+		end
+	end
 	buttonGrid.AnchorPoint = Vector2.new(1, 0)
-	buttonGrid.Position = UDim2.fromOffset(W - MARGIN, gridTop)
-	local grid = box(W - MARGIN - gw * buttonScale, gridTop, W - MARGIN, gridTop + gh * buttonScale)
-	local gridHigh = grid.y0 < H * 0.45
-	-- The menu opens toward the middle: down from a high row (left of it when the weapon label or FIRE is in the
-	-- way), up from a low one.
+	buttonGrid.Position = UDim2.fromOffset(rowRight, rowTop)
+	local grid = box(rowRight - rowW, rowTop, rowRight, rowTop + rowH)
+	-- MENU's list opens downward, upward when it would leave the screen.
 	local menu = view.menu
-	local menuW = menu.Size.X.Offset * buttonScale
-	local fitsDown = grid.y1 + (8 + view.menuHeight) * buttonScale <= ceilingBelow(below, grid.x1 - menuW, grid.x1, grid.y1, H)
-	if gridHigh and not fitsDown then
-		menu.AnchorPoint = Vector2.new(1, 0)
-		menu.Position = UDim2.new(0, -8, 0, 0)
+	local menuH = (4 + view.menuHeight) * buttonScale
+	if grid.y1 + menuH > H - MARGIN and grid.y0 - menuH >= 0 then
+		menu.AnchorPoint = Vector2.new(1, 1)
+		menu.Position = UDim2.new(1, 0, 0, -4)
 	else
-		menu.AnchorPoint = Vector2.new(1, if gridHigh then 0 else 1)
-		menu.Position = if gridHigh then UDim2.new(1, 0, 1, 8) else UDim2.new(1, 0, 0, -10)
+		menu.AnchorPoint = Vector2.new(1, 0)
+		menu.Position = UDim2.new(1, 0, 1, 4)
 	end
 
-	-- The top stack: as big as the span (spanL .. spanR from y) and the room under it allow.
-	local loadRoom = GAP + LOAD_H * S + GAP
-	local function fit(y: number, spanL: number, spanR: number): (number, number, number)
-		local span = spanR - spanL
+	-- The contract column: as big as the span (from x0 to x1 at y) and the room under it allow.
+	local function fit(y: number, x0: number, x1: number): (number, number)
+		local span = x1 - x0
 		local width = math.clamp(span / S, TOP_MIN_W, TOP_W)
 		local scale = math.min(S, span / width)
-		local half = width * scale / 2
-		local cx = math.clamp(W / 2, spanL + half, math.max(spanL + half, spanR - half))
-		local floor = ceilingBelow(below, cx - half, cx + half, y, H)
-		scale = math.min(scale, (floor - loadRoom - y) / TOP_EST_H)
-		return scale, cx, width
+		local floor = ceilingBelow(below, x0, x0 + width * scale, y, H)
+		scale = math.min(scale, (floor - GAP - y) / TOP_EST_H)
+		return scale, width
 	end
-	local topY = 14
-	local spanL, spanR = MARGIN, W - MARGIN
+	-- Its right end: the row of actions when the row is beside it (else the screen's edge, or ADMIN).
+	local function rightLimit(y: number): number
+		local limit = W - MARGIN
+		if grid.y1 > y and grid.y0 < y + TOP_EST_H * S then
+			limit = math.min(limit, grid.x0 - GAP)
+		end
+		if admin then
+			limit = math.min(limit, W - 16 - 90 - GAP)
+		end
+		return limit
+	end
+	local topX, topY = MARGIN, 14
 	if touchLayout then
-		spanL = left.x1 + GAP
+		topX, topY = left.x1 + GAP, MARGIN
 	end
-	if gridHigh then
-		spanR = math.min(spanR, grid.x0 - GAP)
+	local chat = chatBox()
+	if chat and chat.x0 < topX + TOP_MIN_W * S and chat.y1 > topY then
+		topY = chat.y1 + GAP -- under the chat window
 	end
-	if admin then
-		spanR = math.min(spanR, W - ADMIN_LEFT)
-	end
-	local topScale, topX, topWidth = fit(topY, spanL, spanR)
-	if touchLayout and topScale < S * 0.8 then
-		-- No room beside the minimap and the utilities (upright): under them, the whole width.
-		local y = math.max(left.y1, if gridHigh then grid.y1 else 0) + GAP
-		local scale, x, width = fit(y, MARGIN, W - MARGIN)
+	local topScale, topWidth = fit(topY, topX, rightLimit(topY))
+	if chat and topScale < S * 0.8 then
+		-- Little room under the chat: beside it, at the top, if that is bigger.
+		local x = chat.x1 + GAP
+		local scale, width = fit(14, x, rightLimit(14))
 		if scale > topScale then
-			topY, topScale, topX, topWidth = y, scale, x, width
+			topX, topY, topScale, topWidth = x, 14, scale, width
+		end
+	end
+	if touchLayout and topScale < S * 0.8 then
+		-- No room beside the minimap and the actions (upright): under them, the whole width.
+		local y = math.max(left.y1, grid.y1) + GAP
+		local scale, width = fit(y, MARGIN, W - MARGIN)
+		if scale > topScale then
+			topX, topY, topScale, topWidth = MARGIN, y, scale, width
 		end
 	end
 	topScale = math.max(topScale, 0.3)
@@ -3294,16 +3275,6 @@ layout = function()
 	topStack.Size = UDim2.fromOffset(topWidth, 0)
 	topStack.Position = UDim2.fromOffset(topX, topY)
 	view.fitTicket()
-
-	-- The loading bar: at 62 % of the height, under the top stack, over the bottom panels.
-	local loadHalf = LOAD_H * S / 2
-	local topBottom = topY + TOP_EST_H * topScale
-	local loadFloor = ceilingBelow(below, W / 2 - 170 * S, W / 2 + 170 * S, topBottom, H)
-	local loadY = math.min(H * 0.62, loadFloor - GAP - loadHalf)
-	if loadY - loadHalf < topBottom + GAP then
-		loadY = math.min(topBottom + GAP + loadHalf, loadFloor - GAP - loadHalf)
-	end
-	loadBack.Position = UDim2.fromOffset(W / 2, loadY)
 end
 end
 
@@ -3333,6 +3304,7 @@ function Hud.setJob(newJob: any)
 	local giveUp = hudButtons.giveup
 	if giveUp then
 		giveUp.Visible = job ~= nil
+		view.giveUpRule.Visible = job ~= nil
 	end
 	if backpack.frame.Visible then
 		renderBackpack()
@@ -3353,10 +3325,11 @@ function Hud.setJob(newJob: any)
 	local progress = job.progress or 0
 	loadBack.Visible = progress > 0
 	loadFill.Size = UDim2.fromScale(math.clamp(progress, 0, 1), 1)
-	loadText.Text = if job.handling == "board" then (if pickup then "GETTING ON... wait in the circle" else "GETTING OFF... wait in the circle")
-		elseif job.handling == "serve" then "SERVING... hold still"
-		elseif pickup then "LOADING... hold still"
-		else "UNLOADING... hold them off!"
+	loadText.Text = string.upper(if job.handling == "board" then (if pickup then "Getting on… wait in the circle" else "Getting off… wait in the circle")
+		elseif job.handling == "serve" then "Serving… hold still"
+		elseif pickup then "Loading… hold still"
+		else "Unloading… hold them off!")
+	hint.Visible = hint.Visible or loadBack.Visible
 end
 
 function Hud.setVisible(visible: boolean)
@@ -3371,15 +3344,30 @@ end
 local lastShop: string? = nil
 local lastHolding: string? = nil
 
--- 3.6, the hint over the tags: what to do right now in ink, a quieter line under it (RichText; both escaped).
-local function setHint(main: string, sub: string?)
-	local text = if main == "" then "" else view.esc(main)
-	if text ~= "" and sub and sub ~= "" then
-		text ..= `\n<font size="{view.hintSub or 13}" color="{view.hex(P.ink2)}">{view.esc(sub)}</font>`
+-- 3.8, the contextual action (lower centre): what to do right now in white caps, a short instruction under it and
+-- its key in the key box (`key`, or a "(E)" at the end of the words; none on a touch screen). Shown while it has
+-- something to say or a hold runs.
+local function setHint(main: string, sub: string?, key: string?)
+	local a = view.action
+	local words, found = string.match(main, "^(.-)%s*%(([%w%s]+)%)%s*$")
+	if words and found and #found <= 5 then
+		main, key = words, key or found
 	end
-	if hint.Text ~= text then
-		hint.Text = text
-		hint.Visible = text ~= ""
+	if touchLayout then
+		key = nil
+	end
+	local signature = `{main}|{sub}|{key}`
+	if a.shown ~= signature then
+		a.shown = signature
+		a.main.Text = string.upper(main)
+		a.sub.Text = string.upper(sub or "")
+		a.sub.Visible = sub ~= nil and sub ~= ""
+		a.key.Visible = key ~= nil
+		a.key.Text = string.upper(key or "")
+	end
+	local visible = main ~= "" or loadBack.Visible
+	if hint.Visible ~= visible then
+		hint.Visible = visible
 	end
 end
 
@@ -3389,65 +3377,10 @@ RunService.RenderStepped:Connect(function()
 	end
 	local now = os.clock()
 	view.checkIdle(now)
-	-- The car: the speed dial.
+	-- The car: the vehicle line.
 	local car = Drive.myCar()
 	local seatedIn, driving = Drive.seatedCar()
-	local d = view.dial
-	if car then
-		local carId = tostring(car:GetAttribute("CarId"))
-		local stage = tonumber(car:GetAttribute("Stage")) or 0
-		local health = (car:GetAttribute("Health") or 0) :: number
-		local maxHealth = math.max(1, (car:GetAttribute("MaxHealth") or 1) :: number)
-		local share = math.clamp(health / maxHealth, 0, 1)
-		local capacity = Economy.stageCapacity(carId, stage)
-		local loaded = tonumber(car:GetAttribute("CargoCount")) or inVehicle() or 0
-		local inside = seatedIn == car
-		local pct = math.floor(share * 100 + 0.5)
-		-- The slow parts: only when they change.
-		local shown = `{carId}|{stage}|{pct}|{capacity}|{loaded}|{inside}`
-		if d.shown ~= shown then
-			d.shown = shown
-			local def = Economy.findCar(carId)
-			local stageDef = Economy.stageDef(carId, stage)
-			d.name.Text = string.upper(if stageDef then stageDef.name elseif def then def.name else "Car")
-			d.condText.Text = if share <= 0.25 then `⚠ {pct}%` else `{pct}%`
-			d.condText.TextColor3 = if share <= 0.25 then P.danger else P.ink
-			d.condFill.Size = UDim2.fromScale(share, 1)
-			d.condFill.BackgroundColor3 = if share > 0.5 then P.violet elseif share > 0.25 then P.warn else P.danger
-			view.drawPips(capacity, loaded)
-			-- On foot the dial dims and keeps your parked car's condition.
-			d.group.GroupTransparency = if inside then 0 else 0.35
-			d.unit.Text = if inside then "KM/H" else "PARKED"
-		end
-		if inside then
-			local chassis = car.PrimaryPart
-			local v = if chassis then chassis.AssemblyLinearVelocity else Vector3.zero
-			local speed = math.floor(Vector3.new(v.X, 0, v.Z).Magnitude)
-			local boost = Drive.boosting()
-			local text = (if boost then "⚡" else "") .. tostring(speed)
-			if d.speed.Text ~= text then
-				d.speed.Text = text
-				d.speed.TextColor3 = if boost then P.violet else P.ink
-				local top = math.max(1, tonumber(car:GetAttribute("MaxSpeed")) or 80)
-				d.needle.Rotation = -135 + 270 * math.clamp(speed / top, 0, 1)
-			end
-		elseif d.speed.Text ~= "–" then
-			d.speed.Text = "–"
-			d.speed.TextColor3 = P.ink2
-			d.needle.Rotation = -135
-		end
-	elseif d.shown ~= "none" then
-		d.shown = "none"
-		d.name.Text = "NO CAR"
-		d.speed.Text = "–"
-		d.speed.TextColor3 = P.ink2
-		d.unit.Text = "CALL IT: … → CAR"
-		d.condText.Text = ""
-		d.condFill.Size = UDim2.fromScale(0, 1)
-		d.needle.Rotation = -135
-		d.group.GroupTransparency = 0.35
-		view.drawPips(0, 0)
-	end
+	view.drawVehicle(car, seatedIn)
 
 	-- Your health (the Humanoid's).
 	local character = player.Character
@@ -3458,10 +3391,12 @@ RunService.RenderStepped:Connect(function()
 		local most = if humanoid then math.max(1, humanoid.MaxHealth) else 100
 		view.healthText.Text = tostring(life)
 		view.healthFill.Size = UDim2.fromScale(math.clamp(life / most, 0, 1), 1)
-		view.healthFill.BackgroundColor3 = if life / most > 0.3 then P.violet else P.danger
+		view.healthFill.BackgroundColor3 = if life / most > 0.3 then P.ink else P.danger
+		view.healthText.TextColor3 = if life / most > 0.3 then P.ink else P.danger
 	end
 
-	-- Got in / out, cargo in your hands, or the car gun changed: the weapon label shows what fires now.
+	-- Got in / out, cargo in your hands, or the car gun changed: the weapon line shows what fires now (or what you
+	-- carry); the consumables hide while you carry.
 	if weaponBarKey() ~= shownWeaponBar then
 		renderWeapons()
 	end
@@ -3479,8 +3414,9 @@ RunService.RenderStepped:Connect(function()
 	local safe = root ~= nil and Map.isSafe(root.Position.X, root.Position.Z)
 	local holding = myCarrying()
 	if holding ~= lastHolding then
-		-- Picked up / put down: the backpack shows it.
+		-- Picked up / put down: the backpack shows it, the consumables hide while you carry.
 		lastHolding = holding
+		hotbar.Visible = holding == nil
 		if backpack.frame.Visible then
 			renderBackpack()
 		end
@@ -3495,18 +3431,22 @@ RunService.RenderStepped:Connect(function()
 		setHint(step, if progress ~= "" and hands ~= "" then `{progress} · {hands}` else progress .. hands)
 	elseif holding then
 		-- G is the server's "Put down" / "Let go" prompt key (server/Cargo.luau); touch screens tap the prompt.
-		setHint(if holding == "horse" then "🐴  Leading a horse" else "✋  Hands full", if holding == "horse" then `no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}` else `no gun, no sprint · E loads / hands over · {if touch then "tap PUT DOWN" else "G puts it down"} to shoot`)
+		if holding == "horse" then
+			setHint("Leading a horse", `no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}`)
+		else
+			setHint("Load it or hand it over", `no gun, no sprint · {if touch then "tap PUT DOWN" else "G puts it down"} to shoot`, "E")
+		end
 	elseif inShop then
-		setHint(`🏪  {Map.Shops[inShop].name}`, "walk to the counter and press E")
+		setHint(Map.Shops[inShop].name, "walk to the counter", "E")
 	elseif seatedIn and not driving then
 		local gun = if state then Economy.findWeapon(state.weapon) else nil
-		setHint("🪟  Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · Q to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · Space gets out")
+		setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · Q to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · Space gets out")
 	elseif safe and not job then
-		setHint("🛡️  Safe zone", `shops around the depot · {if touch then "OFF DUTY ticket" else "J"} for the Dispatch board`)
+		setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
 	elseif not car then
-		setHint("🚗  No car out", "the … menu → CAR calls it")
+		setHint("No car out", "MENU → CAR calls it")
 	elseif not seatedIn and not job then
-		setHint("🚶  On foot", if touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
+		setHint("On foot", if touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
 	else
 		setHint("")
 	end
@@ -3545,7 +3485,7 @@ RunService.RenderStepped:Connect(function()
 		if position then
 			local flat = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
 			distance = math.floor(flat.Magnitude)
-			labelText.Text = if footText then `{footText}\n{distance} m` else (if pickup then "PICK UP" else string.upper(person or job.customer)) .. `\n{distance} m`
+			labelText.Text = view.mark(footText or (if pickup then "PICK UP" else (person or tostring(job.customer))), distance)
 			local chassis = if seatedIn then seatedIn.PrimaryPart else nil
 			if chassis then
 				pointArrow(chassis.Position + Vector3.new(0, 11, 0), flat, 1)
@@ -3559,7 +3499,7 @@ RunService.RenderStepped:Connect(function()
 		if position then
 			local flat = Vector3.new(gps.position.X - position.X, 0, gps.position.Z - position.Z)
 			local distance = math.floor(flat.Magnitude)
-			labelText.Text = `{gps.name}\n{distance} m`
+			labelText.Text = view.mark(gps.name, distance)
 			if distance < 30 then
 				Hud.toast(`You are at {gps.name}.`)
 				gps = nil
@@ -3588,6 +3528,17 @@ function Hud.start()
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(requestLayout)
 	end
 	player:GetAttributeChangedSignal("Admin"):Connect(requestLayout)
+	-- 3.8: the contract column follows the native chat window; the actions follow the player list.
+	pcall(function()
+		local config = game:GetService("TextChatService"):FindFirstChildOfClass("ChatWindowConfiguration")
+		if config then
+			config:GetPropertyChangedSignal("AbsoluteSize"):Connect(requestLayout)
+			config:GetPropertyChangedSignal("AbsolutePosition"):Connect(requestLayout)
+			config:GetPropertyChangedSignal("Enabled"):Connect(requestLayout)
+		end
+	end)
+	Players.PlayerAdded:Connect(requestLayout)
+	Players.PlayerRemoving:Connect(requestLayout)
 	MapView.start(gui, leftStack)
 	-- Calling your car (server/CarCall.luau).
 	local ok, err = pcall(function()
@@ -3597,7 +3548,7 @@ function Hud.start()
 		warn(`[Hud] no CarCall remote: {err}`)
 	end
 	-- 3.6: ESC closes the open window (the footers say so: the HUD's and, through Hud.onCloseWindows, the other
-	-- modules'), the big map and the "…" menu. Roblox's menu takes the Escape key itself, hence MenuOpened as well.
+	-- modules'), the big map and the MENU list. Roblox's menu takes the Escape key itself, hence MenuOpened as well.
 	local function escape()
 		if MapView.isOpen() then
 			MapView.toggle()
