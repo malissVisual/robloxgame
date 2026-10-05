@@ -23,6 +23,8 @@ export type Blueprint = {
 	depth: number,
 	height: number,
 	details: { Detail },
+	-- The front openings that must stay clear (tools/check-building-looks.py): { center x, width, clear height } each.
+	entries: { { number } }?,
 }
 export type Context = {
 	part: (Instance, string, Vector3, CFrame, Color3, Enum.Material?) -> Part,

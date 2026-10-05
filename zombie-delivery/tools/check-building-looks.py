@@ -14,6 +14,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "src/server/BuildingLooks"
+# The first six (Codex, 4.0.4) have their entries here; later blueprints declare theirs (Blueprint.entries).
 KNOWN = {"depot", "dealer", "guns", "mechanic", "supplies", "warehouse"}
 
 
@@ -78,7 +79,7 @@ end
     for line in result.stdout.splitlines():
         data = json.loads(line)
         id_ = data["id"]
-        assert id_ in KNOWN and id_ not in counts, id_
+        assert id_ not in counts, (id_, "duplicate id")
         details = data["details"]
         assert 1 <= len(details) <= 80, (id_, "part budget")
         names = set()
@@ -106,6 +107,11 @@ end
             if in_front and crossing:
                 clear = {"depot": 14, "dealer": 12, "guns": 10, "mechanic": 15, "supplies": 10}[id_]
                 assert y - h / 2 >= clear or y + h / 2 <= .4, (id_, d["name"], "entry clearance")
+            # A blueprint's own openings (Blueprint.entries: { center x, width, clear height }): kept clear like the doors.
+            if id_ not in KNOWN and in_front:
+                for center, width, clear in data.get("entries", []):
+                    if abs(x - center) < (w + width) / 2:
+                        assert y - h / 2 >= clear or y + h / 2 <= .4, (id_, d["name"], "entry clearance")
             if id_ == "warehouse" and in_front:
                 entries = [(c, 16, 14) for c in data["doorCenters"]] + [(40, 4, 7)]
                 for center, width, clear in entries:
