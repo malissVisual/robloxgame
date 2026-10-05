@@ -245,7 +245,9 @@ function Garages.take(player: Player, carId: string): string?
 		local character = player.Character
 		if not seated and root and character then
 			local rel = spot:PointToObjectSpace(root.Position)
-			if math.abs(rel.X) < 6 and math.abs(rel.Z) < 12 then
+			-- (a long truck stands farther out: Vehicles.driveOut; the spot looks out of the door, -Z in its space)
+			local out, length = Vehicles.driveOut(player, nil)
+			if math.abs(rel.X) < 6 and math.abs(rel.Z + out) < math.max(12, length / 2 + 2) then
 				character:PivotTo(spot * CFrame.new(-7, 3, 0))
 			end
 		end

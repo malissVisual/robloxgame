@@ -3404,11 +3404,17 @@ end
 -- road, the player not in it (seat: they get in, 3.4: a swap from the driver's seat). Returns the car, or nil while
 -- the save loads. 4.0: a car longer than a Box Truck (the Freight Truck, a Freight Hauler) stands further out, its
 -- back a stud clear of the garage's front wall (the spot is Map.GarageApron = 8 in front of it).
+-- 4.0: how much farther out of a garage door a long car stands (the Freight Truck, the Freight Hauler: their back
+-- would reach into the door's lintel), studs along the spot's look; 0 for an ordinary car. Also its length.
+function Vehicles.driveOut(player: Player, carId: string?): (number, number)
+	local length = lengthFor(player, carId)
+	return if length > 17 then length / 2 - (Map.GarageApron - 1) else 0, length
+end
+
 function Vehicles.placeAt(player: Player, carId: string?, spot: CFrame, seat: boolean?): Car?
 	local look = Vector3.new(spot.LookVector.X, 0, spot.LookVector.Z)
 	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
-	local length = lengthFor(player, carId)
-	local out = if length > 17 then length / 2 - (Map.GarageApron - 1) else 0
+	local out = Vehicles.driveOut(player, carId)
 	Vehicles.remove(player) -- the old car is not in the way; a co-owner's car is (step out to the road)
 	local at = freeSpot(spot.Position + look * out, look, 16)
 	local position = Vector3.new(at.X, Vehicles.groundY(at.X, at.Z, spot.Position.Y) + 0.5, at.Z)

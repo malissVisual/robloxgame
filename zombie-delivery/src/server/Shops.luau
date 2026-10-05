@@ -268,6 +268,11 @@ local function onUpgrade(player: Player, id: any)
 	if not cost then
 		return
 	end
+	-- 4.0: Tyres & Suspension 5 lowers the body, a rebuild of the car (like a stage): not in the middle of a job.
+	if id == "handling" and level + 1 >= 5 and Jobs.active(player) then
+		notice:FireClient(player, "Finish your delivery first: the mechanics lower the car.")
+		return
+	end
 	if not PlayerData.spend(player, cost) then
 		notice:FireClient(player, "Not enough money.")
 		return
