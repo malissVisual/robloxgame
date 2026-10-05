@@ -1005,6 +1005,10 @@ end
 -- Where an instant car goes when the player spawns at home: their home's garage drive-out spot, when they just
 -- spawned or pressed PLAY (the server puts them at home, server/Estate.luau) or stand at home; else nil.
 local function homeGarage(player: Player): CFrame?
+	local back = Estate.respawnAt
+	if back and back(player) then
+		return nil -- 4.0.4: back on the job after a death: the car comes to you there
+	end
 	local home = Estate.homeOf(player)
 	local spot = if home then estateSpots("EstateGarages")[home] else nil
 	if not home or not spot then

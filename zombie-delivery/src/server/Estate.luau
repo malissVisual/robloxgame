@@ -663,9 +663,17 @@ end
 -- ── Spawning at home ───────────────────────────────────────────────────────
 
 -- Puts the character at its home's spawn spot (inside, near the door), standing on the floor there.
+-- 4.0.4: set by Main.server.luau: on a job or a mission a new character goes back near where the last one fell, not
+-- home (nil: home as always).
+Estate.respawnAt = nil :: ((player: Player) -> CFrame?)?
+
 local function sendHome(player: Player, character: Model?)
 	if not character then
 		return
+	end
+	local back = Estate.respawnAt
+	if back and back(player) then
+		return -- (Main puts this one back on the job)
 	end
 	local root = character:WaitForChild("HumanoidRootPart", 10)
 	if not root or not root:IsA("BasePart") then

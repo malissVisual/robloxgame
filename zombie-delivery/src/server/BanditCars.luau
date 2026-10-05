@@ -39,6 +39,7 @@ type Bandit = {
 	stuck: number, -- seconds without moving while trying to
 	reverseUntil: number,
 	sees: boolean, -- a clear line to the target
+	seenSince: number?, -- 4.0.4: since when (they fire only after Config.Horde.SpotTime of it)
 	lastHitBy: Player?,
 	lastCause: string?, -- 3.1: how lastHitBy hit it: "gun", "car" (rammed), "splash" (BanditCars.onKillInfo)
 	lastFrom: string?, -- 3.1: and from which car seat's gun ("cargun", "window"; nil = none)
@@ -240,6 +241,7 @@ local function spawnAt(player: Player, cf: CFrame, waypoint: Vector3): boolean
 		stuck = 0,
 		reverseUntil = 0,
 		sees = false,
+		seenSince = nil,
 		lastHitBy = nil,
 		lastCause = nil,
 		lastFrom = nil,
@@ -304,6 +306,11 @@ local function think(b: Bandit, targetPosition: Vector3, targetVelocity: Vector3
 	local position = b.npc.chassis.Position
 	local distance = flat(targetPosition - position).Magnitude
 	b.sees = clearLine(position + Vector3.new(0, 3, 0), targetPosition + Vector3.new(0, 2, 0), targetModel)
+	if not b.sees then
+		b.seenSince = nil
+	elseif not b.seenSince then
+		b.seenSince = os.clock()
+	end
 	if b.sees or distance < 50 then
 		b.waypoint = targetPosition + flat(targetVelocity) * math.clamp(distance / 80, 0, 0.6)
 		return
@@ -322,6 +329,11 @@ local function shoot(b: Bandit, targetPosition: Vector3, targetVelocity: Vector3
 	b.gun = b.gun % math.max(1, #npc.guns) + 1
 	local from = if gun then gun.Position else npc.chassis.Position + Vector3.new(0, 5, 0)
 	local aim = targetPosition + Vector3.new(0, 1.5, 0)
+	-- 4.0.4: not through a wall from the gun itself either (the line was judged from the car's middle).
+	local targetModel: Instance? = if car then car.model elseif humanoid then humanoid.Parent else nil
+	if not clearLine(from, aim, targetModel) then
+		return
+	end
 	local relative = flat(targetVelocity - npc.chassis.AssemblyLinearVelocity).Magnitude
 	local chance = Tuning.Accuracy * math.clamp(1 - relative / 90, 0.35, 1)
 	local tracer = Net.get("Tracer")
@@ -433,7 +445,7 @@ local function drive(b: Bandit, dt: number, now: number)
 	end
 
 	-- Shooting.
-	if wanted and b.sees and distance < Tuning.Range and now >= b.nextShot then
+	if wanted and b.sees and b.seenSince and os.clock() - b.seenSince >= Config.Horde.SpotTime and distance < Tuning.Range and now >= b.nextShot then
 		b.nextShot = now + Tuning.FireEvery * rng:NextNumber(0.8, 1.2)
 		shoot(b, targetPosition, targetVelocity, car, humanoid)
 	end

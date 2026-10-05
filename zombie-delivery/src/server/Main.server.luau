@@ -12,6 +12,7 @@ StarterPlayer.EnableMouseLockOption = false
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
 local Config = require(Shared.Config)
+local Map = require(Shared.Map)
 StarterPlayer.CharacterWalkSpeed = Config.Movement.Walk -- 3.7: the walk of client/CameraRig.luau (server/Cargo.luau falls back to it)
 local GunModels = require(Shared.GunModels)
 
@@ -254,12 +255,49 @@ end
 -- A new gun equipped: the hand changes.
 PlayerData.Changed:Connect(ensureHandGun)
 
+-- 4.0.4: dying on a job or a mission brings you back near where you fell (on the nearest road's sidewalk), not home
+-- across the map: the job goes on. A spot is good for a short while after the death (the respawn wait).
+local fellAt: { [Player]: { at: Vector3, time: number } } = {}
+local RESPAWN_FOR = 30
+local function respawnSpot(player: Player): CFrame?
+	local fell = fellAt[player]
+	if not fell or os.clock() - fell.time > RESPAWN_FOR or not Jobs.involved(player) then
+		return nil
+	end
+	local x, z, dx, dz, width = Map.nearestRoad(fell.at.X, fell.at.Z)
+	-- the sidewalk on the side the player fell on (not in the traffic)
+	local side = if (fell.at.X - x) * -dz + (fell.at.Z - z) * dx >= 0 then 1 else -1
+	local sx, sz = x - dz * side * (width / 2 + 4), z + dx * side * (width / 2 + 4)
+	local position = Vector3.new(sx, Vehicles.groundY(sx, sz, fell.at.Y) + 3.5, sz)
+	return CFrame.lookAt(position, position + Vector3.new(dx, 0, dz))
+end
+Estate.respawnAt = respawnSpot
+
 local function onPlayer(player: Player)
 	player.CharacterAppearanceLoaded:Connect(function()
 		ensureHandGun(player)
 	end)
-	player.CharacterAdded:Connect(function()
+	player.CharacterAdded:Connect(function(character)
+		local humanoid = character:WaitForChild("Humanoid", 10)
+		if humanoid and humanoid:IsA("Humanoid") then
+			humanoid.Died:Connect(function()
+				local root = character:FindFirstChild("HumanoidRootPart")
+				if root and root:IsA("BasePart") then
+					fellAt[player] = { at = root.Position, time = os.clock() }
+				end
+			end)
+		end
 		if playing[player] then
+			local spot = respawnSpot(player)
+			if spot then
+				local root = character:WaitForChild("HumanoidRootPart", 10)
+				if root and player.Character == character then
+					pcall(function()
+						player:RequestStreamAroundAsync(spot.Position, 5)
+					end)
+					character:PivotTo(spot)
+				end
+			end
 			task.wait(1)
 			giveCar(player)
 		end
@@ -281,6 +319,7 @@ task.spawn(function()
 end)
 Players.PlayerRemoving:Connect(function(player)
 	playing[player] = nil
+	fellAt[player] = nil
 	Zombies.clearOwner(player)
 end)
 

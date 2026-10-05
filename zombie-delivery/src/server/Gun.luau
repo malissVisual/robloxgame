@@ -101,7 +101,16 @@ local function latchedHit(aimed: any, car: Vehicles.Car?, root: BasePart, range:
 	if car then
 		return if zombie.car == car then aimed else nil
 	end
-	return if (zombie.root.Position - root.Position).Magnitude <= range + 8 then aimed else nil
+	if (zombie.root.Position - root.Position).Magnitude > range + 8 then
+		return nil
+	end
+	-- On foot: not through a wall (4.0.4); the car it hangs on and the zombie itself do not count.
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local character = root.Parent
+	params.FilterDescendantsInstances = { character :: Instance, zombie.model, zombie.car.model }
+	params.CollisionGroup = "Bullet"
+	return if workspace:Raycast(root.Position, aimed.Position - root.Position, params) then nil else aimed
 end
 
 local function onFire(player: Player, target: any, aimed: any)
@@ -155,7 +164,6 @@ local function onFire(player: Player, target: any, aimed: any)
 	end
 	local toTarget = target - origin
 	local direction = if toTarget.Magnitude > 1 then toTarget.Unit else root.CFrame.LookVector
-	origin += direction * 2
 
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
@@ -165,6 +173,15 @@ local function onFire(player: Player, target: any, aimed: any)
 	end
 	params.FilterDescendantsInstances = exclude
 	params.CollisionGroup = "Bullet"
+	-- 4.0.4: no shots through walls. The rays start at the muzzle (no more 2 studs further out, which could be on the
+	-- far side of a wall you lean on), and a wall between you and the muzzle (a window point or the turret pressed
+	-- against one) takes the shot.
+	local blocked = workspace:Raycast(root.Position, origin - root.Position, params)
+	if blocked then
+		origin = root.Position
+		target = blocked.Position
+		direction = if (target - origin).Magnitude > 0.1 then (target - origin).Unit else direction
+	end
 
 	local look: { number } = if carGun then carGun.color else (Economy.findWeapon(profile.weapon) or Config.Weapons[1]).color
 	local color = Color3.fromRGB(look[1], look[2], look[3])
