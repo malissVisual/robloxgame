@@ -70,8 +70,16 @@
 -- door swings open as you get in or out (the Motor6D "DoorHinge", client/CarVisuals.luau) and you step out at your
 -- own door. 3.7 too, a free hand: one light piece in your hands (the character attribute CarryHands = 1, server/
 -- Cargo.luau) and you open and close the back yourself; two pieces or a heavy one, put one down first (G).
+-- 3.10, getting in and out (shared/Boarding.luau): the E at a door reserves the seat (its attribute Reserved) and
+-- starts the move (the character's attributes Boarding = "ownerId:door:seat", BoardAt, BoardReach); the player's
+-- own client plays it (client/CarBoarding.luau: a step to the handle, the hand on it, the slide in) and THIS server
+-- seats them Config.Cargo.BoardSeconds after the E, when they are still there (else it is cancelled: they stand at
+-- the door). Out (E in a seat: the CarDoor remote; Space; an eject) the client slides out at its door in
+-- AlightSeconds (the attribute AlightAt for the others' arm); somebody still over the car after that is put out at
+-- the door. The doors swing from their DoorOpenAt / DoorCloseAt attributes (server times).
 
 local CollectionService = game:GetService("CollectionService")
+local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -84,6 +92,7 @@ local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
+local Boarding = require(Shared.Boarding)
 
 export type Car = {
 	owner: Player,
@@ -1673,7 +1682,7 @@ local function doorsOf(style: Style): { CarDoor }
 end
 
 -- The door panels: hinged on a player's car (Motor6D "DoorHinge", the attributes Axis, Angle and Door; the clients
--- swing it while its attribute OpenUntil, a server time, lies ahead: client/CarVisuals.luau), else welded shut.
+-- swing it open from its attribute DoorOpenAt to DoorCloseAt, server times: client/CarVisuals.luau), else welded shut.
 local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
 	for index, door in doorsOf(style) do
 		local panel, hingeAt = door.panel, door.hinge
@@ -1959,7 +1968,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	for index, carDoor in doors do
 		local at = Instance.new("Attachment")
 		at.Name = `Door{index}`
-		at.Position = Vector3.new(carDoor.side * (carDoor.outside + 1.4), CHASSIS_HEIGHT / 2 + carDoor.promptY, carDoor.z)
+		at.Position = Vector3.new(carDoor.side * (carDoor.outside + Config.Cargo.DoorStandOut), CHASSIS_HEIGHT / 2 + carDoor.promptY, carDoor.z)
 		at.Parent = chassis
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = if carDoor.driver then "DrivePrompt" else "RidePrompt"
@@ -2144,17 +2153,139 @@ local function eject(seat: Seat | VehicleSeat)
 	end
 end
 
--- 3.7: swings a door of the car open for a moment (the clients animate it: client/CarVisuals.luau); a door without a
--- panel (a bed, the roof) has nothing to swing.
-local function openDoor(car: Car, index: number)
+-- 3.10: a cabin door's opening, in server times (the clients swing it: client/CarVisuals.luau); two people at one door
+-- share it (it shuts after the later one). A door without a panel (a bed, the roof) has nothing to swing.
+local function swingDoor(car: Car, index: number, openAt: number, closeAt: number)
+	local now = workspace:GetServerTimeNow()
 	for _, child in car.chassis:GetChildren() do
 		if child.Name == "DoorHinge" and child:GetAttribute("Door") == index then
-			child:SetAttribute("OpenUntil", workspace:GetServerTimeNow() + Config.Cargo.DoorOpenSeconds)
+			local oldOpen, oldClose = child:GetAttribute("DoorOpenAt"), child:GetAttribute("DoorCloseAt")
+			local a, b = Boarding.mergeDoor(if type(oldOpen) == "number" then oldOpen else nil, if type(oldClose) == "number" then oldClose else nil, openAt, closeAt, now)
+			child:SetAttribute("DoorOpenAt", a)
+			child:SetAttribute("DoorCloseAt", b)
 		end
 	end
 end
 
--- Whoever gets out steps out next to the car at their own door (3.7: the door swings open), not inside the cabin.
+-- 3.10, getting in (see the top): who is on the way into which seat. A reserved seat takes nobody else meanwhile.
+type Boarder = { car: Car, seat: Seat | VehicleSeat, door: number, humanoid: Humanoid, character: Model, at: number }
+local boarders: { [Player]: Boarder } = {}
+local reserved: { [Instance]: Player } = {}
+
+local function seatFree(seat: Seat | VehicleSeat): boolean
+	return seat.Occupant == nil and not reserved[seat]
+end
+
+local function endBoarding(player: Player, b: Boarder)
+	if boarders[player] == b then
+		boarders[player] = nil
+	end
+	if reserved[b.seat] == player then
+		reserved[b.seat] = nil
+		b.seat:SetAttribute("Reserved", nil)
+	end
+end
+
+local function clearBoardAttributes(character: Model)
+	character:SetAttribute("Boarding", nil)
+	character:SetAttribute("BoardAt", nil)
+	character:SetAttribute("BoardReach", nil)
+end
+
+-- Getting in did not work out (the car left, a death, a wreck…): the seat is free again, the door shuts, the
+-- player's client stands them at the door and gives the controls back (the attributes are gone).
+local function cancelBoarding(player: Player, b: Boarder)
+	endBoarding(player, b)
+	clearBoardAttributes(b.character)
+	if b.humanoid.Parent then
+		b.humanoid.PlatformStand = false
+	end
+	if not b.car.wrecked and b.car.chassis.Parent then
+		local now = workspace:GetServerTimeNow()
+		for _, child in b.car.chassis:GetChildren() do
+			if child.Name == "DoorHinge" and child:GetAttribute("Door") == b.door then
+				child:SetAttribute("DoorCloseAt", now)
+			end
+		end
+	end
+end
+
+-- The move is over: into the seat (the door shuts from now: its DoorCloseAt). The attributes stay a moment, so the
+-- client sees the seat before they go.
+local function finishBoarding(player: Player, b: Boarder)
+	endBoarding(player, b)
+	b.humanoid.PlatformStand = false
+	local seat = b.seat
+	if seat:IsA("VehicleSeat") then
+		seat:Sit(b.humanoid)
+	elseif seat:IsA("Seat") then
+		seat:Sit(b.humanoid)
+	end
+	local at = b.at
+	task.delay(1, function()
+		if b.character:GetAttribute("BoardAt") == at then
+			clearBoardAttributes(b.character)
+		end
+	end)
+end
+
+-- The E at a door, checked: the seat is reserved and the move starts (the player's client plays it).
+local function startBoarding(player: Player, car: Car, seat: Seat | VehicleSeat, index: number, humanoid: Humanoid)
+	local character = humanoid.Parent
+	if not character or not character:IsA("Model") then
+		return
+	end
+	local cfg = Config.Cargo
+	local now = workspace:GetServerTimeNow()
+	local door = car.doors[index]
+	local panel = door ~= nil and door.panel ~= nil
+	local seatNo = 0
+	if seat ~= car.seat then
+		local n = seat:GetAttribute("Index")
+		seatNo = if type(n) == "number" then n else 1
+	end
+	reserved[seat] = player
+	seat:SetAttribute("Reserved", player.UserId)
+	boarders[player] = { car = car, seat = seat, door = index, humanoid = humanoid, character = character, at = now }
+	character:SetAttribute("BoardAt", now)
+	character:SetAttribute("BoardReach", panel)
+	character:SetAttribute("Boarding", Boarding.encode(car.owner.UserId, index, seatNo))
+	humanoid.PlatformStand = true -- (the client does it at once too; it goes off again at the seat or on a cancel)
+	if panel then
+		-- Open as the hand reaches the handle, shut as they sit.
+		swingDoor(car, index, now + cfg.BoardStepSeconds * 0.7, now + cfg.BoardSeconds)
+	end
+end
+
+-- Every frame: a move still fine goes on, and into the seat at its time; anything wrong cancels it.
+local function stepBoarding()
+	if next(boarders) == nil then
+		return
+	end
+	local cfg = Config.Cargo
+	local now = workspace:GetServerTimeNow()
+	for player, b in boarders do
+		local car = b.car
+		local root = b.humanoid.RootPart
+		local fine = player.Parent ~= nil and player.Character == b.character and b.humanoid.Health > 0
+			and b.humanoid.SeatPart == nil and root ~= nil and not car.wrecked and car.chassis.Parent ~= nil
+			and cars[car.owner] == car and not car.chauffeured and b.seat.Parent ~= nil and b.seat.Occupant == nil
+			and Vehicles.speed(car) <= cfg.BoardMaxSpeed and (b.seat == car.seat or not car.repairing)
+		if not fine or not root then
+			cancelBoarding(player, b)
+		elseif now >= b.at + cfg.BoardSeconds then
+			if (root.Position - b.seat.Position).Magnitude <= cfg.BoardRange then
+				finishBoarding(player, b)
+			else
+				cancelBoarding(player, b)
+			end
+		end
+	end
+end
+
+-- Whoever gets out slides out at their own door (3.10: their client plays it, client/CarBoarding.luau; the door opens
+-- at once and shuts behind them). Still over the car a moment later (no client move: a lag, a failed start), they are
+-- put out next to it at their door, not left inside the cabin.
 local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driver: boolean)
 	local door = car.doors[index] or car.doors[1]
 	local sitting: Humanoid? = nil
@@ -2173,16 +2304,32 @@ local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driv
 		local left = sitting
 		sitting = nil
 		local character = left and left.Parent
-		if left and character and character:IsA("Model") and left.Health > 0 then
-			if not car.wrecked then
-				openDoor(car, index)
-			end
-			task.defer(function()
-				if character.Parent and car.chassis.Parent then
-					character:PivotTo(car.chassis.CFrame * CFrame.new(door.side * (car.size.X / 2 + 3), 2, door.z))
-				end
-			end)
+		if not left or not character or not character:IsA("Model") or left.Health <= 0 then
+			return
 		end
+		local cfg = Config.Cargo
+		local now = workspace:GetServerTimeNow()
+		character:SetAttribute("AlightAt", now)
+		character:SetAttribute("AlightReach", door.panel ~= nil)
+		if not car.wrecked and door.panel then
+			swingDoor(car, index, now, now + cfg.AlightSeconds + 0.05)
+		end
+		task.delay(cfg.AlightSeconds + 0.4, function()
+			if character:GetAttribute("AlightAt") == now then
+				character:SetAttribute("AlightAt", nil)
+				character:SetAttribute("AlightReach", nil)
+			end
+			local root = left.RootPart
+			local player = Players:GetPlayerFromCharacter(character)
+			if not root or not character.Parent or not car.chassis.Parent or left.SeatPart or left.Health <= 0 or (player and boarders[player]) then
+				return
+			end
+			local frame = car.chassis.CFrame
+			local rel = frame:PointToObjectSpace(root.Position)
+			if Boarding.inside(rel.X, rel.Z, car.size.X / 2, car.size.Z / 2) and math.abs(rel.Y) < car.size.Y + 2 then
+				character:PivotTo(frame * CFrame.new(door.side * (car.size.X / 2 + 3), 2, door.z))
+			end
+		end)
 	end)
 end
 
@@ -2198,7 +2345,8 @@ local function atDoor(car: Car, index: number, humanoid: Humanoid): boolean
 	return (root.Position - at.WorldPosition).Magnitude <= reach + 6
 end
 
--- 3.7: the prompts at the doors: the driver's door seats the owner, a passenger door the next free seat behind it.
+-- 3.7: the prompts at the doors: the driver's door seats the owner, a passenger door the next free seat behind it;
+-- 3.10: through the move (startBoarding), not at once, and only while the car stands.
 local function watchPrompts(car: Car)
 	local function humanoidOf(player: Player): Humanoid?
 		local character = player.Character
@@ -2219,37 +2367,67 @@ local function watchPrompts(car: Car)
 					return
 				end
 				local humanoid = humanoidOf(player)
-				if player == car.owner and not car.wrecked and not car.chauffeured and not car.seat.Occupant and humanoid and not humanoid.SeatPart
-					and atDoor(car, index, humanoid) and not handsFull(player) then
+				if player == car.owner and not car.wrecked and not car.chauffeured and seatFree(car.seat) and humanoid and not humanoid.SeatPart
+					and not boarders[player] and atDoor(car, index, humanoid) and not handsFull(player)
+					and Vehicles.speed(car) <= Config.Cargo.BoardMaxSpeed then
 					-- 3.4: back in a car on the lift of a repair bay: the repair is cancelled (server/Repair.luau).
 					if car.repairing then
 						Vehicles.beforeDrive(player, car)
 						Vehicles.setRepairing(car, false) -- (in case nobody was running it)
 					end
-					openDoor(car, index)
-					car.seat:Sit(humanoid)
+					startBoarding(player, car, car.seat, index, humanoid)
 				end
 			end)
 		else
 			prompt.Triggered:Connect(function(player)
 				local humanoid = humanoidOf(player)
-				if player == car.owner or car.wrecked or car.chauffeured or car.repairing or not humanoid or humanoid.SeatPart then
+				if player == car.owner or car.wrecked or car.chauffeured or car.repairing or not humanoid or humanoid.SeatPart or boarders[player] then
 					return
 				end
 				if not atDoor(car, index, humanoid) or handsFull(player) then
 					return
 				end
+				if Vehicles.speed(car) > Config.Cargo.BoardMaxSpeed then
+					Net.get("Notice"):FireClient(player, "Wait for the car to stop.")
+					return
+				end
 				for _, n in door.seats do
 					local seat = car.passengers[n]
-					if seat and not seat.Occupant then
-						openDoor(car, index)
-						seat:Sit(humanoid)
+					if seat and seatFree(seat) then
+						startBoarding(player, car, seat, index, humanoid)
 						return
 					end
 				end
 				Net.get("Notice"):FireClient(player, "No free seat at this door.")
 			end)
 		end
+	end
+end
+
+-- 3.10: E in a seat (the CarDoor remote, client/CarBoarding.luau): out of the seat; watchSeat opens the door and the
+-- client slides out. Space still does the same through the Humanoid's own jump.
+local lastOut: { [Player]: number } = {}
+local function onCarDoor(player: Player, action: any)
+	if action ~= "out" then
+		return
+	end
+	local now = os.clock()
+	if lastOut[player] and now - lastOut[player] < 0.3 then
+		return
+	end
+	lastOut[player] = now
+	local car, _, seatPart = Vehicles.seatedIn(player)
+	if not car or not seatPart or not (seatPart:IsA("Seat") or seatPart:IsA("VehicleSeat")) then
+		return
+	end
+	local seatWeld = seatPart:FindFirstChild("SeatWeld")
+	if seatWeld then
+		seatWeld:Destroy()
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.Sit = false
 	end
 end
 
@@ -2710,7 +2888,9 @@ function Vehicles.handOver(car: Car)
 		return
 	end
 	Vehicles.setBack(car, false) -- the chauffeur leaves it closed
-	openDoor(car, 1) -- 3.7: the chauffeur got out of the driver's door (server/CarCall.luau steps them out there)
+	-- 3.7: the chauffeur got out of the driver's door (server/CarCall.luau steps them out there).
+	local now = workspace:GetServerTimeNow()
+	swingDoor(car, 1, now, now + Config.Cargo.AlightSeconds + 0.1)
 	local linear = car.chassis:FindFirstChild("Drive")
 	if linear and linear:IsA("LinearVelocity") then
 		linear.PlaneVelocity = Vector2.zero
@@ -2999,11 +3179,26 @@ function Vehicles.windowPoint(car: Car, seat: BasePart): Vector3
 end
 
 function Vehicles.start()
+	-- 3.10: getting in and out, the body passes through the car's shell (client/CarBoarding.luau puts the character
+	-- into this group for the move).
+	pcall(function()
+		PhysicsService:RegisterCollisionGroup("Boarding")
+	end)
+	pcall(function()
+		PhysicsService:CollisionGroupSetCollidable("Boarding", "Car", false)
+	end)
+	Net.get("CarDoor").OnServerEvent:Connect(onCarDoor)
 	Players.PlayerRemoving:Connect(function(player)
+		local b = boarders[player]
+		if b then
+			cancelBoarding(player, b)
+		end
 		Vehicles.remove(player)
 		lastSpawn[player] = nil
+		lastOut[player] = nil
 	end)
 	RunService.Heartbeat:Connect(function()
+		stepBoarding()
 		for _, car in cars do
 			if car.wrecked then
 				continue

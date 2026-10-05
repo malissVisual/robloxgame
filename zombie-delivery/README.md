@@ -74,6 +74,17 @@ Version 3.9 puts **the gun away**: you no longer walk around with it in your han
   back; everybody sees the arm swing (`Config.Melee`, `shared/Melee.luau`, `server/CloseCombat.luau`,
   `client/Holster.luau`).
 - **The bag moved to I.**
+Version 3.10 is **getting in and out of the car**: no more teleporting into the seat.
+- **E at a door:** you step to the handle, your hand takes it, the door swings open, you slide in through it (ducking
+  a little) and it shuts behind you, about half a second in all. Passengers do the same at their own door (the bus
+  through its folding door); a seat with no door (a pickup's bed, a roof, a jump seat) is a quick climb in an arc.
+  Everybody sees it. The server keeps the seat for you meanwhile and seats you at the end (if the car drives off, you
+  die or the car is wrecked, you just stand at the door).
+- **E in a seat gets you out** (Space still does, gamepad X): the door opens at once, you slide out at your side and
+  it shuts behind you. While you sit in a car the prompts around you stay quiet so E means "out", except a 🅿 GARAGE
+  post (E opens it, Space gets you out). Out of a fast car you are put out at the door at once.
+- Tuning in `Config.Cargo` (BoardSeconds, AlightSeconds, DoorShutSeconds …), the timing and curves in
+  `shared/Boarding.luau`, the move in `client/CarBoarding.luau`.
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -121,8 +132,8 @@ for testing). A published game starts with `Config.StartMoney` and saves to the 
 | Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS in the … menu |
 | Crew panel (invite / accept / leave / kick, the crew board) | K | CREW |
 | Leaderboard | L | TOP in the … menu |
-| Get in your car / ride in a friend's car | E / R | the prompt |
-| Get out | Space | jump button |
+| Get in your car / ride in a friend's car (3.10: at a door, a quick move in) | E (gamepad X) | the prompt |
+| Get out (3.10: you slide out at your door) | E or Space (gamepad X) | jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
 | Open / close the back (doors, tailgate, trunk, ramp; 3.2: with empty hands, the car standing) | hold E at the back | the prompt |
 | Put down / Let go (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | the prompt |
@@ -937,7 +948,8 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               unlocking, the rating, the stars, the twists' pay; 3.2: 11 campaigns and 110 missions, the campaign
               chain `requires`, the computed mission levels levelOf, the DUO campaign), Challenges (3.1: the 42 challenges, the
               counters, value / progress / doneCount / allTitles), Melee (3.9: punch or strike, the cone in front of
-              you, the arm's swing curve)
+              you, the arm's swing curve), Boarding (3.10: getting in and out: the timing, the curve, the hand's
+              reach, the doors' swing, the Boarding attribute)
 src/server/   Main (wiring, PLAY: the one Play listener), World (builds the world, also the homes, garages, towers,
               elevators, FOR SALE signs and office computers; 3.4: the repair bays, the GARAGE posts), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once; 3.4: every
@@ -945,7 +957,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               seats, cargo slots, the roof turret of a car gun, the instant spawns and the home garage spot; 3.2: the
               back that opens, its hinges, BackOpen and the BackPrompt; 3.3: the five new vans' bodies, the
               UpgradeKit of the car's upgrades, Quick Hands' hold; 3.4: every car's damage kept, the car on a repair
-              lift; 3.5: the stages' LOOKS, styleFor, the rebuild on a new stage), Zombies (zombies and bandits, roadblocks, the roamers,
+              lift; 3.5: the stages' LOOKS, styleFor, the rebuild on a new stage; 3.10: getting in (the seat reserved,
+              seated on time or cancelled), out (the CarDoor remote), the doors' DoorOpenAt / DoorCloseAt), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
               the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves; 3.2: the DUO
               rules, drives DuoGates; 3.4: the cargo slots on the board, the bulk orders), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
@@ -978,7 +991,8 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               chip), Secrets (3.1: hides the lost packages you found, animates the others nearby), GarageUi (3.4: the
               garage window, only your own GARAGE prompts, the repair timer card), Holster (3.9: B holsters / draws,
               V punches or strikes, the first aim or shot draws a holstered gun; ArmPose hides a holstered gun and
-              swings the arm)
+              swings the arm), CarBoarding (3.10: plays your move into and out of a seat, E in a seat gets you out;
+              ArmPose puts the hand on the handle, CarVisuals swings the door, CameraRig eases into the car's view)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
@@ -1000,7 +1014,8 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               2 → 3 → 4, 6+ only in the Box Truck, every mission fits a car and a stage by its level, the early
               campaigns the Old Van, the big loads say so, the rack migration), run_tests.py checks every car's
               capacity is its body's slot count (3.5: and every stage's its look's), levels the early garages, logic the cheap first levels;
-              3.9: melee (the punch and the strike, the reach cone, the swing curve)
+              3.9: melee (the punch and the strike, the reach cone, the swing curve); 3.10: boarding (the move's timing,
+              a late start, the curve, the hand, the doors' swing)
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
