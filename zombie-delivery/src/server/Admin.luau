@@ -43,6 +43,8 @@
 --                             and paints taken back; the challenges the profile still reaches (kills, level,
 --                             missions ...) stay done without money (the campaigns stay done: their rewards come back
 --                             on the next join)
+--   resetSave                 4.0.5: YOUR save starts over as a new player's (PlayerData.resetSave), then you are
+--                             kicked: join again (in Studio: Play again) to start fresh, the tutorial included
 --   title      name           that title given and shown over your head ("none": no title shown); a reward's title
 --                             comes without its reward
 
@@ -767,6 +769,10 @@ local COMMANDS: { [string]: (Player, any) -> () } = {
 	secretsAll = secretsAll,
 	challengesReset = challengesReset,
 	title = setTitle,
+	resetSave = function(player: Player)
+		PlayerData.resetSave(player)
+		player:Kick("ADMIN: your save was reset. Join again to start as a new player.")
+	end,
 }
 
 local function onCommand(player: Player, name: any, arg: any)

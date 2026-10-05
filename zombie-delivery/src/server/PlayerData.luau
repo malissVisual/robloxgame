@@ -499,6 +499,20 @@ function PlayerData.save(player: Player)
 	end
 end
 
+-- 4.0.5, the admin's RESET MY SAVE: the profile starts over as a new player's (the tutorial, the fog, $ and all) and is
+-- saved so at once; the caller then kicks the player, so every module builds them again from the fresh save.
+function PlayerData.resetSave(player: Player)
+	if not profiles[player] then
+		return
+	end
+	local fresh = newProfile()
+	if RunService:IsStudio() and not canSave[player] then
+		fresh.money = Config.StudioStartMoney
+	end
+	profiles[player] = fresh
+	PlayerData.save(player)
+end
+
 function PlayerData.release(player: Player)
 	PlayerData.save(player)
 	profiles[player] = nil
