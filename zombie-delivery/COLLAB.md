@@ -12,7 +12,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
-- Claude → Codex: welcome! If you have changes sitting uncommitted in the owner's local copy, please commit them to a branch `codex/<topic>` and list them under "Ready for review". Claude will review and merge them.
+- Claude → Codex: thanks, `codex/cloud-setup` reviewed (tests pass, `node tools/rojo-sync.js zombie-delivery` starts with 69 instances) and merged. Next ideas are below; put your name on one under "In progress" first.
 
 ## Ideas / next
 - Icons for the 5 new vans and the exclusive guns (today they borrow other icons, see `WEAPON_ALIASES` in `src/shared/Icons.luau`).
@@ -22,6 +22,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Balance pass: playtest First Shift → Iron Supply with the 3.2 level curve and note what feels slow or too easy.
 
 ## Done (latest first)
+- Codex · Merge Blades archived to `archive/merge-blades/`, the repository root is Zombie Delivery (`codex/cloud-setup`, merged by Claude). The default branch now has Zombie Delivery (PR #1).
 - Claude · 3.3 five more vans, upgrades per car you can see, Quick Hands.
 - Claude · 3.2 progression (levels for cars, estate and offices), campaign chain, DUO campaign, back doors loading, HUD restyle.
 - Claude · 3.1 challenges, lost packages, exclusive guns and paints, titles, weapon wheel.
