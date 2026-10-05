@@ -1661,6 +1661,9 @@ local function buildBase(parent: Instance)
 	part(base, "Bunker", Vector3.new(12, 7, 10), bunker * CFrame.new(0, 3.5, 0), Color3.fromRGB(110, 112, 96), Enum.Material.Concrete)
 	part(base, "BunkerDoor", Vector3.new(3.6, 5.4, 0.3), bunker * CFrame.new(0, 2.7, -5.1), Color3.fromRGB(60, 66, 50), Enum.Material.Metal)
 	sign(base, "AMMO", Vector3.new(5, 1.4, 0.2), bunker * CFrame.new(0, 6, -5.2), Color3.fromRGB(255, 220, 90), Color3.fromRGB(50, 56, 40))
+	-- Approved architecture on the ammo bunker (its front toward the cargo spot); the spot and its sandbags stay clear.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(base, bunker, require(script.Parent.BuildingLooks.Army), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	palletStack(base, CFrame.new(px - 5, ROAD_TOP, pz + 9) * CFrame.Angles(0, 0.2, 0), Vector3.new(2.6, 1.4, 1.6), Color3.fromRGB(80, 92, 58), 2, 2, 2, Enum.Material.Metal)
 end
 
@@ -1669,7 +1672,11 @@ local function buildRadio(parent: Instance)
 	local yard = yardOf("radio")
 	yardFloor(radio, yard, Color3.fromRGB(90, 90, 86), Enum.Material.Concrete)
 	local cx, cz = (yard.x0 + yard.x1) / 2, (yard.z0 + yard.z1) / 2
-	part(radio, "Station", Vector3.new(30, 12, 20), CFrame.new(cx - 50, ROAD_TOP + 6, cz - 60), Color3.fromRGB(150, 150, 140), Enum.Material.Concrete)
+	part(radio, "Station", Vector3.new(30, 12, 20), CFrame.new(cx - 50, ROAD_TOP + 6, cz - 60), Color3.fromRGB(118, 122, 120), Enum.Material.Concrete)
+	-- Approved architecture on the studio block: its front (and new door) faces the cargo spot to the south.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local studio = CFrame.lookAt(Vector3.new(cx - 50, ROAD_TOP, cz - 60), Vector3.new(cx - 50, ROAD_TOP, cz - 59))
+	Kit.build(radio, studio, require(script.Parent.BuildingLooks.Radio), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	-- The lattice tower.
 	local tx, tz = cx + 40, cz - 50
 	local height = 170
@@ -1704,6 +1711,9 @@ local function buildFarm(parent: Instance)
 	local barn = CFrame.new(cx - 60, ROAD_TOP, cz - 80)
 	part(farm, "Barn", Vector3.new(40, 18, 30), barn * CFrame.new(0, 9, 0), Color3.fromRGB(150, 40, 36), Enum.Material.WoodPlanks)
 	gableRoof(farm, barn * CFrame.new(0, 18, 0), 42, 32, 10, Color3.fromRGB(70, 60, 56))
+	-- Approved architecture on the barn's long side toward the yard (painted doors, a hay hoist, lamps).
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(farm, CFrame.lookAt(barn.Position, barn.Position + Vector3.new(0, 0, 1)), require(script.Parent.BuildingLooks.Farm), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	cylinder(farm, "Silo", 36, 14, CFrame.new(cx - 20, ROAD_TOP + 18, cz - 90) * UPRIGHT, Color3.fromRGB(170, 170, 170), Enum.Material.Metal)
 	local dome = part(farm, "SiloTop", Vector3.new(14, 14, 14), CFrame.new(cx - 20, ROAD_TOP + 36, cz - 90), Color3.fromRGB(150, 150, 150), Enum.Material.Metal)
 	dome.Shape = Enum.PartType.Ball
@@ -1942,6 +1952,9 @@ local function buildRanch(parent: Instance)
 	local stable = CFrame.lookAt(Vector3.new(yard.x1 - 20, ROAD_TOP, 800), Vector3.new(yard.x1 - 40, ROAD_TOP, 800))
 	local stalls = stableRow(ranch, stable, 5, 12, 20, Color3.fromRGB(140, 96, 60), WHITE_WOOD)
 	sign(ranch, "STABLE", Vector3.new(12, 2.4, 0.3), stable * CFrame.new(0, 10.6, -10.6), Color3.fromRGB(255, 226, 150), Color3.fromRGB(70, 46, 30))
+	-- Approved architecture on the stable; every stall opening stays clear above the half doors.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(ranch, stable, require(script.Parent.BuildingLooks.Ranch), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	trough(ranch, CFrame.new(yard.x1 - 26, ROAD_TOP, 846) * CFrame.Angles(0, math.pi / 2, 0))
 	for _, n in { 1, 5 } do
 		local at = stalls[n] * CFrame.new(0, 0, -3.6)
@@ -2010,6 +2023,9 @@ local function buildStables(parent: Instance)
 		nightWindow(deco(part(school, "Window", Vector3.new(4.5, 3, 0.3), club * CFrame.new(x, 5.5, -9.15), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 214, 140))
 	end
 	sign(school, "RIDING SCHOOL", Vector3.new(14, 2.2, 0.3), club * CFrame.new(0, 8.6, -9.4), Color3.fromRGB(255, 255, 255), Color3.fromRGB(40, 90, 60))
+	-- Approved architecture on the club house (the secret's hay by the lamp stays clear).
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(school, club, require(script.Parent.BuildingLooks.Stables), { part = part, deco = deco, nightLight = DayNight.nightLight })
 
 	-- The stable along the north side, open to the south: Emma takes the horses in here (Map.CargoSpots.stables).
 	local stable = CFrame.lookAt(Vector3.new(yard.x0 + 110, ROAD_TOP, yard.z0 + 12), Vector3.new(yard.x0 + 110, ROAD_TOP, yard.z0 + 40))
@@ -2136,10 +2152,13 @@ local function buildFuelDepot(parent: Instance)
 
 	-- The office by the entrance, a sign on the road, a fence along the water and the back.
 	local office = CFrame.lookAt(Vector3.new(yard.x0 + 22, ROAD_TOP, yard.z0 + 26), Vector3.new(yard.x0 + 22, ROAD_TOP, yard.z0))
-	part(depot, "Office", Vector3.new(24, 9, 14), office * CFrame.new(0, 4.5, 0), Color3.fromRGB(220, 220, 214), Enum.Material.Metal)
-	part(depot, "OfficeRoof", Vector3.new(25, 0.6, 15), office * CFrame.new(0, 9.3, 0), Color3.fromRGB(90, 94, 100), Enum.Material.Metal)
+	part(depot, "Office", Vector3.new(24, 9, 14), office * CFrame.new(0, 4.5, 0), Color3.fromRGB(150, 156, 156), Enum.Material.Metal)
+	part(depot, "OfficeRoof", Vector3.new(25, 0.6, 15), office * CFrame.new(0, 9.3, 0), Color3.fromRGB(52, 56, 60), Enum.Material.Metal)
 	part(depot, "Door", Vector3.new(3.6, 7, 0.3), office * CFrame.new(-6, 3.5, -7.1), Color3.fromRGB(70, 90, 120), Enum.Material.Metal)
 	nightWindow(deco(part(depot, "Window", Vector3.new(8, 3, 0.3), office * CFrame.new(4, 5, -7.1), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 220, 150))
+	-- Approved architecture on the office; the loading shed, its barrels and the road in stay as they are.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(depot, office, require(script.Parent.BuildingLooks.FuelDepot), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	placeSign(depot, "HARBOR FUEL DEPOT", yard.x0 + 70, yard.z0 + 6, Vector3.new(0, 0, -1), Color3.fromRGB(255, 210, 80), "fueldepot")
 	sign(depot, "NO SMOKING", Vector3.new(6, 2, 0.2), CFrame.lookAt(Vector3.new((bx0 + bx1) / 2, ROAD_TOP + 4.6, bz0 - 0.6), Vector3.new((bx0 + bx1) / 2, ROAD_TOP + 4.6, bz0 - 10)), Color3.fromRGB(255, 255, 255), red)
 	local wire = Color3.fromRGB(110, 114, 118)
@@ -2188,6 +2207,9 @@ local function buildWinter(parent: Instance)
 	local lodge = CFrame.lookAt(Vector3.new(cx - 70, ROAD_TOP, cz), Vector3.new(cx, ROAD_TOP, cz))
 	cabin(winter, lodge, 50, 34, 18)
 	sign(winter, "SKI LODGE", Vector3.new(26, 5, 0.4), lodge * CFrame.new(0, 22, -18), Color3.fromRGB(255, 220, 120), nil, "lodge")
+	-- Approved architecture on the lodge (timber, stone, lanterns); the door and the cargo spot in front stay clear.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(winter, lodge, require(script.Parent.BuildingLooks.Lodge), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	cabin(winter, CFrame.lookAt(Vector3.new(cx + 20, ROAD_TOP, cz - 85), Vector3.new(cx + 20, ROAD_TOP, cz)), 18, 14, 10)
 	cabin(winter, CFrame.lookAt(Vector3.new(cx + 20, ROAD_TOP, cz + 85), Vector3.new(cx + 20, ROAD_TOP, cz)), 18, 14, 10)
 	-- A ski lift up the hill behind.
@@ -4312,9 +4334,12 @@ local function defineMissionPlaces()
 		-- The hangar, open to the runway, the plane in front of it.
 		local hangar = CFrame.lookAt(Vector3.new(-1530, top, 1205), Vector3.new(-1530, top, 1206))
 		local hw, hd, hh = 64, 44, 18
-		shell(field, hangar, hw, hd, hh, Color3.fromRGB(110, 120, 104), Enum.Material.CorrodedMetal, {}, true)
-		gableRoof(field, hangar * CFrame.new(0, hh, 0) * CFrame.Angles(0, math.pi / 2, 0), hd + 2, hw + 2, 8, Color3.fromRGB(96, 106, 92))
+		shell(field, hangar, hw, hd, hh, Color3.fromRGB(86, 94, 84), Enum.Material.CorrodedMetal, {}, true)
+		gableRoof(field, hangar * CFrame.new(0, hh, 0) * CFrame.Angles(0, math.pi / 2, 0), hd + 2, hw + 2, 8, Color3.fromRGB(70, 76, 72))
 		sign(field, "HANGAR 1", Vector3.new(16, 2.4, 0.3), hangar * CFrame.new(0, hh - 1.5, -hd / 2 - 0.2), Color3.fromRGB(255, 255, 255), Color3.fromRGB(60, 70, 60))
+		-- Approved architecture on the hangar; its whole open front stays clear below the fascia.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(field, hangar, require(script.Parent.BuildingLooks.Airfield), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		plane(field, CFrame.lookAt(Vector3.new(-1530, top, 1262), Vector3.new(-1530, top, 1263)))
 		part(field, "Workbench", Vector3.new(10, 3.4, 3), hangar * CFrame.new(-22, 1.7, 16), Color3.fromRGB(120, 90, 60), Enum.Material.WoodPlanks)
 		for n = 0, 2 do
@@ -4354,9 +4379,12 @@ local function defineMissionPlaces()
 		local top = ROAD_TOP
 		local hall = CFrame.lookAt(Vector3.new(1177, top, 650), Vector3.new(1177, top, 640))
 		local w, d, h = 112, 76, 28
-		building(plant, hall, w, d, h, Color3.fromRGB(150, 84, 64), Enum.Material.Brick, 14, 14)
+		building(plant, hall, w, d, h, Color3.fromRGB(118, 66, 52), Enum.Material.Brick, 14, 14)
 		nightWindow(deco(part(plant, "WindowBand", Vector3.new(w - 30, 3, 0.2), hall * CFrame.new(0, 18, -d / 2 - 0.15), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 220, 150))
 		sign(plant, "CITY POWER", Vector3.new(30, 4, 0.4), hall * CFrame.new(0, h - 3.4, -d / 2 - 0.4), Color3.fromRGB(255, 220, 90), Color3.fromRGB(40, 40, 44))
+		-- Approved architecture on the turbine hall; the receiving dock, the gate and the cable reel stay as they are.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(plant, hall, require(script.Parent.BuildingLooks.PowerPlant), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		for _, x in { -24, 24 } do
 			cylinder(plant, "Turbine", 30, 10, hall * CFrame.new(x, 5.3, 4) * ALONG_Z, Color3.fromRGB(70, 110, 90), Enum.Material.Metal)
 		end
@@ -4423,9 +4451,12 @@ local function defineMissionPlaces()
 		local blue = Color3.fromRGB(70, 110, 150)
 		-- The pump house by the gate (its door toward the pile).
 		local house = CFrame.lookAt(Vector3.new(498, top, 730), Vector3.new(498, top, 731))
-		building(works, house, 26, 16, 10, Color3.fromRGB(150, 96, 70), Enum.Material.Brick, 6, 7)
+		building(works, house, 26, 16, 10, Color3.fromRGB(118, 74, 58), Enum.Material.Brick, 6, 7)
 		sign(works, "PUMP HOUSE", Vector3.new(12, 2, 0.3), house * CFrame.new(0, 8.4, -8.4), Color3.fromRGB(255, 255, 255), blue)
 		nightWindow(deco(part(works, "Window", Vector3.new(5, 3, 0.2), house * CFrame.new(8, 5, -8.15), WINDOW_DIM, Enum.Material.Glass)))
+		-- Approved architecture on the pump house's front (its west wall, where the secret lies, stays bare).
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(works, house, require(script.Parent.BuildingLooks.WaterWorks), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		-- The storage tanks, piped to the pump house and out to the river.
 		for n, x in { 585, 650 } do
 			local base = Vector3.new(x, top, 730)
@@ -4509,6 +4540,9 @@ local function defineMissionPlaces()
 		local doorX = if spot then math.clamp((frame:PointToObjectSpace(Vector3.new(spot.pile.x, top, spot.pile.z))).X, -36, 36) else 34
 		box(lab, "DeliveryDoor", frame, doorX - 5, 0, front - 0.4, doorX + 5, 9, front - 0.1, Color3.fromRGB(180, 186, 190), Enum.Material.Metal)
 		sign(lab, "DELIVERIES", Vector3.new(8, 1.4, 0.2), frame * CFrame.new(doorX, 10.2, front - 0.6), Color3.fromRGB(255, 255, 255), Color3.fromRGB(30, 120, 140))
+		-- Approved architecture on the lab's front (its delivery door frame assumes doorX = 36, the clamped cargo line).
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(lab, frame, require(script.Parent.BuildingLooks.Lab), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		-- On the roof: air handlers, a satellite dish, a mast with a light.
 		for _, at in { Vector3.new(-20, 0, 20), Vector3.new(20, 0, 30) } do
 			part(lab, "AirHandler", Vector3.new(10, 4, 8), frame * CFrame.new(at + Vector3.new(0, h + 3, 0)), Color3.fromRGB(190, 194, 196), Enum.Material.Metal)
@@ -4588,6 +4622,10 @@ local function defineMissionPlaces()
 		local nameAt = Vector3.new(gx, top + wallH + 3, wz1 + 2.2)
 		part(prison, "NameBoard", Vector3.new(30, 4.4, 0.6), CFrame.new(nameAt - Vector3.new(0, 0, 0.5)), CONCRETE, Enum.Material.Concrete)
 		sign(prison, "BLACKROCK PRISON", Vector3.new(28, 3.6, 0.2), CFrame.lookAt(nameAt, nameAt + Vector3.new(0, 0, 1)), Color3.fromRGB(240, 240, 240), Color3.fromRGB(40, 40, 44), "prison")
+		-- Approved architecture on the gate front (the wall, both gate towers); nothing hangs into the gateway.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		local gateFront = CFrame.lookAt(Vector3.new(gx, top, wz1), Vector3.new(gx, top, wz1 + 1))
+		Kit.build(prison, gateFront, require(script.Parent.BuildingLooks.Prison), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		-- The towers: the four corners and both sides of the gate.
 		for _, t in { { wx0, wz0, -1, -1 }, { wx1, wz0, 1, -1 }, { wx0, wz1, -1, 1 }, { wx1, wz1, 1, 1 }, { gx - 20, wz1, 0, 1 }, { gx + 20, wz1, 0, 1 } } do
 			prisonTower(prison, t[1], t[2], Vector3.new(t[3], 0, t[4]).Unit)
@@ -4681,6 +4719,9 @@ local function defineMissionPlaces()
 		gableRoof(point, cottage * CFrame.new(0, 9, 0), 22, 16, 5, Color3.fromRGB(150, 30, 28))
 		part(point, "Door", Vector3.new(3.6, 6.6, 0.4), cottage * CFrame.new(-4, 3.3, -7.2), Color3.fromRGB(40, 70, 110), Enum.Material.Wood)
 		nightWindow(deco(part(point, "Window", Vector3.new(4, 3, 0.3), cottage * CFrame.new(4, 5, -7.15), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 210, 130))
+		-- Approved architecture on the keeper's cottage (the round tower keeps its own look); nothing behind it.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(point, cottage, require(script.Parent.BuildingLooks.Lighthouse), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		part(point, "Chimney", Vector3.new(2, 5, 2), cottage * CFrame.new(6, 11.5, 3), Color3.fromRGB(130, 80, 66), Enum.Material.Brick)
 		-- Rocks along the shore, a jetty and a boat on the sea.
 		for k = 0, 6 do
@@ -4796,8 +4837,11 @@ local function defineMissionPlaces()
 			nightLamp(deco(part(yardFolder, "SignalLight", Vector3.new(0.8, 0.8, 0.3), CFrame.lookAt(at + Vector3.new(0.75, 11, 0), at + Vector3.new(10, 11, 0)), color:Lerp(Color3.new(0, 0, 0), 0.5), Enum.Material.Glass)), color)
 		end
 		local office = CFrame.lookAt(Vector3.new(-145, top, -790), Vector3.new(-145, top, -789))
-		building(yardFolder, office, 26, 16, 9, Color3.fromRGB(150, 110, 80), Enum.Material.Brick, 5, 7)
+		building(yardFolder, office, 26, 16, 9, Color3.fromRGB(126, 90, 66), Enum.Material.Brick, 5, 7)
 		sign(yardFolder, "YARD OFFICE", Vector3.new(12, 2, 0.3), office * CFrame.new(0, 7.8, -8.4), Color3.fromRGB(255, 255, 255), Color3.fromRGB(40, 60, 90))
+		-- Approved architecture on the yard office (a platform clock on its corner).
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.build(yardFolder, office, require(script.Parent.BuildingLooks.TrainYard), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		placeSign(yardFolder, "TRAIN YARD", -255, yard.z1 + 15, Vector3.new(0, 0, 1), Color3.fromRGB(255, 220, 120), "trainyard")
 		lamp(yardFolder, -280, -790, top, Vector3.new(0, 0, -1))
 		lamp(yardFolder, -400, -800, top, Vector3.new(0, 0, -1))
@@ -4966,6 +5010,10 @@ local function defineMissionPlaces()
 		palletStack(stadium, CFrame.new(-10, top, 1318), Vector3.new(2, 1.6, 2), Color3.fromRGB(70, 110, 160), 2, 2, 2, Enum.Material.Cardboard)
 		-- The gate arch on the road, sandbags beside it.
 		gate(stadium, -60, yard.z0 + 12, 60, yard.z0 + 12, 18, "STADIUM SHELTER", Color3.fromRGB(255, 255, 255), Color3.fromRGB(40, 70, 150), CONCRETE, "stadium")
+		-- Approved architecture on the entrance gate (its road side); the gateway stays clear below the beam.
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		local entrance = CFrame.lookAt(Vector3.new(0, top, yard.z0 + 12), Vector3.new(0, top, yard.z0 + 11))
+		Kit.build(stadium, entrance, require(script.Parent.BuildingLooks.Stadium), { part = part, deco = deco, nightLight = DayNight.nightLight })
 		for _, x in { -70, 70 } do
 			part(stadium, "Sandbags", Vector3.new(12, 3.4, 3), CFrame.new(x, top + 1.7, yard.z0 + 6), Color3.fromRGB(170, 150, 110), Enum.Material.Fabric)
 		end
