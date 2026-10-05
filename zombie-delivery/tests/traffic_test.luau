@@ -256,8 +256,6 @@ do
 	check("crossing goes straight over the street", k2 == 1 and i2 == 1 and j2 == 0 and math.abs(az - bz) < 1e-6 and math.abs(bx - ax - (Map.Cell - Map.BlockSize + 2 * TrafficLanes.SidewalkInset)) < 1e-6)
 	check("no crossing out of the district", (TrafficLanes.across(d, d.i1, 0, 2, true)) == nil)
 	check("the ring goes around", TrafficLanes.nextCorner(4, 1) == 1 and TrafficLanes.nextCorner(1, -1) == 4)
-	local cx, cz = TrafficLanes.clampToBlock(d, 0, 0, 500, -3)
-	check("fleeing stays on the block", cx == Map.BlockSize / 2 - TrafficLanes.SidewalkInset and cz == -3)
 	local rand = Map.lcg(9)
 	local spots = 0
 	local okSpots = true
@@ -266,12 +264,22 @@ do
 		if spot then
 			spots += 1
 			local dist = math.sqrt((spot.x - 100) ^ 2 + (spot.z - 100) ^ 2)
-			if dist < 70 or dist > 170 or Map.blockAt(spot.x, spot.z) ~= spot.d then
+			local path = TrafficLanes.sidePath(spot.d, spot.i, spot.j, spot.side)
+			local onLine = false
+			if path then
+				for m = 1, #path - 2, 2 do
+					local seg = { ax = path[m], az = path[m + 1], bx = path[m + 2], bz = path[m + 3] }
+					if toSegment(seg, spot.x, spot.z) < 1e-6 then
+						onLine = true
+					end
+				end
+			end
+			if dist < 70 or dist > 170 or Map.blockAt(spot.x, spot.z) ~= spot.d or not onLine or spot.k ~= TrafficLanes.nextCorner(spot.side, 1) then
 				okSpots = false
 			end
 		end
 	end
-	check("sidewalk spots in range, on a block", okSpots and spots > 20, spots)
+	check("sidewalk spots in range, on a block, on its side's walk line", okSpots and spots > 20, spots)
 	check("no sidewalk far out of town", TrafficLanes.sidewalkSpot(-1880, 520, 70, 170, rand) == nil)
 end
 
@@ -477,6 +485,332 @@ do
 		end
 	end
 	check(`every street crossing has its crosswalk ({crossings} crossings)`, missing <= 8 and crossings == 2 * #list + 2 * missing, `{missing} missing`)
+end
+
+-- ── 3.10: the walk lines (people stay on the sidewalk) ────────────────────
+
+do
+	TrafficLanes.forgetSurveys()
+	local body = TrafficLanes.Body
+	local inset = TrafficLanes.SidewalkInset
+	local half = Map.RoadWidth / 2
+
+	-- What stands on the city's sidewalks that the shared modules know: the street lamps (server/World.luau: on a
+	-- corner of every junction, ROAD / 2 + 2 in from both curbs), the light poles (Crossings.PoleCorner, or nearer the
+	-- tip of the corner when that is taken), the towers and the buildings of the homes and garages on the blocks.
+	type Post = { x: number, z: number, r: number }
+	type Box = { x0: number, z0: number, x1: number, z1: number, id: string }
+	local posts: { Post } = {}
+	for _, d in Map.Districts do
+		for kx = d.i0 - 1, d.i1 do
+			for kz = d.j0 - 1, d.j1 do
+				table.insert(posts, { x = d.ox + (kx + 0.5) * Map.Cell + half + 2, z = d.oz + (kz + 0.5) * Map.Cell + half + 2, r = 0.3 })
+			end
+		end
+	end
+	for _, j in Crossings.junctions() do
+		for _, c in { Crossings.PoleCorner, half + 0.6 } do
+			table.insert(posts, { x = j.x + c, z = j.z - c, r = 0.25 })
+			table.insert(posts, { x = j.x - c, z = j.z + c, r = 0.25 })
+		end
+	end
+	local boxes: { Box } = {}
+	for id, tower in Map.Towers do
+		local w = tower.w / 2
+		table.insert(boxes, { x0 = tower.x - w, z0 = tower.z - w, x1 = tower.x + w, z1 = tower.z + w, id = id })
+	end
+	for id, plot in Map.EstatePlots do
+		if not plot.tower and Map.blockAt(plot.x, plot.z) then
+			local ax, az = Map.plotPoint(plot, -plot.w / 2, -plot.front)
+			local bx, bz = Map.plotPoint(plot, plot.w / 2, plot.back)
+			table.insert(boxes, { x0 = math.min(ax, bx), z0 = math.min(az, bz), x1 = math.max(ax, bx), z1 = math.max(az, bz), id = id })
+		end
+	end
+	check("the footprints to keep clear of are there", #posts > 400 and #boxes >= 5, `{#posts} posts, {#boxes} buildings`)
+
+	-- The posts and buildings near a block (the checks below only look at those).
+	local nearPosts: { Post } = {}
+	local nearBoxes: { Box } = {}
+	local function around(cx: number, cz: number)
+		table.clear(nearPosts)
+		table.clear(nearBoxes)
+		local reach = Map.Cell
+		for _, p in posts do
+			if math.abs(p.x - cx) < reach and math.abs(p.z - cz) < reach then
+				table.insert(nearPosts, p)
+			end
+		end
+		for _, b in boxes do
+			if b.x1 > cx - reach and b.x0 < cx + reach and b.z1 > cz - reach and b.z0 < cz + reach then
+				table.insert(nearBoxes, b)
+			end
+		end
+	end
+	-- How close a point comes to them (a post by its edge).
+	local function clearance(x: number, z: number): (number, string)
+		local best, what = math.huge, ""
+		for _, p in nearPosts do
+			local d = math.sqrt((p.x - x) ^ 2 + (p.z - z) ^ 2) - p.r
+			if d < best then
+				best, what = d, `a pole at {p.x}, {p.z}`
+			end
+		end
+		for _, b in nearBoxes do
+			local dx = math.max(b.x0 - x, 0, x - b.x1)
+			local dz = math.max(b.z0 - z, 0, z - b.z1)
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d < best then
+				best, what = d, b.id
+			end
+		end
+		return best, what
+	end
+	local function lineClearance(ax: number, az: number, bx: number, bz: number): (number, string)
+		local length = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+		local steps = math.max(1, math.ceil(length / 0.5))
+		local best, what = math.huge, ""
+		for n = 0, steps do
+			local t = n / steps
+			local d, w = clearance(ax + (bx - ax) * t, az + (bz - az) * t)
+			if d < best then
+				best, what = d, w
+			end
+		end
+		return best, what
+	end
+	-- Somebody standing at (x, z): clear of the lamps and poles (first), and of the buildings (second: false when a
+	-- building is there, which the probe in the game finds; then no group stands there).
+	local function standClear(x: number, z: number, r: number): (boolean, boolean)
+		for _, p in nearPosts do
+			if math.sqrt((p.x - x) ^ 2 + (p.z - z) ^ 2) - p.r < r then
+				return false, false
+			end
+		end
+		for _, b in nearBoxes do
+			local dx = math.max(b.x0 - x, 0, x - b.x1)
+			local dz = math.max(b.z0 - z, 0, z - b.z1)
+			if math.sqrt(dx * dx + dz * dz) < r then
+				return true, false
+			end
+		end
+		return true, true
+	end
+	-- How far in from the curb of side s a point is.
+	local function depthOf(d: Map.District, i: number, j: number, s: number, x: number, z: number): number
+		local nx, nz = TrafficLanes.inward(s)
+		local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
+		return Map.BlockSize / 2 + (x - cx) * nx + (z - cz) * nz
+	end
+
+	-- The ring's geometry: the side toward a corner ends there, `inward` points to the block's middle.
+	local geometryOk = true
+	for k = 1, 4 do
+		for _, dir in { 1, -1 } do
+			local s = TrafficLanes.sideOf(k, dir)
+			if (dir == 1 and TrafficLanes.nextCorner(s, 1) ~= k) or (dir == -1 and s ~= k) then
+				geometryOk = false
+			end
+		end
+		local d = Map.Districts[1]
+		local ax, az = TrafficLanes.corner(d, 0, 0, k)
+		local bx, bz = TrafficLanes.corner(d, 0, 0, k + 1)
+		local nx, nz, tx, tz = TrafficLanes.inward(k)
+		local mx, mz = (ax + bx) / 2, (az + bz) / 2
+		local length = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+		if (mx + nx) ^ 2 + (mz + nz) ^ 2 >= mx * mx + mz * mz or math.abs((bx - ax) / length - tx) > 1e-9 or math.abs((bz - az) / length - tz) > 1e-9 then
+			geometryOk = false
+		end
+		if math.abs(depthOf(d, 0, 0, k, mx, mz) - inset) > 1e-9 then
+			geometryOk = false
+		end
+	end
+	check("sides, corners and the way in agree", geometryOk)
+
+	-- Every walk line, every corner, every crossing and every curb spot keeps a person's width off the lamps, the
+	-- light poles and the buildings Map knows; every spot where people stand still stays off the walk lines (the
+	-- walkers pass them by) and inside the strip an ordinary block keeps free (Frontage).
+	local badLine, badCross, badCurb, badStand, worst, worstWhat = 0, 0, 0, 0, math.huge, ""
+	local byHomes, homeBlocks = 0, {} :: { [string]: boolean }
+	local standing = 1 -- half the width of somebody standing
+	local inner, outer = inset + standing - 1e-6, TrafficLanes.Frontage + 1e-6 -- (a walker on the line: standing wide too)
+	for _, d in Map.Districts do
+		for i = d.i0, d.i1 do
+			for j = d.j0, d.j1 do
+				around(d.ox + i * Map.Cell, d.oz + j * Map.Cell)
+				for s = 1, 4 do
+					local path = TrafficLanes.sidePath(d, i, j, s)
+					if not path then
+						badLine += 1
+						continue
+					end
+					for m = 1, #path - 2, 2 do
+						local c, what = lineClearance(path[m], path[m + 1], path[m + 2], path[m + 3])
+						if c < worst then
+							worst, worstWhat = c, `{d.id} {i},{j} side {s}: {what}`
+						end
+						if c < body then
+							badLine += 1
+						end
+					end
+					for _, alongX in { true, false } do
+						local k2, i2, j2 = TrafficLanes.across(d, i, j, s, alongX)
+						local ax, az = TrafficLanes.corner(d, i, j, s)
+						local cx, cz = TrafficLanes.curbSpot(d, i, j, s, alongX)
+						if k2 then
+							local bx, bz = TrafficLanes.corner(d, i2, j2, k2)
+							if lineClearance(ax, az, bx, bz) < body then
+								badCross += 1
+							end
+							-- the curb spot: on the crossing's line, between the corner and the street
+							local t = ((cx - ax) * (bx - ax) + (cz - az) * (bz - az)) / ((bx - ax) ^ 2 + (bz - az) ^ 2)
+							local off = math.abs((cx - ax) * (bz - az) - (cz - az) * (bx - ax)) / math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+							if t <= 0 or t >= 0.2 or off > 1e-6 then
+								badCurb += 1
+							end
+						end
+						if clearance(cx, cz) < standing or Map.blockAt(cx, cz) ~= d or Map.onRoad(cx, cz) then
+							badCurb += 1
+						end
+					end
+					-- A group along the side (an oval) and two who stop for a word, anywhere along it.
+					local ra, rc = TrafficLanes.GroupRadius.along, TrafficLanes.GroupRadius.across
+					local nx, nz, tx, tz = TrafficLanes.inward(s)
+					for f = 0.15, 0.851, 0.05 do
+						local gx, gz = TrafficLanes.sideSpot(d, i, j, s, f, TrafficLanes.GroupDepth)
+						for a = 0, 11 do
+							local angle = a * math.pi / 6
+							local px = gx + tx * math.cos(angle) * ra + nx * math.sin(angle) * rc
+							local pz = gz + tz * math.cos(angle) * ra + nz * math.sin(angle) * rc
+							local dp = depthOf(d, i, j, s, px, pz)
+							local poles, buildings = standClear(px, pz, standing)
+							if dp - standing < inner or dp + standing > outer or not poles then
+								badStand += 1
+							elseif not buildings then
+								byHomes += 1
+								homeBlocks[`{d.id} {i},{j}`] = true
+							end
+						end
+						local mx, mz = TrafficLanes.sideSpot(d, i, j, s, f, TrafficLanes.MeetDepth)
+						for _, side in { 1.3, -1.3 } do
+							local px, pz = mx + tx * side, mz + tz * side
+							local dp = depthOf(d, i, j, s, px, pz)
+							local poles, buildings = standClear(px, pz, standing)
+							if dp - standing < inner or dp + standing > outer or not poles then
+								badStand += 1
+							elseif not buildings then
+								byHomes += 1
+								homeBlocks[`{d.id} {i},{j}`] = true
+							end
+						end
+					end
+					-- A group on the corner: off both walk lines.
+					local gx, gz = TrafficLanes.cornerSpot(d, i, j, s, TrafficLanes.CornerGroupDepth)
+					for a = 0, 11 do
+						local angle = a * math.pi / 6
+						local px, pz = gx + math.cos(angle) * 1.6, gz + math.sin(angle) * 1.6
+						for _, side in { s, TrafficLanes.nextCorner(s, -1) } do
+							if depthOf(d, i, j, side, px, pz) - standing < inner then
+								badStand += 1
+							end
+						end
+						local poles, buildings = standClear(px, pz, standing)
+						if not poles or not buildings then
+							badStand += 1
+						end
+					end
+				end
+			end
+		end
+	end
+	check("every walk line keeps a person's width off the lamps, light poles and buildings", badLine == 0, `{badLine}; closest {math.floor(worst * 100) / 100} studs: {worstWhat}`)
+	check("the walk lines pass the lamps and light poles with room to spare", worst >= body + 0.3, worst)
+	check("every crossing line too", badCross == 0, badCross)
+	check("people wait to cross on the crossing's line, a step toward the street, on the block", badCurb == 0, badCurb)
+	check("groups and people talking stand off the walk lines, inside the free strip, clear of the poles", badStand == 0, badStand)
+	-- A home on a Suburbs lot reaches 8 studs from the curb on its lot's side: there the probe in the game finds its
+	-- wall and no group stands (nothing else in Map comes that close).
+	local blocks, elsewhere = 0, 0
+	for key in homeBlocks do
+		blocks += 1
+		if string.sub(key, 1, 8) ~= "suburbs " then
+			elsewhere += 1
+		end
+	end
+	check("only the Suburbs homes come near a standing spot (the probe keeps groups off them)", elsewhere == 0 and blocks <= 4, `{byHomes} spots on {blocks} blocks`)
+
+	-- A survey with something on a line: a flag pole on the north side's line of an ordinary block, a wall across
+	-- the whole sidewalk of its south side.
+	local d = Map.Districts[1]
+	local bi, bj = 3, -3
+	local cx, cz = d.ox + bi * Map.Cell, d.oz + bj * Map.Cell
+	local pole = { x = cx, z = cz - (Map.BlockSize / 2 - inset), r = 0.3 }
+	local wall = { x0 = cx - 1, z0 = cz + Map.BlockSize / 2 - 14, x1 = cx + 1, z1 = cz + Map.BlockSize / 2 }
+	local function free(ax: number, az: number, bx: number, bz: number): boolean
+		local length = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+		local steps = math.max(1, math.ceil(length / 0.25))
+		for n = 0, steps do
+			local x, z = ax + (bx - ax) * n / steps, az + (bz - az) * n / steps
+			if math.sqrt((x - pole.x) ^ 2 + (z - pole.z) ^ 2) - pole.r < body then
+				return false
+			end
+			local dx = math.max(wall.x0 - x, 0, x - wall.x1)
+			local dz = math.max(wall.z0 - z, 0, z - wall.z1)
+			if math.sqrt(dx * dx + dz * dz) < body then
+				return false
+			end
+		end
+		return true
+	end
+	local open = TrafficLanes.survey(d, bi, bj, free)
+	local north, east, south, west = TrafficLanes.sideInset(d, bi, bj, 1), TrafficLanes.sideInset(d, bi, bj, 2), TrafficLanes.sideInset(d, bi, bj, 3), TrafficLanes.sideInset(d, bi, bj, 4)
+	check("a survey: the blocked side takes a detour, the walled one is closed, the others stay", open == 3 and north ~= nil and north ~= inset and east == inset and south == nil and west == inset, `{open} open: {north} {east} {south} {west}`)
+	local northPath = TrafficLanes.sidePath(d, bi, bj, 1)
+	local detourOk = northPath ~= nil and #northPath == 8
+	if northPath then
+		for m = 1, #northPath - 2, 2 do
+			if not free(northPath[m], northPath[m + 1], northPath[m + 2], northPath[m + 3]) then
+				detourOk = false
+			end
+		end
+	end
+	check("the detour goes round the pole, from corner to corner", detourOk)
+	-- Routes along the detour: from the corner, from its middle, both ways; a step back onto the line first when off it.
+	local c1x, c1z = TrafficLanes.corner(d, bi, bj, 1)
+	local c2x, c2z = TrafficLanes.corner(d, bi, bj, 2)
+	local fromCorner = TrafficLanes.route(d, bi, bj, 2, 1, c1x, c1z)
+	local mx, mz = TrafficLanes.sideSpot(d, bi, bj, 1, 0.5, north or 0)
+	local east1 = TrafficLanes.route(d, bi, bj, 2, 1, mx, mz)
+	local west1 = TrafficLanes.route(d, bi, bj, 1, -1, mx, mz)
+	local ends = function(r: { number }?, x: number, z: number): boolean
+		return r ~= nil and #r >= 2 and math.abs(r[#r - 1] - x) < 1e-6 and math.abs(r[#r] - z) < 1e-6
+	end
+	check("a route from the corner follows the whole detour", fromCorner ~= nil and #fromCorner == 6 and ends(fromCorner, c2x, c2z), if fromCorner then #fromCorner else "nil")
+	check("a route from the middle goes on to the corner it heads for", east1 ~= nil and #east1 == 4 and ends(east1, c2x, c2z) and west1 ~= nil and #west1 == 4 and ends(west1, c1x, c1z))
+	local ox, oz = TrafficLanes.sideSpot(d, bi, bj, 2, 0.5, inset + 4) -- pushed 4 studs in off the east side's line
+	local back = TrafficLanes.route(d, bi, bj, 3, 1, ox, oz)
+	local bx, bz = TrafficLanes.sideSpot(d, bi, bj, 2, 0.5, inset)
+	check("off the line: a step back onto it, then on to the corner", back ~= nil and #back == 4 and math.abs(back[1] - bx) < 1e-6 and math.abs(back[2] - bz) < 1e-6 and ends(back, TrafficLanes.corner(d, bi, bj, 3)))
+	local onLine = TrafficLanes.route(d, bi, bj, 3, 1, bx, bz)
+	check("on the line: straight on", onLine ~= nil and #onLine == 2)
+	check("no route along a closed side", TrafficLanes.route(d, bi, bj, 4, 1, cx, cz + 50) == nil and TrafficLanes.route(d, bi, bj, 3, -1, cx, cz + 50) == nil)
+	local s3 = TrafficLanes.nearestSide(d, bi, bj, cx, cz + 60)
+	check("the nearest side is never a closed one", s3 ~= nil and s3 ~= 3, s3)
+	local onClosed = 0
+	local rand = Map.lcg(77)
+	for _ = 1, 400 do
+		local spot = TrafficLanes.sidewalkSpot(cx, cz, 0, 60, rand)
+		if spot and spot.d == d and spot.i == bi and spot.j == bj and spot.side == 3 then
+			onClosed += 1
+		end
+	end
+	check("nobody spawns on a closed side", onClosed == 0, onClosed)
+	TrafficLanes.forgetSurveys()
+	check("forgotten: the straight lines again", TrafficLanes.sideInset(d, bi, bj, 3) == inset)
+	local everywhere = TrafficLanes.survey(d, bi, bj, function()
+		return true
+	end)
+	check("a clear block keeps its four straight lines", everywhere == 4 and #(TrafficLanes.sidePath(d, bi, bj, 1) or {}) == 4)
+	TrafficLanes.forgetSurveys()
 end
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

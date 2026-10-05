@@ -69,7 +69,7 @@ local seatedIn: BasePart? = nil -- the car seat you sit in (Humanoid.Seated)
 local lastExit = 0
 -- The prompts that show to you now, and the ones hidden here while you sit in a car.
 local shown: { [ProximityPrompt]: boolean } = {}
-local muted: { [ProximityPrompt]: boolean } = {}
+local muted: { [ProximityPrompt]: number } = {} -- each muted prompt's own reach (put back on the way out)
 local CAR_PROMPTS: { [string]: boolean } = { DrivePrompt = true, RidePrompt = true, BackPrompt = true }
 
 local rayParams = RaycastParams.new()
@@ -360,6 +360,10 @@ local function step(dt: number)
 		stop(m.to)
 		return
 	end
+	if (m.root.Position - m.chassis.Position).Magnitude > 40 then
+		stop(nil) -- moved far away meanwhile (a teleport): no slide back to the car
+		return
+	end
 	local t = Boarding.moveTime(since, m.span, m.total)
 	local pose = if m.kind == "board" then boardPose(m, t) else alightPose(m, t)
 	m.root.CFrame = m.chassis.CFrame * pose
@@ -378,14 +382,16 @@ local function mute(prompt: ProximityPrompt)
 	if muted[prompt] or CAR_PROMPTS[prompt.Name] or seatedUse(prompt) or not prompt.Enabled then
 		return
 	end
-	muted[prompt] = true
-	prompt.Enabled = false
+	-- Hidden through its reach, never through Enabled: the server switches Enabled (an emptied pile, a shut back,
+	-- a pulled lever) while you sit, and turning it back on afterwards would show a prompt it had turned off.
+	muted[prompt] = prompt.MaxActivationDistance
+	prompt.MaxActivationDistance = 0
 end
 
 local function unmuteAll()
-	for prompt in muted do
-		if prompt.Parent and not prompt.Enabled then
-			prompt.Enabled = true
+	for prompt, reach in muted do
+		if prompt.Parent and prompt.MaxActivationDistance == 0 then
+			prompt.MaxActivationDistance = reach
 		end
 	end
 	table.clear(muted)

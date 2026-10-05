@@ -80,6 +80,7 @@ type Delivery = {
 	bestLeft: number, -- the least `left` so far (since the last re-plan)
 	atLight: boolean, -- stopping or waiting for a red light ahead
 	relocated: boolean, -- put back on a road once already
+	rideOffset: CFrame, -- the car's pivot over its start spot (how high it rides): a rescue puts it on a new spot so
 	speed: number, -- signed, along the nose
 	target: Vector3, -- the steering point
 	limit: number, -- the speed the turns and what is ahead allow
@@ -593,7 +594,7 @@ end
 -- fresh route, and drives on; the second time the old way (fallback).
 local function rescue(d: Delivery, now: number)
 	local root = rootOf(d.player)
-	if d.relocated or not root then
+	if d.relocated or not root or now - d.started >= Tuning.MaxTime then
 		fallback(d)
 		return
 	end
@@ -611,11 +612,8 @@ local function rescue(d: Delivery, now: number)
 		return
 	end
 	d.relocated = true
-	-- The same height over the road as now, the new spot and heading (the chauffeur, welded to it, comes along).
-	local here = chassis.Position
-	local lift = here.Y - Vehicles.groundY(here.X, here.Z, here.Y)
-	local model = d.car.model
-	model:PivotTo(start.ground * CFrame.new(0, lift, 0) * chassis.CFrame:ToObjectSpace(model:GetPivot()))
+	-- On the new spot as a car spawned there rides (the chauffeur, welded to it, comes along).
+	d.car.model:PivotTo(start.ground * d.rideOffset)
 	chassis.AssemblyLinearVelocity = Vector3.zero
 	chassis.AssemblyAngularVelocity = Vector3.zero
 	d.route, d.step, d.speed = start.route, 1, 0
@@ -783,11 +781,14 @@ local function think(d: Delivery, now: number)
 	d.atLight = stopAt ~= nil
 	if stopAt then
 		limit = math.min(limit, math.sqrt(2 * BRAKE_PLAN * math.max(stopAt - 0.5, 0)))
-		d.progressAt = now
 	end
 
 	-- Something in the lane: brake for it, overtake when it stays.
 	local gap = obstacleGap(d, position, look)
+	-- Waiting at a red light (at its line, or in the queue before it) is getting on; stuck far before it is not.
+	if stopAt and (stopAt < 15 or gap ~= nil) then
+		d.progressAt = now
+	end
 	if gap then
 		local allowed = math.max(0, (gap - 3) * 1.4)
 		if now < d.overtakeUntil and gap > 1 then
@@ -960,6 +961,7 @@ function CarCall.call(player: Player, carId: string?): string?
 		bestLeft = math.huge,
 		atLight = false,
 		relocated = false,
+		rideOffset = start.ground:ToObjectSpace(car.model:GetPivot()),
 		speed = 0,
 		target = start.ground.Position + start.ground.LookVector * 10,
 		limit = 0,

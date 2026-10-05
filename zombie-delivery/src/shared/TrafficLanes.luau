@@ -16,7 +16,10 @@
 -- turns around.
 --
 -- Sidewalks. Every district block (Map.Districts) is a raised slab; the pedestrians walk a ring SidewalkInset studs
--- inside its edge, corner to corner, and now and then cross the street to the next block's facing corner.
+-- inside its edge, corner to corner, and now and then cross the street to the next block's facing corner. 3.10: the
+-- ring is made of walk lines, one per side, that a block's buildings and poles never stand on (see "Sidewalks"
+-- below: a blocked side takes a detour or is closed), and the spots where people stand still (a group, two talking,
+-- somebody waiting to cross) are off those lines.
 
 local Map = require(script.Parent.Map)
 
@@ -54,8 +57,9 @@ export type Piece = {
 	cum: { number }, -- a turn: the arc length at each sample (SAMPLES + 1 of them)
 }
 
--- A spot on a sidewalk: block (i, j) of district d, walking toward corner k (1 .. 4, see Corners).
-export type Sidewalk = { d: Map.District, i: number, j: number, k: number, x: number, z: number }
+-- A spot on a sidewalk: block (i, j) of district d, on side `side` (corner side → side + 1), walking toward corner
+-- k (1 .. 4, see Corners).
+export type Sidewalk = { d: Map.District, i: number, j: number, k: number, side: number, x: number, z: number }
 
 local SNAP_SLACK = 3 -- a road end within its neighbour's half width + this is snapped onto it
 local SAMPLES = 10 -- points along a turn (arc length table)
@@ -63,8 +67,26 @@ local INF = math.huge
 
 -- Nothing drives north of this line (the tunnel, the winter, the frozen lake).
 TrafficLanes.NorthLimit = Map.Mountain.tunnelZ1 + 60
--- The pedestrians' ring: this far inside a block's edge.
-TrafficLanes.SidewalkInset = 4
+-- The pedestrians' ring: this far inside a block's edge (3.10: 4.5, half a stud more room by the street lamps and
+-- the light poles on the corners, which stand 1.5 – 2 studs in from the curb).
+TrafficLanes.SidewalkInset = 4.5
+-- A side whose line is blocked tries these lines instead (studs in from the curb), else it is closed.
+TrafficLanes.DetourInsets = { 3.2, 6.5, 8.5 }
+-- Half the width a walking person needs (the probe of the survey: anything closer to the line is in the way).
+TrafficLanes.Body = 1.3
+-- The strip along the curb an ordinary block keeps free (server/World.luau: the downtown towers stand 11+ studs in,
+-- the Harbor warehouses 10, the Suburbs' trees by the street about 9.3).
+TrafficLanes.Frontage = 9.3
+-- Where people stand still, studs in from the curb: a group's middle and two walkers who stop for a word (between
+-- the walk line and the buildings: the walkers pass them by).
+TrafficLanes.GroupDepth = 7.4
+TrafficLanes.GroupRadius = { along = 1.9, across = 0.9 } -- a group stands in an oval along the sidewalk
+TrafficLanes.CornerGroupDepth = 8.2 -- a group on a corner: this far in from both curbs
+TrafficLanes.MeetDepth = 6.9
+-- Somebody waiting to cross stands this far from the corner toward the street.
+TrafficLanes.CurbStep = 2.2
+-- A route starts with a step back onto the walk line from farther than this.
+TrafficLanes.Rejoin = 1.5
 -- The block corners in ring order (clockwise seen from above: NW, NE, SE, SW; -Z is north).
 TrafficLanes.Corners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
 
@@ -508,6 +530,13 @@ function TrafficLanes.spawnSpot(g: Graph, px: number, pz: number, minD: number, 
 end
 
 -- ── Sidewalks ──────────────────────────────────────────────────────────────
+-- 3.10: the walk lines. Side s of a block's ring runs from corner s to corner s + 1 (Corners order). On an ordinary
+-- block it is the straight line between the two corners, SidewalkInset in from the curb: clear of the street lamps
+-- and the light poles on the corners (2+ studs off) and of the buildings (Frontage). A special block's things may
+-- stand on that line (a shop's wall, a flag pole): server/Traffic.luau surveys every block once (TrafficLanes.survey
+-- with a probe of the built world), and a blocked side takes a detour line (DetourInsets: a short step off the
+-- corner, along the side, a step back onto the next corner), or is closed when none is clear. Everything the people
+-- walk is made of these lines: the route to a corner, the spawn spots, the flight from a zombie.
 
 -- Corner k (1 .. 4) of the ring around block (i, j) of district d.
 function TrafficLanes.corner(d: Map.District, i: number, j: number, k: number): (number, number)
@@ -519,6 +548,18 @@ end
 -- The next corner around the ring (dir +1 or -1).
 function TrafficLanes.nextCorner(k: number, dir: number): number
 	return (k - 1 + dir) % 4 + 1
+end
+
+-- The side somebody walks on toward corner k going `dir` round the ring (side s: corner s → s + 1).
+function TrafficLanes.sideOf(k: number, dir: number): number
+	return if dir == 1 then TrafficLanes.nextCorner(k, -1) else (k - 1) % 4 + 1
+end
+
+-- Side s's way in from the curb toward the block's middle (unit), and its way along (corner s → s + 1, unit).
+function TrafficLanes.inward(s: number): (number, number, number, number)
+	local a = TrafficLanes.Corners[(s - 1) % 4 + 1]
+	local b = TrafficLanes.Corners[s % 4 + 1]
+	return -(a[1] + b[1]) / 2, -(a[2] + b[2]) / 2, (b[1] - a[1]) / 2, (b[2] - a[2]) / 2
 end
 
 local function cornerIndex(sx: number, sz: number): number
@@ -546,16 +587,172 @@ function TrafficLanes.across(d: Map.District, i: number, j: number, k: number, a
 	return cornerIndex(sx, sz), i2, j2
 end
 
--- Keeps a point on the block (inside the pedestrians' ring).
-function TrafficLanes.clampToBlock(d: Map.District, i: number, j: number, x: number, z: number): (number, number)
-	local half = Map.BlockSize / 2 - TrafficLanes.SidewalkInset
-	local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
-	return math.clamp(x, cx - half, cx + half), math.clamp(z, cz - half, cz + half)
+-- Where somebody waits to cross from corner k (along X or Z): CurbStep from the corner toward the street, on the
+-- crossing's line (out of the way of the people turning the corner).
+function TrafficLanes.curbSpot(d: Map.District, i: number, j: number, k: number, alongX: boolean): (number, number)
+	local c = TrafficLanes.Corners[(k - 1) % 4 + 1]
+	local x, z = TrafficLanes.corner(d, i, j, k)
+	if alongX then
+		return x + c[1] * TrafficLanes.CurbStep, z
+	end
+	return x, z + c[2] * TrafficLanes.CurbStep
+end
+
+-- A point `depth` studs in from the curb of side s, a share f (0 .. 1) of the way from corner s to corner s + 1.
+function TrafficLanes.sideSpot(d: Map.District, i: number, j: number, s: number, f: number, depth: number): (number, number)
+	local ax, az = TrafficLanes.corner(d, i, j, s)
+	local bx, bz = TrafficLanes.corner(d, i, j, s + 1)
+	local nx, nz = TrafficLanes.inward(s)
+	local shift = depth - TrafficLanes.SidewalkInset
+	return ax + (bx - ax) * f + nx * shift, az + (bz - az) * f + nz * shift
+end
+
+-- A point `depth` studs in from both curbs at corner k (inside the turn of the walk lines).
+function TrafficLanes.cornerSpot(d: Map.District, i: number, j: number, k: number, depth: number): (number, number)
+	local c = TrafficLanes.Corners[(k - 1) % 4 + 1]
+	local half = Map.BlockSize / 2 - depth
+	return d.ox + i * Map.Cell + c[1] * half, d.oz + j * Map.Cell + c[2] * half
+end
+
+-- The points of side s on the line `inset` in from the curb (flat x, z; from corner s to corner s + 1).
+local function sidePoints(d: Map.District, i: number, j: number, s: number, inset: number): { number }
+	local ax, az = TrafficLanes.corner(d, i, j, s)
+	local bx, bz = TrafficLanes.corner(d, i, j, s + 1)
+	local shift = inset - TrafficLanes.SidewalkInset
+	if math.abs(shift) < 1e-6 then
+		return { ax, az, bx, bz }
+	end
+	local nx, nz = TrafficLanes.inward(s)
+	return { ax, az, ax + nx * shift, az + nz * shift, bx + nx * shift, bz + nz * shift, bx, bz }
+end
+
+-- The surveyed blocks: per side the line's inset (0: closed). A block not surveyed walks the straight lines.
+local surveyed: { [string]: { number } } = {}
+
+local function blockKey(d: Map.District, i: number, j: number): string
+	return `{d.id}:{i},{j}`
+end
+
+-- Surveys block (i, j): per side the first line (SidewalkInset, then DetourInsets) whose every piece is clear
+-- (clear(ax, az, bx, bz): nothing a person bumps into along that piece, its ends included), else the side is closed.
+-- Returns how many sides are open.
+function TrafficLanes.survey(d: Map.District, i: number, j: number, clear: (number, number, number, number) -> boolean): number
+	local list: { number } = {}
+	local open = 0
+	for s = 1, 4 do
+		list[s] = 0
+		for n = 1, #TrafficLanes.DetourInsets + 1 do
+			local inset = if n == 1 then TrafficLanes.SidewalkInset else TrafficLanes.DetourInsets[n - 1]
+			local points = sidePoints(d, i, j, s, inset)
+			local ok = true
+			for m = 1, #points - 2, 2 do
+				if not clear(points[m], points[m + 1], points[m + 2], points[m + 3]) then
+					ok = false
+					break
+				end
+			end
+			if ok then
+				list[s] = inset
+				open += 1
+				break
+			end
+		end
+	end
+	surveyed[blockKey(d, i, j)] = list
+	return open
+end
+
+-- Forgets every survey (the tests).
+function TrafficLanes.forgetSurveys()
+	table.clear(surveyed)
+end
+
+-- The inset of side s's walk line; nil when the side is closed.
+function TrafficLanes.sideInset(d: Map.District, i: number, j: number, s: number): number?
+	local list = surveyed[blockKey(d, i, j)]
+	if not list then
+		return TrafficLanes.SidewalkInset
+	end
+	local inset = list[(s - 1) % 4 + 1]
+	return if inset > 0 then inset else nil
+end
+
+-- Side s's walk line (flat x, z from corner s to corner s + 1); nil when the side is closed.
+function TrafficLanes.sidePath(d: Map.District, i: number, j: number, s: number): { number }?
+	local inset = TrafficLanes.sideInset(d, i, j, s)
+	if not inset then
+		return nil
+	end
+	return sidePoints(d, i, j, s, inset)
+end
+
+-- The way from (x, z) to corner k along the side somebody walks going `dir` (flat x, z of the points still to walk,
+-- the corner last). It starts with a step back onto the line when (x, z) is more than Rejoin off it (pushed aside,
+-- back from a shop window). nil when that side is closed.
+function TrafficLanes.route(d: Map.District, i: number, j: number, k: number, dir: number, x: number, z: number): { number }?
+	local path = TrafficLanes.sidePath(d, i, j, TrafficLanes.sideOf(k, dir))
+	if not path then
+		return nil
+	end
+	local n = #path
+	local ordered = path
+	if dir ~= 1 then
+		ordered = table.create(n)
+		for m = n - 1, 1, -2 do
+			table.insert(ordered, path[m])
+			table.insert(ordered, path[m + 1])
+		end
+	end
+	local bestM, bestD, bestX, bestZ = 1, INF, ordered[1], ordered[2]
+	for m = 1, n - 2, 2 do
+		local px, pz, d2 = project(ordered[m], ordered[m + 1], ordered[m + 2], ordered[m + 3], x, z)
+		if d2 < bestD - 1e-9 then
+			bestM, bestD, bestX, bestZ = m, d2, px, pz
+		end
+	end
+	local out: { number } = {}
+	if bestD > TrafficLanes.Rejoin * TrafficLanes.Rejoin then
+		table.insert(out, bestX)
+		table.insert(out, bestZ)
+	end
+	for m = bestM + 2, n - 1, 2 do
+		table.insert(out, ordered[m])
+		table.insert(out, ordered[m + 1])
+	end
+	return out
+end
+
+-- The open side of block (i, j) nearest to (x, z): the side, the nearest point on its line, the way along it
+-- (corner s → s + 1, unit) and how far along the side that point is (0 .. 1 from corner s). nil when all are closed.
+function TrafficLanes.nearestSide(d: Map.District, i: number, j: number, x: number, z: number): (number?, number, number, number, number, number)
+	local bestS: number? = nil
+	local bestD, bestX, bestZ = INF, x, z
+	for s = 1, 4 do
+		local path = TrafficLanes.sidePath(d, i, j, s)
+		if not path then
+			continue
+		end
+		for m = 1, #path - 2, 2 do
+			local px, pz, d2 = project(path[m], path[m + 1], path[m + 2], path[m + 3], x, z)
+			if d2 < bestD then
+				bestS, bestD, bestX, bestZ = s, d2, px, pz
+			end
+		end
+	end
+	if not bestS then
+		return nil, x, z, 0, 0, 0
+	end
+	local _, _, tx, tz = TrafficLanes.inward(bestS)
+	local ax, az = TrafficLanes.corner(d, i, j, bestS)
+	local length = Map.BlockSize - 2 * TrafficLanes.SidewalkInset
+	local f = math.clamp(((bestX - ax) * tx + (bestZ - az) * tz) / length, 0, 1)
+	return bestS, bestX, bestZ, tx, tz, f
 end
 
 type Block = { d: Map.District, i: number, j: number }
 
--- A spot on a sidewalk ring minD .. maxD studs from (px, pz) (nil when no block is in reach).
+-- A spot on an open walk line minD .. maxD studs from (px, pz) (nil when no block is in reach): its side, and k the
+-- corner at the side's end (side + 1).
 function TrafficLanes.sidewalkSpot(px: number, pz: number, minD: number, maxD: number, rand: () -> number): Sidewalk?
 	local blocks: { Block } = {}
 	local slack = Map.BlockSize * 0.75
@@ -575,14 +772,30 @@ function TrafficLanes.sidewalkSpot(px: number, pz: number, minD: number, maxD: n
 	end
 	for _ = 1, 12 do
 		local b = blocks[math.floor(rand() * #blocks) + 1]
-		local k = math.floor(rand() * 4) + 1 -- the side from corner k to corner k + 1
-		local ax, az = TrafficLanes.corner(b.d, b.i, b.j, k)
-		local bx, bz = TrafficLanes.corner(b.d, b.i, b.j, k + 1)
-		local f = rand()
-		local x, z = ax + (bx - ax) * f, az + (bz - az) * f
+		local s = math.floor(rand() * 4) + 1
+		local path = TrafficLanes.sidePath(b.d, b.i, b.j, s)
+		if not path then
+			continue
+		end
+		-- A point along the line (a detour too), evenly by length.
+		local total = 0
+		for m = 1, #path - 2, 2 do
+			total += math.sqrt((path[m + 2] - path[m]) ^ 2 + (path[m + 3] - path[m + 1]) ^ 2)
+		end
+		local left = rand() * total
+		local x, z = path[#path - 1], path[#path]
+		for m = 1, #path - 2, 2 do
+			local length = math.sqrt((path[m + 2] - path[m]) ^ 2 + (path[m + 3] - path[m + 1]) ^ 2)
+			if left <= length then
+				local t = if length > 0 then left / length else 0
+				x, z = path[m] + (path[m + 2] - path[m]) * t, path[m + 1] + (path[m + 3] - path[m + 1]) * t
+				break
+			end
+			left -= length
+		end
 		local dist = math.sqrt((x - px) ^ 2 + (z - pz) ^ 2)
 		if dist >= minD and dist <= maxD then
-			return { d = b.d, i = b.i, j = b.j, k = TrafficLanes.nextCorner(k, 1), x = x, z = z }
+			return { d = b.d, i = b.i, j = b.j, k = TrafficLanes.nextCorner(s, 1), side = s, x = x, z = z }
 		end
 	end
 	return nil

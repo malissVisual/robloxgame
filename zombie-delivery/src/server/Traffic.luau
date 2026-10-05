@@ -23,18 +23,28 @@
 --     a function of workspace:GetServerTimeNow(): the clients draw the same colours on the poles themselves.
 --
 -- Pedestrians. R15 people (server/Npcs.luau: Npcs.spawn, Npcs.walkTo) on the sidewalk ring of the blocks, corner to
--- corner. Fewer at night. A zombie within FleeRange and they run (faster, away from it, each a little off straight
--- away so a group scatters, staying on their block) until it is gone. 3.9, living streets:
+-- corner. Fewer at night. 3.10, on the sidewalk: they walk only the walk lines of shared/TrafficLanes.luau (a line
+-- per side of a block, 4.5 studs in from the curb: off the lamps and light poles on the corners, off the buildings),
+-- which the server checks against the built world once at the start (a special block's wall or flag pole on a line:
+-- a detour, or that side is closed; a crosswalk with something on it: nobody crosses there). A route flows from point
+-- to point (no halt at the corners) at the person's own stroll (Config.Traffic.WalkSpeed, the legs at the matching
+-- pace: Npcs.pace); somebody pushed off the line steps back onto it first. A walk that makes no progress for
+-- StuckAfter seconds is given up (back the other way); who keeps getting stuck goes when nobody looks. A zombie
+-- within FLEE_RANGE and they run (RunSpeed, the run animation) along the ring away from it, round the corners, until
+-- it is gone; then they catch their breath and stroll on. 3.9, living streets:
 --   * They cross a street ONLY over a crosswalk (shared/Crossings.luau, painted by server/World.luau): from a corner
---     straight over to the facing corner. They wait at the curb, facing the street, for the walk phase (their
---     street's traffic red for CrossTime more seconds) or, with no lights there, for a gap in the traffic; after
---     CrossWait they go on round the block instead. The cars stop for anybody in their lane.
---   * Groups (GroupChance of the new people, GroupSize): two to four standing in a loose circle by the side of an
---     ordinary block or on its corner, out of the safe zone and off the addresses, cargo spots and employers. They
---     turn to whoever talks, nod or shift (Npcs.gesture), say a line now and then (Npcs.say) and after GroupTime
---     break up and walk off both ways. Standing people cost no pathing: the cheap way to more people.
---   * Walkers stop: at a shop window now and then (WindowChance, facing the block), and two walkers passing each
---     other may stop for a word (MeetChance), both facing each other.
+--     straight over to the facing corner. They wait at the curb (a step toward the street from the corner, out of
+--     the way), facing the street, for the walk phase (their street's traffic red for CrossTime more seconds) or,
+--     with no lights there, for a gap in the traffic; after CrossWait they go on round the block instead. The cars
+--     stop for anybody in their lane.
+--   * Groups (GroupChance of the new people, GroupSize): two to four standing in an oval along the sidewalk of an
+--     ordinary block, between the walk line and the buildings, or round on a corner inside the turn of the walk
+--     lines (a spot the world shows clear), out of the safe zone and off the addresses, cargo spots and employers.
+--     They turn to whoever talks, nod or shift (Npcs.gesture), say a line now and then (Npcs.say) and after
+--     GroupTime break up and walk off both ways. Standing people cost no pathing: the cheap way to more people.
+--   * Walkers stop: at a shop window now and then (WindowChance: a wall straight in from the line; they step up to
+--     it and look), and two walkers passing each other may stop for a word (MeetChance): both step off the line
+--     toward the buildings and face each other. The walkers pass them by.
 --
 -- Bandits among them. During a player's job (driving, out of the safe zone, ★★ and up when Jobs.crewStatus tells
 -- the stars) a traffic car behind them can turn out to be a bandit pickup now and then: it vanishes and
@@ -79,15 +89,12 @@ local PED_SPAWNS_PER_TICK = 2
 local PED_SPAWN_MIN = 70
 local PED_SPAWN_MAX = 170
 local PED_DESPAWN = 240
-local PED_WALK = 8
-local PED_RUN = 16
 local FLEE_RANGE = 40
 local CALM_AFTER = 4 -- seconds without a zombie in range
 local PAUSE_CHANCE = 0.12 -- at a corner (Tuning.CrossChance: over the street)
 local BANDIT_FIRST = 25 -- seconds into a job before a traffic car can be bandits
 local BANDIT_GAP = { 70, 120 } -- seconds between them (one player)
 local BANDIT_RANGE = { 70, 220 }
-local WALK_ANIM = "rbxassetid://507777826" -- server/Npcs.luau's walk (sped up while they run)
 
 -- The bodies: the dealer's cars mostly, now and then a work truck (Config.Cars ids, weight).
 local BODIES: { { id: string, weight: number } } = {
@@ -175,21 +182,27 @@ type Ped = {
 	j: number,
 	k: number, -- the corner it walks to (crossing: the corner it crosses from)
 	dir: number, -- around the ring: +1 or -1
+	speed: number, -- its own stroll (Tuning.WalkSpeed)
+	pace: number, -- the speed it moves at now
 	order: number, -- the walkTo it is on (stale callbacks are ignored)
 	walking: boolean,
-	crossing: boolean, -- over the street to corner ck of block (ci, cj)
+	route: { number }, -- flat x, z of the points still to walk (the goal last)
+	crossing: number, -- 0: no; 1: to the curb; 2: waiting there; 3: over the street to corner ck of block (ci, cj)
 	ci: number,
 	cj: number,
 	ck: number,
 	zebra: Crossings.Crosswalk?, -- the crosswalk it crosses
-	waitSince: number, -- at the curb, waiting to cross, since (0: not waiting)
+	waitSince: number, -- at the curb, waiting to cross, since
 	restUntil: number,
+	stop: Vector3?, -- walking to a spot to stand (a shop window, a word with somebody): what to face there
+	stopFor: number, -- and for how long
 	fleeing: boolean,
 	calmAt: number,
 	nextFlee: number,
-	spin: number, -- its angle off straight away from a zombie
+	spin: number, -- +1 / -1: the way it runs when a zombie is right beside it (a group scatters both ways)
 	group: Group?, -- standing with others, talking
 	meetAfter: number, -- no stopping for a word before this
+	fails: number, -- walks given up in a row (StuckLimit: it goes, out of sight)
 }
 
 -- 3.9: people standing together, talking.
@@ -686,7 +699,148 @@ local function checkCrashes()
 	lastSpeed = speeds
 end
 
+-- ── Who is around ──────────────────────────────────────────────────────────
+
+local function viewers(): { Viewer }
+	local list: { Viewer } = {}
+	for _, player in Players:GetPlayers() do
+		local car = Vehicles.seatedIn(player)
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local part: BasePart? = if car then car.chassis elseif root and root:IsA("BasePart") then root else nil
+		if not part then
+			continue
+		end
+		local p = part.Position
+		local v = part.AssemblyLinearVelocity
+		local hx, hz = v.X, v.Z
+		local speed = math.sqrt(hx * hx + hz * hz)
+		if speed > 4 then
+			hx, hz = hx / speed, hz / speed
+		else
+			local look = part.CFrame.LookVector
+			local flat = math.sqrt(look.X * look.X + look.Z * look.Z)
+			hx, hz = if flat > 0.1 then look.X / flat else 0, if flat > 0.1 then look.Z / flat else 0
+		end
+		table.insert(list, { player = player, x = p.X, z = p.Z, hx = hx, hz = hz })
+	end
+	return list
+end
+
+local function nearest(list: { Viewer }, x: number, z: number): number
+	local best = math.huge
+	for _, v in list do
+		best = math.min(best, math.sqrt((v.x - x) ^ 2 + (v.z - z) ^ 2))
+	end
+	return best
+end
+
+-- Out of everybody's sight: far enough from all, and not in front of the one it is for when close.
+local function hidden(list: { Viewer }, x: number, z: number, minD: number): boolean
+	for _, v in list do
+		local dx, dz = x - v.x, z - v.z
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d < minD * 0.9 then
+			return false
+		end
+		if d < minD * 1.6 and d > 0 and (dx * v.hx + dz * v.hz) / d > 0.55 then
+			return false -- right in front of them
+		end
+	end
+	return true
+end
+
+local lastViewers: { Viewer } = {} -- the players' places at the last manage step (a stuck person goes when unseen)
+
+-- ── The built world, for the people on foot ────────────────────────────────
+-- 3.10: what a person would bump into, asked of the world itself (the solid parts that collide with the Npc group:
+-- walls, poles, lamps, benches, hydrants; not the people, the cars or the flat paint). Used once at the start for the
+-- walk lines (TrafficLanes.survey) and the crosswalks, and now and then for a spot to stand (a group, two talking, a
+-- shop window).
+
+local PROBE_LOW = 1 -- studs over the sidewalk where the probe starts (a curb, a step, a lawn's edge: stepped over)
+local PROBE_HIGH = 5.5
+local overlap = OverlapParams.new()
+overlap.FilterType = Enum.RaycastFilterType.Exclude
+overlap.RespectCanCollide = true
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+rayParams.RespectCanCollide = true
+local zebraClear: { [Crossings.Crosswalk]: boolean } = {} -- the crosswalks people may use (nothing on their line)
+local surveyed = false
+
+-- Not the traffic, not the people, not the players.
+local function refreshFilter()
+	local list: { Instance } = {}
+	if folder then
+		table.insert(list, folder)
+	end
+	local npcs = workspace:FindFirstChild("Npcs")
+	if npcs then
+		table.insert(list, npcs)
+	end
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(list, player.Character)
+		end
+	end
+	overlap.FilterDescendantsInstances = list
+	rayParams.FilterDescendantsInstances = list
+end
+
+-- Nothing solid in this upright box: (x, z) its middle, (tx, tz) the way along it (unit), the half sizes.
+local function clearRect(x: number, z: number, tx: number, tz: number, halfAlong: number, halfAcross: number): boolean
+	local middle = Vector3.new(x, Map.WalkTop + (PROBE_LOW + PROBE_HIGH) / 2, z)
+	local frame = CFrame.lookAt(middle, middle + Vector3.new(tx, 0, tz))
+	local size = Vector3.new(halfAcross * 2, PROBE_HIGH - PROBE_LOW, halfAlong * 2)
+	return #workspace:GetPartBoundsInBox(frame, size, overlap) == 0
+end
+
+-- Can a person walk this straight line (ends included)?
+local function clearLine(ax: number, az: number, bx: number, bz: number): boolean
+	local dx, dz = bx - ax, bz - az
+	local length = math.sqrt(dx * dx + dz * dz)
+	local tx, tz = if length > 0.01 then dx / length else 1, if length > 0.01 then dz / length else 0
+	local body = TrafficLanes.Body
+	return clearRect((ax + bx) / 2, (az + bz) / 2, tx, tz, length / 2 + body, body)
+end
+
+-- Every block's walk lines and every crosswalk, once (the world is built by then).
+local function surveyAll()
+	refreshFilter()
+	local blocks, detours, closed, zebrasClosed = 0, 0, 0, 0
+	for _, d in Map.Districts do
+		for i = d.i0, d.i1 do
+			for j = d.j0, d.j1 do
+				blocks += 1
+				closed += 4 - TrafficLanes.survey(d, i, j, clearLine)
+				for s = 1, 4 do
+					local inset = TrafficLanes.sideInset(d, i, j, s)
+					if inset and inset ~= TrafficLanes.SidewalkInset then
+						detours += 1
+					end
+				end
+			end
+			task.wait()
+		end
+	end
+	local half = (Map.Cell - Map.BlockSize) / 2 + TrafficLanes.SidewalkInset -- the crossing: corner to corner
+	for _, c in Crossings.crosswalks() do
+		local ok = if c.alongX then clearLine(c.x, c.z - half, c.x, c.z + half) else clearLine(c.x - half, c.z, c.x + half, c.z)
+		zebraClear[c] = ok
+		if not ok then
+			zebrasClosed += 1
+		end
+	end
+	surveyed = true
+	print(`[Traffic] sidewalks surveyed: {blocks} blocks, {detours} sides on a detour, {closed} closed, {zebrasClosed} crosswalks closed to people`)
+end
+
 -- ── Pedestrians ────────────────────────────────────────────────────────────
+
+local WALK_OPTIONS: Npcs.WalkOptions = { through = true, stuck = Tuning.StuckAfter, near = 1.2 }
+local WINDOW_LOOK = 12 -- a wall this far in from the walk line is a shop window to look at
+local WINDOW_GAP = 2.2 -- they stand this far from it
 
 local function removePed(ped: Ped)
 	local index = table.find(peds, ped)
@@ -704,86 +858,234 @@ local function removePed(ped: Ped)
 	Npcs.remove(ped.model)
 end
 
-local function setPace(ped: Ped, speed: number)
-	local humanoid = ped.humanoid
-	if not humanoid then
-		return
-	end
-	humanoid.WalkSpeed = speed
-	local animator = humanoid:FindFirstChildOfClass("Animator")
-	if animator then
-		for _, track in animator:GetPlayingAnimationTracks() do
-			if track.Animation and track.Animation.AnimationId == WALK_ANIM then
-				track:AdjustSpeed(speed / 11)
-			end
-		end
-	end
+local function pace(ped: Ped, speed: number)
+	ped.pace = speed
+	Npcs.pace(ped.model, speed)
 end
 
--- At a corner: over the street (to the crosswalk's curb, waiting there for the lights), a moment's rest, or on round
--- the block.
-local function atCorner(ped: Ped)
-	local roll = rand()
-	if roll < Tuning.CrossChance then
-		local k2, i2, j2 = TrafficLanes.across(ped.d, ped.i, ped.j, ped.k, rand() < 0.5)
-		if k2 then
-			local ax, az = TrafficLanes.corner(ped.d, ped.i, ped.j, ped.k)
-			local bx, bz = TrafficLanes.corner(ped.d, i2, j2, k2)
-			local zebra = Crossings.at((ax + bx) / 2, (az + bz) / 2)
-			if zebra then
-				ped.crossing = true
-				ped.zebra = zebra
-				ped.waitSince = os.clock()
-				ped.ci, ped.cj, ped.ck = i2, j2, k2
-				Npcs.face(ped.model, Vector3.new(bx, Map.WalkTop, bz))
-				return
-			end
-		end
-	elseif roll < Tuning.CrossChance + PAUSE_CHANCE then
-		ped.restUntil = os.clock() + rng:NextNumber(2, 5)
-	end
-	ped.k = TrafficLanes.nextCorner(ped.k, ped.dir)
+-- Stands where it is (anchored, idle); whatever it walked is forgotten.
+local function standStill(ped: Ped)
+	ped.order += 1
+	ped.walking = false
+	Npcs.stop(ped.model)
 end
 
-local function walk(ped: Ped, x: number, z: number, speed: number)
+-- Stops a walker where it is for `seconds` (somewhere off the line no walk was planned to); it walks on later.
+local function halt(ped: Ped, now: number, seconds: number)
+	standStill(ped)
+	ped.stop = nil
+	ped.restUntil = now + seconds
+end
+
+-- The nearest living zombie within FLEE_RANGE of a point.
+local function zombieNear(position: Vector3): Vector3?
+	local best: Vector3? = nil
+	local bestD = FLEE_RANGE
+	for _, z in Zombies.all() do
+		if z.dead then
+			continue
+		end
+		local p = z.root.Position
+		local d = Vector3.new(p.X - position.X, 0, p.Z - position.Z).Magnitude
+		if d < bestD then
+			best, bestD = p, d
+		end
+	end
+	return best
+end
+
+local arrive: (Ped) -> ()
+local failed: (Ped) -> ()
+
+-- Walks the next point of its route (false: the route is done). The points flow into each other (no halt at each);
+-- at the end `arrive` decides what next.
+local function walkOn(ped: Ped): boolean
+	local route = ped.route
+	if #route < 2 then
+		return false
+	end
 	ped.order += 1
 	local order = ped.order
 	ped.walking = true
-	Npcs.walkTo(ped.model, Vector3.new(x, Map.WalkTop, z), function(arrived: boolean)
-		if ped.order ~= order then
-			return
+	Npcs.walkTo(ped.model, Vector3.new(route[1], Map.WalkTop, route[2]), function(ok: boolean)
+		if ped.order ~= order or not ped.model.Parent then
+			return -- a newer walk, a halt, gone
 		end
 		ped.walking = false
-		if ped.fleeing then
-			return -- thinkPed sends them on
+		if not ok then
+			failed(ped)
+			return
 		end
-		if not arrived then
-			-- Something in the way: back to the curb it crossed from, or back the other way round the block.
-			if ped.crossing then
-				ped.crossing = false
-				ped.zebra = nil
-			else
-				ped.dir = -ped.dir
-				ped.k = TrafficLanes.nextCorner(ped.k, ped.dir)
-			end
-		elseif ped.crossing then
-			ped.crossing = false
-			ped.zebra = nil
-			ped.i, ped.j = ped.ci, ped.cj
-			ped.k = TrafficLanes.nextCorner(ped.ck, ped.dir)
-		else
-			atCorner(ped)
+		ped.fails = 0
+		table.remove(route, 1)
+		table.remove(route, 1)
+		if not walkOn(ped) then
+			arrive(ped)
 		end
-	end)
-	setPace(ped, speed)
+	end, nil, WALK_OPTIONS)
+	return true
 end
 
--- Stops a walker where it is (a shop window, a word with somebody) for `seconds`; it walks on to its corner later.
-local function halt(ped: Ped, now: number, seconds: number)
-	Npcs.stop(ped.model)
-	ped.order += 1 -- forget the walk
-	ped.walking = false
-	ped.restUntil = now + seconds
+local function setRoute(ped: Ped, route: { number }, speed: number): boolean
+	ped.route = route
+	pace(ped, speed)
+	return walkOn(ped)
+end
+
+-- Along its side of the ring to corner k (from where it is, back onto the walk line first if it is off it). False
+-- when that side is closed.
+local function toCorner(ped: Ped, speed: number): boolean
+	local p = ped.root.Position
+	local route = TrafficLanes.route(ped.d, ped.i, ped.j, ped.k, ped.dir, p.X, p.Z)
+	return route ~= nil and setRoute(ped, route, speed)
+end
+
+-- Standing at corner `from`: the next corner round the ring its way, or the other way when that side is closed.
+local function chooseNext(ped: Ped, from: number): boolean
+	for _ = 1, 2 do
+		local k = TrafficLanes.nextCorner(from, ped.dir)
+		if TrafficLanes.sideInset(ped.d, ped.i, ped.j, TrafficLanes.sideOf(k, ped.dir)) then
+			ped.k = k
+			return true
+		end
+		ped.dir = -ped.dir
+	end
+	return false
+end
+
+-- At corner `from` with a zombie about: of the two sides there, the way whose far corner is farther from it.
+local function awayFrom(ped: Ped, from: number, zombie: Vector3): boolean
+	local best, bestD = 0, -1
+	for n = 1, 2 do
+		local dir = if n == 1 then 1 else -1
+		local k = TrafficLanes.nextCorner(from, dir)
+		if TrafficLanes.sideInset(ped.d, ped.i, ped.j, TrafficLanes.sideOf(k, dir)) then
+			local x, z = TrafficLanes.corner(ped.d, ped.i, ped.j, k)
+			local d2 = (x - zombie.X) ^ 2 + (z - zombie.Z) ^ 2
+			if d2 > bestD then
+				best, bestD = dir, d2
+			end
+		end
+	end
+	if best == 0 then
+		return false
+	end
+	ped.dir = best
+	ped.k = TrafficLanes.nextCorner(from, best)
+	return true
+end
+
+-- Back onto the ring after something odd (the side it was on is closed): the nearest open side, its own way.
+local function rehome(ped: Ped): boolean
+	local p = ped.root.Position
+	local s = TrafficLanes.nearestSide(ped.d, ped.i, ped.j, p.X, p.Z)
+	if not s then
+		return false
+	end
+	ped.k = if ped.dir == 1 then TrafficLanes.nextCorner(s, 1) else s
+	return true
+end
+
+-- The crosswalk from corner (i, j, k) over to corner (i2, j2, k2), if people may use it.
+local function zebraBetween(d: Map.District, i: number, j: number, k: number, i2: number, j2: number, k2: number): Crossings.Crosswalk?
+	local ax, az = TrafficLanes.corner(d, i, j, k)
+	local bx, bz = TrafficLanes.corner(d, i2, j2, k2)
+	local zebra = Crossings.at((ax + bx) / 2, (az + bz) / 2)
+	return if zebra and zebraClear[zebra] then zebra else nil
+end
+
+-- At corner k: over the street now and then (to the curb, waiting there for the lights), a moment's rest, or on
+-- round the block (no halt).
+local function atCorner(ped: Ped)
+	local k = ped.k
+	local roll = rand()
+	if roll < Tuning.CrossChance then
+		local alongX = rand() < 0.5
+		for _ = 1, 2 do
+			local k2, i2, j2 = TrafficLanes.across(ped.d, ped.i, ped.j, k, alongX)
+			local zebra = if k2 then zebraBetween(ped.d, ped.i, ped.j, k, i2, j2, k2) else nil
+			if k2 and zebra then
+				ped.crossing = 1
+				ped.zebra = zebra
+				ped.ci, ped.cj, ped.ck = i2, j2, k2
+				local x, z = TrafficLanes.curbSpot(ped.d, ped.i, ped.j, k, alongX)
+				if setRoute(ped, { x, z }, ped.speed) then
+					return
+				end
+			end
+			alongX = not alongX
+		end
+		ped.crossing = 0
+		ped.zebra = nil
+	elseif roll < Tuning.CrossChance + PAUSE_CHANCE then
+		standStill(ped)
+		ped.restUntil = os.clock() + rng:NextNumber(2, 5)
+		chooseNext(ped, k)
+		return
+	end
+	if not (chooseNext(ped, k) and toCorner(ped, ped.speed)) then
+		standStill(ped)
+		ped.fails += 1
+	end
+end
+
+-- The end of a route.
+arrive = function(ped: Ped)
+	local now = os.clock()
+	local stop = ped.stop
+	if stop then
+		-- At a shop window or by somebody to talk to: stand there a while, facing it.
+		ped.stop = nil
+		standStill(ped)
+		ped.restUntil = now + ped.stopFor
+		Npcs.face(ped.model, stop)
+		return
+	end
+	if ped.crossing == 1 then
+		-- At the curb: wait for the walk phase, facing the other side.
+		standStill(ped)
+		ped.crossing = 2
+		ped.waitSince = now
+		local bx, bz = TrafficLanes.corner(ped.d, ped.ci, ped.cj, ped.ck)
+		Npcs.face(ped.model, Vector3.new(bx, Map.WalkTop, bz))
+		return
+	elseif ped.crossing == 3 then
+		-- Over: on round the new block from the corner it reached.
+		ped.crossing = 0
+		ped.zebra = nil
+		ped.i, ped.j = ped.ci, ped.cj
+		local speed = if ped.fleeing then Tuning.RunSpeed else ped.speed
+		if not (chooseNext(ped, ped.ck) and toCorner(ped, speed)) then
+			standStill(ped)
+		end
+		return
+	end
+	if ped.fleeing then
+		-- On round the block, away from the zombie.
+		local zombie = zombieNear(ped.root.Position)
+		local ok = if zombie then awayFrom(ped, ped.k, zombie) else chooseNext(ped, ped.k)
+		if not (ok and toCorner(ped, Tuning.RunSpeed)) then
+			standStill(ped)
+		end
+		return
+	end
+	atCorner(ped)
+end
+
+-- A walk given up (something in the way, no progress): back the other way round the block, or back to the curb it
+-- crossed from. thinkPed sends it on after a moment (or lets it go, out of sight, when it keeps failing).
+failed = function(ped: Ped)
+	ped.fails += 1
+	ped.stop = nil
+	if ped.crossing ~= 0 then
+		ped.crossing = 0
+		ped.zebra = nil
+	else
+		ped.dir = -ped.dir
+		ped.k = TrafficLanes.nextCorner(ped.k, ped.dir)
+	end
+	standStill(ped)
+	ped.restUntil = os.clock() + rng:NextNumber(0.6, 1.6)
 end
 
 -- A person at (x, z) on the ring of block (i, j), facing (fx, fz), on the way to corner k.
@@ -818,29 +1120,42 @@ local function makePed(d: Map.District, i: number, j: number, k: number, x: numb
 		j = j,
 		k = k,
 		dir = 1,
+		speed = rng:NextNumber(Tuning.WalkSpeed[1], Tuning.WalkSpeed[2]),
+		pace = 0,
 		order = 0,
 		walking = false,
-		crossing = false,
+		route = {},
+		crossing = 0,
 		ci = i,
 		cj = j,
 		ck = k,
 		zebra = nil,
 		waitSince = 0,
 		restUntil = 0,
+		stop = nil,
+		stopFor = 0,
 		fleeing = false,
 		calmAt = 0,
 		nextFlee = 0,
-		spin = 0,
+		spin = 1,
 		group = nil,
 		meetAfter = 0,
+		fails = 0,
 	}
+	pace(ped, ped.speed)
 	table.insert(peds, ped)
 	return ped
 end
 
 local function spawnPed(spot: TrafficLanes.Sidewalk): Ped?
-	local tx, tz = TrafficLanes.corner(spot.d, spot.i, spot.j, spot.k)
-	return makePed(spot.d, spot.i, spot.j, spot.k, spot.x, spot.z, tx, tz, NAMES[rng:NextInteger(1, #NAMES)])
+	local dir = if rand() < 0.5 then 1 else -1
+	local k = if dir == 1 then spot.k else spot.side
+	local tx, tz = TrafficLanes.corner(spot.d, spot.i, spot.j, k)
+	local ped = makePed(spot.d, spot.i, spot.j, k, spot.x, spot.z, tx, tz, NAMES[rng:NextInteger(1, #NAMES)])
+	if ped then
+		ped.dir = dir
+	end
+	return ped
 end
 
 -- ── Groups ─────────────────────────────────────────────────────────────────
@@ -900,37 +1215,34 @@ local function groupSpotClear(x: number, z: number): boolean
 	return true
 end
 
--- Two to four people standing in a loose circle by the side of an ordinary block, or on its corner, facing each
--- other. False when the spot will not do.
+-- Two to four people standing together on the sidewalk of an ordinary block, facing each other: in an oval along
+-- the side, between the walk line and the buildings (TrafficLanes.GroupDepth: the walkers pass them by), or on a
+-- corner inside the turn of the walk lines. False when the spot will not do.
 local function spawnGroup(spot: TrafficLanes.Sidewalk, size: number, now: number): boolean
-	local d, i, j = spot.d, spot.i, spot.j
-	if Map.special(d.id, i, j) then
-		return false -- the shops, the depot, the places: their own people and props
+	local d, i, j, s = spot.d, spot.i, spot.j, spot.side
+	if Map.special(d.id, i, j) or TrafficLanes.sideInset(d, i, j, s) ~= TrafficLanes.SidewalkInset then
+		return false -- the shops, the depot, the places: their own people and props; a side on a detour: no room
 	end
-	local kb = spot.k
-	local ka = TrafficLanes.nextCorner(kb, -1)
-	local ax, az = TrafficLanes.corner(d, i, j, ka)
-	local bx, bz = TrafficLanes.corner(d, i, j, kb)
-	local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
+	local ka, kb = s, TrafficLanes.nextCorner(s, 1)
+	local nx, nz, tx, tz = TrafficLanes.inward(s)
+	local along, across = TrafficLanes.GroupRadius.along, TrafficLanes.GroupRadius.across
 	local x, z = spot.x, spot.z
-	local alongX = math.abs(bx - ax) > math.abs(bz - az)
+	local placed = false
+	refreshFilter()
 	if rand() < 0.3 then
-		-- On the corner, a step in from it (the walkers and the people waiting to cross keep the corner itself).
-		x = bx + (if cx > bx then 4 else -4)
-		z = bz + (if cz > bz then 4 else -4)
+		-- On the corner, a round group (the walkers and the people waiting to cross keep the corner itself).
+		x, z = TrafficLanes.cornerSpot(d, i, j, kb, TrafficLanes.CornerGroupDepth)
+		along, across = 1.6, 1.6
+		placed = clearRect(x, z, tx, tz, along + 1, across + 1)
 	else
-		local f = if alongX then (x - ax) / (bx - ax) else (z - az) / (bz - az)
-		if f < 0.12 or f > 0.88 then
+		local _, _, _, _, _, f = TrafficLanes.nearestSide(d, i, j, x, z)
+		if f < 0.15 or f > 0.85 then
 			return false
 		end
-		-- A little in from the walkers' ring, toward the shop fronts.
-		if alongX then
-			z += if cz > z then 3 else -3
-		else
-			x += if cx > x then 3 else -3
-		end
+		x, z = TrafficLanes.sideSpot(d, i, j, s, f, TrafficLanes.GroupDepth)
+		placed = clearRect(x, z, tx, tz, along + 1, across + 1)
 	end
-	if not groupSpotClear(x, z) then
+	if not placed or not groupSpotClear(x, z) then
 		return false
 	end
 	local group: Group = {
@@ -942,16 +1254,15 @@ local function spawnGroup(spot: TrafficLanes.Sidewalk, size: number, now: number
 		ka = ka,
 		kb = kb,
 	}
-	-- Around the middle, the first two along the street (a pair stands side by side with the street, not one behind
-	-- the other).
-	local turn = if alongX then 0 else math.pi / 2
+	-- Round the middle, the first two along the street (a pair faces each other along the sidewalk, not one behind
+	-- the other toward the wall).
 	local first = rng:NextInteger(1, #NAMES)
 	for n = 1, size do
-		local angle = turn + (n - 1) * math.pi * 2 / size + rng:NextNumber(-0.3, 0.3)
-		local radius = rng:NextNumber(1.7, 2.1)
-		local px, pz = x + math.cos(angle) * radius, z + math.sin(angle) * radius
+		local angle = (n - 1) * math.pi * 2 / size + rng:NextNumber(-0.25, 0.25)
+		local ca, sa = math.cos(angle), math.sin(angle)
+		local px, pz = x + tx * ca * along + nx * sa * across, z + tz * ca * along + nz * sa * across
 		local name = NAMES[(first + n * 5) % #NAMES + 1]
-		local ped = makePed(d, i, j, kb, px, pz, x + rng:NextNumber(-0.5, 0.5), z + rng:NextNumber(-0.5, 0.5), name)
+		local ped = makePed(d, i, j, kb, px, pz, x + rng:NextNumber(-0.4, 0.4), z + rng:NextNumber(-0.4, 0.4), name)
 		if ped then
 			ped.group = group
 			table.insert(group.members, ped)
@@ -1004,26 +1315,64 @@ end
 
 -- ── Stopping and crossing ──────────────────────────────────────────────────
 
--- A walker along the block stops at a shop window: it faces the block for a few seconds.
-local function windowStop(ped: Ped, position: Vector3, now: number)
-	local tx, tz = TrafficLanes.corner(ped.d, ped.i, ped.j, ped.k)
-	local ux, uz = tx - position.X, tz - position.Z
-	local length = math.sqrt(ux * ux + uz * uz)
-	if length < 10 then
-		return -- nearly at the corner: on to it
+-- A walker along an ordinary stretch of its side stops at a shop window: a wall within WINDOW_LOOK of the walk line,
+-- straight in. It steps off the line to stand WINDOW_GAP in front of it, facing it, for a few seconds.
+local function windowStop(ped: Ped, position: Vector3)
+	local d, i, j = ped.d, ped.i, ped.j
+	local s, px, pz, _, _, f = TrafficLanes.nearestSide(d, i, j, position.X, position.Z)
+	if not s or f < 0.15 or f > 0.85 or TrafficLanes.sideInset(d, i, j, s) ~= TrafficLanes.SidewalkInset then
+		return
 	end
-	ux, uz = ux / length, uz / length
-	local cx, cz = ped.d.ox + ped.i * Map.Cell, ped.d.oz + ped.j * Map.Cell
-	local nx, nz = -uz, ux
-	if nx * (cx - position.X) + nz * (cz - position.Z) < 0 then
-		nx, nz = -nx, -nz
+	if (px - position.X) ^ 2 + (pz - position.Z) ^ 2 > 4 then
+		return -- not on its line (stepping back onto it)
 	end
-	halt(ped, now, rng:NextNumber(Tuning.WindowTime[1], Tuning.WindowTime[2]))
-	Npcs.face(ped.model, position + Vector3.new(nx, 0, nz) * 6)
+	local nx, nz = TrafficLanes.inward(s)
+	refreshFilter()
+	local hit = workspace:Raycast(Vector3.new(px, Map.WalkTop + 3, pz), Vector3.new(nx, 0, nz) * WINDOW_LOOK, rayParams)
+	if not hit then
+		return -- nothing to look at (a park, a car park)
+	end
+	local room = hit.Distance - WINDOW_GAP
+	if room < 1.5 then
+		return
+	end
+	local x, z = px + nx * room, pz + nz * room
+	if not clearLine(px, pz, x, z) then
+		return
+	end
+	ped.stop = Vector3.new(x + nx * 4, Map.WalkTop, z + nz * 4)
+	ped.stopFor = rng:NextNumber(Tuning.WindowTime[1], Tuning.WindowTime[2])
+	setRoute(ped, { x, z }, ped.speed)
 end
 
 local function canMeet(ped: Ped, now: number): boolean
-	return ped.walking and not ped.crossing and not ped.fleeing and ped.group == nil and ped.humanoid ~= nil and now >= ped.meetAfter
+	return ped.walking and ped.crossing == 0 and not ped.fleeing and ped.group == nil and ped.stop == nil and ped.humanoid ~= nil and now >= ped.meetAfter
+end
+
+-- Two walkers stop for a word: both step off the walk line toward the buildings (MeetDepth), side by side along the
+-- sidewalk, and face each other; where there is no room for that, they stop right there.
+local function meet(p: Ped, q: Ped, now: number, seconds: number)
+	local pp, qp = p.root.Position, q.root.Position
+	local mx, mz = (pp.X + qp.X) / 2, (pp.Z + qp.Z) / 2
+	local s, _, _, tx, tz, f = TrafficLanes.nearestSide(p.d, p.i, p.j, mx, mz)
+	if s and p.d == q.d and p.i == q.i and p.j == q.j and f > 0.06 and f < 0.94 and TrafficLanes.sideInset(p.d, p.i, p.j, s) == TrafficLanes.SidewalkInset then
+		local sx, sz = TrafficLanes.sideSpot(p.d, p.i, p.j, s, f, TrafficLanes.MeetDepth)
+		local sign = if (pp.X - mx) * tx + (pp.Z - mz) * tz >= 0 then 1.3 else -1.3
+		local ax, az = sx + tx * sign, sz + tz * sign
+		local bx, bz = sx - tx * sign, sz - tz * sign
+		refreshFilter()
+		if clearLine(ax, az, bx, bz) then
+			p.stop, p.stopFor = Vector3.new(bx, Map.WalkTop, bz), seconds
+			q.stop, q.stopFor = Vector3.new(ax, Map.WalkTop, az), seconds
+			setRoute(p, { ax, az }, p.speed)
+			setRoute(q, { bx, bz }, q.speed)
+			return
+		end
+	end
+	halt(p, now, seconds)
+	halt(q, now, seconds)
+	Npcs.face(p.model, qp)
+	Npcs.face(q.model, pp)
 end
 
 -- Two walkers passing each other: now and then they stop for a word.
@@ -1046,14 +1395,10 @@ local function meetings(now: number)
 			p.meetAfter = now + Tuning.MeetCooldown
 			q.meetAfter = now + Tuning.MeetCooldown
 			if rand() < Tuning.MeetChance then
-				local seconds = rng:NextNumber(Tuning.MeetTime[1], Tuning.MeetTime[2])
-				halt(p, now, seconds)
-				halt(q, now, seconds)
-				Npcs.face(p.model, qp)
-				Npcs.face(q.model, pp)
+				meet(p, q, now, rng:NextNumber(Tuning.MeetTime[1], Tuning.MeetTime[2]))
 				Npcs.say(p.model, GREETINGS[rng:NextInteger(1, #GREETINGS)], 2.5)
 				task.delay(1.6, function()
-					if q.model.Parent and not q.fleeing and not q.walking then
+					if q.model.Parent and not q.fleeing then
 						Npcs.say(q.model, REPLIES[rng:NextInteger(1, #REPLIES)], 2.5)
 					end
 				end)
@@ -1083,68 +1428,57 @@ local function mayCross(zebra: Crossings.Crosswalk, clock: number): boolean
 	return true
 end
 
--- The nearest living zombie within FLEE_RANGE of a point.
-local function zombieNear(position: Vector3): Vector3?
-	local best: Vector3? = nil
-	local bestD = FLEE_RANGE
-	for _, z in Zombies.all() do
-		if z.dead then
-			continue
-		end
-		local p = z.root.Position
-		local d = Vector3.new(p.X - position.X, 0, p.Z - position.Z).Magnitude
-		if d < bestD then
-			best, bestD = p, d
-		end
-	end
-	return best
-end
-
+-- Running from a zombie: along the ring, away from it (each its own way when it is right beside them), on round
+-- the corners; out on the street, over to the other side first. Never off the walk lines.
 local function flee(ped: Ped, position: Vector3, zombie: Vector3, now: number)
 	ped.calmAt = now + CALM_AFTER
 	if not ped.fleeing then
 		ped.fleeing = true
-		ped.crossing = false
-		ped.zebra = nil
+		ped.stop = nil
+		ped.nextFlee = 0
 		ped.waitSince = 0
-		ped.spin = rng:NextNumber(-0.7, 0.7)
+		ped.spin = if rand() < 0.5 then 1 else -1
 		local group = ped.group
 		if group then
 			breakUp(group, now, true)
+		end
+		if ped.crossing == 3 and ped.walking then
+			pace(ped, Tuning.RunSpeed)
+		else
+			ped.crossing = 0
+			ped.zebra = nil
 		end
 		if rand() < 0.5 then
 			Npcs.say(ped.model, SCREAMS[rng:NextInteger(1, #SCREAMS)], 2)
 		end
 	end
-	if now < ped.nextFlee then
+	if ped.crossing ~= 0 or now < ped.nextFlee then
 		return
 	end
-	ped.nextFlee = now + 1.2
-	local ax, az = position.X - zombie.X, position.Z - zombie.Z
-	local length = math.sqrt(ax * ax + az * az)
-	if length > 0.1 then
-		ax, az = ax / length, az / length
-	else
-		ax, az = 1, 0
+	ped.nextFlee = now + 1
+	local s, px, pz, tx, tz, f = TrafficLanes.nearestSide(ped.d, ped.i, ped.j, position.X, position.Z)
+	if not s then
+		return
 	end
-	-- Each a little off straight away (a group scatters).
-	local c, s = math.cos(ped.spin), math.sin(ped.spin)
-	ax, az = ax * c - az * s, ax * s + az * c
-	local x, z = TrafficLanes.clampToBlock(ped.d, ped.i, ped.j, position.X + ax * 30, position.Z + az * 30)
-	if Vector3.new(x - position.X, 0, z - position.Z).Magnitude < 6 then
-		-- Cornered against the street: the corner farthest from the zombie.
-		local bestK, bestD = ped.k, -1
-		for k = 1, 4 do
-			local cx, cz = TrafficLanes.corner(ped.d, ped.i, ped.j, k)
-			local d = (cx - zombie.X) ^ 2 + (cz - zombie.Z) ^ 2
-			if d > bestD then
-				bestK, bestD = k, d
-			end
+	local dir, k = ped.dir, ped.k
+	if f < 0.06 or f > 0.94 then
+		-- At a corner: on along the side that leads away.
+		local saveDir, saveK = ped.dir, ped.k
+		if not awayFrom(ped, if f < 0.06 then s else TrafficLanes.nextCorner(s, 1), zombie) then
+			return
 		end
-		x, z = TrafficLanes.corner(ped.d, ped.i, ped.j, bestK)
-		ped.k = bestK
+		dir, k = ped.dir, ped.k
+		ped.dir, ped.k = saveDir, saveK
+	else
+		local away = (px - zombie.X) * tx + (pz - zombie.Z) * tz
+		dir = if away > 2 then 1 elseif away < -2 then -1 else ped.spin
+		k = if dir == 1 then TrafficLanes.nextCorner(s, 1) else s
 	end
-	walk(ped, x, z, PED_RUN)
+	if ped.walking and ped.dir == dir and ped.k == k and ped.pace >= Tuning.RunSpeed then
+		return -- already running that way
+	end
+	ped.dir, ped.k = dir, k
+	toCorner(ped, Tuning.RunSpeed)
 end
 
 local function thinkPed(ped: Ped, now: number, clock: number)
@@ -1158,95 +1492,58 @@ local function thinkPed(ped: Ped, now: number, clock: number)
 		if now < ped.calmAt then
 			return
 		end
+		-- Calm again: catching their breath, then on at a stroll.
 		ped.fleeing = false
-		ped.walking = false
-		ped.order += 1 -- forget the run
-		setPace(ped, PED_WALK)
+		if ped.crossing == 0 then
+			standStill(ped)
+			ped.restUntil = now + rng:NextNumber(1, 2.5)
+		end
+		pace(ped, ped.speed)
+		return
 	end
 	if ped.group then
 		return -- thinkGroup
 	end
 	if ped.walking then
-		if not ped.crossing and ped.humanoid and rand() < Tuning.WindowChance then
-			windowStop(ped, position, now)
+		if ped.crossing == 0 and ped.stop == nil and ped.humanoid and rand() < Tuning.WindowChance then
+			windowStop(ped, position)
 		end
 		return
 	end
 	if now < ped.restUntil then
 		return
 	end
-	if ped.crossing then
+	if ped.fails >= Tuning.StuckLimit and hidden(lastViewers, position.X, position.Z, PED_SPAWN_MIN * 0.6) then
+		removePed(ped) -- stuck somewhere: gone while nobody looks (a new one comes elsewhere)
+		return
+	end
+	if ped.crossing == 2 then
 		local zebra = ped.zebra
-		if ped.waitSince > 0 then
-			if zebra and not mayCross(zebra, clock) then
-				if now - ped.waitSince > Tuning.CrossWait then
-					-- Waited long enough: on round the block instead.
-					ped.crossing = false
-					ped.zebra = nil
-					ped.waitSince = 0
-					ped.k = TrafficLanes.nextCorner(ped.k, ped.dir)
+		if zebra and not mayCross(zebra, clock) then
+			if now - ped.waitSince > Tuning.CrossWait then
+				-- Waited long enough: on round the block instead.
+				ped.crossing = 0
+				ped.zebra = nil
+				ped.waitSince = 0
+				if not (chooseNext(ped, ped.k) and toCorner(ped, ped.speed)) then
+					ped.fails += 1
 				end
-				return
 			end
-			ped.waitSince = 0
+			return
 		end
+		ped.crossing = 3
+		ped.waitSince = 0
 		local x, z = TrafficLanes.corner(ped.d, ped.ci, ped.cj, ped.ck)
-		walk(ped, x, z, PED_WALK)
-	else
-		local x, z = TrafficLanes.corner(ped.d, ped.i, ped.j, ped.k)
-		walk(ped, x, z, PED_WALK)
+		setRoute(ped, { x, z }, ped.speed)
+		return
 	end
-end
-
--- ── Who is around ──────────────────────────────────────────────────────────
-
-local function viewers(): { Viewer }
-	local list: { Viewer } = {}
-	for _, player in Players:GetPlayers() do
-		local car = Vehicles.seatedIn(player)
-		local character = player.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart")
-		local part: BasePart? = if car then car.chassis elseif root and root:IsA("BasePart") then root else nil
-		if not part then
-			continue
-		end
-		local p = part.Position
-		local v = part.AssemblyLinearVelocity
-		local hx, hz = v.X, v.Z
-		local speed = math.sqrt(hx * hx + hz * hz)
-		if speed > 4 then
-			hx, hz = hx / speed, hz / speed
-		else
-			local look = part.CFrame.LookVector
-			local flat = math.sqrt(look.X * look.X + look.Z * look.Z)
-			hx, hz = if flat > 0.1 then look.X / flat else 0, if flat > 0.1 then look.Z / flat else 0
-		end
-		table.insert(list, { player = player, x = p.X, z = p.Z, hx = hx, hz = hz })
+	-- (Interrupted on the way to the curb or over: back onto its own block's ring.)
+	ped.crossing = 0
+	ped.zebra = nil
+	if not toCorner(ped, ped.speed) and not (rehome(ped) and toCorner(ped, ped.speed)) then
+		ped.fails += 1
+		ped.restUntil = now + 2
 	end
-	return list
-end
-
-local function nearest(list: { Viewer }, x: number, z: number): number
-	local best = math.huge
-	for _, v in list do
-		best = math.min(best, math.sqrt((v.x - x) ^ 2 + (v.z - z) ^ 2))
-	end
-	return best
-end
-
--- Out of everybody's sight: far enough from all, and not in front of the one it is for when close.
-local function hidden(list: { Viewer }, x: number, z: number, minD: number): boolean
-	for _, v in list do
-		local dx, dz = x - v.x, z - v.z
-		local d = math.sqrt(dx * dx + dz * dz)
-		if d < minD * 0.9 then
-			return false
-		end
-		if d < minD * 1.6 and d > 0 and (dx * v.hx + dz * v.hz) / d > 0.55 then
-			return false -- right in front of them
-		end
-	end
-	return true
 end
 
 -- ── Keeping the numbers ────────────────────────────────────────────────────
@@ -1310,6 +1607,10 @@ local function manageCars(g: TrafficLanes.Graph, list: { Viewer }, now: number)
 end
 
 local function managePeds(list: { Viewer }, now: number, clock: number)
+	lastViewers = list
+	if not surveyed then
+		return -- the walk lines first (Traffic.start)
+	end
 	for _, ped in table.clone(peds) do
 		if not ped.model.Parent then
 			removePed(ped)
@@ -1498,6 +1799,19 @@ function Traffic.start()
 	local g = TrafficLanes.graph()
 	graph = g
 	nodeLight = Crossings.nodeLights(g)
+	pcall(function()
+		overlap.CollisionGroup = "Npc" -- what the people collide with (server/Npcs.luau)
+		rayParams.CollisionGroup = "Npc"
+	end)
+	task.spawn(function()
+		local ok, err = pcall(function()
+			surveyAll()
+		end)
+		if not ok then
+			warn(`[Traffic] sidewalk survey failed, straight lines everywhere: {err}`)
+			surveyed = true
+		end
+	end)
 	workspace:GetAttributeChangedSignal("Night"):Connect(refreshLights)
 	Players.PlayerRemoving:Connect(function(player)
 		banditAt[player] = nil
