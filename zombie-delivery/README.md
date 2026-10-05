@@ -38,8 +38,8 @@ node tools/rojo-sync.js zombie-delivery
 `zombie-delivery/spust-zombie-delivery.cmd` (Windows) or `zombie-delivery/spust-zombie-delivery.command` (Mac):
 git pull + the sync.
 
-A Play test in Studio without API access cannot save, so it starts with `Config.StudioStartMoney` ($250,000) to try
-the shops. A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
+A Play test in Studio starts like a new player, with `Config.StudioStartMoney` ($150; the admin panel, P, gives money
+for testing). A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
 
 ## How to play
 
