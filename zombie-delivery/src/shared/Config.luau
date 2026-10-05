@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.1.4"
+Config.Version = "3.2"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -558,6 +558,7 @@ Config.Paints = {
 	{ id = "toxicglow", name = "Toxic Glow", price = 0, color = { 120, 255, 80 }, material = "Neon", exclusive = "lab" },
 	{ id = "sunrise", name = "Sunrise Chrome", price = 0, color = { 255, 170, 90 }, material = "Foil", exclusive = "exodus" },
 	{ id = "phantom", name = "Phantom", price = 0, color = { 46, 44, 70 }, material = "Glass", exclusive = "secrets" },
+	{ id = "tandem", name = "Tandem Twin", price = 0, color = { 236, 92, 60 }, material = "Metal", exclusive = "duo" },
 } :: { PaintDef }
 
 -- 3.1: what you get for finishing things (server/Challenges.luau gives it, client/MissionsUi.luau shows it). Every
@@ -575,6 +576,7 @@ Config.Rewards = {
 		lab = { paint = "toxicglow", title = "Cure Runner" },
 		underworld = { weapon = "goldpistol", title = "Made Man" },
 		exodus = { paint = "sunrise", title = "Last Convoy Captain" },
+		duo = { paint = "tandem", title = "Partners in Crime" }, -- 3.2: the DUO campaign (only with a crew)
 	} :: { [string]: { weapon: string?, paint: string?, title: string } },
 	-- The lost packages hidden at every place (Map.Secrets): money for each, and for all of them …
 	SecretMoney = 300,
@@ -1015,6 +1017,8 @@ Config.Missions = {
 		gunner = { name = "SHOTGUN SEAT", icon = "🎯", description = "Kills from the passenger seats pay triple", pay = 1.1 },
 		spotless = { name = "SPOTLESS", icon = "💎", description = "The cargo must arrive in good shape: below 60 % the mission fails", pay = 1.4 },
 		hunted = { name = "HUNTED", icon = "🏴", description = "Bandit cars hunt you the whole way", pay = 1.35 },
+		pair = { name = "PAIR LIFT", icon = "🤝", description = "These pieces only move with two of you carrying together", pay = 1.3 },
+		switches = { name = "TWIN SWITCHES", icon = "🎛", description = "Two levers far apart must be pulled at the same moment to open the gate", pay = 1.25 },
 	} :: { [string]: { name: string, icon: string, description: string, pay: number } },
 	SpotlessFail = 0.6, -- spotless: the mission fails below this condition
 	QuietCost = 0.06, -- quiet: condition lost per shot
@@ -1025,6 +1029,17 @@ Config.Missions = {
 	DefendRadius = 45, -- defend: stay within this of the receiver
 	DefendWaveEvery = 9, -- defend: a wave around the stop every … s
 	GuardedHorde = 5, -- guarded: zombies waiting at every stop (× the tier's stars / 2, at least this)
+	-- 3.2, DUO missions (MissionDef.duo, the "duo" campaign): only with a crew. START needs at least MinCrew crew
+	-- members within StartRange of you; the twists made for two:
+	--   pair      heavy pieces only move with two: nobody of the job within PairRange of the carrier, no pick-up
+	--   switches  the stop's gate opens only when two levers are pulled within LeverWindow seconds of each other
+	Duo = {
+		MinCrew = 1,
+		StartRange = 120,
+		PairRange = 10,
+		LeverWindow = 1.5,
+		LeverApart = 22, -- studs between the two levers (one player cannot pull both in time)
+	},
 }
 
 Config.Jobs = {
@@ -1498,7 +1513,8 @@ export type JobTypeDef = {
 	level: number?, -- the driver level (Config.Levels) needed to take it
 	board: boolean?, -- on the job board (not taken at an employer's place)
 	-- 3.0, the missions (shared/Missions.luau builds JobTypeDefs with these; Config.Missions.Twists):
-	twists: { string }?, -- the mission's twists: defend | lift | quiet | guarded | night | gunner | spotless | hunted
+	twists: { string }?, -- the mission's twists: defend | lift | quiet | guarded | night | gunner | spotless | hunted | pair | switches
+	duo: boolean?, -- 3.2: only with a crew (Config.Missions.Duo)
 	defendTime: number?, -- defend: seconds to hold out at the last drop
 	coop: boolean?, -- made for a crew: pays more and gets harder with every member (Config.Missions)
 	giverRole: string?, -- the look of the giver (server/Npcs.luau roles), else Config.Jobs.People / "townsperson"

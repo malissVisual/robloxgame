@@ -20,6 +20,8 @@ export type Campaign = {
 	level: number, -- the driver level that opens it
 	pitch: string, -- one or two sentences: what this story is about
 	reward: number, -- money for finishing all ten missions (once)
+	requires: { string }?, -- 3.2: campaigns whose finale (mission 10) must be done before this one opens
+	duo: boolean?, -- 3.2: a DUO campaign: every mission only with a crew (Config.Missions.Duo)
 }
 
 -- A mission: everything a JobTypeDef has (id = the mission id, mission = the same id), plus the story.
