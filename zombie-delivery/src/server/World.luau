@@ -726,6 +726,9 @@ local function buildDealer(parent: Instance)
 	local w, d, h = 84, 52, 18
 	local frame = shopFrame(cx, cz, facing, 22)
 	building(shop, frame, w, d, h, Color3.fromRGB(40, 44, 52), Enum.Material.Metal, 16, 12, true)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Dealer), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "DEAD END MOTORS", Vector3.new(60, 7, 0.5), frame * CFrame.new(0, h + 4.5, -d / 2), Color3.fromRGB(255, 80, 60), nil, "dealer", 12)
 	-- 3.5: the cars are sold from the catalog at the sales counter (the dealer window); no lot of every car outside.
 	local desk = counter(shop, frame, d, "dealer", "Dead End Motors")
