@@ -20,8 +20,15 @@ Theme.Colors = {
 -- The GPS purple: the GPS route on the maps, the crew (its strip, window and tags) and the CREW button.
 Theme.Gps = Color3.fromRGB(176, 92, 255)
 Theme.Border = Color3.fromRGB(78, 94, 81)
-Theme.Radius = 8
-Theme.PanelTransparency = 0.06
+Theme.Radius = 10 -- buttons and the default corner
+Theme.PanelTransparency = 0.15 -- 3.2: the HUD's dark glass (the windows set their own, more solid)
+-- 3.2, the HUD style (the right side of 3.1.3 – 3.1.4, now everywhere): dark glass panels with a 12 px corner, a thin
+-- quiet stroke (an accent colour only where it matters), DisplayFont for the big things, HeadingFont small caps for
+-- the labels, gold (Colors.yellow) the one accent.
+Theme.PanelRadius = 12
+Theme.BorderTransparency = 0.45 -- the quiet stroke (Border); an accent stroke is solid
+Theme.WindowTransparency = 0.04
+Theme.Ink = Color3.fromRGB(10, 14, 13) -- key chips, badges, the dark of the bars
 Theme.Font = Enum.Font.GothamMedium
 Theme.HeadingFont = Enum.Font.GothamBold
 Theme.DisplayFont = Enum.Font.GothamBlack

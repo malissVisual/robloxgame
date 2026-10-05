@@ -21,6 +21,7 @@ local Icons = require(Shared.Icons)
 local Map = require(Shared.Map)
 local Roads = require(Shared.Roads)
 local Ui = require(script.Parent.Ui)
+local Theme = require(script.Parent.Theme)
 
 local MapView = {}
 
@@ -618,15 +619,18 @@ local function buildMini(column: any, touch: boolean)
 		BackgroundTransparency = 1,
 		LayoutOrder = 2,
 	}, column)
-	local shadow = Ui.make("Frame", {
+	-- 3.2: the HUD's glass around it, a rim of dark glass with a quiet stroke (the money card's look).
+	local rim = Ui.make("Frame", {
+		Name = "Rim",
 		Size = UDim2.new(1, 8, 1, 8),
-		Position = UDim2.fromOffset(-4, -1),
-		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.65,
+		Position = UDim2.fromOffset(-4, -4),
+		BackgroundColor3 = Ui.Colors.panel,
+		BackgroundTransparency = Theme.PanelTransparency,
 		BorderSizePixel = 0,
 		ZIndex = 1,
 	}, mini)
-	Ui.corner(shadow, 20)
+	Ui.corner(rim, 20)
+	Ui.stroke(rim)
 	-- The map is a CanvasGroup: it clips the turning content to its rounded square.
 	local group = Ui.make("CanvasGroup", {
 		Size = UDim2.fromScale(1, 1),
@@ -678,34 +682,41 @@ local function buildMini(column: any, touch: boolean)
 	miniCar = dot(group, C.car, "🚗", 20)
 	miniCar.ZIndex = 23
 	miniCar.Visible = false
+	-- The compass: N in a dark disc on the edge, toward the north (it goes round as the map turns).
 	miniNorth = Ui.make("TextLabel", {
 		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0, 13),
-		BackgroundColor3 = Color3.fromRGB(24, 26, 30),
+		BackgroundColor3 = Theme.Ink,
+		BackgroundTransparency = 0.1,
 		Text = "N",
-		TextSize = 13,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextSize = 12,
+		Font = Theme.DisplayFont,
+		TextColor3 = Ui.Colors.red,
 		ZIndex = 24,
 	}, group)
 	Ui.corner(miniNorth, 10)
-	Ui.make("UIStroke", { Color = Color3.fromRGB(230, 70, 60), Thickness = 1.5 }, miniNorth)
-	Ui.make("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 16),
-		Position = UDim2.new(0, 0, 1, -18),
-		BackgroundTransparency = 1,
-		Text = if touch then "MAP button = big map" else "M = big map & GPS",
-		TextSize = 12,
-		Font = Enum.Font.GothamBold,
-		TextColor3 = Color3.fromRGB(230, 230, 230),
-		TextStrokeTransparency = 0.3,
+	Ui.make("UIStroke", { Color = Ui.Colors.red, Thickness = 1, Transparency = 0.35 }, miniNorth)
+	-- The key for the big map: a small dark pill at the bottom.
+	local key = Ui.make("TextLabel", {
+		Size = UDim2.fromOffset(0, 16),
+		AutomaticSize = Enum.AutomaticSize.X,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -6),
+		BackgroundColor3 = Theme.Ink,
+		BackgroundTransparency = 0.3,
+		Text = if touch then "MAP  ·  BIG MAP & GPS" else "M  ·  BIG MAP & GPS",
+		TextSize = 10,
+		Font = Theme.HeadingFont,
+		TextColor3 = Ui.Colors.dim,
 		ZIndex = 25,
 	}, group)
-	-- The frame around it.
+	Ui.corner(key, 8)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, key)
+	-- The frame around it: a thin line on the map's edge.
 	local border = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 3 }, mini)
 	Ui.corner(border, 16)
-	Ui.make("UIStroke", { Color = C.accent, Thickness = 2 }, border)
+	Ui.make("UIStroke", { Color = Theme.Border, Thickness = 1, Transparency = 0.2 }, border)
 end
 
 -- ── The big map ────────────────────────────────────────────────────────────
@@ -806,9 +817,11 @@ local function buildList(parent: any)
 	local list = Ui.make("ScrollingFrame", {
 		Size = UDim2.new(0, LIST_W, 1, -56),
 		Position = UDim2.new(1, -LIST_W - 8, 0, 48),
-		BackgroundColor3 = Color3.fromRGB(30, 32, 38),
+		BackgroundColor3 = Ui.Colors.panelLight,
+		BackgroundTransparency = 0.5,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 6,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = Ui.Colors.dim,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ZIndex = 41,
@@ -819,19 +832,21 @@ local function buildList(parent: any)
 	local order = 0
 	local function title(text: string, color: Color3)
 		order += 1
-		Ui.label(list, text, UDim2.new(1, -8, 0, 22), { LayoutOrder = order, TextColor3 = color, TextSize = 16, Font = Enum.Font.GothamBlack, ZIndex = 42 })
+		Ui.caps(list, text, UDim2.new(1, -8, 0, 20), { LayoutOrder = order, TextColor3 = color, TextSize = 12, ZIndex = 42 })
 	end
 	local function entry(landmark: Map.Landmark)
 		order += 1
 		local button = Ui.make("TextButton", {
 			Size = UDim2.new(1, -8, 0, 52),
-			BackgroundColor3 = Color3.fromRGB(46, 50, 58),
+			BackgroundColor3 = Ui.Colors.panel,
+			BackgroundTransparency = 0.2,
 			Text = "",
 			AutoButtonColor = true,
 			LayoutOrder = order,
 			ZIndex = 42,
 		}, list)
-		Ui.corner(button, 8)
+		Ui.corner(button, 10)
+		Ui.stroke(button)
 		Ui.icon(button, Icons.landmark(landmark.id), landmark.icon, UDim2.fromOffset(40, 40), {
 			Position = UDim2.fromOffset(4, 6),
 			TextScaled = true,
@@ -839,12 +854,12 @@ local function buildList(parent: any)
 			ZIndex = 43,
 			ImageColor3 = KIND_COLORS[landmark.kind] or Color3.new(1, 1, 1),
 		})
-		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 15, Font = Enum.Font.GothamBlack, ZIndex = 43 })
+		Ui.label(button, landmark.name, UDim2.new(1, -54, 0, 20), { Position = UDim2.fromOffset(50, 4), TextSize = 14, Font = Theme.DisplayFont, ZIndex = 43, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		Ui.label(button, landmark.description, UDim2.new(1, -54, 0, 26), {
 			Position = UDim2.fromOffset(50, 24),
 			TextSize = 12,
 			Font = Enum.Font.GothamMedium,
-			TextColor3 = Color3.fromRGB(190, 195, 200),
+			TextColor3 = Ui.Colors.dim,
 			ZIndex = 43,
 		})
 		button.Activated:Connect(function()
@@ -852,8 +867,8 @@ local function buildList(parent: any)
 			big.Visible = false
 		end)
 	end
-	title("Click a place to set the GPS", Color3.fromRGB(255, 255, 255))
-	local clear = Ui.button(list, "CLEAR GPS", UDim2.new(1, -8, 0, 32), Color3.fromRGB(90, 96, 104), function()
+	title("Click a place to set the GPS", Ui.Colors.text)
+	local clear = Ui.ghostButton(list, "◆  CLEAR GPS", UDim2.new(1, -8, 0, 32), C.gps, function()
 		setGps(nil)
 	end)
 	order += 1
@@ -887,13 +902,14 @@ local function buildBig(gui: any)
 		Size = UDim2.fromOffset(mapW + LIST_W + 30, mapH + 56),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(20, 22, 26),
+		BackgroundColor3 = Ui.Colors.panel,
+		BackgroundTransparency = Theme.WindowTransparency,
 		Visible = false,
 		ZIndex = 40,
 	}, gui)
 	bigScale = Ui.make("UIScale", {}, big)
-	Ui.corner(big, 12)
-	Ui.stroke(big, C.accent, 2)
+	Ui.corner(big, Theme.PanelRadius)
+	Ui.stroke(big, Ui.Colors.panelLight:Lerp(Ui.Colors.text, 0.2), 1).Transparency = 0.3
 	Ui.make("TextLabel", {
 		Size = UDim2.new(1, -60, 0, 36),
 		Position = UDim2.fromOffset(12, 6),
@@ -901,15 +917,15 @@ local function buildBig(gui: any)
 		RichText = true,
 		Text = `MAP   ▲ you   <font color="{hex(C.job)}">★ delivery ━</font>   <font color="{hex(C.gps)}">◆ GPS ━</font>   <font color="#FF5050">!</font> bandit car   ? crate`,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextSize = 18,
-		Font = Enum.Font.GothamBlack,
-		TextColor3 = C.accent,
+		TextSize = 17,
+		Font = Theme.DisplayFont,
+		TextColor3 = Ui.Colors.text,
 		ZIndex = 41,
 	}, big)
-	local close = Ui.button(big, "X", UDim2.fromOffset(34, 34), Color3.fromRGB(230, 70, 60), function()
+	local close = Ui.closeButton(big, function()
 		big.Visible = false
 	end)
-	close.Position = UDim2.new(1, -42, 0, 6)
+	close.Position = UDim2.new(1, -8, 0, 6)
 	close.ZIndex = 42
 	local holder = Ui.make("Frame", {
 		Size = UDim2.fromOffset(mapW, mapH),

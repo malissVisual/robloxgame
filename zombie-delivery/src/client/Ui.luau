@@ -60,6 +60,8 @@ function Ui.corner(parent: Instance, radius: number?)
 end
 
 -- Reuse the border when a caller highlights a panel; avoid overlapping double strokes.
+-- 3.2: the quiet border (Theme.Border, the default) is see-through (Theme.BorderTransparency); an accent colour is
+-- solid. A caller may still set .Transparency on what it returns.
 function Ui.stroke(parent: Instance, color: Color3?, thickness: number?): any
 	local border: any = parent:FindFirstChild("UiBorder")
 	if not border then
@@ -67,6 +69,7 @@ function Ui.stroke(parent: Instance, color: Color3?, thickness: number?): any
 	end
 	border.Color = color or Theme.Border
 	border.Thickness = thickness or 1
+	border.Transparency = if color == nil or color == Theme.Border then Theme.BorderTransparency else 0
 	return border
 end
 
@@ -93,9 +96,88 @@ function Ui.panel(parent: Instance, size: UDim2, position: UDim2, anchor: Vector
 		BackgroundTransparency = Theme.PanelTransparency,
 		BorderSizePixel = 0,
 	}, parent)
-	Ui.corner(frame, Theme.Radius)
+	Ui.corner(frame, Theme.PanelRadius)
 	Ui.stroke(frame, Theme.Border, 1)
 	return frame
+end
+
+-- ── 3.2: the HUD style ────────────────────────────────────────────────────
+-- The pieces the right side of 3.1.3 – 3.1.4 is made of, for the rest of the interface: the accent edge, the small
+-- caps label, the key chip, the quiet (glass) button and a pill.
+
+-- A thin accent bar down the left edge of a card (the gun card's): `inset` px in, a little shorter than the card.
+-- It sits outside any layout of the card: give the card's content a frame of its own when it has a UIListLayout.
+function Ui.edge(parent: Instance, color: Color3, inset: number?): any
+	local edge = Ui.make("Frame", {
+		Name = "Edge",
+		Size = UDim2.new(0, 3, 1, -16),
+		Position = UDim2.new(0, inset or 7, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		ZIndex = 2,
+	}, parent)
+	Ui.corner(edge, 2)
+	return edge
+end
+
+-- A small caps label (HeadingFont, upper case, dim): the names of things, the units, the keys.
+function Ui.caps(parent: Instance, text: string, size: UDim2, props: { [string]: any }?): any
+	local label = Ui.label(parent, string.upper(text), size, {
+		Font = Theme.HeadingFont,
+		TextSize = 11,
+		TextColor3 = Ui.Colors.dim,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	if props then
+		for key, value in props do
+			label[key] = value
+		end
+	end
+	return label
+end
+
+-- A key in a dark chip ("M", "Q", "K"), the accent colour for its letter.
+function Ui.keyChip(parent: Instance, key: string, size: number, accent: Color3?, props: { [string]: any }?): any
+	local chip = Ui.label(parent, key, UDim2.fromOffset(size, size), {
+		Name = "Key",
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Theme.Ink,
+		Font = Theme.HeadingFont,
+		TextSize = math.max(9, math.floor(size * 0.55)),
+		TextColor3 = accent or Ui.Colors.dim,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = false,
+	})
+	Ui.corner(chip, math.max(4, math.floor(size / 4)))
+	if props then
+		for key2, value in props do
+			chip[key2] = value
+		end
+	end
+	return chip
+end
+
+-- A quiet button: glass, a thin stroke (the accent's, else grey), the text in the accent or the text colour. For the
+-- secondary actions (close, tabs, refresh, OK) next to the coloured main ones.
+function Ui.ghostButton(parent: Instance, text: string, size: UDim2, accent: Color3?, onClick: () -> ()): any
+	local button = Ui.button(parent, text, size, Ui.Colors.panelLight, onClick)
+	button.BackgroundTransparency = 0.2
+	button.TextColor3 = accent or Ui.Colors.text
+	local border = Ui.stroke(button, accent or Ui.Colors.grey, 1)
+	border.Transparency = if accent then 0.35 else 0.45
+	return button
+end
+
+-- A window's close button: a small glass square with ✕.
+function Ui.closeButton(parent: Instance, onClick: () -> ()): any
+	local close = Ui.ghostButton(parent, "✕", UDim2.fromOffset(36, 36), nil, onClick)
+	close.TextSize = 16
+	close.TextColor3 = Ui.Colors.dim
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.new(1, -12, 0, 12)
+	return close
 end
 
 function Ui.label(parent: Instance, text: string, size: UDim2, props: { [string]: any }?): any
