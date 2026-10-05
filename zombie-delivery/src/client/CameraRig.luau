@@ -480,7 +480,7 @@ function CameraRig.start()
 		return
 	end
 	makeCrosshair()
-	UserInputService.InputChanged:Connect(function(input: InputObject)
+	UserInputService.InputChanged:Connect(function(input: InputObject, processed: boolean)
 		if not enabled then
 			return
 		end
@@ -489,6 +489,10 @@ function CameraRig.start()
 			pitch = math.clamp(pitch - input.Delta.Y * SENSITIVITY, -1.2, 0.9)
 			lastMouse = os.clock()
 		elseif input.UserInputType == Enum.UserInputType.MouseWheel then
+			-- The wheel scrolls a window (the job board, the missions…) or a list under the mouse, not the camera.
+			if processed or CameraRig.mouseNeeded() then
+				return
+			end
 			zoom = math.clamp(zoom - input.Position.Z * 0.1, 0.5, 2)
 		end
 	end)
