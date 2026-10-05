@@ -645,7 +645,8 @@ function Ui.tactile(target: GuiObject, lift: number?, hoverScale: number?)
 			home = target.Position
 			tilt = target.Rotation
 		end
-		away = not resting
+		-- Still away until the rest tween finishes: a hover during it must not take the half-way spot as home.
+		away = true
 		for _, tween in playing do
 			tween:Cancel()
 		end
@@ -654,6 +655,13 @@ function Ui.tactile(target: GuiObject, lift: number?, hoverScale: number?)
 		local b = TweenService:Create(scale, info, { Scale = size })
 		table.insert(playing, a)
 		table.insert(playing, b)
+		if resting then
+			a.Completed:Connect(function(state: Enum.PlaybackState)
+				if state == Enum.PlaybackState.Completed then
+					away = false
+				end
+			end)
+		end
 		a:Play()
 		b:Play()
 	end

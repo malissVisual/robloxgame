@@ -258,10 +258,11 @@ moneyLabel = Ui.label(moneyCard, "$0", UDim2.new(1, -74, 0, 28), {
 Ui.make("UITextSizeConstraint", { MaxTextSize = 26 }, moneyLabel)
 Ui.caps(moneyCard, "Available cash", UDim2.new(1, -74, 0, 14), { Position = UDim2.fromOffset(62, 35), TextSize = 12, TextColor3 = P.ink2 })
 local levelRow = Ui.make("Frame", { Size = UDim2.new(1, -24, 0, 16), Position = UDim2.new(0, 12, 1, -21), BackgroundTransparency = 1 }, moneyCard)
-rankLabel = Ui.caps(levelRow, "", UDim2.new(0.5, 0, 1, 0), { TextSize = 12, TextColor3 = P.ink })
+rankLabel = Ui.caps(levelRow, "", UDim2.new(0.62, 0, 1, 0), { TextSize = 12, TextColor3 = P.ink, TextScaled = true })
+Ui.make("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 9 }, rankLabel) -- (the longer ranks shrink a little)
 local xpBack
-xpBack, xpFill = Ui.bar(levelRow, UDim2.new(0.5, -8, 0, 5), P.violet)
-xpBack.Position = UDim2.new(0.5, 8, 0.5, 0)
+xpBack, xpFill = Ui.bar(levelRow, UDim2.new(0.38, -8, 0, 5), P.violet)
+xpBack.Position = UDim2.new(0.62, 8, 0.5, 0)
 xpBack.AnchorPoint = Vector2.new(0, 0.5)
 xpLabel = Ui.caps(moneyCard, "", UDim2.fromOffset(0, 26), {
 	AutomaticSize = Enum.AutomaticSize.X,
@@ -459,8 +460,8 @@ local windows: { any } = {}
 
 -- Does the interface need the mouse right now (a window or the big map is open)?
 function Hud.anyWindowOpen(): boolean
-	if MapView.isOpen() then
-		return true
+	if MapView.isOpen() or (view and view.menu and view.menu.Visible) then
+		return true -- (the "…" menu frees the mouse like a window: CAR and GIVE UP have no key)
 	end
 	for _, w in windows do
 		if w.Visible then
@@ -1690,6 +1691,7 @@ buttonGrid = placed(Ui.make("Frame", {
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 16),
 	BackgroundTransparency = 1,
+	ZIndex = 2, -- over the weapon label and FIRE: the open menu draws on top and takes the taps
 }, gui))
 hudButtons = {}
 
@@ -1785,13 +1787,14 @@ local function utility(def: ButtonDef?, index: number): any
 	return button
 end
 
--- A count in a red dot on the corner (Hud.setBadge).
+-- A count in a red dot on the corner (Hud.setBadge); the button's UIPadding moves its children, so out by that much.
 local function badgeOn(button: any)
+	local pad = button:FindFirstChildOfClass("UIPadding")
 	local badge = Ui.make("TextLabel", {
 		Name = "Badge",
 		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -2, 0, 2),
+		Position = UDim2.new(1, (if pad then pad.PaddingRight.Offset else 0) - 2, 0, 2 - (if pad then pad.PaddingTop.Offset else 0)),
 		BackgroundColor3 = P.danger,
 		BorderSizePixel = 0,
 		Text = "",
@@ -1866,7 +1869,7 @@ for order, def in BUTTONS do
 	badgeOn(button)
 	hudButtons[def.id] = button
 end
-view.menuRows = math.ceil(entries / 2)
+view.menuHeight = math.ceil(entries / 2) * (CELL_H + 6) - 6 + 20 -- px at scale 1, GIVE UP shown
 -- "…": opens and closes the menu.
 local more = utility(nil, index + 1)
 more.Activated:Connect(function()
@@ -1968,7 +1971,7 @@ function renderWeapons()
 	end
 	local usable = carGun ~= nil or not seated or (gun ~= nil and gun.oneHanded == true)
 	local holstered = carGun == nil and loading()
-	local status = if holstered then "Holstered · hands busy"
+	local status = if holstered then "Holstered"
 		elseif carGun then "On the roof"
 		elseif not usable then "⚠ On foot only"
 		elseif seated then "Window ready"
@@ -2416,7 +2419,7 @@ function view.tickTicket(distance: number?)
 	if t.pin.Text ~= pin then
 		t.pin.Text = pin
 	end
-	-- 📦 loaded / slots (by hand only), the pay, then what went wrong.
+	-- What went wrong first (the line is cut at its end), then 📦 loaded / slots (by hand only), the pay, the rest.
 	local car = Drive.myCar()
 	local carId = car and tostring(car:GetAttribute("CarId"))
 	local capacity = if car and carId then Economy.stageCapacity(carId, tonumber(car:GetAttribute("Stage")) or 0) else 0
@@ -2433,21 +2436,23 @@ function view.tickTicket(distance: number?)
 	local danger = view.hex(P.danger)
 	local quiet = view.hex(P.ink2)
 	local parts: { string } = {}
+	if lost > 0 then
+		table.insert(parts, `<font color="{danger}">⚠ {lost} lost</font>`)
+	end
+	if condition < 0.4 then
+		table.insert(parts, `<font color="{danger}">⚠ cargo {math.floor(condition * 100 + 0.5)}%</font>`)
+	end
 	if byHand and capacity > 0 then
 		table.insert(parts, `📦 {aboard} / {capacity} <font color="{quiet}">slots</font>`)
 	end
 	table.insert(parts, `EST. {Ui.money(job.pay)}` .. (if job.night == true then ` <font color="{quiet}">🌙 night</font>` else ""))
-	if condition < 0.995 then
-		local pct = math.floor(condition * 100 + 0.5)
-		table.insert(parts, if condition < 0.4 then `<font color="{danger}">⚠ cargo {pct}%</font>` else `<font color="{quiet}">cargo {pct}%</font>`)
-	end
-	if lost > 0 then
-		table.insert(parts, `<font color="{danger}">⚠ {lost} lost</font>`)
+	if condition < 0.995 and condition >= 0.4 then
+		table.insert(parts, `<font color="{quiet}">cargo {math.floor(condition * 100 + 0.5)}%</font>`)
 	end
 	if wave > 0 then
 		table.insert(parts, `<font color="{quiet}">🌊 wave {wave}</font>`)
 	end
-	t.meta.Text = table.concat(parts, "     ")
+	t.meta.Text = table.concat(parts, "   ")
 end
 
 -- The OFF DUTY ticket: no job, nothing else on top. A click (a tap) opens the Dispatch board.
@@ -3210,7 +3215,7 @@ layout = function()
 	local tagsTop = tagsBottom - HOTBAR_H * tagScale
 	table.insert(below, box(tagsX - BAR_W * tagScale / 2, tagsTop, tagsX + BAR_W * tagScale / 2, tagsBottom))
 	local hintWidth = math.max(BAR_W * tagScale, 2 * math.min(tagsX - spanLeft, spanRight - tagsX))
-	local hintAt = tagsTop - 14 * tagScale -- room for a lifted tag's name
+	local hintAt = tagsTop - 48 * tagScale -- room for a lifted tag's name (lift 9, 10 + 24 px pill at 1.12, 4 spare)
 	local hintSize = math.max(11, math.floor(15 * S + 0.5))
 	hint.TextSize = hintSize
 	view.hintSub = math.max(10, math.floor(13 * S + 0.5))
@@ -3239,10 +3244,18 @@ layout = function()
 	buttonGrid.Position = UDim2.fromOffset(W - MARGIN, gridTop)
 	local grid = box(W - MARGIN - gw * buttonScale, gridTop, W - MARGIN, gridTop + gh * buttonScale)
 	local gridHigh = grid.y0 < H * 0.45
-	-- The menu opens toward the middle: down from a high row, up from a low one.
+	-- The menu opens toward the middle: down from a high row (left of it when the weapon label or FIRE is in the
+	-- way), up from a low one.
 	local menu = view.menu
-	menu.AnchorPoint = Vector2.new(1, if gridHigh then 0 else 1)
-	menu.Position = if gridHigh then UDim2.new(1, 0, 1, 8) else UDim2.new(1, 0, 0, -10)
+	local menuW = menu.Size.X.Offset * buttonScale
+	local fitsDown = grid.y1 + (8 + view.menuHeight) * buttonScale <= ceilingBelow(below, grid.x1 - menuW, grid.x1, grid.y1, H)
+	if gridHigh and not fitsDown then
+		menu.AnchorPoint = Vector2.new(1, 0)
+		menu.Position = UDim2.new(0, -8, 0, 0)
+	else
+		menu.AnchorPoint = Vector2.new(1, if gridHigh then 0 else 1)
+		menu.Position = if gridHigh then UDim2.new(1, 0, 1, 8) else UDim2.new(1, 0, 0, -10)
+	end
 
 	-- The top stack: as big as the span (spanL .. spanR from y) and the room under it allow.
 	local loadRoom = GAP + LOAD_H * S + GAP
@@ -3583,6 +3596,15 @@ function Hud.start()
 	if not ok then
 		warn(`[Hud] no CarCall remote: {err}`)
 	end
+	-- 3.6: ESC closes the open window (the footers say so: the HUD's and, through Hud.onCloseWindows, the other
+	-- modules'), the big map and the "…" menu. Roblox's menu takes the Escape key itself, hence MenuOpened as well.
+	local function escape()
+		if MapView.isOpen() then
+			MapView.toggle()
+		end
+		closeWindows()
+	end
+	game:GetService("GuiService").MenuOpened:Connect(escape)
 	-- Keys.
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not gui.Enabled or UserInputService:GetFocusedTextBox() then
@@ -3590,12 +3612,7 @@ function Hud.start()
 		end
 		local key = input.KeyCode
 		if key == Enum.KeyCode.Escape then
-			-- 3.6: ESC closes the open window (the footers say so: the HUD's and, through Hud.onCloseWindows, the other
-			-- modules'), the big map and the "…" menu.
-			if MapView.isOpen() then
-				MapView.toggle()
-			end
-			closeWindows()
+			escape()
 			return
 		end
 		if processed then

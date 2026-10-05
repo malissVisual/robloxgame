@@ -265,7 +265,7 @@ local function updateScale()
 	if not camera then
 		return
 	end
-	local size = camera.ViewportSize
+	local size = Ui.screenSize() -- (under the top bar: the ScreenGui does not ignore the inset)
 	if scale then
 		scale.Scale = math.clamp(math.min((size.X - 16) / WIDTH, (size.Y - 16) / HEIGHT), 0.35, 1.1)
 	end

@@ -783,7 +783,7 @@ local function updateScale()
 	if not camera or not window or not scale then
 		return
 	end
-	local size = camera.ViewportSize
+	local size = Ui.screenSize() -- (under the top bar: the ScreenGui does not ignore the inset)
 	local s = math.clamp(math.min(size.X / (BASE_W + 40), size.Y / (BASE_H + 40)), 0.55, 1.1)
 	scale.Scale = s
 	window.Size = UDim2.fromOffset(math.floor(math.min(BASE_W, (size.X - 16) / s)), math.floor(math.min(BASE_H, (size.Y - 16) / s)))

@@ -102,6 +102,7 @@ local filter = "all"
 local width, height = MAX_W, MAX_H
 local resizeQueued = false
 local offersRemote: RemoteEvent? = nil
+local askedAt = 0 -- os.clock() of the RequestOffers still waiting for its answer (0: none)
 
 local function getOffersRemote(): RemoteEvent
 	if not offersRemote then
@@ -634,9 +635,10 @@ local function spine(card: any, offer: any, number: number)
 	Ui.dashes(card, true, 14, P.line, UDim2.new(0, 1, 1, -16), UDim2.new(0, SPINE, 0, 8))
 end
 
--- The danger label and the twists, in a row at the top of the ticket body.
+-- The danger label and the twists, in a row at the top of the ticket body (clipped to it: on a narrow board the
+-- last chips are cut off rather than run over the perforation into the payout stub).
 local function dangerRow(body: any, offer: any)
-	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 14), BackgroundTransparency = 1, ZIndex = 2 }, body)
+	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 14), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 2 }, body)
 	Ui.make("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -732,8 +734,8 @@ local function details(body: any, offer: any, w: number): number
 	return y
 end
 
--- The remedy under a locked ticket's details (a soft box across the body).
-local function remedy(body: any, value: string, y: number, w: number): number
+-- The remedy under a locked ticket's details (a soft box across the body); returns where the next thing goes and the box.
+local function remedy(body: any, value: string, y: number, w: number): (number, any)
 	local h = textHeight(value, 14, Theme.Font, w - 24) + 16
 	local box = text(body, value, UDim2.new(1, 0, 0, h), {
 		Position = UDim2.fromOffset(0, y + 6),
@@ -744,11 +746,18 @@ local function remedy(body: any, value: string, y: number, w: number): number
 	})
 	Ui.corner(box, 4)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, box)
-	return y + 6 + h
+	return y + 6 + h, box
 end
 
--- The payout stub: the pay, night pay, and the action (ACCEPT JOB →, or the lock's reason).
-local function payStub(stub: any, offer: any, lockLevel: number?, why: string?)
+-- The payout stub: the pay, night pay, and the action (ACCEPT JOB →, or the lock's reason). A locked button flashes
+-- the ticket's remedy note (`note`): the HUD's toasts sit under this board's ScreenGui and its veil.
+local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, note: any?)
+	local function flash()
+		if note then
+			note.BackgroundColor3 = ROSE
+			TweenService:Create(note, TweenInfo.new(0.8, Enum.EasingStyle.Quad), { BackgroundColor3 = NOTE }):Play()
+		end
+	end
 	local touch = Ui.touchLayout()
 	text(stub, Ui.money(tonumber(offer.pay) or 0), UDim2.new(1, -16, 0, 32), {
 		Position = UDim2.new(0.5, 0, 0.5, -48),
@@ -776,11 +785,13 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?)
 	local at = UDim2.new(0.5, 0, 0.5, 4)
 	if lockLevel then
 		lipButton(stub, `🔒 LEVEL {lockLevel}`, size, at, nil, function()
+			flash()
 			local what = if offer.jobType then `The {offer.jobType.name}` else `{offer.tierName} jobs`
 			Hud.toast(`{what} need{if offer.jobType then "s" else ""} driver level {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.`)
 		end)
 	elseif why then
 		lipButton(stub, `📦 NEEDS {offer.slots} SLOTS`, size, at, nil, function()
+			flash()
 			Hud.toast(why)
 		end)
 	else
@@ -829,15 +840,16 @@ local function offerTicket(offer: any, number: number)
 		ZIndex = 2,
 	})
 	local after = details(column, offer, bodyW)
+	local noteBox: any = nil
 	if note then
-		after = remedy(column, note, after, bodyW)
+		after, noteBox = remedy(column, note, after, bodyW)
 	end
 	local h = math.max(128, after + 16)
 	slot.Size = UDim2.new(1, 0, 0, h)
 	if note then
 		hatch(card, w, h)
 	end
-	payStub(stub, offer, lockLevel, why)
+	payStub(stub, offer, lockLevel, why, noteBox)
 	Ui.tactile(holder, 5, 1)
 end
 
@@ -919,6 +931,12 @@ function DispatchUi.request()
 	if job then
 		return
 	end
+	-- One request at a time: the server keeps only its last list, and ACCEPT JOB sends an index into it.
+	local now = os.clock()
+	if askedAt > 0 and now - askedAt < 5 then
+		return
+	end
+	askedAt = now
 	offers = nil
 	renderList()
 	getOffersRemote():FireServer()
@@ -963,6 +981,7 @@ function DispatchUi.setOffers(list: { any })
 	if type(list) ~= "table" then
 		return
 	end
+	askedAt = 0
 	offers = list
 	if open and not job then
 		renderList()

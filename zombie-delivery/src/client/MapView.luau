@@ -564,9 +564,10 @@ local function turn(x: number, y: number, degrees: number): (number, number)
 	return x * c - y * s, x * s + y * c
 end
 
--- An offset kept inside the minimap's window (on its edge when too far).
+-- An offset kept inside the minimap's window (on its edge when too far). At the top it stays under the header pills
+-- (the place, EXPAND), which draw over the map: the compass and the pinned markers would hide under them.
 local function clampToEdge(x: number, y: number): (number, number, boolean)
-	local far = math.max(math.abs(x) / EDGE_X, math.abs(y) / EDGE_Y)
+	local far = math.max(math.abs(x) / EDGE_X, if y < 0 then -y / (MINI_H / 2 - 36) else y / EDGE_Y)
 	if far > 1 then
 		return x / far, y / far, true
 	end
