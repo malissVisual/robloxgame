@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · owner-approved cinematic contract UI direction on `codex/ui-contract` · design/ui-contract/ and COLLAB.md only · since 2026-10-05
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/ui-contract` · owner approved the cinematic delivery-contract HUD (Hitman-inspired) in design/ui-contract/: compact white type/red accents, quiet hover/focus, no pastel tickets or bulky metal plates; supersedes the earlier UI direction, preserves building signs. Reference + implementation brief only; for Claude to implement, then test day/night readability, carrying/driving, every menu and native controls in Studio.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
