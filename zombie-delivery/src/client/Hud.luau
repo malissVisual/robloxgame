@@ -215,7 +215,7 @@ local touchLayout: any, LEFT_H: any, LEFT_W: any, leftStack: any, moneyLabel: an
 do -- (its own block: the locals below stay out of the 200-register limit)
 touchLayout = Ui.touchLayout()
 -- Money and the minimap share one column (one scale), so they can never overlap.
-local MONEY_HEIGHT = 104 -- money, the stats, the level and the XP bar
+local MONEY_HEIGHT = 104 -- the money, the LV pill with the rank and the XP bar
 LEFT_W, LEFT_H = 230, MONEY_HEIGHT + 8 + 230 -- (the minimap is 230 × 230, client/MapView.luau)
 leftStack = placed(Ui.make("Frame", {
 	Name = "LeftStack",
@@ -225,7 +225,7 @@ leftStack = placed(Ui.make("Frame", {
 	BackgroundTransparency = 1,
 }, gui))
 Ui.list(leftStack, true, 8)
--- 3.2: one glass card. The money big (DisplayFont, a subtle gold); under it the level: a round LV badge (gold ring), the rank, the XP into this level and a thin gold bar.
+-- 3.2: one glass card. The money big (DisplayFont, a subtle gold); under it the level: an LV pill, the rank and the XP bar.
 local moneyPanel = Ui.panel(leftStack, UDim2.fromOffset(230, MONEY_HEIGHT), UDim2.new())
 moneyPanel.LayoutOrder = 1
 Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, moneyPanel)
@@ -239,40 +239,35 @@ moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 30), {
 	TextScaled = true,
 })
 Ui.make("UITextSizeConstraint", { MaxTextSize = 28 }, moneyLabel)
--- The driver level: the badge, the rank and the XP bar (its numbers on hover).
-local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 1, -40), BackgroundTransparency = 1 }, moneyPanel)
-levelChip = Ui.label(levelRow, "1", UDim2.fromOffset(38, 38), {
-	Position = UDim2.new(0, 0, 0.5, 0),
-	AnchorPoint = Vector2.new(0, 0.5),
+-- The driver level: a gold "LV n" pill and the rank on one line, under them a full-width XP bar; the XP numbers only
+-- on hover (or a tap on a touch screen), in a pill beside the card.
+local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 34), Position = UDim2.new(0, 0, 1, -34), BackgroundTransparency = 1 }, moneyPanel)
+levelChip = Ui.label(levelRow, "LV 1", UDim2.fromOffset(0, 18), {
+	AutomaticSize = Enum.AutomaticSize.X,
 	BackgroundTransparency = 0,
-	BackgroundColor3 = Theme.Ink,
+	BackgroundColor3 = C.yellow,
 	Font = Theme.DisplayFont,
-	TextSize = 17,
-	TextColor3 = C.yellow,
+	TextSize = 12,
+	TextColor3 = Theme.Ink,
 	TextXAlignment = Enum.TextXAlignment.Center,
-	TextYAlignment = Enum.TextYAlignment.Bottom,
 	TextWrapped = false,
 })
-Ui.corner(levelChip, 19)
-Ui.stroke(levelChip, C.yellow, 1.5)
-Ui.make("UIPadding", { PaddingBottom = UDim.new(0, 6) }, levelChip)
-Ui.caps(levelChip, "LV", UDim2.new(1, 0, 0, 9), { Position = UDim2.new(0, 0, 0, 5), TextSize = 8, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Center })
-rankLabel = Ui.label(levelRow, "", UDim2.new(1, -48, 0, 16), {
-	Position = UDim2.fromOffset(48, 2),
+Ui.corner(levelChip, 6)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, levelChip)
+rankLabel = Ui.label(levelRow, "", UDim2.new(1, -60, 0, 18), {
+	Position = UDim2.fromOffset(58, 0),
 	TextWrapped = false,
 	TextTruncate = Enum.TextTruncate.AtEnd,
-	TextSize = 14,
+	TextSize = 13,
 	Font = Theme.HeadingFont,
 	TextColor3 = C.text,
 })
--- The XP bar: thick, under the rank. The numbers only on hover (or a tap on a touch screen), in a pill beside it.
-xpBack, xpFill = Ui.bar(levelRow, UDim2.new(1, -48, 0, 10), C.yellow)
-xpBack.Position = UDim2.new(0, 48, 1, -12)
+xpBack, xpFill = Ui.bar(levelRow, UDim2.new(1, 0, 0, 8), C.yellow)
+xpBack.Position = UDim2.new(0, 0, 1, -8)
 xpBack.BackgroundColor3 = Theme.Ink
-Ui.stroke(xpBack, C.yellow, 1).Transparency = 0.6
 xpLabel = Ui.caps(levelRow, "", UDim2.fromOffset(0, 20), {
 	AutomaticSize = Enum.AutomaticSize.X,
-	Position = UDim2.new(1, 22, 1, -7), -- to the right of the card, level with the bar
+	Position = UDim2.new(1, 22, 0.5, 0), -- to the right of the card
 	AnchorPoint = Vector2.new(0, 0.5),
 	BackgroundTransparency = 0.05,
 	BackgroundColor3 = Theme.Ink,
@@ -2464,12 +2459,11 @@ local function showLevelUp(from: number, to: number)
 	local pop = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	TweenService:Create(levelUpFrame, pop, { GroupTransparency = 0 }):Play()
 	TweenService:Create(levelUpPop, pop, { Scale = 1 }):Play()
-	-- The XP bar flashes white, the LV badge gold.
+	-- The XP bar and the LV pill flash white.
 	xpFill.BackgroundColor3 = Color3.new(1, 1, 1)
-	levelChip.BackgroundColor3 = C.yellow
-	levelChip.TextColor3 = Theme.Ink
+	levelChip.BackgroundColor3 = Color3.new(1, 1, 1)
 	TweenService:Create(xpFill, TweenInfo.new(1.2), { BackgroundColor3 = C.yellow }):Play()
-	TweenService:Create(levelChip, TweenInfo.new(1.2), { BackgroundColor3 = Theme.Ink, TextColor3 = C.yellow }):Play()
+	TweenService:Create(levelChip, TweenInfo.new(1.2), { BackgroundColor3 = C.yellow }):Play()
 	Hud.toast(`LEVEL {to}! You are a {rank} now.`)
 	task.delay(4.5, function()
 		if levelUpStamp ~= mine then
@@ -2490,14 +2484,14 @@ local shownLevel: number? = nil
 function refreshLevel()
 	local xp = myXp()
 	if xp == nil then
-		levelChip.Text = "1"
+		levelChip.Text = "LV 1"
 		rankLabel.Text = Levels.rank(1)
 		xpLabel.Text = ""
 		xpFill.Size = UDim2.fromScale(0, 1)
 		return
 	end
 	local level = Levels.levelFor(xp)
-	levelChip.Text = tostring(level)
+	levelChip.Text = `LV {level}`
 	rankLabel.Text = Levels.rank(level)
 	if level >= Config.Levels.MaxLevel then
 		xpLabel.Text = "MAX LEVEL"
