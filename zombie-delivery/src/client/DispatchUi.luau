@@ -3,9 +3,12 @@
 -- board as a lavender window of die-cut delivery tickets. J, the JOBS menu entry, the depot counter and the result
 -- window's NEXT JOB open it (Main sets Hud.onJobs = DispatchUi.open; another window opening closes it).
 --
---   * Opening asks the server for offers (RequestOffers) and shows "Calling the dispatcher..." until they come
---     (Offers → DispatchUi.setOffers, wired in Main). ACCEPT JOB fires AcceptJob with the offer's index and closes;
---     the server checks every offer again (a stale or locked one is refused there with its own notice).
+--   * Opening asks the server for the board (RequestOffers): it sends the current offers, sorted ★ → ★★★★, and when
+--     the next ones come (Offers → DispatchUi.setOffers(list, refreshAt), wired in Main; "Calling the dispatcher..."
+--     until the first ones). 3.7: no refresh button: the server makes new offers every Config.Jobs.RefreshSeconds and
+--     pushes them; the caption row counts down to them quietly ("NEW JOBS IN 2:41"). ACCEPT JOB fires AcceptJob with
+--     the offer's index (its id on the server's board) and closes; the server checks every offer again (a taken,
+--     replaced or locked one is refused there with its own notice).
 --   * Left column: AVAILABLE RUNS filters (All jobs / Deliveries / Special jobs, with counts) and a card for your
 --     car (its name at its stage, cargo slots, condition): your vehicle sets your job capacity.
 --   * A ticket per offer: a numbered icon spine, the danger label ("RISKY · ★★") with the twists as chips (the
@@ -103,6 +106,8 @@ local width, height = MAX_W, MAX_H
 local resizeQueued = false
 local offersRemote: RemoteEvent? = nil
 local askedAt = 0 -- os.clock() of the RequestOffers still waiting for its answer (0: none)
+local refreshAt: number? = nil -- 3.7: when the server makes the next offers (workspace:GetServerTimeNow())
+local ticking = false -- 3.7: the countdown's loop runs (while the board is open)
 
 local function getOffersRemote(): RemoteEvent
 	if not offersRemote then
@@ -451,24 +456,16 @@ local function build()
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextWrapped = false,
 	})
-	local refresh = Ui.make("TextButton", {
-		Size = UDim2.fromOffset(140, 30),
+	-- 3.7: no refresh button: a quiet countdown to the next offers (tickCountdown).
+	refs.countdown = text(main, "", UDim2.fromOffset(150, 30), {
 		Position = UDim2.new(1, -24, 0, 12),
 		AnchorPoint = Vector2.new(1, 0),
-		BackgroundColor3 = P.ticket,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "↻  NEW OFFERS",
-		TextColor3 = P.ink2,
-		Font = Theme.HeadingFont,
+		Font = MONO,
 		TextSize = 12,
-	}, main)
-	Ui.corner(refresh, 6)
-	Ui.make("UIStroke", { Color = P.line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, refresh)
-	onPress(refresh, function()
-		DispatchUi.request()
-	end)
-	refs.refresh = refresh
+		TextColor3 = P.ink2,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextWrapped = false,
+	})
 	local list = Ui.make("ScrollingFrame", {
 		Size = UDim2.new(1, -24, 1, -50),
 		Position = UDim2.fromOffset(24, 50),
@@ -541,7 +538,7 @@ local function refreshChrome()
 		entry.count.Text = if offers or job then tostring(counts[id] or 0) else "–"
 		setFilterLook(id, false)
 	end
-	refs.refresh.Visible = job == nil
+	refs.countdown.Visible = job == nil and offers ~= nil
 end
 
 -- ── The tickets ────────────────────────────────────────────────────────────
@@ -797,6 +794,12 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 	else
 		lipButton(stub, "ACCEPT JOB  →", size, at, P.sage, function()
 			Net.get("AcceptJob"):FireServer(offer.index)
+			-- It leaves the board on the server once started: not shown again before the board comes back.
+			local list = offers
+			local spot = if list then table.find(list, offer) else nil
+			if list and spot then
+				table.remove(list, spot)
+			end
 			DispatchUi.close()
 		end)
 	end
@@ -901,7 +904,7 @@ renderList = function()
 	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board`
 	Ui.clear(refs.list)
 	if #visible == 0 then
-		message(if #list == 0 then "No jobs on the board right now. Ask for new offers." else "Nothing of this kind on the board right now.")
+		message(if #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
 		return
 	end
 	for number, offer in visible do
@@ -926,18 +929,54 @@ function DispatchUi.close()
 	end
 end
 
--- Ask the dispatcher for fresh offers (the list says so until they come).
+-- 3.7: the countdown to the next offers (the caption row), twice a second while the board is open. Past the time the
+-- server pushes the new board; if it has not come a few seconds later, the board asks for it.
+local function tickCountdown()
+	local label = refs.countdown
+	if not label then
+		return
+	end
+	local at = refreshAt
+	if job or not at then
+		label.Text = ""
+		return
+	end
+	local left = at - workspace:GetServerTimeNow()
+	label.Text = if left > 0 then `NEW JOBS IN {Ui.clock(math.ceil(left))}` else "NEW JOBS COMING..."
+	if left < -3 then
+		DispatchUi.request()
+	end
+end
+
+local function startTicker()
+	if ticking then
+		return
+	end
+	ticking = true
+	task.spawn(function()
+		while open do
+			tickCountdown()
+			task.wait(0.5)
+		end
+		ticking = false
+	end)
+end
+
+-- Ask the dispatcher for the board (3.7: the current offers; the server makes new ones only when they expired). The
+-- offers already here stay on show until the answer, unless their time is up ("Calling the dispatcher...").
 function DispatchUi.request()
 	if job then
 		return
 	end
-	-- One request at a time: the server keeps only its last list, and ACCEPT JOB sends an index into it.
 	local now = os.clock()
-	if askedAt > 0 and now - askedAt < 5 then
+	if askedAt > 0 and now - askedAt < 3 then
 		return
 	end
 	askedAt = now
-	offers = nil
+	local at = refreshAt
+	if offers and at and workspace:GetServerTimeNow() >= at then
+		offers = nil
+	end
 	renderList()
 	getOffersRemote():FireServer()
 end
@@ -966,6 +1005,7 @@ function DispatchUi.open()
 	else
 		DispatchUi.request()
 	end
+	startTicker()
 end
 
 function DispatchUi.toggle()
@@ -976,15 +1016,18 @@ function DispatchUi.toggle()
 	end
 end
 
--- The offers the server sent (Main wires Net "Offers" here); ignored while you are on a delivery (like the old board).
-function DispatchUi.setOffers(list: { any })
+-- The offers the server sent (Main wires Net "Offers" here), already sorted ★ → ★★★★, and (3.7) when the next ones
+-- come (server time; nil from an older server: no countdown). Kept while you are on a delivery, shown after it.
+function DispatchUi.setOffers(list: { any }, nextAt: number?)
 	if type(list) ~= "table" then
 		return
 	end
 	askedAt = 0
 	offers = list
+	refreshAt = if type(nextAt) == "number" then nextAt else nil
 	if open and not job then
 		renderList()
+		tickCountdown()
 	end
 end
 

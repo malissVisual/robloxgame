@@ -1284,6 +1284,11 @@ Config.Missions = {
 Config.Jobs = {
 	DeliverRadius = 18,
 	RefreshSeconds = 180, -- 3.7: the board gets new offers on its own this often (no refresh button)
+	-- 3.7: the tutorial's first delivery (Jobs.startTutorialJob): an easy ★ one close to the depot, for the Old Van.
+	TutorialPieces = 2, -- pieces at most (the Old Van's 2 slots)
+	TutorialPickupMax = 400, -- studs (manhattan) from the player to the pick-up at most (the nearest homes to the depot: ~330)
+	TutorialDropMax = 450, -- studs from the pick-up to the drop at most (the ★ tier's minDistance at least)
+	TutorialTries = 6, -- deliveries made for it; the shortest one is given
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
 	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).
 	-- The serve stops (ice cream) are the old way: hold still in the circle for the job type's unloadTime.
