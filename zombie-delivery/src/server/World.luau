@@ -825,7 +825,10 @@ local function buildMechanic(parent: Instance)
 	local facing = Vector3.new(0, 0, -1)
 	local w, d, h = 70, 60, 20
 	local frame = shopFrame(cx, cz, facing, 12)
-	building(shop, frame, w, d, h, Color3.fromRGB(70, 90, 120), Enum.Material.Metal, 34, 15)
+	building(shop, frame, w, d, h, Color3.fromRGB(48, 60, 67), Enum.Material.Metal, 34, 15)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Mechanic), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "WRENCH GARAGE  TUNING · PAINT · REPAIRS", Vector3.new(60, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(120, 200, 255), nil, "mechanic", 12)
 	counter(shop, frame, d, "mechanic", "Wrench Garage")
 	-- 3.4: two repair bays straight in from the wide door (they replace the old lift; no free repairs any more).
