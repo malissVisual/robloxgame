@@ -26,7 +26,8 @@
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
 -- (Ui.screenScale) and sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
--- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()).
+-- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()). 4.2, a gamepad: the selection starts on the first
+-- ACCEPT JOB you can take (Ui.gamepadFocus), A takes it, the stick moves to the others.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -740,7 +741,7 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			Hud.toast(why)
 		end)
 	else
-		action(stub, "ACCEPT JOB", size, at, C.yellow, function()
+		local accept = action(stub, "ACCEPT JOB", size, at, C.yellow, function()
 			Net.get("AcceptJob"):FireServer(offer.index)
 			-- It leaves the board on the server once started: not shown again before the board comes back.
 			local list = offers
@@ -750,6 +751,7 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			end
 			DispatchUi.close()
 		end)
+		refs.firstAccept = refs.firstAccept or accept -- 4.2: the gamepad's selection starts on the first one
 	end
 end
 
@@ -853,6 +855,7 @@ renderList = function()
 	end
 	local visible = shown(list)
 	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board`
+	refs.firstAccept = nil
 	Ui.clear(refs.list)
 	if #visible == 0 then
 		message(if #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
@@ -865,6 +868,10 @@ renderList = function()
 		end
 	end
 	refs.list.CanvasPosition = Vector2.zero
+	-- 4.2, a gamepad: A takes the first job you can take (the stick moves to the others; B closes).
+	if open then
+		Ui.gamepadFocus(refs.firstAccept)
+	end
 end
 
 -- ── Public ─────────────────────────────────────────────────────────────────
@@ -876,6 +883,7 @@ end
 function DispatchUi.close()
 	open = false
 	if gui then
+		Ui.gamepadRelease(gui)
 		gui.Enabled = false
 	end
 end

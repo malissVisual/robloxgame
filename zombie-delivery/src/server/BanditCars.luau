@@ -456,6 +456,8 @@ local function drive(b: Bandit, dt: number, now: number)
 			continue
 		end
 		local relative = flat(playerCar.chassis.AssemblyLinearVelocity - chassis.AssemblyLinearVelocity).Magnitude
+		-- (capped: the player's client owns its car's velocity; the bandit's own speed is the server's)
+		relative = math.min(relative, Vehicles.ramSpeed(playerCar) + flat(chassis.AssemblyLinearVelocity).Magnitude)
 		if wanted and playerCar.owner == b.target and now >= b.nextSwipe then
 			b.nextSwipe = now + 1.2
 			Vehicles.damage(playerCar, Tuning.SwipeDamage, "The bandits rammed your car to pieces!")

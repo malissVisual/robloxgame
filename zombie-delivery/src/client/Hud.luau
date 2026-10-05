@@ -29,6 +29,10 @@
 -- line says HANDS · [B] DRAW · [V] PUNCH or the gun · [B] HOLSTER · [V] STRIKE; a touch screen gets PUNCH / STRIKE
 -- and DRAW / HOLSTER buttons over FIRE.
 -- A shop card whose def has `requires` (a campaign, or a list of them) shows "🔒 FINISH IRON SUPPLY" until it is done.
+-- 4.2, touch: the buttons on the right are placed by client/TouchLayout.luau (FIRE, PUNCH / STRIKE, DRAW / HOLSTER and
+-- client/TouchControls.luau's SPRINT and EXIT / PUT DOWN, which share the hand button's place); a tap on the weapon
+-- line opens the weapon wheel (Hud.onWeaponWheel); the hints drop the (E) / (G) keys a touch screen has no keys for.
+-- A gamepad: Y opens MENU with the selection on its first entry (A takes it).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -652,6 +656,7 @@ Hud.onCrew = nil :: (() -> ())?
 Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
 Hud.onMissions = nil :: (() -> ())? -- client/MissionsUi.luau: the MISSIONS window
+Hud.onWeaponWheel = nil :: (() -> ())? -- 4.2, touch: a tap on the weapon line opens the weapon wheel (WeaponWheel.openTouch)
 
 local openDispatch: () -> ()
 do -- (its own block: the locals below stay out of the 200-register limit)
@@ -1715,6 +1720,7 @@ for _, def in BUTTONS do
 			end
 		end
 		if def.menu and def.id ~= "giveup" then
+			Ui.gamepadRelease(menu) -- (a gamepad: the window it opens takes the selection, or none)
 			menu.Visible = false
 		end
 		def.onClick()
@@ -1731,6 +1737,7 @@ more.Activated:Connect(function()
 		click()
 	end
 	menu.Visible = not menu.Visible
+	Ui.gamepadFocus(if menu.Visible then hudButtons.jobs else more) -- 4.2, a gamepad: on to the first entry
 end)
 hudButtons.more = more
 
@@ -1856,10 +1863,12 @@ local function carryCount(): number
 	return if count and count > 0 then math.floor(count) else 1
 end
 
+-- (everything renderWeapons reads that can change: the gun in your hand is the only part of the State it shows)
 function weaponBarKey(): string
 	local seated, carGun = seatView()
 	local holding = myCarrying()
-	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}`
+	local gun = if state then tostring(state.weapon) else "-"
+	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}|{gun}`
 end
 shownWeaponBar = ""
 
@@ -1928,7 +1937,7 @@ function renderWeapons()
 		elseif carGun then "On the roof"
 		elseif not usable then "⚠ On foot only"
 		elseif seated then "Window ready"
-		elseif touchLayout then (if hands then "Holstered · tap DRAW or PUNCH" else "Ready · tap STRIKE")
+		elseif touchLayout then (if hands then "Holstered · tap DRAW or PUNCH" else "Ready · tap here to switch gun")
 		elseif hands then "[B] Draw · [V] Punch"
 		else "[B] Holster · [V] Strike"
 	local group = Ui.make("CanvasGroup", {
@@ -1960,9 +1969,16 @@ function renderWeapons()
 		TextColor3 = if not usable and not holstered then P.danger else P.ink2,
 	})
 	if not carGun then
-		-- A tap (touch) or a click: the next gun.
+		-- A click: the next gun. 4.2, a tap on a touch screen: the weapon wheel (a tap on a gun takes it).
 		local tap = Ui.make("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 2 }, weaponRow)
-		tap.Activated:Connect(nextWeapon)
+		tap.Activated:Connect(function()
+			local wheel = Hud.onWeaponWheel
+			if touchLayout and wheel then
+				wheel()
+			else
+				nextWeapon()
+			end
+		end)
 	end
 end
 
@@ -2134,6 +2150,9 @@ local function handButton(name: string, text: string, height: number, above: num
 end
 touchHands.melee = handButton("Melee", "PUNCH", 44, 8, Holster.melee)
 touchHands.holster = handButton("Holster", "DRAW", 30, 60, Holster.toggle)
+view.touchHands = touchHands -- 4.2: layout() places them on a touch layout (client/TouchLayout.luau)
+-- 4.2: SPRINT and EXIT / PUT DOWN (a touch layout only; layout() places them).
+require(script.Parent.TouchControls).build(gui)
 end
 
 -- ── Car panel ──────────────────────────────────────────────────────────────
@@ -3200,20 +3219,38 @@ layout = function()
 	local columnRight = W - MARGIN
 	local columnBottom = H - MARGIN
 	local thumb: Box? = nil
+	local cluster: any = nil
 	if touchLayout then
-		local small = math.min(W, H) <= 500
-		local jumpSize = if small then 70 else 120
-		local jump = box(W - (if small then 95 else 170), H - (if small then 90 else 210), 0, 0)
-		jump.x1, jump.y1 = jump.x0 + jumpSize, jump.y0 + jumpSize
-		local fireBottom = jump.y0 - 10
-		fire.Position = UDim2.fromOffset(W - 40, fireBottom)
-		local fireBox = box(W - 40 - fireSize, fireBottom - fireSize, W - 40, fireBottom)
-		table.insert(below, fireBox)
-		table.insert(below, jump)
-		columnRight = math.min(jump.x0, fireBox.x0) - GAP
-		columnBottom = H - GAP
+		-- 4.2 (client/TouchLayout.luau): FIRE over Roblox's jump button, SPRINT / the hand button (PUNCH, EXIT, PUT
+		-- DOWN) / DRAW in a column left of them, each at least 44 px; the right column left of them (or over them).
+		local TouchLayout = require(script.Parent.TouchLayout)
+		cluster = TouchLayout.cluster(W, H, S)
+		local c = cluster
+		setScale(fire, (c.fire.x1 - c.fire.x0) / FIRE_SIZE)
+		fire.Position = UDim2.fromOffset(c.fire.x1, c.fire.y1)
+		local textSize = math.max(12, math.floor(14 * math.max(S, 0.8) + 0.5))
+		for key, b in ({ melee = c.act, holster = c.holster } :: { [string]: any }) do
+			local button = view.touchHands[key]
+			button.Parent = gui -- (out of FIRE: its own size, not FIRE's scale)
+			button.AnchorPoint = Vector2.zero
+			button.Position = UDim2.fromOffset(math.floor(b.x0 + 0.5), math.floor(b.y0 + 0.5))
+			button.Size = UDim2.fromOffset(math.floor(b.x1 - b.x0 + 0.5), math.floor(b.y1 - b.y0 + 0.5))
+			button.TextSize = textSize
+			button.TextWrapped = true
+		end
+		require(script.Parent.TouchControls).place(c.sprint, c.act, textSize)
+		view.touchBoxes = TouchLayout.buttons(c)
+		for _, b in view.touchBoxes do
+			table.insert(below, b)
+		end
+		table.insert(below, c.jump)
+		-- The right column: under it the actions' row (and ADMIN) must stay clear when it goes over the buttons.
+		local rowBottom = (if admin then ADMIN_BOTTOM else MARGIN) + buttonGrid.Size.Y.Offset * math.max(S, TOUCH_BUTTON_MIN)
+		local placedColumn = TouchLayout.column(c, W, H, rightW, rightH, rowBottom)
+		table.insert(view.touchBoxes, placedColumn)
+		columnRight, columnBottom = placedColumn.x1, placedColumn.y1
 		-- Roblox's thumbstick lives in the bottom left corner: nothing of ours goes there.
-		thumb = box(0, H - (if small then 190 else 260), math.max(if small then 170 else 230, W * 0.22), H)
+		thumb = c.thumb
 	elseif UserInputService.TouchEnabled then
 		-- A touch screen with a keyboard: FIRE left of the column.
 		local fireRight = W - MARGIN - rightW - 12
@@ -3236,12 +3273,18 @@ layout = function()
 	local spanLeft = (if thumb then thumb.x1 elseif touchLayout then MARGIN else left.x1) + 12
 	local spanRight = cornerLeft - 12
 	local hintW = math.max(160, math.min(HINT_W * S, spanRight - spanLeft))
+	local hintX = math.clamp(W / 2, spanLeft + hintW / 2, math.max(spanLeft + hintW / 2, spanRight - hintW / 2))
+	local hintBottom = H - (if touchLayout then GAP else MARGIN) - HINT_BOTTOM * S
+	if cluster then
+		-- 4.2: between the thumbstick and the touch buttons or the column (narrower on a narrow phone; upright, over
+		-- them), and the breath bar (client/Stamina.luau) right over it.
+		hintX, hintBottom, hintW = require(script.Parent.TouchLayout).hint(cluster, view.touchBoxes, W, H, S)
+		require(script.Parent.Stamina).place(hintX, hintBottom - 108 * S)
+	end
 	local hintMax = hint:FindFirstChild("Max")
 	if hintMax and hintMax:IsA("UISizeConstraint") then
 		hintMax.MaxSize = Vector2.new(hintW / S, math.huge)
 	end
-	local hintX = math.clamp(W / 2, spanLeft + hintW / 2, math.max(spanLeft + hintW / 2, spanRight - hintW / 2))
-	local hintBottom = H - (if touchLayout then GAP else MARGIN) - HINT_BOTTOM * S
 	hint.AnchorPoint = Vector2.new(0.5, 1)
 	hint.Position = UDim2.fromOffset(hintX, hintBottom)
 	table.insert(below, box(hintX - hintW / 2, hintBottom - 96 * S, hintX + hintW / 2, hintBottom))
@@ -3348,7 +3391,10 @@ function Hud.setState(newState: any)
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
 	end
-	renderWeapons()
+	-- Most States change money or items only: the weapon line is rebuilt when what it shows changed.
+	if weaponBarKey() ~= shownWeaponBar then
+		renderWeapons()
+	end
 	if shop.frame.Visible then
 		renderShop()
 	end
@@ -3416,6 +3462,10 @@ local function setHint(main: string, sub: string?, key: string?)
 	end
 	if touchLayout then
 		key = nil
+		-- 4.2: no keys on a touch screen: "Put it down (G) and open the back (E)" reads "Put it down and open the back"
+		-- (the PUT DOWN button and the prompts are tapped).
+		main = (string.gsub(main, "%s*%([EGQ]%)", ""))
+		sub = if sub then (string.gsub(sub, "%s*%([EGQ]%)", "")) else nil
 	end
 	local signature = `{main}|{sub}|{key}`
 	if a.shown ~= signature then
@@ -3501,13 +3551,17 @@ RunService.RenderStepped:Connect(function()
 		setHint(Map.Shops[inShop].name, "walk to the counter", "E")
 	elseif seatedIn and not driving then
 		local gun = if state then Economy.findWeapon(state.weapon) else nil
-		setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · Q to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
+		if touchLayout then
+			setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · tap the gun line for a pistol, revolver or SMG` else "FIRE shoots out of the window · EXIT gets out")
+		else
+			setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · Q to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
+		end
 	elseif safe and not job then
 		setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
 	elseif not car then
 		setHint("No car out", "MENU → CAR calls it")
 	elseif not seatedIn and not job then
-		setHint("On foot", if touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
+		setHint("On foot", if touchLayout then "FIRE shoots · SPRINT runs · tap the prompt at your car's door" elseif touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
 	else
 		setHint("")
 	end
@@ -3636,6 +3690,14 @@ function Hud.start()
 		end
 		if key == Enum.KeyCode.M then
 			MapView.toggle()
+		elseif key == Enum.KeyCode.ButtonY then
+			-- 4.2, a gamepad: Y opens MENU (every window is in it, MAP and CREW beside it) with the selection on JOBS.
+			view.menu.Visible = not view.menu.Visible
+			if view.menu.Visible then
+				Ui.gamepadFocus(hudButtons.jobs)
+			else
+				Ui.gamepadRelease(view.menu)
+			end
 		elseif key == Enum.KeyCode.J then
 			local toggle = Hud.onJobsKey
 			if toggle then

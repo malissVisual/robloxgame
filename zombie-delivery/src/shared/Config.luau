@@ -6,12 +6,16 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.1"
+Config.Version = "4.2"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
 Config.StudioStartMoney = 150 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
 Config.AutosaveSeconds = 60
+-- 4.2: a save is locked to the server that plays it (UpdateAsync). A join waits this long for the last server's
+-- leave save before it takes the save over; a lock not refreshed for SaveLockStale seconds is a crashed server's.
+Config.SaveLockWait = 15
+Config.SaveLockStale = 150
 Config.SpawnCarCooldown = 4
 
 -- 3.7: walking, the sprint and its breath (client/CameraRig.luau, client/Stamina.luau).

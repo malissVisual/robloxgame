@@ -89,6 +89,18 @@ Version 3.10 is **getting in and out of the car**: no more teleporting into the 
   post (E opens it, Space gets you out). Out of a fast car you are put out at the door at once.
 - Tuning in `Config.Cargo` (BoardSeconds, AlightSeconds, DoorShutSeconds …), the timing and curves in
   `shared/Boarding.luau`, the move in `client/CarBoarding.luau`.
+Version 4.2 makes **phones and tablets** play everything a keyboard does (and a gamepad the main things):
+- **SPRINT** (a toggle left of Roblox's jump button) runs on the same breath as Shift; it turns itself off when the
+  breath runs dry. The breath bar sits over the contextual action.
+- The hand button left of FIRE is **PUNCH / STRIKE** on foot, **EXIT** in a car seat (the jump button still gets you
+  out too) and **PUT DOWN / LET GO / SET DOWN** while you carry, lead a horse or push the trolley or the pallet jack
+  (what G does; the server checks it). DRAW / HOLSTER sits over it. Every button is 44 px or more.
+- A tap on the **weapon line** opens the weapon wheel; tap a gun to take it.
+- On a small phone (844 × 390) the buttons, the right column, the contextual action and the breath bar keep clear of
+  each other, of the thumbstick and of the jump button (`client/TouchLayout.luau`, `tests/touchlayout_test.luau`);
+  the hints and Marge drop the (E) / (G) keys, and her dialog sits in the middle at a readable size.
+- A gamepad: **Y** opens MENU with the selection on JOBS (the stick moves on, A takes it), the job board starts on its
+  first ACCEPT JOB, **d-pad up** takes the next gun.
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -111,38 +123,42 @@ git pull + the sync.
 
 A Play test in Studio starts like a new player, with `Config.StudioStartMoney` ($150; the admin panel, P, gives money
 for testing). A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
+Since 4.2 a save is locked to the server that plays it (UpdateAsync, `Config.SaveLockWait` / `SaveLockStale`): a quick
+rejoin on another server waits up to 15 s for the last server's leave save, a stale server never overwrites newer
+data, leave and shutdown saves retry, and a save that cannot be read on a live server kicks with "please rejoin" instead
+of letting you play a profile that would not be saved.
 
 ## How to play
 
 | Input | PC | Touch |
 |---|---|---|
 | Drive / walk | WASD / arrows | thumbstick |
-| Sprint (on foot; the body speeds up and slows down with weight, leans into the run, and out of a sprint the gun comes up slower) | hold Shift | – |
+| Sprint (on foot; the body speeds up and slows down with weight, leans into the run, and out of a sprint the gun comes up slower) | hold Shift (gamepad: click the left stick) | SPRINT left of the jump button (4.2: a toggle; it turns off when the breath runs dry) |
 | Aim (GTA style: the mouse is locked, the camera follows it, crosshair in the middle) | move the mouse | – |
 | Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (on foot: the gun in your hand; driver: the car gun on the roof if the car has one, else a one-handed gun out of the window; passenger: a one-handed gun out of the window) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
-| Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire) | B (gamepad: d-pad down) | DRAW / HOLSTER over FIRE |
-| Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V | PUNCH / STRIKE over FIRE |
-| Switch gun | hold Q: the weapon wheel (point at a gun, let go); tap Q: the next gun; or click the weapon label | the weapon label |
+| Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire) | B (gamepad: d-pad right) | DRAW / HOLSTER (over PUNCH) |
+| Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: d-pad left) | PUNCH / STRIKE left of FIRE |
+| Switch gun | hold Q: the weapon wheel (point at a gun, let go); tap Q: the next gun; or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 (or click a tag) | the tags |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
-| The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | JOBS in the … menu / MAP / BAG in the … menu |
-| The "…" menu (JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP) | click … | tap … |
-| Close a window, the big map or the … menu | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
-| Call your car (or reset it while you sit in it) | CAR in the … menu | CAR in the … menu |
-| Give up the delivery | GIVE UP in the … menu, twice (or on the Dispatch board) | the same |
-| Music and sound (on / music off / all off) | N | SOUND in the … menu |
-| Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS in the … menu |
+| The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | JOBS in MENU / MAP / BAG in MENU or INVENTORY |
+| MENU (JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP) | click MENU (gamepad: Y, then the stick and A) | tap MENU |
+| Close a window, the big map or MENU | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
+| Call your car (or reset it while you sit in it) | CAR in MENU | CAR in MENU |
+| Give up the delivery | GIVE UP in MENU, twice (or on the Dispatch board) | the same |
+| Music and sound (on / music off / all off) | N | SOUND in MENU |
+| Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS in MENU |
 | Crew panel (invite / accept / leave / kick, the crew board) | K | CREW |
-| Leaderboard | L | TOP in the … menu |
+| Leaderboard | L | TOP in MENU |
 | Get in your car / ride in a friend's car (3.10: at a door, a quick move in) | E (gamepad X) | the prompt |
-| Get out (3.10: you slide out at your door) | E or Space (gamepad X) | jump button |
+| Get out (3.10: you slide out at your door) | E or Space (gamepad X) | EXIT left of FIRE (4.2), or the jump button |
 | Pick up / Load / Take out / Hand over / Lead a horse (on foot, at a stop) | hold E | the prompt |
 | Open / close the back (doors, tailgate, trunk, ramp; 3.2: with empty hands, the car standing) | hold E at the back | the prompt |
-| Put down / Let go (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | the prompt |
+| Put down / Let go / set the trolley or the pallet jack down (to shoot; anybody of the crew can pick it up again) | G (gamepad B) | PUT DOWN / LET GO / SET DOWN left of FIRE (4.2), or the prompt |
 | Open a lost package (3.1) | hold E | the prompt |
-| Real estate list (every property, buy, sell, set your home, GPS) | H | ESTATE in the … menu |
+| Real estate list (every property, buy, sell, set your home, GPS) | H | ESTATE in MENU |
 | View a property's listing (at its FOR SALE sign) | E | the prompt |
 | Run your company (at your office's computer: hire, upgrades, collect the safe) | E | the prompt |
 | Ride a tower elevator (step on a pad under a floor sign) | walk onto it | walk onto it |
@@ -968,7 +984,10 @@ pastel face. Everything is laid out from the screen size, so nothing overlaps on
   delivery label over the target (lined in the route's colour), the YOUR CAR marker of a car call, the owner's name over
   other players' cars and the crew tags. The crosshair dot and the hit numbers keep their outline.
 
-On touch FIRE (sage, big) sits over the jump button and the dial and the weapon label move left of it.
+On touch FIRE sits over the jump button; 4.2: SPRINT, the hand button (PUNCH / STRIKE, EXIT in a seat, PUT DOWN /
+LET GO / SET DOWN while you carry or push) and DRAW / HOLSTER stand in a column left of them, every one 44 px or more,
+and the right column goes left of them (on a narrow phone or upright, over them). `client/TouchLayout.luau` places
+them and `tests/touchlayout_test.luau` checks phones and tablets for overlaps.
 
 The big map (M, or EXPAND) lists every shop, employer and far place with what you can do there: click one to set
 the **GPS**. The route there is drawn along the roads on both maps (yellow to the job's next stop, purple to the GPS
@@ -1114,7 +1133,9 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               garage window, only your own GARAGE prompts, the repair timer card), Holster (3.9: B holsters / draws,
               V punches or strikes, the first aim or shot draws a holstered gun; ArmPose hides a holstered gun and
               swings the arm), CarBoarding (3.10: plays your move into and out of a seat, E in a seat gets you out;
-              ArmPose puts the hand on the handle, CarVisuals swings the door, CameraRig eases into the car's view)
+              ArmPose puts the hand on the handle, CarVisuals swings the door, CameraRig eases into the car's view),
+              TouchLayout (4.2: where the touch buttons, the right column and the contextual action sit; pure, tested),
+              TouchControls (4.2: SPRINT, and EXIT / PUT DOWN / LET GO / SET DOWN in the hand button's place)
 tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zombie waves and roamers), cargo (pieces
               and pay), roads (the GPS), cargun (car guns, one-handed guns, which cars mount a gun, what fires from a
               seat), icons (every picture has its id slot, every gun, item, cargo and landmark has an icon), levels
@@ -1166,8 +1187,9 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 
 Runs every `tests/*_test.luau` (logic with the 2.6 real estate, the 3.0 places and the 3.1 lost packages, cargo,
 roads, cargun, icons, levels with the 3.2 progression, jobs25, traffic, audio, missions with the 3.2 campaign chain
-and DUO campaign, challenges, gear, the 3.4 capacity test, the 3.9 melee test and the 4.0 vehicles40 test: the slow
-van and its stages, the torque curve, the van's save migration, the pallets, the Hand Trolley, the Freight Truck) and
+and DUO campaign, challenges, gear, the 3.4 capacity test, the 3.9 melee test, the 4.0 vehicles40 test: the slow
+van and its stages, the torque curve, the van's save migration, the pallets, the Hand Trolley, the Freight Truck, and
+the 4.2 touchlayout test: the touch buttons on phones and tablets, clear of each other and of the HUD) and
 compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
 function, as Studio compiles). Needs the standalone Luau CLI
 (https://github.com/luau-lang/luau/releases).

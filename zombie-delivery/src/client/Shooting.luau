@@ -474,10 +474,23 @@ function Shooting.start()
 			autoHeld = false
 		end
 	end)
+	-- Alt-Tab swallows the button's InputEnded: without this the gun kept firing in the background.
+	UserInputService.WindowFocusReleased:Connect(function()
+		mouseHeld = false
+		autoHeld = false
+	end)
 	RunService.Heartbeat:Connect(step)
 
 	Net.get("Tracer").OnClientEvent:Connect(function(from: Vector3, to: Vector3, color: Color3, shooter: number)
 		if shooter ~= player.UserId then
+			-- A far-off fight (both ends out of sight) is not drawn: a busy server sends many, each a part and a tween.
+			local camera = workspace.CurrentCamera
+			if camera then
+				local eye = camera.CFrame.Position
+				if (from - eye).Magnitude > 400 and (to - eye).Magnitude > 400 then
+					return
+				end
+			end
 			-- From the gun in their hand as this client shows it (the server shoots from their shoulder).
 			local other = Players:GetPlayerByUserId(shooter)
 			local character = other and other.Character

@@ -181,11 +181,11 @@ function Menu.show(onPlay: () -> ())
 	closeHelp.Position, closeHelp.ZIndex = UDim2.fromOffset(420, 20), 16
 	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local controlsText: { { string } } = if touchLayout then {
-		{ "MOVE", "Left thumbstick" }, { "SHOOT", "FIRE button (draws the gun first)" },
-		{ "HANDS", "DRAW / PUNCH buttons over FIRE" },
-		{ "CARGO", "Tap prompts to pick up and load" }, { "PUT DOWN", "PUT DOWN / LET GO button" },
-		{ "WEAPONS", "Tap the weapon bar" }, { "ITEMS", "Tap the hotbar" },
-		{ "NAVIGATE", "JOBS / MAP / BAG / CAR buttons" }, { "EXIT CAR", "Jump button" },
+		{ "MOVE", "Left thumbstick    ·    SPRINT: on / off (breath)" }, { "SHOOT", "FIRE button (draws the gun first)" },
+		{ "HANDS", "DRAW / PUNCH buttons left of FIRE" },
+		{ "CARGO", "Tap prompts to pick up and load" }, { "PUT DOWN", "PUT DOWN / LET GO / SET DOWN button" },
+		{ "WEAPONS", "Tap the weapon line: the wheel" }, { "ITEMS", "Tap the item tags" },
+		{ "NAVIGATE", "MAP / CREW / MENU buttons" }, { "EXIT CAR", "EXIT button or the jump button" },
 	} else {
 		{ "MOVE", "WASD / arrows    ·    Shift: sprint (breath)" }, { "COMBAT", "Mouse: aim    ·    RMB: aim    ·    LMB: shoot" },
 		{ "HANDS", "B: holster / draw    ·    V: punch / strike" },
@@ -329,7 +329,11 @@ function Menu.show(onPlay: () -> ())
 		infoLabel = nil
 	end
 	play.Activated:Connect(start)
-	keyConnection = UserInputService.InputBegan:Connect(function(input)
+	keyConnection = UserInputService.InputBegan:Connect(function(input, processed)
+		-- (not the Enter that sends a chat line, nor a press a button already took)
+		if processed or UserInputService:GetFocusedTextBox() then
+			return
+		end
 		local key = input.KeyCode
 		if key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter or key == Enum.KeyCode.ButtonA then
 			task.spawn(start)

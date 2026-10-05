@@ -326,7 +326,7 @@ local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Mod
 	return model, humanoid, root, torso
 end
 
-type Moves = { idle: AnimationTrack?, walk: AnimationTrack?, run: AnimationTrack? }
+type Moves = { idle: AnimationTrack?, walk: AnimationTrack?, run: AnimationTrack?, rate: number? }
 local moves: { [Model]: Moves } = {}
 
 local function loadMoves(model: Model, humanoid: Humanoid, bandit: boolean)
@@ -373,7 +373,12 @@ local function animate(model: Model, root: BasePart, runner: boolean)
 				tracks.idle:Stop(0.2)
 			end
 		end
-		moving:AdjustSpeed(math.clamp(speed / (if runner then 24 else 12), 0.5, 2))
+		-- (a track's speed replicates: only a real change is sent, not a new value every pass)
+		local rate = math.clamp(speed / (if runner then 24 else 12), 0.5, 2)
+		if not tracks.rate or math.abs(rate - tracks.rate) > 0.1 then
+			tracks.rate = rate
+			moving:AdjustSpeed(rate)
+		end
 	elseif tracks.idle and not tracks.idle.IsPlaying then
 		tracks.idle:Play(0.2)
 		for _, track in { tracks.walk, tracks.run } do
@@ -881,7 +886,7 @@ local function touches(car: Vehicles.Car, position: Vector3, reach: number): boo
 end
 
 local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
-	local speed = Vehicles.speed(car)
+	local speed = Vehicles.ramSpeed(car)
 	if speed >= Horde.RamMinSpeed then
 		if now - z.lastRam < 0.5 then
 			return
@@ -1083,17 +1088,23 @@ local function standGuard(z: Zombie, position: Vector3, now: number)
 	end
 end
 
+local nextSlow = 0 -- 4.2: the walk animations and the despawn check run 5 times a second, not every frame
+
 local function step()
 	local now = os.clock()
 	refreshHunted(now)
 	local targets = gatherTargets()
 	local cars = Vehicles.all()
+	local slow = now >= nextSlow
+	if slow then
+		nextSlow = now + 0.2
+	end
 	for _, z in table.clone(zombies) do
 		if z.dead then
 			continue
 		end
 		local position = z.root.Position
-		if not z.car then
+		if slow and not z.car then
 			animate(z.model, z.root, z.humanoid.WalkSpeed > 20) -- a wandering runner walks
 		end
 
@@ -1118,7 +1129,7 @@ local function step()
 		end
 
 		-- Too far from everybody: gone.
-		if position.Y < -8 or (not z.resident and nearestPlayerDistance(position) > (if z.roamer then Roam.despawn else Horde.DespawnDistance)) then
+		if slow and (position.Y < -8 or not z.resident and nearestPlayerDistance(position) > (if z.roamer then Roam.despawn else Horde.DespawnDistance)) then
 			-- drowned in the river / the sea, or nobody around
 			remove(z)
 			z.model:Destroy()

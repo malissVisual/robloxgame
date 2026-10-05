@@ -70,6 +70,24 @@ check("say falls back to her line", said.pages[1] == TutorialSteps.Bubble.done)
 local board = TutorialSteps.dialog("board", nil) :: any
 check("the speaker is her name", string.find(board.speaker, string.upper(Config.Tutorial.NpcName), 1, true) == 1, board.speaker)
 
+-- 4.2: on a touch screen her words name no keys.
+local touch = TutorialSteps.forTouch
+check("touch: no (E)", touch("Carry it to Bob (E)") == "Carry it to Bob", touch("Carry it to Bob (E)"))
+check("touch: the G advice names the button", touch(TutorialSteps.hint("carry", job({}))) == "Carry it to the back of the van and load it. Hands full? PUT DOWN sets it down while you open the back", touch(TutorialSteps.hint("carry", job({}))))
+check("touch: no Press J", touch(TutorialSteps.Bubble.board) == "Check the board, hon.", touch(TutorialSteps.Bubble.board))
+for _, phase in { "welcome", "board", "retry", "done", "say", "skip" } do
+	local dialog = TutorialSteps.dialog(phase, { reward = 50, text = "Hi." }) :: any
+	for index, page in dialog.pages do
+		local line = touch(page)
+		check(`touch: {phase} page {index} names no key`, string.find(line, "%([A-Z]%)") == nil and string.find(line, "Press [A-Z]") == nil and string.find(line, "Hold Q") == nil, line)
+	end
+end
+for _, name in TutorialSteps.JobSteps do
+	local line = touch(TutorialSteps.hint(name, job({})))
+	check(`touch: {name} hint names no key`, string.find(line, "%([A-Z]%)") == nil and string.find(line, "%f[%w]G puts") == nil, line)
+end
+check("touch: plain words stay", touch("Delivered! Nice work, driver.") == "Delivered! Nice work, driver.")
+
 check("a reward", Config.Tutorial.Reward > 0)
 check("a talk range", Config.Tutorial.TalkRange > 0 and Config.Tutorial.TalkRange < 12)
 local half = Config.City.BlockSize / 2
