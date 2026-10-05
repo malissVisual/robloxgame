@@ -2,12 +2,14 @@
 -- The real estate window (Config.Estate, server/Estate.luau), in the Dead End Dispatch look. Two pages in one window:
 --
 --   * ESTATE (H, or the ESTATE button in the HUD: EstateUi.toggleList): every property, filtered by kind (ALL,
---     HOMES, GARAGES, OFFICES, OWNED), yours marked (★ your home, OWNED), the price, the level lock and a GPS button.
+--     HOMES, GARAGES, OFFICES, OWNED), yours marked (★ your home, OWNED), the price, the level lock (3.2: or the
+--     campaign it needs, "🔒 IRON SUPPLY") and a GPS button.
 --     A row opens its listing.
 --   * A property's listing (the FOR SALE sign's prompt opens it through the "Estate" remote, or a row of the list):
---     name, kind, district, description, price, garage slots / couriers, the driver level, the sell-back value and
---     the actions: BUY (at the sign; away from it the button sets the GPS there), SELL (asks once more), SET AS HOME,
---     SPAWN AT THE DEPOT and GPS.
+--     name, kind, district, description, price, garage slots / couriers, the driver level, the campaign it requires
+--     (3.2, EstateDef.requires: "Finish Iron Supply first"; the server says which finales you have done), the
+--     sell-back value and the actions: BUY (at the sign; away from it the button sets the GPS there), SELL (asks
+--     once more), SET AS HOME, SPAWN AT THE DEPOT and GPS.
 --
 -- The GPS goes through MapView (setWaypoint: the purple route on both maps, onWaypoint: the HUD's beam and label).
 -- The summary strip shows your car slots (used / total), your home and how many properties you own. The server
@@ -22,7 +24,9 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
+local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
+local Missions = require(Shared.Missions)
 local Net = require(Shared.Net)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
@@ -49,6 +53,7 @@ type State = {
 	slots: number,
 	used: number,
 	owners: { [string]: { string } },
+	finished: { [string]: boolean }, -- 3.2: the required campaigns whose finale you have done
 }
 
 type Kind = { name: string, icon: string, color: Color3 }
@@ -70,7 +75,7 @@ local FILTERS = {
 local GPS_COLOR = Color3.fromRGB(176, 92, 255) -- the GPS route's purple (client/MapView.luau)
 local DARK = Color3.fromRGB(9, 14, 11)
 
-local state: State = { owned = {}, home = nil, office = nil, slots = Config.Estate.BaseCarSlots, used = 0, owners = {} }
+local state: State = { owned = {}, home = nil, office = nil, slots = Config.Estate.BaseCarSlots, used = 0, owners = {}, finished = {} }
 local money = 0
 local remote: RemoteEvent? = nil
 
@@ -180,6 +185,16 @@ end
 
 local function locked(def: Config.EstateDef): boolean
 	return def.level ~= nil and myLevel() < def.level
+end
+
+-- 3.2: the name of the campaign this property still needs ("Iron Supply"), or nil.
+local function needs(def: Config.EstateDef): string?
+	local missing = Economy.missingCampaign(def.requires, state.finished)
+	if not missing then
+		return nil
+	end
+	local campaign = Missions.findCampaign(missing)
+	return if campaign then campaign.name else missing
 end
 
 local function sellValue(def: Config.EstateDef): number
@@ -443,8 +458,11 @@ local function row(def: Config.EstateDef, order: number)
 		bottom, bottomColor = if def.kind == "office" and state.office == def.id then "your company" else `sells {Ui.money(sellValue(def))}`, C.dim
 	else
 		top, topColor = Ui.money(def.price), if money >= def.price then C.money else C.dim
+		local story = needs(def)
 		if locked(def) then
 			bottom, bottomColor = `🔒 LEVEL {def.level}`, C.red
+		elseif story then
+			bottom, bottomColor = `🔒 {string.upper(story)}`, C.red
 		else
 			bottom, bottomColor = if money >= def.price then "FOR SALE" else `{Ui.money(def.price - money)} more`, C.dim
 		end
@@ -477,6 +495,20 @@ local function row(def: Config.EstateDef, order: number)
 	gps.TextSize = 14
 end
 
+-- The OWNED filter with nothing owned: the cheapest home and its level (from Config, not hard-coded).
+local function firstHomeText(): string
+	local first: Config.EstateDef? = nil
+	for _, def in Config.Estate.Properties do
+		if HOME_KINDS[def.kind] and (first == nil or def.price < first.price) then
+			first = def
+		end
+	end
+	if not first then
+		return "Nothing yet: find the FOR SALE signs."
+	end
+	return `Nothing yet. Your first home could be the {first.name} (level {first.level or 1}, {Ui.money(first.price)}): find the FOR SALE signs.`
+end
+
 local function renderList()
 	renderFilters()
 	local scroll = body.CanvasPosition
@@ -489,7 +521,7 @@ local function renderList()
 		end
 	end
 	if shown == 0 then
-		Ui.label(body, if filter == "owned" then "Nothing yet. Your first home is the Elm Bungalow (level 1): find the FOR SALE signs." else "Nothing here.", UDim2.new(1, -10, 0, 60), {
+		Ui.label(body, if filter == "owned" then firstHomeText() else "Nothing here.", UDim2.new(1, -10, 0, 60), {
 			TextColor3 = C.dim,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			Font = Theme.Font,
@@ -590,12 +622,15 @@ local function renderListing()
 	if district then
 		chip(district, C.grey)
 	end
+	local story = needs(def) -- 3.2: the campaign it still needs
 	if isHome then
 		chip("★ YOUR HOME", C.yellow)
 	elseif mine then
 		chip("OWNED", C.green)
 	elseif locked(def) then
 		chip(`🔒 LEVEL {def.level}`, C.red)
+	elseif story then
+		chip(`🔒 {string.upper(story)}`, C.red)
 	else
 		chip("FOR SALE", C.money)
 	end
@@ -628,6 +663,12 @@ local function renderListing()
 	end
 	local level = def.level or 1
 	fact(facts, "DRIVER LEVEL", if locked(def) then `🔒 {level}` else `✓ {level}`, if locked(def) then C.red else C.green, Levels.rank(level))
+	if def.requires and def.requires[1] then
+		-- 3.2: the campaign it opens after (its finale done).
+		local first = Missions.findCampaign(def.requires[1])
+		local name = story or (if first then first.name else def.requires[1])
+		fact(facts, "CAMPAIGN", if story then `🔒 {name}` else `✓ {name}`, if story then C.red else C.green, if story then "finish its finale first" else "finished")
+	end
 	fact(facts, "SELLS FOR", Ui.money(sellValue(def)), C.text, `{math.floor(Config.Estate.SellBack * 100 + 0.5)}% of the price`)
 
 	-- What you can do (or why not).
@@ -647,6 +688,9 @@ local function renderListing()
 		messageColor = C.green
 	elseif locked(def) then
 		message = `Needs driver level {level} ({Levels.rank(level)}). You are level {myLevel()}: deliveries give XP.`
+		messageColor = C.red
+	elseif story then
+		message = `Finish {story} first: {def.name} opens after its finale (MISSIONS, U).`
 		messageColor = C.red
 	elseif money < def.price then
 		message = `You need {Ui.money(def.price - money)} more. Big jobs, night runs and your company pay best.`
@@ -699,7 +743,7 @@ local function renderListing()
 	end)
 	if not mine then
 		if nearProperty(def.id) then
-			local can = not locked(def) and money >= def.price
+			local can = not locked(def) and story == nil and money >= def.price
 			actionButton(actions, `BUY  {Ui.money(def.price)}`, if can then C.yellow else C.grey, function()
 				send("buy", def.id)
 			end)
@@ -780,6 +824,14 @@ local function applyState(raw: any)
 			end
 		end
 	end
+	local finished: { [string]: boolean } = {}
+	if type(raw.finished) == "table" then
+		for id, on in raw.finished do
+			if on == true and type(id) == "string" then
+				finished[id] = true
+			end
+		end
+	end
 	local owners: { [string]: { string } } = {}
 	if type(raw.owners) == "table" then
 		for id, names in raw.owners do
@@ -801,6 +853,7 @@ local function applyState(raw: any)
 		slots = if type(raw.slots) == "number" then raw.slots else Config.Estate.BaseCarSlots,
 		used = if type(raw.used) == "number" then raw.used else 0,
 		owners = owners,
+		finished = finished,
 	}
 end
 

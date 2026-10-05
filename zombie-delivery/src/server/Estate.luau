@@ -4,7 +4,8 @@
 -- mansion on one server both use it.
 --
 --   * Buy: at the property's FOR SALE sign (the EstatePrompt opens its listing on the client, client/EstateUi.luau),
---     with the driver level (def.level), the money, and not owned yet. Your first home becomes your home.
+--     with the driver level (def.level), the campaigns it requires (3.2, def.requires: their finale done, see
+--     Estate.finished), the money, and not owned yet. Your first home becomes your home.
 --   * Sell: anywhere, for Config.Estate.SellBack × the price. Not the home you spawn at: switch first (another home
 --     or the depot). Your cars stay even when the slots shrink; you just cannot buy more until there is room.
 --   * Home: an owned mansion / villa / house. You spawn there (World.EstateSpawns[home]) after every death and after
@@ -13,11 +14,13 @@
 --   * Car slots: Config.Estate.BaseCarSlots + every owned property's garageSlots (server/Shops.luau checks them when
 --     you buy a car; company cars earned from employers do not count).
 --   * Office: the biggest owned office runs your company (server/Business.luau, Estate.officeOf).
---   * Name plates over the FOR SALE signs: "FOR SALE $x · LEVEL n" or "Owned by A, B" (the owners on this server).
+--   * Name plates over the FOR SALE signs: "FOR SALE $x · LEVEL n" (and "· after <campaign>") or "Owned by A, B"
+--     (the owners on this server).
 --
 -- The "Estate" remote: client → server (action, id): "buy" | "sell" | "home" (id or "depot") | "view" | "state";
 -- server → client (open id or nil, state): open that property's listing (the sign was used) and/or the new state
--- { owned = { [id] = true }, home, office, slots, used, owners = { [id] = { names } } }.
+-- { owned = { [id] = true }, home, office, slots, used, owners = { [id] = { names } }, finished = { [campaign] = true } }
+-- (finished: 3.2, the campaigns some property requires whose finale you have done).
 -- The player attributes Estates ("id,id,…"), Home, Office and CarSlots carry the same to every client.
 --
 -- The world (server/World.luau, shared/Map.luau) is read through the 2.6 contract and every piece is optional (a
@@ -32,6 +35,7 @@ local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
+local MissionData = require(Shared.Missions)
 local Net = require(Shared.Net)
 
 local Server = script.Parent
@@ -59,8 +63,16 @@ local notice = Net.get("Notice")
 local remote = Net.get("Estate")
 
 local byId: { [string]: Config.EstateDef } = {}
+-- 3.2: the campaigns some property requires, and the id of each one's finale (its last mission).
+local finales: { [string]: string } = {}
 for _, def in Config.Estate.Properties do
 	byId[def.id] = def
+	local requires: { string } = def.requires or {}
+	for _, campaignId in requires do
+		local list = MissionData.ofCampaign(campaignId)
+		local last = list[#list]
+		finales[campaignId] = if last then last.id else `{campaignId}_10`
+	end
 end
 
 local lastAction: { [Player]: number } = {}
@@ -124,6 +136,27 @@ function Estate.carsOwned(player: Player): number
 		end
 	end
 	return count
+end
+
+-- 3.2: the campaigns some property requires whose finale this player has done (profile.missions), or whose reward was
+-- paid (profile.campaigns: every mission of it done).
+function Estate.finished(player: Player): { [string]: boolean }
+	local done: { [string]: boolean } = {}
+	local profile = PlayerData.get(player)
+	if profile then
+		for campaignId, finale in finales do
+			if profile.campaigns[campaignId] or (profile.missions[finale] or 0) >= 1 then
+				done[campaignId] = true
+			end
+		end
+	end
+	return done
+end
+
+-- The name of a campaign ("Iron Supply"), for the messages.
+local function campaignName(id: string): string
+	local campaign = MissionData.findCampaign(id)
+	return if campaign then campaign.name else id
 end
 
 -- The office you run your company from (the biggest owned one), or nil.
@@ -276,6 +309,7 @@ local function stateFor(player: Player): { [string]: any }?
 		slots = Estate.carSlots(player),
 		used = Estate.carsOwned(player),
 		owners = ownersOnServer(),
+		finished = Estate.finished(player),
 	}
 end
 
@@ -305,7 +339,13 @@ local function refresh(player: Player)
 	local office = Estate.officeOf(player)
 	local slots = Estate.carSlots(player)
 	local used = Estate.carsOwned(player)
-	local signature = `{ids}|{home or ""}|{used}`
+	-- 3.2: a finale done opens a property (requires): that has to reach the window too.
+	local finishedIds: { string } = {}
+	for campaignId in Estate.finished(player) do
+		table.insert(finishedIds, campaignId)
+	end
+	table.sort(finishedIds)
+	local signature = `{ids}|{home or ""}|{used}|{table.concat(finishedIds, ",")}`
 	if signatures[player] == signature then
 		return
 	end
@@ -409,7 +449,8 @@ local function updatePlates()
 		local names = owners[id]
 		local owned = names ~= nil and #names > 0
 		local shown = if names and owned then table.concat(names, ", ", 1, math.min(#names, 3)) .. (if #names > 3 then ` +{#names - 3}` else "") else ""
-		local text = if owned then `Owned by {shown}` else `FOR SALE {money(def.price)}{if def.level and def.level > 1 then ` · LEVEL {def.level}` else ""}`
+		local needs = if def.requires and def.requires[1] then ` · after {campaignName(def.requires[1])}` else ""
+		local text = if owned then `Owned by {shown}` else `FOR SALE {money(def.price)}{if def.level and def.level > 1 then ` · LEVEL {def.level}` else ""}{needs}`
 		local color = if owned then PLATE.yellow else PLATE.money
 		for _, plate in plates[id] or ({} :: { Plate }) do
 			plate.status.Text = text
@@ -454,6 +495,10 @@ function Estate.buy(player: Player, id: string): string?
 	local level = PlayerData.level(player)
 	if def.level and level < def.level then
 		return `{def.name} needs driver level {def.level} ({Levels.rank(def.level)}). You are level {level}: deliveries give XP.`
+	end
+	local missing = Economy.missingCampaign(def.requires, Estate.finished(player))
+	if missing then
+		return `Finish {campaignName(missing)} first: {def.name} opens after its finale (MISSIONS, U).`
 	end
 	if not PlayerData.spend(player, def.price) then
 		return `Not enough money: {def.name} costs {money(def.price)}.`

@@ -328,6 +328,18 @@ function Economy.jobLevel(jobType: Config.JobTypeDef?, tierIndex: number): numbe
 	return if jobType.employer and not jobType.board then 1 else tierLevel
 end
 
+-- 3.2: the first campaign of `requires` (EstateDef.requires: campaign ids) whose finale is not in `finished` yet, or
+-- nil when every one is done (or nothing is required). The server (Estate.buy) and the window (EstateUi) both ask.
+function Economy.missingCampaign(requires: { string }?, finished: { [string]: boolean }): string?
+	local list: { string } = requires or {}
+	for _, id in list do
+		if not finished[id] then
+			return id
+		end
+	end
+	return nil
+end
+
 -- Is this job type on the job board (a special without an employer, or one marked board)?
 function Economy.onBoard(jobType: Config.JobTypeDef): boolean
 	return jobType.board == true or jobType.employer == nil

@@ -10,7 +10,7 @@ Config.Version = "3.2"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
-Config.StudioStartMoney = 25000 -- a Play test in Studio (no saves) starts rich, to try the shops
+Config.StudioStartMoney = 250000 -- a Play test in Studio (no saves) starts rich, to try the shops (3.2: the prices grew)
 Config.AutosaveSeconds = 60
 Config.SpawnCarCooldown = 4
 
@@ -48,6 +48,8 @@ export type CarDef = {
 	mount: boolean?, -- a car gun (Config.CarGuns) fits on its roof; the company / work vehicles carry none
 }
 
+-- 3.2, the progression (Config.Levels): the van is where you start, the pickup opens at level 4, the muscle car at 8
+-- (a third car needs a slot: a garage from level 5, Config.Estate). The guns and the car guns open the same way.
 Config.Cars = {
 	{
 		id = "van",
@@ -65,10 +67,10 @@ Config.Cars = {
 	},
 	{
 		id = "pickup",
-		level = 2,
+		level = 4,
 		mount = true,
 		name = "Pickup",
-		price = 1500,
+		price = 12000,
 		style = "pickup",
 		maxSpeed = 72,
 		accel = 32,
@@ -80,10 +82,10 @@ Config.Cars = {
 	},
 	{
 		id = "muscle",
-		level = 4,
+		level = 8,
 		mount = true,
 		name = "Muscle Car",
-		price = 4000,
+		price = 40000,
 		style = "muscle",
 		maxSpeed = 95,
 		accel = 46,
@@ -155,6 +157,7 @@ Config.Cars = {
 		description = "Frosty's ice cream truck. 1 passenger.",
 		company = true,
 		employer = "icecream",
+		level = 2,
 	},
 	{
 		id = "movingtruck",
@@ -254,10 +257,10 @@ Config.Weapons = {
 	},
 	{
 		id = "smg",
-		level = 2,
+		level = 3,
 		oneHanded = true,
 		name = "SMG",
-		price = 2000,
+		price = 4000,
 		damage = 13,
 		fireRate = 9,
 		range = 130,
@@ -269,9 +272,9 @@ Config.Weapons = {
 	},
 	{
 		id = "shotgun",
-		level = 3,
+		level = 4,
 		name = "Shotgun",
-		price = 3500,
+		price = 7500,
 		damage = 15,
 		fireRate = 1.4,
 		range = 85,
@@ -283,9 +286,9 @@ Config.Weapons = {
 	},
 	{
 		id = "rifle",
-		level = 5,
+		level = 6,
 		name = "Hunting Rifle",
-		price = 6000,
+		price = 15000,
 		damage = 48,
 		fireRate = 2.2,
 		range = 240,
@@ -297,9 +300,9 @@ Config.Weapons = {
 	},
 	{
 		id = "minigun",
-		level = 8,
+		level = 10,
 		name = "Minigun",
-		price = 12000,
+		price = 40000,
 		damage = 15,
 		fireRate = 16,
 		range = 160,
@@ -311,9 +314,9 @@ Config.Weapons = {
 	},
 	{
 		id = "launcher",
-		level = 10,
+		level = 12,
 		name = "Grenade Launcher",
-		price = 18000,
+		price = 60000,
 		damage = 90,
 		fireRate = 1.1,
 		range = 150,
@@ -435,9 +438,9 @@ export type CarGunDef = {
 Config.CarGuns = {
 	{
 		id = "roofmg",
-		level = 3,
+		level = 5,
 		name = "Roof Machine Gun",
-		price = 3500,
+		price = 9000,
 		damage = 14,
 		fireRate = 8,
 		range = 180,
@@ -449,9 +452,9 @@ Config.CarGuns = {
 	},
 	{
 		id = "roofminigun",
-		level = 7,
+		level = 10,
 		name = "Roof Minigun",
-		price = 12000,
+		price = 45000,
 		damage = 16,
 		fireRate = 16,
 		range = 180,
@@ -463,9 +466,9 @@ Config.CarGuns = {
 	},
 	{
 		id = "rooflauncher",
-		level = 9,
+		level = 12,
 		name = "Roof Grenade Launcher",
-		price = 15000,
+		price = 55000,
 		damage = 80,
 		fireRate = 1,
 		range = 160,
@@ -488,12 +491,12 @@ export type UpgradeDef = {
 }
 
 Config.Upgrades = {
-	{ id = "engine", name = "Engine", description = "+8% top speed and acceleration", maxLevel = 5, baseCost = 350, costGrowth = 1.8, perLevel = 0.08 },
-	{ id = "handling", name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 250, costGrowth = 1.7, perLevel = 0.08 },
-	{ id = "armor", name = "Armor", description = "+15% car health", maxLevel = 5, baseCost = 300, costGrowth = 1.8, perLevel = 0.15 },
-	{ id = "plow", name = "Ram Plow", description = "+30% ram damage", maxLevel = 5, baseCost = 250, costGrowth = 1.75, perLevel = 0.30 },
-	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 400, costGrowth = 1.85, perLevel = 0.20 },
-	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 400, costGrowth = 1.85, perLevel = 0.12 },
+	{ id = "engine", name = "Engine", description = "+8% top speed and acceleration", maxLevel = 5, baseCost = 700, costGrowth = 1.8, perLevel = 0.08 },
+	{ id = "handling", name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 500, costGrowth = 1.7, perLevel = 0.08 },
+	{ id = "armor", name = "Armor", description = "+15% car health", maxLevel = 5, baseCost = 600, costGrowth = 1.8, perLevel = 0.15 },
+	{ id = "plow", name = "Ram Plow", description = "+30% ram damage", maxLevel = 5, baseCost = 500, costGrowth = 1.75, perLevel = 0.30 },
+	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
+	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
 
 export type ItemDef = {
@@ -851,11 +854,16 @@ Config.DayNight = {
 }
 
 -- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
--- on the job board (Jobs.Tiers level), cars, guns and car guns (their level field) and some special jobs.
+-- on the job board (Jobs.Tiers level), cars, guns and car guns (their level field), some special jobs, the
+-- campaigns (shared/Missions.luau) and the real estate.
+-- 3.2, the progression: the XP of the whole campaign path (100 missions, first clears) is about 43 000; level 15
+-- needs 41 438 (XpBase 700 × 1.2^n). Playing only the campaigns you reach level 4 after First Shift (the pickup),
+-- level 8 around Empty Shelves / Smoke and Sirens (the muscle car), 12 – 13 by Patient Zero; the last levels
+-- (Dirty Money, Last Convoy) need the job board, the replays for stars and the DUO campaign on top: the endgame.
 Config.Levels = {
 	MaxLevel = 15,
-	XpBase = 120, -- XP needed for level 2; every next level needs more (shared/Levels.luau xpFor)
-	XpGrowth = 1.35,
+	XpBase = 700, -- XP needed for level 2; every next level needs XpGrowth times more (shared/Levels.luau xpFor)
+	XpGrowth = 1.2,
 	XpPerStar = 60, -- a finished delivery: stars × this …
 	XpPerPiece = 10, -- … + per piece delivered …
 	XpPerKill = 4, -- … + per enemy killed during the job
@@ -900,6 +908,9 @@ Config.Crew = {
 -- spawn and its garage keeps cars; garages add car slots; an office runs your own delivery company
 -- (Config.Business). Every player owns their own copy (saved in the profile): two owners of the same mansion on one
 -- server both use it. Where each one stands is in shared/Map.luau (Map.EstatePlots, same ids).
+-- 3.2: mostly the endgame. A garage from level 5 (a third car needs a slot: the muscle car at 8), a house from 6,
+-- the villas at 10 – 11, the mansions at 13 – 15; the offices (your company, Config.Business) at 12 – 15 and only
+-- after a campaign's finale (requires): the first one after Iron Supply, the penthouse after the Last Convoy.
 export type EstateDef = {
 	id: string,
 	name: string,
@@ -908,6 +919,7 @@ export type EstateDef = {
 	garageSlots: number, -- car slots it adds (homes and garages)
 	couriers: number?, -- offices: how many couriers your company can employ from there
 	level: number?, -- the driver level (Config.Levels) needed to buy it
+	requires: { string }?, -- 3.2: campaigns (shared/Missions.luau ids) whose finale must be done before you can buy it
 	description: string,
 }
 
@@ -915,21 +927,21 @@ Config.Estate = {
 	BaseCarSlots = 2, -- the depot's lot: cars you can own without any garage (more need a home or a garage)
 	SellBack = 0.6, -- selling returns this share of the price
 	Properties = {
-		{ id = "hilltop", name = "Hilltop Mansion", kind = "mansion", price = 6000000, garageSlots = 8, level = 10, description = "The top of Sunset Hills: the whole city at your feet, an infinity pool and a garage for eight." },
-		{ id = "oceanview", name = "Ocean View Mansion", kind = "mansion", price = 4500000, garageSlots = 8, level = 9, description = "On the cliffs over the sea, glass all around, a private pier and a garage for eight." },
-		{ id = "pinecrest", name = "Pinecrest Mansion", kind = "mansion", price = 3000000, garageSlots = 6, level = 8, description = "A stone mansion among the pines, a pool and a garage for six." },
-		{ id = "lakeside", name = "Lakeside Villa", kind = "villa", price = 1500000, garageSlots = 4, level = 7, description = "A modern villa by the water with a garage for four." },
-		{ id = "sunset", name = "Sunset Villa", kind = "villa", price = 1000000, garageSlots = 4, level = 6, description = "A white villa on the hill road, sunsets included. Garage for four." },
-		{ id = "maple", name = "12 Maple Street", kind = "house", price = 400000, garageSlots = 2, level = 4, description = "A two-storey family house in the Suburbs with a double garage." },
-		{ id = "oak", name = "7 Oak Lane", kind = "house", price = 300000, garageSlots = 2, level = 3, description = "A brick house with a porch and a double garage." },
-		{ id = "birch", name = "Birch Cottage", kind = "house", price = 200000, garageSlots = 2, level = 2, description = "A cosy cottage at the edge of town, garage for two." },
-		{ id = "elm", name = "Elm Bungalow", kind = "house", price = 150000, garageSlots = 1, level = 1, description = "A small bungalow: your first home, one car fits in the garage." },
-		{ id = "garage_harbor", name = "Harbor Lockup", kind = "garage", price = 50000, garageSlots = 4, level = 1, description = "A rented lock-up at the harbor: four more car slots." },
-		{ id = "garage_north", name = "Highway Garage", kind = "garage", price = 80000, garageSlots = 4, level = 2, description = "A garage on the North Highway: four more car slots." },
-		{ id = "garage_downtown", name = "Downtown Parking", kind = "garage", price = 120000, garageSlots = 6, level = 3, description = "A floor of the downtown parking house: six more car slots." },
-		{ id = "office_harbor", name = "Harbor Point Office", kind = "office", price = 500000, garageSlots = 0, couriers = 3, level = 5, description = "A room in the Harbor Point tower: start your own delivery company with up to 3 couriers." },
-		{ id = "office_tower", name = "Dispatch Tower, 8th floor", kind = "office", price = 900000, garageSlots = 0, couriers = 6, level = 7, description = "A corner office high in the Dispatch Tower: up to 6 couriers." },
-		{ id = "office_penthouse", name = "Dispatch Tower Penthouse", kind = "office", price = 2500000, garageSlots = 0, couriers = 12, level = 11, description = "The top floor of the Dispatch Tower: an empire of up to 12 couriers." },
+		{ id = "hilltop", name = "Hilltop Mansion", kind = "mansion", price = 6000000, garageSlots = 8, level = 15, description = "The top of Sunset Hills: the whole city at your feet, an infinity pool and a garage for eight." },
+		{ id = "oceanview", name = "Ocean View Mansion", kind = "mansion", price = 4500000, garageSlots = 8, level = 14, description = "On the cliffs over the sea, glass all around, a private pier and a garage for eight." },
+		{ id = "pinecrest", name = "Pinecrest Mansion", kind = "mansion", price = 3000000, garageSlots = 6, level = 13, description = "A stone mansion among the pines, a pool and a garage for six." },
+		{ id = "lakeside", name = "Lakeside Villa", kind = "villa", price = 1500000, garageSlots = 4, level = 11, description = "A modern villa by the water with a garage for four." },
+		{ id = "sunset", name = "Sunset Villa", kind = "villa", price = 1000000, garageSlots = 4, level = 10, description = "A white villa on the hill road, sunsets included. Garage for four." },
+		{ id = "maple", name = "12 Maple Street", kind = "house", price = 300000, garageSlots = 2, level = 9, description = "A two-storey family house in the Suburbs with a double garage." },
+		{ id = "oak", name = "7 Oak Lane", kind = "house", price = 220000, garageSlots = 2, level = 8, description = "A brick house with a porch and a double garage." },
+		{ id = "birch", name = "Birch Cottage", kind = "house", price = 150000, garageSlots = 2, level = 7, description = "A cosy cottage at the edge of town, garage for two." },
+		{ id = "elm", name = "Elm Bungalow", kind = "house", price = 90000, garageSlots = 1, level = 6, description = "A small bungalow: your first home, one car fits in the garage." },
+		{ id = "garage_harbor", name = "Harbor Lockup", kind = "garage", price = 25000, garageSlots = 4, level = 5, description = "A rented lock-up at the harbor: four more car slots." },
+		{ id = "garage_north", name = "Highway Garage", kind = "garage", price = 45000, garageSlots = 4, level = 6, description = "A garage on the North Highway: four more car slots." },
+		{ id = "garage_downtown", name = "Downtown Parking", kind = "garage", price = 70000, garageSlots = 6, level = 7, description = "A floor of the downtown parking house: six more car slots." },
+		{ id = "office_harbor", name = "Harbor Point Office", kind = "office", price = 500000, garageSlots = 0, couriers = 3, level = 12, requires = { "army" }, description = "A room in the Harbor Point tower: start your own delivery company with up to 3 couriers." },
+		{ id = "office_tower", name = "Dispatch Tower, 8th floor", kind = "office", price = 900000, garageSlots = 0, couriers = 6, level = 14, requires = { "underworld" }, description = "A corner office high in the Dispatch Tower: up to 6 couriers." },
+		{ id = "office_penthouse", name = "Dispatch Tower Penthouse", kind = "office", price = 2500000, garageSlots = 0, couriers = 12, level = 15, requires = { "exodus" }, description = "The top floor of the Dispatch Tower: an empire of up to 12 couriers." },
 	} :: { EstateDef },
 }
 
@@ -944,9 +956,10 @@ Config.CarCall = {
 }
 
 -- Your delivery company (server/Business.luau), run from an office computer: hire couriers who make deliveries for
--- you while you play (and, less, while you are away), buy them vans, grow the company.
+-- you while you play (and, less, while you are away), buy them vans, grow the company. 3.2: the endgame (the first
+-- office is level 12 and after Iron Supply), priced like it.
 Config.Business = {
-	CourierCost = 25000, -- hiring one courier
+	CourierCost = 40000, -- hiring one courier
 	CourierPerMinute = 120, -- what one courier earns per minute while you are on the server
 	OfflineShare = 0.4, -- while you are away they earn this share …
 	OfflineHours = 8, -- … for at most this long
@@ -1131,7 +1144,7 @@ Config.Jobs = {
 		},
 		{
 			stars = 4,
-			level = 6,
+			level = 7,
 			name = "INSANE",
 			minDistance = 1800,
 			maxDistance = 99999,
@@ -1530,6 +1543,7 @@ Config.JobTypes = {
 		description = "Pick the kids up at three homes and bring them to Sunny Hill School in the school bus.",
 		vehicle = "bus",
 		employer = "school",
+		level = 2,
 		pickups = 3,
 		pickupAt = nil,
 		drops = 1,
@@ -1602,6 +1616,7 @@ Config.JobTypes = {
 		description = "Load a family's furniture at their house and unload it at their new home.",
 		vehicle = "movingtruck",
 		employer = "movers",
+		level = 3,
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -1626,6 +1641,7 @@ Config.JobTypes = {
 		description = "Load fresh food at the Old Farm and bring it to two markets in the city.",
 		vehicle = "monster",
 		employer = "farm",
+		level = 8,
 		pickups = 1,
 		pickupAt = "farm",
 		drops = 2,
@@ -1674,6 +1690,7 @@ Config.JobTypes = {
 		description = "Lead two horses from Silver Spur Ranch into the livestock truck and bring them to the Riverside Riding School.",
 		vehicle = "livestock",
 		employer = "ranch",
+		level = 5,
 		pickups = 1,
 		pickupAt = "ranch",
 		drops = 1,
@@ -1698,6 +1715,7 @@ Config.JobTypes = {
 		description = "Load fuel barrels at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
 		vehicle = "fueltruck",
 		employer = "gas",
+		level = 4,
 		pickups = 1,
 		pickupAt = "fueldepot",
 		drops = 1,

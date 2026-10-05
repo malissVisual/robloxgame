@@ -20,8 +20,8 @@ end
 
 -- Economy ---------------------------------------------------------------------
 
-check("upgrade cost level 0", Economy.upgradeCost("engine", 0) == 350, Economy.upgradeCost("engine", 0))
-check("upgrade cost grows", (Economy.upgradeCost("engine", 1) :: number) > 350)
+check("upgrade cost level 0", Economy.upgradeCost("engine", 0) == 700, Economy.upgradeCost("engine", 0))
+check("upgrade cost grows", (Economy.upgradeCost("engine", 1) :: number) > 700)
 check("upgrade maxed", Economy.upgradeCost("engine", 5) == nil)
 check("unknown upgrade", Economy.upgradeCost("nope", 0) == nil)
 

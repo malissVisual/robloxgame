@@ -30,6 +30,14 @@ local Shops = {}
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
 
+-- 3.2: the lowest level a garage or a home can be bought at (the car slot message says it).
+local GARAGE_LEVEL = Config.Levels.MaxLevel
+for _, def in Config.Estate.Properties do
+	if def.garageSlots > 0 then
+		GARAGE_LEVEL = math.min(GARAGE_LEVEL, def.level or 1)
+	end
+end
+
 local function nearShop(player: Player, shop: string): boolean
 	local info = Map.Shops[shop]
 	local character = player.Character
@@ -66,7 +74,7 @@ local function noSlot(player: Player): boolean
 	if used < slots then
 		return false
 	end
-	notice:FireClient(player, `No free car slot: {used} cars, {slots} slots. Buy a home or a garage for more (ESTATE, H).`)
+	notice:FireClient(player, `No free car slot: {used} cars, {slots} slots. Buy a garage (from level {GARAGE_LEVEL}) or a home for more (ESTATE, H).`)
 	return true
 end
 
