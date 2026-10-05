@@ -28,16 +28,22 @@
 -- block) for server/Repair.luau, the two small garages (the Rented Lockup, the Southside Garage) and a GARAGE prompt at
 -- every home's and garage's drive-out spot (World.GaragePrompts) for server/Garages.luau. No free repairs any more.
 --
+-- Zombie Delivery 3.9: the crosswalks (zebra stripes next to the junctions of the city blocks' roads, where the
+-- pedestrians cross) and the traffic lights at the districts' four-way junctions (shared/Crossings.luau; see
+-- "Crosswalks and traffic lights" below).
+--
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
 -- (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
 
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Crossings = require(Shared.Crossings)
 local Icons = require(Shared.Icons)
 local Map = require(Shared.Map)
 
@@ -1366,6 +1372,120 @@ local function buildConnectors(parent: Instance)
 				cylinder(roads, "Joint", 0.4, a.width, CFrame.new(a.bx, ROAD_TOP - 0.25, a.bz) * UPRIGHT, ASPHALT, Enum.Material.Asphalt)
 			end
 		end
+	end
+end
+
+-- ── Crosswalks and traffic lights (3.9) ────────────────────────────────────
+-- From shared/Crossings.luau: the zebra stripes where the people cross (next to the junctions of the city blocks'
+-- roads) and a light pole on two corners of every four-way junction inside a district. All flat or thin, no
+-- collision but for the poles (like the street lamps). Cheap: a crosswalk is ONE part (its stripes joined into a
+-- union once, then cloned; separate stripes only if the union fails), a pole is the pole, the head and one lit lens
+-- per way it faces. The lens is moved to the red / amber / green slot of its head and coloured by every client
+-- (client/TrafficAnimator.luau) from the cycle in shared/Crossings.luau: tag TrafficLight, attributes Axis, Offset
+-- and Base (the lens's middle slot). Neon: it glows at night by itself.
+
+local ZEBRA = Color3.fromRGB(232, 232, 226)
+local HOUSING = Color3.fromRGB(28, 30, 32)
+
+local function crosswalkStripes(parent: Instance, frame: CFrame): { BasePart }
+	local list: { BasePart } = {}
+	for _, x in Crossings.Stripes do
+		local stripe = deco(part(parent, "Crosswalk", Vector3.new(Crossings.StripeWidth, 0.06, Crossings.Width), frame * CFrame.new(x, 0, 0), ZEBRA))
+		stripe.CastShadow = false
+		table.insert(list, stripe)
+	end
+	return list
+end
+
+-- One crosswalk as a single part (a union of its stripes) and where its middle is in it; nil if CSG is not there.
+local function crosswalkUnion(parent: Instance): (BasePart?, CFrame)
+	local origin = CFrame.new(0, -60, 0)
+	local stripes = crosswalkStripes(parent, origin)
+	local first = table.remove(stripes, 1) :: BasePart
+	local ok, result = pcall(function()
+		return first:UnionAsync(stripes, Enum.CollisionFidelity.Box, Enum.RenderFidelity.Automatic)
+	end)
+	first:Destroy()
+	for _, stripe in stripes do
+		stripe:Destroy()
+	end
+	if not ok or typeof(result) ~= "Instance" or not result:IsA("BasePart") then
+		warn(`[World] crosswalks as single stripes: {result}`)
+		return nil, CFrame.identity
+	end
+	local union = result :: BasePart
+	union.Name = "Crosswalk"
+	union.Anchored = true
+	union.CanCollide = false
+	union.CanQuery = false
+	union.CanTouch = false
+	union.CastShadow = false
+	union.Color = ZEBRA
+	union.Material = Enum.Material.SmoothPlastic
+	if union:IsA("UnionOperation") then
+		union.UsePartColor = true
+	end
+	return union, origin:ToObjectSpace(union.CFrame)
+end
+
+-- A light pole on a block corner: the pole, the head on top and one lens for each way it faces (`faces`: the
+-- direction the lens shows to, the light axis of the traffic that sees it).
+local function lightPole(parent: Instance, x: number, z: number, offset: number, faces: { { dir: Vector3, axis: number } })
+	part(parent, "LightPole", Vector3.new(0.5, 11, 0.5), CFrame.new(x, WALK_TOP + 5.5, z), LAMP_POLE, Enum.Material.Metal)
+	local middle = Vector3.new(x, WALK_TOP + 13, z)
+	deco(part(parent, "LightHead", Vector3.new(1.5, 3.8, 1.5), CFrame.new(middle), HOUSING, Enum.Material.SmoothPlastic))
+	local state = "red"
+	for _, face in faces do
+		local base = CFrame.fromMatrix(middle + face.dir * 0.78, face.dir, Vector3.yAxis)
+		state = Crossings.state(0, offset, face.axis)
+		local color = Crossings.LensColor[state]
+		local lens = deco(part(parent, "Lens", Vector3.new(0.2, 1, 1), base + Vector3.new(0, Crossings.LensSlot[state], 0), Color3.fromRGB(color[1], color[2], color[3]), Enum.Material.Neon))
+		lens.Shape = Enum.PartType.Cylinder
+		lens.CastShadow = false
+		lens:SetAttribute("Axis", face.axis)
+		lens:SetAttribute("Offset", offset)
+		lens:SetAttribute("Base", base)
+		CollectionService:AddTag(lens, Crossings.Tag)
+	end
+end
+
+local function buildCrossings(parent: Instance)
+	local crossings = folder(parent, "Crossings")
+	local zebras = folder(crossings, "Crosswalks")
+	local template, inside = crosswalkUnion(zebras)
+	for _, c in Crossings.crosswalks() do
+		-- The stripes run along the road: a road along X turns the crosswalk a quarter round.
+		local frame = CFrame.new(c.x, ROAD_TOP + 0.04, c.z) * (if c.alongX then CFrame.Angles(0, math.pi / 2, 0) else CFrame.identity)
+		if template then
+			local copy = template:Clone()
+			copy.CFrame = frame * inside
+			copy.Parent = zebras
+		else
+			crosswalkStripes(zebras, frame)
+		end
+	end
+	if template then
+		template:Destroy()
+	end
+	local lights = folder(crossings, "TrafficLights")
+	-- Something solid already on that corner (a flag pole, a shop's wall)? Then right on the tip of the corner.
+	local overlap = OverlapParams.new()
+	overlap.RespectCanCollide = true
+	local function corner(jx: number, jz: number, sx: number, sz: number): (number, number)
+		for _, c in { Crossings.PoleCorner, Map.RoadWidth / 2 + 0.6 } do
+			local x, z = jx + sx * c, jz + sz * c
+			if #workspace:GetPartBoundsInBox(CFrame.new(x, WALK_TOP + 7, z), Vector3.new(1.4, 12, 1.4), overlap) == 0 then
+				return x, z
+			end
+		end
+		return jx + sx * Crossings.PoleCorner, jz + sz * Crossings.PoleCorner
+	end
+	for _, j in Crossings.junctions() do
+		-- NE corner: to the cars coming up from the south (axis 2) and in from the east (axis 1); SW the other two.
+		local nx, nz = corner(j.x, j.z, 1, -1)
+		local sx, sz = corner(j.x, j.z, -1, 1)
+		lightPole(lights, nx, nz, j.offset, { { dir = Vector3.zAxis, axis = 2 }, { dir = Vector3.xAxis, axis = 1 } })
+		lightPole(lights, sx, sz, j.offset, { { dir = -Vector3.zAxis, axis = 2 }, { dir = -Vector3.xAxis, axis = 1 } })
 	end
 end
 
@@ -5038,6 +5158,9 @@ function World.build()
 	end
 	piece("roads and bridges", function()
 		buildConnectors(world)
+	end)
+	piece("crosswalks and traffic lights", function()
+		buildCrossings(world)
 	end)
 	piece("Sunset Hills", function()
 		buildSunsetHills(world)

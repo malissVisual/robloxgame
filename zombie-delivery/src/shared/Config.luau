@@ -1103,15 +1103,42 @@ Config.Levels = {
 
 -- Traffic (server/Traffic.luau): civilian cars driving the roads and people walking the sidewalks, near the players
 -- only (they appear out of sight and disappear far away).
+-- 3.9, living streets: more people (many of them standing and chatting in small groups, which costs no walking),
+-- walkers who stop at a shop window or for a word with somebody, crosswalks (the only places people cross) and
+-- traffic lights at the city's four-way junctions (shared/Crossings.luau: one cycle every client computes itself).
 Config.Traffic = {
 	CarsPerPlayer = 6,
 	MaxCars = 24,
-	PedestriansPerPlayer = 8,
-	MaxPedestrians = 30,
+	PedestriansPerPlayer = 13, -- around one player by day (3.8: 8); at night NightPeople of it
+	MaxPedestrians = 48, -- on the whole server (3.8: 30)
+	NightPeople = 0.4,
 	SpawnMin = 120,
 	SpawnMax = 260,
 	Despawn = 340,
 	CarSpeed = 34,
+	-- Groups: people standing in a loose circle on a sidewalk, talking; after a while they break up and walk off.
+	GroupChance = 0.4, -- share of the new people that come as a group (when there is room for two)
+	GroupSize = { 2, 4 },
+	GroupTime = { 25, 60 }, -- seconds a group stands
+	TalkEvery = { 2.5, 5 }, -- seconds between a group's turns to the speaker / gestures
+	SayChance = 0.3, -- of those turns, a line in a speech bubble
+	-- Walkers stopping.
+	WindowChance = 0.012, -- per half second of walking along a block: stop at a shop window
+	WindowTime = { 3, 7 },
+	MeetChance = 0.35, -- two walkers passing each other stop for a word
+	MeetTime = { 4, 8 },
+	MeetCooldown = 40,
+	-- Crossing the street (only over a crosswalk, next to a junction).
+	CrossChance = 0.28, -- at a corner
+	CrossTime = 6, -- seconds of walk phase still left to step out (the crossing takes about 5)
+	CrossWait = 30, -- seconds waiting at the curb before going on round the block instead
+	CrossGap = 40, -- no lights: no traffic car this close coming toward the crosswalk
+	-- Traffic lights: green for one axis, amber, all red, then the other axis (one cycle = 2 × the three).
+	LightGreen = 12,
+	LightAmber = 3,
+	LightAllRed = 1,
+	StopBack = 7, -- the stop line, this far before the end of a lane (just before the crosswalk)
+	AmberBrake = 20, -- studs/s²: on amber a car stops when it can at this, else drives on
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
