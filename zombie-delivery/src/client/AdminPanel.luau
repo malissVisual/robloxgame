@@ -122,7 +122,7 @@ local SECTIONS = {
 local render: () -> ()
 
 local function renderUnlock()
-	heading("Unlock", `Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, every employer's jobs counted as done and driver level {Config.Levels.MaxLevel}. Car guns: Cars tab.`)
+	heading("Unlock", `Every car (the company ones too), every gun (the earned ones too), every paint, 10 of each item, every employer's jobs counted as done, every owned car's upgrades maxed and driver level {Config.Levels.MaxLevel}. Car guns: Cars tab.`)
 	local row = grid(200)
 	action(row, "UNLOCK EVERYTHING", C.yellow, function()
 		send("unlockAll")
@@ -174,7 +174,7 @@ local function renderCars()
 			button.TextColor3 = Color3.new(0, 0, 0)
 		end
 	end
-	heading("Car gun on your car", "The gun on the roof of the car you drive (van, pickup, muscle, monster, armored). Without one you shoot out of the window: pistol, revolver or SMG only.")
+	heading("Car gun on your car", "The gun on the roof of the car you drive (every dealer car, the monster truck, the armored truck). Without one you shoot out of the window: pistol, revolver or SMG only.")
 	local gunCells = grid(150)
 	action(gunCells, "No car gun", C.red, function()
 		send("carGun", "none")

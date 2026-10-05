@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.2.3"
+Config.Version = "3.3"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -49,7 +49,10 @@ export type CarDef = {
 }
 
 -- 3.2, the progression (Config.Levels): the van is where you start, the pickup opens at level 4, the muscle car at 8
--- (a third car needs a slot: a garage from level 5, Config.Estate). The guns and the car guns open the same way.
+-- (a fourth car needs a slot: a garage from level 5, Config.Estate). The guns and the car guns open the same way.
+-- 3.3: five more vans in between, each with its own body (server/Vehicles.luau STYLES): the Courier Van at 2, the
+-- High-Roof Van at 3, the Box Truck at 6, the Armored Van at 10 and the Rally Van at 12. The dealer's cars stay in
+-- the order of their level (and price): the showroom and the dealer window list them this way.
 Config.Cars = {
 	{
 		id = "van",
@@ -64,6 +67,36 @@ Config.Cars = {
 		ramPower = 1.0,
 		color = { 214, 196, 160 },
 		description = "Slow and rusty, but it is yours. 1 passenger.",
+	},
+	{
+		id = "courier",
+		level = 2,
+		mount = true,
+		name = "Courier Van",
+		price = 3500,
+		style = "courier",
+		maxSpeed = 68,
+		accel = 30,
+		turn = 1.95,
+		health = 340,
+		ramPower = 1.0,
+		color = { 232, 170, 40 },
+		description = "Small, low and quick off the line, an amber light bar on the roof. 1 passenger.",
+	},
+	{
+		id = "highroof",
+		level = 3,
+		mount = true,
+		name = "High-Roof Van",
+		price = 7000,
+		style = "highroof",
+		maxSpeed = 62,
+		accel = 27,
+		turn = 1.75,
+		health = 450,
+		ramPower = 1.1,
+		color = { 168, 186, 200 },
+		description = "Stand up inside. A tall roof, thicker walls and a jump seat for a friend. 2 passengers.",
 	},
 	{
 		id = "pickup",
@@ -81,6 +114,21 @@ Config.Cars = {
 		description = "Two friends ride in the bed and shoot. 3 passengers.",
 	},
 	{
+		id = "boxtruck",
+		level = 6,
+		mount = true,
+		name = "Box Truck",
+		price = 22000,
+		style = "boxtruck",
+		maxSpeed = 64,
+		accel = 26,
+		turn = 1.6,
+		health = 650,
+		ramPower = 1.4,
+		color = { 238, 238, 232 },
+		description = "A cab and a big box behind it. Slow to stop, hard to kill, room for six. 2 passengers.",
+	},
+	{
 		id = "muscle",
 		level = 8,
 		mount = true,
@@ -94,6 +142,36 @@ Config.Cars = {
 		ramPower = 1.0,
 		color = { 30, 30, 36 },
 		description = "Outruns every zombie. Do not crash. 1 passenger.",
+	},
+	{
+		id = "armorvan",
+		level = 10,
+		mount = true,
+		name = "Armored Van",
+		price = 55000,
+		style = "armorvan",
+		maxSpeed = 74,
+		accel = 34,
+		turn = 1.8,
+		health = 900,
+		ramPower = 1.6,
+		color = { 72, 78, 84 },
+		description = "Steel plates, grilles on the windows. The bullets knock, nobody answers. 2 passengers.",
+	},
+	{
+		id = "rallyvan",
+		level = 12,
+		mount = true,
+		name = "Rally Van",
+		price = 80000,
+		style = "rallyvan",
+		maxSpeed = 92,
+		accel = 44,
+		turn = 2.2,
+		health = 420,
+		ramPower = 1.1,
+		color = { 30, 90, 200 },
+		description = "Lowered, striped, a spoiler and big wheels: a van that thinks it is a race car. 1 passenger.",
 	},
 	{
 		id = "armored",
@@ -486,14 +564,21 @@ export type UpgradeDef = {
 	maxLevel: number,
 	baseCost: number,
 	costGrowth: number,
-	perLevel: number, -- +x of the base value per level
+	perLevel: number, -- +x of the base value per level (loading: -x of the hold time)
+	car: boolean?, -- 3.3: a car track: bought for one car (profile.carUpgrades[carId]); else for all your guns (profile.upgrades)
 }
 
+-- Wrench Garage. 3.3: the car tracks (car = true) belong to ONE car, the equipped one when you buy (the price grows
+-- with that car's level; the company vehicles take none); the gun tracks count for all your guns and car guns. The
+-- car tracks show on the car (server/Vehicles.luau): Ram Plow a bull bar (bigger with the level), Armor side plates
+-- (and window grilles from level 3), Engine a hood scoop and twin exhaust pipes from level 3. Quick Hands makes the
+-- holds of the back and the cargo shorter (Economy.loadHold).
 Config.Upgrades = {
-	{ id = "engine", name = "Engine", description = "+8% top speed and acceleration", maxLevel = 5, baseCost = 700, costGrowth = 1.8, perLevel = 0.08 },
-	{ id = "handling", name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 500, costGrowth = 1.7, perLevel = 0.08 },
-	{ id = "armor", name = "Armor", description = "+15% car health", maxLevel = 5, baseCost = 600, costGrowth = 1.8, perLevel = 0.15 },
-	{ id = "plow", name = "Ram Plow", description = "+30% ram damage", maxLevel = 5, baseCost = 500, costGrowth = 1.75, perLevel = 0.30 },
+	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 700, costGrowth = 1.8, perLevel = 0.08 },
+	{ id = "handling", car = true, name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 500, costGrowth = 1.7, perLevel = 0.08 },
+	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 600, costGrowth = 1.8, perLevel = 0.15 },
+	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 500, costGrowth = 1.75, perLevel = 0.30 },
+	{ id = "loading", car = true, name = "Quick Hands", description = "−15% time to open the back, load and unload", maxLevel = 3, baseCost = 600, costGrowth = 1.8, perLevel = 0.15 },
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
@@ -911,7 +996,7 @@ Config.Crew = {
 -- spawn and its garage keeps cars; garages add car slots; an office runs your own delivery company
 -- (Config.Business). Every player owns their own copy (saved in the profile): two owners of the same mansion on one
 -- server both use it. Where each one stands is in shared/Map.luau (Map.EstatePlots, same ids).
--- 3.2: mostly the endgame. A garage from level 5 (a third car needs a slot: the muscle car at 8), a house from 6,
+-- 3.2: mostly the endgame. A garage from level 5 (3.3: a fourth car needs a slot), a house from 6,
 -- the villas at 10 – 11, the mansions at 13 – 15; the offices (your company, Config.Business) at 12 – 15 and only
 -- after a campaign's finale (requires): the first one after Iron Supply, the penthouse after the Last Convoy.
 export type EstateDef = {
@@ -927,7 +1012,7 @@ export type EstateDef = {
 }
 
 Config.Estate = {
-	BaseCarSlots = 2, -- the depot's lot: cars you can own without any garage (more need a home or a garage)
+	BaseCarSlots = 3, -- the depot's lot: cars you can own without any garage (more need a home or a garage); 3.3: 3 (the van + two more)
 	SellBack = 0.6, -- selling returns this share of the price
 	Properties = {
 		{ id = "hilltop", name = "Hilltop Mansion", kind = "mansion", price = 6000000, garageSlots = 8, level = 15, description = "The top of Sunset Hills: the whole city at your feet, an infinity pool and a garage for eight." },

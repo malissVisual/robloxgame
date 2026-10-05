@@ -170,6 +170,42 @@ end)())
 -- Economy v2 -------------------------------------------------------------------
 
 check("handling upgrade", near(Economy.carStats("van", { handling = 5 }).turn, 1.8 * 1.4))
+
+-- 3.3: the car tracks are per car, the gun tracks for all guns; Quick Hands; the old saves' migration ----------
+
+for _, id in { "engine", "handling", "armor", "plow", "loading" } do
+	check(`{id} is a car track`, Economy.isCarUpgrade(id))
+end
+for _, id in { "damage", "firerate", "nope" } do
+	check(`{id} is not a car track`, not Economy.isCarUpgrade(id))
+end
+local quick = Economy.findUpgrade("loading")
+check("Quick Hands: 3 levels, -15 % each", quick ~= nil and quick.maxLevel == 3 and near(quick.perLevel, 0.15) and quick.name == "Quick Hands")
+check("Quick Hands is priced like the others", Economy.upgradeCost("loading", 0) == 600 and Economy.upgradeCost("loading", 3) == nil, Economy.upgradeCost("loading", 0))
+check("no Quick Hands: the plain hold", near(Economy.loadHold(0.25, {}), 0.25))
+check("Quick Hands 1: 15 % shorter", near(Economy.loadHold(0.25, { loading = 1 }), 0.25 * 0.85))
+check("Quick Hands 3: 45 % shorter", near(Economy.loadHold(0.25, { loading = 3 }), 0.25 * 0.55))
+check("Quick Hands never below 40 %", Economy.loadHold(1, { loading = 99 }) >= 0.4 - 1e-9)
+local perCar = { van = { engine = 2 }, courier = { armor = 1 } }
+check("a car's own levels", Economy.carLevels(perCar, "van").engine == 2 and Economy.carLevels(perCar, "courier").engine == nil)
+check("a car without levels: none", next(Economy.carLevels(perCar, "muscle")) == nil and next(Economy.carLevels(nil, "van")) == nil)
+check("the stats read the car's own levels", near(Economy.carStats("van", Economy.carLevels(perCar, "van")).maxSpeed, 60 * 1.16)
+	and Economy.carStats("courier", Economy.carLevels(perCar, "courier")).maxSpeed == (Economy.findCar("courier") :: Config.CarDef).maxSpeed)
+check("the dealer's cars take upgrades", Economy.canUpgrade("van") and Economy.canUpgrade("rallyvan") and Economy.canUpgrade("muscle"))
+check("company vehicles take none", not Economy.canUpgrade("ambulance") and not Economy.canUpgrade("bus") and not Economy.canUpgrade("nope"))
+-- An old save: global levels for every track, a van, a courier van and an ambulance.
+local oldUpgrades: { [string]: number } = { engine = 3, armor = 0, plow = 2, damage = 4, firerate = 1 }
+local carUps: { [string]: { [string]: number } } = { courier = { plow = 4 } }
+local moved = Economy.migrateCarUpgrades(oldUpgrades, { van = true, courier = true, ambulance = true }, carUps)
+check("migration: something moved", moved)
+check("migration: the car tracks left the global levels", oldUpgrades.engine == nil and oldUpgrades.plow == nil and oldUpgrades.armor == nil)
+check("migration: the gun tracks stay", oldUpgrades.damage == 4 and oldUpgrades.firerate == 1)
+check("migration: every owned car got them", carUps.van ~= nil and carUps.van.engine == 3 and carUps.van.plow == 2 and carUps.courier.engine == 3)
+check("migration: a higher level of the car's own stays", carUps.courier.plow == 4)
+check("migration: no level 0 entries", carUps.van.armor == nil)
+check("migration: not the company vehicle", carUps.ambulance == nil)
+check("migration: only once (nothing left to move)", not Economy.migrateCarUpgrades(oldUpgrades, { van = true }, carUps))
+check("three car slots without a garage", Config.Estate.BaseCarSlots == 3, Config.Estate.BaseCarSlots)
 check("launcher splash", Economy.weaponStats("launcher", {}).splash == 14)
 check("items exist", Economy.findItem("nitro") ~= nil and Economy.findItem("nope") == nil)
 check("paints exist", Economy.findPaint("factory") ~= nil and (Economy.findPaint("factory") :: any).price == 0)

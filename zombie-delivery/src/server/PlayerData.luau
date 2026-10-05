@@ -1,8 +1,9 @@
 --!strict
 -- The player's progress: money, the cars and guns they own, the equipped ones, the car guns on their roofs, the upgrade
--- levels, the driver XP (the level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the
--- properties, the home you spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades,
--- the safe; server/Business.luau) and lifetime stats.
+-- levels (3.3: the car tracks per car in carUpgrades, the gun tracks for all guns in upgrades), the driver XP (the
+-- level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the properties, the home you
+-- spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades, the safe;
+-- server/Business.luau) and lifetime stats.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -25,7 +26,8 @@ export type Profile = {
 	car: string,
 	weapons: { [string]: boolean },
 	weapon: string,
-	upgrades: { [string]: number },
+	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
+	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car)
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
 	carPaint: { [string]: string }, -- car id → paint id
@@ -72,6 +74,7 @@ local function newProfile(): Profile
 		weapons = { [Config.Weapons[1].id] = true },
 		weapon = Config.Weapons[1].id,
 		upgrades = {},
+		carUpgrades = {},
 		items = { repair = 1, molotov = 2 },
 		paints = { factory = true },
 		carPaint = {},
@@ -234,10 +237,30 @@ local function applySaved(profile: Profile, saved: any)
 			end
 		end
 	end
+	-- 3.3: the gun tracks stay for all your guns; the car tracks are per car (carUpgrades: only cars you own that can
+	-- take them, only car tracks, clamped). An older save's global car-track levels go to every car it owns, once
+	-- (they are not saved in upgrades again).
+	if type(saved.carUpgrades) == "table" then
+		for carId, levels in saved.carUpgrades do
+			if type(carId) == "string" and type(levels) == "table" and profile.cars[carId] and Economy.canUpgrade(carId) then
+				local into: { [string]: number } = {}
+				for _, def in Config.Upgrades do
+					local level = if def.car then number(levels[def.id], 0, def.maxLevel) else 0
+					if level > 0 then
+						into[def.id] = level
+					end
+				end
+				if next(into) ~= nil then
+					profile.carUpgrades[carId] = into
+				end
+			end
+		end
+	end
 	if type(saved.upgrades) == "table" then
 		for _, def in Config.Upgrades do
 			profile.upgrades[def.id] = number(saved.upgrades[def.id], 0, def.maxLevel)
 		end
+		Economy.migrateCarUpgrades(profile.upgrades, profile.cars, profile.carUpgrades)
 	end
 	if type(saved.items) == "table" then
 		for _, def in Config.Items do
@@ -383,6 +406,7 @@ function PlayerData.save(player: Player)
 		weapons = profile.weapons,
 		weapon = profile.weapon,
 		upgrades = profile.upgrades,
+		carUpgrades = profile.carUpgrades,
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,

@@ -73,6 +73,7 @@ local function sendState(player: Player)
 		weapons = profile.weapons,
 		weapon = profile.weapon,
 		upgrades = profile.upgrades,
+		carUpgrades = profile.carUpgrades, -- 3.3: the car tracks per car (the garage shows the equipped car's)
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,

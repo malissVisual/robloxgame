@@ -1049,18 +1049,39 @@ local function renderShop()
 			renderShop()
 		end)
 		if mechanicTab == "upgrades" then
-			note(shop.body, "Upgrades work for every car you own. Your car is repaired for free in here.", C.dim, 1)
-			for order, def in Config.Upgrades do
-				local c = card(shop.body, 84, order + 1)
-				local level = Economy.level(state.upgrades, def.id)
-				cardText(c, def.name, string.rep("■", level) .. string.rep("□", def.maxLevel - level) .. `  Lv {level}/{def.maxLevel}`, def.description)
-				local cost = Economy.upgradeCost(def.id, level)
-				if cost then
-					cardButton(c, `UPGRADE {Ui.money(cost)}`, C.green, here and money >= cost, function()
-						Net.get("Upgrade"):FireServer(def.id)
-					end)
-				else
-					cardButton(c, "MAX", C.grey, false, function() end)
+			-- 3.3: the car tracks belong to the equipped car (its own levels, shown on it); the gun tracks to every gun.
+			local upCar = Economy.findCar(state.car)
+			local carOk = upCar ~= nil and Economy.canUpgrade(upCar.id)
+			local carLevels = Economy.carLevels(state.carUpgrades, state.car)
+			if carOk then
+				note(shop.body, `Upgrades for: {if upCar then upCar.name else "your car"}. They stay on this car and show on it (bull bar, plates, scoop). Repairs in here are free.`, C.dim, 1)
+			else
+				note(shop.body, `Your {if upCar then upCar.name else "vehicle"} is a company vehicle: it can't be upgraded. Take one of your own cars at the depot garage.`, C.red, 1)
+			end
+			local row = 1
+			for pass = 1, 2 do
+				if pass == 2 then
+					row += 1
+					note(shop.body, "For all your guns (car guns too):", C.dim, row)
+				end
+				for _, def in Config.Upgrades do
+					if (def.car == true) ~= (pass == 1) then
+						continue
+					end
+					row += 1
+					local c = card(shop.body, 84, row)
+					local level = Economy.level(if def.car then carLevels else state.upgrades, def.id)
+					cardText(c, def.name, string.rep("■", level) .. string.rep("□", def.maxLevel - level) .. `  Lv {level}/{def.maxLevel}`, def.description)
+					local cost = Economy.upgradeCost(def.id, level)
+					if def.car and not carOk then
+						cardButton(c, "COMPANY CAR", C.grey, false, function() end)
+					elseif cost then
+						cardButton(c, `UPGRADE {Ui.money(cost)}`, C.green, here and money >= cost, function()
+							Net.get("Upgrade"):FireServer(def.id)
+						end)
+					else
+						cardButton(c, "MAX", C.grey, false, function() end)
+					end
 				end
 			end
 		elseif mechanicTab == "carguns" then

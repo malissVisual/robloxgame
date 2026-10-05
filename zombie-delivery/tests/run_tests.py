@@ -26,6 +26,39 @@ with tempfile.TemporaryDirectory() as tmp:
         sys.stderr.write(result.stderr)
         if "ALL CHECKS PASSED" not in result.stdout:
             ok = False
+# 3.3: the car bodies (server/Vehicles.luau STYLES, not loadable outside Roblox) read as text: every Config.Cars style
+# has a body; every dealer car's body takes cargo (at least 2 slots) and has a back that opens (the 3.2 loading).
+def styles_check():
+    root = os.path.dirname(HERE)
+    config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
+    vehicles = open(os.path.join(root, "src", "server", "Vehicles.luau"), encoding="utf-8").read()
+    table = vehicles[vehicles.index("local STYLES"):vehicles.index("local CHASSIS_HEIGHT")]
+    blocks = {}
+    for match in re.finditer(r"^\t(\w+) = \{\n(.*?)^\t\},?$", table, re.S | re.M):
+        blocks[match.group(1)] = match.group(2)
+    cars = config[config.index("Config.Cars = {"):config.index("} :: { CarDef }")]
+    bad = []
+    for entry in re.findall(r"^\t\{\n(.*?)^\t\},?$", cars, re.S | re.M):
+        car_id = re.search(r'\bid = "(\w+)"', entry).group(1)
+        style = re.search(r'\bstyle = "(\w+)"', entry).group(1)
+        body = blocks.get(style)
+        if body is None:
+            bad.append(f"{car_id}: no style {style}")
+            continue
+        if "company = true" in entry:
+            continue
+        slots = re.search(r"cargo = cargo\((.*?)\n\t\t(back|\})", body, re.S)
+        count = len(re.findall(r"Vector3\.new", slots.group(1))) if slots else 0
+        if count < 2:
+            bad.append(f"{car_id}: {count} cargo slots")
+        if "back = " not in body:
+            bad.append(f"{car_id}: no back")
+    print("== styles: " + (f"every car has a body, every dealer car cargo slots and a back ({len(blocks)} styles)" if not bad else "; ".join(bad)))
+    return not bad
+
+if not styles_check():
+    ok = False
+
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)
 # catches what the type checker does not, e.g. more than 200 locals in one function ("Out of local registers").
 # -O0 -g2 like Roblox Studio: without optimization constants take registers too, so this is the strict check.

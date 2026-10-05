@@ -10,7 +10,7 @@
 --   unlockAll                 every car (company ones too), every gun (earned ones too), every paint, 10 of each
 --                             item, every employer's progress at the top (their rewards count as earned), every
 --                             property (the biggest mansion as the home if you have none) and the top driver level
---   maxUpgrades               every upgrade track at its last level
+--   maxUpgrades               every upgrade track at its last level (3.3: the car tracks of every car you own)
 --   money      amount         + money
 --   setLevel   level          the driver level (1 … Config.Levels.MaxLevel): XP = exactly what that level needs
 --   car        car id         that car, now, next to you
@@ -134,6 +134,23 @@ end
 
 -- ── Unlocks and money ──────────────────────────────────────────────────────
 
+-- Every upgrade track at its last level: the gun tracks, and (3.3) the car tracks of every car you own that takes them.
+local function maxAllUpgrades(profile: PlayerData.Profile)
+	for _, upgrade in Config.Upgrades do
+		if upgrade.car then
+			for carId, owned in profile.cars do
+				if owned and Economy.canUpgrade(carId) then
+					local levels = profile.carUpgrades[carId] or {}
+					levels[upgrade.id] = upgrade.maxLevel
+					profile.carUpgrades[carId] = levels
+				end
+			end
+		else
+			profile.upgrades[upgrade.id] = upgrade.maxLevel
+		end
+	end
+end
+
 local function unlockAll(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -156,6 +173,9 @@ local function unlockAll(player: Player)
 	for _, employer in Config.Employers do
 		profile.rep[employer.id] = math.max(profile.rep[employer.id] or 0, employer.needed, employer.weaponAt or 0)
 	end
+	-- 3.3: every owned car's upgrades (and the gun tracks) at the top.
+	maxAllUpgrades(profile)
+	Vehicles.refreshStats(player)
 	-- Every property (homes, garages, offices); the biggest home becomes the home if there is none.
 	Estate.give(player, "all")
 	-- The top driver level: nothing is locked any more (PlayerData.setLevel fires Changed).
@@ -165,7 +185,7 @@ local function unlockAll(player: Player)
 	for _, campaign in MissionData.Campaigns do
 		Challenges.campaignDone(player, campaign.id)
 	end
-	say(player, `ADMIN: every car, gun, paint, property, mission and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
+	say(player, `ADMIN: every car (its upgrades maxed), gun, paint, property, mission and employer reward unlocked, 10 of each item, level {level}. Car guns: Cars tab.`)
 end
 
 -- The driver level: the XP becomes exactly what that level needs.
@@ -191,7 +211,7 @@ local function carGun(player: Player, arg: any)
 	end
 	local carId = profile.car
 	if not Economy.canMount(carId) then
-		say(player, "ADMIN: this vehicle can't carry a gun (van, pickup, muscle car, monster truck, armored truck can).")
+		say(player, "ADMIN: this vehicle can't carry a gun (the dealer's cars, the monster truck and the armored truck can).")
 		return
 	end
 	if arg == "none" then
@@ -214,12 +234,10 @@ local function maxUpgrades(player: Player)
 	if not profile then
 		return
 	end
-	for _, upgrade in Config.Upgrades do
-		profile.upgrades[upgrade.id] = upgrade.maxLevel
-	end
+	maxAllUpgrades(profile)
 	PlayerData.notify(player)
 	Vehicles.refreshStats(player)
-	say(player, "ADMIN: every upgrade at its last level.")
+	say(player, "ADMIN: every upgrade of every car you own (and the gun upgrades) at its last level.")
 end
 
 local function money(player: Player, arg: any)

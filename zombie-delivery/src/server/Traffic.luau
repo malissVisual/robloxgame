@@ -78,7 +78,10 @@ local WALK_ANIM = "rbxassetid://507777826" -- server/Npcs.luau's walk (sped up w
 -- The bodies: the dealer's cars mostly, now and then a work truck (Config.Cars ids, weight).
 local BODIES: { { id: string, weight: number } } = {
 	{ id = "van", weight = 4 },
+	{ id = "courier", weight = 2 }, -- 3.3: the new vans drive past too (their backs welded shut, no kit)
+	{ id = "highroof", weight = 1.5 },
 	{ id = "pickup", weight = 4 },
+	{ id = "boxtruck", weight = 1 },
 	{ id = "muscle", weight = 3 },
 	{ id = "movingtruck", weight = 1 },
 	{ id = "bus", weight = 0.4 },

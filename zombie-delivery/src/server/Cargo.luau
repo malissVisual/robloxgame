@@ -31,6 +31,7 @@
 -- Info.pair (3.2, the DUO missions' pair twist): a piece only moves with two: no other job member within
 -- Config.Missions.Duo.PairRange of you, no pick-up; the partner gone for PAIR_GRACE s while you carry, it goes down.
 -- Cargo.setBlocked takes a reason (the DUO switches twist blocks a pick-up as well as a drop).
+-- 3.3, Quick Hands (the loading upgrade of the job's car): the holds of the prompts here are shorter (holdFor).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -762,6 +763,13 @@ local function prompt(parent: Instance, action: string, object: string, key: Enu
 	return p
 end
 
+-- 3.3, Quick Hands: the hold of the job's pick-up / load / take-out / hand-over prompts follows the loading level of
+-- the job's car (Vehicles.loadHold; the plain Config hold without a car).
+local function holdFor(session: Session): number
+	local car = session.car
+	return if car then Vehicles.loadHold(car) else Tuning.HoldDuration
+end
+
 -- A horse's body part (prompts go there), if the horse has one.
 local function horsePart(horse: Model): BasePart?
 	return horse.PrimaryPart or horse:FindFirstChildWhichIsA("BasePart", true)
@@ -1239,13 +1247,13 @@ putDown = function(session: Session, player: Player)
 		handle.CanTouch = false
 		handle.Position = if at.Magnitude > 0 then at + Vector3.new(0, 3, 0) else spot + Vector3.new(0, 3, 0)
 		handle.Parent = folder
-		loose = { piece = piece, prompt = prompt(handle, "Lead", "Horse"), handle = handle }
+		loose = { piece = piece, prompt = prompt(handle, "Lead", "Horse", nil, holdFor(session)), handle = handle }
 	else
 		local model = piece.model or buildPiece(piece)
 		piece.model = model
 		setDown(model, frame)
 		local main = model.PrimaryPart :: BasePart
-		loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece)), handle = nil }
+		loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece), nil, holdFor(session)), handle = nil }
 	end
 	loose.prompt.Triggered:Connect(function(by)
 		onLoose(session, by, loose)
@@ -1496,7 +1504,7 @@ local function attachCar(session: Session, old: Vehicles.Car?)
 	if not door then
 		return
 	end
-	local p = prompt(door, "Load", "")
+	local p = prompt(door, "Load", "", nil, holdFor(session))
 	p.MaxActivationDistance = 9
 	p.Triggered:Connect(function(player)
 		onCar(session, player)
@@ -1537,7 +1545,7 @@ local function build(session: Session)
 		table.insert(session.props, part)
 		local horse = plan.mode == "lead"
 		local action = if plan.stage == "pickup" then (if horse then "Lead" else "Pick up") else "Hand over"
-		local p = prompt(part, action, "")
+		local p = prompt(part, action, "", nil, holdFor(session))
 		p.MaxActivationDistance = Tuning.PromptDistance + 2
 		p.Triggered:Connect(function(player)
 			onPile(session, player)

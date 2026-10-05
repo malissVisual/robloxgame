@@ -151,6 +151,61 @@ function Economy.multiplier(upgrades: Upgrades, id: string): number
 	return 1 + math.min(Economy.level(upgrades, id), def.maxLevel) * def.perLevel
 end
 
+-- 3.3: is this a car track (Config.Upgrades car: bought for one car, profile.carUpgrades) or a gun track (for all
+-- your guns, profile.upgrades)?
+function Economy.isCarUpgrade(id: string): boolean
+	local def = Economy.findUpgrade(id)
+	return def ~= nil and def.car == true
+end
+
+-- 3.3: the car tracks' levels of one car out of profile.carUpgrades (car id → track id → level); {} for none.
+function Economy.carLevels(carUpgrades: { [string]: Upgrades }?, carId: string): Upgrades
+	local levels = carUpgrades and carUpgrades[carId]
+	return if type(levels) == "table" then levels else {}
+end
+
+-- 3.3: can this car take the car tracks? Every car you buy; not the employers' company vehicles.
+function Economy.canUpgrade(carId: string): boolean
+	local def = Economy.findCar(carId)
+	return def ~= nil and not def.company
+end
+
+-- 3.3, Quick Hands (the loading track of the car): the hold of the back's prompt and the cargo prompts, `base`
+-- seconds shortened by perLevel per level (never below 40 % of it).
+function Economy.loadHold(base: number, levels: Upgrades): number
+	local def = Economy.findUpgrade("loading")
+	if not def then
+		return base
+	end
+	local level = math.clamp(Economy.level(levels, "loading"), 0, def.maxLevel)
+	return base * math.max(0.4, 1 - level * def.perLevel)
+end
+
+-- 3.3: an old save's global car-track levels (profile.upgrades before the car tracks were per car) go to every car
+-- it owns that can take them (the higher level wins), and leave `upgrades` (only the gun tracks stay there).
+-- Returns whether anything was moved.
+function Economy.migrateCarUpgrades(upgrades: Upgrades, cars: { [string]: boolean }, carUpgrades: { [string]: Upgrades }): boolean
+	local moved = false
+	for _, def in Config.Upgrades do
+		local level = upgrades[def.id]
+		if def.car and level ~= nil then
+			upgrades[def.id] = nil
+			if level > 0 then
+				for carId, owned in cars do
+					if owned and Economy.canUpgrade(carId) then
+						local levels = carUpgrades[carId] or {}
+						carUpgrades[carId] = levels
+						levels[def.id] = math.max(levels[def.id] or 0, math.min(level, def.maxLevel))
+						moved = true
+					end
+				end
+			end
+		end
+	end
+	return moved
+end
+
+-- The car's stats with ITS car-track levels (3.3: Economy.carLevels of profile.carUpgrades).
 function Economy.carStats(carId: string, upgrades: Upgrades): CarStats
 	local def = Economy.findCar(carId) or Config.Cars[1]
 	local engine = Economy.multiplier(upgrades, "engine")

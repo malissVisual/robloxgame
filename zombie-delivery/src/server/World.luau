@@ -685,13 +685,13 @@ local function buildDealer(parent: Instance)
 	building(shop, frame, w, d, h, Color3.fromRGB(40, 44, 52), Enum.Material.Metal, 16, 12, true)
 	sign(shop, "DEAD END MOTORS", Vector3.new(60, 7, 0.5), frame * CFrame.new(0, h + 4.5, -d / 2), Color3.fromRGB(255, 80, 60))
 	counter(shop, frame, d, "dealer", "Dead End Motors")
-	-- Display spots: three inside, four on the lot in front.
+	-- Display spots: three inside, six on the lot in front (3.3: eight cars at the dealer).
 	for _, x in { -26, 0, 26 } do
 		local pad = cylinder(shop, "Turntable", 0.3, 18, frame * CFrame.new(x, 0.45, 4) * UPRIGHT, Color3.fromRGB(200, 200, 205), Enum.Material.Metal)
 		pad.CanCollide = false
 		table.insert(World.DealerSlots, frame * CFrame.new(x, 0.6, 4))
 	end
-	for _, z in { -42, -15, 15, 42 } do
+	for _, z in { -45, -27, -9, 9, 27, 45 } do
 		local spot = CFrame.lookAt(Vector3.new(cx - 40, WALK_TOP, z), Vector3.new(cx - 80, WALK_TOP, z))
 		table.insert(World.DealerSlots, spot)
 	end

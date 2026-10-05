@@ -147,6 +147,21 @@ local function rewardsUpTo(level: number): number
 end
 check("the pickup is not free money (more than the first missions' rewards)", car("pickup").price > rewardsUpTo(1), rewardsUpTo(1))
 check("the muscle car costs real money", car("muscle").price >= 3 * car("pickup").price)
+-- 3.3: five more vans between the start van and the endgame.
+for _, want in { { "courier", 2 }, { "highroof", 3 }, { "boxtruck", 6 }, { "armorvan", 10 }, { "rallyvan", 12 } } do
+	local def = Economy.findCar(want[1] :: string)
+	check(`the {want[1]} is at the dealer from level {want[2]}`, def ~= nil and not def.company and def.level == want[2] and def.mount == true, def and def.level)
+end
+local dealer = 0
+for _, def in Config.Cars do
+	if not def.company then
+		dealer += 1
+	end
+end
+check("eight cars at the dealer", dealer == 8, dealer)
+check("the courier van is cheap, a few missions' money", car("courier").price <= rewardsUpTo(2) and car("courier").price > rewardsUpTo(1), car("courier").price)
+check("the rally van is the dealer's last and dearest", car("rallyvan").price >= 2 * car("muscle").price, car("rallyvan").price)
+check("the armored van is tough, the rally van fast", car("armorvan").health >= 2 * car("van").health and car("rallyvan").maxSpeed > car("pickup").maxSpeed)
 -- The employers' company cars: the strong ones come with a level too (the monster truck no earlier than the muscle car).
 local farm = Economy.findJobType("farmrun")
 check("the monster truck's job needs the muscle car's level", farm ~= nil and Economy.jobLevel(farm, farm.tier) >= car("muscle").level :: number)

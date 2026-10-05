@@ -95,7 +95,12 @@ for _, def in Config.Cars do
 	end
 end
 table.sort(mountable)
-check("mountable cars", table.concat(mountable, ",") == "armored,monster,muscle,pickup,van", table.concat(mountable, ","))
+check("mountable cars", table.concat(mountable, ",") == "armored,armorvan,boxtruck,courier,highroof,monster,muscle,pickup,rallyvan,van", table.concat(mountable, ","))
+for _, def in Config.Cars do
+	if not def.company then
+		check(`every dealer car carries a car gun: {def.id}`, Economy.canMount(def.id))
+	end
+end
 for _, id in { "bus", "icecream", "movingtruck", "livestock", "fueltruck" } do
 	check(`{id} cannot mount a gun`, not Economy.canMount(id))
 end

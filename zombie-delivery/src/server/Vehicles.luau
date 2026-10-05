@@ -39,6 +39,14 @@
 -- crew). While it is open nobody gets behind the wheel (the Drive prompt refuses) and the driver's client holds the
 -- throttle (client/Drive.luau); server/Cargo.luau loads and unloads only through an open back. A new car (a
 -- chauffeur's, a respawn) starts closed. The NPC and traffic cars and the showroom models have the leaves welded shut.
+--
+-- 3.3: five more vans (courier, highroof, boxtruck, armorvan, rallyvan: their STYLES below) and the upgrades you can
+-- see. A player's car carries the "UpgradeKit" (buildKit) for ITS car-track levels (profile.carUpgrades, Economy
+-- carLevels): Ram Plow a bull bar on the front (wider and heavier with the level), Armor side plates (window grilles
+-- from level 3; not on a style that has its own, Style.armored), Engine a hood scoop and twin exhaust pipes from
+-- level 3. Cosmetic: welded, massless, no collisions, not hit by rays, their own colours (never painted). It is built
+-- with the car and rebuilt when the levels change (Vehicles.refreshStats). Quick Hands (the loading track) shortens
+-- the BackPrompt's hold (Vehicles.loadHold; server/Cargo.luau uses it for the cargo prompts of the job's car).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -73,6 +81,7 @@ export type Car = {
 	latched: { [number]: boolean }, -- taken latch slots
 	chauffeured: boolean, -- a chauffeur drives it to its owner (server/CarCall.luau): server-owned, no prompts
 	born: number, -- os.clock() when it was placed
+	kit: string, -- 3.3: the car-track levels its UpgradeKit shows (kitKey)
 }
 
 local Vehicles = {}
@@ -86,7 +95,7 @@ Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
 local DARK = Color3.fromRGB(34, 34, 38)
 local GLASS = Color3.fromRGB(150, 190, 210)
 
-type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue | lightbar | hole
+type Box = { size: Vector3, offset: Vector3, kind: string } -- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue | lightbar | hole | amber
 
 -- 3.2: one leaf of the back (a door, a tailgate, a lid, a ramp), relative to the chassis top centre, closed.
 type Leaf = {
@@ -123,6 +132,7 @@ type Style = {
 	boxes: { Box }, -- relative to the chassis top centre (offset = centre of the box)
 	cargo: CargoSpec, -- relative to the chassis top centre
 	back: Back?, -- 3.2: the back that opens (nil: the bus, nobody loads it by hand)
+	armored: boolean?, -- 3.3: plates and grilles of its own: the Armor upgrade adds none (buildKit)
 }
 
 local function box(size: Vector3, offset: Vector3, kind: string): Box
@@ -531,6 +541,187 @@ local STYLES: { [string]: Style } = {
 		cargo = cargo("ambulance", 15, 7, { Vector3.new(0, 0.6, 3.6) }, Vector3.new(0, 0, 15 / 2 + 2.5)),
 		back = rearDoors(7.4, DOOR_SILL, 6.1, 7.5, ambulanceDoor),
 	},
+	-- 3.3, the dealer's new vans. A compact courier van: low, a sliding-door line on the right, an amber light bar.
+	courier = {
+		width = 6.2,
+		length = 12,
+		wheel = 1.2,
+		wheelWidth = 0.95,
+		clearance = 0.8,
+		seat = Vector3.new(-1.3, 0.4, -1.8),
+		passengers = { Vector3.new(1.3, 0.4, -1.8) },
+		roof = 4.7,
+		boxes = {
+			box(Vector3.new(6.2, 1.8, 2.4), Vector3.new(0, 0.9, -4.8), "body"), -- hood
+			box(Vector3.new(6.2, 3.8, 3.6), Vector3.new(0, 1.9, -1.8), "glass"), -- cabin
+			box(Vector3.new(6.2, 0.5, 3.6), Vector3.new(0, 4.05, -1.8), "body"), -- cabin roof
+			box(Vector3.new(6.2, 4.3, 6), Vector3.new(0, 2.15, 3), "body"), -- cargo box
+			box(Vector3.new(6.4, 0.7, 0.5), Vector3.new(0, 0.35, -6.15), "dark"), -- bumper
+			box(Vector3.new(0.06, 3.4, 0.12), Vector3.new(3.11, 1.95, 3.2), "dark"), -- the sliding door's seam …
+			box(Vector3.new(0.08, 0.14, 3.6), Vector3.new(3.12, 3.45, 1.6), "dark"), -- … its rail …
+			box(Vector3.new(0.1, 0.25, 0.6), Vector3.new(3.14, 2.0, 0.7), "dark"), -- … and its handle
+			box(Vector3.new(3.2, 0.3, 0.8), Vector3.new(0, 4.45, -2.9), "dark"), -- the light bar
+			box(Vector3.new(1.1, 0.3, 0.6), Vector3.new(-0.95, 4.75, -2.9), "amber"),
+			box(Vector3.new(1.1, 0.3, 0.6), Vector3.new(0.95, 4.75, -2.9), "amber"),
+		},
+		cargo = cargo("van", 12, 6.2, { Vector3.new(-1.4, 0, 1.6), Vector3.new(1.4, 0, 1.6), Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
+		back = rearDoors(6.2, DOOR_SILL, 4.1, 6.0, function(side: number): { Box }
+			return { box(Vector3.new(2.0, 1.0, 0.06), Vector3.new(-side * 0.25, 0.6, 0.12), "glass") } -- rear windows
+		end),
+	},
+	-- A high-roof van: the roof well over your head, windows down the cargo box, a jump seat behind the passenger.
+	highroof = {
+		width = 6.8,
+		length = 14,
+		wheel = 1.35,
+		wheelWidth = 1.05,
+		clearance = 0.95,
+		seat = Vector3.new(-1.4, 0.5, -2.4),
+		passengers = { Vector3.new(1.4, 0.5, -2.4), Vector3.new(1.6, 0.5, 0.4) },
+		roof = 7.0,
+		boxes = {
+			box(Vector3.new(6.8, 2, 2.6), Vector3.new(0, 1, -5.7), "body"), -- hood
+			box(Vector3.new(6.8, 4.4, 4), Vector3.new(0, 2.2, -2.4), "glass"), -- cabin
+			box(Vector3.new(6.8, 2.2, 4), Vector3.new(0, 5.5, -2.4), "body"), -- the high roof over the cabin
+			box(Vector3.new(6.8, 6.6, 7.4), Vector3.new(0, 3.3, 3.3), "body"), -- cargo box
+			box(Vector3.new(6.86, 1.2, 3.6), Vector3.new(0, 4.4, 1.6), "glass"), -- side windows of the box
+			box(Vector3.new(6.86, 0.5, 7.4), Vector3.new(0, 1.6, 3.3), "accent"), -- a stripe
+			box(Vector3.new(1.6, 0.3, 1.6), Vector3.new(0, 6.75, 4.6), "dark"), -- roof vent
+			box(Vector3.new(7, 0.8, 0.6), Vector3.new(0, 0.4, -7.1), "dark"), -- bumper
+		},
+		cargo = cargo("van", 14, 6.8, {
+			Vector3.new(-1.6, 0, 2.6),
+			Vector3.new(1.6, 0, 2.6),
+			Vector3.new(-1.6, 0, 5.4),
+			Vector3.new(1.6, 0, 5.4),
+			Vector3.new(-1.6, 2.3, 5.4), -- the tall box stacks
+			Vector3.new(1.6, 2.3, 5.4),
+		}),
+		back = rearDoors(6.8, DOOR_SILL, 6.4, 7.0, function(side: number): { Box }
+			return {
+				box(Vector3.new(2.2, 1.4, 0.06), Vector3.new(-side * 0.25, 1.0, 0.12), "glass"), -- rear windows
+				box(Vector3.new(3.35, 0.5, 0.06), Vector3.new(0, -2.075, 0.12), "accent"), -- the stripe goes round
+			}
+		end),
+	},
+	-- A box truck: a cab, a gap, a big separate box with a wind deflector over the cab and a bottom rail.
+	boxtruck = {
+		width = 7.4,
+		length = 17,
+		wheel = 1.55,
+		wheelWidth = 1.25,
+		clearance = 1.05,
+		seat = Vector3.new(-1.6, 0.5, -4.4),
+		passengers = { Vector3.new(1.6, 0.5, -4.4), Vector3.new(0, 0.5, -4.4) },
+		roof = 8.2,
+		boxes = {
+			box(Vector3.new(7.2, 2.4, 2.4), Vector3.new(0, 1.2, -7.3), "body"), -- hood
+			box(Vector3.new(7.2, 4.6, 3.4), Vector3.new(0, 2.3, -4.4), "glass"), -- cab
+			box(Vector3.new(7.2, 0.8, 3.4), Vector3.new(0, 5.0, -4.4), "body"), -- cab roof
+			box(Vector3.new(6.6, 1.4, 1.6), Vector3.new(0, 6.1, -3.9), "body"), -- wind deflector
+			box(Vector3.new(7.6, 7.6, 10.4), Vector3.new(0, 4.0, 3.0), "body"), -- the box
+			box(Vector3.new(7.7, 0.9, 9.8), Vector3.new(0, 1.6, 3.0), "accent"), -- a stripe down the box
+			box(Vector3.new(7.8, 0.4, 10.4), Vector3.new(0, 0.2, 3.0), "dark"), -- the bottom rail
+			box(Vector3.new(0.3, 7.6, 0.3), Vector3.new(-3.85, 4.0, -2.05), "rail"), -- the box's front corner posts
+			box(Vector3.new(0.3, 7.6, 0.3), Vector3.new(3.85, 4.0, -2.05), "rail"),
+			box(Vector3.new(7.6, 0.8, 0.6), Vector3.new(0, 0.4, -8.8), "dark"), -- bumper
+		},
+		cargo = cargo("truck", 17, 7.4, {
+			Vector3.new(-1.8, 0.4, -0.2),
+			Vector3.new(1.8, 0.4, -0.2),
+			Vector3.new(-1.8, 0.4, 3.2),
+			Vector3.new(1.8, 0.4, 3.2),
+			Vector3.new(-1.8, 0.4, 6.4),
+			Vector3.new(1.8, 0.4, 6.4),
+		}),
+		back = rearDoors(7.6, DOOR_SILL, 7.6, 8.2, function(_side: number): { Box }
+			return {
+				box(Vector3.new(3.7, 0.25, 0.06), Vector3.new(0, 0.2, 0.12), "dark"), -- the latch bar
+				box(Vector3.new(3.65, 0.3, 0.06), Vector3.new(0, -3.0, 0.12), "accent"), -- a reflector strip
+			}
+		end),
+	},
+	-- An armored van: steel plates on the box, the hood and the nose, bars over the windows (its own: Style.armored).
+	armorvan = {
+		width = 7.0,
+		length = 14.5,
+		wheel = 1.45,
+		wheelWidth = 1.15,
+		clearance = 1.0,
+		seat = Vector3.new(-1.5, 0.5, -2.45),
+		passengers = { Vector3.new(1.5, 0.5, -2.45), Vector3.new(1.6, 0.5, 0.5) },
+		roof = 5.5,
+		head = Vector2.new(1.75, -7.3), -- above the ram plate
+		armored = true,
+		boxes = {
+			box(Vector3.new(7.0, 2.2, 2.8), Vector3.new(0, 1.1, -5.85), "body"), -- hood
+			box(Vector3.new(7.0, 4.4, 4), Vector3.new(0, 2.2, -2.45), "glass"), -- cabin
+			box(Vector3.new(7.0, 0.7, 4), Vector3.new(0, 4.75, -2.45), "body"), -- cabin roof
+			box(Vector3.new(7.0, 5.1, 7.7), Vector3.new(0, 2.55, 3.4), "body"), -- cargo box
+			box(Vector3.new(7.2, 1.2, 7.4), Vector3.new(0, 1.4, 3.4), "plate"), -- steel plates
+			box(Vector3.new(7.2, 1.2, 7.4), Vector3.new(0, 3.7, 3.4), "plate"),
+			box(Vector3.new(7.1, 0.25, 2.6), Vector3.new(0, 2.3, -5.85), "plate"), -- on the hood
+			box(Vector3.new(7.4, 1.6, 0.6), Vector3.new(0, 0.6, -7.5), "plate"), -- ram plate
+			-- Grilles over the windscreen and the side windows.
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-1.8, 3.3, -4.53), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(0, 3.3, -4.53), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(1.8, 3.3, -4.53), "rail"),
+			box(Vector3.new(6.6, 0.16, 0.16), Vector3.new(0, 3.3, -4.53), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-3.58, 3.3, -3.6), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-3.58, 3.3, -2.45), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-3.58, 3.3, -1.3), "rail"),
+			box(Vector3.new(0.16, 0.16, 3.4), Vector3.new(-3.58, 3.3, -2.45), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(3.58, 3.3, -3.6), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(3.58, 3.3, -2.45), "rail"),
+			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(3.58, 3.3, -1.3), "rail"),
+			box(Vector3.new(0.16, 0.16, 3.4), Vector3.new(3.58, 3.3, -2.45), "rail"),
+			box(Vector3.new(7.0, 0.8, 0.6), Vector3.new(0, 0.4, -7.0), "dark"), -- bumper under the plate
+		},
+		cargo = cargo("van", 14.5, 7.0, { Vector3.new(-1.7, 0, 2.2), Vector3.new(1.7, 0, 2.2), Vector3.new(-1.7, 0, 5.2), Vector3.new(1.7, 0, 5.2) }),
+		back = rearDoors(7.0, DOOR_SILL, 4.9, 7.25, function(side: number): { Box }
+			return {
+				box(Vector3.new(3.4, 0.9, 0.08), Vector3.new(0, -1.2, 0.13), "plate"), -- a plate over each door
+				box(Vector3.new(1.8, 0.35, 0.06), Vector3.new(-side * 0.3, 1.1, 0.12), "glass"), -- a gun slit
+			}
+		end),
+	},
+	-- A rally van: lowered, big wheels under flares, stripes over the top and down the side, a roof spoiler.
+	rallyvan = {
+		width = 6.6,
+		length = 13.2,
+		wheel = 1.45,
+		wheelWidth = 1.3,
+		clearance = 0.6,
+		seat = Vector3.new(-1.3, 0.3, -2.0),
+		passengers = { Vector3.new(1.3, 0.3, -2.0) },
+		roof = 4.3,
+		boxes = {
+			box(Vector3.new(6.6, 1.6, 2.6), Vector3.new(0, 0.8, -5.3), "body"), -- hood
+			box(Vector3.new(6.6, 3.4, 3.8), Vector3.new(0, 1.7, -2.1), "glass"), -- cabin
+			box(Vector3.new(6.6, 0.5, 3.8), Vector3.new(0, 3.65, -2.1), "body"), -- cabin roof
+			box(Vector3.new(6.6, 3.9, 6.8), Vector3.new(0, 1.95, 3.2), "body"), -- cargo box
+			box(Vector3.new(6.68, 0.45, 12.4), Vector3.new(0, 1.1, 0.1), "accent"), -- side stripe
+			box(Vector3.new(1.2, 0.05, 2.6), Vector3.new(-0.9, 1.63, -5.3), "accent"), -- stripes over the hood …
+			box(Vector3.new(1.2, 0.05, 2.6), Vector3.new(0.9, 1.63, -5.3), "accent"),
+			box(Vector3.new(1.2, 0.05, 10.6), Vector3.new(-0.9, 3.93, 1.3), "accent"), -- … and the roof
+			box(Vector3.new(1.2, 0.05, 10.6), Vector3.new(0.9, 3.93, 1.3), "accent"),
+			box(Vector3.new(6.4, 0.25, 1.2), Vector3.new(0, 4.55, 5.9), "dark"), -- the spoiler on its posts
+			box(Vector3.new(0.3, 0.5, 0.3), Vector3.new(-2.6, 4.15, 5.9), "dark"),
+			box(Vector3.new(0.3, 0.5, 0.3), Vector3.new(2.6, 4.15, 5.9), "dark"),
+			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(-3.4, 1.3, -4.65), "dark"), -- wheel flares
+			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(3.4, 1.3, -4.65), "dark"),
+			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(-3.4, 1.3, 4.65), "dark"),
+			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(3.4, 1.3, 4.65), "dark"),
+			box(Vector3.new(6.8, 0.7, 0.5), Vector3.new(0, 0.35, -6.75), "dark"), -- bumper
+		},
+		cargo = cargo("van", 13.2, 6.6, { Vector3.new(-1.4, 0, 1.5), Vector3.new(1.4, 0, 1.5), Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
+		back = rearDoors(6.6, DOOR_SILL, 3.7, 6.6, function(side: number): { Box }
+			return {
+				box(Vector3.new(2.1, 0.9, 0.06), Vector3.new(-side * 0.25, 0.6, 0.12), "glass"), -- rear windows
+				box(Vector3.new(3.2, 0.45, 0.06), Vector3.new(0, -1.225, 0.12), "accent"), -- the side stripe goes round
+			}
+		end),
+	},
 }
 
 local CHASSIS_HEIGHT = 1.2
@@ -744,6 +935,8 @@ local function boxLook(kind: string, color: Color3, accent: Color3): (Color3, En
 		return Color3.fromRGB(205, 30, 34), Enum.Material.SmoothPlastic
 	elseif kind == "hole" then
 		return Color3.fromRGB(16, 16, 18), Enum.Material.SmoothPlastic
+	elseif kind == "amber" then
+		return Color3.fromRGB(255, 168, 36), Enum.Material.Glass
 	elseif SIREN_DIM[kind] then
 		return SIREN_DIM[kind], Enum.Material.SmoothPlastic
 	end
@@ -810,13 +1003,196 @@ local function backAction(noun: string, open: boolean): string
 	return `{if open then "Close" else "Open"} {noun}`
 end
 
+-- ── The upgrades you can see (3.3) ─────────────────────────────────────────
+-- The "UpgradeKit" folder in a player's car: a bull bar (Ram Plow), side plates and window grilles (Armor), a hood
+-- scoop and twin pipes (Engine). Fitted to every style from its boxes: the front end, the hood, the first window.
+
+local KIT_STEEL = Color3.fromRGB(56, 58, 62)
+local KIT_PLATE = Color3.fromRGB(108, 112, 118)
+local KIT_CHROME = Color3.fromRGB(196, 198, 204)
+
+type Hull = {
+	front: number, -- z of the front end (the bumper, the ram plate)
+	hoodTop: number, -- the hood's top (y over the chassis top)
+	hoodZ: number, -- where the scoop goes (z)
+	hoodLen: number,
+	hood: boolean, -- false: no hood to put a scoop on (the bus)
+	glass: Box?, -- the frontmost window box (the windscreen and the front side windows)
+}
+
+-- Is the point inside one of the style's glass boxes?
+local function inGlass(style: Style, point: Vector3): boolean
+	for _, b in style.boxes do
+		if b.kind == "glass" then
+			local d = point - b.offset
+			if math.abs(d.X) < b.size.X / 2 and math.abs(d.Y) < b.size.Y / 2 and math.abs(d.Z) < b.size.Z / 2 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function hullOf(style: Style): Hull
+	local front = -style.length / 2
+	local hoodBox: Box? = nil
+	local glass: Box? = nil
+	for _, b in style.boxes do
+		local edge = b.offset.Z - b.size.Z / 2
+		front = math.min(front, edge)
+		if b.kind == "body" and (hoodBox == nil or edge < (hoodBox :: Box).offset.Z - (hoodBox :: Box).size.Z / 2 - 0.01) then
+			hoodBox = b
+		end
+		if b.kind == "glass" and (glass == nil or edge < (glass :: Box).offset.Z - (glass :: Box).size.Z / 2) then
+			glass = b
+		end
+	end
+	local hull: Hull = { front = front, hoodTop = 2, hoodZ = front + 2, hoodLen = 2, hood = false, glass = glass }
+	local h = hoodBox
+	if h then
+		local edge = h.offset.Z - h.size.Z / 2
+		hull.hoodTop = h.offset.Y + h.size.Y / 2
+		hull.hoodLen = math.min(h.size.Z, 4)
+		hull.hoodZ = if h.size.Z <= 6 then h.offset.Z else edge + 2.6 -- a long body (the muscle car): the front part
+		hull.hood = not inGlass(style, Vector3.new(0, hull.hoodTop + 0.3, hull.hoodZ))
+	end
+	return hull
+end
+
+-- The levels the kit shows, as a key (rebuilt only when it changes).
+local function kitKey(levels: Economy.Upgrades): string
+	return `{Economy.level(levels, "plow")}/{Economy.level(levels, "armor")}/{Economy.level(levels, "engine")}`
+end
+
+-- (Re)builds the kit of a player's car for these car-track levels.
+local function buildKit(model: Model, chassis: Part, style: Style, levels: Economy.Upgrades)
+	local old = model:FindFirstChild("UpgradeKit")
+	if old then
+		old:Destroy()
+	end
+	local plow = Economy.level(levels, "plow")
+	local armor = Economy.level(levels, "armor")
+	local engine = Economy.level(levels, "engine")
+	if plow < 1 and armor < 1 and engine < 3 then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "UpgradeKit"
+	local top = chassis.CFrame * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
+	local function add(name: string, size: Vector3, at: Vector3, color: Color3, material: Enum.Material, cylinder: boolean?)
+		local frame = top * CFrame.new(at)
+		local p = newPart(model, name, size, if cylinder then frame * ALONG_Z else frame, color, material)
+		if cylinder then
+			p.Shape = Enum.PartType.Cylinder
+		end
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.Massless = true
+		p.Parent = folder
+		weld(chassis, p)
+	end
+	local hull = hullOf(style)
+
+	-- Ram Plow: a bull bar in front of the nose, wider, thicker and lower-reaching with every level.
+	if plow >= 1 then
+		local width = math.min(style.width + 0.2, style.width - 1.6 + 0.36 * plow)
+		local thick = 0.2 + 0.05 * plow
+		local h = math.clamp(hull.hoodTop, 1.5, 2.6)
+		local z = hull.front - 0.35 - 0.05 * plow
+		for _, side in { -1, 1 } do
+			add("BullBarPost", Vector3.new(thick, h + 1.0, thick), Vector3.new(side * (width / 2 - 0.6), (h - 1.0) / 2, z), KIT_STEEL, Enum.Material.Metal)
+		end
+		add("BullBar", Vector3.new(width, thick, thick), Vector3.new(0, h - thick / 2, z), KIT_STEEL, Enum.Material.Metal)
+		add("BullBar", Vector3.new(width, thick, thick), Vector3.new(0, h * 0.35, z), KIT_STEEL, Enum.Material.Metal)
+		if plow >= 3 then
+			add("PlowBlade", Vector3.new(width + 0.2, 0.8, 0.25), Vector3.new(0, -0.6, z - 0.15), KIT_PLATE, Enum.Material.DiamondPlate)
+		end
+		if plow >= 5 then
+			for _, side in { -1, 1 } do
+				add("PlowPad", Vector3.new(1.2, 0.8, 0.3), Vector3.new(side * (width / 2 - 0.6), h * 0.55, z - 0.25), Color3.fromRGB(24, 24, 24), Enum.Material.Rubber)
+			end
+		end
+	end
+
+	-- Armor: plates along both sides between the wheels (taller with the level), grilles over the first windows from 3.
+	if armor >= 1 and not style.armored then
+		local wz = style.length / 2 - style.wheel - 0.5
+		local z0, z1 = -wz + style.wheel + 0.25, wz - style.wheel - 0.25
+		-- Up to the waist of the body (a little over the hood), taller with the level.
+		local y0 = 0.3
+		local y1 = math.min(y0 + 1.4 + 0.15 * armor, math.max(hull.hoodTop + 0.4, 1.8))
+		local height = y1 - y0
+		if z1 - z0 >= 2 then
+			-- Outside everything already on the sides there.
+			local half = style.width / 2
+			for _, b in style.boxes do
+				local by0, by1 = b.offset.Y - b.size.Y / 2, b.offset.Y + b.size.Y / 2
+				local bz0, bz1 = b.offset.Z - b.size.Z / 2, b.offset.Z + b.size.Z / 2
+				if b.kind ~= "hole" and by1 > y0 and by0 < y1 and bz1 > z0 and bz0 < z1 then
+					half = math.max(half, math.abs(b.offset.X) + b.size.X / 2)
+				end
+			end
+			for _, side in { -1, 1 } do
+				add("ArmorPlate", Vector3.new(0.15, height, z1 - z0), Vector3.new(side * (half + 0.08), (y0 + y1) / 2, (z0 + z1) / 2), KIT_PLATE, Enum.Material.DiamondPlate)
+				if armor >= 4 then
+					add("ArmorRim", Vector3.new(0.22, 0.22, z1 - z0), Vector3.new(side * (half + 0.12), y1 - 0.11, (z0 + z1) / 2), KIT_STEEL, Enum.Material.Metal)
+				end
+			end
+		end
+		local g = hull.glass
+		if armor >= 3 and g then
+			local gTop = g.offset.Y + g.size.Y / 2
+			local gFront = g.offset.Z - g.size.Z / 2
+			local yTop = gTop - 0.25
+			local yBottom = math.max(g.offset.Y - g.size.Y / 2 + 0.2, gTop - 2.2, if hull.hood then hull.hoodTop + 0.1 else -math.huge)
+			local band = yTop - yBottom
+			if band >= 0.6 then
+				local y = (yTop + yBottom) / 2
+				-- The windscreen: three bars and a cross bar.
+				for _, f in { -0.25, 0, 0.25 } do
+					add("Grille", Vector3.new(0.14, band, 0.14), Vector3.new(f * g.size.X, y, gFront - 0.08), KIT_STEEL, Enum.Material.Metal)
+				end
+				add("Grille", Vector3.new(g.size.X - 0.4, 0.14, 0.14), Vector3.new(0, y, gFront - 0.08), KIT_STEEL, Enum.Material.Metal)
+				-- The front side windows: two bars and a cross bar on each side.
+				local span = math.min(g.size.Z, 4.4) - 0.6
+				for _, side in { -1, 1 } do
+					local x = side * (g.size.X / 2 + 0.08)
+					for _, f in { 0.3, 0.7 } do
+						add("Grille", Vector3.new(0.14, band, 0.14), Vector3.new(x, y, gFront + 0.3 + span * f), KIT_STEEL, Enum.Material.Metal)
+					end
+					add("Grille", Vector3.new(0.14, 0.14, span), Vector3.new(x, y, gFront + 0.3 + span / 2), KIT_STEEL, Enum.Material.Metal)
+				end
+			end
+		end
+	end
+
+	-- Engine from 3: a scoop on the hood (taller at 5) and two exhaust pipes under the back.
+	if engine >= 3 then
+		if hull.hood then
+			local tall = 0.45 + 0.1 * (engine - 3)
+			local length = math.min(hull.hoodLen * 0.55, 2.2)
+			add("HoodScoop", Vector3.new(2.2, tall, length), Vector3.new(0, hull.hoodTop + tall / 2, hull.hoodZ), KIT_STEEL, Enum.Material.Metal)
+			add("ScoopIntake", Vector3.new(1.8, tall * 0.6, 0.06), Vector3.new(0, hull.hoodTop + tall / 2, hull.hoodZ - length / 2 - 0.03), Color3.fromRGB(16, 16, 18), Enum.Material.SmoothPlastic)
+		end
+		-- (Not under a horse ramp: it folds down over the back end.)
+		local back = style.back
+		if not (back and back.noun == "ramp") then
+			for _, side in { -1, 1 } do
+				add("Exhaust", Vector3.new(1.0, 0.42, 0.42), Vector3.new(side * (style.width / 2 - 1.3), -0.75, style.length / 2 + 0.3), KIT_CHROME, Enum.Material.Metal, true)
+			end
+		end
+	end
+	folder.Parent = model
+end
+
 -- Builds the body. display = a showroom model (anchored, no seats, no movers). gunId = the car gun on its roof (nil:
 -- none). oneBeam: only one headlight carries a SpotLight (the NPC cars: cheaper).
 local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?, oneBeam: boolean?): Built
 	local style = STYLES[def.style] or STYLES.van
 	local accent = if def.style == "icecream"
 		then Color3.fromRGB(255, 120, 180)
-		elseif def.style == "bus" or def.style == "ambulance" then Color3.fromRGB(205, 30, 34)
+		elseif def.style == "bus" or def.style == "ambulance" or def.style == "boxtruck" then Color3.fromRGB(205, 30, 34)
 		else color:Lerp(Color3.new(1, 1, 1), 0.45)
 
 	local model = Instance.new("Model")
@@ -1587,11 +1963,14 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local def = Economy.findCar(carId or profile.car) or Config.Cars[1]
 	Vehicles.remove(player)
 
-	local stats = Economy.carStats(def.id, profile.upgrades)
+	-- 3.3: this car's own car-track levels (a company vehicle has none).
+	local levels = Economy.carLevels(profile.carUpgrades, def.id)
+	local stats = Economy.carStats(def.id, levels)
 	local gunId = gunFor(player, def.id)
 	local paintId = if def.company then nil else profile.carPaint[def.id]
 	local built = build(def, paintColor(def, paintId), ground, false, gunId)
 	applyPaint(built.paintParts, def, paintId)
+	buildKit(built.model, built.chassis, STYLES[def.style] or STYLES.van, levels)
 	local driverSeat = built.seat :: VehicleSeat
 	local car: Car = {
 		owner = player,
@@ -1612,6 +1991,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		latched = {},
 		chauffeured = chauffeured == true,
 		born = os.clock(),
+		kit = kitKey(levels),
 	}
 	car.model.Name = `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
@@ -1627,6 +2007,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	watchPrompts(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then
+		backPrompt.HoldDuration = Economy.loadHold(Config.Cargo.HoldDuration, levels) -- 3.3: Quick Hands
 		backPrompt.Triggered:Connect(function(by: Player)
 			toggleBack(car, by)
 		end)
@@ -1768,17 +2149,39 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	return Vehicles.placeNear(player, carId)
 end
 
--- New upgrades / a new car equipped: the live car takes the new numbers (health keeps its share).
+-- 3.3, Quick Hands: how long the holds of this car's back and its cargo prompts take (its loading level).
+function Vehicles.loadHold(car: Car): number
+	local profile = PlayerData.get(car.owner)
+	local levels = if profile then Economy.carLevels(profile.carUpgrades, car.id) else {}
+	return Economy.loadHold(Config.Cargo.HoldDuration, levels)
+end
+
+-- New upgrades / a new car equipped: the live car takes the new numbers (health keeps its share), and (3.3) its
+-- upgrade kit and its back's hold follow its car-track levels.
 function Vehicles.refreshStats(player: Player)
 	local car = Vehicles.get(player)
 	local profile = PlayerData.get(player)
 	if not car or not profile then
 		return
 	end
+	local levels = Economy.carLevels(profile.carUpgrades, car.id)
 	local share = car.health / car.stats.health
-	car.stats = Economy.carStats(car.id, profile.upgrades)
+	car.stats = Economy.carStats(car.id, levels)
 	car.health = car.stats.health * share
 	writeAttributes(car)
+	local backPrompt = Vehicles.backPrompt(car)
+	if backPrompt then
+		backPrompt.HoldDuration = Vehicles.loadHold(car)
+	end
+	local key = kitKey(levels)
+	if key ~= car.kit then
+		car.kit = key
+		buildKit(car.model, car.chassis, styleOf(car), levels)
+		-- The new parts joined the car's assembly: the driver's client keeps simulating it.
+		pcall(function()
+			car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
+		end)
+	end
 end
 
 -- A new paint job on the live car.

@@ -6,7 +6,8 @@
 --   Dead End Motors     cars (the showroom models have their own prompts); every car needs a free car slot
 --                       (Estate.carSlots: homes and garages add them; the employers' company cars take none)
 --   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
---   Wrench Garage       upgrades, paint jobs and car guns (one on the roof of the equipped car; free repairs inside)
+--   Wrench Garage       upgrades (3.3: the car tracks for the equipped car, the gun tracks for all guns), paint jobs
+--                       and car guns (one on the roof of the equipped car; free repairs inside)
 --   Last Stop Supplies  consumables
 --   Depot Garage        switch between your cars
 --   Job Board           the depot's job board
@@ -207,7 +208,16 @@ local function onUpgrade(player: Player, id: any)
 	if not profile or type(id) ~= "string" or refuse(player, "mechanic") then
 		return
 	end
-	local level = Economy.level(profile.upgrades, id)
+	-- 3.3: a car track upgrades the equipped car only (its own levels, its own price); a gun track all your guns.
+	local carTrack = Economy.isCarUpgrade(id)
+	local carDef = Economy.findCar(profile.car)
+	if carTrack and (not carDef or not Economy.canUpgrade(carDef.id)) then
+		local name = if carDef then carDef.name else "this vehicle"
+		notice:FireClient(player, `The {name} is a company vehicle: it can't be upgraded. Take one of your own cars (depot garage).`)
+		return
+	end
+	local levels = if carTrack and carDef then Economy.carLevels(profile.carUpgrades, carDef.id) else profile.upgrades
+	local level = Economy.level(levels, id)
 	local cost = Economy.upgradeCost(id, level)
 	if not cost then
 		return
@@ -216,7 +226,14 @@ local function onUpgrade(player: Player, id: any)
 		notice:FireClient(player, "Not enough money.")
 		return
 	end
-	profile.upgrades[id] = level + 1
+	if carTrack and carDef then
+		levels[id] = level + 1
+		profile.carUpgrades[carDef.id] = levels
+		local def = Economy.findUpgrade(id)
+		notice:FireClient(player, `{if def then def.name else id} level {level + 1} on your {carDef.name}.`)
+	else
+		profile.upgrades[id] = level + 1
+	end
 	Vehicles.refreshStats(player)
 	PlayerData.notify(player)
 end

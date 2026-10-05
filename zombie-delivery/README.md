@@ -23,6 +23,10 @@ offices and your company are the **endgame**; every campaign now needs the one b
 missions only for two (pair lifts, twin switches); every cargo vehicle gets a **back that opens** (doors, a tailgate,
 a trunk lid, a ramp) and the loading goes through it; and the rest of the **HUD** gets the glass look of the 3.1
 right side (see **Driver levels and the progression**, **Missions**, **The DUO campaign**, **Loading through the back**).
+Version 3.3 brings **five more vans** to buy between the Old Van and the endgame (the Courier Van, the High-Roof Van,
+the Box Truck, the Armored Van and the Rally Van) and **upgrades you can see**: the car upgrades now belong to one
+car and show on it (a bull bar, armor plates and window grilles, a hood scoop and twin pipes), and a new one, **Quick
+Hands**, makes the loading quicker (see **The vans and the upgrades you can see**).
 
 Everything is built in code (the world, the cars, the enemies, the interface), so the game needs no assets: open an
 empty place and sync. The icon set and the logo are optional (see **Graphics**).
@@ -78,8 +82,8 @@ passenger) only a **one-handed** gun fires, out of the side window: the **pistol
 two-handed ones (shotgun, rifle, carbine, minigun, grenade launcher) do not fire from a car (a short hint says so; the
 weapon bar greys them out and tags the others WINDOW). **Car guns** are something else: bolted on the roof at
 **Wrench Garage** (CAR GUNS tab), one per car, and the driver fires them (the turret turns to the target, the weapon bar
-shows it). A car starts with none. They fit the Old Van, the Pickup, the Muscle Car, the Armored Truck and the Monster
-Truck, not the work vehicles (bus, ice cream, moving, livestock, fuel truck). A driver without a car gun shoots a
+shows it). A car starts with none. They fit every car of the dealer (3.3: the five new vans too), the Armored Truck and
+the Monster Truck, not the work vehicles (bus, ice cream, moving, livestock, fuel truck). A driver without a car gun shoots a
 one-handed gun out of the window (a drive-by); passengers always use their own gun.
 
 1. The **start screen** flies over the city; **PLAY** starts the game and brings your car. With a **home** (see
@@ -183,23 +187,24 @@ until then:
 | Level | Opens |
 |---|---|
 | 1 | the Old Van, the Pistol, ★ jobs, Pizza Rush, First Shift |
-| 2 | ★★ jobs, School Run, Ice Cream Route, Code Red |
-| 3 | the SMG ($4,000), Moving Day, Ambulance Run |
+| 2 | **the Courier Van** ($3,500), ★★ jobs, School Run, Ice Cream Route, Code Red |
+| 3 | **the High-Roof Van** ($7,000), the SMG ($4,000), Moving Day, Ambulance Run |
 | 4 | **the Pickup** ($12,000), the Shotgun ($7,500), ★★★ jobs, Fuel Run, Empty Shelves, the DUO campaign |
 | 5 | the Roof Machine Gun ($9,000), Horse Transport, Cash Transport, the Harbor Lockup garage |
-| 6 | the Hunting Rifle ($15,000), Smoke and Sirens, the Highway Garage, the Elm Bungalow |
+| 6 | **the Box Truck** ($22,000), the Hunting Rifle ($15,000), Smoke and Sirens, the Highway Garage, the Elm Bungalow |
 | 7 | ★★★★ INSANE jobs, Army Supply, Winter Run, Downtown Parking, Birch Cottage |
 | 8 | **the Muscle Car** ($40,000), Farm Run (the Monster Truck), Iron Supply, 7 Oak Lane |
 | 9 | Lights Out, 12 Maple Street |
-| 10 | the Minigun ($40,000), the Roof Minigun ($45,000), Wild West End, the Sunset Villa |
+| 10 | **the Armored Van** ($55,000), the Minigun ($40,000), the Roof Minigun ($45,000), Wild West End, the Sunset Villa |
 | 11 | the Lakeside Villa |
-| 12 | the Grenade Launcher ($60,000), the Roof Grenade Launcher ($55,000), Patient Zero, the Harbor Point Office (+ Iron Supply finished) |
+| 12 | **the Rally Van** ($80,000), the Grenade Launcher ($60,000), the Roof Grenade Launcher ($55,000), Patient Zero, the Harbor Point Office (+ Iron Supply finished) |
 | 13 | Dirty Money, the Pinecrest Mansion |
 | 14 | Last Convoy, the Ocean View Mansion, the Dispatch Tower office (+ Dirty Money finished) |
 | 15 | the Hilltop Mansion, the Dispatch Tower Penthouse (+ Last Convoy finished) |
 
-* **Cars**: the Old Van at 1 (free), the Pickup at 4, the Muscle Car at 8. The company vehicles come with their
-  employer's job level. The Wrench Garage upgrades cost twice their 3.1 price.
+* **Cars**: the Old Van at 1 (free), the Courier Van at 2, the High-Roof Van at 3, the Pickup at 4, the Box Truck at 6,
+  the Muscle Car at 8, the Armored Van at 10 and the Rally Van at 12 (3.3; level and price rise together). The company
+  vehicles come with their employer's job level. The Wrench Garage upgrades cost twice their 3.1 price.
 * **Guns**: Pistol 1, SMG 3, Shotgun 4, Hunting Rifle 6, Minigun 10, Grenade Launcher 12. **Car guns**: Roof Machine
   Gun 5, Roof Minigun 10, Roof Grenade Launcher 12.
 * **Real estate** (the endgame): garages 5 – 7, houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
@@ -317,7 +322,7 @@ Since 3.2 every vehicle that takes cargo by hand has a **back that opens** (`Sty
 
 | Vehicle | The back |
 |---|---|
-| Old Van, Ice Cream Truck, Armored Truck, Moving Truck, Ambulance | two rear doors |
+| Old Van, Courier Van, High-Roof Van, Box Truck, Armored Van, Rally Van, Ice Cream Truck, Armored Truck, Moving Truck, Ambulance | two rear doors |
 | Pickup, Monster Truck (new bed rails), Fuel Truck (the flatbed) | a tailgate |
 | Muscle Car | a trunk lid (the spoiler rides on it) |
 | Livestock Truck | a horse ramp down to the ground |
@@ -341,6 +346,50 @@ The loading at a **carry** or **lead** stop:
 
 The holds are short (`Config.Cargo.HoldDuration`), so the extra steps add a few seconds per stop. **board** stops
 (the bus, the ambulance's patients, the survivors) and **serve** stops (the ice cream) do not use the back.
+
+## The vans and the upgrades you can see
+
+Version 3.3 (`Config.Cars`, `Config.Upgrades`, server/Vehicles.luau `STYLES` and `buildKit`).
+
+**Five more vans** at Dead End Motors, each with its own body built from boxes like the Old Van: two rear doors that
+open for the loading (3.2), cargo slots in the back, a roof that takes a car gun, and passenger seats. They paint like
+the Old Van (the body panels and the doors; the steel plates, grilles and lights keep their colours); the courier
+van, the high-roof van and the box truck also drive past in the traffic.
+
+| Car | Level | Price | Top speed | Health | Ram | Passengers | The look |
+|---|---|---|---|---|---|---|---|
+| Old Van | 1 | free | 60 | 300 | × 1.0 | 1 | the start |
+| **Courier Van** | 2 | $3,500 | 68 | 340 | × 1.0 | 1 | compact and low, a sliding-door line, an amber light bar on the roof |
+| **High-Roof Van** | 3 | $7,000 | 62 | 450 | × 1.1 | 2 | a tall roof, windows down the box, a jump seat; 6 cargo slots (stacked) |
+| Pickup | 4 | $12,000 | 72 | 420 | × 1.15 | 3 | |
+| **Box Truck** | 6 | $22,000 | 64 | 650 | × 1.4 | 2 | a cab and a big separate box (6 slots), a wind deflector, a red stripe |
+| Muscle Car | 8 | $40,000 | 95 | 340 | × 1.0 | 1 | |
+| **Armored Van** | 10 | $55,000 | 74 | 900 | × 1.6 | 2 | steel plates on the box, the hood and the nose, grilles over the windows |
+| **Rally Van** | 12 | $80,000 | 92 | 420 | × 1.1 | 1 | lowered, big wheels under flares, stripes, a roof spoiler |
+
+A car needs a free car slot: since 3.3 you have **3** without a garage (the van and two more), a garage from level 5
+adds more (see **Real estate and your company**).
+
+**The upgrades belong to one car.** At Wrench Garage the car tracks (Engine, Handling, Armor, Ram Plow, Quick Hands)
+upgrade the car you have equipped (`profile.carUpgrades[carId]`; the window says "Upgrades for: Courier Van", the price
+grows with that car's level); a new car starts stock. Gun Damage and Fire Rate stay for all your guns and car guns
+("For all your guns"). The employers' company vehicles cannot be upgraded. An older save's upgrades (they were for
+every car) are copied once to every car it owns (`Economy.migrateCarUpgrades`).
+
+**You see them on the car** (`buildKit`, the folder "UpgradeKit", fitted to every body from its width, length, front
+end, hood and first window; rebuilt when you upgrade):
+
+* **Ram Plow** from level 1: a bull bar in front of the nose (two posts, two bars), wider and thicker with every level,
+  a plow blade under it from level 3 and rubber pads at 5.
+* **Armor** from level 1: steel plates along both sides between the wheels, taller with the level (a rim from 4); from
+  level 3 **grilles** over the windscreen and the front side windows (the Armored Van has its own).
+* **Engine** from level 3: a **hood scoop** (taller at 5) and **twin exhaust pipes** under the back.
+* **Quick Hands** (new, 3 levels, $600 · $1,080 · $1,940): **−15 % per level** of the time to open the back and to pick
+  up, load, take out and hand over (the holds of the BackPrompt and the cargo prompts, `Economy.loadHold`; the job's
+  car's level counts).
+
+The kit is cosmetic: welded, massless, no collisions, not hit by bullets, a few parts; the stats come from the levels
+(`Economy.carStats` with the car's own levels).
 
 ## Challenges, secrets and rewards
 
@@ -450,7 +499,8 @@ owners of the same mansion both use it. Everything you own is saved.
 * **Homes** (mansions, villas, houses) are furnished, two storeys for the big ones. Your first home becomes **your
   home** at once; SET AS HOME picks another one, SPAWN AT THE DEPOT none. You spawn at your home after PLAY and after
   every death, and the car you get then waits in front of its garage.
-* **Car slots**: you can own `Config.Estate.BaseCarSlots` = **2** cars without any property; every home and garage
+* **Car slots**: you can own `Config.Estate.BaseCarSlots` = **3** cars without any property (3.3: the van and two
+  more); every home and garage
   adds its garage's slots. Buying a car at Dead End Motors needs a free slot (the dealer tells you to look at ESTATE
   otherwise). Company vehicles earned by working do not count, and cars you already own are never taken away.
 * **Selling** (SELL, click twice to confirm) pays back **60 %** of the price (`Config.Estate.SellBack`). The home you
@@ -536,7 +586,9 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 
 ## Content
 
-* **Cars**: at Dead End Motors the Old Van (free), the Pickup (level 4, $12,000) and the Muscle Car (level 8, $40,000); earned by
+* **Cars**: at Dead End Motors (eight on show: three inside, five on the lot) the Old Van (free), the Courier Van
+  (level 2, $3,500), the High-Roof Van (3, $7,000), the Pickup (4, $12,000), the Box Truck (6, $22,000), the Muscle Car
+  (8, $40,000), the Armored Van (10, $55,000) and the Rally Van (12, $80,000); earned by
   working: School Bus, Armored Truck, Ice Cream Truck, Moving Truck, Monster Truck, Livestock Truck, Fuel Truck,
   Ambulance.
 * **Guns** (Lead & Co.): Pistol (free), SMG, Shotgun, Hunting Rifle, Minigun, Grenade Launcher, each with its own model in
@@ -555,8 +607,9 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 * **Car guns** (Wrench Garage, on the roof of the equipped car, one per car; a new one replaces the old one, no
   refund): Roof Machine Gun (a slim barrel with an ammo box), Roof Minigun (a rotary barrel cluster), Roof Grenade
   Launcher (a fat tube). The Gun Damage and Fire Rate upgrades work for them too.
-* **Upgrades** (Wrench Garage, 5 levels each): Engine, Handling, Armor, Ram Plow, Gun Damage, Fire Rate; paint jobs;
-  car guns.
+* **Upgrades** (Wrench Garage): for the equipped car (3.3: each car its own) Engine, Handling, Armor, Ram Plow (5
+  levels) and Quick Hands (3 levels), the visible ones on the car; for all your guns Gun Damage, Fire Rate (5 levels);
+  paint jobs; car guns.
 * **Items** (Last Stop Supplies): Repair Kit, Medkit, Nitro, Molotov, Landmine.
 * **Enemies**: Walker, Runner, Brute (zombies, around you all the time, in waves during a job); Bandit, Gunner,
   Soldier (people: only during a job).
@@ -623,7 +676,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               elevators, FOR SALE signs and office computers), PlayerData (saves, leaderstats; the save also holds the
               properties, the home and the business; 3.2: moves a 3.1 save's XP to the new curve once), Vehicles (cars,
               seats, cargo slots, the roof turret of a car gun, the instant spawns and the home garage spot; 3.2: the
-              back that opens, its hinges, BackOpen and the BackPrompt), Zombies (zombies and bandits, roadblocks, the roamers,
+              back that opens, its hinges, BackOpen and the BackPrompt; 3.3: the five new vans' bodies, the
+              UpgradeKit of the car's upgrades, Quick Hands' hold), Zombies (zombies and bandits, roadblocks, the roamers,
               who goes after whom), BanditCars (the chasing pickups, driven by the server), Gun (shots, server checked: the hand gun, the car gun or out of
               the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves; 3.2: the DUO
               rules, drives DuoGates), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
@@ -661,7 +715,10 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               challenges (the list, the must-have goals, the titles, the hidden ones, the helpers on a fake profile),
               gear (piercing rounds, the paint finishes, every exclusive item a reward) and the lost packages in logic
               (one per place, near it, in bounds, dry, off the roads); 3.2: cargo also checks the back's extra
-              steps stay quick holds
+              steps stay quick holds; 3.3: logic checks the car tracks per car, Quick Hands and the old saves'
+              migration, levels the five new vans (levels and prices together), cargun that every dealer car takes
+              a car gun, and run_tests.py reads Vehicles.luau's STYLES: every car has a body, every dealer car cargo
+              slots and a back
 ```
 
 **Driving** is arcade, not wheel physics: invisible frictionless wheel colliders and two constraints on the chassis
@@ -695,7 +752,8 @@ function, as Studio compiles). Needs the standalone Luau CLI
 
 **Testing in Studio**: the admin panel (P, or the ADMIN button top right) unlocks everything, gives money, spawns
 cars, puts any car gun on your car (or none), guns and enemies, teleports to every place, starts any job, sets the
-driver level (the LV buttons, LEVEL -1 / +1; UNLOCK also sets the top level), sets the time of day (dusk, night,
+driver level (the LV buttons, LEVEL -1 / +1; UNLOCK also sets the top level and, 3.3, maxes every owned car's
+upgrades, like MAX UPGRADES), sets the time of day (dusk, night,
 dawn … through `DayNight.setClock`), heals, finishes the current stop and switches god mode. The **Estate, company**
 tab gives every property (or one), takes them all, sets the home (or the depot), teleports to any property and
 fills, adds $50,000 to or empties the company safe (UNLOCK also gives every property and, without a home, the most
