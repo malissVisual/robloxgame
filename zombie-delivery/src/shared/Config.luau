@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "3.4"
+Config.Version = "3.5"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -46,7 +46,24 @@ export type CarDef = {
 	employer: string?, -- who (Config.Employers)
 	mount: boolean?, -- a car gun (Config.CarGuns) fits on its roof; the company / work vehicles carry none
 	capacity: number, -- 3.4: cargo slots (the pieces carried or led by hand it takes at once), = its body's slots
-	-- (server/Vehicles.luau STYLES cargo; tests/run_tests.py checks they match). The Cargo Rack adds to it.
+	-- (server/Vehicles.luau STYLES cargo; tests/run_tests.py checks they match). 3.5: the slots of stage 0.
+	role: string?, -- 3.5: what the car is for, in a few words (the dealer's card, the README's table)
+	stages: { StageDef }?, -- 3.5: the stages bought at Wrench Garage; stages[1] is stage 0 (the car as it is sold)
+}
+
+-- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
+-- changes how the car looks (server/Vehicles.luau LOOKS[look]: boxes added on the body, some taken off, its own
+-- cargo slots) and how much it holds; a little more health, a small speed tweak. stages[1] is stage 0 (no price, no
+-- look: the plain body of STYLES); the saved stage is profile.carUpgrades[carId].stage (Economy.stageOf).
+export type StageDef = {
+	name: string, -- what the car is called at this stage ("Work Van")
+	price: number, -- 0 for stage 0
+	level: number?, -- the driver level needed to buy it
+	capacity: number, -- the cargo slots at this stage (= its look's slots; tests/run_tests.py checks it)
+	health: number?, -- + health over the car's own (before the Armor upgrade)
+	speed: number?, -- + top speed in studs / s (may be negative: a high roof is heavier)
+	look: string?, -- the look in server/Vehicles.luau LOOKS (nil: the plain body)
+	adds: string, -- what it adds, in a few words (the STAGE card)
 }
 
 -- 3.2, the progression (Config.Levels): the van is where you start, the pickup opens at level 4, the muscle car at 8
@@ -54,9 +71,14 @@ export type CarDef = {
 -- 3.3: five more vans in between, each with its own body (server/Vehicles.luau STYLES): the Courier Van at 2, the
 -- High-Roof Van at 3, the Box Truck at 6, the Armored Van at 10 and the Rally Van at 12. The dealer's cars stay in
 -- the order of their level (and price): the showroom and the dealer window list them this way.
--- 3.4: every car has a capacity (cargo slots): the vans 4, the High-Roof Van and the Box Truck 6, the Muscle Car 2;
--- a job or a mission with more pieces than your car holds waits until you have a bigger car or a Cargo Rack
--- (Config.Upgrades "rack": +1 slot per level). The employers' vehicles hold what their jobs need.
+-- 3.4: every car has a capacity (cargo slots); a job or a mission with more pieces than your car holds waits until
+-- you have a bigger car. The employers' vehicles hold what their jobs need.
+-- 3.5: STAGES instead of the Cargo Rack. You keep your Old Van and build it up at Wrench Garage: the Rusty Van (2
+-- slots) becomes a Work Van (3) and a Cargo Van (4), each stage with its own look. 4 is where a van ends: more needs a
+-- bigger vehicle. The other cars are not "the next van" but have a ROLE (CarDef.role): the Courier Van is fast, the
+-- High-Roof Van the tougher in-between, the Box Truck the big one (6 – 8 slots, the only way to 6 and more), the
+-- Armored Van the car-gun platform, the Rally Van the fastest, the Pickup the crew car, the Muscle Car the getaway
+-- car. Each has one or two small stages of its own.
 Config.Cars = {
 	{
 		id = "van",
@@ -68,10 +90,16 @@ Config.Cars = {
 		accel = 26,
 		turn = 1.8,
 		health = 300,
-		capacity = 4,
+		capacity = 2,
 		ramPower = 1.0,
 		color = { 214, 196, 160 },
-		description = "Slow and rusty, but it is yours. 1 passenger.",
+		role = "Your first van: it grows with you",
+		description = "Rusty, dented and yours. Build it up at Wrench Garage: a Work Van (3 slots), then a Cargo Van (4). 1 passenger.",
+		stages = {
+			{ name = "Rusty Van", price = 0, capacity = 2, adds = "rust patches, primer over the dents, a loose bumper" },
+			{ name = "Work Van", price = 400, level = 2, capacity = 3, health = 30, speed = 1, look = "van_work", adds = "clean paint, a new bumper, a side ladder, shelves in the back" },
+			{ name = "Cargo Van", price = 1600, level = 4, capacity = 4, health = 70, speed = -1, look = "van_cargo", adds = "a high roof with a roof rack, a light bar, mud flaps" },
+		},
 	},
 	{
 		id = "courier",
@@ -80,14 +108,19 @@ Config.Cars = {
 		name = "Courier Van",
 		price = 3500,
 		style = "courier",
-		maxSpeed = 68,
-		accel = 30,
-		turn = 1.95,
-		health = 340,
-		capacity = 4,
+		maxSpeed = 70,
+		accel = 31,
+		turn = 2.05,
+		health = 320,
+		capacity = 2,
 		ramPower = 1.0,
 		color = { 232, 170, 40 },
-		description = "Small, low and quick off the line, an amber light bar on the roof. 1 passenger.",
+		role = "Fast and nimble: the rush jobs",
+		description = "Small, low and quick off the line, an amber light bar on the roof. Made for speed, not for big loads (2 slots, 3 as an Express Courier). 1 passenger.",
+		stages = {
+			{ name = "Courier Van", price = 0, capacity = 2, adds = "" },
+			{ name = "Express Courier", price = 1200, level = 3, capacity = 3, speed = 2, look = "courier_express", adds = "a roof pod, a checker stripe down the sides" },
+		},
 	},
 	{
 		id = "highroof",
@@ -100,10 +133,15 @@ Config.Cars = {
 		accel = 27,
 		turn = 1.75,
 		health = 450,
-		capacity = 6,
+		capacity = 4,
 		ramPower = 1.1,
 		color = { 168, 186, 200 },
-		description = "Stand up inside. A tall roof, thicker walls and a jump seat for a friend. 2 passengers.",
+		role = "Tougher, the in-between",
+		description = "Stand up inside: a tall roof, thicker walls and a jump seat for a friend. 4 slots from the start, 5 as a Tall Hauler. 2 passengers.",
+		stages = {
+			{ name = "High-Roof Van", price = 0, capacity = 4, adds = "" },
+			{ name = "Tall Hauler", price = 3000, level = 5, capacity = 5, health = 60, look = "highroof_hauler", adds = "a ladder rack with a spare wheel, side steps, a stacked shelf" },
+		},
 	},
 	{
 		id = "pickup",
@@ -116,10 +154,15 @@ Config.Cars = {
 		accel = 32,
 		turn = 2.0,
 		health = 420,
-		capacity = 4,
+		capacity = 2,
 		ramPower = 1.15,
 		color = { 196, 60, 50 },
-		description = "Two friends ride in the bed and shoot. 3 passengers.",
+		role = "The crew car: friends shoot from the bed",
+		description = "An open bed where two friends ride and shoot. Room for 2 pieces beside them (3 as a Ranch Pickup). 3 passengers.",
+		stages = {
+			{ name = "Pickup", price = 0, capacity = 2, adds = "" },
+			{ name = "Ranch Pickup", price = 2500, level = 6, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
+		},
 	},
 	{
 		id = "boxtruck",
@@ -135,7 +178,13 @@ Config.Cars = {
 		capacity = 6,
 		ramPower = 1.4,
 		color = { 238, 238, 232 },
-		description = "A cab and a big box behind it. Slow to stop, hard to kill, room for six. 2 passengers.",
+		role = "The big one: the only way to 6 and more",
+		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler. The big loads need it. 2 passengers.",
+		stages = {
+			{ name = "Box Truck", price = 0, capacity = 6, adds = "" },
+			{ name = "Liftgate Truck", price = 7500, level = 8, capacity = 7, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
+			{ name = "Freight Hauler", price = 15000, level = 10, capacity = 8, health = 150, speed = -2, look = "boxtruck_freight", adds = "a tall wind deflector, side skirts, a second stacked row" },
+		},
 	},
 	{
 		id = "muscle",
@@ -148,10 +197,15 @@ Config.Cars = {
 		accel = 46,
 		turn = 2.3,
 		health = 340,
-		capacity = 2,
+		capacity = 1,
 		ramPower = 1.0,
 		color = { 30, 30, 36 },
-		description = "Outruns every zombie. Do not crash. 1 passenger.",
+		role = "The getaway car: one piece, all speed",
+		description = "Outruns every zombie. One piece in the trunk (2 as a Street Machine). Do not crash. 1 passenger.",
+		stages = {
+			{ name = "Muscle Car", price = 0, capacity = 1, adds = "" },
+			{ name = "Street Machine", price = 6000, level = 9, capacity = 2, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a bigger trunk" },
+		},
 	},
 	{
 		id = "armorvan",
@@ -164,10 +218,15 @@ Config.Cars = {
 		accel = 34,
 		turn = 1.8,
 		health = 900,
-		capacity = 4,
+		capacity = 3,
 		ramPower = 1.6,
 		color = { 72, 78, 84 },
-		description = "Steel plates, grilles on the windows. The bullets knock, nobody answers. 2 passengers.",
+		role = "Very tough: the car-gun platform",
+		description = "Steel plates, grilles on the windows, a roof made for a gun. The bullets knock, nobody answers. 3 slots, 4 as a Fortress Van. 2 passengers.",
+		stages = {
+			{ name = "Armored Van", price = 0, capacity = 3, adds = "" },
+			{ name = "Fortress Van", price = 14000, level = 11, capacity = 4, health = 200, speed = -2, look = "armorvan_fortress", adds = "a gun shield on the roof, side lockers, a spare wheel" },
+		},
 	},
 	{
 		id = "rallyvan",
@@ -176,14 +235,19 @@ Config.Cars = {
 		name = "Rally Van",
 		price = 80000,
 		style = "rallyvan",
-		maxSpeed = 92,
-		accel = 44,
-		turn = 2.2,
+		maxSpeed = 98,
+		accel = 46,
+		turn = 2.25,
 		health = 420,
-		capacity = 4,
+		capacity = 2,
 		ramPower = 1.1,
 		color = { 30, 90, 200 },
-		description = "Lowered, striped, a spoiler and big wheels: a van that thinks it is a race car. 1 passenger.",
+		role = "The fastest van: rush jobs",
+		description = "Lowered, striped, a spoiler and big wheels: the fastest van on the road, 2 slots and no more. 1 passenger.",
+		stages = {
+			{ name = "Rally Van", price = 0, capacity = 2, adds = "" },
+			{ name = "Works Rally", price = 10000, level = 13, capacity = 2, speed = 3, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps (no more room)" },
+		},
 	},
 	{
 		id = "armored",
@@ -594,15 +658,14 @@ export type UpgradeDef = {
 -- (and window grilles from level 3), Engine a hood scoop and twin exhaust pipes from level 3. Quick Hands makes the
 -- holds of the back and the cargo shorter (Economy.loadHold).
 -- 3.4: you keep your first car and upgrade it, so the first levels of the car tracks are cheap (a few deliveries)
--- and the last ones dear; the Cargo Rack adds a cargo slot per level (a roof rack with the extra slots on it,
--- Economy.capacity) for $300 · $750 · $1,880.
+-- and the last ones dear. 3.5: the Cargo Rack (+1 slot a level) is gone: the car's STAGES (CarDef.stages) give the
+-- room now; a 3.4 save's cars became the stage that holds the slots they had, rack included (Economy.legacyStage).
 Config.Upgrades = {
 	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 400, costGrowth = 2.0, perLevel = 0.08 },
 	{ id = "handling", car = true, name = "Handling", description = "+8% steering", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
 	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
 	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
 	{ id = "loading", car = true, name = "Quick Hands", description = "−15% time to open the back, load and unload", maxLevel = 3, baseCost = 400, costGrowth = 2.0, perLevel = 0.15 },
-	{ id = "rack", car = true, name = "Cargo Rack", description = "+1 cargo slot per level · a roof rack", maxLevel = 3, baseCost = 300, costGrowth = 2.5, perLevel = 1 },
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
@@ -1310,10 +1373,12 @@ Config.Jobs = {
 	-- the road with bandits around it.
 	AmbushDistance = 170,
 	-- 3.4: bigger loads on the dangerous jobs (cargo capacity, Config.Cars capacity): an ordinary delivery of danger
-	-- level n is a bulk order with BulkChance[n], its pieces + BulkExtra[n] (min, max). ★ never (3 pieces at most:
-	-- every car takes them), ★★ rarely (5 at most), ★★★ up to 6, ★★★★ up to 8 (a big van or a Cargo Rack).
+	-- level n is a bulk order with BulkChance[n], its pieces + BulkExtra[n] (min, max).
+	-- 3.5 (the stages): ★ never, and at most EasyMaxPieces (the Rusty Van's 2 slots); ★★ (3 at most: the Work Van)
+	-- rarely 4 (the Cargo Van); ★★★ up to 5 (a Tall Hauler or a Box Truck); ★★★★ up to 8 (a Freight Hauler).
+	EasyMaxPieces = 2,
 	BulkChance = { 0, 0.2, 0.45, 0.6 } :: { number },
-	BulkExtra = { { 0, 0 }, { 1, 2 }, { 2, 3 }, { 3, 5 } } :: { { number } },
+	BulkExtra = { { 0, 0 }, { 1, 1 }, { 1, 2 }, { 3, 6 } } :: { { number } },
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
 	Businesses = {
 		{

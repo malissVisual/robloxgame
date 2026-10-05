@@ -1,7 +1,11 @@
 --!strict
--- 3.4: cargo capacity (Config.Cars capacity, the Cargo Rack, Economy.capacity / cargoNeed), what every job and every
--- mission needs against the cars that do them, the repair shop's time and fee (Economy.repairTime / repairFee).
--- (That every car's capacity is its body's slot count is checked by run_tests.py: Vehicles.luau is not loadable here.)
+-- 3.4: cargo capacity (Config.Cars capacity, Economy.capacity / cargoNeed), what every job and every mission needs
+-- against the cars that do them, the repair shop's time and fee (Economy.repairTime / repairFee).
+-- 3.5: the stages (Config.Cars stages, Economy.stageOf / stageCapacity / legacyStage …) instead of the Cargo Rack:
+-- the Old Van grows 2 → 3 → 4 and no further, the Box Truck is the only way to 6 and more, every job and mission fits
+-- a car (and a stage) you can have at its level, the early campaigns the Old Van.
+-- (That every car's capacity is its body's slot count, and every stage's its look's, is checked by run_tests.py:
+-- Vehicles.luau is not loadable here.)
 
 local Config = require("./Config")
 local Economy = require("./Economy")
@@ -17,31 +21,125 @@ local function check(name: string, ok: boolean, detail: any?)
 	end
 end
 
--- ── The cars and the rack ────────────────────────────────────────────────────
+-- ── The cars and their stages ────────────────────────────────────────────────
 
-local rack = Economy.findUpgrade("rack")
-check("the Cargo Rack is a car track of 3 levels, +1 slot each", rack ~= nil and rack.car == true and rack.maxLevel == 3 and rack.perLevel == 1)
-local RACK_MAX = if rack then rack.maxLevel * rack.perLevel else 0
-
-local biggest = 0 -- the biggest dealer car's capacity
+check("the Cargo Rack is gone (3.5: stages)", Economy.findUpgrade("rack") == nil)
 local start = Config.Cars[1]
+local biggest = 0 -- the most any dealer car holds (at its last stage)
+local biggestId = ""
 for _, def in Config.Cars do
 	check(`{def.id}: a capacity`, type(def.capacity) == "number" and def.capacity >= 1, def.capacity)
-	if not def.company then
-		check(`{def.id}: a dealer car takes at least 2 pieces`, def.capacity >= 2, def.capacity)
-		biggest = math.max(biggest, def.capacity)
+	local stages = def.stages
+	if def.company then
+		check(`{def.id}: a company vehicle has no stages`, stages == nil and Economy.maxStage(def.id) == 0)
+		continue
+	end
+	check(`{def.id}: a role`, type(def.role) == "string" and #(def.role :: string) > 3)
+	check(`{def.id}: stages, at most two to buy`, stages ~= nil and #stages >= 1 and #stages <= 3, if stages then #stages else nil)
+	if not stages then
+		continue
+	end
+	local zero = stages[1]
+	check(`{def.id}: stage 0 is the car as sold`, zero.price == 0 and zero.look == nil and zero.capacity == def.capacity and zero.level == nil)
+	for n = 2, #stages do
+		local stage, before = stages[n], stages[n - 1]
+		check(`{def.id}: {stage.name} costs something and has a look`, stage.price > 0 and type(stage.look) == "string" and #stage.adds > 0)
+		check(`{def.id}: {stage.name} holds at least as much as before`, stage.capacity >= before.capacity)
+		check(`{def.id}: {stage.name} opens at or after the car`, (stage.level or 1) >= (def.level or 1) and (stage.level or 1) >= (before.level or 1))
+		check(`{def.id}: {stage.name}'s tweaks are small`, math.abs(stage.speed or 0) <= 4 and (stage.health or 0) <= 0.25 * def.health)
+	end
+	check(`{def.id}: a dealer car holds at least 2 at its last stage`, Economy.maxCapacity(def.id) >= 2, Economy.maxCapacity(def.id))
+	if Economy.maxCapacity(def.id) > biggest then
+		biggest, biggestId = Economy.maxCapacity(def.id), def.id
 	end
 end
-check("the starting van holds 4", start.id == "van" and start.capacity == 4, start.capacity)
-check("the High-Roof Van and the Box Truck are the haulers (6)", (Economy.findCar("highroof") :: any).capacity == 6 and (Economy.findCar("boxtruck") :: any).capacity == 6)
-check("capacity: no rack", Economy.capacity("van", {}) == 4 and Economy.capacity("van", nil) == 4)
-check("capacity: rack 2", Economy.capacity("van", { rack = 2 }) == 6)
-check("capacity: a rack above its max counts its max", Economy.capacity("van", { rack = 9 }) == 4 + RACK_MAX)
-check("capacity: a company vehicle takes no rack", Economy.capacity("armored", { rack = 3 }) == 8)
+
+-- The Old Van: 2 → 3 → 4, and 4 is where a van ends ("6 needs a bigger vehicle").
+local van = start.stages or {}
+check("the starting van is the Old Van", start.id == "van" and start.price == 0)
+check("the Old Van: Rusty Van 2 → Work Van 3 → Cargo Van 4", #van == 3 and van[1].name == "Rusty Van" and van[1].capacity == 2
+	and van[2].name == "Work Van" and van[2].capacity == 3 and van[3].name == "Cargo Van" and van[3].capacity == 4)
+check("the Work Van is cheap and early", #van == 3 and van[2].price <= 500 and (van[2].level or 1) <= 2)
+check("the Box Truck is the big one", biggestId == "boxtruck" and biggest == 8 and Economy.stageCapacity("boxtruck", 0) == 6, `{biggestId} {biggest}`)
+for _, def in Config.Cars do
+	if not def.company and def.id ~= "boxtruck" then
+		check(`{def.id}: below 6 even at its last stage (6+ needs the Box Truck)`, Economy.maxCapacity(def.id) <= 5, Economy.maxCapacity(def.id))
+	end
+end
+check("the High-Roof Van is the in-between (4 → 5)", Economy.stageCapacity("highroof", 0) == 4 and Economy.maxCapacity("highroof") == 5)
+check("the Muscle Car takes 1 – 2", Economy.stageCapacity("muscle", 0) == 1 and Economy.maxCapacity("muscle") == 2)
+check("the Rally Van stays at 2", Economy.maxCapacity("rallyvan") == 2)
+
+-- Economy: the stage of a car's levels, its capacity, its stats, the names.
+check("capacity: stage 0", Economy.capacity("van", {}) == 2 and Economy.capacity("van", nil) == 2)
+check("capacity: stage 1 and 2", Economy.capacity("van", { stage = 1 }) == 3 and Economy.capacity("van", { stage = 2 }) == 4)
+check("capacity: a stage above the last counts the last", Economy.capacity("van", { stage = 9 }) == 4 and Economy.stageOf("van", { stage = 9 }) == 2)
+check("capacity: a negative stage is stage 0", Economy.stageOf("van", { stage = -3 }) == 0)
+check("capacity: a company vehicle has no stages", Economy.capacity("armored", { stage = 3 }) == 8)
 check("capacity: an unknown car holds nothing", Economy.capacity("spaceship", {}) == 0)
+check("the next stage's price", Economy.stageCost("van", 0) == van[2].price and Economy.stageCost("van", 2) == nil)
+check("the stage's health and speed", Economy.carStats("van", { stage = 2 }).health == 300 + (van[3].health or 0)
+	and Economy.carStats("van", { stage = 2 }).maxSpeed == 60 + (van[3].speed or 0))
+check("the stage and the upgrades together", Economy.carStats("van", { stage = 1, armor = 2 }).health == math.floor((300 + (van[2].health or 0)) * 1.3))
+check("the car's title at a stage", Economy.carTitle("van", { stage = 1 }) == "Old Van · Work Van" and Economy.carTitle("courier", {}) == "Courier Van")
+check("advice: the next stage that holds it", string.find(Economy.roomAdvice("van", 0, 4), "Cargo Van", 1, true) ~= nil)
+check("advice: a bigger vehicle beyond the last stage", string.find(Economy.roomAdvice("van", 2, 6), "Box Truck", 1, true) ~= nil
+	and string.find(Economy.roomAdvice("van", 2, 6), "High-Roof", 1, true) == nil)
 check("need: carried and led pieces count", Economy.cargoNeed("carry", 5) == 5 and Economy.cargoNeed("lead", 2) == 2)
 check("need: passengers and serving need no slot", Economy.cargoNeed("board", 8) == 0 and Economy.cargoNeed("serve", 6) == 0)
-check("the rack's first level is cheap", (Economy.upgradeCost("rack", 0) :: number) <= 400, Economy.upgradeCost("rack", 0))
+
+-- A 3.4 save's car becomes the first stage that holds the slots it had (its 3.4 capacity + its Cargo Rack); when none
+-- holds that many, the first stage with the car's most room (0 when no stage adds any).
+check("Old Van, no rack (4 in 3.4): the Cargo Van", Economy.legacyStage("van", 0) == 2)
+check("Old Van with a rack: the Cargo Van (the most a van holds)", Economy.legacyStage("van", 1) == 2 and Economy.legacyStage("van", 3) == 2)
+check("Box Truck (6): rack 0 → stage 0, +1 → stage 1, +2 and +3 → stage 2", Economy.legacyStage("boxtruck", 0) == 0
+	and Economy.legacyStage("boxtruck", 1) == 1 and Economy.legacyStage("boxtruck", 2) == 2 and Economy.legacyStage("boxtruck", 3) == 2)
+check("Muscle Car (2) and Armored Van (4): the stage that holds it", Economy.legacyStage("muscle", 0) == 1 and Economy.legacyStage("armorvan", 0) == 1)
+check("High-Roof, Courier, Pickup: their last stage (the most they hold)", Economy.legacyStage("highroof", 0) == 1
+	and Economy.legacyStage("courier", 2) == 1 and Economy.legacyStage("pickup", 1) == 1)
+check("Rally Van: no stage adds room, stays at stage 0", Economy.legacyStage("rallyvan", 0) == 0 and Economy.legacyStage("rallyvan", 3) == 0)
+check("a company vehicle: nothing", Economy.legacyStage("ambulance", 2) == 0)
+local legacyOk = true
+for _, def in Config.Cars do
+	for rack = 0, 3 do
+		local stage = Economy.legacyStage(def.id, rack)
+		local capacity = Economy.stageCapacity(def.id, stage)
+		if stage < 0 or stage > Economy.maxStage(def.id)
+			or (capacity < Economy.stageCapacity(def.id, 0) + rack and capacity < Economy.maxCapacity(def.id)) then
+			legacyOk = false
+		end
+	end
+end
+check("every car, rack 0 – 3: one of its stages, the rack on top of stage 0 or its most room", legacyOk)
+
+-- The level a load of `need` pieces can first be carried at: a dealer car at a stage that holds it (the later of the
+-- car's level and the stage's), nil when nothing holds it.
+local function levelFor(need: number): number?
+	local best: number? = nil
+	for _, def in Config.Cars do
+		if def.company then
+			continue
+		end
+		for stage = 0, Economy.maxStage(def.id) do
+			local stageDef = Economy.stageDef(def.id, stage)
+			if Economy.stageCapacity(def.id, stage) >= need then
+				local level = math.max(def.level or 1, if stageDef then stageDef.level or 1 else 1)
+				best = if best then math.min(best, level) else level
+			end
+		end
+	end
+	return best
+end
+-- The level the Old Van holds `need` at (nil: never).
+local function vanLevelFor(need: number): number?
+	for stage = 0, Economy.maxStage("van") do
+		if Economy.stageCapacity("van", stage) >= need then
+			local stageDef = Economy.stageDef("van", stage)
+			return if stageDef then stageDef.level or 1 else 1
+		end
+	end
+	return nil
+end
 
 -- ── The special jobs (Config.JobTypes) ───────────────────────────────────────
 
@@ -51,56 +149,75 @@ for _, def in Config.JobTypes do
 		local holds = Economy.capacity(def.vehicle, {})
 		check(`job {def.id}: its {def.vehicle} holds the {need} pieces`, holds >= need, `{need} > {holds}`)
 	else
-		check(`job {def.id}: the starting van takes it`, need <= start.capacity, need)
+		check(`job {def.id}: the Rusty Van takes it`, need <= start.capacity, need)
 	end
 end
 
 -- ── The job board's ordinary deliveries ──────────────────────────────────────
 
+check("★ deliveries are capped at the Rusty Van's slots", Config.Jobs.EasyMaxPieces == start.capacity)
 for tier = 1, #Config.Jobs.Tiers do
 	local most, baseMost = 0, 0
 	for _, business in Config.Jobs.Businesses do
 		if table.find(business.tiers, tier) then
 			local high = business.pieces[2] or business.pieces[1]
+			if tier == 1 then
+				high = math.min(high, Config.Jobs.EasyMaxPieces)
+			end
 			baseMost = math.max(baseMost, high)
 			most = math.max(most, high + (if (Config.Jobs.BulkChance[tier] or 0) > 0 then Config.Jobs.BulkExtra[tier][2] else 0))
 		end
 	end
 	if tier == 1 then
-		check("★: every ordinary delivery fits the starting van", most <= start.capacity, most)
+		check("★: every ordinary delivery fits the Rusty Van (stage 0)", most <= start.capacity, most)
 	elseif tier == 2 then
-		check("★★: without a bulk order every delivery fits the starting van", baseMost <= start.capacity, baseMost)
+		check("★★: without a bulk order every delivery fits the Work Van", baseMost <= Economy.stageCapacity("van", 1), baseMost)
+		check("★★: even a bulk order fits the Cargo Van", most <= Economy.maxCapacity("van"), most)
 		check("★★: bulk orders are rare", (Config.Jobs.BulkChance[2] or 0) <= 0.25)
 	end
-	check(`{string.rep("★", tier)}: the biggest load fits the biggest car with a rack`, most <= biggest + RACK_MAX, most)
+	check(`{string.rep("★", tier)}: the biggest load fits the biggest car at its last stage`, most <= biggest, most)
+	check(`{string.rep("★", tier)}: a car for the usual load at the tier's level`, (levelFor(baseMost) or 99) <= Config.Jobs.Tiers[tier].level, baseMost)
 end
 check("bigger loads on the dangerous jobs", Config.Jobs.BulkExtra[4][2] > Config.Jobs.BulkExtra[2][2] and Config.Jobs.BulkChance[4] > Config.Jobs.BulkChance[2])
 
 -- ── The missions: every one, what it needs ───────────────────────────────────
 
 local EARLY = { dispatch = true, clinic = true, market = true } -- First Shift, Code Red, Empty Shelves
-local listed, lent, early = 0, 0, 0
+local listed, lent, early, big = 0, 0, 0, 0
 for _, mission in Missions.List do
 	local need = Economy.cargoNeed(mission.load, mission.items)
+	local level = mission.level or 1
 	listed += 1
 	if mission.vehicle then
 		lent += 1
 		local holds = Economy.capacity(mission.vehicle, {})
 		print(`  {mission.id} {mission.name}: {need} slots · lends the {mission.vehicle} ({holds})`)
 		check(`{mission.id}: the lent {mission.vehicle} holds it`, holds >= need, `{need} > {holds}`)
-	else
-		local rackLevels = math.max(0, need - start.capacity)
-		local how = if rackLevels == 0 then "" elseif rackLevels <= RACK_MAX then ` · the Old Van with rack {rackLevels}` else ` · a {biggest}-slot car with rack {need - biggest}`
-		print(`  {mission.id} {mission.name}: {need} slots{how}`)
-		check(`{mission.id}: no mission needs more than the biggest car with a full rack`, need <= biggest + RACK_MAX, need)
-		if EARLY[mission.campaign] then
-			early += 1
-			check(`{mission.id}: an early mission fits the starting van with at most two rack levels`, need <= start.capacity + 2, need)
-		end
+		continue
+	end
+	local from = levelFor(need)
+	print(`  {mission.id} {mission.name} (level {level}): {need} slots · a car for it from level {from or "never"}`)
+	check(`{mission.id}: no mission needs more than the Box Truck's last stage`, need <= biggest, need)
+	check(`{mission.id}: a car (and a stage) that holds it opens by the mission's level`, from ~= nil and (from :: number) <= level, from)
+	if EARLY[mission.campaign] then
+		early += 1
+		local vanFrom = vanLevelFor(need)
+		check(`{mission.id}: an early mission fits the Old Van by its level`, vanFrom ~= nil and (vanFrom :: number) <= level, vanFrom)
+	end
+	if mission.campaign == "dispatch" then
+		check(`{mission.id}: First Shift fits the Rusty Van, or the Work Van`, need <= Economy.stageCapacity("van", 1) and (level > 1 or need <= start.capacity), need)
+	elseif mission.campaign == "clinic" or mission.campaign == "market" or mission.campaign == "duo" then
+		check(`{mission.id}: at most the Cargo Van`, need <= Economy.stageCapacity("van", 2), need)
+	end
+	if need >= 5 then
+		big += 1
+		-- 5 and more is a big load (a Tall Hauler or the Box Truck): the story says so.
+		check(`{mission.id}: a big load says so`, string.find(string.lower(mission.description), "load", 1, true) ~= nil, mission.description)
 	end
 end
 check("all 110 missions listed", listed == 110, listed)
 check("some missions lend a vehicle, the early ones mostly do not", lent > 0 and early >= 20, `{lent} lent, {early} early`)
+check("a few big loads later on (the Box Truck's missions)", big >= 4 and big <= 10, big)
 
 -- ── The repair shop ──────────────────────────────────────────────────────────
 
@@ -123,5 +240,6 @@ for _, def in Config.Estate.Properties do
 end
 local courier = Economy.findCar("courier")
 check("the Courier Van's level opens a garage for it", firstGarage ~= nil and courier ~= nil and (firstGarage.level or 1) <= (courier.level or 1))
+check("a stage needs no garage: the Old Van grows in its depot slot", (van[2] and van[2].level or 1) <= 2)
 
 print(if failed == 0 then "ALL CHECKS PASSED" else `{failed} CHECK(S) FAILED`)

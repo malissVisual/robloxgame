@@ -324,8 +324,10 @@ Extras.pumpPopups = nil :: (() -> ())? -- shows the next waiting popup (set by t
 Extras.crewSize = 0 -- 3.2: members of my own crew (the server's state, CrewState as the owner): DUO missions need some
 Extras.DUO_COLOR = Color3.fromRGB(236, 92, 60) -- 3.2: the DUO badge (the Partners in Crime colour)
 Extras.DUO_REFUSAL = "DUO mission: invite a friend first (K) and bring them here."
-Extras.capacity = nil :: number? -- 3.4: the cargo slots of my equipped car (its Cargo Rack included; the server's state)
+Extras.capacity = nil :: number? -- 3.4: the cargo slots of my equipped car (3.5: at its stage; the server's state)
 Extras.carName = "car"
+Extras.carId = "van" -- 3.5: my equipped car and its stage (the advice in the "too small" texts)
+Extras.carStage = 0
 Extras.state = {
 	values = {},
 	done = {},
@@ -451,7 +453,7 @@ end
 
 -- 3.4: what START says when the car is too small (the server's words).
 function Extras.slotsText(need: number): string
-	return `This mission needs a vehicle with {need} slots (your {Extras.carName} holds {Extras.capacity or 0}). Upgrade its Cargo Rack or switch cars at your garage.`
+	return `This mission needs a vehicle with {need} slots (your {Extras.carName} holds {Extras.capacity or 0}). {Economy.roomAdvice(Extras.carId, Extras.carStage, need)}`
 end
 
 -- 3.2: is a DUO mission short of a crew right now (not in somebody else's crew: the leader decides there)?
@@ -2793,6 +2795,8 @@ local function applyState(data: any)
 	Extras.crewSize = if type(data.crewSize) == "number" then data.crewSize else 0
 	Extras.capacity = if type(data.capacity) == "number" then data.capacity else nil
 	Extras.carName = if type(data.carName) == "string" then data.carName else "car"
+	Extras.carId = if type(data.carId) == "string" then data.carId else Config.Cars[1].id
+	Extras.carStage = if type(data.carStage) == "number" then data.carStage else 0
 	hasState = true
 	-- Opened before the first state (a slow load): pick where the player is in the story now.
 	if blindPick then

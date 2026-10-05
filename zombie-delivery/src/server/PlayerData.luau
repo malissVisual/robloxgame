@@ -1,10 +1,10 @@
 --!strict
 -- The player's progress: money, the cars and guns they own, the equipped ones, the car guns on their roofs, the upgrade
--- levels (3.3: the car tracks per car in carUpgrades, the gun tracks for all guns in upgrades), the damage of every
--- car (3.4, carHealth: a parked car keeps it until a repair shop fixes it), the driver XP (the
--- level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the properties, the home you
--- spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades, the safe;
--- server/Business.luau) and lifetime stats.
+-- levels (3.3: the car tracks per car in carUpgrades, the gun tracks for all guns in upgrades; 3.5: a car's stage is
+-- carUpgrades[carId].stage), the damage of every car (3.4, carHealth: a parked car keeps it until a repair shop fixes
+-- it), the driver XP (the level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the
+-- properties, the home you spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades,
+-- the safe; server/Business.luau) and lifetime stats.
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -28,7 +28,7 @@ export type Profile = {
 	weapons: { [string]: boolean },
 	weapon: string,
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
-	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car)
+	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car); 3.5: + stage
 	carHealth: { [string]: number }, -- 3.4: car id → its share of health (0 … 1) while parked; no entry = as new
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
@@ -253,6 +253,11 @@ local function applySaved(profile: Profile, saved: any)
 						into[def.id] = level
 					end
 				end
+				-- 3.5: the car's stage (a 3.4 save's cars get theirs below).
+				local stage = number(levels.stage, 0, Economy.maxStage(carId))
+				if stage > 0 then
+					into.stage = stage
+				end
 				if next(into) ~= nil then
 					profile.carUpgrades[carId] = into
 				end
@@ -264,6 +269,23 @@ local function applySaved(profile: Profile, saved: any)
 			profile.upgrades[def.id] = number(saved.upgrades[def.id], 0, def.maxLevel)
 		end
 		Economy.migrateCarUpgrades(profile.upgrades, profile.cars, profile.carUpgrades)
+	end
+	-- 3.5: a save from before the stages (no carStages) keeps the room of every car it owns: each becomes the stage that
+	-- holds at least the slots it had in 3.4 (Economy.legacyStage: its capacity then plus its Cargo Rack, levels.rack,
+	-- gone), once: the rack is not saved again.
+	if saved.carStages ~= true then
+		local old = if type(saved.carUpgrades) == "table" then saved.carUpgrades else {}
+		for carId in profile.cars do
+			if Economy.canUpgrade(carId) then
+				local levels = old[carId]
+				local stage = Economy.legacyStage(carId, if type(levels) == "table" then number(levels.rack, 0, 3) else 0)
+				if stage > 0 then
+					local into: { [string]: number } = profile.carUpgrades[carId] or {}
+					into.stage = math.max(into.stage or 0, stage)
+					profile.carUpgrades[carId] = into
+				end
+			end
+		end
 	end
 	-- 3.4: the damage of every car (a share of its health, for cars you own).
 	if type(saved.carHealth) == "table" then
@@ -426,6 +448,7 @@ function PlayerData.save(player: Player)
 		rep = profile.rep,
 		xp = profile.xp,
 		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on (applySaved converts older saves once)
+		carStages = true, -- 3.5: the cars' room is their stages (applySaved moves a 3.4 save's cars once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,

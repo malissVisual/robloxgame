@@ -27,10 +27,12 @@ with tempfile.TemporaryDirectory() as tmp:
         if "ALL CHECKS PASSED" not in result.stdout:
             ok = False
 # 3.3: the car bodies (server/Vehicles.luau STYLES, not loadable outside Roblox) read as text: every Config.Cars style
-# has a body; every dealer car's body takes cargo (at least 2 slots) and has a back that opens (the 3.2 loading).
+# has a body; every dealer car's body takes cargo and has a back that opens (the 3.2 loading).
 # 3.4: every car's capacity (Config.Cars capacity) is exactly its body's cargo slots (the slot list of cargo(...)).
-def slot_count(body):
-    start = body.find("cargo = cargo(")
+# 3.5: every stage of a car (Config.Cars stages) holds exactly its look's slots (Vehicles.luau LOOKS[look].slots; stage
+# 0 / no look: the body's), every look a stage names exists, and a dealer car holds at least 2 at its last stage.
+def slot_count(body, key="cargo = cargo("):
+    start = body.find(key)
     if start < 0:
         return 0
     open_at = body.index("{", start)
@@ -44,16 +46,22 @@ def slot_count(body):
                 break
     return len(re.findall(r"Vector3\.new", body[open_at:end]))
 
+def entries(text):
+    blocks = {}
+    for match in re.finditer(r"^\t(\w+) = \{\n(.*?)^\t\},?$", text, re.S | re.M):
+        blocks[match.group(1)] = match.group(2)
+    return blocks
+
 def styles_check():
     root = os.path.dirname(HERE)
     config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
     vehicles = open(os.path.join(root, "src", "server", "Vehicles.luau"), encoding="utf-8").read()
-    table = vehicles[vehicles.index("local STYLES"):vehicles.index("local CHASSIS_HEIGHT")]
-    blocks = {}
-    for match in re.finditer(r"^\t(\w+) = \{\n(.*?)^\t\},?$", table, re.S | re.M):
-        blocks[match.group(1)] = match.group(2)
+    blocks = entries(vehicles[vehicles.index("local STYLES"):vehicles.index("local CHASSIS_HEIGHT")])
+    looks_at = vehicles.index("local LOOKS")
+    looks = entries(vehicles[looks_at:vehicles.index("\n}\n", looks_at) + 3])
     cars = config[config.index("Config.Cars = {"):config.index("} :: { CarDef }")]
     bad = []
+    stages_seen = 0
     for entry in re.findall(r"^\t\{\n(.*?)^\t\},?$", cars, re.S | re.M):
         car_id = re.search(r'\bid = "(\w+)"', entry).group(1)
         style = re.search(r'\bstyle = "(\w+)"', entry).group(1)
@@ -67,13 +75,29 @@ def styles_check():
             bad.append(f"{car_id}: no capacity")
         elif int(capacity.group(1)) != count:
             bad.append(f"{car_id}: capacity {capacity.group(1)} but {count} cargo slots in style {style}")
+        most = count
+        for line in re.findall(r"^\t\t\t\{ name = .*$", entry, re.M):
+            stages_seen += 1
+            name = re.search(r'name = "([^"]+)"', line).group(1)
+            held = int(re.search(r"\bcapacity = (\d+)", line).group(1))
+            look = re.search(r'\blook = "(\w+)"', line)
+            if look is None:
+                slots = count
+            elif look.group(1) not in looks:
+                bad.append(f"{car_id} {name}: no look {look.group(1)}")
+                continue
+            else:
+                slots = slot_count(looks[look.group(1)], "slots = {")
+            if slots != held:
+                bad.append(f"{car_id} {name}: capacity {held} but {slots} cargo slots")
+            most = max(most, slots)
         if "company = true" in entry:
             continue
-        if count < 2:
-            bad.append(f"{car_id}: {count} cargo slots")
+        if count < 1 or most < 2:
+            bad.append(f"{car_id}: {count} cargo slots, {most} at its last stage")
         if "back = " not in body:
             bad.append(f"{car_id}: no back")
-    print("== styles: " + (f"every car has a body, every dealer car cargo slots and a back, every capacity its slots ({len(blocks)} styles)" if not bad else "; ".join(bad)))
+    print("== styles: " + (f"every car has a body, every dealer car cargo slots and a back, every capacity its slots ({len(blocks)} styles, {len(looks)} stage looks, {stages_seen} stages)" if not bad else "; ".join(bad)))
     return not bad
 
 if not styles_check():

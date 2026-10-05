@@ -609,6 +609,13 @@ local function unlocksAt(level: number): { string }
 		if def.level == level and not def.company then
 			table.insert(list, def.name)
 		end
+		-- 3.5: a stage of a car you own (Wrench Garage).
+		local stages: { Config.StageDef } = def.stages or {}
+		for n, stage in stages do
+			if n > 1 and stage.level == level and state and type(state.cars) == "table" and state.cars[def.id] then
+				table.insert(list, `the {stage.name} stage`)
+			end
+		end
 	end
 	for _, def in Config.Weapons do
 		if def.level == level and not def.earned then
@@ -820,7 +827,7 @@ function Hud.setOffers(list: { any })
 		elseif offer.tooBig == true then
 			-- 3.4: more pieces than your car holds (the server refuses it too).
 			c.BackgroundColor3 = C.panel
-			local why = `This job needs {offer.slots} cargo slots: your {offer.carName} holds {offer.capacity}. Upgrade its Cargo Rack (Wrench Garage) or take a bigger car out of your garage.`
+			local why = `This job needs {offer.slots} cargo slots: your {offer.carName} holds {offer.capacity}. ` .. (if state then Economy.roomAdvice(state.car, Economy.stageOf(state.car, Economy.carLevels(state.carUpgrades, state.car)), tonumber(offer.slots) or 0) else "")
 			local short = Ui.ghostButton(c, `📦 NEEDS {offer.slots} SLOTS`, UDim2.fromOffset(110, 46), C.red, function()
 				Hud.toast(why)
 			end)
@@ -857,8 +864,17 @@ local shopId = "dealer"
 local shopFocus: string? = nil
 local mechanicTab = "upgrades"
 
-local function carStats(def: Config.CarDef): string
-	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower} · 📦 {def.capacity} slots`
+-- 3.5: with a car's own levels its stage's numbers (the stage's name first); without (the dealer's catalog) the room
+-- it has from stage 0 to its last stage.
+local function carStats(def: Config.CarDef, levels: { [string]: number }?): string
+	if levels then
+		local stats = Economy.carStats(def.id, levels)
+		local stage = Economy.stageDef(def.id, Economy.stageOf(def.id, levels))
+		local prefix = if stage and stage.name ~= def.name then `{stage.name} · ` else ""
+		return `{prefix}Speed {math.floor(stats.maxSpeed + 0.5)} · Health {stats.health} · 📦 {Economy.capacity(def.id, levels)} slots`
+	end
+	local most = Economy.maxCapacity(def.id)
+	return `Speed {def.maxSpeed} · Health {def.health} · Ram x{def.ramPower} · 📦 {if most > def.capacity then `{def.capacity} → {most}` else def.capacity} slots`
 end
 
 -- Damage, rate, range (and pellets, blast) of a hand gun or a car gun.
@@ -976,14 +992,19 @@ local function renderShop()
 			end
 		end
 		local full = owned >= (tonumber(player:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots)
+		-- 3.5: not "the next van": every car has a role, and its own stages at Wrench Garage (📦 from → to).
+		note(shop.body, "The catalog. Every car has a role and builds up in stages at Wrench Garage (📦 slots from → to). A van ends at 4 slots: more needs the High-Roof Van or the Box Truck.", C.dim, 1)
 		for order, def in Config.Cars do
 			if def.company then
 				continue
 			end
-			local c = card(shop.body, 84, order + 1, def.id == shopFocus)
+			local c = card(shop.body, 100, order + 1, def.id == shopFocus)
 			local lock = if state.cars[def.id] then nil else lockedAt(def.level)
 			local need = needs(def, state.cars[def.id] == true)
 			cardText(c, def.name, carStats(def) .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
+			if def.role then
+				Ui.label(c, `ROLE · {string.upper(def.role)}`, UDim2.new(1, -206, 0, 16), { Position = UDim2.fromOffset(16, 78), TextColor3 = C.blue, TextSize = 12, Font = Theme.HeadingFont })
+			end
 			if state.car == def.id then
 				cardButton(c, "YOUR CAR", C.grey, false, function() end)
 			elseif state.cars[def.id] then
@@ -1014,7 +1035,7 @@ local function renderShop()
 				continue
 			end
 			local c = card(shop.body, 84, order + 1)
-			cardText(c, def.name, carStats(def), def.description)
+			cardText(c, def.name, carStats(def, Economy.carLevels(state.carUpgrades, def.id)), def.description)
 			if state.car == def.id then
 				cardButton(c, "DRIVING", C.grey, false, function() end)
 			else
@@ -1087,11 +1108,45 @@ local function renderShop()
 			local carOk = upCar ~= nil and Economy.canUpgrade(upCar.id)
 			local carLevels = Economy.carLevels(state.carUpgrades, state.car)
 			if carOk then
-				note(shop.body, `Upgrades for: {if upCar then upCar.name else "your car"} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (bull bar, plates, scoop, roof rack). Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
+				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (bull bar, plates, scoop); a STAGE rebuilds the car itself. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
 			else
 				note(shop.body, `Your {if upCar then upCar.name else "vehicle"} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`, C.red, 1)
 			end
 			local row = 1
+			-- 3.5: the STAGE card: the car's next stage (its new look, its room, before → after) or its last one.
+			if carOk and upCar and Economy.maxStage(upCar.id) > 0 then
+				row += 1
+				local stage = Economy.stageOf(upCar.id, carLevels)
+				local last = Economy.maxStage(upCar.id)
+				local now = Economy.stageDef(upCar.id, stage)
+				local nextStage = Economy.stageDef(upCar.id, stage + 1)
+				local c = card(shop.body, 112, row, nextStage ~= nil)
+				local pips = string.rep("■", stage) .. string.rep("□", last - stage)
+				local nowName = if now then now.name else upCar.name
+				if nextStage then
+					local after = table.clone(carLevels)
+					after.stage = stage + 1
+					local a, b = Economy.carStats(upCar.id, carLevels), Economy.carStats(upCar.id, after)
+					cardText(c, `STAGE {stage + 1}/{last}: {nextStage.name}`, `{pips}  {nowName} → {nextStage.name}`, `Adds {nextStage.adds}.`)
+					Ui.label(c, `📦 {Economy.capacity(upCar.id, carLevels)} → {nextStage.capacity} slots · Health {a.health} → {b.health} · Speed {math.floor(a.maxSpeed + 0.5)} → {math.floor(b.maxSpeed + 0.5)}`, UDim2.new(1, -206, 0, 18), {
+						Position = UDim2.fromOffset(16, 80),
+						TextColor3 = C.green,
+						TextSize = 13,
+						Font = Theme.HeadingFont,
+					})
+					local lock = lockedAt(nextStage.level)
+					if lock then
+						lockButton(c, lock)
+					else
+						cardButton(c, `STAGE UP {Ui.money(nextStage.price)}`, C.green, here and money >= nextStage.price, function()
+							Net.get("Upgrade"):FireServer("stage")
+						end)
+					end
+				else
+					cardText(c, `STAGE {stage}/{last}: {nowName}`, `{pips}  the last stage · 📦 {Economy.capacity(upCar.id, carLevels)} slots`, `Your {upCar.name} is all it can be. More room needs a bigger vehicle (Dead End Motors).`)
+					cardButton(c, "LAST STAGE", C.grey, false, function() end)
+				end
+			end
 			for pass = 1, 2 do
 				if pass == 2 then
 					row += 1
@@ -1415,7 +1470,7 @@ function renderBackpack()
 				local c = card(backpack.body, 84, order + 1)
 				local gunId = if def.mount and state.carGuns then state.carGuns[def.id] else nil
 				local gun = if gunId then Economy.findCarGun(gunId) else nil
-				cardText(c, def.name, carStats(def) .. (if gun then ` · 🔫 {gun.name}` else "") .. (if type(state.carHealth) == "table" and type(state.carHealth[def.id]) == "number" and state.carHealth[def.id] < 0.995 then ` · 🔧 {math.floor(state.carHealth[def.id] * 100 + 0.5)}%` else ""), def.description)
+				cardText(c, def.name, carStats(def, Economy.carLevels(state.carUpgrades, def.id)) .. (if gun then ` · 🔫 {gun.name}` else "") .. (if type(state.carHealth) == "table" and type(state.carHealth[def.id]) == "number" and state.carHealth[def.id] < 0.995 then ` · 🔧 {math.floor(state.carHealth[def.id] * 100 + 0.5)}%` else ""), def.description)
 				if state.car == def.id then
 					cardButton(c, "DRIVING", C.grey, false, function() end)
 				end

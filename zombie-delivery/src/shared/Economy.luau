@@ -205,19 +205,125 @@ function Economy.migrateCarUpgrades(upgrades: Upgrades, cars: { [string]: boolea
 	return moved
 end
 
--- 3.4, cargo capacity: how many pieces carried or led by hand the car takes at once: its cargo slots
--- (CarDef.capacity) + its Cargo Rack (the "rack" track, +perLevel each level; not on a company vehicle).
+-- ── 3.5, the stages (Config.Cars stages) ─────────────────────────────────────
+-- A car's stages are bought at Wrench Garage one after the other; stages[1] is stage 0 (the car as it is sold). The
+-- stage is saved with the car's own levels: profile.carUpgrades[carId].stage.
+
+local NO_STAGES: { Config.StageDef } = {}
+
+-- The stages of a car, stage 0 first ({} for a car without them: the company vehicles).
+function Economy.stages(carId: string): { Config.StageDef }
+	local def = Economy.findCar(carId)
+	return if def and def.stages and not def.company then def.stages else NO_STAGES
+end
+
+-- The last stage a car can reach (0: none to buy).
+function Economy.maxStage(carId: string): number
+	return math.max(0, #Economy.stages(carId) - 1)
+end
+
+-- The stage a car is at, out of its own levels (clamped to the stages it has).
+function Economy.stageOf(carId: string, levels: Upgrades?): number
+	local stage = if levels then Economy.level(levels, "stage") else 0
+	return math.clamp(math.floor(stage), 0, Economy.maxStage(carId))
+end
+
+-- A stage of a car (0 = the car as it is sold), or nil.
+function Economy.stageDef(carId: string, stage: number): Config.StageDef?
+	return Economy.stages(carId)[stage + 1]
+end
+
+-- The price of the stage after `stage`, or nil when there is none.
+function Economy.stageCost(carId: string, stage: number): number?
+	local nextStage = Economy.stageDef(carId, stage + 1)
+	return if nextStage then nextStage.price else nil
+end
+
+-- The cargo slots of a car at a stage (its own capacity without stages).
+function Economy.stageCapacity(carId: string, stage: number): number
+	local def = Economy.findCar(carId)
+	if not def then
+		return 0
+	end
+	local stageDef = Economy.stageDef(carId, stage)
+	return if stageDef then stageDef.capacity else def.capacity
+end
+
+-- The most a car can ever hold (its last stage).
+function Economy.maxCapacity(carId: string): number
+	return Economy.stageCapacity(carId, Economy.maxStage(carId))
+end
+
+-- What the car is called at its stage: "Old Van · Work Van" ("Courier Van" while the stage has the car's name).
+function Economy.carTitle(carId: string, levels: Upgrades?): string
+	local def = Economy.findCar(carId)
+	if not def then
+		return carId
+	end
+	local stageDef = Economy.stageDef(carId, Economy.stageOf(carId, levels))
+	return if stageDef and stageDef.name ~= def.name then `{def.name} · {stageDef.name}` else def.name
+end
+
+-- 3.4's cargo slots of the cars you could buy (their capacity before the stages): what a 3.4 save's car held.
+local LEGACY_CAPACITY: { [string]: number } = {
+	van = 4,
+	courier = 4,
+	highroof = 6,
+	pickup = 4,
+	boxtruck = 6,
+	muscle = 2,
+	armorvan = 4,
+	rallyvan = 4,
+}
+
+-- A 3.4 save's car becomes a stage: the first one that holds at least the slots it had then (its 3.4 capacity plus
+-- its Cargo Rack, `rack` levels, +1 slot each, bought: never fewer than were paid for); when no stage holds that many,
+-- the first one with the car's most room (0 when no stage adds any, as on the Rally Van).
+function Economy.legacyStage(carId: string, rack: number): number
+	local last = Economy.maxStage(carId)
+	local had = (LEGACY_CAPACITY[carId] or Economy.stageCapacity(carId, 0)) + math.max(0, rack)
+	local best = 0
+	for stage = 0, last do
+		local capacity = Economy.stageCapacity(carId, stage)
+		if capacity >= had then
+			return stage
+		end
+		if capacity > Economy.stageCapacity(carId, best) then
+			best = stage
+		end
+	end
+	return best
+end
+
+-- What would make room for `need` pieces when this car (at `stage`) holds fewer: its first stage that holds them (built
+-- at Wrench Garage), else the dealer's cars that can (at some stage of theirs). For the "too big for your car" texts.
+function Economy.roomAdvice(carId: string, stage: number, need: number): string
+	for next = stage + 1, Economy.maxStage(carId) do
+		local stageDef = Economy.stageDef(carId, next)
+		if stageDef and stageDef.capacity >= need then
+			return `Build it up at Wrench Garage: as a {stageDef.name} it holds {stageDef.capacity}.`
+		end
+	end
+	local names: { string } = {}
+	for _, def in Config.Cars do
+		if not def.company and def.id ~= carId and Economy.maxCapacity(def.id) >= need then
+			table.insert(names, def.name)
+		end
+	end
+	if #names == 0 then
+		return "None of the dealer's cars holds that much."
+	end
+	return `That needs a bigger vehicle: the {table.concat(names, " or the ")} (your garage, or Dead End Motors).`
+end
+
+-- 3.4, cargo capacity: how many pieces carried or led by hand the car takes at once: its cargo slots (CarDef
+-- capacity; 3.5: its stage's, out of `levels`.stage).
 function Economy.capacity(carId: string, levels: Upgrades?): number
 	local def = Economy.findCar(carId)
 	if not def then
 		return 0
 	end
-	local rack = Economy.findUpgrade("rack")
-	local extra = 0
-	if rack and levels and not def.company then
-		extra = math.clamp(Economy.level(levels, "rack"), 0, rack.maxLevel) * rack.perLevel
-	end
-	return def.capacity + math.floor(extra)
+	return Economy.stageCapacity(carId, Economy.stageOf(carId, levels))
 end
 
 -- 3.4: the cargo slots a job needs: its pieces when they are carried or led in by hand (all of them ride at once:
@@ -240,14 +346,18 @@ function Economy.repairFee(missing: number): number
 end
 
 -- The car's stats with ITS car-track levels (3.3: Economy.carLevels of profile.carUpgrades).
+-- 3.5: with its stage's small bonus (StageDef health, speed) before the upgrades multiply.
 function Economy.carStats(carId: string, upgrades: Upgrades): CarStats
 	local def = Economy.findCar(carId) or Config.Cars[1]
 	local engine = Economy.multiplier(upgrades, "engine")
+	local stage = Economy.stageDef(def.id, Economy.stageOf(def.id, upgrades))
+	local speed = def.maxSpeed + (if stage then stage.speed or 0 else 0)
+	local health = def.health + (if stage then stage.health or 0 else 0)
 	return {
-		maxSpeed = def.maxSpeed * engine,
+		maxSpeed = speed * engine,
 		accel = def.accel * engine,
 		turn = def.turn * Economy.multiplier(upgrades, "handling"),
-		health = math.floor(def.health * Economy.multiplier(upgrades, "armor")),
+		health = math.floor(health * Economy.multiplier(upgrades, "armor")),
 		ramPower = def.ramPower * Economy.multiplier(upgrades, "plow"),
 	}
 end
