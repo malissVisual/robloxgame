@@ -486,7 +486,7 @@ van, the high-roof van and the box truck also drive past in the traffic.
 A car needs a free car slot: since 3.4 the depot holds only your starting van, every further car needs a garage slot
 (see **Cars, cargo, garages and the repair shop**).
 
-**The upgrades belong to one car.** At Wrench Garage the car tracks (Engine, Tyres & Suspension, Armor, Ram Plow, Quick Hands; 4.0: the Hand Trolley)
+**The upgrades belong to one car.** At Wrench Garage the car tracks (Engine, Tyres & Suspension, Armor, Ram Plow; 4.0: the Hand Trolley)
 upgrade the car you have equipped (`profile.carUpgrades[carId]`; the window says "Upgrades for: Courier Van", the price
 grows with that car's level); a new car starts stock. Gun Damage and Fire Rate stay for all your guns and car guns
 ("For all your guns"). The employers' company vehicles cannot be upgraded. An older save's upgrades (they were for
@@ -506,9 +506,8 @@ end, hood and first window; rebuilt when you upgrade):
   **lower stance** (the body sits 0.25 lower: the car is built again).
 * **Hand Trolley** (4.0, one level, $600, only the vans and trucks: `CarDef.trolley`): folded **inside the back doors**
   (seen when they open) on the Attachment `TrolleyMount`; take it out to carry up to 4 pieces at once (server/Cargo.luau).
-* **Quick Hands** (new, 3 levels; 3.4: $400 · $800 · $1,600): **−15 % per level** of the time to open the back and to pick
-  up, load, take out and hand over (the holds of the BackPrompt and the cargo prompts, `Economy.loadHold`; the job's
-  car's level counts).
+* **Quick Hands** is gone (4.0.1): opening the back, picking up, loading, taking out and handing over are instant on E
+  (`Config.Cargo.HoldDuration` 0), so there is nothing left to shorten. A save's Quick Hands levels are refunded once.
 
 * ~~Cargo Rack~~ (3.4, gone in 3.5): the car's **stages** give the room now, each with its own look (see **Stages
   and the cars' roles**). A 3.4 save's cars became the stage that holds the slots they had (see there).
@@ -596,7 +595,7 @@ van". Every car you can buy has **stages** (stage 0 is the car as sold), bought 
 Garage** for the car you drive: the UPGRADES tab shows a **STAGE card** with the next stage's name, its price, its
 level lock, what it adds and **before → after** (📦 slots, health, speed). A stage is kept with the car
 (`profile.carUpgrades[carId].stage`) and **changes its look**: the mechanics rebuild the car where it stands (not
-during a delivery, not on a repair lift). The upgrades (Engine, Tyres & Suspension, Armor, Ram Plow, Quick Hands, the
+during a delivery, not on a repair lift). The upgrades (Engine, Tyres & Suspension, Armor, Ram Plow, the
 Hand Trolley) stay as they were and their UpgradeKit (tyres, bull bar, plates, scoop, the trolley) fits every stage; the paint covers the new body panels too (a high
 roof, a roof pod); the car gun moves up onto a high roof.
 

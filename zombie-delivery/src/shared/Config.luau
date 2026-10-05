@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.0"
+Config.Version = "4.0.1"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -770,7 +770,7 @@ Config.Upgrades = {
 	{ id = "handling", car = true, name = "Tyres & Suspension", description = "+8% steering · Lv 1: new tyres with tread · Lv 3: alloy rims · Lv 5: a lower stance", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
 	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
 	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
-	{ id = "loading", car = true, name = "Quick Hands", description = "−15% time to open the back, load and unload", maxLevel = 3, baseCost = 400, costGrowth = 2.0, perLevel = 0.15 },
+	-- (4.0.1: Quick Hands, "loading", is gone: the holds it shortened are instant now; a save's levels are refunded)
 	{ id = "trolley", car = true, name = "Hand Trolley", description = "Carry up to 4 pieces at once · it rides folded inside the back doors (vans and trucks)", maxLevel = 1, baseCost = 600, costGrowth = 1, perLevel = 0 },
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
@@ -1835,7 +1835,7 @@ Config.Cargo = {
 	ApproachDistance = 80, -- closer than this the HUD says what to do on foot and the enemies come on foot
 	PileOffset = 12, -- an address without a cargo spot: the pile is this far from the road toward the building
 	PromptDistance = 10,
-	HoldDuration = 0.25, -- hold E this long to pick up / load / hand over
+	HoldDuration = 0, -- 4.0.1: E picks up / loads / opens the back at once (no hold; it was 0.25 s)
 	MaxCarSpeed = 6, -- the vehicle must stand to load or unload it
 	StealPieceRate = 3, -- bandits at the car: their steal share x this fills a meter, every full one = a piece gone
 	KidGap = 0.9, -- seconds between the kids (or patients) getting on / off
