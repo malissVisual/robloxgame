@@ -871,7 +871,10 @@ local function buildSupplies(parent: Instance)
 	local facing = Vector3.new(0, 0, 1)
 	local w, d, h = 64, 44, 14
 	local frame = shopFrame(cx, cz, facing, 18)
-	building(shop, frame, w, d, h, Color3.fromRGB(90, 110, 80), Enum.Material.Concrete, 12, 10)
+	building(shop, frame, w, d, h, Color3.fromRGB(77, 82, 77), Enum.Material.Concrete, 12, 10)
+	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Supplies), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "LAST STOP SUPPLIES", Vector3.new(48, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(140, 255, 120), nil, "supplies", 11)
 	counter(shop, frame, d, "supplies", "Last Stop Supplies")
 	for row = -1, 1, 2 do
