@@ -8,6 +8,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/location-mechanic` · approved cinematic mechanic facade in `BuildingLooks/Mechanic.luau` and its World builder; based on `codex/location-kit`. Logic, compilation and geometry checks pass. Studio: both repair bays, timer signs and large-van entry.
 - Codex · `codex/location-kit` · common nonblocking architecture renderer, approved reference and geometry/runtime validator; merge before the six location branches. Logic suite and Studio-mode compilation pass. Studio: day/night lighting and `Architecture` folders; no gameplay changes in this foundation.
 
 ## Questions / handoff
