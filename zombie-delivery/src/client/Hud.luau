@@ -239,7 +239,7 @@ moneyLabel = Ui.label(moneyPanel, "$0", UDim2.new(1, 0, 0, 30), {
 	TextScaled = true,
 })
 Ui.make("UITextSizeConstraint", { MaxTextSize = 28 }, moneyLabel)
--- The driver level: the badge, the rank and the XP, the bar.
+-- The driver level: the badge, the rank and the XP bar (its numbers on hover).
 local levelRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 1, -40), BackgroundTransparency = 1 }, moneyPanel)
 levelChip = Ui.label(levelRow, "1", UDim2.fromOffset(38, 38), {
 	Position = UDim2.new(0, 0, 0.5, 0),
@@ -265,13 +265,35 @@ rankLabel = Ui.label(levelRow, "", UDim2.new(1, -48, 0, 16), {
 	Font = Theme.HeadingFont,
 	TextColor3 = C.text,
 })
-xpLabel = Ui.caps(levelRow, "", UDim2.new(1, -48, 0, 12), {
-	Position = UDim2.fromOffset(48, 20),
-	TextSize = 10,
-})
-xpBack, xpFill = Ui.bar(levelRow, UDim2.new(1, -48, 0, 4), C.yellow)
-xpBack.Position = UDim2.new(0, 48, 1, -4)
+-- The XP bar: thick, under the rank. The numbers only on hover (or a tap on a touch screen), in a pill beside it.
+xpBack, xpFill = Ui.bar(levelRow, UDim2.new(1, -48, 0, 10), C.yellow)
+xpBack.Position = UDim2.new(0, 48, 1, -12)
 xpBack.BackgroundColor3 = Theme.Ink
+Ui.stroke(xpBack, C.yellow, 1).Transparency = 0.6
+xpLabel = Ui.caps(levelRow, "", UDim2.fromOffset(0, 20), {
+	AutomaticSize = Enum.AutomaticSize.X,
+	Position = UDim2.new(1, 22, 1, -7), -- to the right of the card, level with the bar
+	AnchorPoint = Vector2.new(0, 0.5),
+	BackgroundTransparency = 0.05,
+	BackgroundColor3 = Theme.Ink,
+	TextSize = 11,
+	TextColor3 = C.text,
+	Visible = false,
+	ZIndex = 5,
+})
+Ui.corner(xpLabel, 6)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, xpLabel)
+levelRow.MouseEnter:Connect(function()
+	xpLabel.Visible = xpLabel.Text ~= ""
+end)
+levelRow.MouseLeave:Connect(function()
+	xpLabel.Visible = false
+end)
+levelRow.InputBegan:Connect(function(input: InputObject)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		xpLabel.Visible = not xpLabel.Visible and xpLabel.Text ~= ""
+	end
+end)
 end
 
 -- ── Top stack ──────────────────────────────────────────────────────────────
