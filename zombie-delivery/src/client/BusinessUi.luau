@@ -897,7 +897,7 @@ function BusinessUi.gpsToOffice()
 	end
 	local name = tostring(state.officeName or "Your office")
 	MapView.setWaypoint(position)
-	-- The HUD's guide arrow and "You are at ..." work from a landmark.
+	-- The HUD's guide (the circle, the beam, the waypoint) and "You are at ..." work from a landmark.
 	pcall(MapView.onWaypoint, {
 		id = tostring(state.office or "office"),
 		name = name,
