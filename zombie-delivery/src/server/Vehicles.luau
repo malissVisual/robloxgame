@@ -117,6 +117,11 @@
 --   rear Hitch, its wheels on WheelMotors too). None of the car kit (plow, armour, engine, tyres, car gear) on a bike.
 -- * Never traffic, a bandit car or a chauffeur's: the CAR button (Vehicles.spawn) puts it by the kerb next to you at
 --   once and seats you (Vehicles.placeNear); buildNpc / buildTraffic take the van instead of a bike.
+-- 5.1.1, THE E-SCOOTER (CarDef escooter, style "scooter", Style.stand): a bike by every rule above on its own small
+-- art (server/ScooterArt/Geometry.luau, the same ModelArt convention: a deck, a tall stem, two small wheels, no crank).
+-- Its hull is low and short, its wheel colliders small (radius 0.6); the rider STANDS: the DriverSeat sits a hip's
+-- height over the deck (the model's attribute BikeStand: client/BikeRider.luau straightens the legs onto the deck).
+-- One gear slot for the basket on the stem; the rear rack's one light slot.
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -135,6 +140,7 @@ local DayNight = require(script.Parent.DayNight)
 local Boarding = require(Shared.Boarding)
 local VehicleArt = require(script.Parent.VehicleArt.Builder)
 local BikeArt = require(script.Parent.BikeArt.Geometry) -- 5.1: Codex's bikes and bike gear (pure geometry)
+local ScooterArt = require(script.Parent.ScooterArt.Geometry) -- 5.1.1: the E-Scooter (pure geometry, the same convention)
 local ModelArt = require(script.Parent.ModelArt.Builder) -- 5.1: welds that geometry to our hidden roots
 
 export type Car = {
@@ -239,6 +245,7 @@ type Style = {
 	-- 5.1: a bike's body (CarDef.bike): Codex's art over a hidden hull, two wheels on the centre line, one doorless
 	-- saddle (doorsOf), no back, no car kit (buildKit), its cargo slots on the rack or in the box (bikeBody).
 	bike: boolean?,
+	stand: boolean?, -- 5.1.1: the rider stands on a deck (the E-Scooter): the seat a hip's height over it, no crank
 	jack: Vector3?, -- 4.0: the Attachment JackMount (the pallet jack, server/Cargo.luau), relative to the chassis top centre
 }
 
@@ -1047,6 +1054,27 @@ local STYLES: { [string]: Style } = {
 			Vector3.new(-0.35, 0.11, -0.2),
 			Vector3.new(0.35, 0.11, -0.2),
 		}, nil, Vector3.new(-1.3, 0.5, -0.6)),
+	},
+	-- 5.1.1, the E-Scooter (server/ScooterArt/Geometry.luau over this hidden hull): small wheels (radius 0.6, axles at
+	-- z -1.95 and 1.45), so a low hull: the chassis top 1.5 over the ground (clearance 0.3 + 1.2); one low hidden box
+	-- under the stem and the deck (its top 2.1, under a standing rider's hips). The rider stands on the deck (its top
+	-- 0.59): the seat's top at 2.45, about a hip's height over it (client/BikeRider.luau straightens the legs). The rear
+	-- rack's one light slot (the art's Slot1 at 1.39), loaded from behind.
+	scooter = {
+		width = 2.0,
+		length = 5.0,
+		wheel = 0.6,
+		wheelWidth = 0.4,
+		clearance = 0.3,
+		seat = Vector3.new(0, 0.75, -0.2),
+		passengers = {},
+		roof = 2,
+		bike = true,
+		stand = true,
+		boxes = {
+			box(Vector3.new(0.6, 0.6, 3.6), Vector3.new(0, 0.3, -0.2), "dark"), -- the deck, the neck and the stem's foot
+		},
+		cargo = cargo("rack", 5.0, 2.0, { Vector3.new(0, -0.11, 1.45) }, nil, Vector3.new(0, 0.1, 2.3)),
 	},
 }
 
@@ -1904,7 +1932,7 @@ local bikeSpecs: { [string]: any } = {}
 local function bikeSpec(id: string): any
 	local spec = bikeSpecs[id]
 	if not spec then
-		spec = BikeArt.spec(id)
+		spec = if table.find(ScooterArt.ids, id) then ScooterArt.spec(id) else BikeArt.spec(id) -- (5.1.1: the E-Scooter)
 		bikeSpecs[id] = spec
 	end
 	return spec
@@ -1912,10 +1940,10 @@ end
 
 -- The art of a bike (its car id; an unknown one: the Courier Bike, the Cargo Bike's on a cargobike body).
 local function bikeArtId(carId: string, styleId: string): string
-	if carId ~= "cargobike_loaded" and table.find(BikeArt.ids, carId) then
+	if carId ~= "cargobike_loaded" and (table.find(BikeArt.ids, carId) or table.find(ScooterArt.ids, carId)) then
 		return carId
 	end
-	return if styleId == "cargobike" then "cargobike" else "citybike"
+	return if styleId == "cargobike" then "cargobike" elseif styleId == "scooter" then "escooter" else "citybike"
 end
 
 -- A point of an art spec (its `at`, relative to its root: the bike's Frame points are from the ground), or nil.
@@ -1985,15 +2013,18 @@ local function bikeBody(model: Model, chassis: Part, chassisY: number, style: St
 		FrontWheel = wheelRoot(model, chassis, frame, front, style.wheel, 0.3, true),
 		RearWheel = wheelRoot(model, chassis, frame, rear, style.wheel, 0.3, false),
 	}
-	local crankAt = artOrigin(spec, "Crank")
-	local crank = hiddenPart(model, "Crank", BIKE_HIDDEN, frame.CFrame * CFrame.new(crankAt))
-	local crankMotor = Instance.new("Motor6D")
-	crankMotor.Name = "CrankMotor"
-	crankMotor.Part0 = frame
-	crankMotor.Part1 = crank
-	crankMotor.C0 = CFrame.new(crankAt)
-	crankMotor.Parent = chassis
-	targets.Crank = crank
+	if spec.origins.Crank then
+		-- (5.1.1: the E-Scooter has no crank: nothing to pedal.)
+		local crankAt = artOrigin(spec, "Crank")
+		local crank = hiddenPart(model, "Crank", BIKE_HIDDEN, frame.CFrame * CFrame.new(crankAt))
+		local crankMotor = Instance.new("Motor6D")
+		crankMotor.Name = "CrankMotor"
+		crankMotor.Part0 = frame
+		crankMotor.Part1 = crank
+		crankMotor.C0 = CFrame.new(crankAt)
+		crankMotor.Parent = chassis
+		targets.Crank = crank
+	end
 	local art = ModelArt.build(model, spec, targets)
 	for _, p in art.parts do
 		if p:GetAttribute("NightLamp") == true then
@@ -2505,6 +2536,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		-- 5.1: a bike's chassis and boxes are its hidden hull; Codex's art is the look (bikeBody).
 		chassis.Transparency = 1
 		model:SetAttribute("Bike", true)
+		if style.stand then
+			model:SetAttribute("BikeStand", true) -- 5.1.1: the E-Scooter's rider stands (client/BikeRider.luau)
+		end
 	end
 
 	local polished = not oneBeam and VehicleArt.supports(def.style)

@@ -10,6 +10,8 @@
 -- (Vehicles.remove: its damage is kept) and puts the chosen one at the garage's drive-out spot (Vehicles.placeAt).
 -- Not during a delivery (the job's car stays). Calling your car (CAR, server/CarCall.luau) still brings the equipped
 -- car anywhere.
+-- 5.1.1: no bikes here (CarDef.bike: the bikes and the E-Scooter need no garage slot; you switch them at Spoke & Chain
+-- or with the phone's MY BIKE): the window leaves them out and "take" refuses one.
 --
 -- The "Garage" remote (shared/Net.luau):
 --   client → server  ("take", car id)  take that car out here
@@ -157,8 +159,8 @@ local function stateFor(player: Player, at: string, open: boolean): { [string]: 
 	local live = Vehicles.get(player)
 	local cars = {}
 	for _, def in Config.Cars do
-		if not profile.cars[def.id] then
-			continue
+		if not profile.cars[def.id] or def.bike then
+			continue -- (5.1.1: a bike is not kept in a garage)
 		end
 		local levels = Economy.carLevels(profile.carUpgrades, def.id)
 		table.insert(cars, {
@@ -221,6 +223,9 @@ function Garages.take(player: Player, carId: string): string?
 	end
 	if not profile.cars[carId] then
 		return `The {def.name} is not yours.`
+	end
+	if def.bike then
+		return `Bikes need no garage: MY BIKE on your phone (or {Config.BikeShop.Shop}) puts your {def.name} by the kerb.` -- 5.1.1
 	end
 	local at = Garages.where(player)
 	if not at then

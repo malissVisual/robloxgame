@@ -13,10 +13,10 @@ def prepare_modules(tmp, vehicles_source=None):
         (tmp/f'{name}.luau').write_text(s)
     for name in ['Net','World','PlayerData']:(tmp/f'{name}.luau').write_text('return {}\n')
     (tmp/'DayNight.luau').write_text('local Mock=require("./roblox-mock")\nreturn {nightLight=Mock.nightLight}\n')
-    # 5.1: the bikes' art (BikeArt/Geometry, ModelArt/Builder) under their own names next to the fleet's.
-    for name,source in [('Vehicles',ROOT/'src/server/Vehicles.luau'),('Builder',ROOT/'src/server/VehicleArt/Builder.luau'),('Geometry',ROOT/'src/server/VehicleArt/Geometry.luau'),('BikeGeometry',ROOT/'src/server/BikeArt/Geometry.luau'),('ModelBuilder',ROOT/'src/server/ModelArt/Builder.luau')]:
+    # 5.1: the bikes' art (BikeArt/Geometry, ModelArt/Builder; 5.1.1 ScooterArt/Geometry) under their own names next to the fleet's.
+    for name,source in [('Vehicles',ROOT/'src/server/Vehicles.luau'),('Builder',ROOT/'src/server/VehicleArt/Builder.luau'),('Geometry',ROOT/'src/server/VehicleArt/Geometry.luau'),('BikeGeometry',ROOT/'src/server/BikeArt/Geometry.luau'),('ScooterGeometry',ROOT/'src/server/ScooterArt/Geometry.luau'),('ModelBuilder',ROOT/'src/server/ModelArt/Builder.luau')]:
         s=vehicles_source if name=='Vehicles' and vehicles_source is not None else source.read_text()
-        s=s.replace('require(script.Parent.BikeArt.Geometry)','require("./BikeGeometry")').replace('require(script.Parent.ModelArt.Builder)','require("./ModelBuilder")')
+        s=s.replace('require(script.Parent.BikeArt.Geometry)','require("./BikeGeometry")').replace('require(script.Parent.ModelArt.Builder)','require("./ModelBuilder")').replace('require(script.Parent.ScooterArt.Geometry)','require("./ScooterGeometry")')
         s=re.sub(r'require\(Shared.(\w+)\)',r'require("./\1")',s)
         s=re.sub(r'require\(script.Parent.(?:VehicleArt.)?(\w+)\)',r'require("./\1")',s)
         if name=='Vehicles':s=s.replace('return Vehicles','Vehicles.__testBuild = build\nVehicles.__testBuildKit = buildKit\nVehicles.__testStyle = styleFor\nreturn Vehicles')

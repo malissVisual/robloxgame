@@ -3,6 +3,8 @@
 -- roots, the movers and joints CarVisuals needs, one doorless saddle on the leaning frame, no back, the hidden stable
 -- hull, the cargo slots (the bike's own = its capacity; each piece of bike gear adds its room), display anchoring and
 -- the part budget. Run by check_fleet.py next to the fleet audit (the bikes are not in the garage data).
+-- 5.1.1: the E-Scooter (style "scooter", Style.stand) on its own art (ScooterArt): small wheels, no crank, a standing
+-- rider (the BikeStand attribute, the seat a hip's height over the deck), the basket only (no panniers or trailer).
 local Mock = require('./roblox-mock')
 local Vehicles = require('./Vehicles')
 local Config = require('./Config')
@@ -11,6 +13,7 @@ local Economy = require('./Economy')
 local BUDGET = 80 -- BaseParts of a bike as built (art ~60 + 4 roots + chassis, hull, 4 colliders, the saddle)
 local GEAR_BUDGET = 50 -- what the basket, the panniers and the trailer add at most (Codex: 10 + 11 + 25)
 local ROOM = { basket = 2, panniers = 3, trailer = 4 }
+local SCOOTER_BUDGET = 60 -- the E-Scooter as built (art 39 + 3 roots + chassis, hull, 4 colliders, the seat)
 
 local function count(model: any, check: (any) -> boolean): number
 	local n = 0
@@ -44,17 +47,31 @@ for _, def in Config.Cars do
 	local model, chassis = built.model, built.chassis
 	assert(model:GetAttribute('Bike') == true and chassis.Transparency == 1, def.id .. ': a hidden hull, the Bike attribute')
 	assert(built.seat ~= nil and #built.passengers == 0, def.id .. ': one saddle, no passengers')
+	local style = Vehicles.__testStyle(def, 0)
+	local stand = style.stand == true
+	assert(stand == (def.stand == true), def.id .. ': a standing rider on a standing style only')
+	assert((model:GetAttribute('BikeStand') == true) == stand, def.id .. ': the BikeStand attribute')
 	local frame = model:FindFirstChild('BikeFrame')
 	assert(frame and frame.Transparency == 1 and frame.Massless and not frame.CanCollide, def.id .. ': the hidden BikeFrame root')
 	local lean = chassis:FindFirstChild('BikeLean')
 	assert(lean and lean.ClassName == 'Motor6D' and lean.Part0 == chassis and lean.Part1 == frame, def.id .. ': the BikeLean joint')
 	local crank = chassis:FindFirstChild('CrankMotor')
-	assert(crank and crank.Part0 == frame and crank.Part1 and crank.Part1.Name == 'Crank', def.id .. ': the CrankMotor joint')
+	if stand then
+		assert(crank == nil and named(model, 'Crank') == nil, def.id .. ': no crank on a scooter')
+		-- The deck under the standing rider: the seat's top about a hip's height (1.6 – 2.2) over the art's Deck point.
+		local deck = frame:FindFirstChild('Deck')
+		local seatTop = built.seat.Position.Y + built.seat.Size.Y / 2
+		assert(deck, def.id .. ': the Deck point')
+		local over = seatTop - (frame.Position.Y + deck.Position.Y)
+		assert(over > 1.6 and over < 2.2, def.id .. ': the seat ' .. over .. ' over the deck')
+	else
+		assert(crank and crank.Part0 == frame and crank.Part1 and crank.Part1.Name == 'Crank', def.id .. ': the CrankMotor joint')
+	end
 	local wheels = 0
 	for _, d in chassis:GetChildren() do
 		if d.Name == 'WheelMotor' then
 			wheels += 1
-			assert(d.Part0 == frame and d:GetAttribute('Radius') == 1.3, def.id .. ': a wheel on the leaning frame')
+			assert(d.Part0 == frame and d:GetAttribute('Radius') == style.wheel and style.wheel == (if stand then 0.6 else 1.3), def.id .. ': a wheel on the leaning frame')
 		end
 	end
 	assert(wheels == 2, def.id .. ': two visible wheels')
@@ -85,11 +102,17 @@ for _, def in Config.Cars do
 	assert(named(model, 'Headlight') == nil and named(model, 'Tyre') == nil, def.id .. ': no car lamps or car tyres')
 	assert(named(model, 'BikeLamp') ~= nil, def.id .. ': a small beam at night')
 	local parts = count(model, isPart)
-	assert(parts <= BUDGET, def.id .. ': ' .. parts .. ' parts (budget ' .. BUDGET .. ')')
+	assert(parts <= (if stand then SCOOTER_BUDGET else BUDGET), def.id .. ': ' .. parts .. ' parts (budget ' .. BUDGET .. ')')
 	-- The cargo: its own slots = its capacity; every piece of bike gear adds its room.
 	local car: any = { id = def.id, stage = 0, gear = {} }
 	assert(#Vehicles.cargoSlots(car) == def.capacity and Economy.capacity(def.id, {}, {}, nil) == def.capacity, def.id .. ': slots = capacity')
-	local gear = { basket = true, panniers = true, trailer = def.id ~= 'cargobike' or nil }
+	local gear: { [string]: boolean } = {}
+	for _, g in Config.Gear do
+		if g.bikeOnly and Economy.gearFits(def.id, g.id) then
+			gear[g.id] = true
+		end
+	end
+	assert(gear.basket and (gear.panniers == true) == not stand and (gear.trailer == true) == (def.id ~= 'cargobike' and not stand), def.id .. ': the bike gear it takes')
 	car.gear = gear
 	local want = def.capacity
 	for id in gear do
@@ -106,7 +129,7 @@ for _, def in Config.Cars do
 	Vehicles.__testBuildKit(model, chassis, Vehicles.__testStyle(def, 0), {}, def.id, gear)
 	local kit = model:FindFirstChild('UpgradeKit')
 	assert(kit and model:GetAttribute('KitBuilt') == 1, def.id .. ': the kit, KitBuilt')
-	assert(named(kit, 'basketArt') and named(kit, 'panniersArt'), def.id .. ': basket and panniers shown')
+	assert(named(kit, 'basketArt') and (named(kit, 'panniersArt') ~= nil) == (gear.panniers == true), def.id .. ': basket and panniers shown')
 	assert((named(kit, 'trailerArt') ~= nil) == (gear.trailer == true), def.id .. ': the trailer shown when installed')
 	assert(count(kit, function(d) return d.Name == 'WheelMotor' end) == (if gear.trailer then 2 else 0), def.id .. ': the trailer wheels turn')
 	assert(count(kit, function(d) return d.Name == 'BullBar' or d.Name == 'ArmorPlate' or d.Name == 'FoldedTrolley' end) == 0, def.id .. ': no car kit')
@@ -124,5 +147,5 @@ for _, def in Config.Cars do
 	end
 	print(string.format('  %-9s %2d parts, %d slot(s), %2d with its gear (+%d gear parts)', def.id, parts, def.capacity, #slots, gearParts))
 end
-assert(bikes == 4, 'four bikes')
-print('Bike PASS: 4 bikes on Codex art, hidden hull and colliders, leaning saddle, two wheels and a crank, no back, slots = capacity + gear room, display anchored')
+assert(bikes == 5, 'four bikes and the E-Scooter')
+print('Bike PASS: 4 bikes on Codex art and the E-Scooter on its own, hidden hull and colliders, leaning saddle / standing deck, two wheels (and a crank on a bike), no back, slots = capacity + gear room, display anchored')

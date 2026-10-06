@@ -5,7 +5,7 @@ import argparse,json,math,re,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[2]
 HERE=Path(__file__).parent
 BUDGETS={'backpack':14,'backpack_loaded':14,'bigpack':18,'shoes':12,'jacket':16,'cart':22,'phone':6,
-         'rustbike':70,'citybike':70,'cargobike':70,'cargobike_loaded':70,'ebike':70,'basket':10,'panniers':12,'trailer':25,'bell':3,'light':4,
+         'rustbike':70,'citybike':70,'cargobike':70,'cargobike_loaded':70,'ebike':70,'basket':10,'panniers':12,'trailer':25,'bell':3,'light':4,'escooter':45,
          'pump':25,'island':70,'pricesign':12,'jerrycan':8}
 RUNNER='''local Mock=require("./mock")
 local Geometry=require("./Geometry")
@@ -105,6 +105,14 @@ def export(module,luau,output):
             assert sum(p['name'].endswith('Tyre') for p in pieces)==2
             assert all(named[n]['attach']=='Crank' for n in ['LeftPedal','RightPedal'])
             if m['id'].startswith('cargobike'):assert {'Slot'+str(i) for i in range(1,7)}<=named.keys()
+        if m['id']=='escooter':
+            # 5.1.1: the E-Scooter (ScooterArt): a standing rider's Deck and grips, two small wheels, no crank or pedals.
+            assert spec.get('reservedParts',0)>=2,'scooter budget must reserve a seat and stable collider'
+            named={p['name']:p for p in points}
+            assert {'Deck','LeftGrip','RightGrip','FrontAxle','RearAxle','BasketMount','LightMount','Slot1'}<=named.keys()
+            assert 'Crank' not in spec['origins'] and not any('Pedal' in n for n in named)
+            assert sum(p['name'].endswith('Tyre') for p in pieces)==2 and any(p.get('night') for p in pieces)
+            assert all(abs(spec['origins'][w][1]-.6)<1e-6 for w in ['FrontWheel','RearWheel']),'small wheels (radius .6)'
         if m['id'] in ['basket','panniers','trailer']:assert any(p['name']=='Slot1' for p in points)
         if m['id']=='pump':assert any(p['attach']=='Nozzle' for p in pieces) and any(p['name']=='FuelOutlet' for p in points)
     output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(models))

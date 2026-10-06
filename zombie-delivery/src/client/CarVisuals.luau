@@ -19,6 +19,8 @@
 -- speed (CrankMotor), the front wheel does not steer (the fork is part of the frame), and the rider sits posed
 -- (client/BikeRider.luau: leaning forward, hands on the grips, legs pumping with the crank). A trailer's wheels are in
 -- the kit: found again when the car's KitBuilt changes.
+-- 5.1.1, the E-Scooter (the car's attributes Bike and BikeStand): it leans the same way, has no cranks, and its rider
+-- stands (BikeRider.pose's stand: the legs straight on the deck, the hands on the bar).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -190,7 +192,7 @@ local function poseRider(car: Model, state: CarState, near: boolean)
 	end
 	state.rider = rider
 	if rider then
-		BikeRider.pose(rider, state.crank)
+		BikeRider.pose(rider, state.crank, car:GetAttribute("BikeStand") == true) -- (5.1.1: the E-Scooter: standing)
 	end
 end
 

@@ -1083,7 +1083,8 @@ missions. The dealer no longer sells it. Every other car, job tier and campaign 
 
 At level 2 Marge texts you: **Spoke & Chain Cycles** on Main St (Downtown block -1, 1) sells bikes — the Rusty Bike
 ($300, L2), the Courier Bike ($1 100, L2), the Cargo Bike with a front box ($2 400, L3, 4 slots) and the E-Bike
-($6 500, L5) (`Config.Cars` with `bike = true`, Codex's `BikeArt`). CAR (or the phone's MY BIKE) puts your bike by the
+($6 500, L5) (`Config.Cars` with `bike = true`, Codex's `BikeArt`); 5.1.1 adds the **E-Scooter** ($2 800, L4: quick, you
+stand on the deck, 1 slot on its rear rack, the basket fits; `ScooterArt`, `shared/RiderPose.luau`). CAR (or the phone's MY BIKE) puts your bike by the
 kerb and seats you; it leans into turns, the cranks and wheels turn, the rider pedals (`client/BikeRider.luau`). Bike
 gear at the shop (`bikeOnly` in `Config.Gear`): a basket (+2), panniers (+3), a trailer (+4, not on the cargo bike),
 installed in the bike's gear slots. **Bike jobs** (`Config.Jobs.Bike`, the board's BIKE section): light cargo, 300–1 000
