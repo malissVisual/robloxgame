@@ -33,6 +33,9 @@
 -- client/TouchControls.luau's SPRINT and EXIT / PUT DOWN, which share the hand button's place); a tap on the weapon
 -- line opens the weapon wheel (Hud.onWeaponWheel); the hints drop the (E) / (G) keys a touch screen has no keys for.
 -- A gamepad: Y opens MENU with the selection on its first entry (A takes it).
+-- 5.0: Last Stop Supplies has two tabs, ITEMS and KIT (personal gear, client/KitShop.luau); with no vehicle yet the
+-- hint says "On foot · J for the board · Supplies for a backpack"; the PHONE action over the weapon line belongs to
+-- client/Phone.luau (it reads this HUD's RightStack / WeaponBar to sit there).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -919,6 +922,15 @@ local function renderShop()
 			end
 		end
 	elseif shopId == "supplies" then
+		-- 5.0: two tabs: ITEMS (the consumables) and KIT (personal gear, client/KitShop.luau; it keeps the open tab).
+		tabs(shop.body, { { "items", "ITEMS" }, { "kit", "KIT" } }, require(script.Parent.KitShop).currentTab(state), function(id)
+			require(script.Parent.KitShop).tab = id
+			renderShop()
+		end)
+		if require(script.Parent.KitShop).currentTab(state) == "kit" then
+			require(script.Parent.KitShop).render(shop.body, state, here)
+			return
+		end
 		for order, def in Config.Items do
 			local c = card(shop.body, 90, order + 1)
 			local have = state.items[def.id] or 0
@@ -1206,6 +1218,9 @@ function Hud.openShop(id: string, focus: string?)
 		return
 	end
 	closeWindows()
+	if id == "supplies" and (focus == "kit" or focus == "items") then
+		require(script.Parent.KitShop).tab = focus -- 5.0: the phone's SHOP app and the server may open a tab
+	end
 	shopId = id
 	shopFocus = focus
 	shop.frame.Visible = true
@@ -3748,6 +3763,11 @@ RunService.RenderStepped:Connect(function()
 		end
 	elseif safe and not job then
 		setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
+	elseif not car and state and type(state.car) ~= "string" then
+		-- 5.0: no vehicle yet (the career starts on foot): the board, the backpack at Last Stop Supplies.
+		-- (with a backpack already: the phone says what to save up for next)
+		setHint("On foot", (if touchLayout then "the board in MENU" else "J for the board")
+			.. (if require(Shared.Transport).handsRoom(if type(state.kit) == "table" then state.kit else {}) > Config.Cargo.HandsMax then " · your phone says what's next" else " · Supplies for a backpack"), if touchLayout then nil else "J")
 	elseif not car then
 		setHint("No car out", "MENU → CAR calls it")
 	elseif not seatedIn and not job then

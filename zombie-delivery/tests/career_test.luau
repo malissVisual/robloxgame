@@ -238,6 +238,31 @@ check("a broken save moves nothing", next(Economy.migrateGear(nil, { van = true 
 check("the tip without a trolley: where to get it, from level 3", string.find(Freight.trolleyTip("crate", 4, "carry") or "", "level 3", 1, true) ~= nil)
 check("the tip with one: use it", string.find(Freight.trolleyTip("crate", 4, "carry", true) or "", "Use your hand trolley", 1, true) ~= nil)
 
+-- ── 5.0: the road starts on foot ────────────────────────────────────────────
+
+local road50 = Career.road()
+check("5.0 level 1: the on-foot runs come first", road50[1].unlocks[1].kind == "foot")
+local kitEverywhere = true
+for _, kit in Config.Kit do
+	local at = road50[kit.level]
+	kitEverywhere = kitEverywhere and at ~= nil and has(at.unlocks, "kit", kit.id)
+end
+check("5.0: every piece of personal gear (Config.Kit) is on the road at its level", kitEverywhere and #Config.Kit >= 4)
+local bikes = false
+for _, def in Config.Cars do
+	bikes = bikes or (def :: any).kind == "bike"
+end
+check("5.0: the bikes are a line at their level until Config.Cars has one", has(road50[Career.BIKE_LEVEL].unlocks, "soon", "bikes") ~= bikes)
+local soonOnce = 0
+for _, step in road50 do
+	for _, unlock in step.unlocks do
+		if unlock.kind == "soon" then
+			soonOnce += 1
+		end
+	end
+end
+check("5.0: … and only there", soonOnce == (if bikes then 0 else 1))
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

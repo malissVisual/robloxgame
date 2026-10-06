@@ -38,6 +38,7 @@ local CarBoarding = require(Client.CarBoarding)
 local LocationTag = require(Client.LocationTag)
 local CareerUi = require(Client.CareerUi)
 local RoadEventUi = require(Client.RoadEventUi)
+local Phone = require(Client.Phone)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -78,6 +79,7 @@ safely("CarBoarding", CarBoarding.start) -- 3.10: getting in and out of a car (E
 safely("LocationTag", LocationTag.start) -- 4.3: the quiet caption that names the building you come up to
 safely("CareerUi", CareerUi.start) -- 4.6: the CAREER window (C) and the level-up card
 safely("RoadEventUi", RoadEventUi.start) -- 4.8: a road event's side pick-up offer (Y takes it)
+safely("Phone", Phone.start) -- 5.0: the courier's phone (O, the PHONE action), Marge gives it in the tutorial
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
@@ -93,6 +95,7 @@ Hud.onCloseWindows = function()
 	GarageUi.close()
 	DispatchUi.close()
 	CareerUi.close()
+	Phone.close()
 end
 CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows
@@ -109,6 +112,15 @@ end
 GarageUi.onOpen = Hud.closeWindows
 CareerUi.onOpen = Hud.closeWindows
 Hud.onCareer = CareerUi.toggle
+-- 5.0: the phone is one more window (it closes the others); its apps open the board, the career, the map.
+Phone.onOpen = Hud.closeWindows
+Phone.onBoard = DispatchUi.open
+Phone.onCareer = CareerUi.open
+Phone.boardOpen = DispatchUi.isOpen
+Phone.notify = Hud.toast
+Phone.blocked = function(): boolean -- (the NEW PHONE pop-up waits for Marge's dialog and a result or card)
+	return TutorialUi.isOpen() or Hud.resultOpen() or MissionsUi.isOpen() or CareerUi.cardOpen()
+end
 -- 4.6: the level-up card waits for the DELIVERY result and a mission's cleared card (MissionsUi.isOpen counts it).
 CareerUi.blocked = function(): boolean
 	return Hud.resultOpen() or MissionsUi.isOpen()
@@ -118,7 +130,7 @@ Hud.onMissions = MissionsUi.toggle
 MissionsUi.onFindCrew = CrewPanel.open
 CameraRig.mouseNeeded = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
-		or CareerUi.isOpen() or CareerUi.cardOpen()
+		or CareerUi.isOpen() or CareerUi.cardOpen() or Phone.isOpen()
 end
 LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while a window is open
 
@@ -128,6 +140,7 @@ Net.get("State").OnClientEvent:Connect(function(state)
 	DispatchUi.setState(state)
 	Menu.setState(state)
 	CareerUi.setState(state)
+	Phone.setState(state)
 end)
 Net.get("Job").OnClientEvent:Connect(Hud.setJob)
 Net.get("Offers").OnClientEvent:Connect(DispatchUi.setOffers)
