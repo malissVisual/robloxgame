@@ -7,7 +7,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- Codex · `codex/phone-art` · 6-part RightHand phone with grip/screen points, 8 white transparent 256px app PNG/SVGs, 1080×1920 dusk wallpaper + splash logo; preview/API in `design/phone-art/`. Includes identical shared ModelArt/tooling foundation from kit branch (no kit assets). Required suite/compiles, real-builder weld/cleanup checks and SVG/PNG audits pass. Studio: hand pose/screen orientation, lifecycle cleanup, app readability and wallpaper crop; Claude wires phone/UI and image IDs.
+- Codex · `codex/phone-art` · 6-part RightHand phone with grip/screen points, 8 white transparent 256px app PNG/SVGs, 1080×1920 dusk wallpaper + splash logo; preview/API in `design/phone-art/`. Includes identical shared ModelArt/tooling foundation from kit branch (no kit assets). Required suite/compiles, real-builder weld/cleanup checks (including unanchored display-root skins) and SVG/PNG audits pass. Studio: hand pose/screen orientation, lifecycle cleanup, app readability and wallpaper crop; Claude wires phone/UI and image IDs.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->

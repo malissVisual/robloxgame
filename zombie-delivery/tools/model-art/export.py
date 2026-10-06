@@ -5,7 +5,7 @@ import argparse,json,math,re,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[2]
 HERE=Path(__file__).parent
 BUDGETS={'backpack':14,'backpack_loaded':14,'bigpack':18,'shoes':12,'jacket':16,'cart':22,'phone':6,
-         'rustbike':70,'citybike':70,'cargobike':70,'ebike':70,'basket':10,'panniers':12,'trailer':25,'bell':3,'light':4,
+         'rustbike':70,'citybike':70,'cargobike':70,'cargobike_loaded':70,'ebike':70,'basket':10,'panniers':12,'trailer':25,'bell':3,'light':4,
          'pump':25,'island':70,'pricesign':12,'jerrycan':8}
 RUNNER='''local Mock=require("./mock")
 local Geometry=require("./Geometry")
@@ -55,6 +55,12 @@ for _,id in Geometry.ids do
  assert(built.model.Parent==nil)
  for _,point in built.points do assert(point.Parent==nil) end
  for _,target in targets do assert(#target:GetChildren()==0) end
+ -- Anchored review roots hold their welded skin; the skin itself must never freeze a later unanchored rig.
+ for _,target in targets do target.Anchored=true end
+ local display=Builder.build(parent,spec,targets)
+ for _,p in display.parts do assert(not p.Anchored) end
+ Builder.destroy(display)
+ for _,target in targets do assert(#target:GetChildren()==0 and target.Anchored) end
  -- A missing target fails before any partial art model is created.
  local before=#parent:GetChildren()
  assert(not pcall(function() Builder.build(parent,spec,{}) end))
@@ -92,12 +98,12 @@ def export(module,luau,output):
             for foot in ['LeftFoot','RightFoot']:assert sum(p['attach']==foot for p in pieces)<=6
         if m['id'] in ['backpack','backpack_loaded','bigpack']:
             for p in pieces:assert abs(p['at'][0])+p['size'][0]/2<=1 and p['at'][1]-p['size'][1]/2>=-1.12,(m['id'],'arm/hip envelope')
-        if m['id'] in ['rustbike','citybike','cargobike','ebike']:
+        if m['id'] in ['rustbike','citybike','cargobike','cargobike_loaded','ebike']:
             named={p['name']:p for p in points}
             assert {'Saddle','LeftGrip','RightGrip','LeftPedal','RightPedal','FrontAxle','RearAxle','CrankAxis','BasketMount','PannierMount','Hitch'}<=named.keys()
             assert sum(p['name'].endswith('Tyre') for p in pieces)==2
             assert all(named[n]['attach']=='Crank' for n in ['LeftPedal','RightPedal'])
-            if m['id']=='cargobike':assert {'Slot'+str(i) for i in range(1,7)}<=named.keys()
+            if m['id'].startswith('cargobike'):assert {'Slot'+str(i) for i in range(1,7)}<=named.keys()
         if m['id'] in ['basket','panniers','trailer']:assert any(p['name']=='Slot1' for p in points)
         if m['id']=='pump':assert any(p['attach']=='Nozzle' for p in pieces) and any(p['name']=='FuelOutlet' for p in points)
     output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(models))
