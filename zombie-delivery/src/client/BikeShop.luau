@@ -10,6 +10,8 @@
 -- (shared/Icons.luau Icons.bike, the emoji until uploaded), its name, level, price, speed, room and gear slots, what
 -- it is, and the one action that fits: BUY (at the counter, from its level, with the money), EQUIP (an owned bike that
 -- is not your bike of choice), YOUR BIKE, or a dim "🔒 LEVEL n". BikeShop.tab is its only state.
+-- 5.1.1: a bike's badge (CarDef.badge: the E-Scooter's "⚡ ELECTRIC · STAND-UP") after its name; a standing one
+-- (CarDef.stand) shows 🛴 until its picture is uploaded.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -127,7 +129,7 @@ local function bikesTab(body: Instance, state: any, here: boolean, focus: string
 	for order, def in list do
 		local owned = type(state.cars) == "table" and state.cars[def.id] == true
 		local row = P.row(body, ROW_H, order + 2, def.id == mine or def.id == focus)
-		Ui.icon(row, Icons.bike(def.id), "🚲", UDim2.fromOffset(44, 44), {
+		Ui.icon(row, Icons.bike(def.id), if def.stand then "🛴" else "🚲", UDim2.fromOffset(44, 44), {
 			Position = UDim2.fromOffset(12, ROW_H / 2 - 22),
 			ImageColor3 = P.ink,
 			TextSize = 28,
@@ -135,7 +137,8 @@ local function bikesTab(body: Instance, state: any, here: boolean, focus: string
 		})
 		local left = 66
 		local width = UDim2.new(1, -(left + BUTTON_W + 24), 0, 22)
-		Ui.label(row, def.name, width, { Position = UDim2.fromOffset(left, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		local badge = if def.badge then `  <font size="12" color="{P.hex(P.warn)}">{def.badge}</font>` else ""
+		Ui.label(row, def.name .. badge, width, { Position = UDim2.fromOffset(left, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, RichText = true, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		local lvl = def.level or 1
 		local status = if owned then `<font color="{P.hex(P.good)}">✓ OWNED</font>`
 			elseif level < lvl then `<font color="{P.hex(P.warn)}">LEVEL {lvl}</font>`

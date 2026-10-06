@@ -126,6 +126,10 @@ export type CarDef = {
 	-- Spoke & Chain (Map.Shops.bikes), light cargo only, no fuel, no traffic / chauffeur / car gun / paint / car
 	-- upgrade tracks; it never counts as "a vehicle" for car jobs and missions (shared/Transport.luau mode "bike").
 	bike: boolean?,
+	-- 5.1.1: the rider stands (the E-Scooter, style "scooter": a deck, no saddle, no pedals; client/BikeRider.luau's
+	-- standing pose through shared/RiderPose.luau), and a badge on its card at Spoke & Chain ("⚡ ELECTRIC · STAND-UP").
+	stand: boolean?,
+	badge: string?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -562,6 +566,30 @@ Config.Cars = {
 		role = "The hauler: a front box for four light pieces",
 		description = "A long low frame with a box up front: four light pieces ride in it. Slower off the line; it takes a basket or panniers, not a trailer. Rider only.",
 	},
+	-- 5.1.1, the E-Scooter (style "scooter": a narrow low deck, two small wheels, a tall stem; server/ScooterArt): a
+	-- bike by the rules (light cargo, the BIKE jobs, no fuel, sold at Spoke & Chain) that you ride standing. Quick off
+	-- the line and nippy; a small rack over the rear wheel for one light piece and one gear slot for the basket (a
+	-- handlebar bag: no panniers, no trailer, Config.Gear notOn).
+	{
+		id = "escooter",
+		bike = true,
+		stand = true,
+		badge = "⚡ ELECTRIC · STAND-UP",
+		level = 4,
+		name = "E-Scooter",
+		price = 2800,
+		style = "scooter",
+		maxSpeed = 44,
+		accel = 26,
+		turn = 2.8,
+		health = 110,
+		capacity = 1,
+		gearSlots = 1,
+		ramPower = 0.25,
+		color = { 35, 40, 43 },
+		role = "The nippy one: stand on it, zip off, no pedalling",
+		description = "A battery under the deck, a tall stem, a lamp for the night. Zips off the line and darts through traffic. A small rear rack for one light parcel, a basket on the bar. Rider only, standing.",
+	},
 	{
 		id = "ebike",
 		bike = true,
@@ -952,8 +980,8 @@ Config.Gear = {
 	-- 5.1, bike gear (bikeOnly: only on a bike, CarDef.bike; the car gear never goes on one), sold and fitted at Spoke &
 	-- Chain (Map.Shops.bikes) for the bike you ride: `room` more light pieces (Economy.capacity, Transport mode "bike").
 	{ id = "basket", name = "Front Basket", level = 2, price = 150, icon = "🧺", bikeOnly = true, room = 2, description = "+2 light pieces in a wire basket over the front wheel." },
-	{ id = "panniers", name = "Panniers", level = 3, price = 450, icon = "👜", bikeOnly = true, room = 3, description = "+3 light pieces in two bags on the rear rack." },
-	{ id = "trailer", name = "Bike Trailer", level = 4, price = 1200, icon = "📦", bikeOnly = true, room = 4, notOn = { "cargobike" }, description = "+4 light pieces in a two-wheeled trailer behind you (not on the Cargo Bike)." },
+	{ id = "panniers", name = "Panniers", level = 3, price = 450, icon = "👜", bikeOnly = true, room = 3, notOn = { "escooter" }, description = "+3 light pieces in two bags on the rear rack (not on the E-Scooter)." },
+	{ id = "trailer", name = "Bike Trailer", level = 4, price = 1200, icon = "📦", bikeOnly = true, room = 4, notOn = { "cargobike", "escooter" }, description = "+4 light pieces in a two-wheeled trailer behind you (not on the Cargo Bike or the E-Scooter)." },
 } :: { GearDef }
 
 -- 4.6: what the gear does (4.7's cargo rules read StrapsLoss and CoolerDrain).

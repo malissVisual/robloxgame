@@ -160,7 +160,7 @@ end
 local function transportText(): string
 	if state and type(state.car) == "string" then
 		local def = Economy.findCar(state.car)
-		return `{if def and def.bike then "🚲" else "🚐"} {string.upper(if def then def.name else state.car)}`
+		return `{if def and def.stand then "🛴" elseif def and def.bike then "🚲" else "🚐"} {string.upper(if def then def.name else state.car)}`
 	end
 	return `🚶 ON FOOT · {KitShop.roomText(kit())}`
 end
@@ -542,7 +542,7 @@ local function shopApp(list: Instance)
 			shopHeader(list, order, "bikes", "Spoke & Chain · bikes")
 			order += 1
 		end
-		goal(list, order, "🚲", def.name, `Spoke & Chain, {Config.BikeShop.Street}`, def.price, def.level or 1)
+		goal(list, order, if def.stand then "🛴" else "🚲", def.name, `Spoke & Chain, {Config.BikeShop.Street}`, def.price, def.level or 1)
 	end
 	-- The first vehicles you do not own yet (two of them). 5.0: the Old Van comes from Earl (Marge's quest), SET GPS
 	-- to him; the others from Dead End Motors.

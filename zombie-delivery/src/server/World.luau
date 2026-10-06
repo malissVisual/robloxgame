@@ -956,7 +956,8 @@ end
 -- a brick shop 60 × 40 with a 12-wide door near the street, Codex's look (BuildingLooks/BikeShop: the shop windows,
 -- the counter, the wall racks, the repair stand, the bike rack on the pavement), the SPOKE & CHAIN CYCLES board, the
 -- "Shop" prompt on the look's counter (an invisible solid box there) and four display stands on the floor
--- (World.BikeSlots: server/Shops.luau puts a bike on each, facing the door at an angle).
+-- (World.BikeSlots: server/Shops.luau puts a bike on each, facing the door at an angle). 5.1.1: a fifth stand at the
+-- right end of the row (between the repair stand and the tool chest's front) for the E-Scooter.
 World.BikeSlots = {} :: { CFrame }
 
 local function buildBikeShop(parent: Instance)
@@ -973,7 +974,7 @@ local function buildBikeShop(parent: Instance)
 	local desk = part(shop, "CounterPrompt", Vector3.new(12, 4, 3.5), frame * CFrame.new(-15, 2, -5), Color3.fromRGB(35, 40, 43), Enum.Material.Metal)
 	desk.Transparency = 1
 	prompt(desk, "bikes", "Shop", Map.Shops.bikes.name)
-	for n, x in { -15, -7.5, 0, 7.5 } do
+	for n, x in { -15, -7.5, 0, 7.5, 15 } do
 		local stand = frame * CFrame.new(x, 0.3, 9) * CFrame.Angles(0, math.rad(25), 0)
 		deco(part(shop, "BikeStand", Vector3.new(2.6, 0.1, 7.4), stand * CFrame.new(0, 0.05, 0), Color3.fromRGB(150, 156, 158), Enum.Material.DiamondPlate))
 		World.BikeSlots[n] = stand * CFrame.new(0, 0.1, 0)
