@@ -93,6 +93,9 @@ local function sendState(player: Player)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		xp = profile.xp,
+		streak = profile.streak, -- 4.7: good jobs in a row (the board, the CAREER window)
+		licences = profile.licences, -- 4.7: the licences held (tier → true)
+		licenceJobs = profile.licenceJobs, -- 4.7: good jobs counted toward each licence
 	})
 end
 

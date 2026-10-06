@@ -1421,6 +1421,11 @@ function Hud.showResult(r: any)
 		line("CREW DELIVERY!", nil, C.green, 1)
 		line(`You helped {r.driver} deliver {r.cargo}.`, nil, C.dim, 2)
 		line("Your share", Ui.money(r.total), C.yellow, 3)
+		if type(r.rating) == "table" and tonumber(r.rating.stars) then
+			-- 4.7: the owner's rating of the job.
+			local got = math.clamp(math.floor(tonumber(r.rating.stars) or 1), 1, 3)
+			line(`Job rated {string.rep("★", got)}{string.rep("☆", 3 - got)}`, nil, C.dim, 4)
+		end
 	elseif r.success then
 		local payout = r.payout
 		line("DELIVERED!", nil, C.green, 1)
@@ -1444,16 +1449,55 @@ function Hud.showResult(r: any)
 		if nightBonus > 0 then
 			line("Night bonus", "+" .. Ui.money(nightBonus), nil, 9)
 		end
+		-- 4.7: the rating (★ … ★★★, why), the streak of good jobs and the licence it counts toward (not a mission).
+		local rating = if type(r.rating) == "table" then r.rating else nil
+		if rating then
+			local got = math.clamp(math.floor(tonumber(rating.stars) or 2), 1, 3)
+			local ratingPay = tonumber(rating.ratingPay) or 0
+			local percentText = if got == 3 then " (+20% pay)" elseif got == 1 then " (−10% pay)" else ""
+			line(`RATED {string.rep("★", got)}{string.rep("☆", 3 - got)}{percentText}`, if ratingPay > 0 then "+" .. Ui.money(ratingPay) elseif ratingPay < 0 then "-" .. Ui.money(-ratingPay) else nil, if got == 3 then C.green elseif got == 1 then C.red else C.yellow, 10)
+			local why: { string } = {}
+			if type(rating.checks) == "table" then
+				for _, check in rating.checks do
+					if type(check) == "table" and type(check.text) == "string" then
+						table.insert(why, `{if check.ok then "✓" else "✗"} {check.text}`)
+					end
+				end
+			end
+			if #why > 0 then
+				Ui.label(result.body, table.concat(why, "   "), UDim2.new(1, -10, 0, 0), {
+					LayoutOrder = 11,
+					AutomaticSize = Enum.AutomaticSize.Y,
+					TextColor3 = P.ink2,
+					TextSize = 13,
+					Font = Theme.Font,
+				})
+			end
+			local streak = tonumber(rating.streak) or 0
+			local streakPay = tonumber(rating.streakPay) or 0
+			if got >= 2 and streak > 0 then
+				local bonus = math.floor((tonumber(rating.streakBonus) or 0) * 100 + 0.5)
+				line(`Streak: {streak} good {if streak == 1 then "job" else "jobs"} in a row (+{bonus}%)`, if streakPay > 0 then "+" .. Ui.money(streakPay) else nil, C.green, 12)
+			else
+				line("Streak ended: a ★ job (★★ or better keeps it)", nil, C.red, 12)
+			end
+			local licence = if type(rating.licence) == "table" then rating.licence else nil
+			if licence and licence.earned == true then
+				line(`🪪 {licence.stars} LICENCE EARNED: {licence.stars} jobs are on your board!`, nil, C.green, 13)
+			elseif licence then
+				line(`🪪 {licence.stars} licence: {licence.have} / {licence.need} jobs rated ★★+ at {licence.atStars}{if myLevel() < (tonumber(licence.level) or 0) then ` · level {licence.level}` else ""}`, nil, C.dim, 13)
+			end
+		end
 		local crewBonus = tonumber(r.crewBonus) or 0
 		if riders > 0 and crewBonus > 0 then
-			line(`Crew bonus ({riders} in the crew)`, "+" .. Ui.money(crewBonus), nil, 10)
+			line(`Crew bonus ({riders} in the crew)`, "+" .. Ui.money(crewBonus), nil, 14)
 		elseif riders > 0 and crewBonus < 0 then
-			line(`Shared with the crew ({riders})`, "-" .. Ui.money(-crewBonus), C.dim, 10)
+			line(`Shared with the crew ({riders})`, "-" .. Ui.money(-crewBonus), C.dim, 14)
 		end
-		line("TOTAL", Ui.money(r.total), C.yellow, 11)
+		line("TOTAL", Ui.money(r.total), C.yellow, 20)
 		local employer = r.employer
 		if employer then
-			line(`{employer.name}: {employer.done} jobs done`, nil, C.yellow, 12)
+			line(`{employer.name}: {employer.done} jobs done`, nil, C.yellow, 21)
 			-- The next reward of that employer (the gun comes first, then the vehicle).
 			local done = tonumber(employer.done) or 0
 			local gunAt = tonumber(employer.weaponAt)
@@ -1461,27 +1505,33 @@ function Hud.showResult(r: any)
 				elseif type(employer.needed) == "number" and done < employer.needed and employer.reward ~= "" then `{employer.needed - done} more for the {employer.reward}`
 				else nil
 			if nextUp then
-				line(nextUp, nil, C.dim, 13)
+				line(nextUp, nil, C.dim, 22)
 			end
 		end
 		local newCar = r.unlockedCar or (employer and employer.unlocked)
 		if newCar then
-			line(`🚚 NEW CAR: the {newCar} is yours!`, nil, C.green, 14)
+			line(`🚚 NEW CAR: the {newCar} is yours!`, nil, C.green, 23)
 		end
 		if type(r.unlockedWeapon) == "string" then
 			local gun = Economy.findWeapon(r.unlockedWeapon)
-			line(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`, nil, C.green, 15)
+			line(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`, nil, C.green, 24)
 		end
 	else
 		line("DELIVERY FAILED", nil, C.red, 1)
 		Ui.label(result.body, r.reason or "", UDim2.new(1, -10, 0, 60), { LayoutOrder = 2, TextColor3 = P.ink })
+		local lostStreak = tonumber(r.streakLost)
+		if lostStreak and lostStreak > 0 then
+			-- 4.7: a failed job ends the streak of good jobs.
+			line(`Streak of {lostStreak} good {if lostStreak == 1 then "job" else "jobs"} lost`, nil, C.red, 3)
+		end
 	end
 	-- The XP of the job, the level bar and a level-up with what it unlocks.
 	local xp = tonumber(r.xp)
 	if xp and xp > 0 then
 		local level = tonumber(r.level) or myLevel()
 		local rank = if type(r.rank) == "string" then r.rank else Levels.rank(level)
-		line(if r.success then "Driver XP" else "Driver XP (a failed job still counts)", `+{xp} XP`, C.yellow, 30)
+		local topRated = type(r.rating) == "table" and tonumber(r.rating.stars) == 3 and not r.rider -- 4.7: ★★★ × 1.25 XP
+		line(if topRated then "Driver XP (★★★ ×1.25)" elseif r.success then "Driver XP" else "Driver XP (a failed job still counts)", `+{xp} XP`, C.yellow, 30)
 		local row = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 22), BackgroundTransparency = 1, LayoutOrder = 31 }, result.body)
 		Ui.label(row, `LV {level} · {rank}`, UDim2.new(0.5, 0, 1, 0), { TextColor3 = P.ink2, TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = false })
 		local back, fill = P.bar(row, UDim2.new(0.5, 0, 0, 2), P.accent)

@@ -9,7 +9,7 @@ local NAMES = {
 	"State", -- server → client: money, owned cars / guns, upgrades, stats of the equipped car and gun
 	"SpawnCar", -- client → server: bring my car next to me
 	"RequestOffers", -- client → server: the job board was opened
-	"Offers", -- server → client: ({ { index, stars, cargo, customer, address, distance, pay, time } }, refreshAt) 3.7: sorted ★ → ★★★★, index = the offer's id, refreshAt = GetServerTimeNow() of the next offers (pushed then)
+	"Offers", -- server → client: ({ { index, stars, cargo, customer, address, distance, pay, time } }, refreshAt, info) 3.7: sorted ★ → ★★★★, index = the offer's id, refreshAt = GetServerTimeNow() of the next offers (pushed then); 4.7: info = { tiers = { { stars, name, fee, rerolled, open, level, licence? } }, streak }
 	"AcceptJob", -- client → server: take offer (index)
 	"CancelJob", -- client → server: give the active job up
 	"Job", -- server → client: the active job ({ … } or nil when none)
@@ -49,6 +49,7 @@ local NAMES = {
 	"Melee", -- 3.9: client → server: (the swing's direction, a unit Vector3, or nil) a punch (holstered) or a strike with the gun (V); checked on the server
 	"CarDoor", -- 3.10: client → server: ("out") E in a car seat: out of it at your door (server/Vehicles.luau, client/CarBoarding.luau)
 	"Gear", -- 4.6: client → server: ("buy" | "install" | "remove", gear id) for the equipped car at Wrench Garage (server/Shops.luau)
+	"RerollTier", -- 4.7: client → server: (tier) new ordinary offers of that danger level on my board, for Config.Jobs.Choice.RerollFee × its stars, once per board (server/Jobs.luau)
 	"PutDown", -- 4.2: client → server: () the touch PUT DOWN / LET GO / SET DOWN button: what the G prompt in your hands does (server/Cargo.luau, server/Equipment.luau)
 }
 

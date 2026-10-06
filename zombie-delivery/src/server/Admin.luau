@@ -14,7 +14,8 @@
 -- Every argument is checked here (types, NaN, ranges, ids that exist); a bad one does nothing but say so.
 --   unlockAll [T]             every car (company ones too), every gun (earned ones too), every paint, 10 of each
 --                             item, every employer's progress at the top (their rewards count as earned), every
---                             property (the biggest mansion as the home if you have none) and the top driver level
+--                             property (the biggest mansion as the home if you have none), the top driver level
+--                             and (4.7) every licence (Config.Jobs.Licences)
 --   maxUpgrades [T]           every upgrade track at its last level (3.3: the car tracks of every car you own; 3.5:
 --                             and every such car at its last stage)
 --   money [T]  amount         + money (1 … 10 000 000)
@@ -252,6 +253,10 @@ local function unlockAll(player: Player)
 	-- Every employer's jobs counted as done: their car and gun are "earned" in the windows too.
 	for _, employer in Config.Employers do
 		profile.rep[employer.id] = math.max(profile.rep[employer.id] or 0, employer.needed, employer.weaponAt or 0)
+	end
+	-- 4.7: every licence (the ★★★ and ★★★★ board jobs; setLevel alone does not give them).
+	for _, licence in Config.Jobs.Licences do
+		profile.licences[tostring(licence.tier)] = true
 	end
 	-- 3.3: every owned car's upgrades (and the gun tracks) at the top.
 	maxAllUpgrades(profile)

@@ -1,6 +1,6 @@
 --!strict
--- Delivery jobs. The job board offers one ordinary delivery of every danger level (★ … ★★★★) measured from where
--- the player is, and sometimes a special job without an employer (the Winter Run). The employers (Config.Employers)
+-- Delivery jobs. The job board offers ordinary deliveries of every danger level (★ … ★★★★; 4.7: three each) measured from
+-- where the player is, and sometimes a special job without an employer (the Winter Run). The employers (Config.Employers)
 -- give their own special job at their board and lend their vehicle.
 --
 -- A job is a list of stops. At every stop you drive into the circle, then handle the cargo (server/Cargo.luau):
@@ -75,6 +75,19 @@
 -- it take another one. An offer keeps its pay while you move about; its clock grows by the longer drive when you take
 -- it from farther away (fromHere). Jobs.startTutorialJob gives a new player an easy first delivery the same way
 -- (takeOffer), and Jobs.onDelivered tells server/Tutorial.luau how a job ended.
+--
+-- 4.7, real jobs (shared/JobRules.luau, Config.Jobs Choice / Rating / Licences):
+--   * A choice: every danger level the driver may take offers three ordinary deliveries, each a trade-off (Offer.role,
+--     JobRules.roles: SHORT & SAFE always, then two of LONG HAUL, RISKY, BULK ORDER; ordinaryOffer). A tier the driver
+--     may not take yet shows one, locked. REROLL (Net "RerollTier", reroll): that tier's ordinary offers made again for
+--     Choice.RerollFee × its stars, once per tier until the board refreshes (Board.rerolled).
+--   * Every ordinary and special job (never a mission: it has its own rating) is rated ★ … ★★★ when it is done
+--     (JobRules.rate: the clock left, the cargo's condition, a wreck on the way (Job.wrecked), pieces lost); the pay
+--     and the XP follow (JobRules.ratedPay / ratedXp) with the owner's streak of good jobs (profile.streak, reset by
+--     a ★ or a failed job). The result says why (DeliveryResult rating).
+--   * Licences: the board's ★★★ and ★★★★ ordinary deliveries (and the Winter Run, a board special without a level of
+--     its own) need the tier's licence (licenceTier, hasLicence): its level AND enough good jobs at the tier below
+--     (profile.licenceJobs, counted for the owner of a rated job). The locked tier says "LICENCE 3 / 5".
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -98,6 +111,7 @@ local Crew = require(script.Parent.Crew)
 local Gun = require(script.Parent.Gun)
 local DuoGates = require(script.Parent.DuoGates)
 local Freight = require(Shared.Freight)
+local JobRules = require(Shared.JobRules)
 
 type Stop = {
 	address: Map.Address,
@@ -143,10 +157,12 @@ type Offer = {
 	-- 3.7, the board on a timer:
 	id: number, -- the board's id of the offer (AcceptJob sends it), 0 off the board
 	approach: number, -- the drive (manhattan) to the first stop from where it was offered: `distance` and `time` count it
+	role: string?, -- 4.7: the board's trade-off of an ordinary delivery (short | long | risky | bulk), nil otherwise
 }
 
 -- 3.7: a player's job board: its offers (sorted, boardOrder) until refreshAt (workspace:GetServerTimeNow()).
-type Board = { list: { Offer }, refreshAt: number }
+-- 4.7: rerolled = the tiers rerolled on this board (once each).
+type Board = { list: { Offer }, refreshAt: number, rerolled: { [number]: boolean } }
 
 type Job = {
 	offer: Offer,
@@ -190,6 +206,7 @@ type Job = {
 	duoTeamed: boolean, -- the crew had MinCrew members (from then on fewer fails the mission)
 	gateClosed: boolean, -- switches: this stop's gate is still shut (server/DuoGates.luau)
 	gatePulled: number, -- switches: levers down right now (the HUD)
+	wrecked: boolean, -- 4.7: the car was wrecked on this job (the rating)
 }
 
 -- What a DeliveryResult says about the XP (shared/Levels.luau), the owner's and every member's own.
@@ -507,14 +524,15 @@ local function gatesOf(mission: string?): string
 	return if def and def.gates == "pickup" then "pickup" else "drop"
 end
 
--- `plain` (3.7, the tutorial's delivery): never a random modifier.
-local function finishOffer(tierIndex: number, stops: { Stop }, distance: number, cargo: string, customer: string, jobType: Config.JobTypeDef?, pieces: CargoInfo, extraPay: number, plain: boolean?): Offer
+-- `plain` (3.7, the tutorial's delivery; 4.7, the board's SHORT & SAFE one): never a random modifier. `forced` (4.7,
+-- the board's RISKY one): this modifier.
+local function finishOffer(tierIndex: number, stops: { Stop }, distance: number, cargo: string, customer: string, jobType: Config.JobTypeDef?, pieces: CargoInfo, extraPay: number, plain: boolean?, forced: Config.ModifierDef?): Offer
 	local tier = JobsConfig.Tiers[tierIndex]
 	local timeLimit = if jobType then jobType.timeLimit else nil
-	local modifier: Config.ModifierDef? = nil
+	local modifier: Config.ModifierDef? = if timeLimit then nil else forced
 	-- A mission is told as it is written: no random modifier.
 	local mission = if jobType then jobType.mission else nil
-	if not mission and not plain and rng:NextNumber() < tier.modifierChance then
+	if not modifier and not mission and not plain and rng:NextNumber() < tier.modifierChance then
 		-- A rush keeps its fixed clock: no modifier that changes the time or the car's speed.
 		local choices: { Config.ModifierDef } = {}
 		for _, candidate in JobsConfig.Modifiers do
@@ -574,20 +592,47 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 		gates = if twists.switches then gatesOf(mission) else nil,
 		id = 0,
 		approach = 0,
+		role = nil,
 	}
+end
+
+-- 4.7, the board's RISKY delivery: one of the tier's Config.Jobs.Choice.RiskyModifiers.
+local function riskyModifier(tierIndex: number): Config.ModifierDef?
+	local ids = JobsConfig.Choice.RiskyModifiers[tierIndex] or {}
+	if #ids == 0 then
+		return nil
+	end
+	return Economy.findModifier(pick(ids))
 end
 
 -- An ordinary delivery: a business that fits the danger level sends 1 – 3 pieces to somebody who needs them.
 -- 3.7, `easy` (the tutorial's first delivery, Jobs.startTutorialJob): carried pieces only (no people, no horses), at
 -- most Config.Jobs.TutorialPieces, the pick-up within TutorialPickupMax, the drop within TutorialDropMax of it, never
 -- a bulk order or a modifier.
-local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?): Offer?
+-- 4.7, `role` (the board's choice, Config.Jobs.Choice): short = the drop in the near band, the fewest pieces, no
+-- modifier, no bulk; long = the far band, × LongPay; risky = a RiskyModifiers modifier, the bandits want it (×
+-- RiskyBoost where the tier has bandits), × RiskyPay; bulk = a business that sends several, its most pieces + the
+-- tier's BulkExtra. Without a role (the tutorial, the admin's "ordinaryN") it is made as before 4.7.
+local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, role: string?): Offer?
 	local tier = JobsConfig.Tiers[tierIndex]
+	local choice = JobsConfig.Choice
 	local businesses: { Config.BusinessDef } = {}
 	for _, business in JobsConfig.Businesses do
 		local handy = not easy or (not Cargo.isPeople(business.kind) and business.kind ~= "horse")
 		if table.find(business.tiers, tierIndex) and handy then
 			table.insert(businesses, business)
+		end
+	end
+	if role == "bulk" then
+		-- the ones that send more than one piece (if there are any)
+		local several: { Config.BusinessDef } = {}
+		for _, business in businesses do
+			if (business.pieces[2] or business.pieces[1]) > 1 then
+				table.insert(several, business)
+			end
+		end
+		if #several > 0 then
+			businesses = several
 		end
 	end
 	if #businesses == 0 then
@@ -602,15 +647,19 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?): 
 	if not pickup then
 		return nil
 	end
-	local dropMax = if easy then math.clamp(JobsConfig.TutorialDropMax, tier.minDistance, tier.maxDistance) else tier.maxDistance
-	local drop = addressAround(pickup.x, pickup.z, tier.minDistance, dropMax, if tierIndex >= 3 and not easy then 3 else 0, { pickup })
+	local dropMin, dropMax = JobRules.window(role, tier.minDistance, tier.maxDistance)
+	if easy then
+		dropMin, dropMax = tier.minDistance, math.clamp(JobsConfig.TutorialDropMax, tier.minDistance, tier.maxDistance)
+	end
+	local drop = addressAround(pickup.x, pickup.z, dropMin, dropMax, if tierIndex >= 3 and not easy then 3 else 0, { pickup })
 	if not drop then
 		return nil
 	end
 	-- At a far place its own person takes it.
 	local placeId = placeIdOf(drop)
 	local receiver = (placeId and JobsConfig.PlacePeople[placeId]) or pick(business.receivers)
-	local count = rng:NextInteger(business.pieces[1], business.pieces[2] or business.pieces[1])
+	local most = business.pieces[2] or business.pieces[1]
+	local count = if role == "short" then business.pieces[1] elseif role == "bulk" then most else rng:NextInteger(business.pieces[1], most)
 	if tierIndex == 1 then
 		count = math.min(count, JobsConfig.EasyMaxPieces) -- 3.5: a ★ delivery fits the Rusty Van
 	end
@@ -618,8 +667,10 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?): 
 		count = math.max(1, math.min(count, JobsConfig.TutorialPieces))
 	end
 	-- 3.4: a bulk order now and then on the dangerous levels: more pieces (3.5: a later stage or a bigger car).
+	-- 4.7: the BULK ORDER always, the short and the risky one never, the long one by chance as before.
 	local extra = JobsConfig.BulkExtra[tierIndex]
-	if not easy and extra and extra[2] > 0 and rng:NextNumber() < (JobsConfig.BulkChance[tierIndex] or 0) then
+	local bulkChance = if role == "bulk" then 1 elseif role == "short" or role == "risky" then 0 else (JobsConfig.BulkChance[tierIndex] or 0)
+	if not easy and extra and extra[2] > 0 and rng:NextNumber() < bulkChance then
 		count += rng:NextInteger(extra[1], extra[2])
 	end
 	local customer = if drop.poi then `{receiver.name}, {drop.name}` else receiver.name
@@ -628,7 +679,17 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?): 
 		newStop(drop, "drop", "carry", count, `DELIVER to {receiver.name}, {drop.name}`, receiver),
 	}
 	local pieces: CargoInfo = { kind = business.kind, look = business.look, piece = business.piece, plural = business.plural, total = count }
-	return finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), business.cargo, customer, nil, pieces, Tuning.PayPerPiece * count, easy)
+	local forced = if role == "risky" then riskyModifier(tierIndex) else nil
+	local offer = finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), business.cargo, customer, nil, pieces, Tuning.PayPerPiece * count, easy or role == "short", forced)
+	offer.role = role
+	local payMultiplier = if role == "long" then choice.LongPay elseif role == "risky" then choice.RiskyPay else 1
+	if payMultiplier ~= 1 then
+		offer.pay = math.floor(offer.pay * payMultiplier / 5 + 0.5) * 5
+	end
+	if role == "risky" and (tier.ambushEvery > 0 or tier.chaseEvery > 0) then
+		offer.boost = math.max(offer.boost, choice.RiskyBoost)
+	end
+	return offer
 end
 
 -- 4.0, the Freight Run (JobTypeDef load "pallet"): 1 … items pallets from a loading dock of its hub (shared/Map.luau
@@ -882,6 +943,63 @@ local function slotsShort(player: Player, offer: Offer): string?
 	return `This job needs {need} cargo slots: your {name} holds {holds}. {Economy.roomAdvice(carId, stage, need)}`
 end
 
+-- 4.7: the licence tier an offer needs (Config.Jobs.Licences), nil when none: the board's ordinary deliveries and a
+-- board special without a level of its own (the Winter Run). Never a mission or an employer's job (they have their
+-- own levels).
+local function licenceTier(offer: Offer): number?
+	local jobType = offer.jobType
+	if offer.mission or (jobType and (jobType.level ~= nil or jobType.mission ~= nil or (jobType.employer ~= nil and not jobType.board))) then
+		return nil
+	end
+	return if JobRules.licence(offer.tier) then offer.tier else nil
+end
+
+-- 4.7: may the player take the board's jobs of this tier (a tier without a licence: yes)? A licence earned (its level
+-- and its jobs) is marked held from then on (profile.licences).
+local function hasLicence(player: Player, tierIndex: number): boolean
+	local def = JobRules.licence(tierIndex)
+	if not def then
+		return true
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		return false
+	end
+	local key = tostring(tierIndex)
+	if profile.licences[key] then
+		return true
+	end
+	if JobRules.hasLicence(tierIndex, PlayerData.level(player), profile.licences, profile.licenceJobs) then
+		profile.licences[key] = true
+		return true
+	end
+	return false
+end
+
+-- 4.7: what the board and the result say about a tier's licence: { tier, stars, have, need, level, atStars, held }.
+local function licenceInfo(player: Player, tierIndex: number): { [string]: any }?
+	local def = JobRules.licence(tierIndex)
+	local profile = PlayerData.get(player)
+	if not def or not profile then
+		return nil
+	end
+	local have, need = JobRules.progress(tierIndex, profile.licenceJobs)
+	return {
+		tier = tierIndex,
+		stars = string.rep("★", JobsConfig.Tiers[tierIndex].stars),
+		have = have,
+		need = need,
+		level = def.level,
+		atStars = string.rep("★", JobsConfig.Tiers[def.atTier].stars),
+		held = profile.licences[tostring(tierIndex)] == true,
+	}
+end
+
+-- 4.7: why a tier's licence is missing, in words.
+local function licenceText(info: { [string]: any }): string
+	return `{info.stars} jobs need the {info.stars} LICENCE: driver level {info.level} and {info.need} jobs rated ★★ or better at {info.atStars} or harder ({info.have} / {info.need} done).`
+end
+
 -- 3.7: the drive from `from` to the offer's first stop (manhattan, like the route).
 local function approachFrom(from: Vector3, offer: Offer): number
 	local first = offer.stops[1].address
@@ -921,8 +1039,18 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 			lockText, lockButton = Freight.lockText(count, name, takes)
 		end
 	end
+	-- 4.7: the licence (the level first: a tier above your level says LEVEL).
+	local licence = licenceTier(offer)
+	local noLicence = licence ~= nil and offer.level <= playerLevel and not hasLicence(player, licence)
+	local roleInfo = JobRules.roleInfo(offer.role)
 	return {
-		locked = offer.level > playerLevel,
+		locked = offer.level > playerLevel or noLicence,
+		lockReason = if offer.level > playerLevel then "level" elseif noLicence then "licence" else nil,
+		licence = if noLicence and licence then licenceInfo(player, licence) else nil,
+		role = offer.role, -- 4.7: the trade-off (short | long | risky | bulk) and its words
+		roleName = if roleInfo then roleInfo.name else nil,
+		roleIcon = if roleInfo then roleInfo.icon else nil,
+		roleWhy = if roleInfo then roleInfo.why else nil,
 		level = offer.level,
 		slots = need,
 		capacity = holds,
@@ -976,8 +1104,33 @@ local function boardOrder(a: Offer, b: Offer): boolean
 	return a.id < b.id
 end
 
--- A new board for the player, from where they are now: up to two board specials and one ordinary delivery of every
--- danger level, sorted (boardOrder), each with its id; it stays until refreshAt (Config.Jobs.RefreshSeconds).
+-- An offer on the board: its id and the drive to it from where it was offered.
+local function stamp(offer: Offer, from: Vector3)
+	nextOfferId += 1
+	offer.id = nextOfferId
+	offer.approach = approachFrom(from, offer)
+end
+
+-- 4.7: one tier's ordinary deliveries: one of every trade-off (JobRules.roles) when the player may take the tier
+-- (its level and its licence), else one to show what is locked.
+local function tierOffers(player: Player, from: Vector3, tierIndex: number): { Offer }
+	local out: { Offer } = {}
+	local open = PlayerData.level(player) >= JobsConfig.Tiers[tierIndex].level and hasLicence(player, tierIndex)
+	local roles: { string } = if open then JobRules.roles(function(): number
+		return rng:NextNumber()
+	end) else { "short" }
+	for _, role in roles do
+		local offer = ordinaryOffer(from, tierIndex, nil, role)
+		if offer then
+			table.insert(out, offer)
+		end
+	end
+	return out
+end
+
+-- A new board for the player, from where they are now: up to two board specials and (4.7) three ordinary deliveries
+-- of every danger level open to them (one of a locked one), sorted (boardOrder), each with its id; it stays until
+-- refreshAt (Config.Jobs.RefreshSeconds).
 local function makeBoard(player: Player): Board
 	local from = playerPosition(player)
 	local list: { Offer } = {}
@@ -1009,20 +1162,17 @@ local function makeBoard(player: Player): Board
 			table.insert(list, special)
 		end
 	end
-	-- One ordinary delivery of every danger level (the ones above your level locked).
+	-- 4.7: the ordinary deliveries of every danger level (tierOffers: a choice of three, one locked).
 	for tierIndex = 1, #JobsConfig.Tiers do
-		local offer = ordinaryOffer(from, tierIndex)
-		if offer then
+		for _, offer in tierOffers(player, from, tierIndex) do
 			table.insert(list, offer)
 		end
 	end
 	for _, offer in list do
-		nextOfferId += 1
-		offer.id = nextOfferId
-		offer.approach = approachFrom(from, offer)
+		stamp(offer, from)
 	end
 	table.sort(list, boardOrder)
-	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, JobsConfig.RefreshSeconds) }
+	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, JobsConfig.RefreshSeconds), rerolled = {} }
 	boards[player.UserId] = board
 	return board
 end
@@ -1045,12 +1195,72 @@ local function sendBoard(player: Player, board: Board)
 	for _, offer in board.list do
 		table.insert(out, describe(offer, from, level, nightPay, player))
 	end
-	Net.get("Offers"):FireClient(player, out, board.refreshAt)
+	-- 4.7: every tier's REROLL (its fee, used already) and whether it is open, the licence of a locked one.
+	local tiers = {}
+	for index, tier in JobsConfig.Tiers do
+		local open = level >= tier.level and hasLicence(player, index)
+		table.insert(tiers, {
+			stars = tier.stars,
+			name = tier.name,
+			fee = JobRules.rerollFee(tier.stars),
+			rerolled = board.rerolled[index] == true,
+			open = open,
+			level = tier.level,
+			licence = if open then nil else licenceInfo(player, index),
+		})
+	end
+	local profile = PlayerData.get(player)
+	Net.get("Offers"):FireClient(player, out, board.refreshAt, { tiers = tiers, streak = if profile then profile.streak else 0 })
 end
 
 -- A new board now, sent to the player (3.7: the client cannot ask for this; RequestOffers sends the current board).
 function Jobs.makeOffers(player: Player)
 	sendBoard(player, makeBoard(player))
+end
+
+-- 4.7, REROLL (Net "RerollTier", tier): that tier's ordinary offers on the player's board made again, for
+-- Choice.RerollFee × its stars, once per tier until the board refreshes. Not during a job, not a tier the player may
+-- not take; the specials stay. The board is sent again either way.
+local function reroll(player: Player, tierIndex: any)
+	if type(tierIndex) ~= "number" or tierIndex ~= tierIndex or tierIndex % 1 ~= 0 or tierIndex < 1 or tierIndex > #JobsConfig.Tiers then
+		return
+	end
+	if jobs[player] then
+		notice:FireClient(player, "Finish your current delivery first.")
+		return
+	end
+	local board = boards[player.UserId]
+	if not board or workspace:GetServerTimeNow() >= board.refreshAt then
+		sendBoard(player, boardOf(player))
+		return
+	end
+	local tier = JobsConfig.Tiers[tierIndex]
+	local stars = string.rep("★", tier.stars)
+	local fee = JobRules.rerollFee(tier.stars)
+	if board.rerolled[tierIndex] then
+		notice:FireClient(player, `The {stars} jobs were rerolled already. New ones come with the next board.`)
+	elseif PlayerData.level(player) < tier.level or not hasLicence(player, tierIndex) then
+		notice:FireClient(player, `The {stars} jobs are locked for you: nothing to reroll.`)
+	elseif not PlayerData.spend(player, fee) then
+		notice:FireClient(player, `A reroll of the {stars} jobs costs ${fee}.`)
+	else
+		board.rerolled[tierIndex] = true
+		local from = playerPosition(player)
+		local list: { Offer } = {}
+		for _, offer in board.list do
+			if offer.jobType ~= nil or offer.tier ~= tierIndex then
+				table.insert(list, offer)
+			end
+		end
+		for _, offer in tierOffers(player, from, tierIndex) do
+			stamp(offer, from)
+			table.insert(list, offer)
+		end
+		table.sort(list, boardOrder)
+		board.list = list
+		notice:FireClient(player, `New {stars} jobs on the board (-${fee}).`)
+	end
+	sendBoard(player, board)
 end
 
 -- 3.7: every second (update): a board whose time is up gets new offers, pushed to its player (open or not, so the
@@ -1384,6 +1594,7 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		duoTeamed = crewCount >= Config.Missions.Duo.MinCrew,
 		gateClosed = false,
 		gatePulled = 0,
+		wrecked = false,
 	}
 	jobs[player] = job
 	placeDocks(player, offer)
@@ -1453,6 +1664,13 @@ end
 -- startJob, every refusal told to the player.
 local function takeOffer(player: Player, offer: Offer): boolean
 	if not canTake(player, offer.level) then
+		return false
+	end
+	-- 4.7: the ★★★ / ★★★★ board jobs need their licence.
+	local licence = licenceTier(offer)
+	if licence and not hasLicence(player, licence) then
+		local info = licenceInfo(player, licence)
+		notice:FireClient(player, if info then `Locked: {licenceText(info)}` else "Locked: this job needs a licence.")
 		return false
 	end
 	local short = slotsShort(player, offer)
@@ -1549,7 +1767,20 @@ function Jobs.fail(player: Player, reason: string)
 	local xp = if worked then Levels.jobXp(offer.tier, status.deliveredTotal, job.kills, DayNight.isNight(), false) else 0
 	endJob(player, job, false)
 	send(player)
-	resultRemote:FireClient(player, withXp({ success = false, reason = reason, cargo = offer.cargo, stars = offer.tier }, giveXp(player, xp)))
+	-- 4.7: a failed job (not a mission) ends the streak of good jobs.
+	local profile = PlayerData.get(player)
+	local streakLost = 0
+	if profile and not offer.mission and profile.streak > 0 then
+		streakLost = profile.streak
+		profile.streak = 0
+	end
+	resultRemote:FireClient(player, withXp({
+		success = false,
+		reason = reason,
+		cargo = offer.cargo,
+		stars = offer.tier,
+		streakLost = if streakLost > 0 then streakLost else nil,
+	}, giveXp(player, xp)))
 	for _, member in crew do
 		resultRemote:FireClient(member, withXp({
 			success = false,
@@ -1589,14 +1820,39 @@ local function complete(player: Player, job: Job)
 	local missionResult = if offer.mission
 		then { id = offer.mission, name = if offer.jobType then offer.jobType.name else offer.mission, stars = stars }
 		else nil
-	local driverTotal, share = Economy.crewSplit(payout.total, #crew)
+	-- 4.7: an ordinary or special job (not a mission) is rated ★ … ★★★ (JobRules.rate): the pay × the rating plus the
+	-- owner's streak of good jobs, the XP × the rating; a good one counts toward the owner's licences.
+	local profile = PlayerData.get(player)
+	local rating = if offer.mission then nil else JobRules.rate(job.condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0, job.wrecked, job.cargo.lost)
+	local payTotal = payout.total
+	local ratingInfo: { [string]: any }? = nil
+	if rating then
+		local streak = JobRules.nextStreak(if profile then profile.streak else 0, rating.stars)
+		local total, ratingPart, streakPart = JobRules.ratedPay(payout.total, rating.stars, streak)
+		payTotal = total
+		if profile then
+			profile.streak = streak
+			JobRules.countJob(profile.licenceJobs, offer.tier, rating.stars)
+		end
+		ratingInfo = {
+			stars = rating.stars,
+			checks = rating.checks, -- { { text, ok } }: why
+			ratingPay = ratingPart, -- + or − money
+			streak = streak,
+			streakBonus = if rating.stars >= 2 then JobRules.streakBonus(streak) else 0,
+			streakPay = streakPart,
+		}
+	end
+	local driverTotal, share = Economy.crewSplit(payTotal, #crew)
 	-- The split, for everybody's result: the owner first.
 	local split = { { name = player.DisplayName, pay = driverTotal } }
 	for _, member in crew do
 		table.insert(split, { name = member.DisplayName, pay = share })
 	end
 	local xp = Levels.jobXp(offer.tier, delivered, job.kills, night, true)
-	local profile = PlayerData.get(player)
+	if rating then
+		xp = JobRules.ratedXp(xp, rating.stars)
+	end
 	local employerInfo: { [string]: any }? = nil
 	local unlockedWeapon: string? = nil
 	if profile then
@@ -1633,6 +1889,26 @@ local function complete(player: Player, job: Job)
 	end
 	PlayerData.addMoney(player, driverTotal)
 	send(player)
+	local ownerXp = giveXp(player, xp)
+	-- 4.7: the licences after the XP (a level-up may open one): earned now, else the next one's progress.
+	if ratingInfo and profile then
+		for _, def in Config.Jobs.Licences do
+			local key = tostring(def.tier)
+			if profile.licences[key] then
+				continue
+			end
+			local earned = hasLicence(player, def.tier)
+			local info = licenceInfo(player, def.tier)
+			if info then
+				info.earned = earned
+				ratingInfo.licence = info
+			end
+			if earned then
+				notice:FireClient(player, `{string.rep("★", def.tier)} LICENCE earned: the {JobsConfig.Tiers[def.tier].name} jobs are on your board.`)
+			end
+			break
+		end
+	end
 	resultRemote:FireClient(player, withXp({
 		employer = employerInfo,
 		success = true,
@@ -1645,7 +1921,7 @@ local function complete(player: Player, job: Job)
 		night = night,
 		crew = split, -- { { name, pay } }: everybody paid on this job, the owner first
 		riders = #crew, -- crew members besides you
-		crewBonus = driverTotal - payout.total,
+		crewBonus = driverTotal - payTotal,
 		total = driverTotal,
 		delivered = delivered, -- pieces that arrived
 		pieces = offer.total, -- pieces of the job
@@ -1655,7 +1931,8 @@ local function complete(player: Player, job: Job)
 		unlockedWeapon = unlockedWeapon,
 		mission = missionResult, -- 3.0: { id, name, stars } of a mission
 		coopPay = if offer.coop then coopPay else nil, -- a co-op mission: the pay × this for the crew
-	}, giveXp(player, xp)))
+		rating = ratingInfo, -- 4.7: { stars, checks, ratingPay, streak, streakBonus, streakPay, licence? } (not a mission)
+	}, ownerXp))
 	for _, member in crew do
 		local memberProfile = PlayerData.get(member)
 		if memberProfile then
@@ -1673,6 +1950,7 @@ local function complete(player: Player, job: Job)
 			crew = split,
 			total = share,
 			mission = missionResult,
+			rating = if rating then { stars = rating.stars } else nil, -- 4.7: the owner's rating of the job
 		}, giveXp(member, xp)))
 	end
 	local missionId = offer.mission
@@ -1856,6 +2134,7 @@ function Jobs.onCarWrecked(player: Player)
 	if not job then
 		return
 	end
+	job.wrecked = true -- 4.7: the rating
 	notice:FireClient(player, "Your car is wrecked! Press CAR and keep going, the clock is ticking.")
 	if Cargo.isPeople(job.offer.kind) then
 		if Cargo.status(job.cargo).inCar > 0 then
@@ -2397,6 +2676,7 @@ function Jobs.start()
 		end
 	end)
 	Net.get("AcceptJob").OnServerEvent:Connect(accept)
+	Net.get("RerollTier").OnServerEvent:Connect(reroll) -- 4.7
 	Net.get("AcceptEmployer").OnServerEvent:Connect(acceptEmployer)
 	Net.get("CancelJob").OnServerEvent:Connect(function(player)
 		Jobs.fail(player, "Delivery cancelled.")
