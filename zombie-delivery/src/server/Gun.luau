@@ -11,6 +11,7 @@
 -- seat the holster changes nothing.
 -- Every shot that really fires is told to Gun.onShot (3.0: the quiet twist of a mission costs cargo condition per shot;
 -- server/Jobs.luau sets it, Gun does not require Jobs).
+-- 4.5: a player with the attribute AdminOneHit (server/Admin.luau) kills whatever a round hits.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,6 +31,7 @@ local Gun = {}
 Gun.onShot = nil :: ((player: Player) -> ())?
 
 local lastShot: { [Player]: number } = {}
+local ONE_HIT = 1e6 -- 4.5: a round's damage with the admin's ONE-HIT KILLS (the player attribute AdminOneHit)
 local rng = Random.new()
 
 local function spreadDirection(direction: Vector3, degrees: number): Vector3
@@ -139,6 +141,11 @@ local function onFire(player: Player, target: any, aimed: any)
 	end
 	local carGun = if mode == "cargun" and carGunId then Economy.findCarGun(carGunId) else nil
 	local stats = if carGun then Economy.carGunStats(carGun.id, profile.upgrades) else Economy.weaponStats(profile.weapon, profile.upgrades)
+	if player:GetAttribute("AdminOneHit") == true then
+		-- 4.5, the admin's ONE-HIT KILLS (server/Admin.luau): every round kills what it hits.
+		stats = table.clone(stats)
+		stats.damage = ONE_HIT
+	end
 	-- The car seat's gun, for the challenges (Zombies.KillInfo): the roof gun, or a passenger's out of the window.
 	local from = if mode == "cargun" or (mode == "window" and not driving) then mode else nil
 	local now = os.clock()

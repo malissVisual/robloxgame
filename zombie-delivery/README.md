@@ -1060,6 +1060,24 @@ point), with an arrow over your car and a light beam. Big icons over the buildin
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
 
+## The admin panel (4.5)
+
+P (or the ADMIN button on touch) opens it for admins (a Studio Play test, the place's owner, `Config.Admin.UserIds`);
+every command is checked again on the server (`server/Admin.luau`, its header lists them all). At the top a **TARGET**:
+you or any player in the server, and the tabs act on that player.
+- **PLAYER**: GIVE ALL (everything unlocked and upgraded, +$1 000 000), money, XP, the driver level, items, guns, a
+  car next to you, any car's stage, any upgrade track, the car gun, paints, heal, RESET MY SAVE (you only, asks twice).
+- **OP** (toggles, kept over a respawn): god, fly (WASD toward the camera, Space up, Ctrl down, Shift faster), noclip,
+  super jump, walk speed 1× / 2× / 4×, car boost ×2, hidden (no enemy goes after you), one-hit kills; bring the target
+  to you or go to them, clear the bandits after them.
+- **WORLD**: the time of day, kill every enemy on the map, freeze them all, a horde of 10 / 20 / 30, any enemy kind, a
+  bandit car, traffic cars, teleport to any place.
+- **JOBS & MISSIONS**: finish the stop or the whole job (paid as usual), start any job or mission, all missions at 3★,
+  the challenges, titles. **ESTATE**: give or take properties, the home, the company's safe.
+- **BUDDIES**: up to 3 NPC companions (`server/Buddy.luau`, `Config.Buddy`): they follow you, ride in your car's
+  passenger seats, shoot the zombies and bandits around you (their kills pay nobody), fall and come back after 10 s;
+  FOLLOW / STAY / GUARD, DISMISS. A friend at a full car's door takes a buddy's seat.
+
 ## Graphics
 
 The art is in `zombie-delivery/art/`: white silhouette icons for the guns (`weapons/`), the cargo and the items
