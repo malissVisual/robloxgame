@@ -66,6 +66,7 @@ export type Profile = {
 	explored: string, -- 3.7: the map cells uncovered (shared/Explore.luau encodes them)
 	kit: { [string]: boolean }, -- 5.0: personal gear owned (Config.Kit ids: backpacks, shoes, a jacket), yours for good
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
+	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -122,6 +123,7 @@ local function newProfile(): Profile
 		explored = "",
 		kit = {},
 		phone = false,
+		vanQuest = nil,
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -326,6 +328,7 @@ local function applySaved(profile: Profile, saved: any)
 	profile.tutorial = saved.tutorial == true or profile.deliveries > 0 -- 3.7: a player who delivered before needs no tutorial
 	profile.explored = if type(saved.explored) == "string" and #saved.explored <= 65536 then saved.explored else ""
 	profile.phone = saved.phone == true -- 5.0
+	profile.vanQuest = if saved.vanQuest == "open" or saved.vanQuest == "done" then saved.vanQuest else nil -- 5.0
 	if type(saved.kit) == "table" then
 		for _, def in Config.Kit do
 			if saved.kit[def.id] == true then
@@ -650,6 +653,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		explored = profile.explored,
 		kit = profile.kit, -- 5.0
 		phone = profile.phone, -- 5.0
+		vanQuest = profile.vanQuest, -- 5.0
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -777,10 +781,14 @@ function PlayerData.giveCar(player: Player, id: string): boolean
 	if not profile or not Economy.findCar(id) then
 		return false
 	end
+	local def = Economy.findCar(id)
 	local new = not profile.cars[id]
 	profile.cars[id] = true
-	if profile.car == nil then
-		profile.car = id -- 5.0: the first vehicle you get is the one you drive
+	if profile.car == nil and def and not def.company then
+		profile.car = id -- 5.0: the first car of your own you get is the one you drive (not an employer's vehicle)
+	end
+	if id == Config.VanQuest.Car then
+		profile.vanQuest = "done" -- 5.0: Earl's van (bought from him, or given)
 	end
 	changed:Fire(player)
 	return new

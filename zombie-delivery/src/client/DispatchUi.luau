@@ -251,7 +251,8 @@ local function vehicleNote(): string
 	end
 	local level = van.level or 1
 	local when = if myLevel() >= level then "now" else `from level {level}`
-	return `No vehicle yet: this job needs one. The {van.name} is for sale {when} at Dead End Motors ({Ui.money(van.price)}). Until then the ON FOOT runs pay.`
+	local where = if van.id == Config.VanQuest.Car then `from {Config.VanQuest.Seller} at {Config.VanQuest.Place} (Marge's quest)` else "at Dead End Motors"
+	return `No vehicle yet: this job needs one. The {van.name} is for sale {when} {where} ({Ui.money(van.price)}). Until then the ON FOOT runs pay.`
 end
 
 local function carLevels(id: string): any
@@ -975,7 +976,7 @@ local function tierHeader(index: number, info: any, order: number)
 	local level = tonumber(info.level) or 1
 	local walking = onFoot() -- 5.0: no vehicle yet: the car tiers need one
 	local sub = if walking and myLevel() < level then `LOCKED · LEVEL {level} · needs a vehicle ({vehicleShort()})`
-		elseif walking then `NEEDS A VEHICLE · {vehicleShort()}, Dead End Motors`
+		elseif walking then `NEEDS A VEHICLE · {vehicleShort()}, {if firstVehicle() and (firstVehicle() :: Config.CarDef).id == Config.VanQuest.Car then Config.VanQuest.Place else "Dead End Motors"}`
 		elseif info.open == true then "Pick one: each run has its own trade-off"
 		elseif myLevel() < level then `LOCKED · LEVEL {level}{if licence then ` and the {licence.stars} licence` else ""}`
 		elseif licence then `LOCKED · LICENCE {licence.have or 0} / {licence.need or 0} · jobs rated ★★+ at {licence.atStars}`

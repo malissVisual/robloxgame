@@ -18,11 +18,14 @@
 --   CAREER    the career app: rank, level, XP, the next goal in work ("about 8 on-foot runs", client/CareerUi.luau),
 --             what it opens, the next levels of the road (shared/Career.luau), and FULL CAREER (C, Phone.onCareer).
 --   SHOP      what to buy next with your money and level: the personal gear at Last Stop Supplies (Config.Kit,
---             client/KitShop.luau), the bikes (coming in 5.1), the first vehicles at Dead End Motors (the Old Van at
---             level 4); each with what is missing ($ to go, the level), SET GPS to the shop (MapView.setWaypoint).
+--             client/KitShop.luau), the bikes (coming in 5.1), the Old Van from Earl at Earl's Used Wheels (Marge's
+--             quest at level 4, Config.VanQuest; SET GPS to Earl, Map.VanSeller), the next vehicles at Dead End
+--             Motors; each with what is missing ($ to go, the level), SET GPS to the shop (MapView.setWaypoint).
 --   MAP       the big map (MapView.toggle).
 --   MESSAGES  Marge's tips for your level (the backpack, the bike shop, the Old Van, the car tiers: all from Config),
---             the dispatcher's new runs, your level-ups. New ones put a red dot on the PHONE action.
+--             the dispatcher's new runs, your level-ups, and the texts the server sends (the Tutorial remote's
+--             "message": Marge about Earl's van, server/VanQuest.luau; with `gps` it sets the GPS there). New ones put
+--             a red dot on the PHONE action.
 -- The MENU and every key stay as they were (J, C, M ...); the phone is one more way in. Opening it closes the other
 -- windows (Phone.onOpen, Main: Hud.closeWindows); ESC, O, the PHONE action or the home bar (on the home screen)
 -- close it. While it is open the mouse is free (Main: CameraRig.mouseNeeded asks Phone.isOpen).
@@ -203,7 +206,8 @@ local function margeTips(level: number): { string }
 	end
 	local first = vehicles()[1]
 	if first and (first.level or 1) == level and level > 1 then
-		table.insert(tips, `Level {level}: the {first.name} is yours to buy at Dead End Motors ({Career.money(first.price)}). With a vehicle the car jobs open, and the missions.`)
+		local private = first.id == Config.VanQuest.Car -- (5.0: Earl sells it, not the dealer)
+		table.insert(tips, `Level {level}: the {first.name} is yours to buy {if private then `from {Config.VanQuest.Seller} at {Config.VanQuest.Place}, far out west` else "at Dead End Motors"} ({Career.money(first.price)}). With a vehicle the car jobs open, and the missions.`)
 	end
 	for _, tier in Config.Jobs.Tiers do
 		if tier.level == level and level > 1 then
@@ -312,21 +316,24 @@ local function button(parent: Instance, label: string, kind: P.ButtonKind, order
 	return made
 end
 
--- The GPS to one of Map.Shops (the white route on both maps, the HUD's beam and label).
+-- The GPS to one of Map.Shops or a landmark (5.0: "earl", Earl's Used Wheels) (the white route on both maps, the HUD's
+-- beam and label).
 local function gpsTo(shopId: string)
 	local shop = Map.Shops[shopId]
-	if not shop then
-		return
-	end
-	MapView.setWaypoint(Vector3.new(shop.x, Map.RoadTop, shop.z))
 	local landmark: Map.Landmark? = nil
 	for _, entry in Map.Landmarks do
 		if entry.id == shopId then
 			landmark = entry
 		end
 	end
+	local x = if shop then shop.x elseif landmark then landmark.x else nil
+	local z = if shop then shop.z elseif landmark then landmark.z else nil
+	if x == nil or z == nil then
+		return
+	end
+	MapView.setWaypoint(Vector3.new(x, Map.RoadTop, z))
 	pcall(function()
-		MapView.onWaypoint(landmark or { id = shopId, name = shop.name, icon = "🛒", x = shop.x, z = shop.z, kind = "shop", description = "" })
+		MapView.onWaypoint(landmark or { id = shopId, name = if shop then shop.name else shopId, icon = "🛒", x = x, z = z, kind = "shop", description = "" })
 	end)
 end
 
@@ -371,12 +378,18 @@ local function ordersApp(list: Instance)
 		caps(b, `{done} / {total} {if total == 1 then (job.piece or "piece") else (job.pieces or "pieces")} delivered{if (tonumber(job.lost) or 0) > 0 then ` · {job.lost} lost` else ""}`, 9)
 		bar(b, done / total, K.text, 10)
 	end
+	-- 5.0, on foot: what rides in your backpack (the payload's pack / packRoom; the PackCount attribute is live).
+	local packRoom = tonumber(job.packRoom) or tonumber(player:GetAttribute("PackRoom")) or 0
+	if job.mode == "foot" and packRoom > 0 then
+		local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
+		caps(b, `🎒 Backpack {packed} / {packRoom}`, 11, if packed >= packRoom then K.red else K.secondary)
+	end
 	local condition = tonumber(job.condition)
 	if condition and condition < 0.999 then
-		caps(b, `Cargo condition {math.floor(condition * 100 + 0.5)}%`, 11, if condition < 0.5 then K.red else K.secondary)
+		caps(b, `Cargo condition {math.floor(condition * 100 + 0.5)}%`, 12, if condition < 0.5 then K.red else K.secondary)
 	end
 	if type(job.ruleLine) == "string" and job.ruleLine ~= "" then
-		text(b, job.ruleLine, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 12, TextColor3 = K.secondary, TextSize = 13 })
+		text(b, job.ruleLine, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 13, TextColor3 = K.secondary, TextSize = 13 })
 	end
 	button(list, "SHOW ON MAP", "quiet", 2, function()
 		Phone.close()
@@ -480,7 +493,7 @@ local function shopHeader(parent: Instance, order: number, shopId: string, title
 		local notify = Phone.notify
 		local shop = Map.Shops[shopId]
 		if notify then
-			notify(`GPS: {if shop then shop.name else title}`)
+			notify(`GPS: {if shop then shop.name elseif shopId == "earl" then Config.VanQuest.Place else title}`)
 		end
 	end)
 	gps.TextSize = 11
@@ -524,19 +537,29 @@ local function shopApp(list: Instance)
 		order += 1
 		goal(list, order, "🚲", "Bikes", "A bike shop in town", 0, Career.BIKE_LEVEL, "COMING IN 5.1")
 	end
-	-- The first vehicles you do not own yet (two of them).
+	-- The first vehicles you do not own yet (two of them). 5.0: the Old Van comes from Earl (Marge's quest), SET GPS
+	-- to him; the others from Dead End Motors.
 	local cars = if state and type(state.cars) == "table" then state.cars else {}
 	local count = 0
+	local dealerShown = false
 	for _, def in vehicles() do
 		if cars[def.id] or count >= 2 then
 			continue
 		end
-		if count == 0 then
-			order += 1
-			shopHeader(list, order, "dealer", "Dead End Motors · vehicles")
-		end
 		count += 1
 		order += 1
+		if def.id == Config.VanQuest.Car then
+			local quest = if state and state.vanQuest == "open" then "open" else nil
+			shopHeader(list, order, "earl", `{Config.VanQuest.Place} · {def.name}`)
+			order += 1
+			goal(list, order, "🚐", def.name, if quest then `{Config.VanQuest.Seller}, far out west` else "Marge's quest", def.price, def.level or 1)
+			continue
+		end
+		if not dealerShown then
+			dealerShown = true
+			shopHeader(list, order, "dealer", "Dead End Motors · vehicles")
+			order += 1
+		end
 		goal(list, order, "🚐", def.name, "Dead End Motors", def.price, def.level or 1)
 	end
 end
@@ -1354,12 +1377,24 @@ function Phone.start()
 	end)
 	Net.get("Offers").OnClientEvent:Connect(onOffers)
 	-- 5.0: the tutorial's "phone" (server/Tutorial.luau: Marge gives it). Only the name is shared; it may not come.
-	Net.get("Tutorial").OnClientEvent:Connect(function(phase)
+	Net.get("Tutorial").OnClientEvent:Connect(function(phase, data)
 		if phase == "phone" then
 			phoneMoment()
+		elseif phase == "message" and type(data) == "table" and type(data.text) == "string" then
+			-- 5.0: a text from the server (Marge about Earl's van, server/VanQuest.luau); `gps`: a landmark to route to.
+			addMessage(if type(data.from) == "string" then data.from else "Marge", data.text, "marge", true)
+			local gps = data.gps
+			if type(gps) == "table" and type(gps.id) == "string" then
+				gpsTo(gps.id)
+			end
 		end
 	end)
 	player:GetAttributeChangedSignal("Xp"):Connect(onXp)
+	player:GetAttributeChangedSignal("PackCount"):Connect(function()
+		if isOpen and app == "orders" then
+			renderApp() -- 5.0: the backpack line
+		end
+	end)
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or UserInputService:GetFocusedTextBox() then
 			return

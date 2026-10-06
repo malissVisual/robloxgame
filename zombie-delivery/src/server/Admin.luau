@@ -243,6 +243,7 @@ local function unlockAll(player: Player)
 	for _, car in Config.Cars do
 		profile.cars[car.id] = true
 	end
+	profile.vanQuest = "done" -- 5.0: Earl's van is yours already
 	-- 5.0: a player still on foot drives the Old Van from now on; every piece of personal gear, and the phone.
 	if profile.car == nil then
 		profile.car = Config.Cars[1].id

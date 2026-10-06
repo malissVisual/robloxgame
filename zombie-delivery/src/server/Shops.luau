@@ -19,8 +19,9 @@
 --   Depot Garage        3.4: the depot lot's garage window (server/Garages.luau: the starting van, company vehicles)
 --   Job Board           the depot's job board
 --
--- 5.0: you start on foot (profile.car nil): everything for "the equipped car" says you have no vehicle yet, and the
--- first car you buy is yours to drive at once (it comes to you: Vehicles.spawn).
+-- 5.0: you start on foot (profile.car nil): everything for "the equipped car" says you have no vehicle yet. The Old
+-- Van is not sold here (Config.VanQuest: Earl sells it, server/VanQuest.luau); a first car bought here anyway is the one
+-- you drive, parked on the road outside the dealer (you get in yourself).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -31,6 +32,7 @@ local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local TransportRules = require(Shared.Transport)
+local VanQuestRules = require(Shared.VanQuest)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
@@ -43,7 +45,7 @@ local Shops = {}
 
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
-local NO_CAR = "You don't have a vehicle yet. The Old Van is sold at Dead End Motors from level 4."
+local NO_CAR = `You don't have a vehicle yet. The Old Van: {Config.VanQuest.Where}.`
 
 
 local function nearShop(player: Player, shop: string): boolean
@@ -104,6 +106,11 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 	end
 	if kind == "car" then
 		local def = Economy.findCar(id)
+		if def and VanQuestRules.isQuestCar(id) and not profile.cars[id] then
+			-- 5.0: sold privately (Earl's Used Wheels, Marge's quest), not here.
+			notice:FireClient(player, `The {def.name} is not sold here. {Config.VanQuest.DealerNote}`)
+			return
+		end
 		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or tooLow(player, def.name, def.level) or noSlot(player) then
 			return
 		end
@@ -113,11 +120,22 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		end
 		profile.cars[id] = true
 		if profile.car == nil then
-			-- 5.0: your first vehicle: it is the one you drive, and it comes out to you now.
+			-- 5.0: your first vehicle: it is the one you drive, parked on the road outside (you get in yourself; a
+			-- running job's lent company vehicle stays out until the job is over).
 			profile.car = id
 			PlayerData.notify(player)
-			local err = Vehicles.spawn(player, true)
-			notice:FireClient(player, if err then `You bought the {def.name}! Press CAR to call it.` else `You bought the {def.name}! It is parked outside: your first vehicle. The car jobs are on your board now.`)
+			local parked = false
+			if not Jobs.vehicleFor(player) then
+				local shop = Map.Shops.dealer
+				local character = player.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart")
+				local from = if root and root:IsA("BasePart") then root.Position else Vector3.new(shop.x, 0, shop.z)
+				local x, z, dx, dz = Map.nearestRoad(from.X, from.Z)
+				local spot = Vector3.new(x, Map.RoadTop, z)
+				parked = Vehicles.placeAt(player, nil, CFrame.lookAt(spot, spot + Vector3.new(dx, 0, dz)), false) ~= nil
+			end
+			notice:FireClient(player, if parked then `You bought the {def.name}! It is parked on the road outside: your first vehicle. The car jobs are on your board now.`
+				else `You bought the {def.name}! Press CAR to call it.`)
 			return
 		end
 		-- 3.4: it goes into your garage (cars are kept in garages): take it out there.
@@ -468,7 +486,8 @@ local function buildShowroom()
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
-		local price = if def.price > 0 then "$" .. def.price else "BUILD YOURS AT WRENCH GARAGE"
+		local price = if VanQuestRules.isQuestCar(def.id) then "SOLD PRIVATELY · ASK MARGE"
+			elseif def.price > 0 then "$" .. def.price else "BUILD YOURS AT WRENCH GARAGE"
 		local name = if stage and stage.name ~= def.name then `{stage.name} ({def.name}, stage {entry.stage})` else def.name
 		label.Text = if def.level and def.level > 1 then `{name}\n{price} · LEVEL {def.level}+` else `{name}\n{price}`
 		label.TextScaled = true

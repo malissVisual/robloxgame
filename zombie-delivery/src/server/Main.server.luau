@@ -46,6 +46,7 @@ local Explore = require(Server.Explore)
 local Tutorial = require(Server.Tutorial)
 local CloseCombat = require(Server.CloseCombat)
 local Transport = require(Server.Transport)
+local VanQuest = require(Server.VanQuest)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -99,6 +100,7 @@ local function sendState(player: Player)
 		licenceJobs = profile.licenceJobs, -- 4.7: good jobs counted toward each licence
 		kit = profile.kit, -- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau)
 		phone = profile.phone, -- 5.0: Marge gave the phone (client/Phone.luau shows it)
+		vanQuest = profile.vanQuest, -- 5.0: Earl's van (nil, "open", "done"; the phone's SHOP, the career road)
 	})
 end
 
@@ -215,6 +217,7 @@ safely("Tutorial", Tutorial.start) -- 3.7: the first-day tutorial
 safely("CloseCombat", CloseCombat.start) -- 3.9: the holster (B) and the melee (V)
 safely("Buddy", Buddy.start) -- 4.5: the admin's NPC companions
 safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the character (KitSpeed)
+safely("VanQuest", VanQuest.start) -- 5.0: Earl's van, Marge's quest at level 4
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
@@ -228,6 +231,7 @@ local function giveCar(player: Player)
 	end
 	local profile = PlayerData.get(player)
 	local carId = Jobs.vehicleFor(player)
+	Jobs.returnLent(player) -- 5.0: a company vehicle of a job that is over does not stay with you
 	-- 5.0: nobody to give a car to while you are on foot (no vehicle yet).
 	if player.Parent and playing[player] and not Vehicles.get(player) and profile and (carId or profile.car) then
 		Vehicles.spawn(player, true, carId)
@@ -384,6 +388,7 @@ Net.get("Play").OnServerEvent:Connect(function(player)
 	Estate.onPlay(player)
 	giveCar(player)
 	Tutorial.onPlay(player) -- 3.7: a new player's welcome (after StartDelay)
+	VanQuest.onPlay(player) -- 5.0: Marge's text about Earl's van, when it is due
 end)
 
 do
@@ -406,7 +411,9 @@ Net.get("SpawnCar").OnServerEvent:Connect(function(player)
 		notice:FireClient(player, "Your car is already on the way.")
 		return
 	end
-	if Jobs.active(player) and Vehicles.get(player) then
+	Jobs.returnLent(player) -- 5.0: a company vehicle of a job that is over goes back first
+	-- 5.0: on a foot job your own car is not part of the job: CAR calls it as usual.
+	if Jobs.active(player) and not Jobs.isFoot(player) and Vehicles.get(player) then
 		notice:FireClient(player, "Your car is still out there. Find it!")
 		return
 	end

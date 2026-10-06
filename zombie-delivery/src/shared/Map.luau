@@ -231,7 +231,22 @@ Map.Yards = {
 	{ id = "trainyard", name = "Train Yard", x0 = -580, z0 = -900, x1 = -100, z1 = -740 },
 	{ id = "camp", name = "Survivor Camp", x0 = -1080, z0 = -360, x1 = -860, z1 = -140 },
 	{ id = "stadium", name = "Stadium Shelter", x0 = -200, z0 = 1277, x1 = 200, z1 = 1440 },
+	-- 5.0, Earl's Used Wheels (Map.VanSeller): a dusty lot on the north side of the West Highway's last stretch, between
+	-- the Airfield Road and the Old Farm. Its front edge is the highway's edge (centre z 520, 40 wide).
+	{ id = "earl", name = "Earl's Used Wheels", x0 = -1650, z0 = 420, x1 = -1490, z1 = 500 },
 } :: { Area }
+
+-- 5.0, Earl's Used Wheels (Config.VanQuest, server/VanQuest.luau): where Earl's old van stands for sale (x, z, facing
+-- the highway: its nose to the road), where Earl stands (earl) and where the van you buy from him is parked for you
+-- (parking, beside the one for sale, facing the road too). About 1,600 studs west of the depot: a trip.
+export type VanSeller = { x: number, z: number, facing: { x: number, z: number }, earl: { x: number, z: number }, parking: { x: number, z: number } }
+Map.VanSeller = {
+	x = -1592,
+	z = 458,
+	facing = { x = 0, z = 1 },
+	earl = { x = -1572, z = 474 },
+	parking = { x = -1548, z = 458 },
+} :: VanSeller
 
 -- Open ground next to the yards that must stay free of trees (the ranch paddock, the riding arena).
 Map.Clearings = {
@@ -611,6 +626,8 @@ local landmarks: { Landmark } = {
 	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, car guns and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
 	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Repair kits, medkits, nitro, molotovs, mines." },
+	-- 5.0: Earl sells his old van here (Config.VanQuest): your first vehicle.
+	{ id = "earl", name = "Earl's Used Wheels", icon = "🚐", x = Map.VanSeller.earl.x, z = Map.VanSeller.earl.z, kind = "place", description = "Far out west on the West Highway, past the Airfield Road. Earl sells his old van here: your first vehicle (Marge's quest at level 4)." },
 }
 -- Where each employer is, in a few words (the map's list).
 local EMPLOYER_WHERE: { [string]: string } = {

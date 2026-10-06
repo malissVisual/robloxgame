@@ -185,6 +185,7 @@ export type Session = {
 	made: number, -- 4.8: pieces made so far (the index into Info.dests)
 	pack: { Piece }, -- 5.0, on foot: in the owner's backpack (no model)
 	packAt: CFrame?, -- 5.0: where the owner stood at the last tick (the pack's pieces fall there when they die)
+	packHumanoid: Humanoid?, -- 5.0: the owner's humanoid at that tick (it died if it is dead and replaced since)
 }
 
 export type Status = {
@@ -2561,6 +2562,7 @@ function Cargo.begin(owner: Player, info: Info): Session
 		made = 0,
 		pack = {},
 		packAt = nil,
+		packHumanoid = nil,
 	}
 	active[owner] = session
 	packShown(session)
@@ -2661,14 +2663,21 @@ function Cargo.update(session: Session, dt: number)
 			dropped = true
 		end
 	end
-	-- 5.0, on foot: the pack goes where the owner goes; when they die its pieces fall there.
+	-- 5.0, on foot: the pack goes where the owner goes; when they die its pieces fall there. Only a death drops it: a
+	-- character being swapped (the avatar rebuilt, no humanoid or root for a moment) keeps it on the back.
 	if session.info.foot then
 		local character = session.owner.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local root = rootOf(character)
+		local last = session.packHumanoid
+		if last and last ~= humanoid and last.Health <= 0 and #session.pack > 0 then
+			dropPack(session) -- (died and already respawned between two looks: where they fell)
+			dropped = true
+		end
 		if humanoid and root and humanoid.Health > 0 then
 			session.packAt = root.CFrame
-		elseif #session.pack > 0 then
+			session.packHumanoid = humanoid
+		elseif humanoid and humanoid.Health <= 0 and #session.pack > 0 then
 			dropPack(session)
 			dropped = true
 		end
