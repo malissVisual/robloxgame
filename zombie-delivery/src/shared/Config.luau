@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "5.5"
+Config.Version = "5.6"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
@@ -1591,6 +1591,70 @@ Config.Bus = {
 			corners = { { -216, 216 }, { 216, 216 }, { 216, 1116 }, { -216, 1116 } },
 		},
 	} :: { BusLineDef },
+}
+
+-- 5.6, ZDC RIDE: free rental e-scooters at docks on the kerbs of Downtown and the Suburbs (shared/RentalDocks.luau
+-- places them, server/Rental.luau runs them). A rental is the E-Scooter (CarId) by every riding rule, never yours: not
+-- saved, not in your cars, no paint, no gear, no fuel, no garage, no car jobs, never on a mission.
+Config.Rental = {
+	CarId = "escooter", -- the Config.Cars bike a rental is
+	Price = 0, -- free (the money check stays for later)
+	Docks = 20, -- about this many docks (one of them just outside the safe zone by the depot)
+	DowntownDocks = 14, -- of those, at most this many Downtown (the rest in the Suburbs)
+	Spacing = 210, -- no two docks closer than this (studs)
+	Slots = { 2, 3 }, -- scooters in a dock (the dock's dice pick one)
+	SlotPitch = 5.6, -- studs between two docked scooters along the kerb (nose to tail)
+	Start = 8, -- the dock starts this far from its block's corner (past the crosswalk)
+	Depth = 1.6, -- the scooters stand this far in from the curb (the walkers' line, 4.5 in, stays clear)
+	Clear = 10, -- no dock within this of a door, a pile, a cargo spot, an employer's board or an address
+	ParkClear = 8, -- … nor of a home's or a storefront's park on the road
+	StopClear = 24, -- … nor of a bus stop's kerb
+	GasClear = 50, -- … nor of a gas station's middle
+	PlaceClear = 30, -- … nor of a place (Map.Places)
+	Reach = 10, -- the Rent / Return prompts' reach
+	Hold = 0.4, -- the Rent prompt's hold (s)
+	WalkAway = 30, -- off the scooter and farther than this from it: it goes back ("returned")
+	Idle = 45, -- off the scooter this long: it goes back
+	Restock = 20, -- seconds until a rented scooter stands in its dock again (once it is returned)
+	Color = { 214, 72, 64 }, -- the ZDC RIDE red on the rentals' deck and stem
+}
+
+-- 5.6, zip lines between Downtown's rooftops (shared/ZipLines.luau picks them, server/ZipLines.luau builds them and
+-- checks the rides, client/ZipRide.luau rides them): a Climb prompt at the start tower's ladder takes you up, Zip on
+-- its platform, a fast ride over the road to a lower roof across it, Climb down there.
+Config.ZipLines = {
+	Count = 8, -- cables (6 – 10)
+	MinLength = 120, -- studs along the ground between the two platforms
+	MaxLength = 260,
+	MinDrop = 10, -- the start's roof at least this much higher than the end's
+	MaxSlope = 0.35, -- drop / length at most
+	Spread = 180, -- no two cables' middles closer than this
+	Speed = 55, -- studs / s along the cable
+	Ramp = 0.8, -- seconds from standing to full speed
+	Brake = 12, -- the last studs slow down …
+	EndSpeed = 18, -- … to this
+	Sag = 0.035, -- the cable's sag in the middle, per stud of length
+	CableHeight = 7, -- the cable's ends over the platforms' floors
+	Hang = 3.6, -- the rider's root under the cable (hands up on the trolley's handle)
+	Clearance = 3, -- the cable over every roof it crosses (the tests' rule), at least
+	Margin = 9, -- the lines are picked with this much over every roof they cross (the rider's feet clear it)
+	OverStreet = 24, -- the cable over a street, a sidewalk or a lawn (lamps, trees), at least
+	Platform = 7, -- the landing platform's floor (square)
+	Reach = 10, -- the Zip / Climb prompts' reach; the server's check of where a ride starts
+	Cooldown = 3, -- seconds between the end of a ride (or a climb) and the next ride of one player
+	SafeDrop = 6, -- Space lets go only this low over a platform's roof (else it is ignored)
+	Grace = 0.8, -- seconds after a ride's end before the server puts a late rider down at the end
+	Fade = 0.25, -- a climb: the screen fades for this long before you are up (or down)
+}
+
+-- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit
+-- path straight through a Downtown block where two neighbouring lots are open (a lawn or a parking lot), a low fence
+-- to hop at each end and a SHORTCUT sign.
+Config.Shortcuts = {
+	Count = 8, -- alleys (6 – 10)
+	Width = 5, -- the path
+	FenceHeight = 2.2, -- low enough to jump
+	Clear = 10, -- no alley's mouth within this of a door, a pile, a park, a cargo spot or a bus stop
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).

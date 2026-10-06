@@ -14,6 +14,7 @@
 -- list). The fog is drawn as one frame per run of fogged cells in a grid row (a soft rounded frame under it for the
 -- edge), pooled per row; when cells are uncovered only their rows are drawn again. The job's star and route, the GPS,
 -- you, your car on its way and the live markers stay over the fog: you must find your delivery.
+-- 5.6: a small 🛴 marker at every ZDC RIDE rental dock (shared/RentalDocks.luau), under the fog.
 -- 3.8, the contract UI (design/ui-contract/): the minimap is compact and monochrome in a thin square line; inside its
 -- top edge the way you face and where you are ("N · HARBOR") and EXPAND [M], a quiet text action that opens the big
 -- map; under it the next turn of the route ("↰ Left onto Maple St · 120 m", the job's route, else the GPS's; with
@@ -372,6 +373,29 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 40, scale, 11, P.ink2)
 		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, P.ink2)
 		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.safe)
+	end
+	-- 5.6, ZDC RIDE: a small marker at every rental dock (shared/RentalDocks.luau), under the fog: found as you uncover
+	-- the map. The scooter's icon when Icons has one, else its emoji.
+	local rideArt = Icons.bike(Config.Rental.CarId)
+	for _, dock in require(Shared.RentalDocks).docks() do
+		local size = if big then 14 else 12
+		local marker = Ui.make("TextLabel", {
+			Name = "RentalDock",
+			Size = UDim2.fromOffset(size, size),
+			Position = point(dock.x, dock.z, scale),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = K.charcoal,
+			Text = if Icons.get(rideArt) then "" else "🛴",
+			TextScaled = true,
+			Font = Enum.Font.GothamBlack,
+			TextColor3 = P.ink,
+			ZIndex = 7,
+		}, content)
+		Ui.corner(marker, size)
+		Ui.stroke(marker, Color3.fromRGB(Config.Rental.Color[1], Config.Rental.Color[2], Config.Rental.Color[3]), 1)
+		if Icons.get(rideArt) then
+			Ui.icon(marker, rideArt, "🛴", UDim2.fromScale(0.8, 0.8), { Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 7 })
+		end
 	end
 	-- 3.7: the fog over the map (ZIndex 8), the routes and the markers over the fog.
 	local fog: Fog = {

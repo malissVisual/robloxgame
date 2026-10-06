@@ -1079,6 +1079,21 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## ZDC RIDE scooters, zip lines, alley shortcuts (5.6)
+
+**ZDC RIDE** (`Config.Rental`, `shared/RentalDocks.luau`, `server/Rental.luau`, `client/RentalUi.luau`): 20 docks
+(14 Downtown, 6 in the Suburbs, one just outside the depot) with free e-scooters. **Rent** at a dock and you ride at
+once (your own car or bike goes home first); it works like the E-Scooter for foot and bike jobs. Get off and walk 30
+studs away, leave it for 45 s or **Return** it at any dock and it goes back. Not for car jobs or missions; never yours to
+keep, paint or fuel. The phone's GARAGE shows the nearest dock with a GPS button; both maps mark the docks.
+
+**Zip lines** (`Config.ZipLines`, `shared/ZipLines.luau`, `server/ZipLines.luau`, `client/ZipRide.luau`): 8 cables from
+one Downtown roof across a street to a lower roof, 130–210 studs. **Climb** by the ladder, **Zip** at the platform:
+hands up on the trolley, 55 studs/s; Space lets go low over a roof. Your backpack rides along; full hands don't.
+
+**Shortcuts** (`shared/Shortcuts.luau`, `server/Shortcuts.luau`): 8 lit alleys through Downtown blocks over open lots,
+with a low fence to hop at each end and a SHORTCUT sign.
+
 ## City buses, people in every building, the courier phone (5.5)
 
 **City buses** (`shared/BusLines.luau`, `server/Buses.luau`, `server/BusStops.luau`, `client/BusRide.luau`, `Config.Bus`):

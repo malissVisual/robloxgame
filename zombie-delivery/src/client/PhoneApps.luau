@@ -12,7 +12,8 @@
 --            yet, or old ones: it asks for the board (RequestOffers, at most every 3 s).
 --   BAG      your bag (client/BagUi.luau's render) in the phone (sideways).
 --   GARAGE   BRING MY CAR (SpawnCar: the MENU's old CAR), 🚲 MY BIKE / 🚐 CALL CAR (the Equip remote) and ⛽ TOW while
---            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too.
+--            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
+--            line "ZDC RIDE · nearest dock N studs" (shared/RentalDocks.luau) with 📍 GPS (MapView.setWaypoint).
 --   KEYS     the settings' list of every key.
 -- Presentation only: the server decides every job, every vehicle and the money.
 
@@ -22,11 +23,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
+local Map = require(Shared.Map)
 local Net = require(Shared.Net)
+local RentalDocks = require(Shared.RentalDocks)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local BagUi = require(script.Parent.BagUi)
 local OrdersUi = require(script.Parent.OrdersUi)
+local MapView = require(script.Parent.MapView)
 
 local K = Theme.Contract
 local PhoneApps = {}
@@ -315,6 +319,7 @@ function PhoneApps.garage(list: Instance, look: OrdersUi.Kit, host: Host)
 			end)
 		end
 	end
+	order = PhoneApps.rideLine(list, look, host, order + 1)
 	if PhoneApps.towDue() then
 		order += 1
 		look.section(list, "Out of fuel", order)
@@ -326,6 +331,35 @@ function PhoneApps.garage(list: Instance, look: OrdersUi.Kit, host: Host)
 			host.close()
 		end)
 	end
+end
+
+-- 5.6, ZDC RIDE: the nearest rental dock (straight, from where you stand) and the GPS to it; under it what to do
+-- (you have one out: the player attribute Rental). Returns the last order used.
+function PhoneApps.rideLine(list: Instance, look: OrdersUi.Kit, host: Host, order: number): number
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local here = if root and root:IsA("BasePart") then root.Position else nil
+	local dock, far = nil, 0
+	if here then
+		dock, far = RentalDocks.nearest(here.X, here.Z)
+	end
+	local card = look.block(list, order)
+	local head = Ui.make("Frame", { Name = "Head", Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, card)
+	local title = if dock then `🛴 ZDC RIDE · nearest dock {math.floor(far)} studs` else "🛴 ZDC RIDE · free e-scooters"
+	look.text(head, title, UDim2.new(1, if dock then -96 else 0, 1, 0), { Font = Theme.HeadingFont, TextSize = 14, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+	if dock then
+		local found = dock
+		look.pill(head, "📍 GPS", function()
+			MapView.setWaypoint(Vector3.new(found.x, Map.RoadTop, found.z))
+			pcall(function()
+				MapView.onWaypoint({ id = "zdcride", name = `ZDC RIDE · {found.name}`, icon = "🛴", x = found.x, z = found.z, kind = "shop", description = "" })
+			end)
+			host.notify(`GPS: ZDC RIDE · {found.name}`)
+		end)
+	end
+	look.meta(card, if player:GetAttribute("Rental") ~= nil then "Your rental: leave it anywhere, or Return it at any dock."
+		else "Free e-scooters at docks across Downtown and the Suburbs: hold Rent.", 2)
+	return order
 end
 
 -- ── SETTINGS: the keys ─────────────────────────────────────────────────────

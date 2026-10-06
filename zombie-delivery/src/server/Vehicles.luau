@@ -122,6 +122,11 @@
 -- Its hull is low and short, its wheel colliders small (radius 0.6); the rider STANDS: the DriverSeat sits a hip's
 -- height over the deck (the model's attribute BikeStand: client/BikeRider.luau straightens the legs onto the deck).
 -- One gear slot for the basket on the stem; the rear rack's one light slot.
+-- 5.6, ZDC RIDE (server/Rental.luau): Vehicles.spawnAt(…, rental = true) puts a rental E-Scooter out as the player's
+-- vehicle: Car.rental and Car.lent (its damage never kept; Jobs.returnLent takes it back when you call your own car or
+-- bike, buy one, or respawn), the plain numbers (no upgrades, stage, gear, paint or car gun of yours), the model's
+-- attribute Rental. Vehicles.repaint and Vehicles.refreshStats leave it alone; Vehicles.displayModel takes a colour
+-- for the docked ones.
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -169,6 +174,7 @@ export type Car = {
 	repairing: boolean, -- 3.4: on the lift of a repair bay (server/Repair.luau): anchored, nobody drives it
 	doors: { CarDoor }, -- 3.7: its doors (doorsOf): index 1 is the driver's
 	gear: { [string]: boolean }, -- 4.6: the gear installed on it (Config.Gear ids; none on a company vehicle)
+	rental: boolean, -- 5.6: a ZDC RIDE rental scooter (server/Rental.luau): lent too (never kept, never yours), no paint
 }
 
 local Vehicles = {}
@@ -2879,9 +2885,10 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	return built
 end
 
--- A showroom model for the dealer (anchored, no seats); 3.5: at a stage (its look).
-function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?, levels: Economy.Upgrades?, gear: { [string]: boolean }?): Model
-	local built = build(def, rgb(def.color), ground, true, nil, nil, stage)
+-- A showroom model for the dealer (anchored, no seats); 3.5: at a stage (its look). 5.6: `color` paints its body
+-- (a ZDC RIDE scooter in its dock); nil: the car's own colour.
+function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?, levels: Economy.Upgrades?, gear: { [string]: boolean }?, color: Color3?): Model
+	local built = build(def, color or rgb(def.color), ground, true, nil, nil, stage)
 	if levels then
 		buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id, gear)
 		for _, p in built.model:GetDescendants() do
@@ -3771,7 +3778,7 @@ end
 -- (its position on the ground, facing its LookVector) and makes it theirs; the old one goes. seat: the player gets
 -- in at once. chauffeured: a chauffeur drives it (server/CarCall.luau): the server owns it and nobody gets in until
 -- Vehicles.handOver. Returns nil when the profile is not loaded yet.
-function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?): Car?
+function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?): Car?
 	local profile = PlayerData.get(player)
 	if not profile then
 		return nil
@@ -3783,17 +3790,19 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local def = Economy.findCar(id) or Config.Cars[1]
 	Vehicles.remove(player)
 
-	-- 3.3: this car's own car-track levels (a company vehicle has none).
-	local levels = Economy.carLevels(profile.carUpgrades, def.id)
+	-- 3.3: this car's own car-track levels (a company vehicle has none; 5.6: nor a rental, whatever you own).
+	local plain = def.company == true or rental == true
+	local levels = Economy.carLevels(if rental then nil else profile.carUpgrades, def.id)
 	local stats = Economy.carStats(def.id, levels)
 	-- 3.4: your own car comes as damaged as it was parked (profile.carHealth); a lent company vehicle comes fresh.
-	local lent = carId ~= nil and def.company == true and carId ~= profile.car
+	-- 5.6: so does a rental (lent: its damage is never kept).
+	local lent = rental == true or (carId ~= nil and def.company == true and carId ~= profile.car)
 	local share = if lent then 1 else math.clamp(profile.carHealth[def.id] or 1, 0.05, 1)
-	local gunId = gunFor(player, def.id)
-	local paintId = if def.company then nil else profile.carPaint[def.id]
-	local stage = if def.company then 0 else Economy.stageOf(def.id, levels) -- 3.5: its stage's look
+	local gunId = if rental then nil else gunFor(player, def.id)
+	local paintId = if plain then nil else profile.carPaint[def.id]
+	local stage = if plain then 0 else Economy.stageOf(def.id, levels) -- 3.5: its stage's look
 	local lower = if def.bike then 0 else stanceOf(levels) -- 4.0: Tyres & Suspension 5 (5.1: never on a bike)
-	local gear = if def.company then {} else Economy.installedGear(profile.carGear, def.id) -- 4.6
+	local gear = if plain then {} else Economy.installedGear(profile.carGear, def.id) -- 4.6
 	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage, lower)
 	applyPaint(built.paintParts, def, paintId)
 	buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id, gear)
@@ -3825,8 +3834,9 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		repairing = false,
 		doors = doors,
 		gear = gear,
+		rental = rental == true,
 	}
-	car.model.Name = `{player.DisplayName}'s {def.name}`
+	car.model.Name = if rental then `ZDC RIDE · {player.DisplayName}` else `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
 	car.model:SetAttribute("OwnerName", player.DisplayName)
 	car.model:SetAttribute("CarId", def.id)
@@ -3836,6 +3846,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	-- A company vehicle lent for a job runs with its lights flashing (the ambulance's light bar).
 	car.model:SetAttribute("Siren", carId ~= nil and def.company == true)
 	car.model:SetAttribute("Chauffeured", car.chauffeured)
+	car.model:SetAttribute("Rental", if rental then true else nil) -- 5.6: a ZDC RIDE rental (server/Rental.luau)
 	writeAttributes(car)
 	Vehicles.onSpawned(car) -- 5.4: its fuel (server/Fuel.luau)
 	watchPrompts(car)
@@ -4057,8 +4068,8 @@ end
 function Vehicles.refreshStats(player: Player)
 	local car = Vehicles.get(player)
 	local profile = PlayerData.get(player)
-	if not car or not profile then
-		return
+	if not car or not profile or car.rental then
+		return -- (5.6: a rental runs on the plain numbers, whatever you own)
 	end
 	local levels = Economy.carLevels(profile.carUpgrades, car.id)
 	local carDef = Economy.findCar(car.id)
@@ -4094,8 +4105,8 @@ function Vehicles.repaint(player: Player)
 	local car = Vehicles.get(player)
 	local profile = PlayerData.get(player)
 	local def = car and Economy.findCar(car.id)
-	if not car or not profile or not def then
-		return
+	if not car or not profile or not def or car.rental then
+		return -- (5.6: a rental keeps the ZDC RIDE colours)
 	end
 	applyPaint(car.paintParts, def, if def.company then nil else profile.carPaint[car.id])
 end

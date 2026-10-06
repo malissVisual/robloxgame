@@ -11,6 +11,8 @@
 --   Transport.bikeOf(player)   5.1: the bike a bike job is ridden on (the equipped one, else your bike of choice) and
 --                              its Info (nil, nil without a bike): the board's BIKE section, Jobs' room checks
 --   Transport.riding(player)   5.1: is the equipped vehicle a bike (profile.car is one)?
+--   Transport.renting(player)  5.6: is the player's vehicle out a ZDC RIDE rental (server/Rental.luau)? Transport.of
+--                              then counts it as a bike (its rack's slot and the pack), like the owned E-Scooter
 --   Transport.applyKit(player) the character attribute KitSpeed (the shoes' walk / sprint multiplier, nil = 1) that
 --                              client/CameraRig.luau multiplies the walk and the sprint with; set on every spawn and
 --                              whenever the profile changes (a purchase)
@@ -67,7 +69,7 @@ end
 
 function Transport.of(player: Player): Rules.Info
 	local car = Vehicles.get(player)
-	if car and not car.lent then
+	if car and (not car.lent or car.rental) then -- (5.6: a ZDC RIDE rental rides like your E-Scooter)
 		local seated = Vehicles.seatedIn(player)
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -80,6 +82,12 @@ function Transport.of(player: Player): Rules.Info
 		end
 	end
 	return Transport.footOf(player)
+end
+
+-- 5.6: a ZDC RIDE rental out (server/Rental.luau)?
+function Transport.renting(player: Player): boolean
+	local car = Vehicles.get(player)
+	return car ~= nil and car.rental
 end
 
 function Transport.applyKit(player: Player)
