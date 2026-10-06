@@ -4,7 +4,9 @@
 -- carUpgrades[carId].stage), the damage of every car (3.4, carHealth: a parked car keeps it until a repair shop fixes
 -- it), the driver XP (the level and the rank come from it, shared/Levels.luau), the real estate (Config.Estate: the
 -- properties, the home you spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades,
--- the safe; server/Business.luau) and lifetime stats.
+-- the safe; server/Business.luau) and lifetime stats. 4.6: the gear of every car (carGear: Config.Gear bought for a
+-- car, "owned" or "installed" in its gear slots) and the career rewards already given (levelRewards: Config.Levels
+-- Rewards, each level once; shared/Career.luau).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -20,6 +22,7 @@ local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Missions = require(Shared.Missions)
 local Challenges = require(Shared.Challenges)
+local Career = require(Shared.Career)
 
 export type Profile = {
 	money: number,
@@ -30,12 +33,14 @@ export type Profile = {
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
 	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car); 3.5: + stage
 	carHealth: { [string]: number }, -- 3.4: car id → its share of health (0 … 1) while parked; no entry = as new
+	carGear: { [string]: { [string]: string } }, -- 4.6: car id → gear id → "owned" | "installed" (Config.Gear)
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
 	carPaint: { [string]: string }, -- car id → paint id
 	carGuns: { [string]: string }, -- car id → the car gun on its roof (Config.CarGuns); no entry = none
 	rep: { [string]: number }, -- jobs done for each employer (Config.Employers)
 	xp: number, -- driver XP (Config.Levels); older saves have none: 0
+	levelRewards: { [string]: boolean }, -- 4.6: the levels (as strings, "2" … "15") whose Config.Levels.Rewards was given
 	properties: { [string]: boolean }, -- owned real estate (Config.Estate ids)
 	home: string?, -- the home you spawn at (an owned mansion / villa / house), nil = the depot
 	business: { couriers: number, upgrades: { [string]: number }, safe: number, lastTick: number }, -- your company (Config.Business); lastTick = os.time() of the last payout
@@ -80,12 +85,14 @@ local function newProfile(): Profile
 		upgrades = {},
 		carUpgrades = {},
 		carHealth = {},
+		carGear = {},
 		items = { repair = 1, molotov = 2 },
 		paints = { factory = true },
 		carPaint = {},
 		carGuns = {}, -- every car starts without a gun
 		rep = {},
 		xp = 0,
+		levelRewards = {},
 		properties = {},
 		home = nil,
 		business = { couriers = 0, upgrades = {}, safe = 0, lastTick = 0 },
@@ -214,6 +221,55 @@ local function applyChallenges(profile: Profile, saved: { [any]: any })
 	end
 	if type(saved.title) == "string" and profile.titles[saved.title] then
 		profile.title = saved.title
+	end
+end
+
+-- 4.6, the gear of every car you own (Config.Gear, only what fits it: Economy.gearFits), never more installed than
+-- the car's gear slots at its stage (the extra ones stay "owned"). A save from before 4.6 (no carGear) gets its Hand
+-- Trolley upgrades (carUpgrades[carId].trolley, 4.0 – 4.5) installed as gear, once (Economy.migrateGear).
+-- (After the cars and their stages are read.)
+local function applyGear(profile: Profile, saved: { [any]: any })
+	local list: any = saved.carGear
+	if type(list) ~= "table" then
+		list = Economy.migrateGear(saved.carUpgrades, profile.cars)
+	end
+	for carId, gear in list do
+		if type(carId) ~= "string" or not profile.cars[carId] or type(gear) ~= "table" then
+			continue
+		end
+		local slots = Economy.gearSlots(carId, Economy.stageOf(carId, Economy.carLevels(profile.carUpgrades, carId)))
+		local into: { [string]: string } = {}
+		local used = 0
+		for _, def in Config.Gear do
+			local value = gear[def.id]
+			if (value == "owned" or value == "installed") and Economy.gearFits(carId, def.id) then
+				if value == "installed" and used < slots then
+					used += 1
+					into[def.id] = "installed"
+				else
+					into[def.id] = "owned"
+				end
+			end
+		end
+		if next(into) ~= nil then
+			profile.carGear[carId] = into
+		end
+	end
+end
+
+-- 4.6, the career rewards given (the levels 2 … MaxLevel as strings). A save from before 4.6 (no levelRewards) has had
+-- the levels it reached: they count as given (Career.reached), nothing is paid back. (After the XP is read.)
+local function applyLevelRewards(profile: Profile, saved: { [any]: any })
+	local list = saved.levelRewards
+	if type(list) ~= "table" then
+		profile.levelRewards = Career.reached(Levels.levelFor(profile.xp))
+		return
+	end
+	for key, given in list do
+		local level = tonumber(key)
+		if given == true and level and level == math.floor(level) and level >= 2 and level <= Config.Levels.MaxLevel then
+			profile.levelRewards[tostring(level)] = true
+		end
 	end
 end
 
@@ -350,6 +406,8 @@ local function applySaved(profile: Profile, saved: any)
 			profile.rep[employer.id] = number(saved.rep[employer.id], 0, 100000)
 		end
 	end
+	applyGear(profile, saved)
+	applyLevelRewards(profile, saved)
 	applyEstate(profile, saved)
 	applyMissions(profile, saved)
 	applyChallenges(profile, saved)
@@ -513,12 +571,14 @@ function PlayerData.save(player: Player, final: boolean?)
 		upgrades = profile.upgrades,
 		carUpgrades = profile.carUpgrades,
 		carHealth = profile.carHealth,
+		carGear = profile.carGear, -- 4.6
 		items = profile.items,
 		paints = profile.paints,
 		carPaint = profile.carPaint,
 		carGuns = profile.carGuns,
 		rep = profile.rep,
 		xp = profile.xp,
+		levelRewards = profile.levelRewards, -- 4.6
 		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on (applySaved converts older saves once)
 		carStages = true, -- 3.5: the cars' room is their stages (applySaved moves a 3.4 save's cars once)
 		vanStages = true, -- 4.0: the Old Van's four stages (applySaved moves a 3.5 – 3.10 save's van stage once)
@@ -671,6 +731,43 @@ end
 
 -- ── Driver levels (Config.Levels, shared/Levels.luau) ─────────────────────
 
+-- 4.6, the career: every level reached whose reward (Config.Levels.Rewards) was not given yet gives it now, once
+-- (profile.levelRewards): money (counted as earned), items (up to their max), a career paint, a title (shown at once
+-- when none is). The client's level-up card (client/CareerUi.luau) shows the same reward from Config.
+local function giveLevelRewards(profile: Profile)
+	for _, level in Career.pending(Levels.levelFor(profile.xp), profile.levelRewards) do
+		profile.levelRewards[tostring(level)] = true
+		local reward = Career.reward(level)
+		if not reward then
+			continue
+		end
+		local money = reward.money
+		if money and money > 0 then
+			profile.money += math.floor(money)
+			profile.earned += math.floor(money)
+		end
+		if reward.items then
+			for _, def in Config.Items do
+				local count = reward.items[def.id]
+				if count and count > 0 then
+					profile.items[def.id] = math.min(def.max, (profile.items[def.id] or 0) + math.floor(count))
+				end
+			end
+		end
+		local paint = reward.paint
+		if paint and Economy.findPaint(paint) then
+			profile.paints[paint] = true
+		end
+		local title = reward.title
+		if title then
+			profile.titles[title] = true
+			if profile.title == nil then
+				profile.title = title
+			end
+		end
+	end
+end
+
 -- Adds XP; returns the new level and whether it went up.
 function PlayerData.addXp(player: Player, amount: number): (number, boolean)
 	local profile = profiles[player]
@@ -683,6 +780,7 @@ function PlayerData.addXp(player: Player, amount: number): (number, boolean)
 	end
 	profile.xp = math.min(profile.xp + math.floor(amount + 0.5), 2 ^ 50)
 	local after = Levels.levelFor(profile.xp)
+	giveLevelRewards(profile) -- 4.6
 	changed:Fire(player)
 	return after, after > before
 end
@@ -707,6 +805,7 @@ function PlayerData.setLevel(player: Player, level: number): number
 	end
 	local target = math.clamp(math.floor(level), 1, Config.Levels.MaxLevel)
 	profile.xp = Levels.xpFor(target)
+	giveLevelRewards(profile) -- 4.6: the levels it reached, once
 	changed:Fire(player)
 	return target
 end

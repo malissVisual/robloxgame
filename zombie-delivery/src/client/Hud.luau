@@ -661,6 +661,7 @@ Hud.onCrew = nil :: (() -> ())?
 Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
 Hud.onMissions = nil :: (() -> ())? -- client/MissionsUi.luau: the MISSIONS window
+Hud.onCareer = nil :: (() -> ())? -- 4.6 client/CareerUi.luau: the CAREER window (C)
 Hud.onWeaponWheel = nil :: (() -> ())? -- 4.2, touch: a tap on the weapon line opens the weapon wheel (WeaponWheel.openTouch)
 
 local openDispatch: () -> ()
@@ -729,6 +730,8 @@ local function renderShop()
 			return "???", "a secret reward"
 		elseif exclusive == "secrets" then
 			return "REWARD", "find every lost package"
+		elseif exclusive == "career" then
+			return "REWARD", "a career level (CAREER, C)" -- 4.6: Config.Levels.Rewards
 		end
 		for _, campaign in require(Shared.Missions).Campaigns do
 			if campaign.id == exclusive then
@@ -927,7 +930,7 @@ local function renderShop()
 			end, 2)
 		end
 	elseif shopId == "mechanic" then
-		tabs(shop.body, { { "upgrades", "UPGRADES" }, { "paint", "PAINT" }, { "carguns", "CAR GUNS" } }, mechanicTab, function(id)
+		tabs(shop.body, { { "upgrades", "UPGRADES" }, { "gear", "GEAR" }, { "paint", "PAINT" }, { "carguns", "CAR GUNS" } }, mechanicTab, function(id)
 			mechanicTab = id
 			renderShop()
 		end)
@@ -937,7 +940,7 @@ local function renderShop()
 			local carOk = upCar ~= nil and Economy.canUpgrade(upCar.id)
 			local carLevels = Economy.carLevels(state.carUpgrades, state.car)
 			if carOk then
-				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (new tyres and rims, a bull bar, plates, a scoop, the trolley in the back); a STAGE rebuilds the car itself. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
+				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (new tyres and rims, a bull bar, plates, a scoop); a STAGE rebuilds the car itself, the trolley and the other gear are in GEAR. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
 			else
 				note(shop.body, `Your {if upCar then upCar.name else "vehicle"} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`, C.red, 1)
 			end
@@ -1003,6 +1006,8 @@ local function renderShop()
 					end
 				end
 			end
+		elseif mechanicTab == "gear" then
+			require(script.Parent.GearShop).render(shop.body, state, here) -- 4.6: the car's gear and its slots
 		elseif mechanicTab == "carguns" then
 			-- One gun on the roof of the car you have equipped; the driver fires it.
 			local carDef = Economy.findCar(state.car)
@@ -1542,7 +1547,7 @@ end
 -- ── Buttons ────────────────────────────────────────────────────────────────
 
 -- 3.8, the actions (upper right): the quiet text actions MAP [M], CREW [K] and MENU. MENU opens a slim charcoal list of
--- every other action with its key: JOBS (J), MISSIONS (U), BAG (I; 3.9, B before), CAR, TOP (L), ESTATE (H), SOUND (N) and, while a
+-- every other action with its key: JOBS (J), MISSIONS (U), CAREER (C, 4.6), BAG (I; 3.9, B before), CAR, TOP (L), ESTATE (H), SOUND (N) and, while a
 -- job runs, GIVE UP (twice). Hover brightens an action and draws a thin red line under it; a touch screen drops the
 -- keys and keeps 44 px hit areas. Other modules hook in (Hud.onJobs, Hud.onCrew, Hud.onEstate, Hud.onMissions,
 -- Hud.onSound). layout() scales and places the row: on a computer left of (or under) Roblox's player list, on touch
@@ -1571,6 +1576,9 @@ BUTTONS = {
 	{ id = "jobs", menu = true, icon = "📋", text = "JOBS", key = "J", onClick = openDispatch },
 	{ id = "missions", menu = true, icon = "⭐", text = "MISSIONS", key = "U", onClick = function()
 		hook("missions window", Hud.onMissions)
+	end },
+	{ id = "career", menu = true, icon = "🎖", text = "CAREER", key = "C", onClick = function() -- 4.6
+		hook("career window", Hud.onCareer)
 	end },
 	{ id = "bag", menu = true, icon = "🎒", text = "BAG", key = "I", onClick = function()
 		toggleBackpack()

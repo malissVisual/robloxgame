@@ -47,7 +47,7 @@ local lastAction: { [Player]: number } = {}
 local opened: { [Player]: string } = {} -- where the player's window was opened (a garage id or "depot")
 
 -- Short names of the car tracks for the window's upgrade line.
-local SHORT: { [string]: string } = { engine = "Engine", handling = "Tyres", armor = "Armor", plow = "Plow", trolley = "Trolley" }
+local SHORT: { [string]: string } = { engine = "Engine", handling = "Tyres", armor = "Armor", plow = "Plow" }
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
@@ -132,12 +132,18 @@ local function healthOf(player: Player, carId: string): number
 	return if profile then (profile.carHealth[carId] or 1) else 1
 end
 
-local function upgradeLine(levels: Economy.Upgrades): string
+local function upgradeLine(levels: Economy.Upgrades, gear: { [string]: boolean }?): string
 	local parts: { string } = {}
 	for _, def in Config.Upgrades do
 		local level = levels[def.id] or 0
 		if def.car and level > 0 then
 			table.insert(parts, `{SHORT[def.id] or def.name} {level}`)
+		end
+	end
+	-- 4.6: the gear installed on it (Config.Gear).
+	for _, def in Config.Gear do
+		if gear and gear[def.id] then
+			table.insert(parts, def.name)
 		end
 	end
 	return if #parts > 0 then table.concat(parts, " · ") else "stock"
@@ -162,7 +168,7 @@ local function stateFor(player: Player, at: string, open: boolean): { [string]: 
 			name = Economy.carTitle(def.id, levels), -- 3.5: with its stage ("Old Van · Work Van")
 			capacity = Economy.capacity(def.id, levels),
 			health = healthOf(player, def.id),
-			upgrades = if def.company then "company vehicle" else upgradeLine(levels),
+			upgrades = if def.company then "company vehicle" else upgradeLine(levels, Economy.installedGear(profile.carGear, def.id)),
 			equipped = profile.car == def.id,
 			out = live ~= nil and live.id == def.id,
 			company = def.company == true,

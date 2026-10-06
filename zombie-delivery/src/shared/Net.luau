@@ -48,6 +48,7 @@ local NAMES = {
 	"Holster", -- 3.9: client → server: (holstered boolean) the gun away (B) or in the hand; the server sets the character's Holstered attribute (server/CloseCombat.luau)
 	"Melee", -- 3.9: client → server: (the swing's direction, a unit Vector3, or nil) a punch (holstered) or a strike with the gun (V); checked on the server
 	"CarDoor", -- 3.10: client → server: ("out") E in a car seat: out of it at your door (server/Vehicles.luau, client/CarBoarding.luau)
+	"Gear", -- 4.6: client → server: ("buy" | "install" | "remove", gear id) for the equipped car at Wrench Garage (server/Shops.luau)
 	"PutDown", -- 4.2: client → server: () the touch PUT DOWN / LET GO / SET DOWN button: what the G prompt in your hands does (server/Cargo.luau, server/Equipment.luau)
 }
 

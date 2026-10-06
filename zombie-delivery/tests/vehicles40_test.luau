@@ -2,7 +2,7 @@
 -- 4.0, Freight (Stream V): the slow Old Van and its longer way up (Config.Cars van stages, StageDef.accel), the torque
 -- curve of pulling away (Economy.torque / timeToTop, client/Drive.luau), the save migration of the van's stages
 -- (Economy.migrateStage40), the pallets (CarDef / StageDef.pallets, Economy.palletsOf), the Hand Trolley
--- (Config.Upgrades "trolley", CarDef.trolley, Economy.upgradeFits / hasTrolley) and the Freight Truck.
+-- (4.6: Config.Gear "trolley", CarDef.trolley, Economy.gearFits / installedGear) and the Freight Truck.
 -- (The bodies, the stretch and the slots of server/Vehicles.luau are checked as text by run_tests.py.)
 
 local Config = require("./Config")
@@ -105,20 +105,21 @@ check("every car's pallets fit its slots", palletsFit)
 
 -- ── The Hand Trolley ────────────────────────────────────────────────────────
 
-local trolley = Economy.findUpgrade("trolley")
-check("the Hand Trolley: a car track, one level, about $600", trolley ~= nil and trolley.car == true and trolley.maxLevel == 1
-	and (Economy.upgradeCost("trolley", 0) :: number) >= 500 and (Economy.upgradeCost("trolley", 0) :: number) <= 700 and Economy.upgradeCost("trolley", 1) == nil)
+-- 4.6: it is gear now (Config.Gear "trolley", the same id; tests/career_test.luau has the rest of the gear).
+local trolley = Economy.findGear("trolley")
+check("the Hand Trolley: gear, level 3, about $600, no upgrade track any more", trolley ~= nil and trolley.level == 3
+	and trolley.price >= 500 and trolley.price <= 700 and Economy.findUpgrade("trolley") == nil)
 for _, id in { "van", "courier", "highroof", "boxtruck", "freight" } do
-	check(`{id} may take the trolley`, Economy.upgradeFits(id, "trolley"))
+	check(`{id} may take the trolley`, Economy.gearFits(id, "trolley"))
 end
 for _, id in { "pickup", "muscle", "armorvan", "rallyvan", "movingtruck", "spaceship" } do
-	check(`{id} may not take the trolley`, not Economy.upgradeFits(id, "trolley"))
+	check(`{id} may not take the trolley`, not Economy.gearFits(id, "trolley"))
 end
-check("every other car track fits every car you own", Economy.upgradeFits("pickup", "engine") and Economy.upgradeFits("muscle", "handling")
+check("every car track fits every car you own", Economy.upgradeFits("pickup", "engine") and Economy.upgradeFits("muscle", "handling")
 	and not Economy.upgradeFits("ambulance", "engine"))
-check("the trolley rides along once bought", Economy.hasTrolley("van", { trolley = 1 }) and not Economy.hasTrolley("van", {})
-	and not Economy.hasTrolley("van", nil))
-check("not on a car that can't take one (an admin's max upgrades)", not Economy.hasTrolley("muscle", { trolley = 1 }))
+check("the trolley rides along once installed", Economy.installedGear({ van = { trolley = "installed" } }, "van").trolley == true
+	and Economy.installedGear({ van = { trolley = "owned" } }, "van").trolley == nil and Economy.installedGear(nil, "van").trolley == nil)
+check("not on a car that can't take one", Economy.installedGear({ muscle = { trolley = "installed" } }, "muscle").trolley == nil)
 
 -- ── The upgrades you see ────────────────────────────────────────────────────
 

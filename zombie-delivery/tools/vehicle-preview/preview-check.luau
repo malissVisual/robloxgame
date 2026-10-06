@@ -23,21 +23,22 @@ for _,p in staged:GetDescendants() do
 end
 assert(painted>20,'purchased paint missing')
 local cars=Mock.Instance.new('Folder');cars.Name='Cars';cars.Parent=Mock.workspace
-local live=Vehicles.displayModel(Config.Cars[1],Mock.CFrame.new(50,0,90),3,{engine=5,handling=5,armor=5,plow=5,trolley=1})
+local live=Vehicles.displayModel(Config.Cars[1],Mock.CFrame.new(50,0,90),3,{engine=5,handling=5,armor=5,plow=5},{trolley=true,straps=true,cooler=true,roofrack=true})
 live:SetAttribute('OwnerId',1);live:SetAttribute('CarId','van');live.Parent=cars
 car.out=true;car.upgrades='max kit'
 assert(Preview.show(holder,car))
 local viewport=holder:FindFirstChild('VehicleModelPreview');local ref=viewport:FindFirstChild('LiveSource')
 assert(ref.Value==live,'wrong owner or vehicle cloned')
-local tread,plow=0,0
+local tread,plow,strap,cooler=0,0,0,0
 for _,p in viewport:GetDescendants() do
     if p:IsA('BasePart') then
         assert(p.Anchored and not p.CanCollide and not p.CanTouch and not p.CanQuery)
-        if p.Name=='TreadRing' then tread+=1 elseif p.Name=='BullbarCross' then plow+=1 end
+        if p.Name=='TreadRing' then tread+=1 elseif p.Name=='BullbarCross' then plow+=1 elseif p.Name=='RatchetStrap' then strap+=1 elseif p.Name=='CoolerBox' then cooler+=1 end
     end
     assert(p.ClassName~='Motor6D' and p.ClassName~='WeldConstraint' and p.ClassName~='ProximityPrompt','live mover copied into viewport')
 end
 assert(tread==8 and plow==2,'actual installed upgrades missing')
+assert(strap==2 and cooler==1,'4.6: the installed gear missing')
 assert(Preview.show(holder,car) and holder:FindFirstChild('VehicleModelPreview')==viewport,'live preview rebuilt every state tick')
 Preview.clear(holder)
 assert(holder:FindFirstChild('VehicleModelPreview')==nil and viewport.Parent==nil,'closed garage keeps its preview')

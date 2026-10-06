@@ -214,6 +214,21 @@ local function maxAllUpgrades(profile: PlayerData.Profile)
 			profile.upgrades[upgrade.id] = upgrade.maxLevel
 		end
 	end
+	-- 4.6: every piece of gear that fits each car, installed while it has a free gear slot (at its stage), else owned.
+	for carId, owned in profile.cars do
+		if owned and Economy.canUpgrade(carId) then
+			local slots = Economy.gearSlots(carId, Economy.stageOf(carId, Economy.carLevels(profile.carUpgrades, carId)))
+			local gear: { [string]: string } = profile.carGear[carId] or {}
+			local used = Economy.gearUsed(profile.carGear, carId)
+			for _, def in Config.Gear do
+				if Economy.gearFits(carId, def.id) and gear[def.id] == nil then
+					gear[def.id] = if used < slots then "installed" else "owned"
+					used += if gear[def.id] == "installed" then 1 else 0
+				end
+			end
+			profile.carGear[carId] = gear
+		end
+	end
 end
 
 local function unlockAll(player: Player)
