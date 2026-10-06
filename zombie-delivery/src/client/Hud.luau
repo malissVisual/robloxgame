@@ -2859,7 +2859,7 @@ Ui.make("Frame", { Name = "Dot", Size = UDim2.fromOffset(4, 4), Position = UDim2
 
 -- The waypoint's words: the name in caps over the distance.
 function view.mark(name: string, distance: number): string
-	return `{view.esc(string.upper(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
+	return `{view.esc(require(Shared.Residents).caps(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
 end
 HIDDEN = CFrame.new(0, -1000, 0)
 PICKUP_COLOR = P.red -- (a pick-up is the job's stop too; the waypoint says PICK UP)
@@ -3025,7 +3025,7 @@ function footTarget(): (Vector3?, string?, boolean)
 	if typeof(pile) ~= "Vector3" then
 		return nil, nil, false
 	end
-	local person = if type(job.person) == "string" and job.person ~= "" then job.person:upper() else (if pickup then "PICK UP" else "HAND IT OVER")
+	local person = if type(job.person) == "string" and job.person ~= "" then require(Shared.Residents).caps(job.person) else (if pickup then "PICK UP" else "HAND IT OVER")
 	return pile, person, false
 end
 end

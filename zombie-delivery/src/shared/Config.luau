@@ -3105,4 +3105,42 @@ Config.Employers = {
 	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Rosa, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
 
+-- 5.5, people in every building (shared/Residents.luau, shared/Deliveries.luau): every home has residents, made up
+-- from these lists the same way every time (seeded by the home's id). An apartment building has `floors` × 4 flats
+-- (A – D), FlatPeople in each; a Suburbs house HousePeople, one family. A family is Czech or English (its surname);
+-- now and then one of them has a first name from the other list (OtherOrigin), and a few people are only known by a
+-- nickname (NicknameChance: "Old Pete", "Doc Hansen"). Surnames are { a man's, a woman's } (the Czech -ová), or one
+-- for both. A delivery to a home goes to one of its residents (an apartment: "Apt 4C, 40 6th Ave"); a home weighs
+-- as many times as it has residents in the board's draw, at most MaxWeight (a tower comes up more often than a house,
+-- but does not flood the board).
+Config.Residents = {
+	FlatPeople = { 1, 2 } :: { number },
+	HousePeople = { 1, 4 } :: { number },
+	MaxWeight = 6,
+	OtherOrigin = 0.15,
+	NicknameChance = 0.04,
+	Czech = {
+		Women = { "Jana", "Eva", "Petra", "Lucie", "Tereza", "Hana", "Marie", "Veronika", "Kateřina", "Zdeňka" },
+		Men = { "Petr", "Jan", "Tomáš", "Martin", "Jiří", "Pavel", "Lukáš", "Ondřej", "Karel", "Zdeněk" },
+		Surnames = {
+			{ "Novák", "Nováková" }, { "Svoboda", "Svobodová" }, { "Dvořák", "Dvořáková" }, { "Černý", "Černá" },
+			{ "Procházka", "Procházková" }, { "Kučera", "Kučerová" }, { "Veselý", "Veselá" }, { "Horák", "Horáková" },
+			{ "Němec", "Němcová" }, { "Pokorný", "Pokorná" }, { "Marek", "Marková" }, { "Pospíšil", "Pospíšilová" },
+			{ "Hájek", "Hájková" }, { "Král", "Králová" }, { "Jelínek", "Jelínková" }, { "Růžička", "Růžičková" },
+			{ "Beneš", "Benešová" }, { "Fiala", "Fialová" }, { "Sedláček", "Sedláčková" }, { "Zeman", "Zemanová" },
+		} :: { { string } },
+	},
+	English = {
+		Women = { "Sarah", "Emma", "Kate", "Linda", "Megan", "Rosie", "Grace", "Holly", "Nora", "Tina" },
+		Men = { "Mike", "Dave", "Tom", "Jack", "Sam", "Bill", "Frank", "Ray", "Eddie", "Luke" },
+		Surnames = {
+			{ "Brown" }, { "Smith" }, { "Miller" }, { "Walker" }, { "Turner" }, { "Hughes" }, { "Cooper" }, { "Parker" },
+			{ "Reed" }, { "Bennett" }, { "Hayes" }, { "Foster" }, { "Murphy" }, { "Price" }, { "Barnes" }, { "Fisher" },
+			{ "Grant" }, { "Wells" }, { "Hansen" }, { "Doyle" },
+		} :: { { string } },
+	},
+	-- (whole names: what everybody on the block calls them)
+	Nicknames = { "Old Pete", "Doc Hansen", "Granny Ruth", "Sarge Kowalski", "Mad Mira", "Tin-Can Tony", "Lucky Jirka", "Two-Dogs Dana", "Bunker Bob", "Radio Ráďa" },
+}
+
 return Config

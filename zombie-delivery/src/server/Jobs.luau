@@ -1096,7 +1096,8 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 		return nil
 	end
 	-- 5.3: where it goes: a home's door or another storefront (the business's `to`), else an address as before. The
-	-- person there: the storefront's own (B2B), the Harbor's foreman, a far place's own, else one of the receivers.
+	-- person there: a home's resident (5.5, shared/Residents.luau: "Jana Nováková" at "Apt 4C, 40 6th Ave"), the
+	-- storefront's own (B2B), the Harbor's foreman, a far place's own, else one of the business's receivers.
 	local poiWeight = if tierIndex >= 3 and not easy then 3 else 0
 	local function dropNear(x: number, z: number, low: number, high: number, avoid: { Map.Address }): (Map.Address?, Config.PersonDef?)
 		if business.to then
