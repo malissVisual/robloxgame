@@ -134,6 +134,12 @@ local refreshAt: number? = nil -- 3.7: when the server makes the next offers (wo
 local boardInfo: any = nil -- 4.7: { tiers = { { stars, name, fee, rerolled, open, level, licence? } }, streak } (Offers' third value)
 local ticking = false -- 3.7: the countdown's loop runs (while the board is open)
 
+-- 5.2: is the board open on a run that takes more orders (the job payload's `stack`)? Then it shows the offers with
+-- + ADD ORDER on the ones that fit and why not on the others (NO ROOM (3/4 slots), ORDERS FULL (2/2)).
+local function stacking(): boolean
+	return job ~= nil and type(job.stack) == "table" and job.stack.can == true
+end
+
 local function getOffersRemote(): RemoteEvent
 	if not offersRemote then
 		offersRemote = Net.get("RequestOffers")
@@ -634,7 +640,7 @@ local function refreshChrome()
 		refs.capacity.Text = `YOUR CAPACITY · {slots} {if slots == 1 then "SLOT" else "SLOTS"}`
 		refs.context.Text = `{string.upper(name)} · {slots} CARGO {if slots == 1 then "SLOT" else "SLOTS"}  ·  {Levels.rank(level)} / level {level}`
 	end
-	local list: { any } = if job or offers == nil then {} else offers
+	local list: { any } = if (job and not stacking()) or offers == nil then {} else offers
 	local special = 0
 	for _, offer in list do
 		if isSpecial(offer) then
@@ -646,7 +652,7 @@ local function refreshChrome()
 		entry.count.Text = if offers or job then tostring(counts[id] or 0) else "–"
 		setFilterLook(id, false)
 	end
-	refs.countdown.Visible = job == nil and offers ~= nil
+	refs.countdown.Visible = (job == nil or stacking()) and offers ~= nil
 end
 
 -- ── The tickets ────────────────────────────────────────────────────────────
@@ -914,6 +920,25 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			flash()
 			Hud.toast(why)
 		end)
+	elseif stacking() then
+		-- 5.2: on a run that takes more orders: + ADD ORDER where it fits (the board stays open for another), else why not.
+		if offer.addOrder == true then
+			local add = action(stub, "+ ADD ORDER", size, at, C.yellow, function()
+				Net.get("AcceptJob"):FireServer(offer.index)
+				local list = offers
+				local spot = if list then table.find(list, offer) else nil
+				if list and spot then
+					table.remove(list, spot)
+				end
+				renderList()
+			end)
+			refs.firstAccept = refs.firstAccept or add
+		else
+			action(stub, if type(offer.orderButton) == "string" then offer.orderButton else "FINISH YOUR RUN", size, at, nil, function()
+				flash()
+				Hud.toast(if type(offer.orderText) == "string" then offer.orderText else "Finish your current delivery first.")
+			end)
+		end
 	else
 		local accept = action(stub, "ACCEPT JOB", size, at, C.yellow, function()
 			Net.get("AcceptJob"):FireServer(offer.index)
@@ -1115,10 +1140,13 @@ local function bikeHeader(count: number, order: number)
 	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, row)
 end
 
--- On a delivery: that job, and giving it up.
-local function jobTicket()
-	Ui.clear(refs.list)
-	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 132), BackgroundTransparency = 1 }, refs.list)
+-- On a delivery: that job, and giving it up. 5.2: `run`, on top of the offers of a run that takes more orders (its
+-- orders and room).
+local function jobTicket(run: boolean?)
+	if not run then
+		Ui.clear(refs.list)
+	end
+	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 132), BackgroundTransparency = 1, LayoutOrder = 0 }, refs.list)
 	local card, body, stub = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB + 60)
 	Ui.selectRow(card, true) -- the job you are on: the selected look (the red rule)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 24), PaddingTop = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, body)
@@ -1130,7 +1158,11 @@ local function jobTicket()
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	text(body, `You are delivering {job.cargo or "cargo"} to {job.customer or "a customer"}. Finish it first, or give it up.`, UDim2.new(1, 0, 0, 40), {
+	local stack = job.stack
+	local words = if run and type(stack) == "table"
+		then `{stack.open or 1} {if stack.open == 1 then "order" else "orders"} on the go (at most {stack.max or 1}) · {stack.used or 0} of your {stack.room or 0} slots taken, {stack.free or 0} free. + ADD ORDER below takes another one along.`
+		else `You are delivering {job.cargo or "cargo"} to {job.customer or "a customer"}. Finish it first, or give it up.`
+	text(body, words, UDim2.new(1, 0, 0, 40), {
 		Position = UDim2.fromOffset(0, 56),
 		TextColor3 = K.secondary,
 		TextYAlignment = Enum.TextYAlignment.Top,
@@ -1146,7 +1178,7 @@ renderList = function()
 		return
 	end
 	refreshChrome()
-	if job then
+	if job and not stacking() then
 		refs.caption.Text = "You are on a delivery"
 		jobTicket()
 		return
@@ -1164,6 +1196,12 @@ renderList = function()
 	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board{if streak > 0 then `  ·  STREAK {streak} (+{bonus}% pay)` else ""}`
 	refs.firstAccept = nil
 	Ui.clear(refs.list)
+	if stacking() then
+		local ok, err = pcall(jobTicket, true) -- 5.2: the run on top
+		if not ok then
+			warn(`[DispatchUi] the run's ticket failed: {err}`)
+		end
+	end
 	if #visible == 0 then
 		message(if #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
 		return
@@ -1253,7 +1291,7 @@ local function tickCountdown()
 		return
 	end
 	local at = refreshAt
-	if job or not at then
+	if (job and not stacking()) or not at then
 		label.Text = ""
 		return
 	end
@@ -1281,7 +1319,7 @@ end
 -- Ask the dispatcher for the board (3.7: the current offers; the server makes new ones only when they expired). The
 -- offers already here stay on show until the answer, unless their time is up ("Calling the dispatcher...").
 function DispatchUi.request()
-	if job then
+	if job and not stacking() then
 		return
 	end
 	local now = os.clock()
@@ -1316,7 +1354,7 @@ function DispatchUi.open()
 	local made = gui :: ScreenGui
 	made.Enabled = true
 	fit()
-	if job then
+	if job and not stacking() then
 		renderList()
 	else
 		DispatchUi.request()
@@ -1342,7 +1380,7 @@ function DispatchUi.setOffers(list: { any }, nextAt: number?, info: any?)
 	offers = list
 	boardInfo = if type(info) == "table" then info else nil -- 4.7: the tiers' REROLL and licences, the streak
 	refreshAt = if type(nextAt) == "number" then nextAt else nil
-	if open and not job then
+	if open and (not job or stacking()) then
 		renderList()
 		tickCountdown()
 	end
@@ -1358,13 +1396,22 @@ end
 
 function DispatchUi.start()
 	-- The active job (the same "Job" remote Hud.setJob gets): on a delivery the board offers to give it up.
+	-- 5.2: drawn again only when what it shows changes (a run's payload comes often: its orders, its room).
+	local function runKey(): string
+		if not job then
+			return ""
+		end
+		local stack = if type(job.stack) == "table" then job.stack else {}
+		return `{job.cargo}|{job.customer}|{stacking()}|{stack.open}|{stack.free}|{stack.room}`
+	end
 	Net.get("Job").OnClientEvent:Connect(function(payload)
 		local had = job ~= nil
+		local before = runKey()
 		job = payload
 		if open then
 			if had and job == nil then
 				DispatchUi.request()
-			else
+			elseif runKey() ~= before then
 				renderList()
 			end
 		end
