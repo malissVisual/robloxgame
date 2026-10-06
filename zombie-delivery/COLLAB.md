@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · 5.x personal kit: backpacks first, shoes, jacket and cart; reusable art-only renderer/checker · server/KitArt/, server/ModelArt/, art/icons/kit_*, design/kit-models/, tools/model-art/ · since 2026-10-06
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/kit-models` · 5.x backpacks (13/14 loaded, bigpack 16), shoes (4/foot), jacket (13), cart (21 including roots), pure `KitArt/Geometry`, reusable `ModelArt/Builder`, 5 PNG/SVG kit icons; actual renders + handoff in `design/kit-models/`. Required suite/compiles and real-builder budget/weld/cleanup/icon checks pass. Studio: R15 scaling, carry/sit poses, vest/pack layering, shoes, cart grips/deck/wheels; art only, Claude wires gameplay.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
