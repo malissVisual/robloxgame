@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "5.1.1"
+Config.Version = "5.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
@@ -2017,6 +2017,23 @@ Config.Jobs = {
 		AddOnAnswer = 15,
 		AddOnGivers = { "Mrs. Lee", "Old Tom", "Kenny", "Mr. Novotny", "Aunt Maple" } :: { string },
 	},
+	-- 5.2, several orders at once (server/Jobs.luau addOrder, shared/JobRules.luau's orders): while a stackable run is
+	-- on (an ordinary board delivery on foot, on a bike, or a car one of the ★ … CarTiers tiers; never a mission, a
+	-- special, an employer's job, DUO, the Freight Run or the tutorial's), ACCEPT on the board adds another order of
+	-- the same kind (+ ADD ORDER) while your free room takes its pieces (what you carry: hands + backpack on foot, the
+	-- bike + its gear + your backpack, the car + its gear; minus the pieces the open orders still hold or will pick up)
+	-- and fewer than Max[mode] orders are open. Every order keeps its own clock (its offer's, from when it was added),
+	-- pay and rating. The stops go in any order: the GPS takes the open stop whose circle you are at (AtStop studs),
+	-- else the pinned order's nearest, else the nearest one (the current one kept unless another is Hysteresis studs
+	-- nearer). A road event's add-on becomes an order of its own (AddOnTime s on top of the trip for it).
+	Orders = {
+		Max = { foot = 2, bike = 3, car = 4 } :: { [string]: number },
+		CarTiers = 2, -- the car tiers whose board deliveries stack (★, ★★)
+		AtStop = 30,
+		Hysteresis = 80,
+		SwitchEvery = 1, -- seconds between two changes of the stop the GPS shows (no flicker between two close ones)
+		AddOnTime = 30,
+	},
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
 	Businesses = {
 		{
@@ -2231,6 +2248,105 @@ Config.Jobs = {
 			giver = { name = "Anna", title = "Baker", role = "cook" },
 			receivers = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
+			},
+		},
+		-- 5.3 STUBS (Stream W, the world): the storefronts of Map.Venues that had no business yet. Data only, for Stream J
+		-- to fill (the rules per business, the times of day, the receivers at the homes, the backpack looks). `tiers` is
+		-- empty, so the board's car deliveries never pick them yet; NOTE: the light looks (burgers, cafe, news, flowers)
+		-- may already come up on the ON FOOT / BIKE board (server/Jobs.luau footOffer does not look at the tiers).
+		{
+			id = "burgers",
+			place = "Last Bite Burgers",
+			cargo = "Burgers",
+			piece = "burger bag",
+			plural = "burger bags",
+			kind = "crate",
+			look = "pizza", -- (a food box; Stream J: a burger look)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Big Al", title = "Grill cook", role = "cook" },
+			receivers = {
+				{ name = "The Twins", title = "Night shift", role = "townsperson" },
+				{ name = "Mrs. Hungry", title = "Ordered fries too", role = "townsperson" },
+			},
+		},
+		{
+			id = "noodles",
+			place = "Wok Dead",
+			cargo = "Noodles",
+			piece = "noodle box",
+			plural = "noodle boxes",
+			kind = "soup",
+			look = "soup", -- (Stream J: a noodle box look)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Mei", title = "Wok cook", role = "cook" },
+			receivers = {
+				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
+				{ name = "The Twins", title = "Night shift", role = "townsperson" },
+			},
+		},
+		{
+			id = "cafe",
+			place = "Grind House",
+			cargo = "Coffee & Pastries",
+			piece = "pastry bag",
+			plural = "pastry bags",
+			kind = "sack",
+			look = "bread", -- (Stream J: a coffee tray look)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Jules", title = "Barista", role = "cook" },
+			receivers = {
+				{ name = "Grandma Rose", title = "Her morning coffee", role = "townsperson" },
+				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+			},
+		},
+		{
+			id = "news",
+			place = "The Daily Undead",
+			cargo = "Newspapers",
+			piece = "newspaper",
+			plural = "newspapers",
+			kind = "sack",
+			look = "mail", -- (Stream J: a newspaper look and the newspaper round)
+			pieces = { 1, 3 },
+			tiers = {},
+			giver = { name = "Ed", title = "Printer", role = "clerk" },
+			receivers = {
+				{ name = "Old Tom", title = "Reads it twice", role = "townsperson" },
+				{ name = "Grandma Rose", title = "Wants the crossword", role = "townsperson" },
+			},
+		},
+		{
+			id = "flowers",
+			place = "Bloom",
+			cargo = "Flowers",
+			piece = "bouquet",
+			plural = "bouquets",
+			kind = "crate",
+			look = "plants",
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Lily", title = "Florist", role = "shopkeeper" },
+			receivers = {
+				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
+				{ name = "Grandma Rose", title = "Her birthday", role = "townsperson" },
+			},
+		},
+		{
+			id = "icecream",
+			place = "Frosty's Ice Cream",
+			cargo = "Ice Cream",
+			piece = "ice cream tub",
+			plural = "ice cream tubs",
+			kind = "icebox",
+			look = "groceries", -- (Stream J: an ice cream look; Frosty's own van jobs stay the employer's)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Frosty", title = "Ice cream man", role = "shopkeeper" },
+			receivers = {
+				{ name = "The Twins", title = "Hot day", role = "townsperson" },
 			},
 		},
 	} :: { BusinessDef },

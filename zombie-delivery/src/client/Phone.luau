@@ -57,6 +57,7 @@ local P = require(script.Parent.HudContract)
 local MapView = require(script.Parent.MapView)
 local KitShop = require(script.Parent.KitShop)
 local CareerUi = require(script.Parent.CareerUi)
+local OrdersUi = require(script.Parent.OrdersUi) -- 5.2: every order of your run
 
 local K = Theme.Contract
 local Phone = {}
@@ -356,7 +357,7 @@ local function ordersApp(list: Instance)
 	local b = block(list, 1, true)
 	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
 	P.marker(head, 7, { Position = UDim2.fromOffset(0, 4) })
-	P.caps(head, `Active order{if job.mission then " · mission" else ""}`, UDim2.new(1, -14, 1, 0), { Position = UDim2.fromOffset(14, 0), TextStrokeTransparency = 1 })
+	P.caps(head, `{if type(job.orders) == "table" and #job.orders > 1 then `Now · order {job.focus or "?"}` else "Active order"}{if job.mission then " · mission" else ""}`, UDim2.new(1, -14, 1, 0), { Position = UDim2.fromOffset(14, 0), TextStrokeTransparency = 1 })
 	text(b, `{job.cargo or "Cargo"} → {job.customer or "the customer"}`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17 })
 	text(b, `{job.address or "?"}{if job.district then `, {job.district}` else ""}`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = K.secondary, TextSize = 13 })
 	P.rule(b, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
@@ -392,13 +393,16 @@ local function ordersApp(list: Instance)
 	if type(job.ruleLine) == "string" and job.ruleLine ~= "" then
 		text(b, job.ruleLine, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 13, TextColor3 = K.secondary, TextSize = 13 })
 	end
-	button(list, "SHOW ON MAP", "quiet", 2, function()
+	-- 5.2: every order of the run (its stops, clock, pay, PIN), then the actions.
+	OrdersUi.render(list, job, { block = block, caps = caps, text = text, button = button }, 2)
+	local stack = job.stack
+	button(list, "SHOW ON MAP", "quiet", 90, function()
 		Phone.close()
 		if not MapView.isOpen() then
 			MapView.toggle()
 		end
 	end)
-	button(list, "OPEN BOARD", "quiet", 3, function()
+	button(list, if type(stack) == "table" and stack.can == true then "OPEN BOARD · + ADD ORDER" else "OPEN BOARD", "quiet", 91, function()
 		local cb = Phone.onBoard
 		if cb then
 			cb()
@@ -971,6 +975,7 @@ renderApp = function()
 		return
 	end
 	refs.timer = nil
+	OrdersUi.clear()
 	local home = app == "home"
 	refs.home.Visible = home
 	refs.app.Visible = not home
@@ -1024,7 +1029,19 @@ refreshBadges = function()
 	end
 	set("messages", unread)
 	set("board", boardNew)
-	set("orders", if job then 1 else 0)
+	local open = 0 -- 5.2: the orders on the go
+	if job then
+		open = 1
+		if type(job.orders) == "table" then
+			open = 0
+			for _, entry in job.orders do
+				if type(entry) == "table" and entry.state == "open" then
+					open += 1
+				end
+			end
+		end
+	end
+	set("orders", open)
 	set("shop", 0, if affordable() then "$" else nil)
 	local dot = refs.buttonDot
 	if dot then
@@ -1096,6 +1113,9 @@ local function startTicker()
 				local left = job.endsAt - workspace:GetServerTimeNow()
 				timer.Text = Ui.clock(math.max(0, left))
 				timer.TextColor3 = if left < 30 then K.red else K.text
+			end
+			if app == "orders" then
+				OrdersUi.tick() -- 5.2: every order's clock
 			end
 			task.wait(0.5)
 		end

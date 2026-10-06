@@ -36,6 +36,10 @@
 -- where Earl sells his old van (World.VanSeller: Earl and his prompt; server/VanQuest.luau).
 -- Zombie Delivery 5.1: Spoke & Chain Cycles, the bike shop on Downtown block (-1, 1) (Map.Shops.bikes; buildBikeShop:
 -- its counter prompt and World.BikeSlots, the display stands server/Shops.luau puts the bikes on).
+-- Zombie Delivery 5.3, the real places: the ordinary Downtown and Suburbs lots are built from Map.lots (the same lots
+-- the jobs and the client know): the towers (some with an apartment entrance on their street), the storefronts of
+-- Map.Venues (building() + a BuildingLooks Venue* look each + the name board), the Suburbs houses with their front door
+-- to their street, a path, a mailbox and the number (see "Venues and homes" below).
 --
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
@@ -552,6 +556,11 @@ local buildTowerBlock: (Instance, string, number, number) -> ()
 -- the yards out of town.
 local buildMissionBlock: (Instance, string, number, number) -> boolean
 local buildMissionYards: (Instance) -> ()
+-- 5.3, the storefronts and the homes on the lots (Map.lots; defined in "Venues and homes"): a storefront, an apartment
+-- building's entrance (on its tower's street wall), a Suburbs house with its path, mailbox and number.
+local buildVenue: (Instance, Map.Venue, Map.Lot) -> ()
+local buildEntrance: (Instance, Map.Lot, Map.Home) -> ()
+local buildHouse: (Instance, Map.Lot, Map.Home) -> ()
 
 -- ── Districts ──────────────────────────────────────────────────────────────
 
@@ -612,9 +621,8 @@ local function windowStrips(parent: Instance, cx: number, cz: number, w: number,
 	end
 end
 
-local function tower(parent: Instance, cx: number, cz: number, lot: number, height: number)
-	local w = lot - rng:NextNumber(2, 9)
-	local d = lot - rng:NextNumber(2, 9)
+-- A tower w (along X) by d (along Z), height tall, standing in the middle of its lot (5.3: Map.lots sizes it).
+local function tower(parent: Instance, cx: number, cz: number, w: number, d: number, height: number)
 	local model = Instance.new("Model")
 	model.Name = "Building"
 	part(model, "Walls", Vector3.new(w, height, d), CFrame.new(cx, WALK_TOP + height / 2, cz), BUILDING_COLORS[rng:NextInteger(1, #BUILDING_COLORS)], BUILDING_MATERIALS[rng:NextInteger(1, #BUILDING_MATERIALS)])
@@ -629,26 +637,29 @@ local function sidewalk(parent: Instance, cx: number, cz: number, color: Color3?
 	part(parent, "Sidewalk", Vector3.new(BLOCK, WALK_TOP, BLOCK), CFrame.new(cx, WALK_TOP / 2, cz), color or Color3.fromRGB(150, 150, 146), Enum.Material.Concrete)
 end
 
-local function downtownBlock(parent: Instance, cx: number, cz: number, centerFactor: number)
+-- 5.3: what stands on each lot comes from Map.lots (the same for the jobs and the client): a tower (an apartment
+-- building has its entrance on its street), a storefront, a lawn with trees or a parking lot. The buildings end 10+
+-- studs inside the block: room for a receiver and the pieces at an address.
+local function downtownBlock(parent: Instance, d: Map.District, i: number, j: number)
+	local cx, cz = d.ox + i * CELL, d.oz + j * CELL
 	sidewalk(parent, cx, cz)
-	local inset = 10 -- the towers end 10+ studs inside the block: room for a receiver and the pieces at an address
-	local lot = (BLOCK - inset * 2) / 2
-	for a = 0, 1 do
-		for b = 0, 1 do
-			local lx = cx - BLOCK / 2 + inset + lot * (a + 0.5)
-			local lz = cz - BLOCK / 2 + inset + lot * (b + 0.5)
-			local roll = rng:NextNumber()
-			if roll < 0.7 then
-				tower(parent, lx, lz, lot, rng:NextNumber(16, 34) + 55 * centerFactor * rng:NextNumber())
-			elseif roll < 0.85 then
-				deco(part(parent, "Grass", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(70, 88, 52), Enum.Material.Grass))
-				for _ = 1, rng:NextInteger(2, 4) do
-					tree(parent, lx + rng:NextNumber(-lot / 3, lot / 3), lz + rng:NextNumber(-lot / 3, lot / 3))
-				end
-			else
-				deco(part(parent, "Parking", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(60, 60, 64), Enum.Material.Asphalt))
-				wreck(parent, CFrame.new(lx, WALK_TOP, lz) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
+	for _, info in Map.lotsAt(d.id, i, j) do
+		local lx, lz, lot = info.x, info.z, info.size
+		if info.kind == "tower" or info.kind == "apartment" then
+			tower(parent, lx, lz, info.w, info.d, info.h)
+			if info.home then
+				buildEntrance(parent, info, info.home)
 			end
+		elseif info.kind == "venue" and info.venue then
+			buildVenue(parent, info.venue, info)
+		elseif info.kind == "grass" then
+			deco(part(parent, "Grass", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(70, 88, 52), Enum.Material.Grass))
+			for _ = 1, rng:NextInteger(2, 4) do
+				tree(parent, lx + rng:NextNumber(-lot / 3, lot / 3), lz + rng:NextNumber(-lot / 3, lot / 3))
+			end
+		else
+			deco(part(parent, "Parking", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(60, 60, 64), Enum.Material.Asphalt))
+			wreck(parent, CFrame.new(lx, WALK_TOP, lz) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
 		end
 	end
 end
@@ -688,47 +699,31 @@ local HOUSE_COLORS = {
 	Color3.fromRGB(220, 210, 200),
 }
 
-local function house(parent: Instance, frame: CFrame)
-	local w, d, h = rng:NextNumber(20, 26), rng:NextNumber(16, 20), rng:NextNumber(11, 14)
-	local color = HOUSE_COLORS[rng:NextInteger(1, #HOUSE_COLORS)]
-	part(parent, "House", Vector3.new(w, h, d), frame * CFrame.new(0, h / 2, 0), color, Enum.Material.WoodPlanks)
-	gableRoof(parent, frame * CFrame.new(0, h, 0), w + 2, d + 2, 6, Color3.fromRGB(100 + rng:NextInteger(-30, 30), 60, 50))
-	part(parent, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -d / 2 - 0.2), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
-	for _, x in { -w / 3, w / 3 } do
-		local lit = rng:NextNumber() < 0.3
-		local window = deco(part(parent, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -d / 2 - 0.15), Color3.fromRGB(40, 50, 60), Enum.Material.Glass))
-		if lit then
-			nightWindow(window)
-		end
-	end
-end
-
-local function suburbsBlock(parent: Instance, cx: number, cz: number)
-	sidewalk(parent, cx, cz)
-	local inset = 5
-	local lot = (BLOCK - inset * 2) / 2
-	for a = 0, 1 do
-		for b = 0, 1 do
-			local lx = cx - BLOCK / 2 + inset + lot * (a + 0.5)
-			local lz = cz - BLOCK / 2 + inset + lot * (b + 0.5)
-			deco(part(parent, "Lawn", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(76, 100, 54), Enum.Material.Grass))
-			-- The house faces the nearer road (north or south). A house for sale (Map.EstatePlots) has its own lot.
-			local facing = if b == 0 then Vector3.new(0, 0, -1) else Vector3.new(0, 0, 1)
-			local origin = Vector3.new(lx, WALK_TOP, lz - facing.Z * 4)
-			local forSale = buildEstateHouse(parent, lx, lz) -- its lawn and back fence as on every lot
-			if forSale then
-				-- (its own house, drive and sign)
-			elseif rng:NextNumber() < 0.85 then
-				house(parent, CFrame.lookAt(origin, origin + facing))
-			else
-				wreck(parent, CFrame.new(lx, WALK_TOP, lz) * CFrame.Angles(0, rng:NextNumber(0, 6), 0))
+-- 5.3: the lots come from Map.lots: a house (its front door to one of its two streets, Map.Homes), a house for sale
+-- (Map.EstatePlots, the estate's own builder), a storefront or a burnt-out wreck; every lot has its lawn and a low
+-- fence at the back.
+local function suburbsBlock(parent: Instance, d: Map.District, i: number, j: number)
+	sidewalk(parent, d.ox + i * CELL, d.oz + j * CELL)
+	for _, info in Map.lotsAt(d.id, i, j) do
+		local lx, lz, lot = info.x, info.z, info.size
+		deco(part(parent, "Lawn", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(76, 100, 54), Enum.Material.Grass))
+		local facing = Vector3.new(info.facing.x, 0, info.facing.z)
+		if info.kind == "estate" then
+			buildEstateHouse(parent, lx, lz) -- its own house, drive and sign (it faces its nearer street, north or south)
+		elseif info.kind == "house" and info.home then
+			buildHouse(parent, info, info.home) -- (and a tree in its back yard)
+		elseif info.kind == "venue" and info.venue then
+			buildVenue(parent, info.venue, info)
+		else
+			wreck(parent, CFrame.new(lx, WALK_TOP, lz) * CFrame.Angles(0, rng:NextNumber(0, 6), 0))
+			if rng:NextNumber() < 0.6 then
+				tree(parent, lx + rng:NextNumber(-lot / 3, lot / 3), lz + rng:NextNumber(-lot / 3, lot / 3))
 			end
-			if not forSale and rng:NextNumber() < 0.6 then
-				tree(parent, lx + rng:NextNumber(-lot / 3, lot / 3), lz + facing.Z * (lot / 2 - 5))
-			end
-			-- A low fence at the back of the lot.
-			deco(part(parent, "Fence", Vector3.new(lot - 4, 2.5, 0.4), CFrame.new(lx, WALK_TOP + 1.25, lz - facing.Z * (lot / 2 - 1.5)), Color3.fromRGB(230, 230, 225), Enum.Material.WoodPlanks)).CanCollide = true
 		end
+		-- A low fence at the back of the lot.
+		local back = Vector3.new(lx, WALK_TOP + 1.25, lz) - facing * (lot / 2 - 1.5)
+		local size = if facing.X ~= 0 then Vector3.new(0.4, 2.5, lot - 4) else Vector3.new(lot - 4, 2.5, 0.4)
+		deco(part(parent, "Fence", size, CFrame.new(back), Color3.fromRGB(230, 230, 225), Enum.Material.WoodPlanks)).CanCollide = true
 	end
 end
 
@@ -1328,7 +1323,6 @@ end
 local function buildDistrict(parent: Instance, d: Map.District)
 	local district = folder(parent, d.name)
 	buildDistrictRoads(district, d)
-	local span = math.max(d.i1 - d.i0, d.j1 - d.j0) / 2 + 1
 	for i = d.i0, d.i1 do
 		for j = d.j0, d.j1 do
 			local cx, cz = d.ox + i * CELL, d.oz + j * CELL
@@ -1366,11 +1360,11 @@ local function buildDistrict(parent: Instance, d: Map.District)
 				continue
 			end
 			if d.style == "downtown" then
-				downtownBlock(district, cx, cz, 1 - math.max(math.abs(i), math.abs(j)) / span)
+				downtownBlock(district, d, i, j)
 			elseif d.style == "harbor" then
 				harborBlock(district, cx, cz)
 			else
-				suburbsBlock(district, cx, cz)
+				suburbsBlock(district, d, i, j)
 			end
 		end
 	end
@@ -5161,6 +5155,132 @@ local function defineMissionPlaces()
 	end
 end
 defineMissionPlaces()
+
+-- ── Venues and homes (Zombie Delivery 5.3) ─────────────────────────────────
+-- What Map.lots puts on the ordinary lots, besides the towers: the storefronts of Map.Venues and the homes of Map.Homes.
+--   A storefront   World's building() is the shell (Map.VenueSize, the 9-wide door in the middle of the front, the
+--                  ceiling light); BuildingLooks has a look per kind (Kit.storefront: the shop windows that glow at
+--                  night, the awning in the kind's colours, the counter and the menu inside, the kind's own props:
+--                  an oven and its chimney, a giant burger, lanterns, a mailbox ...); the name board stands on the
+--                  parapet over the awning; in the Suburbs a paved forecourt runs from the door to the sidewalk.
+--   An apartment   the entrance on its tower's street wall: a door between two piers under a canopy (it reads
+--                  recessed), the steps, a buzzer panel with the flats, the house number on the canopy, a lamp that
+--                  glows at night. Eight parts.
+--   A house        (the Suburbs) its front door faces its street (the front wall Map.HouseFront forward of the lot's
+--                  middle), a short path to the sidewalk, a mailbox with its number, a tree in the back yard.
+-- Nothing here has a prompt (the jobs give and take at the piles); every part stays inside its lot. Like the real
+-- estate and the missions' places, the builders live in their own function (Luau allows 200 locals per function).
+
+local function defineVenuesAndHomes()
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local context = { part = part, deco = deco, nightLight = DayNight.nightLight }
+	-- The kinds' walls and their looks.
+	local STYLES: { [string]: { wall: Color3, material: Enum.Material, look: Kit.Blueprint } } = {
+		pizzeria = { wall = Color3.fromRGB(176, 104, 78), material = Enum.Material.Brick, look = require(script.Parent.BuildingLooks.VenuePizzeria) },
+		bakery = { wall = Color3.fromRGB(222, 200, 160), material = Enum.Material.Concrete, look = require(script.Parent.BuildingLooks.VenueBakery) },
+		burgers = { wall = Color3.fromRGB(226, 222, 212), material = Enum.Material.SmoothPlastic, look = require(script.Parent.BuildingLooks.VenueBurgers) },
+		noodles = { wall = Color3.fromRGB(70, 64, 66), material = Enum.Material.Concrete, look = require(script.Parent.BuildingLooks.VenueNoodles) },
+		cafe = { wall = Color3.fromRGB(122, 92, 72), material = Enum.Material.Brick, look = require(script.Parent.BuildingLooks.VenueCafe) },
+		postoffice = { wall = Color3.fromRGB(206, 206, 200), material = Enum.Material.Concrete, look = require(script.Parent.BuildingLooks.VenuePostOffice) },
+		news = { wall = Color3.fromRGB(150, 148, 142), material = Enum.Material.Concrete, look = require(script.Parent.BuildingLooks.VenueNews) },
+		hardware = { wall = Color3.fromRGB(124, 112, 96), material = Enum.Material.Brick, look = require(script.Parent.BuildingLooks.VenueHardware) },
+		electronics = { wall = Color3.fromRGB(72, 82, 94), material = Enum.Material.Metal, look = require(script.Parent.BuildingLooks.VenueElectronics) },
+		pawnshop = { wall = Color3.fromRGB(112, 86, 72), material = Enum.Material.Brick, look = require(script.Parent.BuildingLooks.VenuePawnShop) },
+		flowers = { wall = Color3.fromRGB(236, 226, 214), material = Enum.Material.WoodPlanks, look = require(script.Parent.BuildingLooks.VenueFlowers) },
+	}
+	-- Text on the front face of a small part (a house number, the buzzer panel).
+	local function plate(p: Part, text: string, color: Color3)
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Front
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
+		gui.LightInfluence = 0.3
+		gui.Parent = p
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Text = text
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBold
+		label.TextColor3 = color
+		label.Parent = gui
+	end
+
+	buildVenue = function(parent: Instance, venue: Map.Venue, lot: Map.Lot)
+		local size = Map.VenueSize
+		local model = folder(parent, "Venue_" .. venue.id)
+		model:SetAttribute("Venue", venue.id)
+		local facing = Vector3.new(venue.facing.x, 0, venue.facing.z)
+		local origin = Vector3.new(venue.x, WALK_TOP, venue.z)
+		local frame = CFrame.lookAt(origin, origin + facing)
+		local style = STYLES[venue.kind] or STYLES.pizzeria
+		building(model, frame, size.w, size.d, size.h, style.wall, style.material, size.door, size.doorHeight)
+		Kit.build(model, frame, style.look, context)
+		-- The name board on the parapet (in front of the roof's overhang), over the awning.
+		sign(model, `{string.upper(venue.name)}  {venue.sub}`, Vector3.new(24, 3.4, 0.5), frame * CFrame.new(0, size.h + 2.1, -size.d / 2 - 1.3), Color3.new(1, 1, 1), nil, venue.id, 10)
+		if lot.district == "suburbs" then
+			-- A paved forecourt from the door over the lawn to the sidewalk.
+			local reach = Map.VenueFront
+			local door = Vector3.new(venue.door.x, WALK_TOP, venue.door.z)
+			deco(part(model, "Forecourt", Vector3.new(14, 0.1, reach), CFrame.lookAt(door, door + facing) * CFrame.new(0, 0.12, -reach / 2), Color3.fromRGB(176, 172, 164), Enum.Material.Concrete))
+		end
+	end
+
+	buildEntrance = function(parent: Instance, _lot: Map.Lot, home: Map.Home)
+		local model = folder(parent, "Entrance")
+		model:SetAttribute("Home", home.id)
+		local facing = Vector3.new(home.facing.x, 0, home.facing.z)
+		local door = Vector3.new(home.door.x, WALK_TOP, home.door.z)
+		local frame = CFrame.lookAt(door, door + facing) -- (forward: -Z)
+		local stone = Color3.fromRGB(96, 94, 90)
+		deco(part(model, "Door", Vector3.new(4.6, 7.2, 0.3), frame * CFrame.new(0, 3.6, -0.15), Color3.fromRGB(58, 44, 34), Enum.Material.Wood))
+		for _, side in { -1, 1 } do
+			part(model, "Pier", Vector3.new(1.2, 7.8, 1.8), frame * CFrame.new(side * 3, 3.9, -0.9), stone, Enum.Material.Concrete)
+		end
+		deco(part(model, "Canopy", Vector3.new(8.4, 0.9, 3.2), frame * CFrame.new(0, 8.25, -1.6), Color3.fromRGB(40, 42, 46), Enum.Material.Metal))
+		deco(part(model, "Steps", Vector3.new(7.6, 0.4, 2.2), frame * CFrame.new(0, 0.2, -1.1), Color3.fromRGB(150, 148, 142), Enum.Material.Concrete))
+		-- The buzzer panel on the right pier: the flats, top floor first.
+		local rows = {}
+		for floor = home.floors or 2, 1, -1 do
+			table.insert(rows, `{floor}A {floor}B {floor}C {floor}D`)
+		end
+		local buzzer = deco(part(model, "Buzzer", Vector3.new(1, 1.6, 0.12), frame * CFrame.new(3, 4.4, -1.86), Color3.fromRGB(176, 170, 150), Enum.Material.Metal))
+		plate(buzzer, table.concat(rows, "\n"), Color3.fromRGB(30, 30, 32))
+		local number = deco(part(model, "Number", Vector3.new(2.4, 0.7, 0.08), frame * CFrame.new(0, 8.25, -3.24), Color3.fromRGB(40, 42, 46), Enum.Material.Metal))
+		plate(number, string.match(home.address, "^(%d+)") or "", Color3.fromRGB(240, 236, 220))
+		local lamp = deco(part(model, "EntranceLamp", Vector3.new(1.4, 0.15, 0.6), frame * CFrame.new(0, 7.73, -1.6), LAMP_DIM, Enum.Material.Glass))
+		DayNight.nightLight(lamp, LAMP_LIT, LAMP_DIM, "Glass")
+	end
+
+	buildHouse = function(parent: Instance, lot: Map.Lot, home: Map.Home)
+		local facing = Vector3.new(lot.facing.x, 0, lot.facing.z)
+		local door = Vector3.new(home.door.x, WALK_TOP, home.door.z)
+		local frame = CFrame.lookAt(door, door + facing) -- the middle of the front wall (forward: -Z)
+		local w, d, h = lot.w, lot.d, lot.h
+		local body = frame * CFrame.new(0, 0, d / 2) -- the house's middle on the ground
+		local color = HOUSE_COLORS[rng:NextInteger(1, #HOUSE_COLORS)]
+		part(parent, "House", Vector3.new(w, h, d), body * CFrame.new(0, h / 2, 0), color, Enum.Material.WoodPlanks)
+		gableRoof(parent, body * CFrame.new(0, h, 0), w + 2, d + 2, 6, Color3.fromRGB(100 + rng:NextInteger(-30, 30), 60, 50))
+		part(parent, "Door", Vector3.new(4, 7, 0.4), frame * CFrame.new(0, 3.5, -0.2), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
+		for _, x in { -w / 3, w / 3 } do
+			local window = deco(part(parent, "Window", Vector3.new(4, 3.5, 0.3), frame * CFrame.new(x, h * 0.55, -0.15), Color3.fromRGB(40, 50, 60), Enum.Material.Glass))
+			if rng:NextNumber() < 0.3 then
+				nightWindow(window)
+			end
+		end
+		-- The path from the door over the front lawn to the sidewalk, the mailbox beside it with the number.
+		local yard = lot.size / 2 - Map.HouseFront
+		deco(part(parent, "Path", Vector3.new(3, 0.1, yard), frame * CFrame.new(0, 0.12, -yard / 2), Color3.fromRGB(176, 172, 164), Enum.Material.Concrete))
+		deco(part(parent, "MailboxPost", Vector3.new(0.3, 3.2, 0.3), frame * CFrame.new(3, 1.6, -(yard - 2.5)), Color3.fromRGB(90, 70, 50), Enum.Material.Wood))
+		local box = deco(part(parent, "Mailbox", Vector3.new(1.4, 1, 1.6), frame * CFrame.new(3, 3.6, -(yard - 2.5)), Color3.fromRGB(46, 58, 70), Enum.Material.Metal))
+		plate(box, string.match(home.address, "^(%d+)") or "", Color3.fromRGB(240, 236, 220))
+		if rng:NextNumber() < 0.6 then
+			local at = door - facing * (d + 10) + frame.RightVector * rng:NextNumber(-lot.size / 4, lot.size / 4)
+			tree(parent, at.X, at.Z)
+		end
+	end
+end
+defineVenuesAndHomes()
 
 -- ── Scattered things ───────────────────────────────────────────────────────
 

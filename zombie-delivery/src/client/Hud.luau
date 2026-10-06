@@ -1417,6 +1417,34 @@ local function crewList(r: any): { { name: string, pay: number, owner: boolean }
 end
 
 function Hud.showResult(r: any)
+	if type(r) == "table" and r.midJob == true then
+		-- 5.2: one order of a run done while the others go on: a toast, not this window (a lost one: the server's
+		-- notice says it already).
+		if r.success then
+			local got = if type(r.rating) == "table" then math.clamp(math.floor(tonumber(r.rating.stars) or 0), 0, 3) else 0
+			local left = if type(r.order) == "table" then tonumber(r.order.left) or 0 else 0
+			Hud.toast(`ORDER DONE{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · +{Ui.money(tonumber(r.total) or 0)} · {r.cargo or "cargo"} for {r.customer or "the customer"}{if left > 0 then ` · {left} to go` else ""}`)
+			-- 5.2 review: what the window would say of an employer (the jobs done, the next reward) and a new car or gun.
+			local employer = if type(r.employer) == "table" then r.employer else nil
+			if employer then
+				local done = tonumber(employer.done) or 0
+				local gunAt = tonumber(employer.weaponAt)
+				local nextUp = if employer.weapon and gunAt and done < gunAt then ` · {gunAt - done} more for the {employer.weapon}`
+					elseif type(employer.needed) == "number" and done < employer.needed and employer.reward ~= "" then ` · {employer.needed - done} more for the {employer.reward}`
+					else ""
+				Hud.toast(`{employer.name}: {done} jobs done{nextUp}`)
+			end
+			local newCar = r.unlockedCar or (employer and employer.unlocked)
+			if type(newCar) == "string" then
+				Hud.toast(`🚚 NEW CAR: the {newCar} is yours!`)
+			end
+			if type(r.unlockedWeapon) == "string" then
+				local gun = Economy.findWeapon(r.unlockedWeapon)
+				Hud.toast(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`)
+			end
+		end
+		return
+	end
 	closeWindows()
 	Ui.clear(result.body)
 	result.frame.Visible = true
@@ -2585,7 +2613,7 @@ function view.tickTicket(distance: number?)
 	-- and packRoom the fallback).
 	local packRoom = if job.mode == "foot" or job.mode == "bike" then tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0 else 0
 	local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
-	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{packed}/{packRoom}`
+	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{packed}/{packRoom}|{job.ordersLine}`
 	if signature == t.meta0 then
 		return
 	end
@@ -2601,6 +2629,10 @@ function view.tickTicket(distance: number?)
 		add(if done >= needed then "done" else "todo", `{t.action}: {math.min(done, needed)} of {needed} {if needed == 1 then cargo.one else cargo.many} {verb}`)
 	else
 		add("todo", tostring(t.action))
+	end
+	-- 5.2: the other orders of the run ("+2 ORDERS · …"; every one on the phone's ORDERS app).
+	if type(job.ordersLine) == "string" then
+		add("quiet", job.ordersLine)
 	end
 	if packRoom > 0 then
 		add(if packed >= packRoom then "warn" else "quiet", `{if job.mode == "bike" then "🚲 On the bike" else "🎒 Backpack"} {packed}/{packRoom}{if packed >= packRoom then " · full" else ""}`)

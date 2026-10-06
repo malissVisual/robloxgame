@@ -1079,6 +1079,20 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Several orders at once, real shops and homes in town (5.2)
+
+**Several orders at once** (`Config.Jobs.Orders`, `job.orders`): while an ordinary run goes (on foot, by bike, or a ★ / ★★
+car job), the board offers **+ ADD ORDER** as long as your free room allows (hands + backpack, bike + gear + backpack, the
+car's slots) — up to 2 on foot, 3 by bike, 4 by car. Pick up and drop in any order; a drop opens once its pieces are with
+you; the GPS goes to the nearest open stop or the order you **pin** in the phone's ORDERS app (`client/OrdersUi.luau`,
+`JobRules.nextOpenStop`). Every order has its own clock, pay, rating and condition; when one runs out the others go on.
+Missions, specials, employers, the Freight Run, DUO and the tutorial stay one at a time.
+
+**The town got real places** (`Map.makeLots`, `Map.Venues`, `Map.Homes`): eleven storefronts — Luigi's Pizza, Daily Bread
+Bakery, Last Bite Burgers, Wok Dead, Grind House café, the Post Office, The Daily Undead (newspapers), Bolt & Nail
+Hardware, Volt Electronics, Second Life Pawn, Bloom flowers — and 95 delivery homes: apartment entrances downtown (steps,
+a buzzer, a number) and suburb houses facing the street (a path, a mailbox, a number). 5.3 sends the deliveries there.
+
 ## Bikes and Spoke & Chain Cycles (5.1)
 
 At level 2 Marge texts you: **Spoke & Chain Cycles** on Main St (Downtown block -1, 1) sells bikes — the Rusty Bike
