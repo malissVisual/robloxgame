@@ -181,6 +181,9 @@ local lastSpawn: { [Player]: number } = {}
 
 -- Set by Main: (player, car, reason) when a car is destroyed.
 Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
+-- 5.4, set by server/Fuel.luau: a car was just built for its player (every spawn, call, rebuild, garage swap): its
+-- tank's attributes (Fuel, Tank) are written before it is anybody's to drive.
+Vehicles.onSpawned = function(_car: Car) end
 
 local DARK = Color3.fromRGB(34, 34, 38)
 local GLASS = Color3.fromRGB(150, 190, 210)
@@ -3807,6 +3810,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	car.model:SetAttribute("Siren", carId ~= nil and def.company == true)
 	car.model:SetAttribute("Chauffeured", car.chauffeured)
 	writeAttributes(car)
+	Vehicles.onSpawned(car) -- 5.4: its fuel (server/Fuel.luau)
 	watchPrompts(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then

@@ -48,6 +48,7 @@ local CloseCombat = require(Server.CloseCombat)
 local Transport = require(Server.Transport)
 local VanQuest = require(Server.VanQuest)
 local KitWear = require(Server.KitWear)
+local Fuel = require(Server.Fuel)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -222,6 +223,7 @@ safely("Buddy", Buddy.start) -- 4.5: the admin's NPC companions
 safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the character (KitSpeed)
 safely("VanQuest", VanQuest.start) -- 5.0: Earl's van, Marge's quest at level 4
 safely("KitWear", KitWear.start) -- 5.0: the kit you own worn on your character, the phone in your hand
+safely("Fuel", Fuel.start) -- 5.4: the tanks, the burn, the pumps, the jerry cans, the tow
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).

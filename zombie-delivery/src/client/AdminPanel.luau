@@ -8,7 +8,7 @@
 -- 4.5, the OP admin: a TARGET picker at the top (you and every player in the server, by display name; you by default):
 -- every command that changes a profile or a character goes to the target (the server sends the target's UserId on).
 -- The sections:
---   PLAYER           GIVE ALL, unlock everything, max upgrades, heal; money, XP, the driver level, items, guns, cars,
+--   PLAYER           GIVE ALL, unlock everything, max upgrades, heal, 5.4: refuel / empty the tank; money, XP, the driver level, items, guns, cars,
 --                    car stages, upgrade tracks, the car gun, paint; RESET MY SAVE (you only, asks twice)
 --   OP               the toggles with their ON / OFF state (god, fly, noclip, super jump, car boost, hidden, one-hit
 --                    kills; the attributes the server set on the target), the walk 1× / 2× / 4×, bring / go to, clear
@@ -202,6 +202,13 @@ R.player = function()
 	end)
 	action(quick, "HEAL (AND THE CAR)", C.green, function()
 		send("heal")
+	end)
+	-- 5.4: the car's tank (server/Fuel.luau): full, or empty to try the crawl and the phone's TOW.
+	action(quick, "REFUEL THE CAR", C.green, function()
+		send("refuel", 1)
+	end)
+	action(quick, "EMPTY THE TANK", C.grey, function()
+		send("refuel", 0)
 	end)
 
 	heading("Money")

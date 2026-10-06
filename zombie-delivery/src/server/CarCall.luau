@@ -991,6 +991,62 @@ function CarCall.call(player: Player, carId: string?): string?
 	return nil
 end
 
+-- 5.4, the tow (server/Fuel.luau checked the empty tank and took the money): the car is brought to `spot` (a gas
+-- station's bay on the ground, its LookVector the way the car will look) as it is: the same car, its cargo and its
+-- passengers aboard (no rebuild). You come along when you sit in it or stand within Config.Fuel.TowRide studs of it
+-- (beside it on the `across` side, away from the pump: -1 its left, 1 its right); farther away the car goes alone.
+-- False when it cannot (a chauffeur is bringing it).
+function CarCall.tow(player: Player, car: Vehicles.Car, spot: CFrame, across: number?): boolean
+	if deliveries[player] or car.chauffeured or car.wrecked or car.repairing or not car.chassis.Parent then
+		return false
+	end
+	local root = rootOf(player)
+	local inCar = Vehicles.seatedIn(player) == car
+	local rides = not inCar and root ~= nil and (root.Position - car.chassis.Position).Magnitude <= Config.Fuel.TowRide
+	-- The client may drive the car: it needs the ground there first (StreamingEnabled).
+	pcall(function()
+		player:RequestStreamAroundAsync(spot.Position, 5)
+	end)
+	if car.wrecked or car.chauffeured or not car.chassis.Parent or deliveries[player] then
+		return false
+	end
+	local from = car.chassis.Position
+	local height = math.clamp(from.Y - Vehicles.groundY(from.X, from.Z, from.Y), 0.5, 12)
+	local look = Vector3.new(spot.LookVector.X, 0, spot.LookVector.Z)
+	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, -1)
+	local at = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, spot.Y) + height, spot.Z)
+	local chassisTo = CFrame.lookAt(at, at + look)
+	local pivotOffset = car.chassis.CFrame:ToObjectSpace(car.model:GetPivot())
+	pcall(function()
+		car.chassis:SetNetworkOwner(nil)
+	end)
+	car.chassis.AssemblyLinearVelocity = Vector3.zero
+	car.chassis.AssemblyAngularVelocity = Vector3.zero
+	car.model:PivotTo(chassisTo * pivotOffset)
+	local linear = car.chassis:FindFirstChild("Drive")
+	if linear and linear:IsA("LinearVelocity") then
+		linear.PlaneVelocity = Vector2.zero
+	end
+	if rides and root then
+		-- Out of the tow truck's cab: beside the car, on the side away from the pump.
+		local side = chassisTo.RightVector * (across or -1) * (car.size.X / 2 + 3)
+		local stand = at + side + Vector3.new(0, 3, 0)
+		local character = player.Character
+		if character then
+			character:PivotTo(CFrame.lookAt(stand, stand + look))
+			root.AssemblyLinearVelocity = Vector3.zero
+		end
+	end
+	task.delay(0.5, function()
+		if not car.wrecked and not car.chauffeured and not car.repairing and car.chassis.Parent then
+			pcall(function()
+				car.chassis:SetNetworkOwner(car.owner)
+			end)
+		end
+	end)
+	return true
+end
+
 -- Ends a call at once (the chauffeur and the car go), e.g. before a respawn brings a new car.
 function CarCall.cancel(player: Player)
 	local d = deliveries[player]

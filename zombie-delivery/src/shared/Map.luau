@@ -28,6 +28,7 @@
 --   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
 --   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
 --   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St
+--   Gas        (5.4) the gas stations (Map.GasStations): the old one on the North Highway and three on the town's lots
 --   Places     (5.3) what stands on every lot of the ordinary Downtown and Suburbs blocks (Map.lots, seeded: towers,
 --              lawns, parking, houses ...), the storefronts the businesses work from (Map.Venues: Luigi's Pizza, the
 --              Daily Bread Bakery, the Post Office ... and the older pharmacy, FreshMart, bank, Frosty's, warehouse) and
@@ -190,6 +191,7 @@ Map.SpecialBlocks = {
 		["0,-3"] = "lockup", -- the Harbor Lockup (a garage), where the Old Bridge comes over
 		["2,2"] = "warehouse", -- the Harbor Warehouse (3.0): its roller doors on the avenue to the west
 		["0,1"] = "repairs", -- Rust Bridge Repairs (3.4, a repair shop): where the Rust Bridge comes over
+		["0,0"] = "gas", -- 5.4, Harbor Gas (Map.GasStations): where the Rust Bridge comes over, across from Frosty's
 	},
 } :: { [string]: { [string]: string } }
 
@@ -792,6 +794,127 @@ function Map.venuesOf(business: string): { Venue }
 	return list
 end
 
+-- ── Gas stations (Zombie Delivery 5.4) ─────────────────────────────────────
+-- Where the cars refuel (Config.Fuel, server/Fuel.luau): the pumps' Refuel prompts, the kiosk's jerry cans, the tow's
+-- destination. The old Gas Station on the North Highway (its yard "gas"; an employer too: the Fuel Run brings its fuel
+-- from the Harbor Fuel Depot) got Codex's pumps; three more stand on the town's lots, each built from
+-- server/GasArt/Layout.luau (a 70 x 50 station: the island with two pumps under a canopy, the kiosk, the price sign),
+-- its front (the layout's -Z) to its street:
+--   Westside Gas  Downtown block (-4, 1), its south row of lots (lot kind "gas"), on the street the West Highway starts from
+--   Harbor Gas    the Harbor block (0, 0) (a special block "gas"), on the street the Rust Bridge comes in on
+--   Willow Gas    Suburbs block (1, 0), its north row of lots, on Willow Ln (the first street from town)
+-- A station's (x, z) is the middle of its floor; `pumps` are where its pumps stand and `bays` where a car stands
+-- beside one (looking `look`: out of the station; the tow puts a car there), all on the map. A lot station's pumps
+-- and bays come from GasLayout (= GasArt/Layout: the island at (-16, -6), its pumps 4 studs either side of it along Z,
+-- the bays 5.2 studs out across; tests/fuel_test.luau and server/World.luau check them).
+export type GasBay = { x: number, z: number, look: Spot, pump: number }
+export type GasStation = {
+	id: string, -- its Map.Landmarks id ("gas": the old one, an employer's landmark; the others "gas_…")
+	name: string,
+	x: number,
+	z: number,
+	facing: Spot, -- the front (a unit direction along X or Z)
+	about: string, -- the map list's line (a new station)
+	district: string?, -- a lot station: its block (i, j) and its row of lots (b: 0 north, 1 south); nil: a yard / special block
+	i: number?,
+	j: number?,
+	b: number?,
+	pumps: { Spot },
+	bays: { GasBay },
+}
+Map.GasLayout = {
+	width = 70, -- across the front (the layout's X)
+	depth = 50, -- front to back (its Z)
+	pumps = { { -16, -10 }, { -16, -2 } } :: { { number } }, -- (x, z) in the layout's frame
+	bays = { { -21.2, -10, 1 }, { -10.8, -10, 1 }, { -21.2, -2, 2 }, { -10.8, -2, 2 } } :: { { number } }, -- (x, z, pump)
+	inset = 5, -- the front: this far inside the block's edge (the curb)
+}
+do
+	-- A point of a station's frame (right of somebody looking out of the front, back from the middle) on the map.
+	local function at(x: number, z: number, fx: number, fz: number, right: number, back: number): Spot
+		return { x = x - fz * right - fx * back, z = z + fx * right - fz * back }
+	end
+	local stations: { GasStation } = {
+		{
+			id = "gas",
+			name = "Gas Station",
+			x = 136,
+			z = -900,
+			facing = { x = -1, z = 0 },
+			about = "",
+			-- the two pumps under the old canopy (server/World.luau buildGas), their fronts to the highway
+			pumps = { { x = 136, z = -909 }, { x = 136, z = -891 } },
+			bays = { { x = 136, z = -914.5, look = { x = -1, z = 0 }, pump = 1 }, { x = 136, z = -885.5, look = { x = -1, z = 0 }, pump = 2 } },
+		},
+	}
+	local LAYOUT = Map.GasLayout
+	for _, row in {
+		-- id, name, about, district, i, j, b (the lot row; -1: a special block), fx, fz
+		{ "gas_downtown", "Westside Gas", "Downtown's west edge, on Cedar St where the West Highway starts. Fuel at the pumps, jerry cans in the kiosk.", "downtown", -4, 1, 1, 0, 1 },
+		{ "gas_harbor", "Harbor Gas", "In the Harbor, where the Rust Bridge comes over. Fuel at the pumps, jerry cans in the kiosk.", "harbor", 0, 0, -1, 0, 1 },
+		{ "gas_suburbs", "Willow Gas", "The Suburbs, on Willow Ln, the first street from town. Fuel at the pumps, jerry cans in the kiosk.", "suburbs", 1, 0, 0, 0, -1 },
+	} :: { { any } } do
+		local d = districtById(row[4])
+		local i, j, b, fx, fz = row[5], row[6], row[7], row[8], row[9]
+		local cx, cz = d.ox + i * CELL, d.oz + j * CELL
+		-- the front LAYOUT.inset inside the block's edge, the middle of the row (or the block) across
+		local out = BLOCK / 2 - LAYOUT.inset - LAYOUT.depth / 2
+		local x, z = cx + fx * out, cz + fz * out
+		if b >= 0 then
+			local lx = Map.lotCentre(row[4], i, j, 0, b)
+			local rx = Map.lotCentre(row[4], i, j, 1, b)
+			if fz ~= 0 then
+				x = (lx + rx) / 2
+			end
+		end
+		local station: GasStation = {
+			id = row[1],
+			name = row[2],
+			x = x,
+			z = z,
+			facing = { x = fx, z = fz },
+			about = row[3],
+			district = if b >= 0 then row[4] else nil,
+			i = if b >= 0 then i else nil,
+			j = if b >= 0 then j else nil,
+			b = if b >= 0 then b else nil,
+			pumps = {},
+			bays = {},
+		}
+		for _, p in LAYOUT.pumps do
+			table.insert(station.pumps, at(x, z, fx, fz, p[1], p[2]))
+		end
+		for _, p in LAYOUT.bays do
+			local spot = at(x, z, fx, fz, p[1], p[2])
+			table.insert(station.bays, { x = spot.x, z = spot.z, look = { x = fx, z = fz }, pump = p[3] })
+		end
+		table.insert(stations, station)
+	end
+	Map.GasStations = stations
+end
+
+-- A gas station by its id (nil: none).
+function Map.gasStation(id: string): GasStation?
+	for _, station in Map.GasStations do
+		if station.id == id then
+			return station
+		end
+	end
+	return nil
+end
+
+-- The gas station nearest to (x, z) (straight line) and how far it is.
+function Map.nearestGas(x: number, z: number): (GasStation, number)
+	local best, bestD = Map.GasStations[1], math.huge
+	for _, station in Map.GasStations do
+		local d = math.sqrt((station.x - x) ^ 2 + (station.z - z) ^ 2)
+		if d < bestD then
+			best, bestD = station, d
+		end
+	end
+	return best, bestD
+end
+
 -- (kind: shop | employer | place | venue, 5.3: a storefront of Map.Venues)
 export type Landmark = { id: string, name: string, icon: string, x: number, z: number, kind: string, description: string }
 
@@ -887,6 +1010,13 @@ end
 for _, venue in Map.Venues do
 	if venue.built then
 		table.insert(landmarks, { id = venue.id, name = venue.name, icon = venue.icon, x = venue.park.x, z = venue.park.z, kind = "venue", description = venue.about })
+	end
+end
+-- 5.4, the new gas stations (Map.GasStations; the old one is the Gas Station employer's): on the road in front.
+for _, station in Map.GasStations do
+	if station.id ~= "gas" then
+		local out = Map.GasLayout.depth / 2 + Map.GasLayout.inset + Map.CurbPark
+		table.insert(landmarks, { id = station.id, name = station.name, icon = "⛽", x = station.x + station.facing.x * out, z = station.z + station.facing.z * out, kind = "place", description = station.about })
 	end
 end
 -- Zombie Delivery 2.6, the real estate: Sunset Hills (on Sunset Drive), the other mansions and the villas (at their
@@ -1127,7 +1257,10 @@ function Map.addresses(): { Address }
 	for _, d in Map.Districts do
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
-				if Map.special(d.id, i, j) then
+				-- (5.4: a gas station's special block rolls its dice like the ordinary block it was, so every other
+				-- block's addresses stay as they were, and holds none)
+				local special = Map.special(d.id, i, j)
+				if special and special ~= "gas" then
 					continue
 				end
 				local first = math.floor(rand() * 4) + 1
@@ -1148,7 +1281,7 @@ function Map.addresses(): { Address }
 						local k = i + (if nx > 0 then 0 else -1) - d.i0 + 1
 						name = `{number} {d.avenues[k % #d.avenues + 1]}`
 					end
-					if Map.isSafe(x, z) then
+					if Map.isSafe(x, z) or special then
 						continue
 					end
 					table.insert(list, { x = x, z = z, nx = nx, nz = nz, name = name, district = d.name, poi = false })
@@ -1192,7 +1325,7 @@ export type Lot = {
 	x: number, -- the lot's middle
 	z: number,
 	size: number,
-	kind: string, -- tower | apartment | venue | grass | parking | house | wreck | estate
+	kind: string, -- tower | apartment | venue | grass | parking | house | wreck | estate | gas (5.4: a gas station's)
 	facing: Spot, -- the front's way (a unit direction along X or Z: one of the lot's outer sides)
 	w: number, -- the building: a tower's size along X, a house's front (0: none)
 	d: number, -- … a tower's along Z, a house's depth
@@ -1226,6 +1359,15 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 	local districtLots: { [string]: { [string]: { Lot } } } = { downtown = {}, suburbs = {}, harbor = {} }
 	local homes: { Home } = {}
 	local venueAt: { [string]: Venue } = {}
+	-- 5.4: the rows of lots the gas stations stand on (Map.GasStations): both lots of the row are the station's.
+	local gasAt: { [string]: GasStation } = {}
+	for _, station in Map.GasStations do
+		if station.district and station.i and station.j and station.b then
+			for a = 0, 1 do
+				gasAt[`{station.district}:{station.i},{station.j}:{a}{station.b}`] = station
+			end
+		end
+	end
 	for _, venue in Map.Venues do
 		if venue.built then
 			local d = districtById(venue.district)
@@ -1365,7 +1507,11 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 						}
 						table.insert(list, lot)
 						local venue = venueAt[`{d.id}:{i},{j}:{a}{b}`]
-						if venue then
+						local gas = gasAt[`{d.id}:{i},{j}:{a}{b}`]
+						if gas then
+							lot.kind = "gas" -- 5.4: server/World.luau builds the station over the row
+							lot.facing = gas.facing
+						elseif venue then
 							lot.kind = "venue"
 							lot.venue = venue
 							lot.facing = venue.facing

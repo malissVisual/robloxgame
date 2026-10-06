@@ -44,6 +44,9 @@ Icons.Ids = {
 	item_nitro = "rbxassetid://124345149039037",
 	item_molotov = "rbxassetid://94641923810845",
 	item_mine = "rbxassetid://109583785484960",
+	-- 5.4, fuel (Codex's art/icons/jerrycan and fuel, 256 x 256 white; not uploaded yet: the emoji shows).
+	jerrycan = "",
+	fuel = "",
 	-- Map markers: shops, employers, far places (art/map, 128 x 128).
 	map_depot = "rbxassetid://137094707646902",
 	map_dealer = "rbxassetid://109132509782464",
@@ -181,8 +184,13 @@ function Icons.weapon(weaponId: string?): string?
 	return named("weapon_", WEAPON_ALIASES[weaponId] or weaponId)
 end
 
--- An item (Config.Items id).
+-- An item (Config.Items id). 5.4: the jerry can's picture is Codex's art/icons/jerrycan (no item_ prefix).
+local ITEM_NAMES: { [string]: string } = { jerrycan = "jerrycan" }
 function Icons.item(itemId: string?): string?
+	local name = if itemId then ITEM_NAMES[itemId] else nil
+	if name then
+		return if Icons.Ids[name] ~= nil then name else nil
+	end
 	return named("item_", itemId)
 end
 
@@ -273,6 +281,9 @@ local LANDMARK_ALIASES: { [string]: string } = {
 	garage_south = "dealer",
 	repairs = "mechanic", -- 3.4, the second repair shop: a wrench like Wrench Garage
 	earl = "dealer", -- 5.0, Earl's Used Wheels: a car for sale
+	gas_downtown = "gas", -- 5.4, the new gas stations (Map.GasStations): the Gas Station's pump
+	gas_harbor = "gas",
+	gas_suburbs = "gas",
 	-- The missions' places (3.0) have no map icons of their own either: the closest ones.
 	market = "supplies", -- a shop full of things
 	airfield = "army",

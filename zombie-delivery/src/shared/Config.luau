@@ -130,6 +130,10 @@ export type CarDef = {
 	-- standing pose through shared/RiderPose.luau), and a badge on its card at Spoke & Chain ("⚡ ELECTRIC · STAND-UP").
 	stand: boolean?,
 	badge: string?,
+	-- 5.4, fuel (Config.Fuel, shared/FuelMath.luau): the tank in litres and what it burns, litres per 1,000 studs driven.
+	-- Every car has both; a bike has none (no fuel).
+	tank: number?,
+	burn: number?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -184,6 +188,8 @@ Config.Cars = {
 		turn = 1.8,
 		health = 300,
 		capacity = 2,
+		tank = 40, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.0,
 		color = { 214, 196, 160 },
 		role = "Your first vehicle: it grows with you",
@@ -209,6 +215,8 @@ Config.Cars = {
 		turn = 2.05,
 		health = 320,
 		capacity = 2,
+		tank = 35, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
 		ramPower = 1.0,
 		color = { 232, 170, 40 },
 		role = "Fast and nimble: the rush jobs",
@@ -232,6 +240,8 @@ Config.Cars = {
 		turn = 1.75,
 		health = 450,
 		capacity = 4,
+		tank = 50, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
 		ramPower = 1.1,
 		color = { 168, 186, 200 },
 		role = "Tougher, the in-between",
@@ -254,6 +264,8 @@ Config.Cars = {
 		turn = 2.0,
 		health = 420,
 		capacity = 2,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 8, -- litres per 1,000 studs
 		ramPower = 1.15,
 		color = { 196, 60, 50 },
 		role = "The crew car: friends shoot from the bed",
@@ -277,6 +289,8 @@ Config.Cars = {
 		turn = 1.6,
 		health = 650,
 		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
 		ramPower = 1.4,
 		color = { 238, 238, 232 },
 		role = "The big one: the only way to 6 and more",
@@ -300,6 +314,8 @@ Config.Cars = {
 		turn = 2.3,
 		health = 340,
 		capacity = 1,
+		tank = 65, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
 		ramPower = 1.0,
 		color = { 30, 30, 36 },
 		role = "The getaway car: one piece, all speed",
@@ -323,6 +339,8 @@ Config.Cars = {
 		turn = 1.2,
 		health = 900,
 		capacity = 12,
+		tank = 120, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
 		ramPower = 2.0,
 		color = { 46, 88, 150 },
 		role = "Warehouse freight: pallets and 12 slots",
@@ -344,6 +362,8 @@ Config.Cars = {
 		turn = 1.8,
 		health = 900,
 		capacity = 3,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.6,
 		color = { 72, 78, 84 },
 		role = "Very tough: the car-gun platform",
@@ -366,6 +386,8 @@ Config.Cars = {
 		turn = 2.25,
 		health = 420,
 		capacity = 2,
+		tank = 55, -- 5.4: litres (Config.Fuel)
+		burn = 6, -- litres per 1,000 studs
 		ramPower = 1.1,
 		color = { 30, 90, 200 },
 		role = "The fastest van: rush jobs",
@@ -386,6 +408,8 @@ Config.Cars = {
 		turn = 1.6,
 		health = 1000,
 		capacity = 8,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.8,
 		color = { 80, 96, 70 },
 		description = "The army's truck. Two gunners on the roof. 3 passengers.",
@@ -402,6 +426,8 @@ Config.Cars = {
 		turn = 1.4,
 		health = 1300,
 		capacity = 8,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 2.0,
 		color = { 245, 190, 30 },
 		description = "The school's bus. Bring the whole crew. 5 passengers.",
@@ -419,6 +445,8 @@ Config.Cars = {
 		turn = 1.9,
 		health = 1400,
 		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 14, -- litres per 1,000 studs
 		ramPower = 2.5,
 		color = { 60, 130, 220 },
 		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
@@ -436,6 +464,8 @@ Config.Cars = {
 		turn = 1.9,
 		health = 650,
 		capacity = 6,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.3,
 		color = { 250, 240, 245 },
 		description = "Frosty's ice cream truck. 1 passenger.",
@@ -453,6 +483,8 @@ Config.Cars = {
 		turn = 1.5,
 		health = 900,
 		capacity = 10,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
 		ramPower = 1.6,
 		color = { 230, 120, 40 },
 		description = "Big Move's moving truck: a tall box that takes a pallet. 1 passenger.",
@@ -469,6 +501,8 @@ Config.Cars = {
 		turn = 1.5,
 		health = 1000,
 		capacity = 2,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.7,
 		color = { 150, 90, 50 },
 		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
@@ -485,6 +519,8 @@ Config.Cars = {
 		turn = 1.8,
 		health = 800,
 		capacity = 1,
+		tank = 70, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.4,
 		color = { 245, 245, 245 },
 		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
@@ -501,6 +537,8 @@ Config.Cars = {
 		turn = 1.6,
 		health = 950,
 		capacity = 6,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.6,
 		color = { 220, 60, 50 },
 		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
@@ -1000,13 +1038,15 @@ export type ItemDef = {
 	description: string,
 }
 
--- Consumables, bought at Last Stop Supplies, used from the hotbar (keys 1 … 5).
+-- Consumables, bought at Last Stop Supplies, used from the hotbar (keys 1 … 6; 5.4: the jerry can is the sixth).
 Config.Items = {
 	{ id = "repair", name = "Repair Kit", icon = "🔧", price = 150, max = 10, description = "Fixes 40% of your car." },
 	{ id = "medkit", name = "Medkit", icon = "➕", price = 80, max = 10, description = "Heals you fully." },
 	{ id = "nitro", name = "Nitro", icon = "⚡", price = 120, max = 10, description = "4 seconds of +60% speed." },
 	{ id = "molotov", name = "Molotov", icon = "🔥", price = 60, max = 20, description = "Throw it where you aim: burns zombies for 8 s." },
 	{ id = "mine", name = "Landmine", icon = "💣", price = 100, max = 10, description = "Drops behind your car. Boom." },
+	-- 5.4: sold at Last Stop Supplies and at every gas station's kiosk (Map.GasStations); Config.Fuel.CanLitres.
+	{ id = "jerrycan", name = "Jerry Can", icon = "⛽", price = 35, max = 5, description = "+10 L of fuel. Use it next to your car (or in it)." },
 } :: { ItemDef }
 
 Config.ItemTuning = {
@@ -1023,6 +1063,34 @@ Config.ItemTuning = {
 	MineLife = 120,
 	MineMax = 5,
 	UseCooldown = 0.4,
+}
+
+-- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)
+-- has a tank (CarDef.tank, litres) and burns CarDef.burn litres per 1,000 studs it is driven: the server's Tick measures
+-- the chassis' flat distance while somebody drives it, never while a chauffeur does, and skips a jump of more than
+-- MaxJump studs (a teleport, a tow, a rebuild). A full tank lasts about 3 – 5 jobs of the tier the car opens at
+-- (FuelMath.jobsPerTank, tests/fuel_test.luau). Below Low (a share of the tank) the gauge turns red and a toast says LOW
+-- FUEL; empty, the car crawls at CrawlSpeed at most (client/Drive.luau) to a pump, or the phone's TOW brings it to the
+-- nearest station's pump with TowLitres for TowPrice (only with an empty tank). The gas stations (Map.GasStations) sell
+-- fuel at PricePerLitre: the pump's Refuel prompt (hold PumpHold s, on foot, your car parked within PumpReach studs of the
+-- pump) pours PourRate litres a second, charged as it pours, until the tank is full, the money runs out or you stop it.
+-- The jerry can (Config.Items "jerrycan") pours CanLitres next to your car. Your own cars' levels are saved
+-- (profile.carFuel); a new car comes full, a company vehicle a job lends you comes full and is not saved.
+Config.Fuel = {
+	PricePerLitre = 2,
+	CrawlSpeed = 6, -- studs / s: the top speed with an empty tank
+	Low = 0.15, -- the share of the tank under which it is low (red gauge, the LOW FUEL toast)
+	Tick = 0.5, -- seconds between the server's burns
+	MaxJump = 200, -- studs: a move longer than this in one tick is not driving (no burn)
+	PourRate = 8, -- litres a second at a pump
+	PumpReach = 12, -- studs from the pump to your car's body at most (a Freight Truck parks outside the canopy posts)
+	PumpHold = 0.5, -- seconds to hold the Refuel prompt
+	PumpWalk = 14, -- studs: walk farther from the pump than this and it stops pouring
+	TowPrice = 150,
+	TowLitres = 5,
+	TowRide = 80, -- studs: on foot this close to your car and you ride along with the tow
+	CanLitres = 10,
+	CanReach = 12, -- studs from your car's body at most to pour a jerry can
 }
 
 export type PaintDef = {

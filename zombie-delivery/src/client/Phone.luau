@@ -29,6 +29,9 @@
 --             a red dot on the PHONE action.
 -- 5.1: the courier ID has the quick switch when you own a bike: 🚲 MY BIKE (the "Equip" remote's "ride": your bike
 -- comes at once) and, with a car of your own too, 🚐 CALL CAR ("drive": back to your car, the chauffeur brings it).
+-- 5.4: with your own car's tank empty (its Tank / Fuel attributes, server/Fuel.luau) the courier ID shows ⛽ TOW $150
+-- (Config.Fuel.TowPrice; the "Fuel" remote's "tow": the server checks the tank and the money again and the tow brings the
+-- car to the nearest gas station's pump with a little fuel in it).
 -- The MENU and every key stay as they were (J, C, M ...); the phone is one more way in. Opening it closes the other
 -- windows (Phone.onOpen, Main: Hud.closeWindows); ESC, O, the PHONE action or the home bar (on the home screen)
 -- close it. While it is open the mouse is free (Main: CameraRig.mouseNeeded asks Phone.isOpen).
@@ -763,6 +766,22 @@ local function homeWidgets(parent: Instance)
 	refs.switch = switch
 	refs.rideBike = switchButton("🚲 MY BIKE", 1, "ride")
 	refs.callCar = switchButton("🚐 CALL CAR", 2, "drive")
+	-- 5.4: TOW, while your own car's tank is empty (fillHome and the ticker show it).
+	refs.tow = button(card, `⛽ TOW  {Ui.money(Config.Fuel.TowPrice)}`, "main", 7, function()
+		Net.get("Fuel"):FireServer("tow")
+		Phone.close()
+	end)
+	refs.tow.Visible = false
+	refs.towShown = function(): boolean
+		local cars = workspace:FindFirstChild("Cars")
+		for _, car in if cars then cars:GetChildren() else {} do
+			if car:GetAttribute("OwnerId") == player.UserId then
+				local tank, fuel = car:GetAttribute("Tank"), car:GetAttribute("Fuel")
+				return type(tank) == "number" and tank > 0 and type(fuel) == "number" and fuel <= 1e-3
+			end
+		end
+		return false
+	end
 	-- The newest unread message, like a notification (a tap opens MESSAGES).
 	local note = Ui.make("TextButton", {
 		Name = "Notification",
@@ -811,6 +830,7 @@ local function fillHome()
 	refs.switch.Visible = hasBike
 	refs.callCar.Visible = hasCar
 	refs.rideBike.Size = if hasCar then UDim2.new(0.5, -3, 1, 0) else UDim2.new(1, 0, 1, 0)
+	refs.tow.Visible = refs.towShown() -- 5.4
 	local newest: Message? = nil
 	for _, message in messages do
 		if message.unread then
@@ -1123,6 +1143,9 @@ local function startTicker()
 			end
 			if app == "orders" then
 				OrdersUi.tick() -- 5.2: every order's clock
+			end
+			if refs.tow and refs.bigClock then
+				refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
 			end
 			task.wait(0.5)
 		end
