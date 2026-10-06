@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · approved courier-phone UI (home + live order detail, square contract surfaces, readable app launcher); `src/client/Phone.luau`, new phone presentation/layout modules, focused UI tests, `design/phone-ui/` · 2026-10-06 · `codex/phone-ui`.
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/phone-ui` · approved ZDC phone implemented: live home contract, eight square/white apps, red route action, actual Roads/Discovery preview, existing balance/sound settings, scrollable small-screen layouts; `design/phone-ui/` reference + handoff. All 38 test files/compiles, actual phone-module behavior recorder and Rojo build pass. Studio: every app, fresh tutorial/Q/T/camera, multi-order PIN/timers/route/fog, long names/messages, bike/car/tow, keyboard/gamepad/touch, portrait/landscape sizing/scroll/hit targets; approved PNG is concept, not a Studio screenshot.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->

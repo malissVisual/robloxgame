@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(source)
     # 3.7: the client's pure modules (no Roblox at their top level) that a test requires.
-    for name in ("Stamina", "TouchLayout"):
+    for name in ("Stamina", "TouchLayout", "PhoneLayout"):
         shutil.copy(os.path.join(os.path.dirname(SHARED), "client", name + ".luau"), os.path.join(tmp, name + ".luau"))
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))

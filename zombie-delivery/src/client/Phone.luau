@@ -1,48 +1,12 @@
 --!strict
--- 5.0: the courier's phone. Marge gives it in the tutorial (profile.phone, the state's `phone`; the Tutorial remote's
--- "phone" message is the moment she does): from then on a PHONE action sits at the lower right, just over the weapon
--- line (client/Hud.luau's right column; on a touch screen left of that column when the MENU row is in the way), and
--- the O key opens it (Tab is Roblox's player list: this HUD keeps that list on screen and lays out around it, so Tab
--- would hide it with every press). A gamepad: the D-pad's down.
---
--- The phone slides up at the lower right (in the middle of a short touch screen, turned sideways: a phone held
--- upright would not be readable there): a rounded charcoal body with its side keys, the screen with a status bar (the
--- game's time from Lighting.ClockTime, server/DayNight.luau; the signal, the battery) and the home screen: the big
--- clock and the shift (day / night pay), your courier ID (rank, level, the XP line, cash, on foot or your vehicle), the
--- newest message, and six apps in the contract look (design/ui-contract/: charcoal tiles, fine lines, white caps, small
--- red badges):
---   ORDERS    your active job: the contract, where to, the stop and its step, the clock, the pay and the pieces
---             delivered; OPEN BOARD and SHOW ON MAP. Without one: OPEN BOARD. 5.3: 🎒 BAG opens your bag (the I
---             window's BAG tab, client/BagUi.luau).
---   BOARD     the Dispatch board (client/DispatchUi.luau, Phone.onBoard). Its badge counts the new runs the server
---             pushed while the board was closed.
---   CAREER    the career app: rank, level, XP, the next goal in work ("about 8 on-foot runs", client/CareerUi.luau),
---             what it opens, the next levels of the road (shared/Career.luau), and FULL CAREER (C, Phone.onCareer).
---   SHOP      what to buy next with your money and level: the personal gear at Last Stop Supplies (Config.Kit,
---             client/KitShop.luau), 5.1: the bikes at Spoke & Chain (SET GPS), the Old Van from Earl at Earl's Used Wheels (Marge's
---             quest at level 4, Config.VanQuest; SET GPS to Earl, Map.VanSeller), the next vehicles at Dead End
---             Motors; each with what is missing ($ to go, the level), SET GPS to the shop (MapView.setWaypoint).
---   MAP       the big map (MapView.toggle).
---   MESSAGES  Marge's tips for your level (the backpack, the bike shop, the Old Van, the car tiers: all from Config),
---             the dispatcher's new runs, your level-ups, and the texts the server sends (the Tutorial remote's
---             "message": Marge about Earl's van, server/VanQuest.luau; with `gps` it sets the GPS there). New ones put
---             a red dot on the PHONE action.
--- 5.1: the courier ID has the quick switch when you own a bike: 🚲 MY BIKE (the "Equip" remote's "ride": your bike
--- comes at once) and, with a car of your own too, 🚐 CALL CAR ("drive": back to your car, the chauffeur brings it).
--- 5.4: with your own car's tank empty (its Tank / Fuel attributes, server/Fuel.luau) the courier ID shows ⛽ TOW $150
--- (Config.Fuel.TowPrice; the "Fuel" remote's "tow": the server checks the tank and the money again and the tow brings the
--- car to the nearest gas station's pump with a little fuel in it).
--- 5.4, a professional phone: every app sits under a 48 px header (a round back button "‹", the app's name centred) and
--- scrolls; its cards are rounded (8 px) with an inner body, the one that matters carries a 3 px red accent on its left
--- (outside the layout); one type and spacing scale and a small kit (section labels, chips, two-sided rows, the empty
--- state, the stops' stepper, pills: `look`, shared with client/OrdersUi.luau). ORDERS leads with the focused order's
--- hero card; MESSAGES is a chat list (round avatars, a red dot while unread).
--- The MENU and every key stay as they were (J, C, M ...); the phone is one more way in. Opening it closes the other
--- windows (Phone.onOpen, Main: Hud.closeWindows); ESC, O, the PHONE action or the home bar (on the home screen)
--- close it. While it is open the mouse is free (Main: CameraRig.mouseNeeded asks Phone.isOpen).
--- The NEW PHONE moment: on the Tutorial remote's "phone" (or the state's phone turning true while you play): a toast,
--- Marge's first message, and the phone pops up once, after her dialog is closed (Phone.blocked, set by Main).
--- Presentation only: the server decides everything (the remotes it opens are the ones the other windows use).
+-- Approved courier phone UI: charcoal rectangular surfaces, white glyphs, red accents (design/phone-ui/).
+-- Q / gamepad down opens it after Marge gives it. The same server-authoritative orders, messages, board,
+-- career, shopping GPS, bike/car switch, tow and PhoneHold lifecycle remain in use. Home shows the live focused
+-- contract and eight apps; ORDERS adds a discovered-only road preview. BANK displays existing cash (no banking
+-- transactions); SETTINGS uses the existing sound cycle. Both screens scroll; short viewports use a shorter
+-- device and wide touch displays turn it sideways. Hardware alone has modest corner rounding.
+-- PhoneContract draws art, PhoneLayout computes sizing/payload text, PhoneRoute draws the actual route.
+-- No new gameplay remotes, currencies or prices. Phone does not change character joints.
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -55,7 +19,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Career = require(Shared.Career)
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
-local Icons = require(Shared.Icons)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
@@ -82,8 +45,6 @@ Phone.notify = nil :: ((string) -> ())? -- a toast (Hud.toast)
 local player = Players.LocalPlayer
 local KEY = Enum.KeyCode.Q -- 5.4.1 (was O; the weapon wheel moved to T)
 local PAD_KEY = Enum.KeyCode.DPadDown
-local PORTRAIT = Vector2.new(300, 580) -- the body at scale 1, held upright
-local LANDSCAPE = Vector2.new(600, 300) -- turned sideways (a short touch screen)
 local BEZEL = 9
 local SLIDE = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local SLIDE_OUT = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -107,12 +68,17 @@ local APPS: { AppDef } = {
 	{ id = "shop", name = "Shop", glyph = "🛒" },
 	{ id = "map", name = "Map", glyph = "🗺️" },
 	{ id = "messages", name = "Messages", glyph = "💬" },
+	{ id = "bank", name = "Bank", glyph = "$" },
+	{ id = "settings", name = "Settings", glyph = "⚙" },
 }
 
 local state: any = nil
 local job: any = nil
 local gui: ScreenGui? = nil
 local refs: { [string]: any } = {} -- the instances (one table: few locals)
+refs.design = require(script.Parent.PhoneContract)
+refs.layout = require(script.Parent.PhoneLayout)
+refs.routes = require(script.Parent.PhoneRoute)
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 local isOpen = false
 local app = "home"
@@ -295,9 +261,8 @@ local function click()
 	end
 end
 
--- A card of the app's list: 8 px corners, the row surface, a faint line, and an inner Body that grows with its children
--- (the vertical list and the padding live there, so nothing else is laid out as a row). `selected`: a 3 px red accent
--- on the left, outside the layout and rounded with the card's corner. Returns the Body (callers add to it).
+-- A square contract surface with a fine outline; the automatic inner Body owns the layout.
+-- Selected contracts carry a narrow red left rule. Returns the Body.
 local function block(parent: Instance, order: number, selected: boolean?): any
 	local card = Ui.make("Frame", {
 		Name = "Card",
@@ -307,16 +272,12 @@ local function block(parent: Instance, order: number, selected: boolean?): any
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Ui.corner(card, 8)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = if selected then 0.7 else 0.82 }, card)
 	local body = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, card)
 	Ui.list(body, true, 4)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, if selected then 15 else 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, body)
 	if selected then
-		-- (the left 3 px of a rounded red face: its curve follows the card's corner)
-		local accent = Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 3, 1, 0), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 2 }, card)
-		local face = Ui.make("Frame", { Size = UDim2.new(0, 16, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 2 }, accent)
-		Ui.corner(face, 8)
+		Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 2 }, card)
 	end
 	return body
 end
@@ -331,22 +292,24 @@ local function bar(parent: Instance, share: number, color: Color3, order: number
 	fill.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
 end
 
--- 5.4: a phone button's 8 px corners (P.button's red hover edge kept inside the curve).
-local function rounded(made: any): any
-	Ui.corner(made, 8)
+-- Keep the hover marker inside a square phone button.
+local function squareButton(made: any): any
 	local edge = made:FindFirstChild("Edge")
 	if edge and edge:IsA("GuiObject") then
-		edge.Size = UDim2.new(0, 2, 1, -16)
-		edge.Position = UDim2.new(0, -10, 0, 8)
+		edge.Size = UDim2.new(0, 2, 1, 0)
+		edge.Position = UDim2.fromOffset(0, 0)
 	end
 	return made
 end
 
 -- A window action inside the phone (P.button), full width.
 local function button(parent: Instance, label: string, kind: P.ButtonKind, order: number, onClick: () -> ()): any
-	local made = rounded(P.button(parent, label, UDim2.new(1, 0, 0, 44), kind, onClick))
+	local made = squareButton(P.button(parent, label, UDim2.new(1, 0, 0, 54), kind, onClick))
 	made.LayoutOrder = order
 	made.TextSize = 13
+	if kind == "main" then
+		refs.design.primary(made)
+	end
 	return made
 end
 
@@ -393,7 +356,6 @@ do
 			TextWrapped = false,
 			TextXAlignment = Enum.TextXAlignment.Center,
 		})
-		Ui.corner(made, 11)
 		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = tint, Thickness = 1, Transparency = 0.72 }, made)
 		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, made)
 		return made
@@ -436,7 +398,6 @@ do
 		Ui.list(box, true, 8, Enum.HorizontalAlignment.Center)
 		Ui.make("UIPadding", { PaddingTop = UDim.new(0, 24), PaddingBottom = UDim.new(0, 16) }, box)
 		local circle = Ui.make("Frame", { Size = UDim2.fromOffset(64, 64), BackgroundColor3 = K.row, BorderSizePixel = 0, LayoutOrder = 1 }, box)
-		Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, circle)
 		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, circle)
 		text(circle, glyph, UDim2.fromScale(1, 1), { TextSize = 30, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
 		text(box, title, UDim2.new(1, -24, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17, TextXAlignment = Enum.TextXAlignment.Center })
@@ -480,7 +441,7 @@ do
 	local function pill(parent: Instance, value: string, onClick: () -> (), accent: boolean?): any
 		local hit = Ui.make("TextButton", {
 			Name = "Pill",
-			Size = UDim2.fromOffset(0, 36), -- (the touch target; the face inside is 24 px)
+			Size = UDim2.fromOffset(0, 54), -- at least 44 physical px on a 320 px touch screen
 			AutomaticSize = Enum.AutomaticSize.X,
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, 0, 0.5, 0),
@@ -489,6 +450,9 @@ do
 			Text = "",
 			ZIndex = 3,
 		}, parent)
+		if parent:IsA("GuiObject") and parent.Name == "Head" then
+			parent.Size = UDim2.new(parent.Size.X.Scale, parent.Size.X.Offset, 0, 54)
+		end
 		local tint = if accent then K.red else K.line
 		local face = Ui.label(hit, string.upper(value), UDim2.fromOffset(0, 24), {
 			AutomaticSize = Enum.AutomaticSize.X,
@@ -503,7 +467,6 @@ do
 			TextXAlignment = Enum.TextXAlignment.Center,
 			ZIndex = 3,
 		})
-		Ui.corner(face, 12)
 		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = tint, Thickness = 1, Transparency = if accent then 0.35 else 0.6 }, face)
 		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, face)
 		local function lit(on: boolean)
@@ -604,30 +567,34 @@ local function ordersApp(list: Instance)
 	if #orders > 1 and focused then
 		OrdersUi.pinPill(head, focused, look)
 	end
-	text(b, `{job.cargo or "Cargo"} → {job.customer or "the customer"}`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17 })
+	text(b, string.upper(tostring(job.stopLabel or job.customer or "ACTIVE DELIVERY")), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17 })
 	look.meta(b, `{job.address or "?"}{if job.district then `, {job.district}` else ""}`, 3)
+	refs.route = refs.spareRoute or refs.routes.create(b, if typeof(job.position) == "Vector3" then job.position else nil, 4, function() return isOpen and app == "orders" end)
+	refs.spareRoute = nil
+	refs.route.holder.Parent = b
+	refs.route.update()
 	-- The clock (ticked by the open loop) and the pay, their captions under them.
-	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 4 }, b)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 6) }, line)
+	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 5 }, b)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 7) }, line)
 	refs.timer = text(line, if type(job.endsAt) == "number" then Ui.clock(math.max(0, job.endsAt - workspace:GetServerTimeNow())) else "", UDim2.new(0.5, 0, 1, 0), { Font = Theme.HeadingFont, TextSize = 24, TextWrapped = false })
 	text(line, Ui.money(tonumber(job.pay) or 0), UDim2.new(0.5, 0, 1, 0), { Position = UDim2.fromScale(0.5, 0), Font = Theme.HeadingFont, TextSize = 22, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
-	local labels = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, LayoutOrder = 5 }, b)
+	local labels = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, LayoutOrder = 6 }, b)
 	P.caps(labels, "Time left", UDim2.fromScale(0.5, 1), { TextStrokeTransparency = 1, TextSize = 11 })
 	P.caps(labels, "Pay", UDim2.fromScale(0.5, 1), { Position = UDim2.fromScale(0.5, 0), TextStrokeTransparency = 1, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Right })
-	local gap = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 9), BackgroundTransparency = 1, LayoutOrder = 6 }, b)
-	P.rule(gap, UDim2.new(1, 0, 0, 1), { Position = UDim2.fromOffset(0, 4), BackgroundTransparency = 0.75 })
+	local gap = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 10), BackgroundTransparency = 1, LayoutOrder = 7 }, b)
+	P.rule(gap, UDim2.new(1, 0, 0, 1), { Position = UDim2.fromOffset(0, 5), BackgroundTransparency = 0.75 })
 	-- The stops: the focused order's own (the stepper), else "Stop 1 / 3"; then what to do now.
 	if focused and type(focused.stops) == "table" and #focused.stops > 0 then
-		look.stepper(b, focused.stops, 7)
+		look.stepper(b, focused.stops, 8)
 	else
-		caps(b, `Stop {tonumber(job.stopIndex) or 1} / {tonumber(job.stopCount) or 1} · {if job.stage == "pickup" then "pick up" else "deliver"}`, 7).TextSize = 11
+		caps(b, `Stop {tonumber(job.stopIndex) or 1} / {tonumber(job.stopCount) or 1} · {if job.stage == "pickup" then "pick up" else "deliver"}`, 8).TextSize = 11
 	end
 	if type(job.step) == "string" and job.step ~= "" then
-		text(b, job.step, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 8, TextSize = 14 })
+		text(b, job.step, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 9, TextSize = 14 })
 	end
 	-- Chips: how it travels, what rides with you (5.0: the backpack; the PackCount attribute is live), the condition, the
 	-- cargo's rules.
-	local chips = look.chipRow(b, 9)
+	local chips = look.chipRow(b, 10)
 	look.chip(chips, if job.mode == "foot" then "🚶 On foot" elseif job.mode == "bike" then "🚲 By bike" else string.rep("★", math.max(1, tonumber(job.stars) or 1)))
 	local packRoom = tonumber(job.packRoom) or tonumber(player:GetAttribute("PackRoom")) or 0
 	if (job.mode == "foot" or job.mode == "bike") and packRoom > 0 then
@@ -649,34 +616,25 @@ local function ordersApp(list: Instance)
 	local total = tonumber(job.total) or 0
 	if total > 0 then
 		local done = tonumber(job.deliveredTotal) or 0
-		local _, left = look.row2(b, `{done} / {total} {if total == 1 then (job.piece or "piece") else (job.pieces or "pieces")} delivered`, if (tonumber(job.lost) or 0) > 0 then `{job.lost} lost` else "", 10)
+		local _, left = look.row2(b, `{done} / {total} {if total == 1 then (job.piece or "piece") else (job.pieces or "pieces")} delivered`, if (tonumber(job.lost) or 0) > 0 then `{job.lost} lost` else "", 11)
 		left.TextSize = 12
 		left.TextColor3 = K.secondary
-		bar(b, done / total, K.text, 11)
+		bar(b, done / total, K.text, 12)
 	end
 	-- 5.2: the other orders of the run (their stops, clocks, pay, PIN), then the actions.
 	local n = OrdersUi.render(list, job, look, 2)
-	local actions = Ui.make("Frame", { Name = "Actions", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = n }, list)
-	Ui.list(actions, false, 8)
-	local map = P.button(actions, "SHOW ON MAP", UDim2.new(0.5, -4, 1, 0), "quiet", function()
+	local map = button(list, "SHOW ROUTE", "main", n, function()
 		Phone.close()
-		if not MapView.isOpen() then
-			MapView.toggle()
-		end
+		if not MapView.isOpen() then MapView.toggle() end
 	end)
-	map.LayoutOrder = 1
-	map.TextSize = 12
-	rounded(map)
-	-- 5.3: the bag (client/BagUi.luau: every piece you carry and where; the I window's BAG tab).
+	map.Name = "ShowRoute"
+	-- Preserve the full bag and stack actions beneath the route button.
 	local carried = bag.line(job)
-	local pack = P.button(actions, `🎒 BAG\n<font size="10" color="{P.hex(K.secondary)}">{if carried then rich(string.sub(carried, 6)) else "EMPTY"}</font>`, UDim2.new(0.5, -4, 1, 0), "quiet", openBag)
-	pack.LayoutOrder = 2
-	pack.TextSize = 12
+	local pack = button(list, `BAG · {if carried then rich(string.sub(carried, 6)) else "EMPTY"}`, "quiet", n + 1, openBag)
 	pack.RichText = true
 	pack.TextTruncate = Enum.TextTruncate.AtEnd
-	rounded(pack)
 	local stack = job.stack
-	button(list, if type(stack) == "table" and stack.can == true then "OPEN BOARD · + ADD ORDER" else "OPEN BOARD", "quiet", n + 1, openBoard)
+	button(list, if type(stack) == "table" and stack.can == true then "OPEN BOARD · + ADD ORDER" else "OPEN BOARD", "quiet", n + 2, openBoard)
 end
 
 local function careerApp(list: Instance)
@@ -897,7 +855,6 @@ local function messagesApp(list: Instance)
 			TextColor3 = if message.kind == "level" then K.charcoal else K.text,
 			TextXAlignment = Enum.TextXAlignment.Center,
 		})
-		Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, avatar)
 		if message.kind ~= "marge" and message.kind ~= "level" then
 			Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, avatar)
 		end
@@ -944,7 +901,7 @@ local function launch(id: string)
 	end
 end
 
--- An app tile: a raised charcoal square with the glyph, its name under it, a red badge.
+-- A square outline with a white glyph, a label and a red unread/count badge.
 local function tile(parent: Instance, def: AppDef, order: number): any
 	local cell = Ui.make("TextButton", {
 		Name = `{def.id}App`,
@@ -961,17 +918,9 @@ local function tile(parent: Instance, def: AppDef, order: number): any
 		BackgroundColor3 = TILE,
 		BorderSizePixel = 0,
 	}, cell)
-	Ui.corner(face, 14)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, face)
-	-- (the app's icon, art/icons/app_*, once uploaded: shared/Icons.luau; the emoji until then)
-	Ui.icon(face, Icons.app(def.id), def.glyph, UDim2.fromOffset(34, 34), {
-		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		TextSize = 26,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Font = Theme.Font,
-		ImageColor3 = K.text,
-	})
+	-- (uploaded shared/Icons app art, otherwise native monochrome line glyphs)
+	refs.design.glyph(face, def.id, 30)
 	local name = P.caps(cell, def.name, UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 66), TextXAlignment = Enum.TextXAlignment.Center, TextStrokeTransparency = 1, TextSize = 11 })
 	local underline = Ui.make("Frame", { Size = UDim2.new(0, 22, 0, 1), Position = UDim2.new(0.5, -11, 0, 84), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
 	P.hover(cell :: any, underline, name)
@@ -1000,7 +949,6 @@ local function tile(parent: Instance, def: AppDef, order: number): any
 		Visible = false,
 		ZIndex = 3,
 	})
-	Ui.corner(badge, 9)
 	tiles[def.id] = badge
 	cell.Activated:Connect(function()
 		launch(def.id)
@@ -1036,18 +984,15 @@ local function statusBar(screen: Instance, height: number)
 	Ui.make("Frame", { Size = UDim2.fromOffset(2, 4), Position = UDim2.new(1, 2, 0.5, -2), BackgroundColor3 = K.text, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 4 }, battery)
 end
 
--- The home screen's widgets: the clock and the shift, your courier ID, the newest message.
+-- Home: depot brand, courier ID, focused contract and newest unread message.
 local function homeWidgets(parent: Instance)
-	refs.bigClock = text(parent, clockText(), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Font = Theme.DisplayFont, TextSize = if landscape then 36 else 46, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = false })
-	refs.shift = P.caps(parent, shiftText(), UDim2.new(1, 0, 0, 14), { LayoutOrder = 2, TextXAlignment = Enum.TextXAlignment.Center, TextStrokeTransparency = 1, TextSize = 11 })
+	local brand = refs.design.brand(parent, 1)
+	refs.shift = P.caps(brand, shiftText(), UDim2.new(1, -24, 0, 14), { Position = UDim2.fromOffset(12, 70), TextStrokeTransparency = 1, TextSize = 10 })
 	-- The courier ID.
-	local card = block(parent, 3)
-	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, LayoutOrder = 1 }, card)
-	P.marker(head, 6, { Position = UDim2.fromOffset(0, 4) })
-	P.caps(head, "Courier · Dead End Dispatch", UDim2.new(1, -12, 1, 0), { Position = UDim2.fromOffset(12, 0), TextStrokeTransparency = 1, TextSize = 10 })
+	local card = block(parent, 2)
 	local nameRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 2 }, card)
 	text(nameRow, player.DisplayName, UDim2.new(1, -84, 1, 0), { Font = Theme.HeadingFont, TextSize = 16, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-	refs.idMoney = text(nameRow, "", UDim2.fromOffset(84, 22), { Position = UDim2.new(1, 0, 0, 0), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = K.good, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
+	refs.idMoney = text(nameRow, "", UDim2.fromOffset(84, 22), { Position = UDim2.new(1, 0, 0, 0), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
 	refs.idRank = caps(card, "", 3, K.text)
 	local holder = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 6), BackgroundTransparency = 1, LayoutOrder = 4 }, card)
 	local back, fill = P.bar(holder, UDim2.new(1, 0, 0, 3), K.text)
@@ -1055,7 +1000,7 @@ local function homeWidgets(parent: Instance)
 	refs.idXp = fill
 	refs.idTransport = caps(card, "", 5)
 	-- 5.1: the quick switch (fillHome shows it when you own a bike): MY BIKE, and CALL CAR with a car of your own too.
-	local switch = Ui.make("Frame", { Name = "Switch", Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1, LayoutOrder = 6, Visible = false }, card)
+	local switch = Ui.make("Frame", { Name = "Switch", Size = UDim2.new(1, 0, 0, 54), BackgroundTransparency = 1, LayoutOrder = 6, Visible = false }, card)
 	Ui.list(switch, false, 6)
 	local function switchButton(label: string, order: number, how: string): any
 		local made = P.button(switch, label, UDim2.new(0.5, -3, 1, 0), "quiet", function()
@@ -1064,7 +1009,7 @@ local function homeWidgets(parent: Instance)
 		end)
 		made.LayoutOrder = order
 		made.TextSize = 12
-		rounded(made)
+		squareButton(made)
 		return made
 	end
 	refs.switch = switch
@@ -1086,6 +1031,9 @@ local function homeWidgets(parent: Instance)
 		end
 		return false
 	end
+	refs.homeContract = refs.design.card(parent, function()
+		launch(if job then "orders" else "board")
+	end, 3)
 	-- The newest unread message, like a notification (a tap opens MESSAGES).
 	local note = Ui.make("TextButton", {
 		Name = "Notification",
@@ -1096,10 +1044,9 @@ local function homeWidgets(parent: Instance)
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "",
-		LayoutOrder = 4,
+		LayoutOrder = 6,
 		Visible = false,
 	}, parent)
-	Ui.corner(note, 8)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.82 }, note)
 	Ui.list(note, true, 2)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 8) }, note)
@@ -1115,9 +1062,12 @@ end
 
 -- Fills the home widgets with the state right now.
 local function fillHome()
-	if not refs.bigClock then
+	if not refs.idMoney then
 		return
 	end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local pos = if root and root:IsA("BasePart") then root.Position else nil
+	refs.design.updateCard(refs.homeContract, refs.layout.summary(job, workspace:GetServerTimeNow(), if pos then pos.X else nil, if pos then pos.Z else nil))
 	local level = myLevel()
 	refs.idMoney.Text = Ui.money(money())
 	refs.idRank.Text = `{string.upper(Levels.rank(level))} · LEVEL {level}`
@@ -1141,7 +1091,7 @@ local function fillHome()
 			newest = message
 		end
 	end
-	refs.note.Visible = newest ~= nil and not landscape -- (sideways there is no room for it)
+	refs.note.Visible = newest ~= nil
 	if newest then
 		refs.noteFrom.Text = `💬 {string.upper(newest.from)} · {newest.time}`
 		refs.noteText.Text = newest.text
@@ -1151,25 +1101,26 @@ end
 -- The phone: its body, the screen, the status bar, the home screen and the app screen. Built again when it turns.
 local function buildBody(sideways: boolean)
 	local made = gui :: ScreenGui
+	refs.route = nil
+	refs.spareRoute = nil
 	if refs.body then
 		refs.body:Destroy()
 	end
 	table.clear(tiles)
-	refs.bigClock = nil
+	refs.idMoney = nil
 	landscape = sideways
-	local size = if sideways then LANDSCAPE else PORTRAIT
+	local size = refs.fit or refs.layout.fit(1150, 680, false, 1)
 	local body = Ui.make("Frame", {
 		Name = "Phone",
-		Size = UDim2.fromOffset(size.X, size.Y),
+		Size = UDim2.fromOffset(size.width, size.height),
 		BackgroundColor3 = BODY,
 		BorderSizePixel = 0,
 		Visible = false,
 		Active = true, -- (clicks on the phone do not reach the world)
 	}, made)
 	refs.body = body
-	Ui.corner(body, 34)
+	Ui.corner(body, 18)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = BODY_EDGE, Thickness = 1.5 }, body)
-	Ui.make("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 192, 196)) }, body)
 	refs.scale = Ui.make("UIScale", {}, body)
 	-- The side keys (power on the right, the volume on the left; on their long edges when sideways).
 	local keyColor = BODY_EDGE
@@ -1188,11 +1139,7 @@ local function buildBody(sideways: boolean)
 		BackgroundColor3 = SCREEN,
 		BorderSizePixel = 0,
 	}, body)
-	Ui.corner(screen, 26)
-	-- A faint sheen at the top of the screen (glass, not a glow).
-	local sheen = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 160), BackgroundColor3 = K.text, BackgroundTransparency = 0, BorderSizePixel = 0 }, screen)
-	Ui.corner(sheen, 26)
-	Ui.make("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.95), NumberSequenceKeypoint.new(1, 1) }) }, sheen)
+	Ui.corner(screen, 12)
 	local STATUS_H = if sideways then 24 else 30
 	statusBar(screen, STATUS_H)
 	-- The NEW PHONE ribbon (the moment Marge gives it).
@@ -1204,15 +1151,18 @@ local function buildBody(sideways: boolean)
 	-- The home bar at the bottom: home from an app; on the home screen it puts the phone away.
 	local homeBar = Ui.make("TextButton", {
 		Name = "HomeBar",
-		Size = UDim2.new(0, 140, 0, 22),
+		Size = UDim2.new(0, 196, 0, 54),
 		Position = UDim2.new(0.5, 0, 1, -2),
 		AnchorPoint = Vector2.new(0.5, 1),
 		BackgroundTransparency = 1,
 		AutoButtonColor = false,
-		Text = "",
+		Text = "CLOSE",
+		Font = Theme.HeadingFont,
+		TextSize = 12,
+		TextColor3 = K.secondary,
 		ZIndex = 5,
 	}, screen)
-	local pill = Ui.make("Frame", { Size = UDim2.fromOffset(104, 4), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = K.text, BackgroundTransparency = 0.25, BorderSizePixel = 0, ZIndex = 5 }, homeBar)
+	local pill = Ui.make("Frame", { Size = UDim2.fromOffset(104, 2), Position = UDim2.new(.5,0,1,-5), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = K.text, BackgroundTransparency = 0.25, BorderSizePixel = 0, ZIndex = 5 }, homeBar)
 	Ui.corner(pill, 2)
 	homeBar.MouseEnter:Connect(function()
 		pill.BackgroundTransparency = 0
@@ -1229,60 +1179,47 @@ local function buildBody(sideways: boolean)
 		end
 	end)
 	refs.homeBar = homeBar
-	local BOTTOM = 26
-	-- The home screen.
-	local home = Ui.make("Frame", { Name = "Home", Size = UDim2.new(1, -24, 1, -(STATUS_H + BOTTOM)), Position = UDim2.fromOffset(12, STATUS_H), BackgroundTransparency = 1 }, screen)
+	local BOTTOM = 56
+	-- Scrollable home: cards and launcher never overlap, even with transport/tow actions or long messages.
+	local home = Ui.make("ScrollingFrame", {
+		Name = "Home", Size = UDim2.new(1, -24, 1, -(STATUS_H + BOTTOM)), Position = UDim2.fromOffset(12, STATUS_H),
+		BackgroundTransparency = 1, BorderSizePixel = 0, ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 2, ScrollBarImageColor3 = K.line, AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(), ClipsDescendants = true,
+	}, screen)
 	refs.home = home
 	local widgets = Ui.make("Frame", {
-		Name = "Widgets",
-		Size = if sideways then UDim2.new(0.44, 0, 1, 0) else UDim2.new(1, 0, 0, 0),
-		AutomaticSize = if sideways then Enum.AutomaticSize.None else Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
+		Name = "Widgets", Size = UDim2.new(if sideways then .48 else 1, if sideways then -8 else -4, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	}, home)
 	Ui.list(widgets, true, 8)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, if sideways then 4 else 14) }, widgets)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 16) }, widgets)
 	homeWidgets(widgets)
 	local grid = Ui.make("Frame", {
-		Name = "Apps",
-		Size = if sideways then UDim2.new(0.56, -8, 1, -18) else UDim2.new(1, 0, 0, 190),
-		Position = if sideways then UDim2.new(0.44, 8, 0, 0) else UDim2.new(0, 0, 1, -20),
-		AnchorPoint = if sideways then Vector2.zero else Vector2.new(0, 1),
-		BackgroundTransparency = 1,
-	}, home)
-	-- How to put it away, under the apps (the home bar below does it on the home screen).
-	P.caps(home, if Ui.touchLayout() then "Tap the bar below to put it away" else "Q · ESC · the bar below put it away", UDim2.new(if sideways then 0.56 else 1, if sideways then -8 else 0, 0, 14), {
-		Position = UDim2.new(if sideways then 0.44 else 0, if sideways then 8 else 0, 1, -2),
-		AnchorPoint = Vector2.new(0, 1),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextStrokeTransparency = 1,
-		TextSize = 10,
-		TextColor3 = K.line,
-	})
+		Name = "Apps", Size = UDim2.new(if sideways then .52 else 1, if sideways then -8 else 0, 0, 192),
+		Position = if sideways then UDim2.new(.48, 8, 0, 6) else UDim2.new(),
+		BackgroundTransparency = 1, LayoutOrder = 5,
+	}, if sideways then home else widgets)
 	Ui.make("UIGridLayout", {
-		CellSize = UDim2.fromOffset(80, 88),
-		CellPadding = UDim2.fromOffset(if sideways then 6 else 4, 8),
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		SortOrder = Enum.SortOrder.LayoutOrder,
+		CellSize = UDim2.new(.25, -6, 0, 88), CellPadding = UDim2.fromOffset(8, 8), FillDirectionMaxCells = 4,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder,
 	}, grid)
 	for order, def in APPS do
 		local cell = tile(grid, def, order)
-		if order == 1 then
-			refs.firstTile = cell
-		end
+		if order == 1 then refs.firstTile = cell end
 	end
-	-- The app screen (5.4): a 48 px header (the round back button, the app's name centred), a hairline, and the
+	-- The app screen: a square back action, left-aligned title, hairline, and the
 	-- scrolling list under it (Y only, its canvas sized by the content, clear of the home bar at the bottom).
 	local appFrame = Ui.make("Frame", { Name = "App", Size = UDim2.new(1, 0, 1, -(STATUS_H + BOTTOM)), Position = UDim2.fromOffset(0, STATUS_H), BackgroundTransparency = 1, Visible = false }, screen)
 	refs.app = appFrame
-	local HEADER = 48
+	local HEADER = 58
 	local header = Ui.make("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, HEADER), BackgroundTransparency = 1 }, appFrame)
 	local back = Ui.make("TextButton", {
 		Name = "Back",
-		Size = UDim2.fromOffset(36, 36),
-		Position = UDim2.new(0, 12, 0.5, 0),
+		Size = UDim2.fromOffset(54, 54),
+		Position = UDim2.new(0, 4, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = TILE,
+		BackgroundColor3 = SCREEN,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "‹",
@@ -1291,7 +1228,6 @@ local function buildBody(sideways: boolean)
 		TextColor3 = K.text,
 		ZIndex = 2,
 	}, header)
-	Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, back)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, back)
 	Ui.make("UIPadding", { PaddingBottom = UDim.new(0, 3) }, back) -- (the chevron sits a little high in its line)
 	local function backLit(on: boolean)
@@ -1315,11 +1251,10 @@ local function buildBody(sideways: boolean)
 	end)
 	refs.back = back
 	refs.appTitle = P.text(header, "", UDim2.new(1, -120, 1, 0), {
-		Position = UDim2.fromScale(0.5, 0),
-		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromOffset(62, 0),
 		Font = Theme.HeadingFont,
 		TextSize = 17,
-		TextXAlignment = Enum.TextXAlignment.Center,
+		TextXAlignment = Enum.TextXAlignment.Left,
 		TextStrokeTransparency = 1,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
@@ -1346,19 +1281,32 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
-local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES" }
+local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS" }
 
 renderApp = function()
 	if not refs.body then
 		return
 	end
 	refs.timer = nil
+	local previousRoute = refs.route
+	refs.route = nil
+	if previousRoute then
+		if app == "orders" and job and previousRoute.destination == job.position then
+			-- Keep the road/fog instances when only cargo or the countdown changed in another Job payload.
+			previousRoute.holder.Parent = nil
+			refs.spareRoute = previousRoute
+		else
+			previousRoute.holder:Destroy()
+		end
+	end
 	OrdersUi.clear()
 	local home = app == "home"
 	refs.home.Visible = home
 	refs.app.Visible = not home
+	refs.homeBar.Text = if home then "CLOSE" else "HOME"
 	if home then
 		fillHome()
+		Ui.gamepadFocus(refs.firstTile)
 		return
 	end
 	refs.appTitle.Text = APP_TITLES[app] or string.upper(app)
@@ -1373,8 +1321,25 @@ renderApp = function()
 			shopApp(refs.list)
 		elseif app == "messages" then
 			messagesApp(refs.list)
+		elseif app == "bank" then
+			local balance = block(refs.list, 1)
+			caps(balance, "AVAILABLE CASH", 1)
+			text(balance, Ui.money(money()), UDim2.new(1, 0, 0, 44), { Font = Theme.DisplayFont, TextSize = 32, LayoutOrder = 2 })
+			look.meta(balance, "Your current courier balance. Earn money by completing deliveries.", 3)
+			button(refs.list, "FIND A DELIVERY", "main", 2, function() launch("board") end)
+		elseif app == "settings" then
+			local controls = block(refs.list, 1)
+			caps(controls, "PHONE CONTROLS", 1)
+			look.meta(controls, if Ui.touchLayout() then "Tap an app to open it. The back arrow returns home; the bottom bar puts the phone away." else "Q opens the phone. T opens the weapon wheel. Hold right mouse to turn the camera while using the phone.", 2)
+			look.meta(controls, "Sound cycles: everything on → music off → all off. The selected mode is shown in the game's notification.", 3)
+			button(refs.list, "CYCLE SOUND MODE", "quiet", 2, function() require(script.Parent.Sounds).cycle() end)
+			button(refs.list, "PUT PHONE AWAY", "main", 3, Phone.close)
 		end
 	end)
+	if refs.spareRoute then
+		refs.spareRoute.holder:Destroy()
+		refs.spareRoute = nil
+	end
 	if not ok then
 		warn(`[Phone] the {app} app failed: {err}`)
 	end
@@ -1436,16 +1401,9 @@ end
 -- The phone's scale and shape for this screen: upright when it is readable so, else sideways (a short touch screen).
 local function fit(): (boolean, number)
 	local screen = Ui.screenSize()
-	local cap = if Ui.touchLayout() then 1 else math.clamp(Ui.screenScale() * 0.88, 0.7, 1)
-	local upright = math.min(cap, (screen.Y - 48) / PORTRAIT.Y, (screen.X - 32) / PORTRAIT.X)
-	if upright >= 0.72 then
-		return false, upright
-	end
-	local sideways = math.min(cap, (screen.Y - 20) / LANDSCAPE.Y, (screen.X - 24) / LANDSCAPE.X)
-	if sideways > upright then
-		return true, sideways
-	end
-	return false, upright
+	local cap = if Ui.touchLayout() then 1 else math.clamp(Ui.screenScale() * 0.95, 0.85, 1)
+	refs.fit = refs.layout.fit(screen.X, screen.Y, Ui.touchLayout(), cap)
+	return refs.fit.sideways, refs.fit.scale
 end
 
 -- Where the phone rests (and where it slides from).
@@ -1482,10 +1440,8 @@ local function startTicker()
 			if refs.statusTime then
 				refs.statusTime.Text = now
 			end
-			if refs.bigClock then
-				refs.bigClock.Text = now
-				refs.shift.Text = shiftText()
-			end
+			if refs.shift then refs.shift.Text = shiftText() end
+			if app == "home" then fillHome() end
 			local timer = refs.timer
 			if timer and job and type(job.endsAt) == "number" then
 				local left = job.endsAt - workspace:GetServerTimeNow()
@@ -1494,8 +1450,9 @@ local function startTicker()
 			end
 			if app == "orders" then
 				OrdersUi.tick() -- 5.2: every order's clock
+				if refs.route then refs.route.update() end
 			end
-			if refs.tow and refs.bigClock then
+			if refs.tow and refs.idMoney then
 				refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
 			end
 			task.wait(0.5)
@@ -1575,6 +1532,7 @@ openPhone = function(startApp: string?)
 	if landscape ~= sideways or not refs.body then
 		buildBody(sideways)
 	end
+	refs.body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
 	refs.scale.Scale = scale
 	local body = refs.body
 	body.AnchorPoint = if landscape then Vector2.new(0.5, 1) else Vector2.new(1, 1)
@@ -1715,7 +1673,7 @@ local function phoneMoment()
 	addMessage("Marge", "That's my old phone. It's yours now: ORDERS shows your run, BOARD the work, CAREER your road, SHOP what to save up for. Don't lose it.", "marge", true)
 	local notify = Phone.notify
 	if notify then
-		notify(if Ui.touchLayout() then "📱 NEW PHONE · Marge gave you her old phone · tap PHONE" else "📱 NEW PHONE · Marge gave you her old phone · O opens it")
+		notify(if Ui.touchLayout() then "📱 NEW PHONE · Marge gave you her old phone · tap PHONE" else "📱 NEW PHONE · Marge gave you her old phone · Q opens it")
 	end
 	-- It pops up once, when nothing covers the middle any more (her dialog, a result) and the state says it is yours.
 	task.spawn(function()
@@ -1763,7 +1721,7 @@ function Phone.setState(newState: any)
 	if isOpen then
 		if app == "home" then
 			fillHome()
-		elseif app == "shop" or app == "career" then
+		elseif app == "shop" or app == "career" or app == "bank" then
 			renderApp()
 		end
 	end
@@ -1894,6 +1852,7 @@ function Phone.start()
 						Phone.open(current)
 					end)
 				elseif refs.scale then
+					refs.body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
 					refs.scale.Scale = scale
 				end
 			end)
