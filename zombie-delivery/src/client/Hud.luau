@@ -362,6 +362,9 @@ function Hud.toast(text: string)
 	local shown: { any } = {}
 	for _, child in toasts:GetChildren() do
 		if child:GetAttribute("Toast") == true and child:GetAttribute("Leaving") ~= true then
+			if child:GetAttribute("Text") == text then
+				return -- 4.5.1: these words are on screen already (a repeated notice): no second strip fading in
+			end
 			table.insert(shown, child)
 		end
 	end
@@ -383,6 +386,7 @@ function Hud.toast(text: string)
 		LayoutOrder = toastOrder,
 	}, toasts)
 	strip:SetAttribute("Toast", true)
+	strip:SetAttribute("Text", text)
 	-- (the padding moves the children: the rule goes back out to the edge)
 	Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 2, 1, 14), Position = UDim2.fromOffset(-14, -7), BackgroundColor3 = P.ink, BorderSizePixel = 0 }, strip)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7) }, strip)
@@ -3438,11 +3442,19 @@ layout = function()
 	end
 
 	-- The column's real height (unscaled): the contract with the toasts, the banners and the hints under it.
+	-- 4.5.1: with hysteresis. The height is measured through the scale this sets (text heights round to whole pixels,
+	-- a wrapped line can flip), so a fresh measurement each time made scale → height → scale chase each other: the
+	-- column (the contract, Marge's hint) resized every frame, a flicker. It now follows a real change only: taller by
+	-- more than a few px (smaller now), or shorter by more than a toast or two (bigger again).
 	local stackScale = topStack:FindFirstChild("LayoutScale")
-	local tall = TOP_EST_H
+	local tall = view.topTall or TOP_EST_H
 	if stackScale and stackScale:IsA("UIScale") and stackScale.Scale > 0.01 then
-		tall = math.max(TOP_EST_H, topStack.AbsoluteSize.Y / stackScale.Scale)
+		local measured = math.max(TOP_EST_H, topStack.AbsoluteSize.Y / stackScale.Scale)
+		if view.topTall == nil or measured > tall + 10 or measured < tall - 56 then
+			tall = measured
+		end
 	end
+	view.topTall = tall
 	-- The contract column: as big as the span (from x0 to x1 at y) and the room under it allow.
 	local function fit(y: number, x0: number, x1: number): (number, number)
 		local span = x1 - x0
