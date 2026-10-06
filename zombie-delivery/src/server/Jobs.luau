@@ -412,27 +412,52 @@ end
 
 -- Where the vehicle parks, where the cargo and the person are, which way they face. A far place has its cargo spot
 -- (Map.CargoSpots); an ordinary address parks on the road and the pile is on the sidewalk toward the building.
+-- 4.3: on the real ground, not the flat road level: a raised lot or a yard over the road level put the circle, the
+-- pile, the person and the HUD's waypoint under the ground. It looks down from 8 studs over `near` (the road level),
+-- so a canopy, a bay roof or a sign over the spot is never taken for the ground.
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Exclude
+groundParams.RespectCanCollide = true
+local function onGround(x: number, z: number, near: number?): Vector3
+	local base = near or World.RoadTop
+	local skip: { Instance } = {}
+	for _, name in { "Cars", "Zombies", "Npcs", "Animals", "Effects", "Loot", "Showroom", "Equipment", "Cargo" } do
+		local child = workspace:FindFirstChild(name)
+		if child then
+			table.insert(skip, child)
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(skip, player.Character)
+		end
+	end
+	groundParams.FilterDescendantsInstances = skip
+	local hit = workspace:Raycast(Vector3.new(x, base + 8, z), Vector3.new(0, -20, 0), groundParams)
+	return Vector3.new(x, if hit and hit.Normal.Y > 0.6 then hit.Position.Y else base, z)
+end
+
 local function geometry(address: Map.Address): (Vector3, Vector3, Vector3)
 	local spots = (Map :: any).CargoSpots :: { [string]: CargoSpot }?
 	local id = placeIdOf(address)
 	local spot = if id and spots then spots[id] else nil
-	local top = World.RoadTop
 	if spot then
-		local park = Vector3.new(spot.park.x, top, spot.park.z)
-		local pile = Vector3.new(spot.pile.x, top, spot.pile.z)
+		local park = onGround(spot.park.x, spot.park.z)
+		local pile = onGround(spot.pile.x, spot.pile.z, park.Y)
 		local facing = Vector3.new(spot.facing.x, 0, spot.facing.z)
 		if facing.Magnitude < 0.1 then
 			facing = Vector3.new(park.X - pile.X, 0, park.Z - pile.Z)
 		end
 		return park, pile, if facing.Magnitude > 0.1 then facing.Unit else Vector3.new(0, 0, -1)
 	end
-	local park = Vector3.new(address.x, top, address.z)
+	local park = onGround(address.x, address.z)
 	local outward = Vector3.new(address.nx, 0, address.nz)
 	if outward.Magnitude < 0.5 then
 		outward = Vector3.new(0, 0, -1) -- an open yard: the pile is beside the circle
 	end
 	outward = outward.Unit
-	return park, park - outward * Tuning.PileOffset, outward
+	local pile = park - outward * Tuning.PileOffset
+	return park, onGround(pile.X, pile.Z, park.Y), outward
 end
 
 -- "Rocco, the dock foreman" → Rocco, title "Dock foreman".

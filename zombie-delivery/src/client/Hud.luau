@@ -2654,9 +2654,56 @@ local function paintGuide(color: Color3)
 	view.markSquare.BackgroundColor3 = color
 end
 
+-- 4.3: a spot on the real surface. A spot below it (a raised lot, a ramp, a yard over the road level) comes up onto it,
+-- so the circle and the waypoint never sit in the ground; a spot on the ground stays. Two spots are remembered (the
+-- circle and the person), so it casts only when one moves.
+local snapParams = RaycastParams.new()
+snapParams.FilterType = Enum.RaycastFilterType.Exclude
+snapParams.RespectCanCollide = true
+local snaps: { { from: Vector3, to: Vector3 } } = {}
+local function onSurface(spot: Vector3): Vector3
+	for _, s in snaps do
+		if s.from == spot then
+			return s.to
+		end
+	end
+	local skip: { Instance } = { guide }
+	for _, name in { "Cars", "Npcs", "Zombies", "Animals", "Loot", "Equipment", "Effects" } do
+		local child = workspace:FindFirstChild(name)
+		if child then
+			table.insert(skip, child)
+		end
+	end
+	if player.Character then
+		table.insert(skip, player.Character)
+	end
+	snapParams.FilterDescendantsInstances = skip
+	local to = spot
+	-- Just over the spot: the floor under it (a little higher than the spot when it is a little buried).
+	local near = workspace:Raycast(spot + Vector3.new(0, 3, 0), Vector3.new(0, -5, 0), snapParams)
+	if near then
+		if near.Position.Y > spot.Y then
+			to = Vector3.new(spot.X, near.Position.Y, spot.Z)
+		end
+	else
+		-- Nothing right under it: deep in the ground (a ray starting inside a part does not hit it). Look from higher.
+		local top = workspace:Raycast(spot + Vector3.new(0, 40, 0), Vector3.new(0, -40, 0), snapParams)
+		if top and top.Position.Y > spot.Y and top.Position.Y < spot.Y + 12 then -- (not a roof over a gap)
+			to = Vector3.new(spot.X, top.Position.Y, spot.Z)
+		end
+	end
+	table.insert(snaps, 1, { from = spot, to = to })
+	snaps[3] = nil
+	return to
+end
+
 -- The park circle at p with the beam over it (or a thin beam over the pile / the person at `beamAt`), the label
 -- over `labelAt` (default p).
-function placeGuide(p: Vector3, color: Color3, beamAt: Vector3?, labelAt: Vector3?)
+function placeGuide(spot: Vector3, color: Color3, beamSpot: Vector3?, labelSpot: Vector3?)
+	local p = onSurface(spot)
+	local beamAt = if beamSpot then onSurface(beamSpot) else nil
+	-- (a label without a beam is over your vehicle's back: it moves with the car and needs no ground)
+	local labelAt = if labelSpot and beamSpot then (if labelSpot == beamSpot then beamAt else onSurface(labelSpot)) else labelSpot
 	paintGuide(color)
 	ring.CFrame = CFrame.new(p + Vector3.new(0, 0.15, 0)) * UPRIGHT
 	if beamAt then
