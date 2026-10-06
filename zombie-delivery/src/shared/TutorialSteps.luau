@@ -193,7 +193,7 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 			pages = {
 				`Delivered! Nice work, courier. There's ${reward} on top from me.`,
 				"Buy a backpack at Last Stop Supplies: you carry more on foot. Then save up for a bike: the bike shop opens at level 2.",
-				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Hold Q to pick a gun, and explore: the map fills in as you go.`,
+				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Hold T to pick a gun, and explore: the map fills in as you go.`,
 			},
 			primary = "GOT IT",
 		}
@@ -217,12 +217,12 @@ end
 
 -- 4.2, a touch screen (no keys): her words without the keys. "(E)" / "(J)" go (the prompts and the buttons are
 -- tapped), "Press J." goes (her board dialog opens the board itself), "G puts it down" names the PUT DOWN button and
--- "Hold Q to pick a gun" the weapon line (client/TutorialUi.luau asks on a touch layout only).
+-- "Hold T to pick a gun" the weapon line (client/TutorialUi.luau asks on a touch layout only).
 function TutorialSteps.forTouch(line: string): string
 	local out = string.gsub(line, "%s*%([EGJQUKHLMI]%)", "")
 	out = string.gsub(out, "%s*Press [A-Z]%.", "")
 	out = string.gsub(out, "G puts it down", "PUT DOWN sets it down")
-	out = string.gsub(out, "Hold Q to pick a gun", "Tap your gun's line to pick a gun")
+	out = string.gsub(out, "Hold T to pick a gun", "Tap your gun's line to pick a gun")
 	return out
 end
 

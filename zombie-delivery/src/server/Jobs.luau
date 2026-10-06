@@ -298,6 +298,7 @@ type Job = {
 	nextAmbush: number,
 	nextChase: number,
 	dirty: boolean, -- something changed, send it
+	badPayload: boolean?, -- 5.4.1: its payload failed once (warned; a short one goes instead)
 	stealNotice: number, -- when "they are stealing" was last said
 	stealMeter: number, -- a full one = a piece stolen
 	cargo: Cargo.Session,
@@ -723,9 +724,9 @@ local function payload(job: Job): { [string]: any }
 		eventLine = eventLine(job),
 		-- 5.0: "foot" | "car" (5.1: | "bike"); on foot what rides in your backpack (and its room)
 		mode = offer.mode,
-		pack = if status.foot then status.pack else nil,
-		packRoom = if status.foot then status.packRoom else nil,
-		rack = if status.foot and status.rack > 0 then status.rack else nil, -- 5.3: of packRoom, the bike's rack
+		pack = if status.foot then status.pack or 0 else nil,
+		packRoom = if status.foot then status.packRoom or 0 else nil,
+		rack = if status.foot and (status.rack or 0) > 0 then status.rack else nil, -- 5.3: of packRoom, the bike's rack
 		-- 5.2: every order, the HUD's "+2 ORDERS", what the board may add now, and every piece you carry
 		focus = order.id,
 		orders = ordersInfo(job, order),
@@ -737,10 +738,34 @@ end
 
 local function send(player: Player)
 	local job = jobs[player]
-	jobRemote:FireClient(player, if job then payload(job) else nil)
-	if job then
-		job.dirty = false
+	if not job then
+		jobRemote:FireClient(player, nil)
+		return
 	end
+	-- 5.4.1: a payload that fails never leaves the job unseen (the HUD OFF DUTY, the board refusing): a short one goes,
+	-- the error goes to the Output once per job.
+	local ok, data = pcall(payload, job)
+	if not ok then
+		if not job.badPayload then
+			job.badPayload = true
+			warn(`[Jobs] the job payload failed (a short one is sent): {data}`)
+		end
+		local offer = job.offer
+		local stop = offer.stops[job.stop]
+		data = {
+			stars = offer.tier,
+			cargo = offer.cargo,
+			customer = offer.customer,
+			pay = offer.pay,
+			endsAt = job.endsAt,
+			step = if stop then stop.label else nil,
+			stage = if stop then stop.kind else nil,
+			position = if stop then stop.park else nil,
+			mode = offer.mode,
+		}
+	end
+	jobRemote:FireClient(player, data)
+	job.dirty = false
 end
 
 -- ── Offers ─────────────────────────────────────────────────────────────────
@@ -3237,7 +3262,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			if weapon and done >= (employer.weaponAt or employer.needed) and not profile.weapons[weapon.id] then
 				PlayerData.giveWeapon(player, weapon.id)
 				unlockedWeapon = weapon.name
-				notice:FireClient(player, `{employer.person} gives you the {weapon.name}! Pick it on the weapon bar (Q).`)
+				notice:FireClient(player, `{employer.person} gives you the {weapon.name}! Pick it on the weapon bar (T).`)
 			end
 			employerInfo = {
 				name = employer.name,

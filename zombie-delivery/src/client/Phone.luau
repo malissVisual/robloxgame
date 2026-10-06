@@ -80,7 +80,7 @@ Phone.blocked = nil :: (() -> boolean)? -- the NEW PHONE pop-up waits while this
 Phone.notify = nil :: ((string) -> ())? -- a toast (Hud.toast)
 
 local player = Players.LocalPlayer
-local KEY = Enum.KeyCode.O
+local KEY = Enum.KeyCode.Q -- 5.4.1 (was O; the weapon wheel moved to T)
 local PAD_KEY = Enum.KeyCode.DPadDown
 local PORTRAIT = Vector2.new(300, 580) -- the body at scale 1, held upright
 local LANDSCAPE = Vector2.new(600, 300) -- turned sideways (a short touch screen)
@@ -1250,7 +1250,7 @@ local function buildBody(sideways: boolean)
 		BackgroundTransparency = 1,
 	}, home)
 	-- How to put it away, under the apps (the home bar below does it on the home screen).
-	P.caps(home, if Ui.touchLayout() then "Tap the bar below to put it away" else "O · ESC · the bar below put it away", UDim2.new(if sideways then 0.56 else 1, if sideways then -8 else 0, 0, 14), {
+	P.caps(home, if Ui.touchLayout() then "Tap the bar below to put it away" else "Q · ESC · the bar below put it away", UDim2.new(if sideways then 0.56 else 1, if sideways then -8 else 0, 0, 14), {
 		Position = UDim2.new(if sideways then 0.44 else 0, if sideways then 8 else 0, 1, -2),
 		AnchorPoint = Vector2.new(0, 1),
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -1536,8 +1536,32 @@ function Phone.close()
 	task.delay(0.2, placeButton)
 end
 
+local openPhone: (startApp: string?) -> ()
+
+-- 5.4.1: a phone that fails to open says why in the Output (it was a silent no-op) and is put away cleanly.
 function Phone.open(startApp: string?)
-	if not gui or not hasPhone() then
+	local ok, err = pcall(function()
+		openPhone(startApp)
+	end)
+	if not ok then
+		warn(`[Phone] it failed to open: {err}`)
+		isOpen = false
+		if refs.body then
+			refs.body.Visible = false
+		end
+	end
+end
+
+openPhone = function(startApp: string?)
+	if not gui then
+		warn("[Phone] not built yet")
+		return
+	end
+	if not hasPhone() then
+		local tell = Phone.notify
+		if tell then
+			tell("No phone yet: Marge by the job board gives you one.")
+		end
 		return
 	end
 	local hook = Phone.onOpen
@@ -1612,7 +1636,7 @@ local function buildButton(made: ScreenGui)
 	Ui.corner(glyph, 3)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.text, Thickness = 1.5 }, glyph)
 	Ui.make("Frame", { Size = UDim2.new(1, -6, 0, 1), Position = UDim2.new(0, 3, 1, -4), BackgroundColor3 = K.text, BorderSizePixel = 0 }, glyph)
-	local label = P.text(action, if touch then "PHONE" else "PHONE  [O]", UDim2.fromOffset(0, 44), {
+	local label = P.text(action, if touch then "PHONE" else "PHONE  [Q]", UDim2.fromOffset(0, 44), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.HeadingFont,
 		TextSize = 13,

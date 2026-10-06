@@ -290,7 +290,7 @@ local function refuse(driving: boolean)
 	local name = if def then def.name else "That gun"
 	Shooting.notify(if driving
 		then `{name}: too big to fire from a car. Pistol, revolver or SMG out of the window, or mount a car gun at Wrench Garage.`
-		else `{name}: too big to fire from a car. Switch to a pistol, revolver or SMG (Q) to shoot out of the window.`)
+		else `{name}: too big to fire from a car. Switch to a pistol, revolver or SMG (T) to shoot out of the window.`)
 end
 
 -- A zombie hanging on a car (server/Zombies.luau latch: the LatchedTo attribute): the part aimed at goes to the server
