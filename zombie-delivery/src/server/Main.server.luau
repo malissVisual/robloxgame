@@ -30,6 +30,7 @@ local Cargo = require(Server.Cargo)
 local Npcs = require(Server.Npcs)
 local Animals = require(Server.Animals)
 local Admin = require(Server.Admin)
+local Buddy = require(Server.Buddy)
 local DayNight = require(Server.DayNight)
 local Traffic = require(Server.Traffic)
 local Crew = require(Server.Crew)
@@ -205,6 +206,7 @@ safely("Repair", Repair.start) -- 3.4: the repair bays (no free repairs any more
 safely("Explore", Explore.start) -- 3.7: the map you discover
 safely("Tutorial", Tutorial.start) -- 3.7: the first-day tutorial
 safely("CloseCombat", CloseCombat.start) -- 3.9: the holster (B) and the melee (V)
+safely("Buddy", Buddy.start) -- 4.5: the admin's NPC companions
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
