@@ -1301,21 +1301,24 @@ end
 -- server, in the client and in the tests), so the builder (server/World.luau), the jobs and the client know the same
 -- buildings. A block has 2 x 2 lots (a: 0 west, 1 east; b: 0 north, 1 south), DowntownInset / SuburbInset in from its
 -- edge; every lot touches two streets (its outer sides).
---   Downtown  a storefront (Map.Venues), else 70 % a tower (about one in four of them an apartment building with a real
---             entrance on one of its streets: a home), 15 % a lawn with trees, 15 % a parking lot with a wreck. The
---             towers stand in the middle of their lot as before (the entrance on the wall facing the street).
+--   Downtown  a storefront (Map.Venues), else 70 % a tower, 15 % a lawn with trees, 15 % a parking lot with a wreck.
+--             5.5: every tower that can face one of its streets (a free park) is an apartment building with a real
+--             entrance there (a home: its residents in shared/Residents.luau); one with no free street stays a plain,
+--             doorless tower. The towers stand in the middle of their lot as before (the entrance on the street wall).
 --   Suburbs   a storefront, a house for sale (Map.EstatePlots: World's estate code builds it), else 85 % a house with
 --             its front door to one of its two streets (houses face all four ways), a short path to the sidewalk, a
 --             mailbox and its number, 15 % a burnt-out wreck.
 -- The special blocks have no lots (their own builders), the Harbor has none (warehouses and containers). No home or
 -- storefront faces a street where its park would be in the safe zone or within FreeRadius of a place, a cargo spot,
--- an employer's board or a storefront's park (the jobs there have their own spots).
+-- an employer's board, a storefront's park or (5.5) a gas station's pumps and bays (the jobs there have their own
+-- spots), nor (5.5) within ParkGap of another home's park.
 --
 -- Every home (Map.Homes) has the Map.CargoSpots shape: the door (the middle of the front wall), the pile just outside it
 -- (the receiver waits there, the pieces are set down there), the park on the road at the curb in front (pile 8 – 20
--- studs from park). An apartment building's home is one flat ("Apt 3B, 40 6th Ave"; `floors` says how many floors of
--- four flats, A – D, it has: Stream J may pick another flat behind the same door); a house's is its address
--- ("12 Willow Ln"). House numbers run along the street, odd on one side and even on the other.
+-- studs from park). 5.5: an apartment building's home is the building ("40 6th Ave"; `floors` says how many floors of
+-- four flats, A – D, it has: shared/Residents.luau puts people in them and a delivery names one, "Apt 4C, 40 6th
+-- Ave"); a house's is its address ("12 Willow Ln"). House numbers run along the street, odd on one side and even on
+-- the other.
 export type Lot = {
 	district: string,
 	i: number, -- the block
@@ -1338,7 +1341,7 @@ export type Lot = {
 export type Home = {
 	id: string,
 	kind: string, -- house | apartment
-	name: string, -- "12 Willow Ln" / "Apt 3B, 40 6th Ave"
+	name: string, -- "12 Willow Ln" / "40 6th Ave" (5.5: an apartment building's, not one flat's)
 	address: string, -- the building's: "12 Willow Ln" / "40 6th Ave"
 	street: string,
 	district: string,
@@ -1352,6 +1355,7 @@ export type Home = {
 }
 Map.HouseFront = 18 -- a Suburbs house's front wall: this far forward of its lot's middle (12 from the curb)
 Map.FreeRadius = 30
+Map.ParkGap = 12 -- 5.5: no two homes' parks closer than this (every tower facing a street: the parks fill up)
 
 -- Lays out every lot and home (fresh tables each call: the same every time; Map.AllLots / Map.Homes hold the one made
 -- when the module loads).
@@ -1417,11 +1421,29 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 				return false
 			end
 		end
+		-- 5.5: a gas station's pumps and bays (the cars that fill up park there), and the other homes' parks
+		for _, station in Map.GasStations do
+			for _, spot in station.pumps do
+				if near(spot.x, spot.z) then
+					return false
+				end
+			end
+			for _, bay in station.bays do
+				if near(bay.x, bay.z) then
+					return false
+				end
+			end
+		end
+		for _, home in homes do
+			if (x - home.park.x) ^ 2 + (z - home.park.z) ^ 2 < Map.ParkGap * Map.ParkGap then
+				return false
+			end
+		end
 		return true
 	end
 	-- A home behind a front wall `wall` studs out from the block's middle (cx, cz), facing (fx, fz), on the lot whose
 	-- middle is (lx, lz): the door, the pile `step` out, the park at the curb.
-	local function addHome(lot: Lot, d: District, kind: string, wall: number, step: number, unit: string?, floors: number?): Home
+	local function addHome(lot: Lot, d: District, kind: string, wall: number, step: number, floors: number?): Home
 		local cx, cz = d.ox + lot.i * CELL, d.oz + lot.j * CELL
 		local fx, fz = lot.facing.x, lot.facing.z
 		local doorX = if fx ~= 0 then cx + fx * wall else lot.x
@@ -1434,7 +1456,7 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 		local home: Home = {
 			id = `home_{d.id}_{lot.i}_{lot.j}_{lot.a}{lot.b}`,
 			kind = kind,
-			name = if unit then `Apt {unit}, {address}` else address,
+			name = address,
 			address = address,
 			street = street,
 			district = d.id,
@@ -1486,7 +1508,8 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 					for b = 0, 1 do
 						local lx, lz, size = Map.lotCentre(d.id, i, j, a, b)
 						-- every lot rolls the same dice, whatever it becomes (a change on one lot leaves the others)
-						local roll, pick, side, seed = rand(), rand(), rand(), math.floor(rand() * 1e6)
+						-- (5.5: the second die once chose which towers were apartments; still rolled, the others stay)
+						local roll, _, side, seed = rand(), rand(), rand(), math.floor(rand() * 1e6)
 						local w, dd, h = rand(), rand(), rand()
 						local lot: Lot = {
 							district = d.id,
@@ -1522,15 +1545,15 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 								lot.w = size - 2 - w * 7
 								lot.d = size - 2 - dd * 7
 								lot.h = 16 + h * 18 + 55 * centerFactor * ((seed % 1000) / 1000)
-								-- some towers are apartment buildings, more of them away from the middle
-								local facing = if pick < 0.12 + 0.2 * (1 - centerFactor) then pickFacing(d, lot, side < 0.5) else nil
+								-- 5.5: every tower that can face a street is an apartment building (its people:
+								-- shared/Residents.luau); one with no free street stays a plain tower
+								local facing = pickFacing(d, lot, side < 0.5)
 								if facing then
 									lot.kind = "apartment"
 									lot.facing = facing
 									local half = if facing.x ~= 0 then lot.w / 2 else lot.d / 2
 									local floors = math.clamp(math.floor((lot.h - 4) / 9), 2, 9)
-									local unit = `{1 + math.floor(((seed // 1000) % 100) / 100 * floors)}{string.char(65 + seed % 4)}`
-									addHome(lot, d, "apartment", math.abs(lot.x - (d.ox + i * CELL)) + half, 3, unit, floors)
+									addHome(lot, d, "apartment", math.abs(lot.x - (d.ox + i * CELL)) + half, 3, floors)
 								end
 							elseif roll < 0.85 then
 								lot.kind = "grass"

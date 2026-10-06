@@ -7,6 +7,10 @@
 -- spot). The drop is one of the business's `to` (Config.Jobs.Businesses): a home's door (Map.Homes: a Suburbs house, a
 -- downtown apartment entrance), another storefront (B2B: its own person takes it) or the Harbor. The hours and the
 -- evening peak of every business are here too, and the newspaper round's doors (Config.Jobs.Round).
+-- 5.5: every Downtown tower that faces a street is an apartment building, and a home's delivery goes to one of its
+-- residents (shared/Residents.luau): the person is the resident ("Jana Nováková", title "Apt 4C"), an apartment's
+-- address is the flat's ("Apt 4C, 40 6th Ave": the building's spot, door and park). A home weighs Residents.weight in
+-- the draw (its residents, capped: a tower comes up more often than a house); B2B and the Harbor keep their people.
 --
 --   Deliveries.inHours(range, hour)       is the game clock `hour` inside { from, to } (over midnight when from > to)?
 --   Deliveries.open(business, hour)       does the business send anything now (its `hours`)?
@@ -14,12 +18,17 @@
 --   Deliveries.street(venue)              the street its front faces ("Ash St")
 --   Deliveries.venueAddress(venue)        a Map.Address for the venue (its park; the same table every call)
 --   Deliveries.homeAddress(home)          … for a home (its park)
+--   Deliveries.flatAddress(home, flat)    5.5: … for a flat of an apartment building ("Apt 4C, 40 6th Ave"; its spot is
+--                                         the building's; the same table every call); a house's: its homeAddress
+--   Deliveries.residentTarget(home, resident)   5.5: the Target of a delivery to that resident (their flat, the person)
 --   Deliveries.spotOf(address)            the venue's / home's spot for one of those addresses (nil: an ordinary one)
 --   Deliveries.venueFor(business, x, z, reach, allow)   the business's storefront nearest to (x, z) within `reach`
 --                                         (manhattan to its park), nil without one; `allow` filters by its address
---   Deliveries.targets(business)          everywhere it delivers to (its `to`), each { address, person?, kind }
+--   Deliveries.targets(business)          everywhere it delivers to (its `to`), each { address, person?, kind, home? }
+--                                         (5.5: a home Residents.weight times, each a resident of it)
 --   Deliveries.dropFor(business, x, z, low, high, avoid, r, allow)   one target low … high (manhattan) from (x, z),
---                                         else the closest to that band (nil: the business has no `to`, or nothing)
+--                                         else the closest to that band (nil: the business has no `to`, or nothing);
+--                                         5.5: at a home, any of its residents by chance; never a home of `avoid`
 --   Deliveries.round(venue, reach, r, allow, budget)   a newspaper round: the doors (in walking order) on one or two
 --                                         streets near the print shop (each within `reach` of it, the route from it
 --                                         within `budget`) and the papers each takes ({ { home, papers } })
@@ -28,6 +37,7 @@
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
+local Residents = require(script.Parent.Residents)
 
 local Deliveries = {}
 
@@ -41,12 +51,13 @@ export type Spot = {
 	venue: Map.Venue?,
 	home: Map.Home?,
 }
-export type Target = { address: Map.Address, person: Config.PersonDef?, kind: string }
+export type Target = { address: Map.Address, person: Config.PersonDef?, kind: string, home: Map.Home? }
 export type Door = { home: Map.Home, papers: number }
 
 local spots: { [Map.Address]: Spot } = {}
 local venueAddresses: { [string]: Map.Address } = {}
 local homeAddresses: { [string]: Map.Address } = {}
+local flatAddresses: { [string]: Map.Address } = {}
 
 function Deliveries.inHours(range: { number }?, hour: number): boolean
 	if not range or #range < 2 then
@@ -155,6 +166,27 @@ function Deliveries.homeAddress(home: Map.Home): Map.Address
 	return address
 end
 
+function Deliveries.flatAddress(home: Map.Home, flat: string?): Map.Address
+	if not flat or home.kind ~= "apartment" then
+		return Deliveries.homeAddress(home)
+	end
+	local key = `{home.id}:{flat}`
+	local known = flatAddresses[key]
+	if known then
+		return known
+	end
+	local building = Deliveries.homeAddress(home)
+	local address: Map.Address = table.clone(building)
+	address.name = Residents.place(home, flat)
+	flatAddresses[key] = address
+	spots[address] = spots[building]
+	return address
+end
+
+function Deliveries.residentTarget(home: Map.Home, resident: Residents.Resident): Target
+	return { address = Deliveries.flatAddress(home, resident.flat), person = Residents.person(resident), kind = home.kind, home = home }
+end
+
 function Deliveries.spotOf(address: Map.Address): Spot?
 	return spots[address]
 end
@@ -193,8 +225,12 @@ function Deliveries.targets(business: Config.BusinessDef): { Target }
 		if kind == "house" or kind == "apartment" then
 			for _, home in Map.Homes do
 				if home.kind == kind then
-					local target: Target = { address = Deliveries.homeAddress(home), person = nil, kind = home.kind }
-					table.insert(out, target)
+					-- 5.5: a home as often as it has residents (capped), each entry one of them (spread over the flats)
+					local people = Residents.of(home)
+					local weight = Residents.weight(home)
+					for n = 1, weight do
+						table.insert(out, Deliveries.residentTarget(home, people[math.floor((n - 1) * #people / weight) + 1]))
+					end
 				end
 			end
 		elseif kind == "harbor" then
@@ -222,9 +258,17 @@ function Deliveries.dropFor(business: Config.BusinessDef, x: number, z: number, 
 	local fits: { Target } = {}
 	local closest: Target? = nil
 	local closestGap = math.huge
+	-- 5.5: a home to avoid is avoided whole (not another flat of the same building)
+	local avoidHomes: { [Map.Home]: boolean } = {}
+	for _, address in avoid do
+		local spot = spots[address]
+		if spot and spot.home then
+			avoidHomes[spot.home] = true
+		end
+	end
 	for _, target in Deliveries.targets(business) do
 		local address = target.address
-		if table.find(avoid, address) or (allow and not allow(address)) then
+		if table.find(avoid, address) or (target.home and avoidHomes[target.home]) or (allow and not allow(address)) then
 			continue
 		end
 		local d = Map.manhattan(x, z, address.x, address.z)
@@ -236,10 +280,13 @@ function Deliveries.dropFor(business: Config.BusinessDef, x: number, z: number, 
 			closest, closestGap = target, gap
 		end
 	end
-	if #fits > 0 then
-		return fits[math.clamp(math.floor(r() * #fits) + 1, 1, #fits)]
+	local chosen = if #fits > 0 then fits[math.clamp(math.floor(r() * #fits) + 1, 1, #fits)] else closest
+	local home = if chosen then chosen.home else nil
+	if home then
+		-- 5.5: anybody who lives there, not only the ones the draw's entries name
+		return Deliveries.residentTarget(home, Residents.pick(home, r))
 	end
-	return closest
+	return chosen
 end
 
 -- 5.3 review: is a storefront of a business that sends light runs (Config.Cargo.LightLooks) within `reach` (manhattan to

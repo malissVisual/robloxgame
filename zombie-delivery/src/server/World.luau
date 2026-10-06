@@ -37,8 +37,8 @@
 -- Zombie Delivery 5.1: Spoke & Chain Cycles, the bike shop on Downtown block (-1, 1) (Map.Shops.bikes; buildBikeShop:
 -- its counter prompt and World.BikeSlots, the display stands server/Shops.luau puts the bikes on).
 -- Zombie Delivery 5.3, the real places: the ordinary Downtown and Suburbs lots are built from Map.lots (the same lots
--- the jobs and the client know): the towers (some with an apartment entrance on their street), the storefronts of
--- Map.Venues (building() + a BuildingLooks Venue* look each + the name board), the Suburbs houses with their front door
+-- the jobs and the client know): the towers (5.5: an apartment entrance on every one that faces a street), the
+-- storefronts of Map.Venues (building() + a BuildingLooks Venue* look each + the name board), the Suburbs houses with their front door
 -- to their street, a path, a mailbox and the number (see "Venues and homes" below).
 -- Zombie Delivery 5.4, fuel: Codex's pumps at the old Gas Station and three new gas stations on the town's lots
 -- (Map.GasStations; see "Fuel: the pumps and the gas stations" below): their Refuel prompts (World.GasPumps) and the
@@ -5893,6 +5893,7 @@ function World.build()
 	piece("crosswalks and traffic lights", function()
 		buildCrossings(world)
 	end)
+	piece("bus stops", function() require(script.Parent.BusStops).build(world) end) -- 5.5: the city buses' shelters
 	piece("Sunset Hills", function()
 		buildSunsetHills(world)
 	end)

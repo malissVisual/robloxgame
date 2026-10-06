@@ -1704,6 +1704,9 @@ local function hook(name: string, cb: (() -> ())?)
 	end
 end
 local giveUpAt = 0 -- the first press of GIVE UP (a second one within 4 s gives the job up)
+-- 5.5: set by Main: MENU opens the phone's home once you have the phone (client/Phone.luau holds the MENU's actions as
+-- apps); true when it did. Before Marge gives the phone the list below opens as before.
+Hud.onMenu = nil :: (() -> boolean)?
 
 -- (type declared above)
 BUTTONS = {
@@ -1901,6 +1904,10 @@ more.Activated:Connect(function()
 	local click = Ui.onClick
 	if click then
 		click()
+	end
+	local phone = Hud.onMenu
+	if not menu.Visible and phone and phone() then
+		return -- 5.5: the phone is the MENU now
 	end
 	menu.Visible = not menu.Visible
 	Ui.gamepadFocus(if menu.Visible then hudButtons.jobs else more) -- 4.2, a gamepad: on to the first entry
@@ -2859,7 +2866,7 @@ Ui.make("Frame", { Name = "Dot", Size = UDim2.fromOffset(4, 4), Position = UDim2
 
 -- The waypoint's words: the name in caps over the distance.
 function view.mark(name: string, distance: number): string
-	return `{view.esc(string.upper(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
+	return `{view.esc(require(Shared.Residents).caps(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
 end
 HIDDEN = CFrame.new(0, -1000, 0)
 PICKUP_COLOR = P.red -- (a pick-up is the job's stop too; the waypoint says PICK UP)
@@ -3025,7 +3032,7 @@ function footTarget(): (Vector3?, string?, boolean)
 	if typeof(pile) ~= "Vector3" then
 		return nil, nil, false
 	end
-	local person = if type(job.person) == "string" and job.person ~= "" then job.person:upper() else (if pickup then "PICK UP" else "HAND IT OVER")
+	local person = if type(job.person) == "string" and job.person ~= "" then require(Shared.Residents).caps(job.person) else (if pickup then "PICK UP" else "HAND IT OVER")
 	return pile, person, false
 end
 end
@@ -3986,6 +3993,11 @@ function Hud.start()
 			MapView.toggle()
 		elseif key == Enum.KeyCode.ButtonY then
 			-- 4.2, a gamepad: Y opens MENU (every window is in it, MAP and CREW beside it) with the selection on JOBS.
+			-- 5.5: with the phone, Y opens the phone (the MENU's actions are its apps).
+			local phone = Hud.onMenu
+			if not view.menu.Visible and phone and phone() then
+				return
+			end
 			view.menu.Visible = not view.menu.Visible
 			if view.menu.Visible then
 				Ui.gamepadFocus(hudButtons.jobs)

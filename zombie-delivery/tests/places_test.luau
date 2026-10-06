@@ -2,8 +2,10 @@
 -- seeded), the storefronts (Map.Venues) and the homes (Map.Homes) stand on their own ordinary blocks, inside them, off
 -- the roads and off each other; every storefront's and home's door faces a road, the pile is just outside the door and
 -- the park on the road at the curb in front (8 – 20 studs apart, the Map.CargoSpots rule); enough homes of both kinds,
--- houses facing all four ways, apartments 40 – 60; every business a storefront names exists and every food business
--- has a storefront; the new storefronts are landmarks with their kind on the location tag.
+-- houses facing all four ways; 5.5: every Downtown tower that can face a street is an apartment building (named by
+-- its address, the flats are Residents'), only the ones with no free street (the safe zone) stay doorless; every
+-- business a storefront names exists and every food business has a storefront; the new storefronts are landmarks with
+-- their kind on the location tag.
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
 local JobRules = require("./JobRules")
@@ -223,8 +225,8 @@ for _, home in Map.Homes do
 		ways[`{home.facing.x},{home.facing.z}`] = true
 	elseif home.kind == "apartment" then
 		apartments += 1
-		if not home.floors or home.floors < 2 or not string.match(home.name, "^Apt %d+[A-D], %d+ ") then
-			homeProblem = `{home.id}: not a flat ({home.name})`
+		if not home.floors or home.floors < 2 or home.floors > 9 or home.name ~= home.address then
+			homeProblem = `{home.id}: not a building ({home.name}, {home.floors} floors)`
 		end
 	else
 		homeProblem = `{home.id}: kind {home.kind}`
@@ -274,7 +276,63 @@ end
 check("the homes: unique names, a real address on their street, on an ordinary block's lot, out of the safe zone, the door on the front wall", homeProblem == nil, homeProblem)
 print(`  {#Map.Homes} homes: {houses} houses, {apartments} apartments`)
 check("at least 40 homes", #Map.Homes >= 40, #Map.Homes)
-check("40 – 60 apartment doors downtown", apartments >= 40 and apartments <= 60, apartments)
+check("5.5: 150+ apartment doors downtown (every tower that can face a street)", apartments >= 150, apartments)
+-- 5.5: a tower stays doorless only when neither of its streets has a free park (the safe zone, a place's spot …).
+local doorless: string? = nil
+for _, list in Map.lots("downtown") do
+	for _, lot in list do
+		if lot.kind == "tower" then
+			local d, i, j = Map.blockAt(lot.x, lot.z)
+			local cx, cz = (d :: Map.District).ox + i * Map.Cell, (d :: Map.District).oz + j * Map.Cell
+			local out = Map.BlockSize / 2 + Map.CurbPark
+			local west, north = lot.x < cx, lot.z < cz
+			local parks = { { x = cx + (if west then -out else out), z = lot.z }, { x = lot.x, z = cz + (if north then -out else out) } }
+			for _, park in parks do
+				local blocked = Map.isSafe(park.x, park.z)
+				for _, place in Map.Places do
+					blocked = blocked or (park.x - place.x) ^ 2 + (park.z - place.z) ^ 2 < Map.FreeRadius ^ 2
+				end
+				for _, spot in Map.CargoSpots do
+					blocked = blocked or (park.x - spot.park.x) ^ 2 + (park.z - spot.park.z) ^ 2 < Map.FreeRadius ^ 2
+						or (park.x - spot.pile.x) ^ 2 + (park.z - spot.pile.z) ^ 2 < Map.FreeRadius ^ 2
+				end
+				for _, spot in Map.EmployerSpots do
+					blocked = blocked or (park.x - spot.x) ^ 2 + (park.z - spot.z) ^ 2 < Map.FreeRadius ^ 2
+				end
+				for _, venue in Map.Venues do
+					blocked = blocked or (park.x - venue.park.x) ^ 2 + (park.z - venue.park.z) ^ 2 < Map.FreeRadius ^ 2
+				end
+				for _, station in Map.GasStations do
+					for _, spot in station.pumps do
+						blocked = blocked or (park.x - spot.x) ^ 2 + (park.z - spot.z) ^ 2 < Map.FreeRadius ^ 2
+					end
+					for _, bay in station.bays do
+						blocked = blocked or (park.x - bay.x) ^ 2 + (park.z - bay.z) ^ 2 < Map.FreeRadius ^ 2
+					end
+				end
+				for _, home in Map.Homes do
+					blocked = blocked or (park.x - home.park.x) ^ 2 + (park.z - home.park.z) ^ 2 < Map.ParkGap ^ 2
+				end
+				if not blocked then
+					doorless = `{lot.district} {lot.i},{lot.j} {lot.a}{lot.b}: a free park at {park.x}, {park.z} but no entrance`
+				end
+			end
+		end
+	end
+end
+check("5.5: a tower stays doorless only with no free street", doorless == nil, doorless)
+-- 5.5: no home's park on a gas station's pumps or bays.
+local atPumps: string? = nil
+for _, home in Map.Homes do
+	for _, station in Map.GasStations do
+		for _, bay in station.bays do
+			if (home.park.x - bay.x) ^ 2 + (home.park.z - bay.z) ^ 2 < Map.FreeRadius ^ 2 then
+				atPumps = `{home.id} at {station.id}`
+			end
+		end
+	end
+end
+check("5.5: no home parks at a gas station's pumps", atPumps == nil, atPumps)
 check("plenty of houses in the Suburbs", houses >= 30, houses)
 check("the houses face all four ways", ways["1,0"] and ways["-1,0"] and ways["0,1"] and ways["0,-1"] or false)
 

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "5.4.1"
+Config.Version = "5.5"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
@@ -1533,6 +1533,64 @@ Config.Traffic = {
 	LightAllRed = 1,
 	StopBack = 7, -- the stop line, this far before the end of a lane (just before the crosswalk)
 	AmberBrake = 20, -- studs/s²: on amber a car stops when it can at this, else drives on
+}
+
+-- 5.5, the city buses (shared/BusLines.luau, server/Buses.luau, server/BusStops.luau, client/BusRide.luau): free
+-- rides on three loops, driven by one timetable from the server's clock (every client works out the same bus).
+-- A line is a closed loop of road-centre corners (Map's grid; -Z is north), driven clockwise on the right-hand lane;
+-- its stops are worked out along it (every ~2 blocks at the kerb, never on a special block's side or by a door).
+export type BusLineDef = {
+	id: number,
+	name: string, -- "Downtown Ring"
+	short: string, -- the caps word on the signs and the HUD ("RING")
+	color: { number },
+	buses: number, -- how many drive the loop, evenly spaced (the wait is at most its loop time / buses)
+	corners: { { number } },
+}
+Config.Bus = {
+	Speed = 40, -- studs/s on a straight
+	TurnSpeed = 16, -- through a corner (straight over a junction: Speed)
+	Approach = 20, -- studs before and after a corner at the speed between the two
+	Ramp = 1.6, -- seconds from a stop to full speed (and from full speed into a stop)
+	Dwell = 4, -- seconds at every stop, the door open
+	StopGap = 250, -- along the loop, a stop at least this far after the one before (about 2 blocks)
+	StopClear = 18, -- no stop by the kerb within this of a door, a pile, a park, a place or an employer's board
+	MaxWait = 25, -- the longest wait at a stop (the tests hold every line to it)
+	BodyColor = { 226, 228, 222 }, -- the buses' paint; the line's colour is the stripe and the sign
+	Reach = 10, -- the Board prompt's reach at the door
+	NearStop = 25, -- the arrivals card shows within this of a stop
+	HintDistance = 350, -- a foot or bike job's stop farther than this: the HUD may suggest a bus
+	RouteReach = 420, -- a route walks at most this far (manhattan) to the first stop and from the last
+	RouteSaving = 10, -- seconds the bus must save over walking to be suggested
+	Lines = {
+		{
+			id = 1,
+			name = "Downtown Ring",
+			short = "RING",
+			color = { 205, 45, 45 },
+			buses = 8,
+			corners = { { -504, -504 }, { 504, -504 }, { 504, 504 }, { -504, 504 } },
+		},
+		{
+			id = 2,
+			name = "Downtown Cross",
+			short = "CROSS",
+			color = { 235, 180, 30 },
+			buses = 7,
+			corners = {
+				{ -72, -360 }, { 72, -360 }, { 72, -72 }, { 360, -72 }, { 360, 72 }, { 72, 72 },
+				{ 72, 360 }, { -72, 360 }, { -72, 72 }, { -360, 72 }, { -360, -72 }, { -72, -72 },
+			},
+		},
+		{
+			id = 3,
+			name = "Suburbs Link",
+			short = "SUBURBS",
+			color = { 50, 120, 220 },
+			buses = 6,
+			corners = { { -216, 216 }, { 216, 216 }, { 216, 1116 }, { -216, 1116 } },
+		},
+	} :: { BusLineDef },
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
@@ -3104,5 +3162,43 @@ Config.Employers = {
 	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "ambulance", needed = 3, person = "Dr. Novak", pitch = "The phones never stop ringing. Take the ambulance, bring the patients in alive." },
 	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Rosa, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
+
+-- 5.5, people in every building (shared/Residents.luau, shared/Deliveries.luau): every home has residents, made up
+-- from these lists the same way every time (seeded by the home's id). An apartment building has `floors` × 4 flats
+-- (A – D), FlatPeople in each; a Suburbs house HousePeople, one family. A family is Czech or English (its surname);
+-- now and then one of them has a first name from the other list (OtherOrigin), and a few people are only known by a
+-- nickname (NicknameChance: "Old Pete", "Doc Hansen"). Surnames are { a man's, a woman's } (the Czech -ová), or one
+-- for both. A delivery to a home goes to one of its residents (an apartment: "Apt 4C, 40 6th Ave"); a home weighs
+-- as many times as it has residents in the board's draw, at most MaxWeight (a tower comes up more often than a house,
+-- but does not flood the board).
+Config.Residents = {
+	FlatPeople = { 1, 2 } :: { number },
+	HousePeople = { 1, 4 } :: { number },
+	MaxWeight = 6,
+	OtherOrigin = 0.15,
+	NicknameChance = 0.04,
+	Czech = {
+		Women = { "Jana", "Eva", "Petra", "Lucie", "Tereza", "Hana", "Marie", "Veronika", "Kateřina", "Zdeňka" },
+		Men = { "Petr", "Jan", "Tomáš", "Martin", "Jiří", "Pavel", "Lukáš", "Ondřej", "Karel", "Zdeněk" },
+		Surnames = {
+			{ "Novák", "Nováková" }, { "Svoboda", "Svobodová" }, { "Dvořák", "Dvořáková" }, { "Černý", "Černá" },
+			{ "Procházka", "Procházková" }, { "Kučera", "Kučerová" }, { "Veselý", "Veselá" }, { "Horák", "Horáková" },
+			{ "Němec", "Němcová" }, { "Pokorný", "Pokorná" }, { "Marek", "Marková" }, { "Pospíšil", "Pospíšilová" },
+			{ "Hájek", "Hájková" }, { "Král", "Králová" }, { "Jelínek", "Jelínková" }, { "Růžička", "Růžičková" },
+			{ "Beneš", "Benešová" }, { "Fiala", "Fialová" }, { "Sedláček", "Sedláčková" }, { "Zeman", "Zemanová" },
+		} :: { { string } },
+	},
+	English = {
+		Women = { "Sarah", "Emma", "Kate", "Linda", "Megan", "Rosie", "Grace", "Holly", "Nora", "Tina" },
+		Men = { "Mike", "Dave", "Tom", "Jack", "Sam", "Bill", "Frank", "Ray", "Eddie", "Luke" },
+		Surnames = {
+			{ "Brown" }, { "Smith" }, { "Miller" }, { "Walker" }, { "Turner" }, { "Hughes" }, { "Cooper" }, { "Parker" },
+			{ "Reed" }, { "Bennett" }, { "Hayes" }, { "Foster" }, { "Murphy" }, { "Price" }, { "Barnes" }, { "Fisher" },
+			{ "Grant" }, { "Wells" }, { "Hansen" }, { "Doyle" },
+		} :: { { string } },
+	},
+	-- (whole names: what everybody on the block calls them)
+	Nicknames = { "Old Pete", "Doc Hansen", "Granny Ruth", "Sarge Kowalski", "Mad Mira", "Tin-Can Tony", "Lucky Jirka", "Two-Dogs Dana", "Bunker Bob", "Radio Ráďa" },
+}
 
 return Config

@@ -908,7 +908,7 @@ local function buildPiece(piece: Piece): Model
 		text.TextColor3 = Color3.fromRGB(245, 245, 245)
 		text.Font = Enum.Font.GothamBold
 		text.TextSize = 12
-		text.Text = `FOR {string.upper(owner)}`
+		text.Text = `FOR {require(Shared.Residents).caps(owner)}` -- (5.5: a resident's Czech letters in caps)
 		text.Parent = tag
 		tag.Parent = main
 	end
@@ -3974,6 +3974,21 @@ function Cargo.onFoot(session: Session): boolean
 	end
 	local position = ownerPosition(session)
 	return position ~= nil and Vehicles.seatedIn(session.owner) == nil and flat(position, plan.park) < Tuning.ApproachDistance
+end
+
+-- 5.5, a city bus seat (server/Buses.luau): may this player sit down without dropping what the hands hold? Empty
+-- hands, or the owner of a foot job whose backpack takes the held pieces (Cargo.update stows them as they sit, the
+-- way it does on a bike); not a pushed tool or a horse, and not a piece of somebody else's job.
+function Cargo.canStowHands(player: Player): boolean
+	for _, session in active do
+		local held = session.held[player]
+		if held and not session.ended then
+			return held.tool == nil and held.pieces[1].horse == nil and session.info.foot == true and player == session.owner
+				and packTakes(session, held.pieces, false)
+		end
+	end
+	local character = player.Character
+	return Cargo.carrying(character) == nil and (character == nil or character:GetAttribute("Pushing") == nil)
 end
 
 -- The admin tools: the current stop is done at once (loaded / handed over / served).
