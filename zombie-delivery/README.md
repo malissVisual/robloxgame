@@ -1086,6 +1086,19 @@ up to +25% (`profile.streak`; a ★ or a failed job resets it). **Licences** (`C
 and 5 jobs rated ★★+ at ★★ or above; ★★★★ need level 7 and 10 such jobs at ★★★ or above (the board shows LICENCE 3 / 5,
 the CAREER window your progress). Saves from before 4.7 with deliveries keep every tier their level opens.
 
+## Cargo with rules, several drops, things on the road (4.8)
+
+`Config.Jobs.CargoRules` (the maths in `shared/JobRules.luau`), on the board's jobs (not missions or the tutorial):
+**fragile** cargo (cakes, vaccines, samples, electronics, paintings) loses condition when you brake hard, bump or hit
+something ("CAREFUL — FRAGILE"); **food** (pizza, bread, groceries, soup, cakes) loses freshness every minute once picked
+up (the contract shows "Fresh 82%"; under 70% a star off, the pay down to 0.7×; a Cooler Box halves it); **heavy** cargo
+(barrels, strongboxes, furniture, generators) is a slow walk alone, normal on the hand trolley or with a crew mate;
+**cash** brings the bandits sooner; **passengers** complain at every bump. Ratchet Straps take 40% off every condition
+loss from driving. **Multi-drop** (`Config.Jobs.MultiDrop`): ★★★ and ★★★★ offers may have 2–3 drops, every piece tagged
+FOR its customer. **Road events** (`Config.Jobs.RoadEvents`, one in three jobs at most one): a survivor waving by the
+road (stop and they ride with you to the depot for a bonus), an ADD-ON pickup near your route (Y or TAKE IT within
+15 s), a blocked street ahead. The admin panel can force each event.
+
 ## The admin panel (4.5)
 
 P (or the ADMIN button on touch) opens it for admins (a Studio Play test, the place's owner, `Config.Admin.UserIds`);
