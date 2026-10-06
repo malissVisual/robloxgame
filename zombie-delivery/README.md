@@ -1075,6 +1075,17 @@ install or remove at the garage). The Hand Trolley (level 3, $600: 4 pieces at o
 cargo takes less damage), the Cooler Box (level 5: food stays fresh longer), the Roof Rack (level 7: +1 light piece, it
 rides on the roof). You see each piece on the car (`profile.carGear`).
 
+## Jobs you choose and get rated for (4.7)
+
+**The board** offers three ordinary jobs on every tier you can take: always a short, safe one, and two of a long haul
+(×1.15), a risky one (a forced modifier, ×1.1, bandits want it) and a bulk order; each row says why. REROLL a tier once
+per refresh for $50 × its stars (`Config.Jobs.Choice`, the RerollTier remote). **Every job is rated** ★ / ★★ / ★★★
+(`shared/JobRules.luau`, `Config.Jobs.Rating`): a star off for under 25% of the clock left, the cargo under 85% (two
+under 50%), a wreck, a piece lost. ★★★ pays +20% and ×1.25 XP, ★ pays −10%; a **streak** of jobs rated ★★+ adds +5% each,
+up to +25% (`profile.streak`; a ★ or a failed job resets it). **Licences** (`Config.Jobs.Licences`): ★★★ jobs need level 4
+and 5 jobs rated ★★+ at ★★ or above; ★★★★ need level 7 and 10 such jobs at ★★★ or above (the board shows LICENCE 3 / 5,
+the CAREER window your progress). Saves from before 4.7 with deliveries keep every tier their level opens.
+
 ## The admin panel (4.5)
 
 P (or the ADMIN button on touch) opens it for admins (a Studio Play test, the place's owner, `Config.Admin.UserIds`);

@@ -22,6 +22,11 @@
 --     and rank needed), or more pieces than your car holds ("📦 NEEDS 6 SLOTS", what your car holds and
 --     Economy.roomAdvice: the next stage at Wrench Garage, or a bigger car from your garage). Their button flashes the
 --     remedy and toasts the same reason, like the old board did.
+--   * 4.7, a choice: the ordinary offers of a danger level come in a group under its header ("★★ RISKY · pick one"):
+--     three rows, each with its trade-off as a tag (🛡 SHORT & SAFE, 🛣 LONG HAUL, ☠ RISKY, 📦 BULK ORDER) and a WHY
+--     line, and REROLL $100 on the header (RerollTier: new offers of that tier, once until the board refreshes). A
+--     tier without its licence (shared/JobRules.luau) shows one row locked "🪪 LICENCE 3 / 5" with what it needs; the
+--     caption names your streak of good jobs.
 --   * On a delivery the board shows that job and GIVE UP THIS DELIVERY (CancelJob) instead of offers.
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
@@ -111,6 +116,7 @@ local resizeQueued = false
 local offersRemote: RemoteEvent? = nil
 local askedAt = 0 -- os.clock() of the RequestOffers still waiting for its answer (0: none)
 local refreshAt: number? = nil -- 3.7: when the server makes the next offers (workspace:GetServerTimeNow())
+local boardInfo: any = nil -- 4.7: { tiers = { { stars, name, fee, rerolled, open, level, licence? } }, streak } (Offers' third value)
 local ticking = false -- 3.7: the countdown's loop runs (while the board is open)
 
 local function getOffersRemote(): RemoteEvent
@@ -596,18 +602,22 @@ local function dangerRow(body: any, offer: any)
 		TextWrapped = false,
 		LayoutOrder = 1,
 	})
+	-- 4.7: the trade-off of an ordinary offer (its role).
+	if type(offer.roleName) == "string" then
+		chip(row, `{offer.roleIcon or ""} {offer.roleName}`, if offer.role == "risky" then K.red else K.rule, 2)
+	end
 	if offer.modifier then
-		chip(row, `⚠ {offer.modifier.name}`, K.red, 2)
+		chip(row, `⚠ {offer.modifier.name}`, K.red, 3)
 	end
 	if isSpecial(offer) then
-		chip(row, "SPECIAL", K.rule, 3)
+		chip(row, "SPECIAL", K.rule, 4)
 	end
 	if offer.timed then
-		chip(row, "⏱ RUSH CLOCK", K.rule, 4)
+		chip(row, "⏱ RUSH CLOCK", K.rule, 5)
 	end
 	local boost = tonumber(offer.banditBoost)
 	if boost and boost > 1 then
-		chip(row, "🎯 BANDITS WANT IT", K.red, 5)
+		chip(row, "🎯 BANDITS WANT IT", K.red, 6)
 	end
 end
 
@@ -640,6 +650,10 @@ end
 -- The briefing under the title (route, cargo, deadline, risk, the special job); returns where the next thing goes.
 local function details(body: any, offer: any, w: number): number
 	local y = 70
+	-- 4.7, WHY: the trade-off of this offer (the board's choice).
+	if type(offer.roleWhy) == "string" then
+		y += brief(body, "Why", offer.roleWhy, y, w, true, { TextColor3 = K.secondary })
+	end
 	-- ROUTE: the first stop → the last address, its district; the stops and the distance.
 	local stops = tonumber(offer.stops) or 1
 	local route = string.gsub(`{offer.first or "Pick up"}  →  {offer.address or "?"}, {offer.district or ""}`, "[&<>]", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;" })
@@ -738,8 +752,13 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			Hud.toast(`{what} need{if offer.jobType then "s" else ""} driver level {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.`)
 		end)
 	elseif why then
-		-- 4.0: a Freight Run is locked by pallets (the server's lockButton: "NEEDS N PALLETS").
-		action(stub, if type(offer.lockButton) == "string" then offer.lockButton else `📦 NEEDS {offer.slots} SLOTS`, size, at, nil, function()
+		-- 4.0: a Freight Run is locked by pallets (the server's lockButton: "NEEDS N PALLETS"). 4.7: a tier without its
+		-- licence: "LICENCE 3 / 5".
+		local licence = if offer.lockReason == "licence" and type(offer.licence) == "table" then offer.licence else nil
+		local label = if licence then `🪪 LICENCE {licence.have or 0} / {licence.need or 0}`
+			elseif type(offer.lockButton) == "string" then offer.lockButton
+			else `📦 NEEDS {offer.slots} SLOTS`
+		action(stub, label, size, at, nil, function()
 			flash()
 			Hud.toast(why)
 		end)
@@ -763,15 +782,24 @@ local function listWidth(): number
 	return width - SIDEBAR - 24 - 20 - 4
 end
 
-local function offerTicket(offer: any, number: number)
+-- 4.7: what a missing licence needs, in words (the server's licence info).
+local function licenceNote(licence: any): string
+	return `{licence.stars} jobs need the {licence.stars} LICENCE: {licence.need} jobs rated ★★ or better at {licence.atStars} or harder ({licence.have} / {licence.need} done). Drive them well: on time, the cargo whole, no wreck.`
+end
+
+local function offerTicket(offer: any, number: number, order: number?)
 	local w = listWidth()
 	local bodyW = w - SPINE - STUB - 30
-	-- Above your driver level: offered, but locked (the server refuses it too). Else too many pieces for the car.
-	local lockLevel = if offer.locked == true then (tonumber(offer.level) or myLevel() + 1) else nil
-	local why = if lockLevel == nil and offer.tooBig == true then (if type(offer.lockText) == "string" then offer.lockText else roomRemedy(offer)) else nil
+	-- Above your driver level: offered, but locked (the server refuses it too). 4.7: or without the tier's licence.
+	-- Else too many pieces for the car.
+	local licence = if offer.locked == true and offer.lockReason == "licence" and type(offer.licence) == "table" then offer.licence else nil
+	local lockLevel = if offer.locked == true and not licence then (tonumber(offer.level) or myLevel() + 1) else nil
+	local why = if licence then licenceNote(licence)
+		elseif lockLevel == nil and offer.tooBig == true then (if type(offer.lockText) == "string" then offer.lockText else roomRemedy(offer))
+		else nil
 	local note = if lockLevel then `Unlocks at LEVEL {lockLevel} ({Levels.rank(lockLevel)}). Deliveries give XP.` else why
 	-- The slot in the list gets its height once the body is built (the row fills it).
-	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 140), BackgroundTransparency = 1, LayoutOrder = number }, refs.list)
+	local slot = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 140), BackgroundTransparency = 1, LayoutOrder = order or number }, refs.list)
 	local card: any, body: any, stub: any = Ui.ticket(slot, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), nil, STUB)
 	local holder = card.Parent
 	card.BackgroundColor3 = if note then LOCKED_ROW else ROW
@@ -812,6 +840,55 @@ local function offerTicket(offer: any, number: number)
 	slot.Size = UDim2.new(1, 0, 0, h)
 	payStub(stub, offer, lockLevel, why, noteBox)
 	Ui.tactile(holder)
+end
+
+-- 4.7: the header of a danger level's group: its stars and name, what to do (pick one, or what it needs), and REROLL
+-- (Net "RerollTier": new ordinary offers of that tier for its fee, once until the board refreshes).
+local function tierHeader(index: number, info: any, order: number)
+	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
+	local stars = tonumber(info.stars) or index
+	text(row, `{string.rep("★", stars)}  {string.upper(tostring(info.name or ""))}`, UDim2.new(1, -180, 0, 18), {
+		Position = UDim2.fromOffset(4, 4),
+		Font = Theme.HeadingFont,
+		TextSize = 13,
+		TextColor3 = if stars >= 3 then K.red else K.text,
+		TextWrapped = false,
+	})
+	local licence = if type(info.licence) == "table" then info.licence else nil
+	local level = tonumber(info.level) or 1
+	local sub = if info.open == true then "Pick one: each run has its own trade-off"
+		elseif myLevel() < level then `LOCKED · LEVEL {level}{if licence then ` and the {licence.stars} licence` else ""}`
+		elseif licence then `LOCKED · LICENCE {licence.have or 0} / {licence.need or 0} · jobs rated ★★+ at {licence.atStars}`
+		else "LOCKED"
+	text(row, sub, UDim2.new(1, -180, 0, 16), {
+		Position = UDim2.fromOffset(4, 22),
+		TextSize = 12,
+		TextColor3 = if info.open == true then K.secondary else K.red,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, row)
+	if info.open ~= true then
+		return
+	end
+	local fee = tonumber(info.fee) or 0
+	local size, at = UDim2.fromOffset(160, 30), UDim2.new(1, -82, 0, 4)
+	if info.rerolled == true then
+		action(row, "REROLLED", size, at, nil, function()
+			Hud.toast("Rerolled already: new jobs come with the next board.")
+		end)
+		return
+	end
+	local button: any
+	button = action(row, `↻ REROLL {Ui.money(fee)}`, size, at, C.blue, function()
+		local money = if state and type(state.money) == "number" then state.money else math.huge
+		if money < fee then
+			button.Text = "NOT ENOUGH MONEY"
+			return
+		end
+		button.Text = "REROLLING..."
+		Net.get("RerollTier"):FireServer(index)
+	end)
 end
 
 -- On a delivery: that job, and giving it up.
@@ -857,15 +934,30 @@ renderList = function()
 		return
 	end
 	local visible = shown(list)
-	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board`
+	-- 4.7: your streak of good jobs (rated ★★ or better) in the caption.
+	local streak = if boardInfo and type(boardInfo.streak) == "number" then boardInfo.streak else 0
+	local bonus = math.floor(math.min(Config.Jobs.Rating.StreakMax, Config.Jobs.Rating.StreakStep * streak) * 100 + 0.5)
+	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board{if streak > 0 then `  ·  STREAK {streak} (+{bonus}% pay)` else ""}`
 	refs.firstAccept = nil
 	Ui.clear(refs.list)
 	if #visible == 0 then
 		message(if #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
 		return
 	end
+	-- 4.7: a header over every danger level's group (not on the Special jobs filter).
+	local tiers = if boardInfo and type(boardInfo.tiers) == "table" and filter ~= "special" then boardInfo.tiers else nil
+	local headed: { [number]: boolean } = {}
 	for number, offer in visible do
-		local ok, err = pcall(offerTicket, offer, number)
+		local stars = tonumber(offer.stars) or 0
+		local info = if tiers then tiers[stars] else nil
+		if info and not headed[stars] then
+			headed[stars] = true
+			local ok, err = pcall(tierHeader, stars, info, number * 2 - 1)
+			if not ok then
+				warn(`[DispatchUi] a header failed: {err}`)
+			end
+		end
+		local ok, err = pcall(offerTicket, offer, number, number * 2)
 		if not ok then
 			warn(`[DispatchUi] a ticket failed: {err}`)
 		end
@@ -979,13 +1071,14 @@ function DispatchUi.toggle()
 end
 
 -- The offers the server sent (Main wires Net "Offers" here), already sorted ★ → ★★★★, and (3.7) when the next ones
--- come (server time; nil from an older server: no countdown). Kept while you are on a delivery, shown after it.
-function DispatchUi.setOffers(list: { any }, nextAt: number?)
+-- come (server time; nil from an older server: no countdown), and (4.7) the board's tiers and your streak. Kept while you are on a delivery, shown after it.
+function DispatchUi.setOffers(list: { any }, nextAt: number?, info: any?)
 	if type(list) ~= "table" then
 		return
 	end
 	askedAt = 0
 	offers = list
+	boardInfo = if type(info) == "table" then info else nil -- 4.7: the tiers' REROLL and licences, the streak
 	refreshAt = if type(nextAt) == "number" then nextAt else nil
 	if open and not job then
 		renderList()

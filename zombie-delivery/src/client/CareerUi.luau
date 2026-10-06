@@ -4,7 +4,8 @@
 --
 --   * The CAREER window (C, or MENU → CAREER), a courier's career path in the contract look (design/ui-contract/):
 --     on the left YOUR CAREER: the rank you hold, the level, the XP bar, the NEXT GOAL (the next level: the XP to go,
---     about how many deliveries that is, what it unlocks, its reward) and the ladder of the ranks; on the right THE
+--     about how many deliveries that is, what it unlocks, its reward), 4.7 the LICENCES (the ★★★ and ★★★★ board jobs:
+--     the level and the good jobs each needs, shared/JobRules.luau) with your streak, and the ladder of the ranks; on the right THE
 --     ROAD: every level from 1 to the top as a slim row on a line, done ones ticked, the current one raised with the
 --     red rule (YOU ARE HERE), the next one marked NEXT with its progress, the rest LOCKED (dim) with the XP they
 --     need. Each row says what the level unlocks (the job board's tiers and special jobs, cars, the stages of the
@@ -25,6 +26,7 @@ local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Career = require(Shared.Career)
+local JobRules = require(Shared.JobRules)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local DialogKeys = require(script.Parent.DialogKeys)
@@ -195,11 +197,30 @@ local function driverPanel(parent: Instance, road: { Career.Step })
 		label(parent, "You reached the last level. Every car, gun and job is open: the road is yours.", { LayoutOrder = 7, TextColor3 = P.ink })
 	end
 	P.rule(parent, UDim2.new(1, 0, 0, 1), { LayoutOrder = 11 })
-	caps(parent, "The ranks", 12)
+	-- 4.7: the licences for the dangerous board jobs (Config.Jobs.Licences) and the streak of good jobs.
+	caps(parent, "Licences", 12)
+	local held = if state and type(state.licences) == "table" then state.licences else {}
+	local counts = if state and type(state.licenceJobs) == "table" then state.licenceJobs else {}
+	for index, def in Config.Jobs.Licences do
+		local stars = string.rep("★", def.tier)
+		local text: string
+		if JobRules.hasLicence(def.tier, level, held, counts) then
+			text = `<b>{stars} LICENCE</b>  <font color="{P.hex(P.good)}">✓ held</font>`
+		else
+			local have, need = JobRules.progress(def.tier, counts)
+			local levelText = if level >= def.level then `✓ level {def.level}` else `level {def.level}`
+			text = `<b>{stars} LICENCE</b>  {levelText}  ·  {have} / {need} jobs rated ★★+ at {string.rep("★", def.atTier)} or harder`
+		end
+		label(parent, text, { LayoutOrder = 12 + index, TextColor3 = P.ink })
+	end
+	local streak = if state and type(state.streak) == "number" then state.streak else 0
+	label(parent, `<b>Streak</b>  {streak} good {if streak == 1 then "job" else "jobs"} in a row: +{math.floor(JobRules.streakBonus(streak) * 100 + 0.5)}% pay. A job rated ★★ or better keeps it, ★ or a failed one ends it; ★★★ pays +20% and ×1.25 XP.`, { LayoutOrder = 16 })
+	P.rule(parent, UDim2.new(1, 0, 0, 1), { LayoutOrder = 17 })
+	caps(parent, "The ranks", 18)
 	for index, entry in Config.Levels.Ranks do
 		local here = rank == entry.name
 		local done = level >= entry.level
-		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 12 + index }, parent)
+		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 18 + index }, parent)
 		if here then
 			P.marker(row, 6, { Position = UDim2.fromOffset(0, 6) })
 		end

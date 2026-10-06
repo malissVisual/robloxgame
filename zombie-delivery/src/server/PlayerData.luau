@@ -6,7 +6,8 @@
 -- properties, the home you spawn at; server/Estate.luau), the delivery company (Config.Business: couriers, upgrades,
 -- the safe; server/Business.luau) and lifetime stats. 4.6: the gear of every car (carGear: Config.Gear bought for a
 -- car, "owned" or "installed" in its gear slots) and the career rewards already given (levelRewards: Config.Levels
--- Rewards, each level once; shared/Career.luau).
+-- Rewards, each level once; shared/Career.luau). 4.7: the streak of good jobs (streak) and the licences for the
+-- dangerous tiers (licences held, licenceJobs counted toward them; shared/JobRules.luau).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -23,6 +24,7 @@ local Levels = require(Shared.Levels)
 local Missions = require(Shared.Missions)
 local Challenges = require(Shared.Challenges)
 local Career = require(Shared.Career)
+local JobRules = require(Shared.JobRules)
 
 export type Profile = {
 	money: number,
@@ -41,6 +43,9 @@ export type Profile = {
 	rep: { [string]: number }, -- jobs done for each employer (Config.Employers)
 	xp: number, -- driver XP (Config.Levels); older saves have none: 0
 	levelRewards: { [string]: boolean }, -- 4.6: the levels (as strings, "2" … "15") whose Config.Levels.Rewards was given
+	streak: number, -- 4.7: good jobs (rated ★★ or better) in a row; a ★ job or a failed one ends it (JobRules)
+	licences: { [string]: boolean }, -- 4.7: the tiers ("3", "4") whose licence is held (Config.Jobs.Licences)
+	licenceJobs: { [string]: number }, -- 4.7: tier → good jobs counted toward its licence (JobRules.countJob)
 	properties: { [string]: boolean }, -- owned real estate (Config.Estate ids)
 	home: string?, -- the home you spawn at (an owned mansion / villa / house), nil = the depot
 	business: { couriers: number, upgrades: { [string]: number }, safe: number, lastTick: number }, -- your company (Config.Business); lastTick = os.time() of the last payout
@@ -93,6 +98,9 @@ local function newProfile(): Profile
 		rep = {},
 		xp = 0,
 		levelRewards = {},
+		streak = 0,
+		licences = {},
+		licenceJobs = {},
 		properties = {},
 		home = nil,
 		business = { couriers = 0, upgrades = {}, safe = 0, lastTick = 0 },
@@ -273,6 +281,31 @@ local function applyLevelRewards(profile: Profile, saved: { [any]: any })
 	end
 end
 
+-- 4.7, the streak and the licences (after the XP and the deliveries are read). A save from before 4.7 (no licences)
+-- keeps the tiers its level opens if it has delivered (JobRules.grandfather); its counters start at 0.
+local function applyLicences(profile: Profile, saved: { [any]: any })
+	profile.streak = number(saved.streak, 0, 10000)
+	local held = saved.licences
+	if type(held) ~= "table" then
+		profile.licences = JobRules.grandfather(Levels.levelFor(profile.xp), profile.deliveries)
+	else
+		for _, def in Config.Jobs.Licences do
+			if held[tostring(def.tier)] == true then
+				profile.licences[tostring(def.tier)] = true
+			end
+		end
+	end
+	local counts = saved.licenceJobs
+	if type(counts) == "table" then
+		for _, def in Config.Jobs.Licences do
+			local count = number(counts[tostring(def.tier)], 0, def.jobs)
+			if count > 0 then
+				profile.licenceJobs[tostring(def.tier)] = count
+			end
+		end
+	end
+end
+
 -- Saved data is checked, never trusted.
 local function applySaved(profile: Profile, saved: any)
 	if type(saved) ~= "table" then
@@ -408,6 +441,7 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	applyGear(profile, saved)
 	applyLevelRewards(profile, saved)
+	applyLicences(profile, saved) -- 4.7
 	applyEstate(profile, saved)
 	applyMissions(profile, saved)
 	applyChallenges(profile, saved)
@@ -579,6 +613,9 @@ function PlayerData.save(player: Player, final: boolean?)
 		rep = profile.rep,
 		xp = profile.xp,
 		levelRewards = profile.levelRewards, -- 4.6
+		streak = profile.streak, -- 4.7
+		licences = profile.licences, -- 4.7
+		licenceJobs = profile.licenceJobs, -- 4.7
 		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on (applySaved converts older saves once)
 		carStages = true, -- 3.5: the cars' room is their stages (applySaved moves a 3.4 save's cars once)
 		vanStages = true, -- 4.0: the Old Van's four stages (applySaved moves a 3.5 – 3.10 save's van stage once)

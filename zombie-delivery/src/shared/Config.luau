@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.6"
+Config.Version = "4.7"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -1636,6 +1636,50 @@ Config.Jobs = {
 	EasyMaxPieces = 2,
 	BulkChance = { 0, 0.2, 0.45, 0.6 } :: { number },
 	BulkExtra = { { 0, 0 }, { 1, 1 }, { 1, 2 }, { 3, 6 } } :: { { number } },
+	-- 4.7, a choice on the board (server/Jobs.luau makeBoard, shared/JobRules.luau): every danger level you may take
+	-- offers Offers ordinary deliveries, each with its own trade-off (a role, JobRules.roles: the short one always,
+	-- then two of the other three):
+	--   short  SHORT & SAFE  the drop in the first Short share of the tier's distance range, the fewest pieces, never a
+	--                        modifier, never bulk
+	--   long   LONG HAUL     the drop in the last part (Long), the pay × LongPay
+	--   risky  RISKY         a modifier always (RiskyModifiers[tier]), the bandits want it (× RiskyBoost) where the
+	--                        tier has bandits on the road, the pay × RiskyPay on top of the modifier's
+	--   bulk   BULK ORDER    the business's most pieces + the tier's BulkExtra always (a bigger car)
+	-- A tier's distance range is its minDistance … min(maxDistance, minDistance + MaxSpan). REROLL: the ordinary offers
+	-- of one tier made again for RerollFee × the tier's stars, once per tier until the board's next refresh.
+	Choice = {
+		Offers = 3,
+		Short = { 0, 0.35 } :: { number },
+		Long = { 0.6, 1 } :: { number },
+		MaxSpan = 1500,
+		LongPay = 1.15,
+		RiskyPay = 1.1,
+		RiskyBoost = 2,
+		RiskyModifiers = { { "rush" }, { "horde", "fragile", "rush" }, { "horde", "fragile", "rush" }, { "horde", "fragile", "rush", "heavy" } } :: { { string } },
+		RerollFee = 50,
+	},
+	-- 4.7, the rating of every ordinary and special job (not a mission: it has its own, Missions.rate), JobRules.rate:
+	-- a miss for each of: finished with less than OnTime of the clock left, the cargo below GoodCondition (two below
+	-- PoorCondition), a wreck on the way, a piece lost. 0 misses ★★★, 1 ★★, 2 or more ★. The pay × Pay[stars], the
+	-- XP × Xp[stars]. A streak of good jobs (★★ or better, profile.streak) adds StreakStep of the pay a job, at most
+	-- StreakMax; a ★ job or a failed one ends it.
+	Rating = {
+		OnTime = 0.25,
+		GoodCondition = 0.85,
+		PoorCondition = 0.5,
+		Pay = { 0.9, 1, 1.2 } :: { number },
+		Xp = { 1, 1, 1.25 } :: { number },
+		StreakStep = 0.05,
+		StreakMax = 0.25,
+	},
+	-- 4.7, the licences (JobRules.hasLicence; profile.licences, profile.licenceJobs): the board's ordinary deliveries of
+	-- a tier listed here (and a board special without its own level, the Winter Run) need its level AND `jobs` jobs
+	-- rated ★★ or better at danger `atTier` or higher. A save from before 4.7 that has delivered and already has the
+	-- level keeps the tier (JobRules.grandfather).
+	Licences = {
+		{ tier = 3, level = 4, jobs = 5, atTier = 2 },
+		{ tier = 4, level = 7, jobs = 10, atTier = 3 },
+	} :: { { tier: number, level: number, jobs: number, atTier: number } },
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
 	Businesses = {
 		{

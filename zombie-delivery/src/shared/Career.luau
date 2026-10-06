@@ -45,7 +45,15 @@ function Career.unlocksAt(level: number): { Unlock }
 	local list: { Unlock } = {}
 	for index, tier in Config.Jobs.Tiers do
 		if tier.level == level then
-			add(list, "tier", tostring(index), `{string.rep("★", tier.stars)} {tier.name} jobs`)
+			-- 4.7: a tier with a licence (Config.Jobs.Licences) says what else it needs.
+			local licence: { tier: number, level: number, jobs: number, atTier: number }? = nil
+			for _, def in Config.Jobs.Licences do
+				if def.tier == index then
+					licence = def
+				end
+			end
+			local needs = if licence then ` (licence: {licence.jobs} jobs rated ★★+ at {string.rep("★", licence.atTier)})` else ""
+			add(list, "tier", tostring(index), `{string.rep("★", tier.stars)} {tier.name} jobs{needs}`)
 		end
 	end
 	for _, def in Config.JobTypes do
