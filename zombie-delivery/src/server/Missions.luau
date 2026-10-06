@@ -41,6 +41,7 @@ local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local MissionData = require(Shared.Missions)
 local Net = require(Shared.Net)
+local TransportRules = require(Shared.Transport) -- 5.1: a bike is not a car
 
 local Server = script.Parent
 local PlayerData = require(Server.PlayerData)
@@ -126,7 +127,7 @@ local function stateFor(player: Player): { [string]: any }?
 		carName = if carId then (Economy.findCar(carId) or Config.Cars[1]).name else "no vehicle",
 		carId = carId, -- 3.5: the car and its stage (the window's advice: Economy.roomAdvice); 5.0: nil = no vehicle
 		carStage = if carId then Economy.stageOf(carId, Economy.carLevels(profile.carUpgrades, carId)) else 0,
-		hasCar = carId ~= nil, -- 5.0: the missions need a vehicle of your own
+		hasCar = carId ~= nil and not TransportRules.isBike(carId), -- 5.0: the missions need a vehicle of your own (5.1: a car)
 	}
 end
 
@@ -210,6 +211,9 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 	local carId = profile.car
 	if not carId then
 		return Config.VanQuest.MissionsNeed
+	end
+	if TransportRules.isBike(carId) then
+		return Config.BikeShop.MissionsNeed -- 5.1: a bike is not a car
 	end
 	-- 3.4: the pieces must fit your car (a mission that lends a vehicle brings its own room).
 	local need = Economy.cargoNeed(def.load, def.items)

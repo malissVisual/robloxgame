@@ -34,6 +34,8 @@
 --
 -- Zombie Delivery 5.0: Earl's Used Wheels far out on the West Highway (Map.VanSeller; see "Earl's Used Wheels" below),
 -- where Earl sells his old van (World.VanSeller: Earl and his prompt; server/VanQuest.luau).
+-- Zombie Delivery 5.1: Spoke & Chain Cycles, the bike shop on Downtown block (-1, 1) (Map.Shops.bikes; buildBikeShop:
+-- its counter prompt and World.BikeSlots, the display stands server/Shops.luau puts the bikes on).
 --
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
@@ -950,6 +952,34 @@ local function buildSupplies(parent: Instance)
 	end
 end
 
+-- 5.1, Spoke & Chain Cycles (Map.Shops.bikes, Config.BikeShop) on Downtown block (-1, 1), its door on Main St (north):
+-- a brick shop 60 × 40 with a 12-wide door near the street, Codex's look (BuildingLooks/BikeShop: the shop windows,
+-- the counter, the wall racks, the repair stand, the bike rack on the pavement), the SPOKE & CHAIN CYCLES board, the
+-- "Shop" prompt on the look's counter (an invisible solid box there) and four display stands on the floor
+-- (World.BikeSlots: server/Shops.luau puts a bike on each, facing the door at an angle).
+World.BikeSlots = {} :: { CFrame }
+
+local function buildBikeShop(parent: Instance)
+	local shop = folder(parent, "SpokeAndChain")
+	local cx, cz = Map.Shops.bikes.x, Map.Shops.bikes.z
+	sidewalk(shop, cx, cz)
+	local w, d, h = 60, 40, 16
+	local frame = shopFrame(cx, cz, Vector3.new(0, 0, -1), -12)
+	building(shop, frame, w, d, h, Color3.fromRGB(92, 70, 60), Enum.Material.Brick, 12, 10)
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	Kit.build(shop, frame, require(script.Parent.BuildingLooks.BikeShop), { part = part, deco = deco, nightLight = DayNight.nightLight })
+	-- The name board in the look's slot over the fascia (its bottom at y ≈ 17.2, in front of the front wall).
+	sign(shop, "SPOKE & CHAIN  CYCLES", Vector3.new(44, 5, 0.5), frame * CFrame.new(0, 19.7, -d / 2 - 0.8), Color3.fromRGB(255, 120, 90), nil, "bikes", 10)
+	local desk = part(shop, "CounterPrompt", Vector3.new(12, 4, 3.5), frame * CFrame.new(-15, 2, -5), Color3.fromRGB(35, 40, 43), Enum.Material.Metal)
+	desk.Transparency = 1
+	prompt(desk, "bikes", "Shop", Map.Shops.bikes.name)
+	for n, x in { -15, -7.5, 0, 7.5 } do
+		local stand = frame * CFrame.new(x, 0.3, 9) * CFrame.Angles(0, math.rad(25), 0)
+		deco(part(shop, "BikeStand", Vector3.new(2.6, 0.1, 7.4), stand * CFrame.new(0, 0.05, 0), Color3.fromRGB(150, 156, 158), Enum.Material.DiamondPlate))
+		World.BikeSlots[n] = stand * CFrame.new(0, 0.1, 0)
+	end
+end
+
 -- The safe zone border: a green line on the ground and signs.
 local function buildSafeZone(parent: Instance)
 	local zone = folder(parent, "SafeZone")
@@ -1349,6 +1379,7 @@ local function buildDistrict(parent: Instance, d: Map.District)
 		buildGuns(district)
 		buildMechanic(district)
 		buildSupplies(district)
+		buildBikeShop(district) -- 5.1: Spoke & Chain
 		buildSafeZone(district)
 	end
 end

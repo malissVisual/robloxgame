@@ -17,9 +17,17 @@
 --   Transport.foot(kit)        Info on foot
 --   Transport.car(room)        Info in a car that holds `room` pieces
 --
+-- 5.1, the bike (Config.Cars with bike = true, sold at Spoke & Chain): light pieces only, the bike's own room and its
+-- bike gear's (Economy.capacity) plus your pack (packRoom: the hands hold nothing while you ride, the pieces ride in
+-- the pack and the bike's slots); the kit's walk speed does not count on a bike.
+--   Transport.isBike(carId)    is this Config.Cars id a bike (CarDef.bike)?
+--   Transport.bikeRoom(carId, carGear)  what a bike holds with its installed bike gear (profile.carGear), no pack
+--   Transport.bike(room, kit)  Info on a bike that holds `room` pieces (bikeRoom) with this kit
+--
 -- Pure Luau (tests/transport_test.luau).
 
 local Config = require(script.Parent.Config)
+local Economy = require(script.Parent.Economy)
 
 local Transport = {}
 
@@ -87,6 +95,29 @@ end
 -- In a car that holds `room` pieces (Economy.capacity with its stage and gear).
 function Transport.car(room: number): Info
 	return { mode = "car", room = math.max(0, math.floor(room)), lightOnly = false, speedMult = 1 }
+end
+
+-- 5.1: is this car id a bike (Config.Cars bike = true)?
+function Transport.isBike(carId: string?): boolean
+	if carId == nil then
+		return false
+	end
+	local def = Economy.findCar(carId)
+	return def ~= nil and def.bike == true
+end
+
+-- 5.1: what a bike holds itself: its capacity and its installed bike gear's room (carGear: profile.carGear); 0 for
+-- anything that is not a bike.
+function Transport.bikeRoom(carId: string?, carGear: Economy.CarGear?): number
+	if carId == nil or not Transport.isBike(carId) then
+		return 0
+	end
+	return Economy.capacity(carId, nil, Economy.installedGear(carGear, carId), nil)
+end
+
+-- 5.1: on a bike that holds `room` pieces (Transport.bikeRoom), with this kit: + the pack, light pieces only.
+function Transport.bike(room: number, kit: Kit): Info
+	return { mode = "bike", room = math.max(0, math.floor(room)) + Transport.packRoom(kit), lightOnly = true, speedMult = 1 }
 end
 
 return Transport

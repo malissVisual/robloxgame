@@ -89,7 +89,7 @@ for _, step in road do
 end
 local everywhere = true
 for _, def in Config.Cars do
-	if not def.company and seen[`car:{def.id}`] ~= 1 then
+	if not def.company and seen[`{if def.bike then "bike" else "car"}:{def.id}`] ~= 1 then -- (5.1: a bike's kind is "bike")
 		everywhere = false
 		print(`  missing car {def.id}`)
 	end
@@ -174,7 +174,13 @@ check("the summary leaves out the stages of cars you do not own", string.find(Ca
 local function gear(id: string): Config.GearDef
 	return Economy.findGear(id) :: Config.GearDef
 end
-check("four pieces: trolley 3 · straps 4 · cooler 5 · roof rack 7", #Config.Gear == 4 and gear("trolley").level == 3 and gear("straps").level == 4
+local carGearCount = 0 -- (5.1: the bike gear, GearDef.bikeOnly, is tests/bikes_test.luau's)
+for _, def in Config.Gear do
+	if not def.bikeOnly then
+		carGearCount += 1
+	end
+end
+check("four pieces: trolley 3 · straps 4 · cooler 5 · roof rack 7", carGearCount == 4 and gear("trolley").level == 3 and gear("straps").level == 4
 	and gear("cooler").level == 5 and gear("roofrack").level == 7)
 check("the prices: $600, about $900, $1,400, $2,500", gear("trolley").price == 600 and math.abs(gear("straps").price - 900) <= 200
 	and math.abs(gear("cooler").price - 1400) <= 300 and math.abs(gear("roofrack").price - 2500) <= 500)
@@ -251,20 +257,24 @@ for _, kit in Config.Kit do
 	kitEverywhere = kitEverywhere and at ~= nil and has(at.unlocks, "kit", kit.id)
 end
 check("5.0: every piece of personal gear (Config.Kit) is on the road at its level", kitEverywhere and #Config.Kit >= 4)
+-- 5.1: the bikes are on the road (kind "bike", at Spoke & Chain), no "coming in 5.1" line any more.
 local bikes = false
 for _, def in Config.Cars do
-	bikes = bikes or (def :: any).kind == "bike"
+	bikes = bikes or def.bike == true
 end
-check("5.0: the bikes are a line at their level until Config.Cars has one", has(road50[Career.BIKE_LEVEL].unlocks, "soon", "bikes") ~= bikes)
-local soonOnce = 0
+local bikeAt, soon = 0, 0
 for _, step in road50 do
 	for _, unlock in step.unlocks do
 		if unlock.kind == "soon" then
-			soonOnce += 1
+			soon += 1
+		elseif unlock.kind == "bike" and step.level == Career.BIKE_LEVEL then
+			bikeAt += 1
 		end
 	end
 end
-check("5.0: … and only there", soonOnce == (if bikes then 0 else 1))
+check("5.1: no line about the next release", soon == 0)
+check("5.1: level 2 opens the bikes at Spoke & Chain", bikeAt >= 1 and string.find(road50[Career.BIKE_LEVEL].unlocks[1].name .. Career.summary(road50[Career.BIKE_LEVEL].unlocks, 9), "Spoke & Chain", 1, true) ~= nil)
+check("5.1: … and no bike counts as a car", not has(road50[Career.BIKE_LEVEL].unlocks, "car", "rustbike") and (not bikes or has(road50[Career.BIKE_LEVEL].unlocks, "bike", "rustbike")))
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

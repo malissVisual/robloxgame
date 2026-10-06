@@ -39,6 +39,8 @@ local ART = {
 	"sign_camp", "sign_stadium", "sign_hilltop", "sign_oceanview", "sign_pinecrest", "sign_lakeside", "sign_sunset",
 	"sign_maple", "sign_oak", "sign_birch", "sign_elm", "sign_office_harbor", "sign_office_tower",
 	"sign_office_penthouse",
+	-- 5.1, art/icons (Codex's bike art; ids empty until uploaded)
+	"bike_rust", "bike_city", "bike_cargo", "bike_ebike", "gear_basket", "gear_panniers", "gear_trailer", "map_bikes",
 }
 
 -- Every picture has its id slot, and the set has nothing else.
@@ -53,7 +55,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("98 pictures", count == 98, count)
+check("106 pictures", count == 106, count)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)
@@ -111,10 +113,24 @@ for id in Map.Shops do
 end
 check("an unknown landmark: none", Icons.landmark("moon") == nil)
 
+-- 5.1: the bikes and the bike gear have pictures (the car gear: the emoji).
+check("the bike shop's marker", Icons.landmark("bikes") == "map_bikes")
+check("the four bikes", Icons.bike("rustbike") == "bike_rust" and Icons.bike("citybike") == "bike_city" and Icons.bike("cargobike") == "bike_cargo"
+	and Icons.bike("ebike") == "bike_ebike" and Icons.bike("van") == nil and Icons.bike(nil) == nil)
+for _, gear in Config.Gear do
+	check(`gear {gear.id}: {if gear.bikeOnly then "its picture" else "the emoji"}`, if gear.bikeOnly then exists(Icons.gear(gear.id)) else Icons.gear(gear.id) == nil)
+end
+
 -- The building signs: every shop, employer, tower and home has one (two places share their employer's), the garages
--- and the homes are square badges, the rest 4 : 1 boards.
+-- and the homes are square badges, the rest 4 : 1 boards. (5.1: Spoke & Chain has no sign picture: its board is the
+-- contract look, text only.)
+local NO_SIGN_ART: { [string]: boolean } = { bikes = true }
 for id in Map.Shops do
-	check(`shop {id} has a sign`, exists(Icons.sign(id)))
+	if NO_SIGN_ART[id] then
+		check(`shop {id}: no sign picture (the text board)`, Icons.sign(id) == nil)
+	else
+		check(`shop {id} has a sign`, exists(Icons.sign(id)))
+	end
 end
 for _, employer in Config.Employers do
 	check(`employer {employer.id} has a sign`, exists(Icons.sign(employer.id)))

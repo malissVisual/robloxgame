@@ -1,12 +1,16 @@
 --!strict
 -- 5.0: how a player moves cargo right now (shared/Transport.luau has the rules): on foot with their personal gear
 -- (profile.kit, Config.Kit), or with their car when they sit in it or stand by it (the car's room: Economy.capacity
--- with its stage and gear, Vehicles.capacity). 5.1 adds the bike.
+-- with its stage and gear, Vehicles.capacity). 5.1: or on their bike (Config.Cars bike = true): its room, its bike
+-- gear's and the pack, light pieces only (Rules.bike).
 --
 --   Transport.kitOf(player)    the kit owned (empty while the save loads)
 --   Transport.footOf(player)   Info on foot with that kit (a foot job's room, whatever the player drives)
 --   Transport.packRoomOf(player), Transport.warmOf(player)   the pack's room, the jacket's food drain (Cargo, Jobs)
---   Transport.of(player)       Info now: "car" seated in or within NEAR studs of your own car, else on foot
+--   Transport.of(player)       Info now: "car" / "bike" seated on or within NEAR studs of your own vehicle, else on foot
+--   Transport.bikeOf(player)   5.1: the bike a bike job is ridden on (the equipped one, else your bike of choice) and
+--                              its Info (nil, nil without a bike): the board's BIKE section, Jobs' room checks
+--   Transport.riding(player)   5.1: is the equipped vehicle a bike (profile.car is one)?
 --   Transport.applyKit(player) the character attribute KitSpeed (the shoes' walk / sprint multiplier, nil = 1) that
 --                              client/CameraRig.luau multiplies the walk and the sprint with; set on every spawn and
 --                              whenever the profile changes (a purchase)
@@ -42,6 +46,25 @@ function Transport.warmOf(player: Player): number
 	return Rules.warm(Transport.kitOf(player))
 end
 
+-- 5.1: is the vehicle CAR / MY BIKE brings a bike?
+function Transport.riding(player: Player): boolean
+	local profile = PlayerData.get(player)
+	return profile ~= nil and Rules.isBike(profile.car)
+end
+
+-- 5.1: the bike of a bike job (the equipped one, else your bike of choice, while you own it) and its Info.
+function Transport.bikeOf(player: Player): (string?, Rules.Info?)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return nil, nil
+	end
+	local id: string? = if Rules.isBike(profile.car) then profile.car else profile.bike
+	if id == nil or not profile.cars[id] or not Rules.isBike(id) then
+		return nil, nil
+	end
+	return id, Rules.bike(Rules.bikeRoom(id, profile.carGear), profile.kit)
+end
+
 function Transport.of(player: Player): Rules.Info
 	local car = Vehicles.get(player)
 	if car and not car.lent then
@@ -50,6 +73,9 @@ function Transport.of(player: Player): Rules.Info
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 		local near = root ~= nil and root:IsA("BasePart") and (root.Position - car.chassis.Position).Magnitude <= NEAR
 		if seated == car or near then
+			if Rules.isBike(car.id) then
+				return Rules.bike(Vehicles.capacity(car, nil), Transport.kitOf(player)) -- 5.1
+			end
 			return Rules.car(Vehicles.capacity(car, nil))
 		end
 	end

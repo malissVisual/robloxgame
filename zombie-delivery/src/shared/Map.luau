@@ -27,6 +27,7 @@
 --              View), the Survivor Camp (on the Radio Road) and the Stadium Shelter (south of the Suburbs)
 --   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
 --   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
+--   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St
 --
 -- It also holds the shape of the night over the clock (Map.nightFactor): the server runs the clock
 -- (server/DayNight.luau), every client draws the look from the same numbers (client/Weather.luau).
@@ -169,6 +170,7 @@ Map.SpecialBlocks = {
 		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
 		["-1,-1"] = "dispatchtower", -- Dispatch Tower (the offices), in the safe zone
 		["1,1"] = "parking", -- Downtown Parking (a garage), in the safe zone
+		["-1,1"] = "bikes", -- 5.1, Spoke & Chain Cycles (Map.Shops.bikes): its door on Main St, in the safe zone
 		-- 3.0, the missions' places in town (all just outside the safe zone):
 		["0,-3"] = "cityhall", -- City Hall: north of the depot, its steps down to the street in front (south)
 		["-2,-2"] = "police", -- Precinct 13: its front and the patrol cars on the street to the south
@@ -198,6 +200,7 @@ Map.Shops = {
 	guns = { name = "Lead & Co.", x = -CELL, z = 0 },
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
 	supplies = { name = "Last Stop Supplies", x = 0, z = -CELL },
+	bikes = { name = "Spoke & Chain", x = -CELL, z = CELL }, -- 5.1: bikes and bike gear (Config.BikeShop)
 } :: { [string]: { name: string, x: number, z: number } }
 Map.ShopRadius = 80
 
@@ -626,6 +629,8 @@ local landmarks: { Landmark } = {
 	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, car guns and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
 	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Repair kits, medkits, nitro, molotovs, mines." },
+	-- 5.1: the bike shop (Config.BikeShop).
+	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes and bike gear, from level 2, on Main St: faster than walking and more room for the light runs." },
 	-- 5.0: Earl sells his old van here (Config.VanQuest): your first vehicle.
 	{ id = "earl", name = "Earl's Used Wheels", icon = "🚐", x = Map.VanSeller.earl.x, z = Map.VanSeller.earl.z, kind = "place", description = "Far out west on the West Highway, past the Airfield Road. Earl sells his old van here: your first vehicle (Marge's quest at level 4)." },
 }

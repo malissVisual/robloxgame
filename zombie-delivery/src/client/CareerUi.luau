@@ -17,7 +17,7 @@
 --     up (CareerUi.blocked, set by Main), and a jump over several levels shows them as one card.
 -- While the window or the card is open the mouse is free (Main: CameraRig.mouseNeeded).
 -- 5.0: the road starts on foot (shared/Career.luau): level 1 the on-foot runs and the personal gear (Config.Kit, with
--- its price at Last Stop Supplies), the bikes as a "coming in 5.1" line, the Old Van and the car tiers at their new
+-- its price at Last Stop Supplies), the bikes at Spoke & Chain (5.1), the Old Van and the car tiers at their new
 -- levels (all from Config). Below the first car tier the next goal counts on-foot runs. The phone's CAREER app
 -- (client/Phone.luau) reads CareerUi.unlockText and CareerUi.toGo.
 
@@ -95,7 +95,7 @@ local KIND_ICON: { [string]: string } = {
 	garage = "🅿",
 	estate = "🏠",
 	foot = "🚶", -- 5.0: the on-foot runs
-	soon = "🚲", -- 5.0: what the next release brings (the bikes, 5.1)
+	bike = "🚲", -- 5.1: a bike at Spoke & Chain
 }
 
 -- An unlock as the road shows it: its kind's mark and its name ("🔧 Work Van (Old Van)" for a stage).
@@ -103,7 +103,7 @@ local function unlockText(unlock: Career.Unlock): string
 	local icon = KIND_ICON[unlock.kind]
 	if unlock.kind == "gear" then
 		local gear = Economy.findGear(unlock.id)
-		return `{if gear then gear.icon else "🧰"} {unlock.name} (gear)`
+		return `{if gear then gear.icon else "🧰"} {unlock.name} ({if gear and gear.bikeOnly then "bike gear" else "gear"})`
 	elseif unlock.kind == "kit" then
 		-- 5.0: personal gear, at Last Stop Supplies
 		for _, kit in Config.Kit do

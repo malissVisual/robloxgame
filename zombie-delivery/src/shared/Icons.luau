@@ -119,6 +119,16 @@ Icons.Ids = {
 	sign_office_harbor = "rbxassetid://98838604316825",
 	sign_office_tower = "rbxassetid://123929738866726",
 	sign_office_penthouse = "rbxassetid://84138164235299",
+	-- 5.1, the bikes, their gear and the bike shop's map marker (art/icons, Codex's; 256 x 256 white). Empty: not
+	-- uploaded yet (the emoji shows).
+	bike_rust = "",
+	bike_city = "",
+	bike_cargo = "",
+	bike_ebike = "",
+	gear_basket = "",
+	gear_panniers = "",
+	gear_trailer = "",
+	map_bikes = "",
 } :: { [string]: string }
 
 -- The asset id of an icon, or nil while it is empty (not uploaded) or unknown.
@@ -158,6 +168,18 @@ end
 -- An item (Config.Items id).
 function Icons.item(itemId: string?): string?
 	return named("item_", itemId)
+end
+
+-- 5.1: a bike (a Config.Cars id with bike = true); nil for anything else.
+local BIKE_ICONS: { [string]: string } = { rustbike = "bike_rust", citybike = "bike_city", cargobike = "bike_cargo", ebike = "bike_ebike" }
+function Icons.bike(carId: string?): string?
+	local name = if carId then BIKE_ICONS[carId] else nil
+	return if name and Icons.Ids[name] ~= nil then name else nil
+end
+
+-- 5.1: a piece of gear (Config.Gear id) with a picture of its own (the bike gear); nil for the others (the emoji).
+function Icons.gear(gearId: string?): string?
+	return named("gear_", gearId)
 end
 
 -- The cargo kinds (Config.Cargo.Kinds, the job types' itemKind) and the looks of the pieces (Config.Jobs.Businesses

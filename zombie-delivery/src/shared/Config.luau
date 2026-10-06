@@ -853,11 +853,30 @@ Config.VanQuest = {
 	Sold = "Already sold you one, kid. Treat her right.",
 }
 
+-- 5.1, Spoke & Chain Cycles (Map.Shops.bikes, Downtown block (-1, 1), its door on Main St): the bikes (Config.Cars with
+-- bike = true) and the bike gear (Config.Gear bikeOnly). A bike needs no garage slot and comes to you at once (MY
+-- BIKE); you may own bikes and cars: profile.car is the one CAR / MY BIKE brings, profile.bike your bike of choice,
+-- profile.lastCar the car CALL CAR brings back (server/Shops.luau). At Career.BIKE_LEVEL Marge texts you about the
+-- shop (server/Tutorial.luau, the Tutorial remote's "message" with the GPS): Unlock ({price}: the cheapest bike's).
+Config.BikeShop = {
+	Shop = "Spoke & Chain",
+	Street = "Main St",
+	Unlock = "You've got legs, now get wheels — Spoke & Chain on Main St sells a rusty bike for {price}. I put it on your GPS.",
+	Reminder = "Spoke & Chain on Main St still has bikes for you. More room and way faster than walking. It's on your GPS.",
+	Bought = "Nice wheels. The BIKE runs on the board are yours now. A basket holds more.",
+	MissionsNeed = "Missions need your car (a bike won't do): CALL CAR on your phone.",
+}
+
 Config.Gear = {
 	{ id = "trolley", name = "Hand Trolley", level = 3, price = 600, icon = "🛒", needs = "trolley", description = "Carry up to 4 pieces at once. It rides folded inside the back (vans and trucks)." },
 	{ id = "straps", name = "Ratchet Straps", level = 4, price = 900, icon = "🔗", description = "The load is strapped down: cargo condition losses ×0.6. Two orange bands in the back." },
 	{ id = "cooler", name = "Cooler Box", level = 5, price = 1400, icon = "🧊", description = "Food stays fresh twice as long (freshness drains ×0.5). A white box in the back." },
 	{ id = "roofrack", name = "Roof Rack", level = 7, price = 2500, icon = "🧳", notOn = { "muscle", "pickup" }, description = "+1 cargo slot on the roof for a light piece (pizza, parcels, mail, bread, medicine …)." },
+	-- 5.1, bike gear (bikeOnly: only on a bike, CarDef.bike; the car gear never goes on one), sold and fitted at Spoke &
+	-- Chain (Map.Shops.bikes) for the bike you ride: `room` more light pieces (Economy.capacity, Transport mode "bike").
+	{ id = "basket", name = "Front Basket", level = 2, price = 150, icon = "🧺", bikeOnly = true, room = 2, description = "+2 light pieces in a wire basket over the front wheel." },
+	{ id = "panniers", name = "Panniers", level = 3, price = 450, icon = "👜", bikeOnly = true, room = 3, description = "+3 light pieces in two bags on the rear rack." },
+	{ id = "trailer", name = "Bike Trailer", level = 4, price = 1200, icon = "📦", bikeOnly = true, room = 4, notOn = { "cargobike" }, description = "+4 light pieces in a two-wheeled trailer behind you (not on the Cargo Bike)." },
 } :: { GearDef }
 
 -- 4.6: what the gear does (4.7's cargo rules read StrapsLoss and CoolerDrain).
@@ -1271,7 +1290,7 @@ Config.Levels = {
 	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
 	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
 	Rewards = {
-		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop opens (5.1)" },
+		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop: Spoke & Chain on Main St" },
 		[3] = { money = 750, items = { repair = 2 } },
 		[4] = { money = 1000, items = { nitro = 2 }, text = "Old Van: Earl's Used Wheels (Marge's quest)" },
 		[5] = { money = 1500, paint = "hivis" },
@@ -1592,6 +1611,44 @@ Config.Jobs = {
 		NeedsVehicleButton = "🚐 NEEDS A VEHICLE",
 		TutorialDrop = 220,
 		TutorialCargo = { cargo = "Letters", kind = "crate", look = "mail", piece = "letter bundle", plural = "letter bundles" },
+	},
+	-- 5.1, the BIKE jobs (server/Jobs.luau lightOffer with this table, offer.mode = "bike"; the same fields as Foot,
+	-- JobRules.footPay / footTime / footPieces take it): the board's BIKE section from Level on, light looks only,
+	-- longer (MinDistance … MaxDistance) and bigger (Pieces, never more than your bike holds: its room + its bike gear +
+	-- your backpack, Transport mode "bike") than a walk, Downtown, in the Suburbs and in the Harbor. Pay: BasePay +
+	-- PayPerStud × the ride + PayPerPiece a piece (PayMin … PayMax); the clock expects Speed studs / s; XP: a ★ job's
+	-- + XpBonus (about 100 – 130). Done on your bike only (riding it or standing by it; never in a car), Cargo's light
+	-- flow (the pieces ride in your pack and the bike's slots: Info.pack). No waves: now and then a stray walker.
+	Bike = {
+		Level = 2,
+		Offers = 3,
+		Pieces = { 2, 6 } :: { number },
+		PickupMin = 60,
+		PickupMax = 450,
+		PickupWiden = 350,
+		MinDistance = 300,
+		MaxDistance = 1000,
+		Districts = { Downtown = true, Suburbs = true, Harbor = true } :: { [string]: boolean },
+		BasePay = 45,
+		PayPerStud = 0.15,
+		PayPerPiece = 5,
+		PayMin = 90,
+		PayMax = 240,
+		PayTop = 1.25,
+		TimeBase = 45,
+		Speed = 18, -- studs / s the clock expects (the Rusty Bike tops out at 30: generous, with stops)
+		XpBonus = 20,
+		StrayEvery = 30,
+		StrayChance = 0.55,
+		StrayMax = 2,
+		StrayDistance = { 70, 130 } :: { number },
+		-- The board's words: no bike yet; in your car (a bike job is ridden); on your bike (a car job needs your car).
+		NeedsBike = "Needs a bike: Spoke & Chain on Main St sells them from level 2 (the Rusty Bike is the cheapest).",
+		NeedsBikeButton = "🚲 NEEDS A BIKE",
+		RideBike = "Bike jobs are ridden: MY BIKE on your phone brings your bike (your car stays where it is).",
+		RideBikeButton = "🚲 RIDE YOUR BIKE",
+		NeedsCar = "You're on your bike: car jobs need your car. CALL CAR on your phone.",
+		NeedsCarButton = "🚐 CALL YOUR CAR",
 	},
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
 	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).

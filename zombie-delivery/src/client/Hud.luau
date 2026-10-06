@@ -811,6 +811,7 @@ local function renderShop()
 		guns = { "🔫", "Guns for your hands" },
 		supplies = { "🧰", "Supplies for the road" },
 		mechanic = { "🔧", "Upgrades, stages, paint and car guns" },
+		bikes = { "🚲", "Bikes and bike gear" }, -- 5.1
 	} :: { [string]: { string } })[shopId] or { "🏪", "" }
 	shop.icon.Text = about[1]
 	shop.subtitle.Text = about[2]
@@ -823,7 +824,7 @@ local function renderShop()
 		local owned = 0
 		for id, yes in state.cars do
 			local def = Economy.findCar(id)
-			if yes and def and not def.company then
+			if yes and def and not def.company and not def.bike then -- (5.1: a bike needs no garage slot)
 				owned += 1
 			end
 		end
@@ -831,8 +832,8 @@ local function renderShop()
 		-- 3.5: not "the next van": every car has a role, and its own stages at Wrench Garage (📦 from → to).
 		note(shop.body, "The catalog. Every car has a role and builds up in stages at Wrench Garage (📦 slots from → to; more room makes the body longer). A van ends at 4 slots: more needs the High-Roof Van, the Box Truck or the Freight Truck (pallets).", C.dim, 1)
 		for order, def in Config.Cars do
-			if def.company then
-				continue
+			if def.company or def.bike then
+				continue -- (5.1: the bikes are Spoke & Chain's)
 			end
 			local c = card(shop.body, 100, order + 1, def.id == shopFocus)
 			local lock = if state.cars[def.id] then nil else lockedAt(def.level)
@@ -929,6 +930,13 @@ local function renderShop()
 				end)
 			end
 		end
+	elseif shopId == "bikes" then
+		-- 5.1: Spoke & Chain: BIKES and GEAR (client/BikeShop.luau; it keeps the open tab).
+		tabs(shop.body, { { "bikes", "BIKES" }, { "gear", "GEAR" } }, require(script.Parent.BikeShop).tab, function(id)
+			require(script.Parent.BikeShop).tab = id
+			renderShop()
+		end)
+		require(script.Parent.BikeShop).render(shop.body, state, here, shopFocus)
 	elseif shopId == "supplies" then
 		-- 5.0: two tabs: ITEMS (the consumables) and KIT (personal gear, client/KitShop.luau; it keeps the open tab).
 		tabs(shop.body, { { "items", "ITEMS" }, { "kit", "KIT" } }, require(script.Parent.KitShop).currentTab(state), function(id)
@@ -1229,6 +1237,8 @@ function Hud.openShop(id: string, focus: string?)
 	closeWindows()
 	if id == "supplies" and (focus == "kit" or focus == "items") then
 		require(script.Parent.KitShop).tab = focus -- 5.0: the phone's SHOP app and the server may open a tab
+	elseif id == "bikes" then
+		require(script.Parent.BikeShop).tab = if focus == "gear" then "gear" else "bikes" -- 5.1 (a display bike: BIKES)
 	end
 	shopId = id
 	shopFocus = focus
@@ -2573,7 +2583,7 @@ function view.tickTicket(distance: number?)
 	local condition = tonumber(job.condition) or 1
 	-- 5.0, on foot: the backpack ("Backpack 1/2"; the PackCount / PackRoom attributes are live, the payload's pack
 	-- and packRoom the fallback).
-	local packRoom = if job.mode == "foot" then tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0 else 0
+	local packRoom = if job.mode == "foot" or job.mode == "bike" then tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0 else 0
 	local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
 	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{packed}/{packRoom}`
 	if signature == t.meta0 then
@@ -2593,7 +2603,7 @@ function view.tickTicket(distance: number?)
 		add("todo", tostring(t.action))
 	end
 	if packRoom > 0 then
-		add(if packed >= packRoom then "warn" else "quiet", `🎒 Backpack {packed}/{packRoom}{if packed >= packRoom then " · full" else ""}`)
+		add(if packed >= packRoom then "warn" else "quiet", `{if job.mode == "bike" then "🚲 On the bike" else "🎒 Backpack"} {packed}/{packRoom}{if packed >= packRoom then " · full" else ""}`)
 	end
 	local modifier = job.modifier
 	if type(modifier) == "table" and modifier.name then

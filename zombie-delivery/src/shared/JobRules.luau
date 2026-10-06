@@ -45,6 +45,8 @@
 --   JobRules.footPay(distance, pieces, multiplier)   what a foot job pays ($5 steps)
 --   JobRules.footTime(distance, handling, timeMultiplier)   its clock
 --   JobRules.footPieces(wanted, room)     its pieces: within Foot.Pieces and what you carry
+-- 5.1, the BIKE jobs (Config.Jobs.Bike): the same three with Config.Jobs.Bike as their last argument (LightRules), and
+--   JobRules.bikeXp(xp)                   a bike job's XP (+ Bike.XpBonus)
 
 local Config = require(script.Parent.Config)
 
@@ -465,10 +467,24 @@ end
 
 -- ── 5.0: the ON FOOT jobs (Config.Jobs.Foot) ────────────────────────────────
 
+-- 5.1: the numbers of a light job (Config.Jobs.Foot, or Config.Jobs.Bike for a BIKE job: the same fields). Each
+-- function below takes one as its last argument; without it, Foot.
+export type LightRules = {
+	Pieces: { number },
+	BasePay: number,
+	PayPerStud: number,
+	PayPerPiece: number,
+	PayMin: number,
+	PayMax: number,
+	PayTop: number,
+	TimeBase: number,
+	Speed: number,
+}
+
 -- What a foot job pays: BasePay + PayPerStud × the walk (the route, manhattan) + PayPerPiece a piece, kept within
 -- PayMin … PayMax, then × `multiplier` (the role's, the modifier's) but never over PayMax × PayTop, rounded to $5.
-function JobRules.footPay(distance: number, pieces: number, multiplier: number?): number
-	local foot = Config.Jobs.Foot
+function JobRules.footPay(distance: number, pieces: number, multiplier: number?, rules: LightRules?): number
+	local foot: LightRules = rules or Config.Jobs.Foot
 	local base = foot.BasePay + foot.PayPerStud * math.max(0, distance) + foot.PayPerPiece * math.max(0, math.floor(pieces))
 	local pay = math.clamp(base, foot.PayMin, foot.PayMax) * math.max(0, multiplier or 1)
 	return math.min(math.floor(pay / 5 + 0.5) * 5, math.floor(foot.PayMax * foot.PayTop / 5) * 5)
@@ -476,17 +492,22 @@ end
 
 -- A foot job's clock: TimeBase + the walk at Speed studs / s (× the modifier's timeMultiplier) + the handling, whole
 -- seconds.
-function JobRules.footTime(distance: number, handling: number, timeMultiplier: number?): number
-	local foot = Config.Jobs.Foot
+function JobRules.footTime(distance: number, handling: number, timeMultiplier: number?, rules: LightRules?): number
+	local foot: LightRules = rules or Config.Jobs.Foot
 	local walk = math.max(0, distance) / math.max(1, foot.Speed) * (timeMultiplier or 1)
 	return math.floor(foot.TimeBase + walk + math.max(0, handling) + 0.5)
 end
 
 -- The pieces of a foot job: `wanted` (the business's pick) within Foot.Pieces and never more than `room` (what you
--- carry: Transport.handsRoom), at least 1.
-function JobRules.footPieces(wanted: number, room: number): number
-	local band = Config.Jobs.Foot.Pieces
+-- carry: Transport.handsRoom), at least 1. (5.1, a bike job: within Bike.Pieces and what the bike holds.)
+function JobRules.footPieces(wanted: number, room: number, rules: LightRules?): number
+	local band = (rules or Config.Jobs.Foot).Pieces
 	return math.max(1, math.min(math.clamp(math.floor(wanted), band[1], band[2]), math.floor(room)))
+end
+
+-- 5.1: a bike job's XP: a ★ job's (Levels.jobXp of its tier) + Config.Jobs.Bike.XpBonus.
+function JobRules.bikeXp(xp: number): number
+	return xp + Config.Jobs.Bike.XpBonus
 end
 
 return JobRules

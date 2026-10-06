@@ -373,11 +373,14 @@ function Economy.gearSlots(carId: string, stage: number): number
 end
 
 -- Does this piece of gear fit this car (one of yours with a gear slot, the CarDef flag it needs, not a car it is
--- not made for)?
+-- not made for)? 5.1: bike gear (GearDef.bikeOnly) only on a bike (CarDef.bike), the car gear never on one.
 function Economy.gearFits(carId: string, gearId: string): boolean
 	local def = Economy.findCar(carId)
 	local gear = Economy.findGear(gearId)
 	if not def or not gear or def.company or Economy.gearSlots(carId, Economy.maxStage(carId)) <= 0 then
+		return false
+	end
+	if (def.bike == true) ~= (gear.bikeOnly == true) then
 		return false
 	end
 	local needs = gear.needs
@@ -427,6 +430,22 @@ function Economy.rackSlots(carId: string, installed: { [string]: boolean }?, loo
 		return 0
 	end
 	return if Economy.gearFits(carId, "roofrack") then Config.GearTuning.RoofRackSlots else 0
+end
+
+-- 5.1, bike gear: the extra light pieces its installed bike gear (GearDef.room: the basket, the panniers, the trailer)
+-- gives a bike, for a light look or none (a bike takes nothing else); 0 for a car.
+function Economy.bikeRoom(carId: string, installed: { [string]: boolean }?, look: string?): number
+	local def = Economy.findCar(carId)
+	if not def or def.bike ~= true or not installed or (look ~= nil and not Config.Cargo.LightLooks[look]) then
+		return 0
+	end
+	local room = 0
+	for _, gear in Config.Gear do
+		if installed[gear.id] and gear.bikeOnly and Economy.gearFits(carId, gear.id) then
+			room += math.max(0, math.floor(gear.room or 0))
+		end
+	end
+	return room
 end
 
 -- 4.6: a save from 4.0 – 4.5 bought the Hand Trolley as an upgrade track (carUpgrades[carId].trolley = 1): every car
@@ -486,7 +505,7 @@ function Economy.roomAdvice(carId: string, stage: number, need: number): string
 	end
 	local names: { string } = {}
 	for _, def in Config.Cars do
-		if not def.company and def.id ~= carId and Economy.maxCapacity(def.id) >= need then
+		if not def.company and not def.bike and def.id ~= carId and Economy.maxCapacity(def.id) >= need then -- (5.1: no bike)
 			table.insert(names, def.name)
 		end
 	end
@@ -498,13 +517,14 @@ end
 
 -- 3.4, cargo capacity: how many pieces carried or led by hand the car takes at once: its cargo slots (CarDef
 -- capacity; 3.5: its stage's, out of `levels`.stage). 4.6: with its installed gear (Economy.installedGear) and the
--- look of the cargo, the Roof Rack's slot for a light piece too (Economy.rackSlots).
+-- look of the cargo, the Roof Rack's slot for a light piece too (Economy.rackSlots). 5.1: a bike's bike gear adds its
+-- room (Economy.bikeRoom: with a light look or none).
 function Economy.capacity(carId: string, levels: Upgrades?, installed: { [string]: boolean }?, look: string?): number
 	local def = Economy.findCar(carId)
 	if not def then
 		return 0
 	end
-	return Economy.stageCapacity(carId, Economy.stageOf(carId, levels)) + Economy.rackSlots(carId, installed, look)
+	return Economy.stageCapacity(carId, Economy.stageOf(carId, levels)) + Economy.rackSlots(carId, installed, look) + Economy.bikeRoom(carId, installed, look)
 end
 
 -- 3.4: the cargo slots a job needs: its pieces when they are carried or led in by hand (all of them ride at once:
