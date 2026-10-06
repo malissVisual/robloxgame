@@ -41,8 +41,8 @@ if cashrun and ambulance and pizzarush and winter and army then
 
 	-- Levels.
 	check("cash transport from level 5", Economy.jobLevel(cashrun, cashrun.tier) == 5)
-	check("ambulance from level 3", Economy.jobLevel(ambulance, ambulance.tier) == 3)
-	check("pizza rush from level 1", Economy.jobLevel(pizzarush, pizzarush.tier) == 1)
+	check("ambulance from level 4 (5.0: a company vehicle)", Economy.jobLevel(ambulance, ambulance.tier) == 4)
+	check("pizza rush from level 4 (5.0: in your own car)", Economy.jobLevel(pizzarush, pizzarush.tier) == 4)
 	check("a board special without a level needs its tier's", Economy.jobLevel(winter, winter.tier) == Config.Jobs.Tiers[winter.tier].level)
 	check("army supply from level 7 (3.2)", Economy.jobLevel(army, army.tier) == 7)
 end
@@ -91,7 +91,7 @@ end)())
 -- Danger levels ------------------------------------------------------------------------
 
 local tiers = Config.Jobs.Tiers
-check("the easy deliveries are open at level 1", Economy.jobLevel(nil, 1) == 1)
+check("the easy car deliveries are open at level 4 (5.0: on foot before)", Economy.jobLevel(nil, 1) == 4 and Config.Jobs.Foot.Offers >= 1)
 check("danger levels unlock in order", (function()
 	for n = 2, #tiers do
 		if tiers[n].level < tiers[n - 1].level then

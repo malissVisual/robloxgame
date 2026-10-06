@@ -112,6 +112,7 @@ local function stateFor(player: Player): { [string]: any }?
 	end
 	local stars, starsMax = MissionData.stars(profile.missions, nil)
 	local owner = Crew.ownerOf(player)
+	local carId = profile.car
 	return {
 		progress = table.clone(profile.missions),
 		campaigns = table.clone(profile.campaigns),
@@ -121,10 +122,11 @@ local function stateFor(player: Player): { [string]: any }?
 		active = activeOf(player),
 		crewOwner = if owner and owner.Parent then owner.DisplayName else nil,
 		crewSize = #Crew.members(player),
-		capacity = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car)), -- 3.4
-		carName = (Economy.findCar(profile.car) or Config.Cars[1]).name,
-		carId = profile.car, -- 3.5: the car and its stage (the window's advice: Economy.roomAdvice)
-		carStage = Economy.stageOf(profile.car, Economy.carLevels(profile.carUpgrades, profile.car)),
+		capacity = if carId then Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId)) else 0, -- 3.4
+		carName = if carId then (Economy.findCar(carId) or Config.Cars[1]).name else "no vehicle",
+		carId = carId, -- 3.5: the car and its stage (the window's advice: Economy.roomAdvice); 5.0: nil = no vehicle
+		carStage = if carId then Economy.stageOf(carId, Economy.carLevels(profile.carUpgrades, carId)) else 0,
+		hasCar = carId ~= nil, -- 5.0: the missions need a vehicle of your own
 	}
 end
 
@@ -136,7 +138,8 @@ local function signature(player: Player): string
 	local profile = PlayerData.get(player)
 	if profile then
 		stars = MissionData.stars(profile.missions, nil)
-		car = `{profile.car}:{Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car))}`
+		local carId = profile.car
+		car = if carId then `{carId}:{Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId))}` else "-"
 	end
 	return `{activeOf(player) or "-"}|{if owner then owner.UserId else 0}|{PlayerData.level(player)}|{stars}|{#Crew.members(player)}|{car}`
 end
@@ -203,14 +206,19 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 	if not open then
 		return why or "This mission is locked."
 	end
+	-- 5.0: the missions and the campaigns need a vehicle of your own (you start on foot).
+	local carId = profile.car
+	if not carId then
+		return "Missions need a vehicle of your own: the Old Van at Dead End Motors (level 4)."
+	end
 	-- 3.4: the pieces must fit your car (a mission that lends a vehicle brings its own room).
 	local need = Economy.cargoNeed(def.load, def.items)
 	if not def.vehicle and need > 0 then
 		-- 4.6: a Roof Rack (gear) takes one more light piece.
 		local kind = Config.Cargo.Kinds[def.itemKind]
-		local holds = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car), Economy.installedGear(profile.carGear, profile.car), if kind then kind.look else def.itemKind)
+		local holds = Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId), Economy.installedGear(profile.carGear, carId), if kind then kind.look else def.itemKind)
 		if need > holds then
-			local car = Economy.findCar(profile.car) or Config.Cars[1]
+			local car = Economy.findCar(carId) or Config.Cars[1]
 			local stage = Economy.stageOf(car.id, Economy.carLevels(profile.carUpgrades, car.id))
 			return `This mission needs a vehicle with {need} slots (your {car.name} holds {holds}). {Economy.roomAdvice(car.id, stage, need)}`
 		end

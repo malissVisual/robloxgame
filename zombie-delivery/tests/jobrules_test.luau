@@ -138,8 +138,9 @@ check("★★★ counts like ★★", JobRules.nextStreak(4, 3) == 5)
 -- The licences ----------------------------------------------------------------------------
 
 local three, four = JobRules.licence(3), JobRules.licence(4)
-check("★★★: level 4 and 5 good jobs at ★★", three ~= nil and three.level == 4 and three.jobs == 5 and three.atTier == 2)
-check("★★★★: level 7 and 10 good jobs at ★★★", four ~= nil and four.level == 7 and four.jobs == 10 and four.atTier == 3)
+-- 5.0: the car tiers moved up (★ 4, ★★ 5, ★★★ 6, ★★★★ 9): you start on foot.
+check("★★★: level 6 and 5 good jobs at ★★", three ~= nil and three.level == 6 and three.jobs == 5 and three.atTier == 2)
+check("★★★★: level 9 and 10 good jobs at ★★★", four ~= nil and four.level == 9 and four.jobs == 10 and four.atTier == 3)
 check("★ and ★★ need no licence", JobRules.licence(1) == nil and JobRules.licence(2) == nil and JobRules.hasLicence(2, 2, {}, {}))
 check("the licences' levels are their tiers' levels", three ~= nil and four ~= nil and Jobs.Tiers[3].level == three.level and Jobs.Tiers[4].level == four.level)
 
@@ -156,8 +157,8 @@ check("four good ★★ jobs: LICENCE 4 / 5", have == 4 and need == 5)
 check("not yet at 4 / 5", not JobRules.hasLicence(3, 6, {}, counts))
 local grew = JobRules.countJob(counts, 2, 3)
 check("the fifth counts (★★ jobs never count for ★★★★)", #grew == 1 and grew[1] == 3 and (counts["4"] or 0) == 0)
-check("5 / 5 at level 4: the ★★★ licence", JobRules.hasLicence(3, 4, {}, counts))
-check("5 / 5 below level 4: not yet", not JobRules.hasLicence(3, 3, {}, counts))
+check("5 / 5 at level 6: the ★★★ licence", JobRules.hasLicence(3, 6, {}, counts))
+check("5 / 5 below level 6: not yet", not JobRules.hasLicence(3, 5, {}, counts))
 for _ = 1, 3 do
 	JobRules.countJob(counts, 2, 2)
 end
@@ -167,19 +168,19 @@ for _ = 1, 10 do
 end
 have, need = JobRules.progress(4, counts)
 check("ten good ★★★ jobs: 10 / 10 for ★★★★", have == 10 and need == 10)
-check("★★★★ at level 7 with them", JobRules.hasLicence(4, 7, {}, counts) and not JobRules.hasLicence(4, 6, {}, counts))
+check("★★★★ at level 9 with them", JobRules.hasLicence(4, 9, {}, counts) and not JobRules.hasLicence(4, 8, {}, counts))
 check("a licence held stays held", JobRules.hasLicence(4, 1, { ["4"] = true }, {}))
 
 -- The grandfather rule ----------------------------------------------------------------------
 
-local old = JobRules.grandfather(8, 40)
-check("an old save at level 8 with deliveries keeps ★★★ and ★★★★", old["3"] == true and old["4"] == true)
-old = JobRules.grandfather(5, 12)
-check("an old save at level 5 keeps ★★★ only", old["3"] == true and old["4"] == nil)
+local old = JobRules.grandfather(10, 40)
+check("an old save at level 10 with deliveries keeps ★★★ and ★★★★", old["3"] == true and old["4"] == true)
+old = JobRules.grandfather(7, 12)
+check("an old save at level 7 keeps ★★★ only", old["3"] == true and old["4"] == nil)
 old = JobRules.grandfather(9, 0)
 check("no deliveries: no licence given", next(old) == nil)
-old = JobRules.grandfather(3, 50)
-check("below level 4: nothing to keep", next(old) == nil)
+old = JobRules.grandfather(5, 50)
+check("below level 6: nothing to keep", next(old) == nil)
 
 local function tierName(level: number, id: string): string
 	for _, unlock in Career.unlocksAt(level) do
@@ -189,8 +190,8 @@ local function tierName(level: number, id: string): string
 	end
 	return ""
 end
-check("the CAREER road says what the ★★★ and ★★★★ licences need", string.find(tierName(4, "3"), "licence: 5 jobs", 1, true) ~= nil
-	and string.find(tierName(7, "4"), "licence: 10 jobs", 1, true) ~= nil and string.find(tierName(2, "2"), "licence", 1, true) == nil, tierName(4, "3"))
+check("the CAREER road says what the ★★★ and ★★★★ licences need", string.find(tierName(6, "3"), "licence: 5 jobs", 1, true) ~= nil
+	and string.find(tierName(9, "4"), "licence: 10 jobs", 1, true) ~= nil and string.find(tierName(5, "2"), "licence", 1, true) == nil, tierName(6, "3"))
 
 check("stars in words", JobRules.stars(2) == "★★☆" and JobRules.stars(3) == "★★★" and JobRules.stars(0) == "☆☆☆")
 

@@ -418,6 +418,9 @@ local function onTutorial(newPhase: any, data: any)
 		show("say", TutorialSteps.dialog("say", info))
 		return
 	end
+	if newPhase == "phone" then
+		return -- 5.0: Marge gave the phone (client/Phone.luau shows its NEW PHONE moment); not a phase of hers
+	end
 	phase = if newPhase == "done" then nil else newPhase
 	refresh()
 	local dialog = TutorialSteps.dialog(newPhase, info)

@@ -54,9 +54,14 @@ local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
 
 -- 4.5: the admin's walk multiplier (the player attribute AdminSpeed: 1, 2 or 4; only server/Admin.luau sets it).
+-- 5.0: × the kit's (the character attribute KitSpeed, running shoes: server/Transport.luau applyKit), on every step on
+-- foot: the walk, the sprint, the carry.
 local function adminSpeed(): number
 	local value = player:GetAttribute("AdminSpeed")
-	return if type(value) == "number" and value >= 1 and value <= 4 then value else 1
+	local character = player.Character
+	local kit = if character then character:GetAttribute("KitSpeed") else nil
+	local kitMult = if type(kit) == "number" and kit >= 1 and kit <= 2 then kit else 1
+	return (if type(value) == "number" and value >= 1 and value <= 4 then value else 1) * kitMult
 end
 
 -- The step with cargo in the hands: slower still with a heavy piece and nobody helping (the TWO-MAN LIFT twist:

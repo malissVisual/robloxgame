@@ -31,9 +31,9 @@ local rustyTop = Economy.timeToTop(rusty.maxSpeed, rusty.accel)
 print(`  the Rusty Van: 0 → 97 % of {rusty.maxSpeed} in {string.format("%.2f", rustyTop)} s`)
 check("the Rusty Van takes about 3.5 – 4 s to its top speed", rustyTop >= 3.3 and rustyTop <= 4.2, rustyTop)
 check("four stages: Rusty, Patched, Work, Long Cargo", #stages == 4 and stages[2].name == "Patched Van" and stages[3].name == "Work Van" and stages[4].name == "Long Cargo Van")
-check("Patched Van: about $250, level 1 – 2, 2 slots", stages[2].price >= 200 and stages[2].price <= 300 and (stages[2].level or 1) <= 2 and stages[2].capacity == 2)
-check("Work Van: about $700, level 2 – 3, 3 slots", stages[3].price >= 600 and stages[3].price <= 800 and (stages[3].level or 1) >= 2 and (stages[3].level or 1) <= 3 and stages[3].capacity == 3)
-check("Long Cargo Van: about $2,200, level 4 – 5, 4 slots", stages[4].price >= 2000 and stages[4].price <= 2400 and (stages[4].level or 1) >= 4 and (stages[4].level or 1) <= 5 and stages[4].capacity == 4)
+check("Patched Van: about $250, level 4 (5.0), 2 slots", stages[2].price >= 200 and stages[2].price <= 300 and stages[2].level == 4 and stages[2].capacity == 2)
+check("Work Van: about $700, level 5 (5.0), 3 slots", stages[3].price >= 600 and stages[3].price <= 800 and stages[3].level == 5 and stages[3].capacity == 3)
+check("Long Cargo Van: about $2,200, level 6 (5.0), 4 slots", stages[4].price >= 2000 and stages[4].price <= 2400 and stages[4].level == 6 and stages[4].capacity == 4)
 local WANT = { { 42, 11 }, { 48, 15 }, { 54, 19 }, { 56, 21 } } -- the brief's max / accel per stage (about)
 local lastTop = math.huge
 for stage = 0, 3 do
@@ -133,7 +133,7 @@ check("the Engine's card says the smoke stops", engine ~= nil and string.find(en
 local freight = Economy.findCar("freight")
 check("the Freight Truck exists (style freighttruck)", freight ~= nil and freight.style == "freighttruck" and freight.name == "Freight Truck")
 if freight then
-	check("level 9, about $45,000", freight.level == 9 and freight.price >= 40000 and freight.price <= 50000)
+	check("level 10 (5.0), about $45,000", freight.level == 10 and freight.price >= 40000 and freight.price <= 50000)
 	check("12 slots", freight.capacity == 12 and Economy.maxCapacity("freight") == 12)
 	check("slow and heavy", freight.maxSpeed <= 47 and freight.accel <= 13 and freight.turn <= 1.3 and freight.health >= 850)
 	check("no car gun, a trolley", freight.mount ~= true and freight.trolley == true)

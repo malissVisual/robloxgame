@@ -955,7 +955,8 @@ local function renderShop()
 			if carOk then
 				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (new tyres and rims, a bull bar, plates, a scoop); a STAGE rebuilds the car itself, the trolley and the other gear are in GEAR. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
 			else
-				note(shop.body, `Your {if upCar then upCar.name else "vehicle"} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`, C.red, 1)
+				-- 5.0: on foot, no vehicle yet
+				note(shop.body, if upCar then `Your {upCar.name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.` else "You don't have a vehicle yet: the Old Van is sold at Dead End Motors from level 4.", C.red, 1)
 			end
 			local row = 1
 			-- 3.5: the STAGE card: the car's next stage (its new look, its room, before → after) or its last one.

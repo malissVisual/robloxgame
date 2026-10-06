@@ -45,6 +45,7 @@ local Repair = require(Server.Repair)
 local Explore = require(Server.Explore)
 local Tutorial = require(Server.Tutorial)
 local CloseCombat = require(Server.CloseCombat)
+local Transport = require(Server.Transport)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -96,6 +97,8 @@ local function sendState(player: Player)
 		streak = profile.streak, -- 4.7: good jobs in a row (the board, the CAREER window)
 		licences = profile.licences, -- 4.7: the licences held (tier → true)
 		licenceJobs = profile.licenceJobs, -- 4.7: good jobs counted toward each licence
+		kit = profile.kit, -- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau)
+		phone = profile.phone, -- 5.0: Marge gave the phone (client/Phone.luau shows it)
 	})
 end
 
@@ -211,6 +214,7 @@ safely("Explore", Explore.start) -- 3.7: the map you discover
 safely("Tutorial", Tutorial.start) -- 3.7: the first-day tutorial
 safely("CloseCombat", CloseCombat.start) -- 3.9: the holster (B) and the melee (V)
 safely("Buddy", Buddy.start) -- 4.5: the admin's NPC companions
+safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the character (KitSpeed)
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
@@ -222,8 +226,11 @@ local function giveCar(player: Player)
 	while player.Parent and not PlayerData.get(player) and waited < 15 do
 		waited += task.wait(0.5)
 	end
-	if player.Parent and playing[player] and not Vehicles.get(player) and PlayerData.get(player) then
-		Vehicles.spawn(player, true, Jobs.vehicleFor(player))
+	local profile = PlayerData.get(player)
+	local carId = Jobs.vehicleFor(player)
+	-- 5.0: nobody to give a car to while you are on foot (no vehicle yet).
+	if player.Parent and playing[player] and not Vehicles.get(player) and profile and (carId or profile.car) then
+		Vehicles.spawn(player, true, carId)
 	end
 end
 

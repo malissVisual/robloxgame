@@ -14,9 +14,13 @@
 --                       paint jobs and car guns (one on the roof of the equipped car); 3.4: its repair bays are
 --                       server/Repair.luau's (no free repairs any more); 4.6: GEAR for the equipped car (the "Gear"
 --                       remote: buy it, from its level; install it in a free gear slot or remove it, free)
---   Last Stop Supplies  consumables
+--   Last Stop Supplies  consumables; 5.0: personal gear (the "Kit" remote, Config.Kit: backpacks, running shoes, a
+--                       thermal jacket), yours for good (profile.kit, shared/Transport.luau)
 --   Depot Garage        3.4: the depot lot's garage window (server/Garages.luau: the starting van, company vehicles)
 --   Job Board           the depot's job board
+--
+-- 5.0: you start on foot (profile.car nil): everything for "the equipped car" says you have no vehicle yet, and the
+-- first car you buy is yours to drive at once (it comes to you: Vehicles.spawn).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -26,6 +30,7 @@ local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
+local TransportRules = require(Shared.Transport)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
@@ -38,6 +43,7 @@ local Shops = {}
 
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
+local NO_CAR = "You don't have a vehicle yet. The Old Van is sold at Dead End Motors from level 4."
 
 
 local function nearShop(player: Player, shop: string): boolean
@@ -106,6 +112,14 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			return
 		end
 		profile.cars[id] = true
+		if profile.car == nil then
+			-- 5.0: your first vehicle: it is the one you drive, and it comes out to you now.
+			profile.car = id
+			PlayerData.notify(player)
+			local err = Vehicles.spawn(player, true)
+			notice:FireClient(player, if err then `You bought the {def.name}! Press CAR to call it.` else `You bought the {def.name}! It is parked outside: your first vehicle. The car jobs are on your board now.`)
+			return
+		end
 		-- 3.4: it goes into your garage (cars are kept in garages): take it out there.
 		notice:FireClient(player, `You bought the {def.name}! It waits in your {aGarage(player)}: take it out at the 🅿 GARAGE post there (E).`)
 		PlayerData.notify(player)
@@ -139,8 +153,12 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 	elseif kind == "cargun" then
 		-- A roof gun for the equipped car: it replaces the one there (no refund).
 		local def = Economy.findCarGun(id)
-		local carDef = Economy.findCar(profile.car)
-		if not def or not carDef or refuse(player, "mechanic") then
+		local carDef = if profile.car then Economy.findCar(profile.car) else nil
+		if not def or refuse(player, "mechanic") then
+			return
+		end
+		if not carDef then
+			notice:FireClient(player, NO_CAR)
 			return
 		end
 		if not Economy.canMount(carDef.id) then
@@ -201,8 +219,12 @@ end
 -- 3.5: the next stage of the equipped car (Config.Cars stages): its price, its driver level, not during a delivery
 -- (the car is built again with its new look) nor while it is on a repair lift.
 local function buyStage(player: Player, profile: PlayerData.Profile)
-	local carDef = Economy.findCar(profile.car)
-	if not carDef or not Economy.canUpgrade(carDef.id) then
+	local carDef = if profile.car then Economy.findCar(profile.car) else nil
+	if not carDef then
+		notice:FireClient(player, NO_CAR)
+		return
+	end
+	if not Economy.canUpgrade(carDef.id) then
 		notice:FireClient(player, "A company vehicle has no stages. Take one of your own cars out of your garage.")
 		return
 	end
@@ -251,7 +273,11 @@ local function onUpgrade(player: Player, id: any)
 	end
 	-- 3.3: a car track upgrades the equipped car only (its own levels, its own price); a gun track all your guns.
 	local carTrack = Economy.isCarUpgrade(id)
-	local carDef = Economy.findCar(profile.car)
+	local carDef = if profile.car then Economy.findCar(profile.car) else nil
+	if carTrack and not carDef then
+		notice:FireClient(player, NO_CAR)
+		return
+	end
 	if carTrack and (not carDef or not Economy.canUpgrade(carDef.id)) then
 		local name = if carDef then carDef.name else "this vehicle"
 		notice:FireClient(player, `The {name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`)
@@ -296,8 +322,12 @@ local function onGear(player: Player, action: any, id: any)
 	if not profile or not gear or type(action) ~= "string" or not GEAR_ACTIONS[action] or refuse(player, "mechanic") then
 		return
 	end
-	local carDef = Economy.findCar(profile.car)
-	if not carDef or not Economy.canUpgrade(carDef.id) then
+	local carDef = if profile.car then Economy.findCar(profile.car) else nil
+	if not carDef then
+		notice:FireClient(player, NO_CAR)
+		return
+	end
+	if not Economy.canUpgrade(carDef.id) then
 		notice:FireClient(player, "A company vehicle comes with what its job needs: no gear. Take one of your own cars out of your garage.")
 		return
 	end
@@ -363,6 +393,11 @@ local function onPaint(player: Player, id: any)
 	if not profile or not paint or refuse(player, "mechanic") then
 		return
 	end
+	local carId = profile.car
+	if not carId then
+		notice:FireClient(player, NO_CAR)
+		return
+	end
 	if not profile.paints[paint.id] then
 		if paint.exclusive then
 			notice:FireClient(player, `{paint.name} is not for sale. It is a reward.`)
@@ -374,9 +409,32 @@ local function onPaint(player: Player, id: any)
 		end
 		profile.paints[paint.id] = true
 	end
-	profile.carPaint[profile.car] = paint.id
+	profile.carPaint[carId] = paint.id
 	Vehicles.repaint(player)
 	PlayerData.notify(player)
+end
+
+-- 5.0, personal gear (Config.Kit) at Last Stop Supplies: ("buy", kit id): not owned yet, its driver level, its price.
+-- Yours for good (profile.kit): the board, Cargo's hands and the walk read it (shared/Transport.luau).
+local function onKit(player: Player, action: any, id: any)
+	local profile = PlayerData.get(player)
+	local def = if type(id) == "string" then TransportRules.findKit(id) else nil
+	if not profile or action ~= "buy" or not def or refuse(player, "supplies") then
+		return
+	end
+	if profile.kit[def.id] then
+		notice:FireClient(player, `You already have the {def.name}.`)
+		return
+	end
+	if tooLow(player, def.name, def.level) then
+		return
+	end
+	if not PlayerData.spend(player, def.price) then
+		notice:FireClient(player, "Not enough money.")
+		return
+	end
+	PlayerData.giveKit(player, def.id)
+	notice:FireClient(player, `{def.icon} The {def.name} is yours! {def.description}`)
 end
 
 -- 3.5, the showroom: three cars inside the dealership (World.DealerSlots), not every car on a lot. Each one is shown
@@ -452,6 +510,7 @@ function Shops.start()
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)
 	Net.get("Paint").OnServerEvent:Connect(onPaint)
 	Net.get("Gear").OnServerEvent:Connect(onGear)
+	Net.get("Kit").OnServerEvent:Connect(onKit) -- 5.0
 end
 
 return Shops
