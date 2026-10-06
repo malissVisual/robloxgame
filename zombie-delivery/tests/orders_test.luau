@@ -118,6 +118,39 @@ check("a single job: the pick-up first, even standing at the drop", JobRules.nex
 single[1].done = true
 check("then the drop", JobRules.nextOpenStop(single, { [2] = 2 }, { x = 0, z = 0 }) == 2)
 
+-- Hits, wrecks and a failed run reach only their own orders (5.2 review) --------------------------
+
+local function work(id: number, open: boolean, delivered: number, progress: boolean): JobRules.OrderWork
+	return { id = id, open = open, delivered = delivered, progress = progress }
+end
+local run = { work(1, false, 3, true), work(2, true, 1, true), work(3, true, 0, false), work(4, true, 0, true) }
+local function same(list: { number }, want: { number }): boolean
+	if #list ~= #want then
+		return false
+	end
+	for index, value in want do
+		if list[index] ~= value then
+			return false
+		end
+	end
+	return true
+end
+check("a hit on a run reaches only the open orders with pieces in the vehicle", same(JobRules.ordersHit(run, { [1] = 2, [2] = 1, [4] = 0 }, true), { 2 }))
+check("an order not picked up yet keeps its condition", not table.find(JobRules.ordersHit(run, { [2] = 1 }, true), 3))
+check("nothing in the vehicle: nothing hit", #JobRules.ordersHit(run, {}, true) == 0)
+check("a job of stops one after the other: every open order, loaded or not (as before)", same(JobRules.ordersHit(run, {}, false), { 2, 3, 4 }))
+local delivered, worked = JobRules.failedWork(run, 0)
+check("a failed run counts only the open orders' pieces (not the paid one's)", delivered == 1, delivered)
+check("… and worked: an open order was worked on", worked)
+local none, idle = JobRules.failedWork({ work(1, false, 4, true), work(2, true, 0, false) }, 0)
+check("only a paid order done, the open one untouched: no XP", none == 0 and not idle)
+local _, fought = JobRules.failedWork({ work(1, false, 4, true), work(2, true, 0, false) }, 3)
+check("kills no order paid count as work", fought)
+local _, started = JobRules.failedWork({ work(1, true, 0, true) }, 0)
+check("a stop done (or a piece with you) of an open order is work", started)
+local _, cancelled = JobRules.failedWork({ work(1, true, 0, false) }, 0)
+check("a job cancelled right after accepting gives none", not cancelled)
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

@@ -336,7 +336,9 @@ type Order = {
 	paid: number, -- what the owner got for it
 	rating: number?, -- its stars (4.7), once paid
 	freshness: number, -- 4.8: food, 1 … 0 once picked up
-	wrecked: boolean, -- 4.7: a wreck while it was open
+	wrecked: boolean, -- 4.7: a wreck while its pieces were in the car (5.2 review: a job of one order: while it was open)
+	condition: number, -- 5.2 review: its cargo's own condition, 0 … 1 (hits while its pieces were in the car)
+	addOn: boolean, -- 5.2 review: a road event's side pick-up: ★ pay and XP, no rating, no streak, no licence progress
 }
 
 -- 4.8: a side pick-up offered by a road event (one more piece from `giver` at `address`, `distance` from you).
@@ -653,7 +655,7 @@ local function payload(job: Job): { [string]: any }
 		progress = if stop.mode == "serve" or stop.mode == "board" then status.progress else 0,
 		endsAt = order.endsAt,
 		timeLimit = mine.time,
-		condition = job.condition,
+		condition = if job.free then order.condition else job.condition, -- (5.2 review: the focused order's)
 		kills = job.kills,
 		wave = job.wave, -- zombie waves so far
 		pay = mine.pay,
@@ -1659,16 +1661,30 @@ local function runStacks(job: Job): boolean
 end
 
 -- What the player can take on a run of this mode: hands + backpack on foot, the bike + its gear + the backpack, the
--- car + its gear (slotsFor).
-local function orderRoomOf(player: Player, offer: Offer): number
+-- car + its gear (slotsFor). 5.2 review: kit bought during the run (a backpack, bike gear) grows the run's pack with
+-- it (`job`: the run's Cargo.Info.pack, set when it started), so every slot the board counts can be carried. It never
+-- shrinks: what is in it stays.
+local function orderRoomOf(player: Player, offer: Offer, job: Job?): number
+	local room: number
 	if offer.mode == "foot" then
-		return Transport.footOf(player).room
+		room = Transport.footOf(player).room
 	elseif offer.mode == "bike" then
 		local _, bike = Transport.bikeOf(player)
-		return if bike then bike.room else 0
+		room = if bike then bike.room else 0
+	else
+		local _, holds = slotsFor(player, offer)
+		return holds
 	end
-	local _, holds = slotsFor(player, offer)
-	return holds
+	local info = if job then job.cargo.info else nil
+	if info and info.foot then
+		-- (as startJob: a bike job's pack is the bike's whole room; a foot job's the backpack's, all of it while riding)
+		local pack = if offer.mode == "bike" or Transport.riding(player) then room else Transport.packRoomOf(player)
+		if pack > (info.pack or 0) then
+			info.pack = pack
+			info.changed()
+		end
+	end
+	return room
 end
 
 local function sum(list: { number }): number
@@ -1692,7 +1708,7 @@ local function stackCheck(player: Player, job: Job, offer: Offer): (boolean, str
 	elseif offer.mode ~= mode then
 		return false, `{string.upper(words)} ORDERS ONLY`, `Only other {words} runs can be added to your {words} run.`
 	end
-	local room = orderRoomOf(player, offer)
+	local room = orderRoomOf(player, offer, job)
 	local taken = outstanding(job)
 	local used = sum(taken)
 	local open = #openOrders(job)
@@ -1711,7 +1727,7 @@ stackInfo = function(player: Player, job: Job): { [string]: any }?
 	if not job.free then
 		return nil
 	end
-	local room = orderRoomOf(player, job.offer)
+	local room = orderRoomOf(player, job.offer, job)
 	local taken = outstanding(job)
 	return {
 		can = runStacks(job), -- the board may add orders (+ ADD ORDER)
@@ -2116,6 +2132,8 @@ local function newOrder(job: Job, offer: Offer, stops: { number }): Order
 		rating = nil,
 		freshness = 1,
 		wrecked = false,
+		condition = 1,
+		addOn = false,
 	}
 	table.insert(job.orders, order)
 	return order
@@ -2693,11 +2711,14 @@ end
 -- 5.2: on a run that takes more orders it is added to it (addOrder).
 local function accept(player: Player, id: any)
 	local job = jobs[player]
+	local board = boards[player.UserId]
 	if job and not runStacks(job) then
 		notice:FireClient(player, "Finish your current delivery first.")
+		if board then
+			sendBoard(player, board) -- (5.2 review: the board hid the row on + ADD ORDER: it comes back as it is)
+		end
 		return
 	end
-	local board = boards[player.UserId]
 	if type(id) ~= "number" or not board then
 		return
 	end
@@ -2724,6 +2745,8 @@ local function accept(player: Player, id: any)
 		if job then
 			sendBoard(player, board) -- (5.2: the other rows' + ADD ORDER / NO ROOM follow the room left)
 		end
+	elseif job then
+		sendBoard(player, board) -- (5.2 review: refused: the row the board hid on + ADD ORDER comes back, and why not)
 	end
 end
 
@@ -2772,9 +2795,24 @@ function Jobs.fail(player: Player, reason: string)
 	end
 	local crew = crewOf(job, player)
 	-- A failed job still gives a share of the XP (Config.Levels.XpFailed), once something was done: a job cancelled
-	-- right after accepting gives none.
+	-- right after accepting gives none. 5.2 review: only for the orders still open (JobRules.failedWork: their pieces
+	-- handed over, the kills no order paid); something done is a stop of theirs or a piece of theirs with you (a job of
+	-- stops one after the other: a piece in the car or the pack, a stop passed, as before).
 	local status = Cargo.status(job.cargo)
-	local worked = job.kills > 0 or status.deliveredTotal > 0 or status.inCar > 0 or status.pack > 0 or job.stop > 1 -- (5.0: the pack)
+	local kills = math.max(0, job.kills - job.killsPaid)
+	local withYou = Cargo.ordersWithYou(job.cargo)
+	local work: { JobRules.OrderWork } = {}
+	for _, order in job.orders do
+		local progress = status.inCar > 0 or status.pack > 0 or job.stop > 1 -- (5.0: the pack)
+		if job.free then
+			progress = (withYou[order.id] or 0) > 0
+			for _, index in order.stops do
+				progress = progress or job.stopsDone[index] == true
+			end
+		end
+		table.insert(work, { id = order.id, open = order.state == "open", delivered = Cargo.deliveredOf(job.cargo, order.id), progress = progress })
+	end
+	local delivered, worked = JobRules.failedWork(work, kills)
 	-- 5.2: every order still open fails with it (the ones paid stay paid); the card names the focused one.
 	local offer = focusOrder(job).offer
 	for _, order in job.orders do
@@ -2782,7 +2820,7 @@ function Jobs.fail(player: Player, reason: string)
 			order.state = "failed"
 		end
 	end
-	local xp = if worked then Levels.jobXp(offer.tier, status.deliveredTotal, job.kills, DayNight.isNight(), false) else 0
+	local xp = if worked then Levels.jobXp(offer.tier, delivered, kills, DayNight.isNight(), false) else 0
 	endJob(player, job, false)
 	send(player)
 	-- 4.7: a failed job (not a mission) ends the streak of good jobs.
@@ -2845,8 +2883,11 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	local timeLeft = order.endsAt - workspace:GetServerTimeNow()
 	local delivered = Cargo.deliveredOf(session, order.id)
 	local lost = Cargo.lostOf(session, order.id)
-	local kills = math.max(0, job.kills - job.killsPaid)
-	job.killsPaid = job.kills
+	-- The kills no order paid yet (5.2 review: an add-on leaves them to the run's real orders, unless it is the last).
+	local kills = if order.addOn and not final then 0 else math.max(0, job.kills - job.killsPaid)
+	job.killsPaid += kills
+	-- 5.2 review: on a run of several orders each one's own cargo condition (a job of one order: the job's, as before).
+	local condition = if job.free then order.condition else job.condition
 	order.state = "done"
 	for _, index in order.stops do
 		job.stopsDone[index] = true
@@ -2861,9 +2902,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	local nightPay = Economy.nightScale(Config.DayNight.NightPay, DayNight.nightFactor())
 	local night = DayNight.isNight()
 	-- The gunner twist: a kill from a passenger seat counts GunnerKillBonus times in the kill bonus.
-	local payout = Economy.payout(pay, job.condition, timeLeft, offer.time, Economy.paidKills(kills, job.gunnerKills), nightPay)
+	local payout = Economy.payout(pay, condition, timeLeft, offer.time, Economy.paidKills(kills, job.gunnerKills), nightPay)
 	-- A mission is rated (1 – 3 stars): the cargo's condition and the clock left.
-	local stars = Missions.rate(job.condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0)
+	local stars = Missions.rate(condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0)
 	local missionResult = if offer.mission
 		then { id = offer.mission, name = if offer.jobType then offer.jobType.name else offer.mission, stars = stars }
 		else nil
@@ -2872,7 +2913,8 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	local profile = PlayerData.get(player)
 	-- 4.8: food is rated and paid by its freshness too (JobRules.freshPay: the pay × FreshPayMin … 1).
 	local freshness = if JobRules.hasRule(offer.rules, "food") then order.freshness else nil
-	local rating = if offer.mission then nil else JobRules.rate(job.condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0, order.wrecked, lost, freshness)
+	-- (5.2 review: a road event's add-on is not rated: no streak step, no licence progress)
+	local rating = if offer.mission or order.addOn then nil else JobRules.rate(condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0, order.wrecked, lost, freshness)
 	local payTotal = payout.total
 	local freshCut = 0
 	if freshness then
@@ -2985,7 +3027,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		cargo = offer.cargo,
 		customer = offer.customer,
 		stars = offer.tier,
-		condition = job.condition,
+		condition = condition,
 		kills = kills,
 		payout = payout, -- with nightBonus
 		night = night,
@@ -3101,7 +3143,7 @@ local function failOrder(player: Player, job: Job, order: Order, reason: string)
 	Cargo.dropOrder(job.cargo, order.id)
 	local profile = PlayerData.get(player)
 	local streakLost = 0
-	if profile and not offer.mission and profile.streak > 0 then
+	if profile and not offer.mission and not order.addOn and profile.streak > 0 then -- (5.2 review: not for an add-on)
 		streakLost = profile.streak
 		profile.streak = 0
 	end
@@ -3216,9 +3258,26 @@ function Jobs.vehicleFor(player: Player): string?
 	return if jobType then jobType.vehicle else nil
 end
 
-local function loseCondition(player: Player, job: Job, share: number, reason: string)
+-- The cargo loses `share` of its condition: the job's (the HUD, a mission's twists) and, 5.2 review, each open order's
+-- whose pieces ride in the vehicle (JobRules.ordersHit: on a run of several orders one not picked up yet keeps its
+-- own). With a `reason` the job fails at 0 (people: they had enough) and a spotless mission below its line; without one
+-- (a hit, a jolt of a crate) it only counts.
+local function loseCondition(player: Player, job: Job, share: number, reason: string?)
 	job.condition = math.max(0, job.condition - share)
 	job.dirty = true
+	local work: { JobRules.OrderWork } = {}
+	for _, order in job.orders do
+		table.insert(work, { id = order.id, open = order.state == "open", delivered = 0, progress = false })
+	end
+	for _, id in JobRules.ordersHit(work, Cargo.ordersWithYou(job.cargo, true), job.free) do
+		local order = orderById(job, id)
+		if order then
+			order.condition = math.max(0, order.condition - share)
+		end
+	end
+	if not reason then
+		return
+	end
 	if job.condition <= 0 then
 		Jobs.fail(player, reason)
 		return
@@ -3268,9 +3327,15 @@ function Jobs.onCarWrecked(player: Player)
 		return -- (5.0: a foot job's cargo is not in the car; 5.1: nor a bike job's)
 	end
 	job.wrecked = true -- 4.7: the rating
+	-- 5.2 review: the orders whose pieces are in the car (a job of one order: it, as before), before the crash ruins any.
+	local work: { JobRules.OrderWork } = {}
 	for _, order in job.orders do
-		if order.state == "open" then
-			order.wrecked = true -- 5.2: every order on the way
+		table.insert(work, { id = order.id, open = order.state == "open", delivered = 0, progress = false })
+	end
+	for _, id in JobRules.ordersHit(work, Cargo.ordersWithYou(job.cargo, true), job.free) do
+		local order = orderById(job, id)
+		if order then
+			order.wrecked = true
 		end
 	end
 	notice:FireClient(player, "Your car is wrecked! Press CAR and keep going, the clock is ticking.")
@@ -3300,8 +3365,7 @@ function Jobs.onCarDamaged(player: Player, amount: number)
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		local base = amount / car.stats.health * JobsConfig.ConditionPerDamage * multiplier
 		local rules = rulesNow(job) -- (5.2: every open order's)
-		job.condition = math.max(0, job.condition - JobRules.damageLoss(rules, base, speed, Vehicles.hasGear(car, "straps")))
-		job.dirty = true
+		loseCondition(player, job, JobRules.damageLoss(rules, base, speed, Vehicles.hasGear(car, "straps")), nil)
 		local now = os.clock()
 		if JobRules.hasRule(rules, "fragile") and speed >= JobsConfig.CargoRules.HitSpeed and now - job.ruleNotice >= JobsConfig.CargoRules.NoticeEvery then
 			job.ruleNotice = now
@@ -3589,13 +3653,17 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 		return
 	end
 	local status = Cargo.status(job.cargo)
-	-- 5.2: every open order's food has its own freshness, draining once that order was picked up.
+	-- 5.2: every open order's food has its own freshness, draining once that order was picked up (5.2 review: or once
+	-- a piece of it is with you, in the vehicle, the hands or the pack, as before 5.2).
+	local withYou: { [number]: number }? = nil
 	for _, order in job.orders do
 		if order.state ~= "open" or not JobRules.hasRule(order.offer.rules, "food") or order.freshness <= 0 then
 			continue
 		end
 		local picked = false
 		if job.free then
+			withYou = withYou or Cargo.ordersWithYou(job.cargo)
+			picked = ((withYou :: { [number]: number })[order.id] or 0) > 0
 			for _, index in order.stops do
 				local stop = offer.stops[index]
 				if stop.kind == "pickup" and (job.stopsDone[index] or (index == job.stop and status.carrying ~= nil)) then
@@ -3642,8 +3710,7 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 	if people then
 		loseCondition(player, job, loss, "The passengers had enough of your driving and got out.")
 	else
-		job.condition = math.max(0, job.condition - loss)
-		job.dirty = true
+		loseCondition(player, job, loss, nil)
 	end
 end
 
@@ -3830,7 +3897,10 @@ local function addOnOrder(player: Player, job: Job, addOn: AddOn)
 	offer.destNames = nil
 	offer.id = 0
 	offer.role = nil
-	appendOrder(job, offer)
+	-- 5.2 review: a side pick-up, not a job of the focused order's tier: ★ pay and XP (AddOnPay), no rating, streak or
+	-- licence progress (payOrder), and losing it costs no streak (failOrder).
+	offer.tier = 1
+	appendOrder(job, offer).addOn = true
 	endEvent(player, job, `ADD-ON taken: one more {offer.piece} from {addOn.giver} at {addOn.address.name} for {who} (+${addOn.pay}, {Economy.clock(seconds)} on its clock).`)
 	resendBoard(player)
 end
@@ -4077,6 +4147,9 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 		end
 	end
 	recount(player, job)
+	if session.info.foot then
+		orderRoomOf(player, offer, job) -- 5.2 review: a backpack or bike gear bought during the run grows its pack now
+	end
 	Cargo.update(session, step)
 	-- 3.1: the pieces delivered since the last tick (any, the people who board, the horses).
 	if session.deliveredTotal > job.piecesCounted then

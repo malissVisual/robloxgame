@@ -2932,6 +2932,18 @@ function Cargo.withYou(session: Session): { [number]: number }
 	return out
 end
 
+-- 5.2 review: the pieces with you by order (in hands, on a trolley, in the pack, in the vehicle); `vehicleOnly`: only
+-- the ones in the vehicle (what a crash, a hit or a jolt reaches).
+function Cargo.ordersWithYou(session: Session, vehicleOnly: boolean?): { [number]: number }
+	local out: { [number]: number } = {}
+	eachPiece(session, function(piece: Piece, where: string)
+		if where == "vehicle" or (not vehicleOnly and (where == "hands" or where == "pack")) then
+			out[piece.order] = (out[piece.order] or 0) + 1
+		end
+	end)
+	return out
+end
+
 -- Like Cargo.remaining, for one order: its pieces on the way, and the current stop's pile when it is that order's.
 function Cargo.remainingFor(session: Session, order: number): number
 	local n = 0
@@ -2960,8 +2972,8 @@ function Cargo.lostOf(session: Session, order: number): number
 	return session.lostBy[order] or 0
 end
 
--- A failed order's pieces go back (out of the vehicle, the hands, the ground, the pack; its pile if its stop is the
--- current one). Returns how many.
+-- A failed order's pieces go back (out of the vehicle, the hands, a trolley, the ground, the pack; its pile if its stop
+-- is the current one). Returns how many.
 function Cargo.dropOrder(session: Session, order: number): number
 	if session.ended then
 		return 0
@@ -2991,21 +3003,35 @@ function Cargo.dropOrder(session: Session, order: number): number
 			gone(table.remove(session.pack, index) :: Piece)
 		end
 	end
+	-- (5.2 review: a trolley's pieces too, set down or pushed: the ones left on it close up)
+	local tools: { Equipment.Tool } = {}
 	for index = #session.loose, 1, -1 do
 		local item = session.loose[index]
-		if item.piece.order == order and item.tool == nil then
+		if item.piece.order == order then
 			table.remove(session.loose, index)
 			item.prompt:Destroy()
 			if item.handle then
 				item.handle:Destroy()
 			end
 			gone(item.piece)
+			local tool = item.tool
+			if tool and not table.find(tools, tool) then
+				table.insert(tools, tool)
+			end
+		end
+	end
+	for _, tool in tools do
+		local left: { Piece } = {}
+		for _, item in session.loose do
+			if item.tool == tool then
+				table.insert(left, item.piece)
+			end
+		end
+		if #left > 0 then
+			stackOnTool(tool, left, false)
 		end
 	end
 	for player, hands in table.clone(session.held) do
-		if hands.tool then
-			continue -- (on a trolley: they stay with it, counted until it is set down)
-		end
 		local keep: { Piece } = {}
 		for _, piece in hands.pieces do
 			if piece.order == order then

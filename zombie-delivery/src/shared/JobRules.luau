@@ -660,4 +660,35 @@ function JobRules.nextOpenStop(stops: { StopState }, withYou: { [number]: number
 	return best
 end
 
+-- 5.2 review: an order as a crash, a hit or a failed job sees it: its id, still open, its pieces handed over, and
+-- whether something was done for it (a stop done, a piece with you).
+export type OrderWork = { id: number, open: boolean, delivered: number, progress: boolean }
+
+-- The open orders a condition loss or a wreck reaches. On a run of stops in any order (`free`) only the ones with
+-- pieces in the vehicle (`inside[id]` > 0): an order not picked up yet (or all handed over) keeps its own; a job of
+-- stops one after the other: every open order (its only one, as before).
+function JobRules.ordersHit(orders: { OrderWork }, inside: { [number]: number }, free: boolean): { number }
+	local out: { number } = {}
+	for _, order in orders do
+		if order.open and (not free or (inside[order.id] or 0) > 0) then
+			table.insert(out, order.id)
+		end
+	end
+	return out
+end
+
+-- What a failed job's XP counts: the pieces of the orders still open (the ones paid were counted with their pay) and
+-- the kills no order paid; worked = one of those, or something done for an open order (a job cancelled right after
+-- accepting gives none).
+function JobRules.failedWork(orders: { OrderWork }, unpaidKills: number): (number, boolean)
+	local delivered, worked = 0, unpaidKills > 0
+	for _, order in orders do
+		if order.open then
+			delivered += math.max(0, order.delivered)
+			worked = worked or order.delivered > 0 or order.progress
+		end
+	end
+	return delivered, worked
+end
+
 return JobRules

@@ -1424,6 +1424,24 @@ function Hud.showResult(r: any)
 			local got = if type(r.rating) == "table" then math.clamp(math.floor(tonumber(r.rating.stars) or 0), 0, 3) else 0
 			local left = if type(r.order) == "table" then tonumber(r.order.left) or 0 else 0
 			Hud.toast(`ORDER DONE{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · +{Ui.money(tonumber(r.total) or 0)} · {r.cargo or "cargo"} for {r.customer or "the customer"}{if left > 0 then ` · {left} to go` else ""}`)
+			-- 5.2 review: what the window would say of an employer (the jobs done, the next reward) and a new car or gun.
+			local employer = if type(r.employer) == "table" then r.employer else nil
+			if employer then
+				local done = tonumber(employer.done) or 0
+				local gunAt = tonumber(employer.weaponAt)
+				local nextUp = if employer.weapon and gunAt and done < gunAt then ` · {gunAt - done} more for the {employer.weapon}`
+					elseif type(employer.needed) == "number" and done < employer.needed and employer.reward ~= "" then ` · {employer.needed - done} more for the {employer.reward}`
+					else ""
+				Hud.toast(`{employer.name}: {done} jobs done{nextUp}`)
+			end
+			local newCar = r.unlockedCar or (employer and employer.unlocked)
+			if type(newCar) == "string" then
+				Hud.toast(`🚚 NEW CAR: the {newCar} is yours!`)
+			end
+			if type(r.unlockedWeapon) == "string" then
+				local gun = Economy.findWeapon(r.unlockedWeapon)
+				Hud.toast(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`)
+			end
 		end
 		return
 	end
