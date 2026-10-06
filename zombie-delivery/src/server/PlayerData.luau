@@ -7,7 +7,10 @@
 -- the safe; server/Business.luau) and lifetime stats. 4.6: the gear of every car (carGear: Config.Gear bought for a
 -- car, "owned" or "installed" in its gear slots) and the career rewards already given (levelRewards: Config.Levels
 -- Rewards, each level once; shared/Career.luau). 4.7: the streak of good jobs (streak) and the licences for the
--- dangerous tiers (licences held, licenceJobs counted toward them; shared/JobRules.luau).
+-- dangerous tiers (licences held, licenceJobs counted toward them; shared/JobRules.luau). 5.0, "From the bottom" (a
+-- new DataStore, Config.DataStoreName): a new player starts on foot with no vehicle (car = nil, cars = {}), the
+-- personal gear bought at Last Stop Supplies (kit: Config.Kit ids, shared/Transport.luau) and the phone Marge gives
+-- in the tutorial (phone).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -29,7 +32,7 @@ local JobRules = require(Shared.JobRules)
 export type Profile = {
 	money: number,
 	cars: { [string]: boolean },
-	car: string,
+	car: string?, -- 5.0: the equipped car; nil = no vehicle yet (on foot)
 	weapons: { [string]: boolean },
 	weapon: string,
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
@@ -61,6 +64,9 @@ export type Profile = {
 	title: string?, -- the title shown over your head and on the leaderboard (an earned one)
 	tutorial: boolean, -- 3.7: the first-day tutorial is done (or skipped); older saves with a delivery count as done
 	explored: string, -- 3.7: the map cells uncovered (shared/Explore.luau encodes them)
+	kit: { [string]: boolean }, -- 5.0: personal gear owned (Config.Kit ids: backpacks, shoes, a jacket), yours for good
+	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
+	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -83,15 +89,15 @@ end)
 local function newProfile(): Profile
 	return {
 		money = Config.StartMoney,
-		cars = { [Config.Cars[1].id] = true },
-		car = Config.Cars[1].id,
+		cars = {}, -- 5.0: you start on foot (the Old Van is bought at level 4)
+		car = nil,
 		weapons = { [Config.Weapons[1].id] = true },
 		weapon = Config.Weapons[1].id,
 		upgrades = {},
 		carUpgrades = {},
 		carHealth = {},
 		carGear = {},
-		items = { repair = 1, molotov = 2 },
+		items = { medkit = 1 }, -- 5.0: no repair kit (no car)
 		paints = { factory = true },
 		carPaint = {},
 		carGuns = {}, -- every car starts without a gun
@@ -115,6 +121,9 @@ local function newProfile(): Profile
 		title = nil,
 		tutorial = false,
 		explored = "",
+		kit = {},
+		phone = false,
+		vanQuest = nil,
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -318,6 +327,15 @@ local function applySaved(profile: Profile, saved: any)
 	profile.xp = number(saved.xp, 0, 2 ^ 50) -- older saves have no xp: 0 (level 1)
 	profile.tutorial = saved.tutorial == true or profile.deliveries > 0 -- 3.7: a player who delivered before needs no tutorial
 	profile.explored = if type(saved.explored) == "string" and #saved.explored <= 65536 then saved.explored else ""
+	profile.phone = saved.phone == true -- 5.0
+	profile.vanQuest = if saved.vanQuest == "open" or saved.vanQuest == "done" then saved.vanQuest else nil -- 5.0
+	if type(saved.kit) == "table" then
+		for _, def in Config.Kit do
+			if saved.kit[def.id] == true then
+				profile.kit[def.id] = true
+			end
+		end
+	end
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
 	end
@@ -633,6 +651,9 @@ function PlayerData.save(player: Player, final: boolean?)
 		title = profile.title,
 		tutorial = profile.tutorial,
 		explored = profile.explored,
+		kit = profile.kit, -- 5.0
+		phone = profile.phone, -- 5.0
+		vanQuest = profile.vanQuest, -- 5.0
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -760,10 +781,34 @@ function PlayerData.giveCar(player: Player, id: string): boolean
 	if not profile or not Economy.findCar(id) then
 		return false
 	end
+	local def = Economy.findCar(id)
 	local new = not profile.cars[id]
 	profile.cars[id] = true
+	if profile.car == nil and def and not def.company then
+		profile.car = id -- 5.0: the first car of your own you get is the one you drive (not an employer's vehicle)
+	end
+	if id == Config.VanQuest.Car then
+		profile.vanQuest = "done" -- 5.0: Earl's van (bought from him, or given)
+	end
 	changed:Fire(player)
 	return new
+end
+
+-- 5.0: gives a piece of personal gear (Config.Kit: bought at Last Stop Supplies, the admin tools); true when it is new.
+function PlayerData.giveKit(player: Player, id: string): boolean
+	local profile = profiles[player]
+	local known = false
+	for _, def in Config.Kit do
+		if def.id == id then
+			known = true
+		end
+	end
+	if not profile or not known or profile.kit[id] then
+		return false
+	end
+	profile.kit[id] = true
+	changed:Fire(player)
+	return true
 end
 
 -- ── Driver levels (Config.Levels, shared/Levels.luau) ─────────────────────

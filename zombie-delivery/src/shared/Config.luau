@@ -6,11 +6,13 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.8"
+Config.Version = "5.0"
 
-Config.DataStoreName = "ZombieDelivery_v1"
-Config.StartMoney = 150
-Config.StudioStartMoney = 150 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
+-- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
+-- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
+Config.DataStoreName = "ZombieDelivery_v2"
+Config.StartMoney = 40
+Config.StudioStartMoney = 40 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
 Config.AutosaveSeconds = 60
 -- 4.2: a save is locked to the server that plays it (UpdateAsync). A join waits this long for the last server's
 -- leave save before it takes the save over; a lock not refreshed for SaveLockStale seconds is a crashed server's.
@@ -120,6 +122,10 @@ export type CarDef = {
 	-- 4.6: the gear slots (Config.Gear pieces installed at once at Wrench Garage). A stage's own gearSlots wins
 	-- (StageDef.gearSlots); nil: none (the company vehicles come with what their job needs). Economy.gearSlots.
 	gearSlots: number?,
+	-- 5.1: a bicycle (style "bike"; Config.Cars ids rustbike, citybike, cargobike, ebike, appended after the cars): sold at
+	-- Spoke & Chain (Map.Shops.bikes), light cargo only, no fuel, no traffic / chauffeur / car gun / paint / car
+	-- upgrade tracks; it never counts as "a vehicle" for car jobs and missions (shared/Transport.luau mode "bike").
+	bike: boolean?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -166,7 +172,8 @@ Config.Cars = {
 		mount = true,
 		trolley = true,
 		name = "Old Van",
-		price = 0,
+		level = 4, -- 5.0: bought from Earl at Earl's Used Wheels (Config.VanQuest: Marge's quest; you start on foot)
+		price = 1800,
 		style = "van",
 		maxSpeed = 42,
 		accel = 11,
@@ -175,20 +182,20 @@ Config.Cars = {
 		capacity = 2,
 		ramPower = 1.0,
 		color = { 214, 196, 160 },
-		role = "Your first van: it grows with you",
+		role = "Your first vehicle: it grows with you",
 		description = "Rusty, dented, slow off the line, and yours. Build it up at Wrench Garage: a Patched Van, a Work Van (3 slots, a longer body), then a Long Cargo Van (4, a high roof). 1 passenger.",
 		stages = {
 			{ name = "Rusty Van", price = 0, capacity = 2, gearSlots = 1, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
-			{ name = "Patched Van", price = 250, level = 1, capacity = 2, gearSlots = 1, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
-			{ name = "Work Van", price = 700, level = 2, capacity = 3, gearSlots = 2, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
-			{ name = "Long Cargo Van", price = 2200, level = 4, capacity = 4, gearSlots = 3, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
+			{ name = "Patched Van", price = 250, level = 4, capacity = 2, gearSlots = 1, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
+			{ name = "Work Van", price = 700, level = 5, capacity = 3, gearSlots = 2, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
+			{ name = "Long Cargo Van", price = 2200, level = 6, capacity = 4, gearSlots = 3, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
 		},
 	},
 	{
 		id = "courier",
 		gearSlots = 2, -- 4.6
 		trolley = true,
-		level = 2,
+		level = 5,
 		mount = true,
 		name = "Courier Van",
 		price = 3500,
@@ -204,14 +211,14 @@ Config.Cars = {
 		description = "Small, low and quick off the line, an amber light bar on the roof. Made for speed, not for big loads (2 slots, 3 as an Express Courier). 1 passenger.",
 		stages = {
 			{ name = "Courier Van", price = 0, capacity = 2, adds = "" },
-			{ name = "Express Courier", price = 1200, level = 3, capacity = 3, speed = 2, look = "courier_express", adds = "a roof pod, a checker stripe down the sides" },
+			{ name = "Express Courier", price = 1200, level = 6, capacity = 3, speed = 2, look = "courier_express", adds = "a roof pod, a checker stripe down the sides" },
 		},
 	},
 	{
 		id = "highroof",
 		gearSlots = 3, -- 4.6
 		trolley = true,
-		level = 3,
+		level = 5,
 		mount = true,
 		name = "High-Roof Van",
 		price = 7000,
@@ -227,13 +234,13 @@ Config.Cars = {
 		description = "Stand up inside: a tall roof, thicker walls and a jump seat for a friend. 4 slots from the start, 5 as a Tall Hauler. 2 passengers.",
 		stages = {
 			{ name = "High-Roof Van", price = 0, capacity = 4, adds = "" },
-			{ name = "Tall Hauler", price = 3000, level = 5, capacity = 5, health = 60, look = "highroof_hauler", adds = "a ladder rack with a spare wheel, side steps, a stacked shelf" },
+			{ name = "Tall Hauler", price = 3000, level = 7, capacity = 5, health = 60, look = "highroof_hauler", adds = "a ladder rack with a spare wheel, side steps, a stacked shelf" },
 		},
 	},
 	{
 		id = "pickup",
 		gearSlots = 2, -- 4.6
-		level = 4,
+		level = 6,
 		mount = true,
 		name = "Pickup",
 		price = 12000,
@@ -249,14 +256,14 @@ Config.Cars = {
 		description = "An open bed where two friends ride and shoot. Room for 2 pieces beside them (3 as a Ranch Pickup). 3 passengers.",
 		stages = {
 			{ name = "Pickup", price = 0, capacity = 2, adds = "" },
-			{ name = "Ranch Pickup", price = 2500, level = 6, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
+			{ name = "Ranch Pickup", price = 2500, level = 7, capacity = 3, health = 50, look = "pickup_ranch", adds = "a roll bar with spotlights, chrome bed rails" },
 		},
 	},
 	{
 		id = "boxtruck",
 		gearSlots = 3, -- 4.6
 		trolley = true,
-		level = 6,
+		level = 7,
 		mount = true,
 		name = "Box Truck",
 		price = 22000,
@@ -272,14 +279,14 @@ Config.Cars = {
 		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler (a longer box that takes a pallet). The big loads need it. 2 passengers.",
 		stages = {
 			{ name = "Box Truck", price = 0, capacity = 6, gearSlots = 3, adds = "" },
-			{ name = "Liftgate Truck", price = 7500, level = 8, capacity = 7, gearSlots = 3, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
-			{ name = "Freight Hauler", price = 15000, level = 10, capacity = 8, gearSlots = 4, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
+			{ name = "Liftgate Truck", price = 7500, level = 9, capacity = 7, gearSlots = 3, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
+			{ name = "Freight Hauler", price = 15000, level = 11, capacity = 8, gearSlots = 4, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
 		},
 	},
 	{
 		id = "muscle",
 		gearSlots = 1, -- 4.6
-		level = 8,
+		level = 9,
 		mount = true,
 		name = "Muscle Car",
 		price = 40000,
@@ -295,13 +302,13 @@ Config.Cars = {
 		description = "Outruns every zombie. One piece in the trunk (2 as a Street Machine). Do not crash. 1 passenger.",
 		stages = {
 			{ name = "Muscle Car", price = 0, capacity = 1, adds = "" },
-			{ name = "Street Machine", price = 6000, level = 9, capacity = 2, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a bigger trunk" },
+			{ name = "Street Machine", price = 6000, level = 10, capacity = 2, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a bigger trunk" },
 		},
 	},
 	{
 		id = "freight",
 		gearSlots = 4, -- 4.6
-		level = 9,
+		level = 10,
 		trolley = true,
 		pallets = 3,
 		name = "Freight Truck",
@@ -323,7 +330,7 @@ Config.Cars = {
 	{
 		id = "armorvan",
 		gearSlots = 3, -- 4.6
-		level = 10,
+		level = 11,
 		mount = true,
 		name = "Armored Van",
 		price = 55000,
@@ -339,13 +346,13 @@ Config.Cars = {
 		description = "Steel plates, grilles on the windows, a roof made for a gun. The bullets knock, nobody answers. 3 slots, 4 as a Fortress Van. 2 passengers.",
 		stages = {
 			{ name = "Armored Van", price = 0, capacity = 3, adds = "" },
-			{ name = "Fortress Van", price = 14000, level = 11, capacity = 4, health = 200, speed = -2, look = "armorvan_fortress", adds = "a gun shield on the roof, side lockers, a spare wheel" },
+			{ name = "Fortress Van", price = 14000, level = 12, capacity = 4, health = 200, speed = -2, look = "armorvan_fortress", adds = "a gun shield on the roof, side lockers, a spare wheel" },
 		},
 	},
 	{
 		id = "rallyvan",
 		gearSlots = 2, -- 4.6
-		level = 12,
+		level = 13,
 		mount = true,
 		name = "Rally Van",
 		price = 80000,
@@ -361,7 +368,7 @@ Config.Cars = {
 		description = "Lowered, striped, a spoiler and big wheels: the fastest van on the road, 2 slots and no more. 1 passenger.",
 		stages = {
 			{ name = "Rally Van", price = 0, capacity = 2, adds = "" },
-			{ name = "Works Rally", price = 10000, level = 13, capacity = 2, speed = 3, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps (no more room)" },
+			{ name = "Works Rally", price = 10000, level = 14, capacity = 2, speed = 3, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps (no more room)" },
 		},
 	},
 	{
@@ -810,6 +817,8 @@ export type GearDef = {
 	icon: string, -- an emoji (the shop card, the career road)
 	needs: string?, -- a CarDef flag the car must have ("trolley")
 	notOn: { string }?, -- car ids it does not fit
+	bikeOnly: boolean?, -- 5.1: bike gear (basket, panniers, trailer): fits only CarDef.bike, installed at Spoke & Chain
+	room: number?, -- 5.1: bike gear's extra light slots
 }
 
 -- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
@@ -822,6 +831,27 @@ Config.Kit = {
 	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
 	{ id = "jacket", name = "Thermal Jacket", level = 1, price = 300, icon = "🧥", warm = 0.8, description = "Food you carry stays warm longer." },
 } :: { KitDef }
+
+-- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
+-- you reach the van's level (Config.Cars "van" level) without one, Marge texts you about a guy out west; Earl sells his
+-- old van at Earl's Used Wheels (Map.VanSeller, far out on the West Highway) for the van's price. Its stages are
+-- bought at Wrench Garage as usual. Range: studs from Earl the purchase is allowed within (the prompt reaches 10).
+Config.VanQuest = {
+	Car = "van",
+	Seller = "Earl",
+	Place = "Earl's Used Wheels",
+	Range = 16,
+	-- The words (the dealer's card, the board, the missions, the career road, the tutorial, Marge's and Earl's lines).
+	Where = "Earl's Used Wheels (Marge's quest at level 4)",
+	DealerNote = "Sold privately — Marge knows a guy (level 4).",
+	MissionsNeed = "Missions need a vehicle — the Old Van at level 4 (Earl's Used Wheels, Marge's quest).",
+	Unlock = "A guy out west is selling his old van. Cheap-ish. Go see Earl — I put him on your GPS.",
+	Reminder = "Earl still has that van for you, out west on the West Highway. He's on your GPS.",
+	Bought = "Nice. Now you can take ★ car jobs — and don't forget fuel later.",
+	Keys = "Here are the keys, kid. She's ugly but she runs.",
+	TooYoung = "You're green, kid. Come back when Marge sends you.",
+	Sold = "Already sold you one, kid. Treat her right.",
+}
 
 Config.Gear = {
 	{ id = "trolley", name = "Hand Trolley", level = 3, price = 600, icon = "🛒", needs = "trolley", description = "Carry up to 4 pieces at once. It rides folded inside the back (vans and trucks)." },
@@ -1201,6 +1231,7 @@ export type LevelReward = {
 	items: { [string]: number }?, -- Config.Items id → how many
 	paint: string?, -- a Config.Paints id (exclusive "career")
 	title: string?, -- a title shown over your head (profile.titles)
+	text: string?, -- 5.0: what else the level brings, in words ("The bike shop opens (5.1)")
 }
 
 -- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
@@ -1240,9 +1271,9 @@ Config.Levels = {
 	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
 	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
 	Rewards = {
-		[2] = { money = 500, items = { medkit = 2 } },
+		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop opens (5.1)" },
 		[3] = { money = 750, items = { repair = 2 } },
-		[4] = { money = 1000, items = { nitro = 2 } },
+		[4] = { money = 1000, items = { nitro = 2 }, text = "Old Van: Earl's Used Wheels (Marge's quest)" },
 		[5] = { money = 1500, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
@@ -1517,11 +1548,51 @@ Config.Missions = {
 Config.Jobs = {
 	DeliverRadius = 18,
 	RefreshSeconds = 120, -- 3.7: the board gets new offers on its own this often (no refresh button); 4.0.2: 2 min
-	-- 3.7: the tutorial's first delivery (Jobs.startTutorialJob): an easy ★ one close to the depot, for the Old Van.
-	TutorialPieces = 2, -- pieces at most (the Old Van's 2 slots)
+	-- 3.7: the tutorial's first delivery (Jobs.startTutorialJob): an easy one close to the depot (5.0: on foot, Foot).
+	TutorialPieces = 2, -- pieces at most (5.0: two letters, what your hands hold)
 	TutorialPickupMax = 400, -- studs (manhattan) from the player to the pick-up at most (the nearest homes to the depot: ~330)
-	TutorialDropMax = 450, -- studs from the pick-up to the drop at most (the ★ tier's minDistance at least)
+	TutorialDropMax = 450, -- studs from the pick-up to the drop at most (an easy car delivery: Jobs ordinaryOffer easy; 5.0: the tutorial walks, Foot.TutorialDrop)
 	TutorialTries = 6, -- deliveries made for it; the shortest one is given
+	-- 5.0, the ON FOOT jobs (server/Jobs.luau footOffer, server/Cargo.luau's foot flow, shared/Transport.luau): the
+	-- board's own section of Offers, always open (level 1) and for everybody (a driver too: quick money). A business
+	-- that sends a light look (Config.Cargo.LightLooks) sends Pieces pieces, never more than you carry (Transport
+	-- room: your hands and your backpack), from an address PickupMin … PickupMax (manhattan) from you to one
+	-- MinDistance … MaxDistance on, inside the Districts only (never across the river). Internally a ★ job (tier 1:
+	-- the tier-indexed tables stay as they are) with `mode = "foot"`: its own pay (JobRules.footPay: BasePay +
+	-- PayPerStud × the walk + PayPerPiece a piece, PayMin … PayMax, × the role's and the modifier's multiplier up to
+	-- PayMax × PayTop; the fast bonus is the tip), its own clock (JobRules.footTime: TimeBase + the walk / Speed +
+	-- the handling), a ★ job's XP (Levels.jobXp: 70 – 90, about 8 jobs to level 2), the 4.7 rating and streak. No
+	-- waves, no bandits, no road events: while you walk out of the safe zone, every StrayEvery s (± 20 %) with
+	-- StrayChance one walker comes from StrayDistance studs away (StrayMax of yours alive at most).
+	-- The tutorial's first delivery (Jobs.startTutorialJob) is on foot: Config.Jobs.TutorialPieces letters on one
+	-- street (the drop at most TutorialDrop studs from the pick-up), its own cargo (TutorialCargo).
+	Foot = {
+		Offers = 3,
+		Pieces = { 1, 3 } :: { number },
+		PickupMin = 40,
+		PickupMax = 250,
+		PickupWiden = 250, -- none within PickupMax (the depot's safe zone has no addresses): up to this much farther
+		MinDistance = 80,
+		MaxDistance = 350,
+		Districts = { Downtown = true, Suburbs = true } :: { [string]: boolean },
+		BasePay = 50,
+		PayPerStud = 0.08,
+		PayPerPiece = 6,
+		PayMin = 60,
+		PayMax = 110,
+		PayTop = 1.25, -- a LONG HAUL or a RISKY (RUSH) foot job pays more, at most PayMax × this
+		TimeBase = 40,
+		Speed = 9, -- studs / s the clock expects (a walk is 14, a sprint 28: generous)
+		StrayEvery = 40,
+		StrayChance = 0.5,
+		StrayMax = 1,
+		StrayDistance = { 60, 110 } :: { number },
+		-- A car job (the board's ★ … ★★★★, a special in your own car) while you have no vehicle: locked with these words.
+		NeedsVehicle = "Needs a vehicle (Old Van at level 4): until then you deliver on foot.",
+		NeedsVehicleButton = "🚐 NEEDS A VEHICLE",
+		TutorialDrop = 220,
+		TutorialCargo = { cargo = "Letters", kind = "crate", look = "mail", piece = "letter bundle", plural = "letter bundles" },
+	},
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
 	-- the back of the vehicle and load them; at a drop you take them out and carry them to the receiver (Config.Cargo).
 	-- The serve stops (ice cream) are the old way: hold still in the circle for the job type's unloadTime.
@@ -1543,7 +1614,7 @@ Config.Jobs = {
 	Tiers = {
 		{
 			stars = 1,
-			level = 1,
+			level = 4,
 			name = "Easy",
 			minDistance = 150,
 			maxDistance = 650,
@@ -1565,7 +1636,7 @@ Config.Jobs = {
 		},
 		{
 			stars = 2,
-			level = 2,
+			level = 5,
 			name = "Risky",
 			minDistance = 550,
 			maxDistance = 1200,
@@ -1587,7 +1658,7 @@ Config.Jobs = {
 		},
 		{
 			stars = 3,
-			level = 4,
+			level = 6,
 			name = "Deadly",
 			minDistance = 1000,
 			maxDistance = 2000,
@@ -1609,7 +1680,7 @@ Config.Jobs = {
 		},
 		{
 			stars = 4,
-			level = 7,
+			level = 9,
 			name = "INSANE",
 			minDistance = 1800,
 			maxDistance = 99999,
@@ -1688,8 +1759,8 @@ Config.Jobs = {
 	-- rated ★★ or better at danger `atTier` or higher. A save from before 4.7 that has delivered and already has the
 	-- level keeps the tier (JobRules.grandfather).
 	Licences = {
-		{ tier = 3, level = 4, jobs = 5, atTier = 2 },
-		{ tier = 4, level = 7, jobs = 10, atTier = 3 },
+		{ tier = 3, level = 6, jobs = 5, atTier = 2 }, -- 5.0: level 6 (4.7: 4)
+		{ tier = 4, level = 9, jobs = 10, atTier = 3 }, -- 5.0: level 9 (4.7: 7)
 	} :: { { tier: number, level: number, jobs: number, atTier: number } },
 	-- 4.8, cargo with rules (shared/JobRules.luau cargoRules …, server/Jobs.luau, server/Cargo.luau): what a job's cargo
 	-- asks of you, from the look of its pieces (Looks), its Carrying kind (Kinds) and, for a business whose look is
@@ -2225,7 +2296,7 @@ Config.JobTypes = {
 		description = "Pick the kids up at three homes and bring them to Sunny Hill School in the school bus.",
 		vehicle = "bus",
 		employer = "school",
-		level = 2,
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
 		pickups = 3,
 		pickupAt = nil,
 		drops = 1,
@@ -2283,7 +2354,7 @@ Config.JobTypes = {
 		unloadTime = 3,
 		payPerStop = 60,
 		tier = 2,
-		level = 2, -- 3.2: Risky, like the board's tier 2
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
 		cargo = "Ice Cream",
 		pickupLabel = "LOAD THE ICE CREAM",
 		dropLabel = "SELL ICE CREAM AT",
@@ -2300,7 +2371,7 @@ Config.JobTypes = {
 		description = "Load a family's furniture at their house and unload it at their new home.",
 		vehicle = "movingtruck",
 		employer = "movers",
-		level = 3,
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -2325,7 +2396,7 @@ Config.JobTypes = {
 		description = "Load fresh food at the Old Farm and bring it to two markets in the city.",
 		vehicle = "monster",
 		employer = "farm",
-		level = 8,
+		level = 9, -- 5.0: the Muscle Car's level (4.x: 8)
 		pickups = 1,
 		pickupAt = "farm",
 		drops = 2,
@@ -2451,7 +2522,7 @@ Config.JobTypes = {
 		description = "A patient is waiting at their home. Pick them up in the clinic's ambulance and rush them to the City Clinic before it is too late.",
 		vehicle = "ambulance",
 		employer = "clinic",
-		level = 3,
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,
@@ -2478,7 +2549,7 @@ Config.JobTypes = {
 		vehicle = nil,
 		employer = nil,
 		board = true,
-		level = 1,
+		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4
 		pickups = 1,
 		pickupAt = nil,
 		drops = 1,

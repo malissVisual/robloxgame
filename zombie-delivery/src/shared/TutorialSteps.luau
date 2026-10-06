@@ -13,6 +13,11 @@
 -- Only a few broad steps (drive to the pickup, pick up, carry and load, drive to the drop-off, take out, hand over):
 -- the HUD's ticket says the exact key for every moment, the hint says why. The texts stay true whether the back
 -- opens with a piece in your hands or not (one light piece: yes; two: put them down with G first).
+--
+-- 5.0, from the bottom: a new player has no vehicle. Marge gives them the phone (the server's "phone" message, not a
+-- phase: client/Phone.luau shows it) with their first job, ON FOOT: two letters on one street (Jobs.startTutorialJob).
+-- A payload with mode = "foot" gets the walking hints (walk, pick up, hand over: no van); the van's are kept for a
+-- car job. Her last pages send you to Last Stop Supplies for a backpack and to save up for a bike (level 2).
 
 local Config = require(script.Parent.Config)
 
@@ -24,6 +29,9 @@ export type Dialog = {
 	primary: string, -- the last page's action ("LET'S GO"); the earlier pages say CONTINUE
 	secondary: string?, -- a quiet second action on every page ("SKIP TUTORIAL", "LATER")
 }
+
+-- The phases the server sends (server/Tutorial.luau); "phone" (5.0) is a message, not a phase.
+TutorialSteps.Phases = { "welcome", "board", "job", "retry", "done", "say", "phone" }
 
 -- The job's steps (TutorialSteps.jobStep), in the order they come.
 TutorialSteps.JobSteps = { "drive_pickup", "pickup", "pickup_more", "carry", "loose", "drive_drop", "unload", "handover" }
@@ -95,10 +103,26 @@ function TutorialSteps.hint(step: string, job: { [string]: any }?): string
 	local piece = text(payload.piece, "parcel")
 	local person = text(payload.person, if payload.stage == "drop" then "the customer" else "the shop")
 	local name = Config.Tutorial.NpcName
+	if payload.mode == "foot" then
+		-- 5.0: on foot (the first job): walk, pick up, hand over.
+		if step == "drive_pickup" then
+			return "Walk to the red circle: the pickup. Follow the red route on the map; Shift sprints"
+		elseif step == "pickup" then
+			return `Pick up {article(piece)} from {person} (E)`
+		elseif step == "pickup_more" or step == "carry" then
+			return `Your hands hold two: pick up the next {piece} from {person} too (E)`
+		elseif step == "loose" then
+			return `Pick the {piece} up again (E)`
+		elseif step == "drive_drop" then
+			return "Got them all! Walk to the red circle: the drop-off"
+		elseif step == "unload" or step == "handover" then
+			return `Walk to {person} at the red circle and hand them over (E)`
+		end
+	end
 	if step == "welcome" then
 		return `Talk to {name} by the job board (E)`
 	elseif step == "board" then
-		return "Open the job board (J) and take a ★ job"
+		return "Open the job board (J) and take an ON FOOT job"
 	elseif step == "retry" then
 		return `Talk to {name} at the depot (E) for another job`
 	elseif step == "drive_pickup" then
@@ -129,9 +153,9 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		return {
 			speaker = speaker(false),
 			pages = {
-				`Hey, you must be the new driver! I'm {name}, I run dispatch here at Zombie Delivery Co.`,
-				"The city's overrun, but folks still need their stuff. We pick it up, we drive it over, we get paid.",
-				"I've got an easy one for you: a short trip, ★ danger. I'll talk you through it on the radio.",
+				`Hey, you must be the new courier! I'm {name}, I run dispatch here at Zombie Delivery Co.`,
+				"The city's overrun, but folks still need their mail and their medicine. No van yet? Everybody starts on foot.",
+				"I've got an easy one for you: two letters, one street. And take this phone: your orders, the board and your career are on it.",
 			},
 			primary = "LET'S GO",
 			secondary = "SKIP TUTORIAL",
@@ -142,13 +166,13 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		end
 		return {
 			speaker = speaker(false),
-			pages = { "Here's your job. The red route on the map and the red marker over the stop lead to the pickup. Get in your van and go!" },
+			pages = { "Here's your job: two letters. The red route on the map and the red marker over the stop lead to the pickup. Walk there, Shift sprints!" },
 			primary = "ON MY WAY",
 		}
 	elseif phase == "board" then
 		return {
 			speaker = speaker(false),
-			pages = { "Nothing easy on my list right now. Open the job board (J) and take any ★ job: I'll talk you through it." },
+			pages = { "Nothing easy on my list right now. Open the job board (J) and take an ON FOOT job: I'll talk you through it." },
 			primary = "OPEN THE BOARD",
 			secondary = "LATER",
 		}
@@ -167,9 +191,9 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		return {
 			speaker = speaker(true),
 			pages = {
-				`Delivered! Nice work, driver. There's ${reward} on top from me.`,
-				"New jobs land on the board (J) every few minutes, the easiest ★ ones at the top. Missions (U) are bigger stories with better pay.",
-				"Upgrade your van at Wrench Garage. Hold Q to pick a gun. And explore: the map fills in as you go.",
+				`Delivered! Nice work, courier. There's ${reward} on top from me.`,
+				"Buy a backpack at Last Stop Supplies: you carry more on foot. Then save up for a bike: the bike shop opens at level 2.",
+				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Hold Q to pick a gun, and explore: the map fills in as you go.`,
 			},
 			primary = "GOT IT",
 		}

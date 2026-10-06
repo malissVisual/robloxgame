@@ -56,7 +56,15 @@ end
 -- Draws the GEAR tab into `body` (the shop's scrolling body, a vertical list; Hud clears it first). `here`: at the
 -- counter (only there the actions work).
 function GearShop.render(body: Instance, state: any, here: boolean)
-	local carId = if type(state.car) == "string" then state.car else Config.Cars[1].id
+	if type(state.car) ~= "string" then
+		-- 5.0: you start on foot: no car, no gear to show (not the van's list with BUY buttons).
+		local none = Ui.make("Frame", { Name = "GearSlots", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, body)
+		Ui.list(none, true, 4)
+		P.caps(none, "Gear · no vehicle yet", UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1 })
+		Ui.label(none, `Gear goes on a car of your own, and you are still on foot. Your first one: the Old Van from {Config.VanQuest.Where}.`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
+		return
+	end
+	local carId: string = state.car
 	local carDef = Economy.findCar(carId)
 	local carGear: Economy.CarGear = if type(state.carGear) == "table" then state.carGear else {}
 	local levels = Economy.carLevels(state.carUpgrades, carId)

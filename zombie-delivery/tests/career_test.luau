@@ -46,20 +46,23 @@ for _, step in road do
 	check(`level {step.level}: its rank`, step.rank == Levels.rank(step.level))
 end
 check("a new rank is marked where it starts", road[1].newRank and road[5].newRank and not road[7].newRank and road[8].newRank)
-check("level 1: the Old Van, the Pistol, ★ jobs, First Shift", has(road[1].unlocks, "car", "van") and has(road[1].unlocks, "gun", "pistol")
-	and has(road[1].unlocks, "tier", "1") and has(road[1].unlocks, "campaign", "dispatch"))
-check("level 2: the Courier Van, the Rented Lockup, ★★ jobs", has(road[2].unlocks, "car", "courier") and has(road[2].unlocks, "garage", "garage_rented")
-	and has(road[2].unlocks, "tier", "2"))
+-- 5.0: you start on foot; the Old Van, the ★ car jobs and First Shift come at level 4.
+check("level 1: the Pistol (on foot: no car, no car jobs)", has(road[1].unlocks, "gun", "pistol") and not has(road[1].unlocks, "car", "van")
+	and not has(road[1].unlocks, "tier", "1"))
+check("level 2: the Rented Lockup", has(road[2].unlocks, "garage", "garage_rented"))
 check("level 3: the Hand Trolley (gear)", has(road[3].unlocks, "gear", "trolley"))
-check("level 4: the Ratchet Straps, the Pickup, the Long Cargo Van stage", has(road[4].unlocks, "gear", "straps") and has(road[4].unlocks, "car", "pickup")
-	and has(road[4].unlocks, "stage", "van:3"))
+check("level 4: the Old Van, the Patched Van stage, ★ jobs, First Shift, the Ratchet Straps", has(road[4].unlocks, "car", "van") and has(road[4].unlocks, "stage", "van:1")
+	and has(road[4].unlocks, "tier", "1") and has(road[4].unlocks, "campaign", "dispatch") and has(road[4].unlocks, "gear", "straps"))
+check("level 5: the Courier Van, the High-Roof Van, ★★ jobs", has(road[5].unlocks, "car", "courier") and has(road[5].unlocks, "car", "highroof") and has(road[5].unlocks, "tier", "2"))
+check("level 6: the Pickup, the Long Cargo Van stage, ★★★ jobs", has(road[6].unlocks, "car", "pickup") and has(road[6].unlocks, "stage", "van:3") and has(road[6].unlocks, "tier", "3"))
 check("level 5: the Cooler Box, the Roof Machine Gun, the Cash Transport", has(road[5].unlocks, "gear", "cooler") and has(road[5].unlocks, "cargun", "roofmg")
 	and has(road[5].unlocks, "job", "cashrun"))
-check("level 7: the Roof Rack, Birch Cottage, ★★★★ jobs", has(road[7].unlocks, "gear", "roofrack") and has(road[7].unlocks, "estate", "birch")
-	and has(road[7].unlocks, "tier", "4"))
+check("level 7: the Roof Rack, Birch Cottage, the Box Truck", has(road[7].unlocks, "gear", "roofrack") and has(road[7].unlocks, "estate", "birch")
+	and has(road[7].unlocks, "car", "boxtruck"))
+check("level 9: ★★★★ jobs", has(road[9].unlocks, "tier", "4"))
 check("level 15: the Hilltop Mansion and the Penthouse", has(road[15].unlocks, "estate", "hilltop") and has(road[15].unlocks, "estate", "office_penthouse"))
 check("an employer's job says where", (function()
-	for _, unlock in road[2].unlocks do
+	for _, unlock in road[4].unlocks do -- (5.0: a company vehicle from level 4)
 		if unlock.id == "schoolrun" then
 			return string.find(unlock.name, "(", 1, true) ~= nil
 		end
@@ -109,7 +112,7 @@ for _, def in Config.Estate.Properties do
 	end
 end
 check("every car, gear, car gun and property is on the road once", everywhere)
-check("the order inside a level: the board first, the real estate last", road[2].unlocks[1].kind == "tier" and road[15].unlocks[#road[15].unlocks].kind == "estate")
+check("the order inside a level: the board first, the real estate last", road[4].unlocks[1].kind == "tier" and road[15].unlocks[#road[15].unlocks].kind == "estate")
 
 -- ── The rewards ─────────────────────────────────────────────────────────────
 
@@ -161,10 +164,10 @@ check("never past the top", #Career.pending(99, Career.reached(99)) == 0 and Car
 
 -- The level-up card's line.
 local steps = Career.road()
-check("a short summary with … when there is more", string.find(Career.summary(steps[2].unlocks, 2), " …", 1, true) ~= nil
+check("a short summary with … when there is more", string.find(Career.summary(steps[4].unlocks, 2), " …", 1, true) ~= nil
 	and string.find(Career.summary(steps[3].unlocks, 99), "…", 1, true) == nil)
-check("the summary leaves out the stages of cars you do not own", string.find(Career.summary(steps[4].unlocks, 99, { van = false } :: any), "Long Cargo Van", 1, true) == nil
-	and string.find(Career.summary(steps[4].unlocks, 99, { van = true }), "Long Cargo Van", 1, true) ~= nil)
+check("the summary leaves out the stages of cars you do not own", string.find(Career.summary(steps[6].unlocks, 99, { van = false } :: any), "Long Cargo Van", 1, true) == nil
+	and string.find(Career.summary(steps[6].unlocks, 99, { van = true }), "Long Cargo Van", 1, true) ~= nil)
 
 -- ── The gear ────────────────────────────────────────────────────────────────
 
@@ -237,6 +240,31 @@ check("a broken save moves nothing", next(Economy.migrateGear(nil, { van = true 
 -- The board's tip.
 check("the tip without a trolley: where to get it, from level 3", string.find(Freight.trolleyTip("crate", 4, "carry") or "", "level 3", 1, true) ~= nil)
 check("the tip with one: use it", string.find(Freight.trolleyTip("crate", 4, "carry", true) or "", "Use your hand trolley", 1, true) ~= nil)
+
+-- ── 5.0: the road starts on foot ────────────────────────────────────────────
+
+local road50 = Career.road()
+check("5.0 level 1: the on-foot runs come first", road50[1].unlocks[1].kind == "foot")
+local kitEverywhere = true
+for _, kit in Config.Kit do
+	local at = road50[kit.level]
+	kitEverywhere = kitEverywhere and at ~= nil and has(at.unlocks, "kit", kit.id)
+end
+check("5.0: every piece of personal gear (Config.Kit) is on the road at its level", kitEverywhere and #Config.Kit >= 4)
+local bikes = false
+for _, def in Config.Cars do
+	bikes = bikes or (def :: any).kind == "bike"
+end
+check("5.0: the bikes are a line at their level until Config.Cars has one", has(road50[Career.BIKE_LEVEL].unlocks, "soon", "bikes") ~= bikes)
+local soonOnce = 0
+for _, step in road50 do
+	for _, unlock in step.unlocks do
+		if unlock.kind == "soon" then
+			soonOnce += 1
+		end
+	end
+end
+check("5.0: … and only there", soonOnce == (if bikes then 0 else 1))
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

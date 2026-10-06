@@ -16,6 +16,10 @@
 --     it (client/DialogKeys.luau), CAREER opens the window. It waits while the DELIVERY result or a mission's card is
 --     up (CareerUi.blocked, set by Main), and a jump over several levels shows them as one card.
 -- While the window or the card is open the mouse is free (Main: CameraRig.mouseNeeded).
+-- 5.0: the road starts on foot (shared/Career.luau): level 1 the on-foot runs and the personal gear (Config.Kit, with
+-- its price at Last Stop Supplies), the bikes as a "coming in 5.1" line, the Old Van and the car tiers at their new
+-- levels (all from Config). Below the first car tier the next goal counts on-foot runs. The phone's CAREER app
+-- (client/Phone.luau) reads CareerUi.unlockText and CareerUi.toGo.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -90,6 +94,8 @@ local KIND_ICON: { [string]: string } = {
 	campaign = "⭐",
 	garage = "🅿",
 	estate = "🏠",
+	foot = "🚶", -- 5.0: the on-foot runs
+	soon = "🚲", -- 5.0: what the next release brings (the bikes, 5.1)
 }
 
 -- An unlock as the road shows it: its kind's mark and its name ("🔧 Work Van (Old Van)" for a stage).
@@ -98,6 +104,14 @@ local function unlockText(unlock: Career.Unlock): string
 	if unlock.kind == "gear" then
 		local gear = Economy.findGear(unlock.id)
 		return `{if gear then gear.icon else "🧰"} {unlock.name} (gear)`
+	elseif unlock.kind == "kit" then
+		-- 5.0: personal gear, at Last Stop Supplies
+		for _, kit in Config.Kit do
+			if kit.id == unlock.id then
+				return `{kit.icon} {unlock.name} ({Career.money(kit.price)} at Last Stop Supplies)`
+			end
+		end
+		return `🎒 {unlock.name}`
 	elseif unlock.kind == "stage" then
 		local car = Economy.findCar(unlock.car or "")
 		return `{icon} {unlock.name}{if car then ` ({car.name} stage)` else ""}`
@@ -131,15 +145,47 @@ local function unlockLine(unlocks: { Career.Unlock }, max: number?): string
 end
 
 -- About how many deliveries the XP to go is: a delivery of the best danger level open to you, 3 pieces, a few kills.
+-- 5.0: below the first car tier (no danger level open yet) an on-foot run: stars 0 (the words say "on-foot runs").
+-- Its XP is Config.Jobs.Foot's (xp: a number, or { min, max }) when Stream A's band says it, else a ★ job's with 2
+-- pieces and no kills.
 local function deliveriesFor(xpLeft: number, level: number): (number, number)
-	local stars = 1
+	local stars = 0
 	for _, tier in Config.Jobs.Tiers do
 		if tier.level <= level then
 			stars = math.max(stars, tier.stars)
 		end
 	end
-	local each = math.max(1, Levels.jobXp(stars, 3, 5, false, true))
-	return math.max(1, math.ceil(xpLeft / each)), stars
+	local each: number
+	if stars == 0 then
+		local foot = (Config.Jobs :: any).Foot
+		local xp = if type(foot) == "table" then foot.xp else nil
+		if type(xp) == "number" then
+			each = xp
+		elseif type(xp) == "table" and type(xp[1]) == "number" and type(xp[2]) == "number" then
+			each = (xp[1] + xp[2]) / 2
+		else
+			each = Levels.jobXp(1, 2, 0, false, true)
+		end
+	else
+		each = Levels.jobXp(stars, 3, 5, false, true)
+	end
+	return math.max(1, math.ceil(xpLeft / math.max(1, each))), stars
+end
+
+-- "about 6 ★★ deliveries" / "about 8 on-foot runs".
+local function deliveriesText(count: number, stars: number): string
+	if stars == 0 then
+		return `{count} on-foot {if count == 1 then "run" else "runs"}`
+	end
+	return `{count} {string.rep("★", stars)} {if count == 1 then "delivery" else "deliveries"}`
+end
+
+-- 5.0, for the phone's CAREER app (client/Phone.luau): an unlock in the road's words, and the XP to go as work
+-- ("8 on-foot runs").
+CareerUi.unlockText = unlockText
+function CareerUi.toGo(xpLeft: number, level: number): string
+	local count, stars = deliveriesFor(xpLeft, level)
+	return deliveriesText(count, stars)
 end
 
 local function label(parent: Instance, text: string, props: { [string]: any }?): any
@@ -183,7 +229,7 @@ local function driverPanel(parent: Instance, road: { Career.Step })
 		local count, stars = deliveriesFor(left, level)
 		caps(parent, "Next goal", 6, P.danger)
 		label(parent, `<b>LEVEL {nextStep.level}</b>{if nextStep.newRank then `  ·  {string.upper(nextStep.rank)}` else ""}`, { LayoutOrder = 7, TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink })
-		label(parent, `{num(left)} XP to go: about {count} {string.rep("★", stars)} {if count == 1 then "delivery" else "deliveries"}. Missions, kills and night jobs give more.`, { LayoutOrder = 8 })
+		label(parent, `{num(left)} XP to go: about {deliveriesText(count, stars)}. Missions, kills and night jobs give more.`, { LayoutOrder = 8 })
 		local opens = unlockLine(nextStep.unlocks, 5)
 		if opens ~= "" then
 			label(parent, `<b>Opens</b>  {opens}`, { LayoutOrder = 9, TextColor3 = P.ink })

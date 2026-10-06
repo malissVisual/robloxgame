@@ -39,6 +39,9 @@ local ART = {
 	"sign_camp", "sign_stadium", "sign_hilltop", "sign_oceanview", "sign_pinecrest", "sign_lakeside", "sign_sunset",
 	"sign_maple", "sign_oak", "sign_birch", "sign_elm", "sign_office_harbor", "sign_office_tower",
 	"sign_office_penthouse",
+	-- 5.0: art/icons (the kit, the phone's apps)
+	"kit_backpack", "kit_bigpack", "kit_shoes", "kit_jacket", "kit_cart",
+	"app_orders", "app_board", "app_career", "app_shop", "app_map", "app_messages", "app_bank", "app_settings",
 }
 
 -- Every picture has its id slot, and the set has nothing else.
@@ -53,7 +56,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("98 pictures", count == 98, count)
+check("111 pictures", count == 111, count)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)
@@ -110,6 +113,16 @@ for id in Map.Shops do
 	check(`shop {id} has a map icon`, exists(Icons.landmark(id)))
 end
 check("an unknown landmark: none", Icons.landmark("moon") == nil)
+
+-- 5.0: every piece of kit and every app of the phone has an icon (the emoji while its id is empty).
+for _, def in Config.Kit do
+	check(`kit {def.id} has an icon`, exists(Icons.kit(def.id)), Icons.kit(def.id))
+end
+for _, id in { "orders", "board", "career", "shop", "map", "messages" } do
+	check(`phone app {id} has an icon`, exists(Icons.app(id)), Icons.app(id))
+end
+check("an unknown kit or app: none", Icons.kit("jetpack") == nil and Icons.app("casino") == nil and Icons.kit(nil) == nil)
+check("a kit icon while its id is empty: the emoji", Icons.Ids.kit_backpack ~= "" or Icons.get(Icons.kit("backpack")) == nil)
 
 -- The building signs: every shop, employer, tower and home has one (two places share their employer's), the garages
 -- and the homes are square badges, the rest 4 : 1 boards.

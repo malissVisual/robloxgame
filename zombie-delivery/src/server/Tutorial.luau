@@ -3,11 +3,12 @@
 -- tag, the idle animation and a "Talk" prompt), stands at the depot by the job board. She is there for everybody.
 --
 -- A player whose profile.tutorial is false (a new save; PlayerData counts an older save with a delivery as done):
---   wait     until PLAY was pressed: their car came (Main gives it on PLAY; Tutorial.onPlay when Main calls it), then
+--   wait     until PLAY was pressed (Tutorial.onPlay when Main calls it; or their car came), then
 --            Config.Tutorial.StartDelay s for the start screen to fade
 --   welcome  her greeting (client/TutorialUi.luau shows the dialog at once, a marker over her). "Let's go" in the
---            dialog or talking to her (E): Jobs.startTutorialJob, the easiest ★ ordinary job, as if taken from the board
---   board    no job could be made: take any ★ job from the board (J)
+--            dialog or talking to her (E): she gives the PHONE (5.0) and Jobs.startTutorialJob, the first delivery ON
+--            FOOT (two letters on one street), as if taken from the board
+--   board    no job could be made: take an ON FOOT job from the board (J)
 --   job      a job runs: the client reads the Job payload for its hints (shared/TutorialSteps.luau)
 --   retry    it failed or was cancelled (Jobs.onDelivered false, or the job vanished without a result): she offers
 --            another, over the radio or when you talk to her
@@ -19,6 +20,9 @@
 -- Remote "Tutorial": server → client (phase, data?) with data.npc = her model (the marker), data.given (the job is
 -- hers), data.reward (done), data.text (say); (nil) = over (skipped). Client → server: ("go") = her dialog's
 -- "Let's go" / "Another job", ("skip").
+-- 5.0, the phone: profile.phone = true when she gives you the first job (or the tutorial is skipped; a player without
+-- the tutorial gets it at once), and the message ("phone", { npc }) right before the job's: client/Phone.luau shows
+-- its "NEW PHONE" moment (TutorialUi ignores it: not a phase).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -75,6 +79,17 @@ local function bubble(text: string)
 	end
 end
 
+-- 5.0: the phone is yours (profile.phone; the state goes to the client) and the client hears it ("phone"). Once.
+local function givePhone(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile or profile.phone then
+		return
+	end
+	profile.phone = true
+	PlayerData.notify(player)
+	send(player, "phone")
+end
+
 -- The tutorial is over for this player: delivered (with the reward and her last pages) or skipped.
 local function finish(player: Player, delivered: boolean)
 	local profile = PlayerData.get(player)
@@ -95,6 +110,7 @@ local function finish(player: Player, delivered: boolean)
 	else
 		send(player, nil)
 		notice:FireClient(player, `Tutorial skipped. {Tuning.NpcName} is by the job board if you need her.`)
+		givePhone(player) -- 5.0: the phone all the same
 	end
 end
 
@@ -111,6 +127,7 @@ local function giveJob(player: Player, session: Session)
 		send(player, "job")
 		return
 	end
+	givePhone(player) -- 5.0: "take this phone" (before the job's own dialog)
 	local ok, given = pcall(Jobs.startTutorialJob, player)
 	if not ok then
 		warn(`[Tutorial] startTutorialJob: {given}`)
@@ -234,7 +251,7 @@ local function check(player: Player, session: Session, now: number)
 			return
 		end
 		if not session.readyAt and Vehicles.get(player) then
-			session.readyAt = now + Tuning.StartDelay -- the car comes on PLAY (Main giveCar)
+			session.readyAt = now + Tuning.StartDelay -- (a car came on PLAY: Main giveCar; 5.0: a new player has none)
 		end
 		local readyAt = session.readyAt
 		if readyAt and now >= readyAt then
@@ -278,6 +295,7 @@ local function update()
 				check(player, session, now)
 			else
 				sessions[player] = nil -- done (an older save, an admin, skipped): never shown
+				givePhone(player) -- 5.0: no tutorial ahead (a Studio test without it, a save not read): the phone at once
 			end
 		end
 	end

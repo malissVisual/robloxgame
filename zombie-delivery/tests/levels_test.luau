@@ -59,8 +59,9 @@ end
 local top = Levels.xpFor(MAX)
 check("the campaigns give 85 - 100 % of the top level's XP (no kills)", campaignXp >= top * 0.85 and campaignXp <= top, `{math.floor(campaignXp)} of {top}`)
 -- Played in order with about 10 kills a mission, no story mission is ever above your level, and you end at the top.
+-- 5.0: the story starts at the first campaign's level (the levels before it are the foot and the first car jobs).
 do
-	local xp, blocked = 0, nil :: string?
+	local xp, blocked = Levels.xpFor(Missions.Campaigns[1].level), nil :: string?
 	for _, campaign in Missions.Campaigns do
 		if not campaign.duo then
 			for _, def in Missions.ofCampaign(campaign.id) do
@@ -103,9 +104,9 @@ check("the last level is the longest step", Levels.xpFor(MAX) - Levels.xpFor(MAX
 local function car(id: string): Config.CarDef
 	return Economy.findCar(id) :: Config.CarDef
 end
-check("the van is free at level 1", car("van").price == 0 and (car("van").level or 1) == 1)
-check("the pickup opens at level 4", car("pickup").level == 4, car("pickup").level)
-check("the muscle car opens at level 8", car("muscle").level == 8, car("muscle").level)
+check("the van is the first vehicle: $1,800 at level 4 (5.0)", car("van").price == 1800 and car("van").level == 4)
+check("the pickup opens at level 6", car("pickup").level == 6, car("pickup").level)
+check("the muscle car opens at level 9", car("muscle").level == 9, car("muscle").level)
 local function ordered(list: { any }, skip: (any) -> boolean): (boolean, string?)
 	local lastLevel, lastPrice = 0, -1
 	for _, def in list do
@@ -148,7 +149,7 @@ end
 check("the pickup is not free money (more than the first missions' rewards)", car("pickup").price > rewardsUpTo(1), rewardsUpTo(1))
 check("the muscle car costs real money", car("muscle").price >= 3 * car("pickup").price)
 -- 3.3: five more vans between the start van and the endgame.
-for _, want in { { "courier", 2 }, { "highroof", 3 }, { "boxtruck", 6 }, { "armorvan", 10 }, { "rallyvan", 12 } } do
+for _, want in { { "courier", 5 }, { "highroof", 5 }, { "boxtruck", 7 }, { "armorvan", 11 }, { "rallyvan", 13 } } do
 	local def = Economy.findCar(want[1] :: string)
 	check(`the {want[1]} is at the dealer from level {want[2]}`, def ~= nil and not def.company and def.level == want[2] and def.mount == true, def and def.level)
 end
@@ -159,7 +160,7 @@ for _, def in Config.Cars do
 	end
 end
 check("nine cars at the dealer (4.0: the Freight Truck)", dealer == 9, dealer)
-check("the courier van is cheap, a few missions' money", car("courier").price <= rewardsUpTo(2) and car("courier").price > rewardsUpTo(1), car("courier").price)
+check("the courier van is cheap, a few missions' money", car("courier").price <= rewardsUpTo(car("courier").level :: number) and car("courier").price > rewardsUpTo(car("van").level :: number - 1), car("courier").price)
 check("the rally van is the dealer's last and dearest", car("rallyvan").price >= 2 * car("muscle").price, car("rallyvan").price)
 check("the armored van is tough, the rally van fast", car("armorvan").health >= 2 * car("van").health and car("rallyvan").maxSpeed > car("pickup").maxSpeed)
 -- The employers' company cars: the strong ones come with a level too (the monster truck no earlier than the muscle car).

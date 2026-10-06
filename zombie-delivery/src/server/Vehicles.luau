@@ -148,6 +148,9 @@ export type Car = {
 
 local Vehicles = {}
 
+-- 5.0: what Vehicles.spawn (the CAR button, a job, PLAY) says to a player who owns no vehicle yet.
+Vehicles.NO_VEHICLE = `You don't have a vehicle yet: deliver on foot (J: the job board). The Old Van: {Config.VanQuest.Where}.`
+
 local cars: { [Player]: Car } = {}
 local lastSpawn: { [Player]: number } = {}
 
@@ -3344,7 +3347,11 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	if not profile then
 		return nil
 	end
-	local def = Economy.findCar(carId or profile.car) or Config.Cars[1]
+	local id = carId or profile.car
+	if not id then
+		return nil -- 5.0: no vehicle yet (Vehicles.spawn says so)
+	end
+	local def = Economy.findCar(id) or Config.Cars[1]
 	Vehicles.remove(player)
 
 	-- 3.3: this car's own car-track levels (a company vehicle has none).
@@ -3470,8 +3477,12 @@ end
 -- The car right next to the player on the nearest road, and they get in: the old instant way (a force spawn away
 -- from home, the chauffeur's fallback). Returns an error text when it cannot.
 function Vehicles.placeNear(player: Player, carId: string?): string?
-	if not PlayerData.get(player) then
+	local profile = PlayerData.get(player)
+	if not profile then
 		return "Still loading..."
+	end
+	if carId == nil and profile.car == nil then
+		return Vehicles.NO_VEHICLE -- 5.0
 	end
 	local character = player.Character
 	local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -3497,8 +3508,12 @@ end
 -- at home, else next to them and seated. carId = a company vehicle lent for a job. Returns an error text when it
 -- cannot.
 function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string?
-	if not PlayerData.get(player) then
+	local profile = PlayerData.get(player)
+	if not profile then
 		return "Still loading..."
+	end
+	if carId == nil and profile.car == nil then
+		return Vehicles.NO_VEHICLE -- 5.0: you start on foot
 	end
 	if not force then
 		local inCar = Vehicles.seatedIn(player)
@@ -3529,7 +3544,7 @@ end
 -- 4.0: how long the car the player would get is (its style at its stage: a stretched van, the Freight Truck).
 local function lengthFor(player: Player, carId: string?): number
 	local profile = PlayerData.get(player)
-	local def = Economy.findCar(carId or (if profile then profile.car else "van")) or Config.Cars[1]
+	local def = Economy.findCar(carId or (if profile then profile.car else nil) or "van") or Config.Cars[1]
 	local levels = if profile then Economy.carLevels(profile.carUpgrades, def.id) else {}
 	return styleFor(def, if def.company then 0 else Economy.stageOf(def.id, levels)).length
 end

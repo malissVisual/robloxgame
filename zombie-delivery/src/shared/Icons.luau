@@ -5,8 +5,9 @@
 --
 -- How to fill it in:
 --   1. In Studio open View → Asset Manager, then Bulk Import, and pick the PNGs from zombie-delivery/art/
---      (weapons/, cargo/, map/, logo/zombie_delivery_logo.png, ui/menu_background.png, signs/sign_*.png). The file
---      name without .png is the name below (art/cargo/item_medkit.png → item_medkit).
+--      (weapons/, cargo/, map/, logo/zombie_delivery_logo.png, ui/menu_background.png, signs/sign_*.png, 5.0:
+--      icons/kit_*.png and icons/app_*.png). The file name without .png is the name below (art/cargo/item_medkit.png →
+--      item_medkit).
 --   2. Right-click an uploaded image → Copy Asset ID.
 --   3. Paste it here as "rbxassetid://<the number>", e.g. weapon_pistol = "rbxassetid://1234567890".
 -- An empty id means "not uploaded": the game then shows the emoji / text it always showed. The icons are white
@@ -119,6 +120,21 @@ Icons.Ids = {
 	sign_office_harbor = "rbxassetid://98838604316825",
 	sign_office_tower = "rbxassetid://123929738866726",
 	sign_office_penthouse = "rbxassetid://84138164235299",
+	-- 5.0, the personal kit (art/icons/kit_*, 256 x 256; Config.Kit ids, the cart is not sold yet): the KIT tab.
+	kit_backpack = "",
+	kit_bigpack = "",
+	kit_shoes = "",
+	kit_jacket = "",
+	kit_cart = "",
+	-- 5.0, the phone's apps (art/icons/app_*, 256 x 256; client/Phone.luau's app ids, bank and settings for later).
+	app_orders = "",
+	app_board = "",
+	app_career = "",
+	app_shop = "",
+	app_map = "",
+	app_messages = "",
+	app_bank = "",
+	app_settings = "",
 } :: { [string]: string }
 
 -- The asset id of an icon, or nil while it is empty (not uploaded) or unknown.
@@ -188,6 +204,16 @@ local CARGO_ALIASES: { [string]: string } = {
 	pallet = "crate", -- 4.0, freight: a pallet of boxes
 }
 
+-- 5.0: a piece of personal kit (Config.Kit id: backpack, bigpack, shoes, jacket).
+function Icons.kit(kitId: string?): string?
+	return named("kit_", kitId)
+end
+
+-- 5.0: an app of the phone (client/Phone.luau: orders, board, career, shop, map, messages).
+function Icons.app(appId: string?): string?
+	return named("app_", appId)
+end
+
 -- A piece of cargo: a kind (crate, ammo, sack, barrel, icebox, furniture, soup, horse, kid) or a look (pizza, parcel,
 -- medicine, bread, groceries, tools, gold, cake, vaccine, sample, ...). Unknown ones get nil.
 function Icons.cargo(kindOrLook: string?): string?
@@ -216,6 +242,7 @@ local LANDMARK_ALIASES: { [string]: string } = {
 	garage_rented = "dealer", -- 3.4, the small garages
 	garage_south = "dealer",
 	repairs = "mechanic", -- 3.4, the second repair shop: a wrench like Wrench Garage
+	earl = "dealer", -- 5.0, Earl's Used Wheels: a car for sale
 	-- The missions' places (3.0) have no map icons of their own either: the closest ones.
 	market = "supplies", -- a shop full of things
 	airfield = "army",

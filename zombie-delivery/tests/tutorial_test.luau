@@ -88,6 +88,32 @@ for _, name in TutorialSteps.JobSteps do
 end
 check("touch: plain words stay", touch("Delivered! Nice work, driver.") == "Delivered! Nice work, driver.")
 
+-- 5.0: the first job is on foot (no van), Marge gives the phone, and her last pages send you to a backpack and a bike.
+local footJob = function(fields: { [string]: any }): { [string]: any }
+	local out = job(fields)
+	out.mode = "foot"
+	return out
+end
+check("on foot: walking to the pickup", step(footJob({})) == "drive_pickup")
+check("on foot: walking to the drop with letters in hand", step(footJob({ stage = "drop", carrying = "crate" })) == "handover")
+for _, name in TutorialSteps.JobSteps do
+	local line = TutorialSteps.hint(name, footJob({}))
+	check(`on foot: {name} hint, no van`, line ~= "" and string.find(string.lower(line), "van", 1, true) == nil, line)
+	check(`on foot touch: {name} names no key`, string.find(touch(line), "%([A-Z]%)") == nil, touch(line))
+end
+check("on foot: the drive hints say walk", string.find(TutorialSteps.hint("drive_pickup", footJob({})), "Walk", 1, true) ~= nil
+	and string.find(TutorialSteps.hint("drive_drop", footJob({})), "Walk", 1, true) ~= nil)
+check("on foot: hand over", string.find(TutorialSteps.hint("handover", footJob({})), "hand them over", 1, true) ~= nil)
+local welcome = table.concat((TutorialSteps.dialog("welcome", nil) :: any).pages, " ")
+check("the welcome gives the phone and says on foot", string.find(welcome, "phone", 1, true) ~= nil and string.find(welcome, "on foot", 1, true) ~= nil, welcome)
+local lastPages = table.concat(done.pages, " ")
+check("done: a backpack at Last Stop Supplies, a bike at level 2", string.find(lastPages, "backpack", 1, true) ~= nil
+	and string.find(lastPages, "Last Stop Supplies", 1, true) ~= nil and string.find(lastPages, "bike", 1, true) ~= nil and string.find(lastPages, "level 2", 1, true) ~= nil, lastPages)
+check("the phone is a message, not a dialog", TutorialSteps.dialog("phone", nil) == nil and table.find(TutorialSteps.Phases, "phone") ~= nil)
+check("the board hint: an ON FOOT job", string.find(TutorialSteps.hint("board", nil), "ON FOOT", 1, true) ~= nil)
+check("two letters fit two hands", Config.Jobs.TutorialPieces == 2 and Config.Jobs.TutorialPieces <= Config.Cargo.HandsMax)
+check("the tutorial's cargo is light", Config.Cargo.LightLooks[Config.Jobs.Foot.TutorialCargo.look] == true)
+
 check("a reward", Config.Tutorial.Reward > 0)
 check("a talk range", Config.Tutorial.TalkRange > 0 and Config.Tutorial.TalkRange < 12)
 local half = Config.City.BlockSize / 2

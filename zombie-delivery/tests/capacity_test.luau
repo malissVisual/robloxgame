@@ -61,12 +61,13 @@ end
 
 -- The Old Van: 2 → 2 → 3 → 4 (4.0: the Patched Van first), and 4 is where a van ends ("6 needs a bigger vehicle").
 local van = start.stages or {}
-check("the starting van is the Old Van", start.id == "van" and start.price == 0)
+-- 5.0: you start on foot; the Old Van is the first vehicle you buy (level 4, $1,800).
+check("the first vehicle is the Old Van, bought at level 4", start.id == "van" and start.price == 1800 and start.level == 4)
 check("the Old Van: Rusty Van 2 → Patched Van 2 → Work Van 3 → Long Cargo Van 4", #van == 4 and van[1].name == "Rusty Van" and van[1].capacity == 2
 	and van[2].name == "Patched Van" and van[2].capacity == 2 and van[3].name == "Work Van" and van[3].capacity == 3
 	and van[4].name == "Long Cargo Van" and van[4].capacity == 4)
-check("the Patched Van and the Work Van are cheap and early", #van == 4 and van[2].price <= 300 and (van[2].level or 1) <= 2
-	and van[3].price <= 800 and (van[3].level or 1) <= 2)
+check("the Patched Van and the Work Van are cheap and early (5.0: levels 4 and 5)", #van == 4 and van[2].price <= 300 and (van[2].level or 1) <= 4
+	and van[3].price <= 800 and (van[3].level or 1) <= 5)
 check("the Freight Truck is the biggest (12), the Box Truck the big one before it (8)", biggestId == "freight" and biggest == 12
 	and Economy.maxCapacity("boxtruck") == 8 and Economy.stageCapacity("boxtruck", 0) == 6, `{biggestId} {biggest}`)
 for _, def in Config.Cars do
@@ -251,6 +252,6 @@ for _, def in Config.Estate.Properties do
 end
 local courier = Economy.findCar("courier")
 check("the Courier Van's level opens a garage for it", firstGarage ~= nil and courier ~= nil and (firstGarage.level or 1) <= (courier.level or 1))
-check("a stage needs no garage: the Old Van grows in its depot slot", (van[2] and van[2].level or 1) <= 2)
+check("a stage needs no garage: the Old Van grows in its depot slot", (van[2] and van[2].level or 1) <= (start.level or 1))
 
 print(if failed == 0 then "ALL CHECKS PASSED" else `{failed} CHECK(S) FAILED`)

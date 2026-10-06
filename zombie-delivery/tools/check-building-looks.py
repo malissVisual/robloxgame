@@ -17,12 +17,19 @@ DATA = ROOT / "src/server/BuildingLooks"
 # The first six (Codex, 4.0.4) have their entries here; later blueprints declare theirs (Blueprint.entries).
 KNOWN = {"depot", "dealer", "guns", "mechanic", "supplies", "warehouse"}
 
+def projected_size(size, rotation):
+    x,y,z=map(math.radians,rotation)
+    sx,cx,sy,cy,sz,cz=math.sin(x),math.cos(x),math.sin(y),math.cos(y),math.sin(z),math.cos(z)
+    rows=((cy*cz,-cy*sz,sy),(cx*sz+sx*sy*cz,cx*cz-sx*sy*sz,-sx*cy),(sx*sz-cx*sy*cz,sx*cz+cx*sy*sz,cx*cy))
+    return tuple(sum(abs(axis[i])*size[i] for i in range(3)) for axis in rows)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("luau")
     parser.add_argument("--blueprints", type=Path, default=DATA, help="Validate staged blueprints before integrating World")
     args = parser.parse_args()
+    assert all(abs(a-b)<1e-8 for a,b in zip(projected_size([4,.1,.1],[0,0,90]),[.1,4,.1]))
     blueprints = [p for p in sorted(args.blueprints.glob("*.luau")) if p.name != "Kit.luau"]
     renderer = (DATA / "Kit.luau").read_text()
     assert "context.deco(context.part(" in renderer and "item.CanTouch = false" in renderer
@@ -93,7 +100,9 @@ end
             assert all(0 <= n <= 255 for n in d["color"])
             assert 0 <= d.get("transparency", 0) <= 1
             x, y, z = d["position"]
-            w, h, depth = d["size"]
+            rotation=d.get("rotation",[0,0,0])
+            assert len(rotation)==3 and all(math.isfinite(n) for n in rotation)
+            w, h, depth = projected_size(d["size"],rotation)
             # Details remain on/within the original building and its close overhang.
             assert abs(x) + w / 2 <= data["width"] / 2 + 1.5, (id_, d["name"], "side spill")
             assert abs(z) + depth / 2 <= data["depth"] / 2 + 4, (id_, d["name"], "front/back spill")

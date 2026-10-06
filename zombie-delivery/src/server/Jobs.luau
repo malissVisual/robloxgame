@@ -104,6 +104,15 @@
 --     (stop next to them, they ride along until the depot's safe zone: lifts, paid even after the job), a side
 --     pick-up offered on the HUD (Net "RoadEvent", Y: one more piece before the drop, takeAddOn), a blocked street
 --     ahead (a roadblock).
+--
+-- 5.0, from the bottom (Config.Jobs.Foot, shared/Transport.luau, server/Transport.luau): every offer has a `mode`.
+--   * "foot": the board's ON FOOT section (footOffer, Foot.Offers of them through JobRules.roles), always open, on
+--     top of the board: light pieces only, never more than you carry (hands + backpack), a short walk Downtown or in
+--     the Suburbs, its own pay and clock (JobRules.footPay / footTime). startJob needs no vehicle (Cargo's foot flow:
+--     Info.foot, the pack); no waves, bandits or road events, now and then a stray walker (strayStep); a thermal
+--     jacket slows the food's drain. The tutorial's first delivery is one (Jobs.startTutorialJob).
+--   * "car": every other job. Without a vehicle of your own (profile.car nil) the ones in your own car are locked
+--     "NEEDS A VEHICLE" (needsVehicle) and refused; the jobs that lend a company vehicle need their level (4+).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -129,6 +138,7 @@ local DuoGates = require(script.Parent.DuoGates)
 local Npcs = require(script.Parent.Npcs)
 local Freight = require(Shared.Freight)
 local JobRules = require(Shared.JobRules)
+local Transport = require(script.Parent.Transport) -- 5.0: what you carry on foot (the kit)
 
 type Stop = {
 	address: Map.Address,
@@ -180,6 +190,9 @@ type Offer = {
 	dests: { number }?, -- multi-drop: the stop every piece goes to (JobRules.destinations), nil for one drop
 	destNames: { [number]: string }?, -- multi-drop: the customer at each of those stops
 	tutorial: boolean, -- the tutorial's first delivery (no road events)
+	-- 5.0: how it is done: "foot" (the board's ON FOOT section: no vehicle, Config.Jobs.Foot) or "car" (every other job;
+	-- a job that lends a company vehicle too). 5.1 adds "bike".
+	mode: string,
 }
 
 -- 3.7: a player's job board: its offers (sorted, boardOrder) until refreshAt (workspace:GetServerTimeNow()).
@@ -246,6 +259,7 @@ type Job = {
 	eventNpc: Model?,
 	eventName: string,
 	addOn: AddOn?,
+	nextStray: number, -- 5.0, a foot job: os.clock() of the next chance of a stray walker (Config.Jobs.Foot)
 }
 
 -- 4.8: a side pick-up offered by a road event (one more piece from `giver` at `address`, `distance` from you).
@@ -428,8 +442,12 @@ local function payload(job: Job): { [string]: any }
 		-- for the road event
 		rules = offer.rules,
 		freshness = if JobRules.hasRule(offer.rules, "food") then job.freshness else nil,
-		ruleLine = JobRules.ruleLine(offer.rules, job.freshness, cooled(job.owner)),
+		ruleLine = JobRules.ruleLine(offer.rules, job.freshness, offer.mode ~= "foot" and cooled(job.owner)),
 		eventLine = eventLine(job),
+		-- 5.0: "foot" | "car"; on foot what rides in your backpack (and its room)
+		mode = offer.mode,
+		pack = if status.foot then status.pack else nil,
+		packRoom = if status.foot then status.packRoom else nil,
 	}
 end
 
@@ -449,12 +467,13 @@ end
 
 -- An address `low` … `high` (manhattan) from a point, or the closest one to that band. poiWeight > 0 lets the
 -- named places in (that many times as likely).
-local function addressAround(x: number, z: number, low: number, high: number, poiWeight: number, avoid: { Map.Address }): Map.Address?
+-- 5.0: `allow` (a foot job: its districts) leaves the others out, the closest one too.
+local function addressAround(x: number, z: number, low: number, high: number, poiWeight: number, avoid: { Map.Address }, allow: ((Map.Address) -> boolean)?): Map.Address?
 	local fits: { Map.Address } = {}
 	local closest: Map.Address? = nil
 	local closestGap = math.huge
 	for _, address in Map.addresses() do
-		if table.find(avoid, address) or (address.poi and poiWeight <= 0) then
+		if table.find(avoid, address) or (address.poi and poiWeight <= 0) or (allow and not allow(address)) then
 			continue
 		end
 		local d = Map.manhattan(x, z, address.x, address.z)
@@ -668,6 +687,7 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 		dests = nil,
 		destNames = nil,
 		tutorial = false,
+		mode = "car",
 	}
 end
 
@@ -696,7 +716,7 @@ end
 -- An ordinary delivery: a business that fits the danger level sends 1 – 3 pieces to somebody who needs them.
 -- 3.7, `easy` (the tutorial's first delivery, Jobs.startTutorialJob): carried pieces only (no people, no horses), at
 -- most Config.Jobs.TutorialPieces, the pick-up within TutorialPickupMax, the drop within TutorialDropMax of it, never
--- a bulk order or a modifier.
+-- a bulk order or a modifier. (5.0: the tutorial's delivery is on foot, footOffer; `easy` is kept for a car one.)
 -- 4.7, `role` (the board's choice, Config.Jobs.Choice): short = the drop in the near band, the fewest pieces, no
 -- modifier, no bulk; long = the far band, × LongPay; risky = a RiskyModifiers modifier, the bandits want it (×
 -- RiskyBoost where the tier has bandits), × RiskyPay; bulk = a business that sends several, its most pieces + the
@@ -817,6 +837,97 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 	end
 	if role == "risky" and (tier.ambushEvery > 0 or tier.chaseEvery > 0) then
 		offer.boost = math.max(offer.boost, choice.RiskyBoost)
+	end
+	return offer
+end
+
+-- 5.0, an ON FOOT job (Config.Jobs.Foot): a business that sends a light look (Config.Cargo.LightLooks) sends 1 – 3
+-- pieces (never more than `room`, what you carry: Transport.handsRoom) from an address near you to one a short walk
+-- on, Downtown or in the Suburbs only. A ★ job inside (tier 1) with `mode = "foot"`: its own pay and clock
+-- (JobRules.footPay / footTime), level 1, no bandits, only the food rule (the others are about driving). `role` as on
+-- the board (short / long / risky / bulk: JobRules.roles); `tutorial` (the first day's delivery): the post office's
+-- letters (Foot.TutorialCargo), Config.Jobs.TutorialPieces of them, the drop on the same street (TutorialDrop).
+local function footOffer(from: Vector3, role: string?, room: number, tutorial: boolean?): Offer?
+	local foot = JobsConfig.Foot
+	local choice = JobsConfig.Choice
+	local businesses: { Config.BusinessDef } = {}
+	for _, business in JobsConfig.Businesses do
+		if Tuning.LightLooks[business.look] and not Cargo.isPeople(business.kind) and (not tutorial or business.id == "post") then
+			table.insert(businesses, business)
+		end
+	end
+	if role == "bulk" then
+		local several: { Config.BusinessDef } = {}
+		for _, business in businesses do
+			if (business.pieces[2] or business.pieces[1]) > 1 then
+				table.insert(several, business)
+			end
+		end
+		if #several > 0 then
+			businesses = several
+		end
+	end
+	if #businesses == 0 then
+		return nil
+	end
+	local business = pick(businesses)
+	local function allow(address: Map.Address): boolean
+		return not address.poi and foot.Districts[address.district] == true
+	end
+	local pickupMax = if tutorial then math.max(foot.PickupMax, JobsConfig.TutorialPickupMax) else foot.PickupMax
+	local pickup = addressAround(from.X, from.Z, foot.PickupMin, pickupMax, 0, {}, allow)
+	if pickup and Map.manhattan(from.X, from.Z, pickup.x, pickup.z) > pickupMax then
+		-- (none that close, the depot's safe zone has no addresses: a little farther, not always the same one)
+		pickup = addressAround(from.X, from.Z, foot.PickupMin, pickupMax + foot.PickupWiden, 0, {}, allow)
+	end
+	-- 5.0: addressAround falls back to the closest address at any distance: out in the country (far from Downtown and
+	-- the Suburbs) there is no foot job at all, not a walk across the map.
+	if pickup and Map.manhattan(from.X, from.Z, pickup.x, pickup.z) > pickupMax + foot.PickupWiden then
+		pickup = nil
+	end
+	if not pickup then
+		return nil
+	end
+	local dropMin, dropMax = JobRules.window(role, foot.MinDistance, foot.MaxDistance)
+	if tutorial then
+		dropMin, dropMax = foot.MinDistance, math.max(foot.MinDistance, foot.TutorialDrop)
+	end
+	local drop = addressAround(pickup.x, pickup.z, dropMin, dropMax, 0, { pickup }, allow)
+	if not drop then
+		return nil
+	end
+	local receiver = pick(business.receivers)
+	local most = business.pieces[2] or business.pieces[1]
+	local wanted = if role == "short" then business.pieces[1] elseif role == "bulk" then most else rng:NextInteger(business.pieces[1], most)
+	local count = if tutorial then math.max(1, math.min(JobsConfig.TutorialPieces, room)) else JobRules.footPieces(wanted, room)
+	local words = foot.TutorialCargo
+	local cargoName = if tutorial then words.cargo else business.cargo
+	local pieces: CargoInfo = if tutorial
+		then { kind = words.kind, look = words.look, piece = words.piece, plural = words.plural, total = count }
+		else { kind = business.kind, look = business.look, piece = business.piece, plural = business.plural, total = count }
+	local stops: { Stop } = {
+		newStop(pickup, "pickup", "carry", count, if tutorial then `PICK UP the letters at the {business.place}, {pickup.name}` else `PICK UP at the {business.place}, {pickup.name}`, business.giver),
+		newStop(drop, "drop", "carry", count, `DELIVER to {receiver.name}, {drop.name}`, receiver),
+	}
+	local forced = if role == "risky" then riskyModifier(1) else nil
+	local offer = finishOffer(1, stops, routeLength(from.X, from.Z, stops), cargoName, receiver.name, nil, pieces, 0, tutorial or role == "short", forced)
+	offer.mode = "foot"
+	offer.role = role
+	offer.level = 1 -- always open: the board's ON FOOT section
+	offer.boost = 1 -- no bandits on foot
+	-- Its own pay and clock (the walk, not the drive).
+	local handling = 0
+	for _, stop in stops do
+		handling += Economy.handlingTime(stop.mode, stop.needed)
+	end
+	local modifier = offer.modifier
+	local roleMult = if role == "long" then choice.LongPay elseif role == "risky" then choice.RiskyPay else 1
+	offer.pay = JobRules.footPay(offer.distance, count, roleMult * (if modifier then modifier.payMultiplier else 1))
+	offer.time = JobRules.footTime(offer.distance, handling, if modifier then modifier.timeMultiplier else nil)
+	if not tutorial then
+		-- 4.8: of the cargo's rules only the food's freshness counts on foot (the jolts are a vehicle's).
+		applyRules(offer, business.id)
+		offer.rules = if JobRules.hasRule(offer.rules, "food") then { "food" } else {}
 	end
 	return offer
 end
@@ -1017,17 +1128,32 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 	return offer
 end
 
+-- 5.0: a job done in your own car (not on foot, no company vehicle lent) while you own no vehicle yet.
+local function needsVehicle(player: Player, offer: Offer): boolean
+	local jobType = offer.jobType
+	local profile = PlayerData.get(player)
+	return offer.mode ~= "foot" and not (jobType and jobType.vehicle) and profile ~= nil and profile.car == nil
+end
+
 -- 3.4: the cargo slots a job needs, what the vehicle that would do it holds and that vehicle's name: the company
--- vehicle the job lends, else the player's equipped car (3.5: at its stage).
+-- vehicle the job lends, else the player's equipped car (3.5: at its stage). 5.0: on foot the pieces you carry
+-- (Transport: hands and backpack); no vehicle yet: 0.
 local function slotsFor(player: Player, offer: Offer): (number, number, string)
 	local jobType = offer.jobType
 	local need = Economy.cargoNeed(if jobType then jobType.load else "carry", offer.total)
+	if offer.mode == "foot" then
+		local room = Transport.footOf(player).room
+		return offer.total, room, if room > Config.Cargo.HandsMax then "backpack" else "hands"
+	end
 	if jobType and jobType.vehicle then
 		local lent = Economy.findCar(jobType.vehicle)
 		return need, Economy.capacity(jobType.vehicle, {}), if lent then lent.name else jobType.vehicle
 	end
 	local profile = PlayerData.get(player)
 	local carId = if profile then profile.car else Config.Cars[1].id
+	if not carId then
+		return need, 0, "no vehicle"
+	end
 	local def = Economy.findCar(carId)
 	-- 4.6: a Roof Rack on it takes one more light piece (Economy.capacity with the gear and the cargo's look).
 	local gear = if profile then Economy.installedGear(profile.carGear, carId) else {}
@@ -1038,10 +1164,11 @@ end
 local function trolleyFor(player: Player, offer: Offer): boolean
 	local jobType = offer.jobType
 	local profile = PlayerData.get(player)
-	if (jobType and jobType.vehicle) or not profile then
+	local carId = if profile then profile.car else nil
+	if (jobType and jobType.vehicle) or not profile or not carId or offer.mode == "foot" then
 		return false
 	end
-	return Economy.installedGear(profile.carGear, profile.car).trolley == true
+	return Economy.installedGear(profile.carGear, carId).trolley == true
 end
 
 -- 4.8: the board's tip for a heavy cargo (by hand alone very slow), nil otherwise.
@@ -1059,14 +1186,27 @@ end
 local function palletsFor(player: Player, offer: Offer): (number, number, string)
 	local profile = PlayerData.get(player)
 	local carId = if profile then profile.car else Config.Cars[1].id
+	if not carId then
+		return offer.total, 0, "no vehicle" -- 5.0
+	end
 	local def = Economy.findCar(carId)
 	local stage = Economy.stageOf(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else nil)
 	return offer.total, Freight.palletsOf(carId, stage), if def then def.name else "car"
 end
 
 -- 3.4: why the player's car is too small for this job, or nil when it fits. 4.0: a Freight Run needs a vehicle that
--- takes its pallets.
+-- takes its pallets. 5.0: a car job needs a vehicle; a foot job no more pieces than you carry.
 local function slotsShort(player: Player, offer: Offer): string?
+	if needsVehicle(player, offer) then
+		return JobsConfig.Foot.NeedsVehicle
+	end
+	if offer.mode == "foot" then
+		local _, room = slotsFor(player, offer)
+		if offer.total <= room then
+			return nil
+		end
+		return `This job has {offer.total} {offer.plural}: you carry {room}. A bigger backpack (Last Stop Supplies) carries more.`
+	end
 	if Freight.isPallet(offer.kind) then
 		local pallets, takes, carName = palletsFor(player, offer)
 		if pallets <= takes then
@@ -1080,7 +1220,7 @@ local function slotsShort(player: Player, offer: Offer): string?
 		return nil
 	end
 	local profile = PlayerData.get(player)
-	local carId = if profile then profile.car else Config.Cars[1].id
+	local carId = (if profile then profile.car else nil) or Config.Cars[1].id
 	local stage = Economy.stageOf(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else nil)
 	return `This job needs {need} cargo slots: your {name} holds {holds}. {Economy.roomAdvice(carId, stage, need)}`
 end
@@ -1155,7 +1295,8 @@ end
 local function fromHere(offer: Offer, from: Vector3): (number, number)
 	local extra = approachFrom(from, offer) - offer.approach
 	local modifier = offer.modifier
-	local slower = math.max(0, extra) * JobsConfig.TimePerStud * (if modifier then modifier.timeMultiplier else 1)
+	local perStud = if offer.mode == "foot" then 1 / math.max(1, JobsConfig.Foot.Speed) else JobsConfig.TimePerStud -- (5.0: a walk)
+	local slower = math.max(0, extra) * perStud * (if modifier then modifier.timeMultiplier else 1)
 	return math.max(0, offer.distance + extra), offer.time + math.floor(slower + 0.5)
 end
 
@@ -1185,9 +1326,17 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 	local licence = licenceTier(offer)
 	local noLicence = licence ~= nil and offer.level <= playerLevel and not hasLicence(player, licence)
 	local roleInfo = JobRules.roleInfo(offer.role)
+	-- 5.0: a car job while you own no vehicle: locked like a job too big for the car ("NEEDS A VEHICLE").
+	local noVehicle = needsVehicle(player, offer)
+	if noVehicle then
+		tooBig = true
+		lockText, lockButton = JobsConfig.Foot.NeedsVehicle, JobsConfig.Foot.NeedsVehicleButton
+	end
 	return {
+		mode = offer.mode, -- 5.0: "foot" (the board's ON FOOT section) | "car"
+		needsVehicle = if noVehicle then true else nil,
 		locked = offer.level > playerLevel or noLicence,
-		lockReason = if offer.level > playerLevel then "level" elseif noLicence then "licence" else nil,
+		lockReason = if offer.level > playerLevel then "level" elseif noLicence then "licence" elseif noVehicle then "vehicle" else nil,
 		licence = if noLicence and licence then licenceInfo(player, licence) else nil,
 		role = offer.role, -- 4.7: the trade-off (short | long | risky | bulk) and its words
 		roleName = if roleInfo then roleInfo.name else nil,
@@ -1235,7 +1384,12 @@ end
 
 -- 3.7: the board's order: ★ on top, then ★★, ★★★, ★★★★ (the specials at their stars, the locked ones in their place);
 -- at the same stars the lower driver level first, the ordinary delivery before a special; else as they were made.
+-- 5.0: the ON FOOT jobs on top.
 local function boardOrder(a: Offer, b: Offer): boolean
+	local aFoot, bFoot = a.mode == "foot", b.mode == "foot"
+	if aFoot ~= bFoot then
+		return aFoot
+	end
 	if a.tier ~= b.tier then
 		return a.tier < b.tier
 	end
@@ -1307,6 +1461,17 @@ local function makeBoard(player: Player): Board
 			table.insert(list, special)
 		end
 	end
+	-- 5.0: the ON FOOT section, always open: a choice of Foot.Offers (JobRules.roles), for what you carry.
+	local room = Transport.footOf(player).room
+	local footRoles = JobRules.roles(function(): number
+		return rng:NextNumber()
+	end)
+	for index = 1, math.max(1, JobsConfig.Foot.Offers) do
+		local offer = footOffer(from, footRoles[(index - 1) % #footRoles + 1], room)
+		if offer then
+			table.insert(list, offer)
+		end
+	end
 	-- 4.7: the ordinary deliveries of every danger level (tierOffers: a choice of three, one locked).
 	for tierIndex = 1, #JobsConfig.Tiers do
 		for _, offer in tierOffers(player, from, tierIndex) do
@@ -1355,7 +1520,11 @@ local function sendBoard(player: Player, board: Board)
 		})
 	end
 	local profile = PlayerData.get(player)
-	Net.get("Offers"):FireClient(player, out, board.refreshAt, { tiers = tiers, streak = if profile then profile.streak else 0 })
+	-- 5.0: what you carry on foot (the ON FOOT section's "HANDS 2 / BACKPACK 3") and whether you have a vehicle.
+	local foot = Transport.footOf(player)
+	local carry = { hands = Config.Cargo.HandsMax, room = foot.room, pack = math.max(0, foot.room - Config.Cargo.HandsMax), speed = foot.speedMult }
+	local hasCar = profile ~= nil and profile.car ~= nil
+	Net.get("Offers"):FireClient(player, out, board.refreshAt, { tiers = tiers, streak = if profile then profile.streak else 0, foot = carry, hasCar = hasCar })
 end
 
 -- A new board now, sent to the player (3.7: the client cannot ask for this; RequestOffers sends the current board).
@@ -1393,7 +1562,7 @@ local function reroll(player: Player, tierIndex: any)
 		local from = playerPosition(player)
 		local list: { Offer } = {}
 		for _, offer in board.list do
-			if offer.jobType ~= nil or offer.tier ~= tierIndex then
+			if offer.jobType ~= nil or offer.tier ~= tierIndex or offer.mode == "foot" then -- (5.0: the foot jobs stay)
 				table.insert(list, offer)
 			end
 		end
@@ -1430,6 +1599,28 @@ end
 
 function Jobs.active(player: Player): boolean
 	return jobs[player] ~= nil
+end
+
+-- 5.0: is the player's job an on-foot one (their own car may still be called: it is not needed for the job)?
+function Jobs.isFoot(player: Player): boolean
+	local job = jobs[player]
+	return job ~= nil and job.offer.mode == "foot"
+end
+
+-- 5.0: a company vehicle lent for a job that is over stays with nobody: when the player has one out but no job lends
+-- it any more (a respawn, the CAR button after the job), it goes back. True when it went.
+function Jobs.returnLent(player: Player): boolean
+	local car = Vehicles.get(player)
+	if not car or not car.lent then
+		return false
+	end
+	local job = jobs[player]
+	local jobType = job and job.offer.jobType
+	if jobType and jobType.vehicle == car.id then
+		return false
+	end
+	Vehicles.remove(player)
+	return true
 end
 
 local function planOf(stop: Stop): Cargo.Plan
@@ -1567,13 +1758,22 @@ local function endJob(player: Player, job: Job, linger: boolean)
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
 	Vehicles.setSpeedMultiplier(player, 1)
 	-- 3.0: the crew stays together (no Crew.disband): the next mission is one START away.
-	-- A company vehicle goes back; your own car comes to you.
+	-- A company vehicle goes back; your own car comes to you. 5.0: without a car of your own the lent one just goes
+	-- (Vehicles.spawn would refuse with "no vehicle yet" and leave it with you) unless a new job lends the same one.
 	local jobType = job.offer.jobType
 	if jobType and jobType.vehicle then
 		local car = Vehicles.get(player)
 		if car and car.id == jobType.vehicle then
 			task.delay(2, function()
-				if player.Parent and not jobs[player] then
+				if not player.Parent or Vehicles.get(player) ~= car then
+					return
+				end
+				local profile = PlayerData.get(player)
+				if profile and profile.car == nil then
+					if Jobs.vehicleFor(player) ~= car.id then
+						Vehicles.remove(player)
+					end
+				elseif not jobs[player] then
 					Vehicles.spawn(player, true)
 				end
 			end)
@@ -1662,7 +1862,12 @@ end
 -- Starts the job. False and why not (no notice: the caller tells the player).
 local function startJob(player: Player, offer: Offer): (boolean, string?)
 	local jobType = offer.jobType
-	if jobType and jobType.vehicle then
+	local foot = offer.mode == "foot" -- 5.0: no vehicle at all
+	if foot then
+		-- (your car, if you have one, stays where it is: it takes no part)
+	elseif needsVehicle(player, offer) then
+		return false, JobsConfig.Foot.NeedsVehicle
+	elseif jobType and jobType.vehicle then
 		-- The employer lends its vehicle, right next to you.
 		local err = Vehicles.spawn(player, true, jobType.vehicle)
 		if err then
@@ -1686,7 +1891,7 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	local crew: { [Player]: boolean } = {}
 	local handles = false
 	for _, stop in offer.stops do
-		if stop.mode == "carry" or stop.mode == "lead" or stop.mode == "pallet" then -- (4.0: pallets on a jack)
+		if not foot and (stop.mode == "carry" or stop.mode == "lead" or stop.mode == "pallet") then -- (4.0: pallets on a jack)
 			handles = true
 		end
 	end
@@ -1718,6 +1923,9 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	cargoInfo.heavy = if JobRules.hasRule(offer.rules, "heavy") then JobsConfig.CargoRules.HeavyCarrySpeed else nil
 	cargoInfo.dests = offer.dests
 	cargoInfo.destNames = offer.destNames
+	-- 5.0, on foot: no vehicle; the pieces over the hands ride in the owner's pack (the backpack's room).
+	cargoInfo.foot = if foot then true else nil
+	cargoInfo.pack = if foot then Transport.packRoomOf(player) else nil
 	local session = Cargo.begin(player, cargoInfo)
 	local crewCount = #Crew.members(player)
 	local members: { [Player]: boolean } = {}
@@ -1770,8 +1978,8 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		joltCar = nil,
 		joltAt = 0,
 		ruleNotice = 0,
-		-- 4.8: never on the tutorial's delivery or a mission
-		event = if offer.tutorial or offer.mission then nil else JobRules.pickEvent(rng:NextNumber(), rng:NextNumber()),
+		-- 4.8: never on the tutorial's delivery or a mission (5.0: nor on foot)
+		event = if offer.tutorial or offer.mission or foot then nil else JobRules.pickEvent(rng:NextNumber(), rng:NextNumber()),
 		eventAt = JobRules.eventAfter(rng:NextNumber()),
 		eventTries = 0,
 		driven = 0,
@@ -1781,6 +1989,7 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		eventNpc = nil,
 		eventName = "",
 		addOn = nil,
+		nextStray = os.clock() + JobsConfig.Foot.StrayEvery * rng:NextNumber(0.8, 1.2),
 	}
 	jobs[player] = job
 	placeDocks(player, offer)
@@ -1948,7 +2157,7 @@ function Jobs.fail(player: Player, reason: string)
 	-- A failed job still gives a share of the XP (Config.Levels.XpFailed), once something was done: a job cancelled
 	-- right after accepting gives none.
 	local status = Cargo.status(job.cargo)
-	local worked = job.kills > 0 or status.deliveredTotal > 0 or status.inCar > 0 or job.stop > 1
+	local worked = job.kills > 0 or status.deliveredTotal > 0 or status.inCar > 0 or status.pack > 0 or job.stop > 1 -- (5.0: the pack)
 	local offer = job.offer
 	local xp = if worked then Levels.jobXp(offer.tier, status.deliveredTotal, job.kills, DayNight.isNight(), false) else 0
 	endJob(player, job, false)
@@ -2326,8 +2535,8 @@ end
 -- A wrecked car does not end the job: some pieces are ruined, the rest go into the next car (press CAR).
 function Jobs.onCarWrecked(player: Player)
 	local job = jobs[player]
-	if not job then
-		return
+	if not job or job.offer.mode == "foot" then
+		return -- (5.0: a foot job's cargo is not in the car)
 	end
 	job.wrecked = true -- 4.7: the rating
 	notice:FireClient(player, "Your car is wrecked! Press CAR and keep going, the clock is ticking.")
@@ -2349,7 +2558,7 @@ end
 function Jobs.onCarDamaged(player: Player, amount: number)
 	local job = jobs[player]
 	local car = Vehicles.get(player)
-	if job and car then
+	if job and car and job.offer.mode ~= "foot" then -- (5.0: a foot job's cargo is not in the car)
 		local modifier = job.offer.modifier
 		local multiplier = if modifier then modifier.conditionMultiplier else 1
 		-- 4.8: a fragile cargo hit at speed loses more; Ratchet Straps cut every loss from driving (JobRules.damageLoss).
@@ -2568,6 +2777,23 @@ local function footWave(player: Player, job: Job, tier: Config.TierDef, stop: St
 	end
 end
 
+-- 5.0, a foot job: no waves, no bandits. While you walk out of the safe zone, now and then (Foot.StrayEvery ± 20 %,
+-- StrayChance) a single walker comes from StrayDistance studs away, StrayMax of yours alive at most.
+local function strayStep(player: Player, job: Job, position: Vector3, now: number)
+	local foot = JobsConfig.Foot
+	if now < job.nextStray then
+		return
+	end
+	job.nextStray = now + foot.StrayEvery * rng:NextNumber(0.8, 1.2)
+	if World.isSafe(position) or rng:NextNumber() >= foot.StrayChance or Zombies.countFor(player) >= foot.StrayMax then
+		return
+	end
+	local spot = Zombies.findSpot(position, nil, foot.StrayDistance[1], foot.StrayDistance[2])
+	if spot then
+		Zombies.spawn("walker", spot, player, false)
+	end
+end
+
 -- On the road: the zombie waves (paused in the safe zone), the bandit cars and the roadblocks.
 local function roadEnemies(player: Player, job: Job, tier: Config.TierDef, position: Vector3, heading: Vector3?, now: number, step: number, multiplier: number, nightWaves: number)
 	local offer = job.offer
@@ -2628,7 +2854,8 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 	local status = Cargo.status(job.cargo)
 	if JobRules.hasRule(rules, "food") and job.freshness > 0 and (status.inCar > 0 or status.carrying ~= nil or job.stop > 1) then
 		local shown = math.floor(job.freshness * 100 + 0.5)
-		job.freshness = math.max(0, job.freshness - JobRules.freshDrain(offer.tier, step, car ~= nil and Vehicles.hasGear(car, "cooler")))
+		local warm = if offer.mode == "foot" then Transport.warmOf(player) else nil -- 5.0: a thermal jacket
+		job.freshness = math.max(0, job.freshness - JobRules.freshDrain(offer.tier, step, car ~= nil and Vehicles.hasGear(car, "cooler"), warm))
 		if math.floor(job.freshness * 100 + 0.5) ~= shown then
 			job.dirty = true
 		end
@@ -2997,13 +3224,16 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	if offer.twists.defend and lastStop and not job.defendDone then
 		defendStep(player, job, tier, stop, position, now, step, multiplier * nightWaves)
 	end
-	if Cargo.onFoot(session) then
+	local foot = offer.mode == "foot"
+	if foot then
+		strayStep(player, job, position, now) -- 5.0: no waves, no bandits on foot
+	elseif Cargo.onFoot(session) then
 		footWave(player, job, tier, stop, now, multiplier)
 	else
 		roadEnemies(player, job, tier, position, heading, now, step, multiplier, nightWaves)
 	end
-	-- 4.8: the cargo's rules (freshness, jolts) and the road event.
-	cargoRulesStep(player, job, car, step, now)
+	-- 4.8: the cargo's rules (freshness, jolts) and the road event. (5.0: on foot no vehicle takes part.)
+	cargoRulesStep(player, job, if foot then nil else car, step, now)
 	if jobs[player] ~= job then
 		return
 	end
@@ -3085,7 +3315,7 @@ end
 
 -- Start any job now, next to the player: a Config.JobTypes id (with its vehicle), a mission id (shared/Missions.luau,
 -- no locks, no night check), or "ordinary" / "ordinary1" … "ordinary4" (also "tier1" …) for a job-board delivery of
--- that danger level. A running job is cancelled.
+-- that danger level, 5.0: "foot" for an ON FOOT one. A running job is cancelled.
 function Jobs.adminStart(player: Player, jobTypeId: string): boolean
 	if type(jobTypeId) ~= "string" then
 		return false
@@ -3098,7 +3328,9 @@ function Jobs.adminStart(player: Player, jobTypeId: string): boolean
 	local from = playerPosition(player)
 	local offer: Offer? = nil
 	local tierText = string.match(jobTypeId, "^ordinary(%d?)$") or string.match(jobTypeId, "^tier(%d)$")
-	if tierText then
+	if jobTypeId == "foot" then
+		offer = footOffer(from, nil, Transport.footOf(player).room)
+	elseif tierText then
 		local tierIndex = math.clamp(tonumber(tierText) or rng:NextInteger(1, #JobsConfig.Tiers), 1, #JobsConfig.Tiers)
 		offer = ordinaryOffer(from, tierIndex)
 		if offer and not Vehicles.get(player) then
@@ -3204,23 +3436,20 @@ function Jobs.start()
 	RunService.Heartbeat:Connect(update)
 end
 
--- 3.7: the tutorial's first job (server/Tutorial.luau): the easiest ordinary offer near the player, started as if
--- accepted from the board (takeOffer). False when the player has a job already or no offer could be made. Made for a
--- brand-new player at the depot with the Old Van: a ★ delivery of a business's carried pieces (ordinaryOffer easy: at
--- most Config.Jobs.TutorialPieces, no people or horses, no modifier or bulk, the pick-up close by), the shortest of
--- TutorialTries. It does not touch the job board.
+-- 3.7: the tutorial's first job (server/Tutorial.luau): the easiest offer near the player, started as if accepted
+-- from the board (takeOffer). False when the player has a job already or no offer could be made. 5.0: ON FOOT (a new
+-- player has no vehicle): the post office's letters, Config.Jobs.TutorialPieces of them (what the hands hold), the
+-- pick-up close by and the drop on the same street (footOffer tutorial), the shortest of TutorialTries. No road
+-- events, no cargo rules, no modifier. It does not touch the job board.
 function Jobs.startTutorialJob(player: Player): boolean
 	if jobs[player] then
 		return false
 	end
-	-- A brand-new driver may not have called the car yet: it comes first (startJob needs it).
-	if not Vehicles.get(player) and Vehicles.spawn(player, true) ~= nil then
-		return false
-	end
 	local from = playerPosition(player)
+	local room = Transport.footOf(player).room
 	local best: Offer? = nil
 	for _ = 1, math.max(1, JobsConfig.TutorialTries) do
-		local offer = ordinaryOffer(from, 1, true)
+		local offer = footOffer(from, nil, room, true)
 		if offer and (not best or offer.distance < best.distance) then
 			best = offer
 		end
@@ -3228,7 +3457,7 @@ function Jobs.startTutorialJob(player: Player): boolean
 	if not best then
 		return false
 	end
-	best.tutorial = true -- 4.8: no road events on it (and no cargo rules: ordinaryOffer easy)
+	best.tutorial = true -- 4.8: no road events on it
 	return takeOffer(player, best)
 end
 
@@ -3265,6 +3494,7 @@ function Jobs.crewStatus(owner: Player): { [string]: any }?
 		timed = offer.jobType ~= nil and offer.jobType.timeLimit ~= nil,
 		crewCount = job.crewCount, -- paid besides the owner: the invited crew and whoever rode along
 		mission = missionInfo(job),
+		mode = offer.mode, -- 5.0
 	}
 end
 

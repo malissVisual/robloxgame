@@ -43,7 +43,7 @@ local NAMES = {
 	"Challenges", -- client → server: ("open") or ("title", title or nil); server → client: ("state", …) or ("unlocked", …)
 	"Garage", -- 3.4: client → server: ("take", car id) or ("refresh"); server → client: the garage window (server/Garages.luau)
 	"Repair", -- 3.4: server → client: a repair started ({ car, shop, seconds, total, fee }) or ended (nil) (server/Repair.luau)
-	"Tutorial", -- 3.7: server → client: (phase, data?): welcome / board / job / retry / done / say, or nil; client → server: ("go") or ("skip") (server/Tutorial.luau)
+	"Tutorial", -- 3.7: server → client: (phase, data?): welcome / board / job / retry / done / say, or nil (5.0: also "phone", Marge gave it, and "message", { from, text, gps? } a text for the phone: server/VanQuest.luau); client → server: ("go") or ("skip") (server/Tutorial.luau)
 	"Explore", -- 3.7: server → client: ("state", cells string, places list) on joining, ("cells", list) newly uncovered, ("place", id) discovered
 	"Holster", -- 3.9: client → server: (holstered boolean) the gun away (B) or in the hand; the server sets the character's Holstered attribute (server/CloseCombat.luau)
 	"Melee", -- 3.9: client → server: (the swing's direction, a unit Vector3, or nil) a punch (holstered) or a strike with the gun (V); checked on the server
@@ -52,6 +52,7 @@ local NAMES = {
 	"RerollTier", -- 4.7: client → server: (tier) new ordinary offers of that danger level on my board, for Config.Jobs.Choice.RerollFee × its stars, once per board (server/Jobs.luau)
 	"RoadEvent", -- 4.8: server → client: a road event's card ({ kind = "addon", title, text, pay, endsAt }) or nil to close it; client → server: ("accept" | "decline") the add-on (server/Jobs.luau, client/RoadEventUi.luau)
 	"Kit", -- 5.0: client → server: ("buy", kit id) personal gear at Last Stop Supplies (server/Shops.luau, Config.Kit)
+	"PhoneHold", -- 5.0: client → server: (holding boolean) the phone window opened / closed; the server shows the phone in your right hand to everybody while you are on foot with your hands free (server/KitWear.luau, the character attribute PhoneHeld)
 	"PutDown", -- 4.2: client → server: () the touch PUT DOWN / LET GO / SET DOWN button: what the G prompt in your hands does (server/Cargo.luau, server/Equipment.luau)
 }
 

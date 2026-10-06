@@ -13,7 +13,10 @@
 --
 -- Unlock kinds: tier (a danger level on the job board), job (a special job), car, stage (a stage of a car: id
 -- "carId:stage", `car` its car id), gear (Config.Gear), gun, cargun, campaign (shared/Missions.luau), garage, estate
--- (homes and offices). Level 1 lists what you start with (the Old Van, the Pistol, ★ jobs, First Shift).
+-- (homes and offices). Level 1 lists what you start with (the Pistol, the first jobs).
+-- 5.0, the career starts on foot: foot (the ON FOOT runs of the board, Config.Jobs.Foot), kit (personal gear,
+-- Config.Kit: the backpacks, the running shoes …), and soon (what the next release brings: the bikes at BIKE_LEVEL
+-- until Config.Cars has a bike, then the bikes are ordinary car unlocks and the line goes by itself).
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
@@ -34,7 +37,21 @@ export type Step = {
 
 -- The order of the kinds in a row: the job board first, then the vehicles and the gear, the guns, the stories, the
 -- real estate.
-local ORDER: { [string]: number } = { tier = 1, job = 2, car = 3, stage = 4, gear = 5, gun = 6, cargun = 7, campaign = 8, garage = 9, estate = 10 }
+local ORDER: { [string]: number } = { foot = 0, tier = 1, job = 2, kit = 3, soon = 3, car = 3, stage = 4, gear = 5, gun = 6, cargun = 7, campaign = 8, garage = 9, estate = 10 }
+
+-- 5.0: the level the bikes come at (5.1, the Spokes & Chains bike shop; the level 2 reward says so). Only a line on the
+-- road until Config.Cars holds a bike (CarDef kind = "bike").
+Career.BIKE_LEVEL = 2
+
+-- Is there a bike in Config.Cars yet (5.1)?
+local function hasBikes(): boolean
+	for _, def in Config.Cars do
+		if (def :: any).kind == "bike" then
+			return true
+		end
+	end
+	return false
+end
 
 local function add(list: { Unlock }, kind: string, id: string, name: string, car: string?)
 	table.insert(list, { kind = kind, id = id, name = name, car = car })
@@ -43,6 +60,20 @@ end
 -- What one level opens.
 function Career.unlocksAt(level: number): { Unlock }
 	local list: { Unlock } = {}
+	-- 5.0: the on-foot runs (Config.Jobs.Foot, always from level 1) and the personal gear.
+	local foot = (Config.Jobs :: any).Foot
+	local footLevel = if type(foot) == "table" and type(foot.level) == "number" then foot.level else 1
+	if footLevel == level then
+		add(list, "foot", "foot", "On-foot runs: letters, medicine, pizza")
+	end
+	for _, kit in Config.Kit do
+		if kit.level == level then
+			add(list, "kit", kit.id, kit.name)
+		end
+	end
+	if level == Career.BIKE_LEVEL and not hasBikes() then
+		add(list, "soon", "bikes", "Bikes (coming in 5.1)")
+	end
 	for index, tier in Config.Jobs.Tiers do
 		if tier.level == level then
 			-- 4.7: a tier with a licence (Config.Jobs.Licences) says what else it needs.
@@ -67,7 +98,8 @@ function Career.unlocksAt(level: number): { Unlock }
 			continue
 		end
 		if (def.level or 1) == level then
-			add(list, "car", def.id, def.name)
+			-- 5.0: the Old Van is not the dealer's: "Old Van: Earl's Used Wheels (Marge's quest at level 4)".
+			add(list, "car", def.id, if def.id == Config.VanQuest.Car then `{def.name}: {Config.VanQuest.Where}` else def.name)
 		end
 		local stages: { Config.StageDef } = def.stages or {}
 		for n, stage in stages do
