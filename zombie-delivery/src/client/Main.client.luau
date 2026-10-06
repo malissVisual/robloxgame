@@ -36,6 +36,7 @@ local TutorialUi = require(Client.TutorialUi)
 local Holster = require(Client.Holster)
 local CarBoarding = require(Client.CarBoarding)
 local LocationTag = require(Client.LocationTag)
+local CareerUi = require(Client.CareerUi)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -74,6 +75,7 @@ safely("TutorialUi", TutorialUi.start) -- 3.7: the first-day tutorial
 safely("Holster", Holster.start) -- 3.9: B holsters / draws the gun, V punches or strikes
 safely("CarBoarding", CarBoarding.start) -- 3.10: getting in and out of a car (E at a door, E or Space in a seat)
 safely("LocationTag", LocationTag.start) -- 4.3: the quiet caption that names the building you come up to
+safely("CareerUi", CareerUi.start) -- 4.6: the CAREER window (C) and the level-up card
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
@@ -88,6 +90,7 @@ Hud.onCloseWindows = function()
 	MissionsUi.close()
 	GarageUi.close()
 	DispatchUi.close()
+	CareerUi.close()
 end
 CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows
@@ -102,11 +105,18 @@ Hud.onJobsKey = function() -- 4.0.2: J opens the board, J again closes it
 	end
 end
 GarageUi.onOpen = Hud.closeWindows
+CareerUi.onOpen = Hud.closeWindows
+Hud.onCareer = CareerUi.toggle
+-- 4.6: the level-up card waits for the DELIVERY result and a mission's cleared card (MissionsUi.isOpen counts it).
+CareerUi.blocked = function(): boolean
+	return Hud.resultOpen() or MissionsUi.isOpen()
+end
 Hud.onEstate = EstateUi.toggleList
 Hud.onMissions = MissionsUi.toggle
 MissionsUi.onFindCrew = CrewPanel.open
 CameraRig.mouseNeeded = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
+		or CareerUi.isOpen() or CareerUi.cardOpen()
 end
 LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while a window is open
 
@@ -115,6 +125,7 @@ Net.get("State").OnClientEvent:Connect(function(state)
 	Hud.setState(state)
 	DispatchUi.setState(state)
 	Menu.setState(state)
+	CareerUi.setState(state)
 end)
 Net.get("Job").OnClientEvent:Connect(Hud.setJob)
 Net.get("Offers").OnClientEvent:Connect(DispatchUi.setOffers)

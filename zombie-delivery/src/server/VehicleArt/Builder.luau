@@ -18,6 +18,8 @@ local COLORS: { [string]: Color3 } = {
 	wood = Color3.fromRGB(123, 101, 73), tyre = Color3.fromRGB(24, 26, 27), rust = Color3.fromRGB(116, 63, 36),
 	primer = Color3.fromRGB(119, 125, 119), mirror = Color3.fromRGB(178, 190, 191), lamp = Color3.fromRGB(206, 202, 180),
 	armor = Color3.fromRGB(67, 77, 79), tread = Color3.fromRGB(58, 60, 62),
+	-- 4.6, the gear: the ratchet straps' orange webbing, the cooler's white body and blue lid.
+	strap = Color3.fromRGB(232, 112, 28), plastic = Color3.fromRGB(236, 238, 234), coolerlid = Color3.fromRGB(52, 118, 178),
 }
 local LIT_WARM, LIT_AMBER = Color3.fromRGB(255, 228, 182), Color3.fromRGB(255, 166, 52)
 function Builder.supports(id: string): boolean return SUPPORTED[id] == true end
@@ -75,7 +77,7 @@ local function emit(parent: Instance, to: BasePart, frame: CFrame, pieces: { Geo
 		p.Size = Vector3.new(s[1], s[2], s[3])
 		p.CFrame = frame * CFrame.new(v[1], v[2], v[3]) * CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
 		p.Color = if piece.finish == "paint" then paint else COLORS[piece.finish] or COLORS.dark
-		p.Material = if piece.finish == "glass" or piece.finish == "lamp" or piece.finish == "amber" then Enum.Material.Glass elseif piece.finish == "tyre" or piece.finish == "tread" then Enum.Material.Rubber elseif piece.finish == "rust" then Enum.Material.CorrodedMetal elseif piece.finish == "wood" then Enum.Material.WoodPlanks elseif piece.finish == "paint" or piece.finish == "primer" then Enum.Material.SmoothPlastic else Enum.Material.Metal
+		p.Material = if piece.finish == "glass" or piece.finish == "lamp" or piece.finish == "amber" then Enum.Material.Glass elseif piece.finish == "tyre" or piece.finish == "tread" then Enum.Material.Rubber elseif piece.finish == "rust" then Enum.Material.CorrodedMetal elseif piece.finish == "wood" then Enum.Material.WoodPlanks elseif piece.finish == "strap" then Enum.Material.Fabric elseif piece.finish == "paint" or piece.finish == "primer" or piece.finish == "plastic" or piece.finish == "coolerlid" then Enum.Material.SmoothPlastic else Enum.Material.Metal
 		p.Transparency = if piece.finish == "glass" then .28 else 0
 		p.Reflectance = if piece.finish == "mirror" then .35 elseif piece.finish == "steel" then .08 else 0
 		p.CanCollide, p.CanQuery, p.CanTouch, p.Massless = false, false, false, true
@@ -144,5 +146,13 @@ end
 function Builder.upgrades(model: Model, chassis: BasePart, style: Style, folder: Instance, plow: number, armor: number, engine: number, context: Context)
 	local profile = Builder.profile(model:GetAttribute("FleetStyle") :: string, model:GetAttribute("FleetStage") :: number, style)
 	emit(folder, chassis, chassis.CFrame * CFrame.new(0, .6, 0), Geometry.upgrades(profile, plow, armor, engine), COLORS.steel, {}, context)
+end
+-- 4.6, the gear on a polished car (Geometry.gear): emitted into the kit's folder; returns where the Roof Rack's light
+-- piece stands (relative to the chassis top centre), or nil.
+function Builder.gear(model: Model, chassis: BasePart, style: Style, folder: Instance, gear: { [string]: boolean }, cargo: { floor: number, front: number, back: number }, context: Context): Vector3?
+	local profile = Builder.profile(model:GetAttribute("FleetStyle") :: string, model:GetAttribute("FleetStage") :: number, style)
+	local pieces, spot = Geometry.gear(profile, gear, cargo)
+	emit(folder, chassis, chassis.CFrame * CFrame.new(0, .6, 0), pieces, COLORS.steel, {}, context)
+	return if spot then Vector3.new(spot[1], spot[2], spot[3]) else nil
 end
 return Builder

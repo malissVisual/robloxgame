@@ -330,23 +330,121 @@ function Economy.palletsOf(carId: string, stage: number?): number
 	return def.pallets or 0
 end
 
--- 4.0: may this car take this car track? Every car you own takes them (Economy.canUpgrade), the Hand Trolley only
--- the vans and trucks (CarDef.trolley).
+-- 4.0: may this car take this car track? Every car you own takes them (Economy.canUpgrade). (4.6: the Hand Trolley
+-- is gear now: Economy.gearFits.)
 function Economy.upgradeFits(carId: string, upgradeId: string): boolean
+	local _ = upgradeId
+	return Economy.findCar(carId) ~= nil and Economy.canUpgrade(carId)
+end
+
+-- 4.0's question (a car-track level "trolley" ≥ 1 on a car that takes one). 4.6: the game asks the installed gear
+-- (Economy.installedGear, Vehicles.hasGear); kept for older code reading old levels (tools/vehicle-preview's baseline).
+function Economy.hasTrolley(carId: string, levels: Upgrades?): boolean
+	return levels ~= nil and Economy.level(levels, "trolley") >= 1 and Economy.gearFits(carId, "trolley")
+end
+
+-- ── 4.6, gear (Config.Gear): bought per car, installed in its gear slots ──────────────────────────────────────
+-- profile.carGear[carId][gearId] = "owned" (bought, in the garage's store) | "installed" (in one of the car's slots,
+-- on the car). Installing and removing are free at Wrench Garage (server/Shops.luau); the live car shows what is
+-- installed (server/Vehicles.luau Car.gear, Vehicles.hasGear).
+
+export type CarGear = { [string]: { [string]: string } }
+
+function Economy.findGear(id: string): Config.GearDef?
+	for _, gear in Config.Gear do
+		if gear.id == id then
+			return gear
+		end
+	end
+	return nil
+end
+
+-- The gear slots of a car at a stage: the stage's own gearSlots, else the car's, else 0 (the company vehicles).
+function Economy.gearSlots(carId: string, stage: number): number
 	local def = Economy.findCar(carId)
-	if not def or not Economy.canUpgrade(carId) then
+	if not def or def.company then
+		return 0
+	end
+	local stageDef = Economy.stageDef(carId, math.clamp(math.floor(stage or 0), 0, Economy.maxStage(carId)))
+	if stageDef and stageDef.gearSlots ~= nil then
+		return stageDef.gearSlots
+	end
+	return def.gearSlots or 0
+end
+
+-- Does this piece of gear fit this car (one of yours with a gear slot, the CarDef flag it needs, not a car it is
+-- not made for)?
+function Economy.gearFits(carId: string, gearId: string): boolean
+	local def = Economy.findCar(carId)
+	local gear = Economy.findGear(gearId)
+	if not def or not gear or def.company or Economy.gearSlots(carId, Economy.maxStage(carId)) <= 0 then
 		return false
 	end
-	if upgradeId == "trolley" then
-		return def.trolley == true
+	local needs = gear.needs
+	if needs and (def :: any)[needs] ~= true then
+		return false
+	end
+	if gear.notOn and table.find(gear.notOn, carId) then
+		return false
 	end
 	return true
 end
 
--- 4.0: does the car carry its Hand Trolley (bought, level 1, and a car that takes one)? The Attachment TrolleyMount
--- and the folded trolley sit inside its back then (server/Vehicles.luau); server/Cargo.luau hands it out.
-function Economy.hasTrolley(carId: string, levels: Upgrades?): boolean
-	return levels ~= nil and Economy.level(levels, "trolley") >= 1 and Economy.upgradeFits(carId, "trolley")
+-- What one car has of a piece: "installed", "owned" or nil (not bought; nil for gear that does not fit it).
+function Economy.gearState(carGear: CarGear?, carId: string, gearId: string): string?
+	local list = carGear and carGear[carId]
+	local value = if type(list) == "table" then list[gearId] else nil
+	if (value == "installed" or value == "owned") and Economy.gearFits(carId, gearId) then
+		return value
+	end
+	return nil
+end
+
+-- The gear installed on one car (gear id → true), from profile.carGear.
+function Economy.installedGear(carGear: CarGear?, carId: string): { [string]: boolean }
+	local out: { [string]: boolean } = {}
+	for _, gear in Config.Gear do
+		if Economy.gearState(carGear, carId, gear.id) == "installed" then
+			out[gear.id] = true
+		end
+	end
+	return out
+end
+
+-- How many of a car's gear slots are taken.
+function Economy.gearUsed(carGear: CarGear?, carId: string): number
+	local used = 0
+	for _ in Economy.installedGear(carGear, carId) do
+		used += 1
+	end
+	return used
+end
+
+-- 4.6, the Roof Rack: the extra cargo slots it gives a car with this gear installed for a piece of this look (only a
+-- light one, Config.Cargo.LightLooks; 0 without a look).
+function Economy.rackSlots(carId: string, installed: { [string]: boolean }?, look: string?): number
+	if not installed or not installed.roofrack or not look or not Config.Cargo.LightLooks[look] then
+		return 0
+	end
+	return if Economy.gearFits(carId, "roofrack") then Config.GearTuning.RoofRackSlots else 0
+end
+
+-- 4.6: a save from 4.0 – 4.5 bought the Hand Trolley as an upgrade track (carUpgrades[carId].trolley = 1): every car
+-- it owns with that level ≥ 1 that takes a trolley gets it installed. `saved` is the save's carUpgrades as stored.
+function Economy.migrateGear(saved: any, cars: { [string]: boolean }): CarGear
+	local out: CarGear = {}
+	if type(saved) ~= "table" then
+		return out
+	end
+	for carId, levels in saved do
+		if type(carId) == "string" and cars[carId] and type(levels) == "table" then
+			local level = levels.trolley
+			if type(level) == "number" and level == level and level >= 1 and Economy.gearFits(carId, "trolley") then
+				out[carId] = { trolley = "installed" }
+			end
+		end
+	end
+	return out
 end
 
 -- 4.0, the torque curve of a car pulling away (client/Drive.luau): how much of its accel it has at `share` (0 … 1) of
@@ -399,13 +497,14 @@ function Economy.roomAdvice(carId: string, stage: number, need: number): string
 end
 
 -- 3.4, cargo capacity: how many pieces carried or led by hand the car takes at once: its cargo slots (CarDef
--- capacity; 3.5: its stage's, out of `levels`.stage).
-function Economy.capacity(carId: string, levels: Upgrades?): number
+-- capacity; 3.5: its stage's, out of `levels`.stage). 4.6: with its installed gear (Economy.installedGear) and the
+-- look of the cargo, the Roof Rack's slot for a light piece too (Economy.rackSlots).
+function Economy.capacity(carId: string, levels: Upgrades?, installed: { [string]: boolean }?, look: string?): number
 	local def = Economy.findCar(carId)
 	if not def then
 		return 0
 	end
-	return Economy.stageCapacity(carId, Economy.stageOf(carId, levels))
+	return Economy.stageCapacity(carId, Economy.stageOf(carId, levels)) + Economy.rackSlots(carId, installed, look)
 end
 
 -- 3.4: the cargo slots a job needs: its pieces when they are carried or led in by hand (all of them ride at once:

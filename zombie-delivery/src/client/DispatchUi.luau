@@ -508,7 +508,10 @@ local function refreshChrome()
 	local name, slots, condition = myCar()
 	local percent = math.floor(condition * 100 + 0.5)
 	refs.carName.Text = name
-	refs.carStats.Text = `📦 {slots} cargo {if slots == 1 then "slot" else "slots"}`
+	-- 4.6: a Roof Rack (gear) takes one more light piece on the roof.
+	local mine = carId()
+	local rack = Economy.installedGear(if state and type(state.carGear) == "table" then state.carGear else nil, mine).roofrack == true and Economy.gearFits(mine, "roofrack")
+	refs.carStats.Text = `📦 {slots} cargo {if slots == 1 then "slot" else "slots"}{if rack then " + 1 on the roof (light)" else ""}`
 	refs.carHealth.Text = `🔧 {percent}% condition`
 	refs.carHealth.TextColor3 = if condition < 0.35 then K.red else K.secondary
 	refs.carNote.Text = if condition < 0.5 then "Your vehicle sets your job capacity. A repair bay fixes it." else "Your vehicle sets your job capacity."

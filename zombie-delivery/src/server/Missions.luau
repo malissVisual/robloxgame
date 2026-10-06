@@ -206,7 +206,9 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 	-- 3.4: the pieces must fit your car (a mission that lends a vehicle brings its own room).
 	local need = Economy.cargoNeed(def.load, def.items)
 	if not def.vehicle and need > 0 then
-		local holds = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car))
+		-- 4.6: a Roof Rack (gear) takes one more light piece.
+		local kind = Config.Cargo.Kinds[def.itemKind]
+		local holds = Economy.capacity(profile.car, Economy.carLevels(profile.carUpgrades, profile.car), Economy.installedGear(profile.carGear, profile.car), if kind then kind.look else def.itemKind)
 		if need > holds then
 			local car = Economy.findCar(profile.car) or Config.Cars[1]
 			local stage = Economy.stageOf(car.id, Economy.carLevels(profile.carUpgrades, car.id))

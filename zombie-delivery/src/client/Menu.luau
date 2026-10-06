@@ -190,7 +190,7 @@ function Menu.show(onPlay: () -> ())
 		{ "MOVE", "WASD / arrows    ·    Shift: sprint (breath)" }, { "COMBAT", "Mouse: aim    ·    RMB: aim    ·    LMB: shoot" },
 		{ "HANDS", "B: holster / draw    ·    V: punch / strike" },
 		{ "CARGO", "E: pick up / load    ·    G: put down" }, { "EQUIPMENT", "Q: switch weapon    ·    1–5: items" },
-		{ "WINDOWS", "J: jobs    ·    M: map    ·    I: bag" }, { "MOUSE", "Alt: free cursor" },
+		{ "WINDOWS", "J: jobs  ·  M: map  ·  I: bag  ·  C: career" }, { "MOUSE", "Alt: free cursor" },
 		{ "VEHICLE", "E: get in / get out    ·    Space: out too" }, { "ADMIN", "P: admin (when authorized)" },
 	}
 	local rows = {}
