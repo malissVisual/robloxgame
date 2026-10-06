@@ -812,6 +812,17 @@ export type GearDef = {
 	notOn: { string }?, -- car ids it does not fit
 }
 
+-- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
+-- carry on foot and on a bike (shared/Transport.luau). room = light pieces in hands + on the back (the best one counts),
+-- speed = walk / sprint multiplier (the best one counts), warm = food freshness drain multiplier while you carry it.
+export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number? }
+Config.Kit = {
+	{ id = "backpack", name = "Courier Backpack", level = 1, price = 150, icon = "🎒", room = 3, description = "Carry 3 light pieces on foot or on a bike instead of 2." },
+	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster." },
+	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
+	{ id = "jacket", name = "Thermal Jacket", level = 1, price = 300, icon = "🧥", warm = 0.8, description = "Food you carry stays warm longer." },
+} :: { KitDef }
+
 Config.Gear = {
 	{ id = "trolley", name = "Hand Trolley", level = 3, price = 600, icon = "🛒", needs = "trolley", description = "Carry up to 4 pieces at once. It rides folded inside the back (vans and trucks)." },
 	{ id = "straps", name = "Ratchet Straps", level = 4, price = 900, icon = "🔗", description = "The load is strapped down: cargo condition losses ×0.6. Two orange bands in the back." },

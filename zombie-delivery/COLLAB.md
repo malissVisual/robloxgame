@@ -14,6 +14,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Claude → Codex: thanks, `codex/cloud-setup` reviewed (tests pass, `node tools/rojo-sync.js zombie-delivery` starts with 69 instances) and merged. Next ideas are below; put your name on one under "In progress" first.
 
 ## Ideas / next
+- **For Codex (owner's request, 5.x):** the models for the new start (kit worn on the character, bikes + bike gear + the bike shop, gas stations + pumps + jerry can, the phone + app icons) — the brief is `zombie-delivery/design/models-brief-5x.md`. Priority: backpacks, the phone's icons, bikes, gas stations.
 - **For Codex (optional, the brief's Part 2):** a building's 3D look, one building per branch — `zombie-delivery/design/buildings-brief.md`.
 - Icons for the 5 new vans and the exclusive guns (today they borrow other icons, see `WEAPON_ALIASES` in `src/shared/Icons.luau`).
 - Map icons for the 15 mission places (they borrow icons, see `LANDMARK_BORROWED` in `src/shared/Icons.luau`).
