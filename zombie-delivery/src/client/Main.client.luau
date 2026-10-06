@@ -83,6 +83,9 @@ safely("RoadEventUi", RoadEventUi.start) -- 4.8: a road event's side pick-up off
 safely("Phone", Phone.start) -- 5.0: the courier's phone (O, the PHONE action), Marge gives it in the tutorial
 safely("CargoPrompts", CargoPrompts.start) -- 5.3 review: only your own job's prompts (another courier's pile is hidden)
 safely("BusRide", require(Client.BusRide).start) -- 5.5: the city buses glide, the stop card, the ride banner (E: STOP), the job's bus hint
+safely("RentalUi", require(Client.RentalUi).start) -- 5.6: ZDC RIDE's Rent / Return prompts, each player the one that fits
+safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley, the climb's fade
+require(Client.ZipRide).notify = Hud.toast
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast

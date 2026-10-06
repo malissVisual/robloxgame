@@ -225,6 +225,8 @@ safely("VanQuest", VanQuest.start) -- 5.0: Earl's van, Marge's quest at level 4
 safely("KitWear", KitWear.start) -- 5.0: the kit you own worn on your character, the phone in your hand
 safely("Fuel", Fuel.start) -- 5.4: the tanks, the burn, the pumps, the jerry cans, the tow
 safely("Buses", require(Server.Buses).start) -- 5.5: the city buses (their stops: World's build list)
+safely("Rental", require(Server.Rental).start) -- 5.6: ZDC RIDE, the free rental scooters and their docks
+safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between the rooftops (the ladders, the rides)
 print("[Server] Zombie Delivery is running")
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).

@@ -171,6 +171,16 @@ Phone.open("garage");tap("🚲 MY BIKE")
 check("MY BIKE rides the bike",lastSent("Equip").args[1]=="ride")
 Phone.open("garage");tap("🚐 CALL CAR")
 check("CALL CAR calls the car",lastSent("Equip").args[1]=="drive")
+-- 5.6: ZDC RIDE, the nearest rental dock and the GPS to it.
+Phone.open("garage")
+local rideLine=all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"ZDC RIDE · nearest dock",1,true)~=nil end)[1]
+check("garage names the nearest ZDC RIDE dock",rideLine~=nil and #M.warnings==0)
+local waypoints=0
+local setWaypoint=M.MapView.setWaypoint
+M.MapView.setWaypoint=function() waypoints+=1 end
+text("📍 GPS").Parent.Activated:Fire()
+check("ZDC RIDE's GPS sets the waypoint",waypoints==1)
+M.MapView.setWaypoint=setWaypoint
 -- SETTINGS: the keys and the version; BANK: what you earned since you joined.
 local sounds=0
 Phone.onSound=function() sounds+=1 end

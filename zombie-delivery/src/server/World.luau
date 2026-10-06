@@ -5894,6 +5894,7 @@ function World.build()
 		buildCrossings(world)
 	end)
 	piece("bus stops", function() require(script.Parent.BusStops).build(world) end) -- 5.5: the city buses' shelters
+	piece("alley shortcuts", function() require(script.Parent.Shortcuts).build(world) end) -- 5.6: the paths through the blocks
 	piece("Sunset Hills", function()
 		buildSunsetHills(world)
 	end)

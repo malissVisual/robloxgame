@@ -1,0 +1,477 @@
+--!strict
+-- 5.6, ZDC RIDE: the free rental e-scooters (Config.Rental; the docks' places: shared/RentalDocks.luau).
+--
+-- The docks, built when this starts (after World): on the sidewalk along the kerb, 8 native parts each (a base plate,
+-- a charging rail, three bollards, a sign post with the ZDC RIDE · free board facing the street and a small lamp that
+-- glows at night) and 2 – 3 docked E-Scooters in the ZDC RIDE red (Vehicles.displayModel: anchored, nothing of them
+-- collides). A Model per dock in workspace.World.RentalDocks (Atomic streaming), tagged RentalDock (attribute DockId).
+-- Two prompts at every dock, tagged RentalPrompt (attribute Kind = "rent" | "return"; client/RentalUi.luau shows each
+-- player the one that fits them): "Rent scooter" (hold Hold s) and "Return scooter" (the attribute Seated: it works
+-- from the saddle, client/CarBoarding.luau).
+--
+-- Renting (the server checks it all): on foot only (not seated, not getting in, not on a zip line), never on a mission
+-- or a car job, not while a chauffeur brings your car, nothing in your hands that the backpack cannot take
+-- (Cargo.canStowHands; Cargo.update stows them as you sit, like on your bike), one rental at a time, a scooter in the
+-- dock, and the price (Config.Rental.Price: 0, free; the money check stays). Your own car or bike out goes home first
+-- (you are told: BRING MY CAR / MY BIKE brings it back). The rental is a Vehicles.spawnAt(…, rental = true) E-Scooter
+-- where the docked one stood (that one leaves the dock): your vehicle while it lasts (it rides like the owned E-Scooter:
+-- one rack slot and your pack, server/Transport.luau; foot and bike jobs go on as on foot), never saved, never in
+-- your cars, no paint, no gear, no fuel, no garage; you are seated at once. The player attribute Rental = the dock's id
+-- while you have one (the phone, the prompts).
+--
+-- Returning: Return at any dock ends it at once; off the scooter and more than WalkAway studs from it, or off it for
+-- Idle seconds, it goes back by itself; calling your own car or bike (Jobs.returnLent: it is lent), buying one, a
+-- respawn, a wreck or leaving ends it too. A returned scooter stands in its own dock again Restock seconds later.
+
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Economy = require(Shared.Economy)
+local Map = require(Shared.Map)
+local Net = require(Shared.Net)
+local RentalDocks = require(Shared.RentalDocks)
+local Vehicles = require(script.Parent.Vehicles)
+local PlayerData = require(script.Parent.PlayerData)
+local Jobs = require(script.Parent.Jobs)
+local Cargo = require(script.Parent.Cargo)
+local CarCall = require(script.Parent.CarCall)
+local Zombies = require(script.Parent.Zombies)
+local DayNight = require(script.Parent.DayNight)
+
+local Rental = {}
+
+Rental.DockTag = "RentalDock"
+Rental.PromptTag = "RentalPrompt"
+
+local Tuning = Config.Rental
+local TICK = 0.25
+local WALK_TOP = Map.WalkTop
+local RED = Color3.fromRGB(Tuning.Color[1], Tuning.Color[2], Tuning.Color[3])
+local METAL = Color3.fromRGB(46, 48, 52)
+local PLATE = Color3.fromRGB(70, 72, 76)
+local LAMP_LIT = Color3.fromRGB(255, 236, 200)
+local LAMP_DIM = Color3.fromRGB(120, 120, 116)
+
+type Slot = { ground: CFrame, model: Model?, taken: boolean }
+type DockState = { dock: RentalDocks.Dock, model: Model, slots: { Slot } }
+type Ride = { car: Vehicles.Car, state: DockState, slot: number, leftAt: number? }
+
+local docks: { DockState } = {}
+local rides: { [Player]: Ride } = {}
+local started = false
+
+local function tell(player: Player, text: string)
+	Net.get("Notice"):FireClient(player, text)
+end
+
+local function part(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?, collide: boolean?): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.Size = size
+	p.CFrame = cframe
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.CanTouch = false
+	p.CanCollide = collide == true
+	p.CanQuery = collide == true
+	p.Parent = parent
+	return p
+end
+
+local function priceText(): string
+	return if Tuning.Price > 0 then `${Tuning.Price}` else "free"
+end
+
+-- The sign's face: ZDC RIDE, the price, the dock's corner.
+local function signFace(board: BasePart, face: Enum.NormalId, dock: RentalDocks.Dock)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = face
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 60
+	gui.LightInfluence = 0
+	gui.Parent = board
+	local back = Instance.new("Frame")
+	back.Size = UDim2.fromScale(1, 1)
+	back.BackgroundColor3 = Color3.fromRGB(24, 27, 32)
+	back.BorderSizePixel = 0
+	back.Parent = gui
+	local bar = Instance.new("Frame")
+	bar.Size = UDim2.new(1, 0, 0.08, 0)
+	bar.BackgroundColor3 = RED
+	bar.BorderSizePixel = 0
+	bar.Parent = back
+	local function line(text: string, y: number, h: number, color: Color3, font: Enum.Font)
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(0.9, 0, h, 0)
+		label.Position = UDim2.new(0.05, 0, y, 0)
+		label.BackgroundTransparency = 1
+		label.Text = text
+		label.TextScaled = true
+		label.Font = font
+		label.TextColor3 = color
+		label.Parent = back
+	end
+	line(`ZDC RIDE · {priceText()}`, 0.16, 0.42, Color3.fromRGB(242, 242, 240), Enum.Font.GothamBold)
+	line(string.upper(dock.name), 0.64, 0.24, Color3.fromRGB(169, 174, 180), Enum.Font.GothamMedium)
+end
+
+local function prompt(parent: Instance, name: string, action: string, kind: string, dock: RentalDocks.Dock, hold: number): ProximityPrompt
+	local p = Instance.new("ProximityPrompt")
+	p.Name = name
+	p.ActionText = action
+	p.ObjectText = `ZDC RIDE · {priceText()}`
+	p.HoldDuration = hold
+	p.MaxActivationDistance = Tuning.Reach
+	p.RequiresLineOfSight = false
+	p:SetAttribute("Kind", kind)
+	p:SetAttribute("DockId", dock.id)
+	CollectionService:AddTag(p, Rental.PromptTag)
+	p.Parent = parent
+	return p
+end
+
+local function scooterDef(): Config.CarDef
+	return Economy.findCar(Tuning.CarId) or Config.Cars[1]
+end
+
+local function dockScooter(state: DockState, slot: Slot)
+	if slot.model then
+		slot.model.Parent = state.model
+		return
+	end
+	local model = Vehicles.displayModel(scooterDef(), slot.ground, nil, nil, nil, RED)
+	model.Name = "DockedScooter"
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CanCollide = false
+			d.CanTouch = false
+			d.CanQuery = false
+		end
+	end
+	model.Parent = state.model
+	slot.model = model
+end
+
+local function buildDock(folder: Instance, dock: RentalDocks.Dock): DockState
+	local model = Instance.new("Model")
+	model.Name = `ZDC RIDE · {dock.name}`
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	model:SetAttribute("DockId", dock.id)
+	local t = Vector3.new(dock.tx, 0, dock.tz)
+	local n = Vector3.new(dock.nx, 0, dock.nz)
+	local centre = Vector3.new(dock.x, WALK_TOP, dock.z)
+	-- along the kerb (the scooters' way), out toward the street, up
+	local function at(along: number, out: number, y: number): Vector3
+		return centre + t * along + n * out + Vector3.new(0, y, 0)
+	end
+	local facing = CFrame.lookAt(centre, centre + t)
+	local function frameAt(along: number, out: number, y: number): CFrame
+		return facing.Rotation + at(along, out, y)
+	end
+	local half = dock.length / 2
+	local plate = part(model, "DockPlate", Vector3.new(2.6, 0.12, dock.length + 1.2), frameAt(0, 0, 0.06), PLATE, Enum.Material.DiamondPlate)
+	part(model, "ChargeRail", Vector3.new(0.3, 0.5, dock.length), frameAt(0, -1.15, 0.37), METAL, Enum.Material.Metal)
+	for _, along in { -half - 0.3, 0, half + 0.3 } do
+		-- (they do not collide: a rental takes off from its slot beside them)
+		part(model, "Bollard", Vector3.new(0.4, 1.1, 0.4), frameAt(along, 1.05, 0.55), RED, Enum.Material.SmoothPlastic)
+	end
+	local signAlong = half + 1.4
+	part(model, "SignPost", Vector3.new(0.3, 5.6, 0.3), frameAt(signAlong, -0.2, 2.8), METAL, Enum.Material.Metal, true)
+	local signPos = at(signAlong, -0.2, 4.9)
+	local board = part(model, "Sign", Vector3.new(3.2, 1.7, 0.15), CFrame.lookAt(signPos, signPos + n), Color3.fromRGB(24, 27, 32), Enum.Material.Metal)
+	signFace(board, Enum.NormalId.Front, dock)
+	signFace(board, Enum.NormalId.Back, dock)
+	local lamp = part(model, "Lamp", Vector3.new(0.5, 0.3, 0.5), frameAt(signAlong, -0.2, 5.75), LAMP_DIM, Enum.Material.SmoothPlastic)
+	DayNight.nightLight(lamp, LAMP_LIT, LAMP_DIM, "SmoothPlastic")
+	-- The prompts, at the plate's middle.
+	local spot = Instance.new("Attachment")
+	spot.Name = "RentalPrompts"
+	spot.Position = Vector3.new(0, 2.2, 0)
+	spot.Parent = plate
+	prompt(spot, "RentPrompt", "Rent scooter", "rent", dock, Tuning.Hold)
+	local back = prompt(spot, "ReturnPrompt", "Return scooter", "return", dock, 0)
+	back:SetAttribute("Seated", true) -- (from the saddle too: client/CarBoarding.luau leaves it)
+	local state: DockState = { dock = dock, model = model, slots = {} }
+	for _, slot in dock.slots do
+		local ground = CFrame.lookAt(Vector3.new(slot.x, WALK_TOP, slot.z), Vector3.new(slot.x, WALK_TOP, slot.z) + t)
+		local s: Slot = { ground = ground, model = nil, taken = false }
+		table.insert(state.slots, s)
+		local ok, err = pcall(function()
+			dockScooter(state, s)
+		end)
+		if not ok then
+			warn(`[Rental] {dock.name}: no docked scooter: {err}`)
+		end
+	end
+	CollectionService:AddTag(model, Rental.DockTag)
+	model.Parent = folder
+	return state
+end
+
+local function freeSlot(state: DockState): number?
+	for index, slot in state.slots do
+		if not slot.taken then
+			return index
+		end
+	end
+	return nil
+end
+
+-- The nearest other dock with a scooter in it, and how far.
+local function nextDock(from: DockState): (DockState?, number)
+	local best: DockState? = nil
+	local bestD = math.huge
+	for _, state in docks do
+		if state ~= from and freeSlot(state) then
+			local d = math.sqrt((state.dock.x - from.dock.x) ^ 2 + (state.dock.z - from.dock.z) ^ 2)
+			if d < bestD then
+				best, bestD = state, d
+			end
+		end
+	end
+	return best, bestD
+end
+
+local function restock(state: DockState, index: number)
+	task.delay(Tuning.Restock, function()
+		local slot = state.slots[index]
+		if slot and slot.taken then
+			slot.taken = false
+			pcall(dockScooter, state, slot)
+		end
+	end)
+end
+
+-- The rental is over (`why`: what the player is told). Its scooter goes (when it is still theirs).
+local function finish(player: Player, why: string?)
+	local ride = rides[player]
+	if not ride then
+		return
+	end
+	rides[player] = nil
+	if player.Parent then
+		player:SetAttribute("Rental", nil)
+	end
+	if Vehicles.get(player) == ride.car then
+		Vehicles.remove(player)
+	end
+	restock(ride.state, ride.slot)
+	if why and player.Parent then
+		tell(player, why)
+	end
+end
+
+local function rent(player: Player, state: DockState)
+	local profile = PlayerData.get(player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = humanoid and humanoid.RootPart
+	if not profile or not character or not humanoid or not root or humanoid.Health <= 0 then
+		return
+	end
+	if rides[player] then
+		tell(player, "You already have a ZDC RIDE scooter: hop on it, or Return it at any dock.")
+		return
+	end
+	if humanoid.SeatPart ~= nil or Vehicles.seatedIn(player) ~= nil or character:GetAttribute("Boarding") ~= nil then
+		tell(player, "Get off first: ZDC RIDE is for people on foot.")
+		return
+	end
+	if character:GetAttribute("ZipLine") ~= nil then
+		return
+	end
+	if (Vector3.new(root.Position.X - state.dock.x, 0, root.Position.Z - state.dock.z)).Magnitude > Tuning.Reach + state.dock.length / 2 + 4 then
+		return
+	end
+	if Jobs.onMission(player) then
+		tell(player, "No rentals on a mission: they are counting on you.")
+		return
+	end
+	if Jobs.active(player) and not Jobs.isFoot(player) then
+		tell(player, "Not on a car job: your car is your ride.")
+		return
+	end
+	if CarCall.busy(player) then
+		tell(player, "Your car is already on the way.")
+		return
+	end
+	if character:GetAttribute("Pushing") ~= nil then
+		tell(player, "Set the trolley down first.")
+		return
+	end
+	if not Cargo.canStowHands(player) then
+		tell(player, "Your hands are full: no room in the backpack.")
+		return
+	end
+	local index = freeSlot(state)
+	if not index then
+		local other, far = nextDock(state)
+		tell(player, if other then `This dock is empty. The next scooter: {other.dock.name}, {math.floor(far)} studs.` else "Every scooter is out. Try again in a moment.")
+		return
+	end
+	local own = Vehicles.get(player)
+	if own then
+		if own.repairing then
+			tell(player, "Your car is on a repair lift: wait for it, or take it off first.")
+			return
+		end
+		local def = Economy.findCar(own.id)
+		local bike = def ~= nil and def.bike == true
+		Vehicles.remove(player)
+		if not own.lent then
+			tell(player, `Your {if def then def.name else "vehicle"} went home: {if bike then "MY BIKE" else "BRING MY CAR"} on your phone brings it back.`)
+		end
+	end
+	if Tuning.Price > 0 and not PlayerData.spend(player, Tuning.Price) then
+		tell(player, "Not enough money.")
+		return
+	end
+	local slot = state.slots[index]
+	local x, z = slot.ground.Position.X, slot.ground.Position.Z
+	local position = Vector3.new(x, Vehicles.groundY(x, z, WALK_TOP) + 0.5, z)
+	local car = Vehicles.spawnAt(player, Tuning.CarId, CFrame.lookAt(position, position + slot.ground.LookVector), false, nil, true)
+	if not car then
+		if Tuning.Price > 0 then
+			PlayerData.addMoney(player, Tuning.Price)
+		end
+		tell(player, "Still loading...")
+		return
+	end
+	for _, p in car.paintParts do
+		p.Color = RED
+	end
+	slot.taken = true
+	if slot.model then
+		slot.model.Parent = nil
+	end
+	rides[player] = { car = car, state = state, slot = index, leftAt = nil }
+	player:SetAttribute("Rental", state.dock.id)
+	task.defer(function()
+		if not car.wrecked and car.model.Parent and humanoid.Health > 0 and humanoid.SeatPart == nil then
+			car.seat:Sit(humanoid)
+		end
+	end)
+	tell(player, "ZDC RIDE: it's yours for the ride. Leave it anywhere, or Return it at any dock.")
+end
+
+local function giveBack(player: Player, state: DockState)
+	local ride = rides[player]
+	if not ride then
+		return
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") then
+		return
+	end
+	if (Vector3.new(root.Position.X - state.dock.x, 0, root.Position.Z - state.dock.z)).Magnitude > Tuning.Reach + state.dock.length / 2 + 8 then
+		return
+	end
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart and humanoid.SeatPart:IsDescendantOf(ride.car.model) then
+		humanoid.Sit = false
+	end
+	finish(player, "Scooter returned. Thanks for riding ZDC RIDE!")
+end
+
+-- Every TICK: the rentals that ended some other way, the ones left behind.
+local function check()
+	local now = os.clock()
+	for player, ride in table.clone(rides) do
+		local car = ride.car
+		if Vehicles.get(player) ~= car or car.wrecked or not car.model.Parent then
+			-- (your own car or bike came, a shop, a respawn, a wreck: Vehicles took it already)
+			rides[player] = nil
+			if player.Parent then
+				player:SetAttribute("Rental", nil)
+			end
+			restock(ride.state, ride.slot)
+			continue
+		end
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = humanoid and humanoid.RootPart
+		if not player.Parent or not humanoid or not root or humanoid.Health <= 0 then
+			finish(player, nil)
+			continue
+		end
+		if Vehicles.seatedIn(player) == car then
+			ride.leftAt = nil
+			continue
+		end
+		ride.leftAt = ride.leftAt or now
+		local away = (root.Position - car.chassis.Position).Magnitude > Tuning.WalkAway
+		if away or now - (ride.leftAt :: number) > Tuning.Idle then
+			finish(player, "Your ZDC RIDE scooter went back to its dock. Thanks for riding!")
+		end
+	end
+end
+
+-- Is this player riding (or keeping) a rental now?
+function Rental.renting(player: Player): boolean
+	return rides[player] ~= nil
+end
+
+function Rental.start()
+	if started then
+		return
+	end
+	started = true
+	local world = workspace:FindFirstChild("World") or workspace
+	local folder = Instance.new("Folder")
+	folder.Name = "RentalDocks"
+	folder.Parent = world
+	for _, dock in RentalDocks.docks() do
+		local ok, state = pcall(buildDock, folder, dock)
+		if ok then
+			table.insert(docks, state)
+		else
+			warn(`[Rental] {dock.name}: {state}`)
+		end
+	end
+	for _, state in docks do
+		for _, p in state.model:GetDescendants() do
+			if p:IsA("ProximityPrompt") then
+				local kind = p:GetAttribute("Kind")
+				p.Triggered:Connect(function(player: Player)
+					if kind == "rent" then
+						rent(player, state)
+					else
+						giveBack(player, state)
+					end
+				end)
+			end
+		end
+	end
+	-- A wrecked rental: no "press CAR" (it is not yours), the zombies let go of it (Main's handler does that for cars).
+	local onWrecked = Vehicles.onWrecked
+	Vehicles.onWrecked = function(player: Player, car: Vehicles.Car, reason: string)
+		if car.rental then
+			Zombies.releaseCar(car)
+			tell(player, "Your ZDC RIDE scooter broke down: it goes back by itself. Rent another at any dock.")
+			return
+		end
+		onWrecked(player, car, reason)
+	end
+	local acc = 0
+	RunService.Heartbeat:Connect(function(dt: number)
+		acc += dt
+		if acc < TICK then
+			return
+		end
+		acc = 0
+		check()
+	end)
+	Players.PlayerRemoving:Connect(function(player: Player)
+		finish(player, nil)
+	end)
+end
+
+return Rental
