@@ -52,6 +52,7 @@ local NAMES = {
 	"RerollTier", -- 4.7: client → server: (tier) new ordinary offers of that danger level on my board, for Config.Jobs.Choice.RerollFee × its stars, once per board (server/Jobs.luau)
 	"RoadEvent", -- 4.8: server → client: a road event's card ({ kind = "addon", title, text, pay, endsAt }) or nil to close it; client → server: ("accept" | "decline") the add-on (server/Jobs.luau, client/RoadEventUi.luau)
 	"Kit", -- 5.0: client → server: ("buy", kit id) personal gear at Last Stop Supplies (server/Shops.luau, Config.Kit)
+	"PhoneHold", -- 5.0: client → server: (holding boolean) the phone window opened / closed; the server shows the phone in your right hand to everybody while you are on foot with your hands free (server/KitWear.luau, the character attribute PhoneHeld)
 	"PutDown", -- 4.2: client → server: () the touch PUT DOWN / LET GO / SET DOWN button: what the G prompt in your hands does (server/Cargo.luau, server/Equipment.luau)
 }
 

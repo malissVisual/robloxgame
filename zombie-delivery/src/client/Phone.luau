@@ -44,6 +44,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Career = require(Shared.Career)
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
+local Icons = require(Shared.Icons)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
@@ -640,7 +641,15 @@ local function tile(parent: Instance, def: AppDef, order: number): any
 	}, cell)
 	Ui.corner(face, 14)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, face)
-	Ui.label(face, def.glyph, UDim2.fromScale(1, 1), { TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Font })
+	-- (the app's icon, art/icons/app_*, once uploaded: shared/Icons.luau; the emoji until then)
+	Ui.icon(face, Icons.app(def.id), def.glyph, UDim2.fromOffset(34, 34), {
+		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		TextSize = 26,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Theme.Font,
+		ImageColor3 = K.text,
+	})
 	local name = P.caps(cell, def.name, UDim2.new(1, 0, 0, 16), { Position = UDim2.fromOffset(0, 66), TextXAlignment = Enum.TextXAlignment.Center, TextStrokeTransparency = 1, TextSize = 11 })
 	local underline = Ui.make("Frame", { Size = UDim2.new(0, 22, 0, 1), Position = UDim2.new(0.5, -11, 0, 84), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
 	P.hover(cell :: any, underline, name)
@@ -1072,6 +1081,7 @@ function Phone.close()
 		return
 	end
 	isOpen = false
+	Net.get("PhoneHold"):FireServer(false) -- (5.0: the phone leaves your hand: server/KitWear.luau)
 	local body = refs.body
 	if body then
 		Ui.gamepadRelease(body)
@@ -1111,6 +1121,9 @@ function Phone.open(startApp: string?)
 	body.AnchorPoint = if landscape then Vector2.new(0.5, 1) else Vector2.new(1, 1)
 	local rest, hidden = restPosition()
 	app = startApp or "home"
+	if not isOpen then
+		Net.get("PhoneHold"):FireServer(true) -- (5.0: everybody sees it in your hand while you are on foot: server/KitWear.luau)
+	end
 	isOpen = true
 	renderApp()
 	refreshBadges()

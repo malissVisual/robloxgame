@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Icons = require(Shared.Icons)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Transport = require(Shared.Transport)
@@ -148,7 +149,13 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 		-- A backpack smaller than (or as big as) the room you have already adds nothing.
 		local outgrown = not owned and def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= room
 		local row = P.row(body, ROW_H, order + 2, owned)
-		Ui.label(row, def.icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(14, ROW_H / 2 - 20), TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center })
+		-- (its icon, art/icons/kit_*, once uploaded: shared/Icons.luau; the emoji until then)
+		Ui.icon(row, Icons.kit(def.id), def.icon, UDim2.fromOffset(40, 40), {
+			Position = UDim2.fromOffset(14, ROW_H / 2 - 20),
+			TextSize = 26,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ImageColor3 = P.ink,
+		})
 		local left = 64
 		local textW = UDim2.new(1, -(left + BUTTON_W + 24), 0, 22)
 		Ui.label(row, def.name, textW, { Position = UDim2.fromOffset(left, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
