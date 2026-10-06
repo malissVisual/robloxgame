@@ -219,7 +219,7 @@ local solo, none = Economy.crewSplit(300, 0)
 check("solo crew split", solo == 300 and none == 0)
 local driver, share = Economy.crewSplit(300, 2)
 check("crew split", driver == 300 + 90 and share == 150, `{driver} {share}`)
-check("items have unique ids", (function()
+check("items have unique ids (5.4: six, the jerry can)", (function()
 	local seen = {}
 	for _, item in Config.Items do
 		if seen[item.id] then
@@ -227,7 +227,7 @@ check("items have unique ids", (function()
 		end
 		seen[item.id] = true
 	end
-	return #Config.Items == 5
+	return #Config.Items == 6
 end)())
 
 -- Map -------------------------------------------------------------------------

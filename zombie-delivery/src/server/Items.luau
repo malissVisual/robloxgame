@@ -4,6 +4,7 @@
 --   Repair Kit  +40 % car health          Medkit   full player health
 --   Nitro       a speed boost (client)     Molotov  a burning patch where you aim
 --   Landmine    dropped behind the car, blows up when a zombie steps close
+--   Jerry Can   5.4: +10 L of fuel into your car, standing by it or sitting in it (server/Fuel.luau pourCan)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -180,7 +181,7 @@ end
 -- Returns an error text, or nil when the item was used.
 local function apply(player: Player, id: string, target: Vector3?): string?
 	local body = player.Character
-	if (id == "repair" or id == "molotov") and body and body:GetAttribute("Carrying") ~= nil then
+	if (id == "repair" or id == "molotov" or id == "jerrycan") and body and body:GetAttribute("Carrying") ~= nil then
 		return "Your hands are full. Put it down first (G)."
 	end
 	if id == "repair" then
@@ -213,6 +214,8 @@ local function apply(player: Player, id: string, target: Vector3?): string?
 		return molotov(player, target)
 	elseif id == "mine" then
 		return dropMine(player)
+	elseif id == "jerrycan" then
+		return require(script.Parent.Fuel).pourCan(player) -- 5.4
 	end
 	return "Unknown item."
 end

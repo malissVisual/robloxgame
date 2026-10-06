@@ -1949,7 +1949,7 @@ end
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
 -- 3.8, the lower right column (one frame, view.right; layout() scales and places it), bottom up: INVENTORY [I] with
--- the consumables (keys 1-5 and their counts; hidden while you carry), the vehicle line (── Car panel ──), a thin
+-- the consumables (keys 1-6 and their counts; hidden while you carry), the vehicle line (── Car panel ──), a thin
 -- rule, and the weapon (a small icon, the gun's name and state, Q) or, while you carry, the cargo in your hands and
 -- what carrying stops ("2 × PIZZA BOXES / HANDS FULL · NO GUN, NO SPRINT"). Hidden pieces take no room.
 local HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, hotbarCounts: any, FIRE_SIZE: any, fire: any
@@ -2159,7 +2159,7 @@ hotbarCounts = {}
 for index, def in Config.Items do
 	local token = Ui.make("TextButton", {
 		Name = `{def.id}Tag`,
-		Size = UDim2.fromOffset(if touchLayout then 44 else 48, 30),
+		Size = UDim2.fromOffset(if touchLayout then 44 else 46, 30), -- (5.4: six of them fit the column)
 		BackgroundColor3 = P.raised,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
@@ -2330,6 +2330,7 @@ Ui.make("UIListLayout", {
 }, v.speedRow)
 v.speed = P.text(v.speedRow, "0", UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 28, LayoutOrder = 1 })
 v.unit = P.caps(v.speedRow, "KM/H", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2 })
+require(script.Parent.FuelGauge).build(v.speedRow) -- 5.4: the fuel gauge, left of the speed (client/FuelGauge.luau)
 v.line = P.caps(carPanel, "", UDim2.fromOffset(view.right.Size.X.Offset, 18), {
 	TextSize = 13,
 	TextColor3 = P.ink,
@@ -3970,7 +3971,7 @@ function Hud.start()
 				openDispatch()
 			end
 		else -- (Q: the weapon wheel, client/WeaponWheel.luau)
-			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five }
+			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six }
 			local index = table.find(numbers, key)
 			if index and Config.Items[index] then
 				useItem(Config.Items[index].id)

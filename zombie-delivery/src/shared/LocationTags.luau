@@ -64,6 +64,9 @@ local PLACE_SUB: { [string]: string } = {
 	harborpoint = "OFFICES",
 	sunsethills = "HILLTOP MANSION",
 	earl = "USED VANS", -- 5.0, Earl's Used Wheels (Config.VanQuest)
+	gas_downtown = "GAS STATION", -- 5.4, the new gas stations (Map.GasStations)
+	gas_harbor = "GAS STATION",
+	gas_suburbs = "GAS STATION",
 }
 local ESTATE_SUB: { [string]: string } = {
 	garage = "GARAGE",
