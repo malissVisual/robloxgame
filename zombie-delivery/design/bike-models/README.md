@@ -28,7 +28,7 @@ Budgets include the new hidden attachment roots. The gameplay-only seat/collider
 - Ordinary bikes have a rear-rack `Slot1`; Cargo has six box-floor `Slot1`–`Slot6` points. Basket has two, panniers two, trailer four. These are layout points, not a change to cargo rules. Pannier slots are at the bags' openings; others at deck height.
 - `cargobike_loaded` is **only a preview variant with six sample parcels**. Use `cargobike` in production and create actual cargo from its six slot points. Do not give a player those decorative sample parcels as a delivery.
 - Trailer roots: `Frame`, `LeftWheel`, `RightWheel`. Align its forward `Hitch` with the bike's rear `Hitch`, using Claude's hitch/push controller. Wheels are hollow eight-segment rings and rotate separately. Extra trailer colliders/joints are not provided.
-- All decoration is massless/non-colliding/non-querying/non-touching; spokes, strips and small pieces cast no shadows. Parts with `NightLamp=true` need registration with DayNight. If initially built on anchored preview roots, unanchor **built.parts as well as the roots** before driving. Call `Builder.destroy(result)` before replacing skins/gear to remove points from caller roots.
+- All decoration is massless/non-colliding/non-querying/non-touching; spokes, strips and small pieces cast no shadows. Parts with `NightLamp=true` need registration with DayNight. Skin parts stay unanchored even on anchored review roots, so they cannot freeze a later unanchored bike. Call `Builder.destroy(result)` before replacing skins/gear to remove points from caller roots.
 
 ## Shop blueprint
 
