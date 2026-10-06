@@ -31,9 +31,15 @@ for _, blueprint in Blueprints do
 	local frame = Mock.CFrame.new(100, 10, 200)
 	local model = Kit.build(parent, frame, blueprint, { part = part, deco = deco, nightLight = nightLight })
 	assert(model.Parent == parent and model:GetAttribute("Building") == blueprint.id)
-	assert(model:GetAttribute("DetailCount") == #blueprint.details and #parts == #blueprint.details)
-	for i, p in parts do
-		local d = blueprint.details[i]
+	-- 4.3: an interior hall adds its ceiling panels after the details (one, two from 48 studs wide).
+	local extra = if blueprint.interior then (if blueprint.width >= 48 then 2 else 1) else 0
+	assert(model:GetAttribute("DetailCount") == #blueprint.details and #parts == #blueprint.details + extra)
+	for n = 1, extra do
+		local p = parts[#blueprint.details + n]
+		assert(p.Name == "InteriorLight" .. n and decorated[p] and not p.CanCollide and not p.CanQuery and not p.CanTouch)
+	end
+	for i, d in blueprint.details do
+		local p = parts[i]
 		assert(p.Anchored and not p.CanCollide and not p.CanQuery and not p.CanTouch and decorated[p])
 		assert(p.Parent == model and p.Name == d.name and p.Material ~= nil)
 		assert(p.CFrame.position.X == 100 + d.position[1] and p.CFrame.position.Y == 10 + d.position[2] and p.CFrame.position.Z == 200 + d.position[3])

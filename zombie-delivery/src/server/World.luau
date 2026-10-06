@@ -193,31 +193,93 @@ local function nightWindow(p: Part, lit: Color3?)
 	DayNight.nightLight(p, lit or WINDOW_LIT, p.Color, "Glass")
 end
 
--- A name board with its text. `art` is the building's sign picture (shared/Icons.luau Icons.sign, art/signs): once its
--- id is filled in, the picture stands there instead, with its own outline (no board behind it), as big as fits the
--- board for its shape (a 4 : 1 board, a square badge). `artHeight` lets it grow taller than the board, upward from the
--- board's bottom edge (where there is sky or wall above it); while the id is empty the text board is unchanged.
+-- A name board with its text. `art` marks a building's name (the shops, the employers, the places, the garages, the
+-- estate, the road signs to them): since 4.3 it is the contract look the owner chose over the sign pictures (those stay
+-- in art/signs and shared/Icons.luau) — a solid charcoal band, a small red square and the name in white caps, a second
+-- line after a double space ("LEAD & CO.  GUNS": LEAD & CO. over GUNS), a fine line along the bottom. It stands at the
+-- old board's place (an `artHeight` of 8 or more, where the picture grew upward, says it is on a roof edge: it reaches 1 stud
+-- down onto the wall, no gap under it). Without `art`: the plain coloured text board (JOBS, BAY 2, SAFE ZONE …).
 local function sign(parent: Instance, text: string, size: Vector3, cframe: CFrame, color: Color3, background: Color3?, art: string?, artHeight: number?)
-	local image = Icons.get(Icons.sign(art))
-	if image then
-		local aspect = Icons.signAspect(art)
-		local w = math.min(size.X, (artHeight or size.Y) * aspect)
-		local h = w / aspect
-		local plate = deco(part(parent, "Sign", Vector3.new(w, h, size.Z), cframe * CFrame.new(0, math.max(0, h - size.Y) / 2, 0), Color3.new(1, 1, 1)))
-		plate.Transparency = 1
+	if art then
+		local drop = if artHeight and artHeight >= 8 then 1 else 0 -- (a roof edge; the small badges on posts stay put)
+		local boardSize = Vector3.new(size.X, size.Y + drop, math.max(size.Z, 0.3))
+		local board = deco(part(parent, "Sign", boardSize, cframe * CFrame.new(0, -drop / 2, 0), Color3.fromRGB(24, 27, 32), Enum.Material.Metal))
 		local gui = Instance.new("SurfaceGui")
+		gui.Name = "NameBoard"
 		gui.Face = Enum.NormalId.Front
-		-- The canvas as wide as the picture itself (1024 a board, 512 a badge): a smaller one blurs it.
-		gui.PixelsPerStud = math.clamp((if aspect == 1 then 512 else 1024) / w, 16, 160)
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		-- About 1000 px across, and the type no taller than the 100 px a TextLabel allows.
+		local pps = math.clamp(math.min(1000 / boardSize.X, 175 / boardSize.Y), 8, 120)
+		gui.PixelsPerStud = pps
 		gui.LightInfluence = 0
-		gui.Parent = plate
-		local picture = Instance.new("ImageLabel")
-		picture.Size = UDim2.fromScale(1, 1)
-		picture.BackgroundTransparency = 1
-		picture.Image = image
-		picture.ImageColor3 = Color3.new(1, 1, 1)
-		picture.ScaleType = Enum.ScaleType.Fit
-		picture.Parent = gui
+		gui.Parent = board
+		local width, height = boardSize.X * pps, boardSize.Y * pps
+		local title, second = string.match(text, "^(.-)%s%s+(.+)$")
+		local name = title or text
+		local font = Enum.Font.GothamBold
+		local textSize = math.min(100, math.floor(height * (if second then 0.4 else 0.52)))
+		local mark = math.max(4, math.floor(textSize * 0.42))
+		local gap = math.floor(textSize * 0.45)
+		local function measure(n: number): number
+			local ok, bounds = pcall(function()
+				return game:GetService("TextService"):GetTextSize(name, n, font, Vector2.new(100000, 1000))
+			end)
+			return if ok then bounds.X else (utf8.len(name) or #name) * n * 0.68
+		end
+		local wide = measure(textSize)
+		local room = width * 0.9 - mark - gap
+		if wide > room then
+			textSize = math.max(8, math.floor(textSize * room / wide))
+			mark = math.max(4, math.floor(textSize * 0.42))
+			gap = math.floor(textSize * 0.45)
+			wide = measure(textSize)
+		end
+		local row = Instance.new("Frame")
+		row.BackgroundTransparency = 1
+		row.Size = UDim2.fromScale(1, if second then 0.64 else 0.94)
+		row.Parent = gui
+		local layout = Instance.new("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.VerticalAlignment = Enum.VerticalAlignment.Center
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, gap)
+		layout.Parent = row
+		local square = Instance.new("Frame")
+		square.Size = UDim2.fromOffset(mark, mark)
+		square.BackgroundColor3 = Color3.fromRGB(215, 74, 70)
+		square.BorderSizePixel = 0
+		square.LayoutOrder = 1
+		square.Parent = row
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromOffset(math.ceil(wide) + 4, math.ceil(textSize * 1.15))
+		label.BackgroundTransparency = 1
+		label.Text = name
+		label.TextSize = textSize
+		label.Font = font
+		label.TextColor3 = Color3.fromRGB(242, 242, 240)
+		label.LayoutOrder = 2
+		label.Parent = row
+		if second then
+			local under = Instance.new("TextLabel")
+			under.AnchorPoint = Vector2.new(0.5, 0)
+			under.Position = UDim2.fromScale(0.5, 0.6)
+			under.Size = UDim2.fromScale(0.86, 0.26)
+			under.BackgroundTransparency = 1
+			under.Text = second
+			under.TextScaled = true
+			under.Font = Enum.Font.GothamMedium
+			under.TextColor3 = Color3.fromRGB(169, 174, 180)
+			under.Parent = gui
+		end
+		local line = Instance.new("Frame")
+		line.AnchorPoint = Vector2.new(0.5, 1)
+		line.Position = UDim2.new(0.5, 0, 1, -math.max(2, math.floor(height * 0.06)))
+		line.Size = UDim2.new(0.96, 0, 0, math.max(1, math.floor(height * 0.018)))
+		line.BackgroundColor3 = Color3.fromRGB(133, 139, 147)
+		line.BackgroundTransparency = 0.45
+		line.BorderSizePixel = 0
+		line.Parent = gui
 		return
 	end
 	local board = part(parent, "Sign", size, cframe, background or Color3.fromRGB(30, 30, 34), Enum.Material.Metal)
@@ -352,7 +414,7 @@ local function building(parent: Instance, frame: CFrame, w: number, d: number, h
 		end
 	end
 	local ceiling = deco(part(parent, "CeilingLight", Vector3.new(w * 0.5, 0.3, 2), frame * CFrame.new(0, h - 0.4, 0), Color3.fromRGB(255, 245, 220), Enum.Material.Neon))
-	light(ceiling, math.max(w, d), 1.2, Color3.fromRGB(255, 240, 220))
+	light(ceiling, math.max(w, d), 1.6, Color3.fromRGB(255, 240, 220)) -- (4.3: brighter: the darker walls of 4.1)
 end
 
 -- A wedge roof over a box: two wedges, ridge along X.

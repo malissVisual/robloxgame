@@ -3,7 +3,7 @@
 local Kit = require(script.Parent.Kit)
 
 return {
-	id = "depot", width = 80, depth = 40, height = 22,
+	id = "depot", width = 80, depth = 40, height = 22, interior = true,
 	details = {
 		{ name = "FrontFascia", position = { 0, 21, -20.7 }, size = { 80, 2, 1.2 }, color = { 38, 43, 47 }, material = "Metal" },
 		{ name = "DispatchCanopy", position = { 0, 19.6, -21.5 }, size = { 80, 0.6, 4 }, color = { 38, 43, 47 }, material = "Metal" },

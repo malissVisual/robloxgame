@@ -3,7 +3,7 @@
 local Kit = require(script.Parent.Kit)
 
 return {
-	id = "farm", width = 40, depth = 30, height = 18,
+	id = "farm", width = 40, depth = 30, height = 18, interior = true,
 	details = {
 		{ name = "BarnDoorLeaf-1", position = { -3.5, 6, -15.15 }, size = { 7, 12, 0.3 }, color = { 118, 34, 30 }, material = "WoodPlanks" },
 		{ name = "BarnDoorLeaf1", position = { 3.5, 6, -15.15 }, size = { 7, 12, 0.3 }, color = { 118, 34, 30 }, material = "WoodPlanks" },

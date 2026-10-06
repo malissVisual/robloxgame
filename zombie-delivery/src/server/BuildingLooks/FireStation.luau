@@ -54,7 +54,7 @@ end
 table.insert(entries, { DOOR, 4, 7 })
 
 return {
-	id = "firestation", width = 84, depth = 46, height = 20,
+	id = "firestation", width = 84, depth = 46, height = 20, interior = true,
 	details = details,
 	entries = entries,
 } :: Kit.Blueprint

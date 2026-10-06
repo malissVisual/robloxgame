@@ -15,8 +15,8 @@ Mock.Vector3 = { new = function(x, y, z) return { X = x, Y = y, Z = z } end }
 Mock.Color3 = { fromRGB = function(r, g, b) return { R = r, G = g, B = b } end }
 Mock.UDim2 = { fromScale = function(x, y) return { X = x, Y = y } end }
 Mock.Enum = {
-	Material = { Metal = "Metal", Concrete = "Concrete", Brick = "Brick", Glass = "Glass", SmoothPlastic = "SmoothPlastic", Wood = "Wood", WoodPlanks = "WoodPlanks", Slate = "Slate", CorrodedMetal = "CorrodedMetal", Rubber = "Rubber" },
-	PartType = { Cylinder = "Cylinder" }, NormalId = { Front = "Front" }, Font = { GothamMedium = "GothamMedium" },
+	Material = { Metal = "Metal", Concrete = "Concrete", Brick = "Brick", Glass = "Glass", SmoothPlastic = "SmoothPlastic", Wood = "Wood", WoodPlanks = "WoodPlanks", Slate = "Slate", CorrodedMetal = "CorrodedMetal", Rubber = "Rubber", Neon = "Neon" },
+	PartType = { Cylinder = "Cylinder" }, NormalId = { Front = "Front", Bottom = "Bottom" }, Font = { GothamMedium = "GothamMedium" },
 	SurfaceGuiSizingMode = { PixelsPerStud = "PixelsPerStud" },
 }
 local Frame = {}

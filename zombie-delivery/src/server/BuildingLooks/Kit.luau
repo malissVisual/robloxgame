@@ -25,6 +25,9 @@ export type Blueprint = {
 	details: { Detail },
 	-- The front openings that must stay clear (tools/check-building-looks.py): { center x, width, clear height } each.
 	entries: { { number } }?,
+	-- 4.3: an open hall you look into (the depot, bays, docks, garages): warm ceiling panels with light that are on day
+	-- and night, so the inside reads instead of a black box. The panels are not details (no part budget).
+	interior: boolean?,
 }
 export type Context = {
 	part: (Instance, string, Vector3, CFrame, Color3, Enum.Material?) -> Part,
@@ -80,6 +83,28 @@ function Kit.build(parent: Instance, frame: CFrame, blueprint: Blueprint, contex
 				lamp.Parent = item
 			end
 			context.nightLight(item, warm, item.Color, "Glass")
+		end
+	end
+	if blueprint.interior then
+		-- One panel (two in a wide hall) under the ceiling, a little in from the front; a SurfaceLight shines down
+		-- only, so nothing spills onto the roof or through it.
+		local count = if blueprint.width >= 48 then 2 else 1
+		local span = blueprint.width / count
+		local y = blueprint.height - 1.1
+		for n = 1, count do
+			local x = -blueprint.width / 2 + span * (n - 0.5)
+			local pose = frame * CFrame.new(x, y, -blueprint.depth * 0.1)
+			local panel = context.deco(context.part(model, `InteriorLight{n}`, Vector3.new(math.min(span * 0.5, 14), 0.2, 1.4), pose, Color3.fromRGB(255, 236, 205), Enum.Material.Neon))
+			panel.CanTouch = false
+			panel.CastShadow = false
+			local glow = Instance.new("SurfaceLight")
+			glow.Face = Enum.NormalId.Bottom
+			glow.Angle = 150
+			glow.Range = math.clamp(blueprint.height + 12, 20, 40)
+			glow.Brightness = 2
+			glow.Color = Color3.fromRGB(255, 228, 187)
+			glow.Shadows = false
+			glow.Parent = panel
 		end
 	end
 	return model

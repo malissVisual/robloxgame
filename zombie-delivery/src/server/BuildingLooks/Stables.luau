@@ -3,7 +3,7 @@
 local Kit = require(script.Parent.Kit)
 
 return {
-	id = "stables", width = 28, depth = 18, height = 10,
+	id = "stables", width = 28, depth = 18, height = 10, interior = true,
 	-- The front openings kept clear: { center x, width, clear height }.
 	entries = { { 0, 4, 7 } },
 	details = {
