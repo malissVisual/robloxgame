@@ -122,6 +122,10 @@ export type CarDef = {
 	-- 4.6: the gear slots (Config.Gear pieces installed at once at Wrench Garage). A stage's own gearSlots wins
 	-- (StageDef.gearSlots); nil: none (the company vehicles come with what their job needs). Economy.gearSlots.
 	gearSlots: number?,
+	-- 5.1: a bicycle (style "bike"; Config.Cars ids rustbike, citybike, cargobike, ebike, appended after the cars): sold at
+	-- Spoke & Chain (Map.Shops.bikes), light cargo only, no fuel, no traffic / chauffeur / car gun / paint / car
+	-- upgrade tracks; it never counts as "a vehicle" for car jobs and missions (shared/Transport.luau mode "bike").
+	bike: boolean?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -813,6 +817,8 @@ export type GearDef = {
 	icon: string, -- an emoji (the shop card, the career road)
 	needs: string?, -- a CarDef flag the car must have ("trolley")
 	notOn: { string }?, -- car ids it does not fit
+	bikeOnly: boolean?, -- 5.1: bike gear (basket, panniers, trailer): fits only CarDef.bike, installed at Spoke & Chain
+	room: number?, -- 5.1: bike gear's extra light slots
 }
 
 -- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
