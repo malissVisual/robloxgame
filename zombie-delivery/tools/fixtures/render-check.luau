@@ -2,6 +2,9 @@
 -- Exercise the real Kit.build with recorded instances and World's helper contract.
 local Kit = require("./Kit")
 local Mock = require("./roblox-mock")
+-- Rotated tube/disc blueprints need real composition, not translation-only recording.
+local rotated = Mock.CFrame.Angles(0, 0, math.pi / 2) * Mock.CFrame.new(2, 0, 0)
+assert(math.abs(rotated.position.X) < 1e-8 and math.abs(rotated.position.Y - 2) < 1e-8)
 local Blueprints = require("./blueprint-list")
 local parts, decorated, lights = {}, {}, {}
 local function part(parent, name, size, pose, color, material)
