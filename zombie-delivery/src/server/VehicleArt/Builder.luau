@@ -17,8 +17,9 @@ local COLORS: { [string]: Color3 } = {
 	red = Color3.fromRGB(163, 47, 40), amber = Color3.fromRGB(206, 132, 48), white = Color3.fromRGB(217, 218, 207),
 	wood = Color3.fromRGB(123, 101, 73), tyre = Color3.fromRGB(24, 26, 27), rust = Color3.fromRGB(116, 63, 36),
 	primer = Color3.fromRGB(119, 125, 119), mirror = Color3.fromRGB(178, 190, 191), lamp = Color3.fromRGB(206, 202, 180),
-	armor = Color3.fromRGB(67, 77, 79),
+	armor = Color3.fromRGB(67, 77, 79), tread = Color3.fromRGB(58, 60, 62),
 }
+local LIT_WARM, LIT_AMBER = Color3.fromRGB(255, 228, 182), Color3.fromRGB(255, 166, 52)
 function Builder.supports(id: string): boolean return SUPPORTED[id] == true end
 local function triple(v: Vector3): Geometry.V return { v.X, v.Y, v.Z } end
 function Builder.profile(id: string, stage: number, style: Style): Geometry.Profile
@@ -47,13 +48,23 @@ function Builder.profile(id: string, stage: number, style: Style): Geometry.Prof
 	local cargoTop = if cargo then (cargo :: Box).offset.Y + (cargo :: Box).size.Y / 2 else h.offset.Y + h.size.Y / 2
 	if id == "pickup" then cargoTop = 1.6; rear = style.length / 2 - .1 end
 	if id == "van" and stage >= 3 then cargoTop = 6.3 end
+	-- The back's leaves: the lowest edge of the upright ones (the rear face's sill) and a lid's span (lying flat).
+	local sill: number? = nil
+	local lidFront: number?, lidBack: number? = nil, nil
+	local leaves: { Leaf } = if style.back then style.back.leaves else {}
+	for _, leaf in leaves do
+		if leaf.size.Y < leaf.size.Z then
+			lidFront, lidBack = leaf.center.Z - leaf.size.Z / 2, leaf.center.Z + leaf.size.Z / 2
+		end
+		sill = math.min(sill or math.huge, leaf.center.Y - leaf.size.Y / 2)
+	end
 	return {
 		id = id, stage = stage, width = style.width, length = style.length, wheel = style.wheel, wheelWidth = style.wheelWidth,
 		wheelY = style.wheel - style.clearance - 1.2, seatY = style.seat.Y, seatZ = style.seat.Z,
 		headY = if style.head then style.head.X else 1.2, headZ = if style.head then style.head.Y else -style.length / 2 - .05, cabWidth = g.size.X, cabFront = g.offset.Z - g.size.Z / 2,
 		cabBack = cabBack, cabTop = cabTop, windowTop = math.min(g.offset.Y + g.size.Y / 2, cabTop - .3), hoodTop = h.offset.Y + h.size.Y / 2,
 		cargoFront = if cargo then (cargo :: Box).offset.Z - (cargo :: Box).size.Z / 2 else cabBack,
-		cargoBack = rear, cargoTop = cargoTop, roof = style.roof,
+		cargoBack = rear, cargoTop = cargoTop, roof = style.roof, sill = sill, lidFront = lidFront, lidBack = lidBack,
 	}
 end
 local function emit(parent: Instance, to: BasePart, frame: CFrame, pieces: { Geometry.Piece }, paint: Color3, paintParts: { BasePart }, context: Context)
@@ -64,18 +75,20 @@ local function emit(parent: Instance, to: BasePart, frame: CFrame, pieces: { Geo
 		p.Size = Vector3.new(s[1], s[2], s[3])
 		p.CFrame = frame * CFrame.new(v[1], v[2], v[3]) * CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
 		p.Color = if piece.finish == "paint" then paint else COLORS[piece.finish] or COLORS.dark
-		p.Material = if piece.finish == "glass" or piece.finish == "lamp" or piece.finish == "amber" then Enum.Material.Glass elseif piece.finish == "tyre" then Enum.Material.Rubber elseif piece.finish == "rust" then Enum.Material.CorrodedMetal elseif piece.finish == "wood" then Enum.Material.WoodPlanks elseif piece.finish == "paint" or piece.finish == "primer" then Enum.Material.SmoothPlastic else Enum.Material.Metal
+		p.Material = if piece.finish == "glass" or piece.finish == "lamp" or piece.finish == "amber" then Enum.Material.Glass elseif piece.finish == "tyre" or piece.finish == "tread" then Enum.Material.Rubber elseif piece.finish == "rust" then Enum.Material.CorrodedMetal elseif piece.finish == "wood" then Enum.Material.WoodPlanks elseif piece.finish == "paint" or piece.finish == "primer" then Enum.Material.SmoothPlastic else Enum.Material.Metal
 		p.Transparency = if piece.finish == "glass" then .28 else 0
 		p.Reflectance = if piece.finish == "mirror" then .35 elseif piece.finish == "steel" then .08 else 0
 		p.CanCollide, p.CanQuery, p.CanTouch, p.Massless = false, false, false, true
 		p.CollisionGroup = "Car"
-		p.CastShadow = piece.finish ~= "glass"
+		-- Glass, strips, rods and small trim cast no shadow (two sides under 0.6): the panels carry the car's shadow.
+		local a, b, c = s[1], s[2], s[3]
+		p.CastShadow = piece.finish ~= "glass" and (a >= .6 and b >= .6 or a >= .6 and c >= .6 or b >= .6 and c >= .6)
 		if piece.shape == "Cylinder" then (p :: Part).Shape = Enum.PartType.Cylinder end
 		p:SetAttribute("FleetFinish", piece.finish)
 		p.Parent = parent
 		context.weld(to, p)
 		if piece.finish == "paint" then table.insert(paintParts, p) end
-		if piece.finish == "lamp" or piece.finish == "amber" then context.nightLight(p, Color3.fromRGB(255, 228, 182), p.Color, "Glass") end
+		if piece.finish == "lamp" or piece.finish == "amber" then context.nightLight(p, if piece.finish == "amber" then LIT_AMBER else LIT_WARM, p.Color, "Glass") end
 		if piece.text then
 			local gui = Instance.new("SurfaceGui")
 			gui.Name, gui.Face, gui.SizingMode, gui.PixelsPerStud = "FleetLabel", Enum.NormalId.Front, Enum.SurfaceGuiSizingMode.PixelsPerStud, 60
@@ -88,37 +101,45 @@ local function emit(parent: Instance, to: BasePart, frame: CFrame, pieces: { Geo
 		end
 	end
 end
-function Builder.body(model: Model, chassis: BasePart, top: CFrame, style: Style, color: Color3, paintParts: { BasePart }, context: Context)
+-- doors: the cab doors' z spans (the waist line and the mirrors keep clear of them).
+function Builder.body(model: Model, chassis: BasePart, top: CFrame, style: Style, color: Color3, paintParts: { BasePart }, context: Context, doors: { Geometry.DoorSpan }?)
 	local folder = Instance.new("Folder"); folder.Name = "FleetBody"; folder.Parent = model
-	emit(folder, chassis, top, Geometry.body(Builder.profile(model:GetAttribute("FleetStyle") :: string, model:GetAttribute("FleetStage") :: number, style)), color, paintParts, context)
+	local profile = Builder.profile(model:GetAttribute("FleetStyle") :: string, model:GetAttribute("FleetStage") :: number, style)
+	profile.doors = doors
+	emit(folder, chassis, top, Geometry.body(profile), color, paintParts, context)
 end
-function Builder.door(model: Model, panel: BasePart, style: Style, side: number, color: Color3, paintParts: { BasePart }, primer: boolean, context: Context)
+function Builder.door(model: Model, panel: BasePart, style: Style, side: number, color: Color3, paintParts: { BasePart }, context: Context)
 	local profile = Builder.profile(model:GetAttribute("FleetStyle") :: string, model:GetAttribute("FleetStage") :: number, style)
 	local top = (model.PrimaryPart :: BasePart).CFrame * CFrame.new(0, .6, 0)
 	local panelTop = top:PointToObjectSpace(panel.Position).Y + panel.Size.Y / 2
-	emit(panel, panel, panel.CFrame, Geometry.door(triple(panel.Size), side, profile.windowTop, panelTop, primer, math.max(0, math.abs(top:PointToObjectSpace(panel.Position).X) - profile.cabWidth / 2)), color, paintParts, context)
+	emit(panel, panel, panel.CFrame, Geometry.door(triple(panel.Size), side, profile.windowTop, panelTop, math.max(0, math.abs(top:PointToObjectSpace(panel.Position).X) - profile.cabWidth / 2)), color, paintParts, context)
 end
 function Builder.rear(panel: BasePart, color: Color3, paintParts: { BasePart }, context: Context)
 	emit(panel, panel, panel.CFrame, Geometry.rear(triple(panel.Size)), color, paintParts, context)
 end
+-- The look a Tyres & Suspension level gives: 0 the stock steel wheel, 1 new tyres (tread rings), 3 alloy rims too.
+local function tyreTier(handling: number): number
+	return if handling >= 3 then 3 elseif handling >= 1 then 1 else 0
+end
+-- Dresses one tyre (in its folder FleetWheel). The tyre's attributes FleetSide (-1 left, 1 right: its outer face) and
+-- FleetInner (a twin tyre inside another: no rim) come from Vehicles; FleetTyres keeps the tier it was dressed for.
 function Builder.wheel(tyre: BasePart, handling: number, context: Context)
+	local tier = tyreTier(handling)
 	local old = tyre:FindFirstChild("FleetWheel"); if old then old:Destroy() end
 	local folder = Instance.new("Folder"); folder.Name = "FleetWheel"; folder.Parent = tyre
-	emit(folder, tyre, tyre.CFrame, Geometry.wheel(tyre.Size.X, tyre.Size.Y / 2, handling >= 3), COLORS.steel, {}, context)
-	if handling >= 1 then
-		tyre.Color = COLORS.tyre
-		local tread: { Geometry.Piece } = {}
-		for _, side in { -1, 1 } do
-			for n = 0, 9 do
-				local a = n * math.pi / 5
-				table.insert(tread, { name = "TreadBlock", size = { tyre.Size.X * .34, .06, tyre.Size.Y * .2 }, at = { side * tyre.Size.X * .23, math.cos(a) * tyre.Size.Y * .49, math.sin(a) * tyre.Size.Y * .49 }, finish = "tyre", turn = { math.deg(a), 0, 0 } })
-			end
-		end
-		emit(folder, tyre, tyre.CFrame, tread, COLORS.tyre, {}, context)
-	end
+	local side = if tyre:GetAttribute("FleetSide") == -1 then -1 else 1
+	emit(folder, tyre, tyre.CFrame, Geometry.wheel(tyre.Size.X, tyre.Size.Y / 2, tier >= 3, side, tyre:GetAttribute("FleetInner") ~= true, tier >= 1), COLORS.steel, {}, context)
+	-- The rim and tread lie inside the tyre's own shadow.
+	for _, p in folder:GetChildren() do if p:IsA("BasePart") then p.CastShadow = false end end
+	if tier >= 1 then tyre.Color = COLORS.tyre end
+	tyre:SetAttribute("FleetTyres", tier)
 end
+-- A kit change dresses again only the tyres whose look changes (the wheels are built once with the car).
 function Builder.fitTyres(model: Model, handling: number, context: Context)
-	for _, p in model:GetChildren() do if p:IsA("BasePart") and p.Name == "Tyre" then Builder.wheel(p, handling, context) end end
+	local tier = tyreTier(handling)
+	for _, p in model:GetChildren() do
+		if p:IsA("BasePart") and p.Name == "Tyre" and p:GetAttribute("FleetTyres") ~= tier then Builder.wheel(p, handling, context) end
+	end
 end
 function Builder.upgrades(model: Model, chassis: BasePart, style: Style, folder: Instance, plow: number, armor: number, engine: number, context: Context)
 	local profile = Builder.profile(model:GetAttribute("FleetStyle") :: string, model:GetAttribute("FleetStage") :: number, style)

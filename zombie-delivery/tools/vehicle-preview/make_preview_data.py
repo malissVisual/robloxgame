@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate compact garage stage snapshots from the audited actual factory export. No asset uploads."""
-import json,sys
+import json,re,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 def catalog(models):
@@ -27,20 +27,50 @@ def catalog(models):
         cars[f"{m['id']}:{m['stage']}"]=parts
     assert len(cars)==20
     return {'colors':colors,'cars':cars}
-def write(models,path):
-    data=json.dumps(catalog(models),separators=(',',':'))
-    path.write_text('''--!strict
+def dump(value):
+    return json.dumps(value,separators=(',',':'))
+def source(data):
+    """The Luau module: one JSON string per car stage (decoded only when the garage shows it) and the shared colours."""
+    rows=''.join(f'\t["{key}"] = [====[{dump(parts)}]====],\n' for key,parts in data['cars'].items())
+    return '''--!strict
 -- Generated true stage geometry for garage ViewportFrames. Regenerate with tools/vehicle-preview/make_preview_data.py.
--- Lazy local JSON decode; no network, uploaded assets, remote requests or replicated preview Models.
+-- One JSON string per car stage, decoded locally only when the garage shows that stage (then kept); no network,
+-- uploaded assets, remote requests or replicated preview Models.
 local HttpService = game:GetService("HttpService")
 local Data = {}
-local decoded: any = nil
-local source = [====['''+data+''']====]
+local COLORS = [====['''+dump(data['colors'])+''']====]
+local CARS: { [string]: string } = {
+'''+rows+'''}
+local colors: any = nil
+local decoded: { [string]: any } = {}
 function Data.get(carId: string, stage: number): (any?, any)
-    if decoded == nil then decoded = HttpService:JSONDecode(source) end
-    return decoded.cars[carId .. ":" .. tostring(stage)], decoded.colors
+	local key = carId .. ":" .. tostring(stage)
+	local text = CARS[key]
+	if text == nil then
+		return nil, nil
+	end
+	if colors == nil then
+		colors = HttpService:JSONDecode(COLORS)
+	end
+	local rows = decoded[key]
+	if rows == nil then
+		rows = HttpService:JSONDecode(text)
+		decoded[key] = rows
+	end
+	return rows, colors
 end
 return Data
-''')
-    print('Garage snapshots:',len(catalog(models)['cars']),'stages;',len(data),'bytes')
+'''
+def parse(text):
+    """The catalog a generated module holds (for the checker)."""
+    colors=json.loads(text.split('local COLORS = [====[',1)[1].split(']====]',1)[0])
+    cars={key:json.loads(body) for key,body in re.findall(r'\t\["([^"]+)"\] = \[====\[(.*?)\]====\],\n',text)}
+    return {'colors':colors,'cars':cars}
+def write(models,path):
+    data=catalog(models)
+    text=source(data)
+    assert parse(text)==json.loads(dump(data)),'generated module does not round-trip'
+    path.write_text(text)
+    largest=max(len(dump(parts)) for parts in data['cars'].values())
+    print('Garage snapshots:',len(data['cars']),'stages;',len(text),'bytes; largest single decode',largest,'bytes')
 if __name__=='__main__':write(json.loads(Path(sys.argv[1]).read_text()),ROOT/'src/shared/VehiclePreviewData.luau')

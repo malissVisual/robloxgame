@@ -490,6 +490,10 @@ function GarageUi.close()
 	if window then
 		window.Visible = false
 	end
+	-- The model preview (a ViewportFrame with a local copy of the car) is not kept while the window is shut.
+	if refs.drawing then
+		VehiclePreview.clear(refs.drawing)
+	end
 end
 
 -- The window's size on this screen: the design size scaled (Ui.screenScale), never wider or taller than the screen.

@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse,subprocess,tempfile,json,re
 from export_fleet import export,prepare_modules,ROOT,HERE
-from make_preview_data import catalog
+from make_preview_data import catalog,parse
 
 def lua(v):
     if isinstance(v,dict):return '{'+','.join('['+lua(k)+']='+lua(x) for k,x in v.items())+'}'
@@ -21,9 +21,10 @@ def main():
             assert (a['id'],a['stage'],a['upgraded'])==(b['id'],b['stage'],b['upgraded'])
             assert a['physics']==b['physics'] and a['capacity']==b['capacity'],(a['id'],a['stage'],'physics changed')
             parts=[p for p in a['parts'] if 'size' in p]
-            assert len(parts)<=450,(a['id'],a['stage'],len(parts),'part budget')
+            # 4.4 review budget: a stage body at most 170 BaseParts (hidden hulls included), its maximum kit 220.
+            assert len(parts)<=(220 if a['upgraded'] else 170),(a['id'],a['stage'],a['upgraded'],len(parts),'part budget')
         source=(ROOT/'src/shared/VehiclePreviewData.luau').read_text()
-        stored=json.loads(source.split('[====[',1)[1].split(']====]',1)[0])
+        stored=parse(source)
         assert json.dumps(stored,sort_keys=True)==json.dumps(catalog(actual),sort_keys=True),'garage snapshots stale: regenerate'
         prepare_modules(temp)
         rows=catalog(actual)
@@ -36,5 +37,5 @@ def main():
         result=subprocess.run([str(Path(args.luau).resolve()),'preview-check.luau'],cwd=temp,text=True,capture_output=True)
         assert result.returncode==0,result.stdout+result.stderr
         print(result.stdout,end='')
-    print('Fleet compatibility PASS: all 20 stages keep original hulls, seats, joint frames, loading attachments and capacities; 40 variants within part budget; garage data matches factory')
+    print('Fleet compatibility PASS: all 20 stages keep original hulls, seats, joint frames, loading attachments and capacities; 40 variants within part budget (body 170, max kit 220); garage data matches factory')
 if __name__=='__main__':main()

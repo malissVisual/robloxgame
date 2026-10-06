@@ -62,8 +62,19 @@ for _,def in Config.Cars do
 			local player=Vehicles.__testBuild(def,Mock.Color3.fromRGB(unpack(def.color)),Mock.CFrame.identity,false,nil,nil,stage)
 			audit(player,false)
 			local invariant = physics(player)
+			local function wheels()
+				local out={}
+				for _,p in player.model:GetChildren() do if p.Name=='Tyre' then out[p]=p:FindFirstChild('FleetWheel') or false end end
+				return out
+			end
+			local stock=wheels()
+			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{},def.id)
+			for tyre,folder in wheels() do assert(folder==stock[tyre],'stock kit dressed the wheels again') end
 			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=5,armor=5,plow=5,trolley=1},def.id)
 			audit(player,false)
+			local fitted=wheels()
+			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=4,armor=3,plow=5,trolley=1},def.id)
+			for tyre,folder in wheels() do assert(folder==fitted[tyre] and (folder==false or folder.Parent==tyre),'a kit change without a new tyre look dressed the wheels again') end
 			for _,upgraded in {false,true} do
 				local levels=if upgraded then {engine=5,handling=5,armor=5,plow=5,trolley=1} else nil
 				local model=Vehicles.displayModel(def,Mock.CFrame.identity,stage,levels)

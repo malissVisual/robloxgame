@@ -104,4 +104,9 @@ function Preview.show(holder: Instance, car: any): boolean
 	camera.Parent, viewport.CurrentCamera = viewport, camera
 	return true
 end
+-- The window closed: drop the viewport and its local model copy (show builds it again on the next open).
+function Preview.clear(holder: Instance)
+	local old = holder:FindFirstChild("VehicleModelPreview")
+	if old then old:Destroy() end
+end
 return Preview

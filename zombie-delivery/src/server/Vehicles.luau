@@ -2097,7 +2097,7 @@ local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style
 			table.insert(paintParts, p)
 		end
 		if model:GetAttribute("FleetArt") then
-			VehicleArt.door(model, p, style :: any, door.side, color, paintParts, primer, { weld = weld, nightLight = DayNight.nightLight })
+			VehicleArt.door(model, p, style :: any, door.side, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
 		end
 		for _, b in door.trim do
 			local t = trimPart(model, "DoorTrim", b, top * CFrame.new(panel.offset + b.offset), p, color, accent)
@@ -2142,7 +2142,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 
 	local polished = not oneBeam and VehicleArt.supports(def.style)
 	if polished then
-		chassis.Transparency = 1
+		-- The chassis stays visible (dark metal): the floor of the cab and the cargo bay under the skin.
 		model:SetAttribute("FleetArt", true)
 		model:SetAttribute("FleetStyle", def.style)
 		model:SetAttribute("FleetStage", stage or 0)
@@ -2194,7 +2194,14 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	end
 
 	if polished then
-		VehicleArt.body(model, chassis, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+		local spans = {}
+		for _, door in doorsOf(style) do
+			local panel = door.panel
+			if panel then
+				table.insert(spans, { side = door.side, front = panel.offset.Z - panel.size.Z / 2, back = panel.offset.Z + panel.size.Z / 2 })
+			end
+		end
+		VehicleArt.body(model, chassis, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight }, spans)
 	end
 
 	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
@@ -2233,6 +2240,11 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		motor:SetAttribute("Radius", style.wheel)
 		motor.Parent = chassis
 		if polished then
+			-- Its outer face (the rim's side); a twin tyre inside another (no collider) shows no rim.
+			tyre:SetAttribute("FleetSide", if offset.X < 0 then -1 else 1)
+			if not collides then
+				tyre:SetAttribute("FleetInner", true)
+			end
 			VehicleArt.wheel(tyre, 0, { weld = weld, nightLight = DayNight.nightLight })
 			return
 		end
