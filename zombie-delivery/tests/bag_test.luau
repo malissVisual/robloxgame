@@ -46,6 +46,24 @@ check("on the e-scooter (1 on the rack): one bouquet", Bag.room("bouquet", "bike
 check("the cargo bike's box takes four", Bag.room("groceries", "bike", 7, 4) == 4)
 check("a car takes its room", Bag.room("bouquet", "car", 6, nil) == 6)
 
+-- 5.3 review: the rack (the bike's own room) only on a bike run, or a foot run while you ride; walking, none.
+check("rack: a bike run has the bike's own room", Bag.rack("bike", false, 5, 3) == 2 and Bag.rack("bike", true, 5, 3) == 2)
+check("rack: a foot run ridden too", Bag.rack("foot", true, 5, 3) == 2)
+check("rack: walking with a bike at home, none", Bag.rack("foot", false, 5, 3) == 0)
+check("rack: no bike, none", Bag.rack("bike", true, nil, 3) == 0 and Bag.rack("foot", true, nil, 3) == 0)
+check("rack: never below 0", Bag.rack("bike", true, 2, 3) == 0)
+check("rack: a car run, none", Bag.rack("car", true, 5, 3) == 0)
+
+-- 5.3 review: hands full of pizzas, a bouquet next (it does not fit the backpack): pizzas go into the backpack first.
+check("makeRoom: two pizzas in hand, hands for two: one goes in", Bag.makeRoom({ "pizza", "pizza" }, 2, 3) == 1)
+check("makeRoom: … a piece that takes both hands: both go in", Bag.makeRoom({ "pizza", "pizza" }, 1, 3) == 2)
+check("makeRoom: … not with the backpack full", Bag.makeRoom({ "pizza", "pizza" }, 2, 0) == 0)
+check("makeRoom: … nor room for only one of two", Bag.makeRoom({ "pizza", "pizza" }, 1, 1) == 0)
+check("makeRoom: a cake in hand does not go in", Bag.makeRoom({ "cake", "cake" }, 2, 3) == 0)
+check("makeRoom: one of each: the pizza goes", Bag.makeRoom({ "cake", "pizza" }, 2, 3) == 1)
+check("makeRoom: a free hand already: nothing", Bag.makeRoom({ "pizza" }, 2, 3) == 0 and Bag.makeRoom({}, 1, 3) == 0)
+check("makeRoom: a horse (no look) never goes in", Bag.makeRoom({ nil }, 1, 3) == 0)
+
 -- The chip and the groups ------------------------------------------------------------------------------
 
 check("nothing carried: no chip", Bag.line({}) == nil and Bag.line(nil) == nil)

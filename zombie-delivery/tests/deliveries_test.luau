@@ -174,6 +174,71 @@ check("dropFor: `allow` keeps the Harbor out", (function()
 	return true
 end)())
 
+-- 5.3 review: a business is on a tier (a car's ★ … ★★★★) only when it delivers somewhere in that tier's range from
+-- its storefront (Deliveries.reaches; server/Jobs.luau ordinaryOffer filters by it): no ★ ice cream to a home 1,700
+-- studs away, no ★★★★ wedding cake that is a short ride.
+check("reaches: Luigi's has homes 100 – 500 studs off", Deliveries.reaches(byId.pizzeria, luigis.park.x, luigis.park.z, 100, 500, nil))
+check("reaches: not 99,000 studs off", not Deliveries.reaches(byId.pizzeria, luigis.park.x, luigis.park.z, 99000, 99999, nil))
+check("reaches: a business without a `to` goes anywhere", Deliveries.reaches(byId.lab, 0, 0, 99000, 99999, nil))
+check("reaches: `allow` keeps the Harbor out", not Deliveries.reaches(byId.hardware, 1302, 270, 0, 400, onFoot))
+local tierProblem: string? = nil
+for _, business in Config.Jobs.Businesses do
+	local venue = Map.venuesOf(business.id)[1]
+	if business.to and venue then
+		for _, tierIndex in business.tiers do
+			local tier = Config.Jobs.Tiers[tierIndex]
+			if not Deliveries.reaches(business, venue.park.x, venue.park.z, tier.minDistance, tier.maxDistance, nil) then
+				tierProblem = `{business.id} on {string.rep("★", tier.stars)}: nowhere {tier.minDistance} – {tier.maxDistance} studs from its storefront`
+			end
+		end
+	end
+end
+check("every business delivers somewhere in the range of every tier it is on", tierProblem == nil, tierProblem)
+check("ice cream is never a ★ job, a wedding cake never ★★★★", not table.find(byId.icecream.tiers, 1) and not table.find(byId.cake.tiers, 4))
+-- Every tier, every role's band (short / long / any), at noon and at night: some open business has somewhere to go.
+for tierIndex, tier in Config.Jobs.Tiers do
+	for _, role in { "short", "long", "any" } do
+		for _, hour in { 3, 12, 21 } do
+			local low, high = JobRules.window(if role == "any" then nil else role, tier.minDistance, tier.maxDistance)
+			local found = false
+			for _, business in Config.Jobs.Businesses do
+				local venue = Map.venuesOf(business.id)[1]
+				if table.find(business.tiers, tierIndex) and Deliveries.open(business, hour)
+					and (not business.to or (venue ~= nil and Deliveries.reaches(business, venue.park.x, venue.park.z, low, high, nil))) then
+					found = true
+				end
+			end
+			if not found then
+				check(`{string.rep("★", tier.stars)} {role} at {hour}:00 has a business with somewhere to go`, false)
+			end
+		end
+	end
+end
+check("every tier and role has a business with somewhere to go, day and night", true)
+-- On foot: a light business is offered only when a home is a walk from its storefront (the Harbor's Frosty's is not).
+check("on foot: Frosty's sends nothing (no home within a walk)", (function()
+	local venue = Map.venuesOf("icecream")[1]
+	return venue ~= nil and not Deliveries.reaches(byId.icecream, venue.park.x, venue.park.z, Config.Jobs.Foot.MinDistance, Config.Jobs.Foot.MaxDistance, onFoot)
+end)())
+
+-- 5.3 review: the board's note when every storefront near you is shut (Deliveries.closedNear, Places.ClosedNote).
+local foot = Config.Jobs.Foot
+local nearReach = (foot.PickupMax + foot.PickupWiden) * 2
+local deep: Map.Home? = nil -- (the Suburbs' far south-west corner: Grind House and Bloom near, both shut at night)
+local deepScore = -math.huge
+for _, home in Map.Homes do
+	if home.district == "suburbs" and home.park.z - home.park.x > deepScore then
+		deep, deepScore = home, home.park.z - home.park.x
+	end
+end
+local suburb = deep :: Map.Home
+check("closedNear: deep in the Suburbs at night, all shut", Deliveries.closedNear(suburb.park.x, suburb.park.z, nearReach, 2, nil))
+check("closedNear: … not at noon", not Deliveries.closedNear(suburb.park.x, suburb.park.z, nearReach, 12, nil))
+check("closedNear: at Luigi's at night something is open", not Deliveries.closedNear(luigis.park.x, luigis.park.z, nearReach, 2, nil))
+check("closedNear: nothing near at all is not 'closed'", not Deliveries.closedNear(90000, 90000, nearReach, 2, nil))
+check("the note names the late ones, and they are open late", string.find(Config.Jobs.Places.ClosedNote, "Downtown", 1, true) ~= nil
+	and Deliveries.open(byId.pizzeria, 2) and Deliveries.open(byId.noodles, 2) and Deliveries.open(byId.burgers, 2))
+
 -- The tutorial: the Post Office is near the depot, a home close to it.
 local post = Map.venuesOf("post")[1]
 check("the Post Office is within the tutorial's pick-up reach of the depot", post ~= nil and Map.manhattan(0, 0, post.park.x, post.park.z) <= Config.Jobs.TutorialPickupMax)
@@ -196,21 +261,27 @@ local function streetsOf(doors: { Deliveries.Door }): number
 	end
 	return n
 end
-for _, case in { { "foot", Round.FootReach }, { "bike", Round.BikeReach } } do
-	local mode, reach = case[1] :: string, case[2] :: number
+for _, case in { { "foot", Round.FootReach, Round.FootRoute }, { "bike", Round.BikeReach, Round.BikeRoute } } do
+	local mode, reach, budget = case[1] :: string, case[2] :: number, case[3] :: number
 	local rr = dice(11)
 	local smallest, largest, mostStreets, totalOk, homesOk = math.huge, 0, 0, true, true
+	local longest, farthest = 0, 0
 	for _ = 1, 30 do
-		local doors = Deliveries.round(news, reach, rr, onFoot)
+		local doors = Deliveries.round(news, reach, rr, onFoot, budget)
 		local papers = 0
 		local seen: { [Map.Home]: boolean } = {}
+		local x, z, route = news.park.x, news.park.z, 0
 		for _, door in doors do
 			papers += door.papers
 			if seen[door.home] or door.papers < 1 then
 				homesOk = false
 			end
 			seen[door.home] = true
+			route += Map.manhattan(x, z, door.home.park.x, door.home.park.z)
+			x, z = door.home.park.x, door.home.park.z
+			farthest = math.max(farthest, Map.manhattan(news.park.x, news.park.z, x, z))
 		end
+		longest = math.max(longest, route)
 		if papers > Round.Papers[2] then
 			totalOk = false
 		end
@@ -218,11 +289,15 @@ for _, case in { { "foot", Round.FootReach }, { "bike", Round.BikeReach } } do
 		largest = math.max(largest, papers)
 		mostStreets = math.max(mostStreets, streetsOf(doors))
 	end
-	print(`  {mode} rounds: {smallest} – {largest} papers, {mostStreets} streets at most`)
+	print(`  {mode} rounds: {smallest} – {largest} papers, {mostStreets} streets at most, routes up to {math.floor(longest)} studs`)
+	check(`{mode}: the route from the print shop stays within {budget} studs (5.3 review)`, longest <= budget, longest)
+	check(`{mode}: every door within {reach} studs of the print shop`, farthest <= reach, farthest)
 	check(`{mode}: a round has {Round.Papers[1]} – {Round.Papers[2]} papers`, totalOk and smallest >= Round.Papers[1], smallest)
 	check(`{mode}: every door once, a paper or more each`, homesOk)
 	check(`{mode}: one or two streets (a third only to fill the bundle)`, mostStreets <= Round.Streets + 1, mostStreets)
 end
+check("a walk's route is shorter than a ride's", Round.FootRoute < Round.BikeRoute and Round.FootRoute <= Config.Jobs.Foot.MaxDistance * 2)
+check("no route budget room: no round", #Deliveries.round(news, Round.FootReach, dice(5), onFoot, 50) == 0)
 check("an apartment entrance takes FlatPapers", (function()
 	for _, door in Deliveries.round(news, Round.BikeReach, dice(3), nil) do
 		if door.home.kind == "apartment" and door.papers ~= Round.FlatPapers and door.papers ~= 1 then

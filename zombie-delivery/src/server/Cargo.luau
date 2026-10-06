@@ -240,6 +240,8 @@ export type Session = {
 	lostBy: { [number]: number }, -- 5.2: stolen or wrecked, by order
 	knocked: boolean, -- 5.3: knocked at this stop's door (the receiver comes out)
 	missBy: { [number]: number }, -- 5.3: newspapers in the bushes, by order
+	anchor: Vector3?, -- 5.3 review: the stop's pile as Jobs gave it (set when built; another job there takes another slot)
+	slot: number, -- … and this job's place beside it (0: right there; Places.SessionGap to a side: build)
 }
 
 export type Status = {
@@ -988,8 +990,15 @@ local function stackHeld(held: Held)
 	end
 end
 
-local function prompt(parent: Instance, action: string, object: string, key: Enum.KeyCode?, hold: number?): ProximityPrompt
+-- 5.3 review: `owner`, the job's owner: the prompt carries their UserId (attribute CargoOwner) and the tag
+-- Config.Cargo.PromptTag, so client/CargoPrompts.luau hides it from everybody outside that job (another courier's pile
+-- at the same storefront never takes your E; the attribute CargoWith on a player lists the jobs they work for).
+local function prompt(parent: Instance, action: string, object: string, key: Enum.KeyCode?, hold: number?, owner: Player?): ProximityPrompt
 	local p = Instance.new("ProximityPrompt")
+	if owner then
+		p:SetAttribute("CargoOwner", owner.UserId)
+		game:GetService("CollectionService"):AddTag(p, Tuning.PromptTag)
+	end
 	p.ActionText = action
 	p.ObjectText = object
 	p.KeyboardKeyCode = key or Enum.KeyCode.E
@@ -1769,7 +1778,7 @@ local function armHands(session: Session, player: Player, held: Held)
 	if horse then
 		local part = horsePart(horse)
 		if part then
-			local letGo = prompt(part, "Let go", "Horse", Enum.KeyCode.G, 0)
+			local letGo = prompt(part, "Let go", "Horse", Enum.KeyCode.G, 0, session.owner)
 			letGo.MaxActivationDistance = 13 -- the horse walks ~9 studs behind
 			made = letGo
 		end
@@ -1778,7 +1787,7 @@ local function armHands(session: Session, player: Player, held: Held)
 		local main = top.model and top.model.PrimaryPart
 		if main then
 			local owner = destName(session, top) -- 4.8, multi-drop: whose it is
-			local down = prompt(main, if count > 1 then "Put one down" else "Put down", `{capital(session.info.piece)}{if owner then ` for {owner}` else ""}`, Enum.KeyCode.G, 0)
+			local down = prompt(main, if count > 1 then "Put one down" else "Put down", `{capital(session.info.piece)}{if owner then ` for {owner}` else ""}`, Enum.KeyCode.G, 0, session.owner)
 			down.MaxActivationDistance = 4 -- only for the one holding it
 			made = down
 		end
@@ -1881,7 +1890,7 @@ local function layDown(session: Session, piece: Piece, frame: CFrame)
 	setDown(model, frame)
 	local main = model.PrimaryPart :: BasePart
 	local owner = piece.owner -- (4.8, multi-drop)
-	local loose: Loose = { piece = piece, prompt = prompt(main, "Pick up", `{capital(session.info.piece)}{if owner then ` for {owner}` else ""}`, nil, holdFor(session)), handle = nil }
+	local loose: Loose = { piece = piece, prompt = prompt(main, "Pick up", `{capital(session.info.piece)}{if owner then ` for {owner}` else ""}`, nil, holdFor(session), session.owner), handle = nil }
 	loose.prompt.Triggered:Connect(function(by)
 		onLoose(session, by, loose)
 	end)
@@ -1926,7 +1935,7 @@ putDown = function(session: Session, player: Player, all: boolean?)
 			handle.CanTouch = false
 			handle.Position = if at.Magnitude > 0 then at + Vector3.new(0, 3, 0) else frame.Position + Vector3.new(0, 3, 0)
 			handle.Parent = folder
-			loose = { piece = piece, prompt = prompt(handle, "Lead", "Horse", nil, holdFor(session)), handle = handle }
+			loose = { piece = piece, prompt = prompt(handle, "Lead", "Horse", nil, holdFor(session), session.owner), handle = handle }
 		else
 			layDown(session, piece, frame)
 			continue
@@ -2025,10 +2034,51 @@ local function handsFull(session: Session, player: Player): boolean
 	return true
 end
 
+-- 5.3 review, on foot: the owner's hands are full of pieces that fit the backpack and the next one (`piece`) does not
+-- (an added order's bouquet while you hold two pizzas): the held ones that fit go into the pack first (while it has
+-- room), so the hands take it.
+local function makeRoom(session: Session, player: Player, piece: Piece?)
+	local held = session.held[player]
+	if not piece or not held or held.tool or not session.info.foot or player ~= session.owner or packTakes(session, { piece }, false) then
+		return
+	end
+	local both = math.min(handsMax(session, player), Freight.handsMax(piece.kind, piece.look, session.info.lift, session.info.pair, nil))
+	local looks: { string? } = {}
+	for _, inHand in held.pieces do
+		table.insert(looks, if inHand.horse then nil else inHand.look)
+	end
+	local need = Bag.makeRoom(looks, both, packFree(session)) -- (0: nothing to do, or it would not help: handsFull says why)
+	if need <= 0 then
+		return
+	end
+	local moved = 0
+	for index = #held.pieces, 1, -1 do
+		if moved >= need then
+			break
+		end
+		local inHand = held.pieces[index]
+		if packFits(inHand) and not inHand.horse then
+			table.remove(held.pieces, index)
+			stash(session, inHand)
+			moved += 1
+		end
+	end
+	if moved == 0 then
+		return
+	end
+	if #held.pieces == 0 then
+		clearHeld(session, player)
+	else
+		armHands(session, player, held)
+	end
+	tell(player, `{if moved == 1 then "One" else tostring(moved)} into your backpack ({#session.pack} / {session.info.pack or 0}): your hands take the {piece.name}.`)
+end
+
 onLoose = function(session: Session, player: Player, loose: Loose)
 	if loose.tool or not allowed(session, player) then
 		return
 	end
+	makeRoom(session, player, loose.piece)
 	if intoPack(session, player, loose.piece) then
 		-- 5.0, on foot: the hands are full, it goes into the owner's pack.
 		local at = table.find(session.loose, loose)
@@ -2188,8 +2238,9 @@ local function handOver(session: Session, player: Player)
 	refresh(session)
 end
 
--- 5.3: a home's door (World's "Door" part of a house, of an apartment entrance) swings open inward for
--- Places.DoorOpen s and shuts again. An entrance's door does not take part in queries: found through its piers.
+-- 5.3: a home's door (World's "Door" part of a house, of an apartment entrance) swings open for Places.DoorOpen s and
+-- shuts again. An entrance's door does not take part in queries: found through its piers. 5.3 review: outward, onto
+-- the porch (the house behind it is solid), and nobody bumps into it meanwhile.
 local function swingDoor(door: Vector3, facing: Vector3)
 	local places = Config.Jobs.Places
 	local found: BasePart? = nil
@@ -2216,15 +2267,18 @@ local function swingDoor(door: Vector3, facing: Vector3)
 	local angle = math.rad(places.DoorSwing)
 	local a = hinge * CFrame.Angles(0, angle, 0) * hinge:Inverse() * shut
 	local b = hinge * CFrame.Angles(0, -angle, 0) * hinge:Inverse() * shut
-	local open = if (a.Position - door):Dot(facing) < (b.Position - door):Dot(facing) then a else b
+	local open = if (a.Position - door):Dot(facing) > (b.Position - door):Dot(facing) then a else b
 	local tweens = game:GetService("TweenService")
+	local solid = part.CanCollide
 	part:SetAttribute("Swinging", true)
+	part.CanCollide = false
 	tweens:Create(part, TweenInfo.new(0.35, Enum.EasingStyle.Quad), { CFrame = open }):Play()
 	task.delay(places.DoorOpen, function()
 		if part.Parent then
 			tweens:Create(part, TweenInfo.new(0.4, Enum.EasingStyle.Quad), { CFrame = shut }):Play()
 		end
 		task.delay(0.5, function()
+			part.CanCollide = solid
 			part:SetAttribute("Swinging", nil)
 		end)
 	end)
@@ -2245,7 +2299,8 @@ local function knock(session: Session, plan: Plan)
 	swingDoor(door, plan.facing)
 	local visit = session.visit
 	task.delay(Config.Jobs.Places.KnockDelay, function()
-		if session.ended or session.visit ~= visit or session.person then
+		-- (5.3 review: already handed over meanwhile, left at the door: nobody steps out any more)
+		if session.ended or session.visit ~= visit or session.person or (session.moved > 0 and session.moved >= neededNow(session)) then
 			return
 		end
 		local at = door + plan.facing * 1.3
@@ -2259,9 +2314,11 @@ local function knock(session: Session, plan: Plan)
 	end)
 end
 
--- 5.3, a newspaper round's door (Plan.toss): a paper for here out of the owner's satchel, tossed in an arc from where
--- they stand onto the porch. From farther than Round.SureToss it may land in the bushes (JobRules.tossMiss): it still
--- counts, as a miss (the round's tip goes, Jobs).
+-- 5.3, a newspaper round's door (Plan.toss): a paper for here out of your hands (5.3 review: a paper picked up off
+-- the ground) or the owner's satchel, tossed in an arc from where you stand onto the porch. From farther than
+-- Round.SureToss it may land in the bushes (JobRules.tossMiss): it still counts, as a miss (the round's tip goes, Jobs).
+-- 5.3 review, checked here: farther than Round.TossRange (+ 2) from the porch, or no body, no toss; a wall, a house or
+-- a car between you and the porch (a ray from you to it) and it lands in the bushes.
 local function toss(session: Session, player: Player)
 	local plan = session.plan
 	if not plan then
@@ -2271,27 +2328,85 @@ local function toss(session: Session, player: Player)
 		tell(player, `{plan.place or "This door"} has its paper.`)
 		return
 	end
-	if player ~= session.owner then
-		tell(player, "The papers are in the courier's satchel.")
+	local round = Config.Jobs.Round
+	local root = rootOf(player.Character)
+	if not root or flat(root.Position, plan.pile) > round.TossRange + 2 then
+		tell(player, `Too far: walk up to {plan.place or "the house"} and toss it from closer.`)
 		return
 	end
-	local at: number? = nil
-	for index = #session.pack, 1, -1 do
-		if forHere(session, session.pack[index]) then
-			at = index
-			break
+	local held = session.held[player]
+	local inHand: number? = nil
+	if held and not held.tool then
+		for index = #held.pieces, 1, -1 do
+			if forHere(session, held.pieces[index]) then
+				inHand = index
+				break
+			end
 		end
 	end
-	if not at then
-		tell(player, "No paper for this door in your satchel.")
+	local at: number? = nil
+	if not inHand and player == session.owner then
+		for index = #session.pack, 1, -1 do
+			if forHere(session, session.pack[index]) then
+				at = index
+				break
+			end
+		end
+	end
+	if not inHand and not at then
+		tell(player, if player == session.owner then "No paper for this door in your satchel." else "The papers are in the courier's satchel.")
 		return
 	end
-	local piece = table.remove(session.pack, at) :: Piece
+	local piece: Piece
+	if inHand and held then
+		piece = table.remove(held.pieces, inHand) :: Piece
+		if #held.pieces == 0 then
+			clearHeld(session, player)
+		else
+			armHands(session, player, held)
+		end
+		if piece.model then
+			piece.model:Destroy() -- (a new one flies)
+			piece.model = nil
+		end
+	else
+		piece = table.remove(session.pack, at :: number) :: Piece
+	end
 	session.moved += 1
 	countDelivered(session, piece)
-	local root = rootOf(player.Character)
-	local from = if root then root.Position else plan.pile + Vector3.new(0, 3, 0)
+	local from = root.Position
 	local miss = rng:NextNumber() < JobRules.tossMiss(flat(from, plan.pile))
+	if not miss then
+		-- (only the world: the people, the cargo and the stop's props let it through)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local skip: { Instance } = { folder }
+		for _, other in Players:GetPlayers() do
+			if other.Character then
+				table.insert(skip, other.Character)
+			end
+		end
+		for _, prop in session.props do
+			table.insert(skip, prop)
+		end
+		params:AddToFilter(skip)
+		local target = plan.pile + Vector3.new(0, 2.5, 0) -- (over a porch step)
+		for _ = 1, 4 do
+			local hit = workspace:Raycast(from, target - from, params)
+			if not hit or (hit.Position - target).Magnitude <= 2 then
+				break
+			end
+			local model = hit.Instance:FindFirstAncestorOfClass("Model")
+			if model and model:FindFirstChildOfClass("Humanoid") then
+				params:AddToFilter(model) -- (a walker, a receiver: it flies over them)
+			elseif hit.Instance.CanCollide then
+				miss = true -- (a wall, a car, a fence between you and the porch)
+				break
+			else
+				params:AddToFilter(hit.Instance)
+			end
+		end
+	end
 	local right = plan.facing:Cross(Vector3.yAxis)
 	local land = plan.pile - plan.facing * 1.2
 	if miss then
@@ -2356,7 +2471,11 @@ local function onPile(session: Session, player: Player)
 		session.info.changed()
 		return
 	end
-	if plan.bundle and session.info.foot and player == session.owner and #session.pile > 0 then
+	if plan.bundle and player ~= session.owner then
+		tell(player, "The bundle goes in the courier's satchel.") -- 5.3 review: the round's papers are the owner's
+		return
+	end
+	if plan.bundle and session.info.foot and #session.pile > 0 then
 		-- 5.3, the newspaper round: the whole bundle into your satchel at once.
 		local count = #session.pile
 		while #session.pile > 0 do
@@ -2369,6 +2488,7 @@ local function onPile(session: Session, player: Player)
 		session.info.changed()
 		return
 	end
+	makeRoom(session, player, session.pile[#session.pile])
 	if intoPack(session, player, session.pile[#session.pile]) then
 		-- 5.0, on foot: the hands are full, the next piece goes into the owner's pack.
 		local piece = table.remove(session.pile)
@@ -2562,7 +2682,7 @@ local function attachCar(session: Session, old: Vehicles.Car?)
 	if not door then
 		return
 	end
-	local p = prompt(door, "Load", "", nil, holdFor(session))
+	local p = prompt(door, "Load", "", nil, holdFor(session), session.owner)
 	p.MaxActivationDistance = 9
 	p.Triggered:Connect(function(player)
 		onCar(session, player)
@@ -2578,8 +2698,31 @@ local function build(session: Session)
 		return
 	end
 	session.built = true
-	local base = onGround(plan.pile)
 	local right = plan.facing:Cross(Vector3.yAxis)
+	-- 5.3 review: another live job whose stop is here too (two couriers at Luigi's): this one's pile, its clerk and its
+	-- pieces go Places.SessionGap to the side (the first free slot: 0, right, left, twice as far right …).
+	session.anchor = plan.pile
+	local taken: { [number]: boolean } = {}
+	for _, other in active do
+		local there = other.anchor
+		if other ~= session and not other.ended and other.built and there and flat(there, plan.pile) < 2 then
+			taken[other.slot] = true
+		end
+	end
+	local slot = 0
+	while taken[slot] do
+		slot = if slot > 0 then -slot else -slot + 1
+	end
+	session.slot = slot
+	if slot ~= 0 and plan.mode ~= "pallet" and not plan.toss then
+		local shift = right * slot * Config.Jobs.Places.SessionGap
+		plan.pile += shift
+		local personAt = plan.personAt
+		if personAt then
+			plan.personAt = personAt + shift
+		end
+	end
+	local base = onGround(plan.pile)
 	-- 5.3: a storefront's cook / clerk stands in the doorway (Plan.personAt); at a home the receiver is inside until
 	-- you knock (knock); a newspaper round's door has nobody to meet.
 	if plan.person and not plan.door and not plan.toss then
@@ -2601,7 +2744,7 @@ local function build(session: Session)
 			setDown(model, palletSpot(plan, n))
 			piece.model = model
 			local main = model.PrimaryPart :: BasePart
-			local loose: Loose = { piece = piece, prompt = prompt(main, "Lift pallet", "Pallet", nil, holdFor(session)), handle = nil, tool = nil }
+			local loose: Loose = { piece = piece, prompt = prompt(main, "Lift pallet", "Pallet", nil, holdFor(session), session.owner), handle = nil, tool = nil }
 			loose.prompt.MaxActivationDistance = Tuning.PromptDistance - 2
 			loose.prompt.Triggered:Connect(function(by)
 				onLoose(session, by, loose)
@@ -2639,7 +2782,7 @@ local function build(session: Session)
 			elseif plan.toss then "Toss newspaper" -- 5.3
 			elseif plan.nobody then "Leave at the door"
 			else "Hand over"
-		local p = prompt(part, action, plan.place or "", nil, holdFor(session))
+		local p = prompt(part, action, plan.place or "", nil, holdFor(session), session.owner)
 		p.MaxActivationDistance = if plan.toss then Config.Jobs.Round.TossRange else Tuning.PromptDistance + 2
 		p.Triggered:Connect(function(player)
 			onPile(session, player)
@@ -2931,6 +3074,8 @@ function Cargo.begin(owner: Player, info: Info): Session
 		lostBy = {},
 		knocked = false,
 		missBy = {},
+		anchor = nil,
+		slot = 0,
 	}
 	active[owner] = session
 	packShown(session)
@@ -2985,6 +3130,8 @@ function Cargo.setStop(session: Session, plan: Plan, replace: boolean?)
 	session.customers = false
 	session.nextKid = 0
 	session.knocked = false
+	session.anchor = nil
+	session.slot = 0
 	refresh(session)
 end
 
@@ -3096,11 +3243,23 @@ function Cargo.update(session: Session, dt: number)
 			say(session.person, if plan.stage == "pickup" then "Over here! We've been holding out for days!" else "Bring them in, we've got beds ready!")
 		end
 	end
-	-- 5.3: at a home's door you knock (the receiver comes out).
+	-- 5.3: at a home's door you knock (the receiver comes out). 5.3 review: the owner or any crew mate.
 	local door = plan.door
-	if session.built and door and not session.knocked and plan.stage == "drop" and position and flat(position, door) < Config.Jobs.Places.KnockRange then
-		session.knocked = true
-		knock(session, plan)
+	if session.built and door and not session.knocked and plan.stage == "drop" then
+		local near = position ~= nil and flat(position, door) < Config.Jobs.Places.KnockRange
+		if not near then
+			for _, player in Players:GetPlayers() do
+				local root = rootOf(player.Character)
+				if player ~= session.owner and root and flat(root.Position, door) < Config.Jobs.Places.KnockRange and session.info.allowed(player) then
+					near = true
+					break
+				end
+			end
+		end
+		if near then
+			session.knocked = true
+			knock(session, plan)
+		end
 	end
 	if plan.mode == "board" then
 		updateBoard(session, plan, os.clock())
@@ -4090,7 +4249,7 @@ function Cargo.start()
 					local model = piece.model or buildPiece(piece)
 					piece.model = model
 					local main = model.PrimaryPart :: BasePart
-					local loose: Loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece), nil, holdFor(session)), handle = nil, tool = tool }
+					local loose: Loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece), nil, holdFor(session), session.owner), handle = nil, tool = tool }
 					loose.prompt.Enabled = false
 					loose.prompt.Triggered:Connect(function(by)
 						onLoose(session, by, loose)
@@ -4148,6 +4307,28 @@ function Cargo.start()
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		lastPut[player] = nil
+	end)
+
+	-- 5.3 review: who works for which job, for client/CargoPrompts.luau (it hides the prompts of the others' jobs):
+	-- the player attribute CargoWith, ",<owner UserId>,<…>," of every running job that allows them (the owner, the
+	-- riders, the crew), nil for none. Twice a second.
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			for _, player in Players:GetPlayers() do
+				local ids: { number } = {}
+				for owner, session in active do
+					if not session.ended and owner.Parent ~= nil and session.info.allowed(player) then
+						table.insert(ids, owner.UserId)
+					end
+				end
+				table.sort(ids)
+				local with = if #ids > 0 then "," .. table.concat(ids, ",") .. "," else nil
+				if player:GetAttribute("CargoWith") ~= with then
+					player:SetAttribute("CargoWith", with)
+				end
+			end
+		end
 	end)
 end
 
