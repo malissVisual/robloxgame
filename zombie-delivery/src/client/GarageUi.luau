@@ -3,8 +3,8 @@
 --
 --   * The garage window (the "Garage" remote, server/Garages.luau): opened by the 🅿 GARAGE prompt at one of your
 --     garages (or the depot lot's terminal). It closes when you walk away, when another window opens, with ✕ or ESC.
---     3.8 (the contract UI, design/ui-contract/): the charcoal window. On the left a drawing of the selected car (its
---     silhouette by style, in its own colour; no new assets), its role, and two boxes: the cargo capacity and the free
+--     3.8 (the contract UI, design/ui-contract/): the charcoal window. On the left a cached 3D preview of the selected owned car
+--     (its current model and kit when live; otherwise its stage and paint, no uploaded assets), its role, and two boxes: the cargo capacity and the free
 --     garage slots. On the right every car you own as a flat row (the shown one with the red rule): the name, an ACTIVE /
 --     PARKED HERE / IN ANOTHER GARAGE tag, the cargo slots and upgrades, the vehicle condition with a bar, and the
 --     action: TAKE OUT VEHICLE for a car kept here (the one you drive is parked in its place), FIND REPAIR BAY for the
@@ -29,6 +29,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Hud = require(script.Parent.Hud)
 local MapView = require(script.Parent.MapView)
+local VehiclePreview = require(script.Parent.VehiclePreview)
 
 local C = Ui.Colors
 local P = Theme.Postage -- 3.8: remapped to the contract values (see Theme)
@@ -125,7 +126,9 @@ end
 
 -- Draws the car `carId` in `holder` (cleared first): a soft shadow, the body in the car's colour with a darker lower
 -- band, the cab, the windows in ink, the wheels and a cream headlight.
-local function drawCar(holder: Instance, carId: string)
+local function drawCar(holder: Instance, car: any)
+	if VehiclePreview.show(holder, car) then return end
+	local carId = tostring(car.id)
 	Ui.clear(holder)
 	local def = Economy.findCar(carId)
 	local shape = SHAPES[STYLE_SHAPE[if def then def.style else ""] or "van"]
@@ -425,7 +428,7 @@ render = function()
 	-- The left side: the car shown.
 	local shown = shownCar(cars)
 	if shown then
-		drawCar(refs.drawing, tostring(shown.id))
+		drawCar(refs.drawing, shown)
 		local def = Economy.findCar(tostring(shown.id))
 		refs.carName.Text = tostring(shown.name)
 		refs.caption.Text = string.upper(if def and def.role then def.role else "")

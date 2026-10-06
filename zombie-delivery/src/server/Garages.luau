@@ -157,6 +157,8 @@ local function stateFor(player: Player, at: string, open: boolean): { [string]: 
 		local levels = Economy.carLevels(profile.carUpgrades, def.id)
 		table.insert(cars, {
 			id = def.id,
+			stage = Economy.stageOf(def.id, levels), -- visual metadata only; server still owns progression
+			paint = profile.carPaint[def.id],
 			name = Economy.carTitle(def.id, levels), -- 3.5: with its stage ("Old Van · Work Van")
 			capacity = Economy.capacity(def.id, levels),
 			health = healthOf(player, def.id),
