@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · 5.x bikes, separate wheel/crank skins, gear and Spoke & Chain blueprint · server/BikeArt/, server/BuildingLooks/BikeShop.luau, shared ModelArt/tooling foundation, art/icons/bike_*, gear_*, map_bikes, design/bike-models/ · since 2026-10-06
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
