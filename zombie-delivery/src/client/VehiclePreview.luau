@@ -36,7 +36,7 @@ local function snapshot(rows: any, colors: any, paintId: string?): Model
 			p.Color = Color3.fromRGB(c[1], c[2], c[3])
 			if paint.material then
 				local material = (Enum.Material :: any)[paint.material]
-				if typeof(material) == "EnumItem" then p.Material = material end
+				if typeof(material) == "EnumItem" then p.Material = material :: Enum.Material end
 			end
 			if p.Material == Enum.Material.Neon then p.Color = p.Color:Lerp(Color3.new(0, 0, 0), .35) end
 			p.Reflectance = if p.Material == Enum.Material.Glass then .25 elseif p.Material == Enum.Material.Foil then .1 else 0

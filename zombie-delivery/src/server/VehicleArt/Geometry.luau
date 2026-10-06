@@ -151,7 +151,7 @@ function Geometry.body(p: Profile): { Piece }
 		add(out, "SpareHub", { .6, .95, .95 }, { 0, p.cargoTop + .9, p.cargoBack - 2.0 }, "steel", { 0, 0, 90 }, "Cylinder")
 	end
 	if truck or p.id == "highroof" then
-		local top = if p.id == "freighttruck" then 9.1 else math.min(p.cargoTop - .15, p.cabTop + 1.35)
+		local top = if (p.id :: string) == "freighttruck" then 9.1 else math.min(p.cargoTop - .15, p.cabTop + 1.35)
 		local rise = top - p.cabTop
 		if rise > .1 then add(out, "WindDeflector", { p.cabWidth - .5, rise, cabLength * .55 }, { 0, p.cabTop + rise / 2, p.cabBack - cabLength * .28 }, "paint", nil, "Wedge") end
 	end

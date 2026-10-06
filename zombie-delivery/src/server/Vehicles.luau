@@ -1838,7 +1838,7 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	local hull = hullOf(style)
 
 	if model:GetAttribute("FleetArt") then
-		VehicleArt.upgrades(model, chassis, style, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
+		VehicleArt.upgrades(model, chassis, style :: any, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
 	else
 	-- Ram Plow: a bull bar in front of the nose, wider, thicker and lower-reaching with every level.
 	if plow >= 1 then
@@ -2097,7 +2097,7 @@ local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style
 			table.insert(paintParts, p)
 		end
 		if model:GetAttribute("FleetArt") then
-			VehicleArt.door(model, p, style, door.side, color, paintParts, primer, { weld = weld, nightLight = DayNight.nightLight })
+			VehicleArt.door(model, p, style :: any, door.side, color, paintParts, primer, { weld = weld, nightLight = DayNight.nightLight })
 		end
 		for _, b in door.trim do
 			local t = trimPart(model, "DoorTrim", b, top * CFrame.new(panel.offset + b.offset), p, color, accent)
@@ -2194,7 +2194,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	end
 
 	if polished then
-		VehicleArt.body(model, chassis, top, style, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+		VehicleArt.body(model, chassis, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
 	end
 
 	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
