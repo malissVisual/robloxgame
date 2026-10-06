@@ -7,6 +7,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/kit-models` · 5.x backpacks (13/14 loaded, bigpack 16), shoes (4/foot), jacket (13), cart (21 including roots), pure `KitArt/Geometry`, reusable `ModelArt/Builder`, 5 PNG/SVG kit icons; actual renders + handoff in `design/kit-models/`. Required suite/compiles and real-builder budget/weld/cleanup/icon checks pass, including unanchored skins on display roots; straps clear the vest. Studio: R15 scaling, carry/sit poses, vest/pack layering, shoes, cart grips/deck/wheels; art only, Claude wires gameplay.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
