@@ -837,7 +837,9 @@ local function renderShop()
 			local c = card(shop.body, 100, order + 1, def.id == shopFocus)
 			local lock = if state.cars[def.id] then nil else lockedAt(def.level)
 			local need = needs(def, state.cars[def.id] == true)
-			cardText(c, def.name, carStats(def) .. (if lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
+			-- 5.0: the Old Van is sold privately (Config.VanQuest: Earl, Marge's quest), not here.
+			local private = def.id == Config.VanQuest.Car and not state.cars[def.id]
+			cardText(c, def.name, carStats(def) .. (if private then ` · {Config.VanQuest.DealerNote}` elseif lock then ` · from level {lock}` else "") .. (if need then ` · {need}` else ""), def.description)
 			if def.role then
 				Ui.label(c, `ROLE · {string.upper(def.role)}`, UDim2.new(1, -206, 0, 16), { Position = UDim2.fromOffset(16, 78), TextColor3 = P.ink2, TextSize = 11, Font = Theme.HeadingFont })
 			end
@@ -848,6 +850,12 @@ local function renderShop()
 				cardButton(c, "IN GARAGE", C.grey, true, function()
 					Hud.toast("Switch cars at one of your garages (🅿 GARAGE), or at the depot lot for your starting van.")
 				end)
+			elseif private then
+				local sold = cardButton(c, "🔒 SOLD PRIVATELY", C.grey, true, function()
+					Hud.toast(`{Config.VanQuest.DealerNote} {Config.VanQuest.Seller} sells it at {Config.VanQuest.Place}, far out west.`)
+				end)
+				sold.TextSize = 12
+				sold.TextColor3 = P.ink2
 			elseif lock then
 				lockButton(c, lock)
 			elseif need then
@@ -956,7 +964,7 @@ local function renderShop()
 				note(shop.body, `Upgrades for: {Economy.carTitle(state.car, carLevels)} (📦 {Economy.capacity(state.car, carLevels)} cargo slots). They stay on this car and show on it (new tyres and rims, a bull bar, plates, a scoop); a STAGE rebuilds the car itself, the trolley and the other gear are in GEAR. Repairs: drive into a repair bay here, get out and wait.`, C.dim, 1)
 			else
 				-- 5.0: on foot, no vehicle yet
-				note(shop.body, if upCar then `Your {upCar.name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.` else "You don't have a vehicle yet: the Old Van is sold at Dead End Motors from level 4.", C.red, 1)
+				note(shop.body, if upCar then `Your {upCar.name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.` else `You don't have a vehicle yet: the Old Van comes from {Config.VanQuest.Where}.`, C.red, 1)
 			end
 			local row = 1
 			-- 3.5: the STAGE card: the car's next stage (its new look, its room, before → after) or its last one.
@@ -2563,7 +2571,11 @@ function view.tickTicket(distance: number?)
 	local done = tonumber(job.delivered) or 0
 	local lost = tonumber(job.lost) or 0
 	local condition = tonumber(job.condition) or 1
-	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}`
+	-- 5.0, on foot: the backpack ("Backpack 1/2"; the PackCount / PackRoom attributes are live, the payload's pack
+	-- and packRoom the fallback).
+	local packRoom = if job.mode == "foot" then tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0 else 0
+	local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
+	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{packed}/{packRoom}`
 	if signature == t.meta0 then
 		return
 	end
@@ -2579,6 +2591,9 @@ function view.tickTicket(distance: number?)
 		add(if done >= needed then "done" else "todo", `{t.action}: {math.min(done, needed)} of {needed} {if needed == 1 then cargo.one else cargo.many} {verb}`)
 	else
 		add("todo", tostring(t.action))
+	end
+	if packRoom > 0 then
+		add(if packed >= packRoom then "warn" else "quiet", `🎒 Backpack {packed}/{packRoom}{if packed >= packRoom then " · full" else ""}`)
 	end
 	local modifier = job.modifier
 	if type(modifier) == "table" and modifier.name then

@@ -32,6 +32,9 @@
 -- pedestrians cross) and the traffic lights at the districts' four-way junctions (shared/Crossings.luau; see
 -- "Crosswalks and traffic lights" below).
 --
+-- Zombie Delivery 5.0: Earl's Used Wheels far out on the West Highway (Map.VanSeller; see "Earl's Used Wheels" below),
+-- where Earl sells his old van (World.VanSeller: Earl and his prompt; server/VanQuest.luau).
+--
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
 -- (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
@@ -5194,7 +5197,8 @@ local function buildRoadWrecks(parent: Instance)
 				return true
 			end
 		end
-		return false
+		local lot = Map.VanSeller -- 5.0: Earl's gate (the van you buy there drives out onto the highway)
+		return (x - lot.x) ^ 2 + (z - lot.z) ^ 2 < 90 * 90
 	end
 	for _ = 1, 200 do
 		if placed >= 40 then
@@ -5417,6 +5421,96 @@ local function setLighting()
 	terrain.WaterWaveSize = 0.1
 end
 
+-- ── Earl's Used Wheels (5.0) ───────────────────────────────────────────────
+-- Far out west on the West Highway (Map.Yards "earl", Map.VanSeller; Config.VanQuest): a dusty lot behind a rail
+-- fence open to the highway in the middle, the name board by the road, Earl's rusty shed at the back with tyres and
+-- drums, two junk cars, a hand-painted CHEAP VANS board and the FOR SALE plate where Earl's old van stands (the van is
+-- server/VanQuest.luau's: a display model of the real car). Earl stands beside it with the "Buy the van" prompt
+-- (World.VanSeller; server/VanQuest.luau answers it). Built last: its junk cars draw from the world's random numbers
+-- after everything else has.
+World.VanSeller = { npc = nil :: Model?, prompt = nil :: ProximityPrompt? }
+
+local function buildVanLot(parent: Instance)
+	local VanQuestRules = require(Shared.VanQuest)
+	local lot = folder(parent, "EarlsUsedWheels")
+	local yard = yardOf("earl")
+	local seller = Map.VanSeller
+	local top = ROAD_TOP
+	local wood = Color3.fromRGB(122, 96, 66)
+	local road = Vector3.new(seller.facing.x, 0, seller.facing.z)
+	yardFloor(lot, yard, Color3.fromRGB(150, 128, 96), Enum.Material.Ground)
+	-- The fence: the sides and the back, the front open between the two vans' lanes (the way onto the highway).
+	local front = yard.z1 - 1
+	local gate0, gate1 = seller.x - 24, seller.parking.x + 24
+	fence(lot, yard.x0, front, yard.x0, yard.z0, top, 4, wood, 2)
+	fence(lot, yard.x0, yard.z0, yard.x1, yard.z0, top, 4, wood, 2)
+	fence(lot, yard.x1, yard.z0, yard.x1, front, top, 4, wood, 2)
+	fence(lot, yard.x0, front, gate0, front, top, 4, wood, 2)
+	fence(lot, gate1, front, yard.x1, front, top, 4, wood, 2)
+	-- The name board on two poles in the front corner, readable from both ways of the highway.
+	local boardX = (yard.x0 + gate0) / 2
+	for _, dx in { -7.5, 7.5 } do
+		part(lot, "SignPole", Vector3.new(0.6, 14, 0.6), CFrame.new(boardX + dx, top + 7, front - 3), Color3.fromRGB(90, 70, 50), Enum.Material.Wood)
+	end
+	local at = Vector3.new(boardX, top + 12.5, front - 3)
+	sign(lot, "EARL'S USED WHEELS  CHEAP VANS · NO REFUNDS", Vector3.new(17, 4.5, 0.3), CFrame.lookAt(at + road * 0.2, at + road * 2), Color3.fromRGB(255, 220, 120), nil, "earl")
+	sign(lot, "EARL'S USED WHEELS  CHEAP VANS · NO REFUNDS", Vector3.new(17, 4.5, 0.3), CFrame.lookAt(at - road * 0.2, at - road * 2), Color3.fromRGB(255, 220, 120), nil, "earl")
+	-- Hand-painted: a board on the fence by the gate.
+	local painted = CFrame.lookAt(Vector3.new(gate1 + 9, top + 3.4, front + 0.4), Vector3.new(gate1 + 9, top + 3.4, front + 2))
+	sign(lot, "CHEAP VANS!", Vector3.new(9, 2.2, 0.2), painted, Color3.fromRGB(178, 38, 30), Color3.fromRGB(232, 222, 196))
+	-- Earl's shed at the back (its door toward the road), tyres and oil drums by it.
+	local shedAt = Vector3.new(yard.x1 - 26, top, yard.z0 + 14)
+	building(lot, CFrame.lookAt(shedAt, shedAt + road), 18, 12, 9, Color3.fromRGB(128, 84, 58), Enum.Material.CorrodedMetal, 5, 7)
+	for n = 0, 2 do
+		deco(cylinder(lot, "Tire", 1.4, 3.6, CFrame.new(shedAt + Vector3.new(-13, 0.7 + n * 1.4, 2)) * UPRIGHT, Color3.fromRGB(28, 28, 28), Enum.Material.Rubber)).CanCollide = true
+	end
+	barrel(lot, shedAt + Vector3.new(11, 0, 4), Color3.fromRGB(150, 60, 40))
+	barrel(lot, shedAt + Vector3.new(11, 0, 7), Color3.fromRGB(70, 90, 130))
+	-- Two junk cars nobody will ever buy.
+	wreck(lot, CFrame.new(yard.x0 + 18, top, yard.z0 + 22) * CFrame.Angles(0, 0.35, 0), Color3.fromRGB(110, 90, 60))
+	wreck(lot, CFrame.new(yard.x1 - 14, top, front - 22) * CFrame.Angles(0, 1.35, 0), Color3.fromRGB(70, 74, 80))
+	for _, junk in lot:GetChildren() do
+		local body = if junk.Name == "Wreck" then junk:FindFirstChild("Body") else nil
+		if body then
+			for _, burning in body:GetChildren() do
+				if burning:IsA("Fire") or burning:IsA("PointLight") then
+					burning:Destroy() -- (dusty, not burning: Earl would not sell next to a fire)
+				end
+			end
+		end
+	end
+	-- The FOR SALE plate on a stake in front of the van for sale (its nose is toward the road).
+	local plate = Vector3.new(seller.x - 9, top, seller.z + 12)
+	part(lot, "PlateStake", Vector3.new(0.4, 4, 0.4), CFrame.new(plate + Vector3.new(0, 2, 0)), wood, Enum.Material.Wood)
+	local plateFrame = CFrame.lookAt(plate + Vector3.new(0, 4.2, 0.25), plate + Vector3.new(0, 4.2, 0.25) + road)
+	sign(lot, `FOR SALE {VanQuestRules.priceText()}`, Vector3.new(6, 1.8, 0.2), plateFrame, Color3.fromRGB(178, 38, 30), Color3.fromRGB(240, 236, 220))
+	lamp(lot, seller.x + 22, yard.z0 + 30, top, Vector3.new(0, 0, 1))
+	-- Earl, by his van, and the prompt to buy it (on Earl; on the plate's stake when no person could be made).
+	local earl = seller.earl
+	local feet = Vector3.new(earl.x, top, earl.z)
+	local ok, err = pcall(function()
+		local look = Npcs.look("townsperson", Config.VanQuest.Seller, `Used vans · {Config.VanQuest.Place}`)
+		look.hat, look.hatColor = "cap", { 170, 42, 36 }
+		look.hair = { 200, 200, 196 }
+		look.shirt, look.pants, look.vest = { 150, 66, 52 }, { 70, 82, 104 }, { 92, 72, 52 }
+		World.VanSeller.npc = Npcs.spawn(look, CFrame.lookAt(feet, feet + road))
+	end)
+	if not ok then
+		warn(`[World] no Earl at his lot: {err}`)
+	end
+	local npc = World.VanSeller.npc
+	local holder: BasePart = (if npc and npc.PrimaryPart then npc.PrimaryPart else lot:FindFirstChild("PlateStake")) :: BasePart
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "VanSellerPrompt"
+	p.ActionText = VanQuestRules.promptText()
+	p.ObjectText = Config.VanQuest.Seller
+	p.HoldDuration = 0.5
+	p.MaxActivationDistance = 10
+	p.RequiresLineOfSight = false
+	p.Parent = holder
+	World.VanSeller.prompt = p
+end
+
 function World.build()
 	-- A fresh Baseplate place: its plate and spawn would sit inside the city.
 	for _, child in workspace:GetChildren() do
@@ -5509,6 +5603,9 @@ function World.build()
 	-- on the map you discover; client/MapView.luau, server/Explore.luau.)
 	piece("lost packages", function()
 		buildSecrets(world)
+	end)
+	piece("Earl's Used Wheels", function()
+		buildVanLot(world) -- 5.0
 	end)
 	piece("lighting", setLighting)
 end

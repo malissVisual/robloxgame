@@ -209,7 +209,7 @@ local function refusal(player: Player, def: MissionData.MissionDef): string?
 	-- 5.0: the missions and the campaigns need a vehicle of your own (you start on foot).
 	local carId = profile.car
 	if not carId then
-		return "Missions need a vehicle of your own: the Old Van at Dead End Motors (level 4)."
+		return Config.VanQuest.MissionsNeed
 	end
 	-- 3.4: the pieces must fit your car (a mission that lends a vehicle brings its own room).
 	local need = Economy.cargoNeed(def.load, def.items)

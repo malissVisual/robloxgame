@@ -193,7 +193,7 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 			pages = {
 				`Delivered! Nice work, courier. There's ${reward} on top from me.`,
 				"Buy a backpack at Last Stop Supplies: you carry more on foot. Then save up for a bike: the bike shop opens at level 2.",
-				"New jobs land on the board (J) every few minutes, the ON FOOT ones on top. At level 4 the Old Van is yours to buy. Hold Q to pick a gun, and explore: the map fills in as you go.",
+				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Hold Q to pick a gun, and explore: the map fills in as you go.`,
 			},
 			primary = "GOT IT",
 		}

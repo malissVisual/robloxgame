@@ -98,7 +98,8 @@ function Career.unlocksAt(level: number): { Unlock }
 			continue
 		end
 		if (def.level or 1) == level then
-			add(list, "car", def.id, def.name)
+			-- 5.0: the Old Van is not the dealer's: "Old Van: Earl's Used Wheels (Marge's quest at level 4)".
+			add(list, "car", def.id, if def.id == Config.VanQuest.Car then `{def.name}: {Config.VanQuest.Where}` else def.name)
 		end
 		local stages: { Config.StageDef } = def.stages or {}
 		for n, stage in stages do

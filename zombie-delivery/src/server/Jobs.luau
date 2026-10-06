@@ -880,6 +880,11 @@ local function footOffer(from: Vector3, role: string?, room: number, tutorial: b
 		-- (none that close, the depot's safe zone has no addresses: a little farther, not always the same one)
 		pickup = addressAround(from.X, from.Z, foot.PickupMin, pickupMax + foot.PickupWiden, 0, {}, allow)
 	end
+	-- 5.0: addressAround falls back to the closest address at any distance: out in the country (far from Downtown and
+	-- the Suburbs) there is no foot job at all, not a walk across the map.
+	if pickup and Map.manhattan(from.X, from.Z, pickup.x, pickup.z) > pickupMax + foot.PickupWiden then
+		pickup = nil
+	end
 	if not pickup then
 		return nil
 	end
@@ -1596,6 +1601,28 @@ function Jobs.active(player: Player): boolean
 	return jobs[player] ~= nil
 end
 
+-- 5.0: is the player's job an on-foot one (their own car may still be called: it is not needed for the job)?
+function Jobs.isFoot(player: Player): boolean
+	local job = jobs[player]
+	return job ~= nil and job.offer.mode == "foot"
+end
+
+-- 5.0: a company vehicle lent for a job that is over stays with nobody: when the player has one out but no job lends
+-- it any more (a respawn, the CAR button after the job), it goes back. True when it went.
+function Jobs.returnLent(player: Player): boolean
+	local car = Vehicles.get(player)
+	if not car or not car.lent then
+		return false
+	end
+	local job = jobs[player]
+	local jobType = job and job.offer.jobType
+	if jobType and jobType.vehicle == car.id then
+		return false
+	end
+	Vehicles.remove(player)
+	return true
+end
+
 local function planOf(stop: Stop): Cargo.Plan
 	local person = stop.person
 	return {
@@ -1731,13 +1758,22 @@ local function endJob(player: Player, job: Job, linger: boolean)
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
 	Vehicles.setSpeedMultiplier(player, 1)
 	-- 3.0: the crew stays together (no Crew.disband): the next mission is one START away.
-	-- A company vehicle goes back; your own car comes to you.
+	-- A company vehicle goes back; your own car comes to you. 5.0: without a car of your own the lent one just goes
+	-- (Vehicles.spawn would refuse with "no vehicle yet" and leave it with you) unless a new job lends the same one.
 	local jobType = job.offer.jobType
 	if jobType and jobType.vehicle then
 		local car = Vehicles.get(player)
 		if car and car.id == jobType.vehicle then
 			task.delay(2, function()
-				if player.Parent and not jobs[player] then
+				if not player.Parent or Vehicles.get(player) ~= car then
+					return
+				end
+				local profile = PlayerData.get(player)
+				if profile and profile.car == nil then
+					if Jobs.vehicleFor(player) ~= car.id then
+						Vehicles.remove(player)
+					end
+				elseif not jobs[player] then
 					Vehicles.spawn(player, true)
 				end
 			end)

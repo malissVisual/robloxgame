@@ -149,7 +149,7 @@ export type Car = {
 local Vehicles = {}
 
 -- 5.0: what Vehicles.spawn (the CAR button, a job, PLAY) says to a player who owns no vehicle yet.
-Vehicles.NO_VEHICLE = "You don't have a vehicle yet: deliver on foot (J: the job board). The Old Van is sold at Dead End Motors from level 4."
+Vehicles.NO_VEHICLE = `You don't have a vehicle yet: deliver on foot (J: the job board). The Old Van: {Config.VanQuest.Where}.`
 
 local cars: { [Player]: Car } = {}
 local lastSpawn: { [Player]: number } = {}

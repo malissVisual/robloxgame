@@ -168,7 +168,7 @@ Config.Cars = {
 		mount = true,
 		trolley = true,
 		name = "Old Van",
-		level = 4, -- 5.0: bought at Dead End Motors (you start on foot)
+		level = 4, -- 5.0: bought from Earl at Earl's Used Wheels (Config.VanQuest: Marge's quest; you start on foot)
 		price = 1800,
 		style = "van",
 		maxSpeed = 42,
@@ -826,6 +826,27 @@ Config.Kit = {
 	{ id = "jacket", name = "Thermal Jacket", level = 1, price = 300, icon = "🧥", warm = 0.8, description = "Food you carry stays warm longer." },
 } :: { KitDef }
 
+-- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
+-- you reach the van's level (Config.Cars "van" level) without one, Marge texts you about a guy out west; Earl sells his
+-- old van at Earl's Used Wheels (Map.VanSeller, far out on the West Highway) for the van's price. Its stages are
+-- bought at Wrench Garage as usual. Range: studs from Earl the purchase is allowed within (the prompt reaches 10).
+Config.VanQuest = {
+	Car = "van",
+	Seller = "Earl",
+	Place = "Earl's Used Wheels",
+	Range = 16,
+	-- The words (the dealer's card, the board, the missions, the career road, the tutorial, Marge's and Earl's lines).
+	Where = "Earl's Used Wheels (Marge's quest at level 4)",
+	DealerNote = "Sold privately — Marge knows a guy (level 4).",
+	MissionsNeed = "Missions need a vehicle — the Old Van at level 4 (Earl's Used Wheels, Marge's quest).",
+	Unlock = "A guy out west is selling his old van. Cheap-ish. Go see Earl — I put him on your GPS.",
+	Reminder = "Earl still has that van for you, out west on the West Highway. He's on your GPS.",
+	Bought = "Nice. Now you can take ★ car jobs — and don't forget fuel later.",
+	Keys = "Here are the keys, kid. She's ugly but she runs.",
+	TooYoung = "You're green, kid. Come back when Marge sends you.",
+	Sold = "Already sold you one, kid. Treat her right.",
+}
+
 Config.Gear = {
 	{ id = "trolley", name = "Hand Trolley", level = 3, price = 600, icon = "🛒", needs = "trolley", description = "Carry up to 4 pieces at once. It rides folded inside the back (vans and trucks)." },
 	{ id = "straps", name = "Ratchet Straps", level = 4, price = 900, icon = "🔗", description = "The load is strapped down: cargo condition losses ×0.6. Two orange bands in the back." },
@@ -1246,7 +1267,7 @@ Config.Levels = {
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop opens (5.1)" },
 		[3] = { money = 750, items = { repair = 2 } },
-		[4] = { money = 1000, items = { nitro = 2 }, text = "Old Van available at Dead End Motors" },
+		[4] = { money = 1000, items = { nitro = 2 }, text = "Old Van: Earl's Used Wheels (Marge's quest)" },
 		[5] = { money = 1500, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },

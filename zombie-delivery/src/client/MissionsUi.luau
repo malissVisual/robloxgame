@@ -337,6 +337,7 @@ Extras.capacity = nil :: number? -- 3.4: the cargo slots of my equipped car (3.5
 Extras.carName = "car"
 Extras.carId = "van" -- 3.5: my equipped car and its stage (the advice in the "too small" texts)
 Extras.carStage = 0
+Extras.hasCar = true -- 5.0: a vehicle of my own (the server's hasCar); the missions need one
 Extras.state = {
 	values = {},
 	done = {},
@@ -563,7 +564,7 @@ end
 function Extras.slotsShort(def: MissionDef): number?
 	local need = Economy.cargoNeed(def.load, def.items)
 	local holds = Extras.capacity
-	if def.vehicle or crewOwner ~= nil or need <= 0 or holds == nil or need <= holds then
+	if def.vehicle or crewOwner ~= nil or need <= 0 or holds == nil or need <= holds or Extras.noCar() then
 		return nil
 	end
 	return need
@@ -572,6 +573,12 @@ end
 -- 3.4: what START says when the car is too small (the server's words).
 function Extras.slotsText(need: number): string
 	return `This mission needs a vehicle with {need} slots (your {Extras.carName} holds {Extras.capacity or 0}). {Economy.roomAdvice(Extras.carId, Extras.carStage, need)}`
+end
+
+-- 5.0: no vehicle of my own (you start on foot) and not in somebody else's crew: no mission can start (the server's
+-- words: Config.VanQuest.MissionsNeed).
+function Extras.noCar(): boolean
+	return not Extras.hasCar and crewOwner == nil
 end
 
 -- 3.2: is a DUO mission short of a crew right now (not in somebody else's crew: the leader decides there)?
@@ -1375,6 +1382,8 @@ local function actionRow(parent: any, def: MissionDef, order: number)
 			note = "You are on this mission right now."
 		elseif ownJob then
 			note = "Finish your current delivery first."
+		elseif Extras.noCar() then
+			note = `🚐 {Config.VanQuest.MissionsNeed}`
 		elseif Extras.needsCrew(def) then
 			note = `🤝 {Extras.DUO_REFUSAL}`
 		elseif Extras.slotsShort(def) then
@@ -2224,6 +2233,10 @@ function MissionsUi.startMission(id: string)
 		say(why or "Locked.", P.danger)
 		return
 	end
+	if Extras.noCar() then
+		say(Config.VanQuest.MissionsNeed, P.danger) -- 5.0: on foot
+		return
+	end
 	-- 3.2: a DUO mission without a crew: why, and FIND CREW is next to START (the server checks the range too).
 	if Extras.needsCrew(def) then
 		say(Extras.DUO_REFUSAL, P.danger)
@@ -2898,6 +2911,7 @@ local function applyState(data: any)
 	Extras.carName = if type(data.carName) == "string" then data.carName else "car"
 	Extras.carId = if type(data.carId) == "string" then data.carId else Config.Cars[1].id
 	Extras.carStage = if type(data.carStage) == "number" then data.carStage else 0
+	Extras.hasCar = data.hasCar ~= false -- 5.0 (an older server sends none: as before)
 	hasState = true
 	-- Opened before the first state (a slow load): pick where the player is in the story now.
 	if blindPick then
