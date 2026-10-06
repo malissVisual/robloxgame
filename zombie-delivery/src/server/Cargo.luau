@@ -2389,6 +2389,10 @@ local function toss(session: Session, player: Player)
 		for _, prop in session.props do
 			table.insert(skip, prop)
 		end
+		local ride = Vehicles.get(player) -- (your own bike or car beside you does not block the throw)
+		if ride then
+			table.insert(skip, ride.model)
+		end
 		params:AddToFilter(skip)
 		local target = plan.pile + Vector3.new(0, 2.5, 0) -- (over a porch step)
 		for _ = 1, 4 do

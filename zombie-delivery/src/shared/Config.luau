@@ -2135,7 +2135,7 @@ Config.Jobs = {
 		SessionGap = 10,
 		-- 5.3 review: no ON FOOT run because every storefront near you is shut (the Suburbs or the Harbor at night; the
 		-- board looks up to twice the usual reach first): the board says so.
-		ClosedNote = "Shops nearby are closed — head Downtown (Luigi's, Wok Dead, Last Bite open late)",
+		ClosedNote = "Shops here are closed — Downtown food is open late",
 	},
 	-- 5.3, the newspaper round (server/Jobs.luau footOffer's "round", shared/Deliveries.luau Deliveries.round, the
 	-- toss in server/Cargo.luau): from Hours on the game clock (the morning) the ON FOOT and the BIKE sections offer a

@@ -708,7 +708,11 @@ local function careerApp(list: Instance)
 		end
 		local parts = Career.rewardParts(nextStep.reward)
 		if #parts > 0 then
-			look.chip(look.chipRow(g, 4), `Reward: {table.concat(parts, " · ")}`, K.good)
+			look.section(g, "Reward", 4)
+			local row = look.chipRow(g, 5)
+			for _, part in parts do
+				look.chip(row, part, K.good)
+			end
 		end
 	end
 	-- The next few levels of the road.
