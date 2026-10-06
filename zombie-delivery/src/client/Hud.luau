@@ -658,6 +658,7 @@ end
 Hud.onJobs = nil :: (() -> ())? -- 3.6 client/DispatchUi.luau: the Dispatch board (J / JOBS)
 Hud.onJobsKey = nil :: (() -> ())? -- 4.0.2: the J key: opens the board, or closes it when it is open (Main)
 Hud.onCrew = nil :: (() -> ())?
+Hud.oldLevelBanner = false -- 4.6: off: client/CareerUi.luau shows the level-up card (true brings the old banner back)
 Hud.onEstate = nil :: (() -> ())?
 Hud.onSound = nil :: (() -> ())? -- client/Sounds.luau: music and effects on / music off / all off
 Hud.onMissions = nil :: (() -> ())? -- client/MissionsUi.luau: the MISSIONS window
@@ -2958,7 +2959,9 @@ function refreshLevel()
 		return
 	end
 	shownLevel = level
-	if before ~= nil and level > before then
+	-- (4.6: the level-up card is client/CareerUi.luau's: what you unlocked, the reward, what comes next; the old banner
+	-- would say it twice)
+	if before ~= nil and level > before and Hud.oldLevelBanner then
 		showLevelUp(before, level)
 	end
 	if before ~= nil and shop.frame.Visible then
