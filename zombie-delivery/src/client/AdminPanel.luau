@@ -494,6 +494,9 @@ R.jobs = function()
 			send("job", `ordinary{index}`)
 		end)
 	end
+	action(ordinary, "🚶 On foot", C.green, function()
+		send("job", "foot") -- 5.0: an ON FOOT job (Jobs.adminStart)
+	end)
 
 	local got, most = MissionData.stars(missionProgress, nil)
 	heading(`Missions · your {got} / {most} ★`, "ALL 3 ★: every mission done at 3 stars (no money). RESET: the progress cleared. A mission button starts it now (locks ignored; NIGHT ONLY turns the clock to night). The stars shown are yours.")

@@ -93,39 +93,36 @@ for _, distance in { 300, 800, 1500 } do
 end
 check("the extra clock for a longer drive matches Economy.timeLimit (± 1 s rounding)", exact)
 
--- The tutorial's first delivery ---------------------------------------------------------------
+-- The tutorial's first delivery (5.0: on foot, two letters on one street) ------------------------------------
 
-local van = Config.Cars[1]
-local vanSlots = Economy.capacity(van.id, {})
-check("the starting car is the Old Van", van.name == "Old Van", van.name)
-check("the tutorial's pieces fit the Old Van and a ★ delivery", Jobs.TutorialPieces >= 1 and Economy.cargoNeed("carry", Jobs.TutorialPieces) <= vanSlots and Jobs.TutorialPieces <= Jobs.EasyMaxPieces, `{Jobs.TutorialPieces} pieces, {vanSlots} slots`)
-
-local easy = 0
-for _, business in Jobs.Businesses do
-	local people = business.kind == "kid" or business.kind == "patient" or business.kind == "survivor"
-	if table.find(business.tiers, 1) and not people and business.kind ~= "horse" and Config.Cargo.Kinds[business.kind] then
-		easy += 1
+local Foot = Jobs.Foot
+check("the tutorial's letters fit your two hands", Jobs.TutorialPieces >= 1 and Jobs.TutorialPieces <= Config.Cargo.HandsMax, Jobs.TutorialPieces)
+check("the post office sends the letters (a light look, ★)", (function()
+	for _, business in Jobs.Businesses do
+		if business.id == "post" then
+			return Config.Cargo.LightLooks[business.look] == true
+		end
 	end
-end
-check("there are ★ businesses with carried pieces for the tutorial", easy > 0, easy)
-check("a ★ delivery has no modifier and no bulk order", Tiers[1].modifierChance == 0 and (Jobs.BulkChance[1] or 0) == 0)
-check("the tutorial's pick-up band is a band", Jobs.TutorialPickupMax >= Jobs.PickupMinDistance and Jobs.TutorialPickupMax <= Jobs.PickupMaxDistance)
-check("the tutorial's drop stays in the ★ band", Jobs.TutorialDropMax >= Tiers[1].minDistance and Jobs.TutorialDropMax <= Tiers[1].maxDistance)
+	return false
+end)())
+check("the tutorial's pick-up band is a band", Jobs.TutorialPickupMax >= Foot.PickupMin and Jobs.TutorialPickupMax <= Jobs.PickupMaxDistance)
+check("the tutorial's drop is a short walk", Foot.TutorialDrop >= Foot.MinDistance and Foot.TutorialDrop <= Foot.MaxDistance)
 check("a few tries for the shortest one", Jobs.TutorialTries >= 1 and Jobs.TutorialTries <= 20)
 
--- From the depot (Map.Shops.depot: 0, 0) there are pick-ups in the band, and drops in the band from them.
+-- From the depot (Map.Shops.depot: 0, 0) there are foot pick-ups in the band (Downtown, the Suburbs), and drops on foot
+-- from them.
 local depot = Map.Shops.depot
 local pickups, routes = 0, 0
 for _, address in Map.addresses() do
-	if address.poi then
+	if address.poi or not Foot.Districts[address.district] then
 		continue
 	end
 	local d = Map.manhattan(depot.x, depot.z, address.x, address.z)
-	if d >= Jobs.PickupMinDistance and d <= Jobs.TutorialPickupMax then
+	if d >= Foot.PickupMin and d <= Jobs.TutorialPickupMax then
 		pickups += 1
 		for _, drop in Map.addresses() do
 			local leg = Map.manhattan(address.x, address.z, drop.x, drop.z)
-			if drop ~= address and not drop.poi and leg >= Tiers[1].minDistance and leg <= Jobs.TutorialDropMax then
+			if drop ~= address and not drop.poi and Foot.Districts[drop.district] and leg >= Foot.MinDistance and leg <= Foot.TutorialDrop then
 				routes += 1
 				break
 			end
@@ -133,7 +130,32 @@ for _, address in Map.addresses() do
 	end
 end
 check("addresses around the depot for the tutorial's pick-up", pickups >= 3, pickups)
-check("and from them a short drop", routes >= 3, routes)
+check("and from them a short walk to the drop", routes >= 3, routes)
+
+-- 5.0: the ON FOOT section: from the depot and from the Suburbs there are foot jobs in the band.
+for _, from in { { x = depot.x, z = depot.z, name = "the depot" }, { x = 0, z = 900, name = "the Suburbs" } } do
+	local near, far = 0, 0
+	for _, address in Map.addresses() do
+		if address.poi or not Foot.Districts[address.district] then
+			continue
+		end
+		local d = Map.manhattan(from.x, from.z, address.x, address.z)
+		if d <= Foot.PickupMax + Foot.PickupWiden then
+			near += 1 -- (none within PickupMax around the depot's safe zone: Jobs widens the band)
+		end
+		if d >= Foot.MinDistance and d <= Foot.MaxDistance then
+			far += 1
+		end
+	end
+	check(`foot jobs around {from.name}: pick-ups and drops`, near >= 8 and far >= 2, `{near} near, {far} in the band`)
+end
+local harbor = 0
+for _, address in Map.addresses() do
+	if Foot.Districts[address.district] and address.x > Map.River.x0 then
+		harbor += 1
+	end
+end
+check("the foot districts never reach across the river", harbor == 0, harbor)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

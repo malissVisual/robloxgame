@@ -59,8 +59,8 @@ do
 	end
 	check("one DUO campaign: duo", #duo == 1 and duo[1] == "duo", table.concat(duo, ", "))
 	local campaign = Missions.findCampaign("duo")
-	check("the DUO campaign: Partners in Crime, level 4, after First Shift, a reward",
-		campaign ~= nil and campaign.name == "Partners in Crime" and campaign.level == 4 and campaign.icon == "🤝"
+	check("the DUO campaign: Partners in Crime, level 6 (5.0), after First Shift, a reward",
+		campaign ~= nil and campaign.name == "Partners in Crime" and campaign.level == 6 and campaign.icon == "🤝"
 			and campaign.requires ~= nil and #campaign.requires == 1 and campaign.requires[1] == "dispatch" and campaign.reward > 0)
 	check("the DUO campaign has its 3.1 reward", Config.Rewards.Campaigns.duo ~= nil)
 end
@@ -426,12 +426,13 @@ do
 		end
 	end
 	local duo = Missions.ofCampaign("duo")
-	if duo[1].level ~= 4 or duo[10].level ~= 8 then
+	if duo[1].level ~= 6 or duo[10].level ~= 10 then
 		table.insert(spans, `duo {duo[1].level} … {duo[10].level}`)
 	end
 	check("the levels grow from the campaign's to the next one's", #spans == 0, offenders(spans))
-	check("levelOf: First Shift 1 → 2, Iron Supply 8 → 9", Missions.levelOf("dispatch", 1) == 1 and Missions.levelOf("dispatch", 10) == 2
-		and Missions.levelOf("army", 1) == 8 and Missions.levelOf("army", 5) == 8 and Missions.levelOf("army", 10) == 9)
+	-- 5.0: the story starts at level 4 (you need a vehicle): First Shift 4 → 5, Iron Supply 9 → 10.
+	check("levelOf: First Shift 4 → 5, Iron Supply 9 → 10", Missions.levelOf("dispatch", 1) == 4 and Missions.levelOf("dispatch", 10) == 5
+		and Missions.levelOf("army", 1) == 9 and Missions.levelOf("army", 5) == 9 and Missions.levelOf("army", 10) == 10)
 	local last = story[#story]
 	check("the last campaign ends at the top level", Missions.levelOf(last.id, 10) == Config.Levels.MaxLevel)
 	local first = Missions.find("dispatch_1")
@@ -443,21 +444,22 @@ end
 
 do
 	local none: { [string]: number } = {}
-	local open, why = Missions.unlocked("dispatch_1", none, 1)
-	check("the first mission is open at level 1", open and why == nil)
+	local open, why = Missions.unlocked("dispatch_1", none, 4)
+	check("the first mission is open at level 4", open and why == nil)
+	check("… not below it (5.0: on foot first)", not Missions.unlocked("dispatch_1", none, 3))
 	open, why = Missions.unlocked("dispatch_2", none, 15)
 	check("the next one waits for the one before", not open and why ~= nil)
-	open = Missions.unlocked("dispatch_2", { dispatch_1 = 1 }, 1)
+	open = Missions.unlocked("dispatch_2", { dispatch_1 = 1 }, 4)
 	check("… and opens when it is done", open)
 	open, why = Missions.unlocked("clinic_1", none, 15)
 	check("3.2: a campaign waits for the one before it, saying which", not open and why ~= nil and string.find(why or "", "First Shift", 1, true) ~= nil, why)
 	local firstShift = { dispatch_10 = 1 }
-	open, why = Missions.unlocked("clinic_1", firstShift, 1)
+	open, why = Missions.unlocked("clinic_1", firstShift, 4)
 	check("a campaign above your level is locked, saying why", not open and why ~= nil and string.find(why or "", "level") ~= nil, why)
-	open = Missions.unlocked("clinic_1", firstShift, 2)
+	open = Missions.unlocked("clinic_1", firstShift, 5)
 	check("… and opens at its level once the one before is done", open)
-	open = Missions.unlocked("duo_1", firstShift, 4)
-	check("the DUO campaign opens after First Shift at level 4", open)
+	open = Missions.unlocked("duo_1", firstShift, 6)
+	check("the DUO campaign opens after First Shift at level 6", open)
 	open = Missions.unlocked("duo_1", none, 15)
 	check("… not before First Shift's finale", not open)
 	open = Missions.unlocked("firehouse_1", { market_10 = 2 }, 15)
@@ -474,10 +476,10 @@ do
 	end
 	check("Exodus opens with every story finale (the DUO campaign not needed)", Missions.unlocked("exodus_1", all, 14))
 	check("finished: the finale counts", Missions.finished(firstShift, "dispatch") and not Missions.finished({ dispatch_9 = 3 }, "dispatch"))
-	local campaignOpen, campaignWhy = Missions.campaignOpen("market", { clinic_10 = 1 }, 2)
-	check("campaignOpen: the level after the chain", not campaignOpen and string.find(campaignWhy or "", "level 4", 1, true) ~= nil, campaignWhy)
+	local campaignOpen, campaignWhy = Missions.campaignOpen("market", { clinic_10 = 1 }, 5)
+	check("campaignOpen: the level after the chain", not campaignOpen and string.find(campaignWhy or "", "level 6", 1, true) ~= nil, campaignWhy)
 	local clinic4 = Missions.find("clinic_4")
-	if clinic4 and clinic4.level and clinic4.level > 2 then
+	if clinic4 and clinic4.level and clinic4.level > 5 then
 		open = Missions.unlocked("clinic_4", { clinic_3 = 2 }, clinic4.level - 1)
 		check("a mission above your level is locked", not open)
 	end

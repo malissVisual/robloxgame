@@ -15,7 +15,8 @@
 --   unlockAll [T]             every car (company ones too), every gun (earned ones too), every paint, 10 of each
 --                             item, every employer's progress at the top (their rewards count as earned), every
 --                             property (the biggest mansion as the home if you have none), the top driver level
---                             and (4.7) every licence (Config.Jobs.Licences)
+--                             and (4.7) every licence (Config.Jobs.Licences); 5.0: every piece of kit (Config.Kit),
+--                             the phone, and the Old Van as the car you drive when you had none
 --   maxUpgrades [T]           every upgrade track at its last level (3.3: the car tracks of every car you own; 3.5:
 --                             and every such car at its last stage)
 --   money [T]  amount         + money (1 … 10 000 000)
@@ -33,7 +34,7 @@
 --   giveAll [T]               unlockAll (its upgrades and stages maxed) + $1 000 000
 --   teleport [T] landmark id  you (and your car if you drive it) to a Map.Landmarks place
 --   bring [T]                 the target to you;  goto [T]: you to the target
---   job [T]    job type id    any Config.JobTypes id or "ordinary1" … "ordinary4" (Jobs.adminStart)
+--   job [T]    job type id    any Config.JobTypes id, "ordinary1" … "ordinary4" or (5.0) "foot" (Jobs.adminStart)
 --   finishStop [T]            the current stop is done (Jobs.adminFinishStop)
 --   finishJob [T]             the whole current job done and paid (Jobs.adminComplete)
 --   roadEvent [T] kind        4.8: "survivor" | "addon" | "roadblock" on the current job as you drive on (Jobs.adminRoadEvent)
@@ -242,6 +243,19 @@ local function unlockAll(player: Player)
 	for _, car in Config.Cars do
 		profile.cars[car.id] = true
 	end
+	-- 5.0: a player still on foot drives the Old Van from now on; every piece of personal gear, and the phone.
+	if profile.car == nil then
+		profile.car = Config.Cars[1].id
+		task.defer(function()
+			if player.Parent and not Vehicles.get(player) and not Jobs.active(player) then
+				Vehicles.spawn(player, true) -- it comes out to you now
+			end
+		end)
+	end
+	for _, def in Config.Kit do
+		profile.kit[def.id] = true
+	end
+	profile.phone = true
 	for _, weapon in Config.Weapons do
 		profile.weapons[weapon.id] = true
 	end
@@ -296,6 +310,10 @@ local function carGun(player: Player, arg: any)
 		return
 	end
 	local carId = profile.car
+	if not carId then
+		say(player, "ADMIN: you have no vehicle yet (unlockAll gives the Old Van).")
+		return
+	end
 	if not Economy.canMount(carId) then
 		say(player, "ADMIN: this vehicle can't carry a gun (the dealer's cars, the monster truck and the armored truck can).")
 		return
@@ -926,6 +944,10 @@ function Give.upgrade(player: Player, arg: any)
 	local level = math.clamp(math.floor(wanted), 0, def.maxLevel)
 	if def.car then
 		local carId = profile.car
+		if not carId then
+			say(player, "ADMIN: you have no vehicle yet (unlockAll gives the Old Van).")
+			return
+		end
 		if not Economy.upgradeFits(carId, def.id) then
 			say(player, `ADMIN: the {carName(carId)} can't take {def.name}.`)
 			return
@@ -955,7 +977,7 @@ function Give.paint(player: Player, arg: any)
 		return
 	end
 	profile.paints[def.id] = true
-	local carDef = Economy.findCar(profile.car)
+	local carDef = if profile.car then Economy.findCar(profile.car) else nil
 	if carDef and not carDef.company then
 		profile.carPaint[carDef.id] = def.id
 		PlayerData.notify(player)

@@ -30,7 +30,8 @@
 --   JobRules.jolt(before, now, dt)        "bump" | "brake" | nil from the car's speed a tick ago and now
 --   JobRules.joltLoss(rules, jolt, straps)        the condition a jolt costs this cargo (Ratchet Straps × StrapsLoss)
 --   JobRules.damageLoss(rules, base, speed, straps)   the condition a hit of the car costs (base: the usual share)
---   JobRules.freshDrain(tier, seconds, cooler)   the freshness food loses in that time (a Cooler Box × CoolerDrain)
+--   JobRules.freshDrain(tier, seconds, cooler, warm)   the freshness food loses in that time (a Cooler Box × CoolerDrain;
+--                                         5.0: a thermal jacket × its warm)
 --   JobRules.freshPay(freshness)          the pay's multiplier for the food's freshness
 --   JobRules.dropCount(tier, pieces, receivers, r1, r2)   the drops of a board delivery (1 = an ordinary one)
 --   JobRules.destinations(needs, first)   the stop every piece goes to, in the order they are made
@@ -39,6 +40,11 @@
 --   JobRules.eventAfter(r)                seconds of driving before it comes
 --   JobRules.survivorBonus(stars)         a survivor dropped at the safe zone
 --   JobRules.addOnFits(inCar, coming, capacity)   room for one more piece?
+--
+-- 5.0, the ON FOOT jobs (Config.Jobs.Foot; tested in tests/transport_test.luau):
+--   JobRules.footPay(distance, pieces, multiplier)   what a foot job pays ($5 steps)
+--   JobRules.footTime(distance, handling, timeMultiplier)   its clock
+--   JobRules.footPieces(wanted, room)     its pieces: within Foot.Pieces and what you carry
 
 local Config = require(script.Parent.Config)
 
@@ -374,10 +380,11 @@ function JobRules.damageLoss(rules: { string }?, base: number, speed: number, st
 	return strapped(loss, straps)
 end
 
-function JobRules.freshDrain(tier: number, seconds: number, cooler: boolean?): number
+-- 5.0: `warm` (a thermal jacket on foot, Transport.warm) multiplies it too.
+function JobRules.freshDrain(tier: number, seconds: number, cooler: boolean?, warm: number?): number
 	local drain = Config.Jobs.CargoRules.FoodDrain
 	local perMinute = drain[math.clamp(math.floor(tier), 1, #drain)] or 0
-	local loss = perMinute * math.max(0, seconds) / 60
+	local loss = perMinute * math.max(0, seconds) / 60 * math.clamp(warm or 1, 0, 1)
 	return if cooler then loss * Config.GearTuning.CoolerDrain else loss
 end
 
@@ -454,6 +461,32 @@ end
 
 function JobRules.addOnFits(inCar: number, coming: number, capacity: number): boolean
 	return inCar + coming + 1 <= capacity
+end
+
+-- ── 5.0: the ON FOOT jobs (Config.Jobs.Foot) ────────────────────────────────
+
+-- What a foot job pays: BasePay + PayPerStud × the walk (the route, manhattan) + PayPerPiece a piece, kept within
+-- PayMin … PayMax, then × `multiplier` (the role's, the modifier's) but never over PayMax × PayTop, rounded to $5.
+function JobRules.footPay(distance: number, pieces: number, multiplier: number?): number
+	local foot = Config.Jobs.Foot
+	local base = foot.BasePay + foot.PayPerStud * math.max(0, distance) + foot.PayPerPiece * math.max(0, math.floor(pieces))
+	local pay = math.clamp(base, foot.PayMin, foot.PayMax) * math.max(0, multiplier or 1)
+	return math.min(math.floor(pay / 5 + 0.5) * 5, math.floor(foot.PayMax * foot.PayTop / 5) * 5)
+end
+
+-- A foot job's clock: TimeBase + the walk at Speed studs / s (× the modifier's timeMultiplier) + the handling, whole
+-- seconds.
+function JobRules.footTime(distance: number, handling: number, timeMultiplier: number?): number
+	local foot = Config.Jobs.Foot
+	local walk = math.max(0, distance) / math.max(1, foot.Speed) * (timeMultiplier or 1)
+	return math.floor(foot.TimeBase + walk + math.max(0, handling) + 0.5)
+end
+
+-- The pieces of a foot job: `wanted` (the business's pick) within Foot.Pieces and never more than `room` (what you
+-- carry: Transport.handsRoom), at least 1.
+function JobRules.footPieces(wanted: number, room: number): number
+	local band = Config.Jobs.Foot.Pieces
+	return math.max(1, math.min(math.clamp(math.floor(wanted), band[1], band[2]), math.floor(room)))
 end
 
 return JobRules

@@ -164,7 +164,7 @@ check("every car has a style and a price", (function()
 			last = car.price
 		end
 	end
-	return Config.Cars[1].price == 0 and Config.Weapons[1].price == 0
+	return Config.Cars[1].price > 0 and Config.Weapons[1].price == 0 -- (5.0: the Old Van is bought; the pistol is yours)
 end)())
 
 -- Economy v2 -------------------------------------------------------------------
