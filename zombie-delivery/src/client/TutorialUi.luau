@@ -5,7 +5,9 @@
 --     with a short red rule under it, her line in white, a thin line and the actions: CONTINUE on every page but the
 --     last, which says its own action (LET'S GO, ANOTHER JOB, GOT IT); a quiet second action (SKIP TUTORIAL, LATER).
 --     Space or Enter (or the gamepad's A) continues, so do a click or a tap on the panel. While it is open those keys
---     do nothing else (no jump) and the mouse is free (CameraRig.mouseNeeded).
+--     do nothing else (no jump) and the mouse is free (CameraRig.mouseNeeded). 4.4.1: the keys go through
+--     client/DialogKeys.luau (over the other dialogs: her panel is on top) and work for her radio too (retry, done,
+--     say: it comes on its own, mid-jump or mid-drive, so a key waits a little longer before it turns her page).
 --   * The hint: one compact line under the objective, in the HUD's top stack (Hud.topSlot("tutorial"), placed right
 --     after the ticket), with "FIRST DAY" and SKIP (it asks first). During the job it follows the Job payload
 --     (TutorialSteps.jobStep): the same state the ticket shows, never ahead of it.
@@ -16,7 +18,6 @@
 -- (design/ui-contract on codex/ui-contract): white text over a subtle charcoal scrim, fine lines, small red accents,
 -- flat square shapes, the Theme fonts and colours (Theme.Contract).
 
-local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -28,6 +29,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Hud = require(script.Parent.Hud)
 local CameraRig = require(script.Parent.CameraRig)
+local DialogKeys = require(script.Parent.DialogKeys)
 
 local TutorialUi = {}
 
@@ -36,8 +38,8 @@ local CONTRACT = Theme.Contract
 local DIALOG_W = 540
 local TOUCH = Ui.touchLayout() -- 4.2: a phone or a tablet without a keyboard
 local ACTION_H = if TOUCH then 56 else 44 -- the actions' height (unscaled): 44 px or more for a finger at 0.8
-local ACTION = "TutorialContinue"
-local KEYS = { Enum.KeyCode.Space, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter, Enum.KeyCode.ButtonA }
+local KEYS_ID = "tutorial" -- her dialog's entry in client/DialogKeys.luau
+local RADIO_GUARD = 0.8 -- seconds before a key turns a radio page (it comes on its own: maybe mid-jump)
 
 local player = Players.LocalPlayer
 local remote: RemoteEvent
@@ -157,7 +159,7 @@ local function buildDialog(advance: () -> (), second: () -> ())
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, right)
 	view.primary = textAction(right, "", CONTRACT.text, 1, advance)
-	view.keyHint = Ui.label(right, if TOUCH then "" else "SPACE", UDim2.fromOffset(0, ACTION_H), {
+	view.keyHint = Ui.label(right, if TOUCH then "" else DialogKeys.hint(), UDim2.fromOffset(0, ACTION_H), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.MonoFont,
 		TextSize = 11,
@@ -284,17 +286,6 @@ local function freeMouse()
 	CameraRig.mouseNeeded = needed
 end
 
-local function sink(_: string, state: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
-	if state == Enum.UserInputState.Begin then
-		local current = shown
-		-- (a jump pressed just as she starts talking does not skip her first page)
-		if current and os.clock() - current.openedAt > 0.3 then
-			TutorialUi.advance()
-		end
-	end
-	return Enum.ContextActionResult.Sink
-end
-
 local function render()
 	local current = shown
 	if not current then
@@ -324,7 +315,7 @@ local function close()
 	if view.dialogGui then
 		view.dialogGui.Enabled = false
 	end
-	ContextActionService:UnbindAction(ACTION)
+	DialogKeys.close(KEYS_ID)
 end
 
 local function show(kind: string, dialog: TutorialSteps.Dialog?)
@@ -335,12 +326,10 @@ local function show(kind: string, dialog: TutorialSteps.Dialog?)
 	render()
 	view.dialogGui.Enabled = true
 	freeMouse()
-	-- Space / Enter / A turn her pages only when you are talking to her: the radio (retry, done) comes on its own,
-	-- maybe mid-jump or mid-drive, so it takes a click or a tap (its last page would start a job).
-	ContextActionService:UnbindAction(ACTION)
-	if kind ~= "retry" and kind ~= "done" then
-		ContextActionService:BindActionAtPriority(ACTION, sink, false, Enum.ContextActionPriority.High.Value + 10, table.unpack(KEYS))
-	end
+	-- Space / Enter / A turn her pages (4.4.1: the radio's too; it comes on its own, maybe mid-jump or mid-drive, so
+	-- a key waits a little longer there; a jump pressed just as she starts talking does not skip her first page).
+	local radio = kind == "retry" or kind == "done" or kind == "say"
+	DialogKeys.open(KEYS_ID, TutorialUi.advance, { guard = if radio then RADIO_GUARD else 0.3, layer = 2 })
 end
 
 -- What the last page's actions do.
