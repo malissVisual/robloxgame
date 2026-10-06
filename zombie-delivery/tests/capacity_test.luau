@@ -36,6 +36,12 @@ for _, def in Config.Cars do
 		continue
 	end
 	check(`{def.id}: a role`, type(def.role) == "string" and #(def.role :: string) > 3)
+	if def.bike then
+		-- 5.1: a bike has no stages (its bike gear adds the room) and holds what its body has: a rack 1, a box 4.
+		check(`{def.id}: a bike has no stages`, stages == nil and Economy.maxStage(def.id) == 0)
+		check(`{def.id}: a bike holds 1 – 4 light pieces of its own`, def.capacity >= 1 and def.capacity <= 4, def.capacity)
+		continue
+	end
 	local most = if def.id == "van" then 4 else 3 -- 4.0: the Old Van has the longer way up
 	check(`{def.id}: stages, at most {most - 1} to buy`, stages ~= nil and #stages >= 1 and #stages <= most, if stages then #stages else nil)
 	if not stages then

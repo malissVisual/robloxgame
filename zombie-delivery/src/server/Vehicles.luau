@@ -100,6 +100,23 @@
 -- * The Freight Truck (STYLES.freighttruck): a cab-over truck with a long box, 12 slots in three pallet bays, a
 --   roll-up door (rollUpDoor), twin rear tyres (Style.dual) and the Attachment "JackMount" inside the back (its pallet
 --   jack: server/Cargo.luau). A long car comes out of a garage further from the door (Vehicles.placeAt).
+--
+-- 5.1, THE BIKES (CarDef.bike: rustbike, citybike, cargobike, ebike; the styles "bike" and "cargobike", Style.bike):
+-- * The physics are a car's: the style's own boxes and the chassis are a hidden, low, 2.4-wide hull with four hidden
+--   frictionless wheel colliders (no balance physics), and an AlignOrientation "KeepUpright" keeps its right side level
+--   (no roll; it still pitches up a hill). One doorless driver seat (the saddle), no passengers, no back: "Load" puts a
+--   piece straight onto the rack or into the box (server/Cargo.luau: no back, never shut).
+-- * The look is Codex's (server/BikeArt/Geometry.luau through server/ModelArt/Builder.luau): its Frame is welded to a
+--   hidden part "BikeFrame" on the Motor6D "BikeLean" (pivot on the ground under the bike: every client tilts it into
+--   the turns, client/CarVisuals.luau), its wheels to the two hidden Tyres on their WheelMotors (on the BikeFrame: they
+--   spin and lean with it), its cranks and pedals to the hidden "Crank" on the Motor6D "CrankMotor" (turned by the
+--   speed). The saddle (the DriverSeat) sits on the BikeFrame, so the rider leans too (client/BikeRider.luau poses
+--   the arms forward and pumps the legs). The art's NightLamp parts glow at night; a player's bike throws a small beam.
+-- * Bike gear (Config.Gear bikeOnly: basket, panniers, trailer; Vehicles.hasGear) shows in the UpgradeKit from the
+--   same art, and adds its light slots to Vehicles.cargoSlots (the art's slot points; the trailer hangs rigidly at the
+--   rear Hitch, its wheels on WheelMotors too). None of the car kit (plow, armour, engine, tyres, car gear) on a bike.
+-- * Never traffic, a bandit car or a chauffeur's: the CAR button (Vehicles.spawn) puts it by the kerb next to you at
+--   once and seats you (Vehicles.placeNear); buildNpc / buildTraffic take the van instead of a bike.
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -117,6 +134,8 @@ local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
 local Boarding = require(Shared.Boarding)
 local VehicleArt = require(script.Parent.VehicleArt.Builder)
+local BikeArt = require(script.Parent.BikeArt.Geometry) -- 5.1: Codex's bikes and bike gear (pure geometry)
+local ModelArt = require(script.Parent.ModelArt.Builder) -- 5.1: welds that geometry to our hidden roots
 
 export type Car = {
 	owner: Player,
@@ -217,6 +236,9 @@ type Style = {
 	bald: boolean?,
 	smoky: boolean?,
 	dual: boolean?, -- 4.0: twin tyres on the rear axle (the Freight Truck)
+	-- 5.1: a bike's body (CarDef.bike): Codex's art over a hidden hull, two wheels on the centre line, one doorless
+	-- saddle (doorsOf), no back, no car kit (buildKit), its cargo slots on the rack or in the box (bikeBody).
+	bike: boolean?,
 	jack: Vector3?, -- 4.0: the Attachment JackMount (the pallet jack, server/Cargo.luau), relative to the chassis top centre
 }
 
@@ -235,11 +257,12 @@ local function tilted(b: Box): CFrame
 	return if tilt then CFrame.Angles(0, 0, math.rad(tilt)) else CFrame.identity
 end
 
-local function cargo(noun: string, length: number, width: number, slots: { Vector3 }, entry: Vector3?): CargoSpec
+-- door (5.1, a bike): where its Load prompt sits instead of behind the back.
+local function cargo(noun: string, length: number, width: number, slots: { Vector3 }, entry: Vector3?, door: Vector3?): CargoSpec
 	return {
 		slots = slots,
 		noun = noun,
-		door = Vector3.new(0, 2.4, length / 2 + 0.6),
+		door = door or Vector3.new(0, 2.4, length / 2 + 0.6),
 		entry = entry or Vector3.new(width / 2 + 1.5, 0, 0),
 	}
 end
@@ -982,6 +1005,48 @@ local STYLES: { [string]: Style } = {
 			Vector3.new(2.0, 0.6, 11.9),
 		}),
 		back = rollUpDoor(8.6, 0.6, 8.8, 15.0),
+	},
+	-- 5.1, the bikes (Style.bike; Codex's art, server/BikeArt/Geometry.luau, over this hidden hull). The chassis top is
+	-- 2.1 over the ground (clearance 0.9 + the chassis' 1.2): the art's points (from the ground) less 2.1. The boxes are
+	-- a hidden hull over the frame; the wheels come from the art (bikeBody), two on the centre line, four hidden
+	-- colliders 1.9 apart. No back: the rear rack's one light slot (the art's Slot1) loads straight away.
+	bike = {
+		width = 2.4,
+		length = 6.5,
+		wheel = 1.3,
+		wheelWidth = 0.5,
+		clearance = 0.9,
+		seat = Vector3.new(0, 0.86, 0.55), -- the saddle's top at 3.16 (the art's Saddle point)
+		passengers = {},
+		roof = 2,
+		bike = true,
+		boxes = {
+			box(Vector3.new(0.8, 1.2, 4.2), Vector3.new(0, 0.6, 0), "dark"), -- the frame, the saddle, the bars
+		},
+		cargo = cargo("rack", 6.5, 2.4, { Vector3.new(0, 0.71, 1.8) }, nil, Vector3.new(0, 1.0, 2.9)),
+	},
+	-- The Cargo Bike: a longer, low frame with a box up front: four light slots on the box floor (four of the art's six
+	-- box points, spread 2 x 2), loaded from the box's left side.
+	cargobike = {
+		width = 2.4,
+		length = 6.9,
+		wheel = 1.3,
+		wheelWidth = 0.5,
+		clearance = 0.9,
+		seat = Vector3.new(0, 0.86, 0.85),
+		passengers = {},
+		roof = 2,
+		bike = true,
+		boxes = {
+			box(Vector3.new(0.8, 1.2, 2.6), Vector3.new(0, 0.6, 1.0), "dark"), -- the frame behind the box, the saddle
+			box(Vector3.new(1.6, 0.7, 1.6), Vector3.new(0, 0.35, -0.575), "dark"), -- the box
+		},
+		cargo = cargo("cargo box", 6.9, 2.4, {
+			Vector3.new(-0.35, 0.11, -0.95),
+			Vector3.new(0.35, 0.11, -0.95),
+			Vector3.new(-0.35, 0.11, -0.2),
+			Vector3.new(0.35, 0.11, -0.2),
+		}, nil, Vector3.new(-1.3, 0.5, -0.6)),
 	},
 }
 
@@ -1820,6 +1885,235 @@ local function fitTyres(model: Model, folder: Instance, style: Style, handling: 
 	end
 end
 
+-- ── 5.1, the bikes ──────────────────────────────────────────────────────────
+-- Codex's art (server/BikeArt/Geometry.luau): forward -Z, up +Y, from the ground under the bike; the roots Frame,
+-- FrontWheel, RearWheel and Crank are ours (hidden parts), ModelArt.build welds the skin to them.
+
+local BIKE_LAMP_LIT = Color3.fromRGB(255, 240, 200)
+local BIKE_HIDDEN = Vector3.new(0.2, 0.2, 0.2)
+-- The bike gear's art and where it hangs (a Frame point of the bike's art; the trailer at the rear Hitch), how many
+-- light slots it has when Config.Gear gives no room of its own (the 5.1 brief: +2, +3, +4).
+local BIKE_GEAR: { { id: string, point: string, room: number } } = {
+	{ id = "basket", point = "BasketMount", room = 2 },
+	{ id = "panniers", point = "PannierMount", room = 3 },
+	{ id = "trailer", point = "Hitch", room = 4 },
+}
+local STACK = 0.6 -- a gear slot past the art's own points rides this much over another one
+
+local bikeSpecs: { [string]: any } = {}
+local function bikeSpec(id: string): any
+	local spec = bikeSpecs[id]
+	if not spec then
+		spec = BikeArt.spec(id)
+		bikeSpecs[id] = spec
+	end
+	return spec
+end
+
+-- The art of a bike (its car id; an unknown one: the Courier Bike, the Cargo Bike's on a cargobike body).
+local function bikeArtId(carId: string, styleId: string): string
+	if carId ~= "cargobike_loaded" and table.find(BikeArt.ids, carId) then
+		return carId
+	end
+	return if styleId == "cargobike" then "cargobike" else "citybike"
+end
+
+-- A point of an art spec (its `at`, relative to its root: the bike's Frame points are from the ground), or nil.
+local function artPoint(spec: any, name: string): Vector3?
+	for _, point in spec.attachments do
+		if point.name == name then
+			return Vector3.new(point.at[1], point.at[2], point.at[3])
+		end
+	end
+	return nil
+end
+
+local function artOrigin(spec: any, name: string): Vector3
+	local o = spec.origins[name]
+	return Vector3.new(o[1], o[2], o[3])
+end
+
+-- A hidden root for the art (or a mover's part): massless, not colliding, not hit by rays.
+local function hiddenPart(parent: Instance, name: string, size: Vector3, at: CFrame): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = at
+	p.CollisionGroup = "Car"
+	p.Transparency = 1
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.Parent = parent
+	return p
+end
+
+-- A hidden wheel root on a WheelMotor (client/CarVisuals.luau spins every WheelMotor by the speed; Front ones steer,
+-- not on a bike: its fork is part of the frame).
+local function wheelRoot(model: Instance, parent: Instance, on: BasePart, at: Vector3, radius: number, width: number, front: boolean): Part
+	local tyre = hiddenPart(model, "BikeWheel", Vector3.new(width, radius * 2, radius * 2), on.CFrame * CFrame.new(at))
+	tyre.Shape = Enum.PartType.Cylinder
+	local motor = Instance.new("Motor6D")
+	motor.Name = "WheelMotor"
+	motor.Part0 = on
+	motor.Part1 = tyre
+	motor.C0 = CFrame.new(at)
+	motor:SetAttribute("Front", front)
+	motor:SetAttribute("Radius", radius)
+	motor.Parent = parent
+	return tyre
+end
+
+-- The visible bike over the hidden hull (build): the BikeFrame on the BikeLean Motor6D (its pivot on the ground under
+-- the bike), the two wheels and the crank on their Motor6Ds, Codex's skin welded to them, the four hidden wheel
+-- colliders on the chassis. beam: a player's bike throws a small light at night. Returns the BikeFrame (the saddle
+-- goes on it, so the rider leans with the bike).
+local function bikeBody(model: Model, chassis: Part, chassisY: number, style: Style, artId: string, beam: boolean): Part
+	local spec = bikeSpec(artId)
+	local ground = CFrame.new(0, -chassisY, 0)
+	local frame = hiddenPart(model, "BikeFrame", BIKE_HIDDEN, chassis.CFrame * ground)
+	local lean = Instance.new("Motor6D")
+	lean.Name = "BikeLean"
+	lean.Part0 = chassis
+	lean.Part1 = frame
+	lean.C0 = ground
+	lean.Parent = chassis
+	local front, rear = artOrigin(spec, "FrontWheel"), artOrigin(spec, "RearWheel")
+	local targets: { [string]: BasePart } = {
+		Frame = frame,
+		FrontWheel = wheelRoot(model, chassis, frame, front, style.wheel, 0.3, true),
+		RearWheel = wheelRoot(model, chassis, frame, rear, style.wheel, 0.3, false),
+	}
+	local crankAt = artOrigin(spec, "Crank")
+	local crank = hiddenPart(model, "Crank", BIKE_HIDDEN, frame.CFrame * CFrame.new(crankAt))
+	local crankMotor = Instance.new("Motor6D")
+	crankMotor.Name = "CrankMotor"
+	crankMotor.Part0 = frame
+	crankMotor.Part1 = crank
+	crankMotor.C0 = CFrame.new(crankAt)
+	crankMotor.Parent = chassis
+	targets.Crank = crank
+	local art = ModelArt.build(model, spec, targets)
+	for _, p in art.parts do
+		if p:GetAttribute("NightLamp") == true then
+			DayNight.nightLight(p, BIKE_LAMP_LIT, p.Color, p.Material.Name)
+		end
+	end
+	-- The hidden wheel colliders: four, a stable stance under the two visible wheels (no balance physics).
+	local x = style.width / 2 - style.wheelWidth / 2
+	for _, z in { front.Z, rear.Z } do
+		for _, side in { -1, 1 } do
+			local collider = newPart(model, "WheelCollider", Vector3.new(style.wheelWidth, style.wheel * 2, style.wheel * 2), chassis.CFrame * ground * CFrame.new(side * x, style.wheel, z), DARK, Enum.Material.Rubber)
+			collider.Shape = Enum.PartType.Cylinder
+			collider.Transparency = 1
+			collider.CustomPhysicalProperties = FRICTIONLESS
+			weld(chassis, collider)
+		end
+	end
+	if beam then
+		local at = artPoint(spec, "LightMount") or Vector3.new(0, 3, front.Z + 0.8)
+		local lamp = Instance.new("Attachment")
+		lamp.Name = "BikeLamp"
+		lamp.Position = at + Vector3.new(0, 0, -0.2)
+		lamp.Parent = frame
+		local spot = Instance.new("SpotLight")
+		spot.Face = Enum.NormalId.Front
+		spot.Range = if artId == "rustbike" then 26 else 40
+		spot.Angle = 50
+		spot.Brightness = if artId == "rustbike" then 1.4 else 2.6
+		spot.Color = Color3.fromRGB(255, 240, 210)
+		spot.Shadows = false
+		spot.Parent = lamp
+		DayNight.nightLight(spot)
+	end
+	return frame
+end
+
+-- Where the bike's ground is in the chassis' space (its BikeLean's pivot), or nil: not a bike.
+local function bikeGround(chassis: BasePart): CFrame?
+	local lean = chassis:FindFirstChild("BikeLean")
+	return if lean and lean:IsA("Motor6D") then lean.C0 else nil
+end
+
+-- The light slots of a bike's installed gear (Config.Gear order: the basket, the panniers, the trailer), relative to
+-- the chassis' top centre like Style cargo slots: the art's slot points; more room than points stacks over them.
+local function bikeGearSlots(style: Style, artId: string, gear: { [string]: boolean }): { Vector3 }
+	local out: { Vector3 } = {}
+	local spec = bikeSpec(artId)
+	local top = Vector3.new(0, style.clearance + CHASSIS_HEIGHT, 0) -- the chassis top over the bike's ground
+	for _, piece in BIKE_GEAR do
+		if gear[piece.id] ~= true then
+			continue
+		end
+		local mount = artPoint(spec, piece.point)
+		if not mount then
+			continue
+		end
+		local def = Economy.findGear(piece.id)
+		local room = if def and def.room then def.room else piece.room
+		local gearSpec = bikeSpec(piece.id)
+		local origin = mount
+		if piece.id == "trailer" then
+			-- The trailer's own Frame: its forward Hitch on the bike's rear one.
+			origin = mount - (artPoint(gearSpec, "Hitch") or Vector3.zero)
+		end
+		local points: { Vector3 } = {}
+		for n = 1, 8 do
+			local p = artPoint(gearSpec, `Slot{n}`)
+			if not p then
+				break
+			end
+			table.insert(points, p)
+		end
+		if #points == 0 then
+			table.insert(points, Vector3.zero)
+		end
+		for n = 1, room do
+			local layer = (n - 1) // #points
+			table.insert(out, origin + points[(n - 1) % #points + 1] + Vector3.new(0, layer * STACK, 0) - top)
+		end
+	end
+	return out
+end
+
+-- The bike gear on a bike's kit (buildKit): Codex's basket, panniers and trailer on hidden Mount roots at the bike's
+-- points. The basket and the panniers ride on the BikeFrame (they lean with it); the trailer is welded rigidly to the
+-- chassis behind the rear Hitch, its two wheels on WheelMotors (client/CarVisuals.luau spins them; the kit's are
+-- found again when the attribute KitBuilt changes).
+local function bikeGear(model: Model, chassis: Part, folder: Folder, carId: string, gear: { [string]: boolean })
+	local frame = model:FindFirstChild("BikeFrame")
+	local ground = bikeGround(chassis)
+	if not frame or not frame:IsA("BasePart") or not ground then
+		return
+	end
+	local def = Economy.findCar(carId)
+	local spec = bikeSpec(bikeArtId(carId, if def then def.style else "bike"))
+	local groundFrame = chassis.CFrame * ground
+	for _, piece in BIKE_GEAR do
+		local mount = artPoint(spec, piece.point)
+		if gear[piece.id] ~= true or not mount then
+			continue
+		end
+		local gearSpec = bikeSpec(piece.id)
+		if piece.id == "trailer" then
+			local origin = mount - (artPoint(gearSpec, "Hitch") or Vector3.zero)
+			local trailer = hiddenPart(folder, "TrailerFrame", BIKE_HIDDEN, groundFrame * CFrame.new(origin))
+			weld(chassis, trailer)
+			local left, right = artOrigin(gearSpec, "LeftWheel"), artOrigin(gearSpec, "RightWheel")
+			ModelArt.build(folder, gearSpec, {
+				Frame = trailer,
+				LeftWheel = wheelRoot(folder, trailer, trailer, left, left.Y, 0.2, false),
+				RightWheel = wheelRoot(folder, trailer, trailer, right, right.Y, 0.2, false),
+			})
+		else
+			local root = hiddenPart(folder, "GearMount", BIKE_HIDDEN, groundFrame * CFrame.new(mount))
+			weld(frame, root)
+			ModelArt.build(folder, gearSpec, { Mount = root })
+		end
+	end
+end
+
 -- (Re)builds the kit of a player's car (carId) for these car-track levels; 4.6: and its installed gear (none: nil).
 local function buildKit(model: Model, chassis: Part, style: Style, levels: Economy.Upgrades, carId: string, gear: { [string]: boolean }?)
 	local old = model:FindFirstChild("UpgradeKit")
@@ -1840,6 +2134,14 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	model:SetAttribute("Smoky", style.smoky == true and engine < 1)
 	local folder = Instance.new("Folder")
 	folder.Name = "UpgradeKit"
+	if style.bike then
+		-- 5.1: a bike shows only its bike gear (no plow, armour, engine, tyres or car gear on it). KitBuilt: the clients
+		-- find the kit's moving parts again (a trailer's wheels: client/CarVisuals.luau).
+		bikeGear(model, chassis, folder, carId, installed)
+		folder.Parent = model
+		model:SetAttribute("KitBuilt", ((model:GetAttribute("KitBuilt") or 0) :: number) + 1)
+		return
+	end
 	fitTyres(model, folder, style, Economy.level(levels, "handling"))
 	local top = chassis.CFrame * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
 	local function add(name: string, size: Vector3, at: Vector3, color: Color3, material: Enum.Material, cylinder: boolean?): Part
@@ -2053,6 +2355,22 @@ local function doorsOf(style: Style): { CarDoor }
 	if cached then
 		return cached
 	end
+	if style.bike then
+		-- 5.1: a bike has one "door", doorless: the saddle from its left side (client/CarBoarding.luau's climb, a hop).
+		local saddle: { CarDoor } = { {
+			side = -1,
+			z = style.seat.Z,
+			driver = true,
+			seats = {},
+			outside = 0.5,
+			promptY = 0.7,
+			panel = nil,
+			hinge = nil,
+			trim = {},
+		} }
+		doorCache[style] = saddle
+		return saddle
+	end
 	local hull = hullOf(style)
 	local list: { CarDoor } = {}
 	local function add(side: number, z: number, driver: boolean, cabin: boolean): CarDoor
@@ -2183,6 +2501,11 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	local chassis = newPart(model, "Chassis", Vector3.new(style.width - 0.4, CHASSIS_HEIGHT, style.length), chassisCF, DARK, Enum.Material.Metal)
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(2, 0, 0, 100, 1)
 	model.PrimaryPart = chassis
+	if style.bike then
+		-- 5.1: a bike's chassis and boxes are its hidden hull; Codex's art is the look (bikeBody).
+		chassis.Transparency = 1
+		model:SetAttribute("Bike", true)
+	end
 
 	local polished = not oneBeam and VehicleArt.supports(def.style)
 	if polished then
@@ -2223,8 +2546,8 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			end
 			CollectionService:AddTag(p, Vehicles.SirenTag)
 		end
-		-- Keep the original massless collision/raycast hull; the panelled skin supplies its appearance.
-		if polished then p.Transparency = 1 end
+		-- Keep the original massless collision/raycast hull; the panelled skin supplies its appearance (5.1: a bike's art).
+		if polished or style.bike then p.Transparency = 1 end
 		weld(chassis, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
 	end
@@ -2305,7 +2628,10 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		spoke.Massless = true
 		weld(tyre, spoke)
 	end
-	for _, offset in { Vector3.new(-wx, wheelY, -wz), Vector3.new(wx, wheelY, -wz), Vector3.new(-wx, wheelY, wz), Vector3.new(wx, wheelY, wz) } do
+	-- 5.1: a bike's wheels, frame and crank are Codex's art on their own roots (bikeBody); the saddle goes on its frame.
+	local bikeFrame: Part? = if style.bike then bikeBody(model, chassis, chassisY, style, bikeArtId(def.id, def.style), not display and not oneBeam) else nil
+	local corners: { Vector3 } = if style.bike then {} else { Vector3.new(-wx, wheelY, -wz), Vector3.new(wx, wheelY, -wz), Vector3.new(-wx, wheelY, wz), Vector3.new(wx, wheelY, wz) }
+	for _, offset in corners do
 		wheel(offset, true)
 	end
 	if style.dual then
@@ -2318,7 +2644,9 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	local front = -style.length / 2
 	local headY = if style.head then style.head.X else 1.2
 	local headZ = if style.head then style.head.Y else front - 0.05
-	for n, x in { -style.width / 2 + 1, style.width / 2 - 1 } do
+	-- (5.1: a bike's lamps are in its art.)
+	local lamps: { number } = if style.bike then {} else { -style.width / 2 + 1, style.width / 2 - 1 }
+	for n, x in lamps do
 		-- 4.0: the Rusty Van's right lamp is yellowed and dim (Style.dimHead).
 		local yellowed = style.dimHead == true and n == 2
 		local head = newPart(model, "Headlight", Vector3.new(1.2, 0.6, 0.2), top * CFrame.new(x, headY, headZ), if yellowed then DIM_HEAD_DIM else HEAD_DIM, Enum.Material.Glass)
@@ -2393,7 +2721,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	seat.CollisionGroup = "Car"
 	seat:SetAttribute("Door", 1)
 	seat.Parent = model
-	weld(chassis, seat)
+	weld(bikeFrame or chassis, seat)
 	built.seat = seat
 	local doors = doorsOf(style)
 	local doorOf: { [number]: number } = {}
@@ -2438,6 +2766,21 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	angular.RelativeTo = Enum.ActuatorRelativeTo.World
 	angular.AngularVelocity = Vector3.zero
 	angular.Parent = chassis
+	if style.bike then
+		-- 5.1: a bike stays upright: its right side kept level (no roll; it still pitches up and down a hill). The
+		-- strength is set with the movers' (Vehicles.spawnAt).
+		local level = Instance.new("Attachment")
+		level.Name = "Upright"
+		level.Parent = chassis
+		local upright = Instance.new("AlignOrientation")
+		upright.Name = "KeepUpright"
+		upright.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		upright.Attachment0 = level
+		upright.AlignType = Enum.AlignType.PrimaryAxisPerpendicular
+		upright.PrimaryAxis = Vector3.yAxis
+		upright.Responsiveness = 40
+		upright.Parent = chassis
+	end
 
 	-- The cargo: the back door (server/Cargo.luau puts the Load / Take out prompt there) and the passengers' door.
 	local door = Instance.new("Attachment")
@@ -2542,6 +2885,9 @@ end
 
 -- A car for the enemies, driven by the server (server/BanditCars.luau): no seats, no prompts, bandit figures inside.
 function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
+	if def.bike then
+		def = Config.Cars[1] -- 5.1: the bandits never ride bikes
+	end
 	local built = build(def, rgb(def.color), ground, false, "roofmg", true)
 	local model = built.model
 	local spots: { CFrame } = {}
@@ -2600,6 +2946,9 @@ local DRIVER_SKINS = { Color3.fromRGB(255, 224, 196), Color3.fromRGB(214, 160, 1
 -- like an NPC car; anchor it to step it by CFrame. Its parts are in the "Car" collision group. 3.5: at a stage (its
 -- look; the traffic picks one at random).
 function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?, stage: number?): TrafficCar
+	if def.bike then
+		def, stage = Config.Cars[1], nil -- 5.1: no bikes in the traffic
+	end
 	local built = build(def, color or rgb(def.color), ground, false, nil, true, stage)
 	local model = built.model
 	local seat = built.seat
@@ -3052,12 +3401,28 @@ end
 
 -- Where the loaded pieces ride, relative to the chassis: the bottom centre of a piece, facing the front.
 -- 3.5: the slots of the car's stage (its look's: as many as Economy.capacity counts).
+-- 5.1: a bike's installed bike gear adds its light slots after the bike's own (bikeGearSlots: the basket's, the
+-- panniers', the trailer's).
 function Vehicles.cargoSlots(car: Car): { CFrame }
 	local list = {}
-	for _, slot in styleOf(car).cargo.slots do
+	local style = styleOf(car)
+	local slots = style.cargo.slots
+	if style.bike then
+		local def = Economy.findCar(car.id)
+		slots = table.clone(slots)
+		for _, slot in bikeGearSlots(style, bikeArtId(car.id, if def then def.style else "bike"), car.gear) do
+			table.insert(slots, slot)
+		end
+	end
+	for _, slot in slots do
 		table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + slot))
 	end
 	return list
+end
+
+-- 5.1: is this car a bike (CarDef.bike)?
+function Vehicles.isBike(car: Car): boolean
+	return styleOf(car).bike == true
 end
 
 -- 3.4: how many pieces the car takes at once (3.5: at its stage). 4.6: with the cargo's look, the Roof Rack's slot
@@ -3363,7 +3728,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local gunId = gunFor(player, def.id)
 	local paintId = if def.company then nil else profile.carPaint[def.id]
 	local stage = if def.company then 0 else Economy.stageOf(def.id, levels) -- 3.5: its stage's look
-	local lower = stanceOf(levels) -- 4.0: Tyres & Suspension 5
+	local lower = if def.bike then 0 else stanceOf(levels) -- 4.0: Tyres & Suspension 5 (5.1: never on a bike)
 	local gear = if def.company then {} else Economy.installedGear(profile.carGear, def.id) -- 4.6
 	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage, lower)
 	applyPaint(built.paintParts, def, paintId)
@@ -3430,6 +3795,10 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local angular = car.chassis:FindFirstChild("Steer") :: AngularVelocity
 	linear.MaxForce = mass * 160
 	angular.MaxTorque = mass * 6000
+	local upright = car.chassis:FindFirstChild("KeepUpright")
+	if upright and upright:IsA("AlignOrientation") then
+		upright.MaxTorque = mass * 12000 -- (5.1: a bike; over the Steer's, which holds every turn still)
+	end
 
 	pcall(function()
 		car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
@@ -3490,10 +3859,30 @@ function Vehicles.placeNear(player: Player, carId: string?): string?
 	local look = if rootPart then rootPart.CFrame.LookVector else Vector3.new(0, 0, 1)
 	Vehicles.remove(player) -- the old car is not in the way of the new one
 
-	local x, z, dx, dz = Map.nearestRoad(from.X, from.Z)
+	local x, z, dx, dz, width = Map.nearestRoad(from.X, from.Z)
 	local direction = Vector3.new(dx, 0, dz)
 	if direction:Dot(look) < 0 then
 		direction = -direction
+	end
+	local wanted = Economy.findCar(carId or profile.car or "")
+	if wanted and wanted.bike then
+		-- 5.1: a bike stands by the kerb next to you (the road's edge on your side when a road is near; else right
+		-- beside you, facing where you look) and you get on at once.
+		local across = Vector3.new(-dz, 0, dx)
+		local away = Vector3.new(from.X - x, 0, from.Z - z)
+		local spot: Vector3
+		if away.Magnitude < width / 2 + 24 then
+			local side = if away:Dot(across) >= 0 then 1 else -1
+			spot = Vector3.new(x, 0, z) + across * side * math.max(0, math.min(width / 2 - 2.5, away.Magnitude))
+			spot += direction * direction:Dot(Vector3.new(from.X - spot.X, 0, from.Z - spot.Z)) -- level with you
+		else
+			local flat = Vector3.new(look.X, 0, look.Z)
+			direction = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, 1)
+			spot = Vector3.new(from.X, 0, from.Z) + Vector3.new(-direction.Z, 0, direction.X) * 3
+		end
+		local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, from.Y) + 0.5, spot.Z)
+		local bike = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + direction), true)
+		return if bike then nil else "Still loading..."
 	end
 	-- Step along the road if another car stands there.
 	local spot = freeSpot(Vector3.new(x, World.RoadTop, z), direction, 28)
@@ -3518,7 +3907,9 @@ function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string
 	if not force then
 		local inCar = Vehicles.seatedIn(player)
 		local call = Vehicles.callCar
-		if call and not (inCar and inCar.owner == player) then
+		-- 5.1: a bike needs no chauffeur: it is by the kerb next to you at once (placeNear).
+		local wanted = Economy.findCar(carId or profile.car or "")
+		if call and not (wanted and wanted.bike) and not (inCar and inCar.owner == player) then
 			return call(player, carId)
 		end
 		local err = Vehicles.cooldown(player)
@@ -3605,7 +3996,9 @@ function Vehicles.refreshStats(player: Player)
 		return
 	end
 	local levels = Economy.carLevels(profile.carUpgrades, car.id)
-	local rebuilt = Economy.stageOf(car.id, levels) ~= car.stage or stanceOf(levels) ~= car.lower
+	local carDef = Economy.findCar(car.id)
+	local stance = if carDef and carDef.bike then 0 else stanceOf(levels) -- (5.1: a bike never sits lower)
+	local rebuilt = Economy.stageOf(car.id, levels) ~= car.stage or stance ~= car.lower
 	if not car.lent and rebuilt and rebuild(car) then
 		return
 	end

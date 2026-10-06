@@ -37,5 +37,10 @@ def main():
         result=subprocess.run([str(Path(args.luau).resolve()),'preview-check.luau'],cwd=temp,text=True,capture_output=True)
         assert result.returncode==0,result.stdout+result.stderr
         print(result.stdout,end='')
+        # 5.1: the bikes (CarDef.bike: not in the baseline fleet nor the garage data) on the actual factory.
+        (temp/'bike-check.luau').write_text((HERE/'bike-check.luau').read_text())
+        result=subprocess.run([str(Path(args.luau).resolve()),'bike-check.luau'],cwd=temp,text=True,capture_output=True)
+        assert result.returncode==0,result.stdout+result.stderr
+        print(result.stdout,end='')
     print('Fleet compatibility PASS: all 20 stages keep original hulls, seats, joint frames, loading attachments and capacities; 40 variants within part budget (body 170, max kit 220); garage data matches factory')
 if __name__=='__main__':main()
