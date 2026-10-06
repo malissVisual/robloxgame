@@ -10,7 +10,8 @@
 -- dangerous tiers (licences held, licenceJobs counted toward them; shared/JobRules.luau). 5.0, "From the bottom" (a
 -- new DataStore, Config.DataStoreName): a new player starts on foot with no vehicle (car = nil, cars = {}), the
 -- personal gear bought at Last Stop Supplies (kit: Config.Kit ids, shared/Transport.luau) and the phone Marge gives
--- in the tutorial (phone).
+-- in the tutorial (phone). 5.1: bikes are Config.Cars entries in cars (bike = true); the equipped `car` may be one,
+-- `bike` is your bike of choice and `lastCar` the car the phone's CALL CAR brings back (server/Shops.luau).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -32,7 +33,9 @@ local JobRules = require(Shared.JobRules)
 export type Profile = {
 	money: number,
 	cars: { [string]: boolean },
-	car: string?, -- 5.0: the equipped car; nil = no vehicle yet (on foot)
+	car: string?, -- 5.0: the equipped car; nil = no vehicle yet (on foot). 5.1: or a bike (what CAR / MY BIKE brings)
+	bike: string?, -- 5.1: your bike of choice (an owned Config.Cars bike; Spoke & Chain's EQUIP, the phone's MY BIKE)
+	lastCar: string?, -- 5.1: the car you drove before you got on your bike (the phone's CALL CAR brings it back)
 	weapons: { [string]: boolean },
 	weapon: string,
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
@@ -91,6 +94,8 @@ local function newProfile(): Profile
 		money = Config.StartMoney,
 		cars = {}, -- 5.0: you start on foot (the Old Van is bought at level 4)
 		car = nil,
+		bike = nil, -- 5.1
+		lastCar = nil, -- 5.1
 		weapons = { [Config.Weapons[1].id] = true },
 		weapon = Config.Weapons[1].id,
 		upgrades = {},
@@ -466,6 +471,13 @@ local function applySaved(profile: Profile, saved: any)
 	if type(saved.car) == "string" and profile.cars[saved.car] then
 		profile.car = saved.car
 	end
+	-- 5.1: your bike of choice and the car CALL CAR brings back (only ones you own, of the right kind).
+	local function kind(id: any, bike: boolean): string?
+		local def = if type(id) == "string" and profile.cars[id] then Economy.findCar(id) else nil
+		return if def and (def.bike == true) == bike and not def.company then def.id else nil
+	end
+	profile.bike = kind(saved.bike, true)
+	profile.lastCar = kind(saved.lastCar, false)
 	if type(saved.weapon) == "string" and profile.weapons[saved.weapon] then
 		profile.weapon = saved.weapon
 	end
@@ -618,6 +630,8 @@ function PlayerData.save(player: Player, final: boolean?)
 		money = profile.money,
 		cars = profile.cars,
 		car = profile.car,
+		bike = profile.bike, -- 5.1
+		lastCar = profile.lastCar, -- 5.1
 		weapons = profile.weapons,
 		weapon = profile.weapon,
 		upgrades = profile.upgrades,
@@ -786,6 +800,9 @@ function PlayerData.giveCar(player: Player, id: string): boolean
 	profile.cars[id] = true
 	if profile.car == nil and def and not def.company then
 		profile.car = id -- 5.0: the first car of your own you get is the one you drive (not an employer's vehicle)
+	end
+	if def and def.bike and profile.bike == nil then
+		profile.bike = id -- 5.1: your first bike is your bike of choice
 	end
 	if id == Config.VanQuest.Car then
 		profile.vanQuest = "done" -- 5.0: Earl's van (bought from him, or given)

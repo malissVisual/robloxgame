@@ -18,7 +18,7 @@
 --   CAREER    the career app: rank, level, XP, the next goal in work ("about 8 on-foot runs", client/CareerUi.luau),
 --             what it opens, the next levels of the road (shared/Career.luau), and FULL CAREER (C, Phone.onCareer).
 --   SHOP      what to buy next with your money and level: the personal gear at Last Stop Supplies (Config.Kit,
---             client/KitShop.luau), the bikes (coming in 5.1), the Old Van from Earl at Earl's Used Wheels (Marge's
+--             client/KitShop.luau), 5.1: the bikes at Spoke & Chain (SET GPS), the Old Van from Earl at Earl's Used Wheels (Marge's
 --             quest at level 4, Config.VanQuest; SET GPS to Earl, Map.VanSeller), the next vehicles at Dead End
 --             Motors; each with what is missing ($ to go, the level), SET GPS to the shop (MapView.setWaypoint).
 --   MAP       the big map (MapView.toggle).
@@ -26,6 +26,8 @@
 --             the dispatcher's new runs, your level-ups, and the texts the server sends (the Tutorial remote's
 --             "message": Marge about Earl's van, server/VanQuest.luau; with `gps` it sets the GPS there). New ones put
 --             a red dot on the PHONE action.
+-- 5.1: the courier ID has the quick switch when you own a bike: 🚲 MY BIKE (the "Equip" remote's "ride": your bike
+-- comes at once) and, with a car of your own too, 🚐 CALL CAR ("drive": back to your car, the chauffeur brings it).
 -- The MENU and every key stay as they were (J, C, M ...); the phone is one more way in. Opening it closes the other
 -- windows (Phone.onOpen, Main: Hud.closeWindows); ESC, O, the PHONE action or the home bar (on the home screen)
 -- close it. While it is open the mouse is free (Main: CameraRig.mouseNeeded asks Phone.isOpen).
@@ -154,11 +156,11 @@ local function shiftText(): string
 	return "DAY SHIFT · THE BOARD IS OPEN"
 end
 
--- How you get around: "ON FOOT · HANDS 2 / BACKPACK 3" or the vehicle's name.
+-- How you get around: "ON FOOT · HANDS 2 / BACKPACK 3" or the vehicle's name (5.1: 🚲 a bike).
 local function transportText(): string
 	if state and type(state.car) == "string" then
 		local def = Economy.findCar(state.car)
-		return `🚐 {string.upper(if def then def.name else state.car)}`
+		return `{if def and def.bike then "🚲" else "🚐"} {string.upper(if def then def.name else state.car)}`
 	end
 	return `🚶 ON FOOT · {KitShop.roomText(kit())}`
 end
@@ -167,7 +169,7 @@ end
 local function vehicles(): { Config.CarDef }
 	local list: { Config.CarDef } = {}
 	for _, def in Config.Cars do
-		if not def.company and (def :: any).kind ~= "bike" then
+		if not def.company and not def.bike then
 			table.insert(list, def)
 		end
 	end
@@ -202,9 +204,7 @@ local function margeTips(level: number): { string }
 			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}. A {pack.name} at Last Stop Supplies holds {pack.room} ({Career.money(pack.price)}){if shoes then `, and {shoes.name} get you there faster ({Career.money(shoes.price)})` else ""}. The SHOP app says what you can afford.`)
 		end
 	end
-	if level == Career.BIKE_LEVEL then
-		table.insert(tips, `Level {level}! A bike shop is opening in town soon (5.1): more room, more speed than walking. Start saving.`)
-	end
+	-- (5.1: the bike shop at Career.BIKE_LEVEL is Marge's own text from the server, with the GPS: server/Tutorial.luau)
 	local first = vehicles()[1]
 	if first and (first.level or 1) == level and level > 1 then
 		local private = first.id == Config.VanQuest.Car -- (5.0: Earl sells it, not the dealer)
@@ -381,9 +381,9 @@ local function ordersApp(list: Instance)
 	end
 	-- 5.0, on foot: what rides in your backpack (the payload's pack / packRoom; the PackCount attribute is live).
 	local packRoom = tonumber(job.packRoom) or tonumber(player:GetAttribute("PackRoom")) or 0
-	if job.mode == "foot" and packRoom > 0 then
+	if (job.mode == "foot" or job.mode == "bike") and packRoom > 0 then
 		local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
-		caps(b, `🎒 Backpack {packed} / {packRoom}`, 11, if packed >= packRoom then K.red else K.secondary)
+		caps(b, `{if job.mode == "bike" then "🚲 On the bike" else "🎒 Backpack"} {packed} / {packRoom}`, 11, if packed >= packRoom then K.red else K.secondary)
 	end
 	local condition = tonumber(job.condition)
 	if condition and condition < 0.999 then
@@ -529,18 +529,23 @@ local function shopApp(list: Instance)
 			goal(list, order, def.icon, def.name, "Last Stop Supplies", def.price, def.level)
 		end
 	end
-	-- The bikes (5.1): a line until Config.Cars has one.
-	local bikes = false
+	-- 5.1: the bikes at Spoke & Chain you do not own yet (two of them, the cheapest first), SET GPS to the shop.
+	local cars = if state and type(state.cars) == "table" then state.cars else {}
+	local bikesShown = 0
 	for _, def in Config.Cars do
-		bikes = bikes or (def :: any).kind == "bike"
-	end
-	if not bikes then
+		if not def.bike or cars[def.id] or bikesShown >= 2 then
+			continue
+		end
+		bikesShown += 1
 		order += 1
-		goal(list, order, "🚲", "Bikes", "A bike shop in town", 0, Career.BIKE_LEVEL, "COMING IN 5.1")
+		if bikesShown == 1 then
+			shopHeader(list, order, "bikes", "Spoke & Chain · bikes")
+			order += 1
+		end
+		goal(list, order, "🚲", def.name, `Spoke & Chain, {Config.BikeShop.Street}`, def.price, def.level or 1)
 	end
 	-- The first vehicles you do not own yet (two of them). 5.0: the Old Van comes from Earl (Marge's quest), SET GPS
 	-- to him; the others from Dead End Motors.
-	local cars = if state and type(state.cars) == "table" then state.cars else {}
 	local count = 0
 	local dealerShown = false
 	for _, def in vehicles() do
@@ -732,6 +737,21 @@ local function homeWidgets(parent: Instance)
 	back.Position = UDim2.fromOffset(0, 2)
 	refs.idXp = fill
 	refs.idTransport = caps(card, "", 5)
+	-- 5.1: the quick switch (fillHome shows it when you own a bike): MY BIKE, and CALL CAR with a car of your own too.
+	local switch = Ui.make("Frame", { Name = "Switch", Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1, LayoutOrder = 6, Visible = false }, card)
+	Ui.list(switch, false, 6)
+	local function switchButton(label: string, order: number, how: string): any
+		local made = P.button(switch, label, UDim2.new(0.5, -3, 1, 0), "quiet", function()
+			Net.get("Equip"):FireServer(how)
+			Phone.close()
+		end)
+		made.LayoutOrder = order
+		made.TextSize = 12
+		return made
+	end
+	refs.switch = switch
+	refs.rideBike = switchButton("🚲 MY BIKE", 1, "ride")
+	refs.callCar = switchButton("🚐 CALL CAR", 2, "drive")
 	-- The newest unread message, like a notification (a tap opens MESSAGES).
 	local note = Ui.make("TextButton", {
 		Name = "Notification",
@@ -769,6 +789,17 @@ local function fillHome()
 	refs.idRank.Text = `{string.upper(Levels.rank(level))} · LEVEL {level}`
 	refs.idXp.Size = UDim2.fromScale(Levels.progress(myXp()), 1)
 	refs.idTransport.Text = transportText()
+	-- 5.1: the quick switch: which of a bike and a car of your own you have.
+	local hasBike, hasCar = false, false
+	for _, def in Config.Cars do
+		if state and type(state.cars) == "table" and state.cars[def.id] and not def.company then
+			hasBike = hasBike or def.bike == true
+			hasCar = hasCar or not def.bike
+		end
+	end
+	refs.switch.Visible = hasBike
+	refs.callCar.Visible = hasCar
+	refs.rideBike.Size = if hasCar then UDim2.new(0.5, -3, 1, 0) else UDim2.new(1, 0, 1, 0)
 	local newest: Message? = nil
 	for _, message in messages do
 		if message.unread then

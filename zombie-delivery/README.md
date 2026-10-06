@@ -1079,6 +1079,17 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Bikes and Spoke & Chain Cycles (5.1)
+
+At level 2 Marge texts you: **Spoke & Chain Cycles** on Main St (Downtown block -1, 1) sells bikes — the Rusty Bike
+($300, L2), the Courier Bike ($1 100, L2), the Cargo Bike with a front box ($2 400, L3, 4 slots) and the E-Bike
+($6 500, L5) (`Config.Cars` with `bike = true`, Codex's `BikeArt`). CAR (or the phone's MY BIKE) puts your bike by the
+kerb and seats you; it leans into turns, the cranks and wheels turn, the rider pedals (`client/BikeRider.luau`). Bike
+gear at the shop (`bikeOnly` in `Config.Gear`): a basket (+2), panniers (+3), a trailer (+4, not on the cargo bike),
+installed in the bike's gear slots. **Bike jobs** (`Config.Jobs.Bike`, the board's BIKE section): light cargo, 300–1 000
+studs, 2–6 pieces by your room (bike + gear + your backpack), $90–240. Car jobs and missions still need a car; the phone
+switches MY BIKE / CALL CAR when you own both.
+
 ## Your career and your gear (4.6)
 
 **The career** (MENU → CAREER, or **C**): your rank and level, the XP to the next one (about how many deliveries), what

@@ -23,14 +23,22 @@
 -- 5.0, the phone: profile.phone = true when she gives you the first job (or the tutorial is skipped; a player without
 -- the tutorial gets it at once), and the message ("phone", { npc }) right before the job's: client/Phone.luau shows
 -- its "NEW PHONE" moment (TutorialUi ignores it: not a phase).
+-- 5.1, Spoke & Chain: when a player reaches Career.BIKE_LEVEL while playing and owns no bike, Marge texts them
+-- (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's "message" with the GPS to the shop,
+-- client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
+-- (the phone's messages are not saved).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Career = require(Shared.Career)
 local Config = require(Shared.Config)
+local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
+local TransportRules = require(Shared.Transport)
+local VanQuestRules = require(Shared.VanQuest)
 local Net = require(Shared.Net)
 local TutorialSteps = require(Shared.TutorialSteps)
 local PlayerData = require(script.Parent.PlayerData)
@@ -307,11 +315,68 @@ local function track(player: Player)
 	end
 end
 
+-- ── 5.1: Marge about Spoke & Chain ─────────────────────────────────────────
+
+local bikeLevels: { [Player]: number } = {} -- the level last seen while playing (from PLAY on)
+local BIKE_DELAY = 8 -- seconds after PLAY before her reminder (after the welcome and Earl's text)
+
+-- Does the player own a bike?
+local function ownsBike(player: Player): boolean
+	local profile = PlayerData.get(player)
+	if profile then
+		for id, owned in profile.cars do
+			if owned and TransportRules.isBike(id) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Her text (the cheapest bike's price in it) and a toast; the phone sets the GPS to the shop.
+local function tellBikes(player: Player, text: string)
+	local cheapest: number? = nil
+	for _, def in Config.Cars do
+		if def.bike and (cheapest == nil or def.price < cheapest) then
+			cheapest = def.price
+		end
+	end
+	local shop = Map.Shops.bikes
+	local words = string.gsub(text, "{price}", if cheapest then `${cheapest}` else "a few hundred")
+	remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "bikes" } })
+	notice:FireClient(player, `📱 Marge: {words}`)
+end
+
+-- A level-up to the bikes' level while playing (PlayerData.Changed), without a bike: her text.
+local function bikeCheck(player: Player)
+	local before = bikeLevels[player]
+	local profile = PlayerData.get(player)
+	if before == nil or not profile then
+		return
+	end
+	local level = Levels.levelFor(profile.xp)
+	bikeLevels[player] = level
+	if before < Career.BIKE_LEVEL and level >= Career.BIKE_LEVEL and not ownsBike(player) then
+		tellBikes(player, Config.BikeShop.Unlock)
+	end
+end
+
 -- PLAY was pressed (Main may call this from its Play handler; without it the arriving car tells the same).
 function Tutorial.onPlay(player: Player)
 	local session = sessions[player]
 	if session and session.phase == "wait" and not session.readyAt then
 		session.readyAt = os.clock() + Tuning.StartDelay
+	end
+	-- 5.1: from now on a level-up to the bikes' level brings Marge's text; between it and the van's, her reminder.
+	local profile = PlayerData.get(player)
+	local level = if profile then Levels.levelFor(profile.xp) else 1
+	bikeLevels[player] = level
+	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
+		task.delay(BIKE_DELAY, function()
+			if player.Parent and not ownsBike(player) then
+				tellBikes(player, Config.BikeShop.Reminder)
+			end
+		end)
 	end
 end
 
@@ -336,7 +401,9 @@ function Tutorial.start()
 	Players.PlayerRemoving:Connect(function(player)
 		sessions[player] = nil
 		talked[player] = nil
+		bikeLevels[player] = nil
 	end)
+	PlayerData.Changed:Connect(bikeCheck) -- 5.1: Marge about Spoke & Chain
 	for _, player in Players:GetPlayers() do
 		track(player)
 	end

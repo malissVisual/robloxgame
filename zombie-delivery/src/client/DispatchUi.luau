@@ -36,6 +36,11 @@
 --     the car tiers' headers say "NEEDS A VEHICLE · Old Van at level 4" (no REROLL) and every job that needs your own
 --     vehicle is locked "🚐 NEEDS A VEHICLE" with that remedy (a job that lends a company vehicle is not). The server
 --     refuses them anyway.
+--   * 5.1, the bikes: the offers with mode = "bike" come next in a BIKE section (from Config.Jobs.Bike.Level): a header
+--     with your bike and what it holds (the Offers info's `bike`), each row with a 🚲 BIKE chip and "fits your bike
+--     (3 / 4)" on its CARGO line; without a bike they are locked "🚲 NEEDS A BIKE" (Spoke & Chain), while your car is
+--     the one you drive "🚲 RIDE YOUR BIKE" (the server's lockText / lockButton). Riding your bike (state.car a bike)
+--     the car card shows the bike, and the car jobs are locked "🚐 CALL YOUR CAR" (the phone's CALL CAR).
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
 -- (Ui.screenScale) and sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
 -- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()). 4.2, a gamepad: the selection starts on the first
@@ -57,6 +62,7 @@ local Theme = require(script.Parent.Theme)
 local Drive = require(script.Parent.Drive)
 local Hud = require(script.Parent.Hud)
 local KitShop = require(script.Parent.KitShop) -- 5.0: the room on foot in words ("HANDS 2 / BACKPACK 3")
+local BikeShop = require(script.Parent.BikeShop) -- 5.1: your bike and what it holds
 local Transport = require(Shared.Transport)
 
 local K = Theme.Contract
@@ -220,6 +226,14 @@ local function isFoot(offer: any): boolean
 	return offer.mode == "foot"
 end
 
+-- 5.1: a bike run (the BIKE section), and riding your bike (state.car is a bike: the car jobs need your car).
+local function isBike(offer: any): boolean
+	return offer.mode == "bike"
+end
+local function riding(): boolean
+	return state ~= nil and type(state.car) == "string" and Transport.isBike(state.car)
+end
+
 local function myKit(): Transport.Kit
 	return KitShop.owned(state)
 end
@@ -228,7 +242,7 @@ end
 local function firstVehicle(): Config.CarDef?
 	local best: Config.CarDef? = nil
 	for _, def in Config.Cars do
-		if def.company or (def :: any).kind == "bike" then
+		if def.company or def.bike then
 			continue
 		end
 		local b = best
@@ -264,6 +278,9 @@ end
 local function myCar(): (string, number, number)
 	if onFoot() then
 		return "On foot", Transport.handsRoom(myKit()), 1 -- 5.0: your hands and your backpack
+	elseif riding() then
+		local bike = Economy.findCar(carId())
+		return if bike then bike.name else "Bike", BikeShop.room(state, carId()), 1 -- 5.1: what your bike holds
 	end
 	local id = carId()
 	local levels = carLevels(id)
@@ -294,6 +311,9 @@ local function roomRemedy(offer: any): string
 		-- 5.0: on foot the room is your hands and your backpack.
 		local room = Transport.handsRoom(myKit())
 		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. A bigger backpack at Last Stop Supplies carries more.`
+	elseif isBike(offer) then
+		-- 5.1: your bike, its bike gear and your backpack.
+		return `Your {offer.carName or "bike"} and your backpack hold {offer.capacity or 0}; this run has {math.max(need, tonumber(offer.pieces) or 0)}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
 	end
 	local head = `Your {offer.carName or "car"} holds {offer.capacity or 0} {if offer.capacity == 1 then "slot" else "slots"}; this job needs {need}.`
 	if offer.vehicle then
@@ -579,9 +599,11 @@ local function refreshChrome()
 	local percent = math.floor(condition * 100 + 0.5)
 	refs.carName.Text = name
 	local walking = onFoot()
-	refs.carIcon.Visible = not walking
-	refs.footIcon.Visible = walking
-	refs.carCaps.Text = if walking then "YOUR TRANSPORT" else "YOUR VEHICLE"
+	local onBike = riding() -- 5.1
+	refs.carIcon.Visible = not walking and not onBike
+	refs.footIcon.Visible = walking or onBike
+	refs.footIcon.Text = if onBike then "🚲" else "🚶"
+	refs.carCaps.Text = if walking or onBike then "YOUR TRANSPORT" else "YOUR VEHICLE"
 	-- 4.6: a Roof Rack (gear) takes one more light piece on the roof.
 	local mine = carId()
 	local rack = Economy.installedGear(if state and type(state.carGear) == "table" then state.carGear else nil, mine).roofrack == true and Economy.gearFits(mine, "roofrack")
@@ -596,6 +618,14 @@ local function refreshChrome()
 		refs.carNote.Text = `No vehicle yet: the {vehicleShort()}. A backpack carries more.`
 		refs.capacity.Text = `YOUR ROOM · {room}`
 		refs.context.Text = `ON FOOT · {room}  ·  {Levels.rank(level)} / level {level}`
+	elseif onBike then
+		-- 5.1: on your bike: what it holds (its room, its bike gear, your backpack), light cargo; the car jobs need your car.
+		refs.carStats.Text = `📦 {slots} light {if slots == 1 then "piece" else "pieces"} · bike + gear + backpack`
+		refs.carHealth.Text = "Light cargo only · BIKE runs"
+		refs.carHealth.TextColor3 = K.secondary
+		refs.carNote.Text = "Car jobs need your car: CALL CAR on your phone."
+		refs.capacity.Text = `YOUR BIKE · {slots} LIGHT`
+		refs.context.Text = `{string.upper(name)} · {slots} LIGHT  ·  {Levels.rank(level)} / level {level}`
 	else
 		refs.carStats.Text = `📦 {slots} cargo {if slots == 1 then "slot" else "slots"}{if rack then " + 1 on the roof (light)" else ""}`
 		refs.carHealth.Text = `🔧 {percent}% condition`
@@ -677,6 +707,8 @@ local function dangerRow(body: any, offer: any)
 	if isFoot(offer) then
 		-- 5.0: an on-foot run: no danger level, the walker's chip.
 		chip(row, "🚶 ON FOOT", K.text, 1).TextColor3 = K.text
+	elseif isBike(offer) then
+		chip(row, "🚲 BIKE", K.text, 1).TextColor3 = K.text -- 5.1
 	else
 		text(row, `{string.upper(tostring(offer.tierName or "Job"))} · {string.rep("★", stars)}`, UDim2.fromOffset(0, 20), {
 			AutomaticSize = Enum.AutomaticSize.X,
@@ -773,6 +805,11 @@ local function details(body: any, offer: any, w: number): number
 		local room = Transport.handsRoom(myKit())
 		local pieces = count or slots
 		table.insert(words, if pieces <= room then `fits your hands ({pieces} / {room})` else `{pieces} pieces: you carry {room}`)
+	elseif isBike(offer) then
+		-- 5.1: your bike's room with its gear and your backpack (the server's capacity).
+		local room = tonumber(offer.capacity) or 0
+		local pieces = count or slots
+		table.insert(words, if offer.needsBike then "light pieces on a bike" elseif pieces <= room then `fits your bike ({pieces} / {room})` else `{pieces} pieces: your bike holds {room}`)
 	else
 		table.insert(words, if slots > 0 then `{slots} cargo {if slots == 1 then "slot" else "slots"}` else "no cargo slots")
 	end
@@ -910,7 +947,7 @@ local function offerTicket(offer: any, number: number, order: number?)
 	local licence = if offer.locked == true and offer.lockReason == "licence" and type(offer.licence) == "table" then offer.licence else nil
 	local lockLevel = if offer.locked == true and not licence then (tonumber(offer.level) or myLevel() + 1) else nil
 	-- 5.0: a job that needs your own vehicle while you have none (a job that lends a company vehicle does not).
-	local noVehicle = onFoot() and not isFoot(offer) and offer.vehicle == nil
+	local noVehicle = onFoot() and not isFoot(offer) and not isBike(offer) and offer.vehicle == nil -- (5.1: a bike run has its own lock)
 	local why = if licence then licenceNote(licence)
 		elseif lockLevel == nil and noVehicle then vehicleNote()
 		elseif lockLevel == nil and offer.tooBig == true then (if type(offer.lockText) == "string" then offer.lockText else roomRemedy(offer))
@@ -974,8 +1011,10 @@ local function tierHeader(index: number, info: any, order: number)
 	})
 	local licence = if type(info.licence) == "table" then info.licence else nil
 	local level = tonumber(info.level) or 1
-	local walking = onFoot() -- 5.0: no vehicle yet: the car tiers need one
-	local sub = if walking and myLevel() < level then `LOCKED · LEVEL {level} · needs a vehicle ({vehicleShort()})`
+	local onBike = riding() and boardInfo ~= nil and boardInfo.ownsCar == true -- 5.1: on your bike, a car at home
+	local walking = onFoot() or onBike -- 5.0: no vehicle yet: the car tiers need one
+	local sub = if onBike then `NEEDS YOUR CAR · CALL CAR on your phone{if myLevel() < level then ` · LEVEL {level}` else ""}`
+		elseif walking and myLevel() < level then `LOCKED · LEVEL {level} · needs a vehicle ({vehicleShort()})`
 		elseif walking then `NEEDS A VEHICLE · {vehicleShort()}, {if firstVehicle() and (firstVehicle() :: Config.CarDef).id == Config.VanQuest.Car then Config.VanQuest.Place else "Dead End Motors"}`
 		elseif info.open == true then "Pick one: each run has its own trade-off"
 		elseif myLevel() < level then `LOCKED · LEVEL {level}{if licence then ` and the {licence.stars} licence` else ""}`
@@ -1042,6 +1081,40 @@ local function footHeader(count: number, order: number)
 	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, row)
 end
 
+-- 5.1: the header of the BIKE section: what these runs are, and your bike's room on the right (or what is missing).
+local function bikeHeader(count: number, order: number)
+	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
+	text(row, "🚲  BIKE", UDim2.new(1, -220, 0, 18), {
+		Position = UDim2.fromOffset(4, 4),
+		Font = Theme.HeadingFont,
+		TextSize = 13,
+		TextWrapped = false,
+	})
+	local bike = if boardInfo and type(boardInfo.bike) == "table" then boardInfo.bike else nil
+	local sub = if bike == nil then `NEEDS A BIKE · Spoke & Chain on Main St, level {Config.Jobs.Bike.Level}`
+		elseif bike.riding ~= true then "Your car is out: MY BIKE on your phone gets you on the bike"
+		else `{count} light {if count == 1 then "run" else "runs"} · longer, better paid · light cargo only`
+	text(row, sub, UDim2.new(1, -220, 0, 16), {
+		Position = UDim2.fromOffset(4, 22),
+		TextSize = 12,
+		TextColor3 = if bike and bike.riding == true then K.secondary else K.red,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	local room = text(row, if bike then `{string.upper(tostring(bike.name))} · {tonumber(bike.room) or 0} LIGHT` else "NO BIKE", UDim2.fromOffset(0, 22), {
+		Position = UDim2.new(1, -4, 0, 8),
+		AnchorPoint = Vector2.new(1, 0),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Theme.HeadingFont,
+		TextSize = 11,
+		TextColor3 = K.text,
+		TextWrapped = false,
+	})
+	Ui.stroke(room, K.rule, 1)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, room)
+	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, row)
+end
+
 -- On a delivery: that job, and giving it up.
 local function jobTicket()
 	Ui.clear(refs.list)
@@ -1095,11 +1168,12 @@ renderList = function()
 		message(if #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
 		return
 	end
-	-- 5.0: the on-foot runs first, under their own header; then the car jobs.
+	-- 5.0: the on-foot runs first, under their own header; 5.1: then the bike runs under theirs; then the car jobs.
 	local walks: { any } = {}
+	local rides: { any } = {}
 	local rest: { any } = {}
 	for _, offer in visible do
-		table.insert(if isFoot(offer) then walks else rest, offer)
+		table.insert(if isFoot(offer) then walks elseif isBike(offer) then rides else rest, offer)
 	end
 	local order = 0
 	if #walks > 0 then
@@ -1111,6 +1185,20 @@ renderList = function()
 		for number, offer in walks do
 			order += 1
 			local ticketOk, ticketErr = pcall(offerTicket, offer, number, order)
+			if not ticketOk then
+				warn(`[DispatchUi] a ticket failed: {ticketErr}`)
+			end
+		end
+	end
+	if #rides > 0 then
+		order += 1
+		local ok, err = pcall(bikeHeader, #rides, order) -- 5.1
+		if not ok then
+			warn(`[DispatchUi] the bike header failed: {err}`)
+		end
+		for number, offer in rides do
+			order += 1
+			local ticketOk, ticketErr = pcall(offerTicket, offer, #walks + number, order)
 			if not ticketOk then
 				warn(`[DispatchUi] a ticket failed: {ticketErr}`)
 			end
@@ -1131,7 +1219,7 @@ renderList = function()
 			end
 		end
 		order += 1
-		local ok, err = pcall(offerTicket, offer, #walks + index, order)
+		local ok, err = pcall(offerTicket, offer, #walks + #rides + index, order)
 		if not ok then
 			warn(`[DispatchUi] a ticket failed: {err}`)
 		end

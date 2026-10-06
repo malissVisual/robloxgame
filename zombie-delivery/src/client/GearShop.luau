@@ -5,6 +5,8 @@
 -- bought, what it does, and the one action that fits: BUY (from its level: "LEVEL 4" until then), INSTALL (free, into
 -- a free slot), REMOVE (free: it stays the car's). The server checks everything again (server/Shops.luau, the "Gear"
 -- remote). Presentation only, no state of its own.
+-- 5.1: the car gear only (GearDef.bikeOnly is not shown here; riding your bike: a note sends you to Spoke & Chain).
+-- Spoke & Chain's GEAR tab (client/BikeShop.luau) draws the bike gear for your bike with the same rows (forBike).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,8 +14,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
+local Icons = require(Shared.Icons)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
+local Transport = require(Shared.Transport)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
@@ -47,24 +51,40 @@ end
 
 -- Why a piece does not fit a car, in a few words (the button).
 local function misfit(gear: Config.GearDef): string
-	if gear.needs == "trolley" then
+	if gear.bikeOnly then
+		return "NOT ON THIS BIKE" -- 5.1: the trailer and the Cargo Bike
+	elseif gear.needs == "trolley" then
 		return "VANS & TRUCKS"
 	end
 	return "NOT ON THIS CAR"
 end
 
+-- A note instead of the rows (no vehicle, no bike, the wrong shop).
+local function note(body: Instance, title: string, text: string)
+	local none = Ui.make("Frame", { Name = "GearSlots", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, body)
+	Ui.list(none, true, 4)
+	P.caps(none, title, UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1 })
+	Ui.label(none, text, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
+end
+
 -- Draws the GEAR tab into `body` (the shop's scrolling body, a vertical list; Hud clears it first). `here`: at the
--- counter (only there the actions work).
-function GearShop.render(body: Instance, state: any, here: boolean)
-	if type(state.car) ~= "string" then
+-- counter (only there the actions work). 5.1: `forBike` (Spoke & Chain): the bike gear of `bikeId` (your bike).
+function GearShop.render(body: Instance, state: any, here: boolean, forBike: boolean?, bikeId: string?)
+	local vehicleId: string? = if forBike then bikeId elseif type(state.car) == "string" then state.car else nil
+	if vehicleId == nil then
 		-- 5.0: you start on foot: no car, no gear to show (not the van's list with BUY buttons).
-		local none = Ui.make("Frame", { Name = "GearSlots", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, body)
-		Ui.list(none, true, 4)
-		P.caps(none, "Gear · no vehicle yet", UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1 })
-		Ui.label(none, `Gear goes on a car of your own, and you are still on foot. Your first one: the Old Van from {Config.VanQuest.Where}.`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
+		if forBike then
+			note(body, "Bike gear · no bike yet", "Bike gear goes on a bike of your own: buy one in the BIKES tab first.")
+		else
+			note(body, "Gear · no vehicle yet", `Gear goes on a car of your own, and you are still on foot. Your first one: the Old Van from {Config.VanQuest.Where}.`)
+		end
 		return
 	end
-	local carId: string = state.car
+	if not forBike and Transport.isBike(vehicleId) then
+		note(body, "Gear · you ride your bike", "A bike takes bike gear, at Spoke & Chain on Main St. For your car's gear, CALL CAR on your phone first.")
+		return
+	end
+	local carId: string = vehicleId
 	local carDef = Economy.findCar(carId)
 	local carGear: Economy.CarGear = if type(state.carGear) == "table" then state.carGear else {}
 	local levels = Economy.carLevels(state.carUpgrades, carId)
@@ -93,14 +113,18 @@ function GearShop.render(body: Instance, state: any, here: boolean)
 		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.2 }, pip)
 	end
 	local explain = if company then "A company vehicle comes with what its job needs: no gear slots. Take one of your own cars out of your garage."
+		elseif forBike then "Buy a piece once for this bike, then fit or remove it here for free. Each piece takes a gear slot and holds more light pieces."
 		else "Buy a piece once for this car, then install or remove it here for free. Each piece takes one gear slot; bigger cars and later stages have more."
 	Ui.label(head, explain, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = if company then P.danger else P.ink2, TextSize = 14, Font = Theme.Font })
 
 	for order, gear in Config.Gear do
+		if (gear.bikeOnly == true) ~= (forBike == true) then
+			continue -- (5.1: the bike gear at Spoke & Chain, the car gear at Wrench Garage)
+		end
 		local now = Economy.gearState(carGear, carId, gear.id)
 		local fits = not company and Economy.gearFits(carId, gear.id)
 		local row = P.row(body, ROW_H, order + 1, now == "installed")
-		Ui.label(row, gear.icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(14, ROW_H / 2 - 20), TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center })
+		Ui.icon(row, Icons.gear(gear.id), gear.icon, UDim2.fromOffset(40, 40), { Position = UDim2.fromOffset(14, ROW_H / 2 - 20), ImageColor3 = P.ink, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center })
 		local left = 64
 		Ui.label(row, gear.name, UDim2.new(1, -(left + BUTTON_W + 24), 0, 22), { Position = UDim2.fromOffset(left, 8), TextSize = 17, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		local status = if now == "installed" then `<font color="{P.hex(P.good)}">INSTALLED</font>`

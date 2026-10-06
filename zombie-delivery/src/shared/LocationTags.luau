@@ -56,6 +56,7 @@ local SHOP_SUB: { [string]: string } = {
 	mechanic = "UPGRADES · REPAIRS",
 	repairs = "REPAIR SHOP",
 	supplies = "SUPPLIES",
+	bikes = "BIKES · BIKE GEAR", -- 5.1
 }
 local PLACE_SUB: { [string]: string } = {
 	dispatchtower = "OFFICES",

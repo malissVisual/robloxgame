@@ -27,7 +27,8 @@ print(encode({layout=require("./Layout"),caps=caps}))
         result=subprocess.run([str(Path(a.luau).resolve()),'run.luau'],cwd=tmp,capture_output=True,text=True,check=True)
     data=json.loads(result.stdout);layout=data['layout'];caps=data['caps'];parts=[];serial=1000000
     source=(ROOT/'src/server/Vehicles.luau').read_text().split('local STYLES',1)[1].split('local CHASSIS_HEIGHT',1)[0]
-    styles=set(re.findall(r'^\t(\w+) = \{',source,re.M))
+    # 5.1: the bikes (Style.bike) take no fuel: no filler cap.
+    styles={m.group(1) for m in re.finditer(r'^\t(\w+) = \{\n(.*?)^\t\},?$',source,re.S|re.M) if not re.search(r'^\t\tbike = true',m.group(2),re.M)}
     assert {c['id'] for c in caps}==styles and len(caps)==17,'fleet style coverage'
     for cap in caps:assert all(math.isfinite(n) for n in cap['point']['at']) and cap['point']['at'][0]>0
     modelmap={m['id']:m for m in models}

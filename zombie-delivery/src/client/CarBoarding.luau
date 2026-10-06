@@ -17,6 +17,9 @@
 -- Out of a fast car (Config.Cargo.AlightSlideMaxSpeed) you are put out at the door at once, as before.
 --
 -- 4.2, touch: an EXIT button while you sit in a car (CarBoarding.exit, the same CarDoor "out" as E).
+-- 5.1, a bike (the car's attribute Bike): its saddle is a doorless seat on the left, so getting on is the short climb,
+-- played as a hop: upright (no duck under a door frame), the body turning from the bike to face forward over the arc
+-- (Config.Cargo.ClimbArc). Getting off the same backwards, to the left.
 --
 -- E in a seat: while you sit in a car the other prompts around you are hidden (the door prompts and the back's already
 -- are, client/CarVisuals.luau), so E means "get out"; a prompt meant for a driver (the 🅿 GARAGE posts, or any prompt
@@ -57,6 +60,7 @@ type Move = {
 	side: number, -- -1 left, 1 right
 	outside: number, -- the body's half width at the door
 	climb: boolean, -- a seat with no door: an arc, no handle
+	hop: boolean, -- 5.1: onto (or off) a bike's saddle
 	started: number, -- os.clock()
 	span: number, -- seconds this client plays the move over
 	total: number, -- the move's own length (BoardSeconds / AlightSeconds)
@@ -196,6 +200,14 @@ local function standAt(chassis: BasePart, at: Attachment, side: number, extra: n
 	return CFrame.lookAt(position, position + look)
 end
 
+-- How the body bends over the slide (u 0..1): ducking through a door; (5.1) upright onto a bike's saddle.
+local function bodyTurn(m: Move, u: number): CFrame
+	if m.hop then
+		return CFrame.identity
+	end
+	return CFrame.Angles(-Boarding.duck(u), 0, 0)
+end
+
 -- The pose on the way in, t seconds into the move (chassis space).
 local function boardPose(m: Move, t: number): CFrame
 	local phase, u = Boarding.boardPhase(t)
@@ -205,7 +217,7 @@ local function boardPose(m: Move, t: number): CFrame
 	local a, c = m.stand.Position, m.to.Position
 	local bx, by, bz = Boarding.through(m.side, m.outside, a.Y, a.Z, c.Y, m.climb)
 	local position = Vector3.new(Boarding.bezier(a.X, bx, c.X, u), Boarding.bezier(a.Y, by, c.Y, u), Boarding.bezier(a.Z, bz, c.Z, u))
-	return CFrame.new(position) * m.stand.Rotation:Lerp(m.to.Rotation, u) * CFrame.Angles(-Boarding.duck(u), 0, 0)
+	return CFrame.new(position) * m.stand.Rotation:Lerp(m.to.Rotation, u) * bodyTurn(m, u)
 end
 
 -- The pose on the way out (chassis space).
@@ -214,7 +226,7 @@ local function alightPose(m: Move, t: number): CFrame
 	local a, c = m.from.Position, m.to.Position
 	local bx, by, bz = Boarding.through(m.side, m.outside, a.Y, c.Z, c.Y, m.climb)
 	local position = Vector3.new(Boarding.bezier(a.X, bx, c.X, u), Boarding.bezier(a.Y, by, c.Y, u), Boarding.bezier(a.Z, bz, c.Z, u))
-	return CFrame.new(position) * m.from.Rotation:Lerp(m.to.Rotation, u) * CFrame.Angles(-Boarding.duck(u), 0, 0)
+	return CFrame.new(position) * m.from.Rotation:Lerp(m.to.Rotation, u) * bodyTurn(m, u)
 end
 
 -- The move ends: `at` (chassis space) is where the root stays (nil: where it is); the controls come back.
@@ -278,6 +290,7 @@ local function beginBoard(character: Model, humanoid: Humanoid)
 		side = side,
 		outside = math.max(0, math.abs(at.Position.X) - cfg.DoorStandOut),
 		climb = not panel,
+		hop = car:GetAttribute("Bike") == true,
 		started = os.clock(),
 		span = Boarding.span(late, cfg.BoardSeconds, MIN_SPAN),
 		total = cfg.BoardSeconds,
@@ -331,6 +344,7 @@ local function beginAlight(character: Model, humanoid: Humanoid, seat: BasePart)
 		side = side,
 		outside = math.max(0, math.abs(at.Position.X) - cfg.DoorStandOut),
 		climb = not panel,
+		hop = car:GetAttribute("Bike") == true,
 		started = os.clock(),
 		span = cfg.AlightSeconds,
 		total = cfg.AlightSeconds,

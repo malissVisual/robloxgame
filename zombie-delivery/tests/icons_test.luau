@@ -42,6 +42,8 @@ local ART = {
 	-- 5.0: art/icons (the kit, the phone's apps)
 	"kit_backpack", "kit_bigpack", "kit_shoes", "kit_jacket", "kit_cart",
 	"app_orders", "app_board", "app_career", "app_shop", "app_map", "app_messages", "app_bank", "app_settings",
+	-- 5.1, art/icons (Codex's bike art; ids empty until uploaded)
+	"bike_rust", "bike_city", "bike_cargo", "bike_ebike", "gear_basket", "gear_panniers", "gear_trailer", "map_bikes",
 }
 
 -- Every picture has its id slot, and the set has nothing else.
@@ -56,7 +58,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("111 pictures", count == 111, count)
+check("119 pictures", count == 119, count)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)
@@ -123,11 +125,24 @@ for _, id in { "orders", "board", "career", "shop", "map", "messages" } do
 end
 check("an unknown kit or app: none", Icons.kit("jetpack") == nil and Icons.app("casino") == nil and Icons.kit(nil) == nil)
 check("a kit icon while its id is empty: the emoji", Icons.Ids.kit_backpack ~= "" or Icons.get(Icons.kit("backpack")) == nil)
+-- 5.1: the bikes and the bike gear have pictures (the car gear: the emoji).
+check("the bike shop's marker", Icons.landmark("bikes") == "map_bikes")
+check("the four bikes", Icons.bike("rustbike") == "bike_rust" and Icons.bike("citybike") == "bike_city" and Icons.bike("cargobike") == "bike_cargo"
+	and Icons.bike("ebike") == "bike_ebike" and Icons.bike("van") == nil and Icons.bike(nil) == nil)
+for _, gear in Config.Gear do
+	check(`gear {gear.id}: {if gear.bikeOnly then "its picture" else "the emoji"}`, if gear.bikeOnly then exists(Icons.gear(gear.id)) else Icons.gear(gear.id) == nil)
+end
 
 -- The building signs: every shop, employer, tower and home has one (two places share their employer's), the garages
--- and the homes are square badges, the rest 4 : 1 boards.
+-- and the homes are square badges, the rest 4 : 1 boards. (5.1: Spoke & Chain has no sign picture: its board is the
+-- contract look, text only.)
+local NO_SIGN_ART: { [string]: boolean } = { bikes = true }
 for id in Map.Shops do
-	check(`shop {id} has a sign`, exists(Icons.sign(id)))
+	if NO_SIGN_ART[id] then
+		check(`shop {id}: no sign picture (the text board)`, Icons.sign(id) == nil)
+	else
+		check(`shop {id} has a sign`, exists(Icons.sign(id)))
+	end
 end
 for _, employer in Config.Employers do
 	check(`employer {employer.id} has a sign`, exists(Icons.sign(employer.id)))

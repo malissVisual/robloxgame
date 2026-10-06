@@ -57,7 +57,8 @@ local function physics(built)
     return out
 end
 for _,def in Config.Cars do
-	if not def.company then
+	-- 5.1: the bikes (CarDef.bike) are not in the fleet's garage data: bike-check.luau audits them.
+	if not def.company and not def.bike then
 		for stage=0,Economy.maxStage(def.id) do
 			local player=Vehicles.__testBuild(def,Mock.Color3.fromRGB(unpack(def.color)),Mock.CFrame.identity,false,nil,nil,stage)
 			audit(player,false)

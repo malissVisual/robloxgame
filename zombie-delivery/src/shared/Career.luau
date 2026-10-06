@@ -15,8 +15,8 @@
 -- "carId:stage", `car` its car id), gear (Config.Gear), gun, cargun, campaign (shared/Missions.luau), garage, estate
 -- (homes and offices). Level 1 lists what you start with (the Pistol, the first jobs).
 -- 5.0, the career starts on foot: foot (the ON FOOT runs of the board, Config.Jobs.Foot), kit (personal gear,
--- Config.Kit: the backpacks, the running shoes …), and soon (what the next release brings: the bikes at BIKE_LEVEL
--- until Config.Cars has a bike, then the bikes are ordinary car unlocks and the line goes by itself).
+-- Config.Kit: the backpacks, the running shoes …). 5.1: bike (a bike of Config.Cars at its level, "at Spoke & Chain";
+-- before Config.Cars has one, a line "Bikes at Spoke & Chain" at BIKE_LEVEL); the bike gear is gear.
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
@@ -37,16 +37,15 @@ export type Step = {
 
 -- The order of the kinds in a row: the job board first, then the vehicles and the gear, the guns, the stories, the
 -- real estate.
-local ORDER: { [string]: number } = { foot = 0, tier = 1, job = 2, kit = 3, soon = 3, car = 3, stage = 4, gear = 5, gun = 6, cargun = 7, campaign = 8, garage = 9, estate = 10 }
+local ORDER: { [string]: number } = { foot = 0, tier = 1, job = 2, kit = 3, bike = 3, car = 3, stage = 4, gear = 5, gun = 6, cargun = 7, campaign = 8, garage = 9, estate = 10 }
 
--- 5.0: the level the bikes come at (5.1, the Spokes & Chains bike shop; the level 2 reward says so). Only a line on the
--- road until Config.Cars holds a bike (CarDef kind = "bike").
-Career.BIKE_LEVEL = 2
+-- 5.0: the level the bikes come at (5.1: Spoke & Chain, Config.BikeShop; the BIKE runs, Config.Jobs.Bike.Level).
+Career.BIKE_LEVEL = Config.Jobs.Bike.Level
 
--- Is there a bike in Config.Cars yet (5.1)?
+-- Is there a bike in Config.Cars (5.1)?
 local function hasBikes(): boolean
 	for _, def in Config.Cars do
-		if (def :: any).kind == "bike" then
+		if def.bike then
 			return true
 		end
 	end
@@ -72,7 +71,7 @@ function Career.unlocksAt(level: number): { Unlock }
 		end
 	end
 	if level == Career.BIKE_LEVEL and not hasBikes() then
-		add(list, "soon", "bikes", "Bikes (coming in 5.1)")
+		add(list, "bike", "bikes", `Bikes at {Config.BikeShop.Shop}`)
 	end
 	for index, tier in Config.Jobs.Tiers do
 		if tier.level == level then
@@ -95,6 +94,12 @@ function Career.unlocksAt(level: number): { Unlock }
 	end
 	for _, def in Config.Cars do
 		if def.company then
+			continue
+		elseif def.bike then
+			-- 5.1: a bike, at Spoke & Chain (no stages).
+			if (def.level or 1) == level then
+				add(list, "bike", def.id, `{def.name} at {Config.BikeShop.Shop}`)
+			end
 			continue
 		end
 		if (def.level or 1) == level then

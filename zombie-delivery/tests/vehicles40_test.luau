@@ -142,7 +142,7 @@ end
 -- The catalog lists the dealer's cars by their level.
 local lastLevel, ordered = 0, true
 for _, def in Config.Cars do
-	if not def.company then
+	if not def.company and not def.bike then -- (5.1: the bikes are Spoke & Chain's own catalog)
 		if (def.level or 1) < lastLevel then
 			ordered = false
 		end

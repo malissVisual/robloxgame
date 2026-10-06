@@ -22,6 +22,15 @@
 -- 5.0: you start on foot (profile.car nil): everything for "the equipped car" says you have no vehicle yet. The Old
 -- Van is not sold here (Config.VanQuest: Earl sells it, server/VanQuest.luau); a first car bought here anyway is the one
 -- you drive, parked on the road outside the dealer (you get in yourself).
+--
+-- 5.1, Spoke & Chain (Map.Shops.bikes, Config.BikeShop): the bikes (Config.Cars bike = true: the "Buy" remote's "car"
+-- kind, at the bike shop, no garage slot needed) and the bike gear (Config.Gear bikeOnly: the "Gear" remote for your
+-- bike, at the bike shop; the car gear stays at Wrench Garage, never on a bike). A bike on display for each one
+-- (World.BikeSlots, a "Look" prompt). You may own bikes and cars: profile.car is the one CAR / MY BIKE brings,
+-- profile.bike your bike of choice, profile.lastCar the car you got off. The "Equip" remote: ("bike", id) makes an
+-- owned bike your bike of choice (and the one you ride, while you ride one); ("ride") gets you on your bike (the
+-- phone's MY BIKE: it comes at once, server/Vehicles.luau); ("drive") back to your car (the phone's CALL CAR: the
+-- chauffeur brings it). Not during a car job. No car upgrades, stages, paint or car guns on a bike.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -46,6 +55,36 @@ local Shops = {}
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
 local NO_CAR = `You don't have a vehicle yet. The Old Van: {Config.VanQuest.Where}.`
+local ON_BIKE = "That's your bike: bikes take bike gear at Spoke & Chain, no car upgrades, paint or car guns. CALL CAR on your phone for your car."
+
+-- 5.1: the cars of your own (not a company vehicle, not a bike) and the bikes you own, in Config.Cars' order.
+local function owned(profile: PlayerData.Profile, bikes: boolean): { string }
+	local list: { string } = {}
+	for _, def in Config.Cars do
+		if profile.cars[def.id] and not def.company and (def.bike == true) == bikes then
+			table.insert(list, def.id)
+		end
+	end
+	return list
+end
+
+-- 5.1: your bike of choice (profile.bike while you own it, else your first bike), nil without one.
+local function myBike(profile: PlayerData.Profile): string?
+	local chosen = profile.bike
+	if chosen and profile.cars[chosen] and TransportRules.isBike(chosen) then
+		return chosen
+	end
+	return owned(profile, true)[1]
+end
+
+-- 5.1: may the vehicle you drive change now? Not while a job runs in it (a foot or bike job's pieces are in the pack).
+local function midJob(player: Player): boolean
+	if Jobs.active(player) and not Jobs.isFoot(player) then
+		notice:FireClient(player, "Finish your delivery first: the job's vehicle stays with you.")
+		return true
+	end
+	return Jobs.vehicleFor(player) ~= nil
+end
 
 
 local function nearShop(player: Player, shop: string): boolean
@@ -99,6 +138,46 @@ local function aGarage(player: Player): string
 	return "garage"
 end
 
+-- 5.1: a bike at Spoke & Chain: its level and price, no garage slot. It becomes your bike of choice; when you have no
+-- vehicle or ride a bike (and no car job runs) it is the one you ride, parked on the road outside the shop.
+local function buyBike(player: Player, profile: PlayerData.Profile, def: Config.CarDef)
+	if profile.cars[def.id] then
+		notice:FireClient(player, `You already have the {def.name}. EQUIP it here, or MY BIKE on your phone.`)
+		return
+	end
+	if refuse(player, "bikes") or tooLow(player, def.name, def.level) then
+		return
+	end
+	if not PlayerData.spend(player, def.price) then
+		notice:FireClient(player, "Not enough money.")
+		return
+	end
+	local first = myBike(profile) == nil
+	profile.cars[def.id] = true
+	profile.bike = def.id
+	local ride = (profile.car == nil or TransportRules.isBike(profile.car)) and not (Jobs.active(player) and not Jobs.isFoot(player)) and not Jobs.vehicleFor(player)
+	if ride then
+		profile.car = def.id
+	end
+	PlayerData.notify(player)
+	task.spawn(PlayerData.save, player) -- (a purchase: saved now)
+	local parked = false
+	if ride then
+		local shop = Map.Shops.bikes
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local from = if root and root:IsA("BasePart") then root.Position else Vector3.new(shop.x, 0, shop.z)
+		local x, z, dx, dz = Map.nearestRoad(from.X, from.Z)
+		local spot = Vector3.new(x, Map.RoadTop, z)
+		parked = Vehicles.placeAt(player, nil, CFrame.lookAt(spot, spot + Vector3.new(dx, 0, dz)), false) ~= nil
+	end
+	local where = if parked then "It is on the road outside: hop on." elseif ride then "MY BIKE on your phone brings it." else "Your car stays the one you drive: MY BIKE on your phone gets you on the bike."
+	notice:FireClient(player, `🚲 The {def.name} is yours! {where}{if first then " The BIKE runs are on your board now." else ""}`)
+	if first then
+		Net.get("Tutorial"):FireClient(player, "message", { from = "Marge", text = Config.BikeShop.Bought })
+	end
+end
+
 local function onBuy(player: Player, kind: any, id: any, amount: any)
 	local profile = PlayerData.get(player)
 	if not profile or type(id) ~= "string" then
@@ -106,6 +185,10 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 	end
 	if kind == "car" then
 		local def = Economy.findCar(id)
+		if def and def.bike then
+			buyBike(player, profile, def) -- 5.1: at Spoke & Chain
+			return
+		end
 		if def and VanQuestRules.isQuestCar(id) and not profile.cars[id] then
 			-- 5.0: sold privately (Earl's Used Wheels, Marge's quest), not here.
 			notice:FireClient(player, `The {def.name} is not sold here. {Config.VanQuest.DealerNote}`)
@@ -119,9 +202,14 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			return
 		end
 		profile.cars[id] = true
-		if profile.car == nil then
+		local riding = TransportRules.isBike(profile.car)
+		if profile.car == nil or (riding and #owned(profile, false) == 1 and not (Jobs.active(player) and not Jobs.isFoot(player))) then
 			-- 5.0: your first vehicle: it is the one you drive, parked on the road outside (you get in yourself; a
-			-- running job's lent company vehicle stays out until the job is over).
+			-- running job's lent company vehicle stays out until the job is over). 5.1: your first car while you ride
+			-- your bike too (the bike stays your bike of choice: MY BIKE).
+			if riding then
+				profile.bike = profile.car
+			end
 			profile.car = id
 			PlayerData.notify(player)
 			local parked = false
@@ -217,12 +305,112 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 	end
 end
 
-local function onEquip(player: Player, kind: any, id: any)
-	local profile = PlayerData.get(player)
-	if not profile or type(id) ~= "string" then
+-- 5.1, the phone's MY BIKE ("ride"): your bike of choice becomes the vehicle you ride (your car is remembered for
+-- CALL CAR) and comes to you (Vehicles.spawn: a bike at once, by the kerb). Again while on it: it comes again.
+local function ride(player: Player, profile: PlayerData.Profile)
+	local bikeId = myBike(profile)
+	if not bikeId then
+		notice:FireClient(player, `No bike yet: {Config.BikeShop.Shop} on {Config.BikeShop.Street} sells them from level {Config.Jobs.Bike.Level}.`)
 		return
 	end
-	if kind == "car" and profile.cars[id] then
+	Jobs.returnLent(player)
+	if profile.car ~= bikeId and midJob(player) then
+		return
+	end
+	if CarCall.busy(player) then
+		CarCall.cancel(player)
+	end
+	if profile.car and not TransportRules.isBike(profile.car) then
+		profile.lastCar = profile.car
+	end
+	profile.car = bikeId
+	profile.bike = bikeId
+	PlayerData.notify(player)
+	local err = Vehicles.spawn(player, false)
+	if err then
+		notice:FireClient(player, err)
+	end
+end
+
+-- 5.1, the phone's CALL CAR ("drive"): back to your car (the one you got off, else your first car), brought by the
+-- chauffeur like the CAR button. Riding it already: CAR as usual.
+local function drive(player: Player, profile: PlayerData.Profile)
+	local carId = profile.lastCar
+	if not (carId and profile.cars[carId] and not TransportRules.isBike(carId)) then
+		carId = if profile.car and not TransportRules.isBike(profile.car) then profile.car else owned(profile, false)[1]
+	end
+	if not carId then
+		notice:FireClient(player, NO_CAR)
+		return
+	end
+	Jobs.returnLent(player)
+	if profile.car ~= carId and midJob(player) then
+		return
+	end
+	if profile.car ~= carId then
+		if CarCall.busy(player) then
+			CarCall.cancel(player)
+		end
+		if TransportRules.isBike(profile.car) then
+			profile.bike = profile.car
+		end
+		profile.car = carId
+		profile.lastCar = carId
+		PlayerData.notify(player)
+	elseif CarCall.busy(player) then
+		notice:FireClient(player, "Your car is already on the way.")
+		return
+	end
+	local err = Vehicles.spawn(player, false)
+	if err then
+		notice:FireClient(player, err)
+	end
+end
+
+-- 5.1: ("bike", id) at Spoke & Chain (or anywhere): an owned bike becomes your bike of choice, and the one you ride
+-- when you ride a bike (a live one is swapped for it: MY BIKE's way).
+local function equipBike(player: Player, profile: PlayerData.Profile, id: string)
+	local def = Economy.findCar(id)
+	if not def or not def.bike or not profile.cars[id] then
+		return
+	end
+	profile.bike = id
+	local riding = profile.car == nil or TransportRules.isBike(profile.car)
+	if riding and profile.car ~= id and not midJob(player) then
+		profile.car = id
+		PlayerData.notify(player)
+		local live = Vehicles.get(player)
+		if live and TransportRules.isBike(live.id) then
+			local err = Vehicles.spawn(player, false)
+			if err then
+				notice:FireClient(player, err)
+			end
+		end
+		notice:FireClient(player, `🚲 You ride the {def.name} now.`)
+		return
+	end
+	PlayerData.notify(player)
+	notice:FireClient(player, if riding then `🚲 You ride the {def.name}.` else `🚲 The {def.name} is your bike: MY BIKE on your phone gets you on it.`)
+end
+
+local function onEquip(player: Player, kind: any, id: any)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return
+	end
+	if kind == "ride" then
+		ride(player, profile) -- 5.1
+		return
+	elseif kind == "drive" then
+		drive(player, profile) -- 5.1
+		return
+	end
+	if type(id) ~= "string" then
+		return
+	end
+	if (kind == "bike" or kind == "car") and TransportRules.isBike(id) then
+		equipBike(player, profile, id) -- 5.1: bikes need no garage
+	elseif kind == "car" and profile.cars[id] then
 		-- 3.4: cars are switched only at a garage of yours (or the depot lot for the starting van).
 		local err = Garages.take(player, id)
 		if err then
@@ -240,6 +428,10 @@ local function buyStage(player: Player, profile: PlayerData.Profile)
 	local carDef = if profile.car then Economy.findCar(profile.car) else nil
 	if not carDef then
 		notice:FireClient(player, NO_CAR)
+		return
+	end
+	if carDef.bike then
+		notice:FireClient(player, ON_BIKE) -- 5.1
 		return
 	end
 	if not Economy.canUpgrade(carDef.id) then
@@ -296,6 +488,10 @@ local function onUpgrade(player: Player, id: any)
 		notice:FireClient(player, NO_CAR)
 		return
 	end
+	if carTrack and carDef and carDef.bike then
+		notice:FireClient(player, ON_BIKE) -- 5.1
+		return
+	end
 	if carTrack and (not carDef or not Economy.canUpgrade(carDef.id)) then
 		local name = if carDef then carDef.name else "this vehicle"
 		notice:FireClient(player, `The {name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`)
@@ -337,12 +533,23 @@ local GEAR_ACTIONS: { [string]: boolean } = { buy = true, install = true, remove
 local function onGear(player: Player, action: any, id: any)
 	local profile = PlayerData.get(player)
 	local gear = if type(id) == "string" then Economy.findGear(id) else nil
-	if not profile or not gear or type(action) ~= "string" or not GEAR_ACTIONS[action] or refuse(player, "mechanic") then
+	-- 5.1: bike gear at Spoke & Chain for your bike (the one you ride, else your bike of choice); car gear at Wrench
+	-- Garage for your car.
+	local forBike = gear ~= nil and gear.bikeOnly == true
+	if not profile or not gear or type(action) ~= "string" or not GEAR_ACTIONS[action] or refuse(player, if forBike then "bikes" else "mechanic") then
 		return
 	end
-	local carDef = if profile.car then Economy.findCar(profile.car) else nil
+	local targetId = if forBike then myBike(profile) else profile.car
+	local carDef = if targetId then Economy.findCar(targetId) else nil
+	if forBike and TransportRules.isBike(profile.car) then
+		carDef = Economy.findCar(profile.car :: string)
+	end
 	if not carDef then
-		notice:FireClient(player, NO_CAR)
+		notice:FireClient(player, if forBike then `No bike yet: buy one here first.` else NO_CAR)
+		return
+	end
+	if carDef.bike and not forBike then
+		notice:FireClient(player, ON_BIKE)
 		return
 	end
 	if not Economy.canUpgrade(carDef.id) then
@@ -354,7 +561,7 @@ local function onGear(player: Player, action: any, id: any)
 		return
 	end
 	if Jobs.active(player) then
-		notice:FireClient(player, "Finish your delivery first: the mechanics fit the gear between jobs.")
+		notice:FireClient(player, if forBike then "Finish your delivery first: the gear goes on between jobs." else "Finish your delivery first: the mechanics fit the gear between jobs.")
 		return
 	end
 	local list: { [string]: string } = profile.carGear[carDef.id] or {}
@@ -414,6 +621,10 @@ local function onPaint(player: Player, id: any)
 	local carId = profile.car
 	if not carId then
 		notice:FireClient(player, NO_CAR)
+		return
+	end
+	if TransportRules.isBike(carId) then
+		notice:FireClient(player, ON_BIKE) -- 5.1
 		return
 	end
 	if not profile.paints[paint.id] then
@@ -508,6 +719,56 @@ local function buildShowroom()
 	end
 end
 
+-- 5.1, Spoke & Chain's display bikes: every bike of Config.Cars on a stand of its own (World.BikeSlots, in their
+-- order), with a tag (its name, price and level) and a "Look" prompt that opens the shop on it.
+local function buildBikeDisplay()
+	local folder = Instance.new("Folder")
+	folder.Name = "BikeDisplay"
+	folder.Parent = workspace
+	local index = 0
+	for _, def in Config.Cars do
+		if not def.bike then
+			continue
+		end
+		index += 1
+		local slot = World.BikeSlots[index]
+		if not slot then
+			break
+		end
+		local ok, model = pcall(Vehicles.displayModel, def, slot, 0)
+		local chassis = if ok and model then model.PrimaryPart else nil
+		if not ok or not chassis then
+			warn(`[Shops] no display bike {def.id}: {if ok then "no chassis" else model}`)
+			continue
+		end
+		model.Parent = folder
+		local tag = Instance.new("BillboardGui")
+		tag.Size = UDim2.fromOffset(150, 46)
+		tag.StudsOffset = Vector3.new(0, 5, 0)
+		tag.MaxDistance = 40
+		tag.Parent = chassis
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Text = `{def.name}\n${def.price} · LEVEL {def.level or 1}+`
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBlack
+		label.TextColor3 = Color3.fromRGB(255, 220, 120)
+		label.TextStrokeTransparency = 0.2
+		label.Parent = tag
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = "Look"
+		prompt.ObjectText = def.name
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = 9
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = chassis
+		prompt.Triggered:Connect(function(player)
+			openShop:FireClient(player, "bikes", def.id)
+		end)
+	end
+end
+
 function Shops.start()
 	for _, entry in World.ShopPrompts do
 		entry.prompt.Triggered:Connect(function(player)
@@ -524,6 +785,12 @@ function Shops.start()
 		end)
 	end
 	buildShowroom()
+	local ok, err = pcall(function()
+		buildBikeDisplay() -- 5.1
+	end)
+	if not ok then
+		warn(`[Shops] Spoke & Chain's display bikes failed: {err}`)
+	end
 	Net.get("Buy").OnServerEvent:Connect(onBuy)
 	Net.get("Equip").OnServerEvent:Connect(onEquip)
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)

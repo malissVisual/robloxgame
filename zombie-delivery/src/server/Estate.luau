@@ -130,7 +130,7 @@ function Estate.carsOwned(player: Player): number
 	if profile then
 		for id, owned in profile.cars do
 			local def = Economy.findCar(id)
-			if owned and def and not def.company then
+			if owned and def and not def.company and not def.bike then -- (5.1: a bike needs no garage slot)
 				count += 1
 			end
 		end
