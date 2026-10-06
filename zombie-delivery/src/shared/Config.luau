@@ -1989,6 +1989,23 @@ Config.Jobs = {
 		AddOnAnswer = 15,
 		AddOnGivers = { "Mrs. Lee", "Old Tom", "Kenny", "Mr. Novotny", "Aunt Maple" } :: { string },
 	},
+	-- 5.2, several orders at once (server/Jobs.luau addOrder, shared/JobRules.luau's orders): while a stackable run is
+	-- on (an ordinary board delivery on foot, on a bike, or a car one of the ★ … CarTiers tiers; never a mission, a
+	-- special, an employer's job, DUO, the Freight Run or the tutorial's), ACCEPT on the board adds another order of
+	-- the same kind (+ ADD ORDER) while your free room takes its pieces (what you carry: hands + backpack on foot, the
+	-- bike + its gear + your backpack, the car + its gear; minus the pieces the open orders still hold or will pick up)
+	-- and fewer than Max[mode] orders are open. Every order keeps its own clock (its offer's, from when it was added),
+	-- pay and rating. The stops go in any order: the GPS takes the open stop whose circle you are at (AtStop studs),
+	-- else the pinned order's nearest, else the nearest one (the current one kept unless another is Hysteresis studs
+	-- nearer). A road event's add-on becomes an order of its own (AddOnTime s on top of the trip for it).
+	Orders = {
+		Max = { foot = 2, bike = 3, car = 4 } :: { [string]: number },
+		CarTiers = 2, -- the car tiers whose board deliveries stack (★, ★★)
+		AtStop = 30,
+		Hysteresis = 80,
+		SwitchEvery = 1, -- seconds between two changes of the stop the GPS shows (no flicker between two close ones)
+		AddOnTime = 30,
+	},
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
 	Businesses = {
 		{

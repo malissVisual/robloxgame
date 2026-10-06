@@ -47,6 +47,15 @@
 --   JobRules.footPieces(wanted, room)     its pieces: within Foot.Pieces and what you carry
 -- 5.1, the BIKE jobs (Config.Jobs.Bike): the same three with Config.Jobs.Bike as their last argument (LightRules), and
 --   JobRules.bikeXp(xp)                   a bike job's XP (+ Bike.XpBonus)
+--
+-- 5.2, several orders at once (Config.Jobs.Orders; tested in tests/orders_test.luau):
+--   JobRules.stackable(info)              may this offer run beside other orders (StackInfo)?
+--   JobRules.ordersMax(mode)              orders open at once at most (Orders.Max)
+--   JobRules.orderRoom(room, outstanding) the free room: room − the pieces the open orders still hold or pick up
+--   JobRules.canAddOrder(mode, open, pieces, free)   (ok, "full" | "room")
+--   JobRules.orderButton(why, used, room, open, max)   "NO ROOM (3/4 slots)" / "ORDERS FULL (2/2)"
+--   JobRules.stopOpen(stops, index, withYou)          "done" | "open" | "wait" | "empty" (StopState)
+--   JobRules.nextOpenStop(stops, withYou, position, pinned, current)   the stop the GPS shows
 
 local Config = require(script.Parent.Config)
 
@@ -508,6 +517,147 @@ end
 -- 5.1: a bike job's XP: a ★ job's (Levels.jobXp of its tier) + Config.Jobs.Bike.XpBonus.
 function JobRules.bikeXp(xp: number): number
 	return xp + Config.Jobs.Bike.XpBonus
+end
+
+-- ── 5.2: several orders at once (Config.Jobs.Orders) ───────────────────────
+
+-- What makes an offer stackable (server/Jobs.luau fills it from the offer): its mode, its tier, and whether it is a
+-- special (a job type of its own: a board special, an employer's, the Freight Run), a mission, the tutorial's, DUO,
+-- and whether every stop is carried by hand (no horses, people or pallets).
+export type StackInfo = {
+	mode: string,
+	tier: number,
+	special: boolean,
+	mission: boolean,
+	tutorial: boolean,
+	duo: boolean,
+	carried: boolean,
+}
+
+-- One stop of a running job as the GPS sees it: a pick-up or a drop of an order, done (or skipped), where it is.
+export type StopState = { kind: string, order: number, done: boolean, x: number, z: number }
+
+-- May an offer like this run beside other orders (and let others run beside it)? Ordinary board deliveries on foot, on
+-- a bike, or in a car of the ★ … Orders.CarTiers tiers, carried by hand.
+function JobRules.stackable(info: StackInfo): boolean
+	if info.special or info.mission or info.tutorial or info.duo or not info.carried then
+		return false
+	end
+	if info.mode == "foot" or info.mode == "bike" then
+		return true
+	end
+	return info.mode == "car" and info.tier >= 1 and info.tier <= Config.Jobs.Orders.CarTiers
+end
+
+-- How many orders of this mode may be open at once (Orders.Max; 1 for a mode it does not know).
+function JobRules.ordersMax(mode: string): number
+	return math.max(1, math.floor(Config.Jobs.Orders.Max[mode] or 1))
+end
+
+-- The free room: what you can take (`room`) minus the pieces every open order still holds or will pick up.
+function JobRules.orderRoom(room: number, outstanding: { number }): number
+	local used = 0
+	for _, pieces in outstanding do
+		used += math.max(0, math.floor(pieces))
+	end
+	return math.max(0, math.floor(room) - used)
+end
+
+-- May an order of `pieces` pieces be added to `open` open orders of this mode with `free` room left? Else why:
+-- "full" (Orders.Max reached) or "room" (it does not fit).
+function JobRules.canAddOrder(mode: string, open: number, pieces: number, free: number): (boolean, string?)
+	if open >= JobRules.ordersMax(mode) then
+		return false, "full"
+	end
+	if pieces > free then
+		return false, "room"
+	end
+	return true, nil
+end
+
+-- The board's button of an order that does not fit: "NO ROOM (3/4 slots)" (used of room) or "ORDERS FULL (2/2)".
+function JobRules.orderButton(why: string?, used: number, room: number, open: number, max: number): string
+	if why == "full" then
+		return `ORDERS FULL ({open}/{max})`
+	end
+	return `NO ROOM ({used}/{room} slots)`
+end
+
+-- Where a stop of a running job stands: "done" (or skipped), "open" (a pick-up; a drop whose order picked everything
+-- up and some of its pieces are with you), "wait" (a drop whose order still has a pick-up to do) or "empty" (a drop
+-- with every pick-up done and none of its pieces left: nothing to bring there). `withYou[index]`: the pieces for that
+-- stop in hands, the pack, the vehicle or put down.
+function JobRules.stopOpen(stops: { StopState }, index: number, withYou: { [number]: number }): string
+	local stop = stops[index]
+	if not stop or stop.done then
+		return "done"
+	end
+	if stop.kind ~= "drop" then
+		return "open"
+	end
+	for _, other in stops do
+		if other.order == stop.order and other.kind ~= "drop" and not other.done then
+			return "wait"
+		end
+	end
+	return if (withYou[index] or 0) > 0 then "open" else "empty"
+end
+
+local function gap(stop: StopState, position: { x: number, z: number }): number
+	local dx, dz = stop.x - position.x, stop.z - position.z
+	return math.sqrt(dx * dx + dz * dz)
+end
+
+-- The stop the GPS shows: the open stop whose circle you are at (Orders.AtStop studs, the nearest), else the nearest
+-- open stop of the `pinned` order, else the nearest open stop; `current` (the one shown now) stays unless another is
+-- Orders.Hysteresis studs nearer. Nil when nothing is open.
+function JobRules.nextOpenStop(stops: { StopState }, withYou: { [number]: number }, position: { x: number, z: number }, pinned: number?, current: number?): number?
+	local tuning = Config.Jobs.Orders
+	local open: { number } = {}
+	for index in stops do
+		if JobRules.stopOpen(stops, index, withYou) == "open" then
+			table.insert(open, index)
+		end
+	end
+	table.sort(open)
+	if #open == 0 then
+		return nil
+	end
+	local function nearest(list: { number }): (number?, number)
+		local best: number?, bestGap = nil, math.huge
+		for _, index in list do
+			local d = gap(stops[index], position)
+			if d < bestGap then
+				best, bestGap = index, d
+			end
+		end
+		return best, bestGap
+	end
+	-- At a circle: that stop.
+	local here, hereGap = nearest(open)
+	if here and hereGap <= tuning.AtStop then
+		return here
+	end
+	-- The pinned order's stops, if it has an open one.
+	local pool = open
+	if pinned then
+		local mine: { number } = {}
+		for _, index in open do
+			if stops[index].order == pinned then
+				table.insert(mine, index)
+			end
+		end
+		if #mine > 0 then
+			pool = mine
+		end
+	end
+	local best, bestGap = nearest(pool)
+	if current and table.find(pool, current) and current ~= best then
+		if gap(stops[current], position) <= bestGap + tuning.Hysteresis then
+			return current
+		end
+	end
+	return best
 end
 
 return JobRules
