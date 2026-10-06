@@ -837,7 +837,19 @@ local function slotsFor(player: Player, offer: Offer): (number, number, string)
 	local profile = PlayerData.get(player)
 	local carId = if profile then profile.car else Config.Cars[1].id
 	local def = Economy.findCar(carId)
-	return need, Economy.capacity(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else {}), if def then def.name else "car"
+	-- 4.6: a Roof Rack on it takes one more light piece (Economy.capacity with the gear and the cargo's look).
+	local gear = if profile then Economy.installedGear(profile.carGear, carId) else {}
+	return need, Economy.capacity(carId, if profile then Economy.carLevels(profile.carUpgrades, carId) else {}, gear, offer.look), if def then def.name else "car"
+end
+
+-- 4.6: has the car that would do this job the Hand Trolley installed (gear; a lent company vehicle has none)?
+local function trolleyFor(player: Player, offer: Offer): boolean
+	local jobType = offer.jobType
+	local profile = PlayerData.get(player)
+	if (jobType and jobType.vehicle) or not profile then
+		return false
+	end
+	return Economy.installedGear(profile.carGear, profile.car).trolley == true
 end
 
 -- 4.0: a Freight Run's pallets, how many the player's equipped car takes at its stage (Freight.palletsOf) and its name.
@@ -919,7 +931,7 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 		lockText = lockText,
 		lockButton = lockButton,
 		pallets = if pallets then offer.total else nil,
-		tip = Freight.trolleyTip(offer.kind, offer.total, offer.stops[1].mode), -- 4.0: "a hand trolley helps"
+		tip = Freight.trolleyTip(offer.kind, offer.total, offer.stops[1].mode, trolleyFor(player, offer)), -- 4.0: "a hand trolley helps" (4.6: or "use yours")
 		special = jobType ~= nil, -- a special job (a board special: Cash Transport, Pizza Rush, Winter Run)
 		timed = jobType ~= nil and jobType.timeLimit ~= nil, -- a rush: `time` is a fixed clock
 		banditBoost = offer.boost, -- > 1: bandits want this cargo

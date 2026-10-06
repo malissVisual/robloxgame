@@ -1251,6 +1251,12 @@ local function render(session: Session)
 		return
 	end
 	local slots = Vehicles.cargoSlots(car)
+	-- 4.6: a Roof Rack (gear) adds a slot on the roof for a light piece: the Attachment RoofRackSlot, after the others.
+	local roof = car.chassis:FindFirstChild("RoofRackSlot")
+	if roof and roof:IsA("Attachment") and Vehicles.capacity(car, session.info.look) > #slots then
+		slots = table.clone(slots)
+		table.insert(slots, roof.CFrame)
+	end
 	for index, piece in session.load do
 		local slot = slots[index]
 		local horse = piece.horse
@@ -1817,7 +1823,7 @@ local function onCar(session: Session, player: Player)
 		local moving: { Piece } = held.pieces
 		if held.tool then
 			local room = if pallet then Freight.palletRoom(Freight.palletsOf(car.id, car.stage), #session.load)
-				else Freight.pieceRoom(Vehicles.capacity(car), #session.load)
+				else Freight.pieceRoom(Vehicles.capacity(car, session.info.look), #session.load) -- (4.6: a Roof Rack's light slot too)
 			if room <= 0 then
 				local takes = if pallet then Freight.palletsOf(car.id, car.stage) else 0
 				tell(player, if pallet and takes <= 0 then `This {noun} takes no pallets. {Freight.palletAdvice(1)}`

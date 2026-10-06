@@ -88,7 +88,15 @@
 --   stays centred on its chassis; the stretched style is cached per look (its doors with it).
 -- * The UpgradeKit also shows Tyres & Suspension (new tyres with tread rings from 1, alloy rims from 3; the stance at 5
 --   lowers the body: Car.lower, a rebuild) and the Hand Trolley folded inside the back (the model "FoldedTrolley" and
---   the chassis Attachment "TrolleyMount", Economy.hasTrolley).
+--   the chassis Attachment "TrolleyMount"; 4.6: gear, Vehicles.hasGear(car, "trolley")).
+--
+-- 4.6, GEAR (Config.Gear, bought per car and installed in its gear slots at Wrench Garage: profile.carGear, Economy
+-- installedGear). The live car keeps what is installed (Car.gear; Vehicles.hasGear) and the UpgradeKit shows it, cheap
+-- (massless, not colliding, not hit by rays, at most 6 parts a piece; the FleetArt skin's pieces, VehicleArt.gear):
+-- the Hand Trolley folded in the back, Ratchet Straps (two orange bands across the load), the Cooler Box (a white box
+-- at the front of the load) and the Roof Rack (rails on the roof; a car with a rack of its own keeps that one) with
+-- the Attachment "RoofRackSlot" on the chassis where its light piece rides (server/Cargo.luau; Vehicles.capacity with
+-- the cargo's look counts its slot). A company vehicle has no gear.
 -- * The Freight Truck (STYLES.freighttruck): a cab-over truck with a long box, 12 slots in three pallet bays, a
 --   roll-up door (rollUpDoor), twin rear tyres (Style.dual) and the Attachment "JackMount" inside the back (its pallet
 --   jack: server/Cargo.luau). A long car comes out of a garage further from the door (Vehicles.placeAt).
@@ -135,6 +143,7 @@ export type Car = {
 	lent: boolean, -- 3.4: a company vehicle lent for a job: its damage is not kept
 	repairing: boolean, -- 3.4: on the lift of a repair bay (server/Repair.luau): anchored, nobody drives it
 	doors: { CarDoor }, -- 3.7: its doors (doorsOf): index 1 is the driver's
+	gear: { [string]: boolean }, -- 4.6: the gear installed on it (Config.Gear ids; none on a company vehicle)
 }
 
 local Vehicles = {}
@@ -1726,10 +1735,16 @@ local function hullOf(style: Style): Hull
 	return hull
 end
 
--- The levels the kit shows, as a key (rebuilt only when it changes). 4.0: the tyres and the Hand Trolley too.
-local function kitKey(levels: Economy.Upgrades): string
+-- The levels the kit shows, as a key (rebuilt only when it changes). 4.0: the tyres too; 4.6: the installed gear.
+local function kitKey(levels: Economy.Upgrades, gear: { [string]: boolean }): string
 	local tracks = `{Economy.level(levels, "plow")}/{Economy.level(levels, "armor")}/{Economy.level(levels, "engine")}`
-	return `{tracks}/{Economy.level(levels, "handling")}/{Economy.level(levels, "trolley")}`
+	local pieces: { string } = {}
+	for _, def in Config.Gear do
+		if gear[def.id] then
+			table.insert(pieces, def.id)
+		end
+	end
+	return `{tracks}/{Economy.level(levels, "handling")}/{table.concat(pieces, "+")}`
 end
 
 -- 4.0, Tyres & Suspension 5: the body sits this much lower over its wheels (a new stance builds the car again).
@@ -1802,16 +1817,19 @@ local function fitTyres(model: Model, folder: Instance, style: Style, handling: 
 	end
 end
 
--- (Re)builds the kit of a player's car (carId) for these car-track levels.
-local function buildKit(model: Model, chassis: Part, style: Style, levels: Economy.Upgrades, carId: string)
+-- (Re)builds the kit of a player's car (carId) for these car-track levels; 4.6: and its installed gear (none: nil).
+local function buildKit(model: Model, chassis: Part, style: Style, levels: Economy.Upgrades, carId: string, gear: { [string]: boolean }?)
 	local old = model:FindFirstChild("UpgradeKit")
 	if old then
 		old:Destroy()
 	end
-	local oldMount = chassis:FindFirstChild("TrolleyMount")
-	if oldMount then
-		oldMount:Destroy()
+	for _, name in { "TrolleyMount", "RoofRackSlot" } do
+		local oldMount = chassis:FindFirstChild(name)
+		if oldMount then
+			oldMount:Destroy()
+		end
 	end
+	local installed: { [string]: boolean } = gear or {}
 	local plow = Economy.level(levels, "plow")
 	local armor = Economy.level(levels, "armor")
 	local engine = Economy.level(levels, "engine")
@@ -1935,7 +1953,8 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	-- 4.0, the Hand Trolley: folded upright against the right wall just inside the back (seen when the back opens), its
 	-- Attachment TrolleyMount on the chassis at its foot (the chassis' axes). server/Cargo.luau builds the trolley you
 	-- push at the mount and may hide this folded one (the model "FoldedTrolley" in the kit) while it is out.
-	if Economy.hasTrolley(carId, levels) then
+	-- 4.6: gear installed on the car (Config.Gear "trolley").
+	if installed.trolley == true and Economy.gearFits(carId, "trolley") then
 		local spot = trolleySpot(style)
 		local mount = Instance.new("Attachment")
 		mount.Name = "TrolleyMount"
@@ -1954,6 +1973,28 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 		bar("TrolleyHandle", Vector3.new(0.12, 0.12, 1.12), Vector3.new(0, 3.1, 0), KIT_TROLLEY, Enum.Material.Metal)
 		bar("TrolleyBar", Vector3.new(0.1, 0.1, 1.0), Vector3.new(0, 1.7, 0), KIT_TROLLEY, Enum.Material.Metal)
 		bar("TrolleyNose", Vector3.new(0.08, 0.7, 1.1), Vector3.new(-0.14, 0.45, 0), KIT_PLATE, Enum.Material.DiamondPlate)
+	end
+
+	-- 4.6, the other gear (the straps, the cooler, the roof rack) in the FleetArt skin's pieces (VehicleArt.gear), laid
+	-- out over the cargo slots: their floor and the front and back of the load (a slot is Config.Cargo.SlotDepth deep).
+	-- The Roof Rack's light piece rides at the Attachment RoofRackSlot (server/Cargo.luau).
+	local straps = installed.straps == true and Economy.gearFits(carId, "straps")
+	local cooler = installed.cooler == true and Economy.gearFits(carId, "cooler")
+	local rack = installed.roofrack == true and Economy.gearFits(carId, "roofrack")
+	if (straps or cooler or rack) and model:GetAttribute("FleetArt") and #style.cargo.slots > 0 then
+		local floor, front, back = math.huge, math.huge, -math.huge
+		for _, slot in style.cargo.slots do
+			floor = math.min(floor, slot.Y)
+			front = math.min(front, slot.Z - Config.Cargo.SlotDepth / 2)
+			back = math.max(back, slot.Z + Config.Cargo.SlotDepth / 2)
+		end
+		local spot = VehicleArt.gear(model, chassis, style :: any, folder, { straps = straps, cooler = cooler, roofrack = rack }, { floor = floor, front = front, back = back }, { weld = weld, nightLight = DayNight.nightLight })
+		if spot then
+			local slot = Instance.new("Attachment")
+			slot.Name = "RoofRackSlot"
+			slot.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + spot
+			slot.Parent = chassis
+		end
 	end
 
 	folder.Parent = model
@@ -2456,10 +2497,10 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 end
 
 -- A showroom model for the dealer (anchored, no seats); 3.5: at a stage (its look).
-function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?, levels: Economy.Upgrades?): Model
+function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?, levels: Economy.Upgrades?, gear: { [string]: boolean }?): Model
 	local built = build(def, rgb(def.color), ground, true, nil, nil, stage)
 	if levels then
-		buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id)
+		buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id, gear)
 		for _, p in built.model:GetDescendants() do
 			if p:IsA("BasePart") then p.Anchored = true; p.CollisionGroup = "Default" end
 		end
@@ -3016,9 +3057,15 @@ function Vehicles.cargoSlots(car: Car): { CFrame }
 	return list
 end
 
--- 3.4: how many pieces the car takes at once (3.5: at its stage).
-function Vehicles.capacity(car: Car): number
-	return Economy.capacity(car.id, { stage = car.stage })
+-- 3.4: how many pieces the car takes at once (3.5: at its stage). 4.6: with the cargo's look, the Roof Rack's slot
+-- for a light piece too (its installed gear, Economy.capacity).
+function Vehicles.capacity(car: Car, look: string?): number
+	return Economy.capacity(car.id, { stage = car.stage }, car.gear, look)
+end
+
+-- 4.6, gear: is this piece (a Config.Gear id) installed on this live car? (A company vehicle has none.)
+function Vehicles.hasGear(car: Car, gearId: string): boolean
+	return car.gear ~= nil and car.gear[gearId] == true
 end
 
 -- What the HUD calls the cargo space: "Load it into the back of the {noun}".
@@ -3310,9 +3357,10 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local paintId = if def.company then nil else profile.carPaint[def.id]
 	local stage = if def.company then 0 else Economy.stageOf(def.id, levels) -- 3.5: its stage's look
 	local lower = stanceOf(levels) -- 4.0: Tyres & Suspension 5
+	local gear = if def.company then {} else Economy.installedGear(profile.carGear, def.id) -- 4.6
 	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage, lower)
 	applyPaint(built.paintParts, def, paintId)
-	buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id)
+	buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id, gear)
 	local doors = doorsOf(styleFor(def, stage))
 	local driverSeat = built.seat :: VehicleSeat
 	local car: Car = {
@@ -3334,12 +3382,13 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		latched = {},
 		chauffeured = chauffeured == true,
 		born = os.clock(),
-		kit = kitKey(levels),
+		kit = kitKey(levels, gear),
 		stage = stage,
 		lower = lower,
 		lent = lent,
 		repairing = false,
 		doors = doors,
+		gear = gear,
 	}
 	car.model.Name = `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
@@ -3553,10 +3602,13 @@ function Vehicles.refreshStats(player: Player)
 	if backPrompt then
 		backPrompt.HoldDuration = Vehicles.loadHold(car)
 	end
-	local key = kitKey(levels)
+	-- 4.6: the gear installed on it now (Wrench Garage's GEAR tab).
+	local def = Economy.findCar(car.id)
+	car.gear = if car.lent or (def and def.company) then {} else Economy.installedGear(profile.carGear, car.id)
+	local key = kitKey(levels, car.gear)
 	if key ~= car.kit then
 		car.kit = key
-		buildKit(car.model, car.chassis, styleOf(car), levels, car.id)
+		buildKit(car.model, car.chassis, styleOf(car), levels, car.id, car.gear)
 		-- The new parts joined the car's assembly: the driver's client keeps simulating it.
 		pcall(function()
 			car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)

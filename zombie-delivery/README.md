@@ -1060,6 +1060,21 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
 
+## Your career and your gear (4.6)
+
+**The career** (MENU → CAREER, or **C**): your rank and level, the XP to the next one (about how many deliveries), what
+it opens and its reward, and the road from level 1 to 15 — every level's unlocks (job tiers and types, cars and their
+stages, gear, guns, car guns, campaigns, garages, homes) and its reward (`Config.Levels.Rewards`: $500 at level 2 up to
+$15 000 at 15, items, the Hi-Vis Orange paint at 5, the Iron Courier title at 10, Legend Chrome and Legend of the Last
+Road at 15; paid once, `profile.levelRewards`). A level-up shows a card: what you unlocked, the reward, what comes next
+(`shared/Career.luau` builds the road from Config, `client/CareerUi.luau` shows it).
+
+**Gear** (Wrench Garage → GEAR, `Config.Gear`): bought per car, installed in the car's gear slots (`gearSlots`: the
+Old Van 1 / 1 / 2 / 3 by stage, the Courier 2, the High-Roof 3, the Box Truck 3 / 3 / 4, the Freight Truck 4 …; free to
+install or remove at the garage). The Hand Trolley (level 3, $600: 4 pieces at once), Ratchet Straps (level 4: the
+cargo takes less damage), the Cooler Box (level 5: food stays fresh longer), the Roof Rack (level 7: +1 light piece, it
+rides on the roof). You see each piece on the car (`profile.carGear`).
+
 ## The admin panel (4.5)
 
 P (or the ADMIN button on touch) opens it for admins (a Studio Play test, the place's owner, `Config.Admin.UserIds`);

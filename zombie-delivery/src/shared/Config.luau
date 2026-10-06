@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.5.2"
+Config.Version = "4.6"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -115,8 +115,11 @@ export type CarDef = {
 	-- (the first ones: a car's slots begin with a 2 x 2 group at the front of the box; the Freight Truck's are three
 	-- such bays, front to back). A stage's own `pallets` wins (StageDef.pallets); Economy.palletsOf(carId, stage).
 	pallets: number?,
-	-- 4.0: may it take the Hand Trolley (Config.Upgrades "trolley": the vans and the trucks)? Economy.upgradeFits.
+	-- 4.0: may it take the Hand Trolley (4.6: Config.Gear "trolley": the vans and the trucks)? Economy.gearFits.
 	trolley: boolean?,
+	-- 4.6: the gear slots (Config.Gear pieces installed at once at Wrench Garage). A stage's own gearSlots wins
+	-- (StageDef.gearSlots); nil: none (the company vehicles come with what their job needs). Economy.gearSlots.
+	gearSlots: number?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -133,6 +136,7 @@ export type StageDef = {
 	accel: number?, -- 4.0: + acceleration in studs / s² (the Old Van's stages rebuild a slow, heavy van)
 	look: string?, -- the look in server/Vehicles.luau LOOKS (nil: the plain body; 4.0: a look may stretch the body)
 	pallets: number?, -- 4.0: the pallets it takes at this stage (wins over CarDef.pallets; Economy.palletsOf)
+	gearSlots: number?, -- 4.6: the gear slots at this stage (wins over CarDef.gearSlots; Economy.gearSlots)
 	adds: string, -- what it adds, in a few words (the STAGE card)
 }
 
@@ -174,14 +178,15 @@ Config.Cars = {
 		role = "Your first van: it grows with you",
 		description = "Rusty, dented, slow off the line, and yours. Build it up at Wrench Garage: a Patched Van, a Work Van (3 slots, a longer body), then a Long Cargo Van (4, a high roof). 1 passenger.",
 		stages = {
-			{ name = "Rusty Van", price = 0, capacity = 2, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
-			{ name = "Patched Van", price = 250, level = 1, capacity = 2, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
-			{ name = "Work Van", price = 700, level = 2, capacity = 3, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
-			{ name = "Long Cargo Van", price = 2200, level = 4, capacity = 4, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
+			{ name = "Rusty Van", price = 0, capacity = 2, gearSlots = 1, adds = "rust patches, a primer-grey door, a crooked bumper, a cracked windscreen, bald tyres, a yellowed headlight, a smoking exhaust" },
+			{ name = "Patched Van", price = 250, level = 1, capacity = 2, gearSlots = 1, health = 20, speed = 6, accel = 4, look = "van_patched", adds = "the rust ground off and patched in grey primer, a straight new bumper; a quicker, healthier van" },
+			{ name = "Work Van", price = 700, level = 2, capacity = 3, gearSlots = 2, health = 40, speed = 12, accel = 8, look = "van_work", adds = "clean paint, a chrome bumper, a new windscreen and lamps, a ladder, shelves, a body 1.5 studs longer" },
+			{ name = "Long Cargo Van", price = 2200, level = 4, capacity = 4, gearSlots = 3, health = 70, speed = 14, accel = 10, look = "van_cargo", adds = "a body 3.5 studs longer with a high roof, a roof rack, a light bar, mud flaps" },
 		},
 	},
 	{
 		id = "courier",
+		gearSlots = 2, -- 4.6
 		trolley = true,
 		level = 2,
 		mount = true,
@@ -204,6 +209,7 @@ Config.Cars = {
 	},
 	{
 		id = "highroof",
+		gearSlots = 3, -- 4.6
 		trolley = true,
 		level = 3,
 		mount = true,
@@ -226,6 +232,7 @@ Config.Cars = {
 	},
 	{
 		id = "pickup",
+		gearSlots = 2, -- 4.6
 		level = 4,
 		mount = true,
 		name = "Pickup",
@@ -247,6 +254,7 @@ Config.Cars = {
 	},
 	{
 		id = "boxtruck",
+		gearSlots = 3, -- 4.6
 		trolley = true,
 		level = 6,
 		mount = true,
@@ -263,13 +271,14 @@ Config.Cars = {
 		role = "The big one: the only way to 6 and more",
 		description = "A cab and a big box behind it. Slow to stop, hard to kill: 6 slots, 8 as a Freight Hauler (a longer box that takes a pallet). The big loads need it. 2 passengers.",
 		stages = {
-			{ name = "Box Truck", price = 0, capacity = 6, adds = "" },
-			{ name = "Liftgate Truck", price = 7500, level = 8, capacity = 7, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
-			{ name = "Freight Hauler", price = 15000, level = 10, capacity = 8, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
+			{ name = "Box Truck", price = 0, capacity = 6, gearSlots = 3, adds = "" },
+			{ name = "Liftgate Truck", price = 7500, level = 8, capacity = 7, gearSlots = 3, health = 80, look = "boxtruck_lift", adds = "a liftgate, marker lights, a chrome bumper, a stacked row" },
+			{ name = "Freight Hauler", price = 15000, level = 10, capacity = 8, gearSlots = 4, health = 150, speed = -2, pallets = 1, look = "boxtruck_freight", adds = "a box 3 studs longer (a fourth row on the floor) that takes a pallet, a tall wind deflector, side skirts" },
 		},
 	},
 	{
 		id = "muscle",
+		gearSlots = 1, -- 4.6
 		level = 8,
 		mount = true,
 		name = "Muscle Car",
@@ -291,6 +300,7 @@ Config.Cars = {
 	},
 	{
 		id = "freight",
+		gearSlots = 4, -- 4.6
 		level = 9,
 		trolley = true,
 		pallets = 3,
@@ -312,6 +322,7 @@ Config.Cars = {
 	},
 	{
 		id = "armorvan",
+		gearSlots = 3, -- 4.6
 		level = 10,
 		mount = true,
 		name = "Armored Van",
@@ -333,6 +344,7 @@ Config.Cars = {
 	},
 	{
 		id = "rallyvan",
+		gearSlots = 2, -- 4.6
 		level = 12,
 		mount = true,
 		name = "Rally Van",
@@ -766,19 +778,53 @@ export type UpgradeDef = {
 -- room now; a 3.4 save's cars became the stage that holds the slots they had, rack included (Economy.legacyStage).
 -- 4.0, the upgrades you see: Engine level 1 stops the Rusty Van's smoking exhaust; Handling is Tyres & Suspension now
 -- (the id stays, for the saves): new black tyres with a tread ring from level 1 (bald grey ones before, on the Rusty
--- and the Patched Van), alloy rims from 3, a lower stance at 5. The Hand Trolley (one level, only on the cars with
--- CarDef.trolley: Economy.upgradeFits) rides folded inside the back doors (the Attachment TrolleyMount on the
--- chassis); server/Cargo.luau lets you take it out and carry up to 4 pieces at once.
+-- and the Patched Van), alloy rims from 3, a lower stance at 5. 4.6: the Hand Trolley is not an upgrade track any more
+-- but GEAR (Config.Gear below; its id "trolley" and a save's trolley level stay: PlayerData moves it, once).
 Config.Upgrades = {
 	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 1: no more exhaust smoke · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 400, costGrowth = 2.0, perLevel = 0.08 },
 	{ id = "handling", car = true, name = "Tyres & Suspension", description = "+8% steering · Lv 1: new tyres with tread · Lv 3: alloy rims · Lv 5: a lower stance", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
 	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
 	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
 	-- (4.0.1: Quick Hands, "loading", is gone: the holds it shortened are instant now; a save's levels are refunded)
-	{ id = "trolley", car = true, name = "Hand Trolley", description = "Carry up to 4 pieces at once · it rides folded inside the back doors (vans and trucks)", maxLevel = 1, baseCost = 600, costGrowth = 1, perLevel = 0 },
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
+
+-- 4.6, GEAR: pieces of equipment bought for ONE car at Wrench Garage (the GEAR tab) and installed in its gear slots
+-- (CarDef / StageDef gearSlots, Economy.gearSlots). Buying gives that car the piece (profile.carGear[carId][gearId] =
+-- "owned"); installing or removing it there is free, as long as a slot is free ("installed"). Each piece has a driver
+-- level and shows on the car (server/Vehicles.luau buildKit). `needs`: the CarDef flag a car must have to take it
+-- (the trolley: CarDef.trolley, the vans and trucks); `notOn`: cars it does not fit (no roof rack on an open bed or a
+-- low muscle car). The company vehicles have no gear slots: they come with what their jobs need.
+--   trolley   the Hand Trolley (4.0's upgrade, the same id and save): folded inside the back, server/Equipment.luau
+--   straps    Ratchet Straps: the cargo's condition losses × GearTuning.StrapsLoss (4.7's cargo rules use it)
+--   cooler    Cooler Box: food freshness drains × GearTuning.CoolerDrain (4.7)
+--   roofrack  Roof Rack: + GearTuning.RoofRackSlots cargo slot for a LIGHT piece (Config.Cargo.LightLooks), on the
+--             roof (Economy.capacity with the installed gear and the cargo's look; server/Cargo.luau shows it there)
+export type GearDef = {
+	id: string,
+	name: string,
+	level: number, -- the driver level needed to buy it
+	price: number,
+	description: string,
+	icon: string, -- an emoji (the shop card, the career road)
+	needs: string?, -- a CarDef flag the car must have ("trolley")
+	notOn: { string }?, -- car ids it does not fit
+}
+
+Config.Gear = {
+	{ id = "trolley", name = "Hand Trolley", level = 3, price = 600, icon = "🛒", needs = "trolley", description = "Carry up to 4 pieces at once. It rides folded inside the back (vans and trucks)." },
+	{ id = "straps", name = "Ratchet Straps", level = 4, price = 900, icon = "🔗", description = "The load is strapped down: cargo condition losses ×0.6. Two orange bands in the back." },
+	{ id = "cooler", name = "Cooler Box", level = 5, price = 1400, icon = "🧊", description = "Food stays fresh twice as long (freshness drains ×0.5). A white box in the back." },
+	{ id = "roofrack", name = "Roof Rack", level = 7, price = 2500, icon = "🧳", notOn = { "muscle", "pickup" }, description = "+1 cargo slot on the roof for a light piece (pizza, parcels, mail, bread, medicine …)." },
+} :: { GearDef }
+
+-- 4.6: what the gear does (4.7's cargo rules read StrapsLoss and CoolerDrain).
+Config.GearTuning = {
+	StrapsLoss = 0.6, -- Ratchet Straps: cargo condition losses × this
+	CoolerDrain = 0.5, -- Cooler Box: food freshness drains × this
+	RoofRackSlots = 1, -- Roof Rack: + this many cargo slots for light pieces
+}
 
 export type ItemDef = {
 	id: string,
@@ -843,6 +889,9 @@ Config.Paints = {
 	{ id = "sunrise", name = "Sunrise Chrome", price = 0, color = { 255, 170, 90 }, material = "Foil", exclusive = "exodus" },
 	{ id = "phantom", name = "Phantom", price = 0, color = { 46, 44, 70 }, material = "Glass", exclusive = "secrets" },
 	{ id = "tandem", name = "Tandem Twin", price = 0, color = { 236, 92, 60 }, material = "Metal", exclusive = "duo" },
+	-- 4.6, the career (Config.Levels.Rewards): reaching a level gives these, never sold.
+	{ id = "hivis", name = "Hi-Vis Orange", price = 0, color = { 255, 122, 24 }, exclusive = "career" },
+	{ id = "legend", name = "Legend Chrome", price = 0, color = { 214, 220, 228 }, material = "Foil", exclusive = "career" },
 } :: { PaintDef }
 
 -- 3.1: what you get for finishing things (server/Challenges.luau gives it, client/MissionsUi.luau shows it). Every
@@ -1135,6 +1184,14 @@ Config.DayNight = {
 	NightRoam = 1.6, -- roaming zombies multiplier at night
 }
 
+-- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
+export type LevelReward = {
+	money: number?,
+	items: { [string]: number }?, -- Config.Items id → how many
+	paint: string?, -- a Config.Paints id (exclusive "career")
+	title: string?, -- a title shown over your head (profile.titles)
+}
+
 -- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
 -- on the job board (Jobs.Tiers level), cars, guns and car guns (their level field), some special jobs, the
 -- campaigns (shared/Missions.luau) and the real estate.
@@ -1167,6 +1224,26 @@ Config.Levels = {
 		{ level = 12, name = "Dead End Legend" },
 		{ level = 15, name = "King of the Road" },
 	} :: { { level: number, name: string } },
+	-- 4.6, the career (shared/Career.luau, client/CareerUi.luau): every level from 2 gives a reward on top of what it
+	-- unlocks, once (server/PlayerData.luau: profile.levelRewards; a save from before 4.6 counts the levels it had
+	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
+	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
+	Rewards = {
+		[2] = { money = 500, items = { medkit = 2 } },
+		[3] = { money = 750, items = { repair = 2 } },
+		[4] = { money = 1000, items = { nitro = 2 } },
+		[5] = { money = 1500, paint = "hivis" },
+		[6] = { money = 2000, items = { molotov = 4 } },
+		[7] = { money = 2500, items = { mine = 2 } },
+		[8] = { money = 3500, items = { nitro = 3 } },
+		[9] = { money = 4500, items = { repair = 3 } },
+		[10] = { money = 6000, title = "Iron Courier" },
+		[11] = { money = 7000, items = { medkit = 3 } },
+		[12] = { money = 8500, items = { nitro = 3, molotov = 4 } },
+		[13] = { money = 10000, items = { mine = 3 } },
+		[14] = { money = 12000, items = { repair = 3, medkit = 3 } },
+		[15] = { money = 15000, paint = "legend", title = "Legend of the Last Road" },
+	} :: { [number]: LevelReward },
 }
 
 -- Traffic (server/Traffic.luau): civilian cars driving the roads and people walking the sidewalks, near the players
@@ -1927,7 +2004,7 @@ Config.Cargo = {
 	AlightSlideMaxSpeed = 14, -- studs / s: out of a car faster than this you are put out at once (no slide)
 	BoardRange = 16, -- studs: farther than this from the seat when it is time to sit, getting in is cancelled
 	-- 4.0, freight and equipment (shared/Freight.luau, server/Equipment.luau, server/Cargo.luau). The hand trolley of a
-	-- car with the "trolley" upgrade (Stream V: its TrolleyMount) takes TrolleyPieces pieces of any kind but people,
+	-- car with the "trolley" gear (4.6, Config.Gear; its TrolleyMount) takes TrolleyPieces pieces of any kind but people,
 	-- horses and pallets; a pallet (Kinds.pallet) moves only on a pallet jack, one at a time, into a vehicle that takes
 	-- pallets (Economy.palletsOf), where it uses PalletSlots of the cargo slots.
 	TrolleyPieces = 4,

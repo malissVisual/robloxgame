@@ -821,6 +821,13 @@ function Challenges.adminReset(player: Player): number
 	table.clear(profile.titles)
 	table.clear(profile.rewards)
 	profile.title = nil
+	-- 4.6: the career's titles stay (the levels' rewards given, Config.Levels.Rewards).
+	for key in profile.levelRewards do
+		local reward = Config.Levels.Rewards[tonumber(key) or 0]
+		if reward and reward.title then
+			profile.titles[reward.title] = true
+		end
+	end
 	for _, weapon in Config.Weapons do
 		if weapon.exclusive then
 			profile.weapons[weapon.id] = nil
@@ -831,7 +838,7 @@ function Challenges.adminReset(player: Player): number
 	end
 	local exclusivePaints: { [string]: boolean } = {}
 	for _, paint in Config.Paints do
-		if paint.exclusive then
+		if paint.exclusive and paint.exclusive ~= "career" then -- (4.6: the career's paints stay: profile.levelRewards)
 			exclusivePaints[paint.id] = true
 			profile.paints[paint.id] = nil
 		end

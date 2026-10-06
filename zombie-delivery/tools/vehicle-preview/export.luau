@@ -70,14 +70,17 @@ for _,def in Config.Cars do
 			local stock=wheels()
 			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{},def.id)
 			for tyre,folder in wheels() do assert(folder==stock[tyre],'stock kit dressed the wheels again') end
-			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=5,armor=5,plow=5,trolley=1},def.id)
+			-- 4.6: every piece of gear that fits the car (the trolley, the straps, the cooler, the roof rack) on the kit too.
+			local gear={}
+			for _,piece in Config.Gear do if Economy.gearFits(def.id,piece.id) then gear[piece.id]=true end end
+			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=5,armor=5,plow=5},def.id,gear)
 			audit(player,false)
 			local fitted=wheels()
-			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=4,armor=3,plow=5,trolley=1},def.id)
+			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=4,armor=3,plow=5},def.id,gear)
 			for tyre,folder in wheels() do assert(folder==fitted[tyre] and (folder==false or folder.Parent==tyre),'a kit change without a new tyre look dressed the wheels again') end
 			for _,upgraded in {false,true} do
-				local levels=if upgraded then {engine=5,handling=5,armor=5,plow=5,trolley=1} else nil
-				local model=Vehicles.displayModel(def,Mock.CFrame.identity,stage,levels)
+				local levels=if upgraded then {engine=5,handling=5,armor=5,plow=5} else nil
+				local model=Vehicles.displayModel(def,Mock.CFrame.identity,stage,levels,if upgraded then gear else nil)
 				audit({model=model},true)
 				local parts={};local nodeIds={};local all={model};for _,v in model:GetDescendants() do table.insert(all,v) end
 				for _,v in all do nodeIds[v]=v.uid end

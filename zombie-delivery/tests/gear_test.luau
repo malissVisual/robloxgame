@@ -50,8 +50,20 @@ local campaignIds: { [string]: boolean } = {}
 for _, campaign in Missions.Campaigns do
 	campaignIds[campaign.id] = true
 end
+-- 4.6: "career" = a level's reward (Config.Levels.Rewards).
+local careerPaints: { [string]: boolean } = {}
+for _, reward in Config.Levels.Rewards do
+	if reward.paint then
+		careerPaints[reward.paint] = true
+	end
+end
 local function earnable(exclusive: string): boolean
-	return exclusive == "secrets" or exclusive == "challenges" or campaignIds[exclusive] == true
+	return exclusive == "secrets" or exclusive == "challenges" or exclusive == "career" or campaignIds[exclusive] == true
+end
+for _, def in Config.Paints do
+	if def.exclusive == "career" then
+		check(`{def.id}: a career paint is some level's reward`, careerPaints[def.id] == true)
+	end
 end
 for _, def in Config.Weapons do
 	if def.exclusive then

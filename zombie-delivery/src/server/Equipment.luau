@@ -1,5 +1,5 @@
 --!strict
--- 4.0, equipment you push (shared/Freight.luau has the rules): the HAND TROLLEY of a car with the "trolley" upgrade
+-- 4.0, equipment you push (shared/Freight.luau has the rules): the HAND TROLLEY of a car with the "trolley" gear (4.6)
 -- and the PALLET JACK (ještěrka) of the warehouses and the Freight Truck.
 --
 --   where they live  a car's trolley folds inside its back (Stream V: the Attachment TrolleyMount and the folded look;
@@ -29,12 +29,10 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Freight = require(Shared.Freight)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Vehicles = require(script.Parent.Vehicles)
-local PlayerData = require(script.Parent.PlayerData)
 
 local Tuning = Config.Cargo
 local Equipment = {}
@@ -288,22 +286,9 @@ local function mountsOf(car: Vehicles.Car): (Attachment?, Attachment?)
 	return entry.trolley, entry.jack
 end
 
--- Has the car the Hand Trolley upgrade (Stream V: "trolley", a car track)? Without the upgrade defined yet, the mount
--- alone says so.
+-- Has the car the Hand Trolley (4.6: gear installed on it, Vehicles.hasGear)?
 local function hasTrolley(car: Vehicles.Car): boolean
-	if not Economy.findUpgrade("trolley") then
-		return true
-	end
-	local profile = PlayerData.get(car.owner)
-	local levels = if profile then Economy.carLevels(profile.carUpgrades, car.id) else {}
-	local gate = (Economy :: any).hasTrolley -- Stream V: which cars take it, and this one's level
-	if type(gate) == "function" then
-		local ok, yes = pcall(gate, car.id, levels)
-		if ok then
-			return yes == true
-		end
-	end
-	return Economy.level(levels, "trolley") >= 1
+	return Vehicles.hasGear(car, "trolley")
 end
 
 -- Stream V's folded trolley at the mount (car.model.UpgradeKit.FoldedTrolley): hidden while the real one is out.

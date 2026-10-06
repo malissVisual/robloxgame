@@ -2,7 +2,8 @@
 -- 4.0, freight and equipment: the pure rules the server (server/Cargo.luau, server/Equipment.luau, server/Jobs.luau)
 -- and the tests share. No Roblox at the top level: positions are plain { x, y, z } tables.
 --
---   the hand trolley  a car with the "trolley" upgrade carries one (Stream V: the TrolleyMount inside the back). You
+--   the hand trolley  a car with the "trolley" gear installed carries one (4.6: Config.Gear; Stream V: the
+--                     TrolleyMount inside the back). You
 --                     push it (the character attribute Pushing = "trolley") and it takes up to Config.Cargo.TrolleyPieces
 --                     pieces of any kind except people, horses and pallets. Not on a job with the lift or the pair
 --                     twist: those pieces are carried by hand (the missions are made that way).
@@ -212,12 +213,20 @@ function Freight.returnsHome(kind: string, idleSeconds: number, nobodyNear: bool
 	return nobodyNear and idleSeconds >= wait
 end
 
--- A job card's tip (the board): a trolley helps with Config.Cargo.TrolleyTipPieces pieces or more you carry.
-function Freight.trolleyTip(kind: string, pieces: number, mode: string): string?
+-- A job card's tip (the board): a trolley helps with Config.Cargo.TrolleyTipPieces pieces or more you carry. 4.6:
+-- `has` = the car that does the job has the Hand Trolley installed (Economy.installedGear): use it; else where to get
+-- it (gear at Wrench Garage, from its level).
+function Freight.trolleyTip(kind: string, pieces: number, mode: string, has: boolean?): string?
 	if mode ~= "carry" or pieces < Config.Cargo.TrolleyTipPieces or not Freight.trolleyTakes(kind) then
 		return nil
 	end
-	return `A hand trolley helps: {Config.Cargo.TrolleyPieces} pieces at a time (the Hand Trolley upgrade at Wrench Garage).`
+	local count = Config.Cargo.TrolleyPieces
+	if has then
+		return `Use your hand trolley: {count} pieces at a time (open the back, take it out with E).`
+	end
+	local gear = Economy.findGear("trolley")
+	local level = if gear then ` from level {gear.level}` else ""
+	return `A hand trolley helps: {count} pieces at a time (Hand Trolley gear at Wrench Garage{level}).`
 end
 
 return Freight

@@ -12,7 +12,8 @@
 --   Wrench Garage       upgrades (3.3: the car tracks for the equipped car; the gun tracks for all guns), 3.5: the
 --                       car's next STAGE (the "Upgrade" remote with id "stage": Config.Cars stages, its own look),
 --                       paint jobs and car guns (one on the roof of the equipped car); 3.4: its repair bays are
---                       server/Repair.luau's (no free repairs any more)
+--                       server/Repair.luau's (no free repairs any more); 4.6: GEAR for the equipped car (the "Gear"
+--                       remote: buy it, from its level; install it in a free gear slot or remove it, free)
 --   Last Stop Supplies  consumables
 --   Depot Garage        3.4: the depot lot's garage window (server/Garages.luau: the starting van, company vehicles)
 --   Job Board           the depot's job board
@@ -256,12 +257,6 @@ local function onUpgrade(player: Player, id: any)
 		notice:FireClient(player, `The {name} is a company vehicle: it can't be upgraded. Take one of your own cars out of your garage.`)
 		return
 	end
-	-- 4.0: the Hand Trolley fits only the vans and trucks (CarDef.trolley).
-	if carTrack and carDef and not Economy.upgradeFits(carDef.id, id) then
-		local def = Economy.findUpgrade(id)
-		notice:FireClient(player, `The {if def then def.name else id} doesn't fit the {carDef.name}: vans and trucks only.`)
-		return
-	end
 	local levels = if carTrack and carDef then Economy.carLevels(profile.carUpgrades, carDef.id) else profile.upgrades
 	local level = Economy.level(levels, id)
 	local cost = Economy.upgradeCost(id, level)
@@ -285,6 +280,79 @@ local function onUpgrade(player: Player, id: any)
 	else
 		profile.upgrades[id] = level + 1
 	end
+	Vehicles.refreshStats(player)
+	PlayerData.notify(player)
+end
+
+-- 4.6, gear (Config.Gear) for the equipped car, at Wrench Garage: "buy" (its driver level and price; it goes into a
+-- free gear slot at once, else it waits "owned"), "install" (an owned piece into a free slot), "remove" (back to
+-- owned). Not on a company vehicle, not for a piece that does not fit the car, not during a delivery (the kit is
+-- built again), and the trolley not while it is out of the car.
+local GEAR_ACTIONS: { [string]: boolean } = { buy = true, install = true, remove = true }
+
+local function onGear(player: Player, action: any, id: any)
+	local profile = PlayerData.get(player)
+	local gear = if type(id) == "string" then Economy.findGear(id) else nil
+	if not profile or not gear or type(action) ~= "string" or not GEAR_ACTIONS[action] or refuse(player, "mechanic") then
+		return
+	end
+	local carDef = Economy.findCar(profile.car)
+	if not carDef or not Economy.canUpgrade(carDef.id) then
+		notice:FireClient(player, "A company vehicle comes with what its job needs: no gear. Take one of your own cars out of your garage.")
+		return
+	end
+	if not Economy.gearFits(carDef.id, gear.id) then
+		notice:FireClient(player, `The {gear.name} doesn't fit the {carDef.name}.`)
+		return
+	end
+	if Jobs.active(player) then
+		notice:FireClient(player, "Finish your delivery first: the mechanics fit the gear between jobs.")
+		return
+	end
+	local list: { [string]: string } = profile.carGear[carDef.id] or {}
+	local now = Economy.gearState(profile.carGear, carDef.id, gear.id)
+	local levels = Economy.carLevels(profile.carUpgrades, carDef.id)
+	local slots = Economy.gearSlots(carDef.id, Economy.stageOf(carDef.id, levels))
+	local used = Economy.gearUsed(profile.carGear, carDef.id)
+	if action == "buy" then
+		if now ~= nil then
+			notice:FireClient(player, `Your {carDef.name} already has the {gear.name}.`)
+			return
+		end
+		if tooLow(player, gear.name, gear.level) then
+			return
+		end
+		if not PlayerData.spend(player, gear.price) then
+			notice:FireClient(player, "Not enough money.")
+			return
+		end
+		local fits = used < slots
+		list[gear.id] = if fits then "installed" else "owned"
+		notice:FireClient(player, if fits then `The {gear.name} is installed on your {carDef.name} ({used + 1} / {slots} gear slots).`
+			else `The {gear.name} is yours. Every gear slot of your {carDef.name} is taken: REMOVE a piece to install it.`)
+	elseif action == "install" then
+		if now ~= "owned" then
+			return
+		end
+		if used >= slots then
+			notice:FireClient(player, `No free gear slot on your {carDef.name} ({used} / {slots}): remove a piece first.`)
+			return
+		end
+		list[gear.id] = "installed"
+		notice:FireClient(player, `{gear.name} installed ({used + 1} / {slots} gear slots).`)
+	else
+		if now ~= "installed" then
+			return
+		end
+		local live = Vehicles.get(player)
+		if gear.id == "trolley" and live and live.id == carDef.id and live.model:GetAttribute("TrolleyOut") then
+			notice:FireClient(player, "Stow the trolley in the car first (G at the open back).")
+			return
+		end
+		list[gear.id] = "owned"
+		notice:FireClient(player, `{gear.name} removed. It stays your {carDef.name}'s: INSTALL it again here any time, for free.`)
+	end
+	profile.carGear[carDef.id] = list
 	Vehicles.refreshStats(player)
 	PlayerData.notify(player)
 end
@@ -383,6 +451,7 @@ function Shops.start()
 	Net.get("Equip").OnServerEvent:Connect(onEquip)
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)
 	Net.get("Paint").OnServerEvent:Connect(onPaint)
+	Net.get("Gear").OnServerEvent:Connect(onGear)
 end
 
 return Shops

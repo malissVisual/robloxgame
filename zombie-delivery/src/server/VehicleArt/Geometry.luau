@@ -315,4 +315,57 @@ function Geometry.upgrades(p: Profile, plow: number, armor: number, engine: numb
 	end
 	return out
 end
+-- 4.6, the Roof Rack on this body: its rails' half spread, front, back and the roof it stands on (the express pod's top
+-- on an Express Courier), clear of the car gun's ring (z < 2.4) and of the roof spares and wings; `own` when the
+-- stage has a rack of its own already (the Long Cargo Van, the Tall Hauler: the light piece rides on that one).
+function Geometry.roofRack(p: Profile): (number, number, number, number, boolean)
+	local half = p.width / 2 - .45
+	local top, front, back = p.cargoTop, math.max(2.4, p.cargoFront + .7), p.cargoBack - .7
+	local own = (p.id == "van" and p.stage >= 3) or (p.id == "highroof" and p.stage >= 1)
+	if p.id == "highroof" and p.stage >= 1 then front, back = math.max(2.4, p.cargoFront + 1.3), p.cargoBack - 3.2 end
+	if p.id == "courier" and p.stage >= 1 then top, front, back = p.cargoTop + .7, math.max(front, p.cargoBack - 3.4), p.cargoBack - .6 end
+	if p.id == "armorvan" and p.stage >= 1 then back = p.cargoBack - 2.4 end
+	if p.id == "rallyvan" then back = p.cargoBack - 1.2 end
+	if back - front < 1.6 then front = back - 1.6 end
+	return half, front, back, top, own
+end
+-- 4.6, the gear you see (Config.Gear, at most 6 pieces each), in the chassis-top frame. `cargo` is the load's floor
+-- and its front and back (from the cargo slots). Ratchet Straps: two orange bands across the load with their
+-- ratchets; the Cooler Box: a white box with a blue lid at the front left of the load; the Roof Rack: two rails and
+-- three cross bars on the roof (none over a rack the body has). Returns the pieces and, with the rack, where its
+-- light piece stands (its bottom centre).
+function Geometry.gear(p: Profile, gear: { [string]: boolean }, cargo: { floor: number, front: number, back: number }): ({ Piece }, V?)
+	local out: { Piece } = {}
+	local room = math.max(.8, p.cargoTop - cargo.floor)
+	local inner = p.width - .9
+	if gear.straps then
+		local y = cargo.floor + math.min(1.5, room * .6)
+		for _, share in { .3, .7 } do
+			local z = cargo.front + (cargo.back - cargo.front) * share
+			add(out, "RatchetStrap", { inner, .07, .28 }, { 0, y, z }, "strap")
+			add(out, "StrapRatchet", { .32, .2, .36 }, { inner / 2 - .6, y, z }, "steel")
+		end
+	end
+	if gear.cooler then
+		local h = math.clamp(room * .5, .6, 1)
+		local x = -(p.width / 2 - 1.1)
+		local z = cargo.front + .6
+		add(out, "CoolerBox", { 1.3, h, .95 }, { x, cargo.floor + h / 2, z }, "plastic")
+		add(out, "CoolerLid", { 1.36, .12, 1.01 }, { x, cargo.floor + h + .06, z }, "coolerlid")
+		add(out, "CoolerHandle", { .55, .08, .1 }, { x, cargo.floor + h + .16, z }, "dark")
+	end
+	local spot: V? = nil
+	if gear.roofrack then
+		local half, front, back, top, own = Geometry.roofRack(p)
+		local z = front + math.min(1.6, (back - front) / 2)
+		if own then
+			spot = { 0, top + .6, z } -- (on the body's own rack: its rails at top + .5)
+		else
+			for _, side in { -1, 1 } do add(out, "RoofRackRail", { .16, .3, back - front }, { side * half, top + .15, (front + back) / 2 }, "dark") end
+			for n = 0, 2 do add(out, "RoofRackBar", { half * 2 + .16, .1, .16 }, { 0, top + .35, front + .2 + (back - front - .4) * n / 2 }, "steel") end
+			spot = { 0, top + .4, z }
+		end
+	end
+	return out, spot
+end
 return Geometry
