@@ -87,6 +87,10 @@ Zombies.onKillInfo = nil :: ((player: Player, info: KillInfo) -> ())?
 Zombies.hunts = function(_player: Player): boolean
 	return true
 end
+-- 4.5, set by server/Buddy.luau: more people on foot to go after (the admin's NPC buddies), each with the player it
+-- belongs to (the people, ZombieDef.jobOnly, go after a buddy only when they go after its owner: Zombies.hunts).
+export type ExtraTarget = { position: Vector3, velocity: Vector3, humanoid: Humanoid, player: Player }
+Zombies.extraTargets = nil :: (() -> { ExtraTarget })?
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -859,6 +863,18 @@ local function gatherTargets(): { Target }
 		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if humanoid and rootPart and humanoid.Health > 0 and not humanoid.SeatPart and not World.isSafe(rootPart.Position) then
 			table.insert(targets, { position = rootPart.Position, velocity = rootPart.AssemblyLinearVelocity, humanoid = humanoid, player = player })
+		end
+	end
+	-- 4.5: the admin's buddies (server/Buddy.luau), bitten and shot like players on foot.
+	local extra = Zombies.extraTargets
+	if extra then
+		local ok, list = pcall(extra)
+		if ok then
+			for _, t in list do
+				if not World.isSafe(t.position) then
+					table.insert(targets, { position = t.position, velocity = t.velocity, humanoid = t.humanoid, player = t.player })
+				end
+			end
 		end
 	end
 	return targets

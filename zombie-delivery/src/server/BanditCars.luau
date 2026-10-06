@@ -199,6 +199,20 @@ function BanditCars.near(position: Vector3, reach: number): boolean
 	return false
 end
 
+-- 4.5: the nearest live bandit car within `reach` of a point and its chassis (the admin's buddies shoot it,
+-- server/Buddy.luau), or nil.
+function BanditCars.nearest(position: Vector3, reach: number): (Bandit?, BasePart?)
+	local best: Bandit? = nil
+	local bestDistance = reach
+	for _, b in bandits do
+		local d = (b.npc.chassis.Position - position).Magnitude
+		if not b.dead and d < bestDistance then
+			best, bestDistance = b, d
+		end
+	end
+	return best, if best then best.npc.chassis else nil
+end
+
 function BanditCars.countFor(player: Player): number
 	local n = 0
 	for _, b in bandits do
