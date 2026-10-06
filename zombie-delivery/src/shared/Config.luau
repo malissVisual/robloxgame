@@ -1535,6 +1535,64 @@ Config.Traffic = {
 	AmberBrake = 20, -- studs/s²: on amber a car stops when it can at this, else drives on
 }
 
+-- 5.5, the city buses (shared/BusLines.luau, server/Buses.luau, server/BusStops.luau, client/BusRide.luau): free
+-- rides on three loops, driven by one timetable from the server's clock (every client works out the same bus).
+-- A line is a closed loop of road-centre corners (Map's grid; -Z is north), driven clockwise on the right-hand lane;
+-- its stops are worked out along it (every ~2 blocks at the kerb, never on a special block's side or by a door).
+export type BusLineDef = {
+	id: number,
+	name: string, -- "Downtown Ring"
+	short: string, -- the caps word on the signs and the HUD ("RING")
+	color: { number },
+	buses: number, -- how many drive the loop, evenly spaced (the wait is at most its loop time / buses)
+	corners: { { number } },
+}
+Config.Bus = {
+	Speed = 40, -- studs/s on a straight
+	TurnSpeed = 16, -- through a corner (straight over a junction: Speed)
+	Approach = 20, -- studs before and after a corner at the speed between the two
+	Ramp = 1.6, -- seconds from a stop to full speed (and from full speed into a stop)
+	Dwell = 4, -- seconds at every stop, the door open
+	StopGap = 250, -- along the loop, a stop at least this far after the one before (about 2 blocks)
+	StopClear = 18, -- no stop by the kerb within this of a door, a pile, a park, a place or an employer's board
+	MaxWait = 25, -- the longest wait at a stop (the tests hold every line to it)
+	BodyColor = { 226, 228, 222 }, -- the buses' paint; the line's colour is the stripe and the sign
+	Reach = 10, -- the Board prompt's reach at the door
+	NearStop = 25, -- the arrivals card shows within this of a stop
+	HintDistance = 350, -- a foot or bike job's stop farther than this: the HUD may suggest a bus
+	RouteReach = 420, -- a route walks at most this far (manhattan) to the first stop and from the last
+	RouteSaving = 10, -- seconds the bus must save over walking to be suggested
+	Lines = {
+		{
+			id = 1,
+			name = "Downtown Ring",
+			short = "RING",
+			color = { 205, 45, 45 },
+			buses = 8,
+			corners = { { -504, -504 }, { 504, -504 }, { 504, 504 }, { -504, 504 } },
+		},
+		{
+			id = 2,
+			name = "Downtown Cross",
+			short = "CROSS",
+			color = { 235, 180, 30 },
+			buses = 7,
+			corners = {
+				{ -72, -360 }, { 72, -360 }, { 72, -72 }, { 360, -72 }, { 360, 72 }, { 72, 72 },
+				{ 72, 360 }, { -72, 360 }, { -72, 72 }, { -360, 72 }, { -360, -72 }, { -72, -72 },
+			},
+		},
+		{
+			id = 3,
+			name = "Suburbs Link",
+			short = "SUBURBS",
+			color = { 50, 120, 220 },
+			buses = 6,
+			corners = { { -216, 216 }, { 216, 216 }, { 216, 1116 }, { -216, 1116 } },
+		},
+	} :: { BusLineDef },
+}
+
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
 Config.Crew = {
 	MaxMembers = 3,

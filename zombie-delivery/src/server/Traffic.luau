@@ -516,6 +516,22 @@ local function gatherObstacles()
 			end
 		end
 	end
+	-- 5.5: the city buses (server/Buses.luau) keep their timetable and never stop for a car: the cars give way to them
+	-- (five points along the bus's middle, its half width each).
+	local buses = workspace:FindFirstChild("Buses")
+	if buses then
+		for _, model in buses:GetChildren() do
+			local chassis = if model:IsA("Model") then model.PrimaryPart else nil
+			if chassis then
+				local frame = chassis.CFrame
+				local p = frame.Position
+				for _, along in { -8, -4, 0, 4, 8 } do
+					local at = p + frame.LookVector * along
+					addObstacle(at.X, at.Z, 4, false)
+				end
+			end
+		end
+	end
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")

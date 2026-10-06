@@ -5893,6 +5893,7 @@ function World.build()
 	piece("crosswalks and traffic lights", function()
 		buildCrossings(world)
 	end)
+	piece("bus stops", function() require(script.Parent.BusStops).build(world) end) -- 5.5: the city buses' shelters
 	piece("Sunset Hills", function()
 		buildSunsetHills(world)
 	end)

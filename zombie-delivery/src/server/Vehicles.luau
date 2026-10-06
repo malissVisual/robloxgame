@@ -2972,6 +2972,7 @@ export type TrafficCar = {
 	size: Vector3,
 	linear: LinearVelocity,
 	angular: AngularVelocity,
+	seats: { Seat }, -- 5.5: the passenger seats a city bus keeps (keepSeats); empty for the traffic
 }
 
 -- A civilian at the wheel: a body and a head in the driver's seat.
@@ -2981,8 +2982,8 @@ local DRIVER_SKINS = { Color3.fromRGB(255, 224, 196), Color3.fromRGB(214, 160, 1
 -- A civilian car for the traffic (server/Traffic.luau): an ordinary style in `color` (default: its factory colour),
 -- no gun, no seats, no prompts, a driver at the wheel, one headlight beam. It keeps its movers ("Drive", "Steer")
 -- like an NPC car; anchor it to step it by CFrame. Its parts are in the "Car" collision group. 3.5: at a stage (its
--- look; the traffic picks one at random).
-function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?, stage: number?): TrafficCar
+-- look; the traffic picks one at random). 5.5: keepSeats keeps the passenger seats (a city bus: server/Buses.luau).
+function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?, stage: number?, keepSeats: boolean?): TrafficCar
 	if def.bike then
 		def, stage = Config.Cars[1], nil -- 5.1: no bikes in the traffic
 	end
@@ -3003,8 +3004,13 @@ function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3
 		piece("DriverHead", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 3, 0), DRIVER_SKINS[rng:NextInteger(1, #DRIVER_SKINS)])
 		seat:Destroy()
 	end
+	local seats: { Seat } = {}
 	for _, p in built.passengers do
-		p:Destroy()
+		if keepSeats then
+			table.insert(seats, p)
+		else
+			p:Destroy()
+		end
 	end
 	for _, d in model:GetDescendants() do
 		if d:IsA("ProximityPrompt") or d:IsA("Attachment") and (d.Name == "CargoDoor" or d.Name == "CargoEntry") then
@@ -3018,7 +3024,28 @@ function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3
 		size = built.size,
 		linear = built.chassis:FindFirstChild("Drive") :: LinearVelocity,
 		angular = built.chassis:FindFirstChild("Steer") :: AngularVelocity,
+		seats = seats,
 	}
+end
+
+-- 5.5: a city bus (server/Buses.luau): the traffic's bus body in `body` paint with its passenger seats, a stripe of
+-- the line's colour round it and an empty board over the windscreen (the caller writes the line on it). Returns the
+-- bus and the board.
+function Vehicles.buildBus(def: Config.CarDef, ground: CFrame, body: Color3, stripe: Color3): (TrafficCar, Part)
+	local bus = Vehicles.buildTraffic(def, ground, body, nil, true)
+	local style = styleFor(def)
+	local top = bus.chassis.CFrame * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
+	local band = newPart(bus.model, "LineStripe", Vector3.new(style.width + 0.16, 0.6, style.length + 0.16), top * CFrame.new(0, 1.9, 0), stripe, Enum.Material.SmoothPlastic)
+	local front = -style.length / 2 + 1 -- (the glass starts a stud behind the bumper)
+	local board = newPart(bus.model, "LineSign", Vector3.new(style.width - 1.6, 1.1, 0.2), top * CFrame.new(0, style.roof - 1.5, front - 0.12), Color3.fromRGB(20, 22, 26), Enum.Material.SmoothPlastic)
+	for _, p in { band, board } do
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.Massless = true
+		weld(bus.chassis, p)
+	end
+	return bus, board
 end
 
 local function writeAttributes(car: Car)
