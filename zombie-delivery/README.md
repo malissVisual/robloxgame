@@ -1079,6 +1079,36 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Deliveries from real shops to real doors, the bag, newspaper rounds, fuel, the new phone (5.3, 5.4)
+
+**Real deliveries (5.3, `shared/Deliveries.luau`):** every pick-up is at the business's own storefront (`Map.Venues`): a
+pizza comes from Luigi's, bread from Daily Bread, parcels from the Post Office, and the cook or clerk hands it over at
+the door. Home deliveries go to a real front door (`Map.Homes`): you knock, someone opens and takes it, now and then
+nobody is in and you leave it at the door. Business rules: the bakery works mornings, pizza / burgers / noodles pay
+more in the evening and at night, the pharmacy sends medicine to patients, hardware goes to houses and the Harbor,
+electronics to apartments.
+
+**The bag** (`shared/Bag.luau`, `client/BagUi.luau`, the I window's BAG tab and the phone's 🎒 BAG): what you carry and
+where — hands, backpack, the bike's rack or box, the car — piece by piece, for whom and for which order. Small things go
+in the backpack (`Config.Cargo.PackLooks`: mail, newspapers, documents, medicine, pizza, food boxes, bread, small
+parcels); flowers, cakes, groceries and electronics ride in your hands or on a rack (one piece on the scooter).
+
+**Newspaper rounds** (`Config.Jobs.Round`, on foot or by bike, mornings): pick up a bundle of 8–12 papers at The Daily
+Undead and deliver one to every door on one or two streets — walk up or toss it onto the porch (the server checks the
+throw). A tip when you miss none.
+
+**Fuel (5.4, `Config.Fuel`, `shared/FuelMath.luau`, `server/Fuel.luau`):** cars burn fuel as they drive (a tank lasts
+about 3–5 jobs; bikes and the scooter need none). The gauge sits by the speed (`client/FuelGauge.luau`, red under 15%).
+Empty, the car crawls at 6 studs/s — reach a pump or call a **tow** from the phone ($150: your car goes to the nearest
+station with 5 L). Four stations: the old Gas Station on the North Highway, Westside Gas, Harbor Gas and Willow Gas.
+At a pump hold **Refuel** with the car parked beside it: $2 a litre, it pours until full or your money runs out. A
+jerry can (+10 L, $35) is sold in the kiosks and at Last Stop Supplies. The Fuel Run delivery stays; there is no work at
+the stations, only deliveries.
+
+**The phone, redone (5.4):** a clean header with a round back button, cards that fit their text, one type scale. ORDERS
+shows "No active orders" with OPEN BOARD when you have none, else the current order (timer, pay, its stops ✓ ▶ ● ○, your
+load) and every other order with a small PIN. MESSAGES is a chat list (avatars, time, an unread dot).
+
 ## Several orders at once, real shops and homes in town (5.2)
 
 **Several orders at once** (`Config.Jobs.Orders`, `job.orders`): while an ordinary run goes (on foot, by bike, or a ★ / ★★
