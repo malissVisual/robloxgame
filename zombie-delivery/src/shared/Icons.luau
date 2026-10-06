@@ -287,6 +287,18 @@ local LANDMARK_BORROWED: { [string]: string } = {
 	lab = "cargo_medicine",
 	camp = "cargo_soup",
 	stadium = "cargo_kid", -- people sheltering there
+	-- 5.3, the storefronts (Map.Venues): what they send
+	luigis = "cargo_pizza",
+	dailybread = "cargo_sack", -- bread
+	lastbite = "cargo_pizza", -- a food box
+	wokdead = "cargo_soup",
+	grindhouse = "cargo_soup", -- a hot cup
+	postoffice = "cargo_parcel",
+	dailyundead = "cargo_sack", -- the mail bag
+	boltnail = "item_repair",
+	volt = "cargo_crate",
+	secondlife = "cargo_ammo",
+	bloom = "cargo_sack", -- the plants
 }
 
 function Icons.landmark(landmarkId: string?): string?

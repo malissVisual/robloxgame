@@ -96,6 +96,7 @@ local KIND_COLORS = {
 	shop = Color3.fromRGB(150, 196, 146),
 	employer = Color3.fromRGB(226, 184, 120),
 	place = Color3.fromRGB(184, 170, 214),
+	venue = Color3.fromRGB(214, 160, 150), -- 5.3, the storefronts (Map.Venues)
 }
 
 -- A route line on one canvas: two pools of rotated frames (a dark edge under the colour), drawn from `step` on.
@@ -1198,6 +1199,7 @@ local function buildList(parent: any)
 	local groups: { Group } = {
 		{ kind = "shop", title = "SHOPS AND REPAIRS", color = KIND_COLORS.shop },
 		{ kind = "employer", title = "WORK  (earn their vehicle)", color = KIND_COLORS.employer },
+		{ kind = "venue", title = "STORES AND FOOD", color = KIND_COLORS.venue }, -- 5.3
 		{ kind = "place", title = "FAR PLACES", color = KIND_COLORS.place },
 	}
 	for _, group in groups do

@@ -35,6 +35,68 @@ export type Context = {
 	nightLight: (Instance, Color3?, Color3?, string?) -> (),
 }
 
+-- 5.3, the storefronts of Map.Venues (server/World.luau buildVenue): every one is a 30 x 24 x 12 shop (Map.VenueSize)
+-- with a 9-wide, 8-tall door in the middle of its front (World's building() makes the shell, the name board stands on
+-- the parapet above the awning). The shared front: two shop windows that glow at night (framed, a sill, a head), the door
+-- jambs and header, corner piers, a sloping awning in the kind's colours with its valance and a light under it, the
+-- counter and the menu board inside, a plate on the right window, a roof unit and the doorstep. A kind adds its own
+-- `extras` (a chimney, a giant burger, lanterns, a mailbox ...). Pure data: a blueprint like the others.
+export type Storefront = {
+	id: string,
+	awning: Triple,
+	stripe: Triple, -- the awning's stripes and valance
+	trim: Triple, -- the window and door frames
+	counter: Triple,
+	menu: string, -- the board behind the counter
+	poster: string, -- the glowing plate on the right window
+	extras: { Detail },
+}
+Kit.StoreWidth, Kit.StoreDepth, Kit.StoreHeight, Kit.StoreDoor, Kit.StoreDoorHeight = 30, 24, 12, 9, 8
+
+function Kit.storefront(spec: Storefront): Blueprint
+	local front = -Kit.StoreDepth / 2 -- the front wall's outer face (z)
+	local details: { Detail } = {}
+	local function add(detail: Detail)
+		table.insert(details, detail)
+	end
+	local dark, glass = { 34, 44, 52 }, { 40, 52, 60 }
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "L" else "R"
+		add({ name = "ShopWindow" .. tag, position = { side * 9.6, 4.6, front - 0.11 }, size = { 8, 5.4, 0.2 }, color = glass, material = "Glass", night = true })
+		add({ name = "WindowSill" .. tag, position = { side * 9.6, 1.75, front - 0.3 }, size = { 8.6, 0.3, 0.6 }, color = spec.trim, material = "Concrete" })
+		add({ name = "WindowHead" .. tag, position = { side * 9.6, 7.45, front - 0.25 }, size = { 8.6, 0.3, 0.5 }, color = spec.trim, material = "Metal" })
+		add({ name = "DoorJamb" .. tag, position = { side * 4.8, 4, front - 0.25 }, size = { 0.5, 8, 0.5 }, color = spec.trim, material = "Metal" })
+		add({ name = "CornerPier" .. tag, position = { side * 14.55, 6, front - 0.3 }, size = { 0.9, 12, 0.6 }, color = spec.trim, material = "Concrete" })
+	end
+	add({ name = "DoorHeader", position = { 0, 8.25, front - 0.25 }, size = { 10.1, 0.5, 0.5 }, color = spec.trim, material = "Metal" })
+	-- The awning slopes down to the street (its lowest edge 8.7 over the walk), the valance hangs from its front edge.
+	add({ name = "Awning", position = { 0, 9.4, front - 1.9 }, size = { 30, 0.3, 4 }, color = spec.awning, material = "SmoothPlastic", rotation = { -15, 0, 0 } })
+	for n, x in { -7.5, 7.5 } do
+		add({ name = "AwningStripe" .. n, position = { x, 9.4, front - 1.9 }, size = { 3.4, 0.34, 4 }, color = spec.stripe, material = "SmoothPlastic", rotation = { -15, 0, 0 } })
+	end
+	add({ name = "Valance", position = { 0, 8.5, front - 3.75 }, size = { 30, 0.7, 0.1 }, color = spec.stripe, material = "SmoothPlastic" })
+	add({ name = "AwningLight", position = { 0, 8.75, front - 0.6 }, size = { 6, 0.15, 0.5 }, color = { 184, 172, 146 }, material = "Glass", night = true, beam = 18 })
+	add({ name = "WindowPlate", position = { 9.6, 6.55, front - 0.25 }, size = { 4, 0.9, 0.08 }, color = dark, material = "Glass", night = true, label = spec.poster, textColor = { 255, 214, 120 } })
+	add({ name = "Doorstep", position = { 0, 0.1, front - 0.9 }, size = { 10, 0.2, 1.6 }, color = { 120, 120, 118 }, material = "Concrete" })
+	-- Inside: the counter across the back, the menu board on the back wall, a shelf on the left wall.
+	add({ name = "Counter", position = { -2, 1.9, 4 }, size = { 14, 3.8, 2.6 }, color = spec.counter, material = "Wood" })
+	add({ name = "CounterTop", position = { -2, 3.9, 4 }, size = { 14.6, 0.2, 3 }, color = { 200, 200, 196 }, material = "SmoothPlastic" })
+	add({ name = "MenuBoard", position = { 0, 7.4, 10.9 }, size = { 12, 2.6, 0.15 }, color = dark, material = "Metal", label = spec.menu })
+	add({ name = "Shelf", position = { -13.9, 5, 2 }, size = { 1.2, 0.25, 10 }, color = spec.counter, material = "Wood" })
+	add({ name = "RoofUnit", position = { 9, 13, 7 }, size = { 4, 2, 3 }, color = { 120, 122, 124 }, material = "Metal" })
+	for _, extra in spec.extras do
+		add(extra)
+	end
+	return {
+		id = spec.id,
+		width = Kit.StoreWidth,
+		depth = Kit.StoreDepth,
+		height = Kit.StoreHeight,
+		details = details,
+		entries = { { 0, Kit.StoreDoor, Kit.StoreDoorHeight } },
+	}
+end
+
 function Kit.build(parent: Instance, frame: CFrame, blueprint: Blueprint, context: Context): Folder
 	-- Builders call once. No Heartbeat, scans, asset downloads or changes to existing instances.
 	local model = Instance.new("Folder")
