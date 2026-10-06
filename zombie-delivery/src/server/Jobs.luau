@@ -3489,6 +3489,13 @@ function Jobs.involved(player: Player): boolean
 	return jobOwner(player) ~= nil
 end
 
+-- 5.5: on a mission (their own or their crew's)? The city bus does not take them (server/Buses.luau).
+function Jobs.onMission(player: Player): boolean
+	local owner = jobOwner(player)
+	local job = if owner then jobs[owner] else nil
+	return job ~= nil and job.offer.mission ~= nil
+end
+
 function Jobs.onKill(player: Player)
 	local owner = jobOwner(player)
 	local job = owner and jobs[owner]

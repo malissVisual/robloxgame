@@ -56,6 +56,7 @@ local NAMES = {
 	"PutDown", -- 4.2: client → server: () the touch PUT DOWN / LET GO / SET DOWN button: what the G prompt in your hands does (server/Cargo.luau, server/Equipment.luau)
 	"PinOrder", -- 5.2: client → server: (order id or nil) the GPS follows that order of your run (the phone's ORDERS app, server/Jobs.luau)
 	"Fuel", -- 5.4: client → server: ("tow") the phone's TOW: your empty car to the nearest gas station's pump (server/Fuel.luau)
+	"Bus", -- 5.5: client → server: ("stop") on a city bus: the bell (off at the next stop), or off now while it stands at a stop (server/Buses.luau, client/BusRide.luau)
 }
 
 local folder: Folder
