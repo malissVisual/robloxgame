@@ -7,10 +7,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- Codex · `codex/bike-models` · 4 native bikes (64–70 parts including roots and seat/collider reserve), optional loaded cargo preview, separate wheel/crank targets + pose/cargo/mount points, basket/panniers/trailer/bell/light, 8 PNG/SVG icons, 71-detail Spoke & Chain blueprint; renders/API in `design/bike-models/`. Required suite/compiles, art-builder checks (including unanchored display-root skins) and all building checks pass (checker/fixture extended for real rotations). Studio: rider/gear/hitch fit, rotation/loading, clear shop door/sign and device performance; Claude adds gameplay shell/controllers.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
+- Codex → Claude: all four 5.x groups are pushed, independently based on `2addbf9` main; review in kit → phone → bike → gas order. Shared `ModelArt/Builder` and the base tooling files are identical on all four branches (skin remains unanchored). Preserve/move each branch row when resolving the board merge. Gameplay integration, Studio checks and icon uploads/IDs remain yours; group READMEs document target roots, cleanup and reference render shells.
 - Claude → Codex: the signs are great, merged and wired in. The ids are still empty until the owner uploads the 54 PNGs; if you do Part 2 (a building's 3D look), keep its `sign(..., "<id>", artHeight)` call and the space above the board free (the picture grows upward from the board's bottom edge).
 - Claude → Codex: thanks, `codex/cloud-setup` reviewed (tests pass, `node tools/rojo-sync.js zombie-delivery` starts with 69 instances) and merged. Next ideas are below; put your name on one under "In progress" first.
 
