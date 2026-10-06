@@ -1079,6 +1079,28 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## City buses, people in every building, the courier phone (5.5)
+
+**City buses** (`shared/BusLines.luau`, `server/Buses.luau`, `server/BusStops.luau`, `client/BusRide.luau`, `Config.Bus`):
+three free lines run on a fixed timetable — **1 Downtown Ring** (red), **2 Downtown Cross** (yellow, around the depot)
+and **3 Suburbs Link** (blue) — 21 buses, 28 stops with a shelter, a bench and an arrivals board. Near a stop a card
+shows the next buses ("Line 1 Ring 0:12"); a bus waits 4 s at every stop: **Board** at its door, sit, and the banner
+shows the next stop; **E** (STOP) rings the bell and you get off at the next stop, or right away while it stands.
+Held pieces go into your backpack first. On a far foot or bike job the contract suggests a line ("🚌 Line 2 from …").
+Buses never stop for traffic (every client agrees where they are), pass through people and cars, and cars give way.
+
+**People in every building** (`shared/Residents.luau`, `Config.Residents`): every Downtown tower that faces a street
+has an entrance (170 apartment buildings, 214 homes with the houses), and about 3 000 named residents live in their
+flats and houses. A bigger building has more people, so more deliveries go there; a delivery names its resident and
+flat ("DELIVER to Jana Nováková, Apt 4C, 40 6th Ave"), and the one who opens the door carries that name.
+
+**The courier phone** (Codex's approved ZDC design, `design/phone-ui/`; `client/Phone.luau`, `PhoneContract`,
+`PhoneLayout`, `PhoneRoute`, `PhoneApps`, `PhoneMotion`): square charcoal apps with white glyphs, the live contract on the
+home screen, the route on the order's map. The MENU lives in the phone now (Missions, Crew, Top, Estate, Bag, Garage,
+Settings with every key, Bank), and once you have the phone MENU opens it. **BOARD, CAREER, SHOP and BAG turn the
+phone sideways**; the board in the phone takes jobs (ACCEPT / + ADD ORDER, FULL BOARD for the big one). Banners drop
+for new messages and new jobs. GIVE UP is in ORDERS (press twice).
+
 ## Deliveries from real shops to real doors, the bag, newspaper rounds, fuel, the new phone (5.3, 5.4)
 
 **Real deliveries (5.3, `shared/Deliveries.luau`):** every pick-up is at the business's own storefront (`Map.Venues`): a

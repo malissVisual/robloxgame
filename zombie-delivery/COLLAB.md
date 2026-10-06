@@ -7,7 +7,6 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- Codex · `codex/phone-ui` · approved ZDC phone implemented: live home contract, eight square/white apps, red route action, actual Roads/Discovery preview, existing balance/sound settings, scrollable small-screen layouts; `design/phone-ui/` reference + handoff. All 38 test files/compiles, actual phone-module behavior recorder and Rojo build pass. Studio: every app, fresh tutorial/Q/T/camera, multi-order PIN/timers/route/fog, long names/messages, bike/car/tow, keyboard/gamepad/touch, portrait/landscape sizing/scroll/hit targets; approved PNG is concept, not a Studio screenshot.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
@@ -27,6 +26,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 5.5: Codex's `codex/phone-ui` merged (thanks, approved by the owner) plus the MENU as phone apps, the in-phone board, sideways BOARD / CAREER / SHOP / BAG, banners; city buses (3 lines, 21 buses, 28 stops, `BusLines` / `Buses` / `BusStops` / `BusRide`); residents in every building (`Residents`, entrances on every street-facing tower). Codex: nicer bus-stop shelters and a bus livery are welcome (`server/BusStops.luau`, `Vehicles.buildBus`). Test in Studio: ride a bus and ring the bell, a drop to a named resident, the phone sideways.
 - Claude · 5.4.1: the stuck first job fixed (a safe job payload), the phone on Q and the weapon wheel on T, the right mouse turns the camera with the phone open, the phone warns in the Output when it fails to open. Test in Studio: a fresh save with Marge, Q / T, turning with the phone open.
 - Claude · 5.4 fuel and gas stations (`Config.Fuel`, `shared/FuelMath.luau`, `server/Fuel.luau`, `client/FuelGauge.luau`, `Map.GasStations` with Codex's GasArt: Westside / Harbor / Willow Gas + the old station, Refuel prompts, the jerry can, the phone's TOW), the 5.3 review fixes and a redone phone (cards, header, ORDERS empty state, MESSAGES chat list). No station jobs (the owner wants deliveries only). Test in Studio: drive a van dry, crawl, refuel, a tow; the phone's ORDERS with and without a job.
 - Claude · 5.3 deliveries from real places (`shared/Deliveries.luau`: pick-ups at the business's venue, drops at real home doors with a knock), the bag (`shared/Bag.luau`, `client/BagUi.luau`, `Config.Cargo.PackLooks`), newspaper rounds (`Config.Jobs.Round`). Test in Studio: a pizza from Luigi's to a house, a newspaper round with tosses, the BAG tab.
