@@ -39,7 +39,7 @@ function Geometry.pieces(id: string): { Piece }
 		wheel(p, "Front", 1.19, 12, "steel", true)
 		wheel(p, "Rear", 1.19, 12, if rusty then "worn" else "steel", true)
 		local h, s, c = { 0, 2.83, head }, { 0, 2.95, seat }, { 0, 1.22, seat - .12 }
-		bar(p, "TopTube", h, s, .11, "Frame", paint)
+		if not cargo then bar(p, "TopTube", h, s, .11, "Frame", paint) end
 		bar(p, "DownTube", h, c, .13, "Frame", paint)
 		bar(p, "SeatTube", c, s, .12, "Frame", paint)
 		for _, side in { -1, 1 } do
@@ -52,13 +52,12 @@ function Geometry.pieces(id: string): { Piece }
 		add(p, "Handlebar", { 1.42, .09, .09 }, { 0, 3.25, head - .18 }, "Frame", "steel", "Cylinder")
 		for _, side in { -1, 1 } do add(p, "Grip" .. side, { .34, .14, .14 }, { side * .61, 3.25, head - .18 }, "Frame", "sole", "Cylinder") end
 		add(p, "Saddle", { .66, .15, .72 }, { 0, 3.08, seat }, "Frame", "sole")
-		add(p, "SaddleNose", { .3, .12, .32 }, { 0, 3.06, seat - .46 }, "Frame", "sole", "Wedge")
 		if not cargo then
 			add(p, "RearRack", { .76, .065, 1 }, { 0, 2.77, rear - .2 }, "Frame", "steel")
 			for _, side in { -1, 1 } do bar(p, "RackStay" .. side, { side * .16, 1.3, rear }, { side * .33, 2.74, rear + .15 }, .05, "Frame", "steel") end
 		end
 		add(p, "ChainRing", { .07, .62, .62 }, { .22, 0, 0 }, "Crank", "steel", "Cylinder")
-		if not cargo then bar(p, "ChainUpper", { .25, 1.44, seat - .12 }, { .25, 1.42, rear }, .035, "Frame", "sole") end
+		if not cargo and id ~= "ebike" then bar(p, "ChainUpper", { .25, 1.44, seat - .12 }, { .25, 1.42, rear }, .035, "Frame", "sole") end
 		for _, side in { -1, 1 } do
 			bar(p, "CrankArm" .. side, { side * .28, 0, 0 }, { side * .28, side * .38, 0 }, .075, "Crank", "steel")
 			add(p, "Pedal" .. side, { .38, .1, .26 }, { side * .47, side * .38, 0 }, "Crank", "sole")
@@ -141,6 +140,8 @@ function Geometry.spec(id: string): any
 		point("Hitch", "Frame", { 0, .75, -1.85 }); point("LeftAxle", "Frame", { -.94, .64, .25 }); point("RightAxle", "Frame", { .94, .64, .25 })
 		for n = 1, 4 do point("Slot" .. n, "Frame", { if n % 2 == 1 then -.4 else .4, .63, if n <= 2 then -.4 else .4 }) end
 	end
-	return { id = id, pieces = Geometry.pieces(id), attachments = points, origins = origins, newRoots = roots }
+	return { id = id, pieces = Geometry.pieces(id), attachments = points, origins = origins, newRoots = roots,
+		reservedParts = if bike(id) then 2 else 0, -- Claude's stable collider + doorless seat, in the 70-part total
+	}
 end
 return Geometry

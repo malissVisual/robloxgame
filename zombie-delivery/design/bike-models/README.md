@@ -6,19 +6,19 @@
 
 `server/BikeArt/Geometry.luau` is pure native geometry; `ModelArt/Builder` welds it to caller-supplied roots. No meshes, controllers, balance simulation, seats, gameplay cargo or save edits. Forward -Z, up +Y, cylinder axis X. Tyres are hollow twelve-segment rings with four crossed full-diameter spokes, rather than solid discs.
 
-| Model | Skin parts + new roots | Budget |
+| Model | Skin + roots + seat/collider reserve | Budget |
 |---|---:|---:|
-| rustbike | 60 + 4 = 64 | 70 |
-| citybike | 61 + 4 = 65 | 70 |
-| cargobike | 60 + 4 = 64 | 70 |
-| cargobike_loaded (review sample) | 66 + 4 = 70 | 70 |
-| ebike | 66 + 4 = 70 | 70 |
+| rustbike | 59 + 4 + 2 = 65 | 70 |
+| citybike | 60 + 4 + 2 = 66 | 70 |
+| cargobike | 58 + 4 + 2 = 64 | 70 |
+| cargobike_loaded (review sample) | 64 + 4 + 2 = 70 | 70 |
+| ebike | 64 + 4 + 2 = 70 | 70 |
 | basket | 9 + 1 = 10 | 10 |
 | panniers | 10 + 1 = 11 | 12 |
 | trailer | 22 + 3 = 25 | 25 |
 | bell / light | 2 / 3 + 1 mount each | 3 / 4 |
 
-Budgets include the new hidden attachment roots. The gameplay-only seat/collider and additional gear are separate integration costs. The four main bikes are about 6.6 studs long (cargo about 6.9); wheel radius is about 1.3 and frame width about .3, handlebar width about 1.6. Rusty has worn tubes and mismatched wheel finishes; Courier has a lamp and clean red frame; Cargo has a low extended beam and front box; E-Bike has battery, display and rotating brake discs.
+Budgets include the four hidden assembly roots **and reserve two more parts for Claude’s seat and stable collider**. Additional installed gear has its own budget. The four main bikes are about 6.6 studs long (cargo about 6.9); wheel radius is about 1.3 and frame width about .3, handlebar width about 1.6. Rusty has worn tubes and mismatched wheel finishes; Courier has a lamp and clean red frame; Cargo has a low extended beam and front box; E-Bike has battery, display and rotating brake discs.
 
 ## Assemblies and pose/cargo points
 

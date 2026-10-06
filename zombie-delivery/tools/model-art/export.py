@@ -80,7 +80,7 @@ def export(module,luau,output):
     models=[json.loads(line) for line in run.stdout.splitlines()]
     assert len({m['id'] for m in models})==len(models)
     for m in models:
-        spec=m['spec'];pieces=spec['pieces'];count=len(pieces)+spec.get('newRoots',0)
+        spec=m['spec'];pieces=spec['pieces'];count=len(pieces)+spec.get('newRoots',0)+spec.get('reservedParts',0)
         assert count<=BUDGETS[m['id']],(m['id'],count,'part budget')
         assert len({p['name'] for p in pieces})==len(pieces)
         for p in pieces:
@@ -99,6 +99,7 @@ def export(module,luau,output):
         if m['id'] in ['backpack','backpack_loaded','bigpack']:
             for p in pieces:assert abs(p['at'][0])+p['size'][0]/2<=1 and p['at'][1]-p['size'][1]/2>=-1.12,(m['id'],'arm/hip envelope')
         if m['id'] in ['rustbike','citybike','cargobike','cargobike_loaded','ebike']:
+            assert spec.get('reservedParts',0)>=2,'bike budget must reserve a seat and stable collider'
             named={p['name']:p for p in points}
             assert {'Saddle','LeftGrip','RightGrip','LeftPedal','RightPedal','FrontAxle','RearAxle','CrankAxis','BasketMount','PannierMount','Hitch'}<=named.keys()
             assert sum(p['name'].endswith('Tyre') for p in pieces)==2
@@ -107,7 +108,7 @@ def export(module,luau,output):
         if m['id'] in ['basket','panniers','trailer']:assert any(p['name']=='Slot1' for p in points)
         if m['id']=='pump':assert any(p['attach']=='Nozzle' for p in pieces) and any(p['name']=='FuelOutlet' for p in points)
     output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(models))
-    print('Art factory PASS:',{m['id']:len(m['spec']['pieces'])+m['spec'].get('newRoots',0) for m in models})
+    print('Art factory PASS:',{m['id']:len(m['spec']['pieces'])+m['spec'].get('newRoots',0)+m['spec'].get('reservedParts',0) for m in models})
     print('Real builder: nonblocking/massless flags, target welds, local frames, labels, missing-target atomicity and cleanup PASS')
     return models
 if __name__=='__main__':

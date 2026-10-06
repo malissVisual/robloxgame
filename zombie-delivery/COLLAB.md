@@ -7,7 +7,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
-- Codex · `codex/bike-models` · 4 native bikes (64–70 parts including roots), optional loaded cargo preview, separate wheel/crank targets + pose/cargo/mount points, basket/panniers/trailer/bell/light, 8 PNG/SVG icons, 71-detail Spoke & Chain blueprint; renders/API in `design/bike-models/`. Required suite/compiles, art-builder checks (including unanchored display-root skins) and all building checks pass (checker/fixture extended for real rotations). Studio: rider/gear/hitch fit, rotation/loading, clear shop door/sign and device performance; Claude adds gameplay shell/controllers.
+- Codex · `codex/bike-models` · 4 native bikes (64–70 parts including roots and seat/collider reserve), optional loaded cargo preview, separate wheel/crank targets + pose/cargo/mount points, basket/panniers/trailer/bell/light, 8 PNG/SVG icons, 71-detail Spoke & Chain blueprint; renders/API in `design/bike-models/`. Required suite/compiles, art-builder checks (including unanchored display-root skins) and all building checks pass (checker/fixture extended for real rotations). Studio: rider/gear/hitch fit, rotation/loading, clear shop door/sign and device performance; Claude adds gameplay shell/controllers.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
