@@ -6,7 +6,7 @@ return {
 		{ name = "Forecourt", model = "island", at = { -16, 0, -6 } },
 		{ name = "Shop", blueprint = "GasKiosk", at = { 18, 0, 12 } },
 		{ name = "RoadPrice", model = "pricesign", at = { 32, 0, -19 } },
-	},
+	} :: { any },
 	-- ModelArt pieces (lot-frame targets); markings have no collision or query effect.
 	pieces = {
 		{ name = "BayLine1", attach = "Frame", finish = "reflector", size = { .08, .025, 14 }, at = { 5, .025, -6 } },

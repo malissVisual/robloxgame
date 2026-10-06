@@ -11,7 +11,7 @@ function Geometry.pieces(id: string): any
 		{ name = "CameraLens", size = { .035, .12, .12 }, at = { -.22, .34, -.225 }, attach = "RightHand", finish = "glass", shape = "Cylinder", turn = { 0, 90, 0 } },
 		{ name = "SideKey", size = { .035, .18, .07 }, at = { .35, .16, -.3 }, attach = "RightHand", finish = "red" },
 		{ name = "CompanyTab", size = { .16, .035, .02 }, at = { 0, -.64, -.37 }, attach = "RightHand", finish = "red" },
-	}
+	} :: { any }
 end
 function Geometry.spec(id: string): any
 	return { id = id, pieces = Geometry.pieces(id), origins = { RightHand = { 0, 1, 0 } }, newRoots = 0,

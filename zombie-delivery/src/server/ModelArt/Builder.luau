@@ -35,7 +35,7 @@ end
 function Builder.build(parent: Instance, spec: Spec, targets: { [string]: BasePart }): Built
 	-- Validate target coverage before creating anything. Caller supplies rig bones or separate moving assembly roots.
 	for _, p in spec.pieces do assert(targets[p.attach] and FINISH[p.finish], "Missing art target or finish: " .. p.name) end
-	for _, p in spec.attachments or {} do assert(targets[p.attach], "Missing attachment target: " .. p.name) end
+	for _, p in (spec.attachments or {}) :: { Point } do assert(targets[p.attach], "Missing attachment target: " .. p.name) end
 	local model = Instance.new("Model")
 	model.Name = spec.id .. "Art"
 	local built: Built = { model = model, parts = {}, points = {} }
@@ -67,7 +67,7 @@ function Builder.build(parent: Instance, spec: Spec, targets: { [string]: BasePa
 		p:SetAttribute("NightLamp", d.night == true) -- Claude registers these with DayNight; no scheduler here
 		table.insert(built.parts, p)
 	end
-	for _, d in spec.attachments or {} do
+	for _, d in (spec.attachments or {}) :: { Point } do
 		local point = Instance.new("Attachment")
 		point.Name, point.CFrame, point.Parent = d.name, pose(d.at, d.turn), targets[d.attach]
 		table.insert(built.points, point)
