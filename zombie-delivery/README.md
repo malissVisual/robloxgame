@@ -140,7 +140,7 @@ of letting you play a profile that would not be saved.
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
 | Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire) | B (gamepad: d-pad right) | DRAW / HOLSTER (over PUNCH) |
 | Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: d-pad left) | PUNCH / STRIKE left of FIRE |
-| Switch gun | hold Q: the weapon wheel (point at a gun, let go); tap Q: the next gun; or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
+| Switch gun | hold T: the weapon wheel (point at a gun, let go); tap T: the next gun (5.4.1: Q is the phone); or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 (or click a tag) | the tags |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | JOBS in MENU / MAP / BAG in MENU or INVENTORY |
@@ -942,7 +942,7 @@ what each part shows is the same.
 | Upper left | ■ DELIVERY CONTRACT (type, stars, stop), the destination in caps, the objectives as checkboxes, a rule, the time left (red under 30 s) / EST. pay; the tutorial's hint, the crew strip and the toasts sit under it |
 | Upper right | MAP [M] · CREW [K] · MENU (every other action: JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
-| Lower right | the gun and [Q] (3.9 on foot: HANDS · [B] DRAW · [V] PUNCH, or the gun · [B] HOLSTER · [V] STRIKE), or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [I] |
+| Lower right | the gun and [T] (3.9 on foot: HANDS · [B] DRAW · [V] PUNCH, or the gun · [B] HOLSTER · [V] STRIKE), or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [I] |
 | Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it |
 | In the world | a small red waypoint with the place and the distance |
 
@@ -976,7 +976,7 @@ pastel face. Everything is laid out from the screen size, so nothing overlaps on
   **cargo pips** (one per slot, the loaded ones filled, "3 / 4 cargo slots"). On foot it dims and keeps the parked car's
   condition; without a car it says how to get one.
 * **The weapon label** on top of the dial: the gun in your hands (or the car gun while you drive a car that has one),
-  WINDOW READY when it fires from a car seat, the key Q (hold Q: the weapon wheel). Click it for the next gun.
+  WINDOW READY when it fires from a car seat, the key T (hold T: the weapon wheel). Click it for the next gun.
 * **The consumable tags** (bottom centre): repair, medkit, nitro, molotov, mine as tilted pastel tags with their key
   (1 – 5) and how many you have; under the mouse a tag lifts, straightens, grows and shows its name. The **hint** over
   them is a cream pill: what to do right now ("Get out and open the back (E)").
@@ -1063,7 +1063,7 @@ All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map
 ## From the bottom: on foot, your kit, the phone, Earl's van (5.0)
 
 **Everybody starts again** (the DataStore is `ZombieDelivery_v2`; the old saves stay stored, unread). A new courier has
-no vehicle, $40 and a pistol. Marge welcomes you, gives you **the phone** (O, or the PHONE button: ORDERS, BOARD,
+no vehicle, $40 and a pistol. Marge welcomes you, gives you **the phone** (Q since 5.4.1, or the PHONE button: ORDERS, BOARD,
 CAREER, SHOP, MAP, MESSAGES; `client/Phone.luau`) and the first delivery **on foot**: two letter bundles on one street.
 
 **On foot** (`Config.Jobs.Foot`, `offer.mode = "foot"`): the board's ON FOOT section, three light-cargo runs (mail,
@@ -1108,6 +1108,10 @@ the stations, only deliveries.
 **The phone, redone (5.4):** a clean header with a round back button, cards that fit their text, one type scale. ORDERS
 shows "No active orders" with OPEN BOARD when you have none, else the current order (timer, pay, its stops ✓ ▶ ● ○, your
 load) and every other order with a small PIN. MESSAGES is a chat list (avatars, time, an unread dot).
+
+**5.4.1:** the phone moved to **Q** (the weapon wheel to **T**); with only the phone open, holding the right mouse still
+turns the camera. A job whose payload fails no longer gets stuck (the server sends a short one and warns once in the
+Output), so the first delivery, Marge and the board work again.
 
 ## Several orders at once, real shops and homes in town (5.2)
 
@@ -1278,7 +1282,7 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Map
               Weather (the day and night look; 3.0.1: the readable night, the town glow, your own light), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels; 3.9: colours the traffic lights), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
-              card), Sounds (the music and every sound effect, N / SOUND), WeaponWheel (hold Q), MissionsUi (3.0: the MISSIONS window (U),
+              card), Sounds (the music and every sound effect, N / SOUND), WeaponWheel (hold T), MissionsUi (3.0: the MISSIONS window (U),
               the mission banner in the top stack, the celebration card; 3.1: the CHALLENGES, SECRETS and REWARDS
               tabs and the unlock popups; 3.2: the lock texts, the DUO badge, FIND CREW; 3.4: the 📦 needs N slots
               chip), Secrets (3.1: hides the lost packages you found, animates the others nearby), GarageUi (3.4: the

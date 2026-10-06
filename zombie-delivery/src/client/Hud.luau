@@ -2127,7 +2127,7 @@ function renderWeapons()
 	})
 	if not carGun and not touchLayout then
 		-- Q: how to switch (hold: the wheel).
-		P.keyBox(top, "Q", 20, { LayoutOrder = 3 })
+		P.keyBox(top, "T", 20, { LayoutOrder = 3 })
 	end
 	P.caps(group, status, UDim2.new(1, 0, 0, 14), {
 		Position = UDim2.fromOffset(0, 26),
@@ -2148,7 +2148,7 @@ function renderWeapons()
 	end
 end
 
--- The next gun you own (tap Q: client/WeaponWheel.luau has its own; hold Q opens the wheel).
+-- The next gun you own (tap T: client/WeaponWheel.luau has its own; hold T opens the wheel).
 function nextWeapon()
 	if not state then
 		return
@@ -3847,7 +3847,7 @@ RunService.RenderStepped:Connect(function()
 		if touchLayout then
 			setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · tap the gun line for a pistol, revolver or SMG` else "FIRE shoots out of the window · EXIT gets out")
 		else
-			setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · Q to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
+			setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · T to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
 		end
 	elseif safe and not job then
 		setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
@@ -3999,7 +3999,7 @@ function Hud.start()
 			else
 				openDispatch()
 			end
-		else -- (Q: the weapon wheel, client/WeaponWheel.luau)
+		else -- (T: the weapon wheel, client/WeaponWheel.luau)
 			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six }
 			local index = table.find(numbers, key)
 			if index and Config.Items[index] then

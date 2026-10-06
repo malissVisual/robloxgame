@@ -1,5 +1,5 @@
 --!strict
--- The weapon wheel: hold Q and the guns you own come up on a ring around the middle of the screen; point the mouse
+-- The weapon wheel: hold T (5.4.1: Q is the phone) and the guns you own come up on a ring around the middle of the screen; point the mouse
 -- at one and let go of Q (or click it) to take it. A quick tap of Q still takes the next gun, as before.
 -- The look (GTA-like, in the Dead End Dispatch colours): a dark ring cut into one segment per gun, the segment under
 -- the mouse lit with a pointer from the middle, and in the middle the gun's picture, name and bars for its damage,
@@ -605,13 +605,13 @@ function WeaponWheel.start()
 			nextWeapon() -- 4.2, a gamepad: the next gun
 			return
 		end
-		if input.KeyCode ~= Enum.KeyCode.Q then
+		if input.KeyCode ~= Enum.KeyCode.T then
 			return
 		end
 		pressedAt = os.clock()
 	end)
 	UserInputService.InputEnded:Connect(function(input)
-		if input.KeyCode ~= Enum.KeyCode.Q then
+		if input.KeyCode ~= Enum.KeyCode.T then
 			return
 		end
 		local since = pressedAt
