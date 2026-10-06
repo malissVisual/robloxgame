@@ -54,6 +54,13 @@
 --                     at the open back of a vehicle that takes pallets (Freight.palletsOf: their places on its floor,
 --                     palletFrames), at the drop "Unload pallet" onto the jack and "Set down pallet" at the receiving
 --                     dock's pad. The hints (Cargo.step) say what to do with a tool in every state.
+--
+-- 4.8 (server/Jobs.luau, shared/JobRules.luau): Info.heavy, a heavy cargo carried by hand alone walks at that speed
+-- (the lift twist's machinery, updateLift; on the hand trolley or with a crew mate the normal pace). Multi-drop:
+-- Info.dests / destNames give every piece its stop and customer (Piece.dest / owner, a "FOR GRANDMA ROSE" tag over a
+-- piece out of the vehicle, the prompts say it); at a drop only that customer's pieces count (neededNow, toTakeOut),
+-- Take out picks theirs (takeHere), and handing over another customer's piece is refused (it goes back in).
+-- Cargo.setStop(…, replace): a road event's side pick-up swapped in front of the stop you drive to.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -97,6 +104,13 @@ export type Info = {
 	changed: () -> (), -- something to send to the HUD
 	lift: boolean?, -- the lift twist: heavy pieces, carried alone you walk at Config.Missions.LiftSlowSpeed
 	pair: boolean?, -- 3.2, the pair twist: a piece moves only with another job member close (Config.Missions.Duo)
+	-- 4.8, cargo with rules: heavy pieces (Config.Jobs.CargoRules.HeavyCarrySpeed): carried by hand alone you walk this
+	-- slowly; on the hand trolley or with a crew mate within Config.Missions.LiftHelpRange at the normal pace.
+	heavy: number?,
+	-- 4.8, multi-drop: the stop every piece goes to, in the order they are made (JobRules.destinations), and the
+	-- customer's name at each of those stops. A piece is only handed over at its own stop.
+	dests: { number }?,
+	destNames: { [number]: string }?,
 }
 
 type Piece = {
@@ -108,6 +122,8 @@ type Piece = {
 	model: Model?, -- the visible piece where it is now (pile, hands, ground, a slot in the vehicle)
 	npc: Model?, -- a kid standing or walking
 	walkingSince: number?,
+	dest: number?, -- 4.8, multi-drop: the stop it goes to (nil: any drop) …
+	owner: string?, -- … and the customer there ("For Grandma Rose" on the piece)
 }
 
 -- 3.7: pieces, bottom first (two light pieces stacked; one otherwise). The prompt (Put down / Let go) sits on the top one.
@@ -154,6 +170,7 @@ export type Session = {
 	slowed: { [Player]: Model }, -- the lift twist: carriers walking slowly right now (their character, CarrySpeed set)
 	liftTold: boolean, -- the lift twist's hint was given
 	atStop: boolean, -- 3.2: the vehicle stood in the stop's circle at the last tick (Take out only there)
+	made: number, -- 4.8: pieces made so far (the index into Info.dests)
 }
 
 export type Status = {
@@ -747,6 +764,28 @@ end
 
 local function buildPiece(piece: Piece): Model
 	local model = buildLook(piece.look, piece.variant)
+	-- 4.8, multi-drop: a small tag over a piece out of the vehicle says whose it is.
+	local owner = piece.owner
+	local main = model.PrimaryPart
+	if owner and main then
+		local tag = Instance.new("BillboardGui")
+		tag.Name = "ForTag"
+		tag.Size = UDim2.fromOffset(150, 22)
+		tag.StudsOffsetWorldSpace = Vector3.new(0, (model:GetAttribute("Height") :: number? or 2) / 2 + 1.2, 0)
+		tag.MaxDistance = 40
+		tag.LightInfluence = 0
+		local text = Instance.new("TextLabel")
+		text.Size = UDim2.fromScale(1, 1)
+		text.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
+		text.BackgroundTransparency = 0.25
+		text.BorderSizePixel = 0
+		text.TextColor3 = Color3.fromRGB(245, 245, 245)
+		text.Font = Enum.Font.GothamBold
+		text.TextSize = 12
+		text.Text = `FOR {string.upper(owner)}`
+		text.Parent = tag
+		tag.Parent = main
+	end
 	model.Parent = folder
 	return model
 end
@@ -979,7 +1018,63 @@ end
 
 local function newPiece(session: Session): Piece
 	session.nextVariant += 1
-	return { kind = session.info.kind, look = session.info.look, variant = session.nextVariant, origin = session.stop }
+	session.made += 1
+	local dests = session.info.dests
+	local names = session.info.destNames
+	local dest = if dests then dests[session.made] else nil
+	return {
+		kind = session.info.kind,
+		look = session.info.look,
+		variant = session.nextVariant,
+		origin = session.stop,
+		dest = dest,
+		owner = if dest and names then names[dest] else nil,
+	}
+end
+
+-- 4.8, multi-drop: the customer a piece is for ("Grandma Rose"), nil for a piece any drop takes.
+local function destName(_session: Session, piece: Piece): string?
+	return piece.owner
+end
+
+-- 4.8, multi-drop: does this piece go to the current stop (a piece without a stop of its own goes anywhere)?
+local function forHere(session: Session, piece: Piece): boolean
+	return piece.dest == nil or piece.dest == session.stop
+end
+
+-- 4.8: how many of these pieces go to the current stop.
+local function countHere(session: Session, pieces: { Piece }): number
+	local n = 0
+	for _, piece in pieces do
+		if forHere(session, piece) then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- 4.8: does somebody hold a piece for another stop (it goes back into the vehicle)? With `player`: that player.
+local function holdsOther(session: Session, player: Player?): boolean
+	for who, held in session.held do
+		if player == nil or who == player then
+			for _, piece in held.pieces do
+				if not forHere(session, piece) then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+-- 4.8: the last piece in the vehicle that goes to the current stop, taken out of the load (nil: none).
+local function takeHere(session: Session): Piece?
+	for index = #session.load, 1, -1 do
+		if forHere(session, session.load[index]) then
+			return table.remove(session.load, index)
+		end
+	end
+	return nil
 end
 
 -- The pieces in hands (3.7: a player may hold two).
@@ -1036,6 +1131,20 @@ local function crewPushes(session: Session, kind: string): boolean
 	return false
 end
 
+-- 4.8, multi-drop: the pieces for this stop in hands and put down (not in the vehicle).
+local function outHere(session: Session): number
+	local n = 0
+	for _, hands in session.held do
+		n += countHere(session, hands.pieces)
+	end
+	for _, item in session.loose do
+		if forHere(session, item.piece) then
+			n += 1
+		end
+	end
+	return n
+end
+
 -- The pieces this drop can still get: what it needs, or less when pieces were lost on the way.
 local function neededNow(session: Session): number
 	local plan = session.plan
@@ -1045,7 +1154,8 @@ local function neededNow(session: Session): number
 	if plan.stage == "pickup" then
 		return plan.needed
 	end
-	return math.min(plan.needed, session.moved + #session.load + heldCount(session) + #session.loose + #session.walking)
+	-- 4.8, multi-drop: only the pieces for this stop count.
+	return math.min(plan.needed, session.moved + countHere(session, session.load) + outHere(session) + countHere(session, session.walking))
 end
 
 -- The owner's car standing in the stop's circle.
@@ -1084,7 +1194,8 @@ local function toTakeOut(session: Session): boolean
 	if not plan or plan.stage ~= "drop" or not handled(plan.mode) or session.blocked or not atStop(session) then
 		return false
 	end
-	return #session.load > 0 and session.moved + heldCount(session) + #session.loose < neededNow(session)
+	-- (4.8, multi-drop: a piece for this stop)
+	return countHere(session, session.load) > 0 and session.moved + outHere(session) < neededNow(session)
 end
 
 -- 3.2: the vehicle has a back that opens and it is closed (nothing goes in or out).
@@ -1109,7 +1220,7 @@ local function backNeeded(session: Session): boolean
 	if plan.stage == "pickup" then
 		return busy or not session.built or #session.pile > 0
 	end
-	return busy or (#session.load > 0 and session.moved < neededNow(session))
+	return busy or (countHere(session, session.load) > 0 and session.moved < neededNow(session))
 end
 
 -- 3.2: who besides the owner may use the back right now (the job's crew), on the car for client/CarVisuals.luau:
@@ -1143,7 +1254,7 @@ local function refresh(session: Session)
 		local takeOut = toTakeOut(session)
 		-- 3.2: only through an open back. 3.7: what you hold goes in at a pick-up (or a drop that has everything); at a
 		-- drop that still needs it you carry it on (with one light piece in hand Take out gives you a second).
-		local loadable = plan == nil or plan.stage == "pickup" or session.moved >= neededNow(session)
+		local loadable = plan == nil or plan.stage == "pickup" or session.moved >= neededNow(session) or holdsOther(session) -- (4.8: back in)
 		carPrompt.Enabled = (takeOut or (heldCount(session) > 0 and loadable)) and not backShut(session)
 		if pallet then
 			carPrompt.ActionText = if takeOut then "Unload pallet" else "Load pallet"
@@ -1326,21 +1437,27 @@ local function pairRefused(session: Session, player: Player): boolean
 	return true
 end
 
--- Every tick: who carries a heavy piece alone walks at LiftSlowSpeed, with help at the normal step.
+-- Every tick: who carries a heavy piece alone walks at LiftSlowSpeed, with help at the normal step. 4.8, a heavy
+-- cargo (Info.heavy, not the lift twist): at that speed, and a piece on the hand trolley is never slow.
 local function updateLift(session: Session)
+	local slow = if session.info.lift then Config.Missions.LiftSlowSpeed else session.info.heavy or Config.Missions.LiftSlowSpeed
 	for player, held in session.held do
+		if held.tool then
+			continue -- (4.8: the trolley's own pace, Freight.walkSpeed)
+		end
 		local alone = held.pieces[1].horse == nil and not liftHelped(session, player, held.root.Position)
 		if alone and session.slowed[player] ~= held.character then
 			restoreSpeed(session, player)
 			session.slowed[player] = held.character
-			held.character:SetAttribute("CarrySpeed", Config.Missions.LiftSlowSpeed)
+			held.character:SetAttribute("CarrySpeed", slow)
 			local humanoid = held.character:FindFirstChildOfClass("Humanoid")
 			if humanoid then
-				humanoid.WalkSpeed = Config.Missions.LiftSlowSpeed
+				humanoid.WalkSpeed = slow
 			end
 			if not session.liftTold then
 				session.liftTold = true
-				tell(player, `Heavy! Alone you can barely walk. Get a crew mate within {Config.Missions.LiftHelpRange} studs to carry it faster.`)
+				tell(player, if session.info.lift then `Heavy! Alone you can barely walk. Get a crew mate within {Config.Missions.LiftHelpRange} studs to carry it faster.`
+					else `Heavy! Alone you can barely walk: put it on the hand trolley, or get a crew mate within {Config.Missions.LiftHelpRange} studs.`)
 			end
 		elseif not alone and session.slowed[player] then
 			restoreSpeed(session, player)
@@ -1438,7 +1555,8 @@ local function armHands(session: Session, player: Player, held: Held)
 		stackHeld(held)
 		local main = top.model and top.model.PrimaryPart
 		if main then
-			local down = prompt(main, if count > 1 then "Put one down" else "Put down", capital(session.info.piece), Enum.KeyCode.G, 0)
+			local owner = destName(session, top) -- 4.8, multi-drop: whose it is
+			local down = prompt(main, if count > 1 then "Put one down" else "Put down", `{capital(session.info.piece)}{if owner then ` for {owner}` else ""}`, Enum.KeyCode.G, 0)
 			down.MaxActivationDistance = 4 -- only for the one holding it
 			made = down
 		end
@@ -1456,7 +1574,7 @@ local function armHands(session: Session, player: Player, held: Held)
 	character:SetAttribute("Carrying", top.kind)
 	character:SetAttribute("CarryCount", count)
 	character:SetAttribute("CarryHands", if count == 1 and handsMax(session) > 1 then 1 else 2)
-	if not session.info.lift then
+	if not session.info.lift and not session.slowed[player] then -- (4.8: a heavy piece carried alone keeps its pace)
 		character:SetAttribute("CarrySpeed", if count > 1 then Tuning.TwoPieceSpeed else nil)
 	end
 end
@@ -1575,7 +1693,8 @@ putDown = function(session: Session, player: Player, all: boolean?)
 			piece.model = model
 			setDown(model, frame)
 			local main = model.PrimaryPart :: BasePart
-			loose = { piece = piece, prompt = prompt(main, "Pick up", capital(session.info.piece), nil, holdFor(session)), handle = nil }
+			local owner = piece.owner -- (4.8, multi-drop)
+			loose = { piece = piece, prompt = prompt(main, "Pick up", `{capital(session.info.piece)}{if owner then ` for {owner}` else ""}`, nil, holdFor(session)), handle = nil }
 		end
 		loose.prompt.Triggered:Connect(function(by)
 			onLoose(session, by, loose)
@@ -1707,9 +1826,20 @@ local function handOver(session: Session, player: Player)
 		tell(player, everything)
 		return
 	end
-	-- 3.7: everything in your hands goes (two light pieces at once), as many as they still need.
+	-- 3.7: everything in your hands goes (two light pieces at once), as many as they still need. 4.8, multi-drop: a
+	-- piece for another customer is refused (it goes back into the vehicle).
 	local gave = 0
 	while session.held[player] and session.moved < neededNow(session) do
+		local hands = session.held[player] :: Held
+		local top = hands.pieces[#hands.pieces]
+		if top and not forHere(session, top) then
+			local car = session.car
+			tell(player, `That {session.info.piece} is for {top.owner or "another customer"}, not {if plan.person then plan.person.name else "here"}. Put it back in the {if car then Vehicles.cargoNoun(car) else "vehicle"} (E at the back).`)
+			if gave > 0 then
+				refresh(session)
+			end
+			return
+		end
 		local piece = release(session, player)
 		if not piece then
 			break
@@ -1817,7 +1947,7 @@ local function onCar(session: Session, player: Player)
 		return
 	end
 	local handling = plan ~= nil and plan.stage == "drop" and handled(plan.mode)
-	if held and (not handling or session.moved >= neededNow(session)) then
+	if held and (not handling or session.moved >= neededNow(session) or holdsOther(session, player)) then -- (4.8: another customer's piece goes back in)
 		-- 4.0: as many as the vehicle has room for (a pallet: only a vehicle that takes pallets); the rest stay on
 		-- the trolley. The hands' pieces go in as before.
 		local moving: { Piece } = held.pieces
@@ -1899,8 +2029,13 @@ local function onCar(session: Session, player: Player)
 			return
 		end
 		-- One piece (3.7: a second light one into a free hand); 4.0: onto a trolley as many as fit and are needed.
+		-- 4.8, multi-drop: the pieces for this customer (toTakeOut said there is one).
 		repeat
-			local piece = table.remove(session.load) :: Piece
+			local found = takeHere(session)
+			if not found then
+				break
+			end
+			local piece: Piece = found
 			render(session)
 			local horse = piece.horse
 			if horse then
@@ -2292,6 +2427,7 @@ function Cargo.begin(owner: Player, info: Info): Session
 		slowed = {},
 		liftTold = false,
 		atStop = false,
+		made = 0,
 	}
 	active[owner] = session
 	return session
@@ -2321,12 +2457,16 @@ function Cargo.fill(session: Session, count: number)
 	refresh(session)
 end
 
--- The next stop; the last one's people stay a moment.
-function Cargo.setStop(session: Session, plan: Plan)
+-- The next stop; the last one's people stay a moment. 4.8: `replace` (a road event's side pick-up put in front of the
+-- stop you drive to, server/Jobs.luau): the current stop is swapped for this one, the stop's number stays (nothing of
+-- it may have been built or handled yet).
+function Cargo.setStop(session: Session, plan: Plan, replace: boolean?)
 	if session.plan then
-		clearStop(session, true)
+		clearStop(session, not replace)
 	end
-	session.stop += 1
+	if not replace then
+		session.stop += 1
+	end
 	session.plan = plan
 	session.built = false
 	session.greeted = false
@@ -2384,7 +2524,7 @@ function Cargo.update(session: Session, dt: number)
 	if dropped then
 		session.info.changed()
 	end
-	if session.info.lift then
+	if session.info.lift or session.info.heavy then
 		updateLift(session)
 	end
 
@@ -2744,12 +2884,18 @@ function Cargo.step(session: Session): (string, string)
 	local shut = car ~= nil and backShut(session)
 	local open = if car then Vehicles.backVerb(car, true) else ""
 	local two = if session.info.pair and not horse then " together" else "" -- the pair twist
-	local intoCar = plan.stage == "pickup" or session.moved >= neededNow(session)
+	-- (4.8, multi-drop: another customer's piece in your hands goes back in)
+	local other = plan.stage == "drop" and held ~= nil and holdsOther(session, owner)
+	local intoCar = plan.stage == "pickup" or session.moved >= neededNow(session) or other
 	if held then
 		-- 3.7: one light piece leaves a hand free (open the back, take a second one); two fill both hands.
 		local count = #held.pieces
 		local it = if count > 1 then "them" else "it"
 		local free = count < handsMax(session)
+		if other and not shut then
+			local top = held.pieces[count]
+			return mode, `That {piece} is for {top.owner or "another customer"}: put it back in the {noun} (E)`
+		end
 		if intoCar then
 			if shut then
 				if horse then
@@ -2802,6 +2948,9 @@ function Cargo.step(session: Session): (string, string)
 		end
 		if seatedCar then
 			return mode, if horse then `Get out and lead a horse out of the {noun} (E)` else `Get out and take {article(piece)} out of the {noun} (E)`
+		end
+		if session.info.dests then
+			return mode, `Take {who}'s {piece} out of the {noun}{two} (E)` -- 4.8, multi-drop: the labelled one
 		end
 		return mode, if horse then `Lead a horse out of the {noun} (E)` else `Take {article(piece)} out of the {noun}{two} (E)`
 	end
@@ -2889,7 +3038,11 @@ function Cargo.adminFinish(session: Session): boolean
 		end
 		table.clear(session.walking)
 		while session.moved < plan.needed and #session.load > 0 do
-			local piece = table.remove(session.load) :: Piece
+			local found = takeHere(session) -- (4.8, multi-drop: this customer's pieces)
+			if not found then
+				break
+			end
+			local piece: Piece = found
 			if piece.horse then
 				Animals.remove(piece.horse)
 			end

@@ -475,6 +475,12 @@ R.jobs = function()
 	action(testing, "FINISH THE JOB", C.yellow, function()
 		send("finishJob")
 	end)
+	-- 4.8: a road event on the running job (it comes as you drive on).
+	for _, kind in { "survivor", "addon", "roadblock" } do
+		action(testing, `EVENT: {string.upper(kind)}`, C.grey, function()
+			send("roadEvent", kind)
+		end)
+	end
 	local special = grid(150)
 	for _, def in Config.JobTypes do
 		action(special, def.name, C.yellow, function()

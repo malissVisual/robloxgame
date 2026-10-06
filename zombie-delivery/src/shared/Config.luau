@@ -1680,6 +1680,99 @@ Config.Jobs = {
 		{ tier = 3, level = 4, jobs = 5, atTier = 2 },
 		{ tier = 4, level = 7, jobs = 10, atTier = 3 },
 	} :: { { tier: number, level: number, jobs: number, atTier: number } },
+	-- 4.8, cargo with rules (shared/JobRules.luau cargoRules …, server/Jobs.luau, server/Cargo.luau): what a job's cargo
+	-- asks of you, from the look of its pieces (Looks), its Carrying kind (Kinds) and, for a business whose look is
+	-- shared, its id (Businesses). Never the tutorial's delivery or a mission (they are told as they are written).
+	--   fragile  hard braking (a drop of BrakeDecel studs/s² or more from BrakeSpeed or faster) or a bump (BumpDecel or
+	--            more: a wall, a car, a zombie) costs FragileBrake / FragileBump of the condition, a hit while faster
+	--            than HitSpeed FragileHit on top of the usual damage loss; one jolt every JoltCooldown s at most, and
+	--            the HUD says CAREFUL — FRAGILE
+	--   food     the freshness goes from 100 % down by FoodDrain[tier] a minute once the food is picked up (a Cooler Box:
+	--            × Config.GearTuning.CoolerDrain); below GoodFresh it is a miss of the rating (two below PoorFresh),
+	--            and the pay × FreshPayMin … 1 with the freshness
+	--   heavy    carried by hand alone you walk at HeavyCarrySpeed; the hand trolley, or a crew mate within
+	--            Config.Missions.LiftHelpRange, at the normal pace
+	--   cash     the bandits come more (the job's banditBoost at least CashBoost where the tier has bandits)
+	--   people   a bump makes them complain: PeopleBump of the condition
+	-- Ratchet Straps (Config.GearTuning.StrapsLoss) cut every condition loss from driving: the jolts and the car's
+	-- damage.
+	CargoRules = {
+		Looks = {
+			pizza = { "food" },
+			bread = { "food" },
+			groceries = { "food" },
+			soup = { "food" },
+			cake = { "fragile", "food" },
+			vaccine = { "fragile" },
+			sample = { "fragile" },
+			electronics = { "fragile" },
+			painting = { "fragile" },
+			barrel = { "heavy" },
+			generator = { "heavy" },
+			furniture = { "heavy" },
+			gold = { "cash" },
+		} :: { [string]: { string } },
+		Kinds = {
+			cash = { "cash" },
+			kid = { "people" },
+			patient = { "people" },
+			survivor = { "people" },
+		} :: { [string]: { string } },
+		Businesses = {
+			electronics = { "fragile" }, -- radio parts in the parcel look
+			bank = { "heavy" }, -- the strongboxes (the gold look is the cash sacks too)
+		} :: { [string]: { string } },
+		BrakeSpeed = 30, -- studs / s: hard braking counts from this speed
+		BrakeDecel = 50, -- studs / s²: the speed dropping this fast is hard braking (coasting ~20, an Old Van's brake ~28)
+		BumpDecel = 160, -- … this fast a bump (no brake does it: a wall, a car, a zombie run over)
+		JoltCooldown = 1.2,
+		FragileBrake = 0.03,
+		FragileBump = 0.08,
+		HitSpeed = 20, -- a hit (the car damaged) while faster than this …
+		FragileHit = 0.04, -- … costs a fragile cargo this on top
+		PeopleBump = 0.05,
+		FoodDrain = { 0.05, 0.06, 0.07, 0.08 } :: { number }, -- freshness a minute, by danger level
+		GoodFresh = 0.7,
+		PoorFresh = 0.35,
+		FreshPayMin = 0.7, -- stale food (0 %) pays this share; fresh 100 %
+		HeavyCarrySpeed = 4, -- studs / s
+		CashBoost = 1.6,
+		NoticeEvery = 2.5, -- seconds between two CAREFUL notices
+	},
+	-- 4.8, multi-drop (server/Jobs.luau ordinaryOffer, JobRules.dropCount): a board delivery of these danger levels
+	-- (not the SHORT & SAFE one) goes to 2 … Max[tier] customers with Chance[tier]: every piece is labelled for its
+	-- customer (the wrong one is refused), the drops Gap studs apart one after the other; each extra drop pays
+	-- PayPerStop.
+	MultiDrop = {
+		Chance = { 0, 0, 0.45, 0.6 } :: { number },
+		Max = { 1, 1, 2, 3 } :: { number },
+		Gap = { 150, 450 } :: { number },
+		PayPerStop = 60,
+	},
+	-- 4.8, road events (server/Jobs.luau, JobRules.pickEvent): at most one a job, with Chance, never the tutorial's or a
+	-- mission; it comes after After (min, max) seconds of driving out of the safe zone, by Weights:
+	--   survivor   somebody waves by the road SurvivorAhead studs ahead: stop next to them (SurvivorReach) and they
+	--              hop in; drop them in the depot's safe zone (the job may end meanwhile, SurvivorKeep s at most) for
+	--              SurvivorBonus × the tier's stars; they give up after SurvivorWait s or when you drive off
+	--   addon      a side pick-up: one more piece from an address AddOnDistance studs from you, before the drop it
+	--              goes to: + AddOnPay and the time for it; Y (or the button) within AddOnAnswer s
+	--   roadblock  the street ahead is blocked (a bandit roadblock; on a ★ job without bandits)
+	RoadEvents = {
+		Chance = 0.3,
+		After = { 25, 70 } :: { number },
+		Retry = 8, -- no spot for it now: tried again after this many seconds of driving …
+		Tries = 5, -- … this often at most
+		Weights = { survivor = 1, addon = 1, roadblock = 1 } :: { [string]: number },
+		SurvivorAhead = 150,
+		SurvivorReach = 18,
+		SurvivorWait = 45,
+		SurvivorKeep = 600,
+		SurvivorBonus = 60, -- × the tier's stars
+		AddOnPay = 180,
+		AddOnDistance = { 80, 220 } :: { number },
+		AddOnAnswer = 15,
+		AddOnGivers = { "Mrs. Lee", "Old Tom", "Kenny", "Mr. Novotny", "Aunt Maple" } :: { string },
+	},
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
 	Businesses = {
 		{

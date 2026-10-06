@@ -37,6 +37,7 @@ local Holster = require(Client.Holster)
 local CarBoarding = require(Client.CarBoarding)
 local LocationTag = require(Client.LocationTag)
 local CareerUi = require(Client.CareerUi)
+local RoadEventUi = require(Client.RoadEventUi)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -76,6 +77,7 @@ safely("Holster", Holster.start) -- 3.9: B holsters / draws the gun, V punches o
 safely("CarBoarding", CarBoarding.start) -- 3.10: getting in and out of a car (E at a door, E or Space in a seat)
 safely("LocationTag", LocationTag.start) -- 4.3: the quiet caption that names the building you come up to
 safely("CareerUi", CareerUi.start) -- 4.6: the CAREER window (C) and the level-up card
+safely("RoadEventUi", RoadEventUi.start) -- 4.8: a road event's side pick-up offer (Y takes it)
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast

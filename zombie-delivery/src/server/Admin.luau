@@ -36,6 +36,7 @@
 --   job [T]    job type id    any Config.JobTypes id or "ordinary1" … "ordinary4" (Jobs.adminStart)
 --   finishStop [T]            the current stop is done (Jobs.adminFinishStop)
 --   finishJob [T]             the whole current job done and paid (Jobs.adminComplete)
+--   roadEvent [T] kind        4.8: "survivor" | "addon" | "roadblock" on the current job as you drive on (Jobs.adminRoadEvent)
 --   god [T]    boolean?       toggle (or set) invulnerable: you and your car
 --   fly [T] / noclip [T] / jump [T] / carBoost [T] / hidden [T] / oneHit [T]   boolean?: toggle (or set) the player
 --                             attributes AdminFly, AdminNoclip (client/AdminFly.luau), AdminJump (super jump, there
@@ -592,6 +593,11 @@ local function finishStop(player: Player)
 		return
 	end
 	say(player, if Jobs.adminFinishStop(player) then "ADMIN: stop finished." else "ADMIN: nothing to finish at this stop.")
+end
+
+-- 4.8: a road event on the current job now (Jobs.adminRoadEvent).
+local function roadEvent(player: Player, arg: any)
+	say(player, if Jobs.adminRoadEvent(player, arg) then `ADMIN: road event "{arg}" comes as you drive on.` else "ADMIN: no job running (or an unknown event).")
 end
 
 -- ── Missions (server/Missions.luau) ────────────────────────────────────────
@@ -1192,6 +1198,7 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	teleport = teleport,
 	job = job,
 	finishStop = finishStop,
+	roadEvent = roadEvent, -- 4.8
 	god = setGod,
 	spawn = spawnEnemies,
 	banditCar = banditCar,
@@ -1246,7 +1253,7 @@ end
 local TARGETED: { [string]: boolean } = {}
 for _, name in {
 	"unlockAll", "maxUpgrades", "money", "xp", "setLevel", "item", "car", "carGun", "carStage", "upgrade", "paint",
-	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "god", "heal", "speed",
+	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "roadEvent", "god", "heal", "speed",
 	"clearWanted", "buddy", "buddyDismiss", "buddyMode", "giveEstate", "clearEstate", "setHome", "estateTeleport",
 	"businessCash", "missionStart", "missionsAll", "missionsReset", "challengesAll", "secretsAll", "challengesReset",
 	"title",
