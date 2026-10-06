@@ -2130,12 +2130,19 @@ Config.Jobs = {
 		DoorSwing = 80,
 		DoorOpen = 6,
 		NobodyHome = 0.1,
+		-- 5.3 review: two couriers at the same storefront (or door) at once: the second one's pile, clerk and pieces
+		-- stand SessionGap studs to the side (then the other side, then twice as far …), never on top of each other.
+		SessionGap = 10,
+		-- 5.3 review: no ON FOOT run because every storefront near you is shut (the Suburbs or the Harbor at night; the
+		-- board looks up to twice the usual reach first): the board says so.
+		ClosedNote = "Shops nearby are closed — head Downtown (Luigi's, Wok Dead, Last Bite open late)",
 	},
 	-- 5.3, the newspaper round (server/Jobs.luau footOffer's "round", shared/Deliveries.luau Deliveries.round, the
 	-- toss in server/Cargo.luau): from Hours on the game clock (the morning) the ON FOOT and the BIKE sections offer a
 	-- round of The Daily Undead (Business). Pick up the bundle (Papers: one E, it goes into your newspaper satchel: no
 	-- room needed) and bring one paper to every door on one or two streets (Streets; a third only when two do not
-	-- hold Papers[1]) whose nearest door is within FootReach / BikeReach of the print shop: a house takes one, an
+	-- hold Papers[1]), every door within FootReach / BikeReach of the print shop and the route from it through them
+	-- within FootRoute / BikeRoute (5.3 review): a house takes one, an
 	-- apartment entrance FlatPapers (its subscribers). At a door "Toss newspaper" (E) works from TossRange studs:
 	-- within SureToss it always lands on the porch, farther it lands in the bushes with a chance growing to MissAtRange
 	-- (still delivered, but a miss). Pay: PayBase + PayPerPaper a paper + PayPerStud × the route (bike × BikePay),
@@ -2149,6 +2156,9 @@ Config.Jobs = {
 		FlatPapers = 2,
 		FootReach = 700,
 		BikeReach = 1500,
+		-- 5.3 review: the route from the print shop through every door at most this long (a walk stays a walk)
+		FootRoute = 700,
+		BikeRoute = 1600,
 		TossRange = 18,
 		SureToss = 8,
 		MissAtRange = 0.5,
@@ -2390,7 +2400,7 @@ Config.Jobs = {
 			kind = "crate",
 			look = "cake",
 			pieces = { 1, 1 },
-			tiers = { 3, 4 },
+			tiers = { 2, 3 }, -- 5.3 review: its houses are 470 … 1,300 studs from the bakery (never a ★★★★ ride)
 			giver = { name = "Anna", title = "Baker", role = "cook" },
 			receivers = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
@@ -2503,13 +2513,14 @@ Config.Jobs = {
 			kind = "icebox",
 			look = "icecream",
 			pieces = { 1, 2 },
-			tiers = { 1 },
+			-- 5.3 review: Frosty's is at the Harbor, the nearest home ~800 studs off: a ★★ ride, never a ★ walk
+			tiers = { 2 },
 			giver = { name = "Frosty", title = "Ice cream man", role = "shopkeeper" },
 			receivers = {
 				{ name = "The Twins", title = "Hot day", role = "townsperson" },
 				{ name = "Aunt Maple", title = "A birthday party", role = "townsperson" },
 			},
-			to = { "house" },
+			to = { "house", "apartment" },
 			hours = { 11, 20 },
 		},
 	} :: { BusinessDef },
@@ -2604,6 +2615,9 @@ Config.Cargo = {
 	ApproachDistance = 80, -- closer than this the HUD says what to do on foot and the enemies come on foot
 	PileOffset = 12, -- an address without a cargo spot: the pile is this far from the road toward the building
 	PromptDistance = 10,
+	-- 5.3 review: the CollectionService tag of every job prompt (server/Cargo.luau; the attribute CargoOwner = the job
+	-- owner's UserId): client/CargoPrompts.luau hides the ones of a job you do not work for.
+	PromptTag = "CargoPrompt",
 	HoldDuration = 0, -- 4.0.1: E picks up / loads / opens the back at once (no hold; it was 0.25 s)
 	MaxCarSpeed = 6, -- the vehicle must stand to load or unload it
 	StealPieceRate = 3, -- bandits at the car: their steal share x this fills a meter, every full one = a piece gone

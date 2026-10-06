@@ -13,6 +13,10 @@
 --                                        hands + backpack on foot, the bike's room + the backpack by bike, the car's)
 --                                        for a piece that fits the backpack; else the hands on foot, the bike's own
 --                                        room (`rack`) by bike; a car takes its whole room
+--   Bag.rack(mode, riding, bikeRoom, packRoom)   5.3 review: the bike's own room (rack, basket, box) a run has: a
+--                                        bike run's, or a foot run's while you ride (`riding`); 0 walking or no bike
+--   Bag.makeRoom(held, max, free)        5.3 review: how many of the looks in your hands go into the backpack so the
+--                                        hands (`max` with the next piece) take a piece that does not fit it (0: none)
 --   Bag.plural(name)                     "pizza stack" → "pizza stacks" (the words of Config.Jobs.Businesses and
 --                                        Config.Cargo.Kinds, else an "s")
 --   Bag.line(carried)                    the HUD's chip: "🎒 2 newspapers · 1 pizza stack" (nil when you carry nothing)
@@ -41,6 +45,30 @@ function Bag.room(look: string?, mode: string, room: number, rack: number?): num
 		return math.min(all, math.max(0, math.floor(rack or 0)))
 	end
 	return math.min(all, Config.Cargo.HandsMax)
+end
+
+function Bag.rack(mode: string, riding: boolean, bikeRoom: number?, packRoom: number): number
+	if bikeRoom == nil or not (mode == "bike" or (mode == "foot" and riding)) then
+		return 0
+	end
+	return math.max(0, math.floor(bikeRoom - packRoom))
+end
+
+function Bag.makeRoom(held: { string? }, max: number, free: number): number
+	local need = #held - max + 1
+	if need <= 0 then
+		return 0
+	end
+	local fits = 0
+	for _, look in held do
+		if Bag.fits(look) then
+			fits += 1
+		end
+	end
+	if fits < need or free < need then
+		return 0
+	end
+	return need
 end
 
 local plurals: { [string]: string }? = nil

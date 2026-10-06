@@ -1084,8 +1084,9 @@ local function tierHeader(index: number, info: any, order: number)
 	end)
 end
 
--- 5.0: the header of the ON FOOT section: what these runs are, and your room on the right.
-local function footHeader(count: number, order: number)
+-- 5.0: the header of the ON FOOT section: what these runs are, and your room on the right. 5.3 review: `note`, why
+-- there is no run (the board's footNote: the shops near you are shut), in red when there is none.
+local function footHeader(count: number, order: number, note: string?)
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
 	text(row, "🚶  ON FOOT", UDim2.new(1, -220, 0, 18), {
 		Position = UDim2.fromOffset(4, 4),
@@ -1093,10 +1094,11 @@ local function footHeader(count: number, order: number)
 		TextSize = 13,
 		TextWrapped = false,
 	})
-	text(row, `{count} light {if count == 1 then "run" else "runs"} near you · no vehicle needed · quick money`, UDim2.new(1, -220, 0, 16), {
+	local none = count == 0 and note ~= nil
+	text(row, if none and note then note else `{count} light {if count == 1 then "run" else "runs"} near you · no vehicle needed · quick money`, UDim2.new(1, -220, 0, 16), {
 		Position = UDim2.fromOffset(4, 22),
 		TextSize = 12,
-		TextColor3 = K.secondary,
+		TextColor3 = if none then K.red else K.secondary,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
@@ -1210,8 +1212,9 @@ renderList = function()
 			warn(`[DispatchUi] the run's ticket failed: {err}`)
 		end
 	end
+	local footNote = if boardInfo and type(boardInfo.footNote) == "string" then boardInfo.footNote else nil -- 5.3 review
 	if #visible == 0 then
-		message(if #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
+		message(if footNote and filter == "all" then footNote elseif #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
 		return
 	end
 	-- 5.0: the on-foot runs first, under their own header; 5.1: then the bike runs under theirs; then the car jobs.
@@ -1222,9 +1225,9 @@ renderList = function()
 		table.insert(if isFoot(offer) then walks elseif isBike(offer) then rides else rest, offer)
 	end
 	local order = 0
-	if #walks > 0 then
+	if #walks > 0 or (footNote ~= nil and filter == "all") then
 		order += 1
-		local ok, err = pcall(footHeader, #walks, order)
+		local ok, err = pcall(footHeader, #walks, order, footNote)
 		if not ok then
 			warn(`[DispatchUi] the on-foot header failed: {err}`)
 		end

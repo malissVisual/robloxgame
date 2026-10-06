@@ -20,8 +20,11 @@
 --   Deliveries.targets(business)          everywhere it delivers to (its `to`), each { address, person?, kind }
 --   Deliveries.dropFor(business, x, z, low, high, avoid, r, allow)   one target low … high (manhattan) from (x, z),
 --                                         else the closest to that band (nil: the business has no `to`, or nothing)
---   Deliveries.round(venue, reach, r, allow)   a newspaper round: the doors (in walking order) on one or two streets
---                                         near the print shop and the papers each takes ({ { home, papers } })
+--   Deliveries.round(venue, reach, r, allow, budget)   a newspaper round: the doors (in walking order) on one or two
+--                                         streets near the print shop (each within `reach` of it, the route from it
+--                                         within `budget`) and the papers each takes ({ { home, papers } })
+--   Deliveries.reaches(business, x, z, low, high, allow)   does it deliver anywhere low … high from (x, z)?
+--   Deliveries.closedNear(x, z, reach, hour, allow)   only shut light-run storefronts within reach (the board's note)
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
@@ -239,6 +242,27 @@ function Deliveries.dropFor(business: Config.BusinessDef, x: number, z: number, 
 	return closest
 end
 
+-- 5.3 review: is a storefront of a business that sends light runs (Config.Cargo.LightLooks) within `reach` (manhattan to
+-- its park) of (x, z) shut at `hour`, and none of them open there? (The board's ON FOOT note: "Shops nearby are
+-- closed".) `allow` filters by the venue's address.
+function Deliveries.closedNear(x: number, z: number, reach: number, hour: number, allow: ((Map.Address) -> boolean)?): boolean
+	local closed = false
+	for _, business in Config.Jobs.Businesses do
+		if not Config.Cargo.LightLooks[business.look] then
+			continue
+		end
+		for _, venue in Map.venuesOf(business.id) do
+			if Map.manhattan(x, z, venue.park.x, venue.park.z) <= reach and (not allow or allow(Deliveries.venueAddress(venue))) then
+				if Deliveries.open(business, hour) then
+					return false
+				end
+				closed = true
+			end
+		end
+	end
+	return closed
+end
+
 -- ── The newspaper round ────────────────────────────────────────────────────
 
 type Street = { key: string, doors: { Map.Home }, papers: number, near: number }
@@ -251,12 +275,18 @@ local function gapBetween(a: Map.Home, b: Map.Home): number
 	return Map.manhattan(a.park.x, a.park.z, b.park.x, b.park.z)
 end
 
-function Deliveries.round(venue: Map.Venue, reach: number, r: () -> number, allow: ((Map.Address) -> boolean)?): { Door }
+function Deliveries.round(venue: Map.Venue, reach: number, r: () -> number, allow: ((Map.Address) -> boolean)?, budget: number?): { Door }
 	local tuning = Config.Jobs.Round
+	local limit = budget or math.huge
 	local byKey: { [string]: Street } = {}
 	local streets: { Street } = {}
 	for _, home in Map.Homes do
 		if allow and not allow(Deliveries.homeAddress(home)) then
+			continue
+		end
+		-- (5.3 review: only the doors within reach of the print shop, not a whole street that starts there)
+		local near = Map.manhattan(venue.park.x, venue.park.z, home.park.x, home.park.z)
+		if near > reach then
 			continue
 		end
 		local key = `{home.district}:{home.street}`
@@ -268,89 +298,115 @@ function Deliveries.round(venue: Map.Venue, reach: number, r: () -> number, allo
 		end
 		table.insert(street.doors, home)
 		street.papers += papersAt(home)
-		street.near = math.min(street.near, Map.manhattan(venue.park.x, venue.park.z, home.park.x, home.park.z))
+		street.near = math.min(street.near, near)
 	end
 	table.sort(streets, function(a: Street, b: Street): boolean
 		return a.key < b.key
 	end)
-	local eligible: { Street } = {}
-	local weight = 0
-	for _, street in streets do
-		if street.near <= reach then
-			table.insert(eligible, street)
-			weight += street.papers
-		end
-	end
-	if #eligible == 0 then
+	if #streets == 0 then
 		return {}
 	end
-	-- The first street: by chance, the ones with more papers more likely.
-	local roll = r() * weight
-	local first = eligible[#eligible]
-	for _, street in eligible do
-		roll -= street.papers
-		if roll < 0 then
-			first = street
-			break
-		end
-	end
-	local chosen: { Street } = { first }
-	local papers = first.papers
 	local most = math.max(1, tuning.Streets)
-	-- Then the nearest other streets (door to door) while the papers are short of Papers[1]: Streets of them, one more
-	-- only when they still are.
-	while papers < tuning.Papers[1] and #chosen < most + 1 do
-		local best: Street? = nil
-		local bestGap = math.huge
-		for _, street in eligible do
-			if table.find(chosen, street) then
-				continue
-			end
-			for _, mine in chosen do
-				for _, a in mine.doors do
-					for _, b in street.doors do
-						local gap = gapBetween(a, b)
-						if gap < bestGap then
-							best, bestGap = street, gap
+	-- The round that starts on `first`: then the nearest other streets (door to door) while the papers are short of
+	-- Papers[1] (Streets of them, one more only when they still are), the doors in walking order (from the shop, always
+	-- the nearest door next) while the route stays within `budget` (5.3 review). Its doors and papers.
+	local function build(first: Street): ({ Door }, number)
+		local chosen: { Street } = { first }
+		local papers = first.papers
+		while papers < tuning.Papers[1] and #chosen < most + 1 do
+			local best: Street? = nil
+			local bestGap = math.huge
+			for _, street in streets do
+				if table.find(chosen, street) then
+					continue
+				end
+				for _, mine in chosen do
+					for _, a in mine.doors do
+						for _, b in street.doors do
+							local gap = gapBetween(a, b)
+							if gap < bestGap then
+								best, bestGap = street, gap
+							end
 						end
 					end
 				end
 			end
+			if not best then
+				break
+			end
+			table.insert(chosen, best)
+			papers += best.papers
 		end
-		if not best then
-			break
-		end
-		table.insert(chosen, best)
-		papers += best.papers
-	end
-	-- The doors in walking order: from the shop, always the nearest door next.
-	local left: { Map.Home } = {}
-	for _, street in chosen do
-		for _, home in street.doors do
-			table.insert(left, home)
-		end
-	end
-	local out: { Door } = {}
-	local x, z = venue.park.x, venue.park.z
-	local total = 0
-	while #left > 0 do
-		local index, bestGap = 1, math.huge
-		for n, home in left do
-			local gap = Map.manhattan(x, z, home.park.x, home.park.z)
-			if gap < bestGap then
-				index, bestGap = n, gap
+		local left: { Map.Home } = {}
+		for _, street in chosen do
+			for _, home in street.doors do
+				table.insert(left, home)
 			end
 		end
-		local home = table.remove(left, index) :: Map.Home
-		local take = math.min(papersAt(home), tuning.Papers[2] - total)
-		if take <= 0 then
-			break
+		local out: { Door } = {}
+		local x, z = venue.park.x, venue.park.z
+		local total, walked = 0, 0
+		while #left > 0 do
+			local index, bestGap = 1, math.huge
+			for n, home in left do
+				local gap = Map.manhattan(x, z, home.park.x, home.park.z)
+				if gap < bestGap then
+					index, bestGap = n, gap
+				end
+			end
+			local home = table.remove(left, index) :: Map.Home
+			local take = math.min(papersAt(home), tuning.Papers[2] - total)
+			if take <= 0 or walked + bestGap > limit then
+				break
+			end
+			table.insert(out, { home = home, papers = take })
+			total += take
+			walked += bestGap
+			x, z = home.park.x, home.park.z
 		end
-		table.insert(out, { home = home, papers = take })
-		total += take
-		x, z = home.park.x, home.park.z
+		return out, total
 	end
-	return out
+	-- Every street may start a round that holds Papers[1] within the budget; one of them by chance, the ones with more
+	-- papers more likely.
+	local rounds: { { Door } } = {}
+	local weights: { number } = {}
+	local weight = 0
+	for _, street in streets do
+		local doors, papers = build(street)
+		if papers >= tuning.Papers[1] then
+			table.insert(rounds, doors)
+			table.insert(weights, street.papers)
+			weight += street.papers
+		end
+	end
+	if #rounds == 0 then
+		return {}
+	end
+	local roll = r() * weight
+	for n, doors in rounds do
+		roll -= weights[n]
+		if roll < 0 then
+			return doors
+		end
+	end
+	return rounds[#rounds]
+end
+
+-- 5.3 review: does the business deliver anywhere `low` … `high` (manhattan) from (x, z)? (The board offers it on a
+-- tier, or on foot / by bike, only then: no ice cream "nearby" 1,700 studs away, no cake run across the map.) A
+-- business without a `to` (any address) always does.
+function Deliveries.reaches(business: Config.BusinessDef, x: number, z: number, low: number, high: number, allow: ((Map.Address) -> boolean)?): boolean
+	if not business.to then
+		return true
+	end
+	for _, target in Deliveries.targets(business) do
+		local address = target.address
+		local d = Map.manhattan(x, z, address.x, address.z)
+		if d >= low and d <= high and (not allow or allow(address)) then
+			return true
+		end
+	end
+	return false
 end
 
 return Deliveries

@@ -284,7 +284,7 @@ type LightJob = {
 
 -- 3.7: a player's job board: its offers (sorted, boardOrder) until refreshAt (workspace:GetServerTimeNow()).
 -- 4.7: rerolled = the tiers rerolled on this board (once each).
-type Board = { list: { Offer }, refreshAt: number, rerolled: { [number]: boolean } }
+type Board = { list: { Offer }, refreshAt: number, rerolled: { [number]: boolean }, footNote: string? }
 
 type Job = {
 	offer: Offer,
@@ -1019,13 +1019,35 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 	local tier = JobsConfig.Tiers[tierIndex]
 	local choice = JobsConfig.Choice
 	local hour = DayNight.hour()
+	local pickupMax = if easy then math.max(JobsConfig.PickupMinDistance, JobsConfig.TutorialPickupMax) else JobsConfig.PickupMaxDistance
+	local dropMin, dropMax = JobRules.window(role, tier.minDistance, tier.maxDistance)
+	if easy then
+		dropMin, dropMax = tier.minDistance, math.clamp(JobsConfig.TutorialDropMax, tier.minDistance, tier.maxDistance)
+	end
+	-- 5.3: the business's storefront nearest to you (within Places.CarReach, else the nearest at all; 5.3 review: the
+	-- tutorial's within its pick-up reach first); nil for a business without one (an address near you as before).
+	local function venueNear(business: Config.BusinessDef): Map.Venue?
+		return (if easy then Deliveries.venueFor(business, from.X, from.Z, pickupMax, nil) else nil)
+			or Deliveries.venueFor(business, from.X, from.Z, JobsConfig.Places.CarReach, nil)
+			or Deliveries.venueFor(business, from.X, from.Z, math.huge, nil)
+	end
 	local businesses: { Config.BusinessDef } = {}
+	local near: { Config.BusinessDef } = {} -- (the tutorial's: a storefront within its pick-up reach)
 	for _, business in JobsConfig.Businesses do
 		local handy = not easy or (not Cargo.isPeople(business.kind) and business.kind ~= "horse")
-		-- 5.3: only a business open at this hour (the bakery in the morning …)
-		if table.find(business.tiers, tierIndex) and handy and Deliveries.open(business, hour) then
+		-- 5.3: only a business open at this hour (the bakery in the morning …). 5.3 review: and one that delivers
+		-- somewhere in this tier's range from its storefront (no ★ ice cream to a home 1,700 studs away).
+		local venue = if handy then venueNear(business) else nil
+		if table.find(business.tiers, tierIndex) and handy and Deliveries.open(business, hour)
+			and Deliveries.reaches(business, if venue then venue.park.x else from.X, if venue then venue.park.z else from.Z, dropMin, dropMax, nil) then
 			table.insert(businesses, business)
+			if easy and venue and Map.manhattan(from.X, from.Z, venue.park.x, venue.park.z) <= pickupMax then
+				table.insert(near, business)
+			end
 		end
+	end
+	if #near > 0 then
+		businesses = near
 	end
 	if role == "bulk" then
 		-- the ones that send more than one piece (if there are any)
@@ -1040,23 +1062,13 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 		end
 	end
 	if #businesses == 0 then
-		if easy then
-			return nil
-		end
-		businesses = JobsConfig.Businesses
+		return nil -- (5.3 review: never a business of another tier or a closed one, nor one with nowhere to go)
 	end
 	local business = pick(businesses)
-	local pickupMax = if easy then math.max(JobsConfig.PickupMinDistance, JobsConfig.TutorialPickupMax) else JobsConfig.PickupMaxDistance
-	-- 5.3: the business's storefront nearest to you (within Places.CarReach, else the nearest at all); a business
-	-- without one (the lab) from an address near you as before.
-	local venue = Deliveries.venueFor(business, from.X, from.Z, JobsConfig.Places.CarReach, nil) or Deliveries.venueFor(business, from.X, from.Z, math.huge, nil)
+	local venue = venueNear(business)
 	local pickup = if venue then Deliveries.venueAddress(venue) else addressAround(from.X, from.Z, JobsConfig.PickupMinDistance, pickupMax, 0, {})
 	if not pickup then
 		return nil
-	end
-	local dropMin, dropMax = JobRules.window(role, tier.minDistance, tier.maxDistance)
-	if easy then
-		dropMin, dropMax = tier.minDistance, math.clamp(JobsConfig.TutorialDropMax, tier.minDistance, tier.maxDistance)
 	end
 	-- 5.3: where it goes: a home's door or another storefront (the business's `to`), else an address as before. The
 	-- person there: the storefront's own (B2B), the Harbor's foreman, a far place's own, else one of the receivers.
@@ -1205,7 +1217,7 @@ local function footOffer(from: Vector3, role: string?, room: number, tutorial: b
 		end
 		local doors = Deliveries.round(venue, if bike then round.BikeReach else round.FootReach, function(): number
 			return rng:NextNumber()
-		end, allow)
+		end, allow, if bike then round.BikeRoute else round.FootRoute) -- (5.3 review: a route of a walk / a ride)
 		if #doors == 0 then
 			return nil
 		end
@@ -1247,17 +1259,35 @@ local function footOffer(from: Vector3, role: string?, room: number, tutorial: b
 		offer.rules = {}
 		return offer
 	end
-	local businesses: { Config.BusinessDef } = {}
-	for _, business in JobsConfig.Businesses do
-		local light = Tuning.LightLooks[business.look] and not Cargo.isPeople(business.kind)
-		if tutorial then
-			if light and business.id == "post" then
-				table.insert(businesses, business)
+	local dropMin, dropMax = JobRules.window(role, foot.MinDistance, foot.MaxDistance)
+	if tutorial then
+		dropMin, dropMax = foot.MinDistance, math.max(foot.MinDistance, JobsConfig.Foot.TutorialDrop)
+	end
+	-- The businesses that may send this run: open now, a light look you have room for, a storefront within `within`
+	-- (5.3 review: and somewhere to go from it in this run's range).
+	local function gather(within: number): { Config.BusinessDef }
+		local found: { Config.BusinessDef } = {}
+		for _, business in JobsConfig.Businesses do
+			local light = Tuning.LightLooks[business.look] and not Cargo.isPeople(business.kind)
+			if tutorial then
+				if light and business.id == "post" then
+					table.insert(found, business)
+				end
+			elseif light and Deliveries.open(business, hour) and Bag.room(business.look, mode, room, rack) >= 1 then
+				local venue = Deliveries.venueFor(business, from.X, from.Z, within, allow)
+				if (#Map.venuesOf(business.id) == 0 or venue ~= nil)
+					and Deliveries.reaches(business, if venue then venue.park.x else from.X, if venue then venue.park.z else from.Z, dropMin, dropMax, allow) then
+					table.insert(found, business)
+				end
 			end
-		elseif light and Deliveries.open(business, hour) and Bag.room(business.look, mode, room, rack) >= 1
-			and (#Map.venuesOf(business.id) == 0 or Deliveries.venueFor(business, from.X, from.Z, reach, allow) ~= nil) then
-			table.insert(businesses, business)
 		end
+		return found
+	end
+	local businesses = gather(reach)
+	if #businesses == 0 and not tutorial then
+		-- 5.3 review: every storefront near you is shut (the Suburbs at night): the nearest open one, up to twice as far.
+		reach *= 2
+		businesses = gather(reach)
 	end
 	if role == "bulk" then
 		local several: { Config.BusinessDef } = {}
@@ -1288,10 +1318,6 @@ local function footOffer(from: Vector3, role: string?, room: number, tutorial: b
 	end
 	if not pickup then
 		return nil
-	end
-	local dropMin, dropMax = JobRules.window(role, foot.MinDistance, foot.MaxDistance)
-	if tutorial then
-		dropMin, dropMax = foot.MinDistance, math.max(foot.MinDistance, JobsConfig.Foot.TutorialDrop)
 	end
 	local drop: Map.Address? = nil
 	local own: Config.PersonDef? = nil
@@ -1851,9 +1877,14 @@ local function orderRoomOf(player: Player, offer: Offer, job: Job?): number
 	local info = if job then job.cargo.info else nil
 	if info and info.foot then
 		-- (as startJob: a bike job's pack is the bike's whole room; a foot job's the backpack's, all of it while riding)
-		local pack = if offer.mode == "bike" or Transport.riding(player) then room else Transport.packRoomOf(player)
-		if pack > (info.pack or 0) then
-			info.pack = pack
+		local onBike = offer.mode == "bike" or Transport.riding(player)
+		local pack = if onBike then room else Transport.packRoomOf(player)
+		-- 5.3 review: the bike's rack too, only while the run is ridden (a walking foot run has none)
+		local _, bike = Transport.bikeOf(player)
+		local rack = require(Shared.Bag).rack(offer.mode, onBike, if bike then bike.room else nil, Transport.packRoomOf(player))
+		if pack > (info.pack or 0) or rack > (info.rack or 0) then
+			info.pack = math.max(pack, info.pack or 0)
+			info.rack = if rack > (info.rack or 0) then rack else info.rack
 			info.changed()
 		end
 	end
@@ -2116,10 +2147,21 @@ local function makeBoard(player: Player): Board
 	end)
 	-- 5.3: in the morning a newspaper round too (Config.Jobs.Round), on foot and by bike.
 	local rounds = require(Shared.Deliveries).inHours(JobsConfig.Round.Hours, DayNight.hour())
+	local walks = 0
 	for index = 1, math.max(1, JobsConfig.Foot.Offers) + (if rounds then 1 else 0) do
 		local offer = footOffer(from, if rounds and index == 1 then "round" else footRoles[(index - (if rounds then 2 else 1)) % #footRoles + 1], room)
 		if offer then
 			table.insert(list, offer)
+			walks += 1
+		end
+	end
+	-- 5.3 review: no run on foot because the storefronts near you are shut (looked up to twice as far): the board says
+	-- where to go instead.
+	local footNote: string? = nil
+	if walks == 0 then
+		local foot = JobsConfig.Foot
+		if require(Shared.Deliveries).closedNear(from.X, from.Z, (foot.PickupMax + foot.PickupWiden) * 2, DayNight.hour(), nil) then
+			footNote = JobsConfig.Places.ClosedNote
 		end
 	end
 	-- 5.1: the BIKE section from Bike.Level: a choice of Bike.Offers for what your bike holds (shown locked without a
@@ -2149,7 +2191,7 @@ local function makeBoard(player: Player): Board
 		stamp(offer, from)
 	end
 	table.sort(list, boardOrder)
-	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, JobsConfig.RefreshSeconds), rerolled = {} }
+	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, JobsConfig.RefreshSeconds), rerolled = {}, footNote = footNote }
 	boards[player.UserId] = board
 	return board
 end
@@ -2197,7 +2239,7 @@ local function sendBoard(player: Player, board: Board)
 	local bikeId, bike = Transport.bikeOf(player)
 	local bikeDef = if bikeId then Economy.findCar(bikeId) else nil
 	local bikeInfo = if bikeDef and bike then { id = bikeDef.id, name = bikeDef.name, room = bike.room, riding = Transport.riding(player) } else nil
-	Net.get("Offers"):FireClient(player, out, board.refreshAt, { tiers = tiers, streak = if profile then profile.streak else 0, foot = carry, hasCar = hasCar, ownsCar = ownsCar(player), bike = bikeInfo, bikeLevel = JobsConfig.Bike.Level, run = if run then stackInfo(player, run) else nil })
+	Net.get("Offers"):FireClient(player, out, board.refreshAt, { tiers = tiers, streak = if profile then profile.streak else 0, foot = carry, hasCar = hasCar, ownsCar = ownsCar(player), bike = bikeInfo, bikeLevel = JobsConfig.Bike.Level, run = if run then stackInfo(player, run) else nil, footNote = board.footNote })
 end
 
 -- A new board now, sent to the player (3.7: the client cannot ask for this; RequestOffers sends the current board).
@@ -2712,7 +2754,9 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	-- 5.3, the bag (shared/Bag.luau): of that, the bike's own rack / basket / box (what does not fit a backpack rides
 	-- only there: put there at a bike job's pick-up, or stowed when you get on your bike); a newspaper round's bundle
 	-- goes into its satchel on top.
-	cargoInfo.rack = if foot and bike then math.max(0, bike.room - Transport.packRoomOf(player)) else nil
+	-- 5.3 review: only on a bike run, or a foot run ridden (a bike you own but walk without has no rack: Bag.rack).
+	local rack = require(Shared.Bag).rack(offer.mode, riding, if bike then bike.room else nil, Transport.packRoomOf(player))
+	cargoInfo.rack = if foot and rack > 0 then rack else nil
 	cargoInfo.ride = if offer.mode == "bike" then true else nil
 	if foot and offer.round then
 		cargoInfo.pack = (cargoInfo.pack or 0) + offer.total
