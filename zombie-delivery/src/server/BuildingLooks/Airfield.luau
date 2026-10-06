@@ -3,7 +3,7 @@
 local Kit = require(script.Parent.Kit)
 
 return {
-	id = "airfield", width = 64, depth = 44, height = 18,
+	id = "airfield", width = 64, depth = 44, height = 18, interior = true,
 	-- The front openings kept clear: { center x, width, clear height }.
 	entries = { { 0, 62, 15 } },
 	details = {

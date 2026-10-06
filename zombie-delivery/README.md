@@ -910,6 +910,18 @@ Plant, Water Works, Train Yard, Radio Station, Ski Lodge, Riding School, Ranch, 
 Lab, Prison, Lighthouse and Stadium. `tools/check-building-looks.py` keeps every blueprint inside its footprint, off the
 door openings (`Blueprint.entries`) and the name boards, under 80 parts and 2 light beams.
 
+New in 4.3: **the name boards** are no longer pictures floating over the roofs. Every building's name (the shops, the
+employers, the places, the garages, the houses' badges, the road signs to them) is a solid charcoal band on the facade
+in the contract look of the UI: a small red square, the name in white caps, a second line where the name has one
+(LEAD & CO. over GUNS), a fine line along the bottom (`sign()` in `server/World.luau`; the sign pictures stay in
+`art/signs`). **The open halls are lit** day and night (`Blueprint.interior` in `BuildingLooks/Kit.luau`: warm ceiling
+panels with a downward light in the depot, the Harbor Warehouse, Fire Station 9, the hangar, the barns and stables and
+the four garages), and the shops' own ceiling light is brighter. **The location tag**: walk (or drive slowly) up to a
+place you have discovered and a quiet caption names it on the left over the minimap, in the style of the location
+previews: ■ LEAD & CO. over GUN SHOP (`client/LocationTag.luau`, the choice in `shared/LocationTags.luau`: within 45
+studs, 75 for a shop, gone past 70 / 100 or after 4.5 s, each place once per 90 s, never over the NEW LOCATION banner or
+an open window).
+
 ## The HUD
 
 3.8, **the contract UI** (Codex's `design/ui-contract/`, approved by the owner): the world is the main view, the

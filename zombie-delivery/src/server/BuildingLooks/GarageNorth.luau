@@ -3,7 +3,7 @@
 local Kit = require(script.Parent.Kit)
 
 return {
-	id = "garage_north", width = 50, depth = 26, height = 12,
+	id = "garage_north", width = 50, depth = 26, height = 12, interior = true,
 	-- The openings that stay clear: { center x, width, clear height }.
 	entries = { { -18, 10, 9 }, { -6, 10, 9 }, { 6, 10, 9 }, { 18, 10, 9 } },
 	details = {

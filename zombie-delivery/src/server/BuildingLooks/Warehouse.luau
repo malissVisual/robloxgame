@@ -4,7 +4,7 @@ local Kit = require(script.Parent.Kit)
 
 return function(doors: { number }): Kit.Blueprint
 	local blueprint: Kit.Blueprint = {
-		id = "warehouse", width = 100, depth = 56, height = 22,
+		id = "warehouse", width = 100, depth = 56, height = 22, interior = true,
 		details = {
 			{ name = "DockCornice", position = { 0, 21.65, -28.8 }, size = { 100, 0.7, 1.1 }, color = { 38, 43, 47 }, material = "Metal" },
 			{ name = "DockCanopy", position = { 0, 21.1, -29.2 }, size = { 100, 0.45, 4 }, color = { 38, 43, 47 }, material = "Metal" },
