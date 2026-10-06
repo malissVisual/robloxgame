@@ -118,6 +118,19 @@ Hud.onCareer = CareerUi.toggle
 Phone.onOpen = Hud.closeWindows
 Phone.onBoard = DispatchUi.open
 Phone.onCareer = CareerUi.open
+-- 5.5: the HUD MENU's actions are phone apps (their windows open; the phone closes first), and MENU opens the phone.
+Phone.onMissions = MissionsUi.toggle
+Phone.onCrew = CrewPanel.toggle
+Phone.onTop = Leaderboard.toggle
+Phone.onEstate = EstateUi.toggleList
+Phone.onSound = Sounds.cycle
+Hud.onMenu = function(): boolean
+	if not Phone.has() then
+		return false -- (before Marge: the old list)
+	end
+	Phone.toggle()
+	return true
+end
 Phone.boardOpen = DispatchUi.isOpen
 Phone.notify = Hud.toast
 Phone.blocked = function(): boolean -- (the NEW PHONE pop-up waits for Marge's dialog and a result or card)

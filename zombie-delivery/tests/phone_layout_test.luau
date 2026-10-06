@@ -15,6 +15,15 @@ for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{320,448,tr
 end
 check("wide short phone turns sideways", Phone.fit(844,350,true,1).sideways)
 check("narrow short phone scrolls instead of shrinking", not Phone.fit(320,448,true,1).sideways and Phone.fit(320,448,true,1).height < 680)
+-- 5.5: a big app turns the phone sideways on any screen; it still fits.
+for _, screen in {{1920,1000,false},{1280,650,false},{390,800,true},{320,448,true},{844,350,true}} do
+	local w,h,touch = screen[1],screen[2],screen[3]
+	local wide = Phone.sideways(w,h,touch,.9)
+	check(`{w}x{h}: a big app's phone is sideways`, wide.sideways and wide.width == 680)
+	check(`{w}x{h}: sideways fits horizontally`, wide.width*wide.scale <= w-32+.001)
+	check(`{w}x{h}: sideways fits vertically`, wide.height*wide.scale <= h-32+.001)
+end
+check("a desktop's sideways phone keeps the full scale", Phone.sideways(1280,800,false,.95).scale == .95 and Phone.sideways(1280,800,false,.95).height == 340)
 check("no job: board instead of invented contract", not Phone.summary(nil,100).active)
 local summary = Phone.summary({stopLabel="Harbor warehouse",total=2,pay=180,endsAt=376,timeLimit=400,position={X=30,Z=40},orders={{state="open"},{state="done"},{state="open"}}},100,0,0)
 check("current server stop title", summary.title == "HARBOR WAREHOUSE")

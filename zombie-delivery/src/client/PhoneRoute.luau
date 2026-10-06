@@ -105,7 +105,8 @@ function Route.create(parent: Instance, destination: Vector3?, order: number, en
 	holder.Destroying:Connect(function()
 		alive = false
 		resized:Disconnect()
-		known:Disconnect()
+		local handle: any = known -- (Discovery's own signal)
+		handle:Disconnect()
 	end)
 	if not destination then
 		Ui.label(holder,"Route unavailable — check the current objective",UDim2.fromScale(1,1),{TextColor3=K.secondary,TextSize=13,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Center})

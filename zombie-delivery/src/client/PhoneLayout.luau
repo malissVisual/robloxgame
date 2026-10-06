@@ -19,6 +19,14 @@ function PhoneLayout.fit(width: number, height: number, touch: boolean, cap: num
 	return { sideways = sideways, scale = scale, width = w, height = h }
 end
 
+-- 5.5: a big app (BOARD, CAREER, SHOP, BAG) turns the phone sideways even where it would stand upright: the landscape
+-- body at the largest scale that fits (a narrow touch screen gets a smaller one; the app scrolls).
+function PhoneLayout.sideways(width: number, height: number, touch: boolean, cap: number): Fit
+	width, height = math.max(100, width), math.max(100, height)
+	local scale = math.min(if touch then 1 else cap, (width - 32) / 680, (height - 32) / 220)
+	return { sideways = true, scale = scale, width = 680, height = math.min(340, (height - 32) / scale) }
+end
+
 function PhoneLayout.summary(payload: any, now: number, x: number?, z: number?): any
 	if type(payload) ~= "table" then
 		return { active = false, title = "READY FOR YOUR NEXT RUN", meta = "Find a delivery on the board", clock = "", share = 0 }
