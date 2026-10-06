@@ -23,8 +23,8 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "BackLabel", { .52, .18, .03 }, { 0, .33, 1.285 }, "UpperTorso", "charcoal", nil, { 0, 180, 0 }, "ZDC")
 		for _, x in { -.47, .47 } do
 			local side = if x < 0 then "L" else "R"
-			add(out, "ShoulderStrap" .. side, { .15, 1.35, .07 }, { x, -.04, -.56 }, "UpperTorso", "sole")
-			add(out, "Buckle" .. side, { .18, .13, .08 }, { x, -.42, -.62 }, "UpperTorso", "worn")
+			add(out, "ShoulderStrap" .. side, { .15, 1.35, .07 }, { x, -.04, -.69 }, "UpperTorso", "sole")
+			add(out, "Buckle" .. side, { .18, .13, .08 }, { x, -.42, -.76 }, "UpperTorso", "worn")
 		end
 		add(out, "GrabLoop", { .45, .08, .09 }, { 0, .89, 1.02 }, "UpperTorso", "sole")
 		if id == "backpack_loaded" then table.insert(out, Geometry.load()) end
@@ -40,8 +40,8 @@ function Geometry.pieces(id: string): { Piece }
 			local side = if x < 0 then "L" else "R"
 			add(out, "Edge" .. side, { .08, 1.75, .06 }, { x, -.1, 1.49 }, "UpperTorso", "sole")
 			add(out, "Closure" .. side, { .08, .24, .07 }, { x * .78, .3, 1.52 }, "UpperTorso", "steel")
-			add(out, "ShoulderStrap" .. side, { .18, 1.45, .07 }, { x * .54, -.06, -.57 }, "UpperTorso", "sole")
-			add(out, "Buckle" .. side, { .2, .15, .08 }, { x * .54, -.48, -.63 }, "UpperTorso", "worn")
+			add(out, "ShoulderStrap" .. side, { .18, 1.45, .07 }, { x * .54, -.06, -.69 }, "UpperTorso", "sole")
+			add(out, "Buckle" .. side, { .2, .15, .08 }, { x * .54, -.48, -.76 }, "UpperTorso", "worn")
 		end
 		add(out, "TopHandle", { .46, .08, .1 }, { 0, 1.04, 1.04 }, "UpperTorso", "sole")
 	elseif id == "shoes" then

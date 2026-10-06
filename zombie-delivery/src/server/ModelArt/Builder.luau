@@ -46,7 +46,8 @@ function Builder.build(parent: Instance, spec: Spec, targets: { [string]: BasePa
 		p.Name, p.Size = d.name, Vector3.new(d.size[1], d.size[2], d.size[3])
 		p.CFrame = target.CFrame * pose(d.at, d.turn)
 		p.Color, p.Material = Color3.fromRGB(finish.color[1], finish.color[2], finish.color[3]), finish.material
-		p.Anchored, p.Massless, p.CanCollide, p.CanQuery, p.CanTouch = target.Anchored, true, false, false, false
+		-- The weld follows an anchored display root too. Never anchor a skin part: it would freeze the caller's rig.
+		p.Anchored, p.Massless, p.CanCollide, p.CanQuery, p.CanTouch = false, true, false, false, false
 		p.CastShadow = d.shadow == true -- explicitly enable only large pieces; strips, spokes and fasteners stay off
 		if d.shape == "Cylinder" then (p :: Part).Shape = Enum.PartType.Cylinder end
 		p:SetAttribute("ArtAttach", d.attach)
