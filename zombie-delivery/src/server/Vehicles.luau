@@ -108,6 +108,7 @@ local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
 local Boarding = require(Shared.Boarding)
+local VehicleArt = require(script.Parent.VehicleArt.Builder)
 
 export type Car = {
 	owner: Player,
@@ -1627,13 +1628,17 @@ end
 -- The body-coloured leaves join paintParts.
 local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
 	if back.hole then
-		trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), chassis, color, accent)
+		local hole = trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), chassis, color, accent)
+		if model:GetAttribute("FleetArt") then hole.Transparency = 1 end
 	end
 	for _, leaf in back.leaves do
 		local kind = leaf.kind or "body"
 		local p = trimPart(model, "BackDoor", box(leaf.size, leaf.center, kind), top * CFrame.new(leaf.center), if working then nil else chassis, color, accent)
 		if kind == "body" then
 			table.insert(paintParts, p)
+		end
+		if model:GetAttribute("FleetArt") and back.noun == "doors" then
+			VehicleArt.rear(p, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
 		end
 		local trim: { Box } = leaf.trim or {}
 		for _, b in trim do
@@ -1752,6 +1757,10 @@ local KIT_TROLLEY = Color3.fromRGB(196, 46, 38)
 -- the tread), from 3 alloy rims (a silver disc, silver spokes); before, a Rusty Van's tyres stay bald and grey (build).
 -- The new parts are welded to the tyre (they spin with it) and live in the kit's folder.
 local function fitTyres(model: Model, folder: Instance, style: Style, handling: number)
+	if model:GetAttribute("FleetArt") then
+		VehicleArt.fitTyres(model, handling, { weld = weld, nightLight = DayNight.nightLight })
+		return
+	end
 	for _, tyre in model:GetChildren() do
 		if not tyre:IsA("BasePart") or tyre.Name ~= "Tyre" then
 			continue
@@ -1828,6 +1837,9 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 	end
 	local hull = hullOf(style)
 
+	if model:GetAttribute("FleetArt") then
+		VehicleArt.upgrades(model, chassis, style :: any, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
+	else
 	-- Ram Plow: a bull bar in front of the nose, wider, thicker and lower-reaching with every level.
 	if plow >= 1 then
 		local width = math.min(style.width + 0.2, style.width - 1.6 + 0.36 * plow)
@@ -1917,6 +1929,8 @@ local function buildKit(model: Model, chassis: Part, style: Style, levels: Econo
 			end
 		end
 	end
+
+	end -- stock company vehicle kit
 
 	-- 4.0, the Hand Trolley: folded upright against the right wall just inside the back (seen when the back opens), its
 	-- Attachment TrolleyMount on the chassis at its foot (the chassis' axes). server/Cargo.luau builds the trolley you
@@ -2082,6 +2096,9 @@ local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style
 		if not primer then
 			table.insert(paintParts, p)
 		end
+		if model:GetAttribute("FleetArt") then
+			VehicleArt.door(model, p, style :: any, door.side, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
+		end
 		for _, b in door.trim do
 			local t = trimPart(model, "DoorTrim", b, top * CFrame.new(panel.offset + b.offset), p, color, accent)
 			if b.kind == "body" then
@@ -2123,6 +2140,13 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(2, 0, 0, 100, 1)
 	model.PrimaryPart = chassis
 
+	local polished = not oneBeam and VehicleArt.supports(def.style)
+	if polished then
+		-- The chassis stays visible (dark metal): the floor of the cab and the cargo bay under the skin.
+		model:SetAttribute("FleetArt", true)
+		model:SetAttribute("FleetStyle", def.style)
+		model:SetAttribute("FleetStage", stage or 0)
+	end
 	local paintParts: { BasePart } = {}
 	local top = chassisCF * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
 	local height = CHASSIS_HEIGHT
@@ -2155,16 +2179,29 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 			end
 			CollectionService:AddTag(p, Vehicles.SirenTag)
 		end
+		-- Keep the original massless collision/raycast hull; the panelled skin supplies its appearance.
+		if polished then p.Transparency = 1 end
 		weld(chassis, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
 	end
 	-- 3.5: the cosmetic trim (the Rusty Van's rust, a stage's ladder, racks, lamps …); body-coloured trim is painted.
-	local trim: { Box } = style.trim or {}
+	local trim: { Box } = if polished then {} else style.trim or {}
 	for _, b in trim do
 		local p = trimPart(model, "Trim", b, top * CFrame.new(b.offset) * tilted(b), chassis, color, accent)
 		if b.kind == "body" then
 			table.insert(paintParts, p)
 		end
+	end
+
+	if polished then
+		local spans = {}
+		for _, door in doorsOf(style) do
+			local panel = door.panel
+			if panel then
+				table.insert(spans, { side = door.side, front = panel.offset.Z - panel.size.Z / 2, back = panel.offset.Z + panel.size.Z / 2 })
+			end
+		end
+		VehicleArt.body(model, chassis, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight }, spans)
 	end
 
 	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
@@ -2202,6 +2239,15 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		motor:SetAttribute("Front", offset.Z < 0)
 		motor:SetAttribute("Radius", style.wheel)
 		motor.Parent = chassis
+		if polished then
+			-- Its outer face (the rim's side); a twin tyre inside another (no collider) shows no rim.
+			tyre:SetAttribute("FleetSide", if offset.X < 0 then -1 else 1)
+			if not collides then
+				tyre:SetAttribute("FleetInner", true)
+			end
+			VehicleArt.wheel(tyre, 0, { weld = weld, nightLight = DayNight.nightLight })
+			return
+		end
 		local hub = newPart(model, "Hub", Vector3.new(style.wheelWidth + 0.1, style.wheel, style.wheel), tyre.CFrame, Color3.fromRGB(170, 170, 170), Enum.Material.Metal)
 		hub.Shape = Enum.PartType.Cylinder
 		hub.CanCollide = false
@@ -2410,8 +2456,14 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 end
 
 -- A showroom model for the dealer (anchored, no seats); 3.5: at a stage (its look).
-function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?): Model
+function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?, levels: Economy.Upgrades?): Model
 	local built = build(def, rgb(def.color), ground, true, nil, nil, stage)
+	if levels then
+		buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id)
+		for _, p in built.model:GetDescendants() do
+			if p:IsA("BasePart") then p.Anchored = true; p.CollisionGroup = "Default" end
+		end
+	end
 	return built.model
 end
 
