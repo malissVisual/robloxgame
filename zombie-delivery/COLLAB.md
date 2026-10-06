@@ -4,7 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · usable fleet models, distinct van stages, visible upgrade kits and real model previews · server/Vehicles.luau, server/VehicleArt/, client/VehiclePreview.luau, client/GarageUi.luau, shared/VehiclePreviewData.luau, vehicle preview/export tools and design/vehicle-models/ · since 2026-10-06
+- Codex · usable fleet models, distinct van stages, visible upgrade kits and real model previews · server/Vehicles.luau, server/Garages.luau (preview stage/paint fields only), server/VehicleArt/, client/VehiclePreview.luau, client/GarageUi.luau, shared/VehiclePreviewData.luau, vehicle preview/export tools and design/vehicle-models/ · since 2026-10-06
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
