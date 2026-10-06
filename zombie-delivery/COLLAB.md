@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · approved courier-phone UI (home + live order detail, square contract surfaces, readable app launcher); `src/client/Phone.luau`, new phone presentation/layout modules, focused UI tests, `design/phone-ui/` · 2026-10-06 · `codex/phone-ui`.
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
