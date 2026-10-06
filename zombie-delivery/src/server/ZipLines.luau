@@ -222,7 +222,9 @@ local function climb(player: Player, from: Vector3, to: CFrame)
 		pcall(function()
 			player:RequestStreamAroundAsync(to.Position, 3)
 		end)
-		if player.Character == character and humanoid.Health > 0 then
+		-- (re-checked after the fade: a player who sat in a car meanwhile must not carry it onto the roof)
+		if player.Character == character and humanoid.Health > 0 and humanoid.SeatPart == nil and Vehicles.seatedIn(player) == nil
+			and character:GetAttribute("Boarding") == nil and not rides[player] then
 			root.AssemblyLinearVelocity = Vector3.zero
 			character:PivotTo(to)
 		end
@@ -288,6 +290,20 @@ local function onZip(player: Player, action: any)
 	-- (the client's clock may be a little off the server's)
 	if ZipData.canLetGo(ride.line, t) or ZipData.canLetGo(ride.line, t - 0.3) or ZipData.canLetGo(ride.line, t + 0.3) then
 		stop(player, ride, false)
+		return
+	end
+	-- (the client let go already: a lag past the window must not leave the ride running and teleport them later. If
+	-- they really stand on one of the line's roofs, the ride ends where they are.)
+	local _, _, root = rootOf(player)
+	if root then
+		local at = root.Position
+		for _, lot in { ride.line.start, ride.line.finish } do
+			local box = ZipData.boxOf(lot)
+			if box and at.X >= box.x0 - 2 and at.X <= box.x1 + 2 and at.Z >= box.z0 - 2 and at.Z <= box.z1 + 2 and math.abs(at.Y - box.top) <= 8 then
+				stop(player, ride, false)
+				return
+			end
+		end
 	end
 end
 
@@ -335,11 +351,10 @@ local function build(folder: Instance, world: Instance, line: ZipData.Line)
 		truss.Color = METAL
 		truss.Material = Enum.Material.Metal
 		truss.Parent = model
-		local foot = Instance.new("Attachment")
-		foot.Name = "Foot"
+		-- (the prompt's own attachment on the truss, at the ladder's foot: an attachment needs a part for a parent)
+		local up = prompt(truss, "ClimbPrompt", "Climb", line.name, 0.3, 8)
+		local foot = up.Parent :: Attachment
 		foot.Position = Vector3.new(ladder.nx * 1.5, -height / 2 + 2.5, ladder.nz * 1.5)
-		foot.Parent = truss
-		local up = prompt(foot, "ClimbPrompt", "Climb", line.name, 0.3, 8)
 		local p = if index == 1 then line.a else line.b
 		local from = Vector3.new(ladder.x + ladder.nx * 2.5, ladder.base + 3, ladder.z + ladder.nz * 2.5)
 		up.Triggered:Connect(function(player: Player)
