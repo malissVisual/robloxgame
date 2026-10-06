@@ -55,6 +55,12 @@ for _,id in Geometry.ids do
  assert(built.model.Parent==nil)
  for _,point in built.points do assert(point.Parent==nil) end
  for _,target in targets do assert(#target:GetChildren()==0) end
+ -- Anchored review roots hold their welded skin; the skin itself must never freeze a later unanchored rig.
+ for _,target in targets do target.Anchored=true end
+ local display=Builder.build(parent,spec,targets)
+ for _,p in display.parts do assert(not p.Anchored) end
+ Builder.destroy(display)
+ for _,target in targets do assert(#target:GetChildren()==0 and target.Anchored) end
  -- A missing target fails before any partial art model is created.
  local before=#parent:GetChildren()
  assert(not pcall(function() Builder.build(parent,spec,{}) end))

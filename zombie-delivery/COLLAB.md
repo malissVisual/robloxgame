@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · 5.x pumps/island, kiosk, price sign, jerry can, fleet filler positions and 70×50 station layout · server/GasArt/, server/BuildingLooks/GasKiosk.luau, shared ModelArt/tooling foundation, art/icons/fuel, jerrycan, map_gas, design/gas-models/ · since 2026-10-06
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/gas-models` · pumps (22 incl. roots), two-pump island (58), kiosk (40 incl. lamp), price sign/jerry can (8 each), independent nozzles/display slots, 17-style filler positions, 70×50 composition and 3 PNG/SVG icons; renders/API in `design/gas-models/`. Required suite/compiles, real-builder/lot/bay/filler checks, building and image audits pass. Studio: dynamic hose/docking/filler fit, normal/freight vehicle clearance, can carry/pour, signs/lights/kiosk; Claude adds fuel gameplay and four placements.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
