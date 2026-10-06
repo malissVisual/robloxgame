@@ -34,6 +34,7 @@ local Discovery = require(Client.Discovery)
 local TutorialUi = require(Client.TutorialUi)
 local Holster = require(Client.Holster)
 local CarBoarding = require(Client.CarBoarding)
+local LocationTag = require(Client.LocationTag)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -70,6 +71,7 @@ safely("Discovery", Discovery.start) -- 3.7: the map you discover
 safely("TutorialUi", TutorialUi.start) -- 3.7: the first-day tutorial
 safely("Holster", Holster.start) -- 3.9: B holsters / draws the gun, V punches or strikes
 safely("CarBoarding", CarBoarding.start) -- 3.10: getting in and out of a car (E at a door, E or Space in a seat)
+safely("LocationTag", LocationTag.start) -- 4.3: the quiet caption that names the building you come up to
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
@@ -104,6 +106,7 @@ MissionsUi.onFindCrew = CrewPanel.open
 CameraRig.mouseNeeded = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
 end
+LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while a window is open
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)
