@@ -7,6 +7,8 @@
 -- 4.0: pulling away follows a torque curve (shared/Economy.luau Economy.torque): a heavy van (the Rusty Van: accel 11)
 -- pulls away slowly from a standstill, is strongest in the mid-range and creeps up to its top speed; the speed always
 -- changes smoothly (no jumps). Braking and coasting stay as they were.
+-- 5.1: a bike (the car's attribute Bike, server/Vehicles.luau) pedals away at once (no torque curve: full push from a
+-- standstill), coasts on longer, steers already at walking pace and backs up slowly (you walk it back).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -218,18 +220,19 @@ local function step(dt: number)
 		speed = actual + (if speed > 0 then 8 else -8)
 	end
 
+	local bike = car:GetAttribute("Bike") == true
 	local target = 0
 	if throttle > 0 then
 		target = maxSpeed * throttle
 	elseif throttle < 0 then
-		target = maxSpeed * 0.45 * throttle
+		target = maxSpeed * (if bike then 0.2 else 0.45) * throttle
 	end
 	local rate = accel
 	if throttle == 0 then
-		rate = accel * 0.7 -- coasting
+		rate = accel * (if bike then 0.4 else 0.7) -- coasting
 	elseif math.abs(speed) > 1 and math.sign(target) ~= math.sign(speed) then
 		rate = accel * 2.5 -- braking
-	elseif math.abs(target) > math.abs(speed) then
+	elseif math.abs(target) > math.abs(speed) and not bike then
 		-- 4.0: pulling away, the torque curve: soft from a standstill, strong in the mid-range, soft again at the top.
 		rate = accel * Economy.torque(math.abs(speed) / math.max(1, maxSpeed))
 	end
@@ -245,7 +248,7 @@ local function step(dt: number)
 		velocity = current + (velocity - current) * math.min(1, traction * dt)
 	end
 	linear.PlaneVelocity = Vector2.new(velocity.X, velocity.Z)
-	local grip = math.clamp(math.abs(speed) / 12, 0, 1)
+	local grip = math.clamp(math.abs(speed) / (if bike then 5 else 12), 0, 1)
 	local yaw = -steer * turn * grip * (if speed >= 0 then 1 else -1)
 	angular.AngularVelocity = Vector3.new(0, yaw, 0)
 end
