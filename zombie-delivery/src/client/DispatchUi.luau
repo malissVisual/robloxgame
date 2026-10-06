@@ -619,6 +619,20 @@ local function dangerRow(body: any, offer: any)
 	if boost and boost > 1 then
 		chip(row, "🎯 BANDITS WANT IT", K.red, 6)
 	end
+	-- 4.8: a multi-drop delivery (its customers) and the cargo's rules (the RULES line says what they ask).
+	local drops = tonumber(offer.drops)
+	if drops and drops > 1 then
+		chip(row, `📍 {drops} DROPS`, K.rule, 2)
+	end
+	if type(offer.rules) == "table" then
+		local icons = { fragile = "🥚 FRAGILE", food = "🍕 FOOD", heavy = "🏋 HEAVY", cash = "💰 CASH", people = "👥 PASSENGERS" }
+		for index, rule in offer.rules do
+			local name = icons[rule]
+			if name and rule ~= "cash" then -- (cash: BANDITS WANT IT says it)
+				chip(row, name, if rule == "fragile" then K.red else K.rule, 6 + index)
+			end
+		end
+	end
 end
 
 -- One briefing line: a small caps label (ROUTE, CARGO ...) and its value, wrapped to `w` (or one line cut short when
@@ -683,6 +697,14 @@ local function details(body: any, offer: any, w: number): number
 	end
 	if offer.jobType and offer.jobType.description then
 		y += brief(body, "Job", offer.jobType.description, y, w, true, { TextColor3 = K.secondary })
+	end
+	-- 4.8: the cargo's rules (fragile, food, heavy, cash, passengers) and a multi-drop delivery's customers.
+	if type(offer.rulesText) == "string" then
+		y += brief(body, "Rules", offer.rulesText, y, w, true, { TextColor3 = K.text })
+	end
+	local drops = tonumber(offer.drops)
+	if drops and drops > 1 then
+		y += brief(body, "Drops", `{drops} customers, one after the other: every piece is labelled for its customer, the wrong one is refused.`, y, w, true, { TextColor3 = K.secondary })
 	end
 	-- 4.0: the server's tip (a hand trolley helps with 4+ pieces).
 	if type(offer.tip) == "string" then

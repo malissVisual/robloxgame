@@ -320,7 +320,7 @@ Ui.list(topStack, true, 8)
 -- (a toast or a banner under the contract makes the column taller: lay out again for its real height)
 topStack:GetPropertyChangedSignal("AbsoluteSize"):Connect(requestLayout)
 
-local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, mission = 3, carcall = 4, repair = 4, levelup = 5, toasts = 6 }
+local SLOT_ORDER: { [string]: number } = { job = 1, crew = 2, roadevent = 2, mission = 3, carcall = 4, repair = 4, levelup = 5, toasts = 6 } -- (4.8: roadevent, client/RoadEventUi.luau)
 local slots: { [string]: Frame } = {}
 
 -- A place in the contract column for another module's panel, by name ("crew"; an unknown name goes under the toasts).
@@ -1451,6 +1451,10 @@ function Hud.showResult(r: any)
 		end
 		-- 4.7: the rating (★ … ★★★, why), the streak of good jobs and the licence it counts toward (not a mission).
 		local rating = if type(r.rating) == "table" then r.rating else nil
+		if rating and tonumber(rating.freshness) then
+			-- 4.8: food: its freshness took this off the pay.
+			line(`Freshness {math.floor((tonumber(rating.freshness) or 1) * 100 + 0.5)}%`, if (tonumber(rating.freshPay) or 0) < 0 then "-" .. Ui.money(-(tonumber(rating.freshPay) or 0)) else nil, if (tonumber(rating.freshness) or 1) < 0.7 then C.red else nil, 9)
+		end
 		if rating then
 			local got = math.clamp(math.floor(tonumber(rating.stars) or 2), 1, 3)
 			local ratingPay = tonumber(rating.ratingPay) or 0
@@ -2422,9 +2426,10 @@ t.title = P.text(body, "", UDim2.new(1, 0, 0, 0), {
 P.rule(body, UDim2.new(1, 0, 0, 1), { LayoutOrder = 3 })
 local list = Ui.make("Frame", { Name = "Objectives", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 4 }, body)
 Ui.list(list, true, 3)
--- The objective rows (a pool of four): a square box (filled when done) and the words; a warning has no box but a ⚠.
+-- The objective rows (a pool of six; 4.8: the cargo's rules and the road event): a square box (filled when done) and
+-- the words; a warning has no box but a ⚠.
 t.rows = {}
-for n = 1, 4 do
+for n = 1, 6 do
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = n, Visible = false }, list)
 	local box = Ui.make("Frame", { Name = "Box", Size = UDim2.fromOffset(10, 10), Position = UDim2.fromOffset(1, 5), BackgroundColor3 = P.ink, BackgroundTransparency = 1, BorderSizePixel = 0 }, row)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.ink, Thickness = 1, Transparency = 0.1 }, box)
@@ -2542,7 +2547,7 @@ function view.tickTicket(distance: number?)
 	local done = tonumber(job.delivered) or 0
 	local lost = tonumber(job.lost) or 0
 	local condition = tonumber(job.condition) or 1
-	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}`
+	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}`
 	if signature == t.meta0 then
 		return
 	end
@@ -2562,6 +2567,13 @@ function view.tickTicket(distance: number?)
 	local modifier = job.modifier
 	if type(modifier) == "table" and modifier.name then
 		add("todo", `{sentence(tostring(modifier.name))}: {string.lower(tostring(modifier.description or ""))}`)
+	end
+	-- 4.8: the cargo's rules ("Fresh 82% · Fragile: brake gently"; stale food in the contract red) and the road event.
+	if type(job.ruleLine) == "string" then
+		add(if (tonumber(job.freshness) or 1) < 0.35 then "warn" else "quiet", job.ruleLine)
+	end
+	if type(job.eventLine) == "string" then
+		add("todo", job.eventLine)
 	end
 	if lost > 0 then
 		add("warn", `⚠  {lost} {if lost == 1 then cargo.one else cargo.many} lost`)

@@ -88,6 +88,22 @@
 --   * Licences: the board's ★★★ and ★★★★ ordinary deliveries (and the Winter Run, a board special without a level of
 --     its own) need the tier's licence (licenceTier, hasLicence): its level AND enough good jobs at the tier below
 --     (profile.licenceJobs, counted for the owner of a rated job). The locked tier says "LICENCE 3 / 5".
+--
+-- 4.8, cargo with rules, multi-drop and road events (shared/JobRules.luau, Config.Jobs CargoRules / MultiDrop /
+-- RoadEvents):
+--   * Offer.rules (applyRules, from the cargo's look, kind and business; never a mission or the tutorial's delivery):
+--     fragile (hard braking, bumps and hits at speed cost condition, "CAREFUL — FRAGILE"), food (Job.freshness drains
+--     once picked up, a Cooler Box slows it; the contract shows "Fresh 82%", the rating and the pay take it), heavy
+--     (Cargo.Info.heavy: by hand alone very slow, the trolley or a crew mate at the normal pace), cash (the bandits
+--     come more: banditBoost ≥ CashBoost), people (bumps make them complain). Ratchet Straps (gear) × StrapsLoss on
+--     every condition loss from driving (cargoRulesStep, Jobs.onCarDamaged).
+--   * Multi-drop (ordinaryOffer): a ★★★ / ★★★★ board delivery may go to 2 – 3 customers one after the other; every
+--     piece is labelled for its customer (Offer.dests / destNames → Cargo.Info), Take out picks theirs, the wrong one
+--     is refused; the extra drops pay MultiDrop.PayPerStop each.
+--   * Road events (eventsStep, at most one a job, never the tutorial's or a mission): a survivor waving by the road
+--     (stop next to them, they ride along until the depot's safe zone: lifts, paid even after the job), a side
+--     pick-up offered on the HUD (Net "RoadEvent", Y: one more piece before the drop, takeAddOn), a blocked street
+--     ahead (a roadblock).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -110,6 +126,7 @@ local DayNight = require(script.Parent.DayNight)
 local Crew = require(script.Parent.Crew)
 local Gun = require(script.Parent.Gun)
 local DuoGates = require(script.Parent.DuoGates)
+local Npcs = require(script.Parent.Npcs)
 local Freight = require(Shared.Freight)
 local JobRules = require(Shared.JobRules)
 
@@ -158,6 +175,11 @@ type Offer = {
 	id: number, -- the board's id of the offer (AcceptJob sends it), 0 off the board
 	approach: number, -- the drive (manhattan) to the first stop from where it was offered: `distance` and `time` count it
 	role: string?, -- 4.7: the board's trade-off of an ordinary delivery (short | long | risky | bulk), nil otherwise
+	-- 4.8:
+	rules: { string }, -- the cargo's rules (JobRules.cargoRules: fragile, food, heavy, cash, people); none on a mission or the tutorial's
+	dests: { number }?, -- multi-drop: the stop every piece goes to (JobRules.destinations), nil for one drop
+	destNames: { [number]: string }?, -- multi-drop: the customer at each of those stops
+	tutorial: boolean, -- the tutorial's first delivery (no road events)
 }
 
 -- 3.7: a player's job board: its offers (sorted, boardOrder) until refreshAt (workspace:GetServerTimeNow()).
@@ -207,7 +229,27 @@ type Job = {
 	gateClosed: boolean, -- switches: this stop's gate is still shut (server/DuoGates.luau)
 	gatePulled: number, -- switches: levers down right now (the HUD)
 	wrecked: boolean, -- 4.7: the car was wrecked on this job (the rating)
+	-- 4.8, cargo with rules:
+	freshness: number, -- food: 1 … 0 (JobRules.freshDrain once it is picked up)
+	lastSpeed: number, -- the car's flat speed at the last tick (the jolts: JobRules.jolt) …
+	joltCar: Vehicles.Car?, -- … of this car (a new car after a wreck is no jolt)
+	joltAt: number, -- os.clock(): no jolt counts before this (CargoRules.JoltCooldown)
+	ruleNotice: number, -- os.clock() of the last CAREFUL notice
+	-- 4.8, the road event (JobRules.pickEvent): at most one a job
+	event: string?, -- "survivor" | "addon" | "roadblock" still to come or running; nil: none (or over)
+	eventAt: number, -- it comes after this many seconds of driving (driven)
+	eventTries: number,
+	driven: number, -- seconds driven out of the safe zone on this job
+	eventState: string?, -- "waving" (a survivor by the road) | "asked" (an add-on waits for Y), nil before
+	eventUntil: number, -- os.clock(): the survivor gives up / the add-on is gone
+	eventSpot: Vector3?, -- where the survivor waits
+	eventNpc: Model?,
+	eventName: string,
+	addOn: AddOn?,
 }
+
+-- 4.8: a side pick-up offered by a road event (one more piece from `giver` at `address`, `distance` from you).
+type AddOn = { address: Map.Address, pay: number, giver: string, distance: number }
 
 -- What a DeliveryResult says about the XP (shared/Levels.luau), the owner's and every member's own.
 type XpInfo = { xp: number, level: number, rank: string, levelUp: boolean }
@@ -220,10 +262,14 @@ local boards: { [number]: Board } = {} -- 3.7: by UserId, so leaving and coming 
 local nextOfferId = 0
 local jobs: { [Player]: Job } = {}
 local rng = Random.new()
+-- 4.8: a survivor picked up by the road (a road event) rides along until the depot's safe zone, also after the job.
+type Lift = { name: string, bonus: number, untilAt: number }
+local lifts: { [Player]: Lift } = {}
 
 local jobRemote = Net.get("Job")
 local resultRemote = Net.get("DeliveryResult")
 local notice = Net.get("Notice")
+local roadEventRemote = Net.get("RoadEvent") -- 4.8: the add-on's card (client/RoadEventUi.luau) and its answer
 local JobsConfig = Config.Jobs
 local Tuning = Config.Cargo
 
@@ -311,6 +357,25 @@ local function missionInfo(job: Job): { [string]: any }?
 	}
 end
 
+-- 4.8: is a Cooler Box installed on the player's car now (gear: food keeps fresh longer)?
+local function cooled(player: Player): boolean
+	local car = Vehicles.get(player)
+	return car ~= nil and Vehicles.hasGear(car, "cooler")
+end
+
+-- 4.8: the contract's line of the road event (a survivor waving or aboard, an add-on waiting for Y), else nil.
+local function eventLine(job: Job): string?
+	local lift = lifts[job.owner]
+	if job.eventState == "waving" then
+		return "🙋 Somebody is waving by the road ahead: stop next to them to give them a lift"
+	elseif job.eventState == "asked" and job.addOn then
+		return `ADD-ON offered: +${job.addOn.pay} · Y to take it`
+	elseif lift then
+		return `🙋 {lift.name} aboard: drop them at the depot (+${lift.bonus})`
+	end
+	return nil
+end
+
 local function payload(job: Job): { [string]: any }
 	local offer = job.offer
 	local stop = offer.stops[job.stop]
@@ -359,6 +424,12 @@ local function payload(job: Job): { [string]: any }
 		night = DayNight.isNight(), -- the pay and the waves are up
 		crewCount = job.crewCount,
 		mission = missionInfo(job), -- 3.0: the mission (nil for any other job)
+		-- 4.8: the cargo's rules, the food's freshness (0 … 1, nil when not food), the contract's lines for them and
+		-- for the road event
+		rules = offer.rules,
+		freshness = if JobRules.hasRule(offer.rules, "food") then job.freshness else nil,
+		ruleLine = JobRules.ruleLine(offer.rules, job.freshness, cooled(job.owner)),
+		eventLine = eventLine(job),
 	}
 end
 
@@ -593,7 +664,24 @@ local function finishOffer(tierIndex: number, stops: { Stop }, distance: number,
 		id = 0,
 		approach = 0,
 		role = nil,
+		rules = {},
+		dests = nil,
+		destNames = nil,
+		tutorial = false,
 	}
+end
+
+-- 4.8: an offer's cargo rules (JobRules.cargoRules), never a mission's; cash makes the bandits come more where the
+-- tier has them (the board shows BANDITS WANT IT).
+local function applyRules(offer: Offer, business: string?)
+	if offer.mission then
+		return
+	end
+	offer.rules = JobRules.cargoRules(offer.kind, offer.look, business)
+	local tier = JobsConfig.Tiers[offer.tier]
+	if JobRules.hasRule(offer.rules, "cash") and tier and (tier.ambushEvery > 0 or tier.chaseEvery > 0) then
+		offer.boost = math.max(offer.boost, JobsConfig.CargoRules.CashBoost)
+	end
 end
 
 -- 4.7, the board's RISKY delivery: one of the tier's Config.Jobs.Choice.RiskyModifiers.
@@ -678,10 +766,51 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 		newStop(pickup, "pickup", "carry", count, `PICK UP at the {business.place}, {pickup.name}`, business.giver),
 		newStop(drop, "drop", "carry", count, `DELIVER to {receiver.name}, {drop.name}`, receiver),
 	}
+	-- 4.8, multi-drop (a board delivery of ★★★ / ★★★★, never SHORT & SAFE or the tutorial's): 2 … 3 customers one after
+	-- the other (MultiDrop.Gap apart), every piece labelled for its customer (Offer.dests, destNames).
+	local drops = if role and role ~= "short" and not easy then JobRules.dropCount(tierIndex, count, #business.receivers, rng:NextNumber(), rng:NextNumber()) else 1
+	local dests: { number }?, destNames: { [number]: string }? = nil, nil
+	if drops > 1 then
+		local people = table.clone(business.receivers)
+		for i = #people, 2, -1 do
+			local j = rng:NextInteger(1, i)
+			people[i], people[j] = people[j], people[i]
+		end
+		local needs = Economy.splitPieces(count, drops)
+		local multi: { Stop } = { stops[1] }
+		local names: { [number]: string } = {}
+		local avoid: { Map.Address } = { pickup }
+		local at = pickup
+		local gap = JobsConfig.MultiDrop.Gap
+		for n = 1, drops do
+			local address = if n == 1 then addressAround(pickup.x, pickup.z, dropMin, dropMax, 0, avoid) else addressAround(at.x, at.z, gap[1], gap[2], 0, avoid)
+			if not address then
+				break
+			end
+			table.insert(avoid, address)
+			local person = people[n]
+			table.insert(multi, newStop(address, "drop", "carry", needs[n], `DELIVER to {person.name}, {address.name}`, person))
+			names[n + 1] = person.name
+			at = address
+		end
+		if #multi == drops + 1 then
+			stops = multi
+			dests = JobRules.destinations(needs, 2)
+			destNames = names
+			customer = `{people[1].name} & {drops - 1} more`
+		else
+			drops = 1
+		end
+	end
 	local pieces: CargoInfo = { kind = business.kind, look = business.look, piece = business.piece, plural = business.plural, total = count }
 	local forced = if role == "risky" then riskyModifier(tierIndex) else nil
-	local offer = finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), business.cargo, customer, nil, pieces, Tuning.PayPerPiece * count, easy or role == "short", forced)
+	local offer = finishOffer(tierIndex, stops, routeLength(from.X, from.Z, stops), business.cargo, customer, nil, pieces, Tuning.PayPerPiece * count + JobRules.multiDropPay(drops), easy or role == "short", forced)
 	offer.role = role
+	offer.dests = dests
+	offer.destNames = destNames
+	if not easy then
+		applyRules(offer, business.id) -- 4.8 (the tutorial's delivery stays simple)
+	end
 	local payMultiplier = if role == "long" then choice.LongPay elseif role == "risky" then choice.RiskyPay else 1
 	if payMultiplier ~= 1 then
 		offer.pay = math.floor(offer.pay * payMultiplier / 5 + 0.5) * 5
@@ -883,7 +1012,9 @@ local function jobOffer(from: Vector3, jobType: Config.JobTypeDef): Offer?
 		local first = stops[1].address
 		route -= math.max(0, Map.manhattan(from.X, from.Z, first.x, first.z) - JobsConfig.PickupMaxDistance)
 	end
-	return finishOffer(jobType.tier, stops, route, jobType.cargo, customer, jobType, pieces, jobType.payPerStop * #stops)
+	local offer = finishOffer(jobType.tier, stops, route, jobType.cargo, customer, jobType, pieces, jobType.payPerStop * #stops)
+	applyRules(offer, nil) -- 4.8: a special's cargo has its rules too (not a mission's)
+	return offer
 end
 
 -- 3.4: the cargo slots a job needs, what the vehicle that would do it holds and that vehicle's name: the company
@@ -911,6 +1042,17 @@ local function trolleyFor(player: Player, offer: Offer): boolean
 		return false
 	end
 	return Economy.installedGear(profile.carGear, profile.car).trolley == true
+end
+
+-- 4.8: the board's tip for a heavy cargo (by hand alone very slow), nil otherwise.
+local function heavyTip(player: Player, offer: Offer): string?
+	if not JobRules.hasRule(offer.rules, "heavy") then
+		return nil
+	end
+	if trolleyFor(player, offer) then
+		return "Heavy: put it on your hand trolley (a normal pace), or lift it with a crew mate."
+	end
+	return "Heavy: by hand alone you barely walk. A hand trolley (gear at Wrench Garage) or a crew mate lifting with you helps."
 end
 
 -- 4.0: a Freight Run's pallets, how many the player's equipped car takes at its stage (Freight.palletsOf) and its name.
@@ -1059,7 +1201,7 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 		lockText = lockText,
 		lockButton = lockButton,
 		pallets = if pallets then offer.total else nil,
-		tip = Freight.trolleyTip(offer.kind, offer.total, offer.stops[1].mode, trolleyFor(player, offer)), -- 4.0: "a hand trolley helps" (4.6: or "use yours")
+		tip = Freight.trolleyTip(offer.kind, offer.total, offer.stops[1].mode, trolleyFor(player, offer)) or heavyTip(player, offer), -- 4.0: "a hand trolley helps" (4.6: or "use yours"; 4.8: heavy)
 		special = jobType ~= nil, -- a special job (a board special: Cash Transport, Pizza Rush, Winter Run)
 		timed = jobType ~= nil and jobType.timeLimit ~= nil, -- a rush: `time` is a fixed clock
 		banditBoost = offer.boost, -- > 1: bandits want this cargo
@@ -1085,6 +1227,9 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 		piecesName = offer.plural,
 		handling = offer.stops[1].mode,
 		itemKind = offer.kind,
+		rules = offer.rules, -- 4.8: the cargo's rules (ids) and what they ask, the drops of a multi-drop delivery
+		rulesText = JobRules.rulesText(offer.rules),
+		drops = if offer.dests then #offer.stops - 1 else nil,
 	}
 end
 
@@ -1393,8 +1538,29 @@ local function pruneRiders(player: Player, job: Job)
 	job.members = members
 end
 
+-- 4.8: the road event of a job is over: the survivor still waving goes, the add-on's card closes. `text`: told.
+local function endEvent(player: Player, job: Job, text: string?)
+	local npc = job.eventNpc
+	if npc then
+		job.eventNpc = nil
+		Npcs.remove(npc)
+	end
+	if job.eventState == "asked" and player.Parent then
+		roadEventRemote:FireClient(player, nil)
+	end
+	job.event = nil
+	job.eventState = nil
+	job.eventSpot = nil
+	job.addOn = nil
+	job.dirty = true
+	if text then
+		notice:FireClient(player, text)
+	end
+end
+
 local function endJob(player: Player, job: Job, linger: boolean)
 	jobs[player] = nil
+	endEvent(player, job, nil) -- 4.8
 	freeDocks(player) -- 4.0: its loading dock and receiving pad
 	Cargo.finish(job.cargo, linger)
 	DuoGates.clear(player) -- 3.2: the twin-lever gate, if any
@@ -1548,6 +1714,10 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	-- 3.2, the pair twist (stream C: Cargo.Info.pair). FALLBACK: set untyped, so a Cargo.Info without the field still
 	-- type-checks; once it has it this can be a plain field above.
 	cargoInfo.pair = offer.twists.pair == true
+	-- 4.8: a heavy cargo is slow by hand alone; a multi-drop delivery's pieces are labelled for their customers.
+	cargoInfo.heavy = if JobRules.hasRule(offer.rules, "heavy") then JobsConfig.CargoRules.HeavyCarrySpeed else nil
+	cargoInfo.dests = offer.dests
+	cargoInfo.destNames = offer.destNames
 	local session = Cargo.begin(player, cargoInfo)
 	local crewCount = #Crew.members(player)
 	local members: { [Player]: boolean } = {}
@@ -1595,6 +1765,22 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		gateClosed = false,
 		gatePulled = 0,
 		wrecked = false,
+		freshness = 1,
+		lastSpeed = 0,
+		joltCar = nil,
+		joltAt = 0,
+		ruleNotice = 0,
+		-- 4.8: never on the tutorial's delivery or a mission
+		event = if offer.tutorial or offer.mission then nil else JobRules.pickEvent(rng:NextNumber(), rng:NextNumber()),
+		eventAt = JobRules.eventAfter(rng:NextNumber()),
+		eventTries = 0,
+		driven = 0,
+		eventState = nil,
+		eventUntil = 0,
+		eventSpot = nil,
+		eventNpc = nil,
+		eventName = "",
+		addOn = nil,
 	}
 	jobs[player] = job
 	placeDocks(player, offer)
@@ -1823,12 +2009,19 @@ local function complete(player: Player, job: Job)
 	-- 4.7: an ordinary or special job (not a mission) is rated ★ … ★★★ (JobRules.rate): the pay × the rating plus the
 	-- owner's streak of good jobs, the XP × the rating; a good one counts toward the owner's licences.
 	local profile = PlayerData.get(player)
-	local rating = if offer.mission then nil else JobRules.rate(job.condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0, job.wrecked, job.cargo.lost)
+	-- 4.8: food is rated and paid by its freshness too (JobRules.freshPay: the pay × FreshPayMin … 1).
+	local freshness = if JobRules.hasRule(offer.rules, "food") then job.freshness else nil
+	local rating = if offer.mission then nil else JobRules.rate(job.condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0, job.wrecked, job.cargo.lost, freshness)
 	local payTotal = payout.total
+	local freshCut = 0
+	if freshness then
+		payTotal = math.floor(payout.total * JobRules.freshPay(freshness) + 0.5)
+		freshCut = payTotal - payout.total
+	end
 	local ratingInfo: { [string]: any }? = nil
 	if rating then
 		local streak = JobRules.nextStreak(if profile then profile.streak else 0, rating.stars)
-		local total, ratingPart, streakPart = JobRules.ratedPay(payout.total, rating.stars, streak)
+		local total, ratingPart, streakPart = JobRules.ratedPay(payTotal, rating.stars, streak)
 		payTotal = total
 		if profile then
 			profile.streak = streak
@@ -1841,6 +2034,8 @@ local function complete(player: Player, job: Job)
 			streak = streak,
 			streakBonus = if rating.stars >= 2 then JobRules.streakBonus(streak) else 0,
 			streakPay = streakPart,
+			freshness = freshness, -- 4.8: food: its freshness (0 … 1) and what it took off the pay (≤ 0)
+			freshPay = if freshness then freshCut else nil,
 		}
 	end
 	local driverTotal, share = Economy.crewSplit(payTotal, #crew)
@@ -2157,32 +2352,43 @@ function Jobs.onCarDamaged(player: Player, amount: number)
 	if job and car then
 		local modifier = job.offer.modifier
 		local multiplier = if modifier then modifier.conditionMultiplier else 1
-		job.condition = math.max(0, job.condition - amount / car.stats.health * JobsConfig.ConditionPerDamage * multiplier)
+		-- 4.8: a fragile cargo hit at speed loses more; Ratchet Straps cut every loss from driving (JobRules.damageLoss).
+		local velocity = car.chassis.AssemblyLinearVelocity
+		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+		local base = amount / car.stats.health * JobsConfig.ConditionPerDamage * multiplier
+		job.condition = math.max(0, job.condition - JobRules.damageLoss(job.offer.rules, base, speed, Vehicles.hasGear(car, "straps")))
 		job.dirty = true
+		local now = os.clock()
+		if JobRules.hasRule(job.offer.rules, "fragile") and speed >= JobsConfig.CargoRules.HitSpeed and now - job.ruleNotice >= JobsConfig.CargoRules.NoticeEvery then
+			job.ruleNotice = now
+			notice:FireClient(player, "CAREFUL — FRAGILE! Every hit at speed breaks more of the cargo.")
+		end
 	end
 end
 
--- A bandit roadblock on the road ahead of a moving car.
-local function ambush(player: Player, position: Vector3, heading: Vector3?, size: number)
+-- A bandit roadblock on the road ahead of a moving car. 4.8: true when it was set up (a blocked street, the road
+-- event, may have no bandits: size 0).
+local function ambush(player: Player, position: Vector3, heading: Vector3?, size: number): boolean
 	if not heading then
-		return
+		return false
 	end
 	local flat = Vector3.new(heading.X, 0, heading.Z)
 	if flat.Magnitude < 10 then
-		return
+		return false
 	end
 	local forward = flat.Unit
 	local ahead = position + forward * JobsConfig.AmbushDistance
 	local x, z, dx, dz = Map.nearestRoad(ahead.X, ahead.Z)
 	local spot = Vector3.new(x, World.RoadTop, z)
 	if Map.isSafe(x, z) or (spot - position).Magnitude < 100 then
-		return
+		return false
 	end
 	local along = Vector3.new(dx, 0, dz)
 	if along:Dot(forward) < 0 then
 		along = -along
 	end
 	Zombies.roadblock(player, spot, along, size)
+	return true
 end
 
 -- Pieces the pick-ups after the current stop will still add.
@@ -2404,6 +2610,278 @@ local function recount(player: Player, job: Job)
 	end
 end
 
+-- ── 4.8: cargo with rules and road events ──────────────────────────────────
+
+local Rules = JobsConfig.CargoRules
+local Events = JobsConfig.RoadEvents
+local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Priya", "Dmitri", "Hannah", "Carlos", "June", "Wes", "Lena" }
+
+-- Every tick of a job with cargo rules: the food's freshness drains once it is picked up (a Cooler Box slows it), and
+-- a fragile cargo or passengers in the moving car feel the jolts (hard braking, bumps: JobRules.jolt / joltLoss, the
+-- Ratchet Straps cut it). Passengers who had enough end the job like the bandits do (loseCondition).
+local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step: number, now: number)
+	local offer = job.offer
+	local rules = offer.rules
+	if #rules == 0 then
+		return
+	end
+	local status = Cargo.status(job.cargo)
+	if JobRules.hasRule(rules, "food") and job.freshness > 0 and (status.inCar > 0 or status.carrying ~= nil or job.stop > 1) then
+		local shown = math.floor(job.freshness * 100 + 0.5)
+		job.freshness = math.max(0, job.freshness - JobRules.freshDrain(offer.tier, step, car ~= nil and Vehicles.hasGear(car, "cooler")))
+		if math.floor(job.freshness * 100 + 0.5) ~= shown then
+			job.dirty = true
+		end
+	end
+	local fragile, people = JobRules.hasRule(rules, "fragile"), JobRules.hasRule(rules, "people")
+	if not car or not (fragile or people) then
+		return
+	end
+	local velocity = car.chassis.AssemblyLinearVelocity
+	local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	local before = if job.joltCar == car then job.lastSpeed else speed
+	job.lastSpeed, job.joltCar = speed, car
+	if status.inCar <= 0 or car.wrecked or not Vehicles.isDriving(player) or now < job.joltAt then
+		return
+	end
+	local jolt = JobRules.jolt(before, speed, step)
+	local loss = JobRules.joltLoss(rules, jolt, Vehicles.hasGear(car, "straps"))
+	if loss <= 0 then
+		return
+	end
+	job.joltAt = now + Rules.JoltCooldown
+	local share = math.max(1, math.floor(loss * 100 + 0.5))
+	if now - job.ruleNotice >= Rules.NoticeEvery then
+		job.ruleNotice = now
+		notice:FireClient(player, if fragile then `CAREFUL — FRAGILE! {if jolt == "bump" then "That bump" else "Hard braking"} cost {share}% of the cargo.`
+			else `The passengers complain about the bump! -{share}% condition.`)
+	end
+	if people then
+		loseCondition(player, job, loss, "The passengers had enough of your driving and got out.")
+	else
+		job.condition = math.max(0, job.condition - loss)
+		job.dirty = true
+	end
+end
+
+-- 4.8, a survivor picked up by the road: paid in the depot's safe zone (in the car with them), gone after SurvivorKeep.
+local function liftStep(player: Player, now: number)
+	local lift = lifts[player]
+	if not lift then
+		return
+	end
+	if now > lift.untilAt then
+		lifts[player] = nil
+		notice:FireClient(player, `{lift.name} got out and went their own way.`)
+		return
+	end
+	local car = Vehicles.seatedIn(player)
+	if car and car.owner == player and World.isSafe(car.chassis.Position) then
+		lifts[player] = nil
+		PlayerData.addMoney(player, lift.bonus)
+		notice:FireClient(player, `{lift.name} is safe at the depot! +${lift.bonus}`)
+		local job = jobs[player]
+		if job then
+			job.dirty = true
+		end
+	end
+end
+
+-- The survivor event: somebody waving by the road SurvivorAhead studs ahead (Npcs, spawned off the tick). False: no
+-- spot now (try again later).
+local function startSurvivor(player: Player, job: Job, position: Vector3, heading: Vector3?, now: number): boolean
+	if lifts[player] or not heading then
+		return false
+	end
+	local flat = Vector3.new(heading.X, 0, heading.Z)
+	if flat.Magnitude < 10 then
+		return false
+	end
+	local ahead = position + flat.Unit * Events.SurvivorAhead
+	local x, z, dx, dz, width = Map.nearestRoad(ahead.X, ahead.Z)
+	if Map.isSafe(x, z) then
+		return false
+	end
+	local side = Vector3.new(-dz, 0, dx)
+	local edge = Vector3.new(x, 0, z) + side * (width / 2 + 2.5)
+	local spot = onGround(edge.X, edge.Z)
+	local name = pick(SURVIVOR_NAMES)
+	job.eventState = "waving"
+	job.eventSpot = spot
+	job.eventName = name
+	job.eventUntil = now + Events.SurvivorWait
+	job.dirty = true
+	task.spawn(function()
+		local npc = Npcs.spawn(Npcs.look("townsperson", name, "Survivor"), CFrame.lookAt(spot, spot - side))
+		if jobs[player] ~= job or job.eventState ~= "waving" then
+			Npcs.remove(npc)
+			return
+		end
+		job.eventNpc = npc
+		Npcs.say(npc, "Hey! Over here! Please, take me with you!")
+		Npcs.gesture(npc)
+	end)
+	notice:FireClient(player, `Somebody is waving by the road ahead! Stop next to them for a lift to the depot (+${JobRules.survivorBonus(job.offer.tier)}).`)
+	return true
+end
+
+-- The survivor waits: the car stopped next to them, they hop in (a Lift until the depot); too long or driven off, they
+-- give up.
+local function survivorStep(player: Player, job: Job, car: Vehicles.Car?, position: Vector3, now: number)
+	local spot = job.eventSpot
+	if not spot then
+		endEvent(player, job, nil)
+		return
+	end
+	local gap = Vector3.new(position.X - spot.X, 0, position.Z - spot.Z).Magnitude
+	if car and Vehicles.isDriving(player) and gap <= Events.SurvivorReach and Vehicles.speed(car) <= JobsConfig.HoldMaxSpeed then
+		local name = job.eventName
+		local bonus = JobRules.survivorBonus(job.offer.tier)
+		lifts[player] = { name = name, bonus = bonus, untilAt = now + Events.SurvivorKeep }
+		endEvent(player, job, `{name} hopped in! Drop them at the depot's safe zone for +${bonus} (after the job is fine).`)
+		return
+	end
+	if now > job.eventUntil or gap > Events.SurvivorAhead * 2.5 then
+		endEvent(player, job, if gap > Events.SurvivorAhead * 2.5 then nil else "The survivor gave up waiting.")
+	end
+end
+
+-- 4.8, may the add-on go in front of the stop you drive to now? A drop of carried pieces you have not reached yet, a
+-- delivery of one drop customer per piece (not multi-drop, not a mission), and room in the car for one more.
+local function addOnPossible(player: Player, job: Job): boolean
+	local offer = job.offer
+	local stop = offer.stops[job.stop]
+	local car = Vehicles.get(player)
+	if offer.dests or offer.mission or not stop or stop.kind ~= "drop" or stop.mode ~= "carry" or job.cargo.built or not car then
+		return false
+	end
+	return JobRules.addOnFits(Cargo.remaining(job.cargo), futurePieces(job), Vehicles.capacity(car, offer.look))
+end
+
+-- The add-on event: a side pick-up near you, offered on the HUD (RoadEvent → client/RoadEventUi.luau) for AddOnAnswer s.
+local function askAddOn(player: Player, job: Job, position: Vector3, now: number): boolean
+	if not addOnPossible(player, job) then
+		return false
+	end
+	local avoid: { Map.Address } = {}
+	for _, stop in job.offer.stops do
+		table.insert(avoid, stop.address)
+	end
+	local span = Events.AddOnDistance
+	local address = addressAround(position.X, position.Z, span[1], span[2], 0, avoid)
+	if not address or Map.isSafe(address.x, address.z) then
+		return false
+	end
+	local distance = math.floor(Map.manhattan(position.X, position.Z, address.x, address.z))
+	local addOn: AddOn = { address = address, pay = Events.AddOnPay, giver = pick(Events.AddOnGivers), distance = distance }
+	job.addOn = addOn
+	job.eventState = "asked"
+	job.eventUntil = now + Events.AddOnAnswer
+	job.dirty = true
+	roadEventRemote:FireClient(player, {
+		kind = "addon",
+		pay = addOn.pay,
+		title = `ADD-ON: +${addOn.pay}`,
+		text = `One more {job.offer.piece} from {addOn.giver}, {distance} m off your route ({address.name}), before the drop.`,
+		endsAt = workspace:GetServerTimeNow() + Events.AddOnAnswer,
+	})
+	return true
+end
+
+-- The add-on taken: its pick-up goes in front of the stop you drive to (Cargo.setStop replace), the last drop takes
+-- one more piece, the pay and the clock grow.
+local function takeAddOn(player: Player, job: Job, addOn: AddOn)
+	local offer = job.offer
+	local giver: Config.PersonDef = { name = addOn.giver, title = "Side pick-up", role = "townsperson" }
+	local extra = newStop(addOn.address, "pickup", "carry", 1, `ADD-ON: PICK UP at {addOn.address.name}`, giver)
+	local stops = table.clone(offer.stops)
+	local last = table.clone(stops[#stops])
+	last.needed += 1
+	stops[#stops] = last
+	table.insert(stops, job.stop, extra)
+	offer.stops = stops
+	offer.total += 1
+	job.cargo.info.total += 1
+	offer.pay += addOn.pay
+	local seconds = math.floor(addOn.distance * 2 * JobsConfig.TimePerStud + Economy.handlingTime("carry", 1) * 2 + 0.5)
+	offer.time += seconds
+	job.endsAt += seconds
+	Cargo.setStop(job.cargo, planOf(extra), true)
+	blockStop(job)
+	endEvent(player, job, `ADD-ON taken: pick up one more {offer.piece} from {addOn.giver} at {addOn.address.name} (+${addOn.pay}, +{seconds} s).`)
+end
+
+-- RoadEvent from the client: ("accept") or ("decline") the add-on on the HUD.
+local function answerRoadEvent(player: Player, answer: any)
+	if answer ~= "accept" and answer ~= "decline" then
+		return
+	end
+	local job = jobs[player]
+	local addOn = job and job.addOn
+	if not job or not addOn or job.eventState ~= "asked" then
+		roadEventRemote:FireClient(player, nil)
+		return
+	end
+	if answer == "decline" then
+		endEvent(player, job, nil)
+	elseif os.clock() > job.eventUntil or not addOnPossible(player, job) then
+		endEvent(player, job, "Too late for that side pick-up.")
+	else
+		takeAddOn(player, job, addOn)
+	end
+end
+
+-- The blocked street: a roadblock on the road ahead (the tier's bandits with it; a ★ job's has none).
+local function blockStreet(player: Player, job: Job, position: Vector3, heading: Vector3?): boolean
+	local tier = JobsConfig.Tiers[job.offer.tier]
+	local size = if tier.ambushEvery > 0 then math.max(1, math.floor(tier.ambushSize * job.enemyScale * 0.6 + 0.5)) else 0
+	if not ambush(player, position, heading, size) then
+		return false
+	end
+	endEvent(player, job, if size > 0 then "BLOCKED STREET ahead, bandits at the barricade! Find a way round." else "BLOCKED STREET ahead! Find a way round.")
+	return true
+end
+
+-- Every tick: the job's road event (JobRules.pickEvent) after its seconds of driving out of the safe zone; a survivor
+-- waiting, an add-on not answered in time.
+local function eventsStep(player: Player, job: Job, car: Vehicles.Car?, position: Vector3, heading: Vector3?, step: number, now: number)
+	local kind = job.event
+	if not kind then
+		return
+	end
+	if job.eventState == "waving" then
+		survivorStep(player, job, car, position, now)
+		return
+	elseif job.eventState == "asked" then
+		if now > job.eventUntil then
+			endEvent(player, job, nil)
+		end
+		return
+	end
+	if not car or not Vehicles.isDriving(player) or World.isSafe(position) then
+		return
+	end
+	job.driven += step
+	if job.driven < job.eventAt then
+		return
+	end
+	-- (an add-on waits until you drive to a drop: it goes in front of it)
+	local target = job.offer.stops[job.stop]
+	if kind == "addon" and target and target.kind ~= "drop" then
+		return
+	end
+	local started = if kind == "survivor" then startSurvivor(player, job, position, heading, now)
+		elseif kind == "addon" then askAddOn(player, job, position, now)
+		else blockStreet(player, job, position, heading)
+	if not started then
+		job.eventTries += 1
+		job.eventAt = job.driven + Events.Retry
+		if job.eventTries >= Events.Tries then
+			job.event = nil
+		end
+	end
+end
+
 local elapsed = 0
 local boardElapsed = 0
 
@@ -2415,6 +2893,8 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	local car = Vehicles.get(player)
 	local position = playerPosition(player)
 	local heading = if car then car.chassis.AssemblyLinearVelocity else nil
+
+	liftStep(player, now) -- 4.8: a survivor aboard, with a job or without
 
 	if not job then
 		return -- free roam: only the roaming zombies (server/Zombies.luau), no bandits
@@ -2522,6 +3002,12 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	else
 		roadEnemies(player, job, tier, position, heading, now, step, multiplier, nightWaves)
 	end
+	-- 4.8: the cargo's rules (freshness, jolts) and the road event.
+	cargoRulesStep(player, job, car, step, now)
+	if jobs[player] ~= job then
+		return
+	end
+	eventsStep(player, job, car, position, heading, step, now)
 
 	-- The HUD's instruction changes with what you do (parking, getting out): send it when it does.
 	local _, text = stepOf(job)
@@ -2570,6 +3056,7 @@ local function missionOffer(player: Player, def: Config.JobTypeDef): Offer?
 	local offer = jobOffer(playerPosition(player), def)
 	if offer then
 		offer.mission = def.mission or def.id
+		offer.rules = {} -- 4.8: a mission is told as it is written
 	end
 	return offer
 end
@@ -2650,6 +3137,20 @@ function Jobs.adminFinishStop(player: Player): boolean
 	return done
 end
 
+-- 4.8: a road event ("survivor" | "addon" | "roadblock") on the current job at once (the next tick driving out of the
+-- safe zone; an add-on once you drive to a drop). False without a job of your own or with an unknown kind.
+function Jobs.adminRoadEvent(player: Player, kind: any): boolean
+	local job = jobs[player]
+	if not job or (kind ~= "survivor" and kind ~= "addon" and kind ~= "roadblock") then
+		return false
+	end
+	endEvent(player, job, nil)
+	job.event = kind
+	job.eventAt = job.driven
+	job.eventTries = 0
+	return true
+end
+
 -- 4.5: the whole job done at once, paid like a finished one (every piece counted as delivered; the condition and the
 -- clock as they are now; a mission is rated and rewarded). False without a job of your own.
 function Jobs.adminComplete(player: Player): boolean
@@ -2677,6 +3178,7 @@ function Jobs.start()
 	end)
 	Net.get("AcceptJob").OnServerEvent:Connect(accept)
 	Net.get("RerollTier").OnServerEvent:Connect(reroll) -- 4.7
+	roadEventRemote.OnServerEvent:Connect(answerRoadEvent) -- 4.8: the add-on's Y / NO
 	Net.get("AcceptEmployer").OnServerEvent:Connect(acceptEmployer)
 	Net.get("CancelJob").OnServerEvent:Connect(function(player)
 		Jobs.fail(player, "Delivery cancelled.")
@@ -2687,9 +3189,11 @@ function Jobs.start()
 		if job then
 			jobs[player] = nil
 			freeDocks(player)
+			endEvent(player, job, nil) -- 4.8: a survivor still waving goes
 			Cargo.finish(job.cargo, false)
 			Crew.disband(player)
 		end
+		lifts[player] = nil
 		DuoGates.clear(player)
 		for _, other in jobs do
 			other.crew[player] = nil
@@ -2724,6 +3228,7 @@ function Jobs.startTutorialJob(player: Player): boolean
 	if not best then
 		return false
 	end
+	best.tutorial = true -- 4.8: no road events on it (and no cargo rules: ordinaryOffer easy)
 	return takeOffer(player, best)
 end
 

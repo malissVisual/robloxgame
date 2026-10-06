@@ -19,6 +19,26 @@
 --   JobRules.countJob(counts, tier, stars)    a finished job counted toward every licence it is good for
 --   JobRules.grandfather(level, deliveries)   the licences a save from before 4.7 keeps (see the function)
 --   JobRules.stars(n)                     "★★☆"
+--
+-- 4.8, cargo with rules, multi-drop and road events (Config.Jobs CargoRules / MultiDrop / RoadEvents; tested in
+-- tests/cargorules_test.luau):
+--   JobRules.cargoRules(kind, look, business)   the rules of a cargo: { "fragile" | "food" | "heavy" | "cash" | "people" }
+--   JobRules.hasRule(rules, rule)         is it one of them?
+--   JobRules.ruleInfo(rule)               { name, icon, why } for the board and the HUD
+--   JobRules.rulesText(rules)             the board's RULES line, nil without any
+--   JobRules.ruleLine(rules, freshness, cooler)   the contract's line ("Fresh 82% · Fragile: brake gently"), or nil
+--   JobRules.jolt(before, now, dt)        "bump" | "brake" | nil from the car's speed a tick ago and now
+--   JobRules.joltLoss(rules, jolt, straps)        the condition a jolt costs this cargo (Ratchet Straps × StrapsLoss)
+--   JobRules.damageLoss(rules, base, speed, straps)   the condition a hit of the car costs (base: the usual share)
+--   JobRules.freshDrain(tier, seconds, cooler)   the freshness food loses in that time (a Cooler Box × CoolerDrain)
+--   JobRules.freshPay(freshness)          the pay's multiplier for the food's freshness
+--   JobRules.dropCount(tier, pieces, receivers, r1, r2)   the drops of a board delivery (1 = an ordinary one)
+--   JobRules.destinations(needs, first)   the stop every piece goes to, in the order they are made
+--   JobRules.multiDropPay(drops)          what the extra drops pay
+--   JobRules.pickEvent(r1, r2)            the road event of a job ("survivor" | "addon" | "roadblock") or nil
+--   JobRules.eventAfter(r)                seconds of driving before it comes
+--   JobRules.survivorBonus(stars)         a survivor dropped at the safe zone
+--   JobRules.addOnFits(inCar, coming, capacity)   room for one more piece?
 
 local Config = require(script.Parent.Config)
 
@@ -86,8 +106,9 @@ end
 -- ── The rating ─────────────────────────────────────────────────────────────
 
 -- condition 0 … 1 (the cargo), timeShare 0 … 1 (the clock left / the clock), wrecked (the car on the way), lost (the
--- pieces stolen or ruined).
-function JobRules.rate(condition: number, timeShare: number, wrecked: boolean, lost: number): Rating
+-- pieces stolen or ruined). 4.8: freshness 0 … 1 for food (nil: not food), a miss below CargoRules.GoodFresh, two
+-- below PoorFresh.
+function JobRules.rate(condition: number, timeShare: number, wrecked: boolean, lost: number, freshness: number?): Rating
 	local tuning = Config.Jobs.Rating
 	local checks: { Check } = {}
 	local misses = 0
@@ -106,6 +127,19 @@ function JobRules.rate(condition: number, timeShare: number, wrecked: boolean, l
 	else
 		misses += 2
 		table.insert(checks, { text = `Cargo badly damaged ({cargo}%)`, ok = false })
+	end
+	if freshness then
+		local rules = Config.Jobs.CargoRules
+		local fresh = math.floor(math.clamp(freshness, 0, 1) * 100 + 0.5)
+		if freshness >= rules.GoodFresh then
+			table.insert(checks, { text = `Fresh {fresh}%`, ok = true })
+		elseif freshness >= rules.PoorFresh then
+			misses += 1
+			table.insert(checks, { text = `Going stale ({fresh}% fresh)`, ok = false })
+		else
+			misses += 2
+			table.insert(checks, { text = `Stale ({fresh}% fresh)`, ok = false })
+		end
 	end
 	table.insert(checks, { text = if wrecked then "The car was wrecked" else "No wreck", ok = not wrecked })
 	if wrecked then
@@ -212,6 +246,214 @@ function JobRules.grandfather(level: number, deliveries: number): { [string]: bo
 		end
 	end
 	return held
+end
+
+-- ── 4.8: cargo with rules ──────────────────────────────────────────────────
+
+local RULE_ORDER = { "fragile", "food", "heavy", "cash", "people" }
+
+function JobRules.cargoRules(kind: string?, look: string?, business: string?): { string }
+	local tuning = Config.Jobs.CargoRules
+	local set: { [string]: boolean } = {}
+	local empty: { string } = {}
+	local lists: { { string } } = {
+		(if look then tuning.Looks[look] else nil) or empty,
+		(if kind then tuning.Kinds[kind] else nil) or empty,
+		(if business then tuning.Businesses[business] else nil) or empty,
+	}
+	for _, list in lists do
+		for _, rule in list do
+			set[rule] = true
+		end
+	end
+	local out: { string } = {}
+	for _, rule in RULE_ORDER do
+		if set[rule] then
+			table.insert(out, rule)
+		end
+	end
+	return out
+end
+
+function JobRules.hasRule(rules: { string }?, rule: string): boolean
+	return rules ~= nil and table.find(rules, rule) ~= nil
+end
+
+function JobRules.ruleInfo(rule: string): RoleInfo?
+	if rule == "fragile" then
+		return { name = "Fragile", icon = "🥚", why = "Brake gently, no bumps: hard braking and knocks cost condition." }
+	elseif rule == "food" then
+		return { name = "Food", icon = "🍕", why = "It goes stale on the way: the freshness counts in the rating and the pay. A Cooler Box keeps it fresh longer." }
+	elseif rule == "heavy" then
+		return { name = "Heavy", icon = "🏋", why = "Carried by hand alone you barely walk: take the hand trolley, or lift it with a crew mate." }
+	elseif rule == "cash" then
+		return { name = "Cash", icon = "💰", why = "Bandits want it: more chases and roadblocks, and sooner." }
+	elseif rule == "people" then
+		return { name = "Passengers", icon = "👥", why = "Bumps make them complain: every bump costs condition." }
+	end
+	return nil
+end
+
+function JobRules.rulesText(rules: { string }?): string?
+	if not rules or #rules == 0 then
+		return nil
+	end
+	local parts: { string } = {}
+	for _, rule in rules do
+		local info = JobRules.ruleInfo(rule)
+		if info then
+			table.insert(parts, `{info.icon} {string.upper(info.name)}: {info.why}`)
+		end
+	end
+	return if #parts > 0 then table.concat(parts, "  ") else nil
+end
+
+function JobRules.ruleLine(rules: { string }?, freshness: number?, cooler: boolean?): string?
+	if not rules or #rules == 0 then
+		return nil
+	end
+	local parts: { string } = {}
+	for _, rule in rules do
+		if rule == "food" then
+			local fresh = math.floor(math.clamp(freshness or 1, 0, 1) * 100 + 0.5)
+			table.insert(parts, `Fresh {fresh}%{if cooler then " (cooler)" else ""}`)
+		elseif rule == "fragile" then
+			table.insert(parts, "Fragile: brake gently")
+		elseif rule == "heavy" then
+			table.insert(parts, "Heavy: trolley or two to lift")
+		elseif rule == "cash" then
+			table.insert(parts, "Cash: bandits want it")
+		elseif rule == "people" then
+			table.insert(parts, "Passengers: no bumps")
+		end
+	end
+	return if #parts > 0 then table.concat(parts, " · ") else nil
+end
+
+-- The car's speed (studs / s, flat) a tick ago and now, `dt` apart: a bump (the speed gone faster than any brake), hard
+-- braking (from BrakeSpeed or faster), or nil.
+function JobRules.jolt(before: number, now: number, dt: number): string?
+	local tuning = Config.Jobs.CargoRules
+	if dt <= 0 then
+		return nil
+	end
+	local drop = (before - now) / dt
+	if drop >= tuning.BumpDecel then
+		return "bump"
+	elseif drop >= tuning.BrakeDecel and before >= tuning.BrakeSpeed then
+		return "brake"
+	end
+	return nil
+end
+
+local function strapped(loss: number, straps: boolean?): number
+	return if straps then loss * Config.GearTuning.StrapsLoss else loss
+end
+
+function JobRules.joltLoss(rules: { string }?, jolt: string?, straps: boolean?): number
+	local tuning = Config.Jobs.CargoRules
+	if not jolt then
+		return 0
+	end
+	local loss = 0
+	if JobRules.hasRule(rules, "fragile") then
+		loss += if jolt == "bump" then tuning.FragileBump else tuning.FragileBrake
+	end
+	if JobRules.hasRule(rules, "people") and jolt == "bump" then
+		loss += tuning.PeopleBump
+	end
+	return strapped(loss, straps)
+end
+
+function JobRules.damageLoss(rules: { string }?, base: number, speed: number, straps: boolean?): number
+	local tuning = Config.Jobs.CargoRules
+	local loss = math.max(0, base)
+	if JobRules.hasRule(rules, "fragile") and speed >= tuning.HitSpeed then
+		loss += tuning.FragileHit
+	end
+	return strapped(loss, straps)
+end
+
+function JobRules.freshDrain(tier: number, seconds: number, cooler: boolean?): number
+	local drain = Config.Jobs.CargoRules.FoodDrain
+	local perMinute = drain[math.clamp(math.floor(tier), 1, #drain)] or 0
+	local loss = perMinute * math.max(0, seconds) / 60
+	return if cooler then loss * Config.GearTuning.CoolerDrain else loss
+end
+
+function JobRules.freshPay(freshness: number): number
+	local low = Config.Jobs.CargoRules.FreshPayMin
+	return low + (1 - low) * math.clamp(freshness, 0, 1)
+end
+
+-- ── 4.8: multi-drop ────────────────────────────────────────────────────────
+
+-- How many drops a board delivery of danger `tier` with `pieces` pieces and `receivers` different people to take them
+-- gets: 1 (an ordinary one) unless r1 < MultiDrop.Chance[tier]; then 2 … Max[tier] (by r2), never more than the
+-- pieces or the receivers.
+function JobRules.dropCount(tier: number, pieces: number, receivers: number, r1: number, r2: number): number
+	local tuning = Config.Jobs.MultiDrop
+	local chance = tuning.Chance[tier] or 0
+	local most = math.min(tuning.Max[tier] or 1, math.floor(pieces), math.floor(receivers))
+	if r1 >= chance or most < 2 then
+		return 1
+	end
+	return math.clamp(2 + math.floor(math.clamp(r2, 0, 0.999) * (most - 1)), 2, most)
+end
+
+-- The stop every piece goes to, in the order the pieces are made: needs[i] pieces to the stop first + i − 1.
+function JobRules.destinations(needs: { number }, first: number): { number }
+	local out: { number } = {}
+	for index, need in needs do
+		for _ = 1, math.max(0, math.floor(need)) do
+			table.insert(out, first + index - 1)
+		end
+	end
+	return out
+end
+
+function JobRules.multiDropPay(drops: number): number
+	return Config.Jobs.MultiDrop.PayPerStop * math.max(0, math.floor(drops) - 1)
+end
+
+-- ── 4.8: road events ───────────────────────────────────────────────────────
+
+local EVENT_ORDER = { "survivor", "addon", "roadblock" }
+
+function JobRules.pickEvent(r1: number, r2: number): string?
+	local tuning = Config.Jobs.RoadEvents
+	if r1 >= tuning.Chance then
+		return nil
+	end
+	local total = 0
+	for _, id in EVENT_ORDER do
+		total += math.max(0, tuning.Weights[id] or 0)
+	end
+	if total <= 0 then
+		return nil
+	end
+	local at = math.clamp(r2, 0, 0.999999) * total
+	for _, id in EVENT_ORDER do
+		local weight = math.max(0, tuning.Weights[id] or 0)
+		if at < weight then
+			return id
+		end
+		at -= weight
+	end
+	return nil
+end
+
+function JobRules.eventAfter(r: number): number
+	local after = Config.Jobs.RoadEvents.After
+	return after[1] + (after[2] - after[1]) * math.clamp(r, 0, 1)
+end
+
+function JobRules.survivorBonus(stars: number): number
+	return Config.Jobs.RoadEvents.SurvivorBonus * math.max(1, math.floor(stars))
+end
+
+function JobRules.addOnFits(inCar: number, coming: number, capacity: number): boolean
+	return inCar + coming + 1 <= capacity
 end
 
 return JobRules
