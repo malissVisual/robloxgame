@@ -535,6 +535,14 @@ end, hood and first window; rebuilt when you upgrade):
 The kit is cosmetic: welded, massless, no collisions, not hit by bullets, a few parts; the stats come from the levels
 (`Economy.carStats` with the car's own levels).
 
+New in 4.4, **the fleet models** (Codex, `design/vehicle-models/`): the nine cars you can own, at all 20 stages, have
+panelled bodies built from Roblox parts (framed windows, mirrors, grilles, bumpers, steel or alloy wheels, stage gear
+such as the Long Cargo Van's roof rack), and the upgrades you buy show on them (bull bar, armour, windshield guard,
+intake and exhaust, new tyres, alloys). The skin is massless and never collides or blocks a ray: the old hull, seats,
+doors, wheels, cargo points and physics are unchanged (`server/VehicleArt/Geometry.luau` describes the pieces,
+`Builder.luau` welds them). The garage shows your car in 3D (`client/VehiclePreview.luau`, parked cars from
+`shared/VehiclePreviewData.luau`). Traffic, bandits and company vehicles keep the old bodies.
+
 ## Cars, cargo, garages and the repair shop
 
 Version 3.4: a car is something you **earn and keep**. You get the Old Van at the start and you upgrade it; a new car
