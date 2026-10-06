@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · usable fleet models, distinct van stages, visible upgrade kits and real model previews · server/Vehicles.luau, server/Garages.luau (preview stage/paint fields only), server/VehicleArt/, client/VehiclePreview.luau, client/GarageUi.luau, shared/VehiclePreviewData.luau, vehicle preview/export tools and design/vehicle-models/ · since 2026-10-06
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/vehicle-models` (base `3823dad`, 4.2) · native panelled bodies for all 9 owned cars / 20 stages, visible upgrade kits, cached garage 3D previews; exact factory renders and export tools in `design/vehicle-models/` and `tools/vehicle-preview/`. Required 23 test files (483 checks), all module compiles, 40 model audits, baseline physics/attachment comparison, preview recorder checks, Rojo builds and root sync (138 instances) pass. Studio still required: boarding, moving doors/wheels, cargo/trolley, repaint/individual upgrades, roof gun, lights, phone garage fit and several cars' performance. Parked previews show stage/paint body; streamed active previews include installed kit. Full handoff: `design/vehicle-models/README.md`.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
