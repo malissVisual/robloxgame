@@ -244,6 +244,13 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
+-- 4.5.1: the hint on screen (its words, the phase and stop they belong to, since when) and a pending later refresh.
+-- The job's step can go back and forth between two server ticks (the 80-stud approach edge: "drive" / "carry", the
+-- back open / shut): within one stop a new hint waits until the last one has been up HINT_HOLD seconds, so the card
+-- never flips its words (and its height) several times a second.
+local HINT_HOLD = 1
+local hintShown = { text = "", key = "", at = -math.huge, queued = false }
+
 -- The hint line and the marker for the phase and the job right now.
 local function refresh()
 	local text = ""
@@ -256,8 +263,24 @@ local function refresh()
 		text = TutorialSteps.forTouch(text) -- 4.2: no keys on a touch screen
 	end
 	if view.hint then
-		view.hintText.Text = text
-		view.hint.Visible = text ~= ""
+		local key = if job then `{phase}|{job.stopIndex}|{job.stage}` else tostring(phase)
+		if text ~= hintShown.text then
+			local wait = hintShown.at + HINT_HOLD - os.clock()
+			if key == hintShown.key and wait > 0 then
+				if not hintShown.queued then
+					hintShown.queued = true
+					task.delay(wait, function()
+						hintShown.queued = false
+						refresh()
+					end)
+				end
+			else
+				hintShown.text, hintShown.at = text, os.clock()
+				view.hintText.Text = text
+				view.hint.Visible = text ~= ""
+			end
+		end
+		hintShown.key = key
 	end
 	local marker = view.marker
 	if marker then
