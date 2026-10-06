@@ -28,6 +28,11 @@
 --   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
 --   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
 --   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St
+--   Places     (5.3) what stands on every lot of the ordinary Downtown and Suburbs blocks (Map.lots, seeded: towers,
+--              lawns, parking, houses ...), the storefronts the businesses work from (Map.Venues: Luigi's Pizza, the
+--              Daily Bread Bakery, the Post Office ... and the older pharmacy, FreshMart, bank, Frosty's, warehouse) and
+--              the homes the deliveries go to (Map.Homes: apartment entrances downtown, houses in the Suburbs), each
+--              with its door, its pile just outside and its park on the road in front
 --
 -- It also holds the shape of the night over the clock (Map.nightFactor): the server runs the clock
 -- (server/DayNight.luau), every client draws the look from the same numbers (client/Weather.luau).
@@ -619,6 +624,175 @@ end
 -- Where a car comes out of a property's garage (homes and garages): this far in front of the front wall.
 Map.GarageApron = 8
 
+-- ── Venues (Zombie Delivery 5.3) ───────────────────────────────────────────
+-- The real places the businesses (Config.Jobs.Businesses) work from: small storefronts on downtown (and two Suburbs)
+-- lots, each facing its street (server/World.luau builds them from Map.lots; BuildingLooks has a look per kind). A
+-- storefront is VenueSize big, its front wall VenueFront studs in from the curb, the door in the middle of it; the pile
+-- (where the pieces wait and the cook / clerk hands them over) just outside the door, the park on the road at the curb
+-- in front (the Map.CargoSpots rule: pile 8 – 20 studs from park), the clerk's spot just inside the door. The older
+-- storefronts (the Corner Pharmacy, FreshMart, the bank, Frosty's, the Harbor Warehouse) are venues too (`built` false:
+-- World builds them as before; their pile and park are their Map.CargoSpots).
+export type Spot = { x: number, z: number }
+export type Venue = {
+	id: string, -- also its Map.Landmarks id (a new storefront) or its Map.Places id (an older one)
+	business: string, -- the Config.Jobs.Businesses id
+	name: string,
+	kind: string, -- pizzeria | bakery | burgers | noodles | cafe | postoffice | news | hardware | electronics | pawnshop |
+	-- flowers | pharmacy | supermarket | bank | icecream | warehouse
+	sub: string, -- what it is, in caps (the location tag's second line, the name board's second line)
+	icon: string, -- the map list's emoji
+	about: string, -- the map list's line
+	district: string,
+	x: number, -- the middle of the building on the ground
+	z: number,
+	facing: Spot, -- the way its front (the door) faces: a unit direction along X or Z, toward its street
+	door: Spot, -- the middle of the doorway (the front wall)
+	park: Spot,
+	pile: Spot,
+	clerk: Spot, -- where the cook / clerk stands, just inside the door
+	built: boolean, -- a new storefront (World builds it on its lot) or an older one
+}
+Map.VenueSize = { w = 30, d = 24, h = 12, door = 9, doorHeight = 8 } -- (BuildingLooks/Kit.luau's storefront: the same)
+Map.VenueFront = 11 -- studs from the curb (the block's edge) to a storefront's front wall
+Map.DowntownInset = 10 -- the downtown lots start this far inside the block's edge
+Map.CurbPark = 6 -- the park: this far out on the road from the curb
+
+local function districtById(id: string): District
+	for _, d in Map.Districts do
+		if d.id == id then
+			return d
+		end
+	end
+	error(`no district {id}`)
+end
+Map.districtById = districtById
+
+-- The middle of lot (a, b) of block (i, j) (a: 0 west, 1 east; b: 0 north, 1 south) and the lot's size.
+function Map.lotCentre(districtId: string, i: number, j: number, a: number, b: number): (number, number, number)
+	local d = districtById(districtId)
+	local inset = if d.style == "suburbs" then SUBURB_INSET else Map.DowntownInset
+	local size = (BLOCK - inset * 2) / 2
+	return d.ox + i * CELL - BLOCK / 2 + inset + size * (a + 0.5), d.oz + j * CELL - BLOCK / 2 + inset + size * (b + 0.5), size
+end
+
+do
+	local SIZE = Map.VenueSize
+	-- The new storefronts: on block (i, j), lot (a, b), facing (fx, fz) (the lot's outer side).
+	local NEW: { { any } } = {
+		-- id, business, name, kind, sub, icon, about, district, i, j, a, b, fx, fz
+		{ "luigis", "pizzeria", "Luigi's Pizza", "pizzeria", "PIZZERIA", "🍕", "Downtown, south-east, on Ash St. Luigi's pizzas: hot, cheesy, best at night.", "downtown", 2, 2, 0, 1, 0, 1 },
+		{ "dailybread", "bakery", "Daily Bread Bakery", "bakery", "BAKERY", "🥖", "Downtown, south, on Ash St. Anna bakes before sunrise: bread, rolls and cakes.", "downtown", -1, 3, 1, 0, 0, -1 },
+		{ "lastbite", "burgers", "Last Bite Burgers", "burgers", "BURGERS", "🍔", "Downtown, west, on 3rd Ave. Burgers and fries, every one could be your last.", "downtown", -2, -1, 0, 1, -1, 0 },
+		{ "wokdead", "noodles", "Wok Dead", "noodles", "NOODLES", "🍜", "Downtown, east, on Main St. Noodles in a box, hot from the wok.", "downtown", 3, 1, 1, 0, 0, -1 },
+		{ "grindhouse", "cafe", "Grind House", "cafe", "CAFE · COFFEE", "☕", "The Suburbs, on Willow Ln, the first street from town. Coffee and pastries.", "suburbs", 0, 0, 0, 0, 0, -1 },
+		{ "postoffice", "post", "Post Office", "postoffice", "MAIL · PARCELS", "📮", "Downtown, south of the depot, on Ash St. Letters and parcels for every door.", "downtown", 0, 2, 1, 1, 0, 1 },
+		{ "dailyundead", "news", "The Daily Undead", "news", "PRINT SHOP · NEWSSTAND", "📰", "Downtown, north of the depot, on 5th Ave. The morning paper, still printed.", "downtown", 0, -2, 0, 0, -1, 0 },
+		{ "boltnail", "hardware", "Bolt & Nail Hardware", "hardware", "HARDWARE", "🔨", "Downtown, far west, on 2nd Ave. Tools, nails, planks: everything to board up a house.", "downtown", -3, 2, 0, 1, -1, 0 },
+		{ "volt", "electronics", "Volt Electronics", "electronics", "ELECTRONICS", "📻", "Downtown, north-east, on 8th Ave. Radios, batteries, parts.", "downtown", 3, -2, 0, 0, -1, 0 },
+		{ "secondlife", "pawnshop", "Second Life Pawn", "pawnshop", "PAWN SHOP", "💰", "Downtown, far north-west, on Grave St. Vinnie buys and sells anything. Ammo too.", "downtown", -3, -3, 1, 1, 0, 1 },
+		{ "bloom", "flowers", "Bloom", "flowers", "FLOWER SHOP", "💐", "The Suburbs, by the school, on Fern Rd. Flowers, still growing somewhere.", "suburbs", -1, 2, 1, 0, 1, 0 },
+	}
+	local venues: { Venue } = {}
+	for _, row in NEW do
+		local districtId, i, j, a, b, fx, fz = row[8], row[9], row[10], row[11], row[12], row[13], row[14]
+		local d = districtById(districtId)
+		local cx, cz = d.ox + i * CELL, d.oz + j * CELL
+		local lx, lz = Map.lotCentre(districtId, i, j, a, b)
+		local wall = BLOCK / 2 - Map.VenueFront
+		-- the door on the front wall: along the facing axis at the wall, across it at the lot's middle
+		local doorX = if fx ~= 0 then cx + fx * wall else lx
+		local doorZ = if fz ~= 0 then cz + fz * wall else lz
+		local out = BLOCK / 2 + Map.CurbPark
+		table.insert(venues, {
+			id = row[1],
+			business = row[2],
+			name = row[3],
+			kind = row[4],
+			sub = row[5],
+			icon = row[6],
+			about = row[7],
+			district = districtId,
+			x = doorX - fx * SIZE.d / 2,
+			z = doorZ - fz * SIZE.d / 2,
+			facing = { x = fx, z = fz },
+			door = { x = doorX, z = doorZ },
+			pile = { x = doorX + fx * 2.5, z = doorZ + fz * 2.5 },
+			park = { x = if fx ~= 0 then cx + fx * out else lx, z = if fz ~= 0 then cz + fz * out else lz },
+			clerk = { x = doorX - fx * 3 + fz * 3.5, z = doorZ - fz * 3 - fx * 3.5 },
+			built = true,
+		})
+	end
+	-- The older storefronts, from their places and cargo spots.
+	for _, row in {
+		{ "pharmacy", "pharmacy", "pharmacy", "PHARMACY", "💊" },
+		{ "market", "supermarket", "supermarket", "SUPERMARKET", "🛒" },
+		{ "bank", "bank", "bank", "BANK", "🏦" },
+		{ "frosty", "icecream", "icecream", "ICE CREAM", "🍦" },
+		{ "warehouse", "warehouse", "warehouse", "WAREHOUSE", "📦" },
+	} do
+		for _, place in Map.Places do
+			local spot = Map.CargoSpots[place.id]
+			if place.id ~= row[1] or not spot then
+				continue
+			end
+			-- the block behind the place (Map.blockAt comes further down)
+			local bx, bz = place.x - place.nx * 30, place.z - place.nz * 30
+			local d: District? = nil
+			local i, j = 0, 0
+			for _, district in Map.Districts do
+				local di, dj = math.floor((bx - district.ox) / CELL + 0.5), math.floor((bz - district.oz) / CELL + 0.5)
+				if di >= district.i0 and di <= district.i1 and dj >= district.j0 and dj <= district.j1 then
+					d, i, j = district, di, dj
+				end
+			end
+			local fx, fz = place.nx, place.nz
+			local doorX, doorZ = spot.pile.x - fx * 2.5, spot.pile.z - fz * 2.5
+			table.insert(venues, {
+				id = place.id,
+				business = row[2],
+				name = place.name,
+				kind = row[3],
+				sub = row[4],
+				icon = row[5],
+				about = "",
+				district = if d then d.id else "",
+				x = if d then d.ox + i * CELL else place.x,
+				z = if d then d.oz + j * CELL else place.z,
+				facing = { x = fx, z = fz },
+				door = { x = doorX, z = doorZ },
+				park = { x = spot.park.x, z = spot.park.z },
+				pile = { x = spot.pile.x, z = spot.pile.z },
+				clerk = { x = doorX - fx * 3, z = doorZ - fz * 3 },
+				built = false,
+			})
+		end
+	end
+	Map.Venues = venues
+end
+
+-- A venue by its id (nil: none).
+function Map.venue(id: string): Venue?
+	for _, venue in Map.Venues do
+		if venue.id == id then
+			return venue
+		end
+	end
+	return nil
+end
+
+-- The venues of a business (Config.Jobs.Businesses id; the bakery also bakes the cakes: "cake" is the bakery's).
+function Map.venuesOf(business: string): { Venue }
+	local id = if business == "cake" then "bakery" else business
+	local list = {}
+	for _, venue in Map.Venues do
+		if venue.business == id then
+			table.insert(list, venue)
+		end
+	end
+	return list
+end
+
+-- (kind: shop | employer | place | venue, 5.3: a storefront of Map.Venues)
 export type Landmark = { id: string, name: string, icon: string, x: number, z: number, kind: string, description: string }
 
 -- Everything worth driving to, for the map's list and the GPS.
@@ -707,6 +881,12 @@ for _, info in {
 		if place.id == info[1] then
 			table.insert(landmarks, { id = place.id, name = place.name, icon = info[2], x = place.x, z = place.z, kind = "place", description = info[3] })
 		end
+	end
+end
+-- 5.3, the new storefronts (Map.Venues that World builds): on the road in front of their door.
+for _, venue in Map.Venues do
+	if venue.built then
+		table.insert(landmarks, { id = venue.id, name = venue.name, icon = venue.icon, x = venue.park.x, z = venue.park.z, kind = "venue", description = venue.about })
 	end
 end
 -- Zombie Delivery 2.6, the real estate: Sunset Hills (on Sunset Drive), the other mansions and the villas (at their
@@ -981,6 +1161,284 @@ function Map.addresses(): { Address }
 	end
 	addressCache = list
 	return list
+end
+
+-- ── Lots and homes (Zombie Delivery 5.3) ───────────────────────────────────
+-- What stands on every lot of the ordinary Downtown and Suburbs blocks, decided here with Map.lcg (the same on every
+-- server, in the client and in the tests), so the builder (server/World.luau), the jobs and the client know the same
+-- buildings. A block has 2 x 2 lots (a: 0 west, 1 east; b: 0 north, 1 south), DowntownInset / SuburbInset in from its
+-- edge; every lot touches two streets (its outer sides).
+--   Downtown  a storefront (Map.Venues), else 70 % a tower (about one in four of them an apartment building with a real
+--             entrance on one of its streets: a home), 15 % a lawn with trees, 15 % a parking lot with a wreck. The
+--             towers stand in the middle of their lot as before (the entrance on the wall facing the street).
+--   Suburbs   a storefront, a house for sale (Map.EstatePlots: World's estate code builds it), else 85 % a house with
+--             its front door to one of its two streets (houses face all four ways), a short path to the sidewalk, a
+--             mailbox and its number, 15 % a burnt-out wreck.
+-- The special blocks have no lots (their own builders), the Harbor has none (warehouses and containers). No home or
+-- storefront faces a street where its park would be in the safe zone or within FreeRadius of a place, a cargo spot,
+-- an employer's board or a storefront's park (the jobs there have their own spots).
+--
+-- Every home (Map.Homes) has the Map.CargoSpots shape: the door (the middle of the front wall), the pile just outside it
+-- (the receiver waits there, the pieces are set down there), the park on the road at the curb in front (pile 8 – 20
+-- studs from park). An apartment building's home is one flat ("Apt 3B, 40 6th Ave"; `floors` says how many floors of
+-- four flats, A – D, it has: Stream J may pick another flat behind the same door); a house's is its address
+-- ("12 Willow Ln"). House numbers run along the street, odd on one side and even on the other.
+export type Lot = {
+	district: string,
+	i: number, -- the block
+	j: number,
+	a: number, -- the lot in it
+	b: number,
+	x: number, -- the lot's middle
+	z: number,
+	size: number,
+	kind: string, -- tower | apartment | venue | grass | parking | house | wreck | estate
+	facing: Spot, -- the front's way (a unit direction along X or Z: one of the lot's outer sides)
+	w: number, -- the building: a tower's size along X, a house's front (0: none)
+	d: number, -- … a tower's along Z, a house's depth
+	h: number, -- … its height
+	front: number, -- a house: its front wall this far forward of the lot's middle
+	seed: number, -- dice for the looks (colours, trees) World rolls with
+	venue: Venue?,
+	home: Home?,
+}
+export type Home = {
+	id: string,
+	kind: string, -- house | apartment
+	name: string, -- "12 Willow Ln" / "Apt 3B, 40 6th Ave"
+	address: string, -- the building's: "12 Willow Ln" / "40 6th Ave"
+	street: string,
+	district: string,
+	x: number, -- the lot's middle
+	z: number,
+	facing: Spot,
+	door: Spot,
+	park: Spot,
+	pile: Spot,
+	floors: number?, -- an apartment building: floors of flats (A – D on each)
+}
+Map.HouseFront = 18 -- a Suburbs house's front wall: this far forward of its lot's middle (12 from the curb)
+Map.FreeRadius = 30
+
+-- Lays out every lot and home (fresh tables each call: the same every time; Map.AllLots / Map.Homes hold the one made
+-- when the module loads).
+function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
+	local districtLots: { [string]: { [string]: { Lot } } } = { downtown = {}, suburbs = {}, harbor = {} }
+	local homes: { Home } = {}
+	local venueAt: { [string]: Venue } = {}
+	for _, venue in Map.Venues do
+		if venue.built then
+			local d = districtById(venue.district)
+			local i = math.floor((venue.x - d.ox) / CELL + 0.5)
+			local j = math.floor((venue.z - d.oz) / CELL + 0.5)
+			local a = if venue.x > d.ox + i * CELL then 1 else 0
+			local b = if venue.z > d.oz + j * CELL then 1 else 0
+			venueAt[`{venue.district}:{i},{j}:{a}{b}`] = venue
+		end
+	end
+
+	-- The street a front faces from block (i, j) (the names as Map.addresses gives them).
+	local function streetOf(d: District, i: number, j: number, fx: number, fz: number): string
+		if fz ~= 0 then
+			local k = j + (if fz > 0 then 0 else -1) - d.j0 + 1
+			return d.streets[k % #d.streets + 1]
+		end
+		local k = i + (if fx > 0 then 0 else -1) - d.i0 + 1
+		return d.avenues[k % #d.avenues + 1]
+	end
+	-- Is a park here clear of the safe zone and of the places' own spots?
+	local function free(x: number, z: number): boolean
+		local r2 = Map.FreeRadius * Map.FreeRadius
+		local function near(px: number, pz: number): boolean
+			return (x - px) ^ 2 + (z - pz) ^ 2 < r2
+		end
+		if Map.isSafe(x, z) then
+			return false
+		end
+		for _, place in Map.Places do
+			if near(place.x, place.z) then
+				return false
+			end
+		end
+		for _, spot in Map.CargoSpots do
+			if near(spot.park.x, spot.park.z) or near(spot.pile.x, spot.pile.z) then
+				return false
+			end
+		end
+		for _, spot in Map.EmployerSpots do
+			if near(spot.x, spot.z) then
+				return false
+			end
+		end
+		for _, venue in Map.Venues do
+			if near(venue.park.x, venue.park.z) then
+				return false
+			end
+		end
+		return true
+	end
+	-- A home behind a front wall `wall` studs out from the block's middle (cx, cz), facing (fx, fz), on the lot whose
+	-- middle is (lx, lz): the door, the pile `step` out, the park at the curb.
+	local function addHome(lot: Lot, d: District, kind: string, wall: number, step: number, unit: string?, floors: number?): Home
+		local cx, cz = d.ox + lot.i * CELL, d.oz + lot.j * CELL
+		local fx, fz = lot.facing.x, lot.facing.z
+		local doorX = if fx ~= 0 then cx + fx * wall else lot.x
+		local doorZ = if fz ~= 0 then cz + fz * wall else lot.z
+		local out = BLOCK / 2 + Map.CurbPark
+		local street = streetOf(d, lot.i, lot.j, fx, fz)
+		local x0, _, z0 = districtEdges(d)
+		local along = if fz ~= 0 then doorX - x0 else doorZ - z0
+		local address = `{math.floor(along / 8) * 2 + (if fx + fz > 0 then 2 else 1)} {street}`
+		local home: Home = {
+			id = `home_{d.id}_{lot.i}_{lot.j}_{lot.a}{lot.b}`,
+			kind = kind,
+			name = if unit then `Apt {unit}, {address}` else address,
+			address = address,
+			street = street,
+			district = d.id,
+			x = lot.x,
+			z = lot.z,
+			facing = lot.facing,
+			door = { x = doorX, z = doorZ },
+			pile = { x = doorX + fx * step, z = doorZ + fz * step },
+			park = { x = if fx ~= 0 then cx + fx * out else lot.x, z = if fz ~= 0 then cz + fz * out else lot.z },
+			floors = floors,
+		}
+		table.insert(homes, home)
+		lot.home = home
+		return home
+	end
+	-- The lot's outer side to face: one of its two at random, the other if that one's park is not free (nil: neither).
+	local function pickFacing(d: District, lot: Lot, alongX: boolean): Spot?
+		local cx, cz = d.ox + lot.i * CELL, d.oz + lot.j * CELL
+		local out = BLOCK / 2 + Map.CurbPark
+		local sides = { { x = if lot.a == 0 then -1 else 1, z = 0 }, { x = 0, z = if lot.b == 0 then -1 else 1 } }
+		if not alongX then
+			sides = { sides[2], sides[1] }
+		end
+		for _, side in sides do
+			local px = if side.x ~= 0 then cx + side.x * out else lot.x
+			local pz = if side.z ~= 0 then cz + side.z * out else lot.z
+			if free(px, pz) then
+				return side
+			end
+		end
+		return nil
+	end
+
+	for _, d in Map.Districts do
+		if d.style == "harbor" then
+			continue
+		end
+		local rand = Map.lcg(Config.City.Seed + (if d.style == "downtown" then 53 else 54))
+		local span = math.max(d.i1 - d.i0, d.j1 - d.j0) / 2 + 1
+		for i = d.i0, d.i1 do
+			for j = d.j0, d.j1 do
+				if Map.special(d.id, i, j) then
+					continue
+				end
+				local list: { Lot } = {}
+				districtLots[d.id][`{i},{j}`] = list
+				local centerFactor = 1 - math.max(math.abs(i), math.abs(j)) / span
+				for a = 0, 1 do
+					for b = 0, 1 do
+						local lx, lz, size = Map.lotCentre(d.id, i, j, a, b)
+						-- every lot rolls the same dice, whatever it becomes (a change on one lot leaves the others)
+						local roll, pick, side, seed = rand(), rand(), rand(), math.floor(rand() * 1e6)
+						local w, dd, h = rand(), rand(), rand()
+						local lot: Lot = {
+							district = d.id,
+							i = i,
+							j = j,
+							a = a,
+							b = b,
+							x = lx,
+							z = lz,
+							size = size,
+							kind = "grass",
+							facing = { x = 0, z = if b == 0 then -1 else 1 },
+							w = 0,
+							d = 0,
+							h = 0,
+							front = 0,
+							seed = seed,
+						}
+						table.insert(list, lot)
+						local venue = venueAt[`{d.id}:{i},{j}:{a}{b}`]
+						if venue then
+							lot.kind = "venue"
+							lot.venue = venue
+							lot.facing = venue.facing
+							lot.w, lot.d, lot.h = Map.VenueSize.w, Map.VenueSize.d, Map.VenueSize.h
+						elseif d.style == "downtown" then
+							if roll < 0.7 then
+								lot.kind = "tower"
+								lot.w = size - 2 - w * 7
+								lot.d = size - 2 - dd * 7
+								lot.h = 16 + h * 18 + 55 * centerFactor * ((seed % 1000) / 1000)
+								-- some towers are apartment buildings, more of them away from the middle
+								local facing = if pick < 0.12 + 0.2 * (1 - centerFactor) then pickFacing(d, lot, side < 0.5) else nil
+								if facing then
+									lot.kind = "apartment"
+									lot.facing = facing
+									local half = if facing.x ~= 0 then lot.w / 2 else lot.d / 2
+									local floors = math.clamp(math.floor((lot.h - 4) / 9), 2, 9)
+									local unit = `{1 + math.floor(((seed // 1000) % 100) / 100 * floors)}{string.char(65 + seed % 4)}`
+									addHome(lot, d, "apartment", math.abs(lot.x - (d.ox + i * CELL)) + half, 3, unit, floors)
+								end
+							elseif roll < 0.85 then
+								lot.kind = "grass"
+							else
+								lot.kind = "parking"
+							end
+						else
+							-- the Suburbs: a house for sale has its lot (it faces its nearer street, north or south)
+							for _, plot in Map.EstatePlots do
+								if math.abs(plot.x - lx) < 2 and math.abs(plot.z - lz) < size / 2 then
+									lot.kind = "estate"
+								end
+							end
+							if lot.kind ~= "estate" then
+								local facing = if roll < 0.85 then pickFacing(d, lot, side < 0.5) else nil
+								if facing then
+									lot.kind = "house"
+									lot.facing = facing
+									lot.w, lot.d, lot.h = 20 + w * 6, 16 + dd * 4, 11 + h * 3
+									lot.front = Map.HouseFront
+									addHome(lot, d, "house", size / 2 + Map.HouseFront, 2.5)
+								else
+									lot.kind = "wreck"
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return districtLots, homes
+end
+Map.AllLots, Map.Homes = Map.makeLots()
+
+-- The lots of a district's ordinary blocks, by block ("i,j": its four lots); a district without lots: empty.
+function Map.lots(districtId: string): { [string]: { Lot } }
+	return Map.AllLots[districtId] or {}
+end
+
+-- The four lots of block (i, j) (empty: a special block, or a district without lots).
+function Map.lotsAt(districtId: string, i: number, j: number): { Lot }
+	local lots = Map.AllLots[districtId]
+	return if lots then lots[`{i},{j}`] or {} else {}
+end
+
+-- A home by its id (nil: none).
+function Map.home(id: string): Home?
+	for _, home in Map.Homes do
+		if home.id == id then
+			return home
+		end
+	end
+	return nil
 end
 
 return Map

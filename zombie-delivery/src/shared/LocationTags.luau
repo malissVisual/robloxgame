@@ -3,9 +3,10 @@
 -- names it ("■ WRENCH GARAGE" over "UPGRADES · REPAIRS"). This module holds what each place says and the rule of when
 -- the caption comes and goes; the client only asks it four times a second and draws the answer.
 --
---   * The places are Map.Landmarks (the shops, the employers, the mission places, the towers, the estate). The depot
---     reads ZOMBIE DELIVERY CO. like its sign. The second line comes from the landmark's kind (a shop says what it
---     sells, an employer EMPLOYER, a garage GARAGE ...); a place with nothing sure to say has none.
+--   * The places are Map.Landmarks (the shops, the employers, the mission places, the towers, the estate, 5.3: the
+--     storefronts of Map.Venues). The depot reads ZOMBIE DELIVERY CO. like its sign. The second line comes from the
+--     landmark's kind (a shop says what it sells, an employer EMPLOYER, a garage GARAGE, a storefront its kind: PIZZERIA,
+--     PHARMACY ...); a place with nothing sure to say has none.
 --   * A shop's point is its block's centre (you use a shop within Map.ShopRadius of it), so a shop is near from
 --     SHOP_NEAR; a place with a yard (Map.Yards: the base, the farm, the prison ...) is measured to the yard's edge;
 --     everything else to its point (a door, the road in front).
@@ -84,6 +85,12 @@ function LocationTags.subtitle(landmark: Map.Landmark): string?
 	end
 	if PLACE_SUB[landmark.id] then
 		return PLACE_SUB[landmark.id]
+	end
+	-- 5.3: a storefront (Map.Venues; the older ones are places: the pharmacy, FreshMart, the bank, the warehouse) says
+	-- what kind it is
+	local venue = Map.venue(landmark.id)
+	if venue then
+		return venue.sub
 	end
 	for _, def in Config.Estate.Properties do
 		if def.id == landmark.id then

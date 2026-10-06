@@ -2233,6 +2233,105 @@ Config.Jobs = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
 			},
 		},
+		-- 5.3 STUBS (Stream W, the world): the storefronts of Map.Venues that had no business yet. Data only, for Stream J
+		-- to fill (the rules per business, the times of day, the receivers at the homes, the backpack looks). `tiers` is
+		-- empty, so the board's car deliveries never pick them yet; NOTE: the light looks (burgers, cafe, news, flowers)
+		-- may already come up on the ON FOOT / BIKE board (server/Jobs.luau footOffer does not look at the tiers).
+		{
+			id = "burgers",
+			place = "Last Bite Burgers",
+			cargo = "Burgers",
+			piece = "burger bag",
+			plural = "burger bags",
+			kind = "crate",
+			look = "pizza", -- (a food box; Stream J: a burger look)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Big Al", title = "Grill cook", role = "cook" },
+			receivers = {
+				{ name = "The Twins", title = "Night shift", role = "townsperson" },
+				{ name = "Mrs. Hungry", title = "Ordered fries too", role = "townsperson" },
+			},
+		},
+		{
+			id = "noodles",
+			place = "Wok Dead",
+			cargo = "Noodles",
+			piece = "noodle box",
+			plural = "noodle boxes",
+			kind = "soup",
+			look = "soup", -- (Stream J: a noodle box look)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Mei", title = "Wok cook", role = "cook" },
+			receivers = {
+				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
+				{ name = "The Twins", title = "Night shift", role = "townsperson" },
+			},
+		},
+		{
+			id = "cafe",
+			place = "Grind House",
+			cargo = "Coffee & Pastries",
+			piece = "pastry bag",
+			plural = "pastry bags",
+			kind = "sack",
+			look = "bread", -- (Stream J: a coffee tray look)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Jules", title = "Barista", role = "cook" },
+			receivers = {
+				{ name = "Grandma Rose", title = "Her morning coffee", role = "townsperson" },
+				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+			},
+		},
+		{
+			id = "news",
+			place = "The Daily Undead",
+			cargo = "Newspapers",
+			piece = "newspaper",
+			plural = "newspapers",
+			kind = "sack",
+			look = "mail", -- (Stream J: a newspaper look and the newspaper round)
+			pieces = { 1, 3 },
+			tiers = {},
+			giver = { name = "Ed", title = "Printer", role = "clerk" },
+			receivers = {
+				{ name = "Old Tom", title = "Reads it twice", role = "townsperson" },
+				{ name = "Grandma Rose", title = "Wants the crossword", role = "townsperson" },
+			},
+		},
+		{
+			id = "flowers",
+			place = "Bloom",
+			cargo = "Flowers",
+			piece = "bouquet",
+			plural = "bouquets",
+			kind = "crate",
+			look = "plants",
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Lily", title = "Florist", role = "shopkeeper" },
+			receivers = {
+				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
+				{ name = "Grandma Rose", title = "Her birthday", role = "townsperson" },
+			},
+		},
+		{
+			id = "icecream",
+			place = "Frosty's Ice Cream",
+			cargo = "Ice Cream",
+			piece = "ice cream tub",
+			plural = "ice cream tubs",
+			kind = "icebox",
+			look = "groceries", -- (Stream J: an ice cream look; Frosty's own van jobs stay the employer's)
+			pieces = { 1, 2 },
+			tiers = {},
+			giver = { name = "Frosty", title = "Ice cream man", role = "shopkeeper" },
+			receivers = {
+				{ name = "The Twins", title = "Hot day", role = "townsperson" },
+			},
+		},
 	} :: { BusinessDef },
 	-- At a far place the place's own person takes the ordinary deliveries.
 	PlacePeople = {
