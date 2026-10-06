@@ -224,6 +224,14 @@ local CARGO_ALIASES: { [string]: string } = {
 	plants = "sack",
 	survivor = "kid",
 	pallet = "crate", -- 4.0, freight: a pallet of boxes
+	-- 5.3, the storefronts' own pieces
+	burger = "pizza", -- a food bag
+	noodles = "soup",
+	pastry = "sack",
+	newspaper = "parcel",
+	bouquet = "sack",
+	icecream = "icebox",
+	gadget = "crate",
 }
 
 -- 5.0: a piece of personal kit (Config.Kit id: backpack, bigpack, shoes, jacket).

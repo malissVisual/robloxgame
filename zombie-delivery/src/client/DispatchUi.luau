@@ -738,6 +738,14 @@ local function dangerRow(body: any, offer: any)
 	if offer.timed then
 		chip(row, "⏱ RUSH CLOCK", K.rule, 5)
 	end
+	-- 5.3: the evening peak of the pizzas, burgers and noodles (Config.Jobs.Businesses peak), a newspaper round's doors.
+	local peak = tonumber(offer.peak)
+	if peak and peak > 1 then
+		chip(row, `🌆 EVENING +{math.floor((peak - 1) * 100 + 0.5)}%`, K.rule, 5)
+	end
+	if offer.round == true then
+		chip(row, `📰 {math.max(1, (tonumber(offer.stops) or 2) - 1)} DOORS`, K.rule, 2)
+	end
 	local boost = tonumber(offer.banditBoost)
 	if boost and boost > 1 then
 		chip(row, "🎯 BANDITS WANT IT", K.red, 6)

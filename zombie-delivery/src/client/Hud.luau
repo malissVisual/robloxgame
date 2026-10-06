@@ -5,7 +5,7 @@
 -- the actions (MAP, CREW and MENU with every other action and its key), the consumables (items, keys 1-5), the
 -- employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold; the car guns at
 -- Wrench Garage), the weapon (your gun, or the car gun while you drive a car that has one), the backpack (with the
--- job's cargo), the delivery result (with the XP, a level-up and the crew's pay split), toasts, the FIRE button for
+-- job's cargo; 5.3: its BAG tab during a run, client/BagUi.luau, and the bag's chip on the contract), the delivery result (with the XP, a level-up and the crew's pay split), toasts, the FIRE button for
 -- touch screens and the way to the target (the park circle with a beam, on foot the pile / the person or the
 -- vehicle's back, a small waypoint with the name and the distance).
 -- Driver levels (shared/Levels.luau): what your level does not reach yet shows LEVEL N (cars at the dealer, guns,
@@ -1312,13 +1312,25 @@ function renderBackpack()
 	if not state then
 		return
 	end
-	cargoCard(backpack.body)
+	if backpackTab == "bag" and not job then
+		backpackTab = "items" -- (5.3: the run ended)
+	end
+	if backpackTab ~= "bag" then
+		cargoCard(backpack.body)
+	end
 	backpack.footer.Text = `{Ui.money(state.money)} · level {myLevel()}`
-	tabs(backpack.body, { { "items", "ITEMS" }, { "cars", "CARS" }, { "guns", "GUNS" } }, backpackTab, function(id)
+	-- 5.3: during a run the BAG tab first (client/BagUi.luau: every piece you carry and where).
+	local tabList = { { "items", "ITEMS" }, { "cars", "CARS" }, { "guns", "GUNS" } }
+	if job then
+		table.insert(tabList, 1, { "bag", "🎒 BAG" })
+	end
+	tabs(backpack.body, tabList, backpackTab, function(id)
 		backpackTab = id
 		renderBackpack()
 	end)
-	if backpackTab == "items" then
+	if backpackTab == "bag" then
+		require(script.Parent.BagUi).render(backpack.body, job, 1)
+	elseif backpackTab == "items" then
 		for order, def in Config.Items do
 			local c = card(backpack.body, 84, order + 1)
 			local have = state.items[def.id] or 0
@@ -1386,9 +1398,20 @@ function toggleBackpack()
 		backpack.frame.Visible = false
 	else
 		closeWindows()
+		-- 5.3: during a run with something in the bag, I opens on the BAG tab.
+		if job and type(job.carried) == "table" and #job.carried > 0 then
+			backpackTab = "bag"
+		end
 		backpack.frame.Visible = true
 		renderBackpack()
 	end
+end
+-- 5.3: the phone's ORDERS app (🎒 BAG) opens the I window on its BAG tab (client/BagUi.luau).
+require(script.Parent.BagUi).onOpen = function()
+	closeWindows()
+	backpackTab = if job then "bag" else "items"
+	backpack.frame.Visible = true
+	renderBackpack()
 end
 end
 
@@ -2613,7 +2636,11 @@ function view.tickTicket(distance: number?)
 	-- and packRoom the fallback).
 	local packRoom = if job.mode == "foot" or job.mode == "bike" then tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0 else 0
 	local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
-	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{packed}/{packRoom}|{job.ordersLine}`
+	-- 5.3: the bag's chip ("🎒 2 newspapers · 1 pizza stack · I"), made once per job update (client/BagUi.luau).
+	if job.bagLine == nil then
+		job.bagLine = require(script.Parent.BagUi).line(job) or false
+	end
+	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{packed}/{packRoom}|{job.ordersLine}|{job.bagLine}`
 	if signature == t.meta0 then
 		return
 	end
@@ -2634,8 +2661,10 @@ function view.tickTicket(distance: number?)
 	if type(job.ordersLine) == "string" then
 		add("quiet", job.ordersLine)
 	end
-	if packRoom > 0 then
-		add(if packed >= packRoom then "warn" else "quiet", `{if job.mode == "bike" then "🚲 On the bike" else "🎒 Backpack"} {packed}/{packRoom}{if packed >= packRoom then " · full" else ""}`)
+	if type(job.bagLine) == "string" then
+		add(if packRoom > 0 and packed >= packRoom then "warn" else "quiet", `{job.bagLine}{if packRoom > 0 and packed >= packRoom then " · full" else ""}{if touchLayout then "" else "  [I]"}`)
+	elseif packRoom > 0 then
+		add("quiet", `{if job.mode == "bike" then "🚲 On the bike" else "🎒 Backpack"} {packed}/{packRoom}`)
 	end
 	local modifier = job.modifier
 	if type(modifier) == "table" and modifier.name then

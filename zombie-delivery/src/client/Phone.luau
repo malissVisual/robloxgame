@@ -12,7 +12,8 @@
 -- newest message, and six apps in the contract look (design/ui-contract/: charcoal tiles, fine lines, white caps, small
 -- red badges):
 --   ORDERS    your active job: the contract, where to, the stop and its step, the clock, the pay and the pieces
---             delivered; OPEN BOARD and SHOW ON MAP. Without one: OPEN BOARD.
+--             delivered; OPEN BOARD and SHOW ON MAP. Without one: OPEN BOARD. 5.3: 🎒 BAG opens your bag (the I
+--             window's BAG tab, client/BagUi.luau).
 --   BOARD     the Dispatch board (client/DispatchUi.luau, Phone.onBoard). Its badge counts the new runs the server
 --             pushed while the board was closed.
 --   CAREER    the career app: rank, level, XP, the next goal in work ("about 8 on-foot runs", client/CareerUi.luau),
@@ -395,6 +396,12 @@ local function ordersApp(list: Instance)
 	end
 	-- 5.2: every order of the run (its stops, clock, pay, PIN), then the actions.
 	OrdersUi.render(list, job, { block = block, caps = caps, text = text, button = button }, 2)
+	-- 5.3: the bag (client/BagUi.luau: every piece you carry and where; the I window's BAG tab).
+	local bag = require(script.Parent.BagUi)
+	button(list, `🎒 BAG{if bag.line(job) then ` · {string.sub(bag.line(job) or "", 6)}` else " · empty"}`, "quiet", 89, function()
+		Phone.close()
+		bag.open()
+	end)
 	local stack = job.stack
 	button(list, "SHOW ON MAP", "quiet", 90, function()
 		Phone.close()

@@ -1335,6 +1335,15 @@ export type BusinessDef = {
 	tiers: { number }, -- the danger levels it shows up in
 	giver: PersonDef,
 	receivers: { PersonDef },
+	-- 5.3, the real places (shared/Deliveries.luau): the pick-up is the business's storefront (Map.venuesOf), the drop
+	-- one of `to`: "house" (a Suburbs house of Map.Homes), "apartment" (a downtown entrance), "venue:<business id>"
+	-- (that business's storefront: its person takes it), "harbor" (an address in the Harbor: the dock foreman). Nil:
+	-- any address as before 5.3 (the far places on the dangerous levels). `hours` = { from, to } on the game clock it
+	-- sends anything (nil: round the clock; from > to runs over midnight); `peak` = { from, to, pay }: those hours pay
+	-- × pay (the evening rush).
+	to: { string }?,
+	hours: { number }?,
+	peak: { number }?,
 }
 
 -- Day and night (server/DayNight.luau): the clock runs, the night is dark, the street lamps and the headlights come
@@ -1955,6 +1964,12 @@ Config.Jobs = {
 			generator = { "heavy" },
 			furniture = { "heavy" },
 			gold = { "cash" },
+			-- 5.3, the storefronts' own pieces
+			burger = { "food" },
+			noodles = { "food" },
+			pastry = { "food" },
+			icecream = { "food" },
+			gadget = { "fragile" },
 		} :: { [string]: { string } },
 		Kinds = {
 			cash = { "cash" },
@@ -2034,11 +2049,61 @@ Config.Jobs = {
 		SwitchEvery = 1, -- seconds between two changes of the stop the GPS shows (no flicker between two close ones)
 		AddOnTime = 30,
 	},
+	-- 5.3, real places (shared/Deliveries.luau, server/Jobs.luau, server/Cargo.luau): the board's deliveries start at
+	-- the business's storefront (Map.Venues; the nearest one to you: within the light job's PickupMax + PickupWiden on
+	-- foot or by bike, CarReach in a car) where its cook / clerk hands the order over in the doorway, and go to a home's
+	-- door (Map.Homes) or another storefront (Config.Jobs.Businesses `to`). At a home you knock (the owner comes within
+	-- KnockRange of the door): the door swings open (DoorSwing degrees, for DoorOpen s) and the receiver steps out
+	-- after KnockDelay s. With NobodyHome a drop has nobody in: "Leave at the door" (it counts the same).
+	Places = {
+		CarReach = 1600,
+		KnockRange = 22,
+		KnockDelay = 1.2,
+		DoorSwing = 80,
+		DoorOpen = 6,
+		NobodyHome = 0.1,
+	},
+	-- 5.3, the newspaper round (server/Jobs.luau footOffer's "round", shared/Deliveries.luau Deliveries.round, the
+	-- toss in server/Cargo.luau): from Hours on the game clock (the morning) the ON FOOT and the BIKE sections offer a
+	-- round of The Daily Undead (Business). Pick up the bundle (Papers: one E, it goes into your newspaper satchel: no
+	-- room needed) and bring one paper to every door on one or two streets (Streets; a third only when two do not
+	-- hold Papers[1]) whose nearest door is within FootReach / BikeReach of the print shop: a house takes one, an
+	-- apartment entrance FlatPapers (its subscribers). At a door "Toss newspaper" (E) works from TossRange studs:
+	-- within SureToss it always lands on the porch, farther it lands in the bushes with a chance growing to MissAtRange
+	-- (still delivered, but a miss). Pay: PayBase + PayPerPaper a paper + PayPerStud × the route (bike × BikePay),
+	-- rounded to $5, + NoMissTip with no miss at all; clock: TimeBase + the route at the light job's Speed + TimePerDoor
+	-- a door. Never stacked with other orders (a round is one order). Level 1 on foot, the bike's level by bike.
+	Round = {
+		Business = "news",
+		Hours = { 4, 11 } :: { number },
+		Papers = { 8, 12 } :: { number },
+		Streets = 2,
+		FlatPapers = 2,
+		FootReach = 700,
+		BikeReach = 1500,
+		TossRange = 18,
+		SureToss = 8,
+		MissAtRange = 0.5,
+		PayBase = 40,
+		PayPerPaper = 8,
+		PayPerStud = 0.04,
+		BikePay = 1.3,
+		NoMissTip = 40,
+		TimeBase = 60,
+		TimePerDoor = 10,
+	},
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
+	-- 5.3, real places (shared/Deliveries.luau, server/Jobs.luau): a business with a storefront (Map.Venues) sends from
+	-- there: its cook / clerk hands the order over at the door. B2C goes to a home's door (`to`: "house" | "apartment",
+	-- Map.Homes; the receivers are the people living there); B2B to another business's storefront ("venue:<id>": its
+	-- own person takes it) or to the Harbor ("harbor": the dock foreman). The bakery bakes in the morning (`hours`),
+	-- the pizzas, burgers and noodles pay more in the evening and at night (`peak`), the café opens early, The Daily
+	-- Undead prints the morning paper (and its round: Config.Jobs.Round). `to` nil: any address as before (the far
+	-- places of the dangerous levels: the lab, the bank's gold, the warehouse's fuel).
 	Businesses = {
 		{
 			id = "pizzeria",
-			place = "Pizza Place",
+			place = "Luigi's Pizza",
 			cargo = "Pizzas",
 			piece = "pizza stack",
 			plural = "pizza stacks",
@@ -2050,12 +2115,14 @@ Config.Jobs = {
 			receivers = {
 				{ name = "Mrs. Hungry", title = "Ordered extra cheese", role = "townsperson" },
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
-				{ name = "Chief Brody", title = "Fire station", role = "worker" },
+				{ name = "Mr. Novotny", title = "Movie night", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			peak = { 18, 4, 1.25 },
 		},
 		{
 			id = "bakery",
-			place = "Bakery",
+			place = "Daily Bread Bakery",
 			cargo = "Fresh Bread",
 			piece = "bread sack",
 			plural = "bread sacks",
@@ -2065,10 +2132,12 @@ Config.Jobs = {
 			tiers = { 1, 2 },
 			giver = { name = "Anna", title = "Baker", role = "cook" },
 			receivers = {
-				{ name = "Big Mike", title = "Survivor camp cook", role = "cook" },
-				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
 				{ name = "Grandma Rose", title = "Feeds the street", role = "townsperson" },
+				{ name = "Mrs. Hungry", title = "Breakfast for six", role = "townsperson" },
+				{ name = "Old Tom", title = "Fresh rolls, every day", role = "townsperson" },
 			},
+			to = { "house", "apartment", "venue:cafe", "venue:burgers" },
+			hours = { 4, 12 },
 		},
 		{
 			id = "post",
@@ -2083,13 +2152,14 @@ Config.Jobs = {
 			giver = { name = "Mr. Grant", title = "Postmaster", role = "clerk" },
 			receivers = {
 				{ name = "Grandma Rose", title = "Waiting for letters", role = "townsperson" },
-				{ name = "The Mayor", title = "City hall", role = "clerk" },
-				{ name = "Sal", title = "The last barber", role = "shopkeeper" },
+				{ name = "Sal", title = "Mail-order clippers", role = "shopkeeper" },
+				{ name = "Mr. Novotny", title = "New boots", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
 		},
 		{
 			id = "pharmacy",
-			place = "Pharmacy",
+			place = "Corner Pharmacy",
 			cargo = "Medicine",
 			piece = "medicine box",
 			plural = "medicine boxes",
@@ -2099,14 +2169,15 @@ Config.Jobs = {
 			tiers = { 1, 2, 3 },
 			giver = { name = "Mr. Patel", title = "Pharmacist", role = "clerk" },
 			receivers = {
-				{ name = "Dr. Novak", title = "Doctor", role = "clerk" },
-				{ name = "Nurse Kim", title = "Rooftop clinic", role = "clerk" },
 				{ name = "Grandma Rose", title = "Needs her pills", role = "townsperson" },
+				{ name = "Mr. Brown", title = "Bitten? Just a scratch", role = "townsperson" },
+				{ name = "Mrs. Lopez", title = "Fever since Monday", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
 		},
 		{
 			id = "supermarket",
-			place = "Supermarket",
+			place = "FreshMart",
 			cargo = "Groceries",
 			piece = "grocery box",
 			plural = "grocery boxes",
@@ -2116,14 +2187,16 @@ Config.Jobs = {
 			tiers = { 1, 2 },
 			giver = { name = "Carla", title = "Store manager", role = "shopkeeper" },
 			receivers = {
-				{ name = "Big Mike", title = "Survivor camp cook", role = "cook" },
 				{ name = "Mrs. Hungry", title = "Empty fridge", role = "townsperson" },
-				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+				{ name = "Old Tom", title = "Can't carry the bags", role = "townsperson" },
+				{ name = "The Twins", title = "The weekly shop", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			hours = { 7, 22 },
 		},
 		{
 			id = "hardware",
-			place = "Hardware Store",
+			place = "Bolt & Nail Hardware",
 			cargo = "Tools",
 			piece = "tool crate",
 			plural = "tool crates",
@@ -2133,31 +2206,34 @@ Config.Jobs = {
 			tiers = { 2, 3 },
 			giver = { name = "Bob", title = "Hardware store", role = "worker" },
 			receivers = {
-				{ name = "Chief Brody", title = "Fire station", role = "worker" },
 				{ name = "Old Pete", title = "Fixing his roof", role = "townsperson" },
-				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
+				{ name = "Mr. Novotny", title = "Boarding up the windows", role = "townsperson" },
+				{ name = "Aunt Maple", title = "A new fence", role = "townsperson" },
 			},
+			to = { "house", "harbor" },
+			hours = { 6, 20 },
 		},
 		{
 			id = "electronics",
-			place = "Electronics Store",
-			cargo = "Radio Parts",
-			piece = "parts box",
-			plural = "parts boxes",
+			place = "Volt Electronics",
+			cargo = "Electronics",
+			piece = "electronics box",
+			plural = "electronics boxes",
 			kind = "crate",
-			look = "parcel",
+			look = "gadget",
 			pieces = { 1, 2 },
 			tiers = { 2, 3 },
 			giver = { name = "Kenji", title = "Electronics store", role = "clerk" },
 			receivers = {
 				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
-				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
-				{ name = "The Mayor", title = "City hall", role = "clerk" },
+				{ name = "Kenny", title = "A new console, still", role = "townsperson" },
+				{ name = "Ms. Parker", title = "A radio for the news", role = "teacher" },
 			},
+			to = { "apartment" },
 		},
 		{
 			id = "pawnshop",
-			place = "Pawn Shop",
+			place = "Second Life Pawn",
 			cargo = "Ammo",
 			piece = "ammo crate",
 			plural = "ammo crates",
@@ -2167,13 +2243,15 @@ Config.Jobs = {
 			tiers = { 2, 3, 4 },
 			giver = { name = "Vinnie", title = "Pawn broker", role = "shopkeeper" },
 			receivers = {
-				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
-				{ name = "Jax", title = "Survivor camp guard", role = "worker" },
+				{ name = "Old Pete", title = "Guards his street", role = "townsperson" },
+				{ name = "Jax", title = "Holding out at home", role = "worker" },
+				{ name = "Aunt Maple", title = "Shells for the shotgun", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
 		},
 		{
 			id = "warehouse",
-			place = "Warehouse",
+			place = "Harbor Warehouse",
 			cargo = "Generator Fuel",
 			piece = "fuel barrel",
 			plural = "fuel barrels",
@@ -2221,7 +2299,7 @@ Config.Jobs = {
 		},
 		{
 			id = "bank",
-			place = "Bank",
+			place = "First Zombie Bank",
 			cargo = "Gold Bars",
 			piece = "strongbox",
 			plural = "strongboxes",
@@ -2237,7 +2315,7 @@ Config.Jobs = {
 		},
 		{
 			id = "cake",
-			place = "Bakery",
+			place = "Daily Bread Bakery",
 			cargo = "Wedding Cake",
 			piece = "cake box",
 			plural = "cake boxes",
@@ -2249,11 +2327,10 @@ Config.Jobs = {
 			receivers = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
 			},
+			to = { "house" },
+			hours = { 6, 18 },
 		},
-		-- 5.3 STUBS (Stream W, the world): the storefronts of Map.Venues that had no business yet. Data only, for Stream J
-		-- to fill (the rules per business, the times of day, the receivers at the homes, the backpack looks). `tiers` is
-		-- empty, so the board's car deliveries never pick them yet; NOTE: the light looks (burgers, cafe, news, flowers)
-		-- may already come up on the ON FOOT / BIKE board (server/Jobs.luau footOffer does not look at the tiers).
+		-- 5.3, the storefronts that came with the real places (Stream W's stubs, filled):
 		{
 			id = "burgers",
 			place = "Last Bite Burgers",
@@ -2261,14 +2338,17 @@ Config.Jobs = {
 			piece = "burger bag",
 			plural = "burger bags",
 			kind = "crate",
-			look = "pizza", -- (a food box; Stream J: a burger look)
+			look = "burger",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1, 2 },
 			giver = { name = "Big Al", title = "Grill cook", role = "cook" },
 			receivers = {
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
 				{ name = "Mrs. Hungry", title = "Ordered fries too", role = "townsperson" },
+				{ name = "Kenny", title = "Double cheese, no pickles", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			peak = { 18, 4, 1.25 },
 		},
 		{
 			id = "noodles",
@@ -2277,30 +2357,37 @@ Config.Jobs = {
 			piece = "noodle box",
 			plural = "noodle boxes",
 			kind = "soup",
-			look = "soup", -- (Stream J: a noodle box look)
+			look = "noodles",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1, 2 },
 			giver = { name = "Mei", title = "Wok cook", role = "cook" },
 			receivers = {
-				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
+				{ name = "Sparks", title = "Up all night on the radio", role = "worker" },
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
+				{ name = "Ms. Parker", title = "Marking homework", role = "teacher" },
 			},
+			to = { "apartment", "house" },
+			hours = { 11, 4 },
+			peak = { 18, 4, 1.3 },
 		},
 		{
 			id = "cafe",
 			place = "Grind House",
-			cargo = "Coffee & Pastries",
+			cargo = "Pastries",
 			piece = "pastry bag",
 			plural = "pastry bags",
 			kind = "sack",
-			look = "bread", -- (Stream J: a coffee tray look)
+			look = "pastry",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1 },
 			giver = { name = "Jules", title = "Barista", role = "cook" },
 			receivers = {
-				{ name = "Grandma Rose", title = "Her morning coffee", role = "townsperson" },
-				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+				{ name = "Grandma Rose", title = "Her morning croissant", role = "townsperson" },
+				{ name = "Ms. Parker", title = "Breakfast before school", role = "teacher" },
+				{ name = "Mr. Kowalski", title = "Two cinnamon rolls", role = "shopkeeper" },
 			},
+			to = { "house", "apartment" },
+			hours = { 6, 15 },
 		},
 		{
 			id = "news",
@@ -2309,14 +2396,16 @@ Config.Jobs = {
 			piece = "newspaper",
 			plural = "newspapers",
 			kind = "sack",
-			look = "mail", -- (Stream J: a newspaper look and the newspaper round)
+			look = "newspaper",
 			pieces = { 1, 3 },
-			tiers = {},
+			tiers = { 1 },
 			giver = { name = "Ed", title = "Printer", role = "clerk" },
 			receivers = {
 				{ name = "Old Tom", title = "Reads it twice", role = "townsperson" },
 				{ name = "Grandma Rose", title = "Wants the crossword", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			hours = { 4, 11 },
 		},
 		{
 			id = "flowers",
@@ -2325,14 +2414,17 @@ Config.Jobs = {
 			piece = "bouquet",
 			plural = "bouquets",
 			kind = "crate",
-			look = "plants",
+			look = "bouquet",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1, 2 },
 			giver = { name = "Lily", title = "Florist", role = "shopkeeper" },
 			receivers = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
 				{ name = "Grandma Rose", title = "Her birthday", role = "townsperson" },
+				{ name = "Mrs. Lopez", title = "Their anniversary", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			hours = { 8, 19 },
 		},
 		{
 			id = "icecream",
@@ -2341,13 +2433,16 @@ Config.Jobs = {
 			piece = "ice cream tub",
 			plural = "ice cream tubs",
 			kind = "icebox",
-			look = "groceries", -- (Stream J: an ice cream look; Frosty's own van jobs stay the employer's)
+			look = "icecream",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1 },
 			giver = { name = "Frosty", title = "Ice cream man", role = "shopkeeper" },
 			receivers = {
 				{ name = "The Twins", title = "Hot day", role = "townsperson" },
+				{ name = "Aunt Maple", title = "A birthday party", role = "townsperson" },
 			},
+			to = { "house" },
+			hours = { 11, 20 },
 		},
 	} :: { BusinessDef },
 	-- At a far place the place's own person takes the ordinary deliveries.
@@ -2474,6 +2569,29 @@ Config.Cargo = {
 		cake = true,
 		groceries = true,
 		plants = true,
+		-- 5.3, the storefronts' own pieces
+		burger = true,
+		noodles = true,
+		pastry = true,
+		newspaper = true,
+		bouquet = true,
+		icecream = true,
+		gadget = true,
+	} :: { [string]: boolean },
+	-- 5.3, what fits in a backpack (server/Cargo.luau packFits, shared/Bag.luau): small, flat or boxed light pieces.
+	-- Every other light piece (a bouquet, a cake, an electronics box, groceries, ice cream) rides in your hands, or on a
+	-- bike's rack, basket or box (one piece on the e-scooter's rack): on foot never more than your hands hold.
+	PackLooks = {
+		mail = true,
+		newspaper = true,
+		documents = true,
+		medicine = true,
+		pizza = true,
+		burger = true,
+		noodles = true,
+		pastry = true,
+		bread = true,
+		parcel = true,
 	} :: { [string]: boolean },
 	HandsMax = 2, -- light pieces in one player's hands at most
 	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)
