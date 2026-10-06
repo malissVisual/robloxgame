@@ -142,7 +142,7 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		end
 		return {
 			speaker = speaker(false),
-			pages = { "Here's your job. The red route on the map and the arrow over your van lead to the pickup. Get in your van and go!" },
+			pages = { "Here's your job. The red route on the map and the red marker over the stop lead to the pickup. Get in your van and go!" },
 			primary = "ON MY WAY",
 		}
 	elseif phase == "board" then

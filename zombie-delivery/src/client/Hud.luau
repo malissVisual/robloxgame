@@ -7,7 +7,7 @@
 -- Wrench Garage), the weapon (your gun, or the car gun while you drive a car that has one), the backpack (with the
 -- job's cargo), the delivery result (with the XP, a level-up and the crew's pay split), toasts, the FIRE button for
 -- touch screens and the way to the target (the park circle with a beam, on foot the pile / the person or the
--- vehicle's back, an arrow, a small waypoint with the name and the distance).
+-- vehicle's back, a small waypoint with the name and the distance).
 -- Driver levels (shared/Levels.luau): what your level does not reach yet shows LEVEL N (cars at the dealer, guns,
 -- car guns, an employer's job); the server refuses it anyway.
 -- The job board is client/DispatchUi.luau (3.6): J, the JOBS entry, the depot counter and NEXT JOB run Hud.onJobs.
@@ -293,8 +293,9 @@ view.health = -1 -- the health shown (the row redraws only when it changes)
 end
 
 -- ── Top stack ──────────────────────────────────────────────────────────────
--- 3.8: the contract column, upper left (under the native chat on a computer; right of the minimap column on a touch
--- screen), one column that grows downward (a UIListLayout: a hidden entry takes no room, so nothing overlaps):
+-- 3.8: the contract column, upper left (at the left margin under the top bar on a computer, under the native chat
+-- while it is open; right of the minimap column on a touch screen), one column that grows downward (a UIListLayout:
+-- a hidden entry takes no room, so nothing overlaps):
 --   1 the contract group (your own job; with none and nothing else on top, the small OFF DUTY line)
 --   2 the tutorial's hint (client/TutorialUi.luau sets its slot's order 2), the crew slot (a member's view of the
 --     leader's job, an invitation: client/CrewPanel.luau, through Hud.topSlot)
@@ -2567,14 +2568,15 @@ end
 
 -- ── The way to the target ──────────────────────────────────────────────────
 -- The park circle (a ring and a light beam) and, on foot during a carry step, a small ring at the pile / the
--- person with a thin beam over their head; a floating waypoint and an arrow (over the car, or over your head on foot).
+-- person with a thin beam over their head; a floating waypoint. 4.5.2: no arrow over the car or your head (the
+-- route on the maps, the circle, the beam and the waypoint show the way).
 -- 3.8: the contract's red for the job's stop, white for the pile / the person / the vehicle's back and the GPS point.
 -- The waypoint is small and monochrome: a red (or white) square, the name in white caps, the distance under it, and a
 -- fine line down to the spot.
 -- 4.4.1 (minimal): the circles are thin outlines on the ground (a SurfaceGui on a flat invisible part), not filled
--- neon discs; the light is a thin beam that fades out upwards; the arrow is smaller and slimmer.
+-- neon discs; the light is a thin beam that fades out upwards.
 
-local beacon: any, ring: any, pileRing: any, label: any, labelText: any, HIDDEN: any, PICKUP_COLOR: any, PILE_COLOR: any, UPRIGHT: any, hideGuide: any, placeGuide: any, pointArrow: any, GPS_COLOR: any, gps: any, myPosition: any, footTarget: any
+local beacon: any, ring: any, pileRing: any, label: any, labelText: any, HIDDEN: any, PICKUP_COLOR: any, PILE_COLOR: any, UPRIGHT: any, hideGuide: any, placeGuide: any, GPS_COLOR: any, gps: any, myPosition: any, footTarget: any
 do -- (its own block: the locals below stay out of the 200-register limit)
 local guide = Instance.new("Folder")
 guide.Name = "DeliveryGuide"
@@ -2685,12 +2687,6 @@ Ui.make("Frame", { Name = "Dot", Size = UDim2.fromOffset(4, 4), Position = UDim2
 function view.mark(name: string, distance: number): string
 	return `{view.esc(string.upper(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
 end
--- The arrow: a shaft and two sides of a head, pointing along -Z of its frame (4.4.1: smaller and slimmer).
-local arrowParts = {
-	{ part = guidePart("ArrowShaft", Vector3.new(0.28, 0.16, 2.6), 0.1), offset = CFrame.new(0, 0, 0.5) },
-	{ part = guidePart("ArrowLeft", Vector3.new(0.28, 0.16, 1.8), 0.1), offset = CFrame.lookAt(Vector3.new(-0.6, 0, -0.55), Vector3.new(0, 0, -1.2)) },
-	{ part = guidePart("ArrowRight", Vector3.new(0.28, 0.16, 1.8), 0.1), offset = CFrame.lookAt(Vector3.new(0.6, 0, -0.55), Vector3.new(0, 0, -1.2)) },
-}
 HIDDEN = CFrame.new(0, -1000, 0)
 PICKUP_COLOR = P.red -- (a pick-up is the job's stop too; the waypoint says PICK UP)
 PILE_COLOR = P.ink -- the pile, the person, the vehicle's back: white
@@ -2703,9 +2699,6 @@ function hideGuide()
 	label.CFrame = HIDDEN
 	-- 4.4.1: the waypoint is drawn on top of everything, so parked under the map it still showed: switch it off.
 	labelGui.Enabled = false
-	for _, a in arrowParts do
-		a.part.CFrame = HIDDEN
-	end
 end
 hideGuide()
 
@@ -2717,9 +2710,6 @@ local function paintGuide(color: Color3)
 		part.Color = color
 	end
 	light.Color = ColorSequence.new(color)
-	for _, a in arrowParts do
-		a.part.Color = color
-	end
 	view.markSquare.BackgroundColor3 = color
 end
 
@@ -2787,20 +2777,6 @@ function placeGuide(spot: Vector3, color: Color3, beamSpot: Vector3?, labelSpot:
 	end
 	label.CFrame = CFrame.new((labelAt or p) + Vector3.new(0, 10, 0))
 	labelGui.Enabled = true
-end
-
--- The arrow at `origin` pointing along `flat` (scale < 1: the small one over your head on foot).
-function pointArrow(origin: Vector3?, flat: Vector3, scale: number)
-	if origin and flat.Magnitude > 6 then
-		local frame = CFrame.lookAt(origin, origin + flat.Unit)
-		for _, a in arrowParts do
-			a.part.CFrame = frame * (a.offset.Rotation + a.offset.Position * scale)
-		end
-	else
-		for _, a in arrowParts do
-			a.part.CFrame = HIDDEN
-		end
-	end
 end
 
 -- The GPS: a place picked on the big map (the job's target goes first).
@@ -3216,8 +3192,9 @@ end
 --     the top, unscaled) keeps the top right corner (down to ADMIN_BOTTOM) while it shows (admins, Studio).
 --   * Left: cash + minimap + health, one column (LEFT_W × LEFT_H × S): bottom left on a computer (the chat is top
 --     left), top left on touch (the thumbstick is bottom left).
---   * Upper left: the contract column, under the native chat window on a computer (its rectangle from
---     TextChatService's ChatWindowConfiguration; right of it when there is no room under it), right of the minimap
+--   * Upper left: the contract column, at the left margin under Roblox's top bar on a computer; under the native
+--     chat window while it is open (its rectangle from TextChatService's ChatWindowConfiguration; 4.5.2: never right
+--     of it, and a closed chat takes no room), right of the minimap
 --     column on touch (under it when a screen held upright has no room beside it). TOP_W × S wide (narrower down to
 --     TOP_MIN_W before it gets smaller) and as tall as the room over the lower panels allows (TOP_EST_H).
 --   * Upper right: MAP CREW MENU. A computer has Roblox's player list (leaderstats) top right: the row sits left of
@@ -3279,10 +3256,22 @@ local function coreOn(kind: Enum.CoreGuiType): boolean
 	return not ok or on == true
 end
 
--- The native chat window's rectangle on a computer (TextChatService's ChatWindowConfiguration), nil when there is
--- none. Its coordinates may count Roblox's top bar; taken as they are, the column only ends up a little lower.
+-- 4.5.2: is the native chat window open (Roblox's chat button toggles it; StarterGui's "ChatActive")? Open when it
+-- cannot be asked. ChatWindowConfiguration keeps Enabled and its rectangle while the window is closed, so before
+-- 4.5.2 a closed chat still pushed the contract column down, and then (no room under it) to its right: the column
+-- stood near the middle of the screen. Hud.start looks at this twice a second (there is no signal for it).
+function view.chatShown(): boolean
+	local ok, active = pcall(function()
+		return game:GetService("StarterGui"):GetCore("ChatActive")
+	end)
+	return not ok or active ~= false
+end
+
+-- The native chat window's rectangle on a computer (TextChatService's ChatWindowConfiguration), in this HUD's
+-- coordinates; nil when there is none or it is closed.
 local function chatBox(): Box?
-	if touchLayout or not coreOn(Enum.CoreGuiType.Chat) then
+	view.chatOpen = view.chatShown()
+	if touchLayout or not coreOn(Enum.CoreGuiType.Chat) or not view.chatOpen then
 		return nil
 	end
 	local ok, found = pcall(function(): Box?
@@ -3294,7 +3283,7 @@ local function chatBox(): Box?
 		if not config or not config.Enabled then
 			return nil
 		end
-		local position, size = config.AbsolutePosition, config.AbsoluteSize
+		local position, size = config.AbsolutePosition - gui.AbsolutePosition, config.AbsoluteSize
 		if size.X < 1 or size.Y < 1 then
 			return nil
 		end
@@ -3475,23 +3464,24 @@ layout = function()
 		end
 		return limit
 	end
+	-- 4.5.2: always at the left margin on a computer, under Roblox's top bar (the ScreenGui's CoreUISafeInsets).
+	-- An open chat window over it pushes it down, under the chat, still at the left (no longer beside the chat:
+	-- on a wide screen that put the column near the middle). Little room under the chat makes it smaller instead.
 	local topX, topY = MARGIN, 14
 	if touchLayout then
 		topX, topY = left.x1 + GAP, MARGIN
 	end
 	local chat = chatBox()
-	if chat and chat.x0 < topX + TOP_MIN_W * S and chat.y1 > topY then
-		topY = chat.y1 + GAP -- under the chat window
-	end
-	local topScale, topWidth = fit(topY, topX, rightLimit(topY))
-	if chat and topScale < S * 0.8 then
-		-- Little room under the chat: beside it, at the top, if that is bigger.
-		local x = chat.x1 + GAP
-		local scale, width = fit(14, x, rightLimit(14))
-		if scale > topScale then
-			topX, topY, topScale, topWidth = x, 14, scale, width
+	if chat and chat.x0 < topX + TOP_W * S and chat.x1 > topX then
+		if chat.y0 < H * 0.5 then
+			if chat.y1 > topY then
+				topY = chat.y1 + GAP -- under the chat window
+			end
+		else
+			table.insert(below, chat) -- (a chat moved to the bottom: the column stays clear of it)
 		end
 	end
+	local topScale, topWidth = fit(topY, topX, rightLimit(topY))
 	if touchLayout and topScale < S * 0.8 then
 		-- No room beside the minimap and the actions (upright): under them, the whole width.
 		local y = math.max(left.y1, grid.y1) + GAP
@@ -3728,12 +3718,6 @@ RunService.RenderStepped:Connect(function()
 			local flat = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
 			distance = math.floor(flat.Magnitude)
 			labelText.Text = view.mark(footText or (if pickup then "PICK UP" else (person or tostring(job.customer))), distance)
-			local chassis = if seatedIn then seatedIn.PrimaryPart else nil
-			if chassis then
-				pointArrow(chassis.Position + Vector3.new(0, 11, 0), flat, 1)
-			elseif root then
-				pointArrow(root.Position + Vector3.new(0, 4.5, 0), flat, 0.6)
-			end
 		end
 		view.tickTicket(distance)
 	elseif gps then
@@ -3747,13 +3731,6 @@ RunService.RenderStepped:Connect(function()
 				gps = nil
 				MapView.setWaypoint(nil)
 				hideGuide()
-			else
-				local chassis = if seatedIn then seatedIn.PrimaryPart else nil
-				if chassis then
-					pointArrow(chassis.Position + Vector3.new(0, 11, 0), flat, 1)
-				elseif root then
-					pointArrow(root.Position + Vector3.new(0, 4.5, 0), flat, 0.6)
-				end
 			end
 		end
 	end
@@ -3777,6 +3754,15 @@ function Hud.start()
 			config:GetPropertyChangedSignal("AbsoluteSize"):Connect(requestLayout)
 			config:GetPropertyChangedSignal("AbsolutePosition"):Connect(requestLayout)
 			config:GetPropertyChangedSignal("Enabled"):Connect(requestLayout)
+		end
+	end)
+	-- 4.5.2: the chat window opened or closed (Roblox's chat button; no signal for it): the column follows.
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			if gui.Enabled and view.chatShown() ~= view.chatOpen then
+				requestLayout()
+			end
 		end
 	end)
 	Players.PlayerAdded:Connect(requestLayout)
