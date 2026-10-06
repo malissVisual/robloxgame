@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · 5.x phone model, app icons, wallpaper and splash logo · server/PhoneArt/, shared art-only server/ModelArt/ and tools/model-art/ foundation, art/icons/app_*, art/phone/, design/phone-art/ · since 2026-10-06
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
