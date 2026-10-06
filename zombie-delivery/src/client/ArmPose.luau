@@ -9,6 +9,7 @@
 -- Cargo: every character with the Carrying attribute (server/Cargo.luau; players and the people in workspace.Npcs)
 -- holds it: both upper arms forward-down, the forearms forward under the box at chest height (the gun in the hand
 -- is hidden meanwhile); "horse" is a lead: the right hand a little forward on the rope. Blended in and out too.
+-- 5.0: the phone (the PhoneHeld attribute, server/KitWear.luau) is held the same way: the right forearm up.
 -- 3.9: a holstered gun (the Holstered attribute, server/CloseCombat.luau; yours as client/Holster.luau shows it) is
 -- hidden the same way on foot, so the arms hang empty. A melee swing (V) moves the right arm on top of whatever else
 -- it does: a quick wind-up and a punch forward, or an overhead strike with the gun, about Config.Melee.SwingTime long
@@ -137,6 +138,15 @@ local function carryGoals(kind: string?): ArmGoals
 	if kind == nil then
 		return {} :: ArmGoals
 	end
+	if kind == "phone" then
+		-- 5.0: the phone in the right hand (the PhoneHeld attribute, server/KitWear.luau): the upper arm a little forward
+		-- and in, the forearm up toward the chest, the screen turned up to the face; the left arm swings free.
+		return {
+			rs = CFrame.Angles(0, math.rad(16), 0) * CFrame.Angles(math.rad(26), 0, 0),
+			re = CFrame.Angles(math.rad(70), 0, 0),
+			rw = CFrame.Angles(math.rad(-6), 0, 0),
+		}
+	end
 	if kind == "horse" then
 		-- Leading on a rope: the right hand a little forward and out, the elbow soft; the left arm swings free.
 		return {
@@ -252,10 +262,14 @@ function ArmPose.apply(character: Model, t: number, pitch: number)
 	pose(character, t, pitch, 0, nil)
 end
 
--- What a character holds (the server's Carrying attribute), or nil.
+-- What a character holds (the server's Carrying attribute; 5.0: "phone" while the server shows the phone in its
+-- right hand, the PhoneHeld attribute), or nil.
 local function carryingOf(character: Model): string?
 	local value = character:GetAttribute("Carrying")
-	return if type(value) == "string" and value ~= "" then value else nil
+	if type(value) == "string" and value ~= "" then
+		return value
+	end
+	return if character:GetAttribute("PhoneHeld") == true then "phone" else nil
 end
 
 -- The gun in the hand is hidden (on this client) while the hands hold cargo or (3.9) it is holstered on foot, and comes

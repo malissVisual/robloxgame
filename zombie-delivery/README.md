@@ -1060,6 +1060,25 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
 All numbers are in `src/shared/Config.luau`, the world layout in `src/shared/Map.luau`, the formulas in
 `src/shared/Economy.luau`.
 
+## From the bottom: on foot, your kit, the phone, Earl's van (5.0)
+
+**Everybody starts again** (the DataStore is `ZombieDelivery_v2`; the old saves stay stored, unread). A new courier has
+no vehicle, $40 and a pistol. Marge welcomes you, gives you **the phone** (O, or the PHONE button: ORDERS, BOARD,
+CAREER, SHOP, MAP, MESSAGES; `client/Phone.luau`) and the first delivery **on foot**: two letter bundles on one street.
+
+**On foot** (`Config.Jobs.Foot`, `offer.mode = "foot"`): the board's ON FOOT section, three light-cargo runs (mail,
+documents, medicine, pizza, parcels …) a short walk away, $60–110, about 8 runs to level 2; no zombie waves, now and then a
+stray walker. Your hands hold 2 pieces; more go into **your backpack** (the pack: hand over takes the hands first, then
+the pack; it drops when you die). **Your kit** (`Config.Kit`, Last Stop Supplies → KIT, `profile.kit`): the Courier
+Backpack (3), the Big Backpack (4), Running Shoes (+10% speed), a Thermal Jacket (food stays warm) — you wear them
+(Codex's models, `server/KitWear.luau`; a parcel sticks out of the backpack while it holds cargo), and the phone shows
+in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau` say what you carry (on foot or by car).
+
+**Earl's van** (`shared/VanQuest.luau`): at level 4 Marge texts you about a guy out west. Earl's Used Wheels (on the
+West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
+missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
+5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
 ## Your career and your gear (4.6)
 
 **The career** (MENU → CAREER, or **C**): your rank and level, the XP to the next one (about how many deliveries), what

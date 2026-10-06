@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.8"
+Config.Version = "5.0"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
@@ -502,6 +502,83 @@ Config.Cars = {
 		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
 		company = true,
 		employer = "gas",
+	},
+	-- 5.1, the bikes (CarDef.bike): sold at Spoke & Chain from level 2, after the cars (Config.Cars[1] stays the van).
+	-- server/Vehicles.luau builds them on the styles "bike" (a rear rack: 1 slot) and "cargobike" (a front box: 4) with
+	-- Codex's art (server/BikeArt/Geometry.luau, the art id = the car id). No fuel, no passengers, no car gun, no stages;
+	-- the bike gear (Config.Gear bikeOnly: basket, panniers, trailer) adds light slots. Sprint on foot is 28 for ~6 s,
+	-- so even the Rusty Bike (30, all day) is clearly better.
+	{
+		id = "rustbike",
+		bike = true,
+		level = 2,
+		name = "Rusty Bike",
+		price = 300,
+		style = "bike",
+		maxSpeed = 30,
+		accel = 16,
+		turn = 2.4,
+		health = 120,
+		capacity = 1,
+		gearSlots = 1,
+		ramPower = 0.3,
+		color = { 110, 118, 110 },
+		role = "Your first wheels: faster than running, all day",
+		description = "Worn tubes, mismatched wheels, a squeaky chain. A rear rack for one light parcel, your backpack on your back. Rider only.",
+	},
+	{
+		id = "citybike",
+		bike = true,
+		level = 2,
+		name = "Courier Bike",
+		price = 1100,
+		style = "bike",
+		maxSpeed = 38,
+		accel = 20,
+		turn = 2.5,
+		health = 150,
+		capacity = 1,
+		gearSlots = 2,
+		ramPower = 0.35,
+		color = { 153, 49, 43 },
+		role = "The quick one: a clean frame, a lamp, two gear slots",
+		description = "A clean red courier frame with a front lamp. A rear rack for one light parcel and room for two pieces of bike gear. Rider only.",
+	},
+	{
+		id = "cargobike",
+		bike = true,
+		level = 3,
+		name = "Cargo Bike",
+		price = 2400,
+		style = "cargobike",
+		maxSpeed = 32,
+		accel = 14,
+		turn = 2.1,
+		health = 180,
+		capacity = 4,
+		gearSlots = 2,
+		ramPower = 0.4,
+		color = { 153, 49, 43 },
+		role = "The hauler: a front box for four light pieces",
+		description = "A long low frame with a box up front: four light pieces ride in it. Slower off the line; it takes a basket or panniers, not a trailer. Rider only.",
+	},
+	{
+		id = "ebike",
+		bike = true,
+		level = 5,
+		name = "E-Bike",
+		price = 6500,
+		style = "bike",
+		maxSpeed = 48,
+		accel = 24,
+		turn = 2.6,
+		health = 160,
+		capacity = 1,
+		gearSlots = 2,
+		ramPower = 0.4,
+		color = { 153, 49, 43 },
+		role = "The fast one: a battery does half the pedalling",
+		description = "A battery in the frame, a bar display, disc brakes. The fastest thing on two wheels, no fuel needed. A rear rack and two gear slots. Rider only.",
 	},
 } :: { CarDef }
 

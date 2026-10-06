@@ -14,6 +14,11 @@
 -- 3.6: the owner's name sits on a cream pill in ink (Theme.Postage.pill), readable over a night street and a sunny one.
 -- 4.0: the Rusty Van's exhaust smokes (the car's attribute Smoky, server/Vehicles.luau: till Engine level 1): a cheap
 -- ParticleEmitter at its Attachment "Exhaust", made the first time it is near, puffing more at idle than on the move.
+-- 5.1, a bike (the car's attribute Bike, server/Vehicles.luau): its frame leans into the turns (the Motor6D BikeLean,
+-- by how fast it turns at its speed: only the look, the physics stay upright), the cranks and pedals turn with the
+-- speed (CrankMotor), the front wheel does not steer (the fork is part of the frame), and the rider sits posed
+-- (client/BikeRider.luau: leaning forward, hands on the grips, legs pumping with the crank). A trailer's wheels are in
+-- the kit: found again when the car's KitBuilt changes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +26,7 @@ local RunService = game:GetService("RunService")
 
 local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
 
+local BikeRider = require(script.Parent.BikeRider)
 local Drive = require(script.Parent.Drive)
 local Theme = require(script.Parent.Theme)
 
@@ -42,11 +48,22 @@ type CarState = {
 	backReach: number?, -- the BackPrompt's own reach (the server's), before it was hidden here
 	trolleyReach: number?, -- 4.0: the same for the trolley's "Take trolley" (server/Equipment.luau, TrolleyTake)
 	smoke: ParticleEmitter?, -- 4.0: the exhaust smoke (made when first needed)
+	-- 5.1, a bike: its lean and crank joints, how far it leans and where the crank is, the rider posed, the kit seen.
+	lean: Motor6D?,
+	crankMotor: Motor6D?,
+	tilt: number,
+	crank: number,
+	rider: Model?,
+	kitBuilt: any,
 }
 
 local player = Players.LocalPlayer
 local states: { [Model]: CarState } = {}
 local RANGE = 260
+local RIDER_RANGE = 160 -- 5.1: riders posed this close to the camera
+local LEAN_MAX = 0.16 -- 5.1: radians (about 9°) a bike leans at most (its load, welded to the hull, does not lean)
+local LEAN_RATE = 0.006 -- per (rad/s of turning × stud/s of speed)
+local CADENCE = 0.42 -- 5.1: crank turns per wheel turn
 local BACK_TIME = 0.45 -- seconds for the back to swing open or shut
 
 local function stateOf(car: Model): CarState?
@@ -62,6 +79,7 @@ local function stateOf(car: Model): CarState?
 	local hinges: { Hinge } = {}
 	local doorHinges: { DoorHinge } = {}
 	local doorPrompts: { DoorPrompt } = {}
+	local lean: Motor6D?, crankMotor: Motor6D? = nil, nil
 	-- 3.7: the seats behind each door (their attribute Door).
 	local seatsAt: { [number]: { Seat } } = {}
 	for _, child in car:GetChildren() do
@@ -79,6 +97,10 @@ local function stateOf(car: Model): CarState?
 				front = child:GetAttribute("Front") == true,
 				radius = (child:GetAttribute("Radius") or 1.3) :: number,
 			})
+		elseif child:IsA("Motor6D") and child.Name == "BikeLean" then
+			lean = child
+		elseif child:IsA("Motor6D") and child.Name == "CrankMotor" then
+			crankMotor = child
 		elseif child:IsA("Motor6D") and child.Name == "BackHinge" then
 			local angle = child:GetAttribute("Angle")
 			table.insert(hinges, {
@@ -119,12 +141,57 @@ local function stateOf(car: Model): CarState?
 		backReach = nil,
 		trolleyReach = nil,
 		smoke = nil,
+		lean = lean,
+		crankMotor = crankMotor,
+		tilt = 0,
+		crank = 0,
+		rider = nil,
+		kitBuilt = nil,
 	}
 	states[car] = state
 	car.Destroying:Connect(function()
+		local rider = state and state.rider
+		if rider then
+			BikeRider.release(rider)
+		end
 		states[car] = nil
 	end)
 	return state
+end
+
+-- 5.1: the wheels in the car's kit (a bike trailer's: WheelMotors under UpgradeKit) replace the old kit's.
+local function kitWheels(car: Model, state: CarState)
+	local chassis = car.PrimaryPart
+	local kept: { Wheel } = {}
+	for _, wheel in state.wheels do
+		if wheel.motor.Parent == chassis then
+			table.insert(kept, wheel)
+		end
+	end
+	local kit = car:FindFirstChild("UpgradeKit")
+	if kit then
+		for _, d in kit:GetDescendants() do
+			if d:IsA("Motor6D") and d.Name == "WheelMotor" then
+				table.insert(kept, { motor = d, front = false, radius = (d:GetAttribute("Radius") or 1.3) :: number })
+			end
+		end
+	end
+	state.wheels = kept
+end
+
+-- 5.1: the rider on a bike's saddle near the camera is posed (client/BikeRider.luau), the one before let go.
+local function poseRider(car: Model, state: CarState, near: boolean)
+	local seat = car:FindFirstChild("DriverSeat")
+	local occupant = if near and seat and seat:IsA("VehicleSeat") then seat.Occupant else nil
+	local character = occupant and occupant.Parent
+	local rider: Model? = if character and character:IsA("Model") and occupant and occupant.Health > 0 then character else nil
+	if state.rider and state.rider ~= rider then
+		BikeRider.release(state.rider)
+	end
+	state.rider = rider
+	if rider then
+		BikeRider.pose(rider, state.crank)
+	end
 end
 
 -- 4.0: a thin grey-blue puff out of the exhaust pipe, drifting back and up.
@@ -163,7 +230,7 @@ local function nameTag(car: Model, chassis: BasePart)
 	label.AnchorPoint = Vector2.new(0.5, 0)
 	label.BackgroundColor3 = Theme.Postage.pill
 	label.BackgroundTransparency = 0.05
-	label.Text = `{car:GetAttribute("OwnerName") or "?"}'s car`
+	label.Text = `{car:GetAttribute("OwnerName") or "?"}'s {if car:GetAttribute("Bike") == true then "bike" else "car"}`
 	label.TextColor3 = Theme.Postage.ink
 	label.Font = Theme.HeadingFont
 	label.TextSize = 15
@@ -293,12 +360,18 @@ local function step(dt: number)
 		end
 
 		-- Wheels.
+		local bike = state.lean ~= nil
+		if bike then
+			poseRider(car, state, distance <= RIDER_RANGE)
+		end
 		if distance > RANGE then
 			continue
 		end
 		local forward = chassis.AssemblyLinearVelocity:Dot(chassis.CFrame.LookVector)
 		local targetSteer: number
-		if mine and Drive.isDriving() then
+		if bike then
+			targetSteer = 0 -- 5.1: the fork is part of the frame (it leans instead)
+		elseif mine and Drive.isDriving() then
 			targetSteer = -Drive.steer() * 0.45
 		else
 			targetSteer = math.clamp(chassis.AssemblyAngularVelocity.Y * 0.35, -0.45, 0.45) * (if forward >= 0 then 1 else -1)
@@ -313,6 +386,25 @@ local function step(dt: number)
 			wheel.motor.Transform = turn * CFrame.Angles(spin, 0, 0)
 		end
 		state.spin -= forward / 1.3 * dt
+
+		-- 5.1, a bike: the lean into the turn (how fast it turns at its speed), the cranks with the wheels, the kit's
+		-- trailer wheels found again after a new kit.
+		local leanMotor = state.lean
+		if leanMotor and leanMotor.Parent then
+			local goal = math.clamp(chassis.AssemblyAngularVelocity.Y * forward * LEAN_RATE, -LEAN_MAX, LEAN_MAX)
+			state.tilt += (goal - state.tilt) * math.min(1, dt * 6)
+			leanMotor.Transform = CFrame.Angles(0, 0, state.tilt)
+			local crankMotor = state.crankMotor
+			state.crank -= forward / 1.3 * CADENCE * dt
+			if crankMotor and crankMotor.Parent then
+				crankMotor.Transform = CFrame.Angles(state.crank, 0, 0)
+			end
+			local built = car:GetAttribute("KitBuilt")
+			if built ~= state.kitBuilt then
+				state.kitBuilt = built
+				kitWheels(car, state)
+			end
+		end
 
 		-- 3.7: the cabin doors swing open and shut (eased; held while open). 3.10: from DoorOpenAt to DoorCloseAt.
 		for _, swing in state.doorHinges do

@@ -157,7 +157,7 @@ check("every car has a style and a price", (function()
 		if car.style == "" or car.price < 0 then
 			return false
 		end
-		if not car.company then
+		if not car.company and not car.bike then -- (5.1: the bikes are Spoke & Chain's)
 			if car.price <= last then
 				return false -- the dealer's cars get pricier down the list
 			end

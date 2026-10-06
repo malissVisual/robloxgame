@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest")
+PURE = ("Config", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -32,6 +32,7 @@ with tempfile.TemporaryDirectory() as tmp:
 # 3.3: the car bodies (server/Vehicles.luau STYLES, not loadable outside Roblox) read as text: every Config.Cars style
 # has a body; every dealer car's body takes cargo and has a back that opens (the 3.2 loading).
 # 3.4: every car's capacity (Config.Cars capacity) is exactly its body's cargo slots (the slot list of cargo(...)).
+# 5.1: the bikes (CarDef.bike) are exempt from the back; their body must be a bike's (Style.bike) with slots = capacity.
 # 3.5: every stage of a car (Config.Cars stages) holds exactly its look's slots (Vehicles.luau LOOKS[look].slots; stage
 # 0 / no look: the body's), every look a stage names exists, and a dealer car holds at least 2 at its last stage.
 def slot_count(body, key="cargo = cargo("):
@@ -98,6 +99,14 @@ def styles_check():
                 bad.append(f"{car_id} {name}: capacity {held} but {slots} cargo slots")
             most = max(most, slots)
         if "company = true" in entry:
+            continue
+        # 5.1: a bike (bike = true) has no back that opens (you load its rack or box straight away) and may hold one
+        # piece; its slots are its capacity (checked above). Its style says so (bike = true in the body).
+        if re.search(r"\bbike = true", entry):
+            if count < 1:
+                bad.append(f"{car_id}: a bike without cargo slots")
+            if not re.search(r"\bbike = true", body):
+                bad.append(f"{car_id}: a bike on style {style}, which is not a bike body")
             continue
         if count < 1 or most < 2:
             bad.append(f"{car_id}: {count} cargo slots, {most} at its last stage")
