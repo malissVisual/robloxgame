@@ -123,6 +123,7 @@ end
 local function shelter(parent: Instance, stop: BusLines.Stop)
 	local model = Instance.new("Model")
 	model.Name = `Bus Stop · {stop.name}`
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- (the arrivals board streams in with its shelter)
 	model:SetAttribute("StopId", stop.id)
 	model:SetAttribute("StopName", stop.name)
 	-- The frame: on the curb by the door, -Z into the sidewalk; `along` toward the bus's front, `depth` in from the curb.

@@ -60,6 +60,7 @@ type Ride = { model: Model, line: BusLines.Line, index: number }
 
 local tracks: { [Model]: Track } = {}
 local ride: Ride? = nil
+local hiddenPrompts: { ProximityPrompt } = {} -- your bus's Board prompts hidden while you ride it (given back after)
 local job: { [string]: any }? = nil
 local boards: { [Model]: TextLabel } = {}
 local view: { [string]: any } = {}
@@ -326,8 +327,17 @@ local function updateBoards(now: number)
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
 	for model, label in boards do
 		if not label.Parent then
-			boards[model] = nil
-			continue
+			-- (StreamingEnabled: the board part streamed out; look again when it is back, keep the model)
+			local again = if model.Parent then model:FindFirstChild("Arrivals", true) else nil
+			if again and again:IsA("TextLabel") then
+				boards[model] = again
+				label = again
+			else
+				if not model.Parent then
+					boards[model] = nil
+				end
+				continue
+			end
 		end
 		local id = model:GetAttribute("StopId")
 		local stop = if type(id) == "number" then BusLines.allStops()[id] else nil
@@ -342,9 +352,12 @@ local function addBoard(item: Instance)
 	if not item:IsA("Model") then
 		return
 	end
-	task.defer(function()
-		local label = item:FindFirstChild("Arrivals", true)
-		if label and label:IsA("TextLabel") then
+	task.spawn(function()
+		local label = item:FindFirstChild("Arrivals", true) or item:WaitForChild("ArrivalsBoard", 30)
+		if label and not label:IsA("TextLabel") then
+			label = label:FindFirstChild("Arrivals", true)
+		end
+		if label and label:IsA("TextLabel") and item.Parent then
 			boards[item] = label
 		end
 	end)
@@ -387,6 +400,17 @@ local function endRide(humanoid: Humanoid?)
 	end
 	ride = nil
 	ContextActionService:UnbindAction(STOP_ACTION)
+	-- The Board prompts hidden while riding come back (the server sets Enabled only when a dwell starts or ends).
+	for _, prompt in hiddenPrompts do
+		local bus = prompt:FindFirstAncestorOfClass("Model")
+		while bus and bus:GetAttribute("BusLine") == nil and bus.Parent and bus.Parent:IsA("Model") do
+			bus = bus.Parent :: Model
+		end
+		if prompt.Parent then
+			prompt.Enabled = bus ~= nil and bus:GetAttribute("BusAt") ~= nil
+		end
+	end
+	table.clear(hiddenPrompts)
 	if humanoid then
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
 	end
@@ -434,8 +458,10 @@ function BusRide.start()
 	end)
 	-- Your own bus's Board prompt while you ride it: hidden (E gets you off).
 	ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
-		if ride and prompt:GetAttribute("BusLine") ~= nil then
+		local riding = ride
+		if riding and prompt:GetAttribute("BusLine") ~= nil and prompt:IsDescendantOf(riding.model) then
 			prompt.Enabled = false
+			table.insert(hiddenPrompts, prompt)
 		end
 	end)
 	player.CharacterAdded:Connect(watchCharacter)
@@ -458,10 +484,7 @@ function BusRide.start()
 		end
 		watchFolder(folder)
 		RunService.RenderStepped:Connect(function(dt: number)
-			place(dt)
-		end)
-		RunService.PreSimulation:Connect(function()
-			place(nil)
+			place(dt) -- (once a frame: the buses are anchored and never collide)
 		end)
 	end)
 	task.spawn(function()

@@ -79,11 +79,13 @@ function PhoneMotion.banner(screen: Instance, top: number, from: string, text: s
 	}, screen)
 	banner = made
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, made)
-	Ui.list(made, true, 2)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 9) }, made)
+	-- (the accent sits outside the list: the rows go in an inner frame, like Phone's cards)
 	Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 31 }, made)
-	P.caps(made, string.upper(from), UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1, TextColor3 = K.text, TextSize = 11, ZIndex = 31 })
-	local body = Ui.label(made, text, UDim2.new(1, 0, 0, 0), {
+	local inner = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, ZIndex = 31 }, made)
+	Ui.list(inner, true, 2)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 9) }, inner)
+	P.caps(inner, string.upper(from), UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1, TextColor3 = K.text, TextSize = 11, ZIndex = 31 })
+	local body = Ui.label(inner, text, UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
 		Font = Theme.Font,

@@ -422,8 +422,16 @@ local function checkRiders()
 			forget(player)
 			continue
 		end
-		if rider.seat.Occupant == rider.humanoid or clock - rider.since < SIT_GRACE then
+		local alive = player.Character == rider.character and rider.humanoid.Health > 0
+		if alive and (rider.seat.Occupant == rider.humanoid or clock - rider.since < SIT_GRACE) then
 			continue
+		end
+		if not alive then
+			-- (a death or a respawn while seated: the seat is freed even if the engine still lists the old body)
+			local weld = rider.seat:FindFirstChild("SeatWeld")
+			if weld then
+				weld:Destroy()
+			end
 		end
 		forget(player)
 		if player.Character == rider.character and rider.humanoid.Health > 0 and rider.humanoid.SeatPart == nil then
