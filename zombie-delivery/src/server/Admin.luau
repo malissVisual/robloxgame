@@ -57,6 +57,8 @@
 --                             BanditCars.frozen; the workspace attribute AdminFrozen; off when its admin leaves)
 --   time       hour           the clock (DayNight.setClock: the night comes with it)
 --   heal [T]                  you and your car full
+--   refuel [T] share?         5.4: the car's tank full (share 1, the default) or empty (0: try the crawl and the TOW)
+--                             (server/Fuel.luau adminFill)
 --   buddy [T]  count          1 … 3 NPC buddies (Buddy.spawn); buddyDismiss [T]: all gone; buddyMode [T] "follow" |
 --                             "stay" | "guard". The player attributes AdminBuddies (how many) and AdminBuddyMode show it
 --   giveEstate [T] id | "all" a property (Config.Estate) for free, or every one (a first home becomes your home)
@@ -1230,6 +1232,9 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	heal = function(player: Player)
 		heal(player, false)
 	end,
+	refuel = function(player: Player, arg: any) -- 5.4
+		say(player, require(Server.Fuel).adminFill(player, if type(arg) == "number" then arg else nil))
+	end,
 	giveEstate = giveEstate,
 	clearEstate = clearEstate,
 	setHome = setHome,
@@ -1276,7 +1281,7 @@ end
 local TARGETED: { [string]: boolean } = {}
 for _, name in {
 	"unlockAll", "maxUpgrades", "money", "xp", "setLevel", "item", "car", "carGun", "carStage", "upgrade", "paint",
-	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "roadEvent", "god", "heal", "speed",
+	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "roadEvent", "god", "heal", "refuel", "speed",
 	"clearWanted", "buddy", "buddyDismiss", "buddyMode", "giveEstate", "clearEstate", "setHome", "estateTeleport",
 	"businessCash", "missionStart", "missionsAll", "missionsReset", "challengesAll", "secretsAll", "challengesReset",
 	"title",

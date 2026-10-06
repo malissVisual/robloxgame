@@ -11,7 +11,8 @@
 -- new DataStore, Config.DataStoreName): a new player starts on foot with no vehicle (car = nil, cars = {}), the
 -- personal gear bought at Last Stop Supplies (kit: Config.Kit ids, shared/Transport.luau) and the phone Marge gives
 -- in the tutorial (phone). 5.1: bikes are Config.Cars entries in cars (bike = true); the equipped `car` may be one,
--- `bike` is your bike of choice and `lastCar` the car the phone's CALL CAR brings back (server/Shops.luau).
+-- `bike` is your bike of choice and `lastCar` the car the phone's CALL CAR brings back (server/Shops.luau). 5.4: the
+-- fuel in every car you own (carFuel, litres; server/Fuel.luau keeps it, a car without an entry is full).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -41,6 +42,7 @@ export type Profile = {
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
 	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car); 3.5: + stage
 	carHealth: { [string]: number }, -- 3.4: car id → its share of health (0 … 1) while parked; no entry = as new
+	carFuel: { [string]: number }, -- 5.4: car id → litres in its tank (Config.Fuel); no entry = full (a new car)
 	carGear: { [string]: { [string]: string } }, -- 4.6: car id → gear id → "owned" | "installed" (Config.Gear)
 	items: { [string]: number }, -- consumables (Config.Items): how many
 	paints: { [string]: boolean }, -- bought paint jobs
@@ -101,6 +103,7 @@ local function newProfile(): Profile
 		upgrades = {},
 		carUpgrades = {},
 		carHealth = {},
+		carFuel = {}, -- 5.4: every car comes full
 		carGear = {},
 		items = { medkit = 1 }, -- 5.0: no repair kit (no car)
 		paints = { factory = true },
@@ -430,6 +433,15 @@ local function applySaved(profile: Profile, saved: any)
 			end
 		end
 	end
+	-- 5.4: the fuel in every car you own (litres, within its tank).
+	if type(saved.carFuel) == "table" then
+		for carId, litres in saved.carFuel do
+			local def = if type(carId) == "string" and profile.cars[carId] then Economy.findCar(carId) else nil
+			if def and def.tank and type(litres) == "number" and litres == litres then
+				profile.carFuel[carId] = math.clamp(litres, 0, def.tank)
+			end
+		end
+	end
 	if type(saved.items) == "table" then
 		for _, def in Config.Items do
 			profile.items[def.id] = number(saved.items[def.id], 0, def.max)
@@ -637,6 +649,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		upgrades = profile.upgrades,
 		carUpgrades = profile.carUpgrades,
 		carHealth = profile.carHealth,
+		carFuel = profile.carFuel, -- 5.4
 		carGear = profile.carGear, -- 4.6
 		items = profile.items,
 		paints = profile.paints,

@@ -9,6 +9,10 @@
 -- changes smoothly (no jumps). Braking and coasting stay as they were.
 -- 5.1: a bike (the car's attribute Bike, server/Vehicles.luau) pedals away at once (no torque curve: full push from a
 -- standstill), coasts on longer, steers already at walking pace and backs up slowly (you walk it back).
+-- 5.4, fuel (server/Fuel.luau writes the car's attributes Tank and Fuel; shared/FuelMath.luau): with an empty tank the
+-- top speed is Config.Fuel.CrawlSpeed at most (FuelMath.topSpeed: the nitro and the admin's boost too) and a toast says
+-- so once ("Out of fuel — crawl to a pump or call a tow (phone)"); under Config.Fuel.Low of the tank a soft LOW FUEL
+-- toast, once (again only after a refill). A bike has no tank.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Map = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Map"))
 local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
+local FuelMath = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FuelMath"))
 
 local Drive = {}
 
@@ -26,6 +31,7 @@ local steerInput = 0
 local boostUntil = 0
 local boostMultiplier = 1
 local backToldAt = -math.huge -- the "close the back" toast, at most every few seconds
+local fuelTold = { car = nil :: Model?, empty = false, low = false } -- 5.4: the fuel toasts already given for this car
 
 -- Set by Main (Hud.toast). The fallback is Roblox's own notification.
 Drive.notify = nil :: ((text: string) -> ())?
@@ -203,6 +209,24 @@ local function step(dt: number)
 	if Drive.boosting() and throttle > 0 then
 		maxSpeed *= boostMultiplier
 		accel *= 2.5
+	end
+	-- 5.4: an empty tank crawls (the toasts once each: empty, low; again only after a refill).
+	local tank, fuel = car:GetAttribute("Tank"), car:GetAttribute("Fuel")
+	if type(tank) == "number" and type(fuel) == "number" and tank > 0 then
+		maxSpeed = FuelMath.topSpeed(maxSpeed, fuel, tank)
+		if fuelTold.car ~= car then
+			fuelTold.car, fuelTold.empty, fuelTold.low = car, false, false
+		end
+		local empty, low = FuelMath.isEmpty(fuel), FuelMath.isLow(fuel, tank)
+		if Drive.isDriving() and empty and not fuelTold.empty then
+			fuelTold.empty, fuelTold.low = true, true
+			tell("Out of fuel — crawl to a pump or call a tow (phone)")
+		elseif Drive.isDriving() and low and not empty and not fuelTold.low then
+			fuelTold.low = true
+			tell("LOW FUEL · a gas station is on the map (⛽), or use a jerry can")
+		end
+		fuelTold.empty = fuelTold.empty and empty
+		fuelTold.low = fuelTold.low and low
 	end
 	steerInput = steer
 	local turn = (car:GetAttribute("Turn") or 1.8) :: number

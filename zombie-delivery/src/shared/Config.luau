@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "5.2"
+Config.Version = "5.4"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
@@ -130,6 +130,10 @@ export type CarDef = {
 	-- standing pose through shared/RiderPose.luau), and a badge on its card at Spoke & Chain ("⚡ ELECTRIC · STAND-UP").
 	stand: boolean?,
 	badge: string?,
+	-- 5.4, fuel (Config.Fuel, shared/FuelMath.luau): the tank in litres and what it burns, litres per 1,000 studs driven.
+	-- Every car has both; a bike has none (no fuel).
+	tank: number?,
+	burn: number?,
 }
 
 -- 3.5, a stage of a car (CarDef.stages): bought at Wrench Garage one after the other for the car you drive. Each one
@@ -184,6 +188,8 @@ Config.Cars = {
 		turn = 1.8,
 		health = 300,
 		capacity = 2,
+		tank = 40, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.0,
 		color = { 214, 196, 160 },
 		role = "Your first vehicle: it grows with you",
@@ -209,6 +215,8 @@ Config.Cars = {
 		turn = 2.05,
 		health = 320,
 		capacity = 2,
+		tank = 35, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
 		ramPower = 1.0,
 		color = { 232, 170, 40 },
 		role = "Fast and nimble: the rush jobs",
@@ -232,6 +240,8 @@ Config.Cars = {
 		turn = 1.75,
 		health = 450,
 		capacity = 4,
+		tank = 50, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
 		ramPower = 1.1,
 		color = { 168, 186, 200 },
 		role = "Tougher, the in-between",
@@ -254,6 +264,8 @@ Config.Cars = {
 		turn = 2.0,
 		health = 420,
 		capacity = 2,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 8, -- litres per 1,000 studs
 		ramPower = 1.15,
 		color = { 196, 60, 50 },
 		role = "The crew car: friends shoot from the bed",
@@ -277,6 +289,8 @@ Config.Cars = {
 		turn = 1.6,
 		health = 650,
 		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 10, -- litres per 1,000 studs
 		ramPower = 1.4,
 		color = { 238, 238, 232 },
 		role = "The big one: the only way to 6 and more",
@@ -300,6 +314,8 @@ Config.Cars = {
 		turn = 2.3,
 		health = 340,
 		capacity = 1,
+		tank = 65, -- 5.4: litres (Config.Fuel)
+		burn = 7, -- litres per 1,000 studs
 		ramPower = 1.0,
 		color = { 30, 30, 36 },
 		role = "The getaway car: one piece, all speed",
@@ -323,6 +339,8 @@ Config.Cars = {
 		turn = 1.2,
 		health = 900,
 		capacity = 12,
+		tank = 120, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
 		ramPower = 2.0,
 		color = { 46, 88, 150 },
 		role = "Warehouse freight: pallets and 12 slots",
@@ -344,6 +362,8 @@ Config.Cars = {
 		turn = 1.8,
 		health = 900,
 		capacity = 3,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.6,
 		color = { 72, 78, 84 },
 		role = "Very tough: the car-gun platform",
@@ -366,6 +386,8 @@ Config.Cars = {
 		turn = 2.25,
 		health = 420,
 		capacity = 2,
+		tank = 55, -- 5.4: litres (Config.Fuel)
+		burn = 6, -- litres per 1,000 studs
 		ramPower = 1.1,
 		color = { 30, 90, 200 },
 		role = "The fastest van: rush jobs",
@@ -386,6 +408,8 @@ Config.Cars = {
 		turn = 1.6,
 		health = 1000,
 		capacity = 8,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.8,
 		color = { 80, 96, 70 },
 		description = "The army's truck. Two gunners on the roof. 3 passengers.",
@@ -402,6 +426,8 @@ Config.Cars = {
 		turn = 1.4,
 		health = 1300,
 		capacity = 8,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 2.0,
 		color = { 245, 190, 30 },
 		description = "The school's bus. Bring the whole crew. 5 passengers.",
@@ -419,6 +445,8 @@ Config.Cars = {
 		turn = 1.9,
 		health = 1400,
 		capacity = 6,
+		tank = 80, -- 5.4: litres (Config.Fuel)
+		burn = 14, -- litres per 1,000 studs
 		ramPower = 2.5,
 		color = { 60, 130, 220 },
 		description = "The farmer's pride. Zombies are just speed bumps. 3 passengers.",
@@ -436,6 +464,8 @@ Config.Cars = {
 		turn = 1.9,
 		health = 650,
 		capacity = 6,
+		tank = 60, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.3,
 		color = { 250, 240, 245 },
 		description = "Frosty's ice cream truck. 1 passenger.",
@@ -453,6 +483,8 @@ Config.Cars = {
 		turn = 1.5,
 		health = 900,
 		capacity = 10,
+		tank = 90, -- 5.4: litres (Config.Fuel)
+		burn = 11, -- litres per 1,000 studs
 		ramPower = 1.6,
 		color = { 230, 120, 40 },
 		description = "Big Move's moving truck: a tall box that takes a pallet. 1 passenger.",
@@ -469,6 +501,8 @@ Config.Cars = {
 		turn = 1.5,
 		health = 1000,
 		capacity = 2,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.7,
 		color = { 150, 90, 50 },
 		description = "Silver Spur Ranch's horse truck, a stall box on the back. 1 passenger.",
@@ -485,6 +519,8 @@ Config.Cars = {
 		turn = 1.8,
 		health = 800,
 		capacity = 1,
+		tank = 70, -- 5.4: litres (Config.Fuel)
+		burn = 9, -- litres per 1,000 studs
 		ramPower = 1.4,
 		color = { 245, 245, 245 },
 		description = "City Clinic's ambulance: a stretcher in the back, sirens on the roof. 1 passenger.",
@@ -501,6 +537,8 @@ Config.Cars = {
 		turn = 1.6,
 		health = 950,
 		capacity = 6,
+		tank = 100, -- 5.4: litres (Config.Fuel)
+		burn = 12, -- litres per 1,000 studs
 		ramPower = 1.6,
 		color = { 220, 60, 50 },
 		description = "A flatbed with a barrel rack, from the gas station. 1 passenger.",
@@ -1000,13 +1038,15 @@ export type ItemDef = {
 	description: string,
 }
 
--- Consumables, bought at Last Stop Supplies, used from the hotbar (keys 1 … 5).
+-- Consumables, bought at Last Stop Supplies, used from the hotbar (keys 1 … 6; 5.4: the jerry can is the sixth).
 Config.Items = {
 	{ id = "repair", name = "Repair Kit", icon = "🔧", price = 150, max = 10, description = "Fixes 40% of your car." },
 	{ id = "medkit", name = "Medkit", icon = "➕", price = 80, max = 10, description = "Heals you fully." },
 	{ id = "nitro", name = "Nitro", icon = "⚡", price = 120, max = 10, description = "4 seconds of +60% speed." },
 	{ id = "molotov", name = "Molotov", icon = "🔥", price = 60, max = 20, description = "Throw it where you aim: burns zombies for 8 s." },
 	{ id = "mine", name = "Landmine", icon = "💣", price = 100, max = 10, description = "Drops behind your car. Boom." },
+	-- 5.4: sold at Last Stop Supplies and at every gas station's kiosk (Map.GasStations); Config.Fuel.CanLitres.
+	{ id = "jerrycan", name = "Jerry Can", icon = "⛽", price = 35, max = 5, description = "+10 L of fuel. Use it next to your car (or in it)." },
 } :: { ItemDef }
 
 Config.ItemTuning = {
@@ -1023,6 +1063,34 @@ Config.ItemTuning = {
 	MineLife = 120,
 	MineMax = 5,
 	UseCooldown = 0.4,
+}
+
+-- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)
+-- has a tank (CarDef.tank, litres) and burns CarDef.burn litres per 1,000 studs it is driven: the server's Tick measures
+-- the chassis' flat distance while somebody drives it, never while a chauffeur does, and skips a jump of more than
+-- MaxJump studs (a teleport, a tow, a rebuild). A full tank lasts about 3 – 5 jobs of the tier the car opens at
+-- (FuelMath.jobsPerTank, tests/fuel_test.luau). Below Low (a share of the tank) the gauge turns red and a toast says LOW
+-- FUEL; empty, the car crawls at CrawlSpeed at most (client/Drive.luau) to a pump, or the phone's TOW brings it to the
+-- nearest station's pump with TowLitres for TowPrice (only with an empty tank). The gas stations (Map.GasStations) sell
+-- fuel at PricePerLitre: the pump's Refuel prompt (hold PumpHold s, on foot, your car parked within PumpReach studs of the
+-- pump) pours PourRate litres a second, charged as it pours, until the tank is full, the money runs out or you stop it.
+-- The jerry can (Config.Items "jerrycan") pours CanLitres next to your car. Your own cars' levels are saved
+-- (profile.carFuel); a new car comes full, a company vehicle a job lends you comes full and is not saved.
+Config.Fuel = {
+	PricePerLitre = 2,
+	CrawlSpeed = 6, -- studs / s: the top speed with an empty tank
+	Low = 0.15, -- the share of the tank under which it is low (red gauge, the LOW FUEL toast)
+	Tick = 0.5, -- seconds between the server's burns
+	MaxJump = 200, -- studs: a move longer than this in one tick is not driving (no burn)
+	PourRate = 8, -- litres a second at a pump
+	PumpReach = 12, -- studs from the pump to your car's body at most (a Freight Truck parks outside the canopy posts)
+	PumpHold = 0.5, -- seconds to hold the Refuel prompt
+	PumpWalk = 14, -- studs: walk farther from the pump than this and it stops pouring
+	TowPrice = 150,
+	TowLitres = 5,
+	TowRide = 80, -- studs: on foot this close to your car and you ride along with the tow
+	CanLitres = 10,
+	CanReach = 12, -- studs from your car's body at most to pour a jerry can
 }
 
 export type PaintDef = {
@@ -1335,6 +1403,15 @@ export type BusinessDef = {
 	tiers: { number }, -- the danger levels it shows up in
 	giver: PersonDef,
 	receivers: { PersonDef },
+	-- 5.3, the real places (shared/Deliveries.luau): the pick-up is the business's storefront (Map.venuesOf), the drop
+	-- one of `to`: "house" (a Suburbs house of Map.Homes), "apartment" (a downtown entrance), "venue:<business id>"
+	-- (that business's storefront: its person takes it), "harbor" (an address in the Harbor: the dock foreman). Nil:
+	-- any address as before 5.3 (the far places on the dangerous levels). `hours` = { from, to } on the game clock it
+	-- sends anything (nil: round the clock; from > to runs over midnight); `peak` = { from, to, pay }: those hours pay
+	-- × pay (the evening rush).
+	to: { string }?,
+	hours: { number }?,
+	peak: { number }?,
 }
 
 -- Day and night (server/DayNight.luau): the clock runs, the night is dark, the street lamps and the headlights come
@@ -1955,6 +2032,12 @@ Config.Jobs = {
 			generator = { "heavy" },
 			furniture = { "heavy" },
 			gold = { "cash" },
+			-- 5.3, the storefronts' own pieces
+			burger = { "food" },
+			noodles = { "food" },
+			pastry = { "food" },
+			icecream = { "food" },
+			gadget = { "fragile" },
 		} :: { [string]: { string } },
 		Kinds = {
 			cash = { "cash" },
@@ -2034,11 +2117,71 @@ Config.Jobs = {
 		SwitchEvery = 1, -- seconds between two changes of the stop the GPS shows (no flicker between two close ones)
 		AddOnTime = 30,
 	},
+	-- 5.3, real places (shared/Deliveries.luau, server/Jobs.luau, server/Cargo.luau): the board's deliveries start at
+	-- the business's storefront (Map.Venues; the nearest one to you: within the light job's PickupMax + PickupWiden on
+	-- foot or by bike, CarReach in a car) where its cook / clerk hands the order over in the doorway, and go to a home's
+	-- door (Map.Homes) or another storefront (Config.Jobs.Businesses `to`). At a home you knock (the owner comes within
+	-- KnockRange of the door): the door swings open (DoorSwing degrees, for DoorOpen s) and the receiver steps out
+	-- after KnockDelay s. With NobodyHome a drop has nobody in: "Leave at the door" (it counts the same).
+	Places = {
+		CarReach = 1600,
+		KnockRange = 22,
+		KnockDelay = 1.2,
+		DoorSwing = 80,
+		DoorOpen = 6,
+		NobodyHome = 0.1,
+		-- 5.3 review: two couriers at the same storefront (or door) at once: the second one's pile, clerk and pieces
+		-- stand SessionGap studs to the side (then the other side, then twice as far …), never on top of each other.
+		SessionGap = 10,
+		-- 5.3 review: no ON FOOT run because every storefront near you is shut (the Suburbs or the Harbor at night; the
+		-- board looks up to twice the usual reach first): the board says so.
+		ClosedNote = "Shops here are closed — Downtown food is open late",
+	},
+	-- 5.3, the newspaper round (server/Jobs.luau footOffer's "round", shared/Deliveries.luau Deliveries.round, the
+	-- toss in server/Cargo.luau): from Hours on the game clock (the morning) the ON FOOT and the BIKE sections offer a
+	-- round of The Daily Undead (Business). Pick up the bundle (Papers: one E, it goes into your newspaper satchel: no
+	-- room needed) and bring one paper to every door on one or two streets (Streets; a third only when two do not
+	-- hold Papers[1]), every door within FootReach / BikeReach of the print shop and the route from it through them
+	-- within FootRoute / BikeRoute (5.3 review): a house takes one, an
+	-- apartment entrance FlatPapers (its subscribers). At a door "Toss newspaper" (E) works from TossRange studs:
+	-- within SureToss it always lands on the porch, farther it lands in the bushes with a chance growing to MissAtRange
+	-- (still delivered, but a miss). Pay: PayBase + PayPerPaper a paper + PayPerStud × the route (bike × BikePay),
+	-- rounded to $5, + NoMissTip with no miss at all; clock: TimeBase + the route at the light job's Speed + TimePerDoor
+	-- a door. Never stacked with other orders (a round is one order). Level 1 on foot, the bike's level by bike.
+	Round = {
+		Business = "news",
+		Hours = { 4, 11 } :: { number },
+		Papers = { 8, 12 } :: { number },
+		Streets = 2,
+		FlatPapers = 2,
+		FootReach = 700,
+		BikeReach = 1500,
+		-- 5.3 review: the route from the print shop through every door at most this long (a walk stays a walk)
+		FootRoute = 700,
+		BikeRoute = 1600,
+		TossRange = 18,
+		SureToss = 8,
+		MissAtRange = 0.5,
+		PayBase = 40,
+		PayPerPaper = 8,
+		PayPerStud = 0.04,
+		BikePay = 1.3,
+		NoMissTip = 40,
+		TimeBase = 60,
+		TimePerDoor = 10,
+	},
 	-- The ordinary deliveries: every business sends what it makes or sells, to somebody who needs it.
+	-- 5.3, real places (shared/Deliveries.luau, server/Jobs.luau): a business with a storefront (Map.Venues) sends from
+	-- there: its cook / clerk hands the order over at the door. B2C goes to a home's door (`to`: "house" | "apartment",
+	-- Map.Homes; the receivers are the people living there); B2B to another business's storefront ("venue:<id>": its
+	-- own person takes it) or to the Harbor ("harbor": the dock foreman). The bakery bakes in the morning (`hours`),
+	-- the pizzas, burgers and noodles pay more in the evening and at night (`peak`), the café opens early, The Daily
+	-- Undead prints the morning paper (and its round: Config.Jobs.Round). `to` nil: any address as before (the far
+	-- places of the dangerous levels: the lab, the bank's gold, the warehouse's fuel).
 	Businesses = {
 		{
 			id = "pizzeria",
-			place = "Pizza Place",
+			place = "Luigi's Pizza",
 			cargo = "Pizzas",
 			piece = "pizza stack",
 			plural = "pizza stacks",
@@ -2050,12 +2193,14 @@ Config.Jobs = {
 			receivers = {
 				{ name = "Mrs. Hungry", title = "Ordered extra cheese", role = "townsperson" },
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
-				{ name = "Chief Brody", title = "Fire station", role = "worker" },
+				{ name = "Mr. Novotny", title = "Movie night", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			peak = { 18, 4, 1.25 },
 		},
 		{
 			id = "bakery",
-			place = "Bakery",
+			place = "Daily Bread Bakery",
 			cargo = "Fresh Bread",
 			piece = "bread sack",
 			plural = "bread sacks",
@@ -2065,10 +2210,12 @@ Config.Jobs = {
 			tiers = { 1, 2 },
 			giver = { name = "Anna", title = "Baker", role = "cook" },
 			receivers = {
-				{ name = "Big Mike", title = "Survivor camp cook", role = "cook" },
-				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
 				{ name = "Grandma Rose", title = "Feeds the street", role = "townsperson" },
+				{ name = "Mrs. Hungry", title = "Breakfast for six", role = "townsperson" },
+				{ name = "Old Tom", title = "Fresh rolls, every day", role = "townsperson" },
 			},
+			to = { "house", "apartment", "venue:cafe", "venue:burgers" },
+			hours = { 4, 12 },
 		},
 		{
 			id = "post",
@@ -2083,13 +2230,14 @@ Config.Jobs = {
 			giver = { name = "Mr. Grant", title = "Postmaster", role = "clerk" },
 			receivers = {
 				{ name = "Grandma Rose", title = "Waiting for letters", role = "townsperson" },
-				{ name = "The Mayor", title = "City hall", role = "clerk" },
-				{ name = "Sal", title = "The last barber", role = "shopkeeper" },
+				{ name = "Sal", title = "Mail-order clippers", role = "shopkeeper" },
+				{ name = "Mr. Novotny", title = "New boots", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
 		},
 		{
 			id = "pharmacy",
-			place = "Pharmacy",
+			place = "Corner Pharmacy",
 			cargo = "Medicine",
 			piece = "medicine box",
 			plural = "medicine boxes",
@@ -2099,14 +2247,15 @@ Config.Jobs = {
 			tiers = { 1, 2, 3 },
 			giver = { name = "Mr. Patel", title = "Pharmacist", role = "clerk" },
 			receivers = {
-				{ name = "Dr. Novak", title = "Doctor", role = "clerk" },
-				{ name = "Nurse Kim", title = "Rooftop clinic", role = "clerk" },
 				{ name = "Grandma Rose", title = "Needs her pills", role = "townsperson" },
+				{ name = "Mr. Brown", title = "Bitten? Just a scratch", role = "townsperson" },
+				{ name = "Mrs. Lopez", title = "Fever since Monday", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
 		},
 		{
 			id = "supermarket",
-			place = "Supermarket",
+			place = "FreshMart",
 			cargo = "Groceries",
 			piece = "grocery box",
 			plural = "grocery boxes",
@@ -2116,14 +2265,16 @@ Config.Jobs = {
 			tiers = { 1, 2 },
 			giver = { name = "Carla", title = "Store manager", role = "shopkeeper" },
 			receivers = {
-				{ name = "Big Mike", title = "Survivor camp cook", role = "cook" },
 				{ name = "Mrs. Hungry", title = "Empty fridge", role = "townsperson" },
-				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+				{ name = "Old Tom", title = "Can't carry the bags", role = "townsperson" },
+				{ name = "The Twins", title = "The weekly shop", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			hours = { 7, 22 },
 		},
 		{
 			id = "hardware",
-			place = "Hardware Store",
+			place = "Bolt & Nail Hardware",
 			cargo = "Tools",
 			piece = "tool crate",
 			plural = "tool crates",
@@ -2133,31 +2284,34 @@ Config.Jobs = {
 			tiers = { 2, 3 },
 			giver = { name = "Bob", title = "Hardware store", role = "worker" },
 			receivers = {
-				{ name = "Chief Brody", title = "Fire station", role = "worker" },
 				{ name = "Old Pete", title = "Fixing his roof", role = "townsperson" },
-				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
+				{ name = "Mr. Novotny", title = "Boarding up the windows", role = "townsperson" },
+				{ name = "Aunt Maple", title = "A new fence", role = "townsperson" },
 			},
+			to = { "house", "harbor" },
+			hours = { 6, 20 },
 		},
 		{
 			id = "electronics",
-			place = "Electronics Store",
-			cargo = "Radio Parts",
-			piece = "parts box",
-			plural = "parts boxes",
+			place = "Volt Electronics",
+			cargo = "Electronics",
+			piece = "electronics box",
+			plural = "electronics boxes",
 			kind = "crate",
-			look = "parcel",
+			look = "gadget",
 			pieces = { 1, 2 },
 			tiers = { 2, 3 },
 			giver = { name = "Kenji", title = "Electronics store", role = "clerk" },
 			receivers = {
 				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
-				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
-				{ name = "The Mayor", title = "City hall", role = "clerk" },
+				{ name = "Kenny", title = "A new console, still", role = "townsperson" },
+				{ name = "Ms. Parker", title = "A radio for the news", role = "teacher" },
 			},
+			to = { "apartment" },
 		},
 		{
 			id = "pawnshop",
-			place = "Pawn Shop",
+			place = "Second Life Pawn",
 			cargo = "Ammo",
 			piece = "ammo crate",
 			plural = "ammo crates",
@@ -2167,13 +2321,15 @@ Config.Jobs = {
 			tiers = { 2, 3, 4 },
 			giver = { name = "Vinnie", title = "Pawn broker", role = "shopkeeper" },
 			receivers = {
-				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
-				{ name = "Jax", title = "Survivor camp guard", role = "worker" },
+				{ name = "Old Pete", title = "Guards his street", role = "townsperson" },
+				{ name = "Jax", title = "Holding out at home", role = "worker" },
+				{ name = "Aunt Maple", title = "Shells for the shotgun", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
 		},
 		{
 			id = "warehouse",
-			place = "Warehouse",
+			place = "Harbor Warehouse",
 			cargo = "Generator Fuel",
 			piece = "fuel barrel",
 			plural = "fuel barrels",
@@ -2221,7 +2377,7 @@ Config.Jobs = {
 		},
 		{
 			id = "bank",
-			place = "Bank",
+			place = "First Zombie Bank",
 			cargo = "Gold Bars",
 			piece = "strongbox",
 			plural = "strongboxes",
@@ -2237,23 +2393,22 @@ Config.Jobs = {
 		},
 		{
 			id = "cake",
-			place = "Bakery",
+			place = "Daily Bread Bakery",
 			cargo = "Wedding Cake",
 			piece = "cake box",
 			plural = "cake boxes",
 			kind = "crate",
 			look = "cake",
 			pieces = { 1, 1 },
-			tiers = { 3, 4 },
+			tiers = { 2, 3 }, -- 5.3 review: its houses are 470 … 1,300 studs from the bakery (never a ★★★★ ride)
 			giver = { name = "Anna", title = "Baker", role = "cook" },
 			receivers = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
 			},
+			to = { "house" },
+			hours = { 6, 18 },
 		},
-		-- 5.3 STUBS (Stream W, the world): the storefronts of Map.Venues that had no business yet. Data only, for Stream J
-		-- to fill (the rules per business, the times of day, the receivers at the homes, the backpack looks). `tiers` is
-		-- empty, so the board's car deliveries never pick them yet; NOTE: the light looks (burgers, cafe, news, flowers)
-		-- may already come up on the ON FOOT / BIKE board (server/Jobs.luau footOffer does not look at the tiers).
+		-- 5.3, the storefronts that came with the real places (Stream W's stubs, filled):
 		{
 			id = "burgers",
 			place = "Last Bite Burgers",
@@ -2261,14 +2416,17 @@ Config.Jobs = {
 			piece = "burger bag",
 			plural = "burger bags",
 			kind = "crate",
-			look = "pizza", -- (a food box; Stream J: a burger look)
+			look = "burger",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1, 2 },
 			giver = { name = "Big Al", title = "Grill cook", role = "cook" },
 			receivers = {
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
 				{ name = "Mrs. Hungry", title = "Ordered fries too", role = "townsperson" },
+				{ name = "Kenny", title = "Double cheese, no pickles", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			peak = { 18, 4, 1.25 },
 		},
 		{
 			id = "noodles",
@@ -2277,30 +2435,37 @@ Config.Jobs = {
 			piece = "noodle box",
 			plural = "noodle boxes",
 			kind = "soup",
-			look = "soup", -- (Stream J: a noodle box look)
+			look = "noodles",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1, 2 },
 			giver = { name = "Mei", title = "Wok cook", role = "cook" },
 			receivers = {
-				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
+				{ name = "Sparks", title = "Up all night on the radio", role = "worker" },
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
+				{ name = "Ms. Parker", title = "Marking homework", role = "teacher" },
 			},
+			to = { "apartment", "house" },
+			hours = { 11, 4 },
+			peak = { 18, 4, 1.3 },
 		},
 		{
 			id = "cafe",
 			place = "Grind House",
-			cargo = "Coffee & Pastries",
+			cargo = "Pastries",
 			piece = "pastry bag",
 			plural = "pastry bags",
 			kind = "sack",
-			look = "bread", -- (Stream J: a coffee tray look)
+			look = "pastry",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1 },
 			giver = { name = "Jules", title = "Barista", role = "cook" },
 			receivers = {
-				{ name = "Grandma Rose", title = "Her morning coffee", role = "townsperson" },
-				{ name = "Mr. Kowalski", title = "Corner shop", role = "shopkeeper" },
+				{ name = "Grandma Rose", title = "Her morning croissant", role = "townsperson" },
+				{ name = "Ms. Parker", title = "Breakfast before school", role = "teacher" },
+				{ name = "Mr. Kowalski", title = "Two cinnamon rolls", role = "shopkeeper" },
 			},
+			to = { "house", "apartment" },
+			hours = { 6, 15 },
 		},
 		{
 			id = "news",
@@ -2309,14 +2474,16 @@ Config.Jobs = {
 			piece = "newspaper",
 			plural = "newspapers",
 			kind = "sack",
-			look = "mail", -- (Stream J: a newspaper look and the newspaper round)
+			look = "newspaper",
 			pieces = { 1, 3 },
-			tiers = {},
+			tiers = { 1 },
 			giver = { name = "Ed", title = "Printer", role = "clerk" },
 			receivers = {
 				{ name = "Old Tom", title = "Reads it twice", role = "townsperson" },
 				{ name = "Grandma Rose", title = "Wants the crossword", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			hours = { 4, 11 },
 		},
 		{
 			id = "flowers",
@@ -2325,14 +2492,17 @@ Config.Jobs = {
 			piece = "bouquet",
 			plural = "bouquets",
 			kind = "crate",
-			look = "plants",
+			look = "bouquet",
 			pieces = { 1, 2 },
-			tiers = {},
+			tiers = { 1, 2 },
 			giver = { name = "Lily", title = "Florist", role = "shopkeeper" },
 			receivers = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
 				{ name = "Grandma Rose", title = "Her birthday", role = "townsperson" },
+				{ name = "Mrs. Lopez", title = "Their anniversary", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			hours = { 8, 19 },
 		},
 		{
 			id = "icecream",
@@ -2341,13 +2511,17 @@ Config.Jobs = {
 			piece = "ice cream tub",
 			plural = "ice cream tubs",
 			kind = "icebox",
-			look = "groceries", -- (Stream J: an ice cream look; Frosty's own van jobs stay the employer's)
+			look = "icecream",
 			pieces = { 1, 2 },
-			tiers = {},
+			-- 5.3 review: Frosty's is at the Harbor, the nearest home ~800 studs off: a ★★ ride, never a ★ walk
+			tiers = { 2 },
 			giver = { name = "Frosty", title = "Ice cream man", role = "shopkeeper" },
 			receivers = {
 				{ name = "The Twins", title = "Hot day", role = "townsperson" },
+				{ name = "Aunt Maple", title = "A birthday party", role = "townsperson" },
 			},
+			to = { "house", "apartment" },
+			hours = { 11, 20 },
 		},
 	} :: { BusinessDef },
 	-- At a far place the place's own person takes the ordinary deliveries.
@@ -2441,6 +2615,9 @@ Config.Cargo = {
 	ApproachDistance = 80, -- closer than this the HUD says what to do on foot and the enemies come on foot
 	PileOffset = 12, -- an address without a cargo spot: the pile is this far from the road toward the building
 	PromptDistance = 10,
+	-- 5.3 review: the CollectionService tag of every job prompt (server/Cargo.luau; the attribute CargoOwner = the job
+	-- owner's UserId): client/CargoPrompts.luau hides the ones of a job you do not work for.
+	PromptTag = "CargoPrompt",
 	HoldDuration = 0, -- 4.0.1: E picks up / loads / opens the back at once (no hold; it was 0.25 s)
 	MaxCarSpeed = 6, -- the vehicle must stand to load or unload it
 	StealPieceRate = 3, -- bandits at the car: their steal share x this fills a meter, every full one = a piece gone
@@ -2474,6 +2651,29 @@ Config.Cargo = {
 		cake = true,
 		groceries = true,
 		plants = true,
+		-- 5.3, the storefronts' own pieces
+		burger = true,
+		noodles = true,
+		pastry = true,
+		newspaper = true,
+		bouquet = true,
+		icecream = true,
+		gadget = true,
+	} :: { [string]: boolean },
+	-- 5.3, what fits in a backpack (server/Cargo.luau packFits, shared/Bag.luau): small, flat or boxed light pieces.
+	-- Every other light piece (a bouquet, a cake, an electronics box, groceries, ice cream) rides in your hands, or on a
+	-- bike's rack, basket or box (one piece on the e-scooter's rack): on foot never more than your hands hold.
+	PackLooks = {
+		mail = true,
+		newspaper = true,
+		documents = true,
+		medicine = true,
+		pizza = true,
+		burger = true,
+		noodles = true,
+		pastry = true,
+		bread = true,
+		parcel = true,
 	} :: { [string]: boolean },
 	HandsMax = 2, -- light pieces in one player's hands at most
 	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)

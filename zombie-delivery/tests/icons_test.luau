@@ -44,6 +44,8 @@ local ART = {
 	"app_orders", "app_board", "app_career", "app_shop", "app_map", "app_messages", "app_bank", "app_settings",
 	-- 5.1, art/icons (Codex's bike art; ids empty until uploaded)
 	"bike_rust", "bike_city", "bike_cargo", "bike_ebike", "gear_basket", "gear_panniers", "gear_trailer", "map_bikes",
+	-- 5.4, art/icons (Codex's fuel art; ids empty until uploaded; map_gas is above)
+	"jerrycan", "fuel",
 }
 
 -- Every picture has its id slot, and the set has nothing else.
@@ -58,7 +60,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("119 pictures", count == 119, count)
+check("121 pictures", count == 121, count)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)

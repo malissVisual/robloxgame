@@ -56,6 +56,13 @@
 --   JobRules.orderButton(why, used, room, open, max)   "NO ROOM (3/4 slots)" / "ORDERS FULL (2/2)"
 --   JobRules.stopOpen(stops, index, withYou)          "done" | "open" | "wait" | "empty" (StopState)
 --   JobRules.nextOpenStop(stops, withYou, position, pinned, current)   the stop the GPS shows
+--
+-- 5.3, the newspaper round (Config.Jobs.Round; tested in tests/deliveries_test.luau):
+--   JobRules.roundPay(papers, distance, bike)   what a round pays ($5 steps; the no-miss tip comes on top)
+--   JobRules.roundTime(distance, doors, bike)   its clock
+--   JobRules.roundTip(misses)             the tip: Round.NoMissTip with no paper in the bushes, else 0
+--   JobRules.tossMiss(distance)           the chance a paper tossed from `distance` studs lands in the bushes
+--   JobRules.roundCheck(misses)           the result card's line for it ({ text, ok })
 
 local Config = require(script.Parent.Config)
 
@@ -112,6 +119,9 @@ function JobRules.roleInfo(role: string?): RoleInfo?
 		return { name = "Risky", icon = "☠", why = `Trouble on the way, +{percent(choice.RiskyPay)} pay on top of it.` }
 	elseif role == "bulk" then
 		return { name = "Bulk order", icon = "📦", why = "The most pieces: a bigger car and more carrying, more pay." }
+	elseif role == "round" then
+		-- 5.3, the newspaper round (Config.Jobs.Round)
+		return { name = "Paper round", icon = "📰", why = `The morning paper: pick up the bundle, toss one onto every porch on the street. No paper in the bushes: +${Config.Jobs.Round.NoMissTip} tip.` }
 	end
 	return nil
 end
@@ -532,6 +542,7 @@ export type StackInfo = {
 	tutorial: boolean,
 	duo: boolean,
 	carried: boolean,
+	round: boolean?, -- 5.3: a newspaper round (one order on its own)
 }
 
 -- One stop of a running job as the GPS sees it: a pick-up or a drop of an order, done (or skipped), where it is.
@@ -540,7 +551,7 @@ export type StopState = { kind: string, order: number, done: boolean, x: number,
 -- May an offer like this run beside other orders (and let others run beside it)? Ordinary board deliveries on foot, on
 -- a bike, or in a car of the ★ … Orders.CarTiers tiers, carried by hand.
 function JobRules.stackable(info: StackInfo): boolean
-	if info.special or info.mission or info.tutorial or info.duo or not info.carried then
+	if info.special or info.mission or info.tutorial or info.duo or info.round or not info.carried then
 		return false
 	end
 	if info.mode == "foot" or info.mode == "bike" then
@@ -658,6 +669,47 @@ function JobRules.nextOpenStop(stops: { StopState }, withYou: { [number]: number
 		end
 	end
 	return best
+end
+
+-- ── 5.3: the newspaper round (Config.Jobs.Round) ───────────────────────────
+
+-- PayBase + PayPerPaper a paper + PayPerStud × the route (manhattan), × BikePay by bike, in $5 steps.
+function JobRules.roundPay(papers: number, distance: number, bike: boolean?): number
+	local round = Config.Jobs.Round
+	local pay = round.PayBase + round.PayPerPaper * math.max(0, math.floor(papers)) + round.PayPerStud * math.max(0, distance)
+	if bike then
+		pay *= round.BikePay
+	end
+	return math.floor(pay / 5 + 0.5) * 5
+end
+
+-- TimeBase + the route at the light job's Speed (Foot or Bike) + TimePerDoor a door, whole seconds.
+function JobRules.roundTime(distance: number, doors: number, bike: boolean?): number
+	local round = Config.Jobs.Round
+	local speed = if bike then Config.Jobs.Bike.Speed else Config.Jobs.Foot.Speed
+	return math.floor(round.TimeBase + math.max(0, distance) / math.max(1, speed) + round.TimePerDoor * math.max(0, doors) + 0.5)
+end
+
+function JobRules.roundTip(misses: number): number
+	return if misses <= 0 then Config.Jobs.Round.NoMissTip else 0
+end
+
+function JobRules.roundCheck(misses: number): Check
+	if misses <= 0 then
+		return { text = `Every paper on its porch: +${Config.Jobs.Round.NoMissTip} tip`, ok = true }
+	end
+	return { text = `{misses} {if misses == 1 then "paper" else "papers"} in the bushes: no tip`, ok = false }
+end
+
+-- Within SureToss every paper lands on the porch; from there to TossRange the chance of the bushes grows to
+-- MissAtRange (and stays there beyond).
+function JobRules.tossMiss(distance: number): number
+	local round = Config.Jobs.Round
+	if distance <= round.SureToss then
+		return 0
+	end
+	local share = math.clamp((distance - round.SureToss) / math.max(1, round.TossRange - round.SureToss), 0, 1)
+	return share * round.MissAtRange
 end
 
 -- 5.2 review: an order as a crash, a hit or a failed job sees it: its id, still open, its pieces handed over, and

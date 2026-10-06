@@ -40,6 +40,9 @@
 -- the jobs and the client know): the towers (some with an apartment entrance on their street), the storefronts of
 -- Map.Venues (building() + a BuildingLooks Venue* look each + the name board), the Suburbs houses with their front door
 -- to their street, a path, a mailbox and the number (see "Venues and homes" below).
+-- Zombie Delivery 5.4, fuel: Codex's pumps at the old Gas Station and three new gas stations on the town's lots
+-- (Map.GasStations; see "Fuel: the pumps and the gas stations" below): their Refuel prompts (World.GasPumps) and the
+-- kiosks' jerry can prompts (World.GasKiosks) for server/Fuel.luau.
 --
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
 -- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
@@ -100,6 +103,13 @@ World.EstateSigns = {} :: { [string]: { TextLabel } }
 -- 3.1, the lost packages (Map.Secrets; see "The lost packages" below): every package's prompt (a ProximityPrompt
 -- "SecretPrompt", attribute Secret = the Map.Secrets id) for server/Challenges.luau
 World.SecretPrompts = {} :: { { prompt: ProximityPrompt, id: string } }
+-- 5.4, fuel (see "Fuel: the pumps and the gas stations" below): every pump's Refuel prompt (a ProximityPrompt
+-- "RefuelPrompt" on the pump's invisible collider, attributes Station = the Map.GasStations id and Pump = its number;
+-- `labels` are the pump display's TextLabels: Litres, Total, PricePerLitre, PumpNumber) and every kiosk's jerry can
+-- prompt, for server/Fuel.luau.
+export type GasPump = { station: string, index: number, part: BasePart, prompt: ProximityPrompt, labels: { [string]: TextLabel } }
+World.GasPumps = {} :: { GasPump }
+World.GasKiosks = {} :: { { station: string, prompt: ProximityPrompt } }
 
 local rng = Random.new(Config.City.Seed)
 
@@ -652,6 +662,8 @@ local function downtownBlock(parent: Instance, d: Map.District, i: number, j: nu
 			end
 		elseif info.kind == "venue" and info.venue then
 			buildVenue(parent, info.venue, info)
+		elseif info.kind == "gas" then
+			-- 5.4: a gas station's row (buildStations builds the station over it)
 		elseif info.kind == "grass" then
 			deco(part(parent, "Grass", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(70, 88, 52), Enum.Material.Grass))
 			for _ = 1, rng:NextInteger(2, 4) do
@@ -706,6 +718,9 @@ local function suburbsBlock(parent: Instance, d: Map.District, i: number, j: num
 	sidewalk(parent, d.ox + i * CELL, d.oz + j * CELL)
 	for _, info in Map.lotsAt(d.id, i, j) do
 		local lx, lz, lot = info.x, info.z, info.size
+		if info.kind == "gas" then
+			continue -- 5.4: a gas station's row: its forecourt, no lawn, no fence (buildStations)
+		end
 		deco(part(parent, "Lawn", Vector3.new(lot - 2, 0.1, lot - 2), CFrame.new(lx, WALK_TOP + 0.05, lz), Color3.fromRGB(76, 100, 54), Enum.Material.Grass))
 		local facing = Vector3.new(info.facing.x, 0, info.facing.z)
 		if info.kind == "estate" then
@@ -1883,6 +1898,105 @@ local function buildDocks(parent: Instance)
 	end
 end
 
+-- ── Fuel: the pumps and the gas stations (5.4) ─────────────────────────────
+-- Codex's forecourt art (server/GasArt/Geometry: the pump, the island of two pumps under its canopy, the price sign;
+-- ModelArt/Builder welds the decoration to our anchored, hidden roots: no collision, no ray hits) and the gameplay
+-- pieces it leaves to us: the invisible colliders of the pumps and the canopy posts, the Refuel prompt on every pump
+-- (World.GasPumps; server/Fuel.luau answers it and writes the pump's display), the kiosk's jerry can prompt
+-- (World.GasKiosks), the price (Config.Fuel) on the pumps and the sign, the canopy lamps that glow at night. The old Gas
+-- Station's two pumps wear the pump art (buildGas); the three new stations (Map.GasStations) are built from
+-- GasArt/Layout over their lots (buildStations): a forecourt, the island, the kiosk (BuildingLooks/GasKiosk in a shell of
+-- building(), the name board on its parapet), the price sign by the road, the bay markings.
+
+-- Codex's fuel model `id` on anchored hidden roots: its Frame at `frame`, its other roots (the nozzles) at the spec's
+-- origins. Returns the TextLabels of its display slots by name (the price already written in).
+local function gasModel(parent: Instance, id: string, frame: CFrame): { [string]: TextLabel }
+	local Builder = require(script.Parent.ModelArt.Builder)
+	local spec = require(script.Parent.GasArt.Geometry).spec(id)
+	local holder = folder(parent, id)
+	local targets: { [string]: BasePart } = {}
+	for name, at in spec.origins do
+		local root = part(holder, name, Vector3.new(0.2, 0.2, 0.2), frame * CFrame.new(at[1], at[2], at[3]), Color3.new(1, 1, 1))
+		root.Transparency, root.CanCollide, root.CanQuery = 1, false, false
+		targets[name] = root
+	end
+	local built = Builder.build(holder, spec, targets)
+	local labels: { [string]: TextLabel } = {}
+	local price = string.format("$%.2f / L", Config.Fuel.PricePerLitre)
+	for _, p in built.parts do
+		if p:GetAttribute("NightLamp") == true then
+			-- the canopy's lamps: a soft light down on the pumps at night
+			local glow = Instance.new("SurfaceLight")
+			glow.Face = Enum.NormalId.Bottom
+			glow.Angle = 120
+			glow.Range = 16
+			glow.Brightness = 1.6
+			glow.Color = Color3.fromRGB(255, 236, 205)
+			glow.Shadows = false
+			glow.Parent = p
+			DayNight.nightLight(p, Color3.fromRGB(255, 240, 214), p.Color, "SmoothPlastic")
+		end
+		local gui = p:FindFirstChild("ArtLabel")
+		local slots: { Instance } = if gui then gui:GetChildren() else {}
+		for _, label in slots do
+			if label:IsA("TextLabel") then
+				labels[label.Name] = label
+				if string.find(label.Name, "PricePerLitre", 1, true) then
+					label.Text = price
+				end
+			end
+		end
+	end
+	return labels
+end
+
+-- A pump's invisible collider and its Refuel prompt (`at`: the pump's foot, its display to -Z); its display's slots are
+-- the `labels` whose names start with `prefix` ("Pump1": a pump of an island).
+local function gasPrompt(parent: Instance, station: string, index: number, at: CFrame, labels: { [string]: TextLabel }, prefix: string)
+	local collider = part(parent, "PumpCollider", Vector3.new(1.9, 4.2, 1.2), at * CFrame.new(0, 2.1, 0), Color3.new(1, 1, 1))
+	collider.Transparency = 1
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "RefuelPrompt"
+	p.ActionText = "Refuel"
+	p.ObjectText = `Pump {index} · {string.format("$%.2f / L", Config.Fuel.PricePerLitre)}`
+	p.HoldDuration = Config.Fuel.PumpHold
+	p.MaxActivationDistance = 9
+	p.RequiresLineOfSight = false
+	p:SetAttribute("Station", station)
+	p:SetAttribute("Pump", index)
+	p.Parent = collider
+	local mine: { [string]: TextLabel } = {}
+	for name, label in labels do
+		if string.sub(name, 1, #prefix) == prefix then
+			mine[string.sub(name, #prefix + 1)] = label
+		end
+	end
+	if mine.PumpNumber then
+		mine.PumpNumber.Text = string.format("%02d", index)
+	end
+	table.insert(World.GasPumps, { station = station, index = index, part = collider :: BasePart, prompt = p, labels = mine })
+end
+
+-- The kiosk's jerry can prompt on an invisible part at `at` (by the counter, or outside the old shop's door).
+local function kioskPrompt(parent: Instance, station: string, at: CFrame)
+	local holder = part(parent, "KioskCounter", Vector3.new(1, 1, 1), at, Color3.new(1, 1, 1))
+	holder.Transparency, holder.CanCollide, holder.CanQuery = 1, false, false
+	local price = 0
+	for _, def in Config.Items do
+		price = if def.id == "jerrycan" then def.price else price
+	end
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "KioskPrompt"
+	p.ActionText = "Buy jerry can"
+	p.ObjectText = `${price} · +{Config.Fuel.CanLitres} L of fuel`
+	p.HoldDuration = 0.3
+	p.MaxActivationDistance = 8
+	p.RequiresLineOfSight = false
+	p:SetAttribute("Station", station)
+	p.Parent = holder
+	table.insert(World.GasKiosks, { station = station, prompt = p })
+end
+
 local function buildGas(parent: Instance)
 	local gas = folder(parent, "GasStation")
 	local yard = yardOf("gas")
@@ -1895,9 +2009,16 @@ local function buildGas(parent: Instance)
 	end
 	local canopy = part(gas, "Canopy", Vector3.new(52, 2, 48), CFrame.new(cx - 10, ROAD_TOP + 15, cz), Color3.fromRGB(200, 40, 40), Enum.Material.Metal)
 	DayNight.nightLight(light(canopy, 40, 1.5, Color3.fromRGB(255, 240, 220)))
-	for _, dz in { -9, 9 } do
-		part(gas, "Pump", Vector3.new(2.5, 5, 4), CFrame.new(cx - 10, ROAD_TOP + 2.5, cz + dz), Color3.fromRGB(230, 230, 230), Enum.Material.Metal)
+	-- 5.4: Codex's pumps (Map.GasStations "gas": their displays to the highway, the cars stand beside them), a Refuel
+	-- prompt each, the jerry cans at the shop's door, the price sign by the highway.
+	local station = Map.gasStation("gas")
+	local pumps: { Map.Spot } = if station then station.pumps else {}
+	for index, spot in pumps do
+		local at = CFrame.lookAt(Vector3.new(spot.x, ROAD_TOP, spot.z), Vector3.new(spot.x - 1, ROAD_TOP, spot.z))
+		gasPrompt(gas, "gas", index, at, gasModel(gas, "pump", at), "")
 	end
+	kioskPrompt(gas, "gas", CFrame.new(cx + 19.5, ROAD_TOP + 2.5, cz + 6))
+	gasModel(gas, "pricesign", CFrame.lookAt(Vector3.new(yard.x0 + 5, ROAD_TOP, cz - 30), Vector3.new(yard.x0 + 4, ROAD_TOP, cz - 30)))
 	part(gas, "Shop", Vector3.new(26, 12, 30), CFrame.new(cx + 34, ROAD_TOP + 6, cz), Color3.fromRGB(128, 126, 118), Enum.Material.Concrete)
 	-- 4.1, the shop's cinematic front toward the pumps (BuildingLooks/Gas): decoration only.
 	local Kit = require(script.Parent.BuildingLooks.Kit)
@@ -1916,6 +2037,75 @@ local function buildGas(parent: Instance)
 		barrel(gas, Vector3.new(yard.x1 - 6, ROAD_TOP, yard.z0 + 6 + n * 2.6), Color3.fromRGB(70, 90, 130))
 	end
 	employerBoard(gas, "gas", Vector3.new(-1, 0, 0))
+end
+
+-- The three new stations (Map.GasStations but the old one), each GasArt/Layout's 70 x 50 lot facing its street: on the
+-- block's sidewalk slab (the Harbor's special block gets its slab here, a few containers behind the station).
+local function buildStations(parent: Instance)
+	local Layout = require(script.Parent.GasArt.Layout) :: any
+	local Kit = require(script.Parent.BuildingLooks.Kit)
+	local kioskLook = require(script.Parent.BuildingLooks.GasKiosk)
+	local context = { part = part, deco = function(p: Part): Part
+		p.Massless = true
+		return deco(p)
+	end, nightLight = DayNight.nightLight }
+	for _, station in Map.GasStations do
+		if station.id == "gas" then
+			continue
+		end
+		local model = folder(parent, "GasStation_" .. station.id)
+		model:SetAttribute("GasStation", station.id)
+		local facing = Vector3.new(station.facing.x, 0, station.facing.z)
+		local d, i, j = Map.blockAt(station.x, station.z)
+		if d and not station.district then
+			-- a special block of its own: the slab, and the back of the block a container yard
+			local cx, cz = d.ox + i * CELL, d.oz + j * CELL
+			sidewalk(model, cx, cz, Color3.fromRGB(120, 120, 116))
+			local back = Vector3.new(cx, WALK_TOP, cz) - facing * (BLOCK / 4 + 2)
+			local across = Vector3.new(-facing.Z, 0, facing.X)
+			for n, colour in { Color3.fromRGB(170, 60, 40), Color3.fromRGB(40, 90, 150), Color3.fromRGB(120, 120, 124) } do
+				local at = back + across * ((n - 2) * 24)
+				part(model, "Container", Vector3.new(20, 8.5, 8), CFrame.lookAt(at + Vector3.new(0, 4.25, 0), at + Vector3.new(0, 4.25, 0) + facing), colour, Enum.Material.CorrodedMetal)
+			end
+		end
+		local origin = Vector3.new(station.x, WALK_TOP, station.z)
+		local frame = CFrame.lookAt(origin, origin + facing) -- the station's floor middle, -Z: its front (the street)
+		deco(part(model, "Forecourt", Vector3.new(Layout.width, 0.1, Layout.depth), frame * CFrame.new(0, 0.05, 0), Color3.fromRGB(62, 64, 66), Enum.Material.Asphalt))
+		-- the layout's components: the island (its pumps checked against Map.GasStations), the kiosk, the price sign
+		for _, component in Layout.components do
+			local at = frame * CFrame.new(component.at[1], component.at[2], component.at[3])
+			if component.model == "island" then
+				local labels = gasModel(model, "island", at)
+				for index, z in { -4, 4 } do
+					local pump = at * CFrame.new(0, 0.34, z)
+					local spot = station.pumps[index]
+					if not spot or (Vector3.new(spot.x, pump.Y, spot.z) - pump.Position).Magnitude > 0.5 then
+						warn(`[World] {station.id}: pump {index} is not where Map.GasLayout puts it`)
+					end
+					gasPrompt(model, station.id, index, pump, labels, `Pump{index}`)
+				end
+				for _, x in { -10, 10 } do
+					for _, z in { -8, 8 } do
+						local post = part(model, "PostCollider", Vector3.new(0.6, 12, 0.6), at * CFrame.new(x, 6, z), Color3.new(1, 1, 1))
+						post.Transparency = 1
+					end
+				end
+			elseif component.blueprint == "GasKiosk" then
+				local w, depth, h = kioskLook.width, kioskLook.depth, kioskLook.height
+				local entry = kioskLook.entries and kioskLook.entries[1]
+				building(model, at, w, depth, h, Color3.fromRGB(80, 88, 86), Enum.Material.Concrete, if entry then entry[2] else 6, if entry then entry[3] else 7.3)
+				Kit.build(model, at, kioskLook, context)
+				sign(model, `{string.upper(station.name)}  FUEL · KIOSK`, Vector3.new(20, 2.6, 0.5), at * CFrame.new(0, h + 1.7, -depth / 2 - 1.3), Color3.new(1, 1, 1), nil, station.id, 10)
+				kioskPrompt(model, station.id, at * CFrame.new(-5, 2.5, -1.9))
+			elseif component.model then
+				gasModel(model, component.model, at)
+			end
+		end
+		-- the bay markings and parking stops (pure decoration on a hidden root at the floor)
+		local markings = part(model, "Markings", Vector3.new(0.2, 0.2, 0.2), frame * CFrame.new(0, 0.1, 0), Color3.new(1, 1, 1))
+		markings.Transparency, markings.CanCollide, markings.CanQuery = 1, false, false
+		require(script.Parent.ModelArt.Builder).build(model, { id = "markings", pieces = Layout.pieces }, { Frame = markings })
+	end
 end
 
 -- ── Silver Spur Ranch ──────────────────────────────────────────────────────
@@ -5726,6 +5916,9 @@ function World.build()
 	end)
 	piece("gas station", function()
 		buildGas(world)
+	end)
+	piece("gas stations", function()
+		buildStations(world) -- 5.4: Westside Gas, Harbor Gas, Willow Gas
 	end)
 	piece("ranch", function()
 		buildRanch(world)
