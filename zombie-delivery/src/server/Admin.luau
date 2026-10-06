@@ -5,47 +5,77 @@
 -- missions (start any, all at 3 stars, reset). Admins (a Studio Play test, the owner of a user-owned place,
 -- Config.Admin.UserIds) get the player attribute "Admin" (the client shows the panel, client/AdminPanel.luau); every
 -- command is checked here again.
+-- 4.5, the OP admin: any player in the server as the TARGET (marked [T] below), more give commands, the OP toggles
+-- (fly, noclip, speed, super jump, car boost, hidden, one-hit kills), bring / goto, the whole map's enemies killed or
+-- frozen, traffic and hordes, the whole job finished, and NPC buddies (server/Buddy.luau).
 --
--- Commands over the "Admin" remote (name, arg):
---   unlockAll                 every car (company ones too), every gun (earned ones too), every paint, 10 of each
+-- Commands over the "Admin" remote (name, arg, target?): target = the UserId of a player in this server (nil: you).
+-- Only [T] commands take it; the others always act on / near you. Every notice goes to the target, and a copy to you.
+-- Every argument is checked here (types, NaN, ranges, ids that exist); a bad one does nothing but say so.
+--   unlockAll [T]             every car (company ones too), every gun (earned ones too), every paint, 10 of each
 --                             item, every employer's progress at the top (their rewards count as earned), every
 --                             property (the biggest mansion as the home if you have none) and the top driver level
---   maxUpgrades               every upgrade track at its last level (3.3: the car tracks of every car you own; 3.5:
+--   maxUpgrades [T]           every upgrade track at its last level (3.3: the car tracks of every car you own; 3.5:
 --                             and every such car at its last stage)
---   money      amount         + money
---   setLevel   level          the driver level (1 … Config.Levels.MaxLevel): XP = exactly what that level needs
---   car        car id         that car, now, next to you
---   weapon     weapon id      give it and put it in your hand
---   teleport   landmark id    you (and your car if you drive it) to a Map.Landmarks place
---   job        job type id    any Config.JobTypes id or "ordinary1" … "ordinary4" (Jobs.adminStart)
---   finishStop                the current stop is done (Jobs.adminFinishStop)
---   god        boolean?       toggle (or set) invulnerable: you and your car
+--   money [T]  amount         + money (1 … 10 000 000)
+--   xp [T]     amount         + driver XP (1 … 10 000 000)
+--   setLevel [T] level        the driver level (1 … Config.Levels.MaxLevel): XP = exactly what that level needs
+--   item [T]   { id, count }  a consumable (Config.Items): + count (-1000 … 1000), kept within 0 … its max
+--   car [T]    car id         that car, now, next to you
+--   carGun [T] id | "none"    the gun on the roof of your equipped car (Config.CarGuns)
+--   carStage [T] { car, stage }   a car's stage (0 … Economy.maxStage), the car given first if you lack it; the live
+--                             car is rebuilt (not during a job: then it shows from the next car call)
+--   upgrade [T] { id, level } one upgrade track (Config.Upgrades) at that level (0 … maxLevel); a car track goes on
+--                             your equipped car (rebuilt like carStage)
+--   paint [T]  paint id       that paint (Config.Paints) given and put on your equipped car
+--   weapon [T] weapon id      give it and put it in your hand
+--   giveAll [T]               unlockAll (its upgrades and stages maxed) + $1 000 000
+--   teleport [T] landmark id  you (and your car if you drive it) to a Map.Landmarks place
+--   bring [T]                 the target to you;  goto [T]: you to the target
+--   job [T]    job type id    any Config.JobTypes id or "ordinary1" … "ordinary4" (Jobs.adminStart)
+--   finishStop [T]            the current stop is done (Jobs.adminFinishStop)
+--   finishJob [T]             the whole current job done and paid (Jobs.adminComplete)
+--   god [T]    boolean?       toggle (or set) invulnerable: you and your car
+--   fly [T] / noclip [T] / jump [T] / carBoost [T] / hidden [T] / oneHit [T]   boolean?: toggle (or set) the player
+--                             attributes AdminFly, AdminNoclip (client/AdminFly.luau), AdminJump (super jump, there
+--                             too), AdminCarBoost (twice the car's top speed, client/Drive.luau), AdminHidden (no
+--                             zombie or bandit goes after you: Zombies / BanditCars), AdminOneHit (every round kills:
+--                             server/Gun.luau). (The guns have no ammo or reload: nothing to make infinite.)
+--   speed [T]  1 | 2 | 4      the walk × that (the attribute AdminSpeed, client/CameraRig.luau)
+--   clearWanted [T]           the enemies and bandit cars after the target gone (Zombies.clearOwner, BanditCars.clearFor)
 --   spawn      kind | { kind, count }   enemies (Config.Zombies) near you; bandits, gunners and soldiers go after
 --                             you for ADMIN_HUNT s even without a job (Zombies.hunts)
+--   horde      count          a zombie wave (Config.Horde.Roam kinds, 1 … MAX_HORDE) on the roads around you
 --   banditCar                 a bandit pickup chasing you (even without a job, BanditCars.wanted)
+--   traffic    count          1 … 5 traffic cars on the lanes near you (Traffic.adminSpawn)
 --   clear                     kill / remove the enemies around you and the ones after you
+--   killAll                   every enemy and bandit car on the whole map killed
+--   freeze     boolean?       toggle (or set) FREEZE: every enemy and bandit car stands still (Zombies.frozen,
+--                             BanditCars.frozen; the workspace attribute AdminFrozen; off when its admin leaves)
 --   time       hour           the clock (DayNight.setClock: the night comes with it)
---   heal                      you and your car full
---   giveEstate id | "all"     a property (Config.Estate) for free, or every one (a first home becomes your home)
---   clearEstate               every property taken away (and the home: the depot), to try buying again
---   setHome    id | "depot"   the home you spawn at (an owned mansion / villa / house)
---   estateTeleport id         you to the property (its spawn spot inside, or the road at its plot)
---   businessCash amount?      your company's safe (Config.Business): + amount, or filled up to SafeCap
---   missionStart id           any mission (shared/Missions.luau) now, locks ignored (a running job is cancelled; a
+--   heal [T]                  you and your car full
+--   buddy [T]  count          1 … 3 NPC buddies (Buddy.spawn); buddyDismiss [T]: all gone; buddyMode [T] "follow" |
+--                             "stay" | "guard". The player attributes AdminBuddies (how many) and AdminBuddyMode show it
+--   giveEstate [T] id | "all" a property (Config.Estate) for free, or every one (a first home becomes your home)
+--   clearEstate [T]           every property taken away (and the home: the depot), to try buying again
+--   setHome [T] id | "depot"  the home you spawn at (an owned mansion / villa / house)
+--   estateTeleport [T] id     you to the property (its spawn spot inside, or the road at its plot)
+--   businessCash [T] amount?  your company's safe (Config.Business): + amount, or filled up to SafeCap
+--   missionStart [T] id       any mission (shared/Missions.luau) now, locks ignored (a running job is cancelled; a
 --                             NIGHT ONLY mission turns the clock to night)
---   missionsAll               every mission at 3 stars, every campaign rewarded (no money; 3.1: its exclusive gun or
+--   missionsAll [T]           every mission at 3 stars, every campaign rewarded (no money; 3.1: its exclusive gun or
 --                             paint and title); unlockAll does it too
---   missionsReset             the mission progress and the campaign rewards cleared
---   challengesAll             3.1: every challenge done (its money and title), every campaign's reward and the last
+--   missionsReset [T]         the mission progress and the campaign rewards cleared
+--   challengesAll [T]         3.1: every challenge done (its money and title), every campaign's reward and the last
 --                             one (Dead End) (server/Challenges.luau)
---   secretsAll                every lost package found (no money each) and their reward (Phantom)
---   challengesReset           the challenges' stats, secrets, places, titles and rewards cleared, the exclusive guns
+--   secretsAll [T]            every lost package found (no money each) and their reward (Phantom)
+--   challengesReset [T]       the challenges' stats, secrets, places, titles and rewards cleared, the exclusive guns
 --                             and paints taken back; the challenges the profile still reaches (kills, level,
 --                             missions ...) stay done without money (the campaigns stay done: their rewards come back
 --                             on the next join)
---   resetSave                 4.0.5: YOUR save starts over as a new player's (PlayerData.resetSave), then you are
+--   resetSave                 4.0.5: YOUR save (never another player's) starts over as a new player's (PlayerData.resetSave), then you are
 --                             kicked: join again (in Studio: Play again) to start fresh, the tutorial included
---   title      name           that title given and shown over your head ("none": no title shown); a reward's title
+--   title [T]  name           that title given and shown over your head ("none": no title shown); a reward's title
 --                             comes without its reward
 
 local Players = game:GetService("Players")
@@ -71,6 +101,8 @@ local DayNight = require(Server.DayNight)
 local Estate = require(Server.Estate)
 local Missions = require(Server.Missions)
 local Challenges = require(Server.Challenges)
+local Traffic = require(Server.Traffic)
+local Buddy = require(Server.Buddy)
 
 local Admin = {}
 
@@ -81,12 +113,18 @@ local CLEAR_RADIUS = 350 -- "clear" kills every enemy this close
 local MAX_SPAWN = 10 -- enemies per "spawn"
 local ADMIN_HUNT = 300 -- seconds the people an admin called (bandits, gunners, soldiers) go after them without a job
 local GOD_FIELD = "AdminGod" -- the invisible ForceField of god mode (Humanoid:TakeDamage does nothing through it)
+local MAX_HORDE = 30 -- zombies per "horde"
+local MAX_BUDDIES = 3 -- buddies per "buddy"
+local GIVE_ALL_MONEY = 1_000_000
 
 local god: { [Player]: boolean } = {}
 local lastCommand: { [Player]: number } = {}
 -- Bandit cars and bandits an admin called stay after them even without a job (BanditCars.wanted, Zombies.hunts),
 -- until this time.
 local chaseUntil: { [Player]: number } = {}
+-- 4.5: who runs the command on this target right now (another admin): the notices go to both.
+local acting: { [Player]: Player } = {}
+local frozenBy: Player? = nil -- the admin who turned FREEZE on
 
 function Admin.isAdmin(player: Player): boolean
 	if Config.Admin.InStudio and RunService:IsStudio() then
@@ -100,8 +138,24 @@ end
 
 -- ── Helpers ────────────────────────────────────────────────────────────────
 
+-- A notice to the player; when another admin runs the command on them (4.5), they see who did it and the admin gets a
+-- copy with the target's name.
 local function say(player: Player, text: string)
+	local admin = acting[player]
+	if admin and admin ~= player then
+		local body = (string.gsub(text, "^ADMIN: ", ""))
+		notice:FireClient(player, `ADMIN {admin.DisplayName}: {body}`)
+		if admin.Parent then
+			notice:FireClient(admin, `ADMIN → {player.DisplayName}: {body}`)
+		end
+		return
+	end
 	notice:FireClient(player, text)
+end
+
+-- A real, finite number from the remote (nil for anything else: NaN, ±inf, a string).
+local function finite(value: any): number?
+	return if type(value) == "number" and value == value and value > -math.huge and value < math.huge then value else nil
 end
 
 local function rootOf(player: Player): BasePart?
@@ -254,7 +308,7 @@ end
 local function money(player: Player, arg: any)
 	local amount = if type(arg) == "number" and arg == arg then math.clamp(math.floor(arg), 1, 10_000_000) else 10_000
 	PlayerData.addMoney(player, amount)
-	say(player, `ADMIN: +{amount} money.`)
+	say(player, `ADMIN: you got {moneyText(amount)}.`)
 end
 
 local function car(player: Player, arg: any)
@@ -736,9 +790,378 @@ local function setTime(player: Player, arg: any)
 	say(player, string.format("ADMIN: the time is %02d:%02d (%s).", math.floor(hour), math.floor(hour % 1 * 60), if DayNight.isNight() then "night" else "day"))
 end
 
+-- ── 4.5: more to give ──────────────────────────────────────────────────────
+-- (in a table, not more top-level locals: the 200-register limit)
+
+local Give = {}
+
+-- The live car takes a new stage or car track now (a rebuild); during a job it waits for the next car call. A text
+-- to add to the notice ("" when it shows now, or the car is not the equipped one).
+local function refreshCar(player: Player, carId: string): string
+	local profile = PlayerData.get(player)
+	if not profile or profile.car ~= carId then
+		return ""
+	end
+	if Jobs.active(player) then
+		return " It shows on the car after this job."
+	end
+	Vehicles.refreshStats(player)
+	return ""
+end
+
+-- A consumable: { id, count } (count -1000 … 1000, default 1), kept within 0 … its max.
+function Give.item(player: Player, arg: any)
+	local id = if type(arg) == "table" then arg.id else arg
+	local def = if type(id) == "string" then Economy.findItem(id) else nil
+	if not def then
+		say(player, "ADMIN: unknown item.")
+		return
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	local count = math.clamp(math.floor(finite(if type(arg) == "table" then arg.count else nil) or 1), -1000, 1000)
+	local now = math.clamp((profile.items[def.id] or 0) + count, 0, def.max)
+	profile.items[def.id] = now
+	PlayerData.notify(player)
+	say(player, `ADMIN: {def.name}: you have {now} (at most {def.max}).`)
+end
+
+function Give.xp(player: Player, arg: any)
+	local amount = finite(arg)
+	if not amount or amount < 1 then
+		say(player, "ADMIN: how much XP?")
+		return
+	end
+	if not PlayerData.get(player) then
+		say(player, "Still loading...")
+		return
+	end
+	local given = math.clamp(math.floor(amount), 1, 10_000_000)
+	local level, up = PlayerData.addXp(player, given)
+	say(player, `ADMIN: +{given} XP: driver level {level} ({Levels.rank(level)}){if up then ", a level up" else ""}.`)
+end
+
+-- { car, stage }: that car at that stage (given first if the player lacks it).
+function Give.carStage(player: Player, arg: any)
+	local carId = if type(arg) == "table" then arg.car else nil
+	local def = if type(carId) == "string" then Economy.findCar(carId) else nil
+	if not def then
+		say(player, "ADMIN: unknown car.")
+		return
+	end
+	local top = Economy.maxStage(def.id)
+	if top <= 0 then
+		say(player, `ADMIN: the {def.name} has no stages.`)
+		return
+	end
+	local wanted = finite(arg.stage)
+	if not wanted then
+		say(player, "ADMIN: which stage?")
+		return
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	local stage = math.clamp(math.floor(wanted), 0, top)
+	if not profile.cars[def.id] then
+		PlayerData.giveCar(player, def.id)
+	end
+	local levels: { [string]: number } = profile.carUpgrades[def.id] or {}
+	levels.stage = stage
+	profile.carUpgrades[def.id] = levels
+	PlayerData.notify(player)
+	local stageDef = Economy.stageDef(def.id, stage)
+	say(player, `ADMIN: the {def.name} at stage {stage}{if stageDef then " (" .. stageDef.name .. ")" else ""}.{refreshCar(player, def.id)}`)
+end
+
+-- { id, level }: one upgrade track at that level; a car track on the equipped car.
+function Give.upgrade(player: Player, arg: any)
+	local id = if type(arg) == "table" then arg.id else nil
+	local def = if type(id) == "string" then Economy.findUpgrade(id) else nil
+	if not def then
+		say(player, "ADMIN: unknown upgrade.")
+		return
+	end
+	local wanted = finite(arg.level)
+	if not wanted then
+		say(player, "ADMIN: which level?")
+		return
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	local level = math.clamp(math.floor(wanted), 0, def.maxLevel)
+	if def.car then
+		local carId = profile.car
+		if not Economy.upgradeFits(carId, def.id) then
+			say(player, `ADMIN: the {carName(carId)} can't take {def.name}.`)
+			return
+		end
+		local levels: { [string]: number } = profile.carUpgrades[carId] or {}
+		levels[def.id] = level
+		profile.carUpgrades[carId] = levels
+		PlayerData.notify(player)
+		say(player, `ADMIN: {def.name} {level}/{def.maxLevel} on your {carName(carId)}.{refreshCar(player, carId)}`)
+	else
+		profile.upgrades[def.id] = level
+		PlayerData.notify(player)
+		say(player, `ADMIN: {def.name} {level}/{def.maxLevel} (all your guns).`)
+	end
+end
+
+-- A paint job: yours, and on your equipped car (a company vehicle keeps its colours).
+function Give.paint(player: Player, arg: any)
+	local def = if type(arg) == "string" then Economy.findPaint(arg) else nil
+	if not def then
+		say(player, "ADMIN: unknown paint.")
+		return
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		say(player, "Still loading...")
+		return
+	end
+	profile.paints[def.id] = true
+	local carDef = Economy.findCar(profile.car)
+	if carDef and not carDef.company then
+		profile.carPaint[carDef.id] = def.id
+		PlayerData.notify(player)
+		Vehicles.repaint(player)
+		say(player, `ADMIN: {def.name} on your {carDef.name}.`)
+	else
+		PlayerData.notify(player)
+		say(player, `ADMIN: {def.name} is yours (a company vehicle keeps its colours).`)
+	end
+end
+
+function Give.giveAll(player: Player)
+	if not PlayerData.get(player) then
+		say(player, "Still loading...")
+		return
+	end
+	unlockAll(player)
+	PlayerData.addMoney(player, GIVE_ALL_MONEY)
+	say(player, `ADMIN: GIVE ALL: everything unlocked and maxed, and {moneyText(GIVE_ALL_MONEY)}.`)
+end
+
+-- ── 4.5: the OP toggles ────────────────────────────────────────────────────
+-- Player attributes (nil = off): the clients (client/AdminFly.luau, CameraRig, Drive) and the server's modules (Gun,
+-- Zombies, BanditCars) read them. They stay through a respawn and go with the player.
+
+local FLAGS: { [string]: { attribute: string, name: string } } = {
+	fly = { attribute = "AdminFly", name = "FLY (WASD where you look, Space up, Ctrl down, Shift faster)" },
+	noclip = { attribute = "AdminNoclip", name = "NOCLIP (through walls)" },
+	jump = { attribute = "AdminJump", name = "SUPER JUMP" },
+	carBoost = { attribute = "AdminCarBoost", name = "CAR BOOST (twice the top speed)" },
+	hidden = { attribute = "AdminHidden", name = "HIDDEN (zombies and bandits ignore you)" },
+	oneHit = { attribute = "AdminOneHit", name = "ONE-HIT KILLS" },
+}
+
+local function setFlag(player: Player, command: string, arg: any)
+	local flag = FLAGS[command]
+	local on = if type(arg) == "boolean" then arg else player:GetAttribute(flag.attribute) ~= true
+	player:SetAttribute(flag.attribute, if on then true else nil)
+	say(player, `ADMIN: {flag.name} {if on then "ON" else "OFF"}.`)
+end
+
+function Give.speed(player: Player, arg: any)
+	local value = finite(arg)
+	if value ~= 1 and value ~= 2 and value ~= 4 then
+		say(player, "ADMIN: the walking speed is 1×, 2× or 4×.")
+		return
+	end
+	player:SetAttribute("AdminSpeed", if value == 1 then nil else value)
+	say(player, `ADMIN: walking speed {value}×.`)
+end
+
+-- A character (out of its seat first) to a spot; true when it went.
+local function moveCharacter(player: Player, at: CFrame): boolean
+	local character = player.Character
+	local humanoid = humanoidOf(player)
+	if not character or not humanoid then
+		return false
+	end
+	local seat = humanoid.SeatPart
+	if seat then
+		humanoid.Sit = false
+		local seatWeld = seat:FindFirstChild("SeatWeld")
+		if seatWeld then
+			seatWeld:Destroy()
+		end
+		task.wait()
+	end
+	pcall(function()
+		player:RequestStreamAroundAsync(at.Position, 5)
+	end)
+	if player.Character ~= character or not character.Parent then
+		return false
+	end
+	character:PivotTo(at)
+	local root = rootOf(player)
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+	end
+	return true
+end
+
+-- A spot next to a player (a few studs to their right, facing the way they face).
+local function besideOf(player: Player): CFrame?
+	local root = rootOf(player)
+	if not root then
+		return nil
+	end
+	local flatLook = flat(root.CFrame.LookVector)
+	local look = if flatLook.Magnitude > 0.01 then flatLook.Unit else Vector3.new(0, 0, -1)
+	local right = Vector3.new(-look.Z, 0, look.X)
+	local at = root.Position + right * 6 + Vector3.new(0, 1, 0)
+	return CFrame.lookAt(at, at + look)
+end
+
+-- The target to you.
+function Give.bring(player: Player, _arg: any, admin: Player)
+	if player == admin then
+		say(admin, "ADMIN: pick another player as the TARGET first.")
+		return
+	end
+	local at = besideOf(admin)
+	if not at then
+		say(admin, "ADMIN: you have no body right now.")
+		return
+	end
+	say(player, if moveCharacter(player, at) then `ADMIN: you were brought to {admin.DisplayName}.` else "ADMIN: no body to bring right now.")
+end
+
+-- You to the target.
+Give["goto"] = function(player: Player, _arg: any, admin: Player)
+	if player == admin then
+		say(admin, "ADMIN: pick another player as the TARGET first.")
+		return
+	end
+	local at = besideOf(player)
+	if not at then
+		say(admin, `ADMIN: {player.DisplayName} has no body right now.`)
+		return
+	end
+	notice:FireClient(admin, if moveCharacter(admin, at) then `ADMIN: you are with {player.DisplayName}.` else "ADMIN: you have no body right now.")
+end
+
+-- The enemies and bandit cars after the target gone (and the ones an admin called).
+function Give.clearWanted(player: Player)
+	Zombies.clearOwner(player)
+	BanditCars.clearFor(player)
+	chaseUntil[player] = nil
+	say(player, "ADMIN: nobody is after you any more (your enemies and bandit cars are gone).")
+end
+
+-- ── 4.5: the world ─────────────────────────────────────────────────────────
+
+-- Every enemy and bandit car on the whole map.
+function Give.killAll(player: Player)
+	local killed = 0
+	for _, z in table.clone(Zombies.all()) do
+		if not z.dead and Zombies.damage(z, math.huge, nil) then
+			killed += 1
+		end
+	end
+	killed += BanditCars.damageArea(Vector3.zero, 1e7, 1e9, nil)
+	say(player, `ADMIN: {killed} enemies killed on the whole map.`)
+end
+
+function Give.freeze(player: Player, arg: any)
+	local on = if type(arg) == "boolean" then arg else not Zombies.frozen
+	Zombies.frozen = on
+	BanditCars.frozen = on
+	frozenBy = if on then player else nil
+	workspace:SetAttribute("AdminFrozen", if on then true else nil)
+	say(player, if on then "ADMIN: FREEZE ON: every enemy and bandit car stands still." else "ADMIN: FREEZE OFF: the enemies move again.")
+end
+
+function Give.horde(player: Player, arg: any)
+	local count = math.clamp(math.floor(finite(arg) or 10), 1, MAX_HORDE)
+	local root = rootOf(player)
+	if not root then
+		return
+	end
+	if World.isSafe(root.Position) then
+		say(player, "ADMIN: enemies burn in the safe zone. Leave it first.")
+		return
+	end
+	local made = Zombies.spawnAround(player, root.Position, nil, count, Config.Horde.Roam.kinds)
+	say(player, if made > 0 then `ADMIN: a horde of {made} on the roads around you.` else "ADMIN: no room for more enemies here.")
+end
+
+function Give.traffic(player: Player, arg: any)
+	local count = math.clamp(math.floor(finite(arg) or 1), 1, 5)
+	local root = rootOf(player)
+	if not root then
+		return
+	end
+	local made = 0
+	for _ = 1, count do
+		if Traffic.adminSpawn(root.Position) then
+			made += 1
+		end
+	end
+	say(player, if made > 0 then `ADMIN: {made} traffic car{if made > 1 then "s" else ""} on the lanes near you.` else "ADMIN: no traffic lane near you.")
+end
+
+-- ── 4.5: the jobs ──────────────────────────────────────────────────────────
+
+function Give.finishJob(player: Player)
+	if not Jobs.active(player) then
+		say(player, "ADMIN: no job of your own running (a crew member's job is finished by its leader).")
+		return
+	end
+	say(player, if Jobs.adminComplete(player) then "ADMIN: the whole job is done and paid." else "ADMIN: the job could not be finished.")
+end
+
+-- ── 4.5: the buddies (server/Buddy.luau) ───────────────────────────────────
+
+local BUDDY_MODES: { [string]: boolean } = { follow = true, stay = true, guard = true }
+
+local function showBuddies(player: Player)
+	if player.Parent then
+		player:SetAttribute("AdminBuddies", Buddy.count(player))
+	end
+end
+
+function Give.buddy(player: Player, arg: any)
+	local count = math.clamp(math.floor(finite(arg) or 1), 1, MAX_BUDDIES)
+	local before = Buddy.count(player)
+	local now = Buddy.spawn(player, count)
+	showBuddies(player)
+	if player:GetAttribute("AdminBuddyMode") == nil then
+		player:SetAttribute("AdminBuddyMode", "follow")
+	end
+	say(player, if now > before then `ADMIN: {now - before} {if now - before == 1 then "buddy" else "buddies"} with you ({now} in all).` else `ADMIN: no more buddies ({now} is the most).`)
+end
+
+function Give.buddyDismiss(player: Player)
+	Buddy.dismiss(player)
+	showBuddies(player)
+	say(player, "ADMIN: your buddies are gone.")
+end
+
+function Give.buddyMode(player: Player, arg: any)
+	if type(arg) ~= "string" or not BUDDY_MODES[arg] then
+		say(player, "ADMIN: the buddies follow, stay or guard.")
+		return
+	end
+	Buddy.setMode(player, arg :: Buddy.Mode)
+	player:SetAttribute("AdminBuddyMode", arg)
+	say(player, `ADMIN: your buddies {if arg == "follow" then "follow you" elseif arg == "stay" then "stay where they are" else "guard this spot"}.`)
+end
+
 -- ── The remote ─────────────────────────────────────────────────────────────
 
-local COMMANDS: { [string]: (Player, any) -> () } = {
+local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	unlockAll = unlockAll,
 	maxUpgrades = maxUpgrades,
 	money = money,
@@ -773,9 +1196,48 @@ local COMMANDS: { [string]: (Player, any) -> () } = {
 		PlayerData.resetSave(player)
 		player:Kick("ADMIN: your save was reset. Join again to start as a new player.")
 	end,
+	-- 4.5
+	item = Give.item,
+	xp = Give.xp,
+	carStage = Give.carStage,
+	upgrade = Give.upgrade,
+	paint = Give.paint,
+	giveAll = Give.giveAll,
+	speed = Give.speed,
+	bring = Give.bring,
+	["goto"] = Give["goto"],
+	clearWanted = Give.clearWanted,
+	killAll = Give.killAll,
+	freeze = Give.freeze,
+	horde = Give.horde,
+	traffic = Give.traffic,
+	finishJob = Give.finishJob,
+	buddy = Give.buddy,
+	buddyDismiss = Give.buddyDismiss,
+	buddyMode = Give.buddyMode,
 }
+for command in FLAGS do
+	COMMANDS[command] = function(player: Player, arg: any)
+		setFlag(player, command, arg)
+	end
+end
 
-local function onCommand(player: Player, name: any, arg: any)
+-- 4.5: the commands that take a target (another player in the server); the others always act on / near the admin.
+local TARGETED: { [string]: boolean } = {}
+for _, name in {
+	"unlockAll", "maxUpgrades", "money", "xp", "setLevel", "item", "car", "carGun", "carStage", "upgrade", "paint",
+	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "god", "heal", "speed",
+	"clearWanted", "buddy", "buddyDismiss", "buddyMode", "giveEstate", "clearEstate", "setHome", "estateTeleport",
+	"businessCash", "missionStart", "missionsAll", "missionsReset", "challengesAll", "secretsAll", "challengesReset",
+	"title",
+} do
+	TARGETED[name] = true
+end
+for command in FLAGS do
+	TARGETED[command] = true
+end
+
+local function onCommand(player: Player, name: any, arg: any, targetId: any)
 	if not Admin.isAdmin(player) then
 		return
 	end
@@ -790,9 +1252,26 @@ local function onCommand(player: Player, name: any, arg: any)
 		return
 	end
 	lastCommand[player] = now
+	-- 4.5: the target (a player in this server), else you.
+	local target = player
+	local id = finite(targetId)
+	if targetId ~= nil and TARGETED[name] and id ~= player.UserId then
+		local found = if id and id >= 1 and id <= 2 ^ 53 then Players:GetPlayerByUserId(math.floor(id)) else nil
+		if not found or found.Parent ~= Players then
+			say(player, "ADMIN: that player is not in this server any more.")
+			return
+		end
+		target = found
+	end
+	if target ~= player then
+		acting[target] = player
+	end
 	local ok, err = pcall(function()
-		command(player, arg)
+		command(target, arg, player)
 	end)
+	if acting[target] == player then
+		acting[target] = nil
+	end
 	if not ok then
 		warn(`[Admin] {name} failed: {err}`)
 		say(player, `ADMIN: {name} failed (see the server Output).`)
@@ -805,7 +1284,7 @@ local function onPlayer(player: Player)
 		print(`[Admin] {player.Name} is an admin: press P for the admin panel`)
 	end
 	player.CharacterAdded:Connect(function()
-		-- God mode survives a respawn.
+		-- God mode survives a respawn (and so do the OP toggles: they are player attributes).
 		task.defer(shield, player)
 	end)
 end
@@ -819,9 +1298,33 @@ function Admin.start()
 		god[player] = nil
 		lastCommand[player] = nil
 		chaseUntil[player] = nil
+		acting[player] = nil
+		for target, admin in acting do
+			if admin == player then
+				acting[target] = nil
+			end
+		end
+		-- FREEZE goes with the admin who turned it on.
+		if frozenBy == player then
+			frozenBy = nil
+			Zombies.frozen = false
+			BanditCars.frozen = false
+			workspace:SetAttribute("AdminFrozen", nil)
+		end
 	end)
 	Net.get("Admin").OnServerEvent:Connect(onCommand)
 	RunService.Heartbeat:Connect(keepGods)
+	-- 4.5: the buddies' count (the panel shows it) for the players who have had buddies; a buddy may fall meanwhile.
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			for _, player in Players:GetPlayers() do
+				if player:GetAttribute("AdminBuddies") ~= nil then
+					pcall(showBuddies, player)
+				end
+			end
+		end
+	end)
 
 	-- Bandit cars and bandits an admin called keep after them without a job (Main set BanditCars.wanted = Jobs.active
 	-- and Zombies.hunts = Jobs.involved before this).

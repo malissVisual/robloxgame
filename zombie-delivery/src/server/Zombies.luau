@@ -87,6 +87,13 @@ Zombies.onKillInfo = nil :: ((player: Player, info: KillInfo) -> ())?
 Zombies.hunts = function(_player: Player): boolean
 	return true
 end
+-- 4.5, set by server/Buddy.luau: more people on foot to go after (the admin's NPC buddies), each with the player it
+-- belongs to (the people, ZombieDef.jobOnly, go after a buddy only when they go after its owner: Zombies.hunts).
+export type ExtraTarget = { position: Vector3, velocity: Vector3, humanoid: Humanoid, player: Player }
+Zombies.extraTargets = nil :: (() -> { ExtraTarget })?
+-- 4.5, the admin tools (server/Admin.luau): FREEZE stops every enemy where it stands (no steps, no bites, no shots).
+-- A player with the attribute AdminHidden is no target for anybody (on foot or in their car).
+Zombies.frozen = false
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -849,7 +856,7 @@ local function gatherTargets(): { Target }
 	local targets: { Target } = {}
 	for _, car in Vehicles.all() do
 		local position = car.chassis.Position
-		if not World.isSafe(position) then
+		if not World.isSafe(position) and car.owner:GetAttribute("AdminHidden") ~= true then
 			table.insert(targets, { position = position, velocity = car.chassis.AssemblyLinearVelocity, car = car, player = car.owner })
 		end
 	end
@@ -857,8 +864,20 @@ local function gatherTargets(): { Target }
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if humanoid and rootPart and humanoid.Health > 0 and not humanoid.SeatPart and not World.isSafe(rootPart.Position) then
+		if humanoid and rootPart and humanoid.Health > 0 and not humanoid.SeatPart and not World.isSafe(rootPart.Position) and player:GetAttribute("AdminHidden") ~= true then
 			table.insert(targets, { position = rootPart.Position, velocity = rootPart.AssemblyLinearVelocity, humanoid = humanoid, player = player })
+		end
+	end
+	-- 4.5: the admin's buddies (server/Buddy.luau), bitten and shot like players on foot.
+	local extra = Zombies.extraTargets
+	if extra then
+		local ok, list = pcall(extra)
+		if ok then
+			for _, t in list do
+				if not World.isSafe(t.position) then
+					table.insert(targets, { position = t.position, velocity = t.velocity, humanoid = t.humanoid, player = t.player })
+				end
+			end
 		end
 	end
 	return targets
@@ -905,8 +924,8 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 		end
 		return
 	end
-	if z.def.ranged then
-		return -- bandits do not grab cars, they shoot them
+	if z.def.ranged or car.owner:GetAttribute("AdminHidden") == true then
+		return -- bandits do not grab cars, they shoot them (4.5: nobody touches an admin's hidden car)
 	end
 	if z.def.jobOnly and not hunted[car.owner] then
 		return -- a soldier leaves the car of somebody without a job alone
@@ -1092,13 +1111,24 @@ local nextSlow = 0 -- 4.2: the walk animations and the despawn check run 5 times
 
 local function step()
 	local now = os.clock()
-	refreshHunted(now)
-	local targets = gatherTargets()
-	local cars = Vehicles.all()
 	local slow = now >= nextSlow
 	if slow then
 		nextSlow = now + 0.2
 	end
+	if Zombies.frozen then
+		-- 4.5, the admin's FREEZE: everybody stands where they are (a step order to their own spot, 5 times a second).
+		if slow then
+			for _, z in zombies do
+				if not z.dead and not z.car then
+					z.humanoid:MoveTo(z.root.Position)
+				end
+			end
+		end
+		return
+	end
+	refreshHunted(now)
+	local targets = gatherTargets()
+	local cars = Vehicles.all()
 	for _, z in table.clone(zombies) do
 		if z.dead then
 			continue
@@ -1116,8 +1146,8 @@ local function step()
 				z.humanoid.PlatformStand = false
 			elseif World.isSafe(car.chassis.Position) then
 				kill(z, nil, car.chassis.AssemblyLinearVelocity + Vector3.new(0, 20, 0))
-			elseif z.def.jobOnly and not hunted[car.owner] then
-				-- The job is over: a soldier lets go.
+			elseif (z.def.jobOnly and not hunted[car.owner]) or car.owner:GetAttribute("AdminHidden") == true then
+				-- The job is over: a soldier lets go (4.5: everybody lets go of an admin's HIDDEN car).
 				unlatch(z)
 				z.humanoid.PlatformStand = false
 			elseif now >= z.nextAttack then

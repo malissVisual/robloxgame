@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "4.4.1"
+Config.Version = "4.5"
 
 Config.DataStoreName = "ZombieDelivery_v1"
 Config.StartMoney = 150
@@ -1221,6 +1221,33 @@ Config.Crew = {
 	InviteRange = 60, -- studs to the player you invite (or use the crew button from anywhere)
 	InviteTimeout = 30,
 	RiderRange = 250, -- a rider who got out stays on the owner's job (paid, credited) within this of the owner
+}
+
+-- 4.5: the admin's test buddies (server/Buddy.luau, shared/BuddyBrain.luau): NPC couriers that follow their owner on
+-- foot, ride in the owner's passenger seats, and shoot the zombies, bandits and bandit cars around them. Their kills
+-- pay nobody (the economy stays clean). Modes: follow, stay (stand and fight), guard (hold a spot, step out a little
+-- toward an enemy, walk back).
+Config.Buddy = {
+	Max = 3, -- buddies per owner
+	Health = 150,
+	RespawnSeconds = 10, -- a fallen buddy comes back near its owner after this
+	Tick = 0.2, -- seconds between the buddies' decisions (one loop for all of them)
+	FollowDistance = 7, -- studs behind the owner (each buddy at its own place round them)
+	Arrive = 2, -- a walking buddy stops this close to its place
+	Restart = 5, -- a standing buddy sets off once its place is this far
+	Speed = 14, -- walk (the players' walk)
+	RunSpeed = 24, -- run (a player's sprint is 28)
+	RunFrom = 18, -- studs from the owner (or its spot) from which it runs
+	TeleportDistance = 150, -- farther than this from the owner (its spot): it appears next to them
+	StuckPath = 1.5, -- seconds without moving while it should: it looks for a way round (PathfindingService)
+	StuckSeconds = 4, -- seconds without moving: it appears at its place
+	BoardReach = 40, -- studs from the owner's car (standing still) from which it gets into a free passenger seat
+	Range = 90, -- studs it shoots (with a clear line)
+	Damage = 10, -- per hit
+	FireEvery = 0.7, -- seconds between shots
+	Accuracy = 0.8, -- hit chance at a standing target (less at a fast one)
+	GuardLeash = 30, -- guard: how far from its spot it steps out toward an enemy
+	GuardCloseIn = 25, -- guard: it steps toward an enemy farther than this (to get it in sight)
 }
 
 -- Real estate (server/Estate.luau): homes, garages and offices you buy with the money you made. A home is where you

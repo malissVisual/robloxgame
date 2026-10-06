@@ -2885,6 +2885,21 @@ local function watchPrompts(car: Car)
 						return
 					end
 				end
+				-- 4.5: an admin's buddy (server/Buddy.luau) in the seat gets out for a player.
+				local yield = Vehicles.yieldSeat
+				for _, n in door.seats do
+					local seat = car.passengers[n]
+					local occupant = seat and seat.Occupant
+					if yield and seat and occupant and not reserved[seat] and not Players:GetPlayerFromCharacter(occupant.Parent) and yield(seat) then
+						-- (the seat empties as the buddy's SeatWeld goes; a frame later at the latest)
+						task.delay(0.1, function()
+							if seatFree(seat) and humanoid.Parent and humanoid.Health > 0 and not humanoid.SeatPart and not boarders[player] and not car.wrecked then
+								startBoarding(player, car, seat, index, humanoid)
+							end
+						end)
+						return
+					end
+				end
 				Net.get("Notice"):FireClient(player, "No free seat at this door.")
 			end)
 		end
@@ -3142,6 +3157,10 @@ local function remember(car: Car)
 		profile.carHealth[car.id] = math.clamp(car.health / math.max(1, car.stats.health), 0, 1)
 	end
 end
+
+-- 4.5, set by server/Buddy.luau: a player wants the passenger seat an admin's NPC buddy sits in: the buddy gets out
+-- (true when it did; it keeps away from that seat a moment).
+Vehicles.yieldSeat = nil :: ((seat: Seat) -> boolean)?
 
 -- 3.4, set by server/Repair.luau: the owner gets back into a car on the lift (the repair is cancelled).
 Vehicles.beforeDrive = function(_player: Player, _car: Car) end
