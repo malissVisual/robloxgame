@@ -4,7 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · 5.x personal kit: backpacks first, shoes, jacket and cart · server/KitArt/, art/icons/kit_*, design/kit-models/, tools/kit-models/ · since 2026-10-06
+- Codex · 5.x personal kit: backpacks first, shoes, jacket and cart; reusable art-only renderer/checker · server/KitArt/, server/ModelArt/, art/icons/kit_*, design/kit-models/, tools/model-art/ · since 2026-10-06
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
