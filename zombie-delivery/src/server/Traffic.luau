@@ -1775,6 +1775,32 @@ function Traffic.counts(): (number, number)
 	return #cars, #peds
 end
 
+-- 4.5, the admin tools (server/Admin.luau): one more traffic car on a lane 25 … 120 studs from `at`, not on top of
+-- another one. True when it came.
+function Traffic.adminSpawn(at: Vector3): boolean
+	local g = graph
+	if not g then
+		return false
+	end
+	for _ = 1, 6 do
+		local edge, s, x, z = TrafficLanes.spawnSpot(g, at.X, at.Z, 25, 120, rand)
+		if not edge then
+			return false
+		end
+		local crowded = false
+		for _, car in cars do
+			if (car.x - x) ^ 2 + (car.z - z) ^ 2 < (SPACING / 2) ^ 2 then
+				crowded = true
+				break
+			end
+		end
+		if not crowded then
+			return spawnCar(g, edge, s) ~= nil
+		end
+	end
+	return false
+end
+
 -- Everything off the streets (they come back around the players).
 function Traffic.clear()
 	for _, car in table.clone(cars) do

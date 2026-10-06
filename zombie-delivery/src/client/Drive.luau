@@ -193,6 +193,11 @@ local function step(dt: number)
 
 	local maxSpeed = (car:GetAttribute("MaxSpeed") or 60) :: number * ((car:GetAttribute("SpeedMult") or 1) :: number)
 	local accel = (car:GetAttribute("Accel") or 26) :: number
+	if player:GetAttribute("AdminCarBoost") == true then
+		-- 4.5, the admin's CAR BOOST (the player attribute, only server/Admin.luau sets it): twice the top speed.
+		maxSpeed *= 2
+		accel *= 1.6
+	end
 	if Drive.boosting() and throttle > 0 then
 		maxSpeed *= boostMultiplier
 		accel *= 2.5

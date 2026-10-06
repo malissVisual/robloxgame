@@ -2359,6 +2359,22 @@ function Jobs.adminFinishStop(player: Player): boolean
 	return done
 end
 
+-- 4.5: the whole job done at once, paid like a finished one (every piece counted as delivered; the condition and the
+-- clock as they are now; a mission is rated and rewarded). False without a job of your own.
+function Jobs.adminComplete(player: Player): boolean
+	local job = jobs[player]
+	if not job then
+		return false
+	end
+	if job.gateClosed then
+		DuoGates.forceOpen(player)
+		job.gateClosed = false
+	end
+	job.cargo.deliveredTotal = math.max(job.cargo.deliveredTotal, job.offer.total)
+	complete(player, job)
+	return true
+end
+
 function Jobs.start()
 	-- The quiet twist hears every shot (Gun does not require Jobs: no cycle).
 	Gun.onShot = Jobs.onShot

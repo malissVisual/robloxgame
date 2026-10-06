@@ -53,6 +53,12 @@ local SPRINT_SPEED = Config.Movement.Sprint -- 3.7: 28 (3.2.4: 25)
 local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
 
+-- 4.5: the admin's walk multiplier (the player attribute AdminSpeed: 1, 2 or 4; only server/Admin.luau sets it).
+local function adminSpeed(): number
+	local value = player:GetAttribute("AdminSpeed")
+	return if type(value) == "number" and value >= 1 and value <= 4 then value else 1
+end
+
 -- The step with cargo in the hands: slower still with a heavy piece and nobody helping (the TWO-MAN LIFT twist:
 -- server/Cargo.luau sets the character's CarrySpeed attribute).
 local function carrySpeed(character: Model): number
@@ -376,7 +382,7 @@ local function update(dt: number)
 			else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
-		humanoid.WalkSpeed = speed
+		humanoid.WalkSpeed = speed * adminSpeed()
 	end
 
 	local rotation = CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
@@ -510,10 +516,11 @@ local function touchSpeed()
 		local target = if handsFull then carrySpeed(character) elseif sprinting then SPRINT_SPEED else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
-		if speed ~= written or humanoid ~= writtenFor then
-			written = speed
+		local walk = speed * adminSpeed()
+		if walk ~= written or humanoid ~= writtenFor then
+			written = walk
 			writtenFor = humanoid
-			humanoid.WalkSpeed = speed
+			humanoid.WalkSpeed = walk
 		end
 	end)
 end

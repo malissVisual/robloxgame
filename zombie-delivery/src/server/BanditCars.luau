@@ -63,6 +63,9 @@ BanditCars.onKillInfo = nil :: ((player: Player, info: { cause: string, from: st
 BanditCars.wanted = function(_player: Player): boolean
 	return true
 end
+-- 4.5, the admin tools (server/Admin.luau): FREEZE stops every bandit car where it is (no driving, no shots). A target
+-- with the attribute AdminHidden is not wanted: its bandits drive off and give up.
+BanditCars.frozen = false
 
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
@@ -363,12 +366,17 @@ end
 local function drive(b: Bandit, dt: number, now: number)
 	local npc = b.npc
 	local chassis = npc.chassis
+	if BanditCars.frozen then
+		npc.linear.PlaneVelocity = Vector2.zero
+		npc.angular.AngularVelocity = Vector3.zero
+		return
+	end
 	local targetPosition, targetVelocity, car, humanoid = targetInfo(b)
 	local position = chassis.Position
 
 	-- Gone too far, lived too long, the target is gone: vanish.
 	local distance = if targetPosition then flat(targetPosition - position).Magnitude else math.huge
-	local wanted = BanditCars.wanted(b.target)
+	local wanted = BanditCars.wanted(b.target) and b.target:GetAttribute("AdminHidden") ~= true
 	if wanted then
 		b.offSince = nil
 	elseif not b.offSince then
