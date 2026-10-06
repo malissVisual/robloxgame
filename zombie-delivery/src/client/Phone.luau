@@ -1545,6 +1545,9 @@ function Phone.open(startApp: string?)
 	end)
 	if not ok then
 		warn(`[Phone] it failed to open: {err}`)
+		if isOpen then
+			Net.get("PhoneHold"):FireServer(false)
+		end
 		isOpen = false
 		if refs.body then
 			refs.body.Visible = false

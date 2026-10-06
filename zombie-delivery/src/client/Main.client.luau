@@ -131,8 +131,15 @@ Hud.onEstate = EstateUi.toggleList
 Hud.onMissions = MissionsUi.toggle
 MissionsUi.onFindCrew = CrewPanel.open
 CameraRig.mouseNeeded = function(): boolean
+	return CameraRig.windowOpen() or Phone.isOpen()
+end
+-- Every window but the phone (5.4.1: with only the phone open, the right mouse still turns the camera).
+CameraRig.windowOpen = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
-		or CareerUi.isOpen() or CareerUi.cardOpen() or Phone.isOpen()
+		or CareerUi.isOpen() or CareerUi.cardOpen()
+end
+CameraRig.freeLook = function(): boolean
+	return Phone.isOpen() and not CameraRig.windowOpen()
 end
 LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while a window is open
 

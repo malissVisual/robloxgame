@@ -39,6 +39,7 @@ local zoom = 1
 local lastMouse = 0
 local altHeld = false
 local rmbHeld = false -- aiming
+local turning = false -- 5.4.1: the right mouse held to turn the camera while only the phone is open (no aim)
 local lmbHeld = false -- shooting
 local lastFire = 0
 local aimBlend = 0 -- 0 = walking camera, 1 = over the shoulder
@@ -93,6 +94,14 @@ local viewCar: Model? = nil
 
 -- Set by Main: is a window open that needs the mouse?
 CameraRig.mouseNeeded = function(): boolean
+	return false
+end
+-- Set by Main (5.4.1): is a window other than the phone open?
+CameraRig.windowOpen = function(): boolean
+	return false
+end
+-- Set by Main (5.4.1): is the phone the only thing open? Then the right mouse still turns the camera (no aiming).
+CameraRig.freeLook = function(): boolean
 	return false
 end
 
@@ -336,7 +345,12 @@ local function update(dt: number)
 	wasActive = true
 
 	local locked = CameraRig.locked()
-	UserInputService.MouseBehavior = if locked then Enum.MouseBehavior.LockCenter else Enum.MouseBehavior.Default
+	if turning and (locked or not CameraRig.freeLook()) then
+		turning = false
+	end
+	UserInputService.MouseBehavior = if locked then Enum.MouseBehavior.LockCenter
+		elseif turning then Enum.MouseBehavior.LockCurrentPosition
+		else Enum.MouseBehavior.Default
 	UserInputService.MouseIconEnabled = not locked
 
 	local car, driving = Drive.seatedCar()
@@ -540,7 +554,7 @@ function CameraRig.start()
 		if not enabled then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseMovement and CameraRig.locked() then
+		if input.UserInputType == Enum.UserInputType.MouseMovement and (turning or CameraRig.locked()) then
 			yaw -= input.Delta.X * SENSITIVITY
 			pitch = math.clamp(pitch - input.Delta.Y * SENSITIVITY, -1.2, 0.9)
 			lastMouse = os.clock()
@@ -562,6 +576,10 @@ function CameraRig.start()
 		elseif processed then
 			return
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+			if not CameraRig.locked() and CameraRig.freeLook() then
+				turning = true -- 5.4.1: the phone open: the right mouse turns the camera, no gun comes out
+				return
+			end
 			Holster.pressDraws(input) -- 3.9: holstered, the gun comes out and goes up
 			rmbHeld = true
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -576,6 +594,7 @@ function CameraRig.start()
 			shiftHeld = false
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
 			rmbHeld = false
+			turning = false
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
 			lmbHeld = false
 		end
@@ -586,6 +605,7 @@ function CameraRig.start()
 		shiftHeld = false
 		padSprint = false
 		rmbHeld = false
+		turning = false
 		lmbHeld = false
 	end)
 	RunService:BindToRenderStep("ZombieDeliveryCamera", Enum.RenderPriority.Camera.Value + 1, update)

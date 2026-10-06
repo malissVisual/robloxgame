@@ -1109,6 +1109,10 @@ the stations, only deliveries.
 shows "No active orders" with OPEN BOARD when you have none, else the current order (timer, pay, its stops ✓ ▶ ● ○, your
 load) and every other order with a small PIN. MESSAGES is a chat list (avatars, time, an unread dot).
 
+**5.4.1:** the phone moved to **Q** (the weapon wheel to **T**); with only the phone open, holding the right mouse still
+turns the camera. A job whose payload fails no longer gets stuck (the server sends a short one and warns once in the
+Output), so the first delivery, Marge and the board work again.
+
 ## Several orders at once, real shops and homes in town (5.2)
 
 **Several orders at once** (`Config.Jobs.Orders`, `job.orders`): while an ordinary run goes (on foot, by bike, or a ★ / ★★
