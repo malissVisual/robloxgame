@@ -1011,7 +1011,7 @@ them and `tests/touchlayout_test.luau` checks phones and tablets for overlaps.
 
 The big map (M, or EXPAND) lists every shop, employer and far place with what you can do there: click one to set
 the **GPS**. The route there is drawn along the roads on both maps (yellow to the job's next stop, purple to the GPS
-point), with an arrow over your car and a light beam. Big icons over the buildings show them in the world.
+point), with a red marker over the stop and a light beam. Big icons over the buildings show them in the world.
 
 ## Content
 
