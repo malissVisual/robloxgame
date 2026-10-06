@@ -908,7 +908,7 @@ local function buildPiece(piece: Piece): Model
 		text.TextColor3 = Color3.fromRGB(245, 245, 245)
 		text.Font = Enum.Font.GothamBold
 		text.TextSize = 12
-		text.Text = `FOR {string.upper(owner)}`
+		text.Text = `FOR {require(Shared.Residents).caps(owner)}` -- (5.5: a resident's Czech letters in caps)
 		text.Parent = tag
 		tag.Parent = main
 	end
