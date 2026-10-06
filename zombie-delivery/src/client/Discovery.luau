@@ -238,6 +238,11 @@ local function announce(name: string)
 	pump()
 end
 
+-- 4.3: is the banner showing, or one waiting to (client/LocationTag.luau stays quiet meanwhile)?
+function Discovery.busy(): boolean
+	return showing or (shown and #queue > 0)
+end
+
 -- The HUD is shown or hidden (client/MapView.luau MapView.setVisible): the banners wait for it.
 function Discovery.setShown(visible: boolean)
 	shown = visible
