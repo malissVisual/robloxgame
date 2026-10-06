@@ -13,10 +13,10 @@
 -- Outside the window:
 --   * the number of invitations waiting on the CREW button (Hud.setBadge), which flashes when one comes,
 --   * an invitation card at the top (ACCEPT / DECLINE right there, or K for the panel),
---   * for a member: the leader's job at the top (like your own job panel, in the GPS purple; on a mission its
+--   * for a member: the leader's job at the top (like your own job panel; on a mission its
 --     number, name and twists), the GPS set to the
---     leader's next stop (MapView.setWaypoint: the purple route on the minimap and the big map) and a purple beam
---     over it in the world,
+--     leader's next stop (MapView.setWaypoint: the white GPS route on the minimap and the big map) and a thin white
+--     beam over it in the world (4.4.1: white like the GPS on the maps, it was purple),
 --   * a small tag over your crewmates' heads.
 -- The card and the member's strip sit in the Hud's top stack (Hud.topSlot("crew"), under Roblox's top bar, scaled
 -- with it), so they never overlap the job panel, the car call line, the level-up banner or the toasts.
@@ -44,7 +44,7 @@ local Hud = require(script.Parent.Hud)
 local C = Ui.Colors
 local P = Theme.Postage -- 3.8: remapped to the contract values (see Theme)
 local K = Theme.Contract
-local GPS = Ui.Gps -- the GPS purple of the maps (client/MapView.luau): the route beam; on a row it means "highlight"
+local GPS = Ui.Gps -- the old GPS purple: on a row it means "highlight" (the maps' GPS route is white now)
 local VIOLET = P.violet -- the crew's text accent (3.8: a light accent on charcoal)
 local HIDDEN = CFrame.new(0, -1000, 0)
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is X: stood up
@@ -83,7 +83,7 @@ local cardTimer: any = nil
 local cardText: any = nil
 local cardFrom: number? = nil -- whose invitation the card shows
 local scale: any = nil -- the window's UIScale
-local beam: Part? = nil -- the purple beam over the leader's next stop (members)
+local beam: Part? = nil -- the thin white beam over the leader's next stop (members)
 local gpsSet: Vector3? = nil -- the waypoint this module set (nil = none of ours)
 local tags: { [number]: { gui: BillboardGui, head: Instance? } } = {} -- userId → the tag over a crewmate
 
@@ -407,7 +407,7 @@ local function renderJob(myRole: string?)
 		timer.Text = if left then Ui.clock(left) else ""
 		timer.TextColor3 = if left and left < 15 then C.red else C.text
 		local position = if typeof(job.position) == "Vector3" then job.position else nil
-		info.Text = if myRole == "member" then `{meters(distanceTo(position))} to the stop  ·  the purple GPS route leads there`
+		info.Text = if myRole == "member" then `{meters(distanceTo(position))} to the stop  ·  the GPS route leads there`
 			else `{meters(distanceTo(position))} to the stop`
 		-- The newest state's mission (the defend countdown moves without a new render).
 		local fresh = missionOf(status())
@@ -809,7 +809,7 @@ local function updateStrip()
 	local position = if typeof(job.position) == "Vector3" then job.position else nil
 	local owner = Players:GetPlayerByUserId(crew.owner.userId)
 	local ownerDistance = if owner then distanceToPlayer(owner) else nil
-	stripInfo.Text = `Stop {meters(distanceTo(position))}  ·  {ownerName} {meters(ownerDistance)}  ·  follow the purple GPS`
+	stripInfo.Text = `Stop {meters(distanceTo(position))}  ·  {ownerName} {meters(ownerDistance)}  ·  follow the GPS`
 end
 
 -- A member's GPS follows the leader's next stop; it is cleared when there is none any more. Set only when the stop
@@ -1079,7 +1079,8 @@ local function build()
 		TextTruncate = Enum.TextTruncate.None,
 	})
 
-	-- The purple beam over the leader's next stop (a member's guide in the world, like the job's own beam).
+	-- The beam over the leader's next stop (a member's guide in the world, like the job's own beam). 4.4.1: thin and
+	-- white, like the GPS route on the maps (client/MapView.luau) and the Hud's GPS guide.
 	local part = Instance.new("Part")
 	part.Name = "CrewBeam"
 	part.Anchored = true
@@ -1089,9 +1090,9 @@ local function build()
 	part.CastShadow = false
 	part.Material = Enum.Material.Neon
 	part.Shape = Enum.PartType.Cylinder
-	part.Color = GPS
-	part.Transparency = 0.5
-	part.Size = Vector3.new(240, 2, 2)
+	part.Color = K.text
+	part.Transparency = 0.75
+	part.Size = Vector3.new(240, 1.2, 1.2)
 	part.CFrame = HIDDEN
 	part.Parent = workspace
 	beam = part

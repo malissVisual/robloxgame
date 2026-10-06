@@ -102,7 +102,7 @@ function TutorialSteps.hint(step: string, job: { [string]: any }?): string
 	elseif step == "retry" then
 		return `Talk to {name} at the depot (E) for another job`
 	elseif step == "drive_pickup" then
-		return "Get in your van and follow the GPS line to the blue circle: the pickup"
+		return "Get in your van and follow the red route on the map to the red circle: the pickup"
 	elseif step == "pickup" then
 		return `Park in the circle, get out and pick up {article(piece)} from {person} (E)`
 	elseif step == "pickup_more" then
@@ -112,7 +112,7 @@ function TutorialSteps.hint(step: string, job: { [string]: any }?): string
 	elseif step == "loose" then
 		return `Pick the {piece} up again (E)`
 	elseif step == "drive_drop" then
-		return "All loaded! Close the back of the van, get in and follow the GPS to the yellow circle: the drop-off"
+		return "All loaded! Close the back of the van, get in and follow the red route to the red circle: the drop-off"
 	elseif step == "unload" then
 		return `Get out, open the back of the van (E) and take the {piece} out (E)`
 	elseif step == "handover" then
@@ -142,7 +142,7 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		end
 		return {
 			speaker = speaker(false),
-			pages = { "Here's your job. The GPS line on the road and the map lead to the pickup. Get in your van and go!" },
+			pages = { "Here's your job. The red route on the map and the arrow over your van lead to the pickup. Get in your van and go!" },
 			primary = "ON MY WAY",
 		}
 	elseif phase == "board" then

@@ -11,7 +11,7 @@
 --     sell-back value and the actions: BUY (at the sign; away from it the button sets the GPS there), SELL (asks
 --     once more), SET AS HOME, SPAWN AT THE DEPOT and GPS.
 --
--- The GPS goes through MapView (setWaypoint: the purple route on both maps, onWaypoint: the HUD's beam and label).
+-- The GPS goes through MapView (setWaypoint: the white GPS route on both maps, onWaypoint: the HUD's beam and label).
 -- The summary strip shows your car slots (used / total), your home and how many properties you own. The server
 -- answers every action with a Notice; while the window is open it shows in the subtitle too (the toasts are behind
 -- the window). The money comes with the State remote, the level with the player attribute "Level".
@@ -76,7 +76,7 @@ local FILTERS = {
 	{ id = "office", label = "OFFICES" },
 	{ id = "owned", label = "OWNED" },
 }
-local GPS_COLOR = Theme.Gps -- the GPS route's purple (client/MapView.luau); a button wears its lilac face
+local GPS_COLOR = Theme.Gps -- the old GPS purple: a button wears its lilac face (the maps' GPS route is white)
 
 local state: State = { owned = {}, home = nil, office = nil, slots = Config.Estate.BaseCarSlots, used = 0, owners = {}, finished = {} }
 local money = 0
@@ -230,7 +230,7 @@ local function say(text: string, color: Color3?)
 	end)
 end
 
--- The GPS to a property: the purple route on the maps and the HUD's beam (MapView.onWaypoint, set by the Hud).
+-- The GPS to a property: the white route on the maps and the HUD's beam (MapView.onWaypoint, set by the Hud).
 local function setGps(def: Config.EstateDef): boolean
 	local plot = plotOf(def.id)
 	if not plot then

@@ -1352,6 +1352,10 @@ end
 local result: any
 do -- (its own block: the locals below stay out of the 200-register limit)
 result = window("Delivery", Vector2.new(480, 580), "📦", "")
+-- 4.4.1: Space (Enter, the gamepad's A) closes it like OK while it shows (client/DialogKeys.luau).
+require(script.Parent.DialogKeys).watch("result", result.frame, function()
+	result.frame.Visible = false
+end)
 
 -- The crew of a job (r.crew): a number (riders, older payloads) or the list of everyone paid { { name, pay } }
 -- (the owner too; an entry may say owner = true).
@@ -1513,6 +1517,15 @@ function Hud.showResult(r: any)
 		result.frame.Visible = false
 	end)
 	ok.LayoutOrder = 2
+	-- 4.4.1: the key that does OK too (none on a touch screen).
+	Ui.label(actions, require(script.Parent.DialogKeys).hint(), UDim2.fromOffset(0, 44), {
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Theme.MonoFont,
+		TextSize = 11,
+		TextColor3 = P.ink2,
+		TextWrapped = false,
+		LayoutOrder = 3,
+	})
 end
 
 -- Is the DELIVERY result window open (client/MissionsUi.luau waits with its celebration card until it is closed)?
@@ -2554,6 +2567,8 @@ end
 -- 3.8: the contract's red for the job's stop, white for the pile / the person / the vehicle's back and the GPS point.
 -- The waypoint is small and monochrome: a red (or white) square, the name in white caps, the distance under it, and a
 -- fine line down to the spot.
+-- 4.4.1 (minimal): the circles are thin outlines on the ground (a SurfaceGui on a flat invisible part), not filled
+-- neon discs; the light is a thin beam that fades out upwards; the arrow is smaller and slimmer.
 
 local beacon: any, ring: any, pileRing: any, label: any, labelText: any, HIDDEN: any, PICKUP_COLOR: any, PILE_COLOR: any, UPRIGHT: any, hideGuide: any, placeGuide: any, pointArrow: any, GPS_COLOR: any, gps: any, myPosition: any, footTarget: any
 do -- (its own block: the locals below stay out of the 200-register limit)
@@ -2579,14 +2594,61 @@ local function guidePart(name: string, size: Vector3, transparency: number): Par
 	return p
 end
 
-local BEACON_WIDE = Vector3.new(240, 5, 5)
-local BEACON_THIN = Vector3.new(240, 1.2, 1.2)
-beacon = guidePart("Beacon", BEACON_WIDE, 0.55)
-beacon.Shape = Enum.PartType.Cylinder
-ring = guidePart("Ring", Vector3.new(0.2, Config.Jobs.DeliverRadius * 2, Config.Jobs.DeliverRadius * 2), 0.5)
-ring.Shape = Enum.PartType.Cylinder
-pileRing = guidePart("PileRing", Vector3.new(0.2, 7, 7), 0.35)
-pileRing.Shape = Enum.PartType.Cylinder
+-- 4.4.1: a circle as a thin outline: a SurfaceGui on the Right face of a flat invisible part. Stood up with UPRIGHT
+-- (like the old cylinders) that face looks up, so the code placing the circles stays the same. The outline (and a
+-- faint fill, `fill` its transparency) follows the part's Color. `stroke` is in studs.
+local function outlinePart(name: string, diameter: number, stroke: number, fill: number): Part
+	local p = guidePart(name, Vector3.new(0.05, diameter, diameter), 1)
+	local surface = Ui.make("SurfaceGui", {
+		Face = Enum.NormalId.Right,
+		SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud,
+		PixelsPerStud = 16,
+		LightInfluence = 0,
+		AlwaysOnTop = false, -- (parked under the map it is out of sight)
+	}, p)
+	local width = stroke * 16
+	local disc = Ui.make("Frame", {
+		Size = UDim2.new(1, -width * 2, 1, -width * 2),
+		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = p.Color,
+		BackgroundTransparency = fill,
+		BorderSizePixel = 0,
+	}, surface)
+	Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, disc)
+	local line = Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = p.Color, Thickness = width, Transparency = 0.1 }, disc)
+	p:GetPropertyChangedSignal("Color"):Connect(function()
+		disc.BackgroundColor3 = p.Color
+		line.Color = p.Color
+	end)
+	return p
+end
+
+-- The light over the spot: an invisible carrier part (stood up, 240 long) with a thin Beam along it, faint at the
+-- bottom and gone at the top. Narrow over the circle, narrower still over the pile / the person.
+local BEACON_WIDE = 1.2
+local BEACON_THIN = 0.5
+beacon = guidePart("Beacon", Vector3.new(240, 0.2, 0.2), 1)
+local beamBottom = Ui.make("Attachment", { Position = Vector3.new(-120, 0, 0) }, beacon)
+local beamTop = Ui.make("Attachment", { Position = Vector3.new(120, 0, 0) }, beacon)
+local light = Ui.make("Beam", {
+	Attachment0 = beamBottom,
+	Attachment1 = beamTop,
+	FaceCamera = true,
+	LightEmission = 0,
+	LightInfluence = 0,
+	Segments = 1,
+	Width0 = BEACON_WIDE,
+	Width1 = BEACON_WIDE,
+	Color = ColorSequence.new(view.guideColor),
+	Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.6),
+		NumberSequenceKeypoint.new(0.45, 0.8),
+		NumberSequenceKeypoint.new(1, 1),
+	}),
+}, beacon)
+ring = outlinePart("Ring", Config.Jobs.DeliverRadius * 2, 0.35, 0.93)
+pileRing = outlinePart("PileRing", 5, 0.22, 1)
 label = guidePart("Label", Vector3.new(0.2, 0.2, 0.2), 1)
 -- 3.8: the waypoint over the spot. Its bottom (a small dot at the end of a fine line) sits on the label point; over it
 -- the square in the guide's colour, the name in white caps and the distance (view.mark writes both). White on a faint
@@ -2619,11 +2681,11 @@ Ui.make("Frame", { Name = "Dot", Size = UDim2.fromOffset(4, 4), Position = UDim2
 function view.mark(name: string, distance: number): string
 	return `{view.esc(string.upper(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
 end
--- The arrow: a shaft and two sides of a head, pointing along -Z of its frame.
+-- The arrow: a shaft and two sides of a head, pointing along -Z of its frame (4.4.1: smaller and slimmer).
 local arrowParts = {
-	{ part = guidePart("ArrowShaft", Vector3.new(0.6, 0.4, 3.6), 0), offset = CFrame.new(0, 0, 0.8) },
-	{ part = guidePart("ArrowLeft", Vector3.new(0.6, 0.4, 2.6), 0), offset = CFrame.lookAt(Vector3.new(-0.84, 0, -0.6), Vector3.new(0, 0, -1.6)) },
-	{ part = guidePart("ArrowRight", Vector3.new(0.6, 0.4, 2.6), 0), offset = CFrame.lookAt(Vector3.new(0.84, 0, -0.6), Vector3.new(0, 0, -1.6)) },
+	{ part = guidePart("ArrowShaft", Vector3.new(0.28, 0.16, 2.6), 0.1), offset = CFrame.new(0, 0, 0.5) },
+	{ part = guidePart("ArrowLeft", Vector3.new(0.28, 0.16, 1.8), 0.1), offset = CFrame.lookAt(Vector3.new(-0.6, 0, -0.55), Vector3.new(0, 0, -1.2)) },
+	{ part = guidePart("ArrowRight", Vector3.new(0.28, 0.16, 1.8), 0.1), offset = CFrame.lookAt(Vector3.new(0.6, 0, -0.55), Vector3.new(0, 0, -1.2)) },
 }
 HIDDEN = CFrame.new(0, -1000, 0)
 PICKUP_COLOR = P.red -- (a pick-up is the job's stop too; the waypoint says PICK UP)
@@ -2635,6 +2697,8 @@ function hideGuide()
 	ring.CFrame = HIDDEN
 	pileRing.CFrame = HIDDEN
 	label.CFrame = HIDDEN
+	-- 4.4.1: the waypoint is drawn on top of everything, so parked under the map it still showed: switch it off.
+	labelGui.Enabled = false
 	for _, a in arrowParts do
 		a.part.CFrame = HIDDEN
 	end
@@ -2648,6 +2712,7 @@ local function paintGuide(color: Color3)
 	for _, part in { beacon, ring } do
 		part.Color = color
 	end
+	light.Color = ColorSequence.new(color)
 	for _, a in arrowParts do
 		a.part.Color = color
 	end
@@ -2707,14 +2772,17 @@ function placeGuide(spot: Vector3, color: Color3, beamSpot: Vector3?, labelSpot:
 	paintGuide(color)
 	ring.CFrame = CFrame.new(p + Vector3.new(0, 0.15, 0)) * UPRIGHT
 	if beamAt then
-		beacon.Size = BEACON_THIN
+		light.Width0 = BEACON_THIN
+		light.Width1 = BEACON_THIN
 		-- Starts over the person's head, so it never hides them.
 		beacon.CFrame = CFrame.new(beamAt + Vector3.new(0, 127, 0)) * UPRIGHT
 	else
-		beacon.Size = BEACON_WIDE
+		light.Width0 = BEACON_WIDE
+		light.Width1 = BEACON_WIDE
 		beacon.CFrame = CFrame.new(p + Vector3.new(0, 120, 0)) * UPRIGHT
 	end
 	label.CFrame = CFrame.new((labelAt or p) + Vector3.new(0, 10, 0))
+	labelGui.Enabled = true
 end
 
 -- The arrow at `origin` pointing along `flat` (scale < 1: the small one over your head on foot).

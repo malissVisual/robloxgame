@@ -68,6 +68,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Hud = require(script.Parent.Hud)
 local CrewPanel = require(script.Parent.CrewPanel)
+local DialogKeys = require(script.Parent.DialogKeys)
 
 type MissionDef = Missions.MissionDef
 type Campaign = Missions.Campaign
@@ -2482,6 +2483,16 @@ local function buildCleared()
 		hideCleared()
 	end)
 	ok.LayoutOrder = 2
+	-- 4.4.1: Space (Enter, the gamepad's A) closes the card like OK while it shows; the key's hint next to OK.
+	Ui.label(buttons, DialogKeys.hint(), UDim2.fromOffset(0, 42), {
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Theme.MonoFont,
+		TextSize = 11,
+		TextColor3 = P.ink2,
+		TextWrapped = false,
+		LayoutOrder = 3,
+	})
+	DialogKeys.watch("cleared", card, hideCleared)
 	local function scaleCard()
 		local camera = workspace.CurrentCamera
 		if camera then

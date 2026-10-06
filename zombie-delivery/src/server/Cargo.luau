@@ -2528,7 +2528,7 @@ local function toolStep(session: Session, plan: Plan, near: boolean): (string?, 
 	local held = session.held[owner]
 	local car = session.car
 	local noun = if car then Vehicles.cargoNoun(car) else "vehicle"
-	local circle = if pickup then "blue" else "yellow"
+	local circle = "red" -- 4.4.1: the stop's circle is the contract red, the pick-up's too (client/Hud.luau)
 	local seatedCar = Vehicles.seatedIn(owner)
 	local who = if plan.person then plan.person.name else "the receiver"
 	local shut = car ~= nil and backShut(session)
@@ -2686,7 +2686,7 @@ function Cargo.step(session: Session): (string, string)
 	local held = session.held[owner]
 	local car = session.car
 	local noun = if car then Vehicles.cargoNoun(car) else "vehicle"
-	local circle = if plan.stage == "pickup" then "blue" else "yellow"
+	local circle = "red" -- 4.4.1: the stop's circle is the contract red, the pick-up's too (client/Hud.luau)
 	local seatedCar, driving = Vehicles.seatedIn(owner)
 	local position = ownerPosition(session)
 	local near = position ~= nil and flat(position, plan.park) < Tuning.ApproachDistance

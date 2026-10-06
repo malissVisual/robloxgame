@@ -393,7 +393,7 @@ local function join(owner: Player, member: Player)
 	local status = statusFor(owner)
 	tellCrew(owner, `{nameOf(member)} joined the crew.`, member)
 	say(member, if status and type(status.name) == "string"
-		then `You joined {nameOf(owner)}'s crew: {status.name}. Follow the purple GPS route.`
+		then `You joined {nameOf(owner)}'s crew: {status.name}. Follow the GPS route to their stop.`
 		else `You joined {nameOf(owner)}'s crew. You help with their next job and share the pay.`)
 	markCrew(owner)
 end

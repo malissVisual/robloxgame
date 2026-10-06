@@ -36,6 +36,7 @@ local MapView = require(Client.MapView)
 local Leaderboard = require(Client.Leaderboard)
 local CrewPanel = require(Client.CrewPanel)
 local EstateUi = require(Client.EstateUi)
+local DialogKeys = require(Client.DialogKeys)
 
 local C = Ui.Colors
 local P = Theme.Postage
@@ -505,6 +506,18 @@ local function build()
 		welcomeCard.Visible = false
 	end)
 	ok.Position = UDim2.new(1, -106, 1, -46)
+	-- 4.4.1: Space (Enter, the gamepad's A) closes the card like OK while it shows; the key's hint left of OK.
+	Ui.label(welcomeCard, DialogKeys.hint(), UDim2.fromOffset(50, 34), {
+		Position = UDim2.new(1, -160, 1, -46),
+		Font = Theme.MonoFont,
+		TextSize = 11,
+		TextColor3 = C.dim,
+		TextWrapped = false,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	})
+	DialogKeys.watch("welcomeBack", welcomeCard, function()
+		welcomeCard.Visible = false
+	end)
 
 	updateScale()
 	local camera = workspace.CurrentCamera
