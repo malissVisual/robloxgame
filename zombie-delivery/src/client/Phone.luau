@@ -32,6 +32,11 @@
 -- 5.4: with your own car's tank empty (its Tank / Fuel attributes, server/Fuel.luau) the courier ID shows ⛽ TOW $150
 -- (Config.Fuel.TowPrice; the "Fuel" remote's "tow": the server checks the tank and the money again and the tow brings the
 -- car to the nearest gas station's pump with a little fuel in it).
+-- 5.4, a professional phone: every app sits under a 48 px header (a round back button "‹", the app's name centred) and
+-- scrolls; its cards are rounded (8 px) with an inner body, the one that matters carries a 3 px red accent on its left
+-- (outside the layout); one type and spacing scale and a small kit (section labels, chips, two-sided rows, the empty
+-- state, the stops' stepper, pills: `look`, shared with client/OrdersUi.luau). ORDERS leads with the focused order's
+-- hero card; MESSAGES is a chat list (round avatars, a red dot while unread).
 -- The MENU and every key stay as they were (J, C, M ...); the phone is one more way in. Opening it closes the other
 -- windows (Phone.onOpen, Main: Hud.closeWindows); ESC, O, the PHONE action or the home bar (on the home screen)
 -- close it. While it is open the mouse is free (Main: CameraRig.mouseNeeded asks Phone.isOpen).
@@ -266,6 +271,8 @@ local function seed()
 end
 
 -- ── Small pieces ───────────────────────────────────────────────────────────
+-- 5.4, the phone's type and spacing scale (every app): a section label caps 11 secondary; a title HeadingFont 16 – 18;
+-- the body Font 14; meta Font 12 secondary. Gaps of 4, 8, 12 and 16.
 
 local function text(parent: Instance, value: string, size: UDim2, props: { [string]: any }?): any
 	local label = Ui.label(parent, value, size, { TextColor3 = K.text, Font = Theme.Font, TextSize = 14, TextWrapped = true })
@@ -288,38 +295,254 @@ local function click()
 	end
 end
 
--- A block of the app's list: a slim charcoal row that grows with its children (a vertical list inside).
+-- A card of the app's list: 8 px corners, the row surface, a faint line, and an inner Body that grows with its children
+-- (the vertical list and the padding live there, so nothing else is laid out as a row). `selected`: a 3 px red accent
+-- on the left, outside the layout and rounded with the card's corner. Returns the Body (callers add to it).
 local function block(parent: Instance, order: number, selected: boolean?): any
-	local frame = Ui.make("Frame", {
+	local card = Ui.make("Frame", {
+		Name = "Card",
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = if selected then K.raised else K.row,
+		BackgroundColor3 = K.row,
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = if selected then 0.5 else 0.8 }, frame)
+	Ui.corner(card, 8)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = if selected then 0.7 else 0.82 }, card)
+	local body = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, card)
+	Ui.list(body, true, 4)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, if selected then 15 else 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, body)
 	if selected then
-		Ui.make("Frame", { Name = "Selected", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 2 }, frame)
+		-- (the left 3 px of a rounded red face: its curve follows the card's corner)
+		local accent = Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 3, 1, 0), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 2 }, card)
+		local face = Ui.make("Frame", { Size = UDim2.new(0, 16, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 2 }, accent)
+		Ui.corner(face, 8)
 	end
-	Ui.list(frame, true, 4)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 10) }, frame)
-	return frame
+	return body
 end
 
 -- A thin bar in a list (share 0 … 1).
 local function bar(parent: Instance, share: number, color: Color3, order: number)
-	local holder = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 6), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	local back, fill = P.bar(holder, UDim2.new(1, 0, 0, 3), color)
+	local holder = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 8), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+	local back, fill = P.bar(holder, UDim2.new(1, 0, 0, 4), color)
 	back.Position = UDim2.fromOffset(0, 2)
+	Ui.corner(back, 2)
+	Ui.corner(fill, 2)
 	fill.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
+end
+
+-- 5.4: a phone button's 8 px corners (P.button's red hover edge kept inside the curve).
+local function rounded(made: any): any
+	Ui.corner(made, 8)
+	local edge = made:FindFirstChild("Edge")
+	if edge and edge:IsA("GuiObject") then
+		edge.Size = UDim2.new(0, 2, 1, -16)
+		edge.Position = UDim2.new(0, -10, 0, 8)
+	end
+	return made
 end
 
 -- A window action inside the phone (P.button), full width.
 local function button(parent: Instance, label: string, kind: P.ButtonKind, order: number, onClick: () -> ()): any
-	local made = P.button(parent, label, UDim2.new(1, 0, 0, 44), kind, onClick)
+	local made = rounded(P.button(parent, label, UDim2.new(1, 0, 0, 44), kind, onClick))
 	made.LayoutOrder = order
 	made.TextSize = 13
 	return made
+end
+
+-- 5.4: the rest of the kit, in one table (Phone sits near the register limit: no new top-level locals). OrdersUi.Kit
+-- names the same pieces; OrdersUi draws with them too.
+local look: OrdersUi.Kit
+do
+	local TextService = game:GetService("TextService")
+
+	-- How wide a line of text is (unscaled pixels).
+	local function width(value: string, size: number, font: Enum.Font): number
+		local ok, bounds = pcall(function(): Vector2
+			return TextService:GetTextSize(value, size, font, Vector2.new(1000, 100))
+		end)
+		return if ok then math.ceil(bounds.X) + 2 else #value * size * 0.6
+	end
+
+	local function section(list: Instance, label: string, order: number): any
+		local holder = Ui.make("Frame", { Name = "Section", Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, LayoutOrder = order }, list)
+		P.caps(holder, label, UDim2.new(1, -4, 0, 14), {
+			Position = UDim2.new(0, 2, 1, -2),
+			AnchorPoint = Vector2.new(0, 1),
+			TextSize = 11,
+			TextColor3 = K.secondary,
+			TextStrokeTransparency = 1,
+		})
+		return holder
+	end
+
+	local function meta(parent: Instance, value: string, order: number, color: Color3?): any
+		return text(parent, value, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = order, TextSize = 12, TextColor3 = color or K.secondary })
+	end
+
+	local function chip(parent: Instance, value: string, color: Color3?): any
+		local tint = color or K.secondary
+		local made = Ui.label(parent, string.upper(value), UDim2.fromOffset(0, 22), {
+			Name = "Chip",
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = K.raised,
+			BackgroundTransparency = 0,
+			Font = Theme.HeadingFont,
+			TextSize = 11,
+			TextColor3 = tint,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		Ui.corner(made, 11)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = tint, Thickness = 1, Transparency = 0.72 }, made)
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, made)
+		return made
+	end
+
+	local function chipRow(parent: Instance, order: number): any
+		local row = Ui.make("Frame", { Name = "Chips", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, parent)
+		local layout = Ui.make("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, 6),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+		}, row)
+		pcall(function()
+			layout.Wraps = true -- (long rule lines go to a second line)
+		end)
+		return row
+	end
+
+	local function row2(parent: Instance, leftText: string, rightText: string, order: number, strong: boolean?): (any, any, any)
+		local font = if strong then Theme.HeadingFont else Theme.Font
+		local size = if strong then 14 else 12
+		local w = width(rightText, size, font)
+		local row = Ui.make("Frame", { Name = "Row2", Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+		local right = text(row, rightText, UDim2.new(0, w, 1, 0), {
+			Position = UDim2.fromScale(1, 0),
+			AnchorPoint = Vector2.new(1, 0),
+			Font = font,
+			TextSize = size,
+			TextColor3 = if strong then K.text else K.secondary,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		})
+		local left = text(row, leftText, UDim2.new(1, -(w + 8), 1, 0), { TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		return row, left, right
+	end
+
+	local function emptyState(list: Instance, glyph: string, title: string, sub: string?, order: number): any
+		local box = Ui.make("Frame", { Name = "Empty", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, list)
+		Ui.list(box, true, 8, Enum.HorizontalAlignment.Center)
+		Ui.make("UIPadding", { PaddingTop = UDim.new(0, 24), PaddingBottom = UDim.new(0, 16) }, box)
+		local circle = Ui.make("Frame", { Size = UDim2.fromOffset(64, 64), BackgroundColor3 = K.row, BorderSizePixel = 0, LayoutOrder = 1 }, box)
+		Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, circle)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, circle)
+		text(circle, glyph, UDim2.fromScale(1, 1), { TextSize = 30, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
+		text(box, title, UDim2.new(1, -24, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17, TextXAlignment = Enum.TextXAlignment.Center })
+		if sub then
+			text(box, sub, UDim2.new(1, -32, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextSize = 12, TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Center })
+		end
+		return box
+	end
+
+	local function stepper(parent: Instance, stops: { any }, order: number): any
+		local holder = Ui.make("Frame", { Name = "Stops", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, parent)
+		Ui.list(holder, true, 4)
+		local count = #stops
+		for index, stop in stops do
+			if type(stop) ~= "table" then
+				continue
+			end
+			local done, current, open = stop.done == true, stop.current == true, stop.open == true
+			local mark = if done then "✓" elseif current then "▶" elseif open then "●" else "○"
+			local color = if done then K.secondary elseif current then K.red elseif open then K.text else K.secondary
+			local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = index }, holder)
+			Ui.make("UISizeConstraint", { MinSize = Vector2.new(0, 18) }, row)
+			text(row, mark, UDim2.fromOffset(16, 18), { Font = Theme.HeadingFont, TextSize = if current then 10 else 12, TextColor3 = color, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center, TextTransparency = if done then 0.3 else 0 })
+			if index < count then
+				-- (a hairline down to the next stop's dot)
+				Ui.make("Frame", { Size = UDim2.new(0, 1, 1, -14), Position = UDim2.fromOffset(8, 18), BackgroundColor3 = K.line, BackgroundTransparency = 0.7, BorderSizePixel = 0 }, row)
+			end
+			local label = tostring(stop.label or (if stop.kind == "pickup" then "Pick up" else "Deliver"))
+			text(row, label, UDim2.new(1, -24, 0, 0), {
+				Position = UDim2.fromOffset(24, 1),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Font = if current then Theme.HeadingFont else Theme.Font,
+				TextSize = 13,
+				TextColor3 = if current or open then K.text else K.secondary,
+				TextTransparency = if done then 0.3 else 0,
+			})
+		end
+		return holder
+	end
+
+	local function pill(parent: Instance, value: string, onClick: () -> (), accent: boolean?): any
+		local hit = Ui.make("TextButton", {
+			Name = "Pill",
+			Size = UDim2.fromOffset(0, 36), -- (the touch target; the face inside is 24 px)
+			AutomaticSize = Enum.AutomaticSize.X,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, 0, 0.5, 0),
+			BackgroundTransparency = 1,
+			AutoButtonColor = false,
+			Text = "",
+			ZIndex = 3,
+		}, parent)
+		local tint = if accent then K.red else K.line
+		local face = Ui.label(hit, string.upper(value), UDim2.fromOffset(0, 24), {
+			AutomaticSize = Enum.AutomaticSize.X,
+			Position = UDim2.fromScale(0, 0.5),
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundColor3 = K.raised,
+			BackgroundTransparency = 0,
+			Font = Theme.HeadingFont,
+			TextSize = 11,
+			TextColor3 = if accent then K.red else K.text,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 3,
+		})
+		Ui.corner(face, 12)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = tint, Thickness = 1, Transparency = if accent then 0.35 else 0.6 }, face)
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, face)
+		local function lit(on: boolean)
+			face.BackgroundColor3 = if on then TILE_HOVER else K.raised
+		end
+		hit.MouseEnter:Connect(function()
+			lit(true)
+		end)
+		hit.MouseLeave:Connect(function()
+			lit(false)
+		end)
+		hit.SelectionGained:Connect(function()
+			lit(true)
+		end)
+		hit.SelectionLost:Connect(function()
+			lit(false)
+		end)
+		hit.Activated:Connect(function()
+			click()
+			onClick()
+		end)
+		return hit
+	end
+
+	look = {
+		block = block,
+		caps = caps,
+		text = text,
+		button = button,
+		section = section,
+		meta = meta,
+		chip = chip,
+		chipRow = chipRow,
+		row2 = row2,
+		emptyState = emptyState,
+		stepper = stepper,
+		pill = pill,
+		width = width,
+	}
 end
 
 -- The GPS to one of Map.Shops or a landmark (5.0: "earl", Earl's Used Wheels) (the white route on both maps, the HUD's
@@ -345,95 +568,134 @@ end
 
 -- ── The apps ───────────────────────────────────────────────────────────────
 
+-- "&", "<", ">" for RichText.
+local function rich(value: string): string
+	return (string.gsub(string.gsub(string.gsub(value, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+end
+
 local function ordersApp(list: Instance)
+	local bag = require(script.Parent.BagUi)
+	local function openBoard()
+		local cb = Phone.onBoard
+		if cb then
+			cb()
+		end
+	end
+	local function openBag()
+		Phone.close()
+		bag.open()
+	end
 	if not job then
-		local b = block(list, 1)
-		caps(b, "No active order", 1, K.red)
-		text(b, "Nothing in your hands right now. The board has work: on foot from level 1, quick light runs near you.", UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = K.secondary, TextSize = 13 })
-		button(list, "OPEN BOARD", "main", 2, function()
-			local cb = Phone.onBoard
-			if cb then
-				cb()
-			end
-		end)
+		look.emptyState(list, "📦", "No active orders", "Grab a job from the board, on foot from level 1.", 1)
+		button(list, "OPEN BOARD", "main", 2, openBoard)
+		button(list, "🎒 BAG", "quiet", 3, openBag)
 		return
 	end
+	local orders = if type(job.orders) == "table" then job.orders else {}
+	local focused = OrdersUi.focused(job)
+	-- The hero: the focused order.
 	local b = block(list, 1, true)
-	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
-	P.marker(head, 7, { Position = UDim2.fromOffset(0, 4) })
-	P.caps(head, `{if type(job.orders) == "table" and #job.orders > 1 then `Now · order {job.focus or "?"}` else "Active order"}{if job.mission then " · mission" else ""}`, UDim2.new(1, -14, 1, 0), { Position = UDim2.fromOffset(14, 0), TextStrokeTransparency = 1 })
+	local head = Ui.make("Frame", { Name = "Head", Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
+	P.caps(head, `{if #orders > 1 then `Now · order {job.focus or "?"}` else "Now · active order"}{if job.mission then " · mission" else ""}`, UDim2.new(1, -96, 1, 0), {
+		TextSize = 11,
+		TextColor3 = K.red,
+		TextStrokeTransparency = 1,
+	})
+	if #orders > 1 and focused then
+		OrdersUi.pinPill(head, focused, look)
+	end
 	text(b, `{job.cargo or "Cargo"} → {job.customer or "the customer"}`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17 })
-	text(b, `{job.address or "?"}{if job.district then `, {job.district}` else ""}`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = K.secondary, TextSize = 13 })
-	P.rule(b, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
-	local stops = tonumber(job.stopCount) or 1
-	local stop = tonumber(job.stopIndex) or 1
-	caps(b, `Stop {stop} / {stops} · {if job.stage == "pickup" then "pick up" else "deliver"}`, 5)
-	if type(job.step) == "string" and job.step ~= "" then
-		text(b, job.step, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 6, TextSize = 14 })
-	end
-	-- The clock (ticked by the open loop) and the pay.
-	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 7 }, b)
-	refs.timer = text(line, "", UDim2.new(0.5, 0, 1, 0), { Font = Theme.HeadingFont, TextSize = 22, TextWrapped = false })
+	look.meta(b, `{job.address or "?"}{if job.district then `, {job.district}` else ""}`, 3)
+	-- The clock (ticked by the open loop) and the pay, their captions under them.
+	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 4 }, b)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 6) }, line)
+	refs.timer = text(line, if type(job.endsAt) == "number" then Ui.clock(math.max(0, job.endsAt - workspace:GetServerTimeNow())) else "", UDim2.new(0.5, 0, 1, 0), { Font = Theme.HeadingFont, TextSize = 24, TextWrapped = false })
 	text(line, Ui.money(tonumber(job.pay) or 0), UDim2.new(0.5, 0, 1, 0), { Position = UDim2.fromScale(0.5, 0), Font = Theme.HeadingFont, TextSize = 22, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
-	local labels = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, LayoutOrder = 8 }, b)
+	local labels = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, LayoutOrder = 5 }, b)
 	P.caps(labels, "Time left", UDim2.fromScale(0.5, 1), { TextStrokeTransparency = 1, TextSize = 11 })
-	P.caps(labels, "Pay on delivery", UDim2.fromScale(0.5, 1), { Position = UDim2.fromScale(0.5, 0), TextStrokeTransparency = 1, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Right })
-	local total = tonumber(job.total) or 0
-	if total > 0 then
-		local done = tonumber(job.deliveredTotal) or 0
-		caps(b, `{done} / {total} {if total == 1 then (job.piece or "piece") else (job.pieces or "pieces")} delivered{if (tonumber(job.lost) or 0) > 0 then ` · {job.lost} lost` else ""}`, 9)
-		bar(b, done / total, K.text, 10)
+	P.caps(labels, "Pay", UDim2.fromScale(0.5, 1), { Position = UDim2.fromScale(0.5, 0), TextStrokeTransparency = 1, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Right })
+	local gap = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 9), BackgroundTransparency = 1, LayoutOrder = 6 }, b)
+	P.rule(gap, UDim2.new(1, 0, 0, 1), { Position = UDim2.fromOffset(0, 4), BackgroundTransparency = 0.75 })
+	-- The stops: the focused order's own (the stepper), else "Stop 1 / 3"; then what to do now.
+	if focused and type(focused.stops) == "table" and #focused.stops > 0 then
+		look.stepper(b, focused.stops, 7)
+	else
+		caps(b, `Stop {tonumber(job.stopIndex) or 1} / {tonumber(job.stopCount) or 1} · {if job.stage == "pickup" then "pick up" else "deliver"}`, 7).TextSize = 11
 	end
-	-- 5.0, on foot: what rides in your backpack (the payload's pack / packRoom; the PackCount attribute is live).
+	if type(job.step) == "string" and job.step ~= "" then
+		text(b, job.step, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 8, TextSize = 14 })
+	end
+	-- Chips: how it travels, what rides with you (5.0: the backpack; the PackCount attribute is live), the condition, the
+	-- cargo's rules.
+	local chips = look.chipRow(b, 9)
+	look.chip(chips, if job.mode == "foot" then "🚶 On foot" elseif job.mode == "bike" then "🚲 By bike" else string.rep("★", math.max(1, tonumber(job.stars) or 1)))
 	local packRoom = tonumber(job.packRoom) or tonumber(player:GetAttribute("PackRoom")) or 0
 	if (job.mode == "foot" or job.mode == "bike") and packRoom > 0 then
 		local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
-		caps(b, `{if job.mode == "bike" then "🚲 On the bike" else "🎒 Backpack"} {packed} / {packRoom}`, 11, if packed >= packRoom then K.red else K.secondary)
+		look.chip(chips, `{if job.mode == "bike" then "🚲 Bike" else "🎒 Backpack"} {packed} / {packRoom}`, if packed >= packRoom then K.red else nil)
 	end
 	local condition = tonumber(job.condition)
 	if condition and condition < 0.999 then
-		caps(b, `Cargo condition {math.floor(condition * 100 + 0.5)}%`, 12, if condition < 0.5 then K.red else K.secondary)
+		look.chip(chips, `Condition {math.floor(condition * 100 + 0.5)}%`, if condition < 0.5 then K.red else K.warn)
 	end
 	if type(job.ruleLine) == "string" and job.ruleLine ~= "" then
-		text(b, job.ruleLine, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 13, TextColor3 = K.secondary, TextSize = 13 })
+		for part in string.gmatch(job.ruleLine .. " · ", "(.-) · ") do
+			if part ~= "" then
+				look.chip(chips, part)
+			end
+		end
 	end
-	-- 5.2: every order of the run (its stops, clock, pay, PIN), then the actions.
-	OrdersUi.render(list, job, { block = block, caps = caps, text = text, button = button }, 2)
-	-- 5.3: the bag (client/BagUi.luau: every piece you carry and where; the I window's BAG tab).
-	local bag = require(script.Parent.BagUi)
-	button(list, `🎒 BAG{if bag.line(job) then ` · {string.sub(bag.line(job) or "", 6)}` else " · empty"}`, "quiet", 89, function()
-		Phone.close()
-		bag.open()
-	end)
-	local stack = job.stack
-	button(list, "SHOW ON MAP", "quiet", 90, function()
+	-- The pieces delivered.
+	local total = tonumber(job.total) or 0
+	if total > 0 then
+		local done = tonumber(job.deliveredTotal) or 0
+		local _, left = look.row2(b, `{done} / {total} {if total == 1 then (job.piece or "piece") else (job.pieces or "pieces")} delivered`, if (tonumber(job.lost) or 0) > 0 then `{job.lost} lost` else "", 10)
+		left.TextSize = 12
+		left.TextColor3 = K.secondary
+		bar(b, done / total, K.text, 11)
+	end
+	-- 5.2: the other orders of the run (their stops, clocks, pay, PIN), then the actions.
+	local n = OrdersUi.render(list, job, look, 2)
+	local actions = Ui.make("Frame", { Name = "Actions", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = n }, list)
+	Ui.list(actions, false, 8)
+	local map = P.button(actions, "SHOW ON MAP", UDim2.new(0.5, -4, 1, 0), "quiet", function()
 		Phone.close()
 		if not MapView.isOpen() then
 			MapView.toggle()
 		end
 	end)
-	button(list, if type(stack) == "table" and stack.can == true then "OPEN BOARD · + ADD ORDER" else "OPEN BOARD", "quiet", 91, function()
-		local cb = Phone.onBoard
-		if cb then
-			cb()
-		end
-	end)
+	map.LayoutOrder = 1
+	map.TextSize = 12
+	rounded(map)
+	-- 5.3: the bag (client/BagUi.luau: every piece you carry and where; the I window's BAG tab).
+	local carried = bag.line(job)
+	local pack = P.button(actions, `🎒 BAG\n<font size="10" color="{P.hex(K.secondary)}">{if carried then rich(string.sub(carried, 6)) else "EMPTY"}</font>`, UDim2.new(0.5, -4, 1, 0), "quiet", openBag)
+	pack.LayoutOrder = 2
+	pack.TextSize = 12
+	pack.RichText = true
+	pack.TextTruncate = Enum.TextTruncate.AtEnd
+	rounded(pack)
+	local stack = job.stack
+	button(list, if type(stack) == "table" and stack.can == true then "OPEN BOARD · + ADD ORDER" else "OPEN BOARD", "quiet", n + 1, openBoard)
 end
 
 local function careerApp(list: Instance)
 	local xp = myXp()
 	local level = myLevel()
 	local road = Career.road()
-	local b = block(list, 1, true)
-	caps(b, "Dead End Dispatch · your career", 1)
-	text(b, string.upper(Levels.rank(level)), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.DisplayFont, TextSize = 22 })
-	caps(b, `Level {level} of {Config.Levels.MaxLevel} · {string.sub(Career.money(xp), 2)} XP`, 3, K.text)
-	bar(b, Levels.progress(xp), K.text, 4)
+	look.section(list, "Dead End Dispatch · your career", 1)
+	local b = block(list, 2, true)
+	text(b, string.upper(Levels.rank(level)), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Font = Theme.DisplayFont, TextSize = 22 })
+	local chips = look.chipRow(b, 2)
+	look.chip(chips, `Level {level} of {Config.Levels.MaxLevel}`, K.text)
+	look.chip(chips, `{string.sub(Career.money(xp), 2)} XP`)
+	bar(b, Levels.progress(xp), K.text, 3)
 	local nextStep = road[level + 1]
 	if nextStep then
 		local left = math.max(0, nextStep.xp - xp)
-		local g = block(list, 2)
-		caps(g, `Next goal · level {nextStep.level}{if nextStep.newRank then ` · {nextStep.rank}` else ""}`, 1, K.red)
+		look.section(list, "Next goal", 3)
+		local g = block(list, 4)
+		caps(g, `Level {nextStep.level}{if nextStep.newRank then ` · {nextStep.rank}` else ""}`, 1, K.red).TextSize = 11
 		text(g, `{string.sub(Career.money(left), 2)} XP to go: about {CareerUi.toGo(left, level)}.`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextSize = 14 })
 		local opens: { string } = {}
 		for _, unlock in nextStep.unlocks do
@@ -442,16 +704,20 @@ local function careerApp(list: Instance)
 			end
 		end
 		if #opens > 0 then
-			text(g, table.concat(opens, "\n", 1, math.min(#opens, 5)), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = K.secondary, TextSize = 13 })
+			look.meta(g, table.concat(opens, "\n", 1, math.min(#opens, 5)), 3)
 		end
 		local parts = Career.rewardParts(nextStep.reward)
 		if #parts > 0 then
-			text(g, `Reward: {table.concat(parts, " · ")}`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 4, TextColor3 = K.good, TextSize = 13 })
+			look.chip(look.chipRow(g, 4), `Reward: {table.concat(parts, " · ")}`, K.good)
 		end
 	end
 	-- The next few levels of the road.
-	local r = block(list, 3)
-	caps(r, "The road ahead", 1)
+	look.section(list, "The road ahead", 5)
+	local r = block(list, 6)
+	local layout = r:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(0, 8) -- (a step more air between the levels)
+	end
 	local shown = 0
 	for n = level + 2, Config.Levels.MaxLevel do
 		local step = road[n]
@@ -459,16 +725,18 @@ local function careerApp(list: Instance)
 			break
 		end
 		shown += 1
-		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 + shown }, r)
-		local stone = Ui.label(row, tostring(n), UDim2.fromOffset(24, 24), { BackgroundColor3 = K.charcoal, BackgroundTransparency = 0, Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Center })
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.5 }, stone)
+		local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = shown }, r)
+		Ui.make("UISizeConstraint", { MinSize = Vector2.new(0, 24) }, row)
+		local stone = Ui.label(row, tostring(n), UDim2.fromOffset(24, 24), { BackgroundColor3 = K.raised, BackgroundTransparency = 0, Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Center })
+		Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, stone)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, stone)
 		local summary = Career.summary(step.unlocks, 3, if state and type(state.cars) == "table" then state.cars else {})
-		text(row, if summary ~= "" then summary else "better pay and harder roads", UDim2.new(1, -34, 0, 0), { Position = UDim2.fromOffset(34, 3), AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = K.secondary, TextSize = 13 })
+		text(row, if summary ~= "" then summary else "better pay and harder roads", UDim2.new(1, -34, 0, 0), { Position = UDim2.fromOffset(34, 4), AutomaticSize = Enum.AutomaticSize.Y, TextColor3 = K.secondary, TextSize = 13 })
 	end
 	if shown == 0 then
-		text(r, "The top of the road is close.", UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = K.secondary, TextSize = 13 })
+		look.meta(r, "The top of the road is close.", 1)
 	end
-	button(list, if Ui.touchLayout() then "FULL CAREER" else "FULL CAREER  [C]", "main", 4, function()
+	button(list, if Ui.touchLayout() then "FULL CAREER" else "FULL CAREER  [C]", "main", 7, function()
 		local cb = Phone.onCareer
 		if cb then
 			cb()
@@ -480,30 +748,33 @@ end
 local function goal(parent: Instance, order: number, icon: string, name: string, where: string, price: number, level: number, soon: string?)
 	local b = block(parent, order)
 	local mine = money()
-	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
-	text(head, `{icon}  {name}`, UDim2.new(1, -96, 1, 0), { Font = Theme.HeadingFont, TextSize = 15, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 	local status: string, color: Color3
 	if soon then
 		status, color = soon, K.secondary
 	elseif myLevel() < level then
-		status, color = `🔒 LEVEL {level}`, K.warn
+		status, color = `🔒 Level {level}`, K.warn
 	elseif mine >= price then
-		status, color = "✓ AFFORD IT", K.good
+		status, color = "✓ Afford it", K.good
 	else
-		status, color = `{Ui.money(price - mine)} TO GO`, K.secondary
+		status, color = `{Ui.money(price - mine)} to go`, K.secondary
 	end
-	text(head, status, UDim2.new(0, 96, 1, 0), { Position = UDim2.new(1, 0, 0, 0), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = color, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
-	caps(b, if price > 0 then `{where} · {Ui.money(price)} · level {level}` else `{where} · level {level}`, 2)
+	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
+	local tag = look.chip(head, status, color)
+	tag.AnchorPoint = Vector2.new(1, 0.5)
+	tag.Position = UDim2.new(1, 0, 0.5, 0)
+	local w = look.width(string.upper(status), 11, Theme.HeadingFont) + 18
+	text(head, `{icon}  {name}`, UDim2.new(1, -(w + 8), 1, 0), { Font = Theme.HeadingFont, TextSize = 15, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+	look.meta(b, if price > 0 then `{where} · {Ui.money(price)} · level {level}` else `{where} · level {level}`, 2)
 	if not soon then
 		bar(b, if price > 0 then mine / price else 1, if mine >= price and myLevel() >= level then K.good else K.text, 3)
 	end
 end
 
--- A shop's header in the SHOP app with SET GPS.
+-- A shop's section label in the SHOP app with SET GPS.
 local function shopHeader(parent: Instance, order: number, shopId: string, title: string)
-	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	P.caps(row, title, UDim2.new(1, -100, 1, 0), { TextStrokeTransparency = 1, TextColor3 = K.text })
-	local gps = P.button(row, "SET GPS", UDim2.fromOffset(92, 32), "quiet", function()
+	local row = Ui.make("Frame", { Name = "Section", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+	P.caps(row, title, UDim2.new(1, -110, 0, 14), { Position = UDim2.new(0, 2, 1, -11), AnchorPoint = Vector2.new(0, 1), TextSize = 11, TextStrokeTransparency = 1, TextColor3 = K.secondary })
+	local gps = look.pill(row, "📍 Set GPS", function()
 		gpsTo(shopId)
 		local notify = Phone.notify
 		local shop = Map.Shops[shopId]
@@ -511,16 +782,18 @@ local function shopHeader(parent: Instance, order: number, shopId: string, title
 			notify(`GPS: {if shop then shop.name elseif shopId == "earl" then Config.VanQuest.Place else title}`)
 		end
 	end)
-	gps.TextSize = 11
-	gps.AnchorPoint = Vector2.new(1, 0.5)
-	gps.Position = UDim2.new(1, 0, 0.5, 0)
+	gps.Position = UDim2.new(1, 0, 1, 0)
+	gps.AnchorPoint = Vector2.new(1, 1)
 end
 
 local function shopApp(list: Instance)
 	local level = myLevel()
-	local top = block(list, 1)
-	caps(top, "What's next", 1, K.red)
-	text(top, `{Ui.money(money())} in your pocket · level {level}. Personal gear is yours for good; a vehicle opens the car jobs.`, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = K.secondary, TextSize = 13 })
+	local top = block(list, 1, true)
+	caps(top, "What's next", 1, K.red).TextSize = 11
+	local chips = look.chipRow(top, 2)
+	look.chip(chips, `{Ui.money(money())} in your pocket`, K.good)
+	look.chip(chips, `Level {level}`, K.text)
+	look.meta(top, "Personal gear is yours for good; a vehicle opens the car jobs.", 3)
 	local order = 1
 	-- The personal gear still worth buying (Config.Kit), the cheapest first.
 	local owned = kit()
@@ -584,31 +857,57 @@ local function shopApp(list: Instance)
 	end
 end
 
+-- A chat list: one card, a row per message (newest first) split by hairlines: the round avatar, the name and the time,
+-- the text under them (muted once read), a red dot at the right edge while unread.
 local function messagesApp(list: Instance)
 	if #messages == 0 then
-		text(list, "No messages yet.", UDim2.new(1, 0, 0, 40), { TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Center })
+		look.emptyState(list, "✉️", "No messages yet", nil, 1)
 		return
+	end
+	look.section(list, "Recent", 1)
+	local card = block(list, 2)
+	local layout = card:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(0, 0)
+	end
+	local padding = card:FindFirstChildOfClass("UIPadding")
+	if padding then
+		padding.PaddingTop = UDim.new(0, 0)
+		padding.PaddingBottom = UDim.new(0, 0)
 	end
 	local order = 0
 	for index = #messages, 1, -1 do
 		local message = messages[index]
 		order += 1
-		local b = block(list, order, message.unread)
-		local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
-		local avatar = Ui.label(head, string.upper(string.sub(message.from, 1, 1)), UDim2.fromOffset(22, 22), {
+		if order > 1 then
+			local hair = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), BackgroundTransparency = 1, LayoutOrder = order * 2 - 1 }, card)
+			Ui.make("Frame", { Size = UDim2.new(1, -48, 1, 0), Position = UDim2.fromOffset(48, 0), BackgroundColor3 = K.line, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, hair)
+		end
+		local row = Ui.make("Frame", { Name = "Message", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order * 2 }, card)
+		Ui.make("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, row)
+		local avatar = Ui.label(row, string.upper(string.sub(message.from, 1, 1)), UDim2.fromOffset(36, 36), {
 			BackgroundColor3 = if message.kind == "marge" then K.red elseif message.kind == "level" then K.text else K.charcoal,
 			BackgroundTransparency = 0,
 			Font = Theme.HeadingFont,
-			TextSize = 12,
+			TextSize = 15,
 			TextColor3 = if message.kind == "level" then K.charcoal else K.text,
 			TextXAlignment = Enum.TextXAlignment.Center,
 		})
-		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.5 }, avatar)
-		P.caps(head, message.from, UDim2.new(1, -80, 1, 0), { Position = UDim2.fromOffset(30, 0), TextStrokeTransparency = 1, TextColor3 = K.text })
-		P.caps(head, message.time, UDim2.fromOffset(50, 22), { Position = UDim2.new(1, 0, 0, 0), AnchorPoint = Vector2.new(1, 0), TextStrokeTransparency = 1, TextXAlignment = Enum.TextXAlignment.Right, TextSize = 11 })
-		text(b, message.text, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextSize = 13, TextColor3 = if message.unread then K.text else K.secondary })
+		Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, avatar)
+		if message.kind ~= "marge" and message.kind ~= "level" then
+			Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, avatar)
+		end
+		local content = Ui.make("Frame", { Size = UDim2.new(1, -64, 0, 0), Position = UDim2.fromOffset(48, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, row)
+		Ui.list(content, true, 2)
+		local _, name = look.row2(content, message.from, message.time, 1)
+		name.Font = Theme.HeadingFont
+		text(content, message.text, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextSize = 14, TextColor3 = if message.unread then K.text else K.secondary })
+		if message.unread then
+			local dot = Ui.make("Frame", { Name = "Unread", Size = UDim2.fromOffset(8, 8), Position = UDim2.new(1, 0, 0, 18), AnchorPoint = Vector2.new(1, 0.5), BackgroundColor3 = K.red, BorderSizePixel = 0 }, row)
+			Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, dot)
+		end
 	end
-	-- Read now (the dots go; the rows keep their red rule until the app is drawn again).
+	-- Read now (the badge goes; the dots stay until the app is drawn again).
 	for _, message in messages do
 		message.unread = false
 	end
@@ -738,7 +1037,7 @@ local function homeWidgets(parent: Instance)
 	refs.bigClock = text(parent, clockText(), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Font = Theme.DisplayFont, TextSize = if landscape then 36 else 46, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = false })
 	refs.shift = P.caps(parent, shiftText(), UDim2.new(1, 0, 0, 14), { LayoutOrder = 2, TextXAlignment = Enum.TextXAlignment.Center, TextStrokeTransparency = 1, TextSize = 11 })
 	-- The courier ID.
-	local card = block(parent, 3, true)
+	local card = block(parent, 3)
 	local head = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, LayoutOrder = 1 }, card)
 	P.marker(head, 6, { Position = UDim2.fromOffset(0, 4) })
 	P.caps(head, "Courier · Dead End Dispatch", UDim2.new(1, -12, 1, 0), { Position = UDim2.fromOffset(12, 0), TextStrokeTransparency = 1, TextSize = 10 })
@@ -761,6 +1060,7 @@ local function homeWidgets(parent: Instance)
 		end)
 		made.LayoutOrder = order
 		made.TextSize = 12
+		rounded(made)
 		return made
 	end
 	refs.switch = switch
@@ -795,8 +1095,8 @@ local function homeWidgets(parent: Instance)
 		LayoutOrder = 4,
 		Visible = false,
 	}, parent)
-	Ui.corner(note, 10)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, note)
+	Ui.corner(note, 8)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.82 }, note)
 	Ui.list(note, true, 2)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 8) }, note)
 	refs.noteFrom = caps(note, "", 1, K.text)
@@ -967,29 +1267,76 @@ local function buildBody(sideways: boolean)
 			refs.firstTile = cell
 		end
 	end
-	-- The app screen: a header (back, the app's name) and its scrolling list.
+	-- The app screen (5.4): a 48 px header (the round back button, the app's name centred), a hairline, and the
+	-- scrolling list under it (Y only, its canvas sized by the content, clear of the home bar at the bottom).
 	local appFrame = Ui.make("Frame", { Name = "App", Size = UDim2.new(1, 0, 1, -(STATUS_H + BOTTOM)), Position = UDim2.fromOffset(0, STATUS_H), BackgroundTransparency = 1, Visible = false }, screen)
 	refs.app = appFrame
-	local header = Ui.make("Frame", { Size = UDim2.new(1, -20, 0, 44), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1 }, appFrame)
-	local back = P.action(header, "‹  HOME", { Size = UDim2.fromOffset(0, 44), TextSize = 12 }, function()
+	local HEADER = 48
+	local header = Ui.make("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, HEADER), BackgroundTransparency = 1 }, appFrame)
+	local back = Ui.make("TextButton", {
+		Name = "Back",
+		Size = UDim2.fromOffset(36, 36),
+		Position = UDim2.new(0, 12, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = TILE,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "‹",
+		Font = Theme.HeadingFont,
+		TextSize = 26,
+		TextColor3 = K.text,
+		ZIndex = 2,
+	}, header)
+	Ui.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, back)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, back)
+	Ui.make("UIPadding", { PaddingBottom = UDim.new(0, 3) }, back) -- (the chevron sits a little high in its line)
+	local function backLit(on: boolean)
+		back.BackgroundColor3 = if on then TILE_HOVER else TILE
+	end
+	back.MouseEnter:Connect(function()
+		backLit(true)
+	end)
+	back.MouseLeave:Connect(function()
+		backLit(false)
+	end)
+	back.SelectionGained:Connect(function()
+		backLit(true)
+	end)
+	back.SelectionLost:Connect(function()
+		backLit(false)
+	end)
+	back.Activated:Connect(function()
+		click()
 		setApp("home")
 	end)
 	refs.back = back
-	refs.appTitle = P.text(header, "", UDim2.new(1, -90, 1, 0), { Position = UDim2.new(1, 0, 0, 0), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Right, TextStrokeTransparency = 1 })
-	P.rule(appFrame, UDim2.new(1, -20, 0, 1), { Position = UDim2.fromOffset(10, 44) })
+	refs.appTitle = P.text(header, "", UDim2.new(1, -120, 1, 0), {
+		Position = UDim2.fromScale(0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Font = Theme.HeadingFont,
+		TextSize = 17,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextStrokeTransparency = 1,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	Ui.make("Frame", { Name = "Hairline", Size = UDim2.new(1, 0, 0, 1), Position = UDim2.fromOffset(0, HEADER), BackgroundColor3 = K.line, BackgroundTransparency = 0.75, BorderSizePixel = 0 }, appFrame)
 	local list = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -16, 1, -50),
-		Position = UDim2.fromOffset(10, 50),
+		Name = "List",
+		Size = UDim2.new(1, 0, 1, -(HEADER + 1)),
+		Position = UDim2.fromOffset(0, HEADER + 1),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
 		ScrollBarThickness = 3,
 		ScrollBarImageColor3 = K.line,
 		ScrollBarImageTransparency = 0.3,
+		VerticalScrollBarInset = Enum.ScrollBarInset.None,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
+		ClipsDescendants = true,
 	}, appFrame)
 	Ui.list(list, true, 8)
-	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 12), PaddingRight = UDim.new(0, 6) }, list)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 20) }, list)
 	refs.list = list
 end
 
