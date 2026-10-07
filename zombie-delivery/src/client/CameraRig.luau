@@ -11,6 +11,8 @@
 -- Config.Movement.Walk; a gamepad without a mouse sprints with the left stick click there too; 4.2: a touch screen with
 -- the SPRINT toggle, CameraRig.setTouchSprint).
 -- With cargo in your hands (the Carrying attribute, server/Cargo.luau) there is no aiming, no sprint and a slower step.
+-- 6.4: only the hands' pieces: what rides in a bag or the backpack never sets Carrying, so you sprint with it (every
+-- bag's point; the duffel only costs more breath: client/Stamina.luau's BreathCost).
 -- 3.9: with the gun holstered (B, client/Holster.luau) there is no aiming either; 6.1.1: a right or left click no longer
 -- draws it (3 or B does; with fists the left click punches).
 -- 3.10: getting in or out of a car (client/CarBoarding.luau moves the body, Drive.boardingCar) the camera eases between

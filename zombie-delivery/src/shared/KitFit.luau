@@ -3,9 +3,10 @@
 -- art (server/KitArt/Geometry.luau, server/PhoneArt/Geometry.luau) a player wears for their profile.kit, and how the
 -- art, authored for a nominal block R15 body, is fitted to the body the character really has.
 --
---   KitFit.outfit(kit, loaded)   slot → art id: pack = "bigpack" (owned) or "backpack", load = the backpack the
+--   KitFit.outfit(kit, loaded, bag)  slot → art id: pack = "bigpack" (owned) or "backpack", load = the backpack the
 --                                parcel sits on (only while `loaded`: the PackCount attribute > 0), shoes, jacket;
---                                6.0: hand = "bag" (the plastic bag in the left hand), vest = the best vest owned
+--                                6.0: hand = "bag" (the plastic bag in the left hand; 6.4: `bag`, the active bag's id
+--                                when given and owned: "tote", "thermal", "padded", "duffel"), vest = the best vest owned
 --                                ("heavy", else "kevlar": stream 2's armour, Config.Kit; 6.0.1: else "hivis", the
 --                                Courier Vest, the red reflective vest that is no longer part of the courier's body)
 --   KitFit.factors(bone, size)   the x / y / z scale of a body part against its nominal size (clamped; a hand: one
@@ -40,7 +41,7 @@ KitFit.HandMin = 0.7
 KitFit.HandMax = 1.3
 
 -- What to wear: slot → the art id. The best backpack only; the parcel rides on whichever backpack is worn.
-function KitFit.outfit(kit: Kit, loaded: boolean): { [string]: string }
+function KitFit.outfit(kit: Kit, loaded: boolean, bag: string?): { [string]: string }
 	local out: { [string]: string } = {}
 	local pack = if kit.bigpack == true then "bigpack" elseif kit.backpack == true then "backpack" else nil
 	if pack then
@@ -55,7 +56,9 @@ function KitFit.outfit(kit: Kit, loaded: boolean): { [string]: string }
 	if kit.jacket == true then
 		out.jacket = "jacket"
 	end
-	if kit.bag == true then
+	if bag ~= nil and kit[bag] == true then
+		out.hand = bag -- 6.4: the active bag (shared/Transport.luau activeBag: server/KitWear.luau names it)
+	elseif bag == nil and kit.bag == true then
 		out.hand = "bag" -- 6.0 (server/KitWear.luau puts it away while the hands carry or push something)
 	end
 	-- 6.0.1: the Courier Vest ("hivis", the red reflective one, no armour) shows only without an armoured vest

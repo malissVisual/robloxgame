@@ -20,6 +20,8 @@
 --                                                   velocity { x, y, z }; returns the tilt (x, z, radians) and the twist
 --                                                   (radians about the handles)
 --   BagSwing.tilt(state)                            the current tilt's size (radians)
+--   BagSwing.tuning(base, over)                     6.4: a bag's own tuning: `base` (Config.Courier.Bag) with the
+--                                                   numbers of `over` (Config.Courier.Bags[id]) on top; a new table
 
 local BagSwing = {}
 
@@ -73,6 +75,20 @@ local function clampFlat(x: number, z: number, max: number): (number, number)
 		return x * max / size, z * max / size
 	end
 	return x, z
+end
+
+-- 6.4: the heavier bags swing slower and flutter less: their numbers over the plastic bag's (unknown keys and
+-- non-numbers are ignored).
+function BagSwing.tuning(base: Tuning, over: { [string]: number }?): Tuning
+	local out = table.clone(base :: any)
+	if over then
+		for key, value in over do
+			if type(value) == "number" and value == value and type(out[key]) == "number" then
+				out[key] = value
+			end
+		end
+	end
+	return out :: Tuning
 end
 
 function BagSwing.tilt(state: State): number

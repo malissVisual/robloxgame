@@ -182,7 +182,7 @@ require(Client.KeyHints).covered = require(Client.Hotbar).covered -- 6.1: the ke
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)
 	require(Client.KeyHints).setState(state) -- 6.1
-	Holster.setBag(type(state) == "table" and type(state.kit) == "table" and state.kit[require(Shared.Config).Courier.BagKit] == true) -- 6.1
+	Holster.setBag(type(state) == "table" and type(state.bag) == "string") -- 6.1 (6.4: any bag: the server's state.bag)
 	Hud.setState(state)
 	DispatchUi.setState(state)
 	Menu.setState(state)

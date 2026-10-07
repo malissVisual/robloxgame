@@ -11,6 +11,9 @@
 -- KitShop.tab (the shop's open tab: "items" | "kit", nil = KIT while some piece is still to buy) is its only state.
 -- 5.8, the courier phone's look: YOUR ROOM is the phone's card (the red square and caps, the room in big type, a thin
 -- rule under it); BUY is the phone's red primary.
+-- 6.4: five bags; an owned bag's row says IN USE (the state's `bag`) or USE (the Kit remote's ("use", id), anywhere;
+-- the server refuses while your bag holds pieces); the stat line leads with the sprint (every bag's point), then
+-- the perk. The I window's BAGS tab lists the bags you own the same way (client/BagUi.luau BagUi.bags).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -64,15 +67,23 @@ function KitShop.currentTab(state: any): string
 end
 
 -- A piece's short name for the room line ("Courier Backpack" → "BACKPACK"; 6.0: "Plastic Bag" → "BAG").
+-- 6.4: "Canvas Tote" → "TOTE", "Thermal Delivery Bag" → "THERMAL BAG", "Padded Messenger Bag" → "MESSENGER BAG",
+-- "Big Delivery Duffel" → "DUFFEL".
 local function shortName(def: Config.KitDef): string
-	return string.upper((string.gsub(def.name, "^Courier ", ""):gsub("^Plastic ", "")))
+	local name = string.gsub(def.name, "^Courier ", "")
+	if def.extra then
+		for _, cut in { "^Plastic ", "^Canvas ", "^Padded ", "^Big ", "Delivery " } do
+			name = string.gsub(name, cut, "")
+		end
+	end
+	return string.upper(name)
 end
 
 -- What you carry, in words: "HANDS 2" or "HANDS 2 / BACKPACK 3" (the best backpack owned). Also for the job board and
--- the phone.
-function KitShop.roomText(kit: Transport.Kit): string
+-- the phone. 6.4: `bag` the active bag (the state's `bag`; nil = the best owned): only that one counts.
+function KitShop.roomText(kit: Transport.Kit, bag: string?): string
 	local hands = Config.Cargo.HandsMax
-	local room = Transport.handsRoom(kit)
+	local room = Transport.handsRoom(kit, bag)
 	local best: Config.KitDef? = nil
 	for _, def in Config.Kit do
 		local r = def.room
@@ -80,15 +91,14 @@ function KitShop.roomText(kit: Transport.Kit): string
 			best = def
 		end
 	end
-	-- 6.0: the plastic bag (Config.Kit `extra`) adds up with the backpack: "HANDS 2 / BACKPACK + BAG 5".
+	-- 6.0: the bag (Config.Kit `extra`) adds up with the backpack: "HANDS 2 / BACKPACK + BAG 5" (6.4: the active one).
 	local names: { string } = {}
 	if best then
 		table.insert(names, shortName(best))
 	end
-	for _, def in Config.Kit do
-		if kit[def.id] and def.extra then
-			table.insert(names, shortName(def))
-		end
+	local active = Transport.activeBag(kit, bag)
+	if active then
+		table.insert(names, shortName(active))
 	end
 	if #names > 0 and room > hands then
 		return `HANDS {hands} / {table.concat(names, " + ")} {room}`
@@ -106,7 +116,17 @@ local function effect(def: Config.KitDef): string
 		table.insert(parts, `🛡 −{math.floor(def.armour * 100 + 0.5)}% damage`) -- 6.0: the vests
 	end
 	if def.extra then
-		table.insert(parts, `🛍️ +{def.extra} light pieces, with any backpack`) -- 6.0: the plastic bag
+		-- 6.0: the plastic bag; 6.4: every bag: its room (you sprint with it), then its perk
+		table.insert(parts, `🏃 sprint with +{def.extra} light pieces`)
+		if def.bagWarm then
+			table.insert(parts, `🔥 food in it cools ×{def.bagWarm}`)
+		end
+		if def.padded then
+			table.insert(parts, "🛡 fragile safe in it")
+		end
+		if def.bagBreath then
+			table.insert(parts, `💨 sprint breath ×{def.bagBreath}`)
+		end
 	end
 	if def.speed then
 		local change = math.floor((def.speed - 1) * 100 + 0.5)
@@ -142,7 +162,8 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	local kit = KitShop.owned(state)
 	local level = myLevel(state)
 	local money = tonumber(state.money) or 0
-	local room = Transport.handsRoom(kit)
+	local bag: string? = if type(state.bag) == "string" then state.bag else nil -- 6.4: the bag in use (the server's)
+	local room = Transport.handsRoom(kit, bag)
 	local speed = Transport.speedMult(kit)
 
 	-- YOUR ROOM: a pip for every light piece you can carry, the walk speed.
@@ -151,7 +172,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	tagLine(head, "Personal gear · yours for good, on foot and on a bike", 1)
 	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
 	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, line)
-	P.text(line, KitShop.roomText(kit), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
+	P.text(line, KitShop.roomText(kit, bag), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
 	local everything: Transport.Kit = {}
 	for _, def in Config.Kit do
 		everything[def.id] = true
@@ -170,7 +191,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	local armour = Armour.percent(kit) -- 6.0: the best vest's share
 	P.caps(line, (if math.abs(speed - 1) > 0.001 then `  ·  SPEED ×{string.format("%.2g", speed)}` else "  ·  SPEED ×1")
 		.. (if armour > 0 then `  ·  ARMOUR {armour}%` else ""), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextStrokeTransparency = 1, LayoutOrder = most + 2 })
-	Ui.label(head, "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more with a backpack. The best backpack you own counts; so do the best shoes and the best vest. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
+	Ui.label(head, "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more with a backpack, and a bag lets you sprint with them (the hands' pieces stop the sprint). The best backpack, shoes and vest count; of your bags, the one IN USE. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 3,
 		TextColor3 = P.ink2,
@@ -209,7 +230,14 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
 		Ui.label(row, def.description, UDim2.new(1, -(left + BUTTON_W + 24), 0, 34), { Position = UDim2.fromOffset(left, 52), TextSize = 13, Font = Theme.Font, TextColor3 = P.ink2, TextYAlignment = Enum.TextYAlignment.Top })
-		if owned then
+		local active = Transport.activeBag(kit, bag)
+		if owned and def.extra and active and active.id == def.id then
+			action(row, "IN USE", "off", function() end) -- 6.4: the bag in your hand
+		elseif owned and def.extra then
+			action(row, "USE", "main", function()
+				Net.get("Kit"):FireServer("use", def.id) -- 6.4 (the server refuses while your bag is loaded)
+			end)
+		elseif owned then
 			action(row, "OWNED", "off", function() end)
 		elseif level < def.level then
 			action(row, `🔒 LEVEL {def.level}`, "off", function() end)

@@ -309,11 +309,11 @@ until then:
 | Level | Rank | XP | Opens | Reward |
 |---|---|---|---|---|
 | 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Courier Backpack (kit), Running Shoes (kit), Big Backpack (kit), Thermal Jacket (kit), Pistol | – |
-| 2 | Courier | 575 | **Rusty Bike at Spoke & Chain** ($300), **Courier Bike at Spoke & Chain** ($1,100), Front Basket (gear), Rented Lockup | $500, 2 Medkits |
-| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), SMG | $750, 2 Medkits, the Courier Backpack |
-| 4 | Road Rat | 2,093 | ★ Easy jobs, School Run (Sunny Hill School), Ice Cream Route (Frosty's Ice Cream), Moving Day (Big Move Movers), Fuel Run (Gas Station), Ambulance Run (City Clinic), Pizza Rush, **Old Van: Earl's Used Wheels (Marge's quest at level 4)** ($1,800), **E-Scooter at Spoke & Chain** ($2,800), the Patched Van stage, Hand Trolley (gear), Ratchet Straps (gear), Bike Trailer (gear), Shotgun, First Shift (campaign), Southside Garage | $1,000, 2 Medkits, the Running Shoes |
+| 2 | Courier | 575 | **Rusty Bike at Spoke & Chain** ($300), **Courier Bike at Spoke & Chain** ($1,100), Front Basket (gear), Canvas Tote (kit), Rented Lockup | $500, 2 Medkits |
+| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), Thermal Delivery Bag (kit), SMG | $750, 2 Medkits, the Courier Backpack |
+| 4 | Road Rat | 2,093 | ★ Easy jobs, School Run (Sunny Hill School), Ice Cream Route (Frosty's Ice Cream), Moving Day (Big Move Movers), Fuel Run (Gas Station), Ambulance Run (City Clinic), Pizza Rush, **Old Van: Earl's Used Wheels (Marge's quest at level 4)** ($1,800), **E-Scooter at Spoke & Chain** ($2,800), the Patched Van stage, Hand Trolley (gear), Ratchet Straps (gear), Bike Trailer (gear), Padded Messenger Bag (kit), Shotgun, First Shift (campaign), Southside Garage | $1,000, 2 Medkits, the Running Shoes |
 | 5 | Road Warrior | 3,087 | ★★ Risky jobs, Horse Transport (Silver Spur Ranch), Cash Transport, **Courier Van** ($3,500), **High-Roof Van** ($7,000), **E-Bike at Spoke & Chain** ($6,500), the Work Van stage, Cooler Box (gear), Roof Machine Gun, Code Red (campaign), Harbor Lockup | $1,500, 2 Repair Kits, Hi-Vis Orange paint |
-| 6 | Veteran Driver | 4,279 | ★★★ Deadly jobs (licence: 5 jobs rated ★★+ at ★★), Freight Run, **Pickup** ($12,000), the Long Cargo Van stage, the Express Courier stage, Hunting Rifle, Empty Shelves (campaign), Partners in Crime (campaign), Highway Garage, Elm Bungalow | $2,000, 4 Molotovs |
+| 6 | Veteran Driver | 4,279 | ★★★ Deadly jobs (licence: 5 jobs rated ★★+ at ★★), Freight Run, **Pickup** ($12,000), the Long Cargo Van stage, the Express Courier stage, Big Delivery Duffel (kit), Hunting Rifle, Empty Shelves (campaign), Partners in Crime (campaign), Highway Garage, Elm Bungalow | $2,000, 4 Molotovs |
 | 7 | Veteran Driver | 5,710 | Army Supply (Military Base), **Box Truck** ($22,000), the Tall Hauler stage, the Ranch Pickup stage, Roof Rack (gear), Smoke and Sirens (campaign), Downtown Parking, Birch Cottage | $2,500, 2 Landmines |
 | 8 | Wasteland Trucker | 7,427 | 7 Oak Lane | $3,500, 3 Nitros |
 | 9 | Wasteland Trucker | 9,487 | ★★★★ INSANE jobs (licence: 10 jobs rated ★★+ at ★★★), Farm Run (Old Farm), Winter Run, **Muscle Car** ($40,000), the Liftgate Truck stage, Iron Supply (campaign), 12 Maple Street | $4,500, 3 Repair Kits |
@@ -1106,6 +1106,42 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## Five bags: sprint with your deliveries (6.4)
+
+The owner's wish: "bags that make the work easier, bigger, but realistic". **The point of every bag: you sprint with
+your deliveries.** Pieces in your hands stop the sprint and slow the step; what rides in the bag in your hand (or the
+backpack) never does (it never sets the Carrying attribute: `client/CameraRig.luau`). Sold at Last Stop Supplies (KIT):
+
+| Bag | Level | Price | Room | Perk |
+|---|---|---|---|---|
+| Plastic Bag (`bag`, the start kit) | 1 | $25 | +2 | – |
+| Canvas Tote (`tote`) | 2 | $120 | +3 | – |
+| Thermal Delivery Bag (`thermal`) | 3 | $300 | +4 | food in it cools ×0.35 (`bagWarm`; × the Thermal Jacket's 0.8 on top) |
+| Padded Messenger Bag (`padded`) | 4 | $650 | +4 | fragile pieces in it take no knocks (`padded`) |
+| Big Delivery Duffel (`duffel`) | 6 | $1,200 | +6 | heavy: sprinting with it costs 15% more breath (`bagBreath` 1.15) |
+
+- **One bag at a time** (`shared/Transport.luau` `activeBag` / `bagRoom`): the bag in your hand (key 2) is the
+  **active** one, by default the best you own (the most room; a tie goes to the later, pricier one), and its room is
+  the bag's part of what you carry. Owning several never adds up. Every room (Cargo's pack and `BagRoom`, Jobs' room
+  checks and the 6.3 bag line, the board, the hotbar, the shop) asks `Transport.bagRoom(kit, choice)`.
+- **USE** (`profile.activeBag`, saved; a missing or unowned choice falls back to the best): the KIT tab and the I window's
+  new **BAGS** tab show IN USE / USE on your bags (the Kit remote's `("use", id)`, anywhere). Refused while your bag
+  holds pieces or lies on the ground ("Empty your bag first"). A bag you buy goes into use at once when yours is empty.
+  On a run the pack follows the switch (`Cargo` `bagSync`).
+- **The perks** work only for the active bag while it is your hand: the thermal bag keeps an order's food warm by the
+  share of its pieces in it (`Cargo.bagWarm`, `Transport.mixWarm`); the duffel's `BreathCost` attribute
+  (`server/Transport.luau`) makes `client/Stamina.luau` drain the breath faster.
+- **Fragile on foot** (new; `Config.Jobs.CargoRules` FootFall…): a hard landing (a drop of ~14 studs and more) or a bite
+  knocks each order with a fragile piece with you (a cake, a gadget, electronics: −10% / −5% condition, one knock every
+  1.5 s, "CAREFUL — FRAGILE!"); the pieces in the Padded Messenger Bag in your hand are safe (`Cargo.footKnock`,
+  `JobRules.footKnock` / `knockLoss`). Fragile pieces still can't be thrown.
+- **Looks** (`server/KitArt/Geometry.luau`, placeholders until Codex's): a beige canvas tote on long handles, a boxy red
+  insulated bag with a black lid and a ZDC patch, a grey messenger bag with a dark flap held by its strap, a big
+  dark-green duffel on its carry handles; the bag set down on the ground is the active one (`KitWear.bagDrop`). Each
+  swings its own way (`Config.Courier.Bags`, `BagSwing.tuning`): the bigger, the slower and the less flutter.
+- **Hotbar:** the bag slot shows the active bag's icon, name ("· SPRINT WITH YOUR DELIVERIES") and room. Marge texts once
+  when a level opens a bag you don't own (`Config.Courier.BagUnlock`). Tests: `tests/bags_test.luau`.
 
 ## Scooters at the spawn, express buses, the bus map, the bag, English names (6.3)
 

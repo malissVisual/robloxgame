@@ -289,7 +289,7 @@ function KeyHints.setState(state: any)
 	end
 	deliveries = tonumber(state.deliveries) or 0
 	hasGun = type(state.weapon) == "string"
-	hasBag = type(state.kit) == "table" and state.kit[Config.Courier.BagKit] == true
+	hasBag = type(state.bag) == "string" -- 6.4: any bag (the server's active one)
 end
 
 function KeyHints.start()

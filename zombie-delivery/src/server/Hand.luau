@@ -19,6 +19,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Holding = require(Shared.Holding)
 local Net = require(Shared.Net)
+local TransportRules = require(Shared.Transport) -- 6.4: which bag is yours
 local PlayerData = require(script.Parent.PlayerData)
 
 local Hand = {}
@@ -29,9 +30,10 @@ local switchedAt: { [Player]: number } = {}
 local unsettled: { [Player]: boolean? } = {} -- a body whose hand was chosen before the save was in
 local listeners: { (Player, string, string) -> () } = {}
 
+-- (6.4: any bag: the active one is in the hand, shared/Transport.luau activeBag)
 local function ownsBag(player: Player): boolean
 	local profile = PlayerData.get(player)
-	return profile ~= nil and profile.kit[Config.Courier.BagKit] == true
+	return profile ~= nil and TransportRules.activeBag(profile.kit, profile.activeBag) ~= nil
 end
 
 local function hasGun(player: Player): boolean

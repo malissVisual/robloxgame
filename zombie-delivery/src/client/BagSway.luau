@@ -13,6 +13,8 @@
 -- error; with the step jolt at 8 Hz and the flutter on top, the bag jittered and blinked.)
 -- A character's joint is looked up once (again when it leaves the body, every LOOK seconds while it has none); out of
 -- range or gone, the joint goes back to the identity once and its swing is forgotten.
+-- 6.4: each bag swings with its own tuning (the pivot's Bag attribute, Config.Courier.Bags): a tote a little slower,
+-- the thermal and the padded bag heavy and boxy, the duffel slow with hardly any flutter.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,12 +31,27 @@ local B = Config.Courier.Bag
 local LOOK = 0.4 -- seconds between the looks for a bag on a character that has none
 local SWEEP = 5 -- seconds between the clean-ups of the characters that are gone
 
+-- 6.4: every bag's own swing (Config.Courier.Bags over Bag: the bigger, the heavier), made once per bag id. The pivot's
+-- Bag attribute (server/KitWear.luau) names the bag in that hand.
+local tunings: { [string]: BagSwing.Tuning } = {}
+local function tuningOf(pivot: Instance?): BagSwing.Tuning
+	local id = if pivot then pivot:GetAttribute("Bag") else nil
+	local key = if type(id) == "string" then id else Config.Courier.BagKit
+	local made = tunings[key]
+	if not made then
+		made = BagSwing.tuning(B :: any, Config.Courier.Bags[key])
+		tunings[key] = made
+	end
+	return made
+end
+
 type Rec = {
 	joint: Motor6D?,
 	hand: BasePart?,
 	state: BagSwing.State,
 	nextLook: number,
 	written: boolean, -- a Transform of ours is on the joint
+	tuning: BagSwing.Tuning, -- 6.4: this bag's swing
 }
 
 local recs: { [Model]: Rec } = {}
@@ -93,7 +110,7 @@ local function step(dt: number)
 		end
 		local rec = recs[character]
 		if not rec then
-			rec = { joint = nil, hand = nil, state = BagSwing.new(), nextLook = 0, written = false }
+			rec = { joint = nil, hand = nil, state = BagSwing.new(), nextLook = 0, written = false, tuning = tuningOf(nil) }
 			recs[character] = rec
 		end
 		local joint, hand = rec.joint, rec.hand
@@ -111,13 +128,14 @@ local function step(dt: number)
 				continue
 			end
 			rec.joint, rec.hand = joint, hand
+			rec.tuning = tuningOf((joint :: Motor6D).Parent) -- 6.4: the bag that hangs there (a new one is a new joint)
 		end
 		local grip = (hand :: BasePart).CFrame * (joint :: Motor6D).C0
 		local at = grip.Position
 		handVec[1], handVec[2], handVec[3] = at.X, at.Y, at.Z
 		local velocity = root.AssemblyLinearVelocity
 		bodyVec[1], bodyVec[2], bodyVec[3] = velocity.X, velocity.Y, velocity.Z
-		local tx, tz, twist = BagSwing.step(rec.state, dt, handVec, bodyVec, B)
+		local tx, tz, twist = BagSwing.step(rec.state, dt, handVec, bodyVec, rec.tuning)
 		-- The world orientation: your facing, the twist about the handles, tilted away from where the bottom went.
 		local look = root.CFrame.LookVector
 		local flat = Vector3.new(look.X, 0, look.Z)

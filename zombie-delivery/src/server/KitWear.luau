@@ -16,7 +16,10 @@
 --           "bag", server/Hand.luau); put away while you push something or sit. It stays while the hands carry cargo:
 --           6.0 took it off and built it again every time the hands took or gave a piece (the Carrying attribute
 --           toggling: the "blinking" bag). KitWear.bagArt builds the same bag on any part (server/Cargo.luau's bag set
---           down on the ground).
+--           down on the ground). 6.4: the ACTIVE bag (shared/Transport.luau activeBag: profile.activeBag, else the best
+--           owned): the plastic bag, the tote, the thermal, the padded messenger or the duffel, each its own KitArt id;
+--           the pivot's Bag attribute names it (client/BagSway.luau swings each one its own way), and switching the
+--           bag builds the new one (the slot's key is the bag's id). KitWear.bagDrop(id): how far it hangs.
 --   vest    6.0: the best vest owned (stream 2's armour: Config.Kit "heavy", else "kevlar") over the courier's jacket. A
 --           vest that changes while you play (bought, a better one) is put on with the "vest" gesture (arms over the
 --           head, then down: shared/Gestures.luau, played by client/ArmPose.luau for everybody). 6.0.1: else the
@@ -41,6 +44,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local KitFit = require(Shared.KitFit)
 local Net = require(Shared.Net)
+local TransportRules = require(Shared.Transport) -- 6.4: the active bag
 local PlayerData = require(script.Parent.PlayerData)
 local Builder = require(script.Parent.ModelArt.Builder)
 local Npcs = require(script.Parent.Npcs) -- 6.0: the vest's put-on gesture
@@ -119,13 +123,14 @@ end
 
 -- 6.0: the bag's pivot, hung from the left hand by the BagSwing Motor6D (the clients write its Transform), placed
 -- before the art is built on it. Nil without a left hand (an R6 avatar).
-local function hangBag(character: Model): (BasePart?, BasePart?)
+local function hangBag(character: Model, id: string): (BasePart?, BasePart?)
 	local hand = character:FindFirstChild("LeftHand")
 	if not hand or not hand:IsA("BasePart") then
 		return nil, nil
 	end
 	local pivot = Instance.new("Part")
 	pivot.Name = "KitBagPivot"
+	pivot:SetAttribute("Bag", id) -- 6.4: which bag (client/BagSway.luau's tuning)
 	pivot.Size = Vector3.new(0.2, 0.2, 0.2)
 	pivot.Transparency = 1
 	pivot.Massless, pivot.CanCollide, pivot.CanQuery, pivot.CanTouch, pivot.CastShadow = true, false, false, false, false
@@ -141,17 +146,39 @@ local function hangBag(character: Model): (BasePart?, BasePart?)
 	return hand, pivot
 end
 
--- 6.1: the bag's art on `pivot` (its grip: the bag hangs down -Y), its plastic see-through; under `parent`.
-function KitWear.bagArt(parent: Instance, pivot: BasePart): Builder.Built?
-	local spec: Builder.Spec = { id = NAMES.hand, pieces = KitArt.pieces("bag") :: any }
+-- 6.1: the bag's art on `pivot` (its grip: the bag hangs down -Y), its plastic see-through; under `parent`. 6.4: `id`
+-- the bag (a Config.Kit bag with a KitArt look; nil or unknown: the plastic bag).
+function KitWear.bagArt(parent: Instance, pivot: BasePart, id: string?): Builder.Built?
+	local look = if id and KitArt.bags[id] then id else Config.Courier.BagKit
+	local spec: Builder.Spec = { id = NAMES.hand, pieces = KitArt.pieces(look) :: any }
 	local ok, made = pcall(Builder.build, parent, spec, { BagPivot = pivot })
 	if not ok then
-		warn(`[KitWear] bag: {made}`)
+		warn(`[KitWear] bag {look}: {made}`)
 		return nil
 	end
 	local built = made :: Builder.Built
 	seeThrough(built)
 	return built
+end
+
+-- 6.4: how far under its grip a bag's art reaches (studs; server/Cargo.luau stands a set-down bag on its bottom).
+local drops: { [string]: number } = {}
+function KitWear.bagDrop(id: string?): number
+	local look = if id and KitArt.bags[id] then id else Config.Courier.BagKit
+	local known = drops[look]
+	if known then
+		return known
+	end
+	local low = 0
+	for _, piece in KitArt.pieces(look) do
+		local r = piece.turn or { 0, 0, 0 }
+		local turn = CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
+		-- (the half height of a turned box: each of its axes' share of up)
+		local half = (math.abs(turn.RightVector.Y) * piece.size[1] + math.abs(turn.UpVector.Y) * piece.size[2] + math.abs(turn.LookVector.Y) * piece.size[3]) / 2
+		low = math.max(low, half - piece.at[2])
+	end
+	drops[look] = low
+	return low
 end
 
 -- One slot built on the character, fitted to its body parts; nil when a body part is missing (an R6 avatar).
@@ -162,11 +189,11 @@ local function build(character: Model, slot: string, id: string): Slot?
 	local scales: { [string]: KitFit.Scale } = {}
 	if slot == "hand" then
 		-- 6.0: the bag, on its pivot (not fitted: it hangs, the hand's size does not shape it)
-		local hand, pivot = hangBag(character)
+		local hand, pivot = hangBag(character, id)
 		if not hand or not pivot then
 			return nil
 		end
-		local bag = KitWear.bagArt(character, pivot)
+		local bag = KitWear.bagArt(character, pivot, id)
 		if not bag then
 			pivot:Destroy()
 			return nil
@@ -258,7 +285,8 @@ local function refresh(player: Player)
 	local profile = PlayerData.get(player)
 	local wanted: { [string]: string } = {}
 	if humanoid and humanoid.Health > 0 and profile and player.Character == character and character.Parent then
-		wanted = KitFit.outfit(profile.kit, (tonumber(player:GetAttribute("PackCount")) or 0) > 0)
+		local bag = TransportRules.activeBag(profile.kit, profile.activeBag) -- 6.4: the bag in your hand
+		wanted = KitFit.outfit(profile.kit, (tonumber(player:GetAttribute("PackCount")) or 0) > 0, if bag then bag.id else "")
 		if holdsPhone(player, character, humanoid) then
 			wanted.phone = "phone"
 		end

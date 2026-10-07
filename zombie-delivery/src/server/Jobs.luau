@@ -1967,11 +1967,12 @@ local function stackCheck(player: Player, job: Job, offer: Offer): (boolean, str
 		-- open orders and this one must fit there too.
 		local big = if mode == "foot" then Tuning.HandsMax else (job.cargo.info.rack or 0)
 		if mode == "foot" and Bag.fitsBag(offer.look) then
-			-- 6.3 review: a light piece rides in the plastic bag too (its room over the hands, when you own it)
+			-- 6.3 review: a light piece rides in the plastic bag too (its room over the hands, when you own it). 6.4:
+			-- the active bag's room only (Transport.bagRoom), never every bag's
 			local profile = PlayerData.get(player)
 			local Rules = require(Shared.Transport) -- (the shared rules, not this module's server/Transport)
 			if profile then
-				big += math.max(0, Rules.handsRoom(profile.kit) - Rules.backpackRoom(profile.kit))
+				big += Rules.bagRoom(profile.kit, profile.activeBag)
 			end
 		end
 		local bigUsed = 0
@@ -4039,8 +4040,25 @@ local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Polly", "Dean", "Hannah", 
 -- Every tick of a job with cargo rules: the food's freshness drains once it is picked up (a Cooler Box slows it), and
 -- a fragile cargo or passengers in the moving car feel the jolts (hard braking, bumps: JobRules.jolt / joltLoss, the
 -- Ratchet Straps cut it). Passengers who had enough end the job like the bandits do (loseCondition).
+-- 6.4: on a foot or bike run, a hard landing or a bite knocks the fragile pieces with you (Cargo.footKnock: not those in
+-- the Padded Messenger Bag in your hand): each order hit loses JobRules.knockLoss of its condition.
 local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step: number, now: number)
 	local offer = job.offer
+	if offer.mode ~= "car" then
+		local knock, hit = Cargo.footKnock(job.cargo, now)
+		local share = JobRules.knockLoss(knock, false)
+		if share > 0 then
+			job.condition = math.max(0, job.condition - share)
+			job.dirty = true
+			for id in hit do
+				local order = orderById(job, id)
+				if order then
+					order.condition = math.max(0, order.condition - share)
+				end
+			end
+			notice:FireClient(player, `CAREFUL — FRAGILE! {if knock == "fall" then "That fall" else "That hit"} cost {math.floor(share * 100 + 0.5)}% of the cargo. A padded bag keeps it safe.`)
+		end
+	end
 	local rules = rulesNow(job)
 	if #rules == 0 then
 		return
@@ -4070,7 +4088,8 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 			continue
 		end
 		local shown = math.floor(order.freshness * 100 + 0.5)
-		local warm = if offer.mode ~= "car" then Transport.warmOf(player) else nil -- 5.0: a thermal jacket (5.1: on a bike too)
+		-- 5.0: a thermal jacket (5.1: on a bike too); 6.4: × the thermal bag in your hand for this order's pieces in it
+		local warm = if offer.mode ~= "car" then Transport.warmOf(player) * Cargo.bagWarm(job.cargo, order.id) else nil
 		order.freshness = math.max(0, order.freshness - JobRules.freshDrain(order.offer.tier, step, car ~= nil and Vehicles.hasGear(car, "cooler"), warm))
 		if math.floor(order.freshness * 100 + 0.5) ~= shown then
 			job.dirty = true

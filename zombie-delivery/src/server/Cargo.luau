@@ -133,6 +133,14 @@
 --     the server's "n/room" (nil without a foot job: a car job's pickups go to the hands, as before; the slot says so).
 --   * A light piece that goes into your hands while you own the bag but hold something else: once a job, a notice
 --     says to hold the bag (bagHint).
+--
+-- 6.4, five bags (Config.Kit pieces with `extra`; shared/Transport.luau activeBag): the bag in your hand is the ACTIVE
+-- one, and its room alone is the bag's part of Info.pack (session.bagRoom, bagRoomOf; never the sum of the bags you
+-- own). A switch or a purchase that changes it moves Info.pack along (bagSync, on PlayerData.Changed); switching is
+-- refused while the bag holds pieces or lies on the ground (Cargo.bagBusy). The bag set down is the active bag's look
+-- (KitWear.bagArt / bagDrop). Its perks: the thermal bag keeps an order's food warm by the share of its pieces in it
+-- (Cargo.bagWarm), the padded messenger keeps fragile pieces in it safe from the new knocks on foot (Cargo.footKnock:
+-- a hard landing or a bite knocks the other fragile pieces with you), the duffel's slower walk is server/Transport's.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -299,6 +307,13 @@ export type Session = {
 	slot: number, -- … and this job's place beside it (0: right there; Places.SessionGap to a side: build)
 	bagDown: BagDown?, -- 6.1: the bag on the ground with its pieces
 	bagHinted: boolean?, -- 6.3: "Hold your bag (2)" was said on this job (bagHint)
+	bagRoom: number, -- 6.4: the active bag's room in Info.pack (bagSync keeps it with the bag in your hand)
+	-- 6.4, fragile pieces on foot (Cargo.footKnock): the owner's body last looked at, its health then, the highest it
+	-- was since its feet left the ground, and no knock before knockAt (os.clock)
+	knockHumanoid: Humanoid?,
+	knockHealth: number,
+	knockTop: number,
+	knockAt: number,
 }
 
 export type Status = {
@@ -1323,18 +1338,20 @@ local function isPallet(session: Session): boolean
 	return Freight.isPallet(session.info.kind)
 end
 
--- 6.1: the plastic bag's room on a foot job (the `extra` of the owner's kit: Transport.handsRoom − backpackRoom; part
--- of Info.pack), whether it is in the owner's hand, and the pieces in it with you.
+-- 6.1: the plastic bag's room on a foot job (part of Info.pack), whether it is in the owner's hand, and the pieces in
+-- it with you. 6.4: the ACTIVE bag's room (Transport.bagRoom: one bag, never the sum), as the run's pack holds it
+-- (session.bagRoom; bagSync follows a switch or a purchase).
 local function bagRoomOf(session: Session): number
 	if not session.info.foot then
 		return 0
 	end
-	local profile = PlayerData.get(session.owner)
-	if not profile then
-		return 0
-	end
-	local kit = profile.kit
-	return math.clamp(TransportRules.handsRoom(kit) - TransportRules.backpackRoom(kit), 0, session.info.pack or 0)
+	return math.clamp(session.bagRoom, 0, session.info.pack or 0)
+end
+
+-- 6.4: the owner's active bag now (its Config.Kit entry; nil without a bag or the save).
+local function activeBag(owner: Player): Config.KitDef?
+	local profile = PlayerData.get(owner)
+	return if profile then TransportRules.activeBag(profile.kit, profile.activeBag) else nil
 end
 
 local function bagHeld(session: Session): boolean
@@ -1414,6 +1431,25 @@ local function packShown(session: Session)
 	if owner:GetAttribute("BagRoom") ~= bagRoom then
 		owner:SetAttribute("BagRoom", bagRoom)
 	end
+end
+
+-- 6.4: the active bag changed (USE in the shop or the I window, a bag bought, the admin's gift): the run's pack takes
+-- its room instead of the old bag's (the backpack's part stays). Never smaller than the pieces in it (a switch is
+-- refused while it holds any or lies on the ground: Cargo.bagBusy).
+local function bagSync(session: Session)
+	if not session.info.foot or session.ended then
+		return
+	end
+	local bag = activeBag(session.owner)
+	local live = if bag and bag.extra then math.max(0, math.floor(bag.extra)) else 0
+	local inBag = bagCount(session) + (if session.bagDown then #session.bagDown.pieces else 0)
+	if live == session.bagRoom or live < inBag then
+		return
+	end
+	session.info.pack = math.max(0, (session.info.pack or 0) + live - session.bagRoom)
+	session.bagRoom = live
+	packShown(session)
+	session.info.changed()
 end
 
 -- 5.0: a piece goes into the owner's pack (its model goes: nothing shows). 6.1: into the bag in the owner's hand while
@@ -3609,11 +3645,15 @@ local function setBagDown(session: Session): boolean
 	base.Size = Vector3.new(0.6, 0.2, 1)
 	base.Transparency = 1
 	base.Anchored, base.CanCollide, base.CanQuery, base.CanTouch, base.CastShadow = true, false, false, false, false
-	-- (the art hangs from its grip: the bottom 1.6 under it stands on the ground, turned a little off your way)
-	base.CFrame = CFrame.lookAt(spot + Vector3.new(0, 1.6, 0), spot + Vector3.new(0, 1.6, 0) + look) * CFrame.Angles(0, math.rad(25), 0)
+	-- (the art hangs from its grip: its bottom stands on the ground, turned a little off your way. 6.4: the active
+	-- bag's look and its own depth: KitWear.bagDrop; it can't change while the bag lies here)
+	local bag = activeBag(session.owner)
+	local id = if bag then bag.id else nil
+	local up = Vector3.new(0, KitWear.bagDrop(id), 0)
+	base.CFrame = CFrame.lookAt(spot + up, spot + up + look) * CFrame.Angles(0, math.rad(25), 0)
 	base.Parent = model
 	model.PrimaryPart = base
-	KitWear.bagArt(model, base)
+	KitWear.bagArt(model, base, id)
 	model.Parent = folder
 	local p = prompt(base, "Pick up bag", bagText(#pieces), nil, Config.Hand.BagHold, session.owner)
 	p.MaxActivationDistance = Config.Hand.BagReach
@@ -3713,7 +3753,15 @@ function Cargo.begin(owner: Player, info: Info): Session
 		anchor = nil,
 		slot = 0,
 		bagDown = nil,
+		bagRoom = 0,
+		knockHumanoid = nil,
+		knockHealth = 0,
+		knockTop = 0,
+		knockAt = 0,
 	}
+	-- 6.4: the bag room Jobs built Info.pack with (Transport.packRoomOf: the active bag's)
+	local bag = if info.foot then activeBag(owner) else nil
+	session.bagRoom = if bag and bag.extra then math.max(0, math.floor(bag.extra)) else 0
 	active[owner] = session
 	packShown(session)
 	return session
@@ -4030,6 +4078,99 @@ function Cargo.ordersWithYou(session: Session, vehicleOnly: boolean?): { [number
 		end
 	end)
 	return out
+end
+
+-- 6.4: does the owner's bag hold pieces now, or lie on the ground? (Switching the active bag is refused then:
+-- server/Shops.luau's USE.)
+function Cargo.bagBusy(player: Player): boolean
+	local session = active[player]
+	if not session or session.ended then
+		return false
+	end
+	return bagCount(session) > 0 or session.bagDown ~= nil
+end
+
+-- 6.4, the thermal bag (Config.Kit bagWarm): an order's food drain multiplier for the bag in the owner's hand: the
+-- share of its pieces with you (the hands, the pack, the vehicle) that ride in that bag (Transport.mixWarm); 1 without
+-- a warm bag in the hand. A Thermal Jacket's warm multiplies on top (server/Jobs.luau).
+function Cargo.bagWarm(session: Session, order: number): number
+	if not bagHeld(session) then
+		return 1
+	end
+	local profile = PlayerData.get(session.owner)
+	local warm = if profile then TransportRules.bagWarm(profile.kit, profile.activeBag) else 1
+	if warm >= 1 then
+		return 1
+	end
+	local inBag, withYou = 0, 0
+	eachPiece(session, function(piece: Piece, where: string)
+		if piece.order == order and (where == "hands" or where == "pack" or where == "vehicle") then
+			withYou += 1
+			if where == "pack" and piece.inBag then
+				inBag += 1
+			end
+		end
+	end)
+	return if withYou > 0 then TransportRules.mixWarm(inBag / withYou, warm) else 1
+end
+
+-- 6.4, fragile pieces on foot (Config.Jobs.CargoRules FootFall …): server/Jobs.luau asks every tick of a foot or bike
+-- run. The owner's body is read here: the drop since the feet left the ground (its highest point to where it lands:
+-- the speed it lands with, √(2 g h), sampling-proof) and the health lost since the last look. A hard landing or a
+-- bite (JobRules.footKnock) knocks every fragile piece with the owner (Throws.fragile: the hands, the pack, the bag)
+-- except those in a padded bag in the hand (Transport.bagPadded); one knock every FootKnockCooldown. Not seated, on a
+-- zip line, a ladder or swimming. Returns the knock ("fall" | "hit" | nil) and the orders it hits (their pieces).
+function Cargo.footKnock(session: Session, now: number): (string?, { [number]: number })
+	local hit: { [number]: number } = {}
+	local owner = session.owner
+	local character = owner.Character
+	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	local root = rootOf(character)
+	if not session.info.foot or session.ended or not character or not humanoid or not root or humanoid.Health <= 0 then
+		session.knockHumanoid = nil
+		return nil, hit
+	end
+	local y = root.Position.Y
+	if session.knockHumanoid ~= humanoid then -- (a new body: nothing to compare yet)
+		session.knockHumanoid, session.knockHealth, session.knockTop = humanoid, humanoid.Health, y
+		return nil, hit
+	end
+	local lost = session.knockHealth - humanoid.Health
+	session.knockHealth = humanoid.Health
+	local state = humanoid:GetState()
+	local held = humanoid.SeatPart ~= nil or character:GetAttribute("ZipLine") ~= nil
+		or state == Enum.HumanoidStateType.Climbing or state == Enum.HumanoidStateType.Swimming
+	local landed = not held and humanoid.FloorMaterial ~= Enum.Material.Air
+	local drop = session.knockTop - y
+	session.knockTop = if landed or held then y else math.max(session.knockTop, y)
+	local fell = if landed and drop > 0 then math.sqrt(2 * workspace.Gravity * drop) else 0
+	local knock = JobRules.footKnock(fell, landed, lost)
+	if not knock or now < session.knockAt then
+		return nil, hit
+	end
+	local profile = PlayerData.get(owner)
+	local padded = bagHeld(session) and profile ~= nil and TransportRules.bagPadded(profile.kit, profile.activeBag)
+	local job = session.info.fragile == true
+	local any = false
+	local hands = session.held[owner]
+	local inHands: { Piece } = if hands then hands.pieces else {}
+	for _, piece in inHands do
+		if Throws.fragile(piece.look, job) then
+			hit[piece.order] = (hit[piece.order] or 0) + 1
+			any = true
+		end
+	end
+	for _, piece in session.pack do
+		if Throws.fragile(piece.look, job) and not (padded and piece.inBag) then
+			hit[piece.order] = (hit[piece.order] or 0) + 1
+			any = true
+		end
+	end
+	if not any then
+		return nil, hit
+	end
+	session.knockAt = now + Config.Jobs.CargoRules.FootKnockCooldown
+	return knock, hit
 end
 
 -- Like Cargo.remaining, for one order: its pieces on the way, and the current stop's pile when it is that order's.
@@ -5001,6 +5142,13 @@ function Cargo.start()
 		throwShown(session)
 		refresh(session)
 		session.info.changed()
+	end)
+	-- 6.4: a bag switched or bought: the run's pack follows the active bag's room
+	PlayerData.Changed:Connect(function(player: Player)
+		local session = active[player]
+		if session then
+			bagSync(session)
+		end
 	end)
 	local lastThrow: { [Player]: number } = {}
 	Net.get("Throw").OnServerEvent:Connect(function(player: Player, stop: any, direction: any, power: any, release: any)

@@ -253,6 +253,11 @@ local function myKit(): Transport.Kit
 	return KitShop.owned(state)
 end
 
+-- 6.4: the bag in use (the server's state.bag; its room alone counts, never every bag's)
+local function myBag(): string?
+	return if state and type(state.bag) == "string" then state.bag else nil
+end
+
 -- 5.0: the first vehicle you can own (the earliest dealer car: the Old Van), for "Old Van at level 4".
 local function firstVehicle(): Config.CarDef?
 	local best: Config.CarDef? = nil
@@ -292,7 +297,7 @@ end
 -- it is out, else the parked share the state keeps).
 local function myCar(): (string, number, number)
 	if onFoot() then
-		return "On foot", Transport.handsRoom(myKit()), 1 -- 5.0: your hands and your backpack
+		return "On foot", Transport.handsRoom(myKit(), myBag()), 1 -- 5.0: your hands and your backpack
 	elseif riding() then
 		local bike = Economy.findCar(carId())
 		return if bike then bike.name else "Bike", BikeShop.room(state, carId()), 1 -- 5.1: what your bike holds
@@ -324,8 +329,8 @@ local function roomRemedy(offer: any): string
 	local need = tonumber(offer.slots) or 0
 	if isFoot(offer) then
 		-- 5.0: on foot the room is your hands and your backpack.
-		local room = Transport.handsRoom(myKit())
-		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. A bigger backpack at Last Stop Supplies carries more.`
+		local room = Transport.handsRoom(myKit(), myBag())
+		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit(), myBag())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. A bigger backpack at Last Stop Supplies carries more.`
 	elseif isBike(offer) then
 		-- 5.1: your bike, its bike gear and your backpack.
 		return `Your {offer.carName or "bike"} and your backpack hold {offer.capacity or 0}; this run has {math.max(need, tonumber(offer.pieces) or 0)}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
@@ -574,7 +579,7 @@ local function refreshChrome()
 	local level = myLevel()
 	if walking then
 		-- 5.0: on foot: your room (hands and backpack), your pace, when the first vehicle comes.
-		local room = KitShop.roomText(myKit())
+		local room = KitShop.roomText(myKit(), myBag())
 		local speed = Transport.speedMult(myKit())
 		refs.carStats.Text = `🎒 {room}`
 		refs.carHealth.Text = if speed > 1.001 then `👟 pace ×{string.format("%.2g", speed)} · light cargo` else "Light cargo only"
@@ -778,7 +783,7 @@ local function details(body: any, offer: any, w: number): number
 	end
 	if isFoot(offer) then
 		-- 5.0: on foot it is your hands and your backpack, not cargo slots.
-		local room = Transport.handsRoom(myKit())
+		local room = Transport.handsRoom(myKit(), myBag())
 		local pieces = count or slots
 		table.insert(words, if pieces <= room then `fits your hands ({pieces} / {room})` else `{pieces} pieces: you carry {room}`)
 	elseif isBike(offer) then
@@ -1068,7 +1073,7 @@ local function footHeader(count: number, order: number, note: string?)
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	local room = text(row, KitShop.roomText(myKit()), UDim2.fromOffset(0, 22), {
+	local room = text(row, KitShop.roomText(myKit(), myBag()), UDim2.fromOffset(0, 22), {
 		Position = UDim2.new(1, -4, 0, 8),
 		AnchorPoint = Vector2.new(1, 0),
 		AutomaticSize = Enum.AutomaticSize.X,

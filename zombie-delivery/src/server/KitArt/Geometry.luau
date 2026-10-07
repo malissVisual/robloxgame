@@ -4,10 +4,16 @@
 -- from the left hand by server/KitWear.luau: the origin is the grip, the bag hangs down -Y, its broad sides face
 -- out along ±X); "kevlar" (a dark vest with plates) and "heavy" (a bulky armoured vest with shoulder guards) over the
 -- courier's own vest. Geometry.translucent: the see-through pieces (the bag's plastic) and how much.
+-- 6.4 (Claude's placeholders, the same frame as "bag": the grip at the origin, hanging -Y, the broad sides out along ±X,
+-- -X the outer side; the R15 hand holds it about 1.95 above the ground, so nothing reaches lower than -1.7):
+-- "tote" a beige canvas tote on two long webbing handles, "thermal" the boxy red insulated food bag with a black lid,
+-- base and ZDC patch, "padded" a grey messenger bag with a dark flap, held by its strap, "duffel" a big dark-green
+-- duffel (a lying cylinder) on its two carry handles, a shoulder strap along its side. 1 stud ≈ 35 cm of the courier.
 local Geometry = {}
 type V = { number }
 type Piece = { name: string, size: V, at: V, attach: string, finish: string, turn: V?, shape: string?, shadow: boolean?, text: string? }
-Geometry.ids = { "backpack", "backpack_loaded", "bigpack", "shoes", "jacket", "cart", "bag", "kevlar", "heavy" }
+Geometry.ids = { "backpack", "backpack_loaded", "bigpack", "shoes", "jacket", "cart", "bag", "kevlar", "heavy", "tote", "thermal", "padded", "duffel" }
+Geometry.bags = { bag = true, tote = true, thermal = true, padded = true, duffel = true } :: { [string]: boolean } -- 6.4: hung on BagPivot
 Geometry.translucent = { BagBody = .3, BagBottom = .15 } :: { [string]: number }
 local function add(out: { Piece }, name: string, size: V, at: V, attach: string, finish: string, shape: string?, turn: V?, text: string?)
 	table.insert(out, { name = name, size = size, at = at, attach = attach, finish = finish, shape = shape, turn = turn, text = text, shadow = name == "PackBody" or name == "BoxBody" })
@@ -92,6 +98,59 @@ function Geometry.pieces(id: string): { Piece }
 		for _, x in { -.26, .26 } do
 			add(out, if x < 0 then "BagPrintL" else "BagPrintR", { .02, .3, .46 }, { x, -.92, 0 }, "BagPivot", "red")
 		end
+	elseif id == "tote" then
+		-- 38 × 37 × 12 cm of canvas, its two long handles (one on each side) gathered in the hand
+		add(out, "ToteBody", { .34, 1.05, 1.1 }, { 0, -1.025, 0 }, "BagPivot", "canvas")
+		add(out, "ToteHem", { .36, .06, 1.12 }, { 0, -.53, 0 }, "BagPivot", "parcel")
+		add(out, "ToteBottom", { .36, .06, 1.12 }, { 0, -1.53, 0 }, "BagPivot", "parcel")
+		for _, x in { -.13, .13 } do
+			for _, z in { -.205, .205 } do
+				add(out, `ToteStrap{if x < 0 then "O" else "I"}{if z < 0 then "F" else "B"}`, { .05, .54, .09 }, { x, -.28, z }, "BagPivot", "parcel", nil, { if z < 0 then 35 else -35, 0, 0 })
+			end
+			add(out, if x < 0 then "TotePrintO" else "TotePrintI", { .02, .34, .46 }, { x * 1.33, -.98, 0 }, "BagPivot", "red")
+		end
+		add(out, "ToteGrip", { .2, .1, .16 }, { 0, -.04, 0 }, "BagPivot", "parcel")
+	elseif id == "thermal" then
+		-- the insulated ZDC food bag, 40 × 33 × 30 cm: red nylon, a black lid and base, a black ZDC patch on each side
+		add(out, "ThermBody", { .85, .95, 1.15 }, { 0, -.795, 0 }, "BagPivot", "red")
+		add(out, "ThermLid", { .89, .1, 1.19 }, { 0, -.32, 0 }, "BagPivot", "sole")
+		add(out, "ThermBase", { .89, .1, 1.19 }, { 0, -1.25, 0 }, "BagPivot", "sole")
+		add(out, "ThermZip", { .87, .03, 1.17 }, { 0, -.4, 0 }, "BagPivot", "steel")
+		for _, x in { -1, 1 } do
+			local side = if x < 0 then "O" else "I"
+			add(out, "ThermPatch" .. side, { .5, .3, .03 }, { x * .44, -.74, 0 }, "BagPivot", "sole", nil, { 0, if x < 0 then 90 else -90, 0 }, "ZDC")
+			add(out, "ThermReflector" .. side, { .02, .05, 1 }, { x * .435, -1.1, 0 }, "BagPivot", "reflector")
+			add(out, "ThermHandle" .. side, { .05, .42, .14 }, { x * .15, -.17, 0 }, "BagPivot", "sole", nil, { 0, 0, if x < 0 then -45 else 45 })
+		end
+		add(out, "ThermGrip", { .12, .1, .2 }, { 0, -.04, 0 }, "BagPivot", "sole")
+	elseif id == "padded" then
+		-- a 38 × 28 × 12 cm messenger bag of grey nylon, foam-padded, its dark flap on the outer side, held by the strap
+		add(out, "MessBody", { .36, .8, 1.1 }, { 0, -1, 0 }, "BagPivot", "nylon")
+		add(out, "MessFlap", { .05, .62, 1.12 }, { -.205, -.86, 0 }, "BagPivot", "cloth")
+		add(out, "MessFlapTop", { .4, .05, 1.12 }, { -.02, -.585, 0 }, "BagPivot", "cloth")
+		add(out, "MessReflector", { .02, .05, .9 }, { -.235, -.7, 0 }, "BagPivot", "reflector")
+		add(out, "MessPadSeam", { .02, .04, 1 }, { .185, -1, 0 }, "BagPivot", "worn")
+		for _, z in { -.3, .3 } do
+			add(out, if z < 0 then "MessBuckleF" else "MessBuckleB", { .04, .14, .1 }, { -.24, -1.12, z }, "BagPivot", "steel")
+			add(out, if z < 0 then "MessStrapF" else "MessStrapB", { .06, .75, .13 }, { 0, -.32, z * .83 }, "BagPivot", "sole", nil, { if z < 0 then 42 else -42, 0, 0 })
+		end
+		add(out, "MessStrapPad", { .14, .12, .3 }, { 0, -.05, 0 }, "BagPivot", "sole")
+	elseif id == "duffel" then
+		-- a 60 cm dark-green duffel (30 cm across) lying along your way on its two carry handles, a shoulder strap
+		-- clipped along its outer side
+		add(out, "DuffBody", { 1.75, .85, .85 }, { 0, -.745, 0 }, "BagPivot", "olive", "Cylinder", { 0, 90, 0 })
+		for _, z in { -1, 1 } do
+			local tip = if z < 0 then "F" else "B"
+			add(out, "DuffEnd" .. tip, { .06, .87, .87 }, { 0, -.745, z * .875 }, "BagPivot", "sole", "Cylinder", { 0, 90, 0 })
+			add(out, "DuffBand" .. tip, { .08, .87, .87 }, { 0, -.745, z * .4 }, "BagPivot", "sole", "Cylinder", { 0, 90, 0 })
+			add(out, "DuffHandle" .. tip, { .12, .46, .05 }, { 0, -.185, z * .225 }, "BagPivot", "sole", nil, { if z < 0 then 50 else -50, 0, 0 })
+			add(out, "DuffClip" .. tip, { .06, .1, .06 }, { -.42, -.45, z * .78 }, "BagPivot", "steel")
+		end
+		add(out, "DuffZip", { .04, .03, 1.5 }, { 0, -.32, 0 }, "BagPivot", "steel")
+		add(out, "DuffStrap", { .04, .06, 1.5 }, { -.44, -.55, 0 }, "BagPivot", "sole")
+		add(out, "DuffPocket", { .05, .36, .6 }, { -.42, -.82, 0 }, "BagPivot", "olive")
+		add(out, "DuffLabel", { .44, .16, .02 }, { -.455, -.82, 0 }, "BagPivot", "sole", nil, { 0, 90, 0 }, "ZDC")
+		add(out, "DuffGrip", { .16, .1, .18 }, { 0, -.04, 0 }, "BagPivot", "sole")
 	elseif id == "kevlar" or id == "heavy" then
 		local heavy = id == "heavy"
 		local w, h, d = if heavy then 1.98 else 1.88, if heavy then 1.45 else 1.32, if heavy then .2 else .12
@@ -124,10 +183,10 @@ end
 function Geometry.spec(id: string): any
 	local cart = id == "cart"
 	local origins = if cart then { Frame = { 0, 0, 0 }, LeftWheel = { -.9, .59, .2 }, RightWheel = { .9, .59, .2 } }
-		elseif id == "bag" then { BagPivot = { -1.5, 1.95, 0 } }
+		elseif Geometry.bags[id] then { BagPivot = { -1.5, 1.95, 0 } }
 		else { UpperTorso = { 0, 3.4, 0 }, LeftUpperArm = { -1.5, 3.45, 0 }, RightUpperArm = { 1.5, 3.45, 0 }, LeftFoot = { -.52, .37, 0 }, RightFoot = { .52, .37, 0 } }
 	return {
-		id = id, pieces = Geometry.pieces(id), origins = origins, camera = if cart or id == "shoes" or id == "jacket" or id == "kevlar" or id == "heavy" or id == "bag" then "front" else "back", newRoots = if cart then 3 else 0,
+		id = id, pieces = Geometry.pieces(id), origins = origins, camera = if cart or id == "shoes" or id == "jacket" or id == "kevlar" or id == "heavy" or Geometry.bags[id] then "front" else "back", newRoots = if cart then 3 else 0,
 		attachments = if cart then {
 			{ name = "HandleGrip", attach = "Frame", at = { 0, 3.57, .26 } },
 			{ name = "LeftGrip", attach = "Frame", at = { -.42, 3.57, .26 } },

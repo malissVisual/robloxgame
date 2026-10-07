@@ -70,6 +70,9 @@ export type Profile = {
 	tutorial: boolean, -- 3.7: the first-day tutorial is done (or skipped); older saves with a delivery count as done
 	explored: string, -- 3.7: the map cells uncovered (shared/Explore.luau encodes them)
 	kit: { [string]: boolean }, -- 5.0: personal gear owned (Config.Kit ids: backpacks, shoes, a jacket), yours for good
+	-- 6.4: the bag you chose to hold (a Config.Kit bag you own: USE in the KIT tab or the I window's BAGS); nil = the
+	-- best one owned (shared/Transport.luau activeBag decides, a choice no longer owned falls back to it too)
+	activeBag: string?,
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
 	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
 	deliveries: number,
@@ -130,6 +133,7 @@ local function newProfile(): Profile
 		tutorial = false,
 		explored = "",
 		kit = { bag = true }, -- 6.0.2: the plastic bag from the start (the vest is bought)
+		activeBag = nil, -- 6.4: the best bag owned
 		phone = false,
 		vanQuest = nil,
 		deliveries = 0,
@@ -357,6 +361,13 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	if saved.vestKit ~= true and saved.money ~= nil then -- (a real old save: not a lock-only record of a new player)
 		profile.kit[Config.Courier.VestKit] = true
+	end
+	-- 6.4: the bag chosen: kept only while it is a bag you own (else nil: the best one)
+	local chosen = if type(saved.activeBag) == "string" then saved.activeBag else nil
+	for _, def in Config.Kit do
+		if chosen ~= nil and def.id == chosen and def.extra ~= nil and profile.kit[def.id] == true then
+			profile.activeBag = def.id
+		end
 	end
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -697,6 +708,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		tutorial = profile.tutorial,
 		explored = profile.explored,
 		kit = profile.kit, -- 5.0
+		activeBag = profile.activeBag, -- 6.4
 		phone = profile.phone, -- 5.0
 		vanQuest = profile.vanQuest, -- 5.0
 		deliveries = profile.deliveries,

@@ -105,6 +105,8 @@ local function sendState(player: Player)
 		licences = profile.licences, -- 4.7: the licences held (tier → true)
 		licenceJobs = profile.licenceJobs, -- 4.7: good jobs counted toward each licence
 		kit = profile.kit, -- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau)
+		-- 6.4: the bag in your hand (the server's answer: the choice, else the best owned; nil without a bag)
+		bag = (require(Shared.Transport).activeBag(profile.kit, profile.activeBag) or ({} :: any)).id,
 		phone = profile.phone, -- 5.0: Marge gave the phone (client/Phone.luau shows it)
 		vanQuest = profile.vanQuest, -- 5.0: Earl's van (nil, "open", "done"; the phone's SHOP, the career road)
 	})

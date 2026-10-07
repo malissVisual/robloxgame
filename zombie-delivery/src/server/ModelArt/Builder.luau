@@ -27,6 +27,10 @@ local FINISH: { [string]: { color: Triple, material: Enum.Material } } = {
 	wall = { color = { 80, 88, 86 }, material = Enum.Material.Concrete },
 	concrete = { color = { 112, 117, 112 }, material = Enum.Material.Concrete },
 	floor = { color = { 59, 65, 66 }, material = Enum.Material.Concrete },
+	-- 6.4, the bags (KitArt "tote", "padded", "duffel"): beige canvas, grey nylon, dark-green duffel cloth
+	canvas = { color = { 201, 186, 150 }, material = Enum.Material.Fabric },
+	nylon = { color = { 104, 110, 112 }, material = Enum.Material.Fabric },
+	olive = { color = { 54, 74, 50 }, material = Enum.Material.Fabric },
 }
 local function pose(at: Triple, turn: Triple?): CFrame
 	local r = turn or { 0, 0, 0 }

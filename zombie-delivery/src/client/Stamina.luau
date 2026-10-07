@@ -38,13 +38,14 @@ function Stamina.canSprint(state: State): boolean
 end
 
 -- One step of `dt` seconds: `wantSprint` is Shift held where a sprint is allowed (not aiming, not carrying), `moving`
--- whether the character really goes somewhere. Returns the next state (the given one is left as it was).
-function Stamina.step(state: State, dt: number, wantSprint: boolean, moving: boolean, tuning: Tuning): State
+-- whether the character really goes somewhere. Returns the next state (the given one is left as it was). 6.4: `cost`
+-- multiplies the drain (a heavy bag in your hand, the duffel: the BreathCost attribute; nil = 1).
+function Stamina.step(state: State, dt: number, wantSprint: boolean, moving: boolean, tuning: Tuning, cost: number?): State
 	dt = math.max(0, dt)
 	local breath, exhausted, rest = state.breath, state.exhausted, state.rest
 	local sprinting = wantSprint and Stamina.canSprint(state)
 	if sprinting and moving then
-		breath -= dt / math.max(0.01, tuning.Stamina)
+		breath -= dt * math.clamp(cost or 1, 1, 3) / math.max(0.01, tuning.Stamina)
 		rest = 0
 		if breath <= 0 then
 			-- Out of breath: the sprint stops right here.
@@ -101,8 +102,11 @@ local function tuningNow(): Tuning
 end
 
 -- CameraRig, every frame on foot: steps the breath and answers whether the character sprints now.
+-- 6.4: the character's BreathCost (server/Transport.luau: the duffel in your hand) makes the sprint cost more breath.
 function Stamina.update(dt: number, wantSprint: boolean, moving: boolean): boolean
-	current = Stamina.step(current, dt, wantSprint, moving, tuningNow())
+	local character = game:GetService("Players").LocalPlayer.Character
+	local cost = if character then character:GetAttribute("BreathCost") else nil
+	current = Stamina.step(current, dt, wantSprint, moving, tuningNow(), if type(cost) == "number" then cost else nil)
 	return current.sprinting
 end
 
