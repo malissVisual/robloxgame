@@ -45,8 +45,8 @@
 -- carLevels): Ram Plow a bull bar on the front (wider and heavier with the level), Armor side plates (window grilles
 -- from level 3; not on a style that has its own, Style.armored), Engine a hood scoop and twin exhaust pipes from
 -- level 3. Cosmetic: welded, massless, no collisions, not hit by rays, their own colours (never painted). It is built
--- with the car and rebuilt when the levels change (Vehicles.refreshStats). Quick Hands (the loading track) shortens
--- the BackPrompt's hold (Vehicles.loadHold; server/Cargo.luau uses it for the cargo prompts of the job's car).
+-- with the car and rebuilt when the levels change (Vehicles.refreshStats). (Quick Hands, the loading track, went in
+-- 4.0.1; 5.7 took out its last holds: every back's and cargo prompt's hold is Config.Cargo.HoldDuration.)
 --
 -- 3.4: cargo capacity. A car takes Config.Cars capacity pieces (= its STYLES cargo slots). The car's damage stays with it:
 -- its share of health is kept per car in profile.carHealth (remember: every hit, every repair, when it is parked); a
@@ -1068,7 +1068,7 @@ local STYLES: { [string]: Style } = {
 	-- z -1.95 and 1.45), so a low hull: the chassis top 1.5 over the ground (clearance 0.3 + 1.2); one low hidden box
 	-- under the stem and the deck (its top 2.1, under a standing rider's hips). The rider stands on the deck (its top
 	-- 0.59): the seat's top at 2.45, about a hip's height over it (client/BikeRider.luau straightens the legs). The rear
-	-- rack's one light slot (the art's Slot1 at 1.39), loaded from behind.
+	-- rack's light slots (the art's Slot1 at 1.39; 5.7: a second piece stacked on the first), loaded from behind.
 	scooter = {
 		width = 2.0,
 		length = 5.0,
@@ -1083,7 +1083,7 @@ local STYLES: { [string]: Style } = {
 		boxes = {
 			box(Vector3.new(0.6, 0.6, 3.6), Vector3.new(0, 0.3, -0.2), "dark"), -- the deck, the neck and the stem's foot
 		},
-		cargo = cargo("rack", 5.0, 2.0, { Vector3.new(0, -0.11, 1.45) }, nil, Vector3.new(0, 0.1, 2.3)),
+		cargo = cargo("rack", 5.0, 2.0, { Vector3.new(0, -0.11, 1.45), Vector3.new(0, 0.95, 1.45) }, nil, Vector3.new(0, 0.1, 2.3)),
 	},
 }
 
@@ -3499,7 +3499,8 @@ end
 -- 3.4: how many pieces the car takes at once (3.5: at its stage). 4.6: with the cargo's look, the Roof Rack's slot
 -- for a light piece too (its installed gear, Economy.capacity).
 function Vehicles.capacity(car: Car, look: string?): number
-	return Economy.capacity(car.id, { stage = car.stage }, car.gear, look)
+	local room = Economy.capacity(car.id, { stage = car.stage }, car.gear, look)
+	return if car.rental then math.min(room, Config.Rental.Room) else room -- 5.7: a rental's rack takes one
 end
 
 -- 4.6, gear: is this piece (a Config.Gear id) installed on this live car? (A company vehicle has none.)
@@ -3794,6 +3795,9 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local plain = def.company == true or rental == true
 	local levels = Economy.carLevels(if rental then nil else profile.carUpgrades, def.id)
 	local stats = Economy.carStats(def.id, levels)
+	if rental then
+		stats.maxSpeed = math.min(stats.maxSpeed, Config.Rental.MaxSpeed) -- 5.7: a free rental is the slow way round
+	end
 	-- 3.4: your own car comes as damaged as it was parked (profile.carHealth); a lent company vehicle comes fresh.
 	-- 5.6: so does a rental (lent: its damage is never kept).
 	local lent = rental == true or (carId ~= nil and def.company == true and carId ~= profile.car)
@@ -3852,7 +3856,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	watchPrompts(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then
-		backPrompt.HoldDuration = Economy.loadHold(Config.Cargo.HoldDuration, levels) -- 3.3: Quick Hands
+		backPrompt.HoldDuration = Config.Cargo.HoldDuration
 		backPrompt.Triggered:Connect(function(by: Player)
 			toggleBack(car, by)
 		end)
@@ -4037,13 +4041,6 @@ function Vehicles.placeAt(player: Player, carId: string?, spot: CFrame, seat: bo
 	return Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + look), seat == true)
 end
 
--- 3.3, Quick Hands: how long the holds of this car's back and its cargo prompts take (its loading level).
-function Vehicles.loadHold(car: Car): number
-	local profile = PlayerData.get(car.owner)
-	local levels = if profile then Economy.carLevels(profile.carUpgrades, car.id) else {}
-	return Economy.loadHold(Config.Cargo.HoldDuration, levels)
-end
-
 -- 3.5: a new stage is a new body: the live car is built again where it stands (its damage kept: Vehicles.remove
 -- remembers it), the owner back behind the wheel when they sat there (the passengers step out). Not while a chauffeur
 -- drives it or it is on a repair lift (the shop waits for those). Returns whether it was rebuilt.
@@ -4084,7 +4081,7 @@ function Vehicles.refreshStats(player: Player)
 	writeAttributes(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then
-		backPrompt.HoldDuration = Vehicles.loadHold(car)
+		backPrompt.HoldDuration = Config.Cargo.HoldDuration
 	end
 	-- 4.6: the gear installed on it now (Wrench Garage's GEAR tab).
 	local def = Economy.findCar(car.id)

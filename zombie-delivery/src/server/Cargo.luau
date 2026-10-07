@@ -31,7 +31,6 @@
 -- Info.pair (3.2, the DUO missions' pair twist): a piece only moves with two: no other job member within
 -- Config.Missions.Duo.PairRange of you, no pick-up; the partner gone for PAIR_GRACE s while you carry, it goes down.
 -- Cargo.setBlocked takes a reason (the DUO switches twist blocks a pick-up as well as a drop).
--- 3.3, Quick Hands (the loading upgrade of the job's car): the holds of the prompts here are shorter (holdFor).
 -- 3.7, two in your hands: a light piece (Config.Cargo.LightLooks: a pizza stack, a parcel, a mail sack …) can be
 -- carried two at a time (Config.Cargo.HandsMax), stacked in front of the chest, a little slower (TwoPieceSpeed, the
 -- CarrySpeed attribute). Heavy pieces, horses and every piece of a lift or pair job stay one at a time (handsMax).
@@ -1012,11 +1011,9 @@ local function prompt(parent: Instance, action: string, object: string, key: Enu
 	return p
 end
 
--- 3.3, Quick Hands: the hold of the job's pick-up / load / take-out / hand-over prompts follows the loading level of
--- the job's car (Vehicles.loadHold; the plain Config hold without a car).
-local function holdFor(session: Session): number
-	local car = session.car
-	return if car then Vehicles.loadHold(car) else Tuning.HoldDuration
+-- The hold of the job's pick-up / load / take-out / hand-over prompts (5.7: Quick Hands' shorter holds are gone).
+local function holdFor(_session: Session): number
+	return Tuning.HoldDuration
 end
 
 -- A horse's body part (prompts go there), if the horse has one.

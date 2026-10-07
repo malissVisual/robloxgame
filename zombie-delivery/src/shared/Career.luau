@@ -10,6 +10,9 @@
 --   Career.summary(unlocks, max)  a short line: "Box Truck, ★★★ Dangerous jobs, Hunting Rifle …"
 --   Career.pending(level, given)  the levels 2 … level whose reward is not in `given` yet (profile.levelRewards)
 --   Career.reached(level)         the keys of levels 2 … level (a save from before 4.6: given, never paid)
+--   Career.gearLevel(gear)        5.7: the level a piece of gear shows at on the road (car gear: never before a car)
+--   Career.grantKit(reward, kit)  5.7: a reward's kit (Config.Kit) marked owned in `kit` (profile.kit); the money to pay
+--                                 instead when it was owned already (0 otherwise)
 --
 -- Unlock kinds: tier (a danger level on the job board), job (a special job), car, stage (a stage of a car: id
 -- "carId:stage", `car` its car id), gear (Config.Gear), gun, cargun, campaign (shared/Missions.luau), garage, estate
@@ -54,6 +57,21 @@ end
 
 local function add(list: { Unlock }, kind: string, id: string, name: string, car: string?)
 	table.insert(list, { kind = kind, id = id, name = name, car = car })
+end
+
+-- 5.7: the level a piece of gear shows at on the road: its own, but a car's gear (not bikeOnly: the Hand Trolley at 3)
+-- never before the first car (Config.VanQuest's car, level 4): nothing to put it in before that.
+function Career.gearLevel(gear: Config.GearDef): number
+	if gear.bikeOnly then
+		return gear.level
+	end
+	local first: Config.CarDef? = nil
+	for _, def in Config.Cars do
+		if def.id == Config.VanQuest.Car then
+			first = def
+		end
+	end
+	return math.max(gear.level, if first then first.level or 1 else 1)
 end
 
 -- What one level opens.
@@ -114,7 +132,7 @@ function Career.unlocksAt(level: number): { Unlock }
 		end
 	end
 	for _, gear in Config.Gear do
-		if gear.level == level then
+		if Career.gearLevel(gear) == level then
 			add(list, "gear", gear.id, gear.name)
 		end
 	end
@@ -187,6 +205,32 @@ function Career.money(amount: number): string
 	return "$" .. out
 end
 
+-- 5.7: a reward's piece of personal gear (Config.Kit), or nil.
+function Career.kitOf(reward: Config.LevelReward?): Config.KitDef?
+	local id = if reward then reward.kit else nil
+	if id then
+		for _, def in Config.Kit do
+			if def.id == id then
+				return def
+			end
+		end
+	end
+	return nil
+end
+
+-- 5.7: gives a reward's kit: marked owned in `kit` (profile.kit). Owned already: its price is paid instead (returned,
+-- the caller adds it); 0 otherwise.
+function Career.grantKit(reward: Config.LevelReward?, kit: { [string]: boolean }): number
+	local def = Career.kitOf(reward)
+	if not def then
+		return 0
+	elseif kit[def.id] then
+		return def.price
+	end
+	kit[def.id] = true
+	return 0
+end
+
 -- A reward in words, money first.
 function Career.rewardParts(reward: Config.LevelReward?): { string }
 	local parts: { string } = {}
@@ -203,6 +247,10 @@ function Career.rewardParts(reward: Config.LevelReward?): { string }
 				table.insert(parts, `{count} {def.name}{if count == 1 then "" else "s"}`)
 			end
 		end
+	end
+	local kit = Career.kitOf(reward)
+	if kit then
+		table.insert(parts, `the {kit.name}`) -- 5.7
 	end
 	if reward.paint then
 		local paint = Economy.findPaint(reward.paint)

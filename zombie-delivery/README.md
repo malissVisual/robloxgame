@@ -25,8 +25,8 @@ a trunk lid, a ramp) and the loading goes through it; and the rest of the **HUD*
 right side (see **Driver levels and the progression**, **Missions**, **The DUO campaign**, **Loading through the back**).
 Version 3.3 brings **five more vans** to buy between the Old Van and the endgame (the Courier Van, the High-Roof Van,
 the Box Truck, the Armored Van and the Rally Van) and **upgrades you can see**: the car upgrades now belong to one
-car and show on it (a bull bar, armor plates and window grilles, a hood scoop and twin pipes), and a new one, **Quick
-Hands**, makes the loading quicker (see **The vans and the upgrades you can see**).
+car and show on it (a bull bar, armor plates and window grilles, a hood scoop and twin pipes) (see **The vans and the
+upgrades you can see**).
 Version 3.4 makes the cars **real and earned**: every car has a **cargo capacity** (the Old Van holds 4 pieces, the
 High-Roof Van and the Box Truck 6) and a new **Cargo Rack** upgrade adds a slot per level on a roof rack you can see;
 a job or a mission with more pieces than your car holds waits until your car is big enough. You keep your first van
@@ -143,11 +143,15 @@ of letting you play a profile that would not be saved.
 | Switch gun | hold T: the weapon wheel (point at a gun, let go); tap T: the next gun (5.4.1: Q is the phone); or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
 | Items (repair, medkit, nitro, molotov, mine) | 1 – 5 (or click a tag) | the tags |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
-| The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | JOBS in MENU / MAP / BAG in MENU or INVENTORY |
-| MENU (JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP) | click MENU (gamepad: Y, then the stick and A) | tap MENU |
+| The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | BOARD on the phone / MAP / BAG on the phone |
+| The phone (5.0; 5.7: the HUD's MENU button says PHONE once you have it): ORDERS, BOARD, CAREER, SHOP, MAP, GARAGE, MESSAGES and the MENU's apps (MISSIONS, CREW, TOP, ESTATE, BAG, SETTINGS) | Q, or click PHONE (gamepad: Y) | tap PHONE |
+| The career (your level, the road, the licences) | C | CAREER on the phone |
 | Close a window, the big map or MENU | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
-| Call your car (or reset it while you sit in it) | CAR in MENU | CAR in MENU |
-| Give up the delivery | GIVE UP in MENU, twice (or on the Dispatch board) | the same |
+| Call your car or bring your bike (or reset it while you sit in it) | Q → GARAGE: CALL CAR / MY BIKE | PHONE → GARAGE |
+| Give up the delivery | Q → ORDERS → GIVE UP, twice (or on the Dispatch board) | the same |
+| Rent / return a ZDC RIDE scooter (5.6) | hold E at a dock | the prompt |
+| Ride a city bus (5.5) | E at its door (Board); E in your seat rings the bell (STOP) | the prompts |
+| Climb a zip line's ladder, zip, let go (5.6) | E (Climb, Zip); Space lets go low over a roof | the prompts, the jump button |
 | Music and sound (on / music off / all off) | N | SOUND in MENU |
 | Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS in MENU |
 | Crew panel (invite / accept / leave / kick, the crew board) | K | CREW |
@@ -163,6 +167,22 @@ of letting you play a profile that would not be saved.
 | Run your company (at your office's computer: hire, upgrades, collect the safe) | E | the prompt |
 | Ride a tower elevator (step on a pad under a floor sign) | walk onto it | walk onto it |
 | Admin panel (testing tools; only for admins: a Studio Play test, the place's owner, `Config.Admin.UserIds`) | P | the ADMIN button |
+
+**How fast everything goes** (5.7; studs per second, at the top: `Config.Movement`, `Config.Rental`, `Config.Cars`
+maxSpeed, `Config.Bus`, `Config.ZipLines`):
+
+| On foot and two wheels | Top | | Cars | Top |
+|---|---|---|---|---|
+| Walk (Running Shoes ×1.1) | 14 (15.4) | | Old Van: Rusty / Patched / Work / Long Cargo | 42 / 48 / 54 / 56 |
+| Sprint (about 6 s of breath) | 28 | | Freight Truck | 45 |
+| ZDC RIDE rental scooter (free) | 26 | | High-Roof Van | 62 |
+| Rusty Bike | 30 | | Box Truck | 64 |
+| Cargo Bike | 32 | | Courier Van | 70 |
+| E-Scooter (bought) | 36 | | Pickup | 72 |
+| Courier Bike | 38 | | Armored Van | 74 |
+| City bus (free, on its timetable) | 40 | | Muscle Car | 95 |
+| E-Bike | 48 | | Rally Van | 98 |
+| Zip line | 55 | | (the Engine upgrade: +8 % a level) | |
 
 While you carry something (or lead a horse) you cannot shoot, sprint or drive, and you walk slower. A car with its
 back open does not drive (3.2).
@@ -281,31 +301,33 @@ the levels open the gear one step after another, the campaigns open one after an
 real estate and your company come at the very end. Everything locked shows **🔒 LEVEL N** (or **FINISH <CAMPAIGN>**)
 until then:
 
-| Level | Opens |
-|---|---|
-| 1 | the Old Van, the Pistol, ★ jobs, Pizza Rush, First Shift, the Old Van's **Patched Van** stage ($250, 4.0) |
-| 2 | **the Courier Van** ($3,500), the Old Van's **Work Van** stage ($700, 4.0), ★★ jobs, School Run, Ice Cream Route, Code Red, **the Rented Lockup** ($2,500, 3.4) |
-| 3 | **the High-Roof Van** ($7,000), the Express Courier stage ($1,200), the SMG ($4,000), Moving Day, Ambulance Run |
-| 4 | **the Pickup** ($12,000), the Old Van's **Long Cargo Van** stage ($2,200, 4.0), the Shotgun ($7,500), ★★★ jobs, Fuel Run, Empty Shelves, the DUO campaign, **the Southside Garage** ($12,000, 3.4) |
-| 5 | the Tall Hauler stage ($3,000), the Roof Machine Gun ($9,000), Horse Transport, Cash Transport, the Harbor Lockup garage |
-| 6 | **the Box Truck** ($22,000), the Ranch Pickup stage ($2,500), the Hunting Rifle ($15,000), Smoke and Sirens, the Highway Garage, the Elm Bungalow |
-| 7 | ★★★★ INSANE jobs, Army Supply, Winter Run, Downtown Parking, Birch Cottage |
-| 8 | **the Muscle Car** ($40,000), the Liftgate Truck stage ($7,500), Farm Run (the Monster Truck), Iron Supply, 7 Oak Lane |
-| 9 | **the Freight Truck** ($45,000, 4.0), the Street Machine stage ($6,000), Lights Out, 12 Maple Street |
-| 10 | **the Armored Van** ($55,000), the Freight Hauler stage ($15,000), the Minigun ($40,000), the Roof Minigun ($45,000), Wild West End, the Sunset Villa |
-| 11 | the Fortress Van stage ($14,000), the Lakeside Villa |
-| 12 | **the Rally Van** ($80,000), the Grenade Launcher ($60,000), the Roof Grenade Launcher ($55,000), Patient Zero, the Harbor Point Office (+ Iron Supply finished) |
-| 13 | the Works Rally stage ($10,000), Dirty Money, the Pinecrest Mansion |
-| 14 | Last Convoy, the Ocean View Mansion, the Dispatch Tower office (+ Dirty Money finished) |
-| 15 | the Hilltop Mansion, the Dispatch Tower Penthouse (+ Last Convoy finished) |
+| Level | Rank | XP | Opens | Reward |
+|---|---|---|---|---|
+| 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Courier Backpack (kit), Running Shoes (kit), Big Backpack (kit), Thermal Jacket (kit), Pistol | – |
+| 2 | Courier | 575 | **Rusty Bike at Spoke & Chain** ($300), **Courier Bike at Spoke & Chain** ($1,100), Front Basket (gear), Rented Lockup | $500, 2 Medkits |
+| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), SMG | $750, 2 Medkits, the Courier Backpack |
+| 4 | Road Rat | 2,093 | ★ Easy jobs, School Run (Sunny Hill School), Ice Cream Route (Frosty's Ice Cream), Moving Day (Big Move Movers), Fuel Run (Gas Station), Ambulance Run (City Clinic), Pizza Rush, **Old Van: Earl's Used Wheels (Marge's quest at level 4)** ($1,800), **E-Scooter at Spoke & Chain** ($2,800), the Patched Van stage, Hand Trolley (gear), Ratchet Straps (gear), Bike Trailer (gear), Shotgun, First Shift (campaign), Southside Garage | $1,000, 2 Medkits, the Running Shoes |
+| 5 | Road Warrior | 3,087 | ★★ Risky jobs, Horse Transport (Silver Spur Ranch), Cash Transport, **Courier Van** ($3,500), **High-Roof Van** ($7,000), **E-Bike at Spoke & Chain** ($6,500), the Work Van stage, Cooler Box (gear), Roof Machine Gun, Code Red (campaign), Harbor Lockup | $1,500, 2 Repair Kits, Hi-Vis Orange paint |
+| 6 | Veteran Driver | 4,279 | ★★★ Deadly jobs (licence: 5 jobs rated ★★+ at ★★), Freight Run, **Pickup** ($12,000), the Long Cargo Van stage, the Express Courier stage, Hunting Rifle, Empty Shelves (campaign), Partners in Crime (campaign), Highway Garage, Elm Bungalow | $2,000, 4 Molotovs |
+| 7 | Veteran Driver | 5,710 | Army Supply (Military Base), **Box Truck** ($22,000), the Tall Hauler stage, the Ranch Pickup stage, Roof Rack (gear), Smoke and Sirens (campaign), Downtown Parking, Birch Cottage | $2,500, 2 Landmines |
+| 8 | Wasteland Trucker | 7,427 | 7 Oak Lane | $3,500, 3 Nitros |
+| 9 | Wasteland Trucker | 9,487 | ★★★★ INSANE jobs (licence: 10 jobs rated ★★+ at ★★★), Farm Run (Old Farm), Winter Run, **Muscle Car** ($40,000), the Liftgate Truck stage, Iron Supply (campaign), 12 Maple Street | $4,500, 3 Repair Kits |
+| 10 | Convoy Captain | 11,959 | **Freight Truck** ($45,000), the Street Machine stage, Minigun, Roof Minigun, Lights Out (campaign), Sunset Villa | $6,000, the title “Iron Courier” |
+| 11 | Convoy Captain | 14,926 | **Armored Van** ($55,000), the Freight Hauler stage, Wild West End (campaign), Lakeside Villa | $7,000, 3 Medkits |
+| 12 | Dead End Legend | 18,486 | the Fortress Van stage, Grenade Launcher, Roof Grenade Launcher, Patient Zero (campaign), Harbor Point Office | $8,500, 3 Nitros, 4 Molotovs |
+| 13 | Dead End Legend | 22,758 | **Rally Van** ($80,000), Dirty Money (campaign), Pinecrest Mansion | $10,000, 3 Landmines |
+| 14 | Dead End Legend | 27,885 | the Works Rally stage, Last Convoy (campaign), Ocean View Mansion, Dispatch Tower, 8th floor | $12,000, 3 Repair Kits, 3 Medkits |
+| 15 | King of the Road | 34,037 | Hilltop Mansion, Dispatch Tower Penthouse | $15,000, Legend Chrome paint, the title “Legend of the Last Road” |
 
-* **Cars**: the Old Van at 1 (free), the Courier Van at 2, the High-Roof Van at 3, the Pickup at 4, the Box Truck at 6,
-  the Muscle Car at 8, the Freight Truck at 9 (4.0), the Armored Van at 10 and the Rally Van at 12 (3.3; level and
-  price rise together). The company vehicles come with their employer's job level. The Wrench Garage upgrades cost
-  twice their 3.1 price. 3.5: the **stages** open by level too; 4.0: the Patched Van at 1, the Work Van at 2, the Long
-  Cargo Van at 4 (see **Stages and the cars' roles**).
-* **Guns**: Pistol 1, SMG 3, Shotgun 4, Hunting Rifle 6, Minigun 10, Grenade Launcher 12. **Car guns**: Roof Machine
-  Gun 5, Roof Minigun 10, Roof Grenade Launcher 12.
+(5.7: the table is `Career.road()` as the CAREER window shows it: every unlock from Config, the reward from
+`Config.Levels.Rewards`. A car's gear, the Hand Trolley, shows with the first car at level 4.)
+
+* **Cars** (5.0): you start on foot; bikes from level 2 at Spoke & Chain, Earl's Old Van at 4, then the dealer's cars
+  (level and price rise together). The company vehicles come with their employer's job level; the **stages** open by
+  level too (see **Stages and the cars' roles**).
+* **Rewards** (5.7): levels 2 – 4 give what a courier on foot or on a bike uses (medkits, the Courier Backpack, the
+  Running Shoes; a kit you own already pays its price instead); the car's items (repair kits, nitro, mines) start at
+  level 5, once you drive.
 * **Real estate** (the endgame): garages 2 – 7 (3.4: the two small ones early), houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
   the offices 12, 14 and 15, each also needing a campaign's finale (Iron Supply, Dirty Money, Last Convoy; the ESTATE
   list says "Finish Iron Supply first"). Hiring a courier costs $40,000.
@@ -526,8 +548,8 @@ end, hood and first window; rebuilt when you upgrade):
   **lower stance** (the body sits 0.25 lower: the car is built again).
 * **Hand Trolley** (4.0, one level, $600, only the vans and trucks: `CarDef.trolley`): folded **inside the back doors**
   (seen when they open) on the Attachment `TrolleyMount`; take it out to carry up to 4 pieces at once (server/Cargo.luau).
-* **Quick Hands** is gone (4.0.1): opening the back, picking up, loading, taking out and handing over are instant on E
-  (`Config.Cargo.HoldDuration` 0), so there is nothing left to shorten. A save's Quick Hands levels are refunded once.
+* Opening the back, picking up, loading, taking out and handing over are instant on E (`Config.Cargo.HoldDuration` 0;
+  4.0.1 refunded the old loading upgrade's levels once, 5.7 took out its last code).
 
 * ~~Cargo Rack~~ (3.4, gone in 3.5): the car's **stages** give the room now, each with its own look (see **Stages
   and the cars' roles**). A 3.4 save's cars became the stage that holds the slots they had (see there).
@@ -1038,7 +1060,7 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
   refund): Roof Machine Gun (a slim barrel with an ammo box), Roof Minigun (a rotary barrel cluster), Roof Grenade
   Launcher (a fat tube). The Gun Damage and Fire Rate upgrades work for them too.
 * **Upgrades** (Wrench Garage): for the equipped car (3.3: each car its own) Engine, Tyres & Suspension (4.0), Armor,
-  Ram Plow (5 levels), Quick Hands (3 levels; 3.5: the Cargo Rack is gone), the Hand Trolley (4.0, vans and trucks) and
+  Ram Plow (5 levels), the Hand Trolley (4.0, vans and trucks; 4.6: gear) and
   the car's **STAGE** (3.5), the visible ones on the
   car; for all your guns Gun Damage, Fire Rate (5 levels); paint jobs; car guns. Repairs (3.4): the repair bays of
   Wrench Garage and Rust Bridge Repairs.
@@ -1128,7 +1150,7 @@ electronics to apartments.
 **The bag** (`shared/Bag.luau`, `client/BagUi.luau`, the I window's BAG tab and the phone's 🎒 BAG): what you carry and
 where — hands, backpack, the bike's rack or box, the car — piece by piece, for whom and for which order. Small things go
 in the backpack (`Config.Cargo.PackLooks`: mail, newspapers, documents, medicine, pizza, food boxes, bread, small
-parcels); flowers, cakes, groceries and electronics ride in your hands or on a rack (one piece on the scooter).
+parcels); flowers, cakes, groceries and electronics ride in your hands or on a rack (two on the E-Scooter, one on a ZDC RIDE rental).
 
 **Newspaper rounds** (`Config.Jobs.Round`, on foot or by bike, mornings): pick up a bundle of 8–12 papers at The Daily
 Undead and deliver one to every door on one or two streets — walk up or toss it onto the porch (the server checks the
@@ -1169,7 +1191,7 @@ a buzzer, a number) and suburb houses facing the street (a path, a mailbox, a nu
 At level 2 Marge texts you: **Spoke & Chain Cycles** on Main St (Downtown block -1, 1) sells bikes — the Rusty Bike
 ($300, L2), the Courier Bike ($1 100, L2), the Cargo Bike with a front box ($2 400, L3, 4 slots) and the E-Bike
 ($6 500, L5) (`Config.Cars` with `bike = true`, Codex's `BikeArt`); 5.1.1 adds the **E-Scooter** ($2 800, L4: quick, you
-stand on the deck, 1 slot on its rear rack, the basket fits; `ScooterArt`, `shared/RiderPose.luau`). CAR (or the phone's MY BIKE) puts your bike by the
+stand on the deck, 1 slot on its rear rack (5.7: 2, and 36 at the top instead of 44), the basket fits; `ScooterArt`, `shared/RiderPose.luau`). CAR (or the phone's MY BIKE) puts your bike by the
 kerb and seats you; it leans into turns, the cranks and wheels turn, the rider pedals (`client/BikeRider.luau`). Bike
 gear at the shop (`bikeOnly` in `Config.Gear`): a basket (+2), panniers (+3), a trailer (+4, not on the cargo bike),
 installed in the bike's gear slots. **Bike jobs** (`Config.Jobs.Bike`, the board's BIKE section): light cargo, 300–1 000
@@ -1287,7 +1309,7 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               car's damage), Vehicles (cars,
               seats, cargo slots, the roof turret of a car gun, the instant spawns and the home garage spot; 3.2: the
               back that opens, its hinges, BackOpen and the BackPrompt; 3.3: the five new vans' bodies, the
-              UpgradeKit of the car's upgrades, Quick Hands' hold; 3.4: every car's damage kept, the car on a repair
+              UpgradeKit of the car's upgrades; 3.4: every car's damage kept, the car on a repair
               lift; 3.5: the stages' LOOKS, styleFor, the rebuild on a new stage; 4.0: the stretch, the Rusty Van's
               faults, the Freight Truck, the tyres and the folded trolley in the kit, TrolleyMount / JackMount /
               Exhaust; 3.10: getting in (the seat reserved,
@@ -1342,7 +1364,7 @@ tests/        run_tests.py runs every *_test.luau: logic (Economy, Map, the zomb
               challenges (the list, the must-have goals, the titles, the hidden ones, the helpers on a fake profile),
               gear (piercing rounds, the paint finishes, every exclusive item a reward) and the lost packages in logic
               (one per place, near it, in bounds, dry, off the roads); 3.2: cargo also checks the back's extra
-              steps stay quick holds; 3.3: logic checks the car tracks per car, Quick Hands and the old saves'
+              steps stay quick holds; 3.3: logic checks the car tracks per car and the old saves'
               migration, levels the five new vans (levels and prices together), cargun that every dealer car takes
               a car gun, and run_tests.py reads Vehicles.luau's STYLES: every car has a body, every dealer car cargo
               slots and a back; 3.4: capacity (the capacities, what every job and every one of the 110 missions
