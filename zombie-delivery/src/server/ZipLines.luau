@@ -215,6 +215,10 @@ local function climb(player: Player, line: ZipData.Line, which: number, up: bool
 		tell(player, "Set the trolley down first.")
 		return
 	end
+	if Cargo.carrying(character) ~= nil then
+		tell(player, "Hands full: pack it first.") -- 5.7: a real climb takes both hands
+		return
+	end
 	local at = root.Position
 	local route = InteractPose.climbRoute(line, which, up, at.X, at.Y, at.Z, CLIMB_LIFT)
 	local x, y, z, fx, fz = InteractPose.climbEnd(line, which, up, CLIMB_LIFT)

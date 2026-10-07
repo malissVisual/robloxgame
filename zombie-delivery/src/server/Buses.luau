@@ -353,7 +353,7 @@ local function board(player: Player, bus: Bus)
 	if not character or not humanoid or not root or humanoid.Health <= 0 then
 		return
 	end
-	if bus.at <= 0 or bus.leaveIn < 0.3 then
+	if bus.at <= 0 or bus.leaveIn < Config.Interact.BusBoard + 0.2 then -- 5.7: the walk-in ends before it leaves
 		tell(player, "Wait until the bus stops.")
 		return
 	end
@@ -472,7 +472,7 @@ local function stepBus(bus: Bus, now: number)
 			arrived(bus)
 		end
 	end
-	local open = at > 0 and leaveIn > 0.5 and freeSeat(bus) ~= nil
+	local open = at > 0 and leaveIn > Config.Interact.BusBoard + 0.2 and freeSeat(bus) ~= nil
 	if bus.prompt.Enabled ~= open then
 		bus.prompt.Enabled = open
 	end
