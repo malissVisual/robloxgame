@@ -5,7 +5,7 @@
 -- bike). Presentation only: the server checks everything again (server/Shops.luau: "Buy" "car", "Equip" "bike",
 -- "Gear").
 --
--- BIKES: on top YOUR BIKE (the bike of choice, what it holds with its gear and your backpack: shared/Transport.luau,
+-- BIKES: on top YOUR BIKE (the bike of choice, what it holds with its gear and your bag: shared/Transport.luau,
 -- and whether you ride it or your car is the one you drive), then every bike as a slim contract row: its picture
 -- (shared/Icons.luau Icons.bike, the emoji until uploaded), its name, level, price, speed, room and gear slots, what
 -- it is, and the one action that fits: BUY (at the counter, from its level, with the money), EQUIP (an owned bike that
@@ -76,7 +76,7 @@ function BikeShop.mine(state: any): string?
 	return nil
 end
 
--- What your bike holds with its gear and your backpack (Transport mode "bike").
+-- What your bike holds with its gear and your bag (Transport mode "bike").
 function BikeShop.room(state: any, bikeId: string): number
 	local kit = if type(state.kit) == "table" then state.kit else {}
 	return Transport.bike(Transport.bikeRoom(bikeId, if type(state.carGear) == "table" then state.carGear else nil), kit).room
@@ -120,8 +120,8 @@ local function head(body: Instance, state: any)
 	P.text(box, line, UDim2.new(1, 0, 0, 30), { Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 2, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd })
 	local about = if def and not riding and type(state.car) == "string"
 		then "Your car is the one you drive now: MY BIKE on your phone gets you on the bike (CALL CAR brings the car back)."
-		elseif def then "Its room is its own + its bike gear (the GEAR tab) + your backpack: the hands hold nothing while you ride. Light pieces only. It needs no garage and comes to you at once (MY BIKE)."
-		else "A bike is faster than walking and carries more: its room, a basket or panniers, and your backpack. It opens the BIKE runs on the board. No garage needed."
+		elseif def then "Its own bag (its rack, basket or box + its bike gear, the GEAR tab) + your bag: pickups go onto it while it stands close, and getting on loads your hands onto it. Light pieces only. It needs no garage and comes to you at once (MY BIKE)."
+		else "A bike is faster than walking and carries more: its own bag (a rack, a basket or panniers) and your bag. It opens the BIKE runs on the board. No garage needed."
 	Ui.label(box, about, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
 	P.rule(box, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
 end

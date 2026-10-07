@@ -22,7 +22,7 @@ local function key(code) M.services.UserInputService.InputBegan:Fire({KeyCode=co
 local boards=0
 Phone.onBoard=function() boards+=1;Phone.close() end
 Phone.start()
-Phone.setState({phone=true,money=1240,kit={backpack=true},cars={}})
+Phone.setState({phone=true,money=1240,kit={bag=true},cars={}})
 Phone.open()
 check("phone opens without warning",Phone.isOpen() and #M.warnings==0)
 -- 6.5: home is six big tiles in this order; MORE's sub-screen holds the other eight apps (5.5's MENU among them).
@@ -269,9 +269,11 @@ for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage
 end
 -- 6.5: SHOP lists the shops and what they sell; a tap sets the GPS, puts the phone away and says so.
 Phone.open("shop")
-check("SHOP lists the five shops first",named("Shops")~=nil and named("Shops").LayoutOrder<named("Columns").LayoutOrder
-	and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_bikes")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil)
-check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Bags, vests, medkits, items")~=nil and text("Lead & Co.")~=nil and text("Spoke & Chain")~=nil and text("Dead End Motors")~=nil and text("Wrench Garage")~=nil)
+check("SHOP lists the six shops first",named("Shops")~=nil and named("Shops").LayoutOrder<named("Columns").LayoutOrder
+	and named("Shop_bags")~=nil and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_bikes")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil)
+check("6.6: ZDC Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("ZDC Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
+	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.lower(object.Text),"backpack",1,true)~=nil end)[1]==nil)
+check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Vests, shoes, medkits, items")~=nil and text("Lead & Co.")~=nil and text("Spoke & Chain")~=nil and text("Dead End Motors")~=nil and text("Wrench Garage")~=nil)
 do
 	local waypoint
 	local setWaypoint=M.MapView.setWaypoint

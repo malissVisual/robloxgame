@@ -41,7 +41,7 @@ check("only the vests have armour, each within (0, MaxArmour]", others and Confi
 -- The best vest ---------------------------------------------------------------------------------------------------
 
 check("no vest: none, 0%", Armour.best({}) == nil and Armour.share({}) == 0 and Armour.percent({}) == 0)
-check("other kit is no vest", Armour.best({ backpack = true, shoes = true, jacket = true }) == nil)
+check("other kit is no vest", Armour.best({ bag = true, shoes = true, jacket = true }) == nil)
 check("kevlar: 30%", (Armour.best({ kevlar = true }) :: any).id == "kevlar" and near(Armour.share({ kevlar = true }), 0.3) and Armour.percent({ kevlar = true }) == 30)
 check("heavy: 50%", near(Armour.share({ heavy = true }), 0.5) and Armour.percent({ heavy = true }) == 50)
 check("both: the best counts (50%, not 80%)", (Armour.best({ kevlar = true, heavy = true }) :: any).id == "heavy" and Armour.percent({ kevlar = true, heavy = true }) == 50)

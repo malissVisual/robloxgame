@@ -312,8 +312,8 @@ check("roundTip: only with no miss", JobRules.roundTip(0) == Round.NoMissTip and
 check("tossMiss: sure up close, a chance from afar", JobRules.tossMiss(Round.SureToss) == 0 and JobRules.tossMiss(Round.TossRange) == Round.MissAtRange and JobRules.tossMiss((Round.SureToss + Round.TossRange) / 2) > 0)
 check("a round never stacks", not JobRules.stackable({ mode = "foot", tier = 1, special = false, mission = false, tutorial = false, duo = false, carried = true, round = true }))
 
--- Every business's look is light or not on purpose: the food a backpack carries, the big ones in the hands.
-check("the newspaper is light and fits the backpack", Config.Cargo.LightLooks.newspaper == true and Config.Cargo.PackLooks.newspaper == true)
+-- Every business's look is light or not on purpose: the food a bag carries, the big ones in the hands.
+check("the newspaper is light and fits a bag (6.6: no backpack)", Config.Cargo.LightLooks.newspaper == true and (Config.Cargo :: any).PackLooks == nil)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

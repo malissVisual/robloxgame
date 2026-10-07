@@ -17,7 +17,7 @@
 --            line "ZDC RIDE · nearest dock N studs" (shared/RentalDocks.luau) with 📍 GPS (MapView.setWaypoint).
 --   KEYS     the settings' list of every key.
 -- 6.5, the phone's six home tiles (client/Phone.luau):
---   BAG & ITEMS  the I window's tabs in the phone: 🎒 BAG (during a run: BagUi.render), ITEMS (your consumables, how
+--   BAG & ITEMS  the I window's tabs in the phone: 🛍 BAG (during a run: BagUi.render), ITEMS (your consumables, how
 --            many, their key in the bottom bar and USE: the same path as the bar, Hotbar.onUse) and BAGS (BagUi.bags:
 --            the bags you own, USE). PhoneApps.bagTab keeps the tab (nil: BAG during a run, else ITEMS).
 --   SHOPS    SHOP's list of the shops (Map.Shops) and what each sells; a tap sets the GPS there (host.gps), puts the
@@ -287,8 +287,8 @@ end
 
 -- ── BAG ────────────────────────────────────────────────────────────────────
 
--- 6.5: BAG & ITEMS, the I window's tabs (🎒 BAG during a run, ITEMS, BAGS) in a row of square tab buttons.
-local BAG_TABS: { { string } } = { { "bag", "🎒 BAG" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
+-- 6.5: BAG & ITEMS, the I window's tabs (🛍 BAG during a run, ITEMS, BAGS) in a row of square tab buttons.
+local BAG_TABS: { { string } } = { { "bag", "🛍 BAG" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
 
 local function bagTabs(list: Instance, current: string, running: boolean, host: Host)
 	local row = Ui.make("Frame", { Name = "Tabs", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 1 }, list)
@@ -367,7 +367,7 @@ function PhoneApps.bag(list: Instance, look: OrdersUi.Kit, host: Host, wide: boo
 	bagTabs(list, tab, running, host)
 	if tab == "bag" then
 		local n = BagUi.render(list, job, 2)
-		look.meta(list, `Pieces ride where they fit: your hands, the backpack, the bike's rack, the car.{if Ui.touchLayout() then "" else " The I key opens the bag too."}`, n + 1)
+		look.meta(list, `Pieces ride where they fit: your hands, your bag, your bike's bag, the car.{if Ui.touchLayout() then "" else " The I key opens the bag too."}`, n + 1) -- (6.6)
 	elseif tab == "bags" then
 		BagUi.bags(list, host.state(), 2)
 	else
@@ -377,9 +377,11 @@ end
 
 -- ── 6.5: SHOP's list of the shops ─────────────────────────────────────────
 
--- The shops (Map.Shops ids) in the order a new courier needs them, with what they sell.
+-- The shops (Map.Shops ids) in the order a new courier needs them, with what they sell. 6.6: ZDC Bags first (the
+-- depot's bag kiosk, by the spawn); Last Stop Supplies keeps the vests and the items.
 local SHOPS: { { id: string, icon: string, sells: string } } = {
-	{ id = "supplies", icon = "🛒", sells = "Bags, vests, medkits, items" },
+	{ id = "bags", icon = "🛍️", sells = "Bags (sprint with your deliveries)" },
+	{ id = "supplies", icon = "🛒", sells = "Vests, shoes, medkits, items" },
 	{ id = "guns", icon = "🔫", sells = "Guns, from a pistol up" },
 	{ id = "bikes", icon = "🚲", sells = "Bikes, scooters, bike gear" },
 	{ id = "dealer", icon = "🚗", sells = "Cars and vans" },

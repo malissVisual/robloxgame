@@ -13,8 +13,9 @@
 --     then a shade while the server's cooldown runs (Config.ItemTuning.UseCooldown, one for every item). A sixth kind
 --     you own has no slot: key 9 uses it (and the I window does).
 --   * 6.3, over the bar, what you carry as one compact CARRYING pill (shared/Bag.luau Bag.places / Bag.strip are still
---     the data): "CARRYING 🍕✋ 💐🛍 2/4", a small cargo icon a piece (Icons.cargo, client/BagUi.luau's emoji) with a
---     badge for where it is (✋ hands, 🛍 the plastic bag, 🎒 the backpack, 🚲 the rack), greyed when it belongs to
+--     the data): "CARRYING 🍕✋ 💐🛍 · 2/4", a small cargo icon a piece (Icons.cargo, client/BagUi.luau's emoji) with a
+--     badge for where it is (Bag.Marks: ✋ hands, 🛍 the bag, 🚲 6.6: the bike's own bag, 📰 a round's satchel; no
+--     backpack any more), greyed when it belongs to
 --     another order than the one in focus, "+N" over 8 pieces (5 on a touch screen), then the pieces and the room. No
 --     slot frames and no tile a free place: the owner read the 6.0.1 tiles as new inventory slots ("a new inventory
 --     slot is created when you pick something up"). From the job payload's `carried` and the PackCount / PackRoom /
@@ -65,7 +66,7 @@ local ITEMS_W = Hotbar.SLOTS * SLOT + (Hotbar.SLOTS - 1) * SLOT_GAP
 local HANDS_W = #Holding.Order * SLOT + (#Holding.Order - 1) * SLOT_GAP -- 6.1
 local ROW_W = HANDS_W + DIVIDER + ITEMS_W -- the hands and the items (6.3: the pill over them)
 local HAND_ICON: { [string]: string } = { fists = "✊", bag = "🛍", gun = "🔫" }
-local BADGE: { [string]: string } = { hands = "✋", bag = "🛍", pack = "🎒", rack = "🚲" }
+local BADGE: { [string]: string } = Bag.Marks -- (6.6: ✋ hands, 🛍 the bag, 🚲 the bike's bag, 📰 the satchel)
 local FLASH = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local LIT = 0.6 -- seconds the used slot keeps its red outline
 
@@ -461,18 +462,21 @@ end
 
 -- ── What you carry ─────────────────────────────────────────────────────────
 
--- Your room by place: the job's (the payload, the live PackRoom attribute), off duty your kit's on foot.
+-- Your room by place: the job's (the payload, the live PackRoom attribute), off duty your kit's on foot. 6.6: the
+-- hands + the bag (one carrying item) + on a run with a bike its own bag.
 local function placesNow(): { Bag.Place }
 	local kit = if state and type(state.kit) == "table" then state.kit else {}
-	-- (6.1: the bag's room only while it is in your hand; 6.3: on a job the server's, the BagRoom attribute)
-	local _, _, room = bagNow()
-	local bagRoom = if Holster.hand() == "bag" then room else 0
+	-- (6.1: the bag's room only while it is in your hand, a bag on your back its pieces; 6.3: on a job the server's,
+	-- the BagRoom attribute)
+	local _, count, room = bagNow()
+	local active = Transport.activeBag(kit, bagId())
+	local bagRoom = if Holster.hand() == "bag" then room elseif active and active.stays then math.min(count, room) else 0
 	if job then
 		local mode = if type(job.mode) == "string" then job.mode else "car"
 		local packRoom = tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0
 		return Bag.places(mode, packRoom, tonumber(job.rack) or 0, bagRoom)
 	end
-	return Bag.places("foot", Holding.packRoom(Transport.packRoom(kit, bagId()), Transport.bagRoom(kit, bagId()), bagRoom > 0), 0, bagRoom)
+	return Bag.places("foot", bagRoom, 0, bagRoom)
 end
 
 -- The pieces: the payload's `carried`; the live PackCount attribute adds the pack's pieces the payload has not yet.
@@ -517,7 +521,7 @@ local function pillPiece(piece: any, where: string, other: boolean, order: numbe
 		ImageColor3 = if other then P.ink2 else P.ink,
 		ImageTransparency = if other then 0.6 else 0,
 	})
-	Ui.label(holder, BADGE[where] or "🎒", UDim2.fromOffset(11, 11), {
+	Ui.label(holder, BADGE[where] or "📦", UDim2.fromOffset(11, 11), {
 		Position = UDim2.new(1, 0, 1, -3),
 		AnchorPoint = Vector2.new(1, 1),
 		TextSize = 9,
@@ -575,7 +579,7 @@ local function drawStrip()
 			LayoutOrder = #shown + 1,
 		})
 	end
-	pillCount.Text = count
+	pillCount.Text = `· {count}` -- (6.6: "CARRYING 🍕🍕 · 3/4")
 	pillCount.TextColor3 = if pieces > 0 then P.ink else P.ink2
 	pill.Visible = visible
 end

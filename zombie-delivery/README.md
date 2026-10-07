@@ -147,7 +147,7 @@ of letting you play a profile that would not be saved.
 | Switch gun | hold T: the weapon wheel (point at a gun, let go); tap T: the next gun (5.4.1: Q is the phone); or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
 | Items (repair, medkit, nitro, molotov, mine) | 4 – 8 (6.1; 9 a sixth kind; or click a slot) | the slots |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
-| The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | BOARD on the phone / MAP / BAG on the phone |
+| The Dispatch board (the jobs) / map / bag & items | J / M / I (3.9; B before) | BOARD on the phone / MAP / BAG on the phone |
 | The phone (5.0; 5.7: the HUD's MENU button says PHONE once you have it; 6.5: six tiles JOBS, MAP, SHOP, BAG & ITEMS, GARAGE, MORE, and in MORE: CAREER, MISSIONS, CREW, TOP, ESTATE, BANK, MESSAGES, SETTINGS) | Q, or click PHONE (gamepad: Y) | tap PHONE |
 | The career (your level, the road, the licences) | C | CAREER on the phone |
 | Close a window, the big map or MENU | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
@@ -308,9 +308,9 @@ until then:
 
 | Level | Rank | XP | Opens | Reward |
 |---|---|---|---|---|
-| 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Courier Backpack (kit), Running Shoes (kit), Big Backpack (kit), Thermal Jacket (kit), Pistol | – |
+| 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Plastic Bag (kit, ZDC Bags), Running Shoes (kit), Thermal Jacket (kit), Pistol | – |
 | 2 | Courier | 575 | **Rusty Bike at Spoke & Chain** ($300), **Courier Bike at Spoke & Chain** ($1,100), Front Basket (gear), Canvas Tote (kit), Rented Lockup | $500, 2 Medkits |
-| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), Thermal Delivery Bag (kit), SMG | $750, 2 Medkits, the Courier Backpack |
+| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), Thermal Delivery Bag (kit), SMG | $750, 2 Medkits, the Canvas Tote (6.6) |
 | 4 | Road Rat | 2,093 | ★ Easy jobs, School Run (Sunny Hill School), Ice Cream Route (Frosty's Ice Cream), Moving Day (Big Move Movers), Fuel Run (Gas Station), Ambulance Run (City Clinic), Pizza Rush, **Old Van: Earl's Used Wheels (Marge's quest at level 4)** ($1,800), **E-Scooter at Spoke & Chain** ($2,800), the Patched Van stage, Hand Trolley (gear), Ratchet Straps (gear), Bike Trailer (gear), Padded Messenger Bag (kit), Shotgun, First Shift (campaign), Southside Garage | $1,000, 2 Medkits, the Running Shoes |
 | 5 | Road Warrior | 3,087 | ★★ Risky jobs, Horse Transport (Silver Spur Ranch), Cash Transport, **Courier Van** ($3,500), **High-Roof Van** ($7,000), **E-Bike at Spoke & Chain** ($6,500), the Work Van stage, Cooler Box (gear), Roof Machine Gun, Code Red (campaign), Harbor Lockup | $1,500, 2 Repair Kits, Hi-Vis Orange paint |
 | 6 | Veteran Driver | 4,279 | ★★★ Deadly jobs (licence: 5 jobs rated ★★+ at ★★), Freight Run, **Pickup** ($12,000), the Long Cargo Van stage, the Express Courier stage, Big Delivery Duffel (kit), Hunting Rifle, Empty Shelves (campaign), Partners in Crime (campaign), Highway Garage, Elm Bungalow | $2,000, 4 Molotovs |
@@ -330,8 +330,8 @@ until then:
 * **Cars** (5.0): you start on foot; bikes from level 2 at Spoke & Chain, Earl's Old Van at 4, then the dealer's cars
   (level and price rise together). The company vehicles come with their employer's job level; the **stages** open by
   level too (see **Stages and the cars' roles**).
-* **Rewards** (5.7): levels 2 – 4 give what a courier on foot or on a bike uses (medkits, the Courier Backpack, the
-  Running Shoes; a kit you own already pays its price instead); the car's items (repair kits, nitro, mines) start at
+* **Rewards** (5.7): levels 2 – 4 give what a courier on foot or on a bike uses (medkits, the Canvas Tote (6.6: no
+  backpacks), the Running Shoes; a kit you own already pays its price instead); the car's items (repair kits, nitro, mines) start at
   level 5, once you drive.
 * **Real estate** (the endgame): garages 2 – 7 (3.4: the two small ones early), houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
   the offices 12, 14 and 15, each also needing a campaign's finale (Iron Supply, Dirty Money, Last Convoy; the ESTATE
@@ -1120,6 +1120,47 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## One bag, the bike's own bag, the ZDC Bags kiosk (6.6)
+
+The owner: "The backpacks, the bag and the bike work weirdly. When I don't know how to put something on the bike, I take
+it into the bag." and "You can't have a bag and a backpack at the same time; they're in the same category. I need a shop
+for them." **One carrying item, one simple story.**
+
+- **No backpacks.** The Courier Backpack and the Big Backpack are gone from `Config.Kit` (and KitFit's / KitWear's
+  `pack` and `load` slots, `Transport.backpackRoom`, 5.3's `Config.Cargo.PackLooks` / `Bag.fits` / `Bag.room` /
+  `Bag.makeRoom`, the shops, the phone, the I window). **Your room on foot = your hands (2) + your bag** (the active one:
+  `Transport.handsRoom`). Every light piece fits the bag (a bouquet, a cake, groceries too); a heavy one goes only in
+  the hands.
+- **Money back, once.** A real save (`saved.money ~= nil`) without the `noPacks` flag gets the price of every backpack it
+  owned (`Config.RetiredKit`: $150 / $400, `Transport.packRefund`, `server/PlayerData.luau` applySaved); Marge texts
+  once after PLAY: "Backpacks are gone: bags do it all now. You got $X back." (`Config.Courier.PackRefund`,
+  `server/Tutorial.luau`, the kiosk on your GPS). Level 3's career reward is the Canvas Tote now.
+- **The bike has its own bag** (its rack, basket or box with its bike gear: `Cargo.Info.rack`, `Transport.bikeBagOf`;
+  a bike run, or a foot run while your bike is your vehicle; the numbers are the bike's capacity + gear as before).
+  A pickup goes **onto the bike** while it is within `Config.Cargo.BikeReach` (12) studs of you or you sit on it
+  (`Holding.bikeNear`), else **into the bag in your hand**, else **your hands** (`Holding.place`). **Getting on your
+  bike loads your hands onto it** when it has room (the bike's door no longer says "Load it first (E at the back)":
+  `Vehicles.bikeStows`, `Cargo.canStowHands`, `Cargo.update`). At a drop **E** takes the piece from wherever it is: your
+  hands, your bag, the bike within reach; a bike too far away: "Your bike has it: bring it closer." Throws take the
+  near bike's pieces too. The bike's pieces stay on it when you die, and a fall on foot does not knock them.
+- **The HUD tells one story:** the CARRYING pill reads `CARRYING 🍕🍕 · 3/4` with a small mark on each piece (✋ hands,
+  🛍 bag, 🚲 the bike's bag, 📰 a round's satchel: `Bag.Marks`); the bag slot shows n/room; the I window (now "Bag &
+  items", its run tab 📦 CARRYING), BagUi, the phone's ORDERS chip (`CARRYING n / room`), the board and the shop never
+  say backpack.
+- **ZDC Bags** (`Map.Shops.bags`, `Config.BagShop`: a kiosk at (26, 30) in the depot's safe yard, east of the spawn pad,
+  its counter facing it; clear of the scooter rack, the job board, the garage terminal and Marge; `server/BagKiosk.luau`,
+  built from World's buildDepot with its helpers): a counter with the shop prompt, the five bags on its back wall, a
+  striped awning, a lamp and the name board; its own 16-stud radius (`Map.shopRadius`), the plastic bag's picture on
+  the map. It sells **the five bags** (KitShop's "bags" list, USE there too); **Last Stop Supplies keeps the vests,
+  the shoes, the jacket and the items**. Marge's bag texts, the tutorial's last page and the phone's SHOP list ("ZDC Bags
+  · bags (sprint with your deliveries)", first, GPS) send you there.
+
+Tests: `tests/bag_test.luau`, `holding_test.luau` (the bike's reach, where a pickup goes, room = hands + bag),
+`bags_test.luau` (the refund, the kiosk's place), `kitfit_test`, `bagfill_test`, `transport_test`, `career_test`,
+`icons_test`, `locationtag_test`, the phone's check. **Test in Studio:** an old save with a backpack (the money and
+Marge's text once), a bike run (pickups onto the bike next to you, into the bag away from it; get on with a piece in
+your hands; E at a door with the bike far, then near), the kiosk (E at its counter, BUY a bag, USE).
+
 ## The bag shows, and what is in it (6.4.1)
 
 The owner: "the bag isn't visible when I have it; and it would be good if it were more visible, and that there is
@@ -1639,7 +1680,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               3.2: loading through the back, the pair lift; 4.0: pieces on a trolley, pallets on a jack, the tools' hints), Equipment (4.0: the
               hand trolley and the pallet jacks: take, push, stow, set down, go home), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
-              purchases; 3.5: the three display cars, the stages), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
+              purchases; 3.5: the three display cars, the stages; 6.6: ZDC Bags' bags), BagKiosk (6.6: the depot's bag
+              kiosk, built from World's buildDepot), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
               the crew state), Ranking (the leaderboard rows), Estate (buying, selling, the home, car slots, the home
               respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your

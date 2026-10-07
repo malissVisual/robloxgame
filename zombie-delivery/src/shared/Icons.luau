@@ -154,8 +154,6 @@ Icons.Ids = {
 	sign_office_tower = "rbxassetid://123929738866726",
 	sign_office_penthouse = "rbxassetid://84138164235299",
 	-- 5.0, the personal kit (art/icons/kit_*, 256 x 256; Config.Kit ids, the cart is not sold yet): the KIT tab.
-	kit_backpack = "",
-	kit_bigpack = "",
 	kit_shoes = "",
 	kit_jacket = "",
 	kit_cart = "",
@@ -280,7 +278,7 @@ local CARGO_ALIASES: { [string]: string } = {
 	gadget = "crate",
 }
 
--- 5.0: a piece of personal kit (Config.Kit id: backpack, bigpack, shoes, jacket).
+-- 5.0: a piece of personal kit (Config.Kit id: shoes, jacket, the vests, 6.4: the bags).
 function Icons.kit(kitId: string?): string?
 	return named("kit_", kitId)
 end
@@ -356,6 +354,7 @@ local LANDMARK_BORROWED: { [string]: string } = {
 	volt = "cargo_crate",
 	secondlife = "cargo_ammo",
 	bloom = "cargo_sack", -- the plants
+	bags = "kit_bag", -- 6.6: ZDC Bags, the depot's bag kiosk: the plastic bag's picture (its emoji 🛍️ meanwhile)
 }
 
 function Icons.landmark(landmarkId: string?): string?

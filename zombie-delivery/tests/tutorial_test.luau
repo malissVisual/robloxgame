@@ -70,7 +70,7 @@ check("done names the reward", string.find(done.pages[1], "$75", 1, true) ~= nil
 check("done is one page", #done.pages == 1)
 check("the welcome is one page", #(TutorialSteps.dialog("welcome", nil) :: any).pages == 1)
 check("a failed run is one page", #(TutorialSteps.dialog("retry", nil) :: any).pages == 1)
-check("done: +$ the reward, J for a job, the shops in the phone", done.pages[1] == "Delivered! +$75. Next: press J for a job. Shops are in your phone (Q → SHOP).", done.pages[1])
+check("done: +$ the reward, J for a job, the bags by the spawn (6.6), the shops in the phone", done.pages[1] == "Delivered! +$75. Next: press J for a job. Bigger bags: ZDC Bags, by the spawn. Shops are in your phone (Q → SHOP).", done.pages[1])
 local said = TutorialSteps.dialog("say", nil) :: any
 check("say falls back to her line", said.pages[1] == TutorialSteps.Bubble.done)
 local board = TutorialSteps.dialog("board", nil) :: any
@@ -121,10 +121,10 @@ for _, name in TutorialSteps.JobSteps do
 	local line = touch(TutorialSteps.hint(name, job({})))
 	check(`touch: {name} hint names no key`, string.find(line, "%([A-Z]%)") == nil and string.find(line, "%f[%w]G puts") == nil, line)
 end
-check("touch: done names the PHONE button", touch(done.pages[1]) == "Delivered! +$75. Next: PHONE → JOBS for a job. Shops are in your phone (PHONE → SHOP).", touch(done.pages[1]))
+check("touch: done names the PHONE button", touch(done.pages[1]) == "Delivered! +$75. Next: PHONE → JOBS for a job. Bigger bags: ZDC Bags, by the spawn. Shops are in your phone (PHONE → SHOP).", touch(done.pages[1]))
 check("touch: plain words stay", touch("Delivered! Nice work, driver.") == "Delivered! Nice work, driver.")
 
--- 5.0: the first job is on foot (no van), Marge gives the phone, and her last pages send you to a backpack and a bike.
+-- 5.0: the first job is on foot (no van), Marge gives the phone, and her last pages send you to the shops and a bike.
 local footJob = function(fields: { [string]: any }): { [string]: any }
 	local out = job(fields)
 	out.mode = "foot"

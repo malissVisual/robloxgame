@@ -108,13 +108,13 @@ local function unlockText(unlock: Career.Unlock): string
 		local gear = Economy.findGear(unlock.id)
 		return `{if gear then gear.icon else "🧰"} {unlock.name} ({if gear and gear.bikeOnly then "bike gear" else "gear"})`
 	elseif unlock.kind == "kit" then
-		-- 5.0: personal gear, at Last Stop Supplies
+		-- 5.0: personal gear, at Last Stop Supplies (6.6: a bag at ZDC Bags, the depot's kiosk)
 		for _, kit in Config.Kit do
 			if kit.id == unlock.id then
-				return `{kit.icon} {unlock.name} ({Career.money(kit.price)} at Last Stop Supplies)`
+				return `{kit.icon} {unlock.name} ({Career.money(kit.price)} at {if kit.extra then Config.BagShop.Name else "Last Stop Supplies"})`
 			end
 		end
-		return `🎒 {unlock.name}`
+		return `🛍 {unlock.name}`
 	elseif unlock.kind == "stage" then
 		local car = Economy.findCar(unlock.car or "")
 		return `{icon} {unlock.name}{if car then ` ({car.name} stage)` else ""}`

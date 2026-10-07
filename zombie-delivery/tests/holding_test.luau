@@ -1,6 +1,6 @@
 -- 6.1, what you hold (shared/Holding.luau): fists / bag / gun, the keys, who may take what, the d-pad's cycle, a new
--- body, B's holster, a bag leaving the hand (set down loaded, stowed empty), the room that is yours, where a piece goes
--- and what X says. Run with tests/run_tests.py.
+-- body, B's holster, a bag leaving the hand (set down loaded, stowed empty), where a piece goes (6.6: the bike's own bag
+-- within reach, the bag in your hand, the hands; no backpack), the room on foot (6.6: hands + bag) and what X says. Run with tests/run_tests.py.
 local Holding = require("./Holding")
 local Config = require("./Config")
 
@@ -31,7 +31,7 @@ ok, why = Holding.can("gun", true, false, false)
 check("the gun only with a gun", not ok and why == "nogun" and (Holding.can("gun", false, true, false)), why)
 check("an unknown hand never", not Holding.can("phone", true, true, false))
 check("every refusal says why", string.find(Holding.whyText("bagdown"), "pick it up", 1, true) ~= nil and string.find(Holding.whyText("nogun"), "Lead & Co.", 1, true) ~= nil
-	and string.find(Holding.whyText("nobag"), "Last Stop", 1, true) ~= nil and #Holding.whyText(nil) > 0)
+	and string.find(Holding.whyText("nobag"), "ZDC Bags", 1, true) ~= nil and #Holding.whyText(nil) > 0)
 
 -- The d-pad's cycle ------------------------------------------------------------------------------------------------
 
@@ -53,17 +53,48 @@ check("… else fists", Holding.afterHolster("fists", true, false) == "fists" an
 
 check("a loaded bag is set down", Holding.bagLeaves(1) == "down" and Holding.bagLeaves(2) == "down")
 check("an empty one is stowed", Holding.bagLeaves(0) == "stow")
-check("the bag's room is yours while you hold it", Holding.packRoom(3, 2, true) == 3 and Holding.packRoom(3, 2, false) == 1)
-check("only the bag: none without it", Holding.packRoom(2, 2, false) == 0 and Holding.packRoom(2, 2, true) == 2)
-check("never below zero, a bag bigger than the room counts as the room", Holding.packRoom(1, 2, false) == 0 and Holding.packRoom(0, 2, true) == 0)
-check("a piece goes into the bag in your hand while it has room and the piece fits", Holding.place(true, 0, 2, true) == "bag" and Holding.place(true, 1, 2, true) == "bag")
-check("… else the backpack", Holding.place(true, 2, 2, true) == "pack" and Holding.place(false, 0, 2, true) == "pack" and Holding.place(true, 0, 2, false) == "pack")
--- 6.3: server/Cargo.luau asks with the bag's fit (Bag.fitsBag: every light look), not the backpack's (Bag.fits).
+-- 6.6, the bike's own bag within reach (Config.Cargo.BikeReach studs, or you sit on it) --------------------------------
+
+local reach = Config.Cargo.BikeReach
+check("6.6: the reach is about 12 studs", reach == 12, reach)
+check("6.6: on the bike: always within reach", Holding.bikeNear(true, nil, reach) and Holding.bikeNear(true, 500, reach))
+check("6.6: standing by it: within reach", Holding.bikeNear(false, 0, reach) and Holding.bikeNear(false, 6, reach) and Holding.bikeNear(false, reach, reach))
+check("6.6: farther: not", not Holding.bikeNear(false, reach + 0.5, reach) and not Holding.bikeNear(false, 80, reach))
+check("6.6: no bike out (no distance), not; a broken distance, not", not Holding.bikeNear(false, nil, reach) and not Holding.bikeNear(false, 0 / 0, reach))
+
+-- 6.6, where a pickup goes: the bike within reach, else the bag in your hand, else the hands -------------------------
+
 local Bag = require("./Bag")
-check("6.3: a bouquet goes into the bag in your hand (never into the backpack)", Holding.place(true, 0, 2, Bag.fitsBag("bouquet")) == "bag" and not Bag.fits("bouquet"))
-check("6.3: … a cake and groceries too, while the bag has room", Holding.place(true, 0, 2, Bag.fitsBag("cake")) == "bag" and Holding.place(true, 1, 2, Bag.fitsBag("groceries")) == "bag")
-check("6.3: a full bag or the bag not in your hand: not the bag", Holding.place(true, 2, 2, Bag.fitsBag("cake")) == "pack" and Holding.place(false, 0, 2, Bag.fitsBag("cake")) == "pack")
-check("6.3: a heavy piece never goes into the bag", Holding.place(true, 0, 2, Bag.fitsBag("crate")) == "pack" and Holding.place(true, 0, 2, Bag.fitsBag("barrel")) == "pack")
+check("6.6: the bike near with room: onto the bike (even with the bag in your hand)", Holding.place(true, true, 1, true, 4) == "bike" and Holding.place(true, true, 3, false, 0) == "bike")
+check("6.6: the bike near but full: into the bag in your hand", Holding.place(true, true, 0, true, 2) == "bag")
+check("6.6: the bike too far: into the bag in your hand", Holding.place(true, false, 3, true, 1) == "bag")
+check("6.6: … else the hands", Holding.place(true, false, 3, false, 4) == "hands" and Holding.place(true, false, 0, true, 0) == "hands" and Holding.place(true, true, 0, false, 2) == "hands")
+check("6.6: a bouquet, a cake, groceries: like a pizza (every light look fits)", Holding.place(Bag.fitsBag("bouquet"), false, 0, true, 2) == "bag" and Holding.place(Bag.fitsBag("cake"), true, 1, true, 2) == "bike"
+	and Holding.place(Bag.fitsBag("groceries"), false, 0, true, 1) == "bag" and Holding.place(Bag.fitsBag("pizza"), false, 0, true, 1) == "bag")
+check("6.6: a heavy piece only the hands", Holding.place(Bag.fitsBag("crate"), true, 4, true, 4) == "hands" and Holding.place(Bag.fitsBag("barrel"), true, 4, true, 4) == "hands")
+check("6.6: no backpack: never \"pack\"", (function()
+	for _, light in { true, false } do
+		for _, near in { true, false } do
+			for _, held in { true, false } do
+				for free = 0, 2 do
+					local where = Holding.place(light, near, free, held, free)
+					if where ~= "bike" and where ~= "bag" and where ~= "hands" then
+						return false
+					end
+				end
+			end
+		end
+	end
+	return true
+end)())
+
+-- 6.6, your room on foot: the hands + the bag (one carrying item) ------------------------------------------------
+
+local Transport = require("./Transport")
+check("6.6: no bag: the hands", Transport.handsRoom({}, nil) == Config.Cargo.HandsMax)
+check("6.6: room = hands + bag", Transport.handsRoom({ bag = true }, nil) == Config.Cargo.HandsMax + 2 and Transport.handsRoom({ bag = true, duffel = true }, "duffel") == Config.Cargo.HandsMax + 6)
+check("6.6: the room over the hands is the bag's", Transport.packRoom({ tote = true }, nil) == 3 and Transport.packRoom({}, nil) == 0)
+check("6.6: an old backpack in a kit adds nothing", Transport.handsRoom({ backpack = true, bigpack = true } :: any, nil) == Config.Cargo.HandsMax)
 
 -- What X says -------------------------------------------------------------------------------------------------------
 

@@ -371,9 +371,9 @@ local function bikeCheck(player: Player)
 		end
 	end
 	if opened and remote then
-		local shop = Map.Shops.supplies
+		local shop = Map.Shops.bags -- 6.6: the bags are sold at ZDC Bags, the depot's kiosk
 		local words = string.gsub(string.gsub(string.gsub(Config.Courier.BagUnlock, "{name}", opened.name), "{room}", tostring(opened.extra)), "{price}", `${opened.price}`)
-		remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "supplies" } })
+		remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "bags" } })
 		notice:FireClient(player, `📱 Marge: {words}`)
 	end
 end
@@ -401,7 +401,8 @@ local function gunCheck(player: Player)
 end
 
 -- 6.0.1: Marge about the plastic bag (Kit "bag"): once a player with the phone and the first day behind them has its
--- price and no bag, she texts them about Last Stop Supplies with the shop on the GPS. Once a session; before the pistol.
+-- price and no bag, she texts them about Last Stop Supplies with the shop on the GPS (6.0.2: about the vest; 6.6: the
+-- text names ZDC Bags for the bags). Once a session; before the pistol.
 local bagTold: { [Player]: boolean } = {}
 
 local function bagCheck(player: Player): boolean
@@ -442,6 +443,21 @@ function Tutorial.onPlay(player: Player)
 	local profile = PlayerData.get(player)
 	local level = if profile then Levels.levelFor(profile.xp) else 1
 	bikeLevels[player] = level
+	-- 6.6: a save that owned a backpack got its price back (server/PlayerData.luau, Config.RetiredKit): Marge says so,
+	-- once (profile.packRefund is never saved), the bag kiosk on the GPS
+	local refund = if profile then profile.packRefund else nil
+	if profile and refund and refund > 0 then
+		profile.packRefund = nil
+		task.delay(BIKE_DELAY, function()
+			if not player.Parent or not remote then
+				return
+			end
+			local shop = Map.Shops.bags
+			local words = string.gsub(Config.Courier.PackRefund, "{money}", `${refund}`)
+			remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = "bags" } else nil })
+			notice:FireClient(player, `📱 Marge: {words}`)
+		end)
+	end
 	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0: the bag's (6.0.1) or the pistol's price in your pocket, none owned: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
 		task.delay(BIKE_DELAY, function()

@@ -1,10 +1,10 @@
 --!strict
 -- 5.3, your bag (the inventory of a run): every piece you carry and where it is (shared/Bag.luau groups them): in your
--- hands, in your backpack, on your bike's rack / basket / box, in your vehicle. Each piece shows its picture
--- (shared/Icons.luau, an emoji without one), its name, its order and who it is for and where (the job payload's
--- `carried`, server/Jobs.luau), and over them the room you have: the hands, the backpack (or a round's satchel), the
--- rack. It is the BAG tab of the I window (client/Hud.luau draws it with BagUi.render); the phone's ORDERS app
--- (🎒 BAG) and the contract ticket's chip ("🎒 2 newspapers · 1 pizza stack", Bag.line) open it (BagUi.open: Hud sets
+-- hands, in your bag, in your bike's own bag (6.6: its rack / basket / box), a round's satchel, your vehicle. Each piece
+-- shows its picture (shared/Icons.luau, an emoji without one), its name, its order and who it is for and where (the job
+-- payload's `carried`, server/Jobs.luau), and over them the room you have: ✋ the hands, 🛍 the bag, 🚲 the bike's bag
+-- (6.6: no backpack). It is the BAG tab of the I window (client/Hud.luau draws it with BagUi.render); the phone's ORDERS
+-- app (🛍 BAG) and the contract ticket's chip ("📦 2 newspapers · 1 pizza stack", Bag.line) open it (BagUi.open: Hud sets
 -- BagUi.onOpen; 6.0.1: the bottom bar's carried strip too). Presentation only: the server decides what you carry.
 -- 5.8, the courier phone's look (the bag draws in the phone's BAG app too): the head is a slim row with the phone's
 -- tag line (the red square and caps) over the room in big type; the groups are the phone's section labels.
@@ -33,7 +33,7 @@ function BagUi.open()
 	end
 end
 
--- The chip's words for a job payload ("🎒 2 newspapers · 1 pizza stack"), nil when you carry nothing.
+-- The chip's words for a job payload ("📦 2 newspapers · 1 pizza stack"), nil when you carry nothing.
 function BagUi.line(job: any): string?
 	if type(job) ~= "table" or type(job.carried) ~= "table" then
 		return nil
@@ -105,7 +105,7 @@ function BagUi.bags(parent: Instance, state: any, order: number): number
 		button.TextSize = 14
 	end
 	if missing > 0 then
-		P.caps(parent, `{missing} more {if missing == 1 then "bag" else "bags"} at Last Stop Supplies (KIT)`, UDim2.new(1, -12, 0, 24), { LayoutOrder = n, TextColor3 = P.ink2, TextSize = 11, TextStrokeTransparency = 1 })
+		P.caps(parent, `{missing} more {if missing == 1 then "bag" else "bags"} at {Config.BagShop.Name}, by the spawn`, UDim2.new(1, -12, 0, 24), { LayoutOrder = n, TextColor3 = P.ink2, TextSize = 11, TextStrokeTransparency = 1 })
 		n += 1
 	end
 	return n
@@ -116,33 +116,27 @@ function BagUi.render(parent: Instance, job: any, order: number): number
 	local n = order
 	local carried = if type(job) == "table" and type(job.carried) == "table" then job.carried else {}
 	local mode = if type(job) == "table" and type(job.mode) == "string" then job.mode else "car"
-	-- The room: the hands, the backpack (or the satchel), the bike's rack.
+	-- The room: ✋ the hands, 🛍 the bag, 🚲 the bike's bag, 📰 a round's satchel (6.6: Bag.places, as the CARRYING pill).
 	local head = P.row(parent, 68, n)
 	n += 1
 	P.marker(head, 8, { Position = UDim2.fromOffset(16, 13) })
 	P.caps(head, "Your bag", UDim2.new(1, -46, 0, 18), { Position = UDim2.fromOffset(30, 8), TextColor3 = P.ink2, TextSize = 12, TextStrokeTransparency = 1 })
 	local packRoom = tonumber(type(job) == "table" and job.packRoom) or 0
 	local rack = tonumber(type(job) == "table" and job.rack) or 0
+	local bagRoom = tonumber(type(job) == "table" and job.bagRoom) or 0
 	local parts: { string } = {}
 	if mode == "foot" or mode == "bike" then
-		local inHands, inPack, onRack = 0, 0, 0
+		local count: { [string]: number } = { hands = 0, bag = 0, rack = 0, pack = 0 }
 		for _, piece in carried do
-			if type(piece) == "table" then
-				if piece.where == "hands" then
-					inHands += 1
-				elseif piece.where == "rack" then
-					onRack += 1
-				elseif piece.where == "pack" or piece.where == "bag" then -- (6.1: the bag in your hand)
-					inPack += 1
-				end
+			if type(piece) == "table" and type(piece.where) == "string" and count[piece.where] then
+				count[piece.where] += 1
 			end
 		end
-		table.insert(parts, `✋ Hands {inHands}/{Config.Cargo.HandsMax}`)
-		if packRoom - rack > 0 then
-			table.insert(parts, `🎒 Backpack {inPack}/{packRoom - rack}`)
-		end
-		if rack > 0 then
-			table.insert(parts, `🚲 Rack {onRack}/{rack}`)
+		local words: { [string]: string } = { hands = "Hands", bag = "Bag", rack = "Bike", pack = "Satchel" }
+		for _, place in Bag.places(mode, packRoom, rack, math.max(bagRoom, count.bag)) do
+			if place.where == "hands" or place.room > 0 or count[place.where] > 0 then
+				table.insert(parts, `{Bag.Marks[place.where]} {words[place.where]} {count[place.where]}/{math.max(place.room, count[place.where])}`)
+			end
 		end
 	else
 		table.insert(parts, "🚚 In your vehicle and your hands")
@@ -166,7 +160,7 @@ function BagUi.render(parent: Instance, job: any, order: number): number
 			Ui.label(row, capital(tostring(piece.name or "piece")), UDim2.new(1, -70, 0, 22), { Position = UDim2.fromOffset(58, 6), TextSize = 16, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 			local who = if type(piece.dest) == "string" then `for {piece.dest}` else "for the customer"
 			local place = if type(piece.place) == "string" and piece.place ~= piece.dest then ` · {piece.place}` else ""
-			local fits = if Bag.fits(look) then "" elseif Bag.fitsBag(look) then " · bag / hands / rack" else " · hands / rack only" -- (6.3)
+			local fits = if Bag.fitsBag(look) then "" else " · hands only" -- (6.3; 6.6: a light piece fits every bag)
 			Ui.label(row, `Order {tonumber(piece.order) or 1} · {who}{place}{fits}`, UDim2.new(1, -70, 0, 20), { Position = UDim2.fromOffset(58, 30), TextSize = 13, Font = Theme.Font, TextColor3 = P.ink2, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		end
 	end

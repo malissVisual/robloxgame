@@ -3,11 +3,13 @@
 -- your personal gear (Config.Kit; profile.kit in the state as `kit`, missing = none). It is yours for good, on foot
 -- and (5.1) on a bike: what you carry (shared/Transport.luau), how fast you walk, how warm the food stays.
 --
--- On top YOUR ROOM: "HANDS 2 / BACKPACK 3" with a pip for every light piece you can carry and the walk speed; then
+-- On top YOUR ROOM: "HANDS 2 / TOTE 5" with a pip for every light piece you can carry and the walk speed; then
 -- every piece as a slim contract row (like 4.6's client/GearShop.luau): its icon and name, its level and price,
 -- OWNED or not, what it does, and the one action that fits: BUY (at the counter, with the money), OWNED, a dim
--- "🔒 LEVEL n", or "MORE ROOM ALREADY" for a backpack smaller than the one you have. The server checks everything again
--- (server/Shops.luau, the "Kit" remote: at the counter, not owned yet, the level, the money). Presentation only:
+-- "🔒 LEVEL n", or "BETTER VEST ALREADY". The server checks everything again (server/Shops.luau, the "Kit" remote: at
+-- the counter, not owned yet, the level, the money).
+-- 6.6, one carrying item: no backpacks. KitShop.render draws one shop's share (`only`): "bags" for ZDC Bags, the
+-- depot's bag kiosk (the bags, Config.Kit pieces with `extra`), "kit" for Last Stop Supplies' KIT tab (the rest). Presentation only:
 -- KitShop.tab (the shop's open tab: "items" | "kit", nil = KIT while some piece is still to buy) is its only state.
 -- 5.8, the courier phone's look: YOUR ROOM is the phone's card (the red square and caps, the room in big type, a thin
 -- rule under it); BUY is the phone's red primary.
@@ -52,6 +54,7 @@ function KitShop.owned(state: any): Transport.Kit
 end
 
 -- The tab to show: the one picked, else KIT while a piece is still to buy (the new player's first stop), else ITEMS.
+-- (6.6: the bags are ZDC Bags', not this tab's)
 function KitShop.currentTab(state: any): string
 	local picked = KitShop.tab
 	if picked then
@@ -59,18 +62,18 @@ function KitShop.currentTab(state: any): string
 	end
 	local kit = KitShop.owned(state)
 	for _, def in Config.Kit do
-		if not kit[def.id] then
+		if not kit[def.id] and not Transport.isBag(def) then
 			return "kit"
 		end
 	end
 	return "items"
 end
 
--- A piece's short name for the room line ("Courier Backpack" → "BACKPACK"; 6.0: "Plastic Bag" → "BAG").
+-- A bag's short name for the room line (6.0: "Plastic Bag" → "BAG").
 -- 6.4: "Canvas Tote" → "TOTE", "Thermal Delivery Bag" → "THERMAL BAG", "Padded Messenger Bag" → "MESSENGER BAG",
 -- "Big Delivery Duffel" → "DUFFEL".
 local function shortName(def: Config.KitDef): string
-	local name = string.gsub(def.name, "^Courier ", "")
+	local name = def.name
 	if def.extra then
 		for _, cut in { "^Plastic ", "^Canvas ", "^Padded ", "^Big ", "Delivery " } do
 			name = string.gsub(name, cut, "")
@@ -79,29 +82,14 @@ local function shortName(def: Config.KitDef): string
 	return string.upper(name)
 end
 
--- What you carry, in words: "HANDS 2" or "HANDS 2 / BACKPACK 3" (the best backpack owned). Also for the job board and
--- the phone. 6.4: `bag` the active bag (the state's `bag`; nil = the best owned): only that one counts.
+-- What you carry, in words: "HANDS 2" or "HANDS 2 / TOTE 5" (the hands + the bag: 6.6, one carrying item). Also for
+-- the job board and the phone. 6.4: `bag` the active bag (the state's `bag`; nil = the best owned): only that one counts.
 function KitShop.roomText(kit: Transport.Kit, bag: string?): string
 	local hands = Config.Cargo.HandsMax
 	local room = Transport.handsRoom(kit, bag)
-	local best: Config.KitDef? = nil
-	for _, def in Config.Kit do
-		local r = def.room
-		if kit[def.id] and r and (best == nil or r > (best.room or 0)) then
-			best = def
-		end
-	end
-	-- 6.0: the bag (Config.Kit `extra`) adds up with the backpack: "HANDS 2 / BACKPACK + BAG 5" (6.4: the active one).
-	local names: { string } = {}
-	if best then
-		table.insert(names, shortName(best))
-	end
 	local active = Transport.activeBag(kit, bag)
-	if active then
-		table.insert(names, shortName(active))
-	end
-	if #names > 0 and room > hands then
-		return `HANDS {hands} / {table.concat(names, " + ")} {room}`
+	if active and room > hands then
+		return `HANDS {hands} / {shortName(active)} {room}`
 	end
 	return `HANDS {room}`
 end
@@ -109,9 +97,6 @@ end
 -- What a piece does, in a few words (the row's stat line).
 local function effect(def: Config.KitDef): string
 	local parts: { string } = {}
-	if def.room then
-		table.insert(parts, `📦 {def.room} light pieces`)
-	end
 	if def.armour then
 		table.insert(parts, `🛡 −{math.floor(def.armour * 100 + 0.5)}% damage`) -- 6.0: the vests
 	end
@@ -157,8 +142,10 @@ local function action(row: any, text: string, kind: P.ButtonKind, onClick: () ->
 end
 
 -- Draws the KIT tab into `body` (the shop's scrolling body, a vertical list; Hud clears it and puts the tabs at
--- LayoutOrder 0 first). `here`: at the counter (only there BUY works).
-function KitShop.render(body: Instance, state: any, here: boolean)
+-- LayoutOrder 0 first). `here`: at the counter (only there BUY works). 6.6: `only` "bags" draws ZDC Bags' list (the
+-- bags), else Last Stop Supplies' KIT (the rest of the kit).
+function KitShop.render(body: Instance, state: any, here: boolean, only: string?)
+	local bags = only == "bags"
 	local kit = KitShop.owned(state)
 	local level = myLevel(state)
 	local money = tonumber(state.money) or 0
@@ -169,7 +156,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	-- YOUR ROOM: a pip for every light piece you can carry, the walk speed.
 	local head = Ui.make("Frame", { Name = "KitRoom", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2 }, body)
 	Ui.list(head, true, 4)
-	tagLine(head, "Personal gear · yours for good, on foot and on a bike", 1)
+	tagLine(head, if bags then "ZDC Bags · one bag at a time, sprint with your deliveries" else "Personal gear · yours for good, on foot and on a bike", 1)
 	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
 	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, line)
 	P.text(line, KitShop.roomText(kit, bag), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
@@ -177,7 +164,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	for _, def in Config.Kit do
 		everything[def.id] = true
 	end
-	local most = Transport.handsRoom(everything) -- (6.0: the best backpack and every `extra`)
+	local most = Transport.handsRoom(everything) -- (6.0: the hands and the biggest bag)
 	for n = 1, most do
 		local pip = Ui.make("Frame", {
 			Size = UDim2.fromOffset(14, 14),
@@ -191,7 +178,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	local armour = Armour.percent(kit) -- 6.0: the best vest's share
 	P.caps(line, (if math.abs(speed - 1) > 0.001 then `  ·  SPEED ×{string.format("%.2g", speed)}` else "  ·  SPEED ×1")
 		.. (if armour > 0 then `  ·  ARMOUR {armour}%` else ""), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextStrokeTransparency = 1, LayoutOrder = most + 2 })
-	Ui.label(head, "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more with a backpack, and a bag lets you sprint with them (the hands' pieces stop the sprint). The best backpack, shoes and vest count; of your bags, the one IN USE. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
+	Ui.label(head, if bags then "Your room on foot is your hands + ONE bag: what you pick up drops straight in, and you sprint with it (the hands' pieces stop the sprint). On a bike, its own bag takes the pickups too. Of your bags, the one IN USE counts. Bought once, kept for good." else "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more in a bag (ZDC Bags, by the spawn). The best shoes and vest count. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 3,
 		TextColor3 = P.ink2,
@@ -201,9 +188,10 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	P.rule(head, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
 
 	for order, def in Config.Kit do
+		if Transport.isBag(def) ~= bags then
+			continue -- (6.6: the bags at ZDC Bags, the rest at Last Stop Supplies)
+		end
 		local owned = kit[def.id] == true
-		-- A backpack smaller than (or as big as) the room you have already adds nothing.
-		local outgrown = not owned and def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= Transport.backpackRoom(kit)
 		-- 6.0: a vest no better than the one you have adds nothing either (the best vest counts).
 		local outclassed = not owned and def.armour ~= nil and def.armour * 100 <= armour
 		local row = P.row(body, ROW_H, order + 2, owned)
@@ -241,8 +229,6 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 			action(row, "OWNED", "off", function() end)
 		elseif level < def.level then
 			action(row, `🔒 LEVEL {def.level}`, "off", function() end)
-		elseif outgrown then
-			action(row, "MORE ROOM ALREADY", "off", function() end)
 		elseif outclassed then
 			action(row, "BETTER VEST ALREADY", "off", function() end)
 		elseif not here then
