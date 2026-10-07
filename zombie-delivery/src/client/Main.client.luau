@@ -88,6 +88,7 @@ safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, t
 require(Client.ZipRide).notify = Hud.toast
 safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms, the bag flying behind
 safely("Throw", require(Client.Throw).start) -- 6.0: hold X at a home's door to throw the delivery (the dotted arc, TRICKSHOT)
+safely("Unstuck", require(Client.Unstuck).start) -- 6.0.1: lifts your courier out of the ground if it ever sinks in (and says why)
 require(Client.Throw).notify = Hud.toast
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
