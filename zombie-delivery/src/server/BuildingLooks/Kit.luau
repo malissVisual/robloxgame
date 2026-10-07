@@ -110,6 +110,7 @@ function Kit.build(parent: Instance, frame: CFrame, blueprint: Blueprint, contex
 		local pose = frame * CFrame.new(p[1], p[2], p[3]) * CFrame.Angles(math.rad(rotation[1]), math.rad(rotation[2]), math.rad(rotation[3]))
 		local material = (Enum.Material :: any)[detail.material or "Metal"] :: Enum.Material
 		local item = context.deco(context.part(model, detail.name, Vector3.new(s[1], s[2], s[3]), pose, Color3.fromRGB(c[1], c[2], c[3]), material))
+		item.Massless = true
 		item.CanTouch = false
 		item.CastShadow = detail.transparency == nil and detail.label == nil
 		item.Transparency = detail.transparency or 0

@@ -30,7 +30,7 @@ def main():
     parser.add_argument("--blueprints", type=Path, default=DATA, help="Validate staged blueprints before integrating World")
     args = parser.parse_args()
     assert all(abs(a-b)<1e-8 for a,b in zip(projected_size([4,.1,.1],[0,0,90]),[.1,4,.1]))
-    blueprints = [p for p in sorted(args.blueprints.glob("*.luau")) if p.name != "Kit.luau"]
+    blueprints = [p for p in sorted(args.blueprints.glob("*.luau")) if p.name != "Kit.luau" and not p.stem.startswith("Tower")]
     renderer = (DATA / "Kit.luau").read_text()
     assert "context.deco(context.part(" in renderer and "item.CanTouch = false" in renderer
     assert "Heartbeat" not in re.sub(r"--[^\n]*", "", renderer.split("function Kit.build", 1)[1])
@@ -82,6 +82,9 @@ end
         result = subprocess.run([str(Path(args.luau).resolve()), "run.luau"], cwd=tmp, text=True, capture_output=True, check=True)
         rendered = subprocess.run([str(Path(args.luau).resolve()), "render-check.luau"], cwd=tmp, text=True, capture_output=True, check=True)
         print(rendered.stdout, end="")
+    if (args.blueprints / "TowerShopfront.luau").exists():
+        with tempfile.TemporaryDirectory() as stage:
+            subprocess.run(["python3", str(ROOT / "tools/polish-art/check.py"), "towers", args.luau, str(Path(stage) / "towers.json")], check=True)
     counts = {}
     for line in result.stdout.splitlines():
         data = json.loads(line)
