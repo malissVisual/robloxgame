@@ -289,6 +289,17 @@ local healthBack
 healthBack, view.healthFill = P.bar(health, UDim2.new(1, -66, 0, 2), P.ink)
 healthBack.Position = UDim2.new(0, 22, 0.5, 0)
 healthBack.AnchorPoint = Vector2.new(0, 0.5)
+view.healthBack = healthBack
+-- 6.0: the vest you wear (shared/Armour.luau): a small shield and its percent left of the number (Hud.setState).
+view.armourText = P.text(health, "", UDim2.fromOffset(48, HEALTH_HEIGHT), {
+	Position = UDim2.new(1, -42, 0, 0),
+	AnchorPoint = Vector2.new(1, 0),
+	Font = Theme.MonoFont,
+	TextSize = 13,
+	TextColor3 = P.ink2,
+	TextXAlignment = Enum.TextXAlignment.Right,
+	Visible = false,
+})
 view.healthText = P.text(health, "100", UDim2.fromOffset(38, HEALTH_HEIGHT), {
 	Position = UDim2.new(1, 0, 0, 0),
 	AnchorPoint = Vector2.new(1, 0),
@@ -2141,7 +2152,7 @@ function renderWeapons()
 	if touchHands.melee then
 		touchHands.melee.Visible = not seatedNow and not holding
 		touchHands.melee.Text = if away then "PUNCH" else "STRIKE"
-		touchHands.holster.Visible = not seatedNow and not holding
+		touchHands.holster.Visible = not seatedNow and not holding and Holster.armed() -- (6.0: no gun, nothing to draw)
 		touchHands.holster.Text = if away then "DRAW" else "HOLSTER"
 	end
 	if not state then
@@ -2171,6 +2182,17 @@ function renderWeapons()
 	local gun = if carGun then nil else Economy.findWeapon(state.weapon)
 	local def: any = carGun or gun
 	if not def then
+		if not seated then
+			-- 6.0: no gun yet (a new courier: fists only): FISTS and the punch; the pistol is sold at Lead & Co.
+			local top = lineRow(weaponRow, 24)
+			Ui.icon(top, nil, "✊", UDim2.fromOffset(34, 22), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = P.ink, LayoutOrder = 1 })
+			P.text(top, "FISTS", UDim2.fromOffset(0, 24), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 16, LayoutOrder = 2 })
+			P.caps(weaponRow, if touchLayout then "Tap PUNCH · guns at Lead & Co." else "[V] Punch · guns at Lead & Co.", UDim2.new(1, 0, 0, 14), {
+				Position = UDim2.fromOffset(0, 26),
+				TextXAlignment = Enum.TextXAlignment.Right,
+				TextColor3 = P.ink2,
+			})
+		end
 		return
 	end
 	local usable = carGun ~= nil or not seated or (gun ~= nil and gun.oneHanded == true)
@@ -2238,7 +2260,7 @@ function nextWeapon()
 		end
 	end
 	if #owned < 2 then
-		Hud.toast("Buy more guns at Lead & Co., or earn them by working.")
+		Hud.toast(if #owned == 0 then "No gun yet: Lead & Co. sells a pistol. Till then, your fists." else "Buy more guns at Lead & Co., or earn them by working.")
 		return
 	end
 	local index = table.find(owned, state.weapon) or 0
@@ -3766,6 +3788,11 @@ function Hud.setState(newState: any)
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
 	end
+	-- 6.0: the vest's share on the health row (the bar makes room for it).
+	local armour = require(Shared.Armour).percent(if type(state.kit) == "table" then state.kit else {})
+	view.armourText.Visible = armour > 0
+	view.armourText.Text = `🛡{armour}%`
+	view.healthBack.Size = UDim2.new(1, if armour > 0 then -114 else -66, 0, 2)
 	-- Most States change money or items only: the weapon line is rebuilt when what it shows changed.
 	if weaponBarKey() ~= shownWeaponBar then
 		renderWeapons()
@@ -3930,7 +3957,9 @@ RunService.RenderStepped:Connect(function()
 			setHint(Map.Shops[inShop].name, "walk to the counter", "E")
 		elseif seatedIn and not driving then
 			local gun = if state then Economy.findWeapon(state.weapon) else nil
-			if touchLayout then
+			if not gun then
+				setHint("Riding along", if touchLayout then "no gun yet · EXIT gets out" else "no gun yet · E gets out") -- 6.0
+			elseif touchLayout then
 				setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · tap the gun line for a pistol, revolver or SMG` else "FIRE shoots out of the window · EXIT gets out")
 			else
 				setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · T to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")

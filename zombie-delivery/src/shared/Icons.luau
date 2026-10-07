@@ -159,6 +159,8 @@ Icons.Ids = {
 	kit_shoes = "",
 	kit_jacket = "",
 	kit_cart = "",
+	kit_kevlar = "", -- 6.0, the vests
+	kit_heavy = "",
 	-- 5.0, the phone's apps (art/icons/app_*, 256 x 256; client/Phone.luau's app ids, bank and settings for later).
 	app_orders = "",
 	app_board = "",

@@ -19,6 +19,7 @@ local Net = require(Shared.Net)
 local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
+local Armour = require(script.Parent.Armour) -- 6.0: the roof gun's rounds go through the vest
 
 local Tuning = Config.BanditCar
 local DEF = Tuning.car
@@ -364,7 +365,7 @@ local function shoot(b: Bandit, targetPosition: Vector3, targetVelocity: Vector3
 			Vehicles.damage(car, Tuning.ShotDamage, "The bandits shot your car to pieces!")
 			BanditCars.onCarDamaged(car.owner, Tuning.ShotDamage)
 		elseif humanoid then
-			humanoid:TakeDamage(Tuning.ShotDamage)
+			Armour.hurt(humanoid, Tuning.ShotDamage)
 		end
 	else
 		tracer:FireAllClients(from, aim + Vector3.new(rng:NextNumber(-6, 6), rng:NextNumber(-1, 4), rng:NextNumber(-6, 6)), color, 0)

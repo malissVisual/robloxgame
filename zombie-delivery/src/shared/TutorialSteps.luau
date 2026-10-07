@@ -179,12 +179,18 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		}
 	elseif phase == "done" then
 		local reward = if type(info.reward) == "number" then math.floor(info.reward) else Config.Tutorial.Reward
+		local pistol = 0 -- 6.0: no free gun; the pistol's price at Lead & Co. (Config.Arms.Starter)
+		for _, weapon in Config.Weapons do
+			if weapon.id == Config.Arms.Starter then
+				pistol = weapon.price
+			end
+		end
 		return {
 			speaker = speaker(true),
 			pages = {
 				`Delivered! Nice work, courier. There's ${reward} on top from me.`,
 				"Buy a backpack at Last Stop Supplies: you carry more on foot. Then save up for a bike: the bike shop opens at level 2.",
-				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Hold T to pick a gun, and explore: the map fills in as you go.`,
+				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. No gun yet: buy a pistol at Lead & Co. for ${pistol}; till then, V punches. And explore: the map fills in as you go.`,
 			},
 			primary = "SHOW ME AROUND", -- 5.7: the tour (TutorialSteps.tourDialog)
 			secondary = "LATER",
@@ -233,12 +239,14 @@ end
 
 -- 4.2, a touch screen (no keys): her words without the keys. "(E)" / "(J)" go (the prompts and the buttons are
 -- tapped), "Press J." goes (her board dialog opens the board itself), "G puts it down" names the PUT DOWN button and
--- "Hold T to pick a gun" the weapon line (client/TutorialUi.luau asks on a touch layout only).
+-- "Hold T to pick a gun" the weapon line, 6.0: "V punches" the PUNCH button (client/TutorialUi.luau asks on a touch
+-- layout only).
 function TutorialSteps.forTouch(line: string): string
 	local out = string.gsub(line, "%s*%([EGJQUKHLMI]%)", "")
 	out = string.gsub(out, "%s*Press [A-Z]%.", "")
 	out = string.gsub(out, "G puts it down", "PUT DOWN sets it down")
 	out = string.gsub(out, "Hold T to pick a gun", "Tap your gun's line to pick a gun")
+	out = string.gsub(out, "V punches", "tap PUNCH")
 	out = string.gsub(out, "Q opens your phone", "The PHONE button opens your phone") -- 5.7
 	return out
 end

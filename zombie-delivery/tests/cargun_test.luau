@@ -123,6 +123,18 @@ check("passenger: the revolver out of the window", Economy.fireMode(true, false,
 check("passenger: never the car gun", Economy.fireMode(true, false, "pistol", "roofmg") == "window")
 check("passenger: no rifle", Economy.fireMode(true, false, "rifle", "roofmg") == nil)
 check("passenger: no carbine", Economy.fireMode(true, false, "carbine", nil) == nil)
+-- 6.0: no free gun (a new courier: fists only, weapon nil).
+check("6.0: no gun on foot: nothing fires", Economy.fireMode(false, false, nil, nil) == nil and Economy.fireMode(false, false, "nope", nil) == nil)
+check("6.0: no gun in a seat: no window shot", Economy.fireMode(true, false, nil, nil) == nil and Economy.fireMode(true, true, nil, nil) == nil)
+check("6.0: no gun, a car gun: the driver still fires it", Economy.fireMode(true, true, nil, "roofmg") == "cargun")
+check("6.0: no gun is not one-handed, finds nothing", not Economy.oneHanded(nil) and Economy.findWeapon(nil) == nil)
+check("6.0: no gun's stats read as the pistol's (nothing fires anyway)", Economy.weaponStats(nil, {}).damage == Economy.weaponStats("pistol", {}).damage)
+check("6.0: the first gun owned, in the shop's order", Economy.firstWeapon({}) == nil and Economy.firstWeapon({ smg = true, pistol = true }) == "pistol"
+	and Economy.firstWeapon({ rifle = true, nope = true } :: any) == "rifle" and Economy.firstWeapon({ pistol = false } :: any) == nil)
+local starter = Economy.findWeapon(Config.Arms.Starter) :: Config.WeaponDef
+check("6.0: the pistol is bought: $250 at level 1, sold at Lead & Co.", starter ~= nil and starter.id == "pistol" and starter.price == 250
+	and starter.level == 1 and starter.earned == nil and starter.exclusive == nil)
+check("6.0: Marge's tip names the price", string.find(Config.Arms.Tip, "{price}", 1, true) ~= nil)
 
 check("version 2.1+", (function()
 	local major, minor = string.match(Config.Version, "^(%d+)%.(%d+)")

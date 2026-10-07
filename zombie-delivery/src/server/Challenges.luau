@@ -831,10 +831,10 @@ function Challenges.adminReset(player: Player): number
 	for _, weapon in Config.Weapons do
 		if weapon.exclusive then
 			profile.weapons[weapon.id] = nil
-			if profile.weapon == weapon.id then
-				profile.weapon = Config.Weapons[1].id
-			end
 		end
+	end
+	if profile.weapon == nil or not profile.weapons[profile.weapon] then
+		profile.weapon = require(Shared.Economy).firstWeapon(profile.weapons) -- 6.0: another gun you own, else fists only
 	end
 	local exclusivePaints: { [string]: boolean } = {}
 	for _, paint in Config.Paints do

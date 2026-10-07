@@ -38,7 +38,7 @@ export type Profile = {
 	bike: string?, -- 5.1: your bike of choice (an owned Config.Cars bike; Spoke & Chain's EQUIP, the phone's MY BIKE)
 	lastCar: string?, -- 5.1: the car you drove before you got on your bike (the phone's CALL CAR brings it back)
 	weapons: { [string]: boolean },
-	weapon: string,
+	weapon: string?, -- the gun in your hand; 6.0: nil = none yet (a new courier has fists only, Config.Arms)
 	upgrades: { [string]: number }, -- the gun tracks (Config.Upgrades without car): for all your guns
 	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → the car tracks' levels of that car (Config.Upgrades car); 3.5: + stage
 	carHealth: { [string]: number }, -- 3.4: car id → its share of health (0 … 1) while parked; no entry = as new
@@ -98,8 +98,8 @@ local function newProfile(): Profile
 		car = nil,
 		bike = nil, -- 5.1
 		lastCar = nil, -- 5.1
-		weapons = { [Config.Weapons[1].id] = true },
-		weapon = Config.Weapons[1].id,
+		weapons = {}, -- 6.0: no free gun, fists only (the pistol is bought at Lead & Co.); older saves keep theirs
+		weapon = nil,
 		upgrades = {},
 		carUpgrades = {},
 		carHealth = {},
@@ -492,6 +492,8 @@ local function applySaved(profile: Profile, saved: any)
 	profile.lastCar = kind(saved.lastCar, false)
 	if type(saved.weapon) == "string" and profile.weapons[saved.weapon] then
 		profile.weapon = saved.weapon
+	else
+		profile.weapon = Economy.firstWeapon(profile.weapons) -- 6.0: a gun you own, else none
 	end
 end
 
@@ -805,7 +807,7 @@ function PlayerData.giveWeapon(player: Player, id: string, equip: boolean?): boo
 	end
 	local new = not profile.weapons[id]
 	profile.weapons[id] = true
-	if equip then
+	if equip or profile.weapon == nil then -- (6.0: your first gun goes in your hand)
 		profile.weapon = id
 	end
 	changed:Fire(player)

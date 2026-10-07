@@ -3833,6 +3833,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local stats = Economy.carStats(def.id, levels)
 	if rental then
 		stats.maxSpeed = math.min(stats.maxSpeed, Config.Rental.MaxSpeed) -- 5.7: a free rental is the slow way round
+		stats.accel = math.min(stats.accel, Config.Rental.Accel) -- 6.0: but quick off the line
 	end
 	-- 3.4: your own car comes as damaged as it was parked (profile.carHealth); a lent company vehicle comes fresh.
 	-- 5.6: so does a rental (lent: its damage is never kept).

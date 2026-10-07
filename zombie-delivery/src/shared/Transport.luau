@@ -65,15 +65,17 @@ function Transport.packRoom(kit: Kit): number
 	return math.max(0, Transport.handsRoom(kit) - Config.Cargo.HandsMax)
 end
 
--- The walk / sprint multiplier from the kit (running shoes …).
+-- The walk / sprint multiplier from the kit (running shoes …). 6.0: a piece below 1 (the Heavy Armour) slows you: the
+-- best speed-up times the slowest slow-down.
 function Transport.speedMult(kit: Kit): number
-	local mult = 1
+	local mult, slow = 1, 1
 	for _, def in Config.Kit do
 		if kit[def.id] == true and def.speed then
 			mult = math.max(mult, def.speed)
+			slow = math.min(slow, def.speed)
 		end
 	end
-	return mult
+	return mult * slow
 end
 
 -- The food's freshness drain while you carry it (a thermal jacket < 1).

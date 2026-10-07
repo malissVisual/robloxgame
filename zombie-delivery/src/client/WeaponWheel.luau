@@ -12,6 +12,7 @@
 -- 3.9: picking a gun (the wheel or a tap of Q) draws it when it is holstered (B, client/Holster.luau).
 -- 4.2, touch: a tap on the HUD's weapon line opens the wheel (WeaponWheel.openTouch, Main sets Hud.onWeaponWheel);
 -- a tap on a gun takes it, a tap anywhere else closes it. A gamepad's d-pad up takes the next gun (like a tap of Q).
+-- 6.0: no gun at all (a new courier: fists only): the wheel stays shut and says where the pistol is sold.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -100,6 +101,21 @@ local function say(text: string)
 	end
 end
 
+-- Fewer than two guns: nothing to pick. 6.0: none at all (a new courier: fists only): where the pistol is sold.
+local function tooFew(count: number)
+	if count == 0 then
+		local price: number? = nil
+		for _, def in Config.Weapons do
+			if def.id == Config.Arms.Starter then
+				price = def.price
+			end
+		end
+		say(`No gun yet: Lead & Co. sells a pistol{if price then ` for ${price}` else ""}. Till then, your fists.`)
+	else
+		say("Buy more guns at Lead & Co., or earn them by working.")
+	end
+end
+
 local function equip(id: string)
 	Holster.drawIfHolstered() -- 3.9: picking a gun takes it in the hand (on foot; client/Holster.luau)
 	if state and state.weapon ~= id then
@@ -111,7 +127,7 @@ end
 local function nextWeapon()
 	local list = owned()
 	if #list < 2 then
-		say("Buy more guns at Lead & Co., or earn them by working.")
+		tooFew(#list)
 		return
 	end
 	local index = 0
@@ -495,10 +511,11 @@ end
 -- ── Open / close ───────────────────────────────────────────────────────────
 
 local function openWheel()
-	if #owned() < 2 then
+	local count = #owned()
+	if count < 2 then
 		-- Forget the held Q too: RenderStepped would open (and toast) again every frame while it stays down.
 		pressedAt = nil
-		say("Buy more guns at Lead & Co., or earn them by working.")
+		tooFew(count)
 		return
 	end
 	local p = parts or build()

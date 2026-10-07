@@ -3,6 +3,7 @@
 --   Holster (B)  the client says holstered or not; the character's Holstered attribute says it to everybody (the clients
 --                hide the gun in the hand, client/ArmPose.luau) and server/Gun.luau fires no hand-gun shot while it is
 --                set. Every spawn starts holstered. In a car seat it changes nothing (window shots, the car gun).
+--                6.0: without a gun (a new courier: fists only) a draw is refused, the hands stay empty.
 --   Melee (V)    alive, on foot, the hands free (no cargo) and the cooldown over (Config.Melee): a punch when
 --                holstered, a strike with the gun when it is out. It hits the nearest living zombie or bandit in a short
 --                cone in front of you (shared/Melee.luau), pushes it back, and the kill counts like any other (the
@@ -16,6 +17,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Melee = require(Shared.Melee)
 local Net = require(Shared.Net)
 local Zombies = require(script.Parent.Zombies)
+local PlayerData = require(script.Parent.PlayerData)
 
 local CloseCombat = {}
 
@@ -33,6 +35,10 @@ local function onHolster(player: Player, holstered: any)
 	local character = player.Character
 	if type(holstered) ~= "boolean" or not character then
 		return
+	end
+	local profile = PlayerData.get(player)
+	if not holstered and (not profile or profile.weapon == nil) then
+		return -- 6.0: no gun to draw (fists only: V punches)
 	end
 	setHolstered(character, holstered)
 end

@@ -32,6 +32,7 @@ local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
 local DayNight = require(script.Parent.DayNight)
+local Armour = require(script.Parent.Armour) -- 6.0: every bite and bullet on a player goes through the vest
 
 local Horde = Config.Horde
 local Roam = Horde.Roam
@@ -1009,7 +1010,7 @@ function shoot(z: Zombie, target: Target)
 			Vehicles.damage(car, damage, "The bandits shot your car to pieces!")
 			Zombies.onCarDamaged(car.owner, damage)
 		elseif target.humanoid then
-			target.humanoid:TakeDamage(damage)
+			Armour.hurt(target.humanoid, damage)
 		end
 	else
 		local miss = aim + Vector3.new(rng:NextNumber(-6, 6), rng:NextNumber(-2, 4), rng:NextNumber(-6, 6))
@@ -1330,7 +1331,7 @@ local function step()
 		local humanoid = best.humanoid
 		if humanoid and bestDistance < Horde.BiteReach * z.def.scale + 1 and now >= z.nextAttack then
 			z.nextAttack = now + z.def.attackEvery
-			humanoid:TakeDamage(z.def.damage)
+			Armour.hurt(humanoid, z.def.damage)
 		end
 	end
 end
