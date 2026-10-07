@@ -313,7 +313,23 @@ local function ensureHandGun(player: Player)
 		return
 	end
 	local profile = PlayerData.get(player)
-	local weapon = if profile then profile.weapon else "pistol"
+	if not profile then
+		return -- (the save is still loading)
+	end
+	local weapon = profile.weapon
+	if weapon == nil then
+		-- 6.0: no gun (fists only): nothing in the hand, and the hands stay "holstered" (V punches; server/CloseCombat.luau
+		-- refuses a draw without a gun).
+		local old = character:FindFirstChild("HandGun")
+		if old then
+			old:Destroy()
+		end
+		if character:GetAttribute("Holstered") == false then
+			character:SetAttribute("Holstered", true)
+			character:SetAttribute("Aiming", false)
+		end
+		return
+	end
 	if not holds(character, weapon) then
 		buildHandGun(character, hand, weapon)
 	end

@@ -45,10 +45,25 @@ function Economy.findCar(id: string): Config.CarDef?
 	return nil
 end
 
-function Economy.findWeapon(id: string): Config.WeaponDef?
+-- (6.0: nil = no gun, a new courier's fists: nil)
+function Economy.findWeapon(id: string?): Config.WeaponDef?
+	if id == nil then
+		return nil
+	end
 	for _, weapon in Config.Weapons do
 		if weapon.id == id then
 			return weapon
+		end
+	end
+	return nil
+end
+
+-- 6.0: the first gun owned in Config.Weapons' order (weapons: profile.weapons), or nil: fists only. The gun put in
+-- your hand when the one there went away (an exclusive taken back) or a save names none.
+function Economy.firstWeapon(weapons: { [string]: boolean }): string?
+	for _, weapon in Config.Weapons do
+		if weapons[weapon.id] == true then
+			return weapon.id
 		end
 	end
 	return nil
@@ -64,7 +79,7 @@ function Economy.findCarGun(id: string): Config.CarGunDef?
 end
 
 -- A pistol, the revolver, the SMG: fired with one hand, so also out of a car window.
-function Economy.oneHanded(weaponId: string): boolean
+function Economy.oneHanded(weaponId: string?): boolean
 	local def = Economy.findWeapon(weaponId)
 	return def ~= nil and def.oneHanded == true
 end
@@ -79,10 +94,11 @@ end
 --   "hand"    on foot, the gun in your hand
 --   "cargun"  the driver of a car with a car gun installed (carGunId): the roof turret
 --   "window"  any seat, a one-handed gun out of the side window (the driver too, when the car has no car gun)
---   nil       a two-handed gun in a seat: it does not fire
-function Economy.fireMode(seated: boolean, driving: boolean, weaponId: string, carGunId: string?): string?
+--   nil       a two-handed gun in a seat: it does not fire; 6.0: no gun at all (weaponId nil: fists only) on foot or
+--             in a seat without a car gun
+function Economy.fireMode(seated: boolean, driving: boolean, weaponId: string?, carGunId: string?): string?
 	if not seated then
-		return "hand"
+		return if Economy.findWeapon(weaponId) ~= nil then "hand" else nil
 	end
 	if driving and carGunId ~= nil and Economy.findCarGun(carGunId) ~= nil then
 		return "cargun"
@@ -553,7 +569,8 @@ function Economy.carStats(carId: string, upgrades: Upgrades): CarStats
 	}
 end
 
-function Economy.weaponStats(weaponId: string, upgrades: Upgrades): WeaponStats
+-- (6.0: no gun, weaponId nil, reads as the pistol's numbers; nothing fires then: Economy.fireMode)
+function Economy.weaponStats(weaponId: string?, upgrades: Upgrades): WeaponStats
 	local def = Economy.findWeapon(weaponId) or Config.Weapons[1]
 	return {
 		damage = def.damage * Economy.multiplier(upgrades, "damage"),

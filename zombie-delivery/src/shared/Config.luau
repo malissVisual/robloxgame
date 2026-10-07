@@ -9,7 +9,8 @@ local Config = {}
 Config.Version = "5.9.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
--- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
+-- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
+-- (fists only: the pistol is bought at Lead & Co., Config.Arms).
 Config.DataStoreName = "ZombieDelivery_v2"
 Config.StartMoney = 40
 Config.StudioStartMoney = 40 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
@@ -45,6 +46,16 @@ Config.Melee = {
 		punch = { damage = 12, cooldown = 0.55, push = 22 }, -- the fist (holstered)
 		gun = { damage = 22, cooldown = 0.8, push = 38 }, -- the gun in the hand
 	} :: { [string]: { damage: number, cooldown: number, push: number } },
+}
+
+-- 6.0: no free gun. A new courier has fists only (V punches); the pistol (Starter) is bought at Lead & Co. Once you have
+-- its price and no gun, Marge texts you about it (Tip, {price} filled in) with the shop on your GPS, once a session
+-- (server/Tutorial.luau). The vests' numbers are in Config.Kit (armour); MaxArmour caps any vest's share
+-- (shared/Armour.luau).
+Config.Arms = {
+	Starter = "pistol",
+	Tip = "Got {price} on you? Lead & Co. sells a pistol for that. Fists are fine for one biter, not for a crowd. It's on your GPS.",
+	MaxArmour = 0.8,
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
@@ -619,8 +630,8 @@ Config.Cars = {
 		name = "E-Scooter",
 		price = 2800,
 		style = "scooter",
-		maxSpeed = 36,
-		accel = 26,
+		maxSpeed = 32, -- 6.0 (the owner: "not too fast, but a quicker start: electric"): 36 → 32, accel 26 → 42
+		accel = 42,
 		turn = 2.8,
 		health = 110,
 		capacity = 2,
@@ -674,7 +685,8 @@ Config.Weapons = {
 		id = "pistol",
 		oneHanded = true,
 		name = "Pistol",
-		price = 0,
+		level = 1, -- 6.0: bought at Lead & Co. like any gun (a new courier has fists only, Config.Arms)
+		price = 250,
 		damage = 20,
 		fireRate = 3,
 		range = 140,
@@ -968,12 +980,17 @@ export type GearDef = {
 -- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
 -- carry on foot and on a bike (shared/Transport.luau). room = light pieces in hands + on the back (the best one counts),
 -- speed = walk / sprint multiplier (the best one counts), warm = food freshness drain multiplier while you carry it.
-export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number? }
+-- 6.0: armour = the share of every hit a vest takes off (the best vest owned counts, shared/Armour.luau); a speed below 1
+-- slows the walk and the sprint (shared/Transport.luau speedMult: the best shoes × the slowest piece).
+export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number? }
 Config.Kit = {
 	{ id = "backpack", name = "Courier Backpack", level = 1, price = 150, icon = "🎒", room = 3, description = "Carry 3 light pieces on foot or on a bike instead of 2." },
 	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster." },
 	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
 	{ id = "jacket", name = "Thermal Jacket", level = 1, price = 300, icon = "🧥", warm = 0.8, description = "Food you carry stays warm longer." },
+	-- 6.0, the vests (server/Armour.luau takes the share off every bite and bullet; their looks: KitArt / KitWear).
+	{ id = "kevlar", name = "Kevlar Vest", level = 3, price = 600, icon = "🦺", armour = 0.3, description = "Takes 30% off every bite and bullet. Light enough to run in." },
+	{ id = "heavy", name = "Heavy Armour", level = 5, price = 1500, icon = "🛡️", armour = 0.5, speed = 0.92, description = "Plates and shoulder guards: takes 50% off every bite and bullet, but you are a little slower on foot." },
 } :: { KitDef }
 
 -- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
@@ -1621,9 +1638,10 @@ Config.Rental = {
 	Idle = 45, -- off the scooter this long: it goes back
 	Restock = 20, -- seconds until a rented scooter stands in its dock again (once it is returned)
 	Color = { 214, 72, 64 }, -- the ZDC RIDE red on the rentals' deck and stem
-	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 36) and its
+	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 32) and its
 	-- rack takes one light piece (the bought one two). server/Vehicles.luau caps the rental's MaxSpeed and its room.
 	MaxSpeed = 26,
+	Accel = 36, -- 6.0: quick off the line like the bought one (42), the cap above keeps it slow at the top
 	Room = 1,
 }
 

@@ -23,7 +23,7 @@ local hands = Config.Cargo.HandsMax
 local function kit(def: string): Config.KitDef
 	return Transport.findKit(def) :: Config.KitDef
 end
-check("four pieces of kit, all level 1", #Config.Kit == 4 and kit("backpack").level == 1 and kit("shoes").level == 1 and kit("bigpack").level == 1 and kit("jacket").level == 1)
+check("the first four pieces of kit, all level 1", #Config.Kit >= 4 and kit("backpack").level == 1 and kit("shoes").level == 1 and kit("bigpack").level == 1 and kit("jacket").level == 1)
 check("the prices: backpack $150, shoes $250, big backpack $400, jacket $300", kit("backpack").price == 150 and kit("shoes").price == 250
 	and kit("bigpack").price == 400 and kit("jacket").price == 300)
 check("the numbers: room 3 and 4, speed 1.1, warm 0.8", kit("backpack").room == 3 and kit("bigpack").room == 4 and kit("shoes").speed == 1.1 and kit("jacket").warm == 0.8)
@@ -52,6 +52,10 @@ check("the pack: what is over the hands", Transport.packRoom({}) == 0 and Transp
 
 check("no shoes: speed 1", Transport.speedMult({}) == 1 and Transport.speedMult({ backpack = true }) == 1)
 check("running shoes: 1.1", Transport.speedMult({ shoes = true }) == 1.1)
+-- 6.0: the Heavy Armour slows you a little (its speed below 1), with the shoes too; the Kevlar Vest does not.
+check("6.0: heavy armour: 0.92", Transport.speedMult({ heavy = true }) == 0.92)
+check("6.0: shoes and heavy armour: 1.1 × 0.92", math.abs(Transport.speedMult({ shoes = true, heavy = true }) - 1.1 * 0.92) < 1e-9)
+check("6.0: the kevlar vest: no slower", Transport.speedMult({ kevlar = true }) == 1 and Transport.speedMult({ kevlar = true, shoes = true }) == 1.1)
 check("no jacket: the food drains as usual", Transport.warm({}) == 1)
 check("a thermal jacket: × 0.8", Transport.warm({ jacket = true }) == 0.8)
 local plain, warm = JobRules.freshDrain(1, 60, false), JobRules.freshDrain(1, 60, false, Transport.warm({ jacket = true }))
