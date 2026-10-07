@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
 Zombie Delivery's own sounds and music, synthesized from scratch (numpy + ffmpeg): minimal and soft, nothing
-borrowed. Writes two files for Roblox (one upload each, the game plays regions of them):
+borrowed. Writes three files for Roblox (one upload each, the game plays regions of them):
   sfx.ogg    every sound effect one after another (src/shared/SoundSheet.luau has the regions)
   music.ogg  four seamless music loops one after another
+  sfx2.ogg   5.7: the world's sounds (knocks, doors, steps, the zip line, the bikes, the bus, the phone, coins, the
+             city's ambience and wind), a sheet of its own so the two uploaded above stay exactly as they are
 and regions.json + src/shared/SoundSheet.luau (the regions, the asset ids stay to be filled in).
 Run: python3 art/audio/make_audio.py   (from zombie-delivery/)
 """
@@ -164,6 +166,65 @@ MUSIC["day"] = track(92, 8, [(57, "m"), (53, "maj7"), (48, "maj7"), (55, "sus2")
 MUSIC["night"] = track(70, 8, [(50, "m7"), (46, "maj7"), (53, "maj9"), (48, "sus2")], [0, None, None, 2, None, None, 1, None], 1, 0.24, 0.35, bell_notes=((2, 74), (6, 69)))
 MUSIC["tension"] = track(112, 8, [(57, "m"), (57, "m"), (53, "maj7"), (52, "m")], [0, 2, 0, 3, 0, 2, 1, 2], 0, 0.14, 0.32, bass=True, hats=True)
 
+# ── 5.7: the world's sounds (sfx2.ogg) ──────────────────────────────────────────
+# Their own random generator: the two sheets above come out exactly as before (their uploads stay valid).
+rng2 = np.random.default_rng(5707)
+def noise2(sec): return rng2.standard_normal(int(sec * SR))
+def loop_noise(sec, lo, hi):
+    """Noise band-passed around the loop (the FFT is circular): no seam when it repeats."""
+    return bandpass(noise2(sec), lo, hi)
+def knock_hit(pitch):
+    body = thump(240 * pitch, 120 * pitch, 0.14, 0.035)
+    click = bandpass(noise2(0.14), 900, 3200) * env(int(0.14 * SR), 0.0005, 0.012)
+    return body + 0.5 * click
+SFX2 = {}
+SFX2["knock"] = norm(mix(at(knock_hit(1.0), 0, 0.62), at(knock_hit(1.04), 0.17, 0.62), at(knock_hit(0.97), 0.34, 0.62)), 0.7)
+def creak(sec):
+    x = t(sec)
+    f = 260 + 220 * (x / sec) + 25 * np.sin(2 * np.pi * 3.1 * x)
+    tone = np.sin(2 * np.pi * np.cumsum(f) / SR)
+    grain = 0.5 + 0.5 * np.sign(np.sin(2 * np.pi * np.cumsum(38 + 20 * x / sec) / SR))  # stick-slip
+    s = bandpass(tone * grain + 0.15 * noise2(sec), 300, 2600)
+    return s * env(len(x), 0.05, sec * 0.5, sec * 0.35)
+SFX2["door_creak"] = norm(creak(0.9), 0.5)
+x1 = t(1.0)  # the loops below: exactly 1 s, every tone and pulse a whole number of cycles (no seam)
+zip_tone = sum(a * np.sin(2 * np.pi * f * x1 + p) for f, a, p in ((96, 0.6, 0.0), (192, 0.35, 0.8), (288, 0.2, 1.7), (1440, 0.06, 0.3)))
+zip_hiss = loop_noise(1.0, 700, 3400) * (1 + 0.35 * np.sin(2 * np.pi * 16 * x1))
+SFX2["zip"] = norm(lowpass(zip_tone * (1 + 0.15 * np.sin(2 * np.pi * 8 * x1)) + 0.5 * zip_hiss, 4000, circular=True), 0.5)
+hum = sum(a * np.sin(2 * np.pi * f * x1 + p) for f, a, p in ((180, 0.5, 0.0), (360, 0.3, 0.6), (540, 0.12, 1.1), (1260, 0.08, 0.2)))
+SFX2["scooter"] = norm(hum * (1 + 0.08 * np.sin(2 * np.pi * 6 * x1)) + 0.25 * loop_noise(1.0, 250, 1400), 0.45)
+ticks = np.zeros(SR)
+for i in range(12):
+    start = int(i * SR / 12)
+    tick = bandpass(noise2(0.012), 2500, 7000) * env(int(0.012 * SR), 0.0003, 0.002)
+    ticks[start:start + len(tick)] += tick * (1.0 if i % 2 == 0 else 0.8)
+SFX2["freewheel"] = norm(ticks + 0.35 * loop_noise(1.0, 150, 900), 0.45)
+def squeal(sec):
+    x = t(sec); f = 2350 + 60 * np.sin(2 * np.pi * 7 * x) - 300 * x / sec
+    return np.sin(2 * np.pi * np.cumsum(f) / SR) * env(len(x), 0.04, sec * 0.4, sec * 0.3)
+def hiss(sec, lo=1800, hi=9000, decay=None):
+    return bandpass(noise2(sec), lo, hi) * env(int(sec * SR), 0.01, decay or sec * 0.35, sec * 0.2)
+SFX2["bus_brake"] = norm(mix(at(0.35 * squeal(0.7), 0, 1.7), at(lowpass(noise2(0.7), 300) * env(int(0.7 * SR), 0.02, 0.3) * 0.6, 0, 1.7), at(hiss(0.9), 0.75, 1.7)), 0.6)
+SFX2["bus_door"] = norm(mix(at(hiss(0.5, 1500, 8000, 0.15), 0, 0.75), at(thump(150, 70, 0.2, 0.05) * 0.8, 0.5, 0.75)), 0.55)
+def buzz(sec):
+    x = t(sec); s = np.tanh(3 * np.sin(2 * np.pi * 165 * x)) + 0.4 * np.sin(2 * np.pi * 330 * x)
+    return lowpass(s, 900) * env(len(x), 0.008, 10) * np.clip((sec - x) / 0.02, 0, 1)
+SFX2["phone_buzz"] = norm(seq(buzz(0.17), buzz(0.17), gap=0.09), 0.45)
+def step(f0, cutoff):
+    n = int(0.13 * SR)
+    scuff = lowpass(noise2(0.13), cutoff) * env(n, 0.002, 0.03)
+    return thump(f0, f0 * 0.5, 0.13, 0.03) * 0.7 + scuff
+SFX2["step_a"] = norm(step(110, 1500), 0.45)
+SFX2["step_b"] = norm(step(96, 1250), 0.45)
+SFX2["coin"] = norm(mix(at(bell(note(96), 0.45, 0.12), 0, 0.6), at(bell(note(103), 0.5, 0.16), 0.07, 0.6)), 0.5)
+x8 = t(8.0)  # 8 s loops: every modulation a whole number of cycles in 8 s
+rumble = lowpass(noise2(8.0), 180, circular=True)
+far = loop_noise(8.0, 500, 2200) * (1 + 0.3 * np.sin(2 * np.pi * 0.25 * x8))
+SFX2["ambience"] = norm(rumble + 0.25 * far, 0.4)
+gust = 0.55 + 0.3 * np.sin(2 * np.pi * 0.125 * x8) + 0.15 * np.sin(2 * np.pi * 0.375 * x8 + 1.0)
+SFX2["wind"] = norm(loop_noise(8.0, 250, 1100) * gust + 0.3 * loop_noise(8.0, 1500, 4000) * gust ** 2, 0.4)
+LOOPED |= {"zip", "scooter", "freewheel", "ambience", "wind"}
+
 # ── Write the sheets ──────────────────────────────────────────────────────────
 def write_sheet(items, name, gap):
     # Positions are counted in whole samples so every region starts exactly where its sound does (a float sum of
@@ -185,11 +246,12 @@ def write_sheet(items, name, gap):
     return regions, pos
 sfx_regions, sfx_len = write_sheet(list(SFX.items()), "sfx", 0.3)
 music_regions, music_len = write_sheet([(k, v[0]) for k, v in MUSIC.items()], "music", 0.5)
-json.dump({"sfx": sfx_regions, "music": music_regions, "looped": sorted(LOOPED)}, open(os.path.join(HERE, "regions.json"), "w"), indent=2)
+sfx2_regions, sfx2_len = write_sheet(list(SFX2.items()), "sfx2", 0.3)
+json.dump({"sfx": sfx_regions, "music": music_regions, "sfx2": sfx2_regions, "looped": sorted(LOOPED)}, open(os.path.join(HERE, "regions.json"), "w"), indent=2)
 
 # Keep the asset ids already pasted into SoundSheet (a re-run must not wipe them; upload the new files and update).
 sheet_path = os.path.join(ROOT, "src", "shared", "SoundSheet.luau")
-old_ids = {"SfxId": "", "MusicId": ""}
+old_ids = {"SfxId": "", "MusicId": "", "Sfx2Id": ""}
 if os.path.exists(sheet_path):
     import re
     for key in old_ids:
@@ -200,16 +262,22 @@ lua = ["--!strict",
        "-- The game's own sounds (art/audio/make_audio.py writes this file): two audio assets, sfx.ogg and music.ogg,",
        "-- and where each sound / music loop sits in them (start, length in seconds; client/Sounds.luau plays the region).",
        "-- Upload art/audio/sfx.ogg and art/audio/music.ogg (Asset Manager → Import) and paste the ids below.",
+       "-- 5.7: art/audio/sfx2.ogg holds the world's sounds (Sfx2); until its id is pasted, those play a stand-in from",
+       "-- Sfx or stay silent (client/Sounds.luau).",
        "", "local SoundSheet = {}", "",
        f'SoundSheet.SfxId = "{old_ids["SfxId"]}" -- "rbxassetid://…" of art/audio/sfx.ogg',
-       f'SoundSheet.MusicId = "{old_ids["MusicId"]}" -- "rbxassetid://…" of art/audio/music.ogg', "",
+       f'SoundSheet.MusicId = "{old_ids["MusicId"]}" -- "rbxassetid://…" of art/audio/music.ogg',
+       f'SoundSheet.Sfx2Id = "{old_ids["Sfx2Id"]}" -- "rbxassetid://…" of art/audio/sfx2.ogg', "",
        "SoundSheet.Sfx = {"]
 for k, (s, l) in sfx_regions.items():
     lua.append(f"\t{k} = {{ {s}, {l} }},")
 lua += ["} :: { [string]: { number } }", "", "SoundSheet.Music = {"]
 for k, (s, l) in music_regions.items():
     lua.append(f"\t{k} = {{ {s}, {l} }},")
+lua += ["} :: { [string]: { number } }", "", "SoundSheet.Sfx2 = {"]
+for k, (s, l) in sfx2_regions.items():
+    lua.append(f"\t{k} = {{ {s}, {l} }},")
 lua += ["} :: { [string]: { number } }", "", "-- Sounds that loop (their region repeats seamlessly).",
         "SoundSheet.Looped = { " + ", ".join(f"{k} = true" for k in sorted(LOOPED)) + " } :: { [string]: boolean }", "", "return SoundSheet", ""]
 open(sheet_path, "w").write("\n".join(lua))
-print(f"sfx: {len(SFX)} sounds, {sfx_len:.1f} s;  music: {len(MUSIC)} loops, {music_len:.1f} s")
+print(f"sfx: {len(SFX)} sounds, {sfx_len:.1f} s;  music: {len(MUSIC)} loops, {music_len:.1f} s;  sfx2: {len(SFX2)} sounds, {sfx2_len:.1f} s")

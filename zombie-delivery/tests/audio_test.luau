@@ -22,6 +22,19 @@ local USED = {
 for _, name in USED do
 	check("sfx region " .. name, SoundSheet.Sfx[name] ~= nil)
 end
+-- 5.7: the world's sounds (sfx2.ogg), their own sheet.
+local USED2 = {
+	"knock", "door_creak", "zip", "scooter", "freewheel", "bus_brake", "bus_door", "phone_buzz", "step_a", "step_b",
+	"coin", "ambience", "wind",
+}
+for _, name in USED2 do
+	check("sfx2 region " .. name, SoundSheet.Sfx2[name] ~= nil)
+	check("sfx2 " .. name .. " is not also in sfx", SoundSheet.Sfx[name] == nil)
+end
+for _, name in { "zip", "scooter", "freewheel", "ambience", "wind" } do
+	check(name .. " loops", SoundSheet.Looped[name] == true)
+end
+check("the second sheet's id is a string", type(SoundSheet.Sfx2Id) == "string")
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
 end
@@ -38,7 +51,7 @@ for _, def in Config.CarGuns do
 end
 check("weapons listed", weapons > 0)
 -- The regions never overlap (each plays only its own sound).
-for _, sheet in { SoundSheet.Sfx, SoundSheet.Music } do
+for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2 } do
 	local list = {}
 	for name, r in sheet do
 		check(`region {name} is valid`, r[1] >= 0 and r[2] > 0)

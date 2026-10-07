@@ -13,6 +13,8 @@
 -- 3.10, the passers-by (server/Traffic.luau): Npcs.pace sets a walking speed with the legs to match (the run
 -- animation when running), and a walk may flow on into the next one without a halt (`through`) and give up when it
 -- makes no progress (`stuck`) instead of pushing against a wall.
+-- 5.7: Npcs.act names a short arm gesture (a wave, holding a piece out, reaching for it, a knock) on a person or a
+-- courier; the clients play it (client/ArmPose.luau, shared/Gestures.luau).
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -808,6 +810,19 @@ function Npcs.gesture(npc: Model)
 	local tween = TweenService:Create(root, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true), { CFrame = goal })
 	state.turn = tween
 	tween:Play()
+end
+
+-- 5.7: a short arm gesture (shared/Gestures.luau: "wave", "give", "take", "knock") on a person or a player's
+-- character: the attributes Gesture (the kind) and GestureAt (the server time it starts, set last: the clients key on
+-- it); every client lays it over the arms (client/ArmPose.luau) and plays its sound (client/Sounds.luau: a knock, and
+-- with `door` the door's creak after it). Nothing on the server waits for it.
+function Npcs.act(model: Instance?, kind: string, door: boolean?)
+	if not model or not model.Parent or not model:IsA("Model") then
+		return
+	end
+	model:SetAttribute("Gesture", kind)
+	model:SetAttribute("GestureDoor", if door then true else nil)
+	model:SetAttribute("GestureAt", workspace:GetServerTimeNow())
 end
 
 function Npcs.remove(npc: Model)
