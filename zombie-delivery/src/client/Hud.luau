@@ -2038,10 +2038,21 @@ local function menuDot()
 	for _, count in view.badges do
 		any += count
 	end
+	-- 6.5: the phone's unread messages on the same button (its own PHONE action is gone on a computer)
+	local unread = view.phoneUnread or 0
 	local badge = more:FindFirstChild("Badge")
 	if badge and badge:IsA("TextLabel") then
-		badge.Visible = any > 0
-		badge.Text = ""
+		badge.Visible = any + unread > 0
+		badge.Text = if unread > 9 then "9+" elseif unread > 0 then tostring(unread) else ""
+		badge.Size = UDim2.fromOffset(if unread > 9 then 20 else 14, 14)
+	end
+end
+
+-- 6.5: the phone's unread count (client/Phone.luau, through Main) on the PHONE button top right.
+function Hud.setPhoneUnread(count: number)
+	if view.phoneUnread ~= count then
+		view.phoneUnread = count
+		menuDot()
 	end
 end
 

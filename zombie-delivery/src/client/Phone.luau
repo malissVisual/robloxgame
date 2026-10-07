@@ -59,6 +59,7 @@ local Phone = {}
 
 -- Set by Main.
 Phone.onOpen = nil :: (() -> ())? -- the phone opens: close the other windows (Hud.closeWindows)
+Phone.onUnread = nil :: ((number) -> ())? -- 6.5: the unread messages, for the HUD's PHONE button (Hud.setPhoneUnread)
 Phone.onBoard = nil :: (() -> ())? -- FULL BOARD: DispatchUi.open
 Phone.onMissions = nil :: (() -> ())? -- 5.5, the MENU's apps: MissionsUi.toggle
 Phone.onCrew = nil :: (() -> ())? -- CrewPanel.toggle
@@ -244,6 +245,7 @@ end
 local refreshBadges: () -> () = function() end
 local renderApp: () -> () = function() end
 local setApp: (id: string) -> () = function() end -- (── Showing ──)
+local lastUnread = -1 -- 6.5: the unread count last told to Phone.onUnread
 local placeButton: () -> () = function() end -- (the PHONE action's place, ── The PHONE action ──)
 
 local function unreadCount(): number
@@ -1812,7 +1814,17 @@ placeButton = function()
 	if not action or not made then
 		return
 	end
-	local shown = hasPhone() and hudOn() and not isOpen -- (the open phone covers its place)
+	-- (6.5: on a computer the HUD's PHONE [Q] top right is the one; this action stays for touch screens, and the
+	-- unread count goes to the HUD's button through Phone.onUnread)
+	local onUnread = Phone.onUnread
+	if onUnread then
+		local count = unreadCount()
+		if count ~= lastUnread then
+			lastUnread = count
+			pcall(onUnread, count)
+		end
+	end
+	local shown = hasPhone() and hudOn() and not isOpen and Ui.touchLayout() -- (the open phone covers its place)
 	if action.Visible ~= shown then
 		action.Visible = shown
 	end
