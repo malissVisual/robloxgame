@@ -33,6 +33,8 @@
 --   JobRules.freshDrain(tier, seconds, cooler, warm)   the freshness food loses in that time (a Cooler Box × CoolerDrain;
 --                                         5.0: a thermal jacket × its warm)
 --   JobRules.freshPay(freshness)          the pay's multiplier for the food's freshness
+--   JobRules.footKnock(fell, landed, lostHealth)   6.4: "fall" | "hit" | nil: what knocked a fragile piece on foot
+--   JobRules.knockLoss(knock, padded)     6.4: the condition it costs (0 in the Padded Messenger Bag)
 --   JobRules.dropCount(tier, pieces, receivers, r1, r2)   the drops of a board delivery (1 = an ordinary one)
 --   JobRules.destinations(needs, first)   the stop every piece goes to, in the order they are made
 --   JobRules.multiDropPay(drops)          what the extra drops pay
@@ -416,6 +418,28 @@ end
 function JobRules.freshPay(freshness: number): number
 	local low = Config.Jobs.CargoRules.FreshPayMin
 	return low + (1 - low) * math.clamp(freshness, 0, 1)
+end
+
+-- 6.4, fragile pieces on foot: what knocked them this tick. `fell` the fastest the courier fell (studs / s down) since
+-- they left the ground, `landed` the feet are on the ground again, `lostHealth` the health lost since the last tick.
+-- "fall" (a landing faster than FootFallSpeed), "hit" (FootHitMin or more at once) or nil.
+function JobRules.footKnock(fell: number, landed: boolean, lostHealth: number): string?
+	local tuning = Config.Jobs.CargoRules
+	if landed and fell >= tuning.FootFallSpeed then
+		return "fall"
+	elseif lostHealth >= tuning.FootHitMin then
+		return "hit"
+	end
+	return nil
+end
+
+-- 6.4: the condition such a knock costs each order with an unpadded fragile piece with you (padded: none).
+function JobRules.knockLoss(knock: string?, padded: boolean?): number
+	if padded or knock == nil then
+		return 0
+	end
+	local tuning = Config.Jobs.CargoRules
+	return if knock == "fall" then tuning.FootFall elseif knock == "hit" then tuning.FootHit else 0
 end
 
 -- ── 4.8: multi-drop ────────────────────────────────────────────────────────

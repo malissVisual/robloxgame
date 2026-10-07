@@ -21,7 +21,10 @@
 --   Holding.atSpawn(ownsBag, bagDown)          a new body: the bag when it is yours and with you, else fists
 --   Holding.afterHolster(last, ownsBag, bagDown)  B puts the gun away: back to what you held before (the bag, if it is
 --                                              still with you), else fists
---   Holding.bagLeaves(count)                   the bag leaves your hand with `count` pieces in it: "down" | "stow"
+--   Holding.bagLeaves(count, stays)            the bag leaves your hand with `count` pieces in it: "down" | "stow";
+--                                              6.4: "back" for a bag that stays on you (Config.Kit stays: the tote,
+--                                              the messenger, the duffel swing onto your back, their pieces with you)
+--   Holding.wornAs(hand, carry, stays, seated)  6.4: where the bag shows: "hand" | "shoulder" | "hip" | "back" | nil
 --   Holding.packRoom(total, bagRoom, bagHeld)  the room over the hands that is yours now: the backpack's (and a bike's
 --                                              rack, a round's satchel), the bag's only while you hold it
 --   Holding.place(bagHeld, inBag, bagRoom, fits)  where a piece put in the pack goes: "bag" (held, room, it fits a bag)
@@ -102,8 +105,20 @@ function Holding.afterHolster(last: string?, ownsBag: boolean, bagDown: boolean)
 	return "fists"
 end
 
-function Holding.bagLeaves(count: number): string
+function Holding.bagLeaves(count: number, stays: boolean?): string
+	if stays then
+		return "back" -- 6.4: a shoulder / cross-body / slung bag stays on you, loaded or not
+	end
 	return if count > 0 then "down" else "stow"
+end
+
+-- 6.4: where the active bag shows on you: while it is the hand its carry ("hand" | "shoulder" | "hip"; in a seat a bag
+-- that stays goes on the back, a hand bag is put away), else "back" for one that stays, nil (stowed or on the ground).
+function Holding.wornAs(hand: string, carry: string?, stays: boolean?, seated: boolean): string?
+	if hand == "bag" and not seated then
+		return if carry == "shoulder" or carry == "hip" then carry else "hand"
+	end
+	return if stays then "back" else nil
 end
 
 function Holding.packRoom(total: number, bagRoom: number, bagHeld: boolean): number

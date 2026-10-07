@@ -168,7 +168,7 @@ local function transportText(): string
 		local def = Economy.findCar(state.car)
 		return `{if def and def.stand then "🛴" elseif def and def.bike then "🚲" else "🚐"} {string.upper(if def then def.name else state.car)}`
 	end
-	return `🚶 ON FOOT · {KitShop.roomText(kit())}`
+	return `🚶 ON FOOT · {KitShop.roomText(kit(), if state and type(state.bag) == "string" then state.bag else nil)}` -- (6.4: the bag in use)
 end
 
 -- The first vehicles you can own (dealer cars, not bikes), the earliest first.

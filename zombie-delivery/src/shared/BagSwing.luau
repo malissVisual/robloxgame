@@ -20,6 +20,9 @@
 --                                                   velocity { x, y, z }; returns the tilt (x, z, radians) and the twist
 --                                                   (radians about the handles)
 --   BagSwing.tilt(state)                            the current tilt's size (radians)
+--   BagSwing.tuning(base, over)                     6.4: a bag's own tuning: `base` (Config.Courier.Bag) with the
+--                                                   numbers of `over` (Config.Courier.Bags[id]) on top; a new table
+--   BagSwing.bob(distance, speed, amount, step, full)  6.4: a worn bag's bounce with the steps (studs up)
 
 local BagSwing = {}
 
@@ -73,6 +76,30 @@ local function clampFlat(x: number, z: number, max: number): (number, number)
 		return x * max / size, z * max / size
 	end
 	return x, z
+end
+
+-- 6.4: the heavier bags swing slower and flutter less: their numbers over the plastic bag's (unknown keys and
+-- non-numbers are ignored).
+function BagSwing.tuning(base: Tuning, over: { [string]: number }?): Tuning
+	local out = table.clone(base :: any)
+	if over then
+		for key, value in over do
+			if type(value) == "number" and value == value and type(out[key]) == "number" then
+				out[key] = value
+			end
+		end
+	end
+	return out :: Tuning
+end
+
+-- 6.4: a worn bag's lift (studs) with the steps: `distance` walked so far, `speed` now; `amount` at `full` speed and
+-- above (nothing standing), a bump every `step` studs (|sin|: it lifts on each foot's push).
+function BagSwing.bob(distance: number, speed: number, amount: number, step: number, full: number): number
+	if step <= 0 or amount == 0 or not finite(distance) or not finite(speed) then
+		return 0
+	end
+	local fast = math.clamp(speed / math.max(full, 1), 0, 1)
+	return amount * fast * math.abs(math.sin(math.pi * distance / step))
 end
 
 function BagSwing.tilt(state: State): number

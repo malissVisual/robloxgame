@@ -6,7 +6,10 @@ ROOT=Path(__file__).resolve().parents[2]
 HERE=Path(__file__).parent
 BUDGETS={'backpack':14,'backpack_loaded':14,'bigpack':18,'shoes':12,'jacket':16,'cart':22,'phone':6,
          'rustbike':70,'citybike':70,'cargobike':70,'cargobike_loaded':70,'ebike':70,'basket':10,'panniers':12,'trailer':25,'bell':3,'light':4,'escooter':45,
-         'pump':25,'island':70,'pricesign':12,'jerrycan':8}
+         'pump':25,'island':70,'pricesign':12,'jerrycan':8,
+         # 6.0 the plastic bag and the vests; 6.4 the four bigger bags (KitArt, hung on BagPivot)
+         'bag':10,'kevlar':24,'heavy':32,'tote':12,'thermal':14,'padded':12,'duffel':16}
+BAGS={'bag','tote','thermal','padded','duffel'}
 RUNNER='''local Mock=require("./mock")
 local Geometry=require("./Geometry")
 local Builder=require("./Builder")
@@ -114,6 +117,10 @@ def export(module,luau,output):
             assert sum(p['name'].endswith('Tyre') for p in pieces)==2 and any(p.get('night') for p in pieces)
             assert all(abs(spec['origins'][w][1]-.6)<1e-6 for w in ['FrontWheel','RearWheel']),'small wheels (radius .6)'
         if m['id'] in ['basket','panniers','trailer']:assert any(p['name']=='Slot1' for p in points)
+        if m['id'] in BAGS:
+            # 6.4: a bag hangs from the grip (BagPivot at the hand, ~1.95 over the ground): all on the pivot, under it
+            assert set(spec['origins'])=={'BagPivot'} and all(p['attach']=='BagPivot' for p in pieces),(m['id'],'bag pivot')
+            assert all(p['at'][1]<0.05 and p['at'][1]>-1.7 for p in pieces),(m['id'],'hangs under the hand, above the ground')
         if m['id']=='pump':assert any(p['attach']=='Nozzle' for p in pieces) and any(p['name']=='FuelOutlet' for p in points)
     output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(models))
     print('Art factory PASS:',{m['id']:len(m['spec']['pieces'])+m['spec'].get('newRoots',0)+m['spec'].get('reservedParts',0) for m in models})

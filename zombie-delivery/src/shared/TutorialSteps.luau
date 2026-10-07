@@ -183,7 +183,7 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 			speaker = speaker(true),
 			pages = {
 				`Delivered! Nice work, courier. There's ${reward} on top from me.`,
-				"You've got a plastic bag: two more parcels on you, and at a door hold X to throw one. Get the ZDC Courier Vest and a backpack at Last Stop Supplies, then save up for a bike: the bike shop opens at level 2.",
+				"You've got a plastic bag: two more parcels ride in it and you can still sprint (in your hands they'd slow you down), and at a door hold X to throw one. Get the ZDC Courier Vest and a backpack at Last Stop Supplies, bigger bags later, then save up for a bike: the bike shop opens at level 2.",
 				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Your pistol is holstered: 3 draws your gun, 2 holds the bag, V punches. And explore: the map fills in as you go.`,
 			},
 			primary = "SHOW ME AROUND", -- 5.7: the tour (TutorialSteps.tourDialog)

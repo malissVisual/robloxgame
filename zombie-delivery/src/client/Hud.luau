@@ -538,7 +538,8 @@ local function tabs(parent: any, list: { { string } }, selected: string, onPick:
 	for _, entry in list do
 		table.insert(items, { id = entry[1], text = entry[2] })
 	end
-	local row = Ui.tabs(parent, items, onPick, { selected = selected, width = 120, height = 36, gap = 6 }).frame
+	-- (6.4 review: five tabs during a run (BAG, ITEMS, BAGS, CARS, GUNS) fit the window: narrower ones)
+	local row = Ui.tabs(parent, items, onPick, { selected = selected, width = if #list > 4 then 104 else 120, height = 36, gap = 6 }).frame
 	row.Size = UDim2.new(1, -12, 0, 36)
 	row.LayoutOrder = 0
 end
@@ -1347,12 +1348,13 @@ function renderBackpack()
 	if backpackTab == "bag" and not job then
 		backpackTab = "items" -- (5.3: the run ended)
 	end
-	if backpackTab ~= "bag" then
+	if backpackTab ~= "bag" and backpackTab ~= "bags" then
 		cargoCard(backpack.body)
 	end
 	backpack.footer.Text = `{Ui.money(state.money)} · level {myLevel()}`
 	-- 5.3: during a run the BAG tab first (client/BagUi.luau: every piece you carry and where).
-	local tabList = { { "items", "ITEMS" }, { "cars", "CARS" }, { "guns", "GUNS" } }
+	-- 6.4: BAGS, the bags you own and the one in use (client/BagUi.luau BagUi.bags: USE)
+	local tabList = { { "items", "ITEMS" }, { "bags", "BAGS" }, { "cars", "CARS" }, { "guns", "GUNS" } }
 	if job then
 		table.insert(tabList, 1, { "bag", "🎒 BAG" })
 	end
@@ -1362,6 +1364,8 @@ function renderBackpack()
 	end)
 	if backpackTab == "bag" then
 		require(script.Parent.BagUi).render(backpack.body, job, 1)
+	elseif backpackTab == "bags" then
+		require(script.Parent.BagUi).bags(backpack.body, state, 1)
 	elseif backpackTab == "items" then
 		for order, def in Config.Items do
 			local c = card(backpack.body, 84, order + 1)

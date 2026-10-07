@@ -8,6 +8,7 @@
 -- BagUi.onOpen; 6.0.1: the bottom bar's carried strip too). Presentation only: the server decides what you carry.
 -- 5.8, the courier phone's look (the bag draws in the phone's BAG app too): the head is a slim row with the phone's
 -- tag line (the red square and caps) over the room in big type; the groups are the phone's section labels.
+-- 6.4: BagUi.bags draws the I window's BAGS tab: the bags you own, IN USE / USE.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Icons = require(Shared.Icons)
 local Bag = require(Shared.Bag)
+local Net = require(Shared.Net) -- 6.4: USE a bag
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
@@ -64,6 +66,49 @@ end
 
 local function capital(text: string): string
 	return string.upper(string.sub(text, 1, 1)) .. string.sub(text, 2)
+end
+
+-- 6.4: the I window's BAGS tab: every bag you own (Config.Kit pieces with `extra`), its room and perk, IN USE for the
+-- one in your hand (the state's `bag`, the server's) or USE (the Kit remote's ("use", id); the server refuses while
+-- your bag holds pieces or lies on the ground). A note on the ones still to buy. Returns the next layout order.
+function BagUi.bags(parent: Instance, state: any, order: number): number
+	local n = order
+	local kit = if type(state) == "table" and type(state.kit) == "table" then state.kit else {}
+	local inUse = if type(state) == "table" and type(state.bag) == "string" then state.bag else nil
+	local head = P.row(parent, 60, n)
+	n += 1
+	P.marker(head, 8, { Position = UDim2.fromOffset(16, 13) })
+	P.caps(head, "Your bags", UDim2.new(1, -46, 0, 18), { Position = UDim2.fromOffset(30, 8), TextColor3 = P.ink2, TextSize = 12, TextStrokeTransparency = 1 })
+	Ui.label(head, "Sprint with your deliveries. One bag at a time: USE picks it.", UDim2.new(1, -32, 0, 30), { Position = UDim2.fromOffset(16, 28), TextSize = 13, TextColor3 = P.ink2, Font = Theme.Font })
+	local missing = 0
+	for _, def in Config.Kit do
+		if not def.extra then
+			continue
+		end
+		if kit[def.id] ~= true then
+			missing += 1
+			continue
+		end
+		local row = P.row(parent, 64, n, def.id == inUse)
+		n += 1
+		Ui.icon(row, Icons.kit(def.id), def.icon, UDim2.fromOffset(36, 36), { Position = UDim2.fromOffset(10, 14), TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center })
+		Ui.label(row, def.name, UDim2.new(1, -200, 0, 22), { Position = UDim2.fromOffset(56, 8), TextSize = 16, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		local perk = if def.bagWarm then ` · food cools ×{def.bagWarm}` elseif def.padded then " · fragile safe" elseif def.bagBreath then ` · sprint breath ×{def.bagBreath}` else ""
+		Ui.label(row, `🏃 {def.extra} light pieces{perk}`, UDim2.new(1, -200, 0, 20), { Position = UDim2.fromOffset(56, 32), TextSize = 13, Font = Theme.Font, TextColor3 = P.ink2, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		local mine = def.id == inUse
+		local button = P.button(row, if mine then "IN USE" else "USE", UDim2.fromOffset(120, 36), if mine then "off" else "main", function()
+			if not mine then
+				Net.get("Kit"):FireServer("use", def.id)
+			end
+		end)
+		button.Position = UDim2.new(1, -132, 0.5, -18)
+		button.TextSize = 14
+	end
+	if missing > 0 then
+		P.caps(parent, `{missing} more {if missing == 1 then "bag" else "bags"} at Last Stop Supplies (KIT)`, UDim2.new(1, -12, 0, 24), { LayoutOrder = n, TextColor3 = P.ink2, TextSize = 11, TextStrokeTransparency = 1 })
+		n += 1
+	end
+	return n
 end
 
 -- Draws the bag into a window's scrolling list (a UIListLayout) from layout order `order` on; returns the next one.

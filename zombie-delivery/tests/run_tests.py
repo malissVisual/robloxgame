@@ -23,6 +23,8 @@ with tempfile.TemporaryDirectory() as tmp:
         shutil.copy(os.path.join(os.path.dirname(SHARED), "client", name + ".luau"), os.path.join(tmp, name + ".luau"))
     shutil.copy(os.path.join(SHARED, "CourierMotion.luau"), os.path.join(tmp, "CourierMotion.luau"))
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "CharacterArt", "Geometry.luau"), os.path.join(tmp, "CharacterGeometry.luau"))
+    # 6.4: the kit art (pure: the bags' pieces, tests/bags_test.luau)
+    shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "KitArt", "Geometry.luau"), os.path.join(tmp, "KitGeometry.luau"))
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")

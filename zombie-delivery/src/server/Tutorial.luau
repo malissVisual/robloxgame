@@ -362,6 +362,20 @@ local function bikeCheck(player: Player)
 	if before < Career.BIKE_LEVEL and level >= Career.BIKE_LEVEL and not ownsBike(player) then
 		tellBikes(player, Config.BikeShop.Unlock)
 	end
+	-- 6.4: a level that opens a bag you don't own (Config.Kit `extra`): Marge texts once, the shop on the GPS (the
+	-- biggest such bag when one level opens two)
+	local opened: Config.KitDef? = nil
+	for _, def in Config.Kit do
+		if def.extra and def.level > before and def.level <= level and not profile.kit[def.id] then
+			opened = def
+		end
+	end
+	if opened and remote then
+		local shop = Map.Shops.supplies
+		local words = string.gsub(string.gsub(string.gsub(Config.Courier.BagUnlock, "{name}", opened.name), "{room}", tostring(opened.extra)), "{price}", `${opened.price}`)
+		remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "supplies" } })
+		notice:FireClient(player, `📱 Marge: {words}`)
+	end
 end
 
 -- ── 6.0: Marge about the pistol ────────────────────────────────────────────

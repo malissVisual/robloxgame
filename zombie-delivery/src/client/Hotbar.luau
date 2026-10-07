@@ -19,6 +19,7 @@
 --     slot frames and no tile a free place: the owner read the 6.0.1 tiles as new inventory slots ("a new inventory
 --     slot is created when you pick something up"). From the job payload's `carried` and the PackCount / PackRoom /
 --     BagRoom attributes; off duty it hides while you carry nothing. A click opens the I window's BAG tab (BagUi.open).
+-- 6.4: the bag slot is the ACTIVE bag's (the state's `bag`: its icon, its name, its room off duty: Transport.bagRoom).
 -- 6.3: the bag slot's "n/room" is the server's (the BagRoom attribute) on a job, the kit's off duty; a car job says
 -- "HANDS ONLY" (a job whose pickups go to your hands: a car job); a count badge on the slot says the pieces in the bag.
 -- The bar: the pill over the row of the hands and the items. A touch screen: the slots at least 48 px, two item slots,
@@ -297,14 +298,19 @@ end
 -- Whether you own the bag, what is in it, its room, whether it lies on the ground and (6.3) whether this is a car job.
 -- 6.3: the room is the server's on a job (the BagRoom attribute: 0 on a car job, whose pickups go to the hands), the
 -- kit's extra off duty, so the slot never promises room the server does not give.
+-- 6.4: the active bag (the server's state.bag) and its room off duty (Transport.bagRoom: that bag's, never the sum).
+local function bagId(): string?
+	return if state and type(state.bag) == "string" then state.bag else nil
+end
+
 local function bagNow(): (boolean, number, number, boolean, boolean)
 	local kit = kitOwned()
-	local owned = kit[Config.Courier.BagKit] == true
+	local owned = bagId() ~= nil
 	-- (6.3 review: the server decides: no BagRoom on this job = the bag takes nothing here; a mission's foot job is
 	-- built with the car mode, so the mode alone said "CAR JOB" wrongly)
 	local carJob = job ~= nil and player:GetAttribute("BagRoom") == nil
 	local room = if job then math.floor(tonumber(player:GetAttribute("BagRoom")) or 0)
-		else math.max(0, Transport.handsRoom(kit) - Transport.backpackRoom(kit))
+		else Transport.bagRoom(kit, bagId())
 	local count = math.floor(tonumber(player:GetAttribute("BagCount")) or 0)
 	return owned, count, room, typeof(player:GetAttribute("BagDown")) == "Vector3", carJob
 end
@@ -398,7 +404,7 @@ local function drawHands(): boolean
 	local held = Holster.hand()
 	local owned, count, room, down, carJob = bagNow()
 	local weapon = if state and type(state.weapon) == "string" then state.weapon else nil
-	local key = `{held}|{owned}|{count}|{room}|{down}|{carJob}|{weapon}`
+	local key = `{held}|{owned}|{count}|{room}|{down}|{carJob}|{weapon}|{bagId()}`
 	if key == shownHands then
 		return false
 	end
@@ -412,8 +418,11 @@ local function drawHands(): boolean
 			caption, title = "FISTS", "FISTS · V PUNCHES"
 		elseif hand == "bag" then
 			caption = if not owned then "NO BAG" elseif down then `DOWN {count}` elseif carJob then "HANDS ONLY" else `{count}/{room}`
-			title = if down then "YOUR BAG IS ON THE GROUND" elseif owned and carJob then "PLASTIC BAG · NOT ON THIS JOB: PICKUPS GO TO YOUR HANDS" else "PLASTIC BAG"
-			image = Icons.kit(Config.Courier.BagKit)
+			-- 6.4: the active bag's name and icon; its point first: you sprint with what rides in it
+			local bagDef = Transport.findKit(bagId() or Config.Courier.BagKit)
+			local name = if bagDef then string.upper(bagDef.name) else "BAG"
+			title = if down then "YOUR BAG IS ON THE GROUND" elseif owned and carJob then `{name} · NOT ON THIS JOB: PICKUPS GO TO YOUR HANDS` else `{name} · SPRINT WITH YOUR DELIVERIES`
+			image = Icons.kit(bagId() or Config.Courier.BagKit)
 		else
 			caption = if def then string.upper(def.name) else "NO GUN"
 			title = if def then `{string.upper(def.name)} · T PICKS THE GUN` else "NO GUN"
@@ -463,7 +472,7 @@ local function placesNow(): { Bag.Place }
 		local packRoom = tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0
 		return Bag.places(mode, packRoom, tonumber(job.rack) or 0, bagRoom)
 	end
-	return Bag.places("foot", Holding.packRoom(Transport.packRoom(kit), math.max(0, Transport.handsRoom(kit) - Transport.backpackRoom(kit)), bagRoom > 0), 0, bagRoom)
+	return Bag.places("foot", Holding.packRoom(Transport.packRoom(kit, bagId()), Transport.bagRoom(kit, bagId()), bagRoom > 0), 0, bagRoom)
 end
 
 -- The pieces: the payload's `carried`; the live PackCount attribute adds the pack's pieces the payload has not yet.

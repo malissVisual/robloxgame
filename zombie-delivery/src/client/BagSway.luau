@@ -13,6 +13,14 @@
 -- error; with the step jolt at 8 Hz and the flutter on top, the bag jittered and blinked.)
 -- A character's joint is looked up once (again when it leaves the body, every LOOK seconds while it has none); out of
 -- range or gone, the joint goes back to the identity once and its swing is forgotten.
+-- 6.4: each bag swings with its own tuning (the pivot's Bag attribute, Config.Courier.Bags): a tote a little slower,
+-- the thermal and the padded bag heavy and boxy, the duffel slow with hardly any flutter. Each way of wearing it (the
+-- pivot's Worn attribute, server/KitWear.luau: "hand" | "shoulder" | "hip" | "back") its own motion: in the hand the
+-- pendulum, on the shoulder or the hip a stiff little swing (Config.Courier.Wear) and a bounce with the steps
+-- (BagSwing.bob, Bounce), on the back a soft bob (BackBob). When the bag moves between the front and the back (the
+-- character's BagSwitchAt, the server time: the new pivot replaces the old one) it starts where it was, relative to
+-- the body, and moves to its new place over Config.Courier.Switch seconds while the sling / unsling gesture plays
+-- (client/ArmPose.luau). Still the joint's only writer.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,8 +34,25 @@ local Bodies = require(script.Parent.Bodies)
 local BagSway = {}
 
 local B = Config.Courier.Bag
+local C = Config.Courier -- 6.4: Bounce, BackBob, Step, Switch, Wear
+local SWITCH = math.max(0.05, C.Switch)
+local WEAR = BagSwing.tuning(B :: any, C.Wear) -- 6.4: a bag on the shoulder or the hip: a stiff little swing
 local LOOK = 0.4 -- seconds between the looks for a bag on a character that has none
 local SWEEP = 5 -- seconds between the clean-ups of the characters that are gone
+
+-- 6.4: every bag's own swing (Config.Courier.Bags over Bag: the bigger, the heavier), made once per bag id. The pivot's
+-- Bag attribute (server/KitWear.luau) names the bag in that hand.
+local tunings: { [string]: BagSwing.Tuning } = {}
+local function tuningOf(pivot: Instance?): BagSwing.Tuning
+	local id = if pivot then pivot:GetAttribute("Bag") else nil
+	local key = if type(id) == "string" then id else Config.Courier.BagKit
+	local made = tunings[key]
+	if not made then
+		made = BagSwing.tuning(B :: any, Config.Courier.Bags[key])
+		tunings[key] = made
+	end
+	return made
+end
 
 type Rec = {
 	joint: Motor6D?,
@@ -35,6 +60,13 @@ type Rec = {
 	state: BagSwing.State,
 	nextLook: number,
 	written: boolean, -- a Transform of ours is on the joint
+	tuning: BagSwing.Tuning, -- 6.4: this bag's swing
+	worn: string, -- 6.4: "hand" | "shoulder" | "hip" | "back" (the pivot's Worn attribute)
+	walked: number, -- 6.4: studs walked (the steps' bounce)
+	rel: CFrame?, -- 6.4: the bag's last pose relative to the body (a move to the back or the front starts there) …
+	from: CFrame?, -- … the pose the running move started from, and the move's start (the server time)
+	fromAt: number,
+	relBag: string?, -- (the bag that pose was of)
 }
 
 local recs: { [Model]: Rec } = {}
@@ -79,6 +111,7 @@ local function step(dt: number)
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else nil
 	local now = os.clock()
+	local serverNow = workspace:GetServerTimeNow()
 	for _, player in Bodies.players() do
 		local character = player.Character
 		if not character then
@@ -93,16 +126,18 @@ local function step(dt: number)
 		end
 		local rec = recs[character]
 		if not rec then
-			rec = { joint = nil, hand = nil, state = BagSwing.new(), nextLook = 0, written = false }
+			rec = { joint = nil, hand = nil, state = BagSwing.new(), nextLook = 0, written = false, tuning = tuningOf(nil), worn = "hand", walked = 0, rel = nil, from = nil, fromAt = 0, relBag = nil }
 			recs[character] = rec
 		end
 		local joint, hand = rec.joint, rec.hand
+		local switchAt = character:GetAttribute("BagSwitchAt")
+		local switching = type(switchAt) == "number" and serverNow - switchAt < SWITCH + 0.3
 		if joint and (joint.Parent == nil or not hand or hand.Parent ~= character) then
 			release(rec) -- (the bag went: put away, rebuilt)
 			joint, hand = nil, nil
 		end
 		if not joint then
-			if now < rec.nextLook then
+			if now < rec.nextLook and not switching then
 				continue
 			end
 			rec.nextLook = now + LOOK
@@ -111,29 +146,69 @@ local function step(dt: number)
 				continue
 			end
 			rec.joint, rec.hand = joint, hand
+			-- 6.4: the bag that hangs there and how it is worn (a new one is a new joint); moved between the front and
+			-- the back just now: it starts from where it was (rec.rel) and moves over SWITCH seconds
+			local pivot = (joint :: Motor6D).Parent
+			local worn = if pivot then pivot:GetAttribute("Worn") else nil
+			rec.worn = if type(worn) == "string" then worn else "hand"
+			rec.tuning = if rec.worn == "hand" then tuningOf(pivot) else WEAR
+			local bagId = if pivot then pivot:GetAttribute("Bag") else nil
+			rec.from = if switching and rec.rel and rec.relBag == bagId then rec.rel else nil -- (the same bag only)
+			rec.relBag = if type(bagId) == "string" then bagId else nil
+			rec.fromAt = if type(switchAt) == "number" then switchAt else 0
 		end
 		local grip = (hand :: BasePart).CFrame * (joint :: Motor6D).C0
 		local at = grip.Position
 		handVec[1], handVec[2], handVec[3] = at.X, at.Y, at.Z
 		local velocity = root.AssemblyLinearVelocity
 		bodyVec[1], bodyVec[2], bodyVec[3] = velocity.X, velocity.Y, velocity.Z
-		local tx, tz, twist = BagSwing.step(rec.state, dt, handVec, bodyVec, B)
-		-- The world orientation: your facing, the twist about the handles, tilted away from where the bottom went.
-		local look = root.CFrame.LookVector
-		local flat = Vector3.new(look.X, 0, look.Z)
-		local facing = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
-		local right = facing:Cross(Vector3.yAxis)
-		local want = CFrame.fromMatrix(Vector3.zero, right, Vector3.yAxis) * CFrame.Angles(0, twist, 0)
-		local size = math.sqrt(tx * tx + tz * tz)
-		if size > 1e-4 then
-			-- (the bottom moved toward (tx, tz): the up axis leans the other way; axis = bottom's way × up)
-			local axis = Vector3.new(tx / size, 0, tz / size):Cross(Vector3.yAxis)
-			want = CFrame.fromAxisAngle(axis, size) * want
+		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+		rec.walked = (rec.walked + speed * dt) % (C.Step * 64)
+		local transform: CFrame
+		if rec.worn == "hand" then
+			local tx, tz, twist = BagSwing.step(rec.state, dt, handVec, bodyVec, rec.tuning)
+			-- The world orientation: your facing, the twist about the handles, tilted away from where the bottom went.
+			local look = root.CFrame.LookVector
+			local flat = Vector3.new(look.X, 0, look.Z)
+			local facing = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
+			local right = facing:Cross(Vector3.yAxis)
+			local want = CFrame.fromMatrix(Vector3.zero, right, Vector3.yAxis) * CFrame.Angles(0, twist, 0)
+			local size = math.sqrt(tx * tx + tz * tz)
+			if size > 1e-4 then
+				-- (the bottom moved toward (tx, tz): the up axis leans the other way; axis = bottom's way × up)
+				local axis = Vector3.new(tx / size, 0, tz / size):Cross(Vector3.yAxis)
+				want = CFrame.fromAxisAngle(axis, size) * want
+			end
+			transform = grip.Rotation:Inverse() * want
+		else
+			-- 6.4: on the shoulder or the hip a small stiff swing and a bounce with the steps; on the back a soft bob
+			local back = rec.worn == "back"
+			local want = grip.Rotation
+			if not back then
+				local tx, tz = BagSwing.step(rec.state, dt, handVec, bodyVec, rec.tuning)
+				local size = math.sqrt(tx * tx + tz * tz)
+				if size > 1e-4 then
+					want = CFrame.fromAxisAngle(Vector3.new(tx / size, 0, tz / size):Cross(Vector3.yAxis), size) * want
+				end
+			end
+			local lift = BagSwing.bob(rec.walked, speed, if back then C.BackBob else C.Bounce, C.Step, B.FullSpeed)
+			transform = CFrame.new(0, lift, 0) * (grip.Rotation:Inverse() * want)
 		end
-		local transform = grip.Rotation:Inverse() * want
+		-- 6.4: the move between the front and the back (from where it was, relative to the body, to its new place)
+		local from = rec.from
+		if from then
+			local u = math.clamp((serverNow - rec.fromAt) / SWITCH, 0, 1)
+			if u >= 1 then
+				rec.from = nil
+			else
+				local blend = u * u * (3 - 2 * u)
+				transform = grip:Inverse() * (root.CFrame * from):Lerp(grip * transform, blend)
+			end
+		end
 		if transform == transform then -- (never a NaN on a joint)
 			(joint :: Motor6D).Transform = transform
 			rec.written = true
+			rec.rel = root.CFrame:Inverse() * (grip * transform)
 		end
 	end
 	if now - sweptAt > SWEEP then

@@ -10,9 +10,24 @@
 -- sprint (the character attribute KitSpeed, client/CameraRig.luau), the jacket's `warm` the food's freshness drain.
 --
 --   Transport.findKit(id)      the Config.Kit entry, or nil
---   Transport.handsRoom(kit)   light pieces you carry on foot: max(HandsMax, the best backpack's room) + the kit's
---                              `extra` (6.0: the plastic bag, Config.Kit "bag": it adds up with a backpack)
---   Transport.packRoom(kit)    of those, the ones in the pack (handsRoom − HandsMax)
+--   Transport.handsRoom(kit, bag)  light pieces you carry on foot: max(HandsMax, the best backpack's room) + the
+--                              active bag's `extra` (6.0: the plastic bag adds up with a backpack; 6.4: ONE bag, the
+--                              active one, never the sum of the bags you own)
+--   Transport.packRoom(kit, bag)  of those, the ones in the pack (handsRoom − HandsMax)
+--
+-- 6.4, the bags (Config.Kit pieces with `extra`: the plastic bag, the tote, the thermal, the padded messenger, the
+-- duffel). `bag` everywhere is the player's choice (profile.activeBag; the client gets the server's answer as the
+-- state's `bag`): nil, or one not owned, means the best one owned. The server decides (server/Transport.luau bagOf).
+--   Transport.isBag(def)       is this Config.Kit piece a bag (it has `extra`)?
+--   Transport.bestBag(kit)     the bag owned with the most room (a tie: the later one in Config.Kit), or nil
+--   Transport.activeBag(kit, bag)  the bag in your hand: `bag` when it is a bag you own, else bestBag
+--   Transport.bagRoom(kit, bag)    its room (0 without a bag): the one number Cargo, Jobs, the hotbar and the shop use
+--   Transport.bagWarm(kit, bag)    food in it cools × this (the thermal bag; 1 = none)
+--   Transport.bagPadded(kit, bag)  fragile pieces in it are safe (the padded messenger)?
+--   Transport.bagBreath(kit, bag)  the sprint drains the breath × this while it is your hand (the duffel; 1 = none)
+-- (Every bag's point: you sprint with your deliveries. Pieces in a bag or a backpack are never in your hands.)
+--   Transport.mixWarm(share, bagWarm)  the drain multiplier of an order whose `share` of pieces with you is in a
+--                              warm bag: 1 − share × (1 − bagWarm) (a jacket's warm multiplies on top)
 --   Transport.speedMult(kit)   the walk / sprint multiplier (the best shoes; 1 = none)
 --   Transport.warm(kit)        the food's freshness drain multiplier while you carry it (the best jacket; 1 = none)
 --   Transport.foot(kit)        Info on foot
@@ -23,7 +38,7 @@
 -- the pack and the bike's slots); the kit's walk speed does not count on a bike.
 --   Transport.isBike(carId)    is this Config.Cars id a bike (CarDef.bike)?
 --   Transport.bikeRoom(carId, carGear)  what a bike holds with its installed bike gear (profile.carGear), no pack
---   Transport.bike(room, kit)  Info on a bike that holds `room` pieces (bikeRoom) with this kit
+--   Transport.bike(room, kit, bag)  Info on a bike that holds `room` pieces (bikeRoom) with this kit
 --
 -- Pure Luau (tests/transport_test.luau).
 
@@ -50,20 +65,67 @@ function Transport.findKit(id: string): Config.KitDef?
 	return nil
 end
 
--- How many light pieces you carry in your hands and on your back (Config.Cargo.HandsMax + the best backpack's room).
--- 6.0: + every owned piece's `extra` (the plastic bag's 2), on top of the best backpack.
-function Transport.handsRoom(kit: Kit): number
-	local room = Config.Cargo.HandsMax
-	local extra = 0
+-- 6.4: a bag is a Config.Kit piece with `extra` (its room in the hand).
+function Transport.isBag(def: Config.KitDef?): boolean
+	return def ~= nil and def.extra ~= nil
+end
+
+-- 6.4: the bag you own with the most room; a tie goes to the later one in Config.Kit (the pricier: the padded messenger
+-- over the thermal bag). Nil without a bag.
+function Transport.bestBag(kit: Kit): Config.KitDef?
+	local best: Config.KitDef? = nil
 	for _, def in Config.Kit do
-		if kit[def.id] == true and def.room then
-			room = math.max(room, math.floor(def.room))
-		end
-		if kit[def.id] == true and def.extra then
-			extra += math.max(0, math.floor(def.extra))
+		if kit[def.id] == true and def.extra and (best == nil or def.extra >= (best.extra or 0)) then
+			best = def
 		end
 	end
-	return room + extra
+	return best
+end
+
+-- 6.4: the bag in your hand: your choice when it is a bag you own, else the best one (nil without a bag).
+function Transport.activeBag(kit: Kit, bag: string?): Config.KitDef?
+	if bag ~= nil and kit[bag] == true then
+		local def = Transport.findKit(bag)
+		if def and def.extra then
+			return def
+		end
+	end
+	return Transport.bestBag(kit)
+end
+
+-- 6.4: the active bag's room (0 without one). Never the sum of the bags you own.
+function Transport.bagRoom(kit: Kit, bag: string?): number
+	local def = Transport.activeBag(kit, bag)
+	return if def and def.extra then math.max(0, math.floor(def.extra)) else 0
+end
+
+-- 6.4: the active bag's perks (only while it is your hand: the callers check that).
+function Transport.bagWarm(kit: Kit, bag: string?): number
+	local def = Transport.activeBag(kit, bag)
+	return if def and def.bagWarm then math.clamp(def.bagWarm, 0, 1) else 1
+end
+
+function Transport.bagPadded(kit: Kit, bag: string?): boolean
+	local def = Transport.activeBag(kit, bag)
+	return def ~= nil and def.padded == true
+end
+
+function Transport.bagBreath(kit: Kit, bag: string?): number
+	local def = Transport.activeBag(kit, bag)
+	return if def and def.bagBreath then math.clamp(def.bagBreath, 1, 3) else 1
+end
+
+-- 6.4: an order's food drain multiplier when `share` (0 … 1) of its pieces with you rides in a bag that cools × bagWarm.
+function Transport.mixWarm(share: number, bagWarm: number): number
+	local s = math.clamp(if share == share then share else 0, 0, 1)
+	return 1 - s * (1 - math.clamp(bagWarm, 0, 1))
+end
+
+-- How many light pieces you carry in your hands and on your back (Config.Cargo.HandsMax + the best backpack's room).
+-- 6.0: + the bag's `extra` (the plastic bag's 2), on top of the best backpack. 6.4: the active bag's only (`bag`: the
+-- choice, nil = the best owned), never every bag's.
+function Transport.handsRoom(kit: Kit, bag: string?): number
+	return Transport.backpackRoom(kit) + Transport.bagRoom(kit, bag)
 end
 
 -- 6.0 review: the hands and the best backpack only (no bag's extra): what a backpack you might buy is compared with.
@@ -78,8 +140,8 @@ function Transport.backpackRoom(kit: Kit): number
 end
 
 -- The pieces of handsRoom that ride in the pack (not in the hands).
-function Transport.packRoom(kit: Kit): number
-	return math.max(0, Transport.handsRoom(kit) - Config.Cargo.HandsMax)
+function Transport.packRoom(kit: Kit, bag: string?): number
+	return math.max(0, Transport.handsRoom(kit, bag) - Config.Cargo.HandsMax)
 end
 
 -- The walk / sprint multiplier from the kit (running shoes …). 6.0: a piece below 1 (the Heavy Armour) slows you: the
@@ -106,9 +168,9 @@ function Transport.warm(kit: Kit): number
 	return mult
 end
 
--- On foot with this kit.
-function Transport.foot(kit: Kit): Info
-	return { mode = "foot", room = Transport.handsRoom(kit), lightOnly = true, speedMult = Transport.speedMult(kit) }
+-- On foot with this kit (6.4: and this bag choice).
+function Transport.foot(kit: Kit, bag: string?): Info
+	return { mode = "foot", room = Transport.handsRoom(kit, bag), lightOnly = true, speedMult = Transport.speedMult(kit) }
 end
 
 -- In a car that holds `room` pieces (Economy.capacity with its stage and gear).
@@ -135,8 +197,8 @@ function Transport.bikeRoom(carId: string?, carGear: Economy.CarGear?): number
 end
 
 -- 5.1: on a bike that holds `room` pieces (Transport.bikeRoom), with this kit: + the pack, light pieces only.
-function Transport.bike(room: number, kit: Kit): Info
-	return { mode = "bike", room = math.max(0, math.floor(room)) + Transport.packRoom(kit), lightOnly = true, speedMult = 1 }
+function Transport.bike(room: number, kit: Kit, bag: string?): Info
+	return { mode = "bike", room = math.max(0, math.floor(room)) + Transport.packRoom(kit, bag), lightOnly = true, speedMult = 1 }
 end
 
 return Transport
