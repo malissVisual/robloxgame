@@ -13,20 +13,21 @@ end
 function Geometry.pieces(id: string): { Piece }
 	local out: { Piece } = {}
 	if id == "backpack" or id == "backpack_loaded" then
-		add(out, "PackBody", { 1.46, 1.6, .54 }, { 0, -.08, 1 }, "UpperTorso", "cloth")
-		add(out, "BottomReinforcement", { 1.46, .18, .58 }, { 0, -.85, 1 }, "UpperTorso", "sole")
-		add(out, "FoldedTop", { 1.46, .23, .5 }, { 0, .67, 1.01 }, "UpperTorso", "charcoal", "Wedge", { 0, 180, 0 })
-		add(out, "FrontPocket", { 1.22, .62, .18 }, { 0, -.32, 1.35 }, "UpperTorso", "cloth")
-		add(out, "CourierStripe", { 1.2, .1, .035 }, { 0, -.06, 1.455 }, "UpperTorso", "red")
-		add(out, "Zip", { 1.05, .035, .04 }, { 0, .01, 1.45 }, "UpperTorso", "steel")
-		add(out, "ZipPull", { .07, .12, .045 }, { .46, -.03, 1.465 }, "UpperTorso", "steel")
-		add(out, "BackLabel", { .52, .18, .03 }, { 0, .33, 1.285 }, "UpperTorso", "charcoal", nil, { 0, 180, 0 }, "ZDC")
-		for _, x in { -.47, .47 } do
+		-- Compact parcel pack: a reinforced soft case with a low lid, clear of the visible carried parcel.
+		add(out, "PackBody", { 1.62, 1.5, .78 }, { 0, -.25, 1.12 }, "UpperTorso", "cloth")
+		add(out, "BottomReinforcement", { 1.64, .16, .8 }, { 0, -1.03, 1.12 }, "UpperTorso", "sole")
+		add(out, "FoldedTop", { 1.64, .12, .82 }, { 0, .48, 1.12 }, "UpperTorso", "charcoal")
+		add(out, "FrontPocket", { 1.4, .56, .14 }, { 0, -.6, 1.565 }, "UpperTorso", "cloth")
+		add(out, "CourierStripe", { 1.4, .1, .035 }, { 0, -.52, 1.655 }, "UpperTorso", "red")
+		add(out, "Zip", { 1.24, .035, .04 }, { 0, -.31, 1.65 }, "UpperTorso", "steel")
+		add(out, "ZipPull", { .07, .12, .045 }, { .55, -.36, 1.68 }, "UpperTorso", "steel")
+		add(out, "BackLabel", { .64, .28, .035 }, { 0, .19, 1.54 }, "UpperTorso", "charcoal", nil, { 0, 180, 0 }, "ZDC")
+		for _, x in { -.5, .5 } do
 			local side = if x < 0 then "L" else "R"
-			add(out, "ShoulderStrap" .. side, { .15, 1.35, .07 }, { x, -.04, -.69 }, "UpperTorso", "sole")
-			add(out, "Buckle" .. side, { .18, .13, .08 }, { x, -.42, -.76 }, "UpperTorso", "worn")
+			add(out, "ShoulderStrap" .. side, { .15, 1.35, .08 }, { x, -.1, -.75 }, "UpperTorso", "sole")
+			add(out, "Buckle" .. side, { .19, .13, .09 }, { x, -.48, -.83 }, "UpperTorso", "worn")
 		end
-		add(out, "GrabLoop", { .45, .08, .09 }, { 0, .89, 1.02 }, "UpperTorso", "sole")
+		add(out, "GrabLoop", { .44, .1, .22 }, { 0, .57, 1.38 }, "UpperTorso", "sole")
 		if id == "backpack_loaded" then table.insert(out, Geometry.load()) end
 	elseif id == "bigpack" then
 		add(out, "BoxBody", { 1.84, 1.88, .82 }, { 0, -.1, 1.04 }, "UpperTorso", "cloth")

@@ -4,10 +4,14 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · courier backpack matching approved character; native model and worn renders · server/KitArt/Geometry.luau, design/courier-backpack, tools/model-art/export_backpack.py · 2026-10-07
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- `codex/courier-backpack` · refreshed 13-part courier pack, native R15 Accessory export and exact/worn renders in `design/courier-backpack/`; real kit factory, parcel/lid clearance, XML/weld audit and full tests pass. Claude: review/merge, verify KitWear fit / loaded parcel / animation / respawn and standalone import in Studio.
+- `codex/stops-bus-docks` · native shelter, bus finish, 2/3-slot charging docks, zip deck and caged Truss ladder; slots/attachments/night/budgets and actual-bus boarding/hull/seats/welds audited, full tests and fleet checker pass. Claude: wire into existing callers and check live boards / unclip / boarding / climb in Studio; see `design/stops-bus-docks/README.md` and renders.
+- `codex/tower-facades` · four parametric native Kit facades (shopfront, rooftop, fire escape, boarded); 192 real-build clearance/budget cases and full tests pass; renders in `design/tower-facades/`. Claude: supply entrance/ladder/zip-roof metadata, preserve window strips and check all wall orientations / night lights in Studio; art is not wired in.
+- Codex · `codex/street-props` · 9 native prop kinds, optional PolishArt builder, real sheet/renders; actual city plan 534 props / 2,466 parts, rotated footprints and 27 factory cases pass · wire in StreetDressing; check pedestrians, car hull collision/headroom, flare/tag/night behavior. Full suite passes; see `design/street-props/README.md`.
+- Codex · `codex/polish-icons` · 29 transparent white SVG/PNG icons; manifest/sheet in `design/polish-icons/`; upload then fill slots/remove borrowed aliases. Full suite and pixel audits pass.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
