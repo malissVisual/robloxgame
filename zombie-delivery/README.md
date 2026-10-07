@@ -966,7 +966,8 @@ what each part shows is the same.
 | Upper right | MAP [M] · CREW [K] · MENU (every other action: JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
 | Lower right | the gun and [T] (3.9 on foot: HANDS · [B] DRAW · [V] PUNCH, or the gun · [B] HOLSTER · [V] STRIKE), or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [I] |
-| Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it |
+| Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): five square item slots (the consumables you own in their order, the count, keys 1-5; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more). It hides while a window, the phone or a dialog is open |
+| Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it (both over the bottom bar) |
 | In the world | a small red waypoint with the place and the distance |
 
 Every window is a charcoal rectangle (a small caps label, the title, a thin line, slim rows, one main action with a red
@@ -1434,7 +1435,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
               the head, the Challenges remote), CloseCombat (3.9: the holster, the Holstered attribute, the melee
               checked and dealt: the nearest enemy in the cone, MeleeAt / MeleeKind for the swing)
-src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
+src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, the item
+              slots 1-5 and what you carry), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),

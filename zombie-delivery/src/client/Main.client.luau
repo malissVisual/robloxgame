@@ -164,6 +164,11 @@ CameraRig.freeLook = function(): boolean
 	return Phone.isOpen() and not Phone.appOpen() and not CameraRig.windowOpen()
 end
 LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while a window is open
+-- 6.0.1: the bottom bar (client/Hotbar.luau: the items 1-5 and what you carry) hides while a window, the phone or a
+-- dialog (Marge's, the delivery result) covers the game.
+require(Client.Hotbar).covered = function(): boolean
+	return CameraRig.mouseNeeded() or TutorialUi.isOpen() or Hud.resultOpen()
+end
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)

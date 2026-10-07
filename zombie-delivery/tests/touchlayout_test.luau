@@ -119,6 +119,39 @@ for _, screen in SCREENS do
 		end
 		check(`{name}{tag}: the contextual action clear of the column`, not TouchLayout.overlap(hint, column), `{show(hint)} / {show(column)}`)
 		check(`{name}{tag}: the contextual action clear of the jump button`, not TouchLayout.overlap(hint, c.jump), `{show(hint)} / {show(c.jump)}`)
+
+		-- 6.0.1, the bottom bar (client/Hotbar.luau: 5 item slots of 56 over the carried strip, 304 × 100 unscaled; a
+		-- slot at least 48 px on a touch screen) with the right column (now 158 tall: the items left it) and the action.
+		local barScale = math.max(S, 48 / 56)
+		local rowLeft = if admin then math.min(row.x0, W - 16 - 90) else row.x0
+		local col2, over2, bar = TouchLayout.dock(c, W, H, 300 * S, 158 * S, rowBottom, rowLeft, 304 * barScale, 100 * barScale)
+		check(`{name}{tag}: the bar's slots 48 px or bigger`, 56 * barScale >= 48)
+		check(`{name}{tag}: the bar on the screen`, inside(bar, W, H), show(bar))
+		check(`{name}{tag}: the bar clear of the thumbstick`, not TouchLayout.overlap(bar, c.thumb), `{show(bar)} / {show(c.thumb)}`)
+		check(`{name}{tag}: the bar clear of the jump button`, not TouchLayout.overlap(bar, c.jump), `{show(bar)} / {show(c.jump)}`)
+		check(`{name}{tag}: the bar clear of the column`, not TouchLayout.overlap(bar, col2), `{show(bar)} / {show(col2)}`)
+		check(`{name}{tag}: the bar clear of the actions' row`, bar.y0 >= rowBottom or not TouchLayout.overlap(bar, row), `{show(bar)} / {show(row)}`)
+		check(`{name}{tag}: the docked column on the screen`, inside(col2, W, H), show(col2))
+		check(`{name}{tag}: the docked column clear of the actions' row`, over2 or col2.y0 >= rowBottom or col2.x1 <= rowLeft, `{show(col2)} / {show(row)}`)
+		for i, b in buttons do
+			check(`{name}{tag}: the bar clear of {names[i]}`, not TouchLayout.overlap(bar, b), `{show(bar)} / {show(b)}`)
+			check(`{name}{tag}: the docked column clear of {names[i]}`, not TouchLayout.overlap(col2, b), `{show(col2)} / {show(b)}`)
+		end
+		if W > H then
+			check(`{name}{tag}: the bar at the bottom`, bar.y1 >= H - 8 - 0.01, show(bar))
+			check(`{name}{tag}: the docked column clear of the thumbstick`, not TouchLayout.overlap(col2, c.thumb), `{show(col2)} / {show(c.thumb)}`)
+		end
+		local boxes2 = table.clone(buttons)
+		table.insert(boxes2, col2)
+		local hx, hb, hw = TouchLayout.hint(c, boxes2, W, H, S, bar.y0)
+		local hint2 = TouchLayout.box(hx - hw / 2, hb - 96 * S, hx + hw / 2, hb)
+		check(`{name}{tag}: the action over the bar on the screen`, inside(hint2, W, H), show(hint2))
+		check(`{name}{tag}: the action clear of the bar`, not TouchLayout.overlap(hint2, bar), `{show(hint2)} / {show(bar)}`)
+		check(`{name}{tag}: the action clear of the docked column`, not TouchLayout.overlap(hint2, col2), `{show(hint2)} / {show(col2)}`)
+		check(`{name}{tag}: the action (with the bar) clear of the thumbstick`, not TouchLayout.overlap(hint2, c.thumb), `{show(hint2)} / {show(c.thumb)}`)
+		for i, b in buttons do
+			check(`{name}{tag}: the action (with the bar) clear of {names[i]}`, not TouchLayout.overlap(hint2, b), `{show(hint2)} / {show(b)}`)
+		end
 	end
 end
 
