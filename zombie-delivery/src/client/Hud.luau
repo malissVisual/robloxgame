@@ -2110,6 +2110,7 @@ local touchHands: any = {} -- 3.9: the touch buttons over FIRE (melee, holster),
 -- other seat your gun, WINDOW READY when it is one-handed, ON FOOT ONLY when it is not (it does not fire there);
 -- with cargo in your hands the cargo and what carrying stops; while the cargo loads, HOLSTERED and dimmed.
 -- 3.9, on foot: the gun holstered (B) shows HANDS and [B] DRAW · [V] PUNCH, the gun out [B] HOLSTER · [V] STRIKE.
+-- 6.1: the keys of what you hold (3 draws, 1 holsters; B still works), BAG while the bag is in your hand.
 local function seatView(): (boolean, Config.CarGunDef?)
 	local seatedIn, driving = Drive.seatedCar()
 	return seatedIn ~= nil, if seatedIn and driving then Shooting.carGunOf(seatedIn) else nil
@@ -2131,7 +2132,7 @@ function weaponBarKey(): string
 	local seated, carGun = seatView()
 	local holding = myCarrying()
 	local gun = if state then tostring(state.weapon) else "-"
-	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}|{gun}`
+	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}|{gun}|{Holster.hand()}`
 end
 shownWeaponBar = ""
 
@@ -2193,8 +2194,9 @@ function renderWeapons()
 		if not seated then
 			-- 6.0: no gun yet (a new courier: fists only): FISTS and the punch; the pistol is sold at Lead & Co.
 			local top = lineRow(weaponRow, 24)
-			Ui.icon(top, nil, "✊", UDim2.fromOffset(34, 22), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = P.ink, LayoutOrder = 1 })
-			P.text(top, "FISTS", UDim2.fromOffset(0, 24), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 16, LayoutOrder = 2 })
+			local bag = Holster.hand() == "bag" -- 6.1: or the bag in your hand
+			Ui.icon(top, nil, if bag then "🛍" else "✊", UDim2.fromOffset(34, 22), { TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, ImageColor3 = P.ink, LayoutOrder = 1 })
+			P.text(top, if bag then "BAG" else "FISTS", UDim2.fromOffset(0, 24), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 16, LayoutOrder = 2 })
 			P.caps(weaponRow, if touchLayout then "Tap PUNCH · guns at Lead & Co." else "[V] Punch · guns at Lead & Co.", UDim2.new(1, 0, 0, 14), {
 				Position = UDim2.fromOffset(0, 26),
 				TextXAlignment = Enum.TextXAlignment.Right,
@@ -2212,8 +2214,8 @@ function renderWeapons()
 		elseif not usable then "⚠ On foot only"
 		elseif seated then "Window ready"
 		elseif touchLayout then (if hands then "Holstered · tap DRAW or PUNCH" else "Ready · tap here to switch gun")
-		elseif hands then "[B] Draw · [V] Punch"
-		else "[B] Holster · [V] Strike"
+		elseif hands then "[3] Draw · [V] Punch" -- 6.1 (B still draws and holsters)
+		else "[1] Holster · [V] Strike"
 	local group = Ui.make("CanvasGroup", {
 		Name = "GunLine",
 		Size = UDim2.fromScale(1, 1),
@@ -2221,13 +2223,13 @@ function renderWeapons()
 		GroupTransparency = if holstered or not usable then 0.45 else 0,
 	}, weaponRow)
 	local top = lineRow(group, 24)
-	Ui.icon(top, if hands then nil else Icons.weapon(def.id), if hands then "✊" elseif def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.fromOffset(34, 22), {
+	Ui.icon(top, if hands then nil else Icons.weapon(def.id), if hands and Holster.hand() == "bag" then "🛍" elseif hands then "✊" elseif def.splash > 0 then "💥" elseif def.pellets > 1 then "🎯" else "🔫", UDim2.fromOffset(34, 22), {
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ImageColor3 = P.ink,
 		LayoutOrder = 1,
 	})
-	P.text(top, if hands then "HANDS" else string.upper(def.name), UDim2.fromOffset(0, 24), {
+	P.text(top, if hands and Holster.hand() == "bag" then "BAG" elseif hands then "HANDS" else string.upper(def.name), UDim2.fromOffset(0, 24), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.HeadingFont,
 		TextSize = 16,
@@ -4081,11 +4083,12 @@ function Hud.start()
 				openDispatch()
 			end
 		else -- (T: the weapon wheel, client/WeaponWheel.luau)
-			-- 1-5: the bottom bar's slots (client/Hotbar.luau: the items you have, in order; 6: a sixth kind).
-			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six }
+			-- 6.1: 1-3 what you hold (fists / bag / gun), 4-8 the bottom bar's item slots (client/Hotbar.luau: the items
+			-- you have, in order; 9: a sixth kind).
+			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight, Enum.KeyCode.Nine }
 			local index = table.find(numbers, key)
 			if index then
-				require(script.Parent.Hotbar).useSlot(index)
+				require(script.Parent.Hotbar).useKey(index)
 			end
 		end
 	end)

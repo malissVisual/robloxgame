@@ -87,7 +87,7 @@ function BagUi.render(parent: Instance, job: any, order: number): number
 					inHands += 1
 				elseif piece.where == "rack" then
 					onRack += 1
-				elseif piece.where == "pack" then
+				elseif piece.where == "pack" or piece.where == "bag" then -- (6.1: the bag in your hand)
 					inPack += 1
 				end
 			end

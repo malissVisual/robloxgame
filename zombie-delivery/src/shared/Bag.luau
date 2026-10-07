@@ -133,9 +133,10 @@ function Bag.line(carried: { Piece }?): string?
 	return "🎒 " .. table.concat(parts, " · ")
 end
 
-local ORDER = { "hands", "pack", "rack", "vehicle" }
+local ORDER = { "hands", "bag", "pack", "rack", "vehicle" }
 
--- The pieces by where they are, in the order hands, backpack, rack, vehicle; only the places that hold something.
+-- The pieces by where they are, in the order hands, (6.1) the bag in your hand, backpack, rack, vehicle; only the
+-- places that hold something.
 -- `mode` names the rack (an e-scooter's or a bike's: "bike"; nil: "Rack").
 function Bag.groups(carried: { Piece }?, mode: string?): { Group }
 	local by: { [string]: { Piece } } = {}
@@ -151,6 +152,7 @@ function Bag.groups(carried: { Piece }?, mode: string?): { Group }
 	end
 	local titles: { [string]: { string } } = {
 		hands = { "✋", "In your hands" },
+		bag = { "🛍", "In the bag in your hand" }, -- 6.1
 		pack = { "🎒", "In your backpack" },
 		rack = { "🚲", if mode == "bike" then "On your bike" else "On the rack" },
 		vehicle = { "🚚", "In your vehicle" },

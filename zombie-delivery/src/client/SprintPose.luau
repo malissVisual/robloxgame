@@ -1,5 +1,5 @@
 --!strict
--- 6.0: the courier's sprint and the bag that flies behind it, on every player's character within
+-- 6.0: the courier's sprint, on every player's character within
 -- Config.Courier.Sprint.Range of the camera (yours always), every frame in RunService.PreSimulation (after the Animator,
 -- before the engine applies the joints; the Transform only, never C0: shared/Joints.luau).
 --   * 6.0.1, the sprint is a real run cycle (shared/RunCycle.luau): faster than Sprint.From studs / s on foot (not
@@ -13,10 +13,7 @@
 --     the phone, a gesture, a swing, a door's handle (their attributes, or yours from CameraRig / Holster) and 0.35 s
 --     after; the legs, the waist, the head and the bob go on. ArmPose's own sprint lean steps aside meanwhile
 --     (SprintPose.weight).
---   * The plastic bag (server/KitWear.luau: KitBagPivot in the character, hung from the left hand by the Motor6D
---     BagSwing): it hangs straight down at rest and swings back by the speed (Config.Courier.Bag: MaxTilt at
---     FullSpeed, a spring that overshoots a little), flutters and sways when fast and jolts with every step of the
---     cycle (Bag.Bounce). Its Transform turns it from where the hand holds it to that.
+--   * 6.1: the plastic bag's swing moved to client/BagSway.luau (the BagSwing joint's only writer).
 -- Joints are looked up once per character (again every RIG_REFRESH seconds, RIG_RETRY while some are missing, at once
 -- when one left the body). The blend starts from the animation's own value of a joint (a joint that still holds what
 -- we wrote was not written by the Animator this frame: its last animation value is the base, as in ArmPose). Let go
@@ -39,13 +36,11 @@ local Interact = require(script.Parent.Interact)
 local SprintPose = {}
 
 local S = Config.Courier.Sprint
-local B = Config.Courier.Bag
 local RIG_REFRESH = 2 -- seconds a character's joints are kept before they are looked up again …
 local RIG_RETRY = 0.5 -- … or this, while some are missing
 local BUSY_FOR = 1.5 -- seconds after a gesture, a swing or a door's handle the arms stay ArmPose's
 local ARMS_HOLD = 0.35 -- 6.0 review: and this long after ArmPose lets go (it lowers the arms for ~0.3 s)
 local SWEEP = 5 -- seconds between the clean-ups of the characters and joints that are gone
-local TAU = 2 * math.pi
 
 -- The states the sprint is off in (the animation's own jump, fall, climb, swim, sit …).
 local OFF_STATES: { [Enum.HumanoidStateType]: boolean } = {
@@ -63,7 +58,7 @@ local OFF_STATES: { [Enum.HumanoidStateType]: boolean } = {
 
 type Rig = {
 	lh: any, rh: any, lk: any, rk: any, ls: any, rs: any, le: any, re: any,
-	waist: any, neck: any, root: any, bag: any, pivot: BasePart?, expires: number,
+	waist: any, neck: any, root: any, expires: number,
 }
 type Body = {
 	weight: number, -- the cycle's share (0 = the animation alone)
@@ -72,7 +67,6 @@ type Body = {
 	phase: number,
 	effort: number,
 	busyUntil: number,
-	tilt: number, spin: number, flutter: number, swung: boolean, -- the bag
 }
 
 local rigs: { [Model]: Rig } = {}
@@ -130,7 +124,7 @@ end
 
 local function intact(rig: Rig): boolean
 	return not (gone(rig.lh) or gone(rig.rh) or gone(rig.lk) or gone(rig.rk) or gone(rig.ls) or gone(rig.rs)
-		or gone(rig.le) or gone(rig.re) or gone(rig.waist) or gone(rig.neck) or gone(rig.root) or gone(rig.bag))
+		or gone(rig.le) or gone(rig.re) or gone(rig.waist) or gone(rig.neck) or gone(rig.root))
 end
 
 local function rigOf(character: Model): Rig
@@ -140,8 +134,6 @@ local function rigOf(character: Model): Rig
 		return rig
 	end
 	local r15 = character:FindFirstChild("UpperTorso") ~= nil
-	local found = character:FindFirstChild("KitBagPivot")
-	local pivot = if found and found:IsA("BasePart") then found else nil
 	local made: Rig = {
 		lh = if r15 then jointIn(character, "LeftUpperLeg", "LeftHip") else nil,
 		rh = if r15 then jointIn(character, "RightUpperLeg", "RightHip") else nil,
@@ -154,8 +146,6 @@ local function rigOf(character: Model): Rig
 		waist = if r15 then jointIn(character, "UpperTorso", "Waist") else nil,
 		neck = if r15 then jointIn(character, "Head", "Neck") else nil,
 		root = if r15 then jointIn(character, "LowerTorso", "Root") else nil,
-		bag = Joints.find(pivot, "BagSwing"),
-		pivot = pivot,
 		expires = 0,
 	}
 	local complete = r15 and made.lh and made.rh and made.lk and made.rk and made.ls and made.rs and made.le and made.re
@@ -204,7 +194,7 @@ local function bodyBack(rig: Rig)
 	release(rig.root)
 end
 
--- A character out of range (or gone): everything back to the rest pose, the bag hanging from the hand as it is held.
+-- A character out of range (or gone): everything back to the rest pose.
 local function letGo(character: Model)
 	local body = bodies[character]
 	if not body then
@@ -217,10 +207,6 @@ local function letGo(character: Model)
 	end
 	armsBack(rig)
 	bodyBack(rig)
-	local bag = rig.bag
-	if bag and bag.Parent and body.swung then
-		bag.Transform = CFrame.identity
-	end
 end
 
 -- Can this body sprint now (on its feet, nothing else moving it)?
@@ -254,38 +240,6 @@ local function run(rig: Rig, w: number, wa: number, phase: number, effort: numbe
 	elseif written[rig.rs] or written[rig.ls] or written[rig.re] or written[rig.le] then
 		armsBack(rig)
 	end
-end
-
--- The bag flies behind by the speed: a spring toward the tilt, a flutter and a sway when fast, a jolt every step.
-local function swingBag(rig: Rig, body: Body, root: BasePart, dt: number)
-	local joint, pivot = rig.bag, rig.pivot
-	if not joint or not pivot or not joint.Parent or not pivot.Parent then
-		return
-	end
-	local velocity = root.AssemblyLinearVelocity
-	local flat = Vector3.new(velocity.X, 0, velocity.Z)
-	local fast = math.clamp(flat.Magnitude / B.FullSpeed, 0, 1)
-	local goal = math.rad(B.MaxTilt) * fast
-	body.spin += (B.Spring * (goal - body.tilt) - B.Damp * body.spin) * dt
-	body.tilt += body.spin * dt
-	body.flutter += dt * B.FlutterHz * TAU * math.max(0.25, fast)
-	-- (6.0.1: with each footfall of the cycle, phase 0.1 / 0.6, it drops forward, and flies back up between)
-	local jolt = math.rad(B.Bounce) * body.weight * -math.cos(2 * TAU * (body.phase - 0.1))
-	local tilt = body.tilt + math.rad(B.Flutter) * fast * math.sin(body.flutter) + jolt
-	local sway = math.rad(B.Sway) * math.sin(body.flutter * 0.5) * (0.3 + fast)
-	local facing = root.CFrame.LookVector * Vector3.new(1, 0, 1)
-	local ahead = if flat.Magnitude > 1 then flat.Unit elseif facing.Magnitude > 0.01 then facing.Unit else Vector3.new(0, 0, -1)
-	local side = ahead:Cross(Vector3.yAxis)
-	-- The bag hangs down from the grip: its up leans forward as the bag goes back, and sways to the sides.
-	local up = (Vector3.yAxis * math.cos(tilt) + ahead * math.sin(tilt)) * math.cos(sway) + side * math.sin(sway)
-	local right = side - up * side:Dot(up)
-	if right.Magnitude < 1e-3 then
-		return
-	end
-	local want = CFrame.fromMatrix(pivot.Position, right.Unit, up.Unit)
-	-- (pivot = hand · C0 · Transform: the new Transform turns the pivot from where it is to `want`)
-	joint.Transform = (joint.Transform * pivot.CFrame:Inverse() * want).Rotation
-	body.swung = true
 end
 
 local function sweep(now: number)
@@ -326,7 +280,7 @@ local function step(dt: number)
 		local rig = rigOf(character)
 		local body = bodies[character]
 		if not body then
-			body = { weight = 0, arms = 0, on = false, phase = 0, effort = 0, busyUntil = 0, tilt = 0, spin = 0, flutter = 0, swung = false }
+			body = { weight = 0, arms = 0, on = false, phase = 0, effort = 0, busyUntil = 0 }
 			bodies[character] = body
 		end
 		local velocity = root.AssemblyLinearVelocity
@@ -355,7 +309,6 @@ local function step(dt: number)
 			bodyBack(rig)
 			body.arms = 0
 		end
-		swingBag(rig, body, root, dt)
 	end
 	sweep(os.clock())
 end

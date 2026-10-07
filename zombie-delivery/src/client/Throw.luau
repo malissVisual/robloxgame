@@ -8,7 +8,12 @@
 --     (Throws.charge); the camera aims: where you look, lifted by Config.Throw.Lift;
 --   * release: thrown (direction and power to the server).
 -- Too far (Config.Throw.Range) or only fragile pieces: a toast says so and nothing is aimed. Within the range a quiet
--- line under the middle of the screen says the key. When the piece lands at the door the server says so ("landed"):
+-- line under the middle of the screen says the key.
+-- 6.1 (the owner: "after pressing X nothing shows"): X was bound only while the server's ThrowTo was set (a home's
+-- door is the current stop and a piece for it is with you), so anywhere else it did nothing at all. Now it is bound
+-- whenever you could throw at all (the server's ThrowReady: a light piece in your hands, or the bag in your hand with
+-- one in it; or the bag in your hand, or a ThrowTo) and a press without a door in range says why (Holding.throwText:
+-- "Get within 45 studs of the delivery door to throw", "Too fragile to throw", "Nothing to throw"). When the piece lands at the door the server says so ("landed"):
 -- a banner, "TRICKSHOT! +$n" and what earned it (far, over something, off a wall), or "AT THE DOOR".
 -- Nothing runs per frame unless you aim; the binding and the line are looked at every CHECK seconds.
 
@@ -23,6 +28,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Throws = require(Shared.Throws)
+local Holding = require(Shared.Holding) -- 6.1: what X says
 local Theme = require(script.Parent.Theme)
 
 local Throw = {}
@@ -204,15 +210,15 @@ end
 local function startAim()
 	local root = rootOnFoot()
 	local door = doorSpot()
-	if not root or not door then
+	if not root then
 		return
 	end
-	if player:GetAttribute("ThrowFragile") == true then
-		say("Too fragile to throw: hand it over at the door.")
-		return
-	end
-	if flat(root.Position, door) > T.Range then
-		say(`Too far to throw: come within {T.Range} studs of the door.`)
+	-- 6.1: no door here, too far, too fragile, nothing to throw: say so (else aim).
+	local ready = player:GetAttribute("ThrowReady")
+	local text = Holding.throwText(if type(ready) == "string" then ready else nil, door ~= nil, door ~= nil and flat(root.Position, door) > T.Range,
+		player:GetAttribute("ThrowFragile") == true, T.Range)
+	if text or not door then
+		say(text or `Get within {T.Range} studs of the delivery door to throw.`)
 		return
 	end
 	local preview = showPreview()
@@ -320,7 +326,9 @@ end
 local function check()
 	local door = doorSpot()
 	local root = rootOnFoot()
-	local want = door ~= nil and root ~= nil
+	-- 6.1: bound whenever you could throw at all (the server's ThrowReady, the bag in your hand, a door's ThrowTo)
+	local character = player.Character
+	local want = root ~= nil and (door ~= nil or player:GetAttribute("ThrowReady") ~= nil or (character ~= nil and character:GetAttribute("Hand") == "bag"))
 	if want and not state.bound then
 		state.bound = true
 		ContextActionService:BindActionAtPriority(ACTION, onAction, true, Enum.ContextActionPriority.High.Value, Enum.KeyCode.X, Enum.KeyCode.ButtonR1)

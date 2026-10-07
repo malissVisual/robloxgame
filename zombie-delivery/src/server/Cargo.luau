@@ -107,6 +107,23 @@
 --     ground as a loose piece (picked up as ever; on a roof or nowhere it rolls down beside the door). The round's
 --     paper that misses the porch counts, as a miss. The owner's attributes ThrowTo (the door's spot), ThrowStop and
 --     ThrowFragile tell the client when a throw is possible.
+--
+-- 6.1, what you hold (server/Hand.luau, shared/Holding.luau): the plastic bag is one of your hands (fists / bag / gun).
+--   * Its room (the kit's `extra`: bagRoomOf) is yours only while you hold it. A piece in the pack is in the bag
+--     (Piece.inBag) or the backpack: a light piece you pick up (the pile, the ground) drops into the bag in your hand
+--     while it has room, then into the backpack, and the hands stay free (6.0); without the bag in your hand the hands
+--     take it first and the backpack after (as before 6.0). packFree counts the bag only while you hold it.
+--   * The bag leaves your hand (the gun, the fists) with cargo in it: it is set down on the ground at your feet with its
+--     pieces (session.bagDown: KitWear's bag art on an anchored part, a "Pick up bag" prompt only you can use). Its
+--     pieces are not with you meanwhile (no hand-over, no throw from them) but count like a piece put down (the stop
+--     waits for them, the HUD points at the bag: Status.looseAt). E picks it up: the pieces go back in, the bag is
+--     your hand again. It lies there until then, or until the job ends (its pieces are lost, as a dropped piece is);
+--     an order that fails takes its pieces out of it. Dying drops the bag's pieces with the backpack's (the pack's
+--     death rule). An empty bag that leaves the hand is just stowed.
+--   * The owner's attributes: PackRoom is the room that is yours now, BagCount the pieces in the bag (with you or on
+--     the ground), BagDown the spot where it lies, ThrowReady "piece" | "fragile" while you could throw something at
+--     some door (a light piece in your hands, or the bag in your hand with one in it; client/Throw.luau binds X then).
+--     You throw from the hands, else from the bag in your hand (then the backpack's): not with the bag stowed.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -124,6 +141,10 @@ local Animals = require(script.Parent.Animals)
 local Equipment = require(script.Parent.Equipment)
 local PlayerData = require(script.Parent.PlayerData) -- 6.0: the bag owned, the TRICKSHOT tip
 local Throws = require(Shared.Throws) -- 6.0: the throw's arc and tip
+local TransportRules = require(Shared.Transport) -- 6.1: the bag's room (the kit's extra)
+local Holding = require(Shared.Holding) -- 6.1: where a piece goes, what a bag leaving the hand does
+local Hand = require(script.Parent.Hand) -- 6.1: what you hold
+local KitWear = require(script.Parent.KitWear) -- 6.1: the bag's look, set down on the ground
 local tipsPaid: { [any]: number } = setmetatable({}, { __mode = "k" }) :: any -- 6.0 review: trickshot tips paid per session
 
 local Tuning = Config.Cargo
@@ -204,7 +225,11 @@ type Piece = {
 	order: number, -- 5.2: the order it belongs to (1 for a job of one order)
 	name: string, -- 5.2: what it is ("pizza box")
 	heavy: number?, -- 5.2: carried alone by hand you walk this slowly (the order's heavy rule)
+	inBag: boolean?, -- 6.1: in the owner's pack, in the plastic bag (not the backpack)
 }
+
+-- 6.1: the plastic bag set down on the ground with its cargo (only the owner picks it up).
+type BagDown = { pieces: { Piece }, model: Model, prompt: ProximityPrompt, at: Vector3 }
 
 -- 3.7: pieces, bottom first (two light pieces stacked; one otherwise). The prompt (Put down / Let go) sits on the top one.
 -- 4.0: `tool` = on the trolley or the jack the player pushes (no prompt: the tool's own G).
@@ -262,6 +287,7 @@ export type Session = {
 	missBy: { [number]: number }, -- 5.3: newspapers in the bushes, by order
 	anchor: Vector3?, -- 5.3 review: the stop's pile as Jobs gave it (set when built; another job there takes another slot)
 	slot: number, -- … and this job's place beside it (0: right there; Places.SessionGap to a side: build)
+	bagDown: BagDown?, -- 6.1: the bag on the ground with its pieces
 }
 
 export type Status = {
@@ -1281,9 +1307,41 @@ local function isPallet(session: Session): boolean
 	return Freight.isPallet(session.info.kind)
 end
 
--- 5.0, on foot: the room left in the owner's pack.
+-- 6.1: the plastic bag's room on a foot job (the `extra` of the owner's kit: Transport.handsRoom − backpackRoom; part
+-- of Info.pack), whether it is in the owner's hand, and the pieces in it with you.
+local function bagRoomOf(session: Session): number
+	if not session.info.foot then
+		return 0
+	end
+	local profile = PlayerData.get(session.owner)
+	if not profile then
+		return 0
+	end
+	local kit = profile.kit
+	return math.clamp(TransportRules.handsRoom(kit) - TransportRules.backpackRoom(kit), 0, session.info.pack or 0)
+end
+
+local function bagHeld(session: Session): boolean
+	return session.info.foot == true and Hand.get(session.owner) == "bag"
+end
+
+local function bagCount(session: Session): number
+	local n = 0
+	for _, piece in session.pack do
+		if piece.inBag then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- 5.0, on foot: the room left in the owner's pack. 6.1: the backpack's (Info.pack without the bag's), and the bag's
+-- only while it is in the owner's hand.
 local function packFree(session: Session): number
-	return math.max(0, (session.info.pack or 0) - #session.pack)
+	local bagRoom = bagRoomOf(session)
+	local inBag = bagCount(session)
+	local backpack = math.max(0, (session.info.pack or 0) - bagRoom - (#session.pack - inBag))
+	return backpack + (if bagHeld(session) then math.max(0, bagRoom - inBag) else 0)
 end
 
 -- 5.3: the room left on a bike's rack / basket / box (Info.rack) for the pieces that do not fit a backpack.
@@ -1314,33 +1372,47 @@ end
 
 -- 5.0: what is in the owner's pack, for the HUD and the phone (the player attributes PackCount and PackRoom; nil when
 -- there is no foot job).
+-- 6.1: PackRoom is the room that is yours now (the bag's only in your hand), BagCount the pieces in the bag (with you
+-- or lying on the ground).
 local function packShown(session: Session)
 	local owner = session.owner
 	local on = session.info.foot == true and not session.ended
 	local count = if on then #session.pack else nil
-	local room = if on then session.info.pack or 0 else nil
+	local room = if on then math.max(0, (session.info.pack or 0) - (if bagHeld(session) then 0 else bagRoomOf(session))) else nil
+	local down = session.bagDown
+	local bag = if on then bagCount(session) + (if down then #down.pieces else 0) else nil
 	if owner:GetAttribute("PackCount") ~= count then
 		owner:SetAttribute("PackCount", count)
 	end
 	if owner:GetAttribute("PackRoom") ~= room then
 		owner:SetAttribute("PackRoom", room)
 	end
+	if owner:GetAttribute("BagCount") ~= bag then
+		owner:SetAttribute("BagCount", bag)
+	end
 end
 
--- 5.0: a piece goes into the owner's pack (its model goes: nothing shows).
-local function stash(session: Session, piece: Piece)
+-- 5.0: a piece goes into the owner's pack (its model goes: nothing shows). 6.1: into the bag in the owner's hand while
+-- it has room and the piece fits a bag, else the backpack (`satchel`: a round's bundle, always the satchel).
+local function stash(session: Session, piece: Piece, satchel: boolean?)
 	if piece.model then
 		piece.model:Destroy()
 		piece.model = nil
 	end
+	piece.inBag = if not satchel and Holding.place(bagHeld(session), bagCount(session), bagRoomOf(session), packFits(piece)) == "bag" then true else nil
 	table.insert(session.pack, piece)
 	packShown(session)
 end
 
--- 6.0: does the job's owner have the plastic bag (Config.Courier.BagKit)?
-local function bagged(session: Session): boolean
-	local profile = PlayerData.get(session.owner)
-	return profile ~= nil and profile.kit[Config.Courier.BagKit] == true
+-- 6.1: what was said of a piece put into the pack: the bag (n / its room), the backpack, a bike.
+local function packWords(session: Session, piece: Piece): string
+	if not packFits(piece) then
+		return `Onto your bike ({#session.pack} / {session.info.pack or 0}).`
+	elseif piece.inBag then
+		return `Into the bag ({bagCount(session)} / {bagRoomOf(session)}).`
+	end
+	local bagRoom = bagRoomOf(session)
+	return `Into your backpack ({#session.pack - bagCount(session)} / {math.max(0, (session.info.pack or 0) - bagRoom)}).`
 end
 
 -- 5.0: does a piece this player takes go into the pack (a foot job, the owner, the hands full, room left in it)?
@@ -1350,7 +1422,8 @@ local function intoPack(session: Session, player: Player, piece: Piece?): boolea
 		return false
 	end
 	local held = session.held[player]
-	if bagged(session) and (piece == nil or piece.horse == nil) and Equipment.pushing(player) == nil and (held == nil or held.tool == nil) then
+	-- (6.1: only with the bag in your hand; without it the hands first, as before 6.0)
+	if bagHeld(session) and (piece == nil or piece.horse == nil) and Equipment.pushing(player) == nil and (held == nil or held.tool == nil) then
 		return true
 	end
 	return held ~= nil and held.tool == nil and #held.pieces >= handsMax(session, player)
@@ -1392,6 +1465,10 @@ local function outHere(session: Session): number
 		if forHere(session, item.piece) then
 			n += 1
 		end
+	end
+	local down = session.bagDown -- 6.1: the bag set down: its pieces are on the way, like pieces put down
+	if down then
+		n += countHere(session, down.pieces)
 	end
 	return n
 end
@@ -1913,6 +1990,7 @@ end
 
 -- A piece (not a horse) put on the ground at `frame`, with its Pick up prompt: a loose piece of the job.
 local function layDown(session: Session, piece: Piece, frame: CFrame)
+	piece.inBag = nil -- (6.1: out of the bag, on the ground)
 	local model = piece.model or buildPiece(piece)
 	piece.model = model
 	setDown(model, frame)
@@ -2051,7 +2129,9 @@ local function handsFull(session: Session, player: Player): boolean
 		elseif tool == "trolley" then
 			tell(player, `The trolley is full: {#held.pieces} {info.plural}.`)
 		else
-			tell(player, if #held.pieces > 1 then `Your hands are full: two {info.plural}.` else "Your hands are full.")
+			local room = if info.foot and player == session.owner and not bagHeld(session) and session.bagDown == nil then bagRoomOf(session) - bagCount(session) else 0
+			tell(player, (if #held.pieces > 1 then `Your hands are full: two {info.plural}.` else "Your hands are full.")
+				.. (if room > 0 then ` Hold the bag (2): room for {room} more.` else "")) -- 6.1
 		end
 		return true
 	end
@@ -2099,7 +2179,8 @@ local function makeRoom(session: Session, player: Player, piece: Piece?)
 	else
 		armHands(session, player, held)
 	end
-	tell(player, `{if moved == 1 then "One" else tostring(moved)} into your backpack ({#session.pack} / {session.info.pack or 0}): your hands take the {piece.name}.`)
+	local into = session.pack[#session.pack]
+	tell(player, `{if moved == 1 then "One" else tostring(moved)} {if into and into.inBag then "into the bag" else "into your backpack"} ({#session.pack} / {session.info.pack or 0}): your hands take the {piece.name}.`)
 end
 
 onLoose = function(session: Session, player: Player, loose: Loose)
@@ -2116,7 +2197,7 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 		table.remove(session.loose, at)
 		loose.prompt:Destroy()
 		stash(session, loose.piece)
-		if bagged(session) then
+		if loose.piece.inBag then
 			Npcs.act(player.Character, "bag") -- 6.0: into the bag
 		end
 		refresh(session)
@@ -2498,6 +2579,7 @@ end
 
 -- What the player would throw here: a piece for this stop that may fly, the top one in the hands first, then (the
 -- owner) the pack's last. Where it is ("hands" | "pack") and its index; else nil and why ("fragile" | "none").
+-- 6.1: from the pack only with the bag in your hand (you throw from the bag: its pieces first, then the backpack's).
 local function throwPick(session: Session, player: Player): (string?, number?, string)
 	local job = session.info.fragile == true
 	local fragile = false
@@ -2513,18 +2595,57 @@ local function throwPick(session: Session, player: Player): (string?, number?, s
 			end
 		end
 	end
-	if player == session.owner then
-		for index = #session.pack, 1, -1 do
-			local piece = session.pack[index]
-			if forHere(session, piece) then
-				if Throws.throwable(piece.look, job) then
-					return "pack", index, ""
+	if player == session.owner and bagHeld(session) then
+		for pass = 1, 2 do
+			for index = #session.pack, 1, -1 do
+				local piece = session.pack[index]
+				if (piece.inBag == true) == (pass == 1) and forHere(session, piece) then
+					if Throws.throwable(piece.look, job) then
+						return "pack", index, ""
+					end
+					fragile = fragile or Throws.fragile(piece.look, job)
 				end
-				fragile = fragile or Throws.fragile(piece.look, job)
 			end
 		end
 	end
 	return nil, nil, if fragile then "fragile" else "none"
+end
+
+-- 6.1: could the owner throw anything at some door now (wherever the stop is)? "piece": a light piece that may fly in
+-- the hands, or in the pack with the bag in the hand; "fragile": only pieces too fragile to throw; nil: nothing (the
+-- player attribute ThrowReady: client/Throw.luau binds X and says why it can't throw here).
+local function throwReady(session: Session): string?
+	if session.ended or session.info.foot ~= true then
+		return nil
+	end
+	local job = session.info.fragile == true
+	local fragile = false
+	local function look(piece: Piece): boolean
+		if piece.horse ~= nil or not Config.Cargo.LightLooks[piece.look] then
+			return false
+		end
+		if Throws.throwable(piece.look, job) then
+			return true
+		end
+		fragile = true
+		return false
+	end
+	local held = session.held[session.owner]
+	if held and not held.tool then
+		for _, piece in held.pieces do
+			if look(piece) then
+				return "piece"
+			end
+		end
+	end
+	if bagHeld(session) then
+		for _, piece in session.pack do
+			if look(piece) then
+				return "piece"
+			end
+		end
+	end
+	return if fragile then "fragile" else nil
 end
 
 -- The owner's attributes for client/Throw.luau (every tick, written only when they change): ThrowTo = the door's spot
@@ -2550,6 +2671,10 @@ local function throwShown(session: Session)
 	end
 	if owner:GetAttribute("ThrowFragile") ~= fragile then
 		owner:SetAttribute("ThrowFragile", fragile)
+	end
+	local ready = throwReady(session) -- 6.1
+	if owner:GetAttribute("ThrowReady") ~= ready then
+		owner:SetAttribute("ThrowReady", ready)
 	end
 end
 
@@ -2792,7 +2917,7 @@ local function onPile(session: Session, player: Player)
 		-- 5.3, the newspaper round: the whole bundle into your satchel at once.
 		local count = #session.pile
 		while #session.pile > 0 do
-			stash(session, table.remove(session.pile) :: Piece)
+			stash(session, table.remove(session.pile) :: Piece, true)
 		end
 		session.moved += count
 		say(session.person, line(LINES.bundle))
@@ -2808,13 +2933,10 @@ local function onPile(session: Session, player: Player)
 		if piece then
 			stash(session, piece)
 			session.moved += 1
-			local bag = bagged(session) -- 6.0: dropped into the bag in your hand
 			say(session.person, line(LINES.take))
 			Npcs.act(session.person, "give") -- 5.7
-			Npcs.act(player.Character, if bag then "bag" else "take")
-			tell(player, if not packFits(piece) then `Onto your bike ({#session.pack} / {session.info.pack or 0}).`
-				elseif bag then `Into the bag ({#session.pack} / {session.info.pack or 0}).`
-				else `Into your backpack ({#session.pack} / {session.info.pack or 0}).`)
+			Npcs.act(player.Character, if piece.inBag then "bag" else "take") -- (6.0: dropped into the bag in your hand)
+			tell(player, packWords(session, piece))
 			refresh(session)
 			session.info.changed()
 		end
@@ -3349,6 +3471,114 @@ end
 
 -- ── API (server/Jobs.luau) ─────────────────────────────────────────────────
 
+-- ── 6.1: the bag set down ──────────────────────────────────────────────────
+
+-- The bag on the ground goes (picked up, emptied, the job over): its model, its prompt, the BagDown attribute.
+local function clearBagDown(session: Session): BagDown?
+	local down = session.bagDown
+	if not down then
+		return nil
+	end
+	session.bagDown = nil
+	down.prompt:Destroy()
+	down.model:Destroy()
+	if session.owner:GetAttribute("BagDown") ~= nil then
+		session.owner:SetAttribute("BagDown", nil)
+	end
+	return down
+end
+
+local pickUpBag: (Session, Player) -> ()
+
+-- The loaded bag left the owner's hand: set down at their feet (a little ahead, on the left) with its pieces, KitWear's
+-- bag on an anchored part, the "Pick up bag" prompt. True when it went down.
+local function setBagDown(session: Session): boolean
+	local root = rootOf(session.owner.Character)
+	if not root then
+		return false -- (no body: they stay in the bag, the death rule drops them)
+	end
+	local pieces: { Piece } = {}
+	for index = #session.pack, 1, -1 do
+		if session.pack[index].inBag then
+			table.insert(pieces, 1, table.remove(session.pack, index) :: Piece)
+		end
+	end
+	if #pieces == 0 then
+		return false
+	end
+	local down = session.bagDown
+	if down then
+		for _, piece in pieces do
+			table.insert(down.pieces, piece) -- (one bag: a second set-down can't happen, but never lose a piece)
+		end
+		packShown(session)
+		return true
+	end
+	local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, -1)
+	local left = Vector3.yAxis:Cross(look) -- (facing -z: the left is -x)
+	local spot = onGround(root.Position + look * Config.Hand.BagAhead + left * 0.8 - Vector3.new(0, 2.5, 0))
+	local model = Instance.new("Model")
+	model.Name = "SetDownBag"
+	local base = Instance.new("Part")
+	base.Name = "BagPivot"
+	base.Size = Vector3.new(0.6, 0.2, 1)
+	base.Transparency = 1
+	base.Anchored, base.CanCollide, base.CanQuery, base.CanTouch, base.CastShadow = true, false, false, false, false
+	-- (the art hangs from its grip: the bottom 1.6 under it stands on the ground, turned a little off your way)
+	base.CFrame = CFrame.lookAt(spot + Vector3.new(0, 1.6, 0), spot + Vector3.new(0, 1.6, 0) + look) * CFrame.Angles(0, math.rad(25), 0)
+	base.Parent = model
+	model.PrimaryPart = base
+	KitWear.bagArt(model, base)
+	model.Parent = folder
+	local p = prompt(base, "Pick up bag", `Your bag · {#pieces} {if #pieces == 1 then "piece" else "pieces"}`, nil, Config.Hand.BagHold, session.owner)
+	p.MaxActivationDistance = Config.Hand.BagReach
+	local made: BagDown = { pieces = pieces, model = model, prompt = p, at = spot }
+	session.bagDown = made
+	p.Triggered:Connect(function(by)
+		pickUpBag(session, by)
+	end)
+	session.owner:SetAttribute("BagDown", spot)
+	packShown(session)
+	return true
+end
+
+-- E at the bag on the ground: only its owner, on foot. The pieces go back in, the bag is the hand again.
+pickUpBag = function(session: Session, player: Player)
+	local down = session.bagDown
+	if not down or session.ended then
+		return
+	end
+	if player ~= session.owner then
+		tell(player, "That's somebody else's bag.")
+		return
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	if humanoid.SeatPart ~= nil then
+		tell(player, "Get out first.")
+		return
+	end
+	local ok, why = Hand.set(player, "bag", true) -- (first: refused, it stays where it lies)
+	if not ok then
+		tell(player, Holding.whyText(why))
+		return
+	end
+	clearBagDown(session)
+	for _, piece in down.pieces do
+		piece.inBag = true
+		table.insert(session.pack, piece)
+	end
+	Npcs.act(character, "bag")
+	tell(player, `Bag picked up: {bagCount(session)} / {bagRoomOf(session)} in it.`)
+	packShown(session)
+	refresh(session)
+	session.info.changed()
+end
+
 function Cargo.begin(owner: Player, info: Info): Session
 	local session: Session = {
 		owner = owner,
@@ -3398,6 +3628,7 @@ function Cargo.begin(owner: Player, info: Info): Session
 		missBy = {},
 		anchor = nil,
 		slot = 0,
+		bagDown = nil,
 	}
 	active[owner] = session
 	packShown(session)
@@ -3525,6 +3756,10 @@ function Cargo.update(session: Session, dt: number)
 			dropPack(session)
 			dropped = true
 		end
+		-- 6.1: pieces in a bag that is not in the hand (it left while the body was being swapped): set down now.
+		if humanoid and root and humanoid.Health > 0 and not bagHeld(session) and bagCount(session) > 0 and setBagDown(session) then
+			dropped = true
+		end
 	end
 	if session.info.pair and updatePair(session) then
 		dropped = true
@@ -3638,7 +3873,9 @@ function Cargo.remaining(session: Session): number
 		pile = math.max(pile, plan.needed)
 	end
 	local spawning = if plan and plan.stage ~= "pickup" then session.busy else 0 -- a kid getting off right now
+	local down = session.bagDown -- (6.1: the bag on the ground)
 	return #session.load + heldCount(session) + #session.loose + pile + #session.walking + spawning + #session.pack -- (5.0: the pack)
+		+ (if down then #down.pieces else 0)
 end
 
 -- ── 5.2: several orders ─────────────────────────────────────────────────────
@@ -3656,6 +3893,12 @@ local function eachPiece(session: Session, visit: (Piece, string) -> ())
 	end
 	for _, item in session.loose do
 		visit(item.piece, "ground")
+	end
+	local down = session.bagDown -- 6.1: the bag set down
+	if down then
+		for _, piece in down.pieces do
+			visit(piece, "ground")
+		end
 	end
 	for _, piece in session.pack do
 		visit(piece, "pack")
@@ -3764,6 +4007,17 @@ function Cargo.dropOrder(session: Session, order: number): number
 			gone(table.remove(session.pack, index) :: Piece)
 		end
 	end
+	local down = session.bagDown -- 6.1: out of the bag on the ground too (an empty bag there goes: stowed)
+	if down then
+		for index = #down.pieces, 1, -1 do
+			if down.pieces[index].order == order then
+				gone(table.remove(down.pieces, index) :: Piece)
+			end
+		end
+		if #down.pieces == 0 then
+			clearBagDown(session)
+		end
+	end
 	-- (5.2 review: a trolley's pieces too, set down or pushed: the ones left on it close up)
 	local tools: { Equipment.Tool } = {}
 	for index = #session.loose, 1, -1 do
@@ -3835,8 +4089,8 @@ function Cargo.carried(session: Session): { Carried }
 	eachPiece(session, function(piece: Piece, where: string)
 		local shown = where == "hands" or where == "pack" or where == "vehicle"
 		if shown then
-			local place = where
-			if where == "pack" and (session.info.rack or 0) > 0 then
+			local place = if where == "pack" and piece.inBag then "bag" else where -- (6.1: the bag in your hand)
+			if place == "pack" and (session.info.rack or 0) > 0 then
 				if packFits(piece) and inBackpack < backpack then
 					inBackpack += 1
 				else
@@ -3912,6 +4166,8 @@ function Cargo.status(session: Session): Status
 		elseif model then
 			looseAt = model:GetPivot().Position
 		end
+	elseif session.bagDown then
+		looseAt = session.bagDown.at -- 6.1: the bag you set down (the HUD points at it: pick it up)
 	end
 	return {
 		inCar = #session.load,
@@ -4108,6 +4364,10 @@ local function footStep(session: Session, plan: Plan, near: boolean): (string, s
 			return "carry", `Toss the paper onto the porch of {plan.place or "the house"} (E) · from up close it never misses`
 		end
 		return "carry", "No paper for this door in your satchel"
+	end
+	local down = session.bagDown -- 6.1: their delivery is in the bag you set down
+	if down and not pickup and countHere(session, down.pieces) > 0 and countHere(session, session.pack) + (if held then countHere(session, held.pieces) else 0) == 0 then
+		return "carry", `Your bag with the {session.info.plural} is where you set it down: go back for it (E: Pick up bag)`
 	end
 	if not near then
 		if pickup and carrying > 0 then
@@ -4427,6 +4687,10 @@ function Cargo.finish(session: Session, linger: boolean?)
 	end
 	session.ended = true
 	table.clear(session.pack) -- 5.0
+	local down = clearBagDown(session) -- 6.1: the bag left on the ground: its pieces are lost (as a dropped piece)
+	if down then
+		table.clear(down.pieces)
+	end
 	packShown(session)
 	throwShown(session) -- 6.0: no throw any more
 	for _, loose in session.loose do
@@ -4631,6 +4895,27 @@ function Cargo.start()
 	-- job you carry for. Only your own hands, a few times a second at most.
 	-- 6.0: a throw at a door (client/Throw.luau): (the stop's ThrowStop, a direction, a power 0 … 1). Only the owner of a
 	-- running foot job, once per Config.Throw.Cooldown; throwAt checks the rest.
+	-- 6.1: the bag left the owner's hand (server/Hand.luau): loaded, it is set down where they stand (an empty one is just
+	-- stowed); its room is theirs again only in the hand. Not for a new body (the old one died with it: the pack's death
+	-- rule drops its pieces where it fell).
+	Hand.onChanged(function(player: Player, old: string, new: string)
+		local session = active[player]
+		if not session or session.ended or not session.info.foot then
+			return
+		end
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local same = humanoid ~= nil and humanoid.Health > 0 and (session.packHumanoid == nil or session.packHumanoid == humanoid)
+		if old == "bag" and new ~= "bag" and same and Holding.bagLeaves(bagCount(session)) == "down" and setBagDown(session) then
+			local down = session.bagDown
+			local n = if down then #down.pieces else 0
+			tell(player, `Bag set down with {n} {if n == 1 then session.info.piece else session.info.plural} in it: pick it up again (E) before you move on.`)
+		end
+		packShown(session)
+		throwShown(session)
+		refresh(session)
+		session.info.changed()
+	end)
 	local lastThrow: { [Player]: number } = {}
 	Net.get("Throw").OnServerEvent:Connect(function(player: Player, stop: any, direction: any, power: any)
 		if type(stop) ~= "number" or typeof(direction) ~= "Vector3" or type(power) ~= "number" then
