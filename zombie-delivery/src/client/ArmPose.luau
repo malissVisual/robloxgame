@@ -37,6 +37,7 @@ local Gestures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
+local SprintPose = require(script.Parent.SprintPose) -- 6.0.1: its run cycle leans the waist itself
 
 local ArmPose = {}
 
@@ -426,8 +427,10 @@ local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, 
 	local braking = math.max(0, state.speed - now) / math.max(dt, 1 / 240)
 	state.speed = now
 	local onFoot = humanoid ~= nil and humanoid.Health > 0 and not humanoid.Sit
+	-- (6.0.1: the sprint's lean is client/SprintPose.luau's run cycle while it runs: this one steps aside)
 	local goal = if onFoot
-		then LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) - LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1)
+		then LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) * (1 - SprintPose.weight(character))
+			- LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1)
 		else 0
 	state.amount += (goal - state.amount) * math.min(1, dt * 8)
 	if math.abs(state.amount) < 0.002 and math.abs(goal) < 0.002 then

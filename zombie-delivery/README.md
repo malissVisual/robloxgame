@@ -1114,7 +1114,11 @@ let go to throw. The server checks the piece, the range, the line of sight and t
 delivers it (the receiver catches it, or the door opens). **TRICKSHOT** tips for a long throw, a throw over something or
 off a wall. A miss lies where it fell — pick it up again. Fragile cargo (cake, electronics, samples …) can't be thrown.
 
-**Sprinting** (`client/SprintPose.luau`): a longer stride, bent knees and pumping arms over the run animation.
+**Sprinting** (`client/SprintPose.luau`, 6.0.1 `shared/RunCycle.luau`, `Config.Courier.Sprint`): from 20 studs / s on
+foot the stock run gives way to a real run cycle — the thighs swing +55° / −35°, the heels kick up high, the arms pump
+±60° with square elbows against the legs, the upper body leans 14° forward with the head kept level, and the body bobs
+twice a stride. The cadence follows the speed (7 studs a cycle); the arms stay with aiming, carrying, the phone and
+gestures. The bag in the left hand trails behind and jolts with every step. Everybody within 150 studs.
 
 **No free gun** (`Config.Arms`): a new courier has fists (V punches). The pistol costs $250 at Lead & Co.; Marge texts
 you with a GPS once you can afford it. Old saves keep their guns.
