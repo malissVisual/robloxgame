@@ -1,0 +1,176 @@
+[
+  {
+    "id": "map_bus",
+    "folder": "map",
+    "size": 128,
+    "sha256": "2ca549689c7487fe06ea80b5bb7a679ba7ef75db694f893dc31e9cbe1b364df3"
+  },
+  {
+    "id": "map_zip",
+    "folder": "map",
+    "size": 128,
+    "sha256": "778b3a6adc359c386b279294e0d0c55cd7ecd030b2f870b0a47e2bfcd857be9b"
+  },
+  {
+    "id": "map_rental",
+    "folder": "map",
+    "size": 128,
+    "sha256": "50daeee0f83c9f1eec971ebf4dfa00e724b4d0f55375c16aab5abb1d3f205f53"
+  },
+  {
+    "id": "map_shortcut",
+    "folder": "map",
+    "size": 128,
+    "sha256": "16bf0b0c2f1f07a2f1391c2c7b3cf3b203d4453ed1f75ebd99c610e520506ebc"
+  },
+  {
+    "id": "map_bank",
+    "folder": "map",
+    "size": 128,
+    "sha256": "19694e00f39e4e853bcc9f4e16af54cb5c6c520c269b4774bfbbe5ac260804f7"
+  },
+  {
+    "id": "map_clinic",
+    "folder": "map",
+    "size": 128,
+    "sha256": "3a8630fa2b7a32ee9bf76436e6ec4aec0a04da025994aacce5d6bcbf318d23da"
+  },
+  {
+    "id": "map_pharmacy",
+    "folder": "map",
+    "size": 128,
+    "sha256": "048b109e8266d302d88e08df2277ec40a451ccc50f45a4cc331048862ddee369"
+  },
+  {
+    "id": "map_warehouse",
+    "folder": "map",
+    "size": 128,
+    "sha256": "a34e5a12c8026138e64f7500f634a3267c817fd24e4f6e0a0c7ad89632a2ef21"
+  },
+  {
+    "id": "map_firestation",
+    "folder": "map",
+    "size": 128,
+    "sha256": "0f84c10cfb20da2d7850657a689729b87966600b292d8f75219d10eced7b315d"
+  },
+  {
+    "id": "map_police",
+    "folder": "map",
+    "size": 128,
+    "sha256": "f957cbdecef20d0cb890d1348c0a0770d128e95ced9c3a4a66918dff9d88407d"
+  },
+  {
+    "id": "map_waterworks",
+    "folder": "map",
+    "size": 128,
+    "sha256": "1ccfcd9b27f1d7548523df6ffefc4af26e5308c661240ce0a768e4d3208c3b2b"
+  },
+  {
+    "id": "map_lab",
+    "folder": "map",
+    "size": 128,
+    "sha256": "15ea89429809a59c9c0e686a3c3ac3319022d8b87d9868f9c35906b873adced9"
+  },
+  {
+    "id": "map_camp",
+    "folder": "map",
+    "size": 128,
+    "sha256": "03819fc0b46a92d36c4290633ae4bba0f6e557ecf9f37f1b6420bb66b748c0be"
+  },
+  {
+    "id": "map_stadium",
+    "folder": "map",
+    "size": 128,
+    "sha256": "c988ff09aaa6e0d562bee07aa4e9e4c85dfda88d1a4bfc465b0dd58367aa23e7"
+  },
+  {
+    "id": "map_luigis",
+    "folder": "map",
+    "size": 128,
+    "sha256": "a35b4d42fa96808164ef93c1aea5c0d56364b3fc483ef05619e23dae50b7ef6d"
+  },
+  {
+    "id": "map_dailybread",
+    "folder": "map",
+    "size": 128,
+    "sha256": "3c36ba0471645b6c6512a48f9e84535cab82f735dc1cda7b6c7aef5bb87e175f"
+  },
+  {
+    "id": "map_lastbite",
+    "folder": "map",
+    "size": 128,
+    "sha256": "bbff3454e98a051931dcdfc60f1e20bebff1c04c6104e3069575037be1522bcf"
+  },
+  {
+    "id": "map_wokdead",
+    "folder": "map",
+    "size": 128,
+    "sha256": "9479eb36a817a3cbb4ae2ca776cd742b2d99f6c1f90eaba1e5b6b4467c901933"
+  },
+  {
+    "id": "map_grindhouse",
+    "folder": "map",
+    "size": 128,
+    "sha256": "bf850814d402fa0cf721c25dfec87921c8bbf70751f3c3e611a999b3076ff828"
+  },
+  {
+    "id": "map_postoffice",
+    "folder": "map",
+    "size": 128,
+    "sha256": "202880e17f521d7b19ecd1606bf2974cdcbb786e3558b97d86eb59bbbdc5322a"
+  },
+  {
+    "id": "map_dailyundead",
+    "folder": "map",
+    "size": 128,
+    "sha256": "3a66a502fab31e542e89aa568058508c5d8ba933cabad3f52c97b72047ccbae8"
+  },
+  {
+    "id": "map_boltnail",
+    "folder": "map",
+    "size": 128,
+    "sha256": "c8ed7503a4ca0a73e42a2e673bd1f19eb26a29ad0c15d30a2c8aee73f0464c72"
+  },
+  {
+    "id": "map_volt",
+    "folder": "map",
+    "size": 128,
+    "sha256": "ca3886aee3a0804c2203552c59cba43f2b07ba9e7b215121a90423459381c33c"
+  },
+  {
+    "id": "map_secondlife",
+    "folder": "map",
+    "size": 128,
+    "sha256": "604e7952e0bab6b7b28b928eabcb5254ad7b25f97f8bface62278816fcf51f03"
+  },
+  {
+    "id": "map_bloom",
+    "folder": "map",
+    "size": 128,
+    "sha256": "8e1e023a29c7e0090ba8bcdb2bf5011481a9a80c7db887a01bdbd025cb338d12"
+  },
+  {
+    "id": "weapon_reyes",
+    "folder": "weapons",
+    "size": 256,
+    "sha256": "400d6884ae6334f31035c220eafec17b0c76046f0369cb613b3944abeee67901"
+  },
+  {
+    "id": "weapon_lever",
+    "folder": "weapons",
+    "size": 256,
+    "sha256": "85b77a3524e55088a7b73b9e95df3833be36d5e0a0e5fa9e44c3c05bf99c4e0c"
+  },
+  {
+    "id": "weapon_goldpistol",
+    "folder": "weapons",
+    "size": 256,
+    "sha256": "a0c61c5fd8f00d86c9116981552301ee2c691c3cfcd89fd5d80aeab7a73e9374"
+  },
+  {
+    "id": "weapon_deadend",
+    "folder": "weapons",
+    "size": 256,
+    "sha256": "4b11d2aabe0e945fbd2ea471c8b70f45615b560accb2f41b57f625f71bc6068a"
+  }
+]

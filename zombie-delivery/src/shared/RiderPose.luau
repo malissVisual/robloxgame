@@ -49,6 +49,46 @@ local function a(x: number, y: number?): Angles
 	return { x = x, y = y or 0 }
 end
 
+-- 5.8.2: the standing rider ABSOLUTE (client/BikeRider.luau sets these from the rest pose, not on top of the sit
+-- animation: whatever sit an avatar plays, the legs stand straight). The hands reach the bar through RiderPose.armIk;
+-- Reach / Elbow are the fallback when the bar's points are missing. The body is raised or lowered on its Root joint
+-- until the feet rest on the deck (BikeRider measures it).
+RiderPose.Upright = {
+	Lean = math.rad(-8), -- the waist: a slight forward lean over the bar
+	Stagger = math.rad(4), -- the front foot a touch ahead (hips +/-)
+	Knee = math.rad(-8), -- the knees a little soft (a negative X bends the shin back)
+	Reach = math.rad(45), -- fallback: the upper arms forward
+	Elbow = math.rad(25), -- fallback: the elbows bent
+	Inward = math.rad(6), -- fallback: the arms turned in toward the bar
+	MaxPitch = math.rad(110), -- the shoulder's forward swing at most
+	MaxYaw = math.rad(40), -- the arm turned in or out at most
+	MaxElbow = math.rad(140),
+}
+
+-- A two-bone arm reaching a point (pure): `dx, dy, dz` the grip from the shoulder in the shoulder joint's parent frame
+-- (+X right, +Y up, -Z forward), `upper` / `lower` the bones' lengths (shoulder→elbow, elbow→grip). Returns the
+-- shoulder's pitch (about X: 0 hangs straight down, positive swings forward), its yaw (about Y, applied first, as
+-- BikeRider composes Angles(0, yaw, 0) * Angles(pitch, 0, 0)) and the elbow's bend (about X, positive bends the forearm
+-- forward). A point out of reach is reached as far as the arm goes (straight toward it).
+function RiderPose.armIk(dx: number, dy: number, dz: number, upper: number, lower: number): (number, number, number)
+	local u = RiderPose.Upright
+	local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+	if d < 1e-4 or upper <= 0 or lower <= 0 then
+		return u.Reach, 0, u.Elbow
+	end
+	local reach = math.clamp(d, math.abs(upper - lower) + 1e-3, upper + lower - 1e-3)
+	-- The bend: reach^2 = upper^2 + lower^2 + 2 upper lower cos(bend) (bend 0: the arm straight).
+	local cosBend = math.clamp((reach * reach - upper * upper - lower * lower) / (2 * upper * lower), -1, 1)
+	local bend = math.acos(cosBend)
+	-- The chord's direction: pitch from straight down, yaw from the forward half (-Z).
+	local chordPitch = math.acos(math.clamp(-dy / d, -1, 1))
+	local yaw = if chordPitch > 1e-3 then math.atan2(-dx, -dz) else 0
+	-- The upper arm sits below the chord by the triangle's angle at the shoulder (the forearm bends forward and up).
+	local alpha = math.atan2(lower * math.sin(bend), upper + lower * math.cos(bend))
+	local pitch = math.clamp(chordPitch - alpha, -0.5, u.MaxPitch)
+	return pitch, math.clamp(yaw, -u.MaxYaw, u.MaxYaw), math.clamp(bend, 0, u.MaxElbow)
+end
+
 -- The pose this frame: stand (the E-Scooter) or pedal with the crank at `crank` radians.
 function RiderPose.pose(stand: boolean, crank: number): Pose
 	if stand then

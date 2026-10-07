@@ -20,6 +20,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Map = require(Shared.Map)
 local StreetProps = require(Shared.StreetProps)
 local DayNight = require(script.Parent.DayNight)
+local StreetArt = require(script.Parent.StreetArt.Geometry) -- 5.9: Codex's worn props (design/street-props/)
+local PolishBuilder = require(script.Parent.PolishArt.Builder)
 
 local StreetDressing = {}
 
@@ -69,6 +71,34 @@ local function ball(parent: Instance, name: string, size: Vector3, cframe: CFram
 end
 
 -- One prop. `frame`: on the ground at its middle, -Z (LookVector) toward the street, X along the kerb.
+-- 5.9: Codex's prop for this spot (StreetArt.pieces in the same ground frame: X along the kerb, -Z to the street),
+-- built by PolishArt.Builder; the flare keeps our one red light and its Flare tag on the FlareTip. False: not built.
+local function buildArt(model: Instance, prop: StreetProps.Prop, frame: CFrame): boolean
+	local ok, err = pcall(function()
+		local made = PolishBuilder.build(model, frame, {
+			id = prop.kind,
+			pieces = StreetArt.pieces(prop.kind, prop.seed, prop.width) :: any,
+		}, { nightLight = DayNight.nightLight })
+		if prop.kind == "flare" then
+			local tip = made:FindFirstChild("FlareTip", true)
+			if tip and tip:IsA("BasePart") then
+				local light = Instance.new("PointLight")
+				light.Color = FLARE
+				light.Range = 14
+				light.Brightness = 1.6
+				light.Shadows = false
+				light.Parent = tip
+				DayNight.nightLight(light)
+				CollectionService:AddTag(tip, "Flare")
+			end
+		end
+	end)
+	if not ok then
+		warn(`[StreetDressing] the {prop.kind} art failed, the simple one stands: {err}`)
+	end
+	return ok
+end
+
 local function build(model: Instance, prop: StreetProps.Prop)
 	local rand = Random.new(prop.seed)
 	local ground = if prop.road then ROAD_TOP else WALK_TOP
@@ -76,6 +106,9 @@ local function build(model: Instance, prop: StreetProps.Prop)
 	-- (a car only a hair askew: its ends stay out of the traffic's lane)
 	local frame = CFrame.lookAt(at, at + Vector3.new(prop.nx, 0, prop.nz)) * CFrame.Angles(0, if prop.road then 0 else prop.turn, 0)
 	local kind = prop.kind
+	if buildArt(model, prop, frame) then
+		return
+	end
 	if kind == "bin" then
 		local color = BINS[rand:NextInteger(1, #BINS)]
 		part(model, "Bin", Vector3.new(1.4, 2.2, 1.4), frame * CFrame.new(0, 1.1, 0), color, Enum.Material.Metal, true)

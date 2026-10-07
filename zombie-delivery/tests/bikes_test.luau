@@ -199,6 +199,38 @@ local pedalA, pedalB = RiderPose.pose(false, math.pi / 2), RiderPose.pose(false,
 check("pedalling: the legs pump with the crank, in turn", pedalA.rightHip.x > pedalB.rightHip.x and pedalA.leftHip.x < pedalB.leftHip.x)
 check("pedalling: 5.1's pose unchanged", math.abs(deg(RiderPose.pose(false, 0).rightHip.x) + 30) < 1e-6 and math.abs(deg(pedalA.waist.x) + 16) < 1e-6)
 
+-- 5.8.2: the standing rider's two-bone reach (RiderPose.armIk): the hand lands on the point inside the arm's reach.
+do
+	type V = { x: number, y: number, z: number }
+	local function v(x: number, y: number, z: number): V
+		return { x = x, y = y, z = z }
+	end
+	-- The arm hangs along -Y; Rx(a) swings it forward (-Z), Ry(a) turns it.
+	local function rx(p: V, a: number): V
+		return v(p.x, p.y * math.cos(a) - p.z * math.sin(a), p.y * math.sin(a) + p.z * math.cos(a))
+	end
+	local function ry(p: V, a: number): V
+		return v(p.x * math.cos(a) + p.z * math.sin(a), p.y, -p.x * math.sin(a) + p.z * math.cos(a))
+	end
+	local function handOf(pitch: number, yaw: number, bend: number, upper: number, lower: number): V
+		local down = v(0, -1, 0)
+		local e = ry(rx(down, pitch), yaw)
+		local f = ry(rx(down, pitch + bend), yaw)
+		return v(e.x * upper + f.x * lower, e.y * upper + f.y * lower, e.z * upper + f.z * lower)
+	end
+	local worst = 0
+	for _, t in { v(0.4, -0.6, -1.3), v(-0.3, -0.2, -1.6), v(0.2, -1.2, -0.8) } do
+		local pitch, yaw, bend = RiderPose.armIk(t.x, t.y, t.z, 1.1, 1.2)
+		local h = handOf(pitch, yaw, bend, 1.1, 1.2)
+		worst = math.max(worst, math.sqrt((h.x - t.x) ^ 2 + (h.y - t.y) ^ 2 + (h.z - t.z) ^ 2))
+	end
+	check("arm IK: the hand reaches points within the arm (error < 0.05)", worst < 0.05, worst)
+	local p2, y2, b2 = RiderPose.armIk(0, -1, -9, 1.1, 1.2)
+	check("arm IK: out of reach the arm points straight at it", b2 < 0.1 and p2 > math.rad(80) and math.abs(y2) < 1e-3, `{p2} {y2} {b2}`)
+	local p3, _, b3 = RiderPose.armIk(0, 0, 0, 1.1, 1.2)
+	check("arm IK: a degenerate point falls back", p3 == RiderPose.Upright.Reach and b3 == RiderPose.Upright.Elbow)
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else
