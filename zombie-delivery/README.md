@@ -964,15 +964,28 @@ interface is compact white type over a subtle charcoal scrim, fine grey lines an
 in `client/Theme.luau`; `client/HudContract.luau` holds the HUD's pieces). It replaces the 3.6 look described below;
 what each part shows is the same.
 
+6.5, **a clean screen and one clear goal** (the owner: "When I join I don't know what to do. I can't find my way in
+anything. The UI is a terrible mess."): every thing shows once. The **NEXT card** (`client/Objective.luau`, its words
+from `shared/Goal.luau`, tested by `tests/goal_test.luau`) is always the first thing at the upper left: "▶ NEXT", what
+to do now in big type ("Pick up 2 pizzas", "Deliver to Sarah", "Hand it over (E), or hold X to throw", the server's
+own step at the stop, "HOLD OUT 0:23", Marge's hint on her first day, "Delivered! +$45 · Press J for the next job"),
+the place and the live distance, and with a job ▼ DETAILS (a click unfolds the contract group under it). Off duty it
+says "Take a delivery job · Press J · or the job board" and a click opens the board. In the world the beam is taller
+and brighter and the waypoint one pin "TONY'S PIZZA · 120 m"; with no job the pin stands on the depot's job board
+("JOB BOARD · 25 m"). The pill at the lower centre shows only what you can press right now ("E  Pick up pizza").
+Gone: CREW from the top row (K, and the MENU list), the weapon line (the bottom bar's hand slots), the vehicle line,
+INVENTORY [I] (I still works), "J FOR THE BOARD" / "Q → GARAGE" and the other hint texts, the contract's bag chip
+(the bottom bar shows the bag). The numbers are in `Config.Goal`.
+
 | Where | What |
 |---|---|
-| Upper left | ■ DELIVERY CONTRACT (type, stars, stop), the destination in caps, the objectives as checkboxes, a rule, the time left (red under 30 s) / EST. pay; the tutorial's hint, the crew strip and the toasts sit under it |
-| Upper right | MAP [M] · CREW [K] · MENU (every other action: JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news |
+| Upper left | 6.5: the NEXT card (above); under it, folded, ■ DELIVERY CONTRACT (type, stars, stop), the destination in caps, the objectives as checkboxes, a rule, the time left (red under 30 s) / EST. pay; the tutorial's strip, the crew strip and the toasts sit under it |
+| Upper right | 6.5: MAP [M] · PHONE [Q] (MENU before Marge's phone: every other action, JOBS, MISSIONS, CAREER, CREW, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news; under them the small "? KEYS [F1]" |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
-| Lower right | the gun and [T] (3.9 on foot: HANDS · [B] DRAW · [V] PUNCH, or the gun · [B] HOLSTER · [V] STRIKE), or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [I] |
+| Lower right | 6.5: the speed and the fuel while you drive, the PHONE action over it; a touch screen keeps the weapon line too (its tap opens the weapon wheel) |
 | Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): 6.1: three hand slots first (✊ fists 1, 🛍 the bag 2 with its fill, 🔫 the gun 3 with its name; the one you hold outlined red) and a divider, then five square item slots (the consumables you own in their order, the count, keys 4-8; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more; 6.1: the hands and two item slots). It hides while a window, the phone or a dialog is open |
-| Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it (both over the bottom bar) |
-| In the world | a small red waypoint with the place and the distance |
+| Lower centre | 6.5: the action pill, only while you can press something: a key box, the action, a short instruction and the hold line; the breath bar just over it (both over the bottom bar) |
+| In the world | 6.5: the beam and one pin with the place and the distance ("TONY'S PIZZA · 120 m"); with no job on the depot's job board |
 
 Every window is a charcoal rectangle (a small caps label, the title, a thin line, slim rows, one main action with a red
 rule); the job board reads like a delivery briefing (route, cargo, deadline, risk, payout, the lock and its remedy).
@@ -1293,9 +1306,9 @@ and Holstered attributes): never in a seat, never the gun with cargo in your han
   start, swings forward when you stop, out on a turn), the air leans it back at a run, a small flutter and twist at
   speed; within 120 studs of the camera, in PreSimulation, the Transform straight from the hand's frame.
 - **Key hints** (`client/KeyHints.luau`, `Config.KeyHints`): a quiet strip under the top buttons with what the keys do
-  now (on foot: 1 / 2 / 3, 4-8 items, E use or pick up bag, G put down, X throw only while a throw is possible, V, T,
-  Shift, Q, J, M; in a seat: W/S, A/D, E get out, F, 4-8, Q, M). A keyboard only; it hides with the bottom bar. F1 or
-  its KEYS chip folds it (for the session); a courier with fewer than 5 deliveries starts with it open.
+  now (6.5, only the keys of the moment: on foot 1 / 2 / 3, E use or pick up bag, G put down, X throw only while a
+  throw is possible, V; in a seat W/S, A/D, E get out, F). A keyboard only; it hides with the bottom bar. F1 or its
+  "? KEYS [F1]" chip folds it (for the session); a courier with fewer than 2 deliveries starts with it open.
 
 ## The courier on foot: the bag, throws, sprint, armour, no free gun (6.0)
 
@@ -1599,7 +1612,7 @@ SoundSheet; upload them again).
 
 ```
 src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo spots), Roads (the road graph and the
-              GPS routes), Economy (prices, stats, pay, what fires from a car seat), Net (remotes), Joints (Motor6D or
+              GPS routes), Economy (prices, stats, pay, what fires from a car seat), Goal (6.5: the NEXT card's words), Net (remotes), Joints (Motor6D or
               AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
               Levels (XP, levels, rank names; 3.2: fromLegacy, the old saves' XP), TrafficLanes (the traffic's lanes, turns and sidewalks), Crossings (3.9: the crosswalks, the traffic-light junctions and the light cycle), SoundSheet
               (where each sound and music loop sits in the two audio assets), Missions (3.0: the campaigns and missions,
@@ -1641,7 +1654,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               fists / bag / gun: the Hand remote, the Hand and Holstered attributes; Cargo sets a loaded bag down)
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, 6.1: the
               hand slots 1-3, the item slots 4-8 and what you carry), BagSway (6.1: the bag's pendulum, the BagSwing
-              joint's only writer), KeyHints (6.1: the key hints under the top buttons, F1), MapView (minimap, big map, GPS routes),
+              joint's only writer), KeyHints (6.1: the key hints under the top buttons, F1), Objective (6.5: the NEXT
+              card, its words from shared/Goal.luau), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
