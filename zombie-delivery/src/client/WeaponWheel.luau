@@ -101,19 +101,9 @@ local function say(text: string)
 	end
 end
 
--- Fewer than two guns: nothing to pick. 6.0: none at all (a new courier: fists only): where the pistol is sold.
-local function tooFew(count: number)
-	if count == 0 then
-		local price: number? = nil
-		for _, def in Config.Weapons do
-			if def.id == Config.Arms.Starter then
-				price = def.price
-			end
-		end
-		say(`No gun yet: Lead & Co. sells a pistol{if price then ` for ${price}` else ""}. Till then, your fists.`)
-	else
-		say("Buy more guns at Lead & Co., or earn them by working.")
-	end
+-- Fewer than two guns: nothing to pick. (6.7: every courier starts with the pistol, Config.Arms: no "buy a pistol" note.)
+local function tooFew(_count: number)
+	say("Buy more guns at Lead & Co., or earn them by working.")
 end
 
 local function equip(id: string)

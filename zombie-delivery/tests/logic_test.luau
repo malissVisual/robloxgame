@@ -164,7 +164,7 @@ check("every car has a style and a price", (function()
 			last = car.price
 		end
 	end
-	return Config.Cars[1].price > 0 and Config.Weapons[1].price > 0 -- (5.0: the Old Van is bought; 6.0: the pistol too)
+	return Config.Cars[1].price > 0 and Config.Weapons[1].starter == true -- (5.0: the Old Van is bought; 6.7: the pistol is the starter)
 end)())
 
 -- Economy v2 -------------------------------------------------------------------
@@ -218,7 +218,7 @@ local solo, none = Economy.crewSplit(300, 0)
 check("solo crew split", solo == 300 and none == 0)
 local driver, share = Economy.crewSplit(300, 2)
 check("crew split", driver == 300 + 90 and share == 150, `{driver} {share}`)
-check("items have unique ids (5.4: six, the jerry can)", (function()
+check("items have unique ids (5.4: six, the jerry can; 6.7: seven, the energy drink)", (function()
 	local seen = {}
 	for _, item in Config.Items do
 		if seen[item.id] then
@@ -226,7 +226,7 @@ check("items have unique ids (5.4: six, the jerry can)", (function()
 		end
 		seen[item.id] = true
 	end
-	return #Config.Items == 6
+	return #Config.Items == 7
 end)())
 
 -- Map -------------------------------------------------------------------------

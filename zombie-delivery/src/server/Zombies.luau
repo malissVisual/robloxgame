@@ -942,10 +942,11 @@ local function hitByCar(z: Zombie, car: Vehicles.Car, now: number)
 		local health = z.humanoid.Health
 		local killed = Zombies.damage(z, Economy.ramDamage(speed, car.stats.ramPower), car.owner, { push = push, cause = "car" })
 		if not killed then
-			-- Something big: the car bounces off it and takes a dent.
+			-- Something big: the car bounces off it and takes a dent (6.7: × the Ram Plow's guard, Economy.ramGuard).
 			bump:FireClient(car.owner, Horde.RamSlowdown)
-			Vehicles.damage(car, health * Horde.RamSelfDamage)
-			Zombies.onCarDamaged(car.owner, health * Horde.RamSelfDamage)
+			local dent = health * Horde.RamSelfDamage * car.stats.ramGuard
+			Vehicles.damage(car, dent)
+			Zombies.onCarDamaged(car.owner, dent)
 			z.root.AssemblyLinearVelocity = velocity * 0.6 + Vector3.new(0, 15, 0)
 		end
 		return

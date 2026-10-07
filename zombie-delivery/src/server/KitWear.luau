@@ -7,7 +7,7 @@
 --
 --   (6.6: the backpack slots "pack" and "load" are gone with the backpacks: one carrying item, the bag)
 --   shoes   the Running Shoes on both feet
---   jacket  the Thermal Jacket on the torso, its sleeves on the upper arms
+--   (6.7: the "jacket" slot is gone with the Thermal Jacket, Config.RetiredKit)
 --   hand    6.0: the plastic bag (Config.Courier.BagKit) in the left hand: its art hangs from a small part, BagPivot,
 --           joined to the hand by a Motor6D "BagSwing" (KitArt "bag"); every client swings it (6.1: client/BagSway.luau,
 --           the only writer of its Transform). 6.1: only while it is what you hold (the character attribute Hand =
@@ -71,7 +71,7 @@ local KitWear = {}
 
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
 local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit.outfit's vest when no armour is owned)
-local NAMES: { [string]: string } = { shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" }
+local NAMES: { [string]: string } = { shoes = "KitShoes", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" } -- (6.7: no jacket)
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
 -- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays). 6.1: not for

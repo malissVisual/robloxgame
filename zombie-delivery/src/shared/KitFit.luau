@@ -3,7 +3,8 @@
 -- art (server/KitArt/Geometry.luau, server/PhoneArt/Geometry.luau) a player wears for their profile.kit, and how the
 -- art, authored for a nominal block R15 body, is fitted to the body the character really has.
 --
---   KitFit.outfit(kit, bag)      slot → art id: shoes, jacket (6.6: no backpack slot any more, one carrying item);
+--   KitFit.outfit(kit, bag)      slot → art id: shoes (6.6: no backpack slot any more, one carrying item; 6.7: no
+--                                jacket, retired);
 --                                6.0: hand = "bag" (the plastic bag in the left hand; 6.4: `bag`, the active bag's id
 --                                when given and owned: "tote", "thermal", "padded", "duffel"), vest = the best vest owned
 --                                ("heavy", else "kevlar": stream 2's armour, Config.Kit; 6.0.1: else "hivis", the
@@ -58,9 +59,7 @@ function KitFit.outfit(kit: Kit, bag: string?): { [string]: string }
 	if kit.shoes == true then
 		out.shoes = "shoes"
 	end
-	if kit.jacket == true then
-		out.jacket = "jacket"
-	end
+	-- (6.7: no jacket slot: the Thermal Jacket is retired, Config.RetiredKit; its KitArt stays unused)
 	if bag ~= nil and kit[bag] == true then
 		out.hand = bag -- 6.4: the active bag (shared/Transport.luau activeBag: server/KitWear.luau names it)
 	elseif bag == nil and kit.bag == true then

@@ -44,6 +44,7 @@ Icons.Ids = {
 	item_nitro = "rbxassetid://124345149039037",
 	item_molotov = "rbxassetid://94641923810845",
 	item_mine = "rbxassetid://109583785484960",
+	item_energy = "", -- 6.7: the Energy Drink (the emoji 🥤 until its icon is drawn and uploaded)
 	-- 5.4, fuel (Codex's art/icons/jerrycan and fuel, 256 x 256 white; not uploaded yet: the emoji shows).
 	jerrycan = "",
 	fuel = "",
@@ -165,6 +166,7 @@ Icons.Ids = {
 	kit_padded = "",
 	kit_duffel = "",
 	kit_hivis = "", -- 6.0.1: the Courier Vest (the emoji 🦺 until its icon is uploaded)
+	kit_bat = "", -- 6.7: the Baseball Bat (the emoji 🏏 until its icon is drawn and uploaded)
 	-- 5.0, the phone's apps (art/icons/app_*, 256 x 256; client/Phone.luau's app ids, bank and settings for later).
 	app_orders = "",
 	app_board = "",

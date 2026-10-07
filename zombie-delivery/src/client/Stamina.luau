@@ -7,6 +7,8 @@
 -- seconds after it is full.
 -- The breath itself is pure (Stamina.new / step / canSprint / barShown / low): tests/stamina_test.luau runs it in the
 -- plain Luau CLI, so nothing at the top level of this module may touch Roblox; start() and update() do that.
+-- 6.7, the Energy Drink (Config.Items "energy"): the server sets the character's EnergyUntil; update() fills the breath
+-- once for every new value (Stamina.refill) and lets the sprint cost ÷ EnergyBreath until then (Stamina.energized).
 
 local Stamina = {}
 
@@ -39,13 +41,15 @@ end
 
 -- One step of `dt` seconds: `wantSprint` is Shift held where a sprint is allowed (not aiming, not carrying), `moving`
 -- whether the character really goes somewhere. Returns the next state (the given one is left as it was). 6.4: `cost`
--- multiplies the drain (a heavy bag in your hand, the duffel: the BreathCost attribute; nil = 1).
+-- multiplies the drain (a heavy bag in your hand, the duffel: the BreathCost attribute; nil = 1). 6.7: under 1 too (an
+-- Energy Drink: Stamina.energized), never under MIN_COST.
+local MIN_COST = 0.25
 function Stamina.step(state: State, dt: number, wantSprint: boolean, moving: boolean, tuning: Tuning, cost: number?): State
 	dt = math.max(0, dt)
 	local breath, exhausted, rest = state.breath, state.exhausted, state.rest
 	local sprinting = wantSprint and Stamina.canSprint(state)
 	if sprinting and moving then
-		breath -= dt * math.clamp(cost or 1, 1, 3) / math.max(0.01, tuning.Stamina)
+		breath -= dt * math.clamp(cost or 1, MIN_COST, 3) / math.max(0.01, tuning.Stamina)
 		rest = 0
 		if breath <= 0 then
 			-- Out of breath: the sprint stops right here.
@@ -72,6 +76,18 @@ function Stamina.step(state: State, dt: number, wantSprint: boolean, moving: boo
 	}
 end
 
+-- 6.7, the Energy Drink (Config.ItemTuning EnergyTime, EnergyBreath): the drain multiplier while it works: `cost` (the
+-- bag's, nil = 1) ÷ `breath` (×1.3 breath = a 1.3 times longer sprint); not active: `cost` as it is.
+function Stamina.energized(cost: number?, active: boolean, breath: number): number
+	local base = cost or 1
+	return if active and breath > 0 then base / breath else base
+end
+
+-- 6.7: a drink's breath: full at once, rested (the sprint may start again), the bar shown as full.
+function Stamina.refill(state: State): State
+	return { breath = 1, exhausted = false, rest = state.rest, full = 0, sprinting = state.sprinting }
+end
+
 -- Should the bar be on screen: the breath is not full, or it filled up less than HideAfter seconds ago.
 function Stamina.barShown(state: State, tuning: Tuning): boolean
 	return state.breath < 1 or state.full < tuning.HideAfter
@@ -91,22 +107,36 @@ local movement: Tuning? = nil
 local anchor: Vector2? = nil
 local anchorMoved = false
 
+local energyBreath = 1 -- 6.7: Config.ItemTuning.EnergyBreath (read with Config.Movement, below)
+
 local function tuningNow(): Tuning
 	local found = movement
 	if not found then
 		local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"))
 		found = Config.Movement
 		movement = found
+		energyBreath = Config.ItemTuning.EnergyBreath
 	end
 	return found :: Tuning
 end
 
 -- CameraRig, every frame on foot: steps the breath and answers whether the character sprints now.
 -- 6.4: the character's BreathCost (server/Transport.luau: the duffel in your hand) makes the sprint cost more breath.
+-- 6.7: the Energy Drink: the character's EnergyUntil (server time, server/Items.luau): a new value fills the breath,
+-- and until then the sprint costs ÷ Config.ItemTuning.EnergyBreath.
+local drunk: number? = nil -- the EnergyUntil already filled
 function Stamina.update(dt: number, wantSprint: boolean, moving: boolean): boolean
 	local character = game:GetService("Players").LocalPlayer.Character
 	local cost = if character then character:GetAttribute("BreathCost") else nil
-	current = Stamina.step(current, dt, wantSprint, moving, tuningNow(), if type(cost) == "number" then cost else nil)
+	local untilAt = if character then character:GetAttribute("EnergyUntil") else nil
+	local active = type(untilAt) == "number" and workspace:GetServerTimeNow() < untilAt
+	if active and untilAt ~= drunk then
+		drunk = untilAt :: number
+		current = Stamina.refill(current)
+	end
+	local movementNow = tuningNow()
+	local drain = Stamina.energized(if type(cost) == "number" then cost else nil, active, energyBreath)
+	current = Stamina.step(current, dt, wantSprint, moving, movementNow, drain)
 	return current.sprinting
 end
 

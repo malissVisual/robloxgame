@@ -16,6 +16,9 @@
 -- 6.4: five bags; an owned bag's row says IN USE (the state's `bag`) or USE (the Kit remote's ("use", id), anywhere;
 -- the server refuses while your bag holds pieces); the stat line leads with the sprint (every bag's point), then
 -- the perk. The I window's BAGS tab lists the bags you own the same way (client/BagUi.luau BagUi.bags).
+-- 6.7: every piece is drawn at its own shop (shared/Transport.luau kitShop: "bags", "supplies" = the KIT tab, "guns" =
+-- Lead & Co.'s Baseball Bat: KitShop.rows, which client/Hud.luau's guns tab calls too). A starter piece (the plastic
+-- bag) says "STARTER · yours" and is never sold; the Courier Vest's line says its tip.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,6 +30,7 @@ local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Transport = require(Shared.Transport)
 local Armour = require(Shared.Armour)
+local Melee = require(Shared.Melee) -- 6.7: the bat's numbers
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
@@ -54,7 +58,7 @@ function KitShop.owned(state: any): Transport.Kit
 end
 
 -- The tab to show: the one picked, else KIT while a piece is still to buy (the new player's first stop), else ITEMS.
--- (6.6: the bags are ZDC Bags', not this tab's)
+-- (6.6: the bags are ZDC Bags', not this tab's; 6.7: only Last Stop Supplies' own pieces, Transport.kitShop)
 function KitShop.currentTab(state: any): string
 	local picked = KitShop.tab
 	if picked then
@@ -62,7 +66,7 @@ function KitShop.currentTab(state: any): string
 	end
 	local kit = KitShop.owned(state)
 	for _, def in Config.Kit do
-		if not kit[def.id] and not Transport.isBag(def) then
+		if not kit[def.id] and Transport.kitShop(def) == "supplies" then
 			return "kit"
 		end
 	end
@@ -117,11 +121,15 @@ local function effect(def: Config.KitDef): string
 		local change = math.floor((def.speed - 1) * 100 + 0.5)
 		table.insert(parts, if change >= 0 then `👟 walk & sprint +{change}%` else `walk & sprint −{-change}%`)
 	end
-	if def.warm then
-		table.insert(parts, `🔥 food cools ×{def.warm}`)
+	if def.tips then
+		table.insert(parts, `💵 +{math.floor(def.tips * 100 + 0.5)}% tips`) -- 6.7: the Courier Vest
+	end
+	if def.melee then
+		local swing = Melee.def(def.melee)
+		table.insert(parts, `🏏 V: {swing.damage} damage, {Melee.reachOf(def.melee)} studs`) -- 6.7: the bat
 	end
 	if #parts == 0 then
-		return "just the look" -- 6.0.1: the Courier Vest
+		return "just the look"
 	end
 	return table.concat(parts, "  ·  ")
 end
@@ -143,12 +151,10 @@ end
 
 -- Draws the KIT tab into `body` (the shop's scrolling body, a vertical list; Hud clears it and puts the tabs at
 -- LayoutOrder 0 first). `here`: at the counter (only there BUY works). 6.6: `only` "bags" draws ZDC Bags' list (the
--- bags), else Last Stop Supplies' KIT (the rest of the kit).
+-- bags), else Last Stop Supplies' KIT (the rest of the kit; 6.7: not the bat, Lead & Co.'s: KitShop.rows "guns").
 function KitShop.render(body: Instance, state: any, here: boolean, only: string?)
 	local bags = only == "bags"
 	local kit = KitShop.owned(state)
-	local level = myLevel(state)
-	local money = tonumber(state.money) or 0
 	local bag: string? = if type(state.bag) == "string" then state.bag else nil -- 6.4: the bag in use (the server's)
 	local room = Transport.handsRoom(kit, bag)
 	local speed = Transport.speedMult(kit)
@@ -186,15 +192,27 @@ function KitShop.render(body: Instance, state: any, here: boolean, only: string?
 		Font = Theme.Font,
 	})
 	P.rule(head, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
+	KitShop.rows(body, state, here, if bags then "bags" else "supplies", 2)
+end
 
+-- 6.7: the rows of one shop's kit (Transport.kitShop == `shopId`: "bags", "supplies", "guns") into `body` from
+-- LayoutOrder `first` + 1 on (a row a piece, in Config.Kit's order). `here`: at the counter. Returns the last order used.
+function KitShop.rows(body: Instance, state: any, here: boolean, shopId: string, first: number): number
+	local kit = KitShop.owned(state)
+	local level = myLevel(state)
+	local money = tonumber(state.money) or 0
+	local bag: string? = if type(state.bag) == "string" then state.bag else nil -- 6.4: the bag in use (the server's)
+	local armour = Armour.percent(kit) -- 6.0: the best vest's share
+	local last = first
 	for order, def in Config.Kit do
-		if Transport.isBag(def) ~= bags then
-			continue -- (6.6: the bags at ZDC Bags, the rest at Last Stop Supplies)
+		if Transport.kitShop(def) ~= shopId then
+			continue -- (6.6: the bags at ZDC Bags, the rest at Last Stop Supplies; 6.7: the bat at Lead & Co.)
 		end
+		last = first + order
 		local owned = kit[def.id] == true
 		-- 6.0: a vest no better than the one you have adds nothing either (the best vest counts).
 		local outclassed = not owned and def.armour ~= nil and def.armour * 100 <= armour
-		local row = P.row(body, ROW_H, order + 2, owned)
+		local row = P.row(body, ROW_H, first + order, owned)
 		-- (its icon, art/icons/kit_*, once uploaded: shared/Icons.luau; the emoji until then)
 		Ui.icon(row, Icons.kit(def.id), def.icon, UDim2.fromOffset(40, 40), {
 			Position = UDim2.fromOffset(14, ROW_H / 2 - 20),
@@ -208,7 +226,10 @@ function KitShop.render(body: Instance, state: any, here: boolean, only: string?
 		local status = if owned then `<font color="{P.hex(P.good)}">✓ OWNED</font>`
 			elseif level < def.level then `<font color="{P.hex(P.warn)}">LEVEL {def.level}</font>`
 			else effect(def)
-		Ui.label(row, `Level {def.level} · {Ui.money(def.price)} · {status}`, UDim2.new(1, -(left + BUTTON_W + 24), 0, 18), {
+		-- 6.7: a starter piece (the plastic bag) is never sold: "STARTER · yours" and what it does
+		local line = if def.starter then `<font color="{P.hex(P.good)}">STARTER · yours</font> · {effect(def)}`
+			else `Level {def.level} · {Ui.money(def.price)} · {status}`
+		Ui.label(row, line, UDim2.new(1, -(left + BUTTON_W + 24), 0, 18), {
 			Position = UDim2.fromOffset(left, 32),
 			TextSize = 13,
 			Font = Theme.HeadingFont,
@@ -227,6 +248,8 @@ function KitShop.render(body: Instance, state: any, here: boolean, only: string?
 			end)
 		elseif owned then
 			action(row, "OWNED", "off", function() end)
+		elseif def.starter then
+			action(row, "STARTER", "off", function() end) -- 6.7 (the server gives a missing one back for free)
 		elseif level < def.level then
 			action(row, `🔒 LEVEL {def.level}`, "off", function() end)
 		elseif outclassed then
@@ -239,6 +262,7 @@ function KitShop.render(body: Instance, state: any, here: boolean, only: string?
 			end)
 		end
 	end
+	return last
 end
 
 return KitShop

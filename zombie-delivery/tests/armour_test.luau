@@ -69,7 +69,7 @@ check("the vests come after the first four pieces (the KIT tab's order)", (funct
 	for index, def in Config.Kit do
 		at[def.id] = index
 	end
-	return at.kevlar > at.jacket and at.heavy > at.kevlar
+	return at.kevlar > at.shoes and at.heavy > at.kevlar -- (6.7: after the shoes; the jacket is retired)
 end)())
 
 -- 6.0.1: the Courier Vest (the red reflective vest a new courier buys): a look, no armour, sold next to the bag.
@@ -77,7 +77,9 @@ local hivis = Transport.findKit(Config.Courier.VestKit) :: Config.KitDef
 check("the Courier Vest: $20, level 1, an icon and words", hivis ~= nil and hivis.id == "hivis" and hivis.name == "Courier Vest" and hivis.price == 20
 	and hivis.level == 1 and hivis.icon == "🦺" and hivis.description ~= "")
 check("the Courier Vest takes nothing off and adds nothing", hivis.armour == nil and Armour.best({ hivis = true }) == nil and Armour.percent({ hivis = true, kevlar = true }) == 30
-	and hivis.room == nil and hivis.extra == nil and hivis.speed == nil and Transport.speedMult({ hivis = true }) == 1)
+	and (hivis :: any).room == nil and hivis.extra == nil and hivis.speed == nil and Transport.speedMult({ hivis = true }) == 1)
+check("6.7: the Courier Vest's tips: +5%, also under a Kevlar", hivis.tips == 0.05 and Transport.tipShare({ hivis = true }) == 0.05
+	and Transport.tipShare({ hivis = true, kevlar = true, heavy = true }) == 0.05 and Transport.tipShare({ kevlar = true }) == 0)
 check("the Courier Vest right after the bag in the KIT tab", (function()
 	for index, def in Config.Kit do
 		if def.id == "bag" then

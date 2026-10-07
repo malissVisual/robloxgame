@@ -209,7 +209,7 @@ check("four pieces: trolley 3 · straps 4 · cooler 5 · roof rack 7", carGearCo
 	and gear("cooler").level == 5 and gear("roofrack").level == 7)
 check("the prices: $600, about $900, $1,400, $2,500", gear("trolley").price == 600 and math.abs(gear("straps").price - 900) <= 200
 	and math.abs(gear("cooler").price - 1400) <= 300 and math.abs(gear("roofrack").price - 2500) <= 500)
-check("what the gear does is tuned in Config", Config.GearTuning.StrapsLoss == 0.6 and Config.GearTuning.CoolerDrain == 0.5 and Config.GearTuning.RoofRackSlots == 1)
+check("what the gear does is tuned in Config", Config.GearTuning.StrapsLoss == 0.6 and Config.GearTuning.CoolerDrain == 0.5 and Config.GearTuning.RoofRackSlots == 2) -- (6.7: the rack takes two)
 check("the Hand Trolley is no upgrade track any more", Economy.findUpgrade("trolley") == nil)
 
 -- The slots: the stage wins over the car; the company vehicles have none.
@@ -255,7 +255,7 @@ check("slots used", Economy.gearUsed(carGear, "van") == 1 and Economy.gearUsed({
 -- The Roof Rack: one more slot, a light piece only.
 local rack = { roofrack = true }
 check("no rack: the stage's slots", Economy.capacity("van", { stage = 3 }, {}, "parcel") == 4)
-check("a rack takes one more light piece", Economy.capacity("van", { stage = 3 }, rack, "parcel") == 5 and Economy.capacity("van", { stage = 3 }, rack, "pizza") == 5)
+check("a rack takes two more light pieces (6.7: one before)", Economy.capacity("van", { stage = 3 }, rack, "parcel") == 6 and Economy.capacity("van", { stage = 3 }, rack, "pizza") == 6)
 check("… not a heavy one, not without a look", Economy.capacity("van", { stage = 3 }, rack, "crate") == 4 and Economy.capacity("van", { stage = 3 }, rack) == 4)
 check("… not on a car it does not fit", Economy.capacity("pickup", {}, rack, "parcel") == Economy.capacity("pickup", {}))
 check("the old calls stay the same", Economy.capacity("boxtruck", { stage = 2 }) == 8 and Economy.capacity("nope", {}) == 0)

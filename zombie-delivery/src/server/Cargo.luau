@@ -1841,10 +1841,14 @@ local function render(session: Session)
 	end
 	local slots = Vehicles.cargoSlots(car)
 	-- 4.6: a Roof Rack (gear) adds a slot on the roof for a light piece: the Attachment RoofRackSlot, after the others.
+	-- 6.7: Config.GearTuning.RoofRackSlots of them, side by side across the rack (RoofRackGap apart).
 	local roof = car.chassis:FindFirstChild("RoofRackSlot")
-	if roof and roof:IsA("Attachment") and Vehicles.capacity(car, session.info.look) > #slots then
+	local extra = math.min(Config.GearTuning.RoofRackSlots, Vehicles.capacity(car, session.info.look) - #slots)
+	if roof and roof:IsA("Attachment") and extra > 0 then
 		slots = table.clone(slots)
-		table.insert(slots, roof.CFrame)
+		for n = 1, extra do
+			table.insert(slots, roof.CFrame * CFrame.new((n - (extra + 1) / 2) * Config.GearTuning.RoofRackGap, 0, 0))
+		end
 	end
 	for index, piece in session.load do
 		local slot = slots[index]

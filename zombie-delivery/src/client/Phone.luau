@@ -204,7 +204,7 @@ local function vehicles(): { Config.CarDef }
 	return list
 end
 
--- The cheapest piece of kit with this effect ("room", "speed", "warm").
+-- The cheapest piece of kit with this effect ("speed", "armour", "tips"; 6.7: the jacket's "warm" is gone).
 local function cheapestKit(field: string): Config.KitDef?
 	local best: Config.KitDef? = nil
 	for _, def in Config.Kit do
@@ -862,11 +862,17 @@ local function shopApp(list: Instance, wide: boolean)
 	local order = 1
 	-- The personal gear still worth buying (Config.Kit), the cheapest first.
 	local owned = kit()
-	-- 6.6: the bags first (ZDC Bags, the depot's kiosk), then the rest of the kit (Last Stop Supplies)
-	for _, bags in { true, false } do
+	-- 6.6: the bags first (ZDC Bags, the depot's kiosk), then the rest of the kit (Last Stop Supplies); 6.7: each piece
+	-- at its own shop (Transport.kitShop: the Baseball Bat at Lead & Co.)
+	local titles: { [string]: string } = {
+		bags = `{Config.BagShop.Name} · bags (sprint with your deliveries)`,
+		supplies = "Last Stop Supplies · kit",
+		guns = "Lead & Co. · the bat",
+	}
+	for _, shopId in { "bags", "supplies", "guns" } do
 		local wanted: { Config.KitDef } = {}
 		for _, def in Config.Kit do
-			if not owned[def.id] and Transport.isBag(def) == bags then
+			if not owned[def.id] and Transport.kitShop(def) == shopId then
 				table.insert(wanted, def)
 			end
 		end
@@ -875,10 +881,11 @@ local function shopApp(list: Instance, wide: boolean)
 		end)
 		if #wanted > 0 then
 			order += 1
-			shopHeader(gear, order, if bags then "bags" else "supplies", if bags then `{Config.BagShop.Name} · bags (sprint with your deliveries)` else "Last Stop Supplies · kit")
+			shopHeader(gear, order, shopId, titles[shopId])
+			local shop = Map.Shops[shopId]
 			for _, def in wanted do
 				order += 1
-				goal(gear, order, def.icon, def.name, if bags then Config.BagShop.Name else "Last Stop Supplies", def.price, def.level)
+				goal(gear, order, def.icon, def.name, if shop then shop.name else titles[shopId], def.price, def.level)
 			end
 		end
 	end
