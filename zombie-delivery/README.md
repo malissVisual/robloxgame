@@ -1104,6 +1104,12 @@ missions. The dealer no longer sells it. Every other car, job tier and campaign 
 
 ## Every window in the courier-phone style (5.8)
 
+**5.8.1:** `tools/rojo-sync.js` sends a big change (a `git pull` of many large scripts) to Studio in small messages,
+one script each — before, Studio could drop the whole message and keep a mix of old and new scripts (errors like
+`CameraRig: attempt to index nil`). The Output's start line shows the version: `[Server] Zombie Delivery 5.8.1 is
+running`. After a pull: stop the sync (Ctrl+C), start it again, and Disconnect / Connect in Studio's Rojo plugin.
+
+
 The windows now share the approved ZDC phone look (`design/phone-ui/`): a ZDC header (the red square, ZDC, a line glyph,
 the title in caps, a square ✕) on every `Ui.window`; **one red primary action** per view (ACCEPT, START, BUY, PLAY,
 CONTINUE, COLLECT, TAKE OUT; `HudContract.button(…, "primary")` / `Ui.button(…, Theme.Contract.red)`); square tabs with a

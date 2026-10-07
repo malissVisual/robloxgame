@@ -701,8 +701,63 @@ function rescan() {
 	if (patch.removed.length) parts.push(`-${patch.removed.length}`);
 	if (patch.updated.length) parts.push(`~${patch.updated.length}`);
 
-	broadcast(patch);
-	console.log(`↻ změna (${parts.join(" ")}) → odesláno do Studia`);
+	const pieces = splitPatch(patch);
+	for (const piece of pieces) {
+		broadcast(piece);
+	}
+	console.log(`↻ změna (${parts.join(" ")}) → odesláno do Studia${pieces.length > 1 ? ` v ${pieces.length} zprávách` : ""}`);
+}
+
+// Velký patch (git pull změní desítky velkých skriptů naráz) Studio přes
+// WebSocket nemusí převzít celý a tiše ho zahodí — pak ve Studiu zůstane mix
+// starých a nových skriptů. Proto ho posíláme po kouscích: smazání zvlášť,
+// každá změněná instance zvlášť a přidané instance po dávkách do ~256 kB.
+// Přidané jdou v pořadí rodič → dítě (rodič musí přijít dřív).
+const PIECE_BYTES = 256 * 1024;
+
+function sizeOf(value) {
+	try {
+		return encode(value).length;
+	} catch (err) {
+		return PIECE_BYTES;
+	}
+}
+
+function splitPatch(patch) {
+	const pieces = [];
+	if (patch.removed.length) {
+		pieces.push({ added: {}, removed: patch.removed, updated: [] });
+	}
+	const addedIds = Object.keys(patch.added);
+	const depth = (id) => {
+		let n = 0;
+		let current = patch.added[id];
+		while (current && patch.added[current.Parent]) {
+			n += 1;
+			current = patch.added[current.Parent];
+		}
+		return n;
+	};
+	addedIds.sort((a, b) => depth(a) - depth(b));
+	let batch = {};
+	let batchSize = 0;
+	for (const id of addedIds) {
+		const size = sizeOf(patch.added[id]);
+		if (batchSize > 0 && batchSize + size > PIECE_BYTES) {
+			pieces.push({ added: batch, removed: [], updated: [] });
+			batch = {};
+			batchSize = 0;
+		}
+		batch[id] = patch.added[id];
+		batchSize += size;
+	}
+	if (batchSize > 0) {
+		pieces.push({ added: batch, removed: [], updated: [] });
+	}
+	for (const update of patch.updated) {
+		pieces.push({ added: {}, removed: [], updated: [update] });
+	}
+	return pieces.length ? pieces : [patch];
 }
 
 let deadline = null;
