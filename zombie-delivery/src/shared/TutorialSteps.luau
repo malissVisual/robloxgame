@@ -16,8 +16,12 @@
 --
 -- 5.0, from the bottom: a new player has no vehicle. Marge gives them the phone (the server's "phone" message, not a
 -- phase: client/Phone.luau shows it) with their first job, ON FOOT: two letters on one street (Jobs.startTutorialJob).
--- A payload with mode = "foot" gets the walking hints (walk, pick up, hand over: no van); the van's are kept for a
--- car job. Her last pages send you to Last Stop Supplies for a backpack and to save up for a bike (level 2).
+-- A payload with mode = "foot" gets the walking hints (walk, pick up, hand over: no van). Her last pages send you to
+-- Last Stop Supplies for a backpack and to save up for a bike (level 2).
+-- 5.7: the van's hints are gone (a new player never has a car on the first day: every job step has the walking hint,
+-- "Ride" on a bike). After the first delivery her last page offers SHOW ME AROUND, a short tour (TutorialSteps.Tour,
+-- tourDialog): the ZDC RIDE dock by the depot, the nearest bus stop (each on the GPS: client/TutorialUi.luau), then
+-- Q → BOARD. Every page can skip the rest.
 
 local Config = require(script.Parent.Config)
 
@@ -32,6 +36,9 @@ export type Dialog = {
 
 -- The phases the server sends (server/Tutorial.luau); "phone" (5.0) is a message, not a phase.
 TutorialSteps.Phases = { "welcome", "board", "job", "retry", "done", "say", "phone" }
+
+-- 5.7: the tour after the first delivery, in order.
+TutorialSteps.Tour = { "dock", "bus", "board" }
 
 -- The job's steps (TutorialSteps.jobStep), in the order they come.
 TutorialSteps.JobSteps = { "drive_pickup", "pickup", "pickup_more", "carry", "loose", "drive_drop", "unload", "handover" }
@@ -103,21 +110,21 @@ function TutorialSteps.hint(step: string, job: { [string]: any }?): string
 	local piece = text(payload.piece, "parcel")
 	local person = text(payload.person, if payload.stage == "drop" then "the customer" else "the shop")
 	local name = Config.Tutorial.NpcName
-	if payload.mode == "foot" then
-		-- 5.0: on foot (the first job): walk, pick up, hand over.
-		if step == "drive_pickup" then
-			return "Walk to the red circle: the pickup. Follow the red route on the map; Shift sprints"
-		elseif step == "pickup" then
-			return `Pick up {article(piece)} from {person} (E)`
-		elseif step == "pickup_more" or step == "carry" then
-			return `Your hands hold two: pick up the next {piece} from {person} too (E)`
-		elseif step == "loose" then
-			return `Pick the {piece} up again (E)`
-		elseif step == "drive_drop" then
-			return "Got them all! Walk to the red circle: the drop-off"
-		elseif step == "unload" or step == "handover" then
-			return `Walk to {person} at the red circle and hand them over (E)`
-		end
+	-- 5.0: on foot (the first job): walk, pick up, hand over. 5.7: every job step (the van's hints were never reached:
+	-- nobody has a car on the first day); on a bike you ride.
+	local move = if payload.mode == "bike" then "Ride" else "Walk"
+	if step == "drive_pickup" then
+		return `{move} to the red circle: the pickup. Follow the red route on the map{if move == "Walk" then "; Shift sprints" else ""}`
+	elseif step == "pickup" then
+		return `Pick up {article(piece)} from {person} (E)`
+	elseif step == "pickup_more" or step == "carry" then
+		return `Your hands hold two: pick up the next {piece} from {person} too (E)`
+	elseif step == "loose" then
+		return `Pick the {piece} up again (E)`
+	elseif step == "drive_drop" then
+		return `Got them all! {move} to the red circle: the drop-off`
+	elseif step == "unload" or step == "handover" then
+		return `{move} to {person} at the red circle and hand them over (E)`
 	end
 	if step == "welcome" then
 		return `Talk to {name} by the job board (E)`
@@ -125,22 +132,6 @@ function TutorialSteps.hint(step: string, job: { [string]: any }?): string
 		return "Open the job board (J) and take an ON FOOT job"
 	elseif step == "retry" then
 		return `Talk to {name} at the depot (E) for another job`
-	elseif step == "drive_pickup" then
-		return "Get in your van and follow the red route on the map to the red circle: the pickup"
-	elseif step == "pickup" then
-		return `Park in the circle, get out and pick up {article(piece)} from {person} (E)`
-	elseif step == "pickup_more" then
-		return `One in! Pick up the next {piece} from {person} (E)`
-	elseif step == "carry" then
-		return "Carry it to the back of the van and load it (E). Hands full? G puts it down while you open the back"
-	elseif step == "loose" then
-		return `Pick the {piece} up again (E)`
-	elseif step == "drive_drop" then
-		return "All loaded! Close the back of the van, get in and follow the red route to the red circle: the drop-off"
-	elseif step == "unload" then
-		return `Get out, open the back of the van (E) and take the {piece} out (E)`
-	elseif step == "handover" then
-		return `Carry it to {person} (E)`
 	end
 	return ""
 end
@@ -195,7 +186,8 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 				"Buy a backpack at Last Stop Supplies: you carry more on foot. Then save up for a bike: the bike shop opens at level 2.",
 				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Hold T to pick a gun, and explore: the map fills in as you go.`,
 			},
-			primary = "GOT IT",
+			primary = "SHOW ME AROUND", -- 5.7: the tour (TutorialSteps.tourDialog)
+			secondary = "LATER",
 		}
 	elseif phase == "skip" then
 		-- (client only: the hint line's SKIP asks first, a skipped tutorial does not come back)
@@ -215,6 +207,30 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 	return nil
 end
 
+-- 5.7, the tour after the first delivery (TutorialSteps.Tour): one short page a stop, the place on your GPS
+-- (client/TutorialUi.luau). info.dock: the dock's name, info.stop: the bus stop's. Nil for an unknown step.
+function TutorialSteps.tourDialog(step: string, info: { [string]: any }?): Dialog?
+	local data: { [string]: any } = info or {}
+	local last = step == TutorialSteps.Tour[#TutorialSteps.Tour]
+	local page: string? = nil
+	if step == "dock" then
+		page = `See the red ZDC RIDE dock{if type(data.dock) == "string" then ` on {data.dock}` else ""}, right by the depot? Free e-scooters: rent one, ride to your run, leave it at any dock. It's on your GPS.`
+	elseif step == "bus" then
+		page = `The buses are free too. Your nearest stop is {text(data.stop, "a short walk away")}: board at the door, ring the bell (E) and hop off where you need. GPS is on it.`
+	elseif step == "board" then
+		page = "And the work: Q opens your phone, BOARD has every run. New ones come in every few minutes. Go get 'em, courier!"
+	end
+	if not page then
+		return nil
+	end
+	return {
+		speaker = speaker(true),
+		pages = { page },
+		primary = if last then "OPEN THE BOARD" else "NEXT",
+		secondary = "SKIP TOUR",
+	}
+end
+
 -- 4.2, a touch screen (no keys): her words without the keys. "(E)" / "(J)" go (the prompts and the buttons are
 -- tapped), "Press J." goes (her board dialog opens the board itself), "G puts it down" names the PUT DOWN button and
 -- "Hold T to pick a gun" the weapon line (client/TutorialUi.luau asks on a touch layout only).
@@ -223,6 +239,7 @@ function TutorialSteps.forTouch(line: string): string
 	out = string.gsub(out, "%s*Press [A-Z]%.", "")
 	out = string.gsub(out, "G puts it down", "PUT DOWN sets it down")
 	out = string.gsub(out, "Hold T to pick a gun", "Tap your gun's line to pick a gun")
+	out = string.gsub(out, "Q opens your phone", "The PHONE button opens your phone") -- 5.7
 	return out
 end
 

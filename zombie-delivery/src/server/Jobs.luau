@@ -167,6 +167,17 @@
 --     (Deliveries.round: Stop.toss, "Toss newspaper" from Round.TossRange), its own pay and clock (JobRules.roundPay /
 --     roundTime), the tip for no paper in the bushes (Cargo.missesOf, JobRules.roundTip) in payOrder. One order on its
 --     own (never stacked).
+--
+-- 5.7, a better whole game:
+--   * startJob's second half (after jobs[player] = job) runs in a pcall: a failure ends the job, sends the empty job,
+--     tells the player and warns. A job whose tick fails Config.Jobs.TickFails times in a row ends (Jobs.fail).
+--   * Foot and bike runs get life (server/RunEvents.luau, Config.Jobs.FootEvents): a runner, a survivor's tip or a
+--     locked gate on about one run in four, a few walkers at about one drop in five.
+--   * The step up to a car (Config.Jobs.CarStep, JobRules.carStep*): a ★ board delivery in your own car takes 3 – 4
+--     pieces (as many as the car holds now: tierOffers' room) and gives +40 XP.
+--   * The board refills: every offer taken (Board.taken) gets a new one of its kind after the run, made from where
+--     the player is then (Jobs.refillBoard, deferred from endJob).
+--   * A DeliveryResult says its `mode`: client/Hud.luau shows a foot or bike run as a toast and a float.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -284,7 +295,8 @@ type LightJob = {
 
 -- 3.7: a player's job board: its offers (sorted, boardOrder) until refreshAt (workspace:GetServerTimeNow()).
 -- 4.7: rerolled = the tiers rerolled on this board (once each).
-type Board = { list: { Offer }, refreshAt: number, rerolled: { [number]: boolean }, footNote: string? }
+-- 5.7: taken = the offers taken from it since (Jobs.refillBoard puts a new one of each kind in their place after the run).
+type Board = { list: { Offer }, refreshAt: number, rerolled: { [number]: boolean }, footNote: string?, taken: { Offer }? }
 
 type Job = {
 	offer: Offer,
@@ -356,6 +368,7 @@ type Job = {
 	pinned: number?, -- the order the GPS follows (the phone's ORDERS app)
 	switchAt: number, -- os.clock(): the current stop may change again after this (Orders.SwitchEvery)
 	killsPaid: number, -- the kills already paid with an order
+	tickFails: number?, -- 5.7: the server ticks in a row that failed (Config.Jobs.TickFails of them: Jobs.fail)
 }
 
 -- 5.2: one order of a job. `offer` is its own (pay, clock, cargo, customer, pieces, rules); the job's offer is the
@@ -1039,7 +1052,9 @@ end
 -- modifier, no bulk; long = the far band, × LongPay; risky = a RiskyModifiers modifier, the bandits want it (×
 -- RiskyBoost where the tier has bandits), × RiskyPay; bulk = a business that sends several, its most pieces + the
 -- tier's BulkExtra. Without a role (the tutorial, the admin's "ordinaryN") it is made as before 4.7.
-local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, role: string?): Offer?
+-- 5.7, `room`: what the player's own car holds now; a ★ delivery takes Config.Jobs.CarStep's pieces up to it
+-- (JobRules.carStepPieces: at least the Rusty Van's EasyMaxPieces).
+local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, role: string?, room: number?): Offer?
 	local Deliveries = require(Shared.Deliveries) -- 5.3 (required here: Jobs keeps its top-level locals)
 	local tier = JobsConfig.Tiers[tierIndex]
 	local choice = JobsConfig.Choice
@@ -1121,7 +1136,8 @@ local function ordinaryOffer(from: Vector3, tierIndex: number, easy: boolean?, r
 	local most = business.pieces[2] or business.pieces[1]
 	local count = if role == "short" then business.pieces[1] elseif role == "bulk" then most else rng:NextInteger(business.pieces[1], most)
 	if tierIndex == 1 then
-		count = math.min(count, JobsConfig.EasyMaxPieces) -- 3.5: a ★ delivery fits the Rusty Van
+		-- 3.5: a ★ delivery fits the Rusty Van. 5.7: the step up to a car: 3 – 4 pieces, as many as your car holds.
+		count = if easy then math.min(count, JobsConfig.EasyMaxPieces) else JobRules.carStepPieces(role, rng:NextNumber(), room)
 	end
 	if easy then
 		count = math.max(1, math.min(count, JobsConfig.TutorialPieces))
@@ -2116,15 +2132,25 @@ local function stamp(offer: Offer, from: Vector3)
 end
 
 -- 4.7: one tier's ordinary deliveries: one of every trade-off (JobRules.roles) when the player may take the tier
--- (its level and its licence), else one to show what is locked.
-local function tierOffers(player: Player, from: Vector3, tierIndex: number): { Offer }
+-- (its level and its licence), else one to show what is locked. 5.7, `only`: just one offer of that role (Jobs.refillBoard).
+local function tierOffers(player: Player, from: Vector3, tierIndex: number, only: string?): { Offer }
 	local out: { Offer } = {}
 	local open = PlayerData.level(player) >= JobsConfig.Tiers[tierIndex].level and hasLicence(player, tierIndex)
 	local roles: { string } = if open then JobRules.roles(function(): number
 		return rng:NextNumber()
 	end) else { "short" }
+	if only and open then
+		roles = { only }
+	end
+	-- 5.7: a ★ delivery takes as many pieces as your own car holds now (Config.Jobs.CarStep).
+	local room: number? = nil
+	local profile = PlayerData.get(player)
+	local carId = if profile then profile.car else nil
+	if tierIndex == 1 and profile and carId and not Transport.riding(player) then
+		room = Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId), Economy.installedGear(profile.carGear, carId))
+	end
 	for _, role in roles do
-		local offer = ordinaryOffer(from, tierIndex, nil, role)
+		local offer = ordinaryOffer(from, tierIndex, nil, role, room)
 		if offer then
 			table.insert(out, offer)
 		end
@@ -2271,6 +2297,45 @@ end
 -- A new board now, sent to the player (3.7: the client cannot ask for this; RequestOffers sends the current board).
 function Jobs.makeOffers(player: Player)
 	sendBoard(player, makeBoard(player))
+end
+
+-- 5.7: after a run the board is not stale: every offer taken from it (Board.taken) gets a new one of its kind in its
+-- place (the same section and danger level, the same trade-off), made from where the player is now; the other offers
+-- stay until refreshAt. A board about to expire waits for refreshBoards. Pushed to the player (open or not).
+function Jobs.refillBoard(player: Player)
+	local board = boards[player.UserId]
+	local taken = if board then board.taken else nil
+	if not board or not taken or jobs[player] or not player.Parent then
+		return
+	end
+	board.taken = nil
+	if workspace:GetServerTimeNow() >= board.refreshAt - 5 then
+		return
+	end
+	local from = playerPosition(player)
+	local added = 0
+	for _, old in taken do
+		local role = if old.round then "round" else old.role
+		local fresh: Offer? = nil
+		if old.mode == "foot" then
+			fresh = footOffer(from, role, Transport.footOf(player).room)
+		elseif old.mode == "bike" then
+			local _, bike = Transport.bikeOf(player)
+			local rack = if bike then math.max(0, bike.room - Transport.packRoomOf(player)) else 1
+			fresh = footOffer(from, role, if bike then bike.room else JobsConfig.Bike.Pieces[1], nil, true, rack)
+		elseif old.jobType == nil and old.mission == nil and not old.tutorial then
+			fresh = tierOffers(player, from, old.tier, role or "short")[1]
+		end
+		if fresh then
+			stamp(fresh, from)
+			table.insert(board.list, fresh)
+			added += 1
+		end
+	end
+	if added > 0 then
+		table.sort(board.list, boardOrder)
+		sendBoard(player, board)
+	end
 end
 
 -- 4.7, REROLL (Net "RerollTier", tier): that tier's ordinary offers on the player's board made again, for
@@ -2597,6 +2662,8 @@ local function endJob(player: Player, job: Job, linger: boolean)
 	Cargo.finish(job.cargo, linger)
 	DuoGates.clear(player) -- 3.2: the twin-lever gate, if any
 	Zombies.release(player) -- its zombies roam on, its bandits stand down
+	require(script.Parent.RunEvents).finish(player) -- 5.7: a survivor still calling, a locked gate
+	task.defer(Jobs.refillBoard, player) -- 5.7: new offers where the taken ones were (after the result)
 	Vehicles.setSpeedMultiplier(player, 1)
 	-- 3.0: the crew stays together (no Crew.disband): the next mission is one START away.
 	-- A company vehicle goes back; your own car comes to you. 5.0: without a car of your own the lent one just goes
@@ -2860,44 +2927,58 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 		killsPaid = 0,
 	}
 	jobs[player] = job
-	placeDocks(player, offer)
-	-- 5.2: the first order. A run that may take more keeps the order's own offer (its stops, pieces, pay) apart from
-	-- the job's, which gets the stops of the orders added later; a job of stops one after the other is its only order.
-	local all: { number } = {}
-	for index in offer.stops do
-		table.insert(all, index)
-	end
-	newOrder(job, if job.free then table.clone(offer) else offer, all)
-	-- No pick-up: the vehicle starts loaded.
-	if offer.stops[1].kind ~= "pickup" then
-		Cargo.fill(session, offer.total)
-	end
-	Cargo.setStop(session, planFor(job, 1))
-	-- Defend: the last drop unloads only after holding out (a job of one drop: from the start). 3.2, switches: the
-	-- first stop's gate if it has one.
-	placeGate(player, job)
-	blockStop(job)
-	Vehicles.setSpeedMultiplier(player, if offer.modifier then offer.modifier.speedMultiplier else 1)
-	send(player)
-	local title = if jobType then jobType.name else ""
-	if offer.mission then
-		local twists = twistNames(offer)
-		title = `MISSION: {title}{if twists ~= "" then ` ({twists})` else ""}{if offer.duo then " · DUO" elseif offer.coop then " · CO-OP" else ""}`
-	end
-	local text = if jobType then `{title}: {offer.stops[1].label}` else offer.stops[1].label
-	if jobType and jobType.timeLimit then
-		text ..= ` · {math.floor(offer.time / 60)}:{string.format("%02d", offer.time % 60)} on the clock!`
-	elseif offer.boost > 1 then
-		text ..= " · Every bandit in town wants this cargo!"
-	end
-	notice:FireClient(player, text)
-	-- The invited crew hears about it too (their HUD follows the owner's job: server/Crew.luau, Jobs.crewStatus).
-	for _, member in Crew.members(player) do
-		if offer.mission then
-			notice:FireClient(member, `{title} with {player.DisplayName}. Help them out!`)
-		else
-			notice:FireClient(member, `{player.DisplayName} took a job: {if jobType then jobType.name else offer.cargo}. Help them out!`)
+	-- 5.7: everything after this runs in a pcall: an error here must not strand the player with a half-made job (the
+	-- 5.4.1 kind of bug). On failure the job ends, the HUD hears it, the player is told and the Output warned.
+	local ok, err = pcall(function()
+		placeDocks(player, offer)
+		-- 5.2: the first order. A run that may take more keeps the order's own offer (its stops, pieces, pay) apart from
+		-- the job's, which gets the stops of the orders added later; a job of stops one after the other is its only order.
+		local all: { number } = {}
+		for index in offer.stops do
+			table.insert(all, index)
 		end
+		newOrder(job, if job.free then table.clone(offer) else offer, all)
+		-- No pick-up: the vehicle starts loaded.
+		if offer.stops[1].kind ~= "pickup" then
+			Cargo.fill(session, offer.total)
+		end
+		Cargo.setStop(session, planFor(job, 1))
+		-- Defend: the last drop unloads only after holding out (a job of one drop: from the start). 3.2, switches: the
+		-- first stop's gate if it has one.
+		placeGate(player, job)
+		blockStop(job)
+		Vehicles.setSpeedMultiplier(player, if offer.modifier then offer.modifier.speedMultiplier else 1)
+		send(player)
+		local title = if jobType then jobType.name else ""
+		if offer.mission then
+			local twists = twistNames(offer)
+			title = `MISSION: {title}{if twists ~= "" then ` ({twists})` else ""}{if offer.duo then " · DUO" elseif offer.coop then " · CO-OP" else ""}`
+		end
+		local text = if jobType then `{title}: {offer.stops[1].label}` else offer.stops[1].label
+		if jobType and jobType.timeLimit then
+			text ..= ` · {math.floor(offer.time / 60)}:{string.format("%02d", offer.time % 60)} on the clock!`
+		elseif offer.boost > 1 then
+			text ..= " · Every bandit in town wants this cargo!"
+		end
+		notice:FireClient(player, text)
+		-- The invited crew hears about it too (their HUD follows the owner's job: server/Crew.luau, Jobs.crewStatus).
+		for _, member in Crew.members(player) do
+			if offer.mission then
+				notice:FireClient(member, `{title} with {player.DisplayName}. Help them out!`)
+			else
+				notice:FireClient(member, `{player.DisplayName} took a job: {if jobType then jobType.name else offer.cargo}. Help them out!`)
+			end
+		end
+		require(script.Parent.RunEvents).begin(player, offer.mode, offer.tutorial, offer.mission) -- 5.7: life on foot
+	end)
+	if not ok then
+		warn(`[Jobs] startJob failed for {player.Name}: {err}`)
+		if jobs[player] == job then
+			endJob(player, job, false)
+		end
+		send(player)
+		notice:FireClient(player, "That job could not start. Pick another one from the board.")
+		return false, nil
 	end
 	return true, nil
 end
@@ -3022,6 +3103,10 @@ local function accept(player: Player, id: any)
 		if at then
 			table.remove(board.list, at)
 		end
+		-- 5.7: a new one of its kind comes in its place after the run (Jobs.refillBoard).
+		local list = board.taken or {}
+		table.insert(list, offer)
+		board.taken = list
 		if job then
 			sendBoard(player, board) -- (5.2: the other rows' + ADD ORDER / NO ROOM follow the room left)
 		end
@@ -3239,6 +3324,8 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	local xp = Levels.jobXp(offer.tier, delivered, kills, night, true)
 	if offer.mode == "bike" then
 		xp = JobRules.bikeXp(xp) -- 5.1
+	elseif JobRules.carStep(offer.mode, offer.tier, offer.jobType ~= nil or offer.mission ~= nil) and not order.addOn then
+		xp = JobRules.carStepXp(xp) -- 5.7: the step up to a car
 	end
 	if rating then
 		xp = JobRules.ratedXp(xp, rating.stars)
@@ -3309,6 +3396,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	resultRemote:FireClient(player, withXp({
 		employer = employerInfo,
 		success = true,
+		mode = offer.mode, -- 5.7: a foot or bike run shows as a toast and a float (client/Hud.luau showResult)
 		midJob = if final then nil else true,
 		order = orderInfo,
 		cargo = offer.cargo,
@@ -3341,6 +3429,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		resultRemote:FireClient(member, withXp({
 			success = true,
 			rider = true,
+			mode = offer.mode, -- 5.7
 			midJob = if final then nil else true,
 			order = orderInfo,
 			driver = player.DisplayName,
@@ -4519,6 +4608,7 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	local foot = offer.mode == "foot" or offer.mode == "bike"
 	if foot then
 		strayStep(player, job, position, now) -- 5.0: no waves, no bandits on foot (5.1: nor on a bike job)
+		require(script.Parent.RunEvents).step(player, position, stop, job.stop, step) -- 5.7: a runner, a survivor, a gate, walkers at a drop
 	elseif Cargo.onFoot(session) then
 		footWave(player, job, tier, stop, now, multiplier)
 	else
@@ -4564,6 +4654,24 @@ local function update(dt: number)
 		if not ok and now - lastUpdateWarn > 60 then
 			lastUpdateWarn = now
 			warn(`[Jobs] update failed for {player.Name}: {err}`)
+		end
+		-- 5.7: a job whose tick keeps failing ends (Config.Jobs.TickFails in a row) instead of stranding its player.
+		local job = jobs[player]
+		if job then
+			job.tickFails = if ok then 0 else (job.tickFails or 0) + 1
+			if (job.tickFails or 0) >= JobsConfig.TickFails then
+				warn(`[Jobs] {player.Name}'s job failed {JobsConfig.TickFails} ticks in a row: it ends ({err})`)
+				local failed, why = pcall(function()
+					Jobs.fail(player, "Something went wrong with this delivery. Take another one from the board.")
+				end)
+				if not failed then
+					warn(`[Jobs] the failing job could not end cleanly: {why}`)
+					if jobs[player] == job then
+						pcall(endJob, player, job, false)
+					end
+					pcall(send, player)
+				end
+			end
 		end
 	end
 end
@@ -4706,28 +4814,34 @@ function Jobs.start()
 	-- The quiet twist hears every shot (Gun does not require Jobs: no cycle).
 	Gun.onShot = Jobs.onShot
 	-- 3.7: opening the board sends the current offers; new ones only when they expired (or there were none yet).
+	-- (5.7: Net.latest rate limits these two, Config.Robust.Limits; a burst of board requests is answered once)
 	Net.get("RequestOffers").OnServerEvent:Connect(function(player)
-		local job = jobs[player]
-		if not job or runStacks(job) then -- (5.2: a run that takes more orders shows the board too)
-			sendBoard(player, boardOf(player))
-		end
+		Net.latest(player, "RequestOffers", Config.Robust.Limits.RequestOffers, function()
+			local job = jobs[player]
+			if not job or runStacks(job) then -- (5.2: a run that takes more orders shows the board too)
+				sendBoard(player, boardOf(player))
+			end
+		end)
 	end)
 	-- 5.2: the phone's ORDERS app pins an order (its id; nil: none): the GPS follows it.
-	Net.get("PinOrder").OnServerEvent:Connect(function(player, id)
-		local job = jobs[player]
-		if not job or (id ~= nil and type(id) ~= "number") then
-			return
-		end
-		local order = if type(id) == "number" then orderById(job, id) else nil
-		job.pinned = if order and order.state == "open" then order.id else nil
-		job.switchAt = 0
-		job.dirty = true
+	Net.get("PinOrder").OnServerEvent:Connect(function(player, pinned)
+		Net.latest(player, "PinOrder", Config.Robust.Limits.PinOrder, function(_, id: any)
+			local job = jobs[player]
+			if not job or (id ~= nil and type(id) ~= "number") then
+				return
+			end
+			local order = if type(id) == "number" then orderById(job, id) else nil
+			job.pinned = if order and order.state == "open" then order.id else nil
+			job.switchAt = 0
+			job.dirty = true
+		end, pinned)
 	end)
 	Net.get("AcceptJob").OnServerEvent:Connect(accept)
 	Net.get("RerollTier").OnServerEvent:Connect(reroll) -- 4.7
 	roadEventRemote.OnServerEvent:Connect(answerRoadEvent) -- 4.8: the add-on's Y / NO
 	Net.get("AcceptEmployer").OnServerEvent:Connect(acceptEmployer)
 	Net.get("CancelJob").OnServerEvent:Connect(function(player)
+		if not Net.limit(player, "CancelJob", Config.Robust.Limits.CancelJob) then return end -- 5.7
 		Jobs.fail(player, "Delivery cancelled.")
 	end)
 	Players.PlayerRemoving:Connect(function(player)
@@ -4740,6 +4854,7 @@ function Jobs.start()
 			Cargo.finish(job.cargo, false)
 			Crew.disband(player)
 		end
+		require(script.Parent.RunEvents).finish(player) -- 5.7
 		lifts[player] = nil
 		DuoGates.clear(player)
 		for _, other in jobs do

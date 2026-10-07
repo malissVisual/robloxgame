@@ -50,7 +50,23 @@ check("a new rank is marked where it starts", road[1].newRank and road[5].newRan
 check("level 1: the Pistol (on foot: no car, no car jobs)", has(road[1].unlocks, "gun", "pistol") and not has(road[1].unlocks, "car", "van")
 	and not has(road[1].unlocks, "tier", "1"))
 check("level 2: the Rented Lockup", has(road[2].unlocks, "garage", "garage_rented"))
-check("level 3: the Hand Trolley (gear)", has(road[3].unlocks, "gear", "trolley"))
+-- 5.7: the Hand Trolley (gear for a car, level 3) shows on the road with the first car, at level 4.
+check("level 4: the Hand Trolley (car gear: not before the first car)", has(road[4].unlocks, "gear", "trolley") and not has(road[3].unlocks, "gear", "trolley")
+	and Career.gearLevel((Economy.findGear("trolley") :: any)) == 4)
+check("bike gear keeps its level on the road", has(road[2].unlocks, "gear", "basket"))
+-- 5.7: the levels before a car give kit, not car items; a kit owned already pays its price instead.
+for level = 2, 4 do
+	local reward = Career.reward(level) :: Config.LevelReward
+	for id in reward.items or {} do
+		check(`level {level}: no car items before a car ({id})`, id ~= "repair" and id ~= "nitro" and id ~= "mine" and id ~= "jerrycan")
+	end
+end
+check("level 3 gives the Courier Backpack, level 4 the Running Shoes", (Career.kitOf(Career.reward(3)) :: any).id == "backpack" and (Career.kitOf(Career.reward(4)) :: any).id == "shoes")
+check("the kit in words", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "the Courier Backpack", 1, true) ~= nil)
+local ownedKit: { [string]: boolean } = {}
+check("a kit reward: yours, nothing to pay", Career.grantKit(Career.reward(3), ownedKit) == 0 and ownedKit.backpack == true)
+check("owned already: its price instead", Career.grantKit(Career.reward(3), ownedKit) == (Career.kitOf(Career.reward(3)) :: any).price)
+check("no kit, nothing", Career.grantKit(Career.reward(2), ownedKit) == 0 and Career.grantKit(nil, ownedKit) == 0)
 check("level 4: the Old Van, the Patched Van stage, ★ jobs, First Shift, the Ratchet Straps", has(road[4].unlocks, "car", "van") and has(road[4].unlocks, "stage", "van:1")
 	and has(road[4].unlocks, "tier", "1") and has(road[4].unlocks, "campaign", "dispatch") and has(road[4].unlocks, "gear", "straps"))
 check("level 5: the Courier Van, the High-Roof Van, ★★ jobs", has(road[5].unlocks, "car", "courier") and has(road[5].unlocks, "car", "highroof") and has(road[5].unlocks, "tier", "2"))
@@ -143,7 +159,7 @@ for _, level in { 5, 10, 15 } do
 	check(`level {level}: a paint or a title`, reward.paint ~= nil or reward.title ~= nil)
 end
 check("the rewards in words", table.concat(Career.rewardParts(Career.reward(2)), ", ") == "$500, 2 Medkits"
-	and table.concat(Career.rewardParts(Career.reward(5)), ", ") == "$1,500, Hi-Vis Orange paint"
+	and table.concat(Career.rewardParts(Career.reward(5)), ", ") == "$1,500, 2 Repair Kits, Hi-Vis Orange paint"
 	and string.find(table.concat(Career.rewardParts(Career.reward(15)), ", "), "Legend of the Last Road", 1, true) ~= nil)
 check("money in words", Career.money(15000) == "$15,000" and Career.money(500) == "$500" and Career.money(1234567) == "$1,234,567")
 

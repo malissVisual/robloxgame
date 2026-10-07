@@ -1,6 +1,8 @@
 --!strict
--- RemoteEvents. The server creates them on first require, the client waits for them.
+-- RemoteEvents. The server creates them on first require, the client waits for them. 5.7: Net.limit and Net.latest,
+-- the server's rate limit per player and remote (Config.Robust.Limits).
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -57,7 +59,7 @@ local NAMES = {
 	"PinOrder", -- 5.2: client → server: (order id or nil) the GPS follows that order of your run (the phone's ORDERS app, server/Jobs.luau)
 	"Fuel", -- 5.4: client → server: ("tow") the phone's TOW: your empty car to the nearest gas station's pump (server/Fuel.luau)
 	"Bus", -- 5.5: client → server: ("stop") on a city bus: the bell (off at the next stop), or off now while it stands at a stop (server/Buses.luau, client/BusRide.luau)
-	"Zip", -- 5.6: client → server: ("letgo") Space on a zip line, low over a platform's roof (server/ZipLines.luau checks it); server → client: ("fade", seconds) a climb's short fade (client/ZipRide.luau)
+	"Zip", -- 5.6: client → server: ("letgo") Space on a zip line, low over a platform's roof (server/ZipLines.luau checks it); 5.7: the ladder climbs are walked on the client (client/Interact.luau), the server sets their end
 }
 
 local folder: Folder
@@ -80,6 +82,83 @@ function Net.get(name: string): RemoteEvent
 	local remote = folder:WaitForChild(name, 10)
 	assert(remote and remote:IsA("RemoteEvent"), "unknown remote " .. name)
 	return remote
+end
+
+-- ── 5.7: rate limits (the server) ──────────────────────────────────────────
+-- A token bucket per player and name: perSecond requests in a burst, then perSecond a second.
+
+type Bucket = { tokens: number, at: number }
+local buckets: { [Player]: { [string]: Bucket } } = {}
+type Waiting = { args: { any }, n: number, scheduled: boolean }
+local waiting: { [Player]: { [string]: Waiting } } = {}
+
+local function bucketOf(player: Player, name: string, perSecond: number): Bucket
+	local mine = buckets[player]
+	if not mine then
+		mine = {}
+		buckets[player] = mine
+	end
+	local bucket = mine[name]
+	local now = os.clock()
+	if not bucket then
+		bucket = { tokens = math.max(1, perSecond), at = now }
+		mine[name] = bucket
+	else
+		bucket.tokens = math.min(math.max(1, perSecond), bucket.tokens + (now - bucket.at) * perSecond)
+		bucket.at = now
+	end
+	return bucket
+end
+
+-- May this request from the player go on? False when they sent more than perSecond a second (drop it).
+function Net.limit(player: Player, name: string, perSecond: number): boolean
+	local bucket = bucketOf(player, name, perSecond)
+	if bucket.tokens >= 1 then
+		bucket.tokens -= 1
+		return true
+	end
+	return false
+end
+
+-- Like Net.limit, for a remote that carries a state (the aim, a pinned order, "send me the board"): a request over the
+-- limit is not lost, the last one waits and fn(player, ...) runs with it once there is room again (the earlier ones
+-- in between are dropped). A burst is answered once more at its end, never with stale arguments.
+function Net.latest(player: Player, name: string, perSecond: number, fn: (Player, ...any) -> (), ...: any)
+	local mine = waiting[player]
+	if not mine then
+		mine = {}
+		waiting[player] = mine
+	end
+	local found = mine[name]
+	if not (found and found.scheduled) and Net.limit(player, name, perSecond) then
+		fn(player, ...)
+		return
+	end
+	local entry: Waiting = found or { args = {}, n = 0, scheduled = false }
+	mine[name] = entry
+	entry.args, entry.n = { ... }, select("#", ...)
+	if entry.scheduled then
+		return -- (the newest arguments go when the wait is over)
+	end
+	entry.scheduled = true
+	local bucket = bucketOf(player, name, perSecond)
+	local wait = math.max(0, (1 - bucket.tokens) / math.max(perSecond, 0.01))
+	task.delay(wait, function()
+		entry.scheduled = false
+		local list = waiting[player]
+		if not player.Parent or not list or list[name] ~= entry then
+			return
+		end
+		list[name] = nil
+		Net.latest(player, name, perSecond, fn, table.unpack(entry.args, 1, entry.n))
+	end)
+end
+
+if RunService:IsServer() then
+	Players.PlayerRemoving:Connect(function(player)
+		buckets[player] = nil
+		waiting[player] = nil
+	end)
 end
 
 return Net

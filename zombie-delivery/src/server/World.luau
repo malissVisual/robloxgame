@@ -45,8 +45,15 @@
 -- kiosks' jerry can prompts (World.GasKiosks) for server/Fuel.luau.
 --
 -- The night: the street lamps, the lit windows and the night lights of the far places are registered with
--- server/DayNight.luau, which switches them with the workspace attribute "Night". Only some lamps carry a real light
--- (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
+-- server/DayNight.luau and switched with the workspace attribute "Night" (5.7: on every client, client/WorldFx.luau).
+-- Only some lamps carry a real light (a SpotLight shining down); the rest only glow, so the city stays cheap at night.
+--
+-- Zombie Delivery 5.7, a living city: every Downtown tower wears one of four looks (shared/TowerLooks.luau: a
+-- shopfront, a rooftop with a parapet and a water tank, a fire escape, boarded windows), the ordinary blocks get their
+-- street props (server/StreetDressing.luau: bins, hydrants, barricades, sandbags, trash bags, abandoned cars, flares),
+-- the roads are tagged "WetRoad" (they shine in the rain, client/Weather.luau), a few street lamps "BrokenLamp" (they
+-- flicker), the lighthouse's beams and the radio mast's beacon move on the clients (client/WorldFx.luau), the
+-- storefronts' ceiling lights shine only at night, and the build log counts every piece's parts.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -403,6 +410,10 @@ local function lamp(parent: Instance, x: number, z: number, base: number?, reach
 		spot.Parent = head
 	end
 	DayNight.nightLight(head, LAMP_LIT, LAMP_DIM, "Glass")
+	-- 5.7: a few lamps are broken and flicker at night (client/WorldFx.luau), the same ones on every server
+	if Map.lcg(math.floor(x * 7 + 0.5) * 7919 + math.floor(z * 3 + 0.5) + 57)() < Config.LivingCity.Lights.BrokenShare then
+		CollectionService:AddTag(head, "BrokenLamp")
+	end
 end
 
 -- A closed building with a door in the front wall. frame: origin at the floor centre, -Z (LookVector) = the front.
@@ -433,7 +444,8 @@ local function building(parent: Instance, frame: CFrame, w: number, d: number, h
 		end
 	end
 	local ceiling = deco(part(parent, "CeilingLight", Vector3.new(w * 0.5, 0.3, 2), frame * CFrame.new(0, h - 0.4, 0), Color3.fromRGB(255, 245, 220), Enum.Material.Neon))
-	light(ceiling, math.max(w, d), 1.6, Color3.fromRGB(255, 240, 220)) -- (4.3: brighter: the darker walls of 4.1)
+	-- (4.3: brighter: the darker walls of 4.1; 5.7: the light only at night, DayNight switches it: the panel glows always)
+	DayNight.nightLight(light(ceiling, math.max(w, d), 1.6, Color3.fromRGB(255, 240, 220)))
 end
 
 -- A wedge roof over a box: two wedges, ridge along X.
@@ -579,14 +591,14 @@ local function buildDistrictRoads(parent: Instance, d: Map.District)
 	for k = d.i0 - 1, d.i1 do
 		local x = d.ox + (k + 0.5) * CELL
 		local length = z1 - z0 + ROAD
-		part(parent, "Road", Vector3.new(ROAD, 0.4, length), CFrame.new(x, ROAD_TOP - 0.2, (z0 + z1) / 2), ASPHALT, Enum.Material.Asphalt)
+		CollectionService:AddTag(part(parent, "Road", Vector3.new(ROAD, 0.4, length), CFrame.new(x, ROAD_TOP - 0.2, (z0 + z1) / 2), ASPHALT, Enum.Material.Asphalt), "WetRoad")
 		deco(part(parent, "Line", Vector3.new(0.6, 0.05, length - ROAD), CFrame.new(x, ROAD_TOP + 0.02, (z0 + z1) / 2), LINE))
 	end
 	for k = d.j0 - 1, d.j1 do
 		local z = d.oz + (k + 0.5) * CELL
 		for i = d.i0, d.i1 do
 			local cx = d.ox + i * CELL
-			part(parent, "Road", Vector3.new(BLOCK, 0.4, ROAD), CFrame.new(cx, ROAD_TOP - 0.2, z), ASPHALT, Enum.Material.Asphalt)
+			CollectionService:AddTag(part(parent, "Road", Vector3.new(BLOCK, 0.4, ROAD), CFrame.new(cx, ROAD_TOP - 0.2, z), ASPHALT, Enum.Material.Asphalt), "WetRoad")
 			deco(part(parent, "Line", Vector3.new(BLOCK, 0.05, 0.6), CFrame.new(cx, ROAD_TOP + 0.02, z), LINE))
 		end
 	end
@@ -632,13 +644,36 @@ local function windowStrips(parent: Instance, cx: number, cz: number, w: number,
 end
 
 -- A tower w (along X) by d (along Z), height tall, standing in the middle of its lot (5.3: Map.lots sizes it).
-local function tower(parent: Instance, cx: number, cz: number, w: number, d: number, height: number)
+-- 5.7: and its look (shared/TowerLooks.luau: a shopfront, a rooftop, a fire escape or boarded windows), from the lot's
+-- own dice (the world's random numbers are drawn as before: the rest of the city stays where it was). A look with
+-- things on the roof replaces the old roof box.
+local function tower(parent: Instance, lot: Map.Lot)
+	local cx, cz, w, d, height = lot.x, lot.z, lot.w, lot.d, lot.h
 	local model = Instance.new("Model")
 	model.Name = "Building"
 	part(model, "Walls", Vector3.new(w, height, d), CFrame.new(cx, WALK_TOP + height / 2, cz), BUILDING_COLORS[rng:NextInteger(1, #BUILDING_COLORS)], BUILDING_MATERIALS[rng:NextInteger(1, #BUILDING_MATERIALS)])
 	windowStrips(model, cx, cz, w, d, height)
+	local look = require(Shared.TowerLooks).look(lot)
+	model:SetAttribute("Look", look.style)
+	local roofed = false
+	for _, piece in look.pieces do
+		local size = Vector3.new(piece.size[1], piece.size[2], piece.size[3])
+		local at = CFrame.new(cx + piece.at[1], WALK_TOP + piece.at[2], cz + piece.at[3])
+		local color = Color3.fromRGB(piece.color[1], piece.color[2], piece.color[3])
+		local material = (Enum.Material :: any)[piece.material] :: Enum.Material
+		local p = if piece.cylinder then cylinder(model, piece.name, size.Y, size.X, at * UPRIGHT, color, material) else part(model, piece.name, size, at, color, material)
+		deco(p).CastShadow = size.Magnitude > 6
+		local lit = piece.lit
+		if lit then
+			DayNight.nightLight(p, Color3.fromRGB(lit[1], lit[2], lit[3]), color, piece.material)
+		end
+		roofed = roofed or piece.roof == true
+	end
 	if rng:NextNumber() < 0.5 then
-		part(model, "RoofBox", Vector3.new(6, 3, 6), CFrame.new(cx + rng:NextNumber(-w / 4, w / 4), WALK_TOP + height + 1.5, cz + rng:NextNumber(-d / 4, d / 4)), Color3.fromRGB(90, 90, 90), Enum.Material.Metal)
+		local box = CFrame.new(cx + rng:NextNumber(-w / 4, w / 4), WALK_TOP + height + 1.5, cz + rng:NextNumber(-d / 4, d / 4))
+		if not roofed then
+			part(model, "RoofBox", Vector3.new(6, 3, 6), box, Color3.fromRGB(90, 90, 90), Enum.Material.Metal)
+		end
 	end
 	model.Parent = parent
 end
@@ -656,7 +691,7 @@ local function downtownBlock(parent: Instance, d: Map.District, i: number, j: nu
 	for _, info in Map.lotsAt(d.id, i, j) do
 		local lx, lz, lot = info.x, info.z, info.size
 		if info.kind == "tower" or info.kind == "apartment" then
-			tower(parent, lx, lz, info.w, info.d, info.h)
+			tower(parent, info)
 			if info.home then
 				buildEntrance(parent, info, info.home)
 			end
@@ -1423,7 +1458,7 @@ local function buildBridge(parent: Instance, s: Map.Segment)
 	local frame, length = segmentFrame(s, ROAD_TOP)
 	local rusty = s.name == "Rust Bridge"
 	local steel = if rusty then Color3.fromRGB(150, 70, 40) else Color3.fromRGB(110, 100, 90)
-	part(bridge, "Road", Vector3.new(s.width, 0.4, length), frame * CFrame.new(0, -0.2, 0), ASPHALT, Enum.Material.Asphalt)
+	CollectionService:AddTag(part(bridge, "Road", Vector3.new(s.width, 0.4, length), frame * CFrame.new(0, -0.2, 0), ASPHALT, Enum.Material.Asphalt), "WetRoad")
 	deco(part(bridge, "Line", Vector3.new(0.6, 0.05, length), frame * CFrame.new(0, 0.02, 0), LINE))
 	part(bridge, "Deck", Vector3.new(s.width + 8, 4, length), frame * CFrame.new(0, -2.4, 0), Color3.fromRGB(120, 120, 116), Enum.Material.Concrete)
 	for _, side in { -1, 1 } do
@@ -1484,7 +1519,7 @@ local function buildConnectors(parent: Instance)
 			continue
 		end
 		local frame, length = segmentFrame(s, ROAD_TOP)
-		part(roads, "Road", Vector3.new(s.width, 0.4, length), frame * CFrame.new(0, -0.2, 0), ASPHALT, Enum.Material.Asphalt)
+		CollectionService:AddTag(part(roads, "Road", Vector3.new(s.width, 0.4, length), frame * CFrame.new(0, -0.2, 0), ASPHALT, Enum.Material.Asphalt), "WetRoad") -- (5.7: client/Weather.luau wets them in the rain)
 		local trimA, trimB = junctionTrim(s, s.ax, s.az), junctionTrim(s, s.bx, s.bz)
 		deco(part(roads, "Line", Vector3.new(0.6, 0.05, length - trimA - trimB), frame * CFrame.new(0, 0.02, (trimB - trimA) / 2), LINE))
 		if s.kind == "highway" then
@@ -1800,12 +1835,7 @@ local function buildRadio(parent: Instance)
 	end
 	local beacon = deco(part(radio, "Beacon", Vector3.new(2, 2, 2), CFrame.new(tx, ROAD_TOP + height + 1, tz), Color3.fromRGB(255, 30, 30), Enum.Material.Neon))
 	light(beacon, 60, 3, Color3.fromRGB(255, 40, 40))
-	task.spawn(function()
-		while beacon.Parent do
-			beacon.Transparency = if beacon.Transparency == 0 then 0.8 else 0
-			task.wait(0.8)
-		end
-	end)
+	CollectionService:AddTag(beacon, "RadioBeacon") -- 5.7: it blinks on every client (client/WorldFx.luau)
 	placeSign(radio, "RADIO STATION", cx, yard.z1 + 12, Vector3.new(0, 0, 1), Color3.fromRGB(255, 220, 120), "radio")
 end
 
@@ -4969,31 +4999,16 @@ local function defineMissionPlaces()
 		light(lampHead, 70, 3, Color3.fromRGB(255, 240, 200))
 		DayNight.nightLight(lampHead, Color3.fromRGB(255, 244, 200), Color3.fromRGB(190, 186, 170), "Glass")
 		deco(part(point, "Door", Vector3.new(0.4, 6, 3.4), CFrame.new(base + Vector3.new(-7.9, 3 + 3, 0)), Color3.fromRGB(70, 50, 36), Enum.Material.Wood))
-		-- Two beams that sweep round at night (the loop only moves them while it is dark, a few times a second).
-		local beams: { Part } = {}
-		for _ = 1, 2 do
+		-- Two beams that sweep round at night (5.7: every client turns them, client/WorldFx.luau; the attributes say
+		-- round what and which one).
+		for n = 1, 2 do
 			local beam = deco(part(point, "LightBeam", Vector3.new(1.4, 2.4, 80), CFrame.new(hub), Color3.fromRGB(255, 244, 200), Enum.Material.Neon))
 			beam.Transparency = 1
 			beam.CastShadow = false
-			table.insert(beams, beam)
+			beam:SetAttribute("Hub", hub)
+			beam:SetAttribute("Beam", n)
+			CollectionService:AddTag(beam, "LighthouseBeam")
 		end
-		task.spawn(function()
-			local angle = 0
-			while lampHead.Parent do
-				local night = workspace:GetAttribute("Night") == true
-				for n, beam in beams do
-					local want = if night then 0.75 else 1
-					if beam.Transparency ~= want then
-						beam.Transparency = want
-					end
-					if night then
-						beam.CFrame = CFrame.new(hub) * CFrame.Angles(0, angle + n * math.pi, 0) * CFrame.new(0, 0, -41)
-					end
-				end
-				angle += 0.22
-				task.wait(if night then 0.2 else 2)
-			end
-		end)
 		-- The keeper's cottage by the cargo spot.
 		local cottage = CFrame.lookAt(Vector3.new(1582, top, -1045), Vector3.new(1581, top, -1045))
 		part(point, "Cottage", Vector3.new(20, 9, 14), cottage * CFrame.new(0, 4.5, 0), Color3.fromRGB(236, 232, 220), Enum.Material.WoodPlanks)
@@ -5868,16 +5883,25 @@ function World.build()
 	local world = folder(workspace, "World")
 
 	-- Piece by piece, with a breath in between (Studio stays responsive), and a piece that fails only warns.
+	-- 5.7: each line also counts the parts the piece put in the world (the whole city's at the end).
+	local parts = 0
+	local counting = workspace.DescendantAdded:Connect(function(item)
+		if item:IsA("BasePart") then
+			parts += 1
+		end
+	end)
 	local function piece(name: string, build: () -> ())
 		local started = os.clock()
+		local before = parts
 		local ok, err = pcall(function()
 			build()
 		end)
 		if not ok then
 			warn(`[World] {name} failed: {err}`)
 		end
-		print(`[World] {name} built in {math.floor((os.clock() - started) * 1000)} ms`)
-		task.wait()
+		local took = math.floor((os.clock() - started) * 1000)
+		task.wait() -- (the breath; the deferred DescendantAdded events have counted the piece's parts by then)
+		print(`[World] {name} built in {took} ms, {parts - before} parts`)
 	end
 	piece("ground", function()
 		buildGround(world)
@@ -5895,6 +5919,7 @@ function World.build()
 	end)
 	piece("bus stops", function() require(script.Parent.BusStops).build(world) end) -- 5.5: the city buses' shelters
 	piece("alley shortcuts", function() require(script.Parent.Shortcuts).build(world) end) -- 5.6: the paths through the blocks
+	piece("street props", function() require(script.Parent.StreetDressing).build(world) end) -- 5.7: bins, barricades, cars …
 	piece("Sunset Hills", function()
 		buildSunsetHills(world)
 	end)
@@ -5955,6 +5980,9 @@ function World.build()
 		buildVanLot(world) -- 5.0
 	end)
 	piece("lighting", setLighting)
+	task.wait()
+	counting:Disconnect()
+	print(`[World] {parts} parts in all`)
 end
 
 function World.isSafe(position: Vector3): boolean

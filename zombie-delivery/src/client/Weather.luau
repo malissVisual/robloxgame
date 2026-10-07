@@ -11,6 +11,11 @@
 --   * The ambulance's light bar flashes red / blue while its car's attribute Siren is true (server/Vehicles.luau
 --     tags the lenses "SirenLight").
 --   * The big landmark icons hide up close.
+--   * 5.7, the weather (the workspace attribute "Weather" the server picks: shared/WeatherPlan.luau): a rain falls
+--     around the camera (more snow in the winter), the roads shine wet (the parts tagged "WetRoad"), the air thickens
+--     and greys, or a fog closes in; it all blends in and out over Config.LivingCity.Weather Fade seconds. A mist rises
+--     over the river at night, at dawn and in the fog; sun rays at dawn under a clear sky. And it starts
+--     client/WorldFx.luau (the night lights, the clock, the lighthouse and the beacon, the broken lamps).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -19,6 +24,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Map = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Map"))
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local WeatherPlan = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WeatherPlan"))
+local WorldFx = require(script.Parent.WorldFx)
 
 local Weather = {}
 
@@ -85,6 +93,8 @@ local DUSK_TINT = Color3.fromRGB(255, 216, 190)
 local WINTER_HAZE_DAY = Color3.fromRGB(220, 230, 240)
 local WINTER_HAZE_NIGHT = Color3.fromRGB(110, 122, 150)
 local WINTER_DENSITY = 0.12 -- added to the density in the snow
+local WET_HAZE = Color3.fromRGB(128, 134, 140) -- the air in the rain and the fog
+local WET_STEP = 0.02 -- the roads' reflectance changes in these steps (all of them at once)
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
@@ -154,6 +164,7 @@ end
 -- ── Start ──────────────────────────────────────────────────────────────────
 
 function Weather.start()
+	WorldFx.start() -- 5.7: the night lights, the clock, the lighthouse, the beacon, the broken lamps
 	local cloud = Instance.new("Part")
 	cloud.Name = "SnowCloud"
 	cloud.Anchored = true
@@ -176,6 +187,80 @@ function Weather.start()
 	snow.Rate = 0
 	snow.Parent = cloud
 
+	-- 5.7: the rain (long thin drops falling fast), the river's mist and the dawn's sun rays.
+	local tuning = Config.LivingCity.Weather
+	local rain = Instance.new("ParticleEmitter")
+	rain.Name = "Rain"
+	rain.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	rain.Color = ColorSequence.new(Color3.fromRGB(196, 206, 216))
+	rain.Transparency = NumberSequence.new(0.35)
+	rain.LightEmission = 0.15
+	rain.Size = NumberSequence.new(0.14)
+	rain.Squash = NumberSequence.new(3)
+	rain.Orientation = Enum.ParticleOrientation.VelocityParallel
+	rain.Lifetime = NumberRange.new(0.7, 0.9)
+	rain.Speed = NumberRange.new(70, 85)
+	rain.SpreadAngle = Vector2.new(4, 4)
+	rain.EmissionDirection = Enum.NormalId.Bottom
+	rain.Acceleration = Vector3.new(3, 0, 1)
+	rain.Rate = 0
+	rain.Parent = cloud
+	local mistPart = Instance.new("Part")
+	mistPart.Name = "RiverMist"
+	mistPart.Anchored = true
+	mistPart.CanCollide = false
+	mistPart.CanQuery = false
+	mistPart.CanTouch = false
+	mistPart.Transparency = 1
+	mistPart.Size = Vector3.new(Map.River.x1 - Map.River.x0 - 20, 1, 320)
+	mistPart.Parent = workspace
+	local mist = Instance.new("ParticleEmitter")
+	mist.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	mist.Color = ColorSequence.new(Color3.fromRGB(214, 220, 226))
+	mist.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.82), NumberSequenceKeypoint.new(1, 1) })
+	mist.Size = NumberSequence.new(22, 34)
+	mist.Lifetime = NumberRange.new(9, 13)
+	mist.Speed = NumberRange.new(0.5, 1.5)
+	mist.SpreadAngle = Vector2.new(60, 60)
+	mist.EmissionDirection = Enum.NormalId.Top
+	mist.RotSpeed = NumberRange.new(-6, 6)
+	mist.Rate = 0
+	mist.Parent = mistPart
+	local rays = Instance.new("SunRaysEffect")
+	rays.Name = "DawnRays"
+	rays.Intensity = 0
+	rays.Spread = 0.5
+	rays.Enabled = false
+	rays.Parent = Lighting
+	local wet: WeatherPlan.Look = WeatherPlan.look("clear")
+	local wetShown = -1 -- the roads' reflectance written last
+	local lastWet = -1
+	local roads: { BasePart } = {}
+	local function addRoad(item: Instance)
+		if item:IsA("BasePart") then
+			table.insert(roads, item)
+			if wetShown > 0 then
+				item.Reflectance = wetShown
+			end
+		end
+	end
+	for _, item in CollectionService:GetTagged("WetRoad") do
+		addRoad(item)
+	end
+	CollectionService:GetInstanceAddedSignal("WetRoad"):Connect(addRoad)
+	CollectionService:GetInstanceRemovedSignal("WetRoad"):Connect(function(item: Instance)
+		for n, road in roads do
+			if road == item then
+				table.remove(roads, n)
+				break
+			end
+		end
+	end)
+	local function weatherNow(): string
+		local state = workspace:GetAttribute("Weather")
+		return if type(state) == "string" then state else "clear"
+	end
+
 	-- A soft bloom of our own (the lamps, the headlights and the neon signs glow more at night).
 	local bloom = Instance.new("BloomEffect")
 	bloom.Name = "NightBloom"
@@ -186,7 +271,6 @@ function Weather.start()
 
 	watchSirens()
 
-	local wasWinter = false
 	local winter = 0 -- 0 … 1: how far the winter look is blended in (fades over ~2 s)
 	local lastNight, lastWinter, lastCity = -1, -1, -1
 	local city = 0 -- 0 … 1: the town glow (follows the camera, eases over ~1 s)
@@ -220,34 +304,37 @@ function Weather.start()
 		end
 		aura.Brightness = AURA_BRIGHTNESS * f
 		aura.Enabled = f > 0.02
-		if math.abs(f - lastNight) < 0.002 and math.abs(winter - lastWinter) < 0.002 and math.abs(city - lastCity) < 0.01 then
+		if math.abs(f - lastNight) < 0.002 and math.abs(winter - lastWinter) < 0.002 and math.abs(city - lastCity) < 0.01 and math.abs(wet.density - lastWet) < 0.002 then
 			return
 		end
+		local grey = math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1) -- 1 in a full fog
+		local gloom = math.clamp(wet.rain * 0.6 + grey * 0.4, 0, 1)
 		local dusk = 4 * f * (1 - f) -- 1 halfway through dusk or dawn
 		local glow = city * f -- the town glow is a night thing
-		Lighting.Brightness = lerp(DAY.brightness, NIGHT.brightness, f)
+		Lighting.Brightness = lerp(DAY.brightness, NIGHT.brightness, f) * (1 - 0.25 * gloom)
 		Lighting.Ambient = DAY.ambient:Lerp(NIGHT.ambient, f):Lerp(CITY_AMBIENT, glow)
 		Lighting.OutdoorAmbient = DAY.outdoor:Lerp(NIGHT.outdoor, f):Lerp(CITY_OUTDOOR, glow)
 		Lighting.ExposureCompensation = lerp(DAY.exposure, NIGHT.exposure, f)
 		local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 		if atmosphere then
 			local haze = DAY.haze:Lerp(NIGHT.haze, f):Lerp(DUSK_HAZE, dusk * 0.55)
-			atmosphere.Color = haze:Lerp(CITY_HAZE, glow * 0.6):Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter)
+			local wetHaze = WET_HAZE:Lerp(NIGHT.haze, f * 0.7)
+			atmosphere.Color = haze:Lerp(CITY_HAZE, glow * 0.6):Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter):Lerp(wetHaze, gloom * 0.7)
 			atmosphere.Decay = DAY.decay:Lerp(NIGHT.decay, f)
-			atmosphere.Density = lerp(DAY.density, NIGHT.density, f) + WINTER_DENSITY * winter
-			atmosphere.Haze = lerp(DAY.hazeAmount, NIGHT.hazeAmount, f)
+			atmosphere.Density = lerp(DAY.density, NIGHT.density, f) + WINTER_DENSITY * winter + wet.density
+			atmosphere.Haze = lerp(DAY.hazeAmount, NIGHT.hazeAmount, f) + grey * 1.2
 		end
 		local grade = Lighting:FindFirstChild("ZombieGrade")
 		if grade and grade:IsA("ColorCorrectionEffect") then
 			grade.TintColor = DAY.tint:Lerp(NIGHT.tint, f):Lerp(DUSK_TINT, dusk * 0.5)
-			grade.Saturation = lerp(DAY.saturation, NIGHT.saturation, f)
+			grade.Saturation = lerp(DAY.saturation, NIGHT.saturation, f) - 0.1 * gloom
 			grade.Contrast = lerp(DAY.contrast, NIGHT.contrast, f)
 		end
 		bloom.Intensity = lerp(DAY.bloom, NIGHT.bloom, f)
 		bloom.Threshold = lerp(1.4, 1.05, f)
 		-- Until the server has made the atmosphere and the grade (the world is still building), try again next time.
 		if atmosphere and grade then
-			lastNight, lastWinter, lastCity = f, winter, city
+			lastNight, lastWinter, lastCity, lastWet = f, winter, city, wet.density
 		end
 	end
 
@@ -267,17 +354,48 @@ function Weather.start()
 		end
 		-- Snow on, off.
 		local inWinter = Map.isWinter(position.X, position.Z)
-		if inWinter ~= wasWinter then
-			wasWinter = inWinter
-			snow.Rate = if inWinter then 400 else 0
+		-- 5.7: in the winter a rain falls as more snow.
+		local snowRate = if inWinter then 400 + 500 * wet.rain else 0
+		local rainRate = if inWinter then 0 else tuning.RainRate * wet.rain
+		if snow.Rate ~= snowRate then
+			snow.Rate = snowRate
+		end
+		if math.abs(rain.Rate - rainRate) > 1 then
+			rain.Rate = rainRate
 		end
 		-- Day, night, winter.
 		lookClock += dt
 		if lookClock >= LOOK_EVERY then
 			winter = math.clamp(winter + (if inWinter then 1 else -1) * lookClock / 2, 0, 1)
 			city += (cityFactor(position.X, position.Z) - city) * math.min(1, lookClock)
+			-- 5.7: the weather blends toward the server's (rain, fog or clear).
+			wet = WeatherPlan.toward(wet, WeatherPlan.look(weatherNow()), lookClock)
 			lookClock = 0
-			applyLook(Map.nightFactor(Lighting.ClockTime))
+			local hour = Lighting.ClockTime
+			local nightF = Map.nightFactor(hour)
+			applyLook(nightF)
+			-- The roads shine in the rain (in steps, all of them at once).
+			local shine = math.floor(wet.reflect / WET_STEP + 0.5) * WET_STEP
+			if shine ~= wetShown then
+				wetShown = shine
+				for _, road in roads do
+					road.Reflectance = shine
+				end
+			end
+			-- The river's mist: at night, at dawn and in the fog, near the river.
+			local dawn = math.clamp(1 - math.abs(hour - 7) / 1.6, 0, 1)
+			local riverX = (Map.River.x0 + Map.River.x1) / 2
+			local nearRiver = math.abs(position.X - riverX) < tuning.MistRange
+			local mistAmount = if nearRiver then math.max(nightF * 0.6, dawn, math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1)) else 0
+			mist.Rate = 7 * mistAmount
+			if mistAmount > 0 then
+				local b = Map.Bounds
+				mistPart.CFrame = CFrame.new(riverX, Map.WaterLevel + 1.5, math.clamp(position.Z, b.z0 + 160, b.z1 - 160))
+			end
+			-- Sun rays at dawn under a clear sky.
+			local intensity = tuning.SunRays * dawn * wet.rays
+			rays.Enabled = intensity > 0.002
+			rays.Intensity = intensity
 		end
 	end)
 end

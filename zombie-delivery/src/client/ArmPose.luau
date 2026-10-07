@@ -18,6 +18,9 @@
 -- 3.10: getting into a car the right hand goes to the door's handle, getting out it pushes the door (the character's
 -- BoardAt / BoardReach and AlightAt / AlightReach attributes, server/Vehicles.luau; the curve is shared/Boarding.luau
 -- reach), laid on the right arm like the swing; everybody sees it, yours too from the same attributes.
+-- 5.7: a short gesture on top of everything (shared/Gestures.luau: wave, give, take, knock), from the Gesture /
+-- GestureAt attributes the server sets on characters and people (server/Npcs.luau Npcs.act): the receiver waves at the
+-- door and reaches for the piece, the courier holds it out or reaches for it, knocks at the door. Both arms, R15 and R6.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,6 +29,7 @@ local RunService = game:GetService("RunService")
 local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
 local Melee = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Melee"))
 local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
+local Gestures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Gestures"))
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
 
@@ -72,7 +76,7 @@ end
 
 -- The joint goes from the animation toward `aim` (by aimT), then toward `carry` (by carryT), then (3.9) toward the
 -- melee `swing` (by swingT); any may be nil. All 0 gives the joint back to the animation.
-local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carryT: number, swing: CFrame?, swingT: number?)
+local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carryT: number, swing: CFrame?, swingT: number?, gesture: CFrame?, gestureT: number?)
 	if not joint or not joint.Parent then
 		return
 	end
@@ -86,6 +90,9 @@ local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carry
 	end
 	if swing and swingT and swingT > 0 then
 		out = out:Lerp(swing, swingT)
+	end
+	if gesture and gestureT and gestureT > 0 then
+		out = out:Lerp(gesture, gestureT) -- 5.7
 	end
 	if out == base then
 		joint.Transform = base
@@ -222,13 +229,25 @@ local SWINGS: { [string]: SwingShape } = {
 type Swing = { t: number, k: number, kind: string }
 local NO_SWING: Swing = { t = 0, k = 0, kind = "punch" }
 
+-- 5.7: a gesture this frame: how far it is laid on (0..1), the R15 goals, the R6 shoulders (radians, nil: left alone).
+type Gesture = { t: number, goals: ArmGoals, r6Right: number?, r6Left: number? }
+
+local function anglesOf(a: { number }?): CFrame?
+	if not a then
+		return nil
+	end
+	return CFrame.Angles(0, math.rad(a[2]), 0) * CFrame.Angles(math.rad(a[1]), 0, math.rad(a[3]))
+end
+
 local function between(a: CFrame?, b: CFrame?, k: number): CFrame?
 	return if a and b then a:Lerp(b, k) else a or b
 end
 
 -- Every pose on a character: aim (t 0..1, pitch in radians, + is up), carry (t 0..1, the kind held) and the swing.
-local function pose(character: Model, aimT: number, pitch: number, carryT: number, kind: string?, swing: Swing?)
+local function pose(character: Model, aimT: number, pitch: number, carryT: number, kind: string?, swing: Swing?, gesture: Gesture?)
 	local kick = kicks[character] or 0
+	local gt = if gesture then gesture.t else 0
+	local g: ArmGoals = if gesture then gesture.goals else {}
 	local up = math.rad(90) + pitch + kick * 0.11
 	local c: ArmGoals = carryGoals(if carryT > 0 then kind else nil)
 	local sw = swing or NO_SWING
@@ -237,12 +256,12 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 		-- R15: an arm hangs down (-Y); turning about X lifts it forward (-Z), about Y swings it in or out.
 		local w: ArmGoals = if shape then shape.wind else {}
 		local h: ArmGoals = if shape then shape.hit else {}
-		lay(jointIn(character, "RightUpperArm", "RightShoulder"), CFrame.Angles(0, math.rad(8), 0) * CFrame.Angles(up, 0, 0), aimT, c.rs, carryT, between(w.rs, h.rs, sw.k), sw.t)
-		lay(jointIn(character, "RightLowerArm", "RightElbow"), CFrame.Angles(kick * 0.08, 0, 0), aimT, c.re, carryT, between(w.re, h.re, sw.k), sw.t)
-		lay(jointIn(character, "RightHand", "RightWrist"), CFrame.identity, aimT, c.rw, carryT, between(w.rw, h.rw, sw.k), sw.t)
-		lay(jointIn(character, "LeftUpperArm", "LeftShoulder"), CFrame.Angles(0, math.rad(-38), 0) * CFrame.Angles(up - math.rad(8), 0, 0), aimT, c.ls, carryT)
-		lay(jointIn(character, "LeftLowerArm", "LeftElbow"), CFrame.Angles(math.rad(12), 0, 0), aimT, c.le, carryT)
-		lay(jointIn(character, "LeftHand", "LeftWrist"), CFrame.identity, aimT, c.lw, carryT)
+		lay(jointIn(character, "RightUpperArm", "RightShoulder"), CFrame.Angles(0, math.rad(8), 0) * CFrame.Angles(up, 0, 0), aimT, c.rs, carryT, between(w.rs, h.rs, sw.k), sw.t, g.rs, gt)
+		lay(jointIn(character, "RightLowerArm", "RightElbow"), CFrame.Angles(kick * 0.08, 0, 0), aimT, c.re, carryT, between(w.re, h.re, sw.k), sw.t, g.re, gt)
+		lay(jointIn(character, "RightHand", "RightWrist"), CFrame.identity, aimT, c.rw, carryT, between(w.rw, h.rw, sw.k), sw.t, g.rw, gt)
+		lay(jointIn(character, "LeftUpperArm", "LeftShoulder"), CFrame.Angles(0, math.rad(-38), 0) * CFrame.Angles(up - math.rad(8), 0, 0), aimT, c.ls, carryT, nil, 0, g.ls, gt)
+		lay(jointIn(character, "LeftLowerArm", "LeftElbow"), CFrame.Angles(math.rad(12), 0, 0), aimT, c.le, carryT, nil, 0, g.le, gt)
+		lay(jointIn(character, "LeftHand", "LeftWrist"), CFrame.identity, aimT, c.lw, carryT, nil, 0, g.lw, gt)
 		return
 	end
 	local torso = character:FindFirstChild("Torso")
@@ -252,8 +271,10 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 		local rightCarry = if carryT > 0 then CFrame.Angles(0, 0, math.rad(if lead then 25 else 75)) else nil
 		local leftCarry = if carryT > 0 and not lead then CFrame.Angles(0, 0, -math.rad(75)) else nil
 		local rightSwing = if shape then CFrame.Angles(0, 0, shape.r6Wind + (shape.r6Hit - shape.r6Wind) * sw.k) else nil
-		lay(Joints.find(torso, "Right Shoulder"), CFrame.Angles(0, 0, up), aimT, rightCarry, carryT, rightSwing, sw.t)
-		lay(Joints.find(torso, "Left Shoulder"), CFrame.Angles(0, 0, -(up - math.rad(10))), aimT, leftCarry, carryT)
+		local r6Right = if gesture and gesture.r6Right then CFrame.Angles(0, 0, gesture.r6Right) else nil
+		local r6Left = if gesture and gesture.r6Left then CFrame.Angles(0, 0, -gesture.r6Left) else nil
+		lay(Joints.find(torso, "Right Shoulder"), CFrame.Angles(0, 0, up), aimT, rightCarry, carryT, rightSwing, sw.t, r6Right, gt)
+		lay(Joints.find(torso, "Left Shoulder"), CFrame.Angles(0, 0, -(up - math.rad(10))), aimT, leftCarry, carryT, nil, 0, r6Left, gt)
 	end
 end
 
@@ -431,9 +452,50 @@ local function swingOf(character: Model, mine: boolean): Swing
 	return { t = t, k = k, kind = if type(kind) == "string" then kind else "punch" }
 end
 
+-- 5.7: the gesture a character or a person is in (their Gesture / GestureAt attributes, server/Npcs.luau Npcs.act),
+-- played from the moment it arrives here like a swing (an old one, from before it came into view, does not play).
+local seenGestures: { [Model]: Seen } = {}
+local gestured: { [Model]: boolean } = {} -- in a gesture last frame (the arms go back once it ends)
+
+local function gestureOf(character: Model): Gesture?
+	local value = character:GetAttribute("GestureAt")
+	local kind = character:GetAttribute("Gesture")
+	if type(value) ~= "number" or type(kind) ~= "string" then
+		return nil
+	end
+	local seen = seenGestures[character]
+	local start: number
+	if seen and seen.value == value then
+		start = seen.start
+	else
+		start = if workspace:GetServerTimeNow() - value < 1 then os.clock() else -math.huge
+		seenGestures[character] = { value = value, start = start }
+	end
+	local t = os.clock() - start
+	local weight = Gestures.weight(kind, t)
+	local shape = if weight > 0 then Gestures.pose(kind, t) else nil
+	if not shape then
+		return nil
+	end
+	local right, left = Gestures.r6(kind, t)
+	return {
+		t = weight,
+		goals = {
+			rs = anglesOf(shape.rs),
+			re = anglesOf(shape.re),
+			rw = anglesOf(shape.rw),
+			ls = anglesOf(shape.ls),
+			le = anglesOf(shape.le),
+			lw = anglesOf(shape.lw),
+		},
+		r6Right = if right then math.rad(right) else nil,
+		r6Left = if left then math.rad(left) else nil,
+	}
+end
+
 -- One character this frame: the aim and the carry pose blend in or out and go onto the joints, the swing on top.
 -- holstered (3.9): the gun in the hand is hidden while on foot.
-local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: boolean, pitch: number, raise: number, dt: number, holstered: boolean?, swing: Swing?)
+local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: boolean, pitch: number, raise: number, dt: number, holstered: boolean?, swing: Swing?, gesture: Gesture?)
 	local alive = humanoid ~= nil and humanoid.Health > 0 and not humanoid.Sit
 	local kind = if alive then carryingOf(character) else nil
 	-- Hands full: no gun.
@@ -446,19 +508,26 @@ local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: bool
 		showGun(character, true)
 	end
 	local sw = if alive and not kind and swing and swing.t > 0 then swing else nil
+	local gs = if alive and gesture and gesture.t > 0 then gesture else nil -- 5.7 (over the carry too: a reach)
 	local blend = blends[character] or 0
 	blend = if aiming then math.min(1, blend + dt / raise) else math.max(0, blend - dt / LOWER_TIME)
 	local carry = carries[character]
 	local carryBlend = if carry then carry.t else 0
 	carryBlend = if kind then math.min(1, carryBlend + dt / CARRY_IN) else math.max(0, carryBlend - dt / CARRY_OUT)
-	if blend <= 0 and carryBlend <= 0 and not sw then
-		if blends[character] or carry or swung[character] then
+	if blend <= 0 and carryBlend <= 0 and not sw and not gs then
+		if blends[character] or carry or swung[character] or gestured[character] then
 			pose(character, 0, 0, 0, nil) -- back to the animation alone
 			blends[character] = nil
 			carries[character] = nil
 			swung[character] = nil
+			gestured[character] = nil
 		end
 		return
+	end
+	if gs then
+		gestured[character] = true
+	else
+		gestured[character] = nil
 	end
 	if sw then
 		swung[character] = true
@@ -483,7 +552,7 @@ local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: bool
 	else
 		carries[character] = nil
 	end
-	pose(character, ease(blend), math.clamp(pitch, -1.1, 1.1), ease(carryBlend), held, sw)
+	pose(character, ease(blend), math.clamp(pitch, -1.1, 1.1), ease(carryBlend), held, sw, gs)
 end
 
 local function step(dt: number)
@@ -512,7 +581,7 @@ local function step(dt: number)
 		local raise = if player == me then math.max(0.1, CameraRig.raiseTime() - 0.05) else RAISE_TIME
 		-- 3.9: the holster (yours as you just chose it) and the melee swing.
 		local holstered = if player == me then Holster.holstered() else character:GetAttribute("Holstered") == true
-		poseCharacter(character, humanoid, aiming, pitch, raise, dt, holstered, swingOf(character, player == me))
+		poseCharacter(character, humanoid, aiming, pitch, raise, dt, holstered, swingOf(character, player == me), gestureOf(character))
 	end
 	-- The people of the world (givers, receivers) carry too.
 	local npcs = workspace:FindFirstChild("Npcs")
@@ -520,12 +589,13 @@ local function step(dt: number)
 	if npcs and camera then
 		local eye = camera.CFrame.Position
 		for _, model in npcs:GetChildren() do
-			if not model:IsA("Model") or (not carries[model] and not carryingOf(model)) then
+			-- (5.7: or in a gesture: a receiver waving, reaching for the piece)
+			if not model:IsA("Model") or (not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil) then
 				continue
 			end
 			local root = model:FindFirstChild("HumanoidRootPart")
 			if root and root:IsA("BasePart") and (root.Position - eye).Magnitude <= NPC_RANGE then
-				poseCharacter(model, model:FindFirstChildOfClass("Humanoid"), false, 0, RAISE_TIME, dt)
+				poseCharacter(model, model:FindFirstChildOfClass("Humanoid"), false, 0, RAISE_TIME, dt, nil, nil, gestureOf(model))
 			end
 		end
 	end
@@ -552,6 +622,12 @@ local function step(dt: number)
 	for character in swung do
 		if not character.Parent then
 			swung[character] = nil
+		end
+	end
+	for character in seenGestures do
+		if not character.Parent then
+			seenGestures[character] = nil
+			gestured[character] = nil
 		end
 	end
 	for character in blends do

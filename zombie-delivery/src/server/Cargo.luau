@@ -31,7 +31,6 @@
 -- Info.pair (3.2, the DUO missions' pair twist): a piece only moves with two: no other job member within
 -- Config.Missions.Duo.PairRange of you, no pick-up; the partner gone for PAIR_GRACE s while you carry, it goes down.
 -- Cargo.setBlocked takes a reason (the DUO switches twist blocks a pick-up as well as a drop).
--- 3.3, Quick Hands (the loading upgrade of the job's car): the holds of the prompts here are shorter (holdFor).
 -- 3.7, two in your hands: a light piece (Config.Cargo.LightLooks: a pizza stack, a parcel, a mail sack …) can be
 -- carried two at a time (Config.Cargo.HandsMax), stacked in front of the chest, a little slower (TwoPieceSpeed, the
 -- CarrySpeed attribute). Heavy pieces, horses and every piece of a lift or pair job stay one at a time (handsMax).
@@ -1012,11 +1011,9 @@ local function prompt(parent: Instance, action: string, object: string, key: Enu
 	return p
 end
 
--- 3.3, Quick Hands: the hold of the job's pick-up / load / take-out / hand-over prompts follows the loading level of
--- the job's car (Vehicles.loadHold; the plain Config hold without a car).
-local function holdFor(session: Session): number
-	local car = session.car
-	return if car then Vehicles.loadHold(car) else Tuning.HoldDuration
+-- The hold of the job's pick-up / load / take-out / hand-over prompts (5.7: Quick Hands' shorter holds are gone).
+local function holdFor(_session: Session): number
+	return Tuning.HoldDuration
 end
 
 -- A horse's body part (prompts go there), if the horse has one.
@@ -2229,6 +2226,8 @@ local function handOver(session: Session, player: Player)
 		return
 	end
 	say(session.person, if session.moved >= neededNow(session) then line(LINES.done) else line(LINES.thanks))
+	Npcs.act(player.Character, "give") -- 5.7: held out …
+	Npcs.act(session.person, "take") -- … and taken
 	if plan.nobody then
 		tell(player, `Left at the door of {plan.place or "the house"}.`) -- 5.3: nobody home
 	end
@@ -2286,16 +2285,21 @@ end
 
 -- 5.3: the owner came up to a home's door: they knock, the door opens and the receiver steps out (Places.KnockDelay
 -- later). Nobody home (Plan.nobody): the door stays shut, the piece is left at the door.
-local function knock(session: Session, plan: Plan)
+-- 5.7: `by` (who came up) knocks with the fist and everybody near hears it (Npcs.act "knock"; with the door's creak
+-- when it opens), the receiver waves as they step out.
+local function knock(session: Session, plan: Plan, by: Player?)
 	local door = plan.door
 	if not door then
 		return
 	end
 	local person = plan.person
+	local knocker = (by or session.owner).Character
 	if plan.nobody or not person then
+		Npcs.act(knocker, "knock", false)
 		tell(session.owner, `You knock at {plan.place or "the door"}… nobody answers. Leave it at the door (E).`)
 		return
 	end
+	Npcs.act(knocker, "knock", true)
 	swingDoor(door, plan.facing)
 	local visit = session.visit
 	task.delay(Config.Jobs.Places.KnockDelay, function()
@@ -2311,6 +2315,7 @@ local function knock(session: Session, plan: Plan)
 		session.person = npc
 		table.insert(session.props, npc)
 		say(npc, line(LINES.door))
+		Npcs.act(npc, "wave") -- 5.7
 	end)
 end
 
@@ -2500,6 +2505,8 @@ local function onPile(session: Session, player: Player)
 			stash(session, piece)
 			session.moved += 1
 			say(session.person, line(LINES.take))
+			Npcs.act(session.person, "give") -- 5.7
+			Npcs.act(player.Character, "take")
 			tell(player, if packFits(piece) then `Into your backpack ({#session.pack} / {session.info.pack or 0}).` else `Onto your bike ({#session.pack} / {session.info.pack or 0}).`)
 			refresh(session)
 			session.info.changed()
@@ -2520,6 +2527,10 @@ local function onPile(session: Session, player: Player)
 			loaded += 1
 			if loaded == 1 then
 				say(session.person, if piece.horse then line(LINES.horse) else line(LINES.take))
+				if not piece.horse and not (session.held[player] and session.held[player].tool) then
+					Npcs.act(session.person, "give") -- 5.7: handed to you, you reach for it
+					Npcs.act(player.Character, "take")
+				end
 			end
 		else
 			table.insert(session.pile, piece)
@@ -3234,6 +3245,7 @@ function Cargo.update(session: Session, dt: number)
 	end
 	if session.built and not session.greeted and position and flat(position, plan.pile) < 45 then
 		session.greeted = true
+		Npcs.act(session.person, "wave") -- 5.7: over here!
 		local handling = handled(plan.mode)
 		if plan.mode == "pallet" then
 			say(session.person, if plan.stage == "pickup" then `{plan.needed} {if plan.needed == 1 then "pallet" else "pallets"} on the dock. Grab a pallet jack!` else "Set them down on the marked pad, please!")
@@ -3251,18 +3263,20 @@ function Cargo.update(session: Session, dt: number)
 	local door = plan.door
 	if session.built and door and not session.knocked and plan.stage == "drop" then
 		local near = position ~= nil and flat(position, door) < Config.Jobs.Places.KnockRange
+		local by = if near then session.owner else nil -- 5.7: who knocks
 		if not near then
 			for _, player in Players:GetPlayers() do
 				local root = rootOf(player.Character)
 				if player ~= session.owner and root and flat(root.Position, door) < Config.Jobs.Places.KnockRange and session.info.allowed(player) then
 					near = true
+					by = player
 					break
 				end
 			end
 		end
 		if near then
 			session.knocked = true
-			knock(session, plan)
+			knock(session, plan, by)
 		end
 	end
 	if plan.mode == "board" then

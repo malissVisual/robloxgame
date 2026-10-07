@@ -62,6 +62,7 @@ export type Zombie = {
 	nextWander: number,
 	walkSpeed: number, -- its full speed (it shambles slower while it wanders)
 	seenSince: number?, -- 4.0.4, a bandit: since when it has a clear line to its target (it fires only after Horde.SpotTime)
+	touching: boolean?, -- 5.7: it touched a car at the last car-touch test (Config.Robust.Zombies.TouchEvery)
 }
 
 local Zombies = {}
@@ -113,6 +114,25 @@ local function limb(model: Model, name: string, size: Vector3, color: Color3, ma
 	p.CanCollide = false
 	p.Parent = model
 	return p
+end
+
+-- 5.7: the Humanoid states an enemy never needs are off (each one the Humanoid would otherwise test every physics
+-- step): no climbing, swimming or sitting (a car seat, a bench), no flying, and no falling down and getting up (a
+-- ram is computed, a death ragdolls by hand). PlatformStanding stays: a latched or stunned zombie uses it.
+local UNUSED_STATES = {
+	Enum.HumanoidStateType.Climbing,
+	Enum.HumanoidStateType.Swimming,
+	Enum.HumanoidStateType.Seated,
+	Enum.HumanoidStateType.Flying,
+	Enum.HumanoidStateType.FallingDown,
+	Enum.HumanoidStateType.Ragdoll,
+	Enum.HumanoidStateType.GettingUp,
+	Enum.HumanoidStateType.StrafingNoPhysics,
+}
+local function quietStates(humanoid: Humanoid)
+	for _, state in UNUSED_STATES do
+		humanoid:SetStateEnabled(state, false)
+	end
 end
 
 local function motor(name: string, part0: BasePart, part1: BasePart, c0: CFrame, c1: CFrame)
@@ -192,8 +212,7 @@ local function buildBlocky(kind: string, def: Config.ZombieDef, at: Vector3): (M
 	humanoid.BreakJointsOnDeath = true
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+	quietStates(humanoid)
 	humanoid.Parent = model
 
 	model.PrimaryPart = root
@@ -326,8 +345,7 @@ local function buildBody(kind: string, def: Config.ZombieDef, at: Vector3): (Mod
 	humanoid.MaxHealth = def.health
 	humanoid.Health = def.health
 	humanoid.WalkSpeed = def.speed * rng:NextNumber(0.9, 1.1)
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+	quietStates(humanoid)
 	model.PrimaryPart = root
 	model:PivotTo(CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
 	return model, humanoid, root, torso
@@ -947,13 +965,20 @@ local BANDIT_TRACER = Color3.fromRGB(255, 80, 60)
 
 -- 4.0.4: does this bandit see its target: a clear line from its head (not from a point in front of it, which can be on
 -- the far side of a wall it stands at) to the target, nothing solid in between?
+-- (5.7: one RaycastParams for every look, its filter the Zombies folder; set again only if that folder is missing)
+local sightParams = RaycastParams.new()
+sightParams.FilterType = Enum.RaycastFilterType.Exclude
+local sightFilter: Instance? = nil
 local function seesTarget(z: Zombie, target: Target): (boolean, Vector3, Vector3)
 	local from = z.root.Position + Vector3.new(0, 1.2 * z.def.scale, 0)
 	local aim = target.position + Vector3.new(0, 1.5, 0)
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { workspace:FindFirstChild("Zombies") or z.model }
-	local result = workspace:Raycast(from, aim - from, params)
+	local folder = workspace:FindFirstChild("Zombies")
+	local filter: Instance = folder or z.model
+	if filter ~= sightFilter or not folder then
+		sightFilter = filter
+		sightParams.FilterDescendantsInstances = { filter }
+	end
+	local result = workspace:Raycast(from, aim - from, sightParams)
 	local targetModel: Instance? = if target.car then target.car.model elseif target.humanoid then target.humanoid.Parent else nil
 	return result == nil or (targetModel ~= nil and result.Instance:IsDescendantOf(targetModel)), from, aim
 end
@@ -1108,12 +1133,23 @@ local function standGuard(z: Zombie, position: Vector3, now: number)
 end
 
 local nextSlow = 0 -- 4.2: the walk animations and the despawn check run 5 times a second, not every frame
+-- 5.7: the targets' list and the car-touch test run at Config.Robust.Zombies.TouchEvery (20 Hz), not every frame;
+-- the list of zombies to walk through is one table filled again each frame (no new table per frame).
+local nextTouch = 0
+local TOUCH_EVERY = Config.Robust.Zombies.TouchEvery
+local targets: { Target } = {}
+local cars: { Vehicles.Car } = {}
+local walk: { Zombie } = {}
 
 local function step()
 	local now = os.clock()
 	local slow = now >= nextSlow
 	if slow then
 		nextSlow = now + 0.2
+	end
+	local touch = now >= nextTouch
+	if touch then
+		nextTouch = now + TOUCH_EVERY
 	end
 	if Zombies.frozen then
 		-- 4.5, the admin's FREEZE: everybody stands where they are (a step order to their own spot, 5 times a second).
@@ -1127,9 +1163,13 @@ local function step()
 		return
 	end
 	refreshHunted(now)
-	local targets = gatherTargets()
-	local cars = Vehicles.all()
-	for _, z in table.clone(zombies) do
+	if touch then
+		targets = gatherTargets()
+		cars = Vehicles.all()
+	end
+	table.clear(walk)
+	table.move(zombies, 1, #zombies, 1, walk)
+	for _, z in walk do
 		if z.dead then
 			continue
 		end
@@ -1171,16 +1211,18 @@ local function step()
 			continue
 		end
 
-		-- Touching a car?
-		local touched = false
-		for _, c in cars do
-			if touches(c, position, Horde.LatchReach * z.def.scale) then
-				hitByCar(z, c, now)
-				touched = true
-				break
+		-- Touching a car? (5.7: tested at 20 Hz, a car gone since the last list skipped; in between it keeps the answer)
+		if touch then
+			z.touching = false
+			for _, c in cars do
+				if not c.wrecked and c.chassis.Parent and touches(c, position, Horde.LatchReach * z.def.scale) then
+					z.touching = true
+					hitByCar(z, c, now)
+					break
+				end
 			end
 		end
-		if touched or z.dead or z.car then
+		if z.touching or z.dead or z.car then
 			continue
 		end
 

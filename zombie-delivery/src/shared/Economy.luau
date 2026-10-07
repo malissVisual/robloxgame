@@ -170,17 +170,6 @@ function Economy.canUpgrade(carId: string): boolean
 	return def ~= nil and not def.company
 end
 
--- 3.3, Quick Hands (the loading track of the car): the hold of the back's prompt and the cargo prompts, `base`
--- seconds shortened by perLevel per level (never below 40 % of it).
-function Economy.loadHold(base: number, levels: Upgrades): number
-	local def = Economy.findUpgrade("loading")
-	if not def then
-		return base
-	end
-	local level = math.clamp(Economy.level(levels, "loading"), 0, def.maxLevel)
-	return base * math.max(0.4, 1 - level * def.perLevel)
-end
-
 -- 3.3: an old save's global car-track levels (profile.upgrades before the car tracks were per car) go to every car
 -- it owns that can take them (the higher level wins), and leave `upgrades` (only the gun tracks stay there).
 -- Returns whether anything was moved.

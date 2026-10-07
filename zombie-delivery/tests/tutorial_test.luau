@@ -73,7 +73,30 @@ check("the speaker is her name", string.find(board.speaker, string.upper(Config.
 -- 4.2: on a touch screen her words name no keys.
 local touch = TutorialSteps.forTouch
 check("touch: no (E)", touch("Carry it to Bob (E)") == "Carry it to Bob", touch("Carry it to Bob (E)"))
-check("touch: the G advice names the button", touch(TutorialSteps.hint("carry", job({}))) == "Carry it to the back of the van and load it. Hands full? PUT DOWN sets it down while you open the back", touch(TutorialSteps.hint("carry", job({}))))
+check("touch: the G advice names the button", touch("Hands full? G puts it down while you open the back") == "Hands full? PUT DOWN sets it down while you open the back")
+-- 5.7: the van's hints are gone (nobody has a car on the first day): no step says van; a bike rides.
+for _, name in TutorialSteps.JobSteps do
+	local line = TutorialSteps.hint(name, job({}))
+	check(`{name}: no van hint any more`, string.find(string.lower(line), "van", 1, true) == nil, line)
+end
+local bikeJob = job({})
+bikeJob.mode = "bike"
+check("on a bike: ride", string.find(TutorialSteps.hint("drive_pickup", bikeJob), "Ride", 1, true) == 1)
+-- 5.7: the tour after the first delivery.
+local doneDialog = TutorialSteps.dialog("done", { reward = 75 }) :: any
+check("done offers the tour", doneDialog.primary == "SHOW ME AROUND" and doneDialog.secondary ~= nil)
+check("the tour: the dock, the bus stop, the board", #TutorialSteps.Tour == 3 and TutorialSteps.Tour[1] == "dock" and TutorialSteps.Tour[2] == "bus" and TutorialSteps.Tour[3] == "board")
+for index, step in TutorialSteps.Tour do
+	local dialog = TutorialSteps.tourDialog(step, { dock = "Maple St · 3rd Ave", stop = "Cedar St / 6th Ave" }) :: any
+	check(`tour {step}: one short page, skippable`, dialog ~= nil and #dialog.pages == 1 and #dialog.pages[1] <= 200 and dialog.secondary == "SKIP TOUR", dialog and dialog.pages[1])
+	check(`tour {step}: NEXT, the last OPEN THE BOARD`, dialog.primary == (if index == #TutorialSteps.Tour then "OPEN THE BOARD" else "NEXT"))
+	local line = touch(dialog.pages[1])
+	check(`tour {step} on touch names no key`, string.find(line, "%([A-Z]%)") == nil and string.find(line, "%f[%w]Q opens") == nil, line)
+end
+check("the dock page names the dock", string.find((TutorialSteps.tourDialog("dock", { dock = "Maple St" }) :: any).pages[1], "Maple St", 1, true) ~= nil)
+check("the bus page names the stop", string.find((TutorialSteps.tourDialog("bus", { stop = "Cedar St / 6th Ave" }) :: any).pages[1], "Cedar St / 6th Ave", 1, true) ~= nil)
+check("the board page: Q, BOARD", string.find((TutorialSteps.tourDialog("board", nil) :: any).pages[1], "Q opens your phone, BOARD", 1, true) ~= nil)
+check("no tour page for an unknown step", TutorialSteps.tourDialog("nope", nil) == nil)
 check("touch: no Press J", touch(TutorialSteps.Bubble.board) == "Check the board, hon.", touch(TutorialSteps.Bubble.board))
 for _, phase in { "welcome", "board", "retry", "done", "say", "skip" } do
 	local dialog = TutorialSteps.dialog(phase, { reward = 50, text = "Hi." }) :: any

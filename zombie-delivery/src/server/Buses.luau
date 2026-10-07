@@ -20,10 +20,17 @@
 -- On foot only (not out of a car or off a bike, not mid-boarding, not pushing a trolley), never during a mission,
 -- and the hands must go into the backpack (Cargo.canStowHands; Cargo.update stows them as you sit, like on a bike):
 -- else "Your hands are full: no room in the backpack". A free passenger seat → Seat:Sit. Free of charge.
+-- 5.7: not at once: the seat is kept for you and your character marked (BusBoard = "line:index:seat", BusBoardAt = the
+-- server time), your own client walks you in (to the door, up its step, along the aisle, sit: client/BusRide.luau,
+-- Config.Interact.BusBoard; everybody's clients pose it, the folding door opens for it) and THIS server seats you
+-- (Seat:Sit) BusBoard seconds after the Board, when you are still alive, standing and the seat free (else the seat is
+-- let go and you are put on the kerb, like getting off).
 -- Riding: the player attribute BusLine (the line's id) while you ride. The Bus remote's "stop": while it drives, the
--- bell (BusBell: the next stop's name; you get off there); while it stands at a stop, off now. Getting off puts you
--- on the kerb by the door (the stop's kerb). Jumping is switched off on the client while you ride; leaving the seat
--- any other way mid-ride (alive) lands you on the kerb beside the bus.
+-- bell (BusBell: the next stop's name; you get off there); while it stands at a stop, off now. Getting off at a stop:
+-- 5.7, your client walks you out (up from the seat, along the aisle, down the door's step onto the kerb: the
+-- character's BusOff = "line:index", BusOffAt and BusOffTo, the kerb by the door) in Config.Interact.BusAlight; the
+-- server puts you on that kerb when you are not there BusAlightGrace later. Jumping is switched off on the client
+-- while you ride; leaving the seat any other way mid-ride (alive) lands you on the kerb beside the bus at once.
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -46,6 +53,7 @@ local RIDER_GROUP = "BusRider"
 local SIT_GRACE = 0.6 -- seconds for a new rider's seat to report them
 local SAME_PRESS = 0.3 -- the Bus remote, at most this often per player
 local DOOR_OUT = 1.6 -- the Board prompt: this far out of the bus's side, by the door
+local KERB_NEAR = 3 -- 5.7: somebody getting off within this of the kerb's spot by then stays where they are
 
 type Bus = {
 	line: BusLines.Line,
@@ -248,15 +256,20 @@ local function restoreGroups(rider: Rider)
 	table.clear(rider.groups)
 end
 
+-- Where the character stands on the kerb at (x, z) (its root), facing (fx, fz).
+local function kerbFrame(humanoid: Humanoid, root: BasePart, x: number, z: number, fx: number, fz: number): CFrame
+	local lift = humanoid.HipHeight + root.Size.Y / 2 + 0.3
+	local at = Vector3.new(x, Map.WalkTop + lift, z)
+	return CFrame.lookAt(at, at + Vector3.new(fx, 0, fz))
+end
+
 -- Stands the character on the kerb at (x, z), facing (fx, fz).
 local function standAt(character: Model, humanoid: Humanoid, x: number, z: number, fx: number, fz: number)
 	local root = humanoid.RootPart
 	if not root then
 		return
 	end
-	local lift = humanoid.HipHeight + root.Size.Y / 2 + 0.3
-	local at = Vector3.new(x, Map.WalkTop + lift, z)
-	character:PivotTo(CFrame.lookAt(at, at + Vector3.new(fx, 0, fz)))
+	character:PivotTo(kerbFrame(humanoid, root, x, z, fx, fz))
 end
 
 local function forget(player: Player)
@@ -272,16 +285,42 @@ local function forget(player: Player)
 	end
 end
 
--- Off the bus onto the kerb: at a stop by its door, else beside the bus (a jump, an eject mid-ride).
-local function land(rider: Rider)
+-- Off the bus onto the kerb: at a stop by its door, else beside the bus (a jump, an eject mid-ride). 5.7, walk: at a
+-- stop the player's client walks them out first (see the top); the kerb is theirs only if they are not on it by then.
+local function land(rider: Rider, walk: boolean?)
 	local bus = rider.bus
 	local humanoid = rider.humanoid
-	if not rider.character.Parent or humanoid.Health <= 0 then
+	local character = rider.character
+	if not character.Parent or humanoid.Health <= 0 then
 		return
 	end
 	local stop = if bus.at > 0 then bus.line.stops[bus.at] else nil
+	local root = humanoid.RootPart
+	if stop and walk and root then
+		local spot = kerbFrame(humanoid, root, stop.kx + stop.nx * 1.5, stop.kz + stop.nz * 1.5, stop.nx, stop.nz)
+		local now = workspace:GetServerTimeNow()
+		local tuning = Config.Interact
+		character:SetAttribute("BusOff", `{bus.line.id}:{bus.index}`)
+		character:SetAttribute("BusOffTo", spot.Position)
+		character:SetAttribute("BusOffAt", now)
+		task.delay(tuning.BusAlight + tuning.BusAlightGrace, function()
+			if character:GetAttribute("BusOffAt") ~= now then
+				return
+			end
+			character:SetAttribute("BusOff", nil)
+			character:SetAttribute("BusOffTo", nil)
+			character:SetAttribute("BusOffAt", nil)
+			local stillRoot = humanoid.RootPart
+			if character.Parent and humanoid.Health > 0 and humanoid.SeatPart == nil and stillRoot
+				and (stillRoot.Position - spot.Position).Magnitude > KERB_NEAR then
+				stillRoot.AssemblyLinearVelocity = Vector3.zero
+				character:PivotTo(spot)
+			end
+		end)
+		return
+	end
 	if stop then
-		standAt(rider.character, humanoid, stop.kx + stop.nx * 1.5, stop.kz + stop.nz * 1.5, stop.nx, stop.nz)
+		standAt(character, humanoid, stop.kx + stop.nx * 1.5, stop.kz + stop.nz * 1.5, stop.nx, stop.nz)
 		return
 	end
 	local frame = bus.chassis.CFrame
@@ -301,7 +340,7 @@ local function getOff(player: Player)
 		weld:Destroy()
 	end
 	rider.humanoid.Sit = false
-	land(rider)
+	land(rider, true)
 end
 
 local function board(player: Player, bus: Bus)
@@ -314,7 +353,7 @@ local function board(player: Player, bus: Bus)
 	if not character or not humanoid or not root or humanoid.Health <= 0 then
 		return
 	end
-	if bus.at <= 0 or bus.leaveIn < 0.3 then
+	if bus.at <= 0 or bus.leaveIn < Config.Interact.BusBoard + 0.2 then -- 5.7: the walk-in ends before it leaves
 		tell(player, "Wait until the bus stops.")
 		return
 	end
@@ -339,20 +378,45 @@ local function board(player: Player, bus: Bus)
 		tell(player, "The bus is full. The next one is right behind it.")
 		return
 	end
+	-- 5.7: the walk in first (the seat is kept meanwhile: freeSeat skips it; checkRiders waits for it)
+	local walk = Config.Interact.BusBoard
 	local rider: Rider = {
 		bus = bus,
 		seat = seat,
 		humanoid = humanoid,
 		character = character,
-		since = os.clock(),
+		since = os.clock() + walk,
 		bell = false,
 		groups = {},
 	}
 	riders[player] = rider
 	setGroups(rider)
-	seat:Sit(humanoid)
 	player:SetAttribute("BusLine", bus.line.id)
 	player:SetAttribute("BusBell", nil)
+	local at = workspace:GetServerTimeNow()
+	local seatNo = seat:GetAttribute("Index")
+	character:SetAttribute("BusBoard", `{bus.line.id}:{bus.index}:{if type(seatNo) == "number" then seatNo else 0}`)
+	character:SetAttribute("BusBoardAt", at)
+	task.delay(walk, function()
+		if riders[player] == rider then
+			if player.Character == character and humanoid.Health > 0 and humanoid.SeatPart == nil and seat.Parent and seat.Occupant == nil then
+				seat:Sit(humanoid)
+			else
+				-- (it did not work out: the seat is free again, somebody still standing in the bus goes onto the kerb)
+				forget(player)
+				if player.Character == character and humanoid.Health > 0 and humanoid.SeatPart == nil then
+					land(rider)
+				end
+			end
+		end
+		-- (the attributes a moment after the seat, so the client sees it seated first)
+		task.delay(1, function()
+			if character:GetAttribute("BusBoardAt") == at then
+				character:SetAttribute("BusBoard", nil)
+				character:SetAttribute("BusBoardAt", nil)
+			end
+		end)
+	end)
 end
 
 -- The Bus remote: "stop" rings the bell while it drives, gets you off while it stands ("off": the same).
@@ -408,7 +472,7 @@ local function stepBus(bus: Bus, now: number)
 			arrived(bus)
 		end
 	end
-	local open = at > 0 and leaveIn > 0.5 and freeSeat(bus) ~= nil
+	local open = at > 0 and leaveIn > Config.Interact.BusBoard + 0.2 and freeSeat(bus) ~= nil
 	if bus.prompt.Enabled ~= open then
 		bus.prompt.Enabled = open
 	end

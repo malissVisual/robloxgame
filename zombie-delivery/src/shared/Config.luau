@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "5.6"
+Config.Version = "5.7"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
@@ -606,8 +606,10 @@ Config.Cars = {
 	},
 	-- 5.1.1, the E-Scooter (style "scooter": a narrow low deck, two small wheels, a tall stem; server/ScooterArt): a
 	-- bike by the rules (light cargo, the BIKE jobs, no fuel, sold at Spoke & Chain) that you ride standing. Quick off
-	-- the line and nippy; a small rack over the rear wheel for one light piece and one gear slot for the basket (a
-	-- handlebar bag: no panniers, no trailer, Config.Gear notOn).
+	-- the line and nippy; a small rack over the rear wheel and one gear slot for the basket (a handlebar bag: no
+	-- panniers, no trailer, Config.Gear notOn). 5.7 (the owner: "a bit slower, so it isn't too much"): 36 at the top
+	-- (44 before; the Courier Bike 38, the E-Bike 48) and two light pieces stacked on its rack (a ZDC RIDE rental keeps
+	-- one: Config.Rental.Room).
 	{
 		id = "escooter",
 		bike = true,
@@ -617,16 +619,16 @@ Config.Cars = {
 		name = "E-Scooter",
 		price = 2800,
 		style = "scooter",
-		maxSpeed = 44,
+		maxSpeed = 36,
 		accel = 26,
 		turn = 2.8,
 		health = 110,
-		capacity = 1,
+		capacity = 2,
 		gearSlots = 1,
 		ramPower = 0.25,
 		color = { 35, 40, 43 },
 		role = "The nippy one: stand on it, zip off, no pedalling",
-		description = "A battery under the deck, a tall stem, a lamp for the night. Zips off the line and darts through traffic. A small rear rack for one light parcel, a basket on the bar. Rider only, standing.",
+		description = "A battery under the deck, a tall stem, a lamp for the night. Zips off the line and darts through traffic. A rear rack for two light parcels, a basket on the bar. Rider only, standing.",
 	},
 	{
 		id = "ebike",
@@ -921,8 +923,7 @@ export type UpgradeDef = {
 -- Wrench Garage. 3.3: the car tracks (car = true) belong to ONE car, the equipped one when you buy (the price grows
 -- with that car's level; the company vehicles take none); the gun tracks count for all your guns and car guns. The
 -- car tracks show on the car (server/Vehicles.luau): Ram Plow a bull bar (bigger with the level), Armor side plates
--- (and window grilles from level 3), Engine a hood scoop and twin exhaust pipes from level 3. Quick Hands makes the
--- holds of the back and the cargo shorter (Economy.loadHold).
+-- (and window grilles from level 3), Engine a hood scoop and twin exhaust pipes from level 3.
 -- 3.4: you keep your first car and upgrade it, so the first levels of the car tracks are cheap (a few deliveries)
 -- and the last ones dear. 3.5: the Cargo Rack (+1 slot a level) is gone: the car's STAGES (CarDef.stages) give the
 -- room now; a 3.4 save's cars became the stage that holds the slots they had, rack included (Economy.legacyStage).
@@ -935,7 +936,7 @@ Config.Upgrades = {
 	{ id = "handling", car = true, name = "Tyres & Suspension", description = "+8% steering · Lv 1: new tyres with tread · Lv 3: alloy rims · Lv 5: a lower stance", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
 	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
 	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
-	-- (4.0.1: Quick Hands, "loading", is gone: the holds it shortened are instant now; a save's levels are refunded)
+	-- (4.0.1: Quick Hands, "loading", is gone: a save's levels are refunded; 5.7: its hold code too)
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
@@ -1433,6 +1434,7 @@ export type LevelReward = {
 	paint: string?, -- a Config.Paints id (exclusive "career")
 	title: string?, -- a title shown over your head (profile.titles)
 	text: string?, -- 5.0: what else the level brings, in words ("The bike shop opens (5.1)")
+	kit: string?, -- 5.7: a piece of personal gear (a Config.Kit id), yours for good; owned already: its price instead
 }
 
 -- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
@@ -1471,11 +1473,13 @@ Config.Levels = {
 	-- unlocks, once (server/PlayerData.luau: profile.levelRewards; a save from before 4.6 counts the levels it had
 	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
 	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
+	-- 5.7: the levels before a car (2 – 4) give what a courier on foot or on a bike uses (medkits, the Courier Backpack,
+	-- the Running Shoes: Config.Kit); the car's items (repair kits, nitro, mines) start at 5, once you drive.
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop: Spoke & Chain on Main St" },
-		[3] = { money = 750, items = { repair = 2 } },
-		[4] = { money = 1000, items = { nitro = 2 }, text = "Old Van: Earl's Used Wheels (Marge's quest)" },
-		[5] = { money = 1500, paint = "hivis" },
+		[3] = { money = 750, items = { medkit = 2 }, kit = "backpack" },
+		[4] = { money = 1000, items = { medkit = 2 }, kit = "shoes", text = "Old Van: Earl's Used Wheels (Marge's quest)" },
+		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
 		[8] = { money = 3500, items = { nitro = 3 } },
@@ -1617,6 +1621,10 @@ Config.Rental = {
 	Idle = 45, -- off the scooter this long: it goes back
 	Restock = 20, -- seconds until a rented scooter stands in its dock again (once it is returned)
 	Color = { 214, 72, 64 }, -- the ZDC RIDE red on the rentals' deck and stem
+	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 36) and its
+	-- rack takes one light piece (the bought one two). server/Vehicles.luau caps the rental's MaxSpeed and its room.
+	MaxSpeed = 26,
+	Room = 1,
 }
 
 -- 5.6, zip lines between Downtown's rooftops (shared/ZipLines.luau picks them, server/ZipLines.luau builds them and
@@ -1644,7 +1652,34 @@ Config.ZipLines = {
 	Cooldown = 3, -- seconds between the end of a ride (or a climb) and the next ride of one player
 	SafeDrop = 6, -- Space lets go only this low over a platform's roof (else it is ignored)
 	Grace = 0.8, -- seconds after a ride's end before the server puts a late rider down at the end
-	Fade = 0.25, -- a climb: the screen fades for this long before you are up (or down)
+}
+
+-- 5.7, the interactions at the car's level (shared/InteractPose.luau has the curves; client/Interact.luau lays the
+-- poses on the joints): getting on a bike or a scooter (client/CarBoarding.luau; the server seats you at the move's
+-- end: server/Vehicles.luau), the bus's folding door and the walk to a seat (client/BusRide.luau, server/Buses.luau),
+-- the zip lines' ladders climbed for real (client/ZipRide.luau, server/ZipLines.luau) and a ZDC RIDE scooter unclipped
+-- from its dock (client/RentalUi.luau, server/Rental.luau).
+Config.Interact = {
+	BikeMount = 0.6, -- seconds from the E to the saddle: a step to the bike's side, then the leg over (the server seats you)
+	BikeStep = 0.3, -- of BikeMount: the step to the side
+	BikeDismount = 0.55, -- seconds: the leg back over and a step off to the side
+	DockUnclip = 0.45, -- seconds: a rented scooter slides off the dock's charging rail before you get on
+	DockSlide = 1.0, -- studs it slides out (toward the street)
+	BusBoard = 1.7, -- seconds from the Board prompt to the seat: to the door, up the step, along the aisle, sit (the server seats you)
+	BusAlight = 1.3, -- seconds from the seat out of the door onto the kerb
+	BusDoor = 0.45, -- seconds: the folding door opens (or shuts)
+	BusDoorShut = 0.8, -- the door shuts this long before the bus leaves (no Board after that)
+	BusAlightGrace = 0.5, -- seconds after BusAlight: somebody not on the kerb by then is put there by the server
+	ClimbSpeed = 8, -- studs / s up (or down) a zip line's ladder
+	ClimbWalk = 14, -- studs / s across the roof between the ladder and the platform
+	ClimbOnto = 0.5, -- seconds from the street onto the ladder (or off it at the foot)
+	ClimbOver = 0.8, -- seconds over the roof's edge
+	ClimbHop = 0.45, -- seconds over a platform's rail
+	ClimbGrace = 0.6, -- seconds after a climb's end: a climber not at its end by then is put there by the server
+	ClimbCooldown = 0.5, -- seconds after a climb before the next one (or a ride)
+	RungStep = 1, -- studs climbed per hand-over-hand stroke
+	StepLength = 2.2, -- studs per step of a walk played by a move
+	ZipReach = 0.4, -- seconds: the hands go up to the trolley as a ride starts
 }
 
 -- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit
@@ -1816,6 +1851,37 @@ Config.Audio = {
 		goldpistol = "gun_crack",
 		deadend = "gun_crack",
 	} :: { [string]: string },
+}
+
+-- 5.7, sound and juice: the world's sounds (client/Sounds.luau; art/audio/sfx2.ogg, shared/SoundSheet.luau Sfx2), the
+-- HUD money counting up and the confetti of a top rating (client/Juice.luau), and the short arm gestures of people and
+-- couriers (shared/Gestures.luau, client/ArmPose.luau; set by server/Npcs.luau Npcs.act). Volumes 0..1.
+Config.Juice = {
+	StepStride = 5.4, -- studs walked per footstep (on foot, on the ground)
+	StepMinSpeed = 3, -- slower than this (studs / s): no steps
+	StepVolume = 0.32,
+	BikeVolume = 0.32, -- the freewheel's ticking (pedal bikes), silent standing still
+	ScooterVolume = 0.28, -- the electric hum (the E-Scooter, the rental scooters, the E-Bike)
+	ZipVolume = 0.5, -- the trolley's whirr on a zip line (its pitch rises to Config.ZipLines.Speed)
+	BusVolume = 0.7, -- the brake and the doors' hiss at a stop
+	BusRange = 110, -- studs: buses farther from the camera are not heard
+	KnockVolume = 0.85,
+	DoorVolume = 0.6,
+	DoorDelay = 0.45, -- seconds from the knock to the door's creak
+	CoinVolume = 0.55, -- a paid job (and, quieter, the money popped by a kill)
+	BuzzVolume = 0.5, -- the phone's buzz under a banner
+	AmbienceDay = 0.12, -- the city's hum, by day / by night
+	AmbienceNight = 0.2,
+	WindDay = 0.04,
+	WindNight = 0.13,
+	AmbienceFade = 4, -- seconds to go from the day's to the night's level
+	CountUpSeconds = 0.7, -- the HUD money runs up to the new amount in this long
+	ConfettiPieces = 40, -- a ★★★ rating
+	ConfettiSeconds = 1.8,
+	-- Seconds each gesture lasts (Gestures.weight eases it in and out).
+	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6 } :: { [string]: number },
+	WaveHz = 2.2, -- the hand's wave, back and forth per second
+	KnockGap = 0.17, -- seconds between two knocks (the sound's too)
 }
 
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
@@ -2222,6 +2288,46 @@ Config.Jobs = {
 		AddOnAnswer = 15,
 		AddOnGivers = { "Mrs. Lee", "Old Tom", "Kenny", "Mr. Novotny", "Aunt Maple" } :: { string },
 	},
+	-- 5.7, life on a run on foot or by bike (shared/FootEvents.luau picks, server/RunEvents.luau runs them; never the
+	-- tutorial's delivery, a car job or a mission). A light road event on about one run in four (Chance), after After
+	-- (min, max) seconds out of the safe zone, by Weights (none of the car-only ones: no add-on, no blocked street):
+	--   runner    a runner zombie comes after you from RunnerDistance studs away: keep moving, or fight it off
+	--   survivor  somebody calls for help SurvivorAhead studs ahead: walk up (SurvivorReach) and help them for a Tip
+	--             (min, max dollars; a bike pays the same); they give up after SurvivorWait s or once you are far past
+	--   gate      a locked gate across the sidewalk GateAhead studs ahead (GateWidth wide, from the kerb in): go round
+	--             by the road; it is taken away after GateTime s
+	-- No spot for it now: tried again after Retry s, Tries times at most. And at about one drop in five (GroupChance),
+	-- once you come within GroupNear studs of it, a small group of walkers (Group: min, max) shambles about
+	-- GroupDistance studs from the drop (never in the safe zone).
+	FootEvents = {
+		Chance = 0.25,
+		After = { 20, 60 } :: { number },
+		Retry = 6,
+		Tries = 5,
+		Weights = { runner = 1, survivor = 1, gate = 1 } :: { [string]: number },
+		RunnerDistance = { 70, 110 } :: { number },
+		SurvivorAhead = 45,
+		SurvivorReach = 7,
+		SurvivorWait = 40,
+		SurvivorNames = { "Ada", "Big Lou", "Mrs. Park", "Tomas", "Nina", "Grandpa Joe", "Eli", "Marta" } :: { string },
+		Tip = { 15, 35 } :: { number },
+		GateAhead = 30,
+		GateWidth = 10,
+		GateTime = 60,
+		GroupChance = 0.2,
+		Group = { 2, 3 } :: { number },
+		GroupDistance = { 30, 55 } :: { number },
+		GroupNear = 120,
+	},
+	-- 5.7, the step up to a car: a ★ board delivery done in your own car gives XpBonus more XP than a ★ job and takes
+	-- Pieces (min, max; SHORT & SAFE the fewest) pieces, never more than your car holds now (at least EasyMaxPieces),
+	-- so the Old Van at level 4 is clearly a promotion over a bike run (Bike.XpBonus).
+	CarStep = {
+		XpBonus = 40,
+		Pieces = { 3, 4 } :: { number },
+	},
+	-- 5.7: a job whose server tick fails this many times in a row ends (Jobs.fail) instead of stranding its player.
+	TickFails = 5,
 	-- 5.2, several orders at once (server/Jobs.luau addOrder, shared/JobRules.luau's orders): while a stackable run is
 	-- on (an ordinary board delivery on foot, on a bike, or a car one of the ★ … CarTiers tiers; never a mission, a
 	-- special, an employer's job, DUO, the Freight Run or the tutorial's), ACCEPT on the board adds another order of
@@ -2784,7 +2890,7 @@ Config.Cargo = {
 	} :: { [string]: boolean },
 	-- 5.3, what fits in a backpack (server/Cargo.luau packFits, shared/Bag.luau): small, flat or boxed light pieces.
 	-- Every other light piece (a bouquet, a cake, an electronics box, groceries, ice cream) rides in your hands, or on a
-	-- bike's rack, basket or box (one piece on the e-scooter's rack): on foot never more than your hands hold.
+	-- bike's rack, basket or box (two on the e-scooter's rack, 5.7): on foot never more than your hands hold.
 	PackLooks = {
 		mail = true,
 		newspaper = true,
@@ -3263,6 +3369,96 @@ Config.Residents = {
 	},
 	-- (whole names: what everybody on the block calls them)
 	Nicknames = { "Old Pete", "Doc Hansen", "Granny Ruth", "Sarge Kowalski", "Mad Mira", "Tin-Can Tony", "Lucky Jirka", "Two-Dogs Dana", "Bunker Bob", "Radio Ráďa" },
+}
+
+-- 5.7, robustness and load (server/Zombies.luau, shared/Net.luau, server/Shops.luau, server/Jobs.luau, Main.server).
+-- Zombies: TouchEvery = how often (seconds) the car-touch test and the targets' list run (20 Hz, not every frame:
+-- a car at 120 studs/s moves 6 studs between two tests, far less than its own length plus the reach). Limits: how
+-- many requests a second each remote takes from one player (a token bucket: as many in a burst, then that many a
+-- second; Net.limit drops the rest, Net.latest keeps the last one and runs it once there is room again). Aiming,
+-- PinOrder and RequestOffers keep the last (a state: the final one always arrives; a burst of board requests is
+-- answered once); the shop actions and CancelJob drop the extra clicks.
+Config.Robust = {
+	Zombies = {
+		TouchEvery = 0.05,
+	},
+	Limits = {
+		RequestOffers = 2,
+		PinOrder = 5,
+		CancelJob = 2,
+		Buy = 5,
+		Equip = 6,
+		Paint = 5,
+		Gear = 5,
+		Kit = 4,
+		Aiming = 12,
+	},
+}
+
+-- 5.7, a living city and its air: the towers' four looks (shared/TowerLooks.luau), the street props on every ordinary
+-- block (shared/StreetProps.luau, server/StreetDressing.luau), the night lights restyled on every client
+-- (client/WorldFx.luau), the rare rain and fog (shared/WeatherPlan.luau: server/DayNight.luau picks, client/Weather.luau
+-- draws) and the camera's shake and speed (client/CameraRig.luau).
+Config.LivingCity = {
+	Towers = {
+		Budget = 10, -- parts a tower's look adds, at most
+		DoorClear = 6, -- nothing of a look within this (along the wall) of an apartment entrance's door, below 12 studs
+		LadderClear = 6, -- … nor of a zip line's ladder; a zip line's two towers get nothing on the roof
+		RoofHeight = 3, -- a roof's tanks and units stay this low (the zip cables' rule: shared/ZipLines.luau extra)
+	},
+	Street = {
+		Props = { 3, 6 } :: { number }, -- props a block (a Harbor block: the lower half)
+		CurbDepth = 1.7, -- the kerb props' middle, in from the curb (the people walk 4.5 in: shared/TrafficLanes.luau)
+		CornerClear = 15, -- no prop this close (along the side) to a block's corner: the crosswalks, the lamps and poles
+		Clear = 9, -- no prop within this of a door, a pile, a cargo spot, an employer's board, an address or a dock
+		ParkClear = 12, -- … of a home's or a storefront's park (a car pulls in there)
+		StopClear = 24, -- … of a bus stop's kerb
+		GasClear = 50, -- … of a gas station's middle
+		PlaceClear = 30, -- … of a place or a house for sale
+		LadderClear = 9, -- … of a zip line's ladder
+		Spacing = 7, -- no two props of a block closer than this
+		CarShare = 0.22, -- a block side (not on a bus line) has an abandoned car at its kerb this often
+		CarCornerClear = 30, -- the car keeps this far from the corners (the traffic's turns)
+		CarKerb = 2.5, -- the car's middle this far out on the road from the curb (clear of the traffic's lane)
+		FlareShare = 0.5, -- an abandoned car has a red flare by it this often
+		BoardedShare = 0.3, -- a tower's street wall has a boarded shopfront this often
+	},
+	Lights = {
+		RestylePerFrame = 240, -- night lights restyled per frame on a client when the night turns (no hitch)
+		BrokenShare = 0.07, -- the street lamps that flicker at night
+		FlickerRange = 320, -- they flicker only this close to the camera
+	},
+	Clock = {
+		SendEvery = 1, -- seconds between the clock's replications (every client runs it smoothly in between)
+	},
+	Weather = {
+		CheckEvery = 75, -- seconds between the server's rolls for a change in clear weather
+		RainChance = 0.06, -- per roll, by day (× NightBoost at night)
+		FogChance = 0.05,
+		NightBoost = 1.8,
+		Minutes = { 2.5, 6 } :: { number }, -- how long a rain or a fog lasts
+		Calm = 4, -- minutes of clear weather at least after one
+		Fade = 12, -- seconds a client takes to blend into or out of it
+		RainDensity = 0.12, -- added to the atmosphere's density
+		FogDensity = 0.32,
+		WetReflectance = 0.16, -- the roads' shine in the rain
+		RainRate = 900, -- raindrops a second around the camera
+		MistRange = 650, -- the river's mist shows within this of the camera
+		SunRays = 0.18, -- the sun rays' intensity at dawn
+	},
+	Camera = {
+		Explosion = 0.9, -- shake (0 … 1) next to an explosion …
+		ExplosionReach = 140, -- … fading to nothing this far away
+		Damage = 1.6, -- × the share of your health one hit took
+		Ram = 0.022, -- × the speed (studs / s) your car lost in a blink
+		RamFrom = 22, -- … from a loss this big
+		Decay = 1.6, -- shake lost per second
+		Angle = 1.4, -- degrees at full shake
+		Offset = 0.35, -- studs (a touch screen's camera moves, it does not turn)
+		Fov = 6, -- extra field of view at top speed and on a zip line
+		FovFrom = 0.72, -- … from this share of the car's top speed
+		FovBlend = 3, -- per second
+	},
 }
 
 return Config

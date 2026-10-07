@@ -47,6 +47,10 @@
 --   JobRules.footPieces(wanted, room)     its pieces: within Foot.Pieces and what you carry
 -- 5.1, the BIKE jobs (Config.Jobs.Bike): the same three with Config.Jobs.Bike as their last argument (LightRules), and
 --   JobRules.bikeXp(xp)                   a bike job's XP (+ Bike.XpBonus)
+-- 5.7, the step up to a car (Config.Jobs.CarStep; tested in tests/footevents_test.luau):
+--   JobRules.carStep(mode, tier, special) is it a ★ board delivery in your own car?
+--   JobRules.carStepXp(xp)                its XP (+ CarStep.XpBonus)
+--   JobRules.carStepPieces(role, r, room) its pieces: CarStep.Pieces, never more than the car holds now
 --
 -- 5.2, several orders at once (Config.Jobs.Orders; tested in tests/orders_test.luau):
 --   JobRules.stackable(info)              may this offer run beside other orders (StackInfo)?
@@ -527,6 +531,25 @@ end
 -- 5.1: a bike job's XP: a ★ job's (Levels.jobXp of its tier) + Config.Jobs.Bike.XpBonus.
 function JobRules.bikeXp(xp: number): number
 	return xp + Config.Jobs.Bike.XpBonus
+end
+
+-- 5.7, the step up to a car (Config.Jobs.CarStep): is this a ★ board delivery in your own car (mode "car", tier 1, no
+-- job type of its own: not a special, an employer's or a mission)?
+function JobRules.carStep(mode: string, tier: number, special: boolean): boolean
+	return mode == "car" and tier == 1 and not special
+end
+
+-- 5.7: such a delivery's XP: + CarStep.XpBonus.
+function JobRules.carStepXp(xp: number): number
+	return xp + Config.Jobs.CarStep.XpBonus
+end
+
+-- 5.7: such a delivery's pieces: CarStep.Pieces (SHORT & SAFE the fewest, else r: 0 … 1 picks), never more than `room`
+-- (what the player's car holds now; at least EasyMaxPieces: a player without a car sees the Rusty Van's load).
+function JobRules.carStepPieces(role: string?, r: number, room: number?): number
+	local band = Config.Jobs.CarStep.Pieces
+	local wanted = if role == "short" then band[1] else band[1] + math.floor(math.clamp(r, 0, 0.999999) * (band[2] - band[1] + 1))
+	return math.min(wanted, math.max(Config.Jobs.EasyMaxPieces, math.floor(room or 0)))
 end
 
 -- ── 5.2: several orders at once (Config.Jobs.Orders) ───────────────────────

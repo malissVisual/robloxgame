@@ -5,7 +5,8 @@
 --     the body again in the new shape). Under reduced motion: no tween, `done` at once.
 --   * banner(screen, top, from, text, onTap): a new message or a new board drops from the top of the open phone for
 --     2.5 s, drawn like the home screen's message row (a charcoal row, a fine line, the sender in caps, the text in
---     the secondary colour); a tap opens it. A newer banner replaces the last one.
+--     the secondary colour); a tap opens it. A newer banner replaces the last one. 5.7: the phone buzzes with it
+--     (PhoneMotion.onBanner, client/Sounds.luau).
 -- Presentation only.
 
 local GuiService = game:GetService("GuiService")
@@ -22,6 +23,9 @@ local TURN = TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.InO
 local DROP = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 local banner: any = nil
+
+-- 5.7: set by client/Sounds.luau: the phone's buzz as a banner drops.
+PhoneMotion.onBanner = nil :: (() -> ())?
 
 function PhoneMotion.reducedMotion(): boolean
 	local ok, on = pcall(function()
@@ -95,6 +99,10 @@ function PhoneMotion.banner(screen: Instance, top: number, from: string, text: s
 		ZIndex = 31,
 	})
 	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(math.huge, 32) }, body)
+	local buzz = PhoneMotion.onBanner
+	if buzz then
+		buzz()
+	end
 	local reduced = PhoneMotion.reducedMotion()
 	if not reduced then
 		local shown = made.Position
