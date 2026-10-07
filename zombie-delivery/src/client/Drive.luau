@@ -47,17 +47,60 @@ local function tell(text: string)
 	end)
 end
 
-function Drive.myCar(): Model?
-	local cars = workspace:FindFirstChild("Cars")
-	if not cars then
-		return nil
+-- 5.9.2: your car, kept: looked for again only when workspace.Cars gains or loses a car (streaming too), or a car's
+-- OwnerId or Health changes (the HUD and the visuals ask every frame).
+local carWatch = { folder = nil :: Instance?, dirty = true, mine = nil :: Model? }
+
+local function watchCars(folder: Instance)
+	carWatch.folder = folder
+	carWatch.dirty = true
+	local function changed()
+		carWatch.dirty = true
 	end
-	for _, car in cars:GetChildren() do
-		if car:IsA("Model") and car:GetAttribute("OwnerId") == player.UserId and (car:GetAttribute("Health") or 0) > 0 then
-			return car
+	local function hook(child: Instance)
+		changed()
+		child.AttributeChanged:Connect(function(name: string)
+			if name == "OwnerId" or name == "Health" then
+				changed()
+			end
+		end)
+	end
+	for _, child in folder:GetChildren() do
+		hook(child)
+	end
+	folder.ChildAdded:Connect(hook)
+	folder.ChildRemoved:Connect(changed)
+	folder.AncestryChanged:Connect(changed)
+end
+
+function Drive.myCar(): Model?
+	local folder = carWatch.folder
+	if not folder or folder.Parent ~= workspace then
+		local cars = workspace:FindFirstChild("Cars")
+		if not cars then
+			return nil
+		end
+		if cars ~= folder then
+			watchCars(cars)
+		end
+		folder = cars
+	end
+	if carWatch.dirty then
+		carWatch.dirty = false
+		carWatch.mine = nil
+		for _, car in (folder :: Instance):GetChildren() do
+			if car:IsA("Model") and car:GetAttribute("OwnerId") == player.UserId and (car:GetAttribute("Health") or 0) > 0 then
+				carWatch.mine = car
+				break
+			end
 		end
 	end
-	return nil
+	local mine = carWatch.mine
+	if mine and mine.Parent ~= folder then
+		carWatch.dirty = true -- (gone between the signals: look again next time)
+		return nil
+	end
+	return mine
 end
 
 function Drive.isDriving(): boolean

@@ -9,6 +9,9 @@
 -- it on every frame from the same timetable (client/BusRide.luau), so a ride is smooth and the seated riders (welded
 -- to their seats) glide with the bus. The model carries BusLine (the line id), BusIndex (0-based), BusOffset (the
 -- chassis over its point on the road), BusNext (the next stop's name) and BusAt (the stop it stands at, nil driving).
+-- 5.9.2, cheaper: a bus with no player within FAR_PLAYERS is written only every FAR_EVERY seconds (still where the
+-- timetable puts it then: nothing drifts); a bus body casts no shadow from its small parts, and only its chassis, its
+-- seats and its big shell panels (a shot still stops on the bus) answer spatial queries.
 --
 -- Never running anybody over, simply: a bus keeps to its timetable (it ignores the lights and the traffic, so every
 -- client agrees where it is) and NOTHING of it collides (CanCollide off on every part): a person in its way is
@@ -54,6 +57,10 @@ local SIT_GRACE = 0.6 -- seconds for a new rider's seat to report them
 local SAME_PRESS = 0.3 -- the Bus remote, at most this often per player
 local DOOR_OUT = 1.6 -- the Board prompt: this far out of the bus's side, by the door
 local KERB_NEAR = 3 -- 5.7: somebody getting off within this of the kerb's spot by then stays where they are
+local FAR_PLAYERS = 800 -- 5.9.2: a bus with no player within this (flat distance) …
+local FAR_EVERY = 1 -- … is written every this many seconds
+local SMALL_PART = 3 -- 5.9.2: a bus part no bigger than this along every axis casts no shadow
+local SHELL_PART = 5 -- … one at least this big along two axes is a shell panel (stays queryable)
 
 type Bus = {
 	line: BusLines.Line,
@@ -67,6 +74,7 @@ type Bus = {
 	at: number, -- the stop it stands at (0: driving)
 	nextStop: number,
 	leaveIn: number,
+	wrote: number, -- 5.9.2: the server time its CFrame was written last
 }
 
 type Rider = {
@@ -176,6 +184,17 @@ local function build(parent: Instance, def: Config.CarDef, line: BusLines.Line, 
 			end
 			d.CanCollide = false -- never pushes anybody (see the header)
 			d.CanTouch = false
+			-- 5.9.2: out of the physics' spatial index (it moves every frame on every client), but the chassis (the
+			-- floor), the seats and the big shell panels; no shadow from the small parts.
+			local size = d.Size
+			local small = math.max(size.X, size.Y, size.Z) <= SMALL_PART
+			local big = (if size.X >= SHELL_PART then 1 else 0) + (if size.Y >= SHELL_PART then 1 else 0) + (if size.Z >= SHELL_PART then 1 else 0) >= 2
+			if small then
+				d.CastShadow = false
+			end
+			if d ~= chassis and not d:IsA("Seat") and not big then
+				d.CanQuery = false
+			end
 		elseif d:IsA("SpotLight") then
 			table.insert(lights, d)
 			d.Enabled = isNight()
@@ -213,6 +232,7 @@ local function build(parent: Instance, def: Config.CarDef, line: BusLines.Line, 
 		at = -1, -- (the first step writes the attributes)
 		nextStop = 0,
 		leaveIn = leaveIn,
+		wrote = -math.huge,
 	}
 	model:SetAttribute("BusOffset", bus.offset)
 	model.Parent = parent
@@ -455,9 +475,24 @@ local function arrived(bus: Bus)
 	end
 end
 
-local function stepBus(bus: Bus, now: number)
+-- 5.9.2: a player within FAR_PLAYERS (flat) of (x, z)?
+local function watched(x: number, z: number, eyes: { Vector3 }): boolean
+	for _, eye in eyes do
+		local dx, dz = eye.X - x, eye.Z - z
+		if dx * dx + dz * dz <= FAR_PLAYERS * FAR_PLAYERS then
+			return true
+		end
+	end
+	return false
+end
+
+local function stepBus(bus: Bus, now: number, eyes: { Vector3 })
 	local x, z, hx, hz, at, nextStop, leaveIn = BusLines.position(bus.line, bus.index, now)
-	bus.chassis.CFrame = groundFrame(x, z, hx, hz) * bus.offset
+	-- (nobody near: written FAR_EVERY seconds apart, still from the timetable)
+	if now - bus.wrote >= FAR_EVERY or watched(x, z, eyes) then
+		bus.wrote = now
+		bus.chassis.CFrame = groundFrame(x, z, hx, hz) * bus.offset
+	end
 	bus.leaveIn = leaveIn
 	if nextStop ~= bus.nextStop then
 		bus.nextStop = nextStop
@@ -560,8 +595,17 @@ function Buses.start()
 			task.wait(TICK)
 			local ok, err = pcall(function()
 				local now = workspace:GetServerTimeNow()
+				-- (5.9.2: where the players are, once a tick)
+				local eyes: { Vector3 } = {}
+				for _, player in Players:GetPlayers() do
+					local character = player.Character
+					local root = character and character:FindFirstChild("HumanoidRootPart")
+					if root and root:IsA("BasePart") then
+						table.insert(eyes, root.Position)
+					end
+				end
 				for _, bus in buses do
-					stepBus(bus, now)
+					stepBus(bus, now, eyes)
 				end
 				checkRiders()
 			end)

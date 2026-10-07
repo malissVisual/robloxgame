@@ -3,6 +3,8 @@
 --   * The buses glide: every frame each bus near the camera is placed where the timetable puts it now
 --     (BusLines.position from workspace:GetServerTimeNow(), the same function the server steps them by 10 times a
 --     second), its wheels rolling with the way it moved. A rider sits welded to the seat, so the ride is smooth too.
+--     5.9.2: every frame within NEAR_RANGE, MID_EVERY seconds apart out to RANGE, the farther ones left to the server;
+--     the timetable worked out once per bus and frame (the doors read it again).
 --   * At a stop (within Config.Bus.NearStop of its kerb, on foot): a small card in the contract column (the Hud's top
 --     stack, Hud.topSlot("bus"), under the contract) with the next bus of every line there: "BUS · CEDAR ST / 6TH AVE"
 --     over "■ Line 1 Ring 0:12 · ■ Line 3 Suburbs 1:05". The shelters' arrivals boards nearby show the same.
@@ -39,6 +41,7 @@ local Map = require(Shared:WaitForChild("Map"))
 local Net = require(Shared:WaitForChild("Net"))
 local Drive = require(script.Parent.Drive)
 local Interact = require(script.Parent.Interact)
+local Bodies = require(script.Parent.Bodies)
 local Hud = require(script.Parent.Hud)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
@@ -49,7 +52,9 @@ local BusRide = {}
 
 local player = Players.LocalPlayer
 local Tuning = Config.Bus
-local RANGE = 700 -- the buses within this of the camera are placed every frame (farther: the server's steps)
+local RANGE = 700 -- the buses within this of the camera are placed here (farther: the server's steps)
+local NEAR_RANGE = 250 -- 5.9.2: … every frame within this, else MID_EVERY seconds apart
+local MID_EVERY = 1 / 12
 local WHEEL_RANGE = 220
 local POLL = 0.25 -- the cards, the banner and the hint, times a second
 local BOARD_RANGE = 160 -- the shelters' arrivals boards are written within this of the camera
@@ -66,6 +71,10 @@ type Track = {
 	wheels: { Wheel }?,
 	spin: number,
 	last: Vector3?,
+	due: number, -- 5.9.2: os.clock() of its next placing out of NEAR_RANGE
+	when: number, -- the server time its timetable was worked out last (at, leaveIn then)
+	at: number,
+	leaveIn: number,
 }
 type Ride = { model: Model, line: BusLines.Line, index: number }
 
@@ -108,7 +117,7 @@ local function trackOf(model: Model): Track?
 	if not line then
 		return nil
 	end
-	local track: Track = { line = line, index = index, offset = offset, wheels = nil, spin = 0, last = nil }
+	local track: Track = { line = line, index = index, offset = offset, wheels = nil, spin = 0, last = nil, due = 0, when = -1, at = 0, leaveIn = 0 }
 	tracks[model] = track
 	return track
 end
@@ -124,20 +133,29 @@ local function wheelsOf(chassis: BasePart): { Wheel }
 	return list
 end
 
-local function place(dt: number?)
+local function place(dt: number?, now: number)
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
-	local now = workspace:GetServerTimeNow()
+	local clock = os.clock()
 	for model, track in tracks do
 		local chassis = model.PrimaryPart
 		if not chassis then
 			continue -- (not streamed in)
 		end
-		if (chassis.Position - eye).Magnitude > RANGE then
+		local distance = (chassis.Position - eye).Magnitude
+		if distance > RANGE then
 			track.last = nil
 			continue
 		end
-		local x, z, hx, hz = BusLines.position(track.line, track.index, now)
+		if distance > NEAR_RANGE then
+			-- 5.9.2: the middle distance, MID_EVERY seconds apart
+			if clock < track.due then
+				continue
+			end
+			track.due = clock + MID_EVERY
+		end
+		local x, z, hx, hz, at, _, leaveIn = BusLines.position(track.line, track.index, now)
+		track.when, track.at, track.leaveIn = now, at, leaveIn
 		local frame = ground(x, z, hx, hz) * track.offset
 		chassis.CFrame = frame
 		if dt and dt > 0 then
@@ -448,10 +466,9 @@ end
 
 -- Every door near the camera toward its goal: open while the bus stands at a stop (until BusDoorShut before it
 -- leaves) or somebody is on its step.
-local function updateDoors(dt: number)
+local function updateDoors(dt: number, now: number)
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
-	local now = workspace:GetServerTimeNow()
 	local tuning = Config.Interact
 	for model, track in tracks do
 		local chassis = model.PrimaryPart
@@ -465,7 +482,12 @@ local function updateDoors(dt: number)
 			end
 			continue
 		end
-		local _, _, _, _, at, _, leaveIn = BusLines.position(track.line, track.index, now)
+		-- (5.9.2: the timetable as place worked it out this frame)
+		local at, leaveIn = track.at, track.leaveIn
+		if track.when ~= now then
+			local _, _, _, _, a, _, l = BusLines.position(track.line, track.index, now)
+			at, leaveIn = a, l
+		end
 		local goal = if (at > 0 and leaveIn > tuning.BusDoorShut) or heldOpen[model] then 1 else 0
 		local open = if goal > door.open then math.min(1, door.open + dt / tuning.BusDoor) else math.max(0, door.open - dt / tuning.BusDoor)
 		if open <= 0 then
@@ -762,11 +784,14 @@ local function othersStep(dt: number)
 	local now = workspace:GetServerTimeNow()
 	local tuning = Config.Interact
 	local live: { [Model]: boolean } = {}
-	for _, other in Players:GetPlayers() do
+	for _, other in Bodies.players() do
 		local character = other.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local root = humanoid and humanoid.RootPart
-		if other == player or not character or not humanoid or not root or (root.Position - eye).Magnitude > MOVE_RANGE then
+		if other == player or not character then
+			continue
+		end
+		-- (5.9.2: the far ones skipped first, the body's parts looked up once)
+		local humanoid, root = Bodies.near(character, eye, MOVE_RANGE)
+		if not humanoid or not root then
 			continue
 		end
 		local seat = humanoid.SeatPart
@@ -980,8 +1005,9 @@ function BusRide.start()
 		end
 		watchFolder(folder)
 		RunService.RenderStepped:Connect(function(dt: number)
-			place(dt) -- (once a frame: the buses are anchored and never collide)
-			updateDoors(dt) -- 5.7: the folding doors (after the buses moved)
+			local now = workspace:GetServerTimeNow()
+			place(dt, now) -- (once a frame: the buses are anchored and never collide)
+			updateDoors(dt, now) -- 5.7: the folding doors (after the buses moved)
 		end)
 	end)
 	task.spawn(function()

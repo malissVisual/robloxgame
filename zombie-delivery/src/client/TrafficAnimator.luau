@@ -6,7 +6,8 @@
 --
 -- How a new server position is noticed without a second channel: this client writes the car's CFrame itself every
 -- frame, so when the chassis holds something other than what was written last, the server's update has arrived in
--- between. It writes before the physics too (PreSimulation), so your car collides with the car where you see it.
+-- between. It writes before the physics (PreSimulation, once a frame), so your car collides with the car where you
+-- see it.
 -- Far away (beyond RANGE) the cars are left as the server places them.
 --
 -- 3.9, the traffic lights' colours: every lens on the light poles (server/World.luau, tag Crossings.Tag) is moved to
@@ -243,9 +244,7 @@ function TrafficAnimator.start()
 			return -- no traffic on this server
 		end
 		watch(folder)
-		RunService.RenderStepped:Connect(function()
-			place(os.clock())
-		end)
+		-- (5.9.2: placed once a frame, before the physics; placing again at render did the same work twice)
 		RunService.PreSimulation:Connect(function(dt)
 			place(os.clock())
 			wheels(dt)

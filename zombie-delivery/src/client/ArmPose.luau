@@ -21,6 +21,10 @@
 -- 5.7: a short gesture on top of everything (shared/Gestures.luau: wave, give, take, knock), from the Gesture /
 -- GestureAt attributes the server sets on characters and people (server/Npcs.luau Npcs.act): the receiver waves at the
 -- door and reaches for the piece, the courier holds it out or reaches for it, knocks at the door. Both arms, R15 and R6.
+-- 5.9.2, cheaper: each character's joints are looked up once (again every RIG_REFRESH seconds, or at once when one went
+-- away); the other players farther than NPC_RANGE from the camera are left to the animation; the people in
+-- workspace.Npcs are followed through their attributes (Carrying, PhoneHeld, Gesture / GestureAt) instead of a look at
+-- every one of them every frame.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,6 +34,7 @@ local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Jo
 local Melee = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Melee"))
 local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
 local Gestures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Gestures"))
+local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
 
@@ -39,7 +44,9 @@ local RAISE_TIME = 0.2 -- seconds for the arms to come up
 local LOWER_TIME = 0.3
 local CARRY_IN = 0.25 -- seconds to take the cargo into the arms
 local CARRY_OUT = 0.3
-local NPC_RANGE = 180 -- people farther from the camera than this are not posed
+local NPC_RANGE = 180 -- people (5.9.2: and other players) farther from the camera than this are not posed
+local RIG_REFRESH = 2 -- 5.9.2: seconds a character's joints are kept before they are looked up again …
+local RIG_RETRY = 0.5 -- … or this, while some are missing (a body still loading)
 local blends: { [Model]: number } = {}
 -- The carry pose per character: how far in (0..1) and what is held (kept while it blends out).
 type Carry = { t: number, kind: string }
@@ -123,6 +130,61 @@ end
 
 local function jointIn(character: Model, partName: string, jointName: string): any
 	return Joints.find(character:FindFirstChild(partName), jointName)
+end
+
+-- 5.9.2: a character's joints, looked up once: kind "r15" (the arms and the waist), "r6" (rs / ls: the shoulders) or
+-- "none". Looked up again after RIG_REFRESH seconds (Roblox may swap a fresh body's Motor6Ds for AnimationConstraints),
+-- RIG_RETRY while some are missing, and at once when one of them left the body.
+type Rig = { kind: string, rs: any, re: any, rw: any, ls: any, le: any, lw: any, waist: any, expires: number }
+local rigs: { [Model]: Rig } = {}
+
+local function gone(joint: any): boolean
+	return joint ~= nil and joint.Parent == nil
+end
+
+local function intact(rig: Rig): boolean
+	return not (gone(rig.rs) or gone(rig.re) or gone(rig.rw) or gone(rig.ls) or gone(rig.le) or gone(rig.lw) or gone(rig.waist))
+end
+
+local function rigOf(character: Model): Rig
+	local now = os.clock()
+	local rig = rigs[character]
+	if rig and now < rig.expires and intact(rig) then
+		return rig
+	end
+	local made: Rig
+	if character:FindFirstChild("UpperTorso") then
+		made = {
+			kind = "r15",
+			rs = jointIn(character, "RightUpperArm", "RightShoulder"),
+			re = jointIn(character, "RightLowerArm", "RightElbow"),
+			rw = jointIn(character, "RightHand", "RightWrist"),
+			ls = jointIn(character, "LeftUpperArm", "LeftShoulder"),
+			le = jointIn(character, "LeftLowerArm", "LeftElbow"),
+			lw = jointIn(character, "LeftHand", "LeftWrist"),
+			waist = jointIn(character, "UpperTorso", "Waist"),
+			expires = 0,
+		}
+	else
+		local torso = character:FindFirstChild("Torso")
+		made = {
+			kind = if torso then "r6" else "none",
+			rs = Joints.find(torso, "Right Shoulder"),
+			re = nil,
+			rw = nil,
+			ls = Joints.find(torso, "Left Shoulder"),
+			le = nil,
+			lw = nil,
+			waist = nil,
+			expires = 0,
+		}
+	end
+	local complete = if made.kind == "r15" then made.rs and made.re and made.rw and made.ls and made.le and made.lw and made.waist
+		elseif made.kind == "r6" then made.rs and made.ls
+		else nil
+	made.expires = now + (if complete then RIG_REFRESH else RIG_RETRY)
+	rigs[character] = made
+	return made
 end
 
 -- The carry poses (R15). Per kind: how far the upper arms come forward, the elbow bend that brings the forearms
@@ -252,20 +314,20 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 	local c: ArmGoals = carryGoals(if carryT > 0 then kind else nil)
 	local sw = swing or NO_SWING
 	local shape = if sw.t > 0 then SWINGS[sw.kind] or SWINGS.punch else nil
-	if character:FindFirstChild("UpperTorso") then
+	local rig = rigOf(character)
+	if rig.kind == "r15" then
 		-- R15: an arm hangs down (-Y); turning about X lifts it forward (-Z), about Y swings it in or out.
 		local w: ArmGoals = if shape then shape.wind else {}
 		local h: ArmGoals = if shape then shape.hit else {}
-		lay(jointIn(character, "RightUpperArm", "RightShoulder"), CFrame.Angles(0, math.rad(8), 0) * CFrame.Angles(up, 0, 0), aimT, c.rs, carryT, between(w.rs, h.rs, sw.k), sw.t, g.rs, gt)
-		lay(jointIn(character, "RightLowerArm", "RightElbow"), CFrame.Angles(kick * 0.08, 0, 0), aimT, c.re, carryT, between(w.re, h.re, sw.k), sw.t, g.re, gt)
-		lay(jointIn(character, "RightHand", "RightWrist"), CFrame.identity, aimT, c.rw, carryT, between(w.rw, h.rw, sw.k), sw.t, g.rw, gt)
-		lay(jointIn(character, "LeftUpperArm", "LeftShoulder"), CFrame.Angles(0, math.rad(-38), 0) * CFrame.Angles(up - math.rad(8), 0, 0), aimT, c.ls, carryT, nil, 0, g.ls, gt)
-		lay(jointIn(character, "LeftLowerArm", "LeftElbow"), CFrame.Angles(math.rad(12), 0, 0), aimT, c.le, carryT, nil, 0, g.le, gt)
-		lay(jointIn(character, "LeftHand", "LeftWrist"), CFrame.identity, aimT, c.lw, carryT, nil, 0, g.lw, gt)
+		lay(rig.rs, CFrame.Angles(0, math.rad(8), 0) * CFrame.Angles(up, 0, 0), aimT, c.rs, carryT, between(w.rs, h.rs, sw.k), sw.t, g.rs, gt)
+		lay(rig.re, CFrame.Angles(kick * 0.08, 0, 0), aimT, c.re, carryT, between(w.re, h.re, sw.k), sw.t, g.re, gt)
+		lay(rig.rw, CFrame.identity, aimT, c.rw, carryT, between(w.rw, h.rw, sw.k), sw.t, g.rw, gt)
+		lay(rig.ls, CFrame.Angles(0, math.rad(-38), 0) * CFrame.Angles(up - math.rad(8), 0, 0), aimT, c.ls, carryT, nil, 0, g.ls, gt)
+		lay(rig.le, CFrame.Angles(math.rad(12), 0, 0), aimT, c.le, carryT, nil, 0, g.le, gt)
+		lay(rig.lw, CFrame.identity, aimT, c.lw, carryT, nil, 0, g.lw, gt)
 		return
 	end
-	local torso = character:FindFirstChild("Torso")
-	if torso then
+	if rig.kind == "r6" then
 		-- R6: the shoulders swing about their Z axis (mirrored on the left); no elbows, so the arms come well forward.
 		local lead = kind == "horse"
 		local rightCarry = if carryT > 0 then CFrame.Angles(0, 0, math.rad(if lead then 25 else 75)) else nil
@@ -273,8 +335,8 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 		local rightSwing = if shape then CFrame.Angles(0, 0, shape.r6Wind + (shape.r6Hit - shape.r6Wind) * sw.k) else nil
 		local r6Right = if gesture and gesture.r6Right then CFrame.Angles(0, 0, gesture.r6Right) else nil
 		local r6Left = if gesture and gesture.r6Left then CFrame.Angles(0, 0, -gesture.r6Left) else nil
-		lay(Joints.find(torso, "Right Shoulder"), CFrame.Angles(0, 0, up), aimT, rightCarry, carryT, rightSwing, sw.t, r6Right, gt)
-		lay(Joints.find(torso, "Left Shoulder"), CFrame.Angles(0, 0, -(up - math.rad(10))), aimT, leftCarry, carryT, nil, 0, r6Left, gt)
+		lay(rig.rs, CFrame.Angles(0, 0, up), aimT, rightCarry, carryT, rightSwing, sw.t, r6Right, gt)
+		lay(rig.ls, CFrame.Angles(0, 0, -(up - math.rad(10))), aimT, leftCarry, carryT, nil, 0, r6Left, gt)
 	end
 end
 
@@ -349,10 +411,9 @@ local leans: { [Model]: Lean } = {}
 local LEAN_SPRINT = math.rad(9) -- forward at a full sprint
 local LEAN_BRAKE = math.rad(7) -- back while braking hard
 
-local function leanBody(character: Model, humanoid: Humanoid?, dt: number)
-	local waist = jointIn(character, "UpperTorso", "Waist")
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if not waist or not root or not root:IsA("BasePart") then
+local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, dt: number)
+	local waist = rigOf(character).waist
+	if not waist or not root then
 		return
 	end
 	local state = leans[character]
@@ -555,48 +616,123 @@ local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: bool
 	pose(character, ease(blend), math.clamp(pitch, -1.1, 1.1), ease(carryBlend), held, sw, gs)
 end
 
+-- 5.9.2: a character out of range: its arms and its waist given back to the animation (once).
+local function letGo(character: Model)
+	if blends[character] or carries[character] or swung[character] or gestured[character] then
+		pose(character, 0, 0, 0, nil)
+		blends[character] = nil
+		carries[character] = nil
+		swung[character] = nil
+		gestured[character] = nil
+	end
+	if leans[character] then
+		leans[character] = nil
+		local rig = rigs[character]
+		if rig and rig.waist and written[rig.waist] then
+			layer(rig.waist, nil)
+		end
+	end
+end
+
+-- 5.9.2: the people of the world who carry something or gesture (or still blend out of it), from their attributes.
+local npcActive: { [Model]: boolean } = {}
+local npcHooks: { [Instance]: RBXScriptConnection } = {}
+local npcFolder: Instance? = nil
+
+local function npcCheck(model: Model)
+	if carryingOf(model) or model:GetAttribute("GestureAt") ~= nil then
+		npcActive[model] = true
+	end
+end
+
+local function watchNpcs(folder: Instance)
+	if npcFolder == folder then
+		return
+	end
+	npcFolder = folder
+	local function add(child: Instance)
+		if not child:IsA("Model") or npcHooks[child] then
+			return
+		end
+		local model = child
+		npcHooks[model] = model.AttributeChanged:Connect(function(name: string)
+			if name == "Carrying" or name == "PhoneHeld" or name == "GestureAt" or name == "Gesture" then
+				npcCheck(model)
+			end
+		end)
+		npcCheck(model)
+	end
+	for _, child in folder:GetChildren() do
+		add(child)
+	end
+	folder.ChildAdded:Connect(add)
+	folder.ChildRemoved:Connect(function(child: Instance)
+		local hook = npcHooks[child]
+		if hook then
+			hook:Disconnect()
+			npcHooks[child] = nil
+		end
+		if child:IsA("Model") then
+			npcActive[child] = nil
+		end
+	end)
+end
+
 local function step(dt: number)
 	local me = Players.LocalPlayer
-	for _, player in Players:GetPlayers() do
+	local camera = workspace.CurrentCamera
+	local eye = if camera then camera.CFrame.Position else nil
+	for _, player in Bodies.players() do
 		local character = player.Character
 		if not character then
 			continue
 		end
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local mine = player == me
+		local humanoid, root = Bodies.of(character)
+		-- (5.9.2: the far ones are left to the animation; yours never)
+		if not mine and eye and (not root or (root.Position - eye).Magnitude > NPC_RANGE) then
+			letGo(character)
+			continue
+		end
 		local aiming: boolean, pitch: number
-		if player == me then
+		if mine then
 			aiming, pitch = CameraRig.aimPose()
 		else
 			aiming = character:GetAttribute("Aiming") == true
 			local p = character:GetAttribute("AimPitch")
 			pitch = if type(p) == "number" then p else 0
 		end
-		if aiming and player == me and humanoid and humanoid.Health > 0 and not humanoid.Sit then
+		if aiming and mine and humanoid and humanoid.Health > 0 and not humanoid.Sit then
 			report(character)
 		end
-		if character:FindFirstChild("UpperTorso") then
-			leanBody(character, humanoid, dt)
+		if rigOf(character).kind == "r15" then
+			leanBody(character, humanoid, root, dt)
 		end
 		-- Yours come up slower out of a sprint (CameraRig decides); the others' at the normal pace.
-		local raise = if player == me then math.max(0.1, CameraRig.raiseTime() - 0.05) else RAISE_TIME
+		local raise = if mine then math.max(0.1, CameraRig.raiseTime() - 0.05) else RAISE_TIME
 		-- 3.9: the holster (yours as you just chose it) and the melee swing.
-		local holstered = if player == me then Holster.holstered() else character:GetAttribute("Holstered") == true
-		poseCharacter(character, humanoid, aiming, pitch, raise, dt, holstered, swingOf(character, player == me), gestureOf(character))
+		local holstered = if mine then Holster.holstered() else character:GetAttribute("Holstered") == true
+		poseCharacter(character, humanoid, aiming, pitch, raise, dt, holstered, swingOf(character, mine), gestureOf(character))
 	end
-	-- The people of the world (givers, receivers) carry too.
-	local npcs = workspace:FindFirstChild("Npcs")
-	local camera = workspace.CurrentCamera
-	if npcs and camera then
-		local eye = camera.CFrame.Position
-		for _, model in npcs:GetChildren() do
-			-- (5.7: or in a gesture: a receiver waving, reaching for the piece)
-			if not model:IsA("Model") or (not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil) then
+	-- The people of the world (givers, receivers) carry too (5.9.2: only the ones that do, or gesture).
+	if eye then
+		for model in npcActive do
+			if not model.Parent then
+				npcActive[model] = nil
 				continue
 			end
-			local root = model:FindFirstChild("HumanoidRootPart")
-			if root and root:IsA("BasePart") and (root.Position - eye).Magnitude <= NPC_RANGE then
-				poseCharacter(model, model:FindFirstChildOfClass("Humanoid"), false, 0, RAISE_TIME, dt, nil, nil, gestureOf(model))
+			local humanoid, root = Bodies.of(model)
+			if root and (root.Position - eye).Magnitude <= NPC_RANGE then
+				poseCharacter(model, humanoid, false, 0, RAISE_TIME, dt, nil, nil, gestureOf(model))
 			end
+			if not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil then
+				npcActive[model] = nil
+			end
+		end
+	end
+	for character in rigs do
+		if not character.Parent then
+			rigs[character] = nil
 		end
 	end
 	for character in carries do
@@ -660,6 +796,16 @@ function ArmPose.start()
 	-- PreSimulation runs after the Animator and before the engine applies the joints: what is written here is what
 	-- this client shows (a write in RenderStepped or Heartbeat would be overwritten by the next animation step).
 	RunService.PreSimulation:Connect(step)
+	-- 5.9.2: the people of the world, followed from their folder (made by the server, maybe later)
+	local folder = workspace:FindFirstChild("Npcs")
+	if folder then
+		watchNpcs(folder)
+	end
+	workspace.ChildAdded:Connect(function(child: Instance)
+		if child.Name == "Npcs" then
+			watchNpcs(child)
+		end
+	end)
 end
 
 return ArmPose

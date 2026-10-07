@@ -2,15 +2,17 @@
 -- 5.7, the world's moving lights, only on this client (started by client/Weather.luau):
 --   * The night lights: server/DayNight.luau only turns the workspace attribute "Night"; here every part tagged
 --     "NightLight" (the street lamps, the lit windows, the cars' lights …) is restyled: Neon in its LitColor at night,
---     its DimColor and DimMaterial by day, its lights on and off. A dusk or a dawn restyles Config.LivingCity.Lights
---     RestylePerFrame parts a frame (no hitch); a light that streams in or is registered later takes the state at once;
---     a light whose tag is taken away (a wrecked car) goes dark.
+--     its DimColor and DimMaterial by day, its lights on and off. A dusk or a dawn restyles the lights near the camera
+--     first (within Config.LivingCity.Lights RestyleNear: RestyleNearPerFrame a frame), then the far ones lazily
+--     (RestyleFarPerFrame a frame), so it never stutters; a light that streams in or is registered later takes the
+--     state at once; a light whose tag is taken away (a wrecked car) goes dark.
 --   * The clock: the server sends it once a second (the workspace attributes ClockHour and ClockRate); here it runs
---     smoothly in between (Lighting.ClockTime every frame), so the sun and the night look never step.
+--     smoothly in between, Lighting.ClockTime written only when it moved Config.LivingCity.Clock Step hours (5.9.2:
+--     every write re-lights and re-shadows the world; 0.01 h is a fraction of a degree of the sun, never a visible jump).
 --   * The lighthouse's two beams sweep round at night (the parts tagged "LighthouseBeam": their Hub and Beam
 --     attributes), the radio mast's beacon blinks ("RadioBeacon").
 --   * A few broken street lamps ("BrokenLamp") flicker at night, the red flares on the streets ("Flare") burn
---     unsteadily, only within FlickerRange of the camera.
+--     unsteadily, only within FlickerRange of the camera (each flare's light looked up once).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -82,13 +84,10 @@ local function darken(item: Instance)
 end
 
 -- A tagged set kept as a list (added and removed with the tag, streaming included).
-local function watch(tag: string, list: { Instance }, added: ((Instance) -> ())?)
+local function watch(tag: string, list: { Instance }, removed: ((Instance) -> ())?)
 	local function add(item: Instance)
 		if not table.find(list, item) then
 			table.insert(list, item)
-		end
-		if added then
-			added(item)
 		end
 	end
 	for _, item in CollectionService:GetTagged(tag) do
@@ -100,19 +99,47 @@ local function watch(tag: string, list: { Instance }, added: ((Instance) -> ())?
 		if at then
 			table.remove(list, at)
 		end
+		if removed then
+			removed(item)
+		end
 	end)
 end
 
 -- ── The night lights ───────────────────────────────────────────────────────
 
+-- Where a night light is (a light: its part's place), or nil.
+local function placeOf(item: Instance): Vector3?
+	if item:IsA("BasePart") then
+		return item.Position
+	end
+	local parent = item.Parent
+	if parent and parent:IsA("BasePart") then
+		return parent.Position
+	end
+	return nil
+end
+
 local function startRestyle()
-	local queue: { Instance } = {}
-	local cursor = 1
+	-- 5.9.2: two queues, the lights near the camera first (a few a frame), then the far ones (fewer a frame).
+	local near: { Instance } = {}
+	local far: { Instance } = {}
+	local nearAt, farAt = 1, 1
 	local state = nightNow()
 	local function restart()
 		state = nightNow()
-		queue = CollectionService:GetTagged(NIGHT_TAG)
-		cursor = 1
+		near, far = {}, {}
+		nearAt, farAt = 1, 1
+		local camera = workspace.CurrentCamera
+		local eye = if camera then camera.CFrame.Position else nil
+		local range = Tuning.RestyleNear
+		for _, item in CollectionService:GetTagged(NIGHT_TAG) do
+			local at = if eye then placeOf(item) else nil
+			if at and eye and (at - eye).Magnitude <= range then
+				table.insert(near, item)
+			else
+				table.insert(far, item)
+			end
+		end
 	end
 	restart()
 	workspace:GetAttributeChangedSignal("Night"):Connect(restart)
@@ -120,19 +147,23 @@ local function startRestyle()
 		apply(item, nightNow())
 	end)
 	CollectionService:GetInstanceRemovedSignal(NIGHT_TAG):Connect(darken)
-	RunService.Heartbeat:Connect(function()
-		if cursor > #queue then
-			return
-		end
-		local last = math.min(#queue, cursor + Tuning.RestylePerFrame - 1)
-		for n = cursor, last do
+	local function run(queue: { Instance }, from: number, count: number): number
+		local last = math.min(#queue, from + count - 1)
+		for n = from, last do
 			local item = queue[n]
 			-- (one that left in the meantime, or lost its tag, is skipped)
 			if item.Parent and CollectionService:HasTag(item, NIGHT_TAG) then
 				pcall(apply, item, state)
 			end
 		end
-		cursor = last + 1
+		return last + 1
+	end
+	RunService.Heartbeat:Connect(function()
+		if nearAt <= #near then
+			nearAt = run(near, nearAt, Tuning.RestyleNearPerFrame)
+		elseif farAt <= #far then
+			farAt = run(far, farAt, Tuning.RestyleFarPerFrame)
+		end
 	end)
 end
 
@@ -158,7 +189,9 @@ local function startClock()
 		end
 		-- Runs on from the last time the server sent it (never more than a few seconds ahead: a lost update waits).
 		local now = (hour + rate * math.min(os.clock() - baseAt, 3)) % 24
-		if math.abs(Lighting.ClockTime - now) > 1e-4 then
+		-- 5.9.2: written only when it moved a step (either way round the clock; a jump back is written at once too).
+		local moved = math.abs(Lighting.ClockTime - now)
+		if math.min(moved, 24 - moved) >= Config.LivingCity.Clock.Step then
 			Lighting.ClockTime = now
 		end
 	end)
@@ -171,10 +204,13 @@ local function startMoving()
 	local beacons: { Instance } = {}
 	local broken: { Instance } = {}
 	local flares: { Instance } = {}
+	local flareLights: { [Instance]: PointLight? } = {} -- 5.9.2: each flare's light, looked up once
 	watch("LighthouseBeam", beams)
 	watch("RadioBeacon", beacons)
 	watch("BrokenLamp", broken)
-	watch("Flare", flares)
+	watch("Flare", flares, function(item)
+		flareLights[item] = nil
+	end)
 	local angle = 0
 	local blinkClock, flickerClock = 0, 0
 	local beaconOn = true
@@ -246,7 +282,11 @@ local function startMoving()
 		if night then
 			for _, flare in flares do
 				if flare:IsA("BasePart") and (flare.Position - eye).Magnitude < range then
-					local light = flare:FindFirstChildOfClass("PointLight")
+					local light: PointLight? = flareLights[flare]
+					if not light or light.Parent ~= flare then
+						light = flare:FindFirstChildOfClass("PointLight")
+						flareLights[flare] = light
+					end
 					if light then
 						light.Brightness = 1.1 + rand:NextNumber() * 0.9
 					end

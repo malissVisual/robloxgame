@@ -16,6 +16,10 @@
 --     and greys, or a fog closes in; it all blends in and out over Config.LivingCity.Weather Fade seconds. A mist rises
 --     over the river at night, at dawn and in the fog; sun rays at dawn under a clear sky. And it starts
 --     client/WorldFx.luau (the night lights, the clock, the lighthouse and the beacon, the broken lamps).
+--   * 5.9.2, cheaper: the rain (and the snow) follow your graphics quality (Roblox's quality slider, read now and
+--     then): the rain at most RAIN_ALIVE drops alive at the top quality, fewer below; the river's mist and the sun
+--     rays only from MEDIUM_QUALITY up. The wet roads have two looks (dry / wet) and only the ones within WET_RANGE of
+--     the camera are wetted, looked at every WET_EVERY seconds (and as the weather turns).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -94,10 +98,41 @@ local WINTER_HAZE_DAY = Color3.fromRGB(220, 230, 240)
 local WINTER_HAZE_NIGHT = Color3.fromRGB(110, 122, 150)
 local WINTER_DENSITY = 0.12 -- added to the density in the snow
 local WET_HAZE = Color3.fromRGB(128, 134, 140) -- the air in the rain and the fog
-local WET_STEP = 0.02 -- the roads' reflectance changes in these steps (all of them at once)
+local WET_RANGE = 400 -- 5.9.2: the roads within this of the camera shine wet …
+local WET_EVERY = 3 -- … looked at every this many seconds
+local QUALITY_EVERY = 2 -- 5.9.2: seconds between looks at the graphics quality
+local RAIN_ALIVE = 300 -- raindrops alive at most at the top quality (fewer below)
+local MEDIUM_QUALITY = 4 -- the river's mist and the sun rays from this quality (1 … 10) up
+local AUTO_QUALITY = 6 -- the quality assumed when Roblox picks it itself (no number to read)
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
+end
+
+-- 5.9.2: the graphics quality, 1 … 10: your saved slider, else the rendering's level, else AUTO_QUALITY.
+local function qualityNow(): number
+	local level = AUTO_QUALITY
+	pcall(function()
+		local saved = UserSettings().GameSettings.SavedQualityLevel
+		if saved ~= Enum.SavedQualitySetting.Automatic then
+			level = saved.Value
+			return
+		end
+		local rendering = settings().Rendering.QualityLevel
+		if rendering ~= Enum.QualityLevel.Automatic then
+			level = math.ceil(rendering.Value / 2.1) -- (Level01 … Level21)
+		end
+	end)
+	return math.clamp(level, 1, 10)
+end
+
+-- 5.9.2: the flat distance from (x, z) to a road part's top (its box, turned with it).
+local function roadDistance(road: BasePart, eye: Vector3): number
+	local at = road.CFrame:PointToObjectSpace(eye)
+	local half = road.Size / 2
+	local dx = math.max(math.abs(at.X) - half.X, 0)
+	local dz = math.max(math.abs(at.Z) - half.Z, 0)
+	return math.sqrt(dx * dx + dz * dz)
 end
 
 -- 0 … 1: how much "in town" the point is (1 inside a district's edge roads, fading to 0 CITY_FADE studs out).
@@ -233,15 +268,17 @@ function Weather.start()
 	rays.Enabled = false
 	rays.Parent = Lighting
 	local wet: WeatherPlan.Look = WeatherPlan.look("clear")
-	local wetShown = -1 -- the roads' reflectance written last
+	local wetShown = 0 -- the roads' reflectance now (0 dry, else the wet look's)
+	local wetLevel = 0 -- 5.9.2: the wet look's reflectance (the last rain's or fog's)
+	local wetClock = WET_EVERY -- (looked at on the first tick)
+	local wetRoads: { [BasePart]: boolean } = {} -- the roads shown wet
+	local quality = qualityNow()
+	local qualityClock = 0
 	local lastWet = -1
 	local roads: { BasePart } = {}
 	local function addRoad(item: Instance)
 		if item:IsA("BasePart") then
-			table.insert(roads, item)
-			if wetShown > 0 then
-				item.Reflectance = wetShown
-			end
+			table.insert(roads, item) -- (wetted at the next look when it is near)
 		end
 	end
 	for _, item in CollectionService:GetTagged("WetRoad") do
@@ -252,10 +289,26 @@ function Weather.start()
 		for n, road in roads do
 			if road == item then
 				table.remove(roads, n)
+				wetRoads[road] = nil
 				break
 			end
 		end
 	end)
+	-- 5.9.2: the roads near the camera wet (shine > 0) or dry, the far ones dry.
+	local function wetten(shine: number, eye: Vector3)
+		for _, road in roads do
+			local want = shine > 0 and roadDistance(road, eye) <= WET_RANGE
+			if want then
+				if road.Reflectance ~= shine then
+					road.Reflectance = shine
+				end
+				wetRoads[road] = true
+			elseif wetRoads[road] then
+				wetRoads[road] = nil
+				road.Reflectance = 0
+			end
+		end
+	end
 	local function weatherNow(): string
 		local state = workspace:GetAttribute("Weather")
 		return if type(state) == "string" then state else "clear"
@@ -354,9 +407,11 @@ function Weather.start()
 		end
 		-- Snow on, off.
 		local inWinter = Map.isWinter(position.X, position.Z)
-		-- 5.7: in the winter a rain falls as more snow.
-		local snowRate = if inWinter then 400 + 500 * wet.rain else 0
-		local rainRate = if inWinter then 0 else tuning.RainRate * wet.rain
+		-- 5.7: in the winter a rain falls as more snow. 5.9.2: both thinner at a lower graphics quality, the rain never
+		-- more than RAIN_ALIVE drops alive (scaled the same way; a drop lives rain.Lifetime).
+		local scale = math.clamp(quality / 8, 0.3, 1)
+		local snowRate = if inWinter then (400 + 500 * wet.rain) * scale else 0
+		local rainRate = if inWinter then 0 else math.min(tuning.RainRate * wet.rain, RAIN_ALIVE / 0.8) * scale
 		if snow.Rate ~= snowRate then
 			snow.Rate = snowRate
 		end
@@ -374,26 +429,37 @@ function Weather.start()
 			local hour = Lighting.ClockTime
 			local nightF = Map.nightFactor(hour)
 			applyLook(nightF)
-			-- The roads shine in the rain (in steps, all of them at once).
-			local shine = math.floor(wet.reflect / WET_STEP + 0.5) * WET_STEP
-			if shine ~= wetShown then
-				wetShown = shine
-				for _, road in roads do
-					road.Reflectance = shine
-				end
+			-- The roads shine in the rain (5.9.2: dry or wet, wet past half way to the wet look; near the camera only).
+			local goal = WeatherPlan.look(weatherNow()).reflect
+			if goal > 0 then
+				wetLevel = goal
 			end
+			local shine = if wetLevel > 0 and wet.reflect >= wetLevel * 0.5 then wetLevel else 0
+			wetClock += LOOK_EVERY
+			if shine ~= wetShown or (shine > 0 and wetClock >= WET_EVERY) then
+				wetShown = shine
+				wetClock = 0
+				wetten(shine, position)
+			end
+			-- 5.9.2: the graphics quality, now and then
+			qualityClock += LOOK_EVERY
+			if qualityClock >= QUALITY_EVERY then
+				qualityClock = 0
+				quality = qualityNow()
+			end
+			local fancy = quality >= MEDIUM_QUALITY
 			-- The river's mist: at night, at dawn and in the fog, near the river.
 			local dawn = math.clamp(1 - math.abs(hour - 7) / 1.6, 0, 1)
 			local riverX = (Map.River.x0 + Map.River.x1) / 2
 			local nearRiver = math.abs(position.X - riverX) < tuning.MistRange
-			local mistAmount = if nearRiver then math.max(nightF * 0.6, dawn, math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1)) else 0
+			local mistAmount = if nearRiver and fancy then math.max(nightF * 0.6, dawn, math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1)) else 0
 			mist.Rate = 7 * mistAmount
 			if mistAmount > 0 then
 				local b = Map.Bounds
 				mistPart.CFrame = CFrame.new(riverX, Map.WaterLevel + 1.5, math.clamp(position.Z, b.z0 + 160, b.z1 - 160))
 			end
 			-- Sun rays at dawn under a clear sky.
-			local intensity = tuning.SunRays * dawn * wet.rays
+			local intensity = if fancy then tuning.SunRays * dawn * wet.rays else 0
 			rays.Enabled = intensity > 0.002
 			rays.Intensity = intensity
 		end

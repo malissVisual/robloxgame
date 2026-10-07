@@ -3424,12 +3424,15 @@ Config.LivingCity = {
 		BoardedShare = 0.3, -- a tower's street wall has a boarded shopfront this often
 	},
 	Lights = {
-		RestylePerFrame = 240, -- night lights restyled per frame on a client when the night turns (no hitch)
+		RestyleNear = 400, -- 5.9.2: when the night turns, the night lights within this of the camera are restyled first …
+		RestyleNearPerFrame = 60, -- … this many a frame (no hitch)
+		RestyleFarPerFrame = 40, -- … then the far ones, this many a frame
 		BrokenShare = 0.07, -- the street lamps that flicker at night
 		FlickerRange = 320, -- they flicker only this close to the camera
 	},
 	Clock = {
 		SendEvery = 1, -- seconds between the clock's replications (every client runs it smoothly in between)
+		Step = 0.01, -- 5.9.2: hours; a client writes Lighting.ClockTime only when it moved this much (each write re-lights)
 	},
 	Weather = {
 		CheckEvery = 75, -- seconds between the server's rolls for a change in clear weather

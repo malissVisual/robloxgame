@@ -265,17 +265,46 @@ local function driverFree(car: Model): boolean
 	return seat ~= nil and seat:IsA("VehicleSeat") and seat.Occupant == nil and seat:GetAttribute("Reserved") == nil
 end
 
+-- 5.9.2: every car, one list kept and built again only when a car comes or goes (no new table every frame).
+local CAR_FOLDERS = { "Cars", "BanditCars" }
+local carList: { Instance } = {}
+local carFolders: { [string]: Instance } = {}
+local carListDirty = true
+
 local function allCars(): { Instance }
-	local list = {}
-	for _, name in { "Cars", "BanditCars" } do
+	for _, name in CAR_FOLDERS do
+		local known = carFolders[name]
+		if known and known.Parent == workspace then
+			continue
+		end
 		local folder = workspace:FindFirstChild(name)
-		if folder then
-			for _, car in folder:GetChildren() do
-				table.insert(list, car)
+		if folder ~= known then
+			carListDirty = true
+			if folder then
+				carFolders[name] = folder
+				local function changed()
+					carListDirty = true
+				end
+				folder.ChildAdded:Connect(changed)
+				folder.ChildRemoved:Connect(changed)
+			else
+				carFolders[name] = nil
 			end
 		end
 	end
-	return list
+	if carListDirty then
+		carListDirty = false
+		table.clear(carList)
+		for _, name in CAR_FOLDERS do
+			local folder = carFolders[name]
+			if folder then
+				for _, car in folder:GetChildren() do
+					table.insert(carList, car)
+				end
+			end
+		end
+	end
+	return carList
 end
 
 local function step(dt: number)
