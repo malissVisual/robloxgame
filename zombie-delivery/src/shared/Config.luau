@@ -3181,10 +3181,28 @@ Config.Hand = {
 }
 
 -- 6.1, the key hints under the HUD's top buttons (client/KeyHints.luau): a quiet strip of what the keys do now.
+-- 6.5: only the keys of the moment (the hands, E, G, X; the driving keys in a seat), folded to "? KEYS [F1]" after the
+-- first two deliveries.
 Config.KeyHints = {
-	OpenUnder = 5, -- deliveries: a courier with fewer starts with the strip open (else folded to its KEYS chip)
+	OpenUnder = 2, -- deliveries: a courier with fewer starts with the strip open (else folded to its KEYS chip; 5 before 6.5)
 	TextSize = 12,
 	Check = 0.25, -- seconds between the looks at what to show
+}
+
+-- 6.5, the NEXT card and the way to it (the owner: "When I join I don't know what to do. I can't find my way in
+-- anything"): shared/Goal.luau picks the words, client/Objective.luau shows the card at the top left of the contract
+-- column, client/Hud.luau the marker in the world (the beam and the waypoint; with no job the job board's).
+Config.Goal = {
+	ResultShown = 8, -- seconds the card says "Delivered! +$45" after a result (while no new job came)
+	BoardSpot = { -18, -25 }, -- the depot's job board (server/World.luau buildDepot), studs from the depot's centre
+	BoardNear = 9, -- studs: closer than this the board's marker hides (you are at it)
+	BeamHeight = 320, -- studs: the light over the goal (4.4.1: 240)
+	BeamWide = 1.6, -- studs: its width over the park circle (1.2 before)
+	BeamThin = 0.6, -- over the pile / the person / the board (0.5 before)
+	BeamAlpha = 0.35, -- its transparency at the bottom (0.6 before): brighter
+	PinTextSize = 18, -- the waypoint's words "TONY'S PIZZA · 120 m" (14 before)
+	TitleSize = 22, -- the card's title
+	PlaceMax = 250, -- px at scale 1: the card's place line at its widest (the distance follows it)
 }
 
 export type JobTypeDef = {
