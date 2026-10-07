@@ -4048,7 +4048,10 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 		local knock, hit = Cargo.footKnock(job.cargo, now)
 		local share = JobRules.knockLoss(knock, false)
 		if share > 0 then
-			job.condition = math.max(0, job.condition - share)
+			-- (6.4 review: on a free run of several orders only the orders hit lose it, as loseCondition does)
+			if not job.free then
+				job.condition = math.max(0, job.condition - share)
+			end
 			job.dirty = true
 			for id in hit do
 				local order = orderById(job, id)
@@ -4057,6 +4060,7 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 				end
 			end
 			notice:FireClient(player, `CAREFUL — FRAGILE! {if knock == "fall" then "That fall" else "That hit"} cost {math.floor(share * 100 + 0.5)}% of the cargo. A padded bag keeps it safe.`)
+			spotlessFailed(player, job) -- (6.4 review: a spotless mission fails at once, as after any other loss)
 		end
 	end
 	local rules = rulesNow(job)

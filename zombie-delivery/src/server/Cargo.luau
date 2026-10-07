@@ -318,6 +318,8 @@ export type Session = {
 	knockHealth: number,
 	knockTop: number,
 	knockAt: number,
+	knockAir: boolean?, -- 6.4 review: the last look found the feet off the ground (only a real fall lands)
+	knockPos: Vector3?, -- 6.4 review: where the body was then (a jump of more than KNOCK_TELEPORT is a teleport)
 }
 
 export type Status = {
@@ -1427,7 +1429,11 @@ local function packShown(session: Session)
 	local owner = session.owner
 	local on = session.info.foot == true and not session.ended
 	local count = if on then #session.pack else nil
-	local room = if on then math.max(0, (session.info.pack or 0) - (if bagHeld(session) or bagStays(session) then 0 else bagRoomOf(session))) else nil
+	-- (6.4 review: a bag worn on the back keeps its pieces with you but takes no pickups: only its filled places count)
+	local unheld = if bagHeld(session) then 0
+		elseif bagStays(session) then math.max(0, bagRoomOf(session) - bagCount(session))
+		else bagRoomOf(session)
+	local room = if on then math.max(0, (session.info.pack or 0) - unheld) else nil
 	local down = session.bagDown
 	local bag = if on then bagCount(session) + (if down then #down.pieces else 0) else nil
 	local bagRoom = if on then bagRoomOf(session) else nil
@@ -4150,12 +4156,21 @@ function Cargo.footKnock(session: Session, now: number): (string?, { [number]: n
 	local lost = session.knockHealth - humanoid.Health
 	session.knockHealth = humanoid.Health
 	local state = humanoid:GetState()
-	local held = humanoid.SeatPart ~= nil or character:GetAttribute("ZipLine") ~= nil
+	-- (6.4 review: also a zip line's climb down and anything that moves the body (PlatformStand), getting in or out)
+	local held = humanoid.SeatPart ~= nil or humanoid.PlatformStand or character:GetAttribute("ZipLine") ~= nil
+		or character:GetAttribute("ClimbLine") ~= nil or character:GetAttribute("BusOff") ~= nil
 		or state == Enum.HumanoidStateType.Climbing or state == Enum.HumanoidStateType.Swimming
 	local landed = not held and humanoid.FloorMaterial ~= Enum.Material.Air
 	local drop = session.knockTop - y
-	session.knockTop = if landed or held then y else math.max(session.knockTop, y)
-	local fell = if landed and drop > 0 then math.sqrt(2 * workspace.Gravity * drop) else 0
+	-- 6.4 review: a teleport (a tower's elevator pad, a PivotTo, a hitch) is no fall: more than this between two looks
+	-- (a 30-stud fall moves about 22 in one) forgets the height; and only a landing after a look in the air counts
+	local last = session.knockPos
+	local teleported = last ~= nil and (root.Position - last).Magnitude > 60
+	local wasAir = session.knockAir == true
+	session.knockPos = root.Position
+	session.knockAir = not landed and not held
+	session.knockTop = if landed or held or teleported then y else math.max(session.knockTop, y)
+	local fell = if landed and wasAir and not teleported and drop > 0 then math.sqrt(2 * workspace.Gravity * drop) else 0
 	local knock = JobRules.footKnock(fell, landed, lost)
 	if not knock or now < session.knockAt then
 		return nil, hit

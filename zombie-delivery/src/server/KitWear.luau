@@ -73,7 +73,7 @@ local BAG_BUSY: { [string]: boolean } = { Pushing = true, Hand = true }
 
 -- (6.0: `pivot` = the bag's part hung from the hand, removed with the slot)
 type Slot = { key: string, built: Builder.Built, parts: { [string]: BasePart }, sizes: { [string]: Vector3 }, pivot: BasePart? }
-type Wearer = { character: Model, slots: { [string]: Slot }, connections: { RBXScriptConnection }, sized: { [BasePart]: boolean } }
+type Wearer = { character: Model, slots: { [string]: Slot }, connections: { RBXScriptConnection }, sized: { [BasePart]: boolean }, hand: any? }
 
 local wearers: { [Player]: Wearer } = {}
 local wantPhone: { [Player]: boolean } = {} -- the phone window is open (what the client last said)
@@ -344,10 +344,14 @@ local function refresh(player: Player)
 	-- 6.4: the BagWorn attribute (every client: client/BagSway.luau's motion) and, when the bag moves between the
 	-- front and the back while you stand, BagSwitchAt (the server time: the bag's move) and the sling / unsling gesture
 	local wornBefore = character:GetAttribute("BagWorn")
+	-- (6.4 review: the gesture only for a change of hand (1 / 2 / 3, B), not a bike's or a trolley's let-go)
+	local handNow = character:GetAttribute("Hand")
+	local handChanged = wearer.hand ~= handNow
+	wearer.hand = handNow
 	if wornBefore ~= worn and character.Parent then
 		character:SetAttribute("BagWorn", worn)
 		local seated = humanoid ~= nil and (humanoid.Sit or humanoid.SeatPart ~= nil)
-		if type(wornBefore) == "string" and worn ~= nil and not seated then
+		if type(wornBefore) == "string" and worn ~= nil and not seated and handChanged then
 			character:SetAttribute("BagSwitchAt", workspace:GetServerTimeNow())
 			if worn == "back" then
 				Npcs.act(character, "sling")

@@ -538,7 +538,8 @@ local function tabs(parent: any, list: { { string } }, selected: string, onPick:
 	for _, entry in list do
 		table.insert(items, { id = entry[1], text = entry[2] })
 	end
-	local row = Ui.tabs(parent, items, onPick, { selected = selected, width = 120, height = 36, gap = 6 }).frame
+	-- (6.4 review: five tabs during a run (BAG, ITEMS, BAGS, CARS, GUNS) fit the window: narrower ones)
+	local row = Ui.tabs(parent, items, onPick, { selected = selected, width = if #list > 4 then 104 else 120, height = 36, gap = 6 }).frame
 	row.Size = UDim2.new(1, -12, 0, 36)
 	row.LayoutOrder = 0
 end

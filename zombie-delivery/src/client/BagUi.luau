@@ -79,7 +79,7 @@ function BagUi.bags(parent: Instance, state: any, order: number): number
 	n += 1
 	P.marker(head, 8, { Position = UDim2.fromOffset(16, 13) })
 	P.caps(head, "Your bags", UDim2.new(1, -46, 0, 18), { Position = UDim2.fromOffset(30, 8), TextColor3 = P.ink2, TextSize = 12, TextStrokeTransparency = 1 })
-	Ui.label(head, "Sprint with your deliveries: what rides in the bag in your hand (2) never stops the sprint. One bag at a time.", UDim2.new(1, -32, 0, 30), { Position = UDim2.fromOffset(16, 28), TextSize = 13, TextColor3 = P.ink2, Font = Theme.Font })
+	Ui.label(head, "Sprint with your deliveries. One bag at a time: USE picks it.", UDim2.new(1, -32, 0, 30), { Position = UDim2.fromOffset(16, 28), TextSize = 13, TextColor3 = P.ink2, Font = Theme.Font })
 	local missing = 0
 	for _, def in Config.Kit do
 		if not def.extra then

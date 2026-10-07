@@ -1162,6 +1162,12 @@ backpack) never does (it never sets the Carrying attribute: `client/CameraRig.lu
   steps (`Config.Courier.Wear`, `Bounce`, `BagSwing.bob`), on the back a soft bob (`BackBob`). In a seat a bag that
   stays sits on the back; a hand bag is put away.
 
+**6.4 review:** a fragile knock counts only a real fall (a look in the air, then a landing), never a teleport (an
+elevator pad, a PivotTo), a zip line's climb down or getting off a bus; on a run of several orders only the orders hit
+lose condition, and a spotless mission checks at once. With a bag worn on your back the shown room counts only its
+filled places (pickups need it in your hand). The I window's five tabs fit during a run; the sling gesture plays only
+for a change of hand.
+
 ## Scooters at the spawn, express buses, the bus map, the bag, English names (6.3)
 
 **The spawn's rack** (`Config.Rental.SpawnRack`, the first dock of `shared/RentalDocks.luau`): six ZDC RIDE scooters
