@@ -48,6 +48,7 @@ local InteractPose = require(Shared:WaitForChild("InteractPose"))
 local Net = require(Shared:WaitForChild("Net"))
 local Drive = require(script.Parent.Drive)
 local Interact = require(script.Parent.Interact)
+local Bodies = require(script.Parent.Bodies)
 
 local CarBoarding = {}
 
@@ -455,14 +456,14 @@ local function othersStep(dt: number)
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
 	local now = workspace:GetServerTimeNow()
 	local cfg = Config.Interact
-	for _, other in Players:GetPlayers() do
+	for _, other in Bodies.players() do
 		local character = other.Character
 		if other == player or not character then
 			continue
 		end
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		local root = humanoid and humanoid.RootPart
-		if not humanoid or not root or humanoid.Health <= 0 or (root.Position - eye).Magnitude > POSE_RANGE then
+		-- (5.9.2: the far ones skipped first, the body's parts looked up once)
+		local humanoid, root = Bodies.near(character, eye, POSE_RANGE)
+		if not humanoid or not root or humanoid.Health <= 0 then
 			Interact.release(character, OWNER)
 			continue
 		end

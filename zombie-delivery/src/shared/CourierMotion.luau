@@ -1,6 +1,7 @@
 --!strict
 -- One R15 animation family for every courier. Pure selection uses actual velocity and humanoid state;
--- server/CourierAvatar owns the Animator, while existing client arm/ride/interaction poses remain overlays.
+-- 5.9.2: the owning client picks the track (server/CharacterArt/Animate.client.luau, in the StarterCharacter that
+-- server/CourierAvatar installs), while existing client arm/ride/interaction poses remain overlays.
 local Motion = {}
 Motion.Tick = 0.1
 Motion.Fade = 0.18

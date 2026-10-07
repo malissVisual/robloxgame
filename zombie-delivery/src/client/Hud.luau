@@ -3889,66 +3889,71 @@ RunService.RenderStepped:Connect(function()
 
 	local touch = UserInputService.TouchEnabled
 	fire.Visible = touch
-	-- Which shop am I in?
-	local inShop: string? = nil
-	for id in Map.Shops do
-		if nearShop(id) and id ~= "depot" then
-			inShop = id
+	-- 5.9.2: the shop you are in, the backpack's cargo and the hint at most 10 times a second (view.hintAt), not every
+	-- frame.
+	if now >= (view.hintAt or 0) then
+		view.hintAt = now + 0.1
+		-- Which shop am I in?
+		local inShop: string? = nil
+		for id in Map.Shops do
+			if nearShop(id) and id ~= "depot" then
+				inShop = id
+			end
 		end
-	end
-	local root = myRoot()
-	local safe = root ~= nil and Map.isSafe(root.Position.X, root.Position.Z)
-	local holding = myCarrying()
-	if holding ~= lastHolding then
-		-- Picked up / put down: the backpack shows it, the consumables hide while you carry.
-		lastHolding = holding
-		hotbar.Visible = holding == nil
-		if backpack.frame.Visible then
-			renderBackpack()
+		local root = myRoot()
+		local safe = root ~= nil and Map.isSafe(root.Position.X, root.Position.Z)
+		local holding = myCarrying()
+		if holding ~= lastHolding then
+			-- Picked up / put down: the backpack shows it, the consumables hide while you carry.
+			lastHolding = holding
+			hotbar.Visible = holding == nil
+			if backpack.frame.Visible then
+				renderBackpack()
+			end
 		end
-	end
-	-- The hint: during a job its step (and how far this stop is), else what this place is about.
-	local step = if job and type(job.step) == "string" then job.step else ""
-	if job and step ~= "" then
-		local needed = tonumber(job.needed) or 0
-		local done = tonumber(job.delivered) or 0
-		local progress = if needed > 0 and job.handling ~= "drive" then `{math.min(done, needed)} of {needed} {if job.stage == "pickup" then "loaded" else "delivered"}` else ""
-		local hands = if holding == "horse" then "leading a horse: no gun, no sprint" elseif holding then "hands full: no gun, no sprint" else ""
-		setHint(step, if progress ~= "" and hands ~= "" then `{progress} · {hands}` else progress .. hands)
-	elseif holding then
-		-- G is the server's "Put down" / "Let go" prompt key (server/Cargo.luau); touch screens tap the prompt.
-		if holding == "horse" then
-			setHint("Leading a horse", `no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}`)
+		-- The hint: during a job its step (and how far this stop is), else what this place is about.
+		local step = if job and type(job.step) == "string" then job.step else ""
+		if job and step ~= "" then
+			local needed = tonumber(job.needed) or 0
+			local done = tonumber(job.delivered) or 0
+			local progress = if needed > 0 and job.handling ~= "drive" then `{math.min(done, needed)} of {needed} {if job.stage == "pickup" then "loaded" else "delivered"}` else ""
+			local hands = if holding == "horse" then "leading a horse: no gun, no sprint" elseif holding then "hands full: no gun, no sprint" else ""
+			setHint(step, if progress ~= "" and hands ~= "" then `{progress} · {hands}` else progress .. hands)
+		elseif holding then
+			-- G is the server's "Put down" / "Let go" prompt key (server/Cargo.luau); touch screens tap the prompt.
+			if holding == "horse" then
+				setHint("Leading a horse", `no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}`)
+			else
+				setHint("Load it or hand it over", `no gun, no sprint · {if touch then "tap PUT DOWN" else "G puts it down"} to shoot`, "E")
+			end
+		elseif inShop then
+			setHint(Map.Shops[inShop].name, "walk to the counter", "E")
+		elseif seatedIn and not driving then
+			local gun = if state then Economy.findWeapon(state.weapon) else nil
+			if touchLayout then
+				setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · tap the gun line for a pistol, revolver or SMG` else "FIRE shoots out of the window · EXIT gets out")
+			else
+				setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · T to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
+			end
+		elseif safe and not job then
+			setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
+		elseif not car and state and type(state.car) ~= "string" then
+			-- 5.0: no vehicle yet (the career starts on foot): the board, the backpack at Last Stop Supplies.
+			-- (with a backpack already: the phone says what to save up for next)
+			setHint("On foot", (if touchLayout then "the board on your phone" else "J for the board")
+				.. (if require(Shared.Transport).handsRoom(if type(state.kit) == "table" then state.kit else {}) > Config.Cargo.HandsMax then " · your phone says what's next" else " · Supplies for a backpack"), if touchLayout then nil else "J")
+		elseif not car then
+			setHint("No car out", if touchLayout then "PHONE → GARAGE calls it" else "Q → GARAGE calls it") -- 5.7
+		elseif not seatedIn and not job then
+			setHint("On foot", if touchLayout then "FIRE shoots · SPRINT runs · tap the prompt at your car's door" elseif touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
 		else
-			setHint("Load it or hand it over", `no gun, no sprint · {if touch then "tap PUT DOWN" else "G puts it down"} to shoot`, "E")
+			setHint("")
 		end
-	elseif inShop then
-		setHint(Map.Shops[inShop].name, "walk to the counter", "E")
-	elseif seatedIn and not driving then
-		local gun = if state then Economy.findWeapon(state.weapon) else nil
-		if touchLayout then
-			setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · tap the gun line for a pistol, revolver or SMG` else "FIRE shoots out of the window · EXIT gets out")
-		else
-			setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · T to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
-		end
-	elseif safe and not job then
-		setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
-	elseif not car and state and type(state.car) ~= "string" then
-		-- 5.0: no vehicle yet (the career starts on foot): the board, the backpack at Last Stop Supplies.
-		-- (with a backpack already: the phone says what to save up for next)
-		setHint("On foot", (if touchLayout then "the board on your phone" else "J for the board")
-			.. (if require(Shared.Transport).handsRoom(if type(state.kit) == "table" then state.kit else {}) > Config.Cargo.HandsMax then " · your phone says what's next" else " · Supplies for a backpack"), if touchLayout then nil else "J")
-	elseif not car then
-		setHint("No car out", if touchLayout then "PHONE → GARAGE calls it" else "Q → GARAGE calls it") -- 5.7
-	elseif not seatedIn and not job then
-		setHint("On foot", if touchLayout then "FIRE shoots · SPRINT runs · tap the prompt at your car's door" elseif touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
-	else
-		setHint("")
-	end
-	if inShop ~= lastShop then
-		lastShop = inShop
-		if shop.frame.Visible then
-			renderShop()
+		if inShop ~= lastShop then
+			lastShop = inShop
+			if shop.frame.Visible then
+				renderShop()
+			end
 		end
 	end
 

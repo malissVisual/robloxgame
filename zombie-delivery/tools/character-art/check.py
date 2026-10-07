@@ -37,6 +37,15 @@ return Mock""")
         avatar = avatar.replace("require(script.Parent.CharacterArt.Rig)", 'require("./Rig")')
         (tmp / "Avatar.luau").write_text(
             'local M=require("./mock")\nlocal game,Instance,Vector3,script,task,Enum=M.game,M.Instance,M.Vector3,M.script,M.task,M.Enum\n' + avatar)
+        # 5.9.2: the template's Animate LocalScript is the client's locomotion controller; run it per body.
+        animate = (ROOT / "src/server/CharacterArt/Animate.client.luau").read_text()
+        animate = animate.replace('require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CourierMotion"))', 'require("./CourierMotion")')
+        if 'require("./CourierMotion")' not in animate:
+            raise RuntimeError("Animate.client.luau: the CourierMotion require moved; update tools/character-art/check.py")
+        (tmp / "Animate.luau").write_text(
+            'local M=require("./mock")\nlocal Motion=require("./CourierMotion")\nreturn function(env)\n'
+            'local game,Instance,Vector3,script,Enum=env.game,M.Instance,M.Vector3,env.script,M.Enum\n'
+            + animate.replace('local Motion = require("./CourierMotion")', "") + "\nend\n")
         (tmp / "avatar-check.luau").write_text((HERE / "avatar-check.luau").read_text())
         result = subprocess.run([str(Path(luau).resolve()), "check.luau"], cwd=tmp, capture_output=True, text=True)
         if result.returncode:

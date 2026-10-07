@@ -39,6 +39,7 @@ local Net = require(Shared:WaitForChild("Net"))
 local ZipData = require(Shared:WaitForChild("ZipLines"))
 local Drive = require(script.Parent.Drive)
 local Interact = require(script.Parent.Interact)
+local Bodies = require(script.Parent.Bodies)
 
 local ZipRide = {}
 
@@ -50,7 +51,8 @@ local Tuning = Config.ZipLines
 local EASE_IN = 0.45 -- seconds to ease from where you stood onto the cable
 local OWNER = "climb" -- (client/Interact.luau)
 local LEAD = 0.15 -- the server's ZipAt is this long after the Zip (server/ZipLines.luau): the hands go up meanwhile
-local POSE_RANGE = 320 -- riders farther from the camera than this are left alone
+local POSE_RANGE = 320 -- riders farther from the camera than this are left alone (and their trolleys)
+local CLIMB_RANGE = 200 -- 5.9.2: the others' climbs (only the limbs) are posed within this of the camera
 local TROLLEY = Color3.fromRGB(40, 42, 46)
 local HANDLE = Color3.fromRGB(196, 52, 46)
 
@@ -394,10 +396,14 @@ end
 local function othersStep(dt: number, eye: Vector3)
 	local now = workspace:GetServerTimeNow()
 	local seen: { [Model]: boolean } = {}
-	for _, other in Players:GetPlayers() do
+	for _, other in Bodies.players() do
 		local character = other.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart")
-		if other == player or not character or not root or not root:IsA("BasePart") or (root.Position - eye).Magnitude > POSE_RANGE then
+		-- (5.9.2: the far ones skipped first, the body's parts looked up once)
+		if other == player or not character then
+			continue
+		end
+		local _, near = Bodies.near(character, eye, CLIMB_RANGE)
+		if not near then
 			continue
 		end
 		local line, which, up, at = climbOf(character)
@@ -445,17 +451,22 @@ function ZipRide.start()
 		othersStep(dt, eye)
 		local seen: { [Model]: boolean } = {}
 		local now = workspace:GetServerTimeNow()
-		for _, other in Players:GetPlayers() do
+		for _, other in Bodies.players() do
 			local character = other.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			if character and root and root:IsA("BasePart") and (root.Position - eye).Magnitude < POSE_RANGE then
-				local line, at = lineOf(character)
-				-- (over the end, or let go here: standing again, though the server clears the ride a moment later)
-				local over = at == nil or (line ~= nil and now - at > line.duration + 0.1) or (other == player and at == finished)
-				if line and at and not over then
-					seen[character] = true
-					pose(character, line, InteractPose.reachUp(now - at + LEAD))
-				end
+			if not character then
+				continue
+			end
+			-- (5.9.2: the far ones skipped first, the body's parts looked up once)
+			local _, near = Bodies.near(character, eye, POSE_RANGE)
+			if not near then
+				continue
+			end
+			local line, at = lineOf(character)
+			-- (over the end, or let go here: standing again, though the server clears the ride a moment later)
+			local over = at == nil or (line ~= nil and now - at > line.duration + 0.1) or (other == player and at == finished)
+			if line and at and not over then
+				seen[character] = true
+				pose(character, line, InteractPose.reachUp(now - at + LEAD))
 			end
 		end
 		for character in table.clone(posed) do
