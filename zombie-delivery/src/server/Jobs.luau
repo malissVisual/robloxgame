@@ -1924,6 +1924,9 @@ local function orderRoomOf(player: Player, offer: Offer, job: Job?): number
 		if rack > (info.rack or 0) then
 			info.rack = rack
 			info.changed()
+			if job then
+				Cargo.packShown(job.cargo) -- (6.6 review: the HUD's room shows the bike's bag at once)
+			end
 		end
 	end
 	return room

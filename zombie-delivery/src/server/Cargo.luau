@@ -1423,6 +1423,13 @@ end
 -- 6.6: is the owner's bike within reach (Config.Cargo.BikeReach studs of them, or they sit on it: Holding.bikeNear)?
 -- Only on a run with the bike's bag (Info.rack). The bike is the vehicle out (Vehicles.get: your bike; 5.6: a ZDC RIDE
 -- rental scooter rides like it).
+-- 6.6 review: the words when the bike has the pieces: "bring it closer", or with no bike out (a wreck, a car taken
+-- instead) "MY BIKE brings it".
+local function bikeWords(session: Session): string
+	local car = Vehicles.get(session.owner)
+	return if car and TransportRules.isBike(car.id) then "bring it closer" else "MY BIKE (phone) brings it"
+end
+
 local function bikeNear(session: Session): boolean
 	if rackRoomOf(session) <= 0 then
 		return false
@@ -1433,8 +1440,15 @@ local function bikeNear(session: Session): boolean
 		return false
 	end
 	local root = rootOf(owner.Character)
+	local onIt = Vehicles.seatedIn(owner) == car
+	-- (6.6 review: sitting in another seat (a bus, a car) near your bike is not the bike: your hands' pieces would
+	-- ride off on the bike that stays behind)
+	local humanoid = owner.Character and owner.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart ~= nil and not onIt then
+		return false
+	end
 	local distance = if root then (root.Position - car.chassis.Position).Magnitude else nil
-	return Holding.bikeNear(Vehicles.seatedIn(owner) == car, distance, Config.Cargo.BikeReach)
+	return Holding.bikeNear(onIt, distance, Config.Cargo.BikeReach)
 end
 
 -- 6.6: the room left in the bag that takes pieces now: the bag in the owner's hand (`seated`: sitting down, a bag on
@@ -1451,10 +1465,22 @@ local function placesFor(session: Session, pieces: { Piece }, seated: boolean?):
 	local near = bikeNear(session)
 	local onBike = if near then math.max(0, rackRoomOf(session) - bikeCount(session)) else 0
 	local inBag = bagFree(session, seated)
+	-- (6.6 review: a round's papers go back into the satchel while it has room: dropped on a death or put down, they
+	-- were left to the hands and the bag, 2 – 4 a trip)
+	local inSatchel = satchelRoomOf(session)
+	if inSatchel > 0 then
+		for _, held in session.pack do
+			if held.satchel then
+				inSatchel -= 1
+			end
+		end
+	end
 	local out: { string } = {}
 	for _, piece in pieces do
-		local where = Holding.place(bagFits(piece), near, onBike, inBag > 0, inBag)
-		if where == "bike" then
+		local where = if inSatchel > 0 and bagFits(piece) then "satchel" else Holding.place(bagFits(piece), near, onBike, inBag > 0, inBag)
+		if where == "satchel" then
+			inSatchel -= 1
+		elseif where == "bike" then
 			onBike -= 1
 		elseif where == "bag" then
 			inBag -= 1
@@ -1473,7 +1499,12 @@ end
 -- 6.4.1: BagLooks the looks of the pieces in the bag, in order ("pizza,bouquet"; nil when none): server/KitWear.luau
 -- shows them sticking out of the bag (shared/BagFill.luau). 6.6: PackRoom = the bag's part + the bike's bag + a
 -- round's satchel.
-local function packShown(session: Session)
+local packShown: (Session) -> ()
+-- 6.6 review: the HUD's numbers again after the bike's bag grew (server/Jobs.luau orderRoomOf).
+function Cargo.packShown(session: Session)
+	packShown(session)
+end
+packShown = function(session: Session)
 	local owner = session.owner
 	local on = session.info.foot == true and not session.ended
 	local count = if on then #session.pack else nil
@@ -1549,6 +1580,9 @@ end
 local function packWords(session: Session, piece: Piece): string
 	if piece.inBag then
 		return `Into the bag ({bagCount(session)} / {bagRoomOf(session)}).`
+	end
+	if piece.satchel then
+		return "Back in your satchel." -- (6.6 review)
 	end
 	return `Onto your bike ({bikeCount(session)} / {rackRoomOf(session)}).`
 end
@@ -2466,12 +2500,12 @@ local function handOver(session: Session, player: Player)
 	end
 	if gave == 0 then
 		if foot then
-			tell(player, if onBike > 0 then "Your bike has it: bring it closer." else `You carry nothing for {if plan.person then plan.person.name else "them"}.`)
+			tell(player, if onBike > 0 then `Your bike has it: {bikeWords(session)}.` else `You carry nothing for {if plan.person then plan.person.name else "them"}.`)
 		end
 		return
 	end
 	if onBike > 0 and session.moved < neededNow(session) then
-		tell(player, "The rest is on your bike: bring it closer.") -- 6.6
+		tell(player, `The rest is on your bike: {bikeWords(session)}.`) -- 6.6
 	end
 	say(session.person, if session.moved >= neededNow(session) then line(LINES.done) else line(LINES.thanks))
 	Npcs.act(player.Character, "give") -- 5.7: held out …
@@ -4729,7 +4763,8 @@ local function footStep(session: Session, plan: Plan, near: boolean): (string, s
 		end
 	end
 	if here == 0 and far > 0 then
-		return "carry", `Your bike has {if far > 1 then "them" else "it"}: bring it closer to {who}`
+		return "carry", if bikeWords(session) == "bring it closer" then `Your bike has {if far > 1 then "them" else "it"}: bring it closer to {who}`
+			else `Your bike has {if far > 1 then "them" else "it"}: {bikeWords(session)}`
 	elseif here > 0 and plan.door and not session.knocked then
 		return "carry", `Walk up to the door of {plan.place or "the house"} and knock` -- 5.3
 	elseif here > 0 and plan.nobody then
@@ -4915,6 +4950,15 @@ function Cargo.adminFinish(session: Session): boolean
 		return false
 	end
 	local into = if session.info.foot then session.pack else session.load -- (5.0: on foot it all goes into the pack)
+	-- (6.6 review: on foot without a bike's bag a piece put in the pack is in the bag: an unflagged pack piece reads
+	-- as "on the bike", and with no bike it could never be handed over)
+	local noBike = session.info.foot == true and rackRoomOf(session) <= 0
+	local function admit(piece: Piece)
+		if noBike and not piece.satchel then
+			piece.inBag = true
+		end
+		table.insert(into, piece)
+	end
 	for player in table.clone(session.held) do
 		local held = clearHeld(session, player)
 		local pieces: { Piece } = if held then held.pieces else {}
@@ -4926,7 +4970,7 @@ function Cargo.adminFinish(session: Session): boolean
 				piece.model:Destroy()
 				piece.model = nil
 			end
-			table.insert(into, piece)
+			admit(piece)
 		end
 	end
 	for _, loose in session.loose do
@@ -4938,7 +4982,7 @@ function Cargo.adminFinish(session: Session): boolean
 			loose.piece.model:Destroy()
 			loose.piece.model = nil
 		end
-		table.insert(into, loose.piece)
+		admit(loose.piece)
 	end
 	table.clear(session.loose)
 	if plan.mode == "serve" then
@@ -4957,12 +5001,12 @@ function Cargo.adminFinish(session: Session): boolean
 				piece.model:Destroy()
 				piece.model = nil
 			end
-			table.insert(into, piece)
+			admit(piece)
 		end
 		for _, piece in session.walking do
 			removeNpc(piece.npc)
 			piece.npc = nil
-			table.insert(into, piece)
+			admit(piece)
 		end
 		table.clear(session.pile)
 		table.clear(session.walking)
