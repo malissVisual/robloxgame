@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · owner's approved thumbnail → native R15 zombies and a uniform courier for every player, shared locomotion · `server/CharacterArt/`, `server/CourierAvatar.luau`, `server/Main.server.luau`, `server/Zombies.luau`, `shared/CourierMotion.luau`, character tests / render tools / `design/character-models/` · 2026-10-07 (`codex/character-models`, based on main `99172d5`).
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
