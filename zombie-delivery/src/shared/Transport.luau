@@ -10,7 +10,8 @@
 -- sprint (the character attribute KitSpeed, client/CameraRig.luau), the jacket's `warm` the food's freshness drain.
 --
 --   Transport.findKit(id)      the Config.Kit entry, or nil
---   Transport.handsRoom(kit)   light pieces you carry on foot: max(HandsMax, the best backpack's room)
+--   Transport.handsRoom(kit)   light pieces you carry on foot: max(HandsMax, the best backpack's room) + the kit's
+--                              `extra` (6.0: the plastic bag, Config.Kit "bag": it adds up with a backpack)
 --   Transport.packRoom(kit)    of those, the ones in the pack (handsRoom − HandsMax)
 --   Transport.speedMult(kit)   the walk / sprint multiplier (the best shoes; 1 = none)
 --   Transport.warm(kit)        the food's freshness drain multiplier while you carry it (the best jacket; 1 = none)
@@ -50,14 +51,19 @@ function Transport.findKit(id: string): Config.KitDef?
 end
 
 -- How many light pieces you carry in your hands and on your back (Config.Cargo.HandsMax + the best backpack's room).
+-- 6.0: + every owned piece's `extra` (the plastic bag's 2), on top of the best backpack.
 function Transport.handsRoom(kit: Kit): number
 	local room = Config.Cargo.HandsMax
+	local extra = 0
 	for _, def in Config.Kit do
 		if kit[def.id] == true and def.room then
 			room = math.max(room, math.floor(def.room))
 		end
+		if kit[def.id] == true and def.extra then
+			extra += math.max(0, math.floor(def.extra))
+		end
 	end
-	return room
+	return room + extra
 end
 
 -- The pieces of handsRoom that ride in the pack (not in the hands).

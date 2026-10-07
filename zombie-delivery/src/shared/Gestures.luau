@@ -7,6 +7,9 @@
 --   give   both hands forward, holding out (the courier handing a piece over, a giver handing one to you)
 --   take   both hands forward and a little lower, reaching to take it
 --   knock  the right fist forward at the door, three knocks (the sound's knocks, Config.Juice.KnockGap apart)
+--   bag    6.0: the right hand drops a piece into the plastic bag in the left (a pick-up into the bag)
+--   throw  6.0: the right arm winds back over the shoulder and whips forward (a throw at a door)
+--   vest   6.0: both arms over the head, then down, tugging a new vest straight
 -- Angles are in degrees per joint (rs, re, rw: the right shoulder, elbow, wrist; ls, le, lw: the left), as
 -- { x, y, z }: ArmPose turns them into CFrame.Angles(0, y, 0) * CFrame.Angles(x, 0, z). For an R15 arm hanging
 -- down, +x lifts it forward, +y turns it in (the right arm; the left mirrored), +z lifts the right arm out sideways.
@@ -81,6 +84,47 @@ function Gestures.pose(kind: string, t: number): Pose?
 			rs = { 58 + 10 * tap, -6, 0 },
 			re = { 74 - 14 * tap, 0, 0 },
 			rw = { -10, 0, 0 },
+		}
+	elseif kind == "bag" then
+		-- 6.0: a piece dropped into the plastic bag: the right hand across to the left hip and in, the left hand
+		-- lifts the bag's mouth a little forward.
+		local dip = math.sin(math.pi * math.clamp(t / (J.Gestures.bag or 0.4), 0, 1))
+		return {
+			rs = { 34 + 12 * dip, 42, 0 },
+			re = { 58 - 10 * dip, 0, 0 },
+			rw = { -20, 0, 0 },
+			ls = { 16, 0, -8 },
+			le = { 22, 0, 0 },
+		}
+	elseif kind == "throw" then
+		-- 6.0: a throw at a door: the right arm winds back over the shoulder, then whips forward and down.
+		local u = math.clamp(t / (J.Gestures.throw or 0.4), 0, 1)
+		local wind = smooth(u / 0.45)
+		local whip = smooth((u - 0.45) / 0.55)
+		local function mix(a: number, b: number, c: number): number
+			return a + (b - a) * wind + (c - b) * whip
+		end
+		return {
+			rs = { mix(40, 165, 70), mix(0, -8, 12), mix(10, 25, 0) },
+			re = { mix(30, 90, 10), 0, 0 },
+			rw = { mix(0, 20, -30), 0, 0 },
+			ls = { 50, -10, 0 },
+			le = { 20, 0, 0 },
+		}
+	elseif kind == "vest" then
+		-- 6.0: a vest put on: both arms up over the head, then down, tugging it straight at the chest.
+		local u = math.clamp(t / (J.Gestures.vest or 1.2), 0, 1)
+		local up = smooth(u / 0.45)
+		local down = smooth((u - 0.45) / 0.55)
+		local shoulder = 20 + 145 * up - 125 * down
+		local elbow = 20 + 40 * up + 30 * down
+		return {
+			rs = { shoulder, 10 + 10 * down, 0 },
+			re = { elbow, 0, 0 },
+			rw = { -10, 0, 0 },
+			ls = { shoulder, -10 - 10 * down, 0 },
+			le = { elbow, 0, 0 },
+			lw = { -10, 0, 0 },
 		}
 	end
 	return nil

@@ -42,6 +42,7 @@ local ART = {
 	-- 5.0: art/icons (the kit, the phone's apps)
 	"kit_backpack", "kit_bigpack", "kit_shoes", "kit_jacket", "kit_cart",
 	"kit_kevlar", "kit_heavy", -- 6.0, the vests
+	"kit_bag", -- 6.0: the plastic bag (its picture is still to come: the emoji meanwhile)
 	"app_orders", "app_board", "app_career", "app_shop", "app_map", "app_messages", "app_bank", "app_settings",
 	-- 5.1, art/icons (Codex's bike art; ids empty until uploaded)
 	"bike_rust", "bike_city", "bike_cargo", "bike_ebike", "gear_basket", "gear_panniers", "gear_trailer", "map_bikes",
@@ -92,7 +93,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("152 pictures", count == 152, count) -- (6.0: + the two vests)
+check("153 pictures", count == 153, count) -- (6.0: + the two vests and the bag)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)

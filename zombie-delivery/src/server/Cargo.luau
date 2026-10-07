@@ -91,6 +91,22 @@
 --   * The newspaper round: at the print shop "Pick up the bundle" puts every paper into the owner's satchel at once
 --     (Plan.bundle); at a door (Plan.toss) "Toss newspaper" works from Round.TossRange: the paper flies from you onto
 --     the porch, from farther than Round.SureToss maybe into the bushes (JobRules.tossMiss; Cargo.missesOf counts them).
+--
+-- 6.0, the courier on foot (Config.Throw, Config.Courier; shared/Throws.luau, client/Throw.luau):
+--   * The plastic bag (Config.Kit "bag", the owner's profile.kit): a light piece the owner picks up (the pile, the
+--     ground) drops straight into the pack (the bag and any backpack: Info.pack) while it fits and has room, the hands
+--     stay free; the "bag" gesture (shared/Gestures.luau) shows it.
+--   * Throwing at a home's door (a foot job's drop with Plan.door, or a newspaper round's Plan.toss): the owner holds X
+--     and releases; the "Throw" remote brings (the stop's ThrowStop, a direction, a power 0 … 1). Checked here: the
+--     stop, the cooldown, the range (Config.Throw.Range from the door), a body on foot, room to throw (a ray from the
+--     body to the release point), a piece for here in the hands or the pack that may fly (light, not fragile:
+--     Throws.throwable; Info.fragile, a FRAGILE job, refuses all). The arc is traced here (Throws.trace with the
+--     world's rays: people and the stop's props let it through) and the piece flies along it for everybody. Within
+--     Config.Throw.DoorRadius of the door: delivered (the receiver catches it; nobody out yet: the door opens as for a
+--     knock), with the TRICKSHOT tip (Throws.tip: far, over something, off a wall) paid at once; a miss lies on the
+--     ground as a loose piece (picked up as ever; on a roof or nowhere it rolls down beside the door). The round's
+--     paper that misses the porch counts, as a miss. The owner's attributes ThrowTo (the door's spot), ThrowStop and
+--     ThrowFragile tell the client when a throw is possible.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -106,6 +122,8 @@ local Vehicles = require(script.Parent.Vehicles)
 local Npcs = require(script.Parent.Npcs)
 local Animals = require(script.Parent.Animals)
 local Equipment = require(script.Parent.Equipment)
+local PlayerData = require(script.Parent.PlayerData) -- 6.0: the bag owned, the TRICKSHOT tip
+local Throws = require(Shared.Throws) -- 6.0: the throw's arc and tip
 
 local Tuning = Config.Cargo
 local Cargo = {}
@@ -167,6 +185,8 @@ export type Info = {
 	-- bike job (`ride`), or stowed when you get on the bike with it in your hands.
 	rack: number?,
 	ride: boolean?,
+	-- 6.0: the job's cargo is fragile (the FRAGILE modifier, the fragile cargo rule): nothing of it may be thrown.
+	fragile: boolean?,
 }
 
 type Piece = {
@@ -1316,12 +1336,22 @@ local function stash(session: Session, piece: Piece)
 	packShown(session)
 end
 
+-- 6.0: does the job's owner have the plastic bag (Config.Courier.BagKit)?
+local function bagged(session: Session): boolean
+	local profile = PlayerData.get(session.owner)
+	return profile ~= nil and profile.kit[Config.Courier.BagKit] == true
+end
+
 -- 5.0: does a piece this player takes go into the pack (a foot job, the owner, the hands full, room left in it)?
+-- 6.0: with the plastic bag a piece that fits drops straight in, the hands empty or not (never onto a pushed tool).
 local function intoPack(session: Session, player: Player, piece: Piece?): boolean
 	if not session.info.foot or player ~= session.owner or packFree(session) <= 0 or (piece ~= nil and not packTakes(session, { piece }, false)) then
 		return false
 	end
 	local held = session.held[player]
+	if bagged(session) and (piece == nil or piece.horse == nil) and Equipment.pushing(player) == nil and (held == nil or held.tool == nil) then
+		return true
+	end
 	return held ~= nil and held.tool == nil and #held.pieces >= handsMax(session, player)
 end
 
@@ -2085,6 +2115,9 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 		table.remove(session.loose, at)
 		loose.prompt:Destroy()
 		stash(session, loose.piece)
+		if bagged(session) then
+			Npcs.act(player.Character, "bag") -- 6.0: into the bag
+		end
 		refresh(session)
 		session.info.changed()
 		return
@@ -2287,7 +2320,8 @@ end
 -- later). Nobody home (Plan.nobody): the door stays shut, the piece is left at the door.
 -- 5.7: `by` (who came up) knocks with the fist and everybody near hears it (Npcs.act "knock"; with the door's creak
 -- when it opens), the receiver waves as they step out.
-local function knock(session: Session, plan: Plan, by: Player?)
+-- 6.0: `thrown` = a piece thrown against the door did the knocking (no fist, nobody told).
+local function knock(session: Session, plan: Plan, by: Player?, thrown: boolean?)
 	local door = plan.door
 	if not door then
 		return
@@ -2295,11 +2329,15 @@ local function knock(session: Session, plan: Plan, by: Player?)
 	local person = plan.person
 	local knocker = (by or session.owner).Character
 	if plan.nobody or not person then
-		Npcs.act(knocker, "knock", false)
-		tell(session.owner, `You knock at {plan.place or "the door"}… nobody answers. Leave it at the door (E).`)
+		if not thrown then
+			Npcs.act(knocker, "knock", false)
+			tell(session.owner, `You knock at {plan.place or "the door"}… nobody answers. Leave it at the door (E).`)
+		end
 		return
 	end
-	Npcs.act(knocker, "knock", true)
+	if not thrown then
+		Npcs.act(knocker, "knock", true)
+	end
 	swingDoor(door, plan.facing)
 	local visit = session.visit
 	task.delay(Config.Jobs.Places.KnockDelay, function()
@@ -2445,6 +2483,267 @@ local function toss(session: Session, player: Player)
 	session.info.changed()
 end
 
+-- ── 6.0: throwing at a door ────────────────────────────────────────────────
+
+-- The current stop when a piece may be thrown at it: a foot job's home drop (Plan.door) or a round's door (Plan.toss),
+-- not blocked, still waiting for a piece.
+local function throwStop(session: Session): Plan?
+	local plan = session.plan
+	if session.ended or session.info.foot ~= true or session.blocked or not plan or plan.stage ~= "drop" or not (plan.door or plan.toss) then
+		return nil
+	end
+	return if session.moved < neededNow(session) then plan else nil
+end
+
+-- What the player would throw here: a piece for this stop that may fly, the top one in the hands first, then (the
+-- owner) the pack's last. Where it is ("hands" | "pack") and its index; else nil and why ("fragile" | "none").
+local function throwPick(session: Session, player: Player): (string?, number?, string)
+	local job = session.info.fragile == true
+	local fragile = false
+	local held = session.held[player]
+	if held and not held.tool then
+		for index = #held.pieces, 1, -1 do
+			local piece = held.pieces[index]
+			if piece.horse == nil and forHere(session, piece) then
+				if Throws.throwable(piece.look, job) then
+					return "hands", index, ""
+				end
+				fragile = fragile or Throws.fragile(piece.look, job)
+			end
+		end
+	end
+	if player == session.owner then
+		for index = #session.pack, 1, -1 do
+			local piece = session.pack[index]
+			if forHere(session, piece) then
+				if Throws.throwable(piece.look, job) then
+					return "pack", index, ""
+				end
+				fragile = fragile or Throws.fragile(piece.look, job)
+			end
+		end
+	end
+	return nil, nil, if fragile then "fragile" else "none"
+end
+
+-- The owner's attributes for client/Throw.luau (every tick, written only when they change): ThrowTo = the door's spot
+-- while a piece for it is with you, ThrowStop = the stop's visit (the remote names it), ThrowFragile = only fragile ones.
+local function throwShown(session: Session)
+	local owner = session.owner
+	local plan = throwStop(session)
+	local to: Vector3? = nil
+	local fragile: boolean? = nil
+	if plan then
+		local where, _, why = throwPick(session, owner)
+		if where or why == "fragile" then
+			to = plan.pile
+			fragile = if where then nil else true
+		end
+	end
+	local stop = if to then session.visit else nil
+	if owner:GetAttribute("ThrowTo") ~= to then
+		owner:SetAttribute("ThrowTo", to)
+	end
+	if owner:GetAttribute("ThrowStop") ~= stop then
+		owner:SetAttribute("ThrowStop", stop)
+	end
+	if owner:GetAttribute("ThrowFragile") ~= fragile then
+		owner:SetAttribute("ThrowFragile", fragile)
+	end
+end
+
+local function vec(v: Vector3): Throws.Vec
+	return { v.X, v.Y, v.Z }
+end
+
+local function v3(v: Throws.Vec): Vector3
+	return Vector3.new(v[1], v[2], v[3])
+end
+
+-- A ray of the throw through the world only: the people, the cargo, the stop's props, your ride and anything that does
+-- not collide let it through; a body (a zombie, a walker) is flown over.
+local function throwRay(session: Session, player: Player): (Vector3, Vector3) -> RaycastResult?
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	local skip: { Instance } = { folder }
+	for _, other in Players:GetPlayers() do
+		if other.Character then
+			table.insert(skip, other.Character)
+		end
+	end
+	for _, prop in session.props do
+		table.insert(skip, prop)
+	end
+	for _, name in { "Npcs", "Zombies", "Animals", "Effects", "Loot" } do
+		local child = workspace:FindFirstChild(name)
+		if child then
+			table.insert(skip, child)
+		end
+	end
+	local ride = Vehicles.get(player)
+	if ride then
+		table.insert(skip, ride.model)
+	end
+	params:AddToFilter(skip)
+	return function(from: Vector3, to: Vector3): RaycastResult?
+		for _ = 1, 4 do
+			local hit = workspace:Raycast(from, to - from, params)
+			if not hit then
+				return nil
+			end
+			local model = hit.Instance:FindFirstAncestorOfClass("Model")
+			if model and model:FindFirstChildOfClass("Humanoid") then
+				params:AddToFilter(model)
+			else
+				return hit
+			end
+		end
+		return nil
+	end
+end
+
+-- The piece flies along the arc for everybody (anchored, not solid, moved every frame), then `done`.
+local function fly(model: Model, trace: Throws.Trace, done: () -> ())
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CanCollide = false
+		end
+	end
+	task.spawn(function()
+		local start = os.clock()
+		while model.Parent do
+			local t = os.clock() - start
+			model:PivotTo(CFrame.new(v3(Throws.at(trace, t))) * CFrame.Angles(t * 9, t * 4, 0))
+			if t >= trace.time then
+				break
+			end
+			task.wait()
+		end
+		if model.Parent then
+			done()
+		end
+	end)
+end
+
+-- A throw from the player's hands or the owner's pack at the door (the "Throw" remote: Cargo.start checked the stop).
+local function throwAt(session: Session, player: Player, direction: Vector3, power: number)
+	local plan = throwStop(session)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = rootOf(character)
+	if not plan or not character or not humanoid or not root or humanoid.Health <= 0 or humanoid.SeatPart ~= nil or Equipment.pushing(player) then
+		return
+	end
+	local tuning = Config.Throw
+	if flat(root.Position, plan.pile) > tuning.Range + 3 then -- (+3: the client's view of you is a moment old)
+		tell(player, `Too far to throw: come within {tuning.Range} studs of the door.`)
+		return
+	end
+	local where, index, why = throwPick(session, player)
+	local velocity = Throws.velocity(vec(direction), power)
+	if not where or not index then
+		tell(player, if why == "fragile" then "Too fragile to throw: hand it over at the door." else "Nothing to throw at this door.")
+		return
+	end
+	if not velocity then
+		return
+	end
+	local ray = throwRay(session, player)
+	local from = v3(Throws.release(vec(root.Position), vec(root.CFrame.LookVector)))
+	if ray(root.Position, from) then
+		tell(player, "No room to throw here.")
+		return
+	end
+	local piece: Piece
+	local held = session.held[player]
+	if where == "hands" and held then
+		piece = table.remove(held.pieces, index) :: Piece
+		if #held.pieces == 0 then
+			clearHeld(session, player)
+		else
+			armHands(session, player, held)
+		end
+		if piece.model then
+			piece.model:Destroy() -- (a new one flies)
+			piece.model = nil
+		end
+	else
+		piece = table.remove(session.pack, index) :: Piece
+		packShown(session)
+	end
+	Npcs.act(character, "throw")
+	local trace = Throws.trace(vec(from), velocity, function(a: Throws.Vec, b: Throws.Vec): Throws.Hit?
+		local hit = ray(v3(a), v3(b))
+		return if hit then { at = vec(hit.Position), normal = vec(hit.Normal) } else nil
+	end)
+	local land = v3(trace.land)
+	local hitDoor = trace.grounded and Throws.landed(trace.land, vec(plan.pile))
+	local right = plan.facing:Cross(Vector3.yAxis)
+	local visit = session.visit
+	local model = buildPiece(piece)
+	model:PivotTo(CFrame.new(from))
+	local tip: Throws.Tip? = nil
+	local rest: CFrame
+	local loose: Loose? = nil
+	if hitDoor or plan.toss then
+		-- At the door (or the round's paper anywhere: it counts, a miss in the bushes): delivered now.
+		session.moved += 1
+		countDelivered(session, piece)
+		table.insert(session.props, model)
+		if not hitDoor then
+			session.missBy[piece.order] = (session.missBy[piece.order] or 0) + 1
+		end
+		local spot = if trace.grounded then land else onGround(plan.pile + right * 5) -- (a paper flying on: the bushes)
+		rest = CFrame.lookAt(spot, spot + right)
+		if hitDoor then
+			local over = not trace.bounced and ray(from, land + Vector3.new(0, 1.5, 0)) ~= nil
+			tip = Throws.tip(flat(from, land), over, trace.bounced)
+		end
+	else
+		-- A miss: a loose piece where it lands (on a roof, or nowhere: it rolls down beside the door).
+		local ground = onGround(land)
+		if not trace.grounded or math.abs(land.Y - plan.pile.Y) > 5 or math.abs(ground.Y - land.Y) > 1 then
+			ground = onGround(plan.pile + right * rng:NextNumber(3, 5) * (if rng:NextNumber() < 0.5 then -1 else 1))
+		end
+		rest = CFrame.lookAt(ground, ground + right)
+		piece.model = model
+		layDown(session, piece, rest)
+		loose = session.loose[#session.loose]
+		if loose then
+			loose.prompt.Enabled = false
+		end
+	end
+	local paid = if tip then tip.total else 0
+	if paid > 0 then
+		PlayerData.addMoney(player, paid)
+	end
+	fly(model, trace, function()
+		setDown(model, rest)
+		if loose then
+			loose.prompt.Enabled = true
+		end
+		local same = not session.ended and session.visit == visit
+		if hitDoor and same then
+			if session.person then
+				say(session.person, line(LINES.thanks)) -- caught
+				Npcs.act(session.person, "take")
+			elseif plan.door and not session.knocked then
+				session.knocked = true -- (it hit the door: they heard)
+				knock(session, plan, player, true)
+			end
+		end
+		if hitDoor then
+			Net.get("Throw"):FireClient(player, "landed", { tip = paid, far = if tip then tip.far else 0, over = if tip then tip.over else 0, wall = if tip then tip.wall else 0, span = math.floor(flat(from, land) + 0.5) })
+		elseif plan.toss then
+			tell(player, "In the bushes! It counts, but it's a miss: no tip for this round.")
+		else
+			tell(player, `Missed the door: the {piece.name} is on the ground. Pick it up (E).`)
+		end
+	end)
+	refresh(session)
+end
+
 -- What to tell while the stop is blocked (Cargo.setBlocked).
 local function blockedText(session: Session): string
 	return session.blockedReason or "Hold out first! Nothing gets unloaded until the area is safe."
@@ -2504,10 +2803,13 @@ local function onPile(session: Session, player: Player)
 		if piece then
 			stash(session, piece)
 			session.moved += 1
+			local bag = bagged(session) -- 6.0: dropped into the bag in your hand
 			say(session.person, line(LINES.take))
 			Npcs.act(session.person, "give") -- 5.7
-			Npcs.act(player.Character, "take")
-			tell(player, if packFits(piece) then `Into your backpack ({#session.pack} / {session.info.pack or 0}).` else `Onto your bike ({#session.pack} / {session.info.pack or 0}).`)
+			Npcs.act(player.Character, if bag then "bag" else "take")
+			tell(player, if not packFits(piece) then `Onto your bike ({#session.pack} / {session.info.pack or 0}).`
+				elseif bag then `Into the bag ({#session.pack} / {session.info.pack or 0}).`
+				else `Into your backpack ({#session.pack} / {session.info.pack or 0}).`)
 			refresh(session)
 			session.info.changed()
 		end
@@ -3228,6 +3530,7 @@ function Cargo.update(session: Session, dt: number)
 	if next(session.held) ~= nil or next(session.slowed) ~= nil then
 		updateLift(session) -- (the lift twist, 4.8's heavy rule: 5.2, by the piece's order)
 	end
+	throwShown(session) -- 6.0
 
 	local plan = session.plan
 	if not plan then
@@ -4120,6 +4423,7 @@ function Cargo.finish(session: Session, linger: boolean?)
 	session.ended = true
 	table.clear(session.pack) -- 5.0
 	packShown(session)
+	throwShown(session) -- 6.0: no throw any more
 	for _, loose in session.loose do
 		loose.prompt:Destroy()
 		if loose.handle then
@@ -4320,6 +4624,22 @@ function Cargo.start()
 	-- 4.2: the touch PUT DOWN / LET GO / SET DOWN button (client/TouchControls.luau) does what the G prompt in your
 	-- hands does: the pushed tool first (Equipment: stow or set down), else the top piece (or the horse) of whatever
 	-- job you carry for. Only your own hands, a few times a second at most.
+	-- 6.0: a throw at a door (client/Throw.luau): (the stop's ThrowStop, a direction, a power 0 … 1). Only the owner of a
+	-- running foot job, once per Config.Throw.Cooldown; throwAt checks the rest.
+	local lastThrow: { [Player]: number } = {}
+	Net.get("Throw").OnServerEvent:Connect(function(player: Player, stop: any, direction: any, power: any)
+		if type(stop) ~= "number" or typeof(direction) ~= "Vector3" or type(power) ~= "number" then
+			return
+		end
+		local now = os.clock()
+		local session = active[player]
+		if now - (lastThrow[player] or -math.huge) < Config.Throw.Cooldown or not session or session.ended or session.visit ~= stop then
+			return
+		end
+		lastThrow[player] = now
+		throwAt(session, player, direction, power)
+		session.info.changed()
+	end)
 	local lastPut: { [Player]: number } = {}
 	Net.get("PutDown").OnServerEvent:Connect(function(player: Player)
 		local now = os.clock()
@@ -4340,6 +4660,7 @@ function Cargo.start()
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		lastPut[player] = nil
+		lastThrow[player] = nil
 	end)
 
 	-- 5.3 review: who works for which job, for client/CargoPrompts.luau (it hides the prompts of the others' jobs):

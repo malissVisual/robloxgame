@@ -63,9 +63,9 @@ function KitShop.currentTab(state: any): string
 	return "items"
 end
 
--- A piece's short name for the room line ("Courier Backpack" → "BACKPACK").
+-- A piece's short name for the room line ("Courier Backpack" → "BACKPACK"; 6.0: "Plastic Bag" → "BAG").
 local function shortName(def: Config.KitDef): string
-	return string.upper((string.gsub(def.name, "^Courier ", "")))
+	return string.upper((string.gsub(def.name, "^Courier ", ""):gsub("^Plastic ", "")))
 end
 
 -- What you carry, in words: "HANDS 2" or "HANDS 2 / BACKPACK 3" (the best backpack owned). Also for the job board and
@@ -80,8 +80,18 @@ function KitShop.roomText(kit: Transport.Kit): string
 			best = def
 		end
 	end
-	if best and room > hands then
-		return `HANDS {hands} / {shortName(best)} {room}`
+	-- 6.0: the plastic bag (Config.Kit `extra`) adds up with the backpack: "HANDS 2 / BACKPACK + BAG 5".
+	local names: { string } = {}
+	if best then
+		table.insert(names, shortName(best))
+	end
+	for _, def in Config.Kit do
+		if kit[def.id] and def.extra then
+			table.insert(names, shortName(def))
+		end
+	end
+	if #names > 0 and room > hands then
+		return `HANDS {hands} / {table.concat(names, " + ")} {room}`
 	end
 	return `HANDS {room}`
 end
@@ -94,6 +104,9 @@ local function effect(def: Config.KitDef): string
 	end
 	if def.armour then
 		table.insert(parts, `🛡 −{math.floor(def.armour * 100 + 0.5)}% damage`) -- 6.0: the vests
+	end
+	if def.extra then
+		table.insert(parts, `🛍️ +{def.extra} light pieces, with any backpack`) -- 6.0: the plastic bag
 	end
 	if def.speed then
 		local change = math.floor((def.speed - 1) * 100 + 0.5)
@@ -136,10 +149,11 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
 	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, line)
 	P.text(line, KitShop.roomText(kit), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
-	local most = Config.Cargo.HandsMax
+	local everything: Transport.Kit = {}
 	for _, def in Config.Kit do
-		most = math.max(most, def.room or 0)
+		everything[def.id] = true
 	end
+	local most = Transport.handsRoom(everything) -- (6.0: the best backpack and every `extra`)
 	for n = 1, most do
 		local pip = Ui.make("Frame", {
 			Size = UDim2.fromOffset(14, 14),

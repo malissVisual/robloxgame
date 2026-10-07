@@ -41,6 +41,13 @@ check("a full pack: the parcel on the backpack worn", loaded.load == "bigpack" a
 local all = KitFit.outfit({ backpack = true, shoes = true, jacket = true }, true)
 check("everything: pack, parcel, shoes, jacket", all.pack == "backpack" and all.load == "backpack" and all.shoes == "shoes" and all.jacket == "jacket" and count(all) == 4)
 check("a false entry is not owned", count(KitFit.outfit({ shoes = false, jacket = false }, true)) == 0)
+-- 6.0: the plastic bag in the hand, the best vest over the courier's
+local bagged = KitFit.outfit({ bag = true }, false)
+check("the bag in the hand", bagged.hand == "bag" and count(bagged) == 1)
+check("the Kevlar vest", KitFit.outfit({ kevlar = true }, false).vest == "kevlar")
+local vests = KitFit.outfit({ kevlar = true, heavy = true, bag = true, backpack = true }, false)
+check("both vests: only the heavy armour", vests.vest == "heavy" and vests.hand == "bag" and vests.pack == "backpack" and count(vests) == 3)
+check("a false bag or vest is not worn", count(KitFit.outfit({ bag = false, kevlar = false, heavy = false }, true)) == 0)
 
 -- The factors ------------------------------------------------------------------------------------------------------
 
