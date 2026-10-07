@@ -9,6 +9,8 @@
 -- "🔒 LEVEL n", or "MORE ROOM ALREADY" for a backpack smaller than the one you have. The server checks everything again
 -- (server/Shops.luau, the "Kit" remote: at the counter, not owned yet, the level, the money). Presentation only:
 -- KitShop.tab (the shop's open tab: "items" | "kit", nil = KIT while some piece is still to buy) is its only state.
+-- 5.8, the courier phone's look: YOUR ROOM is the phone's card (the red square and caps, the room in big type, a thin
+-- rule under it); BUY is the phone's red primary.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -98,6 +100,14 @@ local function effect(def: Config.KitDef): string
 	return table.concat(parts, "  ·  ")
 end
 
+-- 5.8, the courier phone's tag line (design/phone-ui/): the small red square and the caps label, over a head.
+local function tagLine(parent: Instance, text: string, order: number): any
+	local row = Ui.make("Frame", { Name = "Tag", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+	P.marker(row, 8, { Position = UDim2.fromScale(0, 0.5), AnchorPoint = Vector2.new(0, 0.5) })
+	P.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1 })
+	return row
+end
+
 local function action(row: any, text: string, kind: P.ButtonKind, onClick: () -> ())
 	local button = P.button(row, text, UDim2.fromOffset(BUTTON_W, 40), kind, if kind == "off" then function() end else onClick)
 	button.Position = UDim2.new(1, -BUTTON_W - 12, 0.5, -20)
@@ -117,10 +127,10 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	-- YOUR ROOM: a pip for every light piece you can carry, the walk speed.
 	local head = Ui.make("Frame", { Name = "KitRoom", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2 }, body)
 	Ui.list(head, true, 4)
-	P.caps(head, "Personal gear · yours for good, on foot and on a bike", UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1 })
-	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
-	Ui.list(line, false, 6)
-	P.text(line, KitShop.roomText(kit), UDim2.fromOffset(0, 28), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 20, TextStrokeTransparency = 1, LayoutOrder = 1 })
+	tagLine(head, "Personal gear · yours for good, on foot and on a bike", 1)
+	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
+	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, line)
+	P.text(line, KitShop.roomText(kit), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
 	local most = Config.Cargo.HandsMax
 	for _, def in Config.Kit do
 		most = math.max(most, def.room or 0)
@@ -135,7 +145,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 		}, line)
 		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.2 }, pip)
 	end
-	P.caps(line, if speed > 1.001 then `  ·  SPEED ×{string.format("%.2g", speed)}` else "  ·  SPEED ×1", UDim2.fromOffset(0, 28), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextStrokeTransparency = 1, LayoutOrder = most + 2 })
+	P.caps(line, if speed > 1.001 then `  ·  SPEED ×{string.format("%.2g", speed)}` else "  ·  SPEED ×1", UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextStrokeTransparency = 1, LayoutOrder = most + 2 })
 	Ui.label(head, "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more with a backpack. The best backpack you own counts; so do the best shoes. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 3,
@@ -143,6 +153,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 		TextSize = 14,
 		Font = Theme.Font,
 	})
+	P.rule(head, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
 
 	for order, def in Config.Kit do
 		local owned = kit[def.id] == true
@@ -181,7 +192,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 		elseif not here then
 			action(row, `BUY {Ui.money(def.price)}`, "off", function() end)
 		else
-			action(row, `BUY {Ui.money(def.price)}`, if money >= def.price then "main" else "off", function()
+			action(row, `BUY {Ui.money(def.price)}`, if money >= def.price then "primary" else "off", function()
 				Net.get("Kit"):FireServer("buy", def.id)
 			end)
 		end

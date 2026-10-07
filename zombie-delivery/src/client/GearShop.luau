@@ -5,6 +5,8 @@
 -- bought, what it does, and the one action that fits: BUY (from its level: "LEVEL 4" until then), INSTALL (free, into
 -- a free slot), REMOVE (free: it stays the car's). The server checks everything again (server/Shops.luau, the "Gear"
 -- remote). Presentation only, no state of its own.
+-- 5.8, the courier phone's look: the head is the phone's card (the red square and caps, SLOTS in big type, a thin rule
+-- under it); BUY and INSTALL are the phone's red primary.
 -- 5.1: the car gear only (GearDef.bikeOnly is not shown here; riding your bike: a note sends you to Spoke & Chain).
 -- Spoke & Chain's GEAR tab (client/BikeShop.luau) draws the bike gear for your bike with the same rows (forBike).
 
@@ -40,8 +42,8 @@ local function send(action: string, id: string)
 	Net.get("Gear"):FireServer(action, id)
 end
 
--- The row's action on its right (like the shop's other cards): "main" the one clear action, "quiet" an outline, "off"
--- a dim face whose words say why not.
+-- The row's action on its right (like the shop's other cards): "primary" the one clear action (5.8: the phone's red
+-- face), "quiet" an outline, "off" a dim face whose words say why not.
 local function action(row: any, text: string, kind: P.ButtonKind, onClick: () -> ())
 	local button = P.button(row, text, UDim2.fromOffset(BUTTON_W, 40), kind, if kind == "off" then function() end else onClick)
 	button.Position = UDim2.new(1, -BUTTON_W - 12, 0.5, -20)
@@ -59,11 +61,19 @@ local function misfit(gear: Config.GearDef): string
 	return "NOT ON THIS CAR"
 end
 
+-- 5.8, the courier phone's tag line (design/phone-ui/): the small red square and the caps label, over a head.
+local function tagLine(parent: Instance, text: string, order: number): any
+	local row = Ui.make("Frame", { Name = "Tag", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+	P.marker(row, 8, { Position = UDim2.fromScale(0, 0.5), AnchorPoint = Vector2.new(0, 0.5) })
+	P.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1 })
+	return row
+end
+
 -- A note instead of the rows (no vehicle, no bike, the wrong shop).
 local function note(body: Instance, title: string, text: string)
 	local none = Ui.make("Frame", { Name = "GearSlots", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, body)
 	Ui.list(none, true, 4)
-	P.caps(none, title, UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1 })
+	tagLine(none, title, 1)
 	Ui.label(none, text, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
 end
 
@@ -98,10 +108,10 @@ function GearShop.render(body: Instance, state: any, here: boolean, forBike: boo
 	-- The car and its gear slots: a pip for each, filled while a piece is in it.
 	local head = Ui.make("Frame", { Name = "GearSlots", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1 }, body)
 	Ui.list(head, true, 4)
-	P.caps(head, if company then "Gear · company vehicle" else `Gear for your {Economy.carTitle(carId, levels)}`, UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1 })
-	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
-	Ui.list(line, false, 6)
-	P.text(line, `SLOTS  {used} / {slots}`, UDim2.fromOffset(0, 28), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 20, TextStrokeTransparency = 1, LayoutOrder = 1 })
+	tagLine(head, if company then "Gear · company vehicle" else `Gear for your {Economy.carTitle(carId, levels)}`, 1)
+	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
+	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, line)
+	P.text(line, `SLOTS  {used} / {slots}`, UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
 	for n = 1, slots do
 		local pip = Ui.make("Frame", {
 			Size = UDim2.fromOffset(14, 14),
@@ -116,6 +126,7 @@ function GearShop.render(body: Instance, state: any, here: boolean, forBike: boo
 		elseif forBike then "Buy a piece once for this bike, then fit or remove it here for free. Each piece takes a gear slot and holds more light pieces."
 		else "Buy a piece once for this car, then install or remove it here for free. Each piece takes one gear slot; bigger cars and later stages have more."
 	Ui.label(head, explain, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = if company then P.danger else P.ink2, TextSize = 14, Font = Theme.Font })
+	P.rule(head, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
 
 	for order, gear in Config.Gear do
 		if (gear.bikeOnly == true) ~= (forBike == true) then
@@ -151,13 +162,13 @@ function GearShop.render(body: Instance, state: any, here: boolean, forBike: boo
 			end)
 		elseif now == "owned" then
 			local free = used < slots
-			action(row, if free then "INSTALL" else "NO FREE SLOT", if free and here then "main" else "off", function()
+			action(row, if free then "INSTALL" else "NO FREE SLOT", if free and here then "primary" else "off", function()
 				send("install", gear.id)
 			end)
 		elseif level < gear.level then
 			action(row, `🔒 LEVEL {gear.level}`, "off", function() end)
 		else
-			action(row, `BUY {Ui.money(gear.price)}`, if here and money >= gear.price then "main" else "off", function()
+			action(row, `BUY {Ui.money(gear.price)}`, if here and money >= gear.price then "primary" else "off", function()
 				send("buy", gear.id)
 			end)
 		end

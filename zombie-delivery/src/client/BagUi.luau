@@ -6,6 +6,8 @@
 -- rack. It is the BAG tab of the I window (client/Hud.luau draws it with BagUi.render); the phone's ORDERS app
 -- (🎒 BAG) and the contract ticket's chip ("🎒 2 newspapers · 1 pizza stack", Bag.line) open it (BagUi.open: Hud sets
 -- BagUi.onOpen). Presentation only: the server decides what you carry.
+-- 5.8, the courier phone's look (the bag draws in the phone's BAG app too): the head is a slim row with the phone's
+-- tag line (the red square and caps) over the room in big type; the groups are the phone's section labels.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -65,9 +67,10 @@ function BagUi.render(parent: Instance, job: any, order: number): number
 	local carried = if type(job) == "table" and type(job.carried) == "table" then job.carried else {}
 	local mode = if type(job) == "table" and type(job.mode) == "string" then job.mode else "car"
 	-- The room: the hands, the backpack (or the satchel), the bike's rack.
-	local head = P.row(parent, 66, n, true)
+	local head = P.row(parent, 68, n)
 	n += 1
-	P.caps(head, "Your bag", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(16, 8), TextColor3 = P.ink2, TextSize = 12 })
+	P.marker(head, 8, { Position = UDim2.fromOffset(16, 13) })
+	P.caps(head, "Your bag", UDim2.new(1, -46, 0, 18), { Position = UDim2.fromOffset(30, 8), TextColor3 = P.ink2, TextSize = 12, TextStrokeTransparency = 1 })
 	local packRoom = tonumber(type(job) == "table" and job.packRoom) or 0
 	local rack = tonumber(type(job) == "table" and job.rack) or 0
 	local parts: { string } = {}
@@ -94,7 +97,7 @@ function BagUi.render(parent: Instance, job: any, order: number): number
 	else
 		table.insert(parts, "🚚 In your vehicle and your hands")
 	end
-	Ui.label(head, table.concat(parts, "   ·   "), UDim2.new(1, -24, 0, 22), { Position = UDim2.fromOffset(16, 30), TextSize = 16, TextColor3 = P.ink, Font = Theme.HeadingFont, TextWrapped = false })
+	Ui.label(head, table.concat(parts, "   ·   "), UDim2.new(1, -32, 0, 26), { Position = UDim2.fromOffset(16, 32), TextSize = 16, TextColor3 = P.ink, Font = Theme.DisplayFont, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 	local groups = Bag.groups(carried, mode)
 	if #groups == 0 then
 		local empty = P.row(parent, 52, n)
@@ -103,7 +106,7 @@ function BagUi.render(parent: Instance, job: any, order: number): number
 		return n
 	end
 	for _, group in groups do
-		P.caps(parent, `{group.icon}  {group.title} · {#group.pieces}`, UDim2.new(1, -12, 0, 22), { LayoutOrder = n, TextColor3 = P.ink2, TextSize = 12 })
+		P.caps(parent, `{group.icon}  {group.title} · {#group.pieces}`, UDim2.new(1, -12, 0, 24), { LayoutOrder = n, TextColor3 = P.ink2, TextSize = 11, TextYAlignment = Enum.TextYAlignment.Bottom, TextStrokeTransparency = 1 })
 		n += 1
 		for _, piece in group.pieces do
 			local row = P.row(parent, 56, n)
