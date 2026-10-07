@@ -20,6 +20,9 @@
 -- its price at Last Stop Supplies), the bikes at Spoke & Chain (5.1), the Old Van and the car tiers at their new
 -- levels (all from Config). Below the first car tier the next goal counts on-foot runs. The phone's CAREER app
 -- (client/Phone.luau) reads CareerUi.unlockText and CareerUi.toGo.
+-- 5.8, the courier phone's look (design/phone-ui/): the ZDC window header with the career glyph; the road's rows are
+-- slim (a hairline between them), the current one selected (raised, the red rule); the level-up card opens with the
+-- ZDC heading ([■ ZDC] | career glyph  LEVEL UP) and its OK is the red primary action.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -305,6 +308,10 @@ local function roadRow(step: Career.Step, level: number, xp: number, order: numb
 	if here then
 		Ui.make("Frame", { Name = "Selected", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = P.red, BorderSizePixel = 0, ZIndex = 2 }, row)
 	end
+	-- 5.8: a hairline under each slim row (from the words' column, clear of the milestones' line).
+	if not last then
+		Ui.make("Frame", { Name = "Hairline", Size = UDim2.new(1, -64, 0, 1), Position = UDim2.new(0, 64, 1, -1), BackgroundColor3 = P.line, BackgroundTransparency = Ui.HAIRLINE, BorderSizePixel = 0 }, row)
+	end
 	-- The milestone: a line down the road through a square with the level's number.
 	-- (it starts at the first stone's middle and ends at the last one's)
 	local railTop = if step.level == 1 then 26 else 0
@@ -566,9 +573,9 @@ local function buildCard()
 	cardRefs.scale = Ui.make("UIScale", {}, card)
 	Ui.list(card, true, 8)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 28), PaddingRight = UDim.new(0, 28), PaddingTop = UDim.new(0, 22), PaddingBottom = UDim.new(0, 22) }, card)
-	local top = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = 1 }, card)
-	P.marker(top, 7, { Position = UDim2.fromOffset(0, 4) })
-	P.caps(top, "Level up  ·  Dead End Dispatch", UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1 })
+	-- 5.8: the ZDC heading ([■ ZDC] | career glyph  LEVEL UP), the phone's.
+	local heading = Ui.heading(card, "Level up", { glyph = "career", textSize = 14, height = 22 })
+	heading.frame.LayoutOrder = 1
 	cardRefs.title = label(card, "", { LayoutOrder = 2, Font = Theme.DisplayFont, TextSize = 26, TextColor3 = P.ink })
 	cardRefs.rank = label(card, "", { LayoutOrder = 3, Font = Theme.HeadingFont, TextSize = 13, TextColor3 = P.danger })
 	P.rule(card, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
@@ -587,7 +594,7 @@ local function buildCard()
 	end
 	cardRefs.close = closeCard
 	local hint = DialogKeys.hint()
-	cardRefs.ok = P.button(buttons, if hint ~= "" then `OK   ·   {hint}` else "OK", UDim2.fromOffset(200, 44), "main", closeCard)
+	cardRefs.ok = P.button(buttons, if hint ~= "" then `OK   ·   {hint}` else "OK", UDim2.fromOffset(200, 44), "primary", closeCard) -- 5.8: red
 	cardRefs.ok.LayoutOrder = 1
 	local more = P.button(buttons, "CAREER  ·  THE ROAD", UDim2.fromOffset(200, 44), "quiet", function()
 		closeCard()

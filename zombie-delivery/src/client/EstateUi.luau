@@ -18,6 +18,10 @@
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks EstateUi.isOpen()).
 -- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window: header, ESC footer), the properties as
 -- flat rows with the status column behind a fine line, the filters as flat tabs (the chosen one with a red rule).
+-- 5.8, the courier phone's look (design/phone-ui/): the ZDC window header with the estate glyph, the filters as the
+-- phone's square tabs (Ui.tabs: the open one raised with a red underline), the summary a slim row led by the red
+-- marker, the properties as slim hairline rows (no corners; your home selected: raised, the red rule; one you own a
+-- thin green rule), the facts as flat hairline cells, and BUY as the red primary action.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,7 +39,7 @@ local Theme = require(script.Parent.Theme)
 local MapView = require(script.Parent.MapView)
 
 local C = Ui.Colors
-local P = Theme.Postage
+local K = Theme.Contract
 local EstateUi = {}
 
 -- Set by the HUD: opening this window closes the HUD's windows (one window at a time).
@@ -66,7 +70,7 @@ local KINDS: { [string]: Kind } = {
 	villa = { name = "Villa", icon = "🏡", color = C.blue },
 	house = { name = "House", icon = "🏠", color = C.green },
 	garage = { name = "Garage", icon = "🅿️", color = C.grey },
-	office = { name = "Office", icon = "🏢", color = P.violet },
+	office = { name = "Office", icon = "🏢", color = K.text },
 }
 local HOME_KINDS = { mansion = true, villa = true, house = true }
 local FILTERS = {
@@ -89,7 +93,7 @@ local scale: any = nil
 local subtitle: any = nil
 local summary: any = nil
 local listPage: any = nil
-local filterBar: any = nil
+local filterTabs: Ui.Tabs? = nil -- 5.8: the filters (Ui.tabs)
 local body: any = nil
 local listingPage: any = nil
 local designWidth = BASE_W
@@ -312,31 +316,46 @@ local function build()
 	subtitle = chrome.subtitle
 
 	-- Your car slots, home, properties and money.
+	-- 5.8: a slim row led by the contract's red marker (like the leaderboard's).
 	summary = Ui.label(content, "", UDim2.new(1, -40, 0, 32), {
 		Position = UDim2.fromOffset(20, 12),
 		BackgroundTransparency = 0,
-		BackgroundColor3 = P.ticket,
-		TextSize = 15,
+		BackgroundColor3 = K.row,
+		TextSize = 14,
 		TextColor3 = C.text,
-		TextXAlignment = Enum.TextXAlignment.Center,
+		TextXAlignment = Enum.TextXAlignment.Left,
 		Font = Theme.HeadingFont,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	Ui.corner(summary)
-	Ui.stroke(summary, P.line, 1).Transparency = 0
+	Ui.stroke(summary, K.line, 1).Transparency = Ui.HAIRLINE
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 26), PaddingRight = UDim.new(0, 12) }, summary)
+	Ui.make("Frame", {
+		Name = "Marker",
+		Size = UDim2.fromOffset(7, 7),
+		Position = UDim2.new(0, -15, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = K.red,
+		BorderSizePixel = 0,
+	}, summary)
 
-	-- The list page: the filters and the rows.
+	-- The list page: the filters (5.8: the phone's square tabs, 36 px tall) and the rows.
 	listPage = Ui.make("Frame", { Size = UDim2.new(1, -36, 1, -60), Position = UDim2.fromOffset(18, 54), BackgroundTransparency = 1 }, content)
-	filterBar = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1 }, listPage)
-	Ui.list(filterBar, false, 6)
+	local items: { Ui.TabItem } = {}
+	for _, entry in FILTERS do
+		table.insert(items, { id = entry.id, text = entry.label })
+	end
+	filterTabs = Ui.tabs(listPage, items, function(id: string)
+		filter = id
+		render()
+	end, { selected = filter, height = 36, gap = 4, textSize = 13 })
 	body = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, 0, 1, -42),
-		Position = UDim2.fromOffset(0, 42),
+		Size = UDim2.new(1, 0, 1, -46),
+		Position = UDim2.fromOffset(0, 46),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 6,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, listPage)
@@ -349,8 +368,8 @@ local function build()
 		Position = UDim2.fromOffset(18, 54),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 6,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		Visible = false,
@@ -378,22 +397,11 @@ local function passes(def: Config.EstateDef): boolean
 	return def.kind == filter
 end
 
+-- The filter tabs (5.8: Ui.tabs, built once): the chosen one raised with a red rule under it, the others quiet.
 local function renderFilters()
-	Ui.clear(filterBar)
-	local width = if designWidth < NARROW then 86 else 100
-	for index, entry in FILTERS do
-		local on = filter == entry.id
-		-- The filter tabs: the chosen one raised with a red rule under it, the others quiet.
-		local button = Ui.button(filterBar, entry.label, UDim2.fromOffset(width, 32), if on then P.paper else P.lavenderDeep, function()
-			filter = entry.id
-			render()
-		end)
-		button.TextSize = 13
-		button.LayoutOrder = index
-		button.TextColor3 = if on then C.text else C.dim
-		if on then
-			Ui.make("Frame", { Name = "Rule", AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = C.red, BorderSizePixel = 0, ZIndex = 2 }, button)
-		end
+	local tabs = filterTabs
+	if tabs and tabs.selected ~= filter then
+		tabs.select(filter)
 	end
 end
 
@@ -403,28 +411,24 @@ local function row(def: Config.EstateDef, order: number)
 	local kind = kindOf(def)
 	local narrow = designWidth < NARROW
 	local right = if narrow then 190 else 236 -- the status column and the GPS button
-	-- A flat row: the status column behind a fine line; your home / a property you own has a narrow rule on its left.
+	-- A slim row (5.8: no corners, a hairline): the status column behind a fine line; your home is selected (raised,
+	-- the red rule), a property you own has a thin green rule on its left. Hover / gamepad focus brightens it.
 	local frame = Ui.make("TextButton", {
 		Size = UDim2.new(1, -10, 0, 64),
-		BackgroundColor3 = P.ticket,
+		BackgroundColor3 = K.row,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "",
 		LayoutOrder = order,
 	}, body)
-	Ui.corner(frame)
-	local edge = Ui.stroke(frame, P.line, 1)
-	edge.Transparency = 0
-	if isHome or mine then
-		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = if isHome then C.yellow else C.green, BorderSizePixel = 0, ZIndex = 2 }, frame)
+	Ui.stroke(frame, K.line, 1).Transparency = Ui.HAIRLINE
+	if isHome then
+		Ui.selectRow(frame, true)
+	elseif mine then
+		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = C.green, BorderSizePixel = 0, ZIndex = 2 }, frame)
 	end
-	Ui.dashes(frame, true, 6, P.line, UDim2.new(0, 1, 1, -16), UDim2.new(1, -right - 10, 0, 8))
-	frame.MouseEnter:Connect(function()
-		frame.BackgroundColor3 = P.paper
-	end)
-	frame.MouseLeave:Connect(function()
-		frame.BackgroundColor3 = P.ticket
-	end)
+	Ui.dashes(frame, true, 6, K.rule, UDim2.new(0, 1, 1, -16), UDim2.new(1, -right - 10, 0, 8))
+	Ui.tactile(frame)
 	frame.Activated:Connect(function()
 		EstateUi.openListing(def.id, false)
 	end)
@@ -438,7 +442,7 @@ local function row(def: Config.EstateDef, order: number)
 		Position = UDim2.fromOffset(62, 8),
 		TextSize = 18,
 		Font = Theme.DisplayFont,
-		TextColor3 = if isHome then C.yellow else C.text,
+		TextColor3 = C.text,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
@@ -548,10 +552,9 @@ local function nextOrder(): number
 end
 
 local function fact(parent: any, caption: string, value: string, color: Color3, hint: string?)
-	-- The concept's stat box: lavender, a thin line.
-	local cell = Ui.make("Frame", { BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = nextOrder() }, parent)
-	Ui.corner(cell)
-	Ui.stroke(cell, P.line, 1).Transparency = 0
+	-- A stat cell (5.8: flat, square, a hairline).
+	local cell = Ui.make("Frame", { BackgroundColor3 = K.row, BorderSizePixel = 0, LayoutOrder = nextOrder() }, parent)
+	Ui.stroke(cell, K.line, 1).Transparency = Ui.HAIRLINE
 	Ui.caps(cell, caption, UDim2.new(1, -16, 0, 16), { Position = UDim2.fromOffset(8, 6) })
 	Ui.label(cell, value, UDim2.new(1, -16, 0, 24), {
 		Position = UDim2.fromOffset(8, 22),
@@ -754,7 +757,7 @@ local function renderListing()
 	if not mine then
 		if nearProperty(def.id) then
 			local can = not locked(def) and story == nil and money >= def.price
-			actionButton(actions, `BUY  {Ui.money(def.price)}`, if can then C.yellow else C.grey, function()
+			actionButton(actions, `BUY  {Ui.money(def.price)}`, if can then K.red else C.grey, function() -- 5.8: the red primary
 				send("buy", def.id)
 			end)
 		else

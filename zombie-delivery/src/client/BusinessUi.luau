@@ -18,6 +18,10 @@
 -- While it is open the mouse is free (Main: CameraRig.mouseNeeded checks BusinessUi.isOpen()).
 -- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window), flat cards and rows, the dispatch radio
 -- a dark slip, the welcome-back card a charcoal card with a thin money-green rule.
+-- 5.8, the courier phone's look (design/phone-ui/): the ZDC window header with the bank glyph, the three cards, the
+-- upgrade and courier rows and the radio as flat hairline cards (no corners), each card's title led by the small red
+-- marker, square seats and pips; COLLECT is the red primary action (the one main action of the office), HIRE and
+-- UPGRADE stay main, FIRE keeps its danger look. The welcome-back card gets the ZDC heading and a red GPS TO OFFICE.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,7 +43,7 @@ local EstateUi = require(Client.EstateUi)
 local DialogKeys = require(Client.DialogKeys)
 
 local C = Ui.Colors
-local P = Theme.Postage
+local K = Theme.Contract
 local B = Config.Business
 local BusinessUi = {}
 
@@ -172,7 +176,8 @@ local function paintButton(button: any, text: string, color: Color3, enabled: bo
 	local fill = if enabled then color else C.grey
 	button.Text = text
 	button.BackgroundColor3 = fill
-	button.TextColor3 = if enabled then Theme.textOn(fill) else C.dim
+	-- (5.8: the red primary face keeps its white caps, the phone's PhoneContract.primary)
+	button.TextColor3 = if not enabled then C.dim elseif Theme.soft(fill).primary then K.text else Theme.textOn(fill)
 	button.AutoButtonColor = false
 end
 
@@ -279,12 +284,13 @@ local function card(parent: any, x: number, width: number, title: string): any
 	local frame = Ui.make("Frame", {
 		Size = UDim2.fromOffset(width, 136),
 		Position = UDim2.fromOffset(x, 0),
-		BackgroundColor3 = P.ticket,
+		BackgroundColor3 = K.row,
 		BorderSizePixel = 0,
 	}, parent)
-	Ui.corner(frame)
-	Ui.stroke(frame, P.line, 1).Transparency = 0
-	Ui.caps(frame, title, UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 8) })
+	Ui.stroke(frame, K.line, 1).Transparency = Ui.HAIRLINE
+	-- 5.8: the title led by the contract's red marker (the phone's "■ ACTIVE ORDER").
+	Ui.make("Frame", { Name = "Marker", Size = UDim2.fromOffset(7, 7), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = K.red, BorderSizePixel = 0 }, frame)
+	Ui.caps(frame, title, UDim2.new(1, -38, 0, 16), { Position = UDim2.fromOffset(26, 8) })
 	return frame
 end
 
@@ -338,7 +344,7 @@ local function build()
 	safeBack.Position = UDim2.fromOffset(12, 60)
 	refs.safeFill = safeFill
 	refs.safeInfo = Ui.label(safeCard, "", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 70), TextSize = 12, Font = Theme.Font, TextColor3 = C.dim })
-	refs.collect = Ui.button(safeCard, "COLLECT", UDim2.new(1, -24, 0, 34), C.green, function()
+	refs.collect = Ui.button(safeCard, "COLLECT", UDim2.new(1, -24, 0, 34), K.red, function() -- 5.8: the red primary
 		onCollect()
 	end)
 	refs.collect.Position = UDim2.fromOffset(12, 92)
@@ -351,7 +357,7 @@ local function build()
 		TextColor3 = C.text,
 		TextScaled = true,
 	})
-	refs.multiplier = Ui.label(earnCard, "", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 60), TextSize = 13, TextColor3 = P.violet })
+	refs.multiplier = Ui.label(earnCard, "", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(12, 60), TextSize = 13, TextColor3 = K.text })
 	refs.earnInfo = Ui.label(earnCard, "", UDim2.new(1, -24, 0, 50), {
 		Position = UDim2.fromOffset(12, 80),
 		TextSize = 12,
@@ -398,8 +404,8 @@ local function build()
 		Position = UDim2.fromOffset(18, listTop + 22),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 5,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, content)
@@ -414,23 +420,22 @@ local function build()
 		Position = UDim2.fromOffset(rightX, listTop + 22),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 5,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, content)
 	Ui.list(upgrades, true, 6)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 1), PaddingLeft = UDim.new(0, 1), PaddingRight = UDim.new(0, 6) }, upgrades)
 	for order, def in B.Upgrades do
-		local row = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 84), BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = order }, upgrades)
-		Ui.corner(row)
-		Ui.stroke(row, P.line, 1).Transparency = 0
+		local row = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 84), BackgroundColor3 = K.row, BorderSizePixel = 0, LayoutOrder = order }, upgrades)
+		Ui.stroke(row, K.line, 1).Transparency = Ui.HAIRLINE
 		Ui.label(row, def.name, UDim2.new(1, -20, 0, 20), { Position = UDim2.fromOffset(10, 6), TextSize = 16, Font = Theme.DisplayFont, TextWrapped = false })
 		local level = Ui.label(row, "", UDim2.fromOffset(70, 20), {
 			Position = UDim2.new(1, -80, 0, 6),
 			TextSize = 13,
 			Font = Theme.MonoFont,
-			TextColor3 = P.violet,
+			TextColor3 = K.text,
 			TextXAlignment = Enum.TextXAlignment.Right,
 		})
 		Ui.label(row, def.description, UDim2.new(1, -20, 0, 16), { Position = UDim2.fromOffset(10, 27), TextSize = 12, Font = Theme.Font, TextColor3 = C.dim, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
@@ -438,8 +443,7 @@ local function build()
 		Ui.list(pipBox, false, 4)
 		local pips = {}
 		for i = 1, def.maxLevel do
-			local pip = Ui.make("Frame", { Size = UDim2.fromOffset(16, 10), BackgroundColor3 = P.track, BorderSizePixel = 0, LayoutOrder = i }, pipBox)
-			Ui.corner(pip)
+			local pip = Ui.make("Frame", { Size = UDim2.fromOffset(16, 10), BackgroundColor3 = K.track, BorderSizePixel = 0, LayoutOrder = i }, pipBox)
 			table.insert(pips, pip)
 		end
 		local id = def.id
@@ -451,16 +455,16 @@ local function build()
 		upgradeRows[def.id] = { level = level, pips = pips, button = button }
 	end
 
-	-- ── Dispatch radio ── (a paper slip, typed)
+	-- ── Dispatch radio ── (a dark slip, typed; 5.8: flat, a hairline, the red marker before its title)
 	local radioBox = Ui.make("Frame", {
 		Size = UDim2.new(1, -36, 0, radioHeight),
 		Position = UDim2.new(0, 18, 1, -(radioHeight + 12)),
-		BackgroundColor3 = P.paper,
+		BackgroundColor3 = K.recessed,
 		BorderSizePixel = 0,
 	}, content)
-	Ui.corner(radioBox)
-	Ui.stroke(radioBox, P.line, 1).Transparency = 0
-	Ui.caps(radioBox, "📻 Dispatch radio", UDim2.fromOffset(200, 16), { Position = UDim2.fromOffset(10, 5), TextColor3 = C.green })
+	Ui.stroke(radioBox, K.line, 1).Transparency = Ui.HAIRLINE
+	Ui.make("Frame", { Name = "Marker", Size = UDim2.fromOffset(7, 7), Position = UDim2.fromOffset(10, 9), BackgroundColor3 = K.red, BorderSizePixel = 0 }, radioBox)
+	Ui.caps(radioBox, "📻 Dispatch radio", UDim2.fromOffset(200, 16), { Position = UDim2.fromOffset(24, 5), TextColor3 = K.secondary })
 	refs.radio = {}
 	for i = 1, 3 do
 		local line = Ui.label(radioBox, "", UDim2.new(1, -20, 0, 16), {
@@ -479,24 +483,27 @@ local function build()
 	welcomeCard.Visible = false
 	welcomeCard.BackgroundTransparency = 0
 	welcomeScale = Ui.make("UIScale", {}, welcomeCard)
-	Ui.stroke(welcomeCard, P.line, 1)
+	Ui.stroke(welcomeCard, K.line, 1).Transparency = Ui.HAIRLINE
 	Ui.edge(welcomeCard, C.money, 0)
-	Ui.caps(welcomeCard, "Welcome back, boss", UDim2.new(1, -24, 0, 16), { Position = UDim2.fromOffset(16, 12), TextSize = 13, TextColor3 = C.green })
+	-- 5.8: the ZDC heading ([■ ZDC] | bank glyph  WELCOME BACK, BOSS).
+	local heading = Ui.heading(welcomeCard, "Welcome back, boss", { glyph = "bank", textSize = 14, height = 22 })
+	heading.frame.Size = UDim2.new(1, -32, 0, 22)
+	heading.frame.Position = UDim2.fromOffset(16, 10)
 	refs.welcomeText = Ui.label(welcomeCard, "", UDim2.new(1, -32, 0, 54), {
-		Position = UDim2.fromOffset(16, 30),
+		Position = UDim2.fromOffset(16, 38),
 		TextSize = 20,
 		Font = Enum.Font.GothamBold,
 		RichText = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 	})
 	refs.welcomeInfo = Ui.label(welcomeCard, "", UDim2.new(1, -32, 0, 30), {
-		Position = UDim2.fromOffset(16, 86),
+		Position = UDim2.fromOffset(16, 90),
 		TextSize = 13,
 		Font = Theme.Font,
 		TextColor3 = C.dim,
 		TextYAlignment = Enum.TextYAlignment.Top,
 	})
-	refs.welcomeGps = Ui.button(welcomeCard, "📍 GPS TO OFFICE", UDim2.fromOffset(200, 34), C.blue, function()
+	refs.welcomeGps = Ui.button(welcomeCard, "📍 GPS TO OFFICE", UDim2.fromOffset(200, 36), K.red, function() -- 5.8: the red primary
 		BusinessUi.gpsToOffice()
 		welcomeCard.Visible = false
 	end)
@@ -618,9 +625,8 @@ local function rebuildRows()
 	end
 	local now = os.clock()
 	for i = 1, hired do
-		local frame = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 60), BackgroundColor3 = P.ticket, BorderSizePixel = 0, LayoutOrder = i }, road)
-		Ui.corner(frame)
-		Ui.stroke(frame, P.line, 1).Transparency = 0
+		local frame = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 60), BackgroundColor3 = K.row, BorderSizePixel = 0, LayoutOrder = i }, road)
+		Ui.stroke(frame, K.line, 1).Transparency = Ui.HAIRLINE
 		local iconBox = Ui.make("Frame", { Size = UDim2.fromOffset(34, 34), Position = UDim2.fromOffset(10, 10), BackgroundTransparency = 1 }, frame)
 		local name = courierName(i)
 		Ui.label(frame, `Courier {name}`, UDim2.new(1, -170, 0, 20), {
@@ -691,13 +697,12 @@ local function render()
 	refs.count.TextColor3 = if hired > seats then C.red else C.text
 	Ui.clear(refs.seats)
 	for i = 1, math.max(seats, hired) do
-		local seat = Ui.make("Frame", {
+		Ui.make("Frame", { -- a square seat (5.8: no corners)
 			Size = UDim2.fromOffset(if math.max(seats, hired) > 8 then 10 else 16, 10),
-			BackgroundColor3 = if i <= working then P.violet elseif i <= hired then C.red else P.track,
+			BackgroundColor3 = if i <= working then K.text elseif i <= hired then C.red else K.track,
 			BorderSizePixel = 0,
 			LayoutOrder = i,
 		}, refs.seats)
-		Ui.corner(seat)
 	end
 	refs.crewInfo.Text = if hired > seats then `{hired - seats} without a desk: they do not earn` elseif hired >= seats and seats > 0 then "Every desk is taken" else `Hiring costs {Ui.money(B.CourierCost)}`
 	local canHire = at and hasOffice and hired < seats
@@ -711,7 +716,7 @@ local function render()
 			local level = upgradeLevel(def.id)
 			row.level.Text = `LV {level}/{def.maxLevel}`
 			for i, pip in row.pips do
-				pip.BackgroundColor3 = if i <= level then P.violet else P.track
+				pip.BackgroundColor3 = if i <= level then K.text else K.track
 			end
 			if level >= def.maxLevel then
 				paintButton(row.button, "MAX", C.green, false)
@@ -751,7 +756,7 @@ local function step()
 		refs.safeInfo.Text = `of {Ui.money(cap)} · hire couriers to fill it`
 		refs.safeInfo.TextColor3 = C.dim
 	end
-	paintButton(refs.collect, if safe >= 1 then `COLLECT {Ui.money(safe)}` else "COLLECT", C.green, state.atOffice == true and safe >= 1)
+	paintButton(refs.collect, if safe >= 1 then `COLLECT {Ui.money(safe)}` else "COLLECT", K.red, state.atOffice == true and safe >= 1)
 	if fireArmedUntil > 0 and os.clock() >= fireArmedUntil then
 		fireArmedUntil = 0
 		paintButton(refs.fire, "FIRE", C.red, state.atOffice == true and (tonumber(state.couriers) or 0) > 0)
