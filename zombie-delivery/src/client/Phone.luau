@@ -70,6 +70,7 @@ Phone.onCareer = nil :: (() -> ())? -- FULL CAREER: CareerUi.open
 Phone.boardOpen = nil :: (() -> boolean)? -- is the Dispatch board open (DispatchUi.isOpen): no "new runs" then
 Phone.blocked = nil :: (() -> boolean)? -- the NEW PHONE pop-up waits while this says so (Marge's dialog, a result)
 Phone.notify = nil :: ((string) -> ())? -- a toast (Hud.toast)
+Phone.onTour = nil :: ((kind: string) -> ())? -- 6.7, SETTINGS: "screen" / "around", Marge's tours (client/TutorialUi.luau)
 
 local player = Players.LocalPlayer
 local KEY = Enum.KeyCode.Q -- 5.4.1 (was O; the weapon wheel moved to T)
@@ -1459,6 +1460,11 @@ renderApp = function()
 				end
 			end)
 			button(list, "PUT PHONE AWAY", "main", 3, Phone.close)
+			local tour = Phone.onTour -- 6.7: Marge's tours again (client/TutorialUi.luau: the phone closes first)
+			if tour then
+				button(list, "SHOW ME THE SCREEN", "quiet", 3, function() tour("screen") end)
+				button(list, "SHOW ME AROUND", "quiet", 3, function() tour("around") end)
+			end
 			refs.apps.keys(list, look, 4) -- 5.5: every key, the version
 		elseif app == "board" then
 			refs.apps.board(list, look, refs.host, wide) -- 5.5; 6.0.1: two columns in a wide popup

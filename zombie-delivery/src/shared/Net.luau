@@ -45,7 +45,7 @@ local NAMES = {
 	"Challenges", -- client → server: ("open") or ("title", title or nil); server → client: ("state", …) or ("unlocked", …)
 	"Garage", -- 3.4: client → server: ("take", car id) or ("refresh"); server → client: the garage window (server/Garages.luau)
 	"Repair", -- 3.4: server → client: a repair started ({ car, shop, seconds, total, fee }) or ended (nil) (server/Repair.luau)
-	"Tutorial", -- 3.7: server → client: (phase, data?): welcome / board / job / retry / done / say, or nil (5.0: also "phone", Marge gave it, and "message", { from, text, gps? } a text for the phone: server/VanQuest.luau); client → server: ("go") or ("skip") (server/Tutorial.luau)
+	"Tutorial", -- 3.7: server → client: (phase, data?): welcome / tour (6.7) / board / job / done / say, or nil (5.0: also "phone", Marge gave it, and "message", { from, text, gps? } a text for the phone: server/VanQuest.luau); client → server: ("tour"; 6.5's "go"), ("board") or ("skip") (server/Tutorial.luau)
 	"Explore", -- 3.7: server → client: ("state", cells string, places list) on joining, ("cells", list) newly uncovered, ("place", id) discovered
 	"Holster", -- 3.9: client → server: (holstered boolean) the gun away (B) or in the hand; the server sets the character's Holstered attribute (server/CloseCombat.luau)
 	"Melee", -- 3.9: client → server: (the swing's direction, a unit Vector3, or nil) a punch (holstered) or a strike with the gun (V); checked on the server

@@ -61,17 +61,22 @@ Config.Arms = {
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
--- player, gives them the first job and explains each step until it is delivered.
+-- player, gives them the first job and explains each step until it is delivered. 6.7: she shows the screen with an
+-- arrow tour (client/TutorialArrow.luau) and gives no job: you take any one, the first delivery pays Reward.
 Config.Tutorial = {
 	NpcName = "Marge",
 	NpcTitle = "Dispatcher",
-	Reward = 50, -- money for finishing the tutorial's job (on top of its pay)
+	Reward = 50, -- money for the first delivery (6.7: of any job, on top of its pay; a skipped tutorial pays none)
 	NpcSpot = { -4, -20 }, -- where she stands, studs from the depot's centre (Map.Shops.depot): by the job board, facing the yard
 	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
-	StartDelay = 1.5, -- seconds after your car came (PLAY pressed) before she speaks: the start screen fades out first
-	DoneDelay = 2.5, -- seconds after the delivery before her last pages (the delivery's result shows first)
-	RetryAfter = 1.5, -- a tutorial job gone this long without a result (a special job ended, an admin): offered again
+	StartDelay = 2, -- seconds after PLAY before her welcome shows (6.7: on its own; the start screen fades out first)
+	RetryAfter = 1.5, -- a first job gone this long without a result (a special job ended, an admin): back to "board"
 	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
+	-- 6.7: the arrow tour of the screen (client/TutorialArrow.luau; px at the screen's scale)
+	TourBounce = 10, -- how far the arrow bounces back from its target
+	TourBounceSpeed = 1.6, -- bounces a second
+	TourGap = 8, -- between the target and the arrow's tip
+	TourCaptionWidth = 300, -- the caption box's width
 }
 
 -- 3.7: the map you discover (shared/Explore.luau, server/Explore.luau, client/MapView.luau, the minimap in Hud).

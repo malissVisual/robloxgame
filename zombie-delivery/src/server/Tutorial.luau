@@ -2,27 +2,32 @@
 -- 3.7: the first-day tutorial. Marge, the dispatcher (Config.Tutorial: an R15 person from server/Npcs.luau with a name
 -- tag, the idle animation and a "Talk" prompt), stands at the depot by the job board. She is there for everybody.
 --
--- A player whose profile.tutorial is false (a new save; PlayerData counts an older save with a delivery as done):
+-- 6.7, a tutorial that never annoys (the owner: "It should simply show with an arrow where things are in the menu,
+-- then that you take one job, and you either say yes or skip tutorial. But don't automatically give a job."). A player
+-- whose profile.tutorial is false (a new save; PlayerData counts an older save with a delivery as done):
 --   wait     until PLAY was pressed (Tutorial.onPlay when Main calls it; or their car came), then
 --            Config.Tutorial.StartDelay s for the start screen to fade
---   welcome  her greeting (client/TutorialUi.luau shows the dialog at once, a marker over her). "Let's go" in the
---            dialog or talking to her (E): she gives the PHONE (5.0) and Jobs.startTutorialJob, the first delivery ON
---            FOOT (two letters on one street), as if taken from the board
---   board    no job could be made: take an ON FOOT job from the board (J)
---   job      a job runs: the client reads the Job payload for its hints (shared/TutorialSteps.luau)
---   retry    it failed or was cancelled (Jobs.onDelivered false, or the job vanished without a result): she offers
---            another, over the radio or when you talk to her
--- Jobs.onDelivered with ok (an ordinary job delivered and paid, whichever one): profile.tutorial = true, the
--- Config.Tutorial.Reward on top and her last pages about the rest of the game ("done"). "skip" ends it at once (no
--- reward). Talking to her afterwards gets a short line. A crew mate helping is fine: the job is the owner's.
--- Nothing is saved but profile.tutorial: leaving and coming back before the delivery starts again at the welcome.
+--   welcome  her one-page greeting shows on its own (client/TutorialUi.luau). SHOW ME ("tour" from the client) gives
+--            the PHONE (5.0) and starts the arrow tour; SKIP TUTORIAL ("skip") ends it. Talking to her (E) shows the
+--            greeting again.
+--   tour     the client's arrow tour of the screen runs (client/TutorialArrow.luau). Its last page, TAKE A JOB
+--            ("board"), opens the phone's JOBS; SKIP TUTORIAL ("skip") ends it.
+--   board    she waits for your first job: any one, from the board or the phone (she gives none: Jobs.startTutorialJob
+--            stays callable but unused). Talking to her: one page with OPEN THE BOARD ("say", board = true).
+--   job      a job runs: the HUD's goal card shows the hints (shared/TutorialSteps.luau)
+-- A failed or cancelled job (Jobs.onDelivered false, or the job vanished without a result) goes back to "board" with no
+-- page of hers ("retry" is never sent any more). Jobs.onDelivered with ok, in any phase (whichever job, a crew mate
+-- helping is fine: the job is the owner's): profile.tutorial = true, Config.Tutorial.Reward on top and a toast "First
+-- delivery! +$50" ("done": no page). "skip" ends it at once (no reward). Talking to her afterwards gets a short line.
+-- Nothing is saved but profile.tutorial: leaving and coming back before the first delivery starts again at the welcome;
+-- a save that finished or skipped it never sees it again.
 --
--- Remote "Tutorial": server → client (phase, data?) with data.npc = her model (the marker), data.given (the job is
--- hers), data.reward (done), data.text (say); (nil) = over (skipped). Client → server: ("go") = her dialog's
--- "Let's go" / "Another job", ("skip").
--- 5.0, the phone: profile.phone = true when she gives you the first job (or the tutorial is skipped; a player without
--- the tutorial gets it at once), and the message ("phone", { npc }) right before the job's: client/Phone.luau shows
--- its "NEW PHONE" moment (TutorialUi ignores it: not a phase).
+-- Remote "Tutorial": server → client (phase, data?) with data.npc = her model (the marker), data.reward (done),
+-- data.text / data.board (say); (nil) = over (skipped). Client → server: ("tour") her welcome's SHOW ME (6.5's "go"
+-- counts the same), ("board") the tour's TAKE A JOB, ("skip").
+-- 5.0, the phone: profile.phone = true at SHOW ME (6.7; or when the tutorial ends, delivered or skipped; a player
+-- without the tutorial gets it at once), and the message ("phone", { npc }): client/Phone.luau shows its "NEW PHONE"
+-- moment (TutorialUi ignores it: not a phase; 6.7: the tour opens the phone itself, the moment's pop-up waits for it).
 -- 5.1, Spoke & Chain: when a player reaches Career.BIKE_LEVEL while playing and owns no bike, Marge texts them
 -- (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's "message" with the GPS to the shop,
 -- client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
@@ -53,10 +58,9 @@ local Tuning = Config.Tutorial
 local Tutorial = {}
 
 type Session = {
-	phase: string, -- wait | welcome | board | job | retry
+	phase: string, -- wait | welcome | tour | board | job (6.7)
 	readyAt: number?, -- wait: PLAY was pressed, she speaks at this os.clock()
 	goneAt: number?, -- job: the job disappeared at (no onDelivered yet)
-	nextGo: number, -- a double "go" (a click and a key) starts one job
 	lastAsk: number, -- the remote's throttle
 }
 
@@ -101,7 +105,7 @@ local function givePhone(player: Player)
 	send(player, "phone")
 end
 
--- The tutorial is over for this player: delivered (with the reward and her last pages) or skipped.
+-- The tutorial is over for this player: the first delivery (with the reward) or skipped.
 local function finish(player: Player, delivered: boolean)
 	local profile = PlayerData.get(player)
 	sessions[player] = nil
@@ -109,49 +113,36 @@ local function finish(player: Player, delivered: boolean)
 		return
 	end
 	profile.tutorial = true
+	givePhone(player) -- 5.0: the phone all the same (6.7: also after a first job taken before her welcome)
 	if delivered then
 		PlayerData.addMoney(player, Tuning.Reward) -- (fires PlayerData.Changed: the HUD's money)
-		notice:FireClient(player, `+${Tuning.Reward} from {Tuning.NpcName}: your first delivery!`)
-		-- Her last pages a moment later, over the radio: the delivery's own result shows first.
-		task.delay(Tuning.DoneDelay, function()
-			if player.Parent then
-				send(player, "done", { reward = Tuning.Reward })
-			end
-		end)
+		-- 6.7: a toast, no page (the delivery's own result shows); "done" ends the phase on the client
+		notice:FireClient(player, `First delivery! +${Tuning.Reward} from {Tuning.NpcName}.`)
+		send(player, "done", { reward = Tuning.Reward })
 	else
 		send(player, nil)
 		notice:FireClient(player, `Tutorial skipped. {Tuning.NpcName} is by the job board if you need her.`)
-		givePhone(player) -- 5.0: the phone all the same
 	end
 end
 
--- Her first job (Jobs.startTutorialJob), or the board when none could be made.
-local function giveJob(player: Player, session: Session)
-	local now = os.clock()
-	if now < session.nextGo then
-		return
-	end
-	session.nextGo = now + 1
+-- 6.7: SHOW ME: her phone (the tour opens it) and the arrow tour on the client.
+local function startTour(player: Player, session: Session)
+	givePhone(player)
+	session.phase = "tour"
+	send(player, "tour")
+	bubble(TutorialSteps.Bubble.tour)
+end
+
+-- 6.7: she waits for your first job (any one; she gives none). A job that already runs counts at once.
+local function toBoard(player: Player, session: Session)
 	session.goneAt = nil
 	if Jobs.active(player) then
 		session.phase = "job"
 		send(player, "job")
 		return
 	end
-	givePhone(player) -- 5.0: "take this phone" (before the job's own dialog)
-	local ok, given = pcall(Jobs.startTutorialJob, player)
-	if not ok then
-		warn(`[Tutorial] startTutorialJob: {given}`)
-	end
-	if ok and given == true then
-		session.phase = "job"
-		send(player, "job", { given = true })
-		bubble(TutorialSteps.Bubble.give)
-	else
-		session.phase = "board"
-		send(player, "board")
-		bubble(TutorialSteps.Bubble.board)
-	end
+	session.phase = "board"
+	send(player, "board")
 end
 
 -- The Talk prompt (E at Marge).
@@ -179,7 +170,16 @@ local function onTalk(player: Player)
 		bubble(TutorialSteps.Bubble.busy)
 		return
 	end
-	giveJob(player, session)
+	if session.phase == "wait" or session.phase == "welcome" then
+		session.phase = "welcome" -- (6.7: her greeting again, or before PLAY's delay ran out)
+		send(player, "welcome")
+	elseif session.phase == "tour" then
+		bubble(TutorialSteps.Bubble.tour) -- (the arrows are on screen: no page)
+	else
+		session.phase = "board"
+		send(player, "say", { board = true, reward = Tuning.Reward })
+		bubble(TutorialSteps.Bubble.board)
+	end
 end
 
 local function onRemote(player: Player, action: any)
@@ -197,25 +197,27 @@ local function onRemote(player: Player, action: any)
 	session.lastAsk = now
 	if action == "skip" then
 		finish(player, false)
-	elseif action == "go" then
-		if session.phase == "welcome" or session.phase == "board" or session.phase == "retry" then
-			giveJob(player, session)
+	elseif action == "tour" or action == "go" then
+		if session.phase == "welcome" then
+			startTour(player, session)
+		end
+	elseif action == "board" then
+		if session.phase == "welcome" or session.phase == "tour" then
+			toBoard(player, session)
 		end
 	end
 end
 
--- Set on Jobs.onDelivered (chained): an ordinary job of `player` ended, delivered and paid (ok) or not.
+-- Set on Jobs.onDelivered (chained): a job of `player` ended, delivered and paid (ok) or not.
 local function onDelivered(player: Player, ok: boolean)
 	local session = sessions[player]
 	if not session or not pending(player) then
 		return
 	end
 	if ok then
-		finish(player, true)
+		finish(player, true) -- 6.7: the first delivery of any job, in any phase
 	else
-		session.phase = "retry"
-		session.goneAt = nil
-		send(player, "retry")
+		toBoard(player, session) -- 6.7: no page: the goal card says "Take your first job" again
 	end
 end
 
@@ -274,16 +276,14 @@ local function check(player: Player, session: Session, now: number)
 			session.goneAt = nil
 			return
 		end
-		-- Gone without onDelivered (a special job or a mission ended, an admin cancelled it): offer another.
+		-- Gone without onDelivered (a special job or a mission ended, an admin cancelled it): back to "board".
 		local goneAt = session.goneAt or now
 		session.goneAt = goneAt
 		if now - goneAt >= Tuning.RetryAfter then
-			session.phase = "retry"
-			session.goneAt = nil
-			send(player, "retry")
+			toBoard(player, session)
 		end
 	elseif Jobs.active(player) then
-		session.phase = "job" -- welcome / board / retry: a job taken from the board counts as well
+		session.phase = "job" -- welcome / tour / board: a job taken from the board or the phone counts
 		send(player, "job")
 	end
 end
@@ -314,7 +314,7 @@ end
 
 local function track(player: Player)
 	if not sessions[player] then
-		sessions[player] = { phase = "wait", nextGo = 0, lastAsk = 0 }
+		sessions[player] = { phase = "wait", lastAsk = 0 }
 	end
 end
 

@@ -1120,6 +1120,31 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Marge shows you the screen, you pick your first job (6.7)
+
+The owner: "Make the tutorial not annoy you. It should simply show with an arrow where things are in the menu, then
+that you take one job, and you either say yes or skip tutorial. But don't automatically give a job."
+
+- **Her welcome comes on its own**, 2 s after PLAY on a new save (`Config.Tutorial.StartDelay`): one page, "Hi, I'm
+  Marge, dispatch. You're a courier now: take jobs, deliver, get paid. Let me show you around in 20 seconds." **SHOW
+  ME** gives you her phone and starts the tour; **SKIP TUTORIAL** ends it. TALK TO MARGE over her head only shows while
+  that welcome waits unseen; E at her shows it again.
+- **The arrow tour** (`client/TutorialArrow.luau`, driven by `client/TutorialUi.luau`, the stops in
+  `TutorialSteps.ScreenTour`): a big bouncing red arrow, a pulsing frame round the thing and a one-sentence caption with
+  NEXT › and SKIP TUTORIAL. The NEXT card, PHONE [Q], then the phone opens by itself for JOBS, MAP, SHOP and BAG & ITEMS,
+  it goes away for the bottom bar (1 fists, 2 bag, 3 gun, 4–8 items), then the minimap (M). Nothing stops: you can
+  walk meanwhile. It follows its target every frame (a phone sliding in, a HUD laid out again); `TutorialSteps.placeArrow`
+  (tested) picks the side with room. Enter or a gamepad's A is NEXT (Space still jumps), touch taps. Close the phone
+  during its stops and the tour moves on past them; take a job meanwhile and it ends quietly.
+- **No automatic job:** the last page asks "Ready? Take your first job" with **TAKE A JOB** (the phone opens on JOBS,
+  you pick any job) or SKIP TUTORIAL. Then nothing of hers during play: the **first delivery of any job** pays the $50
+  (`Config.Tutorial.Reward`) with a "First delivery! +$50 from Marge." toast; a failed one just goes back to "Take your
+  first job (J)" on the NEXT card. The strip under the card says FIRST DAY · +$50 ON YOUR FIRST DELIVERY with SKIP (it
+  asks first; a skip pays nothing). Her special two-letter job (`Jobs.startTutorialJob`) is no longer used; her done,
+  board and retry pages are gone. A save that finished or skipped it never sees it again.
+- **Again, any time:** the phone's MORE → SETTINGS has SHOW ME THE SCREEN (this tour) and SHOW ME AROUND (the 5.7
+  world tour: the ZDC RIDE dock, the nearest bus stop, then JOBS).
+
 ## The bag shows, and what is in it (6.4.1)
 
 The owner: "the bag isn't visible when I have it; and it would be good if it were more visible, and that there is
@@ -1655,7 +1680,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, 6.1: the
               hand slots 1-3, the item slots 4-8 and what you carry), BagSway (6.1: the bag's pendulum, the BagSwing
               joint's only writer), KeyHints (6.1: the key hints under the top buttons, F1), Objective (6.5: the NEXT
-              card, its words from shared/Goal.luau), MapView (minimap, big map, GPS routes),
+              card, its words from shared/Goal.luau), TutorialUi (Marge's pages; 6.7: drives the arrow tour) and
+              TutorialArrow (6.7: the tour's arrow, frame and caption), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
