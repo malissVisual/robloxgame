@@ -3625,6 +3625,8 @@ layout = function()
 	end
 	-- The breath bar (client/Stamina.luau) right over the action (6.0.1: on a computer too, the bar raised it).
 	require(script.Parent.Stamina).place(hintX, hintBottom - 108 * S)
+	-- 6.3 review: the throw's line and power meter over the breath bar (its bar and caption about 30 · S tall)
+	require(script.Parent.Throw).place(H - (hintBottom - 108 * S) + 30 * S + GAP)
 	local hintMax = hint:FindFirstChild("Max")
 	if hintMax and hintMax:IsA("UISizeConstraint") then
 		hintMax.MaxSize = Vector2.new(hintW / S, math.huge)

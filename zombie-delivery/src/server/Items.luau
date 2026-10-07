@@ -19,7 +19,6 @@ local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
 local BanditCars = require(script.Parent.BanditCars)
 local PlayerData = require(script.Parent.PlayerData)
-local Holding = require(Shared.Holding) -- 6.3: the hand keys before the item slots (the crate's notice)
 
 local Tuning = Config.ItemTuning
 local Items = {}
@@ -312,23 +311,6 @@ local function placeCrate(folder: Instance)
 	table.insert(crates, crate)
 end
 
--- 6.3: where a consumable you own sits on the bottom bar (client/Hotbar.luau: the first five kinds you own in
--- Config.Items order, keys after the hands' 1-3; a sixth kind on key 9), so the crate's notice explains the new filled
--- slot ("found a Medkit → slot 5").
-local function slotOf(player: Player, id: string): string
-	local profile = PlayerData.get(player)
-	local index = 0
-	for _, def in Config.Items do
-		if profile and (profile.items[def.id] or 0) > 0 then
-			index += 1
-		end
-		if def.id == id then
-			break
-		end
-	end
-	return if index >= 1 and index <= Config.ItemTuning.BarSlots then `slot {index + #Holding.Order}` else "key 9"
-end
-
 local function article(noun: string): string
 	return if string.find("AEIOUaeiou", string.sub(noun, 1, 1), 1, true) then "an " .. noun else "a " .. noun
 end
@@ -345,7 +327,7 @@ local function collect(player: Player, crate: Part)
 	if rng:NextNumber() < loot.ItemChance then
 		local def = Config.Items[rng:NextInteger(1, #Config.Items)]
 		if PlayerData.addItem(player, def.id, 1) then
-			notice:FireClient(player, `Supply crate: found {article(def.name)} {def.icon} → {slotOf(player, def.id)}`)
+			notice:FireClient(player, `Supply crate: found {article(def.name)} {def.icon} → in your item bar`) -- (6.3 review: no slot number: a touch screen shows fewer slots and no keys)
 			gotItem = true
 		end
 	end

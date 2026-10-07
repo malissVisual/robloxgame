@@ -20,7 +20,7 @@
 --     slot is created when you pick something up"). From the job payload's `carried` and the PackCount / PackRoom /
 --     BagRoom attributes; off duty it hides while you carry nothing. A click opens the I window's BAG tab (BagUi.open).
 -- 6.3: the bag slot's "n/room" is the server's (the BagRoom attribute) on a job, the kit's off duty; a car job says
--- "CAR JOB" (its pickups go to your hands); a count badge on the slot says the pieces in the bag.
+-- "HANDS ONLY" (a job whose pickups go to your hands: a car job); a count badge on the slot says the pieces in the bag.
 -- The bar: the pill over the row of the hands and the items. A touch screen: the slots at least 48 px, two item slots,
 -- no keys. It hides with the HUD (it lives in its ScreenGui) and while a window, the phone or a dialog covers the game
 -- (Hotbar.covered, set by the client's Main; checked 10 times a second). Drawn again only when what it shows changed (a
@@ -300,7 +300,9 @@ end
 local function bagNow(): (boolean, number, number, boolean, boolean)
 	local kit = kitOwned()
 	local owned = kit[Config.Courier.BagKit] == true
-	local carJob = job ~= nil and job.mode ~= "foot" and job.mode ~= "bike"
+	-- (6.3 review: the server decides: no BagRoom on this job = the bag takes nothing here; a mission's foot job is
+	-- built with the car mode, so the mode alone said "CAR JOB" wrongly)
+	local carJob = job ~= nil and player:GetAttribute("BagRoom") == nil
 	local room = if job then math.floor(tonumber(player:GetAttribute("BagRoom")) or 0)
 		else math.max(0, Transport.handsRoom(kit) - Transport.backpackRoom(kit))
 	local count = math.floor(tonumber(player:GetAttribute("BagCount")) or 0)
@@ -409,8 +411,8 @@ local function drawHands(): boolean
 		if hand == "fists" then
 			caption, title = "FISTS", "FISTS · V PUNCHES"
 		elseif hand == "bag" then
-			caption = if not owned then "NO BAG" elseif down then `DOWN {count}` elseif carJob then "CAR JOB" else `{count}/{room}`
-			title = if down then "YOUR BAG IS ON THE GROUND" elseif owned and carJob then "PLASTIC BAG · CAR JOB: PICKUPS GO TO YOUR HANDS" else "PLASTIC BAG"
+			caption = if not owned then "NO BAG" elseif down then `DOWN {count}` elseif carJob then "HANDS ONLY" else `{count}/{room}`
+			title = if down then "YOUR BAG IS ON THE GROUND" elseif owned and carJob then "PLASTIC BAG · NOT ON THIS JOB: PICKUPS GO TO YOUR HANDS" else "PLASTIC BAG"
 			image = Icons.kit(Config.Courier.BagKit)
 		else
 			caption = if def then string.upper(def.name) else "NO GUN"

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.2"
+Config.Version = "6.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1089,7 +1089,7 @@ Config.ItemTuning = {
 	MineLife = 120,
 	MineMax = 5,
 	UseCooldown = 0.4,
-	BarSlots = 5, -- 6.3: the bottom bar's item slots on a computer (client/Hotbar.luau; the supply crate's "→ slot n")
+	BarSlots = 5, -- 6.3: the bottom bar's item slots on a computer (client/Hotbar.luau)
 }
 
 -- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)

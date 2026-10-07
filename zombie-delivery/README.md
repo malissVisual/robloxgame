@@ -1107,7 +1107,7 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
-## Scooters at the spawn, express buses, the bus map (6.3)
+## Scooters at the spawn, express buses, the bus map, the bag, English names (6.3)
 
 **The spawn's rack** (`Config.Rental.SpawnRack`, the first dock of `shared/RentalDocks.luau`): six ZDC RIDE scooters
 side by side in the depot's yard, right behind the spawn pad, noses toward the street: hold E, rent one and go. It
@@ -1122,6 +1122,19 @@ trips over 500 studs.
 **The bus map**: the big map (M) draws the three lines and their stops (the **BUS** chip hides them); every stop has a
 map board next to its shelter, and near it (60 studs) your client draws the lines, the stops' names and **YOU ARE
 HERE** on it (`client/BusMapBoard.luau`, one board at a time).
+
+**The bag takes your pickups** (the owner: "things don't go into the bag, a new inventory slot appears"): on a foot or
+bike job with the bag in your hand **every light piece** goes into it (`Bag.fitsBag`: bouquets, cakes and groceries
+too; the backpack still takes `PackLooks` only), and an order of light pieces counts the bag's room. The bag slot shows
+the server's numbers (the BagRoom attribute) with a count badge; a job whose pickups go to the hands (a car job) says
+"HANDS ONLY". The slot-like strip tiles are gone: a "CARRYING …" pill over the bar lists what you carry and where. Holding
+something else, a light pickup tells you once a job to hold the bag (2). A supply crate's consumable says it went to
+your item bar.
+
+**English first names** (the owner: "the people's names without surnames, in English; the whole game is English"):
+residents are a single English first name (or a nickname: "Lucky Jim"), the story people a first name and a role
+(Doctor Ellie, Raj at FreshMart, Chief Carlos, Engineer Ivan, Mayor Ruth, Old Man Jed, Captain Maria …), and no Czech is
+left in any game text. Review: the throw's line and power meter sit over the breath bar (Hud places them, `Throw.place`).
 
 ## Auto-aim throws and the PERFECT tip (6.2)
 

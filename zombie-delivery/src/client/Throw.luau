@@ -67,7 +67,32 @@ type State = {
 	line: TextLabel?,
 	banner: Frame?,
 }
+-- 6.3 review: how far over the screen's bottom the line sits (client/Hud.luau's layout says: over the breath bar, which
+-- the taller bottom bar raised); the meter goes right over the line.
+local lineUp = 232
+local METER_OVER = 34
+
 local state: State = { bound = nil, aiming = false, since = 0, power = 0, angle = 45, clear = false }
+
+local function placeLine()
+	local line = state.line
+	if line then
+		line.Position = UDim2.new(0.5, 0, 1, -lineUp)
+	end
+	local meter = state.meter
+	if meter then
+		meter.Position = UDim2.new(0.5, 0, 1, -(lineUp + METER_OVER))
+	end
+end
+
+-- client/Hud.luau's layout: the line's bottom this far (px) over the screen's bottom (never lower than the 6.0.1 place).
+function Throw.place(fromBottom: number)
+	local up = math.max(232, math.floor(fromBottom + 0.5))
+	if up ~= lineUp then
+		lineUp = up
+		placeLine()
+	end
+end
 local HOLD_STILL = "ZDThrowHoldStill" -- 6.2 review: no walking while aiming (the zones are laid out from where you stand)
 
 local function say(text: string)
@@ -220,7 +245,7 @@ local function meterFrame(): Frame?
 	local bar = Instance.new("Frame")
 	bar.Name = "PowerMeter"
 	bar.AnchorPoint = Vector2.new(0.5, 1)
-	bar.Position = UDim2.new(0.5, 0, 1, -266) -- (over the line)
+	bar.Position = UDim2.new(0.5, 0, 1, -(lineUp + METER_OVER)) -- (over the line)
 	bar.Size = UDim2.fromOffset(260, 14)
 	bar.BackgroundColor3 = K.charcoal
 	bar.BackgroundTransparency = 0.25
@@ -471,7 +496,7 @@ screen = function(): ScreenGui?
 	local line = Instance.new("TextLabel")
 	line.Name = "Line"
 	line.AnchorPoint = Vector2.new(0.5, 1)
-	line.Position = UDim2.new(0.5, 0, 1, -232) -- (6.0.1: over the bottom bar, the action and the breath bar)
+	line.Position = UDim2.new(0.5, 0, 1, -lineUp) -- (over the bottom bar, the action and the breath bar: Throw.place)
 	line.Size = UDim2.fromOffset(0, 26)
 	line.AutomaticSize = Enum.AutomaticSize.X
 	line.BackgroundColor3 = K.charcoal
