@@ -47,7 +47,12 @@ check("the bag in the hand", bagged.hand == "bag" and count(bagged) == 1)
 check("the Kevlar vest", KitFit.outfit({ kevlar = true }, false).vest == "kevlar")
 local vests = KitFit.outfit({ kevlar = true, heavy = true, bag = true, backpack = true }, false)
 check("both vests: only the heavy armour", vests.vest == "heavy" and vests.hand == "bag" and vests.pack == "backpack" and count(vests) == 3)
-check("a false bag or vest is not worn", count(KitFit.outfit({ bag = false, kevlar = false, heavy = false }, true)) == 0)
+check("a false bag or vest is not worn", count(KitFit.outfit({ bag = false, kevlar = false, heavy = false, hivis = false }, true)) == 0)
+-- 6.0.1: the Courier Vest (the red reflective one) in the same slot; an armoured vest is worn instead of it
+local hivis = KitFit.outfit({ hivis = true, bag = true }, false)
+check("the Courier Vest", hivis.vest == "hivis" and hivis.hand == "bag" and count(hivis) == 2)
+check("the Courier Vest and the Kevlar: the Kevlar shows", KitFit.outfit({ hivis = true, kevlar = true }, false).vest == "kevlar")
+check("the Courier Vest and the heavy armour: the armour shows", KitFit.outfit({ hivis = true, kevlar = true, heavy = true }, false).vest == "heavy")
 
 -- The factors ------------------------------------------------------------------------------------------------------
 

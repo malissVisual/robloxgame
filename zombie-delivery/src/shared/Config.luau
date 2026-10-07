@@ -988,6 +988,10 @@ export type GearDef = {
 export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number?, extra: number? }
 Config.Kit = {
 	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "2 more light pieces in your hand; what you pick up drops straight in. Works with a backpack." },
+	-- 6.0.1: the red reflective vest, no longer part of a new courier's body (server/CharacterArt/Geometry.luau hivis):
+	-- just the look (no armour), worn until a Kevlar or heavy vest covers it (shared/KitFit.luau). Saves from before
+	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it.
+	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", description = "The ZDC reflective vest: customers see you're a courier." },
 	{ id = "backpack", name = "Courier Backpack", level = 1, price = 150, icon = "🎒", room = 3, description = "Carry 3 light pieces on foot or on a bike instead of 2." },
 	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster." },
 	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
@@ -3012,6 +3016,7 @@ Config.Throw = {
 -- for everybody within Range of the camera.
 Config.Courier = {
 	BagKit = "bag", -- the Config.Kit id: owned, a light piece picked up drops straight into the bag (or the pack)
+	VestKit = "hivis", -- 6.0.1: the Courier Vest's Config.Kit id (server/KitWear.luau; given once to pre-6.0.1 saves)
 	Sprint = {
 		From = 20, -- studs / s on foot: the sprint cycle takes over from here …
 		Off = 18.5, -- … and lets go under this (no flicker around From; the walk is 14, the stock run from 18)

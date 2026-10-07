@@ -162,6 +162,7 @@ Icons.Ids = {
 	kit_kevlar = "", -- 6.0, the vests
 	kit_heavy = "",
 	kit_bag = "", -- 6.0: the plastic bag (the emoji until its icon is uploaded)
+	kit_hivis = "", -- 6.0.1: the Courier Vest (the emoji 🦺 until its icon is uploaded)
 	-- 5.0, the phone's apps (art/icons/app_*, 256 x 256; client/Phone.luau's app ids, bank and settings for later).
 	app_orders = "",
 	app_board = "",

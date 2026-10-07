@@ -344,6 +344,12 @@ local function applySaved(profile: Profile, saved: any)
 			end
 		end
 	end
+	-- 6.0.1: the red courier vest became bought kit (Config.Courier.VestKit, the Courier Vest). A save from before
+	-- (no vestKit flag) wore it on the body, so it is given once and the look does not change; every save is written
+	-- with the flag from now on, and a brand-new profile (no save to apply) starts without the vest.
+	if saved.vestKit ~= true then
+		profile.kit[Config.Courier.VestKit] = true
+	end
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
 	end
@@ -666,6 +672,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on (applySaved converts older saves once)
 		carStages = true, -- 3.5: the cars' room is their stages (applySaved moves a 3.4 save's cars once)
 		vanStages = true, -- 4.0: the Old Van's four stages (applySaved moves a 3.5 – 3.10 save's van stage once)
+		vestKit = true, -- 6.0.1: the courier vest is bought kit (applySaved gives it once to an older save)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,

@@ -13,9 +13,11 @@
 --   hand    6.0: the plastic bag (Config.Courier.BagKit) in the left hand: its art hangs from a small part, BagPivot,
 --           joined to the hand by a Motor6D "BagSwing" (KitArt "bag"); every client swings it behind a running body
 --           (client/SprintPose.luau, its Transform). Put away while the hands carry or push something, or seated.
---   vest    6.0: the best vest owned (stream 2's armour: Config.Kit "heavy", else "kevlar") over the courier's own. A
+--   vest    6.0: the best vest owned (stream 2's armour: Config.Kit "heavy", else "kevlar") over the courier's jacket. A
 --           vest that changes while you play (bought, a better one) is put on with the "vest" gesture (arms over the
---           head, then down: shared/Gestures.luau, played by client/ArmPose.luau for everybody).
+--           head, then down: shared/Gestures.luau, played by client/ArmPose.luau for everybody). 6.0.1: else the
+--           Courier Vest (Config.Kit "hivis"): Codex's red reflective vest, the pieces that were part of the courier's
+--           body (server/CharacterArt/Geometry.luau Geometry.hivis), in their own colours; bought, it is put on too.
 --   phone   the field phone in the right hand while the phone window is open (the PhoneHold remote, client/Phone.luau)
 --           and you are on foot: not seated, not carrying or pushing anything, not aiming. The character attribute
 --           PhoneHeld (only this server sets it) tells every client: client/ArmPose.luau raises the arm and hides the
@@ -40,11 +42,13 @@ local Builder = require(script.Parent.ModelArt.Builder)
 local Npcs = require(script.Parent.Npcs) -- 6.0: the vest's put-on gesture
 local KitArt = require(script.Parent.KitArt.Geometry)
 local PhoneArt = require(script.Parent.PhoneArt.Geometry)
+local CharacterArt = require(script.Parent.CharacterArt.Geometry) -- 6.0.1: the Courier Vest's pieces
 
 local KitWear = {}
 
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
 local BIGPACK_LOAD_Y = 1.3 -- the parcel on the Big Backpack's lid (the art puts it on the Courier Backpack's top)
+local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit.outfit's vest when no armour is owned)
 local NAMES: { [string]: string } = { pack = "KitPack", load = "KitParcel", shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest" }
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
@@ -72,7 +76,30 @@ local function piecesFor(slot: string, id: string): { any }
 		end
 		return { parcel }
 	end
+	if slot == "vest" and id == HIVIS then
+		-- 6.0.1: the courier's own vest, as kit pieces (any finish: dye() gives them their real colours after the build)
+		local out: { any } = {}
+		for _, piece in CharacterArt.hivis() do
+			table.insert(out, { name = piece.name, attach = piece.attach, size = piece.size, at = piece.at, turn = piece.turn, finish = "red" })
+		end
+		return out
+	end
 	return KitArt.pieces(id)
+end
+
+-- 6.0.1: the Courier Vest's parts in the colour and cloth of the courier art (as server/CharacterArt/Rig.luau paints).
+local function dye(built: Builder.Built)
+	local looks: { [string]: CharacterArt.Piece } = {}
+	for _, piece in CharacterArt.hivis() do
+		looks[piece.name] = piece
+	end
+	for _, part in built.parts do
+		local look = looks[part.Name]
+		if look then
+			part.Color = Color3.fromRGB(look.color[1], look.color[2], look.color[3])
+			part.Material = if look.material == "Fabric" then Enum.Material.Fabric else Enum.Material.SmoothPlastic
+		end
+	end
 end
 
 -- 6.0: the see-through pieces (the bag's plastic).
@@ -148,6 +175,9 @@ local function build(character: Model, slot: string, id: string): Slot?
 	if not ok then
 		warn(`[KitWear] {slot} {id}: {built}`)
 		return nil
+	end
+	if slot == "vest" and id == HIVIS then
+		dye(built :: Builder.Built)
 	end
 	return { key = id, built = built :: Builder.Built, parts = parts, sizes = sizes }
 end
