@@ -25,7 +25,8 @@
 --   P.keyBox(parent, key, size, props?)       a key in a square outline ("E", "J", "Q")
 --   P.action(parent, text, props?, onClick?)  a quiet text action: hover brightens it and draws a thin red underline
 --   P.dot(parent)                             the small red badge dot (Name "Badge", a count in it)
---   P.button(parent, text, size, kind, onClick) a window action: "main" (light face), "quiet" (outline), "off"
+--   P.button(parent, text, size, kind, onClick) a window action: "main" (light face), "primary" (5.8: the phone's red
+--                                             face, white caps, square), "quiet" (outline), "off"
 --   P.row(parent, height, order, selected?)   a slim charcoal window row; selected: raised with a narrow red rule
 --   P.tag(parent, text, color?)               a small outlined caps tag (EXCLUSIVE, REWARD)
 --   P.fade(object, visible, seconds?)         fades a CanvasGroup in or out (no movement)
@@ -275,29 +276,40 @@ function HudContract.dot(parent: Instance, props: { [string]: any }?): any
 	return apply(badge, props)
 end
 
-export type ButtonKind = "main" | "quiet" | "off"
+export type ButtonKind = "main" | "primary" | "quiet" | "off"
 
--- A window action, rectangular: "main" a light face with charcoal text (the one clear action), "quiet" an outline
--- with light text, "off" a dim face (locked / not now: its words say why). Hover: a red edge marker on the left and
--- the text brightens; press: a brief opacity dip. At least 44 px tall where it is used on touch.
+-- A window action, rectangular: "main" a light face with charcoal text (the one clear action), "primary" (5.8) the
+-- courier phone's red action (a Contract.red face, white caps, square; also a text set later), "quiet" an outline
+-- with light text, "off" a dim face (locked / not now: its words say why). Hover: a red edge marker on the left (a
+-- white one on the red face, which also brightens) and the text brightens; press: a brief opacity dip. At least 44 px
+-- tall where it is used on touch.
 function HudContract.button(parent: Instance, text: string, size: UDim2, kind: ButtonKind, onClick: () -> ()): any
 	local main = kind == "main"
+	local primary = kind == "primary"
 	local off = kind == "off"
 	local button = Ui.make("TextButton", {
 		Size = size,
-		BackgroundColor3 = if main then P.ink else P.raised,
-		BackgroundTransparency = if main then 0 elseif off then 0.4 else 1,
+		BackgroundColor3 = if primary then P.red elseif main then P.ink else P.raised,
+		BackgroundTransparency = if main or primary then 0 elseif off then 0.4 else 1,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
-		Text = text,
+		Text = if primary then string.upper(text) else text,
 		Font = Theme.HeadingFont,
 		TextSize = 14,
-		TextColor3 = if main then P.surface elseif off then P.ink2 else P.ink,
+		TextColor3 = if primary then P.ink elseif main then P.surface elseif off then P.ink2 else P.ink,
 		TextTransparency = if off then 0.25 else 0,
 		TextWrapped = true,
 	}, parent)
 	button:SetAttribute("Kind", kind)
-	if not main then
+	if primary then
+		button:GetPropertyChangedSignal("Text"):Connect(function()
+			local upper = string.upper(button.Text)
+			if upper ~= button.Text and not button.RichText then
+				button.Text = upper
+			end
+		end)
+	end
+	if not main and not primary then
 		Ui.make("UIStroke", { Name = "Outline", ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = if off then 0.75 else P.lineAlpha }, button)
 	end
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, button)
@@ -305,7 +317,7 @@ function HudContract.button(parent: Instance, text: string, size: UDim2, kind: B
 		Name = "Edge",
 		Size = UDim2.new(0, 2, 1, 0),
 		Position = UDim2.new(0, -10, 0, 0),
-		BackgroundColor3 = P.red,
+		BackgroundColor3 = if primary then P.ink else P.red,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 	}, button)
@@ -318,7 +330,9 @@ function HudContract.button(parent: Instance, text: string, size: UDim2, kind: B
 			local tween = TweenService:Create(edge, HOVER, { BackgroundTransparency = if on then 0 else 1 })
 			playing = tween
 			tween:Play()
-			if not main then
+			if primary then
+				button.BackgroundColor3 = if on then P.red:Lerp(P.ink, 0.1) else P.red
+			elseif not main then
 				button.BackgroundTransparency = if on then 0.2 else 1
 			end
 		end

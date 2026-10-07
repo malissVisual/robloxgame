@@ -41,6 +41,11 @@
 --     (3 / 4)" on its CARGO line; without a bike they are locked "🚲 NEEDS A BIKE" (Spoke & Chain), while your car is
 --     the one you drive "🚲 RIDE YOUR BIKE" (the server's lockText / lockButton). Riding your bike (state.car a bike)
 --     the car card shows the bike, and the car jobs are locked "🚐 CALL YOUR CAR" (the phone's CALL CAR).
+--   * 5.8, the courier phone's look (design/phone-ui/): the ZDC window header (Ui.window, the board glyph), the filters
+--     as the phone's square tabs (Ui.tabs, a column: the open one raised with a red bar, its count on the right), the
+--     offers as slim hairline cards like the phone's BOARD (the title in caps, the twists as the phone's chips, the
+--     payout behind a thin divider) with ACCEPT JOB / + ADD ORDER as the red primary action, and the section headers
+--     (ON FOOT, BIKE, the danger levels) led by the small red marker.
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
 -- (Ui.screenScale) and sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
 -- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()). 4.2, a gamepad: the selection starts on the first
@@ -120,7 +125,8 @@ local FILTERS = {
 
 local gui: ScreenGui? = nil
 local refs: { [string]: any } = {}
-local filterButtons: { [string]: any } = {}
+local filterTabs: Ui.Tabs? = nil -- 5.8: the AVAILABLE RUNS filters (Ui.tabs)
+local filterCounts: { [string]: any } = {} -- their counts, by filter id
 local open = false
 local offers: { any }? = nil -- nil: waiting for the dispatcher
 local state: any = nil
@@ -160,32 +166,35 @@ local function text(parent: Instance, value: string, size: UDim2, props: { [stri
 	return label
 end
 
--- A click that plays the interface's click (Ui.onClick, client/Sounds.luau) first.
-local function onPress(button: any, fn: () -> ())
-	button.Activated:Connect(function()
-		local click = Ui.onClick
-		if click then
-			click()
-		end
-		fn()
-	end)
-end
-
--- A compact tag that grows with its text (the twists on a row): a fine outline in `accent` (red for a danger), the
--- text in caps.
+-- A compact tag that grows with its text (the twists on a row), the phone's chip (5.8): a raised face, the text in
+-- caps in its tint (red for a danger, white for `K.text`, else the secondary white) and a faint outline of that tint.
 local function chip(parent: Instance, value: string, accent: Color3, order: number): any
+	local tint = if accent == K.red then K.red elseif accent == K.text then K.text else K.secondary
 	local label = text(parent, string.upper(value), UDim2.fromOffset(0, 20), {
 		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundTransparency = 1,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = K.raised,
 		Font = Theme.HeadingFont,
 		TextSize = 11,
-		TextColor3 = if accent == K.red then K.red else K.secondary,
+		TextColor3 = tint,
+		TextXAlignment = Enum.TextXAlignment.Center,
 		TextWrapped = false,
 		LayoutOrder = order,
 	})
-	Ui.stroke(label, accent, 1).Transparency = if accent == K.red then 0.25 else 0
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, label)
+	Ui.stroke(label, tint, 1).Transparency = if tint == K.red then 0.5 else 0.72
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, label)
 	return label
+end
+
+-- 5.8: the small red marker square that leads a section's title (the phone's "■ ACTIVE ORDER"), in a header row.
+local function marker(row: Instance)
+	Ui.make("Frame", {
+		Name = "Marker",
+		Size = UDim2.fromOffset(7, 7),
+		Position = UDim2.fromOffset(4, 9),
+		BackgroundColor3 = K.red,
+		BorderSizePixel = 0,
+	}, row)
 end
 
 -- The row's action (Ui.button: a flat rectangle, a fine line, hover brightens it and shows its underline, press dips
@@ -361,85 +370,34 @@ end
 
 -- ── The window ─────────────────────────────────────────────────────────────
 
-local function setFilterLook(id: string, hover: boolean)
-	local entry = filterButtons[id]
-	if not entry then
-		return
-	end
-	-- The selected filter: a quiet highlight and the narrow red rule; hover / focus brightens the label and shows a
-	-- thin underline (120 ms).
-	local active = filter == id
-	entry.button.BackgroundTransparency = if active then 0 else 1
-	entry.rule.Visible = active
-	entry.name.Font = if active then Theme.HeadingFont else Theme.Font
-	local info = TweenInfo.new(0.12, Enum.EasingStyle.Quad)
-	TweenService:Create(entry.name, info, { TextColor3 = if active or hover then K.text else K.secondary }):Play()
-	TweenService:Create(entry.underline, info, { BackgroundTransparency = if hover and not active then 0.2 else 1 }):Play()
-end
-
 local renderList: () -> () = function() end
 
+-- 5.8: AVAILABLE RUNS as the phone's square tabs (Ui.tabs, a column: the open one raised with a red bar down its left
+-- edge; hover / gamepad focus brightens the others), each with its count on the right; 44 px tall, 52 apart as before.
 local function buildFilters(side: any)
-	for order, def in FILTERS do
-		local button = Ui.make("TextButton", {
-			Size = UDim2.new(1, -16, 0, 44),
-			Position = UDim2.fromOffset(0, 40 + (order - 1) * 52),
-			BackgroundColor3 = K.raised,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = "",
-		}, side)
-		local rule = Ui.make("Frame", {
-			Size = UDim2.new(0, 3, 1, 0),
-			BackgroundColor3 = K.red,
-			BorderSizePixel = 0,
-			Visible = false,
-		}, button)
-		local name = text(button, def.name, UDim2.new(1, -52, 1, 0), {
-			Position = UDim2.fromOffset(14, 0),
-			TextSize = 14,
-			TextColor3 = K.secondary,
-			TextWrapped = false,
-		})
-		local underline = Ui.make("Frame", {
-			Size = UDim2.new(1, -52, 0, 1),
-			Position = UDim2.new(0, 14, 1, -10),
-			BackgroundColor3 = K.text,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-		}, button)
-		local count = text(button, "", UDim2.new(0, 30, 1, 0), {
-			Position = UDim2.new(1, -10, 0, 0),
+	local items: { Ui.TabItem } = {}
+	for _, def in FILTERS do
+		table.insert(items, { id = def.id, text = def.name })
+	end
+	local tabs = Ui.tabs(side, items, function(id: string)
+		filter = id
+		renderList()
+	end, { selected = filter, vertical = true, height = 44, gap = 8, textSize = 13 })
+	tabs.frame.Size = UDim2.new(1, -16, 0, #FILTERS * 52)
+	tabs.frame.Position = UDim2.fromOffset(0, 40)
+	for id, button in tabs.buttons do
+		filterCounts[id] = text(button, "", UDim2.new(0, 30, 1, 0), {
+			Position = UDim2.new(1, 0, 0, 0),
 			AnchorPoint = Vector2.new(1, 0),
 			Font = MONO,
 			TextSize = 13,
 			TextColor3 = K.secondary,
 			TextXAlignment = Enum.TextXAlignment.Right,
-			ZIndex = 2,
+			TextWrapped = false,
+			ZIndex = button.ZIndex + 1,
 		})
-		filterButtons[def.id] = { button = button, rule = rule, underline = underline, name = name, count = count }
-		local id = def.id
-		button.MouseEnter:Connect(function()
-			setFilterLook(id, true)
-		end)
-		button.MouseLeave:Connect(function()
-			setFilterLook(id, false)
-		end)
-		button.SelectionGained:Connect(function()
-			setFilterLook(id, true)
-		end)
-		button.SelectionLost:Connect(function()
-			setFilterLook(id, false)
-		end)
-		onPress(button, function()
-			filter = id
-			for _, other in FILTERS do
-				setFilterLook(other.id, other.id == id)
-			end
-			renderList()
-		end)
 	end
+	filterTabs = tabs
 end
 
 -- The car card under the filters.
@@ -451,7 +409,7 @@ local function buildCarCard(side: any)
 		BorderSizePixel = 0,
 	}, side)
 	refs.carCard = card
-	Ui.make("UIStroke", { Color = K.rule, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, card)
+	Ui.stroke(card, K.line, 1).Transparency = Ui.HAIRLINE -- 5.8: the slim card's hairline
 	refs.carIcon = Ui.icon(card, "map_dealer", "🚐", UDim2.fromOffset(22, 20), {
 		Position = UDim2.fromOffset(14, 12),
 		ImageColor3 = K.secondary,
@@ -499,8 +457,8 @@ local function build()
 		BorderSizePixel = 0,
 		Active = true,
 	}, made)
-	-- The window (Ui.window): the header with the badge, the title and the subtitle, the round ✕, the footer with ESC
-	-- (ESC, the gamepad's B and the Roblox menu close it) and the car and the driver on the right.
+	-- The window (Ui.window): the ZDC header with the board glyph, the title and the subtitle, the square ✕, the footer
+	-- (ESC, the gamepad's B and the Roblox menu close it) with the car and the driver on the right.
 	local window, content, chrome = Ui.window(made, "Dispatch board", "Delivery contracts · choose your next run", "📋", UDim2.fromOffset(MAX_W, MAX_H))
 	chrome.onClose = function()
 		DispatchUi.close()
@@ -648,9 +606,13 @@ local function refreshChrome()
 		end
 	end
 	local counts = { all = #list, delivery = #list - special, special = special }
-	for id, entry in filterButtons do
-		entry.count.Text = if offers or job then tostring(counts[id] or 0) else "–"
-		setFilterLook(id, false)
+	local tabs = filterTabs
+	if tabs and tabs.selected ~= filter then
+		tabs.select(filter)
+	end
+	for id, count in filterCounts do
+		count.Text = if offers or job then tostring(counts[id] or 0) else "–"
+		count.TextColor3 = if filter == id then K.text else K.secondary
 	end
 	refs.countdown.Visible = (job == nil or stacking()) and offers ~= nil
 end
@@ -882,6 +844,8 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 		end
 	end
 	local touch = Ui.touchLayout()
+	-- 5.8: the payout behind a thin divider (the phone's "| $ 1 240").
+	Ui.make("Frame", { Name = "Divider", Size = UDim2.new(0, 1, 1, -24), Position = UDim2.fromOffset(0, 12), BackgroundColor3 = K.rule, BorderSizePixel = 0, ZIndex = 2 }, stub)
 	Ui.caps(stub, "Payout", UDim2.new(1, -28, 0, 14), {
 		Position = UDim2.new(0.5, 0, 0.5, -66),
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -931,7 +895,7 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 	elseif stacking() then
 		-- 5.2: on a run that takes more orders: + ADD ORDER where it fits (the board stays open for another), else why not.
 		if offer.addOrder == true then
-			local add = action(stub, "+ ADD ORDER", size, at, C.yellow, function()
+			local add = action(stub, "+ ADD ORDER", size, at, K.red, function() -- 5.8: the red primary action
 				Net.get("AcceptJob"):FireServer(offer.index)
 				local list = offers
 				local spot = if list then table.find(list, offer) else nil
@@ -948,7 +912,7 @@ local function payStub(stub: any, offer: any, lockLevel: number?, why: string?, 
 			end)
 		end
 	else
-		local accept = action(stub, "ACCEPT JOB", size, at, C.yellow, function()
+		local accept = action(stub, "ACCEPT JOB", size, at, K.red, function() -- 5.8: the red primary action
 			Net.get("AcceptJob"):FireServer(offer.index)
 			-- It leaves the board on the server once started: not shown again before the board comes back.
 			local list = offers
@@ -1002,7 +966,7 @@ local function offerTicket(offer: any, number: number, order: number?)
 	}, body)
 	dangerRow(column, offer)
 	local title = if offer.jobType then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo} for {offer.customer}`
-	text(column, title, UDim2.new(1, 0, 0, 26), {
+	text(column, string.upper(title), UDim2.new(1, 0, 0, 26), { -- 5.8: in caps, like the phone's board cards
 		Position = UDim2.fromOffset(0, 38),
 		Font = Theme.HeadingFont,
 		TextSize = 18,
@@ -1035,8 +999,9 @@ end
 local function tierHeader(index: number, info: any, order: number)
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
 	local stars = tonumber(info.stars) or index
-	text(row, `{string.rep("★", stars)}  {string.upper(tostring(info.name or ""))}`, UDim2.new(1, -180, 0, 18), {
-		Position = UDim2.fromOffset(4, 4),
+	marker(row) -- 5.8
+	text(row, `{string.rep("★", stars)}  {string.upper(tostring(info.name or ""))}`, UDim2.new(1, -194, 0, 18), {
+		Position = UDim2.fromOffset(18, 4),
 		Font = Theme.HeadingFont,
 		TextSize = 13,
 		TextColor3 = if stars >= 3 then K.red else K.text,
@@ -1053,8 +1018,8 @@ local function tierHeader(index: number, info: any, order: number)
 		elseif myLevel() < level then `LOCKED · LEVEL {level}{if licence then ` and the {licence.stars} licence` else ""}`
 		elseif licence then `LOCKED · LICENCE {licence.have or 0} / {licence.need or 0} · jobs rated ★★+ at {licence.atStars}`
 		else "LOCKED"
-	text(row, sub, UDim2.new(1, -180, 0, 16), {
-		Position = UDim2.fromOffset(4, 22),
+	text(row, sub, UDim2.new(1, -194, 0, 16), {
+		Position = UDim2.fromOffset(18, 22),
 		TextSize = 12,
 		TextColor3 = if info.open == true and not walking then K.secondary else K.red,
 		TextWrapped = false,
@@ -1088,15 +1053,16 @@ end
 -- there is no run (the board's footNote: the shops near you are shut), in red when there is none.
 local function footHeader(count: number, order: number, note: string?)
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
-	text(row, "🚶  ON FOOT", UDim2.new(1, -220, 0, 18), {
-		Position = UDim2.fromOffset(4, 4),
+	marker(row) -- 5.8
+	text(row, "🚶  ON FOOT", UDim2.new(1, -234, 0, 18), {
+		Position = UDim2.fromOffset(18, 4),
 		Font = Theme.HeadingFont,
 		TextSize = 13,
 		TextWrapped = false,
 	})
 	local none = count == 0 and note ~= nil
-	text(row, if none and note then note else `{count} light {if count == 1 then "run" else "runs"} near you · no vehicle needed · quick money`, UDim2.new(1, -220, 0, 16), {
-		Position = UDim2.fromOffset(4, 22),
+	text(row, if none and note then note else `{count} light {if count == 1 then "run" else "runs"} near you · no vehicle needed · quick money`, UDim2.new(1, -234, 0, 16), {
+		Position = UDim2.fromOffset(18, 22),
 		TextSize = 12,
 		TextColor3 = if none then K.red else K.secondary,
 		TextWrapped = false,
@@ -1119,8 +1085,9 @@ end
 -- 5.1: the header of the BIKE section: what these runs are, and your bike's room on the right (or what is missing).
 local function bikeHeader(count: number, order: number)
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
-	text(row, "🚲  BIKE", UDim2.new(1, -220, 0, 18), {
-		Position = UDim2.fromOffset(4, 4),
+	marker(row) -- 5.8
+	text(row, "🚲  BIKE", UDim2.new(1, -234, 0, 18), {
+		Position = UDim2.fromOffset(18, 4),
 		Font = Theme.HeadingFont,
 		TextSize = 13,
 		TextWrapped = false,
@@ -1129,8 +1096,8 @@ local function bikeHeader(count: number, order: number)
 	local sub = if bike == nil then `NEEDS A BIKE · Spoke & Chain on Main St, level {Config.Jobs.Bike.Level}`
 		elseif bike.riding ~= true then "Your car is out: MY BIKE on your phone gets you on the bike"
 		else `{count} light {if count == 1 then "run" else "runs"} · longer, better paid · light cargo only`
-	text(row, sub, UDim2.new(1, -220, 0, 16), {
-		Position = UDim2.fromOffset(4, 22),
+	text(row, sub, UDim2.new(1, -234, 0, 16), {
+		Position = UDim2.fromOffset(18, 22),
 		TextSize = 12,
 		TextColor3 = if bike and bike.riding == true then K.secondary else K.red,
 		TextWrapped = false,
@@ -1161,7 +1128,7 @@ local function jobTicket(run: boolean?)
 	Ui.selectRow(card, true) -- the job you are on: the selected look (the red rule)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 24), PaddingTop = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, body)
 	Ui.caps(body, "On a delivery", UDim2.new(1, 0, 0, 16), { TextSize = 11 })
-	text(body, `{job.cargo or "Cargo"} → {job.customer or "the customer"}`, UDim2.new(1, 0, 0, 30), {
+	text(body, string.upper(`{job.cargo or "Cargo"} → {job.customer or "the customer"}`), UDim2.new(1, 0, 0, 30), {
 		Position = UDim2.fromOffset(0, 22),
 		Font = Theme.HeadingFont,
 		TextSize = 20,

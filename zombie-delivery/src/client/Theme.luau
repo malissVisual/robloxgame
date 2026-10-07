@@ -5,6 +5,10 @@
 -- tokens. The semantic colours (Theme.Colors: panel, text, yellow, red ...) keep their names and meaning, so every
 -- module that used them gets the new look; Theme.soft turns one into the flat dark face a button or a chip of that
 -- meaning wears (Ui.button / Ui.chip do it for you). Theme.Postage stays for old references, remapped (see there).
+-- 5.8, every window in the courier-phone style (design/phone-ui/): Theme.Contract.red as a button's colour is the
+-- PRIMARY action (a red face, white caps, square: Ui.button(..., Theme.Contract.red), HudContract.button "primary");
+-- Theme.Colors.red stays the danger meaning (a dark face with a red hint), one step apart so Theme.soft tells them
+-- apart. The last pastel Postage tokens (violet, sage, hatch) are contract tokens now.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
 
@@ -37,9 +41,12 @@ local K = Theme.Contract
 -- cream / lavender / pastel look any more. Each field is remapped to the contract value of the same ROLE (a surface to
 -- a charcoal step, an ink to the light text, an accent to red / good / warn, a pastel face to a flat dark face), so
 -- the old references restyle themselves consistently. The names are legacy: `paper` is a raised charcoal card, `ink`
--- the light text, `sage` the main action's face, `violet` a light accent, `lavenderDeep` a recessed surface. The values
--- are deliberately distinct (sometimes by a step) so Theme.soft can tell the meanings apart. New code uses
--- Theme.Contract.
+-- the light text, `sage` the main action's face, `violet` a light accent, `lavenderDeep` a recessed surface. New code
+-- uses Theme.Contract.
+-- 5.8: the ones that still differed are retired onto contract tokens: paper and sage are Contract.raised (as a
+-- button's colour the raised "active" look: a selected tab or row), lavender is charcoal, violet the white text, hatch
+-- the recessed surface. A main action asks for Theme.Colors.yellow (raised, the red rule) or Contract.red (primary).
+-- The action faces below (rose, sky, ...) stay a step apart so Theme.soft can tell the meanings apart.
 Theme.Postage = {
 	paper = K.raised, -- a card that stands out on charcoal; the active tab (was the cream ticket)
 	ticket = K.row, -- job cards, list rows
@@ -47,8 +54,8 @@ Theme.Postage = {
 	lavenderDeep = K.recessed, -- a sidebar, an inactive tab, a disabled action
 	ink = K.text, -- objectives, prices, big values
 	ink2 = K.secondary, -- routes, labels, explanations
-	sage = Color3.fromRGB(33, 37, 45), -- the main action's face (ACCEPT, TAKE OUT); its accent is the red rule
-	violet = Color3.fromRGB(228, 230, 233), -- the old crew / GPS accent as ink: a light accent, bars and key letters
+	sage = K.raised, -- (was the main action's face) a raised surface, like paper
+	violet = K.text, -- the old crew / GPS accent as ink: the white text, bars and key letters
 	line = K.rule, -- separators, thin strokes
 	shadow = Color3.fromRGB(0, 0, 0), -- (no drop shadows any more)
 	danger = K.red, -- warnings (always with an icon or text, never colour alone)
@@ -83,7 +90,7 @@ Theme.Postage = {
 	lilacLip = Color3.fromRGB(205, 208, 214),
 	disabled = Color3.fromRGB(27, 30, 35), -- a locked / disabled action
 	track = K.track, -- the empty part of a bar
-	hatch = Color3.fromRGB(23, 26, 31), -- a locked row
+	hatch = K.recessed, -- a locked row (a sunk surface; no hatching)
 	note = Color3.fromRGB(31, 33, 38), -- a written remedy under a locked row
 	gold = Color3.fromRGB(214, 178, 92), -- medals, titles, the star gold as text on charcoal
 	silver = Color3.fromRGB(186, 191, 199),
@@ -103,7 +110,9 @@ Theme.Colors = {
 	dim = K.secondary,
 	money = Color3.fromRGB(132, 200, 122), -- money reads as good (a step apart from green)
 	yellow = K.warn, -- the old gold accent: amber as text; as a button it is the main action
-	red = K.red,
+	-- the danger meaning (warnings, FIRE, LEAVE): as text the contract red; as a button's colour a dark face with a red
+	-- hint. One step from Contract.red, which as a button's colour is the primary action.
+	red = Color3.fromRGB(214, 74, 70),
 	green = K.good,
 	blue = Color3.fromRGB(138, 166, 190), -- a cool grey-blue (info)
 	grey = K.line,
@@ -161,32 +170,39 @@ local function key(color: Color3): string
 end
 
 -- face: the flat surface; lip: its thin accent (the main action's red rule, a meaning's edge); text: its label;
--- main: the one clear action of a window; quiet: disabled / secondary (no accent).
-export type Soft = { face: Color3, lip: Color3, text: Color3, main: boolean, quiet: boolean }
+-- main: the one clear action of a window; quiet: disabled / secondary (no accent); primary (5.8): the phone's red
+-- action (a red face, white caps, square; Contract.red).
+export type Soft = { face: Color3, lip: Color3, text: Color3, main: boolean, quiet: boolean, primary: boolean }
 
 -- The flat faces of the semantic colours: what a button or a chip of that meaning wears.
 local SOFT: { [string]: Soft } = {}
 local FACES: { [string]: boolean } = {}
-local function soft(colors: { Color3 }, face: Color3, lip: Color3, text: Color3, main: boolean, quiet: boolean)
+local function soft(colors: { Color3 }, face: Color3, lip: Color3, text: Color3, main: boolean, quiet: boolean, primary: boolean?)
 	for _, color in colors do
-		SOFT[key(color)] = { face = face, lip = lip, text = text, main = main, quiet = quiet }
+		SOFT[key(color)] = { face = face, lip = lip, text = text, main = main, quiet = quiet, primary = primary == true }
 	end
 	FACES[key(face)] = true
 end
 local C = Theme.Colors
 -- The old (3.5 dark, 3.6 pastel) values too: a module that still writes one of them gets the new face.
-soft({ C.yellow, C.green, C.money, P.sage, Color3.fromRGB(245, 179, 79), Color3.fromRGB(139, 186, 116), Color3.fromRGB(170, 218, 137), Color3.fromRGB(229, 237, 206) }, P.sage, P.sageLip, K.text, true, false)
+-- 5.8: the primary action, the phone's red button (Contract.red; PhoneContract.primary draws the same).
+soft({ K.red }, K.red, K.red, K.text, true, false, true)
+-- The main action: raised charcoal (a step from Contract.raised) with the red rule.
+local MAIN_FACE = Color3.fromRGB(33, 37, 45)
+soft({ C.yellow, C.green, C.money, MAIN_FACE, Color3.fromRGB(245, 179, 79), Color3.fromRGB(139, 186, 116), Color3.fromRGB(170, 218, 137), Color3.fromRGB(229, 237, 206) }, MAIN_FACE, P.sageLip, K.text, true, false)
 soft({ C.red, P.rose, Color3.fromRGB(231, 112, 92), Color3.fromRGB(196, 72, 84), Color3.fromRGB(190, 64, 78) }, P.rose, P.roseLip, K.text, false, false)
 soft({ C.blue, P.sky, Color3.fromRGB(117, 175, 185), Color3.fromRGB(56, 112, 148) }, P.sky, P.skyLip, K.text, false, false)
 soft({ C.grey, P.disabled, Color3.fromRGB(79, 95, 82), Color3.fromRGB(138, 124, 148) }, P.disabled, P.disabled, K.secondary, false, true)
-soft({ Theme.Gps, P.violet, P.lilac }, P.lilac, P.lilacLip, K.text, false, false)
+soft({ Theme.Gps, P.violet, Color3.fromRGB(228, 230, 233), P.lilac }, P.lilac, P.lilacLip, K.text, false, false)
 soft({ P.gold, P.butter, Color3.fromRGB(178, 128, 30) }, P.butter, P.butterLip, K.text, false, false)
-soft({ P.paper }, P.paper, K.text, K.text, false, false) -- an active tab / a highlighted card: raised, a white rule
+-- An active tab / a highlighted card (P.paper, P.sage: Contract.raised): raised, a white rule on hover.
+soft({ K.raised }, K.raised, K.text, K.text, false, false)
 soft({ C.panelLight, Color3.fromRGB(34, 45, 40), Color3.fromRGB(252, 247, 237), Color3.fromRGB(250, 244, 228) }, P.ticket, P.line, K.text, false, false)
 soft({ C.panel, P.lavenderDeep, Color3.fromRGB(20, 28, 26), Color3.fromRGB(238, 230, 243), Color3.fromRGB(226, 214, 236) }, P.lavenderDeep, P.line, K.secondary, false, true)
 
 -- The flat face, its thin accent (lip) and its text for an action or a chip of `color`. The semantic colours have
--- their own faces (yellow / green / money: the main action, raised charcoal with a red rule; red: charcoal with a
+-- their own faces (Contract.red: the primary action, a red face; yellow / green / money: the main action, raised
+-- charcoal with a red rule; paper / sage: raised, the active look; red (Theme.Colors.red, danger): charcoal with a
 -- hint of red; blue: with a hint of grey-blue; grey: disabled; the GPS purple: crew); any other colour becomes a
 -- charcoal face barely tinted by it, with the colour itself as the accent (a campaign's, a kind's).
 function Theme.soft(color: Color3): Soft
@@ -195,7 +211,7 @@ function Theme.soft(color: Color3): Soft
 		return known
 	end
 	local face = color:Lerp(K.charcoal, 0.84)
-	return { face = face, lip = color, text = Theme.textOn(face), main = false, quiet = false }
+	return { face = face, lip = color, text = Theme.textOn(face), main = false, quiet = false, primary = false }
 end
 
 -- Is `color` one of the flat faces Theme.soft hands out (so it is not mapped again)?

@@ -50,6 +50,13 @@
 -- scrim under the objective, the celebration card and the unlock popups charcoal cards with their colour as a fine
 -- rim. Light text on charcoal throughout (Theme.Postage is remapped to the contract values; the accents
 -- Theme.Colors green / red / yellow / money read on charcoal).
+-- 5.8 (the courier phone's look, design/phone-ui/): the ZDC window header with the missions glyph; the page tabs and
+-- the ALL / CO-OP filter are Ui.tabs (square, a red underline on the open one); the campaigns, the mission cards, the
+-- open card, the challenge / package / title rows and the reward cards are slim hairline rows and cards (Extras.row:
+-- no corners, no hatching, no lift; the selected one raised with the narrow red rule, a locked one sunk); the twists
+-- and badges are square outlined tags; START is the red primary action (it wears the "off" face while something
+-- blocks it, and FIND CREW is the red one on a DUO mission still short of a crew), EQUIP the main one; section heads
+-- carry the phone's small red marker. The cleared card has the ZDC heading, a red NEXT MISSION and a plain OK.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -293,7 +300,8 @@ local function nextMission(id: string): MissionDef?
 	return nil
 end
 
--- A main action on (its pastel `color`, ink) or off (the disabled lavender, the quiet ink).
+-- An action on (its `color`: Contract.red is the primary face, white caps) or off (the sunk disabled face, the quiet
+-- text). Only the look: the click still asks (and the window says why not).
 local function paintButton(button: any, text: string, color: Color3, enabled: boolean)
 	button.Text = text
 	button.BackgroundColor3 = if enabled then color else P.lavenderDeep
@@ -354,20 +362,22 @@ Extras.state = {
 Extras.PURPLE = Color3.fromRGB(190, 80, 255) -- Dead End's colour (Config.Weapons deadend): rims and glows, not text
 Extras.GOLD = C.yellow -- the titles (an amber that reads on charcoal)
 Extras.SILHOUETTE = K.track -- an item you may not see yet: a dim grey shape on charcoal
--- The compact tags (3.8: a dark, barely tinted face from the consumable tags' set and a text that reads on it).
+-- The compact tags (5.8: the phone's outlined tags: a charcoal face, the text and its outline in the meaning's colour).
 Extras.CHIP = {
-	twist = { face = P.tags[2], ink = P.ink }, -- butter
-	coop = { face = P.tags[1], ink = P.violet }, -- lilac
-	duo = { face = P.tags[4], ink = P.danger }, -- rose
-	warn = { face = P.tags[4], ink = P.danger },
-	good = { face = P.sage, ink = P.ink },
-	quiet = { face = P.lavenderDeep, ink = P.ink2 },
+	twist = { face = K.row, ink = K.text },
+	coop = { face = K.row, ink = C.blue },
+	duo = { face = K.charcoal, ink = P.danger },
+	warn = { face = K.charcoal, ink = P.danger },
+	good = { face = K.row, ink = C.green },
+	gold = { face = K.row, ink = C.yellow }, -- a done mission's stars
+	quiet = { face = K.recessed, ink = K.secondary },
 }
+-- The page tabs (5.8: Ui.tabs, plain caps like the phone's; CHALLENGES gets its count in render).
 Extras.PAGES = {
-	{ id = "missions", text = "🎯 MISSIONS", width = 140 },
-	{ id = "challenges", text = "🏅 CHALLENGES", width = 196 },
-	{ id = "secrets", text = "📦 SECRETS", width = 160 },
-	{ id = "rewards", text = "🎁 REWARDS", width = 140 },
+	{ id = "missions", text = "MISSIONS" },
+	{ id = "challenges", text = "CHALLENGES" },
+	{ id = "secrets", text = "SECRETS" },
+	{ id = "rewards", text = "REWARDS" },
 }
 -- The challenge categories in the order the CHALLENGES tab shows them (an unknown one goes last).
 Extras.CATEGORIES = {
@@ -388,8 +398,8 @@ end
 
 -- ── The shapes this window uses (the window, the lines and the bars are Ui's; 3.8: flat contract shapes) ──
 
--- A compact tag that grows with its text (the twists, CO-OP, DUO, "needs N slots", EQUIPPED): `kind` is one of
--- Extras.CHIP.
+-- A compact square tag that grows with its text (the twists, CO-OP, DUO, "needs N slots", EQUIPPED): `kind` is one
+-- of Extras.CHIP. 5.8: the phone's outlined tag (no corners), the outline in its text's colour.
 function Extras.chip(parent: Instance, text: string, kind: string, order: number?): any
 	local look = Extras.CHIP[kind] or Extras.CHIP.quiet
 	local chip = Ui.label(parent, text, UDim2.new(0, 0, 1, 0), {
@@ -402,83 +412,31 @@ function Extras.chip(parent: Instance, text: string, kind: string, order: number
 		TextWrapped = false,
 		LayoutOrder = order or 0,
 	})
-	Ui.corner(chip)
-	Ui.stroke(chip, if look.ink == P.danger then P.danger else P.line, 1).Transparency = if look.ink == P.danger then 0.4 else 0
+	Ui.stroke(chip, look.ink, 1).Transparency = if look.ink == P.danger then 0.4 else 0.65
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, chip)
 	return chip
 end
 
--- A flat surface (a row, a card, a note): `face` (default the row), square, a fine line (`line`, a meaning's colour
--- for a selected / earned one). `radius` is ignored since 3.8 (kept for the callers).
-function Extras.paper(frame: GuiObject, face: Color3?, line: Color3?, thickness: number?, radius: number?)
-	local _ = radius
-	frame.BackgroundColor3 = face or P.ticket
+-- 5.8, a slim row or card like the phone's (HudContract.row): `face` (default the row surface; a locked one passes
+-- Contract.recessed), square, a hairline (Ui.HAIRLINE); `line` gives the hairline a meaning's colour (an earned
+-- reward, a running mission). Ui.selectRow(frame, true) then gives it the selected look (raised, the red rule).
+function Extras.row(frame: GuiObject, face: Color3?, line: Color3?)
+	frame.BackgroundColor3 = face or K.row
 	frame.BackgroundTransparency = 0
-	Ui.corner(frame)
-	Ui.stroke(frame, line or P.line, math.min(thickness or 1, 1.5)).Transparency = 0
+	frame.BorderSizePixel = 0
+	Ui.stroke(frame, line or K.line, 1).Transparency = if line then 0.35 else Ui.HAIRLINE
 end
 
--- Something locked: 3.8 draws no hatching; the surface steps down (Theme.Postage.hatch) and its words say why.
-function Extras.hatch(frame: GuiObject)
-	frame.BackgroundColor3 = P.hatch
-end
-
--- A page tab or a filter (raised with a red rule under it when on, quiet when off): Extras.paintTab sets which.
-function Extras.tabButton(parent: Instance, text: string, width: number, order: number, onClick: () -> ()): any
-	local button = Ui.make("TextButton", {
-		Size = UDim2.fromOffset(width, 32),
-		BackgroundColor3 = P.lavenderDeep,
+-- A section's small red marker (the phone's "■ ACTIVE ORDER"): a 7 px square, vertically centred at `x`.
+function Extras.marker(parent: Instance, x: number, color: Color3?): any
+	return Ui.make("Frame", {
+		Name = "Marker",
+		Size = UDim2.fromOffset(7, 7),
+		Position = UDim2.new(0, x, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = color or K.red,
 		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = text,
-		TextColor3 = P.ink2,
-		Font = Theme.HeadingFont,
-		TextSize = 14,
-		LayoutOrder = order,
 	}, parent)
-	Ui.corner(button)
-	Ui.stroke(button, P.line, 1).Transparency = 0
-	Ui.make("Frame", {
-		Name = "Rule",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, 0, 0, 2),
-		BackgroundColor3 = K.red,
-		BorderSizePixel = 0,
-		Visible = false,
-	}, button)
-	-- Hover / focus: the label brightens (the open tab is already bright).
-	local function hover(on: boolean)
-		if button:GetAttribute("On") ~= true then
-			button.TextColor3 = if on then K.text else P.ink2
-		end
-	end
-	button.MouseEnter:Connect(function() hover(true) end)
-	button.MouseLeave:Connect(function() hover(false) end)
-	button.SelectionGained:Connect(function() hover(true) end)
-	button.SelectionLost:Connect(function() hover(false) end)
-	button.Activated:Connect(function()
-		local click = Ui.onClick
-		if click then
-			click()
-		end
-		onClick()
-	end)
-	return button
-end
-
-function Extras.paintTab(button: any, on: boolean)
-	button:SetAttribute("On", on)
-	button.BackgroundColor3 = if on then P.paper else P.lavenderDeep
-	button.TextColor3 = if on then P.ink else P.ink2
-	local stroke = button:FindFirstChildOfClass("UIStroke")
-	if stroke then
-		stroke.Color = P.line
-	end
-	local rule = button:FindFirstChild("Rule")
-	if rule and rule:IsA("GuiObject") then
-		rule.Visible = on
-	end
 end
 
 -- A colour as RichText's "#RRGGBB".
@@ -628,8 +586,7 @@ function Extras.itemIcon(parent: Instance, reward: RewardItem, px: number, mode:
 		BackgroundTransparency = if mode == "dim" then 0.5 elseif paint and paint.material == "Glass" then 0.15 else 0,
 		BorderSizePixel = 0,
 	}, holder)
-	Ui.corner(swatch)
-	-- 3.8: a flat square swatch; a fine rim (a thicker one in its own colour for the neon ones).
+	-- 3.8: a flat square swatch (5.8: no corner); a fine rim (a thicker one in its own colour for the neon ones).
 	local neon = paint ~= nil and paint.material == "Neon" and mode == "shown"
 	local rim = Ui.stroke(swatch, if neon then color else color:Lerp(K.text, 0.3), if neon then 2 else 1)
 	rim.Transparency = if mode == "dim" then 0.6 else 0
@@ -819,13 +776,13 @@ local function scrolling(parent: any, size: UDim2, position: UDim2, gap: number)
 		Position = position,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 5,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, parent)
 	Ui.list(frame, true, gap)
-	-- Room above and beside the paper for the hover lift and the outline.
+	-- Room around the rows for their hairline and the selected row's red rule.
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 8) }, frame)
 	frame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
 		hideTip()
@@ -856,7 +813,7 @@ local function build()
 		DisplayOrder = 3,
 	}, player:WaitForChild("PlayerGui"))
 	refs.gui = gui
-	local window, content, chrome = Ui.window(gui, "Missions", SUBTITLE, "🎯", UDim2.fromOffset(BASE_W, BASE_H))
+	local window, content, chrome = Ui.window(gui, "Missions", SUBTITLE, "🎯", UDim2.fromOffset(BASE_W, BASE_H), { glyph = "missions" })
 	window.Visible = false
 	refs.window = window
 	refs.chrome = chrome
@@ -866,20 +823,17 @@ local function build()
 		MissionsUi.close()
 	end
 
-	-- ── The page tabs (MISSIONS | CHALLENGES | SECRETS | REWARDS) and the count on the right ──
+	-- ── The page tabs (MISSIONS | CHALLENGES | SECRETS | REWARDS; 5.8: Ui.tabs) and the count on the right ──
 	do
-		local pages = Ui.make("Frame", { Size = UDim2.new(1, -220, 0, 32), Position = UDim2.fromOffset(16, 12), BackgroundTransparency = 1 }, content)
-		Ui.list(pages, false, 8)
-		refs.pages = {}
-		for order, page in Extras.PAGES do
-			local id = page.id
-			refs.pages[id] = Extras.tabButton(pages, page.text, page.width, order, function()
-				Extras.setTab(id)
-			end)
-		end
+		local pages = Ui.tabs(content, Extras.PAGES, function(id: string)
+			Extras.setTab(id)
+		end, { selected = Extras.tab, gap = 6, textSize = 13 })
+		pages.frame.Size = UDim2.new(1, -220, 0, 36)
+		pages.frame.Position = UDim2.fromOffset(16, 10)
+		refs.pageTabs = pages
 	end
-	refs.stars = Ui.label(content, `★ 0 / {#Missions.List * 3}`, UDim2.fromOffset(190, 32), {
-		Position = UDim2.new(1, -206, 0, 12),
+	refs.stars = Ui.label(content, `★ 0 / {#Missions.List * 3}`, UDim2.fromOffset(190, 36), {
+		Position = UDim2.new(1, -206, 0, 10),
 		TextSize = 21,
 		Font = Theme.DisplayFont,
 		TextColor3 = P.ink,
@@ -887,42 +841,39 @@ local function build()
 		TextWrapped = false,
 	})
 
-	-- ── The campaigns (left, on a deeper lavender column) and the selected campaign's missions (right) ──
-	local column = Ui.make("Frame", { Name = "Column", Size = UDim2.new(0, LEFT_W + 22, 1, -52), Position = UDim2.fromOffset(4, 52), BackgroundColor3 = P.lavenderDeep, BackgroundTransparency = 0.45, BorderSizePixel = 0 }, content)
-	Ui.corner(column)
+	-- ── The campaigns (left, on a sunk column) and the selected campaign's missions (right) ──
+	-- 5.8: the column is the recessed surface (square, a hairline on its right), the stories' caps with the red
+	-- marker, the ALL / CO-OP filter as square tabs.
+	local column = Ui.make("Frame", { Name = "Column", Size = UDim2.new(0, LEFT_W + 22, 1, -52), Position = UDim2.fromOffset(4, 52), BackgroundColor3 = K.recessed, BackgroundTransparency = 0.3, BorderSizePixel = 0 }, content)
 	refs.column = column
-	Ui.caps(column, "Stories", UDim2.fromOffset(90, 28), { Position = UDim2.fromOffset(12, 6), TextSize = 12, TextColor3 = P.ink2 })
-	local tabs = Ui.make("Frame", { Size = UDim2.fromOffset(160, 28), Position = UDim2.new(1, -10, 0, 6), AnchorPoint = Vector2.new(1, 0), BackgroundTransparency = 1 }, column)
-	Ui.list(tabs, false, 6, Enum.HorizontalAlignment.Right)
-	refs.filterTabs = tabs
-	refs.tabs = {}
-	for order, tab in { { id = "all", text = "ALL", width = 54 }, { id = "coop", text = "👥 CO-OP", width = 94 } } do
-		local id = tab.id
-		local button = Extras.tabButton(tabs, tab.text, tab.width, order, function()
-			setFilter(id)
-		end)
-		button.Size = UDim2.fromOffset(tab.width, 28)
-		button.TextSize = 12
-		refs.tabs[id] = button
-	end
-	refs.campaigns = scrolling(content, UDim2.new(0, LEFT_W, 1, -(TOP + 10)), UDim2.fromOffset(14, TOP), 8)
+	Ui.make("Frame", { Name = "Hairline", Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, column)
+	local stories = Ui.make("Frame", { Size = UDim2.fromOffset(100, 36), Position = UDim2.fromOffset(12, 4), BackgroundTransparency = 1 }, column)
+	Extras.marker(stories, 0)
+	Ui.caps(stories, "Stories", UDim2.new(1, -14, 1, 0), { Position = UDim2.fromOffset(14, 0), TextSize = 12, TextColor3 = P.ink2 })
+	local filters = Ui.tabs(column, { { id = "all", text = "ALL" }, { id = "coop", text = "CO-OP" } }, function(id: string)
+		setFilter(id)
+	end, { selected = filter, width = 72, gap = 4, textSize = 12 })
+	filters.frame.Size = UDim2.fromOffset(148, 36)
+	filters.frame.Position = UDim2.new(1, -10, 0, 4)
+	filters.frame.AnchorPoint = Vector2.new(1, 0)
+	refs.filterTabs = filters
+	refs.campaigns = scrolling(content, UDim2.new(0, LEFT_W, 1, -(TOP + 14)), UDim2.fromOffset(14, TOP + 4), 6)
 	refs.missions = scrolling(content, UDim2.new(1, -(LEFT_W + 44), 1, -(TOP - 26)), UDim2.fromOffset(LEFT_W + 32, TOP - 32), 10)
 	-- 3.1: the CHALLENGES / SECRETS / REWARDS pages (one full-width list, rebuilt by render).
 	refs.extra = scrolling(content, UDim2.new(1, -28, 1, -(TOP - 26)), UDim2.fromOffset(14, TOP - 32), 8)
 	refs.extra.Visible = false
 
-	-- ── The tooltip (over everything in the window): a paper slip ──
+	-- ── The tooltip (over everything in the window): a raised square card with a hairline ──
 	local tip = Ui.make("Frame", {
 		Name = "Tooltip",
 		Size = UDim2.fromOffset(280, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = P.paper,
+		BackgroundColor3 = K.raised,
 		BorderSizePixel = 0,
 		Visible = false,
 		ZIndex = 50,
 	}, window)
-	Ui.corner(tip)
-	Ui.stroke(tip, P.ink2, 1).Transparency = 0
+	Ui.stroke(tip, K.line, 1).Transparency = Ui.HAIRLINE_SELECTED
 	Ui.padding(tip, 10)
 	Ui.list(tip, true, 4)
 	refs.tip = tip
@@ -965,8 +916,8 @@ local function campaignRow(campaign: Campaign, order: number)
 	local done, total = Missions.done(progress, campaign.id)
 	local got, most = Missions.stars(progress, campaign.id)
 	local id = campaign.id
-	-- 3.6: a paper ticket, the campaign's colour on its spine; the selected one is the cream paper with a violet
-	-- outline, a locked one hatched.
+	-- 5.8: a slim row (a hairline, square); the campaign's colour as a short bar on its left; the selected one raised
+	-- with the narrow red rule, a locked one sunk (its words say what it waits for).
 	local row = Ui.make("TextButton", {
 		Size = UDim2.new(1, -2, 0, 70),
 		BorderSizePixel = 0,
@@ -974,12 +925,9 @@ local function campaignRow(campaign: Campaign, order: number)
 		Text = "",
 		LayoutOrder = order,
 	}, refs.campaigns)
-	Extras.paper(row, if selected then P.paper elseif locked then P.lavender else P.ticket, P.line, 1)
-	if locked then
-		Extras.hatch(row)
-	end
+	Extras.row(row, if locked then K.recessed else nil)
 	if selected then
-		Ui.selectRow(row, true) -- the quiet highlight and the narrow red rule
+		Ui.selectRow(row, true) -- raised, the narrow red rule
 	end
 	Ui.tactile(row)
 	row.Activated:Connect(function()
@@ -989,8 +937,7 @@ local function campaignRow(campaign: Campaign, order: number)
 		end
 		selectCampaign(id)
 	end)
-	local stripe = Ui.make("Frame", { Size = UDim2.new(0, 5, 1, -16), Position = UDim2.fromOffset(6, 8), BackgroundColor3 = if locked then P.line else color, BorderSizePixel = 0 }, row)
-	Ui.corner(stripe)
+	Ui.make("Frame", { Name = "Swatch", Size = UDim2.fromOffset(4, 30), Position = UDim2.new(0, 8, 0.5, -4), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = if locked then K.track else color, BorderSizePixel = 0 }, row)
 	Ui.label(row, campaign.icon, UDim2.fromOffset(34, 34), {
 		Position = UDim2.fromOffset(16, 17),
 		TextSize = 26,
@@ -1050,22 +997,25 @@ local function campaignHeader(campaign: Campaign, order: number)
 	local color = colorOf(campaign)
 	local done, total = Missions.done(progress, campaign.id)
 	local got, most = Missions.stars(progress, campaign.id)
-	-- 3.6: a paper note, the campaign's colour as its edge.
+	-- 5.8: the phone's contract card: a square card with a hairline, a small marker in the campaign's colour before
+	-- the client in caps, the name in caps under it (the stars on the right), the pitch, the status and a thin bar.
 	local frame = Ui.make("Frame", {
 		Size = UDim2.new(1, -2, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, refs.missions)
-	Extras.paper(frame, P.paper, P.line, 1, 12)
-	Ui.edge(frame, color)
-	-- (4.0.3: the content in a frame of its own: the edge must not be a list item; a scale-tall item in an auto-sized
-	-- list makes the card grow without end)
+	Extras.row(frame)
+	-- (4.0.3: the content in a frame of its own: a scale-tall item in an auto-sized list makes the card grow without
+	-- end)
 	local body = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, frame)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) }, body)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, body)
 	Ui.list(body, true, 4)
-	local title = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 1 }, body)
-	Ui.label(title, `{campaign.icon}  {campaign.name}`, UDim2.new(1, -150, 1, 0), {
+	local client = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 1 }, body)
+	Extras.marker(client, 0, color)
+	Ui.caps(client, campaign.client, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextSize = 12, TextColor3 = P.ink2 })
+	local title = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, body)
+	Ui.label(title, `{campaign.icon}  {string.upper(campaign.name)}`, UDim2.new(1, -150, 1, 0), {
 		TextSize = 22,
 		Font = Theme.DisplayFont,
 		TextColor3 = P.ink,
@@ -1079,7 +1029,6 @@ local function campaignHeader(campaign: Campaign, order: number)
 		TextColor3 = C.yellow,
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
-	Ui.caps(body, campaign.client, UDim2.new(1, 0, 0, 16), { TextSize = 12, TextColor3 = P.ink2, LayoutOrder = 2 })
 	Ui.label(body, campaign.pitch, UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		TextSize = 14,
@@ -1124,7 +1073,7 @@ local function campaignHeader(campaign: Campaign, order: number)
 			LayoutOrder = 6,
 		})
 	end
-	local back, fill = Ui.bar(body, UDim2.new(1, 0, 0, 6), color)
+	local back, fill = Ui.bar(body, UDim2.new(1, 0, 0, 3), color)
 	back.LayoutOrder = 7
 	fill.Size = UDim2.fromScale(if total > 0 then done / total else 0, 1)
 end
@@ -1153,9 +1102,10 @@ local function selectMission(id: string)
 	render()
 end
 
--- 3.6: a mission as a paper ticket (dispatch.png's job ticket): the campaign's colour on the left edge, a numbered
--- spine and a perforation, the tier and the name, the twist chips, the cargo line; on the right a perforated stub with
--- the pay and the status. Hover lifts it; a locked one is hatched.
+-- A mission as a card (5.8: the phone's slim card): a numbered spine ("01" in a square outline, filled in the
+-- campaign's colour when done) behind a fine line, the tier and the name, the twist tags, the cargo line; on the right
+-- a column with the pay and the status. Hover brightens it, the selected one is raised with the red rule, a locked one
+-- sunk, a running one has a brighter hairline.
 local STUB_W = 116
 local SPINE_W = 66
 local function missionCard(def: MissionDef, campaign: Campaign, order: number)
@@ -1172,12 +1122,9 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 		Text = "",
 		LayoutOrder = order,
 	}, refs.missions)
-	Extras.paper(card, if locked then P.lavender elseif selected then P.paper else P.ticket, if status == "active" then K.secondary else P.line, 1)
-	if locked then
-		Extras.hatch(card)
-	end
+	Extras.row(card, if locked then K.recessed else nil, if status == "active" then K.secondary else nil)
 	if selected and not locked then
-		Ui.selectRow(card, true) -- the quiet highlight and the narrow red rule
+		Ui.selectRow(card, true) -- raised, the narrow red rule
 	end
 	card.Activated:Connect(function()
 		local click = Ui.onClick
@@ -1186,21 +1133,19 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 		end
 		selectMission(id)
 	end)
-	Ui.tactile(card, 3, 1.012)
-	local edge = Ui.make("Frame", { Size = UDim2.new(0, 4, 1, -18), Position = UDim2.fromOffset(6, 9), BackgroundColor3 = if locked then P.line else color, BorderSizePixel = 0 }, card)
-	Ui.corner(edge)
-	-- The spine: the number badge (filled when done, outlined when open, quiet when locked), a perforation after it.
+	Ui.tactile(card)
+	-- The spine: the number in a square (filled in the campaign's colour when done, outlined in it when open, quiet
+	-- when locked), a fine line after it.
 	local badge = Ui.make("Frame", {
-		Size = UDim2.fromOffset(42, 42),
+		Size = UDim2.fromOffset(40, 40),
 		Position = UDim2.new(0, 16, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = if stars > 0 then color elseif locked then P.lavenderDeep else P.paper,
+		BackgroundColor3 = if stars > 0 then color elseif locked then K.recessed else K.charcoal,
 		BorderSizePixel = 0,
 	}, card)
-	Ui.corner(badge)
-	Ui.stroke(badge, if locked then P.line else color, 2).Transparency = 0
-	Ui.label(badge, if locked then "🔒" else tostring(def.number), UDim2.fromScale(1, 1), {
-		TextSize = if locked then 17 else 20,
+	Ui.stroke(badge, if locked then K.line else color, 1).Transparency = if locked then Ui.HAIRLINE_SELECTED else 0
+	Ui.label(badge, if locked then "🔒" else string.format("%02d", def.number), UDim2.fromScale(1, 1), {
+		TextSize = if locked then 17 else 18,
 		Font = Theme.DisplayFont,
 		TextColor3 = if stars > 0 then Theme.textOn(color) else P.ink,
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -1267,7 +1212,7 @@ local function missionCard(def: MissionDef, campaign: Campaign, order: number)
 	})
 	local statusText, statusKind = "OPEN", "good"
 	if status == "done" then
-		statusText, statusKind = Ui.stars(stars), "twist"
+		statusText, statusKind = Ui.stars(stars), "gold"
 	elseif status == "locked" then
 		-- 3.2: a mission above your level says which (a campaign still shut says it on its row and header).
 		local needLevel = def.level or 0
@@ -1295,8 +1240,8 @@ local function detailLine(parent: any, text: string, color: Color3?, order: numb
 	})
 end
 
--- The client's briefing as a note in the card (3.8: a flat dark note with a red rule on its left, no tape): the
--- client's icon in a square badge, the words and their name under them like a signature.
+-- The client's briefing as a note in the card (3.8: a flat dark note with a red rule on its left, no tape; 5.8:
+-- square, a hairline): the client's icon in a square badge, the words and their name under them like a signature.
 local function briefingNote(parent: any, def: MissionDef, campaign: Campaign, order: number)
 	local color = colorOf(campaign)
 	local holder = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, parent)
@@ -1304,16 +1249,13 @@ local function briefingNote(parent: any, def: MissionDef, campaign: Campaign, or
 	local note = Ui.make("Frame", {
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = P.tags[2],
 		BorderSizePixel = 0,
 	}, holder)
-	Ui.corner(note)
-	Ui.stroke(note, P.line, 1).Transparency = 0
+	Extras.row(note, K.charcoal)
 	-- The red rule (the contract accent) and the client's badge (in the left margin).
 	Ui.make("Frame", { Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0 }, note)
-	local avatar = Ui.make("Frame", { Size = UDim2.fromOffset(46, 46), Position = UDim2.fromOffset(14, 14), BackgroundColor3 = P.paper, BorderSizePixel = 0 }, note)
-	Ui.corner(avatar)
-	Ui.stroke(avatar, color, 2).Transparency = 0
+	local avatar = Ui.make("Frame", { Size = UDim2.fromOffset(46, 46), Position = UDim2.fromOffset(14, 14), BackgroundColor3 = K.row, BorderSizePixel = 0 }, note)
+	Ui.stroke(avatar, color, 1).Transparency = 0
 	Ui.label(avatar, campaign.icon, UDim2.fromScale(1, 1), { TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center })
 	-- The words and the signature (the note grows with them).
 	local words = Ui.make("Frame", { Size = UDim2.new(1, -88, 0, 0), Position = UDim2.fromOffset(72, 14), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, note)
@@ -1354,7 +1296,10 @@ local function routeText(def: MissionDef): string
 	return `📍 {from}  →  {to}{extra}`
 end
 
--- START (or why not), FIND CREW on a co-op mission.
+-- START (or why not), FIND CREW on a co-op mission. 5.8: START is the red primary action; while something blocks it
+-- (locked, running, your own job, no car, a DUO mission short of a crew, too much cargo) it wears the "off" face and
+-- the note beside it says why (a click still asks and is told). FIND CREW is the red one when the crew is what is
+-- missing (a DUO mission), else a quiet action.
 local function actionRow(parent: any, def: MissionDef, order: number)
 	local status, why = statusOf(def)
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = order }, parent)
@@ -1366,16 +1311,14 @@ local function actionRow(parent: any, def: MissionDef, order: number)
 		note = `👥 Your crew leader picks the mission ({crewOwner}). Leave the crew (K) to play your own.`
 	else
 		local enabled = status ~= "locked" and status ~= "active" and not ownJob
-		local text = if status == "done" then "PLAY AGAIN  →" elseif status == "active" then "▶ PLAYING" else "START  →"
-		local start = Ui.button(row, text, UDim2.fromOffset(170, 44), P.sage, function()
+			and not Extras.noCar() and not Extras.needsCrew(def) and Extras.slotsShort(def) == nil
+		local text = if status == "done" then "PLAY AGAIN" elseif status == "active" then "▶ PLAYING" else "START"
+		local start = Ui.button(row, text, UDim2.fromOffset(170, 44), K.red, function()
 			MissionsUi.startMission(id)
 		end)
 		start.TextSize = 16
 		start.LayoutOrder = 1
-		paintButton(start, text, P.sage, enabled)
-		if enabled then
-			Ui.tactile(start, 3, 1.03)
-		end
+		paintButton(start, text, K.red, enabled)
 		if status == "locked" then
 			note = `🔒 {why or "Locked."}`
 		elseif status == "active" then
@@ -1393,7 +1336,7 @@ local function actionRow(parent: any, def: MissionDef, order: number)
 		end
 	end
 	if def.coop and not member then
-		local find = Ui.button(row, "🔎 FIND CREW", UDim2.fromOffset(150, 44), if Extras.needsCrew(def) then Extras.DUO_COLOR else P.violet, function()
+		local find = Ui.button(row, "🔎 FIND CREW", UDim2.fromOffset(150, 44), if Extras.needsCrew(def) then K.red else P.violet, function()
 			MissionsUi.findCrew(id)
 		end)
 		find.TextSize = 15
@@ -1409,16 +1352,17 @@ local function actionRow(parent: any, def: MissionDef, order: number)
 	end
 end
 
--- 3.6: the open card's back: a quiet lavender sheet under the ticket with the note, the facts and START.
+-- The open card's back (5.8: a raised square card under the selected one, its hairline a step brighter) with the
+-- note, the facts and START.
 local function missionDetail(def: MissionDef, campaign: Campaign, order: number)
-	local color = colorOf(campaign)
 	local frame = Ui.make("Frame", {
 		Size = UDim2.new(1, -4, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, refs.missions)
-	Extras.paper(frame, P.lavender:Lerp(P.paper, 0.5), color, 1.5, 10)
+	Extras.row(frame, K.raised)
+	Ui.stroke(frame, K.line, 1).Transparency = Ui.HAIRLINE_SELECTED
 	Ui.padding(frame, 14)
 	Ui.list(frame, true, 8)
 	briefingNote(frame, def, campaign, 1)
@@ -1468,25 +1412,27 @@ end
 
 -- ── 3.1: the CHALLENGES / SECRETS / REWARDS pages ──────────────────────────
 
--- A section's heading: the name on the left, a count on the right.
+-- A section's heading (5.8: the phone's "■ ACTIVE ORDER"): the small red marker, the name in caps, a count on the
+-- right and a thin line under it all.
 function Extras.section(parent: Instance, text: string, right: string, order: number)
-	local frame = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 30), BackgroundTransparency = 1, LayoutOrder = order }, parent)
-	Ui.label(frame, text, UDim2.new(1, -160, 1, 0), {
-		Position = UDim2.fromOffset(2, 4),
-		TextSize = 17,
+	local frame = Ui.make("Frame", { Size = UDim2.new(1, -2, 0, 32), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+	local line = Ui.make("Frame", { Name = "Line", Size = UDim2.new(1, -16, 0, 26), Position = UDim2.fromOffset(2, 4), BackgroundTransparency = 1 }, frame)
+	Extras.marker(line, 0)
+	Ui.label(line, string.upper(text), UDim2.new(1, -176, 1, 0), {
+		Position = UDim2.fromOffset(16, 0),
+		TextSize = 15,
 		Font = Theme.DisplayFont,
 		TextColor3 = P.ink,
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	Ui.label(frame, right, UDim2.fromOffset(156, 26), {
-		Position = UDim2.new(1, -158, 0, 4),
-		TextSize = 14,
-		Font = Theme.HeadingFont,
+	Ui.caps(line, right, UDim2.fromOffset(156, 26), {
+		Position = UDim2.new(1, -158, 0, 0),
+		TextSize = 12,
 		TextColor3 = P.ink2,
 		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
 	})
+	Ui.make("Frame", { Name = "Rule", Size = UDim2.new(1, -4, 0, 1), Position = UDim2.new(0, 2, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, frame)
 end
 
 -- A plain line of text in a page.
@@ -1519,7 +1465,8 @@ function Extras.finalCard(parent: Instance, order: number, info: {
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Extras.paper(frame, P.paper:Lerp(color, if info.earned then 0.1 else 0.04), if info.earned then color else color:Lerp(P.paper, 0.5), 2, 12)
+	-- 5.8: a square card with a hairline (in its colour once earned), the raised face when it is yours.
+	Extras.row(frame, if info.earned then K.raised else nil, if info.earned then color else nil)
 	-- The picture on a dark square with a fine frame in its colour (3.8: no glow).
 	local art = Ui.make("Frame", { Size = UDim2.fromOffset(112, 112), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = K.charcoal, BorderSizePixel = 0 }, frame)
 	Ui.stroke(art, if info.earned then color else P.line, 1).Transparency = 0
@@ -1576,18 +1523,15 @@ function Extras.challengeRow(parent: Instance, def: Challenges.ChallengeDef, ord
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Extras.paper(row, if isDone then P.tags[3] elseif secret then P.lavender else P.ticket, P.line)
-	if secret then
-		Extras.hatch(row)
-	end
+	-- 5.8: a slim row (a secret one sunk); the badge a square outline (green once done).
+	Extras.row(row, if secret then K.recessed else nil)
 	local badge = Ui.make("Frame", {
 		Size = UDim2.fromOffset(40, 40),
 		Position = UDim2.fromOffset(12, 14),
-		BackgroundColor3 = if isDone then P.sage else P.paper,
+		BackgroundColor3 = if isDone then K.raised else K.charcoal,
 		BorderSizePixel = 0,
 	}, row)
-	Ui.corner(badge)
-	Ui.stroke(badge, if isDone then C.green else P.line, 2).Transparency = 0
+	Ui.stroke(badge, if isDone then C.green else K.line, 1).Transparency = if isDone then 0 else Ui.HAIRLINE_SELECTED
 	Ui.label(badge, if isDone then "✓" elseif secret then "?" else Extras.categoryIcon(def.category), UDim2.fromScale(1, 1), {
 		TextSize = if isDone then 22 else 18,
 		Font = Theme.DisplayFont,
@@ -1611,7 +1555,7 @@ function Extras.challengeRow(parent: Instance, def: Challenges.ChallengeDef, ord
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
 	if not secret then
-		local back, fill = Ui.bar(row, UDim2.new(1, -336, 0, 6), if isDone then C.green else P.violet)
+		local back, fill = Ui.bar(row, UDim2.new(1, -336, 0, 4), if isDone then C.green else K.red)
 		back.Position = UDim2.fromOffset(64, 52)
 		fill.Size = UDim2.fromScale(math.clamp(value / math.max(def.goal, 1), 0, 1), 1)
 		Ui.label(row, `{Extras.num(math.min(value, def.goal))} / {Extras.num(def.goal)}`, UDim2.fromOffset(98, 16), {
@@ -1726,10 +1670,7 @@ function Extras.secretRow(parent: Instance, entry: SecretEntry, label: string, o
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Extras.paper(row, if found then P.tags[3] elseif visited then P.ticket else P.lavender, P.line)
-	if not (visited or found) then
-		Extras.hatch(row)
-	end
+	Extras.row(row, if visited or found then nil else K.recessed) -- 5.8: a slim row, sunk before you have been there
 	Ui.label(row, if found then "✓" elseif visited then "📦" else "🔒", UDim2.fromOffset(36, 50), {
 		Position = UDim2.fromOffset(8, 0),
 		TextSize = if found then 22 else 18,
@@ -1780,7 +1721,7 @@ function Extras.secretsPage(parent: Instance)
 		BorderSizePixel = 0,
 		LayoutOrder = 1,
 	}, parent)
-	Extras.paper(head, P.paper, P.line, 1, 12)
+	Extras.row(head)
 	Ui.padding(head, 14)
 	Ui.list(head, true, 4)
 	Ui.label(head, `📦  Lost packages  ·  {found} / {total} found`, UDim2.new(1, 0, 0, 26), {
@@ -1804,7 +1745,7 @@ function Extras.secretsPage(parent: Instance)
 		TextColor3 = C.money,
 		LayoutOrder = 3,
 	})
-	local back, fill = Ui.bar(head, UDim2.new(1, 0, 0, 6), P.violet)
+	local back, fill = Ui.bar(head, UDim2.new(1, 0, 0, 3), K.red)
 	back.LayoutOrder = 4
 	fill.Size = UDim2.fromScale(if total > 0 then found / total else 0, 1)
 	-- The reward for all of them.
@@ -1869,7 +1810,7 @@ function Extras.campaignCard(parent: Instance, campaign: Campaign, order: number
 		Text = "",
 		LayoutOrder = order,
 	}, parent)
-	Extras.paper(card, if earned then P.paper else P.ticket, if earned then color else P.line, if earned then 2 else 1)
+	Extras.row(card, if earned then K.raised else nil, if earned then color else nil)
 	Ui.padding(card, 8)
 	Ui.list(card, true, 3, Enum.HorizontalAlignment.Center)
 	card.Activated:Connect(function()
@@ -1939,7 +1880,10 @@ function Extras.titleRow(parent: Instance, title: string?, order: number)
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Extras.paper(row, if equipped then P.tags[2] else P.ticket, if equipped then Extras.GOLD else P.line, if equipped then 1.5 else 1)
+	Extras.row(row)
+	if equipped then
+		Ui.selectRow(row, true) -- the one over your head: raised, the red rule
+	end
 	Ui.label(row, if title then `🎖  {title}` else "No title", UDim2.new(1, -330, 1, 0), {
 		Position = UDim2.fromOffset(12, 0),
 		TextSize = 16,
@@ -1964,7 +1908,7 @@ function Extras.titleRow(parent: Instance, title: string?, order: number)
 		chip.AnchorPoint = Vector2.new(1, 0.5)
 		chip.TextSize = 13
 	else
-		local button = Ui.button(row, "EQUIP", UDim2.fromOffset(100, 32), P.sage, function()
+		local button = Ui.button(row, "EQUIP", UDim2.fromOffset(100, 36), C.yellow, function()
 			Extras.equip(title)
 		end)
 		button.TextSize = 14
@@ -1982,7 +1926,7 @@ function Extras.exclusiveCard(parent: Instance, item: ExclusiveItem, order: numb
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 	}, parent)
-	Extras.paper(card, if owned then P.paper else P.ticket, if owned then color:Lerp(P.ink, 0.2) else P.line, if owned then 1.5 else 1)
+	Extras.row(card, if owned then K.raised else nil, if owned then color:Lerp(P.ink, 0.2) else nil)
 	Ui.padding(card, 6)
 	Ui.list(card, true, 3, Enum.HorizontalAlignment.Center)
 	local chip = Extras.chip(card, if owned then "EXCLUSIVE" else "REWARD", if owned then "coop" else "quiet", 1)
@@ -2114,18 +2058,14 @@ render = function()
 	local got, most = Missions.stars(progress, nil)
 	refs.stars.Text = `★ {got} / {most}`
 	refs.chrome.context.Text = `<b>★ {got} / {most} STARS</b> · U · Missions, challenges, lost packages, rewards`
-	for id, button in refs.tabs do
-		Extras.paintTab(button, filter == id)
-	end
+	refs.filterTabs.select(filter)
 	-- 3.1: the page tabs; the CHALLENGES / SECRETS / REWARDS pages draw in their own list.
 	do
 		local page = Extras.tab
 		local S = Extras.state
 		local done = Extras.count(S.done)
-		for id, button in refs.pages do
-			Extras.paintTab(button, page == id)
-		end
-		refs.pages.challenges.Text = `🏅 CHALLENGES {math.min(done, #Challenges.List)}/{#Challenges.List}`
+		refs.pageTabs.select(page)
+		refs.pageTabs.buttons.challenges.Text = `CHALLENGES {math.min(done, #Challenges.List)}/{#Challenges.List}`
 		local missionsPage = page == "missions"
 		refs.campaigns.Visible = missionsPage
 		refs.missions.Visible = missionsPage
@@ -2268,9 +2208,9 @@ end
 
 -- ── The banner during a mission (the Hud's top stack) ──────────────────────
 
--- 3.6: a small paper ticket under the objective ticket, tilted the other way (+0.5°): the campaign's colour as its
--- edge, the mission's name and the crew on top, the twists under it, HOLD OUT / the levers when they matter, and a
--- perforated stub with "3/10".
+-- A compact charcoal scrim under the objective (5.8: square, a hairline): the campaign's colour as its edge, the
+-- mission's name and the crew on top, the twists under it, HOLD OUT / the levers when they matter, and "3/10" behind a
+-- fine line.
 local function buildBanner()
 	-- Right under the job panel and the crew strip, above the car call line and the toasts (Hud's SLOT_ORDER).
 	local slot = Hud.topSlot("mission")
@@ -2283,7 +2223,7 @@ local function buildBanner()
 		BorderSizePixel = 0,
 		Visible = false,
 	}, slot)
-	Ui.corner(banner)
+	Ui.stroke(banner, K.line, 1).Transparency = Ui.HAIRLINE
 	refs.banner = banner
 	refs.bannerEdge = Ui.edge(banner, P.violet)
 	local body = Ui.make("Frame", { Size = UDim2.new(1, -66, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, banner)
@@ -2418,7 +2358,8 @@ local function buildCleared()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = 6,
 	}, player:WaitForChild("PlayerGui"))
-	-- A charcoal card, the campaign's colour as its fine rim (set on every show).
+	-- 5.8: a square charcoal card in the phone's look: the ZDC heading with the missions glyph and a thin line under
+	-- it, a hairline rim; the campaign's colour is the small square before the ribbon (set on every show).
 	local card = Ui.make("Frame", {
 		Name = "MissionCleared",
 		Size = UDim2.fromOffset(460, 0),
@@ -2430,9 +2371,8 @@ local function buildCleared()
 		BorderSizePixel = 0,
 		Visible = false,
 	}, gui)
-	Ui.corner(card)
-	refs.clearedRim = Ui.stroke(card, P.violet, 1)
-	refs.clearedRim.Transparency = 0
+	refs.clearedRim = Ui.stroke(card, K.line, 1)
+	refs.clearedRim.Transparency = Ui.HAIRLINE_SELECTED
 	refs.cleared = card
 	refs.clearedGui = gui
 	refs.clearedScale = Ui.make("UIScale", {}, card)
@@ -2449,7 +2389,11 @@ local function buildCleared()
 			RichText = true,
 		})
 	end
-	line("clearedRibbon", 1, 14, Theme.DisplayFont, P.violet)
+	-- The ZDC heading ([■ ZDC] | ☆ MISSION COMPLETE) and its thin line.
+	local heading = Ui.heading(card, "Mission complete", { glyph = "missions", textSize = 16, height = 28 })
+	heading.frame.LayoutOrder = -2
+	Ui.make("Frame", { Name = "Rule", Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = K.rule, BorderSizePixel = 0, LayoutOrder = -1 }, card)
+	line("clearedRibbon", 1, 13, Theme.HeadingFont, P.ink2)
 	line("clearedName", 2, 26, Theme.DisplayFont, P.ink)
 	-- The three stars (they fly in one after the other).
 	local starRow = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 64), BackgroundTransparency = 1, LayoutOrder = 3 }, card)
@@ -2476,9 +2420,9 @@ local function buildCleared()
 	line("clearedDebrief", 5, 16, Theme.Font, P.ink)
 	line("clearedRewards", 6, 15, Theme.HeadingFont, C.money)
 	line("clearedCampaign", 7, 18, Theme.DisplayFont, C.yellow)
-	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = 8 }, card)
+	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 8 }, card)
 	Ui.list(buttons, false, 10, Enum.HorizontalAlignment.Center)
-	refs.clearedNext = Ui.button(buttons, "NEXT MISSION ▶", UDim2.fromOffset(200, 42), P.sage, function()
+	refs.clearedNext = Ui.button(buttons, "NEXT MISSION ▶", UDim2.fromOffset(220, 44), K.red, function()
 		local id = clearedNext
 		hideCleared()
 		local def = if id then Missions.find(id) else nil
@@ -2492,12 +2436,14 @@ local function buildCleared()
 		end
 	end)
 	refs.clearedNext.LayoutOrder = 1
-	local ok = Ui.button(buttons, "OK", UDim2.fromOffset(110, 42), C.blue, function()
+	refs.clearedNext.TextSize = 15 -- (a long "NEXT: …" in caps wraps onto two lines)
+	refs.clearedNext.TextWrapped = true
+	local ok = Ui.ghostButton(buttons, "OK", UDim2.fromOffset(90, 44), nil, function()
 		hideCleared()
 	end)
 	ok.LayoutOrder = 2
 	-- 4.4.1: Space (Enter, the gamepad's A) closes the card like OK while it shows; the key's hint next to OK.
-	Ui.label(buttons, DialogKeys.hint(), UDim2.fromOffset(0, 42), {
+	Ui.label(buttons, DialogKeys.hint(), UDim2.fromOffset(0, 44), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.MonoFont,
 		TextSize = 11,
@@ -2536,9 +2482,9 @@ local function showCleared(data: any)
 	local color = colorOf(campaign)
 	local stars = math.clamp(tonumber(data.stars) or 1, 1, 3)
 	local card = refs.cleared
-	refs.clearedRim.Color = color
-	refs.clearedRibbon.Text = if def then `{if campaign then campaign.icon .. "  " else ""}MISSION {def.number}/10 COMPLETE` else "MISSION COMPLETE"
-	refs.clearedRibbon.TextColor3 = P.violet
+	local swatch = `<font color="{Extras.hex(color)}">■</font>  `
+	refs.clearedRibbon.Text = if def then `{swatch}{if campaign then esc(string.upper(campaign.name)) .. "  ·  " else ""}MISSION {def.number}/10` else `{swatch}MISSION`
+	refs.clearedRibbon.TextColor3 = P.ink2
 	refs.clearedName.Text = esc(tostring(data.name or (def and def.name) or "Mission"))
 	local newStars = tonumber(data.newStars) or 0
 	local bestStars = tonumber(data.best) or stars
@@ -2683,8 +2629,7 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 			Selectable = false,
 			Text = "",
 		}, slot)
-		Ui.corner(card)
-		Ui.stroke(card, color, 1).Transparency = 0
+		Ui.stroke(card, K.line, 1).Transparency = Ui.HAIRLINE_SELECTED -- 5.8: square, a hairline; its colour the rule
 		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0 }, card)
 		Ui.make("UIScale", { Name = "Pop", Scale = 0.97 }, card)
 		-- 4.0.3: the content in a frame of its own: the rule (scale-tall) must not be an item of the card's list, or

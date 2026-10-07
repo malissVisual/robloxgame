@@ -36,6 +36,10 @@
 -- 5.0: Last Stop Supplies has two tabs, ITEMS and KIT (personal gear, client/KitShop.luau); with no vehicle yet the
 -- hint says "On foot · J for the board · Supplies for a backpack"; the PHONE action over the weapon line belongs to
 -- client/Phone.luau (it reads this HUD's RightStack / WeaponBar to sit there).
+-- 5.8, every window in the courier phone's style (design/phone-ui/): the shop, employer, backpack and result windows
+-- wear Ui.window's ZDC header with a line glyph (the shop's follows its kind), Ui.tabs' square tabs, the phone's red
+-- primary for a row's main action (BUY, UPGRADE, USE, TAKE THE JOB) and tag lines (the red square and caps); the
+-- delivery result is the phone's order card (the customer in big caps, PAY | DRIVER XP) with one red CONTINUE.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -453,18 +457,20 @@ Hud.closeWindows = closeWindows
 -- One window at a time: the leaderboard (L) closes the HUD's windows too.
 Leaderboard.onOpen = closeWindows
 
-type Window = { frame: any, body: any, title: any, subtitle: any, icon: any, footer: any }
+type Window = { frame: any, body: any, title: any, subtitle: any, icon: any, footer: any, glyph: any }
 
--- The window (Ui.window: its chrome, the header with the title and the subtitle, the close button, the footer with
--- ESC and the context on the right, window.footer) with a scrolling body of slim rows.
+-- The window (Ui.window: its chrome, 5.8 the courier phone's ZDC header with the line glyph of `icon` and the title in
+-- caps, the subtitle, the square close button, the footer with the context on the right, window.footer) with a
+-- scrolling body of slim rows, its left edge on the header's line. window.glyph is the header's glyph slot
+-- (Ui.glyph(window.glyph, id) changes it: the shop's kind).
 local function window(title: string, size: Vector2, icon: string, subtitle: string): Window
 	local frame, content, chrome = Ui.window(gui, title, subtitle, icon, UDim2.fromOffset(size.X, size.Y))
 	scaled(frame)
 	frame.Visible = false
 	frame.ZIndex = 5
 	local body = Ui.make("ScrollingFrame", {
-		Size = UDim2.new(1, -28, 1, -12),
-		Position = UDim2.fromOffset(14, 6),
+		Size = UDim2.new(1, -36, 1, -12),
+		Position = UDim2.fromOffset(20, 6),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 3,
@@ -476,7 +482,7 @@ local function window(title: string, size: Vector2, icon: string, subtitle: stri
 	Ui.list(body, true, 6)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 4) }, body)
 	table.insert(windows, frame)
-	return { frame = frame, body = body, title = chrome.title, subtitle = chrome.subtitle, icon = chrome.icon, footer = chrome.context }
+	return { frame = frame, body = body, title = chrome.title, subtitle = chrome.subtitle, icon = chrome.icon, footer = chrome.context, glyph = chrome.glyph }
 end
 
 -- 3.8: a list row is a slim charcoal row (P.row); the one that matters here (`highlight`) raised with a narrow red rule
@@ -494,15 +500,16 @@ local function cardText(c: any, name: string, stats: string, description: string
 	Ui.label(c, description, UDim2.new(1, -190 - x, 0, 20), { Position = UDim2.fromOffset(x, 55), TextColor3 = P.ink2, TextSize = 13, Font = Theme.Font })
 end
 
--- The button of a card, in the column on its right: the main action a light face (a secondary one, `color` C.blue or
--- C.grey, an outline), what you cannot press a dim one with the reason in it.
+-- The button of a card, in the column on its right: the row's main action (BUY, UPGRADE, USE) 5.8 the phone's red
+-- primary (a red face, white caps), a secondary one (`color` C.blue or C.grey) an outline, what you cannot press a dim
+-- one with the reason in it.
 local function cardButton(parent: any, text: string, color: Color3, enabled: boolean, onClick: () -> (), slot: number?): any
 	local function press()
 		if enabled then
 			onClick()
 		end
 	end
-	local kind: P.ButtonKind = if not enabled then "off" elseif color == C.blue or color == C.grey then "quiet" else "main"
+	local kind: P.ButtonKind = if not enabled then "off" elseif color == C.blue or color == C.grey then "quiet" else "primary"
 	local button = P.button(parent, text, UDim2.fromOffset(150, 40), kind, press)
 	button.TextSize = 14
 	local n = slot or 0
@@ -510,17 +517,16 @@ local function cardButton(parent: any, text: string, color: Color3, enabled: boo
 	return button
 end
 
--- The tabs of a window: the open one a light face, the others outlined.
+-- The tabs of a window (5.8: Ui.tabs, the phone's square tabs: the open one raised with a red underline), first in
+-- the body (LayoutOrder 0). A pick re-renders the window (onPick), the open tab too.
 local function tabs(parent: any, list: { { string } }, selected: string, onPick: (string) -> ())
-	local row = Ui.make("Frame", { Size = UDim2.new(1, -12, 0, 40), BackgroundTransparency = 1, LayoutOrder = 0 }, parent)
-	Ui.list(row, false, 6)
+	local items: { Ui.TabItem } = {}
 	for _, entry in list do
-		local on = entry[1] == selected
-		local button = P.button(row, entry[2], UDim2.fromOffset(132, 36), if on then "main" else "quiet", function()
-			onPick(entry[1])
-		end)
-		button.TextSize = 13
+		table.insert(items, { id = entry[1], text = entry[2] })
 	end
+	local row = Ui.tabs(parent, items, onPick, { selected = selected, width = 120, height = 36, gap = 6 }).frame
+	row.Size = UDim2.new(1, -12, 0, 36)
+	row.LayoutOrder = 0
 end
 
 -- A line of text in a window (C.red: a warning, in the contract red).
@@ -804,17 +810,21 @@ local function renderShop()
 	local money = state.money
 	local here = nearShop(shopId)
 	-- 3.6: the header (the shop's name, what it sells, its icon) and the footer (at the counter or not, your money).
+	-- 5.8: and the line glyph of the ZDC header (the phone's: garage for the cars, settings for the mechanic, shop).
 	shop.title.Text = Map.Shops[shopId] and Map.Shops[shopId].name or "Shop"
 	local about = ({
-		dealer = { "🚗", "The catalog · every car has a role" },
-		depot = { "🅿", "Your cars at the depot lot" },
-		guns = { "🔫", "Guns for your hands" },
-		supplies = { "🧰", "Supplies for the road" },
-		mechanic = { "🔧", "Upgrades, stages, paint and car guns" },
-		bikes = { "🚲", "Bikes and bike gear" }, -- 5.1
-	} :: { [string]: { string } })[shopId] or { "🏪", "" }
+		dealer = { "🚗", "The catalog · every car has a role", "garage" },
+		depot = { "🅿", "Your cars at the depot lot", "garage" },
+		guns = { "🔫", "Guns for your hands", "shop" },
+		supplies = { "🧰", "Supplies for the road", "shop" },
+		mechanic = { "🔧", "Upgrades, stages, paint and car guns", "settings" },
+		bikes = { "🚲", "Bikes and bike gear", "shop" }, -- 5.1
+	} :: { [string]: { string } })[shopId] or { "🏪", "", "shop" }
 	shop.icon.Text = about[1]
 	shop.subtitle.Text = about[2]
+	if shop.glyph:GetAttribute("Glyph") ~= about[3] then
+		Ui.glyph(shop.glyph, about[3])
+	end
 	shop.footer.Text = `{if here then "At the counter" else "Walk in to buy"} · {Ui.money(money)}`
 	if not here then
 		note(shop.body, "Walk into the shop to buy here.", C.red, 1)
@@ -954,7 +964,7 @@ local function renderShop()
 			cardButton(c, `BUY 1  {Ui.money(def.price)}`, C.green, here and money >= def.price and have < def.max, function()
 				Net.get("Buy"):FireServer("item", def.id, 1)
 			end, 1)
-			cardButton(c, `BUY 5  {Ui.money(def.price * 5)}`, C.green, here and money >= def.price * 5 and have + 5 <= def.max, function()
+			cardButton(c, `BUY 5  {Ui.money(def.price * 5)}`, C.blue, here and money >= def.price * 5 and have + 5 <= def.max, function()
 				Net.get("Buy"):FireServer("item", def.id, 5)
 			end, 2)
 		end
@@ -1162,8 +1172,10 @@ local function openEmployer(id: string)
 	employerWindow.subtitle.Text = `{employer.person} · they lend you the vehicle`
 	employerWindow.footer.Text = `{state.rep[employer.id] or 0} jobs done here`
 	employerWindow.frame.Visible = true
-	-- The person who runs it, and what they say.
-	Ui.label(body, string.upper(employer.person), UDim2.new(1, -10, 0, 20), { LayoutOrder = 1, TextColor3 = P.ink2, TextSize = 12, Font = Theme.HeadingFont })
+	-- The person who runs it (5.8: the phone's tag line, the red square and caps), and what they say.
+	local person = Ui.make("Frame", { Name = "Person", Size = UDim2.new(1, -10, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, body)
+	P.marker(person, 8, { Position = UDim2.fromScale(0, 0.5), AnchorPoint = Vector2.new(0, 0.5) })
+	P.caps(person, employer.person, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1 })
 	Ui.label(body, `"{employer.pitch}"`, UDim2.new(1, -10, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
@@ -1208,7 +1220,7 @@ local function openEmployer(id: string)
 	if job then
 		Ui.label(body, "Finish your current delivery first (or give it up: phone → ORDERS).", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = P.danger, TextSize = 16 })
 	elseif lock then
-		local button = P.button(body, `🔒 LEVEL {lock}`, UDim2.fromOffset(240, 46), "off", function() end)
+		local button = P.button(body, `🔒 LEVEL {lock}`, UDim2.new(1, -12, 0, 46), "off", function() end)
 		button.LayoutOrder = 7
 		Ui.label(body, `{employer.person} hires drivers from level {lock} ({Levels.rank(lock)}) on. You are level {myLevel()}: deliveries give XP.`, UDim2.new(1, -10, 0, 0), {
 			LayoutOrder = 8,
@@ -1218,7 +1230,8 @@ local function openEmployer(id: string)
 			Font = Enum.Font.GothamMedium,
 		})
 	else
-		local take = P.button(body, "TAKE THE JOB", UDim2.fromOffset(240, 46), "main", function()
+		-- 5.8: the window's one main action, the phone's red primary across the window.
+		local take = P.button(body, "TAKE THE JOB", UDim2.new(1, -12, 0, 46), "primary", function()
 			Net.get("AcceptEmployer"):FireServer(employer.id)
 			employerWindow.frame.Visible = false
 		end)
@@ -1276,8 +1289,10 @@ local function cargoCard(parent: any)
 	local car = Drive.myCar()
 	local carDef = car and Economy.findCar(tostring(car:GetAttribute("CarId")))
 	local lost = tonumber(job.lost) or 0
-	local c = card(parent, if lost > 0 then 118 else 96, -1, true, true)
-	Ui.caps(c, "On this job", UDim2.new(1, -24, 0, 18), { Position = UDim2.fromOffset(16, 8), TextColor3 = P.ink2, TextSize = 12 })
+	local c = card(parent, if lost > 0 then 118 else 96, -1, false, true) -- (5.8: the tag line marks it, no red rule too)
+	-- 5.8: the phone's tag line (the red square and caps).
+	P.marker(c, 8, { Position = UDim2.fromOffset(16, 13) })
+	Ui.caps(c, "On this job", UDim2.new(1, -46, 0, 18), { Position = UDim2.fromOffset(30, 8), TextColor3 = P.ink2, TextSize = 12 })
 	local held = if holding then heldInfo(holding) else nil
 	iconText(c, if held then held.art else nil, if held then held.icon else "", if held then "✋  In your hands: " else "✋  Your hands are free", if held then ` {held.one}` else "", UDim2.new(1, -24, 0, 24), {
 		Position = UDim2.fromOffset(16, 30),
@@ -1485,19 +1500,68 @@ function Hud.showResult(r: any)
 	-- 3.6: the header says how it went, the footer where NEXT JOB goes.
 	result.title.Text = if r.success then "Delivered" else "Delivery failed"
 	result.icon.Text = if r.success then "📦" else "⚠"
-	result.subtitle.Text = if r.cargo then `{r.cargo}{if r.customer then ` for {r.customer}` else ""}` else ""
+	result.subtitle.Text = "Delivery report"
 	result.footer.Text = "Next job · the Dispatch board"
-	-- 3.8: a short accent rule over the headline: the good green, or the red when it failed.
-	P.rule(result.body, UDim2.fromOffset(48, 2), { LayoutOrder = 0, BackgroundColor3 = if r.success then P.good else P.danger, BackgroundTransparency = 0 })
+	-- 5.8: the courier phone's order card on top (design/phone-ui/): how it went in a tag line (the square in the good
+	-- green, or red when it failed; the rating's stars), who it was for in big caps, the cargo, then PAY | DRIVER XP
+	-- between thin rules. The breakdown follows in slim lines, and one red CONTINUE closes it.
+	do
+		local cardFrame = Ui.make("Frame", { Name = "Card", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 0 }, result.body)
+		Ui.list(cardFrame, true, 4)
+		local tone = if r.success then P.good else P.danger
+		local stars = if r.success and type(r.rating) == "table" then math.clamp(math.floor(tonumber(r.rating.stars) or 0), 0, 3) else 0
+		local tagRow = Ui.make("Frame", { Name = "Tag", Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 1 }, cardFrame)
+		P.marker(tagRow, 8, { Position = UDim2.fromScale(0, 0.5), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = tone })
+		local status = if not r.success then "Delivery failed" elseif r.rider then "Crew delivery" else "Delivered"
+		P.caps(tagRow, `{status}{if stars > 0 then `  ·  {string.rep("★", stars)}{string.rep("☆", 3 - stars)}` else ""}`, UDim2.new(1, -16, 1, 0), {
+			Position = UDim2.fromOffset(16, 0),
+			TextColor3 = tone,
+			TextStrokeTransparency = 1,
+		})
+		local who = if r.rider then r.driver else r.customer
+		P.text(cardFrame, string.upper(tostring(who or r.cargo or "Delivery")), UDim2.new(1, 0, 0, 0), {
+			Name = "Who",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = 2,
+			Font = Theme.DisplayFont,
+			TextSize = 24,
+			TextWrapped = true,
+			TextStrokeTransparency = 1,
+		})
+		local meta = if r.rider then `You helped deliver {r.cargo or "the cargo"}` elseif who and r.cargo then tostring(r.cargo) else ""
+		if meta ~= "" then
+			P.caps(cardFrame, meta, UDim2.new(1, 0, 0, 16), { LayoutOrder = 3, TextStrokeTransparency = 1 })
+		end
+		local gained = tonumber(r.xp) or 0
+		local pay = if r.success then tonumber(r.total) else nil
+		if pay or gained > 0 then
+			local numbers = Ui.make("Frame", { Name = "Numbers", Size = UDim2.new(1, 0, 0, 70), BackgroundTransparency = 1, LayoutOrder = 4 }, cardFrame)
+			P.rule(numbers, UDim2.new(1, 0, 0, 1), { Position = UDim2.fromOffset(0, 4) })
+			P.rule(numbers, UDim2.new(1, 0, 0, 1), { Position = UDim2.new(0, 0, 1, -1) })
+			P.rule(numbers, UDim2.new(0, 1, 0, 44), { Position = UDim2.new(0.5, 0, 0, 15) })
+			local halves = {
+				{ if r.rider then "Your share" else "Pay", if pay then Ui.money(pay) else "—" },
+				{ "Driver XP", if gained > 0 then `+{gained}` else "—" },
+			}
+			for i, half in halves do
+				local x = if i == 1 then UDim.new(0, 0) else UDim.new(0.5, 16)
+				P.caps(numbers, half[1], UDim2.new(0.5, -16, 0, 14), { Position = UDim2.new(x, UDim.new(0, 14)), TextSize = 11, TextStrokeTransparency = 1 })
+				P.text(numbers, half[2], UDim2.new(0.5, -16, 0, 30), { Position = UDim2.new(x, UDim.new(0, 30)), Font = Theme.DisplayFont, TextSize = 26, TextStrokeTransparency = 1, TextTruncate = Enum.TextTruncate.AtEnd })
+			end
+		end
+	end
 	local function line(text: string, value: string?, color: Color3?, order: number): any
-		-- 3.2: the headline (order 1) and the TOTAL bigger, the other lines calmer. 3.8: light text on the charcoal
-		-- (green: good news, red: bad, white: the money and the XP, dim: the details).
-		local big = order == 1 or text == "TOTAL"
+		-- 3.2: the TOTAL bigger, the other lines calmer. 3.8: light text on the charcoal (green: good news, red: bad,
+		-- white: the money and the XP, dim: the details). 5.8: a thin rule over the TOTAL (the phone's sum line).
+		local big = text == "TOTAL"
 		local ink = if color == C.green then P.good elseif color == C.red then P.danger elseif color == C.yellow then P.ink elseif color == C.dim then P.ink2 else P.ink
-		local row = Ui.make("Frame", { Size = UDim2.new(1, -12, 0, if order == 1 then 36 else 26), BackgroundTransparency = 1, LayoutOrder = order }, result.body)
+		local row = Ui.make("Frame", { Size = UDim2.new(1, -12, 0, if big then 32 else 26), BackgroundTransparency = 1, LayoutOrder = order }, result.body)
+		if big then
+			P.rule(row, UDim2.new(1, 0, 0, 1))
+		end
 		Ui.label(row, text, UDim2.new(1, if value then -120 else 0, 1, 0), {
 			TextColor3 = ink,
-			TextSize = if order == 1 then 24 elseif big then 18 else 15,
+			TextSize = if big then 18 else 15,
 			Font = if big then Theme.HeadingFont else Theme.Font,
 		})
 		if value then
@@ -1514,18 +1578,11 @@ function Hud.showResult(r: any)
 	local crew = crewList(r)
 	local riders = if type(r.crew) == "number" then r.crew else math.max(0, #crew - 1)
 	if r.success and r.rider then
-		line("CREW DELIVERY!", nil, C.green, 1)
+		-- (5.8: the card says it: CREW DELIVERY, the driver, your share and the owner's rating, 4.7, in the tag line)
 		line(`You helped {r.driver} deliver {r.cargo}.`, nil, C.dim, 2)
-		line("Your share", Ui.money(r.total), C.yellow, 3)
-		if type(r.rating) == "table" and tonumber(r.rating.stars) then
-			-- 4.7: the owner's rating of the job.
-			local got = math.clamp(math.floor(tonumber(r.rating.stars) or 1), 1, 3)
-			line(`Job rated {string.rep("★", got)}{string.rep("☆", 3 - got)}`, nil, C.dim, 4)
-		end
 	elseif r.success then
 		local payout = r.payout
-		line("DELIVERED!", nil, C.green, 1)
-		line(`{r.cargo} for {r.customer}`, nil, C.dim, 2)
+		-- (5.8: the card says DELIVERED, the customer and the cargo)
 		-- The pieces: how many arrived, and how many bandits or crashes took.
 		local pieces = tonumber(r.pieces)
 		if pieces and pieces > 0 then
@@ -1617,7 +1674,7 @@ function Hud.showResult(r: any)
 			line(`🔫 NEW GUN: the {if gun then gun.name else r.unlockedWeapon} is yours!`, nil, C.green, 24)
 		end
 	else
-		line("DELIVERY FAILED", nil, C.red, 1)
+		-- (5.8: the card says DELIVERY FAILED in red)
 		Ui.label(result.body, r.reason or "", UDim2.new(1, -10, 0, 60), { LayoutOrder = 2, TextColor3 = P.ink })
 		local lostStreak = tonumber(r.streakLost)
 		if lostStreak and lostStreak > 0 then
@@ -1666,27 +1723,30 @@ function Hud.showResult(r: any)
 			end
 		end
 	end
-	-- One clear action (NEXT JOB) and a quiet OK, side by side.
-	local actions = Ui.make("Frame", { Size = UDim2.new(1, -12, 0, 44), BackgroundTransparency = 1, LayoutOrder = 90 }, result.body)
-	Ui.list(actions, false, 8)
-	local next = P.button(actions, "NEXT JOB  →", UDim2.fromOffset(170, 44), "main", function()
+	-- 5.8: the phone's one red action across the card, CONTINUE (it closes, like the old OK), and NEXT JOB quiet under
+	-- it (it opens the Dispatch board).
+	local actions = Ui.make("Frame", { Name = "Actions", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 90 }, result.body)
+	Ui.list(actions, true, 6)
+	local ok = P.button(actions, "CONTINUE", UDim2.new(1, 0, 0, 46), "primary", function()
+		result.frame.Visible = false
+	end)
+	ok.LayoutOrder = 1
+	-- 4.4.1: the key that does CONTINUE too, on its right edge (none on a touch screen).
+	Ui.label(ok, require(script.Parent.DialogKeys).hint(), UDim2.fromOffset(60, 20), {
+		Position = UDim2.fromScale(1, 0.5),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Font = Theme.MonoFont,
+		TextSize = 11,
+		TextColor3 = P.ink,
+		TextTransparency = 0.3,
+		TextWrapped = false,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	})
+	local next = P.button(actions, "NEXT JOB  →", UDim2.fromOffset(170, 40), "quiet", function()
 		result.frame.Visible = false
 		openDispatch()
 	end)
-	next.LayoutOrder = 1
-	local ok = P.button(actions, "OK", UDim2.fromOffset(110, 44), "quiet", function()
-		result.frame.Visible = false
-	end)
-	ok.LayoutOrder = 2
-	-- 4.4.1: the key that does OK too (none on a touch screen).
-	Ui.label(actions, require(script.Parent.DialogKeys).hint(), UDim2.fromOffset(0, 44), {
-		AutomaticSize = Enum.AutomaticSize.X,
-		Font = Theme.MonoFont,
-		TextSize = 11,
-		TextColor3 = P.ink2,
-		TextWrapped = false,
-		LayoutOrder = 3,
-	})
+	next.LayoutOrder = 2
 end
 
 -- Is the DELIVERY result window open (client/MissionsUi.luau waits with its celebration card until it is closed)?

@@ -16,6 +16,10 @@
 --     (Hud.topSlot("repair")) while the mechanics work on your car: the car, the shop, the seconds left, the fee and
 --     a bar.
 -- While the window is open the mouse is free (Main: CameraRig.mouseNeeded checks GarageUi.isOpen()).
+-- 5.8, the courier phone's look (design/phone-ui/): the ZDC window header with the garage glyph, the cars as slim
+-- hairline rows (no corners; the shown one selected: raised, the red rule), the status as the phone's outlined caps
+-- tags, the two boxes and the repairs note as flat hairline cards. TAKE OUT VEHICLE is the red primary action on the
+-- car shown on the left (the one main action of the view) and the main action on the others.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,20 +74,21 @@ end
 
 -- ── Small pieces (the window is Ui.window) ──────────────────────────────────
 
--- A compact tag ("ACTIVE", "PARKED HERE"): a dark face, a fine outline, caps.
-local function tag(parent: Instance, text: string, face: Color3, ink: Color3): any
-	local label = Ui.label(parent, text, UDim2.new(0, 0, 0, 22), {
+-- A compact tag ("ACTIVE", "PARKED HERE"), the phone's chip (5.8): a raised square face, the caps in `tint` and a
+-- faint outline of it.
+local function tag(parent: Instance, text: string, tint: Color3): any
+	local label = Ui.label(parent, string.upper(text), UDim2.new(0, 0, 0, 22), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 0,
-		BackgroundColor3 = face,
+		BackgroundColor3 = K.raised,
 		Font = Theme.HeadingFont,
 		TextSize = 11,
-		TextColor3 = ink,
+		TextColor3 = tint,
+		TextXAlignment = Enum.TextXAlignment.Center,
 		TextWrapped = false,
 	})
-	Ui.corner(label)
-	Ui.stroke(label, P.line, 1).Transparency = 0
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, label)
+	Ui.stroke(label, tint, 1).Transparency = if tint == K.red then 0.5 else 0.72
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, label)
 	return label
 end
 
@@ -109,7 +114,7 @@ local STYLE_SHAPE: { [string]: string } = {
 local function carColor(carId: string): Color3
 	local def = Economy.findCar(carId)
 	local rgb = if def then def.color else nil
-	return if rgb then Color3.fromRGB(rgb[1] or 200, rgb[2] or 200, rgb[3] or 200) else P.sage
+	return if rgb then Color3.fromRGB(rgb[1] or 200, rgb[2] or 200, rgb[3] or 200) else K.secondary
 end
 
 local function block(parent: Instance, box: { number }, color: Color3, radius: number, z: number): any
@@ -141,7 +146,7 @@ local function drawCar(holder: Instance, car: any)
 	block(holder, body, paint, 8, 2)
 	block(holder, { body[1], body[2] + body[4] * 0.62, body[3], body[4] * 0.38 }, shade, 6, 3)
 	local cab = shape.cab
-	block(holder, cab, paint:Lerp(P.paper, 0.12), 10, 2)
+	block(holder, cab, paint:Lerp(K.text, 0.12), 10, 2)
 	block(holder, { cab[1], cab[2] + cab[4] * 0.62, cab[3], cab[4] * 0.38 }, shade, 6, 3)
 	-- The windscreen, the cab's side window, the body's windows.
 	block(holder, { cab[1] + cab[3] * 0.52, cab[2] + 6, cab[3] * 0.38, cab[4] * 0.4 }, glass, 4, 4)
@@ -211,11 +216,10 @@ local function build()
 		local box = Ui.make("Frame", {
 			Size = UDim2.new(0.5, -5, 1, 0),
 			Position = UDim2.new((index - 1) * 0.5, (index - 1) * 5, 0, 0),
-			BackgroundColor3 = P.lavender,
+			BackgroundColor3 = K.charcoal, -- 5.8: a flat hairline card on the row surface
 			BorderSizePixel = 0,
 		}, boxes)
-		Ui.corner(box)
-		Ui.stroke(box, P.line, 1).Transparency = 0
+		Ui.stroke(box, K.line, 1).Transparency = Ui.HAIRLINE
 		Ui.caps(box, if index == 1 then "Cargo capacity" else "Free garage slots", UDim2.new(1, -24, 0, 16), {
 			Position = UDim2.fromOffset(12, 14),
 			TextSize = 12,
@@ -230,7 +234,7 @@ local function build()
 		})
 	end
 
-	-- The right side: the cars as paper cards, the note under them.
+	-- The right side: the cars as slim rows, the note under them.
 	local right = Ui.make("Frame", { Name = "Cars", Size = UDim2.new(0.53, 0, 1, 0), Position = UDim2.fromScale(0.47, 0), BackgroundTransparency = 1 }, content)
 	refs.listTitle = Ui.caps(right, "", UDim2.new(1, -48, 0, 16), {
 		Position = UDim2.fromOffset(24, 18),
@@ -242,8 +246,8 @@ local function build()
 		Position = UDim2.fromOffset(22, 42),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 5,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, right)
@@ -257,7 +261,7 @@ local function healthText(share: number): (string, Color3)
 	if share < 0.35 then
 		return `⚠ {percent}% · badly damaged`, P.danger
 	end
-	return `{percent}%`, P.violet
+	return `{percent}%`, K.text
 end
 
 -- The car the window shows on the left: the one picked, else the one you drive, else the first.
@@ -315,8 +319,9 @@ local function findRepairBay()
 	GarageUi.close()
 end
 
--- One car as a paper card.
-local function carCard(car: any, order: number)
+-- One car as a slim row (5.8: no corners, a hairline; the shown one selected). `primary`: its TAKE OUT is the view's
+-- red primary action.
+local function carCard(car: any, order: number, primary: boolean)
 	local id = tostring(car.id)
 	local health = math.clamp(tonumber(car.health) or 1, 0, 1)
 	local damaged = health < 0.995
@@ -325,15 +330,14 @@ local function carCard(car: any, order: number)
 	local card = Ui.make("TextButton", {
 		Name = id,
 		Size = UDim2.new(1, -4, 0, if hasAction and not (active and not damaged) then 168 else 124),
-		BackgroundColor3 = P.ticket,
+		BackgroundColor3 = K.row,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "",
 		LayoutOrder = order,
 	}, refs.list)
-	Ui.corner(card)
 	local isShown = selected == id or (selected == nil and active)
-	Ui.stroke(card, P.line, 1).Transparency = 0
+	Ui.stroke(card, K.line, 1).Transparency = Ui.HAIRLINE
 	if isShown then
 		Ui.selectRow(card, true) -- the car shown on the left: the quiet highlight and the narrow red rule
 	end
@@ -354,9 +358,9 @@ local function carCard(car: any, order: number)
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	local status = if active then tag(card, "ACTIVE", P.sage, P.ink)
-		elseif car.here then tag(card, "PARKED HERE", P.sage, P.ink)
-		else tag(card, "IN ANOTHER GARAGE", P.lavenderDeep, P.ink2)
+	local status = if active then tag(card, "ACTIVE", K.red)
+		elseif car.here then tag(card, "PARKED HERE", K.text)
+		else tag(card, "IN ANOTHER GARAGE", K.secondary)
 	status.AnchorPoint = Vector2.new(1, 0)
 	status.Position = UDim2.new(1, -14, 0, 14)
 	local slots = tonumber(car.capacity) or 0
@@ -384,7 +388,7 @@ local function carCard(car: any, order: number)
 	-- The action.
 	local button: any = nil
 	if active and damaged then
-		button = Ui.button(card, "🔧  FIND REPAIR BAY", UDim2.new(1, -32, 0, 44), P.violet, findRepairBay)
+		button = Ui.button(card, "🔧  FIND REPAIR BAY", UDim2.new(1, -32, 0, 44), Theme.Gps, findRepairBay) -- (a GPS action)
 	elseif active then
 		Ui.label(card, "You are driving it · in top shape", UDim2.new(1, -32, 0, 18), {
 			Position = UDim2.fromOffset(16, 100),
@@ -393,7 +397,8 @@ local function carCard(car: any, order: number)
 			TextColor3 = P.ink2,
 		})
 	elseif car.here then
-		button = Ui.button(card, "TAKE OUT VEHICLE", UDim2.new(1, -32, 0, 44), P.sage, function()
+		-- 5.8: the view's red primary action on one car (see render), the main action (raised, the red rule) on the others.
+		button = Ui.button(card, "TAKE OUT VEHICLE", UDim2.new(1, -32, 0, 44), if primary then K.red else C.yellow, function()
 			getRemote():FireServer("take", id)
 		end)
 	else
@@ -461,16 +466,26 @@ render = function()
 	table.sort(sorted, function(a, b)
 		return rankOf(a) < rankOf(b)
 	end)
+	-- 5.8: one red TAKE OUT VEHICLE: the shown car's when it is kept here, else the first one kept here.
+	local primaryId: string? = if shown and shown.here == true and not shown.out then tostring(shown.id) else nil
+	if primaryId == nil then
+		for _, car in sorted do
+			if car.here == true and not car.out then
+				primaryId = tostring(car.id)
+				break
+			end
+		end
+	end
 	for order, car in sorted do
-		carCard(car, order)
+		carCard(car, order, tostring(car.id) == primaryId)
 	end
 	-- Where repairs happen (Map.RepairShops), and the depot's rule.
 	local shops: { string } = {}
 	for _, shop in Map.RepairShops do
 		table.insert(shops, shop.name)
 	end
-	local note = Ui.make("Frame", { Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = P.tags[4], BorderSizePixel = 0, LayoutOrder = 100 }, refs.list)
-	Ui.corner(note)
+	local note = Ui.make("Frame", { Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = K.recessed, BorderSizePixel = 0, LayoutOrder = 100 }, refs.list)
+	Ui.stroke(note, K.line, 1).Transparency = Ui.HAIRLINE
 	Ui.padding(note, 12)
 	local repairs = `Repairs take place at {table.concat(shops, " or ")}. Park in a bay, get out and let the mechanic work.`
 	Ui.label(note, if state.depot then `The depot lot keeps your starting van and the company vehicles; your other cars wait in your garages. {repairs}` else repairs, UDim2.new(1, 0, 0, 0), {
@@ -607,7 +622,6 @@ local function buildRepairCard()
 		return
 	end
 	repairCard = Ui.make("Frame", { Name = "Repair", Size = UDim2.new(0.78, 0, 0, 44), BackgroundColor3 = K.charcoal, BackgroundTransparency = K.scrim, BorderSizePixel = 0, Visible = false }, Hud.topSlot("repair"))
-	Ui.corner(repairCard)
 	Ui.edge(repairCard, REPAIR_ACCENT)
 	repairRefs.text = Ui.label(repairCard, "", UDim2.new(1, -112, 0, 24), {
 		Position = UDim2.fromOffset(18, 5),

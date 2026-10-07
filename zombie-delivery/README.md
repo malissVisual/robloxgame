@@ -1102,6 +1102,17 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Every window in the courier-phone style (5.8)
+
+The windows now share the approved ZDC phone look (`design/phone-ui/`): a ZDC header (the red square, ZDC, a line glyph,
+the title in caps, a square ✕) on every `Ui.window`; **one red primary action** per view (ACCEPT, START, BUY, PLAY,
+CONTINUE, COLLECT, TAKE OUT; `HudContract.button(…, "primary")` / `Ui.button(…, Theme.Contract.red)`); square tabs with a
+red underline (`Ui.tabs`); slim charcoal rows with a red left rule when selected (`Ui.ticket`, `Ui.selectRow`). Restyled:
+the job board (filters as tabs, phone-style offer cards), missions and the cleared card, crew, garage, estate, company,
+top, career and the level-up card, Marge's dialog, the start menu (ZDC courier terminal, red PLAY), the big map's frame,
+the shops / kit / bike shop / bag, and the delivery result (laid out like the phone's order card, red CONTINUE).
+The admin panel only takes the shared header. The old Postage tokens map to the contract colours.
+
 ## A better whole game (5.7)
 
 **Getting on and off like the car** (`client/Interact.luau`, `shared/InteractPose.luau`, `Config.Interact`): you step

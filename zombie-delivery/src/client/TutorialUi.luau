@@ -20,6 +20,9 @@
 -- Everything lives in ScreenGuis that survive a respawn. The style is the approved "contract" direction
 -- (design/ui-contract on codex/ui-contract): white text over a subtle charcoal scrim, fine lines, small red accents,
 -- flat square shapes, the Theme fonts and colours (Theme.Contract).
+-- 5.8, the courier phone's look (design/phone-ui/): the dialog's main action (CONTINUE, LET'S GO, SHOW ME AROUND ...)
+-- is the phone's red primary button (a red face, white caps, square, a finger tall); the second action stays a quiet
+-- text action.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -97,6 +100,40 @@ local function textAction(parent: Instance, text: string, color: Color3, order: 
 	return button
 end
 
+-- 5.8: the dialog's main action, the phone's red primary (PhoneContract.primary): a red face, white caps, square,
+-- ACTION_H tall; hover / press brightens the face.
+local function primaryAction(parent: Instance, order: number, onClick: () -> ()): any
+	local button = Ui.make("TextButton", {
+		Size = UDim2.fromOffset(0, ACTION_H),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundColor3 = CONTRACT.red,
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		Font = Theme.HeadingFont,
+		TextSize = 13,
+		TextColor3 = CONTRACT.text,
+		LayoutOrder = order,
+	}, parent)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 20), PaddingRight = UDim.new(0, 20) }, button)
+	local function lit(on: boolean)
+		button.BackgroundColor3 = if on then CONTRACT.red:Lerp(CONTRACT.text, 0.1) else CONTRACT.red
+	end
+	button.MouseEnter:Connect(function() lit(true) end)
+	button.MouseLeave:Connect(function() lit(false) end)
+	button.SelectionGained:Connect(function() lit(true) end)
+	button.SelectionLost:Connect(function() lit(false) end)
+	button.Activated:Connect(function()
+		local sound = Ui.onClick
+		if sound then
+			sound()
+		end
+		onClick()
+	end)
+	return button
+end
+
 local function buildDialog(advance: () -> (), second: () -> ())
 	local gui = Ui.make("ScreenGui", {
 		Name = "TutorialDialog",
@@ -163,7 +200,7 @@ local function buildDialog(advance: () -> (), second: () -> ())
 		Padding = UDim.new(0, 8),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, right)
-	view.primary = textAction(right, "", CONTRACT.text, 1, advance)
+	view.primary = primaryAction(right, 1, advance) -- 5.8: the red primary
 	view.keyHint = Ui.label(right, if TOUCH then "" else DialogKeys.hint(), UDim2.fromOffset(0, ACTION_H), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.MonoFont,
@@ -326,7 +363,7 @@ local function render()
 	local line = dialog.pages[current.page] or ""
 	view.line.Text = if TOUCH then TutorialSteps.forTouch(line) else line
 	view.pageLabel.Text = if count > 1 then `{current.page} / {count}` else ""
-	view.primary.Text = if last then dialog.primary else "CONTINUE"
+	view.primary.Text = string.upper(if last then dialog.primary else "CONTINUE")
 	local second = dialog.secondary
 	view.second.Text = second or ""
 	view.second.Visible = second ~= nil
