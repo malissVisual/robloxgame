@@ -23,7 +23,8 @@
 --     bus pulling away carries the move along) in BusBoard, the server seats you then. Off at a stop (BusOff /
 --     BusOffAt / BusOffTo): up from the seat, along the aisle to the door and down its step onto the kerb, in
 --     BusAlight. Your controls are off meanwhile; everybody's walks near the camera are posed from the same attributes.
--- (The big map does not draw the lines yet: client/MapView.luau has no overlay for other modules.)
+-- 6.3: the lines are on the big map (client/MapView.luau, the BUS chip) and on the stops' map boards
+-- (client/BusMapBoard.luau); the express timetable (fewer stops, quicker buses) changes nothing here.
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")

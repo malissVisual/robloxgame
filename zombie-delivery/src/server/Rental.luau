@@ -22,6 +22,10 @@
 -- Returning: Return at any dock ends it at once; off the scooter and more than WalkAway studs from it, or off it for
 -- Idle seconds, it goes back by itself; calling your own car or bike (Jobs.returnLent: it is lent), buying one, a
 -- respawn, a wreck or leaving ends it too. A returned scooter stands in its own dock again Restock seconds later.
+--
+-- 6.3, the rack at the spawn (RentalDocks' dock1, Config.Rental.SpawnRack): built like any dock, but its six scooters
+-- stand side by side facing out of the yard (the plate deeper, the rail behind them, a bollard at each end) and its
+-- board reads TAKE ONE AND GO under ZDC RIDE · free. The rides from it are the same rentals.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -119,7 +123,7 @@ local function signFace(board: BasePart, face: Enum.NormalId, dock: RentalDocks.
 		label.Parent = back
 	end
 	line(`ZDC RIDE · {priceText()}`, 0.16, 0.42, Color3.fromRGB(242, 242, 240), Enum.Font.GothamBold)
-	line(string.upper(dock.name), 0.64, 0.24, Color3.fromRGB(169, 174, 180), Enum.Font.GothamMedium)
+	line(if dock.spawn then "TAKE ONE AND GO" else string.upper(dock.name), 0.64, 0.24, Color3.fromRGB(169, 174, 180), Enum.Font.GothamMedium)
 end
 
 local function prompt(parent: Instance, name: string, action: string, kind: string, dock: RentalDocks.Dock, hold: number): ProximityPrompt
@@ -176,11 +180,15 @@ local function buildDock(folder: Instance, dock: RentalDocks.Dock): DockState
 		return facing.Rotation + at(along, out, y)
 	end
 	local half = dock.length / 2
-	local plate = part(model, "DockPlate", Vector3.new(2.6, 0.12, dock.length + 1.2), frameAt(0, 0, 0.06), PLATE, Enum.Material.DiamondPlate)
-	part(model, "ChargeRail", Vector3.new(0.3, 0.5, dock.length), frameAt(0, -1.15, 0.37), METAL, Enum.Material.Metal)
-	for _, along in { -half - 0.3, 0, half + 0.3 } do
+	-- 6.3: the spawn's rack holds its scooters side by side (each 5 long, facing n): a deeper plate, the rail
+	-- behind their tails and a bollard at each end of the row only (one in the middle would stand in a slot).
+	local rack = dock.spawn
+	local plate = part(model, "DockPlate", Vector3.new(if rack then 5.6 else 2.6, 0.12, dock.length + 1.2), frameAt(0, 0, 0.06), PLATE, Enum.Material.DiamondPlate)
+	part(model, "ChargeRail", Vector3.new(0.3, 0.5, dock.length), frameAt(0, if rack then -2.65 else -1.15, 0.37), METAL, Enum.Material.Metal)
+	local bollards: { number } = if rack then { -half - 0.3, half + 0.3 } else { -half - 0.3, 0, half + 0.3 }
+	for _, along in bollards do
 		-- (they do not collide: a rental takes off from its slot beside them)
-		part(model, "Bollard", Vector3.new(0.4, 1.1, 0.4), frameAt(along, 1.05, 0.55), RED, Enum.Material.SmoothPlastic)
+		part(model, "Bollard", Vector3.new(0.4, 1.1, 0.4), frameAt(along, if rack then 0 else 1.05, 0.55), RED, Enum.Material.SmoothPlastic)
 	end
 	local signAlong = half + 1.4
 	part(model, "SignPost", Vector3.new(0.3, 5.6, 0.3), frameAt(signAlong, -0.2, 2.8), METAL, Enum.Material.Metal, true)
@@ -200,7 +208,7 @@ local function buildDock(folder: Instance, dock: RentalDocks.Dock): DockState
 	back:SetAttribute("Seated", true) -- (from the saddle too: client/CarBoarding.luau leaves it)
 	local state: DockState = { dock = dock, model = model, slots = {} }
 	for _, slot in dock.slots do
-		local ground = CFrame.lookAt(Vector3.new(slot.x, WALK_TOP, slot.z), Vector3.new(slot.x, WALK_TOP, slot.z) + t)
+		local ground = CFrame.lookAt(Vector3.new(slot.x, WALK_TOP, slot.z), Vector3.new(slot.x, WALK_TOP, slot.z) + (if rack then n else t))
 		local s: Slot = { ground = ground, model = nil, taken = false }
 		table.insert(state.slots, s)
 		local ok, err = pcall(function()
