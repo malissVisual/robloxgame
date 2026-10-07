@@ -98,8 +98,8 @@ local function newProfile(): Profile
 		car = nil,
 		bike = nil, -- 5.1
 		lastCar = nil, -- 5.1
-		weapons = {}, -- 6.0: no free gun, fists only (the pistol is bought at Lead & Co.); older saves keep theirs
-		weapon = nil,
+		weapons = { [Config.Arms.Starter] = true }, -- 6.0.2: the start: the phone (Marge), a pistol and the plastic bag
+		weapon = Config.Arms.Starter,
 		upgrades = {},
 		carUpgrades = {},
 		carHealth = {},
@@ -129,7 +129,7 @@ local function newProfile(): Profile
 		title = nil,
 		tutorial = false,
 		explored = "",
-		kit = {},
+		kit = { bag = true }, -- 6.0.2: the plastic bag from the start (the vest is bought)
 		phone = false,
 		vanQuest = nil,
 		deliveries = 0,
@@ -347,6 +347,14 @@ local function applySaved(profile: Profile, saved: any)
 	-- 6.0.1: the red courier vest became bought kit (Config.Courier.VestKit, the Courier Vest). A save from before
 	-- (no vestKit flag) wore it on the body, so it is given once and the look does not change; every save is written
 	-- with the flag from now on, and a brand-new profile (no save to apply) starts without the vest.
+	-- 6.0.2: the start kit (a pistol and the plastic bag) given once to a save from before it
+	if saved.starterKit ~= true and saved.money ~= nil then
+		profile.weapons[Config.Arms.Starter] = true
+		if profile.weapon == nil then
+			profile.weapon = Config.Arms.Starter
+		end
+		profile.kit.bag = true
+	end
 	if saved.vestKit ~= true and saved.money ~= nil then -- (a real old save: not a lock-only record of a new player)
 		profile.kit[Config.Courier.VestKit] = true
 	end
@@ -673,6 +681,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		carStages = true, -- 3.5: the cars' room is their stages (applySaved moves a 3.4 save's cars once)
 		vanStages = true, -- 4.0: the Old Van's four stages (applySaved moves a 3.5 – 3.10 save's van stage once)
 		vestKit = true, -- 6.0.1: the courier vest is bought kit (applySaved gives it once to an older save)
+		starterKit = true, -- 6.0.2: the pistol and the bag of the start (applySaved gives them once to an older save)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,

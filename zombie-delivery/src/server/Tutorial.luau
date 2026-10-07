@@ -397,7 +397,7 @@ local function bagCheck(player: Player): boolean
 	end
 	local bag: Config.KitDef? = nil
 	for _, def in Config.Kit do
-		if def.id == "bag" then
+		if def.id == Config.Courier.VestKit then -- 6.0.2: the bag comes with the start: her text is about the vest
 			bag = def
 		end
 	end
