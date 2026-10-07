@@ -246,6 +246,7 @@ local refreshBadges: () -> () = function() end
 local renderApp: () -> () = function() end
 local setApp: (id: string) -> () = function() end -- (── Showing ──)
 local lastUnread = -1 -- 6.5: the unread count last told to Phone.onUnread
+local crewInvites = 0 -- 6.5 review: the crew invitations waiting (Phone.setCrewInvites): a badge on MORE
 local placeButton: () -> () = function() end -- (the PHONE action's place, ── The PHONE action ──)
 
 local function unreadCount(): number
@@ -1490,6 +1491,14 @@ local function affordable(): boolean
 	return false
 end
 
+-- 6.5 review: the crew invitations waiting (client/CrewPanel.luau through Hud.onCrewBadge, set by Main).
+function Phone.setCrewInvites(count: number)
+	if crewInvites ~= count then
+		crewInvites = math.max(0, count)
+		refreshBadges()
+	end
+end
+
 refreshBadges = function()
 	local unread = unreadCount()
 	local function set(id: string, count: number, word: string?)
@@ -1520,6 +1529,7 @@ refreshBadges = function()
 		jobsSub.Text = if not job then "Take a delivery" elseif open > 1 then `Your run · {open} orders` else "Your run · orders"
 	end
 	set("shop", 0, if affordable() then "$" else nil)
+	set("more", crewInvites) -- (6.5 review: MORE → CREW has your invitations)
 	set("garage", 0, if refs.apps.towDue() then "!" else nil) -- 5.5: the tank ran dry: TOW
 	local dot = refs.buttonDot
 	if dot then
@@ -1818,7 +1828,7 @@ placeButton = function()
 	-- unread count goes to the HUD's button through Phone.onUnread)
 	local onUnread = Phone.onUnread
 	if onUnread then
-		local count = unreadCount()
+		local count = if Ui.touchLayout() then 0 else unreadCount() -- (6.5 review: on touch the phone's own dot says it)
 		if count ~= lastUnread then
 			lastUnread = count
 			pcall(onUnread, count)

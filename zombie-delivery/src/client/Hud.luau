@@ -697,6 +697,7 @@ end
 -- sound setting. Unset, the button says what it is for (CrewPanel.start sets onCrew by itself too).
 Hud.onJobs = nil :: (() -> ())? -- 3.6 client/DispatchUi.luau: the Dispatch board (J / JOBS)
 Hud.onJobsKey = nil :: (() -> ())? -- 4.0.2: the J key: opens the board, or closes it when it is open (Main)
+Hud.onCrewBadge = nil :: ((number) -> ())? -- 6.5 review: the crew invitations, for the phone's MORE tile (Main)
 Hud.onCrew = nil :: (() -> ())?
 Hud.oldLevelBanner = false -- 4.6: off: client/CareerUi.luau shows the level-up card (true brings the old banner back)
 Hud.onEstate = nil :: (() -> ())?
@@ -2058,6 +2059,10 @@ end
 
 -- A small red dot with a count on an action or a menu entry ("crew": the invitations waiting); 0 hides it.
 function Hud.setBadge(id: string, count: number)
+	local crewHook = Hud.onCrewBadge
+	if id == "crew" and crewHook then
+		pcall(crewHook, count) -- (6.5 review: the phone's MORE tile shows the invitations too)
+	end
 	local button = hudButtons[id]
 	local badge = button and button:FindFirstChild("Badge")
 	if badge and badge:IsA("TextLabel") then

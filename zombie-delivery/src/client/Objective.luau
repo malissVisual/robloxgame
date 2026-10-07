@@ -176,6 +176,15 @@ end
 -- Ten times a second from Hud: the card for the job (nil: none), the state, the distance to the target (studs; the job's,
 -- else the job board's) and whether the column shows somebody else's job instead (a crew member without a job of their
 -- own: the crew strip says what to do, the card hides). Returns the card (its `action` is the HUD's pill).
+-- 6.5 review: "bus" on a city bus (the BusLine attribute: E rings the stop), "seat" in any other seat, nil on foot.
+local function seatNow(character: Model?): string?
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.SeatPart == nil then
+		return nil
+	end
+	return if typeof(player:GetAttribute("BusLine")) == "string" then "bus" else "seat"
+end
+
 function Objective.update(job: any, state: any, distance: number?, hidden: boolean): Goal.Card?
 	if not refs.card or type(state) ~= "table" then
 		return nil
@@ -193,6 +202,7 @@ function Objective.update(job: any, state: any, distance: number?, hidden: boole
 	end
 	local character = player.Character
 	local carrying = character and character:GetAttribute("Carrying")
+	-- (6.5 review: the seat's own E for the pill: a bus's stop bell, any other seat's get out)
 	local throwTo = player:GetAttribute("ThrowTo")
 	local card = Goal.now({
 		job = if hasJob then job else nil,
@@ -203,6 +213,7 @@ function Objective.update(job: any, state: any, distance: number?, hidden: boole
 		holding = if type(carrying) == "string" and carrying ~= "" then carrying else nil,
 		canThrow = typeof(throwTo) == "Vector3" and player:GetAttribute("ThrowFragile") ~= true,
 		touch = Ui.touchLayout(),
+		seat = seatNow(character),
 	})
 	current = card
 	local visible = not (hidden and not hasJob)

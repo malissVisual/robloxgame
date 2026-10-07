@@ -45,6 +45,7 @@ export type Input = {
 	distance: number?, -- studs to the target: the job's (the pile, the person, the circle) or, with no job, the board
 	holding: string?, -- what your hands hold (the character's Carrying attribute)
 	canThrow: boolean?, -- X throws at the door now (the ThrowTo attribute, not fragile)
+	seat: string?, -- 6.5 review: you sit: "bus" (E rings the stop) or "seat" (E gets out), nil on foot
 	touch: boolean?, -- a touch screen: no keys in the words
 }
 
@@ -270,6 +271,16 @@ local function forJob(job: { [string]: any }, input: Input): Card
 	return card("step", step, place, input.distance, plainAction(step, touch))
 end
 
+-- 6.5 review: in a seat the pill is the seat's own key (a passenger's or a driver's E gets out, a bus's E rings the
+-- stop), unless the card already has an action of its own.
+function Goal.seated(card: Card, input: Input): Card
+	if input.seat and card.action == nil then
+		local touch = input.touch == true
+		card.action = { key = if touch then nil else "E", text = if input.seat == "bus" then "Stop at the next stop" else "Get out" }
+	end
+	return card
+end
+
 -- What to do now (see the header): always a card.
 function Goal.now(input: Input): Card
 	local touch = input.touch == true
@@ -279,21 +290,23 @@ function Goal.now(input: Input): Card
 		-- Marge's first job (the tutorial runs): her hint for the step is the title (shared/TutorialSteps.luau, read
 		-- as client/TutorialUi.luau reads it; its strip shows only FIRST DAY and SKIP while a job runs). The place, the
 		-- distance and the pill stay the job's.
-		if input.tutorial ~= nil then
+		-- (6.5 review: not on the way to a stop: Marge's step there is the next one at the stop, "Hand it over (E)"
+		-- 100 m from the door; the trip's own card says where to go)
+		if input.tutorial ~= nil and card.kind ~= "to_pickup" and card.kind ~= "to_drop" then
 			local hint = TutorialSteps.hint(TutorialSteps.jobStep(job), job)
 			if hint ~= "" then
 				card.title = if touch then TutorialSteps.forTouch(hint) else hint
 				card.key = if touch then nil else Goal.keyOf(hint)
 			end
 		end
-		return card
+		return Goal.seated(card, input)
 	end
 	-- Something in your hands without a job: put it down (G).
 	local holding: Action? = nil
 	if input.holding then
 		holding = if input.holding == "horse" then { key = if touch then nil else "G", text = "Let it go" } else { key = if touch then nil else "G", text = "Put it down" }
 	end
-	local result = input.result
+	local result = if input.tutorial == "retry" then nil else input.result -- (6.5 review: Marge's ANOTHER JOB wins)
 	if result then
 		if result.success then
 			return {
@@ -334,7 +347,7 @@ function Goal.now(input: Input): Card
 		end
 	end
 	local first = (input.deliveries or 0) <= 0
-	return {
+	return Goal.seated({
 		title = if first then "Take your first job" else "Take a delivery job",
 		place = if touch then "Tap here · or the job board" else "Press J · or the job board",
 		distance = input.distance,
@@ -343,7 +356,7 @@ function Goal.now(input: Input): Card
 		tag = "NEXT",
 		action = holding,
 		opensBoard = true,
-	}
+	}, input)
 end
 
 return Goal

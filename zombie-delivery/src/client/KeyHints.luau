@@ -119,6 +119,9 @@ local function linesNow(): { { Chip } }
 	if not carrying then
 		table.insert(second, chipText("V", if hand == "gun" then "Strike" else "Punch"))
 	end
+	if hasGun then
+		table.insert(second, chipText("T", "Guns")) -- (6.5 review: the weapon line's T box is gone: the wheel is here)
+	end
 	return { first, second }
 end
 
