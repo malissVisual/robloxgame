@@ -27,6 +27,8 @@
 -- (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's "message" with the GPS to the shop,
 -- client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
 -- (the phone's messages are not saved).
+-- 6.0, Lead & Co.: no free gun. Once a player has the pistol's price and no gun, Marge texts them (Config.Arms.Tip, the
+-- GPS to the gun shop), once a session.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,6 +37,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Career = require(Shared.Career)
 local Config = require(Shared.Config)
+local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local TransportRules = require(Shared.Transport)
@@ -361,6 +364,28 @@ local function bikeCheck(player: Player)
 	end
 end
 
+-- ── 6.0: Marge about the pistol ────────────────────────────────────────────
+-- No free gun (Config.Arms): once a player with the phone and the first day behind them has the pistol's price and
+-- owns no gun, Marge texts them about Lead & Co. with the shop on the GPS. Once a session (from PLAY on).
+
+local gunTold: { [Player]: boolean } = {}
+
+local function gunCheck(player: Player)
+	local profile = PlayerData.get(player)
+	if gunTold[player] or bikeLevels[player] == nil or not profile or not profile.tutorial or not profile.phone then
+		return
+	end
+	local pistol = Economy.findWeapon(Config.Arms.Starter)
+	if not pistol or next(profile.weapons) ~= nil or profile.money < pistol.price then
+		return
+	end
+	gunTold[player] = true
+	local shop = Map.Shops.guns
+	local words = string.gsub(Config.Arms.Tip, "{price}", `${pistol.price}`)
+	remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "guns" } })
+	notice:FireClient(player, `📱 Marge: {words}`)
+end
+
 -- PLAY was pressed (Main may call this from its Play handler; without it the arriving car tells the same).
 function Tutorial.onPlay(player: Player)
 	local session = sessions[player]
@@ -371,6 +396,7 @@ function Tutorial.onPlay(player: Player)
 	local profile = PlayerData.get(player)
 	local level = if profile then Levels.levelFor(profile.xp) else 1
 	bikeLevels[player] = level
+	task.delay(BIKE_DELAY + 4, gunCheck, player) -- 6.0: the pistol's price in your pocket already, no gun: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
 		task.delay(BIKE_DELAY, function()
 			if player.Parent and not ownsBike(player) then
@@ -402,8 +428,10 @@ function Tutorial.start()
 		sessions[player] = nil
 		talked[player] = nil
 		bikeLevels[player] = nil
+		gunTold[player] = nil
 	end)
 	PlayerData.Changed:Connect(bikeCheck) -- 5.1: Marge about Spoke & Chain
+	PlayerData.Changed:Connect(gunCheck) -- 6.0: Marge about the pistol
 	for _, player in Players:GetPlayers() do
 		track(player)
 	end

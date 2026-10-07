@@ -8,6 +8,7 @@
 -- swing; this client shows its own choice at once (a short prediction until the attribute agrees) and starts its own
 -- arm swing on the key press (client/ArmPose.luau reads localSwing; the server's MeleeAt does not swing it twice).
 -- Only on foot: in a car seat B and V do nothing and the holster changes nothing (window shots, the car gun).
+-- 6.0: without a gun (a new courier: fists only; Holster.setArmed from the State) B draws nothing and V punches.
 -- (No Roblox UI here and nothing that requires CameraRig or ArmPose: both read this module.)
 
 local Players = game:GetService("Players")
@@ -30,9 +31,22 @@ local drawnBy: InputObject? = nil -- the press that drew the gun (several listen
 local nextSwing = 0
 local swingAt: number? = nil -- os.clock() when this client's own swing started
 local swingKind = "punch"
+local armed = true -- 6.0: you own a gun (client/Shooting.luau's setState); without one nothing draws, V punches
 
 function Holster.setEnabled(on: boolean)
 	enabled = on
+end
+
+-- 6.0: does the State name a gun in your hand? (A new courier has fists only: the server refuses a draw too.)
+function Holster.setArmed(on: boolean)
+	armed = on
+	if not on then
+		pending = nil
+	end
+end
+
+function Holster.armed(): boolean
+	return armed
 end
 
 -- Is the gun away right now (as this client shows it)?
@@ -65,7 +79,7 @@ end
 
 -- Holster (true) or draw (false) the gun: shown here at once, told to the server.
 function Holster.set(holstered: boolean)
-	if Holster.holstered() == holstered then
+	if Holster.holstered() == holstered or (not holstered and not armed) then
 		return
 	end
 	pending = holstered
@@ -83,7 +97,7 @@ end
 
 -- The gun out, if it is holstered and the hands are free. True when this drew it (the caller's press does not fire).
 function Holster.drawIfHolstered(): boolean
-	if not handsFree() or not Holster.holstered() then
+	if not armed or not handsFree() or not Holster.holstered() then
 		return false
 	end
 	Holster.set(false)

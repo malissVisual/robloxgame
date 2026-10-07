@@ -821,10 +821,9 @@ local function shopApp(list: Instance)
 	local order = 1
 	-- The personal gear still worth buying (Config.Kit), the cheapest first.
 	local owned = kit()
-	local room = Transport.handsRoom(owned)
 	local wanted: { Config.KitDef } = {}
 	for _, def in Config.Kit do
-		local outgrown = def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= room
+		local outgrown = def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= Transport.backpackRoom(owned)
 		if not owned[def.id] and not outgrown then
 			table.insert(wanted, def)
 		end
@@ -1439,10 +1438,9 @@ end
 -- Can anything in the SHOP app be bought right now (your level, your money)?
 local function affordable(): boolean
 	local owned = kit()
-	local room = Transport.handsRoom(owned)
 	local level = myLevel()
 	for _, def in Config.Kit do
-		local outgrown = def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= room
+		local outgrown = def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= Transport.backpackRoom(owned)
 		if not owned[def.id] and not outgrown and level >= def.level and money() >= def.price then
 			return true
 		end

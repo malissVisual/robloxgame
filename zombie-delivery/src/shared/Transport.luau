@@ -10,7 +10,8 @@
 -- sprint (the character attribute KitSpeed, client/CameraRig.luau), the jacket's `warm` the food's freshness drain.
 --
 --   Transport.findKit(id)      the Config.Kit entry, or nil
---   Transport.handsRoom(kit)   light pieces you carry on foot: max(HandsMax, the best backpack's room)
+--   Transport.handsRoom(kit)   light pieces you carry on foot: max(HandsMax, the best backpack's room) + the kit's
+--                              `extra` (6.0: the plastic bag, Config.Kit "bag": it adds up with a backpack)
 --   Transport.packRoom(kit)    of those, the ones in the pack (handsRoom − HandsMax)
 --   Transport.speedMult(kit)   the walk / sprint multiplier (the best shoes; 1 = none)
 --   Transport.warm(kit)        the food's freshness drain multiplier while you carry it (the best jacket; 1 = none)
@@ -50,7 +51,23 @@ function Transport.findKit(id: string): Config.KitDef?
 end
 
 -- How many light pieces you carry in your hands and on your back (Config.Cargo.HandsMax + the best backpack's room).
+-- 6.0: + every owned piece's `extra` (the plastic bag's 2), on top of the best backpack.
 function Transport.handsRoom(kit: Kit): number
+	local room = Config.Cargo.HandsMax
+	local extra = 0
+	for _, def in Config.Kit do
+		if kit[def.id] == true and def.room then
+			room = math.max(room, math.floor(def.room))
+		end
+		if kit[def.id] == true and def.extra then
+			extra += math.max(0, math.floor(def.extra))
+		end
+	end
+	return room + extra
+end
+
+-- 6.0 review: the hands and the best backpack only (no bag's extra): what a backpack you might buy is compared with.
+function Transport.backpackRoom(kit: Kit): number
 	local room = Config.Cargo.HandsMax
 	for _, def in Config.Kit do
 		if kit[def.id] == true and def.room then
@@ -65,15 +82,17 @@ function Transport.packRoom(kit: Kit): number
 	return math.max(0, Transport.handsRoom(kit) - Config.Cargo.HandsMax)
 end
 
--- The walk / sprint multiplier from the kit (running shoes …).
+-- The walk / sprint multiplier from the kit (running shoes …). 6.0: a piece below 1 (the Heavy Armour) slows you: the
+-- best speed-up times the slowest slow-down.
 function Transport.speedMult(kit: Kit): number
-	local mult = 1
+	local mult, slow = 1, 1
 	for _, def in Config.Kit do
 		if kit[def.id] == true and def.speed then
 			mult = math.max(mult, def.speed)
+			slow = math.min(slow, def.speed)
 		end
 	end
-	return mult
+	return mult * slow
 end
 
 -- The food's freshness drain while you carry it (a thermal jacket < 1).

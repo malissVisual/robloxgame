@@ -60,6 +60,7 @@ local NAMES = {
 	"Fuel", -- 5.4: client → server: ("tow") the phone's TOW: your empty car to the nearest gas station's pump (server/Fuel.luau)
 	"Bus", -- 5.5: client → server: ("stop") on a city bus: the bell (off at the next stop), or off now while it stands at a stop (server/Buses.luau, client/BusRide.luau)
 	"Zip", -- 5.6: client → server: ("letgo") Space on a zip line, low over a platform's roof (server/ZipLines.luau checks it); 5.7: the ladder climbs are walked on the client (client/Interact.luau), the server sets their end
+	"Throw", -- 6.0: client → server: (the stop: the ThrowStop attribute, a direction Vector3, a power 0 … 1) a throw at a home's door (server/Cargo.luau, client/Throw.luau); server → client: ("landed", { tip, far, over, wall, span }) it hit the door
 }
 
 local folder: Folder

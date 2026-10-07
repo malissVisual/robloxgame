@@ -1102,6 +1102,29 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The courier on foot: the bag, throws, sprint, armour, no free gun (6.0)
+
+**The plastic bag** (Kit "bag", $25, level 1, `extra = 2`): two more light pieces on top of your hands and any backpack,
+carried in the left hand — it swings with your stride and flies back when you sprint. A light piece you pick up (a
+pile or the ground) goes straight into the bag with a quick move of the arm.
+
+**Throwing** (`shared/Throws.luau`, `client/Throw.luau`, the Throw remote, `Cargo.throwAt`, `Config.Throw`): at a home
+drop hold **X** (gamepad R1, touch THROW): a dotted arc and a landing ring (green over the door) with a swinging power;
+let go to throw. The server checks the piece, the range, the line of sight and traces the same arc. Landing at the door
+delivers it (the receiver catches it, or the door opens). **TRICKSHOT** tips for a long throw, a throw over something or
+off a wall. A miss lies where it fell — pick it up again. Fragile cargo (cake, electronics, samples …) can't be thrown.
+
+**Sprinting** (`client/SprintPose.luau`): a longer stride, bent knees and pumping arms over the run animation.
+
+**No free gun** (`Config.Arms`): a new courier has fists (V punches). The pistol costs $250 at Lead & Co.; Marge texts
+you with a GPS once you can afford it. Old saves keep their guns.
+
+**Armour** (`shared/Armour.luau`, `server/Armour.luau`): the Kevlar vest (−30% damage, $600, level 3) and Heavy armour
+(−50%, a little slower, $1 500, level 5) at Last Stop Supplies; the best vest you own counts and shows on you (a put-on
+move when you buy it) and as 🛡 on the HUD. Every hit on a player goes through `Armour.hurt`.
+
+**Scooters**: the E-Scooter tops out at 32 but pulls away hard (accel 42); ZDC RIDE rentals at 26 with a quick start.
+
 ## Couriers and infected, worn street props, new icons, a proper scooter stance (5.9)
 
 **Every player is a ZDC courier** (Codex, `design/character-models/`; `server/CourierAvatar.luau`,

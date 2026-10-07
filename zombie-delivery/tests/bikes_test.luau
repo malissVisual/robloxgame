@@ -146,7 +146,7 @@ check("the E-Scooter: a bike, level 4, about $2,800", scooter ~= nil and scooter
 	and math.abs(scooter.price - 2800) <= 300 and not scooter.company)
 check("… style scooter, the rider stands, the badge", scooter.style == "scooter" and scooter.stand == true
 	and string.find(scooter.badge or "", "ELECTRIC", 1, true) ~= nil and string.find(scooter.badge or "", "STAND-UP", 1, true) ~= nil)
-check("… speed ~36 (5.7: a bit slower), accel ~26, turn ~2.8, health ~110", math.abs(scooter.maxSpeed - 36) <= 2 and math.abs(scooter.accel - 26) <= 2
+check("… speed ~32 (6.0: not too fast), accel ~42 (a quick start), turn ~2.8, health ~110", math.abs(scooter.maxSpeed - 32) <= 2 and math.abs(scooter.accel - 42) <= 2
 	and math.abs(scooter.turn - 2.8) <= 0.15 and math.abs(scooter.health - 110) <= 15)
 local quickest, standing = true, 0
 for _, def in Config.Cars do
@@ -179,6 +179,15 @@ end
 check("5.7: a free rental (capped) < the Rusty Bike < the E-Scooter < the Courier Bike < the E-Bike", Config.Rental.MaxSpeed < top("rustbike")
 	and top("rustbike") < top("escooter") and top("escooter") < top("citybike") and top("citybike") < top("ebike"))
 check("5.7: a rental's rack takes one piece, the bought scooter's two", Config.Rental.Room == 1 and Config.Rental.Room < scooter.capacity)
+-- 6.0: quick off the line, slow at the top: both scooters out-accelerate every other two-wheeler.
+local quickStart = true
+for _, def in Config.Cars do
+	if def.bike and not def.stand then
+		quickStart = quickStart and Config.Rental.Accel > def.accel
+	end
+end
+check("6.0: a rental's accel is capped (36), still the quickest start after the bought one", Config.Rental.Accel == 36
+	and Config.Rental.Accel <= scooter.accel and quickStart)
 check("… on the career road at level 4 (Spoke & Chain), never a car", has(4, "bike", "escooter") and not has(4, "car", "escooter"))
 check("… not advice for a bigger car", string.find(Economy.roomAdvice("van", 0, 4), "Scooter", 1, true) == nil)
 

@@ -255,6 +255,9 @@ end
 local function giveItem(profile: PlayerData.Profile, weapon: string?, paint: string?)
 	if weapon then
 		profile.weapons[weapon] = true
+		if profile.weapon == nil then
+			profile.weapon = weapon -- 6.0: a courier with only fists gets it in the hand
+		end
 	end
 	if paint then
 		profile.paints[paint] = true
@@ -831,10 +834,10 @@ function Challenges.adminReset(player: Player): number
 	for _, weapon in Config.Weapons do
 		if weapon.exclusive then
 			profile.weapons[weapon.id] = nil
-			if profile.weapon == weapon.id then
-				profile.weapon = Config.Weapons[1].id
-			end
 		end
+	end
+	if profile.weapon == nil or not profile.weapons[profile.weapon] then
+		profile.weapon = require(Shared.Economy).firstWeapon(profile.weapons) -- 6.0: another gun you own, else fists only
 	end
 	local exclusivePaints: { [string]: boolean } = {}
 	for _, paint in Config.Paints do

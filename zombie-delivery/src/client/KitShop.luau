@@ -21,6 +21,7 @@ local Icons = require(Shared.Icons)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Transport = require(Shared.Transport)
+local Armour = require(Shared.Armour)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
@@ -62,9 +63,9 @@ function KitShop.currentTab(state: any): string
 	return "items"
 end
 
--- A piece's short name for the room line ("Courier Backpack" → "BACKPACK").
+-- A piece's short name for the room line ("Courier Backpack" → "BACKPACK"; 6.0: "Plastic Bag" → "BAG").
 local function shortName(def: Config.KitDef): string
-	return string.upper((string.gsub(def.name, "^Courier ", "")))
+	return string.upper((string.gsub(def.name, "^Courier ", ""):gsub("^Plastic ", "")))
 end
 
 -- What you carry, in words: "HANDS 2" or "HANDS 2 / BACKPACK 3" (the best backpack owned). Also for the job board and
@@ -79,8 +80,18 @@ function KitShop.roomText(kit: Transport.Kit): string
 			best = def
 		end
 	end
-	if best and room > hands then
-		return `HANDS {hands} / {shortName(best)} {room}`
+	-- 6.0: the plastic bag (Config.Kit `extra`) adds up with the backpack: "HANDS 2 / BACKPACK + BAG 5".
+	local names: { string } = {}
+	if best then
+		table.insert(names, shortName(best))
+	end
+	for _, def in Config.Kit do
+		if kit[def.id] and def.extra then
+			table.insert(names, shortName(def))
+		end
+	end
+	if #names > 0 and room > hands then
+		return `HANDS {hands} / {table.concat(names, " + ")} {room}`
 	end
 	return `HANDS {room}`
 end
@@ -91,8 +102,15 @@ local function effect(def: Config.KitDef): string
 	if def.room then
 		table.insert(parts, `📦 {def.room} light pieces`)
 	end
+	if def.armour then
+		table.insert(parts, `🛡 −{math.floor(def.armour * 100 + 0.5)}% damage`) -- 6.0: the vests
+	end
+	if def.extra then
+		table.insert(parts, `🛍️ +{def.extra} light pieces, with any backpack`) -- 6.0: the plastic bag
+	end
 	if def.speed then
-		table.insert(parts, `👟 walk & sprint +{math.floor((def.speed - 1) * 100 + 0.5)}%`)
+		local change = math.floor((def.speed - 1) * 100 + 0.5)
+		table.insert(parts, if change >= 0 then `👟 walk & sprint +{change}%` else `walk & sprint −{-change}%`)
 	end
 	if def.warm then
 		table.insert(parts, `🔥 food cools ×{def.warm}`)
@@ -131,10 +149,11 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 2 }, head)
 	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center }, line)
 	P.text(line, KitShop.roomText(kit), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 1 })
-	local most = Config.Cargo.HandsMax
+	local everything: Transport.Kit = {}
 	for _, def in Config.Kit do
-		most = math.max(most, def.room or 0)
+		everything[def.id] = true
 	end
+	local most = Transport.handsRoom(everything) -- (6.0: the best backpack and every `extra`)
 	for n = 1, most do
 		local pip = Ui.make("Frame", {
 			Size = UDim2.fromOffset(14, 14),
@@ -145,8 +164,10 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 		}, line)
 		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.2 }, pip)
 	end
-	P.caps(line, if speed > 1.001 then `  ·  SPEED ×{string.format("%.2g", speed)}` else "  ·  SPEED ×1", UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextStrokeTransparency = 1, LayoutOrder = most + 2 })
-	Ui.label(head, "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more with a backpack. The best backpack you own counts; so do the best shoes. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
+	local armour = Armour.percent(kit) -- 6.0: the best vest's share
+	P.caps(line, (if math.abs(speed - 1) > 0.001 then `  ·  SPEED ×{string.format("%.2g", speed)}` else "  ·  SPEED ×1")
+		.. (if armour > 0 then `  ·  ARMOUR {armour}%` else ""), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextStrokeTransparency = 1, LayoutOrder = most + 2 })
+	Ui.label(head, "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more with a backpack. The best backpack you own counts; so do the best shoes and the best vest. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 3,
 		TextColor3 = P.ink2,
@@ -158,7 +179,9 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	for order, def in Config.Kit do
 		local owned = kit[def.id] == true
 		-- A backpack smaller than (or as big as) the room you have already adds nothing.
-		local outgrown = not owned and def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= room
+		local outgrown = not owned and def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= Transport.backpackRoom(kit)
+		-- 6.0: a vest no better than the one you have adds nothing either (the best vest counts).
+		local outclassed = not owned and def.armour ~= nil and def.armour * 100 <= armour
 		local row = P.row(body, ROW_H, order + 2, owned)
 		-- (its icon, art/icons/kit_*, once uploaded: shared/Icons.luau; the emoji until then)
 		Ui.icon(row, Icons.kit(def.id), def.icon, UDim2.fromOffset(40, 40), {
@@ -189,6 +212,8 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 			action(row, `🔒 LEVEL {def.level}`, "off", function() end)
 		elseif outgrown then
 			action(row, "MORE ROOM ALREADY", "off", function() end)
+		elseif outclassed then
+			action(row, "BETTER VEST ALREADY", "off", function() end)
 		elseif not here then
 			action(row, `BUY {Ui.money(def.price)}`, "off", function() end)
 		else

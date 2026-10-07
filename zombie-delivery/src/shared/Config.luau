@@ -6,10 +6,11 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "5.9.2"
+Config.Version = "6.0"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
--- rollback is possible). A new player has no vehicle, $40, the pistol and a medkit (server/PlayerData.luau).
+-- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
+-- (fists only: the pistol is bought at Lead & Co., Config.Arms).
 Config.DataStoreName = "ZombieDelivery_v2"
 Config.StartMoney = 40
 Config.StudioStartMoney = 40 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
@@ -45,6 +46,16 @@ Config.Melee = {
 		punch = { damage = 12, cooldown = 0.55, push = 22 }, -- the fist (holstered)
 		gun = { damage = 22, cooldown = 0.8, push = 38 }, -- the gun in the hand
 	} :: { [string]: { damage: number, cooldown: number, push: number } },
+}
+
+-- 6.0: no free gun. A new courier has fists only (V punches); the pistol (Starter) is bought at Lead & Co. Once you have
+-- its price and no gun, Marge texts you about it (Tip, {price} filled in) with the shop on your GPS, once a session
+-- (server/Tutorial.luau). The vests' numbers are in Config.Kit (armour); MaxArmour caps any vest's share
+-- (shared/Armour.luau).
+Config.Arms = {
+	Starter = "pistol",
+	Tip = "Got {price} on you? Lead & Co. sells a pistol for that. Fists are fine for one biter, not for a crowd. It's on your GPS.",
+	MaxArmour = 0.8,
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
@@ -619,8 +630,8 @@ Config.Cars = {
 		name = "E-Scooter",
 		price = 2800,
 		style = "scooter",
-		maxSpeed = 36,
-		accel = 26,
+		maxSpeed = 32, -- 6.0 (the owner: "not too fast, but a quicker start: electric"): 36 → 32, accel 26 → 42
+		accel = 42,
 		turn = 2.8,
 		health = 110,
 		capacity = 2,
@@ -674,7 +685,8 @@ Config.Weapons = {
 		id = "pistol",
 		oneHanded = true,
 		name = "Pistol",
-		price = 0,
+		level = 1, -- 6.0: bought at Lead & Co. like any gun (a new courier has fists only, Config.Arms)
+		price = 250,
 		damage = 20,
 		fireRate = 3,
 		range = 140,
@@ -968,12 +980,19 @@ export type GearDef = {
 -- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
 -- carry on foot and on a bike (shared/Transport.luau). room = light pieces in hands + on the back (the best one counts),
 -- speed = walk / sprint multiplier (the best one counts), warm = food freshness drain multiplier while you carry it.
-export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number? }
+-- 6.0: extra = light pieces the piece adds on top of the hands and the best backpack (the plastic bag: they all add up).
+-- 6.0: armour = the share of every hit a vest takes off (the best vest owned counts, shared/Armour.luau); a speed below 1
+-- slows the walk and the sprint (shared/Transport.luau speedMult: the best shoes × the slowest piece).
+export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number?, extra: number? }
 Config.Kit = {
+	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "2 more light pieces in your hand; what you pick up drops straight in. Works with a backpack." },
 	{ id = "backpack", name = "Courier Backpack", level = 1, price = 150, icon = "🎒", room = 3, description = "Carry 3 light pieces on foot or on a bike instead of 2." },
 	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster." },
 	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
 	{ id = "jacket", name = "Thermal Jacket", level = 1, price = 300, icon = "🧥", warm = 0.8, description = "Food you carry stays warm longer." },
+	-- 6.0, the vests (server/Armour.luau takes the share off every bite and bullet; their looks: KitArt / KitWear).
+	{ id = "kevlar", name = "Kevlar Vest", level = 3, price = 600, icon = "🦺", armour = 0.3, description = "Takes 30% off every bite and bullet. Light enough to run in." },
+	{ id = "heavy", name = "Heavy Armour", level = 5, price = 1500, icon = "🛡️", armour = 0.5, speed = 0.92, description = "Plates and shoulder guards: takes 50% off every bite and bullet, but you are a little slower on foot." },
 } :: { KitDef }
 
 -- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
@@ -1621,9 +1640,10 @@ Config.Rental = {
 	Idle = 45, -- off the scooter this long: it goes back
 	Restock = 20, -- seconds until a rented scooter stands in its dock again (once it is returned)
 	Color = { 214, 72, 64 }, -- the ZDC RIDE red on the rentals' deck and stem
-	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 36) and its
+	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 32) and its
 	-- rack takes one light piece (the bought one two). server/Vehicles.luau caps the rental's MaxSpeed and its room.
 	MaxSpeed = 26,
+	Accel = 36, -- 6.0: quick off the line like the bought one (42), the cap above keeps it slow at the top
 	Room = 1,
 }
 
@@ -1879,7 +1899,7 @@ Config.Juice = {
 	ConfettiPieces = 40, -- a ★★★ rating
 	ConfettiSeconds = 1.8,
 	-- Seconds each gesture lasts (Gestures.weight eases it in and out).
-	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6 } :: { [string]: number },
+	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6, bag = 0.4, throw = 0.4, vest = 1.2 } :: { [string]: number }, -- 6.0: bag, throw, vest
 	WaveHz = 2.2, -- the hand's wave, back and forth per second
 	KnockGap = 0.17, -- seconds between two knocks (the sound's too)
 }
@@ -2946,6 +2966,70 @@ Config.Cargo = {
 	JackReturnSeconds = 90, -- … or this long (a pallet jack to its parking spot or its truck)
 	TrolleyTipPieces = 4, -- the job card says a trolley helps from this many pieces carried
 	PalletPay = 120, -- a Freight Run pays this per pallet on top of its pay
+}
+
+-- 6.0, the courier on foot: throwing a delivery at a home's door (shared/Throws.luau has the maths, server/Cargo.luau
+-- decides, client/Throw.luau aims). Hold X (a gamepad's R1, the touch THROW button) within Range of the door with a
+-- light piece that is not fragile: a dotted arc shows where it lands, the power swings while you hold, release throws.
+-- The server traces the same arc (Step, Gravity; one bounce off a wall) from your release point (Release: from your
+-- body, studs to your right, up and ahead). Landing within DoorRadius of the door = delivered; a miss lies on the
+-- ground to pick up (a newspaper round's: in the bushes, a miss). A TRICKSHOT tip when it lands: farther than FarFrom
+-- (FarMin … FarMax by the distance up to Range), over something in the way (the straight line blocked, the arc clear:
+-- OverTip), off a wall (WallTip).
+Config.Throw = {
+	Range = 45, -- studs (flat) from the door you may throw from
+	DoorRadius = 4, -- a landing this close (flat) to the door's spot is delivered
+	Cooldown = 0.8, -- seconds between two throws
+	MinSpeed = 16, -- studs / s at the weakest …
+	MaxSpeed = 60, -- … and the strongest (60 at 45° flies ~45 studs)
+	Gravity = 80, -- studs / s² (floatier than the world's: a readable arc)
+	MinUp = 5, -- degrees: the throw's angle over the flat, at least …
+	MaxUp = 70, -- … and at most
+	Lift = 22, -- degrees over where the camera looks (looking level throws up at this)
+	ChargeTime = 1.1, -- seconds from the weakest to the strongest throw while you hold (then back down, and again)
+	Step = 1 / 30, -- seconds per step of the traced arc
+	MaxTime = 3, -- the arc is traced this long at most
+	Bounce = 0.45, -- the speed kept off a wall (once: MaxBounces) …
+	MaxBounces = 1,
+	GroundNormal = 0.6, -- … a surface facing up more than this is ground: it lands there
+	Release = { side = 0.7, up = 1.3, ahead = 0.6 } :: { side: number, up: number, ahead: number },
+	FarFrom = 18, -- studs: a landed throw from farther than this tips …
+	FarMin = 5, -- … this at FarFrom …
+	FarMax = 25, -- … up to this at Range
+	OverTip = 15, -- over a car, a fence, a wall: the straight line was blocked
+	WallTip = 10, -- off a wall
+	TipCap = 60, -- 6.0 review: the trickshot tips of one run add up to this at most
+	Dots = 20, -- the aim's dotted arc
+	-- Too fragile to throw (with a job of the FRAGILE modifier or the fragile cargo rule: everything).
+	FragileLooks = { cake = true, vaccine = true, sample = true, electronics = true, painting = true, gadget = true } :: { [string]: boolean },
+}
+
+-- 6.0, the courier's look on foot (client/SprintPose.luau, server/KitWear.luau): the plastic bag (Config.Kit BagKit)
+-- in the left hand flies behind you by your speed; a sprint (From … Full studs / s on foot) lays a longer stride and
+-- pumping arms over the run animation, for everybody within Range of the camera.
+Config.Courier = {
+	BagKit = "bag", -- the Config.Kit id: owned, a light piece picked up drops straight into the bag (or the pack)
+	Sprint = {
+		From = 20, -- studs / s: the sprint pose starts here …
+		Full = 26, -- … and is all on from here
+		Range = 180, -- studs from the camera
+		Blend = 6, -- how fast it comes and goes (per second)
+		Stride = 0.45, -- the hips swing this much farther than the animation's
+		Knee = 0.35, -- the knees bend this much more
+		Arms = 0.6, -- the shoulders swing this much farther
+		Elbow = 30, -- degrees more bend in the elbows
+	},
+	Bag = {
+		Grip = 0.12, -- studs under the hand
+		MaxTilt = 72, -- degrees back at a full sprint
+		FullSpeed = 28, -- studs / s for the full tilt
+		Spring = 70, -- how hard it swings to its tilt …
+		Damp = 8, -- … and how fast that settles
+		FlutterHz = 4.5, -- the flutter at speed
+		Flutter = 10, -- degrees
+		Sway = 5, -- degrees side to side
+		Range = 180, -- studs from the camera
+	},
 }
 
 export type JobTypeDef = {

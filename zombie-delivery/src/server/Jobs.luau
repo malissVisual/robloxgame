@@ -2832,6 +2832,8 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	cargoInfo.pair = offer.twists.pair == true
 	-- 4.8: a heavy cargo is slow by hand alone; a multi-drop delivery's pieces are labelled for their customers.
 	cargoInfo.heavy = if JobRules.hasRule(offer.rules, "heavy") then JobsConfig.CargoRules.HeavyCarrySpeed else nil
+	-- 6.0: a fragile cargo (the rule, the FRAGILE modifier) is never thrown at a door (server/Cargo.luau).
+	cargoInfo.fragile = if JobRules.hasRule(offer.rules, "fragile") or (offer.modifier ~= nil and offer.modifier.id == "fragile") then true else nil
 	cargoInfo.dests = offer.dests
 	cargoInfo.destNames = offer.destNames
 	-- 5.0, on foot: no vehicle; the pieces over the hands ride in the owner's pack (the backpack's room). 5.1: a bike

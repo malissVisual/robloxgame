@@ -17,7 +17,7 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 local J = Config.Juice
-local KINDS = { "wave", "give", "take", "knock" }
+local KINDS = { "wave", "give", "take", "knock", "bag", "throw", "vest" } -- (6.0: bag, throw, vest)
 
 for _, kind in KINDS do
 	local total = Gestures.seconds(kind)
