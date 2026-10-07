@@ -121,8 +121,12 @@ for _, id in bags do
 			low = math.max(low, piece.size[2] / 2 - piece.at[2])
 		end
 	end
-	check(`{id}: its own art on the bag's pivot ({#pieces} pieces)`, #pieces >= 6 and #pieces <= 16 and unique and onPivot and KitArt.bags[id] == true)
-	check(`{id}: clear of the ground under the hand (1.95 up)`, low > 0.9 and low < 1.75, low)
+	-- 6.7: real-size bags, up to 20 parts; one in the hand (its grip ~1.9 over the ground: tools/character-art/bag-check
+	-- measures it on the real body) at least 0.3 clear of the ground, one worn on the shoulder or the hip lower down
+	local def = kit(id)
+	local inHand = (def.carry or "hand") == "hand"
+	check(`{id}: its own art on the bag's pivot ({#pieces} pieces)`, #pieces >= 6 and #pieces <= 20 and unique and onPivot and KitArt.bags[id] == true)
+	check(`{id}: a real-size bag, clear of the ground {if inHand then "under the hand (1.9 up)" else "where it is worn"}`, low > 0.9 and low <= (if inHand then 1.6 else 2.2), low)
 	check(`{id}: in the hand`, KitFit.outfit({ [id] = true }, false, id).hand == id)
 end
 check("the plastic bag's look is still the 6.0 one", KitArt.pieces("bag")[4].name == "BagBody")

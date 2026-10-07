@@ -1943,7 +1943,9 @@ Config.Juice = {
 	ConfettiPieces = 40, -- a ★★★ rating
 	ConfettiSeconds = 1.8,
 	-- Seconds each gesture lasts (Gestures.weight eases it in and out).
-	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6, bag = 0.4, throw = 0.4, vest = 1.2, sling = 0.55, unsling = 0.55 } :: { [string]: number }, -- 6.0: bag, throw, vest; 6.4: sling, unsling
+	-- 6.7: give 0.5 (the piece held out in the hands), bag 0.5 (looked down at, put in), throw 0.45 (the wind-up to
+	-- Config.Throw.WindUp, the whip, the follow-through), receive 1.3 (a receiver holding the piece handed over).
+	Gestures = { wave = 1.6, give = 0.5, take = 0.45, knock = 0.6, bag = 0.5, throw = 0.45, vest = 1.2, sling = 0.55, unsling = 0.55, receive = 1.3 } :: { [string]: number }, -- 6.0: bag, throw, vest; 6.4: sling, unsling; 6.7: receive
 	WaveHz = 2.2, -- the hand's wave, back and forth per second
 	KnockGap = 0.17, -- seconds between two knocks (the sound's too)
 }
@@ -2977,6 +2979,14 @@ Config.Cargo = {
 		bread = true,
 		parcel = true,
 	} :: { [string]: boolean },
+	-- 6.7, real sizes (the owner: "not realistic"): a light piece is built at LightScale of its 3.x size (a pizza box about
+	-- 33 cm across, a parcel 30–40 cm: a box carried in both hands is about a stud wide), LookScale per look; the heavy
+	-- ones as before (server/Cargo.luau buildLook). In the hands the stack's bottom is at most CarryLow studs over the
+	-- body's root (on the forearms) and its back CarryFront in front of it.
+	LightScale = 0.5,
+	LookScale = { cake = 0.36, medicine = 0.42, newspaper = 0.6, bouquet = 0.55 } :: { [string]: number },
+	CarryLow = 0.05,
+	CarryFront = 0.52,
 	HandsMax = 2, -- light pieces in one player's hands at most
 	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)
 	-- 3.7, the car doors (server/Vehicles.luau, client/CarVisuals.luau): the E to get in shows only at a door (the driver's
@@ -3034,6 +3044,9 @@ Config.Throw = {
 	Range = 45, -- studs (flat) from the door you may throw from
 	DoorRadius = 4, -- a landing this close (flat) to the door's spot is delivered
 	Cooldown = 0.8, -- seconds between two throws
+	-- 6.7: the throw's wind-up (shared/Gestures.luau "throw": the arm back, the torso turned): the server launches the
+	-- piece this many seconds after the throw, when the arm whips through (the piece leaves the hand then)
+	WindUp = 0.18,
 	MinSpeed = 16, -- studs / s at the weakest …
 	MaxSpeed = 60, -- … and the strongest (60 at 45° flies ~45 studs)
 	Gravity = 80, -- studs / s² (floatier than the world's: a readable arc)
@@ -3092,6 +3105,7 @@ Config.Courier = {
 	-- swings it (it trails when you start, swings forward when you stop, out on a turn), the air leans it back at a run.
 	Bag = {
 		Grip = 0.12, -- studs under the hand
+		Clear = 0.25, -- 6.7: studs a real-size bag stays over the ground at rest (tools/character-art/bag-check.luau, on the real body)
 		Spring = 70, -- the swing's stiffness (ω², 1 / s²: about 1.3 swings a second) …
 		Damp = 5, -- … and its damping (1 / s: a few swings, then it hangs still)
 		Kick = 0.006, -- radians of swing for every stud / s² the hand speeds up or slows down (a real pendulum: 1 / g)
@@ -3122,12 +3136,12 @@ Config.Courier = {
 	-- boxy thermal bag off the leg). "back" is a bag slung on the back (the tote, the duffel: lying across it),
 	-- "hipBack" the messenger slid behind the hip; PackPush studs further back while a backpack is worn.
 	BagPlaces = {
-		shoulder = { part = "UpperTorso", at = { -1.05, 0.8, 0.3 }, turn = { 0, 0, 6 } },
-		hip = { part = "UpperTorso", at = { -1.02, 0.1, 0.22 }, turn = { 0, 0, 4 } },
+		shoulder = { part = "UpperTorso", at = { -1.14, 0.8, 0.62 }, turn = { 0, 0, -3 } }, -- (6.7: under the arm, behind it)
+		hip = { part = "UpperTorso", at = { -1.25, 0.1, 0.6 }, turn = { 0, 0, -2 } }, -- (6.7: the real-size messenger at the back of the hip, clear of the arm)
 		back = { part = "UpperTorso", at = { 0, 0.62, 0.95 }, turn = { 0, 90, 0 } },
 		hipBack = { part = "UpperTorso", at = { -0.5, 0.05, 0.72 }, turn = { 0, 90, 0 } },
 	} :: { [string]: { part: string, at: { number }, turn: { number } } },
-	HandOut = { thermal = 0.12, duffel = 0.08 } :: { [string]: number }, -- (6.4.1: the duffel too: full, it swells against the leg)
+	HandOut = { thermal = 0.18, duffel = 0.14 } :: { [string]: number }, -- (6.4.1: the duffel too: full, it swells against the leg; 6.7: the real-size thermal bag and duffel further out)
 	PackPush = 0.5,
 	-- 6.4: a worn bag's motion (client/BagSway.luau; BagSwing.tuning / BagSwing.bob): on the shoulder or the hip a stiff
 	-- small swing (Wear over Bag) and a bounce of Bounce studs with each step (Step studs a step, the full bounce from
@@ -3142,27 +3156,61 @@ Config.Courier = {
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
 	BagUnlock = "Sprint with more of your deliveries: Last Stop Supplies has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
 	-- 6.4.1, what is in the bag shows (shared/BagFill.luau; server/KitWear.luau on you, server/Cargo.luau on the ground):
-	-- the pieces in it (the player's BagCount / BagLooks attributes) stick out of its opening as small shapes of their
-	-- looks (a pizza box, a bouquet, letters …; a parcel otherwise), up to its room and Max; Sink of each one's height
-	-- is inside the bag; one row along the opening up to Rows pieces, then two; each leans Tilt degrees, every other one
-	-- the other way. The body swells as it fills: its thickness by up to Bulge, its length by up to Swell.
+	-- the pieces in it (the player's BagCount / BagLooks attributes) show in its opening, up to its room and Max.
+	-- 6.7, real sizes (the owner: "the things would never really fit in it"): each piece is its real packed size
+	-- (Packed, per BagFill.kind: a pizza box 33 × 4 × 33 cm lying flat, a parcel, a bouquet …; studs on the bag's frame:
+	-- x across its thickness, y up, z along its length; `upright` ones are never laid on their side, `stack` ones lie flat
+	-- on each other, `proud` their own share sticking out). They are packed as a courier packs: a lane along the length,
+	-- the next lane beside it across the thickness, then a layer below (a pizza box that does not fit flat stands on its
+	-- edge). The top layer sticks out of the opening by Proud of its height (a flat stack of pizza boxes: its top box at
+	-- the rim, seen through the open top); a piece that fits no way round is shrunk, never under MinScale; an overfull bag
+	-- pushes them up. Gap studs between them, Tilt degrees of lean (every other one the other way). The body swells as
+	-- it fills: its thickness by up to the bag's `bulge` (else Bulge), its length by up to Swell.
 	-- Mouth: each bag's opening on its pivot (server/KitArt/Geometry.luau's frame: the grip at the origin, hanging -Y):
-	-- its height, its thickness (x) and its length (z).
+	-- the rim's height (y), the inside's thickness (x) and length (z), its depth from the rim to the bottom (d).
 	BagFill = {
 		Max = 6,
-		Sink = 0.55,
-		Rows = 3,
-		Tilt = 7,
-		Bulge = 0.16,
+		Proud = 0.3,
+		Tilt = 3,
+		Gap = 0.015,
+		MinScale = 0.7,
+		Bulge = 0.25,
 		Swell = 0.06,
 		Mouth = {
-			bag = { y = -0.45, x = 0.42, z = 0.84 },
-			tote = { y = -0.5, x = 0.28, z = 0.96 },
-			thermal = { y = -0.27, x = 0.72, z = 1.0 },
-			padded = { y = -0.58, x = 0.3, z = 0.9 },
-			duffel = { y = -0.34, x = 0.34, z = 1.2 },
-		} :: { [string]: { y: number, x: number, z: number } },
+			bag = { y = -0.39, x = 0.5, z = 1.04, d = 1.08, bulge = 0.25 },
+			tote = { y = -0.67, x = 0.32, z = 1.06, d = 1.04, bulge = 0.3 },
+			thermal = { y = -0.52, x = 1.04, z = 1.2, d = 0.86, bulge = 0.04 }, -- (rigid: it hardly swells)
+			padded = { y = -0.57, x = 0.3, z = 1.08, d = 0.82, bulge = 0.12 },
+			duffel = { y = -0.4, x = 0.56, z = 1.6, d = 0.9, bulge = 0.15 }, -- (the open zip along its top)
+		} :: { [string]: { y: number, x: number, z: number, d: number, bulge: number? } },
+		Packed = {
+			pizza = { size = { 0.95, 0.12, 0.95 }, stack = true },
+			parcel = { size = { 0.5, 0.45, 0.6 } },
+			bouquet = { size = { 0.35, 1.0, 0.35 }, upright = true, proud = 0.4 },
+			cake = { size = { 0.65, 0.65, 0.65 }, upright = true },
+			groceries = { size = { 0.5, 0.55, 0.7 }, upright = true },
+			gadget = { size = { 0.35, 0.4, 0.6 } },
+			medicine = { size = { 0.4, 0.4, 0.55 } },
+			mail = { size = { 0.08, 0.35, 0.5 } }, -- a bundle of letters
+			paper = { size = { 0.18, 0.85, 0.18 }, upright = true }, -- a rolled newspaper
+			folder = { size = { 0.06, 0.45, 0.6 } },
+			food = { size = { 0.4, 0.45, 0.5 }, upright = true }, -- a take-out bag or box
+			bread = { size = { 0.16, 1.0, 0.16 }, upright = true, proud = 0.4 }, -- a baguette
+			plants = { size = { 0.45, 0.5, 0.6 }, upright = true }, -- a seedling tray
+		} :: { [string]: { size: { number }, upright: boolean?, stack: boolean?, proud: number? } },
 	},
+	-- 6.7, the bag arm (client/BagSway.luau, every client for every courier near the camera): while a bag hangs in the
+	-- left hand its arm is a little straighter and out (Out degrees away from the body; the animation's elbow bend cut by
+	-- Straight, its swing by SwingCut: the weight pulls it down), and a loaded bag leans the torso the other way (Lean
+	-- degrees with Full pieces in it), laid on top of the animation, blended over Blend seconds. Only while nothing else
+	-- has the arm (aiming, carrying, the phone, a gesture, a swing, a car door, the sprint, and Hold seconds after); the
+	-- lean only while you stand or walk slower than Calm studs / s (client/ArmPose.luau leans the waist faster than that).
+	BagArm = { Out = 9, Straight = 0.5, SwingCut = 0.35, Lean = 3.5, Full = 6, Blend = 0.25, Hold = 0.35, Calm = 10 },
+	-- 6.7, items in the hand (server/HandItem.luau, server/Cargo.luau): a piece handed over at a door is in the courier's
+	-- right hand for Reach seconds (the "give" gesture), then in the receiver's hands for Pass seconds (they reach for it
+	-- Lead seconds before it comes: the "receive" gesture), then on the door's stack; a piece put into the bag is in the
+	-- right hand until BagIn seconds into the "bag" gesture, then in the bag (its fill shows it from then on).
+	HandItem = { Reach = 0.4, Lead = 0.15, Pass = 0.85, BagIn = 0.3 },
 	-- 6.4.1: client/BagSway.luau looks once per spawn, After seconds after your bag shows, whether it really is on you
 	-- (parts, not see-through, within Far studs of your hand and of its place) and says in the Output when not.
 	BagCheck = { After = 3, Far = 4 },

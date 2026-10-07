@@ -1120,6 +1120,49 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Real-size bags, items in the hand, the throw's wind-up (6.7, part A)
+
+The owner: "The bags and the character aren't realistic at all, there are no animations, the bag is small, the things
+would never really fit in it."
+
+**Real-size bags** (`server/KitArt/Geometry.luau`, 1 stud ≈ 35 cm): the plastic bag is 40 × 45 × 20 cm (gussets, a
+hem, two handles into the fist), the canvas tote 40 × 40 × 13 on long handles under the arm, the thermal food bag
+45 × 37 × 38 (zip-round lid, mesh pocket, ZDC patches, two straps to a padded grip), the messenger 40 × 30 × 15 (a
+flap, a zip, buckles; now at the back of the hip, clear of the arm), the duffel 70 cm long and 35 across. Each shows a
+dark open mouth; loaded, the thermal bag's lid stands open behind its straps (`Geometry.open`). A bag in the hand stays
+at least `Config.Courier.Bag.Clear` (0.25) over the ground: `tools/character-art/bag-check.luau` measures it on the
+real body (today 0.33 at the lowest), `tools/model-art/export.py` checks each bag's reach (≤ 20 parts a bag).
+
+**Real-size pieces in them** (`shared/BagFill.luau`, `Config.Courier.BagFill.Packed`, tested): a pizza box is 33 × 4 ×
+33 cm, a parcel, a bouquet a stud tall, a cake box 23 cm … They are packed like a courier packs: lanes along the bag,
+side by side across it, then a layer below; the last one in lies on top. Pizza boxes lie flat and stacked in the
+thermal bag (the top one at the rim, seen through the open lid) and stand on their edge in a plastic bag; a bouquet,
+a cake, a take-out bag stay upright. The top layer sticks out of the opening by 20–40 %, nothing goes under the bottom,
+a piece that fits no way is shrunk to 70 % at the least, and the body swells up to its own amount (the plastic bag
+25 %, the rigid thermal bag 4 %).
+
+**Pieces in the hands at their real size** (`Config.Cargo.LightScale` / `LookScale`): a light piece is built at half
+its old size (a box carried in both hands is about a stud wide, a cake box 0.65), heavy cargo as before; carried, it
+rests on the forearms in front of the chest (`CarryLow`, `CarryFront`).
+
+**Items in the hand** (`server/HandItem.luau`, `shared/Gestures.luau`): handing over at a door, the piece is in your
+hands held out ("give", 0.4 s), then in the receiver's ("receive", 0.85 s), then on the door's stack. A pickup into
+the bag: you bring the bag up with the left hand, look down, put the piece in with the right ("bag", 0.5 s); the bag
+shows it from that moment. A throw: the piece is in your hand through a 0.18 s wind-up (`Config.Throw.WindUp`: the arm
+back, the torso turned) and leaves it at the whip; the server decides everything at the throw and only starts the
+flight then. The two-handed grips are worked out from each body's own rig attachments and the gesture's angles.
+
+**The bag arm** (`client/BagSway.luau`, `Config.Courier.BagArm`): with a bag in the left hand the arm is a little
+straighter, out from the body and swings less; a loaded bag leans the torso slightly the other way (standing or slow);
+the throw turns the torso and the bag gesture tips the head down. Only while nothing else (aiming, carrying, the
+phone, a gesture, the sprint) has those joints; let go to the identity otherwise.
+
+**Test in Studio:** each bag in the hand and worn (2, then 1 / 3), empty and full: the size against the courier, the
+contents in the mouth, the thermal lid opening, nothing in the ground or the leg; a pickup into the bag (the piece in
+the right hand, then in the bag); a hand-over at a door (the piece from your hands into the receiver's, then the
+stack; nobody home: onto the stack); a throw (the arm winds back, the piece leaves at the whip, the arc and the tips as
+before); carrying two light pieces (smaller, on the forearms).
+
 ## The bag shows, and what is in it (6.4.1)
 
 The owner: "the bag isn't visible when I have it; and it would be good if it were more visible, and that there is
