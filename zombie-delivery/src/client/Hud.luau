@@ -3686,7 +3686,7 @@ end
 
 function Hud.setState(newState: any)
 	state = newState
-	moneyLabel.Text = Ui.money(state.money)
+	require(script.Parent.Juice).countMoney(moneyLabel, state.money) -- 5.7: runs up to a higher amount
 	refreshLevel()
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)

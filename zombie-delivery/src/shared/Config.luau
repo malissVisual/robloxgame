@@ -1818,6 +1818,37 @@ Config.Audio = {
 	} :: { [string]: string },
 }
 
+-- 5.7, sound and juice: the world's sounds (client/Sounds.luau; art/audio/sfx2.ogg, shared/SoundSheet.luau Sfx2), the
+-- HUD money counting up and the confetti of a top rating (client/Juice.luau), and the short arm gestures of people and
+-- couriers (shared/Gestures.luau, client/ArmPose.luau; set by server/Npcs.luau Npcs.act). Volumes 0..1.
+Config.Juice = {
+	StepStride = 5.4, -- studs walked per footstep (on foot, on the ground)
+	StepMinSpeed = 3, -- slower than this (studs / s): no steps
+	StepVolume = 0.32,
+	BikeVolume = 0.32, -- the freewheel's ticking (pedal bikes), silent standing still
+	ScooterVolume = 0.28, -- the electric hum (the E-Scooter, the rental scooters, the E-Bike)
+	ZipVolume = 0.5, -- the trolley's whirr on a zip line (its pitch rises to Config.ZipLines.Speed)
+	BusVolume = 0.7, -- the brake and the doors' hiss at a stop
+	BusRange = 110, -- studs: buses farther from the camera are not heard
+	KnockVolume = 0.85,
+	DoorVolume = 0.6,
+	DoorDelay = 0.45, -- seconds from the knock to the door's creak
+	CoinVolume = 0.55, -- a paid job (and, quieter, the money popped by a kill)
+	BuzzVolume = 0.5, -- the phone's buzz under a banner
+	AmbienceDay = 0.12, -- the city's hum, by day / by night
+	AmbienceNight = 0.2,
+	WindDay = 0.04,
+	WindNight = 0.13,
+	AmbienceFade = 4, -- seconds to go from the day's to the night's level
+	CountUpSeconds = 0.7, -- the HUD money runs up to the new amount in this long
+	ConfettiPieces = 40, -- a ★★★ rating
+	ConfettiSeconds = 1.8,
+	-- Seconds each gesture lasts (Gestures.weight eases it in and out).
+	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6 } :: { [string]: number },
+	WaveHz = 2.2, -- the hand's wave, back and forth per second
+	KnockGap = 0.17, -- seconds between two knocks (the sound's too)
+}
+
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
 -- (U) anywhere, server checked (server/Missions.luau), played as jobs (server/Jobs.luau startMission) with twists.
 -- Every mission is rated 1 – 3 stars; the best rating is saved (profile.missions).
