@@ -1,0 +1,60 @@
+# Uniform couriers and thumbnail-inspired infected
+
+Owner's approved reference: [loading-van thumbnail](approved-thumbnail.png). The real native-part factory renders
+are in [renders/](renders/), exported from the actual geometry/builder, with neutral poses and studio lighting.
+The game's dusk lighting and the existing zombie animation tracks supply the final mood and movement.
+
+| Model | Native parts, including the invisible root | Look |
+| --- | ---: | --- |
+| Courier | 39 | Warm tan skin, red reflective vest, charcoal workwear, backwards black cap |
+| Walker / runner | 42 each | Green infected face, cream glowing eyes, torn jacket and trousers |
+| Soldier / brute | 44 each | Same infected design, helmet/chest plate or reinforced shoulder; existing type scales/palettes |
+
+All five stay below the 64-part budget. Bodies have 16 native parts and 15 attachment-defined R15 joints.
+No MeshParts, SpecialMeshes, imported textures or body/accessory asset downloads. The kit's nominal torso, hands,
+upper arms and feet are preserved. Decorative parts remain massless, non-colliding, non-queryable and non-touching,
+including zombie corpses.
+
+## Integration
+
+- **CourierAvatar.start**, called before World.build, installs StarterPlayer.StarterCharacter and switches off
+  personal avatar appearance loading. Every join/respawn receives the same body and uniform. An already spawned
+  personal avatar is replaced once. Earned equipment is still built by KitWear; this uniform grants no free kit.
+- **Animate.client** is cloned into the template to replace the personal-avatar Animate script. Enabled/Disabled
+  do not replicate, so disabling the default script on the server would not be sufficient.
+- **CourierMotion** selects one common public R15 animation family for idle, walk, sprint, jump, fall, climb, swim
+  and sitting. The server-created Animator replicates the tracks; actual velocity controls their pace at 10 Hz.
+  Existing ArmPose, BikeRider and interaction poses still layer Transform in PreSimulation. No C0/C1 writes.
+  Physics/platform-standing states yield to the zip/interaction poses.
+- **CharacterArt.Geometry / Rig** build native infected templates for walker, runner, soldier and brute in Zombies.
+  Existing animation tracks, AI and Config type statistics remain in use. Human bandits/gunners retain their body
+  and gun path. The corpse path now preserves decorative skin flags.
+- The code does not change saves, payouts, cargo capacity, input bindings or the sprint system.
+
+## Reproduce
+
+From zombie-delivery:
+
+```bash
+python3 tests/run_tests.py /path/to/luau
+python3 tools/character-art/check.py /path/to/luau design/character-models/geometry.json
+blender -b -t 4 --python tools/model-art/render.py -- design/character-models/geometry.json design/character-models/renders --workbench
+```
+
+The normal test runner includes connected-skeleton, kit-dimension, scale/ground-clearance and locomotion checks.
+The additional recorder executes the real factory/controller: attachment bind positions, flags, welds, clone
+references, animation choices, initial replacement, respawns and cleanup. It records BuildRigFromAttachments and
+animation playback calls; it does **not** simulate Roblox physics, asset decoding or network replication.
+
+## Claude's Studio review before merge
+
+Start a two-player server with distinct personal avatars (including an R6 avatar). Confirm both use the courier,
+including after Reset/death/rejoin, with no duplicate Animate controllers. Check idle/walk/sprint/jump/fall,
+swimming/climbing and the feet on the ground. Carry one/two parcels, open the phone, draw/aim/melee and board/exit a
+van, bike, scooter and bus; check zip-line poses. Buy each kit piece to check fit and capacity staying profile-based.
+Spawn all four infected types, verify gait and type scale, headshots, latching, corpse ragdolls and expiry.
+Check Output for missing joints/animation permissions and test the common tracks from a second client.
+
+Checks passed in the cloud: full Luau test runner and -O0 -g2 compilation; factory/controller recorders; native
+model renders; Rojo build and the owner's Node synchronizer handshake/source/class audit. Actual engine joint
+construction and animation replication still require this Studio review.

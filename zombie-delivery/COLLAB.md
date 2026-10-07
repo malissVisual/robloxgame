@@ -7,6 +7,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/character-models` (main `882c11c`, 2026-10-07) · native thumbnail-inspired infected + one red-vest courier/rig/animation family for all players, actual renders, square game icon and 4 promo thumbnails · Studio: two distinct avatars after spawn/reset, walk/sprint/jump/climb/swim, carry/phone/aim/melee, van/bike/scooter/bus/zip poses, purchased kit fit, all 4 infected/headshots/latching/ragdolls. Full tests + -O0 -g2 compile, builder/controller recorders and Node sync/Rojo build pass; engine joints/assets/replication still need Studio. See `design/character-models/README.md`; promo PNGs in `art/promo/`. Owner authorized the avatar/zombie hooks; version bump remains Claude's.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
