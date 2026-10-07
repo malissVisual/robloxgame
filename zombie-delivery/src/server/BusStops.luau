@@ -1,6 +1,6 @@
 --!strict
 -- 5.5, the city buses' stops (shared/BusLines.luau): a shelter at every stop's kerb, built once by server/World.luau
--- (its build list: "bus stops"). Native parts, at most 25 a stop (19): a concrete pad, a glass back and sides on four
+-- (its build list: "bus stops"). Native parts, at most 25 a stop (23): a concrete pad, a glass back and sides on four
 -- posts under a roof with a fascia in the line's colour and a lamp that glows at night, a bench, the arrivals board
 -- on the back wall (a SurfaceGui whose "Arrivals" label every client fills from the timetable: client/BusRide.luau),
 -- a pole sign at the front end facing along the street (BUS, the lines' coloured number chips, the stop's name) and
@@ -9,6 +9,10 @@
 -- Where: the shelter stands on the sidewalk from the curb to 3 studs in (the people's walk line, 4.5 in, stays clear:
 -- shared/TrafficLanes.luau), centred on the bus's front-right door; nothing of it collides above the pad but the
 -- posts, the glass, the bench and the pole. Each shelter is a Model tagged "BusStop" with StopId and StopName.
+--
+-- 6.3, the bus map at every stop: a MapBoard panel on two posts past the shelter's back end (in line with its back
+-- glass, facing the road, 3.4 × 4.6), its face "ZDC TRANSIT · EXPRESS · BUS MAP" from afar; the client of a player near
+-- the stop draws the lines on it with YOU ARE HERE (client/BusMapBoard.luau). 4 parts more (23 a stop).
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -173,6 +177,18 @@ local function shelter(parent: Instance, stop: BusLines.Stop)
 	local sign = deco(part(model, "Sign", Vector3.new(2.4, 2.8, 0.15), at(6.2, 0.7, PAD_TOP + 8.6) * CFrame.Angles(0, math.pi / 2, 0), Color3.fromRGB(22, 24, 28), Enum.Material.Metal))
 	signFace(sign, Enum.NormalId.Front, stop)
 	signFace(sign, Enum.NormalId.Back, stop)
+	-- 6.3: the map board past the back end (the bus's side of the shelter; the pole sign is at the front end), its face
+	-- toward the road like the arrivals board's. Its plain face; a near client covers it with the map.
+	local mapAlong, mapDepth = -8.4, 2.7
+	for _, along in { mapAlong - 1.85, mapAlong + 1.85 } do
+		part(model, "MapPost", Vector3.new(0.3, 6.4, 0.3), at(along, mapDepth, PAD_TOP + 3.1), METAL, Enum.Material.Metal)
+	end
+	deco(part(model, "MapFrame", Vector3.new(3.7, 0.3, 0.3), at(mapAlong, mapDepth, PAD_TOP + 6.3), lineColor, Enum.Material.SmoothPlastic))
+	local mapBoard = deco(part(model, "MapBoard", Vector3.new(3.4, 4.6, 0.12), at(mapAlong, mapDepth, PAD_TOP + 3.85), Color3.fromRGB(18, 20, 24), Enum.Material.SmoothPlastic))
+	local plain = surface(mapBoard, Enum.NormalId.Back, 40)
+	plain.Name = "MapBoardGui"
+	text(plain, "ZDC TRANSIT · EXPRESS", UDim2.new(1, -12, 0.08, 0), UDim2.fromOffset(6, 6), Color3.fromRGB(230, 230, 222))
+	text(plain, "BUS MAP", UDim2.new(1, -24, 0.12, 0), UDim2.new(0, 12, 0.44, 0), Color3.fromRGB(255, 196, 70))
 	-- On the road: the yellow kerb line where the bus stands, and BUS.
 	local stand = BusLines.DoorAhead -- (the bus's middle is this far behind the door)
 	deco(part(model, "BusBay", Vector3.new(26, 0.05, 0.45), at(-stand, -0.4, Map.RoadTop + 0.03), PAINT))

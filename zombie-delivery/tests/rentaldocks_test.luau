@@ -1,7 +1,8 @@
 -- 5.6, ZDC RIDE's docks (shared/RentalDocks.luau): about 20 docks on the kerbs of Downtown and the Suburbs, 2 – 3
 -- scooters each, near a block corner past the crosswalk, off the people's walk line, clear of the homes, storefronts,
 -- cargo spots, bus stops, gas stations, places and the alley shortcuts, out of the safe zone with one just outside it by
--- the depot; and clear of the zip lines' ladders. In the standalone Luau CLI.
+-- the depot; and clear of the zip lines' ladders. 6.3: and first of all the rack at the spawn, in the depot's yard by the
+-- spawn pad. In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -24,20 +25,24 @@ end
 
 local tuning = Config.Rental
 local docks = RentalDocks.docks()
-local downtown, suburbs, scooters, depot = 0, 0, 0, 0
+local downtown, suburbs, scooters, depot, spawns = 0, 0, 0, 0, 0
 for _, dock in docks do
+	scooters += #dock.slots
+	if dock.spawn then
+		spawns += 1
+		continue
+	end
 	if dock.district == "downtown" then
 		downtown += 1
 	else
 		suburbs += 1
 	end
-	scooters += #dock.slots
 	if dock.depot then
 		depot += 1
 	end
 end
-print(`  {#docks} docks ({downtown} Downtown, {suburbs} in the Suburbs), {scooters} scooters`)
-check("about 20 docks", #docks >= 16 and #docks <= tuning.Docks, #docks)
+print(`  {#docks} docks (the spawn's rack, {downtown} Downtown, {suburbs} in the Suburbs), {scooters} scooters`)
+check("about 20 docks on the kerbs", downtown + suburbs >= 16 and downtown + suburbs <= tuning.Docks, downtown + suburbs)
 check("Downtown and the Suburbs both have docks", downtown >= 8 and downtown <= tuning.DowntownDocks and suburbs >= 4, `{downtown} / {suburbs}`)
 check("the docks are cached", RentalDocks.docks() == docks)
 check("a rental is the E-Scooter, free", tuning.CarId == "escooter" and tuning.Price == 0)
@@ -56,6 +61,9 @@ for _, dock in docks do
 	local cx, cz = d.ox + dock.i * Map.Cell, d.oz + dock.j * Map.Cell
 	check(`{dock.id} ({dock.name}): a unique id and a name`, not ids[dock.id] and #dock.name > 3)
 	ids[dock.id] = true
+	if dock.spawn then
+		-- 6.3: the spawn's rack, its own rules (below), then the same clearances as every dock.
+	else
 	check(`{dock.id}: an ordinary block of Downtown or the Suburbs`, (dock.district == "downtown" or dock.district == "suburbs") and Map.special(dock.district, dock.i, dock.j) == nil)
 	check(`{dock.id}: 2 – 3 scooters`, #dock.slots >= 2 and #dock.slots <= 3, #dock.slots)
 	check(`{dock.id}: the scooters along the kerb (the dock's way), toward the street`, math.abs(dock.tx * dock.nx + dock.tz * dock.nz) < 1e-9 and math.abs(dock.nx) + math.abs(dock.nz) == 1 and math.abs(dock.tx) + math.abs(dock.tz) == 1)
@@ -71,6 +79,7 @@ for _, dock in docks do
 			local prev = dock.slots[n - 1]
 			check(`{dock.id} slot {n}: a scooter's length from the one before`, math.abs(math.sqrt((slot.x - prev.x) ^ 2 + (slot.z - prev.z) ^ 2) - tuning.SlotPitch) < 1e-6)
 		end
+	end
 	end
 	-- Clear of the homes, the storefronts, the cargo spots, the bus stops, the gas stations, the places, the alleys.
 	local worst, worstPark, worstStop, worstGas, worstPlace = math.huge, math.huge, math.huge, math.huge, math.huge
@@ -103,7 +112,9 @@ for _, dock in docks do
 		for _, place in Map.Places do
 			worstPlace = math.min(worstPlace, dist(place.x, place.z))
 		end
-		check(`{dock.id}: clear by the rules`, RentalDocks.clear(slot.x, slot.z))
+		if not dock.spawn then
+			check(`{dock.id}: clear by the rules`, RentalDocks.clear(slot.x, slot.z))
+		end
 	end
 	check(`{dock.id}: clear of doors, piles, cargo spots and alley mouths`, worst >= tuning.Clear, worst)
 	check(`{dock.id}: clear of the parks on the road`, worstPark >= tuning.ParkClear, worstPark)
@@ -122,21 +133,55 @@ for _, dock in docks do
 	check(`{dock.id}: clear of the zip lines' ladders`, ladder >= tuning.Clear, ladder)
 end
 
--- Spread out, and the one by the depot.
+-- Spread out (6.3: the spawn's rack aside, in the safe zone), and the one by the depot.
 local closest = math.huge
 for n, a in docks do
 	for m, b in docks do
-		if n < m then
+		if n < m and not a.spawn and not b.spawn then
 			closest = math.min(closest, math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2))
 		end
 	end
 end
 check("no two docks within Spacing", closest >= tuning.Spacing, closest)
-check("one dock by the depot", depot == 1 and docks[1].depot)
-local byDepot = docks[1]
+check("one dock by the depot, the first on the kerbs", depot == 1 and docks[2].depot)
+local byDepot = docks[2]
 local outside = math.max(math.abs(byDepot.x), math.abs(byDepot.z)) - Config.City.SafeHalf
 print(string.format("  by the depot: %s, %.0f studs out of the safe zone", byDepot.name, outside))
 check("the depot's dock just outside the safe zone", outside > 0 and outside < 40, outside)
+
+-- 6.3: the rack at the spawn: the first dock, the only one in the safe zone, in the depot's yard within 30 studs of
+-- the spawn (server/World.luau's DepotSpawn: 0, 26, a 10 × 10 pad) and more than 8 clear of the pad, behind it (the
+-- shed, the job board and Marge are in front), its scooters side by side facing the yard's open south edge.
+do
+	local rack = docks[1]
+	local spec = tuning.SpawnRack
+	check("one spawn rack, the first dock", spawns == 1 and rack.spawn and not rack.depot and rack.id == "dock1")
+	check("the spawn rack holds its scooters", #rack.slots == spec.slots and spec.slots >= 4, #rack.slots)
+	local spawnX, spawnZ, pad = 0, 26, 5
+	local farthest, padGap, offBlock = 0, math.huge, false
+	local d, i, j = Map.blockAt(rack.x, rack.z)
+	check("the spawn rack stands on the depot's block", d ~= nil and Map.special(d.id, i, j) == "depot")
+	for n, slot in rack.slots do
+		farthest = math.max(farthest, math.sqrt((slot.x - spawnX) ^ 2 + (slot.z - spawnZ) ^ 2))
+		-- (the scooter's body: a stud and a half each side, 2.5 ahead and behind)
+		local gapX = math.max(0, math.abs(slot.x - spawnX) - pad - 1.5)
+		local gapZ = math.max(0, math.abs(slot.z - spawnZ) - pad - 2.5)
+		padGap = math.min(padGap, math.sqrt(gapX * gapX + gapZ * gapZ))
+		offBlock = offBlock or math.abs(slot.x) > half - 6 or math.abs(slot.z) > half - 6 or Map.onRoad(slot.x, slot.z)
+		check(`spawn rack slot {n}: in the safe zone`, Map.isSafe(slot.x, slot.z))
+		check(`spawn rack slot {n}: behind the spawn pad, out of the shed's way`, slot.z > spawnZ + pad and slot.z > -9 + 20)
+		if n > 1 then
+			local prev = rack.slots[n - 1]
+			check(`spawn rack slot {n}: side by side with the one before`, math.abs(slot.x - prev.x - spec.pitch) < 1e-6 and slot.z == prev.z)
+		end
+	end
+	check("the spawn rack within 30 studs of the spawn", farthest <= 30, farthest)
+	check("the spawn rack clear of the spawn pad", padGap > 8, padGap)
+	check("the spawn rack in the yard, off the road", not offBlock)
+	check("the spawn rack faces the yard's open edge", rack.nx == 0 and rack.nz == 1 and rack.tx == 1 and rack.tz == 0)
+	local near, far = RentalDocks.nearest(spawnX, spawnZ)
+	check("the nearest dock to the spawn is its rack", near == rack and far < 30, far)
+end
 
 -- The nearest dock.
 local dock, far = RentalDocks.nearest(docks[3].x + 1, docks[3].z)

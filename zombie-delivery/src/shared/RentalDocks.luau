@@ -11,6 +11,9 @@
 -- spots, the employers' boards, the addresses, the bus stops, the gas stations, the places, the alley shortcuts' mouths,
 -- the zip lines' ladders, the safe zone) and no other dock is within Spacing. The first one is the clear candidate nearest the depot (just
 -- outside the safe zone); then at most DowntownDocks Downtown and the rest in the Suburbs, Docks in all.
+-- 6.3: before them all, dock1 is the rack at the spawn (Config.Rental.SpawnRack): a fixed row in the depot's yard, the
+-- scooters side by side facing out of it (nx, nz) rather than nose to tail along a kerb, the one dock in the safe zone
+-- (no spacing to the others, it is not one of the Docks).
 --
 --   RentalDocks.docks()            every dock (cached)
 --   RentalDocks.dock(id)           one by its id ("dock3"), or nil
@@ -41,6 +44,7 @@ export type Dock = {
 	length: number, -- along the kerb
 	slots: { Slot },
 	depot: boolean, -- the one by the depot
+	spawn: boolean, -- 6.3: the rack at the spawn (its scooters side by side, facing nx, nz; tx, tz along the row)
 }
 
 local BLOCK = Map.BlockSize
@@ -190,6 +194,35 @@ local function candidate(d: Map.District, i: number, j: number, nx: number, nz: 
 		length = length,
 		slots = slots,
 		depot = false,
+		spawn = false,
+	}
+end
+
+-- 6.3: the rack at the spawn (Config.Rental.SpawnRack), its slots along X round its middle, facing +Z (south, the
+-- yard's open edge and the street).
+local function spawnRack(): Dock
+	local rack = Config.Rental.SpawnRack
+	local slots: { Slot } = {}
+	for n = 1, rack.slots do
+		table.insert(slots, { x = rack.x + (n - (rack.slots + 1) / 2) * rack.pitch, z = rack.z })
+	end
+	local d, i, j = Map.blockAt(rack.x, rack.z)
+	return {
+		id = "",
+		name = rack.name,
+		district = if d then d.id else "downtown",
+		i = i,
+		j = j,
+		x = rack.x,
+		z = rack.z,
+		nx = 0,
+		nz = 1,
+		tx = 1,
+		tz = 0,
+		length = rack.slots * rack.pitch,
+		slots = slots,
+		depot = false,
+		spawn = true,
 	}
 end
 
@@ -274,6 +307,11 @@ function RentalDocks.docks(): { Dock }
 		if c ~= first then
 			take(c.dock)
 		end
+	end
+	-- 6.3: the spawn's rack goes first (the docks are numbered again).
+	table.insert(list, 1, spawnRack())
+	for n, dock in list do
+		dock.id = `dock{n}`
 	end
 	cache = list
 	return list

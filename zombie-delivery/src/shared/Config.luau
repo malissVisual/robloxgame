@@ -1568,7 +1568,8 @@ Config.Traffic = {
 -- 5.5, the city buses (shared/BusLines.luau, server/Buses.luau, server/BusStops.luau, client/BusRide.luau): free
 -- rides on three loops, driven by one timetable from the server's clock (every client works out the same bus).
 -- A line is a closed loop of road-centre corners (Map's grid; -Z is north), driven clockwise on the right-hand lane;
--- its stops are worked out along it (every ~2 blocks at the kerb, never on a special block's side or by a door).
+-- its stops are worked out along it (every ~2 blocks at the kerb, never on a special block's side or by a door; 6.3:
+-- express, every ~4 blocks and at the key places).
 export type BusLineDef = {
 	id: number,
 	name: string, -- "Downtown Ring"
@@ -1578,27 +1579,34 @@ export type BusLineDef = {
 	corners: { { number } },
 }
 Config.Bus = {
-	Speed = 40, -- studs/s on a straight
-	TurnSpeed = 16, -- through a corner (straight over a junction: Speed)
-	Approach = 20, -- studs before and after a corner at the speed between the two
-	Ramp = 1.6, -- seconds from a stop to full speed (and from full speed into a stop)
+	-- 6.3, express lines: fewer stops, farther apart and at the key places, and quicker buses (the bus is for when
+	-- it is too far to walk). The corner speed, the approach and the ramp grew with the speed (the curves stay smooth).
+	Speed = 55, -- studs/s on a straight (5.5: 40)
+	TurnSpeed = 20, -- through a corner (straight over a junction: Speed)
+	Approach = 30, -- studs before and after a corner at the speed between the two
+	Ramp = 2.0, -- seconds from a stop to full speed (and from full speed into a stop)
 	Dwell = 4, -- seconds at every stop, the door open
-	StopGap = 250, -- along the loop, a stop at least this far after the one before (about 2 blocks)
+	StopGap = 560, -- along the loop, a stop at least this far after the one before (about 4 blocks; 5.5: 250)
+	PickWindow = 200, -- … and within this much more the lane nearest the key places is taken (shared/BusLines.luau)
+	LastGap = 420, -- the last stop round the loop at least this far before the first
+	KeyReach = 230, -- a key place (Map.Landmarks, the districts' middles) draws the stops within this of it
+	NameReach = 140, -- a stop within this of a key place is named after it ("City Clinic"), else after its street
 	StopClear = 18, -- no stop by the kerb within this of a door, a pile, a park, a place or an employer's board
 	MaxWait = 25, -- the longest wait at a stop (the tests hold every line to it)
 	BodyColor = { 226, 228, 222 }, -- the buses' paint; the line's colour is the stripe and the sign
 	Reach = 10, -- the Board prompt's reach at the door
 	NearStop = 25, -- the arrivals card shows within this of a stop
-	HintDistance = 350, -- a foot or bike job's stop farther than this: the HUD may suggest a bus
+	HintDistance = 500, -- a foot or bike job's stop farther than this: the HUD may suggest a bus (6.3: long trips only)
 	RouteReach = 420, -- a route walks at most this far (manhattan) to the first stop and from the last
 	RouteSaving = 10, -- seconds the bus must save over walking to be suggested
+	MapBoardReach = 60, -- 6.3: the map board of the nearest stop within this is drawn (client/BusMapBoard.luau)
 	Lines = {
 		{
 			id = 1,
 			name = "Downtown Ring",
 			short = "RING",
 			color = { 205, 45, 45 },
-			buses = 8,
+			buses = 6, -- (6.3: 8; the express loop is quicker, a bus still every ~19 s)
 			corners = { { -504, -504 }, { 504, -504 }, { 504, 504 }, { -504, 504 } },
 		},
 		{
@@ -1606,7 +1614,7 @@ Config.Bus = {
 			name = "Downtown Cross",
 			short = "CROSS",
 			color = { 235, 180, 30 },
-			buses = 7,
+			buses = 5, -- (6.3: 7)
 			corners = {
 				{ -72, -360 }, { 72, -360 }, { 72, -72 }, { 360, -72 }, { 360, 72 }, { 72, 72 },
 				{ 72, 360 }, { -72, 360 }, { -72, 72 }, { -360, 72 }, { -360, -72 }, { -72, -72 },
@@ -1617,7 +1625,7 @@ Config.Bus = {
 			name = "Suburbs Link",
 			short = "SUBURBS",
 			color = { 50, 120, 220 },
-			buses = 6,
+			buses = 4, -- (6.3: 6)
 			corners = { { -216, 216 }, { 216, 216 }, { 216, 1116 }, { -216, 1116 } },
 		},
 	} :: { BusLineDef },
@@ -1629,7 +1637,8 @@ Config.Bus = {
 Config.Rental = {
 	CarId = "escooter", -- the Config.Cars bike a rental is
 	Price = 0, -- free (the money check stays for later)
-	Docks = 20, -- about this many docks (one of them just outside the safe zone by the depot)
+	Docks = 20, -- about this many docks on the kerbs (one of them just outside the safe zone by the depot; 6.3: and the
+	-- spawn's rack, SpawnRack, on top)
 	DowntownDocks = 14, -- of those, at most this many Downtown (the rest in the Suburbs)
 	Spacing = 210, -- no two docks closer than this (studs)
 	Slots = { 2, 3 }, -- scooters in a dock (the dock's dice pick one)
@@ -1652,6 +1661,11 @@ Config.Rental = {
 	MaxSpeed = 26,
 	Accel = 36, -- 6.0: quick off the line like the bought one (42), the cap above keeps it slow at the top
 	Room = 1,
+	-- 6.3, the rack at the spawn: a row of scooters side by side in the depot's yard, behind the spawn pad (the walk
+	-- to Marge and the job board in front of it stays free), their noses toward the yard's open south edge and the
+	-- street. It is the first dock (shared/RentalDocks.luau), the only one in the safe zone; renting and returning work
+	-- as at any dock. x, z: the row's middle; along X.
+	SpawnRack = { x = 0, z = 44, slots = 6, pitch = 3.4, name = "Depot Yard" },
 }
 
 -- 5.6, zip lines between Downtown's rooftops (shared/ZipLines.luau picks them, server/ZipLines.luau builds them and
