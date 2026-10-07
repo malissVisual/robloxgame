@@ -158,8 +158,9 @@ CameraRig.windowOpen = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
 		or CareerUi.isOpen() or CareerUi.cardOpen()
 end
+-- 6.0.1: not while an app is open in the phone's popup (the mouse is needed there).
 CameraRig.freeLook = function(): boolean
-	return Phone.isOpen() and not CameraRig.windowOpen()
+	return Phone.isOpen() and not Phone.appOpen() and not CameraRig.windowOpen()
 end
 LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while a window is open
 

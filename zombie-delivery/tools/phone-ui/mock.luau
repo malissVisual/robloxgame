@@ -92,7 +92,9 @@ local storage = { Shared=setmetatable({}, {__index=function(_,key) return "./"..
 function storage:WaitForChild() return self.Shared end
 local input={InputBegan=signal()}
 function input:GetFocusedTextBox() return nil end
-M.services={Players={LocalPlayer=M.player},ReplicatedStorage=storage,GuiService={ReducedMotionEnabled=true},Lighting={ClockTime=21.133},UserInputService=input,TextService={}}
+-- 6.0.1: Lighting is an instance (the popup's BlurEffect goes in it); GuiService has the Roblox menu's signal.
+M.lighting=M.make("Lighting",{ClockTime=21.133})
+M.services={Players={LocalPlayer=M.player},ReplicatedStorage=storage,GuiService={ReducedMotionEnabled=true,MenuOpened=signal()},Lighting=M.lighting,UserInputService=input,TextService={}}
 function M.services.TextService:GetTextSize(value,size) return M.Vector2.new(#value*size*.55,size) end
 M.services.TweenService={Create=function(_,target,_,props)
 	local tween={Completed=signal()}
@@ -127,8 +129,8 @@ M.Net={get=function(name)
 	end
 	return M.remotes[name]
 end}
-M.Theme={Font=M.Enum.Font.Gotham,HeadingFont=M.Enum.Font.GothamBold,DisplayFont=M.Enum.Font.GothamBold,Contract={}}
-for key,value in {text={242,242,240},secondary={196,199,203},charcoal={20,23,28},line={133,139,147},red={215,74,70},row={26,30,36},raised={32,36,42},good={180,200,180},warn={200,180,100}} do
+M.Theme={Font=M.Enum.Font.Gotham,HeadingFont=M.Enum.Font.GothamBold,DisplayFont=M.Enum.Font.GothamBold,Contract={},WindowTransparency=0.02}
+for key,value in {text={242,242,240},secondary={196,199,203},charcoal={20,23,28},line={133,139,147},red={215,74,70},row={26,30,36},raised={32,36,42},good={180,200,180},warn={200,180,100},rule={82,87,93}} do
 	M.Theme.Contract[key]=M.Color3.fromRGB(unpack(value))
 end
 M.Ui={make=M.make}
@@ -145,6 +147,24 @@ function M.Ui.screenScale() return 1 end
 function M.Ui.touchLayout() return M.touch end
 function M.Ui.gamepadFocus(target) M.focus=target end
 function M.Ui.gamepadRelease() M.focus=nil end
+-- 6.0.1, the popup's header (Ui.window's language): the glyph through the real PhoneContract, the title in caps, the ✕.
+function M.Ui.glyph(slot,id,size)
+	for _,child in slot:GetChildren() do if child:IsA("GuiObject") then child:Destroy() end end
+	slot:SetAttribute("Glyph",id)
+	if id~="" then require("./PhoneContract").glyph(slot,id,size or 24) end
+end
+function M.Ui.heading(parent,title,options)
+	local frame=M.make("Frame",{Name="Heading"},parent)
+	M.make("Frame",{Name="Brand"},frame)
+	local slot=M.make("Frame",{Name="Glyph",Size=M.UDim2.fromOffset(24,24)},frame)
+	M.Ui.glyph(slot,options and options.glyph or "",24)
+	local label=M.Ui.label(frame,string.upper(title),M.UDim2.new(1,0,1,0),{Name="Title"})
+	return {frame=frame,glyph=slot,title=label}
+end
+function M.Ui.closeButton(parent,fn)
+	local made=M.make("TextButton",{Name="Close",Text="✕",Size=M.UDim2.fromOffset(40,40)},parent)
+	made.Activated:Connect(fn);return made
+end
 function M.Ui.money(value) return "$"..tostring(value) end
 function M.Ui.clock(value) return string.format("%02d:%02d",math.floor(value/60),math.floor(value%60)) end
 M.P={text=M.Ui.label,caps=M.Ui.label,hover=function() end,hex=function() return "ffffff" end}

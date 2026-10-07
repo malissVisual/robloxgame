@@ -1,12 +1,12 @@
 --!strict
 -- 5.5: the courier phone's motion (client/Phone.luau), in the approved look (design/phone-ui/): no new surfaces.
---   * turn(body, scaler, from, to, position, scale, done): the phone turns sideways for a big app (BOARD, CAREER,
---     SHOP, BAG) or back upright: its Rotation, its place and its scale in one 0.28 s tween, then `done` (Phone builds
---     the body again in the new shape). Under reduced motion: no tween, `done` at once.
---   * banner(screen, top, from, text, onTap): a new message or a new board drops from the top of the open phone for
---     2.5 s, drawn like the home screen's message row (a charcoal row, a fine line, the sender in caps, the text in
---     the secondary colour); a tap opens it. A newer banner replaces the last one. 5.7: the phone buzzes with it
---     (PhoneMotion.onBanner, client/Sounds.luau).
+--   * banner(screen, top, from, text, onTap): a new message or a new board drops from the top of the open phone (6.0.1:
+--     or of the open app's popup, client/PhonePopup.luau) for 2.5 s, drawn like the home screen's message row (a
+--     charcoal row, a fine line, the sender in caps, the text in the secondary colour; at most 440 px wide); a tap
+--     opens it. A newer banner replaces the last one. 5.7: the phone buzzes with it (PhoneMotion.onBanner,
+--     client/Sounds.luau).
+--   * reducedMotion(): the player's Reduced Motion setting (the phone, its popup, client/Juice.luau).
+-- 6.0.1: the phone no longer turns sideways for a big app (5.5's `turn` is gone): every app opens in the popup.
 -- Presentation only.
 
 local GuiService = game:GetService("GuiService")
@@ -19,7 +19,6 @@ local P = require(script.Parent.HudContract)
 local K = Theme.Contract
 local PhoneMotion = {}
 
-local TURN = TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 local DROP = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 local banner: any = nil
@@ -47,21 +46,6 @@ local function play(target: Instance, info: TweenInfo, goal: { [string]: any }, 
 	tween:Play()
 end
 
--- Turns the body (AnchorPoint 0.5, 0.5) from `from` to `to` degrees while it moves to `position` and its UIScale goes
--- to `scale`, then `done`.
-function PhoneMotion.turn(body: GuiObject, scaler: UIScale, from: number, to: number, position: UDim2, scale: number, done: () -> ())
-	body.Rotation = from
-	if PhoneMotion.reducedMotion() then
-		body.Rotation = to
-		body.Position = position
-		scaler.Scale = scale
-		done()
-		return
-	end
-	play(scaler, TURN, { Scale = scale })
-	play(body, TURN, { Rotation = to, Position = position }, done)
-end
-
 -- The notification banner under the status bar (`top` px down the screen).
 function PhoneMotion.banner(screen: Instance, top: number, from: string, text: string, onTap: () -> ())
 	if banner then
@@ -82,6 +66,7 @@ function PhoneMotion.banner(screen: Instance, top: number, from: string, text: s
 		ZIndex = 30,
 	}, screen)
 	banner = made
+	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(440, math.huge) }, made) -- (6.0.1: a slim row in a wide popup)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.6 }, made)
 	-- (the accent sits outside the list: the rows go in an inner frame, like Phone's cards)
 	Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 31 }, made)

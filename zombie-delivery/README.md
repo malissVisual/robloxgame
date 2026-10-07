@@ -1227,8 +1227,9 @@ flat ("DELIVER to Jana Nováková, Apt 4C, 40 6th Ave"), and the one who opens t
 **The courier phone** (Codex's approved ZDC design, `design/phone-ui/`; `client/Phone.luau`, `PhoneContract`,
 `PhoneLayout`, `PhoneRoute`, `PhoneApps`, `PhoneMotion`): square charcoal apps with white glyphs, the live contract on the
 home screen, the route on the order's map. The MENU lives in the phone now (Missions, Crew, Top, Estate, Bag, Garage,
-Settings with every key, Bank), and once you have the phone MENU opens it. **BOARD, CAREER, SHOP and BAG turn the
-phone sideways**; the board in the phone takes jobs (ACCEPT / + ADD ORDER, FULL BOARD for the big one). Banners drop
+Settings with every key, Bank), and once you have the phone MENU opens it. **6.0.1: every app opens in a centred
+popup** over the game (`PhonePopup`: a dimmed, lightly blurred backdrop, the ZDC header, two columns for BOARD, CAREER
+and SHOP; ✕, a tap beside it, Q, ESC or B return to the phone, which never turns sideways); the board in the phone takes jobs (ACCEPT / + ADD ORDER, FULL BOARD for the big one). Banners drop
 for new messages and new jobs. GIVE UP is in ORDERS (press twice).
 
 ## Deliveries from real shops to real doors, the bag, newspaper rounds, fuel, the new phone (5.3, 5.4)

@@ -13,6 +13,12 @@ end
 local function named(name) return all(M.gui,function(object) return object.Name==name end)[1] end
 local function text(value) return all(M.gui,function(object) return object.Text==value end)[1] end
 local function tap(value) local target=text(value);assert(target,value);target.Activated:Fire() end
+-- 6.0.1: the apps open in a centred popup; the phone never turns.
+local function popup() return named("AppPopup") end
+local function showing(id) local panel=popup();local glyph=panel and named("Glyph");return panel~=nil and glyph~=nil and glyph:GetAttribute("Glyph")==id end
+local function upright() local body=named("Phone");return body.Size.X.Offset==340 and (body.Rotation or 0)==0 end
+local function blur() return M.lighting:FindFirstChild("PhoneAppBlur") end
+local function key(code) M.services.UserInputService.InputBegan:Fire({KeyCode=code},false) end
 local boards=0
 Phone.onBoard=function() boards+=1;Phone.close() end
 Phone.start()
@@ -32,14 +38,14 @@ do
 end
 check("no job has honest empty contract",text("READY FOR YOUR NEXT RUN")~=nil)
 named("HomeContract").Activated:Fire()
--- 5.5: the board is in the phone now (sideways); FULL BOARD opens the Dispatch board.
-check("empty contract opens the phone's board",Phone.isOpen() and named("App").Visible and text("Calling the dispatcher...")~=nil)
+-- 5.5: the board is in the phone; 6.0.1: in its centred popup. FULL BOARD opens the Dispatch board.
+check("empty contract opens the board in the popup",Phone.isOpen() and showing("board") and text("JOB BOARD")~=nil and text("Calling the dispatcher...")~=nil)
 check("the board asks the server for offers",M.sent[#M.sent].name=="RequestOffers")
-check("the board turns the phone sideways",named("Phone").Size.X.Offset==680)
+check("the phone stays upright under the popup",upright() and named("Home").Visible and blur()~=nil and Phone.appOpen())
 tap("FULL BOARD  [J]")
-check("FULL BOARD opens the real board",boards==1 and not Phone.isOpen())
+check("FULL BOARD opens the real board, the popup and its blur go",boards==1 and not Phone.isOpen() and popup()==nil and blur()==nil)
 Phone.open()
-check("home stands upright again",named("Phone").Size.X.Offset==340)
+check("home stands upright, no popup",upright() and popup()==nil and not Phone.appOpen())
 local payload={stopLabel="Harbor warehouse",customer="Earl",cargo="Parcels",total=2,pay=180,endsAt=376,timeLimit=400,position=M.Vector3.new(150,0,100),mode="foot",stopCount=2,stopIndex=2,orders={{id=1,state="open",focused=true,pay=180,endsAt=376,stops={{label="ZDC DEPOT",kind="pickup",done=true},{label="HARBOR WAREHOUSE",kind="drop",current=true}}},{id=2,state="open",title="Medicine",pay=80,stops={{label="Clinic",current=true}}}}}
 M.remotes.Job.OnClientEvent:Fire(payload)
 check("home reflects incoming order",text("HARBOR WAREHOUSE")~=nil and text("$180")~=nil)
@@ -66,13 +72,14 @@ pin.Parent.Activated:Fire()
 check("pin uses existing remote",M.sent[#M.sent].name=="PinOrder")
 tap("SHOW ROUTE")
 check("route opens existing full map and puts phone away",M.mapOpen and not Phone.isOpen())
+check("the closed phone leaves no popup",popup()==nil and blur()==nil)
 Phone.open("orders");tap("BAG · EMPTY")
-check("bag opens in the phone, sideways",(M.bagRendered or 0)>0 and Phone.isOpen() and named("Phone").Size.X.Offset==680 and named("BagRows")~=nil)
-tap("HOME")
-check("home turns the phone back upright",named("Phone").Size.X.Offset==340 and named("Home").Visible)
+check("bag opens in the same popup",(M.bagRendered or 0)>0 and Phone.isOpen() and showing("bag") and #all(M.gui,function(object) return object.Name=="AppPopup" end)==1 and named("BagRows")~=nil and upright())
+named("Close").Activated:Fire()
+check("the ✕ returns to the phone's home",popup()==nil and blur()==nil and Phone.isOpen() and named("Home").Visible and upright())
 for _,app in {"career","shop","messages"} do
 	Phone.open(app)
-	check(`{app} still renders`,#M.warnings==0 and named("App").Visible)
+	check(`{app} still renders`,#M.warnings==0 and showing(app))
 end
 Phone.open("bank")
 check("balance uses current money",text("$1240")~=nil)
@@ -81,8 +88,12 @@ check("balance updates with server state",text("$1450")~=nil)
 Phone.open("settings")
 tap("CYCLE SOUND MODE")
 check("settings uses existing sound cycle",M.soundCycles==1)
-tap("HOME")
-check("home returns gamepad focus to launcher",M.focus==named("ordersApp"))
+check("gamepad focus moves into the popup",M.focus==text("CYCLE SOUND MODE"))
+named("Backdrop").Activated:Fire()
+check("a tap on the backdrop returns home",popup()==nil and Phone.isOpen() and named("Home").Visible)
+named("settingsApp").Activated:Fire()
+named("Close").Activated:Fire()
+check("home returns gamepad focus to the tapped tile",M.focus==named("settingsApp"))
 Phone.open("orders");M.flush()
 M.remotes.Job.OnClientEvent:Fire(nil)
 check("nil job switches to empty state",text("No active orders")~=nil)
@@ -114,12 +125,12 @@ local offers={
 	{index=15,mode="car",cargo="Tyres",customer="Eve",first="Garage",address="Yard",distance=500,time=300,pay=200,stars=2,tierName="Risky",tooBig=true,slots=6,lockButton="📦 NEEDS 6 SLOTS",lockText="Your van holds 4."},
 }
 M.remotes.Offers.OnClientEvent:Fire(offers,M.now+120,{footNote="Two shops near you are shut."})
-check("a new board drops a banner on the open phone",named("Banner")~=nil)
+check("a new board drops a banner on the open phone",named("Banner")~=nil and named("Banner").Parent==named("Screen"))
 named("Banner").Activated:Fire()
-check("the banner opens the board, sideways",named("App").Visible and named("Phone").Size.X.Offset==680)
+check("the banner opens the board in the popup",showing("board") and upright())
 check("board sections: on foot, bike, each danger level",text("On foot · 1")~=nil and text("Bike · 1")~=nil and text("★★ Risky · 2")~=nil and text("★★★ Deadly · 1")~=nil)
 check("the footNote heads ON FOOT",text("Two shops near you are shut.")~=nil)
-check("sideways: two columns of cards",named("Columns")~=nil and named("Left")~=nil and named("Right")~=nil)
+check("a wide popup: two columns of cards",named("Columns")~=nil and named("Left")~=nil and named("Right")~=nil)
 check("a card: the cargo → the customer, the pickup, the pay",text("LETTERS → ANN")~=nil and text("Post office → 12 Elm St, Old Town")~=nil and text("$40")~=nil)
 tap("🔒 LEVEL 7")
 check("a locked offer says why",string.find(toasts[#toasts] or "","level 7",1,true)~=nil and lastSent("AcceptJob")==nil)
@@ -127,7 +138,7 @@ tap("📦 NEEDS 6 SLOTS")
 check("a too-big offer says why",toasts[#toasts]=="Your van holds 4.")
 tap("ACCEPT")
 check("ACCEPT fires AcceptJob with the offer's index",lastSent("AcceptJob").args[1]==11)
-check("after ACCEPT the phone shows ORDERS upright",named("Phone").Size.X.Offset==340 and named("App").Visible)
+check("after ACCEPT the popup shows ORDERS",showing("orders") and text("ORDERS")~=nil and upright())
 -- A run that takes more orders: + ADD ORDER keeps the board open.
 local run={cargo="Letters",customer="Ann",total=1,pay=40,endsAt=M.now+100,timeLimit=200,position=M.Vector3.new(10,0,10),mode="foot",stack={can=true}}
 M.remotes.Job.OnClientEvent:Fire(run)
@@ -136,7 +147,7 @@ check("an accepted offer leaves the phone's board",offers[1].index==12)
 M.remotes.Offers.OnClientEvent:Fire(offers,M.now+240,{})
 Phone.open("board")
 tap("+ ADD ORDER")
-check("+ ADD ORDER fires AcceptJob and stays on the board",lastSent("AcceptJob").args[1]==12 and named("Phone").Size.X.Offset==680 and Phone.isOpen())
+check("+ ADD ORDER fires AcceptJob and stays on the board",lastSent("AcceptJob").args[1]==12 and showing("board") and Phone.isOpen())
 -- GIVE UP: two presses within 4 s.
 Phone.open("orders")
 local cancels=0
@@ -151,10 +162,10 @@ M.remotes.Job.OnClientEvent:Fire({cargo="Gold",customer="Dee",total=1,pay=900,en
 Phone.open("board")
 check("on a delivery the board points to ORDERS",text("You are on a delivery")~=nil and text("OPEN ORDERS")~=nil)
 M.remotes.Job.OnClientEvent:Fire(nil)
--- CAREER and SHOP: sideways, two columns.
+-- CAREER and SHOP: two columns in the wide popup, the phone upright.
 for _,id in {"career","shop"} do
 	Phone.open(id)
-	check(`{id} turns the phone sideways in two columns`,named("Phone").Size.X.Offset==680 and named("Columns")~=nil and #M.warnings==0)
+	check(`{id} opens in the popup in two columns`,showing(id) and upright() and named("Columns")~=nil and #M.warnings==0)
 end
 -- GARAGE: BRING MY CAR, MY BIKE, CALL CAR.
 local bike,car
@@ -164,7 +175,7 @@ for _,def in Config.Cars do
 end
 Phone.setState({phone=true,money=1600,kit={},cars={[bike]=true,[car]=true}})
 Phone.open("garage")
-check("garage stays upright",named("Phone").Size.X.Offset==340)
+check("garage opens in the popup",showing("garage") and upright())
 tap("BRING MY CAR")
 check("BRING MY CAR fires SpawnCar and puts the phone away",lastSent("SpawnCar")~=nil and not Phone.isOpen())
 Phone.open("garage");tap("🚲 MY BIKE")
@@ -193,24 +204,63 @@ check("bank shows what you earned since you joined",text("+$360")~=nil)
 -- A new message drops a banner while another app shows; it opens MESSAGES.
 Phone.open("bank")
 M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Earl has a van for you."})
-check("a new message drops a banner",named("Banner")~=nil)
+check("a new message drops a banner in the open popup",named("Banner")~=nil and named("Banner").Parent==popup())
 named("Banner").Activated:Fire()
-check("the message banner opens MESSAGES",named("App").Visible and text("MESSAGES")~=nil)
--- The turn with motion (reduced motion off): the body turns and lands at rest, Rotation 0.
+check("the message banner opens MESSAGES",showing("messages") and text("MESSAGES")~=nil)
+-- 6.0.1: every app opens in the popup and closes back to home; the phone never turns.
+for _,id in {"orders","board","career","shop","messages","bank","settings","bag","garage"} do
+	Phone.close();Phone.open()
+	named(`{id}App`).Activated:Fire()
+	check(`{id} opens in the centred popup`,showing(id) and upright() and blur()~=nil and named("Heading")~=nil and named("Glyph"):FindFirstChild("NativeGlyph")~=nil and #M.warnings==0)
+	named("Close").Activated:Fire()
+	check(`{id} closes back to the phone's home`,popup()==nil and blur()==nil and Phone.isOpen() and named("Home").Visible and upright())
+end
+-- The popup with motion (reduced motion off): it lands centred at full scale, dim and blurred; back on close.
 M.services.GuiService.ReducedMotionEnabled=false
-Phone.open()
+Phone.close();Phone.open()
 named("boardApp").Activated:Fire()
-check("the animated turn lands sideways at rest",named("Phone").Size.X.Offset==680 and named("Phone").Rotation==0 and named("Phone").AnchorPoint.Y==1)
-tap("HOME")
-check("the animated turn back lands upright at rest",named("Phone").Size.X.Offset==340 and named("Phone").Rotation==0 and named("Home").Visible)
+local panel=popup()
+check("the animated popup lands in the centre",panel.Position.X.Scale==.5 and panel.Position.Y.Scale==.5 and panel.Position.X.Offset==0 and panel:FindFirstChildOfClass("UIScale").Scale==1)
+check("the backdrop dims and the blur is low",named("Backdrop").BackgroundTransparency==.45 and blur().Size==8 and named("Veil").Visible==false)
+check("the desktop popup is 760 x 520",panel.Size.X.Offset==760 and panel.Size.Y.Offset==520)
+check("the phone did not turn",upright())
+-- Q / ESC / gamepad B close the popup first, then the phone.
+key(M.Enum.KeyCode.Q)
+check("Q closes the popup first",popup()==nil and blur()==nil and Phone.isOpen())
+key(M.Enum.KeyCode.Q)
+check("Q again puts the phone away",not Phone.isOpen())
 M.services.GuiService.ReducedMotionEnabled=true
+Phone.open("shop")
+key(M.Enum.KeyCode.Escape)
+check("ESC closes the popup first",popup()==nil and Phone.isOpen())
+key(M.Enum.KeyCode.Escape)
+check("ESC again puts the phone away",not Phone.isOpen())
+Phone.open("bank")
+key(M.Enum.KeyCode.ButtonB)
+check("gamepad B closes the popup first",popup()==nil and Phone.isOpen())
+key(M.Enum.KeyCode.ButtonB)
+check("gamepad B again puts the phone away",not Phone.isOpen())
+Phone.open("orders")
+M.services.GuiService.MenuOpened:Fire()
+key(M.Enum.KeyCode.Escape)
+check("the Roblox menu closes the popup; its ESC leaves the phone open",popup()==nil and Phone.isOpen())
+Phone.close()
 check("no runtime warnings in the 5.5 apps",#M.warnings==0)
 for _,screen in {{320,448},{844,350},{1280,800}} do
 	Phone.close();M.width,M.height=screen[1],screen[2];M.touch=true
 	Phone.open()
 	check(`resize {M.width}x{M.height} opens`,Phone.isOpen() and #M.warnings==0)
 	check("home remains scrollable",named("Home").ClassName=="ScrollingFrame")
+	check("the phone stays upright",upright())
+	Phone.open("board")
+	local size=popup().Size
+	check(`the popup fits {M.width}x{M.height}`,size.X.Offset<=M.width*.92+.001 and size.Y.Offset<=M.height*.86+.001 and showing("board"))
+	check("two columns only in a wide popup",(named("Columns")~=nil)==(size.X.Offset>=600))
 end
+-- The screen turns while an app is open: the popup fits again and the columns follow.
+M.width,M.height=390,800
+M.workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Fire();M.flush()
+check("a resized popup fits the narrow screen in one column",popup().Size.X.Offset<=390*.92+.001 and named("Columns")==nil and upright() and #M.warnings==0)
 Phone.close()
 check("hold lifecycle clears phone",M.sent[#M.sent].name=="PhoneHold" and M.sent[#M.sent].args[1]==false)
 print("ALL CHECKS PASSED")

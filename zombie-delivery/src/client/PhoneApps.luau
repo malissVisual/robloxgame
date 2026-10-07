@@ -2,15 +2,16 @@
 -- 5.5: the courier phone's bigger apps and the HUD MENU's actions in the phone (client/Phone.luau draws ORDERS,
 -- CAREER, SHOP, MESSAGES, BANK and SETTINGS itself). Drawn with the phone's own approved kit (`look`, OrdersUi.Kit:
 -- square charcoal cards, thin rules, red main actions; design/phone-ui/) through a `Host` (what the phone knows and
--- does):
---   BOARD    the job board in the phone (the phone turns sideways for it): the offers the phone keeps from the
+-- does). 6.0.1: every app draws in the phone's centred popup (client/PhonePopup.luau); `wide` (a popup with room for
+-- two columns) splits the board's cards in two:
+--   BOARD    the job board in the phone: the offers the phone keeps from the
 --            Offers remote under ON FOOT / BIKE / one section per danger level (★ … ★★★★, the server's tierName), two
 --            columns of cards (the cargo → the customer, the pickup → the address, the distance, the time, the pay);
 --            ACCEPT and + ADD ORDER fire AcceptJob with the offer's index like the Dispatch board
 --            (client/DispatchUi.luau); a locked offer says why (its level, licence, slots or vehicle). The board's
 --            footNote (the shops near you are shut) heads ON FOOT. FULL BOARD opens the Dispatch board. No offers
 --            yet, or old ones: it asks for the board (RequestOffers, at most every 3 s).
---   BAG      your bag (client/BagUi.luau's render) in the phone (sideways).
+--   BAG      your bag (client/BagUi.luau's render) in the phone.
 --   GARAGE   BRING MY CAR (SpawnCar: the MENU's old CAR), 🚲 MY BIKE / 🚐 CALL CAR (the Equip remote) and ⛽ TOW while
 --            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
 --            line "ZDC RIDE · nearest dock N studs" (shared/RentalDocks.luau) with 📍 GPS (MapView.setWaypoint).
@@ -41,7 +42,6 @@ export type Host = {
 	state: () -> any,
 	-- the last offers the server sent (nil before any), their info (footNote ...), when the next ones come
 	board: () -> ({ any }?, any, number?),
-	sideways: () -> boolean,
 	go: (id: string) -> (),
 	close: () -> (),
 	redraw: () -> (),
@@ -52,7 +52,7 @@ export type Host = {
 
 local player = Players.LocalPlayer
 
--- Two columns in a list (sideways), each a vertical list of its own; upright both are the list itself.
+-- Two columns in a list (a wide popup), each a vertical list of its own; else both are the list itself.
 function PhoneApps.columns(list: Instance, order: number, two: boolean): (Instance, Instance)
 	if not two then
 		return list, list
@@ -188,7 +188,7 @@ local function offerCard(parent: Instance, offer: any, order: number, look: Orde
 	end
 end
 
-function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host)
+function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
 	local job = host.job()
 	if job and not stacking(job) then
 		look.emptyState(list, "📦", "You are on a delivery", "Finish it, or give it up in ORDERS, and the board is yours again.", 1)
@@ -238,7 +238,7 @@ function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host)
 	look.section(list, `{count} {if count == 1 then "job" else "jobs"} on the board{if fresh then ` · new ones in {Ui.clock(fresh)}` else ""}`, 1)
 	local order = 1
 	local footNote = if type(info) == "table" and type(info.footNote) == "string" then info.footNote else nil
-	local two = host.sideways()
+	local two = wide == true
 	local function group(title: string, items: { any }, note: string?)
 		order += 1
 		look.section(list, title, order)
