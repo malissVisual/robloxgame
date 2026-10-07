@@ -5,6 +5,9 @@
 -- 3.8 (the contract UI, design/ui-contract/): the card is a flat charcoal rectangle with a thin red rule, over a
 -- charcoal scrim that fades out to the right (the city stays the main view); PLAY is the main action (a red rule
 -- under it); the controls are a second card.
+-- 5.8 (the courier phone's look, design/phone-ui/): the card carries the ZDC mark (the red square, the wordmark, a
+-- thin rule, COURIER TERMINAL), PLAY is the phone's red primary action, the company line and the controls are slim
+-- hairline rows (no corners), and the controls card has the ZDC heading.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -98,6 +101,7 @@ function Menu.show(onPlay: () -> ())
 
 	local C = Theme.Colors
 	local P = Theme.Postage
+	local K = Theme.Contract
 	if Theme.Images.menuBackground ~= "" then
 		Ui.make("ImageLabel", {
 			Name = "MenuArtwork", Size = UDim2.fromScale(1, 1), Image = Theme.Images.menuBackground,
@@ -106,7 +110,7 @@ function Menu.show(onPlay: () -> ())
 	end
 	-- A localized charcoal scrim (opaque on the left, gone on the right) keeps the real-time city the focal point.
 	local veil = Ui.make("Frame", {
-		Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.lavender,
+		Size = UDim2.fromScale(1, 1), BackgroundColor3 = K.charcoal,
 		BackgroundTransparency = 0.45, BorderSizePixel = 0, Active = false, ZIndex = 2,
 	}, gui)
 	Ui.make("UIGradient", {
@@ -120,25 +124,32 @@ function Menu.show(onPlay: () -> ())
 		BackgroundTransparency = 1, ZIndex = 5,
 	}, gui)
 	local menuScale = Ui.make("UIScale", {}, center)
-	-- The shift card: a flat charcoal rectangle, a thin red rule down its left edge.
+	-- The shift card: a flat charcoal rectangle with the ZDC mark at its top (the phone's brand).
 	local face = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
-	face.BackgroundColor3 = P.lavender
+	face.BackgroundColor3 = K.charcoal
 	face.BackgroundTransparency = 0.06
 	local faceTicket = face.Parent
 	faceTicket.Name = "ShiftCard"
 	faceTicket.ZIndex = 5
+	local brand = Ui.brand(face, 24, { Position = UDim2.fromOffset(24, 16), ZIndex = 6 })
+	for _, part in brand:GetChildren() do
+		if part:IsA("GuiObject") then
+			part.ZIndex = 6
+		end
+	end
+	local brandEnd = 24 + brand.Size.X.Offset
 	Ui.make("Frame", {
-		Size = UDim2.new(0, 3, 1, -48), Position = UDim2.fromOffset(0, 24),
-		BackgroundColor3 = C.red, BorderSizePixel = 0, ZIndex = 6,
+		Name = "BrandRule", Size = UDim2.fromOffset(1, 20), Position = UDim2.fromOffset(brandEnd + 10, 22),
+		BackgroundColor3 = K.rule, BorderSizePixel = 0, ZIndex = 6,
 	}, face)
-	Ui.caps(face, "Dead End Dispatch   ·   delivery company", UDim2.fromOffset(510, 20), {
-		Position = UDim2.fromOffset(24, 22), TextSize = 14, ZIndex = 6,
+	Ui.caps(face, "Courier terminal   ·   Dead End Dispatch", UDim2.fromOffset(536 - (brandEnd + 22), 20), {
+		Position = UDim2.fromOffset(brandEnd + 22, 22), TextSize = 13, ZIndex = 6,
 	})
 	local topTitle = Ui.label(face, "ZOMBIE", UDim2.fromOffset(510, 76), {
 		Position = UDim2.fromOffset(24, 60), TextSize = 64, Font = Theme.DisplayFont, ZIndex = 6,
 	})
 	local bottomTitle = Ui.label(face, "DELIVERY", UDim2.fromOffset(510, 76), {
-		Position = UDim2.fromOffset(24, 128), TextSize = 64, TextColor3 = P.violet, Font = Theme.DisplayFont, ZIndex = 6,
+		Position = UDim2.fromOffset(24, 128), TextSize = 64, TextColor3 = K.text, Font = Theme.DisplayFont, ZIndex = 6,
 	})
 	if Theme.Images.logo ~= "" then
 		topTitle.Visible, bottomTitle.Visible = false, false
@@ -150,9 +161,12 @@ function Menu.show(onPlay: () -> ())
 	local tagline = Ui.label(face, "Deliver. Survive. Get paid.", UDim2.fromOffset(510, 30), {
 		Position = UDim2.fromOffset(24, 216), TextSize = 22, Font = Theme.Font, TextColor3 = C.dim, ZIndex = 6,
 	})
-	local company = Ui.panel(face, UDim2.fromOffset(512, 64), UDim2.fromOffset(24, 264))
-	company.BackgroundColor3 = P.lavender
-	company.ZIndex = 6
+	-- Your company: a slim hairline row.
+	local company = Ui.make("Frame", {
+		Size = UDim2.fromOffset(512, 64), Position = UDim2.fromOffset(24, 264),
+		BackgroundColor3 = K.row, BorderSizePixel = 0, ZIndex = 6,
+	}, face)
+	Ui.stroke(company, K.line, 1).Transparency = Ui.HAIRLINE
 	Ui.caps(company, "Your company", UDim2.fromOffset(488, 16), {
 		Position = UDim2.fromOffset(12, 10), ZIndex = 7,
 	})
@@ -160,21 +174,28 @@ function Menu.show(onPlay: () -> ())
 		Position = UDim2.fromOffset(12, 30), TextSize = 17, ZIndex = 7,
 	})
 	Menu.setState(lastState)
-	local play = Ui.button(face, "PLAY  /  START YOUR SHIFT", UDim2.fromOffset(512, 72), C.yellow, function() end)
+	-- PLAY: the phone's red primary action (Contract.red: a red face, white caps, square).
+	local play = Ui.button(face, "PLAY  /  START YOUR SHIFT", UDim2.fromOffset(512, 72), K.red, function() end)
 	play.Position = UDim2.fromOffset(24, 344)
 	play.TextSize = 23
 	play.ZIndex = 7
 
 	-- Controls live on a separate card so the start screen remains readable on phones.
 	local help = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
-	help.BackgroundColor3 = P.lavender
+	help.BackgroundColor3 = K.charcoal
 	help.BackgroundTransparency = 0.06
 	local helpTicket = help.Parent
 	helpTicket.Name = "ControlsCard"
 	helpTicket.ZIndex, helpTicket.Visible = 15, false
-	Ui.label(help, "Controls", UDim2.fromOffset(460, 38), {
-		Position = UDim2.fromOffset(24, 22), TextSize = 28, Font = Theme.DisplayFont, ZIndex = 16,
-	})
+	-- The ZDC heading: [■ ZDC] | [glyph] CONTROLS.
+	local helpHeading = Ui.heading(help, "Controls", { glyph = "settings", textSize = 22, height = 38 })
+	helpHeading.frame.Size = UDim2.fromOffset(380, 38)
+	helpHeading.frame.Position = UDim2.fromOffset(24, 25)
+	for _, part in helpHeading.frame:GetDescendants() do
+		if part:IsA("GuiObject") then
+			part.ZIndex = 16
+		end
+	end
 	local closeHelp = Ui.ghostButton(help, "‹  BACK", UDim2.fromOffset(116, 48), nil, function()
 		helpTicket.Visible, faceTicket.Visible = false, true
 	end)
@@ -197,11 +218,10 @@ function Menu.show(onPlay: () -> ())
 	for i, entry in controlsText do
 		local row = Ui.make("Frame", {
 			Size = UDim2.fromOffset(512, 40), Position = UDim2.fromOffset(24, 84 + (i - 1) * 42), -- 3.9: nine rows fit
-			BackgroundColor3 = P.lavender, BackgroundTransparency = if i % 2 == 0 then 1 else 0.2,
+			BackgroundColor3 = K.row, BackgroundTransparency = if i % 2 == 0 then 1 else 0,
 			BorderSizePixel = 0, ZIndex = 16,
 		}, help)
-		Ui.corner(row)
-		Ui.label(row, entry[1], UDim2.fromOffset(128, 40), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = P.violet, ZIndex = 17 })
+		Ui.label(row, entry[1], UDim2.fromOffset(128, 40), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = K.secondary, ZIndex = 17 })
 		Ui.label(row, entry[2], UDim2.fromOffset(366, 40), { Position = UDim2.fromOffset(140, 0), TextSize = 16, Font = Theme.Font, ZIndex = 17 })
 		table.insert(rows, row)
 	end
@@ -218,7 +238,6 @@ function Menu.show(onPlay: () -> ())
 		BackgroundTransparency = 0, BackgroundColor3 = P.pill, Text = `version {Config.Version}`,
 		TextSize = 14, Font = Theme.MonoFont, TextColor3 = C.dim, ZIndex = 6,
 	}, gui)
-	Ui.corner(version)
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, version)
 
 	local viewportConnection: RBXScriptConnection? = nil

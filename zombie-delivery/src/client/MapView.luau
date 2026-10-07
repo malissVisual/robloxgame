@@ -21,6 +21,8 @@
 -- neither the address you are at). The map itself is charcoal and greys (land, blocks, water, the streets lighter, the
 -- highways lightest), the job's route and its star in the contract red, the GPS's route and diamond in white, you a
 -- white arrow. The big map is a charcoal window with the same map.
+-- 5.8 (the courier phone's look): the big map's frame wears the window header: the ZDC mark, the map glyph and MAP
+-- (Ui.heading), the legend in small type after it, a thin line under it and the square ✕.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1255,24 +1257,37 @@ local function buildBig(gui: any)
 		ZIndex = 40,
 	}, gui)
 	bigScale = Ui.make("UIScale", {}, big)
-	-- 3.8: a charcoal window (square, a thin line), the legend in light text with the markers' colours.
+	-- 3.8: a charcoal window (square, a thin line). 5.8: the window header: [■ ZDC] | [map glyph] MAP, the legend in
+	-- small type with the markers' colours, a thin line under it, the square ✕.
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.45 }, big)
+	local heading = Ui.heading(big, "Map", { glyph = "map", textSize = 18, height = 36 })
+	heading.frame.Size = UDim2.fromOffset(170, 36)
+	heading.frame.Position = UDim2.fromOffset(12, 5)
+	for _, part in heading.frame:GetDescendants() do
+		if part:IsA("GuiObject") then
+			part.ZIndex = 41
+		end
+	end
+	heading.frame.ZIndex = 41
 	Ui.make("TextLabel", {
-		Size = UDim2.new(1, -60, 0, 36),
-		Position = UDim2.fromOffset(12, 6),
+		Name = "Legend",
+		Size = UDim2.new(1, -(190 + 60), 0, 36),
+		Position = UDim2.fromOffset(190, 5),
 		BackgroundTransparency = 1,
 		RichText = true,
-		Text = `MAP   <font size="12" color="{hex(P.ink2)}">▲ YOU   <font color="{hex(C.job)}">■━</font> DELIVERY   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="{hex(P.danger)}">!</font> BANDIT CAR   ? CRATE   <font color="{hex(C.fog)}">■</font> UNEXPLORED</font>`,
+		Text = `▲ YOU   <font color="{hex(C.job)}">■━</font> DELIVERY   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="{hex(P.danger)}">!</font> BANDIT CAR   ? CRATE   <font color="{hex(C.fog)}">■</font> UNEXPLORED`,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextSize = 18,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextSize = 12,
 		Font = Theme.HeadingFont,
-		TextColor3 = P.ink,
+		TextColor3 = P.ink2,
 		ZIndex = 41,
 	}, big)
+	Ui.make("Frame", { Name = "HeaderLine", Size = UDim2.new(1, -16, 0, 1), Position = UDim2.fromOffset(8, 45), BackgroundColor3 = K.rule, BorderSizePixel = 0, ZIndex = 41 }, big)
 	local close = Ui.closeButton(big, function()
 		big.Visible = false
 	end)
-	close.Position = UDim2.new(1, -10, 0, 6)
+	close.Position = UDim2.new(1, -8, 0, 3)
 	close.ZIndex = 42
 	local holder = Ui.make("Frame", {
 		Size = UDim2.fromOffset(mapW, mapH),
