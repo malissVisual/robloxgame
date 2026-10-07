@@ -12,7 +12,7 @@
 -- 6.1, what you hold (shared/Holding.luau, server/Hand.luau: the character's Hand attribute): fists, the plastic bag or
 -- the gun. Holster.choose asks the server (the Hand remote: keys 1 / 2 / 3 through client/Hotbar.luau, a tap on a hand
 -- slot) and shows the choice at once (a short prediction, as the holster's); a gamepad's d-pad left / right cycles
--- (Holster.cycle), the melee moved to the right stick's click. B still draws and holsters (the server makes the gun the
+-- (Holster.cycle), the melee moved to L1 (6.1 review: the right stick's click is the default camera's zoom). B still draws and holsters (the server makes the gun the
 -- hand, or goes back to the bag / fists). A loaded bag in your hand is not set down by an aim or a shot press (only
 -- 3, B or the wheel do that, on purpose): such a press tells you so instead of drawing.
 -- (No Roblox UI here and nothing that requires CameraRig or ArmPose: both read this module.)
@@ -260,11 +260,11 @@ function Holster.start()
 			return
 		end
 		local key = input.KeyCode
-		-- (a gamepad, 6.1: the d-pad's left and right cycle what you hold, the right stick's click swings; the d-pad's up
+		-- (a gamepad, 6.1: the d-pad's left and right cycle what you hold, L1 swings; the d-pad's up
 		-- is the weapon wheel, its down the phone)
 		if key == Enum.KeyCode.B then
 			Holster.toggle()
-		elseif key == Enum.KeyCode.V or key == Enum.KeyCode.ButtonR3 then
+		elseif key == Enum.KeyCode.V or key == Enum.KeyCode.ButtonL1 then
 			Holster.melee()
 		elseif key == Enum.KeyCode.DPadLeft or key == Enum.KeyCode.DPadRight then
 			Holster.cycle(if key == Enum.KeyCode.DPadLeft then -1 else 1)

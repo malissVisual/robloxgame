@@ -591,6 +591,14 @@ end
 
 -- 6.1, a number key (Hud's keys): 1 / 2 / 3 what you hold, 4 - 8 the item slots, 9 a sixth kind.
 function Hotbar.useKey(key: number)
+	-- (6.1 review: not while a window, the phone or a dialog covers the game: a stray 1 or 3 there set the bag down)
+	local covered = Hotbar.covered
+	if covered then
+		local ok, value = pcall(covered)
+		if ok and value == true then
+			return
+		end
+	end
 	local hand = Holding.ofKey(key)
 	if hand then
 		Holster.choose(hand)

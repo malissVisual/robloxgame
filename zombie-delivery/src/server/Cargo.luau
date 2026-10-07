@@ -3490,12 +3490,32 @@ end
 
 local pickUpBag: (Session, Player) -> ()
 
+local function bagText(count: number): string
+	return `Your bag · {count} {if count == 1 then "piece" else "pieces"}`
+end
+
+-- (6.1 review: the prompt's count follows the pieces: a failed order takes its own out)
+local function bagPromptText(down: BagDown)
+	down.prompt.ObjectText = bagText(#down.pieces)
+end
+
 -- The loaded bag left the owner's hand: set down at their feet (a little ahead, on the left) with its pieces, KitWear's
 -- bag on an anchored part, the "Pick up bag" prompt. True when it went down.
 local function setBagDown(session: Session): boolean
 	local root = rootOf(session.owner.Character)
 	if not root then
 		return false -- (no body: they stay in the bag, the death rule drops them)
+	end
+	-- (6.1 review: not in mid-air, on a ladder, in water or on a zip line: the bag would hang out of reach. The pieces
+	-- stay in the bag until the feet are on the ground; Cargo's update sets it down then)
+	local character = session.owner.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.FloorMaterial == Enum.Material.Air or (character and character:GetAttribute("ZipLine") ~= nil) then
+		return false
+	end
+	local state = humanoid:GetState()
+	if state == Enum.HumanoidStateType.Climbing or state == Enum.HumanoidStateType.Swimming then
+		return false
 	end
 	local pieces: { Piece } = {}
 	for index = #session.pack, 1, -1 do
@@ -3511,6 +3531,7 @@ local function setBagDown(session: Session): boolean
 		for _, piece in pieces do
 			table.insert(down.pieces, piece) -- (one bag: a second set-down can't happen, but never lose a piece)
 		end
+		bagPromptText(down)
 		packShown(session)
 		return true
 	end
@@ -3531,7 +3552,7 @@ local function setBagDown(session: Session): boolean
 	model.PrimaryPart = base
 	KitWear.bagArt(model, base)
 	model.Parent = folder
-	local p = prompt(base, "Pick up bag", `Your bag · {#pieces} {if #pieces == 1 then "piece" else "pieces"}`, nil, Config.Hand.BagHold, session.owner)
+	local p = prompt(base, "Pick up bag", bagText(#pieces), nil, Config.Hand.BagHold, session.owner)
 	p.MaxActivationDistance = Config.Hand.BagReach
 	local made: BagDown = { pieces = pieces, model = model, prompt = p, at = spot }
 	session.bagDown = made
@@ -4016,6 +4037,8 @@ function Cargo.dropOrder(session: Session, order: number): number
 		end
 		if #down.pieces == 0 then
 			clearBagDown(session)
+		else
+			bagPromptText(down)
 		end
 	end
 	-- (5.2 review: a trolley's pieces too, set down or pushed: the ones left on it close up)

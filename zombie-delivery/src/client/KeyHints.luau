@@ -16,6 +16,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local TextService = game:GetService("TextService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -23,6 +24,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
 local Holster = require(script.Parent.Holster)
+local Drive = require(script.Parent.Drive)
 
 local KeyHints = {}
 
@@ -39,6 +41,7 @@ local hasGun = false
 local hasBag = false
 local root: any = nil
 local lines: { any } = {}
+local MAX_LINES = 5 -- (narrow: the chips flow onto more, shorter lines; more than this folds the strip)
 local chip: any = nil
 local shown = ""
 
@@ -49,9 +52,11 @@ end
 local KEY = hex(P.ink)
 local WORD = hex(P.ink2)
 
+type Chip = { rich: string, plain: string }
+
 -- One chip: the key bright, its word muted (`on`: the word bright too, the hand you hold).
-local function chipText(key: string, word: string, on: boolean?): string
-	return `<font color="{KEY}">[{key}]</font> <font color="{if on then KEY else WORD}">{word}</font>`
+local function chipText(key: string, word: string, on: boolean?): Chip
+	return { rich = `<font color="{KEY}">[{key}]</font> <font color="{if on then KEY else WORD}">{word}</font>`, plain = `[{key}] {word}` }
 end
 
 local function keyboard(): boolean
@@ -61,24 +66,34 @@ local function keyboard(): boolean
 	return UserInputService.KeyboardEnabled
 end
 
--- What the strip says now: up to two lines.
-local function linesNow(): { string }
+-- What the strip says now: two groups of chips (each a line when there is room).
+local function linesNow(): { { Chip } }
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not character or not humanoid or humanoid.Health <= 0 then
 		return {}
 	end
-	local first: { string } = {}
-	local second: { string } = {}
+	local first: { Chip } = {}
+	local second: { Chip } = {}
 	if humanoid.SeatPart ~= nil then
-		table.insert(first, chipText("W/S", "Drive"))
-		table.insert(first, chipText("A/D", "Steer"))
-		table.insert(first, chipText("E", "Get out"))
-		table.insert(first, chipText("F", "Shoot"))
+		-- (6.1 review: only the keys that work in this seat: the driver drives, a bus rider rings the bell)
+		local car, driving = Drive.seatedCar()
+		if typeof(player:GetAttribute("BusLine")) == "string" then
+			table.insert(first, chipText("E", "Stop"))
+		elseif car and driving then
+			table.insert(first, chipText("W/S", "Drive"))
+			table.insert(first, chipText("A/D", "Steer"))
+			table.insert(first, chipText("E", "Get out"))
+		else
+			table.insert(first, chipText("E", "Get out"))
+		end
+		if hasGun then
+			table.insert(first, chipText("F", "Shoot"))
+		end
 		table.insert(second, chipText("4-8", "Items"))
 		table.insert(second, chipText("Q", "Phone"))
 		table.insert(second, chipText("M", "Map"))
-		return { table.concat(first, "  "), table.concat(second, "  ") }
+		return { first, second }
 	end
 	local hand = Holster.hand()
 	table.insert(first, chipText("1", "Fists", hand == "fists"))
@@ -98,7 +113,8 @@ local function linesNow(): { string }
 	if carrying then
 		table.insert(first, chipText("G", "Put down"))
 	end
-	if player:GetAttribute("ThrowReady") ~= nil or typeof(player:GetAttribute("ThrowTo")) == "Vector3" then
+	-- (6.1 review: not for fragile pieces only: X just says they can't be thrown)
+	if player:GetAttribute("ThrowReady") == "piece" or (typeof(player:GetAttribute("ThrowTo")) == "Vector3" and player:GetAttribute("ThrowFragile") ~= true) then
 		table.insert(first, chipText("X", "Throw"))
 	end
 	if not carrying then
@@ -111,7 +127,56 @@ local function linesNow(): { string }
 	table.insert(second, chipText("Q", "Phone"))
 	table.insert(second, chipText("J", "Jobs"))
 	table.insert(second, chipText("M", "Map"))
-	return { table.concat(first, "  "), table.concat(second, "  ") }
+	return { first, second }
+end
+
+local GAP_TEXT = "  "
+
+local function width(text: string): number
+	return TextService:GetTextSize(text, K.TextSize, Theme.Font, Vector2.new(10000, 100)).X
+end
+
+-- The groups as lines no wider than `room` px (a group that fits stays one line). Nil when more than MAX_LINES.
+local function flow(groups: { { Chip } }, room: number): { string }?
+	local out: { string } = {}
+	for _, group in groups do
+		local rich: { string } = {}
+		local plain: { string } = {}
+		for _, item in group do
+			local try = table.clone(plain)
+			table.insert(try, item.plain)
+			if #plain > 0 and width(table.concat(try, GAP_TEXT)) > room then
+				table.insert(out, table.concat(rich, GAP_TEXT))
+				rich, plain = {}, {}
+			end
+			table.insert(rich, item.rich)
+			table.insert(plain, item.plain)
+		end
+		if #rich > 0 then
+			table.insert(out, table.concat(rich, GAP_TEXT))
+		end
+	end
+	if #out > MAX_LINES then
+		return nil
+	end
+	return out
+end
+
+-- The room left of the strip's right edge: up to the contract column (client/Hud.luau's TopStack) when it reaches
+-- down beside the strip (6.1 review: on a narrower window the long first line ran over it).
+local function roomFor(gui: any): number
+	local right = gui.AbsolutePosition.X + root.Position.X.Offset -- (anchored at its right: the position is the right edge)
+	local leftEdge = gui.AbsolutePosition.X + 8
+	local column = gui:FindFirstChild("TopStack", true)
+	if column and column:IsA("GuiObject") and column.Visible then
+		local top = root.Position.Y.Offset + gui.AbsolutePosition.Y
+		local bottom = top + MAX_LINES * (K.TextSize + 5) + K.TextSize + 4
+		local c0, c1 = column.AbsolutePosition, column.AbsolutePosition + column.AbsoluteSize
+		if c1.Y > top and c0.Y < bottom and c1.X > leftEdge then
+			leftEdge = c1.X + 12
+		end
+	end
+	return right - leftEdge
 end
 
 local function isOpen(): boolean
@@ -179,8 +244,9 @@ local function build(gui: Instance)
 		open = not isOpen()
 		shown = ""
 	end)
-	lines[1] = line(root, 1)
-	lines[2] = line(root, 2)
+	for index = 1, MAX_LINES do
+		lines[index] = line(root, index)
+	end
 end
 
 local function update(gui: any)
@@ -190,8 +256,8 @@ local function update(gui: any)
 		local ok, value = pcall(covered)
 		hide = ok and value == true
 	end
-	local texts = if hide then {} else linesNow()
-	hide = hide or #texts == 0
+	local groups = if hide then {} else linesNow()
+	hide = hide or #groups == 0
 	if root.Visible == hide then
 		root.Visible = not hide
 	end
@@ -200,15 +266,18 @@ local function update(gui: any)
 	end
 	place(gui)
 	local unfolded = isOpen()
-	local key = `{unfolded}|{texts[1] or ""}|{texts[2] or ""}`
+	local texts = if unfolded then flow(groups, roomFor(gui)) else {}
+	local squeezed = texts == nil -- (no room even on MAX_LINES lines: only the KEYS chip)
+	local shownTexts: { string } = texts or {}
+	local key = `{unfolded}|{squeezed}|{table.concat(shownTexts, "\n")}`
 	if key == shown then
 		return
 	end
 	shown = key
-	chip.Text = if unfolded then "KEYS ▴  [F1]" else "? KEYS  [F1]"
+	chip.Text = if unfolded and not squeezed then "KEYS ▴  [F1]" else "? KEYS  [F1]"
 	for index, label in lines do
-		local text = texts[index]
-		label.Visible = unfolded and text ~= nil and text ~= ""
+		local text = shownTexts[index]
+		label.Visible = text ~= nil and text ~= ""
 		label.Text = text or ""
 	end
 end

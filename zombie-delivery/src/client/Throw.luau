@@ -44,7 +44,7 @@ local player = Players.LocalPlayer
 
 type Preview = { folder: Folder, dots: { BasePart }, ring: BasePart, door: BasePart }
 type State = {
-	bound: boolean,
+	bound: string?,
 	aiming: boolean,
 	since: number, -- when the aim started (the power swings from there)
 	preview: Preview?,
@@ -56,7 +56,7 @@ type State = {
 	line: TextLabel?,
 	banner: Frame?,
 }
-local state: State = { bound = false, aiming = false, since = 0, power = 0 }
+local state: State = { bound = nil, aiming = false, since = 0, power = 0 }
 
 local function say(text: string)
 	local notify = Throw.notify
@@ -326,17 +326,32 @@ end
 local function check()
 	local door = doorSpot()
 	local root = rootOnFoot()
-	-- 6.1: bound whenever you could throw at all (the server's ThrowReady, the bag in your hand, a door's ThrowTo)
+	-- 6.1: bound whenever you could throw at all. "full" (a door's ThrowTo, a throwable piece): X, R1 and the touch THROW
+	-- button; "explain" (only the bag in your hand, or only fragile pieces): X alone, for the toast that says why (review:
+	-- no THROW button on screen and no R1 taken all the time)
 	local character = player.Character
-	local want = root ~= nil and (door ~= nil or player:GetAttribute("ThrowReady") ~= nil or (character ~= nil and character:GetAttribute("Hand") == "bag"))
-	if want and not state.bound then
-		state.bound = true
-		ContextActionService:BindActionAtPriority(ACTION, onAction, true, Enum.ContextActionPriority.High.Value, Enum.KeyCode.X, Enum.KeyCode.ButtonR1)
-		ContextActionService:SetTitle(ACTION, "THROW")
-	elseif not want and state.bound then
-		state.bound = false
-		stopAim()
-		ContextActionService:UnbindAction(ACTION)
+	local want: string? = nil
+	if root ~= nil then
+		if door ~= nil or player:GetAttribute("ThrowReady") == "piece" then
+			want = "full"
+		elseif player:GetAttribute("ThrowReady") ~= nil or (character ~= nil and character:GetAttribute("Hand") == "bag") then
+			want = "explain"
+		end
+	end
+	if want ~= state.bound then
+		if state.bound ~= nil then
+			ContextActionService:UnbindAction(ACTION)
+		end
+		state.bound = want
+		if want ~= "full" then
+			stopAim()
+		end
+		if want == "full" then
+			ContextActionService:BindActionAtPriority(ACTION, onAction, true, Enum.ContextActionPriority.High.Value, Enum.KeyCode.X, Enum.KeyCode.ButtonR1)
+			ContextActionService:SetTitle(ACTION, "THROW")
+		elseif want == "explain" then
+			ContextActionService:BindActionAtPriority(ACTION, onAction, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.X)
+		end
 	end
 	if door and root and not state.aiming and flat(root.Position, door) <= T.Range then
 		showLine(if player:GetAttribute("ThrowFragile") == true then "Too fragile to throw: hand it over at the door"

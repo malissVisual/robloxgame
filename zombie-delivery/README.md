@@ -141,7 +141,7 @@ of letting you play a profile that would not be saved.
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
 | What you hold (6.1): fists / the plastic bag / your gun (a loaded bag that leaves your hand is set down on the ground: E picks it up) | 1 / 2 / 3 (gamepad: d-pad left / right cycles) | tap the hand slots at the left of the bottom bar |
 | Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire; 6.1: 3 draws your gun too, not over a loaded bag) | B | DRAW / HOLSTER (over PUNCH) |
-| Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: click the right stick) | PUNCH / STRIKE left of FIRE |
+| Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: L1) | PUNCH / STRIKE left of FIRE |
 | Throw at a home's door (6.0; 6.1: with the bag in your hand or a light piece in your hands, else it says why) | hold X (gamepad R1) | THROW |
 | Key hints (6.1: fold / unfold the strip under the top buttons) | F1, or its KEYS chip | – |
 | Switch gun | hold T: the weapon wheel (point at a gun, let go); tap T: the next gun (5.4.1: Q is the phone); or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
@@ -1112,7 +1112,7 @@ missions. The dealer no longer sells it. Every other car, job tier and campaign 
 only put it down, you can't hide it"; `shared/Holding.luau`, `server/Hand.luau`, the Hand remote, `Config.Hand`): the
 bottom bar has three HAND slots at its left: **1 fists ✊**, **2 the plastic bag 🛍** (its fill, "2/2"), **3 your gun
 🔫** (its name; T still picks which gun on the weapon wheel). The one you hold has the red outline. Keys 1 / 2 / 3, a
-click or a tap on the slot, a gamepad's d-pad left / right (the melee moved to the right stick's click). The items moved
+click or a tap on the slot, a gamepad's d-pad left / right (the melee moved to L1). The items moved
 to keys **4 – 8** (a touch screen shows two item slots beside the hands; the I window lists them all). B still draws and
 holsters (it makes the gun the hand and goes back to the bag or the fists). The server decides (the character's Hand
 and Holstered attributes): never in a seat, never the gun with cargo in your hands.
@@ -1123,6 +1123,11 @@ and Holstered attributes): never in a seat, never the gun with cargo in your han
   its cargo in it: a "Pick up bag" prompt (E, only you), the HUD points at it, its pieces are not with you (no hand
   over, no throw from them) but the stop waits for them. You have to go back for it; picking it up makes it your hand
   again. It lies there until then or until the job ends (its pieces are lost, as a dropped piece). Zombies leave it.
+- **6.1 review:** in mid-air, on a ladder, in water or on a zip line the bag waits in your hand's place until your feet
+  are on the ground, then it is set down (never hanging out of reach). The touch THROW button and R1 appear only when a
+  throw is possible (X alone still explains why not). The number keys do nothing while a window or the phone is open.
+  The key hints show only the keys that work there (the driver's keys, a bus's E: Stop) and flow onto shorter lines
+  beside the contract on a narrow window. The prompt on a set-down bag counts its pieces as they change.
   Dying drops the bag's pieces with the backpack's. An aim or a shot press does not set a loaded bag down (3, B or the
   wheel do, on purpose).
 - **X fixed** ("after pressing X nothing shows"): X was bound only while the server's ThrowTo was set (a home's door is
