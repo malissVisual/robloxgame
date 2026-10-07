@@ -1,9 +1,10 @@
 --!strict
 -- 3.9: the gun away and the hands on foot, on this client. B holsters the gun or draws it (a gamepad: the d-pad down);
 -- V swings: a punch while holstered, a strike with the gun while it is out (a touch screen: the HUD's small buttons
--- next to FIRE). You start holstered after every spawn. Aiming (right mouse), shooting (left mouse, F, FIRE) or picking
--- a gun on the weapon wheel while holstered draws the gun first: that press does not fire (client/CameraRig.luau,
--- client/Shooting.luau, client/WeaponWheel.luau ask pressDraws / drawIfHolstered), then the usual raise time applies.
+-- next to FIRE). You start holstered after every spawn. Picking a gun on the weapon wheel while holstered draws it
+-- (client/WeaponWheel.luau asks drawIfHolstered). 6.1.1: aiming (right mouse) or shooting (left mouse, F, FIRE) with the
+-- gun away does NOT draw it any more (client/CameraRig.luau, client/Shooting.luau ask pressDraws / firePressAway): with
+-- fists the left mouse punches, else a note says "press 3".
 -- The server keeps the real state (server/CloseCombat.luau: the character's Holstered attribute) and checks every
 -- swing; this client shows its own choice at once (a short prediction until the attribute agrees) and starts its own
 -- arm swing on the key press (client/ArmPose.luau reads localSwing; the server's MeleeAt does not swing it twice).
@@ -182,13 +183,14 @@ function Holster.toggle()
 	end
 end
 
--- The gun out, if it is holstered and the hands are free. True when this drew it (the caller's press does not fire).
+-- The gun out, if it is holstered and the hands are free (an explicit choice: a gun picked on the weapon wheel). True
+-- when this drew it.
 function Holster.drawIfHolstered(): boolean
 	if not armed or not handsFree() or not Holster.holstered() then
 		return false
 	end
 	if bagLoaded() then
-		-- 6.1: an aim or a shot press does not set a loaded bag down (3 or B does, on purpose)
+		-- 6.1: only 3 or B set a loaded bag down (on purpose)
 		if os.clock() - toldAt > 3 then
 			toldAt = os.clock()
 			say("Your bag has deliveries in it: press 3 to set it down and draw your gun.")
@@ -199,17 +201,40 @@ function Holster.drawIfHolstered(): boolean
 	return true
 end
 
--- A shooting or aiming press (left / right mouse, F): true when this press drew the gun. Every listener of the same
--- press gets the same answer (CameraRig and Shooting both ask), until the press ends.
+-- 6.1.1: a shooting or aiming press (left / right mouse, F, the touch FIRE) while the gun is away no longer draws it
+-- (the owner: "with my fists I can still shoot, weird"): what you hold decides, 3 or B takes the gun. With fists the
+-- left mouse punches; anything else shows a short note now and then. True when the press was used here (no shot, no
+-- aim). Every listener of the same press gets the same answer (CameraRig and Shooting both ask), until it ends.
+local function awayPress(input: InputObject?): boolean
+	if not handsFree() or not Holster.holstered() then
+		return false
+	end
+	if input and input.UserInputType == Enum.UserInputType.MouseButton1 and Holster.hand() == "fists" then
+		Holster.melee()
+		return true
+	end
+	if armed and os.clock() - toldAt > 4 then
+		toldAt = os.clock()
+		say(if bagLoaded() then "Your bag has deliveries in it: press 3 to set it down and take your gun."
+			else "Your gun is away: press 3 (or B) to take it.")
+	end
+	return true
+end
+
 function Holster.pressDraws(input: InputObject): boolean
 	if drawnBy == input then
 		return true
 	end
-	if Holster.drawIfHolstered() then
+	if awayPress(input) then
 		drawnBy = input
 		return true
 	end
 	return false
+end
+
+-- The touch FIRE button (client/Shooting.luau setAutoHeld): the same rule, true when the press was used here.
+function Holster.firePressAway(): boolean
+	return awayPress(nil)
 end
 
 -- Where a swing goes along the ground: the camera's way on a computer (the mouse is locked, the crosshair is the aim),

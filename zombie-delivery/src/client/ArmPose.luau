@@ -376,7 +376,16 @@ local function showGun(character: Model, visible: boolean)
 		end
 		return
 	end
-	if gun and gun ~= hidden then
+	-- 6.1.1: hidden again when something showed it. Roblox's camera (the PlayerModule's TransparencyController) sets
+	-- LocalTransparencyModifier on every part of your character each time a part is added or removed (the bag taken off
+	-- or put on, the phone): the holstered gun came back in your hand after 1 (fists). One part tells (it sets them all).
+	if gun and gun == hidden then
+		local probe = gun:FindFirstChildWhichIsA("BasePart", true)
+		if probe and probe.LocalTransparencyModifier < 1 then
+			hiddenGuns[character] = nil
+		end
+	end
+	if gun and gun ~= hiddenGuns[character] then
 		hiddenGuns[character] = gun
 		local parts = gun:GetDescendants()
 		table.insert(parts, gun)
