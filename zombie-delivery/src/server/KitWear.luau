@@ -85,7 +85,7 @@ local BAG_BUSY: { [string]: boolean } = { Pushing = true, Hand = true }
 -- "count:looks")
 type Slot = { key: string, built: Builder.Built, parts: { [string]: BasePart }, sizes: { [string]: Vector3 }, pivot: BasePart?, fill: string? }
 export type Fill = { count: number, looks: { string }, key: string }
-type Wearer = { character: Model, slots: { [string]: Slot }, connections: { RBXScriptConnection }, sized: { [BasePart]: boolean }, hand: any? }
+type Wearer = { character: Model, slots: { [string]: Slot }, connections: { RBXScriptConnection }, sized: { [BasePart]: boolean }, hand: any?, told: boolean? }
 
 local wearers: { [Player]: Wearer } = {}
 local wantPhone: { [Player]: boolean } = {} -- the phone window is open (what the client last said)
@@ -389,6 +389,17 @@ local function refresh(player: Player)
 		else
 			(wanted :: any).hand = nil
 		end
+		-- 6.5.1: the bag is your hand but nothing is worn: say why, once a body (the Output)
+		if character:GetAttribute("Hand") == "bag" and not wanted.hand and not wearer.told then
+			wearer.told = true
+			local owned: { string } = {}
+			for id, on in profile.kit do
+				if on == true then
+					table.insert(owned, tostring(id))
+				end
+			end
+			warn(`[KitWear] {player.Name} holds the bag but none shows: active bag {if bag then bag.id else "none"}, kit {table.concat(owned, ", ")}, choice {tostring(profile.activeBag)}`)
+		end
 	end
 	-- 6.4: the BagWorn attribute (every client: client/BagSway.luau's motion) and, when the bag moves between the
 	-- front and the back while you stand, BagSwitchAt (the server time: the bag's move) and the sling / unsling gesture
@@ -424,6 +435,20 @@ local function refresh(player: Player)
 				warn(`[KitWear] {slot} {id}: {made}`)
 			elseif made then
 				wearer.slots[slot] = made
+				if slot == "hand" then
+					-- 6.5.1: the owner can't see the bag in Studio: say once per bag where it went (the Output)
+					local pivot = made.pivot
+					local hand = made.parts and next(made.parts)
+					print(`[KitWear] {player.Name}: the bag {id} is on ({#made.built.parts} parts, from {hand or "?"}, at {if pivot then tostring(pivot.Position) else "?"})`)
+				end
+			elseif slot == "hand" then
+				local parts: { string } = {}
+				for _, child in character:GetChildren() do
+					if child:IsA("BasePart") then
+						table.insert(parts, child.Name)
+					end
+				end
+				warn(`[KitWear] {player.Name}: the bag {id} has nothing to hang from (body parts: {table.concat(parts, ", ")})`)
 			end
 		end
 	end

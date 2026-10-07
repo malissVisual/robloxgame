@@ -14,6 +14,9 @@ local Unstuck = {}
 
 local CHECK = 0.5
 local MAX_LIFT = 5 -- studs: deeper than this is not "sunk", leave it to the respawn
+-- 6.5.1: shallower than this is the body's own feet standing a little in the kerb (the courier's blocky feet reach
+-- 0.4 below its hip height: Output showed "0.4 studs in Depot.Sidewalk … lifted out" every second, a jitter)
+local MIN_LIFT = 1
 
 local player = Players.LocalPlayer
 local started = false
@@ -132,7 +135,7 @@ local function check()
 	strikes = 0
 	local stand = if humanoid.RigType == Enum.HumanoidRigType.R15 then humanoid.HipHeight + root.Size.Y / 2 else root.Size.Y / 2 + 2
 	local lift = top + stand - root.Position.Y
-	if lift <= 0.3 or lift > MAX_LIFT then
+	if lift <= MIN_LIFT or lift > MAX_LIFT then
 		return
 	end
 	warn(
