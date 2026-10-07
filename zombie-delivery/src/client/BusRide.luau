@@ -13,6 +13,14 @@
 --   * During a foot or bike job (the Job payload's mode), on foot, with the stop farther than Config.Bus.HintDistance:
 --     when BusLines.route says the bus is quicker (at your walk now: the carry walk with a piece in your hands), a
 --     hint line under the contract: "🚌 Line 2 from Cedar St / 6th Ave (3 stops)".
+--   * 5.7, getting on and off like into a car (Config.Interact; the routes and poses: shared/InteractPose.luau,
+--     client/Interact.luau): the front-right door folds open (two leaves turning in on their outer edges) while the bus
+--     stands at a stop and shuts BusDoorShut before it leaves (kept open while somebody is still on its step). Board:
+--     the server keeps your seat and marks you (BusBoard / BusBoardAt: server/Buses.luau); your client walks you to
+--     the kerb by the door, up its step, along the aisle and turns you onto your seat (in the bus's own space, so a
+--     bus pulling away carries the move along) in BusBoard, the server seats you then. Off at a stop (BusOff /
+--     BusOffAt / BusOffTo): up from the seat, along the aisle to the door and down its step onto the kerb, in
+--     BusAlight. Your controls are off meanwhile; everybody's walks near the camera are posed from the same attributes.
 -- (The big map does not draw the lines yet: client/MapView.luau has no overlay for other modules.)
 
 local CollectionService = game:GetService("CollectionService")
@@ -26,8 +34,11 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BusLines = require(Shared:WaitForChild("BusLines"))
 local Config = require(Shared:WaitForChild("Config"))
+local InteractPose = require(Shared:WaitForChild("InteractPose"))
 local Map = require(Shared:WaitForChild("Map"))
 local Net = require(Shared:WaitForChild("Net"))
+local Drive = require(script.Parent.Drive)
+local Interact = require(script.Parent.Interact)
 local Hud = require(script.Parent.Hud)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
@@ -363,6 +374,486 @@ local function addBoard(item: Instance)
 	end)
 end
 
+-- ── 5.7: the folding door ─────────────────────────────────────────────────
+
+local DOOR_RANGE = 220 -- the doors of the buses within this of the camera move
+local DOOR_FOLD = math.rad(82) -- each leaf turns in this far, open
+
+type Door = {
+	panel: BasePart, -- the real door (hidden here while it is open)
+	trims: { BasePart },
+	centre: Vector3, -- chassis space
+	size: Vector3,
+	leaves: { Part }?, -- the two local leaves while it is open
+	open: number, -- 0 shut … 1 open
+}
+local doors: { [Model]: Door | false } = {}
+local heldOpen: { [Model]: boolean } = {} -- somebody gets on or off it now (the poll fills it)
+
+-- The bus's folding door: its CarDoor panel on the right (+X) side and the trims welded to it.
+local function doorOf(model: Model, chassis: BasePart): Door?
+	local known = doors[model]
+	if known ~= nil then
+		return if known then known :: Door else nil
+	end
+	local panel: BasePart? = nil
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child.Name == "CarDoor" and chassis.CFrame:PointToObjectSpace(child.Position).X > 0 then
+			panel = child
+			break
+		end
+	end
+	if not panel then
+		doors[model] = false
+		return nil
+	end
+	local trims: { BasePart } = {}
+	for _, child in model:GetChildren() do
+		local weld = if child:IsA("BasePart") and child.Name == "DoorTrim" then child:FindFirstChildOfClass("WeldConstraint") else nil
+		if weld and (weld.Part0 == panel or weld.Part1 == panel) then
+			table.insert(trims, child :: BasePart)
+		end
+	end
+	local door: Door = {
+		panel = panel,
+		trims = trims,
+		centre = chassis.CFrame:PointToObjectSpace(panel.Position),
+		size = panel.Size,
+		leaves = nil,
+		open = 0,
+	}
+	doors[model] = door
+	return door
+end
+
+local function showPanel(door: Door, shown: boolean)
+	local modifier = if shown then 0 else 1
+	door.panel.LocalTransparencyModifier = modifier
+	for _, trim in door.trims do
+		trim.LocalTransparencyModifier = modifier
+	end
+end
+
+local function shut(door: Door)
+	door.open = 0
+	local leaves = door.leaves
+	if leaves then
+		for _, leaf in leaves do
+			leaf:Destroy()
+		end
+		door.leaves = nil
+	end
+	showPanel(door, true)
+end
+
+-- Every door near the camera toward its goal: open while the bus stands at a stop (until BusDoorShut before it
+-- leaves) or somebody is on its step.
+local function updateDoors(dt: number)
+	local camera = workspace.CurrentCamera
+	local eye = if camera then camera.CFrame.Position else Vector3.zero
+	local now = workspace:GetServerTimeNow()
+	local tuning = Config.Interact
+	for model, track in tracks do
+		local chassis = model.PrimaryPart
+		local door = if chassis then doorOf(model, chassis) else nil
+		if not chassis or not door then
+			continue
+		end
+		if (chassis.Position - eye).Magnitude > DOOR_RANGE then
+			if door.open > 0 then
+				shut(door :: Door)
+			end
+			continue
+		end
+		local _, _, _, _, at, _, leaveIn = BusLines.position(track.line, track.index, now)
+		local goal = if (at > 0 and leaveIn > tuning.BusDoorShut) or heldOpen[model] then 1 else 0
+		local open = if goal > door.open then math.min(1, door.open + dt / tuning.BusDoor) else math.max(0, door.open - dt / tuning.BusDoor)
+		if open <= 0 then
+			if door.open > 0 or door.leaves then
+				shut(door :: Door)
+			end
+			continue
+		end
+		door.open = open
+		local leaves = door.leaves
+		if not leaves then
+			local made: { Part } = {}
+			for n = 1, 2 do
+				local leaf = Instance.new("Part")
+				leaf.Name = "BusDoorLeaf"
+				leaf.Anchored = true
+				leaf.CanCollide = false
+				leaf.CanQuery = false
+				leaf.CanTouch = false
+				leaf.CastShadow = false
+				leaf.Color = door.panel.Color
+				leaf.Material = door.panel.Material
+				leaf.Size = Vector3.new(door.size.X, door.size.Y, door.size.Z / 2 - 0.04)
+				leaf.Parent = workspace.CurrentCamera or workspace
+				made[n] = leaf
+			end
+			leaves = made
+			door.leaves = made
+			showPanel(door, false)
+		end
+		-- each leaf on its outer edge (the front one on the door's front, the back one on its back), turning in
+		local angle = DOOR_FOLD * InteractPose.ease(open)
+		local c, quarter = door.centre, door.size.Z / 4
+		local frame = chassis.CFrame
+		local list = leaves :: { Part }
+		list[1].CFrame = frame * CFrame.new(c.X, c.Y, c.Z - door.size.Z / 2) * CFrame.Angles(0, -angle, 0) * CFrame.new(0, 0, quarter)
+		list[2].CFrame = frame * CFrame.new(c.X, c.Y, c.Z + door.size.Z / 2) * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0, -quarter)
+	end
+	for model, door in doors do
+		if not model.Parent then
+			if door then
+				shut(door :: Door)
+			end
+			doors[model] = nil
+		end
+	end
+end
+
+-- ── 5.7: getting on and off ────────────────────────────────────────────────
+
+local MOVE_HOLD = 1.2 -- after the walk in, waiting this long for the seat
+local MOVE_MIN = 0.3 -- a late start plays quicker, never quicker than this
+local MOVE_RANGE = 160 -- the others' walks are posed within this of the camera
+local AISLE_WALK = 9 -- studs / s along the aisle (the route is then fitted to its time)
+local OWNER = "bus" -- (client/Interact.luau)
+
+type Move = {
+	kind: string, -- "board" | "alight"
+	model: Model,
+	chassis: BasePart,
+	character: Model,
+	humanoid: Humanoid,
+	root: BasePart,
+	route: InteractPose.Route,
+	world: boolean, -- the route in the world's space (getting off), else the bus's
+	value: number, -- the BusBoardAt / BusOffAt it plays
+	started: number, -- os.clock()
+	span: number, -- seconds it plays over here
+}
+
+local move: Move? = nil
+local played: { [string]: number } = {} -- the last BusBoardAt / BusOffAt played here (the server clears them later)
+local lastSeat: { [Model]: BasePart } = {} -- the bus seat each character sat in last (for the walk off)
+type Seen = { value: number, route: InteractPose.Route, total: number }
+local seenMoves: { [Model]: Seen } = {}
+
+local function busByKey(line: number, index: number): Model?
+	for model, track in tracks do
+		if track.line.id == line and track.index == index and model.Parent then
+			return model
+		end
+	end
+	return nil
+end
+
+local function seatOf(model: Model, seatNo: number): BasePart?
+	for _, child in model:GetChildren() do
+		if child:IsA("Seat") and child:GetAttribute("Index") == seatNo then
+			return child
+		end
+	end
+	return nil
+end
+
+-- A point of a route in the bus's space, facing (fx, fz) there.
+local function pointAt(kind: string, position: Vector3, fx: number, fz: number, seconds: number, arc: number?): InteractPose.Point
+	return InteractPose.point(position.X, position.Y, position.Z, kind, seconds, fx, fz, arc)
+end
+
+local function walkTime(a: Vector3, b: Vector3): number
+	return math.max(0.12, (b - a).Magnitude / AISLE_WALK)
+end
+
+-- The places of a walk in or out, in the bus's space: the kerb by the door, inside its step, the aisle by the door, the
+-- aisle at the seat's row and the seated root. lift: the root over the feet.
+local function places(model: Model, chassis: BasePart, seat: BasePart, lift: number): (Vector3, Vector3, Vector3, Vector3, CFrame)
+	local half = BusLines.HalfWidth
+	local doorZ = -BusLines.DoorAhead
+	local inside = chassis.Size.Y / 2 + lift -- (the floor is the chassis' top)
+	local frame = chassis.CFrame
+	local kerbWorld = frame * Vector3.new(half + 1.3, 0, doorZ)
+	local ground = Interact.groundY(kerbWorld.X, frame.Position.Y + 2, kerbWorld.Z, { model })
+	local kerbY = if ground then frame:PointToObjectSpace(Vector3.new(kerbWorld.X, ground + lift, kerbWorld.Z)).Y else inside - 1.2
+	local seated = frame:ToObjectSpace(seat.CFrame * CFrame.new(0, seat.Size.Y / 2 + Config.Cargo.BoardSitLift, 0))
+	local seatZ = seated.Position.Z
+	return Vector3.new(half + 1.3, kerbY, doorZ), Vector3.new(half - 0.9, inside, doorZ), Vector3.new(0, inside, doorZ + 0.6), Vector3.new(0, inside, seatZ), seated
+end
+
+-- The walk in (the bus's space) from `start`: to the kerb by the door, up the step, along the aisle, a turn to the
+-- seat, sit. Fitted to Config.Interact.BusBoard.
+local function boardRoute(model: Model, chassis: BasePart, seat: BasePart, start: CFrame, lift: number): InteractPose.Route
+	local kerb, step, front, row, seated = places(model, chassis, seat, lift)
+	local p0 = start.Position
+	local look = start.LookVector
+	local side = if seated.Position.X >= 0 then 1 else -1
+	local seatLook = seated.LookVector
+	local points = {
+		pointAt("walk", p0, look.X, look.Z, 0),
+		pointAt("walk", kerb, kerb.X - p0.X, kerb.Z - p0.Z, math.max(0.2, (Vector3.new(kerb.X, 0, kerb.Z) - Vector3.new(p0.X, 0, p0.Z)).Magnitude / Config.Movement.Walk)),
+		pointAt("step", step, -1, 0, 0.4, 0.5),
+		pointAt("walk", front, front.X - step.X, front.Z - step.Z, walkTime(step, front)),
+		pointAt("walk", row, 0, 1, walkTime(front, row)),
+		pointAt("turn", row, side, 0, 0.25),
+		pointAt("sit", seated.Position, seatLook.X, seatLook.Z, 0.5),
+	}
+	return InteractPose.fit(InteractPose.route(points), Config.Interact.BusBoard)
+end
+
+-- The walk off (the world's space, from the bus where it stands now) from `start`: up from the seat into the aisle,
+-- along it to the door, down the step onto the kerb at `kerb` (the server's spot). Fitted to BusAlight.
+local function alightRoute(model: Model, chassis: BasePart, seat: BasePart, start: CFrame, kerb: Vector3, lift: number): InteractPose.Route
+	local _, step, front, row, seated = places(model, chassis, seat, lift)
+	local frame = chassis.CFrame
+	local side = if seated.Position.X >= 0 then 1 else -1
+	local function world(v: Vector3): Vector3
+		return frame * v
+	end
+	local function way(x: number, z: number): (number, number)
+		local v = frame:VectorToWorldSpace(Vector3.new(x, 0, z))
+		return v.X, v.Z
+	end
+	local ground = Interact.groundY(kerb.X, kerb.Y, kerb.Z, { model })
+	local landing = Vector3.new(kerb.X, if ground then ground + lift else kerb.Y, kerb.Z)
+	local p0 = start.Position
+	local look = start.LookVector
+	local rowW, frontW, stepW = world(row), world(front), world(step)
+	local ax, az = way(-side, 0)
+	local fx, fz = way(0, -1)
+	local dx, dz = way(1, 0)
+	local points = {
+		pointAt("walk", p0, look.X, look.Z, 0),
+		pointAt("stand", rowW, ax, az, 0.5),
+		pointAt("walk", frontW, fx, fz, walkTime(row, front)),
+		pointAt("walk", stepW, dx, dz, walkTime(front, step)),
+		pointAt("step", landing, landing.X - stepW.X, landing.Z - stepW.Z, 0.45, 0.3),
+	}
+	return InteractPose.fit(InteractPose.route(points), Config.Interact.BusAlight)
+end
+
+-- A walk's pose t seconds in (the stride fading in and out at its ends).
+local function movePose(route: InteractPose.Route, t: number): InteractPose.Pose
+	local _, _, _, _, _, kind, u, dist = InteractPose.sample(route, t)
+	if kind == "walk" then
+		return InteractPose.walk(dist, math.clamp(t / 0.15, 0, 1) * math.clamp((route.total - t) / 0.2, 0, 1))
+	end
+	return InteractPose.forKind(kind, u, dist)
+end
+
+local function stopMove()
+	local m = move
+	move = nil
+	if not m then
+		return
+	end
+	played[m.kind] = m.value
+	Interact.release(m.character, OWNER)
+	Interact.freeze(nil, false)
+	Drive.setBoarding(nil, false)
+	if m.root.Parent then
+		m.root.AssemblyLinearVelocity = Vector3.zero
+	end
+end
+
+local function startMove(kind: string, model: Model, seat: BasePart, character: Model, humanoid: Humanoid, root: BasePart, value: number, kerb: Vector3?)
+	local chassis = model.PrimaryPart
+	if not chassis then
+		return
+	end
+	local lift = Interact.standHeight(humanoid, root)
+	local route = if kind == "board" then boardRoute(model, chassis, seat, chassis.CFrame:ToObjectSpace(root.CFrame), lift)
+		else alightRoute(model, chassis, seat, root.CFrame, kerb or (chassis.CFrame * Vector3.new(BusLines.HalfWidth + 2, 0, -BusLines.DoorAhead)), lift)
+	local late = workspace:GetServerTimeNow() - value
+	move = {
+		kind = kind,
+		model = model,
+		chassis = chassis,
+		character = character,
+		humanoid = humanoid,
+		root = root,
+		route = route,
+		world = kind ~= "board",
+		value = value,
+		started = os.clock(),
+		span = math.max(MOVE_MIN, route.total - math.max(0, late)),
+	}
+	Interact.freeze(humanoid, true)
+	Drive.setBoarding(model, false) -- (no aiming, the walk left alone; the view stays the walk's)
+end
+
+-- Your own walk on or off this frame.
+local function moveStep(dt: number)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = humanoid and humanoid.RootPart
+	local m = move
+	if m and (m.character ~= character or not humanoid or not root or humanoid.Health <= 0 or not m.chassis.Parent) then
+		stopMove()
+		m = nil
+	end
+	if not character or not humanoid or not root or humanoid.Health <= 0 then
+		return
+	end
+	local seat = humanoid.SeatPart
+	if seat and seat.Parent and seat.Parent:IsA("Model") and seat.Parent:GetAttribute("BusLine") ~= nil then
+		lastSeat[character] = seat
+	end
+	local now = workspace:GetServerTimeNow()
+	local tuning = Config.Interact
+	if not m and seat == nil then
+		local boardAt = character:GetAttribute("BusBoardAt")
+		local offAt = character:GetAttribute("BusOffAt")
+		if type(boardAt) == "number" and boardAt ~= played.board and now - boardAt < tuning.BusBoard then
+			local line, index, seatNo = string.match(tostring(character:GetAttribute("BusBoard")), "^(%d+):(%d+):(%d+)$")
+			local model = if line and index then busByKey(tonumber(line) :: number, tonumber(index) :: number) else nil
+			local target = if model and seatNo then seatOf(model, tonumber(seatNo) :: number) else nil
+			if model and target then
+				startMove("board", model, target, character, humanoid, root, boardAt)
+			else
+				played.board = boardAt -- (the bus is not streamed in here: the server seats you anyway)
+			end
+		elseif type(offAt) == "number" and offAt ~= played.alight and now - offAt < tuning.BusAlight then
+			local line, index = string.match(tostring(character:GetAttribute("BusOff")), "^(%d+):(%d+)$")
+			local model = if line and index then busByKey(tonumber(line) :: number, tonumber(index) :: number) else nil
+			local from = lastSeat[character]
+			local kerb = character:GetAttribute("BusOffTo")
+			if model and from and from.Parent == model then
+				startMove("alight", model, from, character, humanoid, root, offAt, if typeof(kerb) == "Vector3" then kerb else nil)
+			else
+				played.alight = offAt
+			end
+		end
+		m = move
+	end
+	if not m then
+		return
+	end
+	local since = os.clock() - m.started
+	if m.kind == "board" then
+		if seat then
+			stopMove() -- seated: the seat holds you now
+			return
+		elseif since >= m.span + MOVE_HOLD then
+			stopMove() -- no seat came (the server puts you on the kerb)
+			return
+		end
+	elseif seat then
+		stopMove()
+		return
+	end
+	local t = m.route.total * math.clamp(since / m.span, 0, 1)
+	local x, y, z, fx, fz = InteractPose.sample(m.route, t)
+	local frame = Interact.frame(x, y, z, fx, fz)
+	Interact.place(root, if m.world then frame else m.chassis.CFrame * frame, dt)
+	Interact.pose(character, movePose(m.route, t), dt, OWNER)
+	if m.kind == "alight" and since >= m.span then
+		stopMove()
+	end
+end
+
+-- Everybody else's walks on and off near the camera: the pose from their attributes (their own clients move them).
+local function othersStep(dt: number)
+	local camera = workspace.CurrentCamera
+	local eye = if camera then camera.CFrame.Position else Vector3.zero
+	local now = workspace:GetServerTimeNow()
+	local tuning = Config.Interact
+	local live: { [Model]: boolean } = {}
+	for _, other in Players:GetPlayers() do
+		local character = other.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = humanoid and humanoid.RootPart
+		if other == player or not character or not humanoid or not root or (root.Position - eye).Magnitude > MOVE_RANGE then
+			continue
+		end
+		local seat = humanoid.SeatPart
+		if seat and seat.Parent and seat.Parent:IsA("Model") and seat.Parent:GetAttribute("BusLine") ~= nil then
+			lastSeat[character] = seat
+			continue
+		end
+		local boardAt = character:GetAttribute("BusBoardAt")
+		local offAt = character:GetAttribute("BusOffAt")
+		local value: number? = nil
+		local route: InteractPose.Route? = nil
+		local seen = seenMoves[character]
+		if type(boardAt) == "number" and now - boardAt < tuning.BusBoard then
+			value = boardAt
+			if not seen or seen.value ~= boardAt then
+				local line, index, seatNo = string.match(tostring(character:GetAttribute("BusBoard")), "^(%d+):(%d+):(%d+)$")
+				local model = if line and index then busByKey(tonumber(line) :: number, tonumber(index) :: number) else nil
+				local target = if model and seatNo then seatOf(model, tonumber(seatNo) :: number) else nil
+				local chassis = model and model.PrimaryPart
+				if model and target and chassis then
+					local kerb = chassis.CFrame:ToObjectSpace(CFrame.new(root.Position))
+					route = boardRoute(model, chassis, target, kerb, 3)
+				end
+			end
+		elseif type(offAt) == "number" and now - offAt < tuning.BusAlight then
+			value = offAt
+			if not seen or seen.value ~= offAt then
+				local line, index = string.match(tostring(character:GetAttribute("BusOff")), "^(%d+):(%d+)$")
+				local model = if line and index then busByKey(tonumber(line) :: number, tonumber(index) :: number) else nil
+				local from = lastSeat[character]
+				local kerb = character:GetAttribute("BusOffTo")
+				local chassis = model and model.PrimaryPart
+				if model and from and from.Parent == model and chassis and typeof(kerb) == "Vector3" then
+					route = alightRoute(model, chassis, from, root.CFrame, kerb, 3)
+				end
+			end
+		end
+		if value and route then
+			seenMoves[character] = { value = value, route = route, total = route.total }
+			seen = seenMoves[character]
+		end
+		if value and seen and seen.value == value then
+			live[character] = true
+			Interact.pose(character, movePose(seen.route, math.clamp(now - value, 0, seen.total)), dt, OWNER)
+		end
+	end
+	for character in seenMoves do
+		if not live[character] then
+			seenMoves[character] = nil
+			Interact.release(character, OWNER)
+		end
+	end
+	for character in lastSeat do
+		if not character.Parent then
+			lastSeat[character] = nil
+		end
+	end
+end
+
+-- The buses somebody gets on or off now (their doors stay open), from everybody's attributes (the poll).
+local function updateHeld()
+	table.clear(heldOpen)
+	local now = workspace:GetServerTimeNow()
+	local tuning = Config.Interact
+	for _, other in Players:GetPlayers() do
+		local character = other.Character
+		if not character then
+			continue
+		end
+		local boardAt, offAt = character:GetAttribute("BusBoardAt"), character:GetAttribute("BusOffAt")
+		local key: string? = nil
+		if type(boardAt) == "number" and now - boardAt < tuning.BusBoard then
+			key = tostring(character:GetAttribute("BusBoard"))
+		elseif type(offAt) == "number" and now - offAt < tuning.BusAlight then
+			key = tostring(character:GetAttribute("BusOff"))
+		end
+		local line, index = nil, nil
+		if key then
+			line, index = string.match(key, "^(%d+):(%d+)")
+		end
+		local model = if line and index then busByKey(tonumber(line) :: number, tonumber(index) :: number) else nil
+		if model then
+			heldOpen[model] = true
+		end
+	end
+end
+
 -- ── Riding ─────────────────────────────────────────────────────────────────
 
 local function busOf(seat: Instance?): Model?
@@ -477,6 +968,11 @@ function BusRide.start()
 			boards[item] = nil
 		end
 	end)
+	-- 5.7: the walks on and off, before the physics step (what is set here is what is simulated and sent)
+	RunService.PreSimulation:Connect(function(dt: number)
+		moveStep(dt)
+		othersStep(dt)
+	end)
 	task.spawn(function()
 		local folder = workspace:WaitForChild("Buses", 60)
 		if not folder then
@@ -485,6 +981,7 @@ function BusRide.start()
 		watchFolder(folder)
 		RunService.RenderStepped:Connect(function(dt: number)
 			place(dt) -- (once a frame: the buses are anchored and never collide)
+			updateDoors(dt) -- 5.7: the folding doors (after the buses moved)
 		end)
 	end)
 	task.spawn(function()
@@ -495,6 +992,7 @@ function BusRide.start()
 				local now = workspace:GetServerTimeNow()
 				updateBanner(now)
 				updateCards(now)
+				updateHeld()
 				if os.clock() >= boardAt then
 					boardAt = os.clock() + BOARD_EVERY
 					updateBoards(now)

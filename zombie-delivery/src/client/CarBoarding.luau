@@ -17,9 +17,17 @@
 -- Out of a fast car (Config.Cargo.AlightSlideMaxSpeed) you are put out at the door at once, as before.
 --
 -- 4.2, touch: an EXIT button while you sit in a car (CarBoarding.exit, the same CarDoor "out" as E).
--- 5.1, a bike (the car's attribute Bike): its saddle is a doorless seat on the left, so getting on is the short climb,
--- played as a hop: upright (no duck under a door frame), the body turning from the bike to face forward over the arc
--- (Config.Cargo.ClimbArc). Getting off the same backwards, to the left.
+-- 5.1, a bike (the car's attribute Bike): its saddle is a doorless seat on the left.
+-- 5.7, getting on a bike or a scooter at the car's level (Config.Interact; the curves: shared/InteractPose.luau, laid
+-- on the joints by client/Interact.luau): a step to the bike's left side, facing along it, the hands going to the
+-- grips; then on a bike the right leg swings up and back over the saddle as the body settles onto it, on the
+-- E-Scooter (BikeStand) the left foot steps up onto the deck and the right one follows, the hands on the bar. The move
+-- is BikeMount long (the server seats you then: server/Vehicles.luau) and ends in the seated rider's pose
+-- (client/BikeRider.luau takes over). A ZDC RIDE rental's BoardAt lies a moment ahead (its scooter slides off the dock
+-- first: client/RentalUi.luau): the step to its side takes that long. Getting off is the same backwards in
+-- BikeDismount, to the left, facing forward. The camera eases as for a car (Drive.setBoarding). Everybody sees the
+-- legs and arms: the others' moves are posed from their Boarding / BoardAt and AlightAt attributes (their own clients
+-- move their bodies).
 --
 -- E in a seat: while you sit in a car the other prompts around you are hidden (the door prompts and the back's already
 -- are, client/CarVisuals.luau), so E means "get out"; a prompt meant for a driver (the 🅿 GARAGE posts, or any prompt
@@ -36,8 +44,10 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Boarding = require(Shared:WaitForChild("Boarding"))
 local Config = require(Shared:WaitForChild("Config"))
+local InteractPose = require(Shared:WaitForChild("InteractPose"))
 local Net = require(Shared:WaitForChild("Net"))
 local Drive = require(script.Parent.Drive)
+local Interact = require(script.Parent.Interact)
 
 local CarBoarding = {}
 
@@ -47,6 +57,8 @@ local EXIT_ACTION = "ZombieDeliveryCarExit"
 local MIN_SPAN = 0.2 -- the move to get in never plays quicker than this
 local HOLD = 1.2 -- after the move, waiting this long for the seat; then back out at the door
 local OUT_EXTRA = 0.6 -- getting out you end this far beyond the door's stand point
+local POSE_RANGE = 160 -- the others' bike moves are posed within this of the camera
+local OWNER = "bike" -- (client/Interact.luau)
 
 type Move = {
 	kind: string, -- "board" | "alight"
@@ -60,7 +72,9 @@ type Move = {
 	side: number, -- -1 left, 1 right
 	outside: number, -- the body's half width at the door
 	climb: boolean, -- a seat with no door: an arc, no handle
-	hop: boolean, -- 5.1: onto (or off) a bike's saddle
+	bike: boolean, -- 5.7: onto (or off) a bike's saddle or a scooter's deck (the mount)
+	deck: boolean, -- 5.7: the E-Scooter: a step up onto its deck
+	step: number, -- 5.7, a mount: the share of the move spent stepping to the side
 	started: number, -- os.clock()
 	span: number, -- seconds this client plays the move over
 	total: number, -- the move's own length (BoardSeconds / AlightSeconds)
@@ -200,16 +214,28 @@ local function standAt(chassis: BasePart, at: Attachment, side: number, extra: n
 	return CFrame.lookAt(position, position + look)
 end
 
--- How the body bends over the slide (u 0..1): ducking through a door; (5.1) upright onto a bike's saddle.
-local function bodyTurn(m: Move, u: number): CFrame
-	if m.hop then
-		return CFrame.identity
-	end
+-- How the body bends over the slide (u 0..1): ducking through a door.
+local function bodyTurn(_m: Move, u: number): CFrame
 	return CFrame.Angles(-Boarding.duck(u), 0, 0)
+end
+
+-- 5.7: a mount's body (chassis space), u 0..1: the step from `from` to the bike's side (`stand`), then onto the saddle
+-- (`to`): a little high over a bike's saddle (the leg goes over), up the deck's step on a scooter.
+local function mountPose(m: Move, from: CFrame, stand: CFrame, to: CFrame, u: number): CFrame
+	if u <= m.step then
+		return from:Lerp(stand, InteractPose.ease(u / math.max(1e-3, m.step)))
+	end
+	local k = InteractPose.ease((u - m.step) / math.max(1e-3, 1 - m.step))
+	local lift = (if m.deck then 0.45 else 0.35) * math.sin(math.pi * k)
+	local position = stand.Position:Lerp(to.Position, k) + Vector3.new(0, lift, 0)
+	return CFrame.new(position) * stand.Rotation:Lerp(to.Rotation, k)
 end
 
 -- The pose on the way in, t seconds into the move (chassis space).
 local function boardPose(m: Move, t: number): CFrame
+	if m.bike then
+		return mountPose(m, m.from, m.stand, m.to, t / math.max(1e-3, m.total))
+	end
 	local phase, u = Boarding.boardPhase(t)
 	if phase == "step" then
 		return m.from:Lerp(m.stand, u)
@@ -222,6 +248,10 @@ end
 
 -- The pose on the way out (chassis space).
 local function alightPose(m: Move, t: number): CFrame
+	if m.bike then
+		-- 5.7: the mount backwards, from the saddle (`from`) to the side (`to`)
+		return mountPose(m, m.to, m.to, m.from, 1 - t / math.max(1e-3, m.total))
+	end
 	local u = Boarding.ease(t / math.max(1e-3, m.total))
 	local a, c = m.from.Position, m.to.Position
 	local bx, by, bz = Boarding.through(m.side, m.outside, a.Y, c.Z, c.Y, m.climb)
@@ -243,6 +273,7 @@ local function stop(at: CFrame?)
 	end
 	local character = m.humanoid.Parent
 	if character and character:IsA("Model") then
+		Interact.release(character, OWNER)
 		freeze(character, m.humanoid, false)
 	else
 		frozen = false
@@ -275,9 +306,16 @@ local function beginBoard(character: Model, humanoid: Humanoid)
 	local cfg = Config.Cargo
 	local frame = chassis.CFrame
 	local side = if at.Position.X >= 0 then 1 else -1
-	local stand = standAt(chassis, at, side, 0, humanoid, root, character, car, Vector3.new(-side, 0, 0))
+	local bike = car:GetAttribute("Bike") == true
+	-- (5.7: beside a bike you face along it; at a door, the car)
+	local stand = standAt(chassis, at, side, 0, humanoid, root, character, car, if bike then Vector3.new(0, 0, -1) else Vector3.new(-side, 0, 0))
 	local to = frame:ToObjectSpace(seat.CFrame * CFrame.new(0, seat.Size.Y / 2 + cfg.BoardSitLift, 0))
 	local late = workspace:GetServerTimeNow() - value
+	local total, share, span = cfg.BoardSeconds, 0, Boarding.span(late, cfg.BoardSeconds, MIN_SPAN)
+	if bike then
+		total, share = InteractPose.mountTimes(-late) -- (a rental's BoardAt lies ahead: its scooter slides off the dock first)
+		span = if late < 0 then total else Boarding.span(late, total, MIN_SPAN)
+	end
 	move = {
 		kind = "board",
 		car = car,
@@ -290,10 +328,12 @@ local function beginBoard(character: Model, humanoid: Humanoid)
 		side = side,
 		outside = math.max(0, math.abs(at.Position.X) - cfg.DoorStandOut),
 		climb = not panel,
-		hop = car:GetAttribute("Bike") == true,
+		bike = bike,
+		deck = car:GetAttribute("BikeStand") == true,
+		step = share,
 		started = os.clock(),
-		span = Boarding.span(late, cfg.BoardSeconds, MIN_SPAN),
-		total = cfg.BoardSeconds,
+		span = span,
+		total = total,
 		value = value,
 	}
 	Drive.setBoarding(car, true)
@@ -321,8 +361,10 @@ local function beginAlight(character: Model, humanoid: Humanoid, seat: BasePart)
 	end
 	local cfg = Config.Cargo
 	local side = if at.Position.X >= 0 then 1 else -1
-	local look = Vector3.new(side * 0.7, 0, -1).Unit -- out and toward the front
+	local bike = car:GetAttribute("Bike") == true
+	local look = if bike then Vector3.new(0, 0, -1) else Vector3.new(side * 0.7, 0, -1).Unit -- out and toward the front
 	local out = standAt(chassis, at, side, OUT_EXTRA, humanoid, root, character, car, look)
+	local seconds = if bike then Config.Interact.BikeDismount else cfg.AlightSeconds
 	local v = chassis.AssemblyLinearVelocity
 	if Vector3.new(v.X, 0, v.Z).Magnitude > cfg.AlightSlideMaxSpeed then
 		-- Out of a moving car: at the door at once (it would drag you along otherwise).
@@ -344,10 +386,12 @@ local function beginAlight(character: Model, humanoid: Humanoid, seat: BasePart)
 		side = side,
 		outside = math.max(0, math.abs(at.Position.X) - cfg.DoorStandOut),
 		climb = not panel,
-		hop = car:GetAttribute("Bike") == true,
+		bike = bike,
+		deck = car:GetAttribute("BikeStand") == true,
+		step = Config.Interact.BikeStep,
 		started = os.clock(),
-		span = cfg.AlightSeconds,
-		total = cfg.AlightSeconds,
+		span = seconds,
+		total = seconds,
 		value = nil,
 	}
 	Drive.setBoarding(car, false)
@@ -386,6 +430,72 @@ local function step(dt: number)
 	-- Carried along with the car, and gravity cancelled over this step (the next frame sets it again anyway).
 	m.root.AssemblyLinearVelocity = m.chassis.AssemblyLinearVelocity + Vector3.new(0, workspace.Gravity * dt * 0.5, 0)
 	m.root.AssemblyAngularVelocity = Vector3.zero
+	-- 5.7: the legs and the arms of a mount (yours; the others' below)
+	local character = m.humanoid.Parent
+	if m.bike and character and character:IsA("Model") then
+		local u = t / math.max(1e-3, m.total)
+		Interact.pose(character, InteractPose.bikeMount(if m.kind == "board" then u else 1 - u, m.deck, m.step), dt, OWNER)
+	end
+end
+
+-- ── 5.7: the others' mounts ───────────────────────────────────────────────
+
+-- The bike each other rider sat on lately (true: a scooter), for the legs of their way off.
+local lastBike: { [Model]: boolean } = {}
+
+local function bikeOf(ownerId: number?): Model?
+	local car = if ownerId then carOf(ownerId) else nil
+	return if car and car:GetAttribute("Bike") == true then car else nil
+end
+
+-- Every other player's mount or dismount near the camera: the legs and the arms from their attributes (their own
+-- client moves the body): the server's BoardAt (a mount) or AlightAt (off a bike they sat on).
+local function othersStep(dt: number)
+	local camera = workspace.CurrentCamera
+	local eye = if camera then camera.CFrame.Position else Vector3.zero
+	local now = workspace:GetServerTimeNow()
+	local cfg = Config.Interact
+	for _, other in Players:GetPlayers() do
+		local character = other.Character
+		if other == player or not character then
+			continue
+		end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local root = humanoid and humanoid.RootPart
+		if not humanoid or not root or humanoid.Health <= 0 or (root.Position - eye).Magnitude > POSE_RANGE then
+			Interact.release(character, OWNER)
+			continue
+		end
+		local seat = humanoid.SeatPart
+		local seatCar = seat and seat.Parent
+		if seatCar and seatCar:IsA("Model") and seatCar:GetAttribute("Bike") == true then
+			lastBike[character] = seatCar:GetAttribute("BikeStand") == true
+		elseif seatCar then
+			lastBike[character] = nil -- (a car's seat: its way out is no dismount)
+		end
+		local pose: InteractPose.Pose? = nil
+		local boardAt = character:GetAttribute("BoardAt")
+		local alightAt = character:GetAttribute("AlightAt")
+		if seat == nil and type(boardAt) == "number" and now - boardAt < cfg.BikeMount + 0.3 then
+			local bike = bikeOf((Boarding.decode(character:GetAttribute("Boarding"))))
+			if bike then
+				pose = InteractPose.bikeMount((now - boardAt) / cfg.BikeMount, bike:GetAttribute("BikeStand") == true, cfg.BikeStep)
+			end
+		elseif seat == nil and type(alightAt) == "number" and now - alightAt < cfg.BikeDismount and lastBike[character] ~= nil then
+			pose = InteractPose.bikeMount(1 - (now - alightAt) / cfg.BikeDismount, lastBike[character] == true, cfg.BikeStep)
+		end
+		if pose then
+			Interact.pose(character, pose, dt, OWNER)
+		else
+			Interact.release(character, OWNER)
+		end
+	end
+	for character in lastBike do
+		if not character.Parent then
+			lastBike[character] = nil
+		end
+	end
+	Interact.sweep()
 end
 
 -- ── E in a seat ────────────────────────────────────────────────────────────
@@ -542,7 +652,10 @@ function CarBoarding.start()
 		task.spawn(watchCharacter, player.Character)
 	end
 	-- Before the physics step, like the poses (client/ArmPose.luau): what is set here is what is simulated and sent.
-	RunService.PreSimulation:Connect(step)
+	RunService.PreSimulation:Connect(function(dt: number)
+		step(dt)
+		othersStep(dt)
+	end)
 end
 
 return CarBoarding

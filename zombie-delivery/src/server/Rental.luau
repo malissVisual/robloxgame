@@ -355,7 +355,7 @@ local function rent(player: Player, state: DockState)
 	player:SetAttribute("Rental", state.dock.id)
 	task.defer(function()
 		if not car.wrecked and car.model.Parent and humanoid.Health > 0 and humanoid.SeatPart == nil then
-			car.seat:Sit(humanoid)
+			Vehicles.mount(player, car, Vector3.new(state.dock.nx, 0, state.dock.nz) * Config.Interact.DockSlide) -- 5.7: it slides off the dock, then you get on
 		end
 	end)
 	tell(player, "ZDC RIDE: it's yours for the ride. Leave it anywhere, or Return it at any dock.")

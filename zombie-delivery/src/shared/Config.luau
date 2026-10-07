@@ -1644,7 +1644,34 @@ Config.ZipLines = {
 	Cooldown = 3, -- seconds between the end of a ride (or a climb) and the next ride of one player
 	SafeDrop = 6, -- Space lets go only this low over a platform's roof (else it is ignored)
 	Grace = 0.8, -- seconds after a ride's end before the server puts a late rider down at the end
-	Fade = 0.25, -- a climb: the screen fades for this long before you are up (or down)
+}
+
+-- 5.7, the interactions at the car's level (shared/InteractPose.luau has the curves; client/Interact.luau lays the
+-- poses on the joints): getting on a bike or a scooter (client/CarBoarding.luau; the server seats you at the move's
+-- end: server/Vehicles.luau), the bus's folding door and the walk to a seat (client/BusRide.luau, server/Buses.luau),
+-- the zip lines' ladders climbed for real (client/ZipRide.luau, server/ZipLines.luau) and a ZDC RIDE scooter unclipped
+-- from its dock (client/RentalUi.luau, server/Rental.luau).
+Config.Interact = {
+	BikeMount = 0.6, -- seconds from the E to the saddle: a step to the bike's side, then the leg over (the server seats you)
+	BikeStep = 0.3, -- of BikeMount: the step to the side
+	BikeDismount = 0.55, -- seconds: the leg back over and a step off to the side
+	DockUnclip = 0.45, -- seconds: a rented scooter slides off the dock's charging rail before you get on
+	DockSlide = 1.0, -- studs it slides out (toward the street)
+	BusBoard = 1.7, -- seconds from the Board prompt to the seat: to the door, up the step, along the aisle, sit (the server seats you)
+	BusAlight = 1.3, -- seconds from the seat out of the door onto the kerb
+	BusDoor = 0.45, -- seconds: the folding door opens (or shuts)
+	BusDoorShut = 0.8, -- the door shuts this long before the bus leaves (no Board after that)
+	BusAlightGrace = 0.5, -- seconds after BusAlight: somebody not on the kerb by then is put there by the server
+	ClimbSpeed = 8, -- studs / s up (or down) a zip line's ladder
+	ClimbWalk = 14, -- studs / s across the roof between the ladder and the platform
+	ClimbOnto = 0.5, -- seconds from the street onto the ladder (or off it at the foot)
+	ClimbOver = 0.8, -- seconds over the roof's edge
+	ClimbHop = 0.45, -- seconds over a platform's rail
+	ClimbGrace = 0.6, -- seconds after a climb's end: a climber not at its end by then is put there by the server
+	ClimbCooldown = 0.5, -- seconds after a climb before the next one (or a ride)
+	RungStep = 1, -- studs climbed per hand-over-hand stroke
+	StepLength = 2.2, -- studs per step of a walk played by a move
+	ZipReach = 0.4, -- seconds: the hands go up to the trolley as a ride starts
 }
 
 -- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit

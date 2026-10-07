@@ -4,11 +4,19 @@
 -- Built when this starts (after World), at most 30 native parts a line (26): on each of its two roofs a landing
 -- platform (a floor, a red rail on three sides, open toward the cable, a gantry of two posts and a crossbar the cable
 -- hangs from; the start's with a ZIP sign and a lamp that glows at night), a ladder (a TrussPart against the street
--- wall, for the look: nothing climbs it) and the cable in 8 black segments along its sag. The roof boxes World put
--- where a platform stands are taken off. A Model per line in workspace.World.ZipLines (Atomic streaming).
+-- wall: the climbs below go up it, not the physics, so it does not collide) and the cable in 8 black segments along
+-- its sag. The roof boxes World put where a platform stands are taken off. A Model per line in
+-- workspace.World.ZipLines (Atomic streaming).
 --
 -- The prompts: "Climb" at each ladder's foot, "Zip" at the start platform's front, "Climb down" at each platform's back.
--- A climb fades the player's screen (the Zip remote's "fade": client/ZipRide.luau) and moves them up or down.
+-- 5.7, a climb is a real one (it used to fade the screen and move you): checked here like a ride's start (alive, on
+-- foot, no trolley, not riding or climbing already, at the prompt), it is marked on the character (ClimbLine = the
+-- line's id, ClimbWhich = 1 the start's ladder or 2 the end's, ClimbUp, and ClimbAt = the server time it starts) and
+-- every client plays it: the climber's own one carries the body along shared/InteractPose.luau's climbRoute (onto the
+-- ladder, up it hand over hand at Config.Interact.ClimbSpeed, over the roof's edge, across the roof and over the
+-- platform's rail; down the same backwards), every one poses the limbs (client/ZipRide.luau). The end is the
+-- server's: ClimbGrace seconds after the route's length a climber who is not at its end is put there (and the
+-- attributes go); a death, a reset or leaving ends it at once.
 -- A ride, checked here: alive, on foot (not seated, not getting in), not on a ride already, past the Cooldown, within
 -- Reach of the start platform, nothing in the hands and no trolley ("Hands full: pack it first"; the backpack's
 -- pieces ride along). The character's attributes ZipLine (the line's id) and ZipAt (the server time it starts) tell
@@ -24,6 +32,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local InteractPose = require(Shared.InteractPose)
 local Net = require(Shared.Net)
 local ZipData = require(Shared.ZipLines)
 local Vehicles = require(script.Parent.Vehicles)
@@ -44,9 +53,13 @@ local LAMP_LIT = Color3.fromRGB(255, 226, 170)
 local LAMP_DIM = Color3.fromRGB(120, 120, 116)
 
 type Ride = { line: ZipData.Line, start: number, character: Model }
+type Climb = { character: Model, finish: number, to: CFrame }
 
 local rides: { [Player]: Ride } = {}
-local lastClimb: { [Player]: number } = {} -- (a climb: no second one while the first fades)
+local climbs: { [Player]: Climb } = {} -- 5.7: on a ladder (or on the way to or from it) now
+local lastClimb: { [Player]: number } = {} -- (the end of a climb: ClimbCooldown before the next)
+local CLIMB_LIFT = 3 -- the server's root over the feet where a climb ends (the clients' own height plays it)
+local CLIMB_NEAR = 3 -- a climber within this of the end at its time stays where they are
 local lastRide: { [Player]: number } = {} -- (the end of a ride: the Cooldown before the next)
 local started = false
 
@@ -152,18 +165,6 @@ local function platform(model: Instance, p: ZipData.Platform, start: boolean, li
 	return frame, floor
 end
 
--- Where a climb puts you: up on the platform's back half, looking at the cable; down at the ladder's foot, looking
--- at the street.
-local function upSpot(p: ZipData.Platform): CFrame
-	local at = Vector3.new(p.x - p.fx * (Tuning.Platform / 2 - 1.6), p.floor + 3, p.z - p.fz * (Tuning.Platform / 2 - 1.6))
-	return CFrame.lookAt(at, at + Vector3.new(p.fx, 0, p.fz))
-end
-
-local function downSpot(ladder: ZipData.Ladder): CFrame
-	local at = Vector3.new(ladder.x + ladder.nx * 3.5, ladder.base + 3, ladder.z + ladder.nz * 3.5)
-	return CFrame.lookAt(at, at + Vector3.new(ladder.nx, 0, ladder.nz))
-end
-
 local function landing(line: ZipData.Line): CFrame
 	local at = Vector3.new(line.b.x, line.b.floor + 3, line.b.z)
 	return CFrame.lookAt(at, at + Vector3.new(line.dx, 0, line.dz))
@@ -182,7 +183,7 @@ end
 -- On foot, free to go (not seated, not getting in, not riding, `cooldown` seconds past the last ride or climb)? Else
 -- what to say (or "": nothing).
 local function busy(player: Player, character: Model, humanoid: Humanoid, since: { [Player]: number }, cooldown: number): string?
-	if rides[player] then
+	if rides[player] or climbs[player] then
 		return ""
 	end
 	if humanoid.SeatPart ~= nil or Vehicles.seatedIn(player) ~= nil or character:GetAttribute("Boarding") ~= nil then
@@ -194,12 +195,13 @@ local function busy(player: Player, character: Model, humanoid: Humanoid, since:
 	return nil
 end
 
-local function climb(player: Player, from: Vector3, to: CFrame)
+-- 5.7: a climb up (the ladder's foot → the platform) or down (the platform → the sidewalk), checked; see the top.
+local function climb(player: Player, line: ZipData.Line, which: number, up: boolean, from: Vector3)
 	local character, humanoid, root = rootOf(player)
 	if not character or not humanoid or not root then
 		return
 	end
-	local why = busy(player, character, humanoid, lastClimb, Tuning.Fade + 0.5)
+	local why = busy(player, character, humanoid, lastClimb, Config.Interact.ClimbCooldown)
 	if why then
 		if why ~= "" then
 			tell(player, why)
@@ -213,22 +215,45 @@ local function climb(player: Player, from: Vector3, to: CFrame)
 		tell(player, "Set the trolley down first.")
 		return
 	end
+	local at = root.Position
+	local route = InteractPose.climbRoute(line, which, up, at.X, at.Y, at.Z, CLIMB_LIFT)
+	local x, y, z, fx, fz = InteractPose.climbEnd(line, which, up, CLIMB_LIFT)
+	local to = CFrame.lookAt(Vector3.new(x, y, z), Vector3.new(x + fx, y, z + fz))
+	local startAt = workspace:GetServerTimeNow() + LEAD
+	climbs[player] = { character = character, finish = startAt + route.total, to = to }
 	lastClimb[player] = os.clock()
-	Net.get("Zip"):FireClient(player, "fade", Tuning.Fade)
-	task.delay(Tuning.Fade, function()
-		if player.Character ~= character or humanoid.Health <= 0 or rides[player] then
-			return
-		end
+	character:SetAttribute("ClimbLine", line.id)
+	character:SetAttribute("ClimbWhich", which)
+	character:SetAttribute("ClimbUp", up)
+	character:SetAttribute("ClimbAt", startAt) -- (last: the clients start on it)
+	task.spawn(function()
 		pcall(function()
 			player:RequestStreamAroundAsync(to.Position, 3)
 		end)
-		-- (re-checked after the fade: a player who sat in a car meanwhile must not carry it onto the roof)
-		if player.Character == character and humanoid.Health > 0 and humanoid.SeatPart == nil and Vehicles.seatedIn(player) == nil
-			and character:GetAttribute("Boarding") == nil and not rides[player] then
-			root.AssemblyLinearVelocity = Vector3.zero
-			character:PivotTo(to)
-		end
 	end)
+end
+
+-- The climb is over: the attributes go (putDown: at its end, when the climber is not there by now).
+local function endClimb(player: Player, c: Climb, putDown: boolean)
+	climbs[player] = nil
+	lastClimb[player] = os.clock()
+	local character = c.character
+	if putDown and player.Character == character then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local root = humanoid and humanoid.RootPart
+		-- (not somebody who sat in a car meanwhile: the car must not go onto the roof)
+		if humanoid and root and humanoid.Health > 0 and humanoid.SeatPart == nil and Vehicles.seatedIn(player) == nil
+			and character:GetAttribute("Boarding") == nil and not rides[player] and (root.Position - c.to.Position).Magnitude > CLIMB_NEAR then
+			root.AssemblyLinearVelocity = Vector3.zero
+			character:PivotTo(c.to)
+		end
+	end
+	if character.Parent then
+		character:SetAttribute("ClimbAt", nil)
+		character:SetAttribute("ClimbLine", nil)
+		character:SetAttribute("ClimbWhich", nil)
+		character:SetAttribute("ClimbUp", nil)
+	end
 end
 
 local function zip(player: Player, line: ZipData.Line)
@@ -318,6 +343,14 @@ local function check()
 			stop(player, ride, true)
 		end
 	end
+	for player, c in table.clone(climbs) do
+		local humanoid = c.character:FindFirstChildOfClass("Humanoid")
+		if player.Parent == nil or player.Character ~= c.character or not humanoid or humanoid.Health <= 0 then
+			endClimb(player, c, false)
+		elseif now >= c.finish + Config.Interact.ClimbGrace then
+			endClimb(player, c, true)
+		end
+	end
 end
 
 local function build(folder: Instance, world: Instance, line: ZipData.Line)
@@ -355,10 +388,9 @@ local function build(folder: Instance, world: Instance, line: ZipData.Line)
 		local up = prompt(truss, "ClimbPrompt", "Climb", line.name, 0.3, 8)
 		local foot = up.Parent :: Attachment
 		foot.Position = Vector3.new(ladder.nx * 1.5, -height / 2 + 2.5, ladder.nz * 1.5)
-		local p = if index == 1 then line.a else line.b
 		local from = Vector3.new(ladder.x + ladder.nx * 2.5, ladder.base + 3, ladder.z + ladder.nz * 2.5)
 		up.Triggered:Connect(function(player: Player)
-			climb(player, from, upSpot(p))
+			climb(player, line, index, true, from)
 		end)
 	end
 	-- On the platforms: Zip at the start's front, Climb down at both backs.
@@ -371,10 +403,9 @@ local function build(folder: Instance, world: Instance, line: ZipData.Line)
 	for index, frame in { frameA, frameB } do
 		local down = prompt(if index == 1 then floorA else floorB, "ClimbDownPrompt", "Climb down", line.name, 0.3, 5)
 		;(down.Parent :: Attachment).WorldCFrame = frame * CFrame.new(0, 2.5, P / 2 - 1.4)
-		local ladder = if index == 1 then line.ladderA else line.ladderB
 		local from = frame.Position + Vector3.new(0, 3, 0)
 		down.Triggered:Connect(function(player: Player)
-			climb(player, from, downSpot(ladder))
+			climb(player, line, index, false, from)
 		end)
 	end
 	model.Parent = folder
@@ -409,6 +440,7 @@ function ZipLines.start()
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		rides[player] = nil
+		climbs[player] = nil
 		lastClimb[player] = nil
 		lastRide[player] = nil
 	end)
