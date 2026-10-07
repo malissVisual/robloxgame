@@ -66,6 +66,17 @@ function Transport.handsRoom(kit: Kit): number
 	return room + extra
 end
 
+-- 6.0 review: the hands and the best backpack only (no bag's extra): what a backpack you might buy is compared with.
+function Transport.backpackRoom(kit: Kit): number
+	local room = Config.Cargo.HandsMax
+	for _, def in Config.Kit do
+		if kit[def.id] == true and def.room then
+			room = math.max(room, math.floor(def.room))
+		end
+	end
+	return room
+end
+
 -- The pieces of handsRoom that ride in the pack (not in the hands).
 function Transport.packRoom(kit: Kit): number
 	return math.max(0, Transport.handsRoom(kit) - Config.Cargo.HandsMax)

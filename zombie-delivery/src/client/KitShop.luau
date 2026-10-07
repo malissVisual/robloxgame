@@ -179,7 +179,7 @@ function KitShop.render(body: Instance, state: any, here: boolean)
 	for order, def in Config.Kit do
 		local owned = kit[def.id] == true
 		-- A backpack smaller than (or as big as) the room you have already adds nothing.
-		local outgrown = not owned and def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= room
+		local outgrown = not owned and def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= Transport.backpackRoom(kit)
 		-- 6.0: a vest no better than the one you have adds nothing either (the best vest counts).
 		local outclassed = not owned and def.armour ~= nil and def.armour * 100 <= armour
 		local row = P.row(body, ROW_H, order + 2, owned)

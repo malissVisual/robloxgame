@@ -124,6 +124,7 @@ local Animals = require(script.Parent.Animals)
 local Equipment = require(script.Parent.Equipment)
 local PlayerData = require(script.Parent.PlayerData) -- 6.0: the bag owned, the TRICKSHOT tip
 local Throws = require(Shared.Throws) -- 6.0: the throw's arc and tip
+local tipsPaid: { [any]: number } = setmetatable({}, { __mode = "k" }) :: any -- 6.0 review: trickshot tips paid per session
 
 local Tuning = Config.Cargo
 local Cargo = {}
@@ -2696,7 +2697,7 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 		end
 		local spot = if trace.grounded then land else onGround(plan.pile + right * 5) -- (a paper flying on: the bushes)
 		rest = CFrame.lookAt(spot, spot + right)
-		if hitDoor then
+		if hitDoor and not plan.toss then -- (6.0 review: a round's papers tip nothing: they are tossed by design)
 			local over = not trace.bounced and ray(from, land + Vector3.new(0, 1.5, 0)) ~= nil
 			tip = Throws.tip(flat(from, land), over, trace.bounced)
 		end
@@ -2715,7 +2716,11 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 		end
 	end
 	local paid = if tip then tip.total else 0
+	-- 6.0 review: the trickshot tips of one run are capped (Config.Throw.TipCap).
+	local before = tipsPaid[session] or 0
+	paid = math.max(0, math.min(paid, (Config.Throw.TipCap or 60) - before))
 	if paid > 0 then
+		tipsPaid[session] = before + paid
 		PlayerData.addMoney(player, paid)
 	end
 	fly(model, trace, function()

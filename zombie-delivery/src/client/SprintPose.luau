@@ -253,6 +253,13 @@ local function step(dt: number)
 			lay(rig.lk, S.Knee * w, 0)
 			lay(rig.rk, S.Knee * w, 0)
 			local arms = armsFree(character, mine)
+			-- (6.0 review: ArmPose lowers the arms for ~0.3 s after a carry, an aim or the phone ends: wait it out)
+			local hold = body :: any
+			if not arms then
+				hold.busyUntil = os.clock() + 0.35
+			elseif os.clock() < (hold.busyUntil or 0) then
+				arms = false
+			end
 			if arms then
 				lay(rig.ls, S.Arms * w, 0)
 				lay(rig.rs, S.Arms * w, 0)

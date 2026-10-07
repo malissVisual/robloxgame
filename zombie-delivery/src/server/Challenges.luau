@@ -255,6 +255,9 @@ end
 local function giveItem(profile: PlayerData.Profile, weapon: string?, paint: string?)
 	if weapon then
 		profile.weapons[weapon] = true
+		if profile.weapon == nil then
+			profile.weapon = weapon -- 6.0: a courier with only fists gets it in the hand
+		end
 	end
 	if paint then
 		profile.paints[paint] = true

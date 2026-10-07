@@ -2998,6 +2998,7 @@ Config.Throw = {
 	FarMax = 25, -- … up to this at Range
 	OverTip = 15, -- over a car, a fence, a wall: the straight line was blocked
 	WallTip = 10, -- off a wall
+	TipCap = 60, -- 6.0 review: the trickshot tips of one run add up to this at most
 	Dots = 20, -- the aim's dotted arc
 	-- Too fragile to throw (with a job of the FRAGILE modifier or the fragile cargo rule: everything).
 	FragileLooks = { cake = true, vaccine = true, sample = true, electronics = true, painting = true, gadget = true } :: { [string]: boolean },
