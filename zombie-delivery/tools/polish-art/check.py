@@ -54,7 +54,7 @@ local function emit(spec,info,bp)
    if info.weld then
     assert(not p.Anchored and p.Massless and not p.CanCollide and not p.CanQuery)
     local w=p:FindFirstChild("PolishWeld");assert(w and w.Part0==root and w.Part1==p)
-   else assert(p.Anchored) end
+   else assert(p.Anchored and p.Massless) end
    record.position=v(p.Position);record.rotation=p.CFrame.R;record.size=v(p.Size)
    record.color={p.Color.R,p.Color.G,p.Color.B};record.material=p.Material;record.shape=p.Shape or "Block";record.opacity=1-p.Transparency
    record.collide=p.CanCollide;record.query=p.CanQuery;record.shadow=p.CastShadow
@@ -74,6 +74,12 @@ local function emit(spec,info,bp)
   local p=names[mount.attach];local a=p:FindFirstChild(mount.name);assert(a)
   assert(((p.CFrame*a.CFrame).Position-M.Vector3.new(mount.at[1],mount.at[2],mount.at[3])).Magnitude<1e-5)
  end
+  local registrations=0
+ for _,piece in spec.pieces do
+  if piece.night then registrations+=1 end
+  if piece.light then registrations+=1 end
+ end
+ assert(seen==registrations,"Night callback registration mismatch")
  assert(lights<=(info.lights or 0))
  print(encode({id=info.id or spec.id,spec=spec,parts=parts,info=info,camera="front"}))
  model:Destroy();assert(model.Parent==nil and #model:GetChildren()==0)
@@ -109,10 +115,10 @@ local sizes={{36,43,16},{38,40,43},{43,36,89}}
 for n,factory in factories do
  for k,size in sizes do
   for direction=1,4 do
-   for protected=0,1 do
+   for protected=0,3 do
     local normals={{0,-1},{1,0},{0,1},{-1,0}}
     local a=normals[direction];local b=normals[direction%4+1]
-    local walls={{nx=a[1],nz=a[2],door=if protected==1 then 0 else nil,ladders=if protected==1 then {-10} else {},zipRoof=protected==1},{nx=b[1],nz=b[2],ladders={}}}
+    local walls={{nx=a[1],nz=a[2],door=if protected==0 then nil elseif protected==1 then 0 elseif protected==2 then -12 else 12,ladders=if protected==0 then {} elseif protected==1 then {-10} elseif protected==2 then {12} else {-12},zipRoof=protected>0},{nx=b[1],nz=b[2],ladders={}}}
     local bp=factory(size[1],size[2],size[3],walls)
     local pieces={}
     for _,d in bp.details do
@@ -128,6 +134,7 @@ end
 local C=require("./Config")
 local Shelter=require("./Shelter");local Dock=require("./Dock");local Zip=require("./ZipPlatform");local Bus=require("./BusLivery")
 emit(Shelter.build({73,121,155},"BONE STREET","1 / 3"),{budget=35,lights=1,id="shelter"})
+emit(Shelter.build({73,121,155},"DOWNTOWN","1 / 2 / 3",{{73,121,155},{215,74,70},{122,146,107}}),{budget=35,lights=1,id="shelter3"})
 for slots=2,3 do emit(Dock.build(slots,C.Rental.SlotPitch,"DOWNTOWN"),{budget=24,lights=1,id="dock"..slots,slots=slots,pitch=C.Rental.SlotPitch}) end
 emit(Zip.platform(C.ZipLines.Platform,C.ZipLines.CableHeight,"BONE ST"),{budget=30,lights=1,id="zip-platform",size=C.ZipLines.Platform,height=C.ZipLines.CableHeight})
 for _,height in {9,16,43,89} do emit(Zip.ladder(height),{budget=12,lights=0,id="ladder"..height,height=height}) end
@@ -155,13 +162,13 @@ def check(mode,luau,output):
             sources["BusLivery"]=server/"VehicleArt/BusLivery.luau"
         for name,path in sources.items():
             source=path.read_text()
-            source=re.sub(r"require\(script\.Parent(?:\.Parent)?\.(?:PolishArt\.|TowerArt\.)?(\w+)\)",r'require("./\1")',source)
+            source=re.sub(r"require\(script\.Parent(?:\.Parent)?\.(?:PolishArt\.|TowerArt\.|BuildingLooks\.)?(\w+)\)",r'require("./\1")',source)
             (tmp/(name+".luau")).write_text((PREFIX if name in ("Builder","Kit") else "")+source)
         mock=(ROOT/"tools/vehicle-preview/roblox-mock.luau").read_text().replace("Part=true,WedgePart=true","Part=true,TrussPart=true,WedgePart=true")
         (tmp/"mock.luau").write_text(mock)
         (tmp/"run.luau").write_text(RUNTIME+samples(mode))
         result=subprocess.run([str(Path(luau).resolve()),"run.luau"],cwd=tmp,capture_output=True,text=True)
-        if result.returncode:raise RuntimeError(result.stderr + "\nLast record: " + result.stdout.splitlines()[-1][:1200])
+        if result.returncode:raise RuntimeError(result.stderr + "\nLast record: " + (result.stdout.splitlines() or ["no records"])[-1][:1200])
     rows=[json.loads(line) for line in result.stdout.splitlines()]
     models=[r for r in rows if "parts" in r]
     for model in models:
@@ -172,6 +179,7 @@ def check(mode,luau,output):
             assert min(p["size"])>=.02 and all(0<=c<=1 for c in p["color"])
             if p["shape"]=="Cylinder":assert abs(p["size"][1]-p["size"][2])<1e-6,(model["id"],p["name"],"noncircular cylinder")
             if not p["collide"]:assert not p["query"]
+            assert not p["shadow"], (model["id"], p["name"], "small art shadows")
             if mode=="street":
                 e=extent(p);f=info["footprint"]
                 assert abs(p["position"][0])+e[0]<=f[0]/2+1e-5,(model["id"],p["name"],"X envelope")
@@ -215,7 +223,7 @@ def stop_check(model):
     mounts={p["name"]:p for p in spec.get("attachments",[]) or []}
     slots={s["name"] for p in spec["pieces"] for s in p.get("slots",[])}
     id=info["id"]
-    if id=="shelter":
+    if id.startswith("shelter"):
         assert "ArrivalsBoard" in named and {"Arrivals","StopName","Lines"}<=slots
         for p in model["parts"]:
             if "size" in p and p["name"]!="KerbLine":assert p["position"][2]+extent(p)[2]<=3+1e-5,"shelter blocks walk line"
