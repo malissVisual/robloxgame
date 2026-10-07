@@ -14,7 +14,7 @@ export type Spec = { id: string, pieces: { Piece }, attachments: { Mount }? }
 export type Options = { weldTo: BasePart?, lineColor: Color3?, nightLight: ((Instance, Color3?, Color3?, string?) -> ())? }
 
 function Builder.build(parent: Instance, frame: CFrame, spec: Spec, options: Options?): Model
-	local opt = options or {}
+	local opt: Options = options or ({} :: Options)
 	local model = Instance.new("Model")
 	model.Name = spec.id
 	local parts: { [string]: BasePart } = {}
@@ -73,13 +73,16 @@ function Builder.build(parent: Instance, frame: CFrame, spec: Spec, options: Opt
 			light.Color = Color3.fromRGB(255, 225, 187)
 			light.Shadows = false
 			light.Parent = p
-			if opt.nightLight then opt.nightLight(light) end
+			local night = opt.nightLight
+			if night then night(light) end
 		end
-		if d.night and opt.nightLight then
-			opt.nightLight(p, Color3.fromRGB(255, 225, 187), p.Color, d.material or "Metal")
+		local nightOf = opt.nightLight
+		if d.night and nightOf then
+			nightOf(p, Color3.fromRGB(255, 225, 187), p.Color, d.material or "Metal")
 		end
 	end
-	for _, mount in spec.attachments or {} do
+	local mounts: { Mount } = spec.attachments or {}
+	for _, mount in mounts do
 		local target = assert(parts[mount.attach], "Missing polish mount target")
 		local attachment = Instance.new("Attachment")
 		attachment.Name = mount.name

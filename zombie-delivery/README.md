@@ -1102,6 +1102,26 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Couriers and infected, worn street props, new icons, a proper scooter stance (5.9)
+
+**Every player is a ZDC courier** (Codex, `design/character-models/`; `server/CourierAvatar.luau`,
+`server/CharacterArt/`, `shared/CourierMotion.luau`): one native-part R15 body for everybody — warm skin, a red reflective
+vest, charcoal workwear, a backwards cap — instead of personal avatars (`StarterPlayer.StarterCharacter`, appearance
+loading off). Roblox's standard R15 animations (idle, walk, run, jump, fall, climb, swim, sit) play from the server by
+the real speed; ArmPose, BikeRider and the interactions still pose on top. The kit (backpacks, shoes, jacket) is worn as
+before. **The infected** are native too: walker, runner, soldier (helmet, chest plate) and brute (a reinforced shoulder)
+with a green face and glowing eyes, on the same AI, animations and type numbers.
+
+**Worn street props** (Codex, `design/street-props/`; `server/StreetArt/Geometry.luau` built by
+`server/PolishArt/Builder.luau` in `server/StreetDressing.luau`): bins, hydrants, barricades with a beacon, sandbags,
+rubble, trash bags, boarded shopfronts with a warning, abandoned cars (flat tyres, broken glass, an ajar door, rust) and
+flares; a prop whose art fails falls back to the simple one. **Icons** (Codex, `design/polish-icons/`): 29 new ones
+(transport, landmarks, the exclusive guns) waiting for their upload ids in `Icons.luau`.
+
+**Standing on the scooter** (5.8.2, `client/BikeRider.luau`, `RiderPose.Upright`, `RiderPose.armIk`): the E-Scooter
+and ZDC RIDE rider stands straight (an absolute pose, not on top of the sit animation), the body raised or lowered until
+the feet rest on the deck (measured, any leg length) and both hands on the bar's grips (a two-bone reach).
+
 ## Every window in the courier-phone style (5.8)
 
 **5.8.1:** `tools/rojo-sync.js` sends a big change (a `git pull` of many large scripts) to Studio in small messages,

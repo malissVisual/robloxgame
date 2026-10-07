@@ -50,7 +50,7 @@ local function characterAdded(player: Player, model: Model)
 	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
 	animator.Parent = humanoid
 	local tracks: { [string]: AnimationTrack } = {}
-	for key, id in Motion.Animations do
+	for key: string, id: string in Motion.Animations :: { [string]: string } do
 		local animation = Instance.new("Animation")
 		animation.AnimationId = id
 		local ok, result = pcall(function() return animator:LoadAnimation(animation) end)
@@ -109,7 +109,8 @@ function Avatar.start()
 	Players.PlayerAdded:Connect(watch)
 	Players.PlayerRemoving:Connect(function(player)
 		clear(player)
-		for _, connection in watches[player] or {} do connection:Disconnect() end
+		local list: { RBXScriptConnection } = watches[player] or {}
+		for _, connection in list do connection:Disconnect() end
 		watches[player], replacing[player] = nil, nil
 	end)
 	for _, player in Players:GetPlayers() do watch(player) end
