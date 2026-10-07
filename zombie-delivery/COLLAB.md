@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · courier backpack matching approved character; native model and worn renders · server/KitArt/Geometry.luau, design/courier-backpack, tools/model-art/export_backpack.py · 2026-10-07
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
