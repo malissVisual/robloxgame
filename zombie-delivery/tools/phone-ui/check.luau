@@ -273,7 +273,8 @@ check("SHOP lists the six shops first",named("Shops")~=nil and named("Shops").La
 	and named("Shop_bags")~=nil and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_bikes")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil)
 check("6.6: ZDC Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("ZDC Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
 	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.lower(object.Text),"backpack",1,true)~=nil end)[1]==nil)
-check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Vests, shoes, medkits, items")~=nil and text("Lead & Co.")~=nil and text("Spoke & Chain")~=nil and text("Dead End Motors")~=nil and text("Wrench Garage")~=nil)
+check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items, vests, running shoes")~=nil and text("Lead & Co.")~=nil and text("Guns, gun upgrades, a baseball bat")~=nil
+	and text("Spoke & Chain")~=nil and text("Dead End Motors")~=nil and text("Wrench Garage")~=nil and text("Stages, car upgrades, gear, paint, car guns, repairs")~=nil) -- (6.7: what each really sells)
 do
 	local waypoint
 	local setWaypoint=M.MapView.setWaypoint
@@ -286,6 +287,7 @@ end
 Phone.setState({phone=true,money=1600,kit={},cars={},items={medkit=2}})
 Phone.open();named("bagApp").Activated:Fire()
 check("off duty BAG & ITEMS opens on ITEMS, no BAG tab",showing("bag") and text("BAG & ITEMS")~=nil and named("Tab_items")~=nil and named("Tab_bags")~=nil and named("Tab_bag")==nil and text("➕  MEDKIT")~=nil and text("×2")~=nil)
+check("6.7: no car, no car items in ITEMS (the energy drink is there)",text("🔧  REPAIR KIT")==nil and text("⛽  JERRY CAN")==nil and text("🥤  ENERGY DRINK")~=nil)
 check("an item names its key in the bottom bar",all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"Key 5.",1,true)~=nil end)[1]~=nil)
 for _,button in all(named("AppPopup"),function(object) return object.Text=="USE" end) do
 	if button.Parent==text("➕  MEDKIT").Parent.Parent then button.Activated:Fire() end

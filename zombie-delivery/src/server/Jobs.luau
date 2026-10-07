@@ -110,7 +110,7 @@
 --     top of the board: light pieces only, never more than you carry (hands + bag), a short walk Downtown or in
 --     the Suburbs, its own pay and clock (JobRules.footPay / footTime). startJob needs no vehicle (Cargo's foot flow:
 --     Info.foot, the pack); no waves, bandits or road events, now and then a stray walker (strayStep); a thermal
---     jacket slows the food's drain. The tutorial's first delivery is one (Jobs.startTutorialJob).
+--     bag slows the food's drain (6.7: the jacket is gone). The tutorial's first delivery is one (Jobs.startTutorialJob).
 --   * "car": every other job. Without a vehicle of your own (profile.car nil) the ones in your own car are locked
 --     "NEEDS A VEHICLE" (needsVehicle) and refused; the jobs that lend a company vehicle need their level (4+).
 --     5.1: a bike is not a car: riding one (profile.car a bike) they are locked "CALL YOUR CAR" (or NEEDS A VEHICLE).
@@ -3287,6 +3287,16 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			table.insert(ratingInfo.checks, JobRules.roundCheck(Cargo.missesOf(session, order.id)))
 		end
 	end
+	-- 6.7: the Courier Vest: the customer tips a share of the pay (Config.Kit tips; every delivery but a mission)
+	if not offer.mission then
+		local tip = JobRules.kitTip(payTotal, Transport.tipShareOf(player))
+		if tip > 0 then
+			payTotal += tip
+			if ratingInfo then
+				table.insert(ratingInfo.checks, JobRules.kitTipCheck(tip))
+			end
+		end
+	end
 	local driverTotal, share = Economy.crewSplit(payTotal, #crew)
 	order.paid = driverTotal
 	-- The split, for everybody's result: the owner first.
@@ -4054,8 +4064,8 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 			continue
 		end
 		local shown = math.floor(order.freshness * 100 + 0.5)
-		-- 5.0: a thermal jacket (5.1: on a bike too); 6.4: × the thermal bag in your hand for this order's pieces in it
-		local warm = if offer.mode ~= "car" then Transport.warmOf(player) * Cargo.bagWarm(job.cargo, order.id) else nil
+		-- 6.4: the thermal bag in your hand for this order's pieces in it (on foot, on a bike; 6.7: no jacket any more)
+		local warm = if offer.mode ~= "car" then Cargo.bagWarm(job.cargo, order.id) else nil
 		order.freshness = math.max(0, order.freshness - JobRules.freshDrain(order.offer.tier, step, car ~= nil and Vehicles.hasGear(car, "cooler"), warm))
 		if math.floor(order.freshness * 100 + 0.5) ~= shown then
 			job.dirty = true

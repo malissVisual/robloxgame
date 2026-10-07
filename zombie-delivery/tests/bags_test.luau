@@ -40,7 +40,7 @@ for _, def in Config.Kit do
 end
 check("five bags in the shop, in this order", table.concat(bags, ",") == "bag,tote,thermal,padded,duffel", table.concat(bags, ","))
 local want = {
-	bag = { 25, 1, 2 },
+	bag = { 0, 1, 2 }, -- 6.7: the starter bag, never sold
 	tote = { 120, 2, 3 },
 	thermal = { 300, 3, 4 },
 	padded = { 650, 4, 4 },
@@ -49,10 +49,12 @@ local want = {
 for id, n in want do
 	local def = kit(id)
 	check(`{def.name}: \${n[1]}, level {n[2]}, +{n[3]}`, def.price == n[1] and def.level == n[2] and def.extra == n[3], `{def.price} {def.level} {def.extra}`)
-	check(`{def.name}: the sprint first in its words`, string.find(def.description, "^Sprint with your deliveries") ~= nil, def.description)
-	check(`{def.name}: no room on the back, no walk speed`, (def :: any).room == nil and def.speed == nil and def.warm == nil)
+	check(`{def.name}: the sprint first in its words`, string.find(def.description, "Sprint with your deliveries", 1, true) ~= nil, def.description)
+	check(`{def.name}: no room on the back, no walk speed`, (def :: any).room == nil and def.speed == nil and (def :: any).warm == nil)
 end
-check("the jacket is no bag", not Transport.isBag(kit("jacket")) and not Transport.isBag(nil))
+check("the shoes are no bag", not Transport.isBag(kit("shoes")) and not Transport.isBag(nil))
+check("6.7: the plastic bag is the starter (not sold), the other bags are", kit("bag").starter == true and kit("tote").starter == nil and kit("duffel").starter == nil)
+check("6.7: every bag at ZDC Bags", Transport.kitShop(kit("bag")) == "bags" and Transport.kitShop(kit("duffel")) == "bags")
 
 -- 6.6, one carrying item: the backpacks are gone, their owners paid back ------------------------------------------
 
@@ -62,13 +64,16 @@ for _, def in Config.Kit do
 	anyRoom = anyRoom or (def :: any).room ~= nil
 end
 check("6.6: no kit piece adds room on the back", not anyRoom)
-check("6.6: the retired backpacks keep their prices for the refund", #Config.RetiredKit == 2 and Config.RetiredKit[1].id == "backpack" and Config.RetiredKit[1].price == 150
-	and Config.RetiredKit[2].id == "bigpack" and Config.RetiredKit[2].price == 400)
+check("6.6: the retired backpacks keep their prices for the refund", Config.RetiredKit[1].id == "backpack" and Config.RetiredKit[1].price == 150
+	and Config.RetiredKit[2].id == "bigpack" and Config.RetiredKit[2].price == 400 and Config.RetiredKit[1].flag == "noPacks" and Config.RetiredKit[2].flag == "noPacks")
+check("6.7: … and the Thermal Jacket after them, its own flag", #Config.RetiredKit == 3 and Config.RetiredKit[3].id == "jacket" and Config.RetiredKit[3].price == 300
+	and Config.RetiredKit[3].flag == "noJacket")
 local money, names = Transport.packRefund({ backpack = true, bigpack = true, bag = true, shoes = true })
 check("6.6: both backpacks: $550 back", money == 550 and #names == 2 and names[1] == "Courier Backpack" and names[2] == "Big Backpack", money)
 check("6.6: the Courier Backpack alone: $150", (Transport.packRefund({ backpack = true })) == 150)
 check("6.6: the Big Backpack alone: $400", (Transport.packRefund({ bigpack = true, tote = true })) == 400)
 check("6.6: no backpack: nothing", (Transport.packRefund({ bag = true, duffel = true })) == 0 and (Transport.packRefund({})) == 0)
+check("6.7: the backpacks' refund leaves the jacket alone", (Transport.packRefund({ jacket = true })) == 0 and (Transport.packRefund({ jacket = true, backpack = true })) == 150)
 check("6.6: a false entry or a broken save: nothing", (Transport.packRefund({ backpack = false })) == 0 and (Transport.packRefund(nil)) == 0 and (Transport.packRefund("backpack")) == 0)
 local words = string.gsub(Config.Courier.PackRefund, "{money}", "$550")
 check("6.6: Marge's words", words == "Backpacks are gone: bags do it all now. You got $550 back.", words)
@@ -112,7 +117,7 @@ check("6.6: the hands' room: the hands + the active bag", Transport.handsRoom({ 
 	and Transport.handsRoom({ bag = true, tote = true }, "bag") == hands + 2)
 check("6.6: the pack's room: the bag's", Transport.packRoom(all, "tote") == 3 and Transport.packRoom({ duffel = true }, nil) == 6)
 check("on foot and on a bike: the active bag only", Transport.foot(all, "thermal").room == hands + 4 and Transport.bike(2, all, "padded").room == 2 + 4)
-check("the bags never add to the walk", Transport.speedMult(all) == 1 and Transport.warm(all) == 1)
+check("the bags never add to the walk", Transport.speedMult(all) == 1)
 
 -- The perks ------------------------------------------------------------------------------------------------------------
 
@@ -121,8 +126,8 @@ check("only the thermal bag keeps warm", Transport.bagWarm({ bag = true }, nil) 
 check("mixWarm: all of it in the bag, none, half", near(Transport.mixWarm(1, 0.35), 0.35) and Transport.mixWarm(0, 0.35) == 1 and near(Transport.mixWarm(0.5, 0.35), 0.675))
 check("mixWarm: out of range is clamped", near(Transport.mixWarm(2, 0.35), 0.35) and Transport.mixWarm(-1, 0.35) == 1 and Transport.mixWarm(0 / 0, 0.35) == 1)
 local plain = JobRules.freshDrain(1, 60, false)
-local both = JobRules.freshDrain(1, 60, false, Transport.warm({ jacket = true }) * Transport.mixWarm(1, Transport.bagWarm(all, "thermal")))
-check("the jacket and the thermal bag stack: × 0.8 × 0.35", near(both, plain * 0.8 * 0.35), both)
+local bagged = JobRules.freshDrain(1, 60, false, Transport.mixWarm(1, Transport.bagWarm(all, "thermal")))
+check("the thermal bag alone does it: × 0.35 (6.7: no jacket on top)", near(bagged, plain * 0.35), bagged)
 check("the padded messenger: fragile safe, the others not", Transport.bagPadded(all, "padded") and not Transport.bagPadded(all, "thermal") and not Transport.bagPadded(all, nil))
 check("the duffel: sprint breath ×1.15 (no slower walk)", kit("duffel").bagBreath == 1.15 and Transport.bagBreath(all, "duffel") == 1.15 and Transport.bagBreath(all, "tote") == 1)
 

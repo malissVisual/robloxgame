@@ -10,6 +10,7 @@
 -- arm swing on the key press (client/ArmPose.luau reads localSwing; the server's MeleeAt does not swing it twice).
 -- Only on foot: in a car seat B and V do nothing and the holster changes nothing (window shots, the car gun).
 -- 6.0: without a gun (a new courier: fists only; Holster.setArmed from the State) B draws nothing and V punches.
+-- 6.7: with the Baseball Bat (Holster.setBat from the State's kit) the punch is a bat swing (shared/Melee.luau).
 -- 6.1, what you hold (shared/Holding.luau, server/Hand.luau: the character's Hand attribute): fists, the plastic bag or
 -- the gun. Holster.choose asks the server (the Hand remote: keys 1 / 2 / 3 through client/Hotbar.luau, a tap on a hand
 -- slot) and shows the choice at once (a short prediction, as the holster's); a gamepad's d-pad left / right cycles
@@ -70,6 +71,12 @@ end
 
 function Holster.armed(): boolean
 	return armed
+end
+
+-- 6.7: does the State's kit hold the Baseball Bat (Config.Melee.BatKit)? V with the gun away swings it then.
+local batOwned = false
+function Holster.setBat(owned: boolean)
+	batOwned = owned
 end
 
 -- 6.1: does the State's kit hold the plastic bag?
@@ -266,10 +273,10 @@ function Holster.melee()
 	if not root or not root:IsA("BasePart") then
 		return
 	end
-	local kind = Melee.kindOf(Holster.holstered())
+	local kind = Melee.kindOf(Holster.holstered(), batOwned) -- 6.7: the bat, once bought
 	nextSwing = now + Melee.def(kind).cooldown
 	swingAt = now
-	swingKind = kind
+	swingKind = Melee.pose(kind) -- (6.7: the bat swings like the gun's strike)
 	local dir = swingDirection(root)
 	-- Turn to the swing (the body faces where the fist or the gun goes).
 	root.CFrame = CFrame.lookAt(root.Position, root.Position + dir)

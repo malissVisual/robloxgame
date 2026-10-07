@@ -4,15 +4,26 @@
 -- cone in front of you that it reaches (server/CloseCombat.luau picks the nearest enemy in it) and the arm's swing
 -- curve over Config.Melee.SwingTime (client/ArmPose.luau). Positions are plain numbers: X and Z along the ground, Y up.
 
+-- 6.7, the Baseball Bat (Config.Kit "bat", Config.Melee.Kinds bat): owned, the punch becomes a bat swing (kindOf's
+-- `bat`), with its own reach (Melee.reachOf) and the gun's overhead strike as its arm swing (Melee.pose).
+
 local Config = require(script.Parent.Config)
 
 local Melee = {}
 
-export type KindDef = { damage: number, cooldown: number, push: number }
+export type KindDef = { damage: number, cooldown: number, push: number, reach: number? }
 
--- The swing for the hands' state: "punch" (holstered) or "gun".
-function Melee.kindOf(holstered: boolean): string
-	return if holstered then "punch" else "gun"
+-- The swing for the hands' state: "punch" (holstered) or "gun". 6.7: holstered with the bat owned (`bat`): "bat".
+function Melee.kindOf(holstered: boolean, bat: boolean?): string
+	if not holstered then
+		return "gun"
+	end
+	return if bat == true then "bat" else "punch"
+end
+
+-- 6.7: does this kit (profile.kit / the State's kit) hold the bat (Config.Melee.BatKit)?
+function Melee.hasBat(kit: { [string]: boolean }?): boolean
+	return type(kit) == "table" and kit[Config.Melee.BatKit] == true
 end
 
 -- A kind's numbers (an unknown kind is a punch).
@@ -21,17 +32,29 @@ function Melee.def(kind: string): KindDef
 	return kinds[kind] or kinds.punch
 end
 
+-- 6.7: how far a kind reaches (its own `reach`, else Config.Melee.Reach).
+function Melee.reachOf(kind: string): number
+	return Melee.def(kind).reach or Config.Melee.Reach
+end
+
+-- 6.7: the arm swing a kind shows (the MeleeKind attribute client/ArmPose.luau reads): its own, or Config.Melee.Poses'
+-- (the bat: the gun's overhead strike).
+function Melee.pose(kind: string): string
+	return Config.Melee.Poses[kind] or kind
+end
+
 -- Is a point in reach of a swing from (fromX, fromY, fromZ) toward (dirX, dirZ) along the ground? Returns its distance
 -- along the ground when it is (within Config.Melee.Reach, HalfAngle to either side and Height up or down), else nil.
--- Something right on top of you (closer than a stud) is always in reach, whatever the direction.
-function Melee.reach(fromX: number, fromY: number, fromZ: number, dirX: number, dirZ: number, toX: number, toY: number, toZ: number): number?
+-- Something right on top of you (closer than a stud) is always in reach, whatever the direction. 6.7: `range` studs
+-- instead of Reach (a kind's Melee.reachOf: the bat's longer reach).
+function Melee.reach(fromX: number, fromY: number, fromZ: number, dirX: number, dirZ: number, toX: number, toY: number, toZ: number, range: number?): number?
 	local cfg = Config.Melee
 	if math.abs(toY - fromY) > cfg.Height then
 		return nil
 	end
 	local dx, dz = toX - fromX, toZ - fromZ
 	local distance = math.sqrt(dx * dx + dz * dz)
-	if distance > cfg.Reach then
+	if distance > (range or cfg.Reach) then
 		return nil
 	end
 	if distance < 1 then

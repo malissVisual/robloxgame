@@ -204,7 +204,7 @@ end
 -- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else
 -- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius).
 Map.Shops = {
-	depot = { name = "Depot Garage", x = 0, z = 0 },
+	depot = { name = "Depot Garage", x = 0, z = 0 }, -- (6.7: the garage terminal, not a shop: it sells nothing, no shop window)
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
 	guns = { name = "Lead & Co.", x = -CELL, z = 0 },
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
@@ -927,17 +927,18 @@ end
 -- (kind: shop | employer | place | venue, 5.3: a storefront of Map.Venues)
 export type Landmark = { id: string, name: string, icon: string, x: number, z: number, kind: string, description: string }
 
--- Everything worth driving to, for the map's list and the GPS.
+-- Everything worth driving to, for the map's list and the GPS. 6.7: every shop's line says what it really sells; the
+-- depot sells nothing (its Depot Garage is the garage terminal: client/MapView.luau lists it on its own, not as a shop).
 local landmarks: { Landmark } = {
-	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Job board, your starting van's lot. The safe zone." },
-	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Buy cars." },
-	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Buy guns." },
-	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, car guns and two repair bays: drive in, get out, wait." },
+	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Your company: the job board, Marge, the garage terminal (your parked van, the company vehicles) and the ZDC Bags kiosk by the spawn. The safe zone." },
+	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4). Every car needs a garage slot." },
+	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Guns from the SMG up (your pistol is the starter), the gun upgrades (Gun Damage, Fire Rate) and a baseball bat." },
+	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Your car's stages, car upgrades, gear, paint and car guns, and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
 	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Config.BagShop.X, z = Config.BagShop.Z, kind = "shop", description = "Bags: sprint with your deliveries. A kiosk in the depot's yard, by the spawn." }, -- 6.6
-	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Vests, running shoes, the thermal jacket; repair kits, medkits, nitro, molotovs, mines." },
+	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Items: medkits, energy drinks, molotovs, and for a car repair kits, nitro, landmines, jerry cans. Vests (the Courier Vest, Kevlar, heavy armour) and running shoes." },
 	-- 5.1: the bike shop (Config.BikeShop).
-	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes and bike gear, from level 2, on Main St: faster than walking and more room for the light runs." },
+	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), from level 2, on Main St: faster than walking and more room for the light runs." },
 	-- 5.0: Earl sells his old van here (Config.VanQuest): your first vehicle.
 	{ id = "earl", name = "Earl's Used Wheels", icon = "🚐", x = Map.VanSeller.earl.x, z = Map.VanSeller.earl.z, kind = "place", description = "Far out west on the West Highway, past the Airfield Road. Earl sells his old van here: your first vehicle (Marge's quest at level 4)." },
 }

@@ -1120,6 +1120,55 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The shops cleaned up: the vest's tips, car-only items, the bat and the energy drink (6.7)
+
+The owner: "In the shop there are useless things. Go through it, delete them, make it better, add or remove."
+
+- **Not for sale any more.** The **Pistol** and the **Plastic Bag** are every courier's from the start (`starter`:
+  "STARTER · yours", $0; the server gives a missing one back for free). Marge's old "buy a pistol" text, the shooting
+  "no gun yet" note and the weapon wheel's pistol price are gone (they could never show: every profile has the pistol
+  since 6.0.2). The **Thermal Jacket** (food ×0.8) is retired: the Thermal Delivery Bag does that job (×0.35). A real
+  save that owned it gets **$300 back once** (`Config.RetiredKit` with its own save flag `noJacket`,
+  `Transport.retiredRefunds`, `server/PlayerData.luau`; Marge says so after PLAY: `Config.Courier.JacketRefund`); its
+  food drain (`server/Jobs.luau`), KitWear's jacket slot and KitFit's are gone.
+- **Rewards apart.** The reward-only guns (revolver, carbine, Maria's Carbine, the Lever Rifle, the Golden Pistol, Dead
+  End) and the 11 never-sold paints sit in a folded **🏆 REWARDS** section at the bottom of their tab (SHOW / HIDE).
+- **The Courier Vest** has a real effect: **+5% tips on every delivery** (`Config.Kit` hivis `tips = 0.05`,
+  `Transport.tipShare`, `JobRules.kitTip`, added in `server/Jobs.luau` payOrder with a line on the result card; not on
+  missions; it counts under a Kevlar or heavy vest too).
+- **Car-only items** (`Config.Items` `car`: the repair kit, nitro, the landmine, the jerry can; their words start with
+  "Car only"): in Last Stop Supplies' ITEMS, the bottom bar, the phone's and the I window's lists and the supply crates
+  only once you own a car (`Economy.ownsCar`: any vehicle that is not a bike; `itemShown` / `itemsFor`); the server
+  (and a gas kiosk) sells them only then. The on-foot items come first in the bar. **The bar's overflow:** more kinds
+  than slots (5, a touch screen 2): the last slot is **MORE** ("+N", its key and key 9): the I window's ITEMS.
+- **Lead & Co.** sells the gun upgrades now (**Gun Damage**, **Fire Rate**: moved from Wrench Garage, the same save
+  keys) and the **Baseball Bat** ($150, level 1, `Config.Kit` bat with `shop = "guns"`): owned, **V with the gun away
+  swings the bat** (`Config.Melee.Kinds` bat: 30 damage, 0.7 s, push 44, 7 studs of reach; a punch is 12) with the
+  gun's overhead strike (`Melee.pose`) and a bat welded into the right hand for the swing (`server/CloseCombat.luau`).
+- **The Energy Drink** ($40, at most 5, Last Stop Supplies): the breath full at once and **×1.3 breath for 30 s**
+  (the character's `EnergyUntil`, `client/Stamina.luau` energized / refill; `Config.ItemTuning` EnergyTime /
+  EnergyBreath), on foot.
+- **Reworked:** the **E-Scooter** holds 3 (two on the rack, one on the deck) for $1,900 at level 3, below the Cargo
+  Bike (the owner's speed 32 stays); the **Hunting Rifle** hits 60 (132 a second: more than the SMG's 117, even
+  before its spread misses far out; one shot drops a walker or a runner); the **Works Rally** stage adds +100 health;
+  bike runs take **up to 8 pieces** (6 before), so the **Bike Trailer**'s +4 counts on one run (fitting it on the
+  Cargo Bike would not have helped: its box + panniers already passed the old cap of 6); the **Ram Plow** also takes
+  12% a level off the dent a zombie you don't kill leaves (`Economy.ramGuard`, at most down to 25%); the **Roof
+  Rack** takes 2 light pieces side by side; the **Muscle Car** holds 2 (the Street Machine 3).
+- **Words that are true:** every item, kit piece and gear says what it does and its limits ("Car only", "5 at most
+  down", "heavy cargo by hand", "not on the E-Scooter"); the map's shop lines and the phone's SHOP list say what each
+  shop really sells; the depot is listed on its own on the map (the Depot Garage is the garage terminal, no shop
+  window).
+
+Tests: `tests/shop67_test.luau` (the energy drink, the bat's numbers, the jacket refund, the car-only filter, the vest's
+tips, where each piece is sold, the reworked numbers), `bags_test`, `transport_test`, `kitfit_test`, `armour_test`,
+`cargun_test`, `capacity_test`, `career_test`, `bikes_test`, `logic_test`, `melee_test`, `icons_test`, the phone's check.
+**Test in Studio:** Lead & Co. (STARTER pistol, the gun upgrades, buy the bat, V with fists and with the bag: the bat in
+the hand, a walker in two swings; REWARDS folded and opened), Last Stop Supplies with no car (no car items, the energy
+drink: sprint ~8 s) and with a car (all seven, the bar's MORE slot and key 9), a delivery with the Courier Vest (the
+tip line), an old save with a jacket ($300 and Marge's text once), the E-Scooter's third piece on its deck, the Roof
+Rack's two pieces, ramming with the plow.
+
 ## One bag, the bike's own bag, the ZDC Bags kiosk (6.6)
 
 The owner: "The backpacks, the bag and the bike work weirdly. When I don't know how to put something on the bike, I take

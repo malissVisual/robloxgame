@@ -32,8 +32,8 @@
 -- (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's "message" with the GPS to the shop,
 -- client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
 -- (the phone's messages are not saved).
--- 6.0, Lead & Co.: no free gun. Once a player has the pistol's price and no gun, Marge texts them (Config.Arms.Tip, the
--- GPS to the gun shop), once a session.
+-- 6.0, Lead & Co.: no free gun; Marge texted a player with the pistol's price and no gun. 6.7: gone: every profile has
+-- the pistol since 6.0.2 (server/PlayerData.luau newProfile, the starterKit flag), so that text could never come.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -42,7 +42,6 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Career = require(Shared.Career)
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local TransportRules = require(Shared.Transport)
@@ -378,31 +377,9 @@ local function bikeCheck(player: Player)
 	end
 end
 
--- ── 6.0: Marge about the pistol ────────────────────────────────────────────
--- No free gun (Config.Arms): once a player with the phone and the first day behind them has the pistol's price and
--- owns no gun, Marge texts them about Lead & Co. with the shop on the GPS. Once a session (from PLAY on).
-
-local gunTold: { [Player]: boolean } = {}
-
-local function gunCheck(player: Player)
-	local profile = PlayerData.get(player)
-	if gunTold[player] or bikeLevels[player] == nil or not profile or not profile.tutorial or not profile.phone then
-		return
-	end
-	local pistol = Economy.findWeapon(Config.Arms.Starter)
-	if not pistol or next(profile.weapons) ~= nil or profile.money < pistol.price then
-		return
-	end
-	gunTold[player] = true
-	local shop = Map.Shops.guns
-	local words = string.gsub(Config.Arms.Tip, "{price}", `${pistol.price}`)
-	remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "guns" } })
-	notice:FireClient(player, `📱 Marge: {words}`)
-end
-
 -- 6.0.1: Marge about the plastic bag (Kit "bag"): once a player with the phone and the first day behind them has its
 -- price and no bag, she texts them about Last Stop Supplies with the shop on the GPS (6.0.2: about the vest; 6.6: the
--- text names ZDC Bags for the bags). Once a session; before the pistol.
+-- text names ZDC Bags for the bags; 6.7: the vest's tips). Once a session.
 local bagTold: { [Player]: boolean } = {}
 
 local function bagCheck(player: Player): boolean
@@ -428,9 +405,7 @@ local function bagCheck(player: Player): boolean
 end
 
 local function tips(player: Player)
-	if not bagCheck(player) then
-		gunCheck(player)
-	end
+	bagCheck(player) -- (6.7: the pistol's text is gone: every courier starts with it)
 end
 
 -- PLAY was pressed (Main may call this from its Play handler; without it the arriving car tells the same).
@@ -444,21 +419,27 @@ function Tutorial.onPlay(player: Player)
 	local level = if profile then Levels.levelFor(profile.xp) else 1
 	bikeLevels[player] = level
 	-- 6.6: a save that owned a backpack got its price back (server/PlayerData.luau, Config.RetiredKit): Marge says so,
-	-- once (profile.packRefund is never saved), the bag kiosk on the GPS
-	local refund = if profile then profile.packRefund else nil
-	if profile and refund and refund > 0 then
-		profile.packRefund = nil
-		task.delay(BIKE_DELAY, function()
-			if not player.Parent or not remote then
-				return
-			end
-			local shop = Map.Shops.bags
-			local words = string.gsub(Config.Courier.PackRefund, "{money}", `${refund}`)
-			remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = "bags" } else nil })
-			notice:FireClient(player, `📱 Marge: {words}`)
-		end)
+	-- once (profile.packRefund is never saved), the bag kiosk on the GPS. 6.7: the Thermal Jacket's the same way
+	-- (profile.jacketRefund, Config.Courier.JacketRefund)
+	for _, retired in { { money = if profile then profile.packRefund else nil, text = Config.Courier.PackRefund }, { money = if profile then profile.jacketRefund else nil, text = Config.Courier.JacketRefund } } do
+		local refund = retired.money
+		if profile and refund and refund > 0 then
+			task.delay(BIKE_DELAY, function()
+				if not player.Parent or not remote then
+					return
+				end
+				local shop = Map.Shops.bags
+				local words = string.gsub(retired.text, "{money}", `${refund}`)
+				remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = "bags" } else nil })
+				notice:FireClient(player, `📱 Marge: {words}`)
+			end)
+		end
 	end
-	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0: the bag's (6.0.1) or the pistol's price in your pocket, none owned: her text
+	if profile then
+		profile.packRefund = nil
+		profile.jacketRefund = nil
+	end
+	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0.1: the vest's price in your pocket, not owned: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
 		task.delay(BIKE_DELAY, function()
 			if player.Parent and not ownsBike(player) then
@@ -490,11 +471,10 @@ function Tutorial.start()
 		sessions[player] = nil
 		talked[player] = nil
 		bikeLevels[player] = nil
-		gunTold[player] = nil
 		bagTold[player] = nil
 	end)
 	PlayerData.Changed:Connect(bikeCheck) -- 5.1: Marge about Spoke & Chain
-	PlayerData.Changed:Connect(tips) -- 6.0: Marge about the pistol (6.0.1: the bag first)
+	PlayerData.Changed:Connect(tips) -- 6.0.1: Marge about the vest (6.7: the pistol's text is gone)
 	for _, player in Players:GetPlayers() do
 		track(player)
 	end

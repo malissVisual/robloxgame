@@ -132,9 +132,28 @@ check("6.0: no gun's stats read as the pistol's (nothing fires anyway)", Economy
 check("6.0: the first gun owned, in the shop's order", Economy.firstWeapon({}) == nil and Economy.firstWeapon({ smg = true, pistol = true }) == "pistol"
 	and Economy.firstWeapon({ rifle = true, nope = true } :: any) == "rifle" and Economy.firstWeapon({ pistol = false } :: any) == nil)
 local starter = Economy.findWeapon(Config.Arms.Starter) :: Config.WeaponDef
-check("6.0: the pistol is bought: $250 at level 1, sold at Lead & Co.", starter ~= nil and starter.id == "pistol" and starter.price == 250
-	and starter.level == 1 and starter.earned == nil and starter.exclusive == nil)
-check("6.0: Marge's tip names the price", string.find(Config.Arms.Tip, "{price}", 1, true) ~= nil)
+check("6.7: the pistol is the starter: level 1, never sold ($0, STARTER · yours)", starter ~= nil and starter.id == "pistol" and starter.price == 0
+	and starter.starter == true and starter.level == 1 and starter.earned == nil and starter.exclusive == nil)
+check("6.7: Marge's 'buy a pistol' tip is gone (every courier starts with it)", (Config.Arms :: any).Tip == nil)
+check("6.7: only the pistol is a starter, every other gun is sold or a reward", (function()
+	for _, def in Config.Weapons do
+		if def.starter and def.id ~= Config.Arms.Starter then
+			return false
+		end
+		if not def.starter and def.price <= 0 and not Economy.rewardOnly(def) then
+			return false
+		end
+	end
+	return true
+end)())
+check("6.7: the reward-only guns (the REWARDS section)", Economy.rewardOnly(Economy.findWeapon("revolver") :: Config.WeaponDef) and Economy.rewardOnly(Economy.findWeapon("deadend") :: Config.WeaponDef)
+	and not Economy.rewardOnly(Economy.findWeapon("smg") :: Config.WeaponDef) and not Economy.rewardOnly(starter))
+local function gunDps(id: string): number
+	local stats = Economy.weaponStats(id, {})
+	return stats.damage * stats.pellets / stats.interval
+end
+check("6.7: the Hunting Rifle out-hits the SMG (132 > 117 a second, and at range the SMG's spread misses)", gunDps("rifle") > gunDps("smg") and Economy.weaponStats("rifle", {}).range > Economy.weaponStats("smg", {}).range, `{gunDps("rifle")} {gunDps("smg")}`)
+check("6.7: … one rifle shot drops a walker or a runner", Economy.weaponStats("rifle", {}).damage >= Config.Zombies.walker.health and Economy.weaponStats("rifle", {}).damage >= Config.Zombies.runner.health)
 
 check("version 2.1+", (function()
 	local major, minor = string.match(Config.Version, "^(%d+)%.(%d+)")
