@@ -111,15 +111,23 @@ local function has(stat: string, goal: number): boolean
 	end
 	return false
 end
-local _, mostStars = Missions.stars({})
+-- 6.8: the "every …" goals count the story chapters (the DUO chapter needs a partner: a solo player can finish them).
+local _, mostStars = Missions.stars({}, nil, true)
+local _, storyMissions = Missions.doneCount({}, true)
+local storyChapters = 0
+for _, campaign in Missions.Campaigns do
+	if not campaign.duo then
+		storyChapters += 1
+	end
+end
 local secretList = (Map :: any).Secrets :: { any }?
 local secretsTotal = if secretList and #secretList > 0 then #secretList else 30
-check("every campaign done (11: ten stories and the DUO campaign)", has("campaigns", #Missions.Campaigns) and #Missions.Campaigns == 11, #Missions.Campaigns)
-check("every star (330, from the data)", has("stars", mostStars) and mostStars == 3 * #Missions.List and mostStars == 330, mostStars)
+check("every story chapter done (10: not the DUO one)", has("campaigns", storyChapters) and storyChapters == 10, storyChapters)
+check("every story star (180, from the data)", has("stars", mostStars) and mostStars == 3 * storyMissions and mostStars == 180, mostStars)
 check("every secret (#Map.Secrets)", has("secrets", secretsTotal), secretsTotal)
 check("every place (#Map.Places)", has("visited", #Map.Places), #Map.Places)
 check("level 15", has("level", 15) and Config.Levels.MaxLevel == 15)
-check("every mission (110)", has("missions", #Missions.List) and #Missions.List == 110, #Missions.List)
+check("every story mission (60)", has("missions", storyMissions) and storyMissions == 60, storyMissions)
 do
 	local bad = {}
 	for _, def in List do
@@ -135,8 +143,8 @@ do
 	local limits: { [string]: number } = {
 		level = Config.Levels.MaxLevel,
 		stars = mostStars,
-		missions = #Missions.List,
-		campaigns = #Missions.Campaigns,
+		missions = storyMissions,
+		campaigns = storyChapters,
 		visited = #Map.Places,
 		secrets = secretsTotal,
 		cars = #Config.Cars,
@@ -236,6 +244,8 @@ do
 		progress[def.id] = 3
 	end
 	progress[Missions.ofCampaign("clinic")[1].id] = 2
+	progress.duo_1 = 3 -- 6.8: the DUO chapter counts for none of these
+	progress.dispatch_4 = 3 -- 6.8: a retired id of an old save counts for none either
 	local profile: Challenges.ProfileLike = {
 		kills = 12,
 		deliveries = 7,
@@ -256,8 +266,8 @@ do
 	check("value deliveries", value(profile, "deliveries") == 7)
 	check("value earned", value(profile, "earned") == 15000)
 	check("value level", value(profile, "level") == 5, value(profile, "level"))
-	check("value stars", value(profile, "stars") == 32, value(profile, "stars"))
-	check("value missions", value(profile, "missions") == 11, value(profile, "missions"))
+	check("value stars (the story's)", value(profile, "stars") == 20, value(profile, "stars"))
+	check("value missions (the story's, no retired id)", value(profile, "missions") == 7, value(profile, "missions"))
 	check("value campaigns", value(profile, "campaigns") == 1, value(profile, "campaigns"))
 	check("value secrets counts only found ones", value(profile, "secrets") == 1)
 	check("value visited", value(profile, "visited") == 3)
@@ -286,7 +296,7 @@ do
 	local legend = Challenges.find("legendary_courier")
 	if legend then
 		local share, reached = Challenges.progress(legend, profile)
-		check("partial progress", not reached and math.abs(share - 11 / #Missions.List) < 1e-9, share)
+		check("partial progress", not reached and math.abs(share - 7 / storyMissions) < 1e-9, share)
 	end
 	local done, total = Challenges.doneCount(profile)
 	check("doneCount counts only real challenges", done == 2 and total == #List, `{done}/{total}`)

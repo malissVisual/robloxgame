@@ -36,7 +36,8 @@ Challenges.Counters = {
 } :: { string }
 
 -- What a challenge measures: a counter above, or one of these read from the profile:
---   kills, deliveries, earned (profile), level (Levels), stars, missions (done), campaigns (done),
+--   kills, deliveries, earned (profile), level (Levels), stars, missions (done), campaigns (done) (6.8: those three
+--   count the story chapters, not the DUO one),
 --   secrets (found), visited (places), titles (earned), properties (owned), cars (owned), weapons (owned)
 export type ChallengeDef = {
 	id: string,
@@ -60,10 +61,17 @@ Challenges.Categories = {
 	{ id = "wealth", name = "Wealth" },
 } :: { { id: string, name: string } }
 
--- The goals that depend on the game's data (they grow with it, the descriptions follow).
-local MISSIONS_TOTAL = #Missions.List -- 110 (3.2: with the DUO campaign)
-local CAMPAIGNS_TOTAL = #Missions.Campaigns -- 11 (ten stories and the DUO campaign)
-local _, STARS_TOTAL = Missions.stars({}) -- 330 (3 per mission)
+-- The goals that depend on the game's data (they grow with it, the descriptions follow). 6.8: the story chapters
+-- only: the DUO chapter needs a partner, so a solo player could never finish "all" of them with it (its own reward
+-- stays; the stats below count the story too).
+local _, MISSIONS_TOTAL = Missions.doneCount({}, true) -- 60 (ten chapters of six)
+local CAMPAIGNS_TOTAL = 0 -- 10 (the story chapters)
+for _, campaign in Missions.Campaigns do
+	if not campaign.duo then
+		CAMPAIGNS_TOTAL += 1
+	end
+end
+local _, STARS_TOTAL = Missions.stars({}, nil, true) -- 180 (3 per story mission)
 local PLACES_TOTAL = #Map.Places -- 29
 local MAX_LEVEL = Config.Levels.MaxLevel -- 15
 local SECRETS_TOTAL = #Map.Secrets -- 30 (the lost packages)
@@ -93,7 +101,7 @@ Challenges.List = {
 
 	-- ── Missions ──
 	{ id = "on_the_clock", name = "On the Clock", description = "Finish 5 different missions.", category = "missions", stat = "missions", goal = 5, money = 500 },
-	{ id = "story_time", name = "Story Time", description = "Finish 1 whole campaign (all of its missions).", category = "missions", stat = "campaigns", goal = 1, money = 1000 },
+	{ id = "story_time", name = "Story Time", description = "Finish 1 whole story chapter (all of its missions).", category = "missions", stat = "campaigns", goal = 1, money = 1000 },
 	{ id = "night_shift", name = "Night Shift", description = "Finish 15 missions at night.", category = "missions", stat = "nightMissions", goal = 15, money = 2000 },
 	{ id = "hold_the_line", name = "Hold the Line", description = "Win 10 HOLD OUT fights.", category = "missions", stat = "defends", goal = 10, money = 2000 },
 	{ id = "wave_rider", name = "Wave Rider", description = "Live through 100 zombie waves on a job.", category = "missions", stat = "waves", goal = 100, money = 2000 },
@@ -101,9 +109,9 @@ Challenges.List = {
 	{ id = "flawless", name = "Flawless", description = "Finish 25 missions with 3 stars.", category = "missions", stat = "perfect", goal = 25, money = 2500 },
 	{ id = "star_collector", name = "Star Collector", description = "Collect 100 mission stars.", category = "missions", stat = "stars", goal = 100, money = 3000 },
 	{ id = "top_of_the_ladder", name = "Top of the Ladder", description = `Reach level {MAX_LEVEL}, the very top.`, category = "missions", stat = "level", goal = MAX_LEVEL, money = 10000 },
-	{ id = "legendary_courier", name = "Legendary Courier", description = `Finish all {MISSIONS_TOTAL} missions.`, category = "missions", stat = "missions", goal = MISSIONS_TOTAL, money = 15000, title = "Legendary Courier" },
-	{ id = "city_saviour", name = "Saviour of the City", description = `Finish all {CAMPAIGNS_TOTAL} campaigns.`, category = "missions", stat = "campaigns", goal = CAMPAIGNS_TOTAL, money = 20000 },
-	{ id = "three_star_general", name = "Three-Star General", description = `Collect all {STARS_TOTAL} stars: 3 on every mission.`, category = "missions", stat = "stars", goal = STARS_TOTAL, money = 20000, title = "Three-Star General" },
+	{ id = "legendary_courier", name = "Legendary Courier", description = `Finish all {MISSIONS_TOTAL} story missions.`, category = "missions", stat = "missions", goal = MISSIONS_TOTAL, money = 15000, title = "Legendary Courier" },
+	{ id = "city_saviour", name = "Saviour of the City", description = `Finish all {CAMPAIGNS_TOTAL} story chapters.`, category = "missions", stat = "campaigns", goal = CAMPAIGNS_TOTAL, money = 20000 },
+	{ id = "three_star_general", name = "Three-Star General", description = `Collect all {STARS_TOTAL} story stars: 3 on every story mission.`, category = "missions", stat = "stars", goal = STARS_TOTAL, money = 20000, title = "Three-Star General" },
 	-- hidden: odd feats, ??? until done
 	{ id = "ghost", name = "Ghost Courier", description = "Finish 1 NO SHOOTING mission without firing a single shot.", category = "missions", stat = "quietMissions", goal = 1, money = 2000, title = "The Ghost", hidden = true },
 	{ id = "horse_whisperer", name = "Horse Whisperer", description = "Deliver 25 horses.", category = "missions", stat = "horses", goal = 25, money = 2500, title = "Horse Whisperer", hidden = true },
@@ -167,14 +175,14 @@ function Challenges.value(profile: ProfileLike, stat: string): number
 	elseif stat == "level" then
 		return Levels.levelFor(profile.xp or 0)
 	elseif stat == "stars" then
-		return (Missions.stars(profile.missions or {}))
+		return (Missions.stars(profile.missions or {}, nil, true)) -- 6.8: the story's
 	elseif stat == "missions" then
-		return count(profile.missions)
+		return (Missions.doneCount(profile.missions or {}, true)) -- 6.8: the story's, no retired ids
 	elseif stat == "campaigns" then
 		local done = 0
 		for _, campaign in Missions.Campaigns do
 			local got, total = Missions.done(profile.missions or {}, campaign.id)
-			if total > 0 and got >= total then
+			if total > 0 and got >= total and not campaign.duo then
 				done += 1
 			end
 		end

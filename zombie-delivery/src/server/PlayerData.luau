@@ -58,7 +58,7 @@ export type Profile = {
 	home: string?, -- the home you spawn at (an owned mansion / villa / house), nil = the depot
 	business: { couriers: number, upgrades: { [string]: number }, safe: number, lastTick: number }, -- your company (Config.Business); lastTick = os.time() of the last payout
 	missions: { [string]: number }, -- the best rating (1 – 3 stars) of every mission done (shared/Missions.luau ids)
-	campaigns: { [string]: boolean }, -- campaigns whose reward was paid (all ten missions done)
+	campaigns: { [string]: boolean }, -- campaigns whose reward was paid (6.8: every mission of the chapter done)
 	-- 3.1, the challenges (shared/Challenges.luau), secrets (Map.Secrets) and rewards (Config.Rewards):
 	stats: { [string]: number }, -- counters the challenges read (Challenges.Counters: headshots, distance, …)
 	visited: { [string]: boolean }, -- places (Map.Places ids) you have been to
@@ -207,11 +207,13 @@ local function applyEstate(profile: Profile, saved: { [any]: any })
 end
 
 -- The missions' best ratings (only shared/Missions.luau ids, 1 – 3 stars) and the campaigns already rewarded.
--- Saves from before 3.0 have none.
+-- Saves from before 3.0 have none. 6.8, the chapters: the mission ids did not change, so a save's ratings keep their
+-- meaning (a rating >= 1 = done: no first-time reward again, the replay's small pay); the ids of the missions no
+-- chapter tells any more (Missions.isRetired) stay in the save untouched (nothing counts them), so nothing is lost.
 local function applyMissions(profile: Profile, saved: { [any]: any })
 	if type(saved.missions) == "table" then
 		for id, stars in saved.missions do
-			if type(id) == "string" and Missions.find(id) and type(stars) == "number" and stars >= 1 then
+			if type(id) == "string" and (Missions.find(id) or Missions.isRetired(id)) and type(stars) == "number" and stars >= 1 then
 				profile.missions[id] = math.clamp(math.floor(stars), 1, 3)
 			end
 		end

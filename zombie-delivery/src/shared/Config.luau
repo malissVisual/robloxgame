@@ -1489,12 +1489,12 @@ export type LevelReward = {
 -- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
 -- on the job board (Jobs.Tiers level), cars, guns and car guns (their level field), some special jobs, the
 -- campaigns (shared/Missions.luau) and the real estate.
--- 3.2, the progression: the first clears of the whole story path (the 100 non-DUO missions' job XP × FirstClearXp,
--- no kills) give about 32 000 XP; level 15 needs 34 037 (XpBase 575 × 1.2^n). Played in order with about 10 kills a
--- mission (+40 XP) no mission is ever above your level: level 4 after First Shift (the pickup), 8 after Empty Shelves
--- (the muscle car), 13 after Wild West End, 14 by the end of Dirty Money and 15 inside Last Convoy. Without the kills
--- you come short around Patient Zero (a few hundred XP: a couple of board jobs). The DUO campaign, the job board
--- and the replays for stars come on top. 3.1 saves (the old curve, Legacy) keep their level (PlayerData, Curve).
+-- 6.8, the progression: the first clears of the story chapters (the 60 non-DUO missions' job XP × FirstClearXp, no
+-- kills) give about 30 800 XP; level 15 needs 34 037 (XpBase 575 × 1.2^n). Played in order with about 10 kills a
+-- mission (+40 XP) no mission is ever above your level (a chapter's missions sit at its level, the finale at the next
+-- chapter's: shared/Missions.luau levelOf), and Last Convoy's finale opens at 15. Without the kills you come short
+-- in the last chapters (a few board jobs). The DUO chapter, the job board and the replays (Config.Missions.ReplayXp:
+-- a quarter) come on top. 3.1 saves (the old curve, Legacy) keep their level (PlayerData, Curve).
 Config.Levels = {
 	MaxLevel = 15,
 	XpBase = 575, -- XP needed for level 2; every next level needs XpGrowth times more (shared/Levels.luau xpFor)
@@ -1957,7 +1957,12 @@ Config.Missions = {
 	TwoStarCondition = 0.75,
 	ThreeStarTime = 0.3,
 	StarBonus = 150, -- paid once for every new star (best rating goes up)
-	FirstClearXp = 1.5, -- the XP of the first clear × this
+	FirstClearXp = 2.5, -- the XP of the first clear × this (6.8: 1.5 before; six missions a chapter carry the same road)
+	-- 6.8, replays (shared/Missions.luau replayPay / replayXp, server/Jobs.luau): a mission you have done before pays
+	-- this share of the job's pay and of its XP, and nothing else (the first clear's reward, the chapter's reward and
+	-- the unlocks come once). A crew member's share follows their own record.
+	ReplayPay = 0.25,
+	ReplayXp = 0.25,
 	-- Co-op missions (MissionDef.coop): every crew member besides the owner adds this share of the pay (for everyone)
 	-- and this share of enemies (waves, foot waves, hordes).
 	CoopPayPerMember = 0.25,
@@ -1995,6 +2000,8 @@ Config.Missions = {
 		PairRange = 10,
 		LeverWindow = 1.5,
 		LeverApart = 22, -- studs between the two levers (one player cannot pull both in time)
+		-- 6.8: what START says without a partner (server/Missions.luau, the MISSIONS window)
+		NeedsPartner = "NEEDS A PARTNER: invite a friend to your crew (K) and bring them here. Rosa & Rico's chapter is a side story: the main story never waits for it.",
 	},
 }
 
@@ -2621,7 +2628,7 @@ Config.Jobs = {
 			look = "ammo",
 			pieces = { 1, 2 },
 			tiers = { 2, 3, 4 },
-			giver = { name = "Vinnie", title = "Pawn broker", role = "shopkeeper" },
+			giver = { name = "Vinnie", title = "Pawn broker", role = "banker" }, -- 6.8: the fixer of the missions (shared/Cast.luau)
 			receivers = {
 				{ name = "Old Pete", title = "Guards his street", role = "townsperson" },
 				{ name = "Jax", title = "Holding out at home", role = "worker" },
@@ -2639,9 +2646,9 @@ Config.Jobs = {
 			look = "barrel",
 			pieces = { 1, 2 },
 			tiers = { 2, 3, 4 },
-			giver = { name = "Gus", title = "Warehouse keeper", role = "worker" },
+			giver = { name = "Rocco", title = "Harbor boss", role = "foreman" }, -- 6.8: shared/Cast.luau (Gus runs the Train Yard)
 			receivers = {
-				{ name = "Nurse Kim", title = "The clinic's generator", role = "clerk" },
+				{ name = "Nurse Kim", title = "The clinic's generator", role = "nurse" },
 				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
 				{ name = "Old Pete", title = "Cold house", role = "townsperson" },
 			},
@@ -2656,10 +2663,10 @@ Config.Jobs = {
 			look = "vaccine",
 			pieces = { 1, 2 },
 			tiers = { 3, 4 },
-			giver = { name = "Doctor Hiro", title = "Lab scientist", role = "clerk" },
+			giver = { name = "Doctor Hiro", title = "Lab chief", role = "doctor" }, -- 6.8: shared/Cast.luau
 			receivers = {
-				{ name = "Doctor Ellie", title = "Doctor", role = "clerk" },
-				{ name = "Nurse Kim", title = "Rooftop clinic", role = "clerk" },
+				{ name = "Doctor Ellie", title = "Doctor", role = "doctor" },
+				{ name = "Nurse Kim", title = "Rooftop clinic", role = "nurse" },
 			},
 		},
 		{
@@ -2672,9 +2679,9 @@ Config.Jobs = {
 			look = "sample",
 			pieces = { 1, 2 },
 			tiers = { 4 },
-			giver = { name = "Doctor Hiro", title = "Lab scientist", role = "clerk" },
+			giver = { name = "Doctor Hiro", title = "Lab chief", role = "doctor" }, -- 6.8: shared/Cast.luau
 			receivers = {
-				{ name = "Doctor Ellie", title = "Working on a cure", role = "clerk" },
+				{ name = "Doctor Ellie", title = "Working on a cure", role = "doctor" },
 			},
 		},
 		{
@@ -2687,7 +2694,7 @@ Config.Jobs = {
 			look = "gold",
 			pieces = { 1, 2 },
 			tiers = { 3, 4 },
-			giver = { name = "Simon", title = "Bank manager", role = "clerk" },
+			giver = { name = "Simon", title = "Bank teller", role = "clerk" }, -- (6.8: Gordon is the manager)
 			receivers = {
 				{ name = "The Mayor", title = "City hall", role = "clerk" },
 				{ name = "Officer Nate", title = "Police bunker", role = "soldier" },
@@ -2832,13 +2839,13 @@ Config.Jobs = {
 		lodge = { name = "Ingrid", title = "Lodge keeper", role = "shopkeeper" },
 		radio = { name = "Sparks", title = "Radio operator", role = "worker" },
 		farm = { name = "Lucy", title = "Farm hand", role = "farmer" },
-		docks = { name = "Rocco", title = "Dock foreman", role = "worker" },
-		gas = { name = "Tony", title = "Pump attendant", role = "clerk" },
+		docks = { name = "Rocco", title = "Harbor boss", role = "foreman" }, -- 6.8: shared/Cast.luau
+		gas = { name = "Tony", title = "Pump attendant", role = "attendant" },
 		school = { name = "Miss Amy", title = "Teacher", role = "teacher" },
-		frosty = { name = "Molly", title = "At the counter", role = "cook" },
+		frosty = { name = "Molly", title = "At the counter", role = "icecream" },
 		movers = { name = "Cody", title = "Big Move Movers", role = "mover" },
 		ranch = { name = "Jesse", title = "Ranch hand", role = "rancher" },
-		stables = { name = "Emma", title = "Riding instructor", role = "rancher" },
+		stables = { name = "Emma", title = "Riding instructor", role = "rider" },
 		fueldepot = { name = "Hank", title = "Depot worker", role = "worker" },
 	} :: { [string]: PersonDef },
 	-- The look of the giver and the receiver of every special job (Config.JobTypes giver / receiver are the names).
@@ -2860,7 +2867,7 @@ Config.Jobs = {
 	FreightReceivers = {
 		market = { name = "Rita", title = "FreshMart stock room", role = "clerk" },
 		movers = { name = "Cody", title = "Big Move Movers", role = "mover" },
-		powerplant = { name = "Ivan", title = "Power Plant stores", role = "worker" },
+		powerplant = { name = "Engineer Ivan", title = "Power Plant", role = "foreman" }, -- 6.8: shared/Cast.luau
 	} :: { [string]: PersonDef },
 	-- The special jobs on the job board (JobTypeDef.board, or no employer): the chance of a first and of a second
 	-- special card next to the ordinary deliveries every time the board is filled.
@@ -3587,7 +3594,7 @@ Config.Employers = {
 	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, person = "Old Man Jed", pitch = "The city is hungry. Take my monster truck to the markets." },
 	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "livestock", needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My horses are sold to the riding school. Lead them into the truck gently, and keep the bandits off them." },
 	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "ambulance", needed = 3, person = "Doctor Ellie", pitch = "The phones never stop ringing. Take the ambulance, bring the patients in alive." },
-	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Rosa, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
+	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Dolly, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
 
 -- 5.5, people in every building (shared/Residents.luau, shared/Deliveries.luau): every home has residents, made up

@@ -233,9 +233,9 @@ for _, mission in Missions.List do
 		check(`{mission.id}: a big load says so`, string.find(string.lower(mission.description), "load", 1, true) ~= nil, mission.description)
 	end
 end
-check("all 110 missions listed", listed == 110, listed)
-check("some missions lend a vehicle, the early ones mostly do not", lent > 0 and early >= 20, `{lent} lent, {early} early`)
-check("a few big loads later on (the Box Truck's missions)", big >= 4 and big <= 10, big)
+check(`all {#Missions.List} missions listed (6.8: eleven chapters of six)`, listed == #Missions.List and listed == 66, listed)
+check("some missions lend a vehicle, the early ones mostly do not", lent > 0 and early >= 12, `{lent} lent, {early} early`)
+check("a few big loads later on (the Box Truck's missions)", big >= 3 and big <= 8, big)
 
 -- ── The repair shop ──────────────────────────────────────────────────────────
 

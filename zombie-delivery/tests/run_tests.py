@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal")
+PURE = ("Config", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(source)
     # 3.7: the client's pure modules (no Roblox at their top level) that a test requires.
-    for name in ("Stamina", "TouchLayout", "PhoneLayout"):
+    for name in ("Stamina", "TouchLayout", "PhoneLayout", "MissionsLayout"):
         shutil.copy(os.path.join(os.path.dirname(SHARED), "client", name + ".luau"), os.path.join(tmp, name + ".luau"))
     shutil.copy(os.path.join(SHARED, "CourierMotion.luau"), os.path.join(tmp, "CourierMotion.luau"))
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "CharacterArt", "Geometry.luau"), os.path.join(tmp, "CharacterGeometry.luau"))

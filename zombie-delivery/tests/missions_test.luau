@@ -1,14 +1,15 @@
--- Logic test of the missions (3.0, shared/Missions.luau): the campaigns of ten missions (3.2: ten stories and the DUO
--- campaign, 110 missions), every field valid against Config (cargo kinds, lendable vehicles, twists, tiers) and
--- Map.Places, the design rules of the spec (load modes, co-op count, twist counts, finales, growing levels / tiers /
--- rewards; 3.2: the campaign chain `requires`, the computed levels, the DUO rules) and the helpers (unlocked,
--- campaignOpen, missing, finished, levelOf, rate, stars, done, twistPay).
+-- Logic test of the missions (3.0, shared/Missions.luau; 6.8: told as story chapters): eleven chapters of six (ten
+-- stories and the DUO one, 66 missions), every field valid against Config (cargo kinds, lendable vehicles, twists,
+-- tiers) and Map.Places, the design rules (load modes, twists, finales, growing levels / tiers / rewards; the chain
+-- `requires`, the computed levels, the DUO rules) and the helpers (levelOf, rate, stars, done, twistPay). The chapter
+-- rules (order, locks, replays, the cast, the saves) are in tests/missions_story_test.luau.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
 local Economy = require("./Economy")
 local Map = require("./Map")
 local Missions = require("./Missions")
+local NpcLooks = require("./NpcLooks")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -32,12 +33,11 @@ local function offenders(list: { string }): string?
 	return table.concat(shown, ", ") .. (if #list > 6 then ` … ({#list} in all)` else "")
 end
 
--- The NPC looks (server/Npcs.luau roles) and the vehicles the missions may lend (Config.Cars).
-local ROLES = {
-	attendant = true, banker = true, clerk = true, cook = true, doctor = true, farmer = true, foreman = true, grocer = true,
-	guard = true, icecream = true, kid = true, mover = true, nurse = true, officer = true, patient = true, rancher = true,
-	rider = true, shopkeeper = true, soldier = true, teacher = true, townsperson = true, worker = true,
-}
+-- The NPC looks (shared/NpcLooks.luau roles) and the vehicles the missions may lend (Config.Cars).
+local ROLES: { [string]: boolean } = {}
+for _, role in NpcLooks.Roles do
+	ROLES[role] = true
+end
 local LENDABLE = { armored = true, bus = true, monster = true, icecream = true, movingtruck = true, livestock = true, ambulance = true, fueltruck = true }
 local BOARD_KINDS = { kid = true, patient = true, survivor = true }
 local SERVE_KINDS = { icebox = true, pizza = true, bread = true, soup = true }
@@ -46,10 +46,11 @@ local NEW_PLACES = {
 	"pharmacy", "market", "warehouse", "firestation", "airfield", "powerplant", "waterworks", "lab", "prison", "lighthouse",
 	"trainyard", "camp", "stadium", "police", "cityhall",
 }
+local CHAPTER = 6 -- 6.8: missions a chapter tells
 
--- The campaigns ------------------------------------------------------------------------
+-- The chapters ------------------------------------------------------------------------
 
-check("eleven campaigns: ten stories and the DUO campaign", #Missions.Campaigns == 11, #Missions.Campaigns)
+check("eleven chapters: ten stories and the DUO one", #Missions.Campaigns == 11, #Missions.Campaigns)
 do
 	local duo = {}
 	for _, campaign in Missions.Campaigns do
@@ -57,12 +58,13 @@ do
 			table.insert(duo, campaign.id)
 		end
 	end
-	check("one DUO campaign: duo", #duo == 1 and duo[1] == "duo", table.concat(duo, ", "))
+	check("one DUO chapter: duo", #duo == 1 and duo[1] == "duo", table.concat(duo, ", "))
 	local campaign = Missions.findCampaign("duo")
-	check("the DUO campaign: Partners in Crime, level 6 (5.0), after First Shift, a reward",
+	check("the DUO chapter: Partners in Crime, level 6, after First Shift, a reward, both twins",
 		campaign ~= nil and campaign.name == "Partners in Crime" and campaign.level == 6 and campaign.icon == "🤝"
-			and campaign.requires ~= nil and #campaign.requires == 1 and campaign.requires[1] == "dispatch" and campaign.reward > 0)
-	check("the DUO campaign has its 3.1 reward", Config.Rewards.Campaigns.duo ~= nil)
+			and campaign.requires ~= nil and #campaign.requires == 1 and campaign.requires[1] == "dispatch" and campaign.reward > 0
+			and campaign.clientId == "rosa" and campaign.partnerId == "rico")
+	check("the DUO chapter has its 3.1 reward", Config.Rewards.Campaigns.duo ~= nil)
 end
 do
 	local ids, bad = {}, {}
@@ -78,6 +80,9 @@ do
 		if #campaign.color ~= 3 or campaign.name == "" or campaign.client == "" or campaign.pitch == "" or campaign.icon == "" then
 			table.insert(bad, campaign.id .. " incomplete")
 		end
+		if #campaign.pitch < 100 or #campaign.pitch > 260 then
+			table.insert(bad, `{campaign.id} pitch {#campaign.pitch} chars (two or three sentences)`)
+		end
 		if campaign.level < previousLevel or campaign.level < 1 or campaign.level > Config.Levels.MaxLevel then
 			table.insert(bad, campaign.id .. " level " .. campaign.level)
 		end
@@ -85,15 +90,18 @@ do
 		if campaign.reward <= 0 then
 			table.insert(bad, campaign.id .. " reward")
 		end
+		if not Config.Rewards.Campaigns[campaign.id] then
+			table.insert(bad, campaign.id .. " has no finale reward (Config.Rewards.Campaigns)")
+		end
 	end
-	check("the campaigns are complete, unique and open in level order", #bad == 0, offenders(bad))
+	check("the chapters are complete, unique, open in level order and end in a big reward", #bad == 0, offenders(bad))
 end
 
--- The missions: ids, numbering ------------------------------------------------------------
+-- The missions: ids, steps ------------------------------------------------------------
 
-check("110 missions", #Missions.List == 110, #Missions.List)
+check("66 missions", #Missions.List == 66, #Missions.List)
 
--- 3.2: the chain ------------------------------------------------------------------------------
+-- The chain ---------------------------------------------------------------------------------
 
 do
 	local bad = {}
@@ -103,7 +111,7 @@ do
 			table.insert(story, campaign)
 		end
 	end
-	check("ten story campaigns", #story == 10, #story)
+	check("ten story chapters", #story == 10, #story)
 	for index, campaign in story do
 		local requires: { string } = campaign.requires or {}
 		if index == 1 then
@@ -111,7 +119,7 @@ do
 				table.insert(bad, campaign.id .. " (the first) requires something")
 			end
 		elseif index == #story then
-			-- Exodus: every other story campaign.
+			-- Exodus: every other story chapter.
 			if #requires ~= #story - 1 then
 				table.insert(bad, `{campaign.id} requires {#requires}`)
 			end
@@ -124,7 +132,7 @@ do
 			table.insert(bad, `{campaign.id} requires {table.concat(requires, ", ")}`)
 		end
 	end
-	-- Every required campaign exists, opens earlier (no loops) and is not the DUO one.
+	-- Every required chapter exists, opens earlier (no loops) and is not the DUO one.
 	local position: { [string]: number } = {}
 	for index, campaign in Missions.Campaigns do
 		position[campaign.id] = index
@@ -137,7 +145,7 @@ do
 			end
 		end
 	end
-	check("every story campaign requires the one before it, Exodus all nine", #bad == 0, offenders(bad))
+	check("every story chapter requires the one before it, Exodus all nine, nothing the DUO one", #bad == 0, offenders(bad))
 end
 do
 	local seen, names, bad = {}, {}, {}
@@ -150,7 +158,8 @@ do
 			table.insert(bad, "duplicate name " .. def.name)
 		end
 		names[def.name] = true
-		if def.id ~= `{def.campaign}_{def.number}` or def.mission ~= def.id then
+		local campaignId, number = string.match(def.id, "^(%a+)_(%d+)$")
+		if campaignId ~= def.campaign or tonumber(number) == nil or (tonumber(number) :: number) > 10 or def.mission ~= def.id then
 			table.insert(bad, def.id .. " id / mission")
 		end
 		if not Missions.findCampaign(def.campaign) then
@@ -160,22 +169,37 @@ do
 			table.insert(bad, def.id .. " find")
 		end
 	end
-	check("unique ids and names, id = <campaign>_<number> = mission", #bad == 0, offenders(bad))
+	check("unique ids and names, id = <campaign>_<3.0 number 1 – 10> = mission", #bad == 0, offenders(bad))
 end
 do
 	local bad = {}
 	for _, campaign in Missions.Campaigns do
 		local list = Missions.ofCampaign(campaign.id)
-		if #list ~= 10 then
+		if #list ~= CHAPTER or Missions.size(campaign.id) ~= CHAPTER then
 			table.insert(bad, `{campaign.id} has {#list}`)
 		end
+		local lastNumber = 0
 		for n, def in list do
 			if def.number ~= n then
-				table.insert(bad, `{campaign.id} number {def.number} at {n}`)
+				table.insert(bad, `{campaign.id} step {def.number} at {n}`)
 			end
+			-- 6.8: the 3.0 numbers keep their order (a save's progress stays a prefix of the chapter)
+			local old = tonumber(string.match(def.id, "_(%d+)$")) or 0
+			if old <= lastNumber then
+				table.insert(bad, `{def.id} after _{lastNumber}`)
+			end
+			lastNumber = old
+		end
+		-- The chapter starts and ends where the 3.0 campaign did (its finale is still the one `requires` means).
+		if list[1] and list[1].id ~= `{campaign.id}_1` and campaign.id ~= "lab" then
+			table.insert(bad, `{campaign.id} starts with {list[1].id}`)
+		end
+		local finale = Missions.finale(campaign.id)
+		if not finale or finale.id ~= `{campaign.id}_10` then
+			table.insert(bad, `{campaign.id} finale {finale and finale.id}`)
 		end
 	end
-	check("10 missions per campaign, numbered 1 – 10", #bad == 0, offenders(bad))
+	check("6 missions per chapter, steps 1 – 6 in their 3.0 order, the finale is _10", #bad == 0, offenders(bad))
 end
 -- 3.2: the DUO missions: every one duo and co-op, nothing else duo.
 do
@@ -229,6 +253,7 @@ do
 		need(def, ROLES[def.giverRole or ""] == true and ROLES[def.receiverRole or ""] == true, "roles")
 		need(def, def.giver ~= "" and def.receiver ~= "" and def.cargo ~= "" and def.description ~= "", "people / cargo / description")
 		need(def, #def.briefing >= 80 and #def.debrief >= 15, "briefing / debrief")
+		need(def, #def.description <= 140, "a one-line description (the story path shows it)")
 		need(def, string.upper(def.pickupLabel) == def.pickupLabel and string.match(def.pickupLabel, " AT$") ~= nil, "pick-up label")
 		need(def, string.upper(def.dropLabel) == def.dropLabel and #def.dropLabel > 0, "drop label")
 		need(def, def.banditBoost == nil or def.banditBoost > 1, "banditBoost")
@@ -268,8 +293,7 @@ do
 			table.insert(missing, id)
 		end
 	end
-	check("Map.Places has the 15 new mission places", #missing == 0,
-		if #missing > 0 then "missing " .. table.concat(missing, ", ") .. " — expected until stream missions-world (shared/Map.luau) lands" else nil)
+	check("Map.Places has the 15 mission places", #missing == 0, offenders(missing))
 	local bad = {}
 	for _, def in Missions.List do
 		for _, at in { def.pickupAt, def.dropAt } do
@@ -278,8 +302,7 @@ do
 			end
 		end
 	end
-	check("every pickupAt / dropAt is a Map.Places id", #bad == 0,
-		if #bad > 0 then (offenders(bad) or "") .. " — the new places come with stream missions-world (shared/Map.luau)" else nil)
+	check("every pickupAt / dropAt is a Map.Places id", #bad == 0, offenders(bad))
 	local used = {}
 	for _, def in Missions.List do
 		used[def.pickupAt or ""] = true
@@ -291,7 +314,7 @@ do
 			table.insert(unused, id)
 		end
 	end
-	check("every new place has a mission", #unused == 0, offenders(unused))
+	check("every mission place has a mission", #unused == 0, offenders(unused))
 end
 
 -- Variety --------------------------------------------------------------------------------------
@@ -307,21 +330,25 @@ do
 		loaded += if def.pickups == 0 then 1 else 0
 		boosted += if def.banditBoost then 1 else 0
 	end
+	-- 6.8: a kind no chapter needs is fine when a special job carries it (the pizza: the Pizza Rush).
+	for _, jobType in Config.JobTypes do
+		kinds[jobType.itemKind] = true
+	end
 	for kind in Config.Cargo.Kinds do
 		if not kinds[kind] and kind ~= "pallet" then -- (4.0: the pallets are the Freight Run's, not a mission's)
 			table.insert(unused, kind)
 		end
 	end
-	check("every cargo kind is used", #unused == 0, offenders(unused))
+	check("every cargo kind is used (a mission or a special job)", #unused == 0, offenders(unused))
 	local vehicleCount = 0
 	for _ in vehicles do
 		vehicleCount += 1
 	end
 	check("every lendable vehicle and your own car", vehicleCount == 9, vehicleCount)
 	check("all four load modes", modes.carry and modes.lead and modes.board and modes.serve or false)
-	check("rushes", rushes >= 6, rushes)
-	check("a vehicle that starts loaded, but rarely", loaded >= 1 and loaded <= 5, loaded)
-	check("cargo the bandits want", boosted >= 4, boosted)
+	check("rushes", rushes >= 4, rushes)
+	check("a vehicle that starts loaded, but rarely", loaded >= 1 and loaded <= 4, loaded)
+	check("cargo the bandits want", boosted >= 3, boosted)
 end
 
 -- The design rules: co-op, twists, finales, growth --------------------------------------------
@@ -334,12 +361,12 @@ do
 			count += if def.coop then 1 else 0
 		end
 		coop += count
-		if count < 3 then
+		if count < 1 then
 			table.insert(bad, `{campaign.id}: {count}`)
 		end
 	end
-	check("at least 3 co-op missions per campaign", #bad == 0, offenders(bad))
-	check("30+ co-op missions", coop >= 30, coop)
+	check("every chapter has a co-op mission", #bad == 0, offenders(bad))
+	check("25+ co-op missions", coop >= 25, coop)
 end
 do
 	local counts: { [string]: number } = {}
@@ -353,14 +380,11 @@ do
 	end
 	local bad = {}
 	for twist, count in counts do
-		-- 3.2: the twists made for two live in the DUO campaign (ten missions): 5 each there.
-		local least = if twist == "pair" or twist == "switches" then 5 else 6
-		if count < least then
+		if count < 3 then
 			table.insert(bad, `{twist} {count}`)
 		end
 	end
-	check("every twist is used at least 6 times (pair / switches 5, in the DUO campaign)", #bad == 0, offenders(bad))
-	-- The DUO campaign mixes in the others too.
+	check("every twist is used at least 3 times", #bad == 0, offenders(bad))
 	local mixed: { [string]: boolean } = {}
 	for _, def in Missions.ofCampaign("duo") do
 		for _, twist in def.twists or {} do
@@ -368,26 +392,38 @@ do
 		end
 	end
 	local missing = {}
-	for _, twist in { "pair", "switches", "defend", "gunner", "lift", "guarded", "hunted" } do
+	for _, twist in { "pair", "switches", "gunner", "hunted" } do
 		if not mixed[twist] then
 			table.insert(missing, twist)
 		end
 	end
-	check("the DUO campaign: pair, switches, defend, gunner, lift, guarded, hunted", #missing == 0, offenders(missing))
-	check("night at most 10 times", counts.night <= 10, counts.night)
+	check("the DUO chapter: pair, switches, gunner, hunted", #missing == 0, offenders(missing))
+	-- 6.8: only the next mission starts, so a NIGHT ONLY one makes the chapter wait for dark: a few, never a first.
+	check("night at most 4 times", counts.night <= 4, counts.night)
+	local nightFirst = {}
+	for _, campaign in Missions.Campaigns do
+		local first = Missions.ofCampaign(campaign.id)[1]
+		if first and table.find(first.twists or {}, "night") then
+			table.insert(nightFirst, first.id)
+		end
+	end
+	check("no chapter opens with a NIGHT ONLY mission", #nightFirst == 0, offenders(nightFirst))
 end
 do
 	local bad = {}
 	for _, campaign in Missions.Campaigns do
 		local list = Missions.ofCampaign(campaign.id)
-		local finale = list[10]
+		local finale = list[#list]
 		if finale then
 			local twists: { string } = finale.twists or {}
 			if #twists ~= 2 or finale.pickups + finale.drops < 3 then
 				table.insert(bad, finale.id .. " finale")
 			end
-			if (finale.level or 0) ~= Missions.levelOf(campaign.id, 10) or finale.tier < 3 then
+			if (finale.level or 0) ~= Missions.levelOf(campaign.id, #list) or finale.tier < 3 then
 				table.insert(bad, finale.id .. " finale level / tier")
+			end
+			if finale.reward < 2 * list[1].reward then
+				table.insert(bad, finale.id .. " finale reward")
 			end
 		end
 		local first = list[1]
@@ -396,20 +432,20 @@ do
 		end
 		for n = 2, #list do
 			local before, def = list[n - 1], list[n]
-			if (def.level or 0) < (before.level or 0) or (def.level or 0) > Missions.levelOf(campaign.id, 10) then
+			if (def.level or 0) < (before.level or 0) or (def.level or 0) > Missions.levelOf(campaign.id, #list) then
 				table.insert(bad, def.id .. " level")
 			end
 			if def.tier < before.tier then
 				table.insert(bad, def.id .. " tier")
 			end
-			if def.reward < before.reward then
+			if def.reward <= before.reward then
 				table.insert(bad, def.id .. " reward")
 			end
 		end
 	end
-	check("finales: 2 twists, multi-stop, the top level, tier 3 – 4", #bad == 0, offenders(bad))
-	-- 3.2: the levels grow inside a campaign up to the next story campaign's level (MaxLevel after the last; the DUO
-	-- campaign 4 levels).
+	check("finales: 2 twists, multi-stop, the top level, tier 3 – 4, the biggest reward; levels, tiers, rewards grow", #bad == 0, offenders(bad))
+	-- The levels grow inside a chapter up to the next story chapter's level (MaxLevel after the last; the DUO chapter
+	-- 4 levels): the chapter's own level until the finale (6.8: rounded down).
 	local spans = {}
 	local story: { Missions.Campaign } = {}
 	for _, campaign in Missions.Campaigns do
@@ -421,79 +457,26 @@ do
 		local following = story[index + 1]
 		local top = if following then following.level else Config.Levels.MaxLevel
 		local list = Missions.ofCampaign(campaign.id)
-		if list[1].level ~= campaign.level or list[10].level ~= top then
-			table.insert(spans, `{campaign.id} {list[1].level} … {list[10].level}`)
+		if list[1].level ~= campaign.level or list[#list].level ~= top then
+			table.insert(spans, `{campaign.id} {list[1].level} … {list[#list].level}`)
 		end
 	end
 	local duo = Missions.ofCampaign("duo")
-	if duo[1].level ~= 6 or duo[10].level ~= 10 then
-		table.insert(spans, `duo {duo[1].level} … {duo[10].level}`)
+	if duo[1].level ~= 6 or duo[#duo].level ~= 10 then
+		table.insert(spans, `duo {duo[1].level} … {duo[#duo].level}`)
 	end
-	check("the levels grow from the campaign's to the next one's", #spans == 0, offenders(spans))
-	-- 5.0: the story starts at level 4 (you need a vehicle): First Shift 4 → 5, Iron Supply 9 → 10.
-	check("levelOf: First Shift 4 → 5, Iron Supply 9 → 10", Missions.levelOf("dispatch", 1) == 4 and Missions.levelOf("dispatch", 10) == 5
-		and Missions.levelOf("army", 1) == 9 and Missions.levelOf("army", 5) == 9 and Missions.levelOf("army", 10) == 10)
+	check("the levels grow from the chapter's to the next one's", #spans == 0, offenders(spans))
+	check("levelOf: First Shift 4 … 4, the finale 5; Smoke and Sirens 7 → 9", Missions.levelOf("dispatch", 1) == 4 and Missions.levelOf("dispatch", 5) == 4
+		and Missions.levelOf("dispatch", 6) == 5 and Missions.levelOf("firehouse", 1) == 7 and Missions.levelOf("firehouse", 4) == 8 and Missions.levelOf("firehouse", 6) == 9)
 	local last = story[#story]
-	check("the last campaign ends at the top level", Missions.levelOf(last.id, 10) == Config.Levels.MaxLevel)
+	check("the last chapter ends at the top level", Missions.levelOf(last.id, Missions.size(last.id)) == Config.Levels.MaxLevel)
 	local first = Missions.find("dispatch_1")
-	local last = Missions.find("exodus_10")
-	check("rewards from 300 to 8000+", first ~= nil and first.reward == 300 and last ~= nil and last.reward >= 8000)
+	local finale = Missions.find("exodus_10")
+	check("first-time rewards from 400 to 10,000+", first ~= nil and first.reward == 400 and finale ~= nil and finale.reward >= 10000)
 end
 
 -- The helpers ----------------------------------------------------------------------------------
 
-do
-	local none: { [string]: number } = {}
-	local open, why = Missions.unlocked("dispatch_1", none, 4)
-	check("the first mission is open at level 4", open and why == nil)
-	check("… not below it (5.0: on foot first)", not Missions.unlocked("dispatch_1", none, 3))
-	open, why = Missions.unlocked("dispatch_2", none, 15)
-	check("the next one waits for the one before", not open and why ~= nil)
-	open = Missions.unlocked("dispatch_2", { dispatch_1 = 1 }, 4)
-	check("… and opens when it is done", open)
-	open, why = Missions.unlocked("clinic_1", none, 15)
-	check("3.2: a campaign waits for the one before it, saying which", not open and why ~= nil and string.find(why or "", "First Shift", 1, true) ~= nil, why)
-	local firstShift = { dispatch_10 = 1 }
-	open, why = Missions.unlocked("clinic_1", firstShift, 4)
-	check("a campaign above your level is locked, saying why", not open and why ~= nil and string.find(why or "", "level") ~= nil, why)
-	open = Missions.unlocked("clinic_1", firstShift, 5)
-	check("… and opens at its level once the one before is done", open)
-	open = Missions.unlocked("duo_1", firstShift, 6)
-	check("the DUO campaign opens after First Shift at level 6", open)
-	open = Missions.unlocked("duo_1", none, 15)
-	check("… not before First Shift's finale", not open)
-	open = Missions.unlocked("firehouse_1", { market_10 = 2 }, 15)
-	check("Smoke and Sirens needs Empty Shelves only (not the DUO campaign)", open)
-	local missing = Missions.missing("exodus", firstShift)
-	check("Exodus waits for the other eight", #missing == 8, #missing)
-	open, why = Missions.unlocked("exodus_1", firstShift, 15)
-	check("… and says so", not open and string.find(why or "", "more campaigns", 1, true) ~= nil, why)
-	local all: { [string]: number } = {}
-	for _, campaign in Missions.Campaigns do
-		if campaign.id ~= "exodus" and campaign.id ~= "duo" then
-			all[`{campaign.id}_10`] = 1
-		end
-	end
-	check("Exodus opens with every story finale (the DUO campaign not needed)", Missions.unlocked("exodus_1", all, 14))
-	check("finished: the finale counts", Missions.finished(firstShift, "dispatch") and not Missions.finished({ dispatch_9 = 3 }, "dispatch"))
-	local campaignOpen, campaignWhy = Missions.campaignOpen("market", { clinic_10 = 1 }, 5)
-	check("campaignOpen: the level after the chain", not campaignOpen and string.find(campaignWhy or "", "level 6", 1, true) ~= nil, campaignWhy)
-	local clinic4 = Missions.find("clinic_4")
-	if clinic4 and clinic4.level and clinic4.level > 5 then
-		open = Missions.unlocked("clinic_4", { clinic_3 = 2 }, clinic4.level - 1)
-		check("a mission above your level is locked", not open)
-	end
-	-- 3.1 saves: a campaign already started stays open (no finale before it, a lower level), a cleared mission
-	-- replays at any level; the next new mission still needs its own level.
-	local oldSave = { army_1 = 2, army_2 = 1 }
-	check("a started campaign stays open without its prerequisites", (Missions.campaignOpen("army", oldSave, 1)))
-	check("… its next mission opens at its level", (Missions.unlocked("army_3", oldSave, Missions.levelOf("army", 3))))
-	check("… a cleared mission replays below its level", (Missions.unlocked("army_2", oldSave, 1)))
-	check("… a new mission above your level stays locked", not Missions.unlocked("army_3", oldSave, Missions.levelOf("army", 3) - 1))
-	check("started: any cleared mission", Missions.started(oldSave, "army") and not Missions.started(oldSave, "power"))
-	open, why = Missions.unlocked("nope_1", none, 15)
-	check("an unknown mission is refused", not open and why ~= nil)
-end
 do
 	local tuning = Config.Missions
 	check("rate: perfect = 3 stars", Missions.rate(1, 1) == 3)
@@ -502,11 +485,15 @@ do
 	check("rate: on the thresholds = 3 stars", Missions.rate(tuning.TwoStarCondition, tuning.ThreeStarTime) == 3)
 	check("rate: wrecked cargo with time left = 1 star", Missions.rate(0, 1) == 1)
 	local got, most = Missions.stars({ dispatch_1 = 3, dispatch_2 = 2, clinic_1 = 5 })
-	check("stars: total, capped at 3 each, of 330 (3 a mission)", got == 8 and most == 3 * #Missions.List and most == 330, `{got}/{most}`)
+	check("stars: total, capped at 3 each, of 198 (3 a mission)", got == 8 and most == 3 * #Missions.List and most == 198, `{got}/{most}`)
 	got, most = Missions.stars({ dispatch_1 = 3, clinic_1 = 1 }, "dispatch")
-	check("stars of one campaign", got == 3 and most == 30, `{got}/{most}`)
-	local done, total = Missions.done({ dispatch_1 = 1, dispatch_2 = 3, clinic_1 = 2 }, "dispatch")
-	check("done of a campaign", done == 2 and total == 10, `{done}/{total}`)
+	check("stars of one chapter", got == 3 and most == 18, `{got}/{most}`)
+	got, most = Missions.stars({ duo_1 = 3, dispatch_1 = 2 }, nil, true)
+	check("stars of the story (the DUO chapter left out)", got == 2 and most == 180, `{got}/{most}`)
+	local done, total = Missions.done({ dispatch_1 = 1, dispatch_2 = 3, clinic_1 = 2, dispatch_4 = 3 }, "dispatch")
+	check("done of a chapter (a retired id does not count)", done == 2 and total == 6, `{done}/{total}`)
+	done, total = Missions.doneCount({ dispatch_1 = 1, duo_1 = 2, dispatch_4 = 3 }, true)
+	check("doneCount of the story", done == 1 and total == 60, `{done}/{total}`)
 	local plain = Missions.find("dispatch_1")
 	local finale = Missions.find("dispatch_10")
 	check("twistPay: none = 1", plain ~= nil and Missions.twistPay(plain) == 1)

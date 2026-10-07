@@ -135,7 +135,9 @@ Phone.onOpen = Hud.closeWindows
 Phone.onBoard = DispatchUi.open
 Phone.onCareer = CareerUi.open
 -- 5.5: the HUD MENU's actions are phone apps (their windows open; the phone closes first), and MENU opens the phone.
-Phone.onMissions = MissionsUi.toggle
+Phone.onMissions = function() -- 6.8: MORE → MISSIONS always opens it (on the chapter you are at)
+	MissionsUi.open()
+end
 Phone.onCrew = CrewPanel.toggle
 Phone.onTop = Leaderboard.toggle
 Phone.onEstate = EstateUi.toggleList

@@ -515,10 +515,10 @@ R.jobs = function()
 		send("missionsReset")
 	end)
 	for _, campaign in MissionData.Campaigns do
-		local done = MissionData.done(missionProgress, campaign.id)
+		local done, total = MissionData.done(missionProgress, campaign.id)
 		local rgb = campaign.color
 		local color = Color3.fromRGB(rgb[1] or 200, rgb[2] or 200, rgb[3] or 200)
-		heading(`{campaign.icon} {campaign.name} · LV {campaign.level} · {done}/10`, campaign.client)
+		heading(`{campaign.icon} {campaign.name} · LV {campaign.level} · {done}/{total}`, campaign.client) -- 6.8: a chapter of six
 		local missions = grid(232)
 		for _, def in MissionData.ofCampaign(campaign.id) do
 			local best = missionProgress[def.id] or 0
