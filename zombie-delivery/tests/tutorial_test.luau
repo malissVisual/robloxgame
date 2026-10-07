@@ -16,7 +16,7 @@ end
 local step = TutorialSteps.jobStep
 -- A Job payload as server/Jobs.luau payload() sends it (only the fields the tutorial reads).
 local function job(fields: { [string]: any }): { [string]: any }
-	local out: { [string]: any } = { stage = "pickup", handling = "drive", delivered = 0, piece = "medicine box", person = "Dr. Novak" }
+	local out: { [string]: any } = { stage = "pickup", handling = "drive", delivered = 0, piece = "medicine box", person = "Doctor Ellie" }
 	for key, value in fields do
 		out[key] = value
 	end
@@ -46,7 +46,7 @@ for _, name in { "welcome", "board", "retry" } do
 end
 check("no hint for other", TutorialSteps.hint("other", job({})) == "")
 local pickup = TutorialSteps.hint("pickup", job({}))
-check("the pickup hint names the piece and the giver", string.find(pickup, "a medicine box from Dr. Novak", 1, true) ~= nil, pickup)
+check("the pickup hint names the piece and the giver", string.find(pickup, "a medicine box from Doctor Ellie", 1, true) ~= nil, pickup)
 check("an before a vowel", string.find(TutorialSteps.hint("pickup", job({ piece = "ice box" })), "an ice box", 1, true) ~= nil)
 check("a hint without a payload still reads", string.find(TutorialSteps.hint("handover", nil), "the shop", 1, true) ~= nil)
 -- The texts must stay true with the 3.7 back rules (one light piece opens it, two need G first): no hand rule promised.

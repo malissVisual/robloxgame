@@ -3,7 +3,7 @@
 -- Every gun is built from a few parts in "gun space": X right, Y up, -Z forward (where the barrel points), the hand
 -- at the origin around the grip. A gun's "Muzzle" attachment sits at the end of its barrel (the flash and the
 -- tracers start there). The parts never collide, are never hit by bullets and weigh nothing.
--- 3.1: the exclusive guns (Config.Rewards, never sold) have their own looks: Reyes' Carbine, Walt's Lever Rifle,
+-- 3.1: the exclusive guns (Config.Rewards, never sold) have their own looks: Maria's Carbine, Walt's Lever Rifle,
 -- Vinnie's Golden Pistol and Dead End (black, neon purple strips, a faint purple glow).
 
 local GunModels = {}
@@ -156,7 +156,7 @@ local LOOKS: { [string]: { pieces: { Piece }, muzzle: Vector3 } } = {
 		},
 	},
 	-- 3.1, exclusive (Config.Rewards) ─────────────────────────────────────────
-	-- Reyes' Carbine: the army carbine in olive drab, with a scope and a fore grip.
+	-- Maria's Carbine: the army carbine in olive drab, with a scope and a fore grip.
 	reyes = {
 		muzzle = v(0, 0.28, -2.48),
 		pieces = {

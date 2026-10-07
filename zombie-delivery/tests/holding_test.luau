@@ -58,6 +58,12 @@ check("only the bag: none without it", Holding.packRoom(2, 2, false) == 0 and Ho
 check("never below zero, a bag bigger than the room counts as the room", Holding.packRoom(1, 2, false) == 0 and Holding.packRoom(0, 2, true) == 0)
 check("a piece goes into the bag in your hand while it has room and the piece fits", Holding.place(true, 0, 2, true) == "bag" and Holding.place(true, 1, 2, true) == "bag")
 check("… else the backpack", Holding.place(true, 2, 2, true) == "pack" and Holding.place(false, 0, 2, true) == "pack" and Holding.place(true, 0, 2, false) == "pack")
+-- 6.3: server/Cargo.luau asks with the bag's fit (Bag.fitsBag: every light look), not the backpack's (Bag.fits).
+local Bag = require("./Bag")
+check("6.3: a bouquet goes into the bag in your hand (never into the backpack)", Holding.place(true, 0, 2, Bag.fitsBag("bouquet")) == "bag" and not Bag.fits("bouquet"))
+check("6.3: … a cake and groceries too, while the bag has room", Holding.place(true, 0, 2, Bag.fitsBag("cake")) == "bag" and Holding.place(true, 1, 2, Bag.fitsBag("groceries")) == "bag")
+check("6.3: a full bag or the bag not in your hand: not the bag", Holding.place(true, 2, 2, Bag.fitsBag("cake")) == "pack" and Holding.place(false, 0, 2, Bag.fitsBag("cake")) == "pack")
+check("6.3: a heavy piece never goes into the bag", Holding.place(true, 0, 2, Bag.fitsBag("crate")) == "pack" and Holding.place(true, 0, 2, Bag.fitsBag("barrel")) == "pack")
 
 -- What X says -------------------------------------------------------------------------------------------------------
 

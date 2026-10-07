@@ -512,7 +512,7 @@ if bank and clinic then
 		and not Map.onRoad(bank.x - bank.nx * 20, bank.z) and not Map.onRoad(clinic.x - clinic.nx * 20, clinic.z))
 	check("the bank and the clinic are not in a yard", Map.inYard(bank.x, bank.z) == nil and Map.inYard(clinic.x, clinic.z) == nil)
 end
-check("the clinic has a board (Dr. Novak), on its sidewalk", (function()
+check("the clinic has a board (Doctor Ellie), on its sidewalk", (function()
 	local spot = Map.EmployerSpots.clinic
 	if not spot or not clinic then
 		return false
@@ -552,7 +552,7 @@ end)())
 check("the clinic's landmark names the ambulance", (function()
 	for _, landmark in Map.Landmarks do
 		if landmark.id == "clinic" then
-			return landmark.description:find("Ambulance", 1, true) ~= nil and landmark.description:find("Dr. Novak", 1, true) ~= nil
+			return landmark.description:find("Ambulance", 1, true) ~= nil and landmark.description:find("Doctor Ellie", 1, true) ~= nil
 		end
 	end
 	return false

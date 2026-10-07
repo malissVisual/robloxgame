@@ -802,7 +802,7 @@ Config.Weapons = {
 	-- 3.1, exclusive: rewards nobody can buy (Config.Rewards). Finish a campaign, or every challenge.
 	{
 		id = "reyes",
-		name = "Reyes' Carbine",
+		name = "Maria's Carbine",
 		price = 0,
 		damage = 28,
 		fireRate = 8,
@@ -811,7 +811,7 @@ Config.Weapons = {
 		spread = 0.7,
 		splash = 0,
 		color = { 170, 210, 110 },
-		description = "Captain Reyes' own rifle, given to the courier who kept the base alive.",
+		description = "Captain Maria's own rifle, given to the courier who kept the base alive.",
 		exclusive = "army",
 	},
 	{
@@ -987,7 +987,7 @@ export type GearDef = {
 -- slows the walk and the sprint (shared/Transport.luau speedMult: the best shoes × the slowest piece).
 export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number?, extra: number? }
 Config.Kit = {
-	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "2 more light pieces in your hand; what you pick up drops straight in. Works with a backpack." },
+	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "2 more light pieces of any kind (a bouquet, a cake too) while you hold it (2); what you pick up drops straight in. Works with a backpack." },
 	-- 6.0.1: the red reflective vest, no longer part of a new courier's body (server/CharacterArt/Geometry.luau hivis):
 	-- just the look (no armour), worn until a Kevlar or heavy vest covers it (shared/KitFit.luau). Saves from before
 	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it.
@@ -1089,6 +1089,7 @@ Config.ItemTuning = {
 	MineLife = 120,
 	MineMax = 5,
 	UseCooldown = 0.4,
+	BarSlots = 5, -- 6.3: the bottom bar's item slots on a computer (client/Hotbar.luau; the supply crate's "→ slot n")
 }
 
 -- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)
@@ -2312,7 +2313,7 @@ Config.Jobs = {
 		AddOnPay = 180,
 		AddOnDistance = { 80, 220 } :: { number },
 		AddOnAnswer = 15,
-		AddOnGivers = { "Mrs. Lee", "Old Tom", "Kenny", "Mr. Novotny", "Aunt Maple" } :: { string },
+		AddOnGivers = { "Mabel", "Old Tom", "Kenny", "Norm", "Aunt Maple" } :: { string },
 	},
 	-- 5.7, life on a run on foot or by bike (shared/FootEvents.luau picks, server/RunEvents.luau runs them; never the
 	-- tutorial's delivery, a car job or a mission). A light road event on about one run in four (Chance), after After
@@ -2335,7 +2336,7 @@ Config.Jobs = {
 		SurvivorAhead = 45,
 		SurvivorReach = 7,
 		SurvivorWait = 40,
-		SurvivorNames = { "Ada", "Big Lou", "Mrs. Park", "Tomas", "Nina", "Grandpa Joe", "Eli", "Marta" } :: { string },
+		SurvivorNames = { "Ada", "Big Lou", "Pam", "Toby", "Nina", "Grandpa Joe", "Eli", "Martha" } :: { string },
 		Tip = { 15, 35 } :: { number },
 		GateAhead = 30,
 		GateWidth = 10,
@@ -2445,9 +2446,9 @@ Config.Jobs = {
 			tiers = { 1, 2 },
 			giver = { name = "Luigi", title = "Pizza chef", role = "cook" },
 			receivers = {
-				{ name = "Mrs. Hungry", title = "Ordered extra cheese", role = "townsperson" },
+				{ name = "Hungry Hannah", title = "Ordered extra cheese", role = "townsperson" },
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
-				{ name = "Mr. Novotny", title = "Movie night", role = "townsperson" },
+				{ name = "Norm", title = "Movie night", role = "townsperson" },
 			},
 			to = { "house", "apartment" },
 			peak = { 18, 4, 1.25 },
@@ -2465,7 +2466,7 @@ Config.Jobs = {
 			giver = { name = "Anna", title = "Baker", role = "cook" },
 			receivers = {
 				{ name = "Grandma Rose", title = "Feeds the street", role = "townsperson" },
-				{ name = "Mrs. Hungry", title = "Breakfast for six", role = "townsperson" },
+				{ name = "Hungry Hannah", title = "Breakfast for six", role = "townsperson" },
 				{ name = "Old Tom", title = "Fresh rolls, every day", role = "townsperson" },
 			},
 			to = { "house", "apartment", "venue:cafe", "venue:burgers" },
@@ -2481,11 +2482,11 @@ Config.Jobs = {
 			look = "parcel",
 			pieces = { 1, 3 },
 			tiers = { 1, 2, 3 },
-			giver = { name = "Mr. Grant", title = "Postmaster", role = "clerk" },
+			giver = { name = "Fred", title = "Postmaster", role = "clerk" },
 			receivers = {
 				{ name = "Grandma Rose", title = "Waiting for letters", role = "townsperson" },
 				{ name = "Sal", title = "Mail-order clippers", role = "shopkeeper" },
-				{ name = "Mr. Novotny", title = "New boots", role = "townsperson" },
+				{ name = "Norm", title = "New boots", role = "townsperson" },
 			},
 			to = { "house", "apartment" },
 		},
@@ -2499,11 +2500,11 @@ Config.Jobs = {
 			look = "medicine",
 			pieces = { 1, 3 },
 			tiers = { 1, 2, 3 },
-			giver = { name = "Mr. Patel", title = "Pharmacist", role = "clerk" },
+			giver = { name = "Phil", title = "Pharmacist", role = "clerk" },
 			receivers = {
 				{ name = "Grandma Rose", title = "Needs her pills", role = "townsperson" },
-				{ name = "Mr. Brown", title = "Bitten? Just a scratch", role = "townsperson" },
-				{ name = "Mrs. Lopez", title = "Fever since Monday", role = "townsperson" },
+				{ name = "Bert", title = "Bitten? Just a scratch", role = "townsperson" },
+				{ name = "Lorna", title = "Fever since Monday", role = "townsperson" },
 			},
 			to = { "house", "apartment" },
 		},
@@ -2519,7 +2520,7 @@ Config.Jobs = {
 			tiers = { 1, 2 },
 			giver = { name = "Carla", title = "Store manager", role = "shopkeeper" },
 			receivers = {
-				{ name = "Mrs. Hungry", title = "Empty fridge", role = "townsperson" },
+				{ name = "Hungry Hannah", title = "Empty fridge", role = "townsperson" },
 				{ name = "Old Tom", title = "Can't carry the bags", role = "townsperson" },
 				{ name = "The Twins", title = "The weekly shop", role = "townsperson" },
 			},
@@ -2539,7 +2540,7 @@ Config.Jobs = {
 			giver = { name = "Bob", title = "Hardware store", role = "worker" },
 			receivers = {
 				{ name = "Old Pete", title = "Fixing his roof", role = "townsperson" },
-				{ name = "Mr. Novotny", title = "Boarding up the windows", role = "townsperson" },
+				{ name = "Norm", title = "Boarding up the windows", role = "townsperson" },
 				{ name = "Aunt Maple", title = "A new fence", role = "townsperson" },
 			},
 			to = { "house", "harbor" },
@@ -2559,7 +2560,7 @@ Config.Jobs = {
 			receivers = {
 				{ name = "Sparks", title = "Ham radio operator", role = "worker" },
 				{ name = "Kenny", title = "A new console, still", role = "townsperson" },
-				{ name = "Ms. Parker", title = "A radio for the news", role = "teacher" },
+				{ name = "Miss Amy", title = "A radio for the news", role = "teacher" },
 			},
 			to = { "apartment" },
 		},
@@ -2608,9 +2609,9 @@ Config.Jobs = {
 			look = "vaccine",
 			pieces = { 1, 2 },
 			tiers = { 3, 4 },
-			giver = { name = "Dr. Ito", title = "Lab scientist", role = "clerk" },
+			giver = { name = "Doctor Hiro", title = "Lab scientist", role = "clerk" },
 			receivers = {
-				{ name = "Dr. Novak", title = "Doctor", role = "clerk" },
+				{ name = "Doctor Ellie", title = "Doctor", role = "clerk" },
 				{ name = "Nurse Kim", title = "Rooftop clinic", role = "clerk" },
 			},
 		},
@@ -2624,9 +2625,9 @@ Config.Jobs = {
 			look = "sample",
 			pieces = { 1, 2 },
 			tiers = { 4 },
-			giver = { name = "Dr. Ito", title = "Lab scientist", role = "clerk" },
+			giver = { name = "Doctor Hiro", title = "Lab scientist", role = "clerk" },
 			receivers = {
-				{ name = "Dr. Novak", title = "Working on a cure", role = "clerk" },
+				{ name = "Doctor Ellie", title = "Working on a cure", role = "clerk" },
 			},
 		},
 		{
@@ -2639,10 +2640,10 @@ Config.Jobs = {
 			look = "gold",
 			pieces = { 1, 2 },
 			tiers = { 3, 4 },
-			giver = { name = "Mr. Sterling", title = "Bank manager", role = "clerk" },
+			giver = { name = "Simon", title = "Bank manager", role = "clerk" },
 			receivers = {
 				{ name = "The Mayor", title = "City hall", role = "clerk" },
-				{ name = "Officer Diaz", title = "Police bunker", role = "soldier" },
+				{ name = "Officer Nate", title = "Police bunker", role = "soldier" },
 			},
 		},
 		{
@@ -2676,7 +2677,7 @@ Config.Jobs = {
 			giver = { name = "Big Al", title = "Grill cook", role = "cook" },
 			receivers = {
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
-				{ name = "Mrs. Hungry", title = "Ordered fries too", role = "townsperson" },
+				{ name = "Hungry Hannah", title = "Ordered fries too", role = "townsperson" },
 				{ name = "Kenny", title = "Double cheese, no pickles", role = "townsperson" },
 			},
 			to = { "house", "apartment" },
@@ -2696,7 +2697,7 @@ Config.Jobs = {
 			receivers = {
 				{ name = "Sparks", title = "Up all night on the radio", role = "worker" },
 				{ name = "The Twins", title = "Night shift", role = "townsperson" },
-				{ name = "Ms. Parker", title = "Marking homework", role = "teacher" },
+				{ name = "Miss Amy", title = "Marking homework", role = "teacher" },
 			},
 			to = { "apartment", "house" },
 			hours = { 11, 4 },
@@ -2715,8 +2716,8 @@ Config.Jobs = {
 			giver = { name = "Jules", title = "Barista", role = "cook" },
 			receivers = {
 				{ name = "Grandma Rose", title = "Her morning croissant", role = "townsperson" },
-				{ name = "Ms. Parker", title = "Breakfast before school", role = "teacher" },
-				{ name = "Mr. Kowalski", title = "Two cinnamon rolls", role = "shopkeeper" },
+				{ name = "Miss Amy", title = "Breakfast before school", role = "teacher" },
+				{ name = "Benny", title = "Two cinnamon rolls", role = "shopkeeper" },
 			},
 			to = { "house", "apartment" },
 			hours = { 6, 15 },
@@ -2753,7 +2754,7 @@ Config.Jobs = {
 			receivers = {
 				{ name = "Lucy and Tom", title = "Getting married", role = "townsperson" },
 				{ name = "Grandma Rose", title = "Her birthday", role = "townsperson" },
-				{ name = "Mrs. Lopez", title = "Their anniversary", role = "townsperson" },
+				{ name = "Lorna", title = "Their anniversary", role = "townsperson" },
 			},
 			to = { "house", "apartment" },
 			hours = { 8, 19 },
@@ -2780,15 +2781,15 @@ Config.Jobs = {
 	} :: { BusinessDef },
 	-- At a far place the place's own person takes the ordinary deliveries.
 	PlacePeople = {
-		base = { name = "Sergeant Hayes", title = "Quartermaster", role = "soldier" },
+		base = { name = "Sergeant Roy", title = "Quartermaster", role = "soldier" },
 		lodge = { name = "Ingrid", title = "Lodge keeper", role = "shopkeeper" },
 		radio = { name = "Sparks", title = "Radio operator", role = "worker" },
 		farm = { name = "Lucy", title = "Farm hand", role = "farmer" },
 		docks = { name = "Rocco", title = "Dock foreman", role = "worker" },
 		gas = { name = "Tony", title = "Pump attendant", role = "clerk" },
-		school = { name = "Ms. Parker", title = "Teacher", role = "teacher" },
+		school = { name = "Miss Amy", title = "Teacher", role = "teacher" },
 		frosty = { name = "Molly", title = "At the counter", role = "cook" },
-		movers = { name = "Kofi", title = "Big Move Movers", role = "mover" },
+		movers = { name = "Cody", title = "Big Move Movers", role = "mover" },
 		ranch = { name = "Jesse", title = "Ranch hand", role = "rancher" },
 		stables = { name = "Emma", title = "Riding instructor", role = "rancher" },
 		fueldepot = { name = "Hank", title = "Depot worker", role = "worker" },
@@ -2803,7 +2804,7 @@ Config.Jobs = {
 		winter = { giver = "cook", receiver = "shopkeeper" },
 		horses = { giver = "rancher", receiver = "rancher" },
 		fuelrun = { giver = "worker", receiver = "shopkeeper" },
-		cashrun = { giver = "banker", receiver = "soldier" }, -- Mr. Gold, the bank manager; Sergeant Hayes as at the base
+		cashrun = { giver = "banker", receiver = "soldier" }, -- Gordon, the bank manager; Sergeant Roy as at the base
 		ambulance = { giver = "townsperson", receiver = "nurse" }, -- Nurse Ada; the patient walks in by themselves (board)
 		pizzarush = { giver = "cook", receiver = "townsperson" },
 		freightrun = { giver = "foreman", receiver = "worker" }, -- 4.0: the dock foreman; FreightReceivers at the drop
@@ -2811,7 +2812,7 @@ Config.Jobs = {
 	-- 4.0, the Freight Run: who takes the pallets at each receiving dock (shared/Map.luau ReceivingDocks).
 	FreightReceivers = {
 		market = { name = "Rita", title = "FreshMart stock room", role = "clerk" },
-		movers = { name = "Kofi", title = "Big Move Movers", role = "mover" },
+		movers = { name = "Cody", title = "Big Move Movers", role = "mover" },
 		powerplant = { name = "Ivan", title = "Power Plant stores", role = "worker" },
 	} :: { [string]: PersonDef },
 	-- The special jobs on the job board (JobTypeDef.board, or no employer): the chance of a first and of a second
@@ -3150,7 +3151,7 @@ Config.JobTypes = {
 		items = 6,
 		itemKind = "kid",
 		giver = "A parent",
-		receiver = "Ms. Parker, the teacher",
+		receiver = "Miss Amy, the teacher",
 	},
 	{
 		id = "armysupply",
@@ -3175,7 +3176,7 @@ Config.JobTypes = {
 		items = 4,
 		itemKind = "ammo",
 		giver = "Rocco, the dock foreman",
-		receiver = "Sergeant Hayes",
+		receiver = "Sergeant Roy",
 	},
 	{
 		id = "icecream",
@@ -3224,8 +3225,8 @@ Config.JobTypes = {
 		unload = "carry",
 		items = 4,
 		itemKind = "furniture",
-		giver = "The Novak family",
-		receiver = "The Novak family",
+		giver = "Ruby's family",
+		receiver = "Ruby's family",
 	},
 	{
 		id = "farmrun",
@@ -3349,8 +3350,8 @@ Config.JobTypes = {
 		unload = "carry",
 		items = 3,
 		itemKind = "cash",
-		giver = "Mr. Gold, the bank manager",
-		receiver = "Sergeant Hayes",
+		giver = "Gordon, the bank manager",
+		receiver = "Sergeant Roy",
 		banditBoost = 2,
 	},
 	{
@@ -3454,52 +3455,46 @@ export type EmployerDef = {
 
 -- People who run something in the world. Work for them: after a few jobs their vehicle is yours.
 Config.Employers = {
-	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bus", needed = 3, person = "Principal Moore", pitch = "Our bus driver ran away. Drive the kids to school!" },
-	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "armored", needed = 4, weapon = "carbine", weaponAt = 2, person = "Captain Reyes", pitch = "We need ammo from the docks. Bring it through the tunnel." },
+	{ id = "school", name = "Sunny Hill School", icon = "🏫", jobType = "schoolrun", reward = "bus", needed = 3, person = "Principal Helen", pitch = "Our bus driver ran away. Drive the kids to school!" },
+	{ id = "army", name = "Military Base", icon = "🪖", jobType = "armysupply", reward = "armored", needed = 4, weapon = "carbine", weaponAt = 2, person = "Captain Maria", pitch = "We need ammo from the docks. Bring it through the tunnel." },
 	{ id = "icecream", name = "Frosty's Ice Cream", icon = "🍦", jobType = "icecream", reward = "icecream", needed = 3, person = "Frosty", pitch = "People still want ice cream. Sell it for us!" },
 	{ id = "movers", name = "Big Move Movers", icon = "🚚", jobType = "moving", reward = "movingtruck", needed = 3, person = "Dana, the boss", pitch = "Families are getting out of town. Move their things." },
-	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, person = "Old Man Jenkins", pitch = "The city is hungry. Take my monster truck to the markets." },
+	{ id = "farm", name = "Old Farm", icon = "🌽", jobType = "farmrun", reward = "monster", needed = 3, person = "Old Man Jed", pitch = "The city is hungry. Take my monster truck to the markets." },
 	{ id = "ranch", name = "Silver Spur Ranch", icon = "🐴", jobType = "horses", reward = "livestock", needed = 4, weapon = "revolver", weaponAt = 2, person = "Walt, the rancher", pitch = "My horses are sold to the riding school. Lead them into the truck gently, and keep the bandits off them." },
-	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "ambulance", needed = 3, person = "Dr. Novak", pitch = "The phones never stop ringing. Take the ambulance, bring the patients in alive." },
+	{ id = "clinic", name = "City Clinic", icon = "🏥", jobType = "ambulance", reward = "ambulance", needed = 3, person = "Doctor Ellie", pitch = "The phones never stop ringing. Take the ambulance, bring the patients in alive." },
 	{ id = "gas", name = "Gas Station", icon = "⛽", jobType = "fuelrun", reward = "fueltruck", needed = 3, person = "Rosa, the owner", pitch = "My pumps are dry. Bring fuel barrels from the harbor depot." },
 } :: { EmployerDef }
 
 -- 5.5, people in every building (shared/Residents.luau, shared/Deliveries.luau): every home has residents, made up
 -- from these lists the same way every time (seeded by the home's id). An apartment building has `floors` × 4 flats
--- (A – D), FlatPeople in each; a Suburbs house HousePeople, one family. A family is Czech or English (its surname);
--- now and then one of them has a first name from the other list (OtherOrigin), and a few people are only known by a
--- nickname (NicknameChance: "Old Pete", "Doc Hansen"). Surnames are { a man's, a woman's } (the Czech -ová), or one
--- for both. A delivery to a home goes to one of its residents (an apartment: "Apt 4C, 40 6th Ave"); a home weighs
--- as many times as it has residents in the board's draw, at most MaxWeight (a tower comes up more often than a house,
--- but does not flood the board).
+-- (A – D), FlatPeople in each; a Suburbs house HousePeople. A delivery to a home goes to one of its residents (an
+-- apartment: "Apt 4C, 40 6th Ave"); a home weighs as many times as it has residents in the board's draw, at most
+-- MaxWeight (a tower comes up more often than a house, but does not flood the board).
+-- 6.3 (the owner: "the people's names without surnames, in English"): a resident is one English first name ("Sarah",
+-- "Mike"), or now and then only a nickname (NicknameChance: "Lucky Jim", "Radio Rita"). No surnames, no Czech
+-- lists any more. Women and Men hold more than 60 names each, so the biggest tower (9 floors × 4 flats × 2 people,
+-- 72 at most) still has a name of its own for everybody.
 Config.Residents = {
 	FlatPeople = { 1, 2 } :: { number },
 	HousePeople = { 1, 4 } :: { number },
 	MaxWeight = 6,
-	OtherOrigin = 0.15,
 	NicknameChance = 0.04,
-	Czech = {
-		Women = { "Jana", "Eva", "Petra", "Lucie", "Tereza", "Hana", "Marie", "Veronika", "Kateřina", "Zdeňka" },
-		Men = { "Petr", "Jan", "Tomáš", "Martin", "Jiří", "Pavel", "Lukáš", "Ondřej", "Karel", "Zdeněk" },
-		Surnames = {
-			{ "Novák", "Nováková" }, { "Svoboda", "Svobodová" }, { "Dvořák", "Dvořáková" }, { "Černý", "Černá" },
-			{ "Procházka", "Procházková" }, { "Kučera", "Kučerová" }, { "Veselý", "Veselá" }, { "Horák", "Horáková" },
-			{ "Němec", "Němcová" }, { "Pokorný", "Pokorná" }, { "Marek", "Marková" }, { "Pospíšil", "Pospíšilová" },
-			{ "Hájek", "Hájková" }, { "Král", "Králová" }, { "Jelínek", "Jelínková" }, { "Růžička", "Růžičková" },
-			{ "Beneš", "Benešová" }, { "Fiala", "Fialová" }, { "Sedláček", "Sedláčková" }, { "Zeman", "Zemanová" },
-		} :: { { string } },
-	},
-	English = {
-		Women = { "Sarah", "Emma", "Kate", "Linda", "Megan", "Rosie", "Grace", "Holly", "Nora", "Tina" },
-		Men = { "Mike", "Dave", "Tom", "Jack", "Sam", "Bill", "Frank", "Ray", "Eddie", "Luke" },
-		Surnames = {
-			{ "Brown" }, { "Smith" }, { "Miller" }, { "Walker" }, { "Turner" }, { "Hughes" }, { "Cooper" }, { "Parker" },
-			{ "Reed" }, { "Bennett" }, { "Hayes" }, { "Foster" }, { "Murphy" }, { "Price" }, { "Barnes" }, { "Fisher" },
-			{ "Grant" }, { "Wells" }, { "Hansen" }, { "Doyle" },
-		} :: { { string } },
-	},
+	Women = {
+		"Sarah", "Emma", "Kate", "Linda", "Megan", "Rosie", "Grace", "Holly", "Nora", "Tina", "Alice", "Amber", "Beth", "Bonnie",
+		"Carol", "Chloe", "Claire", "Daisy", "Debbie", "Ellen", "Emily", "Fiona", "Gemma", "Hazel", "Heather", "Iris", "Jade", "Janet",
+		"Jenny", "Jess", "Joan", "Julie", "Karen", "Laura", "Leah", "Lily", "Lisa", "Lucy", "Maggie", "Martha", "Mary", "Molly",
+		"Nancy", "Olivia", "Paige", "Penny", "Polly", "Rachel", "Rebecca", "Ruby", "Sally", "Sophie", "Stella", "Susan", "Tara", "Vicky",
+		"Wendy", "Zoe", "Abby", "Brenda", "Diana", "Eve", "Faye", "Ivy", "Judy", "Kelly", "Mandy", "Pam",
+	} :: { string },
+	Men = {
+		"Mike", "Dave", "Tom", "Jack", "Sam", "Bill", "Frank", "Ray", "Eddie", "Luke", "Adam", "Alan", "Andy", "Ben",
+		"Bob", "Brian", "Carl", "Chris", "Colin", "Dan", "Dean", "Doug", "Ed", "Fred", "Gary", "George", "Greg", "Harry",
+		"Henry", "Ian", "Jake", "James", "Jeff", "Jim", "Joe", "John", "Josh", "Keith", "Ken", "Kevin", "Larry", "Leo",
+		"Mark", "Matt", "Neil", "Nick", "Owen", "Paul", "Pete", "Phil", "Rob", "Roger", "Ryan", "Scott", "Steve", "Ted",
+		"Terry", "Tim", "Tony", "Walter", "Will", "Zack", "Barry", "Craig", "Gavin", "Hugh", "Lewis", "Max",
+	} :: { string },
 	-- (whole names: what everybody on the block calls them)
-	Nicknames = { "Old Pete", "Doc Hansen", "Granny Ruth", "Sarge Kowalski", "Mad Mira", "Tin-Can Tony", "Lucky Jirka", "Two-Dogs Dana", "Bunker Bob", "Radio Ráďa" },
+	Nicknames = { "Old Pete", "Doc", "Granny Mae", "Sarge", "Mad Mira", "Tin-Can Tony", "Lucky Jim", "Two-Dogs Dana", "Bunker Bob", "Radio Rita" } :: { string },
 }
 
 -- 5.7, robustness and load (server/Zombies.luau, shared/Net.luau, server/Shops.luau, server/Jobs.luau, Main.server).

@@ -57,9 +57,9 @@ local WALK_AWAY = 30 -- studs from where the window opened: it closes
 local WELCOME_SECONDS = 16
 
 local COURIER_NAMES = {
-	"Ana", "Marek", "Bea", "Tomas", "Lucy", "Rex", "Ivana", "Dusty", "Kofi", "Mila", "Hank", "Zoe", "Pavel", "Rosa",
-	"Jin", "Olga", "Bruno", "Nina", "Vic", "Eva", "Sam", "Petra", "Duke", "Lena", "Otto", "Mae", "Igor", "Tess",
-	"Radek", "June", "Max", "Kat",
+	"Anna", "Mark", "Bea", "Toby", "Lucy", "Rex", "Ivy", "Dusty", "Cody", "Millie", "Hank", "Zoe", "Paul", "Rosa",
+	"Jim", "Olive", "Bruno", "Nina", "Vic", "Eva", "Sam", "Peggy", "Duke", "Lena", "Otto", "Mae", "Iggy", "Tess",
+	"Reggie", "June", "Max", "Kat",
 }
 local VANS = { "Rusty Van", "Box Van", "Cargo Van", "Turbo Van", "Armored Van", "Golden Van" }
 local ROADS = {

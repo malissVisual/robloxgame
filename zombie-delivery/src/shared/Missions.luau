@@ -55,16 +55,16 @@ local DUO_SPAN = 4
 -- The stories, in the order they open (3.2: each `requires` the one before it; the DUO campaign only First Shift).
 Missions.Campaigns = {
 	{ id = "dispatch", name = "First Shift", client = "Marge, the dispatcher", clientRole = "clerk", icon = "📦", color = { 255, 200, 70 }, level = 4, pitch = "Marge runs what is left of the city's dispatch office. Learn the streets, keep the parcels moving.", reward = 2500 },
-	{ id = "clinic", name = "Code Red", client = "Dr. Novak, the clinic's doctor", clientRole = "doctor", icon = "🏥", color = { 240, 80, 80 }, level = 5, pitch = "The City Clinic is the last hospital open. Medicine, blood, vaccines and patients: every minute counts.", reward = 4000, requires = { "dispatch" } },
-	{ id = "market", name = "Empty Shelves", client = "Mr. Patel, FreshMart's owner", clientRole = "grocer", icon = "🛒", color = { 110, 200, 90 }, level = 6, pitch = "People are hungry. Fill the supermarket, the shelters and the soup kitchens before the city starves.", reward = 5500, requires = { "clinic" } },
+	{ id = "clinic", name = "Code Red", client = "Doctor Ellie, the City Clinic", clientRole = "doctor", icon = "🏥", color = { 240, 80, 80 }, level = 5, pitch = "The City Clinic is the last hospital open. Medicine, blood, vaccines and patients: every minute counts.", reward = 4000, requires = { "dispatch" } },
+	{ id = "market", name = "Empty Shelves", client = "Raj, FreshMart's owner", clientRole = "grocer", icon = "🛒", color = { 110, 200, 90 }, level = 6, pitch = "People are hungry. Fill the supermarket, the shelters and the soup kitchens before the city starves.", reward = 5500, requires = { "clinic" } },
 	{ id = "duo", name = "Partners in Crime", client = "Rosa & Rico, the twins", clientRole = "townsperson", icon = "🤝", color = { 236, 92, 60 }, level = 6, pitch = "Rosa plans, Rico jokes, and neither of them ever works alone. Jobs for two pairs of hands, two keys and two levers: bring a partner, or don't come at all.", reward = 7500, requires = { "dispatch" }, duo = true },
-	{ id = "firehouse", name = "Smoke and Sirens", client = "Chief Ramirez, Fire Station 9", clientRole = "officer", icon = "🚒", color = { 255, 120, 40 }, level = 7, pitch = "Fires, trapped survivors, dead pumps. The firefighters need a driver who does not panic.", reward = 7000, requires = { "market" } },
-	{ id = "army", name = "Iron Supply", client = "Captain Reyes, the Military Base", clientRole = "soldier", icon = "🪖", color = { 130, 150, 90 }, level = 9, pitch = "The army holds the line at the base. Keep their guns fed, their trucks fuelled and their secrets safe.", reward = 9000, requires = { "firehouse" } },
-	{ id = "power", name = "Lights Out", client = "Engineer Volkov, the Power Plant", clientRole = "foreman", icon = "⚡", color = { 90, 180, 255 }, level = 10, pitch = "The grid is failing block by block. Batteries, generators and spare parts: bring the lights back.", reward = 11000, requires = { "army" } },
+	{ id = "firehouse", name = "Smoke and Sirens", client = "Chief Carlos, Fire Station 9", clientRole = "officer", icon = "🚒", color = { 255, 120, 40 }, level = 7, pitch = "Fires, trapped survivors, dead pumps. The firefighters need a driver who does not panic.", reward = 7000, requires = { "market" } },
+	{ id = "army", name = "Iron Supply", client = "Captain Maria, the Military Base", clientRole = "soldier", icon = "🪖", color = { 130, 150, 90 }, level = 9, pitch = "The army holds the line at the base. Keep their guns fed, their trucks fuelled and their secrets safe.", reward = 9000, requires = { "firehouse" } },
+	{ id = "power", name = "Lights Out", client = "Engineer Ivan, the Power Plant", clientRole = "foreman", icon = "⚡", color = { 90, 180, 255 }, level = 10, pitch = "The grid is failing block by block. Batteries, generators and spare parts: bring the lights back.", reward = 11000, requires = { "army" } },
 	{ id = "ranch", name = "Wild West End", client = "Walt, the rancher", clientRole = "rancher", icon = "🐴", color = { 200, 150, 90 }, level = 11, pitch = "Out west the bandits rule the roads. Walt's horses, the farm's food and a feud that ends with you.", reward = 13000, requires = { "power" } },
-	{ id = "lab", name = "Patient Zero", client = "Dr. Ito, the Biotech Lab", clientRole = "doctor", icon = "🧪", color = { 160, 110, 255 }, level = 12, pitch = "Dr. Ito is close to a cure. Samples, explosives and things nobody should see: handle with care.", reward = 16000, requires = { "ranch" } },
+	{ id = "lab", name = "Patient Zero", client = "Doctor Hiro, the Biotech Lab", clientRole = "doctor", icon = "🧪", color = { 160, 110, 255 }, level = 12, pitch = "Doctor Hiro is close to a cure. Samples, explosives and things nobody should see: handle with care.", reward = 16000, requires = { "ranch" } },
 	{ id = "underworld", name = "Dirty Money", client = "Vinnie, the fixer", clientRole = "banker", icon = "💰", color = { 230, 200, 60 }, level = 13, pitch = "Vinnie pays the best and asks no questions. Cash, gold, stolen art: everybody wants what is in your trunk.", reward = 20000, requires = { "lab" } },
-	{ id = "exodus", name = "Last Convoy", client = "Mayor Grant, City Hall", clientRole = "clerk", icon = "🚌", color = { 255, 255, 255 }, level = 14, pitch = "The city is falling. Get the survivors to the airfield and the lighthouse before the last plane and the last boat leave.", reward = 30000, requires = { "dispatch", "clinic", "market", "firehouse", "army", "power", "ranch", "lab", "underworld" } },
+	{ id = "exodus", name = "Last Convoy", client = "Mayor Ruth, City Hall", clientRole = "clerk", icon = "🚌", color = { 255, 255, 255 }, level = 14, pitch = "The city is falling. Get the survivors to the airfield and the lighthouse before the last plane and the last boat leave.", reward = 30000, requires = { "dispatch", "clinic", "market", "firehouse", "army", "power", "ranch", "lab", "underworld" } },
 } :: { Campaign }
 
 -- Every mission, campaign by campaign (10 each), filled in by shared/Missions data below.
@@ -220,17 +220,17 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "parcel", items = 2, cargo = "Parcels",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = nil, payPerStop = 40,
 		pickupLabel = "PICK UP THE PARCELS AT", dropLabel = "DELIVER THE PARCELS TO",
-		giver = "Marge, the dispatcher", giverRole = "clerk", receiver = "The Hendersons, a family", receiverRole = "townsperson",
+		giver = "Marge, the dispatcher", giverRole = "clerk", receiver = "Jenny's family", receiverRole = "townsperson",
 	})
 	add("dispatch", {
 		number = 2, name = "Mail Call", tier = 1, reward = 350, twists = {},
 		description = "Two sacks of old mail for two streets that have not seen a letter since the outbreak.",
 		briefing = "The post office burned down in week two, but the mail kept piling up in our back room. Two sacks, two streets. People want their letters, even the bills. Especially the bills, weirdly.",
-		debrief = "Mrs. Fisher got a postcard from her son. She cried. I did not. Shut up.",
+		debrief = "Edna got a postcard from her son. She cried. I did not. Shut up.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "mail", items = 2, cargo = "Mail Sacks",
 		pickups = 1, pickupAt = nil, drops = 2, dropAt = nil, payPerStop = 50,
 		pickupLabel = "LOAD THE MAIL SACKS AT", dropLabel = "DROP THE MAIL AT",
-		giver = "Otto, the old postman", giverRole = "worker", receiver = "Mrs. Fisher, a neighbour", receiverRole = "townsperson",
+		giver = "Otto, the old postman", giverRole = "worker", receiver = "Edna, a neighbour", receiverRole = "townsperson",
 	})
 	add("dispatch", {
 		number = 3, name = "Birthday Emergency", tier = 1, reward = 450, twists = { "spotless" },
@@ -250,7 +250,7 @@ do
 		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "furniture", items = 3, cargo = "Furniture",
 		pickups = 1, pickupAt = "movers", drops = 1, dropAt = nil, loadTime = 5, unloadTime = 5, payPerStop = 120,
 		pickupLabel = "LOAD THE FURNITURE AT", dropLabel = "CARRY IT INTO THE HOUSE AT",
-		giver = "Kofi, Big Move Movers", giverRole = "mover", receiver = "Gina, Marge's sister", receiverRole = "townsperson",
+		giver = "Cody, Big Move Movers", giverRole = "mover", receiver = "Gina, Marge's sister", receiverRole = "townsperson",
 	})
 	add("dispatch", {
 		number = 5, name = "Radio Silence", tier = 2, reward = 700, twists = { "guarded" },
@@ -290,7 +290,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "documents", items = 2, cargo = "Secret Files",
 		pickups = 1, pickupAt = "cityhall", drops = 1, dropAt = "police", payPerStop = 160,
 		pickupLabel = "PICK UP THE FILES AT", dropLabel = "HAND THE FILES TO",
-		giver = "Mr. Pruitt, the city clerk", giverRole = "clerk", receiver = "Detective Shaw", receiverRole = "officer",
+		giver = "Percy, the city clerk", giverRole = "clerk", receiver = "Detective Sue", receiverRole = "officer",
 	})
 	add("dispatch", {
 		number = 9, name = "Wheels of Commerce", tier = 3, reward = 1200, coop = true, twists = { "guarded" },
@@ -310,23 +310,23 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "parcel", items = 3, cargo = "The Last Mail",
 		pickups = 2, pickupAt = nil, drops = 3, dropAt = "stadium", payPerStop = 220,
 		pickupLabel = "COLLECT THE LAST PARCELS AT", dropLabel = "DELIVER THE PARCELS TO",
-		giver = "Ben, a sorting clerk", giverRole = "clerk", receiver = "Coach Daniels, the shelter warden", receiverRole = "guard",
+		giver = "Ben, a sorting clerk", giverRole = "clerk", receiver = "Coach Dan, the shelter warden", receiverRole = "guard",
 	})
 end
 
--- ── 2. Code Red (Dr. Novak, the City Clinic) ─────────────────────────────
+-- ── 2. Code Red (Doctor Ellie, the City Clinic) ─────────────────────────────
 -- Pills, a heart attack, vaccines, a dead generator, three patients at once, the night ward, a quarantine block,
 -- a siege, a looted pharmacy and the booster for the whole city.
 do
 	add("clinic", {
 		number = 1, name = "House Call", tier = 1, reward = 400, twists = {},
 		description = "Heart pills from the Corner Pharmacy to an old lady who will not leave her house.",
-		briefing = "Mrs. Gruber's heart pills ran out yesterday and she won't leave her house. The Corner Pharmacy has two boxes behind the counter. Please hurry. She's ninety-one and very rude when she's scared.",
-		debrief = "Mrs. Gruber says you were late. That means she's feeling better.",
+		briefing = "Greta's heart pills ran out yesterday and she won't leave her house. The Corner Pharmacy has two boxes behind the counter. Please hurry. She's ninety-one and very rude when she's scared.",
+		debrief = "Greta says you were late. That means she's feeling better.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "medicine", items = 2, cargo = "Heart Pills",
 		pickups = 1, pickupAt = "pharmacy", drops = 1, dropAt = nil, payPerStop = 50,
 		pickupLabel = "PICK UP THE MEDICINE AT", dropLabel = "BRING THE MEDICINE TO",
-		giver = "Petra, the pharmacist", giverRole = "shopkeeper", receiver = "Mrs. Gruber, a patient at home", receiverRole = "townsperson",
+		giver = "Petra, the pharmacist", giverRole = "shopkeeper", receiver = "Greta, a patient at home", receiverRole = "townsperson",
 	})
 	add("clinic", {
 		number = 2, name = "Code Blue", tier = 1, reward = 450, twists = {},
@@ -336,7 +336,7 @@ do
 		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 1, cargo = "Patient",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "clinic", payPerStop = 80, timeLimit = 180,
 		pickupLabel = "PICK UP THE PATIENT AT", dropLabel = "RUSH THE PATIENT TO",
-		giver = "Mrs. Lindqvist, his wife", giverRole = "townsperson", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Ingrid, his wife", giverRole = "townsperson", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 	add("clinic", {
 		number = 3, name = "Cold Chain", tier = 2, reward = 650, twists = { "spotless" },
@@ -346,7 +346,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "vaccine", items = 3, cargo = "Tetanus Shots",
 		pickups = 1, pickupAt = "lab", drops = 2, dropAt = "clinic", payPerStop = 120,
 		pickupLabel = "LOAD THE COOLERS AT", dropLabel = "DELIVER THE COOLERS TO",
-		giver = "Dr. Ito, the lab chief", giverRole = "doctor", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Doctor Hiro, the lab chief", giverRole = "doctor", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 	add("clinic", {
 		number = 4, name = "Many Hands", tier = 2, reward = 800, coop = true, twists = { "lift" },
@@ -366,7 +366,7 @@ do
 		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 3, cargo = "Patients",
 		pickups = 3, pickupAt = nil, drops = 1, dropAt = "clinic", payPerStop = 160,
 		pickupLabel = "PICK UP THE PATIENT AT", dropLabel = "BRING THE PATIENTS TO",
-		giver = "The Okafor family, worried", giverRole = "townsperson", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Grace's family, worried", giverRole = "townsperson", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 	add("clinic", {
 		number = 6, name = "Night Nurse", tier = 2, reward = 950, twists = { "night" },
@@ -376,17 +376,17 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "medicine", items = 3, cargo = "Medicine Bags",
 		pickups = 1, pickupAt = "clinic", drops = 3, dropAt = nil, payPerStop = 150,
 		pickupLabel = "PICK UP THE MEDICINE BAGS AT", dropLabel = "DELIVER A BAG TO",
-		giver = "Nurse Ada", giverRole = "nurse", receiver = "The Petrovs, feverish", receiverRole = "townsperson",
+		giver = "Nurse Ada", giverRole = "nurse", receiver = "Ted's family, feverish", receiverRole = "townsperson",
 	})
 	add("clinic", {
 		number = 7, name = "Quarantine Zone", tier = 3, reward = 1100, twists = { "guarded" },
 		description = "Blood samples of a new strain, from a trapped nurse to the lab. Hordes at both ends.",
 		briefing = "A block in the east has a new strain: faster, meaner. A brave nurse took blood samples and is hiding in the corner shop. Get them to the lab before the horde around her gets bored and comes in.",
-		debrief = "Dr. Ito says the samples are fascinating. I hate it when he says fascinating.",
+		debrief = "Doctor Hiro says the samples are fascinating. I hate it when he says fascinating.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "sample", items = 3, cargo = "Blood Samples",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "lab", payPerStop = 220,
 		pickupLabel = "COLLECT THE SAMPLES AT", dropLabel = "DELIVER THE SAMPLES TO",
-		giver = "Nurse Kim, trapped", giverRole = "nurse", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Nurse Kim, trapped", giverRole = "nurse", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("clinic", {
 		number = 8, name = "Siege at the Ward", tier = 3, reward = 1300, coop = true, twists = { "defend" }, defendTime = 40,
@@ -396,7 +396,7 @@ do
 		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 4, cargo = "Patients",
 		pickups = 1, pickupAt = "firestation", drops = 1, dropAt = "clinic", payPerStop = 240,
 		pickupLabel = "PICK UP THE PATIENTS AT", dropLabel = "BRING THE PATIENTS TO",
-		giver = "Chief Ramirez, Fire Station 9", giverRole = "officer", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Chief Carlos, Fire Station 9", giverRole = "officer", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 	add("clinic", {
 		number = 9, name = "Pharmacy Run", tier = 3, reward = 1500, coop = true, twists = { "guarded" },
@@ -406,21 +406,21 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "medicine", items = 4, cargo = "Antibiotics",
 		pickups = 1, pickupAt = "pharmacy", drops = 2, dropAt = "camp", loadTime = 4, payPerStop = 260,
 		pickupLabel = "LOAD THE MEDICINE AT", dropLabel = "DELIVER THE MEDICINE TO",
-		giver = "Petra, the pharmacist", giverRole = "shopkeeper", receiver = "Doc Holloway, the camp medic", receiverRole = "doctor",
+		giver = "Petra, the pharmacist", giverRole = "shopkeeper", receiver = "Doc Hal, the camp medic", receiverRole = "doctor",
 	})
 	add("clinic", {
 		number = 10, name = "Code Red", tier = 3, reward = 2000, coop = true, twists = { "spotless", "defend" }, defendTime = 60,
 		description = "The booster for the whole city: lab, two clinics, the Stadium Shelter. Keep it intact and hold the line.",
-		briefing = "Dr. Ito has done it: a booster that keeps a bite from turning for a whole day. Four coolers, two field clinics on the way, then the Stadium Shelter, where two thousand people wait. Keep the coolers safe, and when you get there, hold the line while we vaccinate.",
+		briefing = "Doctor Hiro has done it: a booster that keeps a bite from turning for a whole day. Four coolers, two field clinics on the way, then the Stadium Shelter, where two thousand people wait. Keep the coolers safe, and when you get there, hold the line while we vaccinate.",
 		debrief = "Two thousand people with a fighting chance. Today, you were the medicine.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "vaccine", items = 4, cargo = "Booster Shots",
 		pickups = 1, pickupAt = "lab", drops = 3, dropAt = "stadium", payPerStop = 300,
 		pickupLabel = "LOAD THE VACCINE AT", dropLabel = "DELIVER THE VACCINE TO",
-		giver = "Dr. Ito, the lab chief", giverRole = "doctor", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Doctor Hiro, the lab chief", giverRole = "doctor", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 end
 
--- ── 3. Empty Shelves (Mr. Patel, FreshMart) ──────────────────────────────
+-- ── 3. Empty Shelves (Raj, FreshMart) ──────────────────────────────
 -- Groceries, warm bread from an ice cream truck, potatoes the Rust Riders want, a thawing freezer, water, soup
 -- under fire, seedlings, a supermarket sweep, a price war and the city's ration.
 do
@@ -432,7 +432,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "groceries", items = 4, cargo = "Groceries",
 		pickups = 1, pickupAt = "warehouse", drops = 1, dropAt = "market", payPerStop = 60,
 		pickupLabel = "PICK UP THE GROCERIES AT", dropLabel = "DELIVER THE GROCERIES TO",
-		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Mr. Patel, FreshMart's owner", receiverRole = "grocer",
+		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Raj, FreshMart's owner", receiverRole = "grocer",
 	})
 	add("market", {
 		number = 2, name = "Bread Line", tier = 1, reward = 500, twists = {},
@@ -447,22 +447,22 @@ do
 	add("market", {
 		number = 3, name = "Farm to Table", tier = 2, reward = 700, twists = { "hunted" },
 		description = "Potatoes from the Old Farm in the monster truck. The Rust Riders hunt you all the way back.",
-		briefing = "Old Man Jenkins dug up the potatoes, and the Rust Riders heard about it. They'll come at you from everywhere, all the way back. Take his monster truck, and drive over anything that says 'hand it over'.",
+		briefing = "Old Man Jed dug up the potatoes, and the Rust Riders heard about it. They'll come at you from everywhere, all the way back. Take his monster truck, and drive over anything that says 'hand it over'.",
 		debrief = "Potatoes! Real potatoes! Tonight, everybody eats fries.",
 		vehicle = "monster", load = "carry", unload = "carry", itemKind = "sack", items = 5, cargo = "Potatoes",
 		pickups = 1, pickupAt = "farm", drops = 1, dropAt = "market", loadTime = 4, payPerStop = 130,
 		pickupLabel = "LOAD THE POTATOES AT", dropLabel = "DELIVER THE POTATOES TO",
-		giver = "Old Man Jenkins, the farmer", giverRole = "farmer", receiver = "Mr. Patel, FreshMart's owner", receiverRole = "grocer",
+		giver = "Old Man Jed, the farmer", giverRole = "farmer", receiver = "Raj, FreshMart's owner", receiverRole = "grocer",
 	})
 	add("market", {
 		number = 4, name = "Cold Storage", tier = 2, reward = 800, twists = {},
 		description = "Frozen food from a dead basement freezer to FreshMart, five minutes before it thaws.",
-		briefing = "The FreshMart freezers are fixed, but the frozen food is still in Mrs. Kowalski's basement, and her power just died. Five minutes before it all thaws. Go, go, go!",
+		briefing = "The FreshMart freezers are fixed, but the frozen food is still in Wanda's basement, and her power just died. Five minutes before it all thaws. Go, go, go!",
 		debrief = "Still frozen. You're faster than my nephew, and he has a bicycle.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "icebox", items = 4, cargo = "Frozen Food",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "market", payPerStop = 140, timeLimit = 300,
 		pickupLabel = "PICK UP THE ICE BOXES AT", dropLabel = "DELIVER THE ICE BOXES TO",
-		giver = "Mrs. Kowalski, a neighbour", giverRole = "townsperson", receiver = "Mr. Patel, FreshMart's owner", receiverRole = "grocer",
+		giver = "Wanda, a neighbour", giverRole = "townsperson", receiver = "Raj, FreshMart's owner", receiverRole = "grocer",
 	})
 	add("market", {
 		number = 5, name = "Water Rights", tier = 2, reward = 900, coop = true, twists = { "lift" },
@@ -472,7 +472,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "water", items = 4, cargo = "Drinking Water",
 		pickups = 1, pickupAt = "waterworks", drops = 2, dropAt = "camp", loadTime = 4, unloadTime = 4, payPerStop = 160,
 		pickupLabel = "FILL THE JUGS AT", dropLabel = "DELIVER THE WATER TO",
-		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Marta, the camp leader", receiverRole = "townsperson",
+		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Martha, the camp leader", receiverRole = "townsperson",
 	})
 	add("market", {
 		number = 6, name = "Soup's On", tier = 2, reward = 950, coop = true, twists = { "gunner" },
@@ -482,17 +482,17 @@ do
 		vehicle = nil, load = "carry", unload = "serve", itemKind = "soup", items = 4, cargo = "Lentil Soup",
 		pickups = 1, pickupAt = "school", drops = 3, dropAt = nil, unloadTime = 5, payPerStop = 150,
 		pickupLabel = "LOAD THE SOUP AT", dropLabel = "SERVE SOUP AT",
-		giver = "Chef Bertrand, the school cook", giverRole = "cook", receiver = "Hungry neighbours", receiverRole = "townsperson",
+		giver = "Chef Bert, the school cook", giverRole = "cook", receiver = "Hungry neighbours", receiverRole = "townsperson",
 	})
 	add("market", {
 		number = 7, name = "Seeds of Hope", tier = 2, reward = 1100, twists = { "spotless" },
 		description = "Blight-proof seedlings from the Biotech Lab to the Old Farm. Smooth roads only.",
-		briefing = "Dr. Ito grew seedlings that survive the blight. If they reach the Old Farm in one piece, next year we have tomatoes. If they don't, next year we have regret. Smooth roads only, please.",
-		debrief = "Jenkins planted them already. He talks to them. I think that's normal for farmers.",
+		briefing = "Doctor Hiro grew seedlings that survive the blight. If they reach the Old Farm in one piece, next year we have tomatoes. If they don't, next year we have regret. Smooth roads only, please.",
+		debrief = "Jed planted them already. He talks to them. I think that's normal for farmers.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "plants", items = 4, cargo = "Seedlings",
 		pickups = 1, pickupAt = "lab", drops = 1, dropAt = "farm", payPerStop = 170,
 		pickupLabel = "PICK UP THE SEEDLINGS AT", dropLabel = "DELIVER THE SEEDLINGS TO",
-		giver = "Dr. Ito, the lab chief", giverRole = "doctor", receiver = "Old Man Jenkins, the farmer", receiverRole = "farmer",
+		giver = "Doctor Hiro, the lab chief", giverRole = "doctor", receiver = "Old Man Jed, the farmer", receiverRole = "farmer",
 	})
 	add("market", {
 		number = 8, name = "Supermarket Sweep", tier = 3, reward = 1300, coop = true, twists = { "guarded" },
@@ -502,7 +502,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "groceries", items = 4, cargo = "Groceries",
 		pickups = 2, pickupAt = nil, drops = 1, dropAt = "stadium", payPerStop = 220,
 		pickupLabel = "GRAB THE GROCERIES AT", dropLabel = "DELIVER THE GROCERIES TO",
-		giver = "Dusty, a looter gone honest", giverRole = "townsperson", receiver = "Coach Daniels, the shelter warden", receiverRole = "guard",
+		giver = "Dusty, a looter gone honest", giverRole = "townsperson", receiver = "Coach Dan, the shelter warden", receiverRole = "guard",
 	})
 	add("market", {
 		number = 9, name = "Price War", tier = 3, reward = 1500, twists = { "hunted" }, banditBoost = 1.5,
@@ -512,7 +512,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "crate", items = 4, cargo = "Canned Food",
 		pickups = 1, pickupAt = "docks", drops = 1, dropAt = "market", payPerStop = 250,
 		pickupLabel = "LOAD THE CRATES AT", dropLabel = "DELIVER THE CRATES TO",
-		giver = "Rocco, the dock foreman", giverRole = "worker", receiver = "Mr. Patel, FreshMart's owner", receiverRole = "grocer",
+		giver = "Rocco, the dock foreman", giverRole = "worker", receiver = "Raj, FreshMart's owner", receiverRole = "grocer",
 	})
 	add("market", {
 		number = 10, name = "Empty Shelves", tier = 3, reward = 2200, coop = true, twists = { "guarded", "defend" }, defendTime = 50,
@@ -522,11 +522,11 @@ do
 		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "groceries", items = 10, cargo = "Rations",
 		pickups = 1, pickupAt = "warehouse", drops = 3, dropAt = "market", loadTime = 4, unloadTime = 4, payPerStop = 300,
 		pickupLabel = "LOAD THE RATIONS AT", dropLabel = "DELIVER THE RATIONS TO",
-		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Mr. Patel, FreshMart's owner", receiverRole = "grocer",
+		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Raj, FreshMart's owner", receiverRole = "grocer",
 	})
 end
 
--- ── 4. Smoke and Sirens (Chief Ramirez, Fire Station 9) ──────────────────
+-- ── 4. Smoke and Sirens (Chief Carlos, Fire Station 9) ──────────────────
 -- Hoses, a burning block, diesel the bandits want, the rescue cutters, dynamite for a firebreak, water at night,
 -- runaway kids, a fragile radio repeater, an oil fire and the east side in flames.
 do
@@ -548,7 +548,7 @@ do
 		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 4, cargo = "Survivors",
 		pickups = 2, pickupAt = nil, drops = 1, dropAt = "firestation", payPerStop = 130, timeLimit = 300,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
-		giver = "Mr. Haddad, a neighbour", giverRole = "townsperson", receiver = "Firefighter Duke", receiverRole = "officer",
+		giver = "Sami, a neighbour", giverRole = "townsperson", receiver = "Firefighter Duke", receiverRole = "officer",
 	})
 	add("firehouse", {
 		number = 3, name = "Fuel the Engines", tier = 2, reward = 850, twists = { "hunted" },
@@ -578,7 +578,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "tnt", items = 3, cargo = "Dynamite",
 		pickups = 1, pickupAt = "trainyard", drops = 1, dropAt = "farm", payPerStop = 220,
 		pickupLabel = "LOAD THE DYNAMITE AT", dropLabel = "DELIVER THE DYNAMITE TO",
-		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Old Man Jenkins, the farmer", receiverRole = "farmer",
+		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Old Man Jed, the farmer", receiverRole = "farmer",
 	})
 	add("firehouse", {
 		number = 6, name = "Night Watch", tier = 3, reward = 1200, twists = { "night" },
@@ -588,17 +588,17 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "water", items = 4, cargo = "Fire Water",
 		pickups = 1, pickupAt = "waterworks", drops = 3, dropAt = nil, payPerStop = 200,
 		pickupLabel = "LOAD THE WATER AT", dropLabel = "DROP THE WATER AT",
-		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Mrs. Abara, the block captain", receiverRole = "townsperson",
+		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Joyce, the block captain", receiverRole = "townsperson",
 	})
 	add("firehouse", {
 		number = 7, name = "Lost and Found", tier = 3, reward = 1300, coop = true, twists = { "gunner" },
 		description = "Three kids who ran home at the fire alarm, back to school in the bus. The passengers shoot.",
-		briefing = "The fire alarm at the school went off and three kids ran home on their own. Their parents are hiding them in three houses. Pick them up in the bus, your friends shoot from the windows, and nobody tells Principal Moore we lost them.",
-		debrief = "Three kids, counted twice. Principal Moore never needs to know.",
+		briefing = "The fire alarm at the school went off and three kids ran home on their own. Their parents are hiding them in three houses. Pick them up in the bus, your friends shoot from the windows, and nobody tells Principal Helen we lost them.",
+		debrief = "Three kids, counted twice. Principal Helen never needs to know.",
 		vehicle = "bus", load = "board", unload = "board", itemKind = "kid", items = 3, cargo = "Kids",
 		pickups = 3, pickupAt = nil, drops = 1, dropAt = "school", payPerStop = 220,
 		pickupLabel = "PICK UP THE KID AT", dropLabel = "BRING THE KIDS TO",
-		giver = "Mr. Sato, a worried parent", giverRole = "townsperson", receiver = "Ms. Parker, the teacher", receiverRole = "teacher",
+		giver = "Ken, a worried parent", giverRole = "townsperson", receiver = "Miss Amy, the teacher", receiverRole = "teacher",
 	})
 	add("firehouse", {
 		number = 8, name = "Ladder 9", tier = 3, reward = 1500, twists = { "spotless" },
@@ -614,11 +614,11 @@ do
 		number = 9, name = "Oil Fire", tier = 4, reward = 1800, coop = true, twists = { "guarded" },
 		description = "A big load: five drums of foam concentrate for an oil fire at the Power Plant. Hordes at both ends.",
 		briefing = "The Power Plant has an oil fire, and water makes it worse. The warehouse has foam concentrate, and the plant has a horde that wandered in to warm up. Five drums, so bring something big. Clear them, deliver the foam, and nobody breathe the smoke.",
-		debrief = "Fire's out. Volkov owes me one, and I will collect.",
+		debrief = "Fire's out. Ivan owes me one, and I will collect.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "crate", items = 5, cargo = "Fire Foam",
 		pickups = 1, pickupAt = "warehouse", drops = 1, dropAt = "powerplant", payPerStop = 300,
 		pickupLabel = "LOAD THE FOAM AT", dropLabel = "DELIVER THE FOAM TO",
-		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Engineer Volkov", receiverRole = "foreman",
+		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Engineer Ivan", receiverRole = "foreman",
 	})
 	add("firehouse", {
 		number = 10, name = "Smoke and Sirens", tier = 4, reward = 2800, coop = true, twists = { "defend", "gunner" }, defendTime = 60,
@@ -628,11 +628,11 @@ do
 		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 8, cargo = "Survivors",
 		pickups = 2, pickupAt = nil, drops = 2, dropAt = "stadium", payPerStop = 340,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
-		giver = "Ms. Rivera, a survivor", giverRole = "townsperson", receiver = "Coach Daniels, the shelter warden", receiverRole = "guard",
+		giver = "Lucy, a survivor", giverRole = "townsperson", receiver = "Coach Dan, the shelter warden", receiverRole = "guard",
 	})
 end
 
--- ── 5. Iron Supply (Captain Reyes, the Military Base) ────────────────────
+-- ── 5. Iron Supply (Captain Maria, the Military Base) ────────────────────
 -- Ammo, hot stew at the checkpoints, dynamite for the tunnel, a downed chopper, letters from home, the heavy
 -- weapons, fuel for the planes, classified files, a radar and the night before the big horde.
 do
@@ -644,7 +644,7 @@ do
 		vehicle = "armored", load = "carry", unload = "carry", itemKind = "ammo", items = 4, cargo = "Ammo Crates",
 		pickups = 1, pickupAt = "docks", drops = 1, dropAt = "base", payPerStop = 150,
 		pickupLabel = "LOAD THE AMMO AT", dropLabel = "DELIVER THE AMMO TO",
-		giver = "Rocco, the dock foreman", giverRole = "worker", receiver = "Sergeant Hayes", receiverRole = "soldier",
+		giver = "Rocco, the dock foreman", giverRole = "worker", receiver = "Sergeant Roy", receiverRole = "soldier",
 	})
 	add("army", {
 		number = 2, name = "Mess Hall", tier = 2, reward = 900, twists = {},
@@ -664,7 +664,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "tnt", items = 4, cargo = "Dynamite",
 		pickups = 1, pickupAt = "trainyard", drops = 1, dropAt = "base", payPerStop = 220,
 		pickupLabel = "LOAD THE DYNAMITE AT", dropLabel = "DELIVER THE DYNAMITE TO",
-		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Sergeant Hayes", receiverRole = "soldier",
+		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Sergeant Roy", receiverRole = "soldier",
 	})
 	add("army", {
 		number = 4, name = "Wounded in Action", tier = 3, reward = 1300, coop = true, twists = { "gunner" },
@@ -674,17 +674,17 @@ do
 		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 3, cargo = "Wounded Soldiers",
 		pickups = 1, pickupAt = "airfield", drops = 1, dropAt = "clinic", payPerStop = 250,
 		pickupLabel = "PICK UP THE WOUNDED AT", dropLabel = "BRING THE WOUNDED TO",
-		giver = "Corporal Diaz, the pilot", giverRole = "soldier", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Corporal Danny, the pilot", giverRole = "soldier", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 	add("army", {
 		number = 5, name = "Mail From Home", tier = 3, reward = 1400, twists = { "night" },
 		description = "Weeks of letters for the soldiers. The night patrol opens the gate after dark only.",
 		briefing = "Letters from home have been stuck in a post room in town for weeks. My men haven't heard from their families since spring. The night patrol opens the gate after dark only. Bring the sacks.",
-		debrief = "Private Jones found out he's a father. He fainted. Good fainting, though.",
+		debrief = "Private Billy found out he's a father. He fainted. Good fainting, though.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "mail", items = 3, cargo = "Letters From Home",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "base", payPerStop = 220,
 		pickupLabel = "PICK UP THE MAIL AT", dropLabel = "DELIVER THE MAIL TO",
-		giver = "Otto, the old postman", giverRole = "worker", receiver = "Private Jones", receiverRole = "soldier",
+		giver = "Otto, the old postman", giverRole = "worker", receiver = "Private Billy", receiverRole = "soldier",
 	})
 	add("army", {
 		number = 6, name = "Lock and Load", tier = 3, reward = 1600, coop = true, twists = { "lift" },
@@ -694,7 +694,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "weapons", items = 4, cargo = "Weapons Cases",
 		pickups = 1, pickupAt = "police", drops = 1, dropAt = "base", loadTime = 5, unloadTime = 5, payPerStop = 260,
 		pickupLabel = "LOAD THE WEAPONS AT", dropLabel = "DELIVER THE WEAPONS TO",
-		giver = "Sergeant Kowalczyk, the desk sergeant", giverRole = "officer", receiver = "Sergeant Hayes", receiverRole = "soldier",
+		giver = "Sergeant Stan, the desk sergeant", giverRole = "officer", receiver = "Sergeant Roy", receiverRole = "soldier",
 	})
 	add("army", {
 		number = 7, name = "Fuel Convoy", tier = 3, reward = 1800, coop = true, twists = { "guarded" },
@@ -704,7 +704,7 @@ do
 		vehicle = "fueltruck", load = "carry", unload = "carry", itemKind = "barrel", items = 6, cargo = "Aviation Fuel",
 		pickups = 1, pickupAt = "fueldepot", drops = 1, dropAt = "airfield", payPerStop = 280,
 		pickupLabel = "LOAD THE FUEL AT", dropLabel = "REFUEL THE PLANES AT",
-		giver = "Hank, the depot worker", giverRole = "worker", receiver = "Corporal Diaz, the pilot", receiverRole = "soldier",
+		giver = "Hank, the depot worker", giverRole = "worker", receiver = "Corporal Danny, the pilot", receiverRole = "soldier",
 	})
 	add("army", {
 		number = 8, name = "Classified", tier = 4, reward = 2200, twists = { "hunted" },
@@ -714,7 +714,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "documents", items = 2, cargo = "Classified Files",
 		pickups = 1, pickupAt = "lab", drops = 1, dropAt = "base", payPerStop = 320,
 		pickupLabel = "PICK UP THE BRIEFCASES AT", dropLabel = "DELIVER THE BRIEFCASES TO",
-		giver = "Dr. Ito, the lab chief", giverRole = "doctor", receiver = "Captain Reyes", receiverRole = "soldier",
+		giver = "Doctor Hiro, the lab chief", giverRole = "doctor", receiver = "Captain Maria", receiverRole = "soldier",
 	})
 	add("army", {
 		number = 9, name = "Eyes in the Sky", tier = 4, reward = 2500, twists = { "spotless" },
@@ -724,21 +724,21 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "electronics", items = 3, cargo = "Radar Parts",
 		pickups = 1, pickupAt = "airfield", drops = 1, dropAt = "lighthouse", payPerStop = 330,
 		pickupLabel = "LOAD THE RADAR PARTS AT", dropLabel = "DELIVER THE PARTS TO",
-		giver = "Corporal Diaz, the pilot", giverRole = "soldier", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
+		giver = "Corporal Danny, the pilot", giverRole = "soldier", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
 	})
 	add("army", {
 		number = 10, name = "Iron Supply", tier = 4, reward = 3500, coop = true, twists = { "defend", "hunted" }, defendTime = 75,
 		description = "The last ammo in two gun shops, hunted all the way, and the base gate to hold while it's unloaded.",
 		briefing = "The big horde comes down from the mountains tonight or tomorrow. Two gun shops in town still have ammo, and every bandit gang wants it too. Load up, punch through, and at the base, hold the gate while my men stock the walls. This is it, soldier.",
-		debrief = "The line held. You held it. Captain Reyes salutes you.",
+		debrief = "The line held. You held it. Captain Maria salutes you.",
 		vehicle = "armored", load = "carry", unload = "carry", itemKind = "ammo", items = 8, cargo = "Ammo Crates",
 		pickups = 2, pickupAt = nil, drops = 2, dropAt = "base", payPerStop = 380,
 		pickupLabel = "LOAD THE AMMO AT", dropLabel = "DELIVER THE AMMO TO",
-		giver = "Mack, the gun store owner", giverRole = "shopkeeper", receiver = "Sergeant Hayes", receiverRole = "soldier",
+		giver = "Mack, the gun store owner", giverRole = "shopkeeper", receiver = "Sergeant Roy", receiverRole = "soldier",
 	})
 end
 
--- ── 6. Lights Out (Engineer Volkov, the Power Plant) ─────────────────────
+-- ── 6. Lights Out (Engineer Ivan, the Power Plant) ─────────────────────
 -- Tools, life-support batteries, generators for the bingo, valves, a blast at the river intake, the blackout,
 -- copper thieves, cooling water, the control room and the stadium's lights.
 do
@@ -750,7 +750,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "tools", items = 3, cargo = "Toolboxes",
 		pickups = 1, pickupAt = "warehouse", drops = 1, dropAt = "powerplant", payPerStop = 160,
 		pickupLabel = "PICK UP THE TOOLBOXES AT", dropLabel = "DELIVER THE TOOLS TO",
-		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Engineer Volkov", receiverRole = "foreman",
+		giver = "Rocco, the warehouse boss", giverRole = "foreman", receiver = "Engineer Ivan", receiverRole = "foreman",
 	})
 	add("power", {
 		number = 2, name = "Battery Life", tier = 2, reward = 1000, twists = { "spotless" },
@@ -760,17 +760,17 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "battery", items = 4, cargo = "Battery Packs",
 		pickups = 1, pickupAt = "powerplant", drops = 2, dropAt = "clinic", payPerStop = 170,
 		pickupLabel = "PICK UP THE BATTERIES AT", dropLabel = "DELIVER THE BATTERIES TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 	add("power", {
 		number = 3, name = "Bingo Night", tier = 3, reward = 1200, coop = true, twists = { "lift" },
-		description = "Two generators for two retirement homes. Each weighs more than Volkov's mother-in-law.",
+		description = "Two generators for two retirement homes. Each weighs more than Ivan's mother-in-law.",
 		briefing = "Two retirement homes have no light, no heat, and no TV for the bingo. Each generator weighs more than my mother-in-law. Take a strong friend. Or two.",
 		debrief = "Bingo night is back. The old ladies want to adopt you.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "generator", items = 2, cargo = "Generators",
 		pickups = 1, pickupAt = "powerplant", drops = 2, dropAt = nil, loadTime = 5, unloadTime = 5, payPerStop = 220,
 		pickupLabel = "LOAD THE GENERATORS AT", dropLabel = "DELIVER A GENERATOR TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Mrs. Albescu, the bingo caller", receiverRole = "townsperson",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Doris, the bingo caller", receiverRole = "townsperson",
 	})
 	add("power", {
 		number = 4, name = "Pipe Dream", tier = 3, reward = 1300, twists = { "guarded" },
@@ -780,7 +780,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "tools", items = 4, cargo = "Valves",
 		pickups = 1, pickupAt = "waterworks", drops = 1, dropAt = "powerplant", payPerStop = 230,
 		pickupLabel = "LOAD THE VALVES AT", dropLabel = "DELIVER THE VALVES TO",
-		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Engineer Volkov", receiverRole = "foreman",
+		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Engineer Ivan", receiverRole = "foreman",
 	})
 	add("power", {
 		number = 5, name = "Clogged", tier = 3, reward = 1500, twists = { "quiet" },
@@ -800,7 +800,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "battery", items = 4, cargo = "Battery Packs",
 		pickups = 0, pickupAt = nil, drops = 3, dropAt = nil, payPerStop = 240, timeLimit = 300,
 		pickupLabel = "PICK UP THE BATTERIES AT", dropLabel = "DELIVER BATTERIES TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Mr. Okoro, in the dark", receiverRole = "townsperson",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Leon, in the dark", receiverRole = "townsperson",
 	})
 	add("power", {
 		number = 7, name = "Copper Thieves", tier = 3, reward = 1800, coop = true, twists = { "hunted", "gunner" },
@@ -810,7 +810,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "electronics", items = 4, cargo = "Transformer Parts",
 		pickups = 1, pickupAt = "trainyard", drops = 1, dropAt = "powerplant", payPerStop = 270,
 		pickupLabel = "LOAD THE PARTS AT", dropLabel = "DELIVER THE PARTS TO",
-		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Engineer Volkov", receiverRole = "foreman",
+		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Engineer Ivan", receiverRole = "foreman",
 	})
 	add("power", {
 		number = 8, name = "Cooling Water", tier = 4, reward = 2200, coop = true, twists = { "guarded" },
@@ -820,7 +820,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "water", items = 6, cargo = "Treated Water",
 		pickups = 1, pickupAt = "waterworks", drops = 1, dropAt = "powerplant", loadTime = 4, unloadTime = 4, payPerStop = 320,
 		pickupLabel = "LOAD THE WATER AT", dropLabel = "DELIVER THE WATER TO",
-		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Engineer Volkov", receiverRole = "foreman",
+		giver = "Hugo, the waterworks keeper", giverRole = "worker", receiver = "Engineer Ivan", receiverRole = "foreman",
 	})
 	add("power", {
 		number = 9, name = "Control Room", tier = 4, reward = 2600, twists = { "spotless" },
@@ -830,7 +830,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "electronics", items = 3, cargo = "Control Boards",
 		pickups = 1, pickupAt = "powerplant", drops = 1, dropAt = "cityhall", payPerStop = 330,
 		pickupLabel = "PICK UP THE CONTROL BOARDS AT", dropLabel = "DELIVER THE BOARDS TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Mr. Pruitt, the city clerk", receiverRole = "clerk",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Percy, the city clerk", receiverRole = "clerk",
 	})
 	add("power", {
 		number = 10, name = "Lights Out", tier = 4, reward = 4000, coop = true, twists = { "lift", "defend" }, defendTime = 60,
@@ -840,7 +840,7 @@ do
 		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "generator", items = 4, cargo = "Generators",
 		pickups = 1, pickupAt = "powerplant", drops = 2, dropAt = "stadium", loadTime = 5, unloadTime = 5, payPerStop = 380,
 		pickupLabel = "LOAD THE GENERATORS AT", dropLabel = "DELIVER THE GENERATORS TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Coach Daniels, the shelter warden", receiverRole = "guard",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Coach Dan, the shelter warden", receiverRole = "guard",
 	})
 end
 
@@ -861,12 +861,12 @@ do
 	add("ranch", {
 		number = 2, name = "Feed Run", tier = 2, reward = 1100, twists = { "hunted" },
 		description = "Six sacks of oats from the Old Farm in the monster truck. The Rust Riders hunt every feed truck.",
-		briefing = "My horses eat more than a bunkhouse of cowboys, and the Rust Riders hit every feed truck on the west road. Jenkins has six sacks of oats. Take his monster truck and drive like the devil's on your tail. Because he will be.",
+		briefing = "My horses eat more than a bunkhouse of cowboys, and the Rust Riders hit every feed truck on the west road. Jed has six sacks of oats. Take his monster truck and drive like the devil's on your tail. Because he will be.",
 		debrief = "Oats in the barn, Rust Riders in the ditch. Good day's work.",
 		vehicle = "monster", load = "carry", unload = "carry", itemKind = "sack", items = 6, cargo = "Oats",
 		pickups = 1, pickupAt = "farm", drops = 1, dropAt = "ranch", loadTime = 4, payPerStop = 190,
 		pickupLabel = "LOAD THE OATS AT", dropLabel = "DELIVER THE OATS TO",
-		giver = "Old Man Jenkins, the farmer", giverRole = "farmer", receiver = "Jesse, the ranch hand", receiverRole = "rancher",
+		giver = "Old Man Jed, the farmer", giverRole = "farmer", receiver = "Jesse, the ranch hand", receiverRole = "rancher",
 	})
 	add("ranch", {
 		number = 3, name = "Horse Whisperer", tier = 3, reward = 1300, twists = { "spotless" },
@@ -891,12 +891,12 @@ do
 	add("ranch", {
 		number = 5, name = "Moonlight Rustlers", tier = 3, reward = 1600, twists = { "night" },
 		description = "Two stolen horses hidden in the Old Farm's barn. Only fools move horses by daylight.",
-		briefing = "Rustlers stole two of my horses and hid 'em in the Old Farm's barn. Jenkins tipped me off. Only fools move horses in daylight with bandits watching, so we go at night. Quiet-like.",
+		briefing = "Rustlers stole two of my horses and hid 'em in the Old Farm's barn. Jed tipped me off. Only fools move horses in daylight with bandits watching, so we go at night. Quiet-like.",
 		debrief = "Both horses home. The rustlers will wake up to an empty barn and a bad mood.",
 		vehicle = "livestock", load = "lead", unload = "lead", itemKind = "horse", items = 2, cargo = "Stolen Horses",
 		pickups = 1, pickupAt = "farm", drops = 1, dropAt = "ranch", payPerStop = 250,
 		pickupLabel = "LEAD THE HORSES IN AT", dropLabel = "LEAD THE HORSES OUT AT",
-		giver = "Old Man Jenkins, the farmer", giverRole = "farmer", receiver = "Walt, the rancher", receiverRole = "rancher",
+		giver = "Old Man Jed, the farmer", giverRole = "farmer", receiver = "Walt, the rancher", receiverRole = "rancher",
 	})
 	add("ranch", {
 		number = 6, name = "Wagon Wheels", tier = 3, reward = 1700, coop = true, twists = { "lift" },
@@ -916,7 +916,7 @@ do
 		vehicle = "armored", load = "carry", unload = "carry", itemKind = "cash", items = 3, cargo = "Life Savings",
 		pickups = 1, pickupAt = "bank", drops = 1, dropAt = "ranch", payPerStop = 300,
 		pickupLabel = "LOAD THE CASH AT", dropLabel = "DELIVER THE CASH TO",
-		giver = "Mr. Gold, the bank manager", giverRole = "banker", receiver = "Walt, the rancher", receiverRole = "rancher",
+		giver = "Gordon, the bank manager", giverRole = "banker", receiver = "Walt, the rancher", receiverRole = "rancher",
 	})
 	add("ranch", {
 		number = 8, name = "Showdown", tier = 4, reward = 2300, coop = true, twists = { "guarded" },
@@ -926,7 +926,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "weapons", items = 4, cargo = "Rifles",
 		pickups = 1, pickupAt = "police", drops = 1, dropAt = "ranch", payPerStop = 320,
 		pickupLabel = "LOAD THE RIFLES AT", dropLabel = "DELIVER THE RIFLES TO",
-		giver = "Sergeant Kowalczyk, the desk sergeant", giverRole = "officer", receiver = "Jesse, the ranch hand", receiverRole = "rancher",
+		giver = "Sergeant Stan, the desk sergeant", giverRole = "officer", receiver = "Jesse, the ranch hand", receiverRole = "rancher",
 	})
 	add("ranch", {
 		number = 9, name = "The Long Drive", tier = 4, reward = 2700, coop = true, twists = { "gunner" },
@@ -936,7 +936,7 @@ do
 		vehicle = "livestock", load = "lead", unload = "lead", itemKind = "horse", items = 2, cargo = "Horses",
 		pickups = 1, pickupAt = "ranch", drops = 2, dropAt = "camp", payPerStop = 330,
 		pickupLabel = "LEAD THE HORSES IN AT", dropLabel = "LEAD THE HORSES OUT AT",
-		giver = "Jesse, the ranch hand", giverRole = "rancher", receiver = "Marta, the camp leader", receiverRole = "townsperson",
+		giver = "Jesse, the ranch hand", giverRole = "rancher", receiver = "Martha, the camp leader", receiverRole = "townsperson",
 	})
 	add("ranch", {
 		number = 10, name = "Wild West End", tier = 4, reward = 4500, coop = true, twists = { "defend", "hunted" }, defendTime = 75,
@@ -950,19 +950,19 @@ do
 	})
 end
 
--- ── 8. Patient Zero (Dr. Ito, the Biotech Lab) ───────────────────────────
+-- ── 8. Patient Zero (Doctor Hiro, the Biotech Lab) ───────────────────────────
 -- Miracle blood, microscopes guarded by the faculty, a prisoner who doesn't turn, nitro, Frosty's freezers, three
 -- nests, a rival syndicate, the first one bitten, the trial doses and the cure.
 do
 	add("lab", {
 		number = 1, name = "Specimen Jar", tier = 2, reward = 1200, twists = { "spotless" },
 		description = "Blood of a patient who was bitten and did not turn, from the clinic to the lab. Intact.",
-		briefing = "Dr. Novak has two blood samples from a patient who was bitten and did not turn. Fascinating. If the cases crack, the samples are worthless and we've wasted a miracle. Drive smoothly.",
+		briefing = "Doctor Ellie has two blood samples from a patient who was bitten and did not turn. Fascinating. If the cases crack, the samples are worthless and we've wasted a miracle. Drive smoothly.",
 		debrief = "The samples are perfect. Perfectly fascinating.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "sample", items = 2, cargo = "Miracle Blood",
 		pickups = 1, pickupAt = "clinic", drops = 1, dropAt = "lab", payPerStop = 200,
 		pickupLabel = "PICK UP THE SAMPLES AT", dropLabel = "DELIVER THE SAMPLES TO",
-		giver = "Dr. Novak, the clinic's doctor", giverRole = "doctor", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Doctor Ellie, the City Clinic", giverRole = "doctor", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 2, name = "Lab Rats", tier = 2, reward = 1400, twists = { "guarded" },
@@ -972,7 +972,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "electronics", items = 4, cargo = "Lab Equipment",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "lab", payPerStop = 220,
 		pickupLabel = "PICK UP THE EQUIPMENT AT", dropLabel = "DELIVER THE EQUIPMENT TO",
-		giver = "Professor Lang, a survivor", giverRole = "teacher", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Alan, a professor", giverRole = "teacher", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 3, name = "Subject Seven", tier = 3, reward = 1600, twists = { "night" },
@@ -982,7 +982,7 @@ do
 		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 1, cargo = "Subject Seven",
 		pickups = 1, pickupAt = "prison", drops = 1, dropAt = "lab", payPerStop = 260,
 		pickupLabel = "PICK UP THE PATIENT AT", dropLabel = "BRING THE PATIENT TO",
-		giver = "Warden Cole, Blackrock Prison", giverRole = "guard", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Warden Cole, Blackrock Prison", giverRole = "guard", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 4, name = "Unstable Compounds", tier = 3, reward = 1900, twists = { "quiet", "spotless" },
@@ -992,7 +992,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "tnt", items = 3, cargo = "Nitro Compound",
 		pickups = 1, pickupAt = "powerplant", drops = 1, dropAt = "lab", payPerStop = 280,
 		pickupLabel = "LOAD THE COMPOUND AT", dropLabel = "DELIVER THE COMPOUND TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 5, name = "Deep Freeze", tier = 3, reward = 2000, coop = true, twists = { "lift" },
@@ -1002,7 +1002,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "icebox", items = 4, cargo = "Freezers",
 		pickups = 1, pickupAt = "frosty", drops = 1, dropAt = "lab", loadTime = 5, unloadTime = 5, payPerStop = 290,
 		pickupLabel = "LOAD THE FREEZERS AT", dropLabel = "DELIVER THE FREEZERS TO",
-		giver = "Molly, at the counter", giverRole = "icecream", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Molly, at the counter", giverRole = "icecream", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 6, name = "Field Samples", tier = 4, reward = 2300, coop = true, twists = { "guarded", "gunner" },
@@ -1012,7 +1012,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "sample", items = 4, cargo = "Tissue Samples",
 		pickups = 3, pickupAt = nil, drops = 1, dropAt = "lab", payPerStop = 320,
 		pickupLabel = "COLLECT THE SAMPLES AT", dropLabel = "DELIVER THE SAMPLES TO",
-		giver = "Kenji, the field assistant", giverRole = "doctor", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Kenji, the field assistant", giverRole = "doctor", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 7, name = "Power Hungry", tier = 4, reward = 2500, twists = { "hunted" }, banditBoost = 1.5,
@@ -1022,7 +1022,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "battery", items = 4, cargo = "Battery Packs",
 		pickups = 1, pickupAt = "powerplant", drops = 1, dropAt = "lab", payPerStop = 330,
 		pickupLabel = "LOAD THE BATTERIES AT", dropLabel = "DELIVER THE BATTERIES TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Kenji, the field assistant", receiverRole = "doctor",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Kenji, the field assistant", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 8, name = "Patient Zero", tier = 4, reward = 2900, coop = true, twists = { "guarded", "spotless" },
@@ -1032,7 +1032,7 @@ do
 		vehicle = "ambulance", load = "board", unload = "board", itemKind = "patient", items = 1, cargo = "Patient Zero",
 		pickups = 1, pickupAt = "airfield", drops = 1, dropAt = "lab", payPerStop = 360,
 		pickupLabel = "PICK UP THE PATIENT AT", dropLabel = "BRING THE PATIENT TO",
-		giver = "Corporal Diaz, the pilot", giverRole = "soldier", receiver = "Dr. Ito, the lab chief", receiverRole = "doctor",
+		giver = "Corporal Danny, the pilot", giverRole = "soldier", receiver = "Doctor Hiro, the lab chief", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 9, name = "Midnight Formula", tier = 4, reward = 3200, twists = { "night", "spotless" },
@@ -1042,7 +1042,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "vaccine", items = 3, cargo = "Trial Doses",
 		pickups = 1, pickupAt = "lab", drops = 3, dropAt = "clinic", payPerStop = 370,
 		pickupLabel = "LOAD THE TRIAL DOSES AT", dropLabel = "DELIVER A DOSE TO",
-		giver = "Dr. Ito, the lab chief", giverRole = "doctor", receiver = "Dr. Novak, the clinic's doctor", receiverRole = "doctor",
+		giver = "Doctor Hiro, the lab chief", giverRole = "doctor", receiver = "Doctor Ellie, the City Clinic", receiverRole = "doctor",
 	})
 	add("lab", {
 		number = 10, name = "The Cure", tier = 4, reward = 6000, coop = true, twists = { "defend", "spotless" }, defendTime = 90,
@@ -1052,7 +1052,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "vaccine", items = 8, cargo = "The Cure",
 		pickups = 1, pickupAt = "lab", drops = 3, dropAt = "camp", payPerStop = 420,
 		pickupLabel = "LOAD THE CURE AT", dropLabel = "DELIVER THE CURE TO",
-		giver = "Dr. Ito, the lab chief", giverRole = "doctor", receiver = "Doc Holloway, the camp medic", receiverRole = "doctor",
+		giver = "Doctor Hiro, the lab chief", giverRole = "doctor", receiver = "Doc Hal, the camp medic", receiverRole = "doctor",
 	})
 end
 
@@ -1068,7 +1068,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "parcel", items = 1, cargo = "A Ticking Box",
 		pickups = 0, pickupAt = nil, drops = 1, dropAt = "bank", payPerStop = 220,
 		pickupLabel = "PICK UP THE BOX AT", dropLabel = "DELIVER THE BOX TO",
-		giver = "Vinnie, the fixer", giverRole = "banker", receiver = "Mr. Gold, the bank manager", receiverRole = "banker",
+		giver = "Vinnie, the fixer", giverRole = "banker", receiver = "Gordon, the bank manager", receiverRole = "banker",
 	})
 	add("underworld", {
 		number = 2, name = "Laundry Day", tier = 3, reward = 1800, twists = { "hunted" }, banditBoost = 1.5,
@@ -1078,7 +1078,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "cash", items = 4, cargo = "Dirty Cash",
 		pickups = 1, pickupAt = "bank", drops = 2, dropAt = nil, payPerStop = 260,
 		pickupLabel = "LOAD THE CASH AT", dropLabel = "DROP THE CASH AT",
-		giver = "Mr. Gold, the bank manager", giverRole = "banker", receiver = "Mama Rosa, the laundromat owner", receiverRole = "shopkeeper",
+		giver = "Gordon, the bank manager", giverRole = "banker", receiver = "Mama Rosa, the laundromat owner", receiverRole = "shopkeeper",
 	})
 	add("underworld", {
 		number = 3, name = "Bail Day", tier = 3, reward = 2000, coop = true, twists = { "gunner" },
@@ -1098,7 +1098,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "painting", items = 3, cargo = "Paintings",
 		pickups = 1, pickupAt = "cityhall", drops = 1, dropAt = "lighthouse", payPerStop = 300,
 		pickupLabel = "PICK UP THE PAINTINGS AT", dropLabel = "DELIVER THE PAINTINGS TO",
-		giver = "Mr. Pruitt, the city clerk", giverRole = "clerk", receiver = "Mr. Delacroix, an art buyer", receiverRole = "banker",
+		giver = "Percy, the city clerk", giverRole = "clerk", receiver = "Julian, an art buyer", receiverRole = "banker",
 	})
 	add("underworld", {
 		number = 5, name = "Heavy Business", tier = 4, reward = 2600, coop = true, twists = { "lift" },
@@ -1128,7 +1128,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "documents", items = 1, cargo = "The Ledger",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "bank", payPerStop = 330, timeLimit = 240,
 		pickupLabel = "GRAB THE BRIEFCASE AT", dropLabel = "DELIVER THE BRIEFCASE TO",
-		giver = "Lefty, a lookout", giverRole = "townsperson", receiver = "Mr. Gold, the bank manager", receiverRole = "banker",
+		giver = "Lefty, a lookout", giverRole = "townsperson", receiver = "Gordon, the bank manager", receiverRole = "banker",
 	})
 	add("underworld", {
 		number = 8, name = "Fireworks", tier = 4, reward = 3400, coop = true, twists = { "quiet", "guarded" },
@@ -1148,7 +1148,7 @@ do
 		vehicle = "armored", load = "carry", unload = "carry", itemKind = "cash", items = 6, cargo = "Gold",
 		pickups = 1, pickupAt = "bank", drops = 1, dropAt = "airfield", payPerStop = 380,
 		pickupLabel = "LOAD THE GOLD AT", dropLabel = "DELIVER THE GOLD TO",
-		giver = "Mr. Gold, the bank manager", giverRole = "banker", receiver = "Ace, a smuggler pilot", receiverRole = "worker",
+		giver = "Gordon, the bank manager", giverRole = "banker", receiver = "Ace, a smuggler pilot", receiverRole = "worker",
 	})
 	add("underworld", {
 		number = 10, name = "Dirty Money", tier = 4, reward = 7500, coop = true, twists = { "defend", "hunted" }, defendTime = 75, banditBoost = 2,
@@ -1162,7 +1162,7 @@ do
 	})
 end
 
--- ── 10. Last Convoy (Mayor Grant, City Hall) ─────────────────────────────
+-- ── 10. Last Convoy (Mayor Ruth, City Hall) ─────────────────────────────
 -- The evacuation plan, the first families, fuel for the plane, the lighthouse lamp, the prison, landing gear, the
 -- seed vault, the mayor's own kids, the last boat and the last convoy.
 do
@@ -1174,7 +1174,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "documents", items = 3, cargo = "Evacuation Plans",
 		pickups = 1, pickupAt = "cityhall", drops = 1, dropAt = "police", payPerStop = 260,
 		pickupLabel = "PICK UP THE PLANS AT", dropLabel = "DELIVER THE PLANS TO",
-		giver = "Mr. Pruitt, the city clerk", giverRole = "clerk", receiver = "Detective Shaw", receiverRole = "officer",
+		giver = "Percy, the city clerk", giverRole = "clerk", receiver = "Detective Sue", receiverRole = "officer",
 	})
 	add("exodus", {
 		number = 2, name = "Roll Call", tier = 2, reward = 2300, coop = true, twists = { "gunner" },
@@ -1184,7 +1184,7 @@ do
 		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 6, cargo = "Families",
 		pickups = 3, pickupAt = nil, drops = 1, dropAt = "stadium", payPerStop = 300,
 		pickupLabel = "PICK UP THE FAMILY AT", dropLabel = "BRING THE FAMILIES TO",
-		giver = "Mrs. Abara, the block captain", giverRole = "townsperson", receiver = "Coach Daniels, the shelter warden", receiverRole = "guard",
+		giver = "Joyce, the block captain", giverRole = "townsperson", receiver = "Coach Dan, the shelter warden", receiverRole = "guard",
 	})
 	add("exodus", {
 		number = 3, name = "Fuel for the Flight", tier = 3, reward = 2600, twists = { "quiet" },
@@ -1194,17 +1194,17 @@ do
 		vehicle = "fueltruck", load = "carry", unload = "carry", itemKind = "barrel", items = 6, cargo = "Jet Fuel",
 		pickups = 1, pickupAt = "fueldepot", drops = 1, dropAt = "airfield", payPerStop = 330,
 		pickupLabel = "LOAD THE FUEL AT", dropLabel = "REFUEL THE PLANE AT",
-		giver = "Hank, the depot worker", giverRole = "worker", receiver = "Captain Ellis, the last pilot", receiverRole = "officer",
+		giver = "Hank, the depot worker", giverRole = "worker", receiver = "Captain Jo, the last pilot", receiverRole = "officer",
 	})
 	add("exodus", {
 		number = 4, name = "Keep the Light On", tier = 3, reward = 2900, twists = { "night" },
 		description = "New lamp parts for Lighthouse Point, so the night's evacuation boats miss the rocks.",
-		briefing = "The evacuation boats come at night, and the lighthouse lamp is broken. Without it they'll hit the rocks. Volkov rebuilt the parts. Bring them tonight, the keeper can only test the lamp in the dark.",
+		briefing = "The evacuation boats come at night, and the lighthouse lamp is broken. Without it they'll hit the rocks. Ivan rebuilt the parts. Bring them tonight, the keeper can only test the lamp in the dark.",
 		debrief = "The light is turning. Tonight, the boats find their way.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "electronics", items = 3, cargo = "Lamp Parts",
 		pickups = 1, pickupAt = "powerplant", drops = 1, dropAt = "lighthouse", payPerStop = 340,
 		pickupLabel = "PICK UP THE LAMP PARTS AT", dropLabel = "DELIVER THE PARTS TO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
 	})
 	add("exodus", {
 		number = 5, name = "No One Left Behind", tier = 3, reward = 3200, coop = true, twists = { "guarded" },
@@ -1214,7 +1214,7 @@ do
 		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 6, cargo = "Survivors",
 		pickups = 1, pickupAt = "prison", drops = 1, dropAt = "camp", payPerStop = 360,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
-		giver = "Warden Cole, Blackrock Prison", giverRole = "guard", receiver = "Marta, the camp leader", receiverRole = "townsperson",
+		giver = "Warden Cole, Blackrock Prison", giverRole = "guard", receiver = "Martha, the camp leader", receiverRole = "townsperson",
 	})
 	add("exodus", {
 		number = 6, name = "Landing Gear", tier = 4, reward = 3500, coop = true, twists = { "lift" },
@@ -1224,17 +1224,17 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "tires", items = 8, cargo = "Plane Tires",
 		pickups = 1, pickupAt = "trainyard", drops = 1, dropAt = "airfield", loadTime = 5, unloadTime = 5, payPerStop = 380,
 		pickupLabel = "LOAD THE TIRES AT", dropLabel = "DELIVER THE TIRES TO",
-		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Captain Ellis, the last pilot", receiverRole = "officer",
+		giver = "Gus, the yard foreman", giverRole = "foreman", receiver = "Captain Jo, the last pilot", receiverRole = "officer",
 	})
 	add("exodus", {
 		number = 7, name = "Seed Vault", tier = 4, reward = 3800, twists = { "spotless" },
 		description = "Seedlings of every crop left, from the lab to the boat at Lighthouse Point. Every tray whole.",
-		briefing = "Dr. Ito saved seedlings of every crop we have left. Wherever we land, they're our future. The boat at Lighthouse Point takes them. Every tray must arrive whole.",
+		briefing = "Doctor Hiro saved seedlings of every crop we have left. Wherever we land, they're our future. The boat at Lighthouse Point takes them. Every tray must arrive whole.",
 		debrief = "Our future is on the boat. It sounds dramatic, but it's true.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "plants", items = 4, cargo = "The Seed Vault",
 		pickups = 1, pickupAt = "lab", drops = 1, dropAt = "lighthouse", payPerStop = 380,
 		pickupLabel = "LOAD THE SEEDLINGS AT", dropLabel = "DELIVER THE SEEDLINGS TO",
-		giver = "Dr. Ito, the lab chief", giverRole = "doctor", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
+		giver = "Doctor Hiro, the lab chief", giverRole = "doctor", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
 	})
 	add("exodus", {
 		number = 8, name = "The Mayor's Kids", tier = 4, reward = 4500, coop = true, twists = { "hunted" },
@@ -1244,7 +1244,7 @@ do
 		vehicle = "armored", load = "board", unload = "board", itemKind = "kid", items = 3, cargo = "The Mayor's Kids",
 		pickups = 1, pickupAt = "school", drops = 1, dropAt = "airfield", payPerStop = 400,
 		pickupLabel = "PICK UP THE KIDS AT", dropLabel = "BRING THE KIDS TO",
-		giver = "Ms. Parker, the teacher", giverRole = "teacher", receiver = "Captain Ellis, the last pilot", receiverRole = "officer",
+		giver = "Miss Amy, the teacher", giverRole = "teacher", receiver = "Captain Jo, the last pilot", receiverRole = "officer",
 	})
 	add("exodus", {
 		number = 9, name = "Last Boat", tier = 4, reward = 5500, coop = true, twists = { "guarded", "defend" }, defendTime = 60,
@@ -1254,7 +1254,7 @@ do
 		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 6, cargo = "The Last Survivors",
 		pickups = 1, pickupAt = "stadium", drops = 1, dropAt = "lighthouse", payPerStop = 420,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
-		giver = "Coach Daniels, the shelter warden", giverRole = "guard", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
+		giver = "Coach Dan, the shelter warden", giverRole = "guard", receiver = "Old Tom, the lighthouse keeper", receiverRole = "townsperson",
 	})
 	add("exodus", {
 		number = 10, name = "Last Convoy", tier = 4, reward = 10000, coop = true, twists = { "defend", "gunner" }, defendTime = 90,
@@ -1264,7 +1264,7 @@ do
 		vehicle = "bus", load = "board", unload = "board", itemKind = "survivor", items = 10, cargo = "The Last Convoy",
 		pickups = 3, pickupAt = nil, drops = 2, dropAt = "airfield", payPerStop = 480,
 		pickupLabel = "PICK UP THE SURVIVORS AT", dropLabel = "BRING THE SURVIVORS TO",
-		giver = "Ms. Rivera, a survivor", giverRole = "townsperson", receiver = "Captain Ellis, the last pilot", receiverRole = "officer",
+		giver = "Lucy, a survivor", giverRole = "townsperson", receiver = "Captain Jo, the last pilot", receiverRole = "officer",
 	})
 end
 
@@ -1281,7 +1281,7 @@ do
 		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "furniture", items = 2, cargo = "Jukebox and Speakers",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "camp", loadTime = 5, unloadTime = 5, payPerStop = 110,
 		pickupLabel = "LOAD THE JUKEBOX AT", dropLabel = "CARRY IT INTO",
-		giver = "Rico, Rosa's twin", giverRole = "townsperson", receiver = "Marta, the camp leader", receiverRole = "townsperson",
+		giver = "Rico, Rosa's twin", giverRole = "townsperson", receiver = "Martha, the camp leader", receiverRole = "townsperson",
 	})
 	add("duo", {
 		number = 2, name = "Flood Gate", tier = 2, reward = 800, duo = true, coop = true, twists = { "switches" },
@@ -1301,7 +1301,7 @@ do
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "crate", items = 4, cargo = "Wedding Gear",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "stadium", loadTime = 5, unloadTime = 5, payPerStop = 150,
 		pickupLabel = "LOAD THE WEDDING GEAR AT", dropLabel = "DELIVER THE GEAR TO",
-		giver = "Lola, the bride", giverRole = "townsperson", receiver = "Coach Daniels, the shelter warden", receiverRole = "guard",
+		giver = "Lola, the bride", giverRole = "townsperson", receiver = "Coach Dan, the shelter warden", receiverRole = "guard",
 	})
 	add("duo", {
 		number = 4, name = "Two Keys", tier = 3, reward = 1100, duo = true, coop = true, twists = { "switches", "hunted" }, gates = "pickup",
@@ -1311,57 +1311,57 @@ do
 		vehicle = "armored", load = "carry", unload = "carry", itemKind = "cash", items = 3, cargo = "Emergency Fund",
 		pickups = 1, pickupAt = "bank", drops = 1, dropAt = "cityhall", payPerStop = 200,
 		pickupLabel = "LOAD THE CASH AT", dropLabel = "DELIVER THE FUND TO",
-		giver = "Ms. Kline, the bank manager", giverRole = "banker", receiver = "Mr. Pruitt, the city clerk", receiverRole = "clerk",
+		giver = "Diane, the bank manager", giverRole = "banker", receiver = "Percy, the city clerk", receiverRole = "clerk",
 	})
 	add("duo", {
 		number = 5, name = "Heavy Current", tier = 3, reward = 1300, duo = true, coop = true, twists = { "pair", "guarded" },
 		description = "Transformer coils from the Power Plant to the Radio Station. Two carriers per coil, and a horde at both ends.",
-		briefing = "Rico: The Radio Station blew its transformer. Volkov has spare coils at the Power Plant, and each one weighs more than my car. Rosa: Both of you on a coil, every step, or it doesn't move. And both places are crawling with the dead. Rico: So one carries while the other shoots... no, wait. You both carry. Good luck.",
+		briefing = "Rico: The Radio Station blew its transformer. Ivan has spare coils at the Power Plant, and each one weighs more than my car. Rosa: Both of you on a coil, every step, or it doesn't move. And both places are crawling with the dead. Rico: So one carries while the other shoots... no, wait. You both carry. Good luck.",
 		debrief = "Rosa: DJ Luna dedicated a song to you two. Rico: 'Lean on Me'. She's not subtle.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "generator", items = 2, cargo = "Transformer Coils",
 		pickups = 1, pickupAt = "powerplant", drops = 1, dropAt = "radio", loadTime = 5, unloadTime = 5, payPerStop = 230,
 		pickupLabel = "LOAD THE COILS AT", dropLabel = "CARRY THE COILS INTO",
-		giver = "Engineer Volkov", giverRole = "foreman", receiver = "DJ Luna, the radio host", receiverRole = "clerk",
+		giver = "Engineer Ivan", giverRole = "foreman", receiver = "DJ Luna, the radio host", receiverRole = "clerk",
 	})
 	add("duo", {
 		number = 6, name = "Lock Step", tier = 3, reward = 1500, duo = true, coop = true, twists = { "switches", "defend" }, defendTime = 45,
 		description = "Blackrock's armory to Precinct 13. At the precinct, hold the yard, then pull both gate levers together.",
 		briefing = "Rosa: Blackrock Prison is emptying its armory before the walls fall, and Precinct 13 wants every gun in it. Rico: The precinct yard has a two-lever gate, a two-man rule from the old days. Rosa: When you get there, the dead will already be waiting. Hold them off, then pull both levers together. Then, and only then, unload.",
-		debrief = "Rico: Detective Shaw says the precinct never had a smoother delivery. Rosa: She says that to everybody. Rico: She has never said that to anybody.",
+		debrief = "Rico: Detective Sue says the precinct never had a smoother delivery. Rosa: She says that to everybody. Rico: She has never said that to anybody.",
 		vehicle = "armored", load = "carry", unload = "carry", itemKind = "weapons", items = 4, cargo = "Prison Armory",
 		pickups = 1, pickupAt = "prison", drops = 1, dropAt = "police", payPerStop = 250,
 		pickupLabel = "LOAD THE WEAPONS AT", dropLabel = "DELIVER THE WEAPONS TO",
-		giver = "Warden Cole, Blackrock Prison", giverRole = "guard", receiver = "Detective Shaw", receiverRole = "officer",
+		giver = "Warden Cole, Blackrock Prison", giverRole = "guard", receiver = "Detective Sue", receiverRole = "officer",
 	})
 	add("duo", {
 		number = 7, name = "Cold Hands", tier = 3, reward = 1700, duo = true, coop = true, twists = { "pair" },
 		description = "Freezers full of blood plasma from a dark house to the City Clinic: two carriers, five minutes before it thaws.",
 		briefing = "Rico: A doctor's house went dark, and his freezers are full of blood plasma. Rosa: Five minutes before it thaws. Every freezer is a two-person carry, so don't even think about leaving your partner behind. Rico: Run, lift, drive, lift. Breathe later.",
-		debrief = "Rosa: Dr. Novak says that plasma saves a dozen people this week. Rico: I say we earned a nap.",
+		debrief = "Rosa: Doctor Ellie says that plasma saves a dozen people this week. Rico: I say we earned a nap.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "icebox", items = 2, cargo = "Blood Plasma",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "clinic", loadTime = 4, unloadTime = 4, payPerStop = 240, timeLimit = 300,
 		pickupLabel = "PICK UP THE FREEZERS AT", dropLabel = "RUSH THE PLASMA TO",
-		giver = "Mr. Lindgren, a neighbour", giverRole = "townsperson", receiver = "Nurse Ada", receiverRole = "nurse",
+		giver = "Neil, a neighbour", giverRole = "townsperson", receiver = "Nurse Ada", receiverRole = "nurse",
 	})
 	add("duo", {
 		number = 8, name = "Crossed Wires", tier = 4, reward = 2000, duo = true, coop = true, twists = { "switches", "guarded" }, gates = "pickup",
 		description = "Battery banks from two fenced substations to the Power Plant. Every fence has a two-lever gate and a horde inside.",
-		briefing = "Rosa: Two substations still have charged battery banks, both behind fences with twin-lever gates. Rico: Safety rules: nobody gets electrocuted alone. Rosa: Both yards are full of dead linemen who forgot the rules. Clear them, pull together, load up, and bring the batteries to Volkov.",
+		briefing = "Rosa: Two substations still have charged battery banks, both behind fences with twin-lever gates. Rico: Safety rules: nobody gets electrocuted alone. Rosa: Both yards are full of dead linemen who forgot the rules. Clear them, pull together, load up, and bring the batteries to Ivan.",
 		debrief = "Rico: Six blocks got their lights back. Rosa: And one dead lineman got his hard hat back. Long story.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "battery", items = 4, cargo = "Battery Banks",
 		pickups = 2, pickupAt = nil, drops = 1, dropAt = "powerplant", payPerStop = 300,
 		pickupLabel = "LOAD THE BATTERIES AT", dropLabel = "DELIVER THE BATTERIES TO",
-		giver = "Pedro, a lineman", giverRole = "worker", receiver = "Engineer Volkov", receiverRole = "foreman",
+		giver = "Pedro, a lineman", giverRole = "worker", receiver = "Engineer Ivan", receiverRole = "foreman",
 	})
 	add("duo", {
 		number = 9, name = "Mirror Run", tier = 4, reward = 2400, duo = true, coop = true, twists = { "pair", "gunner" },
 		description = "Big Earl stole the base's mortar crates. Take them back two hands per crate, and shoot from the seats all the way.",
-		briefing = "Rico: Big Earl stole a stack of mortar crates from the Military Base and parked them in a garage across town. Rosa: Every crate is a two-person lift, and Earl's boys patrol the streets. Rico: So you lift together, you ride together, and whoever isn't driving shoots. Rosa: Captain Reyes pays well. Earl does not forgive. Be quick.",
-		debrief = "Rosa: Reyes saluted us. Rico: Earl sent us a postcard. It just says 'soon'. Rosa: Then let's get there first.",
+		briefing = "Rico: Big Earl stole a stack of mortar crates from the Military Base and parked them in a garage across town. Rosa: Every crate is a two-person lift, and Earl's boys patrol the streets. Rico: So you lift together, you ride together, and whoever isn't driving shoots. Rosa: Captain Maria pays well. Earl does not forgive. Be quick.",
+		debrief = "Rosa: Maria saluted us. Rico: Earl sent us a postcard. It just says 'soon'. Rosa: Then let's get there first.",
 		vehicle = nil, load = "carry", unload = "carry", itemKind = "ammo", items = 4, cargo = "Mortar Crates",
 		pickups = 1, pickupAt = nil, drops = 1, dropAt = "base", loadTime = 4, unloadTime = 4, payPerStop = 340,
 		pickupLabel = "TAKE BACK THE CRATES AT", dropLabel = "DELIVER THE CRATES TO",
-		giver = "Dusty, a looter gone honest", giverRole = "townsperson", receiver = "Sergeant Hayes", receiverRole = "soldier",
+		giver = "Dusty, a looter gone honest", giverRole = "townsperson", receiver = "Sergeant Roy", receiverRole = "soldier",
 	})
 	add("duo", {
 		number = 10, name = "Partners in Crime", tier = 4, reward = 3500, duo = true, coop = true, twists = { "pair", "switches" },
@@ -1371,7 +1371,7 @@ do
 		vehicle = "movingtruck", load = "carry", unload = "carry", itemKind = "medicine", items = 8, cargo = "Earl's Medicine Hoard",
 		pickups = 2, pickupAt = nil, drops = 2, dropAt = "stadium", loadTime = 4, unloadTime = 4, payPerStop = 380,
 		pickupLabel = "RAID THE STASH AT", dropLabel = "DELIVER THE MEDICINE TO",
-		giver = "Mona, Earl's ex-accountant", giverRole = "clerk", receiver = "Coach Daniels, the shelter warden", receiverRole = "guard",
+		giver = "Mona, Earl's ex-accountant", giverRole = "clerk", receiver = "Coach Dan, the shelter warden", receiverRole = "guard",
 	})
 end
 

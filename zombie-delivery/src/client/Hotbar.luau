@@ -12,15 +12,19 @@
 --     Hud's use path (Hotbar.onUse: Hud's useItem, the UseItem remote): a short flash and the red outline on the slot,
 --     then a shade while the server's cooldown runs (Config.ItemTuning.UseCooldown, one for every item). A sixth kind
 --     you own has no slot: key 9 uses it (and the I window does).
---   * After a thin divider, what you carry (shared/Bag.luau Bag.places / Bag.strip): one small tile a piece, its cargo
---     icon (Icons.cargo, client/BagUi.luau's emoji) and a badge for where it is (✋ hands, 🛍 the plastic bag, 🎒 the
---     backpack, 🚲 the rack), greyed when it belongs to another order than the one in focus; the free room as dim
---     tiles, "+N" over 8 tiles (7 on a touch screen). From the job payload's `carried` and the PackCount / PackRoom
---     attributes; off duty your room. A click opens the I window's BAG tab (BagUi.open).
--- A computer: one row, a small CARRYING n/room over the tiles. A touch screen: the tiles over the slots (the hands and
--- two item slots), the slots at least 48 px, no keys. It hides with the HUD (it lives in its ScreenGui) and while a
--- window, the phone or a dialog covers the game (Hotbar.covered, set by the client's Main; checked 10 times a second). Drawn again only when what it
--- shows changed (a State, a job update, the pack attributes).
+--   * 6.3, over the bar, what you carry as one compact CARRYING pill (shared/Bag.luau Bag.places / Bag.strip are still
+--     the data): "CARRYING 🍕✋ 💐🛍 2/4", a small cargo icon a piece (Icons.cargo, client/BagUi.luau's emoji) with a
+--     badge for where it is (✋ hands, 🛍 the plastic bag, 🎒 the backpack, 🚲 the rack), greyed when it belongs to
+--     another order than the one in focus, "+N" over 8 pieces (5 on a touch screen), then the pieces and the room. No
+--     slot frames and no tile a free place: the owner read the 6.0.1 tiles as new inventory slots ("a new inventory
+--     slot is created when you pick something up"). From the job payload's `carried` and the PackCount / PackRoom /
+--     BagRoom attributes; off duty it hides while you carry nothing. A click opens the I window's BAG tab (BagUi.open).
+-- 6.3: the bag slot's "n/room" is the server's (the BagRoom attribute) on a job, the kit's off duty; a car job says
+-- "CAR JOB" (its pickups go to your hands); a count badge on the slot says the pieces in the bag.
+-- The bar: the pill over the row of the hands and the items. A touch screen: the slots at least 48 px, two item slots,
+-- no keys. It hides with the HUD (it lives in its ScreenGui) and while a window, the phone or a dialog covers the game
+-- (Hotbar.covered, set by the client's Main; checked 10 times a second). Drawn again only when what it shows changed (a
+-- State, a job update, the pack attributes).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -42,7 +46,7 @@ local Holster = require(script.Parent.Holster) -- 6.1: what you hold
 local Hotbar = {}
 
 local touch = Ui.touchLayout()
-Hotbar.SLOTS = if touch then 2 else 5 -- (6.1: a touch screen keeps room for the hands: 311 wide fits an iPhone SE)
+Hotbar.SLOTS = if touch then 2 else Config.ItemTuning.BarSlots -- (6.1: a touch screen keeps room for the hands: 311 wide fits an iPhone SE)
 Hotbar.FIRST_KEY = #Holding.Order + 1 -- 6.1: the item slots' keys start after the hands' (4)
 -- Set by client/Hud.luau: uses an item (its existing path: the count check, the UseItem remote with the aim point).
 Hotbar.onUse = nil :: ((id: string) -> ())?
@@ -52,13 +56,13 @@ Hotbar.toast = nil :: ((text: string) -> ())?
 Hotbar.covered = nil :: (() -> boolean)?
 
 local SLOT, SLOT_GAP = 56, 6 -- the item slots (unscaled)
-local TILE, TILE_GAP = 38, 4 -- the carried tiles
-local LABEL_H = 14 -- CARRYING n/room over the tiles (a computer)
+local PILL_H, PILL_GAP = 26, 6 -- 6.3: the CARRYING pill over the row, and the room between them
+local PIECE_W, PIECE_ICON = 24, 18 -- a piece in the pill: its width, its icon
 local DIVIDER = if touch then 13 else 25 -- the room of a divider between two parts (12 · the line · 12)
 local TOUCH_MIN = 48 -- px: the smallest slot on a touch screen
 local ITEMS_W = Hotbar.SLOTS * SLOT + (Hotbar.SLOTS - 1) * SLOT_GAP
 local HANDS_W = #Holding.Order * SLOT + (#Holding.Order - 1) * SLOT_GAP -- 6.1
-local ROW_W = HANDS_W + DIVIDER + ITEMS_W -- the hands and the items (the strip after them on a computer)
+local ROW_W = HANDS_W + DIVIDER + ITEMS_W -- the hands and the items (6.3: the pill over them)
 local HAND_ICON: { [string]: string } = { fists = "✊", bag = "🛍", gun = "🔫" }
 local BADGE: { [string]: string } = { hands = "✋", bag = "🛍", pack = "🎒", rack = "🚲" }
 local FLASH = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -78,16 +82,16 @@ type Slot = {
 	lit: number,
 }
 
--- 6.1: a hand slot.
-type HandSlot = { button: any, outline: any, caption: any, name: any, icon: any, hand: string, hover: boolean }
+-- 6.1: a hand slot. 6.3: `badge` the bag slot's count of the pieces in it.
+type HandSlot = { button: any, outline: any, caption: any, name: any, icon: any, badge: any, hand: string, hover: boolean }
 
 local player = Players.LocalPlayer
-local maxTiles = if touch then 7 else 8
+local maxPieces = if touch then 5 else 8 -- 6.3: the pieces the pill shows ("+N" after them)
 local root: any = nil
 local rootScale: any = nil
-local strip: any = nil
-local stripLabel: any = nil
-local tilesRow: any = nil
+local pill: any = nil -- 6.3: the CARRYING pill (a button: the BAG tab)
+local pillRow: any = nil -- … its pieces in a row
+local pillCount: any = nil -- … and "2/4" at its end
 local slots: { Slot } = {}
 local hands: { HandSlot } = {}
 local shownHands = ""
@@ -95,11 +99,6 @@ local owned: { string } = {} -- the item ids you have, in Config.Items order (sl
 local state: any = nil
 local job: any = nil
 local shownStrip = ""
-local carrying = 0 -- the pieces the strip shows (its label's colour)
-
-local function stripWidth(tiles: number): number
-	return math.max(0, tiles * TILE + (tiles - 1) * TILE_GAP)
-end
 
 local function itemDef(id: string): Config.ItemDef?
 	for _, def in Config.Items do
@@ -295,13 +294,17 @@ local function kitOwned(): { [string]: boolean }
 	return if state and type(state.kit) == "table" then state.kit else {}
 end
 
--- The bag's room (the kit's extra), what is in it and whether it lies on the ground.
-local function bagNow(): (boolean, number, number, boolean)
+-- Whether you own the bag, what is in it, its room, whether it lies on the ground and (6.3) whether this is a car job.
+-- 6.3: the room is the server's on a job (the BagRoom attribute: 0 on a car job, whose pickups go to the hands), the
+-- kit's extra off duty, so the slot never promises room the server does not give.
+local function bagNow(): (boolean, number, number, boolean, boolean)
 	local kit = kitOwned()
 	local owned = kit[Config.Courier.BagKit] == true
-	local room = math.max(0, Transport.handsRoom(kit) - Transport.backpackRoom(kit))
+	local carJob = job ~= nil and job.mode ~= "foot" and job.mode ~= "bike"
+	local room = if job then math.floor(tonumber(player:GetAttribute("BagRoom")) or 0)
+		else math.max(0, Transport.handsRoom(kit) - Transport.backpackRoom(kit))
 	local count = math.floor(tonumber(player:GetAttribute("BagCount")) or 0)
-	return owned, count, room, typeof(player:GetAttribute("BagDown")) == "Vector3"
+	return owned, count, room, typeof(player:GetAttribute("BagDown")) == "Vector3", carJob
 end
 
 local function buildHand(parent: Instance, index: number, hand: string): HandSlot
@@ -338,9 +341,25 @@ local function buildHand(parent: Instance, index: number, hand: string): HandSlo
 			ZIndex = 6,
 		}),
 		icon = nil,
+		-- 6.3: the bag's pieces as a count in its top right corner (hidden while it is empty)
+		badge = if hand == "bag" then P.text(button, "", UDim2.fromOffset(18, 18), {
+			Position = UDim2.new(1, 4, 0, -4),
+			AnchorPoint = Vector2.new(1, 0),
+			BackgroundColor3 = P.red,
+			BackgroundTransparency = 0,
+			Font = Theme.HeadingFont,
+			TextSize = 11,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextStrokeTransparency = 1,
+			Visible = false,
+			ZIndex = 7,
+		}) else nil,
 		hand = hand,
 		hover = false,
 	}
+	if slot.badge then
+		Ui.corner(slot.badge, 9)
+	end
 	P.caps(button, tostring(index), UDim2.fromOffset(14, 14), { Position = UDim2.fromOffset(5, 3), TextSize = 11, TextStrokeTransparency = 1, ZIndex = 5, Visible = not touch })
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, slot.name)
 	local function hover(on: boolean)
@@ -375,9 +394,9 @@ local function drawHands(): boolean
 		return false
 	end
 	local held = Holster.hand()
-	local owned, count, room, down = bagNow()
+	local owned, count, room, down, carJob = bagNow()
 	local weapon = if state and type(state.weapon) == "string" then state.weapon else nil
-	local key = `{held}|{owned}|{count}|{room}|{down}|{weapon}`
+	local key = `{held}|{owned}|{count}|{room}|{down}|{carJob}|{weapon}`
 	if key == shownHands then
 		return false
 	end
@@ -390,8 +409,8 @@ local function drawHands(): boolean
 		if hand == "fists" then
 			caption, title = "FISTS", "FISTS · V PUNCHES"
 		elseif hand == "bag" then
-			caption = if not owned then "NO BAG" elseif down then `DOWN {count}` else `{count}/{room}`
-			title = if down then "YOUR BAG IS ON THE GROUND" else "PLASTIC BAG"
+			caption = if not owned then "NO BAG" elseif down then `DOWN {count}` elseif carJob then "CAR JOB" else `{count}/{room}`
+			title = if down then "YOUR BAG IS ON THE GROUND" elseif owned and carJob then "PLASTIC BAG · CAR JOB: PICKUPS GO TO YOUR HANDS" else "PLASTIC BAG"
 			image = Icons.kit(Config.Courier.BagKit)
 		else
 			caption = if def then string.upper(def.name) else "NO GUN"
@@ -412,6 +431,11 @@ local function drawHands(): boolean
 			ZIndex = 2,
 		})
 		slot.caption.Text = caption
+		local badge = slot.badge
+		if badge then
+			badge.Text = tostring(count)
+			badge.Visible = owned and count > 0 and not down
+		end
 		slot.caption.TextColor3 = if hand == "bag" and down then P.warn else P.ink
 		slot.caption.TextTransparency = if can or down then 0 else 0.5
 		slot.name.Text = title
@@ -429,8 +453,9 @@ end
 -- Your room by place: the job's (the payload, the live PackRoom attribute), off duty your kit's on foot.
 local function placesNow(): { Bag.Place }
 	local kit = if state and type(state.kit) == "table" then state.kit else {}
-	-- (6.1: the bag's room only while it is in your hand)
-	local bagRoom = if Holster.hand() == "bag" then math.max(0, Transport.handsRoom(kit) - Transport.backpackRoom(kit)) else 0
+	-- (6.1: the bag's room only while it is in your hand; 6.3: on a job the server's, the BagRoom attribute)
+	local _, _, room = bagNow()
+	local bagRoom = if Holster.hand() == "bag" then room else 0
 	if job then
 		local mode = if type(job.mode) == "string" then job.mode else "car"
 		local packRoom = tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0
@@ -463,51 +488,30 @@ local function carriedNow(): { any }
 	return list
 end
 
--- One tile: a piece (its icon and where it is), a free place (dim, its badge faint) or "+N" (`more`).
-local function tile(t: Bag.Tile?, order: number, more: string?, moreDim: boolean?)
-	local piece = if t then t.piece else nil
-	local other = t ~= nil and t.other
-	local frame = Ui.make("Frame", {
-		Name = "Tile",
-		Size = UDim2.fromOffset(TILE, TILE),
-		BackgroundColor3 = P.surface,
-		BackgroundTransparency = if piece or (more and not moreDim) then 0.3 else 0.72,
-		BorderSizePixel = 0,
+-- 6.3: one piece in the pill: its small icon and, at its corner, the badge of where it is ("+N" when `more`).
+local function pillPiece(piece: any, where: string, other: boolean, order: number)
+	local holder = Ui.make("Frame", {
+		Name = "Piece",
+		Size = UDim2.fromOffset(PIECE_W, PILL_H),
+		BackgroundTransparency = 1,
 		LayoutOrder = order,
-	}, tilesRow)
-	Ui.make("UIStroke", {
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		Color = P.line,
-		Thickness = 1,
-		Transparency = if piece and not other then 0.35 else 0.72,
-	}, frame)
-	if more then
-		P.text(frame, more, UDim2.fromScale(1, 1), {
-			Font = Theme.HeadingFont,
-			TextSize = 13,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextTransparency = if moreDim then 0.5 else 0,
-		})
-		return
-	end
-	if piece then
-		local look = if type(piece.look) == "string" then piece.look else nil
-		Ui.icon(frame, Icons.cargo(look), BagUi.emoji(look), UDim2.fromOffset(22, 22), {
-			Position = UDim2.new(0.5, 0, 0.5, -3),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			TextScaled = true,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextTransparency = if other then 0.6 else 0,
-			ImageColor3 = if other then P.ink2 else P.ink,
-			ImageTransparency = if other then 0.6 else 0,
-		})
-	end
-	Ui.label(frame, BADGE[if t then t.where else "pack"] or "🎒", UDim2.fromOffset(14, 14), {
-		Position = UDim2.new(1, 0, 1, 0),
-		AnchorPoint = Vector2.new(1, 1),
-		TextSize = 10,
+	}, pillRow)
+	local look = if type(piece.look) == "string" then piece.look else nil
+	Ui.icon(holder, Icons.cargo(look), BagUi.emoji(look), UDim2.fromOffset(PIECE_ICON, PIECE_ICON), {
+		Position = UDim2.new(0.5, -2, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextTransparency = if piece and not other then 0 else 0.6,
+		TextTransparency = if other then 0.6 else 0,
+		ImageColor3 = if other then P.ink2 else P.ink,
+		ImageTransparency = if other then 0.6 else 0,
+	})
+	Ui.label(holder, BADGE[where] or "🎒", UDim2.fromOffset(11, 11), {
+		Position = UDim2.new(1, 0, 1, -3),
+		AnchorPoint = Vector2.new(1, 1),
+		TextSize = 9,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextTransparency = if other then 0.6 else 0,
 		ZIndex = 2,
 	})
 end
@@ -519,44 +523,50 @@ local function drawStrip()
 	local places = placesNow()
 	local carried = carriedNow()
 	local focus = if job and type(job.focus) == "number" then job.focus else nil
-	local tiles, more, morePieces = Bag.strip(carried, places, focus, maxTiles)
-	local pieces, room = morePieces, 0
+	-- (Bag.strip still sorts the pieces by place and fills the bag first; the pill draws the pieces only: the free room
+	-- is a number, not empty tiles)
+	local tiles, _, morePieces = Bag.strip(carried, places, focus, maxPieces + 1)
+	local pieces, room = 0, 0
 	for _, place in places do
 		room += place.room
 	end
 	local parts: { string } = {}
+	local shown: { Bag.Tile } = {}
 	for _, t in tiles do
 		local piece = t.piece
+		if piece and #shown < maxPieces then
+			table.insert(shown, t)
+			table.insert(parts, `{t.where}:{tostring(piece.look)}:{t.other}`)
+		end
 		if piece then
 			pieces += 1
 		end
-		table.insert(parts, `{t.where}:{if piece then tostring(piece.look) else "-"}:{t.other}`)
 	end
-	carrying = pieces
-	local label = `CARRYING {pieces}/{room}`
-	local key = `{table.concat(parts, ",")}|{more}|{morePieces}|{label}`
+	pieces += morePieces
+	local more = pieces - #shown
+	local count = `{pieces}/{room}`
+	local visible = pieces > 0 or job ~= nil
+	local key = `{table.concat(parts, ",")}|{more}|{count}|{visible}`
 	if key == shownStrip then
 		return
 	end
 	shownStrip = key
-	Ui.clear(tilesRow)
-	for index, t in tiles do
-		tile(t, index)
+	Ui.clear(pillRow)
+	for index, t in shown do
+		pillPiece(t.piece, t.where, t.other, index)
 	end
-	local count = #tiles
 	if more > 0 then
-		count += 1
-		tile(nil, count, `+{more}`, morePieces == 0)
+		P.text(pillRow, `+{more}`, UDim2.fromOffset(0, PILL_H), {
+			AutomaticSize = Enum.AutomaticSize.X,
+			Font = Theme.HeadingFont,
+			TextSize = 12,
+			TextStrokeTransparency = 1,
+			LayoutOrder = #shown + 1,
+		})
 	end
-	local width = stripWidth(count)
-	if touch then
-		strip.Size = UDim2.fromOffset(width, TILE)
-	else
-		strip.Size = UDim2.fromOffset(math.max(width, 90), SLOT)
-		root.Size = UDim2.fromOffset(ROW_W + DIVIDER + math.max(width, 90), SLOT)
-		stripLabel.Text = label
-		stripLabel.TextColor3 = if pieces > 0 then P.ink else P.ink2
-	end
+	pillCount.Text = count
+	pillCount.TextColor3 = if pieces > 0 then P.ink else P.ink2
+	pill.Visible = visible
 end
 
 -- ── The bar ────────────────────────────────────────────────────────────────
@@ -564,10 +574,8 @@ end
 -- The bar's biggest size (unscaled; Hud's layout() fits that) and the smallest scale it may take (a touch screen: the
 -- slots at least TOUCH_MIN px).
 function Hotbar.size(): (Vector2, number)
-	if touch then
-		return Vector2.new(ROW_W, SLOT + SLOT_GAP + TILE), TOUCH_MIN / SLOT
-	end
-	return Vector2.new(ROW_W + DIVIDER + stripWidth(maxTiles), SLOT), 0
+	-- (6.3: the CARRYING pill over the row, on a computer too)
+	return Vector2.new(ROW_W, PILL_H + PILL_GAP + SLOT), if touch then TOUCH_MIN / SLOT else 0
 end
 
 -- Hud's layout(): the bar's bottom centre (px in the HUD's ScreenGui) and its scale.
@@ -639,7 +647,7 @@ function Hotbar.start(gui: Instance)
 		BackgroundTransparency = 1,
 	}, gui)
 	rootScale = Ui.make("UIScale", { Name = "LayoutScale" }, root)
-	local rowY = if touch then TILE + SLOT_GAP else 0
+	local rowY = PILL_H + PILL_GAP -- (6.3: the pill over the row)
 	-- 6.1: the hand slots at the left, a divider, the items.
 	local handRow = Ui.make("Frame", {
 		Name = "Hands",
@@ -660,45 +668,57 @@ function Hotbar.start(gui: Instance)
 	for index = 1, Hotbar.SLOTS do
 		slots[index] = buildSlot(items, index)
 	end
-	-- What you carry: one button (a click opens the BAG tab), the tiles in a row.
-	strip = Ui.make("TextButton", {
+	-- 6.3: what you carry, one pill over the row (a click opens the BAG tab): CARRYING, the pieces, "n/room".
+	pill = Ui.make("TextButton", {
 		Name = "Carried",
-		Size = UDim2.fromOffset(stripWidth(maxTiles), if touch then TILE else SLOT),
-		Position = if touch then UDim2.fromScale(0.5, 0) else UDim2.fromOffset(ROW_W + DIVIDER, 0),
-		AnchorPoint = if touch then Vector2.new(0.5, 0) else Vector2.zero,
-		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(0, PILL_H),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Position = UDim2.fromScale(0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = P.surface,
+		BackgroundTransparency = 0.3,
+		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "",
+		Visible = false,
 	}, root)
-	tilesRow = Ui.make("Frame", {
-		Name = "Tiles",
-		Size = UDim2.new(1, 0, 0, TILE),
-		Position = UDim2.new(0, 0, 1, 0),
-		AnchorPoint = Vector2.new(0, 1),
-		BackgroundTransparency = 1,
-	}, strip)
+	Ui.corner(pill, math.floor(PILL_H / 2))
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.6 }, pill)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, pill)
 	Ui.make("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = if touch then Enum.HorizontalAlignment.Center else Enum.HorizontalAlignment.Left,
-		VerticalAlignment = Enum.VerticalAlignment.Bottom,
-		Padding = UDim.new(0, TILE_GAP),
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 6),
 		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, tilesRow)
-	if not touch then
-		P.rule(root, UDim2.fromOffset(1, 40), { Position = UDim2.fromOffset(ROW_W + 12, SLOT - 40) })
-		stripLabel = P.caps(strip, "CARRYING", UDim2.new(1, 0, 0, LABEL_H), { TextSize = 10, TextStrokeTransparency = 1 })
-	end
-	strip.MouseEnter:Connect(function()
-		if stripLabel then
-			stripLabel.TextColor3 = P.ink
-		end
+	}, pill)
+	P.caps(pill, "CARRYING", UDim2.fromOffset(0, PILL_H), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 10, TextStrokeTransparency = 1, LayoutOrder = 1 })
+	pillRow = Ui.make("Frame", {
+		Name = "Pieces",
+		Size = UDim2.fromOffset(0, PILL_H),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+	}, pill)
+	Ui.make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 2),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, pillRow)
+	pillCount = P.text(pill, "", UDim2.fromOffset(0, PILL_H), {
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Theme.HeadingFont,
+		TextSize = 12,
+		TextStrokeTransparency = 1,
+		LayoutOrder = 3,
+	})
+	pill.MouseEnter:Connect(function()
+		pill.BackgroundTransparency = 0.12
 	end)
-	strip.MouseLeave:Connect(function()
-		if stripLabel then
-			stripLabel.TextColor3 = if carrying > 0 then P.ink else P.ink2
-		end
+	pill.MouseLeave:Connect(function()
+		pill.BackgroundTransparency = 0.3
 	end)
-	strip.Activated:Connect(function()
+	pill.Activated:Connect(function()
 		local click = Ui.onClick
 		if click then
 			click()
@@ -707,6 +727,7 @@ function Hotbar.start(gui: Instance)
 	end)
 	player:GetAttributeChangedSignal("PackCount"):Connect(drawStrip)
 	player:GetAttributeChangedSignal("PackRoom"):Connect(drawStrip)
+	player:GetAttributeChangedSignal("BagRoom"):Connect(drawStrip) -- 6.3
 	drawItems()
 	drawStrip()
 	drawHands()

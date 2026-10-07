@@ -3,7 +3,7 @@
 -- their place, play an idle animation, turn to you when you come close, say a line in a speech bubble and can walk
 -- somewhere. The employers stand at their WORK HERE boards (server/World.luau), the givers hand cargo over at
 -- pick-ups, the receivers take it at the drops, kids board the bus, a patient boards the ambulance
--- (server/Cargo.luau). Dr. Novak at the City Clinic wears a white coat, the bank guard a uniform.
+-- (server/Cargo.luau). Doctor Ellie at the City Clinic wears a white coat, the bank guard a uniform.
 --
 -- Outfits are made of colours and a few parts (no clothing assets): the body parts are coloured like a shirt, pants
 -- and shoes, with a hat, hair, a vest or an apron welded on (Npcs.look gives every role its own look). A standing

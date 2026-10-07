@@ -4026,7 +4026,7 @@ end
 
 local Rules = JobsConfig.CargoRules
 local Events = JobsConfig.RoadEvents
-local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Priya", "Dmitri", "Hannah", "Carlos", "June", "Wes", "Lena" }
+local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Polly", "Dean", "Hannah", "Carlos", "June", "Wes", "Lena" }
 
 -- Every tick of a job with cargo rules: the food's freshness drains once it is picked up (a Cooler Box slows it), and
 -- a fragile cargo or passengers in the moving car feel the jolts (hard braking, bumps: JobRules.jolt / joltLoss, the

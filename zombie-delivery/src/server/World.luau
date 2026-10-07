@@ -1062,7 +1062,7 @@ local EMPLOYER_ROLES: { [string]: string } = {
 	clinic = "doctor",
 }
 
--- "Walt, the rancher" → "Walt" and "Rancher · Silver Spur Ranch"; "Captain Reyes" → itself and the place's name.
+-- "Walt, the rancher" → "Walt" and "Rancher · Silver Spur Ranch"; "Captain Maria" → itself and the place's name.
 local function nameAndTitle(person: string, place: string): (string, string)
 	local name, role = string.match(person, "^(.-), the (.+)$")
 	if name and role then
@@ -1281,7 +1281,7 @@ end
 
 -- ── City Clinic ────────────────────────────────────────────────────────────
 -- Downtown, south-west of the depot: a white two-storey clinic with blue windows, the emergency canopy over the
--- sidewalk where the ambulance unloads (Map.CargoSpots.clinic), a helipad on the roof, beds inside. Dr. Novak hires
+-- sidewalk where the ambulance unloads (Map.CargoSpots.clinic), a helipad on the roof, beds inside. Doctor Ellie hires
 -- ambulance drivers at the WORK HERE board beside the front; a nurse waits under the canopy.
 
 local CLINIC_WHITE = Color3.fromRGB(238, 240, 236)
@@ -1792,7 +1792,7 @@ local function buildBase(parent: Instance)
 			end
 		end
 	end
-	-- The ammo bunker by the gate: Sergeant Hayes takes the crates here (Map.CargoSpots.base).
+	-- The ammo bunker by the gate: Sergeant Roy takes the crates here (Map.CargoSpots.base).
 	local spot = Map.CargoSpots.base
 	local px, pz = spot.pile.x, spot.pile.z
 	local sand = Color3.fromRGB(170, 150, 110)
@@ -4489,7 +4489,7 @@ local function defineMissionPlaces()
 		deco(cylinder(station, "HydrantCap", 0.6, 1.8, hydrant * CFrame.new(0, 2.7, 0) * UPRIGHT, Color3.fromRGB(200, 200, 204), Enum.Material.Metal))
 		part(station, "FlagPole", Vector3.new(0.5, 20, 0.5), frame * CFrame.new(side * 40, 10, front - 17), Color3.fromRGB(220, 220, 220), Enum.Material.Metal)
 		deco(part(station, "Flag", Vector3.new(0.2, 3.6, 6), frame * CFrame.new(side * 40, 17.8, front - 13.8), FIRE_RED, Enum.Material.Fabric))
-		bystander("worker", "Chief Ramos", "Fire Station 9", frame * CFrame.new(side * 20, 0, front - 6))
+		bystander("worker", "Chief Carlos", "Fire Station 9", frame * CFrame.new(side * 20, 0, front - 6))
 	end
 
 	-- Precinct 13: a blue-grey station house with steps, blue lanterns, its name, two patrol cars in front.
@@ -4526,7 +4526,7 @@ local function defineMissionPlaces()
 		for _, x in { -24, -36 } do
 			patrolCar(precinct, frame * CFrame.new(x, 0, front - 18) * CFrame.Angles(0, math.pi, 0))
 		end
-		bystander("officer", "Officer Diaz", "Precinct 13", frame * CFrame.new(-10, 0, front - 8))
+		bystander("officer", "Officer Nate", "Precinct 13", frame * CFrame.new(-10, 0, front - 8))
 	end
 
 	-- City Hall: a sandstone hall with a portico of columns up wide steps, a clock tower with the flag, a fountain.
@@ -5204,7 +5204,7 @@ local function defineMissionPlaces()
 			local p = Vector3.new(at[1], top, at[2])
 			tent(camp, CFrame.lookAt(p, Vector3.new(fire.X, top, fire.Z)) * CFrame.Angles(0, math.pi / 2, 0), 12, 9, 6, canvas[placeRng:NextInteger(1, #canvas)])
 		end
-		-- The soup kitchen (Ma Jenkins), water barrels, a washing line, a sign for the newcomers.
+		-- The soup kitchen (Ma Betty), water barrels, a washing line, a sign for the newcomers.
 		local kitchen = CFrame.lookAt(Vector3.new(-995, top, -238), Vector3.new(-1005, top, -238))
 		part(camp, "Table", Vector3.new(9, 0.4, 3), kitchen * CFrame.new(0, 3, 0), Color3.fromRGB(130, 96, 64), Enum.Material.WoodPlanks)
 		for _, x in { -3.6, 3.6 } do
@@ -5212,7 +5212,7 @@ local function defineMissionPlaces()
 		end
 		cylinder(camp, "SoupPot", 2.4, 3, kitchen * CFrame.new(2, 4.4, 0) * UPRIGHT, Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
 		sign(camp, "WE HAVE SOUP", Vector3.new(5, 1.4, 0.2), kitchen * CFrame.new(-2, 4.1, -1.2), Color3.fromRGB(60, 40, 20), Color3.fromRGB(240, 220, 170))
-		bystander("cook", "Ma Jenkins, the camp cook", "Survivor Camp", kitchen * CFrame.new(0, 0, 3))
+		bystander("cook", "Ma Betty, the camp cook", "Survivor Camp", kitchen * CFrame.new(0, 0, 3))
 		for k = 0, 2 do
 			barrel(camp, Vector3.new(-1060 + (k % 2) * 3, top, -165 - math.floor(k / 2) * 3), Color3.fromRGB(60, 100, 140))
 		end

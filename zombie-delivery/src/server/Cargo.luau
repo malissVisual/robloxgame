@@ -124,6 +124,15 @@
 --     the ground), BagDown the spot where it lies, ThrowReady "piece" | "fragile" while you could throw something at
 --     some door (a light piece in your hands, or the bag in your hand with one in it; client/Throw.luau binds X then).
 --     You throw from the hands, else from the bag in your hand (then the backpack's): not with the bag stowed.
+--
+-- 6.3, the bag takes pickups for real (the owner: "things don't go into the bag; a new inventory slot is created"):
+--   * The bag in your hand takes every light piece (bagFits: Bag.fitsBag, Config.Cargo.LightLooks: a bouquet, a cake,
+--     groceries too), not only the backpack's looks; the backpack keeps Config.Cargo.PackLooks (packFits). A piece in
+--     the bag needs no rack (rackFree, packTakes).
+--   * BagRoom (an owner attribute next to BagCount) is the bag's room on this job, so the bottom bar's bag slot shows
+--     the server's "n/room" (nil without a foot job: a car job's pickups go to the hands, as before; the slot says so).
+--   * A light piece that goes into your hands while you own the bag but hold something else: once a job, a notice
+--     says to hold the bag (bagHint).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -289,6 +298,7 @@ export type Session = {
 	anchor: Vector3?, -- 5.3 review: the stop's pile as Jobs gave it (set when built; another job there takes another slot)
 	slot: number, -- … and this job's place beside it (0: right there; Places.SessionGap to a side: build)
 	bagDown: BagDown?, -- 6.1: the bag on the ground with its pieces
+	bagHinted: boolean?, -- 6.3: "Hold your bag (2)" was said on this job (bagHint)
 }
 
 export type Status = {
@@ -316,8 +326,8 @@ local active: { [Player]: Session } = {} -- the running sessions by owner (the b
 local PAIR_GRACE = 1.5 -- the pair twist: seconds a carrier may be without the partner before the piece goes down
 
 local KID_NAMES = { "Tommy", "Lily", "Max", "Sophie", "Leo", "Mia", "Ben", "Zoe", "Sam", "Ava", "Noah", "Ella" }
-local PATIENT_NAMES = { "Mr. Brown", "Mrs. Lopez", "Old Pete", "Mr. Dvorak", "Mrs. Chen", "Mr. Okafor", "Miss Hart", "Mr. Svoboda" }
-local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Priya", "Dmitri", "Hannah", "Carlos", "June", "Bogdan", "Amara", "Wes", "Lena" }
+local PATIENT_NAMES = { "Bert", "Lorna", "Old Pete", "Dennis", "May", "Owen", "Hattie", "Steve" }
+local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Polly", "Dean", "Hannah", "Carlos", "June", "Bobby", "Annie", "Wes", "Lena" }
 -- Npcs' walk animation (server/Npcs.luau WALK): a patient's steps are slowed to their shuffle.
 local WALK_ANIMATION = "rbxassetid://507777826"
 local LINES = {
@@ -1224,6 +1234,11 @@ local function packFits(piece: Piece): boolean
 	return Bag.fits(piece.look)
 end
 
+-- 6.3: may this piece go into the plastic bag in the owner's hand? Every light look (Bag.fitsBag), never a horse.
+local function bagFits(piece: Piece): boolean
+	return piece.horse == nil and Bag.fitsBag(piece.look)
+end
+
 -- 4.8, multi-drop: the customer a piece is for ("Grandma Rose"), nil for a piece any drop takes.
 local function destName(_session: Session, piece: Piece): string?
 	return piece.owner
@@ -1349,7 +1364,7 @@ end
 local function rackFree(session: Session): number
 	local used = 0
 	for _, piece in session.pack do
-		if not packFits(piece) then
+		if not packFits(piece) and not piece.inBag then -- (6.3: a bouquet in the bag is not on the rack)
 			used += 1
 		end
 	end
@@ -1358,13 +1373,17 @@ end
 
 -- 5.3: may these pieces go into the pack now? Room for all of them, and the rack's for the ones that do not fit a
 -- backpack: only on a bike job's pick-up (Info.ride) or while you sit on the bike (`seated`).
+-- 6.3: the bag in your hand takes the first light ones while it has room (as stash puts them), whatever their look.
 local function packTakes(session: Session, pieces: { Piece }, seated: boolean): boolean
 	if #pieces > packFree(session) then
 		return false
 	end
+	local bagFree = if bagHeld(session) then math.max(0, bagRoomOf(session) - bagCount(session)) else 0
 	local big = 0
 	for _, piece in pieces do
-		if not packFits(piece) then
+		if bagFree > 0 and bagFits(piece) then
+			bagFree -= 1
+		elseif not packFits(piece) then
 			big += 1
 		end
 	end
@@ -1374,7 +1393,7 @@ end
 -- 5.0: what is in the owner's pack, for the HUD and the phone (the player attributes PackCount and PackRoom; nil when
 -- there is no foot job).
 -- 6.1: PackRoom is the room that is yours now (the bag's only in your hand), BagCount the pieces in the bag (with you
--- or lying on the ground).
+-- or lying on the ground). 6.3: BagRoom the bag's own room on this job (the bottom bar's "n/room"; nil off a foot job).
 local function packShown(session: Session)
 	local owner = session.owner
 	local on = session.info.foot == true and not session.ended
@@ -1382,6 +1401,7 @@ local function packShown(session: Session)
 	local room = if on then math.max(0, (session.info.pack or 0) - (if bagHeld(session) then 0 else bagRoomOf(session))) else nil
 	local down = session.bagDown
 	local bag = if on then bagCount(session) + (if down then #down.pieces else 0) else nil
+	local bagRoom = if on then bagRoomOf(session) else nil
 	if owner:GetAttribute("PackCount") ~= count then
 		owner:SetAttribute("PackCount", count)
 	end
@@ -1391,26 +1411,30 @@ local function packShown(session: Session)
 	if owner:GetAttribute("BagCount") ~= bag then
 		owner:SetAttribute("BagCount", bag)
 	end
+	if owner:GetAttribute("BagRoom") ~= bagRoom then
+		owner:SetAttribute("BagRoom", bagRoom)
+	end
 end
 
 -- 5.0: a piece goes into the owner's pack (its model goes: nothing shows). 6.1: into the bag in the owner's hand while
--- it has room and the piece fits a bag, else the backpack (`satchel`: a round's bundle, always the satchel).
+-- it has room and the piece fits a bag (6.3: every light look), else the backpack (`satchel`: a round's bundle, always
+-- the satchel).
 local function stash(session: Session, piece: Piece, satchel: boolean?)
 	if piece.model then
 		piece.model:Destroy()
 		piece.model = nil
 	end
-	piece.inBag = if not satchel and Holding.place(bagHeld(session), bagCount(session), bagRoomOf(session), packFits(piece)) == "bag" then true else nil
+	piece.inBag = if not satchel and Holding.place(bagHeld(session), bagCount(session), bagRoomOf(session), bagFits(piece)) == "bag" then true else nil
 	table.insert(session.pack, piece)
 	packShown(session)
 end
 
 -- 6.1: what was said of a piece put into the pack: the bag (n / its room), the backpack, a bike.
 local function packWords(session: Session, piece: Piece): string
-	if not packFits(piece) then
-		return `Onto your bike ({#session.pack} / {session.info.pack or 0}).`
-	elseif piece.inBag then
+	if piece.inBag then -- (6.3: before the rack: a bouquet in the bag is not on the bike)
 		return `Into the bag ({bagCount(session)} / {bagRoomOf(session)}).`
+	elseif not packFits(piece) then
+		return `Onto your bike ({#session.pack} / {session.info.pack or 0}).`
 	end
 	local bagRoom = bagRoomOf(session)
 	return `Into your backpack ({#session.pack - bagCount(session)} / {math.max(0, (session.info.pack or 0) - bagRoom)}).`
@@ -1428,6 +1452,17 @@ local function intoPack(session: Session, player: Player, piece: Piece?): boolea
 		return true
 	end
 	return held ~= nil and held.tool == nil and #held.pieces >= handsMax(session, player)
+end
+
+-- 6.3: a light piece went into the owner's hands while they own the plastic bag but hold something else (the fists,
+-- the gun): once a job, how to have the next ones drop straight in (the bottom bar's bag slot is key 2).
+local function bagHint(session: Session, player: Player, piece: Piece?)
+	if session.bagHinted or not piece or player ~= session.owner or not session.info.foot or bagHeld(session)
+		or session.bagDown ~= nil or bagRoomOf(session) <= 0 or not bagFits(piece) then
+		return
+	end
+	session.bagHinted = true
+	tell(player, "Hold your bag (2) and pickups go straight into it.")
 end
 
 -- Is this a stop where the cargo is handled on foot (carried, led, 4.0: moved on a pallet jack)?
@@ -2211,6 +2246,7 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 	if not table.find(session.loose, loose) or not take(session, player, loose.piece) then
 		return -- (3.7: a piece that does not fit the hands stays where it lies)
 	end
+	bagHint(session, player, loose.piece) -- 6.3
 	local index = table.find(session.loose, loose)
 	if index then
 		table.remove(session.loose, index)
@@ -2981,6 +3017,7 @@ local function onPile(session: Session, player: Player)
 		if take(session, player, piece) then
 			loaded += 1
 			if loaded == 1 then
+				bagHint(session, player, piece) -- 6.3
 				say(session.person, if piece.horse then line(LINES.horse) else line(LINES.take))
 				if not piece.horse and not (session.held[player] and session.held[player].tool) then
 					Npcs.act(session.person, "give") -- 5.7: handed to you, you reach for it

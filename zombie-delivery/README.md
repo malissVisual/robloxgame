@@ -377,16 +377,16 @@ dark.
 | Campaign | Client | Needs finished | Level (missions 1 → 10) | Campaign reward |
 |---|---|---|---|---|
 | 📦 First Shift | Marge, the dispatcher | – | 1 → 2 | $2,500 |
-| 🏥 Code Red | Dr. Novak, the City Clinic | First Shift | 2 → 4 | $4,000 |
-| 🛒 Empty Shelves | Mr. Patel, FreshMart | Code Red | 4 → 6 | $5,500 |
+| 🏥 Code Red | Doctor Ellie, the City Clinic | First Shift | 2 → 4 | $4,000 |
+| 🛒 Empty Shelves | Raj, FreshMart | Code Red | 4 → 6 | $5,500 |
 | 🤝 Partners in Crime (DUO) | Rosa & Rico, the twins | First Shift | 4 → 8 | $7,500 |
-| 🚒 Smoke and Sirens | Chief Ramirez, Fire Station 9 | Empty Shelves | 6 → 8 | $7,000 |
-| 🪖 Iron Supply | Captain Reyes, the Military Base | Smoke and Sirens | 8 → 9 | $9,000 |
-| ⚡ Lights Out | Engineer Volkov, the Power Plant | Iron Supply | 9 → 10 | $11,000 |
+| 🚒 Smoke and Sirens | Chief Carlos, Fire Station 9 | Empty Shelves | 6 → 8 | $7,000 |
+| 🪖 Iron Supply | Captain Maria, the Military Base | Smoke and Sirens | 8 → 9 | $9,000 |
+| ⚡ Lights Out | Engineer Ivan, the Power Plant | Iron Supply | 9 → 10 | $11,000 |
 | 🐴 Wild West End | Walt, the rancher | Lights Out | 10 → 12 | $13,000 |
-| 🧪 Patient Zero | Dr. Ito, the Biotech Lab | Wild West End | 12 → 13 | $16,000 |
+| 🧪 Patient Zero | Doctor Hiro, the Biotech Lab | Wild West End | 12 → 13 | $16,000 |
 | 💰 Dirty Money | Vinnie, the fixer | Patient Zero | 13 → 14 | $20,000 |
-| 🚌 Last Convoy | Mayor Grant, City Hall | all nine story campaigns | 14 → 15 | $30,000 |
+| 🚌 Last Convoy | Mayor Ruth, City Hall | all nine story campaigns | 14 → 15 | $30,000 |
 
 * **Stars** (`Missions.rate`): done = ★; the cargo still at 75 % or more = ★★; and 30 % or more of the clock left =
   ★★★. Your best rating per mission is saved.
@@ -764,7 +764,7 @@ theirs on the next join.
 | 🏥 Code Red | Medic Mint paint | Field Medic |
 | 🛒 Empty Shelves | Fresh Lime paint | Grocery Hero |
 | 🚒 Smoke and Sirens | Fire Engine paint (metal) | Smoke Eater |
-| 🪖 Iron Supply | **Reyes' Carbine** (gun) | Quartermaster |
+| 🪖 Iron Supply | **Maria's Carbine** (gun) | Quartermaster |
 | ⚡ Lights Out | Volt Neon paint (neon) | Live Wire |
 | 🐴 Wild West End | **Walt's Lever Rifle** (gun, a round hits 2 in a row) | Outlaw Tamer |
 | 🧪 Patient Zero | Toxic Glow paint (neon) | Cure Runner |
@@ -819,7 +819,7 @@ to your name on the leaderboard (TOP). Your first title is shown at once.
   first" before you have been there), and the Phantom card.
 * **REWARDS**: the eleven campaign rewards (earned, or "finish <campaign>"; a click opens the campaign), your titles with
   EQUIP, and the exclusive guns and paints.
-* The MISSIONS tab's campaign header shows the campaign's reward too ("Reward: Reyes' Carbine + title Quartermaster").
+* The MISSIONS tab's campaign header shows the campaign's reward too ("Reward: Maria's Carbine + title Quartermaster").
 * **Popups** at the top centre, one at a time: a strip for a new place, a card for a package or a challenge (its money
   and title), and a BIG card with a glow and confetti for a campaign's, every package's and every challenge's
   reward. They wait while the DELIVERY result, the mission's celebration card or the MISSIONS window is up, so
@@ -1054,7 +1054,7 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
   (Silver Spur Ranch) and the **Army Carbine** (Military Base). One-handed (they also fire out of a car window):
   Pistol, Ranch Revolver, SMG, Vinnie's Golden Pistol.
 * **Exclusive gear** (3.1, `exclusive` in `Config.Weapons` / `Config.Paints`, never sold; see **Challenges, secrets
-  and rewards**): the guns **Reyes' Carbine** (an olive carbine with a scope), **Walt's Lever Rifle** (wood, a round
+  and rewards**): the guns **Maria's Carbine** (an olive carbine with a scope), **Walt's Lever Rifle** (wood, a round
   hits 2 in a row), **Vinnie's Golden Pistol** and **Dead End** (a round hits 4 in a row), each with its own model; the paints
   Dispatch Yellow, Medic Mint, Fresh Lime, Fire Engine, Volt Neon, Toxic Glow, Sunrise Chrome and Phantom, some with
   a **finish** (metal, neon, foil, glass) on the body panels (`PaintDef.material`). The shops show them as dimmed

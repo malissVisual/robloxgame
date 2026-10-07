@@ -112,7 +112,7 @@ local PARK_LANE = 1.25 -- parked: this × the lane offset off the centre line (n
 local PARK_STRETCH = 40 -- studs before the stop where it moves over to your side of the road
 local SIT_ANIMATION = "rbxassetid://2506281703" -- Roblox's R15 sit
 
-local NAMES = { "Marco", "Jules", "Bruno", "Vince", "Otto", "Luca", "Hank", "Rosa", "Greta", "Nina", "Ivo", "Dora" }
+local NAMES = { "Marco", "Jules", "Bruno", "Vince", "Otto", "Luke", "Hank", "Rosa", "Greta", "Nina", "Ivy", "Dora" }
 local LINES = {
 	"Your {car}, boss. Keys are in it.",
 	"Here she is. Drive safe out there!",
