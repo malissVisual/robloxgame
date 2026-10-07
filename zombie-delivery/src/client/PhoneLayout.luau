@@ -2,29 +2,31 @@
 -- Pure phone sizing and server-payload presentation. No invented orders, money or route destinations.
 local PhoneLayout = {}
 
-export type Fit = { sideways: boolean, scale: number, width: number, height: number }
+export type Fit = { scale: number, width: number, height: number }
+-- 6.0.1: an app's centred popup (client/PhonePopup.luau): its size in px at `scale`, and room for two columns.
+export type Popup = { scale: number, width: number, height: number, wide: boolean }
 
--- Short displays get a shorter scrollable device, rather than shrinking the text until it cannot be read.
+PhoneLayout.SHORT_SCALE = 0.85 -- the smallest scale a short screen shrinks the upright phone to (then it scrolls)
+PhoneLayout.POPUP_W, PhoneLayout.POPUP_H = 760, 520 -- the popup panel at the desktop scale
+PhoneLayout.POPUP_WIDE = 600 -- a popup this wide (px at its scale) shows the board, career and shop in two columns
+
+-- 6.0.1: the phone always stands upright (no app turns it, no screen lays it down). A short screen shrinks it a little
+-- (to SHORT_SCALE), then gives it a shorter scrollable body, rather than shrinking the text until it cannot be read.
 function PhoneLayout.fit(width: number, height: number, touch: boolean, cap: number): Fit
 	width, height = math.max(100, width), math.max(100, height)
-	local sideways = width >= 600 and height < 520
-	local w = if sideways then 680 else 340
-	local scale = math.min(cap, (width - 32) / w)
-	local h = math.min(if sideways then 340 else 680, (height - 32) / scale)
-	-- Prefer readable physical targets; both home and app content scroll when height is constrained.
-	if touch then
-		scale = math.min(1, (width - 32) / w)
-		h = math.min(if sideways then 340 else 680, (height - 32) / scale)
-	end
-	return { sideways = sideways, scale = scale, width = w, height = h }
+	local scale = math.min(if touch then 1 else cap, (width - 32) / 340)
+	scale = math.min(scale, math.max(PhoneLayout.SHORT_SCALE, (height - 32) / 560))
+	return { scale = scale, width = 340, height = math.min(680, (height - 32) / scale) }
 end
 
--- 5.5: a big app (BOARD, CAREER, SHOP, BAG) turns the phone sideways even where it would stand upright: the landscape
--- body at the largest scale that fits (a narrow touch screen gets a smaller one; the app scrolls).
-function PhoneLayout.sideways(width: number, height: number, touch: boolean, cap: number): Fit
+-- 6.0.1: an app's popup: 760 × 520 at the desktop scale (`cap`; touch keeps 1 so its text and targets stay full
+-- size), never wider than 92 % or taller than 86 % of the screen (the content scrolls).
+function PhoneLayout.popup(width: number, height: number, touch: boolean, cap: number): Popup
 	width, height = math.max(100, width), math.max(100, height)
-	local scale = math.min(if touch then 1 else cap, (width - 32) / 680, (height - 32) / 220)
-	return { sideways = true, scale = scale, width = 680, height = math.min(340, (height - 32) / scale) }
+	local scale = if touch then 1 else cap
+	local w = math.min(PhoneLayout.POPUP_W, width * 0.92 / scale)
+	local h = math.min(PhoneLayout.POPUP_H, height * 0.86 / scale)
+	return { scale = scale, width = w, height = h, wide = w >= PhoneLayout.POPUP_WIDE }
 end
 
 function PhoneLayout.summary(payload: any, now: number, x: number?, z: number?): any

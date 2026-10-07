@@ -1,6 +1,7 @@
 --!strict
 -- A clipped, discovered-only route preview using the real Map and Roads; no new navigation authority.
 -- Redraw only on resize, discovery or meaningful movement. Parent destruction disconnects every listener.
+-- 6.0.1: drawn in the chart's own px (the phone app's popup scales it; a scale alone redraws nothing).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -19,6 +20,14 @@ function Route.create(parent: Instance, destination: Vector3?, order: number, en
 	local drawing = Ui.make("Frame", { Name = "Chart", Size = UDim2.fromScale(1,1), BackgroundTransparency = 1 }, holder)
 	local previous: Vector3? = nil
 	local alive = true
+	-- 6.0.1: the chart's size in its own (unscaled) px: the popup's UIScale and its grow animation change only the
+	-- screen size (the chart is 160 tall), so a scale alone draws nothing again.
+	local drawnW = 0
+	local function size(): (number, number)
+		local abs = holder.AbsoluteSize
+		local s = if abs.Y > 0 then abs.Y / 160 else 1
+		return abs.X / s, 160
+	end
 	local function draw(force: boolean?)
 		if enabled and not enabled() then return end
 		local character = Players.LocalPlayer.Character
@@ -43,7 +52,8 @@ function Route.create(parent: Instance, destination: Vector3?, order: number, en
 			x0,x1 = math.min(x0,point.x),math.max(x1,point.x)
 			z0,z1 = math.min(z0,point.z),math.max(z1,point.z)
 		end
-		local w,h = holder.AbsoluteSize.X,holder.AbsoluteSize.Y
+		local w,h = size()
+		drawnW = w
 		local scale = math.min((w-32)/math.max(240,x1-x0),(h-32)/math.max(180,z1-z0))
 		local cx,cz = (x0+x1)/2,(z0+z1)/2
 		local function project(x: number,z: number): (number,number)
@@ -100,7 +110,11 @@ function Route.create(parent: Instance, destination: Vector3?, order: number, en
 			if index == 1 then Ui.corner(marker,4) end
 		end
 	end
-	local resized = holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() draw(true) end)
+	local resized = holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		if math.abs(size() - drawnW) >= 1 then
+			draw(true)
+		end
+	end)
 	local known = Discovery.changed:Connect(function() draw(true) end)
 	holder.Destroying:Connect(function()
 		alive = false
