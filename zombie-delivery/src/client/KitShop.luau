@@ -115,6 +115,9 @@ local function effect(def: Config.KitDef): string
 	if def.warm then
 		table.insert(parts, `🔥 food cools ×{def.warm}`)
 	end
+	if #parts == 0 then
+		return "just the look" -- 6.0.1: the Courier Vest
+	end
 	return table.concat(parts, "  ·  ")
 end
 

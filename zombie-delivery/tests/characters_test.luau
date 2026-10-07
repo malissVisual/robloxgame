@@ -49,7 +49,32 @@ for _, id in Geometry.ids do
 		for bone, nominal in KitFit.Nominal do
 			for i = 1, 3 do check(near(bones[bone].size[i], nominal[i]), "purchased kit fits " .. bone) end
 		end
-		check(names.VestL and names.CapBrimBack and not names.Backpack, "uniform does not grant paid gear")
+		check(names.JacketL and names.CapBrimBack and not names.Backpack, "uniform does not grant paid gear")
+		-- 6.0.1: the red vest is bought kit (Config.Kit "hivis"): not on the body; the jacket under it is hidden by it.
+		check(not names.VestL and not names.VestBack and not names.DispatchBadge, "a new courier starts without the vest")
+		local vest = Geometry.hivis()
+		check(#vest == 11 and #spec.bones + #spec.pieces + #vest <= spec.budget, "the vest: Codex's 11 pieces, within the budget worn")
+		local boxes = {}
+		for _, v in vest do
+			check(v.attach == "UpperTorso" and not names[v.name], "the vest's pieces on the torso, their own names")
+			if not v.turn then table.insert(boxes, v) end
+		end
+		local function inside(p, v): boolean
+			for i = 1, 3 do
+				if p.at[i] - p.size[i] / 2 < v.at[i] - v.size[i] / 2 - 1e-9 or p.at[i] + p.size[i] / 2 > v.at[i] + v.size[i] / 2 + 1e-9 then
+					return false
+				end
+			end
+			return true
+		end
+		for _, p in spec.pieces do
+			if string.match(p.name, "^Jacket") or string.match(p.name, "^PocketFlap") then
+				local hidden = false
+				for _, v in boxes do hidden = hidden or inside(p, v) end
+				check(hidden and p.attach == "UpperTorso", p.name .. " lies inside a vest panel (worn, the vest looks as before)")
+			end
+		end
+		check(Geometry.hivis()[1] ~= vest[1] and Geometry.hivis()[1].color ~= vest[1].color, "fresh vest tables")
 	elseif def then
 		for i = 1, 3 do check(bones.Head.color[i] == def.skin[i], "enemy palette remains type-readable") end
 	end

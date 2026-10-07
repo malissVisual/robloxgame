@@ -1108,6 +1108,10 @@ missions. The dealer no longer sells it. Every other car, job tier and campaign 
 carried in the left hand — it swings with your stride and flies back when you sprint. A light piece you pick up (a
 pile or the ground) goes straight into the bag with a quick move of the arm.
 
+**The Courier Vest** (6.0.1, Kit "hivis", $20, level 1, just the look): a new courier starts with Marge's cash and phone
+in plain charcoal workwear; the red reflective ZDC vest is bought next to the bag and put on with the vest move. A Kevlar
+or heavy vest is worn instead of it. Players from before 6.0.1 get it once on load, so their look does not change.
+
 **Throwing** (`shared/Throws.luau`, `client/Throw.luau`, the Throw remote, `Cargo.throwAt`, `Config.Throw`): at a home
 drop hold **X** (gamepad R1, touch THROW): a dotted arc and a landing ring (green over the door) with a swinging power;
 let go to throw. The server checks the piece, the range, the line of sight and traces the same arc. Landing at the door
@@ -1133,7 +1137,7 @@ move when you buy it) and as 🛡 on the HUD. Every hit on a player goes through
 
 **Every player is a ZDC courier** (Codex, `design/character-models/`; `server/CourierAvatar.luau`,
 `server/CharacterArt/`, `shared/CourierMotion.luau`): one native-part R15 body for everybody — warm skin, a red reflective
-vest, charcoal workwear, a backwards cap — instead of personal avatars (`StarterPlayer.StarterCharacter`, appearance
+vest (bought kit since 6.0.1), charcoal workwear, a backwards cap — instead of personal avatars (`StarterPlayer.StarterCharacter`, appearance
 loading off). Roblox's standard R15 animations (idle, walk, run, jump, fall, climb, swim, sit) play from the server by
 the real speed; ArmPose, BikeRider and the interactions still pose on top. The kit (backpacks, shoes, jacket) is worn as
 before. **The infected** are native too: walker, runner, soldier (helmet, chest plate) and brute (a reinforced shoulder)

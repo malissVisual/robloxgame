@@ -6,7 +6,8 @@
 --   KitFit.outfit(kit, loaded)   slot → art id: pack = "bigpack" (owned) or "backpack", load = the backpack the
 --                                parcel sits on (only while `loaded`: the PackCount attribute > 0), shoes, jacket;
 --                                6.0: hand = "bag" (the plastic bag in the left hand), vest = the best vest owned
---                                ("heavy", else "kevlar": stream 2's armour, Config.Kit) over the courier's red vest
+--                                ("heavy", else "kevlar": stream 2's armour, Config.Kit; 6.0.1: else "hivis", the
+--                                Courier Vest, the red reflective vest that is no longer part of the courier's body)
 --   KitFit.factors(bone, size)   the x / y / z scale of a body part against its nominal size (clamped; a hand: one
 --                                uniform factor so the phone keeps its shape)
 --   KitFit.fit(pieces, scales)   copies of the pieces with their offsets and sizes scaled per their bone (a turned
@@ -57,7 +58,8 @@ function KitFit.outfit(kit: Kit, loaded: boolean): { [string]: string }
 	if kit.bag == true then
 		out.hand = "bag" -- 6.0 (server/KitWear.luau puts it away while the hands carry or push something)
 	end
-	local vest = if kit.heavy == true then "heavy" elseif kit.kevlar == true then "kevlar" else nil
+	-- 6.0.1: the Courier Vest ("hivis", the red reflective one, no armour) shows only without an armoured vest
+	local vest = if kit.heavy == true then "heavy" elseif kit.kevlar == true then "kevlar" elseif kit.hivis == true then "hivis" else nil
 	if vest then
 		out.vest = vest -- 6.0: only the best one shows
 	end

@@ -5,6 +5,7 @@
 -- 5.9.2: the server only builds the template. The walk (shared/CourierMotion.luau) is chosen on each owning client by
 -- the template's own Animate LocalScript (CharacterArt/Animate.client.luau), whose tracks replicate to everybody; the
 -- server's 10 Hz animation loop over every body is gone.
+-- 6.0.1: the template wears plain workwear: the red reflective vest is bought kit (Config.Kit "hivis", worn by KitWear).
 local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Geometry = require(script.Parent.CharacterArt.Geometry)
