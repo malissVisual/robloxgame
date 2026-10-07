@@ -27,6 +27,18 @@
 -- goals, "Pick up the letters at the Post Office", "Deliver to Sarah · Apt 4C", "Hand it over (E)"), a failed run
 -- one page, and the done screen one page with the reward and where to go next (J for a job, Q → SHOP for the shops),
 -- SHOW ME AROUND (the tour, still optional) or CLOSE. The tour's last page points to JOBS (the phone's 6.5 tile).
+-- 6.7, a tutorial that never annoys (the owner: "It should simply show with an arrow where things are in the menu,
+-- then that you take one job, and you either say yes or skip tutorial. But don't automatically give a job."):
+--   * her welcome (one page, it shows on its own after PLAY): SHOW ME (the phone and the arrow tour) / SKIP TUTORIAL;
+--   * the arrow tour of the screen (TutorialSteps.ScreenTour, client/TutorialUi.luau drives it, client/TutorialArrow.luau
+--     draws it): one stop a thing on the screen, a one-sentence caption each (TutorialSteps.tourLine), NEXT / SKIP
+--     TUTORIAL; where the arrow sits by its target is TutorialSteps.placeArrow (pure, tested);
+--   * at its end one page, "ready": TAKE A JOB (the phone's JOBS, any job you like) / SKIP TUTORIAL;
+--   * then no page of hers during play: the first delivery of ANY job pays Config.Tutorial.Reward with a toast (the
+--     server), a failed one goes back to "board" (the goal card's "Take your first job (J)"). Her done page, the
+--     "retry" and "board" pages are gone; talking to her (E) while you wait shows "say" with OPEN THE BOARD.
+--   The 5.7 world tour (TutorialSteps.Tour: the dock, the bus stop, the board) stays for SHOW ME AROUND in the phone's
+--   SETTINGS (MORE).
 
 local Config = require(script.Parent.Config)
 
@@ -39,8 +51,9 @@ export type Dialog = {
 	secondary: string?, -- a quiet second action on every page ("SKIP TUTORIAL", "LATER")
 }
 
--- The phases the server sends (server/Tutorial.luau); "phone" (5.0) is a message, not a phase.
-TutorialSteps.Phases = { "welcome", "board", "job", "retry", "done", "say", "phone" }
+-- The phases the server sends (server/Tutorial.luau); "phone" (5.0) is a message, not a phase. 6.7: "tour" (the arrow
+-- tour runs); "retry" is never sent any more (a failed run goes back to "board"), the clients still read it.
+TutorialSteps.Phases = { "welcome", "tour", "board", "job", "retry", "done", "say", "phone" }
 
 -- 5.7: the tour after the first delivery, in order.
 TutorialSteps.Tour = { "dock", "bus", "board" }
@@ -48,13 +61,136 @@ TutorialSteps.Tour = { "dock", "bus", "board" }
 -- The job's steps (TutorialSteps.jobStep), in the order they come.
 TutorialSteps.JobSteps = { "drive_pickup", "pickup", "pickup_more", "carry", "loose", "drive_drop", "unload", "handover" }
 
--- Marge's speech bubbles over her head (server/Tutorial.luau, Npcs.say).
+-- Marge's speech bubbles over her head (server/Tutorial.luau, Npcs.say). 6.7: no "give" (she gives no job).
 TutorialSteps.Bubble = {
-	give = "Here's your first job. Off you go!",
-	board = "Check the board, hon. Press J.",
+	tour = "Follow the arrows, hon.",
+	board = "Take any job you like, hon. Press J.",
 	busy = "You're on a job! Get going.",
 	done = "Jobs are on the board. Good luck out there.",
 }
+
+-- 6.7: the arrow tour of the screen, in order (client/TutorialUi.luau). target: what the arrow points at, found by name
+-- (next: the HUD's NEXT card, phone: PHONE [Q] top right, jobsApp / mapApp / shopApp / bagApp: the phone's tiles,
+-- hotbar: the bottom bar, minimap: the minimap); side: where the arrow and the caption sit by it (another side when
+-- that one has no room: placeArrow); phone: "open" the tour opens the phone for the stop, "closed" puts it away;
+-- text: the caption (one sentence), touch: a touch screen's own (else forTouch(text)).
+export type TourStop = { id: string, target: string, side: string, phone: string, text: string, touch: string? }
+
+TutorialSteps.ScreenTour = {
+	{ id = "next", target = "next", side = "right", phone = "closed", text = "This card always tells you what to do next." },
+	{ id = "phone", target = "phone", side = "left", phone = "closed", text = "Your phone (Q): jobs, map, shops, everything." },
+	{ id = "jobs", target = "jobsApp", side = "left", phone = "open", text = "Take jobs here." },
+	{ id = "map", target = "mapApp", side = "left", phone = "open", text = "The map and GPS." },
+	{ id = "shop", target = "shopApp", side = "left", phone = "open", text = "Shops: tap one to get GPS there." },
+	{ id = "bag", target = "bagApp", side = "left", phone = "open", text = "Your bag and items." },
+	{
+		id = "hotbar",
+		target = "hotbar",
+		side = "above",
+		phone = "closed",
+		text = "1 fists, 2 your bag, 3 your gun, 4–8 items.",
+		touch = "Tap your fists, your bag, your gun, then your items.",
+	},
+	{
+		id = "minimap",
+		target = "minimap",
+		side = "right",
+		phone = "closed",
+		text = "The minimap: M opens the big map.",
+		touch = "The minimap: EXPAND opens the big map.",
+	},
+} :: { TourStop }
+
+-- 6.7: a tour stop's caption for this screen (a touch screen names no keys).
+function TutorialSteps.tourLine(stop: TourStop, touch: boolean): string
+	if touch then
+		return stop.touch or TutorialSteps.forTouch(stop.text)
+	end
+	return stop.text
+end
+
+-- 6.7: where the tour's arrow and caption go (client/TutorialArrow.luau, every frame; px in the tour's ScreenGui).
+--   target   the thing pointed at { x, y, w, h }      screen  { w, h }
+--   side     the stop's side: the arrow sits left of / right of / above / below the target ("left": it points right)
+--   length   the arrow's length, travel how far it bounces back, gap between the target and its tip
+--   caption  the caption box { w, h }, margin the screen's edge kept free (8)
+-- The stop's side is kept while it has the room for the gap, the arrow, its bounce and the caption; else the side with
+-- the most room to spare (left, right, above, below on a tie). Returns the side, the arrow's Rotation (it is drawn
+-- pointing down: 0 down, 90 left, 180 up, -90 right), its centre with its tip at the gap (arrowX / arrowY), the unit
+-- vector toward the target (dirX / dirY: the bounce goes against it) and the caption's top left, kept on the screen.
+export type ArrowPlace = {
+	side: string,
+	rotation: number,
+	arrowX: number,
+	arrowY: number,
+	dirX: number,
+	dirY: number,
+	captionX: number,
+	captionY: number,
+}
+
+export type ArrowInput = {
+	target: { x: number, y: number, w: number, h: number },
+	screen: { w: number, h: number },
+	side: string,
+	length: number,
+	travel: number,
+	gap: number,
+	caption: { w: number, h: number },
+	margin: number?,
+}
+
+local SIDES = { "left", "right", "above", "below" }
+
+function TutorialSteps.placeArrow(input: ArrowInput): ArrowPlace
+	local t, screen, caption = input.target, input.screen, input.caption
+	local m = input.margin or 8
+	local reach = input.gap * 2 + input.length + input.travel -- the gap, the arrow and its bounce, a gap
+	local function room(side: string): number
+		if side == "left" then
+			return t.x - m
+		elseif side == "right" then
+			return screen.w - (t.x + t.w) - m
+		elseif side == "above" then
+			return t.y - m
+		end
+		return screen.h - (t.y + t.h) - m
+	end
+	local function spare(side: string): number
+		local need = reach + (if side == "left" or side == "right" then caption.w else caption.h)
+		return room(side) - need
+	end
+	local side = if table.find(SIDES, input.side) then input.side else "below"
+	if spare(side) < 0 then
+		local best = -math.huge
+		for _, candidate in SIDES do
+			local value = spare(candidate)
+			if value > best then
+				best, side = value, candidate
+			end
+		end
+	end
+	local cx, cy = t.x + t.w / 2, t.y + t.h / 2
+	local half = input.length / 2
+	local beyond = input.length + input.travel + input.gap -- from the tip to the caption's near edge
+	local out: ArrowPlace
+	if side == "left" then
+		local tip = t.x - input.gap
+		out = { side = side, rotation = -90, arrowX = tip - half, arrowY = cy, dirX = 1, dirY = 0, captionX = tip - beyond - caption.w, captionY = cy - caption.h / 2 }
+	elseif side == "right" then
+		local tip = t.x + t.w + input.gap
+		out = { side = side, rotation = 90, arrowX = tip + half, arrowY = cy, dirX = -1, dirY = 0, captionX = tip + beyond, captionY = cy - caption.h / 2 }
+	elseif side == "above" then
+		local tip = t.y - input.gap
+		out = { side = side, rotation = 0, arrowX = cx, arrowY = tip - half, dirX = 0, dirY = 1, captionX = cx - caption.w / 2, captionY = tip - beyond - caption.h }
+	else
+		local tip = t.y + t.h + input.gap
+		out = { side = side, rotation = 180, arrowX = cx, arrowY = tip + half, dirX = 0, dirY = -1, captionX = cx - caption.w / 2, captionY = tip + beyond }
+	end
+	out.captionX = math.clamp(out.captionX, m, math.max(m, screen.w - m - caption.w))
+	out.captionY = math.clamp(out.captionY, m, math.max(m, screen.h - m - caption.h))
+	return out
+end
 
 local function speaker(radio: boolean): string
 	local tuning = Config.Tutorial
@@ -153,70 +289,67 @@ function TutorialSteps.hint(step: string, job: { [string]: any }?): string
 	if step == "welcome" then
 		return `Talk to {name} by the job board (E)`
 	elseif step == "board" then
-		return "Take an ON FOOT job from the board (J)"
+		return "Take your first job (J)" -- 6.7: any job (the board or the phone's JOBS), she gives none
 	elseif step == "retry" then
-		return `Talk to {name} at the depot (E) for another job`
+		return "Take another job (J)" -- 6.7: (no longer sent: a failed run goes back to "board")
 	end
-	return ""
+	return "" -- (6.7: "tour": the arrows say it; the goal card says "Take your first job")
 end
 
--- Marge's dialog for a phase the server sent (data: reward for done, text for say), nil for a phase without one.
+-- Marge's dialog for a phase the server sent (data: reward, text, board for say), nil for a phase without one.
+-- 6.7: only two of hers come on their own: the welcome (after PLAY) and "ready" (the arrow tour's end, the client's);
+-- "skip" asks before the strip's SKIP; "say" answers when you talk to her (E). Nothing during play: board, job,
+-- retry and done have none (the first delivery's reward is a toast).
 function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 	local info: { [string]: any } = data or {}
 	local name = Config.Tutorial.NpcName
+	local reward = if type(info.reward) == "number" then math.floor(info.reward) else Config.Tutorial.Reward
 	if phase == "welcome" then
-		-- 6.5: one short page (LET'S GO: her phone and the first easy job, on foot)
+		-- 6.7: one page: SHOW ME (her phone and the arrow tour) or SKIP TUTORIAL; no job of hers
 		return {
 			speaker = speaker(false),
-			pages = { `I'm {name}, dispatch. You're a courier now. Take a job, deliver it, get paid. Follow NEXT at the top left.` },
-			primary = "LET'S GO",
+			pages = { `Hi, I'm {name}, dispatch. You're a courier now: take jobs, deliver, get paid. Let me show you around in 20 seconds.` },
+			primary = "SHOW ME",
 			secondary = "SKIP TUTORIAL",
 		}
-	elseif phase == "job" then
-		return nil -- 6.5: no pages during the run (the goal card and the world marker show each step)
-	elseif phase == "board" then
+	elseif phase == "ready" then
+		-- 6.7 (client only): the arrow tour's end. TAKE A JOB opens the phone's JOBS: you pick any job.
 		return {
 			speaker = speaker(false),
-			pages = { "Nothing easy on my list right now. Open the job board (J) and take an ON FOOT job: I'll talk you through it." },
-			primary = "OPEN THE BOARD",
-			secondary = "LATER",
-		}
-	elseif phase == "retry" then
-		return {
-			speaker = speaker(true),
-			pages = { "That one didn't work out. Happens on day one. Want another?" }, -- 6.5: one page
-			primary = "ANOTHER JOB",
-			secondary = "LATER",
-		}
-	elseif phase == "done" then
-		-- 6.5: one page: the reward and where to go next; SHOW ME AROUND (5.7: the tour, TutorialSteps.tourDialog) or CLOSE
-		local reward = if type(info.reward) == "number" then math.floor(info.reward) else Config.Tutorial.Reward
-		return {
-			speaker = speaker(true),
-			pages = { `Delivered! +${reward}. Next: press J for a job. Bigger bags: ZDC Bags, by the spawn. Shops are in your phone (Q → SHOP).` }, -- (6.6)
-			primary = "SHOW ME AROUND",
-			secondary = "CLOSE",
+			pages = { `Ready? Take your first job, any one you like: your first delivery earns +${reward} from me.` },
+			primary = "TAKE A JOB",
+			secondary = "SKIP TUTORIAL",
 		}
 	elseif phase == "skip" then
-		-- (client only: the hint line's SKIP asks first, a skipped tutorial does not come back)
+		-- (client only: the strip's SKIP asks first, a skipped tutorial does not come back)
 		return {
 			speaker = speaker(false),
-			pages = { "Skip the tutorial? I won't walk you through your first job, and there's no first-day bonus." },
+			pages = { "Skip the tutorial? There's no first-delivery bonus then." },
 			primary = "SKIP TUTORIAL",
 			secondary = "KEEP IT",
 		}
 	elseif phase == "say" then
+		if info.board == true then
+			-- 6.7: you talked to her while she waits for your first job
+			return {
+				speaker = speaker(false),
+				pages = { `Take any job you like: the board (J) or JOBS in your phone. Your first delivery earns +${reward} from me.` },
+				primary = "OPEN THE BOARD",
+				secondary = "LATER",
+			}
+		end
 		return {
 			speaker = speaker(false),
 			pages = { text(info.text, TutorialSteps.Bubble.done) },
 			primary = "OK",
 		}
 	end
-	return nil
+	return nil -- (6.5: job; 6.7: tour, board, retry, done: no pages during play)
 end
 
 -- 5.7, the tour after the first delivery (TutorialSteps.Tour): one short page a stop, the place on your GPS
 -- (client/TutorialUi.luau). info.dock: the dock's name, info.stop: the bus stop's. Nil for an unknown step.
+-- 6.7: SHOW ME AROUND in the phone's SETTINGS runs it (the first day has the arrow tour of the screen instead).
 function TutorialSteps.tourDialog(step: string, info: { [string]: any }?): Dialog?
 	local data: { [string]: any } = info or {}
 	local last = step == TutorialSteps.Tour[#TutorialSteps.Tour]
