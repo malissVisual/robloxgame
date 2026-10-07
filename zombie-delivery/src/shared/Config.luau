@@ -56,6 +56,8 @@ Config.Arms = {
 	Starter = "pistol",
 	Tip = "Got {price} on you? Lead & Co. sells a pistol for that. Fists are fine for one biter, not for a crowd. It's on your GPS.",
 	MaxArmour = 0.8,
+	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck)
+	BagTip = "Grab a plastic bag at Last Stop Supplies for {price}: two more parcels on you, and you can throw them at the doors (hold X). It's on your GPS.",
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
