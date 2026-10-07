@@ -15,20 +15,30 @@
 -- trolley (three local parts: the wheel box on the cable, the strap, the handle) over the hands. Both go when the ride
 -- ends or the rider is far away.
 --
--- A climb (Climb / Climb down at the ladders and the platforms): the server sends the Zip remote's ("fade", seconds),
--- the screen goes black for a moment while it moves you.
+-- 5.7: the hands reach up to the trolley as a ride starts (Config.Interact.ZipReach), the hanging pose laid on over it.
+--
+-- 5.7, a climb (Climb / Climb down at the ladders and the platforms) is a real one: the server marks the character
+-- (ClimbLine, ClimbWhich, ClimbUp, ClimbAt: server/ZipLines.luau) and your own client carries your body along
+-- shared/InteractPose.luau's climbRoute from where you stand: onto the ladder, up it hand over hand at
+-- Config.Interact.ClimbSpeed, over the roof's edge, across the roof and over the platform's rail (down: all of it
+-- backwards, and a step off the ladder onto the sidewalk). Your controls are off meanwhile (client/Interact.luau) and
+-- the camera follows as it does on foot. Everybody's climbers near the camera are posed (the hands over hand, the knee
+-- over the edge, a stride on the roof) from the same attributes. The server puts a climber who is not at the end in
+-- time there.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
+local InteractPose = require(Shared:WaitForChild("InteractPose"))
 local Joints = require(Shared:WaitForChild("Joints"))
 local Net = require(Shared:WaitForChild("Net"))
 local ZipData = require(Shared:WaitForChild("ZipLines"))
+local Drive = require(script.Parent.Drive)
+local Interact = require(script.Parent.Interact)
 
 local ZipRide = {}
 
@@ -38,6 +48,8 @@ ZipRide.notify = function(_text: string) end
 local player = Players.LocalPlayer
 local Tuning = Config.ZipLines
 local EASE_IN = 0.45 -- seconds to ease from where you stood onto the cable
+local OWNER = "climb" -- (client/Interact.luau)
+local LEAD = 0.15 -- the server's ZipAt is this long after the Zip (server/ZipLines.luau): the hands go up meanwhile
 local POSE_RANGE = 320 -- riders farther from the camera than this are left alone
 local TROLLEY = Color3.fromRGB(40, 42, 46)
 local HANDLE = Color3.fromRGB(196, 52, 46)
@@ -108,7 +120,7 @@ local function makeTrolley(): Model
 	return model
 end
 
-local function pose(character: Model, line: ZipData.Line)
+local function pose(character: Model, line: ZipData.Line, reach: number)
 	local state = posed[character]
 	if not state then
 		local joints = {}
@@ -124,7 +136,8 @@ local function pose(character: Model, line: ZipData.Line)
 	local current = state :: Posed
 	for _, entry in current.joints do
 		if entry.joint.Parent then
-			entry.joint.Transform = entry.rotation
+			-- (5.7: the hands reach up to the trolley as the ride starts)
+			entry.joint.Transform = if reach >= 1 then entry.rotation else CFrame.identity:Lerp(entry.rotation, reach)
 		end
 	end
 	-- The trolley over the hands: on the cable over the root, along the line.
@@ -273,47 +286,163 @@ local function letGo()
 	end
 end
 
--- ── The climb's fade ───────────────────────────────────────────────────────
+-- ── 5.7: the climbs ─────────────────────────────────────────────────────────
 
-local fadeFrame: Frame? = nil
+type Climbing = {
+	at: number, -- the ClimbAt it plays
+	route: InteractPose.Route,
+	character: Model,
+	humanoid: Humanoid?,
+	root: BasePart?,
+}
 
-local function fade(seconds: number)
-	local gui = player:FindFirstChildOfClass("PlayerGui")
-	if not gui then
+local climbing: Climbing? = nil -- your own
+local climbed: number? = nil -- the ClimbAt of the climb ended here last (the server clears it a moment later)
+local others: { [Model]: Climbing } = {} -- everybody else's near the camera (for the pose)
+
+local function climbOf(character: Model): (ZipData.Line?, number, boolean, number?)
+	local id, which, up, at = character:GetAttribute("ClimbLine"), character:GetAttribute("ClimbWhich"), character:GetAttribute("ClimbUp"), character:GetAttribute("ClimbAt")
+	if type(id) ~= "number" or type(at) ~= "number" then
+		return nil, 1, true, nil
+	end
+	return ZipData.line(id), if which == 2 then 2 else 1, up ~= false, at
+end
+
+-- The zip line's own model (the camera leaves the walk alone while you climb: Drive.setBoarding).
+local function lineModel(line: ZipData.Line): Model?
+	local world = workspace:FindFirstChild("World")
+	local folder = world and world:FindFirstChild("ZipLines")
+	local model = folder and folder:FindFirstChild(line.name)
+	return if model and model:IsA("Model") then model else nil
+end
+
+-- A climb's pose t seconds in: the segment's, the stride fading in and out at the route's ends.
+local function climbPose(route: InteractPose.Route, t: number): InteractPose.Pose
+	local _, _, _, _, _, kind, u, dist = InteractPose.sample(route, t)
+	if kind == "walk" then
+		local amount = math.clamp(t / 0.2, 0, 1) * math.clamp((route.total - t) / 0.25, 0, 1)
+		return InteractPose.walk(dist, amount)
+	end
+	return InteractPose.forKind(kind, u, dist)
+end
+
+local function endClimb(c: Climbing)
+	climbing = nil
+	climbed = c.at
+	Interact.release(c.character, OWNER)
+	Interact.freeze(nil, false)
+	Drive.setBoarding(nil, false)
+	local root = c.root
+	if root and root.Parent then
+		root.AssemblyLinearVelocity = Vector3.zero
+	end
+end
+
+-- Your own climb this frame: started when the server marks you, carried along its route, over at its end (or when
+-- the server ended it: a death, a reset).
+local function climbStep(dt: number)
+	local character = player.Character
+	local line, which, up, at = nil, 1, true, nil
+	if character then
+		line, which, up, at = climbOf(character)
+	end
+	local c = climbing
+	if c and (c.character ~= character or at ~= c.at) then
+		endClimb(c)
+		c = nil
+	end
+	if not c and character and line and at and at ~= climbed and not mine then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local root = humanoid and humanoid.RootPart
+		if not humanoid or not root or humanoid.Health <= 0 or humanoid.SeatPart then
+			return
+		end
+		local p = root.Position
+		local made: Climbing = {
+			at = at,
+			route = InteractPose.climbRoute(line, which, up, p.X, p.Y, p.Z, Interact.standHeight(humanoid, root)),
+			character = character,
+			humanoid = humanoid,
+			root = root,
+		}
+		climbing = made
+		c = made
+		Interact.freeze(humanoid, true)
+		local model = lineModel(line)
+		if model then
+			Drive.setBoarding(model, false) -- (no aiming, the walk left alone; the view stays the walk's)
+		end
+	end
+	if not c then
 		return
 	end
-	local frame = fadeFrame
-	if not frame or not frame.Parent then
-		local screen = Instance.new("ScreenGui")
-		screen.Name = "ZipFade"
-		screen.IgnoreGuiInset = true
-		screen.ResetOnSpawn = false
-		screen.DisplayOrder = 50
-		screen.Parent = gui
-		local made = Instance.new("Frame")
-		made.Size = UDim2.fromScale(1, 1)
-		made.BackgroundColor3 = Color3.new(0, 0, 0)
-		made.BackgroundTransparency = 1
-		made.BorderSizePixel = 0
-		made.Parent = screen
-		fadeFrame = made
-		frame = made
+	local humanoid, root = c.humanoid, c.root
+	if not humanoid or not root or not root.Parent or humanoid.Health <= 0 then
+		endClimb(c)
+		return
 	end
-	local black = frame :: Frame
-	TweenService:Create(black, TweenInfo.new(math.min(seconds, 0.2)), { BackgroundTransparency = 0 }):Play()
-	task.delay(seconds + 0.25, function()
-		TweenService:Create(black, TweenInfo.new(0.35), { BackgroundTransparency = 1 }):Play()
-	end)
+	local t = workspace:GetServerTimeNow() - c.at
+	local x, y, z, fx, fz = InteractPose.sample(c.route, t)
+	Interact.place(root, Interact.frame(x, y, z, fx, fz), dt)
+	Interact.pose(c.character, climbPose(c.route, t), dt, OWNER)
+	if t >= c.route.total then
+		endClimb(c)
+	end
+end
+
+-- Everybody else's climbs near the camera: the pose from their attributes (their own clients move them).
+local function othersStep(dt: number, eye: Vector3)
+	local now = workspace:GetServerTimeNow()
+	local seen: { [Model]: boolean } = {}
+	for _, other in Players:GetPlayers() do
+		local character = other.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if other == player or not character or not root or not root:IsA("BasePart") or (root.Position - eye).Magnitude > POSE_RANGE then
+			continue
+		end
+		local line, which, up, at = climbOf(character)
+		if not line or not at then
+			continue
+		end
+		local c = others[character]
+		if not c or c.at ~= at then
+			-- (from the route's first point: only the limbs are played here)
+			local ladder = if which == 1 then line.ladderA else line.ladderB
+			local x, y, z = ladder.x + ladder.nx * 3, ladder.base + 3, ladder.z + ladder.nz * 3
+			if not up then
+				x, y, z = InteractPose.climbEnd(line, which, true, 3)
+			end
+			local made: Climbing = { at = at, route = InteractPose.climbRoute(line, which, up, x, y, z, 3), character = character, humanoid = nil, root = nil }
+			others[character] = made
+			c = made
+		end
+		local current = c :: Climbing
+		local t = now - at
+		seen[character] = true
+		if t >= 0 and t <= current.route.total then
+			Interact.pose(character, climbPose(current.route, t), dt, OWNER)
+		else
+			Interact.release(character, OWNER) -- (over: the server clears the attributes a moment later)
+		end
+	end
+	for character in others do
+		if not seen[character] then
+			others[character] = nil
+			Interact.release(character, OWNER)
+		end
+	end
 end
 
 -- ── Start ──────────────────────────────────────────────────────────────────
 
 function ZipRide.start()
-	RunService.PreSimulation:Connect(function()
+	RunService.PreSimulation:Connect(function(dt: number)
 		steer()
+		climbStep(dt)
 		-- Everybody's riders near the camera: the pose and the trolley.
 		local camera = workspace.CurrentCamera
 		local eye = if camera then camera.CFrame.Position else Vector3.zero
+		othersStep(dt, eye)
 		local seen: { [Model]: boolean } = {}
 		local now = workspace:GetServerTimeNow()
 		for _, other in Players:GetPlayers() do
@@ -323,9 +452,9 @@ function ZipRide.start()
 				local line, at = lineOf(character)
 				-- (over the end, or let go here: standing again, though the server clears the ride a moment later)
 				local over = at == nil or (line ~= nil and now - at > line.duration + 0.1) or (other == player and at == finished)
-				if line and not over then
+				if line and at and not over then
 					seen[character] = true
-					pose(character, line)
+					pose(character, line, InteractPose.reachUp(now - at + LEAD))
 				end
 			end
 		end
@@ -336,11 +465,6 @@ function ZipRide.start()
 		end
 	end)
 	UserInputService.JumpRequest:Connect(letGo)
-	Net.get("Zip").OnClientEvent:Connect(function(action: any, seconds: any)
-		if action == "fade" then
-			fade(if type(seconds) == "number" then math.clamp(seconds, 0, 2) else Tuning.Fade)
-		end
-	end)
 end
 
 return ZipRide

@@ -77,6 +77,8 @@
 -- the door). Out (E in a seat: the CarDoor remote; Space; an eject) the client slides out at its door in
 -- AlightSeconds (the attribute AlightAt for the others' arm); somebody still over the car after that is put out at
 -- the door. The doors swing from their DoorOpenAt / DoorCloseAt attributes (server times).
+-- 5.7: onto a bike's saddle (or a scooter's deck) the move is Config.Interact.BikeMount long (a step to its side and
+-- the leg over: client/CarBoarding.luau); Vehicles.mount starts it for a ZDC RIDE rental, after its slide off the dock.
 --
 -- 4.0, Freight (the vehicles):
 -- * The Rusty Van looks the part (STYLES.van): big corroded rust patches, a primer-grey driver's door (Style.primerDoor),
@@ -3180,14 +3182,21 @@ local function finishBoarding(player: Player, b: Boarder)
 	end)
 end
 
--- The E at a door, checked: the seat is reserved and the move starts (the player's client plays it).
-local function startBoarding(player: Player, car: Car, seat: Seat | VehicleSeat, index: number, humanoid: Humanoid)
+-- 5.7: how long the move into a seat takes: a bike's saddle (or a scooter's deck) its own (Config.Interact: a step to
+-- the side and the leg over, client/CarBoarding.luau), a car's door Config.Cargo's.
+local function boardSeconds(car: Car): number
+	return if car.model:GetAttribute("Bike") == true then Config.Interact.BikeMount else Config.Cargo.BoardSeconds
+end
+
+-- The E at a door, checked: the seat is reserved and the move starts (the player's client plays it). 5.7: `lead`
+-- seconds later (a rented scooter slides off its dock first: Vehicles.mount); the client walks to the side meanwhile.
+local function startBoarding(player: Player, car: Car, seat: Seat | VehicleSeat, index: number, humanoid: Humanoid, lead: number?)
 	local character = humanoid.Parent
 	if not character or not character:IsA("Model") then
 		return
 	end
 	local cfg = Config.Cargo
-	local now = workspace:GetServerTimeNow()
+	local now = workspace:GetServerTimeNow() + math.max(0, lead or 0)
 	local door = car.doors[index]
 	local panel = door ~= nil and door.panel ~= nil
 	local seatNo = 0
@@ -3224,7 +3233,7 @@ local function stepBoarding()
 			and Vehicles.speed(car) <= cfg.BoardMaxSpeed and (b.seat == car.seat or not car.repairing)
 		if not fine or not root then
 			cancelBoarding(player, b)
-		elseif now >= b.at + cfg.BoardSeconds then
+		elseif now >= b.at + boardSeconds(car) then
 			if (root.Position - b.seat.Position).Magnitude <= cfg.BoardRange then
 				finishBoarding(player, b)
 			else
@@ -3395,6 +3404,33 @@ local function onCarDoor(player: Player, action: any)
 	if humanoid then
 		humanoid.Sit = false
 	end
+end
+
+-- 5.7: onto your own bike or scooter through the move (a step to its side, the leg over), not at once: a ZDC RIDE
+-- rental (server/Rental.luau). slide: the vehicle first slides this far off its dock (it is moved there now; every
+-- client slides a copy over Config.Interact.DockUnclip from where it stood, the model's attributes UnclipAt and
+-- UnclipFrom: client/RentalUi.luau) and the move waits for it. Without a saddle's door it seats you at once.
+function Vehicles.mount(player: Player, car: Car, slide: Vector3?)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart or boarders[player] or car.wrecked or not car.model.Parent then
+		return
+	end
+	local lead = 0
+	if slide and slide.Magnitude > 0 then
+		local from = car.model:GetPivot()
+		car.model:PivotTo(from + slide)
+		car.model:SetAttribute("UnclipFrom", from)
+		car.model:SetAttribute("UnclipAt", workspace:GetServerTimeNow())
+		lead = Config.Interact.DockUnclip
+	end
+	for index, door in car.doors do
+		if door.driver and seatFree(car.seat) then
+			startBoarding(player, car, car.seat, index, humanoid, lead)
+			return
+		end
+	end
+	car.seat:Sit(humanoid)
 end
 
 function Vehicles.get(player: Player): Car?

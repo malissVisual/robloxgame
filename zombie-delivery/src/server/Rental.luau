@@ -16,7 +16,7 @@
 -- (you are told: BRING MY CAR / MY BIKE brings it back). The rental is a Vehicles.spawnAt(…, rental = true) E-Scooter
 -- where the docked one stood (that one leaves the dock): your vehicle while it lasts (it rides like the owned E-Scooter:
 -- one rack slot and your pack, server/Transport.luau; foot and bike jobs go on as on foot), never saved, never in
--- your cars, no paint, no gear, no fuel, no garage; you are seated at once. The player attribute Rental = the dock's id
+-- your cars, no paint, no gear, no fuel, no garage; you mount it (5.7: Vehicles.mount, the slide off the dock). The player attribute Rental = the dock's id
 -- while you have one (the phone, the prompts).
 --
 -- Returning: Return at any dock ends it at once; off the scooter and more than WalkAway studs from it, or off it for
@@ -388,7 +388,7 @@ local function rent(player: Player, state: DockState)
 	player:SetAttribute("Rental", state.dock.id)
 	task.defer(function()
 		if not car.wrecked and car.model.Parent and humanoid.Health > 0 and humanoid.SeatPart == nil then
-			car.seat:Sit(humanoid)
+			Vehicles.mount(player, car, Vector3.new(state.dock.nx, 0, state.dock.nz) * Config.Interact.DockSlide) -- 5.7: it slides off the dock, then you get on
 		end
 	end)
 	tell(player, "ZDC RIDE: it's yours for the ride. Leave it anywhere, or Return it at any dock.")

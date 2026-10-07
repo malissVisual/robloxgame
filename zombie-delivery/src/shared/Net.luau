@@ -59,7 +59,7 @@ local NAMES = {
 	"PinOrder", -- 5.2: client → server: (order id or nil) the GPS follows that order of your run (the phone's ORDERS app, server/Jobs.luau)
 	"Fuel", -- 5.4: client → server: ("tow") the phone's TOW: your empty car to the nearest gas station's pump (server/Fuel.luau)
 	"Bus", -- 5.5: client → server: ("stop") on a city bus: the bell (off at the next stop), or off now while it stands at a stop (server/Buses.luau, client/BusRide.luau)
-	"Zip", -- 5.6: client → server: ("letgo") Space on a zip line, low over a platform's roof (server/ZipLines.luau checks it); server → client: ("fade", seconds) a climb's short fade (client/ZipRide.luau)
+	"Zip", -- 5.6: client → server: ("letgo") Space on a zip line, low over a platform's roof (server/ZipLines.luau checks it); 5.7: the ladder climbs are walked on the client (client/Interact.luau), the server sets their end
 }
 
 local folder: Folder
