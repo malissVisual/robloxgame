@@ -22,6 +22,7 @@
 --   BagSwing.tilt(state)                            the current tilt's size (radians)
 --   BagSwing.tuning(base, over)                     6.4: a bag's own tuning: `base` (Config.Courier.Bag) with the
 --                                                   numbers of `over` (Config.Courier.Bags[id]) on top; a new table
+--   BagSwing.bob(distance, speed, amount, step, full)  6.4: a worn bag's bounce with the steps (studs up)
 
 local BagSwing = {}
 
@@ -89,6 +90,16 @@ function BagSwing.tuning(base: Tuning, over: { [string]: number }?): Tuning
 		end
 	end
 	return out :: Tuning
+end
+
+-- 6.4: a worn bag's lift (studs) with the steps: `distance` walked so far, `speed` now; `amount` at `full` speed and
+-- above (nothing standing), a bump every `step` studs (|sin|: it lifts on each foot's push).
+function BagSwing.bob(distance: number, speed: number, amount: number, step: number, full: number): number
+	if step <= 0 or amount == 0 or not finite(distance) or not finite(speed) then
+		return 0
+	end
+	local fast = math.clamp(speed / math.max(full, 1), 0, 1)
+	return amount * fast * math.abs(math.sin(math.pi * distance / step))
 end
 
 function BagSwing.tilt(state: State): number

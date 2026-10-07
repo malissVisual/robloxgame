@@ -180,6 +180,26 @@ function Geometry.pieces(id: string): { Piece }
 	else error("Unknown kit id: " .. id) end
 	return out
 end
+-- 6.4: the strap of a worn bag on the UpperTorso (Config.Courier.BagPlaces; server/KitWear.luau fits it to the body):
+-- the messenger's cross-body strap (the right shoulder to the left hip, front and back) on the hip or behind it, a
+-- slung tote's or duffel's strap across the chest (the left shoulder to the right hip), the tote's handles over the
+-- left shoulder. None for a bag in the hand.
+function Geometry.straps(id: string, place: string): { Piece }
+	local out: { Piece } = {}
+	local finish = if id == "tote" then "parcel" else "sole"
+	if id == "padded" and (place == "hip" or place == "hipBack") then
+		add(out, "CrossStrapFront", { .14, 2.2, .04 }, { -.05, 0, -.53 }, "UpperTorso", finish, nil, { 0, 0, -45 })
+		add(out, "CrossStrapBack", { .14, 2.2, .04 }, { -.05, 0, .53 }, "UpperTorso", finish, nil, { 0, 0, -45 })
+		add(out, "CrossStrapPad", { .5, .08, .22 }, { .62, .8, 0 }, "UpperTorso", finish)
+	elseif place == "back" and (id == "tote" or id == "duffel") then
+		add(out, "SlingStrapFront", { .12, 2.2, .04 }, { .05, 0, -.53 }, "UpperTorso", finish, nil, { 0, 0, 45 })
+		add(out, "SlingStrapBack", { .12, 2.2, .04 }, { .05, 0, .53 }, "UpperTorso", finish, nil, { 0, 0, 45 })
+		add(out, "SlingStrapTop", { .5, .06, .2 }, { -.62, .8, 0 }, "UpperTorso", finish)
+	elseif place == "shoulder" and id == "tote" then
+		add(out, "ToteOnShoulder", { .44, .06, .26 }, { -.7, .82, .22 }, "UpperTorso", finish)
+	end
+	return out
+end
 function Geometry.spec(id: string): any
 	local cart = id == "cart"
 	local origins = if cart then { Frame = { 0, 0, 0 }, LeftWheel = { -.9, .59, .2 }, RightWheel = { .9, .59, .2 } }

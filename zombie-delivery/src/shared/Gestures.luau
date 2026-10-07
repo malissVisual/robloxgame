@@ -10,6 +10,8 @@
 --   bag    6.0: the right hand drops a piece into the plastic bag in the left (a pick-up into the bag)
 --   throw  6.0: the right arm winds back over the shoulder and whips forward (a throw at a door)
 --   vest   6.0: both arms over the head, then down, tugging a new vest straight
+--   sling / unsling  6.4: the right hand reaches over the left shoulder for the bag's strap and swings the bag onto
+--          the back (sling) or back to the front (unsling) (server/KitWear.luau; client/BagSway.luau moves the bag)
 -- Angles are in degrees per joint (rs, re, rw: the right shoulder, elbow, wrist; ls, le, lw: the left), as
 -- { x, y, z }: ArmPose turns them into CFrame.Angles(0, y, 0) * CFrame.Angles(x, 0, z). For an R15 arm hanging
 -- down, +x lifts it forward, +y turns it in (the right arm; the left mirrored), +z lifts the right arm out sideways.
@@ -110,6 +112,21 @@ function Gestures.pose(kind: string, t: number): Pose?
 			rw = { mix(0, 20, -30), 0, 0 },
 			ls = { 50, -10, 0 },
 			le = { 20, 0, 0 },
+		}
+	elseif kind == "sling" or kind == "unsling" then
+		-- 6.4: a bag swung onto the back (sling) or back to the front (unsling): the right hand reaches across to the
+		-- left shoulder and grips the strap, then pulls it back over the shoulder (sling) or down to the front
+		-- (unsling); the left arm lifts a little out of the way.
+		local u = math.clamp(t / (J.Gestures[kind] or 0.55), 0, 1)
+		local reach = smooth(u / 0.4)
+		local pull = smooth((u - 0.4) / 0.6)
+		local back = if kind == "sling" then 1 else -0.6
+		return {
+			rs = { 30 + 95 * reach + 25 * pull * back, 10 + 40 * reach, 0 },
+			re = { 20 + 85 * reach - 30 * pull, 0, 0 },
+			rw = { -10, 0, 0 },
+			ls = { 10 + 12 * reach, 0, -12 * reach },
+			le = { 15, 0, 0 },
 		}
 	elseif kind == "vest" then
 		-- 6.0: a vest put on: both arms up over the head, then down, tugging it straight at the chest.

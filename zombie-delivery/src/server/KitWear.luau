@@ -20,6 +20,12 @@
 --           owned): the plastic bag, the tote, the thermal, the padded messenger or the duffel, each its own KitArt id;
 --           the pivot's Bag attribute names it (client/BagSway.luau swings each one its own way), and switching the
 --           bag builds the new one (the slot's key is the bag's id). KitWear.bagDrop(id): how far it hangs.
+--           6.4, the ways of wearing it (Config.Kit carry / stays, Holding.wornAs, Config.Courier.BagPlaces): the
+--           plastic and the thermal bag in the left hand, the tote over the left shoulder, the messenger cross-body on
+--           the left hip, the duffel in the hand; out of the hand the tote and the duffel are slung on the back and
+--           the messenger slid behind the hip (a strap across the torso: slot "strap", KitArt.straps), the hand bags
+--           go as in 6.1. The slot key is "id@place"; the character's BagWorn attribute says where it is, BagSwitchAt
+--           (the server time) when it moved between the front and the back, with the "sling" / "unsling" gesture.
 --   vest    6.0: the best vest owned (stream 2's armour: Config.Kit "heavy", else "kevlar") over the courier's jacket. A
 --           vest that changes while you play (bought, a better one) is put on with the "vest" gesture (arms over the
 --           head, then down: shared/Gestures.luau, played by client/ArmPose.luau for everybody). 6.0.1: else the
@@ -45,6 +51,7 @@ local Config = require(Shared.Config)
 local KitFit = require(Shared.KitFit)
 local Net = require(Shared.Net)
 local TransportRules = require(Shared.Transport) -- 6.4: the active bag
+local Holding = require(Shared.Holding) -- 6.4: where the bag is worn
 local PlayerData = require(script.Parent.PlayerData)
 local Builder = require(script.Parent.ModelArt.Builder)
 local Npcs = require(script.Parent.Npcs) -- 6.0: the vest's put-on gesture
@@ -57,7 +64,7 @@ local KitWear = {}
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
 local BIGPACK_LOAD_Y = 1.3 -- the parcel on the Big Backpack's lid (the art puts it on the Courier Backpack's top)
 local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit.outfit's vest when no armour is owned)
-local NAMES: { [string]: string } = { pack = "KitPack", load = "KitParcel", shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest" }
+local NAMES: { [string]: string } = { pack = "KitPack", load = "KitParcel", shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" }
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
 -- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays). 6.1: not for
@@ -75,6 +82,11 @@ local vests: { [Player]: string | false } = {} -- 6.0: the vest worn at the last
 
 -- The art's pieces for a slot (fresh tables: the fit copies them anyway).
 local function piecesFor(slot: string, id: string): { any }
+	if slot == "strap" then
+		-- 6.4: a worn bag's strap on the torso (the key "id@place": KitArt.straps)
+		local bag, place = string.match(id, "^([^@]+)@(%w+)")
+		return if bag and place then KitArt.straps(bag, place) else {}
+	end
 	if slot == "phone" then
 		return PhoneArt.pieces("phone")
 	end
@@ -122,19 +134,31 @@ local function seeThrough(built: Builder.Built)
 end
 
 -- 6.0: the bag's pivot, hung from the left hand by the BagSwing Motor6D (the clients write its Transform), placed
--- before the art is built on it. Nil without a left hand (an R6 avatar).
-local function hangBag(character: Model, id: string): (BasePart?, BasePart?)
-	local hand = character:FindFirstChild("LeftHand")
+-- before the art is built on it. Nil without a left hand (an R6 avatar). 6.4: `place` (Config.Courier.BagPlaces:
+-- "hand", or "shoulder" / "hip" / "back" / "hipBack" on the UpperTorso, scaled to it; `packed`: a backpack is worn,
+-- a slung bag hangs PackPush further back); the pivot's Bag and Worn attributes tell client/BagSway.luau which bag
+-- hangs where.
+local function hangBag(character: Model, id: string, place: string, packed: boolean): (BasePart?, BasePart?)
+	local spot = Config.Courier.BagPlaces[place]
+	local hand = character:FindFirstChild(if spot then spot.part else "LeftHand")
 	if not hand or not hand:IsA("BasePart") then
 		return nil, nil
 	end
 	local pivot = Instance.new("Part")
 	pivot.Name = "KitBagPivot"
 	pivot:SetAttribute("Bag", id) -- 6.4: which bag (client/BagSway.luau's tuning)
+	pivot:SetAttribute("Worn", if place == "hipBack" then "back" else place) -- 6.4: its motion
 	pivot.Size = Vector3.new(0.2, 0.2, 0.2)
 	pivot.Transparency = 1
 	pivot.Massless, pivot.CanCollide, pivot.CanQuery, pivot.CanTouch, pivot.CastShadow = true, false, false, false, false
-	local grip = CFrame.new(0, -hand.Size.Y / 2 - Config.Courier.Bag.Grip, 0)
+	local grip = CFrame.new(-(Config.Courier.HandOut[id] or 0), -hand.Size.Y / 2 - Config.Courier.Bag.Grip, 0)
+	if spot then
+		local f = KitFit.factors(spot.part, { hand.Size.X, hand.Size.Y, hand.Size.Z })
+		local back = if packed and (place == "back" or place == "hipBack") then Config.Courier.PackPush else 0
+		local turn = spot.turn
+		grip = CFrame.new(spot.at[1] * f[1], spot.at[2] * f[2], spot.at[3] * f[3] + back)
+			* CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
+	end
 	pivot.CFrame = hand.CFrame * grip
 	local joint = Instance.new("Motor6D")
 	joint.Name = "BagSwing"
@@ -188,17 +212,22 @@ local function build(character: Model, slot: string, id: string): Slot?
 	local sizes: { [string]: Vector3 } = {}
 	local scales: { [string]: KitFit.Scale } = {}
 	if slot == "hand" then
-		-- 6.0: the bag, on its pivot (not fitted: it hangs, the hand's size does not shape it)
-		local hand, pivot = hangBag(character, id)
+		-- 6.0: the bag, on its pivot (not fitted: it hangs, the hand's size does not shape it). 6.4: the key is
+		-- "id@place" (bagKey), "+" at the end while a backpack is worn.
+		local bagId, place, packed = string.match(id, "^([^@]+)@(%w+)(%+?)$")
+		if not bagId or not place then
+			return nil
+		end
+		local hand, pivot = hangBag(character, bagId, place, packed == "+")
 		if not hand or not pivot then
 			return nil
 		end
-		local bag = KitWear.bagArt(character, pivot, id)
+		local bag = KitWear.bagArt(character, pivot, bagId)
 		if not bag then
 			pivot:Destroy()
 			return nil
 		end
-		return { key = id, built = bag, parts = { LeftHand = hand }, sizes = { LeftHand = hand.Size }, pivot = pivot }
+		return { key = id, built = bag, parts = { [hand.Name] = hand }, sizes = { [hand.Name] = hand.Size }, pivot = pivot }
 	end
 	for _, piece in pieces do
 		local bone: string = piece.attach
@@ -248,13 +277,22 @@ local function takeOff(wearer: Wearer)
 	end
 end
 
--- 6.0: is the left hand free for the bag (nothing pushed, not seated)? 6.1: and is the bag what you hold?
-local function bagFree(character: Model, humanoid: Humanoid): boolean
-	if humanoid.Sit or humanoid.SeatPart ~= nil or character:GetAttribute("Hand") ~= "bag" then
-		return false
+-- 6.0: is the left hand free for the bag (nothing pushed, not seated)? 6.1: and is the bag what you hold? 6.4: where
+-- the active bag shows (Holding.wornAs: "hand" | "shoulder" | "hip" | "back", nil: not shown) and its slot key
+-- ("id@place", "+" with a backpack worn: a slung bag hangs behind it).
+local function bagWorn(character: Model, humanoid: Humanoid, bag: Config.KitDef?): string?
+	if not bag then
+		return nil
 	end
 	local pushing = character:GetAttribute("Pushing")
-	return pushing == nil or pushing == false
+	local busy = humanoid.Sit or humanoid.SeatPart ~= nil or (pushing ~= nil and pushing ~= false)
+	local hand = character:GetAttribute("Hand")
+	return Holding.wornAs(if type(hand) == "string" then hand else "fists", bag.carry, bag.stays, busy)
+end
+
+local function bagKey(bag: Config.KitDef, worn: string, packed: boolean): string
+	local place = if worn == "back" and bag.carry == "hip" then "hipBack" else worn
+	return `{bag.id}@{place}{if packed and worn == "back" then "+" else ""}`
 end
 
 local function holdsPhone(player: Player, character: Model, humanoid: Humanoid): boolean
@@ -284,14 +322,38 @@ local function refresh(player: Player)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local profile = PlayerData.get(player)
 	local wanted: { [string]: string } = {}
+	local worn: string? = nil
 	if humanoid and humanoid.Health > 0 and profile and player.Character == character and character.Parent then
 		local bag = TransportRules.activeBag(profile.kit, profile.activeBag) -- 6.4: the bag in your hand
 		wanted = KitFit.outfit(profile.kit, (tonumber(player:GetAttribute("PackCount")) or 0) > 0, if bag then bag.id else "")
 		if holdsPhone(player, character, humanoid) then
 			wanted.phone = "phone"
 		end
-		if wanted.hand and not bagFree(character, humanoid) then
+		-- 6.4: the bag where it is carried now (the hand, the shoulder, the hip, the back) and its strap
+		worn = if wanted.hand then bagWorn(character, humanoid, bag) else nil
+		if bag and worn then
+			local key = bagKey(bag, worn, wanted.pack ~= nil)
+			wanted.hand = key
+			if #KitArt.straps(bag.id, string.match(key, "@(%w+)") or worn) > 0 then
+				wanted.strap = key
+			end
+		else
 			(wanted :: any).hand = nil
+		end
+	end
+	-- 6.4: the BagWorn attribute (every client: client/BagSway.luau's motion) and, when the bag moves between the
+	-- front and the back while you stand, BagSwitchAt (the server time: the bag's move) and the sling / unsling gesture
+	local wornBefore = character:GetAttribute("BagWorn")
+	if wornBefore ~= worn and character.Parent then
+		character:SetAttribute("BagWorn", worn)
+		local seated = humanoid ~= nil and (humanoid.Sit or humanoid.SeatPart ~= nil)
+		if type(wornBefore) == "string" and worn ~= nil and not seated then
+			character:SetAttribute("BagSwitchAt", workspace:GetServerTimeNow())
+			if worn == "back" then
+				Npcs.act(character, "sling")
+			elseif wornBefore == "back" then
+				Npcs.act(character, "unsling")
+			end
 		end
 	end
 	for slot, current in wearer.slots do

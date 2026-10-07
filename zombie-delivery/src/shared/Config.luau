@@ -995,7 +995,15 @@ export type GearDef = {
 --   bagBreath  the sprint drains the breath × this while you hold it (the character's BreathCost attribute,
 --              server/Transport.luau applyKit; client/Stamina.luau): a heavy bag, you still sprint, a little shorter
 -- Its look in the hand: server/KitArt/Geometry.luau (the same id); its swing: Config.Courier.Bags[id].
-export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number?, extra: number?, bagWarm: number?, padded: boolean?, bagBreath: number? }
+-- 6.4, how it is carried (shared/Holding.luau wornAs / bagLeaves, server/KitWear.luau, Config.Courier.BagPlaces):
+--   carry      while it is your hand: "hand" (in the left hand; the default), "shoulder" (the handles over the left
+--              shoulder, the bag at the hip) or "hip" (cross-body: the strap over the right shoulder, the bag on the
+--              left hip)
+--   stays      when you take the fists or the gun it stays on you, swung onto your back (a strap; the messenger slid
+--              behind the hip), loaded or not: its pieces stay with you, the hands are free. Without it, a hand bag
+--              as in 6.1: stowed when empty, set down on the ground when loaded. Pickups go into a bag (and you throw
+--              from it) only while it is your hand: press 2 to swing it to the front again.
+export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number?, extra: number?, bagWarm: number?, padded: boolean?, bagBreath: number?, carry: string?, stays: boolean? }
 Config.Kit = {
 	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "Sprint with your deliveries: 2 light pieces of any kind (a bouquet, a cake too) ride in it while you hold it (2); what you pick up drops straight in. Works with a backpack." },
 	-- 6.0.1: the red reflective vest, no longer part of a new courier's body (server/CharacterArt/Geometry.luau hivis):
@@ -1003,10 +1011,10 @@ Config.Kit = {
 	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it.
 	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", description = "The ZDC reflective vest: customers see you're a courier." },
 	-- 6.4, the bigger bags (Last Stop Supplies' KIT tab; USE there or in the I window's BAGS tab picks the one you hold)
-	{ id = "tote", name = "Canvas Tote", level = 2, price = 120, icon = "👜", extra = 3, description = "Sprint with your deliveries: 3 light pieces of any kind ride in this sturdy canvas tote." },
-	{ id = "thermal", name = "Thermal Delivery Bag", level = 3, price = 300, icon = "🔥", extra = 4, bagWarm = 0.35, description = "Sprint with your deliveries: 4 light pieces ride in it. Insulated: food in it stays hot (cools ×0.35)." },
-	{ id = "padded", name = "Padded Messenger Bag", level = 4, price = 650, icon = "💼", extra = 4, padded = true, description = "Sprint with your deliveries: 4 light pieces ride in it. Foam-padded: fragile ones take no knocks from a hard fall or a bite." },
-	{ id = "duffel", name = "Big Delivery Duffel", level = 6, price = 1200, icon = "🧳", extra = 6, bagBreath = 1.15, description = "Sprint with your deliveries: 6 light pieces ride in it. Heavy: sprinting with it costs 15% more breath." },
+	{ id = "tote", name = "Canvas Tote", level = 2, price = 120, icon = "👜", extra = 3, carry = "shoulder", stays = true, description = "Sprint with your deliveries: 3 light pieces ride in this canvas tote over your shoulder. Swings onto your back when you draw your gun." },
+	{ id = "thermal", name = "Thermal Delivery Bag", level = 3, price = 300, icon = "🔥", extra = 4, carry = "hand", bagWarm = 0.35, description = "Sprint with your deliveries: 4 light pieces ride in it. Insulated: food in it stays hot (cools ×0.35)." },
+	{ id = "padded", name = "Padded Messenger Bag", level = 4, price = 650, icon = "💼", extra = 4, carry = "hip", stays = true, padded = true, description = "Sprint with your deliveries. Stays on your back when you draw your gun. Foam-padded: 4 light pieces, fragile ones take no knocks." },
+	{ id = "duffel", name = "Big Delivery Duffel", level = 6, price = 1200, icon = "🧳", extra = 6, carry = "hand", stays = true, bagBreath = 1.15, description = "Sprint with your deliveries: 6 light pieces ride in it. Slung on your back when you draw your gun. Heavy: sprinting costs 15% more breath." },
 	{ id = "backpack", name = "Courier Backpack", level = 1, price = 150, icon = "🎒", room = 3, description = "Carry 3 light pieces on foot or on a bike instead of 2." },
 	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster." },
 	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
@@ -1935,7 +1943,7 @@ Config.Juice = {
 	ConfettiPieces = 40, -- a ★★★ rating
 	ConfettiSeconds = 1.8,
 	-- Seconds each gesture lasts (Gestures.weight eases it in and out).
-	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6, bag = 0.4, throw = 0.4, vest = 1.2 } :: { [string]: number }, -- 6.0: bag, throw, vest
+	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6, bag = 0.4, throw = 0.4, vest = 1.2, sling = 0.55, unsling = 0.55 } :: { [string]: number }, -- 6.0: bag, throw, vest; 6.4: sling, unsling
 	WaveHz = 2.2, -- the hand's wave, back and forth per second
 	KnockGap = 0.17, -- seconds between two knocks (the sound's too)
 }
@@ -3108,6 +3116,29 @@ Config.Courier = {
 		padded = { Spring = 38, Damp = 6, Kick = 0.005, HandShare = 0.3, Drag = 0.00035, Flutter = 1.2, FlutterHz = 3.2, Twist = 3, MaxTilt = 50 },
 		duffel = { Spring = 28, Damp = 6.5, Kick = 0.0042, HandShare = 0.22, Drag = 0.0002, Flutter = 0.6, FlutterHz = 2.6, Twist = 1.5, MaxTilt = 38 },
 	} :: { [string]: { [string]: number } },
+	-- 6.4, where a bag sits (server/KitWear.luau hangs its pivot there; Config.Kit carry / stays, Holding.wornAs): the
+	-- body part, the pivot's spot on it (studs on the nominal block body, scaled to the real one: shared/KitFit.luau)
+	-- and its turn (degrees). "hand" is the left hand's grip (Bag.Grip under it; HandOut[id] studs further out: the
+	-- boxy thermal bag off the leg). "back" is a bag slung on the back (the tote, the duffel: lying across it),
+	-- "hipBack" the messenger slid behind the hip; PackPush studs further back while a backpack is worn.
+	BagPlaces = {
+		shoulder = { part = "UpperTorso", at = { -1.05, 0.8, 0.3 }, turn = { 0, 0, 6 } },
+		hip = { part = "UpperTorso", at = { -1.02, 0.1, 0.22 }, turn = { 0, 0, 4 } },
+		back = { part = "UpperTorso", at = { 0, 0.62, 0.95 }, turn = { 0, 90, 0 } },
+		hipBack = { part = "UpperTorso", at = { -0.5, 0.05, 0.72 }, turn = { 0, 90, 0 } },
+	} :: { [string]: { part: string, at: { number }, turn: { number } } },
+	HandOut = { thermal = 0.12 } :: { [string]: number },
+	PackPush = 0.5,
+	-- 6.4: a worn bag's motion (client/BagSway.luau; BagSwing.tuning / BagSwing.bob): on the shoulder or the hip a stiff
+	-- small swing (Wear over Bag) and a bounce of Bounce studs with each step (Step studs a step, the full bounce from
+	-- FullSpeed); on the back only a soft bob (BackBob studs). Switch: seconds the bag takes to move between the front
+	-- and the back (the "sling" / "unsling" gestures of shared/Gestures.luau go with it: the right arm reaches over the
+	-- left shoulder).
+	Wear = { Spring = 150, Damp = 12, Kick = 0.0015, HandShare = 0, Drag = 0.0001, Flutter = 0, Twist = 0, MaxTilt = 12 } :: { [string]: number },
+	Bounce = 0.06,
+	BackBob = 0.035,
+	Step = 3.5,
+	Switch = 0.5,
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
 	BagUnlock = "Sprint with more of your deliveries: Last Stop Supplies has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
 }

@@ -139,6 +139,38 @@ local padded = BagSwing.tuning(base, Config.Courier.Bags.padded)
 check("the padded messenger: between the plastic bag and the duffel", padded.Spring < base.Spring and padded.Spring > Config.Courier.Bags.duffel.Spring)
 check("tuning ignores unknown keys and keeps the base", BagSwing.tuning(base, { Nope = 3, Spring = 10 } :: any).Spring == 10 and (BagSwing.tuning(base, { Nope = 3 } :: any) :: any).Nope == nil and base.Spring == 70)
 
+-- How each bag is carried (6.4: Config.Kit carry / stays, Holding.wornAs / bagLeaves) -----------------------------------
+
+local styles = { bag = { "hand", false }, thermal = { "hand", false }, tote = { "shoulder", true }, padded = { "hip", true }, duffel = { "hand", true } }
+for id, s in styles do
+	local def = kit(id)
+	check(`{def.name}: carried {s[1]}{if s[2] then ", stays on" else ""}`, (def.carry or "hand") == s[1] and (def.stays == true) == s[2])
+	check(`{def.name}: worn {s[1]} while it is the hand`, Holding.wornAs("bag", def.carry, def.stays, false) == s[1])
+	check(`{def.name}: out of the hand {if s[2] then "on the back" else "away"}`, Holding.wornAs("gun", def.carry, def.stays, false) == (if s[2] then "back" else nil)
+		and Holding.wornAs("fists", def.carry, def.stays, false) == (if s[2] then "back" else nil))
+	check(`{def.name}: in a seat {if s[2] then "on the back" else "put away"}`, Holding.wornAs("bag", def.carry, def.stays, true) == (if s[2] then "back" else nil))
+	check(`{def.name}: leaving the hand loaded: {if s[2] then "back" else "down"}`, Holding.bagLeaves(3, def.stays) == (if s[2] then "back" else "down")
+		and Holding.bagLeaves(0, def.stays) == (if s[2] then "back" else "stow"))
+end
+check("6.1's rule without a style: down or stowed", Holding.bagLeaves(1) == "down" and Holding.bagLeaves(0) == "stow")
+check("the messenger's description: sprint first, stays on", string.find(kit("padded").description, "^Sprint with your deliveries%. Stays on your back when you draw your gun%.") ~= nil)
+local places = Config.Courier.BagPlaces
+check("every worn place on the torso", places.shoulder.part == "UpperTorso" and places.hip.part == "UpperTorso" and places.back.part == "UpperTorso" and places.hipBack.part == "UpperTorso")
+check("the shoulder and the hip on the left, the slung bag behind", places.shoulder.at[1] < 0 and places.hip.at[1] < 0 and places.back.at[3] > 0.5 and places.hipBack.at[3] > 0.5)
+check("the strap: the messenger across the body, a slung tote / duffel across the chest, none in the hand",
+	#KitArt.straps("padded", "hip") > 0 and #KitArt.straps("padded", "hipBack") > 0 and #KitArt.straps("duffel", "back") > 0
+	and #KitArt.straps("tote", "back") > 0 and #KitArt.straps("duffel", "hand") == 0 and #KitArt.straps("bag", "hand") == 0)
+for _, piece in KitArt.straps("padded", "hip") do
+	check(`strap {piece.name} on the torso, within it`, piece.attach == "UpperTorso" and math.abs(piece.at[1]) <= 1 and math.abs(piece.at[2]) <= 0.9)
+end
+check("the move takes about half a second, the sling and unsling gestures as long", Config.Courier.Switch >= 0.3 and Config.Courier.Switch <= 0.8
+	and Config.Juice.Gestures.sling ~= nil and Config.Juice.Gestures.unsling ~= nil)
+check("a worn bag's bounce: none standing, some walking, never over the amount", BagSwing.bob(1, 0, 0.06, 3.5, 28) == 0
+	and BagSwing.bob(1.75, 28, 0.06, 3.5, 28) > 0.05 and BagSwing.bob(3.5, 28, 0.06, 3.5, 28) < 1e-6 and BagSwing.bob(1.75, 99, 0.06, 3.5, 28) <= 0.06 + 1e-9)
+check("a broken bounce is none", BagSwing.bob(0 / 0, 10, 0.06, 3.5, 28) == 0 and BagSwing.bob(1, 10, 0.06, 0, 28) == 0)
+local wear = BagSwing.tuning(base, Config.Courier.Wear)
+check("on the shoulder or the hip: stiffer and smaller than in the hand", wear.Spring > base.Spring and wear.MaxTilt < base.MaxTilt and wear.Flutter == 0)
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

@@ -73,8 +73,11 @@ function Holster.armed(): boolean
 end
 
 -- 6.1: does the State's kit hold the plastic bag?
-function Holster.setBag(owned: boolean)
+-- 6.4: `stays`: the bag in use stays on you out of the hand (Config.Kit stays: slung on the back, never set down)
+local bagStays = false
+function Holster.setBag(owned: boolean, stays: boolean?)
 	bagOwned = owned
+	bagStays = stays == true
 end
 
 local function bagDown(): boolean
@@ -96,9 +99,9 @@ function Holster.hand(): string
 	return server
 end
 
--- 6.1: the bag in your hand has cargo in it (it would be set down if it left the hand).
+-- 6.1: the bag in your hand has cargo in it (it would be set down if it left the hand; 6.4: not a bag that stays).
 local function bagLoaded(): boolean
-	return Holster.hand() == "bag" and (tonumber(player:GetAttribute("BagCount")) or 0) > 0 and not bagDown()
+	return Holster.hand() == "bag" and not bagStays and (tonumber(player:GetAttribute("BagCount")) or 0) > 0 and not bagDown()
 end
 
 -- Is the gun away right now (as this client shows it)?

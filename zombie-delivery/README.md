@@ -1142,6 +1142,25 @@ backpack) never does (it never sets the Carrying attribute: `client/CameraRig.lu
   swings its own way (`Config.Courier.Bags`, `BagSwing.tuning`): the bigger, the slower and the less flutter.
 - **Hotbar:** the bag slot shows the active bag's icon, name ("· SPRINT WITH YOUR DELIVERIES") and room. Marge texts once
   when a level opens a bag you don't own (`Config.Courier.BagUnlock`). Tests: `tests/bags_test.luau`.
+- **How each bag is carried** (the owner: "you put the bag on your back, in different ways as fits"; Config.Kit
+  `carry` / `stays`, `Holding.wornAs` / `bagLeaves`, `Config.Courier.BagPlaces`, `server/KitWear.luau`):
+
+  | Bag | While it is your hand (2) | When you take fists or the gun (1 / 3 / B) |
+  |---|---|---|
+  | Plastic Bag, Thermal Delivery Bag | in the left hand (the thermal by its top handle, off the leg) | as in 6.1: stowed when empty, set down on the ground when loaded |
+  | Canvas Tote | over the left shoulder, the bag at the hip | slung on the back by a strap across the chest |
+  | Padded Messenger Bag | cross-body: the strap over the right shoulder, the bag on the left hip | slid behind the hip |
+  | Big Delivery Duffel | in the hand by its carry handles | slung across the back by its strap |
+
+  A bag on your back keeps its pieces **with you** (they count, you hand them over at the door, the padded one keeps
+  them safe) and your hands are free for the gun or the fists; pickups go into it and you throw from it only while
+  it is your hand, so press 2 to swing it to the front again. The move takes ~0.5 s (`Config.Courier.Switch`): the
+  right hand reaches over the left shoulder (the `sling` / `unsling` gestures, `shared/Gestures.luau`, played by
+  `client/ArmPose.luau`) while `client/BagSway.luau` moves the bag from where it was to its new place (the character's
+  `BagWorn` and `BagSwitchAt` attributes; still the joint's only writer, Transform in PreSimulation). Its motion
+  follows where it is: in the hand the pendulum, on the shoulder or the hip a stiff little swing and a bounce with the
+  steps (`Config.Courier.Wear`, `Bounce`, `BagSwing.bob`), on the back a soft bob (`BackBob`). In a seat a bag that
+  stays sits on the back; a hand bag is put away.
 
 ## Scooters at the spawn, express buses, the bus map, the bag, English names (6.3)
 

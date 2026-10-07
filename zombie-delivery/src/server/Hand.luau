@@ -10,7 +10,8 @@
 -- or that lies on the ground (the player attribute BagDown, server/Cargo.luau), a gun you do not have. A new body holds
 -- the bag when it is yours and with you, else its fists (Holding.atSpawn; the save still loading: as soon as it is in).
 -- A purchase or a sale that takes the hand away (the last gun, the bag) goes back to fists.
--- Hand.onChanged(fn(player, old, new)): server/Cargo.luau sets a loaded bag down when it leaves the hand.
+-- Hand.onChanged(fn(player, old, new)): server/Cargo.luau sets a loaded bag down when it leaves the hand (6.4: a hand
+-- bag; a bag that stays, Config.Kit stays, is slung on the back instead: server/KitWear.luau, Holding.bagLeaves).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

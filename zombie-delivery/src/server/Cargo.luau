@@ -140,7 +140,11 @@
 -- refused while the bag holds pieces or lies on the ground (Cargo.bagBusy). The bag set down is the active bag's look
 -- (KitWear.bagArt / bagDrop). Its perks: the thermal bag keeps an order's food warm by the share of its pieces in it
 -- (Cargo.bagWarm), the padded messenger keeps fragile pieces in it safe from the new knocks on foot (Cargo.footKnock:
--- a hard landing or a bite knocks the other fragile pieces with you), the duffel's slower walk is server/Transport's.
+-- a hard landing or a bite knocks the other fragile pieces with you), the duffel's breath cost is server/Transport's.
+-- A bag that stays (Config.Kit stays: the tote, the messenger, the duffel; bagStays) is never set down: out of the hand
+-- it is slung on your back (Holding.bagLeaves "back", server/KitWear.luau) with its pieces, which stay with you (hand
+-- them over, they count, PackRoom keeps its room, the padded one keeps them safe); pickups go into it and you throw
+-- from it only while it is your hand (bagHeld).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1358,6 +1362,14 @@ local function bagHeld(session: Session): boolean
 	return session.info.foot == true and Hand.get(session.owner) == "bag"
 end
 
+-- 6.4: does the active bag stay on you out of the hand (Config.Kit stays: the tote, the messenger, the duffel swing
+-- onto your back with their pieces; Holding.bagLeaves "back")? Its pieces are with you; pickups and throws still need
+-- it as the hand.
+local function bagStays(session: Session): boolean
+	local bag = if session.info.foot then activeBag(session.owner) else nil
+	return bag ~= nil and bag.stays == true
+end
+
 local function bagCount(session: Session): number
 	local n = 0
 	for _, piece in session.pack do
@@ -1415,7 +1427,7 @@ local function packShown(session: Session)
 	local owner = session.owner
 	local on = session.info.foot == true and not session.ended
 	local count = if on then #session.pack else nil
-	local room = if on then math.max(0, (session.info.pack or 0) - (if bagHeld(session) then 0 else bagRoomOf(session))) else nil
+	local room = if on then math.max(0, (session.info.pack or 0) - (if bagHeld(session) or bagStays(session) then 0 else bagRoomOf(session))) else nil
 	local down = session.bagDown
 	local bag = if on then bagCount(session) + (if down then #down.pieces else 0) else nil
 	local bagRoom = if on then bagRoomOf(session) else nil
@@ -3889,7 +3901,7 @@ function Cargo.update(session: Session, dt: number)
 			dropped = true
 		end
 		-- 6.1: pieces in a bag that is not in the hand (it left while the body was being swapped): set down now.
-		if humanoid and root and humanoid.Health > 0 and not bagHeld(session) and bagCount(session) > 0 and setBagDown(session) then
+		if humanoid and root and humanoid.Health > 0 and not bagHeld(session) and not bagStays(session) and bagCount(session) > 0 and setBagDown(session) then
 			dropped = true
 		end
 	end
@@ -4149,7 +4161,7 @@ function Cargo.footKnock(session: Session, now: number): (string?, { [number]: n
 		return nil, hit
 	end
 	local profile = PlayerData.get(owner)
-	local padded = bagHeld(session) and profile ~= nil and TransportRules.bagPadded(profile.kit, profile.activeBag)
+	local padded = (bagHeld(session) or bagStays(session)) and profile ~= nil and TransportRules.bagPadded(profile.kit, profile.activeBag)
 	local job = session.info.fragile == true
 	local any = false
 	local hands = session.held[owner]
@@ -5133,7 +5145,7 @@ function Cargo.start()
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local same = humanoid ~= nil and humanoid.Health > 0 and (session.packHumanoid == nil or session.packHumanoid == humanoid)
-		if old == "bag" and new ~= "bag" and same and Holding.bagLeaves(bagCount(session)) == "down" and setBagDown(session) then
+		if old == "bag" and new ~= "bag" and same and Holding.bagLeaves(bagCount(session), bagStays(session)) == "down" and setBagDown(session) then
 			local down = session.bagDown
 			local n = if down then #down.pieces else 0
 			tell(player, `Bag set down with {n} {if n == 1 then session.info.piece else session.info.plural} in it: pick it up again (E) before you move on.`)
