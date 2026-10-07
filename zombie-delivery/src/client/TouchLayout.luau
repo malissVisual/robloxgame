@@ -15,6 +15,10 @@
 --     upright), it goes over the buttons at the right edge instead, if it fits under the actions' row.
 --   * The contextual action between the thumbstick's corner and the first of those (narrower, on more lines, on a
 --     narrow phone); held upright, over all of them.
+--   * 6.0.1, the bottom bar (client/Hotbar.luau: the items 1-5 over what you carry), TouchLayout.dock: at the bottom
+--     between the thumbstick's corner and the right column; when that is too narrow, between the corner and the
+--     buttons with the right column raised over the bar; else (upright) over everything at the bottom, across the
+--     middle. The contextual action sits over the bar (TouchLayout.hint's `floor`).
 
 local TouchLayout = {}
 
@@ -129,11 +133,15 @@ end
 -- Returns its centre x, its bottom and its width (px).
 TouchLayout.HINT_W = 480
 TouchLayout.MIN_HINT_NARROW = 120
-function TouchLayout.hint(c: Cluster, boxes: { Box }, W: number, H: number, S: number): (number, number, number)
+-- 6.0.1: `floor`, the bottom bar's top edge: the action stays over it.
+function TouchLayout.hint(c: Cluster, boxes: { Box }, W: number, H: number, S: number, floor: number?): (number, number, number)
 	local bottom = H - TouchLayout.GAP - 18 * S
+	if floor then
+		bottom = math.min(bottom, floor - TouchLayout.GAP)
+	end
 	local left, right = TouchLayout.hintSpan(c, boxes, bottom - 96 * S, W)
 	if right - left < TouchLayout.MIN_HINT_NARROW then
-		local top = math.min(c.thumb.y0, c.jump.y0)
+		local top = math.min(c.thumb.y0, c.jump.y0, floor or math.huge)
 		for _, b in boxes do
 			top = math.min(top, b.y0)
 		end
@@ -143,6 +151,52 @@ function TouchLayout.hint(c: Cluster, boxes: { Box }, W: number, H: number, S: n
 	local width = math.max(TouchLayout.MIN_HINT_NARROW, math.min(TouchLayout.HINT_W * S, right - left))
 	local x = math.clamp(W / 2, left + width / 2, math.max(left + width / 2, right - width / 2))
 	return x, bottom, width
+end
+
+-- 6.0.1: the right column (colW × colH, as TouchLayout.column places it) and the bottom bar (barW × barH, the items
+-- over what you carry, client/Hotbar.luau). Returns the column's box, whether it went over the buttons, and the bar's
+-- box: at the bottom beside the column; else at the bottom up to the buttons, the column raised over the bar (under
+-- the actions' row, `rowBottom`, or left of it: `rowLeft`, the row's and the ADMIN button's left edge); else over
+-- everything at the bottom, centred.
+function TouchLayout.dock(c: Cluster, W: number, H: number, colW: number, colH: number, rowBottom: number, rowLeft: number, barW: number, barH: number): (Box, boolean, Box)
+	local gap = TouchLayout.GAP
+	local buttons = TouchLayout.buttons(c)
+	local column, over = TouchLayout.column(c, W, H, colW, colH, rowBottom)
+	local function atBottom(boxes: { Box }): Box?
+		local bottom = H - gap
+		local left, right = TouchLayout.hintSpan(c, boxes, bottom - barH, W)
+		if right - left < barW then
+			return nil
+		end
+		local x = math.clamp(W / 2, left + barW / 2, right - barW / 2)
+		return TouchLayout.box(x - barW / 2, bottom - barH, x + barW / 2, bottom)
+	end
+	local all = table.clone(buttons)
+	table.insert(all, column)
+	local bar = atBottom(all)
+	if bar then
+		return column, over, bar
+	end
+	bar = atBottom(buttons)
+	if bar and not over then
+		local raised = TouchLayout.box(column.x0, bar.y0 - gap - colH, column.x1, bar.y0 - gap)
+		if raised.y0 >= rowBottom + gap then
+			return raised, false, bar
+		end
+		-- Up beside the row instead (a small phone with the ADMIN button): moved left of it.
+		local shift = math.max(0, raised.x1 - (rowLeft - gap))
+		local beside = TouchLayout.box(raised.x0 - shift, raised.y0, raised.x1 - shift, raised.y1)
+		if beside.y0 >= TouchLayout.MARGIN and beside.x0 >= c.thumb.x1 + 12 then
+			return beside, false, bar
+		end
+	end
+	-- Over everything at the bottom (the thumbstick's corner, the buttons, the column), across the middle.
+	local top = math.min(c.thumb.y0, c.jump.y0, column.y0)
+	for _, b in buttons do
+		top = math.min(top, b.y0)
+	end
+	local x = math.clamp(W / 2, TouchLayout.MARGIN + barW / 2, math.max(TouchLayout.MARGIN + barW / 2, W - TouchLayout.MARGIN - barW / 2))
+	return column, over, TouchLayout.box(x - barW / 2, top - gap - barH, x + barW / 2, top - gap)
 end
 
 return TouchLayout

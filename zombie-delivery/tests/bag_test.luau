@@ -92,6 +92,46 @@ check("an unknown place goes with the backpack", #groups[2].pieces == 2)
 check("the rack of a bike says so", groups[3].title == "On your bike")
 check("no pieces, no groups", #Bag.groups(nil, nil) == 0)
 
+-- 6.0.1, the bottom bar's carried strip ----------------------------------------------------------
+
+local places = Bag.places("foot", 5, 0, 2)
+check("places: hands, bag, backpack, rack", #places == 4 and places[1].where == "hands" and places[2].where == "bag" and places[3].where == "pack" and places[4].where == "rack")
+check("places on foot: the hands, the bag's 2, the backpack's rest", places[1].room == Cargo.HandsMax and places[2].room == 2 and places[3].room == 3 and places[4].room == 0)
+local bike = Bag.places("bike", 4, 2, 5)
+check("places by bike: the rack is its part, the bag no more than the rest", bike[4].room == 2 and bike[2].room == 2 and bike[3].room == 0)
+local car = Bag.places("car", 6, 0, 2)
+check("places in a car: the hands only", car[1].room == Cargo.HandsMax and car[2].room == 0 and car[3].room == 0 and car[4].room == 0)
+
+local carried = {
+	{ order = 1, look = "pizza", name = "pizza stack", where = "hands" },
+	{ order = 2, look = "mail", name = "letter", where = "pack" },
+	{ order = 1, look = "parcel", name = "parcel", where = "pack" },
+	{ order = 1, look = "crate", name = "crate", where = "vehicle" },
+}
+local tiles, more = Bag.strip(carried, Bag.places("foot", 3, 0, 1), 1, 8)
+check("strip: a tile a piece and a free place, no vehicle", #tiles == 5 and more == 0, #tiles)
+check("strip: hands first, then the free hand", tiles[1].where == "hands" and tiles[1].piece ~= nil and tiles[2].where == "hands" and tiles[2].piece == nil)
+check("strip: the pack's first piece fills the bag", tiles[3].where == "bag" and tiles[3].piece ~= nil and tiles[3].piece.name == "letter")
+check("strip: another order's piece is marked", tiles[3].other and not tiles[1].other and not tiles[4].other)
+check("strip: the backpack after the bag, then its free room", tiles[4].where == "pack" and tiles[4].piece ~= nil and tiles[5].where == "pack" and tiles[5].piece == nil)
+check("strip: no focus, nothing is another order's", not (Bag.strip(carried, Bag.places("foot", 3, 0, 1), nil, 8))[3].other)
+
+local many = {}
+for i = 1, 6 do
+	table.insert(many, { order = 1, look = "mail", name = "letter", where = if i <= 2 then "hands" else "pack" })
+end
+local full, cut, cutPieces = Bag.strip(many, Bag.places("foot", 8, 0, 0), 1, 8)
+check("strip over 8: 7 tiles and +N", #full == 7 and cut == 3, `{#full} +{cut}`)
+check("strip over 8: the free room goes first", cutPieces == 0 and full[6].piece ~= nil and full[7].piece == nil)
+for i = 1, 6 do
+	table.insert(many, { order = 1, look = "mail", name = "letter", where = "pack" })
+end
+local packed, cut2, cutPieces2 = Bag.strip(many, Bag.places("foot", 8, 0, 0), 1, 8)
+check("strip with more pieces than tiles: the last pieces go too", #packed == 7 and cut2 == 5 and cutPieces2 == 5, `{#packed} +{cut2} ({cutPieces2})`)
+local overflow = Bag.strip({ { where = "rack" }, { where = "moon" } }, Bag.places("foot", 0, 0, 0), nil, 8)
+check("strip: a piece with no room still shows", #overflow == 4 and overflow[3].where == "pack" and overflow[4].where == "rack", #overflow)
+check("strip of nothing: the free hands", #(Bag.strip(nil, Bag.places("car", 0, 0, 0), nil, 8)) == Cargo.HandsMax)
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else
