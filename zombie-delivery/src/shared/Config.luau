@@ -33,6 +33,86 @@ Config.Movement = {
 	HideAfter = 1.5, -- seconds the bar stays after the breath is full again, then it fades out
 }
 
+-- 6.7, the body in motion (the owner: "the character isn't realistic at all, no animations"): the procedural layers
+-- over the stock R15 tracks, as numbers. shared/BodyMotion.luau is the maths (tests/bodymotion_test.luau);
+-- client/BodyLife.luau lays the idle life, the landing, the flinch and the walk's weight on every character and person
+-- near the camera; client/ArmPose.luau the carry's reach to the box and the gestures with the legs ("pickup", "land").
+-- Angles in degrees, distances in studs, times in seconds.
+Config.Body = {
+	Range = 120, -- studs from the camera: the characters and people posed (yours always) …
+	MaxPosed = 40, -- … at most this many, the nearest
+	Detail = 50, -- … the small motions (the breath, the weight shift, the head, the blinks) only this close
+	Retarget = 0.4, -- seconds between the looks for whom to pose and where each head looks
+	-- Breathing: the chest rises and falls; quicker and deeper after a sprint (Recover seconds to calm down).
+	Breath = 3.6,
+	BreathRun = 1.5,
+	BreathTilt = 1.1, -- degrees the chest tips back on a breath in (twice that out of breath)
+	BreathLift = 0.025, -- studs the shoulders rise
+	Recover = 6,
+	-- Standing still (under IdleBelow studs / s): the weight goes onto one foot, holds, then onto the other.
+	IdleBelow = 1.5,
+	ShiftEvery = 5.5, -- seconds per shift (each starts at a moment of its own)
+	ShiftTime = 1.3, -- seconds the move from one foot to the other takes
+	ShiftSway = 0.07, -- studs the hips move sideways
+	ShiftRoll = 2.2, -- degrees the hips tip (the free side down)
+	ShiftKnee = 9, -- degrees the free knee bends
+	-- The head: a person or a courier within LookRange in front is looked at (your own courier also the job's ring
+	-- within LookRing); at most LookYaw / LookPitch, the chest turning LookChest of it, followed at LookSpeed (1 / s).
+	LookRange = 14,
+	LookRing = 30,
+	LookBehind = 110, -- degrees: farther round than this is not looked at
+	LookYaw = 65,
+	LookPitch = 25,
+	LookChest = 0.3,
+	LookSpeed = 5,
+	-- Blinks (a face with EyeL / EyeR): every BlinkEvery seconds or so, shut for BlinkTime, to BlinkShut of the height.
+	BlinkEvery = 4.2,
+	BlinkTime = 0.14,
+	BlinkShut = 0.12,
+	-- The landing: a knee dip, from LandMin studs (falling at LandFrom studs / s) to LandDrop (at LandFull), LandDown
+	-- seconds down and LandUp back up, the upper body tipping LandLean degrees forward at the deepest.
+	LandFrom = 30,
+	LandFull = 90,
+	LandMin = 0.12,
+	LandDrop = 0.5,
+	LandDown = 0.08,
+	LandUp = 0.34,
+	LandLean = 12,
+	-- Hit (health lost, FlinchMin at least): the chest jerks back FlinchBack degrees, the head turns FlinchTurn,
+	-- FlinchIn seconds in, FlinchOut back.
+	FlinchMin = 3,
+	FlinchIn = 0.06,
+	FlinchOut = 0.38,
+	FlinchBack = 10,
+	FlinchTurn = 16,
+	-- The walk (WalkFrom studs / s up to Config.Courier.Sprint.From, where client/SprintPose.luau's run takes over): the
+	-- stock walk's own thighs give the weight: the body sinks WalkBob studs with the legs apart (Spread degrees at the
+	-- widest), the arms swing WalkArm of the legs' spread more, the chest turns WalkTwist degrees against the hips.
+	WalkFrom = 4,
+	WalkBob = 0.09,
+	WalkArm = 0.45,
+	WalkTwist = 4,
+	Spread = 50,
+	-- The carry (client/ArmPose.luau): the hands reach the box's sides (server/Cargo.luau's CarryAt / CarrySize on the
+	-- character), CarryLow of its height under its middle; the upper body leans back CarryLean degrees with both hands
+	-- full, CarryHeavy when the load slows you (CarrySpeed).
+	CarryLow = 0.15,
+	CarryLean = 4,
+	CarryHeavy = 8,
+	-- The phone lies in the palm (shared/KitFit.luau Palm): the wrist rolls it this many degrees, the screen up.
+	PhoneRoll = -90,
+	-- The gestures with the legs (shared/Gestures.luau, posed by client/ArmPose.luau): "pickup" crouches PickupDrop
+	-- studs (at most 0.8: client/Unstuck.luau resets a Root joint hung lower), the hips tip PickupHips and the waist
+	-- PickupBend degrees, the right hand reaching down; "land" is a short dip. Seconds each.
+	PickupDrop = 0.7,
+	PickupHips = 30,
+	PickupBend = 45,
+	-- A piece picked up off the ground stays where it lies this long (server/Cargo.luau), the hands reaching down to
+	-- it, then comes up into them as the body rises.
+	PickupLift = 0.4,
+	Gestures = { pickup = 0.7, land = 0.42 } :: { [string]: number },
+}
+
 -- 3.9: the gun goes away (B: holster / draw) and the hands fight (V: melee). Holstered (the default after every spawn)
 -- the hands are empty, V punches; with the gun out V strikes with it (a pistol-whip, a rifle butt). The server checks
 -- every swing (server/CloseCombat.luau) and hits the nearest living zombie or bandit in a short cone in front of you

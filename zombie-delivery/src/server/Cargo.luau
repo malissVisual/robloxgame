@@ -248,6 +248,7 @@ type Piece = {
 	name: string, -- 5.2: what it is ("pizza box")
 	heavy: number?, -- 5.2: carried alone by hand you walk this slowly (the order's heavy rule)
 	inBag: boolean?, -- 6.1: in the owner's pack, in the plastic bag (not the backpack)
+	liftAt: number?, -- 6.7: picked up off the ground: it stays where it lies until then (os.clock), the body bending to it
 }
 
 -- 6.1: the plastic bag set down on the ground with its cargo (only the owner picks it up).
@@ -1045,6 +1046,19 @@ local function pieceSize(model: Model): (number, number)
 	return if type(height) == "number" then height else 2, if type(depth) == "number" then depth else 2
 end
 
+-- 6.7: where the hands hold (client/ArmPose.luau reaches both hands to the sides of the bottom piece): its middle in
+-- the root's frame and its size, the character's CarryAt / CarrySize (nil: nothing held in the hands).
+local function markHands(character: Model, root: BasePart?, model: Model?)
+	if not root or not model or not model.Parent then
+		character:SetAttribute("CarryAt", nil)
+		character:SetAttribute("CarrySize", nil)
+		return
+	end
+	local frame, size = model:GetBoundingBox()
+	character:SetAttribute("CarryAt", root.CFrame:PointToObjectSpace(frame.Position))
+	character:SetAttribute("CarrySize", size)
+end
+
 -- In front of the chest: one piece's middle at chest height, its back against the body; 3.7: two stacked, the first
 -- at the bottom, the stack a little lower so you still see over it.
 local function stackHeld(held: Held)
@@ -1060,12 +1074,25 @@ local function stackHeld(held: Held)
 	local y = 1.1 - total / 2 - (if #held.pieces > 1 then 0.25 else 0)
 	for _, piece in held.pieces do
 		local model = piece.model
-		if model then
+		if model and not (piece.liftAt and os.clock() < piece.liftAt) then -- (6.7: one still lifted off the ground waits)
 			weldTo(model, held.root, held.root.CFrame * CFrame.new(0, y, -(0.6 + depth / 2)))
 			local h = pieceSize(model)
 			y += h
 		end
 	end
+	markHands(held.character, held.root, held.pieces[1] and held.pieces[1].model) -- 6.7: the hands on the bottom piece
+end
+
+-- 6.7: a piece picked up off the ground comes up into the hands once the body has bent down to it (its `liftAt`,
+-- Config.Body.PickupLift; until then it lies where it was, the hands reaching for it).
+local function liftLater(session: Session, player: Player, piece: Piece)
+	task.delay(Config.Body.PickupLift, function()
+		piece.liftAt = nil
+		local held = session.held[player]
+		if held and not held.tool and table.find(held.pieces, piece) and held.root.Parent then
+			stackHeld(held)
+		end
+	end)
 end
 
 -- 5.3 review: `owner`, the job's owner: the prompt carries their UserId (attribute CargoOwner) and the tag
@@ -1921,6 +1948,7 @@ local function clearHeld(session: Session, player: Player): Held?
 		character:SetAttribute("CarryCount", nil)
 		character:SetAttribute("CarryHands", nil)
 		character:SetAttribute("CarrySpeed", nil)
+		markHands(character, nil, nil) -- 6.7
 	end
 	if held.prompt then
 		held.prompt:Destroy()
@@ -1979,6 +2007,7 @@ local function armHands(session: Session, player: Player, held: Held)
 		-- 4.0: on the trolley or the jack (its own G sets it down): a hand stays free for the back's doors.
 		stackOnTool(tool, held.pieces, true)
 		local character = held.character
+		markHands(character, nil, nil) -- 6.7: the hands are on the tool's handle, not on a piece
 		character:SetAttribute("Carrying", top.kind)
 		character:SetAttribute("CarryCount", count)
 		character:SetAttribute("CarryHands", 1)
@@ -2314,9 +2343,14 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 	if handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
+	loose.piece.liftAt = os.clock() + Config.Body.PickupLift -- 6.7: it waits on the ground for the hands
 	if not table.find(session.loose, loose) or not take(session, player, loose.piece) then
+		loose.piece.liftAt = nil
 		return -- (3.7: a piece that does not fit the hands stays where it lies)
 	end
+	-- 6.7: down on the knees for it (client/ArmPose.luau, shared/Gestures.luau), the hands on it, then up with it
+	Npcs.act(player.Character, "pickup")
+	liftLater(session, player, loose.piece)
 	bagHint(session, player, loose.piece) -- 6.3
 	local index = table.find(session.loose, loose)
 	if index then
@@ -3749,7 +3783,7 @@ pickUpBag = function(session: Session, player: Player)
 		piece.inBag = true
 		table.insert(session.pack, piece)
 	end
-	Npcs.act(character, "bag")
+	Npcs.act(character, "pickup") -- 6.7: bent down for it (6.6: the "bag" gesture, a piece dropped in)
 	tell(player, `Bag picked up: {bagCount(session)} / {bagRoomOf(session)} in it.`)
 	packShown(session)
 	refresh(session)

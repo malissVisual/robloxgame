@@ -42,7 +42,9 @@ local connection: RBXScriptConnection? = nil
 local function step()
 	local v = root.AssemblyLinearVelocity
 	local state = if humanoid.Health <= 0 then "Dead" else humanoid:GetState().Name
-	local selected, pace = Motion.select(state, Vector3.new(v.X, 0, v.Z).Magnitude, v.Y, humanoid.Sit)
+	-- 6.7: the realistic courier's longer legs play the walk and the run slower (Motion.StockHip), the feet planted
+	local stride = humanoid.HipHeight / Motion.StockHip
+	local selected, pace = Motion.select(state, Vector3.new(v.X, 0, v.Z).Magnitude, v.Y, humanoid.Sit, stride)
 	if selected ~= active then
 		local playing = if active then tracks[active] else nil
 		if playing then

@@ -46,16 +46,52 @@ for _, id in Geometry.ids do
 	local root, foot = bones.HumanoidRootPart, bones.LeftFoot
 	check(near(-foot.at[2] + foot.size[2] / 2, root.size[2] / 2 + spec.hipHeight), id .. ": sole matches hip clearance")
 	if id == "courier" then
+		-- 6.7: the realistic body's proportions (the owner: "not blocks any more"): 5.6 – 6 studs from the sole to the
+		-- crown, the head about 1/6.5 of it, slim arms (0.6 – 0.7) and legs (0.75 – 0.85 deep), forearms nearly as long as
+		-- the upper arms, the fingertips at mid-thigh.
+		local function top(b): number return b.at[2] + b.size[2] / 2 end
+		local function bottom(b): number return b.at[2] - b.size[2] / 2 end
+		local sole = bottom(bones.LeftFoot)
+		local tall = top(bones.Head) - sole
+		check(tall >= 5.6 and tall <= 6, "a grown-up's height")
+		check(bones.Head.size[2] / tall > 1 / 7 and bones.Head.size[2] / tall < 1 / 6, "the head about 1/6.5 of the height")
+		check(bones.RightUpperArm.size[1] >= 0.6 and bones.RightUpperArm.size[1] <= 0.7, "slim upper arms")
+		check(bones.RightLowerArm.size[1] < bones.RightUpperArm.size[1], "the forearms slimmer still")
+		check(bones.RightUpperLeg.size[3] >= 0.75 and bones.RightUpperLeg.size[3] <= 0.85, "slim legs")
+		check(bones.RightLowerArm.size[2] > 0.8 * bones.RightUpperArm.size[2], "long forearms")
+		local tips = bottom(bones.RightHand) - 0.25 - sole
+		check(tips > top(bones.RightLowerLeg) - sole and tips < top(bones.RightUpperLeg) - sole, "the fingertips at mid-thigh")
+		check(bones.LeftUpperLeg.at[1] + bones.LeftUpperLeg.size[1] / 2 < bones.RightUpperLeg.at[1] - bones.RightUpperLeg.size[1] / 2, "a gap between the legs")
+		-- The grips in both fists (where a handle sits: under the palm, among the fingers), the fist's pieces there.
+		for _, hand in { "LeftHand", "RightHand" } do
+			local grip = spec.grips[hand]
+			check(grip ~= nil and grip[2] < -bones[hand].size[2] / 2 and grip[2] > -bones[hand].size[2] / 2 - 0.25, hand .. ": its grip under the palm")
+			local s = if hand == "LeftHand" then "L" else "R"
+			check(names["Fingers" .. s] and names["Thumb" .. s], hand .. ": fingers and a thumb")
+		end
+		check(spec.grips.RightHand[1] < 0 and spec.grips.LeftHand[1] > 0, "the palms face the body")
+		-- The purchased kit is authored on the block body (KitFit.Nominal) and scaled onto this one, unclamped, per axis;
+		-- the fist takes the hand's one factor and holds the art in its palm (KitFit.Palm).
 		for bone, nominal in KitFit.Nominal do
-			for i = 1, 3 do check(near(bones[bone].size[i], nominal[i]), "purchased kit fits " .. bone) end
+			if string.match(bone, "Hand$") then
+				local f = KitFit.factors(bone, bones[bone].size)
+				check(f[1] == KitFit.HandMin and f[1] < KitFit.SlabHand and KitFit.Palm[bone] ~= nil, bone .. ": the art in the palm")
+			else
+				local f = KitFit.factors(bone, bones[bone].size)
+				for i = 1, 3 do
+					check(near(f[i], bones[bone].size[i] / nominal[i]) and f[i] > KitFit.Min and f[i] < KitFit.Max, "purchased kit fits " .. bone)
+				end
+			end
 		end
 		check(names.JacketL and names.CapBrimBack and not names.Backpack, "uniform does not grant paid gear")
-		-- 6.0.1: the red vest is bought kit (Config.Kit "hivis"): not on the body; the jacket under it is hidden by it.
+		-- 6.0.1: the red vest is bought kit (Config.Kit "hivis"): not on the body; the jacket under it is hidden by it
+		-- (6.7: the vest as worn, KitFit-scaled onto this torso).
 		check(not names.VestL and not names.VestBack and not names.DispatchBadge, "a new courier starts without the vest")
 		local vest = Geometry.hivis()
 		check(#vest == 11 and #spec.bones + #spec.pieces + #vest <= spec.budget, "the vest: Codex's 11 pieces, within the budget worn")
+		local worn = KitFit.fit(vest, { UpperTorso = KitFit.factors("UpperTorso", bones.UpperTorso.size) })
 		local boxes = {}
-		for _, v in vest do
+		for _, v in worn do
 			check(v.attach == "UpperTorso" and not names[v.name], "the vest's pieces on the torso, their own names")
 			if not v.turn then table.insert(boxes, v) end
 		end
@@ -71,10 +107,22 @@ for _, id in Geometry.ids do
 			if string.match(p.name, "^Jacket") or string.match(p.name, "^PocketFlap") then
 				local hidden = false
 				for _, v in boxes do hidden = hidden or inside(p, v) end
-				check(hidden and p.attach == "UpperTorso", p.name .. " lies inside a vest panel (worn, the vest looks as before)")
+				check(hidden and p.attach == "UpperTorso", p.name .. " lies inside a vest panel (worn, the vest covers it)")
 			end
 		end
+		local torso = bones.UpperTorso
+		for _, v in boxes do
+			check(math.abs(v.at[3]) - v.size[3] / 2 >= torso.size[3] / 2 - 1e-6, v.name .. " lies on the torso, not in it")
+		end
 		check(Geometry.hivis()[1] ~= vest[1] and Geometry.hivis()[1].color ~= vest[1].color, "fresh vest tables")
+	elseif id == "person" then
+		-- 6.7: the people (server/Npcs.luau) wear the same body; every part names the colour their look gives it.
+		for _, b in spec.bones do check(b.paint ~= nil, "person: " .. b.name .. " takes a colour") end
+		for _, p in spec.pieces do
+			check(p.paint ~= nil or string.match(p.name, "^Eye") ~= nil or p.name == "Mouth", "person: " .. p.name .. " takes a colour")
+		end
+		local kid = Geometry.spec("person", 0.75)
+		check(near(kid.hipHeight, spec.hipHeight * 0.75) and near(kid.grips.RightHand[2], spec.grips.RightHand[2] * 0.75), "a kid: the same body, smaller")
 	elseif def then
 		for i = 1, 3 do check(bones.Head.color[i] == def.skin[i], "enemy palette remains type-readable") end
 	end

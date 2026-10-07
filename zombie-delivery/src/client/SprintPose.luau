@@ -17,7 +17,8 @@
 -- Joints are looked up once per character (again every RIG_REFRESH seconds, RIG_RETRY while some are missing, at once
 -- when one left the body). The blend starts from the animation's own value of a joint (a joint that still holds what
 -- we wrote was not written by the Animator this frame: its last animation value is the base, as in ArmPose). Let go
--- (slowing down, out of range, gone), a joint that still holds our value goes back to the rest pose (the identity; the
+-- (slowing down, out of range, gone), a joint that still holds our value goes back to the animation (6.7: client/
+-- PoseLedger.luau; the rest pose where nothing animates it, the
 -- Animator writes over it where it animates; 5.9.1's lesson: a bob must never stay on the Root).
 
 local Players = game:GetService("Players")
@@ -32,6 +33,7 @@ local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
 local Interact = require(script.Parent.Interact)
+local Ledger = require(script.Parent.PoseLedger) -- 6.7: the joints shared with ArmPose and BodyLife
 
 local SprintPose = {}
 
@@ -71,47 +73,29 @@ type Body = {
 
 local rigs: { [Model]: Rig } = {}
 local bodies: { [Model]: Body } = {}
--- Per joint: the Transform written last frame, and the animation's own value under it (as in client/ArmPose.luau).
-local written: { [Instance]: CFrame } = {}
-local animated: { [Instance]: CFrame } = {}
+-- The joints this module posed (6.7: their values are client/PoseLedger.luau's, shared with ArmPose and BodyLife: the
+-- animation's own value under them, what the layers before this one wrote this frame).
+local written: { [Instance]: boolean } = {}
 local pose = RunCycle.blank() -- (one table, filled per character)
 local sweptAt = 0
 
-local function baseOf(joint: any): CFrame
-	local live: CFrame = joint.Transform
-	local mine = written[joint]
-	if mine and Joints.same(live, mine) then
-		return animated[joint] or CFrame.identity
-	end
-	animated[joint] = live
-	return live
-end
-
--- `value` (absolute: the rest pose times the cycle) blended over the animation by `w`.
+-- `value` (absolute: the rest pose times the cycle) blended over the animation (and the layers under it) by `w`.
 local function put(joint: any, value: CFrame, w: number)
 	if not joint or not joint.Parent then
 		return
 	end
-	local out = if w >= 0.999 then value else baseOf(joint):Lerp(value, w)
-	joint.Transform = out
-	written[joint] = out
+	Ledger.write(joint, if w >= 0.999 then value else Ledger.now(joint):Lerp(value, w))
+	written[joint] = true
 end
 
--- The joint let go (once): back to the rest pose if it still holds what we wrote; a value the Animator (or ArmPose)
--- wrote this frame stays.
+-- The joint let go (once): back to the animation's value (the rest pose where nothing animates it) if nothing else
+-- wrote it this frame (6.7: client/PoseLedger.luau release).
 local function release(joint: any)
-	if not joint then
+	if not joint or not written[joint] then
 		return
-	end
-	local mine = written[joint]
-	if not mine then
-		return
-	end
-	if joint.Parent and Joints.same(joint.Transform, mine) then
-		joint.Transform = CFrame.identity
 	end
 	written[joint] = nil
-	animated[joint] = nil
+	Ledger.release(joint)
 end
 
 local function gone(joint: any): boolean
@@ -256,7 +240,6 @@ local function sweep(now: number)
 	for joint in written do
 		if not joint.Parent then
 			written[joint] = nil
-			animated[joint] = nil
 		end
 	end
 end
