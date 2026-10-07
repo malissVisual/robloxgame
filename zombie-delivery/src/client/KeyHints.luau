@@ -274,7 +274,8 @@ local function update(gui: any)
 		return
 	end
 	shown = key
-	chip.Text = if unfolded and not squeezed then "KEYS ▴  [F1]" else "? KEYS  [F1]"
+	-- (6.4.1: plain text: the game font has no "▴", it showed as a missing-glyph box)
+	chip.Text = if unfolded and not squeezed then "KEYS · HIDE  [F1]" else "? KEYS  [F1]"
 	for index, label in lines do
 		local text = shownTexts[index]
 		label.Visible = text ~= nil and text ~= ""

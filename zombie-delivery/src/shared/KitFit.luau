@@ -13,10 +13,24 @@
 --                                uniform factor so the phone keeps its shape)
 --   KitFit.fit(pieces, scales)   copies of the pieces with their offsets and sizes scaled per their bone (a turned
 --                                piece's size follows the scaled direction of each of its own axes)
+-- 6.4.1, the worn bag (server/KitWear.luau; tests/bagfill_test.luau):
+--   KitFit.R6                    the R15 part a piece hangs on → its stand-in on an R6 body (the bag under "Left Arm",
+--                                the straps and the bag's places on the "Torso"); KitFit.factors scales the art to it
+--   KitFit.bagKey(id, place, packed) / KitFit.parseBagKey(key)  the worn bag's slot key "id@place" ("+" at the end:
+--                                a backpack is worn, a slung bag hangs behind it) and back: (id, place, packed) or nil.
+--                                Only the id is a KitArt look (6.4 asked KitArt for "bag@hand": the bag never showed)
+--   KitFit.bagGrip(id, place, part, size, packed)  where the bag's pivot hangs on that body part (`part` the R15 name
+--                                it stands for, `size` the real part's): its offset { x, y, z } and turn (degrees).
+--                                "hand": Config.Courier.Bag.Grip under the hand (HandOut[id] further out), else
+--                                Config.Courier.BagPlaces[place] scaled to the part (PackPush further back when packed)
 --
 -- Pure Luau (tests/kitfit_test.luau).
 
+local Config = require(script.Parent.Config)
+
 local KitFit = {}
+
+KitFit.R6 = { UpperTorso = "Torso", LeftHand = "Left Arm", LeftUpperArm = "Left Arm", RightUpperArm = "Right Arm" } :: { [string]: string }
 
 export type Kit = { [string]: boolean }
 export type Scale = { number } -- x, y, z
@@ -122,6 +136,31 @@ function KitFit.fit(pieces: { any }, scales: { [string]: Scale }): { any }
 		table.insert(out, copy)
 	end
 	return out
+end
+
+-- 6.4.1: the worn bag's slot key and back.
+function KitFit.bagKey(id: string, place: string, packed: boolean): string
+	return `{id}@{place}{if packed then "+" else ""}`
+end
+
+function KitFit.parseBagKey(key: string): (string?, string?, boolean)
+	local id, place, packed = string.match(key, "^([^@]+)@(%w+)(%+?)$")
+	if not id or not place then
+		return nil, nil, false
+	end
+	return id, place, packed == "+"
+end
+
+-- 6.4.1: the bag's pivot on its body part (see the header). `part` is the R15 name the place is authored for.
+function KitFit.bagGrip(id: string, place: string, part: string, size: Scale, packed: boolean): (Scale, Scale)
+	local C = Config.Courier
+	local spot = C.BagPlaces[place]
+	if not spot then
+		return { -(C.HandOut[id] or 0), -(size[2] or 0) / 2 - C.Bag.Grip, 0 }, { 0, 0, 0 }
+	end
+	local f = KitFit.factors(part, size)
+	local back = if packed and (place == "back" or place == "hipBack") then C.PackPush else 0
+	return { spot.at[1] * f[1], spot.at[2] * f[2], spot.at[3] * f[3] + back }, { spot.turn[1], spot.turn[2], spot.turn[3] }
 end
 
 return KitFit

@@ -21,6 +21,13 @@
 -- character's BagSwitchAt, the server time: the new pivot replaces the old one) it starts where it was, relative to
 -- the body, and moves to its new place over Config.Courier.Switch seconds while the sling / unsling gesture plays
 -- (client/ArmPose.luau). Still the joint's only writer.
+-- 6.4.1: the joint may hang from an R6 body's "Left Arm" or "Torso" (server/KitWear.luau, KitFit.R6): it is found by
+-- its pivot, whatever its Part0. The Transform stays a rotation about the grip in the hand (and a few hundredths of a
+-- stud of bounce elsewhere), so the bag never leaves its place. And once per spawn, Config.Courier.BagCheck.After
+-- seconds after your bag shows (the character's BagWorn attribute), a look whether it really is on you; when not, the
+-- Output says why, for the owner to paste: no parts, all see-through, or farther than BagCheck.Far studs from your hand
+-- or from its place, e.g. "[BagSway] your bag is 37.2 studs from your hand (style hand, joint LeftHand → KitBagPivot,
+-- C0 (0.00, -0.27, 0.00), Transform (0.00, 0.00, 0.00))".
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +45,7 @@ local C = Config.Courier -- 6.4: Bounce, BackBob, Step, Switch, Wear
 local SWITCH = math.max(0.05, C.Switch)
 local WEAR = BagSwing.tuning(B :: any, C.Wear) -- 6.4: a bag on the shoulder or the hip: a stiff little swing
 local LOOK = 0.4 -- seconds between the looks for a bag on a character that has none
+local CHECK = Config.Courier.BagCheck -- 6.4.1: the look whether your bag is really on you
 local SWEEP = 5 -- seconds between the clean-ups of the characters that are gone
 
 -- 6.4: every bag's own swing (Config.Courier.Bags over Bag: the bigger, the heavier), made once per bag id. The pivot's
@@ -70,6 +78,7 @@ type Rec = {
 }
 
 local recs: { [Model]: Rec } = {}
+local checks: { [Model]: number | boolean } = {} -- 6.4.1: your body → when its bag showed (os.clock), true: looked
 local sweptAt = 0
 local handVec = { 0, 0, 0 } -- (reused every frame)
 local bodyVec = { 0, 0, 0 }
@@ -85,6 +94,59 @@ local function find(character: Model): (Motor6D?, BasePart?)
 		end
 	end
 	return nil, nil
+end
+
+-- 6.4.1: "(x, y, z)" to two decimals, for the Output.
+local function v3(v: Vector3): string
+	return string.format("(%.2f, %.2f, %.2f)", v.X, v.Y, v.Z)
+end
+
+-- 6.4.1: is your bag really on you? Once, a while after it showed; says in the Output what is wrong (nothing when all
+-- is well). `worn` the BagWorn attribute.
+local function diagnose(character: Model, worn: string)
+	local pivot = character:FindFirstChild("KitBagPivot")
+	local art = character:FindFirstChild("KitBagArt")
+	local parts: { BasePart } = {}
+	if art then
+		for _, child in art:GetChildren() do
+			if child:IsA("BasePart") then
+				table.insert(parts, child)
+			end
+		end
+	end
+	if not pivot or not pivot:IsA("BasePart") or #parts == 0 then
+		warn(`[BagSway] your bag ({worn}) has no parts on your character (pivot {if pivot then "yes" else "no"}, art parts {#parts}): the server built none, look for a [KitWear] line in the server Output`)
+		return
+	end
+	local joint = pivot:FindFirstChild("BagSwing")
+	if not joint or not joint:IsA("Motor6D") or not joint.Part0 then
+		warn(`[BagSway] your bag's joint is {if joint then joint.ClassName else "missing"}: it cannot hang from your hand (style {worn})`)
+		return
+	end
+	local hand = joint.Part0 :: BasePart
+	local about = `style {worn}, joint {hand.Name} → {pivot.Name}, C0 {v3(joint.C0.Position)}, Transform {v3(joint.Transform.Position)}`
+	local place = (hand.CFrame * joint.C0).Position
+	local off = (pivot.Position - place).Magnitude
+	if off > CHECK.Far then
+		warn(string.format("[BagSway] your bag sits %.1f studs from its place (%s)", off, about))
+	end
+	local far, clear = 0, 0
+	for _, part in parts do
+		far = math.max(far, (part.Position - hand.Position).Magnitude)
+		if part.Transparency < 0.95 and part.LocalTransparencyModifier < 0.95 then
+			clear += 1
+		end
+	end
+	if far > CHECK.Far then
+		warn(string.format("[BagSway] your bag is %.1f studs from your hand (%s)", far, about))
+	end
+	local camera = workspace.CurrentCamera
+	local head = character:FindFirstChild("Head")
+	local firstPerson = camera ~= nil and head ~= nil and head:IsA("BasePart") and (camera.CFrame.Position - head.Position).Magnitude < 1
+	if clear == 0 and not firstPerson then
+		local part = parts[1]
+		warn(string.format("[BagSway] your bag's %d parts are all see-through (Transparency %.2f, LocalTransparencyModifier %.2f; %s)", #parts, part.Transparency, part.LocalTransparencyModifier, about))
+	end
 end
 
 -- Our Transform off the joint (it hangs as the hand holds it), the swing forgotten.
@@ -123,6 +185,28 @@ local function step(dt: number)
 				forget(character)
 			end
 			continue
+		end
+		-- 6.4.1: your bag, once per spawn: a look whether it is really on you
+		if player == me and checks[character] ~= true then
+			local worn = character:GetAttribute("BagWorn")
+			local since = checks[character]
+			if type(worn) ~= "string" then
+				checks[character] = nil
+			elseif type(since) ~= "number" then
+				checks[character] = now
+			elseif now - since >= CHECK.After then
+				-- (6.4.1 review: not on a dead body, nor while a body part is being swapped: the bag hangs loose
+				-- for a moment then; look again a little later)
+				local pivot = character:FindFirstChild("KitBagPivot")
+				local joint = pivot and pivot:FindFirstChild("BagSwing")
+				local part0 = if joint and joint:IsA("Motor6D") then joint.Part0 else nil
+				if humanoid.Health <= 0 or (part0 ~= nil and part0.Parent ~= character) then
+					checks[character] = now
+				else
+					checks[character] = true
+					diagnose(character, worn)
+				end
+			end
 		end
 		local rec = recs[character]
 		if not rec then
@@ -216,6 +300,11 @@ local function step(dt: number)
 		for character in recs do
 			if not character.Parent then
 				recs[character] = nil
+			end
+		end
+		for character in checks do
+			if not character.Parent then
+				checks[character] = nil
 			end
 		end
 	end

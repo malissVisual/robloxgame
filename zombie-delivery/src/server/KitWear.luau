@@ -42,6 +42,15 @@
 -- rescaling a body part, the profile changing, PackCount, sitting, the Carrying / Pushing / Aiming attributes, the
 -- phone remote), at most every REFRESH seconds, and only what changed is built again (Builder.destroy first). Death
 -- takes everything off at once; leaving cleans up.
+--
+-- 6.4.1, the bag shows again: 6.4's slot key "id@place" went to KitArt.pieces as a look ("Unknown kit id: bag@hand"),
+-- which threw inside every refresh, so no bag was ever built (and nothing after it in that refresh). The hand slot no
+-- longer asks KitArt for its key (KitFit.parseBagKey gives the look), and one slot that fails to build only warns:
+-- the rest of the outfit is still put on. An R6 body wears the kit too (KitFit.R6: the bag under "Left Arm", the
+-- straps, the pack and the bag's places on the "Torso"). What is in the bag shows (shared/BagFill.luau): the pieces
+-- (the player's BagCount / BagLooks attributes, server/Cargo.luau) stick out of its opening and the body swells; only
+-- the bag's art is built again when they change (the pivot and its swinging joint stay). tools/character-art/check.py
+-- builds every bag in every place on the courier's R15 body and on an R6 body offline.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,6 +61,7 @@ local KitFit = require(Shared.KitFit)
 local Net = require(Shared.Net)
 local TransportRules = require(Shared.Transport) -- 6.4: the active bag
 local Holding = require(Shared.Holding) -- 6.4: where the bag is worn
+local BagFill = require(Shared.BagFill) -- 6.4.1: what is in the bag shows
 local PlayerData = require(script.Parent.PlayerData)
 local Builder = require(script.Parent.ModelArt.Builder)
 local Npcs = require(script.Parent.Npcs) -- 6.0: the vest's put-on gesture
@@ -71,8 +81,10 @@ local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aim
 -- Carrying any more (the cargo is held over it; taking it off and on was the blink), and the Hand attribute decides.
 local BAG_BUSY: { [string]: boolean } = { Pushing = true, Hand = true }
 
--- (6.0: `pivot` = the bag's part hung from the hand, removed with the slot)
-type Slot = { key: string, built: Builder.Built, parts: { [string]: BasePart }, sizes: { [string]: Vector3 }, pivot: BasePart? }
+-- (6.0: `pivot` = the bag's part hung from the hand, removed with the slot. 6.4.1: `fill` = what its art shows in it,
+-- "count:looks")
+type Slot = { key: string, built: Builder.Built, parts: { [string]: BasePart }, sizes: { [string]: Vector3 }, pivot: BasePart?, fill: string? }
+export type Fill = { count: number, looks: { string }, key: string }
 type Wearer = { character: Model, slots: { [string]: Slot }, connections: { RBXScriptConnection }, sized: { [BasePart]: boolean }, hand: any? }
 
 local wearers: { [Player]: Wearer } = {}
@@ -80,7 +92,18 @@ local wantPhone: { [Player]: boolean } = {} -- the phone window is open (what th
 local queued: { [Player]: boolean } = {}
 local vests: { [Player]: string | false } = {} -- 6.0: the vest worn at the last look (false: none; nil: not looked yet)
 
--- The art's pieces for a slot (fresh tables: the fit copies them anyway).
+-- 6.4.1: a body part by its R15 name, or its stand-in on an R6 body (KitFit.R6: "Left Arm" for the LeftHand, the
+-- "Torso" for the UpperTorso …).
+local function bodyPart(character: Model, name: string): BasePart?
+	local part = character:FindFirstChild(name)
+	if not part then
+		local stand = KitFit.R6[name]
+		part = if stand then character:FindFirstChild(stand) else nil
+	end
+	return if part and part:IsA("BasePart") then part else nil
+end
+
+-- The art's pieces for a slot (fresh tables: the fit copies them anyway). Never the hand slot (its key is "id@place").
 local function piecesFor(slot: string, id: string): { any }
 	if slot == "strap" then
 		-- 6.4: a worn bag's strap on the torso (the key "id@place": KitArt.straps)
@@ -134,14 +157,15 @@ local function seeThrough(built: Builder.Built)
 end
 
 -- 6.0: the bag's pivot, hung from the left hand by the BagSwing Motor6D (the clients write its Transform), placed
--- before the art is built on it. Nil without a left hand (an R6 avatar). 6.4: `place` (Config.Courier.BagPlaces:
--- "hand", or "shoulder" / "hip" / "back" / "hipBack" on the UpperTorso, scaled to it; `packed`: a backpack is worn,
--- a slung bag hangs PackPush further back); the pivot's Bag and Worn attributes tell client/BagSway.luau which bag
--- hangs where.
+-- before the art is built on it. Nil without a left hand. 6.4: `place` (Config.Courier.BagPlaces: "hand", or
+-- "shoulder" / "hip" / "back" / "hipBack" on the UpperTorso, scaled to it; `packed`: a backpack is worn, a slung bag
+-- hangs PackPush further back); the pivot's Bag and Worn attributes tell client/BagSway.luau which bag hangs where.
+-- 6.4.1: the spot is KitFit.bagGrip's (tested); on an R6 body the "Left Arm" / the "Torso" (KitFit.R6).
 local function hangBag(character: Model, id: string, place: string, packed: boolean): (BasePart?, BasePart?)
 	local spot = Config.Courier.BagPlaces[place]
-	local hand = character:FindFirstChild(if spot then spot.part else "LeftHand")
-	if not hand or not hand:IsA("BasePart") then
+	local name = if spot then spot.part else "LeftHand"
+	local hand = bodyPart(character, name)
+	if not hand then
 		return nil, nil
 	end
 	local pivot = Instance.new("Part")
@@ -150,15 +174,10 @@ local function hangBag(character: Model, id: string, place: string, packed: bool
 	pivot:SetAttribute("Worn", if place == "hipBack" then "back" else place) -- 6.4: its motion
 	pivot.Size = Vector3.new(0.2, 0.2, 0.2)
 	pivot.Transparency = 1
+	pivot.Anchored = false -- (never anchored: joined to the body, it would freeze it)
 	pivot.Massless, pivot.CanCollide, pivot.CanQuery, pivot.CanTouch, pivot.CastShadow = true, false, false, false, false
-	local grip = CFrame.new(-(Config.Courier.HandOut[id] or 0), -hand.Size.Y / 2 - Config.Courier.Bag.Grip, 0)
-	if spot then
-		local f = KitFit.factors(spot.part, { hand.Size.X, hand.Size.Y, hand.Size.Z })
-		local back = if packed and (place == "back" or place == "hipBack") then Config.Courier.PackPush else 0
-		local turn = spot.turn
-		grip = CFrame.new(spot.at[1] * f[1], spot.at[2] * f[2], spot.at[3] * f[3] + back)
-			* CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
-	end
+	local at, turn = KitFit.bagGrip(id, place, name, { hand.Size.X, hand.Size.Y, hand.Size.Z }, packed)
+	local grip = CFrame.new(at[1], at[2], at[3]) * CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
 	pivot.CFrame = hand.CFrame * grip
 	local joint = Instance.new("Motor6D")
 	joint.Name = "BagSwing"
@@ -171,13 +190,32 @@ local function hangBag(character: Model, id: string, place: string, packed: bool
 end
 
 -- 6.1: the bag's art on `pivot` (its grip: the bag hangs down -Y), its plastic see-through; under `parent`. 6.4: `id`
--- the bag (a Config.Kit bag with a KitArt look; nil or unknown: the plastic bag).
-function KitWear.bagArt(parent: Instance, pivot: BasePart, id: string?): Builder.Built?
+-- the bag (a Config.Kit bag with a KitArt look; nil or unknown: the plastic bag). 6.4.1: `count` pieces in it (their
+-- `looks`, in order; missing ones show as parcels) stick out of its opening, up to its room, and its body swells
+-- (shared/BagFill.luau).
+function KitWear.bagArt(parent: Instance, pivot: BasePart, id: string?, count: number?, looks: { string }?): Builder.Built?
 	local look = if id and KitArt.bags[id] then id else Config.Courier.BagKit
-	local spec: Builder.Spec = { id = NAMES.hand, pieces = KitArt.pieces(look) :: any }
-	local ok, made = pcall(Builder.build, parent, spec, { BagPivot = pivot })
+	local ok, made = pcall(function(): Builder.Built
+		local pieces: { any } = KitArt.pieces(look)
+		local mouth = Config.Courier.BagFill.Mouth[look]
+		local def = TransportRules.findKit(look)
+		local room = if def and def.extra then def.extra else 0
+		local inside = math.max(0, math.floor(count or 0))
+		if mouth and inside > 0 then
+			pieces = BagFill.swell(pieces, mouth, inside, room)
+			for _, piece in BagFill.pieces(mouth, inside, room, looks) do
+				table.insert(pieces, piece)
+			end
+		end
+		local spec: Builder.Spec = { id = NAMES.hand, pieces = pieces :: any }
+		return Builder.build(parent, spec, { BagPivot = pivot })
+	end)
 	if not ok then
 		warn(`[KitWear] bag {look}: {made}`)
+		if (count or 0) > 0 then
+			-- (6.4.1 review: the contents went wrong: the bag itself still shows, empty)
+			return KitWear.bagArt(parent, pivot, id, 0, nil)
+		end
 		return nil
 	end
 	local built = made :: Builder.Built
@@ -205,35 +243,36 @@ function KitWear.bagDrop(id: string?): number
 	return low
 end
 
--- One slot built on the character, fitted to its body parts; nil when a body part is missing (an R6 avatar).
-local function build(character: Model, slot: string, id: string): Slot?
-	local pieces = piecesFor(slot, id)
-	local parts: { [string]: BasePart } = {}
-	local sizes: { [string]: Vector3 } = {}
-	local scales: { [string]: KitFit.Scale } = {}
+-- One slot built on the character, fitted to its body parts; nil when a body part is missing. 6.4.1: `fill` what the
+-- bag shows in it (the hand slot). The offline check (tools/character-art/check.py) calls it as KitWear.build.
+local function build(character: Model, slot: string, id: string, fill: Fill?): Slot?
 	if slot == "hand" then
 		-- 6.0: the bag, on its pivot (not fitted: it hangs, the hand's size does not shape it). 6.4: the key is
-		-- "id@place" (bagKey), "+" at the end while a backpack is worn.
-		local bagId, place, packed = string.match(id, "^([^@]+)@(%w+)(%+?)$")
+		-- "id@place" (KitFit.bagKey), "+" at the end while a backpack is worn; 6.4.1: only `bagId` is a KitArt look.
+		local bagId, place, packed = KitFit.parseBagKey(id)
 		if not bagId or not place then
 			return nil
 		end
-		local hand, pivot = hangBag(character, bagId, place, packed == "+")
+		local hand, pivot = hangBag(character, bagId, place, packed)
 		if not hand or not pivot then
 			return nil
 		end
-		local bag = KitWear.bagArt(character, pivot, bagId)
+		local bag = KitWear.bagArt(character, pivot, bagId, if fill then fill.count else 0, if fill then fill.looks else nil)
 		if not bag then
 			pivot:Destroy()
 			return nil
 		end
-		return { key = id, built = bag, parts = { [hand.Name] = hand }, sizes = { [hand.Name] = hand.Size }, pivot = pivot }
+		return { key = id, built = bag, parts = { [hand.Name] = hand }, sizes = { [hand.Name] = hand.Size }, pivot = pivot, fill = if fill then fill.key else "" }
 	end
+	local pieces = piecesFor(slot, id)
+	local parts: { [string]: BasePart } = {}
+	local sizes: { [string]: Vector3 } = {}
+	local scales: { [string]: KitFit.Scale } = {}
 	for _, piece in pieces do
 		local bone: string = piece.attach
 		if not parts[bone] then
-			local part = character:FindFirstChild(bone)
-			if not part or not part:IsA("BasePart") then
+			local part = bodyPart(character, bone) -- (6.4.1: an R6 body's stand-in, scaled to it below)
+			if not part then
 				return nil
 			end
 			parts[bone], sizes[bone] = part, part.Size
@@ -251,11 +290,20 @@ local function build(character: Model, slot: string, id: string): Slot?
 	end
 	return { key = id, built = built :: Builder.Built, parts = parts, sizes = sizes }
 end
+KitWear.build = build
+
+-- 6.4.1: what the bag in the hand slot shows (the pieces in it: the player's BagCount and BagLooks attributes).
+local function fillOf(player: Player): Fill
+	local count = math.max(0, math.floor(tonumber(player:GetAttribute("BagCount")) or 0))
+	local looks = if count > 0 then BagFill.looks(player:GetAttribute("BagLooks")) else {}
+	return { count = count, looks = looks, key = if count > 0 then `{count}:{table.concat(looks, ",")}` else "" }
+end
 
 -- Still on the same body parts, of the same size (the avatar may replace or rescale them after the spawn)?
 local function fits(character: Model, slot: Slot): boolean
 	for bone, part in slot.parts do
-		if part.Parent ~= character or part.Size ~= slot.sizes[bone] or character:FindFirstChild(bone) ~= part then
+		-- (6.4.1: by the part's own name: an R6 stand-in is filed under the R15 name it stands for)
+		if part.Parent ~= character or part.Size ~= slot.sizes[bone] or character:FindFirstChild(part.Name) ~= part then
 			return false
 		end
 	end
@@ -292,7 +340,7 @@ end
 
 local function bagKey(bag: Config.KitDef, worn: string, packed: boolean): string
 	local place = if worn == "back" and bag.carry == "hip" then "hipBack" else worn
-	return `{bag.id}@{place}{if packed and worn == "back" then "+" else ""}`
+	return KitFit.bagKey(bag.id, place, packed and worn == "back")
 end
 
 local function holdsPhone(player: Player, character: Model, humanoid: Humanoid): boolean
@@ -334,7 +382,8 @@ local function refresh(player: Player)
 		if bag and worn then
 			local key = bagKey(bag, worn, wanted.pack ~= nil)
 			wanted.hand = key
-			if #KitArt.straps(bag.id, string.match(key, "@(%w+)") or worn) > 0 then
+			local _, place = KitFit.parseBagKey(key)
+			if #KitArt.straps(bag.id, place or worn) > 0 then
 				wanted.strap = key
 			end
 		else
@@ -366,12 +415,26 @@ local function refresh(player: Player)
 			wearer.slots[slot] = nil
 		end
 	end
+	local fill = fillOf(player)
 	for slot, id in wanted do
 		if not wearer.slots[slot] then
-			local made = build(character, slot, id)
-			if made then
+			-- (6.4.1: one slot that fails says so and the others are still put on: 6.4's bag error stopped them all)
+			local ok, made = pcall(build, character, slot, id, if slot == "hand" then fill else nil)
+			if not ok then
+				warn(`[KitWear] {slot} {id}: {made}`)
+			elseif made then
 				wearer.slots[slot] = made
 			end
+		end
+	end
+	-- 6.4.1: the pieces in the bag changed: only its art is built again, on the same pivot (its joint keeps swinging)
+	local bagSlot = wearer.slots.hand
+	if bagSlot and bagSlot.pivot and bagSlot.fill ~= fill.key then
+		local art = KitWear.bagArt(character, bagSlot.pivot, (KitFit.parseBagKey(bagSlot.key)), fill.count, fill.looks)
+		if art then
+			Builder.destroy(bagSlot.built)
+			bagSlot.built = art
+			bagSlot.fill = fill.key
 		end
 	end
 	-- 6.0: a vest put on while you play (not the one you joined or respawned with): the put-on gesture.
@@ -455,6 +518,7 @@ local function dress(player: Player, character: Model)
 		table.insert(wearer.connections, humanoid.Died:Connect(function()
 			takeOff(wearer) -- at once: the body falls apart, loose pieces would drop through the world
 			character:SetAttribute("PhoneHeld", nil)
+			character:SetAttribute("BagWorn", nil) -- (6.4.1 review: no bag on a dead body: BagSway's check stays quiet)
 		end))
 		schedule(player)
 	end)
@@ -468,6 +532,13 @@ local function watch(player: Player)
 		schedule(player)
 	end)
 	player:GetAttributeChangedSignal("PackCount"):Connect(function()
+		schedule(player)
+	end)
+	-- 6.4.1: the pieces in the bag (its art shows them)
+	player:GetAttributeChangedSignal("BagCount"):Connect(function()
+		schedule(player)
+	end)
+	player:GetAttributeChangedSignal("BagLooks"):Connect(function()
 		schedule(player)
 	end)
 	if player.Character then

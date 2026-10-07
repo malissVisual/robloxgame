@@ -251,7 +251,7 @@ type Piece = {
 }
 
 -- 6.1: the plastic bag set down on the ground with its cargo (only the owner picks it up).
-type BagDown = { pieces: { Piece }, model: Model, prompt: ProximityPrompt, at: Vector3 }
+type BagDown = { pieces: { Piece }, model: Model, prompt: ProximityPrompt, at: Vector3, base: BasePart?, id: string?, art: any? }
 
 -- 3.7: pieces, bottom first (two light pieces stacked; one otherwise). The prompt (Put down / Let go) sits on the top one.
 -- 4.0: `tool` = on the trolley or the jack the player pushes (no prompt: the tool's own G).
@@ -1425,6 +1425,8 @@ end
 -- there is no foot job).
 -- 6.1: PackRoom is the room that is yours now (the bag's only in your hand), BagCount the pieces in the bag (with you
 -- or lying on the ground). 6.3: BagRoom the bag's own room on this job (the bottom bar's "n/room"; nil off a foot job).
+-- 6.4.1: BagLooks the looks of the pieces in the bag, in order ("pizza,bouquet"; nil when none): server/KitWear.luau
+-- shows them sticking out of the bag (shared/BagFill.luau).
 local function packShown(session: Session)
 	local owner = session.owner
 	local on = session.info.foot == true and not session.ended
@@ -1448,6 +1450,21 @@ local function packShown(session: Session)
 	end
 	if owner:GetAttribute("BagRoom") ~= bagRoom then
 		owner:SetAttribute("BagRoom", bagRoom)
+	end
+	local looks: { string } = {}
+	if on then
+		for _, piece in session.pack do
+			if piece.inBag then
+				table.insert(looks, piece.look)
+			end
+		end
+		for _, piece in (if down then down.pieces else {}) :: { Piece } do
+			table.insert(looks, piece.look)
+		end
+	end
+	local text = if #looks > 0 then table.concat(looks, ",") else nil
+	if owner:GetAttribute("BagLooks") ~= text then
+		owner:SetAttribute("BagLooks", text)
 	end
 end
 
@@ -3614,6 +3631,19 @@ end
 -- (6.1 review: the prompt's count follows the pieces: a failed order takes its own out)
 local function bagPromptText(down: BagDown)
 	down.prompt.ObjectText = bagText(#down.pieces)
+	-- (6.4.1 review: and its art shows the pieces it holds now: a failed order took its own out, a set-down added more)
+	local base = down.base
+	if base and base.Parent then
+		local old = down.art
+		if old and old.model then
+			old.model:Destroy()
+		end
+		local looks: { string } = {}
+		for _, piece in down.pieces do
+			table.insert(looks, piece.look)
+		end
+		down.art = KitWear.bagArt(down.model, base, down.id, #looks, looks)
+	end
 end
 
 -- The loaded bag left the owner's hand: set down at their feet (a little ahead, on the left) with its pieces, KitWear's
@@ -3671,11 +3701,16 @@ local function setBagDown(session: Session): boolean
 	base.CFrame = CFrame.lookAt(spot + up, spot + up + look) * CFrame.Angles(0, math.rad(25), 0)
 	base.Parent = model
 	model.PrimaryPart = base
-	KitWear.bagArt(model, base, id)
+	-- (6.4.1: with its pieces sticking out of it)
+	local looks: { string } = {}
+	for _, piece in pieces do
+		table.insert(looks, piece.look)
+	end
+	local art = KitWear.bagArt(model, base, id, #looks, looks)
 	model.Parent = folder
 	local p = prompt(base, "Pick up bag", bagText(#pieces), nil, Config.Hand.BagHold, session.owner)
 	p.MaxActivationDistance = Config.Hand.BagReach
-	local made: BagDown = { pieces = pieces, model = model, prompt = p, at = spot }
+	local made: BagDown = { pieces = pieces, model = model, prompt = p, at = spot, base = base, id = id, art = art }
 	session.bagDown = made
 	p.Triggered:Connect(function(by)
 		pickUpBag(session, by)
