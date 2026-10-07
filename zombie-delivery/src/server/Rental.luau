@@ -316,33 +316,66 @@ local function rent(player: Player, state: DockState)
 		tell(player, if other then `This dock is empty. The next scooter: {other.dock.name}, {math.floor(far)} studs.` else "Every scooter is out. Try again in a moment.")
 		return
 	end
+	-- 5.7: everything the rental needs is checked before your own vehicle goes home (the scooter's def, the money).
+	if not Economy.findCar(Tuning.CarId) then
+		warn(`[Rental] Config.Rental.CarId {Tuning.CarId} is not a car`)
+		tell(player, "ZDC RIDE is not working right now.")
+		return
+	end
+	if Tuning.Price > 0 and profile.money < Tuning.Price then
+		tell(player, "Not enough money.")
+		return
+	end
 	local own = Vehicles.get(player)
+	local ownId: string?, ownFrame: CFrame? = nil, nil
 	if own then
 		if own.repairing then
 			tell(player, "Your car is on a repair lift: wait for it, or take it off first.")
 			return
 		end
-		local def = Economy.findCar(own.id)
-		local bike = def ~= nil and def.bike == true
+		ownId, ownFrame = own.id, own.chassis.CFrame
 		Vehicles.remove(player)
-		if not own.lent then
-			tell(player, `Your {if def then def.name else "vehicle"} went home: {if bike then "MY BIKE" else "BRING MY CAR"} on your phone brings it back.`)
+	end
+	-- 5.7: the rental did not come (an error, the save gone): your own vehicle comes back where it stood.
+	local function giveOwnBack()
+		if not ownId or not ownFrame or not player.Parent then
+			return
+		end
+		local p = ownFrame.Position
+		local flat = Vector3.new(ownFrame.LookVector.X, 0, ownFrame.LookVector.Z)
+		local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, 1)
+		local at = Vector3.new(p.X, Vehicles.groundY(p.X, p.Z, p.Y) + 0.5, p.Z)
+		local ok, err = pcall(Vehicles.spawnAt, player, ownId, CFrame.lookAt(at, at + look), false)
+		if not ok then
+			warn(`[Rental] {player.Name}'s own vehicle could not come back: {err}`)
 		end
 	end
 	if Tuning.Price > 0 and not PlayerData.spend(player, Tuning.Price) then
+		giveOwnBack()
 		tell(player, "Not enough money.")
 		return
 	end
 	local slot = state.slots[index]
 	local x, z = slot.ground.Position.X, slot.ground.Position.Z
 	local position = Vector3.new(x, Vehicles.groundY(x, z, WALK_TOP) + 0.5, z)
-	local car = Vehicles.spawnAt(player, Tuning.CarId, CFrame.lookAt(position, position + slot.ground.LookVector), false, nil, true)
+	local spawned, result = pcall(Vehicles.spawnAt, player, Tuning.CarId, CFrame.lookAt(position, position + slot.ground.LookVector), false, nil, true)
+	local car = if spawned then result else nil
 	if not car then
+		if not spawned then
+			warn(`[Rental] the scooter for {player.Name} failed: {result}`)
+			pcall(Vehicles.remove, player) -- (a scooter half built before the error)
+		end
 		if Tuning.Price > 0 then
 			PlayerData.addMoney(player, Tuning.Price)
 		end
-		tell(player, "Still loading...")
+		giveOwnBack()
+		tell(player, if spawned then "Still loading..." else "ZDC RIDE is not working right now: try again in a moment.")
 		return
+	end
+	if own and not own.lent then
+		local def = Economy.findCar(own.id)
+		local bike = def ~= nil and def.bike == true
+		tell(player, `Your {if def then def.name else "vehicle"} went home: {if bike then "MY BIKE" else "BRING MY CAR"} on your phone brings it back.`)
 	end
 	for _, p in car.paintParts do
 		p.Color = RED

@@ -4706,28 +4706,34 @@ function Jobs.start()
 	-- The quiet twist hears every shot (Gun does not require Jobs: no cycle).
 	Gun.onShot = Jobs.onShot
 	-- 3.7: opening the board sends the current offers; new ones only when they expired (or there were none yet).
+	-- (5.7: Net.latest rate limits these two, Config.Robust.Limits; a burst of board requests is answered once)
 	Net.get("RequestOffers").OnServerEvent:Connect(function(player)
-		local job = jobs[player]
-		if not job or runStacks(job) then -- (5.2: a run that takes more orders shows the board too)
-			sendBoard(player, boardOf(player))
-		end
+		Net.latest(player, "RequestOffers", Config.Robust.Limits.RequestOffers, function()
+			local job = jobs[player]
+			if not job or runStacks(job) then -- (5.2: a run that takes more orders shows the board too)
+				sendBoard(player, boardOf(player))
+			end
+		end)
 	end)
 	-- 5.2: the phone's ORDERS app pins an order (its id; nil: none): the GPS follows it.
-	Net.get("PinOrder").OnServerEvent:Connect(function(player, id)
-		local job = jobs[player]
-		if not job or (id ~= nil and type(id) ~= "number") then
-			return
-		end
-		local order = if type(id) == "number" then orderById(job, id) else nil
-		job.pinned = if order and order.state == "open" then order.id else nil
-		job.switchAt = 0
-		job.dirty = true
+	Net.get("PinOrder").OnServerEvent:Connect(function(player, pinned)
+		Net.latest(player, "PinOrder", Config.Robust.Limits.PinOrder, function(_, id: any)
+			local job = jobs[player]
+			if not job or (id ~= nil and type(id) ~= "number") then
+				return
+			end
+			local order = if type(id) == "number" then orderById(job, id) else nil
+			job.pinned = if order and order.state == "open" then order.id else nil
+			job.switchAt = 0
+			job.dirty = true
+		end, pinned)
 	end)
 	Net.get("AcceptJob").OnServerEvent:Connect(accept)
 	Net.get("RerollTier").OnServerEvent:Connect(reroll) -- 4.7
 	roadEventRemote.OnServerEvent:Connect(answerRoadEvent) -- 4.8: the add-on's Y / NO
 	Net.get("AcceptEmployer").OnServerEvent:Connect(acceptEmployer)
 	Net.get("CancelJob").OnServerEvent:Connect(function(player)
+		if not Net.limit(player, "CancelJob", Config.Robust.Limits.CancelJob) then return end -- 5.7
 		Jobs.fail(player, "Delivery cancelled.")
 	end)
 	Players.PlayerRemoving:Connect(function(player)

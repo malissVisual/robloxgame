@@ -791,12 +791,21 @@ function Shops.start()
 	if not ok then
 		warn(`[Shops] Spoke & Chain's display bikes failed: {err}`)
 	end
-	Net.get("Buy").OnServerEvent:Connect(onBuy)
-	Net.get("Equip").OnServerEvent:Connect(onEquip)
+	-- 5.7: every shop action is rate limited per player (Config.Robust.Limits; the extra clicks of a flood are dropped).
+	local limits = Config.Robust.Limits
+	local function limited(name: string, perSecond: number, handler: (Player, ...any) -> ()): (Player, ...any) -> ()
+		return function(player: Player, ...: any)
+			if Net.limit(player, name, perSecond) then
+				handler(player, ...)
+			end
+		end
+	end
+	Net.get("Buy").OnServerEvent:Connect(limited("Buy", limits.Buy, onBuy))
+	Net.get("Equip").OnServerEvent:Connect(limited("Equip", limits.Equip, onEquip))
 	Net.get("Upgrade").OnServerEvent:Connect(onUpgrade)
-	Net.get("Paint").OnServerEvent:Connect(onPaint)
-	Net.get("Gear").OnServerEvent:Connect(onGear)
-	Net.get("Kit").OnServerEvent:Connect(onKit) -- 5.0
+	Net.get("Paint").OnServerEvent:Connect(limited("Paint", limits.Paint, onPaint))
+	Net.get("Gear").OnServerEvent:Connect(limited("Gear", limits.Gear, onGear))
+	Net.get("Kit").OnServerEvent:Connect(limited("Kit", limits.Kit, onKit)) -- 5.0
 end
 
 return Shops

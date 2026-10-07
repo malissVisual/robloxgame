@@ -117,7 +117,8 @@ node tools/rojo-sync.js zombie-delivery
 ```
 
 (from the repository root). In Studio open a **new Baseplate place** (not the Merge Blades one), then
-**Plugins → Rojo → Connect** and **Play**. Instead of the command you can double-click
+**Plugins → Rojo → Connect** and **Play**. Turn on **StreamingEnabled** in the place (Workspace → StreamingEnabled;
+the city has thousands of parts, and the server warns in the Output when it is off). Instead of the command you can double-click
 `zombie-delivery/spust-zombie-delivery.cmd` (Windows) or `zombie-delivery/spust-zombie-delivery.command` (Mac):
 git pull + the sync.
 

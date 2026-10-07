@@ -3265,4 +3265,28 @@ Config.Residents = {
 	Nicknames = { "Old Pete", "Doc Hansen", "Granny Ruth", "Sarge Kowalski", "Mad Mira", "Tin-Can Tony", "Lucky Jirka", "Two-Dogs Dana", "Bunker Bob", "Radio Ráďa" },
 }
 
+-- 5.7, robustness and load (server/Zombies.luau, shared/Net.luau, server/Shops.luau, server/Jobs.luau, Main.server).
+-- Zombies: TouchEvery = how often (seconds) the car-touch test and the targets' list run (20 Hz, not every frame:
+-- a car at 120 studs/s moves 6 studs between two tests, far less than its own length plus the reach). Limits: how
+-- many requests a second each remote takes from one player (a token bucket: as many in a burst, then that many a
+-- second; Net.limit drops the rest, Net.latest keeps the last one and runs it once there is room again). Aiming,
+-- PinOrder and RequestOffers keep the last (a state: the final one always arrives; a burst of board requests is
+-- answered once); the shop actions and CancelJob drop the extra clicks.
+Config.Robust = {
+	Zombies = {
+		TouchEvery = 0.05,
+	},
+	Limits = {
+		RequestOffers = 2,
+		PinOrder = 5,
+		CancelJob = 2,
+		Buy = 5,
+		Equip = 6,
+		Paint = 5,
+		Gear = 5,
+		Kit = 4,
+		Aiming = 12,
+	},
+}
+
 return Config

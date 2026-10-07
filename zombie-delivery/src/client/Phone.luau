@@ -1624,33 +1624,42 @@ local function startTicker()
 	end
 	ticking = true
 	task.spawn(function()
+		local lastErr: string? = nil
 		while isOpen do
-			local now = clockText()
-			if refs.statusTime then
-				refs.statusTime.Text = now
-			end
-			if refs.shift then refs.shift.Text = shiftText() end
-			if app == "home" then fillHome() end
-			local timer = refs.timer
-			if timer and job and type(job.endsAt) == "number" then
-				local left = job.endsAt - workspace:GetServerTimeNow()
-				timer.Text = Ui.clock(math.max(0, left))
-				timer.TextColor3 = if left < 30 then K.red else K.text
-			end
-			if app == "orders" then
-				OrdersUi.tick() -- 5.2: every order's clock
-				if refs.route then refs.route.update() end
-			end
-			if refs.tow and refs.idMoney then
-				refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
-			end
-			local due = refs.apps.towDue() -- 5.5: GARAGE's badge and its TOW
-			if due ~= refs.towDue then
-				refs.towDue = due
-				refreshBadges()
-				if app == "garage" then
-					renderApp()
+			-- 5.7: one bad tick (a missing ref, an app's error) is warned once and skipped: the loop never dies, so
+			-- `ticking` never sticks on true with no clock running.
+			local ok, err = pcall(function()
+				local now = clockText()
+				if refs.statusTime then
+					refs.statusTime.Text = now
 				end
+				if refs.shift then refs.shift.Text = shiftText() end
+				if app == "home" then fillHome() end
+				local timer = refs.timer
+				if timer and job and type(job.endsAt) == "number" then
+					local left = job.endsAt - workspace:GetServerTimeNow()
+					timer.Text = Ui.clock(math.max(0, left))
+					timer.TextColor3 = if left < 30 then K.red else K.text
+				end
+				if app == "orders" then
+					OrdersUi.tick() -- 5.2: every order's clock
+					if refs.route then refs.route.update() end
+				end
+				if refs.tow and refs.idMoney then
+					refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
+				end
+				local due = refs.apps.towDue() -- 5.5: GARAGE's badge and its TOW
+				if due ~= refs.towDue then
+					refs.towDue = due
+					refreshBadges()
+					if app == "garage" then
+						renderApp()
+					end
+				end
+			end)
+			if not ok and tostring(err) ~= lastErr then
+				lastErr = tostring(err)
+				warn(`[Phone] ticker: {err}`)
 			end
 			task.wait(0.5)
 		end

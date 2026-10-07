@@ -1319,8 +1319,16 @@ local function startTicker()
 	end
 	ticking = true
 	task.spawn(function()
+		local lastErr: string? = nil
 		while open do
-			tickCountdown()
+			-- 5.7: an error in one tick is warned once and skipped, so `ticking` never sticks with no countdown.
+			local ok, err = pcall(function()
+				tickCountdown()
+			end)
+			if not ok and tostring(err) ~= lastErr then
+				lastErr = tostring(err)
+				warn(`[DispatchUi] ticker: {err}`)
+			end
 			task.wait(0.5)
 		end
 		ticking = false

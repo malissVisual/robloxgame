@@ -692,6 +692,12 @@ function PlayerData.save(player: Player, final: boolean?)
 		local success, err = pcall(function()
 			dataStore:UpdateAsync(key(player), function(old: any): any
 				taken = false
+				-- 5.7: a regular autosave still in flight when the leave save started (or after a RESET MY SAVE swapped
+				-- the profile) writes nothing: it would put this server's lock back on a save that was just released
+				-- (the next server would wait for it), or write the old profile over the new one.
+				if not final and (finished[player] or profiles[player] ~= profile) then
+					return nil
+				end
 				if type(old) == "table" and type(old.lock) == "table" and old.lock.job ~= game.JobId then
 					taken = true -- another server took the save over (we were stale): never overwrite its newer data
 					return nil
@@ -729,10 +735,14 @@ function PlayerData.resetSave(player: Player)
 end
 
 function PlayerData.release(player: Player)
-	PlayerData.save(player, true)
-	profiles[player] = nil
-	canSave[player] = nil
-	finished[player] = nil
+	-- 5.7: the leave save runs after every other PlayerRemoving handler (Business pays the last accrual, Jobs ends a
+	-- job, Fuel and Vehicles store the tank and the damage): a deferred thread starts once they all had their turn.
+	task.defer(function()
+		PlayerData.save(player, true)
+		profiles[player] = nil
+		canSave[player] = nil
+		finished[player] = nil -- (with the profile gone, a late autosave's transform still writes nothing)
+	end)
 end
 
 -- 3.7: was this player's save read (so their profile is really theirs)? False while a DataStore failure plays them

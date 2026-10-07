@@ -228,6 +228,10 @@ safely("Buses", require(Server.Buses).start) -- 5.5: the city buses (their stops
 safely("Rental", require(Server.Rental).start) -- 5.6: ZDC RIDE, the free rental scooters and their docks
 safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between the rooftops (the ladders, the rides)
 print("[Server] Zombie Delivery is running")
+-- 5.7: the city is big (thousands of parts): without streaming every client loads all of it at once.
+if not workspace.StreamingEnabled then
+	warn("[Server] workspace.StreamingEnabled is off: turn it on in the place (Workspace → StreamingEnabled) or big parts of the city load on every client at once")
+end
 
 -- The car comes when the player presses PLAY on the start screen (and after every respawn).
 local playing: { [Player]: boolean } = {}
@@ -384,7 +388,10 @@ Players.PlayerRemoving:Connect(function(player)
 	Zombies.clearOwner(player)
 end)
 
-Net.get("Aiming").OnServerEvent:Connect(setAiming)
+-- 5.7: rate limited; the last aim always arrives (Net.latest).
+Net.get("Aiming").OnServerEvent:Connect(function(player, aiming, aimPitch)
+	Net.latest(player, "Aiming", Config.Robust.Limits.Aiming, setAiming, aiming, aimPitch)
+end)
 
 Net.get("Play").OnServerEvent:Connect(function(player)
 	if playing[player] then
@@ -393,11 +400,26 @@ Net.get("Play").OnServerEvent:Connect(function(player)
 	playing[player] = true
 	-- The only Play listener (a PLAY queued during World.build reaches just the first one): the call's PLAY time and
 	-- the trip home first, then the car (at the home garage when there is a home).
-	CarCall.onPlay(player)
-	Estate.onPlay(player)
-	giveCar(player)
-	Tutorial.onPlay(player) -- 3.7: a new player's welcome (after StartDelay)
-	VanQuest.onPlay(player) -- 5.0: Marge's text about Earl's van, when it is due
+	-- 5.7: every step runs on its own (like `safely`): one that errors does not skip the rest, and it is warned. A
+	-- failed PLAY clears `playing`, so a PLAY sent again runs it all again (each step is safe to run twice).
+	local failed = false
+	local function step(name: string, run: (Player) -> ())
+		local ok, err = pcall(function()
+			run(player)
+		end)
+		if not ok then
+			failed = true
+			warn(`[Server] PLAY for {player.Name}: {name} failed: {err}`)
+		end
+	end
+	step("CarCall", CarCall.onPlay)
+	step("Estate", Estate.onPlay)
+	step("the car", giveCar)
+	step("Tutorial", Tutorial.onPlay) -- 3.7: a new player's welcome (after StartDelay)
+	step("VanQuest", VanQuest.onPlay) -- 5.0: Marge's text about Earl's van, when it is due
+	if failed and player.Parent then
+		playing[player] = nil
+	end
 end)
 
 do
