@@ -964,7 +964,7 @@ local function renderShop()
 			cardButton(c, `BUY 1  {Ui.money(def.price)}`, C.green, here and money >= def.price and have < def.max, function()
 				Net.get("Buy"):FireServer("item", def.id, 1)
 			end, 1)
-			cardButton(c, `BUY 5  {Ui.money(def.price * 5)}`, C.green, here and money >= def.price * 5 and have + 5 <= def.max, function()
+			cardButton(c, `BUY 5  {Ui.money(def.price * 5)}`, C.blue, here and money >= def.price * 5 and have + 5 <= def.max, function()
 				Net.get("Buy"):FireServer("item", def.id, 5)
 			end, 2)
 		end
