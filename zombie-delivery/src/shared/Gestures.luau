@@ -17,6 +17,14 @@
 -- 6.7: "pickup" and "land" also bend the body (shared/BodyMotion.luau gesture, their seconds Config.Body.Gestures):
 -- the keys waist / neck ({ x, y, z } degrees) and crouch ({ drop, back } studs, the hips' tip in degrees);
 -- client/ArmPose.luau bends the legs so the feet stay where they stood.
+--   receive  6.7: both hands held in front of the chest, holding the piece just handed over (a receiver at the door)
+-- 6.7, items in the hand (server/HandItem.luau holds the piece in the right hand while these play): give holds the
+-- piece out in both hands a little closer together (a box about a stud wide between them), take and receive hold it
+-- in front of the chest; bag reaches across with it to the bag's mouth and dips in at Config.Courier.HandItem.BagIn
+-- (the piece goes in then); throw winds up until Config.Throw.WindUp (the arm back over the shoulder) and whips
+-- through it (the server lets the piece go at WindUp, half-way through the whip), then follows through.
+-- Gestures.body(kind, t): 6.7, the torso and the head with it (client/BagSway.luau lays them on the Waist and the Neck):
+-- the bag's look down at it, the throw's turn of the torso back and through, a small bow handing over.
 -- Angles are in degrees per joint (rs, re, rw: the right shoulder, elbow, wrist; ls, le, lw: the left), as
 -- { x, y, z }: ArmPose turns them into CFrame.Angles(0, y, 0) * CFrame.Angles(x, 0, z). For an R15 arm hanging
 -- down, +x lifts it forward, +y turns it in (the right arm; the left mirrored), +z lifts the right arm out sideways.
@@ -67,22 +75,33 @@ function Gestures.pose(kind: string, t: number): Pose?
 			rw = { 0, 0, 18 * swing },
 		}
 	elseif kind == "give" then
+		-- (6.7: the hands closer together, the piece held out between them)
 		return {
-			rs = { 74, 10, 0 },
-			re = { 14, 0, 0 },
-			rw = { -16, 0, 0 },
-			ls = { 74, -10, 0 },
-			le = { 14, 0, 0 },
-			lw = { -16, 0, 0 },
+			rs = { 72, 20, 0 },
+			re = { 16, 0, 0 },
+			rw = { -18, 0, 0 },
+			ls = { 72, -20, 0 },
+			le = { 16, 0, 0 },
+			lw = { -18, 0, 0 },
 		}
 	elseif kind == "take" then
 		return {
-			rs = { 62, 12, 0 },
+			rs = { 62, 16, 0 },
 			re = { 30, 0, 0 },
 			rw = { -8, 0, 0 },
-			ls = { 62, -12, 0 },
+			ls = { 62, -16, 0 },
 			le = { 30, 0, 0 },
 			lw = { -8, 0, 0 },
+		}
+	elseif kind == "receive" then
+		-- 6.7: the piece handed over held in front of the chest, the elbows bent
+		return {
+			rs = { 56, 18, 0 },
+			re = { 42, 0, 0 },
+			rw = { -14, 0, 0 },
+			ls = { 56, -18, 0 },
+			le = { 42, 0, 0 },
+			lw = { -14, 0, 0 },
 		}
 	elseif kind == "knock" then
 		-- The fist comes in to the door on every knock (a sharp tap, back out between them), three times.
@@ -99,28 +118,31 @@ function Gestures.pose(kind: string, t: number): Pose?
 		}
 	elseif kind == "bag" then
 		-- 6.0: a piece dropped into the plastic bag: the right hand across to the left hip and in, the left hand
-		-- lifts the bag's mouth a little forward.
-		local dip = math.sin(math.pi * math.clamp(t / (J.Gestures.bag or 0.4), 0, 1))
+		-- lifts the bag's mouth a little forward. 6.7: with the piece in the hand (server/HandItem.luau): across to
+		-- the mouth, in (deepest at HandItem.BagIn, when it goes in), and back.
+		-- (6.7, worked out on the courier's R15 arms: the left hand brings a hand bag up in front of the belly, its mouth
+		-- under the right hand, which reaches across to the middle and dips down into it)
+		local reach, dip = Gestures.bagMove(t)
 		return {
-			rs = { 34 + 12 * dip, 42, 0 },
-			re = { 58 - 10 * dip, 0, 0 },
-			rw = { -20, 0, 0 },
-			ls = { 16, 0, -8 },
-			le = { 22, 0, 0 },
+			rs = { 48 * reach, 58 * reach + 8 * dip, 0 },
+			re = { 40 * reach - 30 * dip, 0, 0 },
+			rw = { -20 * reach - 10 * dip, 0, 0 },
+			ls = { 16 * reach, -58 * reach, 0 },
+			le = { 95 * reach, 0, 0 },
 		}
 	elseif kind == "throw" then
-		-- 6.0: a throw at a door: the right arm winds back over the shoulder, then whips forward and down.
-		local u = math.clamp(t / (J.Gestures.throw or 0.4), 0, 1)
-		local wind = smooth(u / 0.45)
-		local whip = smooth((u - 0.45) / 0.55)
+		-- 6.0: a throw at a door: the right arm winds back over the shoulder, then whips forward and down. 6.7: the
+		-- wind-up ends just before Config.Throw.WindUp, the whip goes through it (the piece leaves the hand there), and
+		-- the left arm points at the door, then swings down.
+		local wind, whip = Gestures.throwMove(t)
 		local function mix(a: number, b: number, c: number): number
 			return a + (b - a) * wind + (c - b) * whip
 		end
 		return {
-			rs = { mix(40, 165, 70), mix(0, -8, 12), mix(10, 25, 0) },
-			re = { mix(30, 90, 10), 0, 0 },
-			rw = { mix(0, 20, -30), 0, 0 },
-			ls = { 50, -10, 0 },
+			rs = { mix(40, 168, 62), mix(0, -10, 14), mix(10, 28, 0) },
+			re = { mix(30, 95, 8), 0, 0 },
+			rw = { mix(0, 25, -35), 0, 0 },
+			ls = { mix(40, 62, 28), mix(-10, -14, -4), 0 },
 			le = { 20, 0, 0 },
 		}
 	elseif kind == "sling" or kind == "unsling" then
@@ -153,6 +175,46 @@ function Gestures.pose(kind: string, t: number): Pose?
 			le = { elbow, 0, 0 },
 			lw = { -10, 0, 0 },
 		}
+	end
+	return nil
+end
+
+-- 6.7: the bag gesture's reach (0..1: across to the bag's mouth) and dip (0..1, deepest at HandItem.BagIn).
+function Gestures.bagMove(t: number): (number, number)
+	local total = J.Gestures.bag or 0.5
+	local at = Config.Courier.HandItem.BagIn
+	local reach = smooth(t / math.max(0.05, total * 0.4))
+	local dip = math.sin(math.pi * math.clamp((t - (at - 0.12)) / 0.24, 0, 1))
+	return reach, dip
+end
+
+-- 6.7: the throw's wind-up (0..1, done just before Config.Throw.WindUp) and whip (0..1, a third of the way through at
+-- WindUp: the arm over the shoulder, coming forward, where the piece leaves the hand).
+function Gestures.throwMove(t: number): (number, number)
+	local release = Config.Throw.WindUp
+	local wind = smooth(t / math.max(0.05, release - 0.05))
+	local whip = smooth((t - (release - 0.05)) / 0.12)
+	return wind, whip
+end
+
+-- 6.7: the torso and the head in a gesture (degrees, { x, y, z } as for the arms: the Waist's and the Neck's turn laid
+-- on top of the animation by client/BagSway.luau; +x tips forward … backward for the waist and lifts the head, +y
+-- turns them to the left); nil for a gesture of the arms alone.
+function Gestures.body(kind: string, t: number): Pose?
+	if kind == "bag" then
+		-- looking down at the bag's mouth on the left, bent a little toward it
+		local reach, dip = Gestures.bagMove(t)
+		return { waist = { -8 * reach, 10 * reach, 0 }, neck = { -22 * reach - 8 * dip, 10 * reach, 0 } }
+	elseif kind == "throw" then
+		-- the torso turns the right shoulder back in the wind-up and through to the left in the whip, leaning into it;
+		-- the head keeps looking at the door
+		local wind, whip = Gestures.throwMove(t)
+		local function mix(a: number, b: number, c: number): number
+			return a + (b - a) * wind + (c - b) * whip
+		end
+		return { waist = { mix(0, 4, -8), mix(0, -24, 16), 0 }, neck = { 0, mix(0, 18, -12), 0 } }
+	elseif kind == "give" then
+		return { waist = { -4, 0, 0 }, neck = { -6, 0, 0 } } -- (a small bow, handing it over)
 	end
 	return nil
 end

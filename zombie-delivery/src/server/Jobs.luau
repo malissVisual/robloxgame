@@ -107,20 +107,24 @@
 --
 -- 5.0, from the bottom (Config.Jobs.Foot, shared/Transport.luau, server/Transport.luau): every offer has a `mode`.
 --   * "foot": the board's ON FOOT section (footOffer, Foot.Offers of them through JobRules.roles), always open, on
---     top of the board: light pieces only, never more than you carry (hands + backpack), a short walk Downtown or in
+--     top of the board: light pieces only, never more than you carry (hands + bag), a short walk Downtown or in
 --     the Suburbs, its own pay and clock (JobRules.footPay / footTime). startJob needs no vehicle (Cargo's foot flow:
 --     Info.foot, the pack); no waves, bandits or road events, now and then a stray walker (strayStep); a thermal
---     jacket slows the food's drain. The tutorial's first delivery is one (Jobs.startTutorialJob).
+--     bag slows the food's drain (6.7: the jacket is gone). The tutorial's first delivery is one (Jobs.startTutorialJob).
 --   * "car": every other job. Without a vehicle of your own (profile.car nil) the ones in your own car are locked
 --     "NEEDS A VEHICLE" (needsVehicle) and refused; the jobs that lend a company vehicle need their level (4+).
 --     5.1: a bike is not a car: riding one (profile.car a bike) they are locked "CALL YOUR CAR" (or NEEDS A VEHICLE).
 --   * 5.1, "bike": the board's BIKE section (footOffer with Config.Jobs.Bike, Bike.Offers of them) from Bike.Level:
 --     light pieces, a longer ride (Downtown, the Suburbs, the Harbor), never more than your bike holds (Transport.bikeOf:
---     its room + its bike gear + your backpack), JobRules.footPay / footTime with the Bike numbers, a ★ job's XP +
+--     its room + its bike gear + your bag), JobRules.footPay / footTime with the Bike numbers, a ★ job's XP +
 --     Bike.XpBonus. Locked without a bike ("NEEDS A BIKE", Spoke & Chain) and while your car is the one you drive
 --     ("RIDE YOUR BIKE": the phone's MY BIKE). Cargo's light flow like a foot job (Info.foot), the pack is the bike's
 --     whole room (riding stows everything); no waves, bandits or road events, Bike.Stray* walkers. A foot job may be
 --     done on a bike too (riding stows the hands: its pack is your whole room then).
+--   * 6.6, one carrying item and the bike's own bag: no backpack any more. On foot your room is the hands + your bag;
+--     on a bike run (or a foot run while your bike is your vehicle) the bike's own bag (Cargo.Info.rack: its rack,
+--     basket or box with its bike gear, Transport.bikeBagOf) + your bag. Every light piece fits every bag, so a
+--     bouquet or a cake is offered and stacked like a pizza (5.3's "does not fit a backpack" limits are gone).
 --
 -- 5.2, several orders at once (Config.Jobs.Orders, shared/JobRules.luau's orders): still one Job a player, now with
 -- its orders (Job.orders: Order = its own offer, clock, stops, pieces, state open / done / failed, pay and rating; a
@@ -128,7 +132,7 @@
 --   * Stacking: while a stackable run is on (JobRules.stackable: an ordinary board delivery on foot, on a bike, or ★ /
 --     ★★ in a car; never a mission, a special, an employer's job, DUO, the Freight Run or the tutorial's) ACCEPT on the
 --     board adds an order of the same mode (addOrder) when the free room takes its pieces (orderRoomOf: hands +
---     backpack, the bike + its gear + the backpack, the car + its gear; minus what the open orders still hold or pick
+--     bag, the bike + its gear + the bag, the car + its gear; minus what the open orders still hold or pick
 --     up) and fewer than Orders.Max[mode] are open. Its stops go at the end of the job's list (Job.offer.stops, so
 --     the indices never move); the board shows + ADD ORDER or why not (NO ROOM (3/4 slots), ORDERS FULL (2/2)).
 --   * Any order of stops (Job.free: an ordinary delivery; the other jobs go stop after stop as before): the current
@@ -157,13 +161,10 @@
 --     without `to` (the bank's gold, the warehouse's fuel to the far places) work as before.
 --   * At a home (Stop.door) the receiver is inside: you knock when you come up (server/Cargo.luau), the door opens and
 --     they step out; now and then nobody is home (Stop.nobody, Places.NobodyHome): "Leave at the door".
---   * The bag: a piece that does not fit a backpack (Bag.fits: a bouquet, a cake, an electronics box, groceries, ice
---     cream) is offered on foot only as many as your hands hold, by bike as many as the bike's own rack / basket / box
---     takes (Cargo.Info.rack), and an order of them is added to a run only while that room is free (stackCheck).
---     The payload's `carried` says where each piece is (hands, pack, rack, vehicle) and where it goes (`place`), the
---     payload's `rack` the rack's room (client/BagUi.luau).
+--   * The bag: the payload's `carried` says where each piece is (hands, bag, rack: 6.6 the bike's bag, pack: a round's
+--     satchel, vehicle) and where it goes (`place`), the payload's `rack` the bike's bag's room (client/BagUi.luau).
 --   * The newspaper round (footOffer "round", in the morning: Config.Jobs.Round): the bundle at The Daily Undead (one
---     E: it goes into the satchel, Cargo.Info.pack grows by it), a paper to every door on one or two streets
+--     E: it goes into the satchel, 6.6: Cargo.Info.satchel), a paper to every door on one or two streets
 --     (Deliveries.round: Stop.toss, "Toss newspaper" from Round.TossRange), its own pay and clock (JobRules.roundPay /
 --     roundTime), the tip for no paper in the bushes (Cargo.missesOf, JobRules.roundTip) in payOrder. One order on its
 --     own (never stacked).
@@ -735,11 +736,12 @@ local function payload(job: Job): { [string]: any }
 		freshness = if JobRules.hasRule(mine.rules, "food") then order.freshness else nil,
 		ruleLine = JobRules.ruleLine(mine.rules, order.freshness, offer.mode == "car" and cooled(job.owner)),
 		eventLine = eventLine(job),
-		-- 5.0: "foot" | "car" (5.1: | "bike"); on foot what rides in your backpack (and its room)
+		-- 5.0: "foot" | "car" (5.1: | "bike"); on foot what rides over your hands (6.6: your bag, the bike's bag) and its room
 		mode = offer.mode,
 		pack = if status.foot then status.pack or 0 else nil,
 		packRoom = if status.foot then status.packRoom or 0 else nil,
-		rack = if status.foot and (status.rack or 0) > 0 then status.rack else nil, -- 5.3: of packRoom, the bike's rack
+		rack = if status.foot and (status.rack or 0) > 0 then status.rack else nil, -- 5.3: of packRoom, the bike's bag (6.6)
+		bagRoom = if status.foot then status.bagRoom else nil, -- 6.6: of packRoom, your bag's (client/BagUi.luau)
 		-- 5.2: every order, the HUD's "+2 ORDERS", what the board may add now, and every piece you carry
 		focus = order.id,
 		orders = ordersInfo(job, order),
@@ -1228,13 +1230,12 @@ end
 -- 5.1, `bike`: a BIKE job instead (Config.Jobs.Bike's numbers, `mode = "bike"`, its level): Bike.Pieces by `room`
 -- (what your bike holds), a longer ride.
 -- 5.3: from the business's storefront nearest to you (within PickupMax + PickupWiden) to a home's door or another
--- storefront (shared/Deliveries.luau), only the businesses open at this hour; a piece that does not fit a backpack
--- (shared/Bag.luau) only as many as your hands hold (on foot) or `rack` (the bike's own room). `role` "round": the
+-- storefront (shared/Deliveries.luau), only the businesses open at this hour (6.6: every light look fits your bag and
+-- the bike's, so no smaller count for a bouquet or a cake). `role` "round": the
 -- newspaper round instead (Config.Jobs.Round: the bundle at The Daily Undead, one paper to every door on one or two
 -- streets, JobRules.roundPay / roundTime).
-local function footOffer(from: Vector3, role: string?, room: number, tutorial: boolean?, bike: boolean?, rack: number?): Offer?
+local function footOffer(from: Vector3, role: string?, room: number, tutorial: boolean?, bike: boolean?): Offer?
 	local Deliveries = require(Shared.Deliveries)
-	local Bag = require(Shared.Bag)
 	local foot: LightJob = if bike then JobsConfig.Bike else JobsConfig.Foot
 	local choice = JobsConfig.Choice
 	local hour = DayNight.hour()
@@ -1315,7 +1316,7 @@ local function footOffer(from: Vector3, role: string?, room: number, tutorial: b
 				if light and business.id == "post" then
 					table.insert(found, business)
 				end
-			elseif light and Deliveries.open(business, hour) and Bag.room(business.look, mode, room, rack) >= 1 then
+			elseif light and Deliveries.open(business, hour) and room >= 1 then
 				local venue = Deliveries.venueFor(business, from.X, from.Z, within, allow)
 				if (#Map.venuesOf(business.id) == 0 or venue ~= nil)
 					and Deliveries.reaches(business, if venue then venue.park.x else from.X, if venue then venue.park.z else from.Z, dropMin, dropMax, allow) then
@@ -1384,8 +1385,7 @@ local function footOffer(from: Vector3, role: string?, room: number, tutorial: b
 		local band = foot.Pieces
 		wanted = if role == "short" then band[1] elseif role == "bulk" then band[2] else rng:NextInteger(band[1], band[2])
 	end
-	-- 5.3: a piece that does not fit a backpack: what your hands hold (on foot) or the bike's rack.
-	local count = if tutorial then math.max(1, math.min(JobsConfig.TutorialPieces, room)) else JobRules.footPieces(wanted, Bag.room(business.look, mode, room, rack), foot)
+	local count = if tutorial then math.max(1, math.min(JobsConfig.TutorialPieces, room)) else JobRules.footPieces(wanted, room, foot)
 	local words = JobsConfig.Foot.TutorialCargo
 	local cargoName = if tutorial then words.cargo else business.cargo
 	local pieces: CargoInfo = if tutorial
@@ -1667,7 +1667,7 @@ end
 
 -- 3.4: the cargo slots a job needs, what the vehicle that would do it holds and that vehicle's name: the company
 -- vehicle the job lends, else the player's equipped car (3.5: at its stage). 5.0: on foot the pieces you carry
--- (Transport: hands and backpack); no vehicle yet: 0.
+-- (Transport: hands and bag); no vehicle yet: 0.
 local function slotsFor(player: Player, offer: Offer): (number, number, string)
 	local jobType = offer.jobType
 	local need = Economy.cargoNeed(if jobType then jobType.load else "carry", offer.total)
@@ -1676,9 +1676,9 @@ local function slotsFor(player: Player, offer: Offer): (number, number, string)
 	end
 	if offer.mode == "foot" then
 		local room = Transport.footOf(player).room
-		return offer.total, room, if room > Config.Cargo.HandsMax then "backpack" else "hands"
+		return offer.total, room, if room > Config.Cargo.HandsMax then "hands and bag" else "hands"
 	elseif offer.mode == "bike" then
-		-- 5.1: what your bike holds with its bike gear and your backpack.
+		-- 5.1: what your bike holds with its bike gear and your bag.
 		local bikeId, bike = Transport.bikeOf(player)
 		local def = if bikeId then Economy.findCar(bikeId) else nil
 		return offer.total, if bike then bike.room else 0, if def then def.name else "bike"
@@ -1750,14 +1750,14 @@ local function slotsShort(player: Player, offer: Offer): string?
 		if offer.total <= room then
 			return nil
 		end
-		return `This job has {offer.total} {offer.plural}: your {name} and your backpack hold {room}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
+		return `This job has {offer.total} {offer.plural}: your {name}'s bag and yours hold {room}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
 	end
 	if offer.mode == "foot" then
 		local _, room = slotsFor(player, offer)
 		if offer.total <= room then
 			return nil
 		end
-		return `This job has {offer.total} {offer.plural}: you carry {room}. A bigger backpack (Last Stop Supplies) carries more.`
+		return `This job has {offer.total} {offer.plural}: you carry {room}. A bigger bag (ZDC Bags at the depot) carries more.`
 	end
 	if Freight.isPallet(offer.kind) then
 		local pallets, takes, carName = palletsFor(player, offer)
@@ -1901,10 +1901,10 @@ local function runStacks(job: Job): boolean
 	return true
 end
 
--- What the player can take on a run of this mode: hands + backpack on foot, the bike + its gear + the backpack, the
--- car + its gear (slotsFor). 5.2 review: kit bought during the run (a backpack, bike gear) grows the run's pack with
--- it (`job`: the run's Cargo.Info.pack, set when it started), so every slot the board counts can be carried. It never
--- shrinks: what is in it stays.
+-- What the player can take on a run of this mode: hands + bag on foot, the bike's bag + its gear + your bag, the car +
+-- its gear (slotsFor). 5.2 review: kit bought during the run grows it, so every slot the board counts can be carried:
+-- 6.6, bike gear (or getting on your bike on a foot run) the bike's bag (`job`: the run's Cargo.Info.rack); a bag is
+-- Cargo's own (bagSync). It never shrinks: what is in it stays.
 local function orderRoomOf(player: Player, offer: Offer, job: Job?): number
 	local room: number
 	if offer.mode == "foot" then
@@ -1918,16 +1918,15 @@ local function orderRoomOf(player: Player, offer: Offer, job: Job?): number
 	end
 	local info = if job then job.cargo.info else nil
 	if info and info.foot then
-		-- (as startJob: a bike job's pack is the bike's whole room; a foot job's the backpack's, all of it while riding)
+		-- (as startJob: the bike's own bag on a bike run, or a foot run while you ride; 6.6)
 		local onBike = offer.mode == "bike" or Transport.riding(player)
-		local pack = if onBike then room else Transport.packRoomOf(player)
-		-- 5.3 review: the bike's rack too, only while the run is ridden (a walking foot run has none)
-		local _, bike = Transport.bikeOf(player)
-		local rack = require(Shared.Bag).rack(offer.mode, onBike, if bike then bike.room else nil, Transport.packRoomOf(player))
-		if pack > (info.pack or 0) or rack > (info.rack or 0) then
-			info.pack = math.max(pack, info.pack or 0)
-			info.rack = if rack > (info.rack or 0) then rack else info.rack
+		local rack = require(Shared.Bag).rack(offer.mode, onBike, Transport.bikeBagOf(player))
+		if rack > (info.rack or 0) then
+			info.rack = rack
 			info.changed()
+			if job then
+				Cargo.packShown(job.cargo) -- (6.6 review: the HUD's room shows the bike's bag at once)
+			end
 		end
 	end
 	return room
@@ -1961,31 +1960,7 @@ local function stackCheck(player: Player, job: Job, offer: Offer): (boolean, str
 	local max = JobRules.ordersMax(mode)
 	local free = JobRules.orderRoom(room, taken)
 	local ok, why = JobRules.canAddOrder(mode, open, offer.total, free)
-	local Bag = require(Shared.Bag)
-	if ok and mode ~= "car" and not Bag.fits(offer.look) then
-		-- 5.3: a piece that does not fit a backpack rides in the hands (on foot) or on the bike's rack: those of the
-		-- open orders and this one must fit there too.
-		local big = if mode == "foot" then Tuning.HandsMax else (job.cargo.info.rack or 0)
-		if mode == "foot" and Bag.fitsBag(offer.look) then
-			-- 6.3 review: a light piece rides in the plastic bag too (its room over the hands, when you own it). 6.4:
-			-- the active bag's room only (Transport.bagRoom), never every bag's
-			local profile = PlayerData.get(player)
-			local Rules = require(Shared.Transport) -- (the shared rules, not this module's server/Transport)
-			if profile then
-				big += Rules.bagRoom(profile.kit, profile.activeBag)
-			end
-		end
-		local bigUsed = 0
-		for _, order in job.orders do
-			if order.state == "open" and not Bag.fits(order.offer.look) then
-				bigUsed += math.max(0, order.pieces - Cargo.deliveredOf(job.cargo, order.id) - Cargo.lostOf(job.cargo, order.id))
-			end
-		end
-		if offer.total > big - bigUsed then
-			return false, `NO ROOM ({bigUsed}/{big} {if mode == "foot" then "in hands" else "on the rack"})`,
-				`{Bag.plural(offer.piece)} don't go in a backpack: they ride {if mode == "foot" then "in your hands" else "on your bike's rack"}, {math.max(0, big - bigUsed)} left there.`
-		end
-	end
+	-- (6.6: every light piece fits your bag and the bike's: 5.3's "don't go in a backpack" room check is gone)
 	if ok then
 		return true, nil, nil
 	end
@@ -2233,10 +2208,9 @@ local function makeBoard(player: Player): Board
 		local bikeRoles = JobRules.roles(function(): number
 			return rng:NextNumber()
 		end)
-		-- 5.3: the bike's own room (its rack, basket, box: what does not fit a backpack rides there) and the round.
-		local rack = if bike then math.max(0, bike.room - Transport.packRoomOf(player)) else 1
+		-- (6.6: every light piece fits the bike's bag and yours: the bike's whole room, and the round)
 		for index = 1, math.max(1, JobsConfig.Bike.Offers) + (if rounds then 1 else 0) do
-			local offer = footOffer(from, if rounds and index == 1 then "round" else bikeRoles[(index - (if rounds then 2 else 1)) % #bikeRoles + 1], bikeRoom, nil, true, rack)
+			local offer = footOffer(from, if rounds and index == 1 then "round" else bikeRoles[(index - (if rounds then 2 else 1)) % #bikeRoles + 1], bikeRoom, nil, true)
 			if offer then
 				table.insert(list, offer)
 			end
@@ -2292,11 +2266,11 @@ local function sendBoard(player: Player, board: Board)
 		})
 	end
 	local profile = PlayerData.get(player)
-	-- 5.0: what you carry on foot (the ON FOOT section's "HANDS 2 / BACKPACK 3") and whether you have a vehicle.
+	-- 5.0: what you carry on foot (the ON FOOT section's "HANDS 2 / BAG 4") and whether you have a vehicle.
 	local foot = Transport.footOf(player)
 	local carry = { hands = Config.Cargo.HandsMax, room = foot.room, pack = math.max(0, foot.room - Config.Cargo.HandsMax), speed = foot.speedMult }
 	local hasCar = profile ~= nil and profile.car ~= nil
-	-- 5.1: your bike (its name, what it holds with its gear and your backpack) and whether you ride it now.
+	-- 5.1: your bike (its name, what it holds with its gear and your bag) and whether you ride it now.
 	local bikeId, bike = Transport.bikeOf(player)
 	local bikeDef = if bikeId then Economy.findCar(bikeId) else nil
 	local bikeInfo = if bikeDef and bike then { id = bikeDef.id, name = bikeDef.name, room = bike.room, riding = Transport.riding(player) } else nil
@@ -2330,8 +2304,7 @@ function Jobs.refillBoard(player: Player)
 			fresh = footOffer(from, role, Transport.footOf(player).room)
 		elseif old.mode == "bike" then
 			local _, bike = Transport.bikeOf(player)
-			local rack = if bike then math.max(0, bike.room - Transport.packRoomOf(player)) else 1
-			fresh = footOffer(from, role, if bike then bike.room else JobsConfig.Bike.Pieces[1], nil, true, rack)
+			fresh = footOffer(from, role, if bike then bike.room else JobsConfig.Bike.Pieces[1], nil, true)
 		elseif old.jobType == nil and old.mission == nil and not old.tutorial then
 			fresh = tierOffers(player, from, old.tier, role or "short")[1]
 		end
@@ -2845,26 +2818,15 @@ local function startJob(player: Player, offer: Offer): (boolean, string?)
 	cargoInfo.fragile = if JobRules.hasRule(offer.rules, "fragile") or (offer.modifier ~= nil and offer.modifier.id == "fragile") then true else nil
 	cargoInfo.dests = offer.dests
 	cargoInfo.destNames = offer.destNames
-	-- 5.0, on foot: no vehicle; the pieces over the hands ride in the owner's pack (the backpack's room). 5.1: a bike
-	-- job's pack is the bike's whole room (its slots, its bike gear, the backpack: riding stows the hands); so is a foot
-	-- job's while you ride a bike (all you carry goes on the bike when you get on).
+	-- 5.0, on foot: no vehicle; the pieces over the hands ride in the owner's pack. 6.6: your bag (Cargo's session, the
+	-- active bag's room) and, on a bike run or a foot run while your bike is your vehicle, the bike's own bag (its rack,
+	-- basket or box with its bike gear: a pickup goes onto it while the bike is within reach, getting on it loads your
+	-- hands onto it). A newspaper round's bundle goes into its satchel.
 	cargoInfo.foot = if foot then true else nil
-	local _, bike = Transport.bikeOf(player)
-	local riding = bike ~= nil and Transport.riding(player)
-	cargoInfo.pack = if offer.mode == "bike" and bike then bike.room
-		elseif foot and riding then math.max(Transport.packRoomOf(player), Transport.footOf(player).room)
-		elseif foot then Transport.packRoomOf(player)
-		else nil
-	-- 5.3, the bag (shared/Bag.luau): of that, the bike's own rack / basket / box (what does not fit a backpack rides
-	-- only there: put there at a bike job's pick-up, or stowed when you get on your bike); a newspaper round's bundle
-	-- goes into its satchel on top.
-	-- 5.3 review: only on a bike run, or a foot run ridden (a bike you own but walk without has no rack: Bag.rack).
-	local rack = require(Shared.Bag).rack(offer.mode, riding, if bike then bike.room else nil, Transport.packRoomOf(player))
+	local riding = Transport.riding(player)
+	local rack = require(Shared.Bag).rack(offer.mode, riding, Transport.bikeBagOf(player))
 	cargoInfo.rack = if foot and rack > 0 then rack else nil
-	cargoInfo.ride = if offer.mode == "bike" then true else nil
-	if foot and offer.round then
-		cargoInfo.pack = (cargoInfo.pack or 0) + offer.total
-	end
+	cargoInfo.satchel = if foot and offer.round then offer.total else nil
 	local session = Cargo.begin(player, cargoInfo)
 	local crewCount = #Crew.members(player)
 	local members: { [Player]: boolean } = {}
@@ -3323,6 +3285,16 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		payTotal += JobRules.roundTip(Cargo.missesOf(session, order.id))
 		if ratingInfo then
 			table.insert(ratingInfo.checks, JobRules.roundCheck(Cargo.missesOf(session, order.id)))
+		end
+	end
+	-- 6.7: the Courier Vest: the customer tips a share of the pay (Config.Kit tips; every delivery but a mission)
+	if not offer.mission then
+		local tip = JobRules.kitTip(payTotal, Transport.tipShareOf(player))
+		if tip > 0 then
+			payTotal += tip
+			if ratingInfo then
+				table.insert(ratingInfo.checks, JobRules.kitTipCheck(tip))
+			end
 		end
 	end
 	local driverTotal, share = Economy.crewSplit(payTotal, #crew)
@@ -4092,8 +4064,8 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 			continue
 		end
 		local shown = math.floor(order.freshness * 100 + 0.5)
-		-- 5.0: a thermal jacket (5.1: on a bike too); 6.4: × the thermal bag in your hand for this order's pieces in it
-		local warm = if offer.mode ~= "car" then Transport.warmOf(player) * Cargo.bagWarm(job.cargo, order.id) else nil
+		-- 6.4: the thermal bag in your hand for this order's pieces in it (on foot, on a bike; 6.7: no jacket any more)
+		local warm = if offer.mode ~= "car" then Cargo.bagWarm(job.cargo, order.id) else nil
 		order.freshness = math.max(0, order.freshness - JobRules.freshDrain(order.offer.tier, step, car ~= nil and Vehicles.hasGear(car, "cooler"), warm))
 		if math.floor(order.freshness * 100 + 0.5) ~= shown then
 			job.dirty = true
@@ -4564,7 +4536,7 @@ local function updatePlayer(player: Player, step: number, now: number, serverNow
 	end
 	recount(player, job)
 	if session.info.foot then
-		orderRoomOf(player, offer, job) -- 5.2 review: a backpack or bike gear bought during the run grows its pack now
+		orderRoomOf(player, offer, job) -- 5.2 review: bike gear bought during the run grows the bike's bag now (6.6)
 	end
 	Cargo.update(session, step)
 	-- 3.1: the pieces delivered since the last tick (any, the people who board, the horses).

@@ -40,11 +40,12 @@ local ART = {
 	"sign_maple", "sign_oak", "sign_birch", "sign_elm", "sign_office_harbor", "sign_office_tower",
 	"sign_office_penthouse",
 	-- 5.0: art/icons (the kit, the phone's apps)
-	"kit_backpack", "kit_bigpack", "kit_shoes", "kit_jacket", "kit_cart",
+	"kit_shoes", "kit_jacket", "kit_cart", -- (6.6: no backpacks: kit_backpack / kit_bigpack's pictures stay in art/icons unused)
 	"kit_kevlar", "kit_heavy", -- 6.0, the vests
 	"kit_bag", -- 6.0: the plastic bag (its picture is still to come: the emoji meanwhile)
 	"kit_tote", "kit_thermal", "kit_padded", "kit_duffel", -- 6.4, the bags (the emoji meanwhile)
 	"kit_hivis", -- 6.0.1: the Courier Vest (the emoji 🦺 meanwhile)
+	"item_energy", "kit_bat", -- 6.7: the Energy Drink and the Baseball Bat (their pictures still to come: the emoji meanwhile)
 	"app_orders", "app_board", "app_career", "app_shop", "app_map", "app_messages", "app_bank", "app_settings",
 	-- 5.1, art/icons (Codex's bike art; ids empty until uploaded)
 	"bike_rust", "bike_city", "bike_cargo", "bike_ebike", "gear_basket", "gear_panniers", "gear_trailer", "map_bikes",
@@ -95,7 +96,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("158 pictures", count == 158, count) -- (6.0: + the two vests and the bag; 6.0.1: + the Courier Vest; 6.4: + four bags)
+check("158 pictures", count == 158, count) -- (6.0: + the two vests and the bag; 6.0.1: + the Courier Vest; 6.4: + four bags; 6.6: − the two backpacks; 6.7: + the energy drink and the bat)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)
@@ -161,7 +162,8 @@ for _, id in { "orders", "board", "career", "shop", "map", "messages" } do
 	check(`phone app {id} has an icon`, exists(Icons.app(id)), Icons.app(id))
 end
 check("an unknown kit or app: none", Icons.kit("jetpack") == nil and Icons.app("casino") == nil and Icons.kit(nil) == nil)
-check("a kit icon while its id is empty: the emoji", Icons.Ids.kit_backpack ~= "" or Icons.get(Icons.kit("backpack")) == nil)
+check("a kit icon while its id is empty: the emoji", Icons.Ids.kit_tote ~= "" or Icons.get(Icons.kit("tote")) == nil)
+check("6.6: the bag kiosk's marker is the plastic bag's picture", Icons.landmark("bags") == "kit_bag")
 -- 5.1: the bikes and the bike gear have pictures (the car gear: the emoji).
 check("the bike shop's marker", Icons.landmark("bikes") == "map_bikes")
 check("the four bikes", Icons.bike("rustbike") == "bike_rust" and Icons.bike("citybike") == "bike_city" and Icons.bike("cargobike") == "bike_cargo"
@@ -173,7 +175,7 @@ end
 -- The building signs: every shop, employer, tower and home has one (two places share their employer's), the garages
 -- and the homes are square badges, the rest 4 : 1 boards. (5.1: Spoke & Chain has no sign picture: its board is the
 -- contract look, text only.)
-local NO_SIGN_ART: { [string]: boolean } = { bikes = true }
+local NO_SIGN_ART: { [string]: boolean } = { bikes = true, bags = true } -- (6.6: ZDC Bags' board is the contract look too)
 for id in Map.Shops do
 	if NO_SIGN_ART[id] then
 		check(`shop {id}: no sign picture (the text board)`, Icons.sign(id) == nil)

@@ -30,7 +30,7 @@
 --   * On a delivery the board shows that job and GIVE UP THIS DELIVERY (CancelJob) instead of offers.
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
 --   * 5.0, the career starts on foot: the offers with mode = "foot" (a missing mode is "car") come first in an ON FOOT
---     section: a header with your room ("HANDS 2 / BACKPACK 3", client/KitShop.luau roomText from shared/Transport),
+--     section: a header with your room ("HANDS 2 / TOTE 5", client/KitShop.luau roomText from shared/Transport),
 --     each row with a 🚶 ON FOOT chip in place of the danger level and "fits your hands (2 / 3)" on its CARGO line. With
 --     no vehicle (state.car nil) the car card is an ON FOOT card (your room, your pace, when the first vehicle comes),
 --     the car tiers' headers say "NEEDS A VEHICLE · Old Van at level 4" (no REROLL) and every job that needs your own
@@ -66,7 +66,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Drive = require(script.Parent.Drive)
 local Hud = require(script.Parent.Hud)
-local KitShop = require(script.Parent.KitShop) -- 5.0: the room on foot in words ("HANDS 2 / BACKPACK 3")
+local KitShop = require(script.Parent.KitShop) -- 5.0: the room on foot in words ("HANDS 2 / TOTE 5")
 local BikeShop = require(script.Parent.BikeShop) -- 5.1: your bike and what it holds
 local Transport = require(Shared.Transport)
 
@@ -297,7 +297,7 @@ end
 -- it is out, else the parked share the state keeps).
 local function myCar(): (string, number, number)
 	if onFoot() then
-		return "On foot", Transport.handsRoom(myKit(), myBag()), 1 -- 5.0: your hands and your backpack
+		return "On foot", Transport.handsRoom(myKit(), myBag()), 1 -- 5.0: your hands and your bag (6.6)
 	elseif riding() then
 		local bike = Economy.findCar(carId())
 		return if bike then bike.name else "Bike", BikeShop.room(state, carId()), 1 -- 5.1: what your bike holds
@@ -328,12 +328,12 @@ end
 local function roomRemedy(offer: any): string
 	local need = tonumber(offer.slots) or 0
 	if isFoot(offer) then
-		-- 5.0: on foot the room is your hands and your backpack.
+		-- 5.0: on foot the room is your hands and your bag (6.6).
 		local room = Transport.handsRoom(myKit(), myBag())
-		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit(), myBag())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. A bigger backpack at Last Stop Supplies carries more.`
+		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit(), myBag())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. A bigger bag at {Config.BagShop.Name} (by the spawn) carries more.`
 	elseif isBike(offer) then
-		-- 5.1: your bike, its bike gear and your backpack.
-		return `Your {offer.carName or "bike"} and your backpack hold {offer.capacity or 0}; this run has {math.max(need, tonumber(offer.pieces) or 0)}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
+		-- 5.1: your bike, its bike gear and your bag (6.6: the bike's own bag and yours).
+		return `Your {offer.carName or "bike"}'s bag and yours hold {offer.capacity or 0}; this run has {math.max(need, tonumber(offer.pieces) or 0)}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
 	end
 	local head = `Your {offer.carName or "car"} holds {offer.capacity or 0} {if offer.capacity == 1 then "slot" else "slots"}; this job needs {need}.`
 	if offer.vehicle then
@@ -578,18 +578,18 @@ local function refreshChrome()
 	local rack = Economy.installedGear(if state and type(state.carGear) == "table" then state.carGear else nil, mine).roofrack == true and Economy.gearFits(mine, "roofrack")
 	local level = myLevel()
 	if walking then
-		-- 5.0: on foot: your room (hands and backpack), your pace, when the first vehicle comes.
+		-- 5.0: on foot: your room (hands and bag), your pace, when the first vehicle comes.
 		local room = KitShop.roomText(myKit(), myBag())
 		local speed = Transport.speedMult(myKit())
-		refs.carStats.Text = `🎒 {room}`
+		refs.carStats.Text = `🛍 {room}`
 		refs.carHealth.Text = if speed > 1.001 then `👟 pace ×{string.format("%.2g", speed)} · light cargo` else "Light cargo only"
 		refs.carHealth.TextColor3 = K.secondary
-		refs.carNote.Text = `No vehicle yet: the {vehicleShort()}. A backpack carries more.`
+		refs.carNote.Text = `No vehicle yet: the {vehicleShort()}. A bigger bag carries more ({Config.BagShop.Name}).`
 		refs.capacity.Text = `YOUR ROOM · {room}`
 		refs.context.Text = `ON FOOT · {room}  ·  {Levels.rank(level)} / level {level}`
 	elseif onBike then
-		-- 5.1: on your bike: what it holds (its room, its bike gear, your backpack), light cargo; the car jobs need your car.
-		refs.carStats.Text = `📦 {slots} light {if slots == 1 then "piece" else "pieces"} · bike + gear + backpack`
+		-- 5.1: on your bike: what it holds (its room, its bike gear, your bag), light cargo; the car jobs need your car.
+		refs.carStats.Text = `📦 {slots} light {if slots == 1 then "piece" else "pieces"} · bike's bag + gear + your bag`
 		refs.carHealth.Text = "Light cargo only · BIKE runs"
 		refs.carHealth.TextColor3 = K.secondary
 		refs.carNote.Text = "Car jobs need your car: CALL CAR on your phone."
@@ -782,12 +782,12 @@ local function details(body: any, offer: any, w: number): number
 		table.insert(words, `{kind.icon} {count} {name}` .. (if how then ` · {how}` else ""))
 	end
 	if isFoot(offer) then
-		-- 5.0: on foot it is your hands and your backpack, not cargo slots.
+		-- 5.0: on foot it is your hands and your bag, not cargo slots.
 		local room = Transport.handsRoom(myKit(), myBag())
 		local pieces = count or slots
 		table.insert(words, if pieces <= room then `fits your hands ({pieces} / {room})` else `{pieces} pieces: you carry {room}`)
 	elseif isBike(offer) then
-		-- 5.1: your bike's room with its gear and your backpack (the server's capacity).
+		-- 5.1: your bike's room with its gear and your bag (the server's capacity).
 		local room = tonumber(offer.capacity) or 0
 		local pieces = count or slots
 		table.insert(words, if offer.needsBike then "light pieces on a bike" elseif pieces <= room then `fits your bike ({pieces} / {room})` else `{pieces} pieces: your bike holds {room}`)

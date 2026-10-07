@@ -61,10 +61,19 @@ for level = 2, 4 do
 		check(`level {level}: no car items before a car ({id})`, id ~= "repair" and id ~= "nitro" and id ~= "mine" and id ~= "jerrycan")
 	end
 end
-check("level 3 gives the Courier Backpack, level 4 the Running Shoes", (Career.kitOf(Career.reward(3)) :: any).id == "backpack" and (Career.kitOf(Career.reward(4)) :: any).id == "shoes")
-check("the kit in words", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "the Courier Backpack", 1, true) ~= nil)
+check("level 3 gives the Canvas Tote (6.6: no backpack), level 4 the Running Shoes", (Career.kitOf(Career.reward(3)) :: any).id == "tote" and (Career.kitOf(Career.reward(4)) :: any).id == "shoes")
+check("the kit in words", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "the Canvas Tote", 1, true) ~= nil)
 local ownedKit: { [string]: boolean } = {}
-check("a kit reward: yours, nothing to pay", Career.grantKit(Career.reward(3), ownedKit) == 0 and ownedKit.backpack == true)
+check("a kit reward: yours, nothing to pay", Career.grantKit(Career.reward(3), ownedKit) == 0 and ownedKit.tote == true)
+check("6.6: no level gives a backpack", (function()
+	for level = 2, 20 do
+		local reward = Career.reward(level)
+		if reward and (reward.kit == "backpack" or reward.kit == "bigpack") then
+			return false
+		end
+	end
+	return true
+end)())
 check("owned already: its price instead", Career.grantKit(Career.reward(3), ownedKit) == (Career.kitOf(Career.reward(3)) :: any).price)
 check("no kit, nothing", Career.grantKit(Career.reward(2), ownedKit) == 0 and Career.grantKit(nil, ownedKit) == 0)
 check("level 4: the Old Van, the Patched Van stage, ★ jobs, First Shift, the Ratchet Straps", has(road[4].unlocks, "car", "van") and has(road[4].unlocks, "stage", "van:1")
@@ -200,7 +209,7 @@ check("four pieces: trolley 3 · straps 4 · cooler 5 · roof rack 7", carGearCo
 	and gear("cooler").level == 5 and gear("roofrack").level == 7)
 check("the prices: $600, about $900, $1,400, $2,500", gear("trolley").price == 600 and math.abs(gear("straps").price - 900) <= 200
 	and math.abs(gear("cooler").price - 1400) <= 300 and math.abs(gear("roofrack").price - 2500) <= 500)
-check("what the gear does is tuned in Config", Config.GearTuning.StrapsLoss == 0.6 and Config.GearTuning.CoolerDrain == 0.5 and Config.GearTuning.RoofRackSlots == 1)
+check("what the gear does is tuned in Config", Config.GearTuning.StrapsLoss == 0.6 and Config.GearTuning.CoolerDrain == 0.5 and Config.GearTuning.RoofRackSlots == 2) -- (6.7: the rack takes two)
 check("the Hand Trolley is no upgrade track any more", Economy.findUpgrade("trolley") == nil)
 
 -- The slots: the stage wins over the car; the company vehicles have none.
@@ -246,7 +255,7 @@ check("slots used", Economy.gearUsed(carGear, "van") == 1 and Economy.gearUsed({
 -- The Roof Rack: one more slot, a light piece only.
 local rack = { roofrack = true }
 check("no rack: the stage's slots", Economy.capacity("van", { stage = 3 }, {}, "parcel") == 4)
-check("a rack takes one more light piece", Economy.capacity("van", { stage = 3 }, rack, "parcel") == 5 and Economy.capacity("van", { stage = 3 }, rack, "pizza") == 5)
+check("a rack takes two more light pieces (6.7: one before)", Economy.capacity("van", { stage = 3 }, rack, "parcel") == 6 and Economy.capacity("van", { stage = 3 }, rack, "pizza") == 6)
 check("… not a heavy one, not without a look", Economy.capacity("van", { stage = 3 }, rack, "crate") == 4 and Economy.capacity("van", { stage = 3 }, rack) == 4)
 check("… not on a car it does not fit", Economy.capacity("pickup", {}, rack, "parcel") == Economy.capacity("pickup", {}))
 check("the old calls stay the same", Economy.capacity("boxtruck", { stage = 2 }) == 8 and Economy.capacity("nope", {}) == 0)

@@ -808,6 +808,9 @@ local function buildDepot(parent: Instance)
 	local terminal = part(depot, "GarageTerminal", Vector3.new(6, 7, 3), CFrame.new(18, WALK_TOP + 3.5, backZ + 24), Color3.fromRGB(60, 70, 80), Enum.Material.Metal)
 	sign(depot, "GARAGE", Vector3.new(6, 2, 0.3), terminal.CFrame * CFrame.new(0, 2.5, 1.6) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(120, 200, 255))
 	prompt(terminal, "depot", "Switch car", "Depot Garage")
+	-- 6.6: ZDC Bags, the bag kiosk east of the spawn (server/BagKiosk.luau: its own module, World's helpers handed over;
+	-- no new top-level locals here, the -O0 register limit)
+	require(script.Parent.BagKiosk).build(depot, { part = part, deco = deco, sign = sign, prompt = prompt, nightLight = DayNight.nightLight })
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "DepotSpawn"

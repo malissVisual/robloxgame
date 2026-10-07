@@ -735,6 +735,15 @@ local landmarkViews: { { id: string, view: any } } = {}
 local groupViews: { { kind: string, view: any } } = {}
 local discoveredLabel: any = nil
 
+-- 6.7: which group of the big map's list a landmark is in: the depot on its own ("depot": it sells nothing, its Depot
+-- Garage is the garage terminal), the other shops under SHOPS AND REPAIRS, the rest by their kind.
+local function inGroup(landmark: Map.Landmark, kind: string): boolean
+	if landmark.id == "depot" then
+		return kind == "depot"
+	end
+	return landmark.kind == kind
+end
+
 local function refreshKnown()
 	for _, entry in landmarkViews do
 		local visible = Discovery.knows(entry.id)
@@ -745,7 +754,7 @@ local function refreshKnown()
 	for _, group in groupViews do
 		local any = false
 		for _, landmark in Map.Landmarks do
-			if landmark.kind == group.kind and Discovery.knows(landmark.id) then
+			if inGroup(landmark, group.kind) and Discovery.knows(landmark.id) then
 				any = true
 				break
 			end
@@ -1269,6 +1278,7 @@ local function buildList(parent: any)
 	clear.ZIndex = 42
 	type Group = { kind: string, title: string, color: Color3 }
 	local groups: { Group } = {
+		{ kind = "depot", title = "YOUR DEPOT  (jobs, garage terminal)", color = KIND_COLORS.shop }, -- 6.7: not a shop
 		{ kind = "shop", title = "SHOPS AND REPAIRS", color = KIND_COLORS.shop },
 		{ kind = "employer", title = "WORK  (earn their vehicle)", color = KIND_COLORS.employer },
 		{ kind = "venue", title = "STORES AND FOOD", color = KIND_COLORS.venue }, -- 5.3
@@ -1278,7 +1288,7 @@ local function buildList(parent: any)
 		local row = title(group.title, group.color)
 		table.insert(groupViews, { kind = group.kind, view = row })
 		for _, landmark in Map.Landmarks do
-			if landmark.kind == group.kind then
+			if inGroup(landmark, group.kind) then
 				entry(landmark)
 			end
 		end

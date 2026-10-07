@@ -10,11 +10,14 @@
 --     each with its icon (shared/Icons.luau, the emoji without one), the count and its key in the corner (6.1: 4-8; a
 --     touch screen shows two slots, no keys); an empty slot is a dim outline. A key, a click or a tap uses it through
 --     Hud's use path (Hotbar.onUse: Hud's useItem, the UseItem remote): a short flash and the red outline on the slot,
---     then a shade while the server's cooldown runs (Config.ItemTuning.UseCooldown, one for every item). A sixth kind
---     you own has no slot: key 9 uses it (and the I window does).
+--     then a shade while the server's cooldown runs (Config.ItemTuning.UseCooldown, one for every item). 6.7: only
+--     the kinds that are for you (Economy.itemShown: the car-only ones once you own a car); more kinds than slots (6
+--     kinds for 5 slots, 3 for a touch screen's 2): the last slot is MORE ("+N", its key too, and key 9) and opens the
+--     I window's ITEMS (Hotbar.onMore), where every kind has its USE. (6.1's "a sixth kind on key 9" is gone.)
 --   * 6.3, over the bar, what you carry as one compact CARRYING pill (shared/Bag.luau Bag.places / Bag.strip are still
---     the data): "CARRYING 🍕✋ 💐🛍 2/4", a small cargo icon a piece (Icons.cargo, client/BagUi.luau's emoji) with a
---     badge for where it is (✋ hands, 🛍 the plastic bag, 🎒 the backpack, 🚲 the rack), greyed when it belongs to
+--     the data): "CARRYING 🍕✋ 💐🛍 · 2/4", a small cargo icon a piece (Icons.cargo, client/BagUi.luau's emoji) with a
+--     badge for where it is (Bag.Marks: ✋ hands, 🛍 the bag, 🚲 6.6: the bike's own bag, 📰 a round's satchel; no
+--     backpack any more), greyed when it belongs to
 --     another order than the one in focus, "+N" over 8 pieces (5 on a touch screen), then the pieces and the room. No
 --     slot frames and no tile a free place: the owner read the 6.0.1 tiles as new inventory slots ("a new inventory
 --     slot is created when you pick something up"). From the job payload's `carried` and the PackCount / PackRoom /
@@ -53,6 +56,8 @@ Hotbar.FIRST_KEY = #Holding.Order + 1 -- 6.1: the item slots' keys start after t
 Hotbar.onUse = nil :: ((id: string) -> ())?
 -- Set by client/Hud.luau: a toast (an empty slot's key).
 Hotbar.toast = nil :: ((text: string) -> ())?
+-- 6.7, set by client/Hud.luau: opens the I window on its ITEMS tab (the MORE slot).
+Hotbar.onMore = nil :: (() -> ())?
 -- Set by client/Main.client.luau: does a window, the phone or a dialog cover the game now (the bar hides)?
 Hotbar.covered = nil :: (() -> boolean)?
 
@@ -65,7 +70,7 @@ local ITEMS_W = Hotbar.SLOTS * SLOT + (Hotbar.SLOTS - 1) * SLOT_GAP
 local HANDS_W = #Holding.Order * SLOT + (#Holding.Order - 1) * SLOT_GAP -- 6.1
 local ROW_W = HANDS_W + DIVIDER + ITEMS_W -- the hands and the items (6.3: the pill over them)
 local HAND_ICON: { [string]: string } = { fists = "✊", bag = "🛍", gun = "🔫" }
-local BADGE: { [string]: string } = { hands = "✋", bag = "🛍", pack = "🎒", rack = "🚲" }
+local BADGE: { [string]: string } = Bag.Marks -- (6.6: ✋ hands, 🛍 the bag, 🚲 the bike's bag, 📰 the satchel)
 local FLASH = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local LIT = 0.6 -- seconds the used slot keeps its red outline
 
@@ -81,6 +86,7 @@ type Slot = {
 	id: string?,
 	hover: boolean,
 	lit: number,
+	more: boolean, -- 6.7: the MORE slot (more kinds than slots): "+N", opens the I window
 }
 
 -- 6.1: a hand slot. 6.3: `badge` the bag slot's count of the pieces in it.
@@ -97,6 +103,7 @@ local slots: { Slot } = {}
 local hands: { HandSlot } = {}
 local shownHands = ""
 local owned: { string } = {} -- the item ids you have, in Config.Items order (slot n = owned[n])
+local onBar = 0 -- 6.7: how many of them have a slot (all, or SLOTS - 1 when the last slot is MORE)
 local state: any = nil
 local job: any = nil
 local shownStrip = ""
@@ -113,7 +120,7 @@ end
 -- ── The item slots ─────────────────────────────────────────────────────────
 
 local function paint(slot: Slot)
-	local filled = slot.id ~= nil
+	local filled = slot.id ~= nil or slot.more
 	local red = filled and (slot.hover or os.clock() < slot.lit)
 	slot.outline.Color = if red then P.red else P.line
 	slot.outline.Transparency = if red then 0 elseif filled then 0.35 else 0.72
@@ -145,12 +152,24 @@ local function cooldown()
 	end
 end
 
+-- 6.7: the I window's ITEMS (the MORE slot, or key 9 while there are more kinds than slots).
+local function openMore()
+	local more = Hotbar.onMore
+	if more then
+		more()
+	end
+end
+
 local function use(index: number)
+	if #owned > onBar and index >= onBar + 1 then
+		openMore() -- 6.7: the MORE slot (and the key after the bar)
+		return
+	end
 	local id = owned[index]
 	if not id then
 		local say = Hotbar.toast
 		if say and index <= Hotbar.SLOTS then
-			say(`Key {index + Hotbar.FIRST_KEY - 1} is empty: Last Stop Supplies sells medkits, repair kits, nitro and more.`)
+			say(`Key {index + Hotbar.FIRST_KEY - 1} is empty: Last Stop Supplies sells medkits, energy drinks, molotovs (and car items once you own a car).`)
 		end
 		return
 	end
@@ -223,6 +242,7 @@ local function buildSlot(parent: Instance, index: number): Slot
 		id = nil,
 		hover = false,
 		lit = 0,
+		more = false,
 	}
 	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, slot.name)
 	local function hover(on: boolean)
@@ -252,24 +272,44 @@ local function buildSlot(parent: Instance, index: number): Slot
 end
 
 -- The slots from the State's items: the first five kinds you have, their icons only when a slot's kind changed.
+-- 6.7: only the kinds that are for you (Economy.itemShown: a car item once you own a car); more kinds than slots: the
+-- last slot is MORE ("+N" kinds, the I window).
 local function drawItems()
 	table.clear(owned)
 	local items = if state and type(state.items) == "table" then state.items else {}
+	local cars = if state and type(state.cars) == "table" then state.cars else nil
 	for _, def in Config.Items do
-		if (tonumber(items[def.id]) or 0) > 0 then
+		if (tonumber(items[def.id]) or 0) > 0 and Economy.itemShown(def, cars) then
 			table.insert(owned, def.id)
 		end
 	end
+	local overflow = #owned > Hotbar.SLOTS
+	onBar = if overflow then Hotbar.SLOTS - 1 else #owned
+	local moreText = `+{#owned - onBar}`
 	for index, slot in slots do
-		local id = owned[index]
-		if id ~= slot.id then
+		local more = overflow and index == Hotbar.SLOTS
+		local id = if index <= onBar then owned[index] else nil
+		if id ~= slot.id or more ~= slot.more or (more and slot.icon ~= nil and slot.icon.Text ~= moreText) then
 			if slot.icon then
 				slot.icon:Destroy()
 				slot.icon = nil
 			end
 			slot.id = id
+			slot.more = more
 			local def = if id then itemDef(id) else nil
-			if id and def then
+			if more then
+				-- 6.7: "+N" kinds more, in the I window
+				slot.icon = P.text(slot.button, moreText, UDim2.fromOffset(SLOT - 8, 28), {
+					Position = UDim2.new(0.5, 0, 0.5, -2),
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Font = Theme.DisplayFont,
+					TextSize = 22,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					TextStrokeTransparency = 1,
+					ZIndex = 2,
+				})
+				slot.name.Text = "MORE ITEMS · THE I WINDOW"
+			elseif id and def then
 				slot.icon = Ui.icon(slot.button, Icons.item(id), def.icon, UDim2.fromOffset(28, 28), {
 					Position = UDim2.new(0.5, 0, 0.5, -2),
 					AnchorPoint = Vector2.new(0.5, 0.5),
@@ -282,7 +322,7 @@ local function drawItems()
 			end
 			paint(slot)
 		end
-		local text = if id then tostring(math.floor(tonumber(items[id]) or 0)) else ""
+		local text = if id then tostring(math.floor(tonumber(items[id]) or 0)) elseif more then "MORE" else ""
 		if slot.count.Text ~= text then
 			slot.count.Text = text
 		end
@@ -404,7 +444,8 @@ local function drawHands(): boolean
 	local held = Holster.hand()
 	local owned, count, room, down, carJob = bagNow()
 	local weapon = if state and type(state.weapon) == "string" then state.weapon else nil
-	local key = `{held}|{owned}|{count}|{room}|{down}|{carJob}|{weapon}|{bagId()}`
+	local bat = kitOwned().bat == true -- 6.7: the Baseball Bat (V swings it with the gun away)
+	local key = `{held}|{owned}|{count}|{room}|{down}|{carJob}|{weapon}|{bagId()}|{bat}`
 	if key == shownHands then
 		return false
 	end
@@ -415,7 +456,7 @@ local function drawHands(): boolean
 		local can = Holding.can(hand, owned, def ~= nil, down)
 		local caption, title, image = "", "", nil
 		if hand == "fists" then
-			caption, title = "FISTS", "FISTS · V PUNCHES"
+			caption, title = "FISTS", if bat then "FISTS · V SWINGS THE BAT" else "FISTS · V PUNCHES"
 		elseif hand == "bag" then
 			caption = if not owned then "NO BAG" elseif down then `DOWN {count}` elseif carJob then "HANDS ONLY" else `{count}/{room}`
 			-- 6.4: the active bag's name and icon; its point first: you sprint with what rides in it
@@ -461,18 +502,21 @@ end
 
 -- ── What you carry ─────────────────────────────────────────────────────────
 
--- Your room by place: the job's (the payload, the live PackRoom attribute), off duty your kit's on foot.
+-- Your room by place: the job's (the payload, the live PackRoom attribute), off duty your kit's on foot. 6.6: the
+-- hands + the bag (one carrying item) + on a run with a bike its own bag.
 local function placesNow(): { Bag.Place }
 	local kit = if state and type(state.kit) == "table" then state.kit else {}
-	-- (6.1: the bag's room only while it is in your hand; 6.3: on a job the server's, the BagRoom attribute)
-	local _, _, room = bagNow()
-	local bagRoom = if Holster.hand() == "bag" then room else 0
+	-- (6.1: the bag's room only while it is in your hand, a bag on your back its pieces; 6.3: on a job the server's,
+	-- the BagRoom attribute)
+	local _, count, room = bagNow()
+	local active = Transport.activeBag(kit, bagId())
+	local bagRoom = if Holster.hand() == "bag" then room elseif active and active.stays then math.min(count, room) else 0
 	if job then
 		local mode = if type(job.mode) == "string" then job.mode else "car"
 		local packRoom = tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0
 		return Bag.places(mode, packRoom, tonumber(job.rack) or 0, bagRoom)
 	end
-	return Bag.places("foot", Holding.packRoom(Transport.packRoom(kit, bagId()), Transport.bagRoom(kit, bagId()), bagRoom > 0), 0, bagRoom)
+	return Bag.places("foot", bagRoom, 0, bagRoom)
 end
 
 -- The pieces: the payload's `carried`; the live PackCount attribute adds the pack's pieces the payload has not yet.
@@ -517,7 +561,7 @@ local function pillPiece(piece: any, where: string, other: boolean, order: numbe
 		ImageColor3 = if other then P.ink2 else P.ink,
 		ImageTransparency = if other then 0.6 else 0,
 	})
-	Ui.label(holder, BADGE[where] or "🎒", UDim2.fromOffset(11, 11), {
+	Ui.label(holder, BADGE[where] or "📦", UDim2.fromOffset(11, 11), {
 		Position = UDim2.new(1, 0, 1, -3),
 		AnchorPoint = Vector2.new(1, 1),
 		TextSize = 9,
@@ -575,7 +619,7 @@ local function drawStrip()
 			LayoutOrder = #shown + 1,
 		})
 	end
-	pillCount.Text = count
+	pillCount.Text = `· {count}` -- (6.6: "CARRYING 🍕🍕 · 3/4")
 	pillCount.TextColor3 = if pieces > 0 then P.ink else P.ink2
 	pill.Visible = visible
 end
@@ -608,7 +652,8 @@ function Hotbar.useSlot(index: number)
 	use(index)
 end
 
--- 6.1, a number key (Hud's keys): 1 / 2 / 3 what you hold, 4 - 8 the item slots, 9 a sixth kind.
+-- 6.1, a number key (Hud's keys): 1 / 2 / 3 what you hold, 4 - 8 the item slots (6.7: the last one MORE while more kinds
+-- than slots; 9 then opens the I window too).
 function Hotbar.useKey(key: number)
 	-- (6.1 review: not while a window, the phone or a dialog covers the game: a stray 1 or 3 there set the bag down)
 	local covered = Hotbar.covered
@@ -626,10 +671,10 @@ function Hotbar.useKey(key: number)
 	use(key - Hotbar.FIRST_KEY + 1)
 end
 
--- The key of an item you own (6.1: 4 - 8 its place in the bar, 9 a sixth kind), nil when you have none.
+-- The key of an item you own (6.1: 4 - 8 its place in the bar), nil when you have none or (6.7) it is behind MORE.
 function Hotbar.slotOf(id: string): number?
 	local index = table.find(owned, id)
-	return if index then index + Hotbar.FIRST_KEY - 1 else nil
+	return if index and index <= onBar then index + Hotbar.FIRST_KEY - 1 else nil
 end
 
 function Hotbar.setState(newState: any)

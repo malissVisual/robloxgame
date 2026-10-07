@@ -3,8 +3,8 @@
 -- art (server/KitArt/Geometry.luau, server/PhoneArt/Geometry.luau) a player wears for their profile.kit, and how the
 -- art, authored for a nominal block R15 body, is fitted to the body the character really has.
 --
---   KitFit.outfit(kit, loaded, bag)  slot → art id: pack = "bigpack" (owned) or "backpack", load = the backpack the
---                                parcel sits on (only while `loaded`: the PackCount attribute > 0), shoes, jacket;
+--   KitFit.outfit(kit, bag)      slot → art id: shoes (6.6: no backpack slot any more, one carrying item; 6.7: no
+--                                jacket, retired);
 --                                6.0: hand = "bag" (the plastic bag in the left hand; 6.4: `bag`, the active bag's id
 --                                when given and owned: "tote", "thermal", "padded", "duffel"), vest = the best vest owned
 --                                ("heavy", else "kevlar": stream 2's armour, Config.Kit; 6.0.1: else "hivis", the
@@ -18,13 +18,12 @@
 -- 6.4.1, the worn bag (server/KitWear.luau; tests/bagfill_test.luau):
 --   KitFit.R6                    the R15 part a piece hangs on → its stand-in on an R6 body (the bag under "Left Arm",
 --                                the straps and the bag's places on the "Torso"); KitFit.factors scales the art to it
---   KitFit.bagKey(id, place, packed) / KitFit.parseBagKey(key)  the worn bag's slot key "id@place" ("+" at the end:
---                                a backpack is worn, a slung bag hangs behind it) and back: (id, place, packed) or nil.
---                                Only the id is a KitArt look (6.4 asked KitArt for "bag@hand": the bag never showed)
---   KitFit.bagGrip(id, place, part, size, packed)  where the bag's pivot hangs on that body part (`part` the R15 name
---                                it stands for, `size` the real part's): its offset { x, y, z } and turn (degrees).
+--   KitFit.bagKey(id, place) / KitFit.parseBagKey(key)  the worn bag's slot key "id@place" and back: (id, place) or
+--                                nil (6.6: no "+" for a backpack worn any more). Only the id is a KitArt look (6.4 asked KitArt for "bag@hand": the bag never showed)
+--   KitFit.bagGrip(id, place, part, size)  where the bag's pivot hangs on that body part (`part` the R15 name it
+--                                stands for, `size` the real part's): its offset { x, y, z } and turn (degrees).
 --                                "hand": Config.Courier.Bag.Grip under the hand (HandOut[id] further out), else
---                                Config.Courier.BagPlaces[place] scaled to the part (PackPush further back when packed)
+--                                Config.Courier.BagPlaces[place] scaled to the part
 --
 -- Pure Luau (tests/kitfit_test.luau).
 
@@ -72,22 +71,13 @@ KitFit.Palm = {
 	LeftHand = { from = { 0, -0.12, -0.3 }, to = { 0.135, -0.2, 0 }, turn = { 0, -90, 0 } },
 } :: { [string]: { from: Scale, to: Scale, turn: Scale } }
 
--- What to wear: slot → the art id. The best backpack only; the parcel rides on whichever backpack is worn.
-function KitFit.outfit(kit: Kit, loaded: boolean, bag: string?): { [string]: string }
+-- What to wear: slot → the art id. (6.6: the backpacks and their parcel are gone: one carrying item, the bag.)
+function KitFit.outfit(kit: Kit, bag: string?): { [string]: string }
 	local out: { [string]: string } = {}
-	local pack = if kit.bigpack == true then "bigpack" elseif kit.backpack == true then "backpack" else nil
-	if pack then
-		out.pack = pack
-		if loaded then
-			out.load = pack
-		end
-	end
 	if kit.shoes == true then
 		out.shoes = "shoes"
 	end
-	if kit.jacket == true then
-		out.jacket = "jacket"
-	end
+	-- (6.7: no jacket slot: the Thermal Jacket is retired, Config.RetiredKit; its KitArt stays unused)
 	if bag ~= nil and kit[bag] == true then
 		out.hand = bag -- 6.4: the active bag (shared/Transport.luau activeBag: server/KitWear.luau names it)
 	elseif bag == nil and kit.bag == true then
@@ -187,28 +177,27 @@ function KitFit.fit(pieces: { any }, scales: { [string]: Scale }): { any }
 end
 
 -- 6.4.1: the worn bag's slot key and back.
-function KitFit.bagKey(id: string, place: string, packed: boolean): string
-	return `{id}@{place}{if packed then "+" else ""}`
+function KitFit.bagKey(id: string, place: string): string
+	return `{id}@{place}`
 end
 
-function KitFit.parseBagKey(key: string): (string?, string?, boolean)
-	local id, place, packed = string.match(key, "^([^@]+)@(%w+)(%+?)$")
+function KitFit.parseBagKey(key: string): (string?, string?)
+	local id, place = string.match(key, "^([^@]+)@(%w+)$")
 	if not id or not place then
-		return nil, nil, false
+		return nil, nil
 	end
-	return id, place, packed == "+"
+	return id, place
 end
 
 -- 6.4.1: the bag's pivot on its body part (see the header). `part` is the R15 name the place is authored for.
-function KitFit.bagGrip(id: string, place: string, part: string, size: Scale, packed: boolean): (Scale, Scale)
+function KitFit.bagGrip(id: string, place: string, part: string, size: Scale): (Scale, Scale)
 	local C = Config.Courier
 	local spot = C.BagPlaces[place]
 	if not spot then
 		return { -(C.HandOut[id] or 0), -(size[2] or 0) / 2 - C.Bag.Grip, 0 }, { 0, 0, 0 }
 	end
 	local f = KitFit.factors(part, size)
-	local back = if packed and (place == "back" or place == "hipBack") then C.PackPush else 0
-	return { spot.at[1] * f[1], spot.at[2] * f[2], spot.at[3] * f[3] + back }, { spot.turn[1], spot.turn[2], spot.turn[3] }
+	return { spot.at[1] * f[1], spot.at[2] * f[2], spot.at[3] * f[3] }, { spot.turn[1], spot.turn[2], spot.turn[3] }
 end
 
 return KitFit

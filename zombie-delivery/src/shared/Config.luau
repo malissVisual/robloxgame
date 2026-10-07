@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.5.1"
+Config.Version = "6.6"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -117,6 +117,10 @@ Config.Body = {
 -- the hands are empty, V punches; with the gun out V strikes with it (a pistol-whip, a rifle butt). The server checks
 -- every swing (server/CloseCombat.luau) and hits the nearest living zombie or bandit in a short cone in front of you
 -- (shared/Melee.luau); everybody sees the right arm swing (client/ArmPose.luau). No headshots; kills count as usual.
+-- 6.7, the Baseball Bat (Config.Kit "bat", BatKit: $150 at Lead & Co.): owned, V with the gun away (fists or the bag)
+-- swings the bat instead of a punch (Melee.kindOf): its own damage, cooldown, push and a longer `reach` (studs; the
+-- others use Reach). The arm reuses the gun's overhead strike (Poses: the MeleeKind attribute client/ArmPose.luau
+-- reads), and a bat is welded into the right hand for the swing only (server/CloseCombat.luau, BatLook).
 Config.Melee = {
 	Reach = 5.5, -- studs from your root to the enemy's root, along the ground
 	HalfAngle = 70, -- degrees to either side of where you swing
@@ -125,33 +129,43 @@ Config.Melee = {
 	Kinds = {
 		punch = { damage = 12, cooldown = 0.55, push = 22 }, -- the fist (holstered)
 		gun = { damage = 22, cooldown = 0.8, push = 38 }, -- the gun in the hand
-	} :: { [string]: { damage: number, cooldown: number, push: number } },
+		bat = { damage = 30, cooldown = 0.7, push = 44, reach = 7 }, -- 6.7: the Baseball Bat (a walker in two swings)
+	} :: { [string]: { damage: number, cooldown: number, push: number, reach: number? } },
+	BatKit = "bat", -- 6.7: the Config.Kit id that turns the punch into a bat swing
+	Poses = { bat = "gun" } :: { [string]: string }, -- 6.7: a kind's arm swing when it has none of its own
+	-- 6.7: the bat in the hand during a swing (studs, RGB): the handle and the barrel along the hand's grip, gone after
+	-- SwingTime + Linger seconds
+	BatLook = { Length = 3.2, Handle = 0.22, Barrel = 0.4, Wood = { 196, 150, 96 }, Grip = { 40, 40, 44 }, Linger = 0.1 },
 }
 
--- 6.0: no free gun. A new courier has fists only (V punches); the pistol (Starter) is bought at Lead & Co. Once you have
--- its price and no gun, Marge texts you about it (Tip, {price} filled in) with the shop on your GPS, once a session
--- (server/Tutorial.luau). The vests' numbers are in Config.Kit (armour); MaxArmour caps any vest's share
--- (shared/Armour.luau).
+-- 6.0: no free gun; 6.0.2: the start kit is the phone, the pistol (Starter) and the plastic bag. 6.7: so the pistol is
+-- not sold any more (WeaponDef starter: "STARTER · yours" at Lead & Co.) and Marge's old "buy a pistol" text is gone
+-- (every profile has it: server/PlayerData.luau newProfile, starterKit). The vests' numbers are in Config.Kit
+-- (armour); MaxArmour caps any vest's share (shared/Armour.luau).
 Config.Arms = {
 	Starter = "pistol",
-	Tip = "Got {price} on you? Lead & Co. sells a pistol for that. Fists are fine for one biter, not for a crowd. It's on your GPS.",
 	MaxArmour = 0.8,
-	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck)
-	BagTip = "Customers like to see who they open the door to: the ZDC Courier Vest is {price} at Last Stop Supplies. It's on your GPS.",
+	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck); 6.7: the vest's tips
+	BagTip = "Customers tip a courier they can see: the ZDC Courier Vest ({price} at Last Stop Supplies) adds 5% to every delivery. It's on your GPS. Bags are at ZDC Bags, by the spawn.",
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
--- player, gives them the first job and explains each step until it is delivered.
+-- player, gives them the first job and explains each step until it is delivered. 6.7: she shows the screen with an
+-- arrow tour (client/TutorialArrow.luau) and gives no job: you take any one, the first delivery pays Reward.
 Config.Tutorial = {
 	NpcName = "Marge",
 	NpcTitle = "Dispatcher",
-	Reward = 50, -- money for finishing the tutorial's job (on top of its pay)
+	Reward = 50, -- money for the first delivery (6.7: of any job, on top of its pay; a skipped tutorial pays none)
 	NpcSpot = { -4, -20 }, -- where she stands, studs from the depot's centre (Map.Shops.depot): by the job board, facing the yard
 	TalkRange = 10, -- her Talk prompt's reach (the job board's own prompt stays out of it)
-	StartDelay = 1.5, -- seconds after your car came (PLAY pressed) before she speaks: the start screen fades out first
-	DoneDelay = 2.5, -- seconds after the delivery before her last pages (the delivery's result shows first)
-	RetryAfter = 1.5, -- a tutorial job gone this long without a result (a special job ended, an admin): offered again
+	StartDelay = 2, -- seconds after PLAY before her welcome shows (6.7: on its own; the start screen fades out first)
+	RetryAfter = 1.5, -- a first job gone this long without a result (a special job ended, an admin): back to "board"
 	InStudio = true, -- a Studio Play test (no saves: a new profile every time) runs it too; false skips it there
+	-- 6.7: the arrow tour of the screen (client/TutorialArrow.luau; px at the screen's scale)
+	TourBounce = 10, -- how far the arrow bounces back from its target
+	TourBounceSpeed = 1.6, -- bounces a second
+	TourGap = 8, -- between the target and the arrow's tip
+	TourCaptionWidth = 300, -- the caption box's width
 }
 
 -- 3.7: the map you discover (shared/Explore.luau, server/Explore.luau, client/MapView.luau, the minimap in Hud).
@@ -406,16 +420,16 @@ Config.Cars = {
 		accel = 46,
 		turn = 2.3,
 		health = 340,
-		capacity = 1,
+		capacity = 2, -- 6.7: two in the trunk (one was too little for a $40,000 car)
 		tank = 65, -- 5.4: litres (Config.Fuel)
 		burn = 7, -- litres per 1,000 studs
 		ramPower = 1.0,
 		color = { 30, 30, 36 },
-		role = "The getaway car: one piece, all speed",
-		description = "Outruns every zombie. One piece in the trunk (2 as a Street Machine). Do not crash. 1 passenger.",
+		role = "The getaway car: two pieces, all speed",
+		description = "Outruns every zombie. Two pieces in the trunk (3 as a Street Machine). Do not crash. 1 passenger.",
 		stages = {
-			{ name = "Muscle Car", price = 0, capacity = 1, adds = "" },
-			{ name = "Street Machine", price = 6000, level = 10, capacity = 2, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a bigger trunk" },
+			{ name = "Muscle Car", price = 0, capacity = 2, adds = "" },
+			{ name = "Street Machine", price = 6000, level = 10, capacity = 3, speed = 3, look = "muscle_street", adds = "a blower on the hood, side pipes, a wider trunk (3 pieces)" },
 		},
 	},
 	{
@@ -487,7 +501,7 @@ Config.Cars = {
 		description = "Lowered, striped, a spoiler and big wheels: the fastest van on the road, 2 slots and no more. 1 passenger.",
 		stages = {
 			{ name = "Rally Van", price = 0, capacity = 2, adds = "" },
-			{ name = "Works Rally", price = 10000, level = 14, capacity = 2, speed = 3, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps (no more room)" },
+			{ name = "Works Rally", price = 10000, level = 14, capacity = 2, speed = 3, health = 100, look = "rally_works", adds = "a light pod, a roof scoop, mud flaps and a welded cage: +100 health (no more room)" }, -- 6.7: + health (a stage's tweaks stay under a quarter of the car's)
 		},
 	},
 	{
@@ -659,7 +673,7 @@ Config.Cars = {
 		ramPower = 0.3,
 		color = { 110, 118, 110 },
 		role = "Your first wheels: faster than running, all day",
-		description = "Worn tubes, mismatched wheels, a squeaky chain. A rear rack for one light parcel, your backpack on your back. Rider only.",
+		description = "Worn tubes, mismatched wheels, a squeaky chain. A rear rack for one light parcel: the bike's own bag. Rider only.",
 	},
 	{
 		id = "citybike",
@@ -679,6 +693,33 @@ Config.Cars = {
 		role = "The quick one: a clean frame, a lamp, two gear slots",
 		description = "A clean red courier frame with a front lamp. A rear rack for one light parcel and room for two pieces of bike gear. Rider only.",
 	},
+	-- 5.1.1, the E-Scooter (style "scooter": a narrow low deck, two small wheels, a tall stem; server/ScooterArt): a
+	-- bike by the rules (light cargo, the BIKE jobs, no fuel, sold at Spoke & Chain) that you ride standing. Quick off
+	-- the line and nippy; a small rack over the rear wheel and one gear slot for the basket (a handlebar bag: no
+	-- panniers, no trailer, Config.Gear notOn). 5.7 (the owner: "a bit slower, so it isn't too much"): 36 at the top
+	-- (44 before; the Courier Bike 38, the E-Bike 48) and two light pieces stacked on its rack (a ZDC RIDE rental keeps
+	-- one: Config.Rental.Room). 6.7 (it was dearer than the Cargo Bike and held less): three light pieces (two on the
+	-- rack, one on the deck at your feet) for $1,900 at level 3, below the Cargo Bike; the speed stays the owner's 32.
+	{
+		id = "escooter",
+		bike = true,
+		stand = true,
+		badge = "⚡ ELECTRIC · STAND-UP",
+		level = 3, -- (6.7: 4 → 3, beside the Cargo Bike it undercuts; listed before it, the bikes rise in level and price)
+		name = "E-Scooter",
+		price = 1900,
+		style = "scooter",
+		maxSpeed = 32, -- 6.0 (the owner: "not too fast, but a quicker start: electric"): 36 → 32, accel 26 → 42
+		accel = 42,
+		turn = 2.8,
+		health = 110,
+		capacity = 3,
+		gearSlots = 1,
+		ramPower = 0.25,
+		color = { 35, 40, 43 },
+		role = "The nippy one: stand on it, zip off, no pedalling",
+		description = "A battery under the deck, a lamp for the night. Zips off the line and darts through traffic. Three light pieces (two on the rear rack, one at your feet), a basket on the bar; no panniers, no trailer. Rider only, standing.",
+	},
 	{
 		id = "cargobike",
 		bike = true,
@@ -696,32 +737,6 @@ Config.Cars = {
 		color = { 153, 49, 43 },
 		role = "The hauler: a front box for four light pieces",
 		description = "A long low frame with a box up front: four light pieces ride in it. Slower off the line; it takes a basket or panniers, not a trailer. Rider only.",
-	},
-	-- 5.1.1, the E-Scooter (style "scooter": a narrow low deck, two small wheels, a tall stem; server/ScooterArt): a
-	-- bike by the rules (light cargo, the BIKE jobs, no fuel, sold at Spoke & Chain) that you ride standing. Quick off
-	-- the line and nippy; a small rack over the rear wheel and one gear slot for the basket (a handlebar bag: no
-	-- panniers, no trailer, Config.Gear notOn). 5.7 (the owner: "a bit slower, so it isn't too much"): 36 at the top
-	-- (44 before; the Courier Bike 38, the E-Bike 48) and two light pieces stacked on its rack (a ZDC RIDE rental keeps
-	-- one: Config.Rental.Room).
-	{
-		id = "escooter",
-		bike = true,
-		stand = true,
-		badge = "⚡ ELECTRIC · STAND-UP",
-		level = 4,
-		name = "E-Scooter",
-		price = 2800,
-		style = "scooter",
-		maxSpeed = 32, -- 6.0 (the owner: "not too fast, but a quicker start: electric"): 36 → 32, accel 26 → 42
-		accel = 42,
-		turn = 2.8,
-		health = 110,
-		capacity = 2,
-		gearSlots = 1,
-		ramPower = 0.25,
-		color = { 35, 40, 43 },
-		role = "The nippy one: stand on it, zip off, no pedalling",
-		description = "A battery under the deck, a tall stem, a lamp for the night. Zips off the line and darts through traffic. A rear rack for two light parcels, a basket on the bar. Rider only, standing.",
 	},
 	{
 		id = "ebike",
@@ -760,6 +775,7 @@ export type WeaponDef = {
 	oneHanded: boolean?, -- fires out of a car window too (any seat); the two-handed guns only on foot
 	exclusive: string?, -- 3.1: not sold, a reward nobody can buy (Config.Rewards: a campaign id, "secrets" or "challenges")
 	pierce: number?, -- 3.1: the bullet goes on through this many more enemies
+	starter: boolean?, -- 6.7: every profile starts with it (Config.Arms.Starter): not sold, "STARTER · yours" at Lead & Co.
 }
 
 Config.Weapons = {
@@ -767,8 +783,9 @@ Config.Weapons = {
 		id = "pistol",
 		oneHanded = true,
 		name = "Pistol",
-		level = 1, -- 6.0: bought at Lead & Co. like any gun (a new courier has fists only, Config.Arms)
-		price = 250,
+		level = 1, -- 6.0: bought at Lead & Co.; 6.0.2: every courier starts with it; 6.7: so it is not sold any more
+		price = 0,
+		starter = true, -- 6.7
 		damage = 20,
 		fireRate = 3,
 		range = 140,
@@ -776,7 +793,7 @@ Config.Weapons = {
 		spread = 0.5,
 		splash = 0,
 		color = { 255, 230, 140 },
-		description = "Better than throwing the pizza at them.",
+		description = "Your starter gun: one-handed, so it also fires out of a car window. Better than throwing the pizza at them.",
 	},
 	{
 		id = "smg",
@@ -791,7 +808,7 @@ Config.Weapons = {
 		spread = 2,
 		splash = 0,
 		color = { 255, 200, 90 },
-		description = "Sprays a lot of lead.",
+		description = "Sprays a lot of lead, less precise far out. One-handed: it fires out of a car window too.",
 	},
 	{
 		id = "shotgun",
@@ -805,21 +822,21 @@ Config.Weapons = {
 		spread = 6,
 		splash = 0,
 		color = { 255, 150, 70 },
-		description = "Point blank, everything falls apart.",
+		description = "Seven pellets: point blank, everything falls apart; past 40 studs they spread thin. Two hands: not from a car.",
 	},
 	{
 		id = "rifle",
 		level = 6,
 		name = "Hunting Rifle",
 		price = 15000,
-		damage = 48,
+		damage = 60, -- 6.7: 48 → 60 (132 a second: more than the SMG's 117 even before its spread misses at range)
 		fireRate = 2.2,
 		range = 240,
 		pellets = 1,
 		spread = 0.2,
 		splash = 0,
 		color = { 200, 255, 200 },
-		description = "Long range, one head at a time.",
+		description = "Long range and dead accurate: one shot drops a walker or a runner, a headshot most bandits. Two hands: not from a car.",
 	},
 	{
 		id = "minigun",
@@ -833,7 +850,7 @@ Config.Weapons = {
 		spread = 2.5,
 		splash = 0,
 		color = { 120, 220, 255 },
-		description = "The delivery always arrives.",
+		description = "Sixteen shots a second: the delivery always arrives. Two hands: not from a car.",
 	},
 	{
 		id = "launcher",
@@ -847,7 +864,7 @@ Config.Weapons = {
 		spread = 1,
 		splash = 14,
 		color = { 255, 110, 60 },
-		description = "Every shot is a small explosion.",
+		description = "Every shot is a small explosion (a 14-stud blast). Two hands: not from a car.",
 	},
 	-- Earned, not sold (Config.Employers weapon rewards).
 	{
@@ -942,7 +959,8 @@ Config.Weapons = {
 } :: { WeaponDef }
 
 -- Car guns: bolted on the roof at Wrench Garage (one per car, on the cars with CarDef.mount), fired by the driver.
--- A car starts without one. The Gun Damage / Fire Rate upgrades work for them too (Economy.carGunStats).
+-- A car starts without one. The Gun Damage / Fire Rate upgrades work for them too (Economy.carGunStats; 6.7: those are
+-- sold at Lead & Co.).
 export type CarGunDef = {
 	id: string,
 	name: string,
@@ -1012,6 +1030,7 @@ export type UpgradeDef = {
 	costGrowth: number,
 	perLevel: number, -- +x of the base value per level (loading: -x of the hold time)
 	car: boolean?, -- 3.3: a car track: bought for one car (profile.carUpgrades[carId]); else for all your guns (profile.upgrades)
+	guard: number?, -- 6.7, the Ram Plow: each level takes this share off the dent a ram costs the car (Economy.ramGuard)
 }
 
 -- Wrench Garage. 3.3: the car tracks (car = true) belong to ONE car, the equipped one when you buy (the price grows
@@ -1025,14 +1044,18 @@ export type UpgradeDef = {
 -- (the id stays, for the saves): new black tyres with a tread ring from level 1 (bald grey ones before, on the Rusty
 -- and the Patched Van), alloy rims from 3, a lower stance at 5. 4.6: the Hand Trolley is not an upgrade track any more
 -- but GEAR (Config.Gear below; its id "trolley" and a save's trolley level stay: PlayerData moves it, once).
+-- 6.7: the gun tracks (Gun Damage, Fire Rate: no `car`) are sold at Lead & Co. with the guns (server/Shops.luau
+-- onUpgrade: a gun track there, a car track and the stages at Wrench Garage); their save keys (profile.upgrades
+-- damage / firerate) stay. The Ram Plow's bull bar also takes the dent: `guard` a level (Economy.ramGuard,
+-- server/Zombies.luau hitByCar: the car's share of a ram survivor's health × car.stats.ramGuard).
 Config.Upgrades = {
 	{ id = "engine", car = true, name = "Engine", description = "+8% top speed and acceleration · Lv 1: no more exhaust smoke · Lv 3: a hood scoop and twin pipes", maxLevel = 5, baseCost = 400, costGrowth = 2.0, perLevel = 0.08 },
 	{ id = "handling", car = true, name = "Tyres & Suspension", description = "+8% steering · Lv 1: new tyres with tread · Lv 3: alloy rims · Lv 5: a lower stance", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
 	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
-	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
+	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage, −12% of the dent a zombie you don't kill leaves · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30, guard = 0.12 },
 	-- (4.0.1: Quick Hands, "loading", is gone: a save's levels are refunded; 5.7: its hold code too)
-	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
-	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
+	{ id = "damage", name = "Gun Damage", description = "+20% damage for every gun you own, the car guns too (not the melee)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
+	{ id = "firerate", name = "Fire Rate", description = "+12% shots a second for every gun you own, the car guns too", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
 
 -- 4.6, GEAR: pieces of equipment bought for ONE car at Wrench Garage (the GEAR tab) and installed in its gear slots
@@ -1044,8 +1067,9 @@ Config.Upgrades = {
 --   trolley   the Hand Trolley (4.0's upgrade, the same id and save): folded inside the back, server/Equipment.luau
 --   straps    Ratchet Straps: the cargo's condition losses × GearTuning.StrapsLoss (4.7's cargo rules use it)
 --   cooler    Cooler Box: food freshness drains × GearTuning.CoolerDrain (4.7)
---   roofrack  Roof Rack: + GearTuning.RoofRackSlots cargo slot for a LIGHT piece (Config.Cargo.LightLooks), on the
---             roof (Economy.capacity with the installed gear and the cargo's look; server/Cargo.luau shows it there)
+--   roofrack  Roof Rack: + GearTuning.RoofRackSlots cargo slots for LIGHT pieces (Config.Cargo.LightLooks), on the
+--             roof (Economy.capacity with the installed gear and the cargo's look; server/Cargo.luau shows them there,
+--             6.7: two side by side, RoofRackGap apart)
 export type GearDef = {
 	id: string,
 	name: string,
@@ -1060,17 +1084,25 @@ export type GearDef = {
 }
 
 -- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
--- carry on foot and on a bike (shared/Transport.luau). room = light pieces in hands + on the back (the best one counts),
--- speed = walk / sprint multiplier (the best one counts), warm = food freshness drain multiplier while you carry it.
--- 6.0: extra = light pieces the piece adds on top of the hands and the best backpack (the plastic bag: they all add up).
+-- carry on foot and on a bike (shared/Transport.luau). speed = walk / sprint multiplier (the best one counts).
+-- 6.7: the Thermal Jacket (warm: food cooled ×0.8) is gone (the Thermal Delivery Bag keeps food hot; Config.RetiredKit
+-- pays it back once). `tips` = the share of an order's pay a piece adds as the customer's tip on every delivery (the
+-- Courier Vest: shared/JobRules.luau kitTip, server/Jobs.luau payOrder). `starter` = every profile has it (the plastic
+-- bag: "STARTER · yours", never sold). `shop` = the Map.Shops id that sells it (shared/Transport.luau kitShop: else a
+-- bag at ZDC Bags, the rest at Last Stop Supplies): the Baseball Bat at Lead & Co. `melee` = the Config.Melee kind it
+-- turns the punch into (the bat).
+-- 6.0: extra = light pieces a bag adds on top of the hands.
+-- 6.6, one carrying item (the owner: "you can't have a bag and a backpack at the same time"): the backpacks are gone
+-- (Config.RetiredKit, refunded once: server/PlayerData.luau), your room on foot is the hands + the bag in use, and the
+-- bags are sold at ZDC Bags, the kiosk at the depot (Config.BagShop); Last Stop Supplies keeps the vests and the rest.
 -- 6.0: armour = the share of every hit a vest takes off (the best vest owned counts, shared/Armour.luau); a speed below 1
 -- slows the walk and the sprint (shared/Transport.luau speedMult: the best shoes × the slowest piece).
 -- 6.4, the bags (a piece with `extra` is a bag): only ONE bag is in your hand, the active one (profile.activeBag, else
 -- the best owned: the most room, a tie the later one here; shared/Transport.luau activeBag / bagRoom), so owning
--- several never adds up. The point of every bag: you SPRINT with your deliveries (pieces in a bag or a backpack are
--- never "in your hands": no Carrying attribute, no carry step; only the hands' pieces stop the sprint,
+-- several never adds up. The point of every bag: you SPRINT with your deliveries (pieces in a bag are never "in
+-- your hands": no Carrying attribute, no carry step; only the hands' pieces stop the sprint,
 -- client/CameraRig.luau). Its perks work only for that bag, while it is your hand (key 2):
---   bagWarm    food in it cools × this (a Thermal Jacket's `warm` multiplies on top: shared/Transport.luau mixWarm)
+--   bagWarm    food in it cools × this (shared/Transport.luau mixWarm: by the share of the order's pieces in it)
 --   padded     fragile pieces in it take no knock from a hard fall or a bite on foot (Config.Jobs.CargoRules FootFall …)
 --   bagBreath  the sprint drains the breath × this while you hold it (the character's BreathCost attribute,
 --              server/Transport.luau applyKit; client/Stamina.luau): a heavy bag, you still sprint, a little shorter
@@ -1083,26 +1115,49 @@ export type GearDef = {
 --              behind the hip), loaded or not: its pieces stay with you, the hands are free. Without it, a hand bag
 --              as in 6.1: stowed when empty, set down on the ground when loaded. Pickups go into a bag (and you throw
 --              from it) only while it is your hand: press 2 to swing it to the front again.
-export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number?, extra: number?, bagWarm: number?, padded: boolean?, bagBreath: number?, carry: string?, stays: boolean? }
+export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, speed: number?, armour: number?, extra: number?, bagWarm: number?, padded: boolean?, bagBreath: number?, carry: string?, stays: boolean?, tips: number?, starter: boolean?, shop: string?, melee: string? }
 Config.Kit = {
-	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "Sprint with your deliveries: 2 light pieces of any kind (a bouquet, a cake too) ride in it while you hold it (2); what you pick up drops straight in. Works with a backpack." },
+	-- 6.7: every profile has it (newProfile, starterKit): not sold, "STARTER · yours" at ZDC Bags
+	{ id = "bag", name = "Plastic Bag", level = 1, price = 0, starter = true, icon = "🛍️", extra = 2, description = "Your starter bag. Sprint with your deliveries: 2 light pieces of any kind (a bouquet, a cake too) ride in it while you hold it (2); what you pick up drops straight in." },
 	-- 6.0.1: the red reflective vest, no longer part of a new courier's body (server/CharacterArt/Geometry.luau hivis):
 	-- just the look (no armour), worn until a Kevlar or heavy vest covers it (shared/KitFit.luau). Saves from before
-	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it.
-	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", description = "The ZDC reflective vest: customers see you're a courier." },
-	-- 6.4, the bigger bags (Last Stop Supplies' KIT tab; USE there or in the I window's BAGS tab picks the one you hold)
+	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it. 6.7: customers tip a courier
+	-- they can see: +5% of every order's pay (tips; it counts under an armoured vest too: kit is always worn).
+	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", tips = 0.05, description = "The ZDC reflective vest: customers see a courier and tip +5% on every delivery (it still counts under a Kevlar or heavy vest)." },
+	-- 6.4, the bigger bags (6.6: sold at ZDC Bags; USE there or in the I window's BAGS tab picks the one you hold)
 	{ id = "tote", name = "Canvas Tote", level = 2, price = 120, icon = "👜", extra = 3, carry = "shoulder", stays = true, description = "Sprint with your deliveries: 3 light pieces ride in this canvas tote over your shoulder. Swings onto your back when you draw your gun." },
 	{ id = "thermal", name = "Thermal Delivery Bag", level = 3, price = 300, icon = "🔥", extra = 4, carry = "hand", bagWarm = 0.35, description = "Sprint with your deliveries: 4 light pieces ride in it. Insulated: food in it stays hot (cools ×0.35)." },
 	{ id = "padded", name = "Padded Messenger Bag", level = 4, price = 650, icon = "💼", extra = 4, carry = "hip", stays = true, padded = true, description = "Sprint with your deliveries. Stays on your back when you draw your gun. Foam-padded: 4 light pieces, fragile ones take no knocks." },
 	{ id = "duffel", name = "Big Delivery Duffel", level = 6, price = 1200, icon = "🧳", extra = 6, carry = "hand", stays = true, bagBreath = 1.15, description = "Sprint with your deliveries: 6 light pieces ride in it. Slung on your back when you draw your gun. Heavy: sprinting costs 15% more breath." },
-	{ id = "backpack", name = "Courier Backpack", level = 1, price = 150, icon = "🎒", room = 3, description = "Carry 3 light pieces on foot or on a bike instead of 2." },
-	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster." },
-	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
-	{ id = "jacket", name = "Thermal Jacket", level = 1, price = 300, icon = "🧥", warm = 0.8, description = "Food you carry stays warm longer." },
+	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster on foot (not on a bike)." },
 	-- 6.0, the vests (server/Armour.luau takes the share off every bite and bullet; their looks: KitArt / KitWear).
 	{ id = "kevlar", name = "Kevlar Vest", level = 3, price = 600, icon = "🦺", armour = 0.3, description = "Takes 30% off every bite and bullet. Light enough to run in." },
-	{ id = "heavy", name = "Heavy Armour", level = 5, price = 1500, icon = "🛡️", armour = 0.5, speed = 0.92, description = "Plates and shoulder guards: takes 50% off every bite and bullet, but you are a little slower on foot." },
+	{ id = "heavy", name = "Heavy Armour", level = 5, price = 1500, icon = "🛡️", armour = 0.5, speed = 0.92, description = "Plates and shoulder guards: takes 50% off every bite and bullet, but you walk and sprint 8% slower." },
+	-- 6.7, the Baseball Bat (Config.Melee.Kinds bat): sold at Lead & Co. (shop), yours for good like any kit
+	{ id = "bat", name = "Baseball Bat", level = 1, price = 150, icon = "🏏", shop = "guns", melee = "bat", description = "V swings a bat instead of a punch: 30 damage (a punch does 12), a longer reach. With the gun away (fists or the bag); the gun out still strikes with the gun." },
 } :: { KitDef }
+
+-- 6.6: the backpacks that are no longer sold (Config.Kit had them from 5.0 to 6.5). A save that owns one gets its price
+-- back once (shared/Transport.luau packRefund, server/PlayerData.luau: the save's noPacks flag) and Marge's text says
+-- so (Config.Courier.PackRefund, server/Tutorial.luau). 6.7: the Thermal Jacket too, with a flag of its own (`flag`:
+-- the save's mark that it was paid back; noJacket, Config.Courier.JacketRefund), so a 6.6 save is paid for it once.
+Config.RetiredKit = {
+	{ id = "backpack", name = "Courier Backpack", price = 150, flag = "noPacks" },
+	{ id = "bigpack", name = "Big Backpack", price = 400, flag = "noPacks" },
+	{ id = "jacket", name = "Thermal Jacket", price = 300, flag = "noJacket" }, -- 6.7
+} :: { { id: string, name: string, price: number, flag: string } }
+
+-- 6.6, ZDC Bags (server/BagKiosk.luau, Map.Shops.bags): the depot's bag kiosk, in the safe yard east of the spawn pad
+-- (World.DepotSpawn at 0, 26), clear of the scooter rack (Config.Rental.SpawnRack, z 44), the job board (-18, -25), the
+-- garage terminal (18, -25) and Marge (Config.Tutorial.NpcSpot). X / Z: its counter's middle, studs from the depot's
+-- centre; it faces the spawn (-X). Radius: studs from that spot the shop counts as "here" (the counter's BUY, the
+-- server's check; Map.ShopRadius for the big shops). It sells the bags (Config.Kit pieces with `extra`).
+Config.BagShop = {
+	Name = "ZDC Bags",
+	X = 26,
+	Z = 30,
+	Radius = 16,
+}
 
 -- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
 -- you reach the van's level (Config.Cars "van" level) without one, Marge texts you about a guy out west; Earl sells his
@@ -1140,22 +1195,23 @@ Config.BikeShop = {
 }
 
 Config.Gear = {
-	{ id = "trolley", name = "Hand Trolley", level = 3, price = 600, icon = "🛒", needs = "trolley", description = "Carry up to 4 pieces at once. It rides folded inside the back (vans and trucks)." },
-	{ id = "straps", name = "Ratchet Straps", level = 4, price = 900, icon = "🔗", description = "The load is strapped down: cargo condition losses ×0.6. Two orange bands in the back." },
-	{ id = "cooler", name = "Cooler Box", level = 5, price = 1400, icon = "🧊", description = "Food stays fresh twice as long (freshness drains ×0.5). A white box in the back." },
-	{ id = "roofrack", name = "Roof Rack", level = 7, price = 2500, icon = "🧳", notOn = { "muscle", "pickup" }, description = "+1 cargo slot on the roof for a light piece (pizza, parcels, mail, bread, medicine …)." },
+	{ id = "trolley", name = "Hand Trolley", level = 3, price = 600, icon = "🛒", needs = "trolley", description = "Heavy cargo by hand at a normal pace: up to 4 pieces at once (not people, horses or pallets). Folds inside the back: vans and trucks only." },
+	{ id = "straps", name = "Ratchet Straps", level = 4, price = 900, icon = "🔗", description = "The load is strapped down: cargo condition losses from bumps and damage ×0.6. Cars only." },
+	{ id = "cooler", name = "Cooler Box", level = 5, price = 1400, icon = "🧊", description = "Food in the car stays fresh twice as long (freshness drains ×0.5). Cars only." },
+	{ id = "roofrack", name = "Roof Rack", level = 7, price = 2500, icon = "🧳", notOn = { "muscle", "pickup" }, description = "+2 cargo slots on the roof for light pieces only (pizza, parcels, mail, bread, medicine …). Not on the Muscle Car or the Pickup." }, -- 6.7: +1 → +2
 	-- 5.1, bike gear (bikeOnly: only on a bike, CarDef.bike; the car gear never goes on one), sold and fitted at Spoke &
 	-- Chain (Map.Shops.bikes) for the bike you ride: `room` more light pieces (Economy.capacity, Transport mode "bike").
-	{ id = "basket", name = "Front Basket", level = 2, price = 150, icon = "🧺", bikeOnly = true, room = 2, description = "+2 light pieces in a wire basket over the front wheel." },
-	{ id = "panniers", name = "Panniers", level = 3, price = 450, icon = "👜", bikeOnly = true, room = 3, notOn = { "escooter" }, description = "+3 light pieces in two bags on the rear rack (not on the E-Scooter)." },
-	{ id = "trailer", name = "Bike Trailer", level = 4, price = 1200, icon = "📦", bikeOnly = true, room = 4, notOn = { "cargobike", "escooter" }, description = "+4 light pieces in a two-wheeled trailer behind you (not on the Cargo Bike or the E-Scooter)." },
+	{ id = "basket", name = "Front Basket", level = 2, price = 150, icon = "🧺", bikeOnly = true, room = 2, description = "+2 light pieces in a wire basket over the front wheel. Fits every bike and the E-Scooter." },
+	{ id = "panniers", name = "Panniers", level = 3, price = 450, icon = "👜", bikeOnly = true, room = 3, notOn = { "escooter" }, description = "+3 light pieces in two bags on the rear rack. Not on the E-Scooter." },
+	{ id = "trailer", name = "Bike Trailer", level = 4, price = 1200, icon = "📦", bikeOnly = true, room = 4, notOn = { "cargobike", "escooter" }, description = "+4 light pieces in a two-wheeled trailer behind you: bike runs take up to 8 pieces. Not on the Cargo Bike or the E-Scooter." },
 } :: { GearDef }
 
 -- 4.6: what the gear does (4.7's cargo rules read StrapsLoss and CoolerDrain).
 Config.GearTuning = {
 	StrapsLoss = 0.6, -- Ratchet Straps: cargo condition losses × this
 	CoolerDrain = 0.5, -- Cooler Box: food freshness drains × this
-	RoofRackSlots = 1, -- Roof Rack: + this many cargo slots for light pieces
+	RoofRackSlots = 2, -- Roof Rack: + this many cargo slots for light pieces (6.7: 1 → 2)
+	RoofRackGap = 1.8, -- 6.7: studs between the rack's pieces, side by side (server/Cargo.luau)
 }
 
 export type ItemDef = {
@@ -1165,17 +1221,23 @@ export type ItemDef = {
 	price: number,
 	max: number,
 	description: string,
+	car: boolean?, -- 6.7: for a car only: shown (the shop, the bottom bar, the crates) once you own a car (Economy.itemShown)
 }
 
--- Consumables, bought at Last Stop Supplies, used from the hotbar (keys 1 … 6; 5.4: the jerry can is the sixth).
+-- Consumables, bought at Last Stop Supplies, used from the bottom bar (client/Hotbar.luau: in this order, the first
+-- BarSlots kinds you have; 6.7: more than that, the last slot is MORE: the I window). 6.7: the ones for a car (`car`:
+-- the repair kit, nitro, the landmine, the jerry can) come after the ones on foot, show in the shop and on the bar only
+-- once you own a car (any vehicle that is not a bike: Economy.ownsCar), a supply crate gives them only then, and the
+-- server sells them only then (server/Shops.luau). The Energy Drink (Stamina: EnergyTime, EnergyBreath) is new.
 Config.Items = {
-	{ id = "repair", name = "Repair Kit", icon = "🔧", price = 150, max = 10, description = "Fixes 40% of your car." },
-	{ id = "medkit", name = "Medkit", icon = "➕", price = 80, max = 10, description = "Heals you fully." },
-	{ id = "nitro", name = "Nitro", icon = "⚡", price = 120, max = 10, description = "4 seconds of +60% speed." },
-	{ id = "molotov", name = "Molotov", icon = "🔥", price = 60, max = 20, description = "Throw it where you aim: burns zombies for 8 s." },
-	{ id = "mine", name = "Landmine", icon = "💣", price = 100, max = 10, description = "Drops behind your car. Boom." },
+	{ id = "medkit", name = "Medkit", icon = "➕", price = 80, max = 10, description = "Heals you fully, at once." },
+	{ id = "energy", name = "Energy Drink", icon = "🥤", price = 40, max = 5, description = "Your breath full at once, and ×1.3 breath for 30 s: you sprint longer. On foot." }, -- 6.7
+	{ id = "molotov", name = "Molotov", icon = "🔥", price = 60, max = 20, description = "Throw it where you aim (90 studs at most): burns zombies for 8 s. From a car too." },
+	{ id = "repair", name = "Repair Kit", icon = "🔧", price = 150, max = 10, car = true, description = "Car only: fixes 40% of your car's health. Stand next to it." },
+	{ id = "nitro", name = "Nitro", icon = "⚡", price = 120, max = 10, car = true, description = "Car only: 4 seconds of +60% speed while you drive." },
+	{ id = "mine", name = "Landmine", icon = "💣", price = 100, max = 10, car = true, description = "Car only: drops behind your car while you drive; a zombie or a bandit car close by sets it off. 5 at most down (a 6th blows the oldest), gone after 2 minutes." },
 	-- 5.4: sold at Last Stop Supplies and at every gas station's kiosk (Map.GasStations); Config.Fuel.CanLitres.
-	{ id = "jerrycan", name = "Jerry Can", icon = "⛽", price = 35, max = 5, description = "+10 L of fuel. Use it next to your car (or in it)." },
+	{ id = "jerrycan", name = "Jerry Can", icon = "⛽", price = 35, max = 5, car = true, description = "Car only: +10 L of fuel. Use it next to your car (or in it). The gas stations' kiosks sell it too." },
 } :: { ItemDef }
 
 Config.ItemTuning = {
@@ -1193,6 +1255,10 @@ Config.ItemTuning = {
 	MineMax = 5,
 	UseCooldown = 0.4,
 	BarSlots = 5, -- 6.3: the bottom bar's item slots on a computer (client/Hotbar.luau)
+	-- 6.7, the Energy Drink (server/Items.luau sets the character's EnergyUntil, server time; client/Stamina.luau fills
+	-- the breath when it changes and divides the sprint's drain by EnergyBreath until then)
+	EnergyTime = 30,
+	EnergyBreath = 1.3,
 }
 
 -- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)
@@ -1448,6 +1514,7 @@ Config.Horde = {
 	RamDamagePerSpeed = 2.4, -- damage = speed × this × ramPower × plow
 	RamSlowdown = 0.35, -- the car keeps this much speed after hitting a zombie that survives
 	RamSelfDamage = 0.12, -- the car takes this share of a survivor's health as damage
+	RamGuardMin = 0.25, -- 6.7: the Ram Plow cuts that dent to this share at most (Economy.ramGuard: −12% a level)
 	HeadshotMultiplier = 2,
 	-- Free roam: zombies (never bandits) shamble around every player who has no job and is out of the safe zone. They
 	-- wander slowly around their spot and start hunting a player who comes close (a fast car is heard from further)
@@ -1602,11 +1669,11 @@ Config.Levels = {
 	-- unlocks, once (server/PlayerData.luau: profile.levelRewards; a save from before 4.6 counts the levels it had
 	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
 	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
-	-- 5.7: the levels before a car (2 – 4) give what a courier on foot or on a bike uses (medkits, the Courier Backpack,
+	-- 5.7: the levels before a car (2 – 4) give what a courier on foot or on a bike uses (medkits, 6.6: the Canvas Tote,
 	-- the Running Shoes: Config.Kit); the car's items (repair kits, nitro, mines) start at 5, once you drive.
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop: Spoke & Chain on Main St" },
-		[3] = { money = 750, items = { medkit = 2 }, kit = "backpack" },
+		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
 		[4] = { money = 1000, items = { medkit = 2 }, kit = "shoes", text = "Old Van: Earl's Used Wheels (Marge's quest)" },
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
@@ -2023,7 +2090,9 @@ Config.Juice = {
 	ConfettiPieces = 40, -- a ★★★ rating
 	ConfettiSeconds = 1.8,
 	-- Seconds each gesture lasts (Gestures.weight eases it in and out).
-	Gestures = { wave = 1.6, give = 0.45, take = 0.45, knock = 0.6, bag = 0.4, throw = 0.4, vest = 1.2, sling = 0.55, unsling = 0.55 } :: { [string]: number }, -- 6.0: bag, throw, vest; 6.4: sling, unsling
+	-- 6.7: give 0.5 (the piece held out in the hands), bag 0.5 (looked down at, put in), throw 0.45 (the wind-up to
+	-- Config.Throw.WindUp, the whip, the follow-through), receive 1.3 (a receiver holding the piece handed over).
+	Gestures = { wave = 1.6, give = 0.5, take = 0.45, knock = 0.6, bag = 0.5, throw = 0.45, vest = 1.2, sling = 0.55, unsling = 0.55, receive = 1.3 } :: { [string]: number }, -- 6.0: bag, throw, vest; 6.4: sling, unsling; 6.7: receive
 	WaveHz = 2.2, -- the hand's wave, back and forth per second
 	KnockGap = 0.17, -- seconds between two knocks (the sound's too)
 }
@@ -2089,7 +2158,7 @@ Config.Jobs = {
 	-- 5.0, the ON FOOT jobs (server/Jobs.luau footOffer, server/Cargo.luau's foot flow, shared/Transport.luau): the
 	-- board's own section of Offers, always open (level 1) and for everybody (a driver too: quick money). A business
 	-- that sends a light look (Config.Cargo.LightLooks) sends Pieces pieces, never more than you carry (Transport
-	-- room: your hands and your backpack), from an address PickupMin … PickupMax (manhattan) from you to one
+	-- room: your hands and your bag), from an address PickupMin … PickupMax (manhattan) from you to one
 	-- MinDistance … MaxDistance on, inside the Districts only (never across the river). Internally a ★ job (tier 1:
 	-- the tier-indexed tables stay as they are) with `mode = "foot"`: its own pay (JobRules.footPay: BasePay +
 	-- PayPerStud × the walk + PayPerPiece a piece, PayMin … PayMax, × the role's and the modifier's multiplier up to
@@ -2129,14 +2198,16 @@ Config.Jobs = {
 	-- 5.1, the BIKE jobs (server/Jobs.luau lightOffer with this table, offer.mode = "bike"; the same fields as Foot,
 	-- JobRules.footPay / footTime / footPieces take it): the board's BIKE section from Level on, light looks only,
 	-- longer (MinDistance … MaxDistance) and bigger (Pieces, never more than your bike holds: its room + its bike gear +
-	-- your backpack, Transport mode "bike") than a walk, Downtown, in the Suburbs and in the Harbor. Pay: BasePay +
+	-- your bag, Transport mode "bike") than a walk, Downtown, in the Suburbs and in the Harbor. Pay: BasePay +
 	-- PayPerStud × the ride + PayPerPiece a piece (PayMin … PayMax); the clock expects Speed studs / s; XP: a ★ job's
 	-- + XpBonus (about 100 – 130). Done on your bike only (riding it or standing by it; never in a car), Cargo's light
-	-- flow (the pieces ride in your pack and the bike's slots: Info.pack). No waves: now and then a stray walker.
+	-- flow (6.6: the pieces ride in the bike's own bag and yours: Info.rack, the bag). No waves: now and then a stray walker.
+	-- 6.7: up to 8 pieces a run (6 before): a bike's own room with its gear and your bag passed 6 long ago, so the Bike
+	-- Trailer's +4 (and the panniers') only paid off by stacking orders; now a bigger rig takes a bigger run.
 	Bike = {
 		Level = 2,
 		Offers = 3,
-		Pieces = { 2, 6 } :: { number },
+		Pieces = { 2, 8 } :: { number },
 		PickupMin = 60,
 		PickupMax = 450,
 		PickupWiden = 350,
@@ -2485,8 +2556,8 @@ Config.Jobs = {
 	-- 5.2, several orders at once (server/Jobs.luau addOrder, shared/JobRules.luau's orders): while a stackable run is
 	-- on (an ordinary board delivery on foot, on a bike, or a car one of the ★ … CarTiers tiers; never a mission, a
 	-- special, an employer's job, DUO, the Freight Run or the tutorial's), ACCEPT on the board adds another order of
-	-- the same kind (+ ADD ORDER) while your free room takes its pieces (what you carry: hands + backpack on foot, the
-	-- bike + its gear + your backpack, the car + its gear; minus the pieces the open orders still hold or will pick up)
+	-- the same kind (+ ADD ORDER) while your free room takes its pieces (what you carry: hands + bag on foot, the
+	-- bike + its gear + your bag, the car + its gear; minus the pieces the open orders still hold or will pick up)
 	-- and fewer than Max[mode] orders are open. Every order keeps its own clock (its offer's, from when it was added),
 	-- pay and rating. The stops go in any order: the GPS takes the open stop whose circle you are at (AtStop studs),
 	-- else the pinned order's nearest, else the nearest one (the current one kept unless another is Hysteresis studs
@@ -3042,22 +3113,21 @@ Config.Cargo = {
 		icecream = true,
 		gadget = true,
 	} :: { [string]: boolean },
-	-- 5.3, what fits in a backpack (server/Cargo.luau packFits, shared/Bag.luau): small, flat or boxed light pieces.
-	-- Every other light piece (a bouquet, a cake, an electronics box, groceries, ice cream) rides in your hands, or on a
-	-- bike's rack, basket or box (two on the e-scooter's rack, 5.7): on foot never more than your hands hold.
-	PackLooks = {
-		mail = true,
-		newspaper = true,
-		documents = true,
-		medicine = true,
-		pizza = true,
-		burger = true,
-		noodles = true,
-		pastry = true,
-		bread = true,
-		parcel = true,
-	} :: { [string]: boolean },
+	-- 6.6: no backpack (5.3's PackLooks are gone): every light piece fits your bag and the bike's own bag, a heavy one
+	-- only your hands.
+	-- 6.7, real sizes (the owner: "not realistic"): a light piece is built at LightScale of its 3.x size (a pizza box about
+	-- 33 cm across, a parcel 30–40 cm: a box carried in both hands is about a stud wide), LookScale per look; the heavy
+	-- ones as before (server/Cargo.luau buildLook). In the hands the stack's bottom is at most CarryLow studs over the
+	-- body's root (on the forearms) and its back CarryFront in front of it.
+	LightScale = 0.5,
+	LookScale = { cake = 0.36, medicine = 0.42, newspaper = 0.6, bouquet = 0.55 } :: { [string]: number },
+	CarryLow = 0.05,
+	CarryFront = 0.52,
 	HandsMax = 2, -- light pieces in one player's hands at most
+	-- 6.6, the bike's own bag (its rack, basket or box: server/Cargo.luau, shared/Holding.luau bikeNear): on a run with a
+	-- bike, a pickup goes onto it while your bike is within BikeReach studs of you (or you sit on it), and at a drop E
+	-- takes its pieces from it only then ("Your bike has it: bring it closer.").
+	BikeReach = 12,
 	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)
 	-- 3.7, the car doors (server/Vehicles.luau, client/CarVisuals.luau): the E to get in shows only at a door (the driver's
 	-- on the left, the passengers' on their side), this close; the door swings out this far.
@@ -3114,6 +3184,9 @@ Config.Throw = {
 	Range = 45, -- studs (flat) from the door you may throw from
 	DoorRadius = 4, -- a landing this close (flat) to the door's spot is delivered
 	Cooldown = 0.8, -- seconds between two throws
+	-- 6.7: the throw's wind-up (shared/Gestures.luau "throw": the arm back, the torso turned): the server launches the
+	-- piece this many seconds after the throw, when the arm whips through (the piece leaves the hand then)
+	WindUp = 0.18,
 	MinSpeed = 16, -- studs / s at the weakest …
 	MaxSpeed = 60, -- … and the strongest (60 at 45° flies ~45 studs)
 	Gravity = 80, -- studs / s² (floatier than the world's: a readable arc)
@@ -3157,7 +3230,7 @@ Config.Throw = {
 -- (shared/RunCycle.luau: the legs, the arms, the waist, the head and the body's bob, set over the stock run animation),
 -- for everybody within Range of the camera.
 Config.Courier = {
-	BagKit = "bag", -- the Config.Kit id: owned, a light piece picked up drops straight into the bag (or the pack) (6.4: the
+	BagKit = "bag", -- the Config.Kit id: owned, a light piece picked up drops straight into the bag (6.4: the
 	-- plastic one; any Config.Kit piece with `extra` is a bag, and the active one is in your hand: shared/Transport.luau)
 	VestKit = "hivis", -- 6.0.1: the Courier Vest's Config.Kit id (server/KitWear.luau; given once to pre-6.0.1 saves)
 	Sprint = {
@@ -3172,6 +3245,7 @@ Config.Courier = {
 	-- swings it (it trails when you start, swings forward when you stop, out on a turn), the air leans it back at a run.
 	Bag = {
 		Grip = 0.12, -- studs under the hand
+		Clear = 0.25, -- 6.7: studs a real-size bag stays over the ground at rest (tools/character-art/bag-check.luau, on the real body)
 		Spring = 70, -- the swing's stiffness (ω², 1 / s²: about 1.3 swings a second) …
 		Damp = 5, -- … and its damping (1 / s: a few swings, then it hangs still)
 		Kick = 0.006, -- radians of swing for every stud / s² the hand speeds up or slows down (a real pendulum: 1 / g)
@@ -3200,15 +3274,14 @@ Config.Courier = {
 	-- body part, the pivot's spot on it (studs on the nominal block body, scaled to the real one: shared/KitFit.luau)
 	-- and its turn (degrees). "hand" is the left hand's grip (Bag.Grip under it; HandOut[id] studs further out: the
 	-- boxy thermal bag off the leg). "back" is a bag slung on the back (the tote, the duffel: lying across it),
-	-- "hipBack" the messenger slid behind the hip; PackPush studs further back while a backpack is worn.
+	-- "hipBack" the messenger slid behind the hip.
 	BagPlaces = {
-		shoulder = { part = "UpperTorso", at = { -1.05, 0.8, 0.3 }, turn = { 0, 0, 6 } },
-		hip = { part = "UpperTorso", at = { -1.02, 0.1, 0.22 }, turn = { 0, 0, 4 } },
+		shoulder = { part = "UpperTorso", at = { -1.14, 0.8, 0.62 }, turn = { 0, 0, -3 } }, -- (6.7: under the arm, behind it)
+		hip = { part = "UpperTorso", at = { -1.25, 0.1, 0.6 }, turn = { 0, 0, -2 } }, -- (6.7: the real-size messenger at the back of the hip, clear of the arm)
 		back = { part = "UpperTorso", at = { 0, 0.62, 0.95 }, turn = { 0, 90, 0 } },
 		hipBack = { part = "UpperTorso", at = { -0.5, 0.05, 0.72 }, turn = { 0, 90, 0 } },
 	} :: { [string]: { part: string, at: { number }, turn: { number } } },
-	HandOut = { thermal = 0.12, duffel = 0.08 } :: { [string]: number }, -- (6.4.1: the duffel too: full, it swells against the leg)
-	PackPush = 0.5,
+	HandOut = { thermal = 0.18, duffel = 0.14 } :: { [string]: number }, -- (6.4.1: the duffel too: full, it swells against the leg; 6.7: the real-size thermal bag and duffel further out)
 	-- 6.4: a worn bag's motion (client/BagSway.luau; BagSwing.tuning / BagSwing.bob): on the shoulder or the hip a stiff
 	-- small swing (Wear over Bag) and a bounce of Bounce studs with each step (Step studs a step, the full bounce from
 	-- FullSpeed); on the back only a soft bob (BackBob studs). Switch: seconds the bag takes to move between the front
@@ -3220,29 +3293,67 @@ Config.Courier = {
 	Step = 3.5,
 	Switch = 0.5,
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
-	BagUnlock = "Sprint with more of your deliveries: Last Stop Supplies has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
+	BagUnlock = "Sprint with more of your deliveries: ZDC Bags at the depot has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
+	-- 6.6: Marge's text, once, to a save that owned a backpack (Config.RetiredKit): {money} is the refund
+	PackRefund = "Backpacks are gone: bags do it all now. You got {money} back.",
+	-- 6.7: Marge's text, once, to a save that owned the Thermal Jacket (Config.RetiredKit, its noJacket flag)
+	JacketRefund = "The Thermal Jacket is gone: the Thermal Delivery Bag at ZDC Bags keeps food far hotter. You got {money} back.",
 	-- 6.4.1, what is in the bag shows (shared/BagFill.luau; server/KitWear.luau on you, server/Cargo.luau on the ground):
-	-- the pieces in it (the player's BagCount / BagLooks attributes) stick out of its opening as small shapes of their
-	-- looks (a pizza box, a bouquet, letters …; a parcel otherwise), up to its room and Max; Sink of each one's height
-	-- is inside the bag; one row along the opening up to Rows pieces, then two; each leans Tilt degrees, every other one
-	-- the other way. The body swells as it fills: its thickness by up to Bulge, its length by up to Swell.
+	-- the pieces in it (the player's BagCount / BagLooks attributes) show in its opening, up to its room and Max.
+	-- 6.7, real sizes (the owner: "the things would never really fit in it"): each piece is its real packed size
+	-- (Packed, per BagFill.kind: a pizza box 33 × 4 × 33 cm lying flat, a parcel, a bouquet …; studs on the bag's frame:
+	-- x across its thickness, y up, z along its length; `upright` ones are never laid on their side, `stack` ones lie flat
+	-- on each other, `proud` their own share sticking out). They are packed as a courier packs: a lane along the length,
+	-- the next lane beside it across the thickness, then a layer below (a pizza box that does not fit flat stands on its
+	-- edge). The top layer sticks out of the opening by Proud of its height (a flat stack of pizza boxes: its top box at
+	-- the rim, seen through the open top); a piece that fits no way round is shrunk, never under MinScale; an overfull bag
+	-- pushes them up. Gap studs between them, Tilt degrees of lean (every other one the other way). The body swells as
+	-- it fills: its thickness by up to the bag's `bulge` (else Bulge), its length by up to Swell.
 	-- Mouth: each bag's opening on its pivot (server/KitArt/Geometry.luau's frame: the grip at the origin, hanging -Y):
-	-- its height, its thickness (x) and its length (z).
+	-- the rim's height (y), the inside's thickness (x) and length (z), its depth from the rim to the bottom (d).
 	BagFill = {
 		Max = 6,
-		Sink = 0.55,
-		Rows = 3,
-		Tilt = 7,
-		Bulge = 0.16,
+		Proud = 0.3,
+		Tilt = 3,
+		Gap = 0.015,
+		MinScale = 0.7,
+		Bulge = 0.25,
 		Swell = 0.06,
 		Mouth = {
-			bag = { y = -0.45, x = 0.42, z = 0.84 },
-			tote = { y = -0.5, x = 0.28, z = 0.96 },
-			thermal = { y = -0.27, x = 0.72, z = 1.0 },
-			padded = { y = -0.58, x = 0.3, z = 0.9 },
-			duffel = { y = -0.34, x = 0.34, z = 1.2 },
-		} :: { [string]: { y: number, x: number, z: number } },
+			bag = { y = -0.39, x = 0.5, z = 1.04, d = 1.08, bulge = 0.25 },
+			tote = { y = -0.67, x = 0.32, z = 1.06, d = 1.04, bulge = 0.3 },
+			thermal = { y = -0.52, x = 1.04, z = 1.2, d = 0.86, bulge = 0.04 }, -- (rigid: it hardly swells)
+			padded = { y = -0.57, x = 0.3, z = 1.08, d = 0.82, bulge = 0.12 },
+			duffel = { y = -0.4, x = 0.56, z = 1.6, d = 0.9, bulge = 0.15 }, -- (the open zip along its top)
+		} :: { [string]: { y: number, x: number, z: number, d: number, bulge: number? } },
+		Packed = {
+			pizza = { size = { 0.95, 0.12, 0.95 }, stack = true },
+			parcel = { size = { 0.5, 0.45, 0.6 } },
+			bouquet = { size = { 0.35, 1.0, 0.35 }, upright = true, proud = 0.4 },
+			cake = { size = { 0.65, 0.65, 0.65 }, upright = true },
+			groceries = { size = { 0.5, 0.55, 0.7 }, upright = true },
+			gadget = { size = { 0.35, 0.4, 0.6 } },
+			medicine = { size = { 0.4, 0.4, 0.55 } },
+			mail = { size = { 0.08, 0.35, 0.5 } }, -- a bundle of letters
+			paper = { size = { 0.18, 0.85, 0.18 }, upright = true }, -- a rolled newspaper
+			folder = { size = { 0.06, 0.45, 0.6 } },
+			food = { size = { 0.4, 0.45, 0.5 }, upright = true }, -- a take-out bag or box
+			bread = { size = { 0.16, 1.0, 0.16 }, upright = true, proud = 0.4 }, -- a baguette
+			plants = { size = { 0.45, 0.5, 0.6 }, upright = true }, -- a seedling tray
+		} :: { [string]: { size: { number }, upright: boolean?, stack: boolean?, proud: number? } },
 	},
+	-- 6.7, the bag arm (client/BagSway.luau, every client for every courier near the camera): while a bag hangs in the
+	-- left hand its arm is a little straighter and out (Out degrees away from the body; the animation's elbow bend cut by
+	-- Straight, its swing by SwingCut: the weight pulls it down), and a loaded bag leans the torso the other way (Lean
+	-- degrees with Full pieces in it), laid on top of the animation, blended over Blend seconds. Only while nothing else
+	-- has the arm (aiming, carrying, the phone, a gesture, a swing, a car door, the sprint, and Hold seconds after); the
+	-- lean only while you stand or walk slower than Calm studs / s (client/ArmPose.luau leans the waist faster than that).
+	BagArm = { Out = 9, Straight = 0.5, SwingCut = 0.35, Lean = 3.5, Full = 6, Blend = 0.25, Hold = 0.35, Calm = 10 },
+	-- 6.7, items in the hand (server/HandItem.luau, server/Cargo.luau): a piece handed over at a door is in the courier's
+	-- right hand for Reach seconds (the "give" gesture), then in the receiver's hands for Pass seconds (they reach for it
+	-- Lead seconds before it comes: the "receive" gesture), then on the door's stack; a piece put into the bag is in the
+	-- right hand until BagIn seconds into the "bag" gesture, then in the bag (its fill shows it from then on).
+	HandItem = { Reach = 0.4, Lead = 0.15, Pass = 0.85, BagIn = 0.3 },
 	-- 6.4.1: client/BagSway.luau looks once per spawn, After seconds after your bag shows, whether it really is on you
 	-- (parts, not see-through, within Far studs of your hand and of its place) and says in the Output when not.
 	BagCheck = { After = 3, Far = 4 },

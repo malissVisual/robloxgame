@@ -70,6 +70,7 @@ Phone.onCareer = nil :: (() -> ())? -- FULL CAREER: CareerUi.open
 Phone.boardOpen = nil :: (() -> boolean)? -- is the Dispatch board open (DispatchUi.isOpen): no "new runs" then
 Phone.blocked = nil :: (() -> boolean)? -- the NEW PHONE pop-up waits while this says so (Marge's dialog, a result)
 Phone.notify = nil :: ((string) -> ())? -- a toast (Hud.toast)
+Phone.onTour = nil :: ((kind: string) -> ())? -- 6.7, SETTINGS: "screen" / "around", Marge's tours (client/TutorialUi.luau)
 
 local player = Players.LocalPlayer
 local KEY = Enum.KeyCode.Q -- 5.4.1 (was O; the weapon wheel moved to T)
@@ -178,7 +179,7 @@ local function shiftText(): string
 	return "DAY SHIFT · THE BOARD IS OPEN"
 end
 
--- How you get around: "ON FOOT · HANDS 2 / BACKPACK 3" or the vehicle's name (5.1: 🚲 a bike).
+-- How you get around: "ON FOOT · HANDS 2 / TOTE 5" or the vehicle's name (5.1: 🚲 a bike).
 local function transportText(): string
 	if state and type(state.car) == "string" then
 		local def = Economy.findCar(state.car)
@@ -204,7 +205,7 @@ local function vehicles(): { Config.CarDef }
 	return list
 end
 
--- The cheapest piece of kit with this effect ("room", "speed", "warm").
+-- The cheapest piece of kit with this effect ("speed", "armour", "tips"; 6.7: the jacket's "warm" is gone).
 local function cheapestKit(field: string): Config.KitDef?
 	local best: Config.KitDef? = nil
 	for _, def in Config.Kit do
@@ -221,9 +222,16 @@ local function margeTips(level: number): { string }
 	local tips: { string } = {}
 	if level == 1 then
 		table.insert(tips, "Welcome to Dead End Dispatch. No wheels yet, so you walk: letters, medicine, pizza, parcels. Take the ON FOOT runs on the board (J). Be quick and they tip.")
-		local pack, shoes = cheapestKit("room"), cheapestKit("speed")
-		if pack then
-			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}. A {pack.name} at Last Stop Supplies holds {pack.room} ({Career.money(pack.price)}){if shoes then `, and {shoes.name} get you there faster ({Career.money(shoes.price)})` else ""}. The SHOP app says what you can afford.`)
+		-- (6.6: no backpacks: the next bag up, at ZDC Bags by the spawn)
+		local bigger: Config.KitDef? = nil
+		for _, def in Config.Kit do
+			if def.extra and def.id ~= Config.Courier.BagKit and (bigger == nil or def.price < (bigger :: Config.KitDef).price) then
+				bigger = def
+			end
+		end
+		local shoes = cheapestKit("speed")
+		if bigger then
+			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}, your bag more. The {bigger.name} at {Config.BagShop.Name} (by the spawn) holds {bigger.extra or 0} ({Career.money(bigger.price)}){if shoes then `, and {shoes.name} get you there faster ({Career.money(shoes.price)})` else ""}. The SHOP app says what you can afford.`)
 		end
 	end
 	-- (5.1: the bike shop at Career.BIKE_LEVEL is Marge's own text from the server, with the GPS: server/Tutorial.luau)
@@ -606,7 +614,7 @@ local function ordersApp(list: Instance)
 	if not job then
 		look.emptyState(list, "📦", "No active orders", "Grab a job from the board, on foot from level 1.", 1)
 		button(list, "OPEN BOARD", "main", 2, openBoard)
-		button(list, "🎒 BAG", "quiet", 3, openBag)
+		button(list, "🛍 BAG", "quiet", 3, openBag)
 		return
 	end
 	local orders = if type(job.orders) == "table" then job.orders else {}
@@ -647,14 +655,21 @@ local function ordersApp(list: Instance)
 	if type(job.step) == "string" and job.step ~= "" then
 		text(b, job.step, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 9, TextSize = 14 })
 	end
-	-- Chips: how it travels, what rides with you (5.0: the backpack; the PackCount attribute is live), the condition, the
-	-- cargo's rules.
+	-- Chips: how it travels, what you carry (5.0; 6.6: CARRYING n / room, the hands, the bag and the bike's bag: the
+	-- PackCount / PackRoom attributes are live), the condition, the cargo's rules.
 	local chips = look.chipRow(b, 10)
 	look.chip(chips, if job.mode == "foot" then "🚶 On foot" elseif job.mode == "bike" then "🚲 By bike" else string.rep("★", math.max(1, tonumber(job.stars) or 1)))
-	local packRoom = tonumber(job.packRoom) or tonumber(player:GetAttribute("PackRoom")) or 0
-	if (job.mode == "foot" or job.mode == "bike") and packRoom > 0 then
-		local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
-		look.chip(chips, `{if job.mode == "bike" then "🚲 Bike" else "🎒 Backpack"} {packed} / {packRoom}`, if packed >= packRoom then K.red else nil)
+	local packRoom = tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0
+	if job.mode == "foot" or job.mode == "bike" then
+		local inHands = 0
+		for _, piece in (if type(job.carried) == "table" then job.carried else {}) :: { any } do
+			if type(piece) == "table" and piece.where == "hands" then
+				inHands += 1
+			end
+		end
+		local packed = inHands + (tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0)
+		local room = Config.Cargo.HandsMax + packRoom
+		look.chip(chips, `CARRYING {packed} / {room}`, if packed >= room then K.red else nil)
 	end
 	local condition = tonumber(job.condition)
 	if condition and condition < 0.999 then
@@ -848,22 +863,31 @@ local function shopApp(list: Instance, wide: boolean)
 	local order = 1
 	-- The personal gear still worth buying (Config.Kit), the cheapest first.
 	local owned = kit()
-	local wanted: { Config.KitDef } = {}
-	for _, def in Config.Kit do
-		local outgrown = def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= Transport.backpackRoom(owned)
-		if not owned[def.id] and not outgrown then
-			table.insert(wanted, def)
+	-- 6.6: the bags first (ZDC Bags, the depot's kiosk), then the rest of the kit (Last Stop Supplies); 6.7: each piece
+	-- at its own shop (Transport.kitShop: the Baseball Bat at Lead & Co.)
+	local titles: { [string]: string } = {
+		bags = `{Config.BagShop.Name} · bags (sprint with your deliveries)`,
+		supplies = "Last Stop Supplies · kit",
+		guns = "Lead & Co. · the bat",
+	}
+	for _, shopId in { "bags", "supplies", "guns" } do
+		local wanted: { Config.KitDef } = {}
+		for _, def in Config.Kit do
+			if not owned[def.id] and Transport.kitShop(def) == shopId then
+				table.insert(wanted, def)
+			end
 		end
-	end
-	table.sort(wanted, function(a: Config.KitDef, b: Config.KitDef): boolean
-		return a.price < b.price
-	end)
-	if #wanted > 0 then
-		order += 1
-		shopHeader(gear, order, "supplies", "Last Stop Supplies · kit")
-		for _, def in wanted do
+		table.sort(wanted, function(a: Config.KitDef, b: Config.KitDef): boolean
+			return a.price < b.price
+		end)
+		if #wanted > 0 then
 			order += 1
-			goal(gear, order, def.icon, def.name, "Last Stop Supplies", def.price, def.level)
+			shopHeader(gear, order, shopId, titles[shopId])
+			local shop = Map.Shops[shopId]
+			for _, def in wanted do
+				order += 1
+				goal(gear, order, def.icon, def.name, if shop then shop.name else titles[shopId], def.price, def.level)
+			end
 		end
 	end
 	-- 5.1: the bikes at Spoke & Chain you do not own yet (two of them, the cheapest first), SET GPS to the shop.
@@ -1459,6 +1483,11 @@ renderApp = function()
 				end
 			end)
 			button(list, "PUT PHONE AWAY", "main", 3, Phone.close)
+			local tour = Phone.onTour -- 6.7: Marge's tours again (client/TutorialUi.luau: the phone closes first)
+			if tour then
+				button(list, "SHOW ME THE SCREEN", "quiet", 3, function() tour("screen") end)
+				button(list, "SHOW ME AROUND", "quiet", 3, function() tour("around") end)
+			end
 			refs.apps.keys(list, look, 4) -- 5.5: every key, the version
 		elseif app == "board" then
 			refs.apps.board(list, look, refs.host, wide) -- 5.5; 6.0.1: two columns in a wide popup
@@ -1483,8 +1512,7 @@ local function affordable(): boolean
 	local owned = kit()
 	local level = myLevel()
 	for _, def in Config.Kit do
-		local outgrown = def.room ~= nil and def.speed == nil and def.warm == nil and def.room <= Transport.backpackRoom(owned)
-		if not owned[def.id] and not outgrown and level >= def.level and money() >= def.price then
+		if not owned[def.id] and level >= def.level and money() >= def.price then
 			return true
 		end
 	end
@@ -2089,7 +2117,7 @@ function Phone.start()
 	player:GetAttributeChangedSignal("Xp"):Connect(onXp)
 	player:GetAttributeChangedSignal("PackCount"):Connect(function()
 		if isOpen and app == "orders" then
-			renderApp() -- 5.0: the backpack line
+			renderApp() -- 5.0: the CARRYING chip (6.6)
 		end
 	end)
 	-- 6.0.1: the popup's ✕ and backdrop return to the phone's home.

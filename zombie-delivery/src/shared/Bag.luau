@@ -1,39 +1,35 @@
 --!strict
--- 5.3, the bag: what fits in a backpack and where every piece you carry is (your inventory). Pure Luau, shared by
--- server/Cargo.luau (packFits, the rack), server/Jobs.luau (how many pieces an order may have, room checks),
--- client/BagUi.luau and the HUD's chip on the contract ticket; tested in tests/bag_test.luau.
+-- 5.3, the bag: where every piece you carry is (your inventory). Pure Luau, shared by server/Cargo.luau, server/Jobs.luau
+-- (the bike's own room on a run), client/BagUi.luau, client/Hotbar.luau's CARRYING pill and the HUD's chip on the
+-- contract ticket; tested in tests/bag_test.luau.
 --
--- A light piece (Config.Cargo.LightLooks) either fits a backpack (Config.Cargo.PackLooks: mail, newspapers,
--- documents, medicine, pizza, burger bags, noodle boxes, pastries, bread, small parcels) or it does not (a bouquet, a
--- cake, an electronics box, groceries, ice cream): then it rides in your hands, or on a bike's rack, basket or box (the
--- e-scooter's rack takes one), never in the backpack.
+-- 6.6, one carrying item (the owner: "the backpacks, the bag and the bike work weirdly"): no backpack any more, so no
+-- "fits a backpack" either (5.3's Config.Cargo.PackLooks are gone). Three places for a light piece: your hands
+-- (Config.Cargo.HandsMax), your bag (the active one, while it is your hand: shared/Transport.luau bagRoom) and, on a
+-- run with a bike, the bike's own bag (its rack, basket or box: Info.rack). A heavy piece only ever goes in the hands.
+-- A newspaper round's papers ride in its satchel (where = "pack").
 --
---   Bag.fits(look)                       does a piece of this look go into a backpack?
---   Bag.fitsBag(look)                    6.3: does it go into the plastic bag in your hand? Every light look
+--   Bag.fitsBag(look)                    6.3: does it go into a bag (yours or the bike's)? Every light look
 --                                        (Config.Cargo.LightLooks: a bouquet, a cake, groceries too), never a heavy one
---   Bag.room(look, mode, room, rack)     how many pieces of this look one order may have: `room` (what you carry:
---                                        hands + backpack on foot, the bike's room + the backpack by bike, the car's)
---                                        for a piece that fits the backpack; else the hands on foot, the bike's own
---                                        room (`rack`) by bike; a car takes its whole room
---   Bag.rack(mode, riding, bikeRoom, packRoom)   5.3 review: the bike's own room (rack, basket, box) a run has: a
---                                        bike run's, or a foot run's while you ride (`riding`); 0 walking or no bike
---   Bag.makeRoom(held, max, free)        5.3 review: how many of the looks in your hands go into the backpack so the
---                                        hands (`max` with the next piece) take a piece that does not fit it (0: none)
+--   Bag.rack(mode, riding, bikeRoom)     the bike's own bag on a run (`bikeRoom`: Transport.bikeRoom, what the bike and
+--                                        its bike gear hold): a bike run's, or a foot run's while you ride (`riding`:
+--                                        the bike is your vehicle now); 0 walking, a car run or no bike
 --   Bag.plural(name)                     "pizza stack" → "pizza stacks" (the words of Config.Jobs.Businesses and
 --                                        Config.Cargo.Kinds, else an "s")
---   Bag.line(carried)                    the HUD's chip: "🎒 2 newspapers · 1 pizza stack" (nil when you carry nothing)
---   Bag.groups(carried, mode)            the pieces by where they are (hands, backpack, rack, vehicle), for BagUi
---   Bag.places(mode, packRoom, rack, bagRoom)  6.0.1: the room by place for the bottom bar's carried strip: the hands
---                                        (Config.Cargo.HandsMax), the plastic bag, the backpack, the rack (a car run:
---                                        the hands only)
---   Bag.strip(carried, places, focus, max)  6.0.1: the strip's tiles: per place its pieces, then its free room; the
---                                        pieces the server has in the pack fill the bag first; a piece of another
---                                        order than `focus` is `other`; over `max` tiles the free room goes first,
---                                        then the last pieces (returns the tiles, how many went: "+N", and how many of
---                                        those were pieces)
+--   Bag.line(carried)                    the HUD's chip: "📦 2 newspapers · 1 pizza stack" (nil when you carry nothing)
+--   Bag.groups(carried, mode)            the pieces by where they are (hands, bag, the bike, the satchel, vehicle),
+--                                        for BagUi
+--   Bag.places(mode, packRoom, rack, bagRoom)  6.0.1: the room by place for the bottom bar: the hands
+--                                        (Config.Cargo.HandsMax), the bag (`bagRoom`), the bike's bag (`rack`) and a
+--                                        round's satchel (what `packRoom` holds over those; a car run: the hands only)
+--   Bag.strip(carried, places, focus, max)  6.0.1: the strip's tiles: per place its pieces, then its free room; a
+--                                        piece the server has in the pack without a place yet fills the bag first; a
+--                                        piece of another order than `focus` is `other`; over `max` tiles the free
+--                                        room goes first, then the last pieces (returns the tiles, how many went:
+--                                        "+N", and how many of those were pieces)
 --
 -- `carried` is the job payload's (server/Jobs.luau carriedInfo): { order, look, name, where, dest, place } a piece,
--- where = "hands" | "pack" | "rack" | "vehicle".
+-- where = "hands" | "bag" | "rack" (6.6: the bike's own bag) | "pack" (a round's satchel) | "vehicle".
 
 local Config = require(script.Parent.Config)
 
@@ -42,49 +38,16 @@ local Bag = {}
 export type Piece = { order: number?, look: string?, name: string?, where: string?, dest: string?, place: string? }
 export type Group = { where: string, icon: string, title: string, pieces: { Piece } }
 
-function Bag.fits(look: string?): boolean
-	return look ~= nil and Config.Cargo.PackLooks[look] == true
-end
-
--- 6.3 (the owner: "things don't go into the bag"): the plastic bag takes every light piece, not only the backpack's
--- looks; the backpack keeps Config.Cargo.PackLooks.
+-- 6.3 (the owner: "things don't go into the bag"): a bag takes every light piece. 6.6: the bike's bag too.
 function Bag.fitsBag(look: string?): boolean
 	return look ~= nil and Config.Cargo.LightLooks[look] == true
 end
 
-function Bag.room(look: string?, mode: string, room: number, rack: number?): number
-	local all = math.max(0, math.floor(room))
-	if mode == "car" or Bag.fits(look) then
-		return all
-	end
-	if mode == "bike" then
-		return math.min(all, math.max(0, math.floor(rack or 0)))
-	end
-	return math.min(all, Config.Cargo.HandsMax)
-end
-
-function Bag.rack(mode: string, riding: boolean, bikeRoom: number?, packRoom: number): number
+function Bag.rack(mode: string, riding: boolean, bikeRoom: number?): number
 	if bikeRoom == nil or not (mode == "bike" or (mode == "foot" and riding)) then
 		return 0
 	end
-	return math.max(0, math.floor(bikeRoom - packRoom))
-end
-
-function Bag.makeRoom(held: { string? }, max: number, free: number): number
-	local need = #held - max + 1
-	if need <= 0 then
-		return 0
-	end
-	local fits = 0
-	for _, look in held do
-		if Bag.fits(look) then
-			fits += 1
-		end
-	end
-	if fits < need or free < need then
-		return 0
-	end
-	return need
+	return math.max(0, math.floor(bikeRoom))
 end
 
 local plurals: { [string]: string }? = nil
@@ -138,15 +101,16 @@ function Bag.line(carried: { Piece }?): string?
 	if more > 0 then
 		table.insert(parts, `+{more} more`)
 	end
-	return "🎒 " .. table.concat(parts, " · ")
+	return "📦 " .. table.concat(parts, " · ")
 end
 
-local ORDER = { "hands", "bag", "pack", "rack", "vehicle" }
+-- The groups' order and their marks (the hotbar's pill uses the same marks: ✋ 🛍 🚲).
+local ORDER = { "hands", "bag", "rack", "pack", "vehicle" }
+Bag.Marks = { hands = "✋", bag = "🛍", rack = "🚲", pack = "📰", vehicle = "🚚" } :: { [string]: string }
 
--- The pieces by where they are, in the order hands, (6.1) the bag in your hand, backpack, rack, vehicle; only the
--- places that hold something.
--- `mode` names the rack (an e-scooter's or a bike's: "bike"; nil: "Rack").
-function Bag.groups(carried: { Piece }?, mode: string?): { Group }
+-- The pieces by where they are, in the order hands, (6.1) the bag, (6.6) the bike's bag, a round's satchel, vehicle;
+-- only the places that hold something. An unknown place goes with the satchel's.
+function Bag.groups(carried: { Piece }?, _mode: string?): { Group }
 	local by: { [string]: { Piece } } = {}
 	if type(carried) == "table" then
 		for _, piece in carried do
@@ -158,45 +122,45 @@ function Bag.groups(carried: { Piece }?, mode: string?): { Group }
 			end
 		end
 	end
-	local titles: { [string]: { string } } = {
-		hands = { "✋", "In your hands" },
-		bag = { "🛍", "In the bag in your hand" }, -- 6.1
-		pack = { "🎒", "In your backpack" },
-		rack = { "🚲", if mode == "bike" then "On your bike" else "On the rack" },
-		vehicle = { "🚚", "In your vehicle" },
+	local titles: { [string]: string } = {
+		hands = "In your hands",
+		bag = "In your bag",
+		rack = "In your bike's bag", -- 6.6 (its rack, basket or box)
+		pack = "In your satchel", -- a newspaper round's papers
+		vehicle = "In your vehicle",
 	}
 	local out: { Group } = {}
 	for _, where in ORDER do
 		local list = by[where]
 		if list and #list > 0 then
-			table.insert(out, { where = where, icon = titles[where][1], title = titles[where][2], pieces = list })
+			table.insert(out, { where = where, icon = Bag.Marks[where], title = titles[where], pieces = list })
 		end
 	end
 	return out
 end
 
--- 6.0.1, the bottom bar (client/Hotbar.luau): what you carry as small tiles, one a piece and one a free place.
+-- 6.0.1, the bottom bar (client/Hotbar.luau): what you carry, a piece and a free place each.
 export type Place = { where: string, room: number }
 export type Tile = { where: string, piece: Piece?, other: boolean }
 
-local PLACES = { "hands", "bag", "pack", "rack" }
+local PLACES = { "hands", "bag", "rack", "pack" }
 
--- The room by place, in the order hands, bag, backpack, rack. `packRoom` is the pieces over the hands (the payload's
--- packRoom / the PackRoom attribute: the backpack, the bag's extra and a bike's rack), `rack` the bike's part of it,
--- `bagRoom` the plastic bag's part (Transport.handsRoom − Transport.backpackRoom). A car run: the hands only.
+-- The room by place, in the order hands, bag, the bike's bag, the satchel. `packRoom` is the room over the hands (the
+-- payload's packRoom / the PackRoom attribute: the bag's, the bike's bag and a round's satchel), `rack` the bike's part
+-- of it, `bagRoom` the bag's part. A car run: the hands only.
 function Bag.places(mode: string, packRoom: number, rack: number, bagRoom: number): { Place }
 	local hands = Config.Cargo.HandsMax
 	if mode == "car" then
-		return { { where = "hands", room = hands }, { where = "bag", room = 0 }, { where = "pack", room = 0 }, { where = "rack", room = 0 } }
+		return { { where = "hands", room = hands }, { where = "bag", room = 0 }, { where = "rack", room = 0 }, { where = "pack", room = 0 } }
 	end
-	local onRack = math.max(0, math.floor(rack))
-	local packOnly = math.max(0, math.floor(packRoom) - onRack)
-	local bag = math.clamp(math.floor(bagRoom), 0, packOnly)
+	local total = math.max(0, math.floor(packRoom))
+	local onBike = math.clamp(math.floor(rack), 0, total)
+	local bag = math.clamp(math.floor(bagRoom), 0, total - onBike)
 	return {
 		{ where = "hands", room = hands },
 		{ where = "bag", room = bag },
-		{ where = "pack", room = packOnly - bag },
-		{ where = "rack", room = onRack },
+		{ where = "rack", room = onBike },
+		{ where = "pack", room = total - onBike - bag },
 	}
 end
 

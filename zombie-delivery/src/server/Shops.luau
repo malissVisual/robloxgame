@@ -8,16 +8,24 @@
 --                       opens the catalog on it); every car needs a free car slot (Estate.carSlots: homes and garages
 --                       add them; the employers' company cars take none). 3.4: a bought car goes into your garage:
 --                       take it out there (server/Garages.luau)
---   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those)
---   Wrench Garage       upgrades (3.3: the car tracks for the equipped car; the gun tracks for all guns), 3.5: the
+--   Lead & Co.          guns (not the earned ones, Config.Weapons earned: an employer gives those; 6.7: nor the
+--                       starter pistol, every profile has it), 6.7: the gun tracks of the "Upgrade" remote (Gun Damage,
+--                       Fire Rate: for all your guns, moved here from Wrench Garage) and the Baseball Bat (Config.Kit
+--                       shop "guns": the "Kit" remote)
+--   Wrench Garage       upgrades (3.3: the car tracks for the equipped car), 3.5: the
 --                       car's next STAGE (the "Upgrade" remote with id "stage": Config.Cars stages, its own look),
 --                       paint jobs and car guns (one on the roof of the equipped car); 3.4: its repair bays are
 --                       server/Repair.luau's (no free repairs any more); 4.6: GEAR for the equipped car (the "Gear"
 --                       remote: buy it, from its level; install it in a free gear slot or remove it, free)
---   Last Stop Supplies  consumables; 5.0: personal gear (the "Kit" remote, Config.Kit: backpacks, running shoes, a
---                       thermal jacket), yours for good (profile.kit, shared/Transport.luau); 6.4: five bags, and the
---                       Kit remote's ("use", bag id) picks the one in your hand (profile.activeBag), anywhere
---   Depot Garage        3.4: the depot lot's garage window (server/Garages.luau: the starting van, company vehicles)
+--   Last Stop Supplies  consumables (6.7: the car-only ones, Config.Items car, only to a player who owns a car:
+--                       Economy.ownsCar); 5.0: personal gear (the "Kit" remote, Config.Kit: running shoes, 6.0: the
+--                       vests), yours for good (profile.kit, shared/Transport.luau; 6.7: no Thermal Jacket any more)
+--   ZDC Bags            6.6: the depot's bag kiosk (Map.Shops.bags, Config.BagShop; server/BagKiosk.luau builds it):
+--                       the five bags (Config.Kit pieces with `extra`, the same "Kit" remote: a bag is bought only
+--                       here, the rest of the kit only at Last Stop Supplies); the Kit remote's ("use", bag id) picks
+--                       the one in your hand (profile.activeBag), anywhere. 6.6: no backpacks any more
+--   Depot Garage        3.4: the depot lot's garage terminal (server/Garages.luau: the starting van, company vehicles);
+--                       it sells nothing (6.7: no shop window of its own in client/Hud.luau)
 --   Job Board           the depot's job board
 --
 -- 5.0: you start on foot (profile.car nil): everything for "the equipped car" says you have no vehicle yet. The Old
@@ -96,7 +104,7 @@ local function nearShop(player: Player, shop: string): boolean
 	if not info or not root then
 		return false
 	end
-	return Vector3.new(root.Position.X - info.x, 0, root.Position.Z - info.z).Magnitude < Map.ShopRadius
+	return Vector3.new(root.Position.X - info.x, 0, root.Position.Z - info.z).Magnitude < Map.shopRadius(shop) -- (6.6: a kiosk's own)
 end
 
 local function refuse(player: Player, shop: string): boolean
@@ -236,6 +244,12 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		if not def or profile.weapons[id] then
 			return
 		end
+		if def.starter then
+			-- 6.7: the starter pistol is not sold: every profile has it (one that somehow lacks it gets it back, free)
+			PlayerData.giveWeapon(player, def.id)
+			notice:FireClient(player, `The {def.name} is your starter gun: it's yours.`)
+			return
+		end
 		if def.exclusive then
 			-- 3.1: a reward nobody can buy (Config.Rewards).
 			notice:FireClient(player, `The {def.name} is not for sale. It is a reward: you will know when you have earned it.`)
@@ -293,7 +307,11 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		if not def or refuse(player, "supplies") then
 			return
 		end
-		local count = if type(amount) == "number" and amount == amount and math.abs(amount) < math.huge then math.clamp(math.floor(amount), 1, 10) else 1
+		if not Economy.itemShown(def, profile.cars) then
+			notice:FireClient(player, `The {def.name} is for a car: you don't have one yet.`) -- 6.7 (Config.Items car)
+			return
+		end
+		local count =if type(amount) == "number" and amount == amount and math.abs(amount) < math.huge then math.clamp(math.floor(amount), 1, 10) else 1
 		count = math.min(count, def.max - (profile.items[id] or 0))
 		if count <= 0 then
 			notice:FireClient(player, `You cannot carry more {def.name}s.`)
@@ -476,7 +494,9 @@ end
 
 local function onUpgrade(player: Player, id: any)
 	local profile = PlayerData.get(player)
-	if not profile or type(id) ~= "string" or refuse(player, "mechanic") then
+	-- 6.7: the gun tracks (Gun Damage, Fire Rate) at Lead & Co.; the stages and the car tracks at Wrench Garage
+	local gunTrack = type(id) == "string" and id ~= "stage" and Economy.findUpgrade(id) ~= nil and not Economy.isCarUpgrade(id)
+	if not profile or type(id) ~= "string" or refuse(player, if gunTrack then "guns" else "mechanic") then
 		return
 	end
 	if id == "stage" then
@@ -673,7 +693,9 @@ local function useBag(player: Player, def: Config.KitDef)
 end
 
 -- 5.0, personal gear (Config.Kit) at Last Stop Supplies: ("buy", kit id): not owned yet, its driver level, its price.
--- Yours for good (profile.kit): the board, Cargo's hands and the walk read it (shared/Transport.luau).
+-- Yours for good (profile.kit): the board, Cargo's hands and the walk read it (shared/Transport.luau). 6.6: a bag only at
+-- ZDC Bags (Map.Shops.bags), everything else only at Last Stop Supplies. 6.7: the Baseball Bat only at Lead & Co.
+-- (KitDef shop); a starter piece (the plastic bag) is never sold.
 local function onKit(player: Player, action: any, id: any)
 	local profile = PlayerData.get(player)
 	local def = if type(id) == "string" then TransportRules.findKit(id) else nil
@@ -681,11 +703,19 @@ local function onKit(player: Player, action: any, id: any)
 		useBag(player, def) -- 6.4 (not only at the counter)
 		return
 	end
-	if not profile or action ~= "buy" or not def or refuse(player, "supplies") then
+	-- (6.7: each piece at its own shop, TransportRules.kitShop: a bag at ZDC Bags, the bat at Lead & Co., the rest at
+	-- Last Stop Supplies)
+	if not profile or action ~= "buy" or not def or refuse(player, TransportRules.kitShop(def)) then
 		return
 	end
 	if profile.kit[def.id] then
 		notice:FireClient(player, `You already have the {def.name}.`)
+		return
+	end
+	if def.starter then
+		-- 6.7: the plastic bag is every courier's from the start, never sold (a profile without it gets it back, free)
+		PlayerData.giveKit(player, def.id)
+		notice:FireClient(player, `The {def.name} is your starter: it's yours.`)
 		return
 	end
 	if tooLow(player, def.name, def.level) then

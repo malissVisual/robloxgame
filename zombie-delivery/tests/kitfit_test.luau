@@ -29,30 +29,25 @@ end
 
 -- The outfit -------------------------------------------------------------------------------------------------------
 
-check("nothing owned: nothing worn", count(KitFit.outfit({}, false)) == 0)
-check("nothing owned, a full pack: still nothing", count(KitFit.outfit({}, true)) == 0)
-local one = KitFit.outfit({ backpack = true }, false)
-check("the Courier Backpack on the back", one.pack == "backpack" and one.load == nil and count(one) == 1)
-local both = KitFit.outfit({ backpack = true, bigpack = true }, false)
-check("both backpacks: only the Big Backpack", both.pack == "bigpack" and count(both) == 1)
-check("only the Big Backpack", KitFit.outfit({ bigpack = true }, false).pack == "bigpack")
-local loaded = KitFit.outfit({ backpack = true, bigpack = true }, true)
-check("a full pack: the parcel on the backpack worn", loaded.load == "bigpack" and loaded.pack == "bigpack")
-local all = KitFit.outfit({ backpack = true, shoes = true, jacket = true }, true)
-check("everything: pack, parcel, shoes, jacket", all.pack == "backpack" and all.load == "backpack" and all.shoes == "shoes" and all.jacket == "jacket" and count(all) == 4)
-check("a false entry is not owned", count(KitFit.outfit({ shoes = false, jacket = false }, true)) == 0)
+check("nothing owned: nothing worn", count(KitFit.outfit({})) == 0)
+-- 6.6: no backpack slot any more (one carrying item): an old kit's backpack ids wear nothing
+local old = KitFit.outfit({ backpack = true, bigpack = true } :: any)
+check("6.6: an old backpack is never worn", count(old) == 0 and (old :: any).pack == nil and (old :: any).load == nil)
+local all = KitFit.outfit({ backpack = true, shoes = true, jacket = true } :: any)
+check("everything: shoes (6.6: no pack, no parcel; 6.7: an old save's jacket is never worn)", all.shoes == "shoes" and (all :: any).jacket == nil and count(all) == 1)
+check("a false entry is not owned", count(KitFit.outfit({ shoes = false, jacket = false })) == 0)
 -- 6.0: the plastic bag in the hand, the best vest over the courier's
-local bagged = KitFit.outfit({ bag = true }, false)
+local bagged = KitFit.outfit({ bag = true })
 check("the bag in the hand", bagged.hand == "bag" and count(bagged) == 1)
-check("the Kevlar vest", KitFit.outfit({ kevlar = true }, false).vest == "kevlar")
-local vests = KitFit.outfit({ kevlar = true, heavy = true, bag = true, backpack = true }, false)
-check("both vests: only the heavy armour", vests.vest == "heavy" and vests.hand == "bag" and vests.pack == "backpack" and count(vests) == 3)
-check("a false bag or vest is not worn", count(KitFit.outfit({ bag = false, kevlar = false, heavy = false, hivis = false }, true)) == 0)
+check("the Kevlar vest", KitFit.outfit({ kevlar = true }).vest == "kevlar")
+local vests = KitFit.outfit({ kevlar = true, heavy = true, bag = true })
+check("both vests: only the heavy armour", vests.vest == "heavy" and vests.hand == "bag" and count(vests) == 2)
+check("a false bag or vest is not worn", count(KitFit.outfit({ bag = false, kevlar = false, heavy = false, hivis = false })) == 0)
 -- 6.0.1: the Courier Vest (the red reflective one) in the same slot; an armoured vest is worn instead of it
-local hivis = KitFit.outfit({ hivis = true, bag = true }, false)
+local hivis = KitFit.outfit({ hivis = true, bag = true })
 check("the Courier Vest", hivis.vest == "hivis" and hivis.hand == "bag" and count(hivis) == 2)
-check("the Courier Vest and the Kevlar: the Kevlar shows", KitFit.outfit({ hivis = true, kevlar = true }, false).vest == "kevlar")
-check("the Courier Vest and the heavy armour: the armour shows", KitFit.outfit({ hivis = true, kevlar = true, heavy = true }, false).vest == "heavy")
+check("the Courier Vest and the Kevlar: the Kevlar shows", KitFit.outfit({ hivis = true, kevlar = true }).vest == "kevlar")
+check("the Courier Vest and the heavy armour: the armour shows", KitFit.outfit({ hivis = true, kevlar = true, heavy = true }).vest == "heavy")
 
 -- The factors ------------------------------------------------------------------------------------------------------
 

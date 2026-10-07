@@ -18,7 +18,7 @@
 -- server's: ClimbGrace seconds after the route's length a climber who is not at its end is put there (and the
 -- attributes go); a death, a reset or leaving ends it at once.
 -- A ride, checked here: alive, on foot (not seated, not getting in), not on a ride already, past the Cooldown, within
--- Reach of the start platform, nothing in the hands and no trolley ("Hands full: pack it first"; the backpack's
+-- Reach of the start platform, nothing in the hands and no trolley ("Hands full: pack it first"; the bag's
 -- pieces ride along). The character's attributes ZipLine (the line's id) and ZipAt (the server time it starts) tell
 -- every client: the rider's own one moves the body along the cable (shared/ZipLines.luau ZipLines.at), every one poses
 -- the hands up on a trolley. The end is the server's: Grace seconds after the ride's end a rider who is not at the end

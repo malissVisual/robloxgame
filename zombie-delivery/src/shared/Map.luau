@@ -28,6 +28,7 @@
 --   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
 --   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
 --   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St
+--   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn
 --   Gas        (5.4) the gas stations (Map.GasStations): the old one on the North Highway and three on the town's lots
 --   Places     (5.3) what stands on every lot of the ordinary Downtown and Suburbs blocks (Map.lots, seeded: towers,
 --              lawns, parking, houses ...), the storefronts the businesses work from (Map.Venues: Luigi's Pizza, the
@@ -200,16 +201,24 @@ function Map.special(districtId: string, i: number, j: number): string?
 	return if blocks then blocks[`{i},{j}`] else nil
 end
 
--- The shops (their block centres); you must stand within Radius of one to use it.
+-- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else
+-- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius).
 Map.Shops = {
-	depot = { name = "Depot Garage", x = 0, z = 0 },
+	depot = { name = "Depot Garage", x = 0, z = 0 }, -- (6.7: the garage terminal, not a shop: it sells nothing, no shop window)
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
 	guns = { name = "Lead & Co.", x = -CELL, z = 0 },
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
 	supplies = { name = "Last Stop Supplies", x = 0, z = -CELL },
 	bikes = { name = "Spoke & Chain", x = -CELL, z = CELL }, -- 5.1: bikes and bike gear (Config.BikeShop)
-} :: { [string]: { name: string, x: number, z: number } }
+	bags = { name = Config.BagShop.Name, x = Config.BagShop.X, z = Config.BagShop.Z, radius = Config.BagShop.Radius }, -- 6.6: the bags
+} :: { [string]: { name: string, x: number, z: number, radius: number? } }
 Map.ShopRadius = 80
+
+-- 6.6: how close to a shop's spot counts as in it (its own radius, else Map.ShopRadius).
+function Map.shopRadius(shopId: string): number
+	local shop = Map.Shops[shopId]
+	return if shop and shop.radius then shop.radius else Map.ShopRadius
+end
 
 -- 3.4, the repair shops (server/Repair.luau): Wrench Garage in Downtown and Rust Bridge Repairs on a Harbor block
 -- (Map.SpecialBlocks "repairs"). server/World.luau builds their repair bays (World.RepairBays); the bays face the
@@ -918,16 +927,18 @@ end
 -- (kind: shop | employer | place | venue, 5.3: a storefront of Map.Venues)
 export type Landmark = { id: string, name: string, icon: string, x: number, z: number, kind: string, description: string }
 
--- Everything worth driving to, for the map's list and the GPS.
+-- Everything worth driving to, for the map's list and the GPS. 6.7: every shop's line says what it really sells; the
+-- depot sells nothing (its Depot Garage is the garage terminal: client/MapView.luau lists it on its own, not as a shop).
 local landmarks: { Landmark } = {
-	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Job board, your starting van's lot. The safe zone." },
-	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Buy cars." },
-	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Buy guns." },
-	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Upgrades, paint jobs, car guns and two repair bays: drive in, get out, wait." },
+	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Your company: the job board, Marge, the garage terminal (your parked van, the company vehicles) and the ZDC Bags kiosk by the spawn. The safe zone." },
+	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4). Every car needs a garage slot." },
+	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Guns from the SMG up (your pistol is the starter), the gun upgrades (Gun Damage, Fire Rate) and a baseball bat." },
+	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Your car's stages, car upgrades, gear, paint and car guns, and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
-	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Repair kits, medkits, nitro, molotovs, mines." },
+	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Config.BagShop.X, z = Config.BagShop.Z, kind = "shop", description = "Bags: sprint with your deliveries. A kiosk in the depot's yard, by the spawn." }, -- 6.6
+	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Items: medkits, energy drinks, molotovs, and for a car repair kits, nitro, landmines, jerry cans. Vests (the Courier Vest, Kevlar, heavy armour) and running shoes." },
 	-- 5.1: the bike shop (Config.BikeShop).
-	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes and bike gear, from level 2, on Main St: faster than walking and more room for the light runs." },
+	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), from level 2, on Main St: faster than walking and more room for the light runs." },
 	-- 5.0: Earl sells his old van here (Config.VanQuest): your first vehicle.
 	{ id = "earl", name = "Earl's Used Wheels", icon = "🚐", x = Map.VanSeller.earl.x, z = Map.VanSeller.earl.z, kind = "place", description = "Far out west on the West Highway, past the Airfield Road. Earl sells his old van here: your first vehicle (Marge's quest at level 4)." },
 }

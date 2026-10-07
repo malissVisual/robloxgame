@@ -6,7 +6,10 @@
 --
 --   Transport.kitOf(player)    the kit owned (empty while the save loads)
 --   Transport.footOf(player)   Info on foot with that kit (a foot job's room, whatever the player drives)
---   Transport.packRoomOf(player), Transport.warmOf(player)   the pack's room, the jacket's food drain (Cargo, Jobs)
+--   Transport.packRoomOf(player)   the pack's room (6.6: the bag's)
+--   Transport.tipShareOf(player)   6.7: the kit's tip share (the Courier Vest: Rules.tipShare; the jacket is gone)
+--   Transport.bikeBagOf(player) 6.6: the bike's own bag (its rack / basket / box with its bike gear: Rules.bikeRoom) of
+--                              the bike a bike job is ridden on (bikeOf), 0 without a bike
 --   Transport.of(player)       Info now: "car" / "bike" seated on or within NEAR studs of your own vehicle, else on foot
 --   Transport.bikeOf(player)   5.1: the bike a bike job is ridden on (the equipped one, else your bike of choice) and
 --                              its Info (nil, nil without a bike): the board's BIKE section, Jobs' room checks
@@ -54,15 +57,14 @@ function Transport.footOf(player: Player): Rules.Info
 	return Rules.foot(Transport.kitOf(player), Transport.bagOf(player))
 end
 
--- The pieces of a foot job that ride in the pack (the backpack's room over the hands: server/Cargo.luau; 6.4: and the
--- active bag's).
+-- The pieces of a foot job that ride over the hands (server/Cargo.luau's pack; 6.6: the active bag's, no backpack).
 function Transport.packRoomOf(player: Player): number
 	return Rules.packRoom(Transport.kitOf(player), Transport.bagOf(player))
 end
 
--- The food's freshness drain while this player carries it on foot (the thermal jacket).
-function Transport.warmOf(player: Player): number
-	return Rules.warm(Transport.kitOf(player))
+-- 6.7: the share of an order's pay this player's kit adds as a tip (the Courier Vest; the jacket's warmOf is gone).
+function Transport.tipShareOf(player: Player): number
+	return Rules.tipShare(Transport.kitOf(player))
 end
 
 -- 5.1: is the vehicle CAR / MY BIKE brings a bike?
@@ -82,6 +84,13 @@ function Transport.bikeOf(player: Player): (string?, Rules.Info?)
 		return nil, nil
 	end
 	return id, Rules.bike(Rules.bikeRoom(id, profile.carGear), profile.kit, profile.activeBag)
+end
+
+-- 6.6: the bike's own bag of the bike bikeOf names (0 without one).
+function Transport.bikeBagOf(player: Player): number
+	local profile = PlayerData.get(player)
+	local id = Transport.bikeOf(player)
+	return if profile and id then Rules.bikeRoom(id, profile.carGear) else 0
 end
 
 function Transport.of(player: Player): Rules.Info

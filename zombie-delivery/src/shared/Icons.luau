@@ -44,6 +44,7 @@ Icons.Ids = {
 	item_nitro = "rbxassetid://124345149039037",
 	item_molotov = "rbxassetid://94641923810845",
 	item_mine = "rbxassetid://109583785484960",
+	item_energy = "", -- 6.7: the Energy Drink (the emoji 🥤 until its icon is drawn and uploaded)
 	-- 5.4, fuel (Codex's art/icons/jerrycan and fuel, 256 x 256 white; not uploaded yet: the emoji shows).
 	jerrycan = "",
 	fuel = "",
@@ -154,8 +155,6 @@ Icons.Ids = {
 	sign_office_tower = "rbxassetid://123929738866726",
 	sign_office_penthouse = "rbxassetid://84138164235299",
 	-- 5.0, the personal kit (art/icons/kit_*, 256 x 256; Config.Kit ids, the cart is not sold yet): the KIT tab.
-	kit_backpack = "",
-	kit_bigpack = "",
 	kit_shoes = "",
 	kit_jacket = "",
 	kit_cart = "",
@@ -167,6 +166,7 @@ Icons.Ids = {
 	kit_padded = "",
 	kit_duffel = "",
 	kit_hivis = "", -- 6.0.1: the Courier Vest (the emoji 🦺 until its icon is uploaded)
+	kit_bat = "", -- 6.7: the Baseball Bat (the emoji 🏏 until its icon is drawn and uploaded)
 	-- 5.0, the phone's apps (art/icons/app_*, 256 x 256; client/Phone.luau's app ids, bank and settings for later).
 	app_orders = "",
 	app_board = "",
@@ -280,7 +280,7 @@ local CARGO_ALIASES: { [string]: string } = {
 	gadget = "crate",
 }
 
--- 5.0: a piece of personal kit (Config.Kit id: backpack, bigpack, shoes, jacket).
+-- 5.0: a piece of personal kit (Config.Kit id: shoes, jacket, the vests, 6.4: the bags).
 function Icons.kit(kitId: string?): string?
 	return named("kit_", kitId)
 end
@@ -356,6 +356,7 @@ local LANDMARK_BORROWED: { [string]: string } = {
 	volt = "cargo_crate",
 	secondlife = "cargo_ammo",
 	bloom = "cargo_sack", -- the plants
+	bags = "kit_bag", -- 6.6: ZDC Bags, the depot's bag kiosk: the plastic bag's picture (its emoji 🛍️ meanwhile)
 }
 
 function Icons.landmark(landmarkId: string?): string?

@@ -147,7 +147,7 @@ of letting you play a profile that would not be saved.
 | Switch gun | hold T: the weapon wheel (point at a gun, let go); tap T: the next gun (5.4.1: Q is the phone); or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
 | Items (repair, medkit, nitro, molotov, mine) | 4 – 8 (6.1; 9 a sixth kind; or click a slot) | the slots |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
-| The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | BOARD on the phone / MAP / BAG on the phone |
+| The Dispatch board (the jobs) / map / bag & items | J / M / I (3.9; B before) | BOARD on the phone / MAP / BAG on the phone |
 | The phone (5.0; 5.7: the HUD's MENU button says PHONE once you have it; 6.5: six tiles JOBS, MAP, SHOP, BAG & ITEMS, GARAGE, MORE, and in MORE: CAREER, MISSIONS, CREW, TOP, ESTATE, BANK, MESSAGES, SETTINGS) | Q, or click PHONE (gamepad: Y) | tap PHONE |
 | The career (your level, the road, the licences) | C | CAREER on the phone |
 | Close a window, the big map or MENU | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
@@ -308,9 +308,9 @@ until then:
 
 | Level | Rank | XP | Opens | Reward |
 |---|---|---|---|---|
-| 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Courier Backpack (kit), Running Shoes (kit), Big Backpack (kit), Thermal Jacket (kit), Pistol | – |
+| 1 | Rookie Courier | 0 | On-foot runs: letters, medicine, pizza, Plastic Bag (kit, ZDC Bags), Running Shoes (kit), Thermal Jacket (kit), Pistol | – |
 | 2 | Courier | 575 | **Rusty Bike at Spoke & Chain** ($300), **Courier Bike at Spoke & Chain** ($1,100), Front Basket (gear), Canvas Tote (kit), Rented Lockup | $500, 2 Medkits |
-| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), Thermal Delivery Bag (kit), SMG | $750, 2 Medkits, the Courier Backpack |
+| 3 | Runner | 1,265 | **Cargo Bike at Spoke & Chain** ($2,400), Panniers (gear), Thermal Delivery Bag (kit), SMG | $750, 2 Medkits, the Canvas Tote (6.6) |
 | 4 | Road Rat | 2,093 | ★ Easy jobs, School Run (Sunny Hill School), Ice Cream Route (Frosty's Ice Cream), Moving Day (Big Move Movers), Fuel Run (Gas Station), Ambulance Run (City Clinic), Pizza Rush, **Old Van: Earl's Used Wheels (Marge's quest at level 4)** ($1,800), **E-Scooter at Spoke & Chain** ($2,800), the Patched Van stage, Hand Trolley (gear), Ratchet Straps (gear), Bike Trailer (gear), Padded Messenger Bag (kit), Shotgun, First Shift (campaign), Southside Garage | $1,000, 2 Medkits, the Running Shoes |
 | 5 | Road Warrior | 3,087 | ★★ Risky jobs, Horse Transport (Silver Spur Ranch), Cash Transport, **Courier Van** ($3,500), **High-Roof Van** ($7,000), **E-Bike at Spoke & Chain** ($6,500), the Work Van stage, Cooler Box (gear), Roof Machine Gun, Code Red (campaign), Harbor Lockup | $1,500, 2 Repair Kits, Hi-Vis Orange paint |
 | 6 | Veteran Driver | 4,279 | ★★★ Deadly jobs (licence: 5 jobs rated ★★+ at ★★), Freight Run, **Pickup** ($12,000), the Long Cargo Van stage, the Express Courier stage, Big Delivery Duffel (kit), Hunting Rifle, Empty Shelves (campaign), Partners in Crime (campaign), Highway Garage, Elm Bungalow | $2,000, 4 Molotovs |
@@ -330,8 +330,8 @@ until then:
 * **Cars** (5.0): you start on foot; bikes from level 2 at Spoke & Chain, Earl's Old Van at 4, then the dealer's cars
   (level and price rise together). The company vehicles come with their employer's job level; the **stages** open by
   level too (see **Stages and the cars' roles**).
-* **Rewards** (5.7): levels 2 – 4 give what a courier on foot or on a bike uses (medkits, the Courier Backpack, the
-  Running Shoes; a kit you own already pays its price instead); the car's items (repair kits, nitro, mines) start at
+* **Rewards** (5.7): levels 2 – 4 give what a courier on foot or on a bike uses (medkits, the Canvas Tote (6.6: no
+  backpacks), the Running Shoes; a kit you own already pays its price instead); the car's items (repair kits, nitro, mines) start at
   level 5, once you drive.
 * **Real estate** (the endgame): garages 2 – 7 (3.4: the two small ones early), houses 6 – 9, villas 10 – 11, mansions 13 – 15 ($3 – 6 million), and
   the offices 12, 14 and 15, each also needing a campaign's finale (Iron Supply, Dirty Money, Last Convoy; the ESTATE
@@ -1120,6 +1120,201 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The shops cleaned up: the vest's tips, car-only items, the bat and the energy drink (6.7)
+
+The owner: "In the shop there are useless things. Go through it, delete them, make it better, add or remove."
+
+- **Not for sale any more.** The **Pistol** and the **Plastic Bag** are every courier's from the start (`starter`:
+  "STARTER · yours", $0; the server gives a missing one back for free). Marge's old "buy a pistol" text, the shooting
+  "no gun yet" note and the weapon wheel's pistol price are gone (they could never show: every profile has the pistol
+  since 6.0.2). The **Thermal Jacket** (food ×0.8) is retired: the Thermal Delivery Bag does that job (×0.35). A real
+  save that owned it gets **$300 back once** (`Config.RetiredKit` with its own save flag `noJacket`,
+  `Transport.retiredRefunds`, `server/PlayerData.luau`; Marge says so after PLAY: `Config.Courier.JacketRefund`); its
+  food drain (`server/Jobs.luau`), KitWear's jacket slot and KitFit's are gone.
+- **Rewards apart.** The reward-only guns (revolver, carbine, Maria's Carbine, the Lever Rifle, the Golden Pistol, Dead
+  End) and the 11 never-sold paints sit in a folded **🏆 REWARDS** section at the bottom of their tab (SHOW / HIDE).
+- **The Courier Vest** has a real effect: **+5% tips on every delivery** (`Config.Kit` hivis `tips = 0.05`,
+  `Transport.tipShare`, `JobRules.kitTip`, added in `server/Jobs.luau` payOrder with a line on the result card; not on
+  missions; it counts under a Kevlar or heavy vest too).
+- **Car-only items** (`Config.Items` `car`: the repair kit, nitro, the landmine, the jerry can; their words start with
+  "Car only"): in Last Stop Supplies' ITEMS, the bottom bar, the phone's and the I window's lists and the supply crates
+  only once you own a car (`Economy.ownsCar`: any vehicle that is not a bike; `itemShown` / `itemsFor`); the server
+  (and a gas kiosk) sells them only then. The on-foot items come first in the bar. **The bar's overflow:** more kinds
+  than slots (5, a touch screen 2): the last slot is **MORE** ("+N", its key and key 9): the I window's ITEMS.
+- **Lead & Co.** sells the gun upgrades now (**Gun Damage**, **Fire Rate**: moved from Wrench Garage, the same save
+  keys) and the **Baseball Bat** ($150, level 1, `Config.Kit` bat with `shop = "guns"`): owned, **V with the gun away
+  swings the bat** (`Config.Melee.Kinds` bat: 30 damage, 0.7 s, push 44, 7 studs of reach; a punch is 12) with the
+  gun's overhead strike (`Melee.pose`) and a bat welded into the right hand for the swing (`server/CloseCombat.luau`).
+- **The Energy Drink** ($40, at most 5, Last Stop Supplies): the breath full at once and **×1.3 breath for 30 s**
+  (the character's `EnergyUntil`, `client/Stamina.luau` energized / refill; `Config.ItemTuning` EnergyTime /
+  EnergyBreath), on foot.
+- **Reworked:** the **E-Scooter** holds 3 (two on the rack, one on the deck) for $1,900 at level 3, below the Cargo
+  Bike (the owner's speed 32 stays); the **Hunting Rifle** hits 60 (132 a second: more than the SMG's 117, even
+  before its spread misses far out; one shot drops a walker or a runner); the **Works Rally** stage adds +100 health;
+  bike runs take **up to 8 pieces** (6 before), so the **Bike Trailer**'s +4 counts on one run (fitting it on the
+  Cargo Bike would not have helped: its box + panniers already passed the old cap of 6); the **Ram Plow** also takes
+  12% a level off the dent a zombie you don't kill leaves (`Economy.ramGuard`, at most down to 25%); the **Roof
+  Rack** takes 2 light pieces side by side; the **Muscle Car** holds 2 (the Street Machine 3).
+- **Words that are true:** every item, kit piece and gear says what it does and its limits ("Car only", "5 at most
+  down", "heavy cargo by hand", "not on the E-Scooter"); the map's shop lines and the phone's SHOP list say what each
+  shop really sells; the depot is listed on its own on the map (the Depot Garage is the garage terminal, no shop
+  window).
+
+Tests: `tests/shop67_test.luau` (the energy drink, the bat's numbers, the jacket refund, the car-only filter, the vest's
+tips, where each piece is sold, the reworked numbers), `bags_test`, `transport_test`, `kitfit_test`, `armour_test`,
+`cargun_test`, `capacity_test`, `career_test`, `bikes_test`, `logic_test`, `melee_test`, `icons_test`, the phone's check.
+**Test in Studio:** Lead & Co. (STARTER pistol, the gun upgrades, buy the bat, V with fists and with the bag: the bat in
+the hand, a walker in two swings; REWARDS folded and opened), Last Stop Supplies with no car (no car items, the energy
+drink: sprint ~8 s) and with a car (all seven, the bar's MORE slot and key 9), a delivery with the Courier Vest (the
+tip line), an old save with a jacket ($300 and Marge's text once), the E-Scooter's third piece on its deck, the Roof
+Rack's two pieces, ramming with the plow.
+
+## One bag, the bike's own bag, the ZDC Bags kiosk (6.6)
+
+The owner: "The backpacks, the bag and the bike work weirdly. When I don't know how to put something on the bike, I take
+it into the bag." and "You can't have a bag and a backpack at the same time; they're in the same category. I need a shop
+for them." **One carrying item, one simple story.**
+
+- **No backpacks.** The Courier Backpack and the Big Backpack are gone from `Config.Kit` (and KitFit's / KitWear's
+  `pack` and `load` slots, `Transport.backpackRoom`, 5.3's `Config.Cargo.PackLooks` / `Bag.fits` / `Bag.room` /
+  `Bag.makeRoom`, the shops, the phone, the I window). **Your room on foot = your hands (2) + your bag** (the active one:
+  `Transport.handsRoom`). Every light piece fits the bag (a bouquet, a cake, groceries too); a heavy one goes only in
+  the hands.
+- **Money back, once.** A real save (`saved.money ~= nil`) without the `noPacks` flag gets the price of every backpack it
+  owned (`Config.RetiredKit`: $150 / $400, `Transport.packRefund`, `server/PlayerData.luau` applySaved); Marge texts
+  once after PLAY: "Backpacks are gone: bags do it all now. You got $X back." (`Config.Courier.PackRefund`,
+  `server/Tutorial.luau`, the kiosk on your GPS). Level 3's career reward is the Canvas Tote now.
+- **The bike has its own bag** (its rack, basket or box with its bike gear: `Cargo.Info.rack`, `Transport.bikeBagOf`;
+  a bike run, or a foot run while your bike is your vehicle; the numbers are the bike's capacity + gear as before).
+  A pickup goes **onto the bike** while it is within `Config.Cargo.BikeReach` (12) studs of you or you sit on it
+  (`Holding.bikeNear`), else **into the bag in your hand**, else **your hands** (`Holding.place`). **Getting on your
+  bike loads your hands onto it** when it has room (the bike's door no longer says "Load it first (E at the back)":
+  `Vehicles.bikeStows`, `Cargo.canStowHands`, `Cargo.update`). At a drop **E** takes the piece from wherever it is: your
+  hands, your bag, the bike within reach; a bike too far away: "Your bike has it: bring it closer." Throws take the
+  near bike's pieces too. The bike's pieces stay on it when you die, and a fall on foot does not knock them.
+- **The HUD tells one story:** the CARRYING pill reads `CARRYING 🍕🍕 · 3/4` with a small mark on each piece (✋ hands,
+  🛍 bag, 🚲 the bike's bag, 📰 a round's satchel: `Bag.Marks`); the bag slot shows n/room; the I window (now "Bag &
+  items", its run tab 📦 CARRYING), BagUi, the phone's ORDERS chip (`CARRYING n / room`), the board and the shop never
+  say backpack.
+- **ZDC Bags** (`Map.Shops.bags`, `Config.BagShop`: a kiosk at (26, 30) in the depot's safe yard, east of the spawn pad,
+  its counter facing it; clear of the scooter rack, the job board, the garage terminal and Marge; `server/BagKiosk.luau`,
+  built from World's buildDepot with its helpers): a counter with the shop prompt, the five bags on its back wall, a
+  striped awning, a lamp and the name board; its own 16-stud radius (`Map.shopRadius`), the plastic bag's picture on
+  the map. It sells **the five bags** (KitShop's "bags" list, USE there too); **Last Stop Supplies keeps the vests,
+  the shoes, the jacket and the items**. Marge's bag texts, the tutorial's last page and the phone's SHOP list ("ZDC Bags
+  · bags (sprint with your deliveries)", first, GPS) send you there.
+
+Tests: `tests/bag_test.luau`, `holding_test.luau` (the bike's reach, where a pickup goes, room = hands + bag),
+`bags_test.luau` (the refund, the kiosk's place), `kitfit_test`, `bagfill_test`, `transport_test`, `career_test`,
+`icons_test`, `locationtag_test`, the phone's check. **Test in Studio:** an old save with a backpack (the money and
+Marge's text once), a bike run (pickups onto the bike next to you, into the bag away from it; get on with a piece in
+your hands; E at a door with the bike far, then near), the kiosk (E at its counter, BUY a bag, USE).
+
+## Marge shows you the screen, you pick your first job (6.7)
+
+The owner: "Make the tutorial not annoy you. It should simply show with an arrow where things are in the menu, then
+that you take one job, and you either say yes or skip tutorial. But don't automatically give a job."
+
+- **Her welcome comes on its own**, 2 s after PLAY on a new save (`Config.Tutorial.StartDelay`): one page, "Hi, I'm
+  Marge, dispatch. You're a courier now: take jobs, deliver, get paid. Let me show you around in 20 seconds." **SHOW
+  ME** gives you her phone and starts the tour; **SKIP TUTORIAL** ends it. TALK TO MARGE over her head only shows while
+  that welcome waits unseen; E at her shows it again.
+- **The arrow tour** (`client/TutorialArrow.luau`, driven by `client/TutorialUi.luau`, the stops in
+  `TutorialSteps.ScreenTour`): a big bouncing red arrow, a pulsing frame round the thing and a one-sentence caption with
+  NEXT › and SKIP TUTORIAL. The NEXT card, PHONE [Q], then the phone opens by itself for JOBS, MAP, SHOP and BAG & ITEMS,
+  it goes away for the bottom bar (1 fists, 2 bag, 3 gun, 4–8 items), then the minimap (M). Nothing stops: you can
+  walk meanwhile. It follows its target every frame (a phone sliding in, a HUD laid out again); `TutorialSteps.placeArrow`
+  (tested) picks the side with room. Enter or a gamepad's A is NEXT (Space still jumps), touch taps. Close the phone
+  during its stops and the tour moves on past them; take a job meanwhile and it ends quietly.
+- **No automatic job:** the last page asks "Ready? Take your first job" with **TAKE A JOB** (the phone opens on JOBS,
+  you pick any job) or SKIP TUTORIAL. Then nothing of hers during play: the **first delivery of any job** pays the $50
+  (`Config.Tutorial.Reward`) with a "First delivery! +$50 from Marge." toast; a failed one just goes back to "Take your
+  first job (J)" on the NEXT card. The strip under the card says FIRST DAY · +$50 ON YOUR FIRST DELIVERY with SKIP (it
+  asks first; a skip pays nothing). Her special two-letter job (`Jobs.startTutorialJob`) is no longer used; her done,
+  board and retry pages are gone. A save that finished or skipped it never sees it again.
+- **Again, any time:** the phone's MORE → SETTINGS has SHOW ME THE SCREEN (this tour) and SHOW ME AROUND (the 5.7
+  world tour: the ZDC RIDE dock, the nearest bus stop, then JOBS).
+## A more realistic courier, idle life, the pick-up, the carry's grip, landing, flinching (6.7, part B)
+
+The owner: "The character isn't realistic at all, there are no animations … I want better graphics and better
+animations." He chose a more realistic body.
+
+**The body** (`server/CharacterArt/Geometry.luau`, native parts only): 5.9 studs from the sole to the crown, the head
+0.92 (about 1/6.4 of it, an egg-shaped Roblox sphere mesh with a jaw, eye whites and irises, brows, a nose, a mouth,
+ears, short hair under the backwards black cap); slim upper arms (0.6) and forearms (0.52, nearly as long as the upper
+arms), legs 0.64 × 0.8 and 0.56 × 0.68, the fingertips at mid-thigh; balls round the shoulders, the elbows and the
+knees on the joints, so a bent arm or knee has no gap; a neck; hands of a palm (0.22 × 0.36 × 0.4), a thumb and curled
+fingers, the palms facing the body, with a `LeftGripAttachment` / `RightGripAttachment` inside each fist (0.28 under
+the palm's middle: guns, `server/HandItem.luau`'s one-handed grips and the bag's handles sit there); an open charcoal
+jacket over a grey shirt, a collar, pocket flaps, black cuffs, trousers with a belt, boots with round toes. 52 parts
+(63 with the red Courier Vest, within the 64). The R15 part, joint and attachment names are unchanged. The people of
+the world (`server/Npcs.luau`) wear the same body (`Geometry.spec("person")`, a kid at 0.75), dressed in their looks;
+the infected keep the 6.0 block body. The kit stays authored on the block body: `shared/KitFit.luau` scales it onto the
+slimmer one, and a small hand holds the art in its palm (the phone: `KitFit.Palm`, the wrist rolled screen up).
+
+**The animations** (procedural, the joints' Transform in PreSimulation, through one book of the poses,
+`client/PoseLedger.luau`, so the layers add up instead of piling up; numbers in `Config.Body`, the maths in
+`shared/BodyMotion.luau`, tested): `client/BodyLife.luau` breathes (quicker after a sprint), shifts the weight from foot
+to foot standing still, turns the head to a person near and in front (your courier also to the job's ring), blinks,
+dips the knees landing by the fall's speed, flinches when hit and adds the walk's weight (a bob from the stock walk's
+own thighs, a little more arm swing, the chest turning) under the sprint's run; on every player and person within 120
+studs, at most 40, the small motions within 50. The stock walk and run play slower for the longer legs
+(`CourierMotion.StockHip`). `client/ArmPose.luau`: carrying, both hands reach the box's sides (a two-bone reach from
+`CarryAt` / `CarrySize`, which `server/Cargo.luau` sets from the held piece) and the body leans back with a heavy load;
+a piece picked up off the ground plays "pickup": down on the knees, the back bent, the hands on the piece, which comes
+up into them after `Config.Body.PickupLift` (also picking up a set-down bag); gestures with the legs keep the feet where
+they stood.
+
+**Test in Studio:** the courier from all sides and in the dark (the face, the cap, the hands), with the Courier Vest,
+the shoes, each bag and the phone (in the palm, screen up); the people (hats, hair, coats, kids); idle 20 s (breath,
+weight shift, blinks, the head to Marge and to the ring), walk / sprint / stop, jump and fall from a roof (the dip),
+a zombie hit (the flinch); pick up a piece you put down (G, then E) and a set-down bag; carry one and two pieces and a
+heavy one (the hands on the box, walking); seats, bikes, the scooter, zip lines and ladders (nothing posed there); the
+feet on the ground everywhere (Output: no Unstuck lifts).
+
+## Real-size bags, items in the hand, the throw's wind-up (6.7, part A)
+
+The owner: "The bags and the character aren't realistic at all, there are no animations, the bag is small, the things
+would never really fit in it."
+
+**Real-size bags** (`server/KitArt/Geometry.luau`, 1 stud ≈ 35 cm): the plastic bag is 40 × 45 × 20 cm (gussets, a
+hem, two handles into the fist), the canvas tote 40 × 40 × 13 on long handles under the arm, the thermal food bag
+45 × 37 × 38 (zip-round lid, mesh pocket, ZDC patches, two straps to a padded grip), the messenger 40 × 30 × 15 (a
+flap, a zip, buckles; now at the back of the hip, clear of the arm), the duffel 70 cm long and 35 across. Each shows a
+dark open mouth; loaded, the thermal bag's lid stands open behind its straps (`Geometry.open`). A bag in the hand stays
+at least `Config.Courier.Bag.Clear` (0.25) over the ground: `tools/character-art/bag-check.luau` measures it on the
+real body (today 0.33 at the lowest), `tools/model-art/export.py` checks each bag's reach (≤ 20 parts a bag).
+
+**Real-size pieces in them** (`shared/BagFill.luau`, `Config.Courier.BagFill.Packed`, tested): a pizza box is 33 × 4 ×
+33 cm, a parcel, a bouquet a stud tall, a cake box 23 cm … They are packed like a courier packs: lanes along the bag,
+side by side across it, then a layer below; the last one in lies on top. Pizza boxes lie flat and stacked in the
+thermal bag (the top one at the rim, seen through the open lid) and stand on their edge in a plastic bag; a bouquet,
+a cake, a take-out bag stay upright. The top layer sticks out of the opening by 20–40 %, nothing goes under the bottom,
+a piece that fits no way is shrunk to 70 % at the least, and the body swells up to its own amount (the plastic bag
+25 %, the rigid thermal bag 4 %).
+
+**Pieces in the hands at their real size** (`Config.Cargo.LightScale` / `LookScale`): a light piece is built at half
+its old size (a box carried in both hands is about a stud wide, a cake box 0.65), heavy cargo as before; carried, it
+rests on the forearms in front of the chest (`CarryLow`, `CarryFront`).
+
+**Items in the hand** (`server/HandItem.luau`, `shared/Gestures.luau`): handing over at a door, the piece is in your
+hands held out ("give", 0.4 s), then in the receiver's ("receive", 0.85 s), then on the door's stack. A pickup into
+the bag: you bring the bag up with the left hand, look down, put the piece in with the right ("bag", 0.5 s); the bag
+shows it from that moment. A throw: the piece is in your hand through a 0.18 s wind-up (`Config.Throw.WindUp`: the arm
+back, the torso turned) and leaves it at the whip; the server decides everything at the throw and only starts the
+flight then. The two-handed grips are worked out from each body's own rig attachments and the gesture's angles.
+
+**The bag arm** (`client/BagSway.luau`, `Config.Courier.BagArm`): with a bag in the left hand the arm is a little
+straighter, out from the body and swings less; a loaded bag leans the torso slightly the other way (standing or slow);
+the throw turns the torso and the bag gesture tips the head down. Only while nothing else (aiming, carrying, the
+phone, a gesture, the sprint) has those joints; let go to the identity otherwise.
+
+**Test in Studio:** each bag in the hand and worn (2, then 1 / 3), empty and full: the size against the courier, the
+contents in the mouth, the thermal lid opening, nothing in the ground or the leg; a pickup into the bag (the piece in
+the right hand, then in the bag); a hand-over at a door (the piece from your hands into the receiver's, then the
+stack; nobody home: onto the stack); a throw (the arm winds back, the piece leaves at the whip, the arc and the tips as
+before); carrying two light pieces (smaller, on the forearms).
+
 ## The bag shows, and what is in it (6.4.1)
 
 The owner: "the bag isn't visible when I have it; and it would be good if it were more visible, and that there is
@@ -1639,7 +1834,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               3.2: loading through the back, the pair lift; 4.0: pieces on a trolley, pallets on a jack, the tools' hints), Equipment (4.0: the
               hand trolley and the pallet jacks: take, push, stow, set down, go home), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
-              purchases; 3.5: the three display cars, the stages), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
+              purchases; 3.5: the three display cars, the stages; 6.6: ZDC Bags' bags), BagKiosk (6.6: the depot's bag
+              kiosk, built from World's buildDepot), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
               the crew state), Ranking (the leaderboard rows), Estate (buying, selling, the home, car slots, the home
               respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your
@@ -1655,7 +1851,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, 6.1: the
               hand slots 1-3, the item slots 4-8 and what you carry), BagSway (6.1: the bag's pendulum, the BagSwing
               joint's only writer), KeyHints (6.1: the key hints under the top buttons, F1), Objective (6.5: the NEXT
-              card, its words from shared/Goal.luau), MapView (minimap, big map, GPS routes),
+              card, its words from shared/Goal.luau), TutorialUi (Marge's pages; 6.7: drives the arrow tour) and
+              TutorialArrow (6.7: the tour's arrow, frame and caption), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
