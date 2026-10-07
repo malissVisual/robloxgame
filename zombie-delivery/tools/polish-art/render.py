@@ -24,7 +24,28 @@ for model in models:
                     [.08,3,d-4] if nx else [w-4,3,.08],
                     [nx*(w/2+.06),9*floor,nz*(d/2+.06)],[.16,.22,.25]))
         model["id"]=model["spec"]["id"]
+    # Display SurfaceGui labels inside their actual per-slot rectangles. Virtual plates exist only for text layout.
+    nodes={p["id"]:p for p in model["parts"]}
+    authored={p["name"]:p for p in model["spec"]["pieces"]}
+    next_uid=-10000
+    for label in list(model["parts"]):
+        if label["class"]!="TextLabel":continue
+        gui=nodes[label["parent"]];plate=nodes.get(gui.get("parent"))
+        if not plate:continue
+        slots=authored.get(plate["name"],{}).get("slots",[])
+        slot=next((s for s in slots if s["name"]==label["name"]),None)
+        if not slot:continue
+        x,y=slot.get("at",[0,0]);w,h=slot.get("size",[1,1])
+        shift=[(.5-x-w/2)*plate["size"][0],(.5-y-h/2)*plate["size"][1],0]
+        r=plate["rotation"]
+        pos=[plate["position"][i]+sum(r[i*3+j]*shift[j] for j in range(3)) for i in range(3)]
+        proxy=dict(plate,id=next_uid,name="Reference text slot",position=pos,size=[plate["size"][0]*w,plate["size"][1]*h,plate["size"][2]],opacity=0,reference=True)
+        proxy_gui={"id":next_uid-1,"class":"SurfaceGui","name":"Reference text layout","parent":next_uid}
+        label["parent"]=next_uid-1;model["parts"].extend([proxy,proxy_gui]);next_uid-=2
     if mode=="stops":
+        if model["id"]=="bus-livery":
+            body=Path(source).parent/"bus-reference.json"
+            if body.exists():model["parts"].extend(json.loads(body.read_text()))
         for p in list(model["parts"]):
             if p["class"]!="TrussPart":continue
             p["opacity"]=0

@@ -70,13 +70,13 @@ function Builder.build(parent: Instance, frame: CFrame, spec: Spec, options: Opt
 		if d.light then
 			local light = Instance.new("PointLight")
 			light.Range, light.Brightness = d.light, 0.8
-			light.Color = Color3.fromRGB(255, 225, 187)
+			light.Color = p.Color
 			light.Shadows = false
 			light.Parent = p
 			if opt.nightLight then opt.nightLight(light) end
 		end
 		if d.night and opt.nightLight then
-			opt.nightLight(p, Color3.fromRGB(255, 225, 187), p.Color, d.material or "Metal")
+			opt.nightLight(p, p.Color, p.Color, d.material or "Metal")
 		end
 	end
 	for _, mount in spec.attachments or {} do

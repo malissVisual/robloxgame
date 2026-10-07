@@ -74,6 +74,12 @@ local function emit(spec,info,bp)
   local p=names[mount.attach];local a=p:FindFirstChild(mount.name);assert(a)
   assert(((p.CFrame*a.CFrame).Position-M.Vector3.new(mount.at[1],mount.at[2],mount.at[3])).Magnitude<1e-5)
  end
+  local registrations=0
+ for _,piece in spec.pieces do
+  if piece.night then registrations+=1 end
+  if piece.light then registrations+=1 end
+ end
+ assert(seen==registrations,"Night callback registration mismatch")
  assert(lights<=(info.lights or 0))
  print(encode({id=info.id or spec.id,spec=spec,parts=parts,info=info,camera="front"}))
  model:Destroy();assert(model.Parent==nil and #model:GetChildren()==0)
@@ -128,6 +134,7 @@ end
 local C=require("./Config")
 local Shelter=require("./Shelter");local Dock=require("./Dock");local Zip=require("./ZipPlatform");local Bus=require("./BusLivery")
 emit(Shelter.build({73,121,155},"BONE STREET","1 / 3"),{budget=35,lights=1,id="shelter"})
+emit(Shelter.build({73,121,155},"DOWNTOWN","1 / 2 / 3",{{73,121,155},{215,74,70},{122,146,107}}),{budget=35,lights=1,id="shelter3"})
 for slots=2,3 do emit(Dock.build(slots,C.Rental.SlotPitch,"DOWNTOWN"),{budget=24,lights=1,id="dock"..slots,slots=slots,pitch=C.Rental.SlotPitch}) end
 emit(Zip.platform(C.ZipLines.Platform,C.ZipLines.CableHeight,"BONE ST"),{budget=30,lights=1,id="zip-platform",size=C.ZipLines.Platform,height=C.ZipLines.CableHeight})
 for _,height in {9,16,43,89} do emit(Zip.ladder(height),{budget=12,lights=0,id="ladder"..height,height=height}) end
@@ -216,7 +223,7 @@ def stop_check(model):
     mounts={p["name"]:p for p in spec.get("attachments",[]) or []}
     slots={s["name"] for p in spec["pieces"] for s in p.get("slots",[])}
     id=info["id"]
-    if id=="shelter":
+    if id.startswith("shelter"):
         assert "ArrivalsBoard" in named and {"Arrivals","StopName","Lines"}<=slots
         for p in model["parts"]:
             if "size" in p and p["name"]!="KerbLine":assert p["position"][2]+extent(p)[2]<=3+1e-5,"shelter blocks walk line"
