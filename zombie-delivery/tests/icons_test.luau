@@ -46,6 +46,37 @@ local ART = {
 	"bike_rust", "bike_city", "bike_cargo", "bike_ebike", "gear_basket", "gear_panniers", "gear_trailer", "map_bikes",
 	-- 5.4, art/icons (Codex's fuel art; ids empty until uploaded; map_gas is above)
 	"jerrycan", "fuel",
+	-- 5.x polish
+	"map_bus",
+	"map_zip",
+	"map_rental",
+	"map_shortcut",
+	"map_bank",
+	"map_clinic",
+	"map_pharmacy",
+	"map_warehouse",
+	"map_firestation",
+	"map_police",
+	"map_waterworks",
+	"map_lab",
+	"map_camp",
+	"map_stadium",
+	"map_luigis",
+	"map_dailybread",
+	"map_lastbite",
+	"map_wokdead",
+	"map_grindhouse",
+	"map_postoffice",
+	"map_dailyundead",
+	"map_boltnail",
+	"map_volt",
+	"map_secondlife",
+	"map_bloom",
+	"weapon_reyes",
+	"weapon_lever",
+	"weapon_goldpistol",
+	"weapon_deadend",
+
 }
 
 -- Every picture has its id slot, and the set has nothing else.
@@ -60,7 +91,7 @@ for name, id in Icons.Ids do
 	check(`{name} is a picture in art/`, inArt[name] == true)
 	check(`{name} is empty or an asset id`, id == "" or string.match(id, "^rbxassetid://%d+$") ~= nil, id)
 end
-check("121 pictures", count == 121, count)
+check("150 pictures", count == 150, count)
 
 -- get: nil for empty, unknown or no name; the id when it is filled in.
 check("an empty id gives nil", Icons.Ids.weapon_pistol ~= "" or Icons.get("weapon_pistol") == nil)
@@ -163,14 +194,29 @@ check("the depot's sign is a board", Icons.signAspect("depot") == 4)
 check("an unknown building: no sign", Icons.sign("moon") == nil and Icons.sign(nil) == nil)
 check("a sign while its id is empty: the text", Icons.Ids.sign_depot ~= "" or Icons.get(Icons.sign("depot")) == nil)
 
--- Every map icon is used by a landmark.
+-- Uploaded landmark art must be routed. New landmark art is staged while empty, with the borrowed icon retained.
+local STAGED_LANDMARKS = {
+	"bank", "clinic", "pharmacy", "warehouse", "firestation", "police", "waterworks", "lab", "camp", "stadium",
+	"luigis", "dailybread", "lastbite", "wokdead", "grindhouse", "postoffice", "dailyundead", "boltnail", "volt", "secondlife", "bloom",
+}
+local staged, known = {}, {}
+for _, landmark in Map.Landmarks do known[landmark.id] = true end
+for _, id in STAGED_LANDMARKS do
+	check("new art belongs to a real landmark: " .. id, known[id] == true)
+	staged["map_" .. id] = true
+end
+local TRANSPORT = { map_bus = true, map_zip = true, map_rental = true, map_shortcut = true }
 local used = {}
 for _, landmark in Map.Landmarks do
 	used[Icons.landmark(landmark.id) or ""] = true
 end
 for name in Icons.Ids do
 	if string.sub(name, 1, 4) == "map_" then
-		check(`{name} marks a landmark`, used[name] == true)
+		if TRANSPORT[name] then
+			check(name .. " resolves as a dynamic transport marker", Icons.landmark(string.sub(name, 5)) == name)
+		else
+			check(name .. " is routed or has pending upload for its real landmark", used[name] == true or (staged[name] and Icons.Ids[name] == ""))
+		end
 	end
 end
 

@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · polish brief group 1: 29 transport/landmark/weapon icons · `art/map/map_*.svg/png`, `art/weapons/weapon_*.svg/png`, `shared/Icons.luau`, `tools/polish-icons/`, `design/polish-icons/` · 2026-10-07 (`codex/polish-icons`, main `882c11c`). Next: street props → tower facades → stops/bus/docks, separate branches; gameplay wiring remains Claude's.
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/polish-icons` · 29 white transparent SVG/PNG transport/landmark/exclusive-gun icons, empty ID slots, upload manifest and sheet in `design/polish-icons/` · check silhouette/tint at map size; after uploading, fill IDs and remove the matching borrowed aliases. Pixel audit and full Luau suite pass. Next groups follow on separate branches.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
