@@ -227,7 +227,7 @@ safely("Fuel", Fuel.start) -- 5.4: the tanks, the burn, the pumps, the jerry can
 safely("Buses", require(Server.Buses).start) -- 5.5: the city buses (their stops: World's build list)
 safely("Rental", require(Server.Rental).start) -- 5.6: ZDC RIDE, the free rental scooters and their docks
 safely("ZipLines", require(Server.ZipLines).start) -- 5.6: the zip lines between the rooftops (the ladders, the rides)
-print("[Server] Zombie Delivery is running")
+print(`[Server] Zombie Delivery {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)
 -- 5.7: the city is big (thousands of parts): without streaming every client loads all of it at once.
 if not workspace.StreamingEnabled then
 	warn("[Server] workspace.StreamingEnabled is off: turn it on in the place (Workspace → StreamingEnabled) or big parts of the city load on every client at once")
