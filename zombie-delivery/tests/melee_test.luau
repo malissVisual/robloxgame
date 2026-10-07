@@ -21,6 +21,8 @@ local M = Config.Melee
 -- ── The kinds ──────────────────────────────────────────────────────────────
 
 check("holstered punches, drawn strikes with the gun", Melee.kindOf(true) == "punch" and Melee.kindOf(false) == "gun")
+check("6.7: with the bat owned the punch is a bat swing (the gun out still strikes)", Melee.kindOf(true, true) == "bat" and Melee.kindOf(false, true) == "gun"
+	and Melee.def("bat").damage > Melee.def("gun").damage and Melee.reachOf("bat") > M.Reach) -- (tests/shop67_test.luau has the rest)
 local punch, strike = Melee.def("punch"), Melee.def("gun")
 check("the punch is weaker than the gun strike", punch.damage < strike.damage, `{punch.damage} / {strike.damage}`)
 check("the punch is quicker than the gun strike", punch.cooldown < strike.cooldown, `{punch.cooldown} / {strike.cooldown}`)

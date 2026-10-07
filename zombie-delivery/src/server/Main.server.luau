@@ -91,7 +91,7 @@ local function sendState(player: Player)
 		weapon = profile.weapon,
 		upgrades = profile.upgrades,
 		carUpgrades = profile.carUpgrades, -- 3.3: the car tracks per car (the garage shows the equipped car's)
-		carHealth = profile.carHealth, -- 3.4: every parked car's share of health (the backpack's cars tab)
+		carHealth = profile.carHealth, -- 3.4: every parked car's share of health (the I window's cars tab)
 		carGear = profile.carGear, -- 4.6: every car's gear, "owned" or "installed" (Wrench Garage's GEAR tab)
 		items = profile.items,
 		paints = profile.paints,

@@ -69,6 +69,10 @@
 --   JobRules.roundTip(misses)             the tip: Round.NoMissTip with no paper in the bushes, else 0
 --   JobRules.tossMiss(distance)           the chance a paper tossed from `distance` studs lands in the bushes
 --   JobRules.roundCheck(misses)           the result card's line for it ({ text, ok })
+--
+-- 6.7, the Courier Vest (Config.Kit tips; tested in tests/shop67_test.luau):
+--   JobRules.kitTip(pay, share)           the customer's tip: `share` of the order's pay, rounded (0 without)
+--   JobRules.kitTipCheck(tip)             the result card's line for it ({ text, ok })
 
 local Config = require(script.Parent.Config)
 
@@ -407,7 +411,7 @@ function JobRules.damageLoss(rules: { string }?, base: number, speed: number, st
 	return strapped(loss, straps)
 end
 
--- 5.0: `warm` (a thermal jacket on foot, Transport.warm) multiplies it too.
+-- 5.0: `warm` multiplies it too (6.4: the thermal bag, Transport.mixWarm; 6.7: the jacket is gone).
 function JobRules.freshDrain(tier: number, seconds: number, cooler: boolean?, warm: number?): number
 	local drain = Config.Jobs.CargoRules.FoodDrain
 	local perMinute = drain[math.clamp(math.floor(tier), 1, #drain)] or 0
@@ -746,6 +750,19 @@ function JobRules.roundCheck(misses: number): Check
 		return { text = `Every paper on its porch: +${Config.Jobs.Round.NoMissTip} tip`, ok = true }
 	end
 	return { text = `{misses} {if misses == 1 then "paper" else "papers"} in the bushes: no tip`, ok = false }
+end
+
+-- 6.7, the Courier Vest's tip (Config.Kit tips, Transport.tipShare): `share` of an order's pay (after its rating and
+-- streak), rounded; 0 without a share or a pay. server/Jobs.luau payOrder adds it and a line in the rating's checks.
+function JobRules.kitTip(pay: number, share: number): number
+	if pay ~= pay or share ~= share or pay <= 0 or share <= 0 then
+		return 0
+	end
+	return math.floor(pay * math.min(share, 1) + 0.5)
+end
+
+function JobRules.kitTipCheck(tip: number): Check
+	return { text = `Courier Vest: the customer tips +${math.max(0, math.floor(tip))}`, ok = true }
 end
 
 -- Within SureToss every paper lands on the porch; from there to TossRange the chance of the bushes grows to

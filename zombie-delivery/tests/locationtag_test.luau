@@ -50,7 +50,10 @@ for _, t in tags do
 		employers += 1
 		check(`employer {t.id} says EMPLOYER`, t.sub == "EMPLOYER", t.sub)
 	end
-	if kinds[t.id] == "shop" then
+	local kiosk = Map.Shops[t.id] and Map.Shops[t.id].radius -- (6.6: ZDC Bags, a kiosk: near from its own radius)
+	if kinds[t.id] == "shop" and kiosk then
+		shopsNear = shopsNear and t.near == kiosk and t.far > t.near and t.sub ~= nil
+	elseif kinds[t.id] == "shop" then
 		shopsNear = shopsNear and t.near == L.SHOP_NEAR and t.far == L.SHOP_FAR and t.sub ~= nil
 	else
 		shopsNear = shopsNear and t.near == L.NEAR and t.far == L.FAR
@@ -60,6 +63,8 @@ end
 check("there are employers", employers > 0)
 check("a shop (its block's centre) is near from SHOP_NEAR, the rest from NEAR", shopsNear)
 check("a shop's front (the road beside its block) is within SHOP_NEAR", Map.Cell / 2 <= L.SHOP_NEAR, Map.Cell / 2)
+local bags = byId.bags
+check("6.6: ZDC Bags says BAGS, near only at its kiosk (not from the spawn)", bags ~= nil and bags.sub == "BAGS" and bags.near < LocationTags.distance(bags, 0, 26), bags and bags.near)
 local garage = byId.garage_rented
 check("a garage says GARAGE", garage ~= nil and garage.sub == "GARAGE", garage and garage.sub)
 check("an office tower says OFFICES", byId.dispatchtower ~= nil and byId.dispatchtower.sub == "OFFICES")

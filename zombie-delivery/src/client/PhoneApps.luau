@@ -17,7 +17,7 @@
 --            line "ZDC RIDE · nearest dock N studs" (shared/RentalDocks.luau) with 📍 GPS (MapView.setWaypoint).
 --   KEYS     the settings' list of every key.
 -- 6.5, the phone's six home tiles (client/Phone.luau):
---   BAG & ITEMS  the I window's tabs in the phone: 🎒 BAG (during a run: BagUi.render), ITEMS (your consumables, how
+--   BAG & ITEMS  the I window's tabs in the phone: 🛍 BAG (during a run: BagUi.render), ITEMS (your consumables, how
 --            many, their key in the bottom bar and USE: the same path as the bar, Hotbar.onUse) and BAGS (BagUi.bags:
 --            the bags you own, USE). PhoneApps.bagTab keeps the tab (nil: BAG during a run, else ITEMS).
 --   SHOPS    SHOP's list of the shops (Map.Shops) and what each sells; a tap sets the GPS there (host.gps), puts the
@@ -29,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Economy = require(Shared.Economy) -- 6.7: the car-only items
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
@@ -287,8 +288,8 @@ end
 
 -- ── BAG ────────────────────────────────────────────────────────────────────
 
--- 6.5: BAG & ITEMS, the I window's tabs (🎒 BAG during a run, ITEMS, BAGS) in a row of square tab buttons.
-local BAG_TABS: { { string } } = { { "bag", "🎒 BAG" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
+-- 6.5: BAG & ITEMS, the I window's tabs (🛍 BAG during a run, ITEMS, BAGS) in a row of square tab buttons.
+local BAG_TABS: { { string } } = { { "bag", "🛍 BAG" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
 
 local function bagTabs(list: Instance, current: string, running: boolean, host: Host)
 	local row = Ui.make("Frame", { Name = "Tabs", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 1 }, list)
@@ -330,15 +331,21 @@ local function bagTabs(list: Instance, current: string, running: boolean, host: 
 end
 
 -- ITEMS: your consumables (Config.Items), how many, the key in the bottom bar, USE (Hotbar.onUse: the HUD's own
--- useItem, the UseItem remote with your aim).
+-- useItem, the UseItem remote with your aim). 6.7: a car-only item without a car only while you have some.
 local function items(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean, order: number)
 	local Hotbar = require(script.Parent.Hotbar)
 	local state = host.state()
 	local have = if type(state) == "table" and type(state.items) == "table" then state.items else {}
 	local left, right = PhoneApps.columns(list, order, wide)
+	local cars = if type(state) == "table" and type(state.cars) == "table" then state.cars else nil
+	local shown = 0
 	for index, def in Config.Items do
 		local count = tonumber(have[def.id]) or 0
-		local b = look.block(if index % 2 == 1 then left else right, order + index)
+		if count <= 0 and not Economy.itemShown(def, cars) then
+			continue -- 6.7: a car item without a car (one you have still shows)
+		end
+		shown += 1
+		local b = look.block(if shown % 2 == 1 then left else right, order + index)
 		look.row2(b, `{def.icon}  {string.upper(def.name)}`, `×{count}`, 1, true)
 		local slot = if count > 0 then Hotbar.slotOf(def.id) else nil
 		look.meta(b, `{def.description}{if slot and not Ui.touchLayout() then ` Key {slot}.` else ""}`, 2)
@@ -367,7 +374,7 @@ function PhoneApps.bag(list: Instance, look: OrdersUi.Kit, host: Host, wide: boo
 	bagTabs(list, tab, running, host)
 	if tab == "bag" then
 		local n = BagUi.render(list, job, 2)
-		look.meta(list, `Pieces ride where they fit: your hands, the backpack, the bike's rack, the car.{if Ui.touchLayout() then "" else " The I key opens the bag too."}`, n + 1)
+		look.meta(list, `Pieces ride where they fit: your hands, your bag, your bike's bag, the car.{if Ui.touchLayout() then "" else " The I key opens the bag too."}`, n + 1) -- (6.6)
 	elseif tab == "bags" then
 		BagUi.bags(list, host.state(), 2)
 	else
@@ -377,13 +384,16 @@ end
 
 -- ── 6.5: SHOP's list of the shops ─────────────────────────────────────────
 
--- The shops (Map.Shops ids) in the order a new courier needs them, with what they sell.
+-- The shops (Map.Shops ids) in the order a new courier needs them, with what they sell. 6.6: ZDC Bags first (the
+-- depot's bag kiosk, by the spawn); Last Stop Supplies keeps the vests and the items. 6.7: what each really sells
+-- (Lead & Co. the gun upgrades and the bat too; Wrench Garage the stages, the car upgrades, gear and paint).
 local SHOPS: { { id: string, icon: string, sells: string } } = {
-	{ id = "supplies", icon = "🛒", sells = "Bags, vests, medkits, items" },
-	{ id = "guns", icon = "🔫", sells = "Guns, from a pistol up" },
-	{ id = "bikes", icon = "🚲", sells = "Bikes, scooters, bike gear" },
-	{ id = "dealer", icon = "🚗", sells = "Cars and vans" },
-	{ id = "mechanic", icon = "🔧", sells = "Upgrades, repairs, car guns" },
+	{ id = "bags", icon = "🛍️", sells = "Bags (sprint with your deliveries)" },
+	{ id = "supplies", icon = "🛒", sells = "Items, vests, running shoes" },
+	{ id = "guns", icon = "🔫", sells = "Guns, gun upgrades, a baseball bat" },
+	{ id = "bikes", icon = "🚲", sells = "Bikes, the E-Scooter, bike gear" },
+	{ id = "dealer", icon = "🚗", sells = "Cars, vans and trucks" },
+	{ id = "mechanic", icon = "🔧", sells = "Stages, car upgrades, gear, paint, car guns, repairs" },
 }
 
 -- Draws the list at `order` in the SHOP app: a row a shop (its icon, name, what it sells, "📍 GPS"); a tap sets the
@@ -538,7 +548,7 @@ local KEYS: { { string } } = {
 	{ "F", "Fire" },
 	{ "1 / 2 / 3", "Hold: fists, bag, gun" },
 	{ "B", "Holster, draw" },
-	{ "V", "Punch, strike" },
+	{ "V", "Punch (the bat once bought), strike" },
 	{ "Y", "Take a road offer" },
 	{ "X", "Throw (at a door)" },
 	{ "4 – 8", "Items" },

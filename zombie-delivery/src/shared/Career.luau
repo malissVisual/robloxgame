@@ -18,7 +18,7 @@
 -- "carId:stage", `car` its car id), gear (Config.Gear), gun, cargun, campaign (shared/Missions.luau), garage, estate
 -- (homes and offices). Level 1 lists what you start with (the Pistol, the first jobs).
 -- 5.0, the career starts on foot: foot (the ON FOOT runs of the board, Config.Jobs.Foot), kit (personal gear,
--- Config.Kit: the backpacks, the running shoes …). 5.1: bike (a bike of Config.Cars at its level, "at Spoke & Chain";
+-- Config.Kit: the bags, the running shoes …). 5.1: bike (a bike of Config.Cars at its level, "at Spoke & Chain";
 -- before Config.Cars has one, a line "Bikes at Spoke & Chain" at BIKE_LEVEL); the bike gear is gear.
 
 local Config = require(script.Parent.Config)

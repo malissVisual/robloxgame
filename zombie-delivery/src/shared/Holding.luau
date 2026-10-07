@@ -25,10 +25,13 @@
 --                                              6.4: "back" for a bag that stays on you (Config.Kit stays: the tote,
 --                                              the messenger, the duffel swing onto your back, their pieces with you)
 --   Holding.wornAs(hand, carry, stays, seated)  6.4: where the bag shows: "hand" | "shoulder" | "hip" | "back" | nil
---   Holding.packRoom(total, bagRoom, bagHeld)  the room over the hands that is yours now: the backpack's (and a bike's
---                                              rack, a round's satchel), the bag's only while you hold it
---   Holding.place(bagHeld, inBag, bagRoom, fits)  where a piece put in the pack goes: "bag" (held, room, it fits a bag)
---                                              or "pack"
+--   Holding.bikeNear(seated, distance, reach)  6.6: is your bike's own bag within reach: you sit on it, or it stands
+--                                              `distance` studs from you, no more than `reach` (Config.Cargo.BikeReach);
+--                                              nil distance: no bike out
+--   Holding.place(light, bikeNear, bikeFree, bagHeld, bagFree)  6.6: where a piece you pick up goes: "bike" (a light
+--                                              piece, the bike within reach with room on it), else "bag" (a light
+--                                              piece, the bag in your hand with room in it), else "hands". A heavy
+--                                              piece only ever the hands. (6.6: no backpack, one carrying item)
 --   Holding.throwText(ready, door, far, fragile, range)  pressing X: nil = aim, else the toast. `ready` the server's
 --                                              ThrowReady ("piece" | "fragile" | nil: what you could throw anywhere),
 --                                              `door` a home's door for it (ThrowTo), `far` farther than `range`,
@@ -39,9 +42,9 @@ local Holding = {}
 Holding.Order = { "fists", "bag", "gun" }
 
 local WHY: { [string]: string } = {
-	nobag = "No bag yet: Last Stop Supplies sells the plastic bag.",
+	nobag = "No bag yet: ZDC Bags at the depot sells them.", -- (6.6: the bag kiosk by the spawn)
 	bagdown = "Your bag is on the ground where you set it down: go back and pick it up (E).",
-	nogun = "No gun yet: Lead & Co. sells a pistol. Till then, your fists.",
+	nogun = "No gun in your hands yet: Lead & Co. sells guns. Till then, your fists.", -- (6.7: the pistol is every courier's, not sold)
 	seated = "Get out first.",
 	busy = "Your hands are full: put it down (G) first.",
 }
@@ -121,13 +124,22 @@ function Holding.wornAs(hand: string, carry: string?, stays: boolean?, seated: b
 	return if stays then "back" else nil
 end
 
-function Holding.packRoom(total: number, bagRoom: number, bagHeld: boolean): number
-	local bag = math.clamp(math.floor(bagRoom), 0, math.max(0, math.floor(total)))
-	return math.max(0, math.floor(total) - (if bagHeld then 0 else bag))
+function Holding.bikeNear(seated: boolean, distance: number?, reach: number): boolean
+	if seated then
+		return true
+	end
+	return distance ~= nil and distance == distance and distance <= reach
 end
 
-function Holding.place(bagHeld: boolean, inBag: number, bagRoom: number, fits: boolean): string
-	return if bagHeld and fits and inBag < bagRoom then "bag" else "pack"
+function Holding.place(light: boolean, bikeNear: boolean, bikeFree: number, bagHeld: boolean, bagFree: number): string
+	if not light then
+		return "hands"
+	elseif bikeNear and bikeFree > 0 then
+		return "bike"
+	elseif bagHeld and bagFree > 0 then
+		return "bag"
+	end
+	return "hands"
 end
 
 function Holding.throwText(ready: string?, door: boolean, far: boolean, fragile: boolean, range: number): string?

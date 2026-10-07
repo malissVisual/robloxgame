@@ -347,6 +347,10 @@ local function onKiosk(player: Player)
 	if not def or not profile then
 		return
 	end
+	if not Economy.itemShown(def, profile.cars) then
+		notice:FireClient(player, "Jerry cans are for a car: you don't have one yet.") -- 6.7 (Config.Items car)
+		return
+	end
 	if (profile.items[def.id] or 0) >= def.max then
 		notice:FireClient(player, `You carry {def.max} jerry cans already.`)
 		return
@@ -356,7 +360,7 @@ local function onKiosk(player: Player)
 		return
 	end
 	PlayerData.addItem(player, def.id, 1)
-	notice:FireClient(player, `Jerry can bought: +{Tuning.CanLitres} L. Use it next to your car (key 6).`)
+	notice:FireClient(player, `Jerry can bought: +{Tuning.CanLitres} L. Use it next to your car (the bottom bar).`) -- (6.7: its key moves with the bar)
 end
 
 -- ── The tow ────────────────────────────────────────────────────────────────

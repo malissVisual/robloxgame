@@ -17,7 +17,7 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 local J = Config.Juice
-local KINDS = { "wave", "give", "take", "knock", "bag", "throw", "vest" } -- (6.0: bag, throw, vest)
+local KINDS = { "wave", "give", "take", "knock", "bag", "throw", "vest", "receive" } -- (6.0: bag, throw, vest; 6.7: receive)
 
 for _, kind in KINDS do
 	local total = Gestures.seconds(kind)
@@ -82,6 +82,39 @@ for i = 0, 300 do
 end
 check("three knocks", taps == 3, taps)
 check("the knocks fit in the gesture", J.KnockGap * 3 <= J.Gestures.knock)
+
+-- 6.7, items in the hand: the receiver holds what was handed over, the bag's dip, the throw's wind-up.
+local H = Config.Courier.HandItem
+local receive = Gestures.pose("receive", 0.6) :: Gestures.Pose
+check("the receiver holds it in both hands (mirrored)", receive.rs[1] == receive.ls[1] and receive.rs[2] == -receive.ls[2] and receive.re[1] > give.re[1])
+check("the receiver's gesture lasts the hand-over: from Lead before it comes to the end of Pass", J.Gestures.receive >= H.Lead + H.Pass + 0.15
+	and Gestures.weight("receive", H.Lead + 0.05) > 0.8 and Gestures.weight("receive", H.Lead + H.Pass - 0.05) > 0.8)
+check("the giver holds it out the whole reach", J.Gestures.give >= H.Reach and Gestures.weight("give", H.Reach * 0.6) > 0.99)
+check("give, take, receive: the hands closer than a body apart (a box between them)", give.rs[2] >= 15 and take.rs[2] >= 12 and receive.rs[2] >= 12)
+local deepest, deepAt = -1, 0
+for i = 0, 100 do
+	local t = J.Gestures.bag * i / 100
+	local _, dip = Gestures.bagMove(t)
+	if dip > deepest then
+		deepest, deepAt = dip, t
+	end
+end
+check("the bag gesture dips into the bag when the piece goes in (HandItem.BagIn)", math.abs(deepAt - H.BagIn) <= 0.01 and H.BagIn < J.Gestures.bag, deepAt)
+check("the bag gesture is half a second", J.Gestures.bag >= 0.45 and J.Gestures.bag <= 0.6)
+local bagBody = Gestures.body("bag", H.BagIn) :: Gestures.Pose
+check("… and the head looks down at it", bagBody.neck[1] < -15 and bagBody.waist[1] < 0)
+local W = Config.Throw.WindUp
+local wound = (Gestures.pose("throw", W - 0.05) :: Gestures.Pose).rs[1]
+local released = (Gestures.pose("throw", W) :: Gestures.Pose).rs[1]
+local through = (Gestures.pose("throw", W + 0.08) :: Gestures.Pose).rs[1]
+check("the throw winds up until just before WindUp (the arm back over the shoulder)", wound > 160, wound)
+check("… whips through WindUp (the release: the arm coming forward over the shoulder)", released < wound and released > through and released > 110, released)
+check("… and follows through", through < 100, through)
+check("the wind-up about 0.18 s, within the gesture", W >= 0.12 and W <= 0.25 and W < J.Gestures.throw - 0.15)
+local twistBack = (Gestures.body("throw", W - 0.05) :: Gestures.Pose).waist[2]
+local twistThrough = (Gestures.body("throw", J.Gestures.throw - 0.05) :: Gestures.Pose).waist[2]
+check("the throw turns the torso back, then through", twistBack < -15 and twistThrough > 10, `{twistBack} {twistThrough}`)
+check("no body for the arms' own gestures", Gestures.body("wave", 0.3) == nil and Gestures.body("knock", 0.1) == nil)
 
 -- The Juice numbers.
 check("volumes within 0..1", J.StepVolume <= 1 and J.BikeVolume <= 1 and J.ScooterVolume <= 1 and J.ZipVolume <= 1 and J.BusVolume <= 1
