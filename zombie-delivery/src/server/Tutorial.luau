@@ -386,6 +386,38 @@ local function gunCheck(player: Player)
 	notice:FireClient(player, `📱 Marge: {words}`)
 end
 
+-- 6.0.1: Marge about the plastic bag (Kit "bag"): once a player with the phone and the first day behind them has its
+-- price and no bag, she texts them about Last Stop Supplies with the shop on the GPS. Once a session; before the pistol.
+local bagTold: { [Player]: boolean } = {}
+
+local function bagCheck(player: Player): boolean
+	local profile = PlayerData.get(player)
+	if bagTold[player] or bikeLevels[player] == nil or not profile or not profile.tutorial or not profile.phone then
+		return false
+	end
+	local bag: Config.KitDef? = nil
+	for _, def in Config.Kit do
+		if def.id == "bag" then
+			bag = def
+		end
+	end
+	if not bag or (profile.kit :: any)[bag.id] == true or profile.money < bag.price then
+		return false
+	end
+	bagTold[player] = true
+	local shop = Map.Shops.supplies
+	local words = string.gsub(Config.Arms.BagTip, "{price}", `${bag.price}`)
+	remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "supplies" } })
+	notice:FireClient(player, `📱 Marge: {words}`)
+	return true
+end
+
+local function tips(player: Player)
+	if not bagCheck(player) then
+		gunCheck(player)
+	end
+end
+
 -- PLAY was pressed (Main may call this from its Play handler; without it the arriving car tells the same).
 function Tutorial.onPlay(player: Player)
 	local session = sessions[player]
@@ -396,7 +428,7 @@ function Tutorial.onPlay(player: Player)
 	local profile = PlayerData.get(player)
 	local level = if profile then Levels.levelFor(profile.xp) else 1
 	bikeLevels[player] = level
-	task.delay(BIKE_DELAY + 4, gunCheck, player) -- 6.0: the pistol's price in your pocket already, no gun: her text
+	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0: the bag's (6.0.1) or the pistol's price in your pocket, none owned: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
 		task.delay(BIKE_DELAY, function()
 			if player.Parent and not ownsBike(player) then
@@ -429,9 +461,10 @@ function Tutorial.start()
 		talked[player] = nil
 		bikeLevels[player] = nil
 		gunTold[player] = nil
+		bagTold[player] = nil
 	end)
 	PlayerData.Changed:Connect(bikeCheck) -- 5.1: Marge about Spoke & Chain
-	PlayerData.Changed:Connect(gunCheck) -- 6.0: Marge about the pistol
+	PlayerData.Changed:Connect(tips) -- 6.0: Marge about the pistol (6.0.1: the bag first)
 	for _, player in Players:GetPlayers() do
 		track(player)
 	end

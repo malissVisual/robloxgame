@@ -5,7 +5,7 @@
 -- `carried`, server/Jobs.luau), and over them the room you have: the hands, the backpack (or a round's satchel), the
 -- rack. It is the BAG tab of the I window (client/Hud.luau draws it with BagUi.render); the phone's ORDERS app
 -- (🎒 BAG) and the contract ticket's chip ("🎒 2 newspapers · 1 pizza stack", Bag.line) open it (BagUi.open: Hud sets
--- BagUi.onOpen). Presentation only: the server decides what you carry.
+-- BagUi.onOpen; 6.0.1: the bottom bar's carried strip too). Presentation only: the server decides what you carry.
 -- 5.8, the courier phone's look (the bag draws in the phone's BAG app too): the head is a slim row with the phone's
 -- tag line (the red square and caps) over the room in big type; the groups are the phone's section labels.
 
@@ -56,6 +56,11 @@ local EMOJI: { [string]: string } = {
 	gadget = "📻",
 	documents = "💼",
 }
+
+-- 6.0.1: a piece's emoji when its icon has no id yet (the bottom bar's carried strip, client/Hotbar.luau, too).
+function BagUi.emoji(look: string?): string
+	return if look then EMOJI[look] or "📦" else "📦"
+end
 
 local function capital(text: string): string
 	return string.upper(string.sub(text, 1, 1)) .. string.sub(text, 2)

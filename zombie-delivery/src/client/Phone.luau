@@ -3,21 +3,25 @@
 -- Q / gamepad down opens it after Marge gives it. The same server-authoritative orders, messages, board,
 -- career, shopping GPS, bike/car switch, tow and PhoneHold lifecycle remain in use. Home shows the live focused
 -- contract and eight apps; ORDERS adds a discovered-only road preview. BANK displays existing cash (no banking
--- transactions); SETTINGS uses the existing sound cycle. Both screens scroll; short viewports use a shorter
--- device and wide touch displays turn it sideways. Hardware alone has modest corner rounding.
+-- transactions); SETTINGS uses the existing sound cycle. Home scrolls; short viewports use a slightly smaller,
+-- shorter upright device (it never turns sideways). Hardware alone has modest corner rounding.
 -- PhoneContract draws art, PhoneLayout computes sizing/payload text, PhoneRoute draws the actual route.
 -- No new gameplay remotes, currencies or prices. Phone does not change character joints.
--- 5.5, the HUD MENU in the phone and sideways for the big apps (client/PhoneApps.luau, client/PhoneMotion.luau):
+-- 5.5, the HUD MENU in the phone (client/PhoneApps.luau, client/PhoneMotion.luau):
 --   * The MENU's actions are apps under the first eight: MISSIONS, CREW, TOP, ESTATE (the phone closes and their window
 --     opens: Phone.onMissions / onCrew / onTop / onEstate), BAG (in the phone), GARAGE (BRING MY CAR, MY BIKE, CALL
 --     CAR, TOW). GIVE UP sits at the bottom of ORDERS (a second press within 4 s, CancelJob). SETTINGS lists every key
 --     and the version; BANK adds what you earned since you joined. The HUD's MENU opens the phone once you have one
 --     (Main: Hud.onMenu); before Marge it keeps its list.
---   * BOARD (the job board in the phone: ACCEPT / + ADD ORDER fire AcceptJob; FULL BOARD opens the Dispatch board),
---     CAREER, SHOP (two columns) and BAG turn the phone sideways: the body turns 90° as it moves to the bottom centre
---     (0.28 s), then is built again sideways with the app open; home or a small app turns it back (-90° → 0°). A
---     short screen that holds the phone sideways anyway turns nothing; reduced motion swaps without the turn.
+--   * BOARD: the job board in the phone (ACCEPT / + ADD ORDER fire AcceptJob; FULL BOARD opens the Dispatch board).
 --   * New messages and new boards drop a banner from the top of the open phone (a tap opens MESSAGES or BOARD).
+-- 6.0.1, the owner's wish: the phone never turns sideways (5.5's turn for BOARD / CAREER / SHOP / BAG is gone). Every
+--   app opens in a centred popup over the game (client/PhonePopup.luau: a dim, lightly blurred backdrop, a ZDC panel
+--   with Ui.window's header, the app in a scrolling body; it grows from the tapped tile). The phone stays at its place
+--   under the backdrop, on its home screen; closing the app (✕, the backdrop, Q, ESC, gamepad B) returns to it, and Q /
+--   ESC / B again put the phone away. A wide popup shows BOARD, CAREER and SHOP in two columns. MISSIONS, CREW, TOP,
+--   ESTATE, MAP and FULL BOARD still put the phone away and open their windows. The right-mouse camera
+--   (CameraRig.freeLook, Main) is off while an app is open: the mouse is needed.
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -75,21 +79,21 @@ local TILE = Color3.fromRGB(27, 31, 37)
 local TILE_HOVER = Color3.fromRGB(40, 45, 53)
 
 type Message = { from: string, text: string, time: string, unread: boolean, kind: string }
--- 5.5: `wide` turns the phone sideways; `window` opens a window of its own (the phone closes first).
-type AppDef = { id: string, name: string, glyph: string, wide: boolean?, window: boolean? }
+-- 5.5: `window` opens a window of its own (the phone closes first); the others open in the popup (6.0.1).
+type AppDef = { id: string, name: string, glyph: string, window: boolean? }
 
 local APPS: { AppDef } = {
 	{ id = "orders", name = "Orders", glyph = "📦" },
-	{ id = "board", name = "Board", glyph = "📋", wide = true },
-	{ id = "career", name = "Career", glyph = "🎖", wide = true },
-	{ id = "shop", name = "Shop", glyph = "🛒", wide = true },
+	{ id = "board", name = "Board", glyph = "📋" },
+	{ id = "career", name = "Career", glyph = "🎖" },
+	{ id = "shop", name = "Shop", glyph = "🛒" },
 	{ id = "map", name = "Map", glyph = "🗺️", window = true },
 	{ id = "messages", name = "Messages", glyph = "💬" },
 	{ id = "bank", name = "Bank", glyph = "$" },
 	{ id = "settings", name = "Settings", glyph = "⚙" },
 	-- 5.5: the HUD MENU's actions
 	{ id = "missions", name = "Missions", glyph = "⭐", window = true },
-	{ id = "bag", name = "Bag", glyph = "🎒", wide = true },
+	{ id = "bag", name = "Bag", glyph = "🎒" },
 	{ id = "garage", name = "Garage", glyph = "🚗" },
 	{ id = "crew", name = "Crew", glyph = "👥", window = true },
 	{ id = "top", name = "Top", glyph = "🏆", window = true },
@@ -104,12 +108,11 @@ refs.design = require(script.Parent.PhoneContract)
 refs.layout = require(script.Parent.PhoneLayout)
 refs.routes = require(script.Parent.PhoneRoute)
 refs.apps = require(script.Parent.PhoneApps) -- 5.5: BOARD, BAG, GARAGE, the keys
-refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the turn, the banner
+refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the banner
+refs.popup = require(script.Parent.PhonePopup) -- 6.0.1: the apps' centred popup
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 local isOpen = false
 local app = "home"
-local landscape: boolean? = nil -- the body's shape as built (nil: not built yet)
-local turned = false -- 5.5: sideways for a big app (the screen itself would hold the phone upright)
 local messages: { Message } = {}
 local boardNew = 0 -- runs pushed while the board was closed
 local lastRefreshAt: number? = nil
@@ -247,10 +250,12 @@ local function addMessage(from: string, text: string, kind: string, unread: bool
 	if isOpen and (app == "messages" or app == "home") then
 		renderApp()
 	end
-	-- 5.5: a banner drops from the top of the open phone (a tap opens BOARD for a new board, else MESSAGES).
+	-- 5.5: a banner drops from the top of the open phone (a tap opens BOARD for a new board, else MESSAGES); 6.0.1: from
+	-- the top of the open app's popup.
 	local target = if kind == "board" then "board" else "messages"
-	if isOpen and unread and app ~= target and refs.screen and not refs.turning then
-		refs.motion.banner(refs.screen, refs.statusH or 30, from, text, function()
+	if isOpen and unread and app ~= target and refs.screen then
+		local panel = refs.popup.panel()
+		refs.motion.banner(panel or refs.screen, if panel then 0 else refs.statusH or 30, from, text, function()
 			setApp(target)
 		end)
 	end
@@ -695,12 +700,12 @@ local function ordersApp(list: Instance)
 	end
 end
 
-local function careerApp(list: Instance)
+local function careerApp(list: Instance, wide: boolean)
 	local xp = myXp()
 	local level = myLevel()
 	local road = Career.road()
-	-- 5.5, sideways: the current level on the left, the next steps on the right.
-	local here, ahead = refs.apps.columns(list, 1, landscape == true)
+	-- 5.5, a wide popup (6.0.1): the current level on the left, the next steps on the right.
+	local here, ahead = refs.apps.columns(list, 1, wide)
 	look.section(here, "Dead End Dispatch · your career", 1)
 	local b = block(here, 2, true)
 	text(b, string.upper(Levels.rank(level)), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Font = Theme.DisplayFont, TextSize = 22 })
@@ -808,10 +813,10 @@ local function shopHeader(parent: Instance, order: number, shopId: string, title
 	gps.AnchorPoint = Vector2.new(1, 1)
 end
 
-local function shopApp(list: Instance)
+local function shopApp(list: Instance, wide: boolean)
 	local level = myLevel()
-	-- 5.5, sideways: what's next and the kit on the left, the bikes and the vehicles on the right.
-	local gear, rides = refs.apps.columns(list, 1, landscape == true)
+	-- 5.5, a wide popup (6.0.1): what's next and the kit on the left, the bikes and the vehicles on the right.
+	local gear, rides = refs.apps.columns(list, 1, wide)
 	local top = block(gear, 1, true)
 	caps(top, "What's next", 1, K.red).TextSize = 11
 	local chips = look.chipRow(top, 2)
@@ -938,11 +943,14 @@ end
 
 -- ── Building ───────────────────────────────────────────────────────────────
 
-local function launch(id: string)
-	if refs.turning then
-		return
-	end
+-- 6.0.1: `from` (the tapped tile or card) is where the app's popup grows from.
+local function launch(id: string, from: GuiObject?)
 	click()
+	if from then
+		local at, size = from.AbsolutePosition, from.AbsoluteSize
+		refs.from = Vector2.new(at.X + size.X / 2, at.Y + size.Y / 2)
+		refs.lastTile = from
+	end
 	if id == "board" then
 		boardNew = 0
 		refreshBadges()
@@ -1021,7 +1029,7 @@ local function tile(parent: Instance, def: AppDef, order: number): any
 	})
 	tiles[def.id] = badge
 	cell.Activated:Connect(function()
-		launch(def.id)
+		launch(def.id, cell)
 	end)
 	return cell
 end
@@ -1102,7 +1110,7 @@ local function homeWidgets(parent: Instance)
 		return false
 	end
 	refs.homeContract = refs.design.card(parent, function()
-		launch(if job then "orders" else "board")
+		launch(if job then "orders" else "board", refs.homeContract.hit)
 	end, 3)
 	-- The newest unread message, like a notification (a tap opens MESSAGES).
 	local note = Ui.make("TextButton", {
@@ -1125,8 +1133,7 @@ local function homeWidgets(parent: Instance)
 	Ui.make("UISizeConstraint", { MaxSize = Vector2.new(math.huge, 64) }, refs.noteText)
 	refs.note = note
 	note.Activated:Connect(function()
-		click()
-		setApp("messages")
+		launch("messages", note)
 	end)
 end
 
@@ -1168,8 +1175,9 @@ local function fillHome()
 	end
 end
 
--- The phone: its body, the screen, the status bar, the home screen and the app screen. Built again when it turns.
-local function buildBody(sideways: boolean)
+-- The phone: its body, the screen, the status bar and the home screen (6.0.1: always upright; the apps open in the
+-- popup, client/PhonePopup.luau).
+local function buildBody()
 	local made = gui :: ScreenGui
 	refs.route = nil
 	refs.spareRoute = nil
@@ -1178,7 +1186,6 @@ local function buildBody(sideways: boolean)
 	end
 	table.clear(tiles)
 	refs.idMoney = nil
-	landscape = sideways
 	local size = refs.fit or refs.layout.fit(1150, 680, false, 1)
 	local body = Ui.make("Frame", {
 		Name = "Phone",
@@ -1192,16 +1199,10 @@ local function buildBody(sideways: boolean)
 	Ui.corner(body, 18)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = BODY_EDGE, Thickness = 1.5 }, body)
 	refs.scale = Ui.make("UIScale", {}, body)
-	-- The side keys (power on the right, the volume on the left; on their long edges when sideways).
-	local keyColor = BODY_EDGE
-	if sideways then
-		Ui.make("Frame", { Size = UDim2.fromOffset(46, 3), Position = UDim2.new(0, 70, 0, -3), BackgroundColor3 = keyColor, BorderSizePixel = 0 }, body)
-		Ui.make("Frame", { Size = UDim2.fromOffset(60, 3), Position = UDim2.new(1, -150, 1, 0), BackgroundColor3 = keyColor, BorderSizePixel = 0 }, body)
-	else
-		Ui.make("Frame", { Size = UDim2.fromOffset(3, 60), Position = UDim2.new(1, 0, 0, 120), BackgroundColor3 = keyColor, BorderSizePixel = 0 }, body)
-		Ui.make("Frame", { Size = UDim2.fromOffset(3, 36), Position = UDim2.new(0, -3, 0, 100), BackgroundColor3 = keyColor, BorderSizePixel = 0 }, body)
-		Ui.make("Frame", { Size = UDim2.fromOffset(3, 36), Position = UDim2.new(0, -3, 0, 144), BackgroundColor3 = keyColor, BorderSizePixel = 0 }, body)
-	end
+	-- The side keys (power on the right, the volume on the left).
+	Ui.make("Frame", { Size = UDim2.fromOffset(3, 60), Position = UDim2.new(1, 0, 0, 120), BackgroundColor3 = BODY_EDGE, BorderSizePixel = 0 }, body)
+	Ui.make("Frame", { Size = UDim2.fromOffset(3, 36), Position = UDim2.new(0, -3, 0, 100), BackgroundColor3 = BODY_EDGE, BorderSizePixel = 0 }, body)
+	Ui.make("Frame", { Size = UDim2.fromOffset(3, 36), Position = UDim2.new(0, -3, 0, 144), BackgroundColor3 = BODY_EDGE, BorderSizePixel = 0 }, body)
 	local screen = Ui.make("Frame", {
 		Name = "Screen",
 		Size = UDim2.new(1, -BEZEL * 2, 1, -BEZEL * 2),
@@ -1212,7 +1213,7 @@ local function buildBody(sideways: boolean)
 	}, body)
 	Ui.corner(screen, 12)
 	refs.screen = screen
-	local STATUS_H = if sideways then 24 else 30
+	local STATUS_H = 30
 	refs.statusH = STATUS_H
 	statusBar(screen, STATUS_H)
 	-- The NEW PHONE ribbon (the moment Marge gives it).
@@ -1221,7 +1222,7 @@ local function buildBody(sideways: boolean)
 	refs.ribbon.Position = UDim2.new(0.5, 0, 0, STATUS_H + 2)
 	refs.ribbon.ZIndex = 6
 	refs.ribbon.Visible = false
-	-- The home bar at the bottom: home from an app; on the home screen it puts the phone away.
+	-- The home bar at the bottom: it puts the phone away (6.0.1: the apps close in their popup).
 	local homeBar = Ui.make("TextButton", {
 		Name = "HomeBar",
 		Size = UDim2.new(0, 196, 0, 54),
@@ -1245,11 +1246,7 @@ local function buildBody(sideways: boolean)
 	end)
 	homeBar.Activated:Connect(function()
 		click()
-		if app == "home" then
-			Phone.close()
-		else
-			setApp("home")
-		end
+		Phone.close()
 	end)
 	refs.homeBar = homeBar
 	local BOTTOM = 56
@@ -1262,7 +1259,7 @@ local function buildBody(sideways: boolean)
 	}, screen)
 	refs.home = home
 	local widgets = Ui.make("Frame", {
-		Name = "Widgets", Size = UDim2.new(if sideways then .48 else 1, if sideways then -8 else -4, 0, 0),
+		Name = "Widgets", Size = UDim2.new(1, -4, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	}, home)
 	Ui.list(widgets, true, 8)
@@ -1270,10 +1267,9 @@ local function buildBody(sideways: boolean)
 	homeWidgets(widgets)
 	local grid = Ui.make("Frame", {
 		-- (5.5: four to a row, as many rows as the apps need; home scrolls)
-		Name = "Apps", Size = UDim2.new(if sideways then .52 else 1, if sideways then -8 else 0, 0, math.ceil(#APPS / 4) * 96 - 8),
-		Position = if sideways then UDim2.new(.48, 8, 0, 6) else UDim2.new(),
+		Name = "Apps", Size = UDim2.new(1, 0, 0, math.ceil(#APPS / 4) * 96 - 8),
 		BackgroundTransparency = 1, LayoutOrder = 5,
-	}, if sideways then home else widgets)
+	}, widgets)
 	Ui.make("UIGridLayout", {
 		CellSize = UDim2.new(.25, -6, 0, 88), CellPadding = UDim2.fromOffset(8, 8), FillDirectionMaxCells = 4,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder,
@@ -1282,81 +1278,13 @@ local function buildBody(sideways: boolean)
 		local cell = tile(grid, def, order)
 		if order == 1 then refs.firstTile = cell end
 	end
-	-- The app screen: a square back action, left-aligned title, hairline, and the
-	-- scrolling list under it (Y only, its canvas sized by the content, clear of the home bar at the bottom).
-	local appFrame = Ui.make("Frame", { Name = "App", Size = UDim2.new(1, 0, 1, -(STATUS_H + BOTTOM)), Position = UDim2.fromOffset(0, STATUS_H), BackgroundTransparency = 1, Visible = false }, screen)
-	refs.app = appFrame
-	local HEADER = 58
-	local header = Ui.make("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, HEADER), BackgroundTransparency = 1 }, appFrame)
-	local back = Ui.make("TextButton", {
-		Name = "Back",
-		Size = UDim2.fromOffset(54, 54),
-		Position = UDim2.new(0, 4, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = SCREEN,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "‹",
-		Font = Theme.HeadingFont,
-		TextSize = 26,
-		TextColor3 = K.text,
-		ZIndex = 2,
-	}, header)
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, back)
-	Ui.make("UIPadding", { PaddingBottom = UDim.new(0, 3) }, back) -- (the chevron sits a little high in its line)
-	local function backLit(on: boolean)
-		back.BackgroundColor3 = if on then TILE_HOVER else TILE
-	end
-	back.MouseEnter:Connect(function()
-		backLit(true)
-	end)
-	back.MouseLeave:Connect(function()
-		backLit(false)
-	end)
-	back.SelectionGained:Connect(function()
-		backLit(true)
-	end)
-	back.SelectionLost:Connect(function()
-		backLit(false)
-	end)
-	back.Activated:Connect(function()
-		click()
-		setApp("home")
-	end)
-	refs.back = back
-	refs.appTitle = P.text(header, "", UDim2.new(1, -120, 1, 0), {
-		Position = UDim2.fromOffset(62, 0),
-		Font = Theme.HeadingFont,
-		TextSize = 17,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextStrokeTransparency = 1,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	Ui.make("Frame", { Name = "Hairline", Size = UDim2.new(1, 0, 0, 1), Position = UDim2.fromOffset(0, HEADER), BackgroundColor3 = K.line, BackgroundTransparency = 0.75, BorderSizePixel = 0 }, appFrame)
-	local list = Ui.make("ScrollingFrame", {
-		Name = "List",
-		Size = UDim2.new(1, 0, 1, -(HEADER + 1)),
-		Position = UDim2.fromOffset(0, HEADER + 1),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ScrollingDirection = Enum.ScrollingDirection.Y,
-		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = K.line,
-		ScrollBarImageTransparency = 0.3,
-		VerticalScrollBarInset = Enum.ScrollBarInset.None,
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		CanvasSize = UDim2.new(),
-		ClipsDescendants = true,
-	}, appFrame)
-	Ui.list(list, true, 8)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 20) }, list)
-	refs.list = list
 end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
 local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG", garage = "GARAGE" }
 
+-- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
 renderApp = function()
 	if not refs.body then
 		return
@@ -1374,40 +1302,37 @@ renderApp = function()
 		end
 	end
 	OrdersUi.clear()
-	local home = app == "home"
-	refs.home.Visible = home
-	refs.app.Visible = not home
-	refs.homeBar.Text = if home then "CLOSE" else "HOME"
-	if home then
+	if app == "home" then
+		refs.popup.hide()
 		fillHome()
-		Ui.gamepadFocus(refs.firstTile)
+		local back = refs.lastTile
+		Ui.gamepadFocus(if back and back.Parent and back.Visible then back else refs.firstTile)
 		return
 	end
-	refs.appTitle.Text = APP_TITLES[app] or string.upper(app)
-	Ui.clear(refs.list)
-	refs.list.CanvasPosition = Vector2.zero
+	local list, wide = refs.popup.show(app, APP_TITLES[app] or string.upper(app), refs.from)
+	refs.from = nil
 	local ok, err = pcall(function()
 		if app == "orders" then
-			ordersApp(refs.list)
+			ordersApp(list)
 		elseif app == "career" then
-			careerApp(refs.list)
+			careerApp(list, wide)
 		elseif app == "shop" then
-			shopApp(refs.list)
+			shopApp(list, wide)
 		elseif app == "messages" then
-			messagesApp(refs.list)
+			messagesApp(list)
 		elseif app == "bank" then
-			local balance = block(refs.list, 1)
+			local balance = block(list, 1)
 			caps(balance, "AVAILABLE CASH", 1)
 			text(balance, Ui.money(money()), UDim2.new(1, 0, 0, 44), { Font = Theme.DisplayFont, TextSize = 32, LayoutOrder = 2 })
 			look.meta(balance, "Your current courier balance. Earn money by completing deliveries.", 3)
 			look.row2(balance, "Earned since you joined", `+{Ui.money(refs.earned or 0)}`, 4, true) -- 5.5
-			button(refs.list, "FIND A DELIVERY", "main", 2, function() launch("board") end)
+			button(list, "FIND A DELIVERY", "main", 2, function() launch("board") end)
 		elseif app == "settings" then
-			local controls = block(refs.list, 1)
+			local controls = block(list, 1)
 			caps(controls, "PHONE CONTROLS", 1)
-			look.meta(controls, if Ui.touchLayout() then "Tap an app to open it. The back arrow returns home; the bottom bar puts the phone away." else "Q opens the phone. T opens the weapon wheel. Hold right mouse to turn the camera while using the phone.", 2)
+			look.meta(controls, if Ui.touchLayout() then "Tap an app to open it. The ✕ or a tap beside it returns to the phone; the bottom bar puts the phone away." else "Q opens the phone; Q, ESC or the ✕ close an app, then the phone. T opens the weapon wheel. Hold right mouse to turn the camera while only the phone is open.", 2)
 			look.meta(controls, "Sound cycles: everything on → music off → all off. The selected mode is shown in the game's notification.", 3)
-			button(refs.list, "CYCLE SOUND MODE", "quiet", 2, function()
+			button(list, "CYCLE SOUND MODE", "quiet", 2, function()
 				local cycle = Phone.onSound -- 5.5 (Main: Sounds.cycle)
 				if cycle then
 					cycle()
@@ -1415,14 +1340,14 @@ renderApp = function()
 					require(script.Parent.Sounds).cycle()
 				end
 			end)
-			button(refs.list, "PUT PHONE AWAY", "main", 3, Phone.close)
-			refs.apps.keys(refs.list, look, 4) -- 5.5: every key, the version
+			button(list, "PUT PHONE AWAY", "main", 3, Phone.close)
+			refs.apps.keys(list, look, 4) -- 5.5: every key, the version
 		elseif app == "board" then
-			refs.apps.board(refs.list, look, refs.host) -- 5.5
+			refs.apps.board(list, look, refs.host, wide) -- 5.5; 6.0.1: two columns in a wide popup
 		elseif app == "bag" then
-			refs.apps.bag(refs.list, look, refs.host)
+			refs.apps.bag(list, look, refs.host)
 		elseif app == "garage" then
-			refs.apps.garage(refs.list, look, refs.host)
+			refs.apps.garage(list, look, refs.host)
 		end
 	end)
 	if refs.spareRoute then
@@ -1432,7 +1357,7 @@ renderApp = function()
 	if not ok then
 		warn(`[Phone] the {app} app failed: {err}`)
 	end
-	Ui.gamepadFocus(refs.back)
+	refs.popup.focus()
 end
 
 -- Can anything in the SHOP app be bought right now (your level, your money)?
@@ -1487,52 +1412,17 @@ refreshBadges = function()
 	end
 end
 
--- The phone's scale and shape for this screen: upright when it is readable so, else sideways (a short touch screen).
-local function fit(): (boolean, number)
+-- The phone's scale for this screen (6.0.1: always upright; a short screen gets a shorter body that scrolls).
+local function fit(): number
 	local screen = Ui.screenSize()
 	local cap = if Ui.touchLayout() then 1 else math.clamp(Ui.screenScale() * 0.95, 0.85, 1)
 	refs.fit = refs.layout.fit(screen.X, screen.Y, Ui.touchLayout(), cap)
-	return refs.fit.sideways, refs.fit.scale
-end
-
--- 5.5: is this a big app (it turns the phone sideways)?
-local function isWide(id: string): boolean
-	for _, def in APPS do
-		if def.id == id then
-			return def.wide == true
-		end
-	end
-	return false
-end
-
--- 5.5: the shape and scale for showing `id`: the screen's own fit, or sideways for a big app (PhoneLayout.sideways)
--- where the phone would stand upright. Sets refs.fit (the body's size) and `turned`.
-local function shapeFor(id: string): (boolean, number)
-	local sideways, scale = fit()
-	turned = false
-	if sideways or not isWide(id) then
-		return sideways, scale
-	end
-	local screen = Ui.screenSize()
-	local cap = if Ui.touchLayout() then 1 else math.clamp(Ui.screenScale() * 0.95, 0.85, 1)
-	refs.fit = refs.layout.sideways(screen.X, screen.Y, Ui.touchLayout(), cap)
-	turned = true
-	return true, refs.fit.scale
+	return refs.fit.scale
 end
 
 -- Where the phone rests (and where it slides from).
 local function restPosition(): (UDim2, UDim2)
-	if landscape then
-		return UDim2.new(0.5, 0, 1, -8), UDim2.new(0.5, 0, 1, 40)
-	end
 	return UDim2.new(1, -24, 1, -16), UDim2.new(1, -24, 1, 40)
-end
-
-local function reducedMotion(): boolean
-	local ok, on = pcall(function()
-		return (GuiService :: any).ReducedMotionEnabled
-	end)
-	return ok and on == true
 end
 
 local function hudOn(): boolean
@@ -1541,73 +1431,9 @@ local function hudOn(): boolean
 	return hud ~= nil and hud:IsA("ScreenGui") and hud.Enabled
 end
 
--- 5.5: the body at rest in its shape at `scale` (no turn left on it), shown while the phone is open.
-local function settle(scale: number)
-	local body = refs.body
-	body.Rotation = 0
-	body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
-	refs.scale.Scale = scale
-	body.AnchorPoint = if landscape then Vector2.new(0.5, 1) else Vector2.new(1, 1)
-	body.Position = (restPosition())
-	body.Visible = isOpen
-end
-
--- 5.5: the phone turns sideways for a big app (forward: the upright body turns 0° → 90° as it moves to the bottom
--- centre, then the sideways body is built with the app open) or back upright for home or a small app (the upright
--- body is built with it, starts at -90° where the sideways one was and turns to 0°).
-local function turn(sideways: boolean, id: string)
-	local made = gui :: ScreenGui
-	local body = refs.body
-	local area = made.AbsoluteSize
-	local at, size0, origin = body.AbsolutePosition, body.AbsoluteSize, made.AbsolutePosition
-	local center = Vector2.new(at.X + size0.X / 2 - origin.X, at.Y + size0.Y / 2 - origin.Y)
-	local was = refs.scale.Scale
-	refs.turning = true
-	local wide, scale = shapeFor(id)
-	local size = refs.fit
-	if sideways and wide then
-		body.AnchorPoint = Vector2.new(0.5, 0.5)
-		body.Position = UDim2.fromOffset(center.X, center.Y)
-		refs.motion.turn(body, refs.scale, 0, 90, UDim2.fromOffset(area.X / 2, area.Y - 8 - size.height * scale / 2), scale, function()
-			refs.turning = false
-			app = id
-			refs.fit = size
-			buildBody(true)
-			settle(scale)
-			renderApp()
-			refreshBadges()
-		end)
-		return
-	end
-	app = id
-	buildBody(wide)
-	local fresh = refs.body
-	fresh.Size = UDim2.fromOffset(size.width, size.height)
-	fresh.AnchorPoint = Vector2.new(0.5, 0.5)
-	fresh.Position = UDim2.fromOffset(center.X, center.Y)
-	fresh.Visible = isOpen
-	refs.scale.Scale = was
-	renderApp()
-	refreshBadges()
-	local rest = if wide
-		then UDim2.fromOffset(area.X / 2, area.Y - 8 - size.height * scale / 2)
-		else UDim2.fromOffset(area.X - 24 - size.width * scale / 2, area.Y - 16 - size.height * scale / 2)
-	refs.motion.turn(fresh, refs.scale, if wide then 0 else -90, 0, rest, scale, function()
-		refs.turning = false
-		if refs.body == fresh then
-			settle(scale)
-		end
-	end)
-end
-
--- Shows an app (or home) in the open phone; 5.5: a big app turns the phone sideways, home or a small app back.
+-- Shows an app (6.0.1: in the centred popup) or home (the popup closes).
 setApp = function(id: string)
-	if not refs.body or refs.turning then
-		return
-	end
-	local wide = isWide(id)
-	if (wide and not landscape) or (turned and not wide) then
-		turn(wide, id)
+	if not refs.body then
 		return
 	end
 	app = id
@@ -1669,6 +1495,24 @@ function Phone.isOpen(): boolean
 	return isOpen
 end
 
+-- 6.0.1: is an app open in its popup over the phone? (Main: no right-mouse camera then, the mouse is needed.)
+function Phone.appOpen(): boolean
+	return isOpen and refs.popup.isOpen()
+end
+
+-- 6.0.1: Q, ESC and the gamepad's B: an open app closes first (back to the phone's home), then the phone. (ESC can
+-- arrive twice, as the Roblox menu and as the key: the menu that just closed an app leaves the phone open.)
+function Phone.back()
+	if not isOpen then
+		return
+	end
+	if refs.popup.isOpen() then
+		setApp("home")
+	elseif os.clock() - (refs.menuAt or -1) > 0.3 then
+		Phone.close()
+	end
+end
+
 -- 5.5: does the player have the phone (Marge gave it)? The HUD's MENU opens it then (Main: Hud.onMenu).
 function Phone.has(): boolean
 	return hasPhone()
@@ -1679,11 +1523,22 @@ function Phone.close()
 		return
 	end
 	isOpen = false
+	app = "home"
+	-- 6.0.1: an open app goes with it (its popup, its route chart, its timers).
+	local route = refs.route
+	refs.route = nil
+	refs.timer = nil
+	refs.from = nil
+	if route then
+		route.holder:Destroy()
+	end
+	OrdersUi.clear()
+	refs.popup.hide()
 	Net.get("PhoneHold"):FireServer(false) -- (5.0: the phone leaves your hand: server/KitWear.luau)
 	local body = refs.body
 	if body then
 		Ui.gamepadRelease(body)
-		if reducedMotion() or refs.turning then -- (5.5: a phone put away mid-turn hides; the turn's end leaves it so)
+		if refs.motion.reducedMotion() then
 			body.Visible = false
 		else
 			local _, hidden = restPosition()
@@ -1737,18 +1592,14 @@ openPhone = function(startApp: string?)
 	if hook then
 		pcall(hook) -- (the other windows close; their onCloseWindows closes nothing open here yet)
 	end
-	if refs.turning then
-		return -- (5.5: mid-turn; the turn ends where it was going)
-	end
-	local sideways, scale = shapeFor(startApp or "home") -- 5.5: a big app opens sideways
-	if landscape ~= sideways or not refs.body then
-		buildBody(sideways)
+	local scale = fit()
+	if not refs.body then
+		buildBody()
 	end
 	refs.body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
 	refs.scale.Scale = scale
 	local body = refs.body
-	body.Rotation = 0
-	body.AnchorPoint = if landscape then Vector2.new(0.5, 1) else Vector2.new(1, 1)
+	body.AnchorPoint = Vector2.new(1, 1)
 	local rest, hidden = restPosition()
 	app = startApp or "home"
 	if not isOpen then
@@ -1757,8 +1608,9 @@ openPhone = function(startApp: string?)
 	isOpen = true
 	renderApp()
 	refreshBadges()
-	if not body.Visible or reducedMotion() then
-		body.Position = if reducedMotion() then rest else hidden
+	local reduced = refs.motion.reducedMotion()
+	if not body.Visible or reduced then
+		body.Position = if reduced then rest else hidden
 	end
 	body.Visible = true
 	TweenService:Create(body, SLIDE, { Position = rest }):Play()
@@ -1981,7 +1833,7 @@ local function onOffers(list: any, refreshAt: any, info: any)
 	refs.offers = list
 	refs.offersInfo = info
 	local inPhone = isOpen and app == "board"
-	if inPhone and not refs.turning then
+	if inPhone then
 		renderApp()
 	end
 	local dispatch = Phone.boardOpen
@@ -2038,9 +1890,6 @@ function Phone.start()
 		board = function(): ({ any }?, any, number?)
 			return refs.offers, refs.offersInfo, lastRefreshAt
 		end,
-		sideways = function(): boolean
-			return landscape == true
-		end,
 		go = function(id: string)
 			setApp(id)
 		end,
@@ -2067,7 +1916,7 @@ function Phone.start()
 		transport = transportText,
 	}
 	buildButton(made)
-	buildBody(false)
+	buildBody()
 	refs.body.Visible = false
 	Net.get("Job").OnClientEvent:Connect(function(payload)
 		job = if type(payload) == "table" then payload else nil
@@ -2096,15 +1945,41 @@ function Phone.start()
 			renderApp() -- 5.0: the backpack line
 		end
 	end)
+	-- 6.0.1: the popup's ✕ and backdrop return to the phone's home.
+	refs.popup.onClose = function()
+		if isOpen then
+			setApp("home")
+		else
+			refs.popup.hide()
+		end
+	end
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed or UserInputService:GetFocusedTextBox() then
+		if UserInputService:GetFocusedTextBox() then
+			return
+		end
+		-- 6.0.1: ESC and the gamepad's B close an open app, then the phone (also when Roblox took the key).
+		if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB then
+			Phone.back()
+			return
+		end
+		if processed then
 			return
 		end
 		if (input.KeyCode == KEY or input.KeyCode == PAD_KEY) and hudOn() and hasPhone() then
-			Phone.toggle()
+			if Phone.appOpen() then
+				Phone.back() -- (6.0.1: Q closes the app first)
+			else
+				Phone.toggle()
+			end
 		end
 	end)
-	-- The screen turned or resized: a phone that is open is fitted again (upright or sideways).
+	GuiService.MenuOpened:Connect(function()
+		if Phone.appOpen() then
+			refs.menuAt = os.clock()
+			setApp("home") -- (the Roblox menu: the app closes, like a window; the phone stays)
+		end
+	end)
+	-- The screen turned or resized: a phone that is open is fitted again (6.0.1: upright, and its app's popup).
 	local camera = workspace.CurrentCamera
 	if camera then
 		local resized = 0
@@ -2115,19 +1990,12 @@ function Phone.start()
 				if mine ~= resized or not isOpen then
 					return
 				end
-				if refs.turning then
-					return
-				end
-				local sideways, scale = shapeFor(app) -- 5.5: a big app stays sideways
-				if sideways ~= landscape then
-					local current = app
-					Phone.close()
-					task.delay(0.2, function()
-						Phone.open(current)
-					end)
-				elseif refs.scale then
-					refs.body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
-					refs.scale.Scale = scale
+				local scale = fit()
+				refs.body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
+				refs.scale.Scale = scale
+				refs.body.Position = (restPosition())
+				if refs.popup.refit() and app ~= "home" then
+					renderApp() -- (the popup's two columns came or went)
 				end
 			end)
 		end)

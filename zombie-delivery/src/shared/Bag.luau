@@ -21,6 +21,14 @@
 --                                        Config.Cargo.Kinds, else an "s")
 --   Bag.line(carried)                    the HUD's chip: "🎒 2 newspapers · 1 pizza stack" (nil when you carry nothing)
 --   Bag.groups(carried, mode)            the pieces by where they are (hands, backpack, rack, vehicle), for BagUi
+--   Bag.places(mode, packRoom, rack, bagRoom)  6.0.1: the room by place for the bottom bar's carried strip: the hands
+--                                        (Config.Cargo.HandsMax), the plastic bag, the backpack, the rack (a car run:
+--                                        the hands only)
+--   Bag.strip(carried, places, focus, max)  6.0.1: the strip's tiles: per place its pieces, then its free room; the
+--                                        pieces the server has in the pack fill the bag first; a piece of another
+--                                        order than `focus` is `other`; over `max` tiles the free room goes first,
+--                                        then the last pieces (returns the tiles, how many went: "+N", and how many of
+--                                        those were pieces)
 --
 -- `carried` is the job payload's (server/Jobs.luau carriedInfo): { order, look, name, where, dest, place } a piece,
 -- where = "hands" | "pack" | "rack" | "vehicle".
@@ -155,6 +163,89 @@ function Bag.groups(carried: { Piece }?, mode: string?): { Group }
 		end
 	end
 	return out
+end
+
+-- 6.0.1, the bottom bar (client/Hotbar.luau): what you carry as small tiles, one a piece and one a free place.
+export type Place = { where: string, room: number }
+export type Tile = { where: string, piece: Piece?, other: boolean }
+
+local PLACES = { "hands", "bag", "pack", "rack" }
+
+-- The room by place, in the order hands, bag, backpack, rack. `packRoom` is the pieces over the hands (the payload's
+-- packRoom / the PackRoom attribute: the backpack, the bag's extra and a bike's rack), `rack` the bike's part of it,
+-- `bagRoom` the plastic bag's part (Transport.handsRoom − Transport.backpackRoom). A car run: the hands only.
+function Bag.places(mode: string, packRoom: number, rack: number, bagRoom: number): { Place }
+	local hands = Config.Cargo.HandsMax
+	if mode == "car" then
+		return { { where = "hands", room = hands }, { where = "bag", room = 0 }, { where = "pack", room = 0 }, { where = "rack", room = 0 } }
+	end
+	local onRack = math.max(0, math.floor(rack))
+	local packOnly = math.max(0, math.floor(packRoom) - onRack)
+	local bag = math.clamp(math.floor(bagRoom), 0, packOnly)
+	return {
+		{ where = "hands", room = hands },
+		{ where = "bag", room = bag },
+		{ where = "pack", room = packOnly - bag },
+		{ where = "rack", room = onRack },
+	}
+end
+
+-- The strip's tiles (see the header). The vehicle's pieces are not on it (the vehicle line says them).
+function Bag.strip(carried: { Piece }?, places: { Place }, focus: number?, max: number): ({ Tile }, number, number)
+	local room: { [string]: number } = {}
+	local by: { [string]: { Piece } } = {}
+	for _, where in PLACES do
+		room[where] = 0
+		by[where] = {}
+	end
+	for _, place in places do
+		if room[place.where] then
+			room[place.where] = math.max(0, math.floor(place.room))
+		end
+	end
+	if type(carried) == "table" then
+		for _, piece in carried do
+			if type(piece) ~= "table" or piece.where == "vehicle" then
+				continue
+			end
+			local where = if type(piece.where) == "string" and by[piece.where] then piece.where else "pack"
+			if where == "pack" and #by.bag < room.bag then
+				where = "bag" -- (the bag fills first: what you pick up drops straight in)
+			end
+			table.insert(by[where], piece)
+		end
+	end
+	local tiles: { Tile } = {}
+	for _, where in PLACES do
+		for _, piece in by[where] do
+			local other = focus ~= nil and type(piece.order) == "number" and piece.order ~= focus
+			table.insert(tiles, { where = where, piece = piece, other = other })
+		end
+		for _ = #by[where] + 1, room[where] do
+			table.insert(tiles, { where = where, piece = nil, other = false })
+		end
+	end
+	local limit = math.max(2, math.floor(max))
+	if #tiles <= limit then
+		return tiles, 0, 0
+	end
+	local over = #tiles - (limit - 1) -- (one tile says "+N")
+	local gone, pieces = 0, 0
+	for index = #tiles, 1, -1 do
+		if gone >= over then
+			break
+		end
+		if tiles[index].piece == nil then
+			table.remove(tiles, index)
+			gone += 1
+		end
+	end
+	while gone < over do
+		table.remove(tiles)
+		gone += 1
+		pieces += 1
+	end
+	return tiles, gone, pieces
 end
 
 return Bag

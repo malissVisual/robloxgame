@@ -966,7 +966,8 @@ what each part shows is the same.
 | Upper right | MAP [M] · CREW [K] · MENU (every other action: JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
 | Lower right | the gun and [T] (3.9 on foot: HANDS · [B] DRAW · [V] PUNCH, or the gun · [B] HOLSTER · [V] STRIKE), or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [I] |
-| Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it |
+| Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): five square item slots (the consumables you own in their order, the count, keys 1-5; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more). It hides while a window, the phone or a dialog is open |
+| Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it (both over the bottom bar) |
 | In the world | a small red waypoint with the place and the distance |
 
 Every window is a charcoal rectangle (a small caps label, the title, a thin line, slim rows, one main action with a red
@@ -1108,13 +1109,21 @@ missions. The dealer no longer sells it. Every other car, job tier and campaign 
 carried in the left hand — it swings with your stride and flies back when you sprint. A light piece you pick up (a
 pile or the ground) goes straight into the bag with a quick move of the arm.
 
+**The Courier Vest** (6.0.1, Kit "hivis", $20, level 1, just the look): a new courier starts with Marge's cash and phone
+in plain charcoal workwear; the red reflective ZDC vest is bought next to the bag and put on with the vest move. A Kevlar
+or heavy vest is worn instead of it. Players from before 6.0.1 get it once on load, so their look does not change.
+
 **Throwing** (`shared/Throws.luau`, `client/Throw.luau`, the Throw remote, `Cargo.throwAt`, `Config.Throw`): at a home
 drop hold **X** (gamepad R1, touch THROW): a dotted arc and a landing ring (green over the door) with a swinging power;
 let go to throw. The server checks the piece, the range, the line of sight and traces the same arc. Landing at the door
 delivers it (the receiver catches it, or the door opens). **TRICKSHOT** tips for a long throw, a throw over something or
 off a wall. A miss lies where it fell — pick it up again. Fragile cargo (cake, electronics, samples …) can't be thrown.
 
-**Sprinting** (`client/SprintPose.luau`): a longer stride, bent knees and pumping arms over the run animation.
+**Sprinting** (`client/SprintPose.luau`, 6.0.1 `shared/RunCycle.luau`, `Config.Courier.Sprint`): from 20 studs / s on
+foot the stock run gives way to a real run cycle — the thighs swing +55° / −35°, the heels kick up high, the arms pump
+±60° with square elbows against the legs, the upper body leans 14° forward with the head kept level, and the body bobs
+twice a stride. The cadence follows the speed (7 studs a cycle); the arms stay with aiming, carrying, the phone and
+gestures. The bag in the left hand trails behind and jolts with every step. Everybody within 150 studs.
 
 **No free gun** (`Config.Arms`): a new courier has fists (V punches). The pistol costs $250 at Lead & Co.; Marge texts
 you with a GPS once you can afford it. Old saves keep their guns.
@@ -1129,7 +1138,7 @@ move when you buy it) and as 🛡 on the HUD. Every hit on a player goes through
 
 **Every player is a ZDC courier** (Codex, `design/character-models/`; `server/CourierAvatar.luau`,
 `server/CharacterArt/`, `shared/CourierMotion.luau`): one native-part R15 body for everybody — warm skin, a red reflective
-vest, charcoal workwear, a backwards cap — instead of personal avatars (`StarterPlayer.StarterCharacter`, appearance
+vest (bought kit since 6.0.1), charcoal workwear, a backwards cap — instead of personal avatars (`StarterPlayer.StarterCharacter`, appearance
 loading off). Roblox's standard R15 animations (idle, walk, run, jump, fall, climb, swim, sit) play from the server by
 the real speed; ArmPose, BikeRider and the interactions still pose on top. The kit (backpacks, shoes, jacket) is worn as
 before. **The infected** are native too: walker, runner, soldier (helmet, chest plate) and brute (a reinforced shoulder)
@@ -1227,8 +1236,9 @@ flat ("DELIVER to Jana Nováková, Apt 4C, 40 6th Ave"), and the one who opens t
 **The courier phone** (Codex's approved ZDC design, `design/phone-ui/`; `client/Phone.luau`, `PhoneContract`,
 `PhoneLayout`, `PhoneRoute`, `PhoneApps`, `PhoneMotion`): square charcoal apps with white glyphs, the live contract on the
 home screen, the route on the order's map. The MENU lives in the phone now (Missions, Crew, Top, Estate, Bag, Garage,
-Settings with every key, Bank), and once you have the phone MENU opens it. **BOARD, CAREER, SHOP and BAG turn the
-phone sideways**; the board in the phone takes jobs (ACCEPT / + ADD ORDER, FULL BOARD for the big one). Banners drop
+Settings with every key, Bank), and once you have the phone MENU opens it. **6.0.1: every app opens in a centred
+popup** over the game (`PhonePopup`: a dimmed, lightly blurred backdrop, the ZDC header, two columns for BOARD, CAREER
+and SHOP; ✕, a tap beside it, Q, ESC or B return to the phone, which never turns sideways); the board in the phone takes jobs (ACCEPT / + ADD ORDER, FULL BOARD for the big one). Banners drop
 for new messages and new jobs. GIVE UP is in ORDERS (press twice).
 
 ## Deliveries from real shops to real doors, the bag, newspaper rounds, fuel, the new phone (5.3, 5.4)
@@ -1425,7 +1435,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
               the head, the Challenges remote), CloseCombat (3.9: the holster, the Holstered attribute, the melee
               checked and dealt: the nearest enemy in the cone, MeleeAt / MeleeKind for the swing)
-src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), MapView (minimap, big map, GPS routes),
+src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, the item
+              slots 1-5 and what you carry), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),

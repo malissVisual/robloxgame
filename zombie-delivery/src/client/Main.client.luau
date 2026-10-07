@@ -88,6 +88,7 @@ safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, t
 require(Client.ZipRide).notify = Hud.toast
 safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms, the bag flying behind
 safely("Throw", require(Client.Throw).start) -- 6.0: hold X at a home's door to throw the delivery (the dotted arc, TRICKSHOT)
+safely("Unstuck", require(Client.Unstuck).start) -- 6.0.1: lifts your courier out of the ground if it ever sinks in (and says why)
 require(Client.Throw).notify = Hud.toast
 Shooting.notify = Hud.toast
 Drive.notify = Hud.toast
@@ -104,7 +105,9 @@ Hud.onCloseWindows = function()
 	GarageUi.close()
 	DispatchUi.close()
 	CareerUi.close()
-	Phone.close()
+	if not (Hud.escaping and Phone.appOpen()) then
+		Phone.close() -- (6.0.1 review: ESC with an app open goes back to the phone's home, the phone handles it)
+	end
 end
 CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows
@@ -158,10 +161,16 @@ CameraRig.windowOpen = function(): boolean
 	return Hud.anyWindowOpen() or AdminPanel.isOpen() or Leaderboard.isOpen() or CrewPanel.isOpen() or EstateUi.isOpen() or BusinessUi.isOpen() or MissionsUi.isOpen() or WeaponWheel.isOpen() or DispatchUi.isOpen() or GarageUi.isOpen()
 		or CareerUi.isOpen() or CareerUi.cardOpen()
 end
+-- 6.0.1: not while an app is open in the phone's popup (the mouse is needed there).
 CameraRig.freeLook = function(): boolean
-	return Phone.isOpen() and not CameraRig.windowOpen()
+	return Phone.isOpen() and not Phone.appOpen() and not CameraRig.windowOpen()
 end
 LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while a window is open
+-- 6.0.1: the bottom bar (client/Hotbar.luau: the items 1-5 and what you carry) hides while a window, the phone or a
+-- dialog (Marge's, the delivery result) covers the game.
+require(Client.Hotbar).covered = function(): boolean
+	return CameraRig.mouseNeeded() or TutorialUi.isOpen() or Hud.resultOpen()
+end
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)

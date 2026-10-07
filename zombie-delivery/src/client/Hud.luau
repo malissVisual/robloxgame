@@ -2,7 +2,8 @@
 -- The interface: money and the driver level (the rank, a hairline XP line; the numbers on hover; a banner on a
 -- level-up), the minimap (client/MapView.luau) and your health, the vehicle (speed, condition, cargo slots), the
 -- active job (the contract group: what it is, where, the objectives, the deadline and the pay; the hold progress),
--- the actions (MAP, CREW and MENU with every other action and its key), the consumables (items, keys 1-5), the
+-- the actions (MAP, CREW and MENU with every other action and its key), the consumables (items, keys 1-5: 6.0.1, the
+-- bottom bar of client/Hotbar.luau, with what you carry; this HUD places it, its keys and its use path are here), the
 -- employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold; the car guns at
 -- Wrench Garage), the weapon (your gun, or the car gun while you drive a car that has one), the backpack (with the
 -- job's cargo; 5.3: its BAG tab during a run, client/BagUi.luau, and the bag's chip on the contract), the delivery result (with the XP, a level-up and the crew's pay split), toasts, the FIRE button for
@@ -24,7 +25,8 @@
 -- client/HudContract.luau (P below). Upper left the contract group, upper right MAP [M] CREW [K] MENU, lower left the
 -- cash and rank over the monochrome minimap and a thin health bar, lower right the weapon (or the cargo in your hands)
 -- and the vehicle line ("OLD VAN / 72% / CARGO 3 OF 4", the speed while driving) over INVENTORY [I], lower centre one
--- contextual action in a key box with a fine progress line. The windows' rows are slim charcoal rows.
+-- contextual action in a key box with a fine progress line (6.0.1: over the bottom bar, client/Hotbar.luau: the item
+-- slots 1-5 and what you carry). The windows' rows are slim charcoal rows.
 -- 3.9: the bag moved to I (B holsters / draws the gun, V punches or strikes: client/Holster.luau); on foot the weapon
 -- line says HANDS · [B] DRAW · [V] PUNCH or the gun · [B] HOLSTER · [V] STRIKE; a touch screen gets PUNCH / STRIKE
 -- and DRAW / HOLSTER buttons over FIRE.
@@ -449,6 +451,7 @@ function Hud.anyWindowOpen(): boolean
 end
 
 -- Set by client/Main.client.luau: closes the windows outside the HUD too (the crew window).
+Hud.escaping = false -- 6.0.1: true while ESC / the Roblox menu closes the windows (Main keeps an open phone app's phone)
 Hud.onCloseWindows = nil :: (() -> ())?
 
 local function closeWindows()
@@ -1288,6 +1291,9 @@ function useItem(id: string)
 	end
 	Net.get("UseItem"):FireServer(id, Shooting.aimPoint())
 end
+-- 6.0.1: the bottom bar (client/Hotbar.luau) uses its slots through this path, and says so about an empty one.
+require(script.Parent.Hotbar).onUse = useItem
+require(script.Parent.Hotbar).toast = Hud.toast
 
 -- During a job: what is in your hands and in your vehicle.
 local function cargoCard(parent: any)
@@ -1360,7 +1366,8 @@ function renderBackpack()
 		for order, def in Config.Items do
 			local c = card(backpack.body, 84, order + 1)
 			local have = state.items[def.id] or 0
-			cardText(c, `{def.name}  x{have}`, `Key {order}`, def.description, cardIcon(c, Icons.item(def.id), def.icon, 16))
+			local slot = require(script.Parent.Hotbar).slotOf(def.id) -- 6.0.1: the key is its place in the bottom bar
+			cardText(c, `{def.name}  x{have}`, if slot then `Key {slot}` else "None left", def.description, cardIcon(c, Icons.item(def.id), def.icon, 16))
 			cardButton(c, "USE", C.green, have > 0, function()
 				useItem(def.id)
 			end)
@@ -2060,17 +2067,18 @@ end
 
 -- ── Hotbar ─────────────────────────────────────────────────────────────────
 
--- 3.8, the lower right column (one frame, view.right; layout() scales and places it), bottom up: INVENTORY [I] with
--- the consumables (keys 1-6 and their counts; hidden while you carry), the vehicle line (── Car panel ──), a thin
--- rule, and the weapon (a small icon, the gun's name and state, Q) or, while you carry, the cargo in your hands and
--- what carrying stops ("2 × PIZZA BOXES / HANDS FULL · NO GUN, NO SPRINT"). Hidden pieces take no room.
-local HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, hotbarCounts: any, FIRE_SIZE: any, fire: any
+-- 3.8, the lower right column (one frame, view.right; layout() scales and places it), bottom up: INVENTORY [I]
+-- (hidden while you carry), the vehicle line (── Car panel ──), a thin rule, and the weapon (a small icon, the gun's
+-- name and state, Q) or, while you carry, the cargo in your hands and what carrying stops ("2 × PIZZA BOXES / HANDS
+-- FULL · NO GUN, NO SPRINT"). Hidden pieces take no room. 6.0.1: the consumables left it for the bottom bar
+-- (client/Hotbar.luau, lower centre; their keys 1-5 are below in Hud.start), so the column is 32 px shorter.
+local HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, FIRE_SIZE: any, fire: any
 do -- (its own block: the locals below stay out of the 200-register limit)
 local RIGHT_W = 300
-HOTBAR_H = if touchLayout then 76 else 54
+HOTBAR_H = if touchLayout then 44 else 22
 local right = placed(Ui.make("Frame", {
 	Name = "RightStack",
-	Size = UDim2.fromOffset(RIGHT_W, 190),
+	Size = UDim2.fromOffset(RIGHT_W, 158),
 	Position = UDim2.new(1, -16, 1, -16),
 	AnchorPoint = Vector2.new(1, 1),
 	BackgroundTransparency = 1,
@@ -2268,93 +2276,18 @@ function nextWeapon()
 	Net.get("Equip"):FireServer("weapon", owned[index % #owned + 1])
 end
 
--- The inventory: the consumables as compact tokens (the key, the item's small icon, the count; the name over it on
--- hover or gamepad focus; a click or a tap uses it), and INVENTORY [I] (the backpack) under them.
+-- INVENTORY [I] (the backpack). 6.0.1: the consumables' tokens that sat over it are the bottom bar's slots now
+-- (client/Hotbar.luau).
 hotbar = Ui.make("Frame", {
 	Name = "Hotbar",
 	Size = UDim2.fromOffset(RIGHT_W, HOTBAR_H),
 	BackgroundTransparency = 1,
 	LayoutOrder = 4,
 }, right)
-local tokens = lineRow(hotbar, 30, 4)
-tokens.Name = "Items"
-hotbarCounts = {}
-for index, def in Config.Items do
-	local token = Ui.make("TextButton", {
-		Name = `{def.id}Tag`,
-		Size = UDim2.fromOffset(if touchLayout then 44 else 46, 30), -- (5.4: six of them fit the column)
-		BackgroundColor3 = P.raised,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Text = "",
-		AutoButtonColor = false,
-		LayoutOrder = index,
-	}, tokens)
-	local outline = Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.7 }, token)
-	if not touchLayout then
-		P.caps(token, tostring(index), UDim2.fromOffset(12, 12), { Position = UDim2.fromOffset(3, 1), TextSize = 10, TextStrokeTransparency = 1 })
-	end
-	Ui.icon(token, Icons.item(def.id), def.icon, UDim2.fromOffset(18, 18), {
-		Position = UDim2.new(0, if touchLayout then 5 else 13, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		TextScaled = true,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		ImageColor3 = P.ink,
-	})
-	local count = P.text(token, "0", UDim2.fromOffset(16, 30), {
-		Position = UDim2.new(1, -4, 0, 0),
-		AnchorPoint = Vector2.new(1, 0),
-		Font = Theme.MonoFont,
-		TextSize = 13,
-		TextXAlignment = Enum.TextXAlignment.Right,
-	})
-	-- None left: the token dims (its name still says what it is).
-	count:GetPropertyChangedSignal("Text"):Connect(function()
-		count.TextTransparency = if count.Text == "0" then 0.5 else 0
-	end)
-	count.TextTransparency = 0.5
-	hotbarCounts[def.id] = count
-	-- The name over the token while the mouse (or the gamepad) is on it.
-	local name = P.caps(token, def.name, UDim2.fromOffset(0, 18), {
-		AutomaticSize = Enum.AutomaticSize.X,
-		Position = UDim2.new(1, 0, 0, -6),
-		AnchorPoint = Vector2.new(1, 1),
-		BackgroundColor3 = P.surface,
-		BackgroundTransparency = 0.15,
-		TextColor3 = P.ink,
-		Visible = false,
-		ZIndex = 5,
-	})
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, name)
-	local function show(on: boolean)
-		name.Visible = on and not touchLayout
-		outline.Transparency = if on then 0.1 else 0.7
-		token.BackgroundTransparency = if on then 0.3 else 1
-	end
-	token.MouseEnter:Connect(function()
-		show(true)
-	end)
-	token.MouseLeave:Connect(function()
-		show(false)
-	end)
-	token.SelectionGained:Connect(function()
-		show(true)
-	end)
-	token.SelectionLost:Connect(function()
-		show(false)
-	end)
-	token.Activated:Connect(function()
-		local click = Ui.onClick
-		if click then
-			click()
-		end
-		useItem(def.id)
-	end)
-end
 P.action(hotbar, if touchLayout then "INVENTORY" else "INVENTORY  [I]", {
 	Name = "Inventory",
 	Size = UDim2.fromOffset(0, if touchLayout then 44 else 22),
-	Position = UDim2.new(1, -2, 0, 32),
+	Position = UDim2.new(1, -2, 0, 0),
 	AnchorPoint = Vector2.new(1, 0),
 	TextSize = 12,
 }, function()
@@ -3458,10 +3391,10 @@ end
 --   │ DESTINATION                                  │    │ health  □ objectives                         │
 --   │ □ objectives                                 │    │         04:36 / EST.  (column)               │
 --   │ 04:36 REMAINING / EST.                       │    │                                  ┌weapon─┐  │
---   │ (column: tutorial, crew, ...)       ┌weapon─┐│    │ (thumb-                          │vehicle│(FIRE)
---   │ cash / rank                         │vehicle││    │  stick)     [E] ACTION           │items  │(jump)
---   │ minimap         [E] ACTION          │items  ││    │             ─────                └───────┘  │
---   │ + health        ─────               └───────┘│    └──────────────────────────────────────────────┘
+--   │ (column: tutorial, crew, ...)       ┌weapon─┐│    │ (thumb-     [E] ACTION           │vehicle│(FIRE)
+--   │ cash / rank     [E] ACTION          │vehicle││    │  stick)     ▫▫▫▫▫▫ carried       │INVENT.│(jump)
+--   │ minimap         ─────               │INVENT.││    │             ▢▢▢▢▢ items 1-5      └───────┘  │
+--   │ + health  ▢▢▢▢▢ items 1-5 │ ▫▫▫ carried └───┘│    └──────────────────────────────────────────────┘
 --   └──────────────────────────────────────────────┘
 --
 --   * Margins 16 px, gaps 8 px. The ADMIN button (client/AdminPanel.luau, 90 × 32 at 16 px from the right, 56 from
@@ -3482,6 +3415,10 @@ end
 --   * Lower centre: the contextual action (key box, words, the fine hold progress line), its bottom HINT_BOTTOM × S over
 --     the margin, between the left column (touch: the thumbstick's corner) and the right column. client/Stamina.luau's
 --     breath bar sits higher (16 + 170 × S from the bottom), clear of it.
+--   * 6.0.1, bottom centre: the bottom bar (client/Hotbar.luau: the five item slots, a divider and what you carry), at
+--     the margin between the left column and the right one (smaller when they leave too little room); the action and
+--     the breath bar over it. Touch: the carried tiles over the slots (at least 48 px), at the bottom beside the right
+--     column, or up to the buttons with the column raised over it, or over everything (TouchLayout.dock).
 
 do -- (its own block: the locals below stay out of the 200-register limit)
 local MARGIN = 16
@@ -3630,7 +3567,15 @@ layout = function()
 		table.insert(below, c.jump)
 		-- The right column: under it the actions' row (and ADMIN) must stay clear when it goes over the buttons.
 		local rowBottom = (if admin then ADMIN_BOTTOM else MARGIN) + buttonGrid.Size.Y.Offset * math.max(S, TOUCH_BUTTON_MIN)
-		local placedColumn = TouchLayout.column(c, W, H, rightW, rightH, rowBottom)
+		-- 6.0.1: with the bottom bar (client/Hotbar.luau, its slots at least 48 px): beside the column at the bottom, or
+		-- up to the buttons with the column raised over it, or over everything (TouchLayout.dock).
+		local rowLeft = math.min(W - MARGIN - buttonGrid.Size.X.Offset * math.max(S, TOUCH_BUTTON_MIN), if admin then W - 16 - 90 else W)
+		local barSize, barMin = require(script.Parent.Hotbar).size()
+		local barScale = math.max(S, barMin)
+		local placedColumn, _, bar = TouchLayout.dock(c, W, H, rightW, rightH, rowBottom, rowLeft, barSize.X * barScale, barSize.Y * barScale)
+		require(script.Parent.Hotbar).place((bar.x0 + bar.x1) / 2, bar.y1, barScale)
+		view.barBox = bar
+		table.insert(below, bar)
 		table.insert(view.touchBoxes, placedColumn)
 		columnRight, columnBottom = placedColumn.x1, placedColumn.y1
 		-- Roblox's thumbstick lives in the bottom left corner: nothing of ours goes there.
@@ -3659,12 +3604,25 @@ layout = function()
 	local hintW = math.max(160, math.min(HINT_W * S, spanRight - spanLeft))
 	local hintX = math.clamp(W / 2, spanLeft + hintW / 2, math.max(spanLeft + hintW / 2, spanRight - hintW / 2))
 	local hintBottom = H - (if touchLayout then GAP else MARGIN) - HINT_BOTTOM * S
+	if not cluster then
+		-- 6.0.1: the bottom bar (client/Hotbar.luau) at the bottom between the two columns (smaller when the span is
+		-- narrow), the action over it.
+		local barSize = require(script.Parent.Hotbar).size()
+		local barScale = math.max(0.5 * S, math.min(S, (spanRight - spanLeft) / barSize.X))
+		local barW, barH = barSize.X * barScale, barSize.Y * barScale
+		local barX = math.clamp(W / 2, spanLeft + barW / 2, math.max(spanLeft + barW / 2, spanRight - barW / 2))
+		require(script.Parent.Hotbar).place(barX, H - MARGIN, barScale)
+		view.barBox = box(barX - barW / 2, H - MARGIN - barH, barX + barW / 2, H - MARGIN)
+		table.insert(below, view.barBox)
+		hintBottom = math.min(hintBottom, view.barBox.y0 - GAP)
+	end
 	if cluster then
 		-- 4.2: between the thumbstick and the touch buttons or the column (narrower on a narrow phone; upright, over
-		-- them), and the breath bar (client/Stamina.luau) right over it.
-		hintX, hintBottom, hintW = require(script.Parent.TouchLayout).hint(cluster, view.touchBoxes, W, H, S)
-		require(script.Parent.Stamina).place(hintX, hintBottom - 108 * S)
+		-- them; 6.0.1: over the bottom bar).
+		hintX, hintBottom, hintW = require(script.Parent.TouchLayout).hint(cluster, view.touchBoxes, W, H, S, view.barBox.y0)
 	end
+	-- The breath bar (client/Stamina.luau) right over the action (6.0.1: on a computer too, the bar raised it).
+	require(script.Parent.Stamina).place(hintX, hintBottom - 108 * S)
 	local hintMax = hint:FindFirstChild("Max")
 	if hintMax and hintMax:IsA("UISizeConstraint") then
 		hintMax.MaxSize = Vector2.new(hintW / S, math.huge)
@@ -3785,9 +3743,7 @@ function Hud.setState(newState: any)
 		hudButtons.more.Text = if state.phone == true then "PHONE" else "MENU"
 	end
 	refreshLevel()
-	for id, count in hotbarCounts do
-		count.Text = tostring(state.items[id] or 0)
-	end
+	require(script.Parent.Hotbar).setState(state) -- 6.0.1: the bottom bar's item slots and your room
 	-- 6.0: the vest's share on the health row (the bar makes room for it).
 	local armour = require(Shared.Armour).percent(if type(state.kit) == "table" then state.kit else {})
 	view.armourText.Visible = armour > 0
@@ -3807,6 +3763,7 @@ end
 
 function Hud.setJob(newJob: any)
 	job = newJob
+	require(script.Parent.Hotbar).setJob(job) -- 6.0.1: the bottom bar's carried strip
 	view.ticket.wrap.Visible = job ~= nil
 	view.ticket.meta0 = ""
 	view.ticket.idleAt = 0
@@ -4034,6 +3991,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 function Hud.start()
+	require(script.Parent.Hotbar).start(gui) -- 6.0.1: the bottom bar, placed by layout()
 	layout()
 	refreshLevel()
 	player:GetAttributeChangedSignal("Xp"):Connect(refreshLevel)
@@ -4078,7 +4036,9 @@ function Hud.start()
 		if MapView.isOpen() then
 			MapView.toggle()
 		end
+		Hud.escaping = true -- (6.0.1 review: an app open in the phone is closed by the phone itself, the phone stays)
 		closeWindows()
+		Hud.escaping = false
 	end
 	game:GetService("GuiService").MenuOpened:Connect(escape)
 	-- Keys.
@@ -4121,10 +4081,11 @@ function Hud.start()
 				openDispatch()
 			end
 		else -- (T: the weapon wheel, client/WeaponWheel.luau)
+			-- 1-5: the bottom bar's slots (client/Hotbar.luau: the items you have, in order; 6: a sixth kind).
 			local numbers = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six }
 			local index = table.find(numbers, key)
-			if index and Config.Items[index] then
-				useItem(Config.Items[index].id)
+			if index then
+				require(script.Parent.Hotbar).useSlot(index)
 			end
 		end
 	end)

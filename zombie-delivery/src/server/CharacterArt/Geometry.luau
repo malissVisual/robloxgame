@@ -1,6 +1,7 @@
 --!strict
 -- Native block R15 couriers and infected, based on the owner's approved loading-van thumbnail.
 -- Pure data: 16 body parts, a connected 15-joint skeleton, and welded clothing/face pieces. No meshes or uploads.
+-- 6.0.1: the courier's red reflective vest is bought kit now (Geometry.hivis); the body wears a plain charcoal jacket.
 local Geometry = {}
 
 export type Triple = { number }
@@ -16,6 +17,7 @@ local RED = { 188, 39, 37 }
 local SILVER = { 213, 218, 202 }
 local INK = { 20, 24, 20 }
 local CREAM = { 238, 224, 172 }
+local JACKET = { 40, 43, 47 } -- 6.0.1: the work jacket, in the trousers' charcoal
 
 -- At rest the sole is 2.97 studs below the root. The kit's existing nominal R15 dimensions are preserved.
 local BODY = {
@@ -58,6 +60,28 @@ local function triple(a: Triple, scales: Triple): Triple
 	return { a[1] * scales[1], a[2] * scales[2], a[3] * scales[3] }
 end
 
+-- 6.0.1: the red reflective courier vest (Codex's pieces, unchanged) is no longer part of the body: a new courier starts
+-- in plain workwear and buys it at Last Stop Supplies (Config.Kit "hivis", the Courier Vest). Its pieces on the nominal
+-- UpperTorso, with their own colours and cloth; server/KitWear.luau welds them on in the kit's `vest` slot
+-- (shared/KitFit.luau: a Kevlar or heavy vest is worn instead). Fresh tables on every call.
+function Geometry.hivis(): { Piece }
+	local out: { Piece } = {}
+	local function add(name: string, size: Triple, at: Triple, color: Triple, turn: Triple?, material: string?)
+		table.insert(out, { name = name, attach = "UpperTorso", size = size, at = at, color = table.clone(color), turn = turn, material = material })
+	end
+	for _, side in { -1, 1 } do
+		local suffix = if side < 0 then "L" else "R"
+		add("Vest" .. suffix, { 0.83, 1.44, 0.07 }, { side * 0.535, -0.04, -0.535 }, RED, nil, "Fabric")
+		add("Reflector" .. suffix, { 0.83, 0.17, 0.025 }, { side * 0.535, -0.22, -0.581 }, SILVER)
+		add("Collar" .. suffix, { 0.25, 0.49, 0.06 }, { side * 0.29, 0.46, -0.585 }, RED, { 0, 0, side * -22 })
+		add("Pocket" .. suffix, { 0.48, 0.3, 0.03 }, { side * 0.55, -0.53, -0.585 }, { 155, 32, 31 })
+	end
+	add("VestBack", { 1.96, 1.45, 0.06 }, { 0, -0.04, 0.53 }, RED, nil, "Fabric")
+	add("BackReflector", { 1.88, 0.17, 0.025 }, { 0, -0.22, 0.578 }, SILVER)
+	add("DispatchBadge", { 0.33, 0.2, 0.025 }, { -0.55, 0.21, -0.581 }, SILVER)
+	return out
+end
+
 -- Zombie palette arguments are the existing Config.Zombies data; no gameplay numbers are duplicated here.
 function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?, pants: Triple?): Spec
 	assert(table.find(Geometry.ids, id), `Unknown character art: {id}`)
@@ -83,16 +107,14 @@ function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?
 		table.insert(spec.pieces, { name = name, attach = bone, size = triple(size, factors), at = triple(at, factors), color = table.clone(color), turn = turn, material = material, shape = shape })
 	end
 	if courier then
+		-- 6.0.1: the plain work jacket where the vest was (Geometry.hivis, bought kit now): its front panels, pocket flaps
+		-- and back lie inside the vest's own panels, so the vest, worn, looks exactly as it did on the body.
 		for _, side in { -1, 1 } do
 			local suffix = if side < 0 then "L" else "R"
-			add("Vest" .. suffix, "UpperTorso", { 0.83, 1.44, 0.07 }, { side * 0.535, -0.04, -0.535 }, RED, nil, "Fabric")
-			add("Reflector" .. suffix, "UpperTorso", { 0.83, 0.17, 0.025 }, { side * 0.535, -0.22, -0.581 }, SILVER)
-			add("Collar" .. suffix, "UpperTorso", { 0.25, 0.49, 0.06 }, { side * 0.29, 0.46, -0.585 }, RED, { 0, 0, side * -22 })
-			add("Pocket" .. suffix, "UpperTorso", { 0.48, 0.3, 0.03 }, { side * 0.55, -0.53, -0.585 }, { 155, 32, 31 })
+			add("Jacket" .. suffix, "UpperTorso", { 0.79, 1.4, 0.02 }, { side * 0.535, -0.04, -0.512 }, JACKET, nil, "Fabric")
+			add("PocketFlap" .. suffix, "UpperTorso", { 0.44, 0.07, 0.02 }, { side * 0.55, -0.36, -0.53 }, BLACK, nil, "Fabric")
 		end
-		add("VestBack", "UpperTorso", { 1.96, 1.45, 0.06 }, { 0, -0.04, 0.53 }, RED, nil, "Fabric")
-		add("BackReflector", "UpperTorso", { 1.88, 0.17, 0.025 }, { 0, -0.22, 0.578 }, SILVER)
-		add("DispatchBadge", "UpperTorso", { 0.33, 0.2, 0.025 }, { -0.55, 0.21, -0.581 }, SILVER)
+		add("JacketBack", "UpperTorso", { 1.9, 1.4, 0.02 }, { 0, -0.04, 0.512 }, JACKET, nil, "Fabric")
 		add("CapBand", "Head", { 1.68, 0.2, 1.46 }, { 0, 0.605, 0 }, BLACK, nil, "Fabric")
 		add("CapCrown", "Head", { 1.75, 0.55, 1.57 }, { 0, 0.74, 0 }, BLACK, nil, "Fabric", "Ball")
 		add("CapBrimBack", "Head", { 1.27, 0.1, 0.58 }, { 0, 0.53, 0.89 }, BLACK)

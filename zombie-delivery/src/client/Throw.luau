@@ -268,7 +268,7 @@ local function screen(): ScreenGui?
 	local line = Instance.new("TextLabel")
 	line.Name = "Line"
 	line.AnchorPoint = Vector2.new(0.5, 1)
-	line.Position = UDim2.new(0.5, 0, 1, -150)
+	line.Position = UDim2.new(0.5, 0, 1, -232) -- (6.0.1: over the bottom bar, the action and the breath bar)
 	line.Size = UDim2.fromOffset(0, 26)
 	line.AutomaticSize = Enum.AutomaticSize.X
 	line.BackgroundColor3 = K.charcoal
