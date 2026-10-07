@@ -79,6 +79,8 @@ type Rec = {
 
 local recs: { [Model]: Rec } = {}
 local checks: { [Model]: number | boolean } = {} -- 6.4.1: your body → when its bag showed (os.clock), true: looked
+local missingSince: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any -- 6.5.1: Hand "bag", no BagWorn since
+local missingTold: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local sweptAt = 0
 local handVec = { 0, 0, 0 } -- (reused every frame)
 local bodyVec = { 0, 0, 0 }
@@ -147,6 +149,8 @@ local function diagnose(character: Model, worn: string)
 		local part = parts[1]
 		warn(string.format("[BagSway] your bag's %d parts are all see-through (Transparency %.2f, LocalTransparencyModifier %.2f; %s)", #parts, part.Transparency, part.LocalTransparencyModifier, about))
 	end
+	-- 6.5.1: and always one line of what it found (the owner still sees no bag: this tells us where it is)
+	print(string.format("[BagSway] your bag: %d parts (%d visible), %.1f studs from your %s, %.1f from its place (%s)", #parts, clear, far, hand.Name, off, about))
 end
 
 -- Our Transform off the joint (it hangs as the hand holds it), the swing forgotten.
@@ -192,6 +196,18 @@ local function step(dt: number)
 			local since = checks[character]
 			if type(worn) ~= "string" then
 				checks[character] = nil
+				-- 6.5.1: the bag is your hand but the server put none on you: say so once (the Output)
+				if character:GetAttribute("Hand") == "bag" and not missingTold[character] then
+					local at = missingSince[character]
+					if not at then
+						missingSince[character] = now
+					elseif now - at > 4 then
+						missingTold[character] = true
+						warn("[BagSway] you hold your bag (2) but the server put none on you (no BagWorn): look for a [KitWear] line in the server Output")
+					end
+				else
+					missingSince[character] = nil
+				end
 			elseif type(since) ~= "number" then
 				checks[character] = now
 			elseif now - since >= CHECK.After then
