@@ -1,7 +1,8 @@
 -- Logic test of 5.5, people in every building (shared/Residents.luau, Config.Residents, shared/Deliveries.luau): every
 -- home has residents, the same every time; an apartment building floors × 4 flats with 1 – 2 people each, a house
--- 1 – 4 of one family; the names come from the lists, unique in a home; the weight is capped; a delivery to a home
--- names a resident (an apartment's flat in the address and the title); the caps keep the Czech letters.
+-- 1 – 4; the names come from the lists, unique in a home; the weight is capped; a delivery to a home names a resident
+-- (an apartment's flat in the address and the title); the caps keep the Czech letters. 6.3: English first names only
+-- (one word, or a nickname from the list), no Czech letters, no surnames.
 -- Standalone Luau CLI. Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -31,52 +32,34 @@ local tuning = Config.Residents
 
 -- The lists ----------------------------------------------------------------------------------------
 
-local firsts, surnames = 0, 0
+local function plain(name: string): boolean
+	return string.find(name, "[\128-\255]") == nil
+end
 local listsOk = true
-for _, origin in { tuning.Czech, tuning.English } do
-	firsts += #origin.Women + #origin.Men
-	surnames += #origin.Surnames
-	for _, pair in origin.Surnames do
-		if #pair < 1 or #pair > 2 then
+local seenFirst: { [string]: boolean } = {}
+for _, list in { tuning.Women, tuning.Men } do
+	for _, first in list do
+		if not string.match(first, "^%u%l+$") or seenFirst[first] then
 			listsOk = false
 		end
+		seenFirst[first] = true
 	end
 end
-check("about 40 first names and 40 surnames", firsts >= 36 and surnames >= 36, `{firsts} / {surnames}`)
-check("every surname a man's form (and maybe a woman's)", listsOk)
-check("a Czech woman's surname is the -ová / -á form", tuning.Czech.Surnames[1][2] == "Nováková")
-check("a few nicknames (the end of the world)", table.find(tuning.Nicknames, "Old Pete") ~= nil and table.find(tuning.Nicknames, "Doc Hansen") ~= nil)
+check("6.3: 60+ English first names a side (a 9-floor tower's 72 people stay unique)", #tuning.Women >= 60 and #tuning.Men >= 60, `{#tuning.Women} / {#tuning.Men}`)
+check("6.3: every first name one plain word, none twice", listsOk)
+check("6.3: no Czech lists, no surnames", (tuning :: any).Czech == nil and (tuning :: any).English == nil and (tuning :: any).Surnames == nil and (tuning :: any).OtherOrigin == nil)
+local nicksOk = true
+for _, nickname in tuning.Nicknames do
+	nicksOk = nicksOk and plain(nickname) and not seenFirst[nickname]
+end
+check("a few English nicknames (the end of the world), no Czech letters", nicksOk and table.find(tuning.Nicknames, "Lucky Jim") ~= nil and table.find(tuning.Nicknames, "Radio Rita") ~= nil and table.find(tuning.Nicknames, "Lucky Jirka") == nil)
 check("the numbers", tuning.FlatPeople[1] == 1 and tuning.FlatPeople[2] == 2 and tuning.HousePeople[1] == 1 and tuning.HousePeople[2] == 4 and tuning.MaxWeight >= 2)
 
 -- Who lives where ----------------------------------------------------------------------------------
 
-local known: { [string]: boolean } = {}
-for _, origin in { tuning.Czech, tuning.English } do
-	for _, first in origin.Women do
-		for _, pair in tuning.Czech.Surnames do
-			known[`{first} {pair[2] or pair[1]}`] = true
-		end
-		for _, pair in tuning.English.Surnames do
-			known[`{first} {pair[2] or pair[1]}`] = true
-		end
-	end
-	for _, first in origin.Men do
-		for _, pair in tuning.Czech.Surnames do
-			known[`{first} {pair[1]}`] = true
-		end
-		for _, pair in tuning.English.Surnames do
-			known[`{first} {pair[1]}`] = true
-		end
-	end
-end
-for _, nickname in tuning.Nicknames do
-	known[nickname] = true
-end
-
 local problem: string? = nil
-local total, flats, apartments, houses, nicknames = 0, 0, 0, 0, 0
+local total, flats, apartments, houses, nicknames, firsts = 0, 0, 0, 0, 0, 0
 local largest = 0
-local czech, english = 0, 0
 for _, home in Map.Homes do
 	local people = Residents.of(home)
 	if people ~= Residents.of(home) then
@@ -93,15 +76,15 @@ for _, home in Map.Homes do
 			problem = `{home.id}: {person.name} twice`
 		end
 		names[person.name] = true
-		if not known[person.name] then
-			problem = `{home.id}: {person.name} is not from the lists`
+		if not plain(person.name) then
+			problem = `{home.id}: {person.name} has a Czech letter`
 		end
 		if table.find(tuning.Nicknames, person.name) then
 			nicknames += 1
-		elseif string.find(person.name, "[\128-\255]") then
-			czech += 1
+		elseif seenFirst[person.name] then
+			firsts += 1 -- (one word from the lists: no surname)
 		else
-			english += 1
+			problem = `{home.id}: {person.name} is not a first name or a nickname from the lists`
 		end
 	end
 	if home.kind == "apartment" then
@@ -131,28 +114,29 @@ for _, home in Map.Homes do
 		if #people < 1 or #people > 4 then
 			problem = `{home.id}: {#people} people in a house`
 		end
-		local family: string? = nil
 		for _, person in people do
 			if person.flat ~= nil then
 				problem = `{home.id}: a flat in a house`
 			end
-			if not table.find(tuning.Nicknames, person.name) then
-				-- one family: the same surname (a man's or a woman's form of it)
-				local last = string.match(person.name, "(%S+)$") or ""
-				local stem = string.sub(last, 1, 4)
-				if family and family ~= stem then
-					problem = `{home.id}: two families ({family}, {stem})`
-				end
-				family = stem
-			end
 		end
 	end
 end
-check("every home's residents: the same list every call, unique names from the lists", problem == nil, problem)
-print(`  {total} residents in {#Map.Homes} homes ({apartments} buildings, {flats} flats; {houses} houses), {largest} at most in one; {czech} Czech, {english} English, {nicknames} nicknames`)
-check("every flat lived in (1 – 2 each), a house 1 – 4 of one family", problem == nil)
+check("every home's residents: the same list every call, unique first names or nicknames from the lists", problem == nil, problem)
+print(`  {total} residents in {#Map.Homes} homes ({apartments} buildings, {flats} flats; {houses} houses), {largest} at most in one; {firsts} first names, {nicknames} nicknames`)
+check("every flat lived in (1 – 2 each), a house 1 – 4", problem == nil)
 check("a big building has many residents", largest >= 20, largest)
-check("both Czech and English names, a few nicknames", czech > total / 5 and english > total / 5 and nicknames > 0 and nicknames < total / 10, `{czech} / {english} / {nicknames}`)
+check("mostly first names, a few nicknames", firsts > total * 0.8 and nicknames > 0 and nicknames < total / 10, `{firsts} / {nicknames}`)
+
+-- 6.3: a 9-floor tower (72 people at most) still gets a name of its own for everybody.
+local tall = { id = "test-tower-9", kind = "apartment", floors = 9, address = "1 Test St", name = "Test Tower" } :: any
+local tallPeople = Residents.of(tall)
+local tallNames: { [string]: boolean } = {}
+local tallOk = true
+for _, person in tallPeople do
+	tallOk = tallOk and not tallNames[person.name]
+	tallNames[person.name] = true
+end
+check("6.3: a 9-floor tower: every flat lived in, every name unique", tallOk and #tallPeople >= 36, #tallPeople)
 
 -- Seeded by the home's id, not by the order of the calls: a fresh copy of a home (Map.makeLots) has the same people.
 local last = Map.Homes[#Map.Homes]

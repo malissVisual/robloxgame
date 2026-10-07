@@ -124,7 +124,7 @@ local SKINS = { { 255, 224, 196 }, { 241, 194, 160 }, { 214, 160, 120 }, { 176, 
 -- A fixed pool of passers-by (server/Npcs.luau makes one body template per look, so the pool stays small).
 local NAMES = {
 	"Ann", "Bob", "Carla", "Dan", "Eva", "Frank", "Gina", "Hank", "Iris", "Jon", "Kate", "Leo",
-	"Mona", "Ned", "Olga", "Pete", "Rita", "Sam", "Tess", "Vic", "Wendy", "Yuri", "Zoe", "Max",
+	"Mona", "Ned", "Olive", "Pete", "Rita", "Sam", "Tess", "Vic", "Wendy", "Yvonne", "Zoe", "Max",
 }
 local SCREAMS = { "ZOMBIES!", "Run!", "Help!", "Get away from me!", "Not again..." }
 -- 3.9: what the people say.

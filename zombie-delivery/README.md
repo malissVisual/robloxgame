@@ -153,8 +153,9 @@ of letting you play a profile that would not be saved.
 | Close a window, the big map or MENU | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
 | Call your car or bring your bike (or reset it while you sit in it) | Q → GARAGE: CALL CAR / MY BIKE | PHONE → GARAGE |
 | Give up the delivery | Q → ORDERS → GIVE UP, twice (or on the Dispatch board) | the same |
-| Rent / return a ZDC RIDE scooter (5.6) | hold E at a dock | the prompt |
+| Rent / return a ZDC RIDE scooter (5.6; 6.3: a rack of six right behind the spawn) | hold E at a dock | the prompt |
 | Ride a city bus (5.5) | E at its door (Board); E in your seat rings the bell (STOP) | the prompts |
+| Show or hide the bus lines on the big map (6.3) | the BUS chip in the map's header | the same |
 | Climb a zip line's ladder, zip, let go (5.6) | E (Climb, Zip); Space lets go low over a roof | the prompts, the jump button |
 | Music and sound (on / music off / all off) | N | SOUND in MENU |
 | Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS in MENU |
@@ -184,8 +185,8 @@ maxSpeed, `Config.Bus`, `Config.ZipLines`):
 | Cargo Bike | 32 | | Courier Van | 70 |
 | E-Scooter (bought) | 36 | | Pickup | 72 |
 | Courier Bike | 38 | | Armored Van | 74 |
-| City bus (free, on its timetable) | 40 | | Muscle Car | 95 |
-| E-Bike | 48 | | Rally Van | 98 |
+| E-Bike | 48 | | Muscle Car | 95 |
+| City bus (free, express on its timetable; 6.3) | 55 | | Rally Van | 98 |
 | Zip line | 55 | | (the Engine upgrade: +8 % a level) | |
 
 While you carry something (or lead a horse) you cannot shoot, sprint or drive, and you walk slower. A car with its
@@ -377,16 +378,16 @@ dark.
 | Campaign | Client | Needs finished | Level (missions 1 → 10) | Campaign reward |
 |---|---|---|---|---|
 | 📦 First Shift | Marge, the dispatcher | – | 1 → 2 | $2,500 |
-| 🏥 Code Red | Dr. Novak, the City Clinic | First Shift | 2 → 4 | $4,000 |
-| 🛒 Empty Shelves | Mr. Patel, FreshMart | Code Red | 4 → 6 | $5,500 |
+| 🏥 Code Red | Doctor Ellie, the City Clinic | First Shift | 2 → 4 | $4,000 |
+| 🛒 Empty Shelves | Raj, FreshMart | Code Red | 4 → 6 | $5,500 |
 | 🤝 Partners in Crime (DUO) | Rosa & Rico, the twins | First Shift | 4 → 8 | $7,500 |
-| 🚒 Smoke and Sirens | Chief Ramirez, Fire Station 9 | Empty Shelves | 6 → 8 | $7,000 |
-| 🪖 Iron Supply | Captain Reyes, the Military Base | Smoke and Sirens | 8 → 9 | $9,000 |
-| ⚡ Lights Out | Engineer Volkov, the Power Plant | Iron Supply | 9 → 10 | $11,000 |
+| 🚒 Smoke and Sirens | Chief Carlos, Fire Station 9 | Empty Shelves | 6 → 8 | $7,000 |
+| 🪖 Iron Supply | Captain Maria, the Military Base | Smoke and Sirens | 8 → 9 | $9,000 |
+| ⚡ Lights Out | Engineer Ivan, the Power Plant | Iron Supply | 9 → 10 | $11,000 |
 | 🐴 Wild West End | Walt, the rancher | Lights Out | 10 → 12 | $13,000 |
-| 🧪 Patient Zero | Dr. Ito, the Biotech Lab | Wild West End | 12 → 13 | $16,000 |
+| 🧪 Patient Zero | Doctor Hiro, the Biotech Lab | Wild West End | 12 → 13 | $16,000 |
 | 💰 Dirty Money | Vinnie, the fixer | Patient Zero | 13 → 14 | $20,000 |
-| 🚌 Last Convoy | Mayor Grant, City Hall | all nine story campaigns | 14 → 15 | $30,000 |
+| 🚌 Last Convoy | Mayor Ruth, City Hall | all nine story campaigns | 14 → 15 | $30,000 |
 
 * **Stars** (`Missions.rate`): done = ★; the cargo still at 75 % or more = ★★; and 30 % or more of the clock left =
   ★★★. Your best rating per mission is saved.
@@ -764,7 +765,7 @@ theirs on the next join.
 | 🏥 Code Red | Medic Mint paint | Field Medic |
 | 🛒 Empty Shelves | Fresh Lime paint | Grocery Hero |
 | 🚒 Smoke and Sirens | Fire Engine paint (metal) | Smoke Eater |
-| 🪖 Iron Supply | **Reyes' Carbine** (gun) | Quartermaster |
+| 🪖 Iron Supply | **Maria's Carbine** (gun) | Quartermaster |
 | ⚡ Lights Out | Volt Neon paint (neon) | Live Wire |
 | 🐴 Wild West End | **Walt's Lever Rifle** (gun, a round hits 2 in a row) | Outlaw Tamer |
 | 🧪 Patient Zero | Toxic Glow paint (neon) | Cure Runner |
@@ -819,7 +820,7 @@ to your name on the leaderboard (TOP). Your first title is shown at once.
   first" before you have been there), and the Phantom card.
 * **REWARDS**: the eleven campaign rewards (earned, or "finish <campaign>"; a click opens the campaign), your titles with
   EQUIP, and the exclusive guns and paints.
-* The MISSIONS tab's campaign header shows the campaign's reward too ("Reward: Reyes' Carbine + title Quartermaster").
+* The MISSIONS tab's campaign header shows the campaign's reward too ("Reward: Maria's Carbine + title Quartermaster").
 * **Popups** at the top centre, one at a time: a strip for a new place, a card for a package or a challenge (its money
   and title), and a BIG card with a glow and confetti for a campaign's, every package's and every challenge's
   reward. They wait while the DELIVERY result, the mission's celebration card or the MISSIONS window is up, so
@@ -1054,7 +1055,7 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
   (Silver Spur Ranch) and the **Army Carbine** (Military Base). One-handed (they also fire out of a car window):
   Pistol, Ranch Revolver, SMG, Vinnie's Golden Pistol.
 * **Exclusive gear** (3.1, `exclusive` in `Config.Weapons` / `Config.Paints`, never sold; see **Challenges, secrets
-  and rewards**): the guns **Reyes' Carbine** (an olive carbine with a scope), **Walt's Lever Rifle** (wood, a round
+  and rewards**): the guns **Maria's Carbine** (an olive carbine with a scope), **Walt's Lever Rifle** (wood, a round
   hits 2 in a row), **Vinnie's Golden Pistol** and **Dead End** (a round hits 4 in a row), each with its own model; the paints
   Dispatch Yellow, Medic Mint, Fresh Lime, Fire Engine, Volt Neon, Toxic Glow, Sunrise Chrome and Phantom, some with
   a **finish** (metal, neon, foil, glass) on the body panels (`PaintDef.material`). The shops show them as dimmed
@@ -1105,6 +1106,35 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## Scooters at the spawn, express buses, the bus map, the bag, English names (6.3)
+
+**The spawn's rack** (`Config.Rental.SpawnRack`, the first dock of `shared/RentalDocks.luau`): six ZDC RIDE scooters
+side by side in the depot's yard, right behind the spawn pad, noses toward the street: hold E, rent one and go. It
+works like every dock (Return here or anywhere); the street dock just outside the safe zone stays.
+
+**Express buses** (`Config.Bus`, `shared/BusLines.luau`): the bus is for the long way now. A stop about every 4 blocks
+(`StopGap` 560) and at the key places: each next stop is the lane nearest the shops, places and storefronts within a
+window, and a stop by one is named after it ("City Hall", "Fire Station 9", "Sunny Hill School"; else "Oak St / 6th
+Ave"). 14 stops, 15 buses (6 / 5 / 4), 55 studs/s on a straight, a bus every ~19 s. The contract suggests a bus for
+trips over 500 studs.
+
+**The bus map**: the big map (M) draws the three lines and their stops (the **BUS** chip hides them); every stop has a
+map board next to its shelter, and near it (60 studs) your client draws the lines, the stops' names and **YOU ARE
+HERE** on it (`client/BusMapBoard.luau`, one board at a time).
+
+**The bag takes your pickups** (the owner: "things don't go into the bag, a new inventory slot appears"): on a foot or
+bike job with the bag in your hand **every light piece** goes into it (`Bag.fitsBag`: bouquets, cakes and groceries
+too; the backpack still takes `PackLooks` only), and an order of light pieces counts the bag's room. The bag slot shows
+the server's numbers (the BagRoom attribute) with a count badge; a job whose pickups go to the hands (a car job) says
+"HANDS ONLY". The slot-like strip tiles are gone: a "CARRYING …" pill over the bar lists what you carry and where. Holding
+something else, a light pickup tells you once a job to hold the bag (2). A supply crate's consumable says it went to
+your item bar.
+
+**English first names** (the owner: "the people's names without surnames, in English; the whole game is English"):
+residents are a single English first name (or a nickname: "Lucky Jim"), the story people a first name and a role
+(Doctor Ellie, Raj at FreshMart, Chief Carlos, Engineer Ivan, Mayor Ruth, Old Man Jed, Captain Maria …), and no Czech is
+left in any game text. Review: the throw's line and power meter sit over the breath bar (Hud places them, `Throw.place`).
 
 ## Auto-aim throws and the PERFECT tip (6.2)
 
@@ -1276,7 +1306,7 @@ vehicle back. Turn on **StreamingEnabled** in the place (the Output warns when i
 ## ZDC RIDE scooters, zip lines, alley shortcuts (5.6)
 
 **ZDC RIDE** (`Config.Rental`, `shared/RentalDocks.luau`, `server/Rental.luau`, `client/RentalUi.luau`): 20 docks
-(14 Downtown, 6 in the Suburbs, one just outside the depot) with free e-scooters. **Rent** at a dock and you ride at
+(14 Downtown, 6 in the Suburbs, one just outside the depot; 6.3: and the rack at the spawn) with free e-scooters. **Rent** at a dock and you ride at
 once (your own car or bike goes home first); it works like the E-Scooter for foot and bike jobs. Get off and walk 30
 studs away, leave it for 45 s or **Return** it at any dock and it goes back. Not for car jobs or missions; never yours to
 keep, paint or fuel. The phone's GARAGE shows the nearest dock with a GPS button; both maps mark the docks.
@@ -1292,7 +1322,8 @@ with a low fence to hop at each end and a SHORTCUT sign.
 
 **City buses** (`shared/BusLines.luau`, `server/Buses.luau`, `server/BusStops.luau`, `client/BusRide.luau`, `Config.Bus`):
 three free lines run on a fixed timetable — **1 Downtown Ring** (red), **2 Downtown Cross** (yellow, around the depot)
-and **3 Suburbs Link** (blue) — 21 buses, 28 stops with a shelter, a bench and an arrivals board. Near a stop a card
+and **3 Suburbs Link** (blue) — 21 buses, 28 stops with a shelter, a bench and an arrivals board (6.3: express, 15
+buses, 14 stops, a map board at each). Near a stop a card
 shows the next buses ("Line 1 Ring 0:12"); a bus waits 4 s at every stop: **Board** at its door, sit, and the banner
 shows the next stop; **E** (STOP) rings the bell and you get off at the next stop, or right away while it stands.
 Held pieces go into your backpack first. On a far foot or bike job the contract suggests a line ("🚌 Line 2 from …").

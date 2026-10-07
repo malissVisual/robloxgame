@@ -9,6 +9,8 @@
 -- e-scooter's rack takes one), never in the backpack.
 --
 --   Bag.fits(look)                       does a piece of this look go into a backpack?
+--   Bag.fitsBag(look)                    6.3: does it go into the plastic bag in your hand? Every light look
+--                                        (Config.Cargo.LightLooks: a bouquet, a cake, groceries too), never a heavy one
 --   Bag.room(look, mode, room, rack)     how many pieces of this look one order may have: `room` (what you carry:
 --                                        hands + backpack on foot, the bike's room + the backpack by bike, the car's)
 --                                        for a piece that fits the backpack; else the hands on foot, the bike's own
@@ -42,6 +44,12 @@ export type Group = { where: string, icon: string, title: string, pieces: { Piec
 
 function Bag.fits(look: string?): boolean
 	return look ~= nil and Config.Cargo.PackLooks[look] == true
+end
+
+-- 6.3 (the owner: "things don't go into the bag"): the plastic bag takes every light piece, not only the backpack's
+-- looks; the backpack keeps Config.Cargo.PackLooks.
+function Bag.fitsBag(look: string?): boolean
+	return look ~= nil and Config.Cargo.LightLooks[look] == true
 end
 
 function Bag.room(look: string?, mode: string, room: number, rack: number?): number

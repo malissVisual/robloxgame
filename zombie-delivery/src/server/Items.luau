@@ -311,6 +311,10 @@ local function placeCrate(folder: Instance)
 	table.insert(crates, crate)
 end
 
+local function article(noun: string): string
+	return if string.find("AEIOUaeiou", string.sub(noun, 1, 1), 1, true) then "an " .. noun else "a " .. noun
+end
+
 local function collect(player: Player, crate: Part)
 	local index = table.find(crates, crate)
 	if index then
@@ -323,7 +327,7 @@ local function collect(player: Player, crate: Part)
 	if rng:NextNumber() < loot.ItemChance then
 		local def = Config.Items[rng:NextInteger(1, #Config.Items)]
 		if PlayerData.addItem(player, def.id, 1) then
-			notice:FireClient(player, `Supply crate: {def.icon} {def.name}!`)
+			notice:FireClient(player, `Supply crate: found {article(def.name)} {def.icon} → in your item bar`) -- (6.3 review: no slot number: a touch screen shows fewer slots and no keys)
 			gotItem = true
 		end
 	end

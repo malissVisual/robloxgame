@@ -15,6 +15,9 @@
 -- edge), pooled per row; when cells are uncovered only their rows are drawn again. The job's star and route, the GPS,
 -- you, your car on its way and the live markers stay over the fog: you must find your delivery.
 -- 5.6: a small 🛴 marker at every ZDC RIDE rental dock (shared/RentalDocks.luau), under the fog.
+-- 6.3, the bus map: on the big map the express lines (shared/BusLines.luau mapLines: a few corners a loop) in their
+-- colours and their stops as white-ringed dots, under the fog like the docks; the BUS chip in the header hides them or
+-- shows them again (MapView.busShown, for the session).
 -- 3.8, the contract UI (design/ui-contract/): the minimap is compact and monochrome in a thin square line; inside its
 -- top edge the way you face and where you are ("N · HARBOR") and EXPAND [M], a quiet text action that opens the big
 -- map; under it the next turn of the route ("↰ Left onto Maple St · 120 m", the job's route, else the GPS's; with
@@ -106,7 +109,7 @@ local KIND_COLORS = {
 type Line = { edges: { any }, fills: { any }, parent: any, color: Color3, width: number, full: number, cut: number }
 -- 3.7: the fog on one canvas: per grid row a pool of frames (a core and its soft edge for every run of fogged cells).
 type Fog = { layer: any, scale: number, feather: number, rows: { [number]: { any } } }
-type Canvas = { content: any, scale: number, markers: any, job: Line, gps: Line, fog: Fog }
+type Canvas = { content: any, scale: number, markers: any, job: Line, gps: Line, fog: Fog, bus: any? }
 
 -- A route to a goal (the job's target or the GPS point).
 type Route = {
@@ -300,6 +303,46 @@ local function drawLine(line: Line, route: Route, scale: number)
 	line.full, line.cut = route.full, route.cut
 end
 
+-- 6.3: the bus lines on the big map are shown (the BUS chip; the session remembers it).
+MapView.busShown = true
+
+-- 6.3, the bus lines' layer on a canvas: each loop's few corners joined by bands 3 px wide in its colour, every stop
+-- once as a dot in a white ring (ZIndex 7: under the fog, 8, like the docks).
+local function busLayer(content: any, scale: number): any
+	local layer = Ui.make("Frame", { Name = "BusLines", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 7, Visible = MapView.busShown }, content)
+	local lines = require(Shared.BusLines).mapLines(32)
+	for _, line in lines do
+		local color = Color3.fromRGB(line.color[1], line.color[2], line.color[3])
+		local count = #line.points
+		for k = 1, count do
+			local a, b = line.points[k], line.points[k % count + 1]
+			local frame = Ui.make("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 7 }, layer)
+			Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, frame)
+			band(frame, a.x, a.z, b.x, b.z, scale, 3, 3)
+		end
+	end
+	local drawn: { [number]: boolean } = {}
+	for _, line in lines do
+		for _, stop in line.stops do
+			if not drawn[stop.id] then
+				drawn[stop.id] = true
+				local spot = Ui.make("Frame", {
+					Name = "BusStop",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = point(stop.x, stop.z, scale),
+					Size = UDim2.fromOffset(7, 7),
+					BackgroundColor3 = Color3.fromRGB(line.color[1], line.color[2], line.color[3]),
+					BorderSizePixel = 0,
+					ZIndex = 7,
+				}, layer)
+				Ui.corner(spot, 7)
+				Ui.stroke(spot, P.ink, 1.5)
+			end
+		end
+	end
+	return layer
+end
+
 -- The whole world into a frame at `scale` pixels per stud.
 local function draw(parent: any, scale: number, big: boolean): Canvas
 	local content = Ui.make("Frame", {
@@ -399,6 +442,8 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 			Ui.icon(marker, rideArt, "🛴", UDim2.fromScale(0.8, 0.8), { Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 7 })
 		end
 	end
+	-- 6.3: the bus lines (the big map only: the minimap stays quiet).
+	local bus = if big then busLayer(content, scale) else nil
 	-- 3.7: the fog over the map (ZIndex 8), the routes and the markers over the fog.
 	local fog: Fog = {
 		layer = Ui.make("Frame", { Name = "Fog", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 8 }, content),
@@ -419,6 +464,7 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		job = newLine(jobLayer, C.job, width),
 		gps = newLine(gpsLayer, C.gps, width),
 		fog = fog,
+		bus = bus,
 	}
 end
 
@@ -1271,11 +1317,11 @@ local function buildBig(gui: any)
 	heading.frame.ZIndex = 41
 	Ui.make("TextLabel", {
 		Name = "Legend",
-		Size = UDim2.new(1, -(190 + 60), 0, 36),
+		Size = UDim2.new(1, -(190 + 60 + 84), 0, 36),
 		Position = UDim2.fromOffset(190, 5),
 		BackgroundTransparency = 1,
 		RichText = true,
-		Text = `▲ YOU   <font color="{hex(C.job)}">■━</font> DELIVERY   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="{hex(P.danger)}">!</font> BANDIT CAR   ? CRATE   <font color="{hex(C.fog)}">■</font> UNEXPLORED`,
+		Text = `▲ YOU   <font color="{hex(C.job)}">■━</font> DELIVERY   <font color="{hex(C.gps)}">◆━</font> GPS   <font color="{hex(P.danger)}">!</font> BANDIT CAR   ? CRATE   🚌━ BUS LINES   <font color="{hex(C.fog)}">■</font> UNEXPLORED`,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextSize = 12,
@@ -1289,6 +1335,33 @@ local function buildBig(gui: any)
 	end)
 	close.Position = UDim2.new(1, -8, 0, 3)
 	close.ZIndex = 42
+	-- 6.3: the BUS chip left of the ✕: the bus lines on the map on or off (for the session).
+	local busChip = Ui.make("TextButton", {
+		Name = "BusChip",
+		Size = UDim2.fromOffset(76, 24),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -56, 0, 11),
+		BackgroundColor3 = K.raised,
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		TextSize = 12,
+		Font = Theme.HeadingFont,
+		ZIndex = 42,
+	}, big)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = 0.45 }, busChip)
+	local function showBus()
+		busChip.Text = if MapView.busShown then "🚌 BUS ON" else "🚌 BUS OFF"
+		busChip.TextColor3 = if MapView.busShown then P.ink else P.ink2
+		busChip.BackgroundColor3 = if MapView.busShown then K.raised else K.recessed
+		local canvas = bigCanvas
+		if canvas and canvas.bus then
+			canvas.bus.Visible = MapView.busShown
+		end
+	end
+	busChip.Activated:Connect(function()
+		MapView.busShown = not MapView.busShown
+		showBus()
+	end)
 	local holder = Ui.make("Frame", {
 		Size = UDim2.fromOffset(mapW, mapH),
 		Position = UDim2.fromOffset(8, 48),
@@ -1298,6 +1371,7 @@ local function buildBig(gui: any)
 	}, big)
 	local canvas = draw(holder, BIG_SCALE, true)
 	bigCanvas = canvas
+	showBus()
 	for _, landmark in Map.Landmarks do
 		local icon = landmarkIcon(canvas.markers, landmark, BIG_SCALE, 24, true)
 		icon.Activated:Connect(function()

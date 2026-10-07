@@ -482,7 +482,7 @@ function Extras.secretList(): { SecretEntry }
 	return list
 end
 
--- A reward item's name and colour: "Reyes' Carbine", "Volt Neon paint".
+-- A reward item's name and colour: "Maria's Carbine", "Volt Neon paint".
 function Extras.itemName(reward: RewardItem): string
 	if reward.weapon then
 		local def = Economy.findWeapon(reward.weapon)
@@ -544,7 +544,7 @@ function Extras.needsCrew(def: MissionDef): boolean
 	return def.duo == true and crewOwner == nil and Extras.crewSize < Config.Missions.Duo.MinCrew
 end
 
--- A campaign's reward as a line: "Reyes' Carbine + title “Quartermaster”" (nil for a campaign without one).
+-- A campaign's reward as a line: "Maria's Carbine + title “Quartermaster”" (nil for a campaign without one).
 function Extras.rewardLine(campaignId: string): string?
 	local reward = Config.Rewards.Campaigns[campaignId]
 	if not reward then

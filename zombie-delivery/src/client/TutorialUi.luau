@@ -416,14 +416,15 @@ local function tourGps(id: string?, name: string?, x: number?, z: number?)
 end
 
 -- Where the tour goes: the dock and the bus stop nearest the depot (shared/RentalDocks.luau, shared/BusLines.luau).
-local function tourPlaces(): ({ name: string, x: number, z: number }?, { name: string, x: number, z: number }?)
+-- 6.3: the nearest dock is the spawn's rack in the depot's yard (spawn: its page names no street).
+local function tourPlaces(): ({ name: string, x: number, z: number, spawn: boolean }?, { name: string, x: number, z: number }?)
 	local depot = Map.Shops.depot
-	local dock: { name: string, x: number, z: number }? = nil
+	local dock: { name: string, x: number, z: number, spawn: boolean }? = nil
 	local stop: { name: string, x: number, z: number }? = nil
 	pcall(function()
 		local near = require(Shared.RentalDocks).nearest(depot.x, depot.z)
 		if near then
-			dock = { name = near.name, x = near.x, z = near.z }
+			dock = { name = near.name, x = near.x, z = near.z, spawn = near.spawn }
 		end
 	end)
 	pcall(function()
@@ -453,7 +454,7 @@ local function tour(index: number)
 	else
 		tourGps(nil)
 	end
-	show(`tour_{index}`, TutorialSteps.tourDialog(step, { dock = if dock then dock.name else nil, stop = if stop then stop.name else nil }))
+	show(`tour_{index}`, TutorialSteps.tourDialog(step, { dock = if dock and not dock.spawn then dock.name else nil, stop = if stop then stop.name else nil }))
 end
 
 -- What the last page's actions do.

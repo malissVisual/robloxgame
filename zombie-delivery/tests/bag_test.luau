@@ -36,6 +36,30 @@ check("every look that fits a backpack is light", (function()
 	return true
 end)())
 
+-- 6.3, the plastic bag in your hand: every light look (a bouquet, a cake, groceries too), never a heavy one ------------
+
+local bagOk = true
+for look in Cargo.LightLooks do
+	if not Bag.fitsBag(look) then
+		bagOk = false
+		print("  light, not in the bag: " .. look)
+	end
+end
+check("6.3: every light look goes into the bag", bagOk)
+for _, look in { "barrel", "crate", "furniture", "ammo", "cooler", "pallet" } do
+	check(`6.3: {look} never goes into the bag`, not Bag.fitsBag(look) and not Cargo.LightLooks[look])
+end
+check("6.3: no look, no bag", not Bag.fitsBag(nil))
+check("6.3: the bag takes what the backpack does not (the backpack keeps its looks)", Bag.fitsBag("bouquet") and Bag.fitsBag("cake") and Bag.fitsBag("groceries") and Bag.fitsBag("icecream") and not Bag.fits("bouquet") and not Bag.fits("cake"))
+check("6.3: everything the backpack takes, the bag takes", (function()
+	for look in Cargo.PackLooks do
+		if not Bag.fitsBag(look) then
+			return false
+		end
+	end
+	return true
+end)())
+
 -- The room of one order ------------------------------------------------------------------------------
 
 check("on foot a pack look takes the hands and the backpack", Bag.room("pizza", "foot", 4, nil) == 4)

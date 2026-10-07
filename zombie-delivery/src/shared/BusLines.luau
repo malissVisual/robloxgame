@@ -6,11 +6,11 @@
 -- A line is a closed loop through the corners Config.Bus.Lines gives (road-centre points of Map's grid), driven
 -- clockwise on the traffic's right-hand lanes (shared/TrafficLanes.luau): the lane pieces between the junctions and
 -- the Bézier turns over them, straight on wherever a corner is not. Its stops come along the loop, one at least
--- StopGap after the one before (about every 2 blocks), each in the middle of a block's lane where the bus pulls in to
--- the kerb (Map.CurbPark out on the road) with its front-right door by the shelter. Never on a special block's side
--- (the depot, the shops, the places have their own fronts), never by a lot that drives over the sidewalk (a gas
--- station, a house for sale, a storefront) and never within StopClear of a home's door, pile or park, a cargo spot,
--- a place or an employer's board; a blocked middle tries a little up or down the block. Two lines on the same lane
+-- StopGap after the one before (6.3: about every 4 blocks, see below), each in the middle of a block's lane where the
+-- bus pulls in to the kerb (Map.CurbPark out on the road) with its front-right door by the shelter. Never on a special
+-- block's side (the depot, the shops, the places have their own fronts), never by a lot that drives over the sidewalk
+-- (a gas station, a house for sale, a storefront) and never within StopClear of a home's door, pile or park, a cargo
+-- spot, a place or an employer's board; a blocked middle tries a little up or down the block. Two lines on the same lane
 -- of the same block share the stop. A stop is named after its street and the nearer cross street ("Cedar St /
 -- 6th Ave"; the streets between Downtown and the Suburbs take the nearer district's name).
 --
@@ -24,6 +24,14 @@
 --
 -- route(from, to): the best ride from here to there (the line, the stop to board and to leave, the stops ridden,
 -- the walks), or nil when walking (Config.Movement.Walk) is as quick within RouteSaving seconds.
+--
+-- 6.3, express lines: a stop about every 4 blocks (StopGap) and at the key places. Every block's lane of the loop with
+-- a clear kerb is a candidate, scored by the key places near its kerb (Map.Landmarks: the depot and the shops most,
+-- the places and the employers, the storefronts a little; the districts' middles; KeyReach). The line's best lane is
+-- its first stop; then round the loop each next stop is the best-scored lane from StopGap to StopGap + PickWindow
+-- after the one before (the first lane past that when the window has none), the last at least LastGap before the
+-- first. A stop within NameReach of a key place is named after it ("City Clinic", the depot "Depot"; each place names
+-- one stop), else after its street as before. BusLines.mapLines gives the loops as short polylines for the maps.
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
@@ -46,6 +54,7 @@ export type Stop = {
 	nx: number, -- from the road toward the sidewalk (unit)
 	nz: number,
 	lines: { number }, -- the line ids that stop here
+	landmark: string?, -- 6.3: the Map.Landmarks id it is named after (nil: named after its street)
 }
 
 type Segment = {
@@ -118,6 +127,64 @@ local function roadName(x: number, z: number, alongX: boolean): string?
 					best = names[(k - lo + 1) % #names + 1]
 				end
 			end
+		end
+	end
+	return best
+end
+
+-- 6.3, the key places the stops are drawn to and named after: the landmarks in town (Map.Landmarks; the depot, the
+-- shops, the places and the employers weigh more than a storefront or a garage for sale) and the districts' middles
+-- (they draw stops, they name none).
+type KeyPlace = { id: string?, name: string?, x: number, z: number, weight: number }
+local keyPlaces: { KeyPlace }? = nil
+
+local function keys(): { KeyPlace }
+	if keyPlaces then
+		return keyPlaces
+	end
+	local list: { KeyPlace } = {}
+	for _, landmark in Map.Landmarks do
+		local weight = if landmark.id == "depot" then 4
+			elseif landmark.kind == "shop" then 3
+			elseif landmark.kind == "venue" or string.sub(landmark.id, 1, 7) == "garage_" then 1
+			else 2
+		local name = if landmark.id == "depot" then "Depot" else landmark.name
+		table.insert(list, { id = landmark.id, name = name, x = landmark.x, z = landmark.z, weight = weight })
+	end
+	for _, d in Map.Districts do
+		table.insert(list, { id = nil, name = nil, x = d.ox + (d.i0 + d.i1) / 2 * Map.Cell, z = d.oz + (d.j0 + d.j1) / 2 * Map.Cell, weight = 1 })
+	end
+	keyPlaces = list
+	return list
+end
+
+-- How much the key places draw a stop whose kerb is at (x, z).
+local function keyScore(x: number, z: number): number
+	local reach = Tuning.KeyReach
+	local score = 0
+	for _, place in keys() do
+		local d = math.sqrt((place.x - x) ^ 2 + (place.z - z) ^ 2)
+		if d < reach then
+			score += place.weight * (1 - d / reach)
+		end
+	end
+	return score
+end
+
+-- The key place a stop at (x, z) is named after: the weightiest within NameReach that names no stop yet (the nearer
+-- of two as weighty), nil for none.
+local named: { [string]: boolean } = {}
+local function keyName(x: number, z: number): KeyPlace?
+	local best: KeyPlace? = nil
+	local bestD = math.huge
+	for _, place in keys() do
+		local id = place.id
+		if not id or not place.name or named[id] then
+			continue
+		end
+		local d = math.sqrt((place.x - x) ^ 2 + (place.z - z) ^ 2)
+		if d <= Tuning.NameReach and (not best or place.weight > best.weight or (place.weight == best.weight and d < bestD)) then
+			best, bestD = place, d
 		end
 	end
 	return best
@@ -238,8 +305,9 @@ BusLines.HalfLength = 12
 local allStops: { Stop } = {}
 local stopByKey: { [string]: Stop } = {}
 
--- A stop on lane `e` of the graph, `s` studs along its lane piece (nil: the kerb is not clear there).
-local function makeStop(g: TrafficLanes.Graph, e: number, piece: TrafficLanes.Piece, s: number, lineId: number): Stop?
+-- Where a stop on lane `e` of the graph, `s` studs along its lane piece, would be (nil: the kerb is not clear there).
+type Spot = { e: number, x: number, z: number, hx: number, hz: number, kx: number, kz: number, rx: number, rz: number, cx: number, cz: number }
+local function spotAt(g: TrafficLanes.Graph, e: number, piece: TrafficLanes.Piece, s: number): Spot?
 	local x, z, hx, hz = TrafficLanes.at(piece, s)
 	local width = g.width[e]
 	local rx, rz = -hz, hx -- right of the way it goes (-Z is north)
@@ -251,8 +319,13 @@ local function makeStop(g: TrafficLanes.Graph, e: number, piece: TrafficLanes.Pi
 		return nil
 	end
 	local stand = width / 2 - Map.CurbPark
-	local bx, bz = cx + rx * stand, cz + rz * stand
-	local key = `{math.floor(bx + 0.5)},{math.floor(bz + 0.5)}`
+	return { e = e, x = cx + rx * stand, z = cz + rz * stand, hx = hx, hz = hz, kx = kx, kz = kz, rx = rx, rz = rz, cx = cx, cz = cz }
+end
+
+-- The stop at a spot for line `lineId` (two lines on the same lane of the same block share it).
+local function makeStop(g: TrafficLanes.Graph, spot: Spot, lineId: number): Stop
+	local e, cx, cz, hx, hz = spot.e, spot.cx, spot.cz, spot.hx, spot.hz
+	local key = `{math.floor(spot.x + 0.5)},{math.floor(spot.z + 0.5)}`
 	local existing = stopByKey[key]
 	if existing then
 		if not table.find(existing.lines, lineId) then
@@ -268,19 +341,25 @@ local function makeStop(g: TrafficLanes.Graph, e: number, piece: TrafficLanes.Pi
 	local nearEnd = (ex - cx) ^ 2 + (ez - cz) ^ 2 < (ax - cx) ^ 2 + (az - cz) ^ 2
 	local jx, jz = if nearEnd then ex else ax, if nearEnd then ez else az
 	local cross = roadName(jx, jz, not alongX)
+	-- 6.3: named after the key place by it, when there is one.
+	local place = keyName(spot.kx, spot.kz)
+	if place and place.id then
+		named[place.id] = true
+	end
 	local stop: Stop = {
 		id = #allStops + 1,
-		name = if cross and cross ~= street then `{street} / {cross}` else street,
+		name = if place and place.name then place.name elseif cross and cross ~= street then `{street} / {cross}` else street,
 		street = street,
-		x = bx,
-		z = bz,
+		x = spot.x,
+		z = spot.z,
 		hx = hx,
 		hz = hz,
-		kx = kx,
-		kz = kz,
-		nx = rx,
-		nz = rz,
+		kx = spot.kx,
+		kz = spot.kz,
+		nx = spot.rx,
+		nz = spot.rz,
 		lines = { lineId },
+		landmark = if place then place.id else nil,
 	}
 	table.insert(allStops, stop)
 	stopByKey[key] = stop
@@ -384,10 +463,12 @@ local function buildLine(g: TrafficLanes.Graph, def: Config.BusLineDef): Line
 	line.length = arc
 	line.cruiseTotal = cruise
 
-	-- 3. The stops: the middle of a block's lane (or a little up or down it), StopGap after the last one, and not too
-	-- close to the first one round the loop.
+	-- 3. The stops (6.3, express): every block's lane is a candidate where its kerb is clear (the middle, or a little
+	-- up or down it), scored by the key places by it. The best one first, then round the loop the best within the
+	-- window from StopGap after the last one on, and none closer than LastGap to the first one round the loop.
 	local margin = BusLines.HalfLength + 3 -- the whole bus off the junction
-	local lastArc = -math.huge
+	type Candidate = { at: number, spot: Spot, score: number }
+	local candidates: { Candidate } = {}
 	for n, e in edges do
 		local piece = TrafficLanes.lane(g, e)
 		if piece.length < 2 * margin + 10 then
@@ -396,18 +477,61 @@ local function buildLine(g: TrafficLanes.Graph, def: Config.BusLineDef): Line
 		local mid = piece.length / 2
 		for _, shift in { 0, 22, -22, 36, -36 } do
 			local s = math.clamp(mid + shift, margin, piece.length - margin)
-			local at = laneStart[n] + s -- (the lane's segments run on from laneStart)
-			if at - lastArc < Tuning.StopGap or (#line.stops > 0 and line.stopArc[1] + line.length - at < Tuning.StopGap * 0.6) then
-				continue
-			end
-			local stop = makeStop(g, e, piece, s, def.id)
-			if stop then
-				table.insert(line.stops, stop)
-				table.insert(line.stopArc, at)
-				lastArc = at
+			local spot = spotAt(g, e, piece, s)
+			if spot then
+				-- (the lane's segments run on from laneStart)
+				table.insert(candidates, { at = laneStart[n] + s, spot = spot, score = keyScore(spot.kx, spot.kz) })
 				break
 			end
 		end
+	end
+	local first: Candidate? = nil
+	for _, c in candidates do
+		if not first or c.score > first.score + EPS then
+			first = c
+		end
+	end
+	assert(first, `BusLines: line {def.id} has no stops`)
+	local start = first.at
+	local length = line.length
+	local function ahead(c: Candidate): number
+		return (c.at - start) % length
+	end
+	table.sort(candidates, function(a: Candidate, b: Candidate): boolean
+		return ahead(a) < ahead(b)
+	end)
+	local picked: { Candidate } = { first }
+	local last = 0
+	while true do
+		local best: Candidate? = nil
+		local beyond: Candidate? = nil
+		for _, c in candidates do
+			local f = ahead(c)
+			if f < last + Tuning.StopGap or length - f < Tuning.LastGap then
+				continue
+			end
+			if f <= last + Tuning.StopGap + Tuning.PickWindow then
+				if not best or c.score > best.score + EPS then
+					best = c
+				end
+			elseif not beyond then
+				beyond = c
+			end
+		end
+		local pick = best or beyond
+		if not pick then
+			break
+		end
+		table.insert(picked, pick)
+		last = ahead(pick)
+	end
+	-- Round the loop from its start (the timetable runs from the stop nearest it), each made (or shared) now.
+	table.sort(picked, function(a: Candidate, b: Candidate): boolean
+		return a.at < b.at
+	end)
+	for _, c in picked do
+		table.insert(line.stops, makeStop(g, c.spot, def.id))
+		table.insert(line.stopArc, c.at)
 	end
 	assert(#line.stops >= 2, `BusLines: line {def.id} has fewer than 2 stops`)
 
@@ -460,6 +584,9 @@ function BusLines.lines(): { Line }
 				if #stop.lines == 0 then
 					table.remove(allStops, n)
 					stopByKey[`{math.floor(stop.x + 0.5)},{math.floor(stop.z + 0.5)}`] = nil
+					if stop.landmark then
+						named[stop.landmark] = nil
+					end
 				end
 			end
 			for n, stop in allStops do
@@ -662,6 +789,68 @@ function BusLines.route(fromX: number, fromZ: number, toX: number, toZ: number, 
 		return best
 	end
 	return nil
+end
+
+-- ── 6.3, the bus map ───────────────────────────────────────────────────────
+
+export type MapPoint = { x: number, z: number }
+export type MapStop = { id: number, x: number, z: number, name: string }
+export type MapLine = { line: number, short: string, color: { number }, points: { MapPoint }, stops: { MapStop } }
+
+-- How far the point b is off the straight line from a to c.
+local function offLine(a: MapPoint, b: MapPoint, c: MapPoint): number
+	local dx, dz = c.x - a.x, c.z - a.z
+	local length = math.sqrt(dx * dx + dz * dz)
+	if length < EPS then
+		return math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2)
+	end
+	return math.abs(dx * (b.z - a.z) - dz * (b.x - a.x)) / length
+end
+
+local mapCache: { [number]: { MapLine } } = {}
+
+-- Every line for a map (client/MapView.luau, client/BusMapBoard.luau): its loop as a closed polyline of at most
+-- `maxPoints` corners (the straight runs joined, the point that bends it least dropped first: few frames to draw),
+-- and its stops in the order the bus comes to them (where the bus stands). Cached per maxPoints.
+function BusLines.mapLines(maxPoints: number?): { MapLine }
+	local most = math.max(4, maxPoints or 32)
+	local cached = mapCache[most]
+	if cached then
+		return cached
+	end
+	local list: { MapLine } = {}
+	for _, line in BusLines.lines() do
+		local points: { MapPoint } = {}
+		for _, seg in line.segments do
+			local x, z = TrafficLanes.at(seg.piece, seg.s0)
+			local prev = points[#points]
+			if not prev or (prev.x - x) ^ 2 + (prev.z - z) ^ 2 > 1 then
+				table.insert(points, { x = x, z = z })
+			end
+		end
+		-- Drop the point that bends the loop least (it is closed: the neighbours wrap) while it is straight or too many.
+		while #points > 4 do
+			local count = #points
+			local worst, at = math.huge, 0
+			for n = 1, count do
+				local off = offLine(points[(n - 2) % count + 1], points[n], points[n % count + 1])
+				if off < worst then
+					worst, at = off, n
+				end
+			end
+			if worst > 0.5 and count <= most then
+				break
+			end
+			table.remove(points, at)
+		end
+		local stops: { MapStop } = {}
+		for _, stop in line.stops do
+			table.insert(stops, { id = stop.id, x = stop.x, z = stop.z, name = stop.name })
+		end
+		table.insert(list, { line = line.id, short = line.short, color = line.color, points = points, stops = stops })
+	end
+	mapCache[most] = list
+	return list
 end
 
 -- A line's colour as r, g, b (0 … 255).

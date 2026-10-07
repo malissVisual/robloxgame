@@ -1966,6 +1966,14 @@ local function stackCheck(player: Player, job: Job, offer: Offer): (boolean, str
 		-- 5.3: a piece that does not fit a backpack rides in the hands (on foot) or on the bike's rack: those of the
 		-- open orders and this one must fit there too.
 		local big = if mode == "foot" then Tuning.HandsMax else (job.cargo.info.rack or 0)
+		if mode == "foot" and Bag.fitsBag(offer.look) then
+			-- 6.3 review: a light piece rides in the plastic bag too (its room over the hands, when you own it)
+			local profile = PlayerData.get(player)
+			local Rules = require(Shared.Transport) -- (the shared rules, not this module's server/Transport)
+			if profile then
+				big += math.max(0, Rules.handsRoom(profile.kit) - Rules.backpackRoom(profile.kit))
+			end
+		end
 		local bigUsed = 0
 		for _, order in job.orders do
 			if order.state == "open" and not Bag.fits(order.offer.look) then
@@ -4026,7 +4034,7 @@ end
 
 local Rules = JobsConfig.CargoRules
 local Events = JobsConfig.RoadEvents
-local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Priya", "Dmitri", "Hannah", "Carlos", "June", "Wes", "Lena" }
+local SURVIVOR_NAMES = { "Jake", "Rosa", "Old Mike", "Polly", "Dean", "Hannah", "Carlos", "June", "Wes", "Lena" }
 
 -- Every tick of a job with cargo rules: the food's freshness drains once it is picked up (a Cooler Box slows it), and
 -- a fragile cargo or passengers in the moving car feel the jolts (hard braking, bumps: JobRules.jolt / joltLoss, the

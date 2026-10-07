@@ -121,7 +121,7 @@ function BagUi.render(parent: Instance, job: any, order: number): number
 			Ui.label(row, capital(tostring(piece.name or "piece")), UDim2.new(1, -70, 0, 22), { Position = UDim2.fromOffset(58, 6), TextSize = 16, Font = Theme.HeadingFont, TextColor3 = P.ink, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 			local who = if type(piece.dest) == "string" then `for {piece.dest}` else "for the customer"
 			local place = if type(piece.place) == "string" and piece.place ~= piece.dest then ` · {piece.place}` else ""
-			local fits = if Bag.fits(look) then "" else " · hands / rack only"
+			local fits = if Bag.fits(look) then "" elseif Bag.fitsBag(look) then " · bag / hands / rack" else " · hands / rack only" -- (6.3)
 			Ui.label(row, `Order {tonumber(piece.order) or 1} · {who}{place}{fits}`, UDim2.new(1, -70, 0, 20), { Position = UDim2.fromOffset(58, 30), TextSize = 13, Font = Theme.Font, TextColor3 = P.ink2, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		end
 	end

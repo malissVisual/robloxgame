@@ -1,5 +1,6 @@
 -- 5.5, the city buses (shared/BusLines.luau): the three loops, their stops at the kerb, the timetable every client
--- works out from the server's clock and the route the HUD suggests, in the standalone Luau CLI.
+-- works out from the server's clock and the route the HUD suggests, in the standalone Luau CLI. 6.3: express lines
+-- (a stop about every 4 blocks, at the key places and named after them) and the loops for the maps (mapLines).
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -42,7 +43,7 @@ for _, line in lines do
 	check(`line {line.id}: its length adds up`, math.abs(total - line.length) < 1e-3, total)
 end
 
--- The stops: enough of them, about every 2 blocks, on a road at the kerb, never in a building or by a door.
+-- The stops: enough of them, 6.3: about every 4 blocks, on a road at the kerb, never in a building or by a door.
 local function inBuilding(x: number, z: number): string?
 	local d, i, j = Map.blockAt(x, z)
 	if not d then
@@ -61,14 +62,14 @@ local function inBuilding(x: number, z: number): string?
 end
 local clear2 = Config.Bus.StopClear ^ 2
 for _, line in lines do
-	check(`line {line.id}: at least 5 stops`, #line.stops >= 5, #line.stops)
+	check(`line {line.id}: at least 3 stops`, #line.stops >= 3, #line.stops)
 	local worstGap, leastGap = 0, math.huge
 	for k = 1, #line.stops do
 		local gap = (line.stopArc[k % #line.stops + 1] - line.stopArc[k]) % line.length
 		worstGap = math.max(worstGap, gap)
 		leastGap = math.min(leastGap, gap)
 	end
-	check(`line {line.id}: a stop every ~2 blocks`, leastGap >= Config.Bus.StopGap * 0.6 and worstGap <= 700, `{math.floor(leastGap)} .. {math.floor(worstGap)} studs`)
+	check(`line {line.id}: an express stop every ~4 blocks`, leastGap >= Config.Bus.StopGap * 0.6 and worstGap <= Config.Bus.StopGap * 2.5, `{math.floor(leastGap)} .. {math.floor(worstGap)} studs`)
 	for k, stop in line.stops do
 		local where = `line {line.id} stop {k} {stop.name}`
 		check(`{where}: the bus stands on the road`, Map.onRoad(stop.x, stop.z) and Map.onRoad(stop.x + stop.nx * 3.9, stop.z + stop.nz * 3.9))
@@ -77,9 +78,9 @@ for _, line in lines do
 		check(`{where}: the bus pulls in to the kerb`, math.abs(out - (Map.CurbPark + 1.5)) < 0.01, out)
 		local ahead = (stop.kx - stop.x) * stop.hx + (stop.kz - stop.z) * stop.hz
 		check(`{where}: the door is by the shelter`, math.abs(ahead - BusLines.DoorAhead) < 0.01, ahead)
-		-- The shelter: 10 along the kerb, 3.4 in from the curb.
+		-- The shelter: 10 along the kerb, 3.4 in from the curb (6.3: and its map board past its back end).
 		local blocked: string? = nil
-		for _, along in { -5, 0, 5 } do
+		for _, along in { -5, 0, 5, -9.4 } do
 			for _, depth in { 0, 1.7, 3.4 } do
 				local x = stop.kx - stop.nx * 1.5 + stop.nx * depth + stop.hx * along
 				local z = stop.kz - stop.nz * 1.5 + stop.nz * depth + stop.hz * along
@@ -101,7 +102,9 @@ for _, line in lines do
 			end
 		end
 		check(`{where}: clear of the doors and the cargo spots`, byDoor == nil, byDoor)
-		check(`{where}: named after its street`, stop.name ~= "" and string.find(stop.name, stop.street, 1, true) == 1, stop.name)
+		if stop.landmark == nil then
+			check(`{where}: named after its street`, stop.name ~= "" and string.find(stop.name, stop.street, 1, true) == 1, stop.name)
+		end
 		check(`{where}: it knows its line`, table.find(stop.lines, line.id) ~= nil)
 	end
 end
@@ -111,7 +114,45 @@ do
 		ok = ok and stop.id == n and not ids[stop.id]
 		ids[stop.id] = true
 	end
-	check("every stop once, numbered", ok and #BusLines.allStops() >= 20, #BusLines.allStops())
+	check("every stop once, numbered", ok and #BusLines.allStops() >= 10, #BusLines.allStops())
+end
+
+-- 6.3: the key places. A stop by one (within NameReach) is named after it (the depot "Depot"), a place names one stop
+-- at most, every name is the only one; a good few of the stops are at a place.
+do
+	local byId: { [string]: Map.Landmark } = {}
+	for _, landmark in Map.Landmarks do
+		byId[landmark.id] = landmark
+	end
+	local names: { [string]: boolean } = {}
+	local places: { [string]: boolean } = {}
+	local unique, atPlaces = true, 0
+	for _, stop in BusLines.allStops() do
+		unique = unique and not names[stop.name]
+		names[stop.name] = true
+		local id = stop.landmark
+		if id then
+			atPlaces += 1
+			local landmark = byId[id]
+			local far = if landmark then math.sqrt((landmark.x - stop.kx) ^ 2 + (landmark.z - stop.kz) ^ 2) else math.huge
+			local name = if id == "depot" then "Depot" elseif landmark then landmark.name else "?"
+			check(`{stop.name}: named after the place by it`, far <= Config.Bus.NameReach and stop.name == name and not places[id], `{name}, {math.floor(far)} studs`)
+			places[id] = true
+		end
+	end
+	check("every stop's name is its own", unique)
+	print(`  {atPlaces} of {#BusLines.allStops()} stops named after a place`)
+	check("a good few stops at the key places", atPlaces >= 4, atPlaces)
+	-- Every stop with a key place in reach that names no other stop is named after one.
+	for _, stop in BusLines.allStops() do
+		if stop.landmark == nil then
+			for _, landmark in Map.Landmarks do
+				if not places[landmark.id] and math.sqrt((landmark.x - stop.kx) ^ 2 + (landmark.z - stop.kz) ^ 2) <= Config.Bus.NameReach then
+					check(`{stop.name}: no free place by it ({landmark.name})`, false)
+				end
+			end
+		end
+	end
 end
 
 -- The timetable: every line within the longest wait; a bus is never more than a headway away.
@@ -185,7 +226,7 @@ end
 -- in your hands (the carry walk) the bus pays off sooner.
 do
 	local ring = lines[1]
-	local a, b = ring.stops[2], ring.stops[7]
+	local a, b = ring.stops[2], ring.stops[2 + #ring.stops // 2] -- (half round the loop)
 	local route = BusLines.route(a.kx + 30, a.kz + 30, b.kx - 20, b.kz + 10)
 	check("a long way across Downtown takes a bus", route ~= nil)
 	if route then
@@ -203,6 +244,46 @@ do
 	end
 	local walking = BusLines.route(0, 300, -150, 1150)
 	print(`  to the Suburbs (hands free): {if walking then "Line " .. walking.line.id else "walk"}`)
+end
+
+-- 6.3, the loops for the maps: a few corners each, every one on the road, closed round the loop the bus drives (its
+-- stops on the polyline), cached.
+do
+	local maps = BusLines.mapLines(24)
+	check("a map line for every line", #maps == #lines and BusLines.mapLines(24) == maps)
+	for n, mapLine in maps do
+		local line = lines[n]
+		local points = mapLine.points
+		check(`map line {mapLine.line}: a few corners`, #points >= #Config.Bus.Lines[n].corners and #points <= 24, #points)
+		local offRoad = 0
+		for _, p in points do
+			if not Map.onRoad(p.x, p.z) then
+				offRoad += 1
+			end
+		end
+		check(`map line {mapLine.line}: its corners on the road`, offRoad == 0, offRoad)
+		-- Every stop within a few studs of the polyline (the bus pulls in to the kerb there; a cut corner is a chord).
+		local worst = 0
+		for _, stop in mapLine.stops do
+			local best = math.huge
+			for k = 1, #points do
+				local p, q = points[k], points[k % #points + 1]
+				local dx, dz = q.x - p.x, q.z - p.z
+				local t = math.clamp(((stop.x - p.x) * dx + (stop.z - p.z) * dz) / math.max(1e-6, dx * dx + dz * dz), 0, 1)
+				best = math.min(best, math.sqrt((p.x + dx * t - stop.x) ^ 2 + (p.z + dz * t - stop.z) ^ 2))
+			end
+			worst = math.max(worst, best)
+		end
+		check(`map line {mapLine.line}: its stops on the polyline`, worst < 8, worst)
+		check(`map line {mapLine.line}: its stops and colour`, #mapLine.stops == #line.stops and mapLine.stops[1].id == line.stops[1].id and mapLine.color == line.color and mapLine.short == line.short)
+		local length = 0
+		for k = 1, #points do
+			local p, q = points[k], points[k % #points + 1]
+			length += math.sqrt((q.x - p.x) ^ 2 + (q.z - p.z) ^ 2)
+		end
+		check(`map line {mapLine.line}: about as long as the loop`, length > line.length * 0.9 and length <= line.length + 1, `{math.floor(length)} / {math.floor(line.length)}`)
+	end
+	check("a tighter map has fewer corners", #BusLines.mapLines(6)[2].points <= 6)
 end
 
 check("the clock", BusLines.clock(0) == "NOW" and BusLines.clock(12.2) == "0:13" and BusLines.clock(65) == "1:05")
