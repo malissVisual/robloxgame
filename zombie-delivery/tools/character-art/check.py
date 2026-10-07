@@ -46,7 +46,7 @@ return Mock""")
             raise RuntimeError(lifecycle.stdout + lifecycle.stderr)
     models = [json.loads(line) for line in result.stdout.splitlines()]
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(models, indent=2))
+    output.write_text(json.dumps(models, separators=(",", ":")) + "\n")
     print("Native character factory PASS:", {m["id"]: len(m["parts"]) for m in models})
     print("PASS: attachment bind positions, real builder flags/welds, clones, clearance and native-only budgets.")
     print(lifecycle.stdout.strip())
