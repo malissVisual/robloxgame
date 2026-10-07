@@ -1102,6 +1102,38 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## A better whole game (5.7)
+
+**Getting on and off like the car** (`client/Interact.luau`, `shared/InteractPose.luau`, `Config.Interact`): you step
+to a bike's side and swing a leg over the saddle, or step onto a scooter's deck, hands to the bar (and back off); a
+ZDC RIDE scooter slides out of its dock first. The bus's door folds open, you walk up the step to a seat and sit, and
+walk out onto the kerb. Zip line ladders are climbed hand over hand (no more fade), and your hands reach up to the
+trolley.
+
+**Balance and life on foot** (`shared/FootEvents.luau`, `server/RunEvents.luau`, `client/PayFloat.luau`): the E-Scooter
+tops out at 36 (two rack slots), ZDC RIDE rentals at 26; ★ car jobs give +40 XP and up to 4 pieces (what your car holds).
+About one foot or bike run in four meets a runner zombie, a survivor with a tip or a locked gate, and some drops have a
+few walkers. A short run ends in a toast and a "+$ · +XP" float, not the big window; the board replaces a taken offer
+with one near you. Level 3 gives the Courier Backpack, level 4 the Running Shoes; car items start at 5. After the first
+delivery Marge offers SHOW ME AROUND (the scooter dock, a bus stop, the board in the phone). MENU reads PHONE once you
+have it.
+
+**A living city** (`shared/TowerLooks.luau`, `shared/StreetProps.luau`, `server/StreetDressing.luau`,
+`shared/WeatherPlan.luau`, `client/WorldFx.luau`, `Config.LivingCity`): towers in four looks (shopfronts, roofs with
+tanks, fire escapes, boarded windows), streets with bins, barricades, sandbags, debris, abandoned cars and flares; rare
+rain and fog (wet roads, river mist, dawn rays, flickering lamps); the night lights switch on every client (no server
+burst) and the clock runs smoothly; a little camera shake on blasts, rams and hits, a wider view at speed and on a zip.
+
+**Sound and juice** (`art/audio/sfx2.ogg`, `SoundSheet.Sfx2Id`, `client/Juice.luau`, `shared/Gestures.luau`):
+footsteps, a knock and a door creak, the zip whirr, the scooter hum and the bikes' freewheel (no van engine on a bike),
+bus brakes and door hiss, the phone buzz, coins, city ambience and wind. **Upload `sfx2.ogg` and paste its id into
+`SoundSheet.Sfx2Id`** — until then those sounds stay quiet (a few borrow older ones). The money counts up, ★★★ throws
+confetti, people at doors and counters wave and reach for the piece.
+
+**Under the hood** (`Config.Robust`): PLAY, the job start and the tickers can no longer strand you; the leave save is
+safer; zombies think at 20 Hz; remotes are rate-limited (`Net.limit` / `Net.latest`); a failed rental gives your own
+vehicle back. Turn on **StreamingEnabled** in the place (the Output warns when it is off).
+
 ## ZDC RIDE scooters, zip lines, alley shortcuts (5.6)
 
 **ZDC RIDE** (`Config.Rental`, `shared/RentalDocks.luau`, `server/Rental.luau`, `client/RentalUi.luau`): 20 docks
