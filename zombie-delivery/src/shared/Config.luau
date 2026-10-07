@@ -3005,19 +3005,18 @@ Config.Throw = {
 }
 
 -- 6.0, the courier's look on foot (client/SprintPose.luau, server/KitWear.luau): the plastic bag (Config.Kit BagKit)
--- in the left hand flies behind you by your speed; a sprint (From … Full studs / s on foot) lays a longer stride and
--- pumping arms over the run animation, for everybody within Range of the camera.
+-- in the left hand flies behind you by your speed. 6.0.1: from From studs / s on foot the sprint is a real run cycle
+-- (shared/RunCycle.luau: the legs, the arms, the waist, the head and the body's bob, set over the stock run animation),
+-- for everybody within Range of the camera.
 Config.Courier = {
 	BagKit = "bag", -- the Config.Kit id: owned, a light piece picked up drops straight into the bag (or the pack)
 	Sprint = {
-		From = 20, -- studs / s: the sprint pose starts here …
-		Full = 26, -- … and is all on from here
-		Range = 180, -- studs from the camera
-		Blend = 6, -- how fast it comes and goes (per second)
-		Stride = 0.45, -- the hips swing this much farther than the animation's
-		Knee = 0.35, -- the knees bend this much more
-		Arms = 0.6, -- the shoulders swing this much farther
-		Elbow = 30, -- degrees more bend in the elbows
+		From = 20, -- studs / s on foot: the sprint cycle takes over from here …
+		Off = 18.5, -- … and lets go under this (no flicker around From; the walk is 14, the stock run from 18)
+		Full = 26, -- the full swing and lean from here (Config.Movement.Sprint is 28)
+		Range = 150, -- studs from the camera (yours always)
+		BlendTime = 0.15, -- seconds to blend the cycle in or out
+		Stride = 7, -- studs run per full cycle (two steps): the cadence follows the speed
 	},
 	Bag = {
 		Grip = 0.12, -- studs under the hand
@@ -3025,6 +3024,7 @@ Config.Courier = {
 		FullSpeed = 28, -- studs / s for the full tilt
 		Spring = 70, -- how hard it swings to its tilt …
 		Damp = 8, -- … and how fast that settles
+		Bounce = 9, -- 6.0.1: degrees it jolts with every step of the sprint cycle
 		FlutterHz = 4.5, -- the flutter at speed
 		Flutter = 10, -- degrees
 		Sway = 5, -- degrees side to side
