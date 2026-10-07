@@ -4,10 +4,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
-- Codex · polish brief group 2: native street prop set and whole-city footprint/part audit · `server/StreetArt/`, `server/PolishArt/`, `tools/polish-art/`, `design/street-props/` · 2026-10-07 (`codex/street-props`).
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/street-props` · 9 native prop kinds, optional PolishArt builder, real sheet/renders; actual city plan 534 props / 2,466 parts, rotated footprints and 27 factory cases pass · wire in StreetDressing; check pedestrians, car hull collision/headroom, flare/tag/night behavior. Full suite passes; see `design/street-props/README.md`.
 - Codex · `codex/polish-icons` · 29 transparent white SVG/PNG icons; manifest/sheet in `design/polish-icons/`; upload then fill slots/remove borrowed aliases. Full suite and pixel audits pass.
 
 ## Questions / handoff
