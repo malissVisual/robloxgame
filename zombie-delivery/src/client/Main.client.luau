@@ -105,7 +105,9 @@ Hud.onCloseWindows = function()
 	GarageUi.close()
 	DispatchUi.close()
 	CareerUi.close()
-	Phone.close()
+	if not (Hud.escaping and Phone.appOpen()) then
+		Phone.close() -- (6.0.1 review: ESC with an app open goes back to the phone's home, the phone handles it)
+	end
 end
 CrewPanel.onOpen = Hud.closeWindows
 EstateUi.onOpen = Hud.closeWindows

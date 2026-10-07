@@ -451,6 +451,7 @@ function Hud.anyWindowOpen(): boolean
 end
 
 -- Set by client/Main.client.luau: closes the windows outside the HUD too (the crew window).
+Hud.escaping = false -- 6.0.1: true while ESC / the Roblox menu closes the windows (Main keeps an open phone app's phone)
 Hud.onCloseWindows = nil :: (() -> ())?
 
 local function closeWindows()
@@ -4035,7 +4036,9 @@ function Hud.start()
 		if MapView.isOpen() then
 			MapView.toggle()
 		end
+		Hud.escaping = true -- (6.0.1 review: an app open in the phone is closed by the phone itself, the phone stays)
 		closeWindows()
+		Hud.escaping = false
 	end
 	game:GetService("GuiService").MenuOpened:Connect(escape)
 	-- Keys.

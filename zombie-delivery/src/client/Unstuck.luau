@@ -13,7 +13,7 @@ local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Jo
 local Unstuck = {}
 
 local CHECK = 0.5
-local MAX_LIFT = 8 -- studs: deeper than this is not "sunk", leave it to the respawn
+local MAX_LIFT = 5 -- studs: deeper than this is not "sunk", leave it to the respawn
 
 local player = Players.LocalPlayer
 local started = false
@@ -30,10 +30,31 @@ local SKIP: { [Enum.HumanoidStateType]: boolean } = {
 	[Enum.HumanoidStateType.Jumping] = true,
 }
 
--- The top of the solid world part a point is inside, or nil.
-local function solidAround(point: Vector3, character: Model): (number?, BasePart?)
-	local params = OverlapParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
+-- 6.0.1 review: the real shape decides (a wedge ramp's or a turned prop's box is not its body): a small probe ball at
+-- the foot asks the engine which parts it truly overlaps; the surface above the foot comes from a short ray down.
+local probe: Part? = nil
+local function probeAt(point: Vector3): Part
+	local p = probe
+	if not p or not p.Parent then
+		local made = Instance.new("Part")
+		made.Name = "UnstuckProbe"
+		made.Shape = Enum.PartType.Ball
+		made.Size = Vector3.new(0.3, 0.3, 0.3)
+		made.Anchored = true
+		made.CanCollide = false
+		made.CanQuery = false
+		made.CanTouch = false
+		made.Transparency = 1
+		made.Parent = workspace.CurrentCamera
+		probe = made
+		p = made
+	end
+	assert(p)
+	p.CFrame = CFrame.new(point)
+	return p
+end
+
+local function skipList(character: Model): { Instance }
 	local skip: { Instance } = { character }
 	for _, name in { "Cars", "Zombies", "Npcs", "Traffic", "Animals", "Loot", "Buses" } do
 		local folder = workspace:FindFirstChild(name)
@@ -41,17 +62,34 @@ local function solidAround(point: Vector3, character: Model): (number?, BasePart
 			table.insert(skip, folder)
 		end
 	end
+	return skip
+end
+
+-- The ground's surface over a foot that is truly inside a solid world part (within REACH above it), or nil.
+local REACH = 3.5
+local function solidAround(point: Vector3, character: Model): (number?, BasePart?)
+	local skip = skipList(character)
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = skip
-	local best: number?, part: BasePart? = nil, nil
-	for _, hit in workspace:GetPartBoundsInBox(CFrame.new(point), Vector3.new(0.2, 0.2, 0.2), params) do
-		if hit.Anchored and hit.CanCollide and hit.Transparency < 1 then
-			local top = hit.Position.Y + hit.Size.Y / 2
-			if top > point.Y and (best == nil or top > best) then
-				best, part = top, hit
-			end
+	local inside: BasePart? = nil
+	for _, hit in workspace:GetPartsInPart(probeAt(point), params) do
+		if hit.Anchored and hit.CanCollide and hit.Transparency < 1 and hit.Name ~= "UnstuckProbe" then
+			inside = hit
+			break
 		end
 	end
-	return best, part
+	if not inside then
+		return nil, nil
+	end
+	local rays = RaycastParams.new()
+	rays.FilterType = Enum.RaycastFilterType.Exclude
+	rays.FilterDescendantsInstances = skip
+	local hit = workspace:Raycast(point + Vector3.new(0, REACH, 0), Vector3.new(0, -REACH, 0), rays)
+	if not hit or hit.Position.Y <= point.Y + 0.2 then
+		return nil, nil
+	end
+	return hit.Position.Y, inside
 end
 
 local function check()

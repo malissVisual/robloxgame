@@ -347,7 +347,7 @@ local function applySaved(profile: Profile, saved: any)
 	-- 6.0.1: the red courier vest became bought kit (Config.Courier.VestKit, the Courier Vest). A save from before
 	-- (no vestKit flag) wore it on the body, so it is given once and the look does not change; every save is written
 	-- with the flag from now on, and a brand-new profile (no save to apply) starts without the vest.
-	if saved.vestKit ~= true then
+	if saved.vestKit ~= true and saved.money ~= nil then -- (a real old save: not a lock-only record of a new player)
 		profile.kit[Config.Courier.VestKit] = true
 	end
 	if saved.xpCurve ~= Config.Levels.Curve then
