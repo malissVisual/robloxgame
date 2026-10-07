@@ -16,7 +16,12 @@
 -- 3.10: getting in or out of a car (client/CarBoarding.luau moves the body, Drive.boardingCar) the camera eases between
 -- the walk's view and the car's over CAR_BLEND seconds instead of jumping, and the walk (speed, turning, aiming) is
 -- left alone meanwhile.
+-- 5.7, the feel (Config.LivingCity.Camera): a small shake that dies away on an explosion nearby, a ram in your car and
+-- a hit you take (CameraRig.shake for anything else); the field of view opens by Fov at your car's top speed and on a
+-- zip line. A touch screen's Roblox camera shakes too (Humanoid.CameraOffset) and widens the same. Reduced motion
+-- (the player's Roblox setting): no shake, no widening.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -106,6 +111,109 @@ CameraRig.freeLook = function(): boolean
 end
 
 local supported = UserInputService.KeyboardEnabled and UserInputService.MouseEnabled
+
+-- ── 5.7: the shake and the speed's field of view ───────────────────────────
+
+local Feel = Config.LivingCity.Camera
+local shakeAmount = 0 -- 0 … 1, dies away at Feel.Decay a second
+local fovBoost = 0 -- degrees added to the field of view now
+
+local function reducedMotion(): boolean
+	local ok, on = pcall(function(): any
+		return (GuiService :: any).ReducedMotionEnabled
+	end)
+	return ok and on == true
+end
+
+-- Shake the camera a little (0 … 1, added up to 1 at most): an explosion, a ram, a hit.
+function CameraRig.shake(amount: number)
+	if amount <= 0 or reducedMotion() then
+		return
+	end
+	shakeAmount = math.min(1, shakeAmount + amount)
+end
+
+-- This frame's shake (a turn of the camera) and the time it runs on.
+local function shakeTurn(): CFrame
+	if shakeAmount <= 0.001 then
+		return CFrame.identity
+	end
+	local t = os.clock()
+	local k = math.rad(Feel.Angle) * shakeAmount * shakeAmount
+	return CFrame.Angles(math.sin(t * 31) * k, math.sin(t * 27 + 1.3) * k, math.sin(t * 23 + 2.1) * k * 0.5)
+end
+
+-- The field of view's boost toward its goal: the share of your car's top speed past FovFrom, or a zip line.
+local function stepFeel(dt: number)
+	shakeAmount = math.max(0, shakeAmount - Feel.Decay * dt)
+	local goal = 0
+	if not reducedMotion() then
+		local character = player.Character
+		local car = Drive.seatedCar()
+		local chassis = car and car.PrimaryPart
+		if character and character:GetAttribute("ZipLine") ~= nil then
+			goal = Feel.Fov
+		elseif car and chassis then
+			local top = (car:GetAttribute("MaxSpeed") or 60) :: number * ((car:GetAttribute("SpeedMult") or 1) :: number)
+			local v = chassis.AssemblyLinearVelocity
+			local share = Vector3.new(v.X, 0, v.Z).Magnitude / math.max(top, 1)
+			goal = Feel.Fov * math.clamp((share - Feel.FovFrom) / math.max(1 - Feel.FovFrom, 0.01), 0, 1)
+		end
+	end
+	local most = Feel.FovBlend * Feel.Fov * dt
+	fovBoost = if goal > fovBoost then math.min(goal, fovBoost + most) else math.max(goal, fovBoost - most)
+end
+
+-- What shakes the camera: explosions near you, hits you take, your car losing its speed in a blink (a ram).
+local function watchFeel()
+	workspace.ChildAdded:Connect(function(child)
+		if not child:IsA("Explosion") then
+			return
+		end
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local camera = workspace.CurrentCamera
+		local from = if root and root:IsA("BasePart") then root.Position elseif camera then camera.CFrame.Position else nil
+		if from then
+			local distance = (from - child.Position).Magnitude
+			CameraRig.shake(Feel.Explosion * math.clamp(1 - distance / Feel.ExplosionReach, 0, 1))
+		end
+	end)
+	local function watchHealth(character: Model)
+		local humanoid = character:WaitForChild("Humanoid", 10)
+		if not humanoid or not humanoid:IsA("Humanoid") then
+			return
+		end
+		local last = humanoid.Health
+		humanoid.HealthChanged:Connect(function(health)
+			if health < last and health > 0 then
+				CameraRig.shake(Feel.Damage * (last - health) / math.max(humanoid.MaxHealth, 1))
+			end
+			last = health
+		end)
+	end
+	if player.Character then
+		task.spawn(watchHealth, player.Character)
+	end
+	player.CharacterAdded:Connect(watchHealth)
+	local lastCar: Model? = nil
+	local lastSpeed = 0
+	RunService.Heartbeat:Connect(function()
+		local car = Drive.seatedCar()
+		local chassis = car and car.PrimaryPart
+		if not car or not chassis then
+			lastCar = nil
+			return
+		end
+		local v = chassis.AssemblyLinearVelocity
+		local speed = Vector3.new(v.X, 0, v.Z).Magnitude
+		if car == lastCar and lastSpeed - speed > Feel.RamFrom then
+			CameraRig.shake(Feel.Ram * (lastSpeed - speed))
+		end
+		lastCar = car
+		lastSpeed = speed
+	end)
+end
 
 -- ── The crosshair: one small dot ────────────────────────────────────────────
 -- Dim grey over nothing, white over an enemy (it fades between the two), a quick pulse on every hit, a short red
@@ -456,8 +564,9 @@ local function update(dt: number)
 	local hit = workspace:Raycast(focus, desired - focus, wallParams)
 	local position = if hit then hit.Position + (focus - desired).Unit * 0.6 else desired
 	camera.CameraType = Enum.CameraType.Scriptable
-	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector)
-	camera.FieldOfView = lerp(70, 55, aimBlend)
+	stepFeel(dt)
+	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector) * shakeTurn() -- (5.7: the shake)
+	camera.FieldOfView = lerp(70, 55, aimBlend) + fovBoost * (1 - aimBlend)
 
 	-- The gun arm points from the shoulder at whatever is under the crosshair (not simply where the camera looks:
 	-- a camera looking down from above would point the arms at your feet).
@@ -544,9 +653,39 @@ local function touchSpeed()
 	end)
 end
 
+-- 5.7: the Roblox camera of a touch screen shakes (Humanoid.CameraOffset: a small move, it never turns) and widens.
+local function touchFeel()
+	local offsetOn: Humanoid? = nil
+	local fovShown = -1
+	RunService:BindToRenderStep("ZombieDeliveryFeel", Enum.RenderPriority.Camera.Value - 1, function(dt: number)
+		stepFeel(dt)
+		local camera = workspace.CurrentCamera
+		if camera and camera.CameraType ~= Enum.CameraType.Scriptable then
+			local fov = 70 + fovBoost
+			if math.abs(fov - fovShown) > 0.01 then
+				fovShown = fov
+				camera.FieldOfView = fov
+			end
+		end
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid and shakeAmount > 0.001 then
+			local t = os.clock()
+			local k = Feel.Offset * shakeAmount * shakeAmount
+			humanoid.CameraOffset = Vector3.new(math.sin(t * 29) * k, math.sin(t * 33 + 0.7) * k, 0)
+			offsetOn = humanoid
+		elseif offsetOn then
+			offsetOn.CameraOffset = Vector3.zero
+			offsetOn = nil
+		end
+	end)
+end
+
 function CameraRig.start()
+	watchFeel()
 	if not supported then
 		touchSpeed()
+		touchFeel()
 		return
 	end
 	makeCrosshair()

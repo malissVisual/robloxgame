@@ -3368,4 +3368,70 @@ Config.Robust = {
 	},
 }
 
+-- 5.7, a living city and its air: the towers' four looks (shared/TowerLooks.luau), the street props on every ordinary
+-- block (shared/StreetProps.luau, server/StreetDressing.luau), the night lights restyled on every client
+-- (client/WorldFx.luau), the rare rain and fog (shared/WeatherPlan.luau: server/DayNight.luau picks, client/Weather.luau
+-- draws) and the camera's shake and speed (client/CameraRig.luau).
+Config.LivingCity = {
+	Towers = {
+		Budget = 10, -- parts a tower's look adds, at most
+		DoorClear = 6, -- nothing of a look within this (along the wall) of an apartment entrance's door, below 12 studs
+		LadderClear = 6, -- … nor of a zip line's ladder; a zip line's two towers get nothing on the roof
+		RoofHeight = 3, -- a roof's tanks and units stay this low (the zip cables' rule: shared/ZipLines.luau extra)
+	},
+	Street = {
+		Props = { 3, 6 } :: { number }, -- props a block (a Harbor block: the lower half)
+		CurbDepth = 1.7, -- the kerb props' middle, in from the curb (the people walk 4.5 in: shared/TrafficLanes.luau)
+		CornerClear = 15, -- no prop this close (along the side) to a block's corner: the crosswalks, the lamps and poles
+		Clear = 9, -- no prop within this of a door, a pile, a cargo spot, an employer's board, an address or a dock
+		ParkClear = 12, -- … of a home's or a storefront's park (a car pulls in there)
+		StopClear = 24, -- … of a bus stop's kerb
+		GasClear = 50, -- … of a gas station's middle
+		PlaceClear = 30, -- … of a place or a house for sale
+		LadderClear = 9, -- … of a zip line's ladder
+		Spacing = 7, -- no two props of a block closer than this
+		CarShare = 0.22, -- a block side (not on a bus line) has an abandoned car at its kerb this often
+		CarCornerClear = 30, -- the car keeps this far from the corners (the traffic's turns)
+		CarKerb = 2.5, -- the car's middle this far out on the road from the curb (clear of the traffic's lane)
+		FlareShare = 0.5, -- an abandoned car has a red flare by it this often
+		BoardedShare = 0.3, -- a tower's street wall has a boarded shopfront this often
+	},
+	Lights = {
+		RestylePerFrame = 240, -- night lights restyled per frame on a client when the night turns (no hitch)
+		BrokenShare = 0.07, -- the street lamps that flicker at night
+		FlickerRange = 320, -- they flicker only this close to the camera
+	},
+	Clock = {
+		SendEvery = 1, -- seconds between the clock's replications (every client runs it smoothly in between)
+	},
+	Weather = {
+		CheckEvery = 75, -- seconds between the server's rolls for a change in clear weather
+		RainChance = 0.06, -- per roll, by day (× NightBoost at night)
+		FogChance = 0.05,
+		NightBoost = 1.8,
+		Minutes = { 2.5, 6 } :: { number }, -- how long a rain or a fog lasts
+		Calm = 4, -- minutes of clear weather at least after one
+		Fade = 12, -- seconds a client takes to blend into or out of it
+		RainDensity = 0.12, -- added to the atmosphere's density
+		FogDensity = 0.32,
+		WetReflectance = 0.16, -- the roads' shine in the rain
+		RainRate = 900, -- raindrops a second around the camera
+		MistRange = 650, -- the river's mist shows within this of the camera
+		SunRays = 0.18, -- the sun rays' intensity at dawn
+	},
+	Camera = {
+		Explosion = 0.9, -- shake (0 … 1) next to an explosion …
+		ExplosionReach = 140, -- … fading to nothing this far away
+		Damage = 1.6, -- × the share of your health one hit took
+		Ram = 0.022, -- × the speed (studs / s) your car lost in a blink
+		RamFrom = 22, -- … from a loss this big
+		Decay = 1.6, -- shake lost per second
+		Angle = 1.4, -- degrees at full shake
+		Offset = 0.35, -- studs (a touch screen's camera moves, it does not turn)
+		Fov = 6, -- extra field of view at top speed and on a zip line
+		FovFrom = 0.72, -- … from this share of the car's top speed
+		FovBlend = 3, -- per second
+	},
+}
+
 return Config
