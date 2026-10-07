@@ -14,7 +14,7 @@ type V = { number }
 type Piece = { name: string, size: V, at: V, attach: string, finish: string, turn: V?, shape: string?, shadow: boolean?, text: string? }
 Geometry.ids = { "backpack", "backpack_loaded", "bigpack", "shoes", "jacket", "cart", "bag", "kevlar", "heavy", "tote", "thermal", "padded", "duffel" }
 Geometry.bags = { bag = true, tote = true, thermal = true, padded = true, duffel = true } :: { [string]: boolean } -- 6.4: hung on BagPivot
-Geometry.translucent = { BagBody = .3, BagBottom = .15 } :: { [string]: number }
+Geometry.translucent = { BagBody = .12, BagBottom = .06, BagKnot = .1, BagHandleF = .1, BagHandleB = .1 } :: { [string]: number } -- (6.4.1: was .3 / .15)
 local function add(out: { Piece }, name: string, size: V, at: V, attach: string, finish: string, shape: string?, turn: V?, text: string?)
 	table.insert(out, { name = name, size = size, at = at, attach = attach, finish = finish, shape = shape, turn = turn, text = text, shadow = name == "PackBody" or name == "BoxBody" })
 end
@@ -90,13 +90,15 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "Grip", { 1.12, .17, .17 }, { 0, 3.57, .26 }, "Frame", "sole", "Cylinder")
 		add(out, "Axle", { 1.85, .13, .13 }, { 0, .59, .2 }, "Frame", "steel", "Cylinder")
 	elseif id == "bag" then
-		add(out, "BagKnot", { .16, .1, .42 }, { 0, -.02, 0 }, "BagPivot", "white")
-		add(out, "BagHandleF", { .06, .46, .07 }, { 0, -.22, -.17 }, "BagPivot", "white", nil, { 20, 0, 0 })
-		add(out, "BagHandleB", { .06, .46, .07 }, { 0, -.22, .17 }, "BagPivot", "white", nil, { -20, 0, 0 })
-		add(out, "BagBody", { .5, 1.1, 1 }, { 0, -1, 0 }, "BagPivot", "white")
-		add(out, "BagBottom", { .52, .08, 1.02 }, { 0, -1.56, 0 }, "BagPivot", "white")
-		for _, x in { -.26, .26 } do
-			add(out, if x < 0 then "BagPrintL" else "BagPrintR", { .02, .3, .46 }, { x, -.92, 0 }, "BagPivot", "red")
+		-- (6.4.1: a light-tinted plastic, less see-through, a red ZDC stripe round it and the ZDC print on both sides)
+		add(out, "BagKnot", { .16, .1, .42 }, { 0, -.02, 0 }, "BagPivot", "bagplastic")
+		add(out, "BagHandleF", { .06, .46, .07 }, { 0, -.22, -.17 }, "BagPivot", "bagplastic", nil, { 20, 0, 0 })
+		add(out, "BagHandleB", { .06, .46, .07 }, { 0, -.22, .17 }, "BagPivot", "bagplastic", nil, { -20, 0, 0 })
+		add(out, "BagBody", { .5, 1.1, 1 }, { 0, -1, 0 }, "BagPivot", "bagplastic")
+		add(out, "BagBottom", { .52, .08, 1.02 }, { 0, -1.56, 0 }, "BagPivot", "bagplastic")
+		add(out, "BagStripe", { .52, .07, 1.02 }, { 0, -.62, 0 }, "BagPivot", "red")
+		for _, x in { -.262, .262 } do
+			add(out, if x < 0 then "BagPrintL" else "BagPrintR", { .46, .3, .02 }, { x, -.95, 0 }, "BagPivot", "red", nil, { 0, if x < 0 then 90 else -90, 0 }, "ZDC")
 		end
 	elseif id == "tote" then
 		-- 38 × 37 × 12 cm of canvas, its two long handles (one on each side) gathered in the hand

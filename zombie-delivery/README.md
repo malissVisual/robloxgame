@@ -1107,6 +1107,41 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The bag shows, and what is in it (6.4.1)
+
+The owner: "the bag isn't visible when I have it; and it would be good if it were more visible, and that there is
+something in it."
+
+**Why no bag showed in 6.4:** `server/KitWear.luau` asked `KitArt.pieces` for the art of every slot before it built
+it, and 6.4 had made the bag's slot key `"id@place"` (`"bag@hand"`): KitArt threw `Unknown kit id: bag@hand` inside
+every refresh, so the bag was never built (and nothing after it in that refresh). The hand slot now takes its look
+from `KitFit.parseBagKey`, and a slot that fails to build only warns (`[KitWear] hand …`): the rest is still put on.
+`tools/character-art/check.py` now builds every bag with the real KitWear and Builder (`bag-check.luau`) on the
+courier's R15 body and on an R6 body, in every way it is worn, empty and full: no error, the joint from the right
+part, nothing anchored or colliding, every part within 3 studs of the hand (or the torso), its pieces shown.
+
+**Every body:** on an R6 body the bag hangs under the `Left Arm`, its strap, the backpack, the vest and the bag's
+shoulder / hip / back places go on the `Torso` (`KitFit.R6`, scaled to it by `KitFit.factors`).
+
+**What is in it shows** (`shared/BagFill.luau`, `Config.Courier.BagFill`, tested): the pieces in the bag stick out
+of its opening as small shapes of their looks: a pizza box, a bouquet, letters, a rolled newspaper, a folder, a food
+box, a loaf, a cake box, a medicine box, greens, a gadget, else a parcel. Up to the bag's room, one row along the
+opening (two side by side from four), each leaning a little. The body swells up to 16 % across (6 % along) as it
+fills. Cargo sets the player's `BagLooks` attribute next to `BagCount`; KitWear builds only the bag's art again when
+they change (the pivot and its swinging joint stay), so everybody sees it and nothing runs per frame. The bag set
+down on the ground shows its pieces too.
+
+**Easier to see:** the plastic bag is a light-tinted, less see-through plastic (`bagplastic`) with a red ZDC stripe
+round it and the ZDC print on both sides; the messenger is courier blue and the duffel a lighter army green against
+the charcoal clothes; a full duffel hangs a little further out (`HandOut`) so it clears the leg.
+
+**The self-check:** once per spawn, three seconds after your bag shows (`Config.Courier.BagCheck`),
+`client/BagSway.luau` looks whether it really is on you and, when not, says why in the Output, e.g.
+`[BagSway] your bag is 37.2 studs from your hand (style hand, joint LeftHand → KitBagPivot, C0 (0.00, -0.27, 0.00),
+Transform (0.00, 0.00, 0.00))`; also "has no parts on your character", "sits … studs from its place", "its parts are
+all see-through" or "its joint is …". Paste such a line to us. The KEYS chip reads `KEYS · HIDE  [F1]` (the font had
+no "▴").
+
 ## Five bags: sprint with your deliveries (6.4)
 
 The owner's wish: "bags that make the work easier, bigger, but realistic". **The point of every bag: you sprint with

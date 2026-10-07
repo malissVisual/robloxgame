@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.4"
+Config.Version = "6.4.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3127,7 +3127,7 @@ Config.Courier = {
 		back = { part = "UpperTorso", at = { 0, 0.62, 0.95 }, turn = { 0, 90, 0 } },
 		hipBack = { part = "UpperTorso", at = { -0.5, 0.05, 0.72 }, turn = { 0, 90, 0 } },
 	} :: { [string]: { part: string, at: { number }, turn: { number } } },
-	HandOut = { thermal = 0.12 } :: { [string]: number },
+	HandOut = { thermal = 0.12, duffel = 0.08 } :: { [string]: number }, -- (6.4.1: the duffel too: full, it swells against the leg)
 	PackPush = 0.5,
 	-- 6.4: a worn bag's motion (client/BagSway.luau; BagSwing.tuning / BagSwing.bob): on the shoulder or the hip a stiff
 	-- small swing (Wear over Bag) and a bounce of Bounce studs with each step (Step studs a step, the full bounce from
@@ -3141,6 +3141,31 @@ Config.Courier = {
 	Switch = 0.5,
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
 	BagUnlock = "Sprint with more of your deliveries: Last Stop Supplies has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
+	-- 6.4.1, what is in the bag shows (shared/BagFill.luau; server/KitWear.luau on you, server/Cargo.luau on the ground):
+	-- the pieces in it (the player's BagCount / BagLooks attributes) stick out of its opening as small shapes of their
+	-- looks (a pizza box, a bouquet, letters …; a parcel otherwise), up to its room and Max; Sink of each one's height
+	-- is inside the bag; one row along the opening up to Rows pieces, then two; each leans Tilt degrees, every other one
+	-- the other way. The body swells as it fills: its thickness by up to Bulge, its length by up to Swell.
+	-- Mouth: each bag's opening on its pivot (server/KitArt/Geometry.luau's frame: the grip at the origin, hanging -Y):
+	-- its height, its thickness (x) and its length (z).
+	BagFill = {
+		Max = 6,
+		Sink = 0.55,
+		Rows = 3,
+		Tilt = 7,
+		Bulge = 0.16,
+		Swell = 0.06,
+		Mouth = {
+			bag = { y = -0.45, x = 0.42, z = 0.84 },
+			tote = { y = -0.5, x = 0.28, z = 0.96 },
+			thermal = { y = -0.27, x = 0.72, z = 1.0 },
+			padded = { y = -0.58, x = 0.3, z = 0.9 },
+			duffel = { y = -0.34, x = 0.34, z = 1.2 },
+		} :: { [string]: { y: number, x: number, z: number } },
+	},
+	-- 6.4.1: client/BagSway.luau looks once per spawn, After seconds after your bag shows, whether it really is on you
+	-- (parts, not see-through, within Far studs of your hand and of its place) and says in the Output when not.
+	BagCheck = { After = 3, Far = 4 },
 }
 
 -- 6.1, what you hold (the owner's wish: "you choose to hold the pistol or the bag; with cargo in the bag you can only put

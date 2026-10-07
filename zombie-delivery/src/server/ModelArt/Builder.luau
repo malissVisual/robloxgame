@@ -29,8 +29,16 @@ local FINISH: { [string]: { color: Triple, material: Enum.Material } } = {
 	floor = { color = { 59, 65, 66 }, material = Enum.Material.Concrete },
 	-- 6.4, the bags (KitArt "tote", "padded", "duffel"): beige canvas, grey nylon, dark-green duffel cloth
 	canvas = { color = { 201, 186, 150 }, material = Enum.Material.Fabric },
-	nylon = { color = { 104, 110, 112 }, material = Enum.Material.Fabric },
-	olive = { color = { 54, 74, 50 }, material = Enum.Material.Fabric },
+	-- (6.4.1: clearer against the courier's charcoal clothes: a courier-blue messenger, a lighter army-green duffel)
+	nylon = { color = { 58, 104, 156 }, material = Enum.Material.Fabric },
+	olive = { color = { 92, 122, 62 }, material = Enum.Material.Fabric },
+	-- 6.4.1: the plastic bag's light-tinted plastic, and what sticks out of a bag (shared/BagFill.luau): kraft card (a
+	-- pizza box, a food box), leaves, a bouquet's blooms, a loaf's crust
+	bagplastic = { color = { 214, 230, 238 }, material = Enum.Material.SmoothPlastic },
+	kraft = { color = { 190, 152, 104 }, material = Enum.Material.SmoothPlastic },
+	leaf = { color = { 74, 138, 62 }, material = Enum.Material.SmoothPlastic },
+	bloom = { color = { 222, 86, 136 }, material = Enum.Material.SmoothPlastic },
+	crust = { color = { 178, 120, 60 }, material = Enum.Material.SmoothPlastic },
 }
 local function pose(at: Triple, turn: Triple?): CFrame
 	local r = turn or { 0, 0, 0 }
