@@ -49,6 +49,7 @@ end
 local bodies = { { model = courier, name = "R15 courier", hand = "LeftHand", torso = "UpperTorso" }, { model = r6, name = "R6", hand = "Left Arm", torso = "Torso" } }
 local looks = { "pizza", "bouquet", "mail", "newspaper", "cake", "burger" }
 local built, shown = 0, 0
+local handLow = math.huge -- 6.7: the lowest a bag in the hand comes to the ground, on either body
 
 for _, body in bodies do
 	local model = body.model
@@ -96,6 +97,23 @@ for _, body in bodies do
 						check(`{label}: {part.Name} welded to the pivot, loose and light`, weld ~= nil and weld.Part0 == pivot and weld.Part1 == part and not part.Anchored and part.Massless and not part.CanCollide and not part.CanQuery and not part.CanTouch)
 					end
 					check(`{label}: every part within 3 studs of the {on.Name}`, far <= 3, far)
+					-- 6.7: real-size bags: at rest the lowest corner of any part stays Bag.Clear over the ground (the feet's
+					-- soles at y = 0: this body's own hand height decides, not a number in the art)
+					local lowest = math.huge
+					for _, part in slot.built.parts do
+						local h = part.Size / 2
+						for _, sx in { -1, 1 } do
+							for _, sy in { -1, 1 } do
+								for _, sz in { -1, 1 } do
+									lowest = math.min(lowest, (part.CFrame * Vector3.new(sx * h.X, sy * h.Y, sz * h.Z)).Y)
+								end
+							end
+						end
+					end
+					check(`{label}: clear of the ground`, lowest >= Config.Courier.Bag.Clear, lowest)
+					if place == "hand" then
+						handLow = math.min(handLow, lowest)
+					end
 					check(`{label}: most of it clearly visible`, clear >= #slot.built.parts * 0.8, `{clear}/{#slot.built.parts}`)
 					check(`{label}: its pieces stick out of it`, (fill > 0) == (count > 0), fill)
 					if count > 0 then
@@ -145,7 +163,7 @@ end
 check("the bag set down shows its pizza box and its bouquet", art ~= nil and fill == #BagFill.pieces(Config.Courier.BagFill.Mouth.bag, 2, 2, { "pizza", "bouquet" }), fill)
 check("6.4's key no longer reaches KitArt", pcall(KitWear.build, courier, "hand", "bag@hand"))
 
-print(`bags built: {built} (on both bodies, every place, empty and full), {shown} with their pieces`)
+print(`bags built: {built} (on both bodies, every place, empty and full), {shown} with their pieces; a bag in the hand {string.format("%.2f", handLow)} over the ground at the lowest`)
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

@@ -49,6 +49,8 @@
 -- (the player's BagCount / BagLooks attributes, server/Cargo.luau) stick out of its opening and the body swells; only
 -- the bag's art is built again when they change (the pivot and its swinging joint stay). tools/character-art/check.py
 -- builds every bag in every place on the courier's R15 body and on an R6 body offline.
+-- 6.7: the bags are real-size (server/KitArt/Geometry.luau) and so are the pieces packed in them (BagFill); a loaded
+-- bag's moving pieces take their open place first (KitArt.open through BagFill.open: the thermal bag's lid stands open).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -191,6 +193,7 @@ function KitWear.bagArt(parent: Instance, pivot: BasePart, id: string?, count: n
 		local room = if def and def.extra then def.extra else 0
 		local inside = math.max(0, math.floor(count or 0))
 		if mouth and inside > 0 then
+			pieces = BagFill.open(pieces, KitArt.open[look]) -- 6.7: the thermal bag's lid stands open while it holds something
 			pieces = BagFill.swell(pieces, mouth, inside, room)
 			for _, piece in BagFill.pieces(mouth, inside, room, looks) do
 				table.insert(pieces, piece)

@@ -28,6 +28,14 @@
 -- Output says why, for the owner to paste: no parts, all see-through, or farther than BagCheck.Far studs from your hand
 -- or from its place, e.g. "[BagSway] your bag is 37.2 studs from your hand (style hand, joint LeftHand → KitBagPivot,
 -- C0 (0.00, -0.27, 0.00), Transform (0.00, 0.00, 0.00))".
+-- 6.7, the body under the bag (the owner: "no animations … I want better animations"), in the same pass on every
+-- player's R15 body near the camera (Config.Courier.BagArm), each laid on top of the animation and let go to the
+-- identity when it does not apply: while the bag hangs in the left hand (BagWorn "hand") its arm is a little straighter
+-- and out, swinging less, only while client/ArmPose.luau and client/SprintPose.luau leave that arm (no aim, no cargo
+-- in the hands, no phone, gesture, swing or car door, no sprint; BagArm.Hold seconds after); a loaded bag (the
+-- player's BagCount) leans the torso the other way, and a gesture's torso and head (shared/Gestures.luau body: the
+-- throw's turn back and through, the look down into the bag) go on the Waist and the Neck, the waist only standing or
+-- slower than BagArm.Calm (ArmPose leans it when you move faster) and never in the sprint (SprintPose's).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,7 +44,13 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local BagSwing = require(Shared.BagSwing)
+local Joints = require(Shared.Joints) -- 6.7: the bag arm, the lean, the gestures' torso and head
+local Gestures = require(Shared.Gestures)
 local Bodies = require(script.Parent.Bodies)
+local CameraRig = require(script.Parent.CameraRig) -- 6.7: who has the arm now (as client/SprintPose.luau asks)
+local Holster = require(script.Parent.Holster)
+local SprintPose = require(script.Parent.SprintPose)
+local Interact = require(script.Parent.Interact)
 
 local BagSway = {}
 
@@ -172,6 +186,205 @@ local function forget(character: Model)
 	end
 end
 
+-- ── 6.7: the bag arm, the counter-lean, the gestures' torso and head ─────────────────────────────────────────────────
+-- Laid on top of the animation (Transform only, never C0; let go to the identity while it still holds ours), each
+-- joint only while nobody else writes it: the left arm while ArmPose / SprintPose leave it (and A.Hold after), the
+-- waist only standing or slow (A.Calm) and not sprinting, the neck while not sprinting. As in client/ArmPose.luau, a
+-- joint that still holds what we wrote was not written by the Animator this frame: its last animation value is the base.
+
+local A = Config.Courier.BagArm
+local BUSY_FOR = 1.5 -- seconds after a swing or a car door's handle the arms stay ArmPose's (as client/SprintPose.luau)
+local CALM_FOR = 0.6 -- seconds slower than A.Calm before the waist is ours (ArmPose's own lean has died away by then)
+local RIG_REFRESH = 2 -- seconds a body's joints are kept before they are looked up again
+
+type Body = {
+	ls: any,
+	le: any,
+	waist: any,
+	neck: any,
+	expires: number,
+	arm: number, -- the bag arm's share (0..1)
+	lean: number, -- the counter-lean now (radians)
+	calmSince: number?, -- since when (os.clock) slower than A.Calm on foot
+	busyUntil: number, -- the left arm stays the others' until then
+	gestureAt: number?, -- the last GestureAt seen …
+	gestureStart: number, -- … and when it began here (os.clock)
+}
+local bodies: { [Model]: Body } = {}
+local written: { [Instance]: CFrame } = {}
+local animated: { [Instance]: CFrame } = {}
+
+local function baseOf(joint: any): CFrame
+	local live: CFrame = joint.Transform
+	local mine = written[joint]
+	if mine and Joints.same(live, mine) then
+		return animated[joint] or CFrame.identity
+	end
+	animated[joint] = live
+	return live
+end
+
+-- `rotation` on top of the animation's own value; nil lets the joint go.
+local function lay(joint: any, rotation: CFrame?)
+	if not joint then
+		return
+	end
+	if rotation and joint.Parent then
+		local out = baseOf(joint) * rotation
+		if out == out then -- (never a NaN on a joint)
+			joint.Transform = out
+			written[joint] = out
+		end
+		return
+	end
+	local mine = written[joint]
+	if mine then
+		if joint.Parent and Joints.same(joint.Transform, mine) then
+			joint.Transform = CFrame.identity
+		end
+		written[joint] = nil
+		animated[joint] = nil
+	end
+end
+
+-- Degrees { x, y, z } (Gestures' order: CFrame.Angles(0, y, 0) * CFrame.Angles(x, 0, z)) by a share.
+local function turned(a: { number }, w: number): CFrame
+	return CFrame.Angles(0, math.rad(a[2]) * w, 0) * CFrame.Angles(math.rad(a[1]) * w, 0, math.rad(a[3]) * w)
+end
+
+local function letGoBody(character: Model)
+	local body = bodies[character]
+	if body then
+		lay(body.ls, nil)
+		lay(body.le, nil)
+		lay(body.waist, nil)
+		lay(body.neck, nil)
+		bodies[character] = nil
+	end
+end
+
+local function recent(character: Model, name: string): boolean
+	local at = character:GetAttribute(name)
+	return type(at) == "number" and workspace:GetServerTimeNow() - at < BUSY_FOR
+end
+
+-- Has something else the left arm now (client/ArmPose.luau: aiming, carrying, the phone, a gesture, a swing, a car
+-- door; client/SprintPose.luau: the sprint)?
+local function armTaken(character: Model, mine: boolean, gesturing: boolean): boolean
+	if gesturing or character:GetAttribute("Carrying") ~= nil or character:GetAttribute("PhoneHeld") == true or SprintPose.weight(character) > 0.001 then
+		return true
+	end
+	if mine then
+		local aiming = CameraRig.aimPose()
+		local swingAt = Holster.localSwing()
+		if aiming or (swingAt ~= nil and os.clock() - swingAt < BUSY_FOR) then
+			return true
+		end
+	elseif character:GetAttribute("Aiming") == true or recent(character, "MeleeAt") then
+		return true
+	end
+	return recent(character, "BoardAt") or recent(character, "AlightAt")
+end
+
+-- The gesture the body is in (its Gesture / GestureAt attributes, played from when it arrived here, as ArmPose plays
+-- it; an old one, from before it came into view, does not play): its kind and the seconds into it, or nil.
+local function gestureOf(character: Model, body: Body): (string?, number)
+	local value = character:GetAttribute("GestureAt")
+	local kind = character:GetAttribute("Gesture")
+	if type(value) ~= "number" or type(kind) ~= "string" then
+		return nil, 0
+	end
+	if body.gestureAt ~= value then
+		body.gestureAt = value
+		body.gestureStart = if workspace:GetServerTimeNow() - value < 1 then os.clock() else -math.huge
+	end
+	local t = os.clock() - body.gestureStart
+	local total = Gestures.seconds(kind)
+	if not total or t >= total then
+		return nil, 0
+	end
+	return kind, t
+end
+
+local function bodyStep(player: Player, character: Model, humanoid: Humanoid, root: BasePart, dt: number, mine: boolean, now: number)
+	if not character:FindFirstChild("UpperTorso") then
+		return -- (R15 only)
+	end
+	local body = bodies[character]
+	if not body then
+		body = { ls = nil, le = nil, waist = nil, neck = nil, expires = 0, arm = 0, lean = 0, calmSince = nil, busyUntil = 0, gestureAt = nil, gestureStart = 0 }
+		bodies[character] = body
+	end
+	local b = body :: Body
+	local gone = (b.ls and not b.ls.Parent) or (b.waist and not b.waist.Parent) or (b.neck and not b.neck.Parent)
+	if now >= b.expires or gone then
+		b.ls = Joints.find(character:FindFirstChild("LeftUpperArm"), "LeftShoulder")
+		b.le = Joints.find(character:FindFirstChild("LeftLowerArm"), "LeftElbow")
+		b.waist = Joints.find(character:FindFirstChild("UpperTorso"), "Waist")
+		b.neck = Joints.find(character:FindFirstChild("Head"), "Neck")
+		b.expires = now + RIG_REFRESH
+	end
+	local onFoot = humanoid.Health > 0 and not humanoid.Sit and humanoid.SeatPart == nil and character:GetAttribute("ZipLine") == nil
+		and character:GetAttribute("ClimbLine") == nil and not Interact.posing(character)
+	local sprinting = SprintPose.weight(character) > 0.001
+	local kind, t = gestureOf(character, b)
+	-- the bag arm: a little straighter and out while the bag hangs in the left hand and nothing else has the arm
+	local inHand = onFoot and character:GetAttribute("BagWorn") == "hand"
+	if armTaken(character, mine, kind ~= nil) then
+		b.busyUntil = now + A.Hold
+	end
+	local want = if inHand and now >= b.busyUntil then 1 else 0
+	local rate = dt / math.max(0.05, A.Blend)
+	b.arm = math.clamp(b.arm + math.clamp(want - b.arm, -rate, rate), 0, 1)
+	if b.arm > 0.001 then
+		local w = b.arm * b.arm * (3 - 2 * b.arm)
+		if b.ls and b.ls.Parent then
+			-- out from the body; the animation's swing cut (the weight pulls the arm down)
+			local swing = baseOf(b.ls):ToEulerAnglesXYZ()
+			lay(b.ls, CFrame.Angles(-swing * A.SwingCut * w, 0, 0) * CFrame.Angles(0, 0, -math.rad(A.Out) * w))
+		end
+		if b.le and b.le.Parent then
+			local bend = baseOf(b.le):ToEulerAnglesXYZ()
+			lay(b.le, CFrame.Angles(-math.max(0, bend) * A.Straight * w, 0, 0))
+		end
+	elseif written[b.ls] or written[b.le] then
+		lay(b.ls, nil)
+		lay(b.le, nil)
+	end
+	-- the torso: the counter-lean of a loaded bag in the hand and a gesture's turn (the throw, the bag), only standing
+	-- or slow and not sprinting (ArmPose leans the waist itself faster, SprintPose owns it in the sprint)
+	local velocity = root.AssemblyLinearVelocity
+	local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	if onFoot and not sprinting and speed < A.Calm then
+		b.calmSince = b.calmSince or now
+	else
+		b.calmSince = nil
+	end
+	local calm = b.calmSince ~= nil and now - (b.calmSince :: number) >= CALM_FOR
+	local count = tonumber(player:GetAttribute("BagCount")) or 0
+	local goal = if calm and inHand then math.rad(A.Lean) * math.clamp(count / math.max(1, A.Full), 0, 1) else 0
+	b.lean = if calm then b.lean + (goal - b.lean) * math.min(1, rate) else 0
+	local shape = if kind then Gestures.body(kind, t) else nil
+	local weight = if kind then Gestures.weight(kind, t) else 0
+	local waist = if calm and shape and shape.waist and weight > 0 then shape.waist else nil
+	if calm and (math.abs(b.lean) > 1e-3 or waist) then
+		-- (leaning away from the bag on the left: the torso tips to the right, a turn about its Z)
+		local rotation = CFrame.Angles(0, 0, -b.lean)
+		if waist then
+			rotation = turned(waist, weight) * rotation
+		end
+		lay(b.waist, rotation)
+	elseif written[b.waist] then
+		lay(b.waist, nil)
+	end
+	local neck = if onFoot and not sprinting and shape and shape.neck and weight > 0 then shape.neck else nil
+	if neck then
+		lay(b.neck, turned(neck, weight))
+	elseif written[b.neck] then
+		lay(b.neck, nil)
+	end
+end
+
 local function step(dt: number)
 	local me = Players.LocalPlayer
 	local camera = workspace.CurrentCamera
@@ -188,8 +401,12 @@ local function step(dt: number)
 			if recs[character] then
 				forget(character)
 			end
+			if bodies[character] then
+				letGoBody(character) -- 6.7
+			end
 			continue
 		end
+		bodyStep(player, character, humanoid :: Humanoid, root :: BasePart, dt, player == me, now) -- 6.7
 		-- 6.4.1: your bag, once per spawn: a look whether it is really on you
 		if player == me and checks[character] ~= true then
 			local worn = character:GetAttribute("BagWorn")
@@ -321,6 +538,17 @@ local function step(dt: number)
 		for character in checks do
 			if not character.Parent then
 				checks[character] = nil
+			end
+		end
+		for character in bodies do
+			if not character.Parent then
+				bodies[character] = nil
+			end
+		end
+		for joint in written do
+			if not joint.Parent then
+				written[joint] = nil
+				animated[joint] = nil
 			end
 		end
 	end
