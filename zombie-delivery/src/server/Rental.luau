@@ -10,7 +10,7 @@
 -- from the saddle, client/CarBoarding.luau).
 --
 -- Renting (the server checks it all): on foot only (not seated, not getting in, not on a zip line), never on a mission
--- or a car job, not while a chauffeur brings your car, nothing in your hands that the backpack cannot take
+-- or a car job, not while a chauffeur brings your car, nothing in your hands that your bag cannot take (6.6)
 -- (Cargo.canStowHands; Cargo.update stows them as you sit, like on your bike), one rental at a time, a scooter in the
 -- dock, and the price (Config.Rental.Price: 0, free; the money check stays). Your own car or bike out goes home first
 -- (you are told: BRING MY CAR / MY BIKE brings it back). The rental is a Vehicles.spawnAt(…, rental = true) E-Scooter
@@ -315,7 +315,7 @@ local function rent(player: Player, state: DockState)
 		return
 	end
 	if not Cargo.canStowHands(player) then
-		tell(player, "Your hands are full: no room in the backpack.")
+		tell(player, "Your hands are full: no room in your bag.")
 		return
 	end
 	local index = freeSlot(state)

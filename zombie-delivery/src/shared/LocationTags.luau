@@ -8,7 +8,8 @@
 --     landmark's kind (a shop says what it sells, an employer EMPLOYER, a garage GARAGE, a storefront its kind: PIZZERIA,
 --     PHARMACY ...); a place with nothing sure to say has none.
 --   * A shop's point is its block's centre (you use a shop within Map.ShopRadius of it), so a shop is near from
---     SHOP_NEAR; a place with a yard (Map.Yards: the base, the farm, the prison ...) is measured to the yard's edge;
+--     SHOP_NEAR (6.6: a kiosk with its own radius, Map.Shops' `radius`: from that, its point is its counter); a place
+--     with a yard (Map.Yards: the base, the farm, the prison ...) is measured to the yard's edge;
 --     everything else to its point (a door, the road in front).
 --   * Near (NEAR studs, horizontal) and the caption comes; it goes when you are farther than FAR (hysteresis) or after
 --     HOLD seconds. The nearest place only, each at most once per COOLDOWN seconds, and not again before you have
@@ -58,6 +59,7 @@ local SHOP_SUB: { [string]: string } = {
 	repairs = "REPAIR SHOP",
 	supplies = "SUPPLIES",
 	bikes = "BIKES · BIKE GEAR", -- 5.1
+	bags = "BAGS", -- 6.6: the depot's bag kiosk
 }
 local PLACE_SUB: { [string]: string } = {
 	dispatchtower = "OFFICES",
@@ -111,7 +113,10 @@ function LocationTags.build(): { Tag }
 	end
 	local tags: { Tag } = {}
 	for _, landmark in Map.Landmarks do
-		local shop = landmark.kind == "shop"
+		-- (6.6: a kiosk with its own radius, ZDC Bags, is near from that radius, not from a block's front)
+		local kiosk = Map.Shops[landmark.id]
+		local radius = if landmark.kind == "shop" and kiosk then kiosk.radius else nil
+		local shop = landmark.kind == "shop" and radius == nil
 		local name = NAMES[landmark.id] or (string.gsub(landmark.name, "%s*%b()", ""))
 		table.insert(tags, {
 			id = landmark.id,
@@ -120,8 +125,8 @@ function LocationTags.build(): { Tag }
 			x = landmark.x,
 			z = landmark.z,
 			area = yards[landmark.id],
-			near = if shop then LocationTags.SHOP_NEAR else LocationTags.NEAR,
-			far = if shop then LocationTags.SHOP_FAR else LocationTags.FAR,
+			near = if radius then radius elseif shop then LocationTags.SHOP_NEAR else LocationTags.NEAR,
+			far = if radius then radius + (LocationTags.FAR - LocationTags.NEAR) elseif shop then LocationTags.SHOP_FAR else LocationTags.FAR,
 		})
 	end
 	return tags

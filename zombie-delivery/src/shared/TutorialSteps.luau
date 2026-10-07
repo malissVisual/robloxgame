@@ -17,7 +17,7 @@
 -- 5.0, from the bottom: a new player has no vehicle. Marge gives them the phone (the server's "phone" message, not a
 -- phase: client/Phone.luau shows it) with their first job, ON FOOT: two letters on one street (Jobs.startTutorialJob).
 -- A payload with mode = "foot" gets the walking hints (walk, pick up, hand over: no van). Her last pages send you to
--- Last Stop Supplies for a backpack and to save up for a bike (level 2).
+-- the shops and to save up for a bike (level 2). 6.6: bigger bags at ZDC Bags, the kiosk by the spawn (no backpacks).
 -- 5.7: the van's hints are gone (a new player never has a car on the first day: every job step has the walking hint,
 -- "Ride" on a bike). After the first delivery her last page offers SHOW ME AROUND, a short tour (TutorialSteps.Tour,
 -- tourDialog): the ZDC RIDE dock by the depot, the nearest bus stop (each on the GPS: client/TutorialUi.luau), then
@@ -193,7 +193,7 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		local reward = if type(info.reward) == "number" then math.floor(info.reward) else Config.Tutorial.Reward
 		return {
 			speaker = speaker(true),
-			pages = { `Delivered! +${reward}. Next: press J for a job. Shops are in your phone (Q → SHOP).` },
+			pages = { `Delivered! +${reward}. Next: press J for a job. Bigger bags: ZDC Bags, by the spawn. Shops are in your phone (Q → SHOP).` }, -- (6.6)
 			primary = "SHOW ME AROUND",
 			secondary = "CLOSE",
 		}

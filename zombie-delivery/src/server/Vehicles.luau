@@ -3072,15 +3072,29 @@ local function carrying(character: Instance?): string?
 	return if type(value) == "string" then value else nil
 end
 
--- Nobody gets into a seat with a crate in the hands (or a horse on the rope): load it first.
-local function handsFull(player: Player): boolean
+-- 6.6, the bike's own bag: getting on your bike loads what your hands carry onto it (server/Cargo.luau stows it as you
+-- sit). Cargo sets this hook (Cargo.canStowHands: a foot or bike run's pieces, room for them on the bike or in your
+-- bag); true lets you get on with your hands full.
+Vehicles.bikeStows = function(_player: Player): boolean
+	return false
+end
+
+-- Nobody gets into a seat with a crate in the hands (or a horse on the rope): load it first. 6.6: onto your bike you
+-- may (`car`: the one you get on), when its bag takes them (Vehicles.bikeStows).
+local function handsFull(player: Player, car: Car?): boolean
 	local held = carrying(player.Character)
 	if not held then
 		return false
 	end
 	local pushing = player.Character and player.Character:GetAttribute("Pushing")
+	local def = if car then Economy.findCar(car.id) else nil
+	local bike = def ~= nil and def.bike == true
+	if bike and pushing == nil and held ~= "horse" and Vehicles.bikeStows(player) then
+		return false
+	end
 	local loaded = player.Character ~= nil and player.Character:GetAttribute("CarryCount") ~= nil -- (pieces on the trolley)
-	Net.get("Notice"):FireClient(player, if pushing == "trolley" and loaded then "Load them first (E at the back) or set the trolley down (G)."
+	Net.get("Notice"):FireClient(player, if bike and pushing == nil then "No room for that on your bike or in your bag: hand it over, or put it down (G)."
+		elseif pushing == "trolley" and loaded then "Load them first (E at the back) or set the trolley down (G)."
 		elseif pushing == "trolley" then "Stow the trolley first (G at the open back) or set it down (G)."
 		elseif pushing == "jack" then "Set the pallet jack down first (G)."
 		elseif held == "horse" then "Load the horse first (E at the back of the truck)."
@@ -3161,8 +3175,8 @@ end
 -- client sees the seat before they go.
 local function finishBoarding(player: Player, b: Boarder)
 	-- 4.0: something in the hands by now (a piece, a trolley taken on the way in): no seat, the move is cancelled
-	-- (handsFull says why).
-	if handsFull(player) then
+	-- (handsFull says why; 6.6: onto a bike its bag takes them).
+	if handsFull(player, b.car) then
 		cancelBoarding(player, b)
 		return
 	end
@@ -3254,7 +3268,7 @@ local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driv
 		if occupant then
 			if driver and occupant.Parent ~= car.owner.Character then
 				eject(seat) -- somebody else's car
-			elseif driver and handsFull(car.owner) then
+			elseif driver and handsFull(car.owner, car) then
 				eject(seat)
 			else
 				sitting = occupant
@@ -3328,7 +3342,7 @@ local function watchPrompts(car: Car)
 				end
 				local humanoid = humanoidOf(player)
 				if player == car.owner and not car.wrecked and not car.chauffeured and seatFree(car.seat) and humanoid and not humanoid.SeatPart
-					and not boarders[player] and atDoor(car, index, humanoid) and not handsFull(player)
+					and not boarders[player] and atDoor(car, index, humanoid) and not handsFull(player, car)
 					and Vehicles.speed(car) <= Config.Cargo.BoardMaxSpeed then
 					-- 3.4: back in a car on the lift of a repair bay: the repair is cancelled (server/Repair.luau).
 					if car.repairing then

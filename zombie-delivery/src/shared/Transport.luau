@@ -4,16 +4,17 @@
 -- vehicle's capacity; everything that used to read the car's capacity (the board, Jobs' room checks, Cargo's hands)
 -- asks here instead, so a player without a car can work.
 --
--- On foot your hands hold Config.Cargo.HandsMax light pieces; a backpack (Config.Kit `room`) is the room of the hands
--- and the back together: the best one you own counts (the Big Backpack's 4 beats the Courier Backpack's 3). The
--- pieces over the hands ride in the pack (server/Cargo.luau: packRoom). The shoes' `speed` multiplies the walk and the
+-- On foot your hands hold Config.Cargo.HandsMax light pieces and your bag (the active one, below) its `extra`. 6.6, one
+-- carrying item: no backpacks any more (Config.RetiredKit: a save that owned one is paid back once, packRefund). The
+-- pieces over the hands ride in the bag (server/Cargo.luau's pack). The shoes' `speed` multiplies the walk and the
 -- sprint (the character attribute KitSpeed, client/CameraRig.luau), the jacket's `warm` the food's freshness drain.
 --
 --   Transport.findKit(id)      the Config.Kit entry, or nil
---   Transport.handsRoom(kit, bag)  light pieces you carry on foot: max(HandsMax, the best backpack's room) + the
---                              active bag's `extra` (6.0: the plastic bag adds up with a backpack; 6.4: ONE bag, the
---                              active one, never the sum of the bags you own)
---   Transport.packRoom(kit, bag)  of those, the ones in the pack (handsRoom − HandsMax)
+--   Transport.handsRoom(kit, bag)  light pieces you carry on foot: HandsMax + the active bag's `extra` (6.4: ONE bag,
+--                              the active one, never the sum of the bags you own; 6.6: room = hands + bag)
+--   Transport.packRoom(kit, bag)  of those, the ones over the hands: the bag's (6.6: bagRoom)
+--   Transport.packRefund(savedKit)  6.6: the money a save's retired backpacks (Config.RetiredKit) are worth, and their
+--                              names (a save's kit table; anything else: 0, none)
 --
 -- 6.4, the bags (Config.Kit pieces with `extra`: the plastic bag, the tote, the thermal, the padded messenger, the
 -- duffel). `bag` everywhere is the player's choice (profile.activeBag; the client gets the server's answer as the
@@ -25,7 +26,7 @@
 --   Transport.bagWarm(kit, bag)    food in it cools × this (the thermal bag; 1 = none)
 --   Transport.bagPadded(kit, bag)  fragile pieces in it are safe (the padded messenger)?
 --   Transport.bagBreath(kit, bag)  the sprint drains the breath × this while it is your hand (the duffel; 1 = none)
--- (Every bag's point: you sprint with your deliveries. Pieces in a bag or a backpack are never in your hands.)
+-- (Every bag's point: you sprint with your deliveries. Pieces in a bag are never in your hands.)
 --   Transport.mixWarm(share, bagWarm)  the drain multiplier of an order whose `share` of pieces with you is in a
 --                              warm bag: 1 − share × (1 − bagWarm) (a jacket's warm multiplies on top)
 --   Transport.speedMult(kit)   the walk / sprint multiplier (the best shoes; 1 = none)
@@ -34,10 +35,11 @@
 --   Transport.car(room)        Info in a car that holds `room` pieces
 --
 -- 5.1, the bike (Config.Cars with bike = true, sold at Spoke & Chain): light pieces only, the bike's own room and its
--- bike gear's (Economy.capacity) plus your pack (packRoom: the hands hold nothing while you ride, the pieces ride in
--- the pack and the bike's slots); the kit's walk speed does not count on a bike.
+-- bike gear's (Economy.capacity) plus your bag (packRoom: the hands hold nothing while you ride, the pieces ride in
+-- your bag and the bike's own bag, 6.6); the kit's walk speed does not count on a bike.
 --   Transport.isBike(carId)    is this Config.Cars id a bike (CarDef.bike)?
---   Transport.bikeRoom(carId, carGear)  what a bike holds with its installed bike gear (profile.carGear), no pack
+--   Transport.bikeRoom(carId, carGear)  what a bike holds with its installed bike gear (profile.carGear): 6.6, the
+--                              bike's own bag (its rack, basket or box), your bag not counted
 --   Transport.bike(room, kit, bag)  Info on a bike that holds `room` pieces (bikeRoom) with this kit
 --
 -- Pure Luau (tests/transport_test.luau).
@@ -48,10 +50,10 @@ local Economy = require(script.Parent.Economy)
 local Transport = {}
 
 export type Mode = "foot" | "bike" | "car"
-export type Kit = { [string]: boolean } -- Config.Kit ids owned (personal gear: backpacks, shoes …)
+export type Kit = { [string]: boolean } -- Config.Kit ids owned (personal gear: bags, shoes, vests …)
 export type Info = {
 	mode: Mode,
-	room: number, -- pieces you can take on one order (hands + backpack on foot; the vehicle's room otherwise)
+	room: number, -- pieces you can take on one order (hands + bag on foot; a bike's bag + yours; a car's room)
 	lightOnly: boolean, -- only Config.Cargo.LightLooks (on foot, on a bike)
 	speedMult: number, -- walk / ride speed multiplier from the kit (1 = none)
 }
@@ -121,27 +123,32 @@ function Transport.mixWarm(share: number, bagWarm: number): number
 	return 1 - s * (1 - math.clamp(bagWarm, 0, 1))
 end
 
--- How many light pieces you carry in your hands and on your back (Config.Cargo.HandsMax + the best backpack's room).
--- 6.0: + the bag's `extra` (the plastic bag's 2), on top of the best backpack. 6.4: the active bag's only (`bag`: the
--- choice, nil = the best owned), never every bag's.
+-- How many light pieces you carry on foot: your hands (Config.Cargo.HandsMax) + the bag's `extra`. 6.4: the active
+-- bag's only (`bag`: the choice, nil = the best owned), never every bag's. 6.6: no backpack: room = hands + bag.
 function Transport.handsRoom(kit: Kit, bag: string?): number
-	return Transport.backpackRoom(kit) + Transport.bagRoom(kit, bag)
+	return Config.Cargo.HandsMax + Transport.bagRoom(kit, bag)
 end
 
--- 6.0 review: the hands and the best backpack only (no bag's extra): what a backpack you might buy is compared with.
-function Transport.backpackRoom(kit: Kit): number
-	local room = Config.Cargo.HandsMax
-	for _, def in Config.Kit do
-		if kit[def.id] == true and def.room then
-			room = math.max(room, math.floor(def.room))
+-- The pieces of handsRoom that ride over the hands: 6.6, the bag's.
+function Transport.packRoom(kit: Kit, bag: string?): number
+	return Transport.bagRoom(kit, bag)
+end
+
+-- 6.6: what a save's retired backpacks (Config.RetiredKit, owned in its kit table) are worth, and their names in
+-- Config.RetiredKit's order. Anything that is not a table: 0 and none.
+function Transport.packRefund(savedKit: any): (number, { string })
+	local money = 0
+	local names: { string } = {}
+	if type(savedKit) ~= "table" then
+		return money, names
+	end
+	for _, def in Config.RetiredKit do
+		if savedKit[def.id] == true then
+			money += math.max(0, math.floor(def.price))
+			table.insert(names, def.name)
 		end
 	end
-	return room
-end
-
--- The pieces of handsRoom that ride in the pack (not in the hands).
-function Transport.packRoom(kit: Kit, bag: string?): number
-	return math.max(0, Transport.handsRoom(kit, bag) - Config.Cargo.HandsMax)
+	return money, names
 end
 
 -- The walk / sprint multiplier from the kit (running shoes …). 6.0: a piece below 1 (the Heavy Armour) slows you: the

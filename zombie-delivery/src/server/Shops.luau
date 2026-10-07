@@ -14,9 +14,12 @@
 --                       paint jobs and car guns (one on the roof of the equipped car); 3.4: its repair bays are
 --                       server/Repair.luau's (no free repairs any more); 4.6: GEAR for the equipped car (the "Gear"
 --                       remote: buy it, from its level; install it in a free gear slot or remove it, free)
---   Last Stop Supplies  consumables; 5.0: personal gear (the "Kit" remote, Config.Kit: backpacks, running shoes, a
---                       thermal jacket), yours for good (profile.kit, shared/Transport.luau); 6.4: five bags, and the
---                       Kit remote's ("use", bag id) picks the one in your hand (profile.activeBag), anywhere
+--   Last Stop Supplies  consumables; 5.0: personal gear (the "Kit" remote, Config.Kit: running shoes, a thermal
+--                       jacket, 6.0: the vests), yours for good (profile.kit, shared/Transport.luau)
+--   ZDC Bags            6.6: the depot's bag kiosk (Map.Shops.bags, Config.BagShop; server/BagKiosk.luau builds it):
+--                       the five bags (Config.Kit pieces with `extra`, the same "Kit" remote: a bag is bought only
+--                       here, the rest of the kit only at Last Stop Supplies); the Kit remote's ("use", bag id) picks
+--                       the one in your hand (profile.activeBag), anywhere. 6.6: no backpacks any more
 --   Depot Garage        3.4: the depot lot's garage window (server/Garages.luau: the starting van, company vehicles)
 --   Job Board           the depot's job board
 --
@@ -96,7 +99,7 @@ local function nearShop(player: Player, shop: string): boolean
 	if not info or not root then
 		return false
 	end
-	return Vector3.new(root.Position.X - info.x, 0, root.Position.Z - info.z).Magnitude < Map.ShopRadius
+	return Vector3.new(root.Position.X - info.x, 0, root.Position.Z - info.z).Magnitude < Map.shopRadius(shop) -- (6.6: a kiosk's own)
 end
 
 local function refuse(player: Player, shop: string): boolean
@@ -673,7 +676,8 @@ local function useBag(player: Player, def: Config.KitDef)
 end
 
 -- 5.0, personal gear (Config.Kit) at Last Stop Supplies: ("buy", kit id): not owned yet, its driver level, its price.
--- Yours for good (profile.kit): the board, Cargo's hands and the walk read it (shared/Transport.luau).
+-- Yours for good (profile.kit): the board, Cargo's hands and the walk read it (shared/Transport.luau). 6.6: a bag only at
+-- ZDC Bags (Map.Shops.bags), everything else only at Last Stop Supplies.
 local function onKit(player: Player, action: any, id: any)
 	local profile = PlayerData.get(player)
 	local def = if type(id) == "string" then TransportRules.findKit(id) else nil
@@ -681,7 +685,7 @@ local function onKit(player: Player, action: any, id: any)
 		useBag(player, def) -- 6.4 (not only at the counter)
 		return
 	end
-	if not profile or action ~= "buy" or not def or refuse(player, "supplies") then
+	if not profile or action ~= "buy" or not def or refuse(player, if TransportRules.isBag(def) then "bags" else "supplies") then
 		return
 	end
 	if profile.kit[def.id] then

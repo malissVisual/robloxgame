@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.5"
+Config.Version = "6.6"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -57,7 +57,7 @@ Config.Arms = {
 	Tip = "Got {price} on you? Lead & Co. sells a pistol for that. Fists are fine for one biter, not for a crowd. It's on your GPS.",
 	MaxArmour = 0.8,
 	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck)
-	BagTip = "Customers like to see who they open the door to: the ZDC Courier Vest is {price} at Last Stop Supplies. It's on your GPS.",
+	BagTip = "Customers like to see who they open the door to: the ZDC Courier Vest is {price} at Last Stop Supplies. It's on your GPS. Bags are at ZDC Bags, by the spawn.",
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
@@ -579,7 +579,7 @@ Config.Cars = {
 		ramPower = 0.3,
 		color = { 110, 118, 110 },
 		role = "Your first wheels: faster than running, all day",
-		description = "Worn tubes, mismatched wheels, a squeaky chain. A rear rack for one light parcel, your backpack on your back. Rider only.",
+		description = "Worn tubes, mismatched wheels, a squeaky chain. A rear rack for one light parcel: the bike's own bag. Rider only.",
 	},
 	{
 		id = "citybike",
@@ -980,15 +980,18 @@ export type GearDef = {
 }
 
 -- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
--- carry on foot and on a bike (shared/Transport.luau). room = light pieces in hands + on the back (the best one counts),
--- speed = walk / sprint multiplier (the best one counts), warm = food freshness drain multiplier while you carry it.
--- 6.0: extra = light pieces the piece adds on top of the hands and the best backpack (the plastic bag: they all add up).
+-- carry on foot and on a bike (shared/Transport.luau). speed = walk / sprint multiplier (the best one counts), warm =
+-- food freshness drain multiplier while you carry it.
+-- 6.0: extra = light pieces a bag adds on top of the hands.
+-- 6.6, one carrying item (the owner: "you can't have a bag and a backpack at the same time"): the backpacks are gone
+-- (Config.RetiredKit, refunded once: server/PlayerData.luau), your room on foot is the hands + the bag in use, and the
+-- bags are sold at ZDC Bags, the kiosk at the depot (Config.BagShop); Last Stop Supplies keeps the vests and the rest.
 -- 6.0: armour = the share of every hit a vest takes off (the best vest owned counts, shared/Armour.luau); a speed below 1
 -- slows the walk and the sprint (shared/Transport.luau speedMult: the best shoes × the slowest piece).
 -- 6.4, the bags (a piece with `extra` is a bag): only ONE bag is in your hand, the active one (profile.activeBag, else
 -- the best owned: the most room, a tie the later one here; shared/Transport.luau activeBag / bagRoom), so owning
--- several never adds up. The point of every bag: you SPRINT with your deliveries (pieces in a bag or a backpack are
--- never "in your hands": no Carrying attribute, no carry step; only the hands' pieces stop the sprint,
+-- several never adds up. The point of every bag: you SPRINT with your deliveries (pieces in a bag are never "in
+-- your hands": no Carrying attribute, no carry step; only the hands' pieces stop the sprint,
 -- client/CameraRig.luau). Its perks work only for that bag, while it is your hand (key 2):
 --   bagWarm    food in it cools × this (a Thermal Jacket's `warm` multiplies on top: shared/Transport.luau mixWarm)
 --   padded     fragile pieces in it take no knock from a hard fall or a bite on foot (Config.Jobs.CargoRules FootFall …)
@@ -1003,26 +1006,44 @@ export type GearDef = {
 --              behind the hip), loaded or not: its pieces stay with you, the hands are free. Without it, a hand bag
 --              as in 6.1: stowed when empty, set down on the ground when loaded. Pickups go into a bag (and you throw
 --              from it) only while it is your hand: press 2 to swing it to the front again.
-export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, room: number?, speed: number?, warm: number?, armour: number?, extra: number?, bagWarm: number?, padded: boolean?, bagBreath: number?, carry: string?, stays: boolean? }
+export type KitDef = { id: string, name: string, level: number, price: number, description: string, icon: string, speed: number?, warm: number?, armour: number?, extra: number?, bagWarm: number?, padded: boolean?, bagBreath: number?, carry: string?, stays: boolean? }
 Config.Kit = {
-	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "Sprint with your deliveries: 2 light pieces of any kind (a bouquet, a cake too) ride in it while you hold it (2); what you pick up drops straight in. Works with a backpack." },
+	{ id = "bag", name = "Plastic Bag", level = 1, price = 25, icon = "🛍️", extra = 2, description = "Sprint with your deliveries: 2 light pieces of any kind (a bouquet, a cake too) ride in it while you hold it (2); what you pick up drops straight in." },
 	-- 6.0.1: the red reflective vest, no longer part of a new courier's body (server/CharacterArt/Geometry.luau hivis):
 	-- just the look (no armour), worn until a Kevlar or heavy vest covers it (shared/KitFit.luau). Saves from before
 	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it.
 	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", description = "The ZDC reflective vest: customers see you're a courier." },
-	-- 6.4, the bigger bags (Last Stop Supplies' KIT tab; USE there or in the I window's BAGS tab picks the one you hold)
+	-- 6.4, the bigger bags (6.6: sold at ZDC Bags; USE there or in the I window's BAGS tab picks the one you hold)
 	{ id = "tote", name = "Canvas Tote", level = 2, price = 120, icon = "👜", extra = 3, carry = "shoulder", stays = true, description = "Sprint with your deliveries: 3 light pieces ride in this canvas tote over your shoulder. Swings onto your back when you draw your gun." },
 	{ id = "thermal", name = "Thermal Delivery Bag", level = 3, price = 300, icon = "🔥", extra = 4, carry = "hand", bagWarm = 0.35, description = "Sprint with your deliveries: 4 light pieces ride in it. Insulated: food in it stays hot (cools ×0.35)." },
 	{ id = "padded", name = "Padded Messenger Bag", level = 4, price = 650, icon = "💼", extra = 4, carry = "hip", stays = true, padded = true, description = "Sprint with your deliveries. Stays on your back when you draw your gun. Foam-padded: 4 light pieces, fragile ones take no knocks." },
 	{ id = "duffel", name = "Big Delivery Duffel", level = 6, price = 1200, icon = "🧳", extra = 6, carry = "hand", stays = true, bagBreath = 1.15, description = "Sprint with your deliveries: 6 light pieces ride in it. Slung on your back when you draw your gun. Heavy: sprinting costs 15% more breath." },
-	{ id = "backpack", name = "Courier Backpack", level = 1, price = 150, icon = "🎒", room = 3, description = "Carry 3 light pieces on foot or on a bike instead of 2." },
 	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster." },
-	{ id = "bigpack", name = "Big Backpack", level = 1, price = 400, icon = "🎒", room = 4, description = "Carry 4 light pieces on foot or on a bike." },
 	{ id = "jacket", name = "Thermal Jacket", level = 1, price = 300, icon = "🧥", warm = 0.8, description = "Food you carry stays warm longer." },
 	-- 6.0, the vests (server/Armour.luau takes the share off every bite and bullet; their looks: KitArt / KitWear).
 	{ id = "kevlar", name = "Kevlar Vest", level = 3, price = 600, icon = "🦺", armour = 0.3, description = "Takes 30% off every bite and bullet. Light enough to run in." },
 	{ id = "heavy", name = "Heavy Armour", level = 5, price = 1500, icon = "🛡️", armour = 0.5, speed = 0.92, description = "Plates and shoulder guards: takes 50% off every bite and bullet, but you are a little slower on foot." },
 } :: { KitDef }
+
+-- 6.6: the backpacks that are no longer sold (Config.Kit had them from 5.0 to 6.5). A save that owns one gets its price
+-- back once (shared/Transport.luau packRefund, server/PlayerData.luau: the save's noPacks flag) and Marge's text says
+-- so (Config.Courier.PackRefund, server/Tutorial.luau).
+Config.RetiredKit = {
+	{ id = "backpack", name = "Courier Backpack", price = 150 },
+	{ id = "bigpack", name = "Big Backpack", price = 400 },
+} :: { { id: string, name: string, price: number } }
+
+-- 6.6, ZDC Bags (server/BagKiosk.luau, Map.Shops.bags): the depot's bag kiosk, in the safe yard east of the spawn pad
+-- (World.DepotSpawn at 0, 26), clear of the scooter rack (Config.Rental.SpawnRack, z 44), the job board (-18, -25), the
+-- garage terminal (18, -25) and Marge (Config.Tutorial.NpcSpot). X / Z: its counter's middle, studs from the depot's
+-- centre; it faces the spawn (-X). Radius: studs from that spot the shop counts as "here" (the counter's BUY, the
+-- server's check; Map.ShopRadius for the big shops). It sells the bags (Config.Kit pieces with `extra`).
+Config.BagShop = {
+	Name = "ZDC Bags",
+	X = 26,
+	Z = 30,
+	Radius = 16,
+}
 
 -- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
 -- you reach the van's level (Config.Cars "van" level) without one, Marge texts you about a guy out west; Earl sells his
@@ -1522,11 +1543,11 @@ Config.Levels = {
 	-- unlocks, once (server/PlayerData.luau: profile.levelRewards; a save from before 4.6 counts the levels it had
 	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
 	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
-	-- 5.7: the levels before a car (2 – 4) give what a courier on foot or on a bike uses (medkits, the Courier Backpack,
+	-- 5.7: the levels before a car (2 – 4) give what a courier on foot or on a bike uses (medkits, 6.6: the Canvas Tote,
 	-- the Running Shoes: Config.Kit); the car's items (repair kits, nitro, mines) start at 5, once you drive.
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop: Spoke & Chain on Main St" },
-		[3] = { money = 750, items = { medkit = 2 }, kit = "backpack" },
+		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
 		[4] = { money = 1000, items = { medkit = 2 }, kit = "shoes", text = "Old Van: Earl's Used Wheels (Marge's quest)" },
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
@@ -2009,7 +2030,7 @@ Config.Jobs = {
 	-- 5.0, the ON FOOT jobs (server/Jobs.luau footOffer, server/Cargo.luau's foot flow, shared/Transport.luau): the
 	-- board's own section of Offers, always open (level 1) and for everybody (a driver too: quick money). A business
 	-- that sends a light look (Config.Cargo.LightLooks) sends Pieces pieces, never more than you carry (Transport
-	-- room: your hands and your backpack), from an address PickupMin … PickupMax (manhattan) from you to one
+	-- room: your hands and your bag), from an address PickupMin … PickupMax (manhattan) from you to one
 	-- MinDistance … MaxDistance on, inside the Districts only (never across the river). Internally a ★ job (tier 1:
 	-- the tier-indexed tables stay as they are) with `mode = "foot"`: its own pay (JobRules.footPay: BasePay +
 	-- PayPerStud × the walk + PayPerPiece a piece, PayMin … PayMax, × the role's and the modifier's multiplier up to
@@ -2049,10 +2070,10 @@ Config.Jobs = {
 	-- 5.1, the BIKE jobs (server/Jobs.luau lightOffer with this table, offer.mode = "bike"; the same fields as Foot,
 	-- JobRules.footPay / footTime / footPieces take it): the board's BIKE section from Level on, light looks only,
 	-- longer (MinDistance … MaxDistance) and bigger (Pieces, never more than your bike holds: its room + its bike gear +
-	-- your backpack, Transport mode "bike") than a walk, Downtown, in the Suburbs and in the Harbor. Pay: BasePay +
+	-- your bag, Transport mode "bike") than a walk, Downtown, in the Suburbs and in the Harbor. Pay: BasePay +
 	-- PayPerStud × the ride + PayPerPiece a piece (PayMin … PayMax); the clock expects Speed studs / s; XP: a ★ job's
 	-- + XpBonus (about 100 – 130). Done on your bike only (riding it or standing by it; never in a car), Cargo's light
-	-- flow (the pieces ride in your pack and the bike's slots: Info.pack). No waves: now and then a stray walker.
+	-- flow (6.6: the pieces ride in the bike's own bag and yours: Info.rack, the bag). No waves: now and then a stray walker.
 	Bike = {
 		Level = 2,
 		Offers = 3,
@@ -2405,8 +2426,8 @@ Config.Jobs = {
 	-- 5.2, several orders at once (server/Jobs.luau addOrder, shared/JobRules.luau's orders): while a stackable run is
 	-- on (an ordinary board delivery on foot, on a bike, or a car one of the ★ … CarTiers tiers; never a mission, a
 	-- special, an employer's job, DUO, the Freight Run or the tutorial's), ACCEPT on the board adds another order of
-	-- the same kind (+ ADD ORDER) while your free room takes its pieces (what you carry: hands + backpack on foot, the
-	-- bike + its gear + your backpack, the car + its gear; minus the pieces the open orders still hold or will pick up)
+	-- the same kind (+ ADD ORDER) while your free room takes its pieces (what you carry: hands + bag on foot, the
+	-- bike + its gear + your bag, the car + its gear; minus the pieces the open orders still hold or will pick up)
 	-- and fewer than Max[mode] orders are open. Every order keeps its own clock (its offer's, from when it was added),
 	-- pay and rating. The stops go in any order: the GPS takes the open stop whose circle you are at (AtStop studs),
 	-- else the pinned order's nearest, else the nearest one (the current one kept unless another is Hysteresis studs
@@ -2962,22 +2983,13 @@ Config.Cargo = {
 		icecream = true,
 		gadget = true,
 	} :: { [string]: boolean },
-	-- 5.3, what fits in a backpack (server/Cargo.luau packFits, shared/Bag.luau): small, flat or boxed light pieces.
-	-- Every other light piece (a bouquet, a cake, an electronics box, groceries, ice cream) rides in your hands, or on a
-	-- bike's rack, basket or box (two on the e-scooter's rack, 5.7): on foot never more than your hands hold.
-	PackLooks = {
-		mail = true,
-		newspaper = true,
-		documents = true,
-		medicine = true,
-		pizza = true,
-		burger = true,
-		noodles = true,
-		pastry = true,
-		bread = true,
-		parcel = true,
-	} :: { [string]: boolean },
+	-- 6.6: no backpack (5.3's PackLooks are gone): every light piece fits your bag and the bike's own bag, a heavy one
+	-- only your hands.
 	HandsMax = 2, -- light pieces in one player's hands at most
+	-- 6.6, the bike's own bag (its rack, basket or box: server/Cargo.luau, shared/Holding.luau bikeNear): on a run with a
+	-- bike, a pickup goes onto it while your bike is within BikeReach studs of you (or you sit on it), and at a drop E
+	-- takes its pieces from it only then ("Your bike has it: bring it closer.").
+	BikeReach = 12,
 	TwoPieceSpeed = 7, -- the walk (studs / s, the CarrySpeed attribute) with two pieces stacked (one: client/CameraRig's carry step)
 	-- 3.7, the car doors (server/Vehicles.luau, client/CarVisuals.luau): the E to get in shows only at a door (the driver's
 	-- on the left, the passengers' on their side), this close; the door swings out this far.
@@ -3077,7 +3089,7 @@ Config.Throw = {
 -- (shared/RunCycle.luau: the legs, the arms, the waist, the head and the body's bob, set over the stock run animation),
 -- for everybody within Range of the camera.
 Config.Courier = {
-	BagKit = "bag", -- the Config.Kit id: owned, a light piece picked up drops straight into the bag (or the pack) (6.4: the
+	BagKit = "bag", -- the Config.Kit id: owned, a light piece picked up drops straight into the bag (6.4: the
 	-- plastic one; any Config.Kit piece with `extra` is a bag, and the active one is in your hand: shared/Transport.luau)
 	VestKit = "hivis", -- 6.0.1: the Courier Vest's Config.Kit id (server/KitWear.luau; given once to pre-6.0.1 saves)
 	Sprint = {
@@ -3120,7 +3132,7 @@ Config.Courier = {
 	-- body part, the pivot's spot on it (studs on the nominal block body, scaled to the real one: shared/KitFit.luau)
 	-- and its turn (degrees). "hand" is the left hand's grip (Bag.Grip under it; HandOut[id] studs further out: the
 	-- boxy thermal bag off the leg). "back" is a bag slung on the back (the tote, the duffel: lying across it),
-	-- "hipBack" the messenger slid behind the hip; PackPush studs further back while a backpack is worn.
+	-- "hipBack" the messenger slid behind the hip.
 	BagPlaces = {
 		shoulder = { part = "UpperTorso", at = { -1.05, 0.8, 0.3 }, turn = { 0, 0, 6 } },
 		hip = { part = "UpperTorso", at = { -1.02, 0.1, 0.22 }, turn = { 0, 0, 4 } },
@@ -3128,7 +3140,6 @@ Config.Courier = {
 		hipBack = { part = "UpperTorso", at = { -0.5, 0.05, 0.72 }, turn = { 0, 90, 0 } },
 	} :: { [string]: { part: string, at: { number }, turn: { number } } },
 	HandOut = { thermal = 0.12, duffel = 0.08 } :: { [string]: number }, -- (6.4.1: the duffel too: full, it swells against the leg)
-	PackPush = 0.5,
 	-- 6.4: a worn bag's motion (client/BagSway.luau; BagSwing.tuning / BagSwing.bob): on the shoulder or the hip a stiff
 	-- small swing (Wear over Bag) and a bounce of Bounce studs with each step (Step studs a step, the full bounce from
 	-- FullSpeed); on the back only a soft bob (BackBob studs). Switch: seconds the bag takes to move between the front
@@ -3140,7 +3151,9 @@ Config.Courier = {
 	Step = 3.5,
 	Switch = 0.5,
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
-	BagUnlock = "Sprint with more of your deliveries: Last Stop Supplies has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
+	BagUnlock = "Sprint with more of your deliveries: ZDC Bags at the depot has the {name} for you now, {room} pieces in it, {price}. It's on your GPS.",
+	-- 6.6: Marge's text, once, to a save that owned a backpack (Config.RetiredKit): {money} is the refund
+	PackRefund = "Backpacks are gone: bags do it all now. You got {money} back.",
 	-- 6.4.1, what is in the bag shows (shared/BagFill.luau; server/KitWear.luau on you, server/Cargo.luau on the ground):
 	-- the pieces in it (the player's BagCount / BagLooks attributes) stick out of its opening as small shapes of their
 	-- looks (a pizza box, a bouquet, letters …; a parcel otherwise), up to its room and Max; Sink of each one's height

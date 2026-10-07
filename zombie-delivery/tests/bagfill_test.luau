@@ -58,19 +58,17 @@ check("five bags", #bags == 5, #bags)
 
 -- The slot key (the 6.4 bug) -----------------------------------------------------------------------------------------
 
-check("the key of a bag in the hand", KitFit.bagKey("bag", "hand", false) == "bag@hand")
-check("the key of a slung duffel behind a backpack", KitFit.bagKey("duffel", "back", true) == "duffel@back+")
+check("the key of a bag in the hand", KitFit.bagKey("bag", "hand") == "bag@hand")
+check("6.6: the key of a slung duffel (no backpack mark any more)", KitFit.bagKey("duffel", "back") == "duffel@back")
 for _, def in bags do
 	for _, place in { "hand", "shoulder", "hip", "back", "hipBack" } do
-		for _, packed in { false, true } do
-			local key = KitFit.bagKey(def.id, place, packed)
-			local id, at, pack = KitFit.parseBagKey(key)
-			local ok = pcall(KitArt.pieces, id :: string)
-			check(`{key}: back to its bag, place and pack, a look KitArt knows`, id == def.id and at == place and pack == packed and ok)
-		end
+		local key = KitFit.bagKey(def.id, place)
+		local id, at = KitFit.parseBagKey(key)
+		local ok = pcall(KitArt.pieces, id :: string)
+		check(`{key}: back to its bag and place, a look KitArt knows`, id == def.id and at == place and ok)
 	end
 end
-check("not a key: nil", KitFit.parseBagKey("bag") == nil and KitFit.parseBagKey("") == nil)
+check("not a key: nil", KitFit.parseBagKey("bag") == nil and KitFit.parseBagKey("") == nil and KitFit.parseBagKey("duffel@back+") == nil)
 check("(6.4's bug: the key itself is no look)", not pcall(KitArt.pieces, "bag@hand"))
 
 -- Where each bag rests, per way of wearing it, on both bodies ------------------------------------------------------
@@ -100,11 +98,11 @@ check("the plastic bag: only in the hand", table.concat(styles(bags[1]), ",") ==
 for _, body in bodies do
 	for _, def in bags do
 		for _, place in styles(def) do
-			for _, packed in { false, true } do
+			do
 				local spot = Config.Courier.BagPlaces[place]
 				local partName = if spot then spot.part else "LeftHand"
 				local part = body.parts[partName]
-				local at, turn = KitFit.bagGrip(def.id, place, partName, part.size, packed)
+				local at, turn = KitFit.bagGrip(def.id, place, partName, part.size)
 				local mouth = Config.Courier.BagFill.Mouth[def.id]
 				local full = BagFill.swell(KitArt.pieces(def.id), mouth, def.extra or 0, def.extra or 0)
 				for _, piece in BagFill.pieces(mouth, def.extra or 0, def.extra or 0, { "pizza", "bouquet", "newspaper", "cake", "mail", "bread" }) do
@@ -119,7 +117,7 @@ for _, body in bodies do
 						far, farName = length(where), piece.name
 					end
 				end
-				local label = `{body.name}, {def.id} {place}{if packed then " (a backpack worn)" else ""}`
+				local label = `{body.name}, {def.id} {place}`
 				check(`{label}: the grip on its body part ({part.name})`, length(at) < (if spot then 2 else 1.5), length(at))
 				check(`{label}: full, every piece within 3 studs of the {part.name}`, far <= 3, `{farName} {far}`)
 				if place == "hand" and body.name == "R15 courier" then
@@ -134,18 +132,18 @@ for _, body in bodies do
 		end
 	end
 end
-local handAt = KitFit.bagGrip("bag", "hand", "LeftHand", { 1, 0.3, 1 }, false)
+local handAt = KitFit.bagGrip("bag", "hand", "LeftHand", { 1, 0.3, 1 })
 check("the plastic bag's grip just under the R15 hand", math.abs(handAt[2] - (-0.15 - Config.Courier.Bag.Grip)) < 1e-9 and handAt[1] == 0, handAt[2])
-local armAt = KitFit.bagGrip("bag", "hand", "LeftHand", { 1, 2, 1 }, false)
+local armAt = KitFit.bagGrip("bag", "hand", "LeftHand", { 1, 2, 1 })
 check("… and under the bottom of an R6 Left Arm", math.abs(armAt[2] - (-1 - Config.Courier.Bag.Grip)) < 1e-9, armAt[2])
-local thermalAt = KitFit.bagGrip("thermal", "hand", "LeftHand", { 1, 0.3, 1 }, false)
+local thermalAt = KitFit.bagGrip("thermal", "hand", "LeftHand", { 1, 0.3, 1 })
 check("the thermal bag a little further out", thermalAt[1] < 0)
-local shoulder = KitFit.bagGrip("tote", "shoulder", "UpperTorso", { 2, 1.6, 1 }, false)
-local shoulderR6 = KitFit.bagGrip("tote", "shoulder", "UpperTorso", { 2, 2, 1 }, false)
+local shoulder = KitFit.bagGrip("tote", "shoulder", "UpperTorso", { 2, 1.6, 1 })
+local shoulderR6 = KitFit.bagGrip("tote", "shoulder", "UpperTorso", { 2, 2, 1 })
 check("the tote's shoulder spot on the top of the torso, R15 and R6 (scaled to the taller Torso)", math.abs(shoulder[2] - 0.8) < 1e-9 and math.abs(shoulderR6[2] - 1) < 1e-9, `{shoulder[2]} {shoulderR6[2]}`)
-local slung = KitFit.bagGrip("duffel", "back", "UpperTorso", { 2, 1.6, 1 }, false)
-local slungPacked = KitFit.bagGrip("duffel", "back", "UpperTorso", { 2, 1.6, 1 }, true)
-check("a slung bag hangs PackPush further back behind a backpack", math.abs(slungPacked[3] - slung[3] - Config.Courier.PackPush) < 1e-9)
+local slung = KitFit.bagGrip("duffel", "back", "UpperTorso", { 2, 1.6, 1 })
+local back = Config.Courier.BagPlaces.back
+check("6.6: a slung bag hangs at its place on the back (no backpack to push it)", math.abs(slung[3] - back.at[3]) < 1e-9 and (Config.Courier :: any).PackPush == nil, slung[3])
 
 -- What is in the bag ---------------------------------------------------------------------------------------------
 

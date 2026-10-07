@@ -61,10 +61,19 @@ for level = 2, 4 do
 		check(`level {level}: no car items before a car ({id})`, id ~= "repair" and id ~= "nitro" and id ~= "mine" and id ~= "jerrycan")
 	end
 end
-check("level 3 gives the Courier Backpack, level 4 the Running Shoes", (Career.kitOf(Career.reward(3)) :: any).id == "backpack" and (Career.kitOf(Career.reward(4)) :: any).id == "shoes")
-check("the kit in words", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "the Courier Backpack", 1, true) ~= nil)
+check("level 3 gives the Canvas Tote (6.6: no backpack), level 4 the Running Shoes", (Career.kitOf(Career.reward(3)) :: any).id == "tote" and (Career.kitOf(Career.reward(4)) :: any).id == "shoes")
+check("the kit in words", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "the Canvas Tote", 1, true) ~= nil)
 local ownedKit: { [string]: boolean } = {}
-check("a kit reward: yours, nothing to pay", Career.grantKit(Career.reward(3), ownedKit) == 0 and ownedKit.backpack == true)
+check("a kit reward: yours, nothing to pay", Career.grantKit(Career.reward(3), ownedKit) == 0 and ownedKit.tote == true)
+check("6.6: no level gives a backpack", (function()
+	for level = 2, 20 do
+		local reward = Career.reward(level)
+		if reward and (reward.kit == "backpack" or reward.kit == "bigpack") then
+			return false
+		end
+	end
+	return true
+end)())
 check("owned already: its price instead", Career.grantKit(Career.reward(3), ownedKit) == (Career.kitOf(Career.reward(3)) :: any).price)
 check("no kit, nothing", Career.grantKit(Career.reward(2), ownedKit) == 0 and Career.grantKit(nil, ownedKit) == 0)
 check("level 4: the Old Van, the Patched Van stage, ★ jobs, First Shift, the Ratchet Straps", has(road[4].unlocks, "car", "van") and has(road[4].unlocks, "stage", "van:1")

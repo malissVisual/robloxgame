@@ -1,6 +1,6 @@
 -- 6.4.1: the worn bag built by the real server/KitWear.luau (its build and bagArt, the real ModelArt Builder, the real
 -- shared rules) against the property recorder, on the courier's real R15 body (CharacterArt Rig) and on a classic R6
--- body: every bag, in every way it can be worn (Holding.wornAs; a backpack worn or not), empty and full. 6.4 built no
+-- body: every bag, in every way it can be worn (Holding.wornAs; 6.6: no backpack any more), empty and full. 6.4 built no
 -- bag at all (its slot key went to KitArt as a look); this fails loudly on anything like it. At rest (the joint's
 -- Transform the identity, as client/BagSway.luau leaves it hanging): the pivot joined to the right body part, nothing
 -- anchored, colliding or near-invisible, every part within 3 studs of the hand (or of the torso it hangs on), the
@@ -62,9 +62,9 @@ for _, body in bodies do
 			table.insert(places, if def.carry == "hip" then "hipBack" else away)
 		end
 		for _, place in places do
-			for _, packed in { false, true } do
+			do
 				for _, count in { 0, def.extra or 0 } do
-					local key = KitFit.bagKey(def.id, place, packed and (place == "back" or place == "hipBack"))
+					local key = KitFit.bagKey(def.id, place)
 					local label = `{body.name} {key} with {count}`
 					local inBag = table.move(looks, 1, count, 1, {})
 					local ok, slot = pcall(KitWear.build, model, "hand", key, { count = count, looks = inBag, key = `{count}` })
@@ -108,7 +108,7 @@ for _, body in bodies do
 				end
 			end
 			-- its strap, where it has one (on the torso: an R6 body's Torso)
-			local key = KitFit.bagKey(def.id, place, false)
+			local key = KitFit.bagKey(def.id, place)
 			local ok, strap = pcall(KitWear.build, model, "strap", key)
 			check(`{body.name} {key}: the strap built without an error`, ok, strap)
 			if ok and strap then
@@ -119,8 +119,8 @@ for _, body in bodies do
 			end
 		end
 	end
-	-- the pack and the vest go on an R6 Torso too
-	for _, slotId in { { "pack", "backpack" }, { "vest", "kevlar" } } do
+	-- the vest goes on an R6 Torso too (6.6: the backpack's slot is gone)
+	for _, slotId in { { "vest", "kevlar" } } do
 		local ok, slot = pcall(KitWear.build, model, slotId[1], slotId[2])
 		check(`{body.name} {slotId[2]}: built`, ok and slot ~= nil, slot)
 		if ok and slot then
@@ -145,7 +145,7 @@ end
 check("the bag set down shows its pizza box and its bouquet", art ~= nil and fill == #BagFill.pieces(Config.Courier.BagFill.Mouth.bag, 2, 2, { "pizza", "bouquet" }), fill)
 check("6.4's key no longer reaches KitArt", pcall(KitWear.build, courier, "hand", "bag@hand"))
 
-print(`bags built: {built} (on both bodies, every place, a backpack or not, empty and full), {shown} with their pieces`)
+print(`bags built: {built} (on both bodies, every place, empty and full), {shown} with their pieces`)
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else
