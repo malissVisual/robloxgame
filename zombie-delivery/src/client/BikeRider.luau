@@ -18,6 +18,7 @@
 -- the hands on the bar's LeftGrip / RightGrip points (RiderPose.armIk, a two-bone reach).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Joints = require(Shared:WaitForChild("Joints"))
@@ -44,6 +45,8 @@ local written: { [Instance]: CFrame } = {}
 local animated: { [Instance]: CFrame } = {}
 local riders: { [Model]: { any } } = {} -- the joints posed on each rider (released on the way off)
 local lifts: { [Model]: number } = {} -- 5.8.2: a standing rider's Root lift (studs), corrected toward the deck
+local absolute: { [Instance]: boolean } = {} -- 5.9.1: the joints posed absolute (given back to the rest pose, not a sit)
+local watching: RBXScriptConnection? = nil -- 5.9.1: lets go of riders whose scooter vanished under them
 
 
 -- The animation's own value of a joint this frame.
@@ -88,6 +91,7 @@ local function put(joint: any, value: CFrame)
 	end
 	joint.Transform = value
 	written[joint] = value
+	absolute[joint] = true
 end
 
 -- A world point of the scooter's art (an Attachment under its BikeFrame), or `fallback` in the BikeFrame's space.
@@ -155,7 +159,7 @@ local function poseStanding(character: Model)
 	local bottom = feetBottom(character)
 	local lift = lifts[character] or 0
 	if deck and bottom then
-		lift = math.clamp(lift + (deck.Y - bottom) * 0.5, -3, 3)
+		lift = math.clamp(lift + (deck.Y - bottom) * 0.5, -2, 2)
 	end
 	lifts[character] = lift
 	if root then
@@ -195,6 +199,20 @@ function BikeRider.pose(character: Model, crank: number, stand: boolean?)
 	local waist = find(character, BODY[1])
 	if not waist then
 		return -- not an R15 body: the plain sit
+	end
+	if not watching then
+		-- 5.9.1: a rider whose seat went away without a goodbye (the scooter returned or wrecked under them, the model
+		-- gone before client/CarVisuals.luau saw them get off) is let go here.
+		watching = RunService.Heartbeat:Connect(function()
+			for rider in riders do
+				local humanoid = rider:FindFirstChildOfClass("Humanoid")
+				local seat = humanoid and humanoid.SeatPart
+				local car = seat and seat.Parent
+				if not rider.Parent or not humanoid or humanoid.Health <= 0 or not car or car:GetAttribute("Bike") ~= true then
+					BikeRider.release(rider)
+				end
+			end
+		end)
 	end
 	if not riders[character] then
 		local posed: { any } = {}
@@ -249,11 +267,18 @@ function BikeRider.release(character: Model)
 	riders[character] = nil
 	lifts[character] = nil
 	for _, joint in posed do
-		if written[joint] then
+		if absolute[joint] then
+			-- 5.9.1: back to the rest pose (the Animator writes over it next frame where it animates; the Root joint it
+			-- may not animate at all: a lift or a sit's drop must not stay, the body would stand sunk or floating).
+			if joint.Parent then
+				joint.Transform = CFrame.identity
+			end
+		elseif written[joint] then
 			layer(joint, nil)
 		end
 		written[joint] = nil
 		animated[joint] = nil
+		absolute[joint] = nil
 	end
 end
 
