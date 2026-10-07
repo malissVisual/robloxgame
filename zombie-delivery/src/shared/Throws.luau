@@ -18,6 +18,13 @@
 --   Throws.landed(land, door)        within DoorRadius of the door (flat, and not a floor away)
 --   Throws.tip(distance, over, wall) the TRICKSHOT tip: far (FarFrom … Range: FarMin … FarMax), over (OverTip), off a
 --                                    wall (WallTip) and their total
+--   6.2, the auto-aim (the owner: "auto aim, and a perfect hit gets a bigger tip from the customer"):
+--   Throws.solve(from, door, angle)  the launch speed that lands on the door's spot at `angle` degrees over the flat
+--                                    (no air, no walls: the parabola), nil when that angle can't reach it
+--   Throws.powerFor(speed)           the power 0 … 1 that throws at `speed` (nil outside MinSpeed … MaxSpeed)
+--   Throws.direction(from, door, angle)  the unit way: flat toward the door, `angle` degrees up
+--   Throws.landFlat(from, velocity, groundY)  where the parabola comes down to the height groundY (nil: never)
+--   Throws.perfect(land, door)       within PerfectRadius of the door's spot: the customer's PERFECT tip
 --   Throws.fragile(look, job)        too fragile to throw: a FragileLooks look, or every piece of a fragile job
 --   Throws.throwable(look, job)      a light look (Config.Cargo.LightLooks) that is not fragile
 --
@@ -184,6 +191,55 @@ function Throws.tip(span: number, over: boolean, wall: boolean): Tip
 	local o = if over then T.OverTip else 0
 	local w = if wall then T.WallTip else 0
 	return { total = far + o + w, far = far, over = o, wall = w }
+end
+
+function Throws.solve(from: Vec, door: Vec, angle: number): number?
+	local d = Throws.flat(from, door)
+	local dy = door[2] - from[2]
+	local theta = math.rad(angle)
+	local c = math.cos(theta)
+	local denominator = 2 * c * c * (d * math.tan(theta) - dy)
+	if d < 0.5 or denominator <= 1e-6 or not finite(denominator) then
+		return nil
+	end
+	local speed = math.sqrt(T.Gravity * d * d / denominator)
+	return if finite(speed) then speed else nil
+end
+
+function Throws.powerFor(speed: number): number?
+	if not finite(speed) then
+		return nil
+	end
+	local p = (speed - T.MinSpeed) / (T.MaxSpeed - T.MinSpeed)
+	return if p >= 0 and p <= 1 then p else nil
+end
+
+function Throws.direction(from: Vec, door: Vec, angle: number): Vec?
+	local dx, dz = door[1] - from[1], door[3] - from[3]
+	local h = math.sqrt(dx * dx + dz * dz)
+	if h < 1e-3 or not finite(h) then
+		return nil
+	end
+	return lifted(dx / h, dz / h, math.rad(math.clamp(angle, T.MinUp, T.MaxUp)))
+end
+
+function Throws.landFlat(from: Vec, velocity: Vec, groundY: number): Vec?
+	-- y(t) = y0 + vy t - g t² / 2 = groundY: the later root
+	local g = T.Gravity
+	local a, b, c = -0.5 * g, velocity[2], from[2] - groundY
+	local disc = b * b - 4 * a * c
+	if disc < 0 or not finite(disc) then
+		return nil
+	end
+	local t = (-b - math.sqrt(disc)) / (2 * a)
+	if t <= 0 or not finite(t) then
+		return nil
+	end
+	return { from[1] + velocity[1] * t, groundY, from[3] + velocity[3] * t }
+end
+
+function Throws.perfect(land: Vec, door: Vec): boolean
+	return Throws.flat(land, door) <= T.PerfectRadius and math.abs(land[2] - door[2]) <= 6
 end
 
 function Throws.fragile(look: string?, job: boolean): boolean

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.1.1"
+Config.Version = "6.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -2992,7 +2992,8 @@ Config.Throw = {
 	MinUp = 5, -- degrees: the throw's angle over the flat, at least …
 	MaxUp = 70, -- … and at most
 	Lift = 22, -- degrees over where the camera looks (looking level throws up at this)
-	ChargeTime = 1.1, -- seconds from the weakest to the strongest throw while you hold (then back down, and again)
+	ChargeTime = 1.3, -- seconds from the weakest to the strongest throw while you hold (then back down, and again; 6.2:
+	-- slower, the gold PERFECT zone has to be catchable)
 	Step = 1 / 30, -- seconds per step of the traced arc
 	MaxTime = 3, -- the arc is traced this long at most
 	Bounce = 0.45, -- the speed kept off a wall (once: MaxBounces) …
@@ -3006,6 +3007,19 @@ Config.Throw = {
 	WallTip = 10, -- off a wall
 	TipCap = 60, -- 6.0 review: the trickshot tips of one run add up to this at most
 	Dots = 20, -- the aim's dotted arc
+	-- 6.2, the auto-aim (client/Throw.luau): the throw turns to the door by itself at the first of these angles (degrees)
+	-- whose arc reaches the door; you time the power. Landing within PerfectRadius of the door's spot is PERFECT: the
+	-- customer tips PerfectTip, at most PerfectCap a job (beside the TRICKSHOT tip and its TipCap).
+	AutoAngles = { 35, 45, 55, 65 } :: { number },
+	PerfectRadius = 1.5,
+	PerfectTip = 20,
+	PerfectCap = 80,
+	PerfectLines = {
+		"Right on the mat! Here's a little extra.",
+		"What a throw! Keep the change.",
+		"Perfect! I'm telling all my neighbours about you.",
+		"Bullseye! That deserves a tip.",
+	} :: { string },
 	-- Too fragile to throw (with a job of the FRAGILE modifier or the fragile cargo rule: everything).
 	FragileLooks = { cake = true, vaccine = true, sample = true, electronics = true, painting = true, gadget = true } :: { [string]: boolean },
 }

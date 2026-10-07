@@ -142,7 +142,7 @@ of letting you play a profile that would not be saved.
 | What you hold (6.1): fists / the plastic bag / your gun (a loaded bag that leaves your hand is set down on the ground: E picks it up) | 1 / 2 / 3 (gamepad: d-pad left / right cycles) | tap the hand slots at the left of the bottom bar |
 | Holster / draw the gun (3.9; on foot, you start holstered; 6.1.1: aiming or shooting no longer draws it, with fists the left mouse punches; 6.1: 3 draws your gun too, not over a loaded bag) | B | DRAW / HOLSTER (over PUNCH) |
 | Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: L1) | PUNCH / STRIKE left of FIRE |
-| Throw at a home's door (6.0; 6.1: with the bag in your hand or a light piece in your hands, else it says why) | hold X (gamepad R1) | THROW |
+| Throw at a home's door (6.0; 6.1: with the bag in your hand or a light piece in your hands, else it says why; 6.2: it aims itself, let go in the gold zone for a PERFECT tip) | hold X (gamepad R1) | THROW |
 | Key hints (6.1: fold / unfold the strip under the top buttons) | F1, or its KEYS chip | – |
 | Switch gun | hold T: the weapon wheel (point at a gun, let go); tap T: the next gun (5.4.1: Q is the phone); or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
 | Items (repair, medkit, nitro, molotov, mine) | 4 – 8 (6.1; 9 a sixth kind; or click a slot) | the slots |
@@ -1105,6 +1105,23 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## Auto-aim throws and the PERFECT tip (6.2)
+
+The owner's wish: "auto aim when throwing, and a perfect hit gets a bigger tip from the customer". Holding X at a home's
+door (within 45 studs) no longer aims with the camera: your courier turns to the door and the throw picks its own angle
+(`Config.Throw.AutoAngles` 35° / 45° / 55° / 65°: the first whose arc, traced with the world's rays, comes down on the
+door, so it lobs over a fence or a car when it has to). You only time the power: a meter over the "Hold X" line shows
+the swinging needle, the **green zone** (it lands at the door: delivered) and the **gold PERFECT zone**. Let go in the
+gold and the piece lands within `PerfectRadius` (1.5 studs) of the door's spot: the customer says something nice and
+tips **+$20** (`PerfectTip`; at most `PerfectCap` $80 a job, on top of the TRICKSHOT tip and its own cap). The banner
+says "PERFECT! +$n". The landing ring turns gold, green or white as you aim. The power swings a little slower
+(`ChargeTime` 1.3 s). The server still traces the real arc and decides (server/Cargo.luau throwAt); the maths are
+`Throws.solve` / `powerFor` / `direction` / `landFlat` / `perfect` (shared/Throws.luau, tested in throws_test).
+6.2 review: you stand still while aiming (the move keys, the stick and jump wait), the throw is sent with your own
+release point (the server takes it within 3 studs of your body, so its PERFECT matches what you saw), the needle you let
+go on is the power thrown, no zones show when something blocks every arc (the ring alone tells) and a newspaper round
+shows no gold zone (its papers tip nothing); the customer's PERFECT line only comes with the tip (not past the cap).
 
 ## What you hold: fists, the bag or your gun; X fixed; the bag swings (6.1)
 
