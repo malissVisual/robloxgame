@@ -59,12 +59,16 @@ type State = {
 	direction: Vector3?, -- the last frame's aim …
 	power: number, -- … and power: what release throws
 	angle: number, -- 6.2: the auto-aim's angle (degrees over the flat) for this throw
+	clear: boolean, -- 6.2 review: its arc reaches the door (else the meter's zones are not shown: something is in the way)
+	zonedFrom: Vector3?, -- 6.2 review: the release point the meter's zones were laid out from
+	from: Vector3?, -- 6.2 review: the last frame's release point (sent with the throw)
 	meter: Frame?, -- 6.2: the power meter (its Needle, Green and Gold frames)
 	gui: ScreenGui?,
 	line: TextLabel?,
 	banner: Frame?,
 }
-local state: State = { bound = nil, aiming = false, since = 0, power = 0, angle = 45 }
+local state: State = { bound = nil, aiming = false, since = 0, power = 0, angle = 45, clear = false }
+local HOLD_STILL = "ZDThrowHoldStill" -- 6.2 review: no walking while aiming (the zones are laid out from where you stand)
 
 local function say(text: string)
 	local notify = Throw.notify
@@ -182,7 +186,7 @@ end
 -- 6.2: the auto-aim's angle for this throw: the first AutoAngles angle whose solved arc (a throw at its PERFECT power)
 -- comes down on the door with the world's rays; else the first one the power can reach (it may bounce off something:
 -- a trickshot by luck); nil when none can.
-local function pickAngle(from: Throws.Vec, door: Vector3, params: RaycastParams): number?
+local function pickAngle(from: Throws.Vec, door: Vector3, params: RaycastParams): (number?, boolean)
 	local fallback: number? = nil
 	for _, angle in T.AutoAngles do
 		local speed = Throws.solve(from, vec(door), angle)
@@ -196,11 +200,11 @@ local function pickAngle(from: Throws.Vec, door: Vector3, params: RaycastParams)
 				return if hit then { at = vec(hit.Position), normal = vec(hit.Normal) } else nil
 			end)
 			if trace.grounded and Throws.landed(trace.land, vec(door)) then
-				return angle
+				return angle, true
 			end
 		end
 	end
-	return fallback
+	return fallback, false
 end
 
 -- 6.2: the power meter: the bar, the green zone (lands at the door), the gold zone (PERFECT) and the needle.
@@ -301,8 +305,14 @@ local function showZones(from: Throws.Vec, door: Vector3)
 	if not bar or not direction then
 		return
 	end
-	local g0, g1 = zoneOf(from, direction, door, Throws.landed)
-	local p0, p1 = zoneOf(from, direction, door, Throws.perfect)
+	state.zonedFrom = v3(from)
+	local g0: number?, g1: number?, p0: number?, p1: number? = nil, nil, nil, nil
+	if state.clear then -- (6.2 review: something in the way: the ring alone tells)
+		g0, g1 = zoneOf(from, direction, door, Throws.landed)
+		if player:GetAttribute("ThrowToss") ~= true then -- (a round's papers: no PERFECT tip)
+			p0, p1 = zoneOf(from, direction, door, Throws.perfect)
+		end
+	end
 	setZone(bar, "Green", g0, g1)
 	setZone(bar, "Gold", p0, p1)
 	local label = bar:FindFirstChild("Perfect")
@@ -334,7 +344,11 @@ local function aimFrame()
 	if not velocity then
 		return
 	end
-	state.direction, state.power = v3(aimed), power
+	state.direction, state.power, state.from = v3(aimed), power, v3(from)
+	local zoned = state.zonedFrom
+	if zoned and (zoned - v3(from)).Magnitude > 0.2 then
+		showZones(from, door) -- (6.2 review: the body moved anyway: the zones follow)
+	end
 	local meter = state.meter
 	if meter then
 		local needle = meter:FindFirstChild("Needle")
@@ -369,6 +383,7 @@ local function stopAim()
 	if meter then
 		meter.Visible = false
 	end
+	ContextActionService:UnbindAction(HOLD_STILL)
 end
 
 local function startAim()
@@ -391,17 +406,22 @@ local function startAim()
 	-- 6.2: the auto-aim: face the door, pick the angle, lay out the meter's zones
 	faceDoor(root, door)
 	local from = Throws.release(vec(root.Position), vec(root.CFrame.LookVector))
-	local angle = pickAngle(from, door, params)
+	local angle, clear = pickAngle(from, door, params)
 	if not angle then
 		hidePreview()
 		say("Too close or too high to throw from here: step back a little.")
 		return
 	end
-	state.angle = angle
+	state.angle, state.clear = angle, clear
 	showZones(from, door)
+	-- 6.2 review: stand still while aiming (the keys and the gamepad's stick; the zones follow if you move anyway)
+	ContextActionService:BindActionAtPriority(HOLD_STILL, function(): Enum.ContextActionResult
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.ContextActionPriority.High.Value + 1, Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+		Enum.KeyCode.Up, Enum.KeyCode.Down, Enum.KeyCode.Left, Enum.KeyCode.Right, Enum.KeyCode.Thumbstick1, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 	state.aiming = true
 	state.since = os.clock()
-	state.direction = nil
+	state.direction, state.from = nil, nil
 	if not state.render then
 		state.render = RunService.RenderStepped:Connect(aimFrame)
 	end
@@ -412,12 +432,13 @@ local function release()
 	if not state.aiming then
 		return
 	end
-	aimFrame()
+	-- (6.2 review: the power of the last drawn frame, the needle you let go on; no new frame here)
 	local direction = state.direction
+	local from = state.from
 	local stop = player:GetAttribute("ThrowStop")
 	stopAim()
 	if direction and type(stop) == "number" and doorSpot() and rootOnFoot() then
-		Net.get("Throw"):FireServer(stop, direction, state.power)
+		Net.get("Throw"):FireServer(stop, direction, state.power, from)
 	end
 end
 
@@ -531,9 +552,11 @@ local function check()
 	end
 	if door and root and not state.aiming and flat(root.Position, door) <= T.Range then
 		showLine(if player:GetAttribute("ThrowFragile") == true then "Too fragile to throw: hand it over at the door"
+			elseif player:GetAttribute("ThrowToss") == true then `{keyText()} to toss it at the door`
 			else `{keyText()} to throw it at the door · let go in the gold zone for a PERFECT tip`)
 	elseif state.aiming then
-		showLine("Let go in the gold zone: PERFECT")
+		showLine(if state.clear and player:GetAttribute("ThrowToss") ~= true then "Let go in the gold zone: PERFECT"
+			else "Let go when the ring is on the door")
 	else
 		showLine(nil)
 	end

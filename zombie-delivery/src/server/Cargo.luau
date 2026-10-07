@@ -2673,6 +2673,11 @@ local function throwShown(session: Session)
 	if owner:GetAttribute("ThrowFragile") ~= fragile then
 		owner:SetAttribute("ThrowFragile", fragile)
 	end
+	-- 6.2 review: a round's tossed papers tip nothing (no PERFECT either): the client shows no gold zone for them
+	local toss: boolean? = if to and plan and plan.toss then true else nil
+	if owner:GetAttribute("ThrowToss") ~= toss then
+		owner:SetAttribute("ThrowToss", toss)
+	end
 	local ready = throwReady(session) -- 6.1
 	if owner:GetAttribute("ThrowReady") ~= ready then
 		owner:SetAttribute("ThrowReady", ready)
@@ -2754,7 +2759,7 @@ local function fly(model: Model, trace: Throws.Trace, done: () -> ())
 end
 
 -- A throw from the player's hands or the owner's pack at the door (the "Throw" remote: Cargo.start checked the stop).
-local function throwAt(session: Session, player: Player, direction: Vector3, power: number)
+local function throwAt(session: Session, player: Player, direction: Vector3, power: number, release: Vector3?)
 	local plan = throwStop(session)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -2778,6 +2783,11 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 	end
 	local ray = throwRay(session, player)
 	local from = v3(Throws.release(vec(root.Position), vec(root.CFrame.LookVector)))
+	-- 6.2 review: the client's own release point (the one its arc and PERFECT zone were aimed from: this server's view
+	-- of the body is a ping behind), taken when it is near the body and nothing stands between them
+	if release and (release - from).Magnitude <= 3 and not ray(root.Position, release) then
+		from = release
+	end
 	if ray(root.Position, from) then
 		tell(player, "No room to throw here.")
 		return
@@ -2869,7 +2879,7 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 		local same = not session.ended and session.visit == visit
 		if hitDoor and same then
 			if session.person then
-				say(session.person, if perfect then line(Config.Throw.PerfectLines) else line(LINES.thanks)) -- caught
+				say(session.person, if perfect and customerTip > 0 then line(Config.Throw.PerfectLines) else line(LINES.thanks)) -- caught
 				Npcs.act(session.person, "take")
 			elseif plan.door and not session.knocked then
 				session.knocked = true -- (it hit the door: they heard)
@@ -4956,7 +4966,7 @@ function Cargo.start()
 		session.info.changed()
 	end)
 	local lastThrow: { [Player]: number } = {}
-	Net.get("Throw").OnServerEvent:Connect(function(player: Player, stop: any, direction: any, power: any)
+	Net.get("Throw").OnServerEvent:Connect(function(player: Player, stop: any, direction: any, power: any, release: any)
 		if type(stop) ~= "number" or typeof(direction) ~= "Vector3" or type(power) ~= "number" then
 			return
 		end
@@ -4966,7 +4976,7 @@ function Cargo.start()
 			return
 		end
 		lastThrow[player] = now
-		throwAt(session, player, direction, power)
+		throwAt(session, player, direction, power, if typeof(release) == "Vector3" then release else nil)
 		session.info.changed()
 	end)
 	local lastPut: { [Player]: number } = {}

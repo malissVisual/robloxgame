@@ -1118,6 +1118,10 @@ tips **+$20** (`PerfectTip`; at most `PerfectCap` $80 a job, on top of the TRICK
 says "PERFECT! +$n". The landing ring turns gold, green or white as you aim. The power swings a little slower
 (`ChargeTime` 1.3 s). The server still traces the real arc and decides (server/Cargo.luau throwAt); the maths are
 `Throws.solve` / `powerFor` / `direction` / `landFlat` / `perfect` (shared/Throws.luau, tested in throws_test).
+6.2 review: you stand still while aiming (the move keys, the stick and jump wait), the throw is sent with your own
+release point (the server takes it within 3 studs of your body, so its PERFECT matches what you saw), the needle you let
+go on is the power thrown, no zones show when something blocks every arc (the ring alone tells) and a newspaper round
+shows no gold zone (its papers tip nothing); the customer's PERFECT line only comes with the tip (not past the cap).
 
 ## What you hold: fists, the bag or your gun; X fixed; the bag swings (6.1)
 
