@@ -72,6 +72,7 @@ type Track = {
 	spin: number,
 	last: Vector3?,
 	due: number, -- 5.9.2: os.clock() of its next placing out of NEAR_RANGE
+	wrote: CFrame?, -- 5.9.2 review: what this client last placed (a server write in between is re-placed at once)
 	when: number, -- the server time its timetable was worked out last (at, leaveIn then)
 	at: number,
 	leaveIn: number,
@@ -149,8 +150,8 @@ local function place(dt: number?, now: number)
 		end
 		if distance > NEAR_RANGE then
 			-- 5.9.2: the middle distance, MID_EVERY seconds apart
-			if clock < track.due then
-				continue
+			if clock < track.due and chassis.CFrame == track.wrote then
+				continue -- (a server write since the last placing is overwritten now, not left on show)
 			end
 			track.due = clock + MID_EVERY
 		end
@@ -158,6 +159,7 @@ local function place(dt: number?, now: number)
 		track.when, track.at, track.leaveIn = now, at, leaveIn
 		local frame = ground(x, z, hx, hz) * track.offset
 		chassis.CFrame = frame
+		track.wrote = chassis.CFrame
 		if dt and dt > 0 then
 			local last = track.last
 			track.last = frame.Position

@@ -244,10 +244,13 @@ function TrafficAnimator.start()
 			return -- no traffic on this server
 		end
 		watch(folder)
-		-- (5.9.2: placed once a frame, before the physics; placing again at render did the same work twice)
+		-- (placed before the physics and again at render: a server write landing in between is never on show)
 		RunService.PreSimulation:Connect(function(dt)
 			place(os.clock())
 			wheels(dt)
+		end)
+		RunService.RenderStepped:Connect(function()
+			place(os.clock())
 		end)
 	end)
 end
