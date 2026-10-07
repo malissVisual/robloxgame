@@ -1,9 +1,14 @@
 --!strict
 -- Pure R15 courier kit and personal sack-truck skins. Local offsets belong to the named caller-owned target.
+-- 6.0 (Claude's placeholders until Codex's nicer models): "bag", the plastic carrier bag, on BagPivot (a part hung
+-- from the left hand by server/KitWear.luau: the origin is the grip, the bag hangs down -Y, its broad sides face
+-- out along ±X); "kevlar" (a dark vest with plates) and "heavy" (a bulky armoured vest with shoulder guards) over the
+-- courier's own vest. Geometry.translucent: the see-through pieces (the bag's plastic) and how much.
 local Geometry = {}
 type V = { number }
 type Piece = { name: string, size: V, at: V, attach: string, finish: string, turn: V?, shape: string?, shadow: boolean?, text: string? }
-Geometry.ids = { "backpack", "backpack_loaded", "bigpack", "shoes", "jacket", "cart" }
+Geometry.ids = { "backpack", "backpack_loaded", "bigpack", "shoes", "jacket", "cart", "bag", "kevlar", "heavy" }
+Geometry.translucent = { BagBody = .3, BagBottom = .15 } :: { [string]: number }
 local function add(out: { Piece }, name: string, size: V, at: V, attach: string, finish: string, shape: string?, turn: V?, text: string?)
 	table.insert(out, { name = name, size = size, at = at, attach = attach, finish = finish, shape = shape, turn = turn, text = text, shadow = name == "PackBody" or name == "BoxBody" })
 end
@@ -78,15 +83,51 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "Handle", { 1.34, .12, .12 }, { 0, 3.57, .26 }, "Frame", "steel", "Cylinder")
 		add(out, "Grip", { 1.12, .17, .17 }, { 0, 3.57, .26 }, "Frame", "sole", "Cylinder")
 		add(out, "Axle", { 1.85, .13, .13 }, { 0, .59, .2 }, "Frame", "steel", "Cylinder")
+	elseif id == "bag" then
+		add(out, "BagKnot", { .16, .1, .42 }, { 0, -.02, 0 }, "BagPivot", "white")
+		add(out, "BagHandleF", { .06, .46, .07 }, { 0, -.22, -.17 }, "BagPivot", "white", nil, { 20, 0, 0 })
+		add(out, "BagHandleB", { .06, .46, .07 }, { 0, -.22, .17 }, "BagPivot", "white", nil, { -20, 0, 0 })
+		add(out, "BagBody", { .5, 1.1, 1 }, { 0, -1, 0 }, "BagPivot", "white")
+		add(out, "BagBottom", { .52, .08, 1.02 }, { 0, -1.56, 0 }, "BagPivot", "white")
+		for _, x in { -.26, .26 } do
+			add(out, if x < 0 then "BagPrintL" else "BagPrintR", { .02, .3, .46 }, { x, -.92, 0 }, "BagPivot", "red")
+		end
+	elseif id == "kevlar" or id == "heavy" then
+		local heavy = id == "heavy"
+		local w, h, d = if heavy then 1.98 else 1.88, if heavy then 1.45 else 1.32, if heavy then .2 else .12
+		local z = if heavy then .66 else .63
+		add(out, "VestFront", { w, h, d }, { 0, -.12, -z }, "UpperTorso", "charcoal")
+		add(out, "VestBack", { w, h, d }, { 0, -.12, z }, "UpperTorso", "charcoal")
+		for _, x in { -1, 1 } do
+			local side = if x < 0 then "L" else "R"
+			add(out, "VestSide" .. side, { .14, h - .2, z * 2 }, { x * (w / 2 + .02), -.18, 0 }, "UpperTorso", "charcoal")
+			add(out, "VestStrap" .. side, { .42, .12, z * 2 + d }, { x * .55, .6, 0 }, "UpperTorso", "sole")
+			add(out, "Velcro" .. side, { .5, .08, .04 }, { x * .5, -.62, -(z + d / 2 + .02) }, "UpperTorso", "sole")
+		end
+		local plate = if heavy then "steel" else "worn"
+		add(out, "PlateFront", { if heavy then 1.3 else 1.1, if heavy then 1 else .8, .08 }, { 0, -.04, -(z + d / 2 + .04) }, "UpperTorso", plate)
+		add(out, "PlateBack", { if heavy then 1.3 else 1.1, if heavy then 1 else .8, .08 }, { 0, -.04, z + d / 2 + .04 }, "UpperTorso", plate)
+		add(out, "VestTag", { .62, .16, .03 }, { 0, .32, -(z + d / 2 + .1) }, "UpperTorso", "reflector")
+		if heavy then
+			add(out, "CollarFront", { 1.1, .26, .2 }, { 0, .78, -.6 }, "UpperTorso", "charcoal")
+			add(out, "CollarBack", { 1.1, .26, .2 }, { 0, .78, .6 }, "UpperTorso", "charcoal")
+			add(out, "Flap", { 1.2, .42, .14 }, { 0, -.98, -.7 }, "UpperTorso", "charcoal")
+			for _, arm in { "LeftUpperArm", "RightUpperArm" } do
+				local tilt = if arm == "LeftUpperArm" then 12 else -12
+				add(out, arm .. "Guard", { 1.12, .56, 1.12 }, { 0, .36, 0 }, arm, "charcoal", nil, { 0, 0, tilt })
+				add(out, arm .. "GuardPlate", { 1.16, .12, 1.16 }, { 0, .62, 0 }, arm, "steel", nil, { 0, 0, tilt })
+			end
+		end
 	else error("Unknown kit id: " .. id) end
 	return out
 end
 function Geometry.spec(id: string): any
 	local cart = id == "cart"
 	local origins = if cart then { Frame = { 0, 0, 0 }, LeftWheel = { -.9, .59, .2 }, RightWheel = { .9, .59, .2 } }
+		elseif id == "bag" then { BagPivot = { -1.5, 1.95, 0 } }
 		else { UpperTorso = { 0, 3.4, 0 }, LeftUpperArm = { -1.5, 3.45, 0 }, RightUpperArm = { 1.5, 3.45, 0 }, LeftFoot = { -.52, .37, 0 }, RightFoot = { .52, .37, 0 } }
 	return {
-		id = id, pieces = Geometry.pieces(id), origins = origins, camera = if cart or id == "shoes" or id == "jacket" then "front" else "back", newRoots = if cart then 3 else 0,
+		id = id, pieces = Geometry.pieces(id), origins = origins, camera = if cart or id == "shoes" or id == "jacket" or id == "kevlar" or id == "heavy" or id == "bag" then "front" else "back", newRoots = if cart then 3 else 0,
 		attachments = if cart then {
 			{ name = "HandleGrip", attach = "Frame", at = { 0, 3.57, .26 } },
 			{ name = "LeftGrip", attach = "Frame", at = { -.42, 3.57, .26 } },

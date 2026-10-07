@@ -10,6 +10,12 @@
 --           on a foot job): on the Courier Backpack's top, strapped on the Big Backpack's lid
 --   shoes   the Running Shoes on both feet
 --   jacket  the Thermal Jacket on the torso, its sleeves on the upper arms
+--   hand    6.0: the plastic bag (Config.Courier.BagKit) in the left hand: its art hangs from a small part, BagPivot,
+--           joined to the hand by a Motor6D "BagSwing" (KitArt "bag"); every client swings it behind a running body
+--           (client/SprintPose.luau, its Transform). Put away while the hands carry or push something, or seated.
+--   vest    6.0: the best vest owned (stream 2's armour: Config.Kit "heavy", else "kevlar") over the courier's own. A
+--           vest that changes while you play (bought, a better one) is put on with the "vest" gesture (arms over the
+--           head, then down: shared/Gestures.luau, played by client/ArmPose.luau for everybody).
 --   phone   the field phone in the right hand while the phone window is open (the PhoneHold remote, client/Phone.luau)
 --           and you are on foot: not seated, not carrying or pushing anything, not aiming. The character attribute
 --           PhoneHeld (only this server sets it) tells every client: client/ArmPose.luau raises the arm and hides the
@@ -26,10 +32,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local KitFit = require(Shared.KitFit)
 local Net = require(Shared.Net)
 local PlayerData = require(script.Parent.PlayerData)
 local Builder = require(script.Parent.ModelArt.Builder)
+local Npcs = require(script.Parent.Npcs) -- 6.0: the vest's put-on gesture
 local KitArt = require(script.Parent.KitArt.Geometry)
 local PhoneArt = require(script.Parent.PhoneArt.Geometry)
 
@@ -37,16 +45,20 @@ local KitWear = {}
 
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
 local BIGPACK_LOAD_Y = 1.3 -- the parcel on the Big Backpack's lid (the art puts it on the Courier Backpack's top)
-local NAMES: { [string]: string } = { pack = "KitPack", load = "KitParcel", shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone" }
+local NAMES: { [string]: string } = { pack = "KitPack", load = "KitParcel", shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest" }
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
+-- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays)
+local BAG_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true }
 
-type Slot = { key: string, built: Builder.Built, parts: { [string]: BasePart }, sizes: { [string]: Vector3 } }
+-- (6.0: `pivot` = the bag's part hung from the hand, removed with the slot)
+type Slot = { key: string, built: Builder.Built, parts: { [string]: BasePart }, sizes: { [string]: Vector3 }, pivot: BasePart? }
 type Wearer = { character: Model, slots: { [string]: Slot }, connections: { RBXScriptConnection }, sized: { [BasePart]: boolean } }
 
 local wearers: { [Player]: Wearer } = {}
 local wantPhone: { [Player]: boolean } = {} -- the phone window is open (what the client last said)
 local queued: { [Player]: boolean } = {}
+local vests: { [Player]: string | false } = {} -- 6.0: the vest worn at the last look (false: none; nil: not looked yet)
 
 -- The art's pieces for a slot (fresh tables: the fit copies them anyway).
 local function piecesFor(slot: string, id: string): { any }
@@ -63,12 +75,63 @@ local function piecesFor(slot: string, id: string): { any }
 	return KitArt.pieces(id)
 end
 
+-- 6.0: the see-through pieces (the bag's plastic).
+local function seeThrough(built: Builder.Built)
+	for _, part in built.parts do
+		local amount = KitArt.translucent[part.Name]
+		if amount then
+			part.Transparency = amount
+		end
+	end
+end
+
+-- 6.0: the bag's pivot, hung from the left hand by the BagSwing Motor6D (the clients write its Transform), placed
+-- before the art is built on it. Nil without a left hand (an R6 avatar).
+local function hangBag(character: Model): (BasePart?, BasePart?)
+	local hand = character:FindFirstChild("LeftHand")
+	if not hand or not hand:IsA("BasePart") then
+		return nil, nil
+	end
+	local pivot = Instance.new("Part")
+	pivot.Name = "KitBagPivot"
+	pivot.Size = Vector3.new(0.2, 0.2, 0.2)
+	pivot.Transparency = 1
+	pivot.Massless, pivot.CanCollide, pivot.CanQuery, pivot.CanTouch, pivot.CastShadow = true, false, false, false, false
+	local grip = CFrame.new(0, -hand.Size.Y / 2 - Config.Courier.Bag.Grip, 0)
+	pivot.CFrame = hand.CFrame * grip
+	local joint = Instance.new("Motor6D")
+	joint.Name = "BagSwing"
+	joint.Part0 = hand
+	joint.Part1 = pivot
+	joint.C0 = grip
+	joint.Parent = pivot
+	pivot.Parent = character
+	return hand, pivot
+end
+
 -- One slot built on the character, fitted to its body parts; nil when a body part is missing (an R6 avatar).
 local function build(character: Model, slot: string, id: string): Slot?
 	local pieces = piecesFor(slot, id)
 	local parts: { [string]: BasePart } = {}
 	local sizes: { [string]: Vector3 } = {}
 	local scales: { [string]: KitFit.Scale } = {}
+	if slot == "hand" then
+		-- 6.0: the bag, on its pivot (not fitted: it hangs, the hand's size does not shape it)
+		local hand, pivot = hangBag(character)
+		if not hand or not pivot then
+			return nil
+		end
+		local bagSpec: Builder.Spec = { id = NAMES.hand, pieces = pieces :: any }
+		local ok, made = pcall(Builder.build, character, bagSpec, { BagPivot = pivot })
+		if not ok then
+			warn(`[KitWear] {slot} {id}: {made}`)
+			pivot:Destroy()
+			return nil
+		end
+		local bag = made :: Builder.Built
+		seeThrough(bag)
+		return { key = id, built = bag, parts = { LeftHand = hand }, sizes = { LeftHand = hand.Size }, pivot = pivot }
+	end
 	for _, piece in pieces do
 		local bone: string = piece.attach
 		if not parts[bone] then
@@ -96,14 +159,36 @@ local function fits(character: Model, slot: Slot): boolean
 			return false
 		end
 	end
-	return slot.built.model.Parent == character
+	local pivot = slot.pivot
+	return slot.built.model.Parent == character and (pivot == nil or pivot.Parent == character)
+end
+
+local function remove(slot: Slot)
+	Builder.destroy(slot.built)
+	if slot.pivot then
+		slot.pivot:Destroy()
+	end
 end
 
 local function takeOff(wearer: Wearer)
 	for slot, current in wearer.slots do
-		Builder.destroy(current.built)
+		remove(current)
 		wearer.slots[slot] = nil
 	end
+end
+
+-- 6.0: is the left hand free for the bag (nothing carried or pushed, not seated)?
+local function bagFree(character: Model, humanoid: Humanoid): boolean
+	if humanoid.Sit or humanoid.SeatPart ~= nil then
+		return false
+	end
+	for name in BAG_BUSY do
+		local value = character:GetAttribute(name)
+		if value ~= nil and value ~= false then
+			return false
+		end
+	end
+	return true
 end
 
 local function holdsPhone(player: Player, character: Model, humanoid: Humanoid): boolean
@@ -138,10 +223,13 @@ local function refresh(player: Player)
 		if holdsPhone(player, character, humanoid) then
 			wanted.phone = "phone"
 		end
+		if wanted.hand and not bagFree(character, humanoid) then
+			(wanted :: any).hand = nil
+		end
 	end
 	for slot, current in wearer.slots do
 		if wanted[slot] ~= current.key or not fits(character, current) then
-			Builder.destroy(current.built)
+			remove(current)
 			wearer.slots[slot] = nil
 		end
 	end
@@ -152,6 +240,15 @@ local function refresh(player: Player)
 				wearer.slots[slot] = made
 			end
 		end
+	end
+	-- 6.0: a vest put on while you play (not the one you joined or respawned with): the put-on gesture.
+	if profile and humanoid and humanoid.Health > 0 and player.Character == character then
+		local vest: string | false = wanted.vest or false
+		local before = vests[player]
+		if before ~= nil and before ~= vest and vest ~= false and wearer.slots.vest ~= nil then
+			Npcs.act(character, "vest")
+		end
+		vests[player] = vest
 	end
 	local held = if wearer.slots.phone then true else nil
 	if character:GetAttribute("PhoneHeld") ~= held then
@@ -210,7 +307,7 @@ local function dress(player: Player, character: Model)
 		end
 	end))
 	table.insert(wearer.connections, character.AttributeChanged:Connect(function(name)
-		if HANDS_BUSY[name] then
+		if HANDS_BUSY[name] or BAG_BUSY[name] then
 			schedule(player)
 		end
 	end))
@@ -271,6 +368,7 @@ function KitWear.start()
 		forget(player)
 		wantPhone[player] = nil
 		queued[player] = nil
+		vests[player] = nil
 	end)
 end
 

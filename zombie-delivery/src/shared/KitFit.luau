@@ -4,7 +4,9 @@
 -- art, authored for a nominal block R15 body, is fitted to the body the character really has.
 --
 --   KitFit.outfit(kit, loaded)   slot → art id: pack = "bigpack" (owned) or "backpack", load = the backpack the
---                                parcel sits on (only while `loaded`: the PackCount attribute > 0), shoes, jacket
+--                                parcel sits on (only while `loaded`: the PackCount attribute > 0), shoes, jacket;
+--                                6.0: hand = "bag" (the plastic bag in the left hand), vest = the best vest owned
+--                                ("heavy", else "kevlar": stream 2's armour, Config.Kit) over the courier's red vest
 --   KitFit.factors(bone, size)   the x / y / z scale of a body part against its nominal size (clamped; a hand: one
 --                                uniform factor so the phone keeps its shape)
 --   KitFit.fit(pieces, scales)   copies of the pieces with their offsets and sizes scaled per their bone (a turned
@@ -51,6 +53,13 @@ function KitFit.outfit(kit: Kit, loaded: boolean): { [string]: string }
 	end
 	if kit.jacket == true then
 		out.jacket = "jacket"
+	end
+	if kit.bag == true then
+		out.hand = "bag" -- 6.0 (server/KitWear.luau puts it away while the hands carry or push something)
+	end
+	local vest = if kit.heavy == true then "heavy" elseif kit.kevlar == true then "kevlar" else nil
+	if vest then
+		out.vest = vest -- 6.0: only the best one shows
 	end
 	return out
 end
