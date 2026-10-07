@@ -26,7 +26,7 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
-    for name in ("Ui", "Theme", "Net", "MapView", "KitShop", "CareerUi", "BagUi", "Sounds", "Discovery"):
+    for name in ("Ui", "Theme", "Net", "MapView", "KitShop", "CareerUi", "BagUi", "Sounds", "Discovery", "Hotbar"):
         (dest / f"{name}.luau").write_text(f'return require("./mock").{name}')
     (dest / "HudContract.luau").write_text('return require("./mock").P')
     for name in ("mock.luau", "check.luau"):

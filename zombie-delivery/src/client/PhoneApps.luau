@@ -16,6 +16,12 @@
 --            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
 --            line "ZDC RIDE · nearest dock N studs" (shared/RentalDocks.luau) with 📍 GPS (MapView.setWaypoint).
 --   KEYS     the settings' list of every key.
+-- 6.5, the phone's six home tiles (client/Phone.luau):
+--   BAG & ITEMS  the I window's tabs in the phone: 🎒 BAG (during a run: BagUi.render), ITEMS (your consumables, how
+--            many, their key in the bottom bar and USE: the same path as the bar, Hotbar.onUse) and BAGS (BagUi.bags:
+--            the bags you own, USE). PhoneApps.bagTab keeps the tab (nil: BAG during a run, else ITEMS).
+--   SHOPS    SHOP's list of the shops (Map.Shops) and what each sells; a tap sets the GPS there (host.gps), puts the
+--            phone away and says "GPS set: <shop>". Buying stays at the counters (Map.ShopRadius).
 -- Presentation only: the server decides every job, every vehicle and the money.
 
 local Players = game:GetService("Players")
@@ -48,9 +54,13 @@ export type Host = {
 	notify: (text: string) -> (),
 	fullBoard: () -> (),
 	transport: () -> string,
+	gps: (shopId: string) -> (), -- 6.5: the GPS to one of Map.Shops
 }
 
 local player = Players.LocalPlayer
+
+-- 6.5: BAG & ITEMS' open tab ("bag", "items", "bags"); nil picks BAG during a run, else ITEMS. Phone sets it.
+PhoneApps.bagTab = nil :: string?
 
 -- Two columns in a list (a wide popup), each a vertical list of its own; else both are the list itself.
 function PhoneApps.columns(list: Instance, order: number, two: boolean): (Instance, Instance)
@@ -277,9 +287,156 @@ end
 
 -- ── BAG ────────────────────────────────────────────────────────────────────
 
-function PhoneApps.bag(list: Instance, look: OrdersUi.Kit, host: Host)
-	local n = BagUi.render(list, host.job(), 1)
-	look.meta(list, `Pieces ride where they fit: your hands, the backpack, the bike's rack, the car.{if Ui.touchLayout() then "" else " The I key opens the bag too."}`, n + 1)
+-- 6.5: BAG & ITEMS, the I window's tabs (🎒 BAG during a run, ITEMS, BAGS) in a row of square tab buttons.
+local BAG_TABS: { { string } } = { { "bag", "🎒 BAG" }, { "items", "ITEMS" }, { "bags", "BAGS" } }
+
+local function bagTabs(list: Instance, current: string, running: boolean, host: Host)
+	local row = Ui.make("Frame", { Name = "Tabs", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 1 }, list)
+	Ui.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, row)
+	for index, entry in BAG_TABS do
+		local id = entry[1]
+		if id == "bag" and not running then
+			continue
+		end
+		local on = id == current
+		local tab = Ui.make("TextButton", {
+			Name = `Tab_{id}`,
+			Size = UDim2.fromOffset(0, 44),
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = K.raised,
+			BackgroundTransparency = if on then 0 else 1,
+			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			Text = entry[2],
+			Font = Theme.HeadingFont,
+			TextSize = 13,
+			TextColor3 = if on then K.text else K.secondary,
+			LayoutOrder = index,
+		}, row)
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, tab)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = if on then 0.5 else 0.8 }, tab)
+		if on then
+			Ui.make("Frame", { Name = "Underline", Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, -2), BackgroundColor3 = K.red, BorderSizePixel = 0 }, tab)
+		end
+		tab.Activated:Connect(function()
+			local sound = Ui.onClick
+			if sound then
+				sound()
+			end
+			PhoneApps.bagTab = id
+			host.redraw()
+		end)
+	end
+end
+
+-- ITEMS: your consumables (Config.Items), how many, the key in the bottom bar, USE (Hotbar.onUse: the HUD's own
+-- useItem, the UseItem remote with your aim).
+local function items(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean, order: number)
+	local Hotbar = require(script.Parent.Hotbar)
+	local state = host.state()
+	local have = if type(state) == "table" and type(state.items) == "table" then state.items else {}
+	local left, right = PhoneApps.columns(list, order, wide)
+	for index, def in Config.Items do
+		local count = tonumber(have[def.id]) or 0
+		local b = look.block(if index % 2 == 1 then left else right, order + index)
+		look.row2(b, `{def.icon}  {string.upper(def.name)}`, `×{count}`, 1, true)
+		local slot = if count > 0 then Hotbar.slotOf(def.id) else nil
+		look.meta(b, `{def.description}{if slot and not Ui.touchLayout() then ` Key {slot}.` else ""}`, 2)
+		look.button(b, "USE", if count > 0 then "main" else "off", 3, function()
+			if count <= 0 then
+				host.notify(`No {def.name} left. Last Stop Supplies sells them (SHOP sets the GPS).`)
+				return
+			end
+			local use = Hotbar.onUse
+			if use then
+				use(def.id)
+			else
+				Net.get("UseItem"):FireServer(def.id)
+			end
+		end)
+	end
+end
+
+function PhoneApps.bag(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean?)
+	local job = host.job()
+	local running = type(job) == "table"
+	local tab = PhoneApps.bagTab or (if running then "bag" else "items")
+	if tab == "bag" and not running then
+		tab = "items" -- (the run ended)
+	end
+	bagTabs(list, tab, running, host)
+	if tab == "bag" then
+		local n = BagUi.render(list, job, 2)
+		look.meta(list, `Pieces ride where they fit: your hands, the backpack, the bike's rack, the car.{if Ui.touchLayout() then "" else " The I key opens the bag too."}`, n + 1)
+	elseif tab == "bags" then
+		BagUi.bags(list, host.state(), 2)
+	else
+		items(list, look, host, wide == true, 2)
+	end
+end
+
+-- ── 6.5: SHOP's list of the shops ─────────────────────────────────────────
+
+-- The shops (Map.Shops ids) in the order a new courier needs them, with what they sell.
+local SHOPS: { { id: string, icon: string, sells: string } } = {
+	{ id = "supplies", icon = "🛒", sells = "Bags, vests, medkits, items" },
+	{ id = "guns", icon = "🔫", sells = "Guns, from a pistol up" },
+	{ id = "bikes", icon = "🚲", sells = "Bikes, scooters, bike gear" },
+	{ id = "dealer", icon = "🚗", sells = "Cars and vans" },
+	{ id = "mechanic", icon = "🔧", sells = "Upgrades, repairs, car guns" },
+}
+
+-- Draws the list at `order` in the SHOP app: a row a shop (its icon, name, what it sells, "📍 GPS"); a tap sets the
+-- GPS to it, puts the phone away and says so.
+function PhoneApps.shops(list: Instance, look: OrdersUi.Kit, host: Host, order: number)
+	local holder = Ui.make("Frame", { Name = "Shops", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, list)
+	Ui.list(holder, true, 6)
+	look.section(holder, "The shops · tap one for the GPS", 0)
+	for index, entry in SHOPS do
+		local shop = Map.Shops[entry.id]
+		if not shop then
+			continue
+		end
+		local row = Ui.make("TextButton", {
+			Name = `Shop_{entry.id}`,
+			Size = UDim2.new(1, 0, 0, 56),
+			BackgroundColor3 = K.row,
+			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			Text = "",
+			LayoutOrder = index,
+		}, holder)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, row)
+		look.text(row, entry.icon, UDim2.fromOffset(40, 56), { Position = UDim2.fromOffset(8, 0), TextSize = 24, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
+		look.text(row, shop.name, UDim2.new(1, -150, 0, 20), { Position = UDim2.fromOffset(56, 9), Font = Theme.HeadingFont, TextSize = 15, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		look.text(row, entry.sells, UDim2.new(1, -150, 0, 16), { Position = UDim2.fromOffset(56, 31), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		local gps = look.text(row, "📍 GPS  ›", UDim2.fromOffset(84, 56), { Position = UDim2.new(1, -92, 0, 0), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.text, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
+		local function lit(on: boolean)
+			row.BackgroundColor3 = if on then K.raised else K.row
+			gps.TextColor3 = if on then K.red else K.text
+		end
+		row.MouseEnter:Connect(function()
+			lit(true)
+		end)
+		row.MouseLeave:Connect(function()
+			lit(false)
+		end)
+		row.SelectionGained:Connect(function()
+			lit(true)
+		end)
+		row.SelectionLost:Connect(function()
+			lit(false)
+		end)
+		row.Activated:Connect(function()
+			local sound = Ui.onClick
+			if sound then
+				sound()
+			end
+			host.gps(entry.id)
+			host.close()
+			host.notify(`GPS set: {shop.name}`)
+		end)
+	end
 end
 
 -- ── GARAGE ─────────────────────────────────────────────────────────────────

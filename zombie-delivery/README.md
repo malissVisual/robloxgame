@@ -148,7 +148,7 @@ of letting you play a profile that would not be saved.
 | Items (repair, medkit, nitro, molotov, mine) | 4 – 8 (6.1; 9 a sixth kind; or click a slot) | the slots |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | BOARD on the phone / MAP / BAG on the phone |
-| The phone (5.0; 5.7: the HUD's MENU button says PHONE once you have it): ORDERS, BOARD, CAREER, SHOP, MAP, GARAGE, MESSAGES and the MENU's apps (MISSIONS, CREW, TOP, ESTATE, BAG, SETTINGS) | Q, or click PHONE (gamepad: Y) | tap PHONE |
+| The phone (5.0; 5.7: the HUD's MENU button says PHONE once you have it; 6.5: six tiles JOBS, MAP, SHOP, BAG & ITEMS, GARAGE, MORE, and in MORE: CAREER, MISSIONS, CREW, TOP, ESTATE, BANK, MESSAGES, SETTINGS) | Q, or click PHONE (gamepad: Y) | tap PHONE |
 | The career (your level, the road, the licences) | C | CAREER on the phone |
 | Close a window, the big map or MENU | the ✕ at the top right, or the window's own key again (J, U, K, H, L, I, M); ESC / gamepad B still work | ✕ |
 | Call your car or bring your bike (or reset it while you sit in it) | Q → GARAGE: CALL CAR / MY BIKE | PHONE → GARAGE |
@@ -1436,7 +1436,13 @@ home screen, the route on the order's map. The MENU lives in the phone now (Miss
 Settings with every key, Bank), and once you have the phone MENU opens it. **6.0.1: every app opens in a centred
 popup** over the game (`PhonePopup`: a dimmed, lightly blurred backdrop, the ZDC header, two columns for BOARD, CAREER
 and SHOP; ✕, a tap beside it, Q, ESC or B return to the phone, which never turns sideways); the board in the phone takes jobs (ACCEPT / + ADD ORDER, FULL BOARD for the big one). Banners drop
-for new messages and new jobs. GIVE UP is in ORDERS (press twice).
+for new messages and new jobs. GIVE UP is in ORDERS (press twice). **6.5: the home of everything** is six big tiles,
+each with a one-line subtitle: **JOBS** (the board, ORDERS during a run, the open orders on its badge), **MAP**, **SHOP**
+(the shops and what they sell: a tap sets the GPS and says "GPS set: Last Stop Supplies"; under them what to save up
+for), **BAG & ITEMS** (the I window's BAG / ITEMS / BAGS tabs), **GARAGE** and **MORE** (Career, Missions, Crew, Top,
+Estate, Bank, Messages, Settings; ESC goes back to the tiles). A messages row under the tiles shows the unread count.
+The tutorial shows instead of talks: Marge's welcome and her done screen are one page each, the run has no pages (the
+goal card shows each step, `TutorialSteps.hint`), SHOW ME AROUND stays optional.
 
 ## Deliveries from real shops to real doors, the bag, newspaper rounds, fuel, the new phone (5.3, 5.4)
 

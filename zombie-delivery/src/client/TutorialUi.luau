@@ -23,6 +23,9 @@
 -- 5.8, the courier phone's look (design/phone-ui/): the dialog's main action (CONTINUE, LET'S GO, SHOW ME AROUND ...)
 -- is the phone's red primary button (a red face, white caps, square, a finger tall); the second action stays a quiet
 -- text action.
+-- 6.5, a tutorial that shows instead of talks (shared/TutorialSteps.luau): her welcome is one page, the run has none
+-- (the HUD's goal card shows each step from TutorialSteps.hint, so the hint strip keeps only FIRST DAY and SKIP while
+-- a job runs), the done screen is one page with SHOW ME AROUND (the optional tour) and CLOSE.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -323,6 +326,9 @@ local function refresh()
 			end
 		end
 		hintShown.key = key
+		-- 6.5: during the run the HUD's goal card shows this step (TutorialSteps.hint): the strip keeps FIRST DAY and
+		-- SKIP only, its line comes back without a job (talk to her, take a job from the board)
+		view.hintText.Visible = job == nil
 	end
 	local marker = view.marker
 	if marker then
