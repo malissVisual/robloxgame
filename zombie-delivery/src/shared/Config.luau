@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.0.1"
+Config.Version = "6.0.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -57,7 +57,7 @@ Config.Arms = {
 	Tip = "Got {price} on you? Lead & Co. sells a pistol for that. Fists are fine for one biter, not for a crowd. It's on your GPS.",
 	MaxArmour = 0.8,
 	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck)
-	BagTip = "Get yourself kitted out at Last Stop Supplies: a plastic bag for {price} (two more parcels on you, throw them at the doors with X) and the ZDC Courier Vest for $20, so customers see you're one of ours. It's on your GPS.",
+	BagTip = "Customers like to see who they open the door to: the ZDC Courier Vest is {price} at Last Stop Supplies. It's on your GPS.",
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new

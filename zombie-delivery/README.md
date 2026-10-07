@@ -1105,6 +1105,8 @@ missions. The dealer no longer sells it. Every other car, job tier and campaign 
 
 ## The courier on foot: the bag, throws, sprint, armour, no free gun (6.0)
 
+**6.0.2:** a new courier starts with the phone (Marge), a **pistol** and the **plastic bag**; the Courier Vest is still bought ($20, Marge texts about it). Older saves get the pistol and the bag once.
+
 **The plastic bag** (Kit "bag", $25, level 1, `extra = 2`): two more light pieces on top of your hands and any backpack,
 carried in the left hand — it swings with your stride and flies back when you sprint. A light piece you pick up (a
 pile or the ground) goes straight into the bag with a quick move of the arm.

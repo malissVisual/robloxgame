@@ -179,18 +179,12 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 		}
 	elseif phase == "done" then
 		local reward = if type(info.reward) == "number" then math.floor(info.reward) else Config.Tutorial.Reward
-		local pistol = 0 -- 6.0: no free gun; the pistol's price at Lead & Co. (Config.Arms.Starter)
-		for _, weapon in Config.Weapons do
-			if weapon.id == Config.Arms.Starter then
-				pistol = weapon.price
-			end
-		end
 		return {
 			speaker = speaker(true),
 			pages = {
 				`Delivered! Nice work, courier. There's ${reward} on top from me.`,
-				"Buy a backpack at Last Stop Supplies: you carry more on foot. Then save up for a bike: the bike shop opens at level 2.",
-				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. No gun yet: buy a pistol at Lead & Co. for ${pistol}; till then, V punches. And explore: the map fills in as you go.`,
+				"You've got a plastic bag: two more parcels on you, and at a door hold X to throw one. Get the ZDC Courier Vest and a backpack at Last Stop Supplies, then save up for a bike: the bike shop opens at level 2.",
+				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Your pistol is holstered: B draws it, V punches. And explore: the map fills in as you go.`,
 			},
 			primary = "SHOW ME AROUND", -- 5.7: the tour (TutorialSteps.tourDialog)
 			secondary = "LATER",
@@ -247,6 +241,7 @@ function TutorialSteps.forTouch(line: string): string
 	out = string.gsub(out, "G puts it down", "PUT DOWN sets it down")
 	out = string.gsub(out, "Hold T to pick a gun", "Tap your gun's line to pick a gun")
 	out = string.gsub(out, "V punches", "tap PUNCH")
+	out = string.gsub(out, "B draws it", "tap DRAW")
 	out = string.gsub(out, "Q opens your phone", "The PHONE button opens your phone") -- 5.7
 	return out
 end
