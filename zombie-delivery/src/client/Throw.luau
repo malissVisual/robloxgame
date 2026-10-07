@@ -15,6 +15,12 @@
 -- one in it; or the bag in your hand, or a ThrowTo) and a press without a door in range says why (Holding.throwText:
 -- "Get within 45 studs of the delivery door to throw", "Too fragile to throw", "Nothing to throw"). When the piece lands at the door the server says so ("landed"):
 -- a banner, "TRICKSHOT! +$n" and what earned it (far, over something, off a wall), or "AT THE DOOR".
+-- 6.2, the auto-aim (the owner: "auto aim, and a perfect hit gets a bigger tip from the customer"): the camera no
+-- longer aims. Pressing X picks the throw's angle (the first of Config.Throw.AutoAngles whose solved arc, traced with
+-- the world's rays, comes down on the door: over a fence when it has to), turns your body to the door and keeps the
+-- arc on it; you only time the power. A meter over the line shows the swinging power, the green zone (it lands at the
+-- door) and the gold PERFECT zone (within PerfectRadius of the door's spot: the customer tips PerfectTip; the server
+-- decides, server/Cargo.luau throwAt). The banner says "PERFECT! Customer tip +$n".
 -- Nothing runs per frame unless you aim; the binding and the line are looked at every CHECK seconds.
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -52,11 +58,13 @@ type State = {
 	render: RBXScriptConnection?,
 	direction: Vector3?, -- the last frame's aim …
 	power: number, -- … and power: what release throws
+	angle: number, -- 6.2: the auto-aim's angle (degrees over the flat) for this throw
+	meter: Frame?, -- 6.2: the power meter (its Needle, Green and Gold frames)
 	gui: ScreenGui?,
 	line: TextLabel?,
 	banner: Frame?,
 }
-local state: State = { bound = nil, aiming = false, since = 0, power = 0 }
+local state: State = { bound = nil, aiming = false, since = 0, power = 0, angle = 45 }
 
 local function say(text: string)
 	local notify = Throw.notify
@@ -161,7 +169,151 @@ end
 
 local FLAT_DISC = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder lying flat (its axis up)
 
--- One frame of the aim: the direction, the power, the arc and the rings.
+local screen: () -> ScreenGui? -- (the line and the banner's ScreenGui: further down)
+
+-- 6.2: turn the body to the door (flat): the release point the server computes from your facing is the one aimed from.
+local function faceDoor(root: BasePart, door: Vector3)
+	local flatDoor = Vector3.new(door.X, root.Position.Y, door.Z)
+	if (flatDoor - root.Position).Magnitude > 0.5 then
+		root.CFrame = CFrame.lookAt(root.Position, flatDoor)
+	end
+end
+
+-- 6.2: the auto-aim's angle for this throw: the first AutoAngles angle whose solved arc (a throw at its PERFECT power)
+-- comes down on the door with the world's rays; else the first one the power can reach (it may bounce off something:
+-- a trickshot by luck); nil when none can.
+local function pickAngle(from: Throws.Vec, door: Vector3, params: RaycastParams): number?
+	local fallback: number? = nil
+	for _, angle in T.AutoAngles do
+		local speed = Throws.solve(from, vec(door), angle)
+		local power = speed and Throws.powerFor(speed)
+		local direction = Throws.direction(from, vec(door), angle)
+		local velocity = power and direction and Throws.velocity(direction, power)
+		if velocity then
+			fallback = fallback or angle
+			local trace = Throws.trace(from, velocity, function(a: Throws.Vec, b: Throws.Vec): Throws.Hit?
+				local hit = workspace:Raycast(v3(a), v3(b) - v3(a), params)
+				return if hit then { at = vec(hit.Position), normal = vec(hit.Normal) } else nil
+			end)
+			if trace.grounded and Throws.landed(trace.land, vec(door)) then
+				return angle
+			end
+		end
+	end
+	return fallback
+end
+
+-- 6.2: the power meter: the bar, the green zone (lands at the door), the gold zone (PERFECT) and the needle.
+local function meterFrame(): Frame?
+	local existing = state.meter
+	if existing and existing.Parent then
+		return existing
+	end
+	local gui = screen()
+	if not gui then
+		return nil
+	end
+	local bar = Instance.new("Frame")
+	bar.Name = "PowerMeter"
+	bar.AnchorPoint = Vector2.new(0.5, 1)
+	bar.Position = UDim2.new(0.5, 0, 1, -266) -- (over the line)
+	bar.Size = UDim2.fromOffset(260, 14)
+	bar.BackgroundColor3 = K.charcoal
+	bar.BackgroundTransparency = 0.25
+	bar.BorderSizePixel = 0
+	bar.Visible = false
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 4)
+	corner.Parent = bar
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = K.text
+	stroke.Transparency = 0.6
+	stroke.Parent = bar
+	local function zone(name: string, color: Color3, order: number): Frame
+		local frame = Instance.new("Frame")
+		frame.Name = name
+		frame.BackgroundColor3 = color
+		frame.BorderSizePixel = 0
+		frame.Size = UDim2.fromScale(0, 1)
+		frame.ZIndex = order
+		frame.Parent = bar
+		return frame
+	end
+	zone("Green", K.good, 2).BackgroundTransparency = 0.35
+	zone("Gold", K.warn, 3)
+	local needle = Instance.new("Frame")
+	needle.Name = "Needle"
+	needle.AnchorPoint = Vector2.new(0.5, 0.5)
+	needle.Position = UDim2.fromScale(0, 0.5)
+	needle.Size = UDim2.new(0, 3, 1, 8)
+	needle.BackgroundColor3 = K.text
+	needle.BorderSizePixel = 0
+	needle.ZIndex = 4
+	needle.Parent = bar
+	local label = Instance.new("TextLabel")
+	label.Name = "Perfect"
+	label.AnchorPoint = Vector2.new(0.5, 1)
+	label.Size = UDim2.fromOffset(80, 14)
+	label.BackgroundTransparency = 1
+	label.Font = Theme.HeadingFont
+	label.TextSize = 11
+	label.TextColor3 = K.warn
+	label.TextStrokeTransparency = 0.5
+	label.Text = "PERFECT"
+	label.ZIndex = 4
+	label.Parent = bar
+	bar.Parent = gui
+	state.meter = bar
+	return bar
+end
+
+-- A zone of powers (0 … 1, by 0.01) where `hits` holds on the parabola at the door's height: its first and last.
+local function zoneOf(from: Throws.Vec, direction: Throws.Vec, door: Vector3, hits: (Throws.Vec, Throws.Vec) -> boolean): (number?, number?)
+	local first: number?, last: number? = nil, nil
+	for i = 0, 100 do
+		local power = i / 100
+		local velocity = Throws.velocity(direction, power)
+		local land = velocity and Throws.landFlat(from, velocity, door.Y)
+		if land and hits(land, vec(door)) then
+			first = first or power
+			last = power
+		end
+	end
+	return first, last
+end
+
+local function setZone(bar: Frame, name: string, first: number?, last: number?)
+	local frame = bar:FindFirstChild(name)
+	if not frame or not frame:IsA("Frame") then
+		return
+	end
+	frame.Visible = first ~= nil
+	if first and last then
+		frame.Position = UDim2.fromScale(first, 0)
+		frame.Size = UDim2.fromScale(math.max(0.012, last - first + 0.01), 1)
+	end
+end
+
+-- 6.2: the meter's zones for this throw (once, when the aim starts: the angle is fixed, the body turned).
+local function showZones(from: Throws.Vec, door: Vector3)
+	local bar = meterFrame()
+	local direction = Throws.direction(from, vec(door), state.angle)
+	if not bar or not direction then
+		return
+	end
+	local g0, g1 = zoneOf(from, direction, door, Throws.landed)
+	local p0, p1 = zoneOf(from, direction, door, Throws.perfect)
+	setZone(bar, "Green", g0, g1)
+	setZone(bar, "Gold", p0, p1)
+	local label = bar:FindFirstChild("Perfect")
+	if label and label:IsA("TextLabel") then
+		label.Visible = p0 ~= nil
+		label.Position = UDim2.new(if p0 and p1 then (p0 + p1) / 2 else 0.5, 0, 0, -2)
+	end
+	bar.Visible = true
+end
+
+-- One frame of the aim: the direction (6.2: auto, at the door), the power, the arc and the rings.
 local function aimFrame()
 	local root = rootOnFoot()
 	local door = doorSpot()
@@ -171,8 +323,9 @@ local function aimFrame()
 	if not root or not door or not camera or not preview or not params then
 		return
 	end
-	local look = camera.CFrame.LookVector
-	local aimed = Throws.aim(vec(look)) or Throws.aim(vec(root.CFrame.LookVector))
+	faceDoor(root, door)
+	local from = Throws.release(vec(root.Position), vec(root.CFrame.LookVector))
+	local aimed = Throws.direction(from, vec(door), state.angle)
 	if not aimed then
 		return
 	end
@@ -182,7 +335,13 @@ local function aimFrame()
 		return
 	end
 	state.direction, state.power = v3(aimed), power
-	local from = Throws.release(vec(root.Position), vec(root.CFrame.LookVector))
+	local meter = state.meter
+	if meter then
+		local needle = meter:FindFirstChild("Needle")
+		if needle and needle:IsA("Frame") then
+			needle.Position = UDim2.fromScale(power, 0.5)
+		end
+	end
 	local trace = Throws.trace(from, velocity, function(a: Throws.Vec, b: Throws.Vec): Throws.Hit?
 		local hit = workspace:Raycast(v3(a), v3(b) - v3(a), params)
 		return if hit then { at = vec(hit.Position), normal = vec(hit.Normal) } else nil
@@ -192,8 +351,9 @@ local function aimFrame()
 	end
 	local land = v3(trace.land)
 	local hits = trace.grounded and Throws.landed(trace.land, vec(door))
+	local perfect = hits and Throws.perfect(trace.land, vec(door))
 	preview.ring.CFrame = CFrame.new(land + Vector3.new(0, 0.08, 0)) * FLAT_DISC
-	preview.ring.Color = if hits then K.good else K.text
+	preview.ring.Color = if perfect then K.warn elseif hits then K.good else K.text
 	preview.door.CFrame = CFrame.new(door + Vector3.new(0, 0.06, 0)) * FLAT_DISC
 end
 
@@ -205,6 +365,10 @@ local function stopAim()
 		state.render = nil
 	end
 	hidePreview()
+	local meter = state.meter
+	if meter then
+		meter.Visible = false
+	end
 end
 
 local function startAim()
@@ -222,7 +386,19 @@ local function startAim()
 		return
 	end
 	local preview = showPreview()
-	state.params = rayParams(preview)
+	local params = rayParams(preview)
+	state.params = params
+	-- 6.2: the auto-aim: face the door, pick the angle, lay out the meter's zones
+	faceDoor(root, door)
+	local from = Throws.release(vec(root.Position), vec(root.CFrame.LookVector))
+	local angle = pickAngle(from, door, params)
+	if not angle then
+		hidePreview()
+		say("Too close or too high to throw from here: step back a little.")
+		return
+	end
+	state.angle = angle
+	showZones(from, door)
 	state.aiming = true
 	state.since = os.clock()
 	state.direction = nil
@@ -257,7 +433,7 @@ local function onAction(_name: string, inputState: Enum.UserInputState, _input: 
 end
 
 -- The quiet line under the middle of the screen, and the landing banner (one ScreenGui of this module's).
-local function screen(): ScreenGui?
+screen = function(): ScreenGui?
 	local existing = state.gui
 	if existing and existing.Parent then
 		return existing
@@ -355,9 +531,9 @@ local function check()
 	end
 	if door and root and not state.aiming and flat(root.Position, door) <= T.Range then
 		showLine(if player:GetAttribute("ThrowFragile") == true then "Too fragile to throw: hand it over at the door"
-			else `{keyText()} to throw it at the door · trickshots tip`)
+			else `{keyText()} to throw it at the door · let go in the gold zone for a PERFECT tip`)
 	elseif state.aiming then
-		showLine("Release to throw · the ring goes green over the door")
+		showLine("Let go in the gold zone: PERFECT")
 	else
 		showLine(nil)
 	end
@@ -377,7 +553,12 @@ local function landed(info: any)
 		old:Destroy()
 	end
 	local tip = tonumber(info.tip) or 0
+	local perfect = tonumber(info.perfect) or 0 -- 6.2: the customer's PERFECT tip (0: none, or the job's cap reached)
+	local isPerfect = info.isPerfect == true
 	local parts: { string } = {}
+	if isPerfect then
+		table.insert(parts, if perfect > 0 then `CUSTOMER TIP +${perfect}` else "RIGHT ON THE MAT")
+	end
 	local far, over, wall = tonumber(info.far) or 0, tonumber(info.over) or 0, tonumber(info.wall) or 0
 	if far > 0 then
 		table.insert(parts, `FAR {tonumber(info.span) or 0} STUDS +${far}`)
@@ -399,10 +580,12 @@ local function landed(info: any)
 	title.BackgroundTransparency = 1
 	title.Font = Theme.DisplayFont
 	title.TextSize = 36
-	title.TextColor3 = if tip > 0 then K.warn else K.text
+	title.TextColor3 = if tip > 0 or isPerfect then K.warn else K.text
 	title.TextStrokeColor3 = K.charcoal
 	title.TextStrokeTransparency = 0.3
-	title.Text = if tip > 0 then `TRICKSHOT! +${tip}` else "AT THE DOOR!"
+	title.Text = if isPerfect then (if tip + perfect > 0 then `PERFECT! +${tip + perfect}` else "PERFECT!")
+		elseif tip > 0 then `TRICKSHOT! +${tip}`
+		else "AT THE DOOR!"
 	title.Parent = frame
 	local sub = Instance.new("TextLabel")
 	sub.Position = UDim2.fromOffset(0, 42)

@@ -154,6 +154,48 @@ for look in Config.Cargo.LightLooks do
 end
 check("every light look either flies or is fragile", everyLight)
 
+-- 6.2, the auto-aim and the PERFECT tip ----------------------------------------------------------------------------
+
+check("the auto-aim numbers", #T.AutoAngles > 0 and T.PerfectRadius > 0 and T.PerfectRadius < T.DoorRadius and T.PerfectTip > 0
+	and T.PerfectCap >= T.PerfectTip and #T.PerfectLines > 0)
+-- A flat ground at `y`: the cast the server and the client give trace (plain tables, no Vector3 here).
+local function plane(y: number): Throws.Cast
+	return function(a: { number }, b: { number }): Throws.Hit?
+		if a[2] >= y and b[2] < y then
+			local k = (a[2] - y) / (a[2] - b[2])
+			return { at = { a[1] + (b[1] - a[1]) * k, y, a[3] + (b[3] - a[3]) * k }, normal = { 0, 1, 0 } }
+		end
+		return nil
+	end
+end
+for _, case in { { name = "flat", dy = 0, dist = 25 }, { name = "a porch", dy = 2, dist = 18 }, { name = "far", dy = 0, dist = 40 } } do
+	local start = Throws.release({ 0, 3, 0 }, { 0, 0, -1 })
+	local door = { 3, case.dy, -case.dist } -- (the body's feet at y 0, the door's spot dy over them)
+	local any = false
+	for _, angle in T.AutoAngles do
+		local speed = Throws.solve(start, door, angle)
+		local power = speed and Throws.powerFor(speed)
+		local direction = Throws.direction(start, door, angle)
+		if speed and power and direction then
+			any = true
+			local velocity = Throws.velocity(direction, power)
+			local trace = velocity and Throws.trace(start, velocity, plane(case.dy))
+			check(`{case.name} at {angle}°: the solved throw lands on the door`, trace ~= nil and trace.grounded and Throws.flat(trace.land, door) < 0.5,
+				trace and Throws.flat(trace.land, door))
+			local flatLand = velocity and Throws.landFlat(start, velocity, case.dy)
+			check(`{case.name} at {angle}°: landFlat agrees`, flatLand ~= nil and Throws.flat(flatLand, door) < 0.2, flatLand and Throws.flat(flatLand, door))
+		end
+	end
+	check(`{case.name}: some angle reaches the door`, any)
+end
+check("an angle under the door's height can't reach it", Throws.solve({ 0, 0, 0 }, { 0, 30, -10 }, 35) == nil)
+check("no solve on the spot", Throws.solve({ 0, 0, 0 }, { 0, 0, 0 }, 45) == nil)
+check("powerFor within the speeds", Throws.powerFor(T.MinSpeed) == 0 and Throws.powerFor(T.MaxSpeed) == 1 and Throws.powerFor(T.MaxSpeed + 1) == nil
+	and Throws.powerFor(T.MinSpeed - 1) == nil)
+check("perfect in the middle, not at the edge", Throws.perfect({ 1, 0, 0 }, { 0, 0, 0 }) and not Throws.perfect({ 2, 0, 0 }, { 0, 0, 0 })
+	and not Throws.perfect({ 0, 8, 0 }, { 0, 0, 0 }))
+check("landFlat: never down to a height over the arc", Throws.landFlat({ 0, 0, 0 }, { 0, 1, -1 }, 50) == nil)
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else
