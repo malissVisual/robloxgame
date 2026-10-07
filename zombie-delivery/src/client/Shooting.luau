@@ -50,8 +50,8 @@ function Shooting.setState(state: any)
 end
 
 function Shooting.setAutoHeld(held: boolean)
-	-- 3.9: a holstered gun comes out first; this press does not fire.
-	autoHeld = held and not Holster.drawIfHolstered()
+	-- 6.1.1: the gun away, the press does not draw it (3 or B does) and does not fire.
+	autoHeld = held and not Holster.firePressAway()
 end
 
 -- Set by Main: shows a short text (a toast).
@@ -476,7 +476,7 @@ function Shooting.start()
 		if processed then
 			return
 		end
-		-- 3.9: holstered, the press draws the gun and does not fire (client/Holster.luau).
+		-- 6.1.1: the gun away, the press neither draws nor fires (client/Holster.luau pressDraws).
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			mouseHeld = not Holster.pressDraws(input)
 		elseif input.KeyCode == Enum.KeyCode.F or input.KeyCode == Enum.KeyCode.ButtonR2 then

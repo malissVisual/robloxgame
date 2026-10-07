@@ -11,8 +11,8 @@
 -- Config.Movement.Walk; a gamepad without a mouse sprints with the left stick click there too; 4.2: a touch screen with
 -- the SPRINT toggle, CameraRig.setTouchSprint).
 -- With cargo in your hands (the Carrying attribute, server/Cargo.luau) there is no aiming, no sprint and a slower step.
--- 3.9: with the gun holstered (B, client/Holster.luau) there is no aiming either; the first right or left click draws
--- the gun (the left one does not shoot then), and the gun comes up as usual from there.
+-- 3.9: with the gun holstered (B, client/Holster.luau) there is no aiming either; 6.1.1: a right or left click no longer
+-- draws it (3 or B does; with fists the left click punches).
 -- 3.10: getting in or out of a car (client/CarBoarding.luau moves the body, Drive.boardingCar) the camera eases between
 -- the walk's view and the car's over CAR_BLEND seconds instead of jumping, and the walk (speed, turning, aiming) is
 -- left alone meanwhile.
@@ -719,10 +719,10 @@ function CameraRig.start()
 				turning = true -- 5.4.1: the phone open: the right mouse turns the camera, no gun comes out
 				return
 			end
-			Holster.pressDraws(input) -- 3.9: holstered, the gun comes out and goes up
+			Holster.pressDraws(input) -- 6.1.1: the gun away, no aim (3 or B takes it; a note says so)
 			rmbHeld = true
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-			-- 3.9: holstered, this click only draws the gun (no shot, no aim)
+			-- 6.1.1: the gun away, this click does not draw it (with fists it punches; no shot, no aim)
 			lmbHeld = not Holster.pressDraws(input)
 		end
 	end)

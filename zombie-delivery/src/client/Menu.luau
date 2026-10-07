@@ -202,7 +202,7 @@ function Menu.show(onPlay: () -> ())
 	closeHelp.Position, closeHelp.ZIndex = UDim2.fromOffset(420, 20), 16
 	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local controlsText: { { string } } = if touchLayout then {
-		{ "MOVE", "Left thumbstick    ·    SPRINT: on / off (breath)" }, { "SHOOT", "FIRE button (draws the gun first)" },
+		{ "MOVE", "Left thumbstick    ·    SPRINT: on / off (breath)" }, { "SHOOT", "FIRE button (take the gun first: DRAW)" },
 		{ "HANDS", "DRAW / PUNCH buttons left of FIRE" },
 		{ "CARGO", "Tap prompts to pick up and load" }, { "PUT DOWN", "PUT DOWN / LET GO / SET DOWN button" },
 		{ "WEAPONS", "Tap the weapon line: the wheel" }, { "ITEMS", "Tap the item tags" },

@@ -140,7 +140,7 @@ of letting you play a profile that would not be saved.
 | Shoot (on foot: the gun in your hand; driver: the car gun on the roof if the car has one, else a one-handed gun out of the window; passenger: a one-handed gun out of the window) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
 | What you hold (6.1): fists / the plastic bag / your gun (a loaded bag that leaves your hand is set down on the ground: E picks it up) | 1 / 2 / 3 (gamepad: d-pad left / right cycles) | tap the hand slots at the left of the bottom bar |
-| Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire; 6.1: 3 draws your gun too, not over a loaded bag) | B | DRAW / HOLSTER (over PUNCH) |
+| Holster / draw the gun (3.9; on foot, you start holstered; 6.1.1: aiming or shooting no longer draws it, with fists the left mouse punches; 6.1: 3 draws your gun too, not over a loaded bag) | B | DRAW / HOLSTER (over PUNCH) |
 | Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: L1) | PUNCH / STRIKE left of FIRE |
 | Throw at a home's door (6.0; 6.1: with the bag in your hand or a light piece in your hands, else it says why) | hold X (gamepad R1) | THROW |
 | Key hints (6.1: fold / unfold the strip under the top buttons) | F1, or its KEYS chip | – |
@@ -1123,6 +1123,12 @@ and Holstered attributes): never in a seat, never the gun with cargo in your han
   its cargo in it: a "Pick up bag" prompt (E, only you), the HUD points at it, its pieces are not with you (no hand
   over, no throw from them) but the stop waits for them. You have to go back for it; picking it up makes it your hand
   again. It lies there until then or until the job ends (its pieces are lost, as a dropped piece). Zombies leave it.
+- **6.1.1:** with fists or the bag in your hand you can't shoot or aim: a click no longer draws the gun (3 or B
+  takes it; with fists the left mouse punches, anything else shows "press 3"). The weapon wheel still draws the gun
+  you pick on it.
+- **6.1.1:** the holstered gun no longer comes back into your hand after 1 (fists) or 2 (the bag). Roblox's camera
+  shows every part of your character again whenever one is added or removed (the bag going on or off), so the client
+  now hides the gun again as soon as that happens (`client/ArmPose.luau` showGun).
 - **6.1 review:** in mid-air, on a ladder, in water or on a zip line the bag waits in your hand's place until your feet
   are on the ground, then it is set down (never hanging out of reach). The touch THROW button and R1 appear only when a
   throw is possible (X alone still explains why not). The number keys do nothing while a window or the phone is open.
