@@ -12,6 +12,8 @@
 -- is not your bike of choice), YOUR BIKE, or a dim "🔒 LEVEL n". BikeShop.tab is its only state.
 -- 5.1.1: a bike's badge (CarDef.badge: the E-Scooter's "⚡ ELECTRIC · STAND-UP") after its name; a standing one
 -- (CarDef.stand) shows 🛴 until its picture is uploaded.
+-- 5.8, the courier phone's look: YOUR BIKE is the phone's card (the red square and caps, the bike in big type, a thin
+-- rule under it); BUY and EQUIP are the phone's red primary.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -87,6 +89,14 @@ local function action(row: any, text: string, kind: P.ButtonKind, onClick: () ->
 	return button
 end
 
+-- 5.8, the courier phone's tag line (design/phone-ui/): the small red square and the caps label, over a head.
+local function tagLine(parent: Instance, text: string, order: number): any
+	local row = Ui.make("Frame", { Name = "Tag", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+	P.marker(row, 8, { Position = UDim2.fromScale(0, 0.5), AnchorPoint = Vector2.new(0, 0.5) })
+	P.caps(row, text, UDim2.new(1, -16, 1, 0), { Position = UDim2.fromOffset(16, 0), TextStrokeTransparency = 1 })
+	return row
+end
+
 -- YOUR BIKE: the head of the BIKES tab.
 local function head(body: Instance, state: any)
 	local box = Ui.make("Frame", { Name = "YourBike", Size = UDim2.new(1, -12, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2 }, body)
@@ -98,7 +108,7 @@ local function head(body: Instance, state: any)
 			def = bike
 		end
 	end
-	P.caps(box, if def then "Your bike" else "Bikes · light runs, faster", UDim2.new(1, 0, 0, 16), { LayoutOrder = 1, TextStrokeTransparency = 1 })
+	tagLine(box, if def then "Your bike" else "Bikes · light runs, faster", 1)
 	local riding = type(state.car) == "string" and Transport.isBike(state.car)
 	local line: string
 	if def then
@@ -107,12 +117,13 @@ local function head(body: Instance, state: any)
 	else
 		line = `🚲 NO BIKE YET · FROM LEVEL {Config.Jobs.Bike.Level}`
 	end
-	P.text(box, line, UDim2.new(1, 0, 0, 28), { Font = Theme.HeadingFont, TextSize = 20, TextStrokeTransparency = 1, LayoutOrder = 2, TextXAlignment = Enum.TextXAlignment.Left })
+	P.text(box, line, UDim2.new(1, 0, 0, 30), { Font = Theme.DisplayFont, TextSize = 22, TextStrokeTransparency = 1, LayoutOrder = 2, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd })
 	local about = if def and not riding and type(state.car) == "string"
 		then "Your car is the one you drive now: MY BIKE on your phone gets you on the bike (CALL CAR brings the car back)."
 		elseif def then "Its room is its own + its bike gear (the GEAR tab) + your backpack: the hands hold nothing while you ride. Light pieces only. It needs no garage and comes to you at once (MY BIKE)."
 		else "A bike is faster than walking and carries more: its room, a basket or panniers, and your backpack. It opens the BIKE runs on the board. No garage needed."
 	Ui.label(box, about, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextColor3 = P.ink2, TextSize = 14, Font = Theme.Font })
+	P.rule(box, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
 end
 
 -- The BIKES tab.
@@ -156,13 +167,13 @@ local function bikesTab(body: Instance, state: any, here: boolean, focus: string
 		if owned and def.id == mine then
 			action(row, "YOUR BIKE", "off", function() end)
 		elseif owned then
-			action(row, "EQUIP", "main", function()
+			action(row, "EQUIP", "primary", function()
 				Net.get("Equip"):FireServer("bike", def.id)
 			end)
 		elseif level < lvl then
 			action(row, `🔒 LEVEL {lvl}`, "off", function() end)
 		else
-			action(row, `BUY {Ui.money(def.price)}`, if here and money >= def.price then "main" else "off", function()
+			action(row, `BUY {Ui.money(def.price)}`, if here and money >= def.price then "primary" else "off", function()
 				Net.get("Buy"):FireServer("car", def.id)
 			end)
 		end
