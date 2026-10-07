@@ -4,9 +4,13 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · four parametric tower facades, protected entrances / ladders / roofs · server/BuildingLooks/Tower*, server/TowerArt, server/PolishArt, tools/polish-art, tools/check-building-looks.py, design/tower-facades · 2026-10-07
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
+- Codex · `codex/street-props` · 9 native prop kinds, optional PolishArt builder, real sheet/renders; actual city plan 534 props / 2,466 parts, rotated footprints and 27 factory cases pass · wire in StreetDressing; check pedestrians, car hull collision/headroom, flare/tag/night behavior. Full suite passes; see `design/street-props/README.md`.
+- Codex · `codex/polish-icons` · 29 transparent white SVG/PNG icons; manifest/sheet in `design/polish-icons/`; upload then fill slots/remove borrowed aliases. Full suite and pixel audits pass.
+
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->
