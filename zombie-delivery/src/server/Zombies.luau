@@ -225,8 +225,11 @@ local function buildBlocky(kind: string, def: Config.ZombieDef, at: Vector3): (M
 end
 
 -- ── Realistic bodies: R15 characters with animations ───────────────────────
--- Built once per kind from a HumanoidDescription (Roblox's own R15 body), then cloned. Zombies walk with Roblox's
--- zombie animations, bandits with the normal ones. If R15 cannot be built, the blocky body above is used.
+-- Native infected rigs match the approved thumbnail; human bandits retain their existing bodies and guns.
+-- Both keep the existing Animator, AI, scales and ragdoll path. Templates are built once per kind, then cloned.
+
+local CharacterGeometry = require(script.Parent.CharacterArt.Geometry)
+local CharacterRig = require(script.Parent.CharacterArt.Rig)
 
 local ANIMATIONS: { [string]: { [string]: string } } = {
 	zombie = { idle = "rbxassetid://616158929", walk = "rbxassetid://616168032", run = "rbxassetid://616163682" },
@@ -257,6 +260,9 @@ local function template(kind: string, def: Config.ZombieDef): Model?
 	local s = def.scale
 	local bandit = def.ranged == true
 	local ok, result = pcall(function()
+		if not bandit then
+			return CharacterRig.build(CharacterGeometry.spec(kind, s, def.skin, def.shirt, def.pants))
+		end
 		local description = Instance.new("HumanoidDescription")
 		local skin, shirt, pants = rgb(def.skin), rgb(def.shirt), rgb(def.pants)
 		description.HeadColor = skin
@@ -286,7 +292,7 @@ local function template(kind: string, def: Config.ZombieDef): Model?
 			-- A bandana over the mouth, a cap.
 			attach(model, head, "Bandana", Vector3.new(1.25, 0.45, 1.25) * s, CFrame.new(0, -0.25 * s, 0), if kind == "gunner" then Color3.fromRGB(30, 30, 30) else Color3.fromRGB(170, 30, 30), Enum.Material.Fabric, true)
 			attach(model, head, "Cap", Vector3.new(1.3, 0.35, 1.3) * s, CFrame.new(0, 0.55 * s, 0), Color3.fromRGB(40, 40, 46), Enum.Material.Fabric, true)
-		else
+		elseif model:GetAttribute("CharacterArt") == nil then
 			-- No smile: glowing eyes and a dark mouth.
 			if face then
 				face:Destroy()
@@ -526,9 +532,10 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 	-- The body collapses: collides only with the ground and buildings, never with cars or players.
 	for _, d in z.model:GetDescendants() do
 		if d:IsA("BasePart") then
-			d.CanCollide = d.Name ~= "HumanoidRootPart"
+			local decoration = d:GetAttribute("CharacterDecoration") == true
+			d.CanCollide = not decoration and d.Name ~= "HumanoidRootPart"
 			d.CollisionGroup = "Corpse"
-			d.Massless = false
+			d.Massless = decoration -- the thin face/clothing skin stays nonblocking even on a corpse
 			if push then
 				d.AssemblyLinearVelocity = push + Vector3.new(rng:NextNumber(-8, 8), rng:NextNumber(10, 25), rng:NextNumber(-8, 8))
 			end

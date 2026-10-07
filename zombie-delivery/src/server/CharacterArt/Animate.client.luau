@@ -1,0 +1,4 @@
+--!strict
+-- Cloned into the uniform StarterCharacter as "Animate", replacing Roblox's default personal-avatar animator.
+-- CourierAvatar runs the common tracks on the server-created Animator; ArmPose/BikeRider/Interact layer Transform
+-- in PreSimulation on every client. There is intentionally no competing local locomotion controller here.

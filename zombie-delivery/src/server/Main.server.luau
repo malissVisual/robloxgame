@@ -17,6 +17,8 @@ StarterPlayer.CharacterWalkSpeed = Config.Movement.Walk -- 3.7: the walk of clie
 local GunModels = require(Shared.GunModels)
 
 local Server = script.Parent
+-- The same native courier and animation set for everyone, installed before the long world build/first spawn.
+require(Server.CourierAvatar).start()
 local World = require(Server.World)
 local PlayerData = require(Server.PlayerData)
 local Vehicles = require(Server.Vehicles)
