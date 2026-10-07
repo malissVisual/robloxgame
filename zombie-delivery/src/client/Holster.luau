@@ -9,6 +9,12 @@
 -- arm swing on the key press (client/ArmPose.luau reads localSwing; the server's MeleeAt does not swing it twice).
 -- Only on foot: in a car seat B and V do nothing and the holster changes nothing (window shots, the car gun).
 -- 6.0: without a gun (a new courier: fists only; Holster.setArmed from the State) B draws nothing and V punches.
+-- 6.1, what you hold (shared/Holding.luau, server/Hand.luau: the character's Hand attribute): fists, the plastic bag or
+-- the gun. Holster.choose asks the server (the Hand remote: keys 1 / 2 / 3 through client/Hotbar.luau, a tap on a hand
+-- slot) and shows the choice at once (a short prediction, as the holster's); a gamepad's d-pad left / right cycles
+-- (Holster.cycle), the melee moved to L1 (6.1 review: the right stick's click is the default camera's zoom). B still draws and holsters (the server makes the gun the
+-- hand, or goes back to the bag / fists). A loaded bag in your hand is not set down by an aim or a shot press (only
+-- 3, B or the wheel do that, on purpose): such a press tells you so instead of drawing.
 -- (No Roblox UI here and nothing that requires CameraRig or ArmPose: both read this module.)
 
 local Players = game:GetService("Players")
@@ -16,6 +22,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Holding = require(Shared.Holding)
 local Melee = require(Shared.Melee)
 local Net = require(Shared.Net)
 local Sounds = require(script.Parent.Sounds)
@@ -32,6 +40,20 @@ local nextSwing = 0
 local swingAt: number? = nil -- os.clock() when this client's own swing started
 local swingKind = "punch"
 local armed = true -- 6.0: you own a gun (client/Shooting.luau's setState); without one nothing draws, V punches
+local bagOwned = false -- 6.1: the plastic bag is yours (the State's kit: Holster.setBag)
+local handPending: string? = nil -- 6.1: the hand asked for, until the attribute agrees
+local handAt = 0
+local toldAt = -math.huge -- 6.1: the last "your bag is loaded" note
+
+-- Set by client/Main.client.luau: a toast.
+Holster.notify = nil :: ((string) -> ())?
+
+local function say(text: string)
+	local notify = Holster.notify
+	if notify then
+		notify(text)
+	end
+end
 
 function Holster.setEnabled(on: boolean)
 	enabled = on
@@ -47,6 +69,35 @@ end
 
 function Holster.armed(): boolean
 	return armed
+end
+
+-- 6.1: does the State's kit hold the plastic bag?
+function Holster.setBag(owned: boolean)
+	bagOwned = owned
+end
+
+local function bagDown(): boolean
+	return typeof(player:GetAttribute("BagDown")) == "Vector3"
+end
+
+-- 6.1: what you hold now, as this client shows it ("fists" | "bag" | "gun").
+function Holster.hand(): string
+	local character = player.Character
+	local value = character and character:GetAttribute("Hand")
+	local server = if Holding.valid(value) then value :: string elseif character and character:GetAttribute("Holstered") == false then "gun" else "fists"
+	if handPending ~= nil then
+		if handPending == server or os.clock() - handAt > Config.Hand.Predict then
+			handPending = nil
+		else
+			return handPending
+		end
+	end
+	return server
+end
+
+-- 6.1: the bag in your hand has cargo in it (it would be set down if it left the hand).
+local function bagLoaded(): boolean
+	return Holster.hand() == "bag" and (tonumber(player:GetAttribute("BagCount")) or 0) > 0 and not bagDown()
 end
 
 -- Is the gun away right now (as this client shows it)?
@@ -84,8 +135,44 @@ function Holster.set(holstered: boolean)
 	end
 	pending = holstered
 	pendingAt = os.clock()
+	if not holstered then
+		handPending, handAt = "gun", os.clock() -- 6.1: the gun is the hand
+	end
 	Net.get("Holster"):FireServer(holstered)
 	pcall(Sounds.play, "pickup", 0.35, if holstered then 0.8 else 1.15)
+end
+
+-- 6.1: hold this (key 1 / 2 / 3, a hand slot): checked here for the words, decided on the server.
+function Holster.choose(hand: string)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not enabled or not character or not humanoid or humanoid.Health <= 0 or not Holding.valid(hand) then
+		return
+	end
+	if humanoid.SeatPart ~= nil or humanoid.Sit then
+		return -- (in a seat the hands do nothing: window shots, the car gun)
+	end
+	if Holster.hand() == hand then
+		return
+	end
+	local ok, why = Holding.can(hand, bagOwned, armed, bagDown())
+	if not ok then
+		say(Holding.whyText(why))
+		return
+	end
+	if hand == "gun" and not handsFree() then
+		say(Holding.whyText("busy"))
+		return
+	end
+	handPending, handAt = hand, os.clock()
+	pending, pendingAt = hand ~= "gun", os.clock()
+	Net.get("Hand"):FireServer(hand)
+	pcall(Sounds.play, "pickup", 0.35, if hand == "gun" then 1.15 elseif hand == "bag" then 1.4 else 0.8)
+end
+
+-- 6.1: the next hand you may take (a gamepad's d-pad: -1 left, +1 right).
+function Holster.cycle(step: number)
+	Holster.choose(Holding.cycle(Holster.hand(), step, bagOwned, armed, bagDown()))
 end
 
 -- B: holster or draw (on foot, the hands free).
@@ -98,6 +185,14 @@ end
 -- The gun out, if it is holstered and the hands are free. True when this drew it (the caller's press does not fire).
 function Holster.drawIfHolstered(): boolean
 	if not armed or not handsFree() or not Holster.holstered() then
+		return false
+	end
+	if bagLoaded() then
+		-- 6.1: an aim or a shot press does not set a loaded bag down (3 or B does, on purpose)
+		if os.clock() - toldAt > 3 then
+			toldAt = os.clock()
+			say("Your bag has deliveries in it: press 3 to set it down and draw your gun.")
+		end
 		return false
 	end
 	Holster.set(false)
@@ -165,11 +260,14 @@ function Holster.start()
 			return
 		end
 		local key = input.KeyCode
-		-- (a gamepad: d-pad right holsters, d-pad left swings; d-pad down is Roblox's emote menu)
-		if key == Enum.KeyCode.B or key == Enum.KeyCode.DPadRight then
+		-- (a gamepad, 6.1: the d-pad's left and right cycle what you hold, L1 swings; the d-pad's up
+		-- is the weapon wheel, its down the phone)
+		if key == Enum.KeyCode.B then
 			Holster.toggle()
-		elseif key == Enum.KeyCode.V or key == Enum.KeyCode.DPadLeft then
+		elseif key == Enum.KeyCode.V or key == Enum.KeyCode.ButtonL1 then
 			Holster.melee()
+		elseif key == Enum.KeyCode.DPadLeft or key == Enum.KeyCode.DPadRight then
+			Holster.cycle(if key == Enum.KeyCode.DPadLeft then -1 else 1)
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)
@@ -182,6 +280,7 @@ function Holster.start()
 		pending = nil
 		drawnBy = nil
 		swingAt = nil
+		handPending = nil
 	end)
 end
 

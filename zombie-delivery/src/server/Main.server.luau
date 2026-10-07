@@ -220,6 +220,7 @@ safely("Garages", Garages.start) -- 3.4: your cars in your garages, switched onl
 safely("Repair", Repair.start) -- 3.4: the repair bays (no free repairs any more)
 safely("Explore", Explore.start) -- 3.7: the map you discover
 safely("Tutorial", Tutorial.start) -- 3.7: the first-day tutorial
+safely("Hand", require(Server.Hand).start) -- 6.1: what you hold (fists / bag / gun: keys 1 / 2 / 3)
 safely("CloseCombat", CloseCombat.start) -- 3.9: the holster (B) and the melee (V)
 safely("Buddy", Buddy.start) -- 4.5: the admin's NPC companions
 safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the character (KitSpeed)

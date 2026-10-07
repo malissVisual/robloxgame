@@ -379,10 +379,12 @@ local KEYS: { { string } } = {
 	{ "E", "Doors, get in and out" },
 	{ "G", "Put down, let go" },
 	{ "F", "Fire" },
+	{ "1 / 2 / 3", "Hold: fists, bag, gun" },
 	{ "B", "Holster, draw" },
 	{ "V", "Punch, strike" },
 	{ "Y", "Take a road offer" },
-	{ "1 – 6", "Items" },
+	{ "X", "Throw (at a door)" },
+	{ "4 – 8", "Items" },
 	{ "Shift", "Sprint" },
 	{ "ESC", "Close a window" },
 }

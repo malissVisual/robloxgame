@@ -139,10 +139,13 @@ of letting you play a profile that would not be saved.
 | Aim (on foot you walk slowly with both arms up, the gun fires once it is up; in a car the camera moves in for a drive-by) | hold right mouse | – |
 | Shoot (on foot: the gun in your hand; driver: the car gun on the roof if the car has one, else a one-handed gun out of the window; passenger: a one-handed gun out of the window) | left mouse | FIRE |
 | Shoot the nearest enemy (auto-aim) | hold F | hold FIRE |
-| Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire) | B (gamepad: d-pad right) | DRAW / HOLSTER (over PUNCH) |
-| Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: d-pad left) | PUNCH / STRIKE left of FIRE |
+| What you hold (6.1): fists / the plastic bag / your gun (a loaded bag that leaves your hand is set down on the ground: E picks it up) | 1 / 2 / 3 (gamepad: d-pad left / right cycles) | tap the hand slots at the left of the bottom bar |
+| Holster / draw the gun (3.9; on foot, you start holstered; aiming or shooting also draws it, that press does not fire; 6.1: 3 draws your gun too, not over a loaded bag) | B | DRAW / HOLSTER (over PUNCH) |
+| Melee (3.9; on foot): a punch while holstered, a strike with the gun while it is out | V (gamepad: L1) | PUNCH / STRIKE left of FIRE |
+| Throw at a home's door (6.0; 6.1: with the bag in your hand or a light piece in your hands, else it says why) | hold X (gamepad R1) | THROW |
+| Key hints (6.1: fold / unfold the strip under the top buttons) | F1, or its KEYS chip | – |
 | Switch gun | hold T: the weapon wheel (point at a gun, let go); tap T: the next gun (5.4.1: Q is the phone); or click the weapon label (gamepad: d-pad up, the next gun) | tap the weapon label: the weapon wheel, tap a gun (4.2) |
-| Items (repair, medkit, nitro, molotov, mine) | 1 – 5 (or click a tag) | the tags |
+| Items (repair, medkit, nitro, molotov, mine) | 4 – 8 (6.1; 9 a sixth kind; or click a slot) | the slots |
 | Free the mouse (click the interface) | hold Alt (any window frees it too) | – |
 | The Dispatch board (the jobs) / map / backpack | J / M / I (3.9; B before) | BOARD on the phone / MAP / BAG on the phone |
 | The phone (5.0; 5.7: the HUD's MENU button says PHONE once you have it): ORDERS, BOARD, CAREER, SHOP, MAP, GARAGE, MESSAGES and the MENU's apps (MISSIONS, CREW, TOP, ESTATE, BAG, SETTINGS) | Q, or click PHONE (gamepad: Y) | tap PHONE |
@@ -966,7 +969,7 @@ what each part shows is the same.
 | Upper right | MAP [M] · CREW [K] · MENU (every other action: JOBS, MISSIONS, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
 | Lower right | the gun and [T] (3.9 on foot: HANDS · [B] DRAW · [V] PUNCH, or the gun · [B] HOLSTER · [V] STRIKE), or what you carry (2 × PIZZA BOXES); the car: OLD VAN / 72% / CARGO 3 OF 4 and the speed; INVENTORY [I] |
-| Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): five square item slots (the consumables you own in their order, the count, keys 1-5; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more). It hides while a window, the phone or a dialog is open |
+| Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): 6.1: three hand slots first (✊ fists 1, 🛍 the bag 2 with its fill, 🔫 the gun 3 with its name; the one you hold outlined red) and a divider, then five square item slots (the consumables you own in their order, the count, keys 4-8; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more; 6.1: the hands and two item slots). It hides while a window, the phone or a dialog is open |
 | Lower centre | one action: a key box, the action, a short instruction and the hold line; the breath bar just over it (both over the bottom bar) |
 | In the world | a small red waypoint with the place and the distance |
 
@@ -1102,6 +1105,48 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## What you hold: fists, the bag or your gun; X fixed; the bag swings (6.1)
+
+**What you hold** (the owner's wish: "you choose to hold the pistol or the bag; when there is cargo in the bag you can
+only put it down, you can't hide it"; `shared/Holding.luau`, `server/Hand.luau`, the Hand remote, `Config.Hand`): the
+bottom bar has three HAND slots at its left: **1 fists ✊**, **2 the plastic bag 🛍** (its fill, "2/2"), **3 your gun
+🔫** (its name; T still picks which gun on the weapon wheel). The one you hold has the red outline. Keys 1 / 2 / 3, a
+click or a tap on the slot, a gamepad's d-pad left / right (the melee moved to L1). The items moved
+to keys **4 – 8** (a touch screen shows two item slots beside the hands; the I window lists them all). B still draws and
+holsters (it makes the gun the hand and goes back to the bag or the fists). The server decides (the character's Hand
+and Holstered attributes): never in a seat, never the gun with cargo in your hands.
+- **Fists:** the gun holstered, V punches. **Gun:** drawn. **Bag:** in your left hand, the gun holstered; a light
+  piece you pick up drops into it while it has room (then the backpack); you throw from it (X).
+- **The bag leaves your hand** (1 or 3): **empty, it is stowed** (nothing shows, its room is not yours: pieces you pick
+  up go into the hands, then the backpack, as before 6.0). **Loaded, it is set down on the ground** where you stand,
+  its cargo in it: a "Pick up bag" prompt (E, only you), the HUD points at it, its pieces are not with you (no hand
+  over, no throw from them) but the stop waits for them. You have to go back for it; picking it up makes it your hand
+  again. It lies there until then or until the job ends (its pieces are lost, as a dropped piece). Zombies leave it.
+- **6.1 review:** in mid-air, on a ladder, in water or on a zip line the bag waits in your hand's place until your feet
+  are on the ground, then it is set down (never hanging out of reach). The touch THROW button and R1 appear only when a
+  throw is possible (X alone still explains why not). The number keys do nothing while a window or the phone is open.
+  The key hints show only the keys that work there (the driver's keys, a bus's E: Stop) and flow onto shorter lines
+  beside the contract on a narrow window. The prompt on a set-down bag counts its pieces as they change.
+  Dying drops the bag's pieces with the backpack's. An aim or a shot press does not set a loaded bag down (3, B or the
+  wheel do, on purpose).
+- **X fixed** ("after pressing X nothing shows"): X was bound only while the server's ThrowTo was set (a home's door is
+  the current stop and a piece for it is with you), so anywhere else it did nothing. The server's ThrowTo logic was
+  traced and is right for a home drop with a light piece in the hands or the bag (`Cargo.throwShown`); X is now bound
+  whenever you could throw at all (the new ThrowReady attribute: a light piece in your hands, or the bag in your hand
+  with one in it) and a press without a door in range says why: "Get within 45 studs of the delivery door to throw",
+  "Too fragile to throw" or "Nothing to throw". At a door within range the "Hold X" line shows, as before.
+- **The bag no longer blinks:** 6.0 took it off and built it again every time the hands took or gave a piece (KitWear
+  put it away while Carrying was set) and swung it with a Transform built from the pivot's last solved CFrame (any
+  frame it was stale compounded the error) plus an 8 Hz step jolt. Now it stays in the hand while you carry, and
+  `client/BagSway.luau` (its only writer; `client/SprintPose.luau` no longer touches it) swings it as a **pendulum on a
+  spring** (`shared/BagSwing.luau`, `Config.Courier.Bag`): the grip's real acceleration swings it (it trails when you
+  start, swings forward when you stop, out on a turn), the air leans it back at a run, a small flutter and twist at
+  speed; within 120 studs of the camera, in PreSimulation, the Transform straight from the hand's frame.
+- **Key hints** (`client/KeyHints.luau`, `Config.KeyHints`): a quiet strip under the top buttons with what the keys do
+  now (on foot: 1 / 2 / 3, 4-8 items, E use or pick up bag, G put down, X throw only while a throw is possible, V, T,
+  Shift, Q, J, M; in a seat: W/S, A/D, E get out, F, 4-8, Q, M). A keyboard only; it hides with the bottom bar. F1 or
+  its KEYS chip folds it (for the session); a courier with fewer than 5 deliveries starts with it open.
 
 ## The courier on foot: the bag, throws, sprint, armour, no free gun (6.0)
 
@@ -1436,9 +1481,11 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               (3.1: counts the stats from the other modules' hooks, the distance and the places visited, checks and
               pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
               the head, the Challenges remote), CloseCombat (3.9: the holster, the Holstered attribute, the melee
-              checked and dealt: the nearest enemy in the cone, MeleeAt / MeleeKind for the swing)
-src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, the item
-              slots 1-5 and what you carry), MapView (minimap, big map, GPS routes),
+              checked and dealt: the nearest enemy in the cone, MeleeAt / MeleeKind for the swing), Hand (6.1: what you hold,
+              fists / bag / gun: the Hand remote, the Hand and Holstered attributes; Cargo sets a loaded bag down)
+src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, 6.1: the
+              hand slots 1-3, the item slots 4-8 and what you carry), BagSway (6.1: the bag's pendulum, the BagSwing
+              joint's only writer), KeyHints (6.1: the key hints under the top buttons, F1), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),

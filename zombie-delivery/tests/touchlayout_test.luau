@@ -122,9 +122,10 @@ for _, screen in SCREENS do
 
 		-- 6.0.1, the bottom bar (client/Hotbar.luau: 5 item slots of 56 over the carried strip, 304 × 100 unscaled; a
 		-- slot at least 48 px on a touch screen) with the right column (now 158 tall: the items left it) and the action.
+		-- 6.1: the three hand slots, a divider and two item slots over the strip: 311 × 100 (wider fails the iPhone SE).
 		local barScale = math.max(S, 48 / 56)
 		local rowLeft = if admin then math.min(row.x0, W - 16 - 90) else row.x0
-		local col2, over2, bar = TouchLayout.dock(c, W, H, 300 * S, 158 * S, rowBottom, rowLeft, 304 * barScale, 100 * barScale)
+		local col2, over2, bar = TouchLayout.dock(c, W, H, 300 * S, 158 * S, rowBottom, rowLeft, 311 * barScale, 100 * barScale)
 		check(`{name}{tag}: the bar's slots 48 px or bigger`, 56 * barScale >= 48)
 		check(`{name}{tag}: the bar on the screen`, inside(bar, W, H), show(bar))
 		check(`{name}{tag}: the bar clear of the thumbstick`, not TouchLayout.overlap(bar, c.thumb), `{show(bar)} / {show(c.thumb)}`)

@@ -11,8 +11,12 @@
 --   shoes   the Running Shoes on both feet
 --   jacket  the Thermal Jacket on the torso, its sleeves on the upper arms
 --   hand    6.0: the plastic bag (Config.Courier.BagKit) in the left hand: its art hangs from a small part, BagPivot,
---           joined to the hand by a Motor6D "BagSwing" (KitArt "bag"); every client swings it behind a running body
---           (client/SprintPose.luau, its Transform). Put away while the hands carry or push something, or seated.
+--           joined to the hand by a Motor6D "BagSwing" (KitArt "bag"); every client swings it (6.1: client/BagSway.luau,
+--           the only writer of its Transform). 6.1: only while it is what you hold (the character attribute Hand =
+--           "bag", server/Hand.luau); put away while you push something or sit. It stays while the hands carry cargo:
+--           6.0 took it off and built it again every time the hands took or gave a piece (the Carrying attribute
+--           toggling: the "blinking" bag). KitWear.bagArt builds the same bag on any part (server/Cargo.luau's bag set
+--           down on the ground).
 --   vest    6.0: the best vest owned (stream 2's armour: Config.Kit "heavy", else "kevlar") over the courier's jacket. A
 --           vest that changes while you play (bought, a better one) is put on with the "vest" gesture (arms over the
 --           head, then down: shared/Gestures.luau, played by client/ArmPose.luau for everybody). 6.0.1: else the
@@ -52,8 +56,9 @@ local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit
 local NAMES: { [string]: string } = { pack = "KitPack", load = "KitParcel", shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest" }
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
--- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays)
-local BAG_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true }
+-- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays). 6.1: not for
+-- Carrying any more (the cargo is held over it; taking it off and on was the blink), and the Hand attribute decides.
+local BAG_BUSY: { [string]: boolean } = { Pushing = true, Hand = true }
 
 -- (6.0: `pivot` = the bag's part hung from the hand, removed with the slot)
 type Slot = { key: string, built: Builder.Built, parts: { [string]: BasePart }, sizes: { [string]: Vector3 }, pivot: BasePart? }
@@ -136,6 +141,19 @@ local function hangBag(character: Model): (BasePart?, BasePart?)
 	return hand, pivot
 end
 
+-- 6.1: the bag's art on `pivot` (its grip: the bag hangs down -Y), its plastic see-through; under `parent`.
+function KitWear.bagArt(parent: Instance, pivot: BasePart): Builder.Built?
+	local spec: Builder.Spec = { id = NAMES.hand, pieces = KitArt.pieces("bag") :: any }
+	local ok, made = pcall(Builder.build, parent, spec, { BagPivot = pivot })
+	if not ok then
+		warn(`[KitWear] bag: {made}`)
+		return nil
+	end
+	local built = made :: Builder.Built
+	seeThrough(built)
+	return built
+end
+
 -- One slot built on the character, fitted to its body parts; nil when a body part is missing (an R6 avatar).
 local function build(character: Model, slot: string, id: string): Slot?
 	local pieces = piecesFor(slot, id)
@@ -148,15 +166,11 @@ local function build(character: Model, slot: string, id: string): Slot?
 		if not hand or not pivot then
 			return nil
 		end
-		local bagSpec: Builder.Spec = { id = NAMES.hand, pieces = pieces :: any }
-		local ok, made = pcall(Builder.build, character, bagSpec, { BagPivot = pivot })
-		if not ok then
-			warn(`[KitWear] {slot} {id}: {made}`)
+		local bag = KitWear.bagArt(character, pivot)
+		if not bag then
 			pivot:Destroy()
 			return nil
 		end
-		local bag = made :: Builder.Built
-		seeThrough(bag)
 		return { key = id, built = bag, parts = { LeftHand = hand }, sizes = { LeftHand = hand.Size }, pivot = pivot }
 	end
 	for _, piece in pieces do
@@ -207,18 +221,13 @@ local function takeOff(wearer: Wearer)
 	end
 end
 
--- 6.0: is the left hand free for the bag (nothing carried or pushed, not seated)?
+-- 6.0: is the left hand free for the bag (nothing pushed, not seated)? 6.1: and is the bag what you hold?
 local function bagFree(character: Model, humanoid: Humanoid): boolean
-	if humanoid.Sit or humanoid.SeatPart ~= nil then
+	if humanoid.Sit or humanoid.SeatPart ~= nil or character:GetAttribute("Hand") ~= "bag" then
 		return false
 	end
-	for name in BAG_BUSY do
-		local value = character:GetAttribute(name)
-		if value ~= nil and value ~= false then
-			return false
-		end
-	end
-	return true
+	local pushing = character:GetAttribute("Pushing")
+	return pushing == nil or pushing == false
 end
 
 local function holdsPhone(player: Player, character: Model, humanoid: Humanoid): boolean

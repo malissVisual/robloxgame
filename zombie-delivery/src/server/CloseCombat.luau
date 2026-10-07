@@ -4,6 +4,8 @@
 --                hide the gun in the hand, client/ArmPose.luau) and server/Gun.luau fires no hand-gun shot while it is
 --                set. Every spawn starts holstered. In a car seat it changes nothing (window shots, the car gun).
 --                6.0: without a gun (a new courier: fists only) a draw is refused, the hands stay empty.
+--                6.1: B goes through what you hold (server/Hand.luau): a draw makes the gun the hand (a loaded bag in
+--                your hand is set down first, server/Cargo.luau), a holster goes back to the bag or the fists.
 --   Melee (V)    alive, on foot, the hands free (no cargo) and the cooldown over (Config.Melee): a punch when
 --                holstered, a strike with the gun when it is out. It hits the nearest living zombie or bandit in a short
 --                cone in front of you (shared/Melee.luau), pushes it back, and the kill counts like any other (the
@@ -17,7 +19,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Melee = require(Shared.Melee)
 local Net = require(Shared.Net)
 local Zombies = require(script.Parent.Zombies)
-local PlayerData = require(script.Parent.PlayerData)
+local Hand = require(script.Parent.Hand) -- 6.1: what you hold
 
 local CloseCombat = {}
 
@@ -32,15 +34,10 @@ local function setHolstered(character: Model, holstered: boolean)
 end
 
 local function onHolster(player: Player, holstered: any)
-	local character = player.Character
-	if type(holstered) ~= "boolean" or not character then
+	if type(holstered) ~= "boolean" or not player.Character then
 		return
 	end
-	local profile = PlayerData.get(player)
-	if not holstered and (not profile or profile.weapon == nil) then
-		return -- 6.0: no gun to draw (fists only: V punches)
-	end
-	setHolstered(character, holstered)
+	Hand.holster(player, holstered) -- 6.1 (6.0: no gun to draw, fists only: Hand refuses the draw)
 end
 
 -- The direction of the swing along the ground: the client's (a unit vector, checked), else where the body faces.

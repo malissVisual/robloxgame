@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.0.2"
+Config.Version = "6.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3025,18 +3025,44 @@ Config.Courier = {
 		BlendTime = 0.15, -- seconds to blend the cycle in or out
 		Stride = 7, -- studs run per full cycle (two steps): the cadence follows the speed
 	},
+	-- 6.1: the bag is a pendulum on a spring (shared/BagSwing.luau, client/BagSway.luau): the hand's real acceleration
+	-- swings it (it trails when you start, swings forward when you stop, out on a turn), the air leans it back at a run.
 	Bag = {
 		Grip = 0.12, -- studs under the hand
-		MaxTilt = 72, -- degrees back at a full sprint
-		FullSpeed = 28, -- studs / s for the full tilt
-		Spring = 70, -- how hard it swings to its tilt …
-		Damp = 8, -- … and how fast that settles
-		Bounce = 9, -- 6.0.1: degrees it jolts with every step of the sprint cycle
-		FlutterHz = 4.5, -- the flutter at speed
-		Flutter = 10, -- degrees
-		Sway = 5, -- degrees side to side
-		Range = 180, -- studs from the camera
+		Spring = 70, -- the swing's stiffness (ω², 1 / s²: about 1.3 swings a second) …
+		Damp = 5, -- … and its damping (1 / s: a few swings, then it hangs still)
+		Kick = 0.006, -- radians of swing for every stud / s² the hand speeds up or slows down (a real pendulum: 1 / g)
+		HandShare = 0.35, -- of the hand's own swing on top of the body's (the arms pumping must not throw it around)
+		MaxAccel = 260, -- studs / s²: the acceleration is clamped to this (a hitch, a respawn, a teleport)
+		Smooth = 0.06, -- seconds: the velocities are smoothed over this before they are differentiated
+		Drag = 0.0011, -- radians of lean back for every (stud / s)² of the speed (the air at a run: ~50° at 28)
+		MaxTilt = 75, -- degrees from hanging straight, at most
+		FullSpeed = 28, -- studs / s for the full flutter
+		FlutterHz = 5.5, -- the flutter at speed …
+		Flutter = 5, -- … degrees at FullSpeed (nothing below a walk)
+		Twist = 9, -- degrees it twists about its handles at FullSpeed
+		Teleport = 150, -- studs / s: the hand moving faster than this is a jump (a respawn, a seat): the swing starts again
+		Range = 120, -- studs from the camera (yours always)
 	},
+}
+
+-- 6.1, what you hold (the owner's wish: "you choose to hold the pistol or the bag; with cargo in the bag you can only put
+-- it down"): fists, the plastic bag or your gun (shared/Holding.luau, server/Hand.luau, the Hand remote; the bottom
+-- bar's hand slots, keys 1 / 2 / 3, client/Hotbar.luau). A loaded bag that leaves your hand is set down on the ground
+-- with its cargo (server/Cargo.luau), an empty one is stowed.
+Config.Hand = {
+	Cooldown = 0.2, -- seconds between two switches (the server)
+	Predict = 1.5, -- seconds the client shows its own choice before the server's Hand attribute is trusted again
+	BagAhead = 1.3, -- studs in front of your feet (and a little to the left) where a loaded bag is set down
+	BagHold = 0.25, -- seconds: the "Pick up bag" prompt's hold
+	BagReach = 9, -- studs: its reach
+}
+
+-- 6.1, the key hints under the HUD's top buttons (client/KeyHints.luau): a quiet strip of what the keys do now.
+Config.KeyHints = {
+	OpenUnder = 5, -- deliveries: a courier with fewer starts with the strip open (else folded to its KEYS chip)
+	TextSize = 12,
+	Check = 0.25, -- seconds between the looks at what to show
 }
 
 export type JobTypeDef = {

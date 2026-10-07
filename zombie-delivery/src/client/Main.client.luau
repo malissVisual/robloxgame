@@ -86,11 +86,16 @@ safely("BusRide", require(Client.BusRide).start) -- 5.5: the city buses glide, t
 safely("RentalUi", require(Client.RentalUi).start) -- 5.6: ZDC RIDE's Rent / Return prompts, each player the one that fits
 safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley, the climb's fade
 require(Client.ZipRide).notify = Hud.toast
-safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms, the bag flying behind
+safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms
+safely("BagSway", require(Client.BagSway).start) -- 6.1: the bag in the hand swings on a spring (its only writer)
+safely("KeyHints", function() -- 6.1: the quiet key hints under the top buttons (F1 folds them)
+	task.spawn(require(Client.KeyHints).start)
+end)
 safely("Throw", require(Client.Throw).start) -- 6.0: hold X at a home's door to throw the delivery (the dotted arc, TRICKSHOT)
 safely("Unstuck", require(Client.Unstuck).start) -- 6.0.1: lifts your courier out of the ground if it ever sinks in (and says why)
 require(Client.Throw).notify = Hud.toast
 Shooting.notify = Hud.toast
+Holster.notify = Hud.toast -- 6.1: what you hold (keys 1 / 2 / 3)
 Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
 WeaponWheel.notify = Hud.toast
@@ -171,9 +176,12 @@ LocationTag.windowOpen = CameraRig.mouseNeeded -- 4.3: no location caption while
 require(Client.Hotbar).covered = function(): boolean
 	return CameraRig.mouseNeeded() or TutorialUi.isOpen() or Hud.resultOpen()
 end
+require(Client.KeyHints).covered = require(Client.Hotbar).covered -- 6.1: the key hints hide the same way
 
 Net.get("State").OnClientEvent:Connect(function(state)
 	Shooting.setState(state)
+	require(Client.KeyHints).setState(state) -- 6.1
+	Holster.setBag(type(state) == "table" and type(state.kit) == "table" and state.kit[require(Shared.Config).Courier.BagKit] == true) -- 6.1
 	Hud.setState(state)
 	DispatchUi.setState(state)
 	Menu.setState(state)

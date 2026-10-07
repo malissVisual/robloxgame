@@ -184,7 +184,7 @@ function TutorialSteps.dialog(phase: string, data: { [string]: any }?): Dialog?
 			pages = {
 				`Delivered! Nice work, courier. There's ${reward} on top from me.`,
 				"You've got a plastic bag: two more parcels on you, and at a door hold X to throw one. Get the ZDC Courier Vest and a backpack at Last Stop Supplies, then save up for a bike: the bike shop opens at level 2.",
-				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Your pistol is holstered: B draws it, V punches. And explore: the map fills in as you go.`,
+				`New jobs land on the board (J) every few minutes, the ON FOOT ones on top. Old Van: {Config.VanQuest.Where}. Your pistol is holstered: 3 draws your gun, 2 holds the bag, V punches. And explore: the map fills in as you go.`,
 			},
 			primary = "SHOW ME AROUND", -- 5.7: the tour (TutorialSteps.tourDialog)
 			secondary = "LATER",
@@ -241,7 +241,7 @@ function TutorialSteps.forTouch(line: string): string
 	out = string.gsub(out, "G puts it down", "PUT DOWN sets it down")
 	out = string.gsub(out, "Hold T to pick a gun", "Tap your gun's line to pick a gun")
 	out = string.gsub(out, "V punches", "tap PUNCH")
-	out = string.gsub(out, "B draws it", "tap DRAW")
+	out = string.gsub(out, "3 draws your gun, 2 holds the bag", "tap DRAW or the hand slots") -- 6.1 (B still draws)
 	out = string.gsub(out, "Q opens your phone", "The PHONE button opens your phone") -- 5.7
 	return out
 end
