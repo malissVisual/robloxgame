@@ -1,17 +1,20 @@
 --!strict
 -- 6.1, the key hints (the owner's wish: the player sees which keys do what): a quiet strip right under the HUD's top
--- buttons (MAP · CREW · MENU, client/Hud.luau's "HudButtons"), right-aligned, small muted text on no background, one or
+-- buttons (MAP · PHONE, client/Hud.luau's "HudButtons"), right-aligned, small muted text on no background, one or
 -- two short lines of key chips for what the keys do NOW (the real bindings of the client's modules):
---   on foot   [1] Fists [2] Bag [3] Gun (what you have; the one you hold bright) · [4-8] Items · [E] Use · [G] Put down
---             (cargo in your hands) · [X] Throw (only while a throw is possible: the server's ThrowReady / ThrowTo) ·
---             [E] Pick up bag (while yours lies on the ground: BagDown) · [V] Punch / Strike · [T] Guns · [Shift] Sprint
---             · [Q] Phone · [J] Jobs · [M] Map
---   in a seat [W/S] Drive [A/D] Steer · [E] Get out · [F] Shoot · [4-8] Items · [Q] Phone · [M] Map
+--   on foot   [1] Fists [2] Bag [3] Gun (what you have; the one you hold bright) · [E] Use · [G] Put down (cargo in
+--             your hands) · [X] Throw (only while a throw is possible: the server's ThrowReady / ThrowTo) · [E] Pick up
+--             bag (while yours lies on the ground: BagDown) · [V] Punch / Strike
+--   in a seat [W/S] Drive [A/D] Steer · [E] Get out · [F] Shoot
 -- A keyboard only: hidden on a touch screen and with a gamepad alone. Hidden with the HUD and while a window, the phone,
 -- a dialog or the result card covers the game (KeyHints.covered, the bottom bar's rule, set by the client's Main).
 -- The KEYS chip (a click, or F1) folds and unfolds it; the choice stays for the session. A courier with fewer than
 -- Config.KeyHints.OpenUnder deliveries starts with it open, the others folded. Looked at every Check seconds; the text
 -- is set only when it changed.
+-- 6.5 (one of everything on screen): folded it is a small "? KEYS [F1]" chip on a charcoal backing, for everyone after
+-- the first two deliveries. Unfolded it shows only the keys of the moment: the hands (1 / 2 / 3, V), E, G and X on foot,
+-- the driving keys in a seat. [J] Jobs, [M] Map, [Q] Phone, [T] Guns, [Shift] Sprint and [4-8] Items went: the top
+-- buttons, the bottom bar's numbers and the phone say them.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -90,10 +93,7 @@ local function linesNow(): { { Chip } }
 		if hasGun then
 			table.insert(first, chipText("F", "Shoot"))
 		end
-		table.insert(second, chipText("4-8", "Items"))
-		table.insert(second, chipText("Q", "Phone"))
-		table.insert(second, chipText("M", "Map"))
-		return { first, second }
+		return { first }
 	end
 	local hand = Holster.hand()
 	table.insert(first, chipText("1", "Fists", hand == "fists"))
@@ -103,7 +103,6 @@ local function linesNow(): { { Chip } }
 	if hasGun then
 		table.insert(first, chipText("3", "Gun", hand == "gun"))
 	end
-	table.insert(first, chipText("4-8", "Items"))
 	local carrying = character:GetAttribute("Carrying") ~= nil
 	if typeof(player:GetAttribute("BagDown")) == "Vector3" then
 		table.insert(first, chipText("E", "Pick up bag"))
@@ -121,12 +120,8 @@ local function linesNow(): { { Chip } }
 		table.insert(second, chipText("V", if hand == "gun" then "Strike" else "Punch"))
 	end
 	if hasGun then
-		table.insert(second, chipText("T", "Guns"))
+		table.insert(second, chipText("T", "Guns")) -- (6.5 review: the weapon line's T box is gone: the wheel is here)
 	end
-	table.insert(second, chipText("Shift", "Sprint"))
-	table.insert(second, chipText("Q", "Phone"))
-	table.insert(second, chipText("J", "Jobs"))
-	table.insert(second, chipText("M", "Map"))
 	return { first, second }
 end
 
@@ -229,9 +224,11 @@ local function build(gui: Instance)
 	}, root)
 	chip = Ui.make("TextButton", {
 		Name = "Toggle",
-		Size = UDim2.fromOffset(0, K.TextSize + 4),
+		Size = UDim2.fromOffset(0, K.TextSize + 8),
 		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundTransparency = 1,
+		BackgroundColor3 = P.surface, -- (6.5: a small chip on a faint charcoal backing, the mockup's)
+		BackgroundTransparency = 0.5,
+		BorderSizePixel = 0,
 		Font = Theme.HeadingFont,
 		TextSize = K.TextSize - 1,
 		TextColor3 = P.ink2,
@@ -240,6 +237,7 @@ local function build(gui: Instance)
 		Text = "",
 		LayoutOrder = 0,
 	}, root)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, chip)
 	chip.Activated:Connect(function()
 		open = not isOpen()
 		shown = ""

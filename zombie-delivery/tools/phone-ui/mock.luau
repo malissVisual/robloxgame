@@ -181,6 +181,10 @@ M.MapView={isOpen=function() return M.mapOpen==true end,toggle=function() M.mapO
 M.KitShop={owned=function(state) return state.kit or {} end,roomText=function() return "HANDS 2 / PACK 3" end}
 M.CareerUi={toGo=function() return "8 runs" end,unlockText=function() return "Next unlock" end}
 M.BagUi={line=function() return nil end,open=function() M.bagOpen=true end,render=function(parent,job,order) M.bagRendered=(M.bagRendered or 0)+1;M.make("Frame",{Name="BagRows",LayoutOrder=order},parent);return order+1 end}
+-- 6.5: BAG & ITEMS' BAGS tab and ITEMS' USE (the bottom bar's path).
+M.BagUi.bags=function(parent,state,order) M.bagsRendered=(M.bagsRendered or 0)+1;M.make("Frame",{Name="BagsRows",LayoutOrder=order},parent);return order+1 end
+M.Hotbar={slotOf=function(id) return if id=="medkit" then 5 else nil end}
+M.Hotbar.onUse=function(id) M.used=id end
 M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end}
 M.Discovery={grid={X0=-2200,Z0=-3000,Size=120,Rows=40,Cols=36},changed=signal(),uncoveredCell=function() return M.discovered==true end}
 return M

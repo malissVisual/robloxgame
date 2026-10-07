@@ -42,6 +42,21 @@
 -- wear Ui.window's ZDC header with a line glyph (the shop's follows its kind), Ui.tabs' square tabs, the phone's red
 -- primary for a row's main action (BUY, UPGRADE, USE, TAKE THE JOB) and tag lines (the red square and caps); the
 -- delivery result is the phone's order card (the customer in big caps, PAY | DRIVER XP) with one red CONTINUE.
+-- 6.5, a clean screen and one clear goal (the owner: "When I join I don't know what to do. I can't find my way in
+-- anything. The UI is a terrible mess."): every thing shows once.
+--   * The NEXT card (client/Objective.luau, its words from shared/Goal.luau) is the first thing in the contract column:
+--     what to do now, where, how far. The contract group folds under it (▼ DETAILS); off duty the card replaces the
+--     OFF DUTY line ("Take a delivery job · Press J").
+--   * The world marker: the beam is taller and brighter, the waypoint one clear pin "TONY'S PIZZA · 120 m"; with no job
+--     it stands on the depot's job board ("JOB BOARD · 25 m") unless Marge's own marker shows.
+--   * Upper right only MAP [M] and PHONE [Q] (MENU before the phone); CREW went into the list (K still opens it).
+--   * The lower right column is gone on a computer: the weapon line (the bottom bar's hand slots show what you hold),
+--     the vehicle line (the phone's GARAGE) and INVENTORY [I] (I still opens it). Left there: the speed and the fuel
+--     while you drive, the PHONE action (client/Phone.luau sits over the zero-height WeaponBar), and on a touch screen
+--     the weapon line (its tap opens the weapon wheel: no T key there).
+--   * The pill at the lower centre shows only what you can press right now ("E  Pick up pizza"); nothing else.
+--   * The contract's bag chip went (the bottom bar shows the bag); the key hints (client/KeyHints.luau) fold to
+--     "? KEYS [F1]" after the first two deliveries and show only the keys of the moment.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -316,7 +331,8 @@ end
 -- 3.8: the contract column, upper left (at the left margin under the top bar on a computer, under the native chat
 -- while it is open; right of the minimap column on a touch screen), one column that grows downward (a UIListLayout:
 -- a hidden entry takes no room, so nothing overlaps):
---   1 the contract group (your own job; with none and nothing else on top, the small OFF DUTY line)
+--   1 6.5: the NEXT card (client/Objective.luau: always, but for a crew member without a job of their own) and under
+--     it the contract group (your own job, folded until the card is clicked: ▼ DETAILS)
 --   2 the tutorial's hint (client/TutorialUi.luau sets its slot's order 2), the crew slot (a member's view of the
 --     leader's job, an invitation: client/CrewPanel.luau, through Hud.topSlot)
 --   3 the mission banner (3.0: client/MissionsUi.luau)
@@ -681,6 +697,7 @@ end
 -- sound setting. Unset, the button says what it is for (CrewPanel.start sets onCrew by itself too).
 Hud.onJobs = nil :: (() -> ())? -- 3.6 client/DispatchUi.luau: the Dispatch board (J / JOBS)
 Hud.onJobsKey = nil :: (() -> ())? -- 4.0.2: the J key: opens the board, or closes it when it is open (Main)
+Hud.onCrewBadge = nil :: ((number) -> ())? -- 6.5 review: the crew invitations, for the phone's MORE tile (Main)
 Hud.onCrew = nil :: (() -> ())?
 Hud.oldLevelBanner = false -- 4.6: off: client/CareerUi.luau shows the level-up card (true brings the old banner back)
 Hud.onEstate = nil :: (() -> ())?
@@ -1477,6 +1494,7 @@ local function crewList(r: any): { { name: string, pay: number, owner: boolean }
 end
 
 function Hud.showResult(r: any)
+	view.goal.result(r) -- 6.5: the NEXT card says "Delivered! +$45 · Press J for the next job" for a few seconds
 	-- 5.7: a foot or bike run done (r.mode): a toast and the pay floating up from the money (client/PayFloat.luau), not
 	-- this window; a level-up still shows its card (client/CareerUi.luau). Car jobs, missions and failures keep it.
 	if type(r) == "table" and r.success == true and (r.mode == "foot" or r.mode == "bike") then
@@ -1785,6 +1803,9 @@ end
 -- keys and keeps 44 px hit areas. Other modules hook in (Hud.onJobs, Hud.onCrew, Hud.onEstate, Hud.onMissions,
 -- Hud.onSound). layout() scales and places the row: on a computer left of (or under) Roblox's player list, on touch
 -- top right under ADMIN; the list opens downward.
+-- 6.5: the row is MAP [M] and PHONE [Q] only (MENU until Marge gives the phone; the phone holds every action as an
+-- app). CREW is an entry of the list now (K still opens it; its invitations light MENU / PHONE). The two actions sit on
+-- small charcoal panels (the approved mockup).
 
 type ButtonDef = { id: string, text: string, icon: string, menu: boolean?, key: string?, onClick: () -> () }
 local BUTTONS: { ButtonDef }, buttonGrid: any, hudButtons: { [string]: any }
@@ -1806,15 +1827,15 @@ BUTTONS = {
 	{ id = "map", icon = "🗺️", text = "MAP", key = "M", onClick = function()
 		MapView.toggle()
 	end },
-	{ id = "crew", icon = "👥", text = "CREW", key = "K", onClick = function()
-		hook("crew panel", Hud.onCrew)
-	end },
 	{ id = "jobs", menu = true, icon = "📋", text = "JOBS", key = "J", onClick = openDispatch },
 	{ id = "missions", menu = true, icon = "⭐", text = "MISSIONS", key = "U", onClick = function()
 		hook("missions window", Hud.onMissions)
 	end },
 	{ id = "career", menu = true, icon = "🎖", text = "CAREER", key = "C", onClick = function() -- 4.6
 		hook("career window", Hud.onCareer)
+	end },
+	{ id = "crew", menu = true, icon = "👥", text = "CREW", key = "K", onClick = function() -- (6.5: out of the row)
+		hook("crew panel", Hud.onCrew)
 	end },
 	{ id = "bag", menu = true, icon = "🎒", text = "BAG", key = "I", onClick = function()
 		toggleBackpack()
@@ -1847,8 +1868,8 @@ BUTTONS = {
 	end },
 }
 
--- The row: MAP [M]  CREW [K]  MENU, right-aligned in a frame of a fixed size (layout() reads it).
-local ROW_W, ROW_H = if touchLayout then 210 else 250, 44
+-- The row: MAP [M]  PHONE [Q] (6.5; MENU before the phone), right-aligned in a frame of a fixed size (layout() reads it).
+local ROW_W, ROW_H = if touchLayout then 170 else 200, 44
 buttonGrid = placed(Ui.make("Frame", {
 	Name = "HudButtons",
 	Size = UDim2.fromOffset(ROW_W, ROW_H),
@@ -1863,7 +1884,7 @@ Ui.make("UIListLayout", {
 	FillDirection = Enum.FillDirection.Horizontal,
 	HorizontalAlignment = Enum.HorizontalAlignment.Right,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
-	Padding = UDim.new(0, if touchLayout then 6 else 14),
+	Padding = UDim.new(0, if touchLayout then 6 else 8),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, actions)
 hudButtons = {}
@@ -1894,17 +1915,22 @@ end
 view.menu = menu
 view.badges = {} -- the counts on the menu's entries (MENU shows a dot while any is on)
 
--- A quiet action of the row ("MAP  [M]"; a touch screen drops the key).
+-- A quiet action of the row ("MAP  [M]"; a touch screen drops the key). 6.5: on a small charcoal panel with a fine
+-- outline (a finger tall on touch, 34 px on a computer).
 local function utility(def: ButtonDef?, order: number): any
 	local text = if def then def.text else "MENU"
 	local button = P.action(actions, if def and def.key and not touchLayout then `{text}  [{def.key}]` else text, {
 		Name = if def then `{def.id}Button` else "moreButton",
-		Size = UDim2.fromOffset(0, ROW_H),
+		Size = UDim2.fromOffset(0, if touchLayout then ROW_H else 34),
+		BackgroundColor3 = P.surface,
+		BackgroundTransparency = 0.22,
+		TextColor3 = P.ink,
 		LayoutOrder = order,
 		ZIndex = 3,
 	})
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }, button)
-	Ui.make("UISizeConstraint", { MinSize = Vector2.new(44, 44) }, button)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = P.lineAlpha }, button)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, button)
+	Ui.make("UISizeConstraint", { MinSize = Vector2.new(44, if touchLayout then 44 else 34) }, button)
 	return button
 end
 
@@ -2013,15 +2039,30 @@ local function menuDot()
 	for _, count in view.badges do
 		any += count
 	end
+	-- 6.5: the phone's unread messages on the same button (its own PHONE action is gone on a computer)
+	local unread = view.phoneUnread or 0
 	local badge = more:FindFirstChild("Badge")
 	if badge and badge:IsA("TextLabel") then
-		badge.Visible = any > 0
-		badge.Text = ""
+		badge.Visible = any + unread > 0
+		badge.Text = if unread > 9 then "9+" elseif unread > 0 then tostring(unread) else ""
+		badge.Size = UDim2.fromOffset(if unread > 9 then 20 else 14, 14)
+	end
+end
+
+-- 6.5: the phone's unread count (client/Phone.luau, through Main) on the PHONE button top right.
+function Hud.setPhoneUnread(count: number)
+	if view.phoneUnread ~= count then
+		view.phoneUnread = count
+		menuDot()
 	end
 end
 
 -- A small red dot with a count on an action or a menu entry ("crew": the invitations waiting); 0 hides it.
 function Hud.setBadge(id: string, count: number)
+	local crewHook = Hud.onCrewBadge
+	if id == "crew" and crewHook then
+		pcall(crewHook, count) -- (6.5 review: the phone's MORE tile shows the invitations too)
+	end
 	local button = hudButtons[id]
 	local badge = button and button:FindFirstChild("Badge")
 	if badge and badge:IsA("TextLabel") then
@@ -2076,13 +2117,16 @@ end
 -- name and state, Q) or, while you carry, the cargo in your hands and what carrying stops ("2 × PIZZA BOXES / HANDS
 -- FULL · NO GUN, NO SPRINT"). Hidden pieces take no room. 6.0.1: the consumables left it for the bottom bar
 -- (client/Hotbar.luau, lower centre; their keys 1-5 are below in Hud.start), so the column is 32 px shorter.
-local HOTBAR_H: any, hotbar: any, weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, FIRE_SIZE: any, fire: any
+-- 6.5 (one of everything): on a computer the column keeps only the speed and the fuel while you drive; the weapon line
+-- is a zero-height anchor (WeaponBar: client/Phone.luau puts the PHONE action over it), INVENTORY [I] and the rule went.
+-- A touch screen keeps the weapon line (a tap on it opens the weapon wheel). The column's size keeps the room the
+-- PHONE action takes over it (layout() keeps the bottom bar and the pill clear of it).
+local weaponBar: any, weaponBarKey: any, shownWeaponBar: any, renderWeapons: any, nextWeapon: any, FIRE_SIZE: any, fire: any
 do -- (its own block: the locals below stay out of the 200-register limit)
-local RIGHT_W = 300
-HOTBAR_H = if touchLayout then 44 else 22
+local RIGHT_W = if touchLayout then 300 else 240
 local right = placed(Ui.make("Frame", {
 	Name = "RightStack",
-	Size = UDim2.fromOffset(RIGHT_W, 158),
+	Size = UDim2.fromOffset(RIGHT_W, if touchLayout then 130 else 84),
 	Position = UDim2.new(1, -16, 1, -16),
 	AnchorPoint = Vector2.new(1, 1),
 	BackgroundTransparency = 1,
@@ -2098,11 +2142,10 @@ Ui.make("UIListLayout", {
 view.right = right
 weaponBar = Ui.make("Frame", {
 	Name = "WeaponBar",
-	Size = UDim2.fromOffset(RIGHT_W, 40),
+	Size = UDim2.fromOffset(RIGHT_W, if touchLayout then 40 else 0), -- (6.5: on a computer only the PHONE action's anchor)
 	BackgroundTransparency = 1,
 	LayoutOrder = 1,
 }, right)
-view.rightRule = P.rule(right, UDim2.fromOffset(RIGHT_W - 70, 1), { LayoutOrder = 2 })
 local weaponRow = Ui.make("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
@@ -2168,8 +2211,8 @@ function renderWeapons()
 		touchHands.holster.Visible = not seatedNow and not holding and Holster.armed() -- (6.0: no gun, nothing to draw)
 		touchHands.holster.Text = if away then "DRAW" else "HOLSTER"
 	end
-	if not state then
-		return
+	if not state or not touchLayout then
+		return -- 6.5: a computer shows what you hold in the bottom bar's hand slots only
 	end
 	if holding then
 		-- 3.8: the cargo in your hands and the restriction, never a usable-looking gun.
@@ -2282,23 +2325,7 @@ function nextWeapon()
 	Net.get("Equip"):FireServer("weapon", owned[index % #owned + 1])
 end
 
--- INVENTORY [I] (the backpack). 6.0.1: the consumables' tokens that sat over it are the bottom bar's slots now
--- (client/Hotbar.luau).
-hotbar = Ui.make("Frame", {
-	Name = "Hotbar",
-	Size = UDim2.fromOffset(RIGHT_W, HOTBAR_H),
-	BackgroundTransparency = 1,
-	LayoutOrder = 4,
-}, right)
-P.action(hotbar, if touchLayout then "INVENTORY" else "INVENTORY  [I]", {
-	Name = "Inventory",
-	Size = UDim2.fromOffset(0, if touchLayout then 44 else 22),
-	Position = UDim2.new(1, -2, 0, 0),
-	AnchorPoint = Vector2.new(1, 0),
-	TextSize = 12,
-}, function()
-	toggleBackpack()
-end)
+-- (6.5: INVENTORY [I] went: I opens the backpack, and so does the phone's bag.)
 
 -- FIRE for touch screens (auto-aim): a square with a thin line on a charcoal backing; layout() keeps it above
 -- Roblox's jump button.
@@ -2366,6 +2393,8 @@ end
 -- unit, then "OLD VAN / 72% / CARGO 3 OF 4" (the car's or its stage's name, its condition, occupied / total cargo
 -- slots at its stage). On foot it stays as a quieter line with PARKED; without a car it says how to get one.
 -- RenderStepped fills it (view.vehicle; only what changed).
+-- 6.5: the words went (the car's name, condition and cargo are in the phone's GARAGE, "Q → GARAGE" was a second way
+-- to say it): only the speed with the fuel gauge, while you sit in your own car.
 local carPanel: any, hint: any
 do -- (its own block: the locals below stay out of the 200-register limit)
 carPanel = Ui.make("Frame", {
@@ -2393,52 +2422,16 @@ Ui.make("UIListLayout", {
 v.speed = P.text(v.speedRow, "0", UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 28, LayoutOrder = 1 })
 v.unit = P.caps(v.speedRow, "KM/H", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2 })
 require(script.Parent.FuelGauge).build(v.speedRow) -- 5.4: the fuel gauge, left of the speed (client/FuelGauge.luau)
-v.line = P.caps(carPanel, "", UDim2.fromOffset(view.right.Size.X.Offset, 18), {
-	TextSize = 13,
-	TextColor3 = P.ink,
-	TextXAlignment = Enum.TextXAlignment.Right,
-	RichText = true,
-	LayoutOrder = 2,
-})
-v.shown = "" -- what the line shows (it redraws only when it changes)
 view.vehicle = v
 
--- Every frame (RenderStepped): your car (nil: none out) and the car you sit in. The line redraws only when its
--- words change; the speed only while you are inside.
+-- Every frame (RenderStepped): your car (nil: none out) and the car you sit in. 6.5: the speed (and the fuel gauge
+-- in its row) while you are inside your car, nothing else.
 function view.drawVehicle(car: Model?, seatedIn: Model?)
-	if not car then
-		if v.shown ~= "none" then
-			v.shown = "none"
-			v.speedRow.Visible = false
-			v.line.Text = if touchLayout then "ON FOOT  ·  PHONE → GARAGE" else "ON FOOT  ·  Q → GARAGE" -- 5.7
-			v.line.TextTransparency = 0.2
-		end
-		return
-	end
-	local carId = tostring(car:GetAttribute("CarId"))
-	local stage = tonumber(car:GetAttribute("Stage")) or 0
-	local health = (car:GetAttribute("Health") or 0) :: number
-	local maxHealth = math.max(1, (car:GetAttribute("MaxHealth") or 1) :: number)
-	local share = math.clamp(health / maxHealth, 0, 1)
-	local capacity = Economy.stageCapacity(carId, stage)
-	local loaded = tonumber(car:GetAttribute("CargoCount")) or inVehicle() or 0
-	local inside = seatedIn == car
-	local pct = math.floor(share * 100 + 0.5)
-	local shown = `{carId}|{stage}|{pct}|{capacity}|{loaded}|{inside}`
-	if v.shown ~= shown then
-		v.shown = shown
-		local def = Economy.findCar(carId)
-		local stageDef = Economy.stageDef(carId, stage)
-		local name = string.upper(if stageDef then stageDef.name elseif def then def.name else "Car")
-		-- The condition: white, the warm warn under half, the red with a ⚠ from a quarter down.
-		local tint = if share <= 0.25 then P.danger elseif share <= 0.5 then P.warn else P.ink
-		local condition = `<font color="{P.hex(tint)}">{if share <= 0.25 then "⚠ " else ""}{pct}%</font>`
-		local cargo = if capacity > 0 then `CARGO {math.min(loaded, capacity)} OF {capacity}` else "NO CARGO SLOTS"
-		v.line.Text = `{view.esc(name)}  /  {condition}  /  {cargo}{if inside then "" else "  /  PARKED"}`
-		v.line.TextTransparency = if inside then 0 else 0.2
+	local inside = car ~= nil and seatedIn == car
+	if v.speedRow.Visible ~= inside then
 		v.speedRow.Visible = inside
 	end
-	if inside then
+	if car and inside then
 		local chassis = car.PrimaryPart
 		local velocity = if chassis then chassis.AssemblyLinearVelocity else Vector3.zero
 		local text = (if Drive.boosting() then "⚡" else "") .. tostring(math.floor(Vector3.new(velocity.X, 0, velocity.Z).Magnitude))
@@ -2462,20 +2455,13 @@ hint = placed(Ui.make("Frame", {
 	Visible = false,
 }, gui))
 Ui.make("UISizeConstraint", { Name = "Max", MaxSize = Vector2.new(480, math.huge) }, hint)
--- A soft charcoal backing, strongest in the middle (the action reads over a bright street).
+-- 6.5: a pill (the approved mockup): a charcoal panel with a fine outline, the key box on its left, "E  PICK UP PIZZA".
 -- (it fills the hint exactly; the column's padding makes the room around the words)
-local glow = Ui.make("Frame", { Name = "Scrim", Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.surface, BorderSizePixel = 0, ZIndex = 0 }, hint)
-Ui.make("UIGradient", {
-	Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.22, 0.5),
-		NumberSequenceKeypoint.new(0.78, 0.5),
-		NumberSequenceKeypoint.new(1, 1),
-	}),
-}, glow)
+local glow = Ui.make("Frame", { Name = "Scrim", Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.surface, BackgroundTransparency = 0.22, BorderSizePixel = 0, ZIndex = 0 }, hint)
+Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.line, Thickness = 1, Transparency = P.lineAlpha }, glow)
 local column = Ui.make("Frame", { Name = "Column", Size = UDim2.fromOffset(0, 0), AutomaticSize = Enum.AutomaticSize.XY, BackgroundTransparency = 1 }, hint)
 Ui.list(column, true, 6)
-Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 34), PaddingRight = UDim.new(0, 34), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, column)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 16), PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7) }, column)
 local row = Ui.make("Frame", { Name = "Row", Size = UDim2.fromOffset(0, 0), AutomaticSize = Enum.AutomaticSize.XY, BackgroundTransparency = 1, LayoutOrder = 1 }, column)
 Ui.make("UIListLayout", {
 	FillDirection = Enum.FillDirection.Horizontal,
@@ -2490,7 +2476,7 @@ Ui.list(words, true, 2)
 a.main = P.text(words, "", UDim2.fromOffset(0, 0), {
 	AutomaticSize = Enum.AutomaticSize.XY,
 	Font = Theme.HeadingFont,
-	TextSize = 15,
+	TextSize = 17, -- (6.5: the pill, 15 before)
 	TextWrapped = true,
 	LayoutOrder = 1,
 })
@@ -2518,7 +2504,8 @@ end
 --   ─────
 --   04:36 REMAINING / EST. $640 / 420 M                  (the time red when it runs short; night pay, a wave)
 -- What to do right now (the job's step: "Get out and open the back (E)") is the contextual action, lower centre.
--- With no job and nothing else in the column: a small OFF DUTY line that opens the Dispatch board.
+-- 6.5: the group is the NEXT card's details (client/Objective.luau over it: ▼ DETAILS unfolds it); the card took the
+-- OFF DUTY line's place.
 
 local LOAD_H: any, loadFill: any, loadBack: any, loadText: any
 do -- (its own block: the locals below stay out of the 200-register limit)
@@ -2672,15 +2659,9 @@ function view.tickTicket(distance: number?)
 	local done = tonumber(job.delivered) or 0
 	local lost = tonumber(job.lost) or 0
 	local condition = tonumber(job.condition) or 1
-	-- 5.0, on foot: the backpack ("Backpack 1/2"; the PackCount / PackRoom attributes are live, the payload's pack
-	-- and packRoom the fallback).
-	local packRoom = if job.mode == "foot" or job.mode == "bike" then tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0 else 0
-	local packed = tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0
-	-- 5.3: the bag's chip ("🎒 2 newspapers · 1 pizza stack · I"), made once per job update (client/BagUi.luau).
-	if job.bagLine == nil then
-		job.bagLine = require(script.Parent.BagUi).line(job) or false
-	end
-	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{packed}/{packRoom}|{job.ordersLine}|{job.bagLine}`
+	-- (6.5: the bag's chip "🎒 2 newspapers · 1 pizza stack · I" and the backpack's "1/2" went: the bottom bar's bag
+	-- slot shows them.)
+	local signature = `{t.action}|{needed}|{done}|{lost}|{math.floor(condition * 100 + 0.5)}|{job.modifier and job.modifier.name}|{job.stage}|{job.ruleLine}|{job.eventLine}|{job.ordersLine}`
 	if signature == t.meta0 then
 		return
 	end
@@ -2700,11 +2681,6 @@ function view.tickTicket(distance: number?)
 	-- 5.2: the other orders of the run ("+2 ORDERS · …"; every one on the phone's ORDERS app).
 	if type(job.ordersLine) == "string" then
 		add("quiet", job.ordersLine)
-	end
-	if type(job.bagLine) == "string" then
-		add(if packRoom > 0 and packed >= packRoom then "warn" else "quiet", `{job.bagLine}{if packRoom > 0 and packed >= packRoom then " · full" else ""}{if touchLayout then "" else "  [I]"}`)
-	elseif packRoom > 0 then
-		add("quiet", `{if job.mode == "bike" then "🚲 On the bike" else "🎒 Backpack"} {packed}/{packRoom}`)
 	end
 	local modifier = job.modifier
 	if type(modifier) == "table" and modifier.name then
@@ -2730,29 +2706,22 @@ function view.tickTicket(distance: number?)
 	end
 end
 
--- The OFF DUTY line: no job, nothing else in the column. A click (a tap) opens the Dispatch board.
-local idle = Ui.make("Frame", { Name = "OffDuty", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, Visible = false, LayoutOrder = 2 }, slot)
-local idleRow = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, idle)
-Ui.make("UIListLayout", {
-	FillDirection = Enum.FillDirection.Horizontal,
-	VerticalAlignment = Enum.VerticalAlignment.Center,
-	Padding = UDim.new(0, 10),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, idleRow)
-P.marker(idleRow, 8, { BackgroundColor3 = P.ink2, LayoutOrder = 1 })
-P.caps(idleRow, "Off duty", UDim2.fromOffset(0, 44), { AutomaticSize = Enum.AutomaticSize.X, TextColor3 = P.ink, LayoutOrder = 2 })
-P.action(idleRow, if touchLayout then "DISPATCH BOARD" else "PICK A RUN  [J]", { LayoutOrder = 3, TextSize = 12 }, openDispatch)
-t.idle = idle
+-- 6.5: the NEXT card over the contract group (client/Objective.luau); it replaced the OFF DUTY line (a click on the
+-- card opens the Dispatch board when there is no job). The contract group folds under it.
+view.goal = require(script.Parent.Objective)
+view.goal.build(slot, t.wrap, openDispatch)
 t.idleAt = 0
+t.busy = false
 
--- Shows the OFF DUTY line when the column has nothing on it (no job; no crew strip, invitation or mission banner).
+-- Is somebody else's job on the column (a crew strip, an invitation, a mission banner) while you have none? Then the
+-- card steps aside (the strip says what to do). Looked at 3 times a second.
 function view.checkIdle(now: number)
 	if now < t.idleAt then
 		return
 	end
 	t.idleAt = now + 0.3
-	local busy = job ~= nil
-	if not busy then
+	local busy = false
+	if job == nil then
 		for _, name in { "crew", "mission" } do
 			for _, child in Hud.topSlot(name):GetChildren() do
 				if child:IsA("GuiObject") and child.Visible then
@@ -2761,9 +2730,7 @@ function view.checkIdle(now: number)
 			end
 		end
 	end
-	if idle.Visible == busy then
-		idle.Visible = not busy
-	end
+	t.busy = busy
 end
 
 -- The hold progress (loading / unloading / boarding / serving, from the server's Job payload): a fine line under the
@@ -2788,6 +2755,9 @@ end
 -- fine line down to the spot.
 -- 4.4.1 (minimal): the circles are thin outlines on the ground (a SurfaceGui on a flat invisible part), not filled
 -- neon discs; the light is a thin beam that fades out upwards.
+-- 6.5 (the owner: "I can't find my way"): the beam taller and brighter (Config.Goal), the waypoint one clear pin on a
+-- charcoal panel outlined in the guide's colour: "TONY'S PIZZA · 120 m", bigger, always on top. With no job (and no
+-- GPS point) it stands on the depot's job board, "JOB BOARD · 25 m" (view.boardMark), until you take a job.
 
 local beacon: any, ring: any, pileRing: any, label: any, labelText: any, HIDDEN: any, PICKUP_COLOR: any, PILE_COLOR: any, UPRIGHT: any, hideGuide: any, placeGuide: any, GPS_COLOR: any, gps: any, myPosition: any, footTarget: any
 do -- (its own block: the locals below stay out of the 200-register limit)
@@ -2843,26 +2813,27 @@ local function outlinePart(name: string, diameter: number, stroke: number, fill:
 	return p
 end
 
--- The light over the spot: an invisible carrier part (stood up, 240 long) with a thin Beam along it, faint at the
--- bottom and gone at the top. Narrow over the circle, narrower still over the pile / the person.
-local BEACON_WIDE = 1.2
-local BEACON_THIN = 0.5
-beacon = guidePart("Beacon", Vector3.new(240, 0.2, 0.2), 1)
-local beamBottom = Ui.make("Attachment", { Position = Vector3.new(-120, 0, 0) }, beacon)
-local beamTop = Ui.make("Attachment", { Position = Vector3.new(120, 0, 0) }, beacon)
+-- The light over the spot: an invisible carrier part (stood up, Config.Goal.BeamHeight long) with a thin Beam along
+-- it, strongest at the bottom and gone at the top. Narrow over the circle, narrower over the pile / the person.
+local BEACON_WIDE = Config.Goal.BeamWide
+local BEACON_THIN = Config.Goal.BeamThin
+local BEAM_HALF = Config.Goal.BeamHeight / 2
+beacon = guidePart("Beacon", Vector3.new(BEAM_HALF * 2, 0.2, 0.2), 1)
+local beamBottom = Ui.make("Attachment", { Position = Vector3.new(-BEAM_HALF, 0, 0) }, beacon)
+local beamTop = Ui.make("Attachment", { Position = Vector3.new(BEAM_HALF, 0, 0) }, beacon)
 local light = Ui.make("Beam", {
 	Attachment0 = beamBottom,
 	Attachment1 = beamTop,
 	FaceCamera = true,
-	LightEmission = 0,
+	LightEmission = 0.3, -- (6.5: brighter; 0 before)
 	LightInfluence = 0,
 	Segments = 1,
 	Width0 = BEACON_WIDE,
 	Width1 = BEACON_WIDE,
 	Color = ColorSequence.new(view.guideColor),
 	Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.6),
-		NumberSequenceKeypoint.new(0.45, 0.8),
+		NumberSequenceKeypoint.new(0, Config.Goal.BeamAlpha),
+		NumberSequenceKeypoint.new(0.45, Config.Goal.BeamAlpha + (1 - Config.Goal.BeamAlpha) * 0.45),
 		NumberSequenceKeypoint.new(1, 1),
 	}),
 }, beacon)
@@ -2870,35 +2841,28 @@ ring = outlinePart("Ring", Config.Jobs.DeliverRadius * 2, 0.35, 0.93)
 pileRing = outlinePart("PileRing", 5, 0.22, 1)
 label = guidePart("Label", Vector3.new(0.2, 0.2, 0.2), 1)
 -- 3.8: the waypoint over the spot. Its bottom (a small dot at the end of a fine line) sits on the label point; over it
--- the square in the guide's colour, the name in white caps and the distance (view.mark writes both). White on a faint
--- charcoal stroke: it reads over a night street and a sunny one alike.
-local labelGui = Ui.make("BillboardGui", { Size = UDim2.fromOffset(240, 78), SizeOffset = Vector2.new(0, 0.5), AlwaysOnTop = true, LightInfluence = 0, MaxDistance = 100000 }, label)
-local words = Ui.make("Frame", { Size = UDim2.fromOffset(0, 40), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.fromScale(0.5, 0), AnchorPoint = Vector2.new(0.5, 0), BackgroundTransparency = 1 }, labelGui)
-Ui.make("UIListLayout", {
-	FillDirection = Enum.FillDirection.Horizontal,
-	VerticalAlignment = Enum.VerticalAlignment.Top,
-	Padding = UDim.new(0, 7),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, words)
-view.markSquare = P.marker(words, 8, { LayoutOrder = 1 })
-Ui.make("UIPadding", { PaddingTop = UDim.new(0, 4) }, words)
-labelText = P.text(words, "", UDim2.fromOffset(0, 36), {
+-- (6.5) one pin: a charcoal panel outlined in the guide's colour (view.markSquare, the outline), the name in white
+-- caps and the distance in the contract red on one line (view.mark writes both). It reads over a night street and a
+-- sunny one alike, and over everything (AlwaysOnTop).
+local PIN_H = Config.Goal.PinTextSize + 16
+local labelGui = Ui.make("BillboardGui", { Size = UDim2.fromOffset(420, PIN_H + 38), SizeOffset = Vector2.new(0, 0.5), AlwaysOnTop = true, LightInfluence = 0, MaxDistance = 100000 }, label)
+local words = Ui.make("Frame", { Size = UDim2.fromOffset(0, PIN_H), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.fromScale(0.5, 0), AnchorPoint = Vector2.new(0.5, 0), BackgroundColor3 = P.surface, BackgroundTransparency = 0.22, BorderSizePixel = 0 }, labelGui)
+view.markSquare = Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = P.red, Thickness = 1.5 }, words)
+Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, words)
+labelText = P.text(words, "", UDim2.fromOffset(0, PIN_H), {
 	AutomaticSize = Enum.AutomaticSize.X,
 	Font = Theme.HeadingFont,
-	TextSize = 14,
-	TextYAlignment = Enum.TextYAlignment.Top,
-	TextStrokeTransparency = 0.45,
+	TextSize = Config.Goal.PinTextSize,
+	TextStrokeTransparency = 1,
 	RichText = true,
-	LineHeight = 1.1,
-	LayoutOrder = 2,
 })
 -- The fine line down to the spot and the dot at its end.
 Ui.make("Frame", { Name = "Stem", Size = UDim2.fromOffset(1, 30), Position = UDim2.new(0.5, 0, 1, -4), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = P.ink, BackgroundTransparency = 0.2, BorderSizePixel = 0 }, labelGui)
 Ui.make("Frame", { Name = "Dot", Size = UDim2.fromOffset(4, 4), Position = UDim2.new(0.5, 0, 1, 0), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = P.ink, BorderSizePixel = 0 }, labelGui)
 
--- The waypoint's words: the name in caps over the distance.
+-- The waypoint's words: the name in caps and the distance, one line ("TONY'S PIZZA · 120 m").
 function view.mark(name: string, distance: number): string
-	return `{view.esc(require(Shared.Residents).caps(name))}\n<font size="12" color="{P.hex(P.ink2)}">{distance} m</font>`
+	return `{view.esc(require(Shared.Residents).caps(name))} · <font color="{P.hex(P.red)}">{distance} m</font>`
 end
 HIDDEN = CFrame.new(0, -1000, 0)
 PICKUP_COLOR = P.red -- (a pick-up is the job's stop too; the waypoint says PICK UP)
@@ -2912,6 +2876,7 @@ function hideGuide()
 	label.CFrame = HIDDEN
 	-- 4.4.1: the waypoint is drawn on top of everything, so parked under the map it still showed: switch it off.
 	labelGui.Enabled = false
+	view.boardShown = false
 end
 hideGuide()
 
@@ -2923,7 +2888,7 @@ local function paintGuide(color: Color3)
 		part.Color = color
 	end
 	light.Color = ColorSequence.new(color)
-	view.markSquare.BackgroundColor3 = color
+	view.markSquare.Color = color
 end
 
 -- 4.3: a spot on the real surface. A spot below it (a raised lot, a ramp, a yard over the road level) comes up onto it,
@@ -2972,6 +2937,7 @@ end
 -- The park circle at p with the beam over it (or a thin beam over the pile / the person at `beamAt`), the label
 -- over `labelAt` (default p).
 function placeGuide(spot: Vector3, color: Color3, beamSpot: Vector3?, labelSpot: Vector3?)
+	view.boardShown = false -- (the guide shows something else now; view.boardMark sets it again)
 	local p = onSurface(spot)
 	local beamAt = if beamSpot then onSurface(beamSpot) else nil
 	-- (a label without a beam is over your vehicle's back: it moves with the car and needs no ground)
@@ -2982,14 +2948,40 @@ function placeGuide(spot: Vector3, color: Color3, beamSpot: Vector3?, labelSpot:
 		light.Width0 = BEACON_THIN
 		light.Width1 = BEACON_THIN
 		-- Starts over the person's head, so it never hides them.
-		beacon.CFrame = CFrame.new(beamAt + Vector3.new(0, 127, 0)) * UPRIGHT
+		beacon.CFrame = CFrame.new(beamAt + Vector3.new(0, BEAM_HALF + 7, 0)) * UPRIGHT
 	else
 		light.Width0 = BEACON_WIDE
 		light.Width1 = BEACON_WIDE
-		beacon.CFrame = CFrame.new(p + Vector3.new(0, 120, 0)) * UPRIGHT
+		beacon.CFrame = CFrame.new(p + Vector3.new(0, BEAM_HALF, 0)) * UPRIGHT
 	end
 	label.CFrame = CFrame.new((labelAt or p) + Vector3.new(0, 10, 0))
 	labelGui.Enabled = true
+end
+
+-- 6.5: with no job (and no GPS point: `hidden`, or a crew member following somebody's job) the job board's marker:
+-- a thin beam over the depot's board and "JOB BOARD · 25 m", until you take a job. Not while Marge's own marker shows
+-- (her first day: client/TutorialUi.luau), nor when you stand at the board. Returns how far the board is (the NEXT
+-- card's distance with no job).
+function view.boardMark(position: Vector3?, hidden: boolean): number?
+	local spot = view.goal.boardSpot()
+	local distance = if position then math.floor(Vector3.new(spot.X - position.X, 0, spot.Z - position.Z).Magnitude) else nil
+	local show = distance ~= nil and not hidden and distance >= Config.Goal.BoardNear and not view.goal.margeShown()
+	if show and distance then
+		if not view.boardShown then
+			placeGuide(spot, P.red, spot, spot)
+			ring.CFrame = HIDDEN -- (a beam and the pin: no park circle at a board)
+			view.boardShown = true
+		end
+		labelText.Text = view.mark("Job board", distance)
+	elseif view.boardShown and not hidden then
+		hideGuide()
+	elseif view.boardShown then
+		view.boardShown = false
+		if not gps then
+			hideGuide()
+		end
+	end
+	return distance
 end
 
 -- The GPS: a place picked on the big map (the job's target goes first).
@@ -3392,16 +3384,18 @@ end
 --
 --   COMPUTER (keyboard and mouse)                       TOUCH, held sideways (phone or tablet, no keyboard)
 --   ┌──────────────────────────────────────────────┐    ┌──────────────────────────────────────────────┐
---   │ (chat)                MAP CREW MENU (players)│    │ cash    ■ CONTRACT          MAP CREW MENU    │
---   │ ■ CONTRACT                                   │    │ minimap DESTINATION                          │
---   │ DESTINATION                                  │    │ health  □ objectives                         │
---   │ □ objectives                                 │    │         04:36 / EST.  (column)               │
---   │ 04:36 REMAINING / EST.                       │    │                                  ┌weapon─┐  │
---   │ (column: tutorial, crew, ...)       ┌weapon─┐│    │ (thumb-     [E] ACTION           │vehicle│(FIRE)
---   │ cash / rank     [E] ACTION          │vehicle││    │  stick)     ▫▫▫▫▫▫ carried       │INVENT.│(jump)
---   │ minimap         ─────               │INVENT.││    │             ▢▢▢▢▢ items 1-5      └───────┘  │
---   │ + health  ▢▢▢▢▢ items 1-5 │ ▫▫▫ carried └───┘│    └──────────────────────────────────────────────┘
+--   │ (chat)                 MAP  PHONE   (players)│    │ cash    ▶ NEXT                MAP  PHONE     │
+--   │ ▶ NEXT                          ? KEYS [F1]  │    │ minimap Pick up 2 pizzas                     │
+--   │ Pick up 2 pizzas                             │    │ health  Tony's Pizza  120 m                  │
+--   │ Tony's Pizza  120 m                          │    │         ▼ DETAILS  (column)                  │
+--   │ ▼ DETAILS (the contract group under it)      │    │                                  ┌weapon─┐  │
+--   │ (column: tutorial, crew, ...)                │    │ (thumb-     [E] ACTION           │ speed │(FIRE)
+--   │ cash / rank     [E] ACTION          ┌PHONE─┐│    │  stick)     ▫▫▫▫▫▫ carried       │ PHONE │(jump)
+--   │ minimap                             │speed ││    │             ▢▢▢▢▢ items 1-5      └───────┘  │
+--   │ + health  ▢▢▢▢▢ items 1-5 │ ▫▫▫ carried └────┘│    └──────────────────────────────────────────────┘
 --   └──────────────────────────────────────────────┘
+--   (6.5: the lower right column holds the speed while you drive and the PHONE action over it; on touch the weapon
+--   line too. The action pill shows only while you can press something.)
 --
 --   * Margins 16 px, gaps 8 px. The ADMIN button (client/AdminPanel.luau, 90 × 32 at 16 px from the right, 56 from
 --     the top, unscaled) keeps the top right corner (down to ADMIN_BOTTOM) while it shows (admins, Studio).
@@ -3412,10 +3406,10 @@ end
 --     of it, and a closed chat takes no room), right of the minimap
 --     column on touch (under it when a screen held upright has no room beside it). TOP_W × S wide (narrower down to
 --     TOP_MIN_W before it gets smaller) and as tall as the room over the lower panels allows (TOP_EST_H).
---   * Upper right: MAP CREW MENU. A computer has Roblox's player list (leaderstats) top right: the row sits left of
+--   * Upper right: MAP PHONE (6.5; MENU before the phone). A computer has Roblox's player list (leaderstats) top right: the row sits left of
 --     it (PLAYER_LIST_W), or under it when the screen is too narrow. On touch top right, under ADMIN. MENU's list opens
 --     downward (upward when it would leave the screen).
---   * Lower right: the weapon / cargo line, the vehicle line and the inventory, right-aligned in one column. Touch:
+--   * Lower right: the speed (6.5: and on touch the weapon line), right-aligned in one column, the PHONE action over it. Touch:
 --     the FIRE button just over Roblox's jump button (70 px at 95 / 90 px from the corner on a small screen, 120 px at
 --     170 / 210 px on a big one), the column left of them. A touch screen with a keyboard: FIRE left of the column.
 --   * Lower centre: the contextual action (key box, words, the fine hold progress line), its bottom HINT_BOTTOM × S over
@@ -3639,7 +3633,7 @@ layout = function()
 	hint.Position = UDim2.fromOffset(hintX, hintBottom)
 	table.insert(below, box(hintX - hintW / 2, hintBottom - 96 * S, hintX + hintW / 2, hintBottom))
 
-	-- Upper right: MAP CREW MENU (its Size is the unscaled row).
+	-- Upper right: MAP PHONE (its Size is the unscaled row).
 	local base = if touchLayout then math.max(S, TOUCH_BUTTON_MIN) else S
 	local gw, gh = buttonGrid.Size.X.Offset, buttonGrid.Size.Y.Offset
 	local buttonScale = math.clamp(base, 0.45, base)
@@ -3746,9 +3740,9 @@ end
 function Hud.setState(newState: any)
 	state = newState
 	require(script.Parent.Juice).countMoney(moneyLabel, state.money) -- 5.7: runs up to a higher amount
-	-- 5.7: once Marge gave you the phone, MENU opens it (Hud.onMenu): the button says so.
+	-- 5.7: once Marge gave you the phone, MENU opens it (Hud.onMenu): the button says so (6.5: with its key, Q).
 	if hudButtons and hudButtons.more then
-		hudButtons.more.Text = if state.phone == true then "PHONE" else "MENU"
+		hudButtons.more.Text = if state.phone ~= true then "MENU" elseif touchLayout then "PHONE" else "PHONE  [Q]"
 	end
 	refreshLevel()
 	require(script.Parent.Hotbar).setState(state) -- 6.0.1: the bottom bar's item slots and your room
@@ -3772,7 +3766,7 @@ end
 function Hud.setJob(newJob: any)
 	job = newJob
 	require(script.Parent.Hotbar).setJob(job) -- 6.0.1: the bottom bar's carried strip
-	view.ticket.wrap.Visible = job ~= nil
+	-- (6.5: the contract group's visibility is the NEXT card's: folded until ▼ DETAILS, client/Objective.luau)
 	view.ticket.meta0 = ""
 	view.ticket.idleAt = 0
 	local giveUp = hudButtons.giveup
@@ -3820,7 +3814,9 @@ local lastHolding: string? = nil
 
 -- 3.8, the contextual action (lower centre): what to do right now in white caps, a short instruction under it and
 -- its key in the key box (`key`, or a "(E)" at the end of the words; none on a touch screen). Shown while it has
--- something to say or a hold runs.
+-- something to say or a hold runs. 6.5: only an action you can take right now (the NEXT card's `action`: "E  Pick up
+-- pizza", "E  Hand it over · or hold X to throw", "G  Put it down"); the step, the place's name, "J for the board",
+-- "Q → GARAGE" and the riding tips went (the card, the phone and the key hints say them).
 local function setHint(main: string, sub: string?, key: string?)
 	local a = view.action
 	local words, found = string.match(main, "^(.-)%s*%(([%w%s]+)%)%s*$")
@@ -3855,9 +3851,9 @@ RunService.RenderStepped:Connect(function()
 	end
 	local now = os.clock()
 	view.checkIdle(now)
-	-- The car: the vehicle line.
+	-- The car: the speed and the fuel while you drive.
 	local car = Drive.myCar()
-	local seatedIn, driving = Drive.seatedCar()
+	local seatedIn = Drive.seatedCar()
 	view.drawVehicle(car, seatedIn)
 
 	-- Your health (the Humanoid's).
@@ -3892,54 +3888,19 @@ RunService.RenderStepped:Connect(function()
 				inShop = id
 			end
 		end
-		local root = myRoot()
-		local safe = root ~= nil and Map.isSafe(root.Position.X, root.Position.Z)
 		local holding = myCarrying()
 		if holding ~= lastHolding then
-			-- Picked up / put down: the backpack shows it, the consumables hide while you carry.
+			-- Picked up / put down: the backpack shows it.
 			lastHolding = holding
-			hotbar.Visible = holding == nil
 			if backpack.frame.Visible then
 				renderBackpack()
 			end
 		end
-		-- The hint: during a job its step (and how far this stop is), else what this place is about.
-		local step = if job and type(job.step) == "string" then job.step else ""
-		if job and step ~= "" then
-			local needed = tonumber(job.needed) or 0
-			local done = tonumber(job.delivered) or 0
-			local progress = if needed > 0 and job.handling ~= "drive" then `{math.min(done, needed)} of {needed} {if job.stage == "pickup" then "loaded" else "delivered"}` else ""
-			local hands = if holding == "horse" then "leading a horse: no gun, no sprint" elseif holding then "hands full: no gun, no sprint" else ""
-			setHint(step, if progress ~= "" and hands ~= "" then `{progress} · {hands}` else progress .. hands)
-		elseif holding then
-			-- G is the server's "Put down" / "Let go" prompt key (server/Cargo.luau); touch screens tap the prompt.
-			if holding == "horse" then
-				setHint("Leading a horse", `no gun, no sprint · {if touch then "tap LET GO" else "G lets go"}`)
-			else
-				setHint("Load it or hand it over", `no gun, no sprint · {if touch then "tap PUT DOWN" else "G puts it down"} to shoot`, "E")
-			end
-		elseif inShop then
-			setHint(Map.Shops[inShop].name, "walk to the counter", "E")
-		elseif seatedIn and not driving then
-			local gun = if state then Economy.findWeapon(state.weapon) else nil
-			if not gun then
-				setHint("Riding along", if touchLayout then "no gun yet · EXIT gets out" else "no gun yet · E gets out") -- 6.0
-			elseif touchLayout then
-				setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · tap the gun line for a pistol, revolver or SMG` else "FIRE shoots out of the window · EXIT gets out")
-			else
-				setHint("Riding along", if gun and not gun.oneHanded then `the {gun.name} is too big for the window · T to a pistol, revolver or SMG` else "right mouse aims, left mouse shoots out of the window · E gets out")
-			end
-		elseif safe and not job then
-			setHint("Dispatch board", if touch then "safe zone · OFF DUTY → DISPATCH BOARD for a run" else "safe zone · shops around the depot", "J")
-		elseif not car and state and type(state.car) ~= "string" then
-			-- 5.0: no vehicle yet (the career starts on foot): the board, the backpack at Last Stop Supplies.
-			-- (with a backpack already: the phone says what to save up for next)
-			setHint("On foot", (if touchLayout then "the board on your phone" else "J for the board")
-				.. (if require(Shared.Transport).handsRoom(if type(state.kit) == "table" then state.kit else {}) > Config.Cargo.HandsMax then " · your phone says what's next" else " · Supplies for a backpack"), if touchLayout then nil else "J")
-		elseif not car then
-			setHint("No car out", if touchLayout then "PHONE → GARAGE calls it" else "Q → GARAGE calls it") -- 5.7
-		elseif not seatedIn and not job then
-			setHint("On foot", if touchLayout then "FIRE shoots · SPRINT runs · tap the prompt at your car's door" elseif touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
+		-- 6.5: the NEXT card (client/Objective.luau) and its action, the only words of the pill.
+		local goal = view.goal.update(job, state, view.goalDistance, view.ticket.busy)
+		local action = goal and goal.action
+		if action then
+			setHint(action.text, action.sub, action.key)
 		else
 			setHint("")
 		end
@@ -3951,7 +3912,8 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- The job.
+	-- The job (6.5: and with none, the job board).
+	local here = myPosition()
 	if job then
 		local circle: Vector3 = job.position
 		local pickup = job.stage == "pickup"
@@ -3974,16 +3936,19 @@ RunService.RenderStepped:Connect(function()
 			placeGuide(circle, if pickup then PICKUP_COLOR else view.guideColor)
 		end
 		local person = if type(job.person) == "string" and job.person ~= "" then job.person else nil
-		local position = myPosition()
 		local distance: number? = nil
-		if position then
-			local flat = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
+		if here then
+			local flat = Vector3.new(target.X - here.X, 0, target.Z - here.Z)
 			distance = math.floor(flat.Magnitude)
 			labelText.Text = view.mark(footText or (if pickup then "PICK UP" else (person or tostring(job.customer))), distance)
 		end
 		view.tickTicket(distance)
-	elseif gps then
-		local position = myPosition()
+		view.goalDistance = distance -- (the NEXT card's distance: the target the marker shows)
+	else
+		view.goalDistance = view.boardMark(here, gps ~= nil or view.ticket.busy)
+	end
+	if not job and gps then
+		local position = here
 		if position then
 			local flat = Vector3.new(gps.position.X - position.X, 0, gps.position.Z - position.Z)
 			local distance = math.floor(flat.Magnitude)
@@ -4000,6 +3965,7 @@ end)
 
 function Hud.start()
 	require(script.Parent.Hotbar).start(gui) -- 6.0.1: the bottom bar, placed by layout()
+	view.goal.start() -- 6.5: the NEXT card follows Marge's first day (the Tutorial remote)
 	layout()
 	refreshLevel()
 	player:GetAttributeChangedSignal("Xp"):Connect(refreshLevel)

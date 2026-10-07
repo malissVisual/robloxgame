@@ -149,6 +149,8 @@ Hud.onMenu = function(): boolean
 end
 Phone.boardOpen = DispatchUi.isOpen
 Phone.notify = Hud.toast
+Hud.onCrewBadge = Phone.setCrewInvites -- 6.5 review: crew invitations on the phone's MORE tile
+Phone.onUnread = Hud.setPhoneUnread -- 6.5: the unread dot on PHONE [Q] top right (the phone's own action: touch only)
 Phone.blocked = function(): boolean -- (the NEW PHONE pop-up waits for Marge's dialog and a result or card)
 	return TutorialUi.isOpen() or Hud.resultOpen() or MissionsUi.isOpen() or CareerUi.cardOpen()
 end

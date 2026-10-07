@@ -25,8 +25,25 @@ Phone.start()
 Phone.setState({phone=true,money=1240,kit={backpack=true},cars={}})
 Phone.open()
 check("phone opens without warning",Phone.isOpen() and #M.warnings==0)
--- 5.5: the eight approved apps and the HUD MENU's six (missions, bag, garage, crew, top, estate)
+-- 6.5: home is six big tiles in this order; MORE's sub-screen holds the other eight apps (5.5's MENU among them).
+local function appIds(frame)
+	local buttons={}
+	for _,child in frame:GetChildren() do if child.ClassName=="TextButton" and string.match(child.Name,"App$") then table.insert(buttons,child) end end
+	table.sort(buttons,function(a,b) return a.LayoutOrder<b.LayoutOrder end)
+	local ids={}
+	for _,button in buttons do table.insert(ids,(string.gsub(button.Name,"App$",""))) end
+	return table.concat(ids,",")
+end
+check("home: the six tiles JOBS, MAP, SHOP, BAG & ITEMS, GARAGE, MORE in order",appIds(named("Tiles"))=="jobs,map,shop,bag,garage,more")
+for _,name in {"JOBS","MAP","SHOP","BAG & ITEMS","GARAGE","MORE"} do
+	local label=text(name)
+	check(`the {name} tile has its name and a one-line subtitle`,label~=nil and label.Parent.Parent==named("Tiles") and label.Parent:FindFirstChild("Sub")~=nil and label.Parent:FindFirstChild("Sub").Text~="")
+end
+check("JOBS carries the red edge",named("jobsApp"):FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red)
+check("MORE: career, missions, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,missions,crew,top,estate,bank,messages,settings")
+check("MORE waits behind the tiles",named("Home").Visible and not named("More").Visible)
 check("all fourteen apps constructed",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==14)
+check("the messages row is always on home",named("MessagesRow")~=nil and named("MessagesRow").Visible and text("No new messages")~=nil)
 check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==14)
 do
 	local icons=require("./Icons")
@@ -49,6 +66,12 @@ check("home stands upright, no popup",upright() and popup()==nil and not Phone.a
 local payload={stopLabel="Harbor warehouse",customer="Earl",cargo="Parcels",total=2,pay=180,endsAt=376,timeLimit=400,position=M.Vector3.new(150,0,100),mode="foot",stopCount=2,stopIndex=2,orders={{id=1,state="open",focused=true,pay=180,endsAt=376,stops={{label="ZDC DEPOT",kind="pickup",done=true},{label="HARBOR WAREHOUSE",kind="drop",current=true}}},{id=2,state="open",title="Medicine",pay=80,stops={{label="Clinic",current=true}}}}}
 M.remotes.Job.OnClientEvent:Fire(payload)
 check("home reflects incoming order",text("HARBOR WAREHOUSE")~=nil and text("$180")~=nil)
+-- 6.5: during a run JOBS counts the open orders and opens ORDERS.
+local jobsBadge=named("jobsApp"):FindFirstChild("Badge")
+check("JOBS' badge counts the open orders",jobsBadge.Visible and jobsBadge.Text=="2" and named("jobsApp"):FindFirstChild("Sub").Text=="Your run · 2 orders")
+named("jobsApp").Activated:Fire()
+check("JOBS opens ORDERS during a run",showing("orders") and text("ORDERS")~=nil)
+named("Close").Activated:Fire()
 named("HomeContract").Activated:Fire()
 M.flush()
 check("orders chart builds actual route",named("RoutePreview")~=nil and named("Destination")~=nil)
@@ -91,9 +114,22 @@ check("settings uses existing sound cycle",M.soundCycles==1)
 check("gamepad focus moves into the popup",M.focus==text("CYCLE SOUND MODE"))
 named("Backdrop").Activated:Fire()
 check("a tap on the backdrop returns home",popup()==nil and Phone.isOpen() and named("Home").Visible)
+-- 6.5: MORE is a sub-screen in the phone; its apps close back to it, ESC goes back to the tiles, then puts it away.
+named("moreApp").Activated:Fire()
+check("MORE turns home to its sub-screen",named("More").Visible and not named("Home").Visible and popup()==nil and M.focus==named("careerApp"))
 named("settingsApp").Activated:Fire()
+check("a MORE app opens in the popup",showing("settings") and Phone.appOpen())
 named("Close").Activated:Fire()
-check("home returns gamepad focus to the tapped tile",M.focus==named("settingsApp"))
+check("its ✕ returns to MORE with the focus on the tapped row",named("More").Visible and Phone.isOpen() and M.focus==named("settingsApp"))
+key(M.Enum.KeyCode.Escape)
+check("ESC in MORE goes back to the tiles",named("Home").Visible and not named("More").Visible and Phone.isOpen() and M.focus==named("jobsApp"))
+named("moreApp").Activated:Fire();named("MoreBack").Activated:Fire()
+check("‹ BACK goes back to the tiles",named("Home").Visible and not named("More").Visible)
+named("moreApp").Activated:Fire()
+key(M.Enum.KeyCode.Escape);key(M.Enum.KeyCode.Escape)
+check("ESC again puts the phone away; it opens on its tiles",not Phone.isOpen())
+Phone.open()
+check("the phone opens on its tiles",named("Home").Visible and not named("More").Visible)
 Phone.open("orders");M.flush()
 M.remotes.Job.OnClientEvent:Fire(nil)
 check("nil job switches to empty state",text("No active orders")~=nil)
@@ -111,9 +147,13 @@ Phone.onCrew=function() windows.crew=true end
 Phone.onTop=function() windows.top=true end
 Phone.onEstate=function() windows.estate=true end
 for _,id in {"missions","crew","top","estate"} do
-	Phone.open();named(`{id}App`).Activated:Fire()
+	Phone.open();named("moreApp").Activated:Fire();named(`{id}App`).Activated:Fire()
 	check(`{id} app opens its window and puts the phone away`,windows[id]==true and not Phone.isOpen())
 end
+M.mapOpen=false
+Phone.open();named("mapApp").Activated:Fire()
+check("MAP opens the big map and puts the phone away",M.mapOpen and not Phone.isOpen())
+M.mapOpen=false
 check("Phone.has follows the state",Phone.has())
 -- The board: sections, two columns, locks, ACCEPT, a banner for a new board.
 Phone.open()
@@ -207,18 +247,61 @@ M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Earl has a v
 check("a new message drops a banner in the open popup",named("Banner")~=nil and named("Banner").Parent==popup())
 named("Banner").Activated:Fire()
 check("the message banner opens MESSAGES",showing("messages") and text("MESSAGES")~=nil)
+-- 6.5: the home's messages row shows the unread count and the newest line; a tap opens MESSAGES and reads them.
+Phone.close();Phone.open()
+M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="The bike shop is open."})
+M.remotes.Tutorial.OnClientEvent:Fire("message",{from="Marge",text="Spoke & Chain is on your GPS."})
+check("the messages row counts the unread",named("Unread").Visible and named("Unread").Text=="2" and text("Spoke & Chain is on your GPS.")~=nil)
+named("MessagesRow").Activated:Fire()
+check("the messages row opens MESSAGES",showing("messages"))
+named("Close").Activated:Fire()
+check("read: the count goes",not named("Unread").Visible and text("No new messages")~=nil)
 -- 6.0.1: every app opens in the popup and closes back to home; the phone never turns.
-for _,id in {"orders","board","career","shop","messages","bank","settings","bag","garage"} do
+-- 6.5: the tiles (JOBS off duty: the board) and MORE's rows; each closes back to the page it came from.
+for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
+	local id,shows,inMore=entry[1],entry[2],entry[3]==true
 	Phone.close();Phone.open()
+	if inMore then named("moreApp").Activated:Fire() end
 	named(`{id}App`).Activated:Fire()
-	check(`{id} opens in the centred popup`,showing(id) and upright() and blur()~=nil and named("Heading")~=nil and named("Glyph"):FindFirstChild("NativeGlyph")~=nil and #M.warnings==0)
+	check(`{id} opens in the centred popup`,showing(shows) and upright() and blur()~=nil and named("Heading")~=nil and named("Glyph"):FindFirstChild("NativeGlyph")~=nil and #M.warnings==0)
 	named("Close").Activated:Fire()
-	check(`{id} closes back to the phone's home`,popup()==nil and blur()==nil and Phone.isOpen() and named("Home").Visible and upright())
+	check(`{id} closes back to the phone's {if inMore then "MORE" else "home"}`,popup()==nil and blur()==nil and Phone.isOpen() and named(if inMore then "More" else "Home").Visible and upright())
 end
+-- 6.5: SHOP lists the shops and what they sell; a tap sets the GPS, puts the phone away and says so.
+Phone.open("shop")
+check("SHOP lists the five shops first",named("Shops")~=nil and named("Shops").LayoutOrder<named("Columns").LayoutOrder
+	and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_bikes")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil)
+check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Bags, vests, medkits, items")~=nil and text("Lead & Co.")~=nil and text("Spoke & Chain")~=nil and text("Dead End Motors")~=nil and text("Wrench Garage")~=nil)
+do
+	local waypoint
+	local setWaypoint=M.MapView.setWaypoint
+	M.MapView.setWaypoint=function(at) waypoint=at end
+	named("Shop_supplies").Activated:Fire()
+	check("a shop's tap sets the GPS there, puts the phone away and says so",waypoint~=nil and waypoint.Z==-Config.City.BlockSize-Config.City.RoadWidth and not Phone.isOpen() and toasts[#toasts]=="GPS set: Last Stop Supplies")
+	M.MapView.setWaypoint=setWaypoint
+end
+-- 6.5: BAG & ITEMS, the I window's tabs: ITEMS (USE through the bottom bar's path), BAGS; BAG during a run.
+Phone.setState({phone=true,money=1600,kit={},cars={},items={medkit=2}})
+Phone.open();named("bagApp").Activated:Fire()
+check("off duty BAG & ITEMS opens on ITEMS, no BAG tab",showing("bag") and text("BAG & ITEMS")~=nil and named("Tab_items")~=nil and named("Tab_bags")~=nil and named("Tab_bag")==nil and text("➕  MEDKIT")~=nil and text("×2")~=nil)
+check("an item names its key in the bottom bar",all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"Key 5.",1,true)~=nil end)[1]~=nil)
+for _,button in all(named("AppPopup"),function(object) return object.Text=="USE" end) do
+	if button.Parent==text("➕  MEDKIT").Parent.Parent then button.Activated:Fire() end
+end
+check("USE goes through the bottom bar's path",M.used=="medkit")
+named("Tab_bags").Activated:Fire()
+check("BAGS shows the bags you own",showing("bag") and named("BagsRows")~=nil and named("Tab_bags"):FindFirstChild("Underline")~=nil)
+M.remotes.Job.OnClientEvent:Fire({cargo="Letters",customer="Ann",total=2,pay=40,endsAt=M.now+100,mode="foot",orders={{id=1,state="open"}}})
+named("Close").Activated:Fire();named("bagApp").Activated:Fire()
+check("during a run it opens on BAG",named("Tab_bag")~=nil and named("BagRows")~=nil)
+check("JOBS' badge: one open order",named("jobsApp"):FindFirstChild("Badge").Text=="1" and named("jobsApp"):FindFirstChild("Sub").Text=="Your run · orders")
+M.remotes.Job.OnClientEvent:Fire(nil)
+check("the run ends: BAG & ITEMS falls back to ITEMS",named("Tab_bag")==nil and named("Tab_items")~=nil)
+Phone.close()
 -- The popup with motion (reduced motion off): it lands centred at full scale, dim and blurred; back on close.
 M.services.GuiService.ReducedMotionEnabled=false
 Phone.close();Phone.open()
-named("boardApp").Activated:Fire()
+named("jobsApp").Activated:Fire() -- (6.5: JOBS off duty is the board)
 local panel=popup()
 check("the animated popup lands in the centre",panel.Position.X.Scale==.5 and panel.Position.Y.Scale==.5 and panel.Position.X.Offset==0 and panel:FindFirstChildOfClass("UIScale").Scale==1)
 check("the backdrop dims and the blur is low",named("Backdrop").BackgroundTransparency==.45 and blur().Size==8 and named("Veil").Visible==false)
