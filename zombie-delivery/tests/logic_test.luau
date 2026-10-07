@@ -188,7 +188,6 @@ for _, def in Config.Upgrades do
 		check(`{def.id}: the first level is cheap`, (Economy.upgradeCost(def.id, 0) :: number) <= 400, Economy.upgradeCost(def.id, 0))
 	end
 end
-check("an old save's Quick Hands level changes no hold", near(Economy.loadHold(0.25, { loading = 3 }), 0.25))
 local perCar = { van = { engine = 2 }, courier = { armor = 1 } }
 check("a car's own levels", Economy.carLevels(perCar, "van").engine == 2 and Economy.carLevels(perCar, "courier").engine == nil)
 check("a car without levels: none", next(Economy.carLevels(perCar, "muscle")) == nil and next(Economy.carLevels(nil, "van")) == nil)

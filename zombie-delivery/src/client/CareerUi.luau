@@ -168,6 +168,9 @@ local function deliveriesFor(xpLeft: number, level: number): (number, number)
 		end
 	else
 		each = Levels.jobXp(stars, 3, 5, false, true)
+		if stars == 1 then
+			each = JobRules.carStepXp(each) -- 5.7: a ★ delivery in your own car pays the step-up XP
+		end
 	end
 	return math.max(1, math.ceil(xpLeft / math.max(1, each))), stars
 end

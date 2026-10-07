@@ -876,6 +876,9 @@ local function giveLevelRewards(profile: Profile)
 				end
 			end
 		end
+		local kitCash = Career.grantKit(reward, profile.kit) -- 5.7: a backpack, the shoes (owned: their price)
+		profile.money += kitCash
+		profile.earned += kitCash
 		local paint = reward.paint
 		if paint and Economy.findPaint(paint) then
 			profile.paints[paint] = true

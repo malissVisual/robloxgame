@@ -606,8 +606,10 @@ Config.Cars = {
 	},
 	-- 5.1.1, the E-Scooter (style "scooter": a narrow low deck, two small wheels, a tall stem; server/ScooterArt): a
 	-- bike by the rules (light cargo, the BIKE jobs, no fuel, sold at Spoke & Chain) that you ride standing. Quick off
-	-- the line and nippy; a small rack over the rear wheel for one light piece and one gear slot for the basket (a
-	-- handlebar bag: no panniers, no trailer, Config.Gear notOn).
+	-- the line and nippy; a small rack over the rear wheel and one gear slot for the basket (a handlebar bag: no
+	-- panniers, no trailer, Config.Gear notOn). 5.7 (the owner: "a bit slower, so it isn't too much"): 36 at the top
+	-- (44 before; the Courier Bike 38, the E-Bike 48) and two light pieces stacked on its rack (a ZDC RIDE rental keeps
+	-- one: Config.Rental.Room).
 	{
 		id = "escooter",
 		bike = true,
@@ -617,16 +619,16 @@ Config.Cars = {
 		name = "E-Scooter",
 		price = 2800,
 		style = "scooter",
-		maxSpeed = 44,
+		maxSpeed = 36,
 		accel = 26,
 		turn = 2.8,
 		health = 110,
-		capacity = 1,
+		capacity = 2,
 		gearSlots = 1,
 		ramPower = 0.25,
 		color = { 35, 40, 43 },
 		role = "The nippy one: stand on it, zip off, no pedalling",
-		description = "A battery under the deck, a tall stem, a lamp for the night. Zips off the line and darts through traffic. A small rear rack for one light parcel, a basket on the bar. Rider only, standing.",
+		description = "A battery under the deck, a tall stem, a lamp for the night. Zips off the line and darts through traffic. A rear rack for two light parcels, a basket on the bar. Rider only, standing.",
 	},
 	{
 		id = "ebike",
@@ -921,8 +923,7 @@ export type UpgradeDef = {
 -- Wrench Garage. 3.3: the car tracks (car = true) belong to ONE car, the equipped one when you buy (the price grows
 -- with that car's level; the company vehicles take none); the gun tracks count for all your guns and car guns. The
 -- car tracks show on the car (server/Vehicles.luau): Ram Plow a bull bar (bigger with the level), Armor side plates
--- (and window grilles from level 3), Engine a hood scoop and twin exhaust pipes from level 3. Quick Hands makes the
--- holds of the back and the cargo shorter (Economy.loadHold).
+-- (and window grilles from level 3), Engine a hood scoop and twin exhaust pipes from level 3.
 -- 3.4: you keep your first car and upgrade it, so the first levels of the car tracks are cheap (a few deliveries)
 -- and the last ones dear. 3.5: the Cargo Rack (+1 slot a level) is gone: the car's STAGES (CarDef.stages) give the
 -- room now; a 3.4 save's cars became the stage that holds the slots they had, rack included (Economy.legacyStage).
@@ -935,7 +936,7 @@ Config.Upgrades = {
 	{ id = "handling", car = true, name = "Tyres & Suspension", description = "+8% steering · Lv 1: new tyres with tread · Lv 3: alloy rims · Lv 5: a lower stance", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.08 },
 	{ id = "armor", car = true, name = "Armor", description = "+15% car health · side plates, Lv 3: window grilles", maxLevel = 5, baseCost = 350, costGrowth = 2.0, perLevel = 0.15 },
 	{ id = "plow", car = true, name = "Ram Plow", description = "+30% ram damage · a bull bar on the front", maxLevel = 5, baseCost = 300, costGrowth = 1.95, perLevel = 0.30 },
-	-- (4.0.1: Quick Hands, "loading", is gone: the holds it shortened are instant now; a save's levels are refunded)
+	-- (4.0.1: Quick Hands, "loading", is gone: a save's levels are refunded; 5.7: its hold code too)
 	{ id = "damage", name = "Gun Damage", description = "+20% gun damage (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.20 },
 	{ id = "firerate", name = "Fire Rate", description = "+12% shots per second (car guns too)", maxLevel = 5, baseCost = 800, costGrowth = 1.85, perLevel = 0.12 },
 } :: { UpgradeDef }
@@ -1433,6 +1434,7 @@ export type LevelReward = {
 	paint: string?, -- a Config.Paints id (exclusive "career")
 	title: string?, -- a title shown over your head (profile.titles)
 	text: string?, -- 5.0: what else the level brings, in words ("The bike shop opens (5.1)")
+	kit: string?, -- 5.7: a piece of personal gear (a Config.Kit id), yours for good; owned already: its price instead
 }
 
 -- Driver levels (shared/Levels.luau): XP for every delivery, a rank for every level; levels unlock the danger levels
@@ -1471,11 +1473,13 @@ Config.Levels = {
 	-- unlocks, once (server/PlayerData.luau: profile.levelRewards; a save from before 4.6 counts the levels it had
 	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
 	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
+	-- 5.7: the levels before a car (2 – 4) give what a courier on foot or on a bike uses (medkits, the Courier Backpack,
+	-- the Running Shoes: Config.Kit); the car's items (repair kits, nitro, mines) start at 5, once you drive.
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop: Spoke & Chain on Main St" },
-		[3] = { money = 750, items = { repair = 2 } },
-		[4] = { money = 1000, items = { nitro = 2 }, text = "Old Van: Earl's Used Wheels (Marge's quest)" },
-		[5] = { money = 1500, paint = "hivis" },
+		[3] = { money = 750, items = { medkit = 2 }, kit = "backpack" },
+		[4] = { money = 1000, items = { medkit = 2 }, kit = "shoes", text = "Old Van: Earl's Used Wheels (Marge's quest)" },
+		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
 		[8] = { money = 3500, items = { nitro = 3 } },
@@ -1617,6 +1621,10 @@ Config.Rental = {
 	Idle = 45, -- off the scooter this long: it goes back
 	Restock = 20, -- seconds until a rented scooter stands in its dock again (once it is returned)
 	Color = { 214, 72, 64 }, -- the ZDC RIDE red on the rentals' deck and stem
+	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 36) and its
+	-- rack takes one light piece (the bought one two). server/Vehicles.luau caps the rental's MaxSpeed and its room.
+	MaxSpeed = 26,
+	Room = 1,
 }
 
 -- 5.6, zip lines between Downtown's rooftops (shared/ZipLines.luau picks them, server/ZipLines.luau builds them and
@@ -2253,6 +2261,46 @@ Config.Jobs = {
 		AddOnAnswer = 15,
 		AddOnGivers = { "Mrs. Lee", "Old Tom", "Kenny", "Mr. Novotny", "Aunt Maple" } :: { string },
 	},
+	-- 5.7, life on a run on foot or by bike (shared/FootEvents.luau picks, server/RunEvents.luau runs them; never the
+	-- tutorial's delivery, a car job or a mission). A light road event on about one run in four (Chance), after After
+	-- (min, max) seconds out of the safe zone, by Weights (none of the car-only ones: no add-on, no blocked street):
+	--   runner    a runner zombie comes after you from RunnerDistance studs away: keep moving, or fight it off
+	--   survivor  somebody calls for help SurvivorAhead studs ahead: walk up (SurvivorReach) and help them for a Tip
+	--             (min, max dollars; a bike pays the same); they give up after SurvivorWait s or once you are far past
+	--   gate      a locked gate across the sidewalk GateAhead studs ahead (GateWidth wide, from the kerb in): go round
+	--             by the road; it is taken away after GateTime s
+	-- No spot for it now: tried again after Retry s, Tries times at most. And at about one drop in five (GroupChance),
+	-- once you come within GroupNear studs of it, a small group of walkers (Group: min, max) shambles about
+	-- GroupDistance studs from the drop (never in the safe zone).
+	FootEvents = {
+		Chance = 0.25,
+		After = { 20, 60 } :: { number },
+		Retry = 6,
+		Tries = 5,
+		Weights = { runner = 1, survivor = 1, gate = 1 } :: { [string]: number },
+		RunnerDistance = { 70, 110 } :: { number },
+		SurvivorAhead = 45,
+		SurvivorReach = 7,
+		SurvivorWait = 40,
+		SurvivorNames = { "Ada", "Big Lou", "Mrs. Park", "Tomas", "Nina", "Grandpa Joe", "Eli", "Marta" } :: { string },
+		Tip = { 15, 35 } :: { number },
+		GateAhead = 30,
+		GateWidth = 10,
+		GateTime = 60,
+		GroupChance = 0.2,
+		Group = { 2, 3 } :: { number },
+		GroupDistance = { 30, 55 } :: { number },
+		GroupNear = 120,
+	},
+	-- 5.7, the step up to a car: a ★ board delivery done in your own car gives XpBonus more XP than a ★ job and takes
+	-- Pieces (min, max; SHORT & SAFE the fewest) pieces, never more than your car holds now (at least EasyMaxPieces),
+	-- so the Old Van at level 4 is clearly a promotion over a bike run (Bike.XpBonus).
+	CarStep = {
+		XpBonus = 40,
+		Pieces = { 3, 4 } :: { number },
+	},
+	-- 5.7: a job whose server tick fails this many times in a row ends (Jobs.fail) instead of stranding its player.
+	TickFails = 5,
 	-- 5.2, several orders at once (server/Jobs.luau addOrder, shared/JobRules.luau's orders): while a stackable run is
 	-- on (an ordinary board delivery on foot, on a bike, or a car one of the ★ … CarTiers tiers; never a mission, a
 	-- special, an employer's job, DUO, the Freight Run or the tutorial's), ACCEPT on the board adds another order of
@@ -2815,7 +2863,7 @@ Config.Cargo = {
 	} :: { [string]: boolean },
 	-- 5.3, what fits in a backpack (server/Cargo.luau packFits, shared/Bag.luau): small, flat or boxed light pieces.
 	-- Every other light piece (a bouquet, a cake, an electronics box, groceries, ice cream) rides in your hands, or on a
-	-- bike's rack, basket or box (one piece on the e-scooter's rack): on foot never more than your hands hold.
+	-- bike's rack, basket or box (two on the e-scooter's rack, 5.7): on foot never more than your hands hold.
 	PackLooks = {
 		mail = true,
 		newspaper = true,

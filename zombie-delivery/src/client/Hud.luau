@@ -1206,7 +1206,7 @@ local function openEmployer(id: string)
 	end
 	local lock = if jobType then lockedAt(jobType.level) else nil
 	if job then
-		Ui.label(body, "Finish your current delivery first (or give it up: MENU).", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = P.danger, TextSize = 16 })
+		Ui.label(body, "Finish your current delivery first (or give it up: phone → ORDERS).", UDim2.new(1, -10, 0, 24), { LayoutOrder = 7, TextColor3 = P.danger, TextSize = 16 })
 	elseif lock then
 		local button = P.button(body, `🔒 LEVEL {lock}`, UDim2.fromOffset(240, 46), "off", function() end)
 		button.LayoutOrder = 7
@@ -1440,6 +1440,17 @@ local function crewList(r: any): { { name: string, pay: number, owner: boolean }
 end
 
 function Hud.showResult(r: any)
+	-- 5.7: a foot or bike run done (r.mode): a toast and the pay floating up from the money (client/PayFloat.luau), not
+	-- this window; a level-up still shows its card (client/CareerUi.luau). Car jobs, missions and failures keep it.
+	if type(r) == "table" and r.success == true and (r.mode == "foot" or r.mode == "bike") then
+		local got = if type(r.rating) == "table" then math.clamp(math.floor(tonumber(r.rating.stars) or 0), 0, 3) else 0
+		local left = if type(r.order) == "table" then tonumber(r.order.left) or 0 else 0
+		local streak = if type(r.rating) == "table" and got >= 2 then tonumber(r.rating.streak) or 0 else 0
+		Hud.toast(`{if r.midJob == true then "ORDER DONE" else "DELIVERED"}{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · {r.cargo or "cargo"} for {r.customer or r.driver or "the customer"}{if left > 0 then ` · {left} to go` elseif streak > 1 then ` · streak {streak}` else ""}`)
+		local xp = tonumber(r.xp) or 0
+		require(script.Parent.PayFloat).show(moneyLabel, `+{Ui.money(tonumber(r.total) or 0)}{if xp > 0 then ` · +{xp} XP` else ""}`)
+		return
+	end
 	if type(r) == "table" and r.midJob == true then
 		-- 5.2: one order of a run done while the others go on: a toast, not this window (a lost one: the server's
 		-- notice says it already).
@@ -2378,7 +2389,7 @@ function view.drawVehicle(car: Model?, seatedIn: Model?)
 		if v.shown ~= "none" then
 			v.shown = "none"
 			v.speedRow.Visible = false
-			v.line.Text = "NO CAR  /  MENU → CAR"
+			v.line.Text = if touchLayout then "ON FOOT  ·  PHONE → GARAGE" else "ON FOOT  ·  Q → GARAGE" -- 5.7
 			v.line.TextTransparency = 0.2
 		end
 		return
@@ -3687,6 +3698,10 @@ end
 function Hud.setState(newState: any)
 	state = newState
 	require(script.Parent.Juice).countMoney(moneyLabel, state.money) -- 5.7: runs up to a higher amount
+	-- 5.7: once Marge gave you the phone, MENU opens it (Hud.onMenu): the button says so.
+	if hudButtons and hudButtons.more then
+		hudButtons.more.Text = if state.phone == true then "PHONE" else "MENU"
+	end
 	refreshLevel()
 	for id, count in hotbarCounts do
 		count.Text = tostring(state.items[id] or 0)
@@ -3861,10 +3876,10 @@ RunService.RenderStepped:Connect(function()
 	elseif not car and state and type(state.car) ~= "string" then
 		-- 5.0: no vehicle yet (the career starts on foot): the board, the backpack at Last Stop Supplies.
 		-- (with a backpack already: the phone says what to save up for next)
-		setHint("On foot", (if touchLayout then "the board in MENU" else "J for the board")
+		setHint("On foot", (if touchLayout then "the board on your phone" else "J for the board")
 			.. (if require(Shared.Transport).handsRoom(if type(state.kit) == "table" then state.kit else {}) > Config.Cargo.HandsMax then " · your phone says what's next" else " · Supplies for a backpack"), if touchLayout then nil else "J")
 	elseif not car then
-		setHint("No car out", "MENU → CAR calls it")
+		setHint("No car out", if touchLayout then "PHONE → GARAGE calls it" else "Q → GARAGE calls it") -- 5.7
 	elseif not seatedIn and not job then
 		setHint("On foot", if touchLayout then "FIRE shoots · SPRINT runs · tap the prompt at your car's door" elseif touch then "FIRE shoots · E at your car to drive" else "right mouse aims, left mouse shoots · E at your car to drive")
 	else

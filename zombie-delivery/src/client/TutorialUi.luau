@@ -12,6 +12,9 @@
 --     after the ticket), with "FIRST DAY" and SKIP (it asks first). During the job it follows the Job payload
 --     (TutorialSteps.jobStep): the same state the ticket shows, never ahead of it.
 --   * A marker over Marge (TALK TO MARGE ▼) while she has something for you (welcome, retry).
+--   * 5.7, the tour: her last page after the first delivery says SHOW ME AROUND: a page each for the ZDC RIDE dock
+--     nearest the depot and the bus stop nearest it (each set on the GPS: MapView, the beam over it), then Q → BOARD
+--     (OPEN THE BOARD opens the phone's BOARD). SKIP TOUR on every page (the GPS goes).
 -- 4.2, a phone: the dialog sits in the middle at a readable size (at least 0.8, as wide as the screen allows), its
 -- actions and the hint's SKIP a finger tall (ACTION_H); a tap anywhere on it still continues.
 -- Everything lives in ScreenGuis that survive a respawn. The style is the approved "contract" direction
@@ -23,12 +26,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local TutorialSteps = require(Shared.TutorialSteps)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Hud = require(script.Parent.Hud)
 local CameraRig = require(script.Parent.CameraRig)
+local MapView = require(script.Parent.MapView)
 local DialogKeys = require(script.Parent.DialogKeys)
 
 local TutorialUi = {}
@@ -351,8 +356,67 @@ local function show(kind: string, dialog: TutorialSteps.Dialog?)
 	freeMouse()
 	-- Space / Enter / A turn her pages (4.4.1: the radio's too; it comes on its own, maybe mid-jump or mid-drive, so
 	-- a key waits a little longer there; a jump pressed just as she starts talking does not skip her first page).
-	local radio = kind == "retry" or kind == "done" or kind == "say"
+	local radio = kind == "retry" or kind == "done" or kind == "say" or string.sub(kind, 1, 5) == "tour_"
 	DialogKeys.open(KEYS_ID, TutorialUi.advance, { guard = if radio then RADIO_GUARD else 0.3, layer = 2 })
+end
+
+-- ── 5.7: the tour ───────────────────────────────────────────────────────────
+
+-- A place on the GPS (the white route and the HUD's beam: MapView.onWaypoint, set by the Hud); nil clears it.
+local function tourGps(id: string?, name: string?, x: number?, z: number?)
+	local ok, err = pcall(function()
+		if id and name and x and z then
+			MapView.setWaypoint(Vector3.new(x, Map.RoadTop, z))
+			MapView.onWaypoint({ id = id, name = name, icon = "📍", x = x, z = z, kind = "place", description = "" } :: Map.Landmark)
+		else
+			MapView.setWaypoint(nil)
+			MapView.onWaypoint(nil)
+		end
+	end)
+	if not ok then
+		warn(`[TutorialUi] tour GPS: {err}`)
+	end
+end
+
+-- Where the tour goes: the dock and the bus stop nearest the depot (shared/RentalDocks.luau, shared/BusLines.luau).
+local function tourPlaces(): ({ name: string, x: number, z: number }?, { name: string, x: number, z: number }?)
+	local depot = Map.Shops.depot
+	local dock: { name: string, x: number, z: number }? = nil
+	local stop: { name: string, x: number, z: number }? = nil
+	pcall(function()
+		local near = require(Shared.RentalDocks).nearest(depot.x, depot.z)
+		if near then
+			dock = { name = near.name, x = near.x, z = near.z }
+		end
+	end)
+	pcall(function()
+		local best = math.huge
+		for _, candidate in require(Shared.BusLines).allStops() do
+			local d = (candidate.kx - depot.x) ^ 2 + (candidate.kz - depot.z) ^ 2
+			if d < best then
+				best = d
+				stop = { name = candidate.name, x = candidate.kx, z = candidate.kz }
+			end
+		end
+	end)
+	return dock, stop
+end
+
+-- Shows the tour's step `index` (TutorialSteps.Tour) with its place on the GPS; past the last one it is over.
+local function tour(index: number)
+	local step = TutorialSteps.Tour[index]
+	if not step then
+		return
+	end
+	local dock, stop = tourPlaces()
+	if step == "dock" and dock then
+		tourGps("tour_dock", `ZDC RIDE · {dock.name}`, dock.x, dock.z)
+	elseif step == "bus" and stop then
+		tourGps("tour_bus", `Bus stop · {stop.name}`, stop.x, stop.z)
+	else
+		tourGps(nil)
+	end
+	show(`tour_{index}`, TutorialSteps.tourDialog(step, { dock = if dock then dock.name else nil, stop = if stop then stop.name else nil }))
 end
 
 -- What the last page's actions do.
@@ -367,6 +431,25 @@ local function finishDialog(kind: string, primary: boolean)
 		local open = (Hud :: any).onJobs -- (Main: DispatchUi.open)
 		if type(open) == "function" then
 			open()
+		end
+	elseif kind == "done" and primary then
+		tour(1) -- 5.7: SHOW ME AROUND
+	elseif string.sub(kind, 1, 5) == "tour_" then
+		local index = tonumber(string.sub(kind, 6)) or #TutorialSteps.Tour
+		if primary and index < #TutorialSteps.Tour then
+			tour(index + 1)
+			return
+		end
+		tourGps(nil)
+		if primary then
+			-- the last page: OPEN THE BOARD (the phone's BOARD, else the Dispatch board)
+			local ok = pcall(function()
+				require(script.Parent.Phone).open("board")
+			end)
+			local open = (Hud :: any).onJobs
+			if not ok and type(open) == "function" then
+				open()
+			end
 		end
 	end
 end
