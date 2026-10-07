@@ -25,6 +25,11 @@
 -- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window), flat rows, the pay split on dark
 -- faces; the strip and the invitation card are charcoal scrims with a thin rule on their left (white for the strip,
 -- red for an invitation waiting); the tags over heads are compact charcoal labels with light text.
+-- 5.8 (the courier phone's look, design/phone-ui/): the ZDC window header with the crew glyph; the section heads carry
+-- the phone's small red marker and a thin line; the rows are slim (square, a hairline; a highlighted one raised with a
+-- narrow rule on its left: red for the job / an invitation / a co-op seeker, amber for the leader and your own board
+-- entry); ACCEPT (in the window and on the invitation card) is the red primary action; KICK, DECLINE, STOP and LEAVE
+-- keep the dark danger face, INVITE / LOOK the main one; the pay split is a square bar (the leader's part red).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -277,8 +282,19 @@ local function nextOrder(): number
 	return order
 end
 
+-- A section head (5.8: the phone's "■ ACTIVE ORDER"): the small red marker, the caps and a thin line under them.
 local function heading(text: string)
-	Ui.caps(body, text, UDim2.new(1, -10, 0, 24), { LayoutOrder = nextOrder(), TextSize = 14, TextColor3 = C.dim })
+	local frame = Ui.make("Frame", { Size = UDim2.new(1, -10, 0, 30), BackgroundTransparency = 1, LayoutOrder = nextOrder() }, body)
+	Ui.make("Frame", {
+		Name = "Marker",
+		Size = UDim2.fromOffset(7, 7),
+		Position = UDim2.new(0, 2, 0.5, 2),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = K.red,
+		BorderSizePixel = 0,
+	}, frame)
+	Ui.caps(frame, text, UDim2.new(1, -18, 1, -4), { Position = UDim2.fromOffset(18, 4), TextSize = 13, TextColor3 = C.dim })
+	Ui.make("Frame", { Name = "Rule", Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = K.rule, BorderSizePixel = 0 }, frame)
 end
 
 local function note(text: string, color: Color3?)
@@ -291,20 +307,22 @@ local function note(text: string, color: Color3?)
 	})
 end
 
+-- 5.8: a slim row like the phone's (square, a hairline). A highlighted row is raised with a narrow rule on its left
+-- and a brighter hairline (red for the GPS / crew highlight, else the caller's colour, e.g. the leader's amber).
 local function row(height: number, highlight: Color3?): any
 	local frame = Ui.make("Frame", {
 		Size = UDim2.new(1, -10, 0, height),
-		BackgroundColor3 = P.ticket,
+		BackgroundColor3 = K.row,
 		BorderSizePixel = 0,
 		LayoutOrder = nextOrder(),
 	}, body)
-	Ui.corner(frame)
-	Ui.stroke(frame, P.line, 1).Transparency = 0
-	-- 3.8: a highlighted row is raised with a narrow rule on its left (red for the GPS / crew highlight, else the
-	-- caller's colour, e.g. the leader's amber).
+	Ui.stroke(frame, K.line, 1).Transparency = Ui.HAIRLINE
 	if highlight then
-		frame.BackgroundColor3 = K.raised
-		Ui.make("Frame", { Name = "Rule", Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = if highlight == GPS then K.red else highlight, BorderSizePixel = 0 }, frame)
+		Ui.selectRow(frame, true)
+		local rule = frame:FindFirstChild("Rule")
+		if rule and rule:IsA("Frame") and highlight ~= GPS then
+			rule.BackgroundColor3 = highlight
+		end
 	end
 	return frame
 end
@@ -330,7 +348,9 @@ local function rowText(frame: any, name: string, sub: string, nameColor: Color3?
 	})
 end
 
--- A button on the right of a row (slot 1 = the rightmost); a disabled one is grey and does nothing.
+-- A button on the right of a row (slot 1 = the rightmost; 112 × 36, square like the phone's); `color` says what it
+-- means (Theme.Contract.red: the primary action, Theme.Colors.red: danger, green: the main one); a disabled one is
+-- grey and does nothing.
 local function rowButton(frame: any, text: string, color: Color3, enabled: boolean, slot: number, onClick: () -> ()): any
 	local button = Ui.button(frame, text, UDim2.fromOffset(112, 36), if enabled then color else C.grey, function()
 		if enabled then
@@ -433,21 +453,21 @@ local function renderSplit(names: { string }, preview: boolean)
 		Font = Theme.HeadingFont,
 		TextColor3 = C.dim,
 	})
-	-- The bar: every part as wide as its share of everything paid out (pastel faces, ink names).
+	-- The bar: every part as wide as its share of everything paid out (5.8: square; the leader's part red, the members'
+	-- two greys in turn, light names).
 	local bar = Ui.make("Frame", {
 		Size = UDim2.new(1, -28, 0, 20),
 		Position = UDim2.fromOffset(14, 30),
-		BackgroundColor3 = P.track,
+		BackgroundColor3 = K.recessed,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 	}, frame)
-	Ui.corner(bar)
 	local total = ownerShare + memberShare * count
 	local x = 0
 	local leaderIsMe = crew ~= nil and type(crew.owner) == "table" and crew.owner.userId == player.UserId
-	local parts = { { share = ownerShare, color = P.butter, text = if preview or leaderIsMe then "LEADER (YOU)" else "LEADER" } }
+	local parts = { { share = ownerShare, color = K.red, text = if preview or leaderIsMe then "LEADER (YOU)" else "LEADER" } }
 	for index = 1, count do
-		table.insert(parts, { share = memberShare, color = if index % 2 == 1 then P.sky else P.sage, text = names[index] or (if index > #names and not preview then "RIDER" else "MEMBER") })
+		table.insert(parts, { share = memberShare, color = if index % 2 == 1 then K.track else K.track:Lerp(K.line, 0.3), text = names[index] or (if index > #names and not preview then "RIDER" else "MEMBER") })
 	end
 	for _, part in parts do
 		local width = part.share / total
@@ -536,7 +556,7 @@ local function renderInvitations()
 			rowButton(frame, "DECLINE", C.red, true, 1, function()
 				answer(item.userId, false)
 			end)
-			rowButton(frame, "ACCEPT", C.green, not blocked, 2, function()
+			rowButton(frame, "ACCEPT", K.red, not blocked, 2, function()
 				answer(item.userId, true)
 			end)
 		end
@@ -966,7 +986,7 @@ local function build()
 
 	-- The window.
 	local content
-	window, content, chrome = Ui.window(gui, "Crew", "Work together · share the pay", "👥", UDim2.fromOffset(640, 620))
+	window, content, chrome = Ui.window(gui, "Crew", "Work together · share the pay", "👥", UDim2.fromOffset(640, 620), { glyph = "crew" })
 	scale = Ui.make("UIScale", {}, window)
 	window.Visible = false
 	window.ZIndex = 5
@@ -979,8 +999,8 @@ local function build()
 		Position = UDim2.fromOffset(16, 12),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ScrollBarThickness = 6,
-		ScrollBarImageColor3 = P.ink2,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = K.line,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 	}, content)
@@ -1057,7 +1077,7 @@ local function build()
 	})
 	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = 3 }, cardBody)
 	Ui.list(buttons, false, 8)
-	local accept = Ui.button(buttons, "✔  ACCEPT", UDim2.fromOffset(130, 36), C.green, function()
+	local accept = Ui.button(buttons, "✔  ACCEPT", UDim2.fromOffset(130, 36), K.red, function()
 		if cardFrom then
 			answer(cardFrom, true)
 		end
