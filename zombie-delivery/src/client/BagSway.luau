@@ -51,6 +51,7 @@ local CameraRig = require(script.Parent.CameraRig) -- 6.7: who has the arm now (
 local Holster = require(script.Parent.Holster)
 local SprintPose = require(script.Parent.SprintPose)
 local Interact = require(script.Parent.Interact)
+local Ledger = require(script.Parent.PoseLedger) -- 6.7 B: the joints shared with ArmPose, SprintPose and BodyLife
 
 local BagSway = {}
 
@@ -187,7 +188,7 @@ local function forget(character: Model)
 end
 
 -- ── 6.7: the bag arm, the counter-lean, the gestures' torso and head ─────────────────────────────────────────────────
--- Laid on top of the animation (Transform only, never C0; let go to the identity while it still holds ours), each
+-- Laid on top of the animation (Transform only, never C0; let go back to the animation: 6.7 B, client/PoseLedger.luau), each
 -- joint only while nobody else writes it: the left arm while ArmPose / SprintPose leave it (and A.Hold after), the
 -- waist only standing or slow (A.Calm) and not sprinting, the neck while not sprinting. As in client/ArmPose.luau, a
 -- joint that still holds what we wrote was not written by the Animator this frame: its last animation value is the base.
@@ -211,39 +212,32 @@ type Body = {
 	gestureStart: number, -- … and when it began here (os.clock)
 }
 local bodies: { [Model]: Body } = {}
-local written: { [Instance]: CFrame } = {}
-local animated: { [Instance]: CFrame } = {}
+-- 6.7 B: the joints these layers wrote; their values go through client/PoseLedger.luau (shared with ArmPose,
+-- SprintPose and BodyLife, so the waist's and the arm's layers add up instead of piling up on a frame the Animator
+-- skips).
+local written: { [Instance]: boolean } = {}
 
+-- The animation's own value of a joint this frame (client/PoseLedger.luau).
 local function baseOf(joint: any): CFrame
-	local live: CFrame = joint.Transform
-	local mine = written[joint]
-	if mine and Joints.same(live, mine) then
-		return animated[joint] or CFrame.identity
-	end
-	animated[joint] = live
-	return live
+	return Ledger.base(joint)
 end
 
--- `rotation` on top of the animation's own value; nil lets the joint go.
+-- `rotation` on top of the animation (and the layers under this one); nil lets the joint go (back to the animation).
 local function lay(joint: any, rotation: CFrame?)
 	if not joint then
 		return
 	end
 	if rotation and joint.Parent then
-		local out = baseOf(joint) * rotation
+		local out = Ledger.now(joint) * rotation
 		if out == out then -- (never a NaN on a joint)
-			joint.Transform = out
-			written[joint] = out
+			Ledger.write(joint, out)
+			written[joint] = true
 		end
 		return
 	end
-	local mine = written[joint]
-	if mine then
-		if joint.Parent and Joints.same(joint.Transform, mine) then
-			joint.Transform = CFrame.identity
-		end
+	if written[joint] then
 		written[joint] = nil
-		animated[joint] = nil
+		Ledger.release(joint)
 	end
 end
 
@@ -548,7 +542,6 @@ local function step(dt: number)
 		for joint in written do
 			if not joint.Parent then
 				written[joint] = nil
-				animated[joint] = nil
 			end
 		end
 	end

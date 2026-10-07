@@ -16,10 +16,20 @@
 -- 5.7: Npcs.act names a short arm gesture (a wave, holding a piece out, reaching for it, a knock) on a person or a
 -- courier; the clients play it (client/ArmPose.luau, shared/Gestures.luau).
 
+-- 6.7: the people wear the couriers' realistic body (server/CharacterArt: Geometry "person", built by its Rig): slim
+-- limbs, hands that hold, a face with eyes that blink (client/BodyLife.luau also gives them the breath, the weight
+-- shift and a look at the players who come up). dress() paints every part by its BodyPaint colour group; the hats and
+-- the hair are sized to the smaller head; the walk is slowed to the longer legs (CourierMotion.StockHip).
+
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
+
+local CharacterGeometry = require(script.Parent.CharacterArt.Geometry) -- 6.7
+local CharacterRig = require(script.Parent.CharacterArt.Rig)
+local Motion = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CourierMotion"))
 
 local Npcs = {}
 
@@ -34,6 +44,7 @@ local RUN = "rbxassetid://507767714" -- Roblox's R15 run (Npcs.pace, 3.10)
 local STRIDE = 12.8 -- studs / s of a full-size body at the walk's or the run's own speed (Roblox's Animate: 16 / 1.25)
 local RUN_FROM = 10 -- studs / s: from here on the run animation
 local GREET_RANGE = 14 -- turn to a player this close
+local KID_SCALE = 0.75 -- 6.7: a kid's body against a grown-up's
 local NAME_RANGE = 60
 
 type State = {
@@ -75,16 +86,23 @@ local function warmBases()
 	end
 	warmed = true
 	for _, child in { false, true } do
-		local ok, rig = pcall(function()
-			local d = Instance.new("HumanoidDescription")
-			if child then
-				d.HeightScale = 0.72
-				d.WidthScale = 0.78
-				d.DepthScale = 0.78
-				d.HeadScale = 0.95
-			end
-			return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
+		-- 6.7: the couriers' realistic body (a kid's at KID_SCALE); Roblox's own default body if that ever fails
+		local ok, rig = pcall(function(): Model
+			return CharacterRig.build(CharacterGeometry.spec("person", if child then KID_SCALE else 1))
 		end)
+		if not ok then
+			warn(`[Npcs] no realistic body, Roblox's own: {rig}`)
+			ok, rig = pcall(function(): Model
+				local d = Instance.new("HumanoidDescription")
+				if child then
+					d.HeightScale = 0.72
+					d.WidthScale = 0.78
+					d.DepthScale = 0.78
+					d.HeadScale = 0.95
+				end
+				return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
+			end)
+		end
 		if ok and rig then
 			baseRigs[child] = rig
 		else
@@ -189,6 +207,23 @@ local function dress(model: Model, look: Look)
 	paint({ "LowerTorso", "LeftUpperLeg", "RightUpperLeg" }, pants)
 	paint({ "LeftLowerLeg", "RightLowerLeg" }, if look.boots then shoes else pants)
 	paint({ "LeftFoot", "RightFoot" }, shoes)
+	-- 6.7: the realistic body's pieces by their colour group (server/CharacterArt/Geometry.luau `paint`): the hands, the
+	-- neck, the jaw, the nose and the ears skin, the shoulders and the elbows the sleeves, the knees the trousers (or
+	-- the boots), the toes the shoes, the brows the hair.
+	local groups: { [string]: Color3 } = {
+		skin = skin,
+		sleeve = sleeve,
+		forearm = if look.shortSleeves and not look.coat then skin else sleeve,
+		shin = if look.boots then shoes else pants,
+		boot = shoes,
+		hair = rgb(look.hair, Color3.fromRGB(52, 38, 28)),
+	}
+	for _, part in model:GetChildren() do
+		local group = part:GetAttribute("BodyPaint")
+		if part:IsA("BasePart") and part:GetAttribute("CharacterDecoration") and type(group) == "string" and groups[group] then
+			part.Color = groups[group]
+		end
+	end
 
 	local torso = bodyPart(model, "UpperTorso")
 	local lower = bodyPart(model, "LowerTorso")
@@ -244,6 +279,10 @@ local function dress(model: Model, look: Look)
 	end
 	-- The default R15 head is about 1.2 studs every way (an older block head is 2 x 1 x 1 with a smaller mesh).
 	local h = Vector3.one * math.min(head.Size.X, head.Size.Y, head.Size.Z) * (if head.Size.X > head.Size.Y * 1.5 then 1.2 else 1)
+	if model:GetAttribute("CharacterArt") ~= nil then
+		-- 6.7: the realistic body's egg-shaped head (0.8 x 0.92 x 0.86): the hats and the hair a little wider than it
+		h = Vector3.new(head.Size.X * 1.1, head.Size.Y, head.Size.Z * 1.05)
+	end
 	local hat = look.hat or "none"
 	local hatColor = rgb(look.hatColor, Color3.fromRGB(60, 60, 66))
 	if look.hair and hat ~= "helmet" and hat ~= "beanie" then
@@ -765,6 +804,10 @@ function Npcs.spawn(look: Look, at: CFrame): Model
 	model.PrimaryPart = root
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	local scale = if look.child then 0.72 else 1
+	if humanoid and model:GetAttribute("CharacterArt") ~= nil then
+		-- 6.7: the walk's pace by the legs (the realistic body's step is longer than the stock walk's)
+		scale = humanoid.HipHeight / Motion.StockHip
+	end
 	local flat = Vector3.new(at.LookVector.X, 0, at.LookVector.Z)
 	local facing = if flat.Magnitude > 0.01 then CFrame.lookAt(at.Position, at.Position + flat) else CFrame.new(at.Position)
 	-- The root floats HipHeight over the ground (R15).

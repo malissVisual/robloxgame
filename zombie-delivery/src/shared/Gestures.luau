@@ -12,6 +12,11 @@
 --   vest   6.0: both arms over the head, then down, tugging a new vest straight
 --   sling / unsling  6.4: the right hand reaches over the left shoulder for the bag's strap and swings the bag onto
 --          the back (sling) or back to the front (unsling) (server/KitWear.luau; client/BagSway.luau moves the bag)
+--   pickup 6.7: down on the knees, the back bent, the right hand to a piece (a bag) on the ground and up with it
+--   land   6.7: a short dip on the knees (client/BodyLife.luau dips a landing by itself, by the fall)
+-- 6.7: "pickup" and "land" also bend the body (shared/BodyMotion.luau gesture, their seconds Config.Body.Gestures):
+-- the keys waist / neck ({ x, y, z } degrees) and crouch ({ drop, back } studs, the hips' tip in degrees);
+-- client/ArmPose.luau bends the legs so the feet stay where they stood.
 --   receive  6.7: both hands held in front of the chest, holding the piece just handed over (a receiver at the door)
 -- 6.7, items in the hand (server/HandItem.luau holds the piece in the right hand while these play): give holds the
 -- piece out in both hands a little closer together (a box about a stud wide between them), take and receive hold it
@@ -25,6 +30,7 @@
 -- down, +x lifts it forward, +y turns it in (the right arm; the left mirrored), +z lifts the right arm out sideways.
 
 local Config = require(script.Parent.Config)
+local BodyMotion = require(script.Parent.BodyMotion) -- 6.7: the gestures with the legs
 
 local Gestures = {}
 
@@ -35,7 +41,7 @@ local J = Config.Juice
 
 -- How long a gesture lasts (nil: no such gesture).
 function Gestures.seconds(kind: string): number?
-	return J.Gestures[kind]
+	return J.Gestures[kind] or Config.Body.Gestures[kind] -- (6.7: pickup, land)
 end
 
 local function smooth(x: number): number
@@ -46,7 +52,7 @@ end
 -- How far the gesture is laid over the arms (0..1) `t` seconds after it began: in over the first quarter (at most
 -- 0.18 s), held, out over the last third (at most 0.3 s). 0 before the start and from the end on.
 function Gestures.weight(kind: string, t: number): number
-	local total = J.Gestures[kind]
+	local total = Gestures.seconds(kind)
 	if not total or t <= 0 or t >= total then
 		return 0
 	end
@@ -57,6 +63,10 @@ end
 
 -- The arm angles `t` seconds into the gesture (the shape it is lerped toward; nil for an unknown kind).
 function Gestures.pose(kind: string, t: number): Pose?
+	local body = BodyMotion.gesture(kind, t) -- 6.7: pickup, land
+	if body then
+		return body
+	end
 	if kind == "wave" then
 		local swing = math.sin(2 * math.pi * J.WaveHz * math.max(0, t))
 		return {

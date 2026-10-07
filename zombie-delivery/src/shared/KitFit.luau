@@ -12,7 +12,9 @@
 --   KitFit.factors(bone, size)   the x / y / z scale of a body part against its nominal size (clamped; a hand: one
 --                                uniform factor so the phone keeps its shape)
 --   KitFit.fit(pieces, scales)   copies of the pieces with their offsets and sizes scaled per their bone (a turned
---                                piece's size follows the scaled direction of each of its own axes)
+--                                piece's size follows the scaled direction of each of its own axes); 6.7: on a hand
+--                                smaller than the block one (the courier's fist) the art is held in the palm
+--                                (KitFit.Palm: scaled by the hand's one factor, turned to face the way the palm does)
 -- 6.4.1, the worn bag (server/KitWear.luau; tests/bagfill_test.luau):
 --   KitFit.R6                    the R15 part a piece hangs on → its stand-in on an R6 body (the bag under "Left Arm",
 --                                the straps and the bag's places on the "Torso"); KitFit.factors scales the art to it
@@ -36,22 +38,38 @@ export type Scale = { number } -- x, y, z
 
 -- The block R15 body the art is authored for (design/kit-models/README.md): the torso 2 wide, 1.6 high, 1 deep, the
 -- feet 1 × .3 × 1.2, the upper arms and the hand of the block rig.
+-- 6.7: the courier's realistic body (server/CharacterArt/Geometry.luau) is slimmer than this (the torso 1.24 x 1.58 x
+-- 0.76, the upper arms 0.6 x 1.1 x 0.6, the feet 0.48 x 0.3 x 0.86, the hands 0.22 x 0.36 x 0.4): the art stays
+-- authored on the block body and every piece is scaled onto the real one (the vests, the packs, the shoes, the bag
+-- places). The pelvis and the left hand are measured too (art hung from them scales the same way).
 KitFit.Nominal = {
 	UpperTorso = { 2, 1.6, 1 },
+	LowerTorso = { 2, 0.4, 1 }, -- 6.7
 	LeftUpperArm = { 1, 1.17, 1 },
 	RightUpperArm = { 1, 1.17, 1 },
 	LeftFoot = { 1, 0.3, 1.2 },
 	RightFoot = { 1, 0.3, 1.2 },
 	RightHand = { 1, 0.3, 1 },
+	LeftHand = { 1, 0.3, 1 }, -- 6.7
 } :: { [string]: Scale }
 
 -- Bones fitted with one factor for all three axes (the handset is a rigid device, not cloth).
-local UNIFORM: { [string]: boolean } = { RightHand = true }
+local UNIFORM: { [string]: boolean } = { RightHand = true, LeftHand = true }
 
 KitFit.Min = 0.5 -- a factor never goes below / above these (an odd mesh body: kept attached, not absurd)
 KitFit.Max = 2
-KitFit.HandMin = 0.7
+KitFit.HandMin = 0.45 -- 6.7: 0.7 before; the courier's fist (one factor 0.31) holds the phone at a real size
 KitFit.HandMax = 1.3
+
+-- 6.7: a hand smaller than the block one (its factor under SlabHand) holds the art IN ITS PALM: the art (authored on
+-- the block hand's front, the phone's screen facing -Z) is scaled about `from` (its middle there), turned so it faces
+-- the way the palm does (the palms face the body: the right one -X, the left +X) and set at `to` on the real hand, just
+-- off the palm (KitFit.fit). The phone pose (client/ArmPose.luau) rolls the wrist so the palm and the screen face up.
+KitFit.SlabHand = 0.8
+KitFit.Palm = {
+	RightHand = { from = { 0, -0.12, -0.3 }, to = { -0.135, -0.2, 0 }, turn = { 0, 90, 0 } },
+	LeftHand = { from = { 0, -0.12, -0.3 }, to = { 0.135, -0.2, 0 }, turn = { 0, -90, 0 } },
+} :: { [string]: { from: Scale, to: Scale, turn: Scale } }
 
 -- What to wear: slot → the art id. (6.6: the backpacks and their parcel are gone: one carrying item, the bag.)
 function KitFit.outfit(kit: Kit, bag: string?): { [string]: string }
@@ -84,12 +102,15 @@ function KitFit.factors(bone: string, size: Scale): Scale
 		return { 1, 1, 1 }
 	end
 	local out: Scale = {}
+	local raw: Scale = {}
 	for i = 1, 3 do
 		local f = (size[i] or 0) / nominal[i]
-		out[i] = if finite(f) and f > 0 then math.clamp(f, KitFit.Min, KitFit.Max) else 1
+		raw[i] = if finite(f) and f > 0 then f else 1
+		out[i] = math.clamp(raw[i], KitFit.Min, KitFit.Max)
 	end
 	if UNIFORM[bone] then
-		local f = math.clamp((out[1] + out[3]) / 2, KitFit.HandMin, KitFit.HandMax)
+		-- (6.7: from the hand's own measure, so a fist smaller than Min still gets its own size, down to HandMin)
+		local f = math.clamp((raw[1] + raw[3]) / 2, KitFit.HandMin, KitFit.HandMax)
 		return { f, f, f }
 	end
 	return out
@@ -107,14 +128,41 @@ local function axes(turn: { number }?): { Scale }
 	}
 end
 
+-- 6.7: Euler degrees (CFrame.Angles order, as `axes` reads them) of a rotation given by its three axes.
+local function angles(x: Scale, y: Scale, z: Scale): Scale
+	local b = math.asin(math.clamp(z[1], -1, 1))
+	return { math.deg(math.atan2(-z[2], z[3])), math.deg(b), math.deg(math.atan2(-y[1], x[1])) }
+end
+
+-- 6.7: a piece held in a small hand's palm (KitFit.Palm): scaled by the hand's one factor `f` about the art's middle,
+-- turned to face the way the palm does and set off the palm.
+local function inPalm(piece: any, copy: any, palm: { from: Scale, to: Scale, turn: Scale }, f: number)
+	local frame = axes(palm.turn)
+	local function turned(v: Scale): Scale
+		local out: Scale = {}
+		for i = 1, 3 do
+			out[i] = frame[1][i] * v[1] + frame[2][i] * v[2] + frame[3][i] * v[3]
+		end
+		return out
+	end
+	local at = turned({ (piece.at[1] - palm.from[1]) * f, (piece.at[2] - palm.from[2]) * f, (piece.at[3] - palm.from[3]) * f })
+	copy.at = { at[1] + palm.to[1], at[2] + palm.to[2], at[3] + palm.to[3] }
+	copy.size = { piece.size[1] * f, piece.size[2] * f, piece.size[3] * f }
+	local own = axes(piece.turn)
+	copy.turn = angles(turned(own[1]), turned(own[2]), turned(own[3]))
+end
+
 -- Copies of the pieces (Builder pieces: size, at, attach, turn?) fitted per bone; a bone not in `scales` is left as is.
--- The input is not changed.
+-- The input is not changed. 6.7: on a hand smaller than the block one, in its palm (KitFit.Palm).
 function KitFit.fit(pieces: { any }, scales: { [string]: Scale }): { any }
 	local out: { any } = {}
 	for _, piece in pieces do
 		local s = scales[piece.attach]
 		local copy = table.clone(piece)
-		if s then
+		local palm = if s and UNIFORM[piece.attach] and s[1] < KitFit.SlabHand then KitFit.Palm[piece.attach] else nil
+		if s and palm then
+			inPalm(piece, copy, palm, s[1])
+		elseif s then
 			copy.at = { piece.at[1] * s[1], piece.at[2] * s[2], piece.at[3] * s[3] }
 			local size: Scale = {}
 			for i, axis in axes(piece.turn) do

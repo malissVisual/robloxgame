@@ -1313,6 +1313,44 @@ that you take one job, and you either say yes or skip tutorial. But don't automa
   board and retry pages are gone. A save that finished or skipped it never sees it again.
 - **Again, any time:** the phone's MORE → SETTINGS has SHOW ME THE SCREEN (this tour) and SHOW ME AROUND (the 5.7
   world tour: the ZDC RIDE dock, the nearest bus stop, then JOBS).
+## A more realistic courier, idle life, the pick-up, the carry's grip, landing, flinching (6.7, part B)
+
+The owner: "The character isn't realistic at all, there are no animations … I want better graphics and better
+animations." He chose a more realistic body.
+
+**The body** (`server/CharacterArt/Geometry.luau`, native parts only): 5.9 studs from the sole to the crown, the head
+0.92 (about 1/6.4 of it, an egg-shaped Roblox sphere mesh with a jaw, eye whites and irises, brows, a nose, a mouth,
+ears, short hair under the backwards black cap); slim upper arms (0.6) and forearms (0.52, nearly as long as the upper
+arms), legs 0.64 × 0.8 and 0.56 × 0.68, the fingertips at mid-thigh; balls round the shoulders, the elbows and the
+knees on the joints, so a bent arm or knee has no gap; a neck; hands of a palm (0.22 × 0.36 × 0.4), a thumb and curled
+fingers, the palms facing the body, with a `LeftGripAttachment` / `RightGripAttachment` inside each fist (0.28 under
+the palm's middle: guns, `server/HandItem.luau`'s one-handed grips and the bag's handles sit there); an open charcoal
+jacket over a grey shirt, a collar, pocket flaps, black cuffs, trousers with a belt, boots with round toes. 52 parts
+(63 with the red Courier Vest, within the 64). The R15 part, joint and attachment names are unchanged. The people of
+the world (`server/Npcs.luau`) wear the same body (`Geometry.spec("person")`, a kid at 0.75), dressed in their looks;
+the infected keep the 6.0 block body. The kit stays authored on the block body: `shared/KitFit.luau` scales it onto the
+slimmer one, and a small hand holds the art in its palm (the phone: `KitFit.Palm`, the wrist rolled screen up).
+
+**The animations** (procedural, the joints' Transform in PreSimulation, through one book of the poses,
+`client/PoseLedger.luau`, so the layers add up instead of piling up; numbers in `Config.Body`, the maths in
+`shared/BodyMotion.luau`, tested): `client/BodyLife.luau` breathes (quicker after a sprint), shifts the weight from foot
+to foot standing still, turns the head to a person near and in front (your courier also to the job's ring), blinks,
+dips the knees landing by the fall's speed, flinches when hit and adds the walk's weight (a bob from the stock walk's
+own thighs, a little more arm swing, the chest turning) under the sprint's run; on every player and person within 120
+studs, at most 40, the small motions within 50. The stock walk and run play slower for the longer legs
+(`CourierMotion.StockHip`). `client/ArmPose.luau`: carrying, both hands reach the box's sides (a two-bone reach from
+`CarryAt` / `CarrySize`, which `server/Cargo.luau` sets from the held piece) and the body leans back with a heavy load;
+a piece picked up off the ground plays "pickup": down on the knees, the back bent, the hands on the piece, which comes
+up into them after `Config.Body.PickupLift` (also picking up a set-down bag); gestures with the legs keep the feet where
+they stood.
+
+**Test in Studio:** the courier from all sides and in the dark (the face, the cap, the hands), with the Courier Vest,
+the shoes, each bag and the phone (in the palm, screen up); the people (hats, hair, coats, kids); idle 20 s (breath,
+weight shift, blinks, the head to Marge and to the ring), walk / sprint / stop, jump and fall from a roof (the dip),
+a zombie hit (the flinch); pick up a piece you put down (G, then E) and a set-down bag; carry one and two pieces and a
+heavy one (the hands on the box, walking); seats, bikes, the scooter, zip lines and ladders (nothing posed there); the
+feet on the ground everywhere (Output: no Unstuck lifts).
+
 ## Real-size bags, items in the hand, the throw's wind-up (6.7, part A)
 
 The owner: "The bags and the character aren't realistic at all, there are no animations, the bag is small, the things

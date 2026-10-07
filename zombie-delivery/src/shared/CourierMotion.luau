@@ -11,7 +11,13 @@ Motion.Animations = {
 	swim = "rbxassetid://507784897", swimidle = "rbxassetid://507785072", sit = "rbxassetid://2506281703",
 }
 
-function Motion.select(state: string, speed: number, vertical: number, seated: boolean): (string?, number)
+-- 6.7: the stock tracks are paced for a body standing on this hip height. A longer leg covers more ground with every
+-- step: `stride` (the body's HipHeight / StockHip; 1 when not given) slows the walk and the run to match, so the feet do
+-- not slide (the realistic courier: 2.2 / 2).
+Motion.StockHip = 2
+
+function Motion.select(state: string, speed: number, vertical: number, seated: boolean, stride: number?): (string?, number)
+	local legs = math.max(stride or 1, 0.25)
 	if state == "Dead" then return nil, 1 end
 	if seated or state == "Seated" then return "sit", 1 end
 	if state == "Jumping" then return "jump", 1 end
@@ -24,8 +30,8 @@ function Motion.select(state: string, speed: number, vertical: number, seated: b
 	-- Physics/platform-stand interactions (ziplines) supply their own pose.
 	if state == "Physics" or state == "PlatformStanding" or state == "Ragdoll" then return nil, 1 end
 	if speed < 0.7 then return "idle", 1 end
-	if speed < 18 then return "walk", math.clamp(speed / 12.8, 0.25, 2) end
-	return "run", math.clamp(speed / 24, 0.5, 2)
+	if speed < 18 then return "walk", math.clamp(speed / (12.8 * legs), 0.25, 2) end
+	return "run", math.clamp(speed / (24 * legs), 0.5, 2)
 end
 
 return Motion

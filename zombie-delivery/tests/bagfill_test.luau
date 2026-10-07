@@ -11,6 +11,7 @@ local Holding = require("./Holding")
 local KitFit = require("./KitFit")
 local BagFill = require("./BagFill")
 local KitArt = require("./KitGeometry")
+local Geometry = require("./CharacterGeometry") -- 6.7 B: the courier's realistic body
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -78,8 +79,20 @@ check("(6.4's bug: the key itself is no look)", not pcall(KitArt.pieces, "bag@ha
 -- The bodies: the courier's R15 (server/CharacterArt/Geometry.luau) and a classic R6. `parts` the R15 names the kit
 -- asks for → the part it gets there (KitFit.R6) and its size.
 type Body = { name: string, parts: { [string]: { name: string, size: { number } } } }
+-- 6.7 B: the courier's realistic body, as server/CharacterArt/Geometry.luau builds it (its bones and joints).
+local courierBones: { [string]: any } = {}
+local courierJoints: { [string]: any } = {}
+do
+	local courier = Geometry.spec("courier")
+	for _, b in courier.bones do
+		courierBones[b.name] = b
+	end
+	for _, j in courier.joints do
+		courierJoints[j.name] = j
+	end
+end
 local bodies: { Body } = {
-	{ name = "R15 courier", parts = { LeftHand = { name = "LeftHand", size = { 1, 0.3, 1 } }, UpperTorso = { name = "UpperTorso", size = { 2, 1.6, 1 } } } },
+	{ name = "R15 courier", parts = { LeftHand = { name = "LeftHand", size = courierBones.LeftHand.size }, UpperTorso = { name = "UpperTorso", size = courierBones.UpperTorso.size } } },
 	{ name = "R6", parts = { LeftHand = { name = KitFit.R6.LeftHand, size = { 1, 2, 1 } }, UpperTorso = { name = KitFit.R6.UpperTorso, size = { 2, 2, 1 } } } },
 }
 check("R6 stand-ins: the bag under the Left Arm, the places on the Torso", KitFit.R6.LeftHand == "Left Arm" and KitFit.R6.UpperTorso == "Torso")
@@ -123,12 +136,17 @@ for _, body in bodies do
 				check(`{label}: the grip on its body part ({part.name})`, length(at) < (if spot then 2 else 1.5), length(at))
 				check(`{label}: full, every piece within 3 studs of the {part.name}`, far <= 3, `{farName} {far}`)
 				if place == "hand" and body.name == "R15 courier" then
-					-- the hand at x = -1.5 from the root, the left leg up to x = -1: a full bag still clears it
+					-- 6.7 B: the realistic courier's left hand hangs closer to the leg (x = -0.89 from the root, the leg's
+					-- outside at -0.67); client/BagSway.luau holds the bag arm out Config.Courier.BagArm.Out degrees about
+					-- the shoulder: a full bag, hanging straight from its grip, still clears the leg
+					local hand, leg, shoulder = courierBones.LeftHand, courierBones.LeftUpperLeg, courierJoints.LeftShoulder.at
+					local below = shoulder[2] - (hand.at[2] + at[2])
+					local gripX = hand.at[1] + at[1] - below * math.sin(math.rad(Config.Courier.BagArm.Out))
 					local inner = -math.huge
 					for _, piece in full do
-						inner = math.max(inner, -1.5 + at[1] + piece.at[1] + halfX(piece))
+						inner = math.max(inner, gripX + piece.at[1] + halfX(piece))
 					end
-					check(`{label}: full, it clears the left leg`, inner < -1, inner)
+					check(`{label}: full, it clears the left leg`, inner < leg.at[1] - leg.size[1] / 2, inner)
 				end
 			end
 		end

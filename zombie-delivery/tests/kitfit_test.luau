@@ -87,6 +87,34 @@ check("a uniform scale: every size by it, whatever the turn", same(uniform[3].si
 local oblique = KitFit.fit({ { size = { 1, 1, 1 }, at = { 0, 0, 0 }, attach = "UpperTorso", turn = { 0, 0, 45 } } }, { UpperTorso = { 2, 1, 1 } })
 check("an oblique piece: between the factors", oblique[1].size[1] > 1 and oblique[1].size[1] < 2 and near(oblique[1].size[3], 1))
 
+-- 6.7: the realistic body's fist (0.22 x 0.36 x 0.4) holds the art in its palm --------------------------------------
+
+local fist = KitFit.factors("RightHand", { 0.22, 0.36, 0.4 })
+check("the fist: the smallest hand factor", near(fist[1], KitFit.HandMin) and fist[1] < KitFit.SlabHand, fist[1])
+check("the block hand keeps its factor", near(KitFit.factors("RightHand", { 1, 0.3, 1 })[1], 1))
+check("the left hand and the pelvis are measured too", KitFit.Nominal.LeftHand ~= nil and KitFit.Nominal.LowerTorso ~= nil
+	and near(KitFit.factors("LeftHand", { 0.22, 0.36, 0.4 })[1], KitFit.HandMin))
+local phone = {
+	{ name = "Case", size = { 0.68, 1.18, 0.11 }, at = { 0, -0.12, -0.3 }, attach = "RightHand" },
+	{ name = "Screen", size = { 0.57, 0.9, 0.025 }, at = { 0, -0.11, -0.37 }, attach = "RightHand" },
+	{ name = "Lens", size = { 0.035, 0.12, 0.12 }, at = { -0.22, 0.34, -0.225 }, attach = "RightHand", turn = { 0, 90, 0 } },
+}
+local held = KitFit.fit(phone, { RightHand = fist })
+local palm = KitFit.Palm.RightHand
+check("in the palm: the art's middle on the palm spot", same(held[1].at, palm.to), `{held[1].at[1]} {held[1].at[2]} {held[1].at[3]}`)
+check("in the palm: scaled by the hand's one factor", same(held[1].size, { 0.68 * fist[1], 1.18 * fist[1], 0.11 * fist[1] }))
+check("in the palm: the screen faces the palm's way (-X, the body)", held[2].at[1] < held[1].at[1] and near(held[2].at[3], 0, 1e-9))
+check("in the palm: turned a quarter about the hand", near(held[1].turn[2], 90, 1e-6) and near(held[1].turn[1], 0, 1e-6))
+-- the lens, already turned a quarter, turns on with it: half round about Y (or its mirror) faces the same way
+local lensTurn = held[3].turn
+local cosY = math.cos(math.rad(lensTurn[2])) * math.cos(math.rad(lensTurn[1]))
+check("in the palm: a turned piece turns with it", near(math.abs(cosY), 1, 1e-6), `{lensTurn[1]} {lensTurn[2]} {lensTurn[3]}`)
+check("in the palm: off the palm, not in it", held[1].at[1] + held[1].size[3] / 2 <= -0.11 + 1e-6)
+local blockHeld = KitFit.fit(phone, { RightHand = { 1, 1, 1 } })
+check("a block hand: the art as authored", same(blockHeld[1].at, phone[1].at) and blockHeld[1].turn == nil)
+local leftHeld = KitFit.fit({ { name = "Case", size = { 0.68, 1.18, 0.11 }, at = { 0, -0.12, -0.3 }, attach = "LeftHand" } }, { LeftHand = fist })
+check("the left palm faces +X", same(leftHeld[1].at, KitFit.Palm.LeftHand.to) and KitFit.Palm.LeftHand.to[1] > 0)
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else
