@@ -251,7 +251,7 @@ type Piece = {
 }
 
 -- 6.1: the plastic bag set down on the ground with its cargo (only the owner picks it up).
-type BagDown = { pieces: { Piece }, model: Model, prompt: ProximityPrompt, at: Vector3 }
+type BagDown = { pieces: { Piece }, model: Model, prompt: ProximityPrompt, at: Vector3, base: BasePart?, id: string?, art: any? }
 
 -- 3.7: pieces, bottom first (two light pieces stacked; one otherwise). The prompt (Put down / Let go) sits on the top one.
 -- 4.0: `tool` = on the trolley or the jack the player pushes (no prompt: the tool's own G).
@@ -3631,6 +3631,19 @@ end
 -- (6.1 review: the prompt's count follows the pieces: a failed order takes its own out)
 local function bagPromptText(down: BagDown)
 	down.prompt.ObjectText = bagText(#down.pieces)
+	-- (6.4.1 review: and its art shows the pieces it holds now: a failed order took its own out, a set-down added more)
+	local base = down.base
+	if base and base.Parent then
+		local old = down.art
+		if old and old.model then
+			old.model:Destroy()
+		end
+		local looks: { string } = {}
+		for _, piece in down.pieces do
+			table.insert(looks, piece.look)
+		end
+		down.art = KitWear.bagArt(down.model, base, down.id, #looks, looks)
+	end
 end
 
 -- The loaded bag left the owner's hand: set down at their feet (a little ahead, on the left) with its pieces, KitWear's
@@ -3693,11 +3706,11 @@ local function setBagDown(session: Session): boolean
 	for _, piece in pieces do
 		table.insert(looks, piece.look)
 	end
-	KitWear.bagArt(model, base, id, #looks, looks)
+	local art = KitWear.bagArt(model, base, id, #looks, looks)
 	model.Parent = folder
 	local p = prompt(base, "Pick up bag", bagText(#pieces), nil, Config.Hand.BagHold, session.owner)
 	p.MaxActivationDistance = Config.Hand.BagReach
-	local made: BagDown = { pieces = pieces, model = model, prompt = p, at = spot }
+	local made: BagDown = { pieces = pieces, model = model, prompt = p, at = spot, base = base, id = id, art = art }
 	session.bagDown = made
 	p.Triggered:Connect(function(by)
 		pickUpBag(session, by)

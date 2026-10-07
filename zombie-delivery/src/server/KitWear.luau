@@ -212,6 +212,10 @@ function KitWear.bagArt(parent: Instance, pivot: BasePart, id: string?, count: n
 	end)
 	if not ok then
 		warn(`[KitWear] bag {look}: {made}`)
+		if (count or 0) > 0 then
+			-- (6.4.1 review: the contents went wrong: the bag itself still shows, empty)
+			return KitWear.bagArt(parent, pivot, id, 0, nil)
+		end
 		return nil
 	end
 	local built = made :: Builder.Built
@@ -514,6 +518,7 @@ local function dress(player: Player, character: Model)
 		table.insert(wearer.connections, humanoid.Died:Connect(function()
 			takeOff(wearer) -- at once: the body falls apart, loose pieces would drop through the world
 			character:SetAttribute("PhoneHeld", nil)
+			character:SetAttribute("BagWorn", nil) -- (6.4.1 review: no bag on a dead body: BagSway's check stays quiet)
 		end))
 		schedule(player)
 	end)

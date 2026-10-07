@@ -195,8 +195,17 @@ local function step(dt: number)
 			elseif type(since) ~= "number" then
 				checks[character] = now
 			elseif now - since >= CHECK.After then
-				checks[character] = true
-				diagnose(character, worn)
+				-- (6.4.1 review: not on a dead body, nor while a body part is being swapped: the bag hangs loose
+				-- for a moment then; look again a little later)
+				local pivot = character:FindFirstChild("KitBagPivot")
+				local joint = pivot and pivot:FindFirstChild("BagSwing")
+				local part0 = if joint and joint:IsA("Motor6D") then joint.Part0 else nil
+				if humanoid.Health <= 0 or (part0 ~= nil and part0.Parent ~= character) then
+					checks[character] = now
+				else
+					checks[character] = true
+					diagnose(character, worn)
+				end
 			end
 		end
 		local rec = recs[character]
