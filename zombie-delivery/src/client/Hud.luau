@@ -5,7 +5,7 @@
 -- the actions (MAP, CREW and MENU with every other action and its key), the consumables (items, keys 1-5: 6.0.1, the
 -- bottom bar of client/Hotbar.luau, with what you carry; this HUD places it, its keys and its use path are here), the
 -- employers (their car and gun rewards), the shops (opened by their counters; earned guns are not sold; the car guns at
--- Wrench Garage), the weapon (your gun, or the car gun while you drive a car that has one), the backpack (with the
+-- Wrench Garage), the weapon (your gun, or the car gun while you drive a car that has one), the I window (with the
 -- job's cargo; 5.3: its BAG tab during a run, client/BagUi.luau, and the bag's chip on the contract), the delivery result (with the XP, a level-up and the crew's pay split), toasts, the FIRE button for
 -- touch screens and the way to the target (the park circle with a beam, on foot the pile / the person or the
 -- vehicle's back, a small waypoint with the name and the distance).
@@ -35,8 +35,9 @@
 -- client/TouchControls.luau's SPRINT and EXIT / PUT DOWN, which share the hand button's place); a tap on the weapon
 -- line opens the weapon wheel (Hud.onWeaponWheel); the hints drop the (E) / (G) keys a touch screen has no keys for.
 -- A gamepad: Y opens MENU with the selection on its first entry (A takes it).
--- 5.0: Last Stop Supplies has two tabs, ITEMS and KIT (personal gear, client/KitShop.luau); with no vehicle yet the
--- hint says "On foot · J for the board · Supplies for a backpack"; the PHONE action over the weapon line belongs to
+-- 5.0: Last Stop Supplies has two tabs, ITEMS and KIT (personal gear, client/KitShop.luau; 6.6: the bags are ZDC
+-- Bags', the depot's kiosk: its own list, KitShop.render "bags"); with no vehicle yet the hint says "On foot · J for
+-- the board"; the PHONE action over the weapon line belongs to
 -- client/Phone.luau (it reads this HUD's RightStack / WeaponBar to sit there).
 -- 5.8, every window in the courier phone's style (design/phone-ui/): the shop, employer, backpack and result windows
 -- wear Ui.window's ZDC header with a line glyph (the shop's follows its kind), Ui.tabs' square tabs, the phone's red
@@ -137,7 +138,7 @@ end
 local function nearShop(shop: string): boolean
 	local root = myRoot()
 	local info = Map.Shops[shop]
-	return root ~= nil and info ~= nil and Vector3.new(root.Position.X - info.x, 0, root.Position.Z - info.z).Magnitude < Map.ShopRadius
+	return root ~= nil and info ~= nil and Vector3.new(root.Position.X - info.x, 0, root.Position.Z - info.z).Magnitude < Map.shopRadius(shop) -- (6.6: a kiosk's own)
 end
 
 -- ── Cargo ──────────────────────────────────────────────────────────────────
@@ -849,6 +850,7 @@ local function renderShop()
 		depot = { "🅿", "Your cars at the depot lot", "garage" },
 		guns = { "🔫", "Guns for your hands", "shop" },
 		supplies = { "🧰", "Supplies for the road", "shop" },
+		bags = { "🛍️", "Bags · sprint with your deliveries", "shop" }, -- 6.6
 		mechanic = { "🔧", "Upgrades, stages, paint and car guns", "settings" },
 		bikes = { "🚲", "Bikes and bike gear", "shop" }, -- 5.1
 	} :: { [string]: { string } })[shopId] or { "🏪", "", "shop" }
@@ -979,6 +981,9 @@ local function renderShop()
 			renderShop()
 		end)
 		require(script.Parent.BikeShop).render(shop.body, state, here, shopFocus)
+	elseif shopId == "bags" then
+		-- 6.6: ZDC Bags, the depot's bag kiosk: the bags only (client/KitShop.luau's list, USE for the one you own)
+		require(script.Parent.KitShop).render(shop.body, state, here, "bags")
 	elseif shopId == "supplies" then
 		-- 5.0: two tabs: ITEMS (the consumables) and KIT (personal gear, client/KitShop.luau; it keeps the open tab).
 		tabs(shop.body, { { "items", "ITEMS" }, { "kit", "KIT" } }, require(script.Parent.KitShop).currentTab(state), function(id)
@@ -986,7 +991,7 @@ local function renderShop()
 			renderShop()
 		end)
 		if require(script.Parent.KitShop).currentTab(state) == "kit" then
-			require(script.Parent.KitShop).render(shop.body, state, here)
+			require(script.Parent.KitShop).render(shop.body, state, here, "kit")
 			return
 		end
 		for order, def in Config.Items do
@@ -1296,7 +1301,7 @@ end
 
 local backpack: any, renderBackpack: any, useItem: any, toggleBackpack: any
 do -- (its own block: the locals below stay out of the 200-register limit)
-backpack = window("Backpack", Vector2.new(640, 540), "🎒", "Your items, cars and guns")
+backpack = window("Bag & items", Vector2.new(640, 540), "🛍️", "Your items, bags, cars and guns") -- (6.6: no backpack in its name)
 local backpackTab = "items"
 -- (renderBackpack is declared above the block)
 
@@ -1373,7 +1378,7 @@ function renderBackpack()
 	-- 6.4: BAGS, the bags you own and the one in use (client/BagUi.luau BagUi.bags: USE)
 	local tabList = { { "items", "ITEMS" }, { "bags", "BAGS" }, { "cars", "CARS" }, { "guns", "GUNS" } }
 	if job then
-		table.insert(tabList, 1, { "bag", "🎒 BAG" })
+		table.insert(tabList, 1, { "bag", "📦 CARRYING" }) -- (6.6: what you carry: hands, bag, the bike's bag)
 	end
 	tabs(backpack.body, tabList, backpackTab, function(id)
 		backpackTab = id
@@ -1460,7 +1465,7 @@ function toggleBackpack()
 		renderBackpack()
 	end
 end
--- 5.3: the phone's ORDERS app (🎒 BAG) opens the I window on its BAG tab (client/BagUi.luau).
+-- 5.3: the phone's ORDERS app (🛍 BAG) opens the I window on its BAG tab (client/BagUi.luau).
 require(script.Parent.BagUi).onOpen = function()
 	closeWindows()
 	backpackTab = if job then "bag" else "items"
@@ -1837,7 +1842,7 @@ BUTTONS = {
 	{ id = "crew", menu = true, icon = "👥", text = "CREW", key = "K", onClick = function() -- (6.5: out of the row)
 		hook("crew panel", Hud.onCrew)
 	end },
-	{ id = "bag", menu = true, icon = "🎒", text = "BAG", key = "I", onClick = function()
+	{ id = "bag", menu = true, icon = "🛍️", text = "BAG", key = "I", onClick = function()
 		toggleBackpack()
 	end },
 	{ id = "car", menu = true, icon = "🚗", text = "CAR", onClick = function()

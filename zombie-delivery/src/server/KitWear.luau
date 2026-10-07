@@ -5,9 +5,7 @@
 -- the upper arms, the feet, the right hand), massless and never colliding, touching or hit by rays. The joints are
 -- never touched (no C0); the parts ride the body parts wherever the animation puts them, seated in a car too.
 --
---   pack    the best backpack owned (Config.Kit: the Big Backpack, else the Courier Backpack) on the back
---   load    the one parcel on it while the pack holds something (the player's PackCount attribute > 0, server/Cargo.luau
---           on a foot job): on the Courier Backpack's top, strapped on the Big Backpack's lid
+--   (6.6: the backpack slots "pack" and "load" are gone with the backpacks: one carrying item, the bag)
 --   shoes   the Running Shoes on both feet
 --   jacket  the Thermal Jacket on the torso, its sleeves on the upper arms
 --   hand    6.0: the plastic bag (Config.Courier.BagKit) in the left hand: its art hangs from a small part, BagPivot,
@@ -39,7 +37,7 @@
 -- The art is authored for a nominal block R15 body; every piece is scaled per axis to the size of the body part it
 -- sits on (shared/KitFit.luau: a wider torso, a deeper foot …; clamped, the hand with one factor). Nothing runs per
 -- frame: a player's pieces are compared with what they should wear after an event (a spawn, the avatar loading or
--- rescaling a body part, the profile changing, PackCount, sitting, the Carrying / Pushing / Aiming attributes, the
+-- rescaling a body part, the profile changing, sitting, the Carrying / Pushing / Aiming attributes, the
 -- phone remote), at most every REFRESH seconds, and only what changed is built again (Builder.destroy first). Death
 -- takes everything off at once; leaving cleans up.
 --
@@ -47,7 +45,7 @@
 -- which threw inside every refresh, so no bag was ever built (and nothing after it in that refresh). The hand slot no
 -- longer asks KitArt for its key (KitFit.parseBagKey gives the look), and one slot that fails to build only warns:
 -- the rest of the outfit is still put on. An R6 body wears the kit too (KitFit.R6: the bag under "Left Arm", the
--- straps, the pack and the bag's places on the "Torso"). What is in the bag shows (shared/BagFill.luau): the pieces
+-- straps and the bag's places on the "Torso"). What is in the bag shows (shared/BagFill.luau): the pieces
 -- (the player's BagCount / BagLooks attributes, server/Cargo.luau) stick out of its opening and the body swells; only
 -- the bag's art is built again when they change (the pivot and its swinging joint stay). tools/character-art/check.py
 -- builds every bag in every place on the courier's R15 body and on an R6 body offline.
@@ -72,9 +70,8 @@ local CharacterArt = require(script.Parent.CharacterArt.Geometry) -- 6.0.1: the 
 local KitWear = {}
 
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
-local BIGPACK_LOAD_Y = 1.3 -- the parcel on the Big Backpack's lid (the art puts it on the Courier Backpack's top)
 local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit.outfit's vest when no armour is owned)
-local NAMES: { [string]: string } = { pack = "KitPack", load = "KitParcel", shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" }
+local NAMES: { [string]: string } = { shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" }
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
 -- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays). 6.1: not for
@@ -112,13 +109,6 @@ local function piecesFor(slot: string, id: string): { any }
 	end
 	if slot == "phone" then
 		return PhoneArt.pieces("phone")
-	end
-	if slot == "load" then
-		local parcel = KitArt.load()
-		if id == "bigpack" then
-			parcel.at = { parcel.at[1], BIGPACK_LOAD_Y, parcel.at[3] }
-		end
-		return { parcel }
 	end
 	if slot == "vest" and id == HIVIS then
 		-- 6.0.1: the courier's own vest, as kit pieces (any finish: dye() gives them their real colours after the build)
@@ -158,10 +148,9 @@ end
 
 -- 6.0: the bag's pivot, hung from the left hand by the BagSwing Motor6D (the clients write its Transform), placed
 -- before the art is built on it. Nil without a left hand. 6.4: `place` (Config.Courier.BagPlaces: "hand", or
--- "shoulder" / "hip" / "back" / "hipBack" on the UpperTorso, scaled to it; `packed`: a backpack is worn, a slung bag
--- hangs PackPush further back); the pivot's Bag and Worn attributes tell client/BagSway.luau which bag hangs where.
+-- "shoulder" / "hip" / "back" / "hipBack" on the UpperTorso, scaled to it); the pivot's Bag and Worn attributes tell client/BagSway.luau which bag hangs where.
 -- 6.4.1: the spot is KitFit.bagGrip's (tested); on an R6 body the "Left Arm" / the "Torso" (KitFit.R6).
-local function hangBag(character: Model, id: string, place: string, packed: boolean): (BasePart?, BasePart?)
+local function hangBag(character: Model, id: string, place: string): (BasePart?, BasePart?)
 	local spot = Config.Courier.BagPlaces[place]
 	local name = if spot then spot.part else "LeftHand"
 	local hand = bodyPart(character, name)
@@ -176,7 +165,7 @@ local function hangBag(character: Model, id: string, place: string, packed: bool
 	pivot.Transparency = 1
 	pivot.Anchored = false -- (never anchored: joined to the body, it would freeze it)
 	pivot.Massless, pivot.CanCollide, pivot.CanQuery, pivot.CanTouch, pivot.CastShadow = true, false, false, false, false
-	local at, turn = KitFit.bagGrip(id, place, name, { hand.Size.X, hand.Size.Y, hand.Size.Z }, packed)
+	local at, turn = KitFit.bagGrip(id, place, name, { hand.Size.X, hand.Size.Y, hand.Size.Z })
 	local grip = CFrame.new(at[1], at[2], at[3]) * CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
 	pivot.CFrame = hand.CFrame * grip
 	local joint = Instance.new("Motor6D")
@@ -248,12 +237,12 @@ end
 local function build(character: Model, slot: string, id: string, fill: Fill?): Slot?
 	if slot == "hand" then
 		-- 6.0: the bag, on its pivot (not fitted: it hangs, the hand's size does not shape it). 6.4: the key is
-		-- "id@place" (KitFit.bagKey), "+" at the end while a backpack is worn; 6.4.1: only `bagId` is a KitArt look.
-		local bagId, place, packed = KitFit.parseBagKey(id)
+		-- "id@place" (KitFit.bagKey); 6.4.1: only `bagId` is a KitArt look.
+		local bagId, place = KitFit.parseBagKey(id)
 		if not bagId or not place then
 			return nil
 		end
-		local hand, pivot = hangBag(character, bagId, place, packed)
+		local hand, pivot = hangBag(character, bagId, place)
 		if not hand or not pivot then
 			return nil
 		end
@@ -327,7 +316,7 @@ end
 
 -- 6.0: is the left hand free for the bag (nothing pushed, not seated)? 6.1: and is the bag what you hold? 6.4: where
 -- the active bag shows (Holding.wornAs: "hand" | "shoulder" | "hip" | "back", nil: not shown) and its slot key
--- ("id@place", "+" with a backpack worn: a slung bag hangs behind it).
+-- ("id@place").
 local function bagWorn(character: Model, humanoid: Humanoid, bag: Config.KitDef?): string?
 	if not bag then
 		return nil
@@ -338,9 +327,9 @@ local function bagWorn(character: Model, humanoid: Humanoid, bag: Config.KitDef?
 	return Holding.wornAs(if type(hand) == "string" then hand else "fists", bag.carry, bag.stays, busy)
 end
 
-local function bagKey(bag: Config.KitDef, worn: string, packed: boolean): string
+local function bagKey(bag: Config.KitDef, worn: string): string
 	local place = if worn == "back" and bag.carry == "hip" then "hipBack" else worn
-	return KitFit.bagKey(bag.id, place, packed and worn == "back")
+	return KitFit.bagKey(bag.id, place)
 end
 
 local function holdsPhone(player: Player, character: Model, humanoid: Humanoid): boolean
@@ -373,14 +362,14 @@ local function refresh(player: Player)
 	local worn: string? = nil
 	if humanoid and humanoid.Health > 0 and profile and player.Character == character and character.Parent then
 		local bag = TransportRules.activeBag(profile.kit, profile.activeBag) -- 6.4: the bag in your hand
-		wanted = KitFit.outfit(profile.kit, (tonumber(player:GetAttribute("PackCount")) or 0) > 0, if bag then bag.id else "")
+		wanted = KitFit.outfit(profile.kit, if bag then bag.id else "")
 		if holdsPhone(player, character, humanoid) then
 			wanted.phone = "phone"
 		end
 		-- 6.4: the bag where it is carried now (the hand, the shoulder, the hip, the back) and its strap
 		worn = if wanted.hand then bagWorn(character, humanoid, bag) else nil
 		if bag and worn then
-			local key = bagKey(bag, worn, wanted.pack ~= nil)
+			local key = bagKey(bag, worn)
 			wanted.hand = key
 			local _, place = KitFit.parseBagKey(key)
 			if #KitArt.straps(bag.id, place or worn) > 0 then
@@ -554,9 +543,6 @@ local function watch(player: Player)
 		dress(player, character)
 	end)
 	player.CharacterAppearanceLoaded:Connect(function()
-		schedule(player)
-	end)
-	player:GetAttributeChangedSignal("PackCount"):Connect(function()
 		schedule(player)
 	end)
 	-- 6.4.1: the pieces in the bag (its art shows them)

@@ -21,8 +21,8 @@
 --
 -- Getting on: a "Board" prompt at the front-right door while the bus stands at a stop (Dwell seconds, Config.Bus).
 -- On foot only (not out of a car or off a bike, not mid-boarding, not pushing a trolley), never during a mission,
--- and the hands must go into the backpack (Cargo.canStowHands; Cargo.update stows them as you sit, like on a bike):
--- else "Your hands are full: no room in the backpack". A free passenger seat → Seat:Sit. Free of charge.
+-- and the hands must go into the bag (6.6: Cargo.canStowHands; Cargo.update stows them as you sit, like on a bike):
+-- else "Your hands are full: no room in your bag". A free passenger seat → Seat:Sit. Free of charge.
 -- 5.7: not at once: the seat is kept for you and your character marked (BusBoard = "line:index:seat", BusBoardAt = the
 -- server time), your own client walks you in (to the door, up its step, along the aisle, sit: client/BusRide.luau,
 -- Config.Interact.BusBoard; everybody's clients pose it, the folding door opens for it) and THIS server seats you
@@ -390,7 +390,7 @@ local function board(player: Player, bus: Bus)
 		return
 	end
 	if not Cargo.canStowHands(player) then
-		tell(player, "Your hands are full: no room in the backpack.")
+		tell(player, "Your hands are full: no room in your bag.")
 		return
 	end
 	local seat = freeSeat(bus)

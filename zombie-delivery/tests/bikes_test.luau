@@ -89,9 +89,10 @@ local carGear: Economy.CarGear = { rustbike = { basket = "installed" }, citybike
 check("bikeRoom: the bike and its installed gear", Transport.bikeRoom("rustbike", carGear) == 3 and Transport.bikeRoom("citybike", carGear) == 1
 	and Transport.bikeRoom("van", carGear) == 0 and Transport.bikeRoom(nil, carGear) == 0)
 local plain = Transport.bike(3, {})
-local packed = Transport.bike(3, { bigpack = true, shoes = true })
-check("on a bike: its room + the pack, light only, no kit speed", plain.mode == "bike" and plain.room == 3 and plain.lightOnly and plain.speedMult == 1
-	and packed.room == 3 + (4 - Config.Cargo.HandsMax) and packed.speedMult == 1)
+local packed = Transport.bike(3, { tote = true, shoes = true })
+check("on a bike: its own bag + your bag (6.6), light only, no kit speed", plain.mode == "bike" and plain.room == 3 and plain.lightOnly and plain.speedMult == 1
+	and packed.room == 3 + 3 and packed.speedMult == 1)
+check("6.6: an old backpack adds nothing on a bike", Transport.bike(3, { backpack = true, bigpack = true } :: any).room == 3)
 
 -- The shop -------------------------------------------------------------------------------------------------------------
 
@@ -170,8 +171,8 @@ check("… room: 2, with the basket 4, the panniers never count", Economy.capaci
 	and Economy.capacity("escooter", {}, { basket = true, panniers = true, trailer = true }, "parcel") == 4
 	and Economy.bikeRoom("escooter", { basket = true }) == 2)
 local scooterGear: Economy.CarGear = { escooter = { basket = "installed", panniers = "installed" } }
-check("… Transport mode bike: 4 on the scooter + the pack", Transport.isBike("escooter") and Transport.bikeRoom("escooter", scooterGear) == 4
-	and Transport.bike(Transport.bikeRoom("escooter", scooterGear), { bigpack = true }).room == 4 + Transport.packRoom({ bigpack = true }))
+check("… Transport mode bike: 4 on the scooter + your bag", Transport.isBike("escooter") and Transport.bikeRoom("escooter", scooterGear) == 4
+	and Transport.bike(Transport.bikeRoom("escooter", scooterGear), { bag = true }).room == 4 + Transport.packRoom({ bag = true }) and Transport.packRoom({ bag = true }) == 2)
 -- 5.7: the speed ladder on two wheels (the owner: the scooter "a bit slower, so it isn't too much").
 local function top(id: string): number
 	return (Economy.findCar(id) :: Config.CarDef).maxSpeed

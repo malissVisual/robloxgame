@@ -990,6 +990,7 @@ local ICON_GLYPHS: { [string]: string } = {
 	["🏪"] = "shop",
 	["🛒"] = "shop",
 	["🎒"] = "bag",
+	["🛍"] = "bag", -- 6.6: the bag (no backpacks any more)
 	["📦"] = "orders",
 	["🗺"] = "map",
 	["💬"] = "messages",

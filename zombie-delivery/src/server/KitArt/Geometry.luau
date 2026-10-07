@@ -9,6 +9,8 @@
 -- "tote" a beige canvas tote on two long webbing handles, "thermal" the boxy red insulated food bag with a black lid,
 -- base and ZDC patch, "padded" a grey messenger bag with a dark flap, held by its strap, "duffel" a big dark-green
 -- duffel (a lying cylinder) on its two carry handles, a shoulder strap along its side. 1 stud ≈ 35 cm of the courier.
+-- 6.6: the backpacks ("backpack", "backpack_loaded", "bigpack" and Geometry.load's parcel) are no longer sold or worn
+-- (Config.RetiredKit, server/KitWear.luau has no pack slot): their art stays here for the model renders only.
 local Geometry = {}
 type V = { number }
 type Piece = { name: string, size: V, at: V, attach: string, finish: string, turn: V?, shape: string?, shadow: boolean?, text: string? }

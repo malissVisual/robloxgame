@@ -12,7 +12,9 @@
 -- personal gear bought at Last Stop Supplies (kit: Config.Kit ids, shared/Transport.luau) and the phone Marge gives
 -- in the tutorial (phone). 5.1: bikes are Config.Cars entries in cars (bike = true); the equipped `car` may be one,
 -- `bike` is your bike of choice and `lastCar` the car the phone's CALL CAR brings back (server/Shops.luau). 5.4: the
--- fuel in every car you own (carFuel, litres; server/Fuel.luau keeps it, a car without an entry is full).
+-- fuel in every car you own (carFuel, litres; server/Fuel.luau keeps it, a car without an entry is full). 6.6: the
+-- backpacks are gone (Config.RetiredKit): a save from before (no noPacks flag) gets their price back once
+-- (shared/Transport.luau packRefund; profile.packRefund, never saved, tells server/Tutorial.luau to say so).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -69,10 +71,11 @@ export type Profile = {
 	title: string?, -- the title shown over your head and on the leaderboard (an earned one)
 	tutorial: boolean, -- 3.7: the first-day tutorial is done (or skipped); older saves with a delivery count as done
 	explored: string, -- 3.7: the map cells uncovered (shared/Explore.luau encodes them)
-	kit: { [string]: boolean }, -- 5.0: personal gear owned (Config.Kit ids: backpacks, shoes, a jacket), yours for good
+	kit: { [string]: boolean }, -- 5.0: personal gear owned (Config.Kit ids: bags, shoes, a jacket, vests), yours for good
 	-- 6.4: the bag you chose to hold (a Config.Kit bag you own: USE in the KIT tab or the I window's BAGS); nil = the
 	-- best one owned (shared/Transport.luau activeBag decides, a choice no longer owned falls back to it too)
 	activeBag: string?,
+	packRefund: number?, -- 6.6: the money this load paid back for retired backpacks (Marge says so once; never saved)
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
 	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
 	deliveries: number,
@@ -134,6 +137,7 @@ local function newProfile(): Profile
 		explored = "",
 		kit = { bag = true }, -- 6.0.2: the plastic bag from the start (the vest is bought)
 		activeBag = nil, -- 6.4: the best bag owned
+		packRefund = nil, -- 6.6
 		phone = false,
 		vanQuest = nil,
 		deliveries = 0,
@@ -341,6 +345,15 @@ local function applySaved(profile: Profile, saved: any)
 	profile.explored = if type(saved.explored) == "string" and #saved.explored <= 65536 then saved.explored else ""
 	profile.phone = saved.phone == true -- 5.0
 	profile.vanQuest = if saved.vanQuest == "open" or saved.vanQuest == "done" then saved.vanQuest else nil -- 5.0
+	-- 6.6: the backpacks are gone (Config.RetiredKit): a real save from before (no noPacks flag; not a lock-only record
+	-- of a new player) gets their price back, once (the kit below no longer knows them, so they are dropped)
+	if saved.noPacks ~= true and saved.money ~= nil then
+		local refund = require(Shared.Transport).packRefund(saved.kit)
+		if refund > 0 then
+			profile.money = math.min(profile.money + refund, 2 ^ 50)
+			profile.packRefund = refund
+		end
+	end
 	if type(saved.kit) == "table" then
 		for _, def in Config.Kit do
 			if saved.kit[def.id] == true then
@@ -693,6 +706,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		vanStages = true, -- 4.0: the Old Van's four stages (applySaved moves a 3.5 – 3.10 save's van stage once)
 		vestKit = true, -- 6.0.1: the courier vest is bought kit (applySaved gives it once to an older save)
 		starterKit = true, -- 6.0.2: the pistol and the bag of the start (applySaved gives them once to an older save)
+		noPacks = true, -- 6.6: the backpacks are gone (applySaved pays an older save's back once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,
@@ -864,7 +878,7 @@ function PlayerData.giveCar(player: Player, id: string): boolean
 	return new
 end
 
--- 5.0: gives a piece of personal gear (Config.Kit: bought at Last Stop Supplies, the admin tools); true when it is new.
+-- 5.0: gives a piece of personal gear (Config.Kit: bought at Last Stop Supplies or ZDC Bags, the admin tools); true when it is new.
 function PlayerData.giveKit(player: Player, id: string): boolean
 	local profile = profiles[player]
 	local known = false
@@ -906,7 +920,7 @@ local function giveLevelRewards(profile: Profile)
 				end
 			end
 		end
-		local kitCash = Career.grantKit(reward, profile.kit) -- 5.7: a backpack, the shoes (owned: their price)
+		local kitCash = Career.grantKit(reward, profile.kit) -- 5.7: the shoes, 6.6: the tote (owned: their price)
 		profile.money += kitCash
 		profile.earned += kitCash
 		local paint = reward.paint
