@@ -1,9 +1,10 @@
 --!strict
 -- 5.7: the interactions at the car's level (Config.Interact), the pure part: no Roblox at its top level, so
 -- tests/interact_test.luau runs it in the standalone Luau. The clients build their CFrames and joint rotations from
--- these plain numbers (client/Interact.luau lays the poses over the R15 joints; client/CarBoarding.luau,
--- client/BusRide.luau and client/ZipRide.luau move the bodies), the server times its checks by the same routes
--- (server/ZipLines.luau, server/Buses.luau, server/Vehicles.luau).
+-- these plain numbers (client/Interact.luau lays the poses over the R15 joints; client/CarBoarding.luau and
+-- client/BusRide.luau move the bodies, client/ZipRide.luau raises the hands to the trolley), the server times its
+-- checks by the same routes (server/Buses.luau, server/Vehicles.luau). 6.10: the zip lines' ladders are real trusses
+-- the body climbs by itself; climbRoute and climbEnd are not played any more (kept, with tests/interact_test.luau).
 --
 -- A route: points the body's root goes through, each with how it gets there (`kind`: "walk", "turn", "climb", "over",
 -- "hop", "step", "onto", "off", "sit", "stand"), in how many seconds, the way it faces on arrival (fx, fz; turned to over the
@@ -16,7 +17,7 @@
 --   InteractPose.climbRoute(line, which, up, x, y, z, lift)   a zip line's ladder climb (which: 1 the start's ladder,
 --                                           2 the end's), from (x, y, z): the street, up the ladder, over the roof's
 --                                           edge, across the roof onto the platform (up), or all of it backwards
---   InteractPose.climbEnd(line, which, up, lift)   where a climb ends: x, y, z, fx, fz (the server's end too)
+--   InteractPose.climbEnd(line, which, up, lift)   where a climb ends: x, y, z, fx, fz (5.7: the server's end too)
 --
 -- The poses: a joint table (InteractPose.Pose: radians about X, Y, Z in the R15 joints' own frames: +X swings a limb
 -- forward, +Z swings the right limbs out to the right, the left ones in; the waist's -X leans forward).

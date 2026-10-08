@@ -16,8 +16,10 @@
 -- and uses no tower or block of another line, its middle Spread from every other line's.
 --
 -- Each tower of a line has a ladder on one of its outer walls (the street side; an apartment building's other street
--- side, away from its entrance): a "Climb" there takes you up to the platform, "Climb down" on a platform back to the
--- sidewalk at its foot (server/ZipLines.luau).
+-- side, away from its entrance). 6.10: a real one, a truss the body climbs by itself (ZipLines.truss), up to a little
+-- over the roof; you walk onto the platform through the gap in its back rail, and get down by the ladder again or just
+-- jump off (server/ZipLines.luau builds it all; the 5.7 "Climb" and "Climb down" prompts are gone). A ride starts with
+-- the Zip prompt or a jump on the start platform (ZipLines.canStart, ZipLines.startAt; client/ZipRide.luau).
 --
 -- A ride (ZipLines.at): from standing to Speed in Ramp seconds, at Speed along the cable, slowing over the last Brake
 -- studs to EndSpeed; the rider's root hangs Hang under the cable (the hands up on the trolley's handle).
@@ -33,6 +35,11 @@
 --   ZipLines.surfaceAt(x, z)       what is under a point: "box" (a tower or storefront: its roof's height and the lot),
 --                                  "open" (a block's sidewalk or open lot), "road", "special" or "outside"
 --   ZipLines.boxOf(lot)            a lot's building as a box (x0, z0, x1, z1, top), nil for an open lot
+--   ZipLines.truss(ladder)         6.10: a ladder's truss: its middle (x, y, z) and its height (a multiple of 2)
+--   ZipLines.canStart(line, x, y, z, lift)   6.10: may a ride start with the root here (`lift` over the feet)? The
+--                                  server's check of the Zip prompt and of a jump
+--   ZipLines.startAt(x, y, z, lift)          6.10: the line whose start platform the body is on (a jump there grabs the
+--                                  trolley), or nil
 
 local Config = require(script.Parent.Config)
 local Map = require(script.Parent.Map)
@@ -85,6 +92,8 @@ local BLOCK = Map.BlockSize
 local WALK = Map.WalkTop
 local ROAD = Map.RoadTop
 local STEP = 2 -- studs between two samples along the cable
+local TRUSS_OUT = 1.05 -- 6.10: a ladder's truss stands this far out of its wall (2 deep: 0.05 off the wall)
+local START_UNDER = 1.5 -- 6.10: a ride starts with the feet this far under the start platform's floor at most (the roof)
 
 -- ── The buildings as boxes ─────────────────────────────────────────────────
 
@@ -195,6 +204,16 @@ local function ladderOn(lot: Map.Lot): Ladder
 		return { x = lot.x + sx * lot.w / 2, z = lot.z + sz * (lot.d / 2 - 2.5), nx = sx, nz = 0, base = WALK, top = WALK + lot.h, street = streetOf(lot, sx, 0) }
 	end
 	return { x = lot.x + sx * (lot.w / 2 - 2.5), z = lot.z + sz * lot.d / 2, nx = 0, nz = sz, base = WALK, top = WALK + lot.h, street = streetOf(lot, 0, sz) }
+end
+
+-- 6.10: a ladder's truss (a TrussPart the Humanoid climbs by itself, its height a multiple of 2): its middle x, y, z
+-- and its height. It ends LadderOver over the roof (the climber gets off onto the roof); its foot goes as far into the
+-- sidewalk as the 2-stud steps need. (Its top up to 2 studs over the roof would stand in a rider's way where a ladder
+-- is under the cable: tests/ziplines_test.luau.)
+function ZipLines.truss(ladder: Ladder): (number, number, number, number)
+	local top = ladder.top + Config.ZipLines.LadderOver
+	local height = math.max(2, math.ceil((top - ladder.base) / 2 - 1e-9) * 2)
+	return ladder.x + ladder.nx * TRUSS_OUT, top - height / 2, ladder.z + ladder.nz * TRUSS_OUT, height
 end
 
 -- The ride's numbers for a line (its duration, the studs at full speed).
@@ -421,6 +440,30 @@ function ZipLines.canLetGo(line: Line, t: number): boolean
 		end
 	end
 	return false
+end
+
+-- 6.10: may a ride on the line start with the root at (x, y, z), `lift` over the feet? The server's check of the Zip
+-- prompt and of a jump: within Reach of the start platform's middle along the ground, the feet from a little under its
+-- floor (the roof round it, not the ladder) up to GrabRise over it (a jump on its way up).
+function ZipLines.canStart(line: Line, x: number, y: number, z: number, lift: number): boolean
+	local tuning = Config.ZipLines
+	local a = line.a
+	local feet = y - lift - a.floor
+	return (x - a.x) ^ 2 + (z - a.z) ^ 2 <= tuning.Reach * tuning.Reach and feet >= -START_UNDER and feet <= tuning.GrabRise
+end
+
+-- 6.10: the line whose start platform a body is on, or nil: its root at (x, y, z), `lift` over the feet, over the
+-- platform's floor (half a stud round it) and the feet as ZipLines.canStart wants them. A jump there grabs the trolley
+-- (client/ZipRide.luau).
+function ZipLines.startAt(x: number, y: number, z: number, lift: number): Line?
+	local half = Config.ZipLines.Platform / 2 + 0.5
+	for _, line in ZipLines.lines() do
+		local a = line.a
+		if math.abs(x - a.x) <= half and math.abs(z - a.z) <= half and ZipLines.canStart(line, x, y, z, lift) then
+			return line
+		end
+	end
+	return nil
 end
 
 return ZipLines
