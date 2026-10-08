@@ -40,6 +40,7 @@ local boostUntil = 0
 local boostMultiplier = 1
 local backToldAt = -math.huge -- the "close the back" toast, at most every few seconds
 local fuelTold = { car = nil :: Model?, empty = false, low = false } -- 5.4: the fuel toasts already given for this car
+local turnSaid = 0 -- 6.11: when the Studio diagnostic of a slow scooter turn was last printed
 -- 6.10: the scooter's wheelie (ScooterRide.wheelieStep), the scooter it is on, and the touch button's hold.
 local wheelie = { state = ScooterRide.wheelie(), car = nil :: Model?, touch = false }
 
@@ -348,7 +349,15 @@ local function step(dt: number)
 	look = look.Unit
 
 	-- Against a wall the real speed drops: do not keep a big speed that would shoot the car off when it turns away.
-	local actual = chassis.AssemblyLinearVelocity:Dot(look)
+	-- (6.11: a bike's or a scooter's by how fast it really goes, not only along its nose: in a quick turn the nose leads
+	-- the way it moves for a moment, and that share was taken off the speed in every turn: "it slows down so much when
+	-- I turn")
+	local moving = chassis.AssemblyLinearVelocity
+	local actual = moving:Dot(look)
+	if car:GetAttribute("Bike") == true then
+		local flat = Vector3.new(moving.X, 0, moving.Z).Magnitude
+		actual = if actual >= 0 then flat else -flat
+	end
 	if math.abs(speed) > math.abs(actual) + 8 then
 		speed = actual + (if speed > 0 then 8 else -8)
 	end
@@ -391,6 +400,17 @@ local function step(dt: number)
 		yaw = -steer * ScooterRide.turnRate(speed, baseMax, turn) * ScooterRide.turnFactor(wheelie.state.amount) * (if speed >= 0 then 1 else -1)
 	end
 	angular.AngularVelocity = Vector3.new(0, yaw, 0)
+	if scooter and RunService:IsStudio() then
+		-- 6.11, Studio only: a scooter that is much slower than it should be while it turns says so in the Output (at
+		-- most every 2 s): the numbers to find what holds it back if a turn still slows it
+		local flat = Vector3.new(moving.X, 0, moving.Z).Magnitude
+		local now = os.clock()
+		if math.abs(steer) > 0.3 and throttle > 0 and flat > 3 and flat < speed * 0.75 and now - turnSaid > 2 then
+			turnSaid = now
+			print(string.format("[Drive] scooter in a turn: %.1f studs/s, should be %.1f (along the nose %.1f, top %.0f); steering %.2f, turning %.2f rad/s",
+				flat, speed, moving:Dot(look), maxSpeed, steer, chassis.AssemblyAngularVelocity.Y))
+		end
+	end
 end
 
 function Drive.start()

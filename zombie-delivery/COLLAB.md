@@ -29,6 +29,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.11.1:
+  - **Turn speed:** a bike or a scooter keeps its speed in turns. Drive's wall check uses the real horizontal speed, not the share along the nose.
+  - **Diagnostic:** a Studio-only `[Drive] scooter in a turn` line appears if a turn still slows it.
+  - **Test in Studio:** ride the scooter through turns at speed.
 - Claude · 6.11, the centre:
   - **Central Park** with a Terrain pond, island, fountain, bridge, gazebo and paths on block (0,0) (`server/CentralPark.luau`, `Map.Park`).
   - **The depot** moved to (1,-1) (`Map.Depot`). The towers that stood there are gone but their dice are still rolled (`Map.FormerBlocks`, `tests/centre_test.luau`).
