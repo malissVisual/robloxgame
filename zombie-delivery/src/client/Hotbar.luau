@@ -169,7 +169,7 @@ local function use(index: number)
 	if not id then
 		local say = Hotbar.toast
 		if say and index <= Hotbar.SLOTS then
-			say(`Key {index + Hotbar.FIRST_KEY - 1} is empty: Last Stop Supplies sells medkits, energy drinks, molotovs (and car items once you own a car).`)
+			say(`Key {index + Hotbar.FIRST_KEY - 1} is empty: Last Stop Supplies (the gear stall by the spawn) sells medkits, energy drinks, molotovs (and car items once you own a car).`)
 		end
 		return
 	end

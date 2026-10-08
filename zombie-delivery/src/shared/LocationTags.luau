@@ -57,9 +57,9 @@ local SHOP_SUB: { [string]: string } = {
 	guns = "GUN SHOP",
 	mechanic = "UPGRADES · REPAIRS",
 	repairs = "REPAIR SHOP",
-	supplies = "SUPPLIES",
+	supplies = "GEAR", -- (6.12.2: the gear stall's GEAR counter, near from its radius)
 	bikes = "BIKES · BIKE GEAR", -- 5.1
-	bags = "BAGS", -- 6.6: the depot's bag kiosk
+	bags = "BAGS", -- 6.6: the depot's bag kiosk (6.12.2: the gear stall's BAGS counter)
 }
 local PLACE_SUB: { [string]: string } = {
 	park = "SAFE ZONE", -- 6.11: the Central Park in the middle of it (Map.Park)

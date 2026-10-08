@@ -386,10 +386,11 @@ end
 
 -- The shops (Map.Shops ids) in the order a new courier needs them, with what they sell. 6.6: ZDC Bags first (the
 -- depot's bag kiosk, by the spawn); Last Stop Supplies keeps the vests and the items. 6.7: what each really sells
--- (Lead & Co. the gun upgrades and the bat too; Wrench Garage the stages, the car upgrades, gear and paint).
+-- (Lead & Co. the gun upgrades and the bat too; Wrench Garage the stages, the car upgrades, gear and paint). 6.12.2:
+-- the bags and Last Stop Supplies are the two counters of the gear stall by the spawn; no running shoes any more.
 local SHOPS: { { id: string, icon: string, sells: string } } = {
 	{ id = "bags", icon = "🛍️", sells = "Bags (sprint with your deliveries)" },
-	{ id = "supplies", icon = "🛒", sells = "Items, vests, running shoes" },
+	{ id = "supplies", icon = "🛒", sells = "Items and vests, next to the bags" }, -- (6.12.2: the gear stall, no shoes)
 	{ id = "guns", icon = "🔫", sells = "Guns, gun upgrades, a baseball bat" },
 	{ id = "bikes", icon = "🚲", sells = "Bikes, the E-Scooter, bike gear" },
 	{ id = "dealer", icon = "🚗", sells = "Cars, vans and trucks" },

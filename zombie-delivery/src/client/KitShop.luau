@@ -184,7 +184,7 @@ function KitShop.render(body: Instance, state: any, here: boolean, only: string?
 	local armour = Armour.percent(kit) -- 6.0: the best vest's share
 	P.caps(line, (if math.abs(speed - 1) > 0.001 then `  ·  SPEED ×{string.format("%.2g", speed)}` else "  ·  SPEED ×1")
 		.. (if armour > 0 then `  ·  ARMOUR {armour}%` else ""), UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextStrokeTransparency = 1, LayoutOrder = most + 2 })
-	Ui.label(head, if bags then "Your room on foot is your hands + ONE bag: what you pick up drops straight in, and you sprint with it (the hands' pieces stop the sprint). On a bike, its own bag takes the pickups too. Of your bags, the one IN USE counts. Bought once, kept for good." else "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more in a bag (ZDC Bags, by the spawn). The best shoes and vest count. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
+	Ui.label(head, if bags then "Your room on foot is your hands + ONE bag: what you pick up drops straight in, and you sprint with it (the hands' pieces stop the sprint). On a bike, its own bag takes the pickups too. Of your bags, the one IN USE counts. Bought once, kept for good." else "On foot you carry light things only (letters, medicine, pizza, parcels): two in your hands, more in a bag (ZDC Bags, the counter next door). The best vest counts. Bought once, kept for good.", UDim2.new(1, 0, 0, 0), {
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 3,
 		TextColor3 = P.ink2,

@@ -16,7 +16,7 @@
 --   Transport.riding(player)   5.1: is the equipped vehicle a bike (profile.car is one)?
 --   Transport.renting(player)  5.6: is the player's vehicle out a ZDC RIDE rental (server/Rental.luau)? Transport.of
 --                              then counts it as a bike (its rack's slot and the pack), like the owned E-Scooter
---   Transport.applyKit(player) the character attribute KitSpeed (the shoes' walk / sprint multiplier, nil = 1) that
+--   Transport.applyKit(player) the character attribute KitSpeed (the kit's walk / sprint multiplier, nil = 1) that
 --                              client/CameraRig.luau multiplies the walk and the sprint with; set on every spawn and
 --                              whenever the profile changes (a purchase). 6.4: and BreathCost, the active bag's
 --                              bagBreath while the bag is your hand (the duffel: the sprint drains the breath faster,

@@ -110,7 +110,7 @@ check("a 6.6 save with the jacket (noPacks already): $300 back, once", a66.noJac
 local a65 = Transport.retiredRefunds({ money = 900, kit = { jacket = true, backpack = true, bigpack = true } })
 check("a 6.5 save with both backpacks and the jacket: $550 + $300", a65.noPacks == 550 and a65.noJacket == 300)
 check("a save paid back already (noJacket): nothing again", next(Transport.retiredRefunds({ money = 1, noPacks = true, noJacket = true, kit = { jacket = true } })) == nil)
-check("no jacket: nothing", next(Transport.retiredRefunds({ money = 1, noPacks = true, kit = { shoes = true } })) == nil)
+check("no jacket: nothing", next(Transport.retiredRefunds({ money = 1, noPacks = true, noShoes = true, kit = { shoes = true, bag = true } })) == nil)
 check("a lock-only record (no money: a new player) or a broken save: nothing", next(Transport.retiredRefunds({ kit = { jacket = true } })) == nil
 	and next(Transport.retiredRefunds(nil)) == nil and next(Transport.retiredRefunds("jacket")) == nil and next(Transport.retiredRefunds({ money = 5, kit = "jacket" })) == nil)
 local words = string.gsub(Config.Courier.JacketRefund, "{money}", "$300")
@@ -167,7 +167,7 @@ for _, def in Config.Kit do
 	table.insert(shops[shop], def.id)
 end
 check("ZDC Bags: the five bags", table.concat(shops.bags or {}, ",") == "bag,tote,thermal,padded,duffel", table.concat(shops.bags or {}, ","))
-check("Last Stop Supplies: the vest, the shoes, the armour", table.concat(shops.supplies or {}, ",") == "hivis,shoes,kevlar,heavy", table.concat(shops.supplies or {}, ","))
+check("Last Stop Supplies: the vest, the armour (6.12.2: no shoes)", table.concat(shops.supplies or {}, ",") == "hivis,kevlar,heavy", table.concat(shops.supplies or {}, ","))
 check("Lead & Co.: the bat", table.concat(shops.guns or {}, ",") == "bat")
 check("the starters are never sold ($0): the plastic bag and the pistol", (Transport.findKit("bag") :: Config.KitDef).starter == true
 	and (Transport.findKit("bag") :: Config.KitDef).price == 0 and (Economy.findWeapon("pistol") :: Config.WeaponDef).starter == true
