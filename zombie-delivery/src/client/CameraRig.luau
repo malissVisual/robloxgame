@@ -63,7 +63,8 @@ local AIM_WALK_SPEED = 3.5 -- a careful step with the gun up
 local CARRY_SPEED = 8 -- a crate, a barrel or a horse on a rope: no sprinting
 
 -- 4.5: the admin's walk multiplier (the player attribute AdminSpeed: 1, 2 or 4; only server/Admin.luau sets it).
--- 5.0: × the kit's (the character attribute KitSpeed, running shoes: server/Transport.luau applyKit), on every step on
+-- 5.0: × the kit's (the character attribute KitSpeed: server/Transport.luau applyKit; 6.12.2: the Running Shoes and their
+-- +10% are gone, nothing in the kit speeds you up any more), on every step on
 -- foot: the walk, the sprint, the carry.
 local function adminSpeed(): number
 	local value = player:GetAttribute("AdminSpeed")

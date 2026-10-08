@@ -5,6 +5,8 @@
 -- their own and a name over the head), and the counter's "Shop" prompt moves onto them: you shop by talking to the
 -- clerk. They greet you (a wave, a line) and look at you when you come to the counter. server/Shops.luau keeps its own
 -- handler on the same prompt (it opens the shop); a counter without room for a clerk keeps its prompt.
+-- 6.12.2: Dot (Last Stop Supplies) and Nell (ZDC Bags) stand side by side, behind the GEAR and BAGS counters of the
+-- gear stall at the spawn (server/GearStall.luau); Last Stop's old building has no counter, so nobody stands there.
 local Players = game:GetService("Players")
 
 local Map = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Map"))
@@ -17,12 +19,12 @@ type Clerk = { name: string, title: string, role: string, lines: { string } }
 
 -- Who stands behind which counter (the shop ids of World.ShopPrompts).
 local CLERKS: { [string]: Clerk } = {
-	supplies = { name = "Dot", title = "Last Stop Supplies", role = "townsperson", lines = { "Vests, bags, a drink for the road. Take a look.", "Stock up, courier. The night is long." } },
+	supplies = { name = "Dot", title = "Last Stop Supplies", role = "townsperson", lines = { "Vests, medkits, a drink for the road. Take a look.", "Stock up, courier. The night is long." } }, -- (6.12.2: at the gear stall)
 	guns = { name = "Ray", title = "Lead & Co.", role = "townsperson", lines = { "Looking for something with a kick?", "Every round counts out there." } },
 	bikes = { name = "Kip", title = "Spoke & Chain", role = "townsperson", lines = { "Two wheels beat two feet. Have a look.", "Fresh chains, fresh tyres." } },
 	dealer = { name = "Sal", title = "Dead End Motors", role = "townsperson", lines = { "Every one of these runs. Mostly.", "Need more room in the back? Let's talk." } },
 	mechanic = { name = "Gus", title = "Wrench Garage", role = "townsperson", lines = { "Bring it in, I'll make it purr.", "Armour, tyres, a bigger engine?" } },
-	bags = { name = "Nell", title = "ZDC Bags", role = "townsperson", lines = { "A good bag and you can sprint with the goods.", "Pick a bag, any bag." } },
+	bags = { name = "Nell", title = "ZDC Bags", role = "townsperson", lines = { "A good bag and you can sprint with the goods.", "Pick a bag, any bag." } }, -- (6.12.2: next to Dot)
 }
 
 local BEHIND = 1.6 -- studs behind the counter's back face where the clerk stands

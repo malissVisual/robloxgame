@@ -6,8 +6,9 @@
 --
 -- On foot your hands hold Config.Cargo.HandsMax light pieces and your bag (the active one, below) its `extra`. 6.6, one
 -- carrying item: no backpacks any more (Config.RetiredKit: a save that owned one is paid back once, packRefund). The
--- pieces over the hands ride in the bag (server/Cargo.luau's pack). The shoes' `speed` multiplies the walk and the
--- sprint (the character attribute KitSpeed, client/CameraRig.luau). (6.7: the Thermal Jacket and its `warm` are gone.)
+-- pieces over the hands ride in the bag (server/Cargo.luau's pack). A piece's `speed` multiplies the walk and the
+-- sprint (the character attribute KitSpeed, client/CameraRig.luau). (6.7: the Thermal Jacket and its `warm` are gone;
+-- 6.12.2: the Running Shoes and their +10% too, Config.RetiredKit: only the Heavy Armour's slow-down is left.)
 --
 --   Transport.findKit(id)      the Config.Kit entry, or nil
 --   Transport.handsRoom(kit, bag)  light pieces you carry on foot: HandsMax + the active bag's `extra` (6.4: ONE bag,
@@ -15,8 +16,8 @@
 --   Transport.packRoom(kit, bag)  of those, the ones over the hands: the bag's (6.6: bagRoom)
 --   Transport.packRefund(savedKit, flag)  6.6: the money a save's retired backpacks (Config.RetiredKit) are worth, and
 --                              their names (a save's kit table; anything else: 0, none); 6.7: `flag` picks the retired
---                              pieces of one save mark ("noPacks" the default, "noJacket")
---   Transport.retiredRefunds(saved)  6.7: a save's refunds by flag ({ noPacks = n, noJacket = n }: once each)
+--                              pieces of one save mark ("noPacks" the default, "noJacket", 6.12.2: "noShoes")
+--   Transport.retiredRefunds(saved)  6.7: a save's refunds by flag ({ noPacks = n, noJacket = n, noShoes = n }: once each)
 --   Transport.tipShare(kit)    6.7: the tip share of the kit (the Courier Vest's Config.Kit tips; 0 = none)
 --   Transport.kitShop(def)     6.7: the Map.Shops id that sells a piece (its `shop`, else "bags" / "supplies")
 --
@@ -33,7 +34,7 @@
 -- (Every bag's point: you sprint with your deliveries. Pieces in a bag are never in your hands.)
 --   Transport.mixWarm(share, bagWarm)  the drain multiplier of an order whose `share` of pieces with you is in a
 --                              warm bag: 1 − share × (1 − bagWarm)
---   Transport.speedMult(kit)   the walk / sprint multiplier (the best shoes; 1 = none)
+--   Transport.speedMult(kit)   the walk / sprint multiplier (the best speed-up × the slowest piece; 1 = none)
 --   Transport.foot(kit)        Info on foot
 --   Transport.car(room)        Info in a car that holds `room` pieces
 --
@@ -156,8 +157,8 @@ function Transport.packRefund(savedKit: any, flag: string?): (number, { string }
 	return money, names
 end
 
--- The walk / sprint multiplier from the kit (running shoes …). 6.0: a piece below 1 (the Heavy Armour) slows you: the
--- best speed-up times the slowest slow-down.
+-- The walk / sprint multiplier from the kit (6.12.2: no Running Shoes any more). 6.0: a piece below 1 (the Heavy
+-- Armour) slows you: the best speed-up times the slowest slow-down.
 function Transport.speedMult(kit: Kit): number
 	local mult, slow = 1, 1
 	for _, def in Config.Kit do

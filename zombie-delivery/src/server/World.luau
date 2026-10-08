@@ -66,6 +66,11 @@
 -- the giant rooftop set pieces on the shops (server/ShopProps.luau, ShopProps.mount: the depot's parcel, Lead & Co.'s
 -- GUN STORE, the vest and the shoe, the bike, the car, the wrench, Luigi's pizza slice, the bank's coin, the clinic's
 -- cross).
+--
+-- Zombie Delivery 6.12.2, the spawn's corner: the JOBS spot round the depot's job board (server/JobsSpot.luau) and the
+-- gear stall west of the spawn (server/GearStall.luau: ZDC Bags and Last Stop Supplies side by side, in place of 6.6's
+-- bag kiosk); Last Stop's old building on block (0, -1) stands as an ordinary one (buildSupplies, Map.LastStop: no
+-- counter, no clerk, no name board; its rooftop vest and sneaker stay).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -862,9 +867,16 @@ local function buildDepot(parent: Instance)
 	local terminal = part(depot, "GarageTerminal", Vector3.new(6, 7, 3), o * CFrame.new(18, WALK_TOP + 3.5, backZ + 24), Color3.fromRGB(60, 70, 80), Enum.Material.Metal)
 	sign(depot, "GARAGE", Vector3.new(6, 2, 0.3), terminal.CFrame * CFrame.new(0, 2.5, 1.6) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(120, 200, 255))
 	prompt(terminal, "depot", "Switch car", "Depot Garage")
-	-- 6.6: ZDC Bags, the bag kiosk east of the spawn (server/BagKiosk.luau: its own module, World's helpers handed over;
-	-- no new top-level locals here, the -O0 register limit; 6.11: at Map.Shops.bags, which follows the depot)
-	require(script.Parent.BagKiosk).build(depot, { part = part, deco = deco, sign = sign, prompt = prompt, nightLight = DayNight.nightLight })
+	-- 6.12.2 (the owner: "make the jobs have a proper look; next to it a stall for the bags and the gear"): the JOBS spot
+	-- round the job board (server/JobsSpot.luau: a booth with its canopy, the lit JOBS sign, the screens, a bench) and
+	-- the gear stall west of the spawn (server/GearStall.luau, Config.GearStall: the BAGS and GEAR counters, Map.Shops.bags
+	-- and Map.Shops.supplies; it replaces 6.6's kiosk), their own modules with World's helpers handed over (no new
+	-- top-level locals here, the -O0 register limit).
+	do
+		local tools = { part = part, deco = deco, sign = sign, prompt = prompt, nightLight = DayNight.nightLight }
+		require(script.Parent.JobsSpot).build(depot, board, tools)
+		require(script.Parent.GearStall).build(depot, tools)
+	end
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "DepotSpawn"
@@ -1045,22 +1057,32 @@ local function buildRepairShop(parent: Instance, cx: number, cz: number)
 	sign(shop, "🔧 REPAIRS", Vector3.new(8, 3, 0.3), frame * CFrame.new(-w / 2 + 2, 12.5, -d / 2 - 10), Color3.fromRGB(255, 220, 120))
 end
 
+-- 6.12.2: the building on block (0, -1) that was Last Stop Supplies (Map.LastStop): its stock is sold at the depot's
+-- gear stall now (Map.Shops.supplies, server/GearStall.luau), so it stands here as an ordinary building: its look
+-- without the shop's plate, its shelves, and its rooftop set piece kept where it was (the owner likes the props), but no
+-- counter, no prompt, no clerk and no name board.
 local function buildSupplies(parent: Instance)
-	local shop = folder(parent, "LastStopSupplies")
-	local cx, cz = Map.Shops.supplies.x, Map.Shops.supplies.z
+	local shop = folder(parent, "LastStopBuilding")
+	local cx, cz = Map.LastStop.x, Map.LastStop.z
 	sidewalk(shop, cx, cz)
 	local facing = Vector3.new(0, 0, 1)
 	local w, d, h = 64, 44, 14
 	local frame = shopFrame(cx, cz, facing, 18)
 	building(shop, frame, w, d, h, Color3.fromRGB(77, 82, 77), Enum.Material.Concrete, 12, 10)
-	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	-- Approved facade only, minus its shop signage (the labelled plate: "SUPPLIES / COLLECTION").
 	local Kit = require(script.Parent.BuildingLooks.Kit)
-	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Supplies), { part = part, deco = deco, nightLight = DayNight.nightLight })
-	sign(shop, "LAST STOP SUPPLIES", Vector3.new(48, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(140, 255, 120), nil, "supplies", 11)
-	-- 6.11: its rooftop set piece behind the board, a giant courier vest and a running shoe (server/ShopProps.luau)
+	local look = table.clone(require(script.Parent.BuildingLooks.Supplies))
+	local plain = {}
+	for _, detail in look.details do
+		if detail.label == nil then
+			table.insert(plain, detail)
+		end
+	end
+	look.details = plain
+	Kit.build(shop, frame, look, { part = part, deco = deco, nightLight = DayNight.nightLight })
+	-- 6.11: its rooftop set piece, a giant courier vest and a running shoe (server/ShopProps.luau), where it always stood
 	local props = require(script.Parent.ShopProps)
 	props.place(shop, "supplies", frame * props.mount("supplies"))
-	counter(shop, frame, d, "supplies", "Last Stop Supplies")
 	for row = -1, 1, 2 do
 		part(shop, "Shelf", Vector3.new(30, 6, 2), frame * CFrame.new(0, 3, row * 8 - 2), Color3.fromRGB(150, 140, 120), Enum.Material.Wood)
 	end

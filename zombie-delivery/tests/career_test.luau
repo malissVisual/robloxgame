@@ -61,7 +61,16 @@ for level = 2, 4 do
 		check(`level {level}: no car items before a car ({id})`, id ~= "repair" and id ~= "nitro" and id ~= "mine" and id ~= "jerrycan")
 	end
 end
-check("level 3 gives the Canvas Tote (6.6: no backpack), level 4 the Running Shoes", (Career.kitOf(Career.reward(3)) :: any).id == "tote" and (Career.kitOf(Career.reward(4)) :: any).id == "shoes")
+check("level 3 gives the Canvas Tote (6.6: no backpack), level 4 the Thermal Delivery Bag (6.12.2: no Running Shoes)", (Career.kitOf(Career.reward(3)) :: any).id == "tote" and (Career.kitOf(Career.reward(4)) :: any).id == "thermal")
+check("6.12.2: no level gives a retired piece", (function()
+	for level = 2, 20 do
+		local reward = Career.reward(level)
+		if reward and reward.kit and Career.kitOf(reward) == nil then
+			return false
+		end
+	end
+	return true
+end)())
 check("the kit in words", string.find(table.concat(Career.rewardParts(Career.reward(3)), ", "), "the Canvas Tote", 1, true) ~= nil)
 local ownedKit: { [string]: boolean } = {}
 check("a kit reward: yours, nothing to pay", Career.grantKit(Career.reward(3), ownedKit) == 0 and ownedKit.tote == true)

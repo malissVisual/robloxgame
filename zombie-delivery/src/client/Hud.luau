@@ -880,8 +880,8 @@ local function renderShop()
 	local about = ({
 		dealer = { "🚗", "The catalog · every car has a role", "garage" },
 		guns = { "🔫", "Guns, gun upgrades and a bat", "shop" }, -- 6.7
-		supplies = { "🧰", "Items, vests and shoes", "shop" }, -- 6.7
-		bags = { "🛍️", "Bags · sprint with your deliveries", "shop" }, -- 6.6
+		supplies = { "🧰", "Items and vests · the GEAR counter", "shop" }, -- 6.7 (6.12.2: no shoes; at the gear stall)
+		bags = { "🛍️", "Bags · sprint with your deliveries", "shop" }, -- 6.6 (6.12.2: the gear stall's BAGS counter)
 		mechanic = { "🔧", "Stages, car upgrades, gear, paint, car guns", "settings" }, -- 6.7
 		bikes = { "🚲", "Bikes and bike gear", "shop" }, -- 5.1
 	} :: { [string]: { string } })[shopId] or { "🏪", "", "shop" }
@@ -1388,7 +1388,7 @@ function useItem(id: string)
 	local count = if state then state.items[id] or 0 else 0
 	if count <= 0 then
 		local def = Economy.findItem(id)
-		Hud.toast(`No {if def then def.name else id} left. Buy more at Last Stop Supplies.`)
+		Hud.toast(`No {if def then def.name else id} left. Buy more at Last Stop Supplies (the gear stall by the spawn).`)
 		return
 	end
 	Net.get("UseItem"):FireServer(id, Shooting.aimPoint())

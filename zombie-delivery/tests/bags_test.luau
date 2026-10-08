@@ -66,7 +66,7 @@ end
 check("6.6: no kit piece adds room on the back", not anyRoom)
 check("6.6: the retired backpacks keep their prices for the refund", Config.RetiredKit[1].id == "backpack" and Config.RetiredKit[1].price == 150
 	and Config.RetiredKit[2].id == "bigpack" and Config.RetiredKit[2].price == 400 and Config.RetiredKit[1].flag == "noPacks" and Config.RetiredKit[2].flag == "noPacks")
-check("6.7: … and the Thermal Jacket after them, its own flag", #Config.RetiredKit == 3 and Config.RetiredKit[3].id == "jacket" and Config.RetiredKit[3].price == 300
+check("6.7: … and the Thermal Jacket after them, its own flag (6.12.2: the shoes after it, tests/gearstall_test.luau)", #Config.RetiredKit >= 3 and Config.RetiredKit[3].id == "jacket" and Config.RetiredKit[3].price == 300
 	and Config.RetiredKit[3].flag == "noJacket")
 local money, names = Transport.packRefund({ backpack = true, bigpack = true, bag = true, shoes = true })
 check("6.6: both backpacks: $550 back", money == 550 and #names == 2 and names[1] == "Courier Backpack" and names[2] == "Big Backpack", money)
@@ -78,14 +78,15 @@ check("6.6: a false entry or a broken save: nothing", (Transport.packRefund({ ba
 local words = string.gsub(Config.Courier.PackRefund, "{money}", "$550")
 check("6.6: Marge's words", words == "Backpacks are gone: bags do it all now. You got $550 back.", words)
 
--- 6.6, ZDC Bags: the bag kiosk in the depot's safe yard, by the spawn --------------------------------------------------
+-- 6.6, ZDC Bags: the bag kiosk in the depot's safe yard, by the spawn (6.12.2: the gear stall's BAGS counter) ---------
 
 local Map = require("./Map")
 local shop = Map.Shops.bags
 -- (6.11: Config.BagShop, the rack, the spawn, the board, the terminal and Marge are given from the depot's middle,
 -- Map.Depot: the checks below are in the depot's own studs)
 check("6.6: ZDC Bags is a shop", shop ~= nil and shop.name == "ZDC Bags" and shop.x == Map.Depot.x + Config.BagShop.X and shop.z == Map.Depot.z + Config.BagShop.Z)
-check("6.6: a kiosk's own radius, the big shops' as before", Map.shopRadius("bags") == Config.BagShop.Radius and Map.shopRadius("supplies") == Map.ShopRadius and Map.shopRadius("moon") == Map.ShopRadius)
+check("6.6: a kiosk's own radius, the big shops' as before (6.12.2: the gear stall's, Last Stop Supplies' too)", Map.shopRadius("bags") == Config.BagShop.Radius and Map.shopRadius("supplies") == Config.GearStall.Radius
+	and Map.shopRadius("guns") == Map.ShopRadius and Map.shopRadius("moon") == Map.ShopRadius)
 local function away(x: number, z: number): number
 	return math.sqrt((Config.BagShop.X - x) ^ 2 + (Config.BagShop.Z - z) ^ 2)
 end
@@ -98,7 +99,8 @@ check("6.11: the kiosk on the depot's block", (function()
 end)())
 check("6.6: clear of the spawn pad (0, 26), its radius not over it", away(0, 26) - 5 > Config.BagShop.Radius - 2, away(0, 26))
 check("6.6: clear of the scooter rack", away(rack.x + rack.slots * rack.pitch / 2, rack.z) > 12 and away(rack.x - rack.slots * rack.pitch / 2, rack.z) > 12)
-check("6.6: clear of the job board, the garage terminal and Marge", away(-18, -25) > 40 and away(18, -25) > 40 and away(marge[1], marge[2]) > 40)
+-- (6.12.2: next to the JOBS spot now, its radius short of the job board and Marge)
+check("6.6: clear of the job board, the garage terminal and Marge", away(-18, -25) > Config.BagShop.Radius + 8 and away(18, -25) > 40 and away(marge[1], marge[2]) > Config.BagShop.Radius + 8)
 local soldHere = 0
 for _, def in Config.Kit do
 	if Transport.isBag(def) then

@@ -420,17 +420,22 @@ function Tutorial.onPlay(player: Player)
 	bikeLevels[player] = level
 	-- 6.6: a save that owned a backpack got its price back (server/PlayerData.luau, Config.RetiredKit): Marge says so,
 	-- once (profile.packRefund is never saved), the bag kiosk on the GPS. 6.7: the Thermal Jacket's the same way
-	-- (profile.jacketRefund, Config.Courier.JacketRefund)
-	for _, retired in { { money = if profile then profile.packRefund else nil, text = Config.Courier.PackRefund }, { money = if profile then profile.jacketRefund else nil, text = Config.Courier.JacketRefund } } do
+	-- (profile.jacketRefund, Config.Courier.JacketRefund). 6.12.2: the Running Shoes' (profile.shoeRefund,
+	-- Config.Courier.ShoeRefund), Last Stop Supplies (the gear stall's GEAR counter) on the GPS
+	for _, retired in {
+		{ money = if profile then profile.packRefund else nil, text = Config.Courier.PackRefund, shop = "bags" },
+		{ money = if profile then profile.jacketRefund else nil, text = Config.Courier.JacketRefund, shop = "bags" },
+		{ money = if profile then profile.shoeRefund else nil, text = Config.Courier.ShoeRefund, shop = "supplies" },
+	} do
 		local refund = retired.money
 		if profile and refund and refund > 0 then
 			task.delay(BIKE_DELAY, function()
 				if not player.Parent or not remote then
 					return
 				end
-				local shop = Map.Shops.bags
+				local shop = Map.Shops[retired.shop]
 				local words = string.gsub(retired.text, "{money}", `${refund}`)
-				remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = "bags" } else nil })
+				remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = retired.shop } else nil })
 				notice:FireClient(player, `📱 Marge: {words}`)
 			end)
 		end
@@ -438,6 +443,7 @@ function Tutorial.onPlay(player: Player)
 	if profile then
 		profile.packRefund = nil
 		profile.jacketRefund = nil
+		profile.shoeRefund = nil
 	end
 	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0.1: the vest's price in your pocket, not owned: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
