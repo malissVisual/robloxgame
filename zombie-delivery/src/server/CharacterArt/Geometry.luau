@@ -68,7 +68,13 @@ local BLOCK_JOINTS = {
 -- 6.7: the human body. Heights from the sole (the root's middle is G over it, HipHeight = G - 1):
 --   sole 0 · ankle 0.3 · knee 1.55 · hip 2.8 · waist 3.2 · elbow 3.5 · shoulder 4.48 · neck 4.78 · chin 4.98 · crown 5.9
 --   wrist 2.6, the fingertips about 2.0 (mid-thigh). The shoulder joints at x ±ARM, the hips at ±LEG.
-local G = 3.2
+-- 6.8 review: the root's bottom at the hips, as on every R15 body (G 3.8: HipHeight 2.8 = the leg, the hips 1.0 under
+-- the root's middle; 6.7 had G 3.2, the hips 0.4 under it). Roblox's seat weld and Config.Cargo.BoardSitLift put the
+-- root 1.5 over a seat's top: the hips 0.5 over it now, the thighs on the seat (with 3.2 the hips were 1.1 over it,
+-- the thighs floating ~0.7 over car, bus and bike seats).
+-- And the numbers measured from the root that were tuned on the 6.0 block body (its hips 0.95 under the root, its
+-- shoulders 0.75 over it) fit this body again: its shoulders are 0.68 over the root, its head's middle 1.64.
+local G = 3.8
 local ARM = 0.89
 local LEG = 0.35
 local function Y(height: number): number
@@ -222,7 +228,7 @@ function Geometry.spec(id: string, scale: number?, skin: Triple?, shirt: Triple?
 		}
 	end
 	local spec: Spec = { id = id, bones = {}, joints = {}, pieces = {}, hipHeight = (if human then G - 1 else 1.97) * s, budget = 64, grips = {} }
-	-- Root stays 2*s high, so HipHeight remains the leg clearance for every scale.
+	-- Root stays 2*s high, so HipHeight remains the leg clearance for every scale (6.8 review: the leg itself, hip to sole).
 	local body: { { any } } = if human then HUMAN else BLOCK
 	local joints: { { any } } = if human then HUMAN_JOINTS else BLOCK_JOINTS
 	for _, b in body do

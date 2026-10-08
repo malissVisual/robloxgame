@@ -11,10 +11,35 @@ Motion.Animations = {
 	swim = "rbxassetid://507784897", swimidle = "rbxassetid://507785072", sit = "rbxassetid://2506281703",
 }
 
--- 6.7: the stock tracks are paced for a body standing on this hip height. A longer leg covers more ground with every
--- step: `stride` (the body's HipHeight / StockHip; 1 when not given) slows the walk and the run to match, so the feet do
--- not slide (the realistic courier: 2.2 / 2).
-Motion.StockHip = 2
+-- 6.7: the stock tracks are paced for a body standing on this leg. A longer leg covers more ground with every step:
+-- `stride` (Motion.stride: the body's leg / StockLeg; 1 when not given) slows the walk and the run to match, so the feet
+-- do not slide. 6.8 review: the leg is measured on the rig (Motion.leg: hip → knee → ankle → sole, the realistic
+-- courier's 2.8: 1.4; 6.7 took its HipHeight 2.2 for it, 1.1, and the feet slid).
+Motion.StockLeg = 2
+
+-- 6.8 review: the right leg of an R15 body, hip to sole (studs), from its rig attachments (the hip to the knee on the
+-- thigh, the knee to the ankle on the shin, the ankle to the foot's bottom); nil when a piece is missing (an R6 body).
+function Motion.leg(character: Instance): number?
+	local thigh = character:FindFirstChild("RightUpperLeg")
+	local shin = character:FindFirstChild("RightLowerLeg")
+	local foot = character:FindFirstChild("RightFoot")
+	local function at(part: Instance?, name: string): Vector3?
+		local found = if part then part:FindFirstChild(name) else nil
+		return if found and found:IsA("Attachment") then found.Position else nil
+	end
+	local hip, knee = at(thigh, "RightHipRigAttachment"), at(thigh, "RightKneeRigAttachment")
+	local knee2, ankle = at(shin, "RightKneeRigAttachment"), at(shin, "RightAnkleRigAttachment")
+	local ankle2 = at(foot, "RightAnkleRigAttachment")
+	if not (hip and knee and knee2 and ankle and ankle2 and foot and foot:IsA("BasePart")) then
+		return nil
+	end
+	return (hip - knee).Magnitude + (knee2 - ankle).Magnitude + math.max(0, ankle2.Y + foot.Size.Y / 2)
+end
+
+-- 6.8 review: how much longer than the stock one a leg's step is (`leg` studs, hip to sole; nil: the stock leg).
+function Motion.stride(leg: number?): number
+	return math.max(leg or Motion.StockLeg, 0.5) / Motion.StockLeg
+end
 
 function Motion.select(state: string, speed: number, vertical: number, seated: boolean, stride: number?): (string?, number)
 	local legs = math.max(stride or 1, 0.25)

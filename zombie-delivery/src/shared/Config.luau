@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.6"
+Config.Version = "6.8"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1854,7 +1854,14 @@ Config.ZipLines = {
 	EndSpeed = 18, -- … to this
 	Sag = 0.035, -- the cable's sag in the middle, per stud of length
 	CableHeight = 7, -- the cable's ends over the platforms' floors
-	Hang = 3.6, -- the rider's root under the cable (hands up on the trolley's handle)
+	-- the rider's root under the cable (hands up on the trolley's handle). 6.8 review: 3.6 → 3.1, the body about where
+	-- 6.7 hung it (the root moved 0.6 up in it: shared/ZipLines.luau Feet 3.8): the feet 0.1 over the end platform
+	Hang = 3.1,
+	-- 6.8 review: the trolley's handle hangs HandleDrop under the cable; client/ZipRide.luau reaches the hands to it
+	-- (HandSpread apart, the elbows bent: a two-bone reach on the body's own arms) instead of a fixed pose that put them
+	-- 0.9 studs up through the trolley; arms too short to reach it bring it down to the hands
+	HandleDrop = 0.35,
+	HandSpread = 2.0,
 	Clearance = 3, -- the cable over every roof it crosses (the tests' rule), at least
 	Margin = 9, -- the lines are picked with this much over every roof they cross (the rider's feet clear it)
 	OverStreet = 24, -- the cable over a street, a sidewalk or a lawn (lamps, trees), at least
@@ -3126,9 +3133,13 @@ Config.Cargo = {
 	-- 33 cm across, a parcel 30–40 cm: a box carried in both hands is about a stud wide), LookScale per look; the heavy
 	-- ones as before (server/Cargo.luau buildLook). In the hands the stack's bottom is at most CarryLow studs over the
 	-- body's root (on the forearms) and its back CarryFront in front of it.
+	-- 6.8 review: the root's middle is 0.6 higher in the body now (server/CharacterArt/Geometry.luau G 3.8): the stack
+	-- goes as much lower on it, to where the forearms are (the elbows 0.3 under the root): CarryLow 0.05 → -0.55; a
+	-- tall stack's middle at most CarryMiddle over the root (it was 1.1 in server/Cargo.luau stackHeld).
 	LightScale = 0.5,
 	LookScale = { cake = 0.36, medicine = 0.42, newspaper = 0.6, bouquet = 0.55 } :: { [string]: number },
-	CarryLow = 0.05,
+	CarryLow = -0.55,
+	CarryMiddle = 0.5,
 	CarryFront = 0.52,
 	HandsMax = 2, -- light pieces in one player's hands at most
 	-- 6.6, the bike's own bag (its rack, basket or box: server/Cargo.luau, shared/Holding.luau bikeNear): on a run with a
@@ -3207,7 +3218,11 @@ Config.Throw = {
 	Bounce = 0.45, -- the speed kept off a wall (once: MaxBounces) …
 	MaxBounces = 1,
 	GroundNormal = 0.6, -- … a surface facing up more than this is ground: it lands there
-	Release = { side = 0.7, up = 1.3, ahead = 0.6 } :: { side: number, up: number, ahead: number },
+	-- 6.8 review: where the piece leaves the hand, from the root: the right hand's grip at the whip (shared/Gestures.luau
+	-- "throw" WindUp seconds in, the arm over the shoulder coming forward, on the courier's body: tests/throws_test.luau
+	-- works it out from the rig and holds this to it). It was the shoulder (0.7, 1.3, 0.6): the piece popped down
+	-- ~1.8 studs out of the raised hand. The client's arc, its zones and the server all start here (Throws.release).
+	Release = { side = 1.4, up = 2.6, ahead = 0.25 } :: { side: number, up: number, ahead: number },
 	FarFrom = 18, -- studs: a landed throw from farther than this tips …
 	FarMin = 5, -- … this at FarFrom …
 	FarMax = 25, -- … up to this at Range
@@ -3246,7 +3261,8 @@ Config.Courier = {
 		Full = 26, -- the full swing and lean from here (Config.Movement.Sprint is 28)
 		Range = 150, -- studs from the camera (yours always)
 		BlendTime = 0.15, -- seconds to blend the cycle in or out
-		Stride = 7, -- studs run per full cycle (two steps): the cadence follows the speed
+		Stride = 7, -- studs run per full cycle (two steps): the cadence follows the speed (6.8 review: on the stock 2-stud
+		-- leg; client/SprintPose.luau scales it by each body's own, shared/CourierMotion.luau stride: the courier's 9.8)
 	},
 	-- 6.1: the bag is a pendulum on a spring (shared/BagSwing.luau, client/BagSway.luau): the hand's real acceleration
 	-- swings it (it trails when you start, swings forward when you stop, out on a turn), the air leans it back at a run.

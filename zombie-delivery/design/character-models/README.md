@@ -17,7 +17,8 @@ sphere, Roblox's own shape, rounds the head and a few pieces; the checker allows
 massless, non-colliding, non-queryable and non-touching, including zombie corpses.
 
 **6.7, the realistic body** (the owner: "not blocks any more"): heights from the sole: ankle 0.3, knee 1.55, hip 2.8,
-waist 3.2, elbow 3.5, wrist 2.6, shoulder 4.48, chin 4.98, crown 5.9 (HipHeight 2.2). Bones: torso 1.24 × 1.58 × 0.76,
+waist 3.2, elbow 3.5, wrist 2.6, shoulder 4.48, chin 4.98, crown 5.9 (HipHeight 2.8 since the 6.8 review: the root's
+middle 3.8 over the sole, its bottom at the hips; 6.7 had 2.2). Bones: torso 1.24 × 1.58 × 0.76,
 pelvis 1.24 × 0.6 × 0.78, head 0.8 × 0.92 × 0.86, upper arms 0.6 × 1.1 × 0.6, forearms 0.52 × 0.94 × 0.52, hands
 0.22 × 0.36 × 0.4 (the palms toward the body), thighs 0.64 × 1.31 × 0.8, shins 0.56 × 1.28 × 0.68, feet 0.52 × 0.3 ×
 0.86. Balls on the shoulder, elbow and knee joints; a neck; fingers and a thumb on each hand; the grip attachments

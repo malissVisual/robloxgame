@@ -8,7 +8,9 @@
 --     cycle's rotations, as client/BikeRider.luau's standing rider), blended in from the animation and back out over
 --     Sprint.BlendTime; it lets go under Sprint.Off. The cycle's phase moves with the distance run (Sprint.Stride studs
 --     a cycle), so the cadence follows the speed; the swing and the lean grow from From to Full. The walk and the
---     stock run under From are the animation's alone.
+--     stock run under From are the animation's alone. 6.8 review: Stride is the stock leg's; a body's own leg (shared/
+--     CourierMotion.luau leg, hip to sole: the courier's 2.8) runs a longer one (Stride × Motion.stride: 9.8), the feet
+--     planted as in the walk.
 --   * The arms are left alone (blended back to the animation) while client/ArmPose.luau has them: aiming, carrying,
 --     the phone, a gesture, a swing, a door's handle (their attributes, or yours from CameraRig / Holster) and 0.35 s
 --     after; the legs, the waist, the head and the bob go on. ArmPose's own sprint lean steps aside meanwhile
@@ -29,6 +31,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Joints = require(Shared.Joints)
 local RunCycle = require(Shared.RunCycle)
+local Motion = require(Shared.CourierMotion) -- 6.8 review: the leg's own stride
 local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
@@ -61,6 +64,7 @@ local OFF_STATES: { [Enum.HumanoidStateType]: boolean } = {
 type Rig = {
 	lh: any, rh: any, lk: any, rk: any, ls: any, rs: any, le: any, re: any,
 	waist: any, neck: any, root: any, expires: number,
+	stride: number, -- 6.8 review: studs a run cycle covers on this body's legs (Sprint.Stride × Motion.stride)
 }
 type Body = {
 	weight: number, -- the cycle's share (0 = the animation alone)
@@ -131,6 +135,7 @@ local function rigOf(character: Model): Rig
 		neck = if r15 then jointIn(character, "Head", "Neck") else nil,
 		root = if r15 then jointIn(character, "LowerTorso", "Root") else nil,
 		expires = 0,
+		stride = S.Stride * Motion.stride(if r15 then Motion.leg(character) else nil),
 	}
 	local complete = r15 and made.lh and made.rh and made.lk and made.rk and made.ls and made.rs and made.le and made.re
 		and made.waist and made.neck and made.root
@@ -193,18 +198,21 @@ local function letGo(character: Model)
 	bodyBack(rig)
 end
 
--- Can this body sprint now (on its feet, nothing else moving it)?
-local function onFoot(character: Model, humanoid: Humanoid, mine: boolean): boolean
+-- Can this body sprint now (on its feet, nothing else moving it)? 6.8 review: client/ArmPose.luau's lean asks too
+-- (`air`: a jump or a fall counts as on foot there: its lean eases out by itself, nothing reads it back meanwhile).
+local function onFoot(character: Model, humanoid: Humanoid, mine: boolean, air: boolean?): boolean
 	if humanoid.Health <= 0 or humanoid.Sit or humanoid.SeatPart ~= nil or humanoid.PlatformStand then
 		return false
 	end
 	local state = humanoid:GetState()
-	if OFF_STATES[state] or (mine and state == Enum.HumanoidStateType.Physics) then
+	local flying = state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall
+	if (OFF_STATES[state] and not (air and flying)) or (mine and state == Enum.HumanoidStateType.Physics) then
 		return false
 	end
 	return character:GetAttribute("ZipLine") == nil and character:GetAttribute("ClimbLine") == nil
 		and not Interact.posing(character)
 end
+SprintPose.onFoot = onFoot
 
 -- The run cycle into the joints: the legs, the waist, the neck and the Root by `w`, the arms by `wa`.
 local function run(rig: Rig, w: number, wa: number, phase: number, effort: number)
@@ -273,7 +281,7 @@ local function step(dt: number)
 		local was = body.weight
 		local w = math.clamp(was + math.clamp((if body.on then 1 else 0) - was, -rate, rate), 0, 1)
 		body.weight = w
-		body.phase = RunCycle.advance(body.phase, speed * dt, S.Stride)
+		body.phase = RunCycle.advance(body.phase, speed * dt, rig.stride) -- (6.8 review: this body's own stride)
 		body.effort += (RunCycle.effort(speed, S.From, S.Full) - body.effort) * math.min(1, dt * 6)
 		if w > 0.001 then
 			local free = armsFree(character, mine)

@@ -19,7 +19,8 @@
 -- 6.7: the people wear the couriers' realistic body (server/CharacterArt: Geometry "person", built by its Rig): slim
 -- limbs, hands that hold, a face with eyes that blink (client/BodyLife.luau also gives them the breath, the weight
 -- shift and a look at the players who come up). dress() paints every part by its BodyPaint colour group; the hats and
--- the hair are sized to the smaller head; the walk is slowed to the longer legs (CourierMotion.StockHip).
+-- the hair are sized to the smaller head; the walk is slowed to the longer legs (CourierMotion.stride; 6.8 review: the
+-- leg measured on the rig).
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -805,8 +806,9 @@ function Npcs.spawn(look: Look, at: CFrame): Model
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	local scale = if look.child then 0.72 else 1
 	if humanoid and model:GetAttribute("CharacterArt") ~= nil then
-		-- 6.7: the walk's pace by the legs (the realistic body's step is longer than the stock walk's)
-		scale = humanoid.HipHeight / Motion.StockHip
+		-- 6.7: the walk's pace by the legs (the realistic body's step is longer than the stock walk's); 6.8 review: the
+		-- leg measured on the rig, hip to sole (Motion.leg: 2.8 / 2 = 1.4, a kid's 2.1 / 2), the feet planted
+		scale = Motion.stride(Motion.leg(model) or humanoid.HipHeight)
 	end
 	local flat = Vector3.new(at.LookVector.X, 0, at.LookVector.Z)
 	local facing = if flat.Magnitude > 0.01 then CFrame.lookAt(at.Position, at.Position + flat) else CFrame.new(at.Position)

@@ -65,8 +65,10 @@ local RIG_REFRESH = 2 -- 5.9.2: seconds a character's joints are kept before the
 local RIG_RETRY = 0.5 -- … or this, while some are missing (a body still loading)
 local PHONE_ROLL = Config.Body.PhoneRoll -- 6.7: degrees the wrist rolls the phone in the palm up
 local blends: { [Model]: number } = {}
--- The carry pose per character: how far in (0..1) and what is held (kept while it blends out).
-type Carry = { t: number, kind: string }
+-- The carry pose per character: how far in (0..1) and what is held (kept while it blends out). 6.8 review: `goals`, the
+-- hands' last reach to the box (server/Cargo.luau clears Carrying and CarryAt together when it is put down: the arms
+-- blend out of where they held it, not out of a fixed shape they snapped to); `leaving`: blending out.
+type Carry = { t: number, kind: string, goals: ArmGoals?, leaving: boolean }
 local carries: { [Model]: Carry } = {}
 local hiddenGuns: { [Model]: Instance } = {}
 -- 6.7: the joints this module posed (their values are client/PoseLedger.luau's: it knows the animation's own value
@@ -446,6 +448,17 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 	-- (6.7: with the box's place known, the hands reach its sides; a gesture that bends the body for it, the pick-up,
 	-- leaves the arms on the box: they follow it down to the ground and up)
 	local reached = if carryT > 0 and kind then reachGoals(character, rig, kind) else nil
+	-- 6.8 review: the box put down (its CarryAt gone with Carrying), the arms blend out of their last reach to it
+	local carry = carries[character]
+	if carry and carryT > 0 then
+		if reached then
+			carry.goals = reached
+		elseif carry.leaving then
+			reached = carry.goals
+		else
+			carry.goals = nil -- (a trolley's handle, the phone, a lead: the fixed shapes, and out of them)
+		end
+	end
 	local c: ArmGoals = reached or carryGoals(if carryT > 0 then kind else nil)
 	local g: ArmGoals = if gesture and not (reached and gesture.body) then gesture.goals else {}
 	if rig.kind == "r15" then
@@ -557,7 +570,7 @@ local leans: { [Model]: Lean } = {}
 local LEAN_SPRINT = math.rad(9) -- forward at a full sprint
 local LEAN_BRAKE = math.rad(7) -- back while braking hard
 
-local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, dt: number)
+local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, dt: number, mine: boolean)
 	local waist = rigOf(character).waist
 	if not waist or not root then
 		return
@@ -571,17 +584,25 @@ local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, 
 	local now = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	local braking = math.max(0, state.speed - now) / math.max(dt, 1 / 240)
 	state.speed = now
-	local onFoot = humanoid ~= nil and humanoid.Health > 0 and not humanoid.Sit
+	-- 6.8 review: on its feet as client/SprintPose.luau sees it (not seated, platform-standing, on a zip line or a
+	-- ladder, in a move of client/Interact.luau, climbing, swimming, dead …; a jump or a fall still eases the lean out).
+	-- Otherwise the waist is let go at once: an interaction move reads the waist back every frame and a braking lean
+	-- built up on it (about 7°).
+	if not humanoid or not SprintPose.onFoot(character, humanoid, mine, true) then
+		if written[waist] then
+			layer(waist, nil)
+		end
+		state.amount = 0
+		return
+	end
 	-- (6.0.1: the sprint's lean is client/SprintPose.luau's run cycle while it runs: this one steps aside)
 	-- 6.7: a load in both hands (a heavy one that slows you more) leans the upper body back against it
 	local carry = carries[character]
 	local load = if carry and carry.kind ~= "phone" and carry.kind ~= "horse" and character:GetAttribute("Pushing") == nil
 		then carry.t * math.rad(if character:GetAttribute("CarrySpeed") ~= nil then B.CarryHeavy elseif character:GetAttribute("CarryHands") == 1 then 0 else B.CarryLean)
 		else 0
-	local goal = if onFoot
-		then LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) * (1 - SprintPose.weight(character))
-			- LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1) - load
-		else 0
+	local goal = LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) * (1 - SprintPose.weight(character))
+		- LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1) - load
 	state.amount += (goal - state.amount) * math.min(1, dt * 8)
 	if math.abs(state.amount) < 0.002 and math.abs(goal) < 0.002 then
 		if written[waist] then
@@ -761,8 +782,9 @@ local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: bool
 		if carry then
 			carry.t = carryBlend
 			carry.kind = held :: string
+			carry.leaving = kind == nil -- 6.8 review: blending out (pose keeps the last reach then)
 		else
-			carries[character] = { t = carryBlend, kind = held :: string }
+			carries[character] = { t = carryBlend, kind = held :: string, goals = nil, leaving = kind == nil }
 		end
 	else
 		carries[character] = nil
@@ -860,7 +882,7 @@ local function step(dt: number)
 			report(character)
 		end
 		if rigOf(character).kind == "r15" then
-			leanBody(character, humanoid, root, dt)
+			leanBody(character, humanoid, root, dt, mine)
 		end
 		-- Yours come up slower out of a sprint (CameraRig decides); the others' at the normal pace.
 		local raise = if mine then math.max(0.1, CameraRig.raiseTime() - 0.05) else RAISE_TIME

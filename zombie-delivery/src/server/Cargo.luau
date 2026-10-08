@@ -1101,7 +1101,8 @@ end
 
 -- In front of the chest: one piece's middle at chest height, its back against the body; 3.7: two stacked, the first
 -- at the bottom, the stack a little lower so you still see over it. 6.7: a real-size light piece rests on the forearms
--- (its bottom at most Tuning.CarryLow over the root), its back Tuning.CarryFront in front of the body.
+-- (its bottom at most Tuning.CarryLow over the root), its back Tuning.CarryFront in front of the body. 6.8 review: a
+-- tall stack's middle at most Tuning.CarryMiddle over the root (both 0.6 lower: the root sits higher in the body).
 local function stackHeld(held: Held)
 	local total, depth = 0, 0
 	for _, piece in held.pieces do
@@ -1112,7 +1113,7 @@ local function stackHeld(held: Held)
 			depth = math.max(depth, d)
 		end
 	end
-	local y = math.min(Tuning.CarryLow, 1.1 - total / 2 - (if #held.pieces > 1 then 0.25 else 0))
+	local y = math.min(Tuning.CarryLow, Tuning.CarryMiddle - total / 2 - (if #held.pieces > 1 then 0.25 else 0))
 	for _, piece in held.pieces do
 		local model = piece.model
 		if model and not (piece.liftAt and os.clock() < piece.liftAt) then -- (6.7: one still lifted off the ground waits)
