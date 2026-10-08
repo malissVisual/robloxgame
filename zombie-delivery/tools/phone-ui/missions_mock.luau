@@ -91,6 +91,33 @@ end
 function M.methods:PivotTo(cframe)
 	self._p.Pivot = cframe
 end
+-- 6.8 review: the gamepad's selection is put back by Name after a rebuild (a recursive find, IsDescendantOf).
+function M.methods:IsDescendantOf(ancestor)
+	local node = self.Parent
+	while node do
+		if node == ancestor then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+function M.methods:FindFirstChild(name, recursive)
+	for _, child in self._children do
+		if child.Name == name then
+			return child
+		end
+	end
+	if recursive then
+		for _, child in self._children do
+			local found = child:FindFirstChild(name, true)
+			if found then
+				return found
+			end
+		end
+	end
+	return nil
+end
 function M.methods:FindFirstAncestorWhichIsA(class)
 	local node = self.Parent
 	while node do
@@ -274,6 +301,10 @@ function Ui.gamepadFocus(target)
 end
 function Ui.gamepadRelease()
 	M.focus = nil
+end
+-- (like GuiService.SelectedObject: a destroyed button is no selection)
+function Ui.gamepadSelection()
+	return if M.focus and M.focus.Parent ~= nil then M.focus else nil
 end
 
 M.MHud = {

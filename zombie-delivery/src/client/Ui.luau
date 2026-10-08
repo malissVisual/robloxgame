@@ -123,6 +123,11 @@ function Ui.gamepadFocus(target: GuiObject?)
 	end)
 end
 
+-- 6.8 review: what the gamepad has selected now (nil: nothing), so a window that rebuilds its rows can put it back.
+function Ui.gamepadSelection(): GuiObject?
+	return GuiService.SelectedObject
+end
+
 -- 4.2: a window that closes lets go of the gamepad's selection inside it.
 function Ui.gamepadRelease(container: Instance?)
 	local selected = GuiService.SelectedObject
