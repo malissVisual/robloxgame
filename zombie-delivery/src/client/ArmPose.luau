@@ -48,6 +48,7 @@ local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 local Gestures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Gestures"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local BodyMotion = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BodyMotion")) -- 6.7
+local KitFit = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("KitFit")) -- 6.9: the phone in a palm or not
 local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
@@ -255,18 +256,31 @@ local DEFAULT_SHAPE = CARRY_SHAPES.crate
 
 type ArmGoals = { rs: CFrame?, re: CFrame?, rw: CFrame?, ls: CFrame?, le: CFrame?, lw: CFrame? }
 
-local function carryGoals(kind: string?): ArmGoals
+-- 6.9: does this body hold the phone in its palm (a hand smaller than the block one, shared/KitFit.luau SlabHand)?
+-- Roblox's classic R15 hand holds it on its front, the screen already toward the face.
+local function inPalm(character: Model?): boolean
+	local hand = if character then character:FindFirstChild("RightHand") else nil
+	if not hand or not hand:IsA("BasePart") then
+		return false
+	end
+	local s = hand.Size
+	return KitFit.factors("RightHand", { s.X, s.Y, s.Z })[1] < KitFit.SlabHand
+end
+
+local function carryGoals(kind: string?, character: Model?): ArmGoals
 	if kind == nil then
 		return {} :: ArmGoals
 	end
 	if kind == "phone" then
 		-- 5.0: the phone in the right hand (the PhoneHeld attribute, server/KitWear.luau): the upper arm a little forward
 		-- and in, the forearm up toward the chest, the screen turned up to the face; the left arm swings free.
-		-- 6.7: the phone lies in the palm (shared/KitFit.luau Palm): the wrist rolls a quarter round, palm and screen up.
+		-- 6.7: the phone lies in the palm (shared/KitFit.luau Palm): the wrist rolls a quarter round, palm and screen up
+		-- (6.9: only on a hand that holds it in its palm).
+		local roll = if inPalm(character) then PHONE_ROLL else 0
 		return {
 			rs = CFrame.Angles(0, math.rad(16), 0) * CFrame.Angles(math.rad(26), 0, 0),
 			re = CFrame.Angles(math.rad(70), 0, 0),
-			rw = CFrame.Angles(math.rad(-6), 0, 0) * CFrame.Angles(0, math.rad(PHONE_ROLL), 0),
+			rw = CFrame.Angles(math.rad(-6), 0, 0) * CFrame.Angles(0, math.rad(roll), 0),
 		}
 	end
 	if kind == "horse" then
@@ -459,7 +473,7 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 			carry.goals = nil -- (a trolley's handle, the phone, a lead: the fixed shapes, and out of them)
 		end
 	end
-	local c: ArmGoals = reached or carryGoals(if carryT > 0 then kind else nil)
+	local c: ArmGoals = reached or carryGoals(if carryT > 0 then kind else nil, character)
 	local g: ArmGoals = if gesture and not (reached and gesture.body) then gesture.goals else {}
 	if rig.kind == "r15" then
 		-- R15: an arm hangs down (-Y); turning about X lifts it forward (-Z), about Y swings it in or out.

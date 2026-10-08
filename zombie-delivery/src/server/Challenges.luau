@@ -751,8 +751,15 @@ local function onLoaded(player: Player)
 end
 
 local function onPlayer(player: Player)
-	player.CharacterAdded:Connect(function()
+	player.CharacterAdded:Connect(function(character)
 		task.delay(0.5, updateTag, player)
+		-- 6.9: server/CourierAvatar.luau puts the player's own head on after the spawn (ApplyDescriptionAsync): the tag
+		-- went with the old one (once it is gone: a moment later)
+		character.ChildAdded:Connect(function(child)
+			if child.Name == "Head" and child:IsA("BasePart") then
+				task.delay(0.2, updateTag, player)
+			end
+		end)
 	end)
 	-- Roblox can rebuild the head when the avatar loads.
 	player.CharacterAppearanceLoaded:Connect(function()

@@ -1170,7 +1170,13 @@ head: a Roblox head with the player's face; if the player has other body parts, 
 - **The 6.7 animations stay** (the idle life, the pick-up, the carry grip, the landing, the flinch). They are written on
   the R15 joints, so they play on any R15 body.
 - **The 6.7 native courier** (CharacterArt `courier`) is only a fallback, used if Roblox's body cannot be made at
-  server start.
+  server start. Players on it keep the workwear: no look of their own is put on it.
+- **Review fixes:**
+  - The title over your head (`server/Challenges.luau`) moves onto your own head when it is put on.
+  - The phone's wrist roll applies only to a hand that holds it in its palm (`client/ArmPose.luau`). On the classic hand,
+    the screen already faces you.
+- **Back since 5.8:** the classic body's parts register touches again, so the tower's elevator pads (`World.luau`
+  ridePad) carry you again.
 - **Tests:**
   - `tests/avatarlook_test.luau`;
   - `tools/character-art/avatar-check.luau`: the classic template, Roblox's Animate swapped for the game's, your

@@ -26,6 +26,7 @@ local replacing: { [Player]: boolean } = {}
 local looks: { [Player]: HumanoidDescription | false } = {}
 local loading: { [Player]: boolean } = {}
 local dressed: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local classicBody = false -- the template is Roblox's classic R15 (not the native fallback: no own look goes on that)
 local started = false
 
 local WAIT_FOR_WORLD = 5 -- seconds a fresh body may take to reach the workspace before its look is put on
@@ -70,22 +71,23 @@ local function settle(model: Model)
 	end
 end
 
--- Roblox's classic R15 in the workwear; the native courier when Roblox's body cannot be made (no avatar service).
-local function templateBody(): Model
+-- Roblox's classic R15 in the workwear (true); the native courier when Roblox's body cannot be made (no avatar
+-- service: false, the players keep the workwear).
+local function templateBody(): (Model, boolean)
 	local ok, body = pcall(function(): Model
 		return Players:CreateHumanoidModelFromDescription(workwear(), Enum.HumanoidRigType.R15)
 	end)
 	if ok and body then
-		return body
+		return body, true
 	end
 	warn(`[CourierAvatar] Roblox's R15 body did not load ({body}): the native courier instead`)
-	return Rig.build(Geometry.spec("courier"))
+	return Rig.build(Geometry.spec("courier")), false
 end
 
 -- The player's own look on a courier body, once the body is in the world and the look has loaded.
 local function dress(player: Player, model: Model)
 	local look = looks[player]
-	if not look or dressed[model] then
+	if not classicBody or not look or dressed[model] then
 		return
 	end
 	local description = look :: HumanoidDescription
@@ -113,7 +115,7 @@ end
 
 -- Once per player: their avatar's description, made classic. A body that spawned meanwhile is dressed when it comes.
 local function loadLook(player: Player)
-	if looks[player] ~= nil or loading[player] then
+	if not classicBody or looks[player] ~= nil or loading[player] then
 		return
 	end
 	loading[player] = true
@@ -166,7 +168,8 @@ end
 
 function Avatar.start()
 	if started then return end
-	local template = templateBody()
+	local template, isClassic = templateBody()
+	classicBody = isClassic
 	settle(template)
 	template.Name = "StarterCharacter"
 	-- (every courier body, Roblox's or the native one: CourierAvatar dresses it, KitWear wears the kit on it)
