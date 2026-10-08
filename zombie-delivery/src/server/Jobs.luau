@@ -269,8 +269,8 @@ type Offer = {
 	-- peak's pay multiplier it was offered with (Config.Jobs.Businesses peak; the board's chip)
 	round: boolean?,
 	peak: number?,
-	-- 6.8: a mission the owner has done before (Jobs.startMission): its pay is Missions.replayPay already, its XP
-	-- Missions.replayXp (payOrder)
+	-- 6.8: a mission the owner has done before (Jobs.startMission): payOrder pays the owner Missions.replayPay of their
+	-- share and Missions.replayXp of the XP (6.8 review: each crew member by their own record)
 	replay: boolean?,
 }
 
@@ -3303,6 +3303,10 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		end
 	end
 	local driverTotal, share = Economy.crewSplit(payTotal, #crew)
+	if offer.replay then
+		-- 6.8 review: the replay's cut is the owner's own (a crew member's first time pays them in full, below)
+		driverTotal = Missions.replayPay(driverTotal)
+	end
 	order.paid = driverTotal
 	-- The split, for everybody's result: the owner first.
 	local split = { { name = player.DisplayName, pay = driverTotal } }
@@ -3318,8 +3322,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	if rating then
 		xp = JobRules.ratedXp(xp, rating.stars)
 	end
+	local crewXp = xp -- (6.8 review: each crew member's own replay cut, below)
 	if offer.replay then
-		xp = Missions.replayXp(xp) -- 6.8: a replayed mission (its pay was cut when it started)
+		xp = Missions.replayXp(xp) -- 6.8: a replayed mission (the owner's share was cut above)
 	end
 	local employerInfo: { [string]: any }? = nil
 	local unlockedWeapon: string? = nil
@@ -3399,7 +3404,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		night = night,
 		crew = split, -- { { name, pay } }: everybody paid on this job, the owner first
 		riders = #crew, -- crew members besides you
-		crewBonus = driverTotal - payTotal,
+		crewBonus = math.max(0, driverTotal - payTotal), -- (6.8 review: never negative on a replay)
 		total = driverTotal,
 		delivered = delivered, -- pieces that arrived
 		pieces = order.pieces, -- pieces of the order
@@ -3419,7 +3424,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		if memberProfile then
 			memberProfile.deliveries += 1
 		end
-		local again = offer.mission ~= nil and not offer.replay and memberProfile ~= nil and Missions.cleared(memberProfile.missions, offer.mission)
+		local again = offer.mission ~= nil and memberProfile ~= nil and Missions.cleared(memberProfile.missions, offer.mission)
 		local memberPay = if again then Missions.replayPay(share) else share
 		missionPaid[member] = memberPay
 		PlayerData.addMoney(member, memberPay)
@@ -3438,7 +3443,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			total = memberPay,
 			mission = missionResult,
 			rating = if rating then { stars = rating.stars } else nil, -- 4.7: the owner's rating of the job
-		}, giveXp(member, if again then Missions.replayXp(xp) else xp)))
+		}, giveXp(member, if again then Missions.replayXp(crewXp) else crewXp)))
 	end
 	local missionId = offer.mission
 	-- 3.1: the missions' counters for who finished it (the owner and the crew there), before the rewards check them.
@@ -4730,8 +4735,7 @@ function Jobs.startMission(player: Player, def: Config.JobTypeDef, replay: boole
 		return false, "No route for this mission from here, try again."
 	end
 	if replay then
-		offer.pay = Missions.replayPay(offer.pay)
-		offer.replay = true
+		offer.replay = true -- (6.8 review: the pay is cut at the payout, per person: payOrder)
 	end
 	return startJob(player, offer)
 end

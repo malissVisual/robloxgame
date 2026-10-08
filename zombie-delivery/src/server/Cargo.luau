@@ -1072,6 +1072,7 @@ local function setDown(model: Model, at: CFrame)
 			d.Anchored = true
 			d.Massless = false
 			d.CanCollide = d == model.PrimaryPart
+			d.CanQuery, d.CanTouch = true, true -- (6.8 review: a piece held in a hand had them off: HandItem)
 		end
 	end
 	model:PivotTo(at)
@@ -2465,14 +2466,20 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 	if handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
-	loose.piece.liftAt = os.clock() + Config.Body.PickupLift -- 6.7: it waits on the ground for the hands
+	-- (6.8 review: the bend only for a piece the hands pick up: not a horse on a lead, not a trolley's load)
+	local bend = loose.piece.horse == nil and Equipment.pushing(player) == nil
+	if bend then
+		loose.piece.liftAt = os.clock() + Config.Body.PickupLift -- 6.7: it waits on the ground for the hands
+	end
 	if not table.find(session.loose, loose) or not take(session, player, loose.piece) then
 		loose.piece.liftAt = nil
 		return -- (3.7: a piece that does not fit the hands stays where it lies)
 	end
-	-- 6.7: down on the knees for it (client/ArmPose.luau, shared/Gestures.luau), the hands on it, then up with it
-	Npcs.act(player.Character, "pickup")
-	liftLater(session, player, loose.piece)
+	if bend then
+		-- 6.7: down on the knees for it (client/ArmPose.luau, shared/Gestures.luau), the hands on it, then up with it
+		Npcs.act(player.Character, "pickup")
+		liftLater(session, player, loose.piece)
+	end
 	bagHint(session, player, loose.piece) -- 6.3
 	local index = table.find(session.loose, loose)
 	if index then
@@ -2890,7 +2897,8 @@ local function throwPick(session: Session, player: Player): (string?, number?, s
 			for index = #session.pack, 1, -1 do
 				local piece = session.pack[index]
 				local place = packPlace(piece)
-				if (place == "bag") == (pass == 1) and (near or place ~= "bike") and forHere(session, piece) then
+				-- (6.8 review: not the piece still going into the bag: it is in your hand for the bag gesture)
+				if (place == "bag") == (pass == 1) and (near or place ~= "bike") and forHere(session, piece) and not piece.entering then
 					if Throws.throwable(piece.look, job) then
 						return "pack", index, ""
 					end
