@@ -198,6 +198,9 @@ Config.City = {
 	HighwayWidth = 40,
 	Seed = 7331,
 	SafeHalf = 235, -- the safe zone around the depot: a square, |x| and |z| below this
+	-- 6.10, the curb (Map.WalkTop, Map.CurbRun; shared/CurbShape.luau): the vehicle you drive, over a kerb, rises at most
+	-- this fast (studs / s; client/CurbRide.luau): it drives up the slope and stays on the walk instead of hopping off it
+	CurbHop = 6,
 }
 
 export type CarDef = {

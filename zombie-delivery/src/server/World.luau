@@ -54,6 +54,10 @@
 -- the roads are tagged "WetRoad" (they shine in the rain, client/Weather.luau), a few street lamps "BrokenLamp" (they
 -- flicker), the lighthouse's beams and the radio mast's beacon move on the clients (client/WorldFx.luau), the
 -- storefronts' ceiling lights shine only at night, and the build log counts every piece's parts.
+--
+-- Zombie Delivery 6.10, the curb: the blocks' sidewalks stand Map.WalkTop (0.9), half a stud over the roads, and every
+-- block's slab has its kerb all round (sidewalk(): server/Curbs.luau, shared/CurbShape.luau), a light grey slope
+-- Map.CurbRun studs out onto the road that every vehicle drives up and down anywhere along the curb.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -680,6 +684,8 @@ end
 
 local function sidewalk(parent: Instance, cx: number, cz: number, color: Color3?)
 	part(parent, "Sidewalk", Vector3.new(BLOCK, WALK_TOP, BLOCK), CFrame.new(cx, WALK_TOP / 2, cz), color or Color3.fromRGB(150, 150, 146), Enum.Material.Concrete)
+	-- 6.10: and its curb all round: a sloped kerb from the road up to the walk, driven up anywhere (server/Curbs.luau)
+	require(script.Parent.Curbs).ring(parent, cx, cz)
 end
 
 -- 5.3: what stands on each lot comes from Map.lots (the same for the jobs and the client): a tower (an apartment
@@ -1034,9 +1040,28 @@ local function buildSafeZone(parent: Instance)
 	local zone = folder(parent, "SafeZone")
 	local half = Config.City.SafeHalf
 	local green = Color3.fromRGB(80, 255, 140)
-	for _, info in { { Vector3.new(half * 2, 0.06, 1.2), Vector3.new(0, 0, half) }, { Vector3.new(half * 2, 0.06, 1.2), Vector3.new(0, 0, -half) }, { Vector3.new(1.2, 0.06, half * 2), Vector3.new(half, 0, 0) }, { Vector3.new(1.2, 0.06, half * 2), Vector3.new(-half, 0, 0) } } do
-		local strip = deco(part(zone, "Border", info[1], CFrame.new(info[2] + Vector3.new(0, WALK_TOP + 0.05, 0)), green, Enum.Material.Neon))
-		strip.Transparency = 0.3
+	-- 6.10: each side in pieces that lie on what is under them (shared/CurbShape.luau): on the blocks at the walk's top,
+	-- over the roads it crosses at the road's (the walk is a curb higher now), up and down the kerbs' slopes between
+	local CurbShape = require(Shared.CurbShape)
+	for _, side in { { 0, half }, { 0, -half }, { half, 0 }, { -half, 0 } } do
+		local alongX = side[2] ~= 0
+		local function on(t: number): Vector3
+			local x, z = if alongX then t else side[1], if alongX then side[2] else t
+			return Vector3.new(x, CurbShape.groundAt(x, z) + 0.05, z)
+		end
+		-- what is under [t, t + 1]: 1 the walk, 2 a road, 3 a kerb's slope
+		local function under(t: number): number
+			local ground = on(t + 0.5).Y - 0.05
+			return if math.abs(ground - WALK_TOP) < 1e-3 then 1 elseif math.abs(ground - ROAD_TOP) < 1e-3 then 2 else 3
+		end
+		local from = -half
+		for t = -half + 1, half do
+			if t == half or under(t) ~= under(from) then
+				local a, b = on(from), on(t)
+				deco(part(zone, "Border", Vector3.new(1.2, 0.06, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b), green, Enum.Material.Neon)).Transparency = 0.3
+				from = t
+			end
+		end
 	end
 	for _, dir in { Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), Vector3.new(0, 0, -1) } do
 		local at = dir * (half + 3) + Vector3.new(dir.Z, 0, dir.X) * (CELL / 2 + ROAD / 2 + 4)
@@ -1081,7 +1106,7 @@ local function employerBoard(parent: Instance, employer: string, facing: Vector3
 	if not spot then
 		return
 	end
-	local base = Vector3.new(spot.x, WALK_TOP, spot.z)
+	local base = Vector3.new(spot.x, groundAt(spot.x, spot.z), spot.z) -- (6.10: the far places' boards on their yards)
 	local frame = CFrame.lookAt(base, base + facing)
 	part(parent, "BoardPost", Vector3.new(0.6, 6, 0.6), frame * CFrame.new(-3, 3, 0), Color3.fromRGB(80, 60, 40), Enum.Material.Wood)
 	part(parent, "BoardPost", Vector3.new(0.6, 6, 0.6), frame * CFrame.new(3, 3, 0), Color3.fromRGB(80, 60, 40), Enum.Material.Wood)
@@ -5586,6 +5611,11 @@ local function buildRoadWrecks(parent: Instance)
 			continue
 		end
 		local lane = (if rng:NextNumber() < 0.5 then -1 else 1) * rng:NextNumber(7, s.width / 2 - 5)
+		-- 6.10: by a block, off its kerb's slope (shared/CurbShape.luau): a wreck turned across reaches 5.5 from its middle
+		local short = 5.5 + Map.CurbRun - require(Shared.CurbShape).outside(x - dz * lane, z + dx * lane)
+		if short > 0 then
+			lane -= math.sign(lane) * short
+		end
 		local at = Vector3.new(x - dz * lane, ROAD_TOP, z + dx * lane)
 		wreck(wrecks, CFrame.lookAt(at, at + Vector3.new(dx, 0, dz)) * CFrame.Angles(0, rng:NextNumber(-0.5, 0.5), 0))
 		placed += 1

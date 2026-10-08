@@ -4006,7 +4006,8 @@ function Vehicles.placeNear(player: Player, carId: string?): string?
 		local spot: Vector3
 		if away.Magnitude < width / 2 + 24 then
 			local side = if away:Dot(across) >= 0 then 1 else -1
-			spot = Vector3.new(x, 0, z) + across * side * math.max(0, math.min(width / 2 - 2.5, away.Magnitude))
+			-- (6.10: clear of the kerb's slope, Map.CurbRun out onto the road, so it stands level)
+			spot = Vector3.new(x, 0, z) + across * side * math.max(0, math.min(width / 2 - Map.CurbRun - 1.5, away.Magnitude))
 			spot += direction * direction:Dot(Vector3.new(from.X - spot.X, 0, from.Z - spot.Z)) -- level with you
 		else
 			local flat = Vector3.new(look.X, 0, look.Z)
