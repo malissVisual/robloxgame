@@ -7,7 +7,7 @@
 --
 --   (6.6: the backpack slots "pack" and "load" are gone with the backpacks: one carrying item, the bag)
 --   shoes   the Running Shoes on both feet
---   jacket  the Thermal Jacket on the torso, its sleeves on the upper arms
+--   (6.7: the "jacket" slot is gone with the Thermal Jacket, Config.RetiredKit)
 --   hand    6.0: the plastic bag (Config.Courier.BagKit) in the left hand: its art hangs from a small part, BagPivot,
 --           joined to the hand by a Motor6D "BagSwing" (KitArt "bag"); every client swings it (6.1: client/BagSway.luau,
 --           the only writer of its Transform). 6.1: only while it is what you hold (the character attribute Hand =
@@ -49,6 +49,8 @@
 -- (the player's BagCount / BagLooks attributes, server/Cargo.luau) stick out of its opening and the body swells; only
 -- the bag's art is built again when they change (the pivot and its swinging joint stay). tools/character-art/check.py
 -- builds every bag in every place on the courier's R15 body and on an R6 body offline.
+-- 6.7: the bags are real-size (server/KitArt/Geometry.luau) and so are the pieces packed in them (BagFill); a loaded
+-- bag's moving pieces take their open place first (KitArt.open through BagFill.open: the thermal bag's lid stands open).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -71,7 +73,7 @@ local KitWear = {}
 
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
 local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit.outfit's vest when no armour is owned)
-local NAMES: { [string]: string } = { shoes = "KitShoes", jacket = "KitJacket", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" }
+local NAMES: { [string]: string } = { shoes = "KitShoes", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" } -- (6.7: no jacket)
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
 -- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays). 6.1: not for
@@ -191,6 +193,7 @@ function KitWear.bagArt(parent: Instance, pivot: BasePart, id: string?, count: n
 		local room = if def and def.extra then def.extra else 0
 		local inside = math.max(0, math.floor(count or 0))
 		if mouth and inside > 0 then
+			pieces = BagFill.open(pieces, KitArt.open[look]) -- 6.7: the thermal bag's lid stands open while it holds something
 			pieces = BagFill.swell(pieces, mouth, inside, room)
 			for _, piece in BagFill.pieces(mouth, inside, room, looks) do
 				table.insert(pieces, piece)

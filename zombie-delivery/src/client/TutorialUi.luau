@@ -1,31 +1,36 @@
 --!strict
 -- 3.7: the first-day tutorial on screen (server/Tutorial.luau decides, the words are in shared/TutorialSteps.luau).
 --
---   * Marge's dialog: a charcoal panel at the lower centre (over the hint and the item tags), the speaker in small caps
---     with a short red rule under it, her line in white, a thin line and the actions: CONTINUE on every page but the
---     last, which says its own action (LET'S GO, ANOTHER JOB, GOT IT); a quiet second action (SKIP TUTORIAL, LATER).
---     Space or Enter (or the gamepad's A) continues, so do a click or a tap on the panel. While it is open those keys
---     do nothing else (no jump) and the mouse is free (CameraRig.mouseNeeded). 4.4.1: the keys go through
---     client/DialogKeys.luau (over the other dialogs: her panel is on top) and work for her radio too (retry, done,
---     say: it comes on its own, mid-jump or mid-drive, so a key waits a little longer before it turns her page).
---   * The hint: one compact line under the objective, in the HUD's top stack (Hud.topSlot("tutorial"), placed right
---     after the ticket), with "FIRST DAY" and SKIP (it asks first). During the job it follows the Job payload
---     (TutorialSteps.jobStep): the same state the ticket shows, never ahead of it.
---   * A marker over Marge (TALK TO MARGE ▼) while she has something for you (welcome, retry).
---   * 5.7, the tour: her last page after the first delivery says SHOW ME AROUND: a page each for the ZDC RIDE dock
---     nearest the depot and the bus stop nearest it (each set on the GPS: MapView, the beam over it), then Q → BOARD
---     (OPEN THE BOARD opens the phone's BOARD). SKIP TOUR on every page (the GPS goes).
+--   * Marge's dialog: a charcoal panel at the lower centre, the speaker in small caps with a short red rule under it,
+--     her line in white, a thin line and the actions: the red primary and a quiet second action. Space or Enter (or
+--     the gamepad's A) does the primary, so does a click or a tap on the panel. While it is open those keys do nothing
+--     else (no jump) and the mouse is free (CameraRig.mouseNeeded). 4.4.1: the keys go through client/DialogKeys.luau.
+--   * The strip under the NEXT card (Hud.topSlot("tutorial")): FIRST DAY · +$50 ON YOUR FIRST DELIVERY and SKIP (it
+--     asks first), while she waits for your first job and while it runs. 6.5: the goal card shows each step
+--     (TutorialSteps.hint, shared/Goal.luau), so the strip has no line of its own.
+--   * A marker over Marge (TALK TO MARGE ▼), only while her welcome waits and is not on screen.
 -- 4.2, a phone: the dialog sits in the middle at a readable size (at least 0.8, as wide as the screen allows), its
--- actions and the hint's SKIP a finger tall (ACTION_H); a tap anywhere on it still continues.
--- Everything lives in ScreenGuis that survive a respawn. The style is the approved "contract" direction
--- (design/ui-contract on codex/ui-contract): white text over a subtle charcoal scrim, fine lines, small red accents,
--- flat square shapes, the Theme fonts and colours (Theme.Contract).
--- 5.8, the courier phone's look (design/phone-ui/): the dialog's main action (CONTINUE, LET'S GO, SHOW ME AROUND ...)
--- is the phone's red primary button (a red face, white caps, square, a finger tall); the second action stays a quiet
--- text action.
--- 6.5, a tutorial that shows instead of talks (shared/TutorialSteps.luau): her welcome is one page, the run has none
--- (the HUD's goal card shows each step from TutorialSteps.hint, so the hint strip keeps only FIRST DAY and SKIP while
--- a job runs), the done screen is one page with SHOW ME AROUND (the optional tour) and CLOSE.
+-- actions a finger tall (ACTION_H); a tap anywhere on it still does the primary.
+-- Everything lives in ScreenGuis that survive a respawn; the look is the contract direction (Theme.Contract) with
+-- 5.8's red primary.
+--
+-- 6.7, a tutorial that never annoys (the owner: "It should simply show with an arrow where things are in the menu,
+-- then that you take one job, and you either say yes or skip tutorial. But don't automatically give a job."):
+--   1 her welcome shows on its own 2 s after PLAY (one page): SHOW ME / SKIP TUTORIAL. SHOW ME asks the server for the
+--     phone ("tour") and starts the arrow tour at once.
+--   2 the arrow tour of the screen (TutorialSteps.ScreenTour; client/TutorialArrow.luau draws it): the NEXT card,
+--     PHONE [Q], then the phone opens on its own (the tour opens it) for JOBS, MAP, SHOP and BAG & ITEMS, it is put
+--     away for the bottom bar, then the minimap. Each stop one sentence, NEXT › (Enter, the gamepad's Y, a tap) and
+--     SKIP TUTORIAL. Nothing stops: you can walk meanwhile. The mouse is free for the buttons (so the bottom bar, which
+--     hides while the mouse is free, is let show while the arrow points at it: Hotbar.covered is wrapped). The phone
+--     closed by you during its stops: on to the stop after them. A job taken meanwhile ends the tour quietly.
+--   3 "ready" (one page): TAKE A JOB (the server's "board"; the phone opens on JOBS, you pick any job) / SKIP TUTORIAL.
+--   4 then nothing of hers during play: the server pays the first delivery of any job (a toast); TutorialUi.isOpen()
+--     is only her dialog, and the tour until it opened the phone (the phone's NEW PHONE pop-up waits for it: the
+--     tour opens the phone itself).
+--   SHOW ME AROUND in the phone's SETTINGS (Phone.onTour): the 5.7 world tour (the ZDC RIDE dock and the bus stop
+--   nearest the depot on the GPS, then Q → JOBS), and SHOW ME THE SCREEN, this arrow tour again (no server, no
+--   "ready").
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,6 +46,7 @@ local Hud = require(script.Parent.Hud)
 local CameraRig = require(script.Parent.CameraRig)
 local MapView = require(script.Parent.MapView)
 local DialogKeys = require(script.Parent.DialogKeys)
+local TutorialArrow = require(script.Parent.TutorialArrow)
 
 local TutorialUi = {}
 
@@ -50,7 +56,8 @@ local DIALOG_W = 540
 local TOUCH = Ui.touchLayout() -- 4.2: a phone or a tablet without a keyboard
 local ACTION_H = if TOUCH then 56 else 44 -- the actions' height (unscaled): 44 px or more for a finger at 0.8
 local KEYS_ID = "tutorial" -- her dialog's entry in client/DialogKeys.luau
-local RADIO_GUARD = 0.8 -- seconds before a key turns a radio page (it comes on its own: maybe mid-jump)
+local RADIO_GUARD = 0.8 -- seconds before a key turns a page that came on its own (maybe mid-jump)
+local PHONE_TRIES = 12 -- 6.7: the tour's looks (4 a second) for a phone it may open before it goes on without
 
 local player = Players.LocalPlayer
 local remote: RemoteEvent
@@ -60,6 +67,11 @@ local npc: Model? = nil -- Marge
 
 type Shown = { kind: string, dialog: TutorialSteps.Dialog, page: number, openedAt: number }
 local shown: Shown? = nil
+
+-- 6.7: the arrow tour while it runs. first: the first day's (its end asks "ready", its SKIP skips the tutorial);
+-- phoneSeen: the tour has had the phone open; tries: looks for a phone to open at the stop.
+type Touring = { index: number, first: boolean, phoneSeen: boolean, tries: number }
+local touring: Touring? = nil
 
 local view: any = {} -- the instances (one table: few locals)
 
@@ -145,7 +157,7 @@ local function buildDialog(advance: () -> (), second: () -> ())
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Enabled = false,
 	}, player:WaitForChild("PlayerGui"))
-	-- The whole panel is a button: a click or a tap anywhere on it continues.
+	-- The whole panel is a button: a click or a tap anywhere on it does the primary.
 	local panel = Ui.make("TextButton", {
 		Name = "Dialog",
 		Size = UDim2.fromOffset(DIALOG_W, 0),
@@ -215,41 +227,32 @@ local function buildDialog(advance: () -> (), second: () -> ())
 	view.dialogGui = gui
 end
 
+-- 6.7: the strip under the NEXT card: FIRST DAY · the bonus, and SKIP (the goal card says what to do).
 local function buildHint(onSkip: () -> ())
 	local slot = Hud.topSlot("tutorial")
-	slot.LayoutOrder = 2 -- right under the objective ticket (Hud's slot 1; the crew strip shows only without a job)
+	slot.LayoutOrder = 2 -- right under the NEXT card (Hud's slot 1; the crew strip shows only without a job)
 	local strip = Ui.make("Frame", {
 		Name = "TutorialHint",
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, if TOUCH then 44 else 30),
 		BackgroundColor3 = CONTRACT.charcoal,
 		BackgroundTransparency = 0.18,
 		BorderSizePixel = 0,
 		Visible = false,
 	}, slot)
 	Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = CONTRACT.red, BorderSizePixel = 0 }, strip)
-	local body = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, strip)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 8) }, body)
-	Ui.list(body, true, 2)
-	local top = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, LayoutOrder = 1 }, body)
-	Ui.label(top, string.upper(`First day · {Config.Tutorial.NpcName}`), UDim2.new(1, -60, 1, 0), {
+	Ui.label(strip, string.upper(`First day · +${Config.Tutorial.Reward} on your first delivery`), UDim2.new(1, -84, 1, 0), {
+		Position = UDim2.fromOffset(14, 0),
 		Font = Theme.HeadingFont,
 		TextSize = 11,
 		TextColor3 = CONTRACT.secondary,
 		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 	})
-	local skip = textAction(top, "SKIP", CONTRACT.secondary, 1, onSkip)
+	local skip = textAction(strip, "SKIP", CONTRACT.secondary, 1, onSkip)
 	skip.AnchorPoint = Vector2.new(1, 0.5)
-	skip.Position = UDim2.new(1, 0, 0.5, 0)
-	skip.Size = UDim2.fromOffset(0, if TOUCH then 44 else 28) -- 4.2: a finger's height on touch (it reaches over the line)
+	skip.Position = UDim2.new(1, -10, 0.5, 0)
+	skip.Size = UDim2.fromOffset(0, if TOUCH then 44 else 28) -- 4.2: a finger's height on touch
 	skip.ZIndex = 2
-	view.hintText = Ui.label(body, "", UDim2.new(1, 0, 0, 0), {
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Font = Theme.Font,
-		TextSize = 15,
-		TextColor3 = CONTRACT.text,
-		LayoutOrder = 2,
-	})
 	view.hint = strip
 end
 
@@ -264,7 +267,7 @@ local function buildMarker()
 		Enabled = false,
 	}, player:WaitForChild("PlayerGui"))
 	Ui.list(marker, true, 0, Enum.HorizontalAlignment.Center)
-	Ui.label(marker, "", UDim2.new(1, 0, 0, 22), {
+	Ui.label(marker, string.upper(`Talk to {Config.Tutorial.NpcName}`), UDim2.new(1, 0, 0, 22), {
 		Name = "Text",
 		Font = Theme.HeadingFont,
 		TextSize = 14,
@@ -289,61 +292,25 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
--- 4.5.1: the hint on screen (its words, the phase and stop they belong to, since when) and a pending later refresh.
--- The job's step can go back and forth between two server ticks (the 80-stud approach edge: "drive" / "carry", the
--- back open / shut): within one stop a new hint waits until the last one has been up HINT_HOLD seconds, so the card
--- never flips its words (and its height) several times a second.
-local HINT_HOLD = 1
-local hintShown = { text = "", key = "", at = -math.huge, queued = false }
-
--- The hint line and the marker for the phase and the job right now.
+-- The strip and the marker for the phase right now.
 local function refresh()
-	local text = ""
-	if phase == "job" or (phase ~= nil and job ~= nil) then
-		text = TutorialSteps.hint(TutorialSteps.jobStep(job), job)
-	elseif phase ~= nil then
-		text = TutorialSteps.hint(phase, nil)
-	end
-	if TOUCH then
-		text = TutorialSteps.forTouch(text) -- 4.2: no keys on a touch screen
-	end
 	if view.hint then
-		local key = if job then `{phase}|{job.stopIndex}|{job.stage}` else tostring(phase)
-		if text ~= hintShown.text then
-			local wait = hintShown.at + HINT_HOLD - os.clock()
-			if key == hintShown.key and wait > 0 then
-				if not hintShown.queued then
-					hintShown.queued = true
-					task.delay(wait, function()
-						hintShown.queued = false
-						refresh()
-					end)
-				end
-			else
-				hintShown.text, hintShown.at = text, os.clock()
-				view.hintText.Text = text
-				view.hint.Visible = text ~= ""
-			end
+		local on = phase == "board" or phase == "job" or phase == "retry" -- (6.7: not over her welcome or the tour)
+		if view.hint.Visible ~= on then
+			view.hint.Visible = on
 		end
-		hintShown.key = key
-		-- 6.5: during the run the HUD's goal card shows this step (TutorialSteps.hint): the strip keeps FIRST DAY and
-		-- SKIP only, its line comes back without a job (talk to her, take a job from the board)
-		view.hintText.Visible = job == nil
 	end
 	local marker = view.marker
 	if marker then
+		-- 6.7: only while her welcome waits and is not on screen (it shows on its own after PLAY)
 		local head = npc and (npc:FindFirstChild("Head") or npc.PrimaryPart)
-		local wanted = head ~= nil and job == nil and (phase == "welcome" or phase == "retry")
+		local wanted = head ~= nil and job == nil and phase == "welcome" and shown == nil and touring == nil
 		marker.Adornee = if wanted then head else nil
 		marker.Enabled = wanted
-		local label = marker:FindFirstChild("Text")
-		if label and label:IsA("TextLabel") then
-			label.Text = string.upper(`Talk to {Config.Tutorial.NpcName}`)
-		end
 	end
 end
 
--- The mouse is free while a dialog is open (CameraRig asks Main's mouseNeeded; ours is put in front of it).
+-- The mouse is free while her dialog or the tour is up (CameraRig asks Main's mouseNeeded; ours is put in front).
 local wrapped: (() -> boolean)? = nil
 local function freeMouse()
 	if CameraRig.mouseNeeded == wrapped then
@@ -351,10 +318,42 @@ local function freeMouse()
 	end
 	local previous = CameraRig.mouseNeeded
 	local function needed(): boolean
-		return TutorialUi.isOpen() or previous()
+		return TutorialUi.isOpen() or touring ~= nil or previous()
 	end
 	wrapped = needed
 	CameraRig.mouseNeeded = needed
+end
+
+-- 6.7: the phone (client/Phone.luau), or nil when it did not load.
+local function phoneApi(): any
+	local ok, phone = pcall(function(): any
+		return require(script.Parent.Phone)
+	end)
+	return if ok then phone else nil
+end
+
+-- 6.7: the bottom bar hides while the mouse is free (Main's Hotbar.covered): it shows while the tour points at it
+-- (unless a window, the phone or a result covers the game).
+local coveredWrapped: (() -> boolean)? = nil
+local function showHotbar()
+	local ok, Hotbar = pcall(function(): any
+		return require(script.Parent.Hotbar)
+	end)
+	if not ok or Hotbar.covered == coveredWrapped then
+		return
+	end
+	local previous = Hotbar.covered
+	local function covered(): boolean
+		local tour = touring
+		local stop = if tour then TutorialSteps.ScreenTour[tour.index] else nil
+		if stop and stop.target == "hotbar" then
+			local phone = phoneApi()
+			return CameraRig.windowOpen() or Hud.resultOpen() or (phone ~= nil and phone.isOpen())
+		end
+		return if previous then previous() else false
+	end
+	coveredWrapped = covered
+	Hotbar.covered = covered
 end
 
 local function render()
@@ -387,6 +386,7 @@ local function close()
 		view.dialogGui.Enabled = false
 	end
 	DialogKeys.close(KEYS_ID)
+	refresh()
 end
 
 local function show(kind: string, dialog: TutorialSteps.Dialog?)
@@ -397,13 +397,227 @@ local function show(kind: string, dialog: TutorialSteps.Dialog?)
 	render()
 	view.dialogGui.Enabled = true
 	freeMouse()
-	-- Space / Enter / A turn her pages (4.4.1: the radio's too; it comes on its own, maybe mid-jump or mid-drive, so
-	-- a key waits a little longer there; a jump pressed just as she starts talking does not skip her first page).
-	local radio = kind == "retry" or kind == "done" or kind == "say" or string.sub(kind, 1, 5) == "tour_"
+	refresh()
+	-- Space / Enter / A do the primary (4.4.1: a page that comes on its own, maybe mid-jump or mid-drive, waits a
+	-- little longer: a jump pressed just as she starts talking does not take her first action).
+	local radio = kind == "welcome" or kind == "say" or kind == "talk" or string.sub(kind, 1, 7) == "around_"
 	DialogKeys.open(KEYS_ID, TutorialUi.advance, { guard = if radio then RADIO_GUARD else 0.3, layer = 2 })
 end
 
--- ── 5.7: the tour ───────────────────────────────────────────────────────────
+-- Her board: the phone's JOBS (6.7: you pick any job there), else the Dispatch board.
+local function openBoard()
+	local phone = phoneApi()
+	if phone and phone.has() then
+		phone.open("board")
+		return
+	end
+	local open = (Hud :: any).onJobs -- (Main: DispatchUi.open)
+	if type(open) == "function" then
+		open()
+	end
+end
+
+-- ── 6.7: the arrow tour of the screen ──────────────────────────────────────
+
+-- A part of the HUD by its path of names (client/Hud.luau, client/Objective.luau, client/MapView.luau, Hotbar).
+local function hudPart(path: { string }): GuiObject?
+	local playerGui = player:FindFirstChild("PlayerGui")
+	local node: Instance? = playerGui and playerGui:FindFirstChild("ZombieDeliveryHud")
+	for _, name in path do
+		node = if node then node:FindFirstChild(name) else nil
+	end
+	return if node and node:IsA("GuiObject") then node else nil
+end
+
+-- What a tour stop points at (TutorialSteps.ScreenTour target), by name; nil while it is not there.
+local function tourTarget(name: string): GuiObject?
+	local playerGui = player:FindFirstChild("PlayerGui")
+	if not playerGui then
+		return nil
+	end
+	if name == "next" then
+		return hudPart({ "TopStack", "Slot_job", "Goal" }) -- the NEXT card (client/Objective.luau)
+	elseif name == "phone" then
+		-- PHONE [Q] top right (Hud's row: "moreButton"); the phone's own PHONE action (touch) when that one hides
+		local button = hudPart({ "HudButtons", "Row", "moreButton" })
+		if button and button.Visible then
+			return button
+		end
+		local phoneGui = playerGui:FindFirstChild("ZombieDeliveryPhone")
+		local other = phoneGui and phoneGui:FindFirstChild("PhoneButton")
+		return if other and other:IsA("GuiObject") then other else button
+	elseif name == "hotbar" then
+		return hudPart({ "BottomBar" }) -- client/Hotbar.luau
+	elseif name == "minimap" then
+		return hudPart({ "LeftStack", "Minimap" }) -- client/MapView.luau
+	end
+	-- a tile of the phone's home (client/Phone.luau: jobsApp, mapApp, shopApp, bagApp)
+	local phoneGui = playerGui:FindFirstChild("ZombieDeliveryPhone")
+	local body = phoneGui and phoneGui:FindFirstChild("Phone")
+	local tiles = body and body:FindFirstChild("Tiles", true)
+	local tile = tiles and tiles:FindFirstChild(name)
+	return if tile and tile:IsA("GuiObject") then tile else nil
+end
+
+local applyStop: () -> ()
+
+-- The tour is over (skipped: SKIP TUTORIAL on the first day's).
+local function finishTour(skipped: boolean)
+	local tour = touring
+	touring = nil
+	TutorialArrow.hide()
+	refresh()
+	if not tour or not tour.first then
+		return
+	end
+	if skipped then
+		remote:FireServer("skip")
+	elseif phase ~= nil and job == nil then
+		show("ready", TutorialSteps.dialog("ready", { reward = Config.Tutorial.Reward }))
+	end
+end
+
+-- Ends the tour without a word (a job started, the tutorial ended).
+local function stopTour()
+	if touring then
+		touring = nil
+		TutorialArrow.hide()
+		refresh()
+	end
+end
+
+local function nextStop()
+	local tour = touring
+	if not tour then
+		return
+	end
+	tour.index += 1
+	tour.tries = 0
+	applyStop()
+end
+
+-- The phone was put away during its stops (Q, ESC, a tile that opens a window), or it never came: on to the first
+-- stop after them.
+local function pastPhone()
+	local tour = touring
+	if not tour then
+		return
+	end
+	local index = tour.index
+	while TutorialSteps.ScreenTour[index] and TutorialSteps.ScreenTour[index].phone == "open" do
+		index += 1
+	end
+	tour.index = index
+	tour.tries = 0
+	applyStop()
+end
+
+-- Shows the tour's stop (its phone opened or put away first); past the last one it is over.
+applyStop = function()
+	local tour = touring
+	if not tour then
+		return
+	end
+	local stops = TutorialSteps.ScreenTour
+	local stop = stops[tour.index]
+	if not stop then
+		finishTour(false)
+		return
+	end
+	local phone = phoneApi()
+	if phone then
+		if stop.phone == "open" then
+			if phone.isOpen() then
+				if phone.appOpen() then
+					phone.back() -- (an app's popup over the tiles: back to them)
+				end
+			elseif tour.phoneSeen then
+				pastPhone() -- (you put it away during its stops)
+				return
+			elseif phone.has() then
+				phone.open()
+			end
+		elseif phone.isOpen() then
+			phone.close()
+		end
+	end
+	freeMouse()
+	showHotbar()
+	local last = tour.index == #stops
+	TutorialArrow.show({
+		find = function(): GuiObject?
+			return tourTarget(stop.target)
+		end,
+		text = TutorialSteps.tourLine(stop, TOUCH),
+		side = stop.side,
+		step = tour.index,
+		count = #stops,
+		next = if last and not tour.first then "DONE" else "NEXT ›",
+		skip = if tour.first then "SKIP TUTORIAL" else "CLOSE",
+		onNext = nextStop,
+		onSkip = function()
+			finishTour(true)
+		end,
+		-- 6.8 review: a gamepad's selection on NEXT only while the phone is open for the stop; elsewhere none, so the
+		-- stick walks and A jumps (Y is NEXT)
+		select = stop.phone == "open",
+	})
+	refresh()
+end
+
+-- Four times a second while the tour runs: its phone stops (the phone it opens, or the player who put it away).
+local function tourTick()
+	local tour = touring
+	if tour and not TutorialArrow.isShown() then
+		-- 6.8 review: the arrow hid itself after an error (its frame loop warns and hides): the tour ends with it, not
+		-- half-running (its phone stops, TutorialUi.isOpen holding the NEW PHONE pop-up and the bottom bar back)
+		stopTour()
+		return
+	end
+	local stop = if tour then TutorialSteps.ScreenTour[tour.index] else nil
+	if not tour or not stop or stop.phone ~= "open" then
+		return
+	end
+	local phone = phoneApi()
+	if not phone then
+		pastPhone()
+		return
+	end
+	if phone.isOpen() then
+		if not tour.phoneSeen then
+			tour.phoneSeen = true -- (from now on the NEW PHONE pop-up finds it open and stays away)
+			TutorialArrow.focus() -- (the phone put the gamepad's selection on its first tile)
+		end
+	elseif tour.phoneSeen or tour.tries >= PHONE_TRIES then
+		pastPhone() -- (you put it away: the tour never opens it against you; or it never came)
+	else
+		tour.tries += 1
+		if phone.has() then
+			phone.open() -- (the state with the phone may come a moment after SHOW ME)
+		end
+	end
+end
+
+-- Starts the arrow tour (first: the first day's, after SHOW ME).
+local function startTour(first: boolean)
+	close()
+	local tour: Touring = { index = 1, first = first, phoneSeen = false, tries = 0 }
+	touring = tour
+	applyStop()
+	task.spawn(function()
+		while touring == tour do
+			local ok, err = pcall(function()
+				tourTick()
+			end)
+			if not ok then
+				warn(`[TutorialUi] tour: {err}`)
+			end
+			task.wait(0.25)
+		end
+	end)
+end
+
+-- ── 5.7: SHOW ME AROUND, the world tour ─────────────────────────────────────
 
 -- A place on the GPS (the white route and the HUD's beam: MapView.onWaypoint, set by the Hud); nil clears it.
 local function tourGps(id: string?, name: string?, x: number?, z: number?)
@@ -446,8 +660,8 @@ local function tourPlaces(): ({ name: string, x: number, z: number, spawn: boole
 	return dock, stop
 end
 
--- Shows the tour's step `index` (TutorialSteps.Tour) with its place on the GPS; past the last one it is over.
-local function tour(index: number)
+-- Shows the world tour's step `index` (TutorialSteps.Tour) with its place on the GPS; past the last one it is over.
+local function around(index: number)
 	local step = TutorialSteps.Tour[index]
 	if not step then
 		return
@@ -460,46 +674,70 @@ local function tour(index: number)
 	else
 		tourGps(nil)
 	end
-	show(`tour_{index}`, TutorialSteps.tourDialog(step, { dock = if dock and not dock.spawn then dock.name else nil, stop = if stop then stop.name else nil }))
+	show(`around_{index}`, TutorialSteps.tourDialog(step, { dock = if dock and not dock.spawn then dock.name else nil, stop = if stop then stop.name else nil }))
 end
+
+-- ── Her dialogs' actions ───────────────────────────────────────────────────
 
 -- What the last page's actions do.
 local function finishDialog(kind: string, primary: boolean)
 	if kind == "welcome" then
-		remote:FireServer(if primary then "go" else "skip")
+		if primary then
+			remote:FireServer("tour") -- 6.7: SHOW ME: the phone (the server) and the arrow tour
+			startTour(true)
+		else
+			remote:FireServer("skip")
+		end
+	elseif kind == "ready" then
+		if primary then
+			remote:FireServer("board") -- 6.7: TAKE A JOB: you pick any job; the first delivery pays her bonus
+			openBoard()
+		else
+			remote:FireServer("skip")
+		end
 	elseif kind == "skip" and primary then
 		remote:FireServer("skip")
-	elseif kind == "retry" and primary then
-		remote:FireServer("go")
-	elseif kind == "board" and primary then
-		local open = (Hud :: any).onJobs -- (Main: DispatchUi.open)
-		if type(open) == "function" then
-			open()
-		end
-	elseif kind == "done" and primary then
-		tour(1) -- 5.7: SHOW ME AROUND
-	elseif string.sub(kind, 1, 5) == "tour_" then
-		local index = tonumber(string.sub(kind, 6)) or #TutorialSteps.Tour
+	elseif kind == "talk" and primary then
+		openBoard()
+	elseif string.sub(kind, 1, 7) == "around_" then
+		local index = tonumber(string.sub(kind, 8)) or #TutorialSteps.Tour
 		if primary and index < #TutorialSteps.Tour then
-			tour(index + 1)
+			around(index + 1)
 			return
 		end
 		tourGps(nil)
 		if primary then
-			-- the last page: OPEN THE BOARD (the phone's BOARD, else the Dispatch board)
-			local ok = pcall(function()
-				require(script.Parent.Phone).open("board")
-			end)
-			local open = (Hud :: any).onJobs
-			if not ok and type(open) == "function" then
-				open()
-			end
+			openBoard() -- the last page: OPEN THE BOARD
 		end
 	end
 end
 
+-- Is her dialog open (6.7: or the tour, until it has opened the phone: the NEW PHONE pop-up waits for it, Main's
+-- Phone.blocked; the bottom bar hides meanwhile)? Main asks it for the mouse, the bottom bar and the phone's pop-up.
 function TutorialUi.isOpen(): boolean
-	return shown ~= nil
+	local tour = touring
+	return shown ~= nil or (tour ~= nil and not tour.phoneSeen)
+end
+
+-- 6.7: is the arrow tour on screen?
+function TutorialUi.touring(): boolean
+	return touring ~= nil
+end
+
+-- 6.7, the phone's SETTINGS (Phone.onTour): "screen" the arrow tour again, "around" SHOW ME AROUND (the world tour).
+function TutorialUi.tour(kind: string)
+	if touring or shown then
+		return
+	end
+	local phone = phoneApi()
+	if phone and phone.isOpen() then
+		phone.close()
+	end
+	if kind == "screen" then
+		startTour(false)
+	else
+		around(1)
+	end
 end
 
 -- The next page, or the dialog's own action on the last one.
@@ -531,18 +769,22 @@ local function onTutorial(newPhase: any, data: any)
 	if typeof(info.npc) == "Instance" and info.npc:IsA("Model") then
 		npc = info.npc
 	end
-	if type(newPhase) ~= "string" then
-		-- Over (skipped): her tutorial dialogs go, a line she said stays.
+	if type(newPhase) ~= "string" or newPhase == "done" then
+		-- Over (skipped, or 6.7: the first delivery, its toast is the server's): her tutorial dialogs and the first
+		-- day's tour go, a line she said stays.
 		phase = nil
+		if touring and touring.first then
+			stopTour()
+		end
 		local current = shown
-		if current and current.kind ~= "say" and current.kind ~= "done" then
+		if current and current.kind ~= "say" and string.sub(current.kind, 1, 7) ~= "around_" then
 			close()
 		end
 		refresh()
 		return
 	end
 	if newPhase == "say" then
-		show("say", TutorialSteps.dialog("say", info))
+		show(if info.board == true then "talk" else "say", TutorialSteps.dialog("say", info))
 		return
 	end
 	if newPhase == "phone" or newPhase == "message" then
@@ -550,14 +792,22 @@ local function onTutorial(newPhase: any, data: any)
 		-- a message for the phone's MESSAGES); neither is a phase of hers
 		return
 	end
-	phase = if newPhase == "done" then nil else newPhase
-	refresh()
-	local dialog = TutorialSteps.dialog(newPhase, info)
-	if dialog then
-		show(newPhase, dialog)
-	elseif shown and shown.kind ~= "say" and shown.kind ~= "done" and newPhase == "job" then
-		close() -- (a job taken from the board while her welcome was still up)
+	phase = newPhase
+	if newPhase == "welcome" then
+		if not touring and (shown == nil or shown.kind == "welcome") then
+			show("welcome", TutorialSteps.dialog("welcome", info))
+		end
+	elseif newPhase == "job" then
+		-- (a job taken from the board or the phone during her welcome or the tour: they go quietly)
+		if touring and touring.first then
+			stopTour()
+		end
+		local current = shown
+		if current and (current.kind == "welcome" or current.kind == "ready") then
+			close()
+		end
 	end
+	refresh() -- (6.7: tour, board, retry: no page of hers)
 end
 
 function TutorialUi.start()
@@ -568,6 +818,11 @@ function TutorialUi.start()
 	end)
 	buildMarker()
 	remote.OnClientEvent:Connect(onTutorial)
+	-- 6.7: the phone's SETTINGS offers the tours again (a hook: the phone does not require this module)
+	local phone = phoneApi()
+	if phone then
+		phone.onTour = TutorialUi.tour
+	end
 	-- (Main connects the HUD to "Job" right after the modules start; no job is sent before PLAY, so nothing queued is
 	-- taken from it.)
 	Net.get("Job").OnClientEvent:Connect(function(payload)

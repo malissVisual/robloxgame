@@ -280,27 +280,21 @@ local function muzzle(car: Model, fromRoof: boolean): Vector3?
 	return (chassis.CFrame * CFrame.new(side * (chassis.Size.X / 2 + 0.6), at.Y + 2.6, at.Z)).Position
 end
 
--- 6.0: no gun yet (fists only): where to get one.
-local function noGun(): string
-	local pistol = Economy.findWeapon(Config.Arms.Starter)
-	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	return `No gun yet: Lead & Co. sells a pistol{if pistol then ` for ${pistol.price}` else ""}. Till then, {if touch then "tap PUNCH" else "V punches"}.`
-end
-
--- A two-handed gun in a car seat: say why nothing fires (not more often than every few seconds). 6.0: or no gun.
+-- A two-handed gun in a car seat: say why nothing fires (not more often than every few seconds). (6.7: the 6.0 "no gun
+-- yet: buy a pistol" note is gone: every courier starts with the pistol, Config.Arms; before the State names it,
+-- nothing fires and nothing is said.)
 local lastRefusal = 0
 local function refuse(driving: boolean)
+	local def = Economy.findWeapon(weapon)
+	if not def then
+		return
+	end
 	local now = os.clock()
-	if now - lastRefusal < (if weapon == nil then 10 else 3) then
+	if now - lastRefusal < 3 then
 		return
 	end
 	lastRefusal = now
-	local def = Economy.findWeapon(weapon)
-	if not def then
-		Shooting.notify(noGun())
-		return
-	end
-	local name = if def then def.name else "That gun"
+	local name = def.name
 	Shooting.notify(if driving
 		then `{name}: too big to fire from a car. Pistol, revolver or SMG out of the window, or mount a car gun at Wrench Garage.`
 		else `{name}: too big to fire from a car. Switch to a pistol, revolver or SMG (T) to shoot out of the window.`)
@@ -409,10 +403,7 @@ local function step()
 	end
 	-- Cargo in the hands, or the gun holstered (3.9): no shooting (the server ignores it too).
 	if not car and (CameraRig.carrying() or Holster.holstered()) then
-		if weapon == nil and not CameraRig.carrying() then
-			refuse(false) -- 6.0: no gun yet: where to buy one
-		end
-		return
+		return -- (6.7: no "buy a pistol" note: everybody has one)
 	end
 	-- What fires: the hand gun, the car gun, a one-handed gun out of the window, or nothing (two-handed, in a car).
 	local mode, carGun = Shooting.mode()

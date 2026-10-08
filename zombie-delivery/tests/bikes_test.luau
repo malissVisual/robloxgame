@@ -28,7 +28,7 @@ local STUBS = {
 	{ id = "rustbike", level = 2, price = 300, capacity = 1, gearSlots = 1 },
 	{ id = "citybike", level = 2, price = 1100, capacity = 1, gearSlots = 2 },
 	{ id = "cargobike", level = 3, price = 2400, capacity = 4, gearSlots = 2 },
-	{ id = "escooter", level = 4, price = 2800, capacity = 2, gearSlots = 1 }, -- 5.1.1 (5.7: two on its rack)
+	{ id = "escooter", level = 3, price = 1900, capacity = 3, gearSlots = 1 }, -- 5.1.1 (5.7: two on its rack; 6.7: + one on the deck, $1,900 at level 3)
 	{ id = "ebike", level = 5, price = 6500, capacity = 1, gearSlots = 2 },
 }
 for _, stub in STUBS do
@@ -109,15 +109,20 @@ check("Marge's text names the price", string.find(Config.BikeShop.Unlock, "{pric
 -- The BIKE jobs ---------------------------------------------------------------------------------------------------------
 
 local bike = Config.Jobs.Bike
-check("from level 2, 2 – 6 pieces, 300 – 1,000 studs", bike.Level == 2 and bike.Pieces[1] == 2 and bike.Pieces[2] == 6 and bike.MinDistance == 300 and bike.MaxDistance == 1000)
+check("from level 2, 2 – 8 pieces (6.7: 6 → 8), 300 – 1,000 studs", bike.Level == 2 and bike.Pieces[1] == 2 and bike.Pieces[2] == 8 and bike.MinDistance == 300 and bike.MaxDistance == 1000)
 check("pay $45 + $0.15 / stud", bike.BasePay == 45 and bike.PayPerStud == 0.15)
 local short, long = JobRules.footPay(400, 2, 1, bike), JobRules.footPay(1000, 4, 1, bike)
 check("a longer ride pays more, $5 steps, within PayMin … PayMax × PayTop", short < long and short % 5 == 0 and long % 5 == 0 and short >= bike.PayMin
 	and JobRules.footPay(5000, 6, 3, bike) <= bike.PayMax * bike.PayTop, `{short} {long}`)
 check("better than a walk of the same length", JobRules.footPay(400, 2, 1, bike) >= JobRules.footPay(400, 2, 1))
 check("the clock expects a ride, not a walk", JobRules.footTime(800, 10, nil, bike) < JobRules.footTime(800, 10))
-check("pieces: Bike.Pieces by the bike's room", JobRules.footPieces(6, 4, bike) == 4 and JobRules.footPieces(1, 9, bike) == 2 and JobRules.footPieces(9, 9, bike) == 6
+check("pieces: Bike.Pieces by the bike's room", JobRules.footPieces(6, 4, bike) == 4 and JobRules.footPieces(1, 9, bike) == 2 and JobRules.footPieces(9, 9, bike) == 8
 	and JobRules.footPieces(3, 1, bike) == 1)
+-- 6.7: the trailer's room counts on one run now: the Courier Bike with panniers and the trailer (1 + 3 + 4) takes a
+-- run of 8 (6 before), and its pay stays within PayMax × PayTop.
+local rig = Economy.capacity("citybike", {}, { panniers = true, trailer = true }, "parcel")
+check("6.7: a Courier Bike with panniers and a trailer: 8 pieces on one run", rig == 8 and JobRules.footPieces(8, rig, bike) == 8 and JobRules.footPieces(8, rig - 4, bike) == 4, rig)
+check("6.7: an 8-piece ride's pay stays capped", JobRules.footPay(1000, 8, 1, bike) <= bike.PayMax * bike.PayTop)
 check("the foot jobs' numbers stay the default", JobRules.footPieces(9, 9) == Config.Jobs.Foot.Pieces[2])
 local xpLow = JobRules.bikeXp(Levels.jobXp(1, 2, 0, false, true))
 local xpHigh = JobRules.bikeXp(Levels.jobXp(1, 6, 0, false, true))
@@ -143,8 +148,8 @@ check("Career.BIKE_LEVEL is the BIKE jobs' level", Career.BIKE_LEVEL == bike.Lev
 -- 5.1.1, the E-Scooter ---------------------------------------------------------------------------------------------------
 
 local scooter = Economy.findCar("escooter") :: Config.CarDef
-check("the E-Scooter: a bike, level 4, about $2,800", scooter ~= nil and scooter.bike == true and scooter.level == 4
-	and math.abs(scooter.price - 2800) <= 300 and not scooter.company)
+check("the E-Scooter: a bike, level 3, $1,900 (6.7: below the Cargo Bike, at its level)", scooter ~= nil and scooter.bike == true and scooter.level == 3
+	and scooter.price == 1900 and scooter.price < (Economy.findCar("cargobike") :: Config.CarDef).price and not scooter.company)
 check("… style scooter, the rider stands, the badge", scooter.style == "scooter" and scooter.stand == true
 	and string.find(scooter.badge or "", "ELECTRIC", 1, true) ~= nil and string.find(scooter.badge or "", "STAND-UP", 1, true) ~= nil)
 check("… speed ~32 (6.0: not too fast), accel ~42 (a quick start), turn ~2.8, health ~110", math.abs(scooter.maxSpeed - 32) <= 2 and math.abs(scooter.accel - 42) <= 2
@@ -162,24 +167,24 @@ end
 check("… the nippiest of the two-wheelers (accel and turn), slower than the E-Bike", quickest and scooter.maxSpeed < (Economy.findCar("ebike") :: Config.CarDef).maxSpeed)
 check("… the only stand-up one", standing == 1)
 check("… no stages, no car gun, no trolley", scooter.stages == nil and not scooter.mount and not scooter.trolley)
-check("… two light pieces of its own (5.7), one gear slot", scooter.capacity == 2 and Economy.gearSlots("escooter", 0) == 1 and Economy.capacity("escooter", {}) == 2)
+check("… three light pieces of its own (5.7: two; 6.7: + one on the deck), one gear slot", scooter.capacity == 3 and Economy.gearSlots("escooter", 0) == 1 and Economy.capacity("escooter", {}) == 3)
 check("… the basket fits (a handlebar bag), the panniers and the trailer do not", Economy.gearFits("escooter", "basket")
 	and not Economy.gearFits("escooter", "panniers") and not Economy.gearFits("escooter", "trailer"))
 check("… no car gear on it", not Economy.gearFits("escooter", "roofrack") and not Economy.gearFits("escooter", "straps"))
--- Slots = capacity + gear: its own rack's two, the basket's two (what Vehicles.cargoSlots lays out: bike-check.luau).
-check("… room: 2, with the basket 4, the panniers never count", Economy.capacity("escooter", {}, { basket = true }, "parcel") == 4
-	and Economy.capacity("escooter", {}, { basket = true, panniers = true, trailer = true }, "parcel") == 4
+-- Slots = capacity + gear: its own three (6.7), the basket's two (what Vehicles.cargoSlots lays out: bike-check.luau).
+check("… room: 3, with the basket 5, the panniers never count", Economy.capacity("escooter", {}, { basket = true }, "parcel") == 5
+	and Economy.capacity("escooter", {}, { basket = true, panniers = true, trailer = true }, "parcel") == 5
 	and Economy.bikeRoom("escooter", { basket = true }) == 2)
 local scooterGear: Economy.CarGear = { escooter = { basket = "installed", panniers = "installed" } }
-check("… Transport mode bike: 4 on the scooter + your bag", Transport.isBike("escooter") and Transport.bikeRoom("escooter", scooterGear) == 4
-	and Transport.bike(Transport.bikeRoom("escooter", scooterGear), { bag = true }).room == 4 + Transport.packRoom({ bag = true }) and Transport.packRoom({ bag = true }) == 2)
+check("… Transport mode bike: 5 on the scooter + your bag", Transport.isBike("escooter") and Transport.bikeRoom("escooter", scooterGear) == 5
+	and Transport.bike(Transport.bikeRoom("escooter", scooterGear), { bag = true }).room == 5 + Transport.packRoom({ bag = true }) and Transport.packRoom({ bag = true }) == 2)
 -- 5.7: the speed ladder on two wheels (the owner: the scooter "a bit slower, so it isn't too much").
 local function top(id: string): number
 	return (Economy.findCar(id) :: Config.CarDef).maxSpeed
 end
 check("5.7: a free rental (capped) < the Rusty Bike < the E-Scooter < the Courier Bike < the E-Bike", Config.Rental.MaxSpeed < top("rustbike")
 	and top("rustbike") < top("escooter") and top("escooter") < top("citybike") and top("citybike") < top("ebike"))
-check("5.7: a rental's rack takes one piece, the bought scooter's two", Config.Rental.Room == 1 and Config.Rental.Room < scooter.capacity)
+check("5.7: a rental's rack takes one piece, the bought scooter's three (6.7)", Config.Rental.Room == 1 and Config.Rental.Room < scooter.capacity)
 -- 6.0: quick off the line, slow at the top: both scooters out-accelerate every other two-wheeler.
 local quickStart = true
 for _, def in Config.Cars do
@@ -189,7 +194,7 @@ for _, def in Config.Cars do
 end
 check("6.0: a rental's accel is capped (36), still the quickest start after the bought one", Config.Rental.Accel == 36
 	and Config.Rental.Accel <= scooter.accel and quickStart)
-check("… on the career road at level 4 (Spoke & Chain), never a car", has(4, "bike", "escooter") and not has(4, "car", "escooter"))
+check("… on the career road at level 3 (Spoke & Chain), never a car", has(3, "bike", "escooter") and not has(3, "car", "escooter"))
 check("… not advice for a bigger car", string.find(Economy.roomAdvice("van", 0, 4), "Scooter", 1, true) == nil)
 
 -- The rider (shared/RiderPose.luau): pedalling on a bike, standing on the scooter.

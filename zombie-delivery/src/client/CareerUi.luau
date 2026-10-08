@@ -108,10 +108,15 @@ local function unlockText(unlock: Career.Unlock): string
 		local gear = Economy.findGear(unlock.id)
 		return `{if gear then gear.icon else "🧰"} {unlock.name} ({if gear and gear.bikeOnly then "bike gear" else "gear"})`
 	elseif unlock.kind == "kit" then
-		-- 5.0: personal gear, at Last Stop Supplies (6.6: a bag at ZDC Bags, the depot's kiosk)
+		-- 5.0: personal gear, at Last Stop Supplies (6.6: a bag at ZDC Bags, the depot's kiosk; 6.7: the bat at Lead & Co.,
+		-- the starter bag yours already: shared/Transport.luau kitShop)
 		for _, kit in Config.Kit do
 			if kit.id == unlock.id then
-				return `{kit.icon} {unlock.name} ({Career.money(kit.price)} at {if kit.extra then Config.BagShop.Name else "Last Stop Supplies"})`
+				if kit.starter then
+					return `{kit.icon} {unlock.name} (yours from the start)`
+				end
+				local shop = require(Shared.Map).Shops[require(Shared.Transport).kitShop(kit)]
+				return `{kit.icon} {unlock.name} ({Career.money(kit.price)} at {if shop then shop.name else "Last Stop Supplies"})`
 			end
 		end
 		return `🛍 {unlock.name}`

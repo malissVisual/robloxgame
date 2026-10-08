@@ -2,33 +2,38 @@
 -- 3.7: the first-day tutorial. Marge, the dispatcher (Config.Tutorial: an R15 person from server/Npcs.luau with a name
 -- tag, the idle animation and a "Talk" prompt), stands at the depot by the job board. She is there for everybody.
 --
--- A player whose profile.tutorial is false (a new save; PlayerData counts an older save with a delivery as done):
+-- 6.7, a tutorial that never annoys (the owner: "It should simply show with an arrow where things are in the menu,
+-- then that you take one job, and you either say yes or skip tutorial. But don't automatically give a job."). A player
+-- whose profile.tutorial is false (a new save; PlayerData counts an older save with a delivery as done):
 --   wait     until PLAY was pressed (Tutorial.onPlay when Main calls it; or their car came), then
 --            Config.Tutorial.StartDelay s for the start screen to fade
---   welcome  her greeting (client/TutorialUi.luau shows the dialog at once, a marker over her). "Let's go" in the
---            dialog or talking to her (E): she gives the PHONE (5.0) and Jobs.startTutorialJob, the first delivery ON
---            FOOT (two letters on one street), as if taken from the board
---   board    no job could be made: take an ON FOOT job from the board (J)
---   job      a job runs: the client reads the Job payload for its hints (shared/TutorialSteps.luau)
---   retry    it failed or was cancelled (Jobs.onDelivered false, or the job vanished without a result): she offers
---            another, over the radio or when you talk to her
--- Jobs.onDelivered with ok (an ordinary job delivered and paid, whichever one): profile.tutorial = true, the
--- Config.Tutorial.Reward on top and her last pages about the rest of the game ("done"). "skip" ends it at once (no
--- reward). Talking to her afterwards gets a short line. A crew mate helping is fine: the job is the owner's.
--- Nothing is saved but profile.tutorial: leaving and coming back before the delivery starts again at the welcome.
+--   welcome  her one-page greeting shows on its own (client/TutorialUi.luau). SHOW ME ("tour" from the client) gives
+--            the PHONE (5.0) and starts the arrow tour; SKIP TUTORIAL ("skip") ends it. Talking to her (E) shows the
+--            greeting again.
+--   tour     the client's arrow tour of the screen runs (client/TutorialArrow.luau). Its last page, TAKE A JOB
+--            ("board"), opens the phone's JOBS; SKIP TUTORIAL ("skip") ends it.
+--   board    she waits for your first job: any one, from the board or the phone (she gives none: Jobs.startTutorialJob
+--            stays callable but unused). Talking to her: one page with OPEN THE BOARD ("say", board = true).
+--   job      a job runs: the HUD's goal card shows the hints (shared/TutorialSteps.luau)
+-- A failed or cancelled job (Jobs.onDelivered false, or the job vanished without a result) goes back to "board" with no
+-- page of hers ("retry" is never sent any more). Jobs.onDelivered with ok, in any phase (whichever job, a crew mate
+-- helping is fine: the job is the owner's): profile.tutorial = true, Config.Tutorial.Reward on top and a toast "First
+-- delivery! +$50" ("done": no page). "skip" ends it at once (no reward). Talking to her afterwards gets a short line.
+-- Nothing is saved but profile.tutorial: leaving and coming back before the first delivery starts again at the welcome;
+-- a save that finished or skipped it never sees it again.
 --
--- Remote "Tutorial": server → client (phase, data?) with data.npc = her model (the marker), data.given (the job is
--- hers), data.reward (done), data.text (say); (nil) = over (skipped). Client → server: ("go") = her dialog's
--- "Let's go" / "Another job", ("skip").
--- 5.0, the phone: profile.phone = true when she gives you the first job (or the tutorial is skipped; a player without
--- the tutorial gets it at once), and the message ("phone", { npc }) right before the job's: client/Phone.luau shows
--- its "NEW PHONE" moment (TutorialUi ignores it: not a phase).
+-- Remote "Tutorial": server → client (phase, data?) with data.npc = her model (the marker), data.reward (done),
+-- data.text / data.board (say); (nil) = over (skipped). Client → server: ("tour") her welcome's SHOW ME (6.5's "go"
+-- counts the same), ("board") the tour's TAKE A JOB, ("skip").
+-- 5.0, the phone: profile.phone = true at SHOW ME (6.7; or when the tutorial ends, delivered or skipped; a player
+-- without the tutorial gets it at once), and the message ("phone", { npc }): client/Phone.luau shows its "NEW PHONE"
+-- moment (TutorialUi ignores it: not a phase; 6.7: the tour opens the phone itself, the moment's pop-up waits for it).
 -- 5.1, Spoke & Chain: when a player reaches Career.BIKE_LEVEL while playing and owns no bike, Marge texts them
 -- (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's "message" with the GPS to the shop,
 -- client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
 -- (the phone's messages are not saved).
--- 6.0, Lead & Co.: no free gun. Once a player has the pistol's price and no gun, Marge texts them (Config.Arms.Tip, the
--- GPS to the gun shop), once a session.
+-- 6.0, Lead & Co.: no free gun; Marge texted a player with the pistol's price and no gun. 6.7: gone: every profile has
+-- the pistol since 6.0.2 (server/PlayerData.luau newProfile, the starterKit flag), so that text could never come.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,7 +42,6 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Career = require(Shared.Career)
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local TransportRules = require(Shared.Transport)
@@ -53,10 +57,9 @@ local Tuning = Config.Tutorial
 local Tutorial = {}
 
 type Session = {
-	phase: string, -- wait | welcome | board | job | retry
+	phase: string, -- wait | welcome | tour | board | job (6.7)
 	readyAt: number?, -- wait: PLAY was pressed, she speaks at this os.clock()
 	goneAt: number?, -- job: the job disappeared at (no onDelivered yet)
-	nextGo: number, -- a double "go" (a click and a key) starts one job
 	lastAsk: number, -- the remote's throttle
 }
 
@@ -101,7 +104,7 @@ local function givePhone(player: Player)
 	send(player, "phone")
 end
 
--- The tutorial is over for this player: delivered (with the reward and her last pages) or skipped.
+-- The tutorial is over for this player: the first delivery (with the reward) or skipped.
 local function finish(player: Player, delivered: boolean)
 	local profile = PlayerData.get(player)
 	sessions[player] = nil
@@ -109,49 +112,36 @@ local function finish(player: Player, delivered: boolean)
 		return
 	end
 	profile.tutorial = true
+	givePhone(player) -- 5.0: the phone all the same (6.7: also after a first job taken before her welcome)
 	if delivered then
 		PlayerData.addMoney(player, Tuning.Reward) -- (fires PlayerData.Changed: the HUD's money)
-		notice:FireClient(player, `+${Tuning.Reward} from {Tuning.NpcName}: your first delivery!`)
-		-- Her last pages a moment later, over the radio: the delivery's own result shows first.
-		task.delay(Tuning.DoneDelay, function()
-			if player.Parent then
-				send(player, "done", { reward = Tuning.Reward })
-			end
-		end)
+		-- 6.7: a toast, no page (the delivery's own result shows); "done" ends the phase on the client
+		notice:FireClient(player, `First delivery! +${Tuning.Reward} from {Tuning.NpcName}.`)
+		send(player, "done", { reward = Tuning.Reward })
 	else
 		send(player, nil)
 		notice:FireClient(player, `Tutorial skipped. {Tuning.NpcName} is by the job board if you need her.`)
-		givePhone(player) -- 5.0: the phone all the same
 	end
 end
 
--- Her first job (Jobs.startTutorialJob), or the board when none could be made.
-local function giveJob(player: Player, session: Session)
-	local now = os.clock()
-	if now < session.nextGo then
-		return
-	end
-	session.nextGo = now + 1
+-- 6.7: SHOW ME: her phone (the tour opens it) and the arrow tour on the client.
+local function startTour(player: Player, session: Session)
+	givePhone(player)
+	session.phase = "tour"
+	send(player, "tour")
+	bubble(TutorialSteps.Bubble.tour)
+end
+
+-- 6.7: she waits for your first job (any one; she gives none). A job that already runs counts at once.
+local function toBoard(player: Player, session: Session)
 	session.goneAt = nil
 	if Jobs.active(player) then
 		session.phase = "job"
 		send(player, "job")
 		return
 	end
-	givePhone(player) -- 5.0: "take this phone" (before the job's own dialog)
-	local ok, given = pcall(Jobs.startTutorialJob, player)
-	if not ok then
-		warn(`[Tutorial] startTutorialJob: {given}`)
-	end
-	if ok and given == true then
-		session.phase = "job"
-		send(player, "job", { given = true })
-		bubble(TutorialSteps.Bubble.give)
-	else
-		session.phase = "board"
-		send(player, "board")
-		bubble(TutorialSteps.Bubble.board)
-	end
+	session.phase = "board"
+	send(player, "board")
 end
 
 -- The Talk prompt (E at Marge).
@@ -179,7 +169,16 @@ local function onTalk(player: Player)
 		bubble(TutorialSteps.Bubble.busy)
 		return
 	end
-	giveJob(player, session)
+	if session.phase == "wait" or session.phase == "welcome" then
+		session.phase = "welcome" -- (6.7: her greeting again, or before PLAY's delay ran out)
+		send(player, "welcome")
+	elseif session.phase == "tour" then
+		bubble(TutorialSteps.Bubble.tour) -- (the arrows are on screen: no page)
+	else
+		session.phase = "board"
+		send(player, "say", { board = true, reward = Tuning.Reward })
+		bubble(TutorialSteps.Bubble.board)
+	end
 end
 
 local function onRemote(player: Player, action: any)
@@ -197,25 +196,27 @@ local function onRemote(player: Player, action: any)
 	session.lastAsk = now
 	if action == "skip" then
 		finish(player, false)
-	elseif action == "go" then
-		if session.phase == "welcome" or session.phase == "board" or session.phase == "retry" then
-			giveJob(player, session)
+	elseif action == "tour" or action == "go" then
+		if session.phase == "welcome" then
+			startTour(player, session)
+		end
+	elseif action == "board" then
+		if session.phase == "welcome" or session.phase == "tour" then
+			toBoard(player, session)
 		end
 	end
 end
 
--- Set on Jobs.onDelivered (chained): an ordinary job of `player` ended, delivered and paid (ok) or not.
+-- Set on Jobs.onDelivered (chained): a job of `player` ended, delivered and paid (ok) or not.
 local function onDelivered(player: Player, ok: boolean)
 	local session = sessions[player]
 	if not session or not pending(player) then
 		return
 	end
 	if ok then
-		finish(player, true)
+		finish(player, true) -- 6.7: the first delivery of any job, in any phase
 	else
-		session.phase = "retry"
-		session.goneAt = nil
-		send(player, "retry")
+		toBoard(player, session) -- 6.7: no page: the goal card says "Take your first job" again
 	end
 end
 
@@ -274,16 +275,14 @@ local function check(player: Player, session: Session, now: number)
 			session.goneAt = nil
 			return
 		end
-		-- Gone without onDelivered (a special job or a mission ended, an admin cancelled it): offer another.
+		-- Gone without onDelivered (a special job or a mission ended, an admin cancelled it): back to "board".
 		local goneAt = session.goneAt or now
 		session.goneAt = goneAt
 		if now - goneAt >= Tuning.RetryAfter then
-			session.phase = "retry"
-			session.goneAt = nil
-			send(player, "retry")
+			toBoard(player, session)
 		end
 	elseif Jobs.active(player) then
-		session.phase = "job" -- welcome / board / retry: a job taken from the board counts as well
+		session.phase = "job" -- welcome / tour / board: a job taken from the board or the phone counts
 		send(player, "job")
 	end
 end
@@ -314,7 +313,7 @@ end
 
 local function track(player: Player)
 	if not sessions[player] then
-		sessions[player] = { phase = "wait", nextGo = 0, lastAsk = 0 }
+		sessions[player] = { phase = "wait", lastAsk = 0 }
 	end
 end
 
@@ -378,31 +377,9 @@ local function bikeCheck(player: Player)
 	end
 end
 
--- ── 6.0: Marge about the pistol ────────────────────────────────────────────
--- No free gun (Config.Arms): once a player with the phone and the first day behind them has the pistol's price and
--- owns no gun, Marge texts them about Lead & Co. with the shop on the GPS. Once a session (from PLAY on).
-
-local gunTold: { [Player]: boolean } = {}
-
-local function gunCheck(player: Player)
-	local profile = PlayerData.get(player)
-	if gunTold[player] or bikeLevels[player] == nil or not profile or not profile.tutorial or not profile.phone then
-		return
-	end
-	local pistol = Economy.findWeapon(Config.Arms.Starter)
-	if not pistol or next(profile.weapons) ~= nil or profile.money < pistol.price then
-		return
-	end
-	gunTold[player] = true
-	local shop = Map.Shops.guns
-	local words = string.gsub(Config.Arms.Tip, "{price}", `${pistol.price}`)
-	remote:FireClient(player, "message", { from = "Marge", text = words, gps = { x = shop.x, z = shop.z, id = "guns" } })
-	notice:FireClient(player, `📱 Marge: {words}`)
-end
-
 -- 6.0.1: Marge about the plastic bag (Kit "bag"): once a player with the phone and the first day behind them has its
 -- price and no bag, she texts them about Last Stop Supplies with the shop on the GPS (6.0.2: about the vest; 6.6: the
--- text names ZDC Bags for the bags). Once a session; before the pistol.
+-- text names ZDC Bags for the bags; 6.7: the vest's tips). Once a session.
 local bagTold: { [Player]: boolean } = {}
 
 local function bagCheck(player: Player): boolean
@@ -428,9 +405,7 @@ local function bagCheck(player: Player): boolean
 end
 
 local function tips(player: Player)
-	if not bagCheck(player) then
-		gunCheck(player)
-	end
+	bagCheck(player) -- (6.7: the pistol's text is gone: every courier starts with it)
 end
 
 -- PLAY was pressed (Main may call this from its Play handler; without it the arriving car tells the same).
@@ -444,21 +419,27 @@ function Tutorial.onPlay(player: Player)
 	local level = if profile then Levels.levelFor(profile.xp) else 1
 	bikeLevels[player] = level
 	-- 6.6: a save that owned a backpack got its price back (server/PlayerData.luau, Config.RetiredKit): Marge says so,
-	-- once (profile.packRefund is never saved), the bag kiosk on the GPS
-	local refund = if profile then profile.packRefund else nil
-	if profile and refund and refund > 0 then
-		profile.packRefund = nil
-		task.delay(BIKE_DELAY, function()
-			if not player.Parent or not remote then
-				return
-			end
-			local shop = Map.Shops.bags
-			local words = string.gsub(Config.Courier.PackRefund, "{money}", `${refund}`)
-			remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = "bags" } else nil })
-			notice:FireClient(player, `📱 Marge: {words}`)
-		end)
+	-- once (profile.packRefund is never saved), the bag kiosk on the GPS. 6.7: the Thermal Jacket's the same way
+	-- (profile.jacketRefund, Config.Courier.JacketRefund)
+	for _, retired in { { money = if profile then profile.packRefund else nil, text = Config.Courier.PackRefund }, { money = if profile then profile.jacketRefund else nil, text = Config.Courier.JacketRefund } } do
+		local refund = retired.money
+		if profile and refund and refund > 0 then
+			task.delay(BIKE_DELAY, function()
+				if not player.Parent or not remote then
+					return
+				end
+				local shop = Map.Shops.bags
+				local words = string.gsub(retired.text, "{money}", `${refund}`)
+				remote:FireClient(player, "message", { from = "Marge", text = words, gps = if shop then { x = shop.x, z = shop.z, id = "bags" } else nil })
+				notice:FireClient(player, `📱 Marge: {words}`)
+			end)
+		end
 	end
-	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0: the bag's (6.0.1) or the pistol's price in your pocket, none owned: her text
+	if profile then
+		profile.packRefund = nil
+		profile.jacketRefund = nil
+	end
+	task.delay(BIKE_DELAY + 4, tips, player) -- 6.0.1: the vest's price in your pocket, not owned: her text
 	if level >= Career.BIKE_LEVEL and level < VanQuestRules.level() and remote then
 		task.delay(BIKE_DELAY, function()
 			if player.Parent and not ownsBike(player) then
@@ -490,11 +471,10 @@ function Tutorial.start()
 		sessions[player] = nil
 		talked[player] = nil
 		bikeLevels[player] = nil
-		gunTold[player] = nil
 		bagTold[player] = nil
 	end)
 	PlayerData.Changed:Connect(bikeCheck) -- 5.1: Marge about Spoke & Chain
-	PlayerData.Changed:Connect(tips) -- 6.0: Marge about the pistol (6.0.1: the bag first)
+	PlayerData.Changed:Connect(tips) -- 6.0.1: Marge about the vest (6.7: the pistol's text is gone)
 	for _, player in Players:GetPlayers() do
 		track(player)
 	end

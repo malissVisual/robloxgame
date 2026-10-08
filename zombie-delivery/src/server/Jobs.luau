@@ -110,7 +110,7 @@
 --     top of the board: light pieces only, never more than you carry (hands + bag), a short walk Downtown or in
 --     the Suburbs, its own pay and clock (JobRules.footPay / footTime). startJob needs no vehicle (Cargo's foot flow:
 --     Info.foot, the pack); no waves, bandits or road events, now and then a stray walker (strayStep); a thermal
---     jacket slows the food's drain. The tutorial's first delivery is one (Jobs.startTutorialJob).
+--     bag slows the food's drain (6.7: the jacket is gone). The tutorial's first delivery is one (Jobs.startTutorialJob).
 --   * "car": every other job. Without a vehicle of your own (profile.car nil) the ones in your own car are locked
 --     "NEEDS A VEHICLE" (needsVehicle) and refused; the jobs that lend a company vehicle need their level (4+).
 --     5.1: a bike is not a car: riding one (profile.car a bike) they are locked "CALL YOUR CAR" (or NEEDS A VEHICLE).
@@ -269,6 +269,9 @@ type Offer = {
 	-- peak's pay multiplier it was offered with (Config.Jobs.Businesses peak; the board's chip)
 	round: boolean?,
 	peak: number?,
+	-- 6.8: a mission the owner has done before (Jobs.startMission): payOrder pays the owner Missions.replayPay of their
+	-- share and Missions.replayXp of the XP (6.8 review: each crew member by their own record)
+	replay: boolean?,
 }
 
 -- 5.1: the numbers of a light job: Config.Jobs.Foot or Config.Jobs.Bike (footOffer, strayStep; JobRules.LightRules).
@@ -486,6 +489,8 @@ local function missionInfo(job: Job): { [string]: any }?
 		name = if jobType then jobType.name else id,
 		campaign = if def then def.campaign else nil,
 		number = if def then def.number else nil,
+		of = if def then Missions.size(def.campaign) else nil, -- 6.8: the chapter's length (the banner's "3/6")
+		replay = if offer.replay then true else nil, -- 6.8: a replay (its small pay)
 		twists = twists,
 		coop = offer.coop,
 		defendLeft = if holding then math.max(0, math.ceil(job.defendLeft or 0)) else nil,
@@ -3287,7 +3292,21 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			table.insert(ratingInfo.checks, JobRules.roundCheck(Cargo.missesOf(session, order.id)))
 		end
 	end
+	-- 6.7: the Courier Vest: the customer tips a share of the pay (Config.Kit tips; every delivery but a mission)
+	if not offer.mission then
+		local tip = JobRules.kitTip(payTotal, Transport.tipShareOf(player))
+		if tip > 0 then
+			payTotal += tip
+			if ratingInfo then
+				table.insert(ratingInfo.checks, JobRules.kitTipCheck(tip))
+			end
+		end
+	end
 	local driverTotal, share = Economy.crewSplit(payTotal, #crew)
+	if offer.replay then
+		-- 6.8 review: the replay's cut is the owner's own (a crew member's first time pays them in full, below)
+		driverTotal = Missions.replayPay(driverTotal)
+	end
 	order.paid = driverTotal
 	-- The split, for everybody's result: the owner first.
 	local split = { { name = player.DisplayName, pay = driverTotal } }
@@ -3302,6 +3321,10 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	end
 	if rating then
 		xp = JobRules.ratedXp(xp, rating.stars)
+	end
+	local crewXp = xp -- (6.8 review: each crew member's own replay cut, below)
+	if offer.replay then
+		xp = Missions.replayXp(xp) -- 6.8: a replayed mission (the owner's share was cut above)
 	end
 	local employerInfo: { [string]: any }? = nil
 	local unlockedWeapon: string? = nil
@@ -3381,7 +3404,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		night = night,
 		crew = split, -- { { name, pay } }: everybody paid on this job, the owner first
 		riders = #crew, -- crew members besides you
-		crewBonus = driverTotal - payTotal,
+		crewBonus = math.max(0, driverTotal - payTotal), -- (6.8 review: never negative on a replay)
 		total = driverTotal,
 		delivered = delivered, -- pieces that arrived
 		pieces = order.pieces, -- pieces of the order
@@ -3393,12 +3416,18 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		coopPay = if offer.coop then coopPay else nil, -- a co-op mission: the pay × this for the crew
 		rating = ratingInfo, -- 4.7: { stars, checks, ratingPay, streak, streakBonus, streakPay, licence? } (not a mission)
 	}, ownerXp))
+	-- 6.8: what this order paid everybody (a mission's "cleared" card says it); a crew member who has done the mission
+	-- before (and is not on a replay of the owner's already) gets the replay share of their pay and XP.
+	local missionPaid: { [Player]: number } = { [player] = driverTotal }
 	for _, member in crew do
 		local memberProfile = PlayerData.get(member)
 		if memberProfile then
 			memberProfile.deliveries += 1
 		end
-		PlayerData.addMoney(member, share)
+		local again = offer.mission ~= nil and memberProfile ~= nil and Missions.cleared(memberProfile.missions, offer.mission)
+		local memberPay = if again then Missions.replayPay(share) else share
+		missionPaid[member] = memberPay
+		PlayerData.addMoney(member, memberPay)
 		resultRemote:FireClient(member, withXp({
 			success = true,
 			rider = true,
@@ -3411,10 +3440,10 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			stars = offer.tier,
 			night = night,
 			crew = split,
-			total = share,
+			total = memberPay,
 			mission = missionResult,
 			rating = if rating then { stars = rating.stars } else nil, -- 4.7: the owner's rating of the job
-		}, giveXp(member, xp)))
+		}, giveXp(member, if again then Missions.replayXp(crewXp) else crewXp)))
 	end
 	local missionId = offer.mission
 	-- 3.1: the missions' counters for who finished it (the owner and the crew there), before the rewards check them.
@@ -3445,7 +3474,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	local onMission = Jobs.onMissionComplete
 	if missionId and onMission then
 		local ok, err = pcall(function()
-			onMission(player, missionId, stars, present)
+			onMission(player, missionId, stars, present, missionPaid)
 		end)
 		if not ok then
 			warn(`[Jobs] onMissionComplete failed: {err}`)
@@ -4054,8 +4083,8 @@ local function cargoRulesStep(player: Player, job: Job, car: Vehicles.Car?, step
 			continue
 		end
 		local shown = math.floor(order.freshness * 100 + 0.5)
-		-- 5.0: a thermal jacket (5.1: on a bike too); 6.4: × the thermal bag in your hand for this order's pieces in it
-		local warm = if offer.mode ~= "car" then Transport.warmOf(player) * Cargo.bagWarm(job.cargo, order.id) else nil
+		-- 6.4: the thermal bag in your hand for this order's pieces in it (on foot, on a bike; 6.7: no jacket any more)
+		local warm = if offer.mode ~= "car" then Cargo.bagWarm(job.cargo, order.id) else nil
 		order.freshness = math.max(0, order.freshness - JobRules.freshDrain(order.offer.tier, step, car ~= nil and Vehicles.hasGear(car, "cooler"), warm))
 		if math.floor(order.freshness * 100 + 0.5) ~= shown then
 			job.dirty = true
@@ -4673,8 +4702,9 @@ end
 
 -- ── Missions (shared/Missions.luau, server/Missions.luau) ───────────────────
 
--- Set by Main: a mission was finished (the owner, the mission id, the rating 1 – 3, everybody paid with the owner).
-Jobs.onMissionComplete = nil :: ((owner: Player, missionId: string, stars: number, members: { Player }) -> ())?
+-- Set by Main: a mission was finished (the owner, the mission id, the rating 1 – 3, everybody paid with the owner;
+-- 6.8: what this order paid each of them).
+Jobs.onMissionComplete = nil :: ((owner: Player, missionId: string, stars: number, members: { Player }, paid: { [Player]: number }?) -> ())?
 
 -- A mission's offer from where the player is (its stops, the pay × the twists, its clock), marked as the mission.
 local function missionOffer(player: Player, def: Config.JobTypeDef): Offer?
@@ -4688,7 +4718,8 @@ end
 
 -- Start a mission for the player now (server/Missions.luau checked that it is open and the level). Refused with a
 -- job running, in somebody else's crew, or a night mission by day. False and why not (the caller tells the player).
-function Jobs.startMission(player: Player, def: Config.JobTypeDef): (boolean, string?)
+-- 6.8: `replay` (the player has done it before): the job pays Missions.replayPay of its pay (and of its XP).
+function Jobs.startMission(player: Player, def: Config.JobTypeDef, replay: boolean?): (boolean, string?)
 	if jobs[player] then
 		return false, "Finish your current delivery first."
 	end
@@ -4702,6 +4733,9 @@ function Jobs.startMission(player: Player, def: Config.JobTypeDef): (boolean, st
 	local offer = missionOffer(player, def)
 	if not offer then
 		return false, "No route for this mission from here, try again."
+	end
+	if replay then
+		offer.replay = true -- (6.8 review: the pay is cut at the payout, per person: payOrder)
 	end
 	return startJob(player, offer)
 end

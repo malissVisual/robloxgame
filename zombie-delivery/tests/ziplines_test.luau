@@ -21,6 +21,25 @@ end
 local tuning = Config.ZipLines
 local lines = ZipLines.lines()
 check("6 – 10 lines", #lines >= 6 and #lines <= 10, #lines)
+-- 6.8 review: the rider's feet are the courier's (its root HipHeight + 1 over the soles), and the handle hangs under
+-- the cable within the arms' reach of the shoulders (client/ZipRide.luau bends the elbows to it)
+local courier = require("./CharacterGeometry").spec("courier")
+check("the rider's feet are the courier's", math.abs(ZipLines.Feet - (courier.hipHeight + 1)) < 1e-6, ZipLines.Feet)
+do
+	local shoulderY, elbowY, wristY = 0, 0, 0
+	for _, j in courier.joints do
+		if j.name == "RightShoulder" then
+			shoulderY = j.at[2]
+		elseif j.name == "RightElbow" then
+			elbowY = j.at[2]
+		elseif j.name == "RightWrist" then
+			wristY = j.at[2]
+		end
+	end
+	local reach = (shoulderY - elbowY) + (elbowY - wristY) + 0.46 -- (the wrist to the grip in the fist)
+	local up = tuning.Hang - tuning.HandleDrop - shoulderY
+	check("the handle within the arms' reach, the elbows bent a little", tuning.HandleDrop > 0.2 and up < reach - 0.1 and up > reach * 0.75, up)
+end
 check("the lines are cached", ZipLines.lines() == lines)
 
 -- Every Downtown lot's building as a box (the towers, the storefronts …), straight from Map.lots.

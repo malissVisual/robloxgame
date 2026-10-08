@@ -30,7 +30,11 @@ for _, id in Geometry.ids do
 	model:PivotTo(Mock.CFrame.new(0, spec.hipHeight + model.PrimaryPart.Size.Y / 2, 0))
 	local named, parts = {}, {}
 	for _, p in model:GetDescendants() do
-		assert(p.ClassName ~= "MeshPart" and p.ClassName ~= "SpecialMesh")
+		assert(p.ClassName ~= "MeshPart")
+		-- 6.7: Roblox's own sphere stretched over a part (an ellipsoid), never an uploaded mesh
+		if p.ClassName == "SpecialMesh" then
+			assert(p.MeshType == "Sphere" and (p.MeshId == nil or p.MeshId == "") and p.Parent and p.Parent:IsA("BasePart"))
+		end
 		if not p:IsA("BasePart") then continue end
 		assert(not p.Anchored)
 		named[p.Name] = p
@@ -43,7 +47,8 @@ for _, id in Geometry.ids do
 		end
 		table.insert(parts, { id = p.uid, name = p.Name, class = p.ClassName,
 			position = v(p.Position), rotation = p.CFrame.R, size = v(p.Size),
-			color = { p.Color.R, p.Color.G, p.Color.B }, material = p.Material, shape = p.Shape or "Block", opacity = 1 - p.Transparency })
+			color = { p.Color.R, p.Color.G, p.Color.B }, material = p.Material,
+			shape = if p:FindFirstChildOfClass("SpecialMesh") then "Ellipsoid" else p.Shape or "Block", opacity = 1 - p.Transparency })
 	end
 	assert(#parts == #spec.bones + #spec.pieces and #parts <= spec.budget)
 	for _, j in spec.joints do
@@ -59,6 +64,25 @@ for _, id in Geometry.ids do
 	end
 	assert(named.HumanoidRootPart.Transparency == 1 and named.HumanoidRootPart.RootPriority == 127)
 	assert(named.RightHand:FindFirstChild("RightGripAttachment"))
+	-- 6.7: the realistic body: a grip in each fist (under the palm, the fingers round it, a thumb), a rounded head,
+	-- balls on the shoulders, the elbows and the knees.
+	if id == "courier" or id == "person" then
+		for _, side in { "Left", "Right" } do
+			local hand = named[side .. "Hand"]
+			local grip = hand:FindFirstChild(side .. "GripAttachment")
+			assert(grip and grip:IsA("Attachment"), side .. " hand grip")
+			local at = grip.CFrame.Position
+			assert(at.Y < -hand.Size.Y / 2 and at.Y > -hand.Size.Y / 2 - 0.25, side .. " grip under the palm")
+			assert(math.abs(at.X) < hand.Size.X / 2 and math.abs(at.Z) < 0.05, side .. " grip in the fist")
+			local fingers = named["Fingers" .. string.sub(side, 1, 1)]
+			assert(fingers and (fingers.Position - (hand.CFrame * grip.CFrame).Position).Magnitude < 0.12, side .. " fingers round the grip")
+			assert(named["Thumb" .. string.sub(side, 1, 1)], side .. " thumb")
+		end
+		assert(named.Head:FindFirstChildOfClass("SpecialMesh"), "a rounded head")
+		for _, ball in { "ShoulderL", "ShoulderR", "ElbowL", "ElbowR", "KneeL", "KneeR" } do
+			assert(named[ball] and named[ball].Shape == "Ball", ball .. ": a ball on the joint")
+		end
+	end
 	-- Rojo/respawn clones must retain the art-to-bone references inside their own model, not the template.
 	local clone = model:Clone()
 	for _, p in clone:GetDescendants() do

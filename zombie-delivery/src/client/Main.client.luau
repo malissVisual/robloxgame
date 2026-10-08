@@ -88,6 +88,7 @@ safely("RentalUi", require(Client.RentalUi).start) -- 5.6: ZDC RIDE's Rent / Ret
 safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley, the climb's fade
 require(Client.ZipRide).notify = Hud.toast
 safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms
+safely("BodyLife", require(Client.BodyLife).start) -- 6.7: the breath, the weight shift, the head, blinks, the landing, the flinch, the walk
 safely("BagSway", require(Client.BagSway).start) -- 6.1: the bag in the hand swings on a spring (its only writer)
 safely("KeyHints", function() -- 6.1: the quiet key hints under the top buttons (F1 folds them)
 	task.spawn(require(Client.KeyHints).start)
@@ -135,7 +136,9 @@ Phone.onOpen = Hud.closeWindows
 Phone.onBoard = DispatchUi.open
 Phone.onCareer = CareerUi.open
 -- 5.5: the HUD MENU's actions are phone apps (their windows open; the phone closes first), and MENU opens the phone.
-Phone.onMissions = MissionsUi.toggle
+Phone.onMissions = function() -- 6.8: MORE → MISSIONS always opens it (on the chapter you are at)
+	MissionsUi.open()
+end
 Phone.onCrew = CrewPanel.toggle
 Phone.onTop = Leaderboard.toggle
 Phone.onEstate = EstateUi.toggleList
@@ -187,6 +190,7 @@ Net.get("State").OnClientEvent:Connect(function(state)
 	-- 6.1 (6.4: any bag, the server's state.bag; one that stays is slung on the back, never set down)
 	local bagDef = if type(state) == "table" and type(state.bag) == "string" then require(Shared.Transport).findKit(state.bag) else nil
 	Holster.setBag(bagDef ~= nil, bagDef ~= nil and bagDef.stays == true)
+	Holster.setBat(type(state) == "table" and require(Shared.Melee).hasBat(state.kit)) -- 6.7: V swings the bat
 	Hud.setState(state)
 	DispatchUi.setState(state)
 	Menu.setState(state)

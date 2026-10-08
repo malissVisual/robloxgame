@@ -582,7 +582,10 @@ local function update(dt: number)
 		aimParams.FilterDescendantsInstances = aimExclude
 		local aimHit = workspace:Raycast(ray.Origin, ray.Direction * 600, aimParams)
 		local target = if aimHit then aimHit.Position else ray.Origin + ray.Direction * 600
-		local shoulder = root.Position + Vector3.new(0, 1.5, 0)
+		-- (6.8 review: the body's own right shoulder, 0.68 over the courier's root; 1.5 over it without the rig's)
+		local torso = character:FindFirstChild("UpperTorso")
+		local joint = torso and torso:FindFirstChild("RightShoulderRigAttachment")
+		local shoulder = if joint and joint:IsA("Attachment") then joint.WorldPosition else root.Position + Vector3.new(0, 1.5, 0)
 		local offset = target - shoulder
 		-- Something very close under the crosshair (or the ground at your feet): keep the arms level-ish.
 		local goal = if offset.Magnitude > 4 then math.asin(math.clamp(offset.Unit.Y, -1, 1)) else 0

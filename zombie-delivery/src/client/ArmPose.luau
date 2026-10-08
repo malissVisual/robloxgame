@@ -25,6 +25,18 @@
 -- away); the other players farther than NPC_RANGE from the camera are left to the animation; the people in
 -- workspace.Npcs are followed through their attributes (Carrying, PhoneHeld, Gesture / GestureAt) instead of a look at
 -- every one of them every frame.
+-- 6.7, the realistic body:
+--   * the carry holds the box: with the server's CarryAt / CarrySize on the character (server/Cargo.luau: the held
+--     piece's middle and size in the root's frame) both hands reach its sides (a two-bone reach of each arm,
+--     shared/BodyMotion.luau reach, from the box's real place under the root weld: the palms against it, the elbows
+--     out and down) instead of the fixed shapes (still the fallback: no CarryAt, the trolley, the phone, the lead);
+--     the upper body leans back a little with both hands full (Config.Body.CarryLean, CarryHeavy when it slows you);
+--   * gestures bend the body too ("pickup", "land": shared/Gestures.luau's waist / neck / crouch): the waist, the head,
+--     the Root joint (the hips down and back) and the legs (bent so the feet stay where they stood: BodyMotion.crouch on
+--     the body's own thigh and shin);
+--   * the phone lies in the palm (shared/KitFit.luau Palm): the wrist rolls the palm and the screen up to the face;
+--   * every joint goes through client/PoseLedger.luau (the layers share the joints: ArmPose.armsBusy / legsBusy tell
+--     client/BodyLife.luau to step aside).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,10 +46,13 @@ local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Jo
 local Melee = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Melee"))
 local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
 local Gestures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Gestures"))
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local BodyMotion = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BodyMotion")) -- 6.7
 local Bodies = require(script.Parent.Bodies)
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
 local SprintPose = require(script.Parent.SprintPose) -- 6.0.1: its run cycle leans the waist itself
+local Ledger = require(script.Parent.PoseLedger) -- 6.7
 
 local ArmPose = {}
 
@@ -48,18 +63,19 @@ local CARRY_OUT = 0.3
 local NPC_RANGE = 180 -- people (5.9.2: and other players) farther from the camera than this are not posed
 local RIG_REFRESH = 2 -- 5.9.2: seconds a character's joints are kept before they are looked up again …
 local RIG_RETRY = 0.5 -- … or this, while some are missing (a body still loading)
+local PHONE_ROLL = Config.Body.PhoneRoll -- 6.7: degrees the wrist rolls the phone in the palm up
 local blends: { [Model]: number } = {}
--- The carry pose per character: how far in (0..1) and what is held (kept while it blends out).
-type Carry = { t: number, kind: string }
+-- The carry pose per character: how far in (0..1) and what is held (kept while it blends out). 6.8 review: `goals`, the
+-- hands' last reach to the box (server/Cargo.luau clears Carrying and CarryAt together when it is put down: the arms
+-- blend out of where they held it, not out of a fixed shape they snapped to); `leaving`: blending out.
+type Carry = { t: number, kind: string, goals: ArmGoals?, leaving: boolean }
 local carries: { [Model]: Carry } = {}
 local hiddenGuns: { [Model]: Instance } = {}
--- Per joint: the Transform written last frame, and the animation's own value under it. A joint that still holds
--- our value was not written by the Animator this frame (throttled, or no track moves it): the last animation
--- value is the base then, so the pose never piles up on itself and an arm never stays stuck up.
--- (Plain tables, cleaned up when a joint goes away: Roblox may collect an Instance's Lua handle from a weak table
--- while the Instance still exists.)
-local written: { [Instance]: CFrame } = {}
-local animated: { [Instance]: CFrame } = {}
+-- 6.7: the joints this module posed (their values are client/PoseLedger.luau's: it knows the animation's own value
+-- under them, a joint that still holds a pose was not written by the Animator this frame, so a pose never piles up on
+-- itself and an arm never stays stuck up). (Plain tables, cleaned up when a joint goes away: Roblox may collect an
+-- Instance's Lua handle from a weak table while the Instance still exists.)
+local written: { [Instance]: boolean } = {}
 local reported = false
 -- Recoil: every shot kicks the arms up a little, then they settle back on the aim.
 local kicks: { [Model]: number } = {}
@@ -71,24 +87,22 @@ function ArmPose.kick(character: Model)
 	local strength = KICK[if type(weapon) == "string" then weapon else "pistol"] or 1
 	kicks[character] = math.min(2.5, (kicks[character] or 0) + strength)
 end
--- The animation's own value of a joint this frame (see `written` above).
-local function baseOf(joint: any): CFrame
-	local live: CFrame = joint.Transform
-	local mine = written[joint]
-	if mine and Joints.same(live, mine) then
-		return animated[joint] or CFrame.identity
+
+-- The joint given back (this module no longer poses it).
+local function free(joint: any)
+	if written[joint] then
+		written[joint] = nil
+		Ledger.release(joint)
 	end
-	animated[joint] = live
-	return live
 end
 
--- The joint goes from the animation toward `aim` (by aimT), then toward `carry` (by carryT), then (3.9) toward the
--- melee `swing` (by swingT); any may be nil. All 0 gives the joint back to the animation.
+-- The joint goes from the animation (6.7: and the layers under this one) toward `aim` (by aimT), then toward `carry`
+-- (by carryT), then (3.9) toward the melee `swing` (by swingT); any may be nil. All 0 gives the joint back.
 local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carryT: number, swing: CFrame?, swingT: number?, gesture: CFrame?, gestureT: number?)
 	if not joint or not joint.Parent then
 		return
 	end
-	local base = baseOf(joint)
+	local base = Ledger.now(joint)
 	local out = base
 	if aim and aimT > 0 then
 		out = out:Lerp(aim, aimT)
@@ -103,13 +117,11 @@ local function lay(joint: any, aim: CFrame?, aimT: number, carry: CFrame?, carry
 		out = out:Lerp(gesture, gestureT) -- 5.7
 	end
 	if out == base then
-		joint.Transform = base
-		written[joint] = nil
-		animated[joint] = nil
+		free(joint)
 		return
 	end
-	joint.Transform = out
-	written[joint] = out
+	Ledger.write(joint, out)
+	written[joint] = true
 end
 
 -- Laid ON TOP of the animation (the walk keeps going under it); `rotation` = nil gives the joint back.
@@ -117,16 +129,12 @@ local function layer(joint: any, rotation: CFrame?)
 	if not joint or not joint.Parent then
 		return
 	end
-	local base = baseOf(joint)
 	if not rotation then
-		joint.Transform = base
-		written[joint] = nil
-		animated[joint] = nil
+		free(joint)
 		return
 	end
-	local out = base * rotation
-	joint.Transform = out
-	written[joint] = out
+	Ledger.write(joint, Ledger.now(joint) * rotation)
+	written[joint] = true
 end
 
 local function jointIn(character: Model, partName: string, jointName: string): any
@@ -136,7 +144,14 @@ end
 -- 5.9.2: a character's joints, looked up once: kind "r15" (the arms and the waist), "r6" (rs / ls: the shoulders) or
 -- "none". Looked up again after RIG_REFRESH seconds (Roblox may swap a fresh body's Motor6Ds for AnimationConstraints),
 -- RIG_RETRY while some are missing, and at once when one of them left the body.
-type Rig = { kind: string, rs: any, re: any, rw: any, ls: any, le: any, lw: any, waist: any, expires: number }
+-- 6.7: and the body's joints for the gestures with the legs (neck, root, hips, knees, ankles) and the measures for the
+-- reaches (from the rig attachments: the bones' lengths, the shoulders on the torso, the palm's half thickness).
+type Rig = {
+	kind: string, rs: any, re: any, rw: any, ls: any, le: any, lw: any, waist: any, expires: number,
+	neck: any, root: any, rh: any, rk: any, ra: any, lh: any, lk: any, la: any,
+	torso: BasePart?, rightShoulder: Vector3?, leftShoulder: Vector3?,
+	upperArm: number, lowerArm: number, thigh: number, shin: number, palm: number,
+}
 local rigs: { [Model]: Rig } = {}
 
 local function gone(joint: any): boolean
@@ -144,7 +159,21 @@ local function gone(joint: any): boolean
 end
 
 local function intact(rig: Rig): boolean
-	return not (gone(rig.rs) or gone(rig.re) or gone(rig.rw) or gone(rig.ls) or gone(rig.le) or gone(rig.lw) or gone(rig.waist))
+	return not (gone(rig.rs) or gone(rig.re) or gone(rig.rw) or gone(rig.ls) or gone(rig.le) or gone(rig.lw) or gone(rig.waist)
+		or gone(rig.neck) or gone(rig.root) or gone(rig.rh) or gone(rig.rk) or gone(rig.ra) or gone(rig.lh) or gone(rig.lk) or gone(rig.la))
+end
+
+-- 6.7: an attachment's place in its part (nil: none).
+local function pointIn(character: Model, part: string, name: string): Vector3?
+	local p = character:FindFirstChild(part)
+	local a = p and p:FindFirstChild(name)
+	return if a and a:IsA("Attachment") then a.Position else nil
+end
+
+-- 6.7: the distance between two rig attachments of a part (or one and the part's middle), else `fallback`.
+local function span(character: Model, part: string, a: string, b: string?, fallback: number): number
+	local p, q = pointIn(character, part, a), if b then pointIn(character, part, b) else Vector3.zero
+	return if p and q then math.max((p - q).Magnitude, 0.2) else fallback
 end
 
 local function rigOf(character: Model): Rig
@@ -155,6 +184,8 @@ local function rigOf(character: Model): Rig
 	end
 	local made: Rig
 	if character:FindFirstChild("UpperTorso") then
+		local torso = character:FindFirstChild("UpperTorso")
+		local hand = character:FindFirstChild("RightHand")
 		made = {
 			kind = "r15",
 			rs = jointIn(character, "RightUpperArm", "RightShoulder"),
@@ -165,6 +196,23 @@ local function rigOf(character: Model): Rig
 			lw = jointIn(character, "LeftHand", "LeftWrist"),
 			waist = jointIn(character, "UpperTorso", "Waist"),
 			expires = 0,
+			neck = jointIn(character, "Head", "Neck"),
+			root = jointIn(character, "LowerTorso", "Root"),
+			rh = jointIn(character, "RightUpperLeg", "RightHip"),
+			rk = jointIn(character, "RightLowerLeg", "RightKnee"),
+			ra = jointIn(character, "RightFoot", "RightAnkle"),
+			lh = jointIn(character, "LeftUpperLeg", "LeftHip"),
+			lk = jointIn(character, "LeftLowerLeg", "LeftKnee"),
+			la = jointIn(character, "LeftFoot", "LeftAnkle"),
+			torso = if torso and torso:IsA("BasePart") then torso else nil,
+			rightShoulder = pointIn(character, "UpperTorso", "RightShoulderRigAttachment"),
+			leftShoulder = pointIn(character, "UpperTorso", "LeftShoulderRigAttachment"),
+			upperArm = span(character, "RightUpperArm", "RightShoulderRigAttachment", "RightElbowRigAttachment", 1),
+			lowerArm = span(character, "RightLowerArm", "RightElbowRigAttachment", "RightWristRigAttachment", 0.9)
+				+ span(character, "RightHand", "RightWristRigAttachment", nil, 0.2),
+			thigh = span(character, "RightUpperLeg", "RightHipRigAttachment", "RightKneeRigAttachment", 1.2),
+			shin = span(character, "RightLowerLeg", "RightKneeRigAttachment", "RightAnkleRigAttachment", 1.2),
+			palm = if hand and hand:IsA("BasePart") then math.min(hand.Size.X, hand.Size.Z) / 2 else 0.15,
 		}
 	else
 		local torso = character:FindFirstChild("Torso")
@@ -178,6 +226,9 @@ local function rigOf(character: Model): Rig
 			lw = nil,
 			waist = nil,
 			expires = 0,
+			neck = nil, root = nil, rh = nil, rk = nil, ra = nil, lh = nil, lk = nil, la = nil,
+			torso = nil, rightShoulder = nil, leftShoulder = nil,
+			upperArm = 1, lowerArm = 1, thigh = 1, shin = 1, palm = 0.15,
 		}
 	end
 	local complete = if made.kind == "r15" then made.rs and made.re and made.rw and made.ls and made.le and made.lw and made.waist
@@ -211,10 +262,11 @@ local function carryGoals(kind: string?): ArmGoals
 	if kind == "phone" then
 		-- 5.0: the phone in the right hand (the PhoneHeld attribute, server/KitWear.luau): the upper arm a little forward
 		-- and in, the forearm up toward the chest, the screen turned up to the face; the left arm swings free.
+		-- 6.7: the phone lies in the palm (shared/KitFit.luau Palm): the wrist rolls a quarter round, palm and screen up.
 		return {
 			rs = CFrame.Angles(0, math.rad(16), 0) * CFrame.Angles(math.rad(26), 0, 0),
 			re = CFrame.Angles(math.rad(70), 0, 0),
-			rw = CFrame.Angles(math.rad(-6), 0, 0),
+			rw = CFrame.Angles(math.rad(-6), 0, 0) * CFrame.Angles(0, math.rad(PHONE_ROLL), 0),
 		}
 	end
 	if kind == "horse" then
@@ -235,6 +287,40 @@ local function carryGoals(kind: string?): ArmGoals
 		le = CFrame.Angles(math.rad(shape.elbow), 0, 0),
 		lw = CFrame.Angles(0, math.rad(10), 0),
 	}
+end
+
+-- 6.7: the hands on the held box's sides. The box (server/Cargo.luau: CarryAt its middle in the root's frame, CarrySize
+-- its size) where it really is under the root weld; each arm a two-bone reach (shared/BodyMotion.luau) from its shoulder
+-- on the torso to the palm's spot against the box's side (CarryLow of its height under the middle), the elbows out,
+-- down and back, the palms against it. Nil without the box (the trolley, the phone, the lead: the fixed shapes then).
+local B = Config.Body
+local SIDES = { 1, -1 }
+local function reachGoals(character: Model, rig: Rig, kind: string): ArmGoals?
+	if kind == "phone" or kind == "horse" or rig.kind ~= "r15" or character:GetAttribute("Pushing") ~= nil then
+		return nil
+	end
+	local at, size = character:GetAttribute("CarryAt"), character:GetAttribute("CarrySize")
+	local torso, rightAt, leftAt = rig.torso, rig.rightShoulder, rig.leftShoulder
+	if typeof(at) ~= "Vector3" or typeof(size) ~= "Vector3" or not torso or not rightAt or not leftAt then
+		return nil
+	end
+	local _, root = Bodies.of(character)
+	if not root then
+		return nil
+	end
+	local goals: ArmGoals = {}
+	for _, side in SIDES do
+		local spot = root.CFrame:PointToWorldSpace(Vector3.new(at.X + side * (size.X / 2 + rig.palm), at.Y - size.Y * B.CarryLow, at.Z))
+		local d = torso.CFrame:PointToObjectSpace(spot) - (if side > 0 then rightAt else leftAt)
+		local xx, xy, xz, yx, yy, yz, bend = BodyMotion.reach(d.X, d.Y, d.Z, rig.upperArm, rig.lowerArm, side * 0.6, -1, 0.7)
+		local turn = CFrame.fromMatrix(Vector3.zero, Vector3.new(xx, xy, xz), Vector3.new(yx, yy, yz))
+		if side > 0 then
+			goals.rs, goals.re, goals.rw = turn, CFrame.Angles(bend, 0, 0), CFrame.identity
+		else
+			goals.ls, goals.le, goals.lw = turn, CFrame.Angles(bend, 0, 0), CFrame.identity
+		end
+	end
+	return goals
 end
 
 -- 3.9, the melee swing of the right arm (R15): per kind the wind-up and the hit; the arm goes from one to the other
@@ -293,7 +379,10 @@ type Swing = { t: number, k: number, kind: string }
 local NO_SWING: Swing = { t = 0, k = 0, kind = "punch" }
 
 -- 5.7: a gesture this frame: how far it is laid on (0..1), the R15 goals, the R6 shoulders (radians, nil: left alone).
-type Gesture = { t: number, goals: ArmGoals, r6Right: number?, r6Left: number? }
+-- 6.7: `body` the goals of a gesture that bends the body (the waist, the head, the Root joint, the legs), else nil.
+type BodyGoals = { waist: CFrame?, neck: CFrame?, root: CFrame?, rh: CFrame?, rk: CFrame?, ra: CFrame?, lh: CFrame?, lk: CFrame?, la: CFrame? }
+type Gesture = { t: number, goals: ArmGoals, r6Right: number?, r6Left: number?, body: BodyGoals? }
+local legged: { [Model]: boolean } = {} -- 6.7: a gesture posed the body last frame (it goes back once it ends)
 
 local function anglesOf(a: { number }?): CFrame?
 	if not a then
@@ -306,16 +395,72 @@ local function between(a: CFrame?, b: CFrame?, k: number): CFrame?
 	return if a and b then a:Lerp(b, k) else a or b
 end
 
+-- 6.7: a gesture's body goals: the waist and the head as shared/Gestures.luau's angles; `crouch` { drop, back, hips }:
+-- the Root joint the hips down and back, tipped forward `hips` degrees, the legs bent on this body's own thigh and shin
+-- (shared/BodyMotion.luau crouch) so the feet stay where they stood and flat.
+local function bodyGoals(rig: Rig, shape: { [string]: { number } }): BodyGoals?
+	local crouch = shape.crouch
+	if not crouch and not shape.waist and not shape.neck then
+		return nil
+	end
+	local out: BodyGoals = { waist = anglesOf(shape.waist), neck = anglesOf(shape.neck) }
+	if crouch then
+		local tip = math.rad(crouch[3])
+		local hip, knee, ankle = BodyMotion.crouch(crouch[1], crouch[2], rig.thigh, rig.shin)
+		out.root = CFrame.new(0, -crouch[1], crouch[2]) * CFrame.Angles(-tip, 0, 0)
+		out.rh = CFrame.Angles(hip + tip, 0, 0)
+		out.lh = out.rh
+		out.rk = CFrame.Angles(knee, 0, 0)
+		out.lk = out.rk
+		out.ra = CFrame.Angles(ankle, 0, 0)
+		out.la = out.ra
+	end
+	return out
+end
+
+-- 6.7: the body's joints toward a gesture's goals (by t), or given back (body nil).
+local function layBody(character: Model, rig: Rig, body: BodyGoals?, t: number)
+	local b: BodyGoals = body or {}
+	lay(rig.waist, nil, 0, nil, 0, nil, nil, b.waist, t)
+	lay(rig.neck, nil, 0, nil, 0, nil, nil, b.neck, t)
+	lay(rig.root, nil, 0, nil, 0, nil, nil, b.root, t)
+	lay(rig.rh, nil, 0, nil, 0, nil, nil, b.rh, t)
+	lay(rig.rk, nil, 0, nil, 0, nil, nil, b.rk, t)
+	lay(rig.ra, nil, 0, nil, 0, nil, nil, b.ra, t)
+	lay(rig.lh, nil, 0, nil, 0, nil, nil, b.lh, t)
+	lay(rig.lk, nil, 0, nil, 0, nil, nil, b.lk, t)
+	lay(rig.la, nil, 0, nil, 0, nil, nil, b.la, t)
+	if body then
+		legged[character] = true
+	else
+		legged[character] = nil
+	end
+end
+
 -- Every pose on a character: aim (t 0..1, pitch in radians, + is up), carry (t 0..1, the kind held) and the swing.
 local function pose(character: Model, aimT: number, pitch: number, carryT: number, kind: string?, swing: Swing?, gesture: Gesture?)
 	local kick = kicks[character] or 0
 	local gt = if gesture then gesture.t else 0
-	local g: ArmGoals = if gesture then gesture.goals else {}
 	local up = math.rad(90) + pitch + kick * 0.11
-	local c: ArmGoals = carryGoals(if carryT > 0 then kind else nil)
 	local sw = swing or NO_SWING
 	local shape = if sw.t > 0 then SWINGS[sw.kind] or SWINGS.punch else nil
 	local rig = rigOf(character)
+	-- (6.7: with the box's place known, the hands reach its sides; a gesture that bends the body for it, the pick-up,
+	-- leaves the arms on the box: they follow it down to the ground and up)
+	local reached = if carryT > 0 and kind then reachGoals(character, rig, kind) else nil
+	-- 6.8 review: the box put down (its CarryAt gone with Carrying), the arms blend out of their last reach to it
+	local carry = carries[character]
+	if carry and carryT > 0 then
+		if reached then
+			carry.goals = reached
+		elseif carry.leaving then
+			reached = carry.goals
+		else
+			carry.goals = nil -- (a trolley's handle, the phone, a lead: the fixed shapes, and out of them)
+		end
+	end
+	local c: ArmGoals = reached or carryGoals(if carryT > 0 then kind else nil)
+	local g: ArmGoals = if gesture and not (reached and gesture.body) then gesture.goals else {}
 	if rig.kind == "r15" then
 		-- R15: an arm hangs down (-Y); turning about X lifts it forward (-Z), about Y swings it in or out.
 		local w: ArmGoals = if shape then shape.wind else {}
@@ -326,6 +471,10 @@ local function pose(character: Model, aimT: number, pitch: number, carryT: numbe
 		lay(rig.ls, CFrame.Angles(0, math.rad(-38), 0) * CFrame.Angles(up - math.rad(8), 0, 0), aimT, c.ls, carryT, nil, 0, g.ls, gt)
 		lay(rig.le, CFrame.Angles(math.rad(12), 0, 0), aimT, c.le, carryT, nil, 0, g.le, gt)
 		lay(rig.lw, CFrame.identity, aimT, c.lw, carryT, nil, 0, g.lw, gt)
+		local body = if gesture and gt > 0 then gesture.body else nil
+		if body or legged[character] then
+			layBody(character, rig, body, gt) -- 6.7
+		end
 		return
 	end
 	if rig.kind == "r6" then
@@ -421,7 +570,7 @@ local leans: { [Model]: Lean } = {}
 local LEAN_SPRINT = math.rad(9) -- forward at a full sprint
 local LEAN_BRAKE = math.rad(7) -- back while braking hard
 
-local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, dt: number)
+local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, dt: number, mine: boolean)
 	local waist = rigOf(character).waist
 	if not waist or not root then
 		return
@@ -435,12 +584,25 @@ local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, 
 	local now = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	local braking = math.max(0, state.speed - now) / math.max(dt, 1 / 240)
 	state.speed = now
-	local onFoot = humanoid ~= nil and humanoid.Health > 0 and not humanoid.Sit
+	-- 6.8 review: on its feet as client/SprintPose.luau sees it (not seated, platform-standing, on a zip line or a
+	-- ladder, in a move of client/Interact.luau, climbing, swimming, dead …; a jump or a fall still eases the lean out).
+	-- Otherwise the waist is let go at once: an interaction move reads the waist back every frame and a braking lean
+	-- built up on it (about 7°).
+	if not humanoid or not SprintPose.onFoot(character, humanoid, mine, true) then
+		if written[waist] then
+			layer(waist, nil)
+		end
+		state.amount = 0
+		return
+	end
 	-- (6.0.1: the sprint's lean is client/SprintPose.luau's run cycle while it runs: this one steps aside)
-	local goal = if onFoot
-		then LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) * (1 - SprintPose.weight(character))
-			- LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1)
+	-- 6.7: a load in both hands (a heavy one that slows you more) leans the upper body back against it
+	local carry = carries[character]
+	local load = if carry and carry.kind ~= "phone" and carry.kind ~= "horse" and character:GetAttribute("Pushing") == nil
+		then carry.t * math.rad(if character:GetAttribute("CarrySpeed") ~= nil then B.CarryHeavy elseif character:GetAttribute("CarryHands") == 1 then 0 else B.CarryLean)
 		else 0
+	local goal = LEAN_SPRINT * math.clamp((now - 12) / 9, 0, 1) * (1 - SprintPose.weight(character))
+		- LEAN_BRAKE * math.clamp((braking - 15) / 40, 0, 1) - load
 	state.amount += (goal - state.amount) * math.min(1, dt * 8)
 	if math.abs(state.amount) < 0.002 and math.abs(goal) < 0.002 then
 		if written[waist] then
@@ -563,6 +725,7 @@ local function gestureOf(character: Model): Gesture?
 		},
 		r6Right = if right then math.rad(right) else nil,
 		r6Left = if left then math.rad(left) else nil,
+		body = bodyGoals(rigOf(character), shape), -- 6.7: pickup, land
 	}
 end
 
@@ -619,8 +782,9 @@ local function poseCharacter(character: Model, humanoid: Humanoid?, aiming: bool
 		if carry then
 			carry.t = carryBlend
 			carry.kind = held :: string
+			carry.leaving = kind == nil -- 6.8 review: blending out (pose keeps the last reach then)
 		else
-			carries[character] = { t = carryBlend, kind = held :: string }
+			carries[character] = { t = carryBlend, kind = held :: string, goals = nil, leaving = kind == nil }
 		end
 	else
 		carries[character] = nil
@@ -718,7 +882,7 @@ local function step(dt: number)
 			report(character)
 		end
 		if rigOf(character).kind == "r15" then
-			leanBody(character, humanoid, root, dt)
+			leanBody(character, humanoid, root, dt, mine)
 		end
 		-- Yours come up slower out of a sprint (CameraRig decides); the others' at the normal pace.
 		local raise = if mine then math.max(0.1, CameraRig.raiseTime() - 0.05) else RAISE_TIME
@@ -799,9 +963,24 @@ local function step(dt: number)
 	for joint in written do
 		if not joint.Parent then
 			written[joint] = nil
-			animated[joint] = nil
 		end
 	end
+	for character in legged do
+		if not character.Parent then
+			legged[character] = nil
+		end
+	end
+end
+
+-- 6.7: does ArmPose have this character's arms now (the aim, the carry, the phone, a swing, a gesture, or blending out
+-- of one)? client/BodyLife.luau leaves them alone then.
+function ArmPose.armsBusy(character: Model): boolean
+	return blends[character] ~= nil or carries[character] ~= nil or swung[character] ~= nil or gestured[character] ~= nil
+end
+
+-- 6.7: is a gesture bending this character's body and legs now ("pickup", "land")?
+function ArmPose.legsBusy(character: Model): boolean
+	return legged[character] ~= nil
 end
 
 function ArmPose.start()

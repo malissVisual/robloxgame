@@ -6,14 +6,26 @@ The game's dusk lighting and the existing zombie animation tracks supply the fin
 
 | Model | Native parts, including the invisible root | Look |
 | --- | ---: | --- |
-| Courier | 33 | Warm tan skin, charcoal workwear (jacket and trousers), backwards black cap; the red reflective vest is bought kit (6.0.1) |
+| Courier | 52 (6.7) | The realistic body (6.7): 5.9 studs, warm tan skin, an open charcoal jacket over a grey shirt, trousers, boots, backwards black cap; the red reflective vest is bought kit (6.0.1) |
+| Person | 38 (6.7) | The same body for the people of `server/Npcs.luau`, painted per look (a kid at 0.75) |
 | Walker / runner | 42 each | Green infected face, cream glowing eyes, torn jacket and trousers |
 | Soldier / brute | 44 each | Same infected design, helmet/chest plate or reinforced shoulder; existing type scales/palettes |
 
-All five stay below the 64-part budget. Bodies have 16 native parts and 15 attachment-defined R15 joints.
-No MeshParts, SpecialMeshes, imported textures or body/accessory asset downloads. The kit's nominal torso, hands,
-upper arms and feet are preserved. Decorative parts remain massless, non-colliding, non-queryable and non-touching,
-including zombie corpses.
+All stay within the 64-part budget (the courier with the Courier Vest: 63). Bodies have 16 native parts and 15
+attachment-defined R15 joints. No MeshParts, imported textures or body/accessory asset downloads (6.7: a SpecialMesh
+sphere, Roblox's own shape, rounds the head and a few pieces; the checker allows only that). Decorative parts remain
+massless, non-colliding, non-queryable and non-touching, including zombie corpses.
+
+**6.7, the realistic body** (the owner: "not blocks any more"): heights from the sole: ankle 0.3, knee 1.55, hip 2.8,
+waist 3.2, elbow 3.5, wrist 2.6, shoulder 4.48, chin 4.98, crown 5.9 (HipHeight 2.8 since the 6.8 review: the root's
+middle 3.8 over the sole, its bottom at the hips; 6.7 had 2.2). Bones: torso 1.24 × 1.58 × 0.76,
+pelvis 1.24 × 0.6 × 0.78, head 0.8 × 0.92 × 0.86, upper arms 0.6 × 1.1 × 0.6, forearms 0.52 × 0.94 × 0.52, hands
+0.22 × 0.36 × 0.4 (the palms toward the body), thighs 0.64 × 1.31 × 0.8, shins 0.56 × 1.28 × 0.68, feet 0.52 × 0.3 ×
+0.86. Balls on the shoulder, elbow and knee joints; a neck; fingers and a thumb on each hand; the grip attachments
+in the fists at (∓0.03, -0.28, 0). The kit is still authored on the block body below (`KitFit.Nominal`) and scaled onto
+this one; `tools/character-art/check.py` checks the grips, the balls and the rounded head, `tests/characters_test.luau`
+the proportions and the vest worn over the jacket. `renders/` still shows the 6.0 courier until the next Blender
+render (the block body stays the infected's).
 
 **6.0.1, the vest is bought:** the owner wants a new courier to start in plain workwear and to buy the red reflective
 vest (Config.Kit `hivis`, the Courier Vest, $20 at Last Stop Supplies, next to the plastic bag). Codex's 11 vest pieces

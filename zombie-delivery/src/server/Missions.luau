@@ -31,6 +31,15 @@
 -- 3.4, cargo capacity: a mission with more pieces carried or led by hand (Economy.cargoNeed) than your equipped car
 -- holds (Economy.capacity: 3.5, the slots of its stage) is refused at START with what it needs, unless it lends a
 -- vehicle. The state says capacity, carName (3.5: carId, carStage) so the window can tell before START.
+--
+-- 6.8, the chapters (shared/Missions.luau): only a chapter's NEXT mission (the first not done) starts, a done one
+-- replays. A replay (the player's own record: profile.missions[id] >= 1) starts with replay = true (server/Jobs.luau:
+-- the job pays Config.Missions.ReplayPay of its pay and ReplayXp of its XP) and credit() gives nothing but a better
+-- rating (and its StarBonus for a new star); the first clear pays the mission's reward and the first-clear XP, the
+-- finale the chapter's reward (once: profile.campaigns) with Challenges.campaignDone's gun or paint and title. The
+-- "cleared" table says first / replay and what the job paid this player (Jobs passes it: `paid`), the step and the
+-- chapter's size, the next mission. The saved record is profile.missions (best rating; >= 1 = done), saved at once
+-- after a first clear (server/PlayerData.luau keeps the retired ids of a pre-6.8 save, uncounted).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -187,7 +196,7 @@ local function duoRefusal(player: Player): string?
 	if near >= tuning.MinCrew then
 		return nil
 	end
-	return "DUO mission: invite a friend first (K) and bring them here."
+	return Config.Missions.Duo.NeedsPartner -- 6.8: one text for the server and the window
 end
 
 -- Can this player start the mission now? nil = yes, else why not (for the Notice).
@@ -235,7 +244,9 @@ end
 
 -- Plays the mission (Jobs.startMission); says why not. True when it started.
 local function begin(player: Player, def: MissionData.MissionDef): boolean
-	local ok, why = Jobs.startMission(player, def)
+	-- 6.8: a mission this player has done before is a replay (its small pay: server/Jobs.luau).
+	local profile = PlayerData.get(player)
+	local ok, why = Jobs.startMission(player, def, profile ~= nil and MissionData.cleared(profile.missions, def.id))
 	if not ok then
 		say(player, why or "The mission could not start here, try again.")
 		Missions.send(player)
@@ -313,39 +324,40 @@ end
 
 -- ── Done: the rewards ──────────────────────────────────────────────────────
 
--- The extra XP of a first clear: (FirstClearXp - 1) × what the job itself gave (its tier and pieces, no kills).
-local function firstClearXp(def: MissionData.MissionDef): number
+-- The extra XP of a first clear: `share` (Missions.creditFor xpBonus: FirstClearXp - 1) × what the job itself gave (its
+-- tier and pieces, no kills).
+local function bonusXp(def: MissionData.MissionDef, share: number): number
 	local base = Levels.jobXp(def.tier, def.items, 0, false, true)
-	return math.floor(math.max(0, Config.Missions.FirstClearXp - 1) * base + 0.5)
+	return math.floor(share * base + 0.5)
 end
 
--- One player's credit for the mission: the best rating, the money and XP, the campaign. The "cleared" table.
-local function credit(player: Player, def: MissionData.MissionDef, stars: number, owner: Player): { [string]: any }?
+-- One player's credit for the mission: the best rating, the money and XP, the chapter. The "cleared" table. `paid`:
+-- what the job itself paid this player (6.8: the card's "REPLAY · $X"). 6.8: what is due comes from
+-- Missions.creditFor (tests/missions_story_test.luau): the first clear's reward and XP once, the chapter's reward once.
+local function credit(player: Player, def: MissionData.MissionDef, stars: number, owner: Player, paid: number): { [string]: any }?
 	local profile = PlayerData.get(player)
 	if not profile then
 		return nil
 	end
-	local before = math.clamp(profile.missions[def.id] or 0, 0, 3)
-	local best = math.max(before, stars)
-	local newStars = best - before
-	local first = before < 1
+	local plan = MissionData.creditFor(profile.missions, profile.campaigns, def.id, stars)
+	if not plan then
+		return nil
+	end
+	local first = plan.first
+	local best, newStars = plan.best, plan.newStars
 	profile.missions[def.id] = best
+	local reward = plan.reward
+	local starBonus = plan.starBonus
+	local xp = if plan.xpBonus > 0 then bonusXp(def, plan.xpBonus) else 0
 
-	local reward = if first then math.max(0, def.reward) else 0
-	local starBonus = newStars * Config.Missions.StarBonus
-	local xp = if first then firstClearXp(def) else 0
-
-	-- The campaign: all its missions done (any rating) pays its reward once.
+	-- The chapter: its last mission done (any rating) pays its reward once.
 	local campaignDone: string? = nil
 	local campaignReward = 0
 	local campaign = MissionData.findCampaign(def.campaign)
-	if campaign and not profile.campaigns[campaign.id] then
-		local done, total = MissionData.done(profile.missions, campaign.id)
-		if total > 0 and done >= total then
-			profile.campaigns[campaign.id] = true
-			campaignDone = campaign.name
-			campaignReward = campaign.reward
-		end
+	if campaign and plan.chapterDone then
+		profile.campaigns[campaign.id] = true
+		campaignDone = campaign.name
+		campaignReward = plan.chapterReward
 	end
 
 	local money = reward + starBonus + campaignReward
@@ -354,7 +366,7 @@ local function credit(player: Player, def: MissionData.MissionDef, stars: number
 	else
 		PlayerData.notify(player)
 	end
-	-- 3.1: the campaign's exclusive reward (Config.Rewards.Campaigns), once.
+	-- 3.1: the chapter's exclusive reward (Config.Rewards.Campaigns), once.
 	if campaignDone and campaign then
 		Challenges.campaignDone(player, campaign.id)
 	end
@@ -362,15 +374,20 @@ local function credit(player: Player, def: MissionData.MissionDef, stars: number
 	if xp > 0 then
 		level, levelUp = PlayerData.addXp(player, xp)
 	end
-	-- A first clear (or a campaign) is worth saving right away; the autosave does the rest.
+	-- A first clear (or a chapter) is worth saving right away; the autosave does the rest (a replay's better rating).
 	if first or campaignDone then
 		task.spawn(PlayerData.save, player)
 	end
+	local following = MissionData.nextUp(profile.missions, def.campaign)
 	return {
 		id = def.id,
 		name = def.name,
 		campaign = def.campaign,
 		number = def.number,
+		of = MissionData.size(def.campaign), -- 6.8: the chapter's length ("3/6")
+		replay = not first, -- 6.8: a replay: only its small pay (`paid`), no reward, no XP bonus
+		paid = paid,
+		nextId = if following then following.id else nil, -- 6.8: the chapter's next mission (nil: it is done)
 		stars = stars,
 		best = best,
 		newStars = newStars,
@@ -389,8 +406,8 @@ local function credit(player: Player, def: MissionData.MissionDef, stars: number
 end
 
 -- Jobs.onMissionComplete is wired to this in Main: the owner, the crew who were there at the finish (members), the
--- rating.
-function Missions.onComplete(owner: Player, missionId: string, stars: number, members: { Player })
+-- rating, and (6.8) what the job paid each of them (`paid`, by player).
+function Missions.onComplete(owner: Player, missionId: string, stars: number, members: { Player }, paid: { [Player]: number }?)
 	local def = if type(missionId) == "string" then MissionData.find(missionId) else nil
 	if not def then
 		warn(`[Missions] unknown mission done: {missionId}`)
@@ -423,7 +440,7 @@ function Missions.onComplete(owner: Player, missionId: string, stars: number, me
 				continue
 			end
 		end
-		local ok, result = pcall(credit, player, def, rating, owner)
+		local ok, result = pcall(credit, player, def, rating, owner, if paid then paid[player] or 0 else 0)
 		if not ok then
 			warn(`[Missions] credit for {player.Name} failed: {result}`)
 		elseif result then

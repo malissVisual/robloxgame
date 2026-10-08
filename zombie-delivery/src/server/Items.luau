@@ -5,6 +5,10 @@
 --   Nitro       a speed boost (client)     Molotov  a burning patch where you aim
 --   Landmine    dropped behind the car, blows up when a zombie steps close
 --   Jerry Can   5.4: +10 L of fuel into your car, standing by it or sitting in it (server/Fuel.luau pourCan)
+--   Energy Drink  6.7: on foot: the character's EnergyUntil = now + EnergyTime (server time); client/Stamina.luau fills
+--               the breath and stretches the sprint (× EnergyBreath) until then
+-- 6.7: a supply crate gives a player only the items that are for them (Economy.itemsFor: the car-only items, Config.Items
+-- car, only to a player who owns a car). Using one still only needs a car at hand (a lent one too), as before.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +16,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Economy = require(Shared.Economy) -- 6.7: the car-only items
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local World = require(script.Parent.World)
@@ -216,6 +221,19 @@ local function apply(player: Player, id: string, target: Vector3?): string?
 		return dropMine(player)
 	elseif id == "jerrycan" then
 		return require(script.Parent.Fuel).pourCan(player) -- 5.4
+	elseif id == "energy" then
+		-- 6.7: on foot, alive: the breath full and the sprint longer for EnergyTime (a second can starts it over)
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if not character or not humanoid or humanoid.Health <= 0 then
+			return "You cannot drink that now."
+		end
+		if humanoid.SeatPart ~= nil then
+			return "Drink it on foot: it's for the sprint."
+		end
+		character:SetAttribute("EnergyUntil", workspace:GetServerTimeNow() + Tuning.EnergyTime)
+		notice:FireClient(player, `🥤 Breath full, and ×{Tuning.EnergyBreath} breath for {Tuning.EnergyTime} s.`)
+		return nil
 	end
 	return "Unknown item."
 end
@@ -324,8 +342,11 @@ local function collect(player: Player, crate: Part)
 	crate:Destroy()
 	local loot = Config.Loot
 	local gotItem = false
-	if rng:NextNumber() < loot.ItemChance then
-		local def = Config.Items[rng:NextInteger(1, #Config.Items)]
+	local profile = PlayerData.get(player)
+	-- 6.7: only the items that are for this player (no car items without a car: Economy.itemsFor)
+	local pool = Economy.itemsFor(if profile then profile.cars else nil)
+	if rng:NextNumber() < loot.ItemChance and #pool > 0 then
+		local def = pool[rng:NextInteger(1, #pool)]
 		if PlayerData.addItem(player, def.id, 1) then
 			notice:FireClient(player, `Supply crate: found {article(def.name)} {def.icon} → in your item bar`) -- (6.3 review: no slot number: a touch screen shows fewer slots and no keys)
 			gotItem = true

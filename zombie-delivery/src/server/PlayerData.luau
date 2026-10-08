@@ -14,7 +14,8 @@
 -- `bike` is your bike of choice and `lastCar` the car the phone's CALL CAR brings back (server/Shops.luau). 5.4: the
 -- fuel in every car you own (carFuel, litres; server/Fuel.luau keeps it, a car without an entry is full). 6.6: the
 -- backpacks are gone (Config.RetiredKit): a save from before (no noPacks flag) gets their price back once
--- (shared/Transport.luau packRefund; profile.packRefund, never saved, tells server/Tutorial.luau to say so).
+-- (shared/Transport.luau packRefund; profile.packRefund, never saved, tells server/Tutorial.luau to say so). 6.7: the
+-- Thermal Jacket the same way (the noJacket flag, profile.jacketRefund).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -60,7 +61,7 @@ export type Profile = {
 	home: string?, -- the home you spawn at (an owned mansion / villa / house), nil = the depot
 	business: { couriers: number, upgrades: { [string]: number }, safe: number, lastTick: number }, -- your company (Config.Business); lastTick = os.time() of the last payout
 	missions: { [string]: number }, -- the best rating (1 – 3 stars) of every mission done (shared/Missions.luau ids)
-	campaigns: { [string]: boolean }, -- campaigns whose reward was paid (all ten missions done)
+	campaigns: { [string]: boolean }, -- campaigns whose reward was paid (6.8: every mission of the chapter done)
 	-- 3.1, the challenges (shared/Challenges.luau), secrets (Map.Secrets) and rewards (Config.Rewards):
 	stats: { [string]: number }, -- counters the challenges read (Challenges.Counters: headshots, distance, …)
 	visited: { [string]: boolean }, -- places (Map.Places ids) you have been to
@@ -76,6 +77,7 @@ export type Profile = {
 	-- best one owned (shared/Transport.luau activeBag decides, a choice no longer owned falls back to it too)
 	activeBag: string?,
 	packRefund: number?, -- 6.6: the money this load paid back for retired backpacks (Marge says so once; never saved)
+	jacketRefund: number?, -- 6.7: … and for the retired Thermal Jacket (the same way)
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
 	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
 	deliveries: number,
@@ -138,6 +140,7 @@ local function newProfile(): Profile
 		kit = { bag = true }, -- 6.0.2: the plastic bag from the start (the vest is bought)
 		activeBag = nil, -- 6.4: the best bag owned
 		packRefund = nil, -- 6.6
+		jacketRefund = nil, -- 6.7
 		phone = false,
 		vanQuest = nil,
 		deliveries = 0,
@@ -211,11 +214,13 @@ local function applyEstate(profile: Profile, saved: { [any]: any })
 end
 
 -- The missions' best ratings (only shared/Missions.luau ids, 1 – 3 stars) and the campaigns already rewarded.
--- Saves from before 3.0 have none.
+-- Saves from before 3.0 have none. 6.8, the chapters: the mission ids did not change, so a save's ratings keep their
+-- meaning (a rating >= 1 = done: no first-time reward again, the replay's small pay); the ids of the missions no
+-- chapter tells any more (Missions.isRetired) stay in the save untouched (nothing counts them), so nothing is lost.
 local function applyMissions(profile: Profile, saved: { [any]: any })
 	if type(saved.missions) == "table" then
 		for id, stars in saved.missions do
-			if type(id) == "string" and Missions.find(id) and type(stars) == "number" and stars >= 1 then
+			if type(id) == "string" and (Missions.find(id) or Missions.isRetired(id)) and type(stars) == "number" and stars >= 1 then
 				profile.missions[id] = math.clamp(math.floor(stars), 1, 3)
 			end
 		end
@@ -346,14 +351,15 @@ local function applySaved(profile: Profile, saved: any)
 	profile.phone = saved.phone == true -- 5.0
 	profile.vanQuest = if saved.vanQuest == "open" or saved.vanQuest == "done" then saved.vanQuest else nil -- 5.0
 	-- 6.6: the backpacks are gone (Config.RetiredKit): a real save from before (no noPacks flag; not a lock-only record
-	-- of a new player) gets their price back, once (the kit below no longer knows them, so they are dropped)
-	if saved.noPacks ~= true and saved.money ~= nil then
-		local refund = require(Shared.Transport).packRefund(saved.kit)
-		if refund > 0 then
-			profile.money = math.min(profile.money + refund, 2 ^ 50)
-			profile.packRefund = refund
-		end
+	-- of a new player) gets their price back, once (the kit below no longer knows them, so they are dropped). 6.7: the
+	-- Thermal Jacket too, by its own noJacket flag (a 6.6 save has noPacks already): Transport.retiredRefunds, by flag;
+	-- Marge says so (profile.packRefund / jacketRefund, never saved).
+	local refunds = require(Shared.Transport).retiredRefunds(saved)
+	for _, refund in refunds do
+		profile.money = math.min(profile.money + refund, 2 ^ 50)
 	end
+	profile.packRefund = refunds.noPacks
+	profile.jacketRefund = refunds.noJacket
 	if type(saved.kit) == "table" then
 		for _, def in Config.Kit do
 			if saved.kit[def.id] == true then
@@ -707,6 +713,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		vestKit = true, -- 6.0.1: the courier vest is bought kit (applySaved gives it once to an older save)
 		starterKit = true, -- 6.0.2: the pistol and the bag of the start (applySaved gives them once to an older save)
 		noPacks = true, -- 6.6: the backpacks are gone (applySaved pays an older save's back once)
+		noJacket = true, -- 6.7: the Thermal Jacket is gone (applySaved pays it back once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,

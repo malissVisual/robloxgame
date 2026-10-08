@@ -4492,7 +4492,7 @@ local function defineMissionPlaces()
 		deco(cylinder(station, "HydrantCap", 0.6, 1.8, hydrant * CFrame.new(0, 2.7, 0) * UPRIGHT, Color3.fromRGB(200, 200, 204), Enum.Material.Metal))
 		part(station, "FlagPole", Vector3.new(0.5, 20, 0.5), frame * CFrame.new(side * 40, 10, front - 17), Color3.fromRGB(220, 220, 220), Enum.Material.Metal)
 		deco(part(station, "Flag", Vector3.new(0.2, 3.6, 6), frame * CFrame.new(side * 40, 17.8, front - 13.8), FIRE_RED, Enum.Material.Fabric))
-		bystander("worker", "Chief Carlos", "Fire Station 9", frame * CFrame.new(side * 20, 0, front - 6))
+		bystander("firefighter", "Chief Carlos", "Fire Station 9", frame * CFrame.new(side * 20, 0, front - 6)) -- 6.8: shared/Cast.luau
 	end
 
 	-- Precinct 13: a blue-grey station house with steps, blue lanterns, its name, two patrol cars in front.

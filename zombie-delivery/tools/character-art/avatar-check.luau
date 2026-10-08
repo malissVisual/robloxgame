@@ -136,7 +136,7 @@ assert(playing(1).id == "rbxassetid://507766388" and playing(10).id == playing(1
 a.Character.PrimaryPart.AssemblyLinearVelocity = M.Vector3.new(0, 0, 28)
 run.Heartbeat:Fire(1 / 60)
 assert(playing(1).id == "rbxassetid://507767714", "a run from the actual velocity")
-assert(math.abs(playing(1).rate - 28 / 24) < 1e-6, "the pace matches the speed")
+assert(math.abs(playing(1).rate - 28 / 24 / (2.8 / 2)) < 1e-6, "the pace matches the speed (6.7: and the legs; 6.8 review: the leg measured, hip to sole 2.8)")
 assert(playing(10).id == "rbxassetid://507766388", "each body its own")
 a.Character:FindFirstChildOfClass("Humanoid").Sit = true
 run.Heartbeat:Fire(1 / 60)

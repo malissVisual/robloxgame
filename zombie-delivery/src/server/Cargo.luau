@@ -162,6 +162,19 @@
 --     a fall on foot does not knock them.
 --   * PackRoom / Status.packRoom: the bag's room (yours now: bagHeld / bagStays), the bike's bag (Info.rack) and the
 --     satchel's; PackCount every piece in the pack.
+-- 6.7, real sizes and items in the hand (the owner: "the bag is small, the things would never really fit in it … no
+-- animations"):
+--   * a light piece is built at its real size (Config.Cargo.LightScale / LookScale: a pizza box about 33 cm, a parcel
+--     about a stud): buildLook scales it; in the hands it rests on the forearms in front of the chest (stackHeld:
+--     Config.Cargo.CarryLow / CarryFront), two still stack;
+--   * a hand-over at a door is no longer empty-handed (server/HandItem.luau): the first piece given is in your right
+--     hand while you hold it out ("give"), then in the receiver's hands ("receive"), then on the door's stack;
+--   * a piece put into the bag (a pickup) is in your right hand through the "bag" gesture and goes in at
+--     Config.Courier.HandItem.BagIn: the bag's fill (BagCount / BagLooks: server/KitWear.luau) shows it from then on
+--     (Piece.entering);
+--   * a throw winds up first: the piece is in your hand for Config.Throw.WindUp seconds (the "throw" gesture's arm
+--     back, the torso turned) and leaves it at the whip. The server decides it all at the throw (the arc, the door,
+--     the tips) and only starts the flight then: the client never picks the moment.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -175,6 +188,7 @@ local JobRules = require(Shared.JobRules) -- 5.3: the newspaper's toss
 local Net = require(Shared.Net)
 local Vehicles = require(script.Parent.Vehicles)
 local Npcs = require(script.Parent.Npcs)
+local HandItem = require(script.Parent.HandItem) -- 6.7: the piece in the hand while a gesture plays
 local Animals = require(script.Parent.Animals)
 local Equipment = require(script.Parent.Equipment)
 local PlayerData = require(script.Parent.PlayerData) -- 6.0: the bag owned, the TRICKSHOT tip
@@ -266,6 +280,8 @@ type Piece = {
 	heavy: number?, -- 5.2: carried alone by hand you walk this slowly (the order's heavy rule)
 	inBag: boolean?, -- 6.1: in the owner's pack, in the bag (6.6: else on the bike, or …)
 	satchel: boolean?, -- 6.6: … in a newspaper round's satchel
+	entering: boolean?, -- 6.7: on its way into the bag in the owner's hand (the bag's fill shows it once it is in)
+	liftAt: number?, -- 6.7: picked up off the ground: it stays where it lies until then (os.clock), the body bending to it
 }
 
 -- 6.1: the plastic bag set down on the ground with its cargo (only the owner picks it up).
@@ -978,6 +994,11 @@ local function buildLook(look: string, variant: number): Model
 	if main then
 		model.PrimaryPart = main
 		main.PivotOffset = main.CFrame:Inverse()
+		-- 6.7: a light piece at its real size (about the pivot: the bottom centre stays at the origin)
+		local scale = if Tuning.LightLooks[look] then Tuning.LookScale[look] or Tuning.LightScale else 1
+		if scale ~= 1 then
+			model:ScaleTo(scale)
+		end
 	end
 	local size = model:GetExtentsSize()
 	model:SetAttribute("Height", size.Y)
@@ -1051,6 +1072,7 @@ local function setDown(model: Model, at: CFrame)
 			d.Anchored = true
 			d.Massless = false
 			d.CanCollide = d == model.PrimaryPart
+			d.CanQuery, d.CanTouch = true, true -- (6.8 review: a piece held in a hand had them off: HandItem)
 		end
 	end
 	model:PivotTo(at)
@@ -1064,8 +1086,23 @@ local function pieceSize(model: Model): (number, number)
 	return if type(height) == "number" then height else 2, if type(depth) == "number" then depth else 2
 end
 
+-- 6.7: where the hands hold (client/ArmPose.luau reaches both hands to the sides of the bottom piece): its middle in
+-- the root's frame and its size, the character's CarryAt / CarrySize (nil: nothing held in the hands).
+local function markHands(character: Model, root: BasePart?, model: Model?)
+	if not root or not model or not model.Parent then
+		character:SetAttribute("CarryAt", nil)
+		character:SetAttribute("CarrySize", nil)
+		return
+	end
+	local frame, size = model:GetBoundingBox()
+	character:SetAttribute("CarryAt", root.CFrame:PointToObjectSpace(frame.Position))
+	character:SetAttribute("CarrySize", size)
+end
+
 -- In front of the chest: one piece's middle at chest height, its back against the body; 3.7: two stacked, the first
--- at the bottom, the stack a little lower so you still see over it.
+-- at the bottom, the stack a little lower so you still see over it. 6.7: a real-size light piece rests on the forearms
+-- (its bottom at most Tuning.CarryLow over the root), its back Tuning.CarryFront in front of the body. 6.8 review: a
+-- tall stack's middle at most Tuning.CarryMiddle over the root (both 0.6 lower: the root sits higher in the body).
 local function stackHeld(held: Held)
 	local total, depth = 0, 0
 	for _, piece in held.pieces do
@@ -1076,15 +1113,28 @@ local function stackHeld(held: Held)
 			depth = math.max(depth, d)
 		end
 	end
-	local y = 1.1 - total / 2 - (if #held.pieces > 1 then 0.25 else 0)
+	local y = math.min(Tuning.CarryLow, Tuning.CarryMiddle - total / 2 - (if #held.pieces > 1 then 0.25 else 0))
 	for _, piece in held.pieces do
 		local model = piece.model
-		if model then
-			weldTo(model, held.root, held.root.CFrame * CFrame.new(0, y, -(0.6 + depth / 2)))
+		if model and not (piece.liftAt and os.clock() < piece.liftAt) then -- (6.7: one still lifted off the ground waits)
+			weldTo(model, held.root, held.root.CFrame * CFrame.new(0, y, -(Tuning.CarryFront + depth / 2)))
 			local h = pieceSize(model)
 			y += h
 		end
 	end
+	markHands(held.character, held.root, held.pieces[1] and held.pieces[1].model) -- 6.7: the hands on the bottom piece
+end
+
+-- 6.7: a piece picked up off the ground comes up into the hands once the body has bent down to it (its `liftAt`,
+-- Config.Body.PickupLift; until then it lies where it was, the hands reaching for it).
+local function liftLater(session: Session, player: Player, piece: Piece)
+	task.delay(Config.Body.PickupLift, function()
+		piece.liftAt = nil
+		local held = session.held[player]
+		if held and not held.tool and table.find(held.pieces, piece) and held.root.Parent then
+			stackHeld(held)
+		end
+	end)
 end
 
 -- 5.3 review: `owner`, the job's owner: the prompt carries their UserId (attribute CargoOwner) and the tag
@@ -1409,6 +1459,17 @@ local function bagCount(session: Session): number
 	return n
 end
 
+-- 6.7: what the bag shows (its BagCount / BagLooks): not the piece still on its way in, in your hand.
+local function bagShown(session: Session): number
+	local n = 0
+	for _, piece in session.pack do
+		if piece.inBag and not piece.entering then
+			n += 1
+		end
+	end
+	return n
+end
+
 -- 6.6: the pieces in the bike's own bag.
 local function bikeCount(session: Session): number
 	local n = 0
@@ -1514,7 +1575,7 @@ packShown = function(session: Session)
 		else 0
 	local room = if on then bagPart + rackRoomOf(session) + satchelRoomOf(session) else nil
 	local down = session.bagDown
-	local bag = if on then bagCount(session) + (if down then #down.pieces else 0) else nil
+	local bag = if on then bagShown(session) + (if down then #down.pieces else 0) else nil
 	local bagRoom = if on then bagRoomOf(session) else nil
 	if owner:GetAttribute("PackCount") ~= count then
 		owner:SetAttribute("PackCount", count)
@@ -1531,7 +1592,7 @@ packShown = function(session: Session)
 	local looks: { string } = {}
 	if on then
 		for _, piece in session.pack do
-			if piece.inBag then
+			if piece.inBag and not piece.entering then
 				table.insert(looks, piece.look)
 			end
 		end
@@ -1574,6 +1635,44 @@ local function stash(session: Session, piece: Piece, where: string)
 	piece.satchel = if where == "satchel" then true else nil
 	table.insert(session.pack, piece)
 	packShown(session)
+end
+
+-- 6.7: a piece the owner's hand puts into the pack: stashed at once (it counts), but when it goes into the bag it is
+-- in the right hand through the "bag" gesture (its look where it lay, else a new one: server/HandItem.luau) and the
+-- bag shows it only from Config.Courier.HandItem.BagIn on (Piece.entering). True when it went into the bag.
+local function stashByHand(session: Session, player: Player, piece: Piece, where: string): boolean
+	local model = piece.model
+	piece.model = nil -- (kept for the hand: stash would destroy it)
+	piece.entering = true
+	stash(session, piece, where)
+	if not piece.inBag then
+		piece.entering = nil
+		if model then
+			model:Destroy()
+		end
+		packShown(session)
+		return false
+	end
+	local character = player.Character
+	Npcs.act(character, "bag")
+	local shown = model or buildLook(piece.look, piece.variant)
+	if not shown.Parent then
+		shown.Parent = folder
+	end
+	local hold = HandItem.hold(character, shown, "bag")
+	if not hold then
+		shown:Destroy()
+	end
+	task.delay(Config.Courier.HandItem.BagIn, function()
+		if hold then
+			HandItem.drop(hold) -- (in the bag now)
+		end
+		piece.entering = nil
+		if not session.ended then
+			packShown(session)
+		end
+	end)
+	return true
 end
 
 -- 6.1: what was said of a piece put into the pack: the bag (n / its room), 6.6: the bike's bag (n / its room).
@@ -1875,10 +1974,14 @@ local function render(session: Session)
 	end
 	local slots = Vehicles.cargoSlots(car)
 	-- 4.6: a Roof Rack (gear) adds a slot on the roof for a light piece: the Attachment RoofRackSlot, after the others.
+	-- 6.7: Config.GearTuning.RoofRackSlots of them, side by side across the rack (RoofRackGap apart).
 	local roof = car.chassis:FindFirstChild("RoofRackSlot")
-	if roof and roof:IsA("Attachment") and Vehicles.capacity(car, session.info.look) > #slots then
+	local extra = math.min(Config.GearTuning.RoofRackSlots, Vehicles.capacity(car, session.info.look) - #slots)
+	if roof and roof:IsA("Attachment") and extra > 0 then
 		slots = table.clone(slots)
-		table.insert(slots, roof.CFrame)
+		for n = 1, extra do
+			table.insert(slots, roof.CFrame * CFrame.new((n - (extra + 1) / 2) * Config.GearTuning.RoofRackGap, 0, 0))
+		end
 	end
 	for index, piece in session.load do
 		local slot = slots[index]
@@ -1997,6 +2100,7 @@ local function clearHeld(session: Session, player: Player): Held?
 		character:SetAttribute("CarryCount", nil)
 		character:SetAttribute("CarryHands", nil)
 		character:SetAttribute("CarrySpeed", nil)
+		markHands(character, nil, nil) -- 6.7
 	end
 	if held.prompt then
 		held.prompt:Destroy()
@@ -2055,6 +2159,7 @@ local function armHands(session: Session, player: Player, held: Held)
 		-- 4.0: on the trolley or the jack (its own G sets it down): a hand stays free for the back's doors.
 		stackOnTool(tool, held.pieces, true)
 		local character = held.character
+		markHands(character, nil, nil) -- 6.7: the hands are on the tool's handle, not on a piece
 		character:SetAttribute("Carrying", top.kind)
 		character:SetAttribute("CarryCount", count)
 		character:SetAttribute("CarryHands", 1)
@@ -2171,12 +2276,15 @@ local function dropFrame(session: Session, last: CFrame): CFrame
 	return CFrame.lookAt(spot, spot + ahead)
 end
 
--- A piece (not a horse) put on the ground at `frame`, with its Pick up prompt: a loose piece of the job.
-local function layDown(session: Session, piece: Piece, frame: CFrame)
+-- A piece (not a horse) put on the ground at `frame`, with its Pick up prompt: a loose piece of the job. 6.7: `held`:
+-- its model is still in a hand (a throw's wind-up): the caller sets it down later.
+local function layDown(session: Session, piece: Piece, frame: CFrame, held: boolean?)
 	piece.inBag = nil -- (6.1: out of the bag, on the ground)
 	local model = piece.model or buildPiece(piece)
 	piece.model = model
-	setDown(model, frame)
+	if not held then
+		setDown(model, frame)
+	end
 	local main = model.PrimaryPart :: BasePart
 	local owner = piece.owner -- (4.8, multi-drop)
 	local loose: Loose = { piece = piece, prompt = prompt(main, "Pick up", `{capital(session.info.piece)}{if owner then ` for {owner}` else ""}`, nil, holdFor(session), session.owner), handle = nil }
@@ -2350,11 +2458,8 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 		if loose.handle then
 			loose.handle:Destroy()
 		end
-		stash(session, loose.piece, into)
+		stashByHand(session, player, loose.piece, into) -- 6.0: into the bag (6.7: in your hand, the bag gesture)
 		tell(player, packWords(session, loose.piece))
-		if loose.piece.inBag then
-			Npcs.act(player.Character, "bag") -- 6.0: into the bag
-		end
 		refresh(session)
 		session.info.changed()
 		return
@@ -2362,8 +2467,19 @@ onLoose = function(session: Session, player: Player, loose: Loose)
 	if handsFull(session, player) or pairRefused(session, player) then
 		return
 	end
+	-- (6.8 review: the bend only for a piece the hands pick up: not a horse on a lead, not a trolley's load)
+	local bend = loose.piece.horse == nil and Equipment.pushing(player) == nil
+	if bend then
+		loose.piece.liftAt = os.clock() + Config.Body.PickupLift -- 6.7: it waits on the ground for the hands
+	end
 	if not table.find(session.loose, loose) or not take(session, player, loose.piece) then
+		loose.piece.liftAt = nil
 		return -- (3.7: a piece that does not fit the hands stays where it lies)
+	end
+	if bend then
+		-- 6.7: down on the knees for it (client/ArmPose.luau, shared/Gestures.luau), the hands on it, then up with it
+		Npcs.act(player.Character, "pickup")
+		liftLater(session, player, loose.piece)
 	end
 	bagHint(session, player, loose.piece) -- 6.3
 	local index = table.find(session.loose, loose)
@@ -2418,6 +2534,7 @@ local function handOver(session: Session, player: Player)
 		return
 	end
 	local gave = 0
+	local passed = false -- 6.7: the first light piece went from your hand into theirs
 	local function give(piece: Piece)
 		gave += 1
 		session.moved += 1
@@ -2433,8 +2550,17 @@ local function handOver(session: Session, player: Player)
 		else
 			local model = piece.model or buildPiece(piece)
 			piece.model = nil
-			setDown(model, if isPallet(session) then palletSpot(plan, session.moved) else stackFrame(plan, session.moved, -1))
+			local spot = if isPallet(session) then palletSpot(plan, session.moved) else stackFrame(plan, session.moved, -1)
 			table.insert(session.props, model)
+			if not passed and Tuning.LightLooks[piece.look] then
+				-- 6.7: the first one from your right hand into the receiver's (nobody home: you set it down), then the stack
+				passed = true
+				HandItem.pass(model, player.Character, if plan.nobody then nil else session.person, folder, function(kept: Model)
+					setDown(kept, spot)
+				end)
+			else
+				setDown(model, spot)
+			end
 		end
 	end
 	-- 3.7: everything in your hands goes (two light pieces at once), as many as they still need. 4.8, multi-drop: a
@@ -2509,7 +2635,9 @@ local function handOver(session: Session, player: Player)
 	end
 	say(session.person, if session.moved >= neededNow(session) then line(LINES.done) else line(LINES.thanks))
 	Npcs.act(player.Character, "give") -- 5.7: held out …
-	Npcs.act(session.person, "take") -- … and taken
+	if not passed then
+		Npcs.act(session.person, "take") -- … and taken (6.7: a piece passed hand to hand: HandItem's "receive")
+	end
 	if plan.nobody then
 		tell(player, `Left at the door of {plan.place or "the house"}.`) -- 5.3: nobody home
 	end
@@ -2770,7 +2898,8 @@ local function throwPick(session: Session, player: Player): (string?, number?, s
 			for index = #session.pack, 1, -1 do
 				local piece = session.pack[index]
 				local place = packPlace(piece)
-				if (place == "bag") == (pass == 1) and (near or place ~= "bike") and forHere(session, piece) then
+				-- (6.8 review: not the piece still going into the bag: it is in your hand for the bag gesture)
+				if (place == "bag") == (pass == 1) and (near or place ~= "bike") and forHere(session, piece) and not piece.entering then
 					if Throws.throwable(piece.look, job) then
 						return "pack", index, ""
 					end
@@ -2991,6 +3120,8 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 	local visit = session.visit
 	local model = buildPiece(piece)
 	model:PivotTo(CFrame.new(from))
+	-- 6.7: in your hand through the wind-up (Config.Throw.WindUp), then it flies (launch, below)
+	local inHand = HandItem.hold(character, model, "throw")
 	local tip: Throws.Tip? = nil
 	local perfect = false -- 6.2: landed within PerfectRadius of the door's spot (the customer tips)
 	local rest: CFrame
@@ -3018,7 +3149,7 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 		end
 		rest = CFrame.lookAt(ground, ground + right)
 		piece.model = model
-		layDown(session, piece, rest)
+		layDown(session, piece, rest, inHand ~= nil)
 		loose = session.loose[#session.loose]
 		if loose then
 			loose.prompt.Enabled = false
@@ -3042,7 +3173,7 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 			PlayerData.addMoney(player, customerTip)
 		end
 	end
-	fly(model, trace, function()
+	local function landed()
 		setDown(model, rest)
 		if loose then
 			loose.prompt.Enabled = true
@@ -3067,7 +3198,22 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 		else
 			tell(player, `Missed the door: the {piece.name} is on the ground. Pick it up (E).`)
 		end
-	end)
+	end
+	-- 6.7: the piece leaves the hand at the whip, WindUp seconds after the throw (the server's moment, never the client's)
+	local function launch()
+		if inHand and not HandItem.release(inHand, folder) then
+			return -- (gone with the stop meanwhile)
+		end
+		if model.Parent then
+			model:PivotTo(CFrame.new(from))
+			fly(model, trace, landed)
+		end
+	end
+	if inHand then
+		task.delay(Config.Throw.WindUp, launch)
+	else
+		launch()
+	end
 	refresh(session)
 end
 
@@ -3129,11 +3275,13 @@ local function onPile(session: Session, player: Player)
 		-- your hand: Holding.place).
 		local piece = table.remove(session.pile)
 		if piece then
-			stash(session, piece, into)
+			local inBag = stashByHand(session, player, piece, into) -- (6.7: the bag gesture with it in your hand)
 			session.moved += 1
 			say(session.person, line(LINES.take))
 			Npcs.act(session.person, "give") -- 5.7
-			Npcs.act(player.Character, if piece.inBag then "bag" else "take") -- (6.0: dropped into the bag in your hand)
+			if not inBag then
+				Npcs.act(player.Character, "take") -- (6.0: into the bag in your hand: its own gesture)
+			end
 			tell(player, packWords(session, piece))
 			refresh(session)
 			session.info.changed()
@@ -3814,7 +3962,7 @@ pickUpBag = function(session: Session, player: Player)
 		piece.inBag = true
 		table.insert(session.pack, piece)
 	end
-	Npcs.act(character, "bag")
+	Npcs.act(character, "pickup") -- 6.7: bent down for it (6.6: the "bag" gesture, a piece dropped in)
 	tell(player, `Bag picked up: {bagCount(session)} / {bagRoomOf(session)} in it.`)
 	packShown(session)
 	refresh(session)

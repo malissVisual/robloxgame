@@ -6,7 +6,8 @@
 --
 --   Transport.kitOf(player)    the kit owned (empty while the save loads)
 --   Transport.footOf(player)   Info on foot with that kit (a foot job's room, whatever the player drives)
---   Transport.packRoomOf(player), Transport.warmOf(player)   the pack's room (6.6: the bag's), the jacket's food drain
+--   Transport.packRoomOf(player)   the pack's room (6.6: the bag's)
+--   Transport.tipShareOf(player)   6.7: the kit's tip share (the Courier Vest: Rules.tipShare; the jacket is gone)
 --   Transport.bikeBagOf(player) 6.6: the bike's own bag (its rack / basket / box with its bike gear: Rules.bikeRoom) of
 --                              the bike a bike job is ridden on (bikeOf), 0 without a bike
 --   Transport.of(player)       Info now: "car" / "bike" seated on or within NEAR studs of your own vehicle, else on foot
@@ -61,9 +62,9 @@ function Transport.packRoomOf(player: Player): number
 	return Rules.packRoom(Transport.kitOf(player), Transport.bagOf(player))
 end
 
--- The food's freshness drain while this player carries it on foot (the thermal jacket).
-function Transport.warmOf(player: Player): number
-	return Rules.warm(Transport.kitOf(player))
+-- 6.7: the share of an order's pay this player's kit adds as a tip (the Courier Vest; the jacket's warmOf is gone).
+function Transport.tipShareOf(player: Player): number
+	return Rules.tipShare(Transport.kitOf(player))
 end
 
 -- 5.1: is the vehicle CAR / MY BIKE brings a bike?

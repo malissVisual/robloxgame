@@ -158,7 +158,7 @@ of letting you play a profile that would not be saved.
 | Show or hide the bus lines on the big map (6.3) | the BUS chip in the map's header | the same |
 | Climb a zip line's ladder, zip, let go (5.6) | E (Climb, Zip); Space lets go low over a roof | the prompts, the jump button |
 | Music and sound (on / music off / all off) | N | SOUND in MENU |
-| Missions (the campaigns, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MISSIONS in MENU |
+| Missions (6.8: who you work for: the clients and their story chapters, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MORE → MISSIONS on the phone |
 | Crew panel (invite / accept / leave / kick, the crew board) | K | CREW |
 | Leaderboard | L | TOP in MENU |
 | Get in your car / ride in a friend's car (3.10: at a door, a quick move in) | E (gamepad X) | the prompt |
@@ -360,41 +360,54 @@ your client only), so a zombie is never hidden in the black; and the street lamp
 
 ## Missions
 
-Press **U** (or **MISSIONS**) anywhere: the window lists the **11 campaigns** of **10 missions** each
-(`shared/Missions.luau`; 3.2: the 10 story campaigns and the DUO one), with the total stars (X / 330, every count
-computed from the data) on top and ALL / CO-OP tabs. Every campaign has a client, a story, a colour and the driver
-level it opens at; its missions open **one after another** (finish one, any rating, and the next is open).
+Press **U** (or **MISSIONS**, or the phone's MORE → MISSIONS) anywhere: **who you work for** (6.8). Every client has
+**one chapter of six missions** told in order (`shared/Missions.luau`, the people in `shared/Cast.luau`): each
+briefing picks up where the last debrief stopped, and the finale pays the chapter's big reward. Ten story chapters
+and the DUO one, 66 missions; the stars on top (X / 198, every count computed from the data).
 
-**The campaign chain** (3.2, `Campaign.requires`, `Missions.unlocked` / `campaignOpen` / `missing`): every story
-campaign needs the **finale** (mission 10) of the one before it, and then its level; Last Convoy needs all nine. A
-locked campaign says what it waits for ("🔒 Finish Code Red first · LEVEL 4"). Inside a campaign the missions' own
-levels grow from the campaign's level (mission 1) to the next campaign's (mission 10), computed in `add()`
-(`Missions.levelOf`), so the rank matters all the way; a mission above your level shows its own LEVEL lock. Click a mission for its card: the briefing in the
-client's words, the twists, the cargo, the vehicle, the danger level and the pay, and **START**. The mission starts
-right where you are (the pick-up is near you, or at its fixed place); a member of somebody's crew sees "your crew
-leader picks the mission" instead (the leader's START takes the crew along). A NIGHT ONLY mission starts only after
-dark.
+**The window** (`client/MissionsUi.luau`; its measures in `client/MissionsLayout.luau`): on the left a card per client
+with their **portrait** (`client/Portrait.luau`: a bust of their NPC, dressed from `shared/NpcLooks.luau`, in a
+ViewportFrame over the chapter's colour), the name, the role and the place, the progress "2 / 6", or why it is shut
+("🔒 Level 6", "🔒 Finish Raj's chapter first"), and NEW / ✓ DONE / 🤝 DUO badges. On the right the chosen client big:
+the portrait, the name, the role, the pitch; the **action card** with the next mission (the briefing in the client's
+words, the route, the twists, what the pay is made of); **THE STORY**: the six missions as a path (✓ done, ▶ next, 🔒
+locked: "Finish 'X' first" / "Level 7"), each with a one-line description and its pay; then the finale's reward with
+its picture. Under the chapter, never scrolled away (6.8 review), the **action bar**: the pay ("FIRST TIME · ≈ $1,220 +
+540 XP" or "REPLAY · ≈ $300"), why START would be refused, FIND CREW on a co-op or DUO mission and a big **START** (GO TO
+<client> for a shut chapter). A small screen (a phone held sideways) stacks the clients as a strip on top of the
+chapter, with a smaller hero portrait. With a gamepad START is selected on opening and the selection stays put when the
+server's state comes (a page that did not change is not drawn again) or a client or a step is chosen. A member of somebody else's crew sees "Your crew leader picks the
+mission"; the mission starts right where you are; a NIGHT ONLY one starts only after dark.
 
-| Campaign | Client | Needs finished | Level (missions 1 → 10) | Campaign reward |
+**The order** (`Missions.unlocked` / `statusOf` / `nextUp` / `chapterState`): in a chapter only the **next** mission
+(the first not done) starts; the later ones wait for it; a done one replays. The chapters open one after another
+(`Campaign.requires`: every story chapter needs the finale of the one before it, Last Convoy all nine), then at their
+level; inside a chapter the missions sit at its level and the finale at the next chapter's (`Missions.levelOf`). Played
+in order the story itself carries you to level 15 (tests/missions_story_test.luau).
+
+| Client | Chapter | Opens | The six missions, in order | Finale's reward |
 |---|---|---|---|---|
-| 📦 First Shift | Marge, the dispatcher | – | 1 → 2 | $2,500 |
-| 🏥 Code Red | Doctor Ellie, the City Clinic | First Shift | 2 → 4 | $4,000 |
-| 🛒 Empty Shelves | Raj, FreshMart | Code Red | 4 → 6 | $5,500 |
-| 🤝 Partners in Crime (DUO) | Rosa & Rico, the twins | First Shift | 4 → 8 | $7,500 |
-| 🚒 Smoke and Sirens | Chief Carlos, Fire Station 9 | Empty Shelves | 6 → 8 | $7,000 |
-| 🪖 Iron Supply | Captain Maria, the Military Base | Smoke and Sirens | 8 → 9 | $9,000 |
-| ⚡ Lights Out | Engineer Ivan, the Power Plant | Iron Supply | 9 → 10 | $11,000 |
-| 🐴 Wild West End | Walt, the rancher | Lights Out | 10 → 12 | $13,000 |
-| 🧪 Patient Zero | Doctor Hiro, the Biotech Lab | Wild West End | 12 → 13 | $16,000 |
-| 💰 Dirty Money | Vinnie, the fixer | Patient Zero | 13 → 14 | $20,000 |
-| 🚌 Last Convoy | Mayor Ruth, City Hall | all nine story campaigns | 14 → 15 | $30,000 |
+| Marge, the dispatcher | 📦 First Shift | level 4 | Paper Trail → Mail Call → Birthday Emergency → Dead Letter Office → Wheels of Commerce → **Rush Hour of the Dead** | $2,500 · Dispatch Yellow paint · "Dispatcher's Favourite" |
+| Doctor Ellie, the City Clinic | 🏥 Code Red | 5, after Marge | House Call → Code Blue → Many Hands → Ambulance Chaser → Quarantine Zone → **Code Red** | $4,000 · Medic Mint paint · "Field Medic" |
+| Raj, FreshMart | 🛒 Empty Shelves | 6, after Ellie | Stock Up → Bread Line → Farm to Table → Seeds of Hope → Price War → **Empty Shelves** | $5,500 · Fresh Lime paint · "Grocery Hero" |
+| Rosa & Rico, the twins (DUO) | 🤝 Partners in Crime | 6, after Marge | Double Act → Flood Gate → Two Keys → Cold Hands → Mirror Run → **Partners in Crime** | $7,500 · Tandem Twin paint · "Partners in Crime" |
+| Chief Carlos, Fire Station 9 | 🚒 Smoke and Sirens | 7, after Raj | Hose Down → Smoke Eaters → Fuel the Engines → Firebreak → Oil Fire → **Smoke and Sirens** | $7,000 · Fire Engine paint · "Smoke Eater" |
+| Captain Maria, the Military Base | 🪖 Iron Supply | 9, after Carlos | Ammo Run → Mess Hall → Boom Sticks → Wounded in Action → Eyes in the Sky → **Iron Supply** | $9,000 · Maria's Carbine · "Quartermaster" |
+| Engineer Ivan, the Power Plant | ⚡ Lights Out | 10, after Maria | Spare Parts → Battery Life → Blackout → Copper Thieves → Cooling Water → **Lights Out** | $11,000 · Volt Neon paint · "Live Wire" |
+| Walt, the rancher | 🐴 Wild West End | 11, after Ivan | Saddle Up → Feed Run → Horse Whisperer → Moonlight Rustlers → Showdown → **Wild West End** | $13,000 · Walt's Lever Rifle · "Outlaw Tamer" |
+| Doctor Hiro, the lab chief | 🧪 Patient Zero | 12, after Walt | Lab Rats → Deep Freeze → Power Hungry → Patient Zero → Midnight Formula → **The Cure** | $16,000 · Toxic Glow paint · "Cure Runner" |
+| Vinnie, the fixer | 💰 Dirty Money | 13, after Hiro | No Questions Asked → Laundry Day → Art Appreciation → Heavy Business → Fireworks → **Dirty Money** | $20,000 · Vinnie's Golden Pistol · "Made Man" |
+| Mayor Ruth, City Hall | 🚌 Last Convoy | 14, after all nine | Evacuation Plan → Fuel for the Flight → Seed Vault → The Mayor's Kids → Last Boat → **Last Convoy** | $30,000 · Sunrise Chrome paint · "Last Convoy Captain" |
 
 * **Stars** (`Missions.rate`): done = ★; the cargo still at 75 % or more = ★★; and 30 % or more of the clock left =
-  ★★★. Your best rating per mission is saved.
-* **Rewards** (server/Missions.luau): the job's own pay as always (× the twists' pay), plus the **first clear's
-  reward** ($300 – $10,000, once) with × 1.5 the job's XP (`FirstClearXp`), **$150 for every new star**
-  (`StarBonus`), and the **campaign reward** once all ten are done. A card celebrates it: the stars fly in, the
-  client's debrief, the rewards and NEXT (it waits until the delivery result is closed).
+  ★★★. Your best rating per mission is saved (a rating of 1 or more = done).
+* **Rewards** (6.8, `Missions.creditFor`, server/Missions.luau, server/Jobs.luau): the **first time** a mission is done
+  it pays the job's pay (× the twists), its **first-time reward** ($400 – $11,000) and the job's XP × 2.5
+  (`FirstClearXp`); the chapter's finale pays the **chapter's reward** once (the money, and its exclusive gun or paint
+  and title, `Config.Rewards.Campaigns`). A **replay** pays only a quarter of the job's pay and of its XP
+  (`Config.Missions.ReplayPay` / `ReplayXp`): no reward, no XP bonus, no unlock; the window and the card say
+  "REPLAY · $X". A new best rating still pays $150 a new star (`StarBonus`, once per star). A celebration card shows
+  it: the stars, the client's debrief, FIRST CLEAR! or REPLAY · $X, the rewards and NEXT (the chapter's next mission).
 * **Twists** (`Config.Missions.Twists`, each pays more):
 
   | Twist | What happens | Pay |
@@ -410,27 +423,28 @@ dark.
   | 🤝 PAIR LIFT (3.2, DUO only) | the pieces only move with two: no pick-up or take-out without another job member within 10 studs, and the piece goes down when the partner is gone for 1.5 s | × 1.3 |
   | 🎛 TWIN SWITCHES (3.2, DUO only) | two levers 22 studs apart at the stop: two different players pull them within 1.5 s of each other to open the gate | × 1.25 |
 
-* **Co-op** (56 of the missions, tagged CO-OP; outside the DUO campaign they can still be played alone): for every crew mate besides you
+* **Co-op** (CO-OP chips; outside the DUO chapter they can be played alone): for every crew mate besides you
   (members and riders, `MaxMembers` at most) the pay is × (1 + 0.25 per mate) for everybody and the enemies (waves,
   foot waves, hordes) × (1 + 0.35 per mate), recounted when the crew changes (a toast says so).
 * **The crew gets the stars too** (`Config.Missions.CrewCredit`): the members and riders with you at the finish get
-  the rating, the first clear and the campaign as if it were theirs, if the mission is open for them (its campaign,
-  its level, the mission before it); otherwise only their share of the pay.
-* During a mission a **banner** in the HUD's top stack shows "MISSION 3/10 · Name", the twists, the crew count, the
+  the rating, the first time's reward and the chapter as if it were theirs, if the mission is open for them (it is
+  their next one, or one they have done); otherwise only their share of the pay. A crew member who has done the
+  mission before gets the replay's share of their pay.
+* During a mission a **banner** in the HUD's top stack shows "MISSION 3/6 · Name", the twists, the crew count, the
   HOLD OUT countdown and (3.2) the TWIN SWITCHES lever count; the crew members' strip and banner show it too.
 * The leaderboard (L) has a **STARS** column (ties on the level go to the stars).
 
-### The DUO campaign
+### The DUO chapter
 
-**Partners in Crime** (3.2, 🤝, Rosa & Rico, the twins; level 4, after First Shift's finale) is ten missions **only
-for a crew** (`duo = true`, all co-op), told for two: Double Act, Flood Gate, Shotgun Wedding, Two Keys, Heavy
-Current, Lock Step, Cold Hands, Crossed Wires, Mirror Run and the finale Partners in Crime (levels 4 → 8). They use
-the two new twists often and mix in HOLD OUT, SHOTGUN SEAT, TWO-MAN LIFT, HOT ZONE and HUNTED.
+**Partners in Crime** (3.2, 🤝, Rosa & Rico, the twins; level 6, after First Shift's finale) is six missions **only
+for a crew** (`duo = true`, all co-op), told for two: Double Act, Flood Gate, Two Keys, Cold Hands, Mirror Run and the
+finale Partners in Crime (levels 6 → 10). The window marks it **NEEDS A PARTNER** and it is a side story: no story
+chapter, no property and none of the "every …" challenges need it (6.8).
 
 * **Start rule** (server/Missions.luau): START needs at least `Config.Missions.Duo.MinCrew` = 1 crew member online
-  and within `StartRange` = 120 studs; otherwise "DUO mission: invite a friend first (K) and bring them here." (the
-  card shows FIND CREW). If the crew drops below that during the mission (a partner leaves the crew or the game),
-  the mission fails: "Your partner left."
+  and within `StartRange` = 120 studs; otherwise `Config.Missions.Duo.NeedsPartner` ("NEEDS A PARTNER: invite a friend
+  to your crew (K) and bring them here …"; the card shows FIND CREW). If the crew drops below that during the mission
+  (a partner leaves the crew or the game), the mission fails: "Your partner left."
 * **Pair lift** (`pair`): Jobs passes `Info.pair` to Cargo; a piece is picked up, carried or taken out only while
   another job member is within `PairRange` = 10 studs ("Pair lift: you need your partner on the other side.");
   alone for more than 1.5 s, the piece goes down.
@@ -439,8 +453,7 @@ the two new twists often and mix in HOLD OUT, SHOTGUN SEAT, TWO-MAN LIFT, HOT ZO
   (`Cargo.setBlocked`, the hint "Pull both levers together!"). A pull holds its lever down for `LeverWindow` = 1.5 s;
   both down at once, pulled by **two different players**, and the boom swings up and the stop opens. The gate goes
   when the stop is done or the job ends.
-* **Reward**: $7,500, the **Tandem Twin** paint (metal) and the title **Partners in Crime**. The DUO campaign is a
-  side story: Last Convoy does not need it. The MISSIONS window tags its row and cards 🤝 DUO.
+* **Reward**: $7,500, the **Tandem Twin** paint (metal) and the title **Partners in Crime**.
 
 ## Loading through the back
 
@@ -755,7 +768,7 @@ plates and grilles; the Ram Plow's bull bar; the folded Hand Trolley in the back
 Version 3.1 (`shared/Challenges.luau`, `server/Challenges.luau`, `Config.Rewards`). Everything is saved, and every
 reward is given **once** (the save marks it given).
 
-**Campaign rewards.** Finishing all ten missions of a campaign still pays its money (see **Missions**), and now also
+**Campaign rewards.** Finishing a chapter (6.8: its six missions, the finale last) still pays its money (see **Missions**), and now also
 gives a **title** and an **exclusive gun or paint** (`Config.Rewards.Campaigns`). Campaigns finished before 3.1 give
 theirs on the next join.
 
@@ -790,7 +803,7 @@ give a title, and 4 are **hidden** (??? until done):
 |---|---|
 | ⚔️ Combat | First Blood (10 kills · $200), Sharpshooter (25 headshots · $500), The Bigger They Are (10 brutes · $800), Bandit Bounty (25 bandits on foot · $1,500), Demolition Crew (50 explosion kills · $1,500), Horde Breaker (500 kills · $2,000), Headhunter (250 headshots · $4,000 · Headhunter), Giant Slayer (100 brutes · $6,000 · Giant Slayer), The Undertaker (5,000 kills · $15,000 · The Undertaker) |
 | 🚗 Driving | Sunday Driver (25,000 studs · $300), Speed Bump (run over 50 · $600), Highway Patrol (10 bandit cars · $2,000), Mounted Mayhem (100 car gun kills · $2,500), Long Haul (250,000 studs · $3,000), Road Warrior (1,000,000 studs · $12,000 · Road Warrior) |
-| 🎯 Missions | On the Clock (5 missions · $500), Story Time (1 campaign · $1,000), Night Shift (15 at night · $2,000), Hold the Line (10 HOLD OUT won · $2,000), Wave Rider (100 waves · $2,000), Trusted Courier (25 missions · $2,500), Flawless (25 at 3 stars · $2,500), Star Collector (100 stars · $3,000), Top of the Ladder (level 15 · $10,000), Legendary Courier (all 110 missions · $15,000 · Legendary Courier), Saviour of the City (all 11 campaigns · $20,000), Three-Star General (all 330 stars · $20,000 · Three-Star General); hidden: Ghost Courier (a NO SHOOTING mission without a shot · $2,000 · The Ghost), Horse Whisperer (25 horses · $2,500 · Horse Whisperer), Against the Clock (10 timed missions · $3,000) |
+| 🎯 Missions | On the Clock (5 missions · $500), Story Time (1 campaign · $1,000), Night Shift (15 at night · $2,000), Hold the Line (10 HOLD OUT won · $2,000), Wave Rider (100 waves · $2,000), Trusted Courier (25 missions · $2,500), Flawless (25 at 3 stars · $2,500), Star Collector (100 stars · $3,000), Top of the Ladder (level 15 · $10,000), Legendary Courier (all 60 story missions · $15,000 · Legendary Courier), Saviour of the City (all 10 story chapters · $20,000), Three-Star General (all 180 story stars · $20,000 · Three-Star General; 6.8: the "all" ones count the story, not the DUO chapter); hidden: Ghost Courier (a NO SHOOTING mission without a shot · $2,000 · The Ghost), Horse Whisperer (25 horses · $2,500 · Horse Whisperer), Against the Clock (10 timed missions · $3,000) |
 | 🧭 Explorer | Sightseer (5 places · $300), Lost and Found (1 package · $300), Package Sniffer (10 packages · $2,500), Cartographer (all 29 places · $5,000 · Cartographer), Every Last Box (all 30 packages · $10,000) |
 | 🤝 Co-op | Better Together (1 mission with a crew mate · $300), Riding Shotgun (50 kills from a passenger seat · $1,500), Crew Chief (25 missions with a crew mate · $4,000 · Crew Chief) |
 | 💰 Wealth | First Paycheck (earn $10,000 · $300), Home Sweet Home (1 property · $1,000), Car Collector (5 cars · $2,000); hidden: Millionaire (earn $1,000,000 · $10,000 · Millionaire) |
@@ -1091,8 +1104,8 @@ point), with a red marker over the stop and a light beam. Big icons over the bui
 * **Real estate** (`Config.Estate`): 3 mansions, 2 villas, 4 houses, 5 garages (3.4: + the Rented Lockup and the
   Southside Garage), 3 offices. **Your company**
   (`Config.Business`): couriers, 3 upgrades, the safe.
-* **Missions** (`shared/Missions.luau`, 3.0; 3.2: + the DUO campaign): 11 campaigns × 10 missions, 10 twists, 56
-  co-op missions, 15 new places;
+* **Missions** (`shared/Missions.luau`, 3.0; 3.2: + the DUO campaign; 6.8: story chapters): 11 clients × 6 missions,
+  10 twists, 32 co-op missions, 15 new places, the story's people in `shared/Cast.luau`;
   new cargo (water, generators, batteries, TNT, documents, electronics, weapons, paintings, mail, tyres, plants) and
   survivors who walk aboard by themselves.
 * **Challenges, secrets, rewards** (3.1): 42 challenges (`shared/Challenges.luau`), 30 lost packages (`Map.Secrets`),
@@ -1119,6 +1132,137 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## 6.7 + 6.8 in short
+
+The owner's wishes after 6.6: "the bags and the character aren't realistic, no animations… the shop has useless
+things… the tutorial annoys… the missions menu is a mess, I want a picture of who gives them and a story". Released
+together as 6.8: real-size bags with their pieces inside and items in the hand (6.7 A), a more realistic courier and
+NPC body with idle life, pick-up, carry grip, landing and flinch (6.7 B), the shops cleaned up with the vest's tips,
+car-only items, the bat and the energy drink (6.7 C), Marge's arrow tour and no automatic job (6.7 D), the missions as
+story chapters with portraits, first-time and replay rewards (6.8). Review fixes: the bags 15% wider and deeper for the
+new body (KitArt `Geometry.BagScale`), the replay cut per person, the missions screen keeping the gamepad's selection and
+START in a fixed bar, the tour's NEXT on Y, the body's root at the hips (G 3.8, HipHeight 2.8: seats, the zip line's
+handle, the stride scaled to the leg), the throw leaving the raised hand (`Config.Throw.Release` up 2.6).
+
+## Who you work for: the missions as story chapters (6.8)
+
+The owner: "Look at the missions and check the logic. The menu is weird, I can't find my way in it. I want to see it
+big, with a picture of who I go to for a set of missions. And the sets should be right: they tell a story, one mission
+after another. A mission you complete once gives its rewards; after that only something small."
+
+**Chapters** (`shared/Missions.luau`): every client has one chapter of **six** missions (was ten), each briefing
+continuing from the last debrief, ending in a finale with the chapter's big reward (the table in **Missions**). The
+stories were rewritten to hold together: First Shift is your first week (parcels, the post office's lost mail, a
+birthday, files on who sold the army's food, the bandits' answer: every van's tires slashed, the dispatch moving into
+the Stadium Shelter); Code Red follows a fever to a new strain and Doctor Hiro's booster; Raj fights Tusk's price war;
+Carlos's fires lead to Ivan's plant; Maria readies the base for the big horde; Ivan's blackout turns out to be copper
+thieves; Walt's feud with the Rust Riders ends at the ranch; Hiro's cure is enough for one camp only, so it has to
+leave the city; Vinnie leaves on his yacht and gives his pier to the mayor; Mayor Ruth's Last Convoy carries the cure
+out. Each briefing names the client who sent you on ("Marge says you're her best driver…").
+
+**The people** (`shared/Cast.luau`, `shared/NpcLooks.luau`): one entry per story character (the name, the "Name, the
+title" line, the role line, the place, the NPC look), so a name always comes with the same words and the same face
+(Npcs.look hashes the name and the role). The looks moved from `server/Npcs.luau` to `shared/NpcLooks.luau` (Npcs.look
+calls it) so the client draws the same people; a new **firefighter** look (a red helmet, a dark turnout coat with
+hi-vis stripes) dresses Chief Carlos at Fire Station 9 and Firefighter Duke. Fixed on the way: Mayor Ruth was still
+"he"; two bank managers (Gordon stays; the bank's Simon is its teller); Rocco was "the warehouse boss" and "the dock
+foreman" (now the harbor boss of both, in Config.Jobs too); the bandit boss "Big Earl" clashed with Earl who sells you
+the van (now **Tusk**); a second Kenji, Lucy and "Mama Rosa" renamed (Yuki, Tess, Mama Lu) and the Gas Station's
+owner is Dolly (Rosa is a twin); Doctor Hiro / Ellie and Nurse Kim wear the doctor's / nurse's look in Config.Jobs,
+Vinnie the banker's, Molly the ice cream look, Emma the rider's, Tony the attendant's, Engineer Ivan the foreman's; the
+Rust Riders were finished at the ranch and back later (Vinnie's rival is the Crimson Syndicate); three "bitten but
+never turned" subjects became one (Patient Zero); the Stadium was "sealed for good" and used after; Maria praised
+herself in the third person; firehouse's first briefing called a veteran "Rookie". A test keeps the 6.3 surnames out.
+
+**The logic** (bugs fixed):
+* **Rewards paid on every replay**: a mission's full job pay (and XP) was paid again every time (≈ $5,000 for a
+  replay of Last Convoy). Now a replay pays `Config.Missions.ReplayPay` (25 %) of its pay and `ReplayXp` (25 %) of
+  its XP (`Jobs.startMission(…, replay)`, `Missions.replayPay` / `replayXp`); a crew member who has done it gets the
+  replay's share too. What a finish gives is one pure function, `Missions.creditFor` (the first time: the reward and
+  the XP bonus; the finale: the chapter's reward once; a replay: nothing but a new star's StarBonus).
+* **Only the next mission**: before, any mission whose predecessor was done could start; now only a chapter's next
+  (`Missions.nextUp`), the later ones say "Finish 'X' first".
+* **Hard-coded tens**: the finale was `<campaign>_10` and the previous mission `<campaign>_<n-1>` (string-built
+  ids), the banner "3/10", the cards "finish all ten" — all from the chapter's list now.
+* **A chapter that can't be finished on the way**: the levels inside a chapter rose too fast (the story waited for
+  board jobs, First Shift's fourth mission already needed level 5); a chapter's missions now sit at its level, its
+  finale at the next chapter's, and the story played in order reaches level 15 (`FirstClearXp` 2.5).
+  First Shift fits the Rusty Van (2 slots); a NIGHT ONLY mission never opens a chapter (three in all, the window says
+  "starts after dark").
+* **DUO blocking**: the "every mission / campaign / star" challenges counted the DUO chapter (a solo player could
+  never finish them, nor Dead End); they count the story now (60 missions, 10 chapters, 180 stars).
+
+**The saves** (`server/PlayerData.luau`): the mission ids did not change: every chapter kept six of its ten old
+missions in their old order, with the old first and the old finale, so a save's ratings mean the same missions
+(rating ≥ 1 = done: no second first-time reward), an old save's progress stays a run from the chapter's start, and a
+finished campaign stays finished (`profile.campaigns`). The 44 retired ids (`Missions.isRetired`: dispatch 4–7,
+clinic 3 6 8 9, market 4 5 6 8, duo 3 5 6 8, firehouse 4 6 7 8, army 5–8, power 3 4 5 9, ranch 4 6 7 9, lab 1 3 4 6,
+underworld 3 6 7 9, exodus 2 4 5 6) stay in the save untouched and count nowhere.
+
+**The screen** (`client/MissionsUi.luau`, `client/MissionsLayout.luau`, `client/Portrait.luau`): see **Missions**. The
+portraits need no uploaded image and no server template: the client builds the bust from the NPC look (a flat
+silhouette with the role's emoji if that ever fails). The phone's MORE → MISSIONS opens it.
+
+**Tests**: `tests/missions_test.luau` (the data and the design rules), `tests/missions_story_test.luau` (the order and
+the locks, every `requires` valid, every chapter finishable in story order, first time against replay, the old saves,
+the cast), `tests/missions_layout_test.luau` (1280 × 720 and an iPhone SE sideways), and `tools/phone-ui/check.py` runs
+the real window against recorded instances (`tools/phone-ui/missions.luau`).
+
+Test in Studio: open U at level 4 with the van: Marge's chapter chosen, START on Paper Trail; finish it (the cleared
+card: FIRST CLEAR!, the reward, NEXT); replay it (REPLAY · $X on the card and in the DELIVERY result: a quarter); a
+locked step's "Finish 'X' first"; Ellie's card "🔒 Finish Marge's chapter first"; the portraits (Marge, Chief Carlos's
+helmet, the twins side by side) in the list and big; a phone sideways (the clients on top, START in view); a gamepad
+(START selected and still selected a second later, the cards and the steps reachable and kept selected when chosen);
+MORE → MISSIONS on the phone; the admin's missionsAll / missionsReset.
+## The shops cleaned up: the vest's tips, car-only items, the bat and the energy drink (6.7)
+
+The owner: "In the shop there are useless things. Go through it, delete them, make it better, add or remove."
+
+- **Not for sale any more.** The **Pistol** and the **Plastic Bag** are every courier's from the start (`starter`:
+  "STARTER · yours", $0; the server gives a missing one back for free). Marge's old "buy a pistol" text, the shooting
+  "no gun yet" note and the weapon wheel's pistol price are gone (they could never show: every profile has the pistol
+  since 6.0.2). The **Thermal Jacket** (food ×0.8) is retired: the Thermal Delivery Bag does that job (×0.35). A real
+  save that owned it gets **$300 back once** (`Config.RetiredKit` with its own save flag `noJacket`,
+  `Transport.retiredRefunds`, `server/PlayerData.luau`; Marge says so after PLAY: `Config.Courier.JacketRefund`); its
+  food drain (`server/Jobs.luau`), KitWear's jacket slot and KitFit's are gone.
+- **Rewards apart.** The reward-only guns (revolver, carbine, Maria's Carbine, the Lever Rifle, the Golden Pistol, Dead
+  End) and the 11 never-sold paints sit in a folded **🏆 REWARDS** section at the bottom of their tab (SHOW / HIDE).
+- **The Courier Vest** has a real effect: **+5% tips on every delivery** (`Config.Kit` hivis `tips = 0.05`,
+  `Transport.tipShare`, `JobRules.kitTip`, added in `server/Jobs.luau` payOrder with a line on the result card; not on
+  missions; it counts under a Kevlar or heavy vest too).
+- **Car-only items** (`Config.Items` `car`: the repair kit, nitro, the landmine, the jerry can; their words start with
+  "Car only"): in Last Stop Supplies' ITEMS, the bottom bar, the phone's and the I window's lists and the supply crates
+  only once you own a car (`Economy.ownsCar`: any vehicle that is not a bike; `itemShown` / `itemsFor`); the server
+  (and a gas kiosk) sells them only then. The on-foot items come first in the bar. **The bar's overflow:** more kinds
+  than slots (5, a touch screen 2): the last slot is **MORE** ("+N", its key and key 9): the I window's ITEMS.
+- **Lead & Co.** sells the gun upgrades now (**Gun Damage**, **Fire Rate**: moved from Wrench Garage, the same save
+  keys) and the **Baseball Bat** ($150, level 1, `Config.Kit` bat with `shop = "guns"`): owned, **V with the gun away
+  swings the bat** (`Config.Melee.Kinds` bat: 30 damage, 0.7 s, push 44, 7 studs of reach; a punch is 12) with the
+  gun's overhead strike (`Melee.pose`) and a bat welded into the right hand for the swing (`server/CloseCombat.luau`).
+- **The Energy Drink** ($40, at most 5, Last Stop Supplies): the breath full at once and **×1.3 breath for 30 s**
+  (the character's `EnergyUntil`, `client/Stamina.luau` energized / refill; `Config.ItemTuning` EnergyTime /
+  EnergyBreath), on foot.
+- **Reworked:** the **E-Scooter** holds 3 (two on the rack, one on the deck) for $1,900 at level 3, below the Cargo
+  Bike (the owner's speed 32 stays); the **Hunting Rifle** hits 60 (132 a second: more than the SMG's 117, even
+  before its spread misses far out; one shot drops a walker or a runner); the **Works Rally** stage adds +100 health;
+  bike runs take **up to 8 pieces** (6 before), so the **Bike Trailer**'s +4 counts on one run (fitting it on the
+  Cargo Bike would not have helped: its box + panniers already passed the old cap of 6); the **Ram Plow** also takes
+  12% a level off the dent a zombie you don't kill leaves (`Economy.ramGuard`, at most down to 25%); the **Roof
+  Rack** takes 2 light pieces side by side; the **Muscle Car** holds 2 (the Street Machine 3).
+- **Words that are true:** every item, kit piece and gear says what it does and its limits ("Car only", "5 at most
+  down", "heavy cargo by hand", "not on the E-Scooter"); the map's shop lines and the phone's SHOP list say what each
+  shop really sells; the depot is listed on its own on the map (the Depot Garage is the garage terminal, no shop
+  window).
+
+Tests: `tests/shop67_test.luau` (the energy drink, the bat's numbers, the jacket refund, the car-only filter, the vest's
+tips, where each piece is sold, the reworked numbers), `bags_test`, `transport_test`, `kitfit_test`, `armour_test`,
+`cargun_test`, `capacity_test`, `career_test`, `bikes_test`, `logic_test`, `melee_test`, `icons_test`, the phone's check.
+**Test in Studio:** Lead & Co. (STARTER pistol, the gun upgrades, buy the bat, V with fists and with the bag: the bat in
+the hand, a walker in two swings; REWARDS folded and opened), Last Stop Supplies with no car (no car items, the energy
+drink: sprint ~8 s) and with a car (all seven, the bar's MORE slot and key 9), a delivery with the Courier Vest (the
+tip line), an old save with a jacket ($300 and Marge's text once), the E-Scooter's third piece on its deck, the Roof
+Rack's two pieces, ramming with the plow.
 
 ## One bag, the bike's own bag, the ZDC Bags kiosk (6.6)
 
@@ -1160,6 +1304,126 @@ Tests: `tests/bag_test.luau`, `holding_test.luau` (the bike's reach, where a pic
 `icons_test`, `locationtag_test`, the phone's check. **Test in Studio:** an old save with a backpack (the money and
 Marge's text once), a bike run (pickups onto the bike next to you, into the bag away from it; get on with a piece in
 your hands; E at a door with the bike far, then near), the kiosk (E at its counter, BUY a bag, USE).
+
+## Marge shows you the screen, you pick your first job (6.7)
+
+The owner: "Make the tutorial not annoy you. It should simply show with an arrow where things are in the menu, then
+that you take one job, and you either say yes or skip tutorial. But don't automatically give a job."
+
+- **Her welcome comes on its own**, 2 s after PLAY on a new save (`Config.Tutorial.StartDelay`): one page, "Hi, I'm
+  Marge, dispatch. You're a courier now: take jobs, deliver, get paid. Let me show you around in 20 seconds." **SHOW
+  ME** gives you her phone and starts the tour; **SKIP TUTORIAL** ends it. TALK TO MARGE over her head only shows while
+  that welcome waits unseen; E at her shows it again.
+- **The arrow tour** (`client/TutorialArrow.luau`, driven by `client/TutorialUi.luau`, the stops in
+  `TutorialSteps.ScreenTour`): a big bouncing red arrow, a pulsing frame round the thing and a one-sentence caption with
+  NEXT › and SKIP TUTORIAL. The NEXT card, PHONE [Q], then the phone opens by itself for JOBS, MAP, SHOP and BAG & ITEMS,
+  it goes away for the bottom bar (1 fists, 2 bag, 3 gun, 4–8 items), then the minimap (M). Nothing stops: you can
+  walk meanwhile. It follows its target every frame (a phone sliding in, a HUD laid out again); `TutorialSteps.placeArrow`
+  (tested) picks the side with room. Enter is NEXT (Space still jumps), touch taps; a gamepad's Y is NEXT (the caption
+  says "Y"; 6.8 review: A jumps, and NEXT is selected only at the phone's stops, so the stick walks the rest of the
+  tour). Close the phone during its stops and the tour moves on past them; take a job meanwhile and it ends quietly (and
+  if the arrow ever fails, the tour ends instead of half-running).
+- **No automatic job:** the last page asks "Ready? Take your first job" with **TAKE A JOB** (the phone opens on JOBS,
+  you pick any job) or SKIP TUTORIAL. Then nothing of hers during play: the **first delivery of any job** pays the $50
+  (`Config.Tutorial.Reward`) with a "First delivery! +$50 from Marge." toast; a failed one just goes back to "Take your
+  first job (J)" on the NEXT card. The strip under the card says FIRST DAY · +$50 ON YOUR FIRST DELIVERY with SKIP (it
+  asks first; a skip pays nothing). Her special two-letter job (`Jobs.startTutorialJob`) is no longer used; her done,
+  board and retry pages are gone. A save that finished or skipped it never sees it again.
+- **Again, any time:** the phone's MORE → SETTINGS has SHOW ME THE SCREEN (this tour) and SHOW ME AROUND (the 5.7
+  world tour: the ZDC RIDE dock, the nearest bus stop, then JOBS).
+## A more realistic courier, idle life, the pick-up, the carry's grip, landing, flinching (6.7, part B)
+
+The owner: "The character isn't realistic at all, there are no animations … I want better graphics and better
+animations." He chose a more realistic body.
+
+**The body** (`server/CharacterArt/Geometry.luau`, native parts only): 5.9 studs from the sole to the crown, the head
+0.92 (about 1/6.4 of it, an egg-shaped Roblox sphere mesh with a jaw, eye whites and irises, brows, a nose, a mouth,
+ears, short hair under the backwards black cap); slim upper arms (0.6) and forearms (0.52, nearly as long as the upper
+arms), legs 0.64 × 0.8 and 0.56 × 0.68, the fingertips at mid-thigh; balls round the shoulders, the elbows and the
+knees on the joints, so a bent arm or knee has no gap; a neck; hands of a palm (0.22 × 0.36 × 0.4), a thumb and curled
+fingers, the palms facing the body, with a `LeftGripAttachment` / `RightGripAttachment` inside each fist (0.28 under
+the palm's middle: guns, `server/HandItem.luau`'s one-handed grips and the bag's handles sit there); an open charcoal
+jacket over a grey shirt, a collar, pocket flaps, black cuffs, trousers with a belt, boots with round toes. 52 parts
+(63 with the red Courier Vest, within the 64). The R15 part, joint and attachment names are unchanged. The people of
+the world (`server/Npcs.luau`) wear the same body (`Geometry.spec("person")`, a kid at 0.75), dressed in their looks;
+the infected keep the 6.0 block body. The kit stays authored on the block body: `shared/KitFit.luau` scales it onto the
+slimmer one, and a small hand holds the art in its palm (the phone: `KitFit.Palm`, the wrist rolled screen up).
+
+**The animations** (procedural, the joints' Transform in PreSimulation, through one book of the poses,
+`client/PoseLedger.luau`, so the layers add up instead of piling up; numbers in `Config.Body`, the maths in
+`shared/BodyMotion.luau`, tested): `client/BodyLife.luau` breathes (quicker after a sprint), shifts the weight from foot
+to foot standing still, turns the head to a person near and in front (your courier also to the job's ring), blinks,
+dips the knees landing by the fall's speed, flinches when hit and adds the walk's weight (a bob from the stock walk's
+own thighs, a little more arm swing, the chest turning) under the sprint's run; on every player and person within 120
+studs, at most 40, the small motions within 50. The stock walk and run play slower for the longer legs
+(`CourierMotion.stride`, the leg measured on the rig). `client/ArmPose.luau`: carrying, both hands reach the box's sides (a two-bone reach from
+`CarryAt` / `CarrySize`, which `server/Cargo.luau` sets from the held piece) and the body leans back with a heavy load;
+a piece picked up off the ground plays "pickup": down on the knees, the back bent, the hands on the piece, which comes
+up into them after `Config.Body.PickupLift` (also picking up a set-down bag); gestures with the legs keep the feet where
+they stood.
+
+**Test in Studio:** the courier from all sides and in the dark (the face, the cap, the hands), with the Courier Vest,
+the shoes, each bag and the phone (in the palm, screen up); the people (hats, hair, coats, kids); idle 20 s (breath,
+weight shift, blinks, the head to Marge and to the ring), walk / sprint / stop, jump and fall from a roof (the dip),
+a zombie hit (the flinch); pick up a piece you put down (G, then E) and a set-down bag; carry one and two pieces and a
+heavy one (the hands on the box, walking); seats, bikes, the scooter, zip lines and ladders (nothing posed there); the
+feet on the ground everywhere (Output: no Unstuck lifts).
+
+**6.8 review, the body fixed:** the root's bottom is at the hips as on every R15 body (`Geometry` G 3.8, HipHeight 2.8
+= the leg; 6.7 had the root 0.6 lower in the body), so the seat weld (the root 1.5 over a seat) puts the thighs on car,
+bus and bike seats instead of 0.8 over them, and the numbers tuned on the 6.0 block body fit again. The walk, the run
+and the sprint's stride are paced by the leg measured on the rig (`CourierMotion.leg` / `stride`: 2.8 / 2), so the
+feet stop sliding. On a zip line the hands hold the trolley's handle (a two-bone reach of each arm,
+`Config.ZipLines.HandleDrop` / `HandSpread`; `Hang` 3.1, `ZipLines.Feet` 3.8). A thrown piece leaves the hand where
+the hand is at the whip (`Config.Throw.Release`, worked out from the rig in `tests/throws_test.luau`). Putting a box
+down, the arms blend out of their last reach to it; the carry lean lets go of the waist off one's feet; the carry sits
+`Config.Cargo.CarryLow` / `CarryMiddle` lower on the root (where the forearms are). **Test in Studio:** sit in a car,
+a bus, a bike and stand on a scooter (the thighs on the seat, the head under the roof); walk and run on a flat road
+(the feet planted); a zip line (the hands on the handle, the feet clear of both platforms); a throw (the piece leaves
+the raised hand); put a box down (no snap); a bus walk-in and a ladder climb (no lean on the waist).
+
+## Real-size bags, items in the hand, the throw's wind-up (6.7, part A)
+
+The owner: "The bags and the character aren't realistic at all, there are no animations, the bag is small, the things
+would never really fit in it."
+
+**Real-size bags** (`server/KitArt/Geometry.luau`, 1 stud ≈ 35 cm): the plastic bag is 40 × 45 × 20 cm (gussets, a
+hem, two handles into the fist), the canvas tote 40 × 40 × 13 on long handles under the arm, the thermal food bag
+45 × 37 × 38 (zip-round lid, mesh pocket, ZDC patches, two straps to a padded grip), the messenger 40 × 30 × 15 (a
+flap, a zip, buckles; now at the back of the hip, clear of the arm), the duffel 70 cm long and 35 across. Each shows a
+dark open mouth; loaded, the thermal bag's lid stands open behind its straps (`Geometry.open`). A bag in the hand stays
+at least `Config.Courier.Bag.Clear` (0.25) over the ground: `tools/character-art/bag-check.luau` measures it on the
+real body (today 0.33 at the lowest), `tools/model-art/export.py` checks each bag's reach (≤ 20 parts a bag).
+
+**Real-size pieces in them** (`shared/BagFill.luau`, `Config.Courier.BagFill.Packed`, tested): a pizza box is 33 × 4 ×
+33 cm, a parcel, a bouquet a stud tall, a cake box 23 cm … They are packed like a courier packs: lanes along the bag,
+side by side across it, then a layer below; the last one in lies on top. Pizza boxes lie flat and stacked in the
+thermal bag (the top one at the rim, seen through the open lid) and stand on their edge in a plastic bag; a bouquet,
+a cake, a take-out bag stay upright. The top layer sticks out of the opening by 20–40 %, nothing goes under the bottom,
+a piece that fits no way is shrunk to 70 % at the least, and the body swells up to its own amount (the plastic bag
+25 %, the rigid thermal bag 4 %).
+
+**Pieces in the hands at their real size** (`Config.Cargo.LightScale` / `LookScale`): a light piece is built at half
+its old size (a box carried in both hands is about a stud wide, a cake box 0.65), heavy cargo as before; carried, it
+rests on the forearms in front of the chest (`CarryLow`, `CarryFront`).
+
+**Items in the hand** (`server/HandItem.luau`, `shared/Gestures.luau`): handing over at a door, the piece is in your
+hands held out ("give", 0.4 s), then in the receiver's ("receive", 0.85 s), then on the door's stack. A pickup into
+the bag: you bring the bag up with the left hand, look down, put the piece in with the right ("bag", 0.5 s); the bag
+shows it from that moment. A throw: the piece is in your hand through a 0.18 s wind-up (`Config.Throw.WindUp`: the arm
+back, the torso turned) and leaves it at the whip; the server decides everything at the throw and only starts the
+flight then. The two-handed grips are worked out from each body's own rig attachments and the gesture's angles.
+
+**The bag arm** (`client/BagSway.luau`, `Config.Courier.BagArm`): with a bag in the left hand the arm is a little
+straighter, out from the body and swings less; a loaded bag leans the torso slightly the other way (standing or slow);
+the throw turns the torso and the bag gesture tips the head down. Only while nothing else (aiming, carrying, the
+phone, a gesture, the sprint) has those joints; let go to the identity otherwise.
+
+**Test in Studio:** each bag in the hand and worn (2, then 1 / 3), empty and full: the size against the courier, the
+contents in the mouth, the thermal lid opening, nothing in the ground or the leg; a pickup into the bag (the piece in
+the right hand, then in the bag); a hand-over at a door (the piece from your hands into the receiver's, then the
+stack; nobody home: onto the stack); a throw (the arm winds back, the piece leaves at the whip, the arc and the tips as
+before); carrying two light pieces (smaller, on the forearms).
 
 ## The bag shows, and what is in it (6.4.1)
 
@@ -1657,8 +1921,11 @@ src/shared/   Config (all numbers), Map (world layout, roads, addresses, cargo s
               AnimationConstraint), GunModels (the guns in the hands), Icons (the asset ids of the icon set and the logo),
               Levels (XP, levels, rank names; 3.2: fromLegacy, the old saves' XP), TrafficLanes (the traffic's lanes, turns and sidewalks), Crossings (3.9: the crosswalks, the traffic-light junctions and the light cycle), SoundSheet
               (where each sound and music loop sits in the two audio assets), Missions (3.0: the campaigns and missions,
-              unlocking, the rating, the stars, the twists' pay; 3.2: 11 campaigns and 110 missions, the campaign
-              chain `requires`, the computed mission levels levelOf, the DUO campaign), Challenges (3.1: the 42 challenges, the
+              unlocking, the rating, the stars, the twists' pay; 3.2: the campaign chain `requires`, the computed
+              mission levels levelOf, the DUO campaign; 6.8: 11 chapters of 6, only the next one starts, nextUp /
+              statusOf / chapterState, creditFor (first time / replay), replayPay / replayXp, the retired ids), Cast
+              (6.8: the story's people: name, title line, role line, place, NPC look), NpcLooks (6.8: the NPCs'
+              clothes per role, moved from server/Npcs; the portraits use it too), Challenges (3.1: the 42 challenges, the
               counters, value / progress / doneCount / allTitles), Melee (3.9: punch or strike, the cone in front of
               you, the arm's swing curve), Boarding (3.10: getting in and out: the timing, the curve, the hand's
               reach, the doors' swing, the Boarding attribute), Freight (4.0: who takes what on a trolley or a jack, the
@@ -1678,7 +1945,7 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               the window; 3.1: piercing rounds), Jobs (job board, stops, special jobs, crews, the zombie waves; 3.2: the DUO
               rules, drives DuoGates; 3.4: the cargo slots on the board, the bulk orders), Cargo (the cargo you carry, lead or board at a stop, the pieces in the vehicle;
               3.2: loading through the back, the pair lift; 4.0: pieces on a trolley, pallets on a jack, the tools' hints), Equipment (4.0: the
-              hand trolley and the pallet jacks: take, push, stow, set down, go home), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers), Animals (the
+              hand trolley and the pallet jacks: take, push, stow, set down, go home), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers; 6.8: their looks from shared/NpcLooks), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
               purchases; 3.5: the three display cars, the stages; 6.6: ZDC Bags' bags), BagKiosk (6.6: the depot's bag
               kiosk, built from World's buildDepot), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
@@ -1687,7 +1954,7 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your
               company: couriers, upgrades, the safe, online and offline earnings, the office computer), Missions (3.0: the
               MISSIONS window's state, START checked, the rewards, stars and crew credit when one is done; 3.4: the
-              cargo slots at START), Garages (3.4: your cars at your garages, the garage window's TAKE OUT, the depot
+              cargo slots at START; 6.8: a replay starts as one, Missions.creditFor pays), Garages (3.4: your cars at your garages, the garage window's TAKE OUT, the depot
               lot), Repair (3.4: the repair bays, the timer, the fee), Challenges
               (3.1: counts the stats from the other modules' hooks, the distance and the places visited, checks and
               pays the challenges, the lost packages' prompts, the campaign / secrets / Dead End rewards, the title over
@@ -1697,7 +1964,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
 src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hotbar (6.0.1: the bottom bar, 6.1: the
               hand slots 1-3, the item slots 4-8 and what you carry), BagSway (6.1: the bag's pendulum, the BagSwing
               joint's only writer), KeyHints (6.1: the key hints under the top buttons, F1), Objective (6.5: the NEXT
-              card, its words from shared/Goal.luau), MapView (minimap, big map, GPS routes),
+              card, its words from shared/Goal.luau), TutorialUi (Marge's pages; 6.7: drives the arrow tour) and
+              TutorialArrow (6.7: the tour's arrow, frame and caption), MapView (minimap, big map, GPS routes),
               Theme (3.6: the Postage & Trouble tokens), Ui (the shared pieces; 3.6: window, ticket, tag, dial, tactile),
               DispatchUi (3.6: the Dispatch board),
               CameraRig (GTA-style aim camera), ArmPose (the arms come up to aim or carry, seen by everybody),
@@ -1706,10 +1974,12 @@ src/client/   Main, Menu (start screen), Hud (interface, the on-foot guide), Hot
               Weather (the day and night look; 3.0.1: the readable night, the town glow, your own light), Ui, Leaderboard (L), CrewPanel (K, the invitation card, the member's
               job strip and GPS), TrafficAnimator (smooths the traffic cars and spins their wheels; 3.9: colours the traffic lights), EstateUi (H, the
               real estate list and listings), BusinessUi (the company window at the office computer, the welcome-back
-              card), Sounds (the music and every sound effect, N / SOUND), WeaponWheel (hold T), MissionsUi (3.0: the MISSIONS window (U),
+              card), Sounds (the music and every sound effect, N / SOUND), WeaponWheel (hold T), MissionsUi (6.8: who you work for: the
+              clients' cards, the chosen chapter, the story path, START; 3.0: the MISSIONS window (U),
               the mission banner in the top stack, the celebration card; 3.1: the CHALLENGES, SECRETS and REWARDS
               tabs and the unlock popups; 3.2: the lock texts, the DUO badge, FIND CREW; 3.4: the 📦 needs N slots
-              chip), Secrets (3.1: hides the lost packages you found, animates the others nearby), GarageUi (3.4: the
+              chip), MissionsLayout (6.8: the window's measures: wide or a strip on top), Portrait (6.8: the clients' busts in a
+              ViewportFrame, from shared/NpcLooks), Secrets (3.1: hides the lost packages you found, animates the others nearby), GarageUi (3.4: the
               garage window, only your own GARAGE prompts, the repair timer card), Holster (3.9: B holsters / draws,
               V punches or strikes, the first aim or shot draws a holstered gun; ArmPose hides a holstered gun and
               swings the arm), CarBoarding (3.10: plays your move into and out of a seat, E in a seat gets you out;
@@ -1767,7 +2037,8 @@ python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
 
 Runs every `tests/*_test.luau` (logic with the 2.6 real estate, the 3.0 places and the 3.1 lost packages, cargo,
 roads, cargun, icons, levels with the 3.2 progression, jobs25, traffic, audio, missions with the 3.2 campaign chain
-and DUO campaign, challenges, gear, the 3.4 capacity test, the 3.9 melee test, the 4.0 vehicles40 test: the slow
+and DUO campaign, 6.8's missions_story (the chapters' order and locks, first time and replays, the saves, the cast)
+and missions_layout (the window on a monitor and a phone), challenges, gear, the 3.4 capacity test, the 3.9 melee test, the 4.0 vehicles40 test: the slow
 van and its stages, the torque curve, the van's save migration, the pallets, the Hand Trolley, the Freight Truck, and
 the 4.2 touchlayout test: the touch buttons on phones and tablets, clear of each other and of the HUD) and
 compiles every module (`luau-compile -O0 -g2`: at most 200 registers a
@@ -1781,7 +2052,7 @@ upgrades, like MAX UPGRADES), sets the time of day (dusk, night,
 dawn … through `DayNight.setClock`), heals, finishes the current stop and switches god mode. The **Estate, company**
 tab gives every property (or one), takes them all, sets the home (or the depot), teleports to any property and
 fills, adds $50,000 to or empties the company safe (UNLOCK also gives every property and, without a home, the most
-expensive mansion as the home). The **Missions** tab starts any of the 110 missions now (locks ignored; a running job
+expensive mansion as the home). The **Missions** tab starts any of the 66 missions now (locks ignored; a running job
 is cancelled, a NIGHT ONLY one turns the clock to night), sets every mission to 3 stars and every campaign done (no
 money; UNLOCK does it too) or clears the progress (commands `missionStart`, `missionsAll`, `missionsReset`); 3.1:
 it gives every campaign's exclusive reward and title too. The **Challenges, secrets** tab (3.1) marks every challenge

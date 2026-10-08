@@ -16,33 +16,27 @@
 -- 5.7: Npcs.act names a short arm gesture (a wave, holding a piece out, reaching for it, a knock) on a person or a
 -- courier; the clients play it (client/ArmPose.luau, shared/Gestures.luau).
 
+-- 6.7: the people wear the couriers' realistic body (server/CharacterArt: Geometry "person", built by its Rig): slim
+-- limbs, hands that hold, a face with eyes that blink (client/BodyLife.luau also gives them the breath, the weight
+-- shift and a look at the players who come up). dress() paints every part by its BodyPaint colour group; the hats and
+-- the hair are sized to the smaller head; the walk is slowed to the longer legs (CourierMotion.stride; 6.8 review: the
+-- leg measured on the rig).
+
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 
+local CharacterGeometry = require(script.Parent.CharacterArt.Geometry) -- 6.7
+local CharacterRig = require(script.Parent.CharacterArt.Rig)
+local Motion = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CourierMotion"))
+
 local Npcs = {}
 
-export type Look = {
-	name: string, -- shown over the head
-	title: string?, -- a second line ("Rancher", "Sergeant")
-	skin: { number }?, -- r, g, b
-	shirt: { number }?,
-	pants: { number }?,
-	hat: string?, -- none | cap | cowboy | hardhat | beanie | chef | helmet
-	child: boolean?, -- a kid (smaller)
-	hatColor: { number }?,
-	hair: { number }?, -- hair colour (nil = none showing)
-	vest: { number }?, -- a vest over the shirt
-	apron: { number }?, -- an apron (or overalls' bib) in front
-	shoes: { number }?,
-	boots: boolean?, -- the shins in the shoe colour (riding boots, army boots)
-	shortSleeves: boolean?, -- forearms show the skin
-	coat: { number }?, -- a long coat over everything (the doctor's white coat)
-	tie: { number }?, -- a tie down the shirt front
-	bandage: boolean?, -- a bandage round the head (a patient)
-	walkSpeed: number?, -- studs / s (default 8, a kid 9; a patient shuffles)
-}
+-- 6.8: the looks live in shared/NpcLooks.luau (the client's portraits draw the same people); Npcs.Look stays the type.
+local NpcLooks = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("NpcLooks"))
+export type Look = NpcLooks.Look
 
 local GROUP = "Npc"
 local IDLE = "rbxassetid://507766388"
@@ -51,6 +45,7 @@ local RUN = "rbxassetid://507767714" -- Roblox's R15 run (Npcs.pace, 3.10)
 local STRIDE = 12.8 -- studs / s of a full-size body at the walk's or the run's own speed (Roblox's Animate: 16 / 1.25)
 local RUN_FROM = 10 -- studs / s: from here on the run animation
 local GREET_RANGE = 14 -- turn to a player this close
+local KID_SCALE = 0.75 -- 6.7: a kid's body against a grown-up's
 local NAME_RANGE = 60
 
 type State = {
@@ -92,16 +87,23 @@ local function warmBases()
 	end
 	warmed = true
 	for _, child in { false, true } do
-		local ok, rig = pcall(function()
-			local d = Instance.new("HumanoidDescription")
-			if child then
-				d.HeightScale = 0.72
-				d.WidthScale = 0.78
-				d.DepthScale = 0.78
-				d.HeadScale = 0.95
-			end
-			return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
+		-- 6.7: the couriers' realistic body (a kid's at KID_SCALE); Roblox's own default body if that ever fails
+		local ok, rig = pcall(function(): Model
+			return CharacterRig.build(CharacterGeometry.spec("person", if child then KID_SCALE else 1))
 		end)
+		if not ok then
+			warn(`[Npcs] no realistic body, Roblox's own: {rig}`)
+			ok, rig = pcall(function(): Model
+				local d = Instance.new("HumanoidDescription")
+				if child then
+					d.HeightScale = 0.72
+					d.WidthScale = 0.78
+					d.DepthScale = 0.78
+					d.HeadScale = 0.95
+				end
+				return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
+			end)
+		end
 		if ok and rig then
 			baseRigs[child] = rig
 		else
@@ -138,119 +140,12 @@ end
 
 -- ── Looks ──────────────────────────────────────────────────────────────────
 
-local SKINS = { { 255, 224, 196 }, { 241, 194, 160 }, { 214, 160, 120 }, { 176, 122, 84 }, { 132, 88, 60 }, { 98, 66, 46 } }
-local HAIRS = { { 40, 30, 24 }, { 74, 50, 32 }, { 120, 84, 50 }, { 196, 160, 100 }, { 150, 150, 150 }, { 30, 26, 26 } }
-local SHIRTS = { { 70, 110, 160 }, { 160, 60, 60 }, { 90, 130, 90 }, { 200, 180, 140 }, { 120, 90, 140 }, { 60, 60, 66 }, { 210, 140, 60 } }
-local PANTS = { { 50, 64, 100 }, { 60, 60, 64 }, { 110, 90, 70 }, { 40, 40, 44 }, { 150, 130, 100 } }
-local BRIGHT = { { 230, 80, 70 }, { 70, 150, 230 }, { 250, 200, 60 }, { 110, 200, 110 }, { 230, 120, 200 }, { 250, 140, 50 } }
-
-local function hash(text: string): number
-	local h = 7
-	for n = 1, #text do
-		h = (h * 31 + string.byte(text, n)) % 1000003
-	end
-	return h
-end
-
-local function pick<T>(list: { T }, h: number, salt: number): T
-	return list[(h // salt) % #list + 1]
-end
-
--- A quick look for a role (consistent outfits): "rancher", "soldier", "officer", "farmer", "worker", "foreman",
--- "teacher", "kid", "shopkeeper", "grocer", "icecream", "mover", "cook", "clerk", "attendant", "rider", "doctor",
--- "nurse", "patient", "banker", "guard", anything else = a townsperson. Skin and hair come from the name, so the same person always looks the same.
+-- A look for a role (shared/NpcLooks.luau look: "rancher", "soldier", "officer", "farmer", "worker", "foreman",
+-- "firefighter", "teacher", "kid", "shopkeeper", "grocer", "icecream", "mover", "cook", "clerk", "attendant", "rider",
+-- "doctor", "nurse", "patient", "banker", "guard", anything else = a townsperson). Skin and hair come from the name, so
+-- the same person always looks the same.
 function Npcs.look(role: string, name: string, title: string?): Look
-	local h = hash(name .. role)
-	local look: Look = {
-		name = name,
-		title = title,
-		skin = pick(SKINS, h, 1),
-		hair = pick(HAIRS, h, 7),
-		shirt = pick(SHIRTS, h, 11),
-		pants = pick(PANTS, h, 13),
-		shoes = { 46, 38, 32 },
-	}
-	if role == "rancher" then
-		look.hat, look.hatColor = "cowboy", { 120, 82, 50 }
-		look.shirt, look.pants, look.vest = { 168, 52, 44 }, { 58, 76, 112 }, { 96, 64, 40 }
-		look.boots, look.shoes = true, { 82, 54, 34 }
-	elseif role == "farmer" then
-		look.hat, look.hatColor = "cowboy", { 218, 190, 120 }
-		look.shirt, look.pants, look.apron = { 196, 186, 156 }, { 66, 92, 136 }, { 66, 92, 136 }
-		look.shortSleeves = true
-	elseif role == "soldier" or role == "officer" then
-		look.hat = if role == "officer" then "cap" else "helmet"
-		look.hatColor = { 74, 84, 54 }
-		look.shirt, look.pants, look.vest = { 92, 102, 66 }, { 78, 86, 58 }, if role == "soldier" then { 64, 70, 46 } else nil
-		look.boots, look.shoes = true, { 34, 30, 26 }
-	elseif role == "worker" or role == "foreman" then
-		look.hat, look.hatColor = "hardhat", if role == "foreman" then { 240, 120, 30 } else { 240, 200, 40 }
-		look.shirt, look.pants, look.vest = { 70, 80, 96 }, { 64, 64, 70 }, { 210, 230, 50 }
-		look.boots = true
-	elseif role == "teacher" then
-		look.hat = "none"
-		look.shirt, look.pants = { 150, 96, 120 }, { 60, 60, 72 }
-	elseif role == "kid" then
-		look.child = true
-		look.hat = if h % 3 == 0 then "cap" else if h % 3 == 1 then "beanie" else "none"
-		look.hatColor = pick(BRIGHT, h, 17)
-		look.shirt, look.pants = pick(BRIGHT, h, 19), pick(PANTS, h, 23)
-		look.shortSleeves = true
-	elseif role == "shopkeeper" or role == "grocer" then
-		look.hat = if role == "grocer" then "cap" else "none"
-		look.hatColor = { 60, 120, 60 }
-		look.shirt, look.pants, look.apron = { 120, 160, 200 }, { 60, 60, 64 }, if role == "grocer" then { 70, 130, 70 } else { 230, 226, 214 }
-	elseif role == "icecream" then
-		look.hat, look.hatColor = "cap", { 250, 150, 200 }
-		look.shirt, look.pants, look.apron = { 245, 245, 250 }, { 80, 120, 180 }, { 250, 170, 210 }
-		look.shortSleeves = true
-	elseif role == "mover" then
-		look.hat, look.hatColor = "cap", { 230, 120, 40 }
-		look.shirt, look.pants = { 230, 120, 40 }, { 60, 60, 70 }
-		look.shortSleeves, look.boots = true, true
-	elseif role == "cook" then
-		look.hat, look.hatColor = "chef", { 248, 248, 248 }
-		look.shirt, look.pants, look.apron = { 240, 240, 240 }, { 40, 40, 44 }, { 250, 250, 250 }
-	elseif role == "clerk" then
-		look.hat = "none"
-		look.shirt, look.pants, look.vest = { 236, 236, 240 }, { 44, 46, 58 }, { 44, 54, 84 }
-		look.shoes = { 24, 24, 26 }
-	elseif role == "attendant" then
-		look.hat, look.hatColor = "cap", { 200, 40, 40 }
-		look.shirt, look.pants = { 200, 44, 40 }, { 50, 50, 56 }
-		look.shortSleeves = true
-	elseif role == "rider" then
-		look.hat, look.hatColor = "helmet", { 30, 30, 34 }
-		look.shirt, look.pants, look.vest = { 236, 236, 236 }, { 214, 196, 160 }, { 40, 60, 90 }
-		look.boots, look.shoes = true, { 26, 22, 20 }
-	elseif role == "doctor" then
-		look.hat = "none"
-		look.shirt, look.pants, look.coat, look.tie = { 150, 196, 220 }, { 60, 66, 80 }, { 246, 246, 248 }, { 40, 80, 140 }
-		look.shoes = { 30, 30, 32 }
-	elseif role == "nurse" then
-		look.hat = "none"
-		look.shirt, look.pants = { 96, 176, 176 }, { 96, 176, 176 }
-		look.shortSleeves, look.shoes = true, { 240, 240, 240 }
-	elseif role == "patient" then
-		-- A hospital gown, a bandaged head, slow on the feet.
-		look.hat = "none"
-		look.shirt, look.pants = { 176, 206, 226 }, { 176, 206, 226 }
-		look.shortSleeves, look.bandage, look.walkSpeed = true, true, 4.5
-		look.shoes = { 220, 220, 216 }
-	elseif role == "banker" then
-		look.hat = "none"
-		look.shirt, look.pants, look.vest, look.tie = { 236, 236, 240 }, { 34, 36, 46 }, { 34, 36, 46 }, { 196, 156, 50 }
-		look.shoes = { 20, 20, 22 }
-	elseif role == "guard" then
-		look.hat, look.hatColor = "cap", { 30, 40, 70 }
-		look.shirt, look.pants, look.vest = { 60, 76, 120 }, { 30, 34, 50 }, { 34, 38, 48 }
-		look.boots, look.shoes = true, { 24, 22, 20 }
-	else
-		look.hat = if h % 5 == 0 then "cap" elseif h % 5 == 1 then "beanie" else "none"
-		look.hatColor = pick(SHIRTS, h, 29)
-		look.shortSleeves = h % 2 == 0
-	end
-	return look
+	return NpcLooks.look(role, name, title)
 end
 
 -- ── The body ───────────────────────────────────────────────────────────────
@@ -313,6 +208,23 @@ local function dress(model: Model, look: Look)
 	paint({ "LowerTorso", "LeftUpperLeg", "RightUpperLeg" }, pants)
 	paint({ "LeftLowerLeg", "RightLowerLeg" }, if look.boots then shoes else pants)
 	paint({ "LeftFoot", "RightFoot" }, shoes)
+	-- 6.7: the realistic body's pieces by their colour group (server/CharacterArt/Geometry.luau `paint`): the hands, the
+	-- neck, the jaw, the nose and the ears skin, the shoulders and the elbows the sleeves, the knees the trousers (or
+	-- the boots), the toes the shoes, the brows the hair.
+	local groups: { [string]: Color3 } = {
+		skin = skin,
+		sleeve = sleeve,
+		forearm = if look.shortSleeves and not look.coat then skin else sleeve,
+		shin = if look.boots then shoes else pants,
+		boot = shoes,
+		hair = rgb(look.hair, Color3.fromRGB(52, 38, 28)),
+	}
+	for _, part in model:GetChildren() do
+		local group = part:GetAttribute("BodyPaint")
+		if part:IsA("BasePart") and part:GetAttribute("CharacterDecoration") and type(group) == "string" and groups[group] then
+			part.Color = groups[group]
+		end
+	end
 
 	local torso = bodyPart(model, "UpperTorso")
 	local lower = bodyPart(model, "LowerTorso")
@@ -368,6 +280,10 @@ local function dress(model: Model, look: Look)
 	end
 	-- The default R15 head is about 1.2 studs every way (an older block head is 2 x 1 x 1 with a smaller mesh).
 	local h = Vector3.one * math.min(head.Size.X, head.Size.Y, head.Size.Z) * (if head.Size.X > head.Size.Y * 1.5 then 1.2 else 1)
+	if model:GetAttribute("CharacterArt") ~= nil then
+		-- 6.7: the realistic body's egg-shaped head (0.8 x 0.92 x 0.86): the hats and the hair a little wider than it
+		h = Vector3.new(head.Size.X * 1.1, head.Size.Y, head.Size.Z * 1.05)
+	end
 	local hat = look.hat or "none"
 	local hatColor = rgb(look.hatColor, Color3.fromRGB(60, 60, 66))
 	if look.hair and hat ~= "helmet" and hat ~= "beanie" then
@@ -889,6 +805,11 @@ function Npcs.spawn(look: Look, at: CFrame): Model
 	model.PrimaryPart = root
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	local scale = if look.child then 0.72 else 1
+	if humanoid and model:GetAttribute("CharacterArt") ~= nil then
+		-- 6.7: the walk's pace by the legs (the realistic body's step is longer than the stock walk's); 6.8 review: the
+		-- leg measured on the rig, hip to sole (Motion.leg: 2.8 / 2 = 1.4, a kid's 2.1 / 2), the feet planted
+		scale = Motion.stride(Motion.leg(model) or humanoid.HipHeight)
+	end
 	local flat = Vector3.new(at.LookVector.X, 0, at.LookVector.Z)
 	local facing = if flat.Magnitude > 0.01 then CFrame.lookAt(at.Position, at.Position + flat) else CFrame.new(at.Position)
 	-- The root floats HipHeight over the ground (R15).

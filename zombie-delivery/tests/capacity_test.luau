@@ -82,7 +82,7 @@ for _, def in Config.Cars do
 	end
 end
 check("the High-Roof Van is the in-between (4 → 5)", Economy.stageCapacity("highroof", 0) == 4 and Economy.maxCapacity("highroof") == 5)
-check("the Muscle Car takes 1 – 2", Economy.stageCapacity("muscle", 0) == 1 and Economy.maxCapacity("muscle") == 2)
+check("the Muscle Car takes 2 – 3 (6.7: 1 – 2 before)", Economy.stageCapacity("muscle", 0) == 2 and Economy.maxCapacity("muscle") == 3)
 check("the Rally Van stays at 2", Economy.maxCapacity("rallyvan") == 2)
 
 -- Economy: the stage of a car's levels, its capacity, its stats, the names.
@@ -112,7 +112,7 @@ check("Old Van, no rack (4 in 3.4): the Long Cargo Van", Economy.legacyStage("va
 check("Old Van with a rack: the Long Cargo Van (the most a van holds)", Economy.legacyStage("van", 1) == 3 and Economy.legacyStage("van", 3) == 3)
 check("Box Truck (6): rack 0 → stage 0, +1 → stage 1, +2 and +3 → stage 2", Economy.legacyStage("boxtruck", 0) == 0
 	and Economy.legacyStage("boxtruck", 1) == 1 and Economy.legacyStage("boxtruck", 2) == 2 and Economy.legacyStage("boxtruck", 3) == 2)
-check("Muscle Car (2) and Armored Van (4): the stage that holds it", Economy.legacyStage("muscle", 0) == 1 and Economy.legacyStage("armorvan", 0) == 1)
+check("Muscle Car (2) and Armored Van (4): the stage that holds it (6.7: the Muscle Car holds 2 at stage 0)", Economy.legacyStage("muscle", 0) == 0 and Economy.legacyStage("muscle", 1) == 1 and Economy.legacyStage("armorvan", 0) == 1)
 check("High-Roof, Courier, Pickup: their last stage (the most they hold)", Economy.legacyStage("highroof", 0) == 1
 	and Economy.legacyStage("courier", 2) == 1 and Economy.legacyStage("pickup", 1) == 1)
 check("Rally Van: no stage adds room, stays at stage 0", Economy.legacyStage("rallyvan", 0) == 0 and Economy.legacyStage("rallyvan", 3) == 0)
@@ -233,9 +233,9 @@ for _, mission in Missions.List do
 		check(`{mission.id}: a big load says so`, string.find(string.lower(mission.description), "load", 1, true) ~= nil, mission.description)
 	end
 end
-check("all 110 missions listed", listed == 110, listed)
-check("some missions lend a vehicle, the early ones mostly do not", lent > 0 and early >= 20, `{lent} lent, {early} early`)
-check("a few big loads later on (the Box Truck's missions)", big >= 4 and big <= 10, big)
+check(`all {#Missions.List} missions listed (6.8: eleven chapters of six)`, listed == #Missions.List and listed == 66, listed)
+check("some missions lend a vehicle, the early ones mostly do not", lent > 0 and early >= 12, `{lent} lent, {early} early`)
+check("a few big loads later on (the Box Truck's missions)", big >= 3 and big <= 8, big)
 
 -- ── The repair shop ──────────────────────────────────────────────────────────
 

@@ -7,9 +7,26 @@ HERE=Path(__file__).parent
 BUDGETS={'backpack':14,'backpack_loaded':14,'bigpack':18,'shoes':12,'jacket':16,'cart':22,'phone':6,
          'rustbike':70,'citybike':70,'cargobike':70,'cargobike_loaded':70,'ebike':70,'basket':10,'panniers':12,'trailer':25,'bell':3,'light':4,'escooter':45,
          'pump':25,'island':70,'pricesign':12,'jerrycan':8,
-         # 6.0 the plastic bag and the vests; 6.4 the four bigger bags (KitArt, hung on BagPivot)
-         'bag':10,'kevlar':24,'heavy':32,'tote':12,'thermal':14,'padded':12,'duffel':16}
+         # 6.0 the plastic bag and the vests; 6.4 the four bigger bags (KitArt, hung on BagPivot); 6.7 real-size bags
+         # with seams, closures and straps: still modest, never over 20 parts a bag
+         'bag':14,'kevlar':24,'heavy':32,'tote':16,'thermal':16,'padded':16,'duffel':18}
 BAGS={'bag','tote','thermal','padded','duffel'}
+# 6.7: how far under its grip a bag may reach. In the hand (the plastic bag, the thermal bag, the duffel) the R15 grip is
+# ~1.9 over the ground (tools/character-art/bag-check.luau measures it on the real body, Config.Courier.Bag.Clear):
+# 1.65 at most. Worn from the shoulder or the strap's crossing (the tote, the messenger) the grip is ~3.3-4 up.
+BAG_REACH={'bag':1.65,'thermal':1.65,'duffel':1.65,'tote':2.2,'padded':2.2}
+def reach_down(p):
+    # how far under the grip a (turned) piece reaches: the world-Y share of each of its axes (CFrame.Angles, degrees)
+    a,b,c=(math.radians(v) for v in (p.get('turn') or [0,0,0]))
+    ry=[math.cos(a)*math.sin(c)+math.sin(a)*math.sin(b)*math.cos(c),
+        math.cos(a)*math.cos(c)-math.sin(a)*math.sin(b)*math.sin(c),
+        -math.sin(a)*math.cos(b)]
+    size=p['size']
+    if p.get('shape')=='Cylinder':
+        half=abs(ry[0])*size[0]/2+math.sqrt(max(0.0,1-ry[0]**2))*size[1]/2  # (round across its axis)
+    else:
+        half=sum(abs(ry[i])*size[i]/2 for i in range(3))
+    return half-p['at'][1]
 RUNNER='''local Mock=require("./mock")
 local Geometry=require("./Geometry")
 local Builder=require("./Builder")
@@ -120,7 +137,9 @@ def export(module,luau,output):
         if m['id'] in BAGS:
             # 6.4: a bag hangs from the grip (BagPivot at the hand, ~1.95 over the ground): all on the pivot, under it
             assert set(spec['origins'])=={'BagPivot'} and all(p['attach']=='BagPivot' for p in pieces),(m['id'],'bag pivot')
-            assert all(p['at'][1]<0.05 and p['at'][1]>-1.7 for p in pieces),(m['id'],'hangs under the hand, above the ground')
+            assert all(p['at'][1]<0.05 for p in pieces),(m['id'],'hangs under its grip')
+            low=max(reach_down(p) for p in pieces)
+            assert low<=BAG_REACH[m['id']],(m['id'],low,'clear of the ground (6.7: real size)')
         if m['id']=='pump':assert any(p['attach']=='Nozzle' for p in pieces) and any(p['name']=='FuelOutlet' for p in points)
     output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(models))
     print('Art factory PASS:',{m['id']:len(m['spec']['pieces'])+m['spec'].get('newRoots',0)+m['spec'].get('reservedParts',0) for m in models})

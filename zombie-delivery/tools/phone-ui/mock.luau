@@ -31,6 +31,7 @@ M.Enum = setmetatable({}, {__index=function(t,key)
 	rawset(t,key,values); return values
 end})
 local methods = {}
+M.methods = methods -- (6.8: tools/phone-ui/missions_mock.luau adds the few the MISSIONS window needs)
 local events = {Activated=true,MouseEnter=true,MouseLeave=true,SelectionGained=true,SelectionLost=true,InputBegan=true,InputEnded=true,Destroying=true,Completed=true}
 local object = {
 	__index = function(self,key)

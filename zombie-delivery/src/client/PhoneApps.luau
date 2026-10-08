@@ -29,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Economy = require(Shared.Economy) -- 6.7: the car-only items
 local Levels = require(Shared.Levels)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
@@ -330,15 +331,21 @@ local function bagTabs(list: Instance, current: string, running: boolean, host: 
 end
 
 -- ITEMS: your consumables (Config.Items), how many, the key in the bottom bar, USE (Hotbar.onUse: the HUD's own
--- useItem, the UseItem remote with your aim).
+-- useItem, the UseItem remote with your aim). 6.7: a car-only item without a car only while you have some.
 local function items(list: Instance, look: OrdersUi.Kit, host: Host, wide: boolean, order: number)
 	local Hotbar = require(script.Parent.Hotbar)
 	local state = host.state()
 	local have = if type(state) == "table" and type(state.items) == "table" then state.items else {}
 	local left, right = PhoneApps.columns(list, order, wide)
+	local cars = if type(state) == "table" and type(state.cars) == "table" then state.cars else nil
+	local shown = 0
 	for index, def in Config.Items do
 		local count = tonumber(have[def.id]) or 0
-		local b = look.block(if index % 2 == 1 then left else right, order + index)
+		if count <= 0 and not Economy.itemShown(def, cars) then
+			continue -- 6.7: a car item without a car (one you have still shows)
+		end
+		shown += 1
+		local b = look.block(if shown % 2 == 1 then left else right, order + index)
 		look.row2(b, `{def.icon}  {string.upper(def.name)}`, `×{count}`, 1, true)
 		local slot = if count > 0 then Hotbar.slotOf(def.id) else nil
 		look.meta(b, `{def.description}{if slot and not Ui.touchLayout() then ` Key {slot}.` else ""}`, 2)
@@ -378,14 +385,15 @@ end
 -- ── 6.5: SHOP's list of the shops ─────────────────────────────────────────
 
 -- The shops (Map.Shops ids) in the order a new courier needs them, with what they sell. 6.6: ZDC Bags first (the
--- depot's bag kiosk, by the spawn); Last Stop Supplies keeps the vests and the items.
+-- depot's bag kiosk, by the spawn); Last Stop Supplies keeps the vests and the items. 6.7: what each really sells
+-- (Lead & Co. the gun upgrades and the bat too; Wrench Garage the stages, the car upgrades, gear and paint).
 local SHOPS: { { id: string, icon: string, sells: string } } = {
 	{ id = "bags", icon = "🛍️", sells = "Bags (sprint with your deliveries)" },
-	{ id = "supplies", icon = "🛒", sells = "Vests, shoes, medkits, items" },
-	{ id = "guns", icon = "🔫", sells = "Guns, from a pistol up" },
-	{ id = "bikes", icon = "🚲", sells = "Bikes, scooters, bike gear" },
-	{ id = "dealer", icon = "🚗", sells = "Cars and vans" },
-	{ id = "mechanic", icon = "🔧", sells = "Upgrades, repairs, car guns" },
+	{ id = "supplies", icon = "🛒", sells = "Items, vests, running shoes" },
+	{ id = "guns", icon = "🔫", sells = "Guns, gun upgrades, a baseball bat" },
+	{ id = "bikes", icon = "🚲", sells = "Bikes, the E-Scooter, bike gear" },
+	{ id = "dealer", icon = "🚗", sells = "Cars, vans and trucks" },
+	{ id = "mechanic", icon = "🔧", sells = "Stages, car upgrades, gear, paint, car guns, repairs" },
 }
 
 -- Draws the list at `order` in the SHOP app: a row a shop (its icon, name, what it sells, "📍 GPS"); a tap sets the
@@ -540,7 +548,7 @@ local KEYS: { { string } } = {
 	{ "F", "Fire" },
 	{ "1 / 2 / 3", "Hold: fists, bag, gun" },
 	{ "B", "Holster, draw" },
-	{ "V", "Punch, strike" },
+	{ "V", "Punch (the bat once bought), strike" },
 	{ "Y", "Take a road offer" },
 	{ "X", "Throw (at a door)" },
 	{ "4 – 8", "Items" },

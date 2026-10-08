@@ -564,7 +564,7 @@ local STYLES: { [string]: Style } = {
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(0.9, 1.42, 0), "accent"), -- stripes
 			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(-0.9, 1.42, 0), "accent"),
 		},
-		cargo = cargo("car", 13.5, 6.4, { Vector3.new(0, 0.3, 5) }),
+		cargo = cargo("car", 13.5, 6.4, { Vector3.new(-1.2, 0.3, 5), Vector3.new(1.2, 0.3, 5) }), -- 6.7: two in the trunk
 		-- The trunk lid on the rear deck, hinged at its front edge; the spoiler and the stripes ride on it.
 		back = {
 			noun = "trunk",
@@ -1085,7 +1085,8 @@ local STYLES: { [string]: Style } = {
 		boxes = {
 			box(Vector3.new(0.6, 0.6, 3.6), Vector3.new(0, 0.3, -0.2), "dark"), -- the deck, the neck and the stem's foot
 		},
-		cargo = cargo("rack", 5.0, 2.0, { Vector3.new(0, -0.11, 1.45), Vector3.new(0, 0.95, 1.45) }, nil, Vector3.new(0, 0.1, 2.3)),
+		-- (6.7: a third piece on the deck at the rider's feet, in front of them, behind the stem)
+		cargo = cargo("rack", 5.0, 2.0, { Vector3.new(0, -0.11, 1.45), Vector3.new(0, 0.95, 1.45), Vector3.new(0, -0.91, -1.25) }, nil, Vector3.new(0, 0.1, 2.3)),
 	},
 }
 
@@ -1335,7 +1336,8 @@ local LOOKS: { [string]: Look } = {
 			Vector3.new(1.8, 0.4, 8.4),
 		},
 	},
-	-- The Street Machine: a blower through the hood (no scoop from the Engine upgrade), side pipes, a wider trunk.
+	-- The Street Machine: a blower through the hood (no scoop from the Engine upgrade), side pipes, a wider trunk (6.7:
+	-- three pieces across it).
 	muscle_street = {
 		trim = {
 			box(Vector3.new(1.4, 0.7, 1.4), Vector3.new(0, 1.75, -4.6), "rail"),
@@ -1343,7 +1345,7 @@ local LOOKS: { [string]: Look } = {
 			box(Vector3.new(0.3, 0.3, 4.5), Vector3.new(-3.35, 0.15, -0.6), "chrome"),
 			box(Vector3.new(0.3, 0.3, 4.5), Vector3.new(3.35, 0.15, -0.6), "chrome"),
 		},
-		slots = { Vector3.new(-1.2, 0.3, 5), Vector3.new(1.2, 0.3, 5) },
+		slots = { Vector3.new(-1.85, 0.3, 5), Vector3.new(0, 0.3, 5), Vector3.new(1.85, 0.3, 5) },
 		hoodBusy = true,
 	},
 	-- The Fortress Van: a shield round the roof gun, lockers on the sides, a spare wheel on the roof.

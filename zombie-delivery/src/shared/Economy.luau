@@ -15,6 +15,7 @@ export type CarStats = {
 	turn: number,
 	health: number,
 	ramPower: number,
+	ramGuard: number, -- 6.7: × the dent a ram survivor leaves on the car (the Ram Plow's bull bar: Economy.ramGuard)
 }
 
 export type WeaponStats = {
@@ -566,7 +567,52 @@ function Economy.carStats(carId: string, upgrades: Upgrades): CarStats
 		turn = def.turn * Economy.multiplier(upgrades, "handling"),
 		health = math.floor(health * Economy.multiplier(upgrades, "armor")),
 		ramPower = def.ramPower * Economy.multiplier(upgrades, "plow"),
+		ramGuard = Economy.ramGuard(upgrades), -- 6.7
 	}
+end
+
+-- 6.7, the Ram Plow's other half: the share of a ram's dent (Config.Horde.RamSelfDamage of a survivor's health) the car
+-- still takes: 1 − guard × the plow's level (UpgradeDef guard), never under Config.Horde.RamGuardMin.
+function Economy.ramGuard(upgrades: Upgrades): number
+	local def = Economy.findUpgrade("plow")
+	local guard = if def and def.guard then def.guard else 0
+	return math.max(Config.Horde.RamGuardMin, 1 - guard * Economy.level(upgrades, "plow"))
+end
+
+-- 6.7: do you own a car (any vehicle in `cars` that is not a bike: your own or an employer's)? The car-only items
+-- (Config.Items car) need one.
+function Economy.ownsCar(cars: { [string]: boolean }?): boolean
+	if type(cars) ~= "table" then
+		return false
+	end
+	for id, owned in cars do
+		local def = if owned == true and type(id) == "string" then Economy.findCar(id) else nil
+		if def and not def.bike then
+			return true
+		end
+	end
+	return false
+end
+
+-- 6.7: is this item for you now: on foot always, a car-only one (ItemDef car) once you own a car (ownsCar)?
+function Economy.itemShown(def: Config.ItemDef, cars: { [string]: boolean }?): boolean
+	return def.car ~= true or Economy.ownsCar(cars)
+end
+
+-- 6.7: the items that are for you now (itemShown), in Config.Items' order.
+function Economy.itemsFor(cars: { [string]: boolean }?): { Config.ItemDef }
+	local list: { Config.ItemDef } = {}
+	for _, def in Config.Items do
+		if Economy.itemShown(def, cars) then
+			table.insert(list, def)
+		end
+	end
+	return list
+end
+
+-- 6.7: is a Config.Weapons gun a reward only (an employer's, a campaign's, the secrets' or the challenges'), never sold?
+function Economy.rewardOnly(def: Config.WeaponDef): boolean
+	return def.earned ~= nil or def.exclusive ~= nil
 end
 
 -- (6.0: no gun, weaponId nil, reads as the pistol's numbers; nothing fires then: Economy.fireMode)
