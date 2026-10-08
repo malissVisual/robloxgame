@@ -127,7 +127,7 @@ function StylePreview.dress(copy: Model, def: Config.CosmeticDef)
 		end
 	elseif def.slot == "vest" then
 		local vest = copy:FindFirstChild("KitVestArt")
-		if vest then
+		if vest and vest:FindFirstChild("VestL") then -- (the Courier Vest's own piece: an armoured vest takes no dye)
 			StyleBuild.tint(vest:GetChildren(), StyleLooks.Vest, def)
 		end
 	elseif def.slot == "bag" then
@@ -236,7 +236,8 @@ function StylePreview.show(holder: Instance, tab: string, def: Config.CosmeticDe
 		if def and def.slot == "hat" and head and head:IsA("BasePart") then
 			focus = head
 		end
-		if def and def.slot == "vest" and m:FindFirstChild("KitVestArt") == nil then
+		local vestArt = m:FindFirstChild("KitVestArt")
+		if def and def.slot == "vest" and (vestArt == nil or vestArt:FindFirstChild("VestL") == nil) then
 			note = "The colour shows on the Courier Vest (Last Stop Supplies)."
 		end
 	else

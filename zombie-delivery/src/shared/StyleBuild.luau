@@ -213,7 +213,9 @@ function StyleBuild.tint(parts: { Instance }, shares: { [string]: number }, def:
 			end
 			local c = def.color
 			p.Color = rgb({ math.floor(c[1] * share), math.floor(c[2] * share), math.floor(c[3] * share) })
-			p.Material = material(def.material, p.Material)
+			-- a dye without a material of its own: the part's own one (stored), not the last dye's
+			local own = p:GetAttribute("StyleMaterial")
+			p.Material = material(def.material, material(if type(own) == "string" then own else nil, p.Material))
 		elseif typeof(base) == "Color3" then
 			p.Color = base
 			local m = p:GetAttribute("StyleMaterial")

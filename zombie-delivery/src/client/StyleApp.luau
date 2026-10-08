@@ -43,9 +43,10 @@ StyleApp.pick = {} :: { [string]: string }
 type Host = PhoneApps.Host
 
 local player = Players.LocalPlayer
-local shown: { host: Host?, preview: Instance?, cards: { [string]: Instance }, bound: boolean, key: string } = {
+local shown: { host: Host?, preview: Instance?, row: Instance?, cards: { [string]: Instance }, bound: boolean, key: string } = {
 	host = nil,
 	preview = nil,
+	row = nil, -- the tabs row drawn last (only its going frees the keys)
 	cards = {},
 	bound = false,
 	key = "",
@@ -293,8 +294,16 @@ local function tabs(list: Instance)
 	if not Ui.touchLayout() then
 		Ui.label(row, "TAB · ↑ ↓ · ENTER", UDim2.fromOffset(150, 44), { Name = "KeyHint", TextSize = 11, TextColor3 = K.secondary, LayoutOrder = 3, TextXAlignment = Enum.TextXAlignment.Left })
 	end
-	-- the row goes with the app (another app, the popup closed): the keys are free again
-	row.Destroying:Connect(unbind)
+	-- the row goes with the app (another app, the popup closed): the keys are free again. Only the row drawn last
+	-- does it: an older row going later (a redraw with deferred signals, the closing popup's tween while STYLE is
+	-- opened again) must not free the keys of the app that shows.
+	shown.row = row
+	row.Destroying:Connect(function()
+		if shown.row == row then
+			shown.row = nil
+			unbind()
+		end
+	end)
 end
 
 -- Two small squares of the item's colours.
@@ -432,6 +441,7 @@ end
 -- The app closed (the popup went, another app): the keys free, the preview's copy dropped.
 function StyleApp.close()
 	unbind()
+	shown.row = nil
 	local holder = shown.preview
 	if holder then
 		pcall(StylePreview.clear, holder)

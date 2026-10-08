@@ -351,9 +351,12 @@ function StyleWear.start()
 		forget(player)
 		queued[player] = nil
 	end)
-	-- the vehicles already out (a late start)
+	-- the vehicles already out (a late start), and a vest or a bag KitWear built before the tint hook was set
 	for _, car in Vehicles.all() do
 		Vehicles.onStyle(car)
+	end
+	for _, player in Players:GetPlayers() do
+		KitWear.retint(player)
 	end
 end
 
