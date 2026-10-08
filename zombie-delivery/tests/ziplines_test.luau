@@ -23,8 +23,10 @@ local lines = ZipLines.lines()
 check("6 – 10 lines", #lines >= 6 and #lines <= 10, #lines)
 -- 6.8 review: the rider's feet are the courier's (its root HipHeight + 1 over the soles), and the handle hangs under
 -- the cable within the arms' reach of the shoulders (client/ZipRide.luau bends the elbows to it)
-local courier = require("./CharacterGeometry").spec("courier")
-check("the rider's feet are the courier's", math.abs(ZipLines.Feet - (courier.hipHeight + 1)) < 1e-6, ZipLines.Feet)
+-- 6.9: the couriers wear Roblox's classic blocky R15 (server/CourierAvatar.luau); its stand-in is the native block body
+-- (CharacterArt's 6.0 body, the infected's: the classic R15's proportions and joints, HipHeight 1.97 against 2)
+local courier = require("./CharacterGeometry").spec("walker")
+check("the rider's feet are the courier's", math.abs(ZipLines.Feet - (courier.hipHeight + 1)) < 0.05, ZipLines.Feet)
 do
 	local shoulderY, elbowY, wristY = 0, 0, 0
 	for _, j in courier.joints do

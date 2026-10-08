@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.8.1"
+Config.Version = "6.9"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1855,12 +1855,14 @@ Config.ZipLines = {
 	Sag = 0.035, -- the cable's sag in the middle, per stud of length
 	CableHeight = 7, -- the cable's ends over the platforms' floors
 	-- the rider's root under the cable (hands up on the trolley's handle). 6.8 review: 3.6 → 3.1, the body about where
-	-- 6.7 hung it (the root moved 0.6 up in it: shared/ZipLines.luau Feet 3.8): the feet 0.1 over the end platform
-	Hang = 3.1,
+	-- 6.7 hung it (the root moved 0.6 up in it: shared/ZipLines.luau Feet 3.8): the feet 0.1 over the end platform.
+	-- 6.9: Roblox's classic R15 (its feet 3 under the root): 3.9, the feet still 0.1 over it (CableHeight 7)
+	Hang = 3.9,
 	-- 6.8 review: the trolley's handle hangs HandleDrop under the cable; client/ZipRide.luau reaches the hands to it
 	-- (HandSpread apart, the elbows bent: a two-bone reach on the body's own arms) instead of a fixed pose that put them
-	-- 0.9 studs up through the trolley; arms too short to reach it bring it down to the hands
-	HandleDrop = 0.35,
+	-- 0.9 studs up through the trolley; arms too short to reach it bring it down to the hands. 6.9: 1.55, the classic
+	-- R15's shorter arms (the handle's strap longer, the elbows a little bent; 6.7's body hung 0.35 under the cable)
+	HandleDrop = 1.55,
 	HandSpread = 2.0,
 	Clearance = 3, -- the cable over every roof it crosses (the tests' rule), at least
 	Margin = 9, -- the lines are picked with this much over every roof they cross (the rider's feet clear it)
@@ -3136,10 +3138,11 @@ Config.Cargo = {
 	-- 6.8 review: the root's middle is 0.6 higher in the body now (server/CharacterArt/Geometry.luau G 3.8): the stack
 	-- goes as much lower on it, to where the forearms are (the elbows 0.3 under the root): CarryLow 0.05 → -0.55; a
 	-- tall stack's middle at most CarryMiddle over the root (it was 1.1 in server/Cargo.luau stackHeld).
+	-- 6.9: Roblox's classic R15 (the hips 1 under the root's middle, the 6.0 body's numbers): 0.05 and 1.1 again
 	LightScale = 0.5,
 	LookScale = { cake = 0.36, medicine = 0.42, newspaper = 0.6, bouquet = 0.55 } :: { [string]: number },
-	CarryLow = -0.55,
-	CarryMiddle = 0.5,
+	CarryLow = 0.05,
+	CarryMiddle = 1.1,
 	CarryFront = 0.52,
 	HandsMax = 2, -- light pieces in one player's hands at most
 	-- 6.6, the bike's own bag (its rack, basket or box: server/Cargo.luau, shared/Holding.luau bikeNear): on a run with a
@@ -3222,7 +3225,8 @@ Config.Throw = {
 	-- "throw" WindUp seconds in, the arm over the shoulder coming forward, on the courier's body: tests/throws_test.luau
 	-- works it out from the rig and holds this to it). It was the shoulder (0.7, 1.3, 0.6): the piece popped down
 	-- ~1.8 studs out of the raised hand. The client's arc, its zones and the server all start here (Throws.release).
-	Release = { side = 1.4, up = 2.6, ahead = 0.25 } :: { side: number, up: number, ahead: number },
+	-- 6.9: on Roblox's classic R15, the couriers' body again (wider shoulders, shorter arms than 6.7's: 1.4, 2.6, 0.25)
+	Release = { side = 1.9, up = 2.0, ahead = 0.1 } :: { side: number, up: number, ahead: number },
 	FarFrom = 18, -- studs: a landed throw from farther than this tips …
 	FarMin = 5, -- … this at FarFrom …
 	FarMax = 25, -- … up to this at Range

@@ -1,5 +1,5 @@
 -- 6.4.1: the worn bag built by the real server/KitWear.luau (its build and bagArt, the real ModelArt Builder, the real
--- shared rules) against the property recorder, on the courier's real R15 body (CharacterArt Rig) and on a classic R6
+-- shared rules) against the property recorder, on Roblox's classic R15 (6.9), the native courier's R15 body (CharacterArt Rig) and on a classic R6
 -- body: every bag, in every way it can be worn (Holding.wornAs; 6.6: no backpack any more), empty and full. 6.4 built no
 -- bag at all (its slot key went to KitArt as a look); this fails loudly on anything like it. At rest (the joint's
 -- Transform the identity, as client/BagSway.luau leaves it hanging): the pivot joined to the right body part, nothing
@@ -24,9 +24,13 @@ local function check(name: string, ok: boolean, detail: any?)
 	end
 end
 
--- The courier's real R15 body, standing.
+-- The courier's real R15 body, standing (6.9: the native courier, only if Roblox's body cannot be made).
 local courier = Rig.build(Geometry.spec("courier"))
 courier:PivotTo(CFrame.new(0, Geometry.spec("courier").hipHeight + 1, 0))
+-- 6.9: the couriers' body, Roblox's classic blocky R15 (server/CourierAvatar.luau); the native block body stands in for
+-- it (the classic R15's part sizes and joints), standing.
+local classic = Rig.build(Geometry.spec("walker"))
+classic:PivotTo(CFrame.new(0, Geometry.spec("walker").hipHeight + 1, 0))
 -- A classic R6 body (its parts' standard sizes), standing.
 local r6 = Instance.new("Model")
 r6.Name = "R6"
@@ -46,7 +50,11 @@ for _, p in {
 	part.Parent = r6
 end
 
-local bodies = { { model = courier, name = "R15 courier", hand = "LeftHand", torso = "UpperTorso" }, { model = r6, name = "R6", hand = "Left Arm", torso = "Torso" } }
+local bodies = {
+	{ model = classic, name = "classic R15", hand = "LeftHand", torso = "UpperTorso" },
+	{ model = courier, name = "R15 courier", hand = "LeftHand", torso = "UpperTorso" },
+	{ model = r6, name = "R6", hand = "Left Arm", torso = "Torso" },
+}
 local looks = { "pizza", "bouquet", "mail", "newspaper", "cake", "burger" }
 local built, shown = 0, 0
 local handLow = math.huge -- 6.7: the lowest a bag in the hand comes to the ground, on either body
@@ -163,7 +171,7 @@ end
 check("the bag set down shows its pizza box and its bouquet", art ~= nil and fill == #BagFill.pieces(Config.Courier.BagFill.Mouth.bag, 2, 2, { "pizza", "bouquet" }), fill)
 check("6.4's key no longer reaches KitArt", pcall(KitWear.build, courier, "hand", "bag@hand"))
 
-print(`bags built: {built} (on both bodies, every place, empty and full), {shown} with their pieces; a bag in the hand {string.format("%.2f", handLow)} over the ground at the lowest`)
+print(`bags built: {built} (on every body, every place, empty and full), {shown} with their pieces; a bag in the hand {string.format("%.2f", handLow)} over the ground at the lowest`)
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

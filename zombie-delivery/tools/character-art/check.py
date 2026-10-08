@@ -36,8 +36,13 @@ return Mock""")
         avatar = avatar.replace('require(ReplicatedStorage:WaitForChild("Shared").CourierMotion)', 'require("./CourierMotion")')
         avatar = avatar.replace("require(script.Parent.CharacterArt.Geometry)", 'require("./Geometry")')
         avatar = avatar.replace("require(script.Parent.CharacterArt.Rig)", 'require("./Rig")')
+        # 6.9: the classic body's fields (shared/AvatarLook.luau, pure data)
+        avatar = avatar.replace('require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AvatarLook"))', 'require("./AvatarLook")')
+        if 'require("./AvatarLook")' not in avatar:
+            raise RuntimeError("CourierAvatar.luau: the AvatarLook require moved; update tools/character-art/check.py")
+        (tmp / "AvatarLook.luau").write_text((ROOT / "src/shared/AvatarLook.luau").read_text())
         (tmp / "Avatar.luau").write_text(
-            'local M=require("./mock")\nlocal game,Instance,Vector3,script,task,Enum=M.game,M.Instance,M.Vector3,M.script,M.task,M.Enum\n' + avatar)
+            'local M=require("./mock")\nlocal game,Instance,Vector3,Color3,script,task,Enum,workspace=M.game,M.Instance,M.Vector3,M.Color3,M.script,M.task,M.Enum,M.workspace\n' + avatar)
         # 5.9.2: the template's Animate LocalScript is the client's locomotion controller; run it per body.
         animate = (ROOT / "src/server/CharacterArt/Animate.client.luau").read_text()
         animate = animate.replace('require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CourierMotion"))', 'require("./CourierMotion")')
@@ -97,7 +102,7 @@ def bag_check(tmp, luau):
     result = subprocess.run([str(Path(luau).resolve()), "bag-check.luau"], cwd=tmp, capture_output=True, text=True)
     if result.returncode or "ALL CHECKS PASSED" not in result.stdout:
         raise RuntimeError("Worn bag check FAILED:\n" + result.stdout + result.stderr)
-    return "Worn bag PASS (real KitWear + Builder, R15 courier and R6): " + result.stdout.strip().splitlines()[-2]
+    return "Worn bag PASS (real KitWear + Builder, classic R15, R15 courier and R6): " + result.stdout.strip().splitlines()[-2]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
