@@ -23,11 +23,11 @@ local game, workspace, task = mock.game, mock.workspace, mock.task
 local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
 local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
 '''
-    for name in ("Phone", "PhoneContract", "PhoneLayout", "PhoneRoute", "PhoneApps", "PhoneMotion", "PhonePopup", "OrdersUi", "TasksApp"):
+    for name in ("Phone", "PhoneContract", "PhoneLayout", "PhoneRoute", "PhoneApps", "PhoneMotion", "PhonePopup", "OrdersUi", "TasksApp", "StyleApp"):
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
-    for name in ("Ui", "Theme", "Net", "MapView", "KitShop", "CareerUi", "BagUi", "Sounds", "Discovery", "Hotbar"):
+    for name in ("Ui", "Theme", "Net", "MapView", "KitShop", "CareerUi", "BagUi", "Sounds", "Discovery", "Hotbar", "StylePreview"):
         (dest / f"{name}.luau").write_text(f'return require("./mock").{name}')
     (dest / "HudContract.luau").write_text('return require("./mock").P')
     for name in ("mock.luau", "check.luau"):

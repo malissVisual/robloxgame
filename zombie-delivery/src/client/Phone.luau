@@ -102,13 +102,14 @@ local TILES: { AppDef } = {
 	{ id = "shop", name = "SHOP", sub = "Where to buy what" },
 	{ id = "bag", name = "BAG & ITEMS", sub = "Bag, items, bags" },
 	{ id = "garage", name = "GARAGE", sub = "Bike, car, tow" },
-	{ id = "more", name = "MORE", sub = "Career, crew, bank …" },
+	{ id = "more", name = "MORE", sub = "Career, style, crew …" },
 }
 
--- … and MORE's entries (the 5.5 MENU's windows among them).
+-- … and MORE's entries (the 5.5 MENU's windows among them; 6.12: STYLE, client/StyleApp.luau).
 local MORE: { AppDef } = {
 	{ id = "career", name = "CAREER", sub = "Your level and what's next" },
 	{ id = "tasks", name = "TASKS", sub = "Daily and weekly tasks" }, -- 6.12
+	{ id = "style", name = "STYLE", sub = "Looks for you and your rides" },
 	{ id = "missions", name = "MISSIONS", sub = "Missions and challenges", window = true },
 	{ id = "crew", name = "CREW", sub = "Work with friends", window = true },
 	{ id = "top", name = "TOP", sub = "The best couriers", window = true },
@@ -129,6 +130,7 @@ refs.apps = require(script.Parent.PhoneApps) -- 5.5: BOARD, BAG, GARAGE, the key
 refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the banner
 refs.popup = require(script.Parent.PhonePopup) -- 6.0.1: the apps' centred popup
 refs.tasks = require(script.Parent.TasksApp) -- 6.12: MORE → TASKS, the daily and weekly tasks
+refs.style = require(script.Parent.StyleApp) -- 6.12: STYLE, the cosmetics
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
 refs.page = "home" -- 6.5: the home's page: "home" (the six tiles) or "more" (MORE's sub-screen)
@@ -1426,7 +1428,7 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
-local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS" }
+local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE" }
 
 -- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
 renderApp = function()
@@ -1501,6 +1503,8 @@ renderApp = function()
 			refs.apps.garage(list, look, refs.host)
 		elseif app == "tasks" then
 			refs.tasks.draw(list, look, wide) -- 6.12
+		elseif app == "style" then
+			refs.style.render(list, look, refs.host, wide) -- 6.12: the cosmetics (client/StyleApp.luau)
 		end
 	end)
 	if refs.spareRoute then
@@ -1976,10 +1980,12 @@ function Phone.setState(newState: any)
 	end
 	placeButton()
 	refreshBadges()
+	-- 6.12: STYLE: a purchase asked for there plays "cash"; the app is drawn again only for what it shows
+	local styleChanged = refs.style.changed(state)
 	if isOpen then
 		if app == "home" then
 			fillHome()
-		elseif app == "shop" or app == "career" or app == "bank" or app == "garage" or app == "bag" then
+		elseif app == "shop" or app == "career" or app == "bank" or app == "garage" or app == "bag" or (app == "style" and styleChanged) then
 			renderApp()
 		end
 	end
