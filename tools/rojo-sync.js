@@ -13,6 +13,11 @@
  *   GET  /api/socket/{cursor}  → WebSocket, binární msgpack rámce se změnami
  *   POST /api/write            → zápis ze Studia zpět (jen potvrzujeme, ignorujeme)
  *   POST /api/open/{id}        → "otevři skript v editoru"
+ *   POST /api/rojo-sync/stop   → náš vlastní: nově spuštěný rojo-sync tím vypne starý
+ *
+ * Strom se čte z disku znovu při každém Connect ze Studia, při každé změně
+ * v src/ a pro jistotu každých 5 s — po `git pull` už není potřeba nic
+ * restartovat.
  *
  * Pozor na dvě pasti, na kterých se to jinak zasekne:
  *   1) Všechno je MessagePack, ne JSON.
@@ -582,6 +587,11 @@ const server = http.createServer((req, res) => {
 	const urlPath = (req.url || "").split("?")[0];
 
 	if (req.method === "GET" && urlPath === "/api/rojo") {
+		// Každé Connect ve Studiu dostane přesně to, co je teď na disku. Strom
+		// v paměti se jinak mění jen podle událostí watcheru, a ty se na Windows
+		// při velkém `git pull` ztrácejí — Studio pak drželo mix starých a nových
+		// skriptů a ani Disconnect / Connect to nespravilo.
+		rescan();
 		// expectedPlaceIds / gameId / placeId schválně vynecháváme —
 		// jinak by plugin přepsal identitu placu nebo odmítl připojení.
 		respond(res, 200, {
@@ -602,6 +612,17 @@ const server = http.createServer((req, res) => {
 			instances: tree.instances,
 		});
 		console.log(`→ read: poslán celý strom (${instanceCount()} instancí)`);
+		return;
+	}
+
+	if (req.method === "POST" && urlPath === "/api/rojo-sync/stop") {
+		// Druhé spuštění rojo-syncu převezme port: starý proces se tu ukončí.
+		req.resume();
+		req.on("end", () => {
+			respond(res, 200, { sessionId });
+			console.log("■ spuštěn nový rojo-sync — tenhle končí");
+			setTimeout(() => process.exit(0), 100);
+		});
 		return;
 	}
 
@@ -785,7 +806,9 @@ function schedule() {
 // na Windows se zpětnými lomítky, a občas je null.
 function inScope(fileName) {
 	if (!fileName) {
-		return false;
+		// Bez jména chodí i přetečení bufferu (Windows, velký `git pull`):
+		// změny se ztratily, takže radši přečteme všechno znovu.
+		return true;
 	}
 	const normalized = fileName.split(path.sep).join("/");
 	return normalized === "default.project.json" || normalized === "src" || normalized.startsWith("src/");
@@ -825,6 +848,105 @@ function watch() {
 	attach();
 }
 
+// Pojistka: i kdyby se nějaká událost ztratila, do pár vteřin se to srovná.
+// Každých 5 s jen projdeme velikosti a časy souborů (levné) a celý strom
+// čteme znovu, jen když se něco z toho pohnulo.
+const POLL_MS = 5000;
+let lastStamp = null;
+
+function stampOf(diskPath, out) {
+	let stat;
+	try {
+		stat = fs.statSync(diskPath);
+	} catch (err) {
+		out.push(`${diskPath}:-`);
+		return;
+	}
+	out.push(`${diskPath}:${stat.mtimeMs}:${stat.size}`);
+	if (stat.isDirectory()) {
+		for (const entry of fs.readdirSync(diskPath).sort()) {
+			if (!entry.startsWith(".")) {
+				stampOf(path.join(diskPath, entry), out);
+			}
+		}
+	}
+}
+
+function diskStamp() {
+	const out = [];
+	stampOf(PROJECT_FILE, out);
+	const visit = (node) => {
+		if (node.$path) {
+			stampOf(path.resolve(PROJECT_ROOT, node.$path), out);
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!key.startsWith("$") && child && typeof child === "object") {
+				visit(child);
+			}
+		}
+	};
+	try {
+		visit(JSON.parse(fs.readFileSync(PROJECT_FILE, "utf8")).tree);
+	} catch (err) {
+		out.push("!project");
+	}
+	return out.join("\n");
+}
+
+function poll() {
+	const stamp = diskStamp();
+	if (stamp !== lastStamp) {
+		lastStamp = stamp;
+		rescan();
+	}
+}
+
+// Port drží jiný rojo-sync (typicky starý v jiném okně PowerShellu). Požádáme
+// ho, ať skončí, a port převezmeme — jinak by Studio dál četlo jeho starý strom.
+let listenTries = 0;
+
+function askOldToStop(done) {
+	const req = http.request(
+		{ host: HOST, port: PORT, method: "POST", path: "/api/rojo-sync/stop", timeout: 2000 },
+		(res) => {
+			res.resume();
+			done(res.statusCode === 200);
+		}
+	);
+	req.on("timeout", () => req.destroy());
+	req.on("error", () => done(false));
+	req.end();
+}
+
+function portTaken() {
+	console.error("");
+	console.error(`  ! Port ${PORT} drží jiný rojo-sync (starý v jiném okně). Zavři ho Ctrl+C a spusť znovu.`);
+	console.error("");
+	process.exit(1);
+}
+
+server.on("error", (err) => {
+	if (err.code !== "EADDRINUSE") {
+		console.error(`  ! server spadl: ${err.message}`);
+		process.exit(1);
+	}
+	listenTries += 1;
+	if (listenTries > 3) {
+		portTaken();
+		return;
+	}
+	if (listenTries === 1) {
+		console.log(`  port ${PORT} je obsazený — vypínám starý rojo-sync…`);
+	}
+	askOldToStop((stopped) => {
+		if (!stopped && listenTries === 1) {
+			portTaken();
+			return;
+		}
+		setTimeout(() => server.listen(PORT, HOST), 500);
+	});
+});
+
 server.listen(PORT, HOST, () => {
 	console.log("");
 	console.log("  rojo-sync — náhrada rojo serve pro Roblox Studio");
@@ -835,4 +957,6 @@ server.listen(PORT, HOST, () => {
 	console.log("  Ve Studiu: Plugins → Rojo → Connect");
 	console.log("");
 	watch();
+	lastStamp = diskStamp();
+	setInterval(poll, POLL_MS);
 });

@@ -122,6 +122,16 @@ the city has thousands of parts, and the server warns in the Output when it is o
 `zombie-delivery/spust-zombie-delivery.cmd` (Windows) or `zombie-delivery/spust-zombie-delivery.command` (Mac):
 git pull + the sync.
 
+**6.8.1, the sync after a `git pull`:**
+- On every **Connect** in Studio, `tools/rojo-sync.js` reads the disk again. It also checks the files every 5 s.
+- Starting the sync a second time stops the old one, even when the old one is in another window. A running old sync
+  used to keep the new one off the port.
+- Before 6.8.1, a big pull could leave Studio with a mix of old and new scripts. 6.7 and 6.8 hit this: Studio kept the
+  6.6 `CharacterArt/Geometry`, so it built the old block courier, and the Output said `[Npcs] no realistic body …
+  Unknown character art: person`.
+- After a pull, start the sync, then use Disconnect / Connect in Rojo. The Output must show the new version:
+  `[Server] Zombie Delivery 6.8.1 is running`.
+
 A Play test in Studio starts like a new player, with `Config.StudioStartMoney` ($150; the admin panel, P, gives money
 for testing). A published game starts with `Config.StartMoney` and saves to the DataStore `Config.DataStoreName`.
 Since 4.2 a save is locked to the server that plays it (UpdateAsync, `Config.SaveLockWait` / `SaveLockStale`): a quick
@@ -1674,6 +1684,7 @@ the feet rest on the deck (measured, any leg length) and both hands on the bar's
 one script each — before, Studio could drop the whole message and keep a mix of old and new scripts (errors like
 `CameraRig: attempt to index nil`). The Output's start line shows the version: `[Server] Zombie Delivery 5.8.1 is
 running`. After a pull: stop the sync (Ctrl+C), start it again, and Disconnect / Connect in Studio's Rojo plugin.
+(6.8.1: this alone did not always work. See **Running** above.)
 
 
 The windows now share the approved ZDC phone look (`design/phone-ui/`): a ZDC header (the red square, ZDC, a line glyph,
