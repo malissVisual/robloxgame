@@ -56,7 +56,13 @@ Map.BlockSize = BLOCK
 Map.RoadWidth = ROAD
 Map.HighwayWidth = HIGHWAY
 Map.RoadTop = 0.4
-Map.WalkTop = 0.6
+-- 6.10: the sidewalks a curb over the road (the owner: "a little higher"): WalkTop 0.6 → 0.9, 0.5 studs over the
+-- road (about 15 cm; it was 0.2). Every block's edge is a sloped kerb (shared/CurbShape.luau, built by
+-- server/Curbs.luau): CurbRun studs out onto the road it rises from RoadTop to WalkTop, so every vehicle drives up and
+-- down it anywhere along the curb (the wheels are frictionless colliders: a slope lifts them, a step would stop them)
+-- and the people step over it.
+Map.WalkTop = 0.9
+Map.CurbRun = 2
 
 export type District = {
 	id: string,
@@ -316,7 +322,8 @@ Map.Places = {
 -- on a platform; within 60 studs of the place's point (the extra one anywhere in its place's yard), never in the
 -- water, never inside a solid part, reachable on foot (a jump is about 7 studs). Where a place has nothing to hide
 -- behind near its point, World brings a small cover with the package (a sandbag nest, a snowman, hay, tyres, boxes,
--- a cable reel). y is the floor under the package: the yards 0.4 (ROAD_TOP), the blocks' sidewalks 0.6 (WALK_TOP).
+-- a cable reel). y is the floor under the package: the yards 0.4 (ROAD_TOP), the blocks' sidewalks Map.WalkTop (6.10:
+-- written so, it follows the curb: 0.9 now).
 Map.Secrets = {
 	-- The far places.
 	{ id = "secret_base", place = "base", hint = "The soldiers built a little sandbag nest in the middle of the yard. Something waits inside.", x = 330, y = 0.4, z = -2632 },
@@ -329,18 +336,18 @@ Map.Secrets = {
 	{ id = "secret_stables", place = "stables", hint = "Hay by the lamp near the clubhouse: look on the side away from the stalls.", x = 619.6, y = 0.4, z = 931.5 },
 	{ id = "secret_fueldepot", place = "fueldepot", hint = "Behind the full barrels at the back of the loading shed. No smoking!", x = 1465, y = 0.4, z = 592 },
 	-- The employers' buildings in town.
-	{ id = "secret_school", place = "school", hint = "Class is out. In the corner of the front wall, as far from the door as you can get.", x = -38.5, y = 0.6, z = 1171 },
-	{ id = "secret_frosty", place = "frosty", hint = "Hugging the pink wall north of the door, out of the sun, like ice cream should.", x = 1209.6, y = 0.6, z = -30 },
-	{ id = "secret_movers", place = "movers", hint = "Among the moving boxes nobody ever moved, against the orange wall.", x = 302.4, y = 0.6, z = 111 },
-	{ id = "secret_bank", place = "bank", hint = "Up the steps, between marble and money: behind the last column on the south side.", x = 127.6, y = 1.8, z = -266 },
-	{ id = "secret_clinic", place = "clinic", hint = "The patients' bench by the front door hides more than old gum.", x = -266, y = 0.6, z = 324 },
+	{ id = "secret_school", place = "school", hint = "Class is out. In the corner of the front wall, as far from the door as you can get.", x = -38.5, y = Map.WalkTop, z = 1171 },
+	{ id = "secret_frosty", place = "frosty", hint = "Hugging the pink wall north of the door, out of the sun, like ice cream should.", x = 1209.6, y = Map.WalkTop, z = -30 },
+	{ id = "secret_movers", place = "movers", hint = "Among the moving boxes nobody ever moved, against the orange wall.", x = 302.4, y = Map.WalkTop, z = 111 },
+	{ id = "secret_bank", place = "bank", hint = "Up the steps, between marble and money: behind the last column on the south side.", x = 127.6, y = Map.WalkTop + 1.2, z = -266 }, -- (the portico, 1.2 over the walk)
+	{ id = "secret_clinic", place = "clinic", hint = "The patients' bench by the front door hides more than old gum.", x = -266, y = Map.WalkTop, z = 324 },
 	-- The missions' places in town (3.0).
-	{ id = "secret_pharmacy", place = "pharmacy", hint = "Right under the green cross, against the wall.", x = 116, y = 0.6, z = 414 },
-	{ id = "secret_market", place = "market", hint = "Between the grocery pallets at the delivery bay.", x = -411, y = 0.7, z = 109 },
-	{ id = "secret_warehouse", place = "warehouse", hint = "The yellow forklift parked out front is hiding something behind its back.", x = 1345, y = 0.6, z = 252 }, -- 4.0: moved off the loading docks
-	{ id = "secret_firestation", place = "firestation", hint = "Tucked behind the red hydrant on the corner. No hose needed.", x = 316, y = 0.6, z = -104 },
-	{ id = "secret_police", place = "police", hint = "Between the two parked patrol cars. Nobody is watching.", x = -258, y = 0.6, z = -258 },
-	{ id = "secret_cityhall", place = "cityhall", hint = "Make a wish at the fountain, then look on its far side, toward the hall.", x = 22, y = 0.6, z = -401.5 },
+	{ id = "secret_pharmacy", place = "pharmacy", hint = "Right under the green cross, against the wall.", x = 116, y = Map.WalkTop, z = 414 },
+	{ id = "secret_market", place = "market", hint = "Between the grocery pallets at the delivery bay.", x = -411, y = Map.WalkTop + 0.1, z = 109 }, -- (the car park, 0.1 over the walk)
+	{ id = "secret_warehouse", place = "warehouse", hint = "The yellow forklift parked out front is hiding something behind its back.", x = 1345, y = Map.WalkTop, z = 252 }, -- 4.0: moved off the loading docks
+	{ id = "secret_firestation", place = "firestation", hint = "Tucked behind the red hydrant on the corner. No hose needed.", x = 316, y = Map.WalkTop, z = -104 },
+	{ id = "secret_police", place = "police", hint = "Between the two parked patrol cars. Nobody is watching.", x = -258, y = Map.WalkTop, z = -258 },
+	{ id = "secret_cityhall", place = "cityhall", hint = "Make a wish at the fountain, then look on its far side, toward the hall.", x = 22, y = Map.WalkTop, z = -401.5 },
 	-- The missions' places out of town (3.0).
 	{ id = "secret_airfield", place = "airfield", hint = "Old tyres by the fence, just inside the gate on your right. Look behind them.", x = -1430.5, y = 0.4, z = 1156 },
 	{ id = "secret_powerplant", place = "powerplant", hint = "A big cable reel by the lamp in front of the turbine hall. Check the side facing the hall.", x = 1114, y = 0.4, z = 602.6 },

@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BusLines = require(Shared.BusLines)
+local CurbShape = require(Shared.CurbShape)
 local Map = require(Shared.Map)
 local DayNight = require(script.Parent.DayNight)
 
@@ -179,9 +180,12 @@ local function shelter(parent: Instance, stop: BusLines.Stop)
 	signFace(sign, Enum.NormalId.Back, stop)
 	-- 6.3: the map board past the back end (the bus's side of the shelter; the pole sign is at the front end), its face
 	-- toward the road like the arrivals board's. Its plain face; a near client covers it with the map.
+	-- 6.10: off the pad its posts stand on the walk, or (a stop by no block) on the land (World's ground: 0).
+	local onBlock = Map.blockAt(stop.kx, stop.kz) ~= nil
+	local postFoot, postTop = if onBlock then Map.WalkTop else 0, PAD_TOP + 6.3
 	local mapAlong, mapDepth = -8.4, 2.7
 	for _, along in { mapAlong - 1.85, mapAlong + 1.85 } do
-		part(model, "MapPost", Vector3.new(0.3, 6.4, 0.3), at(along, mapDepth, PAD_TOP + 3.1), METAL, Enum.Material.Metal)
+		part(model, "MapPost", Vector3.new(0.3, postTop - postFoot, 0.3), at(along, mapDepth, (postFoot + postTop) / 2), METAL, Enum.Material.Metal)
 	end
 	deco(part(model, "MapFrame", Vector3.new(3.7, 0.3, 0.3), at(mapAlong, mapDepth, PAD_TOP + 6.3), lineColor, Enum.Material.SmoothPlastic))
 	local mapBoard = deco(part(model, "MapBoard", Vector3.new(3.4, 4.6, 0.12), at(mapAlong, mapDepth, PAD_TOP + 3.85), Color3.fromRGB(18, 20, 24), Enum.Material.SmoothPlastic))
@@ -191,7 +195,13 @@ local function shelter(parent: Instance, stop: BusLines.Stop)
 	text(plain, "BUS MAP", UDim2.new(1, -24, 0.12, 0), UDim2.new(0, 12, 0.44, 0), Color3.fromRGB(255, 196, 70))
 	-- On the road: the yellow kerb line where the bus stands, and BUS.
 	local stand = BusLines.DoorAhead -- (the bus's middle is this far behind the door)
-	deco(part(model, "BusBay", Vector3.new(26, 0.05, 0.45), at(-stand, -0.4, Map.RoadTop + 0.03), PAINT))
+	if onBlock then
+		-- 6.10: the kerb is a slope now (shared/CurbShape.luau): the yellow line is painted along it, halfway down
+		local out = CurbShape.Run / 2
+		deco(part(model, "BusBay", Vector3.new(26, 0.05, 0.6), at(-stand, -out, Map.RoadTop + CurbShape.rise(out) + 0.03) * CFrame.Angles(CurbShape.Angle, 0, 0), PAINT))
+	else
+		deco(part(model, "BusBay", Vector3.new(26, 0.05, 0.45), at(-stand, -0.4, Map.RoadTop + 0.03), PAINT))
+	end
 	local letters = deco(part(model, "BusLetters", Vector3.new(7, 0.05, 2.6), at(-stand, -3.8, Map.RoadTop + 0.03), PAINT))
 	letters.Transparency = 1
 	local paint = surface(letters, Enum.NormalId.Top, 40)
