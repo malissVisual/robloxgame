@@ -29,6 +29,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.3:
+  - **Cosmetics** (`Config.Cosmetics`, `server/StyleWear.luau`, shared Style / StyleLooks / StyleBuild): hats, jackets, vest and bag colours, wraps, bike paint, decals.
+  - **Bought from the clerks:** "Style" [R / L2] on Dot, Gus and Kip opens the phone's STYLE on their tab; the server checks you stand at the shop. STYLE in the phone is the wardrobe (TRY, WEAR, TAKE OFF anywhere).
+  - **Review fixes:** STYLE's keys, a dye's material, the vest preview, KitWear retinted at start.
 - Claude · 6.12.2:
   - **Spawn:** a JOBS booth round the job board (`server/JobsSpot.luau`); one gear stall with the GEAR (Dot, Last Stop Supplies) and BAGS (Nell, ZDC Bags) counters (`server/GearStall.luau`, `Config.GearStall`) in place of the bag kiosk.
   - **Last Stop's old building** (`Map.LastStop`): no shop any more; its rooftop props stay.

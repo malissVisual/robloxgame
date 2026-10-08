@@ -9,7 +9,7 @@ import glob, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan")
+PURE = ("Config", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks")
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -120,6 +120,31 @@ def styles_check():
     return not bad
 
 if not styles_check():
+    ok = False
+
+# 6.12, the clerks: the looks' clerks (Config.Cosmetics.Counters) are server/ShopClerks.luau's people at those shops,
+# and their "Style" prompt's keys (R, the gamepad's L2) stay free: nothing else in src binds them.
+def clerks_check():
+    root = os.path.dirname(HERE)
+    config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
+    clerks = open(os.path.join(root, "src", "server", "ShopClerks.luau"), encoding="utf-8").read()
+    start = config.index("\tCounters = {")
+    counters = dict(re.findall(r'^\t\t(\w+) = \{ clerk = "(\w+)"', config[start:config.index("} :: { [string]: CosmeticCounter }", start)], re.M))
+    people = dict(re.findall(r'^\t(\w+) = \{ name = "(\w+)"', clerks, re.M))
+    bad = [f"{shop}: {name} in Config.Cosmetics.Counters, {people.get(shop)} in ShopClerks" for shop, name in counters.items() if people.get(shop) != name]
+    if not counters:
+        bad.append("no Counters in Config.Cosmetics")
+    if "STYLE_KEY = Enum.KeyCode.R " not in clerks or "STYLE_PAD = Enum.KeyCode.ButtonL2 " not in clerks:
+        bad.append("ShopClerks: the Style prompt's keys moved; update tests/run_tests.py")
+    for folder, _, files in os.walk(os.path.join(root, "src")):
+        for name in files:
+            if name.endswith(".luau") and name != "ShopClerks.luau":
+                if re.search(r"Enum\.KeyCode\.(R|ButtonL2)\b", open(os.path.join(folder, name), encoding="utf-8").read()):
+                    bad.append(f"{name} binds R or L2, the clerks' Style prompt's keys")
+    print("== clerks: " + (f"the looks' clerks are ShopClerks' people ({', '.join(f'{k} {v}' for k, v in counters.items())}); R and L2 only for their Style prompt" if not bad else "; ".join(bad)))
+    return not bad
+
+if not clerks_check():
     ok = False
 
 # Every module must compile the way Roblox compiles it: the Luau compiler (luau-compile, next to the luau binary)

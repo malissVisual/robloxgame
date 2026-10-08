@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.2"
+Config.Version = "6.12.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1377,6 +1377,140 @@ Config.Rewards = {
 	Secrets = { paint = "phantom", title = "Treasure Hunter", money = 25000 },
 	-- … and for every challenge done: the gun nobody else has.
 	Challenges = { weapon = "deadend", title = "The Last Courier", money = 50000 },
+}
+
+-- 6.12: cosmetics (the owner: "something to spend the game's money on, looks only, no advantage"). Looked at, tried,
+-- worn and taken off in the phone's STYLE app (client/StyleApp.luau, client/StylePreview.luau). The clerks (the owner:
+-- "things are bought only from the NPCs in the shops, for the vibe"): bought only at a shop that sells the slot (a
+-- slot's `shops`; Counters, their clerks). The server decides every purchase and puts the looks on
+-- (server/StyleWear.luau; the Style remote, Config.Robust.Limits.Style). No numbers of the game change: a cosmetic has
+-- no stats. profile.style = { owned = { id → true }, worn = { slot → id } } (shared/Style.luau: the rules;
+-- server/PlayerData.luau saves it). The geometry is shared/StyleLooks.luau's, built by
+-- shared/StyleBuild.luau: welded, massless, non-colliding, never hit by rays.
+--   look     a hat or a jacket of StyleLooks (built on the courier's classic R15 body, fitted to its real parts), "dye"
+--            (the Courier Vest's or the bag's colour, through KitWear's tint hook), "wrap" (a colour over the car's paint
+--            job), "bikepaint" (a bike's or the E-Scooter's frame), a decal of StyleLooks (stripes, flames, logo, checker,
+--            pinstripe: thin parts laid on the body's painted panels, round its lamps, racks, labels and doors)
+--   color    the main colour (RGB); trim the second one (a cuff, a band, a stripe, the flames' core)
+--   material an Enum.Material name for the main colour (default: Fabric on the courier, SmoothPlastic on a vehicle)
+--   level    sold from this driver level (default 1)
+--   reward   never sold: given later by tasks, events or passes (StyleWear.give); the app shows it as a reward
+-- Prices against the economy: a walk pays $60 – 110, a bike run $100 – 250, a level's reward $500 – 15,000; the kit
+-- costs $120 – 1,500 and Wrench Garage's paints $300 – 3,000. So the courier's looks start at a delivery or two and the
+-- vehicles' wraps and decals sit with the garage's paints (tests/style_test.luau keeps them there).
+export type CosmeticDef = {
+	id: string,
+	name: string,
+	slot: string,
+	look: string,
+	price: number,
+	color: { number },
+	trim: { number }?,
+	material: string?,
+	level: number?,
+	reward: string?,
+	description: string,
+}
+-- The clerks: a slot's `shops`, the Map.Shops ids that sell it (the first one with a counter: where the app sends you).
+export type CosmeticSlot = { id: string, tab: string, name: string, note: string, shops: { string } }
+-- The clerks: a counter that sells looks (Config.Cosmetics.Counters): its clerk (server/ShopClerks.luau's person, the
+-- same name), the place in a sentence ("Wrench Garage"), the STYLE tab their "Style" prompt opens, the prompt's line.
+export type CosmeticCounter = { clerk: string, place: string, tab: string, pitch: string }
+
+Config.Cosmetics = {
+	-- The slots, one item worn in each, in the app's order; `tab` is the app's tab ("courier" | "vehicle"); `shops`, who
+	-- sells it: the courier's looks at the gear stall (Dot's GEAR counter, and Nell's BAGS beside it), the wraps and
+	-- decals at Wrench Garage (Gus), the bike paint at Spoke & Chain (Kip) and at Wrench Garage.
+	Slots = {
+		{ id = "hat", tab = "courier", name = "Hats", shops = { "supplies", "bags" }, note = "Your own hats and hair hide under it while you wear it." },
+		{ id = "jacket", tab = "courier", name = "Jackets", shops = { "supplies", "bags" }, note = "Over your own clothes; the vest and the bag go on top." },
+		{ id = "vest", tab = "courier", name = "Courier Vest colour", shops = { "supplies", "bags" }, note = "Shows on the Courier Vest (Last Stop Supplies) while no Kevlar or heavy vest covers it." },
+		{ id = "bag", tab = "courier", name = "Bag colour", shops = { "supplies", "bags" }, note = "The bag in your hand, whichever bag it is." },
+		{ id = "wrap", tab = "vehicle", name = "Wraps · cars, vans, trucks", shops = { "mechanic" }, note = "A colour wrap over the paint job of every car you own. TAKE OFF shows the paint again." },
+		{ id = "bikepaint", tab = "vehicle", name = "Paint · bikes and the E-Scooter", shops = { "bikes", "mechanic" }, note = "The frame of every bike you own and of the E-Scooter." },
+		{ id = "decal", tab = "vehicle", name = "Decals · cars, vans, trucks", shops = { "mechanic" }, note = "On every car you own, around its lamps, racks, labels and doors." },
+	} :: { CosmeticSlot },
+	-- The shops whose clerk sells looks (Map.Shops ids): server/ShopClerks.luau gives the clerk a "Style" prompt beside
+	-- "Shop" (`pitch` after their name) that opens the phone's STYLE on `tab`. Nell at ZDC Bags, next to Dot, sells the
+	-- courier's looks too (the slots' shops) but has no prompt of her own.
+	Counters = {
+		supplies = { clerk = "Dot", place = "the gear stall", tab = "courier", pitch = "Looks for you" },
+		mechanic = { clerk = "Gus", place = "Wrench Garage", tab = "vehicle", pitch = "Looks for your rides" },
+		bikes = { clerk = "Kip", place = "Spoke & Chain", tab = "vehicle", pitch = "Paint for your bikes" },
+	} :: { [string]: CosmeticCounter },
+	Items = {
+		-- Hats (StyleLooks.hat: fitted to the head; the player's own hat and hair accessories hide under it)
+		{ id = "cap_red", name = "Backwards Cap · ZDC Red", slot = "hat", look = "cap", price = 120, color = { 196, 40, 38 }, trim = { 28, 31, 34 }, description = "The dispatcher's favourite, worn the courier way." },
+		{ id = "cap_black", name = "Backwards Cap · Black", slot = "hat", look = "cap", price = 120, color = { 32, 34, 38 }, trim = { 196, 40, 38 }, description = "A black cap with a red snap, peak to the back." },
+		{ id = "beanie_orange", name = "Beanie · Safety Orange", slot = "hat", look = "beanie", price = 150, color = { 245, 120, 30 }, trim = { 214, 92, 22 }, description = "A knitted beanie with a pom-pom. Seen from three blocks away." },
+		{ id = "beanie_grey", name = "Beanie · Heather Grey", slot = "hat", look = "beanie", price = 150, color = { 150, 152, 156 }, trim = { 196, 40, 38 }, description = "A grey beanie with a red cuff." },
+		{ id = "hardhat", name = "Hard Hat", slot = "hat", look = "hardhat", price = 300, color = { 246, 196, 36 }, trim = { 40, 40, 44 }, description = "A site helmet with a ridge and a peak. Looks only: it stops no bites." },
+		{ id = "helmet", name = "Bike Helmet", slot = "hat", look = "helmet", price = 380, color = { 40, 110, 210 }, trim = { 235, 236, 232 }, description = "A vented cycling helmet with a visor." },
+		{ id = "cowboy", name = "Cowboy Hat", slot = "hat", look = "cowboy", price = 450, level = 4, color = { 122, 82, 50 }, trim = { 40, 30, 24 }, description = "A wide brim and a creased crown, for the long roads out west." },
+		{ id = "cap_gold", name = "Golden Cap", slot = "hat", look = "cap", price = 0, reward = "event", color = { 226, 178, 52 }, trim = { 120, 84, 20 }, material = "Metal", description = "Not for sale: a reward of a later event." },
+		{ id = "helmet_chrome", name = "Chrome Helmet", slot = "hat", look = "helmet", price = 0, reward = "pass", color = { 205, 210, 216 }, trim = { 30, 30, 34 }, material = "Foil", description = "Not for sale: a reward of a later pass." },
+		-- Jackets (StyleLooks.jacket: thin shells over the torso and the arms, under the vest and the bag)
+		{ id = "hoodie_grey", name = "Hoodie · Grey", slot = "jacket", look = "hoodie", price = 350, color = { 118, 122, 128 }, trim = { 196, 40, 38 }, description = "A grey hoodie: a hood, a kangaroo pocket, red cuffs." },
+		{ id = "hoodie_red", name = "Hoodie · ZDC Red", slot = "jacket", look = "hoodie", price = 350, color = { 176, 36, 34 }, trim = { 30, 32, 36 }, description = "The company's red hoodie with black cuffs." },
+		{ id = "track_blue", name = "Track Jacket", slot = "jacket", look = "track", price = 500, color = { 36, 74, 160 }, trim = { 236, 236, 232 }, description = "Blue, with two white stripes down each sleeve." },
+		{ id = "bomber_olive", name = "Bomber Jacket", slot = "jacket", look = "bomber", price = 650, level = 3, color = { 88, 98, 62 }, trim = { 214, 110, 40 }, description = "An olive bomber with ribbed orange cuffs and a sleeve pocket." },
+		{ id = "puffer_yellow", name = "Puffer Jacket", slot = "jacket", look = "puffer", price = 800, level = 4, color = { 238, 190, 40 }, trim = { 60, 60, 64 }, material = "SmoothPlastic", description = "A quilted puffer for the cold night shifts." },
+		{ id = "leather_black", name = "Leather Jacket", slot = "jacket", look = "leather", price = 1200, level = 6, color = { 34, 34, 36 }, trim = { 170, 172, 176 }, material = "Leather", description = "A biker's jacket: lapels, a slanted zip, a belt." },
+		{ id = "hoodie_night", name = "Night Shift Hoodie", slot = "jacket", look = "hoodie", price = 0, reward = "tasks", color = { 24, 26, 30 }, trim = { 200, 236, 80 }, description = "Not for sale: a reward of the daily tasks later." },
+		-- The Courier Vest's colour (dye: the vest's cloth; its reflective bands stay)
+		{ id = "vest_orange", name = "Safety Orange", slot = "vest", look = "dye", price = 100, color = { 245, 118, 26 }, description = "The road crew's orange." },
+		{ id = "vest_lime", name = "Hi-Vis Lime", slot = "vest", look = "dye", price = 100, color = { 196, 232, 40 }, description = "The brightest thing in a dead city." },
+		{ id = "vest_blue", name = "Courier Blue", slot = "vest", look = "dye", price = 150, color = { 40, 98, 196 }, description = "A calm blue vest." },
+		{ id = "vest_pink", name = "Hot Pink", slot = "vest", look = "dye", price = 200, color = { 236, 72, 150 }, description = "Nobody misses this courier." },
+		{ id = "vest_black", name = "Stealth Black", slot = "vest", look = "dye", price = 250, color = { 34, 36, 40 }, description = "Black cloth, the silver bands still shine." },
+		{ id = "vest_gold", name = "Gold Vest", slot = "vest", look = "dye", price = 0, reward = "event", color = { 222, 176, 48 }, material = "Metal", description = "Not for sale: a reward of a later event." },
+		-- The bag's colour (dye: the active bag's body)
+		{ id = "bag_black", name = "Midnight Black", slot = "bag", look = "dye", price = 80, color = { 30, 32, 36 }, description = "Every bag you hold in black." },
+		{ id = "bag_sky", name = "Sky Blue", slot = "bag", look = "dye", price = 100, color = { 90, 170, 230 }, description = "Every bag you hold in sky blue." },
+		{ id = "bag_mint", name = "Mint", slot = "bag", look = "dye", price = 100, color = { 120, 210, 170 }, description = "Every bag you hold in mint." },
+		{ id = "bag_purple", name = "Royal Purple", slot = "bag", look = "dye", price = 150, color = { 110, 60, 170 }, description = "Every bag you hold in purple." },
+		{ id = "bag_yellow", name = "Hi-Vis Yellow", slot = "bag", look = "dye", price = 150, color = { 240, 214, 40 }, description = "Every bag you hold in hi-vis yellow." },
+		{ id = "bag_gold", name = "Gold Bag", slot = "bag", look = "dye", price = 0, reward = "pass", color = { 222, 176, 48 }, material = "Metal", description = "Not for sale: a reward of a later pass." },
+		-- Wraps for the cars, vans and trucks (over Wrench Garage's paint job while worn)
+		{ id = "wrap_sand", name = "Desert Sand", slot = "wrap", look = "wrap", price = 800, color = { 196, 170, 120 }, description = "A dusty sand wrap." },
+		{ id = "wrap_teal", name = "Satin Teal", slot = "wrap", look = "wrap", price = 900, color = { 32, 150, 150 }, description = "A satin teal wrap." },
+		{ id = "wrap_orange", name = "Sunset Orange", slot = "wrap", look = "wrap", price = 900, color = { 240, 110, 40 }, description = "A sunset orange wrap." },
+		{ id = "wrap_ice", name = "Ice Blue", slot = "wrap", look = "wrap", price = 900, color = { 150, 200, 236 }, description = "A pale ice-blue wrap." },
+		{ id = "wrap_red", name = "ZDC Courier Red", slot = "wrap", look = "wrap", price = 1000, color = { 190, 36, 34 }, description = "The company's red, on every car of yours." },
+		{ id = "wrap_green", name = "Racing Green", slot = "wrap", look = "wrap", price = 1100, color = { 22, 92, 56 }, description = "A deep racing green." },
+		{ id = "wrap_matte", name = "Matte Black", slot = "wrap", look = "wrap", price = 1200, color = { 30, 31, 34 }, material = "Plastic", description = "A flat, matte black." },
+		{ id = "wrap_purple", name = "Candy Purple", slot = "wrap", look = "wrap", price = 1500, level = 6, color = { 130, 40, 170 }, material = "Metal", description = "A metallic candy purple." },
+		{ id = "wrap_chrome", name = "Mirror Chrome", slot = "wrap", look = "wrap", price = 0, reward = "pass", color = { 200, 206, 212 }, material = "Foil", description = "Not for sale: a reward of a later pass." },
+		-- Paint for the bikes and the E-Scooter (their frames)
+		{ id = "bike_mint", name = "Mint Frame", slot = "bikepaint", look = "bikepaint", price = 150, color = { 120, 210, 170 }, description = "Every bike's frame and the E-Scooter in mint." },
+		{ id = "bike_sky", name = "Sky Blue Frame", slot = "bikepaint", look = "bikepaint", price = 150, color = { 90, 170, 230 }, description = "Every bike's frame and the E-Scooter in sky blue." },
+		{ id = "bike_yellow", name = "Sunflower Frame", slot = "bikepaint", look = "bikepaint", price = 200, color = { 244, 200, 40 }, description = "Every bike's frame and the E-Scooter in yellow." },
+		{ id = "bike_pink", name = "Bubblegum Frame", slot = "bikepaint", look = "bikepaint", price = 200, color = { 240, 120, 180 }, description = "Every bike's frame and the E-Scooter in pink." },
+		{ id = "bike_black", name = "Matte Black Frame", slot = "bikepaint", look = "bikepaint", price = 250, color = { 32, 33, 36 }, material = "Plastic", description = "Every bike's frame and the E-Scooter in matte black." },
+		{ id = "bike_white", name = "Pearl White Frame", slot = "bikepaint", look = "bikepaint", price = 250, color = { 236, 236, 230 }, description = "Every bike's frame and the E-Scooter in pearl white." },
+		{ id = "bike_gold", name = "Gold Frame", slot = "bikepaint", look = "bikepaint", price = 0, reward = "event", color = { 222, 176, 48 }, material = "Metal", description = "Not for sale: a reward of a later event." },
+		-- Decals for the cars, vans and trucks (StyleLooks.decals)
+		{ id = "logo", name = "ZDC Logo", slot = "decal", look = "logo", price = 500, color = { 236, 236, 232 }, trim = { 196, 40, 38 }, description = "The company's roundel on both sides." },
+		{ id = "stripes_white", name = "Racing Stripes · White", slot = "decal", look = "stripes", price = 900, color = { 236, 236, 232 }, description = "Two white stripes over the hood and the roof." },
+		{ id = "stripes_black", name = "Racing Stripes · Black", slot = "decal", look = "stripes", price = 900, color = { 26, 27, 30 }, description = "Two black stripes over the hood and the roof." },
+		{ id = "checker", name = "Checker Band", slot = "decal", look = "checker", price = 1200, level = 5, color = { 236, 236, 232 }, trim = { 24, 24, 26 }, description = "A black and white checker band down both sides." },
+		{ id = "flames", name = "Hot Rod Flames", slot = "decal", look = "flames", price = 1600, level = 5, color = { 240, 96, 24 }, trim = { 255, 206, 60 }, description = "Orange flames off the hood and down the sides." },
+		{ id = "flames_blue", name = "Blue Flames", slot = "decal", look = "flames", price = 1800, level = 7, color = { 40, 110, 230 }, trim = { 150, 220, 255 }, description = "Blue flames off the hood and down the sides." },
+		{ id = "pinstripe_gold", name = "Gold Pinstripes", slot = "decal", look = "pinstripe", price = 0, reward = "tasks", color = { 222, 176, 48 }, description = "Not for sale: a reward of the daily tasks later." },
+	} :: { CosmeticDef },
+	-- How the looks sit (studs; shared/StyleLooks.luau, shared/StyleBuild.luau).
+	Fit = {
+		Shell = 0.02, -- a jacket's shell over a body part, each side (under the Courier Vest's cloth, 0.07, and a bag's strap)
+		Head = 1.2, -- the classic R15 head every way: the hats are drawn on it, then scaled to the real head
+		HeadMin = 0.6, -- … by at least / at most this (an odd head: still on it, not absurd)
+		HeadMax = 1.6,
+		Lift = 0.008, -- a decal's gap over the panel it lies on
+		Thick = 0.03, -- a decal's thickness
+		Margin = 0.05, -- a decal keeps this far from a lamp, a rack, a label, a door
+		MinRun = 0.6, -- a stripe's piece shorter than this between two obstacles is left out
+		Budget = 56, -- parts one decal adds to a vehicle at most
+		Checker = 0.3, -- the checker band's square
+	},
 }
 
 -- Supply crates lying around the world: drive or walk into one.
@@ -4018,6 +4152,7 @@ Config.Robust = {
 		Wheelie = 8, -- 6.10: up / down on the E-Scooter (server/Wheelie.luau)
 		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
 		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
+		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
 	},
 }
 

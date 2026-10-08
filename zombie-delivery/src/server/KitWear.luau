@@ -51,6 +51,9 @@
 -- builds every bag in every place on the courier's R15 body and on an R6 body offline.
 -- 6.7: the bags are real-size (server/KitArt/Geometry.luau) and so are the pieces packed in them (BagFill); a loaded
 -- bag's moving pieces take their open place first (KitArt.open through BagFill.open: the thermal bag's lid stands open).
+-- 6.12: the tint hook (KitWear.tint, set by server/StyleWear.luau): every slot built (and the bag's art built again for
+-- what is in it) is handed to it, so the Courier Vest's cloth and the bag's body take the colour worn in the phone's
+-- STYLE app (bought from Dot at the gear stall); KitWear.retint(player) hands it the slots worn now (the colour changed).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,6 +73,10 @@ local PhoneArt = require(script.Parent.PhoneArt.Geometry)
 local CharacterArt = require(script.Parent.CharacterArt.Geometry) -- 6.0.1: the Courier Vest's pieces
 
 local KitWear = {}
+
+-- 6.12, set by server/StyleWear.luau: (player, slot, the slot's key, its built art) after a slot is built; it recolours
+-- the vest's or the bag's parts (StyleBuild.tint keeps their own colours to go back to).
+KitWear.tint = nil :: ((Player, string, string, Builder.Built) -> ())?
 
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
 local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit.outfit's vest when no armour is owned)
@@ -352,6 +359,19 @@ local function holdsPhone(player: Player, character: Model, humanoid: Humanoid):
 	return true
 end
 
+-- 6.12: a slot built (or its bag's art built again): the STYLE colour on it (KitWear.tint).
+local function tintSlot(player: Player, slot: string, made: Slot)
+	local hook = KitWear.tint
+	if hook then
+		local ok, err = pcall(function()
+			hook(player, slot, made.key, made.built)
+		end)
+		if not ok then
+			warn(`[KitWear] tint {slot}: {err}`)
+		end
+	end
+end
+
 -- What the character should wear now, against what it wears: the differences are built again.
 local function refresh(player: Player)
 	local wearer = wearers[player]
@@ -427,6 +447,7 @@ local function refresh(player: Player)
 				warn(`[KitWear] {slot} {id}: {made}`)
 			elseif made then
 				wearer.slots[slot] = made
+				tintSlot(player, slot, made) -- 6.12
 				if slot == "hand" then
 					-- 6.5.1: the owner can't see the bag in Studio: say once per bag where it went (the Output)
 					local pivot = made.pivot
@@ -452,6 +473,7 @@ local function refresh(player: Player)
 			Builder.destroy(bagSlot.built)
 			bagSlot.built = art
 			bagSlot.fill = fill.key
+			tintSlot(player, "hand", bagSlot) -- 6.12
 		end
 	end
 	-- 6.0: a vest put on while you play (not the one you joined or respawned with): the put-on gesture.
@@ -557,6 +579,17 @@ local function watch(player: Player)
 	end)
 	if player.Character then
 		dress(player, player.Character)
+	end
+end
+
+-- 6.12: the STYLE colours changed (the Courier Vest's, the bag's): the slots worn now take them (server/StyleWear.luau).
+function KitWear.retint(player: Player)
+	local wearer = wearers[player]
+	if not wearer then
+		return
+	end
+	for slot, current in wearer.slots do
+		tintSlot(player, slot, current)
 	end
 end
 

@@ -7,11 +7,23 @@
 -- handler on the same prompt (it opens the shop); a counter without room for a clerk keeps its prompt.
 -- 6.12.2: Dot (Last Stop Supplies) and Nell (ZDC Bags) stand side by side, behind the GEAR and BAGS counters of the
 -- gear stall at the spawn (server/GearStall.luau); Last Stop's old building has no counter, so nobody stands there.
+-- 6.12, the looks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): the clerks who sell
+-- them (Config.Cosmetics.Counters: Dot at the gear stall, Gus at Wrench Garage, Kip at Spoke & Chain) get a second
+-- prompt under "Shop": "Style" on R (the gamepad's L2), so both show at once (E is "Shop"'s). It greets you as "Shop"
+-- does and opens the phone's STYLE app on their tab (StyleWear.invite: COURIER at Dot, VEHICLE at Gus and Kip), where
+-- BUY works while you stand at the shop (server/StyleWear.luau checks it).
+--   Why R and L2: nothing else in the game uses them. The keyboard's E, G, X, F, H, Q, T, Y, V, B, J, M, I, U, C, K, L,
+--   N, P, the numbers, Tab and Shift are taken (client/KeyHints.luau, PhoneApps' KEYS); the gamepad's X is every E
+--   prompt's, B the G prompts' and the phone's back, Y the menu, L1 / R1 the holster, a throw, a seat and STYLE's tabs,
+--   the D-pad the phone, the weapon wheel and the hands, L3 the camera, R2 the gun.
 local Players = game:GetService("Players")
 
-local Map = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Map"))
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Map = require(Shared:WaitForChild("Map"))
 local World = require(script.Parent.World)
 local Npcs = require(script.Parent.Npcs)
+local StyleWear = require(script.Parent.StyleWear)
 
 local ShopClerks = {}
 
@@ -28,6 +40,9 @@ local CLERKS: { [string]: Clerk } = {
 }
 
 local BEHIND = 1.6 -- studs behind the counter's back face where the clerk stands
+local STYLE_KEY = Enum.KeyCode.R -- the looks' prompt (see the header: free on the keyboard …)
+local STYLE_PAD = Enum.KeyCode.ButtonL2 -- (… and on a gamepad)
+local STYLE_BELOW = 1.9 -- studs under the "Shop" prompt's attachment: the two prompts one over the other
 local started = false
 
 -- The floor under the counter (its bottom) and the spot behind it, facing the customers (the counter's front: its
@@ -59,7 +74,8 @@ local function place(prompt: ProximityPrompt, shop: string)
 	prompt.ActionText = "Shop"
 	prompt.Parent = chest
 	local said = 0
-	prompt.Triggered:Connect(function(player: Player)
+	-- The clerk turns to you, waves and says a line (at most every 8 s): either prompt.
+	local function greet(player: Player)
 		local character = player.Character
 		local body = character and character:FindFirstChild("HumanoidRootPart")
 		if body and body:IsA("BasePart") then
@@ -71,7 +87,30 @@ local function place(prompt: ProximityPrompt, shop: string)
 			said = now
 			Npcs.say(npc, clerk.lines[math.random(1, #clerk.lines)], 4)
 		end
-	end)
+	end
+	prompt.Triggered:Connect(greet)
+	-- 6.12, the looks: "Style · Gus · Looks for your rides" under "Shop", on its own key (both show at once).
+	local counter = Config.Cosmetics.Counters[shop]
+	if counter then -- (its clerk is this one: tests/run_tests.py compares the names)
+		local below = Instance.new("Attachment")
+		below.Name = "StylePromptAt"
+		below.Position = chest.Position - Vector3.new(0, STYLE_BELOW, 0)
+		below.Parent = root
+		local style = Instance.new("ProximityPrompt")
+		style.Name = "StylePrompt"
+		style.ActionText = "Style"
+		style.ObjectText = `{clerk.name} · {counter.pitch}`
+		style.KeyboardKeyCode = STYLE_KEY
+		style.GamepadKeyCode = STYLE_PAD
+		style.HoldDuration = 0
+		style.MaxActivationDistance = prompt.MaxActivationDistance
+		style.RequiresLineOfSight = false
+		style.Parent = below
+		style.Triggered:Connect(function(player: Player)
+			greet(player)
+			StyleWear.invite(player, counter.tab)
+		end)
+	end
 	-- A look at whoever comes up to the counter (cheap: every 0.5 s, the nearest player in reach)
 	task.spawn(function()
 		while npc.Parent do

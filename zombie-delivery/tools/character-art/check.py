@@ -60,6 +60,7 @@ return Mock""")
         if lifecycle.returncode or "ALL CHECKS PASSED" not in lifecycle.stdout:
             raise RuntimeError(lifecycle.stdout + lifecycle.stderr)
         bags = bag_check(tmp, luau)
+        style = style_check(tmp, luau)
     models = [json.loads(line) for line in result.stdout.splitlines()]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(models, separators=(",", ":")) + "\n")
@@ -67,6 +68,7 @@ return Mock""")
     print("PASS: attachment bind positions, real builder flags/welds, clones, clearance and native-only budgets.")
     print(lifecycle.stdout.strip())
     print(bags)
+    print(style)
     print("BuildRigFromAttachments/Animator physics and replication require Studio; the recorder does not simulate them.")
 
 # 6.4.1: the worn bag built by the real server/KitWear.luau (its requires pointed at the pure shared modules, the real
@@ -103,6 +105,39 @@ def bag_check(tmp, luau):
     if result.returncode or "ALL CHECKS PASSED" not in result.stdout:
         raise RuntimeError("Worn bag check FAILED:\n" + result.stdout + result.stderr)
     return "Worn bag PASS (real KitWear + Builder, classic R15, R15 courier and R6): " + result.stdout.strip().splitlines()[-2]
+
+# 6.12: the courier's cosmetics (hats, jackets; the vest's and the bags' colours) built by the real shared/StyleBuild.luau
+# and server/StyleWear.luau's tint hook on the real KitWear (bag_check's modules, already in `tmp`), on the classic R15
+# stand-in and the native courier (style-check.luau).
+def style_check(tmp, luau):
+    src = ROOT / "src"
+    prefix = ('local M=require("./mock")\nlocal game,Instance,Vector3,Color3,CFrame,UDim2,Enum,workspace,typeof=M.game,M.Instance,'
+              'M.Vector3,M.Color3,M.CFrame,M.UDim2,M.Enum,M.workspace,M.typeof\n')
+    for name in ("Style", "StyleLooks", "Map"):  # (6.12, the clerks: Style knows the shops, Map.Shops)
+        text = (src / "shared" / f"{name}.luau").read_text()
+        (tmp / f"{name}.luau").write_text(re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text))
+    build = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', (src / "shared/StyleBuild.luau").read_text())
+    (tmp / "StyleBuild.luau").write_text(prefix + build)
+    # the profile StyleWear reads (the check sets it); 6.12, the clerks: the level, the money and the state's push for
+    # the Style remote's "buy" (StyleWear.handle)
+    (tmp / "StylePlayerData.luau").write_text(
+        "local M = { profile = nil, at = 15, notified = 0 }\nfunction M.get() return M.profile end\n"
+        "function M.level() return M.at end\nfunction M.notify() M.notified += 1 end\n"
+        "function M.spend(_, n) if M.profile.money < n then return false end\nM.profile.money -= n\nreturn true end\nreturn M\n")
+    wear = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', (src / "server/StyleWear.luau").read_text())
+    for module, local in (("PlayerData", "StylePlayerData"), ("Vehicles", "Stub"), ("KitWear", "KitWear")):
+        call = f"require(script.Parent.{module})"
+        if call not in wear:
+            raise RuntimeError(f"StyleWear.luau: {call} moved; update tools/character-art/check.py")
+        wear = wear.replace(call, f'require("./{local}")')
+    if "require(script" in wear:
+        raise RuntimeError("StyleWear.luau requires a module the style check does not know; update tools/character-art/check.py")
+    (tmp / "StyleWear.luau").write_text(prefix + wear)
+    (tmp / "style-check.luau").write_text((HERE / "style-check.luau").read_text())
+    result = subprocess.run([str(Path(luau).resolve()), "style-check.luau"], cwd=tmp, capture_output=True, text=True)
+    if result.returncode or "ALL CHECKS PASSED" not in result.stdout:
+        raise RuntimeError("Style looks check FAILED:\n" + result.stdout + result.stderr)
+    return "Style looks PASS (real StyleBuild + StyleWear's tint on KitWear, classic R15 stand-in and native courier): " + result.stdout.strip().splitlines()[-2]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

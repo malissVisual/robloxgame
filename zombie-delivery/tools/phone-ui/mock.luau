@@ -178,7 +178,9 @@ function M.P.button(parent,value,size,kind,fn)
 end
 function M.P.dot(parent,props) return M.Ui.label(parent,"",M.UDim2.fromOffset(14,14),props) end
 function M.P.tag(parent,value) return M.Ui.label(parent,value,M.UDim2.fromOffset(100,20)) end
-M.MapView={isOpen=function() return M.mapOpen==true end,toggle=function() M.mapOpen=not M.mapOpen end,setWaypoint=function() end}
+M.MapView={isOpen=function() return M.mapOpen==true end,toggle=function() M.mapOpen=not M.mapOpen end,setWaypoint=function(at) M.waypoint=at end}
+-- 6.12, the clerks: where the local character stands (STYLE's BUY only at a shop that sells the look; the GPS above)
+function M.stand(x,z) M.root.Position=M.Vector3.new(x,0,z) end
 M.KitShop={owned=function(state) return state.kit or {} end,roomText=function() return "HANDS 2 / PACK 3" end}
 M.CareerUi={toGo=function() return "8 runs" end,unlockText=function() return "Next unlock" end}
 M.BagUi={line=function() return nil end,open=function() M.bagOpen=true end,render=function(parent,job,order) M.bagRendered=(M.bagRendered or 0)+1;M.make("Frame",{Name="BagRows",LayoutOrder=order},parent);return order+1 end}
@@ -186,6 +188,17 @@ M.BagUi={line=function() return nil end,open=function() M.bagOpen=true end,rende
 M.BagUi.bags=function(parent,state,order) M.bagsRendered=(M.bagsRendered or 0)+1;M.make("Frame",{Name="BagsRows",LayoutOrder=order},parent);return order+1 end
 M.Hotbar={slotOf=function(id) return if id=="medkit" then 5 else nil end}
 M.Hotbar.onUse=function(id) M.used=id end
-M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end,play=function(name) M.played=name end} -- (6.12: TASKS' sounds)
+M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end}
+-- 6.12: STYLE's sound on a purchase, its 3D preview (client/StylePreview.luau: recorded, not drawn) and its keys
+M.played={}
+M.Sounds.play=function(name) table.insert(M.played,name) end
+M.previews={}
+M.StylePreview={show=function(holder,tab,def) table.insert(M.previews,{holder=holder,tab=tab,id=def and def.id}); return "courier",nil end,clear=function() M.previewCleared=(M.previewCleared or 0)+1 end}
+M.actions={}
+M.services.ContextActionService={
+	BindActionAtPriority=function(_,name,fn,_,priority,...) M.actions[name]={fn=fn,keys={...},priority=priority} end,
+	UnbindAction=function(_,name) M.actions[name]=nil end,
+}
+M.Enum.ContextActionPriority.High.Value=3000
 M.Discovery={grid={X0=-2200,Z0=-3000,Size=120,Rows=40,Cols=36},changed=signal(),uncoveredCell=function() return M.discovered==true end}
 return M
