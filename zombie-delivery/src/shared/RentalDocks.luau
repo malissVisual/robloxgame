@@ -9,8 +9,9 @@
 -- shared/TrafficLanes.luau). Every block corner and side is a candidate; Map.lcg orders them (the same everywhere),
 -- and a dock is kept when it is clear (Config.Rental: of the homes' and storefronts' doors, piles and parks, the cargo
 -- spots, the employers' boards, the addresses, the bus stops, the gas stations, the places, the alley shortcuts' mouths,
--- the zip lines' ladders, the safe zone) and no other dock is within Spacing. The first one is the clear candidate nearest the depot (just
--- outside the safe zone); then at most DowntownDocks Downtown and the rest in the Suburbs, Docks in all.
+-- the zip lines' ladders, the safe zone) and no other dock is within Spacing. The first one is the clear candidate
+-- nearest the middle of the safe zone (just outside it; the depot stood there before 6.11, the park now); then at most
+-- DowntownDocks Downtown and the rest in the Suburbs, Docks in all.
 -- 6.3: before them all, dock1 is the rack at the spawn (Config.Rental.SpawnRack): a fixed row in the depot's yard, the
 -- scooters side by side facing out of it (nx, nz) rather than nose to tail along a kerb, the one dock in the safe zone
 -- (no spacing to the others, it is not one of the Docks).
@@ -199,22 +200,23 @@ local function candidate(d: Map.District, i: number, j: number, nx: number, nz: 
 end
 
 -- 6.3: the rack at the spawn (Config.Rental.SpawnRack), its slots along X round its middle, facing +Z (south, the
--- yard's open edge and the street).
+-- yard's open edge and the street). 6.11: its middle given from the depot's (Map.Depot, wherever the depot is).
 local function spawnRack(): Dock
 	local rack = Config.Rental.SpawnRack
+	local x, z = Map.Depot.x + rack.x, Map.Depot.z + rack.z
 	local slots: { Slot } = {}
 	for n = 1, rack.slots do
-		table.insert(slots, { x = rack.x + (n - (rack.slots + 1) / 2) * rack.pitch, z = rack.z })
+		table.insert(slots, { x = x + (n - (rack.slots + 1) / 2) * rack.pitch, z = z })
 	end
-	local d, i, j = Map.blockAt(rack.x, rack.z)
+	local d, i, j = Map.blockAt(x, z)
 	return {
 		id = "",
 		name = rack.name,
 		district = if d then d.id else "downtown",
 		i = i,
 		j = j,
-		x = rack.x,
-		z = rack.z,
+		x = x,
+		z = z,
 		nx = 0,
 		nz = 1,
 		tx = 1,
@@ -242,7 +244,9 @@ function RentalDocks.docks(): { Dock }
 		end
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
-				if Map.special(d.id, i, j) then
+				-- (6.11: a special block that was ordinary, the depot's, rolls its dice as before and keeps no dock)
+				local special = Map.special(d.id, i, j)
+				if special and not Map.wasOrdinary(d.id, i, j) then
 					continue
 				end
 				for _, corner in { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } } do
@@ -250,6 +254,9 @@ function RentalDocks.docks(): { Dock }
 					for side = 1, 2 do
 						-- (every candidate rolls the same dice, kept or not)
 						local key, count = rand(), r.Slots[1 + math.floor(rand() * #r.Slots)]
+						if special then
+							continue
+						end
 						local nx, nz = if side == 1 then sx else 0, if side == 1 then 0 else sz
 						local dock = candidate(d, i, j, nx, nz, sx, sz, count)
 						if not dock and count > r.Slots[1] then
@@ -266,7 +273,8 @@ function RentalDocks.docks(): { Dock }
 	table.sort(candidates, function(p: Candidate, q: Candidate): boolean
 		return p.key < q.key
 	end)
-	-- The one by the depot first (the clear candidate nearest the middle of the safe zone).
+	-- The one by the depot first (the clear candidate nearest the middle of the safe zone; 6.11: by the park, the depot
+	-- has its own rack, the `depot` flag keeps its name).
 	local first: Candidate? = nil
 	for _, c in candidates do
 		if not first or c.dock.x ^ 2 + c.dock.z ^ 2 < first.dock.x ^ 2 + first.dock.z ^ 2 then

@@ -48,9 +48,9 @@ Art.Motion = {
 Art.Mounts = {
 	-- Lead & Co. (World buildGuns: 60 × 46 × 16); its board LEAD & CO. GUNS on the roof's front edge.
 	guns = { at = { 0, 17, -17 }, roof = { -31, -24, 31, 24 }, sign = { -22.75, 6 }, avoid = { { 17, 7, 23, 13 } } },
-	-- Luigi's (World buildVenue: Map.VenueSize 30 × 24 × 12). The look's little RoofPizza disc (BuildingLooks/
-	-- VenuePizzeria) stays clear behind the slice; better taken out when this goes in.
-	pizza = { at = { 1, 13, -7 }, roof = { -16, -13, 16, 13 }, sign = { -13.05, 2.8 }, avoid = { { 7, 5.5, 11, 8.5 }, { 7.7, 7.7, 10.3, 10.3 }, { -6.5, -2.25, -1.5, -1.75 } } },
+	-- Luigi's (World buildVenue: Map.VenueSize 30 × 24 × 12). (6.11: the look's little RoofPizza disc, BuildingLooks/
+	-- VenuePizzeria, is gone: the slice took its place.)
+	pizza = { at = { 1, 13, -7 }, roof = { -16, -13, 16, 13 }, sign = { -13.05, 2.8 }, avoid = { { 7, 5.5, 11, 8.5 }, { 7.7, 7.7, 10.3, 10.3 } } },
 	-- Last Stop Supplies (World buildSupplies: 64 × 44 × 14).
 	supplies = { at = { 0, 15, -14.5 }, roof = { -33, -23, 33, 23 }, sign = { -21.75, 6 }, avoid = { { 19.5, 7.5, 24.5, 12.5 } } },
 	-- Spoke & Chain (World buildBikeShop: 60 × 40 × 16; its board 0.8 in front of the front wall).
@@ -64,9 +64,10 @@ Art.Mounts = {
 	-- First Zombie Bank (World buildBank: 72 × 56 × 24): on the top of the copper dome (a Ball 16 at h + 8.7, z 6),
 	-- sunk 0.4 into it. (On the flat roof instead: { -22, 25, -16 }.)
 	bank = { at = { 0, 40.3, 6 }, roof = { -8, -2, 8, 14 }, avoid = {} },
-	-- City Clinic (World buildClinic: 84 × 56 × 26): on the right of the CITY CLINIC board, clear of the helipad.
-	-- (Replacing the old flat roof cross at x -28 instead: take out its CrossPost, CrossSign and red cross, then { -28, 27, -22 }.)
-	clinic = { at = { 30, 27, -20 }, roof = { -43, -29, 43, 29 }, sign = { -27.75, 5.5 }, avoid = { { -3, -7, 23, 19 }, { 29.2, 11.2, 36.8, 16.8 }, { -36.8, 11.2, -29.2, 16.8 }, { -33.5, -24.2, -22.5, -23.1 } } },
+	-- City Clinic (World buildClinic: 84 × 56 × 26): where the old flat roof cross stood (6.11: World took out its
+	-- CrossPost, CrossSign and red cross), behind the CITY CLINIC board at x -28, clear of the helipad. (At the board's
+	-- other end instead: { 30, 27, -20 }.)
+	clinic = { at = { -28, 27, -22 }, roof = { -43, -29, 43, 29 }, sign = { -27.75, 5.5 }, avoid = { { -3, -7, 23, 19 }, { 29.2, 11.2, 36.8, 16.8 }, { -36.8, 11.2, -29.2, 16.8 } } },
 } :: { [string]: Mount }
 
 -- ── Frames ─────────────────────────────────────────────────────────────────

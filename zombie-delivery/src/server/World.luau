@@ -58,6 +58,14 @@
 -- Zombie Delivery 6.10, the curb: the blocks' sidewalks stand Map.WalkTop (0.9), half a stud over the roads, and every
 -- block's slab has its kerb all round (sidewalk(): server/Curbs.luau, shared/CurbShape.luau), a light grey slope
 -- Map.CurbRun studs out onto the road that every vehicle drives up and down anywhere along the curb.
+--
+-- Zombie Delivery 6.11, the centre: the Central Park on the middle block (Map.Park; server/CentralPark.luau, its own
+-- piece of the build: the pond, real water in a hole World leaves in the ground for it, buildGround), the depot moved
+-- to block (1, -1) north-east of it (Map.Depot; buildDepot as before, every spot of it from the depot's middle), where
+-- four plain towers stood (their dice are still rolled, tower(..., true): the rest of the city stays as it was), and
+-- the giant rooftop set pieces on the shops (server/ShopProps.luau, ShopProps.mount: the depot's parcel, Lead & Co.'s
+-- GUN STORE, the vest and the shoe, the bike, the car, the wrench, Luigi's pizza slice, the bank's coin, the clinic's
+-- cross).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -83,7 +91,7 @@ local ROAD_TOP = Map.RoadTop
 local WALK_TOP = Map.WalkTop
 
 World.RoadTop = ROAD_TOP
-World.DepotSpawn = Vector3.new(0, WALK_TOP + 3, 26)
+World.DepotSpawn = Vector3.new(Map.Depot.x, WALK_TOP + 3, Map.Depot.z + 26) -- (6.11: in the depot's yard, Map.Depot)
 World.ShopPrompts = {} :: { { prompt: ProximityPrompt, shop: string } }
 World.EmployerPrompts = {} :: { { prompt: ProximityPrompt, employer: string } }
 World.EmployerNpcs = {} :: { [string]: Model } -- the person at each WORK HERE board (Config.Employers id)
@@ -529,7 +537,21 @@ local function buildGround(world: Instance)
 	local margin = 700
 	local z0, z1 = b.z0 - margin, b.z1 + margin
 	local seaX1 = b.x1 + margin
-	tiled(world, "Ground", b.x0 - margin, Map.River.x0, z0, z1, -2, 4, grass, Enum.Material.Ground)
+	-- 6.11: with a square hole under the Central Park's pond (Map.Park; server/CentralPark.luau fills it with water and
+	-- gives it a floor): the tile over it shrinks to the hole's west and three more pieces go round the hole.
+	for _, tile in tiled(world, "Ground", b.x0 - margin, Map.River.x0, z0, z1, -2, 4, grass, Enum.Material.Ground) do
+		local park = Map.Park
+		local tx0, tx1 = tile.Position.X - tile.Size.X / 2, tile.Position.X + tile.Size.X / 2
+		local tz0, tz1 = tile.Position.Z - tile.Size.Z / 2, tile.Position.Z + tile.Size.Z / 2
+		local hx0, hx1, hz0, hz1 = park.x - park.pond, park.x + park.pond, park.z - park.pond, park.z + park.pond
+		if hx0 > tx0 and hx1 < tx1 and hz0 > tz0 and hz1 < tz1 then
+			tile.Size = Vector3.new(hx0 - tx0, tile.Size.Y, tz1 - tz0)
+			tile.CFrame = CFrame.new((tx0 + hx0) / 2, tile.Position.Y, (tz0 + tz1) / 2)
+			for _, box in { { hx1, tx1, tz0, tz1 }, { hx0, hx1, tz0, hz0 }, { hx0, hx1, hz1, tz1 } } do
+				part(world, "Ground", Vector3.new(box[2] - box[1], tile.Size.Y, box[4] - box[3]), CFrame.new((box[1] + box[2]) / 2, tile.Position.Y, (box[3] + box[4]) / 2), grass, Enum.Material.Ground)
+			end
+		end
+	end
 	tiled(world, "Ground", Map.River.x1, Map.Sea.x0, z0, z1, -2, 4, grass, Enum.Material.Ground)
 	local bottom = Color3.fromRGB(60, 56, 44)
 	tiled(world, "RiverBed", Map.River.x0, Map.River.x1, z0, z1, -30, 4, bottom, Enum.Material.Mud)
@@ -650,9 +672,23 @@ end
 -- A tower w (along X) by d (along Z), height tall, standing in the middle of its lot (5.3: Map.lots sizes it).
 -- 5.7: and its look (shared/TowerLooks.luau: a shopfront, a rooftop, a fire escape or boarded windows), from the lot's
 -- own dice (the world's random numbers are drawn as before: the rest of the city stays where it was). A look with
--- things on the roof replaces the old roof box.
-local function tower(parent: Instance, lot: Map.Lot)
+-- things on the roof replaces the old roof box. 6.11: `dry` builds nothing and only draws the world's random numbers a
+-- tower draws (the same calls in the same order as below), for a tower that is gone (Map.formerLotsAt: the depot's
+-- block), so every random thing built after it stays as it was.
+local function tower(parent: Instance, lot: Map.Lot, dry: boolean?)
 	local cx, cz, w, d, height = lot.x, lot.z, lot.w, lot.d, lot.h
+	if dry then
+		rng:NextInteger(1, #BUILDING_COLORS)
+		rng:NextInteger(1, #BUILDING_MATERIALS)
+		for _ = 1, math.min(math.floor((height - 4) / 9), 6) * 4 do -- (windowStrips: a die for every window)
+			rng:NextNumber()
+		end
+		if rng:NextNumber() < 0.5 then
+			rng:NextNumber(-w / 4, w / 4)
+			rng:NextNumber(-d / 4, d / 4)
+		end
+		return
+	end
 	local model = Instance.new("Model")
 	model.Name = "Building"
 	part(model, "Walls", Vector3.new(w, height, d), CFrame.new(cx, WALK_TOP + height / 2, cz), BUILDING_COLORS[rng:NextInteger(1, #BUILDING_COLORS)], BUILDING_MATERIALS[rng:NextInteger(1, #BUILDING_MATERIALS)])
@@ -785,37 +821,44 @@ end
 
 -- ── The depot and the shops ────────────────────────────────────────────────
 
+-- 6.11: on its block north-east of the park (Map.Depot), laid out as on the middle block before: every spot below is
+-- given from the depot's middle (`o`), the crates draw the world's random numbers as before. The giant parcel stands on
+-- its roof (ShopProps "depot").
 local function buildDepot(parent: Instance)
 	local depot = folder(parent, "Depot")
-	sidewalk(depot, 0, 0, Color3.fromRGB(120, 120, 116))
+	local o = CFrame.new(Map.Depot.x, 0, Map.Depot.z)
+	sidewalk(depot, Map.Depot.x, Map.Depot.z, Color3.fromRGB(120, 120, 116))
 	local wallColor = Color3.fromRGB(56, 61, 65)
 	local depth, width, height = 40, 80, 22
 	local backZ = -BLOCK / 2 + 6
-	part(depot, "Back", Vector3.new(width, height, 2), CFrame.new(0, WALK_TOP + height / 2, backZ + 1), wallColor, Enum.Material.Metal)
-	part(depot, "Left", Vector3.new(2, height, depth), CFrame.new(-width / 2 + 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
-	part(depot, "Right", Vector3.new(2, height, depth), CFrame.new(width / 2 - 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
-	part(depot, "Roof", Vector3.new(width, 2, depth), CFrame.new(0, WALK_TOP + height + 1, backZ + depth / 2), Color3.fromRGB(34, 38, 42), Enum.Material.Metal)
+	part(depot, "Back", Vector3.new(width, height, 2), o * CFrame.new(0, WALK_TOP + height / 2, backZ + 1), wallColor, Enum.Material.Metal)
+	part(depot, "Left", Vector3.new(2, height, depth), o * CFrame.new(-width / 2 + 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
+	part(depot, "Right", Vector3.new(2, height, depth), o * CFrame.new(width / 2 - 1, WALK_TOP + height / 2, backZ + depth / 2), wallColor, Enum.Material.Metal)
+	part(depot, "Roof", Vector3.new(width, 2, depth), o * CFrame.new(0, WALK_TOP + height + 1, backZ + depth / 2), Color3.fromRGB(34, 38, 42), Enum.Material.Metal)
 	-- Approved architecture; the depot terminals, cargo and spawn stay in their original places.
 	local Kit = require(script.Parent.BuildingLooks.Kit)
-	local frame = CFrame.new(0, WALK_TOP, backZ + depth / 2) * CFrame.Angles(0, math.pi, 0)
+	local frame = o * CFrame.new(0, WALK_TOP, backZ + depth / 2) * CFrame.Angles(0, math.pi, 0)
 	Kit.build(depot, frame, require(script.Parent.BuildingLooks.Depot), { part = part, deco = deco, nightLight = DayNight.nightLight })
-	sign(depot, "ZOMBIE DELIVERY CO.", Vector3.new(60, 8, 1), CFrame.new(0, WALK_TOP + height + 6, backZ + depth - 2) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(255, 190, 60), nil, "depot", 12)
+	sign(depot, "ZOMBIE DELIVERY CO.", Vector3.new(60, 8, 1), o * CFrame.new(0, WALK_TOP + height + 6, backZ + depth - 2) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(255, 190, 60), nil, "depot", 12)
+	-- 6.11: the giant ZDC parcel on the roof, behind the name board (server/ShopProps.luau; seen from the park)
+	local props = require(script.Parent.ShopProps)
+	props.place(depot, "depot", frame * props.mount("depot"))
 	for n = 1, 10 do
 		local s = rng:NextNumber(3, 5)
-		part(depot, "Crate", Vector3.new(s, s, s), CFrame.new(rng:NextNumber(-34, 34), WALK_TOP + s / 2, backZ + rng:NextNumber(4, 14)) * CFrame.Angles(0, rng:NextNumber(0, 1.5), 0), Color3.fromRGB(150, 110, 70), Enum.Material.WoodPlanks)
+		part(depot, "Crate", Vector3.new(s, s, s), o * CFrame.new(rng:NextNumber(-34, 34), WALK_TOP + s / 2, backZ + rng:NextNumber(4, 14)) * CFrame.Angles(0, rng:NextNumber(0, 1.5), 0), Color3.fromRGB(150, 110, 70), Enum.Material.WoodPlanks)
 		if n > 7 then
-			part(depot, "Crate", Vector3.new(s * 0.8, s * 0.8, s * 0.8), CFrame.new(rng:NextNumber(-34, 34), WALK_TOP + s * 1.4, backZ + rng:NextNumber(4, 14)), Color3.fromRGB(140, 100, 64), Enum.Material.WoodPlanks)
+			part(depot, "Crate", Vector3.new(s * 0.8, s * 0.8, s * 0.8), o * CFrame.new(rng:NextNumber(-34, 34), WALK_TOP + s * 1.4, backZ + rng:NextNumber(4, 14)), Color3.fromRGB(140, 100, 64), Enum.Material.WoodPlanks)
 		end
 	end
-	-- The job board and the garage terminal.
-	local board = part(depot, "JobBoard", Vector3.new(14, 8, 1), CFrame.new(-18, WALK_TOP + 5, backZ + 24) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(110, 80, 50), Enum.Material.Wood)
+	-- The job board and the garage terminal (Config.Goal.BoardSpot: the board, from the depot's middle).
+	local board = part(depot, "JobBoard", Vector3.new(14, 8, 1), o * CFrame.new(-18, WALK_TOP + 5, backZ + 24) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(110, 80, 50), Enum.Material.Wood)
 	sign(depot, "JOBS", Vector3.new(10, 3, 0.3), board.CFrame * CFrame.new(0, 2, -0.7), Color3.fromRGB(255, 220, 80))
 	prompt(board, "jobs", "Job Board", "Dispatcher")
-	local terminal = part(depot, "GarageTerminal", Vector3.new(6, 7, 3), CFrame.new(18, WALK_TOP + 3.5, backZ + 24), Color3.fromRGB(60, 70, 80), Enum.Material.Metal)
+	local terminal = part(depot, "GarageTerminal", Vector3.new(6, 7, 3), o * CFrame.new(18, WALK_TOP + 3.5, backZ + 24), Color3.fromRGB(60, 70, 80), Enum.Material.Metal)
 	sign(depot, "GARAGE", Vector3.new(6, 2, 0.3), terminal.CFrame * CFrame.new(0, 2.5, 1.6) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(120, 200, 255))
 	prompt(terminal, "depot", "Switch car", "Depot Garage")
 	-- 6.6: ZDC Bags, the bag kiosk east of the spawn (server/BagKiosk.luau: its own module, World's helpers handed over;
-	-- no new top-level locals here, the -O0 register limit)
+	-- no new top-level locals here, the -O0 register limit; 6.11: at Map.Shops.bags, which follows the depot)
 	require(script.Parent.BagKiosk).build(depot, { part = part, deco = deco, sign = sign, prompt = prompt, nightLight = DayNight.nightLight })
 
 	local spawn = Instance.new("SpawnLocation")
@@ -855,6 +898,9 @@ local function buildDealer(parent: Instance)
 	local Kit = require(script.Parent.BuildingLooks.Kit)
 	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Dealer), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "DEAD END MOTORS", Vector3.new(60, 7, 0.5), frame * CFrame.new(0, h + 4.5, -d / 2), Color3.fromRGB(255, 80, 60), nil, "dealer", 12)
+	-- 6.11: its rooftop set piece behind the board, a two-tone car tipped up on a pylon (server/ShopProps.luau)
+	local props = require(script.Parent.ShopProps)
+	props.place(shop, "dealer", frame * props.mount("dealer"))
 	-- 3.5: the cars are sold from the catalog at the sales counter (the dealer window); no lot of every car outside.
 	local desk = counter(shop, frame, d, "dealer", "Dead End Motors")
 	local catalog = desk:FindFirstChildOfClass("ProximityPrompt")
@@ -889,6 +935,9 @@ local function buildGuns(parent: Instance)
 	local Kit = require(script.Parent.BuildingLooks.Kit)
 	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Guns), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "LEAD & CO.  GUNS", Vector3.new(44, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(255, 200, 80), nil, "guns", 10)
+	-- 6.11: its rooftop set piece behind the board, GUN STORE in block letters and a giant cartridge (server/ShopProps.luau)
+	local props = require(script.Parent.ShopProps)
+	props.place(shop, "guns", frame * props.mount("guns"))
 	counter(shop, frame, d, "guns", "Lead & Co.")
 	-- Guns on the wall.
 	for n = -2, 2 do
@@ -951,6 +1000,9 @@ local function buildMechanic(parent: Instance)
 	local Kit = require(script.Parent.BuildingLooks.Kit)
 	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Mechanic), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "WRENCH GARAGE  TUNING · PAINT · REPAIRS", Vector3.new(60, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(120, 200, 255), nil, "mechanic", 12)
+	-- 6.11: its rooftop set piece behind the board, a giant wrench across a tyre (server/ShopProps.luau)
+	local props = require(script.Parent.ShopProps)
+	props.place(shop, "mechanic", frame * props.mount("mechanic"))
 	counter(shop, frame, d, "mechanic", "Wrench Garage")
 	-- 3.4: two repair bays straight in from the wide door (they replace the old lift; no free repairs any more).
 	for index, x in { -8.5, 8.5 } do
@@ -1000,6 +1052,9 @@ local function buildSupplies(parent: Instance)
 	local Kit = require(script.Parent.BuildingLooks.Kit)
 	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Supplies), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	sign(shop, "LAST STOP SUPPLIES", Vector3.new(48, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(140, 255, 120), nil, "supplies", 11)
+	-- 6.11: its rooftop set piece behind the board, a giant courier vest and a running shoe (server/ShopProps.luau)
+	local props = require(script.Parent.ShopProps)
+	props.place(shop, "supplies", frame * props.mount("supplies"))
 	counter(shop, frame, d, "supplies", "Last Stop Supplies")
 	for row = -1, 1, 2 do
 		part(shop, "Shelf", Vector3.new(30, 6, 2), frame * CFrame.new(0, 3, row * 8 - 2), Color3.fromRGB(150, 140, 120), Enum.Material.Wood)
@@ -1025,6 +1080,9 @@ local function buildBikeShop(parent: Instance)
 	Kit.build(shop, frame, require(script.Parent.BuildingLooks.BikeShop), { part = part, deco = deco, nightLight = DayNight.nightLight })
 	-- The name board in the look's slot over the fascia (its bottom at y ≈ 17.2, in front of the front wall).
 	sign(shop, "SPOKE & CHAIN  CYCLES", Vector3.new(44, 5, 0.5), frame * CFrame.new(0, 19.7, -d / 2 - 0.8), Color3.fromRGB(255, 120, 90), nil, "bikes", 10)
+	-- 6.11: its rooftop set piece behind the board, a giant bicycle on a pylon (server/ShopProps.luau)
+	local props = require(script.Parent.ShopProps)
+	props.place(shop, "bikes", frame * props.mount("bikes"))
 	local desk = part(shop, "CounterPrompt", Vector3.new(12, 4, 3.5), frame * CFrame.new(-15, 2, -5), Color3.fromRGB(35, 40, 43), Enum.Material.Metal)
 	desk.Transparency = 1
 	prompt(desk, "bikes", "Shop", Map.Shops.bikes.name)
@@ -1268,6 +1326,9 @@ function buildBank(parent: Instance, cx: number, cz: number)
 	cylinder(bank, "DomeDrum", 7, 16, frame * CFrame.new(0, h + 5.2, 6) * UPRIGHT, MARBLE, Enum.Material.Marble)
 	local dome = part(bank, "Dome", Vector3.new(16, 16, 16), frame * CFrame.new(0, h + 8.7, 6), Color3.fromRGB(96, 140, 118), Enum.Material.Metal)
 	dome.Shape = Enum.PartType.Ball
+	-- 6.11: the giant gold coin on top of the dome (server/ShopProps.luau; it spins on the clients)
+	local props = require(script.Parent.ShopProps)
+	props.place(bank, "bank", frame * props.mount("bank"))
 	-- Tall windows beside the door: they glow at night; lanterns at the door, a light under the portico.
 	for _, x in { -27, -17, 17, 27 } do
 		nightWindow(deco(part(bank, "Window", Vector3.new(5, 12, 0.2), frame * CFrame.new(x, 9, front - 0.6), WINDOW_DIM, Enum.Material.Glass)), Color3.fromRGB(255, 226, 160))
@@ -1308,7 +1369,7 @@ function buildBank(parent: Instance, cx: number, cz: number)
 end
 
 -- ── City Clinic ────────────────────────────────────────────────────────────
--- Downtown, south-west of the depot: a white two-storey clinic with blue windows, the emergency canopy over the
+-- Downtown, south-west of the park: a white two-storey clinic with blue windows, the emergency canopy over the
 -- sidewalk where the ambulance unloads (Map.CargoSpots.clinic), a helipad on the roof, beds inside. Doctor Ellie hires
 -- ambulance drivers at the WORK HERE board beside the front; a nurse waits under the canopy.
 
@@ -1371,7 +1432,7 @@ function buildClinic(parent: Instance, cx: number, cz: number)
 	for _, x in { -3.4, 3.4 } do
 		part(clinic, "BenchLeg", Vector3.new(0.4, 1.6, 1.8), bench * CFrame.new(x, 0.8, 0), Color3.fromRGB(60, 60, 64), Enum.Material.Metal)
 	end
-	-- On the roof: the helipad with its H and lights, a big red cross seen from the road.
+	-- On the roof: the helipad with its H and lights, a big red cross seen from the road (6.11: the rooftop set piece).
 	cylinder(clinic, "Helipad", 0.3, 26, frame * CFrame.new(10, h + 1.15, 6) * UPRIGHT, Color3.fromRGB(70, 74, 78), Enum.Material.Concrete)
 	for _, piece in { { 1.6, 10, -3 }, { 1.6, 10, 3 }, { 6, 1.6, 0 } } do
 		deco(part(clinic, "H", Vector3.new(piece[1], 0.05, piece[2]), frame * CFrame.new(10 + piece[3], h + 1.32, 6), Color3.fromRGB(240, 240, 240)))
@@ -1381,9 +1442,9 @@ function buildClinic(parent: Instance, cx: number, cz: number)
 		local beacon = deco(part(clinic, "PadLight", Vector3.new(0.6, 0.4, 0.6), frame * CFrame.new(10 + math.cos(angle) * 12, h + 1.4, 6 + math.sin(angle) * 12), Color3.fromRGB(120, 140, 110), Enum.Material.Glass))
 		DayNight.nightLight(beacon, Color3.fromRGB(120, 255, 120), Color3.fromRGB(120, 140, 110), "Glass")
 	end
-	part(clinic, "CrossPost", Vector3.new(0.6, 6, 0.6), frame * CFrame.new(-28, h + 3.5, front + 4.6), Color3.fromRGB(90, 90, 94), Enum.Material.Metal)
-	deco(part(clinic, "CrossSign", Vector3.new(11, 11, 0.4), frame * CFrame.new(-28, h + 9, front + 4), Color3.fromRGB(250, 250, 250), Enum.Material.SmoothPlastic))
-	redCross(clinic, frame * CFrame.new(-28, h + 9, front + 3.7), 9)
+	-- 6.11: the big 3D red cross with its heartbeat line (server/ShopProps.luau), where the flat roof cross stood
+	local props = require(script.Parent.ShopProps)
+	props.place(clinic, "clinic", frame * props.mount("clinic"))
 	-- Inside: the reception desk, beds with curtains along the back wall.
 	part(clinic, "Reception", Vector3.new(14, 4, 3), frame * CFrame.new(-16, 2, -8), Color3.fromRGB(220, 222, 226), Enum.Material.SmoothPlastic)
 	for _, x in { -32, -22, 22, 32 } do
@@ -1431,6 +1492,17 @@ local function buildDistrict(parent: Instance, d: Map.District)
 				continue
 			elseif special == "repairs" then
 				buildRepairShop(district, cx, cz)
+				continue
+			elseif special and Map.wasOrdinary(d.id, i, j) then
+				-- 6.11: the depot's block had towers: their dice still roll here (buildDepot builds the depot below);
+				-- a gone lawn or car park would need its own (tests/places_test.luau: they are all towers)
+				for _, lot in Map.formerLotsAt(d.id, i, j) do
+					if lot.kind == "tower" or lot.kind == "apartment" then
+						tower(district, lot, true)
+					else
+						warn(`[World] the gone {lot.kind} on block {i}, {j} rolls no dice: the world's random numbers shift`)
+					end
+				end
 				continue
 			elseif special and buildMissionBlock(district, special, cx, cz) then
 				continue
@@ -5451,6 +5523,11 @@ local function defineVenuesAndHomes()
 		Kit.build(model, frame, style.look, context)
 		-- The name board on the parapet (in front of the roof's overhang), over the awning.
 		sign(model, `{string.upper(venue.name)}  {venue.sub}`, Vector3.new(24, 3.4, 0.5), frame * CFrame.new(0, size.h + 2.1, -size.d / 2 - 1.3), Color3.new(1, 1, 1), nil, venue.id, 10)
+		if venue.kind == "pizzeria" then
+			-- 6.11: Luigi's giant pizza slice on the roof (server/ShopProps.luau; it bobs on the clients)
+			local props = require(script.Parent.ShopProps)
+			props.place(model, "pizza", frame * props.mount("pizza"))
+		end
 		if lot.district == "suburbs" then
 			-- A paved forecourt from the door over the lawn to the sidewalk.
 			local reach = Map.VenueFront
@@ -5944,6 +6021,10 @@ function World.build()
 			buildDistrict(world, d)
 		end)
 	end
+	-- 6.11: the Central Park on the middle block (server/CentralPark.luau: its own dice, World's helpers handed over)
+	piece("Central Park", function()
+		require(script.Parent.CentralPark).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
+	end)
 	piece("roads and bridges", function()
 		buildConnectors(world)
 	end)

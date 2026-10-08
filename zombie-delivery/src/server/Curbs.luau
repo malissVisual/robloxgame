@@ -7,7 +7,8 @@
 -- Cheap: a block's ring (a wedge along each side, a corner wedge at each corner) is ONE part, a union made once and
 -- cloned for every block (like the crosswalks; 124 blocks: 124 parts). Its collision is the union's convex hull, which
 -- is exact above the road (the hull also fills the ring's middle up to the walk's top, where the slab is anyway). Only
--- when the union cannot be made: the eight pieces themselves for every block (and a warning in the Output).
+-- when the union cannot be made: the eight pieces themselves for every block (and a warning in the Output). 6.11: the
+-- Central Park's block always gets the eight pieces (its pond is sunk into the slab: Curbs.ring's `open`).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -78,13 +79,15 @@ local function makeTemplate(parent: Instance)
 	state.inside = ORIGIN:ToObjectSpace(union.CFrame)
 end
 
--- The ring round the block centred at (cx, cz), into `parent` (where the block's slab is).
-function Curbs.ring(parent: Instance, cx: number, cz: number)
+-- The ring round the block centred at (cx, cz), into `parent` (where the block's slab is). 6.11: `open` builds the
+-- eight pieces, not the union: its hull would close the block's middle up to the walk's top, and the Central Park
+-- (server/CentralPark.luau) has its pond there.
+function Curbs.ring(parent: Instance, cx: number, cz: number, open: boolean?)
 	if not state.tried then
 		makeTemplate(parent)
 	end
 	local template = state.template
-	if template then
+	if template and not open then
 		local copy = template:Clone()
 		copy.CFrame = CFrame.new(cx, 0, cz) * state.inside
 		copy.Parent = parent

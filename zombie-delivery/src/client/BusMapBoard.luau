@@ -2,8 +2,9 @@
 -- 6.3, the bus map on the stops (server/BusStops.luau builds a MapBoard panel at every shelter, shared/BusLines.luau
 -- has the lines): the board of the stop nearest you, within Config.Bus.MapBoardReach, gets a map drawn here. The
 -- express lines in their colours (BusLines.mapLines: a few corners each), every stop a dot with a white ring, the
--- names of the stops of this stop's lines, Downtown and the Suburbs as quiet blocks, the depot, and YOU ARE HERE in
--- the contract red at this stop; over it "ZDC TRANSIT · EXPRESS", under it the lines' chips.
+-- names of the stops of this stop's lines, Downtown and the Suburbs as quiet blocks, the depot (6.11: and the green
+-- Central Park), and YOU ARE HERE in the contract red at this stop; over it "ZDC TRANSIT · EXPRESS", under it the
+-- lines' chips.
 --
 -- One board at a time: it is drawn when the nearest stop changes (a POLL, on foot or not) and taken down when you walk
 -- off (the board's plain face, "BUS MAP", shows again); a board that streamed out is drawn again when it is back.
@@ -133,7 +134,7 @@ local function draw(board: BasePart, stopId: number): SurfaceGui
 		return ox + (x - x0) * scale, oy + (z - z0) * scale
 	end
 
-	-- Downtown and the Suburbs as quiet blocks, the depot's block (where the safe zone is) lighter.
+	-- Downtown and the Suburbs as quiet blocks, the depot's block (in the safe zone) lighter.
 	for _, d in Map.Districts do
 		local ex0, ex1, ez0, ez1 = Map.districtEdges(d)
 		local ax, ay = project(ex0, ez0)
@@ -147,6 +148,13 @@ local function draw(board: BasePart, stopId: number): SurfaceGui
 	Ui.make("Frame", { Position = UDim2.fromOffset(dx0, dy0), Size = UDim2.fromOffset(dx1 - dx0, dy1 - dy0), BackgroundColor3 = K.track, BorderSizePixel = 0, ZIndex = 3 }, area)
 	local cx, cy = project(depot.x, depot.z)
 	label(area, "DEPOT", cx + (dx1 - dx0) / 2 + 2, cy, 9, K.secondary, false, 3)
+	-- 6.11: the Central Park in the middle (Map.Park; the depot is north-east of it), its lawns green.
+	local park = Map.Park
+	local px0, py0 = project(park.x - half, park.z - half)
+	local px1, py1 = project(park.x + half, park.z + half)
+	Ui.make("Frame", { Position = UDim2.fromOffset(px0, py0), Size = UDim2.fromOffset(px1 - px0, py1 - py0), BackgroundColor3 = Color3.fromRGB(58, 76, 58), BorderSizePixel = 0, ZIndex = 3 }, area)
+	local ppx, ppy = project(park.x, park.z)
+	label(area, "PARK", ppx - (px1 - px0) / 2 - 2, ppy, 9, K.secondary, true, 3)
 
 	-- The lines, then the stops over them.
 	local here: BusLines.Stop? = BusLines.allStops()[stopId]

@@ -176,8 +176,8 @@ Config.Explore = {
 	PlaceRadius = 70, -- this close to a place (a shop, an employer, a mission place) and it is discovered
 	-- The grid covers Map.Bounds and this much more on every side (the world's walls stand on Map.Bounds).
 	Pad = 60,
-	-- A new player (or a save from before 3.7) starts with the cells over this square around the depot uncovered
-	-- (the safe zone, Config.City.SafeHalf, and a little more): nobody starts lost.
+	-- A new player (or a save from before 3.7) starts with the cells over this square around the middle uncovered
+	-- (the safe zone, Config.City.SafeHalf, and a little more; the park, the depot and the shops): nobody starts lost.
 	StartHalf = 240,
 	-- A jump farther than this between two checks is a teleport (the admin, a home spawn): the way between is not
 	-- uncovered. Shorter (a fast car): the cells along the way are.
@@ -197,7 +197,7 @@ Config.City = {
 	RoadWidth = 34,
 	HighwayWidth = 40,
 	Seed = 7331,
-	SafeHalf = 235, -- the safe zone around the depot: a square, |x| and |z| below this
+	SafeHalf = 235, -- the safe zone round the middle (6.11: the Central Park; the depot is in it): a square, |x|, |z| below this
 	-- 6.10, the curb (Map.WalkTop, Map.CurbRun; shared/CurbShape.luau): the vehicle you drive, over a kerb, rises at most
 	-- this fast (studs / s; client/CurbRide.luau): it drives up the slope and stays on the walk instead of hopping off it
 	CurbHop = 6,
@@ -1153,8 +1153,8 @@ Config.RetiredKit = {
 
 -- 6.6, ZDC Bags (server/BagKiosk.luau, Map.Shops.bags): the depot's bag kiosk, in the safe yard east of the spawn pad
 -- (World.DepotSpawn at 0, 26), clear of the scooter rack (Config.Rental.SpawnRack, z 44), the job board (-18, -25), the
--- garage terminal (18, -25) and Marge (Config.Tutorial.NpcSpot). X / Z: its counter's middle, studs from the depot's
--- centre; it faces the spawn (-X). Radius: studs from that spot the shop counts as "here" (the counter's BUY, the
+-- garage terminal (18, -25) and Marge (Config.Tutorial.NpcSpot), all studs from the depot's middle (6.11: Map.Depot,
+-- block (1, -1)). X / Z: its counter's middle; it faces the spawn (-X). Radius: studs from that spot the shop counts as "here" (the counter's BUY, the
 -- server's check; Map.ShopRadius for the big shops). It sells the bags (Config.Kit pieces with `extra`).
 Config.BagShop = {
 	Name = "ZDC Bags",
@@ -1811,7 +1811,7 @@ Config.Bus = {
 Config.Rental = {
 	CarId = "escooter", -- the Config.Cars bike a rental is
 	Price = 0, -- free (the money check stays for later)
-	Docks = 20, -- about this many docks on the kerbs (one of them just outside the safe zone by the depot; 6.3: and the
+	Docks = 20, -- about this many docks on the kerbs (one of them just outside the safe zone by the park; 6.3: and the
 	-- spawn's rack, SpawnRack, on top)
 	DowntownDocks = 14, -- of those, at most this many Downtown (the rest in the Suburbs)
 	Spacing = 210, -- no two docks closer than this (studs)
@@ -1838,7 +1838,7 @@ Config.Rental = {
 	-- 6.3, the rack at the spawn: a row of scooters side by side in the depot's yard, behind the spawn pad (the walk
 	-- to Marge and the job board in front of it stays free), their noses toward the yard's open south edge and the
 	-- street. It is the first dock (shared/RentalDocks.luau), the only one in the safe zone; renting and returning work
-	-- as at any dock. x, z: the row's middle; along X.
+	-- as at any dock. x, z: the row's middle, studs from the depot's middle (6.11: Map.Depot); along X.
 	SpawnRack = { x = 0, z = 44, slots = 6, pitch = 3.4, name = "Depot Yard" },
 }
 

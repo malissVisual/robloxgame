@@ -246,9 +246,15 @@ for _ = 1, 3000 do
 end
 check("nearestRoad is always on a road", allOnRoad)
 
-local rx, rz = Map.nearestRoad(0, 26)
-check("road in front of the depot", near(rx, 0) and near(rz, Map.Cell / 2), `{rx} {rz}`)
-check("depot is safe", Map.isSafe(0, 0) and not Map.isSafe(400, 0))
+-- (the spawn: 26 south of the depot's middle, server/World.luau DepotSpawn; 6.11: the depot is Map.Depot, its yard
+-- open to Bone St)
+local spawnX, spawnZ = Map.Depot.x, Map.Depot.z + 26
+local rx, rz = Map.nearestRoad(spawnX, spawnZ)
+check("road in front of the depot", near(rx, Map.Depot.x) and near(rz, Map.Depot.z + Map.Cell / 2), `{rx} {rz}`)
+check("depot is safe", Map.isSafe(Map.Depot.x, Map.Depot.z) and Map.isSafe(spawnX, spawnZ) and not Map.isSafe(400, 0))
+check("6.11: the park in the middle of the safe zone, the depot north-east of it", Map.special("downtown", Map.Park.i, Map.Park.j) == "park"
+	and Map.Park.x == 0 and Map.Park.z == 0 and Map.isSafe(Map.Park.x, Map.Park.z) and Map.special("downtown", Map.Depot.i, Map.Depot.j) == "depot"
+	and Map.Depot.x == Map.Cell and Map.Depot.z == -Map.Cell and Map.Shops.depot.x == Map.Depot.x and Map.Shops.depot.z == Map.Depot.z)
 check("river is water", Map.inWater(840, 0) and not Map.inWater(0, 0) and Map.inWater(1800, 0))
 
 local bridgesOk = true
@@ -293,7 +299,7 @@ check("addresses are on roads, out of the safe zone, not in water", good)
 check("every place is an address", poiCount == #Map.Places)
 check("plenty of addresses", #addresses > 200, #addresses)
 
-local depotX, depotZ = 0, 26
+local depotX, depotZ = spawnX, spawnZ
 for index, tier in Config.Jobs.Tiers do
 	local count = 0
 	for _, a in addresses do
@@ -949,9 +955,9 @@ end
 check("every property is reachable by road from the depot", (function()
 	for id, plot in Map.EstatePlots do
 		local x, z = Map.plotPoint(plot, 0, -plot.front - Map.GarageApron)
-		local route = Roads.route(0, 26, x, z)
+		local route = Roads.route(spawnX, spawnZ, x, z)
 		local gap = distanceToRoad(x, z)
-		local straight = math.sqrt(x * x + (z - 26) ^ 2)
+		local straight = math.sqrt((x - spawnX) ^ 2 + (z - spawnZ) ^ 2)
 		if #route < 2 or gap > 45 or Roads.length(route) > 3 * straight + 600 then
 			print("  no route to:", id, gap, Roads.length(route))
 			return false
@@ -1327,9 +1333,9 @@ check("the mission places are reachable by road from the depot, both ways", (fun
 			if not place then
 				return false
 			end
-			local there = Roads.route(0, 26, place.x, place.z)
-			local back = Roads.route(place.x, place.z, 0, 26)
-			local straight = math.sqrt(place.x ^ 2 + (place.z - 26) ^ 2)
+			local there = Roads.route(spawnX, spawnZ, place.x, place.z)
+			local back = Roads.route(place.x, place.z, spawnX, spawnZ)
+			local straight = math.sqrt((place.x - spawnX) ^ 2 + (place.z - spawnZ) ^ 2)
 			if #there < 2 or #back < 2 or Roads.length(there) > 3 * straight + 600 then
 				print("  no route to:", id, Roads.length(there))
 				return false

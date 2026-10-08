@@ -1,5 +1,5 @@
 --!strict
--- The shops in the safe zone around the depot. You walk in and use the prompt at the counter (it opens the shop on
+-- The shops in the safe zone around the park. You walk in and use the prompt at the counter (it opens the shop on
 -- your screen); the purchases are checked here, also that you really stand in that shop and that your driver level
 -- (shared/Levels.luau) is high enough for what you buy (the level field of Config.Cars, Weapons and CarGuns).
 --
