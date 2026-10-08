@@ -1184,6 +1184,12 @@ Bone St.
 
 Letters, bulbs, logos and lamps glow at night.
 
+**6.11.1:** a bike or a scooter no longer loses speed in a turn (the owner: "it slows down so much when I turn").
+- `client/Drive.luau`'s wall check compares with how fast it really moves, not only along its nose: in a quick turn
+  the nose leads the way it moves for a moment, and that share was taken off the speed.
+- In Studio, a scooter that is still much slower than it should be while turning prints `[Drive] scooter in a turn: …`
+  with the numbers, at most every 2 s.
+
 **Review fixes:**
 - the moving props turn about their own rest frame, through a PivotOffset on the PrimaryPart;
 - vehicles sink in the pond;
