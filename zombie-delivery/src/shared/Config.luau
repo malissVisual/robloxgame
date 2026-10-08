@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12"
+Config.Version = "6.12.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3541,6 +3541,9 @@ Config.Goal = {
 	PinTextSize = 18, -- the waypoint's words "TONY'S PIZZA · 120 m" (14 before)
 	TitleSize = 22, -- the card's title
 	PlaceMax = 250, -- px at scale 1: the card's place line at its widest (the distance follows it)
+	-- 6.12.1 (the owner: "this shows all game long"): "Take a delivery job" and the job board's marker only for a new
+	-- courier, up to this many deliveries; after that, with no job, the card and the marker stay away (J opens the board)
+	HintJobs = 3,
 }
 
 export type JobTypeDef = {

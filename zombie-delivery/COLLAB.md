@@ -29,6 +29,12 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.1:
+  - **HUD:** the NEXT card only for new couriers (`Config.Goal.HintJobs`); a big health bar and a separate shield bar; MAP replaced by MOUSE [ALT].
+  - **Real estate:** bought from the phone; no floating FOR SALE plates or sign prompts.
+  - **Clerks:** an NPC behind every shop counter carries the Shop prompt (`server/ShopClerks.luau`).
+  - **Fix:** the phone-ui check expects `task_done`.
+  - **Next:** the owner's shop rework (a gear stall, a gun shop with a shooting range, one glass vehicle store with bikes and the garage).
 - Claude · 6.12:
   - **Daily and weekly tasks:** `shared/Tasks.luau`, `server/Tasks.luau`, the TASKS app, `Config.Tasks`; hooks with `Tasks.note`.
   - **Sounds:** the sfx3 sheet with doors, horns (H, `server/Horn.luau`), footsteps by surface, splashes, ambience and UI stings (`client/SoundScape.luau`, `shared/SoundPlan.luau`).

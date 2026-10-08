@@ -8,7 +8,7 @@
 --   * A property's listing (the FOR SALE sign's prompt opens it through the "Estate" remote, or a row of the list):
 --     name, kind, district, description, price, garage slots / couriers, the driver level, the campaign it requires
 --     (3.2, EstateDef.requires: "Finish Iron Supply first"; the server says which finales you have done), the
---     sell-back value and the actions: BUY (at the sign; away from it the button sets the GPS there), SELL (asks
+--     sell-back value and the actions: BUY (6.12.1: from here, anywhere), SELL (asks
 --     once more), SET AS HOME, SPAWN AT THE DEPOT and GPS.
 --
 -- The GPS goes through MapView (setWaypoint: the white GPS route on both maps, onWaypoint: the HUD's beam and label).
@@ -50,7 +50,6 @@ local player = Players.LocalPlayer
 local BASE_W, BASE_H = 740, 620 -- the window's design size (smaller on small screens, see updateScale)
 local SUBTITLE = "Homes, garages and offices · H"
 local NARROW = 600 -- below this design width: two fact columns, a slimmer row
-local NEAR = 100 -- studs from a plot's middle where BUY works without the sign (server: 110)
 local CONFIRM = 3 -- seconds a SELL click waits for the second one
 local NOTICE_TIME = 4
 
@@ -101,7 +100,6 @@ local designWidth = BASE_W
 local page = "list" -- "list" | "listing"
 local filter = "all"
 local current: string? = nil -- the listing's property
-local atSign = false -- the listing was opened at its FOR SALE sign
 local confirmSell: string? = nil
 local confirmUntil = 0
 local renderQueued = false
@@ -133,12 +131,6 @@ local function myLevel(): number
 	return tonumber(player:GetAttribute("Level")) or 1
 end
 
-local function myRoot(): BasePart?
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	return if root and root:IsA("BasePart") then root else nil
-end
-
 -- ── The map (shared/Map.luau Map.EstatePlots, 2.6 contract; optional) ─────
 
 local function plotOf(id: string): { x: number, z: number, district: string? }?
@@ -161,19 +153,6 @@ local function districtName(id: string?): string?
 	end
 	local words = string.gsub(id, "[_%-]", " ")
 	return (string.gsub(words, "%f[%a]%a", string.upper))
-end
-
--- Can BUY go to the server from here? At the sign, near the plot, or for a property the map does not place.
-local function nearProperty(id: string): boolean
-	if atSign and current == id then
-		return true
-	end
-	local plot = plotOf(id)
-	if not plot then
-		return true
-	end
-	local root = myRoot()
-	return root ~= nil and Vector3.new(root.Position.X - plot.x, 0, root.Position.Z - plot.z).Magnitude <= NEAR
 end
 
 -- ── Helpers ────────────────────────────────────────────────────────────────
@@ -310,7 +289,7 @@ local function build()
 	chrome.onClose = function()
 		EstateUi.close()
 	end
-	chrome.context.Text = "H · the FOR SALE signs sell · GPS shows the way"
+	chrome.context.Text = "H · buy from here · GPS shows the way"
 	content.ClipsDescendants = true
 	scale = Ui.make("UIScale", {}, window)
 	subtitle = chrome.subtitle
@@ -707,8 +686,6 @@ local function renderListing()
 		messageColor = C.red
 	elseif money < def.price then
 		message = `You need {Ui.money(def.price - money)} more. Big jobs, night runs and your company pay best.`
-	elseif not nearProperty(def.id) then
-		message = "Buy it at its FOR SALE sign: GO THERE sets the GPS."
 	else
 		message = if HOME_KINDS[def.kind] and not state.home then "Buy it and it becomes your home: you spawn here." else "Ready to buy."
 		messageColor = C.money
@@ -755,18 +732,11 @@ local function renderListing()
 		layout.Wraps = true
 	end)
 	if not mine then
-		if nearProperty(def.id) then
-			local can = not locked(def) and story == nil and money >= def.price
-			actionButton(actions, `BUY  {Ui.money(def.price)}`, if can then K.red else C.grey, function() -- 5.8: the red primary
-				send("buy", def.id)
-			end)
-		else
-			actionButton(actions, "GO THERE TO BUY", C.blue, function()
-				if setGps(def) then
-					EstateUi.close()
-				end
-			end)
-		end
+		-- (6.12.1: bought from here, the phone, anywhere: no walk to the FOR SALE sign)
+		local can = not locked(def) and story == nil and money >= def.price
+		actionButton(actions, `BUY  {Ui.money(def.price)}`, if can then K.red else C.grey, function() -- 5.8: the red primary
+			send("buy", def.id)
+		end)
 	else
 		if HOME_KINDS[def.kind] and not isHome then
 			actionButton(actions, "SET AS HOME", C.green, function()
@@ -880,7 +850,6 @@ function EstateUi.close()
 	if window then
 		window.Visible = false
 	end
-	atSign = false
 	confirmSell = nil
 end
 
@@ -907,11 +876,10 @@ end
 function EstateUi.openList()
 	show(function()
 		page = "list"
-		atSign = false
-	end)
+		end)
 end
 
--- A property's listing; fromSign = opened by its FOR SALE sign (BUY works there).
+-- A property's listing (fromSign: 6.12.1, no longer used: BUY works from anywhere).
 function EstateUi.openListing(id: string, fromSign: boolean?)
 	if not byId[id] then
 		return
@@ -922,7 +890,6 @@ function EstateUi.openListing(id: string, fromSign: boolean?)
 		end
 		current = id
 		page = "listing"
-		atSign = fromSign == true
 	end)
 	if window and window.Visible then
 		listingPage.CanvasPosition = Vector2.zero

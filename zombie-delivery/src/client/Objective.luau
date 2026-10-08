@@ -38,6 +38,7 @@ local player = Players.LocalPlayer
 
 local refs: any = {} -- the card's instances
 local expanded = false -- the contract group unfolded (the session's choice)
+local quiet = false -- 6.12.1: the idle "Take a delivery job" card is held back (an experienced courier)
 local phase: string? = nil -- the tutorial's phase (nil: none runs)
 local lastResult: { success: boolean, total: number?, at: number }? = nil
 local current: Goal.Card? = nil
@@ -216,7 +217,9 @@ function Objective.update(job: any, state: any, distance: number?, hidden: boole
 		seat = seatNow(character),
 	})
 	current = card
-	local visible = not (hidden and not hasJob)
+	-- 6.12.1: no "Take a delivery job" for a courier who knows the way (Config.Goal.HintJobs deliveries done)
+	quiet = not hasJob and card.kind == "nojob" and (tonumber(state.deliveries) or 0) >= G.HintJobs
+	local visible = not (hidden and not hasJob) and not quiet
 	if refs.card.Visible ~= visible then
 		refs.card.Visible = visible
 	end
@@ -245,6 +248,12 @@ function Objective.update(job: any, state: any, distance: number?, hidden: boole
 		refs.placeRow.Visible = row
 	end
 	return card
+end
+
+-- 6.12.1: is the idle card held back (an experienced courier with no job)? client/Hud.luau hides the board's marker
+-- then too.
+function Objective.quiet(): boolean
+	return quiet
 end
 
 -- Marge's first day: the phase the Tutorial remote says (as client/TutorialUi.luau reads it: a string is the phase,

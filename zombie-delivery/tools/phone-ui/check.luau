@@ -340,7 +340,7 @@ do
 	M.remotes.Tasks.OnClientEvent:Fire("state",state)
 	check("the new state: ✓ CLAIMED, no CLAIM, no badges, no dot",showing("tasks") and named("Claim_1")==nil and text("✓ CLAIMED")~=nil and not named("tasksApp"):FindFirstChild("Badge").Visible and told==0)
 	M.remotes.Tasks.OnClientEvent:Fire("done",{title="Ride a zip line",weekly=false,money=120,xp=80})
-	check("a task done: a toast and a sound",string.find(toasts[#toasts] or "","TASK DONE: Ride a zip line",1,true)~=nil and M.played=="level_up")
+	check("a task done: a toast and a sound",string.find(toasts[#toasts] or "","TASK DONE: Ride a zip line",1,true)~=nil and M.played=="task_done")
 	for _,task in state.daily do task.progress=task.target;task.done=true;task.claimed=true end
 	state.bonus.done=true;state.ready=1
 	M.remotes.Tasks.OnClientEvent:Fire("state",state)
