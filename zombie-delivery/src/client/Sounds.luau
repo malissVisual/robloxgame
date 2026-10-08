@@ -19,10 +19,18 @@
 -- coins on a payout and on money popped by a kill, and the city's hum and wind (louder at night). Until Sfx2Id is
 -- filled in, a few play a stand-in from the first sheet (coin: cash, the buzz: notify, the knock: putdown) and the
 -- rest stay silent (no van engine on a bike). Also starts client/Juice.luau.
+--
+-- 6.12, the world sounds alive (art/audio/sfx3.ogg, SoundSheet.Sfx3, Config.Soundscape): client/SoundScape.luau plays
+-- the footsteps by surface (yours and the nearest players'; it took over the 5.7 steps and the hum and wind), the
+-- splashes, the car doors and the backs, the horn (H in the driver's seat) and the ambience (the day, the night, a
+-- rooftop's wind, the park's fountain); it gets how to play from here (SoundScape.start). Money that went down outside
+-- a job plays "purchase". The UI stings for other modules: Sounds.play("task_done" | "purchase" | "event_start" |
+-- "event_end", volume?, pitch?). Until Sfx3Id is filled in, a few play a stand-in (FALLBACK: the steps the 5.7 steps, a
+-- door (or a tailgate) shut the putdown, the horns the chauffeur's horn, the bell the coin, the beep the notice,
+-- task_done job_done, purchase cash, event_start the wave alarm, event_end the notice) and the rest stay silent.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -36,6 +44,7 @@ local Drive = require(script.Parent.Drive)
 local Ui = require(script.Parent.Ui)
 local PhoneMotion = require(script.Parent.PhoneMotion)
 local Juice = require(script.Parent.Juice)
+local SoundScape = require(script.Parent.SoundScape)
 
 local Sounds = {}
 
@@ -48,10 +57,22 @@ Sounds.notify = nil :: ((text: string) -> ())?
 
 local enabled = SoundSheet.SfxId ~= "" and SoundSheet.MusicId ~= ""
 local sheet2 = SoundSheet.Sfx2Id ~= "" -- 5.7: the world's sounds
--- 5.7: stand-ins from the first sheet while sfx2.ogg is not uploaded yet.
-local FALLBACK: { [string]: string } = { coin = "cash", phone_buzz = "notify", knock = "putdown" }
+local sheet3 = SoundSheet.Sfx3Id ~= "" -- 6.12: doors, horns, steps by surface, ambience, UI stings
+-- 5.7: stand-ins from the first sheet while sfx2.ogg is not uploaded yet. 6.12: and from the first two while sfx3.ogg
+-- is not (a stand-in of a stand-in works too: a step plays the 5.7 step once sfx2 is up).
+local FALLBACK: { [string]: string } = {
+	coin = "cash", phone_buzz = "notify", knock = "putdown",
+	car_door_close = "putdown",
+	horn_car = "horn", horn_van = "horn", horn_truck = "horn", bike_bell = "coin", scooter_beep = "notify",
+	task_done = "job_done", purchase = "cash", event_start = "wave", event_end = "notify",
+}
+for _, surface in { "concrete", "grass", "wood", "metal", "water" } do
+	FALLBACK[`step_{surface}_a`] = "step_a"
+	FALLBACK[`step_{surface}_b`] = "step_b"
+end
 local musicGroup: SoundGroup
 local effectsGroup: SoundGroup
+local started = false -- 6.12: Sounds.start made the groups (a module may play before)
 local mode = 1 -- 1 everything, 2 music off, 3 all off
 local MODES = { "Sound: music and effects on", "Sound: music off", "Sound: all off" }
 
@@ -75,6 +96,12 @@ local function find(name: string): (string?, NumberRange?)
 		range = region(SoundSheet.Sfx2, name)
 		if range then
 			return SoundSheet.Sfx2Id, range
+		end
+	end
+	if sheet3 then
+		range = region(SoundSheet.Sfx3, name)
+		if range then
+			return SoundSheet.Sfx3Id, range
 		end
 	end
 	local standIn = FALLBACK[name]
@@ -103,7 +130,7 @@ local ROUND = { gun_light = 3, gun_crack = 2, gun_heavy = 2, gun_rapid = 4, hit 
 local flat: { [string]: { sounds: { Sound }, next: number } } = {}
 
 local function play(name: string, volume: number?, pitch: number?)
-	if not enabled or mode == 3 then
+	if not enabled or mode == 3 or not started then
 		return
 	end
 	local entry = flat[name]
@@ -113,7 +140,7 @@ local function play(name: string, volume: number?, pitch: number?)
 			return
 		end
 		local made: { Sound } = {}
-		for _ = 1, ROUND[name] or 1 do
+		for _ = 1, ROUND[name] or (if string.sub(name, 1, 5) == "step_" then 2 else 1) do -- (6.12: the steps by surface)
 			table.insert(made, makeSound(asset, range, false, effectsGroup, effectsGroup))
 		end
 		entry = { sounds = made, next = 1 }
@@ -132,7 +159,7 @@ Sounds.play = play
 -- 3D effects: a Sound in an attachment at the spot, gone when it ends (at most MaxVoices at once).
 local voices = 0
 local function playAt(name: string, position: Vector3, volume: number?, pitch: number?, maxDistance: number?)
-	if not enabled or mode == 3 or voices >= AUDIO.MaxVoices then
+	if not enabled or mode == 3 or voices >= AUDIO.MaxVoices or not started then
 		return
 	end
 	local camera = workspace.CurrentCamera
@@ -346,9 +373,13 @@ local function listenGame()
 			level = now
 		end
 		if type(state.money) == "number" then
-			-- Money that moved without a job or a kill: a purchase, a collected safe.
+			-- Money that moved without a job or a kill: a purchase, a collected safe. 6.12: a purchase (down) its own.
 			if money and state.money ~= money and os.clock() - lastPayout > 1.5 then
-				play("cash", 0.6)
+				if state.money < money then
+					play("purchase", Config.Soundscape.PurchaseVolume)
+				else
+					play("cash", 0.6)
+				end
 			end
 			money = state.money
 		end
@@ -568,87 +599,17 @@ local function updateZip()
 	sound.Volume = JUICE.ZipVolume * (0.3 + 0.7 * math.min(share, 1))
 end
 
--- 5.7: your footsteps on foot (one every StepStride studs, the two steps in turn), on the ground only.
-local stepDistance = 0
-local stepLeft = false
-local mutedRoot: Instance? = nil
-local function footsteps(dt: number)
-	if not enabled or not sheet2 or mode == 3 then
-		return
+-- 6.12: the footsteps (5.7: yours by speed) and the ambience (5.7: the hum and the wind) moved to
+-- client/SoundScape.luau, with the doors, the horn, the splashes and the fountain. How it plays: this module's.
+local function make(name: string, parent: Instance?, looped: boolean): Sound?
+	if not enabled or not started then
+		return nil
 	end
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not character or not humanoid or not root then
-		return
+	local asset, range = find(name)
+	if not asset or not range then
+		return nil
 	end
-	if humanoid.Health <= 0 or humanoid.SeatPart ~= nil or humanoid.PlatformStand or humanoid.FloorMaterial == Enum.Material.Air
-		or character:GetAttribute("ZipLine") ~= nil then
-		stepDistance = JUICE.StepStride * 0.6 -- the first step on landing comes soon
-		return
-	end
-	local v = root.AssemblyLinearVelocity
-	local speed = Vector3.new(v.X, 0, v.Z).Magnitude
-	if speed < JUICE.StepMinSpeed then
-		stepDistance = JUICE.StepStride * 0.6
-		return
-	end
-	stepDistance += speed * dt
-	if stepDistance < JUICE.StepStride then
-		return
-	end
-	stepDistance = math.min(stepDistance - JUICE.StepStride, JUICE.StepStride * 0.5)
-	stepLeft = not stepLeft
-	play(if stepLeft then "step_a" else "step_b", JUICE.StepVolume * math.clamp(speed / 16, 0.6, 1.3), 0.92 + math.random() * 0.16)
-	if mutedRoot ~= root then
-		-- Roblox's own running sound (RbxCharacterSounds) would step over ours.
-		local running = root:FindFirstChild("Running")
-		if running and running:IsA("Sound") then
-			running.Volume = 0
-			mutedRoot = root
-		end
-	end
-end
-
--- 5.7: the city's hum and the wind (2D loops, louder at night), once in the game.
-local ambience: Sound? = nil
-local wind: Sound? = nil
-local ambienceNight: boolean? = nil
-local function updateAmbience()
-	if not enabled or not sheet2 or not inGame then
-		return
-	end
-	if not ambience then
-		local asset, range = find("ambience")
-		if asset and range then
-			local sound = makeSound(asset, range, true, effectsGroup, effectsGroup)
-			sound.Volume = 0
-			sound:Play()
-			ambience = sound
-		end
-	end
-	if not wind then
-		local asset, range = find("wind")
-		if asset and range then
-			local sound = makeSound(asset, range, true, effectsGroup, effectsGroup)
-			sound.Volume = 0
-			sound.TimePosition = sound.PlaybackRegion.Min + 3 -- (not in step with the hum)
-			sound:Play()
-			wind = sound
-		end
-	end
-	local night = workspace:GetAttribute("Night") == true
-	if night == ambienceNight then
-		return
-	end
-	ambienceNight = night
-	local info = TweenInfo.new(JUICE.AmbienceFade, Enum.EasingStyle.Sine)
-	if ambience then
-		TweenService:Create(ambience, info, { Volume = if night then JUICE.AmbienceNight else JUICE.AmbienceDay }):Play()
-	end
-	if wind then
-		TweenService:Create(wind, info, { Volume = if night then JUICE.WindNight else JUICE.WindDay }):Play()
-	end
+	return makeSound(asset, range, looped, effectsGroup, parent or effectsGroup)
 end
 
 -- 5.7: the buses: the brake as one stands at a stop, the doors' hiss as it leaves (its BusAt attribute,
@@ -766,9 +727,12 @@ function Sounds.start()
 	effectsGroup = Instance.new("SoundGroup")
 	effectsGroup.Name = "Effects"
 	effectsGroup.Parent = SoundService
+	started = true
 	applyMode()
 	if not enabled then
 		warn("[Sounds] no sound yet: upload art/audio/sfx.ogg and art/audio/music.ogg and put their ids in shared/SoundSheet.luau")
+	elseif not sheet3 then
+		print("[Sounds] 6.12: art/audio/sfx3.ogg is not uploaded yet (SoundSheet.Sfx3Id): stand-ins play (art/audio/NAHRAT-SFX3.md)")
 	end
 	player.CharacterAdded:Connect(function()
 		spawnedAt = os.clock()
@@ -789,7 +753,22 @@ function Sounds.start()
 		play("phone_buzz", JUICE.BuzzVolume)
 	end
 	pickMusic()
-	RunService.Heartbeat:Connect(footsteps)
+	-- 6.12: the footsteps, the splashes, the doors, the horn and the ambience (client/SoundScape.luau)
+	SoundScape.start({
+		play = play,
+		playAt = playAt,
+		make = make,
+		has = function(name: string): boolean
+			return enabled and find(name) ~= nil
+		end,
+		on = function(): boolean
+			return enabled and mode ~= 3
+		end,
+		inGame = function(): boolean
+			return inGame
+		end,
+		sheet3 = enabled and sheet3,
+	})
 	task.spawn(function()
 		local tick = 0
 		while true do
@@ -805,7 +784,6 @@ function Sounds.start()
 			end
 			if tick % 10 == 0 then
 				pickMusic()
-				updateAmbience()
 			end
 		end
 	end)

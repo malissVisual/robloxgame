@@ -1143,6 +1143,42 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Daily and weekly tasks, more sounds (6.12)
+
+The owner asked for a proposal of what the game needs and picked tasks, live events, cosmetics, sounds and getting
+ready to publish. 6.12 brings the tasks and the sounds; cosmetics, live events and the release kit come next.
+
+**Daily and weekly tasks** (`shared/Tasks.luau`, `server/Tasks.luau`, `client/TasksApp.luau`, `Config.Tasks`)
+- **What you get:** MORE → TASKS on the phone gives every courier three daily tasks and one weekly task, picked for
+  each player and the same all day. Examples: "Deliver 3 pizza stacks", "Land 2 PERFECT throws", "Ride a zip line",
+  "Kill 20 zombies at night", "Deliver 50 pieces of cargo".
+- **When they change:** new dailies at 00:00 UTC, a new weekly on Monday at 00:00 UTC.
+- **Your level:** only tasks open at it are picked, and the rewards grow with it.
+- **Claiming:** each card shows the progress and the reward; press CLAIM when it is done.
+  - Finishing all three dailies opens a bonus.
+  - A finished task you forgot to claim is paid at the reset.
+  - A red dot on PHONE and on MORE shows rewards waiting.
+- **Where progress comes from:** the hooks are one call each: `Tasks.note` in Jobs, Cargo (throws), ZipLines, Wheelie,
+  Buses, RunEvents, Missions and the zombie kills.
+
+**More sounds** (`art/audio/sfx3.ogg`, `SoundSheet.Sfx3Id`, `shared/SoundPlan.luau`, `client/SoundScape.luau`,
+`Config.Soundscape`)
+- **Vehicles:**
+  - Car doors click open and thunk shut; a van's rear doors swing and slam; a roll-up door rattles.
+  - **H** behind the wheel honks for everybody nearby (`server/Horn.luau`): car, van, truck, a bike's bell, a
+    scooter's beep.
+- **Footsteps** follow the ground, for you and the players near you:
+  - concrete;
+  - the park's grass;
+  - the wooden bridge and gazebo;
+  - metal ladders and platforms;
+  - wading.
+- **Water:** you splash into the pond or the river.
+- **The city:** traffic and birds by day; wind, crickets and far-off groans at night; wind on the rooftops; the
+  fountain babbles.
+- **Purchases** ring the till, and a finished task has its own sting.
+- **Uploading:** upload `sfx3.ogg` and paste its id (`art/audio/NAHRAT-SFX3.md`). Until then stand-ins play.
+
 ## The Central Park in the middle, the depot north-east of it, giant rooftop props (6.11)
 
 The owner: "Make the middle of the map, the safe zone, nice: nature, water in the middle, a park; move the houses so

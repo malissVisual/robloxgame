@@ -29,6 +29,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12:
+  - **Daily and weekly tasks:** `shared/Tasks.luau`, `server/Tasks.luau`, the TASKS app, `Config.Tasks`; hooks with `Tasks.note`.
+  - **Sounds:** the sfx3 sheet with doors, horns (H, `server/Horn.luau`), footsteps by surface, splashes, ambience and UI stings (`client/SoundScape.luau`, `shared/SoundPlan.luau`).
+  - **Waiting on the owner:** uploading `art/audio/sfx3.ogg` and its id in `SoundSheet.Sfx3Id`.
+  - **Test in Studio:** MORE → TASKS, CLAIM; H in a car; footsteps on grass, the bridge and a ladder; day and night ambience.
 - Claude · 6.11.1:
   - **Turn speed:** a bike or a scooter keeps its speed in turns. Drive's wall check uses the real horizontal speed, not the share along the nose.
   - **Diagnostic:** a Studio-only `[Drive] scooter in a turn` line appears if a turn still slows it.

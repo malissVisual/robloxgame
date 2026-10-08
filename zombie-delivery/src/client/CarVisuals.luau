@@ -26,6 +26,10 @@
 -- (BikeRider.pose's wheelie). Your own scooter from client/Drive.luau at once (Drive.wheelie), everybody else's from
 -- its attribute WheelieAt (server/Wheelie.luau), popped up and dropped at the same pace. It leans on Config.Scooter's
 -- numbers (a bike on LEAN_MAX, LEAN_RATE).
+-- 6.12: says when a cabin door starts to open or is shut and when the back starts to open or to close
+-- (CarVisuals.onSwing, set by client/SoundScape.luau: the doors' and the back's sounds where they are); the back's kind
+-- (two rear doors, a roll-up door, a tailgate / trunk lid / ramp) from its hinge (shared/SoundPlan.luau backKind). A car
+-- just seen (streamed in, its back already open) stays quiet its first second.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,12 +37,17 @@ local RunService = game:GetService("RunService")
 
 local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
 local ScooterRide = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScooterRide"))
+local SoundPlan = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SoundPlan"))
 
 local BikeRider = require(script.Parent.BikeRider)
 local Drive = require(script.Parent.Drive)
 local Theme = require(script.Parent.Theme)
 
 local CarVisuals = {}
+
+-- 6.12: set by client/SoundScape.luau. what: "door" or the back's kind (SoundPlan.backKind); moment: "opening" (it
+-- starts to open), "closing" (the back starts to close) or "shut"; part: the leaf that moves.
+CarVisuals.onSwing = nil :: ((what: string, moment: string, part: BasePart) -> ())?
 
 type Wheel = { motor: Motor6D, front: boolean, radius: number }
 type Hinge = { motor: Motor6D, axis: Vector3, angle: number } -- angle: the open turn in radians
@@ -67,6 +76,9 @@ type CarState = {
 	axle: Vector3?,
 	wheelie: number,
 	wheelieTime: number,
+	-- 6.12: the back's kind for its sounds, and no sounds before this (os.clock: a car just seen).
+	backKind: string,
+	quietUntil: number,
 }
 
 local player = Players.LocalPlayer
@@ -93,6 +105,7 @@ local function stateOf(car: Model): CarState?
 	local doorPrompts: { DoorPrompt } = {}
 	local lean: Motor6D?, crankMotor: Motor6D? = nil, nil
 	local axle: Vector3? = nil
+	local backKind = "swing"
 	-- 3.7: the seats behind each door (their attribute Door).
 	local seatsAt: { [number]: { Seat } } = {}
 	for _, child in car:GetChildren() do
@@ -119,6 +132,11 @@ local function stateOf(car: Model): CarState?
 			crankMotor = child
 		elseif child:IsA("Motor6D") and child.Name == "BackHinge" then
 			local angle = child:GetAttribute("Angle")
+			if #hinges == 0 then
+				-- 6.12: C1 = the hinge from the leaf's middle (server/Vehicles.luau buildBack): a roll-up door hangs from
+				-- its top, a tailgate stands on its bottom edge
+				backKind = SoundPlan.backKind(if child:GetAttribute("Axis") == "X" then "X" else "Y", child.C1.Position.Y)
+			end
 			table.insert(hinges, {
 				motor = child,
 				axis = if child:GetAttribute("Axis") == "X" then Vector3.xAxis else Vector3.yAxis,
@@ -166,6 +184,8 @@ local function stateOf(car: Model): CarState?
 		axle = axle,
 		wheelie = 0,
 		wheelieTime = 0,
+		backKind = backKind,
+		quietUntil = os.clock() + 1,
 	}
 	states[car] = state
 	car.Destroying:Connect(function()
@@ -485,6 +505,12 @@ local function step(dt: number)
 				local t = swing.open * swing.open * (3 - 2 * swing.open)
 				swing.motor.Transform = CFrame.fromAxisAngle(Vector3.yAxis, swing.angle * t)
 			end
+			-- 6.12: the latch as it opens, the thunk as it shuts
+			local onSwing = CarVisuals.onSwing
+			local leaf = swing.motor.Part1
+			if onSwing and leaf and (before == 0) ~= (swing.open == 0) and os.clock() > state.quietUntil then
+				onSwing("door", if before == 0 then "opening" else "shut", leaf)
+			end
 		end
 
 		-- 3.2: the back swings toward BackOpen (eased); held there every frame while it is open.
@@ -493,6 +519,16 @@ local function step(dt: number)
 			local before = state.back
 			if before ~= target then
 				state.back = if target > before then math.min(target, before + dt / BACK_TIME) else math.max(target, before - dt / BACK_TIME)
+				-- 6.12: its sound as it starts to move (made to the swing's length) and as it is shut
+				local onSwing = CarVisuals.onSwing
+				local leaf = state.hinges[1].motor.Part1
+				if onSwing and leaf and os.clock() > state.quietUntil then
+					if before == 1 - target then
+						onSwing(state.backKind, if target == 1 then "opening" else "closing", leaf)
+					elseif state.back == 0 then
+						onSwing(state.backKind, "shut", leaf)
+					end
+				end
 			end
 			if state.back > 0 or before > 0 then
 				local t = state.back * state.back * (3 - 2 * state.back)

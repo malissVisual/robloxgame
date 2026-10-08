@@ -35,6 +35,27 @@ for _, name in { "zip", "scooter", "freewheel", "ambience", "wind" } do
 	check(name .. " loops", SoundSheet.Looped[name] == true)
 end
 check("the second sheet's id is a string", type(SoundSheet.Sfx2Id) == "string")
+-- 6.12: the doors, the horns, the footsteps by surface, the splash, the ambience and the UI stings (sfx3.ogg).
+local USED3 = {
+	"car_door_open", "car_door_close", "van_back_open", "van_back_close", "van_roll_up", "van_roll_down",
+	"horn_car", "horn_van", "horn_truck", "bike_bell", "scooter_beep",
+	"step_concrete_a", "step_concrete_b", "step_grass_a", "step_grass_b", "step_wood_a", "step_wood_b",
+	"step_metal_a", "step_metal_b", "step_water_a", "step_water_b", "splash",
+	"amb_day", "amb_night", "amb_roof", "amb_fountain",
+	"task_done", "purchase", "event_start", "event_end",
+}
+for _, name in USED3 do
+	check("sfx3 region " .. name, SoundSheet.Sfx3[name] ~= nil)
+	check("sfx3 " .. name .. " is in no other sheet", SoundSheet.Sfx[name] == nil and SoundSheet.Sfx2[name] == nil)
+end
+for _, name in { "amb_day", "amb_night", "amb_roof", "amb_fountain" } do
+	check(name .. " loops", SoundSheet.Looped[name] == true and SoundSheet.Sfx3[name][2] >= 4)
+end
+for _, name in { "car_door_open", "car_door_close", "horn_car", "step_concrete_a", "splash", "task_done", "event_start" } do
+	check(name .. " does not loop", SoundSheet.Looped[name] == nil)
+end
+check("the third sheet's id is a string", type(SoundSheet.Sfx3Id) == "string")
+check("the third sheet is an asset id or empty", SoundSheet.Sfx3Id == "" or string.match(SoundSheet.Sfx3Id, "^rbxassetid://%d+$") ~= nil, SoundSheet.Sfx3Id)
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
 end
@@ -51,7 +72,7 @@ for _, def in Config.CarGuns do
 end
 check("weapons listed", weapons > 0)
 -- The regions never overlap (each plays only its own sound).
-for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2 } do
+for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3 } do
 	local list = {}
 	for name, r in sheet do
 		check(`region {name} is valid`, r[1] >= 0 and r[2] > 0)

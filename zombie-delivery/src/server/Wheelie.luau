@@ -16,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Vehicles = require(script.Parent.Vehicles)
+local Tasks = require(script.Parent.Tasks) -- 6.12: the seconds of a wheelie count for the wheelie task
 
 local Wheelie = {}
 
@@ -28,6 +29,10 @@ local active: { [Model]: Up } = {}
 local started = false
 
 local function drop(model: Model)
+	local entry = active[model]
+	if entry then -- 6.12: its seconds up (the balance's MaxSeconds at most) for the daily task
+		Tasks.note(entry.player, "wheelie", math.min(workspace:GetServerTimeNow() - entry.at, Config.Scooter.Wheelie.MaxSeconds))
+	end
 	active[model] = nil
 	if model.Parent then
 		model:SetAttribute("WheelieAt", nil)

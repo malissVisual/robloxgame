@@ -50,6 +50,7 @@ local NAMES = {
 	"Holster", -- 3.9: client → server: (holstered boolean) the gun away (B) or in the hand; the server sets the character's Holstered attribute (server/CloseCombat.luau)
 	"Melee", -- 3.9: client → server: (the swing's direction, a unit Vector3, or nil) a punch (holstered) or a strike with the gun (V); checked on the server
 	"CarDoor", -- 3.10: client → server: ("out") E in a car seat: out of it at your door (server/Vehicles.luau, client/CarBoarding.luau)
+	"Horn", -- 6.12: client → server: () H in the driver's seat; server → clients near it: (car model) its horn (server/Horn.luau, client/SoundScape.luau)
 	"Gear", -- 4.6: client → server: ("buy" | "install" | "remove", gear id) for the equipped car at Wrench Garage (server/Shops.luau)
 	"RerollTier", -- 4.7: client → server: (tier) new ordinary offers of that danger level on my board, for Config.Jobs.Choice.RerollFee × its stars, once per board (server/Jobs.luau)
 	"RoadEvent", -- 4.8: server → client: a road event's card ({ kind = "addon", title, text, pay, endsAt }) or nil to close it; client → server: ("accept" | "decline") the add-on (server/Jobs.luau, client/RoadEventUi.luau)
@@ -63,6 +64,7 @@ local NAMES = {
 	"Hand", -- 6.1: client → server: ("fists" | "bag" | "gun") what you hold (keys 1 / 2 / 3, the bottom bar's hand slots); the server decides (server/Hand.luau: the character's Hand and Holstered attributes; a loaded bag that leaves the hand is set down by server/Cargo.luau)
 	"Wheelie", -- 6.10: client → server: (up boolean) your E-Scooter on its back wheel or down again (server/Wheelie.luau checks it and sets the scooter's WheelieAt; client/Drive.luau)
 	"Throw", -- 6.0: client → server: (the stop: the ThrowStop attribute, a direction Vector3, a power 0 … 1) a throw at a home's door (server/Cargo.luau, client/Throw.luau); server → client: ("landed", { tip, far, over, wall, span }) it hit the door
+	"Tasks", -- 6.12: client → server: ("open") or ("claim", 1 … 3 | "bonus" | "weekly"); server → client: ("state", view), ("done", { title, weekly, money, xp }), ("claimed", { title, money, xp }) (server/Tasks.luau, client/TasksApp.luau)
 }
 
 local folder: Folder

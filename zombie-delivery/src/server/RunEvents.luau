@@ -25,6 +25,7 @@ local FootEvents = require(Shared.FootEvents)
 local Zombies = require(script.Parent.Zombies)
 local Npcs = require(script.Parent.Npcs)
 local PlayerData = require(script.Parent.PlayerData)
+local Tasks = require(script.Parent.Tasks) -- 6.12: a survivor's tip counts for the tips task
 
 local RunEvents = {}
 
@@ -259,6 +260,7 @@ local function ongoing(player: Player, run: Run, position: Vector3)
 	local gap = flat(position, spot)
 	if gap <= tuning.SurvivorReach then
 		PlayerData.addMoney(player, run.tip)
+		Tasks.note(player, "tips", run.tip) -- 6.12
 		tell(player, `{run.name}: "Thank you, courier!" +${run.tip} tip`)
 		local npc = run.npc
 		if npc then

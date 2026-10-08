@@ -30,6 +30,8 @@
 --   MESSAGES, SETTINGS; ESC or ‹ BACK returns to the tiles). Under the tiles a messages row (always there: the unread
 --   count and the newest line), the focused contract and the courier card. Every app and window is the same as
 --   before; only home is regrouped.
+-- 6.12, MORE → TASKS (client/TasksApp.luau): the daily and weekly tasks in the popup. The rewards waiting to be
+--   claimed go on its row, on MORE and on the phone's dot (with the unread messages: Phone.onUnread).
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -106,6 +108,7 @@ local TILES: { AppDef } = {
 -- … and MORE's entries (the 5.5 MENU's windows among them).
 local MORE: { AppDef } = {
 	{ id = "career", name = "CAREER", sub = "Your level and what's next" },
+	{ id = "tasks", name = "TASKS", sub = "Daily and weekly tasks" }, -- 6.12
 	{ id = "missions", name = "MISSIONS", sub = "Missions and challenges", window = true },
 	{ id = "crew", name = "CREW", sub = "Work with friends", window = true },
 	{ id = "top", name = "TOP", sub = "The best couriers", window = true },
@@ -125,6 +128,7 @@ refs.routes = require(script.Parent.PhoneRoute)
 refs.apps = require(script.Parent.PhoneApps) -- 5.5: BOARD, BAG, GARAGE, the keys
 refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the banner
 refs.popup = require(script.Parent.PhonePopup) -- 6.0.1: the apps' centred popup
+refs.tasks = require(script.Parent.TasksApp) -- 6.12: MORE → TASKS, the daily and weekly tasks
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
 refs.page = "home" -- 6.5: the home's page: "home" (the six tiles) or "more" (MORE's sub-screen)
@@ -1422,7 +1426,7 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
-local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE" }
+local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS" }
 
 -- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
 renderApp = function()
@@ -1495,6 +1499,8 @@ renderApp = function()
 			refs.apps.bag(list, look, refs.host, wide) -- 6.5: BAG & ITEMS, the I window's tabs
 		elseif app == "garage" then
 			refs.apps.garage(list, look, refs.host)
+		elseif app == "tasks" then
+			refs.tasks.draw(list, look, wide) -- 6.12
 		end
 	end)
 	if refs.spareRoute then
@@ -1557,11 +1563,13 @@ refreshBadges = function()
 		jobsSub.Text = if not job then "Take a delivery" elseif open > 1 then `Your run · {open} orders` else "Your run · orders"
 	end
 	set("shop", 0, if affordable() then "$" else nil)
-	set("more", crewInvites) -- (6.5 review: MORE → CREW has your invitations)
+	local ready = refs.tasks.ready() -- 6.12: the task rewards waiting (TASKS, MORE and the dot)
+	set("tasks", ready)
+	set("more", crewInvites + ready) -- (6.5 review: MORE → CREW has your invitations)
 	set("garage", 0, if refs.apps.towDue() then "!" else nil) -- 5.5: the tank ran dry: TOW
 	local dot = refs.buttonDot
 	if dot then
-		local total = unread + (if boardNew > 0 then 1 else 0)
+		local total = unread + (if boardNew > 0 then 1 else 0) + ready
 		dot.Visible = total > 0
 		dot.Text = if unread > 9 then "9+" elseif unread > 1 then tostring(unread) else ""
 		dot.Size = UDim2.fromOffset(if unread > 9 then 20 else 14, 14)
@@ -1627,6 +1635,8 @@ local function startTicker()
 				if app == "orders" then
 					OrdersUi.tick() -- 5.2: every order's clock
 					if refs.route then refs.route.update() end
+				elseif app == "tasks" then
+					refs.tasks.tick() -- 6.12: the time until the tasks are new
 				end
 				if refs.tow and refs.idMoney then
 					refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
@@ -1856,7 +1866,7 @@ placeButton = function()
 	-- unread count goes to the HUD's button through Phone.onUnread)
 	local onUnread = Phone.onUnread
 	if onUnread then
-		local count = if Ui.touchLayout() then 0 else unreadCount() -- (6.5 review: on touch the phone's own dot says it)
+		local count = if Ui.touchLayout() then 0 else unreadCount() + refs.tasks.ready() -- (6.5 review: on touch the phone's own dot says it; 6.12: + the task rewards)
 		if count ~= lastUnread then
 			lastUnread = count
 			pcall(onUnread, count)
@@ -2093,6 +2103,21 @@ function Phone.start()
 	buildButton(made)
 	buildBody()
 	refs.body.Visible = false
+	-- 6.12: the TASKS app's state (server/Tasks.luau): the badges and the dot, the app while it shows, its toasts.
+	refs.tasks.notify = function(message: string)
+		local tell = Phone.notify
+		if tell then
+			tell(message)
+		end
+	end
+	refs.tasks.changed = function()
+		refreshBadges()
+		placeButton()
+		if isOpen and app == "tasks" then
+			renderApp()
+		end
+	end
+	refs.tasks.start()
 	Net.get("Job").OnClientEvent:Connect(function(payload)
 		job = if type(payload) == "table" then payload else nil
 		refreshBadges()

@@ -26,6 +26,7 @@ Phone.setState({phone=true,money=1240,kit={bag=true},cars={}})
 Phone.open()
 check("phone opens without warning",Phone.isOpen() and #M.warnings==0)
 -- 6.5: home is six big tiles in this order; MORE's sub-screen holds the other eight apps (5.5's MENU among them).
+-- 6.12: and TASKS (the daily and weekly tasks) after CAREER: nine.
 local function appIds(frame)
 	local buttons={}
 	for _,child in frame:GetChildren() do if child.ClassName=="TextButton" and string.match(child.Name,"App$") then table.insert(buttons,child) end end
@@ -40,11 +41,11 @@ for _,name in {"JOBS","MAP","SHOP","BAG & ITEMS","GARAGE","MORE"} do
 	check(`the {name} tile has its name and a one-line subtitle`,label~=nil and label.Parent.Parent==named("Tiles") and label.Parent:FindFirstChild("Sub")~=nil and label.Parent:FindFirstChild("Sub").Text~="")
 end
 check("JOBS carries the red edge",named("jobsApp"):FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red)
-check("MORE: career, missions, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,missions,crew,top,estate,bank,messages,settings")
+check("MORE: career, tasks, missions, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,tasks,missions,crew,top,estate,bank,messages,settings")
 check("MORE waits behind the tiles",named("Home").Visible and not named("More").Visible)
-check("all fourteen apps constructed",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==14)
+check("all fifteen apps constructed",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==15)
 check("the messages row is always on home",named("MessagesRow")~=nil and named("MessagesRow").Visible and text("No new messages")~=nil)
-check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==14)
+check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==15)
 do
 	local icons=require("./Icons")
 	icons.Ids.app_settings="rbxassetid://12345"
@@ -258,7 +259,7 @@ named("Close").Activated:Fire()
 check("read: the count goes",not named("Unread").Visible and text("No new messages")~=nil)
 -- 6.0.1: every app opens in the popup and closes back to home; the phone never turns.
 -- 6.5: the tiles (JOBS off duty: the board) and MORE's rows; each closes back to the page it came from.
-for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
+for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"tasks","tasks",true},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
 	local id,shows,inMore=entry[1],entry[2],entry[3]==true
 	Phone.close();Phone.open()
 	if inMore then named("moreApp").Activated:Fire() end
@@ -302,6 +303,59 @@ check("JOBS' badge: one open order",named("jobsApp"):FindFirstChild("Badge").Tex
 M.remotes.Job.OnClientEvent:Fire(nil)
 check("the run ends: BAG & ITEMS falls back to ITEMS",named("Tab_bag")==nil and named("Tab_items")~=nil)
 Phone.close()
+-- 6.12: MORE → TASKS: the server's state (the Tasks remote), the cards, CLAIM, the badges and the dot, the toasts.
+do
+	local asked=false
+	for _,sent in M.sent do if sent.name=="Tasks" and sent.args[1]=="open" then asked=true end end
+	check("the phone asks for its tasks when it starts",asked)
+	local told
+	Phone.onUnread=function(count) told=count end
+	local state={
+		daily={
+			{slot=1,id="pizza",title="Deliver 3 pizza stacks",target=3,progress=3,money=180,xp=110,done=true,claimed=false},
+			{slot=2,id="zip",title="Ride a zip line",target=1,progress=0,money=120,xp=80,done=false,claimed=false},
+			{slot=3,id="tips",title="Earn $80 in tips",target=80,progress=40,unit="$",money=150,xp=100,done=false,claimed=false},
+		},
+		bonus={money=300,xp=150,done=false,claimed=false},
+		weekly={slot="weekly",id="w_kill",title="Kill 150 zombies",target=150,progress=20,money=1400,xp=550,done=false,claimed=false},
+		dayEnds=M.now+3*3600+120,weekEnds=M.now+2*86400+3600,ready=1,
+	}
+	Phone.close();Phone.open()
+	M.remotes.Tasks.OnClientEvent:Fire("state",state)
+	check("a reward to claim: a badge on MORE and the HUD's phone dot",named("moreApp"):FindFirstChild("Badge").Visible and named("moreApp"):FindFirstChild("Badge").Text=="1" and told==1)
+	named("moreApp").Activated:Fire()
+	check("MORE has TASKS with its badge",named("tasksApp")~=nil and named("tasksApp"):FindFirstChild("Badge").Visible and named("tasksApp"):FindFirstChild("Badge").Text=="1")
+	named("tasksApp").Activated:Fire()
+	check("TASKS opens in the popup",showing("tasks") and text("TASKS")~=nil and upright() and #M.warnings==0)
+	check("three daily cards, the bonus card and the weekly card",named("Task_1")~=nil and named("Task_2")~=nil and named("Task_3")~=nil and named("Task_bonus")~=nil and named("Task_weekly")~=nil)
+	check("a card: its title, its progress and its reward",text("Ride a zip line")~=nil and text("0 / 1")~=nil and text("$120 · 80 XP")~=nil and text("20 / 150")~=nil)
+	check("money tasks read in dollars",text("$40 / $80")~=nil)
+	check("how long until the tasks are new",text("New tasks in 3 h 2 min · at 00:00 UTC")~=nil and text("New in 2 d 1 h · Monday 00:00 UTC")~=nil)
+	check("CLAIM only on the done task, the gamepad on it",named("Claim_1")~=nil and named("Claim_2")==nil and named("Claim_weekly")==nil and named("Claim_bonus")==nil and M.focus==named("Claim_1"))
+	named("Claim_1").Activated:Fire()
+	check("CLAIM asks the server for that task",lastSent("Tasks").args[1]=="claim" and lastSent("Tasks").args[2]==1)
+	M.remotes.Tasks.OnClientEvent:Fire("claimed",{title="Deliver 3 pizza stacks",money=180,xp=110})
+	check("a claim paid: a toast and the money's sound",toasts[#toasts]=="Deliver 3 pizza stacks: +$180 · +110 XP" and M.played=="cash")
+	state.daily[1].claimed=true;state.ready=0
+	M.remotes.Tasks.OnClientEvent:Fire("state",state)
+	check("the new state: ✓ CLAIMED, no CLAIM, no badges, no dot",showing("tasks") and named("Claim_1")==nil and text("✓ CLAIMED")~=nil and not named("tasksApp"):FindFirstChild("Badge").Visible and told==0)
+	M.remotes.Tasks.OnClientEvent:Fire("done",{title="Ride a zip line",weekly=false,money=120,xp=80})
+	check("a task done: a toast and a sound",string.find(toasts[#toasts] or "","TASK DONE: Ride a zip line",1,true)~=nil and M.played=="level_up")
+	for _,task in state.daily do task.progress=task.target;task.done=true;task.claimed=true end
+	state.bonus.done=true;state.ready=1
+	M.remotes.Tasks.OnClientEvent:Fire("state",state)
+	check("every daily done: CLAIM BONUS",named("Claim_bonus")~=nil and M.focus==named("Claim_bonus"))
+	named("Claim_bonus").Activated:Fire()
+	check("CLAIM BONUS asks for the bonus",lastSent("Tasks").args[1]=="claim" and lastSent("Tasks").args[2]=="bonus")
+	check("before the reset the countdown runs",text("New tasks in 3 h 2 min · at 00:00 UTC")~=nil)
+	M.now=state.dayEnds+1;require("./TasksApp").tick()
+	check("the phone's ticker counts down to the reset",text("New tasks in 0 s · at 00:00 UTC")~=nil)
+	M.now=100
+	named("Close").Activated:Fire()
+	check("TASKS closes back to the phone",popup()==nil and Phone.isOpen() and #M.warnings==0)
+	Phone.onUnread=nil
+	Phone.close()
+end
 -- The popup with motion (reduced motion off): it lands centred at full scale, dim and blurred; back on close.
 M.services.GuiService.ReducedMotionEnabled=false
 Phone.close();Phone.open()
