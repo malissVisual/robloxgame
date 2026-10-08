@@ -179,6 +179,10 @@
 --   * The board refills: every offer taken (Board.taken) gets a new one of its kind after the run, made from where
 --     the player is then (Jobs.refillBoard, deferred from endJob).
 --   * A DeliveryResult says its `mode`: client/Hud.luau shows a foot or bike run as a toast and a float.
+--
+-- 6.12, the daily and weekly tasks (server/Tasks.luau, required where it is called: no new top-level local here):
+-- payOrder tells Tasks.note every order paid ("order": its pieces, look, mode, ★★★, pay; the crew's share for each
+-- member) and its tips (the round's, the Courier Vest's).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3288,6 +3292,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	if offer.round then
 		-- 5.3, the newspaper round: the tip for no paper in the bushes (a line in the rating's checks).
 		payTotal += JobRules.roundTip(Cargo.missesOf(session, order.id))
+		require(script.Parent.Tasks).note(player, "tips", JobRules.roundTip(Cargo.missesOf(session, order.id))) -- 6.12: the tips task
 		if ratingInfo then
 			table.insert(ratingInfo.checks, JobRules.roundCheck(Cargo.missesOf(session, order.id)))
 		end
@@ -3297,6 +3302,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		local tip = JobRules.kitTip(payTotal, Transport.tipShareOf(player))
 		if tip > 0 then
 			payTotal += tip
+			require(script.Parent.Tasks).note(player, "tips", tip) -- 6.12: the tips task
 			if ratingInfo then
 				table.insert(ratingInfo.checks, JobRules.kitTipCheck(tip))
 			end
@@ -3361,6 +3367,8 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		end
 	end
 	PlayerData.addMoney(player, driverTotal)
+	-- 6.12: the daily and weekly tasks (server/Tasks.luau): the pieces of its look, a bike or scooter run, ★★★, the pay
+	require(script.Parent.Tasks).note(player, "order", delivered, { look = offer.look, mode = offer.mode, stars = if rating then rating.stars elseif offer.mission then stars else nil, pay = driverTotal, owner = true })
 	if final then
 		send(player)
 	else
@@ -3428,6 +3436,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		local memberPay = if again then Missions.replayPay(share) else share
 		missionPaid[member] = memberPay
 		PlayerData.addMoney(member, memberPay)
+		require(script.Parent.Tasks).note(member, "order", delivered, { look = offer.look, pay = memberPay }) -- 6.12: the crew's tasks
 		resultRemote:FireClient(member, withXp({
 			success = true,
 			rider = true,

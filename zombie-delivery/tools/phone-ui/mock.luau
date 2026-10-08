@@ -186,6 +186,6 @@ M.BagUi={line=function() return nil end,open=function() M.bagOpen=true end,rende
 M.BagUi.bags=function(parent,state,order) M.bagsRendered=(M.bagsRendered or 0)+1;M.make("Frame",{Name="BagsRows",LayoutOrder=order},parent);return order+1 end
 M.Hotbar={slotOf=function(id) return if id=="medkit" then 5 else nil end}
 M.Hotbar.onUse=function(id) M.used=id end
-M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end}
+M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end,play=function(name) M.played=name end} -- (6.12: TASKS' sounds)
 M.Discovery={grid={X0=-2200,Z0=-3000,Size=120,Rows=40,Cols=36},changed=signal(),uncoveredCell=function() return M.discovered==true end}
 return M

@@ -63,6 +63,7 @@ local NAMES = {
 	"Hand", -- 6.1: client → server: ("fists" | "bag" | "gun") what you hold (keys 1 / 2 / 3, the bottom bar's hand slots); the server decides (server/Hand.luau: the character's Hand and Holstered attributes; a loaded bag that leaves the hand is set down by server/Cargo.luau)
 	"Wheelie", -- 6.10: client → server: (up boolean) your E-Scooter on its back wheel or down again (server/Wheelie.luau checks it and sets the scooter's WheelieAt; client/Drive.luau)
 	"Throw", -- 6.0: client → server: (the stop: the ThrowStop attribute, a direction Vector3, a power 0 … 1) a throw at a home's door (server/Cargo.luau, client/Throw.luau); server → client: ("landed", { tip, far, over, wall, span }) it hit the door
+	"Tasks", -- 6.12: client → server: ("open") or ("claim", 1 … 3 | "bonus" | "weekly"); server → client: ("state", view), ("done", { title, weekly, money, xp }), ("claimed", { title, money, xp }) (server/Tasks.luau, client/TasksApp.luau)
 }
 
 local folder: Folder

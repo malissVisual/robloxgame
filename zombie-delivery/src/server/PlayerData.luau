@@ -15,7 +15,8 @@
 -- fuel in every car you own (carFuel, litres; server/Fuel.luau keeps it, a car without an entry is full). 6.6: the
 -- backpacks are gone (Config.RetiredKit): a save from before (no noPacks flag) gets their price back once
 -- (shared/Transport.luau packRefund; profile.packRefund, never saved, tells server/Tutorial.luau to say so). 6.7: the
--- Thermal Jacket the same way (the noJacket flag, profile.jacketRefund).
+-- Thermal Jacket the same way (the noJacket flag, profile.jacketRefund). 6.12: the daily and weekly tasks (tasks:
+-- shared/Tasks.luau's save, kept by server/Tasks.luau; read only from a real save).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -33,6 +34,7 @@ local Missions = require(Shared.Missions)
 local Challenges = require(Shared.Challenges)
 local Career = require(Shared.Career)
 local JobRules = require(Shared.JobRules)
+local TaskData = require(Shared.Tasks) -- 6.12: the daily and weekly tasks (profile.tasks)
 
 export type Profile = {
 	money: number,
@@ -80,6 +82,9 @@ export type Profile = {
 	jacketRefund: number?, -- 6.7: … and for the retired Thermal Jacket (the same way)
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
 	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
+	-- 6.12: the daily and weekly tasks (shared/Tasks.luau: the day, the level, the picks' ids, progress, claims; the
+	-- week the same). nil until server/Tasks.luau starts them (a new courier, a save from before 6.12)
+	tasks: TaskData.Saved?,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -143,6 +148,7 @@ local function newProfile(): Profile
 		jacketRefund = nil, -- 6.7
 		phone = false,
 		vanQuest = nil,
+		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -380,6 +386,11 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	if saved.vestKit ~= true and saved.money ~= nil then -- (a real old save: not a lock-only record of a new player)
 		profile.kit[Config.Courier.VestKit] = true
+	end
+	-- 6.12: the daily and weekly tasks, checked (TaskData.clean), only from a real save (not a lock-only record of a
+	-- new player); a save from before 6.12 has none: server/Tasks.luau starts them fresh.
+	if saved.money ~= nil then
+		profile.tasks = TaskData.clean(saved.tasks)
 	end
 	-- 6.4: the bag chosen: kept only while it is a bag you own (else nil: the best one)
 	local chosen = if type(saved.activeBag) == "string" then saved.activeBag else nil
@@ -732,6 +743,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		activeBag = profile.activeBag, -- 6.4
 		phone = profile.phone, -- 5.0
 		vanQuest = profile.vanQuest, -- 5.0
+		tasks = profile.tasks, -- 6.12
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

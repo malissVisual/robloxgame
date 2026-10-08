@@ -35,6 +35,7 @@ local ZipData = require(Shared.ZipLines)
 local Vehicles = require(script.Parent.Vehicles)
 local Cargo = require(script.Parent.Cargo)
 local DayNight = require(script.Parent.DayNight)
+local Tasks = require(script.Parent.Tasks) -- 6.12: a ride counts for the zip-line task
 
 local ZipLines = {}
 
@@ -221,6 +222,7 @@ local function zip(player: Player, line: ZipData.Line)
 	lastRide[player] = os.clock()
 	character:SetAttribute("ZipAt", startAt)
 	character:SetAttribute("ZipLine", line.id)
+	Tasks.note(player, "zip", 1) -- 6.12: the daily task "Ride a zip line"
 end
 
 -- The ride is over: off the cable (putDown: at the end platform, when the rider is not there already).
