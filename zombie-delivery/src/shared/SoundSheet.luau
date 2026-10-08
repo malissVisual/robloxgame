@@ -4,12 +4,16 @@
 -- Upload art/audio/sfx.ogg and art/audio/music.ogg (Asset Manager → Import) and paste the ids below.
 -- 5.7: art/audio/sfx2.ogg holds the world's sounds (Sfx2); until its id is pasted, those play a stand-in from
 -- Sfx or stay silent (client/Sounds.luau).
+-- 6.12: art/audio/sfx3.ogg holds the doors, the horns, the footsteps by surface, the splash, the ambience loops and
+-- the UI stings (Sfx3); until its id is pasted, those play a stand-in from Sfx / Sfx2 or stay silent
+-- (client/Sounds.luau FALLBACK; art/audio/NAHRAT-SFX3.md says how to upload it).
 
 local SoundSheet = {}
 
 SoundSheet.SfxId = "rbxassetid://108821829330157" -- "rbxassetid://…" of art/audio/sfx.ogg
 SoundSheet.MusicId = "rbxassetid://71392718953355" -- "rbxassetid://…" of art/audio/music.ogg
 SoundSheet.Sfx2Id = "rbxassetid://86322785000784" -- "rbxassetid://…" of art/audio/sfx2.ogg
+SoundSheet.Sfx3Id = "" -- "rbxassetid://…" of art/audio/sfx3.ogg (6.12)
 
 SoundSheet.Sfx = {
 	gun_light = { 0.0, 0.349977 },
@@ -62,7 +66,40 @@ SoundSheet.Sfx2 = {
 	wind = { 19.95, 8.0 },
 } :: { [string]: { number } }
 
+SoundSheet.Sfx3 = {
+	car_door_open = { 0.0, 0.5 },
+	car_door_close = { 0.8, 0.55 },
+	van_back_open = { 1.65, 0.8 },
+	van_back_close = { 2.75, 0.9 },
+	van_roll_up = { 3.95, 0.85 },
+	van_roll_down = { 5.1, 0.9 },
+	horn_car = { 6.3, 0.42 },
+	horn_van = { 7.02, 0.55 },
+	horn_truck = { 7.87, 0.95 },
+	bike_bell = { 9.12, 0.95 },
+	scooter_beep = { 10.37, 0.24 },
+	step_concrete_a = { 10.91, 0.2 },
+	step_concrete_b = { 11.41, 0.2 },
+	step_grass_a = { 11.91, 0.2 },
+	step_grass_b = { 12.41, 0.2 },
+	step_wood_a = { 12.91, 0.22 },
+	step_wood_b = { 13.43, 0.22 },
+	step_metal_a = { 13.95, 0.25 },
+	step_metal_b = { 14.5, 0.25 },
+	step_water_a = { 15.05, 0.32 },
+	step_water_b = { 15.67, 0.32 },
+	splash = { 16.29, 1.1 },
+	amb_day = { 17.69, 12.0 },
+	amb_night = { 29.99, 12.0 },
+	amb_roof = { 42.29, 8.0 },
+	amb_fountain = { 50.59, 6.0 },
+	task_done = { 56.89, 0.95 },
+	purchase = { 58.14, 0.8 },
+	event_start = { 59.24, 1.5 },
+	event_end = { 61.04, 1.2 },
+} :: { [string]: { number } }
+
 -- Sounds that loop (their region repeats seamlessly).
-SoundSheet.Looped = { ambience = true, engine = true, freewheel = true, scooter = true, wind = true, zip = true } :: { [string]: boolean }
+SoundSheet.Looped = { amb_day = true, amb_fountain = true, amb_night = true, amb_roof = true, ambience = true, engine = true, freewheel = true, scooter = true, wind = true, zip = true } :: { [string]: boolean }
 
 return SoundSheet

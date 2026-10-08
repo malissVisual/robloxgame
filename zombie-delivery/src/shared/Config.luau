@@ -2164,6 +2164,67 @@ Config.Juice = {
 	KnockGap = 0.17, -- seconds between two knocks (the sound's too)
 }
 
+-- 6.12, the world sounds alive (the owner: "more sounds so the game feels alive"): art/audio/sfx3.ogg
+-- (shared/SoundSheet.luau Sfx3), what plays where picked by shared/SoundPlan.luau, played by client/SoundScape.luau and
+-- client/Sounds.luau. Volumes 0..1, under the SOUND setting's effects volume (Config.Audio.EffectsVolume).
+Config.Soundscape = {
+	-- Footsteps by surface: the material under the feet (a ray down, Terrain too) → a surface; every material not here
+	-- is "concrete" (asphalt, pavement, brick, slate …). The park's lawns are decoration over its concrete slab: they
+	-- are found from Map.Park's layout (SoundPlan.parkLawn). In the water (the pond, the river, the sea): "water".
+	Materials = {
+		Grass = "grass", LeafyGrass = "grass", Ground = "grass", Mud = "grass", Sand = "grass", Snow = "grass",
+		Wood = "wood", WoodPlanks = "wood", Cardboard = "wood",
+		Metal = "metal", CorrodedMetal = "metal", DiamondPlate = "metal", Foil = "metal",
+		Water = "water",
+	} :: { [string]: string },
+	StepVolume = { concrete = 1, grass = 0.9, wood = 1.05, metal = 0.85, water = 1 } :: { [string]: number }, -- × Config.Juice.StepVolume
+	ClimbStride = 2.2, -- studs climbed per step on a ladder (a metal rung)
+	WadeStride = 1.3, -- × Config.Juice.StepStride in the water (slower strides, strokes when swimming)
+	Others = 6, -- other players' characters stepping (the nearest to the camera) …
+	OthersRange = 60, -- … within this many studs
+	OthersVolume = 0.75, -- × their steps' volume (3D, at their feet)
+	OthersEvery = 0.5, -- seconds between the looks for who is near
+	SplashVolume = 0.85, -- a body going into the water (louder falling fast)
+	SplashGap = 1.2, -- seconds before the same body splashes again
+	SplashRange = 140, -- studs from the camera
+	-- Doors (client/CarVisuals.luau's swings, every car near you).
+	DoorVolume = 0.7, -- a cabin door opening / shut
+	BackVolume = 0.8, -- the back: the rear doors, a roll-up door, a tailgate, a trunk lid, a ramp
+	DoorRange = 90, -- studs from the camera
+	-- The horn: H in the driver's seat (server/Horn.luau sends it to everybody near; others hear the car's own horn).
+	HornVolume = 0.65,
+	HornRange = 260, -- studs: farther clients are not even sent it
+	HornGap = 0.6, -- seconds between two honks of one player (the server's check too)
+	HornPerSecond = 3, -- the Horn remote's rate limit (Net.limit)
+	-- CarId → its horn (else horn_car; a pedal bike rings bike_bell, a stand-up scooter beeps scooter_beep).
+	Horns = {
+		van = "horn_van", courier = "horn_van", highroof = "horn_van", armorvan = "horn_van", rallyvan = "horn_van",
+		icecream = "horn_van", ambulance = "horn_van",
+		pickup = "horn_car", muscle = "horn_car",
+		boxtruck = "horn_truck", freight = "horn_truck", armored = "horn_truck", bus = "horn_truck", monster = "horn_truck",
+		movingtruck = "horn_truck", livestock = "horn_truck", fueltruck = "horn_truck",
+	} :: { [string]: string },
+	-- The ambience (2D loops, in the game only): the day's (traffic far off, birds) and the night's (wind, crickets,
+	-- groans far away) blend with the clock (Map.nightFactor of the workspace's ClockHour); a rooftop's wind rises from
+	-- RoofFrom to RoofFull studs up and turns the street's ambience down by RoofDuck. Without sfx3.ogg the 5.7 hum and
+	-- wind play as before (Config.Juice), the wind up to RoofStandIn louder on a roof.
+	Day = 0.13,
+	Night = 0.2,
+	Roof = 0.3,
+	RoofFrom = 22,
+	RoofFull = 60,
+	RoofDuck = 0.45,
+	RoofStandIn = 0.12,
+	Blend = 0.12, -- the share of the way to the goal volume every Tick
+	Tick = 0.25, -- seconds between the looks at the ambience, the cars in the water and who is near
+	-- The park's fountain (Map.Park): a 3D loop at the fountain, heard within FountainRange studs.
+	Fountain = 0.55,
+	FountainRange = 75,
+	FountainHeight = 4, -- studs over the walk (the basin and the jet)
+	-- The UI stings (client/Sounds.luau play: "task_done", "purchase", "event_start", "event_end").
+	PurchaseVolume = 0.75, -- money that went down outside a job (a purchase; up: the old cash sound)
+}
+
 -- The missions (3.0): 10 campaigns of 10 story missions each (shared/Missions.luau), taken from the MISSIONS window
 -- (U) anywhere, server checked (server/Missions.luau), played as jobs (server/Jobs.luau startMission) with twists.
 -- Every mission is rated 1 – 3 stars; the best rating is saved (profile.missions).
