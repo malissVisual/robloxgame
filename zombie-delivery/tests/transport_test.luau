@@ -23,11 +23,25 @@ local hands = Config.Cargo.HandsMax
 local function kit(def: string): Config.KitDef
 	return Transport.findKit(def) :: Config.KitDef
 end
-check("the shoes at level 1 (6.0: and more kit)", #Config.Kit >= 5 and kit("shoes").level == 1)
+check("6.12.2: no Running Shoes in the kit (retired, paid back), the rest is there", #Config.Kit >= 5 and Transport.findKit("shoes") == nil)
 check("6.6: no backpacks in the kit", Transport.findKit("backpack") == nil and Transport.findKit("bigpack") == nil)
 check("6.7: no Thermal Jacket in the kit (retired, paid back)", Transport.findKit("jacket") == nil)
-check("the price: shoes $250", kit("shoes").price == 250)
-check("the number: speed 1.1", kit("shoes").speed == 1.1)
+check("6.12.2: the shoes are retired at their price ($250), with their own save flag", (function()
+	for _, def in Config.RetiredKit do
+		if def.id == "shoes" then
+			return def.price == 250 and def.flag == "noShoes"
+		end
+	end
+	return false
+end)())
+check("6.12.2: nothing in the kit speeds you up any more (the Heavy Armour only slows)", (function()
+	for _, def in Config.Kit do
+		if def.speed and def.speed > 1 then
+			return false
+		end
+	end
+	return true
+end)())
 check("an unknown id is nil", Transport.findKit("rocketpack") == nil)
 check("6.0: the plastic bag at level 1: 2 extra (6.7: the starter, $0)", kit("bag").price == 0 and kit("bag").starter == true and kit("bag").level == 1 and kit("bag").extra == 2 and (kit("bag") :: any).room == nil)
 local seen: { [string]: boolean } = {}
@@ -44,7 +58,7 @@ check("every piece: its own id, a name, an icon, words", unique)
 
 check("bare hands: HandsMax (2)", Transport.handsRoom({}) == hands and hands == 2, Transport.handsRoom({}))
 check("6.6: an old backpack adds nothing", Transport.handsRoom({ backpack = true } :: any) == hands and Transport.handsRoom({ backpack = true, bigpack = true } :: any) == hands)
-check("shoes carry nothing", Transport.handsRoom({ shoes = true }) == hands)
+check("6.12.2: an old save's shoes carry nothing", Transport.handsRoom({ shoes = true }) == hands)
 check("an unknown or false id is ignored", Transport.handsRoom({ rocketpack = true, bigpack = false } :: any) == hands)
 check("6.0: the bag alone: 2 more (4)", Transport.handsRoom({ bag = true }) == hands + 2)
 check("6.6: room = hands + bag (one carrying item)", Transport.handsRoom({ bag = true, tote = true }, "tote") == hands + 3 and Transport.handsRoom({ bag = true, backpack = true } :: any) == hands + 2)
@@ -54,20 +68,20 @@ check("the pack: what is over the hands (6.6: the bag's)", Transport.packRoom({}
 
 -- Walking and the food --------------------------------------------------------------------------------------------
 
-check("no shoes: speed 1", Transport.speedMult({}) == 1 and Transport.speedMult({ bag = true }) == 1)
-check("running shoes: 1.1", Transport.speedMult({ shoes = true }) == 1.1)
--- 6.0: the Heavy Armour slows you a little (its speed below 1), with the shoes too; the Kevlar Vest does not.
+check("no kit: speed 1", Transport.speedMult({}) == 1 and Transport.speedMult({ bag = true }) == 1)
+check("6.12.2: an old save's running shoes: no faster (they are gone)", Transport.speedMult({ shoes = true }) == 1)
+-- 6.0: the Heavy Armour slows you a little (its speed below 1); the Kevlar Vest does not (6.12.2: no shoes any more).
 check("6.0: heavy armour: 0.92", Transport.speedMult({ heavy = true }) == 0.92)
-check("6.0: shoes and heavy armour: 1.1 × 0.92", math.abs(Transport.speedMult({ shoes = true, heavy = true }) - 1.1 * 0.92) < 1e-9)
-check("6.0: the kevlar vest: no slower", Transport.speedMult({ kevlar = true }) == 1 and Transport.speedMult({ kevlar = true, shoes = true }) == 1.1)
+check("6.12.2: old shoes and heavy armour: 0.92", Transport.speedMult({ shoes = true, heavy = true }) == 0.92)
+check("6.0: the kevlar vest: no slower", Transport.speedMult({ kevlar = true }) == 1 and Transport.speedMult({ kevlar = true, shoes = true }) == 1)
 local plain, warm = JobRules.freshDrain(1, 60, false), JobRules.freshDrain(1, 60, false, 0.8)
 check("freshDrain takes a warm multiplier (6.7: the thermal bag's, no jacket any more)", math.abs(warm - plain * 0.8) < 1e-9 and plain > 0, `{plain} {warm}`)
 check("freshDrain without it is the 4.8 one", JobRules.freshDrain(2, 30, true) == JobRules.freshDrain(2, 30, true, nil))
 
 -- The Info --------------------------------------------------------------------------------------------------------
 
-local foot = Transport.foot({ bag = true, shoes = true })
-check("on foot: mode, room, light only, speed", foot.mode == "foot" and foot.room == hands + 2 and foot.lightOnly == true and foot.speedMult == 1.1)
+local foot = Transport.foot({ bag = true, heavy = true })
+check("on foot: mode, room, light only, speed", foot.mode == "foot" and foot.room == hands + 2 and foot.lightOnly == true and foot.speedMult == 0.92)
 local bare = Transport.foot({})
 check("on foot with nothing: 2, 1", bare.room == hands and bare.speedMult == 1)
 local car = Transport.car(4)

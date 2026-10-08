@@ -69,7 +69,7 @@ check("the vests come after the first four pieces (the KIT tab's order)", (funct
 	for index, def in Config.Kit do
 		at[def.id] = index
 	end
-	return at.kevlar > at.shoes and at.heavy > at.kevlar -- (6.7: after the shoes; the jacket is retired)
+	return at.kevlar > at.duffel and at.heavy > at.kevlar -- (6.7: the jacket is retired; 6.12.2: the shoes too: after the bags)
 end)())
 
 -- 6.0.1: the Courier Vest (the red reflective vest a new courier buys): a look, no armour, sold next to the bag.

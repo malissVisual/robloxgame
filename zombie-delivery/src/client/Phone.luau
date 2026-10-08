@@ -211,18 +211,6 @@ local function vehicles(): { Config.CarDef }
 	return list
 end
 
--- The cheapest piece of kit with this effect ("speed", "armour", "tips"; 6.7: the jacket's "warm" is gone).
-local function cheapestKit(field: string): Config.KitDef?
-	local best: Config.KitDef? = nil
-	for _, def in Config.Kit do
-		local b = best
-		if (def :: any)[field] ~= nil and (b == nil or def.price < b.price) then
-			best = def
-		end
-	end
-	return best
-end
-
 -- Marge's tips: what a level opens, in her words, all from Config. Level 1 has two.
 local function margeTips(level: number): { string }
 	local tips: { string } = {}
@@ -235,9 +223,9 @@ local function margeTips(level: number): { string }
 				bigger = def
 			end
 		end
-		local shoes = cheapestKit("speed")
+		-- (6.12.2: no Running Shoes in her tip any more: they are gone)
 		if bigger then
-			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}, your bag more. The {bigger.name} at {Config.BagShop.Name} (by the spawn) holds {bigger.extra or 0} ({Career.money(bigger.price)}){if shoes then `, and {shoes.name} get you there faster ({Career.money(shoes.price)})` else ""}. The SHOP app says what you can afford.`)
+			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}, your bag more. The {bigger.name} at {Config.BagShop.Name} (by the spawn) holds {bigger.extra or 0} ({Career.money(bigger.price)}). The SHOP app says what you can afford.`)
 		end
 	end
 	-- (5.1: the bike shop at Career.BIKE_LEVEL is Marge's own text from the server, with the GPS: server/Tutorial.luau)

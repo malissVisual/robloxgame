@@ -274,14 +274,15 @@ check("SHOP lists the six shops first",named("Shops")~=nil and named("Shops").La
 	and named("Shop_bags")~=nil and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_bikes")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil)
 check("6.6: ZDC Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("ZDC Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
 	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.lower(object.Text),"backpack",1,true)~=nil end)[1]==nil)
-check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items, vests, running shoes")~=nil and text("Lead & Co.")~=nil and text("Guns, gun upgrades, a baseball bat")~=nil
+check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items and vests, next to the bags")~=nil and text("Lead & Co.")~=nil and text("Guns, gun upgrades, a baseball bat")~=nil
 	and text("Spoke & Chain")~=nil and text("Dead End Motors")~=nil and text("Wrench Garage")~=nil and text("Stages, car upgrades, gear, paint, car guns, repairs")~=nil) -- (6.7: what each really sells)
 do
 	local waypoint
 	local setWaypoint=M.MapView.setWaypoint
 	M.MapView.setWaypoint=function(at) waypoint=at end
 	named("Shop_supplies").Activated:Fire()
-	check("a shop's tap sets the GPS there, puts the phone away and says so",waypoint~=nil and waypoint.Z==-Config.City.BlockSize-Config.City.RoadWidth and not Phone.isOpen() and toasts[#toasts]=="GPS set: Last Stop Supplies")
+	local gear=require("./Map").Shops.supplies -- (6.12.2: Last Stop Supplies is the gear stall's GEAR counter at the depot)
+	check("a shop's tap sets the GPS there, puts the phone away and says so",waypoint~=nil and waypoint.X==gear.x and waypoint.Z==gear.z and not Phone.isOpen() and toasts[#toasts]=="GPS set: Last Stop Supplies")
 	M.MapView.setWaypoint=setWaypoint
 end
 -- 6.5: BAG & ITEMS, the I window's tabs: ITEMS (USE through the bottom bar's path), BAGS; BAG during a run.

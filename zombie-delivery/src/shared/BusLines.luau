@@ -150,14 +150,17 @@ local function keys(): { KeyPlace }
 		if landmark.id == Map.Park.id then
 			continue
 		end
+		-- 6.12.2: Last Stop Supplies moved into the depot's yard (the gear stall's GEAR counter): it still draws from its
+		-- old block (Map.LastStop, where its building stands), so every line keeps its stops, and names none there.
 		local yard = landmark.id == "depot" or landmark.id == "bags"
+		local former = landmark.id == "supplies"
 		local weight = if landmark.id == "depot" then 4
 			elseif landmark.kind == "shop" then 3
 			elseif landmark.kind == "venue" or string.sub(landmark.id, 1, 7) == "garage_" then 1
 			else 2
-		local name = if landmark.id == "depot" then "Depot" else landmark.name
-		local x = if yard then landmark.x - Map.Depot.x + Map.Park.x else landmark.x
-		local z = if yard then landmark.z - Map.Depot.z + Map.Park.z else landmark.z
+		local name = if landmark.id == "depot" then "Depot" elseif former then nil else landmark.name
+		local x = if former then Map.LastStop.x elseif yard then landmark.x - Map.Depot.x + Map.Park.x else landmark.x
+		local z = if former then Map.LastStop.z elseif yard then landmark.z - Map.Depot.z + Map.Park.z else landmark.z
 		table.insert(list, { id = landmark.id, name = name, x = x, z = z, weight = weight })
 	end
 	for _, d in Map.Districts do

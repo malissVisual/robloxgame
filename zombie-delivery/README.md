@@ -1143,6 +1143,29 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The spawn's corner: a JOBS spot and one gear stall, no more shoes (6.12.2)
+
+The owner: "the jobs spot at the spawn gets a look, next to it a stall for the bags and gear, the shoes away, the
+spawn as it is; the shops are needlessly big". Keep the spinning models over the buildings.
+
+- **The JOBS spot** (`server/JobsSpot.luau`): the job board gets a booth with a canopy and a lamp, a big red JOBS
+  sign that glows at night, a ticker, two screens, a mat, a bench and parcels. The board, Marge, the terminal and
+  the spawn stay where they were.
+- **One gear stall** west of the spawn (`server/GearStall.luau`, `Config.GearStall`), under one awning "LAST STOP
+  SUPPLIES · ZDC BAGS":
+  - the GEAR counter with Dot (Last Stop Supplies: vests, medkits, drinks, the car items);
+  - the BAGS counter with Nell (ZDC Bags).
+  - It replaces the 6.6 bag kiosk (`server/BagKiosk.luau` is gone). `Map.Shops.supplies` and `Map.Shops.bags` are
+    the two counters.
+- **Last Stop's old building** on block (0, -1) (`Map.LastStop`) is an ordinary building: no counter, clerk or name
+  board. Its giant vest and sneaker still spin on the roof.
+- **No Running Shoes:**
+  - They are gone from `Config.Kit` (`Config.RetiredKit`), the outfit and the texts.
+  - A save that owned them gets $250 back once (`noShoes`, `profile.shoeRefund`, Marge's text with the GPS on the
+    GEAR counter).
+  - Level 4's reward is the Thermal Delivery Bag.
+- `tests/gearstall_test.luau` covers the stall's layout, the old block and the refund.
+
 ## Clerks in the shops, real estate from the phone, a bigger health bar (6.12.1)
 
 The owner after playing 6.12: "the job hint shows all game long", "the health and the shield at the bottom bigger",
@@ -2167,8 +2190,8 @@ src/server/   Main (wiring, PLAY: the one Play listener), World (builds the worl
               3.2: loading through the back, the pair lift; 4.0: pieces on a trolley, pallets on a jack, the tools' hints), Equipment (4.0: the
               hand trolley and the pallet jacks: take, push, stow, set down, go home), DuoGates (3.2: the TWIN SWITCHES gate, its two levers), Npcs (the R15 people: givers, receivers, kids, employers; 6.8: their looks from shared/NpcLooks), Animals (the
               horses: build, walk, lead rope, stalls), Items (consumables, supply crates), Shops (counters, showroom,
-              purchases; 3.5: the three display cars, the stages; 6.6: ZDC Bags' bags), BagKiosk (6.6: the depot's bag
-              kiosk, built from World's buildDepot), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
+              purchases; 3.5: the three display cars, the stages; 6.6: ZDC Bags' bags), GearStall (6.12.2: the depot's gear stall,
+              ZDC Bags and Last Stop Supplies; 6.6's BagKiosk before it), JobsSpot (6.12.2: the job board's booth), Admin (the admin commands, checked on the server), DayNight (the clock, the Night attribute,
               the night lights), Traffic (civilian cars and pedestrians, bandits among them), Crew (invitations, crews,
               the crew state), Ranking (the leaderboard rows), Estate (buying, selling, the home, car slots, the home
               respawn, the owners on the signs), CarCall (the chauffeur who drives your car to you), Business (your

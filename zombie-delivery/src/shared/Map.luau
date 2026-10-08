@@ -30,7 +30,9 @@
 --   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
 --   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
 --   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St
---   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn
+--   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn;
+--              6.12.2: it and Last Stop Supplies (Map.Shops.supplies) are the two counters of the gear stall there
+--              (Config.GearStall), Last Stop's old building on block (0, -1) an ordinary one (Map.LastStop)
 --   Park       (6.11) the Central Park (Map.Park, server/CentralPark.luau): the pond with its island and fountain, the
 --              paths, trees, flowerbeds, benches, lamps and a gazebo, on the middle block in the safe zone
 --   Gas       (5.4) the gas stations (Map.GasStations): the old one on the North Highway and three on the town's lots
@@ -182,7 +184,7 @@ Map.SpecialBlocks = {
 		["1,0"] = "dealer",
 		["-1,0"] = "guns",
 		["0,1"] = "mechanic",
-		["0,-1"] = "supplies",
+		["0,-1"] = "supplies", -- (6.12.2: Last Stop's old building, no shop any more: Map.LastStop; the block stays special)
 		["2,1"] = "movers",
 		["1,-2"] = "bank", -- First Zombie Bank: its front on 6th Ave, just out of the safe zone
 		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
@@ -229,9 +231,16 @@ end
 -- scooter rack and the ZDC Bags kiosk, on Downtown block (1, -1) north-east of the park, laid out as on the middle block
 -- before: the hall at the back (north), the yard open to Bone St (south), the park's corner across the junction. Every
 -- spot of it is given from its middle (x, z): World.DepotSpawn, Config.Tutorial.NpcSpot, Config.Goal.BoardSpot,
--- Config.BagShop, Config.Rental.SpawnRack.
+-- Config.BagShop, Config.Rental.SpawnRack. 6.12.2: the JOBS spot round the job board (server/JobsSpot.luau) and the
+-- gear stall west of the spawn (Config.GearStall: the ZDC Bags and Last Stop Supplies counters) in place of the kiosk.
 export type Depot = { i: number, j: number, x: number, z: number }
 Map.Depot = { i = 1, j = -1, x = CELL, z = -CELL } :: Depot
+
+-- 6.12.2: the building on Downtown block (0, -1) that was Last Stop Supplies until its stock moved to the gear stall at
+-- the depot (Map.Shops.supplies): an ordinary building now (server/World.luau buildSupplies: its look and its rooftop
+-- vest and sneaker, no counter, no clerk, no name board). The block stays special (its dice as before); the bus lines
+-- still draw a stop toward it as they did (shared/BusLines.luau), without its name.
+Map.LastStop = { i = 0, j = -1, x = 0, z = -CELL }
 
 -- 6.11, the Central Park (the owner: "the middle of the map, where the safe zone is, nice: nature, some water in the
 -- middle, a park ... so people remember where the safe zone is and where all the shops are") on the middle block (0, 0),
@@ -257,15 +266,23 @@ function Map.inPond(x: number, y: number, z: number): boolean
 end
 
 -- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else
--- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius).
+-- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius). 6.12.2: ZDC Bags and Last Stop
+-- Supplies are the two counters of the gear stall in the depot's yard (Config.GearStall): each spot is its counter's
+-- front, with the stall's radius.
 Map.Shops = {
 	depot = { name = "Depot Garage", x = Map.Depot.x, z = Map.Depot.z }, -- (6.7: the garage terminal, not a shop: it sells nothing, no shop window)
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
 	guns = { name = "Lead & Co.", x = -CELL, z = 0 },
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
-	supplies = { name = "Last Stop Supplies", x = 0, z = -CELL },
+	-- 6.12.2: the GEAR counter of the gear stall (its old building on block (0, -1): Map.LastStop)
+	supplies = {
+		name = "Last Stop Supplies",
+		x = Map.Depot.x + Config.GearStall.X + Config.GearStall.Depth / 2,
+		z = Map.Depot.z + Config.GearStall.Z + Config.GearStall.Counter,
+		radius = Config.GearStall.Radius,
+	},
 	bikes = { name = "Spoke & Chain", x = -CELL, z = CELL }, -- 5.1: bikes and bike gear (Config.BikeShop)
-	bags = { name = Config.BagShop.Name, x = Map.Depot.x + Config.BagShop.X, z = Map.Depot.z + Config.BagShop.Z, radius = Config.BagShop.Radius }, -- 6.6: the bags (6.11: in the depot's yard, wherever the depot is)
+	bags = { name = Config.BagShop.Name, x = Map.Depot.x + Config.BagShop.X, z = Map.Depot.z + Config.BagShop.Z, radius = Config.BagShop.Radius }, -- 6.6: the bags (6.11: in the depot's yard, wherever the depot is; 6.12.2: the gear stall's BAGS counter)
 } :: { [string]: { name: string, x: number, z: number, radius: number? } }
 Map.ShopRadius = 80
 
@@ -986,15 +1003,16 @@ export type Landmark = { id: string, name: string, icon: string, x: number, z: n
 -- Everything worth driving to, for the map's list and the GPS. 6.7: every shop's line says what it really sells; the
 -- depot sells nothing (its Depot Garage is the garage terminal: client/MapView.luau lists it on its own, not as a shop).
 local landmarks: { Landmark } = {
-	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the job board, Marge, the garage terminal (your parked van, the company vehicles) and the ZDC Bags kiosk by the spawn. The safe zone." },
+	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the JOBS spot with the job board, Marge, the garage terminal (your parked van, the company vehicles) and the gear stall by the spawn (ZDC Bags and Last Stop Supplies). The safe zone." },
 	-- 6.11: the Central Park in the middle of the safe zone (Map.Park).
 	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it. The depot is across the junction to the north-east." },
 	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4). Every car needs a garage slot." },
 	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Guns from the SMG up (your pistol is the starter), the gun upgrades (Gun Damage, Fire Rate) and a baseball bat." },
 	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Your car's stages, car upgrades, gear, paint and car guns, and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
-	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Map.Shops.bags.x, z = Map.Shops.bags.z, kind = "shop", description = "Bags: sprint with your deliveries. A kiosk in the depot's yard, by the spawn." }, -- 6.6
-	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Items: medkits, energy drinks, molotovs, and for a car repair kits, nitro, landmines, jerry cans. Vests (the Courier Vest, Kevlar, heavy armour) and running shoes." },
+	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Map.Shops.bags.x, z = Map.Shops.bags.z, kind = "shop", description = "Bags: sprint with your deliveries. The BAGS counter of the gear stall in the depot's yard, by the spawn." }, -- 6.6 (6.12.2: the stall)
+	-- 6.12.2: the GEAR counter of the gear stall in the depot's yard (no running shoes any more)
+	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = Map.Shops.supplies.x, z = Map.Shops.supplies.z, kind = "shop", description = "Items: medkits, energy drinks, molotovs, and for a car repair kits, nitro, landmines, jerry cans. Vests (the Courier Vest, Kevlar, heavy armour). The GEAR counter of the gear stall in the depot's yard, by the spawn." },
 	-- 5.1: the bike shop (Config.BikeShop).
 	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), from level 2, on Main St: faster than walking and more room for the light runs." },
 	-- 5.0: Earl sells his old van here (Config.VanQuest): your first vehicle.
