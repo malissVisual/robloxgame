@@ -58,7 +58,7 @@ type Climb = { character: Model, finish: number, to: CFrame }
 local rides: { [Player]: Ride } = {}
 local climbs: { [Player]: Climb } = {} -- 5.7: on a ladder (or on the way to or from it) now
 local lastClimb: { [Player]: number } = {} -- (the end of a climb: ClimbCooldown before the next)
-local CLIMB_LIFT = 3 -- the server's root over the feet where a climb ends (the clients' own height plays it)
+local CLIMB_LIFT = 3 -- the server's root over the feet where a climb ends, for an R6 body (6.8 review: an R15 one's own)
 local CLIMB_NEAR = 3 -- a climber within this of the end at its time stays where they are
 local lastRide: { [Player]: number } = {} -- (the end of a ride: the Cooldown before the next)
 local started = false
@@ -165,8 +165,9 @@ local function platform(model: Instance, p: ZipData.Platform, start: boolean, li
 	return frame, floor
 end
 
-local function landing(line: ZipData.Line): CFrame
-	local at = Vector3.new(line.b.x, line.b.floor + 3, line.b.z)
+-- `lift`: the root over the feet (6.8 review: the body's own, HipHeight + half the root; it was 3, under the 3.8 body)
+local function landing(line: ZipData.Line, lift: number): CFrame
+	local at = Vector3.new(line.b.x, line.b.floor + lift, line.b.z)
 	return CFrame.lookAt(at, at + Vector3.new(line.dx, 0, line.dz))
 end
 
@@ -220,8 +221,10 @@ local function climb(player: Player, line: ZipData.Line, which: number, up: bool
 		return
 	end
 	local at = root.Position
-	local route = InteractPose.climbRoute(line, which, up, at.X, at.Y, at.Z, CLIMB_LIFT)
-	local x, y, z, fx, fz = InteractPose.climbEnd(line, which, up, CLIMB_LIFT)
+	-- (6.8 review: the climber's own root over its feet, as its client plays it: the courier's 3.8, not 3)
+	local lift = if humanoid.RigType == Enum.HumanoidRigType.R15 then humanoid.HipHeight + root.Size.Y / 2 else CLIMB_LIFT
+	local route = InteractPose.climbRoute(line, which, up, at.X, at.Y, at.Z, lift)
+	local x, y, z, fx, fz = InteractPose.climbEnd(line, which, up, lift)
 	local to = CFrame.lookAt(Vector3.new(x, y, z), Vector3.new(x + fx, y, z + fz))
 	local startAt = workspace:GetServerTimeNow() + LEAD
 	climbs[player] = { character = character, finish = startAt + route.total, to = to }
@@ -295,7 +298,7 @@ local function stop(player: Player, ride: Ride, putDown: boolean)
 	if putDown and player.Character == character then
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
 		local root = humanoid and humanoid.RootPart
-		local spot = landing(ride.line)
+		local spot = landing(ride.line, if humanoid and root then humanoid.HipHeight + root.Size.Y / 2 else ZipData.Feet)
 		if humanoid and root and humanoid.Health > 0 and (root.Position - spot.Position).Magnitude > 6 then
 			root.AssemblyLinearVelocity = Vector3.zero
 			character:PivotTo(spot)

@@ -38,12 +38,17 @@ end
 local active: string? = nil
 local rate = 1
 local connection: RBXScriptConnection? = nil
+local leg: number? = nil -- 6.8 review: the body's own leg (hip to sole), measured once its rig is there
 
 local function step()
 	local v = root.AssemblyLinearVelocity
 	local state = if humanoid.Health <= 0 then "Dead" else humanoid:GetState().Name
-	-- 6.7: the realistic courier's longer legs play the walk and the run slower (Motion.StockHip), the feet planted
-	local stride = humanoid.HipHeight / Motion.StockHip
+	-- 6.7: the realistic courier's longer legs play the walk and the run slower, the feet planted. 6.8 review: by the
+	-- leg measured on the rig (Motion.leg / Motion.stride: 2.8 / 2), not the HipHeight (6.7: 2.2 / 2, the feet slid).
+	if not leg then
+		leg = Motion.leg(character)
+	end
+	local stride = Motion.stride(leg or humanoid.HipHeight)
 	local selected, pace = Motion.select(state, Vector3.new(v.X, 0, v.Z).Magnitude, v.Y, humanoid.Sit, stride)
 	if selected ~= active then
 		local playing = if active then tracks[active] else nil

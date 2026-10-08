@@ -408,7 +408,10 @@ local function follow(h: Horse)
 	if distance > 40 then
 		-- Left far behind (the leader teleported): catch up at once, behind them.
 		local behind = to - leaderRoot.CFrame.LookVector * FOLLOW
-		local center = Vector3.new(behind.X, to.Y - 3 + ROOT_Y, behind.Z) -- a character's root is ~3 over its feet
+		-- (the leader's feet: its root HipHeight + half its size over them; 6.8 review: not ~3, the courier's is 3.8)
+		local leaderHumanoid = leader:FindFirstChildOfClass("Humanoid")
+		local feet = to.Y - (if leaderHumanoid then leaderHumanoid.HipHeight + leaderRoot.Size.Y / 2 else 3)
+		local center = Vector3.new(behind.X, feet + ROOT_Y, behind.Z)
 		h.model:PivotTo(CFrame.lookAt(center, Vector3.new(to.X, center.Y, to.Z)))
 		return
 	end

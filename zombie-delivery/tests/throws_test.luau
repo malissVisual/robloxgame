@@ -3,6 +3,8 @@
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
 local Throws = require("./Throws")
+local Gestures = require("./Gestures") -- 6.8 review: the throw's arm at the whip
+local CharacterGeometry = require("./CharacterGeometry") -- 6.8 review: the courier's rig
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -40,6 +42,73 @@ local from = Throws.release({ 0, 3, 0 }, { 0, 0, -1 })
 check("released ahead, to the right and up", near(from[1], T.Release.side) and near(from[2], 3 + T.Release.up) and near(from[3], -T.Release.ahead))
 local turned = Throws.release({ 10, 0, 10 }, { 1, 0.5, 0 }) -- facing +x: the right is +z (a pitched look counts flat)
 check("released for a turned body", near(turned[1], 10 + T.Release.ahead) and near(turned[3], 10 + T.Release.side))
+-- 6.8 review: the piece leaves the hand where the hand is. The right hand's grip (the courier's rig at rest, the
+-- root at the origin) with the "throw" gesture's arm and torso WindUp seconds in (when the server lets it go): within
+-- a few tenths of Release (it was the shoulder, the piece popped down ~1.8 studs out of the raised hand).
+do
+	local spec = CharacterGeometry.spec("courier")
+	local at: { [string]: { number } } = {}
+	for _, j in spec.joints do
+		at[j.name] = j.at
+	end
+	local hand: { number } = { 0, 0, 0 }
+	for _, b in spec.bones do
+		if b.name == "RightHand" then
+			hand = b.at
+		end
+	end
+	local g = spec.grips.RightHand
+	local grip = { hand[1] + g[1], hand[2] + g[2], hand[3] + g[3] }
+	type M = { { number } }
+	local function mul(a: M, b: M): M
+		local out: M = {}
+		for i = 1, 3 do
+			out[i] = {}
+			for k = 1, 3 do
+				out[i][k] = a[i][1] * b[1][k] + a[i][2] * b[2][k] + a[i][3] * b[3][k]
+			end
+		end
+		return out
+	end
+	local function apply(m: M, v: { number }): { number }
+		return {
+			m[1][1] * v[1] + m[1][2] * v[2] + m[1][3] * v[3],
+			m[2][1] * v[1] + m[2][2] * v[2] + m[2][3] * v[3],
+			m[3][1] * v[1] + m[3][2] * v[2] + m[3][3] * v[3],
+		}
+	end
+	local function sub(a: { number }, b: { number }): { number }
+		return { a[1] - b[1], a[2] - b[2], a[3] - b[3] }
+	end
+	local function add(a: { number }, b: { number }): { number }
+		return { a[1] + b[1], a[2] + b[2], a[3] + b[3] }
+	end
+	-- (as client/ArmPose.luau turns a pose: CFrame.Angles(0, y, 0) * CFrame.Angles(x, 0, z), degrees)
+	local function angles(a: { number }?): M
+		local x, y, z = math.rad(a and a[1] or 0), math.rad(a and a[2] or 0), math.rad(a and a[3] or 0)
+		local rx: M = { { 1, 0, 0 }, { 0, math.cos(x), -math.sin(x) }, { 0, math.sin(x), math.cos(x) } }
+		local ry: M = { { math.cos(y), 0, math.sin(y) }, { 0, 1, 0 }, { -math.sin(y), 0, math.cos(y) } }
+		local rz: M = { { math.cos(z), -math.sin(z), 0 }, { math.sin(z), math.cos(z), 0 }, { 0, 0, 1 } }
+		return mul(ry, mul(rx, rz))
+	end
+	local t = T.WindUp
+	local arm = Gestures.pose("throw", t) :: Gestures.Pose
+	local body = Gestures.body("throw", t)
+	local W = angles(body and body.waist)
+	local S = mul(W, angles(arm.rs))
+	local E = mul(S, angles(arm.re))
+	local H = mul(E, angles(arm.rw))
+	local shoulder = add(at.Waist, apply(W, sub(at.RightShoulder, at.Waist)))
+	local elbow = add(shoulder, apply(S, sub(at.RightElbow, at.RightShoulder)))
+	local wrist = add(elbow, apply(E, sub(at.RightWrist, at.RightElbow)))
+	local held = add(wrist, apply(H, sub(grip, at.RightWrist)))
+	local r = T.Release
+	check("the release is the hand at the whip (side, up, ahead)", near(held[1], r.side, 0.15) and near(held[2], r.up, 0.15) and near(-held[3], r.ahead, 0.15),
+		string.format("%.2f %.2f %.2f", held[1], held[2], -held[3]))
+	check("the hand at the whip is up over the shoulder", held[2] > at.RightShoulder[2] + 1, held[2])
+	check("near the root (the server takes a client's point within 3 studs of its own)", math.sqrt(r.side ^ 2 + r.up ^ 2 + r.ahead ^ 2) < 3)
+end
+
 local level = Throws.aim({ 0, 0, -1 }) :: { number }
 check("looking level throws up by Lift", level ~= nil and near(upDeg(level), T.Lift, 1e-4) and near(len(level), 1) and level[3] < 0)
 check("looking down still throws up a little", near(upDeg(Throws.aim({ 0, -0.99, -0.1 }) :: { number }), T.MinUp, 1e-4))
@@ -168,8 +237,9 @@ local function plane(y: number): Throws.Cast
 		return nil
 	end
 end
+local standing = CharacterGeometry.spec("courier").hipHeight + 1 -- 6.8 review: the courier's root over its feet (3.8)
 for _, case in { { name = "flat", dy = 0, dist = 25 }, { name = "a porch", dy = 2, dist = 18 }, { name = "far", dy = 0, dist = 40 } } do
-	local start = Throws.release({ 0, 3, 0 }, { 0, 0, -1 })
+	local start = Throws.release({ 0, standing, 0 }, { 0, 0, -1 })
 	local door = { 3, case.dy, -case.dist } -- (the body's feet at y 0, the door's spot dy over them)
 	local any = false
 	for _, angle in T.AutoAngles do

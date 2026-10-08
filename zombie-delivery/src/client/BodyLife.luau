@@ -79,6 +79,7 @@ type Life = {
 	target: BasePart?, -- what the head looks at (a head, the job's ring)
 	lookAt: number, -- when to choose again
 	shut: number, -- the eyes' shut share last drawn
+	released: boolean, -- 6.8 review: given back to the animation (letGo) and not posed since: no need to again
 }
 
 local rigs: { [Model]: Rig } = {}
@@ -186,20 +187,33 @@ local function eyesOpen(rig: Rig, life: Life)
 	end
 end
 
--- Everything given back to the animation (once).
+-- Everything given back to the animation (once: 6.8 review, a body that can't be posed (a driver, a bus rider, the
+-- dead, a zip rider) is let go when it stops being posed, not again every frame, and without a table a frame).
 local function letGo(character: Model)
 	local rig = rigs[character]
 	local life = lives[character]
+	if life and life.released then
+		return
+	end
 	if rig then
-		for _, joint in { rig.root, rig.waist, rig.neck, rig.rs, rig.ls, rig.rh, rig.rk, rig.ra, rig.lh, rig.lk, rig.la } do
-			layer(joint, nil)
-		end
+		layer(rig.root, nil)
+		layer(rig.waist, nil)
+		layer(rig.neck, nil)
+		layer(rig.rs, nil)
+		layer(rig.ls, nil)
+		layer(rig.rh, nil)
+		layer(rig.rk, nil)
+		layer(rig.ra, nil)
+		layer(rig.lh, nil)
+		layer(rig.lk, nil)
+		layer(rig.la, nil)
 		if life then
 			eyesOpen(rig, life)
 		end
 	end
 	if life then
 		life.fall, life.landAt, life.walk, life.idle = 0, -math.huge, 0, 0
+		life.released = true
 	end
 end
 
@@ -226,6 +240,7 @@ local function lifeOf(character: Model, humanoid: Humanoid): Life
 		target = nil,
 		lookAt = 0,
 		shut = 0,
+		released = false,
 	}
 	lives[character] = made
 	return made
@@ -284,10 +299,11 @@ local function live(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 	end
 	local life = lifeOf(character, humanoid)
 	if not able(character, humanoid, mine) then
-		letGo(character)
+		letGo(character) -- (6.8 review: once, then nothing while it stays so)
 		life.health = humanoid.Health
 		return
 	end
+	life.released = false
 	local v = root.AssemblyLinearVelocity
 	local speed = Vector3.new(v.X, 0, v.Z).Magnitude
 	-- The landing: the fastest fall since the feet left the ground, dipped once they are back on it.

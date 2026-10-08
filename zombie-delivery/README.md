@@ -1338,7 +1338,7 @@ to foot standing still, turns the head to a person near and in front (your couri
 dips the knees landing by the fall's speed, flinches when hit and adds the walk's weight (a bob from the stock walk's
 own thighs, a little more arm swing, the chest turning) under the sprint's run; on every player and person within 120
 studs, at most 40, the small motions within 50. The stock walk and run play slower for the longer legs
-(`CourierMotion.StockHip`). `client/ArmPose.luau`: carrying, both hands reach the box's sides (a two-bone reach from
+(`CourierMotion.stride`, the leg measured on the rig). `client/ArmPose.luau`: carrying, both hands reach the box's sides (a two-bone reach from
 `CarryAt` / `CarrySize`, which `server/Cargo.luau` sets from the held piece) and the body leans back with a heavy load;
 a piece picked up off the ground plays "pickup": down on the knees, the back bent, the hands on the piece, which comes
 up into them after `Config.Body.PickupLift` (also picking up a set-down bag); gestures with the legs keep the feet where
@@ -1350,6 +1350,19 @@ weight shift, blinks, the head to Marge and to the ring), walk / sprint / stop, 
 a zombie hit (the flinch); pick up a piece you put down (G, then E) and a set-down bag; carry one and two pieces and a
 heavy one (the hands on the box, walking); seats, bikes, the scooter, zip lines and ladders (nothing posed there); the
 feet on the ground everywhere (Output: no Unstuck lifts).
+
+**6.8 review, the body fixed:** the root's bottom is at the hips as on every R15 body (`Geometry` G 3.8, HipHeight 2.8
+= the leg; 6.7 had the root 0.6 lower in the body), so the seat weld (the root 1.5 over a seat) puts the thighs on car,
+bus and bike seats instead of 0.8 over them, and the numbers tuned on the 6.0 block body fit again. The walk, the run
+and the sprint's stride are paced by the leg measured on the rig (`CourierMotion.leg` / `stride`: 2.8 / 2), so the
+feet stop sliding. On a zip line the hands hold the trolley's handle (a two-bone reach of each arm,
+`Config.ZipLines.HandleDrop` / `HandSpread`; `Hang` 3.1, `ZipLines.Feet` 3.8). A thrown piece leaves the hand where
+the hand is at the whip (`Config.Throw.Release`, worked out from the rig in `tests/throws_test.luau`). Putting a box
+down, the arms blend out of their last reach to it; the carry lean lets go of the waist off one's feet; the carry sits
+`Config.Cargo.CarryLow` / `CarryMiddle` lower on the root (where the forearms are). **Test in Studio:** sit in a car,
+a bus, a bike and stand on a scooter (the thighs on the seat, the head under the roof); walk and run on a flat road
+(the feet planted); a zip line (the hands on the handle, the feet clear of both platforms); a throw (the piece leaves
+the raised hand); put a box down (no snap); a bus walk-in and a ladder climb (no lean on the waist).
 
 ## Real-size bags, items in the hand, the throw's wind-up (6.7, part A)
 
