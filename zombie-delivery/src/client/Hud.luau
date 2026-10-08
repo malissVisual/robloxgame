@@ -258,7 +258,7 @@ do -- (its own block: the locals below stay out of the 200-register limit)
 touchLayout = Ui.touchLayout()
 view = {}
 -- The cash line, the minimap and the health row share one column (one scale), so they can never overlap.
-local MONEY_HEIGHT, HEALTH_HEIGHT = 30, 18
+local MONEY_HEIGHT, HEALTH_HEIGHT = 30, 44 -- (6.12.1: the health row 18 → 44: the shield's bar over a thick health bar)
 LEFT_W = MapView.MiniSize.X
 LEFT_H = MONEY_HEIGHT + 6 + MapView.MiniSize.Y + 6 + HEALTH_HEIGHT
 leftStack = placed(Ui.make("Frame", {
@@ -306,29 +306,36 @@ moneyHolder.InputBegan:Connect(function(input: InputObject)
 	end
 end)
 -- (the minimap goes between them: LayoutOrder 2, client/MapView.luau)
--- Your health under the minimap: a plus, a thin bar and the number.
+-- Your health under the minimap. 6.12.1 (the owner: "the health and the shield at the bottom bigger, they matter more"):
+-- a thick bar with a big plus and the number in big type (green, red when low); over it the vest's shield as its own
+-- blue bar with its percent (shared/Armour.luau: the share of a hit the vest takes; only while you wear one).
 local health = Ui.make("Frame", { Name = "Health", Size = UDim2.fromOffset(LEFT_W, HEALTH_HEIGHT), BackgroundTransparency = 1, LayoutOrder = 3 }, leftStack)
-P.text(health, "+", UDim2.fromOffset(14, HEALTH_HEIGHT), { Font = Theme.HeadingFont, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center })
-local healthBack
-healthBack, view.healthFill = P.bar(health, UDim2.new(1, -66, 0, 2), P.ink)
-healthBack.Position = UDim2.new(0, 22, 0.5, 0)
-healthBack.AnchorPoint = Vector2.new(0, 0.5)
-view.healthBack = healthBack
--- 6.0: the vest you wear (shared/Armour.luau): a small shield and its percent left of the number (Hud.setState).
-view.armourText = P.text(health, "", UDim2.fromOffset(48, HEALTH_HEIGHT), {
-	Position = UDim2.new(1, -42, 0, 0),
-	AnchorPoint = Vector2.new(1, 0),
-	Font = Theme.MonoFont,
-	TextSize = 13,
-	TextColor3 = P.ink2,
-	TextXAlignment = Enum.TextXAlignment.Right,
-	Visible = false,
-})
-view.healthText = P.text(health, "100", UDim2.fromOffset(38, HEALTH_HEIGHT), {
+view.armourRow = Ui.make("Frame", { Name = "Shield", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Visible = false }, health)
+P.text(view.armourRow, "🛡", UDim2.fromOffset(22, 16), { TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center })
+local armourBack
+armourBack, view.armourFill = P.bar(view.armourRow, UDim2.new(1, -80, 0, 6), Color3.fromRGB(86, 168, 255))
+armourBack.Position = UDim2.new(0, 28, 0.5, 0)
+armourBack.AnchorPoint = Vector2.new(0, 0.5)
+view.armourText = P.text(view.armourRow, "", UDim2.fromOffset(48, 16), {
 	Position = UDim2.new(1, 0, 0, 0),
 	AnchorPoint = Vector2.new(1, 0),
 	Font = Theme.MonoFont,
-	TextSize = 14,
+	TextSize = 15,
+	TextColor3 = Color3.fromRGB(86, 168, 255),
+	TextXAlignment = Enum.TextXAlignment.Right,
+})
+local lifeRow = Ui.make("Frame", { Name = "Life", Size = UDim2.new(1, 0, 0, 26), Position = UDim2.new(0, 0, 1, 0), AnchorPoint = Vector2.new(0, 1), BackgroundTransparency = 1 }, health)
+P.text(lifeRow, "+", UDim2.fromOffset(22, 26), { Font = Theme.HeadingFont, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center })
+local healthBack
+healthBack, view.healthFill = P.bar(lifeRow, UDim2.new(1, -80, 0, 12), P.good)
+healthBack.Position = UDim2.new(0, 28, 0.5, 0)
+healthBack.AnchorPoint = Vector2.new(0, 0.5)
+view.healthBack = healthBack
+view.healthText = P.text(lifeRow, "100", UDim2.fromOffset(48, 26), {
+	Position = UDim2.new(1, 0, 0, 0),
+	AnchorPoint = Vector2.new(1, 0),
+	Font = Theme.MonoFont,
+	TextSize = 22,
 	TextXAlignment = Enum.TextXAlignment.Right,
 })
 view.health = -1 -- the health shown (the row redraws only when it changes)
@@ -1911,8 +1918,15 @@ Hud.onMenu = nil :: (() -> boolean)?
 
 -- (type declared above)
 BUTTONS = {
-	{ id = "map", icon = "🗺️", text = "MAP", key = "M", onClick = function()
-		MapView.toggle()
+	-- 6.12.1 (the owner: "MAP away, it is at the map; PHONE stays; ALT for the mouse next to it, on the right"): the
+	-- minimap's EXPAND [M] opens the big map; MOUSE [ALT] keeps the mouse free (Alt held frees it for a moment)
+	{ id = "mouse", icon = "🖱", text = "MOUSE", key = "ALT", onClick = function()
+		local free = require(script.Parent.CameraRig).toggleFreeMouse()
+		Hud.toast(if free then "The mouse is free: click MOUSE again to look around." else "The mouse looks around again (Alt frees it).")
+		local button = hudButtons.mouse
+		if button then
+			button.TextColor3 = if free then P.red else P.ink
+		end
 	end },
 	{ id = "jobs", menu = true, icon = "📋", text = "JOBS", key = "J", onClick = openDispatch },
 	{ id = "missions", menu = true, icon = "⭐", text = "MISSIONS", key = "U", onClick = function()
@@ -2119,6 +2133,11 @@ more.Activated:Connect(function()
 	Ui.gamepadFocus(if menu.Visible then hudButtons.jobs else more) -- 4.2, a gamepad: on to the first entry
 end)
 hudButtons.more = more
+-- 6.12.1: MOUSE right of PHONE (a computer only: a touch screen has no mouse to free)
+if hudButtons.mouse then
+	hudButtons.mouse.LayoutOrder = order + 2
+	hudButtons.mouse.Visible = not touchLayout
+end
 
 -- MENU wears a dot while any of its entries has a count.
 local function menuDot()
@@ -3836,11 +3855,11 @@ function Hud.setState(newState: any)
 	end
 	refreshLevel()
 	require(script.Parent.Hotbar).setState(state) -- 6.0.1: the bottom bar's item slots and your room
-	-- 6.0: the vest's share on the health row (the bar makes room for it).
+	-- 6.0: the vest's share on the health row. 6.12.1: its own blue bar over the health bar.
 	local armour = require(Shared.Armour).percent(if type(state.kit) == "table" then state.kit else {})
-	view.armourText.Visible = armour > 0
-	view.armourText.Text = `🛡{armour}%`
-	view.healthBack.Size = UDim2.new(1, if armour > 0 then -114 else -66, 0, 2)
+	view.armourRow.Visible = armour > 0
+	view.armourText.Text = `{armour}%`
+	view.armourFill.Size = UDim2.fromScale(math.clamp(armour / 100, 0, 1), 1)
 	-- Most States change money or items only: the weapon line is rebuilt when what it shows changed.
 	if weaponBarKey() ~= shownWeaponBar then
 		renderWeapons()
@@ -3955,7 +3974,7 @@ RunService.RenderStepped:Connect(function()
 		local most = if humanoid then math.max(1, humanoid.MaxHealth) else 100
 		view.healthText.Text = tostring(life)
 		view.healthFill.Size = UDim2.fromScale(math.clamp(life / most, 0, 1), 1)
-		view.healthFill.BackgroundColor3 = if life / most > 0.3 then P.ink else P.danger
+		view.healthFill.BackgroundColor3 = if life / most > 0.3 then P.good else P.danger
 		view.healthText.TextColor3 = if life / most > 0.3 then P.ink else P.danger
 	end
 
@@ -4035,7 +4054,7 @@ RunService.RenderStepped:Connect(function()
 		view.tickTicket(distance)
 		view.goalDistance = distance -- (the NEXT card's distance: the target the marker shows)
 	else
-		view.goalDistance = view.boardMark(here, gps ~= nil or view.ticket.busy)
+		view.goalDistance = view.boardMark(here, gps ~= nil or view.ticket.busy or view.goal.quiet()) -- (6.12.1: not for an experienced courier)
 	end
 	if not job and gps then
 		local position = here

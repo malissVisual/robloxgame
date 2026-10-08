@@ -1143,6 +1143,32 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Clerks in the shops, real estate from the phone, a bigger health bar (6.12.1)
+
+The owner after playing 6.12: "the job hint shows all game long", "the health and the shield at the bottom bigger",
+"I don't want the FOR SALE signs; buy everything through the phone, and things only from the people in the shops,
+for the vibe", "MAP away, keep PHONE, ALT for the mouse next to it on the right".
+
+- **The NEXT card:** "Take a delivery job" and the job board's marker show only to a new courier, up to
+  `Config.Goal.HintJobs` (3) deliveries. After that, with no job, they stay away and J still opens the board
+  (`client/Objective.luau` `quiet`, `client/Hud.luau` boardMark).
+- **Health and shield** (Hud's health row, 18 → 44 px):
+  - Health is a thick green bar (red when low) with a big + and the number in big type.
+  - The vest's shield is its own blue bar over it, with its percent.
+- **The top-right buttons:**
+  - MAP [M] is gone: the minimap's EXPAND [M] opens the big map.
+  - PHONE [Q] stays. MOUSE [ALT] is to its right: Alt held frees the mouse for a moment, and a click keeps it free
+    until the next click (`CameraRig.toggleFreeMouse`).
+- **Real estate from the phone** (`server/Estate.luau`, `client/EstateUi.luau`):
+  - BUY works in the ESTATE app (H) from anywhere.
+  - The floating FOR SALE name plates and the signs' prompts are gone. The signs' own boards still say FOR SALE or
+    OWNED.
+- **Clerks** (`server/ShopClerks.luau`):
+  - **Who stands where:** a person stands behind every shop counter: Dot at Last Stop Supplies, Ray at Lead & Co.,
+    Kip at Spoke & Chain, Sal at Dead End Motors, Gus at Wrench Garage, Nell at the ZDC Bags kiosk.
+  - **The Shop prompt** is on them ("Shop · Ray · Lead & Co.").
+  - **When you come to the counter:** they look at you, wave and say a line.
+
 ## Daily and weekly tasks, more sounds (6.12)
 
 The owner asked for a proposal of what the game needs and picked tasks, live events, cosmetics, sounds and getting

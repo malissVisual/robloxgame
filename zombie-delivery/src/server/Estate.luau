@@ -3,7 +3,7 @@
 -- Every player owns their own copy (profile.properties, saved by server/PlayerData.luau): two owners of the same
 -- mansion on one server both use it.
 --
---   * Buy: at the property's FOR SALE sign (the EstatePrompt opens its listing on the client, client/EstateUi.luau),
+--   * Buy: from the phone's ESTATE app anywhere (6.12.1; before, at the property's FOR SALE sign: its prompt is off now),
 --     with the driver level (def.level), the campaigns it requires (3.2, def.requires: their finale done, see
 --     Estate.finished), the money, and not owned yet. Your first home becomes your home.
 --   * Sell: anywhere, for Config.Estate.SellBack × the price. Not the home you spawn at: switch first (another home
@@ -14,8 +14,8 @@
 --   * Car slots: Config.Estate.BaseCarSlots + every owned property's garageSlots (server/Shops.luau checks them when
 --     you buy a car; company cars earned from employers do not count).
 --   * Office: the biggest owned office runs your company (server/Business.luau, Estate.officeOf).
---   * Name plates over the FOR SALE signs: "FOR SALE $x · LEVEL n" (and "· after <campaign>") or "Owned by A, B"
---     (the owners on this server).
+--   * The signs' own boards say "FOR SALE $x" or "OWNED A, B" (the owners on this server). 6.12.1: no floating
+--     name plates over them any more.
 --
 -- The "Estate" remote: client → server (action, id): "buy" | "sell" | "home" (id or "depot") | "view" | "state";
 -- server → client (open id or nil, state): open that property's listing (the sign was used) and/or the new state
@@ -34,7 +34,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
-local Map = require(Shared.Map)
 local MissionData = require(Shared.Missions)
 local Net = require(Shared.Net)
 
@@ -45,8 +44,6 @@ local PlayerData = require(Server.PlayerData)
 local Estate = {}
 
 local HOME_KINDS = { mansion = true, villa = true, house = true }
-local SIGN_RANGE = 45 -- studs from a FOR SALE sign that count as "at the property" (buying)
-local PLOT_RANGE = 110 -- … or from the plot's middle (Map.EstatePlots)
 local ACTION_GAP = 0.3 -- seconds between two actions of one player (a double click does not buy twice)
 local PROFILE_WAIT = 15 -- seconds a fresh character waits for the save to load
 
@@ -190,28 +187,6 @@ local function spawnOf(id: string): CFrame?
 	return if typeof(spot) == "CFrame" then spot else nil
 end
 
-local function plotOf(id: string): Vector3?
-	local plots = (Map :: any).EstatePlots
-	local plot = if type(plots) == "table" then plots[id] else nil
-	if type(plot) == "table" and type(plot.x) == "number" and type(plot.z) == "number" then
-		return Vector3.new(plot.x, 0, plot.z)
-	end
-	return nil
-end
-
--- Where a prompt is in the world (on a part, an attachment or a model).
-local function promptPosition(prompt: Instance): Vector3?
-	local parent = prompt.Parent
-	if parent and parent:IsA("BasePart") then
-		return parent.Position
-	elseif parent and parent:IsA("Attachment") then
-		return parent.WorldPosition
-	elseif parent and parent:IsA("Model") then
-		return parent:GetPivot().Position
-	end
-	return nil
-end
-
 type Sign = { prompt: ProximityPrompt, estate: string }
 
 local function signs(): { Sign }
@@ -226,34 +201,6 @@ end
 
 local function flatDistance(a: Vector3, b: Vector3): number
 	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
-end
-
--- Is the player at the property (its FOR SALE sign or its plot)? A property the world does not place anywhere
--- (an older World) can be bought from anywhere.
-local function atProperty(player: Player, id: string): boolean
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local known = false
-	local position = if root and root:IsA("BasePart") then root.Position else nil
-	for _, sign in signs() do
-		if sign.estate == id then
-			local at = promptPosition(sign.prompt)
-			if at then
-				known = true
-				if position and (position - at).Magnitude <= SIGN_RANGE then
-					return true
-				end
-			end
-		end
-	end
-	local plot = plotOf(id)
-	if plot then
-		known = true
-		if position and flatDistance(position, plot) <= PLOT_RANGE then
-			return true
-		end
-	end
-	return not known
 end
 
 -- ── State for the clients ──────────────────────────────────────────────────
@@ -375,72 +322,6 @@ local function money(amount: number): string
 	return "$" .. formatted
 end
 
-local function buildPlate(sign: Sign): Plate?
-	local def = byId[sign.estate]
-	local part = sign.prompt.Parent
-	local adornee: BasePart? = nil
-	if part and part:IsA("BasePart") then
-		adornee = part
-	elseif part and part:IsA("Attachment") and part.Parent and part.Parent:IsA("BasePart") then
-		adornee = part.Parent :: BasePart
-	end
-	if not def or not adornee then
-		return nil
-	end
-	local old = adornee:FindFirstChild("EstatePlate")
-	if old then
-		old:Destroy()
-	end
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "EstatePlate"
-	gui.Size = UDim2.fromOffset(240, 64)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, adornee.Size.Y / 2 + 3.2, 0)
-	gui.MaxDistance = 140
-	gui.LightInfluence = 0
-	gui.Adornee = adornee
-	local back = Instance.new("Frame")
-	back.Size = UDim2.fromScale(1, 1)
-	back.BackgroundColor3 = PLATE.panel
-	back.BackgroundTransparency = 0.18
-	back.BorderSizePixel = 0
-	back.Parent = gui
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = back
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = PLATE.yellow
-	stroke.Thickness = 1.5
-	stroke.Transparency = 0.2
-	stroke.Parent = back
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -12, 0.5, -2)
-	title.Position = UDim2.fromOffset(6, 3)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.GothamBlack
-	title.TextScaled = true
-	title.TextColor3 = PLATE.text
-	title.Text = def.name
-	title.Parent = back
-	local status = Instance.new("TextLabel")
-	status.Size = UDim2.new(1, -12, 0.5, -4)
-	status.Position = UDim2.new(0, 6, 0.5, 1)
-	status.BackgroundTransparency = 1
-	status.Font = Enum.Font.GothamBold
-	status.TextScaled = true
-	status.TextColor3 = PLATE.money
-	status.Text = ""
-	status.Parent = back
-	gui.Parent = adornee
-	-- The prompt says what it is (World may have set its own texts).
-	if sign.prompt.ObjectText == "" then
-		sign.prompt.ObjectText = def.name
-	end
-	if sign.prompt.ActionText == "" or sign.prompt.ActionText == "Interact" then
-		sign.prompt.ActionText = "View"
-	end
-	return { title = title, status = status }
-end
-
 local function updatePlates()
 	platesDirty = false
 	local owners = ownersOnServer()
@@ -489,9 +370,7 @@ function Estate.buy(player: Player, id: string): string?
 	if profile.properties[id] then
 		return `{def.name} is already yours.`
 	end
-	if not atProperty(player, id) then
-		return `Go to the FOR SALE sign of {def.name} to buy it (GPS in the ESTATE list, H).`
-	end
+	-- (6.12.1, the owner: "buy through the phone": from the ESTATE app anywhere, no walk to its sign)
 	local level = PlayerData.level(player)
 	if def.level and level < def.level then
 		return `{def.name} needs driver level {def.level} ({Levels.rank(def.level)}). You are level {level}: deliveries give XP.`
@@ -739,17 +618,11 @@ function Estate.onPlay(player: Player)
 end
 
 function Estate.start()
+	-- 6.12.1 (the owner: "I don't want this to show; buy through the phone, only things at the shops' people"): no
+	-- floating FOR SALE plate over the signs and no prompt at them: the properties are bought in the phone's ESTATE app
+	-- (H) from anywhere. The signs' own boards stay (they still say FOR SALE / OWNED, updatePlates).
 	for _, sign in signs() do
-		local plate = buildPlate(sign)
-		if plate then
-			local list = plates[sign.estate] or {}
-			plates[sign.estate] = list
-			table.insert(list, plate)
-		end
-		local id = sign.estate
-		sign.prompt.Triggered:Connect(function(player)
-			Estate.openListing(player, id)
-		end)
+		sign.prompt.Enabled = false
 	end
 	if #signs() == 0 then
 		warn("[Estate] no FOR SALE signs in the world (World.EstatePrompts): the properties are bought from the ESTATE list (H)")

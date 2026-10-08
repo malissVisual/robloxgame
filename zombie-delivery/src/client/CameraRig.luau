@@ -45,6 +45,7 @@ local pitch = -0.12
 local zoom = 1
 local lastMouse = 0
 local altHeld = false
+local freeMouse = false -- 6.12.1: the HUD's MOUSE [ALT] button clicked: the mouse stays free until it is clicked again
 local rmbHeld = false -- aiming
 local turning = false -- 5.4.1: the right mouse held to turn the camera while only the phone is open (no aim)
 local lmbHeld = false -- shooting
@@ -359,9 +360,16 @@ function CameraRig.carrying(): string?
 	return carryingOf(player.Character)
 end
 
--- Is the mouse captured right now (aiming), or free (a window, Alt, Roblox's menu, typing)?
+-- Is the mouse captured right now (aiming), or free (a window, Alt, the MOUSE button, Roblox's menu, typing)?
 function CameraRig.locked(): boolean
-	return enabled and supported and not altHeld and not CameraRig.mouseNeeded() and UserInputService:GetFocusedTextBox() == nil
+	return enabled and supported and not altHeld and not freeMouse and not CameraRig.mouseNeeded() and UserInputService:GetFocusedTextBox() == nil
+end
+
+-- 6.12.1: the HUD's MOUSE [ALT] button (client/Hud.luau): Alt held frees the mouse for a moment, a click on the button
+-- keeps it free until the next click. Returns whether it is free now.
+function CameraRig.toggleFreeMouse(): boolean
+	freeMouse = not freeMouse
+	return freeMouse
 end
 
 function CameraRig.setEnabled(on: boolean)

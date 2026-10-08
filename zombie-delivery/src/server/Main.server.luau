@@ -205,6 +205,7 @@ safely("Jobs", Jobs.start)
 safely("Gun", Gun.start)
 safely("Items", Items.start)
 safely("Shops", Shops.start)
+safely("ShopClerks", require(Server.ShopClerks).start) -- 6.12.1: a clerk behind every shop counter
 safely("BanditCars", BanditCars.start)
 safely("Npcs", Npcs.start)
 safely("Animals", Animals.start)
