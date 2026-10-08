@@ -16,6 +16,9 @@
 -- through the deck and threw the arms up on some avatars): straight legs, the body raised or lowered on its Root joint
 -- until the lower foot rests on the scooter's Deck point (measured every frame, so any leg length stands right), and
 -- the hands on the bar's LeftGrip / RightGrip points (RiderPose.armIk, a two-bone reach).
+-- 6.10, the scooter's wheelie (client/CarVisuals.luau passes how far up it is): the deck, the seat and so the whole
+-- rider pitch back round the rear axle; here the knees bend, the thighs come forward and the body sits back over them
+-- (RiderPose.uprightAt), the feet still put on the deck and the hands still on the bar (wherever they are now).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -144,15 +147,17 @@ local function feetBottom(character: Model): number?
 	return low
 end
 
--- 5.8.2: the standing rider (the E-Scooter), absolute.
-local function poseStanding(character: Model)
+-- 5.8.2: the standing rider (the E-Scooter), absolute. 6.10: wheelie, how far its deck is up (0 … 1).
+local function poseStanding(character: Model, wheelie: number)
 	local u = RiderPose.Upright
 	-- The legs: straight under the body, the front foot a touch ahead, the knees soft; a slight lean over the bar.
-	put(find(character, BODY[1]), CFrame.Angles(u.Lean, 0, 0))
-	put(find(character, BODY[2]), CFrame.Angles(-u.Stagger, 0, 0))
-	put(find(character, BODY[3]), CFrame.Angles(u.Knee, 0, 0))
-	put(find(character, BODY[4]), CFrame.Angles(u.Stagger, 0, 0))
-	put(find(character, BODY[5]), CFrame.Angles(u.Knee, 0, 0))
+	-- (6.10: on the back wheel the knees bend and the body sits back.)
+	local lean, thigh, knee = RiderPose.uprightAt(wheelie)
+	put(find(character, BODY[1]), CFrame.Angles(lean, 0, 0))
+	put(find(character, BODY[2]), CFrame.Angles(thigh - u.Stagger, 0, 0))
+	put(find(character, BODY[3]), CFrame.Angles(knee, 0, 0))
+	put(find(character, BODY[4]), CFrame.Angles(thigh + u.Stagger, 0, 0))
+	put(find(character, BODY[5]), CFrame.Angles(knee, 0, 0))
 	-- The feet onto the deck: the Root joint lifts (or lowers) the body by what the last frame missed.
 	local root = Joints.find(character:FindFirstChild("LowerTorso"), "Root")
 	local deck = artPoint(character, "Deck", Vector3.new(0, 0.59, -0.2))
@@ -194,8 +199,8 @@ local function poseStanding(character: Model)
 end
 
 -- The rider's pose this frame. crank: the bike's crank angle (radians, client/CarVisuals.luau); stand (5.1.1): the
--- E-Scooter's standing rider (the crank does nothing then).
-function BikeRider.pose(character: Model, crank: number, stand: boolean?)
+-- E-Scooter's standing rider (the crank does nothing then); wheelie (6.10): how far the scooter is up on its back wheel.
+function BikeRider.pose(character: Model, crank: number, stand: boolean?, wheelie: number?)
 	local waist = find(character, BODY[1])
 	if not waist then
 		return -- not an R15 body: the plain sit
@@ -232,7 +237,7 @@ function BikeRider.pose(character: Model, crank: number, stand: boolean?)
 		if root and not table.find(list, root) then
 			table.insert(list, root) -- (released with the rest on the way off)
 		end
-		poseStanding(character)
+		poseStanding(character, wheelie or 0)
 		return
 	end
 	local pose = RiderPose.pose(false, crank)

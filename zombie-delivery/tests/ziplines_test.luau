@@ -1,7 +1,8 @@
 -- 5.6, the zip lines (shared/ZipLines.luau): 6 – 10 cables from a taller Downtown tower's roof over a road to a lower
 -- roof, about 120 – 260 studs, never through a building (the cable stays Clearance over every roof it crosses but its
 -- own two), the platforms on their roofs, the ladders on a street wall, and the ride's numbers; in the standalone
--- Luau CLI.
+-- Luau CLI. 6.10: the ladders' trusses (climbed for real, clear of the riders), getting on with a jump or the Zip
+-- prompt from anywhere on the start platform.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -43,6 +44,8 @@ do
 	check("the handle within the arms' reach, the elbows bent a little", tuning.HandleDrop > 0.2 and up < reach - 0.1 and up > reach * 0.75, up)
 end
 check("the lines are cached", ZipLines.lines() == lines)
+-- 6.10: you walk onto a platform through the gap in its back rail (the body is 2 wide), two pieces of rail beside it
+check("the back rail's gap lets a body through", tuning.RailGap >= 2.4 and (tuning.Platform - tuning.RailGap) / 2 >= 1, tuning.RailGap)
 
 -- Every Downtown lot's building as a box (the towers, the storefronts …), straight from Map.lots.
 local boxes: { ZipLines.Box } = {}
@@ -120,6 +123,56 @@ for _, line in lines do
 			local dd = math.sqrt((lot.home.door.x - ladder.x) ^ 2 + (lot.home.door.z - ladder.z) ^ 2)
 			check(`{line.name}: the ladder well away from the door`, dd > 8, dd)
 		end
+		-- 6.10: a real ladder, a truss the body climbs by itself: a multiple of 2 high, against its wall, from the
+		-- sidewalk (its foot in it) to a little over the roof, so a climber gets off onto the roof
+		local tx, ty, tz, height = ZipLines.truss(ladder)
+		local top, bottom = ty + height / 2, ty - height / 2
+		check(`{line.name}: the truss a multiple of 2 high`, height >= 2 and height % 2 == 0, height)
+		check(`{line.name}: the truss from the sidewalk to a little over the roof`, bottom <= ladder.base + 1e-6 and bottom > ladder.base - 2 and top >= ladder.top and top <= ladder.top + 1, `{bottom} … {top}`)
+		local out, along = (tx - ladder.x) * ladder.nx + (tz - ladder.z) * ladder.nz, (tx - ladder.x) * ladder.nz - (tz - ladder.z) * ladder.nx
+		check(`{line.name}: the truss against its wall`, math.abs(out - 1.05) < 1e-6 and math.abs(along) < 1e-6, out)
+		-- … and solid now: the rider never touches it. Where the body (2 wide, 1 deep round the root, turned any way)
+		-- is over the truss's 2 × 2, its lowest solid part (the root's bottom, 1 under its middle) stays over its top.
+		local worst = math.huge
+		local t = 0
+		while t <= line.duration do
+			local x, y, z = ZipLines.rider(line, t)
+			local dx, dz = math.max(0, math.abs(x - tx) - 1), math.max(0, math.abs(z - tz) - 1)
+			if dx * dx + dz * dz < 1.2 * 1.2 then
+				worst = math.min(worst, y - 1 - top)
+			end
+			t += 0.01
+		end
+		check(`{line.name}: the rider clears the ladder's top`, worst >= 0.3, worst)
+	end
+	-- 6.10: onto the zip line with a jump (ZipLines.startAt) or the Zip prompt (the server's ZipLines.canStart): from
+	-- anywhere on the start platform, a jump on its way up too; not beside it, not from the street or the ladder, not
+	-- from the end platform.
+	do
+		local a, b = line.a, line.b
+		local lift = ZipLines.Feet
+		local half = tuning.Platform / 2
+		local anywhere = true
+		for _, corner in { { 0, 0 }, { half, half }, { -half, half }, { half, -half }, { -half, -half } } do
+			local x, z = a.x + corner[1], a.z + corner[2]
+			anywhere = anywhere and ZipLines.startAt(x, a.floor + lift, z, lift) == line and ZipLines.startAt(x, a.floor + lift + 5, z, lift) == line
+			anywhere = anywhere and ZipLines.canStart(line, x, a.floor + lift, z, lift)
+		end
+		check(`{line.name}: a jump anywhere on the start platform grabs`, anywhere)
+		check(`{line.name}: not beside the platform`, ZipLines.startAt(a.x + half + 2, a.floor + lift, a.z, lift) == nil and ZipLines.startAt(a.x, a.floor + lift, a.z - half - 2, lift) == nil)
+		check(`{line.name}: not from the street, nor over a whole jump`, ZipLines.startAt(a.x, Map.WalkTop + lift, a.z, lift) == nil and ZipLines.startAt(a.x, a.floor + lift + tuning.GrabRise + 1, a.z, lift) == nil)
+		check(`{line.name}: no ride from the end platform`, ZipLines.startAt(b.x, b.floor + lift, b.z, lift) == nil and not ZipLines.canStart(line, b.x, b.floor + lift, b.z, lift))
+		-- the Zip from the roof behind the platform (walking in), not from the ladder's top
+		local behind = ZipLines.canStart(line, a.x - a.fx * (half + 1.5), a.floor - 0.5 + lift, a.z - a.fz * (half + 1.5), lift)
+		local l = line.ladderA
+		local cx, cz = l.x + l.nx * 2.5, l.z + l.nz * 2.5 -- (a climber's root, out of the truss)
+		local fromLadder = ZipLines.canStart(line, cx, l.top - 2 + lift, cz, lift)
+		check(`{line.name}: the Zip from the roof behind the platform, not from the ladder`, behind and not fromLadder)
+		-- the Zip prompt in the platform's middle: every spot on it within PromptReach (the root 0.5 over the prompt),
+		-- the climber on the ladder beyond it
+		local corner = math.sqrt(2 * (half + 0.5) ^ 2 + 0.5 ^ 2)
+		local ladderAway = math.sqrt((cx - a.x) ^ 2 + (cz - a.z) ^ 2)
+		check(`{line.name}: the Zip prompt reaches the whole platform, not the ladder`, corner <= tuning.PromptReach and ladderAway > tuning.PromptReach, ladderAway)
 	end
 	-- The ride: from standing, about Speed along the cable, over at `duration`, gentle at the end.
 	local x0, y0, z0 = ZipLines.at(line, 0)

@@ -1030,7 +1030,9 @@ function Zombies.roadblock(owner: Player, at: Vector3, along: Vector3, count: nu
 	model.Name = "Roadblock"
 	local side = Vector3.new(-along.Z, 0, along.X)
 	local lane = if rng:NextNumber() < 0.5 then -1 else 1
-	local center = at + side * lane * 7
+	-- (6.10: the frame on the ground, y 0: the pieces add World.RoadTop themselves; `at` comes at road height and
+	-- the car and the barrels floated RoadTop over the road)
+	local center = Vector3.new(at.X, 0, at.Z) + side * lane * 7
 	local frame = CFrame.lookAt(center, center + side) -- across the road
 	local function piece(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material)
 		local p = Instance.new("Part")

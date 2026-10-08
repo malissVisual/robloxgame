@@ -17,6 +17,8 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local CurbShape = require(Shared.CurbShape)
 local Map = require(Shared.Map)
 local StreetProps = require(Shared.StreetProps)
 local DayNight = require(script.Parent.DayNight)
@@ -28,6 +30,7 @@ local StreetDressing = {}
 local WALK_TOP = Map.WalkTop
 local ROAD_TOP = Map.RoadTop
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder standing up
+local CAR_TYRES = 2.19 -- 6.10: an abandoned car's tyres, this far each side of its middle (StreetArt/Geometry.luau)
 
 local BINS = { Color3.fromRGB(46, 70, 52), Color3.fromRGB(62, 64, 68), Color3.fromRGB(40, 54, 82) }
 local CARS = { Color3.fromRGB(96, 64, 52), Color3.fromRGB(70, 76, 82), Color3.fromRGB(112, 92, 62), Color3.fromRGB(58, 70, 60), Color3.fromRGB(122, 44, 40), Color3.fromRGB(150, 146, 136) }
@@ -106,6 +109,13 @@ local function build(model: Instance, prop: StreetProps.Prop)
 	-- (a car only a hair askew: its ends stay out of the traffic's lane)
 	local frame = CFrame.lookAt(at, at + Vector3.new(prop.nx, 0, prop.nz)) * CFrame.Angles(0, if prop.road then 0 else prop.turn, 0)
 	local kind = prop.kind
+	if prop.road then
+		-- 6.10: the kerb is a slope out onto the road (shared/CurbShape.luau): the car's kerb-side tyres (+Z) stand up on
+		-- it, the car leans away from the walk about its street-side tyres (they stay on the road)
+		local lift = CurbShape.rise(Config.LivingCity.Street.CarKerb - CAR_TYRES)
+		local lean = math.asin(math.min(1, lift / (2 * CAR_TYRES)))
+		frame = frame * CFrame.new(0, 0, -CAR_TYRES) * CFrame.Angles(-lean, 0, 0) * CFrame.new(0, 0, CAR_TYRES)
+	end
 	if buildArt(model, prop, frame) then
 		return
 	end

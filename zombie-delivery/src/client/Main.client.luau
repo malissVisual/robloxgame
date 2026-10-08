@@ -85,7 +85,7 @@ safely("CargoPrompts", CargoPrompts.start) -- 5.3 review: only your own job's pr
 safely("BusRide", require(Client.BusRide).start) -- 5.5: the city buses glide, the stop card, the ride banner (E: STOP), the job's bus hint
 safely("BusMapBoard", require(Client.BusMapBoard).start) -- 6.3: the bus map on the nearest stop's board, YOU ARE HERE
 safely("RentalUi", require(Client.RentalUi).start) -- 5.6: ZDC RIDE's Rent / Return prompts, each player the one that fits
-safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley, the climb's fade
+safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley; 6.10: a jump on a start platform grabs it
 require(Client.ZipRide).notify = Hud.toast
 safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms
 safely("BodyLife", require(Client.BodyLife).start) -- 6.7: the breath, the weight shift, the head, blinks, the landing, the flinch, the walk
@@ -95,6 +95,7 @@ safely("KeyHints", function() -- 6.1: the quiet key hints under the top buttons 
 end)
 safely("Throw", require(Client.Throw).start) -- 6.0: hold X at a home's door to throw the delivery (the dotted arc, TRICKSHOT)
 safely("Unstuck", require(Client.Unstuck).start) -- 6.0.1: lifts your courier out of the ground if it ever sinks in (and says why)
+safely("CurbRide", require(Client.CurbRide).start) -- 6.10: up the kerb's slope at speed without a hop off its top
 require(Client.Throw).notify = Hud.toast
 Shooting.notify = Hud.toast
 Holster.notify = Hud.toast -- 6.1: what you hold (keys 1 / 2 / 3)

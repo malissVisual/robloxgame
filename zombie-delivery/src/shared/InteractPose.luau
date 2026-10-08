@@ -1,9 +1,10 @@
 --!strict
 -- 5.7: the interactions at the car's level (Config.Interact), the pure part: no Roblox at its top level, so
 -- tests/interact_test.luau runs it in the standalone Luau. The clients build their CFrames and joint rotations from
--- these plain numbers (client/Interact.luau lays the poses over the R15 joints; client/CarBoarding.luau,
--- client/BusRide.luau and client/ZipRide.luau move the bodies), the server times its checks by the same routes
--- (server/ZipLines.luau, server/Buses.luau, server/Vehicles.luau).
+-- these plain numbers (client/Interact.luau lays the poses over the R15 joints; client/CarBoarding.luau and
+-- client/BusRide.luau move the bodies, client/ZipRide.luau raises the hands to the trolley), the server times its
+-- checks by the same routes (server/Buses.luau, server/Vehicles.luau). 6.10: the zip lines' ladders are real trusses
+-- the body climbs by itself; climbRoute and climbEnd are not played any more (kept, with tests/interact_test.luau).
 --
 -- A route: points the body's root goes through, each with how it gets there (`kind`: "walk", "turn", "climb", "over",
 -- "hop", "step", "onto", "off", "sit", "stand"), in how many seconds, the way it faces on arrival (fx, fz; turned to over the
@@ -16,7 +17,7 @@
 --   InteractPose.climbRoute(line, which, up, x, y, z, lift)   a zip line's ladder climb (which: 1 the start's ladder,
 --                                           2 the end's), from (x, y, z): the street, up the ladder, over the roof's
 --                                           edge, across the roof onto the platform (up), or all of it backwards
---   InteractPose.climbEnd(line, which, up, lift)   where a climb ends: x, y, z, fx, fz (the server's end too)
+--   InteractPose.climbEnd(line, which, up, lift)   where a climb ends: x, y, z, fx, fz (5.7: the server's end too)
 --
 -- The poses: a joint table (InteractPose.Pose: radians about X, Y, Z in the R15 joints' own frames: +X swings a limb
 -- forward, +Z swings the right limbs out to the right, the left ones in; the waist's -X leans forward).
@@ -29,7 +30,9 @@
 --   InteractPose.forKind(kind, u, dist)     the pose of a route's segment
 --   InteractPose.bikeMount(u, stand, step)  getting onto a bike (a leg swung over the saddle) or a scooter (a step onto
 --                                           its deck, the hands to the bar); u 0..1, step: the walk to its side's share
---   InteractPose.reachUp(u)                 the hands going up to the zip line's trolley (0..1 of the full grip)
+--   InteractPose.scooterHop(u)              6.10: the quick hop onto an E-Scooter's deck from where you stand (the
+--                                           knees tuck, the hands to the bar); off it backwards
+--   InteractPose.reachUp(u)               the hands going up to the zip line's trolley (0..1 of the full grip)
 --   InteractPose.blend(a, b, k)             two poses mixed
 
 local Config = require(script.Parent.Config)
@@ -426,6 +429,28 @@ function InteractPose.bikeMount(u: number, stand: boolean, step: number): Pose
 		pose.leftKnee = v(riderAt("leftKnee", SIT_KNEE).x - rad(14) * bump)
 		pose.waist = v(pose.waist.x - rad(10) * swing, 0, -rad(6) * swing)
 	end
+	return pose
+end
+
+-- 6.10: the quick hop onto an E-Scooter's deck from where you stand (Config.Interact.ScooterHop; no walk to its side):
+-- the hands are on the bar by halfway, both knees tuck up in the air (the left a touch higher) and the body ends in the
+-- standing rider's pose, the same end as InteractPose.bikeMount's, so the seat takes over without a jump. Getting off
+-- is the same backwards (u from 1 to 0).
+function InteractPose.scooterHop(u: number): Pose
+	local x = math.clamp(u, 0, 1)
+	local finish = InteractPose.bikeMount(1, true, 0)
+	local pose = InteractPose.blend(InteractPose.zero(), finish, ease(x))
+	local arms = ease(x / 0.5)
+	for _, name in { "rightShoulder", "leftShoulder", "rightElbow", "leftElbow" } do
+		local f = finish[name]
+		pose[name] = v(f.x * arms, f.y * arms, f.z * arms)
+	end
+	local tuck = math.sin(math.pi * x)
+	pose.waist = v(pose.waist.x - rad(10) * tuck)
+	pose.rightHip = v(pose.rightHip.x + rad(46) * tuck)
+	pose.rightKnee = v(pose.rightKnee.x - rad(70) * tuck)
+	pose.leftHip = v(pose.leftHip.x + rad(56) * tuck)
+	pose.leftKnee = v(pose.leftKnee.x - rad(82) * tuck)
 	return pose
 end
 

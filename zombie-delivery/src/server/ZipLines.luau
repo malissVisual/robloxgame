@@ -1,30 +1,28 @@
 --!strict
 -- 5.6, the zip lines between Downtown's rooftops (shared/ZipLines.luau has where; Config.ZipLines the numbers).
 --
--- Built when this starts (after World), at most 30 native parts a line (26): on each of its two roofs a landing
--- platform (a floor, a red rail on three sides, open toward the cable, a gantry of two posts and a crossbar the cable
--- hangs from; the start's with a ZIP sign and a lamp that glows at night), a ladder (a TrussPart against the street
--- wall: the climbs below go up it, not the physics, so it does not collide) and the cable in 8 black segments along
--- its sag. The roof boxes World put where a platform stands are taken off. A Model per line in
--- workspace.World.ZipLines (Atomic streaming).
+-- Built when this starts (after World), at most 30 native parts a line (28): on each of its two roofs a landing
+-- platform (a floor, a red rail on three sides, open toward the cable, the back one in two pieces since 6.10, a gantry
+-- of two posts and a crossbar the cable hangs from; the start's with a ZIP sign and a lamp that glows at night), a
+-- ladder (a TrussPart against the street wall) and the cable in 8 black segments along its sag. The roof boxes World
+-- put where a platform stands are taken off. A Model per line in workspace.World.ZipLines (Atomic streaming).
 --
--- The prompts: "Climb" at each ladder's foot, "Zip" at the start platform's front, "Climb down" at each platform's back.
--- 5.7, a climb is a real one (it used to fade the screen and move you): checked here like a ride's start (alive, on
--- foot, no trolley, not riding or climbing already, at the prompt), it is marked on the character (ClimbLine = the
--- line's id, ClimbWhich = 1 the start's ladder or 2 the end's, ClimbUp, and ClimbAt = the server time it starts) and
--- every client plays it: the climber's own one carries the body along shared/InteractPose.luau's climbRoute (onto the
--- ladder, up it hand over hand at Config.Interact.ClimbSpeed, over the roof's edge, across the roof and over the
--- platform's rail; down the same backwards), every one poses the limbs (client/ZipRide.luau). The end is the
--- server's: ClimbGrace seconds after the route's length a climber who is not at its end is put there (and the
--- attributes go); a death, a reset or leaving ends it at once.
--- A ride, checked here: alive, on foot (not seated, not getting in), not on a ride already, past the Cooldown, within
--- Reach of the start platform, nothing in the hands and no trolley ("Hands full: pack it first"; the bag's
--- pieces ride along). The character's attributes ZipLine (the line's id) and ZipAt (the server time it starts) tell
--- every client: the rider's own one moves the body along the cable (shared/ZipLines.luau ZipLines.at), every one poses
--- the hands up on a trolley. The end is the server's: Grace seconds after the ride's end a rider who is not at the end
--- platform is put there (no teleporting off a cable). The Zip remote's "letgo" (Space) ends it early only where
--- ZipLines.canLetGo allows it (low over one of the line's roofs); anywhere else it is ignored. A death, a reset or
--- leaving ends it.
+-- 6.10 (the owner: "like a building you climb up by yourself, and onto the zip line you just jump"): the ladders are
+-- real. Each truss is solid and queried, so the Humanoid climbs it by itself (Roblox's own climb and its animation),
+-- from the sidewalk to a little over the roof (shared/ZipLines.luau truss). You walk across the roof and onto the
+-- platform through the gap in the middle of its back rail (RailGap; the floor is 0.5 up). Getting down is yours too:
+-- the ladder again, or a jump (no fall damage). The 5.7 climbs are gone: the "Climb" and "Climb down" prompts, the
+-- route every client played and the end the server set.
+-- A ride starts with the "Zip" prompt in the start platform's middle (PromptReach: from anywhere on it) or with a jump
+-- there (the Zip remote's "grab" with the line's id; client/ZipRide.luau asks only on the platform). Both are checked
+-- the same here: alive, on foot (not seated, not getting in), not on a ride already, past the Cooldown, where
+-- ZipLines.canStart allows it (within Reach of the platform's middle, the feet from the roof up to a jump over the
+-- floor, not on the ladder), nothing in the hands and no trolley ("Hands full: pack it first"; the bag's pieces ride
+-- along). The character's attributes ZipLine (the line's id) and ZipAt (the server time it starts) tell every client:
+-- the rider's own one moves the body along the cable (shared/ZipLines.luau ZipLines.at), every one poses the hands up
+-- on a trolley. The end is the server's: Grace seconds after the ride's end a rider who is not at the end platform is
+-- put there (no teleporting off a cable). The Zip remote's "letgo" (Space) ends it early only where ZipLines.canLetGo
+-- allows it (low over one of the line's roofs); anywhere else it is ignored. A death, a reset or leaving ends it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,7 +30,6 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local InteractPose = require(Shared.InteractPose)
 local Net = require(Shared.Net)
 local ZipData = require(Shared.ZipLines)
 local Vehicles = require(script.Parent.Vehicles)
@@ -53,13 +50,8 @@ local LAMP_LIT = Color3.fromRGB(255, 226, 170)
 local LAMP_DIM = Color3.fromRGB(120, 120, 116)
 
 type Ride = { line: ZipData.Line, start: number, character: Model }
-type Climb = { character: Model, finish: number, to: CFrame }
 
 local rides: { [Player]: Ride } = {}
-local climbs: { [Player]: Climb } = {} -- 5.7: on a ladder (or on the way to or from it) now
-local lastClimb: { [Player]: number } = {} -- (the end of a climb: ClimbCooldown before the next)
-local CLIMB_LIFT = 3 -- the server's root over the feet where a climb ends, for an R6 body (6.8 review: an R15 one's own)
-local CLIMB_NEAR = 3 -- a climber within this of the end at its time stays where they are
 local lastRide: { [Player]: number } = {} -- (the end of a ride: the Cooldown before the next)
 local started = false
 
@@ -139,14 +131,18 @@ local function clearRoof(world: Instance, platform: ZipData.Platform)
 	end
 end
 
--- A platform: the floor, the rail (open toward the cable), the gantry over its middle. Returns its frame (-Z toward
--- the cable, the origin on the floor's middle) and its floor.
+-- A platform: the floor, the rail (open toward the cable; 6.10: its back in two pieces, a RailGap between them to walk
+-- in through from the roof), the gantry over its middle. Returns its frame (-Z toward the cable, the origin on the
+-- floor's middle) and its floor.
 local function platform(model: Instance, p: ZipData.Platform, start: boolean, line: ZipData.Line): (CFrame, BasePart)
 	local P = Tuning.Platform
 	local centre = Vector3.new(p.x, p.floor, p.z)
 	local frame = CFrame.lookAt(centre, centre + Vector3.new(p.fx, 0, p.fz))
 	local floor = part(model, "Floor", Vector3.new(P, 0.5, P), frame * CFrame.new(0, -0.25, 0), FLOOR, Enum.Material.DiamondPlate, true)
-	part(model, "Rail", Vector3.new(P, 1.1, 0.2), frame * CFrame.new(0, 0.55, P / 2 - 0.1), RED, Enum.Material.Metal, true)
+	local back = (P - Tuning.RailGap) / 2
+	for _, side in { -1, 1 } do
+		part(model, "Rail", Vector3.new(back, 1.1, 0.2), frame * CFrame.new(side * (P - back) / 2, 0.55, P / 2 - 0.1), RED, Enum.Material.Metal, true)
+	end
 	for _, side in { -1, 1 } do
 		part(model, "Rail", Vector3.new(0.2, 1.1, P), frame * CFrame.new(side * (P / 2 - 0.1), 0.55, 0), RED, Enum.Material.Metal, true)
 	end
@@ -181,102 +177,39 @@ local function rootOf(player: Player): (Model?, Humanoid?, BasePart?)
 	return character, humanoid, root
 end
 
--- On foot, free to go (not seated, not getting in, not riding, `cooldown` seconds past the last ride or climb)? Else
--- what to say (or "": nothing).
-local function busy(player: Player, character: Model, humanoid: Humanoid, since: { [Player]: number }, cooldown: number): string?
-	if rides[player] or climbs[player] then
+-- On foot, free to go (not seated, not getting in, not riding, the Cooldown past the last ride)? Else what to say (or
+-- "": nothing).
+local function busy(player: Player, character: Model, humanoid: Humanoid): string?
+	if rides[player] then
 		return ""
 	end
 	if humanoid.SeatPart ~= nil or Vehicles.seatedIn(player) ~= nil or character:GetAttribute("Boarding") ~= nil then
 		return "Get out first."
 	end
-	if os.clock() - (since[player] or -math.huge) < cooldown then
+	if os.clock() - (lastRide[player] or -math.huge) < Tuning.Cooldown then
 		return ""
 	end
 	return nil
 end
 
--- 5.7: a climb up (the ladder's foot → the platform) or down (the platform → the sidewalk), checked; see the top.
-local function climb(player: Player, line: ZipData.Line, which: number, up: boolean, from: Vector3)
-	local character, humanoid, root = rootOf(player)
-	if not character or not humanoid or not root then
-		return
-	end
-	local why = busy(player, character, humanoid, lastClimb, Config.Interact.ClimbCooldown)
-	if why then
-		if why ~= "" then
-			tell(player, why)
-		end
-		return
-	end
-	if (root.Position - from).Magnitude > Tuning.Reach + 6 then
-		return
-	end
-	if character:GetAttribute("Pushing") ~= nil then
-		tell(player, "Set the trolley down first.")
-		return
-	end
-	if Cargo.carrying(character) ~= nil then
-		tell(player, "Hands full: pack it first.") -- 5.7: a real climb takes both hands
-		return
-	end
-	local at = root.Position
-	-- (6.8 review: the climber's own root over its feet, as its client plays it: the courier's 3.8, not 3)
-	local lift = if humanoid.RigType == Enum.HumanoidRigType.R15 then humanoid.HipHeight + root.Size.Y / 2 else CLIMB_LIFT
-	local route = InteractPose.climbRoute(line, which, up, at.X, at.Y, at.Z, lift)
-	local x, y, z, fx, fz = InteractPose.climbEnd(line, which, up, lift)
-	local to = CFrame.lookAt(Vector3.new(x, y, z), Vector3.new(x + fx, y, z + fz))
-	local startAt = workspace:GetServerTimeNow() + LEAD
-	climbs[player] = { character = character, finish = startAt + route.total, to = to }
-	lastClimb[player] = os.clock()
-	character:SetAttribute("ClimbLine", line.id)
-	character:SetAttribute("ClimbWhich", which)
-	character:SetAttribute("ClimbUp", up)
-	character:SetAttribute("ClimbAt", startAt) -- (last: the clients start on it)
-	task.spawn(function()
-		pcall(function()
-			player:RequestStreamAroundAsync(to.Position, 3)
-		end)
-	end)
-end
-
--- The climb is over: the attributes go (putDown: at its end, when the climber is not there by now).
-local function endClimb(player: Player, c: Climb, putDown: boolean)
-	climbs[player] = nil
-	lastClimb[player] = os.clock()
-	local character = c.character
-	if putDown and player.Character == character then
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		local root = humanoid and humanoid.RootPart
-		-- (not somebody who sat in a car meanwhile: the car must not go onto the roof)
-		if humanoid and root and humanoid.Health > 0 and humanoid.SeatPart == nil and Vehicles.seatedIn(player) == nil
-			and character:GetAttribute("Boarding") == nil and not rides[player] and (root.Position - c.to.Position).Magnitude > CLIMB_NEAR then
-			root.AssemblyLinearVelocity = Vector3.zero
-			character:PivotTo(c.to)
-		end
-	end
-	if character.Parent then
-		character:SetAttribute("ClimbAt", nil)
-		character:SetAttribute("ClimbLine", nil)
-		character:SetAttribute("ClimbWhich", nil)
-		character:SetAttribute("ClimbUp", nil)
-	end
-end
-
+-- A ride, asked by the Zip prompt or a jump on the start platform (6.10: the Zip remote's "grab"); see the top.
 local function zip(player: Player, line: ZipData.Line)
 	local character, humanoid, root = rootOf(player)
 	if not character or not humanoid or not root then
 		return
 	end
-	local why = busy(player, character, humanoid, lastRide, Tuning.Cooldown)
+	local why = busy(player, character, humanoid)
 	if why then
 		if why ~= "" then
 			tell(player, why)
 		end
 		return
 	end
-	local a = line.a
-	if (Vector3.new(root.Position.X - a.x, 0, root.Position.Z - a.z)).Magnitude > Tuning.Reach or math.abs(root.Position.Y - (a.floor + 3)) > 6 then
+	-- (6.10: anywhere on the start platform or the roof by it, a jump on its way up too, not the ladder; the body's own
+	-- root over its feet)
+	local at = root.Position
+	local lift = if humanoid.RigType == Enum.HumanoidRigType.R15 then humanoid.HipHeight + root.Size.Y / 2 else ZipData.Feet
+	if not ZipData.canStart(line, at.X, at.Y, at.Z, lift) then
 		return
 	end
 	if Cargo.carrying(character) ~= nil or character:GetAttribute("Pushing") ~= nil then
@@ -310,7 +243,18 @@ local function stop(player: Player, ride: Ride, putDown: boolean)
 	end
 end
 
-local function onZip(player: Player, action: any)
+local function onZip(player: Player, action: any, id: any)
+	if not Net.limit(player, "Zip", Config.Robust.Limits.Zip) then
+		return -- (6.10 review: a flood of jumps or lets-go)
+	end
+	if action == "grab" then
+		-- 6.10: a jump on the line's start platform (client/ZipRide.luau), checked as the Zip prompt
+		local line = if type(id) == "number" then ZipData.line(id) else nil
+		if line then
+			zip(player, line)
+		end
+		return
+	end
 	if action ~= "letgo" then
 		return
 	end
@@ -350,14 +294,6 @@ local function check()
 			stop(player, ride, true)
 		end
 	end
-	for player, c in table.clone(climbs) do
-		local humanoid = c.character:FindFirstChildOfClass("Humanoid")
-		if player.Parent == nil or player.Character ~= c.character or not humanoid or humanoid.Health <= 0 then
-			endClimb(player, c, false)
-		elseif now >= c.finish + Config.Interact.ClimbGrace then
-			endClimb(player, c, true)
-		end
-	end
 end
 
 local function build(folder: Instance, world: Instance, line: ZipData.Line)
@@ -368,7 +304,7 @@ local function build(folder: Instance, world: Instance, line: ZipData.Line)
 	clearRoof(world, line.a)
 	clearRoof(world, line.b)
 	local frameA, floorA = platform(model, line.a, true, line)
-	local frameB, floorB = platform(model, line.b, false, line)
+	platform(model, line.b, false, line)
 	-- The cable, along its sag.
 	for n = 0, SEGMENTS - 1 do
 		local x0, y0, z0 = ZipData.cable(line, n / SEGMENTS)
@@ -377,44 +313,28 @@ local function build(folder: Instance, world: Instance, line: ZipData.Line)
 		local cable = part(model, "Cable", Vector3.new((p1 - p0).Magnitude + 0.1, 0.22, 0.22), CFrame.lookAt((p0 + p1) / 2, p1) * CFrame.Angles(0, math.pi / 2, 0), CABLE, Enum.Material.Metal)
 		cable.Shape = Enum.PartType.Cylinder
 	end
-	-- The ladders (the look) with the Climb at their feet.
-	for index, ladder in { line.ladderA, line.ladderB } do
-		local height = math.max(2, math.floor((ladder.top - ladder.base) / 2) * 2)
+	-- 6.10: the ladders, real ones: a truss the Humanoid climbs by itself (solid and queried: its climbing finds it), up
+	-- to a little over the roof (its foot in the sidewalk as deep as the 2-stud steps need)
+	for _, ladder in { line.ladderA, line.ladderB } do
+		local x, y, z, height = ZipData.truss(ladder)
 		local truss = Instance.new("TrussPart")
 		truss.Name = "Ladder"
 		truss.Anchored = true
-		truss.CanCollide = false
-		truss.CanQuery = false
+		truss.CanCollide = true
+		truss.CanQuery = true
 		truss.CanTouch = false
 		truss.Size = Vector3.new(2, height, 2)
-		truss.CFrame = CFrame.new(ladder.x + ladder.nx * 1.05, ladder.base + height / 2, ladder.z + ladder.nz * 1.05)
+		truss.CFrame = CFrame.new(x, y, z)
 		truss.Color = METAL
 		truss.Material = Enum.Material.Metal
 		truss.Parent = model
-		-- (the prompt's own attachment on the truss, at the ladder's foot: an attachment needs a part for a parent)
-		local up = prompt(truss, "ClimbPrompt", "Climb", line.name, 0.3, 8)
-		local foot = up.Parent :: Attachment
-		foot.Position = Vector3.new(ladder.nx * 1.5, -height / 2 + 2.5, ladder.nz * 1.5)
-		local from = Vector3.new(ladder.x + ladder.nx * 2.5, ladder.base + 3, ladder.z + ladder.nz * 2.5)
-		up.Triggered:Connect(function(player: Player)
-			climb(player, line, index, true, from)
-		end)
 	end
-	-- On the platforms: Zip at the start's front, Climb down at both backs.
-	local P = Tuning.Platform
-	local go = prompt(floorA, "ZipPrompt", "Zip", line.name, 0, 6)
-	;(go.Parent :: Attachment).WorldCFrame = frameA * CFrame.new(0, 2.5, -(P / 2 - 1.8))
+	-- The Zip in the start platform's middle (6.10: PromptReach, from anywhere on it; a jump there does the same).
+	local go = prompt(floorA, "ZipPrompt", "Zip", line.name, 0, Tuning.PromptReach)
+	;(go.Parent :: Attachment).WorldCFrame = frameA * CFrame.new(0, 2.5, 0)
 	go.Triggered:Connect(function(player: Player)
 		zip(player, line)
 	end)
-	for index, frame in { frameA, frameB } do
-		local down = prompt(if index == 1 then floorA else floorB, "ClimbDownPrompt", "Climb down", line.name, 0.3, 5)
-		;(down.Parent :: Attachment).WorldCFrame = frame * CFrame.new(0, 2.5, P / 2 - 1.4)
-		local from = frame.Position + Vector3.new(0, 3, 0)
-		down.Triggered:Connect(function(player: Player)
-			climb(player, line, index, false, from)
-		end)
-	end
 	model.Parent = folder
 end
 
@@ -447,8 +367,6 @@ function ZipLines.start()
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		rides[player] = nil
-		climbs[player] = nil
-		lastClimb[player] = nil
 		lastRide[player] = nil
 	end)
 end

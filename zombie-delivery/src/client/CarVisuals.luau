@@ -21,12 +21,18 @@
 -- the kit: found again when the car's KitBuilt changes.
 -- 5.1.1, the E-Scooter (the car's attributes Bike and BikeStand): it leans the same way, has no cranks, and its rider
 -- stands (BikeRider.pose's stand: the legs straight on the deck, the hands on the bar).
+-- 6.10, the scooter's wheelie (shared/ScooterRide.luau): the BikeLean also pitches the deck back round the rear axle
+-- (the rear WheelMotor's place on the BikeFrame), the rider and the load on the frame with it, the rider sitting back
+-- (BikeRider.pose's wheelie). Your own scooter from client/Drive.luau at once (Drive.wheelie), everybody else's from
+-- its attribute WheelieAt (server/Wheelie.luau), popped up and dropped at the same pace. It leans on Config.Scooter's
+-- numbers (a bike on LEAN_MAX, LEAN_RATE).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
+local ScooterRide = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScooterRide"))
 
 local BikeRider = require(script.Parent.BikeRider)
 local Drive = require(script.Parent.Drive)
@@ -57,6 +63,10 @@ type CarState = {
 	crank: number,
 	rider: Model?,
 	kitBuilt: any,
+	-- 6.10, a scooter: the rear axle on its BikeFrame (the wheelie's pivot), how far up it is drawn and since when.
+	axle: Vector3?,
+	wheelie: number,
+	wheelieTime: number,
 }
 
 local player = Players.LocalPlayer
@@ -82,6 +92,7 @@ local function stateOf(car: Model): CarState?
 	local doorHinges: { DoorHinge } = {}
 	local doorPrompts: { DoorPrompt } = {}
 	local lean: Motor6D?, crankMotor: Motor6D? = nil, nil
+	local axle: Vector3? = nil
 	-- 3.7: the seats behind each door (their attribute Door).
 	local seatsAt: { [number]: { Seat } } = {}
 	for _, child in car:GetChildren() do
@@ -99,6 +110,9 @@ local function stateOf(car: Model): CarState?
 				front = child:GetAttribute("Front") == true,
 				radius = (child:GetAttribute("Radius") or 1.3) :: number,
 			})
+			if child:GetAttribute("Front") == false and child.Part0 and child.Part0.Name == "BikeFrame" then
+				axle = child.C0.Position -- 6.10: the rear wheel's axle on the frame (the wheelie turns round it)
+			end
 		elseif child:IsA("Motor6D") and child.Name == "BikeLean" then
 			lean = child
 		elseif child:IsA("Motor6D") and child.Name == "CrankMotor" then
@@ -149,6 +163,9 @@ local function stateOf(car: Model): CarState?
 		crank = 0,
 		rider = nil,
 		kitBuilt = nil,
+		axle = axle,
+		wheelie = 0,
+		wheelieTime = 0,
 	}
 	states[car] = state
 	car.Destroying:Connect(function()
@@ -192,7 +209,7 @@ local function poseRider(car: Model, state: CarState, near: boolean)
 	end
 	state.rider = rider
 	if rider then
-		BikeRider.pose(rider, state.crank, car:GetAttribute("BikeStand") == true) -- (5.1.1: the E-Scooter: standing)
+		BikeRider.pose(rider, state.crank, car:GetAttribute("BikeStand") == true, state.wheelie) -- (5.1.1: the E-Scooter: standing; 6.10: its wheelie)
 	end
 end
 
@@ -422,9 +439,27 @@ local function step(dt: number)
 		-- trailer wheels found again after a new kit.
 		local leanMotor = state.lean
 		if leanMotor and leanMotor.Parent then
-			local goal = math.clamp(chassis.AssemblyAngularVelocity.Y * forward * LEAN_RATE, -LEAN_MAX, LEAN_MAX)
+			local scooter = car:GetAttribute("BikeStand") == true
+			local goal = if scooter then ScooterRide.lean(chassis.AssemblyAngularVelocity.Y, forward)
+				else math.clamp(chassis.AssemblyAngularVelocity.Y * forward * LEAN_RATE, -LEAN_MAX, LEAN_MAX)
 			state.tilt += (goal - state.tilt) * math.min(1, dt * 6)
-			leanMotor.Transform = CFrame.Angles(0, 0, state.tilt)
+			local axle = state.axle
+			if scooter and axle then
+				-- 6.10: the wheelie: the deck pitched back round the rear axle (yours from your Drive, the others' from
+				-- WheelieAt), then the lean
+				local at = car:GetAttribute("WheelieAt")
+				if mine and Drive.isDriving() then
+					state.wheelie, state.wheelieTime = Drive.wheelie(car)
+				else
+					state.wheelie = ScooterRide.amountStep(state.wheelie, type(at) == "number", dt)
+					state.wheelieTime = if type(at) == "number" then now - at else state.wheelieTime
+				end
+				local pitch = ScooterRide.pitch(state.wheelie, state.wheelieTime)
+				leanMotor.Transform = if pitch ~= 0 then CFrame.new(axle) * CFrame.Angles(pitch, 0, 0) * CFrame.new(-axle) * CFrame.Angles(0, 0, state.tilt)
+					else CFrame.Angles(0, 0, state.tilt)
+			else
+				leanMotor.Transform = CFrame.Angles(0, 0, state.tilt)
+			end
 			local crankMotor = state.crankMotor
 			state.crank -= forward / 1.3 * CADENCE * dt
 			if crankMotor and crankMotor.Parent then

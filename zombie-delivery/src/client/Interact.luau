@@ -1,7 +1,7 @@
 --!strict
 -- 5.7: the shared helpers of the interactions at the car's level (Config.Interact; the curves and the routes are
 -- shared/InteractPose.luau): getting on a bike or a scooter (client/CarBoarding.luau), the bus's door and seat
--- (client/BusRide.luau), the zip lines' ladders (client/ZipRide.luau).
+-- (client/BusRide.luau); 5.7 – 6.9 the zip lines' ladders too (6.10: real trusses, climbed by the body itself).
 --
 -- * Interact.pose(character, pose, dt, owner): an InteractPose.Pose laid ON TOP of what the Animator wrote this frame
 --   into the R15 joints' Transform (shared/Joints.luau: Motor6Ds or AnimationConstraints; C0 is never written), eased

@@ -10,7 +10,9 @@
 -- where it stood in the dock). Every client near it plays the slide: the real scooter stays hidden here
 -- (LocalTransparencyModifier) while a local copy of it (anchored, nothing of it collides or is clicked) jolts back as
 -- the clamp lets go and slides out to it over DockUnclip; then the copy goes and the real one shows. Meanwhile its
--- rider steps to its side and gets on (client/CarBoarding.luau: the mount).
+-- rider steps to its side and gets on (client/CarBoarding.luau: the mount). 6.10: every docked scooter has its own
+-- Ride prompt (Kind "rent" too, so shown the same way); the rider hops on at once while it slides (Config.Interact
+-- ScooterHop, DockUnclip), and the dock's own Rent prompt reaches only while the dock is empty.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
