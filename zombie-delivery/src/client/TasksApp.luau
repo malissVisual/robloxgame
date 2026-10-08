@@ -25,8 +25,8 @@ local TasksApp = {}
 TasksApp.notify = nil :: ((string) -> ())? -- a toast (Phone.notify: Hud.toast)
 TasksApp.changed = nil :: (() -> ())? -- the state changed: the phone's badges, the app if it shows
 
--- 6.12: the sounds (client/Sounds.luau names). The sounds helper's "task_done" will take DONE's place.
-local DONE_SOUND = "level_up"
+-- 6.12: the sounds (client/Sounds.luau names; sfx3's "task_done", with its stand-in until sfx3 is uploaded).
+local DONE_SOUND = "task_done"
 local CLAIM_SOUND = "cash"
 
 local view: any = nil -- the server's last state (shared/Tasks.luau Tasks.view)

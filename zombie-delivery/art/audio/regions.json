@@ -173,12 +173,144 @@
       8.0
     ]
   },
+  "sfx3": {
+    "car_door_open": [
+      0.0,
+      0.5
+    ],
+    "car_door_close": [
+      0.8,
+      0.55
+    ],
+    "van_back_open": [
+      1.65,
+      0.8
+    ],
+    "van_back_close": [
+      2.75,
+      0.9
+    ],
+    "van_roll_up": [
+      3.95,
+      0.85
+    ],
+    "van_roll_down": [
+      5.1,
+      0.9
+    ],
+    "horn_car": [
+      6.3,
+      0.42
+    ],
+    "horn_van": [
+      7.02,
+      0.55
+    ],
+    "horn_truck": [
+      7.87,
+      0.95
+    ],
+    "bike_bell": [
+      9.12,
+      0.95
+    ],
+    "scooter_beep": [
+      10.37,
+      0.24
+    ],
+    "step_concrete_a": [
+      10.91,
+      0.2
+    ],
+    "step_concrete_b": [
+      11.41,
+      0.2
+    ],
+    "step_grass_a": [
+      11.91,
+      0.2
+    ],
+    "step_grass_b": [
+      12.41,
+      0.2
+    ],
+    "step_wood_a": [
+      12.91,
+      0.22
+    ],
+    "step_wood_b": [
+      13.43,
+      0.22
+    ],
+    "step_metal_a": [
+      13.95,
+      0.25
+    ],
+    "step_metal_b": [
+      14.5,
+      0.25
+    ],
+    "step_water_a": [
+      15.05,
+      0.32
+    ],
+    "step_water_b": [
+      15.67,
+      0.32
+    ],
+    "splash": [
+      16.29,
+      1.1
+    ],
+    "amb_day": [
+      17.69,
+      12.0
+    ],
+    "amb_night": [
+      29.99,
+      12.0
+    ],
+    "amb_roof": [
+      42.29,
+      8.0
+    ],
+    "amb_fountain": [
+      50.59,
+      6.0
+    ],
+    "task_done": [
+      56.89,
+      0.95
+    ],
+    "purchase": [
+      58.14,
+      0.8
+    ],
+    "event_start": [
+      59.24,
+      1.5
+    ],
+    "event_end": [
+      61.04,
+      1.2
+    ]
+  },
   "looped": [
+    "amb_day",
+    "amb_fountain",
+    "amb_night",
+    "amb_roof",
     "ambience",
     "engine",
     "freewheel",
     "scooter",
     "wind",
     "zip"
-  ]
+  ],
+  "pcm_sha256": {
+    "sfx": "80d38e17db854818d3262626dea603604ccfa46e46e66ffd70b91bd560b57832",
+    "music": "19575952dd46b6321373b1a31e5e31897da59ec6fa2f417d2d9dfc69bf3191cc",
+    "sfx2": "343535d0809e9e63ea1b48f0b914ebb29651ae4d9ae6f66b1d5a55ad8d85cb9b",
+    "sfx3": "63d310abebf8b82ef8c94715657fa9c92738ea6f48cd62ae490dad840d4230b0"
+  }
 }

@@ -967,9 +967,14 @@ function EstateUi.start()
 			say(text, C.yellow)
 		end
 	end)
-	-- H opens and closes the list (not while typing, e.g. in the chat).
+	-- H opens and closes the list (not while typing, e.g. in the chat). 6.12: not behind the wheel: H is the horn there
+	-- (client/SoundScape.luau).
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or UserInputService:GetFocusedTextBox() or input.KeyCode ~= Enum.KeyCode.H then
+			return
+		end
+		local _, driving = require(script.Parent.Drive).seatedCar()
+		if driving then
 			return
 		end
 		if hudOn() then
