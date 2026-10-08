@@ -1136,7 +1136,7 @@ local function renderShop()
 				end
 			end
 			row += 1
-			note(shop.body, "Gun Damage and Fire Rate (every gun, the car guns too): Lead & Co., west of the depot.", C.dim, row)
+			note(shop.body, "Gun Damage and Fire Rate (every gun, the car guns too): Lead & Co., west of the park.", C.dim, row)
 		elseif mechanicTab == "gear" then
 			require(script.Parent.GearShop).render(shop.body, state, here) -- 4.6: the car's gear and its slots
 		elseif mechanicTab == "carguns" then

@@ -62,6 +62,7 @@ local SHOP_SUB: { [string]: string } = {
 	bags = "BAGS", -- 6.6: the depot's bag kiosk
 }
 local PLACE_SUB: { [string]: string } = {
+	park = "SAFE ZONE", -- 6.11: the Central Park in the middle of it (Map.Park)
 	dispatchtower = "OFFICES",
 	harborpoint = "OFFICES",
 	sunsethills = "HILLTOP MANSION",

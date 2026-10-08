@@ -4396,8 +4396,8 @@ function Vehicles.start()
 			end
 			local position = car.chassis.Position
 			-- (3.4: no free repairs any more: the repair bays, server/Repair.luau.)
-			-- Drove into the water (or off the world).
-			if position.Y < -7 then
+			-- Drove into the water (or off the world; 6.11 review: or into the park's pond, Map.inPond).
+			if position.Y < -7 or Map.inPond(position.X, position.Y, position.Z) then
 				Vehicles.damage(car, math.huge, "Your car sank!")
 			end
 		end

@@ -96,6 +96,7 @@ end)
 safely("Throw", require(Client.Throw).start) -- 6.0: hold X at a home's door to throw the delivery (the dotted arc, TRICKSHOT)
 safely("Unstuck", require(Client.Unstuck).start) -- 6.0.1: lifts your courier out of the ground if it ever sinks in (and says why)
 safely("CurbRide", require(Client.CurbRide).start) -- 6.10: up the kerb's slope at speed without a hop off its top
+safely("ShopPropMotion", require(Client.ShopPropMotion).start) -- 6.11: the bank's coin spins, Luigi's pizza slice bobs
 require(Client.Throw).notify = Hud.toast
 Shooting.notify = Hud.toast
 Holster.notify = Hud.toast -- 6.1: what you hold (keys 1 / 2 / 3)

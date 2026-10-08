@@ -304,10 +304,19 @@ function ZipLines.lines(): { Line }
 	end
 	local tuning = Config.ZipLines
 	local towers: { Map.Lot } = {}
-	for _, lots in Map.lots("downtown") do
-		for _, lot in lots do
-			if (lot.kind == "tower" or lot.kind == "apartment") and lot.w > tuning.Platform + 2 and lot.d > tuning.Platform + 2 then
-				table.insert(towers, lot)
+	-- 6.11: the towers a block had while it was ordinary (Map.FormerLots: the depot's four) are gone, but they still
+	-- roll their dice in the shuffle below (never kept), so every line stays where it was
+	local gone: { [Map.Lot]: boolean } = {}
+	local former = Map.FormerLots.downtown or {}
+	for _, source in { Map.lots("downtown"), former } do
+		for _, lots in source do
+			for _, lot in lots do
+				if (lot.kind == "tower" or lot.kind == "apartment") and lot.w > tuning.Platform + 2 and lot.d > tuning.Platform + 2 then
+					table.insert(towers, lot)
+					if source == former then
+						gone[lot] = true
+					end
+				end
 			end
 		end
 	end
@@ -335,7 +344,10 @@ function ZipLines.lines(): { Line }
 			if line.length < tuning.MinLength or line.length > tuning.MaxLength or (line.ay - line.by) / line.length > tuning.MaxSlope then
 				continue
 			end
-			table.insert(candidates, { line = line, score = rand(), key = key(s) * 10000 + key(e) })
+			local score = rand()
+			if not (gone[s] or gone[e]) then
+				table.insert(candidates, { line = line, score = score, key = key(s) * 10000 + key(e) })
+			end
 		end
 	end
 	table.sort(candidates, function(p: Candidate, q: Candidate): boolean

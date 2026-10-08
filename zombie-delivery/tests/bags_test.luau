@@ -82,14 +82,20 @@ check("6.6: Marge's words", words == "Backpacks are gone: bags do it all now. Yo
 
 local Map = require("./Map")
 local shop = Map.Shops.bags
-check("6.6: ZDC Bags is a shop", shop ~= nil and shop.name == "ZDC Bags" and shop.x == Config.BagShop.X and shop.z == Config.BagShop.Z)
+-- (6.11: Config.BagShop, the rack, the spawn, the board, the terminal and Marge are given from the depot's middle,
+-- Map.Depot: the checks below are in the depot's own studs)
+check("6.6: ZDC Bags is a shop", shop ~= nil and shop.name == "ZDC Bags" and shop.x == Map.Depot.x + Config.BagShop.X and shop.z == Map.Depot.z + Config.BagShop.Z)
 check("6.6: a kiosk's own radius, the big shops' as before", Map.shopRadius("bags") == Config.BagShop.Radius and Map.shopRadius("supplies") == Map.ShopRadius and Map.shopRadius("moon") == Map.ShopRadius)
 local function away(x: number, z: number): number
 	return math.sqrt((Config.BagShop.X - x) ^ 2 + (Config.BagShop.Z - z) ^ 2)
 end
 local rack = Config.Rental.SpawnRack
 local marge = Config.Tutorial.NpcSpot
-check("6.6: inside the depot's block, in the safe zone", math.abs(Config.BagShop.X) < Config.City.BlockSize / 2 - 8 and math.abs(Config.BagShop.Z) < Config.City.BlockSize / 2 - 8 and Map.isSafe(Config.BagShop.X, Config.BagShop.Z))
+check("6.6: inside the depot's block, in the safe zone", math.abs(Config.BagShop.X) < Config.City.BlockSize / 2 - 8 and math.abs(Config.BagShop.Z) < Config.City.BlockSize / 2 - 8 and Map.isSafe(shop.x, shop.z))
+check("6.11: the kiosk on the depot's block", (function()
+	local d, i, j = Map.blockAt(shop.x, shop.z)
+	return d ~= nil and Map.special(d.id, i, j) == "depot" and i == Map.Depot.i and j == Map.Depot.j
+end)())
 check("6.6: clear of the spawn pad (0, 26), its radius not over it", away(0, 26) - 5 > Config.BagShop.Radius - 2, away(0, 26))
 check("6.6: clear of the scooter rack", away(rack.x + rack.slots * rack.pitch / 2, rack.z) > 12 and away(rack.x - rack.slots * rack.pitch / 2, rack.z) > 12)
 check("6.6: clear of the job board, the garage terminal and Marge", away(-18, -25) > 40 and away(18, -25) > 40 and away(marge[1], marge[2]) > 40)

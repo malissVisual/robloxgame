@@ -64,7 +64,8 @@ check("there are employers", employers > 0)
 check("a shop (its block's centre) is near from SHOP_NEAR, the rest from NEAR", shopsNear)
 check("a shop's front (the road beside its block) is within SHOP_NEAR", Map.Cell / 2 <= L.SHOP_NEAR, Map.Cell / 2)
 local bags = byId.bags
-check("6.6: ZDC Bags says BAGS, near only at its kiosk (not from the spawn)", bags ~= nil and bags.sub == "BAGS" and bags.near < LocationTags.distance(bags, 0, 26), bags and bags.near)
+-- (the spawn: 26 south of the depot's middle, server/World.luau DepotSpawn; 6.11: the depot is Map.Depot)
+check("6.6: ZDC Bags says BAGS, near only at its kiosk (not from the spawn)", bags ~= nil and bags.sub == "BAGS" and bags.near < LocationTags.distance(bags, Map.Depot.x, Map.Depot.z + 26), bags and bags.near)
 local garage = byId.garage_rented
 check("a garage says GARAGE", garage ~= nil and garage.sub == "GARAGE", garage and garage.sub)
 check("an office tower says OFFICES", byId.dispatchtower ~= nil and byId.dispatchtower.sub == "OFFICES")
@@ -128,11 +129,18 @@ check("a place the banner just announced waits its cooldown", action == nil)
 action = L.step(s5, list, 0, 10, L.COOLDOWN + 1, true)
 check("... and then comes", action == "show")
 
--- A walk through the real map: up to the depot, it names it.
+-- A walk through the real map: up to the depot, it names it (6.11: its yard opens to Bone St, south of its middle).
 local s6 = L.new()
 local real = L.build()
-action, t = L.step(s6, real, 0, 60, 0, true)
+action, t = L.step(s6, real, Map.Depot.x, Map.Depot.z + 60, 0, true)
 check("on the street in front of the depot: ZOMBIE DELIVERY CO.", action == "show" and t ~= nil and t.id == "depot", t and t.id)
+-- 6.11: by the pond in the middle, the park names itself (and the safe zone); in front of a shop round it, the shop.
+local park = byId.park
+check("6.11: the Central Park says SAFE ZONE", park ~= nil and park.name == "Central Park" and park.sub == "SAFE ZONE", park and park.sub)
+action, t = L.step(L.new(), real, Map.Park.x, Map.Park.z + 24, 0, true)
+check("6.11: on the path round the pond: CENTRAL PARK", action == "show" and t ~= nil and t.id == "park", t and t.id)
+action, t = L.step(L.new(), real, Map.Park.x, Map.Park.z - 85, 0, true)
+check("6.11: on the kerb in front of Last Stop Supplies, across Bone St from the park: the shop", action == "show" and t ~= nil and t.id == "supplies", t and t.id)
 
 -- ── Where it sits ──────────────────────────────────────────────────────────
 

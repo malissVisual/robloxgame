@@ -144,12 +144,21 @@ local function keys(): { KeyPlace }
 	end
 	local list: { KeyPlace } = {}
 	for _, landmark in Map.Landmarks do
+		-- 6.11: the depot moved from the middle block to Map.Depot (the park is there now): it and its bag kiosk still
+		-- draw from the middle of the safe zone, where they stood, and the park draws nothing of its own, so every line
+		-- keeps its stops (the depot's own block and the blocks round it are special: no stop by them anyway)
+		if landmark.id == Map.Park.id then
+			continue
+		end
+		local yard = landmark.id == "depot" or landmark.id == "bags"
 		local weight = if landmark.id == "depot" then 4
 			elseif landmark.kind == "shop" then 3
 			elseif landmark.kind == "venue" or string.sub(landmark.id, 1, 7) == "garage_" then 1
 			else 2
 		local name = if landmark.id == "depot" then "Depot" else landmark.name
-		table.insert(list, { id = landmark.id, name = name, x = landmark.x, z = landmark.z, weight = weight })
+		local x = if yard then landmark.x - Map.Depot.x + Map.Park.x else landmark.x
+		local z = if yard then landmark.z - Map.Depot.z + Map.Park.z else landmark.z
+		table.insert(list, { id = landmark.id, name = name, x = x, z = z, weight = weight })
 	end
 	for _, d in Map.Districts do
 		table.insert(list, { id = nil, name = nil, x = d.ox + (d.i0 + d.i1) / 2 * Map.Cell, z = d.oz + (d.j0 + d.j1) / 2 * Map.Cell, weight = 1 })

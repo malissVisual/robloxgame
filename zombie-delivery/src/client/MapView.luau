@@ -26,6 +26,8 @@
 -- white arrow. The big map is a charcoal window with the same map.
 -- 5.8 (the courier phone's look): the big map's frame wears the window header: the ZDC mark, the map glyph and MAP
 -- (Ui.heading), the legend in small type after it, a thin line under it and the square ✕.
+-- 6.11: the Central Park (Map.Park) is the one green block, its pond and island drawn in the middle of the map, CENTRAL
+-- PARK under it on the big map; the depot is the block north-east of it (Map.Depot).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -78,6 +80,7 @@ local C = {
 	ice = Color3.fromRGB(52, 58, 66),
 	yard = Color3.fromRGB(48, 52, 58),
 	special = Color3.fromRGB(66, 70, 76),
+	park = Color3.fromRGB(58, 76, 58), -- 6.11: the Central Park's lawns (Map.Park), the one green block
 	roadEdge = Color3.fromRGB(22, 25, 30),
 	road = Color3.fromRGB(132, 138, 146),
 	highway = Color3.fromRGB(176, 181, 188),
@@ -380,10 +383,19 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
 				local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
-				local color = if Map.special(d.id, i, j) then C.special else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
+				local special = Map.special(d.id, i, j)
+				local color = if special == Map.Park.id then C.park elseif special then C.special else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
 				rounded(rect(content, cx - half, cz - half, cx + half, cz + half, scale, color, 3), blockRadius)
 			end
 		end
+	end
+	-- 6.11: the Central Park's pond in the middle of the map (Map.Park; an octagon, drawn round) and its island.
+	do
+		local park = Map.Park
+		local r = park.pond * 1.04
+		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, park.x - r, park.z - r, park.x + r, park.z + r, scale, C.water, 3))
+		local island = park.island
+		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, park.x - island, park.z - island, park.x + island, park.z + island, scale, C.park, 3))
 	end
 	-- Roads: all the plum edges first, then the fills, so the junctions are clean.
 	local border = if big then 1.5 else 3
@@ -418,6 +430,7 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		caption(content, "FROZEN LAKE", (lake.x0 + lake.x1) / 2, lake.z0 - 40, scale, 11, P.ink2)
 		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, P.ink2)
 		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.safe)
+		caption(content, "CENTRAL PARK", Map.Park.x, Map.Park.z + Map.BlockSize / 2 + 30, scale, 10, P.ink2) -- 6.11
 	end
 	-- 5.6, ZDC RIDE: a small marker at every rental dock (shared/RentalDocks.luau), under the fog: found as you uncover
 	-- the map. The scooter's icon when Icons has one, else its emoji.

@@ -11,8 +11,8 @@
 -- uncovers its cell whatever the radius. (The explorer challenges still count the Map.Places you reach:
 -- profile.visited, server/Challenges.luau.)
 --
--- A new player (an empty profile.explored: a new save or one from before 3.7) starts with the depot's area uncovered
--- (Config.Explore.StartHalf), so nobody starts lost.
+-- A new player (an empty profile.explored: a new save or one from before 3.7) starts with the safe zone uncovered
+-- (the park, the depot and the shops round it: Config.Explore.StartHalf), so nobody starts lost.
 --
 -- Remote "Explore", server → client:
 --   ("state", cells, places)   on joining: the save string (shared/Explore.decode reads it) and the known landmarks' ids
@@ -85,7 +85,7 @@ local function commit(player: Player, fresh: { number })
 	end
 end
 
--- The profile is in: its cells, the depot's area for a new player, and the state to the client.
+-- The profile is in: its cells, the safe zone's for a new player, and the state to the client.
 local function onLoaded(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile or states[player] then

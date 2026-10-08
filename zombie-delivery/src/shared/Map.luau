@@ -2,7 +2,9 @@
 -- The layout of the world, as plain numbers (x, z on the ground; -Z is north on the map). The server builds it
 -- (server/World.luau), the client draws it (client/MapView.luau) and both ask it where the roads are.
 --
---   Downtown   a 9 x 9 grid of blocks around the depot, the shops in the four blocks next to it (the safe zone)
+--   Downtown   a 9 x 9 grid of blocks around the Central Park (6.11: the middle block, a pond in the very middle of the
+--              map, Map.Park), the shops in the four blocks next to it (the safe zone), the depot north-east of it
+--              on block (1, -1) (6.11: Map.Depot; it stood on the middle block before)
 --   Harbor     east, across the river (Rust Bridge, Old Bridge), docks on the sea
 --   Suburbs    south, little houses
 --   Highways   north to the Gas Station, through the mountain tunnel to the Military Base;
@@ -10,7 +12,7 @@
 --   Riverside  the Riverside Riding School by the river, down Riding School Lane from the Suburbs
 --   Harbor     the Harbor Fuel Depot south of the warehouses
 --   Downtown   the First Zombie Bank just north of the safe zone (on 6th Ave, the way to the North Highway) and
---              the City Clinic south-west of the depot
+--              the City Clinic south-west of the park
 --   Real estate (Config.Estate, Map.EstatePlots), spread over the map: the Hilltop Mansion in Sunset Hills above the
 --              city (up the winding Sunset Drive, north-east of Downtown), Ocean View on the sea cliffs north of the
 --              Harbor, Pinecrest in the pines off the West Highway, the Lakeside Villa by the frozen lake, the Sunset
@@ -29,7 +31,9 @@
 --   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
 --   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St
 --   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn
---   Gas        (5.4) the gas stations (Map.GasStations): the old one on the North Highway and three on the town's lots
+--   Park       (6.11) the Central Park (Map.Park, server/CentralPark.luau): the pond with its island and fountain, the
+--              paths, trees, flowerbeds, benches, lamps and a gazebo, on the middle block in the safe zone
+--   Gas       (5.4) the gas stations (Map.GasStations): the old one on the North Highway and three on the town's lots
 --   Places     (5.3) what stands on every lot of the ordinary Downtown and Suburbs blocks (Map.lots, seeded: towers,
 --              lawns, parking, houses ...), the storefronts the businesses work from (Map.Venues: Luigi's Pizza, the
 --              Daily Bread Bakery, the Post Office ... and the older pharmacy, FreshMart, bank, Frosty's, warehouse) and
@@ -170,10 +174,11 @@ Map.Districts = {
 	},
 } :: { District }
 
--- Blocks that are not ordinary city blocks: the depot, the shops and the employers' buildings.
+-- Blocks that are not ordinary city blocks: the park, the depot, the shops and the employers' buildings.
 Map.SpecialBlocks = {
 	downtown = {
-		["0,0"] = "depot",
+		["0,0"] = "park", -- 6.11: the Central Park (Map.Park), where the depot stood
+		["1,-1"] = "depot", -- 6.11: the depot (Map.Depot), where four plain towers stood (Map.FormerBlocks)
 		["1,0"] = "dealer",
 		["-1,0"] = "guns",
 		["0,1"] = "mechanic",
@@ -185,7 +190,7 @@ Map.SpecialBlocks = {
 		["1,1"] = "parking", -- Downtown Parking (a garage), in the safe zone
 		["-1,1"] = "bikes", -- 5.1, Spoke & Chain Cycles (Map.Shops.bikes): its door on Main St, in the safe zone
 		-- 3.0, the missions' places in town (all just outside the safe zone):
-		["0,-3"] = "cityhall", -- City Hall: north of the depot, its steps down to the street in front (south)
+		["0,-3"] = "cityhall", -- City Hall: north of the park, its steps down to the street in front (south)
 		["-2,-2"] = "police", -- Precinct 13: its front and the patrol cars on the street to the south
 		["2,-1"] = "firestation", -- Fire Station 9: the truck bays open to the avenue on the east
 		["1,3"] = "pharmacy", -- the Corner Pharmacy: its door on the street to the north
@@ -207,16 +212,60 @@ function Map.special(districtId: string, i: number, j: number): string?
 	return if blocks then blocks[`{i},{j}`] else nil
 end
 
+-- 6.11: the special blocks that were ordinary blocks before (Harbor Gas, 5.4; the depot's, 6.11). Whatever rolls its
+-- dice block by block (Map.addresses, Map.makeLots, shared/RentalDocks.luau, shared/Shortcuts.luau, the towers in
+-- server/World.luau) still rolls theirs and keeps nothing there, so every other block stays as it was.
+Map.FormerBlocks = {
+	downtown = { ["1,-1"] = true },
+	harbor = { ["0,0"] = true },
+} :: { [string]: { [string]: boolean } }
+
+function Map.wasOrdinary(districtId: string, i: number, j: number): boolean
+	local blocks = Map.FormerBlocks[districtId]
+	return blocks ~= nil and blocks[`{i},{j}`] == true
+end
+
+-- 6.11, the depot (the owner: "move the houses elsewhere"): the spawn, the job board, the garage terminal, Marge, the
+-- scooter rack and the ZDC Bags kiosk, on Downtown block (1, -1) north-east of the park, laid out as on the middle block
+-- before: the hall at the back (north), the yard open to Bone St (south), the park's corner across the junction. Every
+-- spot of it is given from its middle (x, z): World.DepotSpawn, Config.Tutorial.NpcSpot, Config.Goal.BoardSpot,
+-- Config.BagShop, Config.Rental.SpawnRack.
+export type Depot = { i: number, j: number, x: number, z: number }
+Map.Depot = { i = 1, j = -1, x = CELL, z = -CELL } :: Depot
+
+-- 6.11, the Central Park (the owner: "the middle of the map, where the safe zone is, nice: nature, some water in the
+-- middle, a park ... so people remember where the safe zone is and where all the shops are") on the middle block (0, 0),
+-- the shops all round it. server/CentralPark.luau builds it, client/MapView.luau draws it. In studs from its middle:
+--   pond    the pond, a regular octagon (its flat sides to the four streets), `pond` from the middle to a flat side;
+--           real water (Terrain) from the ground's 0 down `depth` (the walk is Map.WalkTop over it), a stone coping
+--   island  the island in the pond's middle (its radius): the fountain, a footbridge to it from the south
+--   ring    the path round the pond (this wide, outside the coping); paths from it to the middles of the four sides
+--           and to the four corners
+--   walk    the sidewalk round the block's edge (this wide): the people's walk line on it as on every block, nothing
+--           solid on it (no fence: the park is open all round)
+--   seed    the park's own dice (the trees' sizes and shades): the world's random numbers are not touched
+export type Park = { id: string, name: string, i: number, j: number, x: number, z: number, pond: number, depth: number, island: number, ring: number, walk: number, seed: number }
+Map.Park = { id = "park", name = "Central Park", i = 0, j = 0, x = 0, z = 0, pond = 19, depth = 4, island = 6.5, ring = 4.5, walk = 10, seed = Config.City.Seed + 611 } :: Park
+
+-- 6.11 review: is (x, y, z) in the park's pond: inside its octagon (flat sides `pond` from the middle, to the streets
+-- and to the corners) and lower than the walk? server/Vehicles.luau sinks a vehicle there (its coping is low enough for
+-- a car's wheels to roll over, and the pond's floor is above the usual "sank" depth).
+function Map.inPond(x: number, y: number, z: number): boolean
+	local park = Map.Park
+	local dx, dz = math.abs(x - park.x), math.abs(z - park.z)
+	return y < Map.WalkTop and dx <= park.pond and dz <= park.pond and (dx + dz) <= park.pond * math.sqrt(2)
+end
+
 -- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else
 -- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius).
 Map.Shops = {
-	depot = { name = "Depot Garage", x = 0, z = 0 }, -- (6.7: the garage terminal, not a shop: it sells nothing, no shop window)
+	depot = { name = "Depot Garage", x = Map.Depot.x, z = Map.Depot.z }, -- (6.7: the garage terminal, not a shop: it sells nothing, no shop window)
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
 	guns = { name = "Lead & Co.", x = -CELL, z = 0 },
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
 	supplies = { name = "Last Stop Supplies", x = 0, z = -CELL },
 	bikes = { name = "Spoke & Chain", x = -CELL, z = CELL }, -- 5.1: bikes and bike gear (Config.BikeShop)
-	bags = { name = Config.BagShop.Name, x = Config.BagShop.X, z = Config.BagShop.Z, radius = Config.BagShop.Radius }, -- 6.6: the bags
+	bags = { name = Config.BagShop.Name, x = Map.Depot.x + Config.BagShop.X, z = Map.Depot.z + Config.BagShop.Z, radius = Config.BagShop.Radius }, -- 6.6: the bags (6.11: in the depot's yard, wherever the depot is)
 } :: { [string]: { name: string, x: number, z: number, radius: number? } }
 Map.ShopRadius = 80
 
@@ -263,7 +312,7 @@ Map.Yards = {
 
 -- 5.0, Earl's Used Wheels (Config.VanQuest, server/VanQuest.luau): where Earl's old van stands for sale (x, z, facing
 -- the highway: its nose to the road), where Earl stands (earl) and where the van you buy from him is parked for you
--- (parking, beside the one for sale, facing the road too). About 1,600 studs west of the depot: a trip.
+-- (parking, beside the one for sale, facing the road too). About 1,700 studs west of the depot: a trip.
 export type VanSeller = { x: number, z: number, facing: { x: number, z: number }, earl: { x: number, z: number }, parking: { x: number, z: number } }
 Map.VanSeller = {
 	x = -1592,
@@ -703,8 +752,8 @@ do
 		{ "lastbite", "burgers", "Last Bite Burgers", "burgers", "BURGERS", "🍔", "Downtown, west, on 3rd Ave. Burgers and fries, every one could be your last.", "downtown", -2, -1, 0, 1, -1, 0 },
 		{ "wokdead", "noodles", "Wok Dead", "noodles", "NOODLES", "🍜", "Downtown, east, on Main St. Noodles in a box, hot from the wok.", "downtown", 3, 1, 1, 0, 0, -1 },
 		{ "grindhouse", "cafe", "Grind House", "cafe", "CAFE · COFFEE", "☕", "The Suburbs, on Willow Ln, the first street from town. Coffee and pastries.", "suburbs", 0, 0, 0, 0, 0, -1 },
-		{ "postoffice", "post", "Post Office", "postoffice", "MAIL · PARCELS", "📮", "Downtown, south of the depot, on Ash St. Letters and parcels for every door.", "downtown", 0, 2, 1, 1, 0, 1 },
-		{ "dailyundead", "news", "The Daily Undead", "news", "PRINT SHOP · NEWSSTAND", "📰", "Downtown, north of the depot, on 5th Ave. The morning paper, still printed.", "downtown", 0, -2, 0, 0, -1, 0 },
+		{ "postoffice", "post", "Post Office", "postoffice", "MAIL · PARCELS", "📮", "Downtown, south of the park, on Ash St. Letters and parcels for every door.", "downtown", 0, 2, 1, 1, 0, 1 },
+		{ "dailyundead", "news", "The Daily Undead", "news", "PRINT SHOP · NEWSSTAND", "📰", "Downtown, north of the park, on 5th Ave. The morning paper, still printed.", "downtown", 0, -2, 0, 0, -1, 0 },
 		{ "boltnail", "hardware", "Bolt & Nail Hardware", "hardware", "HARDWARE", "🔨", "Downtown, far west, on 2nd Ave. Tools, nails, planks: everything to board up a house.", "downtown", -3, 2, 0, 1, -1, 0 },
 		{ "volt", "electronics", "Volt Electronics", "electronics", "ELECTRONICS", "📻", "Downtown, north-east, on 8th Ave. Radios, batteries, parts.", "downtown", 3, -2, 0, 0, -1, 0 },
 		{ "secondlife", "pawnshop", "Second Life Pawn", "pawnshop", "PAWN SHOP", "💰", "Downtown, far north-west, on Grave St. Vinnie buys and sells anything. Ammo too.", "downtown", -3, -3, 1, 1, 0, 1 },
@@ -937,12 +986,14 @@ export type Landmark = { id: string, name: string, icon: string, x: number, z: n
 -- Everything worth driving to, for the map's list and the GPS. 6.7: every shop's line says what it really sells; the
 -- depot sells nothing (its Depot Garage is the garage terminal: client/MapView.luau lists it on its own, not as a shop).
 local landmarks: { Landmark } = {
-	{ id = "depot", name = "Depot (your company)", icon = "📦", x = 0, z = 0, kind = "shop", description = "Your company: the job board, Marge, the garage terminal (your parked van, the company vehicles) and the ZDC Bags kiosk by the spawn. The safe zone." },
+	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the job board, Marge, the garage terminal (your parked van, the company vehicles) and the ZDC Bags kiosk by the spawn. The safe zone." },
+	-- 6.11: the Central Park in the middle of the safe zone (Map.Park).
+	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it. The depot is across the junction to the north-east." },
 	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4). Every car needs a garage slot." },
 	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Guns from the SMG up (your pistol is the starter), the gun upgrades (Gun Damage, Fire Rate) and a baseball bat." },
 	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Your car's stages, car upgrades, gear, paint and car guns, and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
-	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Config.BagShop.X, z = Config.BagShop.Z, kind = "shop", description = "Bags: sprint with your deliveries. A kiosk in the depot's yard, by the spawn." }, -- 6.6
+	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Map.Shops.bags.x, z = Map.Shops.bags.z, kind = "shop", description = "Bags: sprint with your deliveries. A kiosk in the depot's yard, by the spawn." }, -- 6.6
 	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = 0, z = -CELL, kind = "shop", description = "Items: medkits, energy drinks, molotovs, and for a car repair kits, nitro, landmines, jerry cans. Vests (the Courier Vest, Kevlar, heavy armour) and running shoes." },
 	-- 5.1: the bike shop (Config.BikeShop).
 	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), from level 2, on Main St: faster than walking and more room for the light runs." },
@@ -958,7 +1009,7 @@ local EMPLOYER_WHERE: { [string]: string } = {
 	farm = "At the end of the West Highway.",
 	ranch = "Off the West Highway, down the Ranch Road.",
 	gas = "On the North Highway.",
-	clinic = "Downtown, south-west of the depot.",
+	clinic = "Downtown, south-west of the park.",
 }
 for _, employer in Config.Employers do
 	local spot = Map.EmployerSpots[employer.id]
@@ -1002,12 +1053,12 @@ for _, info in {
 	{ "fueldepot", "🛢️", "South of the Harbor. Fuel barrels for the Gas Station." },
 	{ "bank", "🏦", "Downtown, just north of the safe zone. The cash transports load here." },
 	-- 3.0, the missions' places
-	{ "pharmacy", "💊", "Downtown, south of the depot. Pills, bandages and the last vaccines in town." },
-	{ "market", "🛒", "Downtown, west of the depot. FreshMart: not so fresh any more, but still open." },
+	{ "pharmacy", "💊", "Downtown, south of the park. Pills, bandages and the last vaccines in town." },
+	{ "market", "🛒", "Downtown, west of the park. FreshMart: not so fresh any more, but still open." },
 	{ "warehouse", "📦", "In the Harbor. Roller doors, forklifts and crates of everything." },
-	{ "firestation", "🚒", "Downtown, east of the depot. Fire Station 9: red trucks, brave crews." },
-	{ "police", "🚓", "Downtown, north-west of the depot. Precinct 13: what is left of the law." },
-	{ "cityhall", "🏛️", "Downtown, north of the depot. The mayor still holds office here." },
+	{ "firestation", "🚒", "Downtown, east of the depot, across 7th Ave. Fire Station 9: red trucks, brave crews." },
+	{ "police", "🚓", "Downtown, north-west of the park. Precinct 13: what is left of the law." },
+	{ "cityhall", "🏛️", "Downtown, north of the park. The mayor still holds office here." },
 	{ "airfield", "✈️", "Far south-west, down the Airfield Road off the West Highway. A runway and an old plane." },
 	{ "powerplant", "⚡", "South of the Harbor. The chimneys that keep the city's lights on." },
 	{ "waterworks", "💧", "By the river, south-east of Downtown. Clean water for everybody." },
@@ -1048,7 +1099,7 @@ do
 	local dispatchX, dispatchZ = towerDoor(Map.Towers.dispatchtower)
 	local harborX, harborZ = towerDoor(Map.Towers.harborpoint)
 	table.insert(landmarks, { id = "sunsethills", name = "Sunset Hills", icon = "🏡", x = 600, z = -900, kind = "place", description = "Above the city, north-east of Downtown: the winding Sunset Drive up to the Hilltop Mansion, the whole city at your feet. A home to spawn at and a garage for eight." })
-	table.insert(landmarks, { id = "dispatchtower", name = "Dispatch Tower", icon = "🏢", x = dispatchX, z = dispatchZ, kind = "place", description = "Downtown, by the depot. Offices for sale on the 8th floor and the penthouse: run your own delivery company. Take the elevator in the lobby." })
+	table.insert(landmarks, { id = "dispatchtower", name = "Dispatch Tower", icon = "🏢", x = dispatchX, z = dispatchZ, kind = "place", description = "Downtown, by the park, two blocks west of the depot. Offices for sale on the 8th floor and the penthouse: run your own delivery company. Take the elevator in the lobby." })
 	table.insert(landmarks, { id = "harborpoint", name = "Harbor Point", icon = "🏙️", x = harborX, z = harborZ, kind = "place", description = "In the Harbor, by the docks. An office for sale on the 7th floor: start your own delivery company. Take the elevator in the lobby." })
 	local WHERE: { [string]: string } = {
 		oceanview = "On the sea cliffs north of the Harbor, up Cliff Road.",
@@ -1276,9 +1327,9 @@ function Map.addresses(): { Address }
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
 				-- (5.4: a gas station's special block rolls its dice like the ordinary block it was, so every other
-				-- block's addresses stay as they were, and holds none)
+				-- block's addresses stay as they were, and holds none; 6.11: so does the depot's, Map.FormerBlocks)
 				local special = Map.special(d.id, i, j)
-				if special and special ~= "gas" then
+				if special and not Map.wasOrdinary(d.id, i, j) then
 					continue
 				end
 				local first = math.floor(rand() * 4) + 1
@@ -1376,9 +1427,12 @@ Map.FreeRadius = 30
 Map.ParkGap = 12 -- 5.5: no two homes' parks closer than this (every tower facing a street: the parks fill up)
 
 -- Lays out every lot and home (fresh tables each call: the same every time; Map.AllLots / Map.Homes hold the one made
--- when the module loads).
-function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
+-- when the module loads). 6.11: the third result are the lots a block that was ordinary had (Map.FormerBlocks: the
+-- depot's four towers), laid out with the same dice but with no homes; nothing stands on them any more, but whatever
+-- rolled dice for them still does (server/World.luau's towers), so every other block stays as it was.
+function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home }, { [string]: { [string]: { Lot } } })
 	local districtLots: { [string]: { [string]: { Lot } } } = { downtown = {}, suburbs = {}, harbor = {} }
+	local formerLots: { [string]: { [string]: { Lot } } } = { downtown = {}, suburbs = {}, harbor = {} }
 	local homes: { Home } = {}
 	local venueAt: { [string]: Venue } = {}
 	-- 5.4: the rows of lots the gas stations stand on (Map.GasStations): both lots of the row are the station's.
@@ -1516,11 +1570,17 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 		local span = math.max(d.i1 - d.i0, d.j1 - d.j0) / 2 + 1
 		for i = d.i0, d.i1 do
 			for j = d.j0, d.j1 do
-				if Map.special(d.id, i, j) then
+				-- (6.11: a block that was ordinary rolls its lots' dice as before, into formerLots)
+				local former = Map.wasOrdinary(d.id, i, j)
+				if Map.special(d.id, i, j) and not former then
 					continue
 				end
 				local list: { Lot } = {}
-				districtLots[d.id][`{i},{j}`] = list
+				if former then
+					formerLots[d.id][`{i},{j}`] = list
+				else
+					districtLots[d.id][`{i},{j}`] = list
+				end
 				local centerFactor = 1 - math.max(math.abs(i), math.abs(j)) / span
 				for a = 0, 1 do
 					for b = 0, 1 do
@@ -1565,7 +1625,7 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 								lot.h = 16 + h * 18 + 55 * centerFactor * ((seed % 1000) / 1000)
 								-- 5.5: every tower that can face a street is an apartment building (its people:
 								-- shared/Residents.luau); one with no free street stays a plain tower
-								local facing = pickFacing(d, lot, side < 0.5)
+								local facing = if former then nil else pickFacing(d, lot, side < 0.5)
 								if facing then
 									lot.kind = "apartment"
 									lot.facing = facing
@@ -1586,7 +1646,7 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 								end
 							end
 							if lot.kind ~= "estate" then
-								local facing = if roll < 0.85 then pickFacing(d, lot, side < 0.5) else nil
+								local facing = if roll < 0.85 and not former then pickFacing(d, lot, side < 0.5) else nil
 								if facing then
 									lot.kind = "house"
 									lot.facing = facing
@@ -1603,9 +1663,9 @@ function Map.makeLots(): ({ [string]: { [string]: { Lot } } }, { Home })
 			end
 		end
 	end
-	return districtLots, homes
+	return districtLots, homes, formerLots
 end
-Map.AllLots, Map.Homes = Map.makeLots()
+Map.AllLots, Map.Homes, Map.FormerLots = Map.makeLots()
 
 -- The lots of a district's ordinary blocks, by block ("i,j": its four lots); a district without lots: empty.
 function Map.lots(districtId: string): { [string]: { Lot } }
@@ -1615,6 +1675,13 @@ end
 -- The four lots of block (i, j) (empty: a special block, or a district without lots).
 function Map.lotsAt(districtId: string, i: number, j: number): { Lot }
 	local lots = Map.AllLots[districtId]
+	return if lots then lots[`{i},{j}`] or {} else {}
+end
+
+-- 6.11: the lots block (i, j) had while it was ordinary (Map.FormerBlocks; empty for any other block). Nothing stands
+-- on them: only their dice are still rolled.
+function Map.formerLotsAt(districtId: string, i: number, j: number): { Lot }
+	local lots = Map.FormerLots[districtId]
 	return if lots then lots[`{i},{j}`] or {} else {}
 end
 

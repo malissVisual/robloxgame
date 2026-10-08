@@ -109,7 +109,9 @@ function Shortcuts.alleys(): { Alley }
 	local candidates: { Candidate } = {}
 	for i = d.i0, d.i1 do
 		for j = d.j0, d.j1 do
-			if Map.special(d.id, i, j) then
+			-- (6.11: a special block that was ordinary, the depot's, rolls its dice as before and holds no alley)
+			local special = Map.special(d.id, i, j)
+			if special and not Map.wasOrdinary(d.id, i, j) then
 				continue
 			end
 			local lots: { [string]: Map.Lot } = {}
@@ -120,6 +122,9 @@ function Shortcuts.alleys(): { Alley }
 			local half = BLOCK / 2
 			-- (every block rolls the same dice, whatever it holds)
 			local rolls = { rand(), rand(), rand(), rand() }
+			if special then
+				continue
+			end
 			for n = 1, 4 do
 				-- n 1, 2: the columns a = 0, 1 (the path along Z); n 3, 4: the rows b = 0, 1 (along X)
 				local alongX = n > 2

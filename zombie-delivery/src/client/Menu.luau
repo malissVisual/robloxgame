@@ -26,10 +26,11 @@ local infoLabel: any = nil
 local flying = false
 local lastState: any = nil
 
--- Camera stops around the depot (close enough to be streamed in), looped.
+-- Camera stops around the depot (close enough to be streamed in), looped. 6.11: the Central Park's pond in the middle
+-- first, then over it to the depot north-east of it (Map.Park, Map.Depot).
 local SHOTS = {
-	{ Vector3.new(-260, 70, 300), Vector3.new(0, 10, 0) },
-	{ Vector3.new(260, 50, 260), Vector3.new(100, 5, -60) },
+	{ Vector3.new(-200, 60, 230), Vector3.new(0, 6, 0) },
+	{ Vector3.new(-30, 34, 70), Vector3.new(144, 18, -150) },
 	{ Vector3.new(560, 45, 140), Vector3.new(840, 0, 72) },
 	{ Vector3.new(300, 110, -420), Vector3.new(0, 0, -150) },
 	{ Vector3.new(-420, 40, -200), Vector3.new(-200, 5, 0) },

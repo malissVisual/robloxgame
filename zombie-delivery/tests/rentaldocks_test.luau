@@ -133,7 +133,8 @@ for _, dock in docks do
 	check(`{dock.id}: clear of the zip lines' ladders`, ladder >= tuning.Clear, ladder)
 end
 
--- Spread out (6.3: the spawn's rack aside, in the safe zone), and the one by the depot.
+-- Spread out (6.3: the spawn's rack aside, in the safe zone), and the one by the depot (the first on the kerbs, nearest
+-- the middle of the safe zone: 6.11, the park's; the depot has its rack).
 local closest = math.huge
 for n, a in docks do
 	for m, b in docks do
@@ -150,26 +151,28 @@ print(string.format("  by the depot: %s, %.0f studs out of the safe zone", byDep
 check("the depot's dock just outside the safe zone", outside > 0 and outside < 40, outside)
 
 -- 6.3: the rack at the spawn: the first dock, the only one in the safe zone, in the depot's yard within 30 studs of
--- the spawn (server/World.luau's DepotSpawn: 0, 26, a 10 × 10 pad) and more than 8 clear of the pad, behind it (the
--- shed, the job board and Marge are in front), its scooters side by side facing the yard's open south edge.
+-- the spawn (server/World.luau's DepotSpawn: 26 south of the depot's middle, a 10 × 10 pad; 6.11: the depot is
+-- Map.Depot) and more than 8 clear of the pad, behind it (the shed, the job board and Marge are in front), its scooters
+-- side by side facing the yard's open south edge.
 do
 	local rack = docks[1]
 	local spec = tuning.SpawnRack
 	check("one spawn rack, the first dock", spawns == 1 and rack.spawn and not rack.depot and rack.id == "dock1")
 	check("the spawn rack holds its scooters", #rack.slots == spec.slots and spec.slots >= 4, #rack.slots)
-	local spawnX, spawnZ, pad = 0, 26, 5
+	local ox, oz = Map.Depot.x, Map.Depot.z
+	local spawnX, spawnZ, pad = ox, oz + 26, 5
 	local farthest, padGap, offBlock = 0, math.huge, false
 	local d, i, j = Map.blockAt(rack.x, rack.z)
-	check("the spawn rack stands on the depot's block", d ~= nil and Map.special(d.id, i, j) == "depot")
+	check("the spawn rack stands on the depot's block", d ~= nil and Map.special(d.id, i, j) == "depot" and i == Map.Depot.i and j == Map.Depot.j)
 	for n, slot in rack.slots do
 		farthest = math.max(farthest, math.sqrt((slot.x - spawnX) ^ 2 + (slot.z - spawnZ) ^ 2))
 		-- (the scooter's body: a stud and a half each side, 2.5 ahead and behind)
 		local gapX = math.max(0, math.abs(slot.x - spawnX) - pad - 1.5)
 		local gapZ = math.max(0, math.abs(slot.z - spawnZ) - pad - 2.5)
 		padGap = math.min(padGap, math.sqrt(gapX * gapX + gapZ * gapZ))
-		offBlock = offBlock or math.abs(slot.x) > half - 6 or math.abs(slot.z) > half - 6 or Map.onRoad(slot.x, slot.z)
+		offBlock = offBlock or math.abs(slot.x - ox) > half - 6 or math.abs(slot.z - oz) > half - 6 or Map.onRoad(slot.x, slot.z)
 		check(`spawn rack slot {n}: in the safe zone`, Map.isSafe(slot.x, slot.z))
-		check(`spawn rack slot {n}: behind the spawn pad, out of the shed's way`, slot.z > spawnZ + pad and slot.z > -9 + 20)
+		check(`spawn rack slot {n}: behind the spawn pad, out of the shed's way`, slot.z > spawnZ + pad and slot.z - oz > -9 + 20)
 		if n > 1 then
 			local prev = rack.slots[n - 1]
 			check(`spawn rack slot {n}: side by side with the one before`, math.abs(slot.x - prev.x - spec.pitch) < 1e-6 and slot.z == prev.z)
