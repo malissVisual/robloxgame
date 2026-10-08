@@ -370,10 +370,13 @@ with their **portrait** (`client/Portrait.luau`: a bust of their NPC, dressed fr
 ViewportFrame over the chapter's colour), the name, the role and the place, the progress "2 / 6", or why it is shut
 ("🔒 Level 6", "🔒 Finish Raj's chapter first"), and NEW / ✓ DONE / 🤝 DUO badges. On the right the chosen client big:
 the portrait, the name, the role, the pitch; the **action card** with the next mission (the briefing in the client's
-words, the route, the twists, the pay: "FIRST TIME · ≈ $1,220 + 540 XP" or "REPLAY · ≈ $300") and a big **START**;
-**THE STORY**: the six missions as a path (✓ done, ▶ next, 🔒 locked: "Finish 'X' first" / "Level 7"), each with a
-one-line description and its pay; then the finale's reward with its picture. A small screen (a phone held sideways)
-stacks the clients as a strip on top of the chapter. A member of somebody else's crew sees "Your crew leader picks the
+words, the route, the twists, what the pay is made of); **THE STORY**: the six missions as a path (✓ done, ▶ next, 🔒
+locked: "Finish 'X' first" / "Level 7"), each with a one-line description and its pay; then the finale's reward with
+its picture. Under the chapter, never scrolled away (6.8 review), the **action bar**: the pay ("FIRST TIME · ≈ $1,220 +
+540 XP" or "REPLAY · ≈ $300"), why START would be refused, FIND CREW on a co-op or DUO mission and a big **START** (GO TO
+<client> for a shut chapter). A small screen (a phone held sideways) stacks the clients as a strip on top of the
+chapter, with a smaller hero portrait. With a gamepad START is selected on opening and the selection stays put when the
+server's state comes (a page that did not change is not drawn again) or a client or a step is chosen. A member of somebody else's crew sees "Your crew leader picks the
 mission"; the mission starts right where you are; a NIGHT ONLY one starts only after dark.
 
 **The order** (`Missions.unlocked` / `statusOf` / `nextUp` / `chapterState`): in a chapter only the **next** mission
@@ -1197,8 +1200,9 @@ the real window against recorded instances (`tools/phone-ui/missions.luau`).
 Test in Studio: open U at level 4 with the van: Marge's chapter chosen, START on Paper Trail; finish it (the cleared
 card: FIRST CLEAR!, the reward, NEXT); replay it (REPLAY · $X on the card and in the DELIVERY result: a quarter); a
 locked step's "Finish 'X' first"; Ellie's card "🔒 Finish Marge's chapter first"; the portraits (Marge, Chief Carlos's
-helmet, the twins side by side) in the list and big; a phone sideways (the clients on top); a gamepad (START
-selected, the cards and the steps reachable); MORE → MISSIONS on the phone; the admin's missionsAll / missionsReset.
+helmet, the twins side by side) in the list and big; a phone sideways (the clients on top, START in view); a gamepad
+(START selected and still selected a second later, the cards and the steps reachable and kept selected when chosen);
+MORE → MISSIONS on the phone; the admin's missionsAll / missionsReset.
 ## The shops cleaned up: the vest's tips, car-only items, the bat and the energy drink (6.7)
 
 The owner: "In the shop there are useless things. Go through it, delete them, make it better, add or remove."
@@ -1303,8 +1307,10 @@ that you take one job, and you either say yes or skip tutorial. But don't automa
   NEXT › and SKIP TUTORIAL. The NEXT card, PHONE [Q], then the phone opens by itself for JOBS, MAP, SHOP and BAG & ITEMS,
   it goes away for the bottom bar (1 fists, 2 bag, 3 gun, 4–8 items), then the minimap (M). Nothing stops: you can
   walk meanwhile. It follows its target every frame (a phone sliding in, a HUD laid out again); `TutorialSteps.placeArrow`
-  (tested) picks the side with room. Enter or a gamepad's A is NEXT (Space still jumps), touch taps. Close the phone
-  during its stops and the tour moves on past them; take a job meanwhile and it ends quietly.
+  (tested) picks the side with room. Enter is NEXT (Space still jumps), touch taps; a gamepad's Y is NEXT (the caption
+  says "Y"; 6.8 review: A jumps, and NEXT is selected only at the phone's stops, so the stick walks the rest of the
+  tour). Close the phone during its stops and the tour moves on past them; take a job meanwhile and it ends quietly (and
+  if the arrow ever fails, the tour ends instead of half-running).
 - **No automatic job:** the last page asks "Ready? Take your first job" with **TAKE A JOB** (the phone opens on JOBS,
   you pick any job) or SKIP TUTORIAL. Then nothing of hers during play: the **first delivery of any job** pays the $50
   (`Config.Tutorial.Reward`) with a "First delivery! +$50 from Marge." toast; a failed one just goes back to "Take your

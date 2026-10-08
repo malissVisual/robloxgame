@@ -14,13 +14,14 @@
 --   * The target is found by Point.find a few times a second while it is gone (by name: no tree walks a frame);
 --     hidden (its ScreenGui off, a parent not Visible) or off the screen, the arrow and the frame hide and the caption
 --     waits at the top centre, so NEXT and SKIP are always there.
---   * Keys: Enter (and a gamepad's A) is NEXT, not Space (you can still jump); a gamepad's selection sits on NEXT. A
---     touch screen taps (the caption a finger tall, at least 0.8 of its size).
+--   * Keys: Enter is NEXT, not Space (you can still jump). A touch screen taps (the caption a finger tall, at least 0.8
+--     of its size). 6.8 review, a gamepad: Y is NEXT (the caption's key says "Y" while a gamepad is in use) and A is
+--     left alone, so it jumps; the gamepad's selection sits on NEXT only at the stops that open the phone (a point's
+--     `select`: the phone is a menu anyway, A presses NEXT there), elsewhere nothing is selected and the stick walks.
 --   * Drawn with frames (nothing to upload): a shaft and a chevron head in the ZDC red over a charcoal outline, drawn
 --     pointing down and turned by Rotation for the other three directions.
 
 local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -45,6 +46,7 @@ export type Point = {
 	skip: string, -- the quiet action's words ("SKIP TUTORIAL")
 	onNext: () -> (),
 	onSkip: () -> (),
+	select: boolean?, -- 6.8 review: the gamepad's selection on NEXT (the phone's stops); else none (the stick walks)
 }
 
 local K = Theme.Contract
@@ -187,7 +189,7 @@ local function buildCaption(gui: Instance)
 		Padding = UDim.new(0, 8),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, right)
-	Ui.label(right, if TOUCH then "" else "ENTER", UDim2.fromOffset(0, ACTION_H), {
+	refs.key = Ui.label(right, if TOUCH then "" else "ENTER", UDim2.fromOffset(0, ACTION_H), {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Font = Theme.MonoFont,
 		TextSize = 11,
@@ -287,6 +289,10 @@ local function look(now: number)
 		target = found
 	end
 	targetShown = found ~= nil and onScreen(found)
+	-- 6.8 review: NEXT's key as it is now (a gamepad's Y, else Enter; a touch screen names none)
+	local pad = Ui.gamepadActive()
+	refs.key.Text = if pad then "Y" elseif TOUCH then "" else "ENTER"
+	refs.key.Visible = pad or not TOUCH
 	local s = Ui.screenScale()
 	if TOUCH then
 		-- (like Marge's dialog: readable on a phone, never wider than the screen)
@@ -349,13 +355,11 @@ end
 
 -- ── Keys ───────────────────────────────────────────────────────────────────
 
--- Enter / a gamepad's A: NEXT (A over a selected button presses that button: the selection sits on NEXT).
-local function onKey(_: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+-- Enter / a gamepad's Y: NEXT. 6.8 review: not A (it sank the jump the whole tour); at the phone's stops A presses the
+-- selected NEXT itself.
+local function onKey(_: string, state: Enum.UserInputState): Enum.ContextActionResult
 	local point = current
 	if not point or UserInputService:GetFocusedTextBox() then
-		return Enum.ContextActionResult.Pass
-	end
-	if input.KeyCode == Enum.KeyCode.ButtonA and GuiService.SelectedObject ~= nil then
 		return Enum.ContextActionResult.Pass
 	end
 	if state == Enum.UserInputState.Begin and os.clock() - shownAt > GUARD then
@@ -371,7 +375,7 @@ local function bind(on: boolean)
 	bound = on
 	if on then
 		-- (under client/DialogKeys.luau's priority: a dialog that opens over the tour takes the keys first)
-		ContextActionService:BindActionAtPriority(ACTION, onKey, false, Enum.ContextActionPriority.High.Value + 5, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter, Enum.KeyCode.ButtonA)
+		ContextActionService:BindActionAtPriority(ACTION, onKey, false, Enum.ContextActionPriority.High.Value + 5, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter, Enum.KeyCode.ButtonY)
 	else
 		ContextActionService:UnbindAction(ACTION)
 	end
@@ -405,12 +409,18 @@ function TutorialArrow.show(point: Point)
 		end)
 	end
 	update()
-	TutorialArrow.focus()
+	if point.select then
+		TutorialArrow.focus()
+	else
+		Ui.gamepadRelease(refs.gui) -- 6.8 review: (NEXT kept from a phone stop) the stick walks again, A jumps
+	end
 end
 
--- A gamepad's selection back on NEXT (the phone that opens puts it on its first tile).
+-- A gamepad's selection back on NEXT (the phone that opens puts it on its first tile). 6.8 review: only at a stop
+-- that asks for it (`select`: the phone's).
 function TutorialArrow.focus()
-	if current and refs.next then
+	local point = current
+	if point and point.select and refs.next then
 		Ui.gamepadFocus(refs.next)
 	end
 end

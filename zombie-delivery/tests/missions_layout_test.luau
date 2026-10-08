@@ -39,6 +39,13 @@ for _, screen in SCREENS do
 	else
 		check(`{screen.name}: wide: the column and the chapter side by side, a hero portrait`, layout.width - layout.listW >= 560 and page >= 400 and layout.heroH <= page, `{layout.width - layout.listW} × {page}`)
 	end
+	-- 6.8 review: START in view (it sat under the fold at 1280 × 720, two screens down on a phone): the action bar
+	-- under the chapter ends inside the window's content, holds START, and the chapter above it still scrolls a story.
+	local parts = MissionsLayout.parts(layout)
+	check(`{screen.name}: START in view: the action bar under the chapter, inside the window`, parts.barTop >= parts.chapterTop + parts.chapterH
+		and parts.barTop + parts.barH <= parts.contentH and parts.barH >= layout.start and parts.chapterTop >= layout.tabs,
+		`bar {parts.barTop} – {parts.barTop + parts.barH} of {parts.contentH}`)
+	check(`{screen.name}: the chapter keeps room above the bar`, parts.chapterH >= (if layout.narrow then 140 else 360), parts.chapterH)
 end
 
 do
@@ -46,6 +53,7 @@ do
 	check("1280 × 720: the full window at about scale 1, side by side", not monitor.narrow and monitor.width == 1000 and monitor.height == 640 and math.abs(monitor.scale - 1) < 0.05, monitor.scale)
 	local phone = MissionsLayout.fit(667, 375 - TOPBAR)
 	check("iPhone SE: stacked (the clients on top), the slim chrome, the bigger text", phone.narrow and phone.scale >= MissionsLayout.MinScale and phone.header < 78 and phone.text > monitor.text)
+	check("iPhone SE: a smaller hero portrait (6.8 review)", phone.heroW <= 80 and phone.heroW < monitor.heroW, phone.heroW)
 	local big = MissionsLayout.fit(3840, 2160)
 	check("a 4K screen: never bigger than MaxScale", big.scale <= MissionsLayout.MaxScale and not big.narrow)
 end

@@ -2261,12 +2261,14 @@ local function carryCount(): number
 	return if count and count > 0 then math.floor(count) else 1
 end
 
--- (everything renderWeapons reads that can change: the gun in your hand is the only part of the State it shows)
+-- (everything renderWeapons reads that can change: the gun in your hand is the only part of the State it shows;
+-- 6.8 review: and the bat, which turns the touch PUNCH into BAT the moment it is bought)
 function weaponBarKey(): string
 	local seated, carGun = seatView()
 	local holding = myCarrying()
 	local gun = if state then tostring(state.weapon) else "-"
-	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}|{gun}|{Holster.hand()}`
+	local bat = state ~= nil and type(state.kit) == "table" and state.kit[Config.Melee.BatKit] == true
+	return `{seated}|{if carGun then carGun.id else ""}|{loading()}|{holding or ""}|{if holding then carryCount() else 0}|{Holster.holstered()}|{gun}|{Holster.hand()}|{bat}`
 end
 shownWeaponBar = ""
 
@@ -2294,7 +2296,8 @@ function renderWeapons()
 	local away = Holster.holstered()
 	if touchHands.melee then
 		touchHands.melee.Visible = not seatedNow and not holding
-		touchHands.melee.Text = if not away then "STRIKE" elseif type(state.kit) == "table" and state.kit.bat == true then "BAT" else "PUNCH" -- (6.7: the bat)
+		-- (6.7: the bat; 6.8 review: before the first State too, `state` is nil then)
+		touchHands.melee.Text = if not away then "STRIKE" elseif state and type(state.kit) == "table" and state.kit[Config.Melee.BatKit] == true then "BAT" else "PUNCH"
 		touchHands.holster.Visible = not seatedNow and not holding and Holster.armed() -- (6.0: no gun, nothing to draw)
 		touchHands.holster.Text = if away then "DRAW" else "HOLSTER"
 	end

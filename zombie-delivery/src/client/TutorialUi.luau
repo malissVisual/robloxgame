@@ -20,7 +20,7 @@
 --     phone ("tour") and starts the arrow tour at once.
 --   2 the arrow tour of the screen (TutorialSteps.ScreenTour; client/TutorialArrow.luau draws it): the NEXT card,
 --     PHONE [Q], then the phone opens on its own (the tour opens it) for JOBS, MAP, SHOP and BAG & ITEMS, it is put
---     away for the bottom bar, then the minimap. Each stop one sentence, NEXT › (Enter, the gamepad's A, a tap) and
+--     away for the bottom bar, then the minimap. Each stop one sentence, NEXT › (Enter, the gamepad's Y, a tap) and
 --     SKIP TUTORIAL. Nothing stops: you can walk meanwhile. The mouse is free for the buttons (so the bottom bar, which
 --     hides while the mouse is free, is let show while the arrow points at it: Hotbar.covered is wrapped). The phone
 --     closed by you during its stops: on to the stop after them. A job taken meanwhile ends the tour quietly.
@@ -558,6 +558,9 @@ applyStop = function()
 		onSkip = function()
 			finishTour(true)
 		end,
+		-- 6.8 review: a gamepad's selection on NEXT only while the phone is open for the stop; elsewhere none, so the
+		-- stick walks and A jumps (Y is NEXT)
+		select = stop.phone == "open",
 	})
 	refresh()
 end
@@ -565,6 +568,12 @@ end
 -- Four times a second while the tour runs: its phone stops (the phone it opens, or the player who put it away).
 local function tourTick()
 	local tour = touring
+	if tour and not TutorialArrow.isShown() then
+		-- 6.8 review: the arrow hid itself after an error (its frame loop warns and hides): the tour ends with it, not
+		-- half-running (its phone stops, TutorialUi.isOpen holding the NEW PHONE pop-up and the bottom bar back)
+		stopTour()
+		return
+	end
 	local stop = if tour then TutorialSteps.ScreenTour[tour.index] else nil
 	if not tour or not stop or stop.phone ~= "open" then
 		return

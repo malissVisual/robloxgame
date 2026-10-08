@@ -20,6 +20,14 @@
 --     quarter of the pay (Config.Missions.ReplayPay). The ALL / CO-OP filter is gone: the chips say CO-OP / DUO.
 --   * Gamepad: the client cards, the path's steps and the buttons are selectable; opening the window selects START.
 --   * The banner says "MISSION 3/6", the cleared card FIRST CLEAR! or "REPLAY · $X" and the chapter's next mission.
+-- 6.8 review:
+--   * START and the pay line live in the ACTION BAR under the chapter's scrolling list (MissionsLayout.parts), always
+--     in view: FIRST TIME / REPLAY pay, why START would be refused (else the mission's name), FIND CREW, START (PLAY
+--     AGAIN; GO TO <client> for a shut chapter). At 1280 × 720 START sat under the fold, on a phone two screens down.
+--   * A render that would draw the same page again (Page.key: the state it shows) keeps what is there; the server's
+--     reply to ("open") no longer rebuilds the page under the gamepad's selected START. When it does rebuild (a client
+--     or a step chosen, a new state), the selection goes back to the button of the same Name (START is "Start"), else
+--     START. The portraits are no longer rebuilt for nothing either.
 -- The older notes below describe the rest of the window (the other tabs, the banner, the cards outside it).
 --
 --   * (3.0 – 6.7: a campaign list on the left and ten mission cards on the right; 6.8 replaced them, see above.) A
@@ -769,6 +777,15 @@ function Page.fit()
 	refs.extra.Size = UDim2.new(1, -28, 0, page)
 	refs.extra.Position = UDim2.fromOffset(14, top)
 	local clients, list = refs.clients, refs.clientsList
+	-- 6.8 review: the chapter stops above the action bar (START in view); the bar lines up with the chapter's rows
+	-- (the list's padding: 3 px on the left, 10 + 4 on the right).
+	local parts = Page.Layout.parts(layout)
+	local chapterX = if layout.narrow then 8 else layout.listW + 14
+	local chapterInset = if layout.narrow then 16 else layout.listW + 22
+	refs.chapter.Size = UDim2.new(1, -chapterInset, 0, parts.chapterH)
+	refs.chapter.Position = UDim2.fromOffset(chapterX, parts.chapterTop)
+	refs.bar.Size = UDim2.new(1, -(chapterInset + 17), 0, parts.barH)
+	refs.bar.Position = UDim2.fromOffset(chapterX + 3, parts.barTop)
 	if layout.narrow then
 		refs.clientsHead.Visible = false
 		refs.column.Visible = false
@@ -777,8 +794,6 @@ function Page.fit()
 		clients.AutomaticCanvasSize = Enum.AutomaticSize.X
 		clients.ScrollingDirection = Enum.ScrollingDirection.X
 		list.FillDirection = Enum.FillDirection.Horizontal
-		refs.chapter.Size = UDim2.new(1, -16, 0, page - layout.stripH - 6)
-		refs.chapter.Position = UDim2.fromOffset(8, top + layout.stripH + 6)
 	else
 		refs.clientsHead.Visible = Extras.tab == "missions"
 		refs.column.Visible = Extras.tab == "missions"
@@ -789,12 +804,10 @@ function Page.fit()
 		clients.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		clients.ScrollingDirection = Enum.ScrollingDirection.Y
 		list.FillDirection = Enum.FillDirection.Vertical
-		refs.chapter.Size = UDim2.new(1, -(layout.listW + 22), 0, page)
-		refs.chapter.Position = UDim2.fromOffset(layout.listW + 14, top)
 	end
 	hideTip()
 	if was and (was.narrow ~= layout.narrow or was.text ~= layout.text) and window.Visible then
-		queueRender()
+		queueRender() -- (Page.key has the layout's narrow and text: this one rebuilds)
 	end
 end
 
@@ -853,6 +866,10 @@ local function build()
 	refs.clientsList = clients:FindFirstChildOfClass("UIListLayout")
 	refs.chapter = scrolling(content, UDim2.fromOffset(600, 400), UDim2.fromOffset(310, 46), 10)
 	refs.chapter.Name = "Chapter"
+	-- 6.8 review: the action bar under the chapter (the pay line and START, never scrolled away; Page.bar fills it,
+	-- Page.fit places it): the raised face, a hairline in the chapter's colour.
+	refs.bar = Ui.make("Frame", { Name = "ActionBar", BackgroundColor3 = K.raised, BorderSizePixel = 0 }, content)
+	refs.barStroke = Ui.stroke(refs.bar, K.line, 1)
 	-- 3.1: the CHALLENGES / SECRETS / REWARDS pages (one full-width list, rebuilt by render).
 	refs.extra = scrolling(content, UDim2.fromOffset(600, 400), UDim2.fromOffset(14, 46), 8)
 	refs.extra.Visible = false
@@ -1163,14 +1180,14 @@ function Page.blocker(def: MissionDef): string?
 end
 
 -- The action card: the focused mission (the next one unless one was clicked on the path) with the client's
--- briefing, the route, the twists, what it pays you now (FIRST TIME or REPLAY) and the big START (PLAY AGAIN); a shut
--- chapter says what to do first, a finished one says so.
+-- briefing, the route, the twists and what it pays you now (FIRST TIME or REPLAY); a shut chapter says what to do
+-- first, a finished one says so. (6.8 review: START, FIND CREW, GO TO, the pay and why START is refused are in the
+-- action bar under the chapter, Page.bar: always in view.)
 function Page.action(campaign: Campaign, order: number)
 	local layout = refs.layout
 	local color = colorOf(campaign)
 	local state = Missions.chapterState(campaign.id, progress, myLevel())
 	local def = Page.focus(campaign)
-	refs.startButton = nil
 	local frame = Ui.make("Frame", {
 		Name = "Action",
 		Size = UDim2.new(1, -4, 0, 0),
@@ -1190,12 +1207,6 @@ function Page.action(campaign: Campaign, order: number)
 		if first then
 			local nextDef = Missions.nextUp(progress, first.id)
 			detailLine(body, `{esc(Missions.missingText(missing))} {if nextDef then `{esc(Missions.clientName(first.id))}'s next mission is “{esc(nextDef.name)}”.` else ""}`, P.ink, 2, layout.text)
-			local go = Ui.button(body, `GO TO {string.upper(Missions.clientName(first.id))} ▶`, UDim2.fromOffset(240, layout.start - 8), K.red, function()
-				Page.select(first.id)
-			end)
-			go.TextSize = 15
-			go.LayoutOrder = 3
-			refs.startButton = go
 		else
 			detailLine(body, `It opens at driver level {campaign.level} (you are level {myLevel()}). Deliveries on the job board (J) and the other chapters give XP.`, P.ink, 2, layout.text)
 		end
@@ -1295,38 +1306,132 @@ function Page.action(campaign: Campaign, order: number)
 	if short then
 		detailLine(body, `<b>📦 needs {short} slots</b>  {esc(Extras.slotsText(short))}`, P.danger, 19, layout.small + 1)
 	end
-	-- What it pays you now.
-	local cash, xp, replay = Page.payout(def)
+	-- What it pays you now, explained (6.8 review: the amount itself is on the action bar).
+	local _, _, replay = Page.payout(def)
 	local payLine = if replay
-		then `<font color="{Extras.hex(P.ink2)}"><b>REPLAY · ≈ {Ui.money(cash)}</b></font>  a quarter of the pay: no reward, no XP bonus, no unlock{if stars < 3 then `  ·  a new best ★ still pays {Ui.money(T.StarBonus)}` else ""}`
-		else `<font color="{good}"><b>FIRST TIME · ≈ {Ui.money(cash)} + {xp} XP</b></font>  the reward {Ui.money(def.reward)} and about {Ui.money(payHint(def))} pay{if finale then `  ·  <font color="{Extras.hex(Extras.GOLD)}"><b>+ THE CHAPTER'S REWARD</b></font>` else ""}`
-	detailLine(body, payLine, P.ink, 20, layout.text)
-	-- START (PLAY AGAIN), FIND CREW on a co-op or DUO mission, and why START would be refused.
-	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, layout.start), BackgroundTransparency = 1, LayoutOrder = 21 }, body)
-	Ui.list(row, false, 10)
-	local blocker = Page.blocker(def)
-	local member = crewOwner ~= nil
-	local id = def.id
-	if not member then
-		local text = if status == "done" then `PLAY AGAIN ▶` elseif status == "active" then "▶ PLAYING" else "START ▶"
-		local start = Ui.button(row, text, UDim2.fromOffset(if layout.narrow then 190 else 220, layout.start), K.red, function()
-			MissionsUi.startMission(id)
-		end)
-		start.TextSize = 18
-		start.LayoutOrder = 1
-		paintButton(start, text, K.red, blocker == nil)
-		refs.startButton = start
+		then `<font color="{Extras.hex(P.ink2)}"><b>REPLAY</b></font>  a quarter of the pay: no reward, no XP bonus, no unlock{if stars < 3 then `  ·  a new best ★ still pays {Ui.money(T.StarBonus)}` else ""}`
+		else `<font color="{good}"><b>FIRST TIME</b></font>  the reward {Ui.money(def.reward)} and about {Ui.money(payHint(def))} pay, the first-clear XP{if finale then `  ·  <font color="{Extras.hex(Extras.GOLD)}"><b>+ THE CHAPTER'S REWARD</b></font>` else ""}`
+	detailLine(body, payLine, P.ink, 20, layout.small + 1)
+end
+
+-- 6.8 review, the action bar under the chapter (MissionsLayout.parts: never scrolled away): on the left what the
+-- focused mission pays you now ("FIRST TIME · ≈ $1,220 + 540 XP", "REPLAY · ≈ $300") and under it why START would be
+-- refused (else which mission it starts); on the right FIND CREW on a co-op or DUO mission and the big START (PLAY
+-- AGAIN, ▶ PLAYING; none for a member of somebody else's crew). A shut chapter: what it waits for and GO TO <client>.
+-- START is named "Start" (the gamepad's selection goes back to it after a rebuild).
+function Page.bar(campaign: Campaign)
+	local layout = refs.layout
+	local bar = refs.bar
+	Ui.clear(bar)
+	refs.startButton = nil
+	local state = Missions.chapterState(campaign.id, progress, myLevel())
+	local def = Page.focus(campaign)
+	refs.barStroke.Color = if state.open then colorOf(campaign) else K.line
+	refs.barStroke.Transparency = if state.open then 0.35 else Ui.HAIRLINE
+	-- The buttons on the right (START last, at the edge), the words in the room left of them.
+	local pad = if layout.narrow then 3 else 6
+	local buttons: { { name: string, text: string, width: number, color: Color3, size: number, on: boolean, click: () -> () } } = {}
+	local top, under = "", ""
+	local topColor, underColor = P.ink, P.ink2
+	if not state.open then
+		top, topColor = `🔒  {string.upper(campaign.name)} IS STILL SHUT`, P.danger
+		local missing = Missions.missing(campaign.id, progress)
+		local first = missing[1]
+		if first then
+			under = Missions.missingText(missing)
+			table.insert(buttons, {
+				name = "GoTo",
+				text = `GO TO {string.upper(Missions.clientName(first.id))} ▶`,
+				width = if layout.narrow then 220 else 240,
+				color = K.red,
+				size = 15,
+				on = true,
+				click = function()
+					Page.select(first.id)
+				end,
+			})
+		else
+			under = `It opens at driver level {campaign.level} (you are level {myLevel()}).`
+		end
+	elseif def then
+		local status = statusOf(def)
+		local cash, xp, replay = Page.payout(def)
+		local finale = def.number == Missions.size(campaign.id)
+		top = if replay then `REPLAY · ≈ {Ui.money(cash)}` else `FIRST TIME · ≈ {Ui.money(cash)} + {xp} XP{if finale then " + 🏆" else ""}`
+		topColor = if replay then P.ink else C.money
+		local blocker = Page.blocker(def)
+		local member = crewOwner ~= nil
+		under = blocker or `▶ {def.name}  ·  mission {def.number} of {Missions.size(campaign.id)}`
+		underColor = if blocker and not member then P.danger elseif blocker then P.violet else P.ink2
+		local id = def.id
+		local crew = (def.coop or def.duo) and not member
+		if crew then
+			table.insert(buttons, {
+				name = "FindCrew",
+				text = "🔎 FIND CREW",
+				width = 150,
+				color = if Extras.needsCrew(def) then K.red else P.violet,
+				size = 15,
+				on = true,
+				click = function()
+					MissionsUi.findCrew(id)
+				end,
+			})
+		end
+		if not member then
+			table.insert(buttons, {
+				name = "Start",
+				text = if status == "done" then "PLAY AGAIN ▶" elseif status == "active" then "▶ PLAYING" else "START ▶",
+				width = if layout.narrow then 190 elseif crew then 180 else 220, -- (beside FIND CREW: room for the pay)
+				color = K.red,
+				size = 18,
+				on = blocker == nil,
+				click = function()
+					MissionsUi.startMission(id)
+				end,
+			})
+		end
 	end
-	if (def.coop or def.duo) and not member then
-		local find = Ui.button(row, "🔎 FIND CREW", UDim2.fromOffset(150, layout.start), if Extras.needsCrew(def) then K.red else P.violet, function()
-			MissionsUi.findCrew(id)
-		end)
-		find.TextSize = 15
-		find.LayoutOrder = 2
+	local x = 10
+	for index = #buttons, 1, -1 do
+		local info = buttons[index]
+		local button = Ui.button(bar, info.text, UDim2.fromOffset(info.width, layout.start), info.color, info.click)
+		button.Name = info.name
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -x, 0.5, 0)
+		button.TextSize = info.size
+		if info.name == "Start" then
+			paintButton(button, info.text, info.color, info.on) -- (the "off" face while something blocks it)
+		end
+		if info.name == "Start" or info.name == "GoTo" then
+			refs.startButton = button
+		end
+		x += info.width + 10
 	end
-	if blocker then
-		detailLine(body, blocker, if member then P.violet else P.ink, 22, layout.small + 1)
-	end
+	local words = Ui.make("Frame", {
+		Name = "Words",
+		Size = UDim2.new(1, -(x + 14), 1, -pad * 2),
+		Position = UDim2.fromOffset(14, pad),
+		BackgroundTransparency = 1,
+	}, bar)
+	Ui.label(words, top, UDim2.new(1, 0, 0, layout.text + 3), {
+		Name = "Pay",
+		TextSize = layout.text,
+		Font = Theme.DisplayFont,
+		TextColor3 = topColor,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	-- (two lines at most: the long reasons, the DUO's partner and the slots, are told in full in the hero and the card)
+	Ui.label(words, under, UDim2.new(1, 0, 1, -(layout.text + 4)), {
+		Name = "Why",
+		Position = UDim2.fromOffset(0, layout.text + 4),
+		TextSize = layout.small + 1,
+		Font = Theme.HeadingFont,
+		TextColor3 = underColor,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
 end
 
 -- One step of the story path: the node (✓ done, ▶ next, 🔒 locked) on the chapter's line, the number and the name,
@@ -1474,10 +1579,84 @@ function Page.finale(campaign: Campaign, order: number)
 	})
 end
 
+-- 6.8 review: everything the MISSIONS page shows that can change, as one string: a render with the same key draws
+-- nothing new (the server's reply to ("open") came 0.2 s after the window opened and rebuilt it all, the gamepad's
+-- selected START with it, and ~12 portraits).
+function Page.key(): string
+	local layout = refs.layout
+	local stars: { string } = {}
+	for id, count in progress do
+		table.insert(stars, `{id}={count}`)
+	end
+	table.sort(stars)
+	return table.concat({
+		table.concat(stars, ","),
+		tostring(myLevel()),
+		selectedCampaign,
+		selectedMission or "",
+		active or "",
+		if jobMission then tostring(jobMission.id) else "",
+		tostring(ownJob),
+		crewOwner or "",
+		tostring(Extras.crewSize),
+		tostring(Extras.capacity),
+		Extras.carName,
+		Extras.carId,
+		tostring(Extras.carStage),
+		tostring(Extras.hasCar),
+		tostring(workspace:GetAttribute("Night")),
+		tostring(Extras.state.campaigns[selectedCampaign] == true),
+		tostring(layout and layout.narrow),
+		tostring(layout and layout.text),
+	}, "|")
+end
+
+-- 6.8 review: the gamepad's selection when it is on something a render rebuilds (a client card, a step, the action
+-- bar's buttons, a row of the other pages): its Name and where it is, so Page.refocus can put it back.
+type Kept = { object: GuiObject, name: string, within: GuiObject }
+function Page.keepSelection(): Kept?
+	local selected = Ui.gamepadSelection()
+	local window = refs.window
+	if not selected or not window or not selected:IsDescendantOf(window) then
+		return nil
+	end
+	for _, within in { refs.clients, refs.chapter, refs.bar, refs.extra } do
+		if within and selected:IsDescendantOf(within) then
+			return { object = selected, name = selected.Name, within = within }
+		end
+	end
+	return nil -- (the tabs, the ✕: never rebuilt)
+end
+
+-- 6.8 review: after a render, the selection kept by Page.keepSelection back on its button (the same Name in the same
+-- place: a client card is its campaign id, a step its mission id, START "Start"), else on `fallback` (START). Nothing
+-- to do when the render drew nothing new (the selected one is still there); a page that went away (a REWARDS card
+-- opened a chapter) hands it to the fallback.
+function Page.refocus(kept: Kept?, fallback: GuiObject?)
+	if not kept then
+		return
+	end
+	local within = kept.within
+	if within.Visible and kept.object.Parent ~= nil and Ui.gamepadSelection() == kept.object then
+		return
+	end
+	-- (a plain class name is no name: some other row's button would get it)
+	local found = if within.Visible and kept.name ~= kept.object.ClassName then within:FindFirstChild(kept.name, true) else nil
+	local target = if found and found:IsA("GuiObject") and found.Visible then found else fallback
+	if target then
+		Ui.gamepadFocus(target)
+	end
+end
+
 -- The MISSIONS page: the clients, then the chosen one's chapter (the hero, the action card, the story path, the
--- finale's reward).
+-- finale's reward) and the action bar under it. 6.8 review: not again when nothing it shows changed (Page.key).
 function Page.render()
 	local layout = refs.layout
+	local key = Page.key()
+	if key == refs.pageKey then
+		return
+	end
+	refs.pageKey = nil -- (set once the page is drawn: a render that fails half-way is drawn again next time)
 	refs.selectedCard = nil
 	Ui.clear(refs.clients)
 	local done = 0
@@ -1499,6 +1678,8 @@ function Page.render()
 		Page.step(def, campaign, 10 + index, index == #list)
 	end
 	Page.finale(campaign, 40)
+	Page.bar(campaign)
+	refs.pageKey = key
 	if layout.narrow and refs.selectedCard then
 		-- The chosen client's card in view on the strip.
 		local card = refs.selectedCard
@@ -2165,6 +2346,8 @@ render = function()
 	local got, most = Missions.stars(progress, nil)
 	refs.stars.Text = `★ {got} / {most}`
 	refs.chrome.context.Text = `<b>★ {got} / {most} STARS</b> · U · Who you work for, challenges, lost packages, rewards`
+	-- 6.8 review: a gamepad's selection on something rebuilt below goes back to it (by its Name) afterwards.
+	local kept = Page.keepSelection()
 	-- 3.1: the page tabs; the CHALLENGES / SECRETS / REWARDS pages draw in their own list.
 	do
 		local page = Extras.tab
@@ -2175,6 +2358,7 @@ render = function()
 		local missionsPage = page == "missions"
 		refs.clients.Visible = missionsPage
 		refs.chapter.Visible = missionsPage
+		refs.bar.Visible = missionsPage
 		refs.column.Visible = missionsPage and not layout.narrow
 		refs.clientsHead.Visible = missionsPage and not layout.narrow
 		refs.extra.Visible = not missionsPage
@@ -2183,11 +2367,13 @@ render = function()
 				elseif page == "secrets" then `📦 {Extras.count(S.secrets)} / {math.max(S.secretsTotal, #Extras.secretList())}`
 				else `🎖 {Extras.count(S.titles)} titles`
 			Extras.renderPage(page)
+			Page.refocus(kept, nil)
 			return
 		end
 	end
-	-- 6.8: the clients and the chosen one's chapter.
+	-- 6.8: the clients and the chosen one's chapter (6.8 review: only when something it shows changed).
 	Page.render()
+	Page.refocus(kept, refs.startButton)
 end
 
 -- ── Open / close ───────────────────────────────────────────────────────────

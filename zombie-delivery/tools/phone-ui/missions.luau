@@ -107,8 +107,46 @@ check("… the DUO chapter says so", has(named(clients, "duo"), "🤝 DUO"))
 check("the hero: Marge, her role and place, the pitch", named(chapter, "Hero") ~= nil and has(named(chapter, "Hero"), "Marge") and has(named(chapter, "Hero"), "Dispatcher  ·  Dead End Dispatch"))
 local action = named(chapter, "Action")
 check("the action card shows the next mission: Dead Letter Office, its briefing, FIRST TIME pay", has(action, "▶ NEXT · MISSION 4 OF 6") and has(action, "Dead Letter Office") and has(action, "Timmy's uncle Percy") and has(action, "FIRST TIME"))
-local start = button(action, "START ▶")
-check("a big START, selected for a gamepad", start ~= nil and M.focus == start)
+-- 6.8 review: START and the pay line in the action bar under the chapter (never scrolled away).
+local bar = named(window, "ActionBar")
+local start = button(bar, "START ▶")
+check("a big START in the action bar with the pay, selected for a gamepad", start ~= nil and start.Name == "Start" and M.focus == start and has(bar, "FIRST TIME · ≈") and has(bar, "XP") and has(bar, "Dead Letter Office"))
+-- START is in view: in the bar (not in a scrolling list) under the chapter, inside the window's content.
+local function startInView(): (boolean, string)
+	local now = named(bar, "Start")
+	if not now or not bar.Visible or not now.Visible then
+		return false, "no START"
+	end
+	local node = now.Parent
+	while node and node ~= window do
+		if node.ClassName == "ScrollingFrame" then
+			return false, "START in a scrolling list"
+		end
+		node = node.Parent
+	end
+	local content = named(window, "Content")
+	local contentH = window.Size.Y.Offset + content.Size.Y.Offset -- (the window less its header and footer)
+	local top, bottom = bar.Position.Y.Offset, bar.Position.Y.Offset + bar.Size.Y.Offset
+	local chapterBottom = chapter.Position.Y.Offset + chapter.Size.Y.Offset
+	local wide = bar.Position.X.Offset + bar.AbsoluteSize.X
+	local ok = top >= chapterBottom and bottom <= contentH and now.Size.Y.Offset <= bar.Size.Y.Offset
+		and now.Size.X.Offset + 10 <= bar.AbsoluteSize.X and wide <= window.Size.X.Offset
+	return ok, `bar {top} – {bottom} of {contentH}, chapter ends {chapterBottom}`
+end
+check("… START in view at 1280 × 800: under the chapter, inside the window", startInView())
+-- 6.8 review: the server's reply to ("open") (the same state) draws nothing again: START keeps the selection.
+M.remotes.Missions.OnClientEvent:Fire("state", state)
+M.flush()
+check("the same state again: nothing rebuilt, START still selected", start.Parent ~= nil and named(chapter, "Action") == action and M.focus == start)
+-- A state that changes the page rebuilds it: the selection goes back to the new START (its Name).
+state.capacity = 3
+M.remotes.Missions.OnClientEvent:Fire("state", state)
+M.flush()
+check("a new state rebuilds: the new START selected", start.Parent == nil and M.focus == named(bar, "Start") and M.focus ~= nil)
+state.capacity = 2
+M.remotes.Missions.OnClientEvent:Fire("state", state)
+M.flush()
+start = button(bar, "START ▶")
 local path = {}
 for _, def in Missions.ofCampaign("dispatch") do
 	table.insert(path, named(chapter, def.id))
@@ -122,34 +160,40 @@ start.Activated:Fire()
 local sent = M.sent[#M.sent]
 check("START asks the server for the next mission", sent.name == "Missions" and sent.args[1] == "start" and sent.args[2] == "dispatch_8")
 
--- A done mission on the path: PLAY AGAIN at the replay's pay.
+-- A done mission on the path: PLAY AGAIN at the replay's pay. 6.8 review: chosen with a gamepad, the step keeps it.
+M.focus = path[2]
 path[2].Activated:Fire()
 M.flush()
 action = named(chapter, "Action")
-check("a done mission clicked on the path: PLAY AGAIN, REPLAY pay", button(action, "PLAY AGAIN ▶") ~= nil and has(action, "REPLAY · ≈") and has(action, "✓ DONE · MISSION 2 OF 6"))
+check("a done mission clicked on the path: PLAY AGAIN, REPLAY pay", button(bar, "PLAY AGAIN ▶") ~= nil and has(bar, "REPLAY · ≈") and has(action, "REPLAY") and has(action, "✓ DONE · MISSION 2 OF 6"))
+check("… the gamepad's selection back on that step (rebuilt)", path[2].Parent == nil and M.focus ~= nil and M.focus.Name == "dispatch_2" and M.focus.Parent ~= nil)
 -- A locked one: START is off and says why.
 path[6].Activated:Fire()
-action = named(chapter, "Action")
-check("a locked one: why under START", has(action, "🔒 Finish \"Dead Letter Office\" first"))
+check("a locked one: why beside START", has(bar, "🔒 Finish \"Dead Letter Office\" first"))
 
 -- Another client: Rosa & Rico (open after First Shift's finale at level 6).
 state.progress = { dispatch_1 = 3, dispatch_2 = 2, dispatch_3 = 1, dispatch_8 = 2, dispatch_9 = 1, dispatch_10 = 1 }
 state.level = 6
 M.remotes.Missions.OnClientEvent:Fire("state", state)
 M.flush()
-named(clients, "duo").Activated:Fire()
+-- 6.8 review: a client chosen with a gamepad keeps the selection on its (rebuilt) card.
+local duoCard = named(clients, "duo")
+M.focus = duoCard
+duoCard.Activated:Fire()
 M.flush()
 action = named(chapter, "Action")
-check("the twins: both names, NEEDS A PARTNER, START waits for a partner", has(named(chapter, "Hero"), "Rosa & Rico") and has(named(chapter, "Hero"), "NEEDS A PARTNER") and has(action, "NEEDS A PARTNER") and button(action, "🔎 FIND CREW") ~= nil)
+check("the twins: both names, NEEDS A PARTNER, START waits for a partner", has(named(chapter, "Hero"), "Rosa & Rico") and has(named(chapter, "Hero"), "NEEDS A PARTNER") and has(bar, "NEEDS A PARTNER") and button(bar, "🔎 FIND CREW") ~= nil)
+check("… the gamepad's selection back on the twins' card", duoCard.Parent == nil and M.focus ~= nil and M.focus.Name == "duo" and M.focus.Parent == clients)
 named(clients, "clinic").Activated:Fire()
 M.flush()
 check("Ellie's chapter opens after Marge's: NEW, her first mission next", has(named(clients, "clinic"), "NEW") and has(named(chapter, "Action"), "House Call"))
 named(clients, "exodus").Activated:Fire()
 M.flush()
-check("a far chapter: shut, says what to do and GO TO", has(named(chapter, "Action"), "IS STILL SHUT") and button(named(chapter, "Action"), "GO TO DOCTOR ELLIE ▶") ~= nil)
-button(named(chapter, "Action"), "GO TO DOCTOR ELLIE ▶").Activated:Fire()
+check("a far chapter: shut, says what to do and GO TO", has(named(chapter, "Action"), "IS STILL SHUT") and has(bar, "IS STILL SHUT") and button(bar, "GO TO DOCTOR ELLIE ▶") ~= nil)
+M.focus = button(bar, "GO TO DOCTOR ELLIE ▶")
+M.focus.Activated:Fire()
 M.flush()
-check("… GO TO opens that client", named(clients, "clinic"):GetAttribute("Selected") == true)
+check("… GO TO opens that client, the gamepad's selection on its START", named(clients, "clinic"):GetAttribute("Selected") == true and M.focus == named(bar, "Start"))
 
 -- A phone held sideways: the clients on a strip on top, the chapter under them.
 M.width, M.height = 667, 339
@@ -160,18 +204,21 @@ check("narrow: the clients become a strip on top", list.FillDirection == M.Enum.
 check("… the slim chrome (no subtitle), still every card and the chapter", not named(window, "Subtitle").Visible and #all(clients, function(object)
 	return object.ClassName == "TextButton"
 end) == #Missions.Campaigns and named(chapter, "Hero") ~= nil)
+check("… START in view on an iPhone SE sideways (6.8 review)", startInView())
+check("… a small hero portrait (6.8 review)", named(named(chapter, "Hero"), "Portrait").Size.X.Offset <= 80)
 M.width, M.height = 1280, 684
 M.workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Fire()
 M.flush()
 check("back on a monitor: the column again", list.FillDirection == M.Enum.FillDirection.Vertical and named(M.gui, "Column").Visible)
+check("… START in view at 1280 × 720 (6.8 review)", startInView())
 
 -- The other tabs still work.
 named(window, "challengesTab").Activated:Fire()
 M.flush()
-check("CHALLENGES: the chapter page hides", not clients.Visible and not chapter.Visible)
+check("CHALLENGES: the chapter page hides", not clients.Visible and not chapter.Visible and not bar.Visible)
 named(window, "missionsTab").Activated:Fire()
 M.flush()
-check("MISSIONS again", clients.Visible and chapter.Visible)
+check("MISSIONS again", clients.Visible and chapter.Visible and bar.Visible)
 
 -- The banner during a mission: "MISSION 3/6".
 M.remotes.Job.OnClientEvent:Fire({ mission = { id = "clinic_4", name = "Many Hands", campaign = "clinic", number = 3, of = 6, twists = { "lift" }, coop = true } })
