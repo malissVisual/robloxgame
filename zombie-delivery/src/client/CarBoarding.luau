@@ -29,6 +29,13 @@
 -- legs and arms: the others' moves are posed from their Boarding / BoardAt and AlightAt attributes (their own clients
 -- move their bodies).
 --
+-- 6.10, an E-Scooter (BikeStand; yours or a ZDC RIDE rental): no step to its side any more, a quick hop from where you
+-- stand straight onto its deck (Config.Interact.ScooterHop; the path: shared/ScooterRide.luau hop, the legs and arms:
+-- InteractPose.scooterHop), the server seats you as it ends; off it a hop down to its left side (ScooterHopOff). Its
+-- prompt reaches only right beside it (server/Vehicles.luau), so the hop is short. When the Boarding attribute comes
+-- before the scooter itself (a scooter put out next to you a moment ago, still streaming in) the move starts as soon
+-- as it is there (half a second at most).
+--
 -- E in a seat: while you sit in a car the other prompts around you are hidden (the door prompts and the back's already
 -- are, client/CarVisuals.luau), so E means "get out"; a prompt meant for a driver (the 🅿 GARAGE posts, or any prompt
 -- with the attribute Seated = true) keeps E while it shows, and Space gets you out then. Gamepad: X (the prompts'
@@ -46,6 +53,7 @@ local Boarding = require(Shared:WaitForChild("Boarding"))
 local Config = require(Shared:WaitForChild("Config"))
 local InteractPose = require(Shared:WaitForChild("InteractPose"))
 local Net = require(Shared:WaitForChild("Net"))
+local ScooterRide = require(Shared:WaitForChild("ScooterRide"))
 local Drive = require(script.Parent.Drive)
 local Interact = require(script.Parent.Interact)
 local Bodies = require(script.Parent.Bodies)
@@ -75,6 +83,7 @@ type Move = {
 	climb: boolean, -- a seat with no door: an arc, no handle
 	bike: boolean, -- 5.7: onto (or off) a bike's saddle or a scooter's deck (the mount)
 	deck: boolean, -- 5.7: the E-Scooter: a step up onto its deck
+	hop: boolean, -- 6.10: the E-Scooter: a quick hop from where you stand (no step to its side)
 	step: number, -- 5.7, a mount: the share of the move spent stepping to the side
 	started: number, -- os.clock()
 	span: number, -- seconds this client plays the move over
@@ -83,6 +92,8 @@ type Move = {
 }
 
 local move: Move? = nil
+-- 6.10: the Boarding attribute came before its scooter (streaming): tried again each frame until `untilAt`.
+local retry = { character = nil :: Model?, humanoid = nil :: Humanoid?, untilAt = 0 }
 local frozen = false
 local savedGroups: { [BasePart]: string } = {}
 local controls: any = nil -- the PlayerModule's controls (false: none found)
@@ -232,9 +243,17 @@ local function mountPose(m: Move, from: CFrame, stand: CFrame, to: CFrame, u: nu
 	return CFrame.new(position) * stand.Rotation:Lerp(to.Rotation, k)
 end
 
+-- 6.10: the hop (chassis space), u 0..1: from `from` to `to` in an arc, turning to `to`'s facing on the way.
+local function hopPose(from: CFrame, to: CFrame, u: number): CFrame
+	local k, lift, turn = ScooterRide.hop(u)
+	return CFrame.new(from.Position:Lerp(to.Position, k) + Vector3.new(0, lift, 0)) * from.Rotation:Lerp(to.Rotation, turn)
+end
+
 -- The pose on the way in, t seconds into the move (chassis space).
 local function boardPose(m: Move, t: number): CFrame
-	if m.bike then
+	if m.hop then
+		return hopPose(m.from, m.to, t / math.max(1e-3, m.total))
+	elseif m.bike then
 		return mountPose(m, m.from, m.stand, m.to, t / math.max(1e-3, m.total))
 	end
 	local phase, u = Boarding.boardPhase(t)
@@ -249,7 +268,9 @@ end
 
 -- The pose on the way out (chassis space).
 local function alightPose(m: Move, t: number): CFrame
-	if m.bike then
+	if m.hop then
+		return hopPose(m.from, m.to, t / math.max(1e-3, m.total)) -- 6.10: off the deck in a hop
+	elseif m.bike then
 		-- 5.7: the mount backwards, from the saddle (`from`) to the side (`to`)
 		return mountPose(m, m.to, m.to, m.from, 1 - t / math.max(1e-3, m.total))
 	end
@@ -297,23 +318,33 @@ local function beginBoard(character: Model, humanoid: Humanoid)
 	local car = carOf(ownerId)
 	local chassis = car and car.PrimaryPart
 	local seat = car and seatOf(car, seatNo)
-	if not car or not chassis or not seat then
+	local at, panel = nil, false
+	if chassis then
+		at, panel = doorOf(chassis, door)
+	end
+	if not car or not chassis or not seat or not at then
+		if retry.character ~= character then
+			retry.character, retry.humanoid, retry.untilAt = character, humanoid, os.clock() + 0.5 -- (6.10: not here yet)
+		end
 		return
 	end
-	local at, panel = doorOf(chassis, door)
-	if not at then
-		return
-	end
+	retry.character = nil
 	local cfg = Config.Cargo
 	local frame = chassis.CFrame
 	local side = if at.Position.X >= 0 then 1 else -1
 	local bike = car:GetAttribute("Bike") == true
+	local hop = bike and car:GetAttribute("BikeStand") == true -- 6.10: onto a scooter's deck from where you stand
 	-- (5.7: beside a bike you face along it; at a door, the car)
 	local stand = standAt(chassis, at, side, 0, humanoid, root, character, car, if bike then Vector3.new(0, 0, -1) else Vector3.new(-side, 0, 0))
 	local to = frame:ToObjectSpace(seat.CFrame * CFrame.new(0, seat.Size.Y / 2 + cfg.BoardSitLift, 0))
 	local late = workspace:GetServerTimeNow() - value
 	local total, share, span = cfg.BoardSeconds, 0, Boarding.span(late, cfg.BoardSeconds, MIN_SPAN)
-	if bike then
+	if hop then
+		-- 6.10: no stand at its side: a cancel puts you back where you were
+		stand = frame:ToObjectSpace(root.CFrame)
+		total = Config.Interact.ScooterHop
+		span = if late < 0 then total - late else Boarding.span(late, total, MIN_SPAN)
+	elseif bike then
 		total, share = InteractPose.mountTimes(-late) -- (a rental's BoardAt lies ahead: its scooter slides off the dock first)
 		span = if late < 0 then total else Boarding.span(late, total, MIN_SPAN)
 	end
@@ -331,6 +362,7 @@ local function beginBoard(character: Model, humanoid: Humanoid)
 		climb = not panel,
 		bike = bike,
 		deck = car:GetAttribute("BikeStand") == true,
+		hop = hop,
 		step = share,
 		started = os.clock(),
 		span = span,
@@ -363,9 +395,11 @@ local function beginAlight(character: Model, humanoid: Humanoid, seat: BasePart)
 	local cfg = Config.Cargo
 	local side = if at.Position.X >= 0 then 1 else -1
 	local bike = car:GetAttribute("Bike") == true
+	local hop = bike and car:GetAttribute("BikeStand") == true -- 6.10: off a scooter's deck in a hop to its left
 	local look = if bike then Vector3.new(0, 0, -1) else Vector3.new(side * 0.7, 0, -1).Unit -- out and toward the front
-	local out = standAt(chassis, at, side, OUT_EXTRA, humanoid, root, character, car, look)
-	local seconds = if bike then Config.Interact.BikeDismount else cfg.AlightSeconds
+	local extra = if hop then math.max(0, Config.Interact.ScooterOff - math.abs(at.Position.X)) else OUT_EXTRA
+	local out = standAt(chassis, at, side, extra, humanoid, root, character, car, look)
+	local seconds = if hop then Config.Interact.ScooterHopOff elseif bike then Config.Interact.BikeDismount else cfg.AlightSeconds
 	local v = chassis.AssemblyLinearVelocity
 	if Vector3.new(v.X, 0, v.Z).Magnitude > cfg.AlightSlideMaxSpeed then
 		-- Out of a moving car: at the door at once (it would drag you along otherwise).
@@ -389,6 +423,7 @@ local function beginAlight(character: Model, humanoid: Humanoid, seat: BasePart)
 		climb = not panel,
 		bike = bike,
 		deck = car:GetAttribute("BikeStand") == true,
+		hop = hop,
 		step = Config.Interact.BikeStep,
 		started = os.clock(),
 		span = seconds,
@@ -402,6 +437,12 @@ end
 local function step(dt: number)
 	local m = move
 	if not m then
+		local character, humanoid = retry.character, retry.humanoid
+		if character and humanoid and os.clock() < retry.untilAt and character:GetAttribute("Boarding") ~= nil then
+			beginBoard(character, humanoid) -- (6.10: its scooter may be here now)
+		else
+			retry.character = nil
+		end
 		return
 	end
 	if not m.chassis.Parent or not m.root.Parent or m.humanoid.Health <= 0 then
@@ -435,7 +476,8 @@ local function step(dt: number)
 	local character = m.humanoid.Parent
 	if m.bike and character and character:IsA("Model") then
 		local u = t / math.max(1e-3, m.total)
-		Interact.pose(character, InteractPose.bikeMount(if m.kind == "board" then u else 1 - u, m.deck, m.step), dt, OWNER)
+		local k = if m.kind == "board" then u else 1 - u
+		Interact.pose(character, if m.hop then InteractPose.scooterHop(k) else InteractPose.bikeMount(k, m.deck, m.step), dt, OWNER)
 	end
 end
 
@@ -477,13 +519,18 @@ local function othersStep(dt: number)
 		local pose: InteractPose.Pose? = nil
 		local boardAt = character:GetAttribute("BoardAt")
 		local alightAt = character:GetAttribute("AlightAt")
+		local scooter = lastBike[character] == true
 		if seat == nil and type(boardAt) == "number" and now - boardAt < cfg.BikeMount + 0.3 then
 			local bike = bikeOf((Boarding.decode(character:GetAttribute("Boarding"))))
-			if bike then
-				pose = InteractPose.bikeMount((now - boardAt) / cfg.BikeMount, bike:GetAttribute("BikeStand") == true, cfg.BikeStep)
+			if bike and bike:GetAttribute("BikeStand") == true then
+				pose = InteractPose.scooterHop((now - boardAt) / cfg.ScooterHop) -- 6.10: the hop onto the deck
+			elseif bike then
+				pose = InteractPose.bikeMount((now - boardAt) / cfg.BikeMount, false, cfg.BikeStep)
 			end
-		elseif seat == nil and type(alightAt) == "number" and now - alightAt < cfg.BikeDismount and lastBike[character] ~= nil then
-			pose = InteractPose.bikeMount(1 - (now - alightAt) / cfg.BikeDismount, lastBike[character] == true, cfg.BikeStep)
+		elseif seat == nil and type(alightAt) == "number" and lastBike[character] ~= nil
+			and now - alightAt < (if scooter then cfg.ScooterHopOff else cfg.BikeDismount) then
+			pose = if scooter then InteractPose.scooterHop(1 - (now - alightAt) / cfg.ScooterHopOff)
+				else InteractPose.bikeMount(1 - (now - alightAt) / cfg.BikeDismount, false, cfg.BikeStep)
 		end
 		if pose then
 			Interact.pose(character, pose, dt, OWNER)

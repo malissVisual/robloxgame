@@ -30,7 +30,9 @@
 --   InteractPose.forKind(kind, u, dist)     the pose of a route's segment
 --   InteractPose.bikeMount(u, stand, step)  getting onto a bike (a leg swung over the saddle) or a scooter (a step onto
 --                                           its deck, the hands to the bar); u 0..1, step: the walk to its side's share
---   InteractPose.reachUp(u)                 the hands going up to the zip line's trolley (0..1 of the full grip)
+--   InteractPose.scooterHop(u)              6.10: the quick hop onto an E-Scooter's deck from where you stand (the
+--                                           knees tuck, the hands to the bar); off it backwards
+--   InteractPose.reachUp(u)               the hands going up to the zip line's trolley (0..1 of the full grip)
 --   InteractPose.blend(a, b, k)             two poses mixed
 
 local Config = require(script.Parent.Config)
@@ -427,6 +429,28 @@ function InteractPose.bikeMount(u: number, stand: boolean, step: number): Pose
 		pose.leftKnee = v(riderAt("leftKnee", SIT_KNEE).x - rad(14) * bump)
 		pose.waist = v(pose.waist.x - rad(10) * swing, 0, -rad(6) * swing)
 	end
+	return pose
+end
+
+-- 6.10: the quick hop onto an E-Scooter's deck from where you stand (Config.Interact.ScooterHop; no walk to its side):
+-- the hands are on the bar by halfway, both knees tuck up in the air (the left a touch higher) and the body ends in the
+-- standing rider's pose, the same end as InteractPose.bikeMount's, so the seat takes over without a jump. Getting off
+-- is the same backwards (u from 1 to 0).
+function InteractPose.scooterHop(u: number): Pose
+	local x = math.clamp(u, 0, 1)
+	local finish = InteractPose.bikeMount(1, true, 0)
+	local pose = InteractPose.blend(InteractPose.zero(), finish, ease(x))
+	local arms = ease(x / 0.5)
+	for _, name in { "rightShoulder", "leftShoulder", "rightElbow", "leftElbow" } do
+		local f = finish[name]
+		pose[name] = v(f.x * arms, f.y * arms, f.z * arms)
+	end
+	local tuck = math.sin(math.pi * x)
+	pose.waist = v(pose.waist.x - rad(10) * tuck)
+	pose.rightHip = v(pose.rightHip.x + rad(46) * tuck)
+	pose.rightKnee = v(pose.rightKnee.x - rad(70) * tuck)
+	pose.leftHip = v(pose.leftHip.x + rad(56) * tuck)
+	pose.leftKnee = v(pose.leftKnee.x - rad(82) * tuck)
 	return pose
 end
 

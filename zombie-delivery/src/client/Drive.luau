@@ -13,6 +13,12 @@
 -- top speed is Config.Fuel.CrawlSpeed at most (FuelMath.topSpeed: the nitro and the admin's boost too) and a toast says
 -- so once ("Out of fuel — crawl to a pump or call a tow (phone)"); under Config.Fuel.Low of the tank a soft LOW FUEL
 -- toast, once (again only after a refill). A bike has no tank.
+-- 6.10, the E-Scooter (the car's attributes Bike and BikeStand; a ZDC RIDE rental too) rides on its own numbers
+-- (Config.Scooter through shared/ScooterRide.luau): the steering ramps in (no snap) and turns quickly at walking pace,
+-- easing off toward the top speed; a firm brake on S, a long coast. The wheelie: hold Shift (a gamepad's B, the touch
+-- WHEELIE button: Drive.setWheelieHeld) while rolling and it pops onto its back wheel (less steering, a little more top
+-- speed) until you let go, brake, slow down or the balance runs out (Config.Scooter.Wheelie); the server is told
+-- (the Wheelie remote, server/Wheelie.luau) so everybody sees it, your own client draws it at once (Drive.wheelie).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,6 +28,8 @@ local UserInputService = game:GetService("UserInputService")
 local Map = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Map"))
 local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
 local FuelMath = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FuelMath"))
+local ScooterRide = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScooterRide"))
+local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 
 local Drive = {}
 
@@ -32,6 +40,8 @@ local boostUntil = 0
 local boostMultiplier = 1
 local backToldAt = -math.huge -- the "close the back" toast, at most every few seconds
 local fuelTold = { car = nil :: Model?, empty = false, low = false } -- 5.4: the fuel toasts already given for this car
+-- 6.10: the scooter's wheelie (ScooterRide.wheelieStep), the scooter it is on, and the touch button's hold.
+local wheelie = { state = ScooterRide.wheelie(), car = nil :: Model?, touch = false }
 
 -- Set by Main (Hud.toast). The fallback is Roblox's own notification.
 Drive.notify = nil :: ((text: string) -> ())?
@@ -176,9 +186,55 @@ function Drive.boost(seconds: number, multiplier: number)
 	speed *= 1.15
 end
 
--- Hit something heavy: keep this share of the speed.
+-- Hit something heavy: keep this share of the speed. (6.10: a scooter's wheelie comes down.)
 function Drive.bump(keep: number)
 	speed *= keep
+	ScooterRide.knock(wheelie.state)
+end
+
+-- 6.10: your scooter's wheelie as drawn now: how far up (0 … 1) and the seconds since it went up (the wobble), on
+-- `car` (nil: not on it).
+function Drive.wheelie(car: Model): (number, number)
+	if wheelie.car ~= car then
+		return 0, 0
+	end
+	return wheelie.state.amount, wheelie.state.time
+end
+
+-- 6.10: the touch WHEELIE button held (client/TouchControls.luau).
+function Drive.setWheelieHeld(on: boolean)
+	wheelie.touch = on
+end
+
+-- 6.10: the wheelie's key held now: Shift, a gamepad's B, the touch button.
+local function wheelieHeld(): boolean
+	if wheelie.touch then
+		return true
+	end
+	if UserInputService:GetFocusedTextBox() then
+		return false
+	end
+	return UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+		or UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonB)
+end
+
+-- 6.10: one step of the wheelie on the scooter you drive (nil: none): the server hears when it goes up or down.
+local function wheelieStep(car: Model?, throttle: number, dt: number)
+	local w = wheelie.state
+	if car ~= wheelie.car then
+		if wheelie.car and w.up then
+			Net.get("Wheelie"):FireServer(false)
+		end
+		wheelie.state = ScooterRide.wheelie()
+		wheelie.car = car
+		w = wheelie.state
+	end
+	if not car then
+		return
+	end
+	if ScooterRide.wheelieStep(w, wheelieHeld(), speed, throttle < 0 and speed > 1, dt) then
+		Net.get("Wheelie"):FireServer(w.up)
+	end
 end
 
 local function keyAxis(positive: { Enum.KeyCode }, negative: { Enum.KeyCode }): number
@@ -213,6 +269,7 @@ local function step(dt: number)
 	local chassis = car and car.PrimaryPart
 	if not car or not chassis then
 		speed = 0
+		wheelieStep(nil, 0, dt)
 		return
 	end
 	local linear = chassis:FindFirstChild("Drive") :: LinearVelocity?
@@ -271,6 +328,14 @@ local function step(dt: number)
 		fuelTold.empty = fuelTold.empty and empty
 		fuelTold.low = fuelTold.low and low
 	end
+	-- 6.10: the E-Scooter's own handling: the steering ramps (no snap), its wheelie (a little more top speed while up)
+	local scooter = car:GetAttribute("Bike") == true and car:GetAttribute("BikeStand") == true
+	local baseMax = (car:GetAttribute("MaxSpeed") or 32) :: number -- (the curve on its own top speed, not a boost's)
+	wheelieStep(if scooter and Drive.isDriving() then car else nil, throttle, dt)
+	if scooter then
+		steer = ScooterRide.steerStep(steerInput, steer, dt)
+		maxSpeed *= ScooterRide.speedFactor(wheelie.state.amount)
+	end
 	steerInput = steer
 	local turn = (car:GetAttribute("Turn") or 1.8) :: number
 
@@ -303,6 +368,9 @@ local function step(dt: number)
 		-- 4.0: pulling away, the torque curve: soft from a standstill, strong in the mid-range, soft again at the top.
 		rate = accel * Economy.torque(math.abs(speed) / math.max(1, maxSpeed))
 	end
+	if scooter then
+		target, rate = ScooterRide.drive(speed, throttle, maxSpeed, accel) -- 6.10: its brake, coast and walk back
+	end
 	speed = moveToward(speed, target, rate * dt)
 
 	-- On ice (and a little on snow) the car does not go where it points at once: it slides.
@@ -317,6 +385,10 @@ local function step(dt: number)
 	linear.PlaneVelocity = Vector2.new(velocity.X, velocity.Z)
 	local grip = math.clamp(math.abs(speed) / (if bike then 5 else 12), 0, 1)
 	local yaw = -steer * turn * grip * (if speed >= 0 then 1 else -1)
+	if scooter then
+		-- 6.10: quick at walking pace, calm at the top speed, less on the back wheel
+		yaw = -steer * ScooterRide.turnRate(speed, baseMax, turn) * ScooterRide.turnFactor(wheelie.state.amount) * (if speed >= 0 then 1 else -1)
+	end
 	angular.AngularVelocity = Vector3.new(0, yaw, 0)
 end
 
