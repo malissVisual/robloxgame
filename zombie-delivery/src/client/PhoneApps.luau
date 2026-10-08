@@ -546,6 +546,7 @@ local KEYS: { { string } } = {
 	{ "T", "Weapon wheel" },
 	{ "E", "Doors, get in and out" },
 	{ "G", "Put down, let go" },
+	{ "R", "Style: looks from Dot, Gus, Kip" }, -- 6.12: the clerks' second prompt (server/ShopClerks.luau)
 	{ "F", "Fire" },
 	{ "1 / 2 / 3", "Hold: fists, bag, gun" },
 	{ "B", "Holster, draw" },

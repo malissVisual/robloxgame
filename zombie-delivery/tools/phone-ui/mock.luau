@@ -178,7 +178,9 @@ function M.P.button(parent,value,size,kind,fn)
 end
 function M.P.dot(parent,props) return M.Ui.label(parent,"",M.UDim2.fromOffset(14,14),props) end
 function M.P.tag(parent,value) return M.Ui.label(parent,value,M.UDim2.fromOffset(100,20)) end
-M.MapView={isOpen=function() return M.mapOpen==true end,toggle=function() M.mapOpen=not M.mapOpen end,setWaypoint=function() end}
+M.MapView={isOpen=function() return M.mapOpen==true end,toggle=function() M.mapOpen=not M.mapOpen end,setWaypoint=function(at) M.waypoint=at end}
+-- 6.12, the clerks: where the local character stands (STYLE's BUY only at a shop that sells the look; the GPS above)
+function M.stand(x,z) M.root.Position=M.Vector3.new(x,0,z) end
 M.KitShop={owned=function(state) return state.kit or {} end,roomText=function() return "HANDS 2 / PACK 3" end}
 M.CareerUi={toGo=function() return "8 runs" end,unlockText=function() return "Next unlock" end}
 M.BagUi={line=function() return nil end,open=function() M.bagOpen=true end,render=function(parent,job,order) M.bagRendered=(M.bagRendered or 0)+1;M.make("Frame",{Name="BagRows",LayoutOrder=order},parent);return order+1 end}

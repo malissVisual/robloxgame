@@ -358,15 +358,25 @@ do
 end
 -- 6.12: STYLE (client/StyleApp.luau): the tabs, the preview, a card an item with its price; BUY / WEAR / TAKE OFF ask
 -- the server through the Style remote; what can't be done yet says why; the purchase's "cash"; the keys while open.
+-- The clerks: BUY only at a shop that sells the look (the courier stands at the gear stall for it); away from it the
+-- button says where ("AT THE GEAR STALL") and a press sets the GPS there; walking up or away redraws the cards (the
+-- phone's ticker, StyleApp.tick); a clerk's "Style" prompt (the Style remote's ("open", tab)) opens STYLE on the tab.
 do
 	M.played={}
+	local Map=require("./Map")
+	local StyleApp=require("./StyleApp")
+	local gear,garage=Map.Shops.supplies,Map.Shops.mechanic
+	M.stand(gear.x,gear.z)
 	local function inCard(id,name)
 		local card=named(`Style_{id}`)
 		return card and all(card,function(object) return object.Name==name end)[1]
 	end
 	local function styleSent() return lastSent("Style") end
 	Phone.setState({phone=true,money=300,kit={},cars={},style={owned={},worn={}}})
-	Phone.open();named("moreApp").Activated:Fire();named("styleApp").Activated:Fire()
+	Phone.open();named("moreApp").Activated:Fire()
+	check("MORE's STYLE row: your looks, bought at the shops",text("Your looks; buy them at the shops")~=nil)
+	named("styleApp").Activated:Fire()
+	check("the line under the tabs says who sells them",text("Buy them from Dot at the gear stall; wear them from here, anywhere. Looks only: no item changes a number of the game; your own look stays under them.")~=nil)
 	check("STYLE opens in the popup on COURIER",showing("style") and text("STYLE")~=nil and named("Tab_courier")~=nil and named("Tab_vehicle")~=nil and named("Tab_courier"):FindFirstChild("Underline")~=nil)
 	check("its sections: hats, jackets, the vest's and the bag's colours",text("Hats · your own")~=nil and text("Jackets · your own")~=nil and text("Courier Vest colour · your own")~=nil and text("Bag colour · your own")~=nil)
 	check("the live preview shows the courier with the first item",#M.previews>0 and M.previews[#M.previews].tab=="courier" and M.previews[#M.previews].id=="cap_red" and named("Preview")~=nil)
@@ -409,16 +419,54 @@ do
 	check("↑ the one before",M.previews[#M.previews].id==pickedBefore)
 	press(M.Enum.KeyCode.Tab)
 	check("TAB switches to VEHICLE: wraps, bike paint, decals",named("Tab_vehicle"):FindFirstChild("Underline")~=nil and text("Wraps · cars, vans, trucks · your own")~=nil and text("Decals · cars, vans, trucks · your own")~=nil and M.previews[#M.previews].tab=="vehicle")
+	check("at the gear stall a wrap is sold at Wrench Garage",inCard("wrap_sand","Main").Text=="AT WRENCH GARAGE")
+	M.waypoint=nil
 	press(M.Enum.KeyCode.Return)
-	check("ENTER does the picked item's action (a wrap too dear says so)",string.find(toasts[#toasts] or "","Not enough money",1,true)~=nil)
+	check("ENTER does the picked item's action (a wrap away from Gus: where, and the GPS)",toasts[#toasts]=="Gus sells it at Wrench Garage. It's on your GPS."
+		and M.waypoint~=nil and M.waypoint.X==garage.x and M.waypoint.Z==garage.z and showing("style"))
+	M.stand(garage.x,garage.z);StyleApp.tick()
+	check("walked up to Wrench Garage: the cards follow, BUY there",inCard("wrap_sand","Main").Text=="BUY · $800" and inCard("bike_mint","Main").Text=="BUY · $150")
+	press(M.Enum.KeyCode.Return)
+	check("ENTER at the shop: a wrap too dear says so",string.find(toasts[#toasts] or "","Not enough money",1,true)~=nil)
+	M.stand(gear.x,gear.z);StyleApp.tick()
 	press(M.Enum.KeyCode.ButtonL1)
 	check("the gamepad's L1 switches back",named("Tab_courier"):FindFirstChild("Underline")~=nil)
 	named("Tab_vehicle").Activated:Fire()
 	check("a tap on a tab switches it",named("Tab_vehicle"):FindFirstChild("Underline")~=nil)
 	named("Tab_courier").Activated:Fire()
+	-- away from the gear stall: what you own still WEAR, TRY still previews, the rest says where it is sold
+	local before=#M.sent
+	M.stand(5000,5000);StyleApp.tick()
+	check("away: a look for sale says where (AT THE GEAR STALL)",inCard("beanie_orange","Main").Text=="AT THE GEAR STALL" and inCard("cap_red","Main").Text=="WEAR")
+	check("away: a reward and a level's lock as before",inCard("cap_gold","Main").Text=="REWARD ONLY" and inCard("cowboy","Main").Text=="BUY · $450")
+	M.waypoint=nil
+	inCard("beanie_orange","Main").Activated:Fire()
+	check("its press: who sells it and the GPS to the gear stall, no remote",#M.sent==before and toasts[#toasts]=="Dot sells it at the gear stall. It's on your GPS."
+		and M.waypoint~=nil and M.waypoint.X==gear.x and M.waypoint.Z==gear.z and showing("style"))
+	inCard("beanie_orange","Try").Activated:Fire()
+	check("away: TRY previews, the caption says who sells it",M.previews[#M.previews].id=="beanie_orange" and text("BEANIE · SAFETY ORANGE · Dot sells it at the gear stall.")~=nil and #M.sent==before)
+	inCard("cap_red","Main").Activated:Fire()
+	check("away: WEAR works anywhere",lastSent("Style").args[1]=="wear" and lastSent("Style").args[2]=="cap_red")
+	local drawn=#M.previews
+	StyleApp.tick()
+	check("standing still draws nothing again",#M.previews==drawn)
+	M.stand(gear.x,gear.z);StyleApp.tick()
+	check("back at the gear stall: BUY again",inCard("beanie_orange","Main").Text=="BUY · $150")
 	named("Close").Activated:Fire()
 	M.flush()
 	check("closed: the keys are free again",M.actions.ZombieDeliveryStyleKeys==nil and Phone.isOpen() and named("More").Visible)
+	-- a clerk's "Style" prompt: the server's ("open", tab) opens the phone on STYLE at that tab
+	Phone.close()
+	M.remotes.Style.OnClientEvent:Fire("open","vehicle")
+	check("Gus's Style prompt opens STYLE on VEHICLE",Phone.isOpen() and showing("style") and named("Tab_vehicle"):FindFirstChild("Underline")~=nil)
+	M.remotes.Style.OnClientEvent:Fire("open","courier")
+	check("Dot's opens it on COURIER (the phone already open)",showing("style") and named("Tab_courier"):FindFirstChild("Underline")~=nil)
+	Phone.close()
+	Phone.setState({phone=false,money=380,kit={},cars={},style={owned={cap_red=true},worn={}}})
+	M.remotes.Style.OnClientEvent:Fire("open","vehicle")
+	check("no phone yet: it says so, nothing opens",not Phone.isOpen() and string.find(toasts[#toasts] or "","No phone yet",1,true)~=nil)
+	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={}}})
+	M.stand(0,0)
 	check("no warnings in STYLE",#M.warnings==0)
 	Phone.close()
 end

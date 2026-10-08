@@ -1379,11 +1379,13 @@ Config.Rewards = {
 	Challenges = { weapon = "deadend", title = "The Last Courier", money = 50000 },
 }
 
--- 6.12: cosmetics (the owner: "something to spend the game's money on, looks only, no advantage"). Bought, worn and
--- taken off in the phone's STYLE app (client/StyleApp.luau, client/StylePreview.luau); the server decides every
--- purchase and puts the looks on (server/StyleWear.luau; the Style remote, Config.Robust.Limits.Style). No numbers of
--- the game change: a cosmetic has no stats. profile.style = { owned = { id → true }, worn = { slot → id } }
--- (shared/Style.luau: the rules; server/PlayerData.luau saves it). The geometry is shared/StyleLooks.luau's, built by
+-- 6.12: cosmetics (the owner: "something to spend the game's money on, looks only, no advantage"). Looked at, tried,
+-- worn and taken off in the phone's STYLE app (client/StyleApp.luau, client/StylePreview.luau). The clerks (the owner:
+-- "things are bought only from the NPCs in the shops, for the vibe"): bought only at a shop that sells the slot (a
+-- slot's `shops`; Counters, their clerks). The server decides every purchase and puts the looks on
+-- (server/StyleWear.luau; the Style remote, Config.Robust.Limits.Style). No numbers of the game change: a cosmetic has
+-- no stats. profile.style = { owned = { id → true }, worn = { slot → id } } (shared/Style.luau: the rules;
+-- server/PlayerData.luau saves it). The geometry is shared/StyleLooks.luau's, built by
 -- shared/StyleBuild.luau: welded, massless, non-colliding, never hit by rays.
 --   look     a hat or a jacket of StyleLooks (built on the courier's classic R15 body, fitted to its real parts), "dye"
 --            (the Courier Vest's or the bag's colour, through KitWear's tint hook), "wrap" (a colour over the car's paint
@@ -1409,19 +1411,33 @@ export type CosmeticDef = {
 	reward: string?,
 	description: string,
 }
-export type CosmeticSlot = { id: string, tab: string, name: string, note: string }
+-- The clerks: a slot's `shops`, the Map.Shops ids that sell it (the first one with a counter: where the app sends you).
+export type CosmeticSlot = { id: string, tab: string, name: string, note: string, shops: { string } }
+-- The clerks: a counter that sells looks (Config.Cosmetics.Counters): its clerk (server/ShopClerks.luau's person, the
+-- same name), the place in a sentence ("Wrench Garage"), the STYLE tab their "Style" prompt opens, the prompt's line.
+export type CosmeticCounter = { clerk: string, place: string, tab: string, pitch: string }
 
 Config.Cosmetics = {
-	-- The slots, one item worn in each, in the app's order; `tab` is the app's tab ("courier" | "vehicle").
+	-- The slots, one item worn in each, in the app's order; `tab` is the app's tab ("courier" | "vehicle"); `shops`, who
+	-- sells it: the courier's looks at the gear stall (Dot's GEAR counter, and Nell's BAGS beside it), the wraps and
+	-- decals at Wrench Garage (Gus), the bike paint at Spoke & Chain (Kip) and at Wrench Garage.
 	Slots = {
-		{ id = "hat", tab = "courier", name = "Hats", note = "Your own hats and hair hide under it while you wear it." },
-		{ id = "jacket", tab = "courier", name = "Jackets", note = "Over your own clothes; the vest and the bag go on top." },
-		{ id = "vest", tab = "courier", name = "Courier Vest colour", note = "Shows on the Courier Vest (Last Stop Supplies) while no Kevlar or heavy vest covers it." },
-		{ id = "bag", tab = "courier", name = "Bag colour", note = "The bag in your hand, whichever bag it is." },
-		{ id = "wrap", tab = "vehicle", name = "Wraps · cars, vans, trucks", note = "A colour wrap over the paint job of every car you own. TAKE OFF shows the paint again." },
-		{ id = "bikepaint", tab = "vehicle", name = "Paint · bikes and the E-Scooter", note = "The frame of every bike you own and of the E-Scooter." },
-		{ id = "decal", tab = "vehicle", name = "Decals · cars, vans, trucks", note = "On every car you own, around its lamps, racks, labels and doors." },
+		{ id = "hat", tab = "courier", name = "Hats", shops = { "supplies", "bags" }, note = "Your own hats and hair hide under it while you wear it." },
+		{ id = "jacket", tab = "courier", name = "Jackets", shops = { "supplies", "bags" }, note = "Over your own clothes; the vest and the bag go on top." },
+		{ id = "vest", tab = "courier", name = "Courier Vest colour", shops = { "supplies", "bags" }, note = "Shows on the Courier Vest (Last Stop Supplies) while no Kevlar or heavy vest covers it." },
+		{ id = "bag", tab = "courier", name = "Bag colour", shops = { "supplies", "bags" }, note = "The bag in your hand, whichever bag it is." },
+		{ id = "wrap", tab = "vehicle", name = "Wraps · cars, vans, trucks", shops = { "mechanic" }, note = "A colour wrap over the paint job of every car you own. TAKE OFF shows the paint again." },
+		{ id = "bikepaint", tab = "vehicle", name = "Paint · bikes and the E-Scooter", shops = { "bikes", "mechanic" }, note = "The frame of every bike you own and of the E-Scooter." },
+		{ id = "decal", tab = "vehicle", name = "Decals · cars, vans, trucks", shops = { "mechanic" }, note = "On every car you own, around its lamps, racks, labels and doors." },
 	} :: { CosmeticSlot },
+	-- The shops whose clerk sells looks (Map.Shops ids): server/ShopClerks.luau gives the clerk a "Style" prompt beside
+	-- "Shop" (`pitch` after their name) that opens the phone's STYLE on `tab`. Nell at ZDC Bags, next to Dot, sells the
+	-- courier's looks too (the slots' shops) but has no prompt of her own.
+	Counters = {
+		supplies = { clerk = "Dot", place = "the gear stall", tab = "courier", pitch = "Looks for you" },
+		mechanic = { clerk = "Gus", place = "Wrench Garage", tab = "vehicle", pitch = "Looks for your rides" },
+		bikes = { clerk = "Kip", place = "Spoke & Chain", tab = "vehicle", pitch = "Paint for your bikes" },
+	} :: { [string]: CosmeticCounter },
 	Items = {
 		-- Hats (StyleLooks.hat: fitted to the head; the player's own hat and hair accessories hide under it)
 		{ id = "cap_red", name = "Backwards Cap · ZDC Red", slot = "hat", look = "cap", price = 120, color = { 196, 40, 38 }, trim = { 28, 31, 34 }, description = "The dispatcher's favourite, worn the courier way." },

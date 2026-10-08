@@ -6,7 +6,9 @@
 -- massless and out of the physics; a hat's crown wider than the head and over its top, its rim above the eyes, near
 -- the head; a jacket's shells round their parts (thin), its details on them, its torso under the Courier Vest's cloth.
 -- A replaced head (the avatar loading) is noticed; the player's own hat and hair hide under a STYLE hat and come back.
--- The vest's and every bag's colour go on (and off) through KitWear's tint hook. Run by tools/character-art/check.py.
+-- The vest's and every bag's colour go on (and off) through KitWear's tint hook. 6.12, the clerks: the Style remote's
+-- "buy" (StyleWear.handle) only where the look is sold, by where the character stands; wear and take off anywhere.
+-- Run by tools/character-art/check.py.
 local M = require("./mock")
 local Instance, Vector3, CFrame = M.Instance, M.Vector3, M.CFrame
 local Geometry = require("./Geometry")
@@ -249,7 +251,69 @@ do
 	end
 end
 
-print(`style looks built: {built} (every hat and jacket on both bodies, {parts} parts); a crown's rim at {string.format("%.2f", lowest)} of the head's height at the lowest, a part {string.format("%.2f", widest)} from the head's middle at the farthest; {tinted} vest and bag parts dyed and undyed`)
+-- 6.12, the clerks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): the Style remote's
+-- handler on the server, with the character's HumanoidRootPart at the gear stall, at Wrench Garage, at Spoke & Chain
+-- and far from any shop (Map.Shops; the money through PlayerData.spend).
+local bought = 0
+do
+	local Map = require("./Map")
+	local repainted = 0
+	local Vehicles = require("./Stub") :: any -- (StyleWear's Vehicles here: a vehicle look bought repaints your cars)
+	Vehicles.repaint = function()
+		repainted += 1
+	end
+	local character = Instance.new("Model")
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Parent = character
+	local player = { Name = "Buyer", Character = character }
+	local profile = { style = Style.empty(), money = 5000 }
+	PlayerData.profile = profile
+	local function stand(x: number, z: number)
+		root.CFrame = CFrame.new(x, 3, z)
+	end
+	local function at(id: string)
+		stand(Map.Shops[id].x, Map.Shops[id].z)
+	end
+	local function buy(id: string): boolean
+		local money = profile.money
+		StyleWear.handle(player :: any, "buy", id)
+		local def = Style.find(id) :: any
+		local got = profile.style.owned[id] == true
+		if got then
+			bought += 1
+			check(`{id}: paid and worn`, profile.money == money - def.price and profile.style.worn[def.slot] == id, profile.money)
+		else
+			check(`{id}: refused, no money taken`, profile.money == money)
+		end
+		return got
+	end
+	at("mechanic")
+	check("a vest colour at Wrench Garage: refused", not buy("vest_orange"))
+	stand(1e5, 1e5)
+	check("a bag colour far from any shop: refused", not buy("bag_black"))
+	at("supplies")
+	check("a vest colour at Dot's GEAR counter: bought", buy("vest_orange"))
+	at("bags")
+	check("a bag colour at Nell's BAGS counter, beside Dot: bought", buy("bag_black"))
+	check("a wrap at the gear stall: refused", not buy("wrap_teal"))
+	at("bikes")
+	check("a wrap at Spoke & Chain: refused", not buy("wrap_teal"))
+	check("bike paint at Spoke & Chain: bought", buy("bike_mint"))
+	at("mechanic")
+	check("bike paint at Wrench Garage too: bought", buy("bike_sky"))
+	check("a vehicle look bought: your cars repainted", repainted == 2, repainted)
+	check("a reward at its shop: never", not buy("vest_gold"))
+	stand(1e5, 1e5)
+	StyleWear.handle(player :: any, "unwear", "vest")
+	check("TAKE OFF anywhere", profile.style.worn.vest == nil and profile.style.owned.vest_orange == true)
+	StyleWear.handle(player :: any, "wear", "vest_orange")
+	check("WEAR anywhere", profile.style.worn.vest == "vest_orange")
+	player.Character = nil :: any
+	check("no character: no purchase", not buy("vest_blue"))
+end
+
+print(`style looks built: {built} (every hat and jacket on both bodies, {parts} parts); a crown's rim at {string.format("%.2f", lowest)} of the head's height at the lowest, a part {string.format("%.2f", widest)} from the head's middle at the farthest; {tinted} vest and bag parts dyed and undyed; {bought} looks bought only at their shops, refused elsewhere`)
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

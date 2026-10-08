@@ -5,7 +5,11 @@
 -- crown over the head, the jacket's shell under the Courier Vest), and the decals laid on a van's panels round its
 -- lamps and labels. The fit on real bodies and on the real fleet: tools/character-art/style-check.luau and
 -- tools/vehicle-preview/decal-check.luau. Run with tests/run_tests.py.
+-- The clerks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): every slot is sold at
+-- shops that exist (Dot's gear stall, Gus's Wrench Garage, Kip's Spoke & Chain), where you stand decides a purchase
+-- (Style.shopAt / Style.canBuyAt: server/StyleWear.luau's "buy" and the app's BUY), and the toasts say who sells it.
 local Config = require("./Config")
+local Map = require("./Map")
 local Style = require("./Style")
 local StyleLooks = require("./StyleLooks")
 local CharacterGeometry = require("./CharacterGeometry")
@@ -135,6 +139,83 @@ check("the toasts", Style.say("bought", cap) == "Backwards Cap · ZDC Red is you
 	and Style.say("off", cap, "hat") == "Backwards Cap · ZDC Red is off.")
 check("money with thousands", Style.money(1200) == "$1,200" and Style.money(80) == "$80" and Style.money(15000) == "$15,000")
 check("Style.slots: four for the courier, three for the vehicles", #Style.slots("courier") == 4 and #Style.slots("vehicle") == 3)
+
+-- Where the looks are sold (the clerks) ----------------------------------------------------------------------------
+local function same(list: { string }, want: { string }): boolean
+	return table.concat(list, ",") == table.concat(want, ",")
+end
+local SOLD: { [string]: { string } } = {
+	hat = { "supplies", "bags" }, jacket = { "supplies", "bags" }, vest = { "supplies", "bags" }, bag = { "supplies", "bags" },
+	wrap = { "mechanic" }, decal = { "mechanic" }, bikepaint = { "bikes", "mechanic" },
+}
+for _, slot in Config.Cosmetics.Slots do
+	local shops = Style.shopsFor(slot.id)
+	check(`{slot.id}: sold where the owner said`, SOLD[slot.id] ~= nil and same(shops, SOLD[slot.id]), table.concat(shops, ","))
+	local real = #shops > 0
+	for _, id in shops do
+		real = real and Map.Shops[id] ~= nil and Map.shopRadius(id) > 0
+	end
+	check(`{slot.id}: every shop of it is in Map.Shops`, real)
+	local counter, at = Style.counterFor(slot.id)
+	check(`{slot.id}: a clerk sells it, on its tab`, counter ~= nil and at == shops[1] and counter.tab == slot.tab and #counter.clerk > 1 and #counter.place > 3)
+	for _, def in Style.items(slot.id) do
+		if not same(Style.shopsFor(def), shops) then
+			check(`{def.id}: sold where its slot is`, false)
+		end
+	end
+end
+for id, counter in Config.Cosmetics.Counters do
+	check(`counter {id}: a shop of the map that sells looks of its tab`, Map.Shops[id] ~= nil and (counter.tab == "courier" or counter.tab == "vehicle") and #counter.pitch > 3)
+	local sells = false
+	for _, slot in Style.slots(counter.tab) do
+		sells = sells or Style.sells(id, slot.id)
+	end
+	check(`counter {id}: sells something of its tab`, sells)
+end
+check("three clerks: Dot, Gus, Kip", Config.Cosmetics.Counters.supplies.clerk == "Dot" and Config.Cosmetics.Counters.mechanic.clerk == "Gus"
+	and Config.Cosmetics.Counters.bikes.clerk == "Kip" and Config.Cosmetics.Counters.bags == nil)
+check("sells: a shop of the slot, nothing else", Style.sells("mechanic", wrap) and Style.sells("bags", cap) and not Style.sells("supplies", wrap)
+	and not Style.sells("guns", cap) and not Style.sells(nil, cap) and #Style.shopsFor("nonsense") == 0)
+-- where you stand (server/Shops.luau's nearShop: the horizontal distance under Map.shopRadius)
+local function at(id: string, dx: number?): (number, number)
+	local shop = Map.Shops[id]
+	return shop.x + (dx or 0), shop.z
+end
+local bikePaint = Style.find("bike_mint") :: any
+local mx, mz = at("mechanic")
+check("at Wrench Garage: wraps, decals, bike paint; no hats", Style.shopAt(wrap, mx, mz) == "mechanic" and Style.shopAt(decal, mx, mz) == "mechanic"
+	and Style.shopAt(bikePaint, mx, mz) == "mechanic" and Style.shopAt(cap, mx, mz) == nil)
+local bx, bz = at("bikes")
+check("at Spoke & Chain: bike paint only", Style.shopAt(bikePaint, bx, bz) == "bikes" and Style.shopAt(wrap, bx, bz) == nil and Style.shopAt("hat", bx, bz) == nil)
+local gx, gz = at("supplies")
+local nx, nz = at("bags")
+check("at the gear stall (Dot's GEAR or Nell's BAGS): the courier's looks, no wraps", Style.shopAt(cap, gx, gz) == "supplies" and Style.shopAt("vest", nx, nz) ~= nil
+	and Style.sells(Style.shopAt("bag", nx, nz), "bag") and Style.shopAt(wrap, gx, gz) == nil)
+local r = Map.shopRadius("mechanic")
+local inX = at("mechanic", r - 0.5)
+local outX = at("mechanic", r + 0.5)
+check("the shop's radius is the edge", Style.shopAt(wrap, inX, mz) == "mechanic" and Style.shopAt(wrap, outX, mz) == nil)
+check("far from every shop: none", Style.shopAt(cap, 1e5, 1e5) == nil and Style.shopAt(bikePaint, -1e5, 1e5) == nil)
+-- the purchase as server/StyleWear.luau decides it (a wardrobe, money, a level, where the character stands)
+local function buy(def: any, money: number, level: number, x: number, z: number): (boolean, string?)
+	return Style.canBuyAt(Style.empty(), def, money, level, Style.shopAt(def, x, z))
+end
+check("buy at its shop", (buy(wrap, 99999, 15, mx, mz)) and (buy(cap, 120, 1, gx, gz)) and (buy(cap, 120, 1, nx, nz)) and (buy(bikePaint, 150, 1, bx, bz)) and (buy(bikePaint, 150, 1, mx, mz)))
+check("buy away from its shops: \"shop\"", select(2, buy(wrap, 99999, 15, gx, gz)) == "shop" and select(2, buy(cap, 99999, 15, mx, mz)) == "shop"
+	and select(2, buy(wrap, 99999, 15, 1e5, 1e5)) == "shop" and select(2, buy(bikePaint, 99999, 15, gx, gz)) == "shop")
+check("too poor: \"money\" at the shop, \"shop\" away from it", select(2, buy(wrap, 10, 15, mx, mz)) == "money" and select(2, buy(wrap, 10, 15, gx, gz)) == "shop")
+check("a reward or a level says so anywhere", select(2, buy(reward, 99999, 15, gx, gz)) == "reward" and select(2, buy(reward, 99999, 15, 1e5, 1e5)) == "reward"
+	and select(2, buy(cowboy, 99999, cowboy.level - 1, gx, gz)) == "level" and select(2, buy(cowboy, 99999, cowboy.level - 1, mx, mz)) == "level")
+local mine = Style.empty()
+mine.owned.cap_red = true
+check("owned stays owned (no second purchase) anywhere", select(2, Style.canBuyAt(mine, cap, 99999, 15, "supplies")) == "owned" and select(2, Style.canBuyAt(mine, cap, 99999, 15, nil)) == "owned")
+check("the toasts name the clerk and the shop", Style.say("shop", wrap) == "Buy it from Gus at Wrench Garage." and Style.say("shop", cap) == "Buy it from Dot at the gear stall."
+	and Style.say("shop", bikePaint) == "Buy it from Kip at Spoke & Chain or Gus at Wrench Garage."
+	and Style.say("where", wrap) == "Gus sells it at Wrench Garage. It's on your GPS." and Style.say("where", bikePaint) == "Kip sells it at Spoke & Chain. It's on your GPS."
+	and Style.say("sold", cap) == "Dot sells it at the gear stall." and Style.say("notOwned", decal) == "Buy ZDC Logo first, from Gus at Wrench Garage.")
+check("the app's button away from the shop", Style.atLabel(wrap) == "AT WRENCH GARAGE" and Style.atLabel(cap) == "AT THE GEAR STALL" and Style.atLabel(bikePaint) == "AT SPOKE & CHAIN")
+check("who sells a tab's looks", Style.soldBy("courier") == "Dot at the gear stall" and Style.soldBy("vehicle") == "Gus at Wrench Garage and Kip at Spoke & Chain")
+check("no toast says the phone sells", not string.find(string.lower(Style.say("shop", wrap) .. Style.say("where", cap) .. Style.say("notOwned", cap)), "phone", 1, true))
 
 -- The hats and jackets on the classic R15 body ---------------------------------------------------------------------
 local half = Fit.Head / 2

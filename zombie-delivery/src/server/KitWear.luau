@@ -52,8 +52,8 @@
 -- 6.7: the bags are real-size (server/KitArt/Geometry.luau) and so are the pieces packed in them (BagFill); a loaded
 -- bag's moving pieces take their open place first (KitArt.open through BagFill.open: the thermal bag's lid stands open).
 -- 6.12: the tint hook (KitWear.tint, set by server/StyleWear.luau): every slot built (and the bag's art built again for
--- what is in it) is handed to it, so the Courier Vest's cloth and the bag's body take the colour bought in the phone's
--- STYLE app; KitWear.retint(player) hands it the slots worn now (the colour changed).
+-- what is in it) is handed to it, so the Courier Vest's cloth and the bag's body take the colour worn in the phone's
+-- STYLE app (bought from Dot at the gear stall); KitWear.retint(player) hands it the slots worn now (the colour changed).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

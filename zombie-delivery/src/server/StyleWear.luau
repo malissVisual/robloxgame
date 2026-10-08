@@ -3,10 +3,14 @@
 -- server: the wardrobe in the profile (profile.style = { owned, worn }, server/PlayerData.luau saves it), the Style
 -- remote (client/StyleApp.luau, the phone's STYLE app) and the looks on everybody's courier and vehicles.
 --
---   The Style remote: ("buy", id) an item that exists, is sold (not a reward), is not yours, at your level, for its
---   price through PlayerData.spend (the game's one money path); bought, it is worn at once. ("wear", id) one you own,
---   in its slot (one item a slot). ("unwear", slot) off again. Rate limited (Config.Robust.Limits.Style); every answer
---   is a toast (the Notice remote, shared/Style.luau's words); the state (State, Main) carries the wardrobe back.
+--   The Style remote: ("buy", id) an item that exists, is sold (not a reward), is not yours, at your level, while you
+--   stand at one of the shops that sell it (the clerks, the owner: "things are bought only from the NPCs in the shops,
+--   for the vibe": Style.shopAt, server/Shops.luau's nearShop test; away from them "Buy it from Gus at Wrench
+--   Garage."), for its price through PlayerData.spend (the game's one money path); bought, it is worn at once.
+--   ("wear", id) one you own, in its slot (one item a slot), and ("unwear", slot) off again: anywhere. Rate limited
+--   (Config.Robust.Limits.Style); every answer is a toast (the Notice remote, shared/Style.luau's words); the state
+--   (State, Main) carries the wardrobe back. server → client: ("open", tab) the phone's STYLE app on that tab
+--   (StyleWear.invite: a clerk's "Style" prompt, server/ShopClerks.luau).
 --   StyleWear.give(player, id) gives an item without money (the rewards of later tasks, events and passes).
 --
 --   The looks (shared/StyleBuild.luau, shared/StyleLooks.luau): all decorative parts, massless, never colliding,
@@ -263,7 +267,10 @@ local function onStyle(player: Player, action: any, arg: any)
 		if not def then
 			return
 		end
-		local ok, why = Style.canBuy(style, def, profile.money, PlayerData.level(player))
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local shop = if root and root:IsA("BasePart") then Style.shopAt(def, root.Position.X, root.Position.Z) else nil
+		local ok, why = Style.canBuyAt(style, def, profile.money, PlayerData.level(player), shop)
 		if not ok then
 			tell(player, Style.say(why or "money", def))
 			return
@@ -307,6 +314,8 @@ local function onStyle(player: Player, action: any, arg: any)
 	apply(player, slot)
 end
 
+StyleWear.handle = onStyle -- (the offline check, tools/character-art/style-check.luau, calls it as the remote would)
+
 -- 6.12: an item given without money (later: the rewards of the daily tasks, events and passes). True when it is new;
 -- `wear`: put it on too.
 function StyleWear.give(player: Player, id: string, wear: boolean?): boolean
@@ -322,6 +331,20 @@ function StyleWear.give(player: Player, id: string, wear: boolean?): boolean
 	end
 	PlayerData.notify(player)
 	return true
+end
+
+-- The clerks: a clerk's "Style" prompt (server/ShopClerks.luau) opens the phone's STYLE app on `tab` ("courier" |
+-- "vehicle") for that player; without the phone (Marge gives it) a toast says so.
+function StyleWear.invite(player: Player, tab: string)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return
+	end
+	if profile.phone ~= true then
+		tell(player, "No phone yet: Marge by the job board gives you one. The looks are in its STYLE app.")
+		return
+	end
+	Net.get("Style"):FireClient(player, "open", tab)
 end
 
 function StyleWear.start()

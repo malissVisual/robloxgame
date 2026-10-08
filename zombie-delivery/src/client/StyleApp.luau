@@ -1,15 +1,23 @@
 --!strict
 -- 6.12: the courier phone's STYLE app (MORE → STYLE; client/Phone.luau draws it in its centred popup with the phone's
--- own kit, OrdersUi.Kit): the cosmetics of Config.Cosmetics to spend your money on. Looks only, no advantage.
+-- own kit, OrdersUi.Kit): the wardrobe of Config.Cosmetics' looks, bought from the clerks at the shops. Looks only, no
+-- advantage.
 --   * Two tabs: COURIER (hats, jackets, the Courier Vest's colour, the bag's colour) and VEHICLE (wraps for the cars,
 --     vans and trucks, paint for the bikes and the E-Scooter, decals). Under them the live 3D preview
 --     (client/StylePreview.luau: your courier or the vehicle you have out, the item you look at put on it), then a
 --     section a slot (what you wear in it) and a card an item: its colours, its name, OWNED / WEARING / its price (or
 --     🏆 REWARD: not for sale, given later by tasks, events, passes; 🔒 its level), a line about it, TRY (the preview)
---     and BUY · $price, WEAR or TAKE OFF.
+--     and BUY · $price (at a shop that sells it; elsewhere where it is sold, "AT WRENCH GARAGE"), WEAR or TAKE OFF.
 --   * BUY / WEAR / TAKE OFF ask the server (the Style remote: server/StyleWear.luau checks everything and takes the
 --     money); what you can't do yet only says why (your level, your money, a reward). A purchase plays "cash" when the
 --     state brings it back. The cards follow the state (StyleApp.changed: only what the app shows).
+--   * The clerks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): the phone is the
+--     wardrobe. BUY · $price only while you stand at one of the item's shops (Style.shopAt, the server's test, on your
+--     character); elsewhere an item for sale says where it is sold ("AT WRENCH GARAGE"): a press sets the GPS there
+--     (the SHOP app's path, host.gps) and says who sells it. What you own is worn and taken off anywhere, TRY previews
+--     anywhere. Where you stand is part of StyleApp.key: the phone's ticker (StyleApp.tick, twice a second while the
+--     app shows) draws the cards again when you walk up to a shop or away. A clerk's "Style" prompt opens the app on
+--     their tab (server/ShopClerks.luau → the Style remote's ("open", tab), client/Phone.luau; StyleApp.show).
 --   * Keys while the app is open (bound with ContextActionService only then): TAB, the gamepad's L1 / R1 switch the
 --     tab; ↑ / ↓ pick the item before / after (the preview follows, the list scrolls to it); ENTER does its main
 --     action. A gamepad's selection moving over a card's buttons previews that card.
@@ -99,6 +107,25 @@ local function send(action: string, arg: string)
 	Net.get("Style"):FireServer(action, arg)
 end
 
+-- Where your character stands (x, z), or nil without one.
+local function spot(): (number?, number?)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		return root.Position.X, root.Position.Z
+	end
+	return nil, nil
+end
+
+-- The one of the item's (or the slot's) shops you stand at, or nil.
+local function shopHere(item: Config.CosmeticDef | string): string?
+	local x, z = spot()
+	if x == nil or z == nil then
+		return nil
+	end
+	return Style.shopAt(item, x, z)
+end
+
 -- The main action of an item (BUY, WEAR, TAKE OFF), or why it can't be done (a toast).
 local function act(def: Config.CosmeticDef, host: Host)
 	local state = host.state()
@@ -109,8 +136,16 @@ local function act(def: Config.CosmeticDef, host: Host)
 	elseif now == "owned" then
 		send("wear", def.id)
 	else
-		local ok, why = Style.canBuy(style, def, moneyOf(state), level())
-		if not ok then
+		local ok, why = Style.canBuyAt(style, def, moneyOf(state), level(), shopHere(def))
+		if not ok and why == "shop" then
+			-- away from its shops: the GPS to the one that sells it (as the SHOP app's list), and who that is
+			local _, shop = Style.counterFor(def)
+			if shop then
+				host.gps(shop)
+			end
+			host.notify(Style.say("where", def))
+			return
+		elseif not ok then
 			host.notify(Style.say(why or "money", def))
 			return
 		end
@@ -133,6 +168,8 @@ local function preview(def: Config.CosmeticDef?)
 		text = `{text}{if text ~= "" then " · " else ""}{if ok and type(note) == "string" then note else "No preview here."}`
 	elseif type(note) == "string" and note ~= "" then
 		text = `{text} · {note}`
+	elseif def and shown.host and Style.state(wardrobe(shown.host.state()), def) == "sale" and not shopHere(def) then
+		text = `{text} · {Style.say("sold", def)}` -- (tried away from its shop: who sells it)
 	end
 	if caption and caption:IsA("TextLabel") then
 		caption.Text = text
@@ -352,8 +389,13 @@ local function card(parent: Instance, def: Config.CosmeticDef, order: number, lo
 	elseif now == "reward" then
 		label, kind = "REWARD ONLY", "off"
 	else
-		local ok = Style.canBuy(style, def, money, lvl)
-		label, kind = `BUY · {Style.money(def.price)}`, if ok then "main" else "off"
+		local here = shopHere(def)
+		if here or locked then
+			local ok = Style.canBuyAt(style, def, money, lvl, here)
+			label, kind = `BUY · {Style.money(def.price)}`, if ok then "main" else "off"
+		else
+			label, kind = Style.atLabel(def), "off" -- (sold at a shop: a press sets the GPS there)
+		end
 	end
 	local main = look.button(half(2), label, kind, 1, function()
 		act(def, host)
@@ -387,8 +429,9 @@ function StyleApp.render(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	local holder = Ui.make("Frame", { Name = "Preview", Size = UDim2.new(1, 0, 0, 200), BackgroundColor3 = K.charcoal, BorderSizePixel = 0, LayoutOrder = 1, ClipsDescendants = true }, b)
 	Ui.label(b, "", UDim2.new(1, 0, 0, 18), { Name = "PreviewCaption", TextSize = 12, TextColor3 = K.secondary, LayoutOrder = 2 })
 	shown.preview = holder
-	look.meta(list, if tab == "courier" then "Looks only: no item changes a number of the game. Your own look stays under them."
-		else "Looks only: on every vehicle of yours it fits. A lent company vehicle and a ZDC RIDE scooter keep theirs.", 3)
+	look.meta(list, `Buy them from {Style.soldBy(tab)}; wear them from here, anywhere. `
+		.. (if tab == "courier" then "Looks only: no item changes a number of the game; your own look stays under them."
+			else "Looks only, on every vehicle of yours they fit; a lent company vehicle and a ZDC RIDE scooter keep theirs."), 3)
 	local n = 4
 	for _, slot in Style.slots(tab) do
 		local worn = Style.worn(style, slot.id)
@@ -408,16 +451,35 @@ function StyleApp.render(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	shown.key = StyleApp.key(state)
 end
 
--- What the app shows of the state (the wardrobe, what you can afford, your level): a redraw only when it changes.
+-- What the app shows of the state (the wardrobe, what you can afford, your level) and of where you stand (at which
+-- slots' shops): a redraw only when it changes.
 function StyleApp.key(state: any): string
 	local style = wardrobe(state)
 	local money, lvl = moneyOf(state), level()
-	local parts: { string } = { Style.key(style, { "hat", "jacket", "vest", "bag", "wrap", "bikepaint", "decal" }), `lv{lvl}` }
+	local parts: { string } = { Style.key(style, { "hat", "jacket", "vest", "bag", "wrap", "bikepaint", "decal" }), `lv{lvl}@` }
+	for _, slot in Config.Cosmetics.Slots do
+		table.insert(parts, if shopHere(slot.id) then "1" else "0")
+	end
 	for _, def in Config.Cosmetics.Items do
 		local owned = style.owned[def.id] == true
 		table.insert(parts, if owned then "o" elseif Style.canBuy(style, def, money, lvl) then "b" else "-")
 	end
 	return table.concat(parts, "")
+end
+
+-- The phone's ticker while STYLE shows (twice a second): you walked up to a shop or away, the cards follow.
+function StyleApp.tick()
+	local host = shown.host
+	if host and shown.row and shown.row.Parent and StyleApp.key(host.state()) ~= shown.key then
+		host.redraw()
+	end
+end
+
+-- A clerk's "Style" prompt (the Style remote's ("open", tab), client/Phone.luau): the app opens on that tab.
+function StyleApp.show(tab: any)
+	if tab == "courier" or tab == "vehicle" then
+		StyleApp.tab = tab
+	end
 end
 
 -- A new state (Phone.setState): a purchase asked for here plays "cash" once it is yours; true when the open app

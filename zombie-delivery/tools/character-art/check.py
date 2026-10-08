@@ -113,13 +113,17 @@ def style_check(tmp, luau):
     src = ROOT / "src"
     prefix = ('local M=require("./mock")\nlocal game,Instance,Vector3,Color3,CFrame,UDim2,Enum,workspace,typeof=M.game,M.Instance,'
               'M.Vector3,M.Color3,M.CFrame,M.UDim2,M.Enum,M.workspace,M.typeof\n')
-    for name in ("Style", "StyleLooks"):
+    for name in ("Style", "StyleLooks", "Map"):  # (6.12, the clerks: Style knows the shops, Map.Shops)
         text = (src / "shared" / f"{name}.luau").read_text()
         (tmp / f"{name}.luau").write_text(re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text))
     build = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', (src / "shared/StyleBuild.luau").read_text())
     (tmp / "StyleBuild.luau").write_text(prefix + build)
-    # the profile StyleWear reads (the check sets it)
-    (tmp / "StylePlayerData.luau").write_text("local M = { profile = nil }\nfunction M.get() return M.profile end\nreturn M\n")
+    # the profile StyleWear reads (the check sets it); 6.12, the clerks: the level, the money and the state's push for
+    # the Style remote's "buy" (StyleWear.handle)
+    (tmp / "StylePlayerData.luau").write_text(
+        "local M = { profile = nil, at = 15, notified = 0 }\nfunction M.get() return M.profile end\n"
+        "function M.level() return M.at end\nfunction M.notify() M.notified += 1 end\n"
+        "function M.spend(_, n) if M.profile.money < n then return false end\nM.profile.money -= n\nreturn true end\nreturn M\n")
     wear = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', (src / "server/StyleWear.luau").read_text())
     for module, local in (("PlayerData", "StylePlayerData"), ("Vehicles", "Stub"), ("KitWear", "KitWear")):
         call = f"require(script.Parent.{module})"

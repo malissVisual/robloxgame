@@ -32,6 +32,9 @@
 --   before; only home is regrouped.
 -- 6.12, MORE → TASKS (client/TasksApp.luau): the daily and weekly tasks in the popup. The rewards waiting to be
 --   claimed go on its row, on MORE and on the phone's dot (with the unread messages: Phone.onUnread).
+-- 6.12, MORE → STYLE (client/StyleApp.luau): the wardrobe; the looks are bought from the clerks at the shops. A clerk's
+--   "Style" prompt (the Style remote's ("open", tab)) opens the phone on STYLE at that tab; the ticker re-checks the
+--   shop you stand at while it shows.
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -109,7 +112,7 @@ local TILES: { AppDef } = {
 local MORE: { AppDef } = {
 	{ id = "career", name = "CAREER", sub = "Your level and what's next" },
 	{ id = "tasks", name = "TASKS", sub = "Daily and weekly tasks" }, -- 6.12
-	{ id = "style", name = "STYLE", sub = "Looks for you and your rides" },
+	{ id = "style", name = "STYLE", sub = "Your looks; buy them at the shops" }, -- (the clerks sell them: client/StyleApp.luau)
 	{ id = "missions", name = "MISSIONS", sub = "Missions and challenges", window = true },
 	{ id = "crew", name = "CREW", sub = "Work with friends", window = true },
 	{ id = "top", name = "TOP", sub = "The best couriers", window = true },
@@ -1629,6 +1632,8 @@ local function startTicker()
 					if refs.route then refs.route.update() end
 				elseif app == "tasks" then
 					refs.tasks.tick() -- 6.12: the time until the tasks are new
+				elseif app == "style" then
+					refs.style.tick() -- 6.12: you walked up to a shop that sells looks, or away: BUY there, "AT …" elsewhere
 				end
 				if refs.tow and refs.idMoney then
 					refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
@@ -2131,6 +2136,14 @@ function Phone.start()
 			if type(gps) == "table" and type(gps.id) == "string" then
 				gpsTo(gps.id)
 			end
+		end
+	end)
+	-- 6.12, the clerks: Dot's, Gus's or Kip's "Style" prompt (server/ShopClerks.luau, StyleWear.invite): the STYLE app
+	-- on their tab (no phone: openPhone says so).
+	Net.get("Style").OnClientEvent:Connect(function(action, tab)
+		if action == "open" then
+			refs.style.show(tab)
+			Phone.open("style")
 		end
 	end)
 	player:GetAttributeChangedSignal("Xp"):Connect(onXp)

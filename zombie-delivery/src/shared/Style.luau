@@ -18,9 +18,21 @@
 --   Style.key(style, slots)                  the worn items of these slots as one string (a look changed?)
 --   Style.say(kind, def, slot?)              the toast for an answer (English, the game's words)
 --   Style.rgb(c, k?)                         a colour { r, g, b } scaled by k (a shade), clamped to 0 … 255
+-- The clerks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): the phone shows, tries
+-- and wears; a look is bought only at a shop that sells its slot (Config.Cosmetics: a slot's `shops`, the Counters).
+--   Style.shopsFor(def or slot)              the Map.Shops ids that sell it, in Config's order
+--   Style.sells(shop, def or slot)           does that shop sell it
+--   Style.shopAt(def or slot, x, z)          the one of its shops you stand at (server/Shops.luau's nearShop: the
+--                                            horizontal distance to Map.Shops[id] under Map.shopRadius(id)), or nil
+--   Style.counterFor(def or slot)            the counter that sells it (its first shop with a clerk) and that shop's id
+--   Style.canBuyAt(style, def, money, level, shop?)  Style.canBuy, and the shop you stand at (`shop`, nil: none) must
+--                                            sell it: false and "shop" (checked after "level", before "money")
+--   Style.atLabel(def) / Style.soldBy(tab)   "AT WRENCH GARAGE" (the app's button away from the shop); "Gus at Wrench
+--                                            Garage and Kip at Spoke & Chain" (who sells a tab's looks)
 -- Pure Luau (tests/style_test.luau).
 
 local Config = require(script.Parent.Config)
+local Map = require(script.Parent.Map)
 
 local Style = {}
 
@@ -149,6 +161,81 @@ function Style.key(style: Wardrobe, slots: { string }): string
 	return table.concat(parts, ";")
 end
 
+-- ── Where it is sold (the clerks) ─────────────────────────────────────────────
+
+local function slotOf(item: Config.CosmeticDef | string): Config.CosmeticSlot?
+	return Style.slot(if type(item) == "string" then item else item.slot)
+end
+
+function Style.shopsFor(item: Config.CosmeticDef | string): { string }
+	local slot = slotOf(item)
+	return if slot and slot.shops then slot.shops else {}
+end
+
+function Style.sells(shop: string?, item: Config.CosmeticDef | string): boolean
+	return shop ~= nil and table.find(Style.shopsFor(item), shop) ~= nil
+end
+
+function Style.shopAt(item: Config.CosmeticDef | string, x: number, z: number): string?
+	for _, id in Style.shopsFor(item) do
+		local shop = Map.Shops[id]
+		if shop then
+			local dx, dz = x - shop.x, z - shop.z
+			if math.sqrt(dx * dx + dz * dz) < Map.shopRadius(id) then
+				return id
+			end
+		end
+	end
+	return nil
+end
+
+function Style.counterFor(item: Config.CosmeticDef | string): (Config.CosmeticCounter?, string?)
+	for _, id in Style.shopsFor(item) do
+		local counter = Config.Cosmetics.Counters[id]
+		if counter then
+			return counter, id
+		end
+	end
+	return nil, nil
+end
+
+function Style.canBuyAt(style: Wardrobe, def: Config.CosmeticDef, money: number, level: number, shop: string?): (boolean, string?)
+	local ok, why = Style.canBuy(style, def, money, level)
+	if (ok or why == "money") and not Style.sells(shop, def) then
+		return false, "shop"
+	end
+	return ok, why
+end
+
+function Style.atLabel(def: Config.CosmeticDef | string): string
+	local counter = Style.counterFor(def)
+	return if counter then `AT {string.upper(counter.place)}` else "AT A SHOP"
+end
+
+-- "Gus at Wrench Garage" for each counter that sells these slots (each once, in Config's order), joined with `join`.
+local function clerks(slots: { string }, join: string): string
+	local names: { string } = {}
+	local seen: { [string]: boolean } = {}
+	for _, slot in slots do
+		for _, id in Style.shopsFor(slot) do
+			local counter = Config.Cosmetics.Counters[id]
+			if counter and not seen[id] then
+				seen[id] = true
+				table.insert(names, `{counter.clerk} at {counter.place}`)
+			end
+		end
+	end
+	return if #names > 0 then table.concat(names, join) else "the shops"
+end
+
+function Style.soldBy(tab: string): string
+	local slots: { string } = {}
+	for _, slot in Style.slots(tab) do
+		table.insert(slots, slot.id)
+	end
+	return clerks(slots, " and ")
+end
+
 local function money(n: number): string
 	local text = tostring(math.floor(n))
 	local formatted = text:reverse():gsub("(%d%d%d)", "%1,"):reverse()
@@ -177,7 +264,17 @@ function Style.say(kind: string, def: Config.CosmeticDef?, slot: string?): strin
 	elseif kind == "owned" then
 		return `{name} is yours already: WEAR it.`
 	elseif kind == "notOwned" then
-		return `Buy {name} first.`
+		return if def then `Buy {name} first, from {clerks({ def.slot }, " or ")}.` else `Buy {name} first.`
+	elseif kind == "shop" then
+		-- (the server's refusal away from its shops: who sells it, and where)
+		return `Buy it from {if def then clerks({ def.slot }, " or ") else "the shops"}.`
+	elseif kind == "where" then
+		-- (the app's button away from its shops: its GPS goes to the first one)
+		local counter = if def then Style.counterFor(def) else nil
+		return if counter then `{counter.clerk} sells it at {counter.place}. It's on your GPS.` else "It's sold at the shops."
+	elseif kind == "sold" then
+		local counter = if def then Style.counterFor(def) else nil
+		return if counter then `{counter.clerk} sells it at {counter.place}.` else ""
 	end
 	return name
 end
