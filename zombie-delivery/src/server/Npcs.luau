@@ -92,7 +92,8 @@ local function warmBases()
 			return CharacterRig.build(CharacterGeometry.spec("person", if child then KID_SCALE else 1))
 		end)
 		if not ok then
-			warn(`[Npcs] no realistic body, Roblox's own: {rig}`)
+			-- 6.8.1: in Studio this has meant an old copy of CharacterArt/Geometry (a mix of old and new scripts)
+			warn(`[Npcs] no realistic body, Roblox's own: {rig}. If it says "Unknown character art", Studio holds an old copy of a script: start rojo-sync again and Disconnect / Connect Rojo.`)
 			ok, rig = pcall(function(): Model
 				local d = Instance.new("HumanoidDescription")
 				if child then
