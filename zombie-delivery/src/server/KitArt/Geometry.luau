@@ -263,4 +263,34 @@ function Geometry.spec(id: string): any
 		} else {},
 	}
 end
+-- 6.8: the bags a little wider and deeper (the 6.7 body is ~30 cm a stud, the bags were drawn at ~35: they read ~15%
+-- small), never taller (a bag in the hand stays clear of the ground: tools/character-art/bag-check). Across (x) and
+-- along (z) only, the grip still at the origin; BagFill's mouths in Config.Courier.BagFill grow the same. Not the
+-- duffel: a lying cylinder, wider would be taller too (a full one in an R6 hand then drags), and it is 70 cm already.
+Geometry.BagScale = { bag = 1.15, tote = 1.15, thermal = 1.15, padded = 1.15, duffel = 1 } :: { [string]: number }
+do
+	local drawn = Geometry.pieces
+	Geometry.pieces = function(id: string): { Piece }
+		local out = drawn(id)
+		if not Geometry.bags[id] then
+			return out
+		end
+		local k = Geometry.BagScale[id] or 1
+		local scaled: { Piece } = {}
+		for _, piece in out do
+			local copy = table.clone(piece)
+			copy.size = { piece.size[1] * k, piece.size[2], piece.size[3] * k }
+			copy.at = { piece.at[1] * k, piece.at[2], piece.at[3] * k }
+			table.insert(scaled, copy)
+		end
+		return scaled
+	end
+	for id, moving in Geometry.open do
+		local k = Geometry.BagScale[id] or 1
+		for _, place in moving do
+			place.at = { place.at[1] * k, place.at[2], place.at[3] * k }
+		end
+	end
+end
+
 return Geometry

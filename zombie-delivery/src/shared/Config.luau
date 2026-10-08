@@ -3327,11 +3327,12 @@ Config.Courier = {
 		Bulge = 0.25,
 		Swell = 0.06,
 		Mouth = {
-			bag = { y = -0.39, x = 0.5, z = 1.04, d = 1.08, bulge = 0.25 },
-			tote = { y = -0.67, x = 0.32, z = 1.06, d = 1.04, bulge = 0.3 },
-			thermal = { y = -0.52, x = 1.04, z = 1.2, d = 0.86, bulge = 0.04 }, -- (rigid: it hardly swells)
-			padded = { y = -0.57, x = 0.3, z = 1.08, d = 0.82, bulge = 0.12 },
-			duffel = { y = -0.4, x = 0.56, z = 1.6, d = 0.9, bulge = 0.15 }, -- (the open zip along its top)
+			-- (6.8: x and z grown with KitArt's Geometry.BagScale 1.15: the bags a little wider and deeper)
+			bag = { y = -0.39, x = 0.575, z = 1.196, d = 1.08, bulge = 0.25 },
+			tote = { y = -0.67, x = 0.368, z = 1.219, d = 1.04, bulge = 0.3 },
+			thermal = { y = -0.52, x = 1.196, z = 1.38, d = 0.86, bulge = 0.04 }, -- (rigid: it hardly swells)
+			padded = { y = -0.57, x = 0.345, z = 1.242, d = 0.82, bulge = 0.12 },
+			duffel = { y = -0.4, x = 0.56, z = 1.6, d = 0.9, bulge = 0.15 }, -- (the open zip along its top; 6.8: not grown)
 		} :: { [string]: { y: number, x: number, z: number, d: number, bulge: number? } },
 		Packed = {
 			pizza = { size = { 0.95, 0.12, 0.95 }, stack = true },
