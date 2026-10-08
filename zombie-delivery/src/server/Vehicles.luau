@@ -199,6 +199,9 @@ Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
 -- 5.4, set by server/Fuel.luau: a car was just built for its player (every spawn, call, rebuild, garage swap): its
 -- tank's attributes (Fuel, Tank) are written before it is anybody's to drive.
 Vehicles.onSpawned = function(_car: Car) end
+-- 6.12, set by server/StyleWear.luau: a car was built, repainted or got a new kit or gun: its STYLE looks go on (a
+-- wrap over the paint, a bike's frame colour, a decal round its new parts). Never changes its physics.
+Vehicles.onStyle = function(_car: Car) end
 
 local DARK = Color3.fromRGB(34, 34, 38)
 local GLASS = Color3.fromRGB(150, 190, 210)
@@ -3934,6 +3937,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	car.model:SetAttribute("Rental", if rental then true else nil) -- 5.6: a ZDC RIDE rental (server/Rental.luau)
 	writeAttributes(car)
 	Vehicles.onSpawned(car) -- 5.4: its fuel (server/Fuel.luau)
+	Vehicles.onStyle(car) -- 6.12: its STYLE looks (server/StyleWear.luau)
 	watchPrompts(car)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then
@@ -4209,6 +4213,7 @@ function Vehicles.refreshStats(player: Player)
 	if key ~= car.kit then
 		car.kit = key
 		buildKit(car.model, car.chassis, styleOf(car), levels, car.id, car.gear)
+		Vehicles.onStyle(car) -- 6.12: a decal goes round the new kit
 		-- The new parts joined the car's assembly: the driver's client keeps simulating it.
 		pcall(function()
 			car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
@@ -4225,6 +4230,7 @@ function Vehicles.repaint(player: Player)
 		return -- (5.6: a rental keeps the ZDC RIDE colours)
 	end
 	applyPaint(car.paintParts, def, if def.company then nil else profile.carPaint[car.id])
+	Vehicles.onStyle(car) -- 6.12: a STYLE wrap goes over the paint again (and the frame, the decal)
 end
 
 -- A car gun bought (or changed): the live car gets the turret that fits it now, or loses the one it should not have.
@@ -4252,6 +4258,7 @@ function Vehicles.refreshGun(player: Player)
 		end)
 	end
 	car.model:SetAttribute("CarGun", want)
+	Vehicles.onStyle(car) -- 6.12: a decal goes round the gun on the roof (or over its place again)
 end
 
 -- The light bar on (an ambulance on a job) or off; every client flashes it (client/Weather.luau).

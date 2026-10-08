@@ -107,6 +107,7 @@ local function sendState(player: Player)
 		kit = profile.kit, -- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau)
 		-- 6.4: the bag in your hand (the server's answer: the choice, else the best owned; nil without a bag)
 		bag = (require(Shared.Transport).activeBag(profile.kit, profile.activeBag) or ({} :: any)).id,
+		style = profile.style, -- 6.12: the cosmetics owned and worn (the phone's STYLE app)
 		phone = profile.phone, -- 5.0: Marge gave the phone (client/Phone.luau shows it)
 		vanQuest = profile.vanQuest, -- 5.0: Earl's van (nil, "open", "done"; the phone's SHOP, the career road)
 	})
@@ -229,6 +230,7 @@ safely("Transport", Transport.start) -- 5.0: the kit's walk speed on the charact
 safely("VanQuest", VanQuest.start) -- 5.0: Earl's van, Marge's quest at level 4
 safely("KitWear", KitWear.start) -- 5.0: the kit you own worn on your character, the phone in your hand
 safely("Fuel", Fuel.start) -- 5.4: the tanks, the burn, the pumps, the jerry cans, the tow
+safely("StyleWear", require(Server.StyleWear).start) -- 6.12: the cosmetics (the STYLE app), after KitWear and Vehicles
 safely("Wheelie", require(Server.Wheelie).start) -- 6.10: the E-Scooter's wheelie, checked and shown to everybody
 safely("Buses", require(Server.Buses).start) -- 5.5: the city buses (their stops: World's build list)
 safely("Rental", require(Server.Rental).start) -- 5.6: ZDC RIDE, the free rental scooters and their docks

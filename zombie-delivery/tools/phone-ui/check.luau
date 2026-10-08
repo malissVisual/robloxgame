@@ -40,11 +40,11 @@ for _,name in {"JOBS","MAP","SHOP","BAG & ITEMS","GARAGE","MORE"} do
 	check(`the {name} tile has its name and a one-line subtitle`,label~=nil and label.Parent.Parent==named("Tiles") and label.Parent:FindFirstChild("Sub")~=nil and label.Parent:FindFirstChild("Sub").Text~="")
 end
 check("JOBS carries the red edge",named("jobsApp"):FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red)
-check("MORE: career, missions, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,missions,crew,top,estate,bank,messages,settings")
+check("MORE: career, style (6.12), missions, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,style,missions,crew,top,estate,bank,messages,settings")
 check("MORE waits behind the tiles",named("Home").Visible and not named("More").Visible)
-check("all fourteen apps constructed",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==14)
+check("all fifteen apps constructed",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==15)
 check("the messages row is always on home",named("MessagesRow")~=nil and named("MessagesRow").Visible and text("No new messages")~=nil)
-check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==14)
+check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==15)
 do
 	local icons=require("./Icons")
 	icons.Ids.app_settings="rbxassetid://12345"
@@ -302,6 +302,71 @@ check("JOBS' badge: one open order",named("jobsApp"):FindFirstChild("Badge").Tex
 M.remotes.Job.OnClientEvent:Fire(nil)
 check("the run ends: BAG & ITEMS falls back to ITEMS",named("Tab_bag")==nil and named("Tab_items")~=nil)
 Phone.close()
+-- 6.12: STYLE (client/StyleApp.luau): the tabs, the preview, a card an item with its price; BUY / WEAR / TAKE OFF ask
+-- the server through the Style remote; what can't be done yet says why; the purchase's "cash"; the keys while open.
+do
+	local function inCard(id,name)
+		local card=named(`Style_{id}`)
+		return card and all(card,function(object) return object.Name==name end)[1]
+	end
+	local function styleSent() return lastSent("Style") end
+	Phone.setState({phone=true,money=300,kit={},cars={},style={owned={},worn={}}})
+	Phone.open();named("moreApp").Activated:Fire();named("styleApp").Activated:Fire()
+	check("STYLE opens in the popup on COURIER",showing("style") and text("STYLE")~=nil and named("Tab_courier")~=nil and named("Tab_vehicle")~=nil and named("Tab_courier"):FindFirstChild("Underline")~=nil)
+	check("its sections: hats, jackets, the vest's and the bag's colours",text("Hats · your own")~=nil and text("Jackets · your own")~=nil and text("Courier Vest colour · your own")~=nil and text("Bag colour · your own")~=nil)
+	check("the live preview shows the courier with the first item",#M.previews>0 and M.previews[#M.previews].tab=="courier" and M.previews[#M.previews].id=="cap_red" and named("Preview")~=nil)
+	check("a card an item: its colours, name, price",named("Style_cap_red")~=nil and text("BACKWARDS CAP · ZDC RED")~=nil and inCard("cap_red","Colour1")~=nil and inCard("cap_red","Colour2")~=nil and text("$120")~=nil)
+	check("a reward is flagged",inCard("cap_gold","Main")~=nil and inCard("cap_gold","Main").Text=="REWARD ONLY" and text("🏆 REWARD")~=nil)
+	check("a level's lock shows",text("🔒 LEVEL 4")~=nil)
+	check("two columns of cards in a wide popup",named("Columns")~=nil)
+	inCard("cap_red","Main").Activated:Fire()
+	check("BUY asks the server with the item",styleSent()~=nil and styleSent().args[1]=="buy" and styleSent().args[2]=="cap_red")
+	local before=#M.sent
+	inCard("cap_gold","Main").Activated:Fire()
+	check("a reward is never bought: it says so",#M.sent==before and string.find(toasts[#toasts] or "","not for sale",1,true)~=nil)
+	inCard("leather_black","Main").Activated:Fire()
+	check("too dear or too early: it says why",#M.sent==before and string.find(toasts[#toasts] or "","unlocks at level 6",1,true)~=nil)
+	inCard("hoodie_grey","Main").Activated:Fire()
+	check("not enough money: it says so",#M.sent==before and toasts[#toasts]=="Not enough money: Hoodie · Grey costs $350.")
+	inCard("beanie_grey","Try").Activated:Fire()
+	check("TRY previews it, no remote",#M.sent==before and M.previews[#M.previews].id=="beanie_grey" and named("Style_beanie_grey"):FindFirstChild("Accent")~=nil and named("Style_beanie_grey"):FindFirstChild("Accent").Visible)
+	-- the state brings the purchase back: "cash", OWNED → WEAR, WEARING → TAKE OFF
+	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={hat="cap_red"}}})
+	check("the purchase plays cash once",M.played[#M.played]=="cash" and #M.played==1)
+	check("WEARING and TAKE OFF",text("WEARING")~=nil and inCard("cap_red","Main").Text=="TAKE OFF" and text("Hats · Backwards Cap · ZDC Red")~=nil)
+	inCard("cap_red","Main").Activated:Fire()
+	check("TAKE OFF asks the server with the slot",styleSent().args[1]=="unwear" and styleSent().args[2]=="hat")
+	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={}}})
+	check("no second cash",#M.played==1)
+	inCard("cap_red","Main").Activated:Fire()
+	check("WEAR asks the server with the item",inCard("cap_red","Main").Text=="WEAR" and styleSent().args[1]=="wear" and styleSent().args[2]=="cap_red")
+	local renders=#M.previews
+	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={}},items={medkit=1}})
+	check("a state change STYLE doesn't show draws nothing again",#M.previews==renders)
+	-- the keys: bound while open
+	local keys=M.actions.ZombieDeliveryStyleKeys
+	check("the keys bound while STYLE is open",keys~=nil and keys.priority==3006)
+	local function press(code) M.actions.ZombieDeliveryStyleKeys.fn("x",M.Enum.UserInputState.Begin,{KeyCode=code}) end
+	local pickedBefore=M.previews[#M.previews].id
+	press(M.Enum.KeyCode.Down)
+	check("↓ picks the next item (the preview follows)",M.previews[#M.previews].id~=pickedBefore and showing("style"))
+	press(M.Enum.KeyCode.Up)
+	check("↑ the one before",M.previews[#M.previews].id==pickedBefore)
+	press(M.Enum.KeyCode.Tab)
+	check("TAB switches to VEHICLE: wraps, bike paint, decals",named("Tab_vehicle"):FindFirstChild("Underline")~=nil and text("Wraps · cars, vans, trucks · your own")~=nil and text("Decals · cars, vans, trucks · your own")~=nil and M.previews[#M.previews].tab=="vehicle")
+	press(M.Enum.KeyCode.Return)
+	check("ENTER does the picked item's action (a wrap too dear says so)",string.find(toasts[#toasts] or "","Not enough money",1,true)~=nil)
+	press(M.Enum.KeyCode.ButtonL1)
+	check("the gamepad's L1 switches back",named("Tab_courier"):FindFirstChild("Underline")~=nil)
+	named("Tab_vehicle").Activated:Fire()
+	check("a tap on a tab switches it",named("Tab_vehicle"):FindFirstChild("Underline")~=nil)
+	named("Tab_courier").Activated:Fire()
+	named("Close").Activated:Fire()
+	M.flush()
+	check("closed: the keys are free again",M.actions.ZombieDeliveryStyleKeys==nil and Phone.isOpen() and named("More").Visible)
+	check("no warnings in STYLE",#M.warnings==0)
+	Phone.close()
+end
 -- The popup with motion (reduced motion off): it lands centred at full scale, dim and blurred; back on close.
 M.services.GuiService.ReducedMotionEnabled=false
 Phone.close();Phone.open()

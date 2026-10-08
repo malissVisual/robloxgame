@@ -15,7 +15,9 @@
 -- fuel in every car you own (carFuel, litres; server/Fuel.luau keeps it, a car without an entry is full). 6.6: the
 -- backpacks are gone (Config.RetiredKit): a save from before (no noPacks flag) gets their price back once
 -- (shared/Transport.luau packRefund; profile.packRefund, never saved, tells server/Tutorial.luau to say so). 6.7: the
--- Thermal Jacket the same way (the noJacket flag, profile.jacketRefund).
+-- Thermal Jacket the same way (the noJacket flag, profile.jacketRefund). 6.12: the wardrobe of cosmetics (style: the
+-- items owned and the one worn in each slot, Config.Cosmetics; shared/Style.luau cleans it, server/StyleWear.luau
+-- changes it): a save from before 6.12 has none and gets the empty one; read only from a real save (saved.money).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -33,6 +35,7 @@ local Missions = require(Shared.Missions)
 local Challenges = require(Shared.Challenges)
 local Career = require(Shared.Career)
 local JobRules = require(Shared.JobRules)
+local Style = require(Shared.Style) -- 6.12: the cosmetics' wardrobe
 
 export type Profile = {
 	money: number,
@@ -78,6 +81,7 @@ export type Profile = {
 	activeBag: string?,
 	packRefund: number?, -- 6.6: the money this load paid back for retired backpacks (Marge says so once; never saved)
 	jacketRefund: number?, -- 6.7: … and for the retired Thermal Jacket (the same way)
+	style: Style.Wardrobe, -- 6.12: the cosmetics owned (id → true) and worn (slot → id); server/StyleWear.luau
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
 	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
 	deliveries: number,
@@ -141,6 +145,7 @@ local function newProfile(): Profile
 		activeBag = nil, -- 6.4: the best bag owned
 		packRefund = nil, -- 6.6
 		jacketRefund = nil, -- 6.7
+		style = Style.empty(), -- 6.12: no cosmetics yet
 		phone = false,
 		vanQuest = nil,
 		deliveries = 0,
@@ -380,6 +385,12 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	if saved.vestKit ~= true and saved.money ~= nil then -- (a real old save: not a lock-only record of a new player)
 		profile.kit[Config.Courier.VestKit] = true
+	end
+	-- 6.12: the cosmetics' wardrobe, from a real save only (a lock-only record of a new player keeps the new, empty
+	-- one). A save from before 6.12 has no style: it gets the empty wardrobe; a saved one is cleaned (known items, each
+	-- worn one owned and in its own slot: shared/Style.luau).
+	if saved.money ~= nil then
+		profile.style = Style.sanitize(saved.style)
 	end
 	-- 6.4: the bag chosen: kept only while it is a bag you own (else nil: the best one)
 	local chosen = if type(saved.activeBag) == "string" then saved.activeBag else nil
@@ -730,6 +741,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		explored = profile.explored,
 		kit = profile.kit, -- 5.0
 		activeBag = profile.activeBag, -- 6.4
+		style = profile.style, -- 6.12: the cosmetics owned and worn
 		phone = profile.phone, -- 5.0
 		vanQuest = profile.vanQuest, -- 5.0
 		deliveries = profile.deliveries,

@@ -187,5 +187,16 @@ M.BagUi.bags=function(parent,state,order) M.bagsRendered=(M.bagsRendered or 0)+1
 M.Hotbar={slotOf=function(id) return if id=="medkit" then 5 else nil end}
 M.Hotbar.onUse=function(id) M.used=id end
 M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end}
+-- 6.12: STYLE's sound on a purchase, its 3D preview (client/StylePreview.luau: recorded, not drawn) and its keys
+M.played={}
+M.Sounds.play=function(name) table.insert(M.played,name) end
+M.previews={}
+M.StylePreview={show=function(holder,tab,def) table.insert(M.previews,{holder=holder,tab=tab,id=def and def.id}); return "courier",nil end,clear=function() M.previewCleared=(M.previewCleared or 0)+1 end}
+M.actions={}
+M.services.ContextActionService={
+	BindActionAtPriority=function(_,name,fn,_,priority,...) M.actions[name]={fn=fn,keys={...},priority=priority} end,
+	UnbindAction=function(_,name) M.actions[name]=nil end,
+}
+M.Enum.ContextActionPriority.High.Value=3000
 M.Discovery={grid={X0=-2200,Z0=-3000,Size=120,Rows=40,Cols=36},changed=signal(),uncoveredCell=function() return M.discovered==true end}
 return M
