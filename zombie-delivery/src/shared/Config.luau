@@ -146,7 +146,8 @@ Config.Arms = {
 	Starter = "pistol",
 	MaxArmour = 0.8,
 	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck); 6.7: the vest's tips
-	BagTip = "Customers tip a courier they can see: the ZDC Courier Vest ({price} at Last Stop Supplies) adds 5% to every delivery. It's on your GPS. Bags are at ZDC Bags, by the spawn.",
+	-- 6.12.2: Last Stop Supplies is the GEAR counter of the gear stall by the spawn, ZDC Bags the counter next to it
+	BagTip = "Customers tip a courier they can see: the ZDC Courier Vest ({price}) adds 5% to every delivery. Last Stop Supplies sells it at the gear stall by the spawn. It's on your GPS. Bags are at the counter next to it.",
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
@@ -1088,7 +1089,8 @@ export type GearDef = {
 }
 
 -- 5.0: personal gear (yours, not a car's), bought at Last Stop Supplies and kept for good (profile.kit): what you
--- carry on foot and on a bike (shared/Transport.luau). speed = walk / sprint multiplier (the best one counts).
+-- carry on foot and on a bike (shared/Transport.luau). speed = walk / sprint multiplier (the best one counts; 6.12.2:
+-- the Running Shoes and their 1.1 are gone, only the Heavy Armour's slow-down is left).
 -- 6.7: the Thermal Jacket (warm: food cooled ×0.8) is gone (the Thermal Delivery Bag keeps food hot; Config.RetiredKit
 -- pays it back once). `tips` = the share of an order's pay a piece adds as the customer's tip on every delivery (the
 -- Courier Vest: shared/JobRules.luau kitTip, server/Jobs.luau payOrder). `starter` = every profile has it (the plastic
@@ -1099,8 +1101,9 @@ export type GearDef = {
 -- 6.6, one carrying item (the owner: "you can't have a bag and a backpack at the same time"): the backpacks are gone
 -- (Config.RetiredKit, refunded once: server/PlayerData.luau), your room on foot is the hands + the bag in use, and the
 -- bags are sold at ZDC Bags, the kiosk at the depot (Config.BagShop); Last Stop Supplies keeps the vests and the rest.
+-- 6.12.2: both are the two counters of the gear stall at the spawn (Config.GearStall).
 -- 6.0: armour = the share of every hit a vest takes off (the best vest owned counts, shared/Armour.luau); a speed below 1
--- slows the walk and the sprint (shared/Transport.luau speedMult: the best shoes × the slowest piece).
+-- slows the walk and the sprint (shared/Transport.luau speedMult: the best speed-up × the slowest piece).
 -- 6.4, the bags (a piece with `extra` is a bag): only ONE bag is in your hand, the active one (profile.activeBag, else
 -- the best owned: the most room, a tie the later one here; shared/Transport.luau activeBag / bagRoom), so owning
 -- several never adds up. The point of every bag: you SPRINT with your deliveries (pieces in a bag are never "in
@@ -1133,7 +1136,7 @@ Config.Kit = {
 	{ id = "thermal", name = "Thermal Delivery Bag", level = 3, price = 300, icon = "🔥", extra = 4, carry = "hand", bagWarm = 0.35, description = "Sprint with your deliveries: 4 light pieces ride in it. Insulated: food in it stays hot (cools ×0.35)." },
 	{ id = "padded", name = "Padded Messenger Bag", level = 4, price = 650, icon = "💼", extra = 4, carry = "hip", stays = true, padded = true, description = "Sprint with your deliveries. Stays on your back when you draw your gun. Foam-padded: 4 light pieces, fragile ones take no knocks." },
 	{ id = "duffel", name = "Big Delivery Duffel", level = 6, price = 1200, icon = "🧳", extra = 6, carry = "hand", stays = true, bagBreath = 1.15, description = "Sprint with your deliveries: 6 light pieces ride in it. Slung on your back when you draw your gun. Heavy: sprinting costs 15% more breath." },
-	{ id = "shoes", name = "Running Shoes", level = 1, price = 250, icon = "👟", speed = 1.1, description = "Walk and sprint 10% faster on foot (not on a bike)." },
+	-- (6.12.2: the Running Shoes are gone, the owner: "remove the shoes, they bore me": Config.RetiredKit pays them back)
 	-- 6.0, the vests (server/Armour.luau takes the share off every bite and bullet; their looks: KitArt / KitWear).
 	{ id = "kevlar", name = "Kevlar Vest", level = 3, price = 600, icon = "🦺", armour = 0.3, description = "Takes 30% off every bite and bullet. Light enough to run in." },
 	{ id = "heavy", name = "Heavy Armour", level = 5, price = 1500, icon = "🛡️", armour = 0.5, speed = 0.92, description = "Plates and shoulder guards: takes 50% off every bite and bullet, but you walk and sprint 8% slower." },
@@ -1145,22 +1148,47 @@ Config.Kit = {
 -- back once (shared/Transport.luau packRefund, server/PlayerData.luau: the save's noPacks flag) and Marge's text says
 -- so (Config.Courier.PackRefund, server/Tutorial.luau). 6.7: the Thermal Jacket too, with a flag of its own (`flag`:
 -- the save's mark that it was paid back; noJacket, Config.Courier.JacketRefund), so a 6.6 save is paid for it once.
+-- 6.12.2: the Running Shoes the same way (noShoes, Config.Courier.ShoeRefund; level 4's reward is the Thermal Delivery
+-- Bag now).
 Config.RetiredKit = {
 	{ id = "backpack", name = "Courier Backpack", price = 150, flag = "noPacks" },
 	{ id = "bigpack", name = "Big Backpack", price = 400, flag = "noPacks" },
 	{ id = "jacket", name = "Thermal Jacket", price = 300, flag = "noJacket" }, -- 6.7
+	{ id = "shoes", name = "Running Shoes", price = 250, flag = "noShoes" }, -- 6.12.2: their +10% walk and sprint gone too
 } :: { { id: string, name: string, price: number, flag: string } }
 
--- 6.6, ZDC Bags (server/BagKiosk.luau, Map.Shops.bags): the depot's bag kiosk, in the safe yard east of the spawn pad
--- (World.DepotSpawn at 0, 26), clear of the scooter rack (Config.Rental.SpawnRack, z 44), the job board (-18, -25), the
--- garage terminal (18, -25) and Marge (Config.Tutorial.NpcSpot), all studs from the depot's middle (6.11: Map.Depot,
--- block (1, -1)). X / Z: its counter's middle; it faces the spawn (-X). Radius: studs from that spot the shop counts as "here" (the counter's BUY, the
--- server's check; Map.ShopRadius for the big shops). It sells the bags (Config.Kit pieces with `extra`).
+-- 6.12.2, the gear stall at the spawn (the owner: "next to it [the jobs] make a stall for the bags and the gear ... the
+-- shops feel unnecessarily big"; server/GearStall.luau): one open-air market stall under one awning on the west side of
+-- the depot's yard, next to the JOBS spot (server/JobsSpot.luau), facing the yard (+X): two counters side by side, BAGS
+-- (ZDC Bags, Map.Shops.bags: the bags, as the 6.6 kiosk sold them) to the north and GEAR (Last Stop Supplies,
+-- Map.Shops.supplies: the vests and the items; its old building on block (0, -1) is no shop any more) to the south,
+-- each with its clerk (server/ShopClerks.luau: Nell, Dot). Clear of the spawn pad (World.DepotSpawn at 0, 26), the
+-- scooter rack (Config.Rental.SpawnRack, z 44), the JOBS spot round the job board (-18, -25), the garage terminal
+-- (18, -25) and Marge (Config.Tutorial.NpcSpot), all studs from the depot's middle (Map.Depot).
+--   X, Z      the stall's middle; Width along its front (Z), Depth (X), Height to the roof
+--   Counter   each counter's middle from the stall's middle along the front
+--   Radius    studs from a counter's front the shop counts as "here" (the counter's BUY, the server's check): the stall,
+--             not the whole yard (Map.ShopRadius for the big shops)
+--   Board     the name board on its roof (a second line after the double space)
+Config.GearStall = {
+	X = -33,
+	Z = 8,
+	Width = 26,
+	Depth = 9,
+	Height = 10,
+	Counter = 6.5,
+	Radius = 14,
+	Board = "LAST STOP SUPPLIES · ZDC BAGS  GEAR & BAGS FOR COURIERS",
+}
+
+-- 6.6, ZDC Bags (Map.Shops.bags): the bags (Config.Kit pieces with `extra`). 6.12.2: the BAGS counter of the gear stall
+-- (Config.GearStall; the 6.6 kiosk east of the spawn is gone). X / Z: the counter's front (the customers' side), studs
+-- from the depot's middle; Radius: the stall's. (Last Stop Supplies, the GEAR counter: Map.Shops.supplies.)
 Config.BagShop = {
 	Name = "ZDC Bags",
-	X = 26,
-	Z = 30,
-	Radius = 16,
+	X = Config.GearStall.X + Config.GearStall.Depth / 2,
+	Z = Config.GearStall.Z - Config.GearStall.Counter,
+	Radius = Config.GearStall.Radius,
 }
 
 -- 5.0, Earl's van (shared/VanQuest.luau, server/VanQuest.luau): the first vehicle is not sold at Dead End Motors. When
@@ -1674,11 +1702,12 @@ Config.Levels = {
 	-- reached as given, nothing is paid back). Money from $500 to $15,000, items (Config.Items ids, capped at their
 	-- max), and at 5 / 10 / 15 a career paint (Config.Paints exclusive "career") or a title.
 	-- 5.7: the levels before a car (2 – 4) give what a courier on foot or on a bike uses (medkits, 6.6: the Canvas Tote,
-	-- the Running Shoes: Config.Kit); the car's items (repair kits, nitro, mines) start at 5, once you drive.
+	-- the Running Shoes: Config.Kit; 6.12.2: the shoes are gone, level 4 gives the Thermal Delivery Bag); the car's items
+	-- (repair kits, nitro, mines) start at 5, once you drive.
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "The bike shop: Spoke & Chain on Main St" },
 		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
-		[4] = { money = 1000, items = { medkit = 2 }, kit = "shoes", text = "Old Van: Earl's Used Wheels (Marge's quest)" },
+		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "Old Van: Earl's Used Wheels (Marge's quest)" }, -- (6.12.2: the shoes before)
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
@@ -3444,6 +3473,8 @@ Config.Courier = {
 	PackRefund = "Backpacks are gone: bags do it all now. You got {money} back.",
 	-- 6.7: Marge's text, once, to a save that owned the Thermal Jacket (Config.RetiredKit, its noJacket flag)
 	JacketRefund = "The Thermal Jacket is gone: the Thermal Delivery Bag at ZDC Bags keeps food far hotter. You got {money} back.",
+	-- 6.12.2: … and to a save that owned the Running Shoes (Config.RetiredKit, its noShoes flag)
+	ShoeRefund = "The Running Shoes are gone from the shops: you got {money} back. Need more legs? An Energy Drink at the gear stall by the spawn.",
 	-- 6.4.1, what is in the bag shows (shared/BagFill.luau; server/KitWear.luau on you, server/Cargo.luau on the ground):
 	-- the pieces in it (the player's BagCount / BagLooks attributes) show in its opening, up to its room and Max.
 	-- 6.7, real sizes (the owner: "the things would never really fit in it"): each piece is its real packed size

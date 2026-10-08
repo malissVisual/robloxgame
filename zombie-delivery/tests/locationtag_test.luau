@@ -140,7 +140,13 @@ check("6.11: the Central Park says SAFE ZONE", park ~= nil and park.name == "Cen
 action, t = L.step(L.new(), real, Map.Park.x, Map.Park.z + 24, 0, true)
 check("6.11: on the path round the pond: CENTRAL PARK", action == "show" and t ~= nil and t.id == "park", t and t.id)
 action, t = L.step(L.new(), real, Map.Park.x, Map.Park.z - 85, 0, true)
-check("6.11: on the kerb in front of Last Stop Supplies, across Bone St from the park: the shop", action == "show" and t ~= nil and t.id == "supplies", t and t.id)
+-- 6.12.2: Last Stop Supplies is the GEAR counter of the gear stall at the depot; its old building is no shop
+check("6.12.2: on the kerb in front of Last Stop's old building, across Bone St from the park: no shop's tag", t == nil or t.id ~= "supplies", t and t.id)
+local gear = Map.Shops.supplies
+action, t = L.step(L.new(), real, gear.x + 3, gear.z, 0, true)
+check("6.12.2: at the gear stall's GEAR counter: LAST STOP SUPPLIES", action == "show" and t ~= nil and t.id == "supplies" and t.sub == "GEAR", t and t.id)
+action, t = L.step(L.new(), real, Map.Shops.bags.x + 3, Map.Shops.bags.z, 0, true)
+check("6.12.2: at its BAGS counter: ZDC BAGS", action == "show" and t ~= nil and t.id == "bags", t and t.id)
 
 -- ── Where it sits ──────────────────────────────────────────────────────────
 

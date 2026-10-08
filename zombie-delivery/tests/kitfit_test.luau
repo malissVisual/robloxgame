@@ -34,7 +34,7 @@ check("nothing owned: nothing worn", count(KitFit.outfit({})) == 0)
 local old = KitFit.outfit({ backpack = true, bigpack = true } :: any)
 check("6.6: an old backpack is never worn", count(old) == 0 and (old :: any).pack == nil and (old :: any).load == nil)
 local all = KitFit.outfit({ backpack = true, shoes = true, jacket = true } :: any)
-check("everything: shoes (6.6: no pack, no parcel; 6.7: an old save's jacket is never worn)", all.shoes == "shoes" and (all :: any).jacket == nil and count(all) == 1)
+check("6.12.2: an old save's retired kit is never worn (6.6: no pack, no parcel; 6.7: no jacket; 6.12.2: no shoes)", (all :: any).shoes == nil and (all :: any).jacket == nil and count(all) == 0)
 check("a false entry is not owned", count(KitFit.outfit({ shoes = false, jacket = false })) == 0)
 -- 6.0: the plastic bag in the hand, the best vest over the courier's
 local bagged = KitFit.outfit({ bag = true })

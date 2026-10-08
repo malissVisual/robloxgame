@@ -6,7 +6,7 @@
 -- never touched (no C0); the parts ride the body parts wherever the animation puts them, seated in a car too.
 --
 --   (6.6: the backpack slots "pack" and "load" are gone with the backpacks: one carrying item, the bag)
---   shoes   the Running Shoes on both feet
+--   (6.12.2: the "shoes" slot is gone with the Running Shoes, Config.RetiredKit; their KitArt stays unused)
 --   (6.7: the "jacket" slot is gone with the Thermal Jacket, Config.RetiredKit)
 --   hand    6.0: the plastic bag (Config.Courier.BagKit) in the left hand: its art hangs from a small part, BagPivot,
 --           joined to the hand by a Motor6D "BagSwing" (KitArt "bag"); every client swings it (6.1: client/BagSway.luau,
@@ -73,7 +73,7 @@ local KitWear = {}
 
 local REFRESH = 0.1 -- seconds: events in a burst (the avatar loading, a flood of the remote) give one look
 local HIVIS = Config.Courier.VestKit -- 6.0.1: the Courier Vest ("hivis": KitFit.outfit's vest when no armour is owned)
-local NAMES: { [string]: string } = { shoes = "KitShoes", phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" } -- (6.7: no jacket)
+local NAMES: { [string]: string } = { phone = "HeldPhone", hand = "KitBag", vest = "KitVest", strap = "KitBagStrap" } -- (6.7: no jacket, 6.12.2: no shoes)
 -- What a change of these character attributes can change: the phone is put away for the hands' other work.
 local HANDS_BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, Aiming = true }
 -- 6.0: … and the bag is put away for these (aiming, the left hand only steadies the gun: the bag stays). 6.1: not for

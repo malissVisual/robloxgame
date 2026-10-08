@@ -18,9 +18,10 @@
 --                       server/Repair.luau's (no free repairs any more); 4.6: GEAR for the equipped car (the "Gear"
 --                       remote: buy it, from its level; install it in a free gear slot or remove it, free)
 --   Last Stop Supplies  consumables (6.7: the car-only ones, Config.Items car, only to a player who owns a car:
---                       Economy.ownsCar); 5.0: personal gear (the "Kit" remote, Config.Kit: running shoes, 6.0: the
---                       vests), yours for good (profile.kit, shared/Transport.luau; 6.7: no Thermal Jacket any more)
---   ZDC Bags            6.6: the depot's bag kiosk (Map.Shops.bags, Config.BagShop; server/BagKiosk.luau builds it):
+--                       Economy.ownsCar); 5.0: personal gear (the "Kit" remote, Config.Kit: 6.0: the vests), yours
+--                       for good (profile.kit, shared/Transport.luau; 6.7: no Thermal Jacket, 6.12.2: no Running Shoes
+--                       any more). 6.12.2: the GEAR counter of the gear stall at the spawn (server/GearStall.luau)
+--   ZDC Bags            6.6: the depot's bag kiosk (Map.Shops.bags, Config.BagShop; 6.12.2: the gear stall's BAGS counter):
 --                       the five bags (Config.Kit pieces with `extra`, the same "Kit" remote: a bag is bought only
 --                       here, the rest of the kit only at Last Stop Supplies); the Kit remote's ("use", bag id) picks
 --                       the one in your hand (profile.activeBag), anywhere. 6.6: no backpacks any more

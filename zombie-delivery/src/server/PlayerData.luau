@@ -15,7 +15,8 @@
 -- fuel in every car you own (carFuel, litres; server/Fuel.luau keeps it, a car without an entry is full). 6.6: the
 -- backpacks are gone (Config.RetiredKit): a save from before (no noPacks flag) gets their price back once
 -- (shared/Transport.luau packRefund; profile.packRefund, never saved, tells server/Tutorial.luau to say so). 6.7: the
--- Thermal Jacket the same way (the noJacket flag, profile.jacketRefund). 6.12: the daily and weekly tasks (tasks:
+-- Thermal Jacket the same way (the noJacket flag, profile.jacketRefund; 6.12.2: the Running Shoes, noShoes and
+-- profile.shoeRefund). 6.12: the daily and weekly tasks (tasks:
 -- shared/Tasks.luau's save, kept by server/Tasks.luau; read only from a real save).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
@@ -80,6 +81,7 @@ export type Profile = {
 	activeBag: string?,
 	packRefund: number?, -- 6.6: the money this load paid back for retired backpacks (Marge says so once; never saved)
 	jacketRefund: number?, -- 6.7: … and for the retired Thermal Jacket (the same way)
+	shoeRefund: number?, -- 6.12.2: … and for the retired Running Shoes (the same way)
 	phone: boolean, -- 5.0: Marge gave you the phone (the tutorial; client/Phone.luau)
 	vanQuest: string?, -- 5.0: Earl's van (Config.VanQuest, server/VanQuest.luau): nil, "open" (Marge told you) or "done"
 	-- 6.12: the daily and weekly tasks (shared/Tasks.luau: the day, the level, the picks' ids, progress, claims; the
@@ -146,6 +148,7 @@ local function newProfile(): Profile
 		activeBag = nil, -- 6.4: the best bag owned
 		packRefund = nil, -- 6.6
 		jacketRefund = nil, -- 6.7
+		shoeRefund = nil, -- 6.12.2
 		phone = false,
 		vanQuest = nil,
 		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
@@ -366,6 +369,7 @@ local function applySaved(profile: Profile, saved: any)
 	end
 	profile.packRefund = refunds.noPacks
 	profile.jacketRefund = refunds.noJacket
+	profile.shoeRefund = refunds.noShoes -- 6.12.2: the Running Shoes (their noShoes flag)
 	if type(saved.kit) == "table" then
 		for _, def in Config.Kit do
 			if saved.kit[def.id] == true then
@@ -725,6 +729,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		starterKit = true, -- 6.0.2: the pistol and the bag of the start (applySaved gives them once to an older save)
 		noPacks = true, -- 6.6: the backpacks are gone (applySaved pays an older save's back once)
 		noJacket = true, -- 6.7: the Thermal Jacket is gone (applySaved pays it back once)
+		noShoes = true, -- 6.12.2: the Running Shoes are gone (applySaved pays them back once)
 		properties = profile.properties,
 		home = profile.home,
 		business = profile.business,
