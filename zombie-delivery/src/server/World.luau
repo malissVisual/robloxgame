@@ -550,6 +550,11 @@ local function buildGround(world: Instance)
 			for _, box in { { hx1, tx1, tz0, tz1 }, { hx0, hx1, tz0, hz0 }, { hx0, hx1, hz1, tz1 } } do
 				part(world, "Ground", Vector3.new(box[2] - box[1], tile.Size.Y, box[4] - box[3]), CFrame.new((box[1] + box[2]) / 2, tile.Position.Y, (box[3] + box[4]) / 2), grass, Enum.Material.Ground)
 			end
+			-- (6.11 review: the pond's floor and its water come with the hole, here, not in the park's own build step:
+			-- a park that failed to build would have left a hole to the void a short walk from the spawn. Terrain: a
+			-- whole layer of cells, its top at the ground's 0; past the octagon it is inside the stone and the ground.)
+			part(world, "PondFloor", Vector3.new(2 * park.pond + 2, 1, 2 * park.pond + 2), CFrame.new(park.x, -park.depth, park.z), Color3.fromRGB(62, 68, 56), Enum.Material.Mud)
+			workspace.Terrain:FillBlock(CFrame.new(park.x, -park.depth / 2, park.z), Vector3.new(2 * park.pond + 8, park.depth, 2 * park.pond + 8), Enum.Material.Water)
 		end
 	end
 	tiled(world, "Ground", Map.River.x1, Map.Sea.x0, z0, z1, -2, 4, grass, Enum.Material.Ground)

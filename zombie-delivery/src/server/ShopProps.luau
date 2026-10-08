@@ -64,7 +64,13 @@ function ShopProps.place(parent: Instance, id: string, roof: CFrame): Model
 				end
 			end
 			local rest = roof * CFrame.new(motion.pivot[1], motion.pivot[2], motion.pivot[3])
+			-- (6.11 review: with a PrimaryPart the model's pivot is that part's own frame times its PivotOffset, and
+			-- WorldPivot is ignored: the offset puts the pivot on the rest frame, else PivotTo moved the slice ~2.8 studs
+			-- and turned it sideways)
 			group.PrimaryPart = first
+			if first then
+				first.PivotOffset = first.CFrame:ToObjectSpace(rest)
+			end
 			group.WorldPivot = rest
 			group:SetAttribute("Rest", rest)
 			group:SetAttribute("Motion", motion.kind)

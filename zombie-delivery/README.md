@@ -1143,6 +1143,52 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The Central Park in the middle, the depot north-east of it, giant rooftop props (6.11)
+
+The owner: "Make the middle of the map, the safe zone, nice: nature, water in the middle, a park; move the houses so
+people remember where the safe zone and the shops are; big set pieces over the main shops: a giant pizza slice over
+the pizza place, a 3D GUN STORE sign with a bullet casing." They picked the layout with the park in the very middle.
+
+**The Central Park** is Downtown block (0, 0) (`Map.Park`, `server/CentralPark.luau`), in the middle of the safe zone
+with every shop around it.
+- **The pond:** a stone-edged octagon of real Terrain water, 38 studs across and 3.5 deep. You can swim in it.
+- **The island and bridge:** the island in the middle has a fountain whose jet shows from afar and glows at night. A
+  wooden footbridge leads to it.
+- **Around the pond:** paths to every side and corner, 21 trees, flowerbeds, benches facing the water, lamps, a gazebo
+  and ducks.
+- **Signs and the map:** a CENTRAL PARK · SAFE ZONE sign faces each street. On the map (M) it is the one green block,
+  with the pond.
+- **No hole to the void:** the pond's floor and water are made with the ground's hole in `World.buildGround`.
+- **Vehicles:** a vehicle that rolls into the pond sinks (`Map.inPond`, server/Vehicles.luau), so you can call a new
+  one.
+
+**The depot** moved one block north-east (block (1, −1), `Map.Depot`), laid out as before with its yard open to
+Bone St.
+- **What moved with it:** the spawn (144, −118), Marge, the job board, the garage terminal, the ZDC Bags kiosk and the
+  scooter rack are all placed from the depot's middle.
+- **The four plain towers** that stood there are gone. Their dice are still rolled (`Map.FormerBlocks`,
+  `tower(lot, true)`), so the rest of the city is identical: addresses, homes, zip lines, bus stops and docks.
+  `tests/centre_test.luau` holds that.
+
+**The rooftop props** (`server/ShopArt/Geometry.luau`, `server/ShopProps.luau`; checked by
+`tools/polish-art/check.py shops`):
+- the depot's ZDC parcel;
+- GUN STORE in 3D block letters with a brass cartridge;
+- a hi-vis vest and a sneaker;
+- a bicycle;
+- a 50s car tipped up on a pylon;
+- a wrench across a tyre;
+- Luigi's pizza slice, which bobs;
+- the bank's gold coin, which spins (`client/ShopPropMotion.luau`);
+- the clinic's red cross.
+
+Letters, bulbs, logos and lamps glow at night.
+
+**Review fixes:**
+- the moving props turn about their own rest frame, through a PivotOffset on the PrimaryPart;
+- vehicles sink in the pond;
+- the pond's floor is built with the ground.
+
 ## Zip lines by hand, scooters you hop on, curbs (6.10)
 
 The owner, after 6.9:

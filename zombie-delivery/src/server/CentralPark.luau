@@ -209,10 +209,9 @@ function CentralPark.build(parent: Instance, tools: Tools)
 	end
 
 	-- ── The pond ────────────────────────────────────────────────────────────
-	-- Its floor, the water (Terrain: a whole layer of cells, its top at the ground's 0; past the octagon it is inside
-	-- the stone and the ground, unseen), the coping round it and a post at every corner.
-	part(folder, "PondFloor", Vector3.new(2 * pond + 2, 1, 2 * pond + 2), CFrame.new(at(0, floor - 0.5, 0)), Color3.fromRGB(62, 68, 56), Enum.Material.Mud)
-	workspace.Terrain:FillBlock(CFrame.new(at(0, -P.depth / 2, 0)), Vector3.new(2 * pond + 8, P.depth, 2 * pond + 8), Enum.Material.Water)
+	-- The coping round it and a post at every corner.
+	-- (6.11 review: the floor and the water are made with the ground's hole in World.buildGround, so a park that fails
+	-- to build leaves no hole to the void)
 	for k = 0, 7 do
 		local angle = k * math.pi / 4
 		local n = Vector3.new(math.cos(angle), 0, math.sin(angle))

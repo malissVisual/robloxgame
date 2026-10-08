@@ -29,6 +29,12 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.11, the centre:
+  - **Central Park** with a Terrain pond, island, fountain, bridge, gazebo and paths on block (0,0) (`server/CentralPark.luau`, `Map.Park`).
+  - **The depot** moved to (1,-1) (`Map.Depot`). The towers that stood there are gone but their dice are still rolled (`Map.FormerBlocks`, `tests/centre_test.luau`).
+  - **Rooftop props** on nine shops (`server/ShopProps.luau`, `ShopArt`, `client/ShopPropMotion.luau`).
+  - **Review fixes:** the props' pivot, vehicles sinking in the pond (`Map.inPond`), the pond floor made with the ground.
+  - **Test in Studio:** spawn at the new depot, walk to the park, swim in the pond, look at the props by day and night, press M.
 - Claude · 6.10, three streams merged and reviewed:
   - **Zip lines:** real climbable ladders, a gap in the platform's back rail, Zip from anywhere on the start platform or by a jump (the Zip remote's "grab"). The automatic climb is removed.
   - **Scooters:** a 0.3 s hop on and off, per-scooter Ride prompts at docks, new steering, brake and coast, and a Shift / gamepad R1 / touch wheelie (`server/Wheelie.luau`, the WheelieAt attribute).

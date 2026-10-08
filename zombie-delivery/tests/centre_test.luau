@@ -173,4 +173,16 @@ for _, dock in RentalDocks.docks() do
 end
 check("no dock on the park or the depot but the spawn's rack", docksClear)
 
+-- 6.11 review: a vehicle in the pond sinks (server/Vehicles.luau): inside the octagon and under the walk only
+do
+	local P = Map.Park
+	local low = Map.WalkTop - 1
+	check("the pond's middle, low: in the pond", Map.inPond(P.x, low, P.z))
+	check("near a flat side, low: in the pond", Map.inPond(P.x + P.pond - 0.5, low, P.z))
+	check("past a flat side: not in the pond", not Map.inPond(P.x + P.pond + 1, low, P.z))
+	check("in a cut corner of the square: not in the pond", not Map.inPond(P.x + P.pond - 0.5, low, P.z + P.pond - 0.5))
+	check("over the pond at the walk's height or higher (the bridge, the island): not in it", not Map.inPond(P.x, Map.WalkTop + 1, P.z))
+	check("a car on the street by the park: not in the pond", not Map.inPond(P.x + 72, Map.RoadTop + 1.5, P.z))
+end
+
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

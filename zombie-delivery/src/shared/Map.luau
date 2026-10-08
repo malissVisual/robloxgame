@@ -247,6 +247,15 @@ Map.Depot = { i = 1, j = -1, x = CELL, z = -CELL } :: Depot
 export type Park = { id: string, name: string, i: number, j: number, x: number, z: number, pond: number, depth: number, island: number, ring: number, walk: number, seed: number }
 Map.Park = { id = "park", name = "Central Park", i = 0, j = 0, x = 0, z = 0, pond = 19, depth = 4, island = 6.5, ring = 4.5, walk = 10, seed = Config.City.Seed + 611 } :: Park
 
+-- 6.11 review: is (x, y, z) in the park's pond: inside its octagon (flat sides `pond` from the middle, to the streets
+-- and to the corners) and lower than the walk? server/Vehicles.luau sinks a vehicle there (its coping is low enough for
+-- a car's wheels to roll over, and the pond's floor is above the usual "sank" depth).
+function Map.inPond(x: number, y: number, z: number): boolean
+	local park = Map.Park
+	local dx, dz = math.abs(x - park.x), math.abs(z - park.z)
+	return y < Map.WalkTop and dx <= park.pond and dz <= park.pond and (dx + dz) <= park.pond * math.sqrt(2)
+end
+
 -- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else
 -- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius).
 Map.Shops = {
