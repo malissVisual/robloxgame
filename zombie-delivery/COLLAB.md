@@ -29,6 +29,10 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.2:
+  - **Spawn:** a JOBS booth round the job board (`server/JobsSpot.luau`); one gear stall with the GEAR (Dot, Last Stop Supplies) and BAGS (Nell, ZDC Bags) counters (`server/GearStall.luau`, `Config.GearStall`) in place of the bag kiosk.
+  - **Last Stop's old building** (`Map.LastStop`): no shop any more; its rooftop props stay.
+  - **Running Shoes retired:** refunded once (`noShoes`); level 4 gives the Thermal Delivery Bag.
 - Claude · 6.12.1:
   - **HUD:** the NEXT card only for new couriers (`Config.Goal.HintJobs`); a big health bar and a separate shield bar; MAP replaced by MOUSE [ALT].
   - **Real estate:** bought from the phone; no floating FOR SALE plates or sign prompts.
