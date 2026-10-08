@@ -129,6 +129,13 @@
 -- bike, buy one, or respawn), the plain numbers (no upgrades, stage, gear, paint or car gun of yours), the model's
 -- attribute Rental. Vehicles.repaint and Vehicles.refreshStats leave it alone; Vehicles.displayModel takes a colour
 -- for the docked ones.
+-- 6.10, THE E-SCOOTER'S QUICK HOP (the owner: "don't teleport me onto the scooter, I want to grab it and jump on it
+-- quickly"): its Drive prompt sits just left of the deck and reaches Config.Interact.ScooterReach (you are right next
+-- to it); the E starts a hop from where you stand onto the deck (client/CarBoarding.luau) and the server seats you
+-- ScooterHop later (boardSeconds); off it is a hop down to its left side. MY BIKE (and PLAY, a respawn) puts the
+-- scooter right beside you when there is room (placeNear) and you hop on (spawnAt → Vehicles.mount), a rental's slide
+-- off its dock plays while you hop. Its load rides on the BikeFrame (Vehicles.cargoHolder: it leans and wheelies
+-- with the deck; server/Wheelie.luau and client/CarVisuals.luau for the wheelie). The bikes keep their step and leg over.
 
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -2872,13 +2879,18 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		local at = Instance.new("Attachment")
 		at.Name = `Door{index}`
 		at.Position = Vector3.new(carDoor.side * (carDoor.outside + Config.Cargo.DoorStandOut), CHASSIS_HEIGHT / 2 + carDoor.promptY, carDoor.z)
+		if style.stand then
+			-- 6.10: the E-Scooter's just left of its deck, a short reach (below): you are right beside it, from any side
+			at.Position = Vector3.new(carDoor.side * Config.Interact.ScooterPromptOut, at.Position.Y, carDoor.z)
+		end
 		at.Parent = chassis
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = if carDoor.driver then "DrivePrompt" else "RidePrompt"
 		prompt.ActionText = if carDoor.driver then "Drive" else "Ride along"
 		prompt.ObjectText = def.name
 		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = if carDoor.driver then Config.Cargo.DriverDoorReach
+		prompt.MaxActivationDistance = if style.stand then Config.Interact.ScooterReach
+			elseif carDoor.driver then Config.Cargo.DriverDoorReach
 			elseif carDoor.panel == nil then Config.Cargo.SeatReach
 			else Config.Cargo.DoorReach
 		prompt.RequiresLineOfSight = false
@@ -3198,9 +3210,12 @@ local function finishBoarding(player: Player, b: Boarder)
 	end)
 end
 
--- 5.7: how long the move into a seat takes: a bike's saddle (or a scooter's deck) its own (Config.Interact: a step to
--- the side and the leg over, client/CarBoarding.luau), a car's door Config.Cargo's.
+-- 5.7: how long the move into a seat takes: a bike's saddle its own (Config.Interact: a step to the side and the leg
+-- over, client/CarBoarding.luau), a car's door Config.Cargo's. 6.10: a scooter's deck a quick hop (ScooterHop).
 local function boardSeconds(car: Car): number
+	if car.model:GetAttribute("BikeStand") == true then
+		return Config.Interact.ScooterHop
+	end
 	return if car.model:GetAttribute("Bike") == true then Config.Interact.BikeMount else Config.Cargo.BoardSeconds
 end
 
@@ -3426,6 +3441,7 @@ end
 -- rental (server/Rental.luau). slide: the vehicle first slides this far off its dock (it is moved there now; every
 -- client slides a copy over Config.Interact.DockUnclip from where it stood, the model's attributes UnclipAt and
 -- UnclipFrom: client/RentalUi.luau) and the move waits for it. Without a saddle's door it seats you at once.
+-- 6.10: onto a scooter (yours put out next to you: spawnAt; a rental) the quick hop, at once: the slide plays meanwhile.
 function Vehicles.mount(player: Player, car: Car, slide: Vector3?)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -3438,7 +3454,7 @@ function Vehicles.mount(player: Player, car: Car, slide: Vector3?)
 		car.model:PivotTo(from + slide)
 		car.model:SetAttribute("UnclipFrom", from)
 		car.model:SetAttribute("UnclipAt", workspace:GetServerTimeNow())
-		lead = Config.Interact.DockUnclip
+		lead = if car.model:GetAttribute("BikeStand") == true then 0 else Config.Interact.DockUnclip
 	end
 	for index, door in car.doors do
 		if door.driver and seatFree(car.seat) then
@@ -3541,6 +3557,18 @@ function Vehicles.cargoSlots(car: Car): { CFrame }
 		table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + slot))
 	end
 	return list
+end
+
+-- 6.10: the part a loaded piece is welded to (server/Cargo.luau): on a scooter its BikeFrame (the load leans and
+-- wheelies with the deck: client/CarVisuals.luau), else the chassis. The slots stay relative to the chassis.
+function Vehicles.cargoHolder(car: Car): BasePart
+	if car.model:GetAttribute("BikeStand") == true then
+		local frame = car.model:FindFirstChild("BikeFrame")
+		if frame and frame:IsA("BasePart") then
+			return frame
+		end
+	end
+	return car.chassis
 end
 
 -- 5.1: is this car a bike (CarDef.bike)?
@@ -3941,7 +3969,14 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if seat and not car.chauffeured and humanoid and humanoid.Health > 0 and not carrying(character) then
 		task.defer(function()
-			if not car.wrecked then
+			if car.wrecked then
+				return
+			end
+			-- 6.10: onto a scooter put out next to you you hop (Vehicles.mount), you are not put into its seat
+			local root = humanoid.RootPart
+			if def.stand and root and humanoid.SeatPart == nil and (root.Position - driverSeat.Position).Magnitude <= Config.Interact.ScooterHopReach then
+				Vehicles.mount(player, car)
+			else
 				driverSeat:Sit(humanoid)
 			end
 		end)
@@ -4013,7 +4048,37 @@ function Vehicles.placeNear(player: Player, carId: string?): string?
 			direction = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, 1)
 			spot = Vector3.new(from.X, 0, from.Z) + Vector3.new(-direction.Z, 0, direction.X) * 3
 		end
-		local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, from.Y) + 0.5, spot.Z)
+		local ground: number? = nil
+		if wanted.stand and character and rootPart then
+			-- 6.10: the E-Scooter stands right beside you (your right, else your left: where there is room on the same
+			-- ground) facing where you look, and you hop on (spawnAt); with no room on either side, by the kerb as a bike.
+			local flat = Vector3.new(look.X, 0, look.Z)
+			local facing = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
+			local right = Vector3.new(-facing.Z, 0, facing.X)
+			local overlap = OverlapParams.new()
+			overlap.FilterType = Enum.RaycastFilterType.Exclude
+			overlap.FilterDescendantsInstances = { character }
+			overlap.RespectCanCollide = true
+			local ray = RaycastParams.new()
+			ray.FilterType = Enum.RaycastFilterType.Exclude
+			ray.FilterDescendantsInstances = { character }
+			ray.RespectCanCollide = true
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			local feet = from.Y - rootPart.Size.Y / 2 - (if humanoid then humanoid.HipHeight else 2)
+			for _, side in { 1, -1 } do
+				-- the ground there, looked for from your own height (not a roof over you: a bus shelter, a canopy)
+				local at = from + right * side * Config.Interact.ScooterCallSide
+				local hit = workspace:Raycast(Vector3.new(at.X, from.Y + 1, at.Z), Vector3.new(0, -8, 0), ray)
+				local y = if hit then hit.Position.Y else math.huge
+				local room = math.abs(y - feet) < 1.5 and #workspace:GetPartBoundsInBox(CFrame.lookAt(Vector3.new(at.X, y + 1.8, at.Z),
+					Vector3.new(at.X + facing.X, y + 1.8, at.Z + facing.Z)), Vector3.new(2.2, 2.4, 5.2), overlap) == 0
+				if room then
+					spot, direction, ground = Vector3.new(at.X, 0, at.Z), facing, y
+					break
+				end
+			end
+		end
+		local position = Vector3.new(spot.X, (ground or Vehicles.groundY(spot.X, spot.Z, from.Y)) + 0.5, spot.Z)
 		local bike = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + direction), true)
 		return if bike then nil else "Still loading..."
 	end

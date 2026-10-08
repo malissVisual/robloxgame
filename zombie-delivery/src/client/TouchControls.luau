@@ -10,6 +10,9 @@
 --       PUT DOWN  while you carry a piece, LET GO while you lead a horse, SET DOWN while you push the trolley or the
 --                 pallet jack: what the G prompt in your hands does (the "PutDown" remote; the server checks it,
 --                 server/Cargo.luau, server/Equipment.luau). The prompt itself still works when you tap it.
+--   * WHEELIE (6.10; Shift on a computer, B on a gamepad): in SPRINT's place while you ride an E-Scooter: hold it and
+--     the scooter pops onto its back wheel (client/Drive.luau, Drive.setWheelieHeld), let go and it comes down. Lit
+--     while held.
 -- Hud builds them into its ScreenGui (TouchControls.build) and its layout() places them (TouchControls.place, the boxes
 -- of client/TouchLayout.luau), so they hide with the HUD. The 3.8 contract look, like FIRE and the hand buttons: a
 -- charcoal face, white type, a fine light line, the red accent; at least 44 px each way.
@@ -23,6 +26,7 @@ local Theme = require(script.Parent.Theme)
 local Ui = require(script.Parent.Ui)
 local CameraRig = require(script.Parent.CameraRig)
 local CarBoarding = require(script.Parent.CarBoarding)
+local Drive = require(script.Parent.Drive)
 
 local TouchControls = {}
 
@@ -37,6 +41,8 @@ type Parts = {
 	sprintAccent: Frame,
 	act: TextButton,
 	actKind: string, -- "" (hidden) | "exit" | "put"
+	wheelie: TextButton, -- 6.10: in SPRINT's place on an E-Scooter (held)
+	wheelieHeld: boolean,
 }
 
 local player = Players.LocalPlayer
@@ -111,6 +117,16 @@ local function refresh(p: Parts)
 	if p.act.GuiState ~= Enum.GuiState.Press then
 		p.act.BackgroundTransparency = REST
 	end
+	-- 6.10: WHEELIE while you drive an E-Scooter (let go when it goes)
+	local car, driving = Drive.seatedCar()
+	local riding = driving and car ~= nil and car:GetAttribute("BikeStand") == true and CarBoarding.seated()
+	p.wheelie.Visible = riding
+	if not riding and p.wheelieHeld then
+		p.wheelieHeld = false
+		Drive.setWheelieHeld(false)
+	end
+	p.wheelie.BackgroundTransparency = if p.wheelieHeld then LIT else REST
+	p.wheelie.BackgroundColor3 = if p.wheelieHeld then K.raised else K.charcoal
 end
 
 -- Builds the buttons into the HUD's ScreenGui (only on a touch layout; a computer has the keys).
@@ -120,14 +136,32 @@ function TouchControls.build(gui: Instance)
 	end
 	local sprint, sprintStroke, sprintAccent = button(gui, "Sprint", "SPRINT")
 	local act = button(gui, "TouchAct", "EXIT")
+	local wheelie = button(gui, "Wheelie", "WHEELIE")
 	local made: Parts = {
 		sprint = sprint,
 		sprintStroke = sprintStroke,
 		sprintAccent = sprintAccent,
 		act = act,
 		actKind = "",
+		wheelie = wheelie,
+		wheelieHeld = false,
 	}
 	parts = made
+	-- 6.10: held, not tapped: up while the finger is on it
+	wheelie.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			made.wheelieHeld = true
+			Drive.setWheelieHeld(true)
+			refresh(made)
+		end
+	end)
+	wheelie.InputEnded:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			made.wheelieHeld = false
+			Drive.setWheelieHeld(false)
+			refresh(made)
+		end
+	end)
 	sprint.Activated:Connect(function()
 		local click = Ui.onClick
 		if click then
@@ -175,8 +209,10 @@ function TouchControls.place(sprint: Box, act: Box, textSize: number)
 	end
 	put(p.sprint, sprint)
 	put(p.act, act)
+	put(p.wheelie, sprint) -- (6.10: SPRINT hides in a seat)
 	p.sprint.TextSize = textSize
 	p.act.TextSize = textSize
+	p.wheelie.TextSize = textSize
 end
 
 return TouchControls

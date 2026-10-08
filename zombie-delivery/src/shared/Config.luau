@@ -700,6 +700,7 @@ Config.Cars = {
 	-- (44 before; the Courier Bike 38, the E-Bike 48) and two light pieces stacked on its rack (a ZDC RIDE rental keeps
 	-- one: Config.Rental.Room). 6.7 (it was dearer than the Cargo Bike and held less): three light pieces (two on the
 	-- rack, one on the deck at your feet) for $1,900 at level 3, below the Cargo Bike; the speed stays the owner's 32.
+	-- 6.10: its turn eases off with the speed, a firm brake and the wheelie (Config.Scooter); you hop on (Config.Interact).
 	{
 		id = "escooter",
 		bike = true,
@@ -1820,8 +1821,8 @@ Config.Rental = {
 	StopClear = 24, -- … nor of a bus stop's kerb
 	GasClear = 50, -- … nor of a gas station's middle
 	PlaceClear = 30, -- … nor of a place (Map.Places)
-	Reach = 10, -- the Rent / Return prompts' reach
-	Hold = 0.4, -- the Rent prompt's hold (s)
+	Reach = 10, -- the dock's Rent (6.10: only while it is empty) / Return prompts' reach (a scooter's Ride: ScooterReach)
+	Hold = 0, -- the Ride prompt's hold (s; 6.10: 0.4 → 0, E and you hop on)
 	WalkAway = 30, -- off the scooter and farther than this from it: it goes back ("returned")
 	Idle = 45, -- off the scooter this long: it goes back
 	Restock = 20, -- seconds until a rented scooter stands in its dock again (once it is returned)
@@ -1883,7 +1884,18 @@ Config.Interact = {
 	BikeMount = 0.6, -- seconds from the E to the saddle: a step to the bike's side, then the leg over (the server seats you)
 	BikeStep = 0.3, -- of BikeMount: the step to the side
 	BikeDismount = 0.55, -- seconds: the leg back over and a step off to the side
-	DockUnclip = 0.45, -- seconds: a rented scooter slides off the dock's charging rail before you get on
+	-- 6.10 (the owner: "don't teleport me onto the scooter, I want to grab it and jump on it quickly"): onto an E-Scooter
+	-- (yours or a ZDC RIDE rental) a quick hop from where you stand, no walk to its side (shared/ScooterRide.luau hop,
+	-- InteractPose.scooterHop); its prompt reaches only right beside it. The bikes keep the step and the leg over.
+	ScooterHop = 0.3, -- seconds from the E to the deck (the server seats you then)
+	ScooterHopOff = 0.25, -- seconds: off the deck, a hop down to its left side
+	ScooterArc = 0.7, -- studs: the hop's arc over the straight line
+	ScooterReach = 4, -- the scooter's Drive / Ride prompt reach (yours, and every docked rental's own)
+	ScooterPromptOut = 0.6, -- that prompt sits this far left of the deck's middle (a bike's 1.9 out, at its side)
+	ScooterOff = 2.4, -- off the deck you land this far left of its middle
+	ScooterCallSide = 2.6, -- MY BIKE (and PLAY, a respawn) puts the scooter this far to your side, then you hop on
+	ScooterHopReach = 8, -- a scooter put out this close to you is hopped onto; farther, you are seated at once
+	DockUnclip = 0.25, -- seconds: a rented scooter slides off the dock's charging rail (6.10: 0.45; you hop on meanwhile)
 	DockSlide = 1.0, -- studs it slides out (toward the street)
 	BusBoard = 1.7, -- seconds from the Board prompt to the seat: to the door, up the step, along the aisle, sit (the server seats you)
 	BusAlight = 1.3, -- seconds from the seat out of the door onto the kerb
@@ -1900,6 +1912,42 @@ Config.Interact = {
 	RungStep = 1, -- studs climbed per hand-over-hand stroke
 	StepLength = 2.2, -- studs per step of a walk played by a move
 	ZipReach = 0.4, -- seconds: the hands go up to the trolley as a ride starts
+}
+
+-- 6.10, the E-Scooter's ride (the owner: "give the scooter better controls, and maybe pop it onto its back wheel"):
+-- its handling (client/Drive.luau through shared/ScooterRide.luau, pure: tests/scooter_test.luau) and the wheelie (hold
+-- Shift, a gamepad's B or the touch WHEELIE button: the deck pitches back round its rear axle, client/CarVisuals.luau;
+-- the rider sits back, client/BikeRider.luau; server/Wheelie.luau checks it and tells everybody through the scooter's
+-- attribute WheelieAt). A ZDC RIDE rental rides the same (its own top speed and pull: Config.Rental). The bikes and the
+-- cars keep their handling.
+Config.Scooter = {
+	-- The steering: CarDef.turn (rad/s) times a share that eases from LowTurn at walking pace down to HighTurn at the
+	-- scooter's top speed (MaxSpeed): quick and precise in the city's corners, calm at full speed (6.0: 2.8 at any speed)
+	LowTurn = 1.15,
+	HighTurn = 0.45,
+	EaseFrom = 6, -- studs/s: the turn starts easing off from here
+	GripSpeed = 2.5, -- studs/s: from a stand the steering fades in up to this speed (it does not spin on the spot)
+	SteerIn = 7, -- the steering goes to the key's full lock at this rate (1/s: about 0.14 s, no snap) …
+	SteerOut = 12, -- … and back to the middle at this one (about 0.08 s)
+	Brake = 80, -- studs/s²: S while rolling forward (32 → 0 in 0.4 s)
+	Coast = 14, -- studs/s²: no key, it rolls on (32 → 0 in about 2.3 s)
+	Reverse = 0.2, -- of the top speed: S from a stand walks it back
+	LeanMax = 0.2, -- radians (about 11°) the scooter leans into a turn at most (the look only; a bike: 0.16)
+	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
+	Wheelie = {
+		Angle = 24, -- degrees the deck pitches back round the rear axle when it is up
+		Pop = 0.18, -- seconds to come up …
+		Drop = 0.22, -- … and to come down
+		MinSpeed = 5, -- studs/s: it pops from this speed (hold the key and it pops as you get there)
+		DropSpeed = 3, -- under this it comes down
+		MaxSeconds = 3.5, -- the balance holds this long, then it drops by itself (let go and press again)
+		Cooldown = 0.8, -- seconds after a drop before the next one
+		Turn = 0.4, -- the steering's share while up (the front wheel is in the air)
+		SpeedBonus = 0.08, -- the top speed +8% while up
+		Wobble = 2.5, -- degrees: the balance's wobble at the end (a third of it at the start)
+		WobbleHz = 1.6,
+		ServerSlack = 0.6, -- seconds past MaxSeconds before the server takes it down itself (the trip of the remote)
+	},
 }
 
 -- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit
@@ -3862,6 +3910,7 @@ Config.Robust = {
 		Gear = 5,
 		Kit = 4,
 		Aiming = 12,
+		Wheelie = 8, -- 6.10: up / down on the E-Scooter (server/Wheelie.luau)
 	},
 }
 

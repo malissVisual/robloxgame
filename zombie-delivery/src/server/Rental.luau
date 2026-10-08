@@ -26,6 +26,12 @@
 -- 6.3, the rack at the spawn (RentalDocks' dock1, Config.Rental.SpawnRack): built like any dock, but its six scooters
 -- stand side by side facing out of the yard (the plate deeper, the rail behind them, a bollard at each end) and its
 -- board reads TAKE ONE AND GO under ZDC RIDE · free. The rides from it are the same rentals.
+--
+-- 6.10 (the owner: "don't teleport me onto the scooter, I want to grab it and jump on it quickly"): every docked
+-- scooter has its own "Ride" prompt just left of its deck (Kind "rent", the attribute Slot; the owned scooter's place
+-- and short reach, Config.Interact.ScooterReach; no hold): E at the scooter you want and that one is yours, you hop on
+-- it at once while it slides off the rail (Vehicles.mount). The dock's own Rent prompt shows only while the dock is
+-- empty (refreshDock: its reach), and says where the next scooter is.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -61,7 +67,7 @@ local LAMP_LIT = Color3.fromRGB(255, 236, 200)
 local LAMP_DIM = Color3.fromRGB(120, 120, 116)
 
 type Slot = { ground: CFrame, model: Model?, taken: boolean }
-type DockState = { dock: RentalDocks.Dock, model: Model, slots: { Slot } }
+type DockState = { dock: RentalDocks.Dock, model: Model, slots: { Slot }, rentPrompt: ProximityPrompt? }
 type Ride = { car: Vehicles.Car, state: DockState, slot: number, leftAt: number? }
 
 local docks: { DockState } = {}
@@ -145,6 +151,8 @@ local function scooterDef(): Config.CarDef
 	return Economy.findCar(Tuning.CarId) or Config.Cars[1]
 end
 
+local rent: (Player, DockState, number?) -> () -- (below; 6.10: a docked scooter's own Ride prompt calls it)
+
 local function dockScooter(state: DockState, slot: Slot)
 	if slot.model then
 		slot.model.Parent = state.model
@@ -158,6 +166,22 @@ local function dockScooter(state: DockState, slot: Slot)
 			d.CanTouch = false
 			d.CanQuery = false
 		end
+	end
+	-- 6.10: its own Ride prompt where an owned scooter has its Drive prompt (just left of the deck, a short reach): E at
+	-- this scooter and it is yours. (It goes and comes back with the model.)
+	local index = table.find(state.slots, slot)
+	local chassis = model.PrimaryPart
+	if index and chassis then
+		local at = Instance.new("Attachment")
+		at.Name = "RidePoint"
+		at.Position = Vector3.new(-Config.Interact.ScooterPromptOut, 1.3, -0.2)
+		at.Parent = chassis
+		local ride = prompt(at, "DockRidePrompt", "Ride", "rent", state.dock, Tuning.Hold) -- (not "RidePrompt": a car door's)
+		ride.MaxActivationDistance = Config.Interact.ScooterReach
+		ride:SetAttribute("Slot", index)
+		ride.Triggered:Connect(function(player: Player)
+			rent(player, state, index)
+		end)
 	end
 	model.Parent = state.model
 	slot.model = model
@@ -203,10 +227,11 @@ local function buildDock(folder: Instance, dock: RentalDocks.Dock): DockState
 	spot.Name = "RentalPrompts"
 	spot.Position = Vector3.new(0, 2.2, 0)
 	spot.Parent = plate
-	prompt(spot, "RentPrompt", "Rent scooter", "rent", dock, Tuning.Hold)
+	-- (6.10: only while the dock is empty, refreshDock: it says where the next scooter is; each scooter has its Ride)
+	local empty = prompt(spot, "RentPrompt", "Find a scooter", "rent", dock, 0)
 	local back = prompt(spot, "ReturnPrompt", "Return scooter", "return", dock, 0)
 	back:SetAttribute("Seated", true) -- (from the saddle too: client/CarBoarding.luau leaves it)
-	local state: DockState = { dock = dock, model = model, slots = {} }
+	local state: DockState = { dock = dock, model = model, slots = {}, rentPrompt = empty }
 	for _, slot in dock.slots do
 		local ground = CFrame.lookAt(Vector3.new(slot.x, WALK_TOP, slot.z), Vector3.new(slot.x, WALK_TOP, slot.z) + (if rack then n else t))
 		local s: Slot = { ground = ground, model = nil, taken = false }
@@ -218,6 +243,11 @@ local function buildDock(folder: Instance, dock: RentalDocks.Dock): DockState
 			warn(`[Rental] {dock.name}: no docked scooter: {err}`)
 		end
 	end
+	local docked = false
+	for _, slot in state.slots do
+		docked = docked or slot.model ~= nil
+	end
+	empty.MaxActivationDistance = if docked then 0 else Tuning.Reach
 	CollectionService:AddTag(model, Rental.DockTag)
 	model.Parent = folder
 	return state
@@ -230,6 +260,27 @@ local function freeSlot(state: DockState): number?
 		end
 	end
 	return nil
+end
+
+-- 6.10: the free slot nearest to `position` (the scooter you stand at), or nil.
+local function nearestFree(state: DockState, position: Vector3): number?
+	local best: number? = nil
+	local bestD = math.huge
+	for index, slot in state.slots do
+		local d = (Vector3.new(slot.ground.Position.X - position.X, 0, slot.ground.Position.Z - position.Z)).Magnitude
+		if not slot.taken and d < bestD then
+			best, bestD = index, d
+		end
+	end
+	return best
+end
+
+-- 6.10: the dock's own Rent prompt reaches only while no scooter stands in it (each one has its own Ride prompt).
+local function refreshDock(state: DockState)
+	local empty = state.rentPrompt
+	if empty then
+		empty.MaxActivationDistance = if freeSlot(state) then 0 else Tuning.Reach
+	end
 end
 
 -- The nearest other dock with a scooter in it, and how far.
@@ -253,6 +304,7 @@ local function restock(state: DockState, index: number)
 		if slot and slot.taken then
 			slot.taken = false
 			pcall(dockScooter, state, slot)
+			refreshDock(state)
 		end
 	end)
 end
@@ -276,7 +328,8 @@ local function finish(player: Player, why: string?)
 	end
 end
 
-local function rent(player: Player, state: DockState)
+-- Renting at this dock (6.10: `chosen` the slot whose Ride prompt was used; else the free one nearest to you).
+function rent(player: Player, state: DockState, chosen: number?)
 	local profile = PlayerData.get(player)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -298,6 +351,10 @@ local function rent(player: Player, state: DockState)
 	if (Vector3.new(root.Position.X - state.dock.x, 0, root.Position.Z - state.dock.z)).Magnitude > Tuning.Reach + state.dock.length / 2 + 4 then
 		return
 	end
+	local picked = if chosen then state.slots[chosen] else nil
+	if picked and (Vector3.new(root.Position.X - picked.ground.Position.X, 0, root.Position.Z - picked.ground.Position.Z)).Magnitude > Config.Interact.ScooterReach + 6 then
+		return -- (6.10: the scooter's own prompt: you stand right at it)
+	end
 	if Jobs.onMission(player) then
 		tell(player, "No rentals on a mission: they are counting on you.")
 		return
@@ -318,7 +375,7 @@ local function rent(player: Player, state: DockState)
 		tell(player, "Your hands are full: no room in your bag.")
 		return
 	end
-	local index = freeSlot(state)
+	local index = if picked and not picked.taken then chosen else nearestFree(state, root.Position)
 	if not index then
 		local other, far = nextDock(state)
 		tell(player, if other then `This dock is empty. The next scooter: {other.dock.name}, {math.floor(far)} studs.` else "Every scooter is out. Try again in a moment.")
@@ -392,11 +449,12 @@ local function rent(player: Player, state: DockState)
 	if slot.model then
 		slot.model.Parent = nil
 	end
+	refreshDock(state)
 	rides[player] = { car = car, state = state, slot = index, leftAt = nil }
 	player:SetAttribute("Rental", state.dock.id)
 	task.defer(function()
 		if not car.wrecked and car.model.Parent and humanoid.Health > 0 and humanoid.SeatPart == nil then
-			Vehicles.mount(player, car, Vector3.new(state.dock.nx, 0, state.dock.nz) * Config.Interact.DockSlide) -- 5.7: it slides off the dock, then you get on
+			Vehicles.mount(player, car, Vector3.new(state.dock.nx, 0, state.dock.nz) * Config.Interact.DockSlide) -- 5.7: it slides off the dock (6.10: as you hop on)
 		end
 	end)
 	tell(player, "ZDC RIDE: it's yours for the ride. Leave it anywhere, or Return it at any dock.")
@@ -479,7 +537,7 @@ function Rental.start()
 	end
 	for _, state in docks do
 		for _, p in state.model:GetDescendants() do
-			if p:IsA("ProximityPrompt") then
+			if p:IsA("ProximityPrompt") and p:GetAttribute("Slot") == nil then -- (6.10: a scooter's Ride prompt is wired already)
 				local kind = p:GetAttribute("Kind")
 				p.Triggered:Connect(function(player: Player)
 					if kind == "rent" then
