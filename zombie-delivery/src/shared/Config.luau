@@ -3922,7 +3922,70 @@ Config.Robust = {
 		Aiming = 12,
 		Wheelie = 8, -- 6.10: up / down on the E-Scooter (server/Wheelie.luau)
 		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
+		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
 	},
+}
+
+-- 6.12, the daily and weekly tasks (the owner: "daily and weekly tasks so players come back"; shared/Tasks.luau picks
+-- and counts them, server/Tasks.luau keeps profile.tasks and pays, client/TasksApp.luau is the phone's TASKS app).
+-- Every UTC day a courier gets Daily tasks from DailyPool, every UTC week (from Monday 00:00 UTC) one from WeeklyPool,
+-- picked by the day's (the week's) number and the UserId: the same all day, new at 00:00 UTC; never two of one
+-- `group` a day, only the kinds open at the courier's level when the day starts (`level`, 1 when missing).
+-- A kind: `event` is what server/Tasks.luau's Tasks.note counts (deliver: pieces delivered, `look` only that cargo
+-- look; ride: deliveries on a bike or a scooter; stars3: jobs finished at ★★★; perfect: PERFECT throws; zip: zip-line
+-- rides; wheelie: seconds of wheelie; bus: bus trips; kill: zombies killed, `night` only after dark; tips: tip
+-- money; earn: delivery pay; mission: missions finished). `text` is the title ({n} the target; `one` when it is 1),
+-- `target` the range it is picked from (in `step`s; `grow`: × (1 + grow × (level − 1)) for the ones that grow with
+-- you), `money` and `xp` the reward (× (1 + LevelScale × (level − 1)), the level when the day starts).
+-- All the dailies done opens the AllDaily bonus (its own CLAIM). A task done and not claimed by the reset is paid then.
+export type TaskDef = {
+	id: string,
+	event: string,
+	text: string,
+	one: string?,
+	target: { number },
+	step: number?,
+	grow: number?,
+	money: number,
+	xp: number,
+	level: number?,
+	group: string?,
+	look: string?,
+	night: boolean?,
+}
+
+Config.Tasks = {
+	Daily = 3, -- daily tasks a day
+	LevelScale = 0.12, -- the rewards × (1 + this × (level − 1)): a level-10 courier's × 2.08
+	AllDaily = { money = 300, xp = 150 }, -- every daily done: the bonus (× the same scale)
+	BusTrip = 8, -- seconds seated at least before getting off at a stop counts as a bus trip (not the same stop)
+	StateGap = 0.5, -- seconds between two states to one player (server/Tasks.luau)
+	CheckEvery = 10, -- seconds between two checks of everybody for the reset at 00:00 UTC
+	SaveDelay = 5, -- seconds after a CLAIM until it is saved (one save for a burst)
+	DailyPool = {
+		{ id = "deliver", group = "deliver", event = "deliver", text = "Deliver {n} pieces of cargo", target = { 6, 12 }, money = 150, xp = 100 },
+		{ id = "pizza", group = "deliver", event = "deliver", look = "pizza", text = "Deliver {n} pizza stacks", one = "Deliver a pizza stack", target = { 2, 4 }, money = 180, xp = 110 },
+		{ id = "parcel", group = "deliver", event = "deliver", look = "parcel", text = "Deliver {n} parcels", target = { 3, 5 }, money = 170, xp = 100 },
+		{ id = "medicine", group = "deliver", event = "deliver", look = "medicine", text = "Deliver {n} medicine boxes", target = { 3, 5 }, money = 170, xp = 100 },
+		{ id = "perfect", event = "perfect", text = "Land {n} PERFECT throws", one = "Land a PERFECT throw", target = { 2, 4 }, money = 200, xp = 120 },
+		{ id = "zip", event = "zip", text = "Ride {n} zip lines", one = "Ride a zip line", target = { 1, 2 }, money = 120, xp = 80 },
+		{ id = "stars3", event = "stars3", text = "Finish {n} jobs at ★★★", one = "Finish a job at ★★★", target = { 2, 3 }, money = 220, xp = 130 },
+		{ id = "bus", event = "bus", text = "Take {n} bus trips", one = "Take a bus trip", target = { 1, 2 }, money = 120, xp = 80 },
+		{ id = "night", event = "kill", night = true, text = "Kill {n} zombies at night", target = { 15, 25 }, step = 5, money = 200, xp = 120 },
+		{ id = "tips", event = "tips", text = "Earn ${n} in tips", target = { 40, 80 }, step = 10, grow = 0.25, money = 150, xp = 100 },
+		{ id = "wheelie", event = "wheelie", text = "Wheelie for {n} seconds in all", target = { 10, 20 }, step = 5, money = 150, xp = 90, level = 2 },
+		{ id = "ride", event = "ride", text = "Make {n} deliveries on a bike or a scooter", one = "Make a delivery on a bike or a scooter", target = { 2, 4 }, money = 180, xp = 110, level = 2 },
+		{ id = "mission", event = "mission", text = "Finish {n} missions", one = "Finish a mission", target = { 1, 2 }, money = 300, xp = 150, level = 5 },
+	} :: { TaskDef },
+	WeeklyPool = {
+		{ id = "w_deliver", event = "deliver", text = "Deliver {n} pieces of cargo", target = { 40, 60 }, step = 5, money = 1500, xp = 600 },
+		{ id = "w_earn", event = "earn", text = "Earn ${n} on deliveries", target = { 2500, 3500 }, step = 250, grow = 0.4, money = 1500, xp = 600 },
+		{ id = "w_perfect", event = "perfect", text = "Land {n} PERFECT throws", target = { 15, 25 }, step = 5, money = 1500, xp = 600 },
+		{ id = "w_stars3", event = "stars3", text = "Finish {n} jobs at ★★★", target = { 10, 15 }, money = 1600, xp = 650 },
+		{ id = "w_kill", event = "kill", text = "Kill {n} zombies", target = { 150, 250 }, step = 25, money = 1400, xp = 550 },
+		{ id = "w_tips", event = "tips", text = "Earn ${n} in tips", target = { 300, 500 }, step = 50, grow = 0.25, money = 1500, xp = 600 },
+		{ id = "w_missions", event = "mission", text = "Finish {n} missions", target = { 4, 6 }, money = 2500, xp = 900, level = 5 },
+	} :: { TaskDef },
 }
 
 -- 5.7, a living city and its air: the towers' four looks (shared/TowerLooks.luau), the street props on every ordinary

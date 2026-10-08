@@ -51,6 +51,7 @@ local Transport = require(Server.Transport)
 local VanQuest = require(Server.VanQuest)
 local KitWear = require(Server.KitWear)
 local Fuel = require(Server.Fuel)
+local Tasks = require(Server.Tasks) -- 6.12: the daily and weekly tasks
 
 -- ── Collision groups ───────────────────────────────────────────────────────
 -- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
@@ -169,6 +170,9 @@ BanditCars.wanted = Jobs.active
 -- 3.1, the challenges' counters (server/Challenges.luau): how the kills happened, and what the jobs tell.
 Zombies.onKillInfo = function(player, info)
 	Challenges.onKill(player, { kind = info.kind, bandit = info.bandit, headshot = info.headshot, cause = info.cause, from = info.from })
+	if not info.bandit then
+		Tasks.note(player, "kill", 1, { night = DayNight.isNight() }) -- 6.12: a zombie (the night task: after dark)
+	end
 end
 BanditCars.onKillInfo = function(player, info)
 	Challenges.onKill(player, { car = true, cause = info.cause, from = info.from })
@@ -218,6 +222,7 @@ safely("Business", Business.start)
 Jobs.onMissionComplete = Missions.onComplete
 safely("Missions", Missions.start)
 safely("Challenges", Challenges.start)
+safely("Tasks", Tasks.start) -- 6.12: the daily and weekly tasks (the phone's TASKS app)
 safely("Garages", Garages.start) -- 3.4: your cars in your garages, switched only there
 safely("Repair", Repair.start) -- 3.4: the repair bays (no free repairs any more)
 safely("Explore", Explore.start) -- 3.7: the map you discover

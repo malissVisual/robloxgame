@@ -47,6 +47,7 @@ local Net = require(Shared.Net)
 local Vehicles = require(script.Parent.Vehicles)
 local Cargo = require(script.Parent.Cargo)
 local Jobs = require(script.Parent.Jobs)
+local Tasks = require(script.Parent.Tasks) -- 6.12: a bus trip counts for the bus task
 
 local Buses = {}
 
@@ -353,6 +354,10 @@ local function getOff(player: Player)
 	local rider = riders[player]
 	if not rider then
 		return
+	end
+	-- 6.12: off at a stop after a ride (seated Config.Tasks.BusTrip seconds or more: not off where you got on)
+	if rider.bus.at > 0 and os.clock() - rider.since >= Config.Tasks.BusTrip then
+		Tasks.note(player, "bus", 1)
 	end
 	forget(player)
 	local weld = rider.seat:FindFirstChild("SeatWeld")

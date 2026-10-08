@@ -3173,7 +3173,9 @@ local function throwAt(session: Session, player: Player, direction: Vector3, pow
 			perfectPaid[session] = given + customerTip
 			PlayerData.addMoney(player, customerTip)
 		end
+		require(script.Parent.Tasks).note(player, "perfect", 1) -- 6.12: the PERFECT throws task (server/Tasks.luau)
 	end
+	require(script.Parent.Tasks).note(player, "tips", paid + customerTip) -- 6.12: the tips task (nothing for $0)
 	local function landed()
 		setDown(model, rest)
 		if loose then

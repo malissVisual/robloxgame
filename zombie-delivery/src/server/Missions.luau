@@ -57,6 +57,7 @@ local PlayerData = require(Server.PlayerData)
 local Jobs = require(Server.Jobs)
 local Crew = require(Server.Crew)
 local Challenges = require(Server.Challenges)
+local Tasks = require(Server.Tasks) -- 6.12: a mission finished counts for the mission tasks
 
 local Missions = {}
 
@@ -447,6 +448,7 @@ function Missions.onComplete(owner: Player, missionId: string, stars: number, me
 			getRemote():FireClient(player, "cleared", result)
 			Missions.send(player)
 			Challenges.check(player) -- 3.1: missions, stars, campaigns (and the counters Jobs just told)
+			Tasks.note(player, "mission", 1) -- 6.12: "Finish a mission" (a replay too)
 		end
 	end
 end
