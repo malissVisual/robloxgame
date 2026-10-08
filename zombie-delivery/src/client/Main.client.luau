@@ -85,7 +85,7 @@ safely("CargoPrompts", CargoPrompts.start) -- 5.3 review: only your own job's pr
 safely("BusRide", require(Client.BusRide).start) -- 5.5: the city buses glide, the stop card, the ride banner (E: STOP), the job's bus hint
 safely("BusMapBoard", require(Client.BusMapBoard).start) -- 6.3: the bus map on the nearest stop's board, YOU ARE HERE
 safely("RentalUi", require(Client.RentalUi).start) -- 5.6: ZDC RIDE's Rent / Return prompts, each player the one that fits
-safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley, the climb's fade
+safely("ZipRide", require(Client.ZipRide).start) -- 5.6: riding the zip lines, the riders' pose and trolley; 6.10: a jump on a start platform grabs it
 require(Client.ZipRide).notify = Hud.toast
 safely("SprintPose", require(Client.SprintPose).start) -- 6.0: the sprint's stride and pumping arms
 safely("BodyLife", require(Client.BodyLife).start) -- 6.7: the breath, the weight shift, the head, blinks, the landing, the flinch, the walk

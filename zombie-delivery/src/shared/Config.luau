@@ -1839,8 +1839,10 @@ Config.Rental = {
 }
 
 -- 5.6, zip lines between Downtown's rooftops (shared/ZipLines.luau picks them, server/ZipLines.luau builds them and
--- checks the rides, client/ZipRide.luau rides them): a Climb prompt at the start tower's ladder takes you up, Zip on
--- its platform, a fast ride over the road to a lower roof across it, Climb down there.
+-- checks the rides, client/ZipRide.luau rides them): up the start tower's ladder, Zip on its platform, a fast ride over
+-- the road to a lower roof across it, down its ladder. 6.10 (the owner: "like a building you climb up by yourself, and
+-- onto the zip line you just jump"): the ladders are real trusses the body climbs itself (no Climb prompts any more),
+-- the platform's back rail has a gap to walk in through, and a jump on the start platform grabs the trolley.
 Config.ZipLines = {
 	Count = 8, -- cables (6 – 10)
 	MinLength = 120, -- studs along the ground between the two platforms
@@ -1868,8 +1870,14 @@ Config.ZipLines = {
 	Margin = 9, -- the lines are picked with this much over every roof they cross (the rider's feet clear it)
 	OverStreet = 24, -- the cable over a street, a sidewalk or a lawn (lamps, trees), at least
 	Platform = 7, -- the landing platform's floor (square)
-	Reach = 10, -- the Zip / Climb prompts' reach; the server's check of where a ride starts
-	Cooldown = 3, -- seconds between the end of a ride (or a climb) and the next ride of one player
+	RailGap = 3, -- 6.10: the gap in the middle of a platform's back rail (walk in from the roof; the floor 0.5 up)
+	-- the server's check of where a ride starts: this far from the start platform's middle along the ground (6.10: the
+	-- feet from a little under its floor up to GrabRise over it)
+	Reach = 10,
+	PromptReach = 6, -- 6.10: the Zip prompt's, from the start platform's middle: anywhere on it, not from the ladder
+	GrabRise = 8, -- 6.10: a jump there grabs the trolley: the feet up to this over the floor (a whole jump)
+	LadderOver = 0.2, -- 6.10: a ladder's truss ends this far over its roof (its foot sunk into the sidewalk to fit)
+	Cooldown = 3, -- seconds between the end of a ride and the next ride of one player
 	SafeDrop = 6, -- Space lets go only this low over a platform's roof (else it is ignored)
 	Grace = 0.8, -- seconds after a ride's end before the server puts a late rider down at the end
 }
@@ -1878,7 +1886,8 @@ Config.ZipLines = {
 -- poses on the joints): getting on a bike or a scooter (client/CarBoarding.luau; the server seats you at the move's
 -- end: server/Vehicles.luau), the bus's folding door and the walk to a seat (client/BusRide.luau, server/Buses.luau),
 -- the zip lines' ladders climbed for real (client/ZipRide.luau, server/ZipLines.luau) and a ZDC RIDE scooter unclipped
--- from its dock (client/RentalUi.luau, server/Rental.luau).
+-- from its dock (client/RentalUi.luau, server/Rental.luau). 6.10: the zip lines' ladders are real trusses the body
+-- climbs itself; the Climb numbers are only shared/InteractPose.luau's climbRoute's now (not played).
 Config.Interact = {
 	BikeMount = 0.6, -- seconds from the E to the saddle: a step to the bike's side, then the leg over (the server seats you)
 	BikeStep = 0.3, -- of BikeMount: the step to the side
@@ -1895,8 +1904,6 @@ Config.Interact = {
 	ClimbOnto = 0.5, -- seconds from the street onto the ladder (or off it at the foot)
 	ClimbOver = 0.8, -- seconds over the roof's edge
 	ClimbHop = 0.45, -- seconds over a platform's rail
-	ClimbGrace = 0.6, -- seconds after a climb's end: a climber not at its end by then is put there by the server
-	ClimbCooldown = 0.5, -- seconds after a climb before the next one (or a ride)
 	RungStep = 1, -- studs climbed per hand-over-hand stroke
 	StepLength = 2.2, -- studs per step of a walk played by a move
 	ZipReach = 0.4, -- seconds: the hands go up to the trolley as a ride starts
