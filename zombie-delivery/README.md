@@ -1143,6 +1143,40 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## One body for every courier: Roblox's classic R15 with your own look (6.9)
+
+The owner, after seeing 6.7's body for the first time: "the figure is weird; people like Roblox's own blocky R15. Keep
+the player's clothes and face, but give everybody the same figure, and the same walk and animations". And: "no cube
+head: a Roblox head with the player's face; if the player has other body parts, give them the blocky R15 ones".
+
+- **Your body** (`server/CourierAvatar.luau`, `shared/AvatarLook.luau`):
+  - The StarterCharacter is Roblox's own classic blocky R15, built with `Players:CreateHumanoidModelFromDescription`
+    (AvatarLook `Body`: the default torso, arms and legs, the classic proportions). It wears the courier's workwear
+    (`AvatarLook.Workwear`) and the game's Animate.
+  - Once you spawn, your own avatar goes on it: `GetHumanoidDescriptionFromUserId`, then `ApplyDescriptionAsync`. The
+    torso, the arms, the legs, the proportions and your avatar's animations are reset. Your head and face (a dynamic
+    head too), your clothes, your skin colours, your hair, your hats and your other accessories stay.
+  - A player whose look cannot load keeps the workwear: a Studio test player, or Roblox's avatar service down.
+  - As on the native body, only the root has mass, so riders don't change how vehicles handle, and the root stays out
+    of raycasts.
+  - KitWear dresses the kit again when your head is replaced.
+- **The people** (`server/Npcs.luau`) are Roblox's classic R15 again, dressed as before 6.7. Kids are smaller.
+- **The infected** keep their native block body, which already has the classic R15's proportions.
+- **The numbers tuned on 6.7's taller body** are back on the classic R15's:
+  - the zip line: `Hang` 3.9, `HandleDrop` 1.55, `ZipLines.Feet` 3 (the feet still 0.1 over the end platform);
+  - the carry: `CarryLow` 0.05, `CarryMiddle` 1.1;
+  - the throw's release: `Config.Throw.Release` (1.9, 2.0, 0.1), worked out on the block body in
+    `tests/throws_test.luau`.
+- **The 6.7 animations stay** (the idle life, the pick-up, the carry grip, the landing, the flinch). They are written on
+  the R15 joints, so they play on any R15 body.
+- **The 6.7 native courier** (CharacterArt `courier`) is only a fallback, used if Roblox's body cannot be made at
+  server start.
+- **Tests:**
+  - `tests/avatarlook_test.luau`;
+  - `tools/character-art/avatar-check.luau`: the classic template, Roblox's Animate swapped for the game's, your
+    look's head, face and clothes kept while the body is reset;
+  - the bag check on a classic R15 stand-in.
+
 ## 6.7 + 6.8 in short
 
 The owner's wishes after 6.6: "the bags and the character aren't realistic, no animations… the shop has useless

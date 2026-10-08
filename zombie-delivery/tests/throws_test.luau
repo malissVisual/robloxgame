@@ -4,7 +4,7 @@
 local Config = require("./Config")
 local Throws = require("./Throws")
 local Gestures = require("./Gestures") -- 6.8 review: the throw's arm at the whip
-local CharacterGeometry = require("./CharacterGeometry") -- 6.8 review: the courier's rig
+local CharacterGeometry = require("./CharacterGeometry") -- 6.8 review: the courier's rig (6.9: the classic R15's)
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -46,7 +46,9 @@ check("released for a turned body", near(turned[1], 10 + T.Release.ahead) and ne
 -- root at the origin) with the "throw" gesture's arm and torso WindUp seconds in (when the server lets it go): within
 -- a few tenths of Release (it was the shoulder, the piece popped down ~1.8 studs out of the raised hand).
 do
-	local spec = CharacterGeometry.spec("courier")
+	-- 6.9: the couriers wear Roblox's classic blocky R15 (server/CourierAvatar.luau); its stand-in here is the native
+	-- block body (CharacterArt's 6.0 body, the infected's: the classic R15's proportions and joints)
+	local spec = CharacterGeometry.spec("walker")
 	local at: { [string]: { number } } = {}
 	for _, j in spec.joints do
 		at[j.name] = j.at

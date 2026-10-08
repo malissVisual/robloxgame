@@ -406,8 +406,9 @@ function ZipLines.rider(line: Line, t: number): (number, number, number)
 end
 
 -- The rider's feet: this far under the root (an R15 body's hip height and half its root). 6.8 review: the courier's
--- (server/CharacterArt/Geometry.luau: HipHeight 2.8 + 1; it was 3, the 6.0 block body's)
-ZipLines.Feet = 3.8
+-- (server/CharacterArt/Geometry.luau: HipHeight 2.8 + 1; it was 3, the 6.0 block body's). 6.9: Roblox's classic R15,
+-- the couriers' body again (server/CourierAvatar.luau): HipHeight 2 + 1
+ZipLines.Feet = 3
 
 function ZipLines.canLetGo(line: Line, t: number): boolean
 	local x, y, z = ZipLines.rider(line, t)

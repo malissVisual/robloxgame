@@ -21,6 +21,9 @@
 -- shift and a look at the players who come up). dress() paints every part by its BodyPaint colour group; the hats and
 -- the hair are sized to the smaller head; the walk is slowed to the longer legs (CourierMotion.stride; 6.8 review: the
 -- leg measured on the rig).
+-- 6.9 (the owner: "everybody blocky R15, like Roblox"): the people are Roblox's own classic blocky R15 again, the
+-- couriers' body (shared/AvatarLook.luau's Body; a kid smaller), dressed as before 6.7. The realistic body's paint
+-- groups, head sizes and stride stay for a body that carries CharacterArt (none is built here any more).
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -28,8 +31,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 
-local CharacterGeometry = require(script.Parent.CharacterArt.Geometry) -- 6.7
-local CharacterRig = require(script.Parent.CharacterArt.Rig)
+local AvatarLook = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AvatarLook")) -- 6.9
 local Motion = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CourierMotion"))
 
 local Npcs = {}
@@ -45,7 +47,6 @@ local RUN = "rbxassetid://507767714" -- Roblox's R15 run (Npcs.pace, 3.10)
 local STRIDE = 12.8 -- studs / s of a full-size body at the walk's or the run's own speed (Roblox's Animate: 16 / 1.25)
 local RUN_FROM = 10 -- studs / s: from here on the run animation
 local GREET_RANGE = 14 -- turn to a player this close
-local KID_SCALE = 0.75 -- 6.7: a kid's body against a grown-up's
 local NAME_RANGE = 60
 
 type State = {
@@ -87,24 +88,20 @@ local function warmBases()
 	end
 	warmed = true
 	for _, child in { false, true } do
-		-- 6.7: the couriers' realistic body (a kid's at KID_SCALE); Roblox's own default body if that ever fails
+		-- 6.9: Roblox's classic blocky R15, the couriers' body (shared/AvatarLook.luau), a kid's smaller
 		local ok, rig = pcall(function(): Model
-			return CharacterRig.build(CharacterGeometry.spec("person", if child then KID_SCALE else 1))
+			local d = Instance.new("HumanoidDescription")
+			for field, value in AvatarLook.Body do
+				(d :: any)[field] = value
+			end
+			if child then
+				d.HeightScale = 0.72
+				d.WidthScale = 0.78
+				d.DepthScale = 0.78
+				d.HeadScale = 0.95
+			end
+			return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
 		end)
-		if not ok then
-			-- 6.8.1: in Studio this has meant an old copy of CharacterArt/Geometry (a mix of old and new scripts)
-			warn(`[Npcs] no realistic body, Roblox's own: {rig}. If it says "Unknown character art", Studio holds an old copy of a script: start rojo-sync again and Disconnect / Connect Rojo.`)
-			ok, rig = pcall(function(): Model
-				local d = Instance.new("HumanoidDescription")
-				if child then
-					d.HeightScale = 0.72
-					d.WidthScale = 0.78
-					d.DepthScale = 0.78
-					d.HeadScale = 0.95
-				end
-				return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
-			end)
-		end
 		if ok and rig then
 			baseRigs[child] = rig
 		else
