@@ -1143,6 +1143,34 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Style: looks for you and your rides, bought from the clerks (6.12.3)
+
+The owner: "something to spend the money on, looks only" and "things are bought only from the NPCs in the shops,
+for the vibe". Nothing here changes a game number.
+
+- **The catalogue** (`Config.Cosmetics`, 51 items: 44 for sale, 7 reward-only for later tasks, events and passes):
+  - COURIER: hats, jackets, the Courier Vest's colour, the bag's colour;
+  - VEHICLE: wraps for cars, vans and trucks, bike and E-Scooter paint, decals (stripes, flames, the ZDC logo, a
+    checker band).
+- **Bought from a clerk.** Each clerk has a second prompt, "Style" [R] (gamepad L2), under "Shop". It opens the
+  phone's STYLE app on their tab, where BUY works while you stand at their shop (`Config.Cosmetics.Counters`,
+  `Style.shopAt`; the server checks it):
+  - Dot at the gear stall: COURIER;
+  - Gus at Wrench Garage: wraps, decals and bike paint;
+  - Kip at Spoke & Chain: bike paint.
+- **The phone's STYLE** (MORE → STYLE) is the wardrobe. It has a live 3D preview, TRY, and WEAR / TAKE OFF
+  anywhere. Away from the shop, an item not owned reads "AT WRENCH GARAGE" and sets the GPS there.
+- **On the courier and vehicles** (`server/StyleWear.luau`, `shared/StyleBuild.luau`, `shared/StyleLooks.luau`):
+  - Hats fit the player's own head and hide their hat and hair.
+  - Jackets are thin shells under the vest and the bag.
+  - Vest and bag colours go on through `KitWear.tint`.
+  - Wraps go over the paint. Decals are laid around lamps, labels and doors.
+  - Every part is massless, welded, never colliding.
+  - A rental or a lent company vehicle takes none.
+- **Save:** `profile.style = { owned, worn }`, from real saves only.
+- **Checks:** `tests/style_test.luau`, `tools/character-art/style-check.luau` and
+  `tools/vehicle-preview/decal-check.luau`, and the phone recorder covers STYLE.
+
 ## The spawn's corner: a JOBS spot and one gear stall, no more shoes (6.12.2)
 
 The owner: "the jobs spot at the spawn gets a look, next to it a stall for the bags and gear, the shoes away, the
