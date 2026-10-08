@@ -1,6 +1,6 @@
 --!strict
 -- 6.10, the E-Scooter's wheelie, the server's side. The riding is the owner's client's (client/Drive.luau through
--- shared/ScooterRide.luau: hold Shift, a gamepad's B or the touch WHEELIE button); every client draws it
+-- shared/ScooterRide.luau: hold Shift, a gamepad's R1 or the touch WHEELIE button); every client draws it
 -- (client/CarVisuals.luau pitches the deck back round its rear axle, client/BikeRider.luau sits the rider back).
 -- The driver's client says up or down (the Wheelie remote, rate-limited: Config.Robust.Limits). Here it is checked
 -- (the driver of a stand-up scooter, yours or a ZDC RIDE rental, rolling) and put on the scooter's model as the

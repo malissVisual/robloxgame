@@ -166,7 +166,7 @@ of letting you play a profile that would not be saved.
 | Rent / return a ZDC RIDE scooter (5.6; 6.3: a rack of six right behind the spawn) | hold E at a dock | the prompt |
 | Ride a city bus (5.5) | E at its door (Board); E in your seat rings the bell (STOP) | the prompts |
 | Show or hide the bus lines on the big map (6.3) | the BUS chip in the map's header | the same |
-| Climb a zip line's ladder, zip, let go (5.6) | E (Climb, Zip); Space lets go low over a roof | the prompts, the jump button |
+| Zip line: climb the ladder yourself, zip, let go (5.6; 6.10) | walk into the ladder; on the start platform E (Zip) or a jump; Space lets go low over a roof | the prompt, the jump button |
 | Music and sound (on / music off / all off) | N | SOUND in MENU |
 | Missions (6.8: who you work for: the clients and their story chapters, START, the stars; 3.1: the CHALLENGES, SECRETS and REWARDS tabs) | U | MORE → MISSIONS on the phone |
 | Crew panel (invite / accept / leave / kick, the crew board) | K | CREW |
@@ -1142,6 +1142,61 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## Zip lines by hand, scooters you hop on, curbs (6.10)
+
+The owner, after 6.9:
+- "At the zip line E walks me there by itself, then E walks me back down. Let me climb the building myself and just
+  jump onto the zip line."
+- "Don't teleport me onto the scooter: I want to grab it and jump on quickly. Better controls, and a wheelie."
+- "Sidewalks a little higher than the roads, and I want to drive onto them with the car, the bike and the scooter."
+
+**Zip lines** (`Config.ZipLines`, `shared/ZipLines.luau`, `server/ZipLines.luau`, `client/ZipRide.luau`):
+- The ladders are real (`ZipData.truss`). You climb them yourself with Roblox's own climb.
+- You walk across the roof and onto the platform through the gap in its back rail (`RailGap`).
+- To grab the trolley, **jump** anywhere on the start platform (the Zip remote's `"grab"`, checked by
+  `ZipData.canStart`) or press **E** (Zip) there.
+- Space lets go low over a roof.
+- Getting down is your own business: climb the ladder or just jump off. There is no fall damage, but fragile cargo
+  still takes a hard landing.
+- The automatic climb and its "Climb" / "Climb down" prompts are gone. Your bag rides along; full hands don't.
+
+**Scooters** (`shared/ScooterRide.luau`, `server/Wheelie.luau`, `client/Drive.luau`, `client/CarBoarding.luau`,
+`client/CarVisuals.luau`, `client/BikeRider.luau`, `server/Rental.luau`):
+- **Getting on:** press E right beside your E-Scooter, or at any docked ZDC RIDE scooter. Each docked scooter has its
+  own Ride prompt, with no hold. Your courier hops straight onto the deck in a third of a second; getting off is a
+  quick hop to the side.
+- **MY BIKE** puts your scooter right next to you.
+- **Steering:** quick and precise at low speed, calm at full speed. S is a firm brake, and the scooter coasts further
+  when you let go.
+- **Wheelie:** hold **Shift** (a gamepad's **R1**, the touch **WHEELIE** button) while rolling to pop onto the back
+  wheel.
+  - The front lifts about 24°, your rider leans back on the bar, steering gets lighter and top speed rises 8%.
+  - It drops after up to 3.5 seconds. Everyone around sees it (the scooter's `WheelieAt` attribute).
+- Bikes keep their step-and-leg-over mount.
+
+**Curbs** (`shared/CurbShape.luau`, `server/Curbs.luau`, `client/CurbRide.luau`):
+- The sidewalks stand half a stud (about 15 cm) over the road: `Map.WalkTop` 0.9, `Map.RoadTop` 0.4.
+- Every block has a light-grey sloped kerb all round its edge, `Map.CurbRun` = 2 studs out onto the road. It is one
+  union cloned per block, or eight wedges if the union fails.
+- Every car, van, truck, bike and E-Scooter can drive up and down it anywhere: slowly or fast, straight on or at an
+  angle. Pedestrians cross every crosswalk without a step.
+- Over a kerb, the vehicle you drive rises at most `Config.City.CurbHop` studs/s, so it climbs onto the sidewalk
+  without jumping.
+- Things that stood at the old sidewalk height were moved:
+  - the lost packages;
+  - the far employer boards;
+  - the bus-bay lines and posts;
+  - the safe-zone border, now lying on the walk, the roads and the slopes;
+  - abandoned cars, now leaning on the kerb;
+  - road wrecks.
+
+**Also:** the bandits' roadblock stands on the road. It floated 0.4 over it.
+
+**Review fixes:**
+- The touch WHEELIE button lets go even when the finger slides off it.
+- The gamepad wheelie is R1, not B: B also closes the phone and the windows.
+- The Zip remote is rate-limited (`Config.Robust.Limits.Zip`).
 
 ## One body for every courier: Roblox's classic R15 with your own look (6.9)
 

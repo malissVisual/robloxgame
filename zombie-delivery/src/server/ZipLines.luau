@@ -244,6 +244,9 @@ local function stop(player: Player, ride: Ride, putDown: boolean)
 end
 
 local function onZip(player: Player, action: any, id: any)
+	if not Net.limit(player, "Zip", Config.Robust.Limits.Zip) then
+		return -- (6.10 review: a flood of jumps or lets-go)
+	end
 	if action == "grab" then
 		-- 6.10: a jump on the line's start platform (client/ZipRide.luau), checked as the Zip prompt
 		local line = if type(id) == "number" then ZipData.line(id) else nil

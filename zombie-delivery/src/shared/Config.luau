@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.9"
+Config.Version = "6.10"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1926,7 +1926,7 @@ Config.Interact = {
 
 -- 6.10, the E-Scooter's ride (the owner: "give the scooter better controls, and maybe pop it onto its back wheel"):
 -- its handling (client/Drive.luau through shared/ScooterRide.luau, pure: tests/scooter_test.luau) and the wheelie (hold
--- Shift, a gamepad's B or the touch WHEELIE button: the deck pitches back round its rear axle, client/CarVisuals.luau;
+-- Shift, a gamepad's R1 or the touch WHEELIE button: the deck pitches back round its rear axle, client/CarVisuals.luau;
 -- the rider sits back, client/BikeRider.luau; server/Wheelie.luau checks it and tells everybody through the scooter's
 -- attribute WheelieAt). A ZDC RIDE rental rides the same (its own top speed and pull: Config.Rental). The bikes and the
 -- cars keep their handling.
@@ -3921,6 +3921,7 @@ Config.Robust = {
 		Kit = 4,
 		Aiming = 12,
 		Wheelie = 8, -- 6.10: up / down on the E-Scooter (server/Wheelie.luau)
+		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
 	},
 }
 

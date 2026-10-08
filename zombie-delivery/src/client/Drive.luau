@@ -15,7 +15,7 @@
 -- toast, once (again only after a refill). A bike has no tank.
 -- 6.10, the E-Scooter (the car's attributes Bike and BikeStand; a ZDC RIDE rental too) rides on its own numbers
 -- (Config.Scooter through shared/ScooterRide.luau): the steering ramps in (no snap) and turns quickly at walking pace,
--- easing off toward the top speed; a firm brake on S, a long coast. The wheelie: hold Shift (a gamepad's B, the touch
+-- easing off toward the top speed; a firm brake on S, a long coast. The wheelie: hold Shift (a gamepad's R1, the touch
 -- WHEELIE button: Drive.setWheelieHeld) while rolling and it pops onto its back wheel (less steering, a little more top
 -- speed) until you let go, brake, slow down or the balance runs out (Config.Scooter.Wheelie); the server is told
 -- (the Wheelie remote, server/Wheelie.luau) so everybody sees it, your own client draws it at once (Drive.wheelie).
@@ -206,7 +206,8 @@ function Drive.setWheelieHeld(on: boolean)
 	wheelie.touch = on
 end
 
--- 6.10: the wheelie's key held now: Shift, a gamepad's B, the touch button.
+-- 6.10: the wheelie's key held now: Shift, a gamepad's R1 (6.10 review: not B, which also closes the phone and the
+-- windows), the touch button.
 local function wheelieHeld(): boolean
 	if wheelie.touch then
 		return true
@@ -215,7 +216,7 @@ local function wheelieHeld(): boolean
 		return false
 	end
 	return UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
-		or UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonB)
+		or UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR1)
 end
 
 -- 6.10: one step of the wheelie on the scooter you drive (nil: none): the server hears when it goes up or down.

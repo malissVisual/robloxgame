@@ -10,7 +10,7 @@
 --       PUT DOWN  while you carry a piece, LET GO while you lead a horse, SET DOWN while you push the trolley or the
 --                 pallet jack: what the G prompt in your hands does (the "PutDown" remote; the server checks it,
 --                 server/Cargo.luau, server/Equipment.luau). The prompt itself still works when you tap it.
---   * WHEELIE (6.10; Shift on a computer, B on a gamepad): in SPRINT's place while you ride an E-Scooter: hold it and
+--   * WHEELIE (6.10; Shift on a computer, R1 on a gamepad): in SPRINT's place while you ride an E-Scooter: hold it and
 --     the scooter pops onto its back wheel (client/Drive.luau, Drive.setWheelieHeld), let go and it comes down. Lit
 --     while held.
 -- Hud builds them into its ScreenGui (TouchControls.build) and its layout() places them (TouchControls.place, the boxes
@@ -147,19 +147,39 @@ function TouchControls.build(gui: Instance)
 		wheelieHeld = false,
 	}
 	parts = made
-	-- 6.10: held, not tapped: up while the finger is on it
+	-- 6.10: held, not tapped: up while the finger is on it. 6.10 review: that finger's own input lets go, also when it
+	-- slid off the button before it lifted (the button's InputEnded does not come then); a second finger is ignored.
+	local holding: InputObject? = nil
+	local function letGo()
+		holding = nil
+		made.wheelieHeld = false
+		Drive.setWheelieHeld(false)
+		refresh(made)
+	end
 	wheelie.InputBegan:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			made.wheelieHeld = true
-			Drive.setWheelieHeld(true)
-			refresh(made)
+		if holding ~= nil or (input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseButton1) then
+			return
 		end
+		holding = input
+		made.wheelieHeld = true
+		Drive.setWheelieHeld(true)
+		refresh(made)
+		local watch: RBXScriptConnection? = nil
+		watch = input:GetPropertyChangedSignal("UserInputState"):Connect(function()
+			local state = input.UserInputState
+			if state == Enum.UserInputState.End or state == Enum.UserInputState.Cancel then
+				if watch then
+					watch:Disconnect()
+				end
+				if holding == input then
+					letGo()
+				end
+			end
+		end)
 	end)
 	wheelie.InputEnded:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			made.wheelieHeld = false
-			Drive.setWheelieHeld(false)
-			refresh(made)
+		if input == holding then
+			letGo()
 		end
 	end)
 	sprint.Activated:Connect(function()
