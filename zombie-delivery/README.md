@@ -1143,6 +1143,32 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Performance and mobile (6.13.1)
+
+The game is public, and many players are on phones. This pass is a static audit plus safe fixes. The report is
+`design/performance/REPORT.md`; the owner's phone test is `design/performance/NAVOD.md`, in Czech.
+
+- **Shadows:** a shared rule (`shared/RenderBudget.luau`, `Config.Performance`) turns CastShadow off on small parts
+  and on flat plates near the ground. World's `part()` and the art builders use it. The city's shadow casters drop
+  from 18,209 to 14,088.
+- **Lights:** `client/WorldFx.luau` lets only the nearest night lights shine. A computer gets 40 within 320 studs, a
+  phone 16 within 200.
+  - Lights already on stay on a little longer, so nothing blinks at the edge.
+  - A vehicle's lights count as one.
+  - They fade over 0.3 s.
+- **Sign text:** small text draws only up close (971 → 104 drawn at any distance). Big boards keep their reach: 100 studs
+  per stud of board height.
+- **Phones** (`client/DeviceBudget.luau`) get shorter ranges for cosmetic animation. ArmPose cleanup, car prompts and
+  the minimap are throttled.
+- **Streaming-safe:** horses, zombies, car visuals and the garage UI forget what streams out. The depot is a Persistent
+  model.
+  - Network ownership: an empty car is the server's, and its driver's while someone drives (`Vehicles.claim`).
+  - So a far-away parked car can't fall through ground its owner's client no longer has.
+  - Streaming itself is switched on in Studio by the owner (Workspace's Streaming properties, NAVOD.md).
+- **The admin's PERFORMANCE overlay** (P → WORLD, `client/PerfOverlay.luau`) shows FPS, CPU and GPU time, draw calls,
+  memory, ping, parts, shadows, lights and streaming, with a LITE switch to compare. Use it for screenshots from a
+  phone.
+
 ## Analytics: where new players drop off, the economy, errors (6.13)
 
 The game is public. `server/Analytics.luau` (rules in `shared/AnalyticsPlan.luau`, `Config.Analytics`) reports to

@@ -4,8 +4,9 @@
 -- Driving is arcade, not wheel physics: invisible frictionless wheel colliders (they ride over curbs) and two
 -- constraints on the chassis move the car. A LinearVelocity in the ground plane (gravity still works) and an
 -- AngularVelocity that turns it around the vertical axis and keeps it upright. The owner's client simulates the car
--- (network owner) and sets both constraints from the VehicleSeat's throttle / steer (client/Drive.luau), the
--- server only reads where the car is and how fast it goes (ramming, deliveries).
+-- (network owner) while the owner sits in its driver's seat and sets both constraints from the VehicleSeat's throttle /
+-- steer (client/Drive.luau), the server only reads where the car is and how fast it goes (ramming, deliveries). 6.13.1:
+-- an empty car is the server's (Vehicles.claim; with StreamingEnabled a far owner's client loses the ground under it).
 --
 -- The visible tyres hang on Motor6Ds that every client spins and steers (client/CarVisuals.luau).
 -- Other players ride along in the passenger seats (a "Ride along" prompt at their door, 3.7) and shoot from there
@@ -25,7 +26,7 @@
 -- Calling the car (the CAR button: Vehicles.spawn without force) goes to server/CarCall.luau through the hook
 -- Vehicles.callCar: a chauffeur drives it to you. While a chauffeur drives a car (car.chauffeured, the attribute
 -- Chauffeured) the SERVER owns and drives it, nobody gets in (the door prompts refuse, the clients hide them);
--- Vehicles.handOver gives it to its owner (the chauffeur's door swings, the owner's client owns it again). The
+-- Vehicles.handOver gives it to its owner (the chauffeur's door swings, the owner's client drives it again). The
 -- instant cases stay instant (force: PLAY, a respawn, a car bought or equipped, a job's vehicle): next to you and
 -- seated, or, when you spawn at home, parked at your home's garage drive-out spot (the hook Vehicles.homeGarage).
 --
@@ -1515,18 +1516,26 @@ local SIREN_DIM: { [string]: Color3 } = {
 	sirenblue = Color3.fromRGB(34, 44, 120),
 }
 
-local function newPart(model: Model, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material): Part
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Size = size
-	p.CFrame = cframe
-	p.Color = color
-	p.Material = material
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.CollisionGroup = "Car"
-	p.Parent = model
-	return p
+-- 6.13.1: a moving part's shadow is redrawn every frame: only the pieces big enough throw one (shared/RenderBudget.luau;
+-- no lamps, handles, mirrors or trims; by its size alone: a car's thin roof and floor plates make its shadow). (A
+-- do-block: no new top-level local.)
+local newPart: (model: Model, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material) -> Part
+do
+	local RenderBudget = require(Shared.RenderBudget)
+	newPart = function(model: Model, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material): Part
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.CFrame = cframe
+		p.Color = color
+		p.Material = material
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.CollisionGroup = "Car"
+		p.CastShadow = RenderBudget.casts(size.X, size.Y, size.Z)
+		p.Parent = model
+		return p
+	end
 end
 
 local function weld(a: BasePart, b: BasePart)
@@ -3280,6 +3289,22 @@ end
 -- Whoever gets out slides out at their own door (3.10: their client plays it, client/CarBoarding.luau; the door opens
 -- at once and shuts behind them). Still over the car a moment later (no client move: a lag, a failed start), they are
 -- put out next to it at their door, not left inside the cabin.
+-- 6.13.1: who simulates a car (its network owner): its driver while somebody sits in its driver's seat (the owner:
+-- the seat takes nobody else), the server while it stands empty or a chauffeur drives it. With StreamingEnabled a far
+-- owner's client loses the ground under a parked car: owning it, that client would let it fall through (the server
+-- then sinks it, "Your car sank!"). Every hand-over of the car goes through here (the seat, the spawn, the chauffeur's
+-- hand-over, the lift, a new kit or gun, a decal, the tow).
+function Vehicles.claim(car: Car)
+	if car.wrecked or not car.chassis.Parent or car.chassis.Anchored then
+		return -- (an anchored part has no owner: the lift sets it again when it lets go)
+	end
+	local occupant = car.seat.Occupant
+	local driver = if occupant and not car.chauffeured then Players:GetPlayerFromCharacter(occupant.Parent) else nil
+	pcall(function()
+		car.chassis:SetNetworkOwner(driver)
+	end)
+end
+
 local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driver: boolean)
 	local door = car.doors[index] or car.doors[1]
 	local sitting: Humanoid? = nil
@@ -3292,8 +3317,14 @@ local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driv
 				eject(seat)
 			else
 				sitting = occupant
+				if driver then
+					Vehicles.claim(car) -- 6.13.1: its driver's client drives it
+				end
 			end
 			return
+		end
+		if driver then
+			Vehicles.claim(car) -- 6.13.1: an empty car is the server's (it cannot fall through ground a far owner lost)
 		end
 		local left = sitting
 		sitting = nil
@@ -3753,9 +3784,7 @@ function Vehicles.setRepairing(car: Car, on: boolean)
 			eject(seat) -- the SeatWeld goes too: nobody stays in a car on the lift
 		end
 	else
-		pcall(function()
-			car.chassis:SetNetworkOwner(if car.chauffeured then nil else car.owner)
-		end)
+		Vehicles.claim(car)
 	end
 end
 
@@ -3965,9 +3994,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		upright.MaxTorque = mass * 12000 -- (5.1: a bike; over the Steer's, which holds every turn still)
 	end
 
-	pcall(function()
-		car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
-	end)
+	Vehicles.claim(car) -- 6.13.1: the server's until its driver sits (the seat's watcher hands it over)
 
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -4010,9 +4037,7 @@ function Vehicles.handOver(car: Car)
 	if angular and angular:IsA("AngularVelocity") then
 		angular.AngularVelocity = Vector3.zero
 	end
-	pcall(function()
-		car.chassis:SetNetworkOwner(car.owner)
-	end)
+	Vehicles.claim(car) -- (6.13.1: the server keeps it parked until the owner sits in the driver's seat)
 end
 
 -- The car right next to the player on the nearest road, and they get in: the old instant way (a force spawn away
@@ -4214,10 +4239,9 @@ function Vehicles.refreshStats(player: Player)
 		car.kit = key
 		buildKit(car.model, car.chassis, styleOf(car), levels, car.id, car.gear)
 		Vehicles.onStyle(car) -- 6.12: a decal goes round the new kit
-		-- The new parts joined the car's assembly: the driver's client keeps simulating it.
-		pcall(function()
-			car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
-		end)
+		-- The new parts joined the car's assembly: the driver's client keeps simulating it (the server while it stands
+		-- empty or a chauffeur drives it).
+		Vehicles.claim(car)
 	end
 end
 
@@ -4251,11 +4275,9 @@ function Vehicles.refreshGun(player: Player)
 	if want then
 		car.turret, car.muzzle = buildTurret(car.model, car.chassis, car.turretBase, want)
 		car.gunId = want
-		-- The new parts joined the car's assembly: the driver's client keeps simulating it (the server while a
-		-- chauffeur drives it).
-		pcall(function()
-			car.chassis:SetNetworkOwner(if car.chauffeured then nil else player)
-		end)
+		-- The new parts joined the car's assembly: the driver's client keeps simulating it (the server while it
+		-- stands empty or a chauffeur drives it).
+		Vehicles.claim(car)
 	end
 	car.model:SetAttribute("CarGun", want)
 	Vehicles.onStyle(car) -- 6.12: a decal goes round the gun on the roof (or over its place again)

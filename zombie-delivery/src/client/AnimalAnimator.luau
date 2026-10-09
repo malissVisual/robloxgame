@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
+local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone animates only the nearer animals
 
 local AnimalAnimator = {}
 
@@ -31,6 +32,7 @@ type Rig = {
 }
 
 local rigs: { [Model]: Rig } = {}
+local watched: { [Model]: boolean } = {} -- (its Destroying hooked once)
 
 -- The four-beat walk (left hind, left fore, right hind, right fore) and the two-beat trot (diagonal pairs).
 local GAIT: { { id: string, walk: number, trot: number, front: boolean } } = {
@@ -42,9 +44,11 @@ local GAIT: { { id: string, walk: number, trot: number, front: boolean } } = {
 
 local function rigOf(model: Model): Rig?
 	local rig = rigs[model]
-	if rig then
+	if rig and rig.root.Parent == model then
 		return rig
 	end
+	-- (6.13.1, StreamingEnabled: an animal's parts streamed out and back in are new ones: its joints looked up again)
+	rigs[model] = nil
 	local root = model:FindFirstChild("HumanoidRootPart")
 	if not root or not root:IsA("BasePart") then
 		return nil
@@ -62,7 +66,7 @@ local function rigOf(model: Model): Rig?
 	if #legs < 4 or not neckPart then
 		return nil -- not all streamed in yet: try again next frame
 	end
-	rig = {
+	local made: Rig = {
 		root = root,
 		legs = legs,
 		neck = Joints.find(root, "Neck"),
@@ -73,11 +77,15 @@ local function rigOf(model: Model): Rig?
 		speed = 0,
 		seed = math.random() * 100,
 	}
-	rigs[model] = rig
-	model.Destroying:Connect(function()
-		rigs[model] = nil
-	end)
-	return rig
+	rigs[model] = made
+	if not watched[model] then
+		watched[model] = true
+		model.Destroying:Connect(function()
+			rigs[model] = nil
+			watched[model] = nil
+		end)
+	end
+	return made
 end
 
 local function set(joint: any, cframe: CFrame)
@@ -135,6 +143,7 @@ local function step(dt: number)
 	end
 	local eye = camera.CFrame.Position
 	local t = os.clock()
+	local range = DeviceBudget.range(RANGE)
 	for _, model in folder:GetChildren() do
 		if not model:IsA("Model") then
 			continue
@@ -143,7 +152,7 @@ local function step(dt: number)
 		if not rig or not rig.root.Parent then
 			continue
 		end
-		if (rig.root.Position - eye).Magnitude > RANGE then
+		if (rig.root.Position - eye).Magnitude > range then
 			continue
 		end
 		animate(model, rig, dt, t)

@@ -62,6 +62,8 @@ local LOWER_TIME = 0.3
 local CARRY_IN = 0.25 -- seconds to take the cargo into the arms
 local CARRY_OUT = 0.3
 local NPC_RANGE = 180 -- people (5.9.2: and other players) farther from the camera than this are not posed
+-- 6.13.1: a phone poses only the nearer bodies (client/DeviceBudget.luau); the gone bodies are swept once a second
+local budget = { device = require(script.Parent.DeviceBudget), sweptAt = 0 }
 local RIG_REFRESH = 2 -- 5.9.2: seconds a character's joints are kept before they are looked up again …
 local RIG_RETRY = 0.5 -- … or this, while some are missing (a body still loading)
 local PHONE_ROLL = Config.Body.PhoneRoll -- 6.7: degrees the wrist rolls the phone in the palm up
@@ -872,6 +874,7 @@ local function step(dt: number)
 	local me = Players.LocalPlayer
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else nil
+	local range = budget.device.range(NPC_RANGE)
 	for _, player in Bodies.players() do
 		local character = player.Character
 		if not character then
@@ -880,7 +883,7 @@ local function step(dt: number)
 		local mine = player == me
 		local humanoid, root = Bodies.of(character)
 		-- (5.9.2: the far ones are left to the animation; yours never)
-		if not mine and eye and (not root or (root.Position - eye).Magnitude > NPC_RANGE) then
+		if not mine and eye and (not root or (root.Position - eye).Magnitude > range) then
 			letGo(character)
 			continue
 		end
@@ -912,7 +915,7 @@ local function step(dt: number)
 				continue
 			end
 			local humanoid, root = Bodies.of(model)
-			if root and (root.Position - eye).Magnitude <= NPC_RANGE then
+			if root and (root.Position - eye).Magnitude <= range then
 				poseCharacter(model, humanoid, false, 0, RAISE_TIME, dt, nil, nil, gestureOf(model))
 			end
 			if not carries[model] and not carryingOf(model) and not gestured[model] and model:GetAttribute("GestureAt") == nil then
@@ -920,6 +923,21 @@ local function step(dt: number)
 			end
 		end
 	end
+	-- (the kicks fade every frame)
+	for character, kick in kicks do
+		local left = kick * math.exp(-dt * 14)
+		if left > 0.01 and character.Parent then
+			kicks[character] = left
+		else
+			kicks[character] = nil
+		end
+	end
+	-- 6.13.1: the bodies that are gone, forgotten once a second (it was every frame: a dozen tables walked)
+	local now = os.clock()
+	if now - budget.sweptAt < 1 then
+		return
+	end
+	budget.sweptAt = now
 	for character in rigs do
 		if not character.Parent then
 			rigs[character] = nil
@@ -959,14 +977,6 @@ local function step(dt: number)
 	for character in blends do
 		if not character.Parent then
 			blends[character] = nil
-		end
-	end
-	for character, kick in kicks do
-		local left = kick * math.exp(-dt * 14)
-		if left > 0.01 and character.Parent then
-			kicks[character] = left
-		else
-			kicks[character] = nil
 		end
 	end
 	for character in leans do

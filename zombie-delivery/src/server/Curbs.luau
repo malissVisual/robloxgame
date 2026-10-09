@@ -43,6 +43,7 @@ local function piece(parent: Instance, p: CurbShape.Piece, at: CFrame): BasePart
 	made.TopSurface = Enum.SurfaceType.Smooth
 	made.BottomSurface = Enum.SurfaceType.Smooth
 	made.CanTouch = false
+	made.CastShadow = false -- 6.13.1: a low slope on the road, nothing to shade (Config.Performance)
 	made.Parent = parent
 	return made
 end
@@ -70,6 +71,7 @@ local function makeTemplate(parent: Instance)
 	union.Name = "Curb"
 	union.Anchored = true
 	union.CanTouch = false
+	union.CastShadow = false -- 6.13.1 (the clones too)
 	union.Color = COLOR
 	union.Material = Enum.Material.Concrete
 	if union:IsA("UnionOperation") then

@@ -52,6 +52,10 @@ export type Storefront = {
 	extras: { Detail },
 }
 Kit.StoreWidth, Kit.StoreDepth, Kit.StoreHeight, Kit.StoreDoor, Kit.StoreDoorHeight = 30, 24, 12, 9, 8
+-- 6.13.1: a label's text is drawn only this close (SurfaceGui.MaxDistance; a big label SignPerStud studs per stud of its
+-- height): server/World.luau sets both from Config.Performance before it builds (nil: no limit).
+Kit.SignRange = nil :: number?
+Kit.SignPerStud = nil :: number?
 
 function Kit.storefront(spec: Storefront): Blueprint
 	local front = -Kit.StoreDepth / 2 -- the front wall's outer face (z)
@@ -111,7 +115,8 @@ function Kit.build(parent: Instance, frame: CFrame, blueprint: Blueprint, contex
 		local material = (Enum.Material :: any)[detail.material or "Metal"] :: Enum.Material
 		local item = context.deco(context.part(model, detail.name, Vector3.new(s[1], s[2], s[3]), pose, Color3.fromRGB(c[1], c[2], c[3]), material))
 		item.CanTouch = false
-		item.CastShadow = detail.transparency == nil and detail.label == nil
+		-- (6.13.1: and only a piece big enough, as World's part() decided: shared/RenderBudget.luau)
+		item.CastShadow = item.CastShadow and detail.transparency == nil and detail.label == nil
 		item.Transparency = detail.transparency or 0
 		if detail.shape == "Cylinder" then
 			item.Shape = Enum.PartType.Cylinder
@@ -123,6 +128,10 @@ function Kit.build(parent: Instance, frame: CFrame, blueprint: Blueprint, contex
 			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 			gui.PixelsPerStud = 40
 			gui.LightInfluence = 0.15
+			local range = Kit.SignRange
+			if range then
+				gui.MaxDistance = math.max(range, s[2] * (Kit.SignPerStud or 0))
+			end
 			gui.Parent = item
 			local text = Instance.new("TextLabel")
 			text.Size = UDim2.fromScale(1, 1)

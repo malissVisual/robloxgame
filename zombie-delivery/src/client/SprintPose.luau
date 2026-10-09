@@ -33,6 +33,7 @@ local Joints = require(Shared.Joints)
 local RunCycle = require(Shared.RunCycle)
 local Motion = require(Shared.CourierMotion) -- 6.8 review: the leg's own stride
 local Bodies = require(script.Parent.Bodies)
+local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone poses only the nearer bodies
 local CameraRig = require(script.Parent.CameraRig)
 local Holster = require(script.Parent.Holster)
 local Interact = require(script.Parent.Interact)
@@ -257,6 +258,7 @@ local function step(dt: number)
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else nil
 	local rate = dt / math.max(S.BlendTime, 0.01)
+	local range = DeviceBudget.range(S.Range)
 	for _, player in Bodies.players() do
 		local character = player.Character
 		if not character then
@@ -264,7 +266,7 @@ local function step(dt: number)
 		end
 		local mine = player == me
 		local humanoid, root = Bodies.of(character)
-		if not humanoid or not root or (not mine and eye and (root.Position - eye).Magnitude > S.Range) then
+		if not humanoid or not root or (not mine and eye and (root.Position - eye).Magnitude > range) then
 			letGo(character)
 			continue
 		end

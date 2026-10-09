@@ -13,13 +13,26 @@
 --     attributes), the radio mast's beacon blinks ("RadioBeacon").
 --   * A few broken street lamps ("BrokenLamp") flicker at night, the red flares on the streets ("Flare") burn
 --     unsteadily, only within FlickerRange of the camera (each flare's light looked up once).
+--   * 6.13.1, the light budget (a phone: design/performance/REPORT.md): the night lights' real lights (a lamp's pool on
+--     the road, a window's glow, a headlight's beam) are expensive to draw, so only the nearest ones shine:
+--     RenderBudget.choose (Config.Performance MaxLights within LightRange of the camera; a phone or a tablet its Lite
+--     numbers, client/DeviceBudget.luau), chosen again every LightEvery seconds. A vehicle's lights go together (both
+--     headlights or neither); one that shines keeps shining a little past the range and the count (LightHoldRange,
+--     LightHoldExtra: nothing blinks at the edge); a light fades in and out over LightFade seconds (its Brightness; a
+--     broken lamp's flicker snaps). Every lamp still glows (its part turns Neon); the far ones just light nothing.
+--     Every Light found in or as a night light takes part (found when it is restyled or streams in), whoever switches it
+--     (a server write that lights one over the budget is put out again).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
-local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local RenderBudget = require(Shared:WaitForChild("RenderBudget"))
+local DeviceBudget = require(script.Parent.DeviceBudget)
 
 local WorldFx = {}
 
@@ -37,10 +50,200 @@ local function nightNow(): boolean
 	return workspace:GetAttribute("Night") == true
 end
 
--- One night light on or off (the same as the server's DayNight: the part, its lights, or a tagged light itself).
-local function apply(item: Instance, on: boolean)
+-- ── 6.13.1: the light budget ───────────────────────────────────────────────
+
+local Performance = Config.Performance
+local VEHICLE_FOLDERS: { [string]: boolean } = { Cars = true, BanditCars = true, Traffic = true, Buses = true }
+
+local budget = {
+	lights = {} :: { Light }, -- every Light of a night light seen (the gone ones dropped at the next choice)
+	known = {} :: { [Light]: boolean },
+	shining = {} :: { [Light]: boolean }, -- within the budget at the last choice
+	group = {} :: { [Light]: Instance }, -- what it goes with: its vehicle's model, else the light itself
+	full = {} :: { [Light]: number }, -- its own brightness (it fades from and to it)
+	target = {} :: { [Light]: boolean }, -- on or off, as this client last decided
+	fades = {} :: { [Light]: Tween },
+	held = {} :: { [Instance]: number }, -- a broken lamp out right now (its part: until when), startMoving's
+	chosenAt = 0,
+}
+
+-- A vehicle's lights go together: the model right under workspace.Cars / BanditCars / Traffic / Buses.
+local function groupOf(light: Light): Instance
+	local node: Instance? = light.Parent
+	while node do
+		local parent = node.Parent
+		if parent and parent.Parent == workspace and VEHICLE_FOLDERS[parent.Name] then
+			return node
+		end
+		node = parent
+	end
+	return light
+end
+
+local function register(light: Light)
+	if not budget.known[light] then
+		budget.known[light] = true
+		table.insert(budget.lights, light)
+		budget.group[light] = groupOf(light)
+		budget.full[light] = if light.Brightness > 0 then light.Brightness else 1
+	end
+end
+
+-- Forgets a light (gone, or no night light any more): its fade stopped, its own brightness back.
+local function forget(light: Light)
+	local fading = budget.fades[light]
+	if fading then
+		fading:Cancel()
+		budget.fades[light] = nil
+	end
+	local full = budget.full[light]
+	if full and light.Parent then
+		light.Brightness = full
+	end
+	budget.known[light] = nil
+	budget.shining[light] = nil
+	budget.group[light] = nil
+	budget.full[light] = nil
+	budget.target[light] = nil
+end
+
+-- Where a light shines from: its part, or its attachment (a bike's lamp).
+local function lightAt(light: Light): Vector3?
+	local parent = light.Parent
+	if parent and parent:IsA("BasePart") then
+		return parent.Position
+	elseif parent and parent:IsA("Attachment") then
+		return parent.WorldPosition
+	end
+	return nil
+end
+
+-- A light on or off: its Brightness fades over LightFade seconds (snap: at once), off at the end of a fade out.
+local function fade(light: Light, on: boolean, snap: boolean)
+	local running = budget.fades[light]
+	if running then
+		running:Cancel()
+		budget.fades[light] = nil
+	end
+	local full = budget.full[light] or 1
+	if snap or Performance.LightFade <= 0 then
+		light.Brightness = full
+		light.Enabled = on
+		return
+	end
+	if on then
+		if not light.Enabled then
+			light.Brightness = 0
+			light.Enabled = true
+		elseif math.abs(light.Brightness - full) < 1e-3 then
+			return
+		end
+	elseif not light.Enabled then
+		light.Brightness = full
+		return
+	end
+	local made = TweenService:Create(light, TweenInfo.new(Performance.LightFade), { Brightness = if on then full else 0 })
+	budget.fades[light] = made
+	made.Completed:Connect(function(state: Enum.PlaybackState)
+		if budget.fades[light] ~= made then
+			return
+		end
+		budget.fades[light] = nil
+		if state == Enum.PlaybackState.Completed and not on and budget.target[light] == false then
+			light.Enabled = false
+			light.Brightness = full
+		end
+	end)
+	made:Play()
+end
+
+-- One Light of a night light on or off: on only within the budget (and not a broken lamp flickering out). snap: no fade
+-- (the flicker).
+local function switch(light: Light, on: boolean, snap: boolean?)
+	register(light)
+	local want = on and budget.shining[light] == true and budget.held[light.Parent :: Instance] == nil
+	if budget.target[light] ~= want then
+		budget.target[light] = want
+		fade(light, want, snap == true)
+	elseif not want and light.Enabled and not budget.fades[light] then
+		fade(light, false, true) -- (a server write lit it again: out at once)
+	elseif want and not light.Enabled then
+		fade(light, true, snap == true) -- (a server write put it out)
+	end
+end
+
+-- Every LightEvery seconds: the nearest within range shine (a vehicle's lights together, a little hold at the edge),
+-- the rest fade out.
+local function chooseLights()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local eye = camera.CFrame.Position
+	local kept: { Light } = {}
+	local seen: { [Light]: boolean } = {}
+	local units: { RenderBudget.Unit } = {}
+	local members: { [number]: { Light } } = {}
+	local unitOf: { [Instance]: number } = {}
+	for _, light in budget.lights do
+		if seen[light] then
+			continue -- (listed twice: forgotten and found again in between)
+		end
+		local at = if budget.known[light] and light.Parent then lightAt(light) else nil
+		if at then
+			seen[light] = true
+			table.insert(kept, light)
+			local key = budget.group[light] or light
+			local distance = (at - eye).Magnitude
+			local index: number = unitOf[key] or 0
+			if index == 0 then
+				table.insert(units, { distance = distance, size = 0, on = false })
+				index = #units
+				unitOf[key] = index
+				members[index] = {}
+			end
+			local unit = units[index]
+			unit.distance = math.min(unit.distance, distance)
+			unit.size += 1
+			unit.on = unit.on or budget.shining[light] == true
+			table.insert(members[index], light)
+		elseif budget.known[light] then
+			forget(light) -- (gone: streamed out, destroyed)
+		end
+	end
+	budget.lights = kept
+	local most, range = RenderBudget.numbers(DeviceBudget.lite)
+	local chosen = RenderBudget.choose(units, most, range)
+	local night = nightNow()
+	for index, list in members do
+		local on = chosen[index] == true
+		for _, light in list do
+			if on then
+				budget.shining[light] = true
+			else
+				budget.shining[light] = nil
+			end
+			switch(light, night)
+		end
+	end
+end
+
+-- How many Lights of the night lights this client knows and how many shine now (the admin's overlay).
+function WorldFx.lightCount(): (number, number)
+	local shining = 0
+	for _, light in budget.lights do
+		if light.Enabled and light.Parent then
+			shining += 1
+		end
+	end
+	return #budget.lights, shining
+end
+
+-- One night light on or off (the same as the server's DayNight: the part, its lights, or a tagged light itself). snap:
+-- its lights at once, no fade (a broken lamp's flicker).
+local function apply(item: Instance, on: boolean, snap: boolean?)
 	if item:IsA("Light") then
-		item.Enabled = on
+		switch(item, on, snap)
 		return
 	end
 	if item:IsA("BasePart") then
@@ -53,7 +256,7 @@ local function apply(item: Instance, on: boolean)
 	end
 	for _, child in item:GetChildren() do
 		if child:IsA("Light") then
-			child.Enabled = on
+			switch(child, on, snap)
 		end
 	end
 end
@@ -62,6 +265,7 @@ end
 -- painted it since, a burnt-out car).
 local function darken(item: Instance)
 	if item:IsA("Light") then
+		forget(item)
 		item.Enabled = false
 		return
 	end
@@ -78,6 +282,7 @@ local function darken(item: Instance)
 	end
 	for _, child in item:GetChildren() do
 		if child:IsA("Light") then
+			forget(child)
 			child.Enabled = false
 		end
 	end
@@ -158,11 +363,18 @@ local function startRestyle()
 		end
 		return last + 1
 	end
+	local every = Config.Performance.LightEvery
 	RunService.Heartbeat:Connect(function()
 		if nearAt <= #near then
 			nearAt = run(near, nearAt, Tuning.RestyleNearPerFrame)
 		elseif farAt <= #far then
 			farAt = run(far, farAt, Tuning.RestyleFarPerFrame)
+		end
+		-- 6.13.1: the light budget, a few times a second
+		local now = os.clock()
+		if now - budget.chosenAt >= every then
+			budget.chosenAt = now
+			chooseLights()
 		end
 	end)
 end
@@ -214,7 +426,7 @@ local function startMoving()
 	local angle = 0
 	local blinkClock, flickerClock = 0, 0
 	local beaconOn = true
-	local dark: { [Instance]: number } = {} -- a broken lamp that is out right now: until when (os.clock)
+	local dark = budget.held -- a broken lamp that is out right now: until when (os.clock; 6.13.1: the budget leaves it out)
 	local rand = Random.new()
 	RunService.Heartbeat:Connect(function(dt: number)
 		local camera = workspace.CurrentCamera
@@ -257,7 +469,7 @@ local function startMoving()
 		end
 		flickerClock = 0
 		local now = os.clock()
-		local range = Tuning.FlickerRange
+		local range = DeviceBudget.range(Tuning.FlickerRange) -- (6.13.1: closer on a phone)
 		for _, lamp in broken do
 			if not lamp:IsA("BasePart") then
 				continue
@@ -267,11 +479,11 @@ local function startMoving()
 			if outUntil then
 				if not near or now >= outUntil then
 					dark[lamp] = nil
-					apply(lamp, night)
+					apply(lamp, night, true)
 				end
 			elseif near and rand:NextNumber() < 0.07 then
 				dark[lamp] = now + rand:NextNumber(0.05, 0.5)
-				apply(lamp, false)
+				apply(lamp, false, true)
 			end
 		end
 		for lamp in dark do

@@ -44,6 +44,7 @@ local Economy = require(Shared.Economy)
 local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local RentalDocks = require(Shared.RentalDocks)
+local RenderBudget = require(Shared.RenderBudget) -- 6.13.1: only the parts big enough throw a shadow
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
 local Jobs = require(script.Parent.Jobs)
@@ -91,6 +92,7 @@ local function part(parent: Instance, name: string, size: Vector3, cframe: CFram
 	p.CanTouch = false
 	p.CanCollide = collide == true
 	p.CanQuery = collide == true
+	p.CastShadow = RenderBudget.shadowFor(size, cframe)
 	p.Parent = parent
 	return p
 end

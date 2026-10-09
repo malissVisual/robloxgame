@@ -7,7 +7,7 @@ HERE=Path(__file__).resolve().parent
 
 def prepare_modules(tmp, vehicles_source=None):
     prefix='local Mock = require("./roblox-mock")\nlocal game, workspace, Instance, Vector3, Vector2, Color3, CFrame, Enum, PhysicalProperties, UDim2, typeof = Mock.game, Mock.workspace, Mock.Instance, Mock.Vector3, Mock.Vector2, Mock.Color3, Mock.CFrame, Mock.Enum, Mock.PhysicalProperties, Mock.UDim2, Mock.typeof\n'
-    for name in ['Config','Economy','Map','Boarding']:
+    for name in ['Config','Economy','Map','Boarding','RenderBudget']: # (6.13.1: RenderBudget, the cars' shadows)
         s=(ROOT/'src/shared'/f'{name}.luau').read_text()
         s=re.sub(r'require\(script.Parent.(\w+)\)',r'require("./\1")',s)
         (tmp/f'{name}.luau').write_text(s)

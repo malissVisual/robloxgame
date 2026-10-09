@@ -178,19 +178,27 @@ local LINE = Color3.fromRGB(200, 170, 60)
 
 -- ── Helpers ────────────────────────────────────────────────────────────────
 
-local function part(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?): Part
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Anchored = true
-	p.Size = size
-	p.CFrame = cframe
-	p.Color = color
-	p.Material = material or Enum.Material.SmoothPlastic
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.CanTouch = false
-	p.Parent = parent
-	return p
+-- 6.13.1: a part throws a shadow only when it is big enough to throw one you notice (shared/RenderBudget.luau,
+-- Config.Performance: no rails, strips, frames, bolts, small boxes or plates lying flat; every builder that takes
+-- World's helpers gets it too). (A do-block: no new top-level local, the -O0 register limit.)
+local part: (parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?) -> Part
+do
+	local RenderBudget = require(Shared.RenderBudget)
+	part = function(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?): Part
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Anchored = true
+		p.Size = size
+		p.CFrame = cframe
+		p.Color = color
+		p.Material = material or Enum.Material.SmoothPlastic
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.CanTouch = false
+		p.CastShadow = RenderBudget.shadowFor(size, cframe)
+		p.Parent = parent
+		return p
+	end
 end
 
 local function deco(p: Part): Part
@@ -223,7 +231,9 @@ local function tiled(parent: Instance, name: string, x0: number, x1: number, z0:
 	local w, d = (x1 - x0) / nx, (z1 - z0) / nz
 	for a = 0, nx - 1 do
 		for b = 0, nz - 1 do
-			table.insert(list, part(parent, name, Vector3.new(w, height, d), CFrame.new(x0 + w * (a + 0.5), y, z0 + d * (b + 0.5)), color, material))
+			local tile = part(parent, name, Vector3.new(w, height, d), CFrame.new(x0 + w * (a + 0.5), y, z0 + d * (b + 0.5)), color, material)
+			tile.CastShadow = false -- 6.13.1: the ground, the beds, the embankments, the snow, the boundary: nothing to shade
+			table.insert(list, tile)
 		end
 	end
 	return list
@@ -265,6 +275,7 @@ local function sign(parent: Instance, text: string, size: Vector3, cframe: CFram
 		local pps = math.clamp(math.min(1000 / boardSize.X, 175 / boardSize.Y), 8, 120)
 		gui.PixelsPerStud = pps
 		gui.LightInfluence = 0
+		gui.MaxDistance = Config.Performance.NameBoardRange -- 6.13.1: no text drawn across the whole city
 		gui.Parent = board
 		local width, height = boardSize.X * pps, boardSize.Y * pps
 		local title, second = string.match(text, "^(.-)%s%s+(.+)$")
@@ -340,6 +351,8 @@ local function sign(parent: Instance, text: string, size: Vector3, cframe: CFram
 	gui.Face = Enum.NormalId.Front
 	gui.PixelsPerStud = 20
 	gui.LightInfluence = 0
+	-- 6.13.1: a plain board's text only up close, a big one (MOUNT ROT TUNNEL, the stadium's board) from further
+	gui.MaxDistance = math.max(Config.Performance.SignRange, size.Y * Config.Performance.SignPerStud)
 	gui.Parent = board
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
@@ -845,7 +858,12 @@ end
 -- given from the depot's middle (`o`), the crates draw the world's random numbers as before. The giant parcel stands on
 -- its roof (ShopProps "depot").
 local function buildDepot(parent: Instance)
-	local depot = folder(parent, "Depot")
+	-- 6.13.1 (StreamingEnabled): the spawn, the job board, the counters and Marge's yard are always on every client (a
+	-- Persistent model: never streamed out, there before you respawn or come back).
+	local depot = Instance.new("Model")
+	depot.Name = "Depot"
+	depot.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	depot.Parent = parent
 	local o = CFrame.new(Map.Depot.x, 0, Map.Depot.z)
 	sidewalk(depot, Map.Depot.x, Map.Depot.z, Color3.fromRGB(120, 120, 116))
 	local wallColor = Color3.fromRGB(56, 61, 65)
@@ -2988,6 +3006,7 @@ local function defineRealEstate()
 		gui.Face = Enum.NormalId.Front
 		gui.PixelsPerStud = 30
 		gui.LightInfluence = 0
+		gui.MaxDistance = Config.Performance.SignRange -- (6.13.1: only up close)
 		gui.Parent = board
 		local label = Instance.new("TextLabel")
 		label.Name = "Status"
@@ -5569,6 +5588,7 @@ local function defineVenuesAndHomes()
 		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 		gui.PixelsPerStud = 40
 		gui.LightInfluence = 0.3
+		gui.MaxDistance = Config.Performance.SignRange -- (6.13.1: 400 numbers and buzzers, drawn only up close)
 		gui.Parent = p
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)
@@ -6048,6 +6068,11 @@ local function buildVanLot(parent: Instance)
 end
 
 function World.build()
+	-- 6.13.1: the building looks' labels are drawn only up close (Kit has no Config of its own: the tools load it bare)
+	do
+		local Kit = require(script.Parent.BuildingLooks.Kit)
+		Kit.SignRange, Kit.SignPerStud = Config.Performance.SignRange, Config.Performance.SignPerStud
+	end
 	-- A fresh Baseplate place: its plate and spawn would sit inside the city.
 	for _, child in workspace:GetChildren() do
 		if child.Name == "Baseplate" or child:IsA("SpawnLocation") then

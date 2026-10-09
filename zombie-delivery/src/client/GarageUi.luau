@@ -696,6 +696,12 @@ function GarageUi.start()
 			watchPrompt(item)
 		end
 		world.DescendantAdded:Connect(watchPrompt)
+		-- 6.13.1 (StreamingEnabled): a prompt that streams out is forgotten (one that streams back in is a new one)
+		world.DescendantRemoving:Connect(function(item: Instance)
+			if item:IsA("ProximityPrompt") then
+				prompts[item] = nil
+			end
+		end)
 	end)
 end
 
