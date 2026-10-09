@@ -595,6 +595,11 @@ local function tourTick()
 			tour.phoneSeen = true -- (from now on the NEW PHONE pop-up finds it open and stays away)
 			TutorialArrow.focus() -- (the phone put the gamepad's selection on its first tile)
 		end
+		-- 6.14 review: the tile it points at stays in view (the phone was resized, it opened late)
+		local target = stop.target
+		pcall(function()
+			phone.reveal(target)
+		end)
 	elseif tour.phoneSeen or tour.tries >= PHONE_TRIES then
 		pastPhone() -- (you put it away: the tour never opens it against you; or it never came)
 	else

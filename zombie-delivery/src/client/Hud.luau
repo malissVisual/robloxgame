@@ -1598,14 +1598,12 @@ function Hud.showResult(r: any)
 		local got = if type(r.rating) == "table" then math.clamp(math.floor(tonumber(r.rating.stars) or 0), 0, 3) else 0
 		local left = if type(r.order) == "table" then tonumber(r.order.left) or 0 else 0
 		local streak = if type(r.rating) == "table" and got >= 2 then tonumber(r.rating.streak) or 0 else 0
-		Hud.toast(`{if r.midJob == true then "ORDER DONE" else "DELIVERED"}{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · {r.cargo or "cargo"} for {r.customer or r.driver or "the customer"}{if left > 0 then ` · {left} to go` elseif streak > 1 then ` · streak {streak}` else ""}`)
+		-- 6.14: what the pay (6.14 review: and a SHIFT DONE's pay, server/Shift.luau, as the window's line) brings the
+		-- savings goal to, on the DELIVERED toast's second line ("$1,160 to go for the Old Van"; client/ReadyCheck.luau)
+		local saving = if r.midJob ~= true then require(script.Parent.ReadyCheck).goalWords((tonumber(r.total) or 0) + (if type(r.shift) == "table" and r.shift.done == true then tonumber(r.shift.money) or 0 else 0)) else nil
+		Hud.toast(`{if r.midJob == true then "ORDER DONE" else "DELIVERED"}{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · {r.cargo or "cargo"} for {r.customer or r.driver or "the customer"}{if left > 0 then ` · {left} to go` elseif streak > 1 then ` · streak {streak}` else ""}{if saving then `\n💰 {saving}` else ""}`)
 		local xp = tonumber(r.xp) or 0
 		require(script.Parent.PayFloat).show(moneyLabel, `+{Ui.money(tonumber(r.total) or 0)}{if xp > 0 then ` · +{xp} XP` else ""}`)
-		-- 6.14: what the pay brings the savings goal to ("+$85 · $1,160 to go for the Old Van"; client/ReadyCheck.luau)
-		local saving = if r.midJob ~= true then require(script.Parent.ReadyCheck).resultLine(tonumber(r.total) or 0) else nil
-		if saving then
-			Hud.toast(saving)
-		end
 		return
 	end
 	if type(r) == "table" and r.midJob == true then
@@ -3248,19 +3246,18 @@ local levelUpUnlocks = Ui.label(levelUpBody, "", UDim2.new(1, 0, 0, 0), {
 local levelUpStamp = 0
 
 local function showLevelUp(from: number, to: number)
-	-- 6.14: what is new AND where it is (shared/Career.luau whereOf: "Old Van (Earl's Used Wheels)"); the stages only
-	-- of a car you own. (The level-up card, client/CareerUi.luau, has the GPS buttons.)
-	local Career = require(Shared.Career)
+	-- 6.14 review: the names only and at most 6 ("and 3 more"), as the level-up card's line (client/CareerUi.luau
+	-- unlockLine(…, 6)): the card, with its WHERE rows and GPS buttons, says where each one is.
 	local unlocked: { string } = {}
 	for level = from + 1, to do
-		for _, unlock in Career.unlocksAt(level) do
-			if unlock.kind == "stage" and not (state and type(state.cars) == "table" and state.cars[unlock.car or ""]) then
-				continue
-			end
-			local where = Career.whereOf(unlock)
-			local known = where == nil or where.place == nil or string.find(unlock.name, where.label, 1, true) ~= nil
-			table.insert(unlocked, if known then unlock.name else `{unlock.name} ({(where :: any).label})`)
+		for _, name in unlocksAt(level) do
+			table.insert(unlocked, name)
 		end
+	end
+	if #unlocked > 6 then
+		local more = #unlocked - 6
+		unlocked = table.move(unlocked, 1, 6, 1, {})
+		table.insert(unlocked, `and {more} more`)
 	end
 	local rank = Levels.rank(to)
 	levelUpTitle.Text = `LEVEL {to}  /  {rank:upper()}`
@@ -3674,10 +3671,17 @@ layout = function()
 	setScale(leftStack, S)
 	local left: Box
 	if touchLayout then
+		-- 6.14 review (client/TouchLayout.luau leftColumn): with the savings line the column still ends over the
+		-- thumbstick's corner, a little smaller if need be; with no room for it the line stays away (SavingsRoom,
+		-- client/SavingsLine.luau).
+		local fits, leftScale = require(script.Parent.TouchLayout).leftColumn(require(script.Parent.TouchLayout).cluster(W, H, S), S, LEFT_H, Config.Readiness.LineHeight, leftStack.Size.Y.Offset)
+		leftStack:SetAttribute("SavingsRoom", fits)
+		setScale(leftStack, leftScale)
 		leftStack.AnchorPoint = Vector2.zero
 		leftStack.Position = UDim2.fromOffset(MARGIN, MARGIN)
-		left = box(MARGIN, MARGIN, MARGIN + LEFT_W * S, MARGIN + leftStack.Size.Y.Offset * S)
+		left = box(MARGIN, MARGIN, MARGIN + LEFT_W * leftScale, MARGIN + leftStack.Size.Y.Offset * leftScale)
 	else
+		leftStack:SetAttribute("SavingsRoom", true)
 		leftStack.AnchorPoint = Vector2.new(0, 1)
 		leftStack.Position = UDim2.new(0, MARGIN, 1, -MARGIN)
 		left = box(MARGIN, H - MARGIN - leftStack.Size.Y.Offset * S, MARGIN + LEFT_W * S, H - MARGIN)

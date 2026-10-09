@@ -25,11 +25,26 @@
 --     and a two-handed gun on a hard one (HardTier), a medkit, a repair kit once you drive. At most MaxRows rows.
 --   * What to save up for (`goal`): the first row not done that costs money (required first), with your money.
 -- `quiet`: Marge's first day runs (or the phone is not yours yet): the HUD's savings line and the READY toast wait.
--- The words every surface uses are here too (Readiness.status, goalLine, workLine, resultLine, readyToast …).
+-- The words every surface uses are here too (Readiness.status, badge, goalLine, workLine, resultLine, readyToast …).
+-- 6.14 review:
+--   * A car of your own is never a company vehicle the employers gave you (they wait at the depot lot, CALL CAR does
+--     not bring them): with only those, the row asks for Earl's van as before. (One taken out at the depot lot is the
+--     equipped car, state.car: the server lets it do the mission, and so does the row.)
+--   * The goal says `afford` only when the money AND the level are there (Earl, the dealer, Wrench Garage, the gear
+--     stall and the range all refuse below the level): with the money saved and the level not yet, "level 4 to buy".
+--   * night     a NIGHT ONLY mission (its "night" twist; server/Jobs.luau startMission refuses by day): a required row,
+--               done while the workspace's Night attribute is not false (the MISSIONS window's own rule)
+--   * partner   in your crew AND near you (server/Missions.luau duoRefusal: Config.Missions.Duo.StartRange)
+--   * room      another car of yours that holds the pieces: the GPS to where it is kept (the depot lot for the van and the
+--               employers' vehicles, else your nearest garage: server/Garages.luau keptAt), not the phone's GARAGE
+--   * `start`   whether START can work right now and else what it says: IN PROGRESS (that mission runs), LEADER PICKS
+--               (in somebody else's crew), AFTER YOUR RUN (a job of yours runs), CALL CAR (no car of yours out and the
+--               mission lends none: server/Jobs.luau "Call your car first"). The tile and the READY CHECK say it.
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
 local Levels = require(script.Parent.Levels)
+local Map = require(script.Parent.Map)
 local Missions = require(script.Parent.Missions)
 local VanQuest = require(script.Parent.VanQuest)
 local Armour = require(script.Parent.Armour)
@@ -56,10 +71,18 @@ export type Input = {
 	tutorial: string?, -- Marge's first day: her phase while it runs (nil, or "done", when it is over)
 	phone: boolean?, -- the phone is yours (false: her first day has not given it yet)
 	mission: string?, -- a mission id to check instead of the next one (the tests; a window's pick)
+	-- 6.14 review (nil: not known, nothing is held back for it):
+	night: boolean?, -- the workspace's Night attribute (false: by day)
+	active: string?, -- the mission running now, yours or your crew leader's (the Missions state)
+	onJob: boolean?, -- a job of your own runs (the Job remote)
+	carOut: boolean?, -- a vehicle of yours stands in the world (false: CALL CAR first)
+	partnerNear: boolean?, -- a member of your crew within Config.Missions.Duo.StartRange of you
+	garages: { string }?, -- the properties you own that keep cars (the Missions state: Config.Estate garageSlots > 0)
+	at: { x: number, z: number }?, -- where you stand (your nearest garage)
 }
 
 export type Check = {
-	id: string, -- level | vehicle | cargo | partner | friend | vest | gun | medkit | repair
+	id: string, -- level | vehicle | cargo | partner | night | friend | vest | gun | medkit | repair
 	icon: string,
 	text: string, -- the headline: "Reach level 4", "A van of your own"
 	detail: string?, -- how and where: "Old Van at Earl's Used Wheels · $1,800 · level 4"
@@ -91,7 +114,12 @@ export type MissionInfo = {
 	description: string,
 }
 
-export type Goal = { id: string, icon: string, name: string, have: number, need: number, left: number, place: string?, afford: boolean }
+-- `afford`: the money AND the level are there (buy it now); `locked`: the level is not (6.14 review).
+export type Goal = { id: string, icon: string, name: string, have: number, need: number, left: number, place: string?, level: number?, locked: boolean, afford: boolean }
+
+-- 6.14 review: can START work now ("START"), else what it says instead: "IN PROGRESS", "LEADER PICKS", "AFTER YOUR RUN",
+-- "CALL CAR", "NOT READY", "ALL DONE"; `why` in words.
+export type Start = { can: boolean, label: string, why: string? }
 
 export type Result = {
 	mission: MissionInfo?,
@@ -101,6 +129,7 @@ export type Result = {
 	required: number, -- required rows
 	goal: Goal?,
 	quiet: boolean,
+	start: Start,
 }
 
 -- Where a place id is, in the words the rows use (the ids: Map.Shops / Map.Landmarks).
@@ -170,22 +199,64 @@ function Readiness.quiet(input: Input): boolean
 	return (input.tutorial ~= nil and QUIET_PHASES[input.tutorial] == true) or input.phone == false
 end
 
--- A car of `cars` that is not a bike (its id), the equipped one first, then the one CALL CAR brings back.
+-- A car of `cars` that is not a bike (its id), the equipped one first, then the one CALL CAR brings back. 6.14 review:
+-- never a company vehicle (the employers' cars wait at the depot and CALL CAR does not bring them).
 local function ownCar(input: Input): string?
 	local cars = input.cars or {}
 	for pass = 1, 2 do
 		local id = if pass == 1 then input.car else input.lastCar
 		local def = if id then Economy.findCar(id) else nil
-		if def and not def.bike and cars[def.id] == true then
+		if def and not def.bike and not def.company and cars[def.id] == true then
 			return def.id
 		end
 	end
 	for _, def in Config.Cars do
-		if cars[def.id] == true and not def.bike then
+		if cars[def.id] == true and not def.bike and not def.company then
 			return def.id
 		end
 	end
 	return nil
+end
+
+-- 6.14 review: where one of your cars is kept (server/Garages.luau keptAt): the depot lot for the starting van, the
+-- employers' vehicles and every car of a save with more cars than slots; else your garage nearest to `input.at` (the
+-- first one without a spot). Returns a place id for the GPS (Map.Shops.depot or a Map.EstatePlots id) and its name.
+function Readiness.keptAt(input: Input, carId: string): (string, string)
+	local def = Economy.findCar(carId)
+	local garages: { Config.EstateDef } = {}
+	local slots = Config.Estate.BaseCarSlots
+	local mine: { string } = input.garages or {}
+	local cars: { [string]: boolean } = input.cars or {}
+	for _, id in mine do
+		for _, estate in Config.Estate.Properties do
+			if estate.id == id and estate.garageSlots > 0 then
+				table.insert(garages, estate)
+				slots += estate.garageSlots
+			end
+		end
+	end
+	local owned = 0
+	for id, yes in cars do
+		local car = Economy.findCar(id)
+		if yes == true and car and not car.company and not car.bike then
+			owned += 1
+		end
+	end
+	if def == nil or def.id == Config.Cars[1].id or def.company or #garages == 0 or owned > slots then
+		return "depot", "the depot lot"
+	end
+	local best, bestDistance = garages[1], math.huge
+	local at = input.at
+	if at then
+		for _, estate in garages do
+			local plot = Map.EstatePlots[estate.id]
+			local d = if plot then math.sqrt((plot.x - at.x) ^ 2 + (plot.z - at.z) ^ 2) else math.huge
+			if d < bestDistance then
+				best, bestDistance = estate, d
+			end
+		end
+	end
+	return best.id, best.name
 end
 
 -- How many pieces of this mission's cargo a car holds now (its stage, its gear: the Roof Rack for light pieces).
@@ -362,12 +433,13 @@ local function cargoCheck(input: Input, def: Missions.MissionDef, level: number)
 		return { id = "cargo", icon = "📦", text = text, detail = `Your {carName} holds {room}`, done = true, required = true }
 	end
 	text = `A vehicle for {need} pieces`
-	-- Another car of yours that holds them now: free, swap at a garage.
+	-- Another car of yours that holds them now: free, swap where it is kept (6.14 review: the GPS there).
 	for _, other in Config.Cars do
 		if other.id ~= mine and not other.bike and (input.cars or {})[other.id] == true then
 			local otherRoom = holds(input, other.id, look)
 			if otherRoom >= need then
-				return { id = "cargo", icon = "📦", text = text, detail = `Your {carName} holds {room}: take your {other.name} (holds {otherRoom}) · GARAGE`, done = false, required = true, action = "garage", name = other.name }
+				local place, where = Readiness.keptAt(input, other.id)
+				return { id = "cargo", icon = "📦", text = text, detail = `Your {carName} holds {room}: take out your {other.name} (holds {otherRoom}) at {where}`, done = false, required = true, action = "gps", place = place, name = other.name }
 			end
 		end
 	end
@@ -491,6 +563,32 @@ local function recommended(input: Input, def: Missions.MissionDef, level: number
 	return list
 end
 
+-- 6.14 review: can START work right now (the server's refusals in their order: server/Missions.luau refusal, then
+-- server/Jobs.luau startMission and startJob)? IN PROGRESS (this mission runs), LEADER PICKS (somebody else's crew),
+-- AFTER YOUR RUN (a job or another mission runs), NOT READY (a required row), CALL CAR (no car of yours out and the
+-- mission lends none), else START.
+function Readiness.startOf(input: Input, mission: MissionInfo?, ready: boolean): Start
+	if not mission then
+		return { can = false, label = "ALL DONE", why = "Every mission is done: every star is yours" }
+	end
+	if input.active ~= nil and input.active == mission.id then
+		return { can = false, label = "IN PROGRESS", why = `{mission.name} runs right now` }
+	end
+	if input.crewOwner ~= nil then
+		return { can = false, label = "LEADER PICKS", why = `{input.crewOwner} leads your crew: your crew leader picks the mission` }
+	end
+	if input.onJob == true or input.active ~= nil then
+		return { can = false, label = "AFTER YOUR RUN", why = "Finish your current delivery first" }
+	end
+	if not ready then
+		return { can = false, label = "NOT READY", why = nil }
+	end
+	if not mission.lends and input.carOut == false then
+		return { can = false, label = "CALL CAR", why = "Call your car first: CALL CAR on your phone's GARAGE" }
+	end
+	return { can = true, label = "START", why = nil }
+end
+
 -- What the next mission (or input.mission) needs, what would help, and what to save up for. See the header.
 function Readiness.evaluate(input: Input): Result
 	local tuning = Config.Readiness
@@ -506,7 +604,7 @@ function Readiness.evaluate(input: Input): Result
 		def, kind = Readiness.nextMission(progress)
 	end
 	if not def then
-		return { mission = nil, checks = {}, ready = false, done = 0, required = 0, goal = nil, quiet = quiet }
+		return { mission = nil, checks = {}, ready = false, done = 0, required = 0, goal = nil, quiet = quiet, start = Readiness.startOf(input, nil, false) }
 	end
 	local mission = def :: Missions.MissionDef
 	local campaign = Missions.findCampaign(mission.campaign)
@@ -539,8 +637,19 @@ function Readiness.evaluate(input: Input): Result
 		table.insert(required, cargo)
 	end
 	if mission.duo then
+		-- 6.14 review: in your crew AND near you (server/Missions.luau duoRefusal); a crew leader brings their own.
 		local crewed = inCrew(input)
-		table.insert(required, { id = "partner", icon = "👥", text = "A partner in your crew", detail = if crewed then "Your crew is with you" else "DUO: Rosa & Rico only work with two · INVITE a friend", done = crewed, required = true, action = if crewed then nil else "invite" })
+		local near = crewed and (input.crewOwner ~= nil or input.partnerNear ~= false)
+		local detail = if near
+			then "Your crew is with you"
+			elseif crewed then `Your partner is too far: bring them here (within {Config.Missions.Duo.StartRange} studs)`
+			else "DUO: Rosa & Rico only work with two · INVITE a friend"
+		table.insert(required, { id = "partner", icon = "👥", text = "A partner in your crew", detail = detail, done = near, required = true, action = if crewed then nil else "invite" })
+	end
+	-- 6.14 review: a NIGHT ONLY mission waits for the dark (server/Jobs.luau startMission refuses it by day).
+	if table.find(mission.twists or {}, "night") then
+		local dark = input.night ~= false
+		table.insert(required, { id = "night", icon = "🌙", text = "Night only", detail = if dark then "It is night: go now" else "It starts after dark (the clock in the top bar)", done = dark, required = true })
 	end
 	-- What would help: the ones not done first, as many as fit.
 	local helps = recommended(input, mission, level, vehicle.done)
@@ -564,16 +673,19 @@ function Readiness.evaluate(input: Input): Result
 	end
 	-- The savings goal: the first row not done that costs money (never a medkit or a repair kit: Config.Readiness.NotGoals,
 	-- pocket money is nothing to save up for).
+	-- 6.14 review: `afford` only with the level too (every counter refuses below it).
 	local goal: Goal? = nil
 	local cash = math.max(0, input.money or 0)
 	for _, check in checks do
 		local cost = check.cost
 		if not check.done and cost and cost > 0 and not tuning.NotGoals[check.id] then
-			goal = { id = check.id, icon = check.icon, name = check.name or check.text, have = cash, need = cost, left = math.max(0, cost - cash), place = check.place, afford = cash >= cost }
+			local locked = (check.level or 1) > level
+			goal = { id = check.id, icon = check.icon, name = check.name or check.text, have = cash, need = cost, left = math.max(0, cost - cash), place = check.place, level = check.level, locked = locked, afford = cash >= cost and not locked }
 			break
 		end
 	end
-	return { mission = info, checks = checks, ready = done == #required, done = done, required = #required, goal = goal, quiet = quiet }
+	local ready = done == #required
+	return { mission = info, checks = checks, ready = ready, done = done, required = #required, goal = goal, quiet = quiet, start = Readiness.startOf(input, info, ready) }
 end
 
 -- ── The words ─────────────────────────────────────────────────────────────
@@ -588,12 +700,38 @@ function Readiness.line(check: Check): string
 	return if check.detail and not check.done then `{check.text} → {check.detail}` else check.text
 end
 
--- "READY · START", or "2 of 3 ready".
+-- "READY · START", "2 of 3 ready"; 6.14 review: "IN PROGRESS", "LEADER PICKS", ready but START cannot work yet:
+-- "READY · CALL CAR", "READY · AFTER YOUR RUN".
 function Readiness.status(result: Result): string
 	if not result.mission then
 		return "ALL DONE"
 	end
-	return if result.ready then "READY · START" else `{result.done} of {result.required} ready`
+	local start = result.start
+	if start.label == "IN PROGRESS" or start.label == "LEADER PICKS" then
+		return start.label
+	end
+	if not result.ready then
+		return `{result.done} of {result.required} ready`
+	end
+	return `READY · {start.label}`
+end
+
+-- The NEXT MISSION tile's and the READY CHECK's chip (caps) and its tone: "good" (green), "bad" (red), "wait" (amber).
+function Readiness.badge(result: Result): (string, string)
+	if not result.mission then
+		return "★ ALL YOURS", "good"
+	end
+	local label = result.start.label
+	if label == "IN PROGRESS" then
+		return "▶ IN PROGRESS", "good"
+	elseif label == "LEADER PICKS" then
+		return "👥 LEADER PICKS", "wait"
+	elseif not result.ready then
+		return `✖ {string.upper(Readiness.status(result))}`, "bad"
+	elseif result.start.can then
+		return "✔ READY · START", "good"
+	end
+	return `✔ READY · {label}`, "wait"
 end
 
 -- "First Shift · 1/6", a replay "Replay for stars · First Shift", the DUO side story "DUO · Partners in Crime · 2/6".
@@ -607,39 +745,67 @@ function Readiness.chapterLine(mission: MissionInfo?): string
 	return `{if mission.duo then "DUO · " else ""}{mission.chapter} · {mission.number}/{mission.total}`
 end
 
+-- The goal's money: "$640 / $1,800"; affordable "✓ buy it · $1,800"; 6.14 review: the money saved but the level not
+-- yet "$1,800 saved · level 4".
+function Readiness.goalMoney(goal: Goal): string
+	if goal.afford then
+		return `✓ buy it · {money(goal.need)}`
+	elseif goal.left <= 0 and goal.locked then
+		return `{money(goal.need)} saved · level {goal.level or 1}`
+	end
+	return `{money(goal.have)} / {money(goal.need)}`
+end
+
 -- "Old Van · $640 / $1,800".
 function Readiness.goalLine(goal: Goal): string
-	return `{goal.name} · {money(goal.have)} / {money(goal.need)}`
+	return `{goal.name} · {Readiness.goalMoney(goal)}`
 end
 
 -- The HUD's savings line under the cash: "🚐 Old Van  $640 / $1,800"; affordable: "🚐 Old Van  ✓ buy it · $1,800".
 function Readiness.hudLine(goal: Goal): string
-	if goal.afford then
-		return `{goal.icon} {goal.name}  ✓ buy it · {money(goal.need)}`
-	end
-	return `{goal.icon} {goal.name}  {money(goal.have)} / {money(goal.need)}`
+	return `{goal.icon} {goal.name}  {Readiness.goalMoney(goal)}`
 end
 
--- "$1,160 to go", or "✓ you can buy it".
+-- "$1,160 to go", "✓ you can buy it"; the money saved below the level: "level 4 to buy".
 function Readiness.toGo(goal: Goal): string
-	return if goal.left > 0 then `{money(goal.left)} to go` else "✓ you can buy it"
+	if goal.left > 0 then
+		return `{money(goal.left)} to go`
+	end
+	return if goal.locked then `level {goal.level or 1} to buy` else "✓ you can buy it"
 end
 
--- The WORK tile's goal line: "Earn for the Old Van · $1,160 to go", or "Buy the Old Van now · $1,800".
+-- The WORK tile's goal line: "Earn for the Old Van · $1,160 to go", "Buy the Old Van now · $1,800", or with the money
+-- and not the level "Old Van saved · reach level 4 to buy".
 function Readiness.workLine(goal: Goal?): string?
 	if not goal then
 		return nil
 	end
-	return if goal.left > 0 then `Earn for the {goal.name} · {money(goal.left)} to go` else `Buy the {goal.name} now · {money(goal.need)}`
+	if goal.left > 0 then
+		return `Earn for the {goal.name} · {money(goal.left)} to go`
+	end
+	return if goal.locked then `{goal.name} saved · reach level {goal.level or 1} to buy` else `Buy the {goal.name} now · {money(goal.need)}`
+end
+
+-- After a pay (`after`: your money with it in): "$1,160 to go for the Old Van", "enough for the Old Van now", or
+-- "the Old Van is saved: level 4 to buy".
+function Readiness.goalWords(goal: Goal?, after: number): string?
+	if not goal then
+		return nil
+	end
+	local left = math.max(0, goal.need - after)
+	if left > 0 then
+		return `{money(left)} to go for the {goal.name}`
+	end
+	return if goal.locked then `the {goal.name} is saved: level {goal.level or 1} to buy` else `enough for the {goal.name} now`
 end
 
 -- The job result's line: "+$85 · $1,160 to go for the Old Van" (`after`: your money with this pay in it).
 function Readiness.resultLine(pay: number, goal: Goal?, after: number): string?
-	if not goal or pay <= 0 then
+	local words = Readiness.goalWords(goal, after)
+	if not words or pay <= 0 then
 		return nil
 	end
-	local left = math.max(0, goal.need - after)
-	return if left > 0 then `+{money(pay)} · {money(left)} to go for the {goal.name}` else `+{money(pay)} · enough for the {goal.name} now`
+	return `+{money(pay)} · {words}`
 end
 
 -- The one-time toast when the next mission is ready: "Ready for Paper Trail · open MISSIONS (U)".
@@ -653,6 +819,7 @@ function Readiness.key(result: Result): string
 	for _, check in result.checks do
 		table.insert(parts, `{check.id}:{if check.done then 1 else 0}:{check.cost or 0}:{check.detail or ""}`)
 	end
+	table.insert(parts, result.start.label) -- (6.14 review: START, CALL CAR, IN PROGRESS … redraw the buttons)
 	return table.concat(parts, "|")
 end
 

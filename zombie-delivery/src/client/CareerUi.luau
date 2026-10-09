@@ -630,7 +630,9 @@ local function showCard(from: number, to: number)
 	if not step then
 		return
 	end
-	cardRefs.scale.Scale = math.clamp(Ui.screenScale(), 0.6, 1.05)
+	local cardScale = math.clamp(Ui.screenScale(), 0.6, 1.05)
+	cardRefs.scale.Scale = cardScale
+	cardRefs.nextLine.Visible = true
 	cardRefs.title.Text = `LEVEL {to}  ·  {string.upper(step.rank)}`
 	local newRank = Levels.rank(from) ~= step.rank
 	cardRefs.rank.Text = if newRank then "A NEW RANK" else `YOU STAY A {string.upper(step.rank)}`
@@ -662,7 +664,10 @@ local function showCard(from: number, to: number)
 			child:Destroy()
 		end
 	end
-	local rows = Career.whereRows(shownUnlocks(unlocks), 3, 4)
+	-- 6.14 review: a short screen (a phone sideways: the card at its 0.6 scale) takes 2 rows; the measure below drops
+	-- more if the card still reaches over the screen's edge.
+	local short = Ui.screenSize().Y / cardScale < 600
+	local rows = Career.whereRows(shownUnlocks(unlocks), if short then 2 else 3, if short then 2 else 4)
 	cardRefs.where.Visible = #rows > 0
 	for index, row in rows do
 		local line = Ui.make("Frame", { Name = `Where_{row.place or row.window}`, Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = index }, cardRefs.where)
@@ -719,6 +724,33 @@ local function showCard(from: number, to: number)
 	local mine = cardToken
 	card.Visible = true
 	Ui.gamepadFocus(cardRefs.ok)
+	-- 6.14 review: the card (centred at 45 % of the height) must fit: while it is taller than 88 % of the screen, the
+	-- last WHERE row goes (the CAREER window lists them all), then the NEXT line. (Measured once drawn: a few frames.)
+	task.defer(function()
+		for _ = 1, 6 do
+			if cardToken ~= mine or not card.Visible then
+				return
+			end
+			if card.AbsoluteSize.Y <= Ui.screenSize().Y * 0.88 then
+				return
+			end
+			local last: GuiObject? = nil
+			for _, child in cardRefs.where:GetChildren() do
+				if child:IsA("GuiObject") and (last == nil or child.LayoutOrder > (last :: GuiObject).LayoutOrder) then
+					last = child
+				end
+			end
+			if last then
+				last:Destroy()
+				cardRefs.where.Visible = #cardRefs.where:GetChildren() > 1 -- (its UIListLayout stays)
+			elseif cardRefs.nextLine.Visible then
+				cardRefs.nextLine.Visible = false
+			else
+				return
+			end
+			task.wait()
+		end
+	end)
 	task.delay(CARD_SECONDS, function()
 		if cardToken == mine then
 			cardRefs.close()

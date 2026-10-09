@@ -342,6 +342,7 @@ Extras.capacity = nil :: number? -- 3.4: the cargo slots of my equipped car (3.5
 Extras.carName = "car"
 Extras.carId = "van" -- 3.5: my equipped car and its stage (the advice in the "too small" texts)
 Extras.carStage = 0
+Extras.gear = nil :: { [string]: boolean }? -- 6.14 review: my car's installed gear (the server's state): the Roof Rack's slots
 Extras.hasCar = true -- 5.0: a vehicle of my own (the server's hasCar); the missions need one
 Extras.state = {
 	values = {},
@@ -507,16 +508,27 @@ end
 -- somebody else's crew: the leader's car does the mission (the server checks that one).
 function Extras.slotsShort(def: MissionDef): number?
 	local need = Economy.cargoNeed(def.load, def.items)
-	local holds = Extras.capacity
+	local holds = Extras.holds(def)
 	if def.vehicle or crewOwner ~= nil or need <= 0 or holds == nil or need <= holds or Extras.noCar() then
 		return nil
 	end
 	return need
 end
 
+-- 6.14 review: what my car holds of this mission's pieces: its stage's slots (the server's capacity) and the Roof
+-- Rack's for light pieces (Economy.capacity with the gear, as server/Missions.luau refusal counts them); nil unknown.
+function Extras.holds(def: MissionDef): number?
+	local holds = Extras.capacity
+	if holds == nil then
+		return nil
+	end
+	local kind = Config.Cargo.Kinds[def.itemKind]
+	return holds + Economy.rackSlots(Extras.carId, Extras.gear, if kind then kind.look else def.itemKind)
+end
+
 -- 3.4: what START says when the car is too small (the server's words).
-function Extras.slotsText(need: number): string
-	return `This mission needs a vehicle with {need} slots (your {Extras.carName} holds {Extras.capacity or 0}). {Economy.roomAdvice(Extras.carId, Extras.carStage, need)}`
+function Extras.slotsText(need: number, def: MissionDef): string
+	return `This mission needs a vehicle with {need} slots (your {Extras.carName} holds {Extras.holds(def) or 0}). {Economy.roomAdvice(Extras.carId, Extras.carStage, need)}`
 end
 
 -- 5.0: no vehicle of my own (you start on foot) and not in somebody else's crew: no mission can start (the server's
@@ -1186,7 +1198,7 @@ function Page.blocker(def: MissionDef): string?
 	elseif Extras.needsCrew(def) then
 		return `🤝 {Extras.DUO_REFUSAL}`
 	elseif Extras.slotsShort(def) then
-		return `📦 needs {Extras.slotsShort(def)} slots: your {Extras.carName} holds {Extras.capacity or 0}.`
+		return `📦 needs {Extras.slotsShort(def)} slots: your {Extras.carName} holds {Extras.holds(def) or 0}.`
 	elseif table.find(twistsOf(def), "night") and workspace:GetAttribute("Night") == false then
 		return "🌙 Night only: it starts after dark (the clock in the top bar)."
 	end
@@ -1318,7 +1330,7 @@ function Page.action(campaign: Campaign, order: number)
 		end
 	end
 	if short then
-		detailLine(body, `<b>📦 needs {short} slots</b>  {esc(Extras.slotsText(short))}`, P.danger, 19, layout.small + 1)
+		detailLine(body, `<b>📦 needs {short} slots</b>  {esc(Extras.slotsText(short, def))}`, P.danger, 19, layout.small + 1)
 	end
 	-- What it pays you now, explained (6.8 review: the amount itself is on the action bar).
 	local _, _, replay = Page.payout(def)
@@ -1614,6 +1626,7 @@ function Page.key(): string
 		crewOwner or "",
 		tostring(Extras.crewSize),
 		tostring(Extras.capacity),
+		tostring(Extras.gear ~= nil and Extras.gear.roofrack == true), -- 6.14 review
 		Extras.carName,
 		Extras.carId,
 		tostring(Extras.carStage),
@@ -2475,7 +2488,7 @@ function MissionsUi.startMission(id: string)
 	end
 	local short = Extras.slotsShort(def)
 	if short then
-		say(Extras.slotsText(short), P.danger)
+		say(Extras.slotsText(short, def), P.danger)
 		return
 	end
 	pendingStart = id
@@ -3159,6 +3172,7 @@ local function applyState(data: any)
 	Extras.carName = if type(data.carName) == "string" then data.carName else "car"
 	Extras.carId = if type(data.carId) == "string" then data.carId else Config.Cars[1].id
 	Extras.carStage = if type(data.carStage) == "number" then data.carStage else 0
+	Extras.gear = if type(data.gear) == "table" then data.gear else nil -- 6.14 review
 	Extras.hasCar = data.hasCar ~= false -- 5.0 (an older server sends none: as before)
 	hasState = true
 	-- Opened before the first state (a slow load): pick where the player is in the story now.

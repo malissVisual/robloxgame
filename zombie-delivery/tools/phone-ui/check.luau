@@ -799,6 +799,30 @@ do
 	check("… the READY CHECK: every required row ✔, START",named("Start")~=nil and named("Check_vehicle"):FindFirstChild("Mark").Text=="✔" and named("Check_vehicle").ClassName=="Frame" and named("SavingsGoal")==nil)
 	named("Start").Activated:Fire()
 	check("… START goes through the MISSIONS window (ReadyCheck.onStart), the phone away",started[#started]=="dispatch_1" and not Phone.isOpen())
+	-- 6.14 review: START only when it can work (the Missions state: carOut, active, crewOwner): no car of yours out
+	-- (CALL CAR), the mission running (IN PROGRESS), somebody else's crew (LEADER PICKS).
+	M.remotes.Missions.OnClientEvent:Fire("state",{progress={},level=4,crewSize=0,carOut=false})
+	Phone.close();Phone.open()
+	tile=named("nextApp")
+	check("6.14 review: ready, no car of yours out: READY · CALL CAR in amber, the reason under it",tile:FindFirstChild("Status").Text=="✔ READY · CALL CAR" and tile:FindFirstChild("Status").TextColor3==M.Theme.Contract.warn
+		and tile:FindFirstChild("Goal").Text=="Call your car first: CALL CAR on your phone's GARAGE",tile:FindFirstChild("Status").Text)
+	named("nextApp").Activated:Fire()
+	check("… the READY CHECK: CALL CAR FIRST, no START",named("CallCar")~=nil and named("Start")==nil and text("✔ READY · CALL CAR")~=nil)
+	named("CallCar").Activated:Fire()
+	check("… CALL CAR FIRST opens the GARAGE",showing("garage"))
+	M.remotes.Missions.OnClientEvent:Fire("state",{progress={},level=4,crewSize=0,carOut=true,active="dispatch_1"})
+	Phone.close();Phone.open()
+	check("6.14 review: the mission running: IN PROGRESS, not START",named("nextApp"):FindFirstChild("Status").Text=="▶ IN PROGRESS",named("nextApp"):FindFirstChild("Status").Text)
+	M.remotes.Missions.OnClientEvent:Fire("state",{progress={},level=4,crewSize=0,carOut=true,crewOwner="Ann"})
+	Phone.close();Phone.open()
+	check("6.14 review: in Ann's crew: LEADER PICKS, never READY · START",named("nextApp"):FindFirstChild("Status").Text=="👥 LEADER PICKS" and named("nextApp"):FindFirstChild("Status").TextColor3==M.Theme.Contract.warn)
+	named("nextApp").Activated:Fire()
+	check("… the READY CHECK: no START, your leader picks",named("Start")==nil and named("Waiting")~=nil and text("👥 YOUR LEADER PICKS")~=nil)
+	check("… no READY toast for any of it",#said==count)
+	M.workspace:SetAttribute("Night",false);M.workspace:GetAttributeChangedSignal("Night"):Fire()
+	check("… the night changing on a day mission: no warnings, nothing new",#said==count and #M.warnings==0)
+	M.workspace:SetAttribute("Night",nil)
+	Phone.close()
 	-- A co-op mission: bring a friend (INVITE: Roblox's game invite, else the CREW window for that mission).
 	M.remotes.Missions.OnClientEvent:Fire("state",{progress={dispatch_1=1,dispatch_2=1,dispatch_3=1,dispatch_8=1},level=4,crewSize=0})
 	check("6.14: a new mission ready at once (a clear's NEXT: its card says so) is no news: no toast",#said==count)
@@ -832,15 +856,27 @@ do
 	require("./SavingsLine").start(Ready)
 	local line=cash:FindFirstChild("Savings")
 	local height=require("./Config").Readiness.LineHeight
-	check("6.14 HUD: the savings line under the cash, the column taller by its height",line~=nil and line.Visible and line:FindFirstChild("Words").Text=="🚐 OLD VAN  $150 / $1,800"
+	check("6.14 HUD: the savings line under the cash, the column taller by its height",line~=nil and line.Visible and line:FindFirstChild("Words").Text=="🚐 OLD VAN" and line:FindFirstChild("Money").Text=="$150 / $1,800"
 		and cash.Size.Y.Offset==30+height and stack.Size.Y.Offset==258+height)
+	-- 6.14 review: the money in a label of its own at the right; the name gets the rest (cut with "…").
+	check("… the money at the right, the name left of it",line:FindFirstChild("Money").AnchorPoint.X==1 and line:FindFirstChild("Money").Size.X.Offset>0
+		and line:FindFirstChild("Words").Size.X.Scale==1 and line:FindFirstChild("Words").Size.X.Offset==-(line:FindFirstChild("Money").Size.X.Offset+8))
+	stack:SetAttribute("SavingsRoom",false);stack:GetAttributeChangedSignal("SavingsRoom"):Fire()
+	check("6.14 review: no room over the thumbstick (Hud's SavingsRoom): the line stays away, the column back",not line.Visible and stack.Size.Y.Offset==258 and cash.Size.Y.Offset==30)
+	stack:SetAttribute("SavingsRoom",true);stack:GetAttributeChangedSignal("SavingsRoom"):Fire()
+	check("… room again: it comes back",line.Visible and stack.Size.Y.Offset==258+height)
 	line.Activated:Fire()
 	check("… a tap opens the READY CHECK (SavingsLine.onOpen)",opened==1)
 	M.remotes.Tutorial.OnClientEvent:Fire("board",{})
 	check("… Marge's first day: hidden, the column back",not line.Visible and cash.Size.Y.Offset==30 and stack.Size.Y.Offset==258 and Ready.resultLine(85)==nil)
 	M.remotes.Tutorial.OnClientEvent:Fire("done",{})
 	Ready.setState({phone=true,money=2000,kit={},cars={},vanQuest="open",items={medkit=1}})
-	check("… enough money: buy it, in green",line.Visible and line:FindFirstChild("Words").Text=="🚐 OLD VAN  ✓ BUY IT · $1,800" and line:FindFirstChild("Words").TextColor3==M.Theme.Contract.good)
+	check("… enough money: buy it, in green",line.Visible and line:FindFirstChild("Money").Text=="✓ BUY IT · $1,800" and line:FindFirstChild("Words").TextColor3==M.Theme.Contract.good)
+	-- 6.14 review: the money without the level is no BUY IT (Earl sells at level 4).
+	M.player:SetAttribute("Xp",Levels.xpFor(3))
+	Ready.setState({phone=true,money=2000,kit={},cars={},vanQuest="open",items={medkit=1}})
+	check("6.14 review: the money, not the level: saved, the level to reach, in amber",line.Visible and line:FindFirstChild("Money").Text=="$1,800 SAVED · LEVEL 4" and line:FindFirstChild("Money").TextColor3==M.Theme.Contract.warn,line:FindFirstChild("Money").Text)
+	check("… WORK says so too",Ready.workLine()=="Old Van saved · reach level 4 to buy" and Ready.resultLine(85)=="+$85 · the Old Van is saved: level 4 to buy")
 	stack:Destroy()
 	check("6.14: no warnings",#M.warnings==0)
 end

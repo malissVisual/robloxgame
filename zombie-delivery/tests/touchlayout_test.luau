@@ -214,6 +214,34 @@ do
 	check("a narrow computer window: the chips fit somewhere on the screen", inside(narrow, 900, 600) and small >= TouchLayout.CHIPS_MIN, `{show(narrow)} {small}`)
 end
 
+-- 6.14 review: the HUD's left column at the top left (client/Hud.luau LEFT_H: the cash 30 + 6 + the minimap 172 + 6 +
+-- the health 44 = 258 px at scale 1) with the savings line (Config.Readiness.LineHeight 20 px) ends over the
+-- thumbstick's corner, at LEFT_SHRINK of the HUD's scale at least; else the line stays away and the column keeps the
+-- HUD's scale (as before 6.14).
+do
+	local BASE, LINE = 258, 20
+	local shown, hidden = 0, 0
+	for _, screen in SCREENS do
+		local name, W, H = screen[1] :: string, screen[2] :: number, screen[3] :: number
+		local S = scaleFor(W, H)
+		local c = TouchLayout.cluster(W, H, S)
+		local fits, scale = TouchLayout.leftColumn(c, S, BASE, LINE, BASE + LINE)
+		local _, plain = TouchLayout.leftColumn(c, S, BASE, LINE, BASE)
+		check(`{name}: the left column without the line keeps the HUD's scale`, plain == S, plain)
+		if fits then
+			shown += 1
+			local bottom = TouchLayout.MARGIN + (BASE + LINE) * scale
+			check(`{name}: with the savings line the left column ends over the thumbstick ({math.floor(bottom)} ≤ {c.thumb.y0})`, bottom <= c.thumb.y0 + 1e-6 and scale >= S * TouchLayout.LEFT_SHRINK - 1e-9 and scale <= S, `{scale} of {S}`)
+		else
+			hidden += 1
+			-- (the line goes: the column is BASE tall again and keeps S)
+			check(`{name}: no room for the savings line over the thumbstick: it stays away`, (BASE + LINE) * S * TouchLayout.LEFT_SHRINK > c.thumb.y0 - TouchLayout.MARGIN, S)
+		end
+	end
+	check("the savings line shows on most phones, the iPhone 14 among them", shown >= 5 and (TouchLayout.leftColumn(TouchLayout.cluster(844, 354, scaleFor(844, 354)), scaleFor(844, 354), BASE, LINE, BASE + LINE)), `{shown} shown, {hidden} hidden`)
+	check("… and stays away on the smallest phone (640 × 316)", not (TouchLayout.leftColumn(TouchLayout.cluster(640, 316, scaleFor(640, 316)), scaleFor(640, 316), BASE, LINE, BASE + LINE)))
+end
+
 -- The small helpers.
 local a = TouchLayout.box(0, 0, 10, 10)
 check("overlap: shared area", TouchLayout.overlap(a, TouchLayout.box(5, 5, 15, 15)))

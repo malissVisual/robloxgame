@@ -1525,11 +1525,11 @@ local function buildBody()
 	end
 	local grid = Ui.make("Frame", {
 		-- (6.5: the big tiles, two to a row; 6.12.5: smaller, under the MAIN apps)
-		Name = "Tiles", Size = UDim2.new(1, 0, 0, math.ceil(#TILES / 2) * 68 - 8),
+		Name = "Tiles", Size = UDim2.new(1, 0, 0, math.ceil(#TILES / 2) * (refs.layout.TILE_H + refs.layout.TILE_GAP) - refs.layout.TILE_GAP),
 		BackgroundTransparency = 1, LayoutOrder = 3,
 	}, widgets)
 	Ui.make("UIGridLayout", {
-		CellSize = UDim2.new(.5, -4, 0, 60), CellPadding = UDim2.fromOffset(8, 8), FillDirectionMaxCells = 2,
+		CellSize = UDim2.new(.5, -4, 0, refs.layout.TILE_H), CellPadding = UDim2.fromOffset(8, refs.layout.TILE_GAP), FillDirectionMaxCells = 2,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder,
 	}, grid)
 	for order, def in TILES do
@@ -1855,23 +1855,28 @@ end
 
 -- 6.14: scrolls the open phone's home so the tile `name` ("mapApp") shows whole (Marge's arrow tour points at it,
 -- client/TutorialUi.luau: with NEXT MISSION and WORK on top, MAP or BAG may sit under the fold of a short phone).
+-- 6.14 review: from the layout (PhoneLayout.tileSpan / homeView), not from where the tile is drawn now: right after
+-- the phone opens or the screen is resized those positions are a frame old.
 function Phone.reveal(name: string)
-	local home, body = refs.home, refs.body
-	local tile = if body then body:FindFirstChild(name, true) else nil
-	if not (isOpen and home and tile and tile:IsA("GuiObject")) then
+	local home, fit, layout = refs.home, refs.fit, refs.layout
+	if not (isOpen and home and fit) then
 		return
 	end
-	local scale = if refs.scale then math.max(0.1, refs.scale.Scale) else 1
-	local top = (tile.AbsolutePosition.Y - home.AbsolutePosition.Y) / scale + home.CanvasPosition.Y
-	local bottom = top + tile.AbsoluteSize.Y / scale
-	local view = home.AbsoluteSize.Y / scale
-	local y = home.CanvasPosition.Y
-	if top < y then
-		y = math.max(0, top - 8)
-	elseif bottom > y + view then
-		y = bottom - view + 8
+	local top, height = nil :: number?, 0
+	for index, def in MAIN do
+		if `{def.id}App` == name then
+			top, height = layout.tileSpan(true, index)
+		end
 	end
-	home.CanvasPosition = Vector2.new(0, y)
+	for index, def in TILES do
+		if `{def.id}App` == name then
+			top, height = layout.tileSpan(false, index)
+		end
+	end
+	if top == nil then
+		return
+	end
+	home.CanvasPosition = Vector2.new(0, layout.reveal(top, height, home.CanvasPosition.Y, layout.homeView(fit)))
 end
 
 function Phone.close()

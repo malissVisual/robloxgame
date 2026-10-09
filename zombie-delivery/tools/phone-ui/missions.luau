@@ -241,6 +241,33 @@ M.focus.Activated:Fire()
 M.flush()
 check("… GO TO opens that client, the gamepad's selection on its START", named(clients, "clinic"):GetAttribute("Selected") == true and M.focus == named(bar, "Start"))
 
+-- 6.14 review: the Roof Rack's slots count for light pieces in the window too (the state's gear), as the server counts
+-- them: Empty Shelves' first mission takes 3 bags of groceries, the Old Van holds 2.
+do
+	local saved, savedLevel = state.progress, state.level
+	local open = {}
+	for _, id in { "dispatch", "clinic" } do
+		for _, def in Missions.ofCampaign(id) do
+			open[def.id] = 2
+		end
+	end
+	state.progress, state.level = open, 6
+	M.remotes.Missions.OnClientEvent:Fire("state", state)
+	M.flush()
+	named(clients, "market").Activated:Fire()
+	M.flush()
+	check("6.14 review: 3 bags of groceries in an Old Van that holds 2: needs 3 slots", has(chapter, "needs 3 slots"))
+	state.gear = { roofrack = true }
+	M.remotes.Missions.OnClientEvent:Fire("state", state)
+	M.flush()
+	check("… with the Roof Rack (2 more slots for light pieces): room, START", not has(chapter, "needs 3 slots") and not has(bar, "needs 3 slots") and named(bar, "Start") ~= nil)
+	state.gear, state.progress, state.level = nil, saved, savedLevel
+	M.remotes.Missions.OnClientEvent:Fire("state", state)
+	M.flush()
+	named(clients, "clinic").Activated:Fire()
+	M.flush()
+end
+
 -- A phone held sideways: the clients on a strip on top, the chapter under them.
 M.width, M.height = 667, 339
 M.workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Fire()

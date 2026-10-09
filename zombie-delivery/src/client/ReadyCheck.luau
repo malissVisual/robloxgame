@@ -18,6 +18,11 @@
 --     and a sting when the next mission becomes READY ("Ready for Paper Trail · open MISSIONS (U)"); the job result's
 --     "+$85 · $1,160 to go for the Old Van" (ReadyCheck.resultLine, client/Hud.luau). The toast and the line wait
 --     through Marge's first day (Readiness `quiet`).
+-- 6.14 review: what START needs besides the rows comes in too: the night (the workspace's Night attribute, watched),
+-- the mission running, a job of yours (the Job remote, else the Missions state's onJob), a car of yours out and your
+-- crew's members near you, your garages (the Missions state: server/Missions.luau asks the server's own answers) and
+-- where you stand. The tile and the READY CHECK say Readiness.badge / start (START, CALL CAR, IN PROGRESS, LEADER
+-- PICKS, AFTER YOUR RUN); the READY toast waits for a START that can work (by day a night mission is not ready).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -62,6 +67,7 @@ local data: { [string]: any } = {
 	previous = nil, -- the last answer's mission and whether it was ready (announce: only a change is news)
 	asked = false, -- the Missions state asked for once the save was in (setState)
 	view = nil, -- the READY CHECK's live pieces (the goal's money line and bar: tick)
+	onJob = nil, -- 6.14 review: a job of yours runs (the Job remote; nil until it said)
 }
 
 local ACTION_WORDS: { [string]: string } = { gps = "📍 GPS  ›", invite = "INVITE  ›", jobs = "JOBS  ›", garage = "GARAGE  ›", missions = "MISSIONS  ›" }
@@ -89,6 +95,10 @@ function ReadyCheck.input(): Readiness.Input
 	-- (the XP decides, as on the server; before it is known, the Missions state's level)
 	local known = tonumber(player:GetAttribute("Xp")) ~= nil or type(state.xp) == "number"
 	local level = if known then Levels.levelFor(xp) elseif type(missions.level) == "number" then missions.level else 1
+	local night = workspace:GetAttribute("Night")
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local at = if root and root:IsA("BasePart") then { x = root.Position.X, z = root.Position.Z } else nil
 	return {
 		xp = xp,
 		level = level,
@@ -107,6 +117,14 @@ function ReadyCheck.input(): Readiness.Input
 		vanQuest = if type(state.vanQuest) == "string" then state.vanQuest else nil,
 		tutorial = data.tutorial,
 		phone = if data.state == nil then nil else state.phone == true,
+		-- 6.14 review (nil: not known, nothing held back for it)
+		night = if type(night) == "boolean" then night else nil,
+		active = if type(missions.active) == "string" then missions.active else nil,
+		onJob = if data.onJob ~= nil then data.onJob elseif type(missions.onJob) == "boolean" then missions.onJob else nil,
+		carOut = if type(missions.carOut) == "boolean" then missions.carOut else nil,
+		partnerNear = if type(missions.partnersNear) == "number" then missions.partnersNear >= Config.Missions.Duo.MinCrew else nil,
+		garages = tableOf(missions.garages),
+		at = at,
 	}
 end
 
@@ -141,7 +159,8 @@ local function announce(result: Readiness.Result)
 	if not mission or not result.ready or result.quiet or data.announced[mission.id] then
 		return
 	end
-	if type(data.missions.crewOwner) == "string" then
+	local label = result.start.label
+	if type(data.missions.crewOwner) == "string" or label == "LEADER PICKS" or label == "IN PROGRESS" then
 		return -- (in somebody else's crew the leader picks the mission: the toast waits until you lead your own)
 	end
 	data.announced[mission.id] = true
@@ -216,6 +235,17 @@ function ReadyCheck.resultLine(pay: number): string?
 	return Readiness.resultLine(pay, result.goal, (tonumber(state.money) or 0) + pay)
 end
 
+-- 6.14 review: the goal's words after a pay, for the DELIVERED toast ("$1,160 to go for the Old Van"); nil without
+-- a goal, without pay or during Marge's first day.
+function ReadyCheck.goalWords(pay: number): string?
+	local result = ReadyCheck.current()
+	if result.quiet or not result.goal or pay <= 0 then
+		return nil
+	end
+	local state = tableOf(data.state) or {}
+	return Readiness.goalWords(result.goal, (tonumber(state.money) or 0) + pay)
+end
+
 -- ── The phone's NEXT MISSION tile ─────────────────────────────────────────
 
 -- Its lines in the tile Phone's mainTile made (`left`: where its text starts): NEXT MISSION and the readiness on top
@@ -247,15 +277,16 @@ function ReadyCheck.fillTile(t: { [string]: any }?)
 	local mission = result.mission
 	t.name.Text = if mission then `{mission.icon} {mission.name}` else "🏆 Every mission done"
 	t.chapter.Text = Readiness.chapterLine(mission)
-	t.status.Text = if not mission then "★ ALL YOURS" elseif result.ready then "✔ READY · START" else `✖ {string.upper(Readiness.status(result))}`
-	t.status.TextColor3 = if result.ready or not mission then K.good else K.red
+	local badge, tone = Readiness.badge(result)
+	t.status.Text = badge
+	t.status.TextColor3 = if tone == "good" then K.good elseif tone == "wait" then K.warn else K.red
 	local goal = result.goal
-	t.goal.Text = if goal then `{goal.icon} {Readiness.goalLine(goal)}` elseif mission and result.ready then "Everything it needs is yours" else ""
-	t.goal.TextColor3 = if goal and goal.afford then K.good elseif goal then K.text else K.secondary
+	t.goal.Text = if goal then `{goal.icon} {Readiness.goalLine(goal)}` elseif mission and result.ready then (result.start.why or "Everything it needs is yours") else ""
+	t.goal.TextColor3 = if goal and goal.afford then K.good elseif goal and goal.locked and goal.left <= 0 then K.warn elseif goal then K.text else K.secondary
 	t.track.Visible = goal ~= nil
 	if goal then
 		t.bar.Size = UDim2.fromScale(math.clamp(goal.have / math.max(1, goal.need), 0, 1), 1)
-		t.bar.BackgroundColor3 = if goal.afford then K.good else K.red
+		t.bar.BackgroundColor3 = if goal.afford then K.good elseif goal.left <= 0 then K.warn else K.red
 	end
 end
 
@@ -410,9 +441,9 @@ function ReadyCheck.tick()
 	end
 	view.have.Text = `{Readiness.money(goal.have)} / {Readiness.money(goal.need)}`
 	view.left.Text = Readiness.toGo(goal)
-	view.left.TextColor3 = if goal.afford then K.good else K.text
+	view.left.TextColor3 = if goal.afford then K.good elseif goal.left <= 0 then K.warn else K.text
 	view.fill.Size = UDim2.fromScale(math.clamp(goal.have / math.max(1, goal.need), 0, 1), 1)
-	view.fill.BackgroundColor3 = if goal.afford then K.good else K.red
+	view.fill.BackgroundColor3 = if goal.afford then K.good elseif goal.left <= 0 then K.warn else K.red
 end
 
 -- What the READY CHECK shows right now (the phone draws it again when this changes, not for every coin).
@@ -442,7 +473,8 @@ function ReadyCheck.draw(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	look.text(card, string.upper(mission.name), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 19 })
 	look.meta(card, mission.description, 3)
 	local chips = look.chipRow(card, 4)
-	look.chip(chips, if result.ready then "✔ Ready · start" else `✖ {Readiness.status(result)}`, if result.ready then K.good else K.red)
+	local badge, tone = Readiness.badge(result)
+	look.chip(chips, badge, if tone == "good" then K.good elseif tone == "wait" then K.warn else K.red)
 	look.chip(chips, string.rep("★", math.clamp(mission.tier, 1, 4)), K.text)
 	if mission.duo then
 		look.chip(chips, "🤝 DUO", K.red)
@@ -456,18 +488,34 @@ function ReadyCheck.draw(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	if owner then
 		look.meta(card, `👥 You ride in {owner}'s crew: your leader picks the mission. Leave the crew (CREW) to start your own.`, 5)
 	end
-	-- The buttons: START when ready (the MISSIONS window on it, its START), else JOBS (earn, level up); MISSIONS.
+	-- The buttons: START when it can work (the MISSIONS window on it, its START), CALL CAR FIRST (the GARAGE), what
+	-- stands in the way (IN PROGRESS, LEADER PICKS, AFTER YOUR RUN: quiet), else JOBS (earn, level up); MISSIONS.
 	local actions = if wide then left else list
 	local base = if wide then 2 else 30
-	if result.ready then
-		local start = look.button(actions, `START ▶   {string.upper(mission.name)}`, "main", base, function()
+	local start = result.start
+	if start.why and not start.can and start.label ~= "NOT READY" and start.label ~= "LEADER PICKS" then
+		look.meta(card, `⏸ {start.why}.`, 6)
+	end
+	if start.can then
+		local button = look.button(actions, `START ▶   {string.upper(mission.name)}`, "main", base, function()
 			host.close()
 			local go = ReadyCheck.onStart
 			if go then
 				go(mission.id)
 			end
 		end)
-		start.Name = "Start"
+		button.Name = "Start"
+	elseif start.label == "IN PROGRESS" or (result.ready and (start.label == "LEADER PICKS" or start.label == "AFTER YOUR RUN")) then
+		local words = if start.label == "IN PROGRESS" then "▶ IN PROGRESS" elseif start.label == "LEADER PICKS" then "👥 YOUR LEADER PICKS" else "FINISH YOUR RUN FIRST"
+		local button = look.button(actions, words, "quiet", base, function()
+			host.notify(start.why or start.label)
+		end)
+		button.Name = "Waiting"
+	elseif result.ready and start.label == "CALL CAR" then
+		local button = look.button(actions, "CALL CAR FIRST  ›", "main", base, function()
+			host.go("garage")
+		end)
+		button.Name = "CallCar"
 	else
 		local jobs = look.button(actions, "WORK · EARN AND LEVEL UP", "main", base, function()
 			host.go("board")
@@ -522,6 +570,15 @@ function ReadyCheck.start()
 		ReadyCheck.setTutorial(phase)
 	end)
 	player:GetAttributeChangedSignal("Xp"):Connect(changed)
+	-- 6.14 review: the night (a NIGHT ONLY mission) and a job of yours (AFTER YOUR RUN).
+	workspace:GetAttributeChangedSignal("Night"):Connect(changed)
+	Net.get("Job").OnClientEvent:Connect(function(job: any)
+		local now = job ~= nil
+		if now ~= data.onJob then
+			data.onJob = now
+			changed()
+		end
+	end)
 	-- The HUD's savings line under the cash (client/SavingsLine.luau; no HUD, no line).
 	local ok, err = pcall(function()
 		require(script.Parent.SavingsLine).start(ReadyCheck)

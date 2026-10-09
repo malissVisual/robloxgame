@@ -22,6 +22,9 @@
 --   * 6.14, the grind chips (client/GrindChips.luau: the streak and the shift), TouchLayout.chips: at the top between
 --     the contract column and the actions' row (one over the other when it is narrow), or under the row at the right
 --     edge, clear of all of the above.
+--   * 6.14 review, the HUD's left column at the top left (the cash, 6.14's savings line, the minimap, the health),
+--     TouchLayout.leftColumn: with the savings line it must end over the thumbstick's corner; it may shrink a little
+--     for it (LEFT_SHRINK of the HUD's scale), else the line stays away (the column as it was before 6.14).
 
 local TouchLayout = {}
 
@@ -172,7 +175,19 @@ function TouchLayout.dock(c: Cluster, W: number, H: number, colW: number, colH: 
 			return nil
 		end
 		local x = math.clamp(W / 2, left + barW / 2, right - barW / 2)
-		return TouchLayout.box(x - barW / 2, bottom - barH, x + barW / 2, bottom)
+		-- 6.14 review: the left column (`base` px tall at scale 1 without the savings line, `line` px more with it; `height`:
+-- its height now) from the top margin down. `fits`: with the line it ends over the thumbstick's corner at a scale of
+-- at least LEFT_SHRINK × S (else the line stays away); `scale`: the column's scale for `height` (S without the line;
+-- with it, as much of S as ends over the corner, never under LEFT_SHRINK × S).
+TouchLayout.LEFT_SHRINK = 0.92
+function TouchLayout.leftColumn(c: Cluster, S: number, base: number, line: number, height: number): (boolean, number)
+	local room = c.thumb.y0 - TouchLayout.MARGIN
+	local fits = room / math.max(1, base + line) >= S * TouchLayout.LEFT_SHRINK
+	local scale = if height > base then math.min(S, math.max(S * TouchLayout.LEFT_SHRINK, room / height)) else S
+	return fits, scale
+end
+
+return TouchLayout.box(x - barW / 2, bottom - barH, x + barW / 2, bottom)
 	end
 	local all = table.clone(buttons)
 	table.insert(all, column)
