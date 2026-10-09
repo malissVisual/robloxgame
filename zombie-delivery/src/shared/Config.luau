@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.14"
+Config.Version = "6.14.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -716,8 +716,8 @@ Config.Cars = {
 		name = "E-Scooter",
 		price = 1900,
 		style = "scooter",
-		maxSpeed = 32, -- 6.0 (the owner: "not too fast, but a quicker start: electric"): 36 → 32, accel 26 → 42
-		accel = 42,
+		maxSpeed = 34, -- 6.0 (the owner: "not too fast, but a quicker start: electric"): 36 → 32, accel 26 → 42; 6.14.1: 34
+		accel = 38, -- (6.14.1: 42, with the softer first push and the glide into the top speed, Config.Scooter.Pull)
 		turn = 2.8,
 		health = 110,
 		capacity = 3,
@@ -2065,10 +2065,10 @@ Config.Rental = {
 	Idle = 45, -- off the scooter this long: it goes back
 	Restock = 20, -- seconds until a rented scooter stands in its dock again (once it is returned)
 	Color = { 214, 72, 64 }, -- the ZDC RIDE red on the rentals' deck and stem
-	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 32) and its
+	-- 5.7, the balance: a free rental is the slow way round (the Rusty Bike does 30, the bought E-Scooter 34; 6.14.1: the rental 28) and its
 	-- rack takes one light piece (the bought one two). server/Vehicles.luau caps the rental's MaxSpeed and its room.
-	MaxSpeed = 26,
-	Accel = 36, -- 6.0: quick off the line like the bought one (42), the cap above keeps it slow at the top
+	MaxSpeed = 28, -- 6.14.1: 26 (it was slower than a sprint's 28)
+	Accel = 34, -- 6.0: quick off the line like the bought one (6.14.1: 38), the cap above keeps it slow at the top
 	Room = 1,
 	-- 6.3, the rack at the spawn: a row of scooters side by side in the depot's yard, behind the spawn pad (the walk
 	-- to Marge and the job board in front of it stays free), their noses toward the yard's open south edge and the
@@ -2168,14 +2168,24 @@ Config.Interact = {
 Config.Scooter = {
 	-- The steering: CarDef.turn (rad/s) times a share that eases from LowTurn at walking pace down to HighTurn at the
 	-- scooter's top speed (MaxSpeed): quick and precise in the city's corners, calm at full speed (6.0: 2.8 at any speed)
-	LowTurn = 1.15,
-	HighTurn = 0.45,
+	-- 6.14.1 (the owner: "a more pleasant ride on the scooter": the steering, the pull and the brake, the camera): 1.15 →
+	-- 0.95 and 0.45 → 0.6, calmer at a middle speed (a 16 studs/s turn about 7 studs round, 6 before) and less lazy at
+	-- the top (about 20 studs round, 25 before)
+	LowTurn = 0.95,
+	HighTurn = 0.6,
 	EaseFrom = 6, -- studs/s: the turn starts easing off from here
 	GripSpeed = 2.5, -- studs/s: from a stand the steering fades in up to this speed (it does not spin on the spot)
-	SteerIn = 7, -- the steering goes to the key's full lock at this rate (1/s: about 0.14 s, no snap) …
-	SteerOut = 12, -- … and back to the middle at this one (about 0.08 s)
-	Brake = 80, -- studs/s²: S while rolling forward (32 → 0 in 0.4 s)
-	Coast = 14, -- studs/s²: no key, it rolls on (32 → 0 in about 2.3 s)
+	SteerIn = 4.5, -- the steering goes to the key's full lock at this rate (1/s: about 0.22 s, a tap is a small turn) …
+	SteerOut = 9, -- … and back to the middle at this one (about 0.11 s) (6.14.1: 7 and 12, a key snapped to a sharp turn)
+	Brake = 55, -- studs/s²: S while rolling forward (34 → 0 in about 0.6 s; 6.14.1: 80 threw you over the bar)
+	Coast = 10, -- studs/s²: no key, it rolls on (34 → 0 in about 3.4 s; 6.14.1: 14)
+	-- 6.14.1, the pull (ScooterRide.pull, × the scooter's Accel by its share of the top speed): soft for the first push
+	-- (Start at a stand, all of it from Full), all of it up to Ease, then fading to Top at the top speed: it glides
+	-- into its top speed instead of hitting a wall at it
+	Pull = { Start = 0.7, Full = 0.25, Ease = 0.7, Top = 0.35 },
+	-- 6.14.1, the carve: the way it moves follows its nose at this rate (1/s) instead of at once, a touch of flow in a
+	-- turn (not on ice or snow: their own slide)
+	Carve = 16,
 	Reverse = 0.2, -- of the top speed: S from a stand walks it back
 	LeanMax = 0.2, -- radians (about 11°) the scooter leans into a turn at most (the look only; a bike: 0.16)
 	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
@@ -2184,6 +2194,7 @@ Config.Scooter = {
 		Pop = 0.18, -- seconds to come up …
 		Drop = 0.22, -- … and to come down
 		MinSpeed = 5, -- studs/s: it pops from this speed (hold the key and it pops as you get there)
+		Hold = 0.12, -- 6.14.1: seconds the key is held before it pops (a tap of Shift is no wheelie)
 		DropSpeed = 3, -- under this it comes down
 		MaxSeconds = 3.5, -- the balance holds this long, then it drops by itself (let go and press again)
 		Cooldown = 0.8, -- seconds after a drop before the next one
@@ -4488,6 +4499,21 @@ Config.LivingCity = {
 		Fov = 6, -- extra field of view at top speed and on a zip line
 		FovFrom = 0.72, -- … from this share of the car's top speed
 		FovBlend = 3, -- per second
+		-- 6.14.1 (the owner: "a more pleasant ride on the scooter … the camera and the feel"): on a scooter or a bike
+		-- (the car's Bike attribute) the camera rides closer and lower, swings back behind you sooner and quicker, looks a
+		-- little into the turn, tilts with the lean and widens from a lower speed (client/CameraRig.luau)
+		TwoWheels = {
+			Fov = 9, -- extra field of view at the top speed (a car: Fov) …
+			FovFrom = 0.4, -- … from this share of the top speed (a car: FovFrom)
+			Back = 8.5, -- studs behind (a car: its length × 0.7 + 9, about 12 for a scooter)
+			Up = 1.5, -- studs over the focus (a car: 2)
+			FollowAfter = 0.6, -- seconds without the mouse before it swings back behind you (a car: 1.2)
+			Follow = 5, -- 1/s: how quickly it swings back (a car: 6 % a frame)
+			FollowFrom = 4, -- studs/s: from this speed
+			LookAhead = 0.2, -- seconds of the turn it looks ahead
+			Roll = 0.35, -- the share of the ride's lean (Config.Scooter LeanRate / LeanMax) the picture tilts with
+			RollRate = 6, -- 1/s
+		},
 	},
 }
 

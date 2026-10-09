@@ -65,15 +65,21 @@ for v = S.EaseFrom, TOP, 0.5 do
 	before = rate
 end
 check("the turn eases off steadily with the speed", falling)
-check("at the top speed the swing is half the old one (no twitch)", TOP * ScooterRide.turnRate(TOP, TOP, TURN) < 0.6 * TOP * TURN, TOP * ScooterRide.turnRate(TOP, TOP, TURN))
-check("tighter than before at walking pace", ScooterRide.turnRate(4, TOP, TURN) > TURN)
+-- 6.14.1 (the owner: "a more pleasant ride"): the turn's radius (speed / turn rate) at walking pace, a middle speed and the
+-- top: tight, calm (not the 6.10 twitch at 16 studs/s), not lazy (6.10: about 25 studs round at the top)
+local function radius(v: number): number
+	return v / ScooterRide.turnRate(v, TOP, TURN)
+end
+check("quick at walking pace: a turn under 3 studs round", radius(4) < 3, radius(4))
+check("calm at a middle speed: a 16 studs/s turn at least 6.5 studs round", radius(16) >= 6.5, radius(16))
+check("not lazy at the top: under 22 studs round", radius(TOP) < 22 and radius(TOP) > 14, radius(TOP))
 
 local steer, t = 0, 0
 while steer < 1 and t < 2 do
 	steer = ScooterRide.steerStep(steer, 1, 1 / 60)
 	t += 1 / 60
 end
-check("the steering ramps in, no snap (a few frames)", t > 0.08 and t < 0.25, t)
+check("the steering ramps in, no snap (6.14.1: about a fifth of a second, a tap is a small turn)", t > 0.15 and t < 0.3, t)
 local back = 0
 while steer > 0 and back < 2 do
 	steer = ScooterRide.steerStep(steer, 0, 1 / 60)
@@ -87,10 +93,31 @@ check("a stick's share is held, not overshot", near(ScooterRide.steerStep(0.49, 
 -- Throttle, brake, coast ------------------------------------------------------------
 
 local target, rate = ScooterRide.drive(0, 1, TOP, 42)
-check("full pull from a stand", near(target, TOP) and near(rate, 42))
+check("a soft first push from a stand (6.14.1)", near(target, TOP) and near(rate, 42 * S.Pull.Start) and S.Pull.Start >= 0.5 and S.Pull.Start < 1, rate)
+target, rate = ScooterRide.drive(TOP * 0.5, 1, TOP, 42)
+check("… the full pull at a middle speed", near(rate, 42))
+target, rate = ScooterRide.drive(TOP * 0.98, 1, TOP, 42)
+check("… gliding into the top speed", rate < 42 * 0.5 and rate > 0, rate)
+local rising, last = true, -1
+for share = 0, S.Pull.Ease, 0.01 do
+	local p = ScooterRide.pull(share)
+	rising = rising and p >= last - 1e-9
+	last = p
+end
+check("the pull never drops on the way to the full pull", rising)
+do -- the time from a stand to 95 % of the top speed, as client/Drive.luau steps it
+	local v, time = 0, 0
+	while v < TOP * 0.95 and time < 5 do
+		local goal, pull = ScooterRide.drive(v, 1, TOP, def and def.accel or 38)
+		v = math.min(goal, v + pull / 60)
+		time += 1 / 60
+	end
+	check("to 95 % of the top speed in about a second (quick, never a jolt)", time > 0.8 and time < 1.6, time)
+end
 target, rate = ScooterRide.drive(TOP, -1, TOP, 42)
-check("a firm brake on S", rate == S.Brake and target < 0 and S.Brake >= 60, rate)
-check("… stops from the top speed in under half a second", TOP / S.Brake <= 0.5, TOP / S.Brake)
+check("a brake on S", rate == S.Brake and target < 0, rate)
+check("… stops from the top speed in about half a second, not a jolt (6.14.1)", TOP / S.Brake >= 0.45 and TOP / S.Brake <= 0.8, TOP / S.Brake)
+check("the carve follows the nose quickly, never all at once", ScooterRide.carve(1 / 60) > 0.15 and ScooterRide.carve(1 / 60) < 0.5 and near(ScooterRide.carve(0), 0), ScooterRide.carve(1 / 60))
 target, rate = ScooterRide.drive(TOP, 0, TOP, 42)
 check("no key: it coasts on", near(target, 0) and rate == S.Coast and S.Coast < 42 / 2)
 target, rate = ScooterRide.drive(0, -1, TOP, 42)
@@ -120,7 +147,9 @@ run(w, 0.5, true, 20)
 check("a key held since before (getting on) does not pop it", not w.up)
 run(w, 0.1, false, 20)
 run(w, 0.05, true, 20)
-check("let go and press: it pops", w.up)
+check("6.14.1: a tap of the key is no wheelie", not w.up and W.Hold > 0.05 and W.Hold <= 0.2, W.Hold)
+run(w, W.Hold, true, 20)
+check("let go and press (held a moment): it pops", w.up)
 w = ScooterRide.wheelie()
 run(w, 0.1, false, 2)
 run(w, 0.3, true, 2)
@@ -136,7 +165,7 @@ check("the balance runs out: it drops by itself", not w.up and changes == 1)
 run(w, W.Cooldown + 0.5, true, 20)
 check("held on, it stays down (let go first)", not w.up)
 run(w, 0.05, false, 20)
-run(w, 0.05, true, 20)
+run(w, W.Hold + 0.05, true, 20)
 check("let go and press again: up again", w.up)
 run(w, 0.05, true, 20, true)
 check("the brake drops it", not w.up)
@@ -144,7 +173,7 @@ run(w, 0.05, false, 20)
 run(w, 0.05, true, 20)
 check("… and the cooldown holds the next one", not w.up)
 run(w, W.Cooldown, false, 20)
-run(w, 0.05, true, 20)
+run(w, W.Hold + 0.05, true, 20)
 check("after the cooldown it pops", w.up)
 run(w, 0.05, true, W.DropSpeed - 1)
 check("slowing right down drops it", not w.up)

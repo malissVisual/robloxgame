@@ -8,6 +8,9 @@
 --                                                  walking pace easing to HighTurn at its top speed, faded in from a stand
 --   ScooterRide.steerStep(current, input, dt)     the steering ramped toward the key (or the stick): no snap, quick back
 --   ScooterRide.drive(speed, throttle, maxSpeed, accel)   the speed it heads for and how fast (the brake, the coast)
+--   ScooterRide.pull(share)                       6.14.1: the share of the pull at a share of the top speed (Config.Scooter
+--                                                  Pull: a soft first push, a glide into the top speed)
+--   ScooterRide.carve(dt)                         6.14.1: how much of the way to its nose the motion turns in a step
 --   ScooterRide.lean(yawRate, forward)            the lean into a turn (radians, the look only)
 --   ScooterRide.wheelie() / wheelieStep(w, held, speed, braking, dt)   the wheelie: up while the key is held, rolling and
 --                                                  not braking, down after MaxSeconds by itself (then let go, Cooldown)
@@ -27,6 +30,7 @@ export type Wheelie = {
 	rest: number, -- seconds before it may pop again
 	armed: boolean, -- the key was let go since the last drop (or since getting on)
 	amount: number, -- how far up it is drawn (0 … 1)
+	held: number, -- 6.14.1: seconds the key has been held while armed (it pops at Config.Scooter.Wheelie.Hold)
 }
 
 local function smooth(x: number): number
@@ -63,16 +67,34 @@ function ScooterRide.steerStep(current: number, input: number, dt: number): numb
 	return toward(current, goal, rate * dt)
 end
 
--- The speed the scooter heads for (studs/s along its nose) and the rate it gets there (studs/s²): the full pull of
--- `accel` from a stand (electric: no torque curve), the brake on S while rolling forward, a long coast with no key, a
--- slow walk back on S from a stand.
+-- 6.14.1: the share of the pull (× Accel) at `share` of the top speed: Start at a stand rising to all of it at Full, all
+-- of it up to Ease, then down to Top at the top speed (and past it).
+function ScooterRide.pull(share: number): number
+	local p = Config.Scooter.Pull
+	local s = math.max(0, share)
+	if s < p.Full then
+		return p.Start + (1 - p.Start) * smooth(s / math.max(1e-3, p.Full))
+	elseif s <= p.Ease then
+		return 1
+	end
+	return 1 + (p.Top - 1) * smooth((s - p.Ease) / math.max(1e-3, 1 - p.Ease))
+end
+
+-- 6.14.1: the share of the way from where it moves to where its nose points that one step of `dt` turns (Carve 1/s).
+function ScooterRide.carve(dt: number): number
+	return 1 - math.exp(-Config.Scooter.Carve * math.max(0, dt))
+end
+
+-- The speed the scooter heads for (studs/s along its nose) and the rate it gets there (studs/s²): the pull of `accel`
+-- (electric: no torque curve; 6.14.1: a soft first push and a glide into the top speed, ScooterRide.pull), the brake
+-- on S while rolling forward, a long coast with no key, a slow walk back on S from a stand.
 function ScooterRide.drive(speed: number, throttle: number, maxSpeed: number, accel: number): (number, number)
 	local cfg = Config.Scooter
 	if throttle > 0 then
 		if speed < -1 then
 			return maxSpeed * throttle, cfg.Brake -- (rolling back: W brakes first)
 		end
-		return maxSpeed * throttle, accel
+		return maxSpeed * throttle, accel * ScooterRide.pull(speed / math.max(1, maxSpeed))
 	elseif throttle < 0 then
 		if speed > 1 then
 			return maxSpeed * cfg.Reverse * throttle, cfg.Brake
@@ -92,7 +114,7 @@ end
 -- ── The wheelie ─────────────────────────────────────────────────────────────
 
 function ScooterRide.wheelie(): Wheelie
-	return { up = false, time = 0, rest = 0, armed = false, amount = 0 }
+	return { up = false, time = 0, rest = 0, armed = false, amount = 0, held = 0 }
 end
 
 -- How far up it is drawn, one step on toward up (1) or down (0).
@@ -105,14 +127,18 @@ function ScooterRide.amountStep(amount: number, up: boolean, dt: number): number
 end
 
 -- One step of the wheelie: `held` the key, `speed` along the nose (studs/s), `braking` S while rolling forward. Up
--- when the key is held (pressed again since the last drop), rolling at MinSpeed or more and not braking; down when it
--- is let go, on the brake, under DropSpeed or after MaxSeconds (the balance). Returns whether `up` changed.
+-- when the key is held (pressed again since the last drop; 6.14.1: for Hold seconds, a tap is nothing), rolling at
+-- MinSpeed or more and not braking; down when it is let go, on the brake, under DropSpeed or after MaxSeconds (the
+-- balance). Returns whether `up` changed.
 function ScooterRide.wheelieStep(w: Wheelie, held: boolean, speed: number, braking: boolean, dt: number): boolean
 	local cfg = Config.Scooter.Wheelie
 	local was = w.up
 	w.rest = math.max(0, w.rest - dt)
 	if not held then
 		w.armed = true
+		w.held = 0
+	elseif w.armed and not w.up then
+		w.held += dt
 	end
 	if w.up then
 		w.time += dt
@@ -121,7 +147,7 @@ function ScooterRide.wheelieStep(w: Wheelie, held: boolean, speed: number, braki
 			w.rest = cfg.Cooldown
 			w.armed = false
 		end
-	elseif held and w.armed and w.rest <= 0 and not braking and speed >= cfg.MinSpeed then
+	elseif held and w.armed and w.rest <= 0 and not braking and speed >= cfg.MinSpeed and w.held >= (cfg.Hold or 0) - 1e-9 then
 		w.up = true
 		w.time = 0
 	end

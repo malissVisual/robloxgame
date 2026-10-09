@@ -30,6 +30,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.14.1: a smoother scooter ride: calmer steering in the middle, less lazy at the top, the carve, a soft push and a glide into the top speed, a softer brake, E-Scooter 34 / rental 28; on two wheels the camera rides closer, follows quicker, tilts with the lean and widens sooner; the wheelie after a 0.12 s hold (`Config.Scooter`, `shared/ScooterRide.luau`, `client/Drive.luau`, `client/CameraRig.luau`). **Test in Studio:** ride a rental and the E-Scooter through corners, brake, let go, tap Shift.
 - Claude · 6.14: the progression made clear and the grind made fun (the owner: "jobs are the daily work: grind, save up, progress in the mission"):
   - **Get ready for the mission:** the phone's NEXT MISSION tile and READY CHECK (`shared/Readiness.luau`, `client/ReadyCheck.luau`), the savings line under the cash, WORK's "Earn for the Old Van", the result's "to go" line, LEVEL UP with WHERE and GPS (`Career.whereOf`, `client/Gps.luau`), INVITE.
   - **Regulars** (`shared/Regulars.luau`, `server/Regulars.luau`, MORE → REGULARS) and **golden orders** (`shared/SpecialOrders.luau`, `server/SpecialOrders.luau`).

@@ -190,10 +190,10 @@ maxSpeed, `Config.Bus`, `Config.ZipLines`):
 |---|---|---|---|---|
 | Walk (Running Shoes ×1.1) | 14 (15.4) | | Old Van: Rusty / Patched / Work / Long Cargo | 42 / 48 / 54 / 56 |
 | Sprint (about 6 s of breath) | 28 | | Freight Truck | 45 |
-| ZDC RIDE rental scooter (free) | 26 | | High-Roof Van | 62 |
+| ZDC RIDE rental scooter (free) | 28 | | High-Roof Van | 62 |
 | Rusty Bike | 30 | | Box Truck | 64 |
 | Cargo Bike | 32 | | Courier Van | 70 |
-| E-Scooter (bought) | 36 | | Pickup | 72 |
+| E-Scooter (bought) | 34 | | Pickup | 72 |
 | Courier Bike | 38 | | Armored Van | 74 |
 | E-Bike | 48 | | Muscle Car | 95 |
 | City bus (free, express on its timetable; 6.3) | 55 | | Rally Van | 98 |
@@ -1142,6 +1142,27 @@ in your hand while it is open. `shared/Transport.luau` / `server/Transport.luau`
 West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 — your first vehicle, then ★ car jobs and
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
+
+## A smoother scooter ride (6.14.1)
+
+The owner: "I want a more pleasant ride on the scooter" (the steering; the pull, the brake and the speed; the camera
+and the feel). The E-Scooter and the ZDC RIDE rentals (`shared/ScooterRide.luau`, `Config.Scooter`,
+`client/Drive.luau`, `client/CameraRig.luau`):
+- **The steering**: calmer at a middle speed (a turn at 16 studs/s about 7 studs round, 6 before) and less lazy at the
+  top (about 20 studs round, 25 before): `LowTurn` 0.95, `HighTurn` 0.6. A key goes to full lock in about 0.22 s
+  (`SteerIn` 4.5, 0.14 s before), so a tap is a small turn. **The carve**: the way it moves follows its nose a touch
+  later (`Carve` 16/s), a flowing turn instead of a cursor turning on the spot (not on ice or snow).
+- **The pull, the brake, the speed**: a soft first push and a glide into the top speed instead of hitting a wall at it
+  (`Config.Scooter.Pull`, `ScooterRide.pull`; to 95 % of the top in about a second); a softer brake (`Brake` 55: 34 → 0
+  in about 0.6 s, 0.4 before) and a longer coast (`Coast` 10). The E-Scooter does 34 (32 before, accel 38), a rental 28
+  (26: it was slower than a sprint).
+- **The camera and the feel** (`Config.LivingCity.Camera.TwoWheels`, on a scooter and on a bike): closer and lower
+  (8.5 studs behind, 12 before), it swings back behind you after 0.6 s without the mouse (1.2 before), quicker and the
+  same at any frame rate, a little into the turn; the picture tilts a few degrees with the lean (not with reduced
+  motion); the field of view widens from 40 % of the top speed, up to +9° (a car: from 72 %, +6°).
+- **The wheelie** pops only after holding Shift (R1, WHEELIE) for 0.12 s: a tap is no wheelie.
+- Tests: `tests/scooter_test.luau` (the turn's radius at three speeds, the pull, the brake, the carve, the hold),
+  `tests/bikes_test.luau`.
 
 ## Get ready for the mission: a goal, and a grind that is fun (6.14)
 

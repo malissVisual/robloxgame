@@ -22,6 +22,10 @@
 -- a hit you take (CameraRig.shake for anything else); the field of view opens by Fov at your car's top speed and on a
 -- zip line. A touch screen's Roblox camera shakes too (Humanoid.CameraOffset) and widens the same. Reduced motion
 -- (the player's Roblox setting): no shake, no widening.
+-- 6.14.1 (the owner: "a more pleasant ride on the scooter"): on two wheels (a scooter, a bike) the camera rides closer
+-- and lower, swings back behind you sooner, quicker and the same at any frame rate, looks a little into the turn, tilts
+-- with the lean (not with reduced motion) and widens from a lower share of the top speed (Config.LivingCity.Camera
+-- TwoWheels).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -121,6 +125,7 @@ local supported = UserInputService.KeyboardEnabled and UserInputService.MouseEna
 local Feel = Config.LivingCity.Camera
 local shakeAmount = 0 -- 0 … 1, dies away at Feel.Decay a second
 local fovBoost = 0 -- degrees added to the field of view now
+local rideRoll = 0 -- 6.14.1: radians the picture tilts with a scooter's or a bike's lean now
 
 local function reducedMotion(): boolean
 	local ok, on = pcall(function(): any
@@ -161,10 +166,13 @@ local function stepFeel(dt: number)
 			local top = (car:GetAttribute("MaxSpeed") or 60) :: number * ((car:GetAttribute("SpeedMult") or 1) :: number)
 			local v = chassis.AssemblyLinearVelocity
 			local share = Vector3.new(v.X, 0, v.Z).Magnitude / math.max(top, 1)
-			goal = Feel.Fov * math.clamp((share - Feel.FovFrom) / math.max(1 - Feel.FovFrom, 0.01), 0, 1)
+			local two = car:GetAttribute("Bike") == true -- 6.14.1: a scooter or a bike widens sooner and more
+			local fov = if two then Feel.TwoWheels.Fov else Feel.Fov
+			local from = if two then Feel.TwoWheels.FovFrom else Feel.FovFrom
+			goal = fov * math.clamp((share - from) / math.max(1 - from, 0.01), 0, 1)
 		end
 	end
-	local most = Feel.FovBlend * Feel.Fov * dt
+	local most = Feel.FovBlend * math.max(Feel.Fov, Feel.TwoWheels.Fov) * dt
 	fovBoost = if goal > fovBoost then math.min(goal, fovBoost + most) else math.max(goal, fovBoost - most)
 end
 
@@ -481,16 +489,21 @@ local function update(dt: number)
 	-- Aiming from a car (drive-by): right mouse held, any seat.
 	local carAim = locked and car ~= nil and rmbHeld and humanoid.Health > 0
 
-	-- Driving and not touching the mouse for a moment: the camera swings back behind the car.
-	if car and driving and car.PrimaryPart and now - lastMouse > 1.2 and not carAim then
+	-- Driving and not touching the mouse for a moment: the camera swings back behind the car. (6.14.1: on two wheels
+	-- sooner, quicker, the same at any frame rate and a little into the turn: Feel.TwoWheels)
+	local twoWheels = car ~= nil and car:GetAttribute("Bike") == true
+	if car and driving and car.PrimaryPart and now - lastMouse > (if twoWheels then Feel.TwoWheels.FollowAfter else 1.2) and not carAim then
 		local chassis = car.PrimaryPart
 		local v = chassis.AssemblyLinearVelocity
-		if Vector3.new(v.X, 0, v.Z).Magnitude > 8 then
+		if Vector3.new(v.X, 0, v.Z).Magnitude > (if twoWheels then Feel.TwoWheels.FollowFrom else 8) then
 			local look = chassis.CFrame.LookVector
 			local carYaw = math.atan2(-look.X, -look.Z)
+			if twoWheels then
+				carYaw += chassis.AssemblyAngularVelocity.Y * Feel.TwoWheels.LookAhead
+			end
 			local diff = (carYaw - yaw + math.pi) % (2 * math.pi) - math.pi
-			yaw += diff * math.min(1, 0.06)
-			pitch += (-0.18 - pitch) * 0.05
+			yaw += diff * (if twoWheels then 1 - math.exp(-Feel.TwoWheels.Follow * dt) else math.min(1, 0.06))
+			pitch += (-0.18 - pitch) * (if twoWheels then 1 - math.exp(-3 * dt) else 0.05)
 		end
 	end
 
@@ -548,8 +561,9 @@ local function update(dt: number)
 		end
 		local size = extentsSize
 		local carFocus = chassis.Position + Vector3.new(0, size.Y * 0.6 + 2, 0)
-		-- Behind the car; aiming: closer, over the right side of the roof.
-		local carBack = Vector3.new(lerp(0, 3, aimBlend), lerp(2, 0.8, aimBlend), lerp(size.Z * 0.7 + 9, size.Z * 0.3 + 4, aimBlend) * zoom)
+		-- Behind the car; aiming: closer, over the right side of the roof. (6.14.1: on two wheels closer and lower)
+		local two = shown:GetAttribute("Bike") == true
+		local carBack = Vector3.new(lerp(0, 3, aimBlend), lerp(if two then Feel.TwoWheels.Up else 2, 0.8, aimBlend), lerp(if two then Feel.TwoWheels.Back else size.Z * 0.7 + 9, size.Z * 0.3 + 4, aimBlend) * zoom)
 		local k = carBlend * carBlend * (3 - 2 * carBlend)
 		focus = focus:Lerp(carFocus, k)
 		back = back:Lerp(carBack, k)
@@ -576,7 +590,15 @@ local function update(dt: number)
 	local position = if hit then hit.Position + (focus - desired).Unit * 0.6 else desired
 	camera.CameraType = Enum.CameraType.Scriptable
 	stepFeel(dt)
-	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector) * shakeTurn() -- (5.7: the shake)
+	-- 6.14.1: on two wheels the picture tilts a little with the lean (the ride's own LeanRate / LeanMax, its share Roll)
+	local rollGoal = 0
+	if twoWheels and driving and chassis and not reducedMotion() then
+		local forward = chassis.AssemblyLinearVelocity:Dot(chassis.CFrame.LookVector)
+		local lean = math.clamp(chassis.AssemblyAngularVelocity.Y * forward * Config.Scooter.LeanRate, -Config.Scooter.LeanMax, Config.Scooter.LeanMax)
+		rollGoal = lean * Feel.TwoWheels.Roll
+	end
+	rideRoll += (rollGoal - rideRoll) * (1 - math.exp(-Feel.TwoWheels.RollRate * dt))
+	camera.CFrame = CFrame.lookAt(position, position + rotation.LookVector) * shakeTurn() * CFrame.Angles(0, 0, rideRoll) -- (5.7: the shake)
 	camera.FieldOfView = lerp(70, 55, aimBlend) + fovBoost * (1 - aimBlend)
 
 	-- The gun arm points from the shoulder at whatever is under the crosshair (not simply where the camera looks:

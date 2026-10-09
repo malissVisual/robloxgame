@@ -19,6 +19,9 @@
 -- WHEELIE button: Drive.setWheelieHeld) while rolling and it pops onto its back wheel (less steering, a little more top
 -- speed) until you let go, brake, slow down or the balance runs out (Config.Scooter.Wheelie); the server is told
 -- (the Wheelie remote, server/Wheelie.luau) so everybody sees it, your own client draws it at once (Drive.wheelie).
+-- 6.14.1 (the owner: "a more pleasant ride on the scooter"): a gentler steering ramp, a calmer middle and a less lazy top
+-- of the turn, a soft first push and a glide into the top speed (ScooterRide.pull), a softer brake, a longer coast, the
+-- carve (its way follows its nose a touch later), the wheelie only after a short hold (a tap of Shift is nothing).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -391,6 +394,15 @@ local function step(dt: number)
 		local current = chassis.AssemblyLinearVelocity
 		current = Vector3.new(current.X, 0, current.Z)
 		velocity = current + (velocity - current) * math.min(1, traction * dt)
+	elseif scooter and math.abs(speed) > 1 then
+		-- 6.14.1, the carve: the scooter's way follows its nose a touch later (Config.Scooter.Carve), never faster than
+		-- it goes: a flowing turn instead of a cursor turning on the spot
+		local current = chassis.AssemblyLinearVelocity
+		current = Vector3.new(current.X, 0, current.Z)
+		if current.Magnitude > 1 then
+			local blended = current:Lerp(velocity, ScooterRide.carve(dt))
+			velocity = if blended.Magnitude > 0.01 then blended.Unit * math.abs(speed) else velocity
+		end
 	end
 	linear.PlaneVelocity = Vector2.new(velocity.X, velocity.Z)
 	local grip = math.clamp(math.abs(speed) / (if bike then 5 else 12), 0, 1)
