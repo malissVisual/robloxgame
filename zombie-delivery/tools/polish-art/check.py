@@ -5,7 +5,13 @@
 real server/ShopProps.place (a stub DayNight records the night colours): budgets, finite geometry, round cylinders and
 balls, real materials (a glowing piece's day one that DayNight restores), decorative flags, shadows only on big pieces,
 every part (moving ones through their whole motion) inside the prop's envelope, and the envelope on its building
-(Art.Mounts): on the roof, behind the name board, clear of the roof units."""
+(Art.Mounts): on the roof, behind the name board, clear of the roof units.
+6.12.6, the gear stall's two props ("gearvest" over GEAR, "zdcbag" over BAGS): the real server/GearStall.build places
+them, next to the real JOBS booth (server/JobsSpot.build round the job board where World stands it) and the depot
+hall's look (BuildingLooks/Depot through Kit.build, the hall's shell from World's numbers); in the stall's own frame:
+Art.Mounts agrees with the stall it builds, each prop over its counter's prompt, on the roof behind the name board (the
+spawn in front of it: nothing of them can cover its text), 7-10.5 studs tall and at least 4.5 of it in sight over the
+board from the spawn, clear of the other prop, the hall (its canopy) and the booth by a stud, decoration only."""
 from pathlib import Path
 import argparse
 import json
@@ -180,6 +186,44 @@ for _,id in Art.ids do
  print(encode({placed={id=id,parts=count,glowing=glowing,moving=moved,lights=lights}}))
 end
 print(encode({city={props=#Art.ids,parts=total}}))
+-- 6.12.6, the gear stall: the real GearStall.build (it places its two props), the real JOBS booth round the job board
+-- where World stands it, the depot hall's look (Kit.build, World's frame) and its shell (World buildDepot: 80 wide, 40
+-- deep, 22 tall and its roof, the name board on top; its back wall at -BlockSize/2 + 6): every part's box in the
+-- stall's frame (GearStall's: its base on the walk, -Z out to the yard, +X to the GEAR counter).
+local C=require("./Config");local Map=require("./Map")
+local S,D,walk=C.GearStall,Map.Depot,Map.WalkTop
+local function tool(parent,name,size,cf,color,material)
+ local p=M.Instance.new("Part");p.Name=name;p.Size=size;p.CFrame=cf;p.Color=color or M.Color3.new(0,0,0);p.Material=material or "Plastic"
+ p.Anchored=true;p.Parent=parent;return p
+end
+local tools={part=tool,deco=function(p) p.CanCollide=false;p.CanQuery=false;return p end,
+ sign=function(parent,text,size,cf) tool(parent,"Sign",size,cf):SetAttribute("Text",text) end,
+ prompt=function(parent,shop) parent:SetAttribute("PromptShop",shop) end,
+ nightLight=function(item) item:SetAttribute("NightLight",true) end}
+local depot=M.Instance.new("Folder")
+require("./GearStall").build(depot,tools)
+local backZ=-C.City.BlockSize/2+6
+local board=tool(depot,"JobBoard",M.Vector3.new(14,8,1),M.CFrame.new(D.x+C.Goal.BoardSpot[1],walk+5,D.z+C.Goal.BoardSpot[2])*M.CFrame.Angles(0,math.pi,0))
+require("./JobsSpot").build(depot,board,tools)
+local hall=M.Instance.new("Folder");hall.Name="Hall";hall.Parent=depot
+require("./Kit").build(hall,M.CFrame.new(D.x,walk,D.z+backZ+20)*M.CFrame.Angles(0,math.pi,0),require("./DepotLook"),tools)
+tool(hall,"HallShell",M.Vector3.new(80,walk+32,40),M.CFrame.new(D.x,(walk+32)/2,D.z+backZ+20))
+local base=M.Vector3.new(D.x+S.X,walk,D.z+S.Z)
+local frame=M.CFrame.lookAt(base,base+M.Vector3.new(1,0,0))
+local rows={}
+for _,p in depot:GetDescendants() do
+ if p:IsA("BasePart") then
+  local cf=frame:ToObjectSpace(p.CFrame);local r,s,o=cf.R,p.Size,cf.Position;local e={}
+  for i=0,2 do e[i+1]=(math.abs(r[i*3+1])*s.X+math.abs(r[i*3+2])*s.Y+math.abs(r[i*3+3])*s.Z)/2 end
+  local at,prop=p,""
+  while at.Parent~=depot do at=at.Parent;if string.sub(at.Name,1,9)=="ShopProp_" then prop=string.sub(at.Name,10) end end
+  table.insert(rows,{name=p.Name,group=if at==hall then "hall" elseif at.Name=="GearStall" then "stall" else "jobs",prop=prop,
+   box={o.X-e[1],o.Y-e[2],o.Z-e[3],o.X+e[1],o.Y+e[2],o.Z+e[3]},size={s.X,s.Y,s.Z},collide=p.CanCollide,query=p.CanQuery,prompt=p:GetAttribute("PromptShop") or ""})
+ end
+end
+local spawn=frame:PointToObjectSpace(M.Vector3.new(D.x,walk,D.z+26)) -- (World.DepotSpawn)
+print(encode({stall={parts=rows,spawn={spawn.X,spawn.Z},config={Width=S.Width,Depth=S.Depth,Height=S.Height,Counter=S.Counter},
+ mounts={gearvest=Art.Mounts.gearvest,zdcbag=Art.Mounts.zdcbag},envelopes={gearvest=Art.Envelopes.gearvest,zdcbag=Art.Envelopes.zdcbag}}}))
 """
     return """
 local C=require("./Config")
@@ -206,6 +250,7 @@ def check(mode,luau,output):
         if mode=="street":sources["StreetGeometry"]=server/"StreetArt/Geometry.luau"
         elif mode=="shops":
             sources["ShopGeometry"]=server/"ShopArt/Geometry.luau";sources["ShopProps"]=server/"ShopProps.luau"
+            sources["GearStall"]=server/"GearStall.luau";sources["JobsSpot"]=server/"JobsSpot.luau";sources["DepotLook"]=server/"BuildingLooks/Depot.luau"
             (tmp/"DayNight.luau").write_text(DAYNIGHT_STUB)
         elif mode=="towers":
             sources["Facade"]=server/"TowerArt/Facade.luau"
@@ -216,8 +261,12 @@ def check(mode,luau,output):
         for name,path in sources.items():
             source=path.read_text().replace("require(script.Parent.ShopArt.Geometry)",'require("./ShopGeometry")')
             source=re.sub(r"require\(script\.Parent(?:\.Parent)?\.(?:PolishArt\.|TowerArt\.)?(\w+)\)",r'require("./\1")',source)
-            (tmp/(name+".luau")).write_text((PREFIX if name in ("Builder","Kit") else SHOP_PREFIX if name=="ShopProps" else "")+source)
+            source=re.sub(r"require\(Shared\.(\w+)\)",r'require("./\1")',source) # (GearStall: Config, Map)
+            (tmp/(name+".luau")).write_text((PREFIX if name in ("Builder","Kit","JobsSpot") else SHOP_PREFIX if name in ("ShopProps","GearStall") else "")+source)
         mock=(ROOT/"tools/vehicle-preview/roblox-mock.luau").read_text().replace("Part=true,WedgePart=true","Part=true,TrussPart=true,WedgePart=true")
+        # (6.12.6: a CFrame's Rotation, for JobsSpot)
+        assert "local F={}; F.__index=F" in mock
+        mock=mock.replace("local F={}; F.__index=F","local F={}; F.__index=function(f,k) if k=='Rotation' then return setmetatable({Position=Mock.Vector3.zero,R=f.R},F) end; return F[k] end")
         (tmp/"mock.luau").write_text(mock)
         (tmp/"run.luau").write_text(RUNTIME+samples(mode))
         result=subprocess.run([str(Path(luau).resolve()),"run.luau"],cwd=tmp,capture_output=True,text=True)
@@ -242,6 +291,7 @@ def check(mode,luau,output):
         if mode=="shops":shop_check(model)
     city=next((r["city"] for r in rows if "city" in r),None)
     if city:print("City plan PASS:",city)
+    if mode=="shops":stall_check(next(r["stall"] for r in rows if "stall" in r))
     for row in rows:
         if "placed" in row:
             placed=row["placed"];model=next(m for m in models if m["id"]==placed["id"])
@@ -324,6 +374,58 @@ def shop_check(model):
     if mount.get("sign"):assert box[1]>=mount["sign"][0]+0.25,(name,"in front of the name board")
     for r in mount.get("avoid") or []:
         assert box[2]<=r[0] or r[2]<=box[0] or box[3]<=r[1] or r[3]<=box[1],(name,"on a roof unit",r)
+
+def box_gap(a,b):
+    """How far apart two boxes { x0, y0, z0, x1, y1, z1 } are (0 when they touch or overlap)."""
+    return math.sqrt(sum(max(b[i]-a[i+3],a[i]-b[i+3],0)**2 for i in range(3)))
+
+def stall_check(stall):
+    """6.12.6, the gear stall's props in the stall's frame (-Z out to the yard, +X to GEAR; y 0 on the walk)."""
+    S=stall["config"];c=S["Counter"];parts=stall["parts"]
+    def one(name,test=lambda p:True):
+        found=[p for p in parts if p["group"]=="stall" and not p["prop"] and p["name"]==name and test(p)]
+        assert len(found)==1,("stall",name,len(found));return found[0]
+    roof=one("Roof");top=roof["box"][4]
+    board=one("Sign",lambda p:abs(p["size"][0]-S["Width"])<1e-6)
+    front,back,boardTop=board["box"][2],board["box"][5],board["box"][4]
+    desks={p["prompt"]:p["box"] for p in parts if p["group"]=="stall" and p["name"]=="Counter"}
+    assert set(desks)=={"supplies","bags"},desks.keys()
+    # Nothing else of the stall over its roof but its name board (and the props).
+    for p in parts:
+        if p["group"]=="stall" and not p["prop"] and p["name"]!="Sign":assert p["box"][4]<=top+1e-6,("stall",p["name"],"over the roof")
+    others=[p for p in parts if p["group"] in ("hall","jobs")]
+    assert any(p["name"]=="DispatchCanopy" for p in others) and any(p["name"]=="Canopy" for p in others),"the hall's and the booth's canopies"
+    sx,sz=stall["spawn"];eye=5 # (a courier's eyes over the walk, at the spawn)
+    assert sz<front-10,"the spawn in front of the stall's name board"
+    boxes={}
+    for id,shop,side in (("gearvest","supplies",1),("zdcbag","bags",-1)):
+        mine=[p for p in parts if p["prop"]==id]
+        assert mine and all(p["group"]=="stall" for p in mine),(id,"not placed by GearStall.build")
+        assert all(not p["collide"] and not p["query"] for p in mine),(id,"decoration only (the prompts reach through)")
+        lo=[min(p["box"][i] for p in mine) for i in range(3)];hi=[max(p["box"][i+3] for p in mine) for i in range(3)]
+        # Art.Mounts is the stall GearStall builds: over its counter, on the roof's top, the roof and the board's back.
+        mount=stall["mounts"][id];ax,ay,az=mount["at"];W,H,D=stall["envelopes"][id]
+        assert abs(ax-side*c)<1e-6 and abs(ay-top)<1e-6,(id,"mount: over its counter, on the roof")
+        r=roof["box"];assert all(abs(u-v)<1e-6 for u,v in zip(mount["roof"],(r[0],r[2],r[3],r[5]))),(id,"mount: the roof",mount["roof"])
+        assert abs(mount["sign"][0]-back)<1e-6 and abs(mount["sign"][1]-(boardTop-top))<1e-6,(id,"mount: the name board",mount["sign"])
+        # Over its counter's prompt, on the roof behind the board, on its own half.
+        desk=desks[shop];assert abs((lo[0]+hi[0])/2-(desk[0]+desk[3])/2)<0.75,(id,"not over its counter")
+        assert lo[1]>=top-1e-6 and lo[2]>=back+0.25-1e-6,(id,"on the roof, behind the board")
+        env=(ax-W/2,top,az-D/2,ax+W/2,top+H,az+D/2)
+        assert (env[0]>=-1e-6 if side>0 else env[3]<=1e-6) and W<=desk[3]-desk[0],(id,"wider than its counter")
+        # Sized to the stall, and in sight over the board from the spawn (its top at least 4.5 over the line of sight).
+        height=hi[1]-top;assert 7<=height<=10.5,(id,"height",height)
+        px,pz=(lo[0]+hi[0])/2,(lo[2]+hi[2])/2
+        t=(front-sz)/(pz-sz);hidden=eye+(boardTop-eye)/t
+        assert hi[1]-hidden>=4.5,(id,"hidden behind the board from the spawn",hi[1]-hidden)
+        # Clear of the depot hall (its canopy), the JOBS booth, by a stud through the whole turn.
+        near=min(others,key=lambda p:box_gap(env,p["box"]))
+        assert box_gap(env,near["box"])>=1,(id,"against",near["group"],near["name"])
+        boxes[id]=env
+        print(f"  stall     {id:9s} over {shop:8s} (x {ax:+.1f}, z {az:+.1f}, y {top:.1f}): {height:.1f} tall, "
+              f"{hi[0]-lo[0]:.1f} x {hi[2]-lo[2]:.1f} at rest, {hi[1]-hidden:.1f} in sight from the spawn, "
+              f"{box_gap(env,near['box']):.1f} from the {near['group']}'s {near['name']}")
+    assert box_gap(boxes["gearvest"],boxes["zdcbag"])>=1,"the two props apart"
 
 def tower_check(p,info):
     w,d,h=info["tower"];x,y,z=p["position"];ex,ey,ez=extent(p)

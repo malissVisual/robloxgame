@@ -237,9 +237,9 @@ export type Depot = { i: number, j: number, x: number, z: number }
 Map.Depot = { i = 1, j = -1, x = CELL, z = -CELL } :: Depot
 
 -- 6.12.2: the building on Downtown block (0, -1) that was Last Stop Supplies until its stock moved to the gear stall at
--- the depot (Map.Shops.supplies): an ordinary building now (server/World.luau buildSupplies: its look and its rooftop
--- vest and sneaker, no counter, no clerk, no name board). The block stays special (its dice as before); the bus lines
--- still draw a stop toward it as they did (shared/BusLines.luau), without its name.
+-- the depot (Map.Shops.supplies): an ordinary building now (server/World.luau buildSupplies: its look, no counter, no
+-- clerk, no name board; 6.12.6: a bare roof, its giant vest turns over the gear stall). The block stays special (its
+-- dice as before); the bus lines still draw a stop toward it as they did (shared/BusLines.luau), without its name.
 Map.LastStop = { i = 0, j = -1, x = 0, z = -CELL }
 
 -- 6.11, the Central Park (the owner: "the middle of the map, where the safe zone is, nice: nature, some water in the

@@ -1143,6 +1143,22 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The vest and a ZDC bag spin over the gear stall (6.12.8)
+
+The owner, about Last Stop's old building: "that shop has nothing, put those props on my stalls".
+
+- **Over the gear stall at the spawn** (`server/GearStall.luau` calls `ShopProps.place`), two giant props turn
+  slowly behind the board "LAST STOP SUPPLIES · ZDC BAGS". Both are about 10 studs tall and fit the stall.
+  - Over **GEAR** (Dot): the hi-vis vest (`gearvest`) on a hanger on a short pole.
+  - Over **BAGS** (Nell): a new red **ZDC thermal bag** (`zdcbag`) on a turntable: black lid and piping, the ZDC
+    logo front and back, a reflective strip all round, straps and a grip.
+  - They spin at different speeds (Art.Motion "spin"; `client/ShopPropMotion.luau`). At night the vest's stripes and
+    the bag's logo and strip glow.
+- **Last Stop's old building** on (0, −1) has a bare roof now. The vest and the shoe are gone from it; shoes are not
+  in the game since 6.12.2.
+- `tools/polish-art/check.py shops` has a stall case. It runs the real stall, the JOBS booth and the depot hall, and
+  checks the props sit over their counters, show over the board from the spawn and clear the hall's canopy.
+
 ## Fuel lasts five times as long, two gas stations by the safe zone (6.12.7)
 
 The owner: "one or two gas stations closer, and the fuel lasts really long".

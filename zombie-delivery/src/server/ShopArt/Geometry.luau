@@ -8,7 +8,10 @@
 --   guns      Lead & Co.: GUN STORE in 3D block letters on a double-sided marquee (bulbs along it, readable from both
 --             sides) and a giant brass cartridge with its copper bullet standing at the end of the line
 --   pizza     Luigi's Pizza (every pizzeria venue): a giant slice leaning to the street, pepperoni, basil, cheese drips
---   supplies  Last Stop Supplies: a giant hi-vis courier vest on a rack and a giant running shoe on a lit pedestal
+--   gearvest  the gear stall's GEAR counter (Last Stop Supplies, server/GearStall.luau): 6.11's giant hi-vis courier
+--             vest from Last Stop's old roof at half size, on a hanger turning on a pole (6.12.6; the shoe is gone)
+--   zdcbag    the gear stall's BAGS counter (ZDC Bags): a giant red ZDC insulated delivery bag on a turntable, the ZDC
+--             logo front and back, a reflective strip round it, two straps up to a padded grip (6.12.6)
 --   bikes     Spoke & Chain Cycles: a giant bicycle on a pylon (spoked wheels, chain, saddle), a parcel in its basket
 --   dealer    Dead End Motors: a two-tone 50s car tipped up on a pylon, bunting down to the roof
 --   mechanic  Wrench Garage: a giant wrench across a big tyre standing in chocks
@@ -18,8 +21,9 @@
 -- A piece's `night`/`lit`: it glows in that colour at night (DayNight.nightLight; ShopProps hands the colour over),
 -- `light`: a warm PointLight in it at night (one at most per prop), `moves`: the prop's one moving group (Art.Motion,
 -- animated by client/ShopPropMotion.luau). Only big pieces cast shadows. Art.Mounts: where each stands on its building
--- (the World builder's frame); tools/polish-art/check.py shops proves the fit: on the roof, behind the name board,
--- clear of the roof units, every part inside Art.Envelopes.
+-- (the World builder's frame; the stall's two: GearStall's frame); tools/polish-art/check.py shops proves the fit: on
+-- the roof, behind the name board, clear of the roof units, every part inside Art.Envelopes (and the stall's: over
+-- their counters, sized to the stall, clear of the depot hall and the JOBS booth, through the real GearStall.build).
 local Art = {}
 
 export type Triple = { number }
@@ -28,22 +32,27 @@ export type Piece = {
 	night: boolean?, lit: Triple?, light: number?, shadow: boolean?, moves: boolean?,
 }
 export type Motion = { kind: string, pivot: Triple, rate: number?, amplitude: number?, period: number?, sway: number? }
--- at: the roof frame in the building's frame (World's `frame` of that building; y = the roof's top over it);
+-- at: the roof frame in the building's frame (World's `frame` of that building, GearStall's for the stall; y = the
+-- roof's top over it);
 -- roof: the surface it stands on { x0, z0, x1, z1 }; sign: the name board { its back face's z, its top over the roof };
 -- avoid: what already stands there (roof units, a chimney, the helipad) { x0, z0, x1, z1 } each.
 export type Mount = { at: Triple, roof: { number }, sign: { number }?, avoid: { { number } } }
 
-Art.ids = { "guns", "pizza", "supplies", "bikes", "dealer", "mechanic", "depot", "bank", "clinic" }
-Art.Budgets = { guns = 160, pizza = 120, supplies = 120, bikes = 120, dealer = 120, mechanic = 120, depot = 120, bank = 120, clinic = 120 }
+-- (6.12.6: "supplies", the vest and the shoe on Last Stop's old roof, is gone: its vest stands over the gear stall's
+-- GEAR counter as "gearvest", the ZDC bag over BAGS as "zdcbag"; that roof is bare.)
+Art.ids = { "guns", "pizza", "gearvest", "zdcbag", "bikes", "dealer", "mechanic", "depot", "bank", "clinic" }
+Art.Budgets = { guns = 160, pizza = 120, gearvest = 60, zdcbag = 60, bikes = 120, dealer = 120, mechanic = 120, depot = 120, bank = 120, clinic = 120 }
 -- The box each prop stays in (moving pieces included, through their whole motion): x within ±W/2, y 0 … H, z within ±D/2.
 Art.Envelopes = {
-	guns = { 49.6, 20, 9.4 }, pizza = { 17.2, 17, 8.6 }, supplies = { 32, 19.5, 13 }, bikes = { 23.2, 19, 6.4 },
+	guns = { 49.6, 20, 9.4 }, pizza = { 17.2, 17, 8.6 }, gearvest = { 7, 10.2, 7 }, zdcbag = { 7, 10, 7 }, bikes = { 23.2, 19, 6.4 },
 	dealer = { 25.2, 17.2, 13.8 }, mechanic = { 20.8, 18.8, 8.4 }, depot = { 21.2, 19, 18.6 }, bank = { 13.4, 18, 13.4 },
 	clinic = { 14.8, 20, 10.6 },
 }
 Art.Motion = {
 	pizza = { kind = "bob", pivot = { 0.4, 8.2, 0 }, amplitude = 0.35, period = 3.2, sway = 2.5 },
 	bank = { kind = "spin", pivot = { 0, 11, 0 }, rate = 0.6 },
+	gearvest = { kind = "spin", pivot = { 0, 3.2, 0 }, rate = 0.5 }, -- (about 13 s a turn)
+	zdcbag = { kind = "spin", pivot = { 0, 3.4, 0 }, rate = 0.4 }, -- (about 16 s: the two never turn in step)
 } :: { [string]: Motion }
 Art.Mounts = {
 	-- Lead & Co. (World buildGuns: 60 × 46 × 16); its board LEAD & CO. GUNS on the roof's front edge.
@@ -51,8 +60,11 @@ Art.Mounts = {
 	-- Luigi's (World buildVenue: Map.VenueSize 30 × 24 × 12). (6.11: the look's little RoofPizza disc, BuildingLooks/
 	-- VenuePizzeria, is gone: the slice took its place.)
 	pizza = { at = { 1, 13, -7 }, roof = { -16, -13, 16, 13 }, sign = { -13.05, 2.8 }, avoid = { { 7, 5.5, 11, 8.5 }, { 7.7, 7.7, 10.3, 10.3 } } },
-	-- Last Stop Supplies (World buildSupplies: 64 × 44 × 14).
-	supplies = { at = { 0, 15, -14.5 }, roof = { -33, -23, 33, 23 }, sign = { -21.75, 6 }, avoid = { { 19.5, 7.5, 24.5, 12.5 } } },
+	-- The gear stall at the spawn (server/GearStall.luau, Config.GearStall: 26 × 9 × 10, its roof 27 × 10 and 0.5 thick,
+	-- the board LAST STOP SUPPLIES · ZDC BAGS 3.2 tall on its front edge, its back face at -D/2 + 0.8): one prop over each
+	-- counter (±Config.GearStall.Counter; GEAR at +X, the south), just behind the board, clear of each other.
+	gearvest = { at = { 6.5, 10.5, 0.3 }, roof = { -13.5, -5, 13.5, 5 }, sign = { -3.7, 3.2 }, avoid = { { -10, -3.2, -3, 3.8 } } },
+	zdcbag = { at = { -6.5, 10.5, 0.3 }, roof = { -13.5, -5, 13.5, 5 }, sign = { -3.7, 3.2 }, avoid = { { 3, -3.2, 10, 3.8 } } },
 	-- Spoke & Chain (World buildBikeShop: 60 × 40 × 16; its board 0.8 in front of the front wall).
 	bikes = { at = { 0, 17, -16 }, roof = { -31, -21, 31, 21 }, sign = { -20.55, 5.2 }, avoid = {} },
 	-- Dead End Motors (World buildDealer: 84 × 52 × 18).
@@ -340,10 +352,11 @@ local function pizza()
 	floodlight(ORIGIN, { 0.4, 0.25, -2.6 }, 14)
 end
 
-local function supplies()
-	-- The vest (hem 4.5 over the roof, 12 tall, front -Z): two front panels zipped in the middle, shoulder straps with
-	-- the V of the neck and the armholes, the back, the sides, reflective stripes round it and over the shoulders.
-	local vest = child(ORIGIN, { 10, 4.5, 0 })
+-- The hi-vis courier vest in g (its hem at g's origin, 12.15 tall, 11.1 across, front -Z; 6.11's rooftop vest over Last
+-- Stop): two front panels zipped in the middle, shoulder straps with the V of the neck and the armholes, the back, the
+-- sides, the ZDC badge on the chest, reflective stripes over the shoulders and round it (6.12.6: round the sides too, it
+-- turns now), all glowing at night.
+local function courierVest(vest: Group)
 	local orange, silver, silverLit = { 255, 112, 28 }, { 206, 210, 214 }, { 236, 242, 248 }
 	for n, side in { -1, 1 } do
 		put(vest, `FrontLower{n}`, { 5.4, 6.6, 0.5 }, { side * 2.7, 3.3, -1.4 }, orange, "Fabric")
@@ -354,7 +367,7 @@ local function supplies()
 		put(vest, `BackStrap{n}`, { 2.8, 1, 0.5 }, { side * 2.8, 11.3, 1.4 }, orange, "Fabric")
 		put(vest, `Shoulder{n}`, { 2.8, 0.4, 3.3 }, { side * 2.8, 11.95, 0 }, orange, "Fabric")
 		for k, y in { 1.7, 4.6 } do
-			put(vest, `SideStripe{n}_{k}`, { 0.15, 0.9, 2.9 }, { side * 5.47, y, 0 }, silver, "Metal")
+			glow(put(vest, `SideStripe{n}_{k}`, { 0.15, 0.9, 2.9 }, { side * 5.47, y, 0 }, silver, "Metal"), silverLit)
 		end
 		for k, z in { -1.78, 1.78 } do
 			glow(put(vest, `StripeUp{n}_{k}`, { 0.9, 6.85, 0.15 }, { side * 2.8, 8.475, z }, silver, "Metal"), silverLit)
@@ -369,42 +382,68 @@ local function supplies()
 		end
 	end
 	put(vest, "CourierBadge", { 1.2, 1.2, 0.08 }, { 3, 3.15, -1.7 }, ZDC_RED, "SmoothPlastic")
-	-- It hangs on a hook from a rack behind it.
-	put(ORIGIN, "RackPost", { 0.6, 19, 0.6 }, { 10, 9.5, 2.8 }, STEEL, "Metal")
-	put(ORIGIN, "RackArm", { 0.5, 0.5, 3.4 }, { 10, 18.75, 1.3 }, STEEL, "Metal")
-	put(ORIGIN, "RackFoot", { 3, 0.3, 3 }, { 10, 0.15, 2.8 }, DARK, "Metal")
-	put(ORIGIN, "Hook", { 0.3, 2.2, 0.3 }, { 10, 17.6, 0 }, CHROME, "Metal")
-	put(ORIGIN, "HookTop", { 0.7, 0.7, 0.7 }, { 10, 18.75, 0 }, CHROME, "Metal", "Ball")
-	-- The running shoe on a pedestal with a glowing rim: its heel on the pedestal, the toe up and out to the street.
-	local sx = -6.5
-	upright(ORIGIN, "Pedestal", 6, 9, { sx, 3, 0 }, { 48, 52, 58 }, "Metal")
-	glow(upright(ORIGIN, "PedestalRim", 0.4, 9.4, { sx, 6.2, 0 }, { 120, 220, 110 }, "SmoothPlastic"), { 150, 255, 130 })
-	local shoe = child(child(ORIGIN, { sx, 6.4, 0 }, { 0, -30, -10 }), { -4, 0, 0 })
-	local blue, white, rubber, neon = { 36, 110, 220 }, { 240, 240, 236 }, { 40, 40, 44 }, { 232, 255, 64 }
-	put(shoe, "Outsole", { 8.4, 0.6, 4.8 }, { 0.2, 0.3, 0 }, rubber, "Rubber")
-	upright(shoe, "OutsoleToe", 0.6, 4.8, { -4, 0.3, 0 }, rubber, "Rubber")
-	upright(shoe, "OutsoleHeel", 0.6, 4.8, { 4.4, 0.3, 0 }, rubber, "Rubber")
-	put(shoe, "Midsole", { 8.4, 1.4, 4.6 }, { 0.2, 1.3, 0 }, white, "SmoothPlastic")
-	upright(shoe, "MidsoleToe", 1.4, 4.6, { -4, 1.3, 0 }, white, "SmoothPlastic")
-	upright(shoe, "MidsoleHeel", 1.4, 4.6, { 4.4, 1.3, 0 }, white, "SmoothPlastic")
-	put(shoe, "ToeBox", { 4.4, 4.4, 4.4 }, { -3.6, 2, 0 }, blue, "Fabric", "Ball")
-	put(shoe, "Vamp", { 4.5, 2.2, 4.4 }, { -1.25, 3.1, 0 }, blue, "Fabric")
-	put(shoe, "Instep", { 4.4, 2.4, 3.4 }, { 0, 5.4, 0 }, blue, "Fabric", "Wedge", { 0, 90, 0 })
-	put(shoe, "Quarter", { 4, 4.6, 4.4 }, { 3, 4.3, 0 }, blue, "Fabric")
-	upright(shoe, "HeelRound", 4.6, 4.4, { 4.4, 4.3, 0 }, blue, "Fabric")
-	put(shoe, "Collar", { 4.6, 0.7, 4.7 }, { 3.4, 6.55, 0 }, { 30, 34, 44 }, "Fabric")
-	upright(shoe, "CollarBack", 0.7, 4.7, { 4.4, 6.55, 0 }, { 30, 34, 44 }, "Fabric")
-	put(shoe, "Opening", { 3, 0.1, 3 }, { 3, 6.95, 0 }, { 18, 18, 20 }, "SmoothPlastic")
-	put(shoe, "Tongue", { 1.6, 1.8, 3 }, { 1.2, 7, 0 }, { 90, 160, 240 }, "Fabric", nil, { 0, 0, 20 })
-	for n = 1, 4 do
-		local t = n * 0.2
-		put(shoe, `Lace{n}`, { 0.35, 0.3, 3.2 }, { -1.7 + 3.4 * t - 0.09, 4.2 + 2.4 * t + 0.12, 0 }, white, "SmoothPlastic", nil, { 0, 0, 35.2 })
+end
+
+local function gearvest()
+	-- The vest at half size (6 tall, 5.5 across) on a hanger: a bar inside its shoulders, the hook out of the neck. The
+	-- hanger and the vest turn (Art.Motion) about the pole they stand on (its top hidden inside the vest, under the V of
+	-- the neck), its foot on the stall's roof; the hem 3.2 up, level with the top of the stall's board, the hook's top
+	-- 10 up. A floodlight behind the board lights it at night.
+	put(ORIGIN, "Foot", { 2.2, 0.3, 2.2 }, { 0, 0.15, 0 }, DARK, "Metal")
+	upright(ORIGIN, "Pole", 5.9, 0.35, { 0, 3.25, 0 }, STEEL, "Metal")
+	moving = true
+	local vest = child(ORIGIN, { 0, 3.2, 0 }, nil, 0.5)
+	courierVest(vest)
+	put(vest, "HangerBar", { 8, 0.3, 0.3 }, { 0, 11.6, 0 }, CHROME, "Metal")
+	upright(vest, "HookStem", 1.4, 0.3, { 0, 12.4, 0 }, CHROME, "Metal")
+	tube(vest, "HookArc", { 0, 13.1 }, { 0.7, 13.45 }, 0, 0.3, CHROME, "Metal")
+	put(vest, "HookBend", { 0.3, 0.3, 0.3 }, { 0.7, 13.45, 0 }, CHROME, "Metal", "Ball")
+	tube(vest, "HookTip", { 0.7, 13.45 }, { 1.1, 13 }, 0, 0.3, CHROME, "Metal")
+	moving = false
+	floodlight(ORIGIN, { 0, 0.25, -3 }, 10)
+end
+
+local function zdcbag()
+	-- The shop's Thermal Delivery Bag (server/KitArt/Geometry.luau "thermal") 5 studs wide: red nylon, black piping down
+	-- its corners, a black base and a black zip-round lid; the ZDC logo on the front and the back (the red square and ZDC
+	-- in white block letters on a black patch, as on the name boards), a reflective strip round it under the logo (the
+	-- logo and the strip glow at night), two straps from the lid up to a padded grip. It turns on a turntable on a short
+	-- post (Art.Motion); its bottom 3.4 over the stall's roof, just over the top of the board (3.2: the strip and the logo
+	-- in sight from the spawn), the grip's top 9.6.
+	put(ORIGIN, "Foot", { 2.4, 0.3, 2.4 }, { 0, 0.15, 0 }, DARK, "Metal")
+	upright(ORIGIN, "Post", 2.85, 0.8, { 0, 1.725, 0 }, STEEL, "Metal")
+	moving = true
+	upright(ORIGIN, "Turntable", 0.25, 4.8, { 0, 3.275, 0 }, DARK, "Metal")
+	local bag = child(ORIGIN, { 0, 3.4, 0 })
+	local red, black, silver, silverLit = { 196, 38, 34 }, { 30, 31, 34 }, { 206, 210, 214 }, { 236, 242, 248 }
+	put(bag, "Base", { 5.16, 0.35, 4.16 }, { 0, 0.175, 0 }, black, "Fabric")
+	put(bag, "Body", { 5, 4, 4 }, { 0, 2.35, 0 }, red, "Fabric")
+	put(bag, "Zip", { 5.08, 0.12, 4.08 }, { 0, 4.41, 0 }, { 150, 152, 156 }, "Metal")
+	put(bag, "Lid", { 5.16, 0.45, 4.16 }, { 0, 4.695, 0 }, black, "Fabric")
+	for k, corner in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+		put(bag, `Piping{k}`, { 0.14, 4, 0.14 }, { corner[1] * 2.5, 2.35, corner[2] * 2 }, black, "Fabric")
 	end
 	for n, side in { -1, 1 } do
-		glow(put(shoe, `Stripe{n}`, { 5, 0.7, 0.12 }, { 1.2, 3.6, side * 2.26 }, neon, "SmoothPlastic", nil, { 0, 0, 22 }), { 220, 255, 80 })
+		glow(put(bag, `Strip{n}`, { 5.16, 0.4, 0.08 }, { 0, 1.35, side * 2.04 }, silver, "Metal"), silverLit)
+		glow(put(bag, `StripSide{n}`, { 0.08, 0.4, 4 }, { side * 2.54, 1.35, 0 }, silver, "Metal"), silverLit)
 	end
-	put(shoe, "HeelTab", { 0.5, 1.4, 1.6 }, { 6.75, 6.2, 0 }, neon, "SmoothPlastic")
-	floodlight(ORIGIN, { 2, 0.25, -4.6 }, 20)
+	-- The logo (front: n = 1 at -Z, read from there; back: n = 2): the patch, the red square, ZDC beside it.
+	local redLit, white, whiteLit = { 255, 70, 60 }, { 248, 246, 240 }, { 255, 255, 255 }
+	local letters = textWidth("ZDC") * 0.24
+	local start = -(1.25 + 0.25 + letters) / 2
+	for n, side in { -1, 1 } do
+		local face = child(bag, { 0, 2.85, side * 2 }, if side < 0 then { 0, 180, 0 } else nil)
+		put(face, `LogoPatch{n}`, { 4.6, 1.9, 0.08 }, { 0, 0, 0.04 }, black, "SmoothPlastic")
+		glow(put(face, `LogoSquare{n}`, { 1.25, 1.25, 0.06 }, { start + 0.625, 0, 0.11 }, ZDC_RED, "SmoothPlastic"), redLit)
+		text(child(face, { start + 1.5 + letters / 2, 0, 0.08 }), `Logo{n}_`, "ZDC", 0.24, 0.1, white, "SmoothPlastic", whiteLit)
+	end
+	-- The straps and the grip.
+	for n, side in { -1, 1 } do
+		bar(bag, `Strap{n}`, { side * 2.1, 4.85 }, { side * 0.75, 5.85 }, 0, 0.22, 0.9, black, "Fabric")
+	end
+	put(bag, "Grip", { 1.7, 0.6, 0.6 }, { 0, 5.9, 0 }, black, "Rubber", "Cylinder")
+	moving = false
+	floodlight(ORIGIN, { 0, 0.25, -3 }, 10)
 end
 
 local function bikes()
@@ -658,7 +697,7 @@ local function clinic()
 end
 
 local BUILDERS: { [string]: () -> () } = {
-	guns = guns, pizza = pizza, supplies = supplies, bikes = bikes, dealer = dealer, mechanic = mechanic,
+	guns = guns, pizza = pizza, gearvest = gearvest, zdcbag = zdcbag, bikes = bikes, dealer = dealer, mechanic = mechanic,
 	depot = depot, bank = bank, clinic = clinic,
 }
 

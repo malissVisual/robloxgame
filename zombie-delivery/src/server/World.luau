@@ -64,13 +64,13 @@
 -- to block (1, -1) north-east of it (Map.Depot; buildDepot as before, every spot of it from the depot's middle), where
 -- four plain towers stood (their dice are still rolled, tower(..., true): the rest of the city stays as it was), and
 -- the giant rooftop set pieces on the shops (server/ShopProps.luau, ShopProps.mount: the depot's parcel, Lead & Co.'s
--- GUN STORE, the vest and the shoe, the bike, the car, the wrench, Luigi's pizza slice, the bank's coin, the clinic's
--- cross).
+-- GUN STORE, the bike, the car, the wrench, Luigi's pizza slice, the bank's coin, the clinic's cross; 6.12.6: the vest
+-- and the ZDC bag over the gear stall, GearStall's own).
 --
 -- Zombie Delivery 6.12.2, the spawn's corner: the JOBS spot round the depot's job board (server/JobsSpot.luau) and the
 -- gear stall west of the spawn (server/GearStall.luau: ZDC Bags and Last Stop Supplies side by side, in place of 6.6's
 -- bag kiosk); Last Stop's old building on block (0, -1) stands as an ordinary one (buildSupplies, Map.LastStop: no
--- counter, no clerk, no name board; its rooftop vest and sneaker stay).
+-- counter, no clerk, no name board; 6.12.6: no rooftop prop either, its vest turns over the stall's GEAR counter).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -1059,8 +1059,8 @@ end
 
 -- 6.12.2: the building on block (0, -1) that was Last Stop Supplies (Map.LastStop): its stock is sold at the depot's
 -- gear stall now (Map.Shops.supplies, server/GearStall.luau), so it stands here as an ordinary building: its look
--- without the shop's plate, its shelves, and its rooftop set piece kept where it was (the owner likes the props), but no
--- counter, no prompt, no clerk and no name board.
+-- without the shop's plate, its shelves, but no counter, no prompt, no clerk and no name board. 6.12.6 (the owner:
+-- "that shop has nothing, put those props on my stalls"): its roof is bare, the vest turns over the gear stall.
 local function buildSupplies(parent: Instance)
 	local shop = folder(parent, "LastStopBuilding")
 	local cx, cz = Map.LastStop.x, Map.LastStop.z
@@ -1080,9 +1080,7 @@ local function buildSupplies(parent: Instance)
 	end
 	look.details = plain
 	Kit.build(shop, frame, look, { part = part, deco = deco, nightLight = DayNight.nightLight })
-	-- 6.11: its rooftop set piece, a giant courier vest and a running shoe (server/ShopProps.luau), where it always stood
-	local props = require(script.Parent.ShopProps)
-	props.place(shop, "supplies", frame * props.mount("supplies"))
+	-- (6.12.6: no rooftop set piece any more: its giant vest turns over the gear stall's GEAR counter, server/GearStall.luau)
 	for row = -1, 1, 2 do
 		part(shop, "Shelf", Vector3.new(30, 6, 2), frame * CFrame.new(0, 3, row * 8 - 2), Color3.fromRGB(150, 140, 120), Enum.Material.Wood)
 	end
