@@ -1143,6 +1143,27 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The Lantern Garden and a wooden footbridge (6.12.15)
+
+The owner: "a bit bigger park, a wooden bridge to another park, its own style".
+
+- **The Lantern Garden** (`server/LanternGarden.luau`, `Map.Garden`) replaces Last Stop's old building on (0, −1),
+  north of the Central Park and next to the spawn. It is a Japanese garden:
+  - cherry trees in blossom with falling petals;
+  - a shallow koi pond with stepping stones, a zig-zag plank bridge and a waterfall;
+  - stone lanterns that glow at night, a tea pavilion with a flared roof, raked gravel, bamboo and benches;
+  - a hedge round it, with a roofed gate on each side.
+- **The footbridge** (`server/Footbridge.luau`, `Map.Footbridge`) is an arched timber bridge with vermilion railings
+  and paper lanterns. It crosses Bone St mid-block between the garden and the Central Park.
+  - **Span:** 55 studs. Its deck is 17.7–18.7 studs over the street, leaving 16.3 of clearance over the road.
+  - **Clearance check:** the tallest vehicle, the Box Truck with its roof launcher, is 12.6.
+    `tools/vehicle-preview/clearance-check.luau` checks every vehicle against it.
+  - **Ramps:** two 34-stud flights at about 14° with flat landings, in each park, so bikes and scooters roll over too.
+- **The Central Park** has the bridge's ramp at its north-east; a few trees moved for it. The pond is unchanged.
+- **On the map:** the garden and the bridge are drawn there, with a landmark and GPS ("Lantern Garden") and a SAFE ZONE
+  location tag.
+- **Tests:** `tests/garden_test.luau`.
+
 ## Lead & Co. moves to a shooting range outside the safe zone (6.12.14)
 
 The owner: "the gun store out of the safe zone, at a shooting range, a smaller shop, keep the props".

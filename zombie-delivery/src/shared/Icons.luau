@@ -333,6 +333,7 @@ local LANDMARK_ALIASES: { [string]: string } = {
 	trainyard = "movers", -- freight
 	cityhall = "school", -- a public building with a flag
 	park = "farm", -- 6.11, the Central Park (Map.Park): the green sprig (its emoji 🌳 in the list)
+	garden = "bloom", -- 6.12.15, the Lantern Garden (Map.Garden): the flowers (its emoji 🏮 in the list)
 }
 -- Landmarks with no map icon of their own yet: another icon's full name.
 local LANDMARK_BORROWED: { [string]: string } = {

@@ -147,15 +147,16 @@ local function keys(): { KeyPlace }
 		-- 6.11: the depot moved from the middle block to Map.Depot (the park is there now): it and its bag kiosk still
 		-- draw from the middle of the safe zone, where they stood, and the park draws nothing of its own, so every line
 		-- keeps its stops (the depot's own block and the blocks round it are special: no stop by them anyway)
-		if landmark.id == Map.Park.id then
+		-- (6.12.15: nor does the Lantern Garden north of the park, Map.Garden: the lines keep their stops)
+		if landmark.id == Map.Park.id or landmark.id == Map.Garden.id then
 			continue
 		end
 		-- 6.12.2: Last Stop Supplies moved into the depot's yard (the gear stall's GEAR counter): it still draws from its
-		-- old block (Map.LastStop, where its building stands), so every line keeps its stops, and names none there.
-		-- 6.12.14: Lead & Co. moved out to its shooting range (Map.GunRange) the same way: it still draws from its old
-		-- block (Map.FormerGunShop), so every line keeps its stops, and names none (none was named after it).
+		-- old block (its building stood there; 6.12.15: the Lantern Garden, Map.Garden), so every line keeps its stops,
+		-- and names none there. 6.12.14: Lead & Co. moved out to its shooting range (Map.GunRange) the same way: it still
+		-- draws from its old block (Map.FormerGunShop), so every line keeps its stops, and names none (none was named after it).
 		local yard = landmark.id == "depot" or landmark.id == "bags"
-		local former = if landmark.id == "supplies" then Map.LastStop elseif landmark.id == "guns" then Map.FormerGunShop else nil
+		local former = if landmark.id == "supplies" then Map.Garden elseif landmark.id == "guns" then Map.FormerGunShop else nil
 		local weight = if landmark.id == "depot" then 4
 			elseif landmark.kind == "shop" then 3
 			elseif landmark.kind == "venue" or string.sub(landmark.id, 1, 7) == "garage_" then 1

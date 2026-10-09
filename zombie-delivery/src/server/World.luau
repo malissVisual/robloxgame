@@ -69,8 +69,7 @@
 --
 -- Zombie Delivery 6.12.2, the spawn's corner: the JOBS spot round the depot's job board (server/JobsSpot.luau) and the
 -- gear stall west of the spawn (server/GearStall.luau: ZDC Bags and Last Stop Supplies side by side, in place of 6.6's
--- bag kiosk); Last Stop's old building on block (0, -1) stands as an ordinary one (buildSupplies, Map.LastStop: no
--- counter, no clerk, no name board; 6.12.6: no rooftop prop either, its vest turns over the stall's GEAR counter).
+-- bag kiosk); 6.12.15: Last Stop's old building on block (0, -1) is gone (the Lantern Garden stands there).
 --
 -- Zombie Delivery 6.12.14, Lead & Co.'s shooting range (server/GunRange.luau, Config.GunRange, Map.GunRange): a fenced
 -- compound on Downtown block (-2, 1), just outside the safe zone, its own piece of the build with World's helpers (the
@@ -78,6 +77,10 @@
 -- block was ordinary: its towers and its car park roll their dice dry (the world's random numbers as before). Lead &
 -- Co.'s old building on block (-1, 0) stands as an ordinary one (buildGuns, Map.FormerGunShop: no counter, no clerk, no
 -- name board, no prop).
+--
+-- Zombie Delivery 6.12.15, the Lantern Garden on block (0, -1) north of the park (Map.Garden; server/LanternGarden.luau,
+-- its own piece of the build like the park) and the footbridge over Bone St between the two (Map.Footbridge;
+-- server/Footbridge.luau, its own piece).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -1114,35 +1117,6 @@ local function buildRepairShop(parent: Instance, cx: number, cz: number)
 	sign(shop, "🔧 REPAIRS", Vector3.new(8, 3, 0.3), frame * CFrame.new(-w / 2 + 2, 12.5, -d / 2 - 10), Color3.fromRGB(255, 220, 120))
 end
 
--- 6.12.2: the building on block (0, -1) that was Last Stop Supplies (Map.LastStop): its stock is sold at the depot's
--- gear stall now (Map.Shops.supplies, server/GearStall.luau), so it stands here as an ordinary building: its look
--- without the shop's plate, its shelves, but no counter, no prompt, no clerk and no name board. 6.12.6 (the owner:
--- "that shop has nothing, put those props on my stalls"): its roof is bare, the vest turns over the gear stall.
-local function buildSupplies(parent: Instance)
-	local shop = folder(parent, "LastStopBuilding")
-	local cx, cz = Map.LastStop.x, Map.LastStop.z
-	sidewalk(shop, cx, cz)
-	local facing = Vector3.new(0, 0, 1)
-	local w, d, h = 64, 44, 14
-	local frame = shopFrame(cx, cz, facing, 18)
-	building(shop, frame, w, d, h, Color3.fromRGB(77, 82, 77), Enum.Material.Concrete, 12, 10)
-	-- Approved facade only, minus its shop signage (the labelled plate: "SUPPLIES / COLLECTION").
-	local Kit = require(script.Parent.BuildingLooks.Kit)
-	local look = table.clone(require(script.Parent.BuildingLooks.Supplies))
-	local plain = {}
-	for _, detail in look.details do
-		if detail.label == nil then
-			table.insert(plain, detail)
-		end
-	end
-	look.details = plain
-	Kit.build(shop, frame, look, { part = part, deco = deco, nightLight = DayNight.nightLight })
-	-- (6.12.6: no rooftop set piece any more: its giant vest turns over the gear stall's GEAR counter, server/GearStall.luau)
-	for row = -1, 1, 2 do
-		part(shop, "Shelf", Vector3.new(30, 6, 2), frame * CFrame.new(0, 3, row * 8 - 2), Color3.fromRGB(150, 140, 120), Enum.Material.Wood)
-	end
-end
-
 -- 5.1, Spoke & Chain Cycles on Downtown block (-1, 1), its door on Main St (north): a brick shop 60 × 40 with a 12-wide
 -- door near the street, Codex's look (BuildingLooks/BikeShop). 6.12.7: its bikes are sold at Dead End Motors' BIKES
 -- counter (Map.Shops.bikes, buildDealer: one shop for the cars and the bikes), so it stands here as an ordinary building
@@ -1619,7 +1593,6 @@ local function buildDistrict(parent: Instance, d: Map.District)
 			require(script.Parent.GunRange).build(district, tools)
 		end
 		buildMechanic(district)
-		buildSupplies(district)
 		buildBikeShop(district) -- 5.1: Spoke & Chain
 		buildSafeZone(district)
 	end
@@ -6120,6 +6093,13 @@ function World.build()
 	-- 6.11: the Central Park on the middle block (server/CentralPark.luau: its own dice, World's helpers handed over)
 	piece("Central Park", function()
 		require(script.Parent.CentralPark).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
+	end)
+	-- 6.12.15: the Lantern Garden north of it and the footbridge over the street between them
+	piece("Lantern Garden", function()
+		require(script.Parent.LanternGarden).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
+	end)
+	piece("footbridge", function()
+		require(script.Parent.Footbridge).build(world:FindFirstChild("Downtown") or world, { part = part, deco = deco, sign = sign, nightLight = DayNight.nightLight })
 	end)
 	piece("roads and bridges", function()
 		buildConnectors(world)
