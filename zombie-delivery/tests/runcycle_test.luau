@@ -27,7 +27,7 @@ end
 
 local S = Config.Courier.Sprint
 check("the sprint's numbers", S.From > Config.Movement.Walk and S.Full > S.From and S.Full <= Config.Movement.Sprint
-	and S.Off < S.From and S.Off >= 18 and S.Stride > 4 and S.Stride < 12 and S.BlendTime > 0 and S.BlendTime < 0.5
+	and S.Off < S.From and S.Off >= 18 and S.Stride > 4 and S.Stride < 16 and S.Hang >= 0 and S.Hang < 0.9 and S.BlendTime > 0 and S.BlendTime < 0.5
 	and S.Range >= 100)
 
 -- The full sprint, sampled finely.
@@ -53,22 +53,22 @@ for i = 0, STEPS do
 	armMax = math.max(armMax, math.abs(deg(p.rightShoulder)), math.abs(deg(p.leftShoulder)))
 	bobMax, bobMin = math.max(bobMax, p.bob), math.min(bobMin, p.bob)
 end
-check("the hips swing +55 forward", near(hipMax, 55, 0.01), hipMax)
-check("the hips swing -35 back", near(hipMin, -35, 0.01), hipMin)
+check("the hips swing +66 forward (6.12.6: the slow-mo reach)", near(hipMax, 66, 0.01), hipMax)
+check("the hips swing -42 back", near(hipMin, -42, 0.01), hipMin)
 check("the knees never bend backward (always bent a little)", kneeMin >= 5, kneeMin)
 check("the knees kick up to about 110 and no further", kneeMax >= 105 and kneeMax <= 116, kneeMax)
 check("the knee is nearly straight reaching forward", near(-deg(poses[0].rightKnee), 10, 0.01), -deg(poses[0].rightKnee))
 check("the elbows stay about square", elbowMin >= 75 and elbowMax <= 105, `{elbowMin}..{elbowMax}`)
 check("the elbows bend more on the back swing", poses[0].rightElbow > poses[STEPS / 2].rightElbow and poses[0].rightShoulder < 0)
-check("the arms swing +-60", near(armMax, 60, 0.01), armMax)
-check("the lean forward at a full sprint is 14", near(deg(poses[0].lean), -14, 1e-6), deg(poses[0].lean))
+check("the arms swing +-76", near(armMax, 76, 0.01), armMax)
+check("the lean forward at a full sprint is 16", near(deg(poses[0].lean), -16, 1e-6), deg(poses[0].lean))
 check("the head kept about level", math.abs(deg(poses[0].lean + poses[0].neckPitch)) < 3)
-check("the body bobs 0.15 studs", near(bobMax - bobMin, 0.15, 1e-3) and bobMin < 0, `{bobMin}..{bobMax}`)
+check("the body bobs 0.32 studs", near(bobMax - bobMin, 0.32, 1e-3) and bobMin < 0, `{bobMin}..{bobMax}`)
 local twistMax = 0
 for i = 0, STEPS do
 	twistMax = math.max(twistMax, math.abs(deg(poses[i].twist)))
 end
-check("the waist turns +-6 against the hips", near(twistMax, 6, 0.01), twistMax)
+check("the waist turns +-7 against the hips", near(twistMax, 7, 0.01), twistMax)
 
 -- Symmetric: the left side is the right side half a cycle later; the arms against the legs.
 local symmetric, opposite = true, true
@@ -123,6 +123,32 @@ local out = RunCycle.blank()
 local calm = RunCycle.pose(0, 0, out)
 check("the pose is written into the given table", calm == out)
 check("a calm sprint swings less", calm.rightHip < poses[0].rightHip and calm.rightHip > 0 and math.abs(calm.lean) < math.abs(poses[0].lean))
+
+-- 6.12.6, the slow-mo hang: the flights keep their place, the phase never runs back, it is slow in the air and quick
+-- through the steps, and one cycle is still one.
+do
+	local k = S.Hang
+	check("the hang keeps the flights and the steps in place", near(RunCycle.hang(0, k), 0, 1e-9) and near(RunCycle.hang(0.5, k), 0.5, 1e-9)
+		and near(RunCycle.hang(0.25, k), 0.25, 1e-9) and near(RunCycle.hang(0.75, k), 0.75, 1e-9))
+	local back, last = false, RunCycle.hang(0, k)
+	for i = 1, 720 do
+		local h = RunCycle.hang(i / 720, k)
+		local step = h - last
+		if step < 0 then
+			step += 1
+		end
+		if step <= 0 or step > 0.01 then
+			back = true
+		end
+		last = h
+	end
+	check("the hung phase always moves on", not back)
+	local d = 1e-4
+	local air = RunCycle.hang(d, k) - RunCycle.hang(0, k)
+	local step = RunCycle.hang(0.25 + d, k) - RunCycle.hang(0.25, k)
+	check("slow in the flight, quick through the step", near(air / d, 1 - k, 1e-3) and near(step / d, 1 + k, 1e-3), `{air / d} / {step / d}`)
+	check("no hang at 0", near(RunCycle.hang(0.3, 0), 0.3, 1e-12))
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

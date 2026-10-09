@@ -1143,6 +1143,19 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The slow-mo sprint (6.12.6)
+
+The owner: "make the sprint look like a slow-mo sprint". The body still runs at the sprint's speed; the run cycle on it
+(`shared/RunCycle.luau`, `client/SprintPose.luau`, every client sees it) now looks like a slow-motion shot:
+
+- **Big strides at about half the old cadence:** `Config.Courier.Sprint.Stride` 7 → 13 studs a cycle (about two
+  cycles a second at 28 studs / s).
+- **It hangs in the air:** `RunCycle.hang` and `Sprint.Hang` (0.45). The cycle slows in the two flights and hurries
+  through the steps, so the runner sails and the feet only touch down.
+- **A longer reach:** the thighs swing +66 / −42 (55 / 35), the arms ±76 (60), the lean 16 (14), the float 0.32 studs
+  (0.15).
+- Tuning: `Stride` (higher = slower legs) and `Hang` (0 = no hang) in `Config.Courier.Sprint`.
+
 ## JOBS, MISSIONS and TASKS up front in the phone (6.12.5)
 
 The owner: "the main things in the phone, jobs, missions and tasks, make them more visible".

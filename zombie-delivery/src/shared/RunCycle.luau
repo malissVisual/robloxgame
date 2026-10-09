@@ -13,23 +13,26 @@
 -- and bends an elbow; a knee bends with a NEGATIVE X (the shin back); a negative waist X tips the upper body forward.
 -- About Y a positive angle turns a part to the left (seen from above). Angles in radians, the Root bob in studs.
 -- `effort` 0..1 (the speed between Sprint.From and Sprint.Full) scales the swing (from Calm of it) and the lean.
+-- 6.12.6, the slow-mo sprint (the owner: "make the sprint look like a slow-mo sprint"): big strides at half the old
+-- cadence (Config.Courier.Sprint.Stride 7 → 13), a longer reach of the legs and the arms, a higher float, and the
+-- cycle hangs in the two flights (RunCycle.hang, Sprint.Hang): the body sails, the feet hurry through the steps.
 
 local RunCycle = {}
 
 local TAU = 2 * math.pi
 local rad = math.rad
 
-RunCycle.HipForward = rad(55) -- the thigh's swing forward …
-RunCycle.HipBack = rad(35) -- … and back
-RunCycle.ArmSwing = rad(60) -- the upper arms forward / back, against the legs
+RunCycle.HipForward = rad(66) -- the thigh's swing forward … (6.12.6: 55, the slow-mo reach)
+RunCycle.HipBack = rad(42) -- … and back (35)
+RunCycle.ArmSwing = rad(76) -- the upper arms forward / back, against the legs (60)
 RunCycle.Elbow = rad(92) -- the elbows bent about square …
 RunCycle.ElbowBack = rad(10) -- … this much more on the back swing (less in front)
 RunCycle.Inward = rad(10) -- the arms swing a little across the body in front
-RunCycle.Lean = rad(14) -- the upper body forward (the waist) at a full sprint
-RunCycle.Twist = rad(6) -- the upper body turns against the hips with the arms …
+RunCycle.Lean = rad(16) -- the upper body forward (the waist) at a full sprint (14)
+RunCycle.Twist = rad(7) -- the upper body turns against the hips with the arms … (6)
 RunCycle.HipTwist = rad(4) -- … and the hips (the Root) with the legs
 RunCycle.HeadKeep = 0.85 -- the neck takes back this share of the lean and the turn: the head stays level
-RunCycle.Bob = 0.15 -- studs: the body rises and falls this much twice a cycle …
+RunCycle.Bob = 0.32 -- studs: the body rises and falls this much twice a cycle … (0.15: 6.12.6 floats higher)
 RunCycle.Sink = 0.06 -- … from this far under the rest height (the loaded knee at the lowest)
 RunCycle.Calm = 0.75 -- the swing's share at the start of a sprint (effort 0)
 RunCycle.CalmLean = 0.5 -- the lean's share at the start of a sprint
@@ -91,6 +94,15 @@ end
 -- The knee's bend (radians, positive = bent; the joint takes it as a negative X) at the leg's `phase`.
 function RunCycle.knee(phase: number): number
 	return rad(sample(KNEE, phase))
+end
+
+-- 6.12.6: the slow-mo hang. The cycle's phase as the pose reads it: it slows by the share `hang` (0..0.9) at the two
+-- flights (phase 0 and 0.5, the body highest) and hurries by as much through the steps (0.25 and 0.75), so the
+-- runner sails through the air and the feet only touch down. 0 and 0.5 stay where they are; one cycle is still one.
+function RunCycle.hang(phase: number, hang: number): number
+	local k = math.clamp(hang, 0, 0.9)
+	local p = wrap(phase)
+	return wrap(p - k * math.sin(2 * TAU * p) / (2 * TAU))
 end
 
 -- The phase after running `distance` studs with `stride` studs a cycle.
