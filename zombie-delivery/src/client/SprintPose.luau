@@ -216,7 +216,7 @@ SprintPose.onFoot = onFoot
 
 -- The run cycle into the joints: the legs, the waist, the neck and the Root by `w`, the arms by `wa`.
 local function run(rig: Rig, w: number, wa: number, phase: number, effort: number)
-	local p = RunCycle.pose(phase, effort, pose)
+	local p = RunCycle.pose(RunCycle.hang(phase, S.Hang or 0), effort, pose) -- (6.12.6: the slow-mo hang)
 	put(rig.rh, CFrame.Angles(p.rightHip, 0, 0), w)
 	put(rig.lh, CFrame.Angles(p.leftHip, 0, 0), w)
 	put(rig.rk, CFrame.Angles(p.rightKnee, 0, 0), w)

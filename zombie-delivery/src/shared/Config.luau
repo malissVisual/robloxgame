@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.5"
+Config.Version = "6.12.6"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3547,8 +3547,10 @@ Config.Courier = {
 		Full = 26, -- the full swing and lean from here (Config.Movement.Sprint is 28)
 		Range = 150, -- studs from the camera (yours always)
 		BlendTime = 0.15, -- seconds to blend the cycle in or out
-		Stride = 7, -- studs run per full cycle (two steps): the cadence follows the speed (6.8 review: on the stock 2-stud
-		-- leg; client/SprintPose.luau scales it by each body's own, shared/CourierMotion.luau stride: the courier's 9.8)
+		Stride = 13, -- studs run per full cycle (two steps): the cadence follows the speed (6.8 review: on the stock 2-stud
+		-- leg; client/SprintPose.luau scales it by each body's own, shared/CourierMotion.luau stride). 6.12.6, the slow-mo
+		-- sprint: 7 → 13, big strides at about half the old cadence (2 cycles a second at 28 studs / s)
+		Hang = 0.45, -- 6.12.6: the cycle slows by this share in the flights and hurries through the steps (RunCycle.hang)
 	},
 	-- 6.1: the bag is a pendulum on a spring (shared/BagSwing.luau, client/BagSway.luau): the hand's real acceleration
 	-- swings it (it trails when you start, swings forward when you stop, out on a turn), the air leans it back at a run.
