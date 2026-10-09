@@ -9,6 +9,8 @@
 -- gear stall at the spawn (server/GearStall.luau); Last Stop's old building has no counter, so nobody stands there.
 -- 6.12.7: Sal (CARS) and Kip (BIKES) stand side by side the same way, behind the two counters of Dead End Motors
 -- (server/World.luau buildDealer); Spoke & Chain's old building has no counter any more.
+-- 6.12.14: Ray stands behind the counter of Lead & Co.'s range shop (server/GunRange.luau), out of the safe zone; the
+-- old shop on block (-1, 0) has no counter any more. The zombies leave the clerks alone, there as anywhere.
 -- 6.12, the looks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): the clerks who sell
 -- them (Config.Cosmetics.Counters: Dot at the gear stall, Gus at Wrench Garage, Kip at Dead End Motors) get a second
 -- prompt under "Shop": "Style" on R (the gamepad's L2), so both show at once (E is "Shop"'s). It greets you as "Shop"
@@ -34,7 +36,7 @@ type Clerk = { name: string, title: string, role: string, lines: { string } }
 -- Who stands behind which counter (the shop ids of World.ShopPrompts).
 local CLERKS: { [string]: Clerk } = {
 	supplies = { name = "Dot", title = "Last Stop Supplies", role = "townsperson", lines = { "Vests, medkits, a drink for the road. Take a look.", "Stock up, courier. The night is long." } }, -- (6.12.2: at the gear stall)
-	guns = { name = "Ray", title = "Lead & Co.", role = "townsperson", lines = { "Looking for something with a kick?", "Every round counts out there." } },
+	guns = { name = "Ray", title = "Lead & Co. · Range", role = "townsperson", lines = { "Looking for something with a kick?", "Every round counts out there.", "The lanes are next door. The targets drop when you hit them." } }, -- (6.12.14: at the range)
 	bikes = { name = "Kip", title = "Dead End Motors · Bikes", role = "townsperson", lines = { "Two wheels beat two feet. Have a look.", "Fresh chains, fresh tyres." } }, -- (6.12.7: the BIKES counter, next to Sal)
 	dealer = { name = "Sal", title = "Dead End Motors · Cars", role = "townsperson", lines = { "Every one of these runs. Mostly.", "Need more room in the back? Let's talk." } },
 	mechanic = { name = "Gus", title = "Wrench Garage", role = "townsperson", lines = { "Bring it in, I'll make it purr.", "Armour, tyres, a bigger engine?" } },

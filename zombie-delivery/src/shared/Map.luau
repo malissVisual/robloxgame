@@ -3,7 +3,8 @@
 -- (server/World.luau), the client draws it (client/MapView.luau) and both ask it where the roads are.
 --
 --   Downtown   a 9 x 9 grid of blocks around the Central Park (6.11: the middle block, a pond in the very middle of the
---              map, Map.Park), the shops in the four blocks next to it (the safe zone), the depot north-east of it
+--              map, Map.Park), the shops in the four blocks next to it (the safe zone; 6.12.14: but the guns, out at
+--              Lead & Co.'s range, Map.GunRange), the depot north-east of it
 --              on block (1, -1) (6.11: Map.Depot; it stood on the middle block before)
 --   Harbor     east, across the river (Rust Bridge, Old Bridge), docks on the sea
 --   Suburbs    south, little houses
@@ -32,6 +33,9 @@
 --   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St;
 --              6.12.7: the bikes are Dead End Motors' BIKES counter (Map.Shops.bikes, Config.BikeShop), next to its car
 --              counter: one shop; Spoke & Chain's old building an ordinary one (Map.FormerBikeShop)
+--   Range      (6.12.14) Lead & Co.'s shooting range (Map.GunRange, Config.GunRange; Map.Shops.guns its counter):
+--              Downtown block (-2, 1), south-west of the park just outside the safe zone, its gate on 4th Ave; the
+--              gun shop's old building on block (-1, 0) an ordinary one (Map.FormerGunShop)
 --   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn;
 --              6.12.2: it and Last Stop Supplies (Map.Shops.supplies) are the two counters of the gear stall there
 --              (Config.GearStall), Last Stop's old building on block (0, -1) an ordinary one (Map.LastStop)
@@ -184,7 +188,7 @@ Map.SpecialBlocks = {
 		["0,0"] = "park", -- 6.11: the Central Park (Map.Park), where the depot stood
 		["1,-1"] = "depot", -- 6.11: the depot (Map.Depot), where four plain towers stood (Map.FormerBlocks)
 		["1,0"] = "dealer",
-		["-1,0"] = "guns",
+		["-1,0"] = "guns", -- (6.12.14: Lead & Co.'s old building, no shop any more: Map.FormerGunShop; the block stays special)
 		["0,1"] = "mechanic",
 		["0,-1"] = "supplies", -- (6.12.2: Last Stop's old building, no shop any more: Map.LastStop; the block stays special)
 		["2,1"] = "movers",
@@ -193,6 +197,8 @@ Map.SpecialBlocks = {
 		["-1,-1"] = "dispatchtower", -- Dispatch Tower (the offices), in the safe zone
 		["1,1"] = "parking", -- Downtown Parking (a garage), in the safe zone
 		["-1,1"] = "bikes", -- 5.1, Spoke & Chain Cycles (6.12.7: its old building, no shop any more: Map.FormerBikeShop)
+		-- 6.12.14: Lead & Co.'s shooting range (Map.GunRange, Config.GunRange): just outside the safe zone, on 4th Ave
+		["-2,1"] = "gunrange",
 		-- 3.0, the missions' places in town (all just outside the safe zone):
 		["0,-3"] = "cityhall", -- City Hall: north of the park, its steps down to the street in front (south)
 		["-2,-2"] = "police", -- Precinct 13: its front and the patrol cars on the street to the south
@@ -216,11 +222,12 @@ function Map.special(districtId: string, i: number, j: number): string?
 	return if blocks then blocks[`{i},{j}`] else nil
 end
 
--- 6.11: the special blocks that were ordinary blocks before (Harbor Gas, 5.4; the depot's, 6.11). Whatever rolls its
--- dice block by block (Map.addresses, Map.makeLots, shared/RentalDocks.luau, shared/Shortcuts.luau, the towers in
--- server/World.luau) still rolls theirs and keeps nothing there, so every other block stays as it was.
+-- 6.11: the special blocks that were ordinary blocks before (Harbor Gas, 5.4; the depot's, 6.11; 6.12.14: Lead & Co.'s
+-- range, Map.GunRange). Whatever rolls its dice block by block (Map.addresses, Map.makeLots, shared/RentalDocks.luau,
+-- shared/Shortcuts.luau, the towers, lawns and car parks in server/World.luau) still rolls theirs and keeps nothing
+-- there, so every other block stays as it was.
 Map.FormerBlocks = {
-	downtown = { ["1,-1"] = true },
+	downtown = { ["1,-1"] = true, ["-2,1"] = true },
 	harbor = { ["0,0"] = true },
 } :: { [string]: { [string]: boolean } }
 
@@ -251,6 +258,32 @@ Map.LastStop = { i = 0, j = -1, x = 0, z = -CELL }
 -- the bus lines still draw a stop toward it as they did (shared/BusLines.luau), without its name.
 Map.FormerBikeShop = { i = -1, j = 1, x = -CELL, z = CELL }
 
+-- 6.12.14: the building on Downtown block (-1, 0) that was Lead & Co. until the guns moved out to its shooting range
+-- (Map.GunRange, Map.Shops.guns): an ordinary building now (server/World.luau buildGuns: its shell and its barred
+-- windows, no counter, no prompt, no clerk, no name board, no gun racks; its GUN STORE and the giant cartridge stand,
+-- smaller, on the range shop's roof). The block stays special; the bus lines still draw a stop toward it as they did
+-- (shared/BusLines.luau), without its name.
+Map.FormerGunShop = { i = -1, j = 0, x = -CELL, z = 0 }
+
+-- 6.12.14, Lead & Co.'s shooting range (the owner: "move the gun store out of the safe zone, to a shooting range"):
+-- Downtown block (-2, 1) (Config.GunRange.Block), its middle (x, z) and its front (Config.GunRange.Facing: east, 4th
+-- Ave and the park). server/GunRange.luau builds the compound in its frame; Map.gunRangeAt turns a spot of that frame
+-- (right of someone looking out of the gate, back from the block's middle) into the map's x, z.
+export type GunRange = { i: number, j: number, x: number, z: number, fx: number, fz: number }
+Map.GunRange = {
+	i = Config.GunRange.Block[1],
+	j = Config.GunRange.Block[2],
+	x = Config.GunRange.Block[1] * CELL,
+	z = Config.GunRange.Block[2] * CELL,
+	fx = Config.GunRange.Facing[1],
+	fz = Config.GunRange.Facing[2],
+} :: GunRange
+
+function Map.gunRangeAt(right: number, back: number): (number, number)
+	local r = Map.GunRange
+	return r.x - r.fz * right - r.fx * back, r.z + r.fx * right - r.fz * back
+end
+
 -- 6.11, the Central Park (the owner: "the middle of the map, where the safe zone is, nice: nature, some water in the
 -- middle, a park ... so people remember where the safe zone is and where all the shops are") on the middle block (0, 0),
 -- the shops all round it. server/CentralPark.luau builds it, client/MapView.luau draws it. In studs from its middle:
@@ -279,10 +312,12 @@ end
 -- Supplies are the two counters of the gear stall in the depot's yard (Config.GearStall): each spot is its counter's
 -- front, with the stall's radius. 6.12.7: the bikes ("bikes") are the BIKES counter of Dead End Motors, beside its car
 -- counter ("dealer"): its spot the counter's front, its radius over the counter and the bike stands (Config.BikeShop).
+-- 6.12.14: the guns ("guns") are sold at Lead & Co.'s range out of the safe zone (Map.GunRange): its spot the range
+-- shop's counter front (set just below), its radius the cabin, its forecourt and the gate (Config.GunRange).
 Map.Shops = {
 	depot = { name = "Depot Garage", x = Map.Depot.x, z = Map.Depot.z }, -- (6.7: the garage terminal, not a shop: it sells nothing, no shop window)
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
-	guns = { name = "Lead & Co.", x = -CELL, z = 0 },
+	guns = { name = "Lead & Co.", x = 0, z = 0, radius = Config.GunRange.Radius }, -- (6.12.14: the range's counter; it stood on block (-1, 0))
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
 	-- 6.12.2: the GEAR counter of the gear stall (its old building on block (0, -1): Map.LastStop)
 	supplies = {
@@ -303,6 +338,11 @@ Map.Shops = {
 	bags = { name = Config.BagShop.Name, x = Map.Depot.x + Config.BagShop.X, z = Map.Depot.z + Config.BagShop.Z, radius = Config.BagShop.Radius }, -- 6.6: the bags (6.11: in the depot's yard, wherever the depot is; 6.12.2: the gear stall's BAGS counter)
 } :: { [string]: { name: string, x: number, z: number, radius: number? } }
 Map.ShopRadius = 80
+do
+	-- 6.12.14: Lead & Co.'s spot, the range shop's counter front (in the cabin, Config.GunRange)
+	local range = Config.GunRange
+	Map.Shops.guns.x, Map.Shops.guns.z = Map.gunRangeAt(range.Cabin.X, range.Cabin.Z + range.Counter.Z - range.Counter.Deep / 2)
+end
 
 -- 6.6: how close to a shop's spot counts as in it (its own radius, else Map.ShopRadius).
 function Map.shopRadius(shopId: string): number
@@ -1028,10 +1068,11 @@ export type Landmark = { id: string, name: string, icon: string, x: number, z: n
 local landmarks: { Landmark } = {
 	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the JOBS spot with the job board, Marge, the garage terminal (your parked van, the company vehicles) and the gear stall by the spawn (ZDC Bags and Last Stop Supplies). The safe zone." },
 	-- 6.11: the Central Park in the middle of the safe zone (Map.Park).
-	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it. The depot is across the junction to the north-east." },
+	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it (Lead & Co.'s range just outside, to the south-west). The depot is across the junction to the north-east." },
 	-- 6.12.7: one shop for the cars and the bikes (the CARS and BIKES counters; Spoke & Chain's own entry is gone)
 	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4); every car needs a garage slot. And at the BIKES counter, from level 2: bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), faster than walking with more room for the light runs." },
-	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Guns from the SMG up (your pistol is the starter), the gun upgrades (Gun Damage, Fire Rate) and a baseball bat." },
+	-- 6.12.14: Lead & Co.'s range out of the safe zone (the map icon and the GPS at its counter; Map.FormerGunShop: its old building)
+	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = Map.Shops.guns.x, z = Map.Shops.guns.z, kind = "shop", description = "Lead & Co.'s shooting range, just outside the safe zone south-west of the park (4th Ave). The range shop: guns from the SMG up (your pistol is the starter), the gun upgrades (Gun Damage, Fire Rate) and a baseball bat. Beside it, four lanes: the targets drop when you hit them. Zombies come too." },
 	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Your car's stages, car upgrades, gear, paint and car guns, and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
 	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Map.Shops.bags.x, z = Map.Shops.bags.z, kind = "shop", description = "Bags: sprint with your deliveries. The BAGS counter of the gear stall in the depot's yard, by the spawn." }, -- 6.6 (6.12.2: the stall)

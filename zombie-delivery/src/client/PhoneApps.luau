@@ -560,11 +560,12 @@ end
 -- (Lead & Co. the gun upgrades and the bat too; Wrench Garage the stages, the car upgrades, gear and paint). 6.12.2:
 -- the bags and Last Stop Supplies are the two counters of the gear stall by the spawn; no running shoes any more.
 -- 6.12.7: one shop for the cars and the bikes, Dead End Motors (its CARS and BIKES counters), where Spoke & Chain's row
--- was (the bikes come before the first car).
+-- was (the bikes come before the first car). 6.12.14: Lead & Co. sells at its shooting range out of the safe zone (the
+-- GPS to the range shop's counter, Map.Shops.guns).
 local SHOPS: { { id: string, icon: string, sells: string } } = {
 	{ id = "bags", icon = "🛍️", sells = "Bags (sprint with your deliveries)" },
 	{ id = "supplies", icon = "🛒", sells = "Items and vests, next to the bags" }, -- (6.12.2: the gear stall, no shoes)
-	{ id = "guns", icon = "🔫", sells = "Guns, gun upgrades, a baseball bat" },
+	{ id = "guns", icon = "🔫", sells = "Range · guns, gun upgrades, a baseball bat" }, -- (6.12.14: the range)
 	{ id = "dealer", icon = "🚗", sells = "Cars, vans, trucks · bikes, the E-Scooter, bike gear" },
 	{ id = "mechanic", icon = "🔧", sells = "Stages, car upgrades, gear, paint, car guns, repairs" },
 }

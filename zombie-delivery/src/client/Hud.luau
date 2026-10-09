@@ -879,7 +879,7 @@ local function renderShop()
 	shop.title.Text = Map.Shops[shopId] and Map.Shops[shopId].name or "Shop"
 	local about = ({
 		dealer = { "🚗", "The catalog · every car has a role", "garage" },
-		guns = { "🔫", "Guns, gun upgrades and a bat", "shop" }, -- 6.7
+		guns = { "🔫", "The range shop · guns, gun upgrades, a bat", "shop" }, -- 6.7 (6.12.14: at Lead & Co.'s range)
 		supplies = { "🧰", "Items and vests · the GEAR counter", "shop" }, -- 6.7 (6.12.2: no shoes; at the gear stall)
 		bags = { "🛍️", "Bags · sprint with your deliveries", "shop" }, -- 6.6 (6.12.2: the gear stall's BAGS counter)
 		mechanic = { "🔧", "Stages, car upgrades, gear, paint, car guns", "settings" }, -- 6.7
@@ -949,7 +949,7 @@ local function renderShop()
 			end
 		end
 	elseif shopId == "guns" then
-		note(shop.body, "Guns for your hands: one-handed ones (pistol, revolver, SMG) also fire out of a car window; car guns are at Wrench Garage. The gun upgrades and the Baseball Bat are sold here too.", C.dim, 1)
+		note(shop.body, "Guns for your hands: one-handed ones (pistol, revolver, SMG) also fire out of a car window; car guns are at Wrench Garage. The gun upgrades and the Baseball Bat are sold here too. Try them on the lanes beside the shop: the targets drop when you hit them.", C.dim, 1)
 		-- 6.7: one gun's card (the starter pistol: STARTER · yours; a reward: how to earn it).
 		local function gunCard(def: Config.WeaponDef, order: number)
 			local c = card(shop.body, 84, order)
@@ -1143,7 +1143,7 @@ local function renderShop()
 				end
 			end
 			row += 1
-			note(shop.body, "Gun Damage and Fire Rate (every gun, the car guns too): Lead & Co., west of the park.", C.dim, row)
+			note(shop.body, "Gun Damage and Fire Rate (every gun, the car guns too): Lead & Co.'s range, south-west of the park, just outside the safe zone.", C.dim, row)
 		elseif mechanicTab == "gear" then
 			require(script.Parent.GearShop).render(shop.body, state, here) -- 4.6: the car's gear and its slots
 		elseif mechanicTab == "carguns" then

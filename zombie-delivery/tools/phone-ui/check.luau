@@ -427,7 +427,7 @@ check("SHOP lists the five shops first",named("Shops")~=nil and named("Shops").L
 	and named("Shop_bikes")==nil and named("Shop_guns").LayoutOrder<named("Shop_dealer").LayoutOrder and named("Shop_dealer").LayoutOrder<named("Shop_mechanic").LayoutOrder)
 check("6.6: ZDC Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("ZDC Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
 	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.lower(object.Text),"backpack",1,true)~=nil end)[1]==nil)
-check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items and vests, next to the bags")~=nil and text("Lead & Co.")~=nil and text("Guns, gun upgrades, a baseball bat")~=nil
+check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items and vests, next to the bags")~=nil and text("Lead & Co.")~=nil and text("Range · guns, gun upgrades, a baseball bat")~=nil
 	and text("Dead End Motors")~=nil and text("Cars, vans, trucks · bikes, the E-Scooter, bike gear")~=nil and text("Wrench Garage")~=nil and text("Stages, car upgrades, gear, paint, car guns, repairs")~=nil) -- (6.7: what each really sells; 6.12.7: the bikes at Dead End Motors)
 check("6.12.7: Spoke & Chain is gone from SHOP, its bikes named as part of Dead End Motors",all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.upper(object.Text),"SPOKE",1,true)~=nil end)[1]==nil
 	and caps("Dead End Motors · bikes")~=nil and caps("Dead End Motors · vehicles")~=nil
@@ -443,6 +443,19 @@ do
 	local counter=require("./Map").Shops.bikes
 	check("the bikes' Set GPS: the BIKES counter at Dead End Motors",waypoint~=nil and waypoint.X==counter.x and waypoint.Z==counter.z and toasts[#toasts]=="GPS: Dead End Motors · Bikes")
 	M.MapView.setWaypoint=setWaypoint
+end
+do
+	-- 6.12.14: Lead & Co.'s row: its range out of the safe zone, the GPS to the range shop's counter (Map.Shops.guns).
+	local waypoint
+	local setWaypoint=M.MapView.setWaypoint
+	M.MapView.setWaypoint=function(at) waypoint=at end
+	named("Shop_guns").Activated:Fire()
+	local Map=require("./Map")
+	local range=Map.Shops.guns
+	check("6.12.14: Lead & Co.'s GPS: its range's counter, out of the safe zone",waypoint~=nil and waypoint.X==range.x and waypoint.Z==range.z and not Map.isSafe(range.x,range.z)
+		and math.abs(range.x-Map.GunRange.x)<Map.BlockSize/2 and math.abs(range.z-Map.GunRange.z)<Map.BlockSize/2 and toasts[#toasts]=="GPS set: Lead & Co.")
+	M.MapView.setWaypoint=setWaypoint
+	Phone.open("shop")
 end
 do
 	local waypoint

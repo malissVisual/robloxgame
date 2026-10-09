@@ -1,7 +1,7 @@
 --!strict
 -- 4.3, the location tag: when you come up to a building, a quiet caption names it, in the contract style
 -- (design/ui-contract, the captions of design/location-looks): a small red square and the name in white caps, a fine
--- line, the kind of place under it in the secondary colour ("■ LEAD & CO." / "GUN SHOP"), on a subtle charcoal scrim
+-- line, the kind of place under it in the secondary colour ("■ LEAD & CO." / "GUN SHOP · RANGE"), on a subtle charcoal scrim
 -- that fades out to the right. No box, no sound. It fades and slides in (8 px, 0.35 s) and fades out (0.5 s).
 --
 -- What shows and when is shared/LocationTags.luau (pure, tested): the nearest discovered landmark within ~45 studs,

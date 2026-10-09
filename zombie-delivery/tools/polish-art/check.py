@@ -13,7 +13,12 @@ them, next to the real JOBS booth (server/JobsSpot.build round the job board whe
 hall's look (BuildingLooks/Depot through Kit.build, the hall's shell from World's numbers); in the stall's own frame:
 Art.Mounts agrees with the stall it builds, each prop over its counter's prompt, on the roof behind the name board (the
 spawn in front of it: nothing of them can cover its text), 7-10.5 studs tall and at least 4.5 of it in sight over the
-board from the spawn, clear of the other prop, the hall (its canopy) and the booth by a stud, decoration only."""
+board from the spawn, clear of the other prop, the hall (its canopy) and the booth by a stud, decoration only.
+6.12.14, Lead & Co.'s range ("guns", GUN STORE and the cartridge at the smaller scale): the real server/GunRange.build
+places it on the range shop's roof; in the cabin's own frame: Art.Mounts.guns agrees with the cabin it builds (the roof
+slab's top and box, the name board's back face and top), the prop on the roof behind the board, over the counter with
+the "guns" prompt (Map.Shops.guns its front), its letters in sight over the board from the street in front of the gate
+(4th Ave), clear of everything else of the compound by a stud, decoration only; the compound within its part budget."""
 from pathlib import Path
 import argparse
 import json
@@ -226,6 +231,32 @@ end
 local spawn=frame:PointToObjectSpace(M.Vector3.new(D.x,walk,D.z+26)) -- (World.DepotSpawn)
 print(encode({stall={parts=rows,spawn={spawn.X,spawn.Z},config={Width=S.Width,Depth=S.Depth,Height=S.Height,Counter=S.Counter},
  mounts={gearvest=Art.Mounts.gearvest,zdcbag=Art.Mounts.zdcbag},envelopes={gearvest=Art.Envelopes.gearvest,zdcbag=Art.Envelopes.zdcbag}}}))
+-- 6.12.14, Lead & Co.'s range: the real GunRange.build (it places the guns prop on its cabin's roof); every part's box
+-- in the cabin's frame (its middle on the walk, -Z out of its door toward 4th Ave).
+local R,G=C.GunRange,Map.GunRange
+local range=M.Instance.new("Folder")
+local rangeTools={part=tool,deco=tools.deco,nightLight=tools.nightLight,
+ sign=function(parent,text,size,cf,color,background,art) local p=tool(parent,"Sign",size,cf);p:SetAttribute("Text",text);if art then p:SetAttribute("Art",art) end end,
+ prompt=function(parent,shop) parent:SetAttribute("PromptShop",shop) end,
+ sidewalk=function(parent,cx,cz) tool(parent,"Sidewalk",M.Vector3.new(C.City.BlockSize,walk,C.City.BlockSize),M.CFrame.new(cx,walk/2,cz)) end}
+require("./GunRange").build(range,rangeTools)
+local rbase=M.Vector3.new(G.x,walk,G.z)
+local cabin=M.CFrame.lookAt(rbase,rbase+M.Vector3.new(G.fx,0,G.fz))*M.CFrame.new(R.Cabin.X,0,R.Cabin.Z)
+local rrows={}
+for _,p in range:GetDescendants() do
+ if p:IsA("BasePart") then
+  local cf=cabin:ToObjectSpace(p.CFrame);local r,s,o=cf.R,p.Size,cf.Position;local e={}
+  for i=0,2 do e[i+1]=(math.abs(r[i*3+1])*s.X+math.abs(r[i*3+2])*s.Y+math.abs(r[i*3+3])*s.Z)/2 end
+  local at,prop=p,""
+  while at.Parent~=range do at=at.Parent;if string.sub(at.Name,1,9)=="ShopProp_" then prop=string.sub(at.Name,10) end end
+  table.insert(rrows,{name=p.Name,prop=prop,box={o.X-e[1],o.Y-e[2],o.Z-e[3],o.X+e[1],o.Y+e[2],o.Z+e[3]},collide=p.CanCollide,query=p.CanQuery,
+   prompt=p:GetAttribute("PromptShop") or "",art=p:GetAttribute("Art") or "",text=p:GetAttribute("Text") or ""})
+ end
+end
+local shopAt=cabin:PointToObjectSpace(M.Vector3.new(Map.Shops.guns.x,walk,Map.Shops.guns.z))
+local street=cabin:PointToObjectSpace(M.Vector3.new(Map.gunRangeAt(R.Gate.X,-(C.City.BlockSize/2+C.City.RoadWidth/2))))
+print(encode({range={parts=rrows,shop={shopAt.X,shopAt.Z},street={street.X,street.Z},config={Width=R.Cabin.Width,Depth=R.Cabin.Depth,Height=R.Cabin.Height,
+ Counter=R.Counter,Board=R.Board},mount=Art.Mounts.guns,envelope=Art.Envelopes.guns}}))
 """
     return """
 local C=require("./Config")
@@ -253,6 +284,7 @@ def check(mode,luau,output):
         elif mode=="shops":
             sources["ShopGeometry"]=server/"ShopArt/Geometry.luau";sources["ShopProps"]=server/"ShopProps.luau"
             sources["GearStall"]=server/"GearStall.luau";sources["JobsSpot"]=server/"JobsSpot.luau";sources["DepotLook"]=server/"BuildingLooks/Depot.luau"
+            sources["GunRange"]=server/"GunRange.luau" # (6.12.14)
             (tmp/"DayNight.luau").write_text(DAYNIGHT_STUB)
         elif mode=="towers":
             sources["Facade"]=server/"TowerArt/Facade.luau"
@@ -264,7 +296,7 @@ def check(mode,luau,output):
             source=path.read_text().replace("require(script.Parent.ShopArt.Geometry)",'require("./ShopGeometry")')
             source=re.sub(r"require\(script\.Parent(?:\.Parent)?\.(?:PolishArt\.|TowerArt\.)?(\w+)\)",r'require("./\1")',source)
             source=re.sub(r"require\(Shared\.(\w+)\)",r'require("./\1")',source) # (GearStall: Config, Map)
-            (tmp/(name+".luau")).write_text((PREFIX if name in ("Builder","Kit","JobsSpot") else SHOP_PREFIX if name in ("ShopProps","GearStall") else "")+source)
+            (tmp/(name+".luau")).write_text((PREFIX if name in ("Builder","Kit","JobsSpot") else SHOP_PREFIX if name in ("ShopProps","GearStall") else RANGE_PREFIX if name=="GunRange" else "")+source)
         mock=(ROOT/"tools/vehicle-preview/roblox-mock.luau").read_text().replace("Part=true,WedgePart=true","Part=true,TrussPart=true,WedgePart=true")
         # (6.12.6: a CFrame's Rotation, for JobsSpot)
         assert "local F={}; F.__index=F" in mock
@@ -295,6 +327,7 @@ def check(mode,luau,output):
     city=next((r["city"] for r in rows if "city" in r),None)
     if city:print("City plan PASS:",city)
     if mode=="shops":stall_check(next(r["stall"] for r in rows if "stall" in r))
+    if mode=="shops":range_check(next(r["range"] for r in rows if "range" in r))
     for row in rows:
         if "placed" in row:
             placed=row["placed"];model=next(m for m in models if m["id"]==placed["id"])
@@ -316,6 +349,8 @@ end
 return DayNight
 """
 SHOP_PREFIX = PREFIX + 'local game=M.game\nlocal warn=function(...) error(table.concat({...}," ")) end\n'
+# (6.12.14: server/GunRange.luau draws its targets' rings with a Vector2 anchor and a UDim corner)
+RANGE_PREFIX = SHOP_PREFIX + 'local Vector2,UDim=M.Vector2,{new=function(a,b) return {a,b} end}\n'
 MATERIALS = {"Asphalt","Basalt","Brick","Cardboard","Carpet","CeramicTiles","ClayRoofTiles","Cobblestone","Concrete",
     "CorrodedMetal","CrackedLava","DiamondPlate","Fabric","Foil","ForceField","Glacier","Glass","Granite","Grass","Ground",
     "Ice","LeafyGrass","Leather","Limestone","Marble","Metal","Mud","Neon","Pavement","Pebble","Plaster","Plastic","Rock",
@@ -429,6 +464,52 @@ def stall_check(stall):
               f"{hi[0]-lo[0]:.1f} x {hi[2]-lo[2]:.1f} at rest, {hi[1]-hidden:.1f} in sight from the spawn, "
               f"{box_gap(env,near['box']):.1f} from the {near['group']}'s {near['name']}")
     assert box_gap(boxes["gearvest"],boxes["zdcbag"])>=1,"the two props apart"
+
+def range_check(rng):
+    """6.12.14, Lead & Co.'s range: the guns prop on the range shop's roof (the cabin's frame: -Z out of its door, y 0
+    on the walk), as server/GunRange.build places it."""
+    parts=rng["parts"];cfg=rng["config"];mount=rng["mount"];W,H,D=rng["envelope"]
+    def one(test,what):
+        found=[p for p in parts if not p["prop"] and test(p)]
+        assert len(found)==1,("range",what,len(found));return found[0]
+    roof=one(lambda p:p["name"]=="CabinRoof","the roof");top=roof["box"][4]
+    board=one(lambda p:p["name"]=="Sign" and p["art"]=="guns","the name board")
+    desk=one(lambda p:p["name"]=="Counter","the counter")
+    assert desk["prompt"]=="guns" and board["text"]==cfg["Board"],("range","the counter's prompt, the board's words")
+    front,back,boardTop=board["box"][2],board["box"][5],board["box"][4]
+    # Art.Mounts.guns is the cabin GunRange builds: on the roof slab's top, its box, the board's back face and top.
+    ax,ay,az=mount["at"];r=roof["box"]
+    assert abs(ay-top)<1e-6 and abs(ax)<1e-6,("range","mount: on the roof's top",ay,top)
+    assert all(abs(u-v)<1e-6 for u,v in zip(mount["roof"],(r[0],r[2],r[3],r[5]))),("range","mount: the roof",mount["roof"],r)
+    assert abs(mount["sign"][0]-back)<1e-6 and abs(mount["sign"][1]-(boardTop-top))<1e-6,("range","mount: the name board",mount["sign"])
+    assert abs(top-(cfg["Height"]+0.5))<1e-6 and abs((r[3]-r[0])-(cfg["Width"]+1))<1e-6 and abs((r[5]-r[2])-(cfg["Depth"]+1))<1e-6,("range","the roof: the cabin's")
+    # The prop: placed by GunRange.build, decoration only, on the roof behind the board, over the counter.
+    mine=[p for p in parts if p["prop"]=="guns"]
+    assert mine and all(not p["collide"] and not p["query"] for p in mine),("range","the prop: decoration only")
+    lo=[min(p["box"][i] for p in mine) for i in range(3)];hi=[max(p["box"][i+3] for p in mine) for i in range(3)]
+    assert lo[1]>=top-1e-6 and lo[2]>=back+0.25-1e-6 and lo[0]>=r[0]-1e-6 and hi[0]<=r[3]+1e-6 and hi[2]<=r[5]+1e-6,("range","the prop: on the roof, behind the board")
+    assert desk["box"][0]<=(lo[0]+hi[0])/2<=desk["box"][3],("range","the prop: over the counter")
+    sx,sz=rng["shop"];assert abs(sz-desk["box"][2])<1e-6 and desk["box"][0]<=sx<=desk["box"][3],("range","Map.Shops.guns: the counter's front")
+    # Smaller than on the old 60-wide roof, but the letters (the marquee) read over the board from the street in front
+    # of the gate (4th Ave, a courier's eyes 5 over the walk): at least 2 studs of them in sight.
+    height=hi[1]-top;assert 7<=height<=10.5 and hi[0]-lo[0]<=cfg["Width"]+1,("range","the prop's size",height)
+    letters=[p for p in mine if p["name"].startswith("Front")]
+    assert letters,("range","the street side's letters")
+    l0=min(p["box"][1] for p in letters);l1=max(p["box"][4] for p in letters);lz=min(p["box"][2] for p in letters)
+    ex,ez=rng["street"];eye=5
+    hidden=eye+(boardTop-eye)*(lz-ez)/(front-ez)
+    assert l1-max(l0,hidden)>=2,("range","the letters hidden behind the board from the street",hidden,l0,l1)
+    # Clear of everything else of the compound that stands over the roof's top (the masts, the pavilion, the gate) by a
+    # stud, the cabin's own board and roof unit aside (Art.Mounts.guns: the board, the avoid box).
+    env=(ax-W/2,top,az-D/2,ax+W/2,top+H,az+D/2)
+    others=[p for p in parts if not p["prop"] and p["box"][4]>top+1e-6 and not (p["name"]=="Sign" and p["art"]=="guns") and p["name"]!="RoofUnit"]
+    near=min(others,key=lambda p:box_gap(env,p["box"]))
+    assert box_gap(env,near["box"])>=1,("range","the prop against",near["name"])
+    count=len([p for p in parts if not p["prop"]])
+    assert count<=320,("range","parts",count)
+    print(f"  range     guns over the counter (x {ax:+.1f}, z {az:+.1f}, y {top:.1f}): {height:.1f} tall, {hi[0]-lo[0]:.1f} x {hi[2]-lo[2]:.1f}, "
+          f"its letters {l1-max(l0,hidden):.1f} of {l1-l0:.1f} in sight from 4th Ave, {box_gap(env,near['box']):.1f} from the {near['name']}; "
+          f"the compound {count} parts, {len(mine)} in the prop")
 
 # 6.12.7, the props that stand on one roof together (World buildDealer: Dead End Motors' car and, since the bikes are
 # sold there, the giant bike from Spoke & Chain's old roof): one building (the same roof, name board and roof height),

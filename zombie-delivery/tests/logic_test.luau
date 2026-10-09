@@ -279,7 +279,12 @@ for _, place in Map.Places do
 	check(`place {place.name} is reachable`, Map.onRoad(place.x, place.z) and not Map.inWater(place.x, place.z))
 end
 for id, shop in Map.Shops do
-	check(`shop {id} is in the safe zone`, Map.isSafe(shop.x, shop.z))
+	if id == "guns" then
+		-- 6.12.14: Lead & Co. sells at its shooting range, just outside (tests/gunrange_test.luau)
+		check("6.12.14: Lead & Co.'s range is out of the safe zone", not Map.isSafe(shop.x, shop.z))
+	else
+		check(`shop {id} is in the safe zone`, Map.isSafe(shop.x, shop.z))
+	end
 end
 
 local addresses = Map.addresses()

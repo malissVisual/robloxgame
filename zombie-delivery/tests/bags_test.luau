@@ -85,8 +85,8 @@ local shop = Map.Shops.bags
 -- (6.11: Config.BagShop, the rack, the spawn, the board, the terminal and Marge are given from the depot's middle,
 -- Map.Depot: the checks below are in the depot's own studs)
 check("6.6: ZDC Bags is a shop", shop ~= nil and shop.name == "ZDC Bags" and shop.x == Map.Depot.x + Config.BagShop.X and shop.z == Map.Depot.z + Config.BagShop.Z)
-check("6.6: a kiosk's own radius, the big shops' as before (6.12.2: the gear stall's, Last Stop Supplies' too)", Map.shopRadius("bags") == Config.BagShop.Radius and Map.shopRadius("supplies") == Config.GearStall.Radius
-	and Map.shopRadius("guns") == Map.ShopRadius and Map.shopRadius("moon") == Map.ShopRadius)
+check("6.6: a kiosk's own radius, the big shops' as before (6.12.2: the gear stall's, Last Stop Supplies' too; 6.12.14: Lead & Co.'s range its own)", Map.shopRadius("bags") == Config.BagShop.Radius and Map.shopRadius("supplies") == Config.GearStall.Radius
+	and Map.shopRadius("guns") == Config.GunRange.Radius and Map.shopRadius("mechanic") == Map.ShopRadius and Map.shopRadius("moon") == Map.ShopRadius)
 local function away(x: number, z: number): number
 	return math.sqrt((Config.BagShop.X - x) ^ 2 + (Config.BagShop.Z - z) ^ 2)
 end
