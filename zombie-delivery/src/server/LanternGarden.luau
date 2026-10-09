@@ -215,12 +215,12 @@ function LanternGarden.build(parent: Instance, tools: Tools)
 	-- ── The paths ───────────────────────────────────────────────────────────
 	-- (each a hair over the one before: no flicker where two meet; the last one under the footbridge's ramp's foot)
 	local paths = table.clone(G.paths)
-	local foot = Map.Footbridge.ramps.garden[#Map.Footbridge.ramps.garden]
 	do
-		local footU, footV = foot.bx - cx, foot.bz - cz
-		local down = if foot.bz > foot.az then 1 else -1 -- (the way down its last flight, along v)
-		local a, b = footV - down, footV + down * 2.5
-		table.insert(paths, { u0 = footU - foot.width / 2, v0 = math.min(a, b), u1 = footU + foot.width / 2, v1 = math.max(a, b) })
+		-- (6.12.16: the footbridge's foot comes down along v, its walkway Map.Footbridge.width wide)
+		local foot = Map.Footbridge.feet.garden
+		local footU, footV, half = foot.x - cx, foot.z - cz, Map.Footbridge.width / 2
+		local a, b = footV - foot.dz, footV + foot.dz * 2.5
+		table.insert(paths, { u0 = footU - half, v0 = math.min(a, b), u1 = footU + half, v1 = math.max(a, b) })
 	end
 	for n, box in paths do
 		local thick = 0.1 + n * 0.002

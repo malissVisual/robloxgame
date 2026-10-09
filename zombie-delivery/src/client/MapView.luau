@@ -409,16 +409,15 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 			local x, z = garden.x + disc.u, garden.z + disc.v
 			Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, x - disc.r, z - disc.r, x + disc.r, z + disc.r, scale, C.water, 3))
 		end
+		-- (6.12.16: its curve, chord by chord, 3 studs each, each a hair longer: no gap where the curve turns)
 		local F = Map.Footbridge
-		local function wood(ax: number, az: number, bx: number, bz: number, width: number)
+		local every = math.max(1, math.floor(3 / F.step + 0.5))
+		local i = 1
+		while i < #F.line do
+			local a, b = F.line[i], F.line[math.min(i + every, #F.line)]
 			local frame = Ui.make("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = C.footbridge, BorderSizePixel = 0, ZIndex = 6 }, content)
-			band(frame, ax, az, bx, bz, scale, math.max(2, width * scale), 0)
-		end
-		wood(F.x, F.z0, F.x, F.z1, F.width + 2 * F.beam)
-		for _, ramp in { F.ramps.park, F.ramps.garden } do
-			for _, piece in ramp do
-				wood(piece.ax, piece.az, piece.bx, piece.bz, piece.width + (if piece.kind == "ramp" then 2 * F.beam else 0))
-			end
+			band(frame, a.x, a.z, b.x, b.z, scale, math.max(2, (F.width + 2 * F.edge) * scale), math.max(1, scale))
+			i += every
 		end
 	end
 	-- Roads: all the plum edges first, then the fills, so the junctions are clean.

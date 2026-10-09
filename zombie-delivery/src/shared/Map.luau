@@ -294,8 +294,11 @@ end
 --   walk    the sidewalk round the block's edge (this wide): the people's walk line on it as on every block, nothing
 --           solid on it (no fence: the park is open all round)
 --   seed    the park's own dice (the trees' sizes and shades): the world's random numbers are not touched
-export type Park = { id: string, name: string, i: number, j: number, x: number, z: number, pond: number, depth: number, island: number, ring: number, walk: number, seed: number }
-Map.Park = { id = "park", name = "Central Park", i = 0, j = 0, x = 0, z = 0, pond = 19, depth = 4, island = 6.5, ring = 4.5, walk = 10, seed = Config.City.Seed + 611 } :: Park
+--   corners (6.12.16) how far each path to a corner reaches from the middle along its diagonal (south-east, south-west,
+--           north-west, north-east: CentralPark's k = 0 … 3), set below with the footbridge: the north-east one ends
+--           before the footbridge's low ramp round that corner (nobody walks under it)
+export type Park = { id: string, name: string, i: number, j: number, x: number, z: number, pond: number, depth: number, island: number, ring: number, walk: number, seed: number, corners: { number } }
+Map.Park = { id = "park", name = "Central Park", i = 0, j = 0, x = 0, z = 0, pond = 19, depth = 4, island = 6.5, ring = 4.5, walk = 10, seed = Config.City.Seed + 611, corners = {} } :: Park
 
 -- 6.11 review: is (x, y, z) in the park's pond: inside its octagon (flat sides `pond` from the middle, to the streets
 -- and to the corners) and lower than the walk? server/Vehicles.luau sinks a vehicle there (its coping is low enough for
@@ -382,11 +385,12 @@ Map.Garden = {
 		{ u = 2, v = 12.5, kind = "low", lit = true }, -- the pond's south shore
 		{ u = 23, v = 2, kind = "low", lit = false }, -- its east shore
 		{ u = 13, v = -24, kind = "tall", lit = true }, -- the pavilion's step
-		{ u = -33, v = 5, kind = "tall", lit = true }, -- the foot of the footbridge's ramp
+		{ u = -30.5, v = 6, kind = "tall", lit = true }, -- by the foot of the footbridge's ramp (6.12.16: off its wider walkway)
 		{ u = -10, v = -29, kind = "tall", lit = false }, -- the raked gravel
 		{ u = -3, v = -14.5, kind = "low", lit = false }, -- by the waterfall
 	},
-	cherries = { { u = -32, v = 12 }, { u = -14, v = 30 }, { u = 7, v = 30 }, { u = 38, v = 32 }, { u = 38, v = -18 }, { u = 4, v = -32 }, { u = -35, v = -8 } },
+	-- (6.12.16: the three by the footbridge's wider, curved ramp moved: off its west run and out from under its south run)
+	cherries = { { u = -17.5, v = -11 }, { u = -14, v = 24.5 }, { u = 7, v = 24.5 }, { u = 38, v = 32 }, { u = 38, v = -18 }, { u = 4, v = -32 }, { u = -35, v = -8 } },
 	bamboo = { { u = 36, v = -37 }, { u = 28, v = -41 }, { u = -41.5, v = -30 }, { u = -41.5, v = -39 }, { u = 41, v = 10 }, { u = 41, v = 20 } },
 	shrubs = {
 		{ u = -18, v = -7, size = 2.6 },
@@ -396,7 +400,7 @@ Map.Garden = {
 		{ u = 8, v = 14.5, size = 2.2 },
 		{ u = -14, v = -15, size = 2.4 },
 		{ u = 34, v = -28, size = 2.8 },
-		{ u = -22, v = 31, size = 2.6 },
+		{ u = -21, v = 28, size = 2.6 },
 		{ u = 18, v = 31, size = 2.4 },
 		{ u = 9, v = -41, size = 2.6 },
 	},
@@ -419,108 +423,329 @@ Map.Garden = {
 	gates = { { u = 29, v = 44.4, nu = 0, nv = 1 }, { u = 44.4, v = -6, nu = 1, nv = 0 }, { u = -6, v = -44.4, nu = 0, nv = -1 }, { u = -44.4, v = -20, nu = -1, nv = 0 } },
 } :: Garden
 
--- 6.12.15, the footbridge over Bone St between the Central Park (south) and the Lantern Garden (north): an arched timber
--- bridge mid-block (x = `x`, far from the junctions, their lights and crosswalks), its walkway `width` wide between the
--- railings. Its span runs from a landing just inside the garden's lawn (z0) to one just inside the park's (z1), over the
--- garden's sidewalk, the road and the park's sidewalk (nothing of it stands on them); its deck's top is `deck` over the
--- ground at the landings and `camber` more in the middle (an arch), its beams `thick` under the deck's top. From each
--- landing a ramp (no steps: a bike or a scooter rolls over it) runs along the lawn's edge and turns down the side of the
--- park to the ground, no steeper than the curb (shared/CurbShape.luau: every vehicle and every person goes up that):
---   clearance   the beams' underside over the walk (the vehicles drive up onto the sidewalks too) at least the tallest
---               vehicle (`tallest`: the Box Truck with the Roof Launcher on it, 12.6; the Freight Truck with its roof
---               rack 12.4, the city bus 9; tools/vehicle-preview/check_fleet.py builds the whole fleet and holds every
---               one to it) + 3
---   ramps       per park the pieces from the bridge's landing down: "landing" (flat) and "ramp" (sloped) pieces, each a
---               band `width` wide from (ax, az) to (bx, bz) in plan, its top ya at a and yb at b; the garden's are the
---               park's turned half round the span's middle
-export type RampPiece = { kind: string, ax: number, az: number, bx: number, bz: number, ya: number, yb: number, width: number }
+-- 6.12.15, the footbridge over Bone St between the Central Park (south) and the Lantern Garden (north), mid-block, far
+-- from the junctions, their lights and crosswalks. 6.12.16 (the owner: "good for walking, only I walk through this
+-- [a timber of the old arch]. I'd make it wider, for two people at least, and don't be afraid to make it curve a bit"):
+-- one curved walkway, `width` wide between the railings, from the park's east path up round the park's north-east
+-- corner, along its north lawn, in a soft S over the street and down the garden's south and west edges to its path.
+-- server/Footbridge.luau builds it (shared/FootbridgeShape.luau: its pieces), client/MapView.luau draws it.
+--   plan        the park's half from its foot (on the park's east path) to the middle over Bone St: a straight run up
+--               the east lawn, a turn round the north-east corner, a run along the north lawn, a turn (more than a
+--               quarter) out over the sidewalk, and a straight over the road; every turn `radius` and wider on the
+--               centre line (a bike rounds it). The garden's half is the park's turned half round the middle (one design).
+--   line        the centre line every `step` studs from the park's foot (s = 0) to the garden's (s = length): where it
+--               is (x, z), its way (dx, dz), the walking surface's top (y), and the stretch after it: its turn (k: 1 / the
+--               radius, + to the left) and its grade (g, + up the way it runs). Map.footbridgeAt reads it anywhere.
+--   slope       the steepest grade: the curb's (shared/CurbShape.luau, 14°: every person and every vehicle goes up
+--               that), on the centre line and on the inside edge of a turn too (it is shorter there: the centre line
+--               climbs less in a turn)
+--   deck        the walking surface where the bridge first reaches out over a sidewalk (`street`: from there to the
+--               same point on the far side it is this high and more, a taiko-bridge `hump` in the middle); `thick` the
+--               structure under it there: deck - thick over the walk at least the tallest vehicle (`tallest`: the Box
+--               Truck with the Roof Launcher on it, 12.6; the Freight Truck with its roof rack 12.4, the city bus 9;
+--               tools/vehicle-preview/check_fleet.py builds the whole fleet and holds every one to it) + 3
+--   edge        the railings and the span's girders outside the walkway on each side (the structure is width / 2 +
+--               edge from the centre line); nothing at all stands in the walkway from its surface up to `headroom`
+--               over it
+--   gates       where the two vermilion gates (torii) stand, one at each end of the span (at `street`), their posts
+--               `gatePost` out from the centre line on outriggers under the deck (nothing of them stands on a sidewalk)
+--   feet        the bottom of each ramp: where it is and the way down it
+--   low, beds   (6.12.16 review) where a ramp is lower than `low` over the ground under it (its planks `slab` thick),
+--               nothing walkable is under it: from each foot (`beds`: s from … to) a planted bed, closed by clipped
+--               hedges, fills the ground under it (shared/FootbridgeShape.luau), and no path runs there
+export type FootbridgePoint = { s: number, x: number, z: number, dx: number, dz: number, k: number, y: number, g: number }
+export type FootbridgeFoot = { x: number, z: number, dx: number, dz: number }
+export type FootbridgePlan = { kind: string, length: number, radius: number, turn: number }
 export type Footbridge = {
 	x: number,
+	z: number,
 	width: number,
-	z0: number,
-	z1: number,
+	edge: number,
+	headroom: number,
+	slab: number,
+	low: number,
+	beds: { { number } },
 	deck: number,
-	camber: number,
 	thick: number,
-	beam: number,
 	tallest: number,
-	landing: number,
+	slope: number,
+	radius: number,
 	rail: number,
-	arch: number,
-	ramps: { park: { RampPiece }, garden: { RampPiece } },
+	hump: number,
+	step: number,
+	plan: { FootbridgePlan },
+	line: { FootbridgePoint },
+	length: number,
+	middle: number,
+	street: { number },
+	gates: { number },
+	gatePost: number,
+	feet: { park: FootbridgeFoot, garden: FootbridgeFoot },
 }
 do
 	local park, garden = Map.Park, Map.Garden
 	local lawn = BLOCK / 2 - park.walk -- (the lawn's edge from a park's middle; the garden's walk is as wide)
-	local inset = 0.5 -- the landings and the ramps stay this far inside the lawns
-	local landing = 7 -- a landing's side: room to turn a bike
-	local width = 6
-	local deck = 17.7
-	local z1 = park.z - lawn + inset -- the span's park end …
-	local z0 = garden.z + lawn - inset -- … and its garden end
-	local zc = z1 + landing / 2 -- the ramp's first flight, along the park's lawn edge …
-	local xc = park.x + lawn - inset - landing / 2 -- … its second, down the park's east side
-	local foot = park.z - 2.5 - 1 -- (a stud before the park's east path, 5 wide: the ramp comes down onto it)
-	local first = xc - landing / 2 - (park.x + landing / 2)
-	local slope = (deck - Map.WalkTop) / (first + foot - (z1 + landing))
-	local turn = deck - first * slope -- the corner landing's top
-	local parkRamp: { RampPiece } = {
-		{ kind = "landing", ax = park.x, az = z1, bx = park.x, bz = z1 + landing, ya = deck, yb = deck, width = landing },
-		{ kind = "ramp", ax = park.x + landing / 2, az = zc, bx = xc - landing / 2, bz = zc, ya = deck, yb = turn, width = width },
-		{ kind = "landing", ax = xc, az = z1, bx = xc, bz = z1 + landing, ya = turn, yb = turn, width = landing },
-		{ kind = "ramp", ax = xc, az = z1 + landing, bx = xc, bz = foot, ya = turn, yb = Map.WalkTop, width = width },
+	local inset = 0.5 -- the structure stays this far inside the lawns
+	local width, edge = 10, 0.65
+	local half = width / 2 + edge
+	local slope = (Map.WalkTop - Map.RoadTop) / Map.CurbRun -- the curb's grade (14°)
+	local deck, thick = 17.2, 0.5
+	local slab, low = 0.3, 9 -- (the ramps' planks; the headroom under them below which a planted bed fills the ground)
+	local step = 0.25
+	local xm, zm = park.x, (park.z + garden.z) / 2 -- the middle: over Bone St's centre line, mid-block
+	local xe = park.x + lawn - inset - half -- the east run's centre line …
+	local zn = park.z - lawn + inset + half -- … the north run's (along the lawn's north edge) …
+	local zf = park.z - 2.6 -- … and the foot: just north of the park's east path (5 wide), on its edge
+	local corner, top, beta = 12, 13, math.rad(140) -- the turns: round the north-east corner; out over the sidewalk
+	-- The turn out over the sidewalk (right, from the north run's west) ends heading north-east (50° off the road's
+	-- crossing: a soft S), and the straight from there runs through the middle: where the north run ends (xt) follows.
+	-- (The north-east corner's turn is low over the park's north-east corner: a planted bed under it, Map.Park.corners.)
+	local ez = zn - top * (1 - math.cos(beta))
+	local ddx, ddz = -math.cos(beta), -math.sin(beta)
+	local over = (zm - ez) / ddz
+	local xt = xm + top * math.sin(beta) - ddx * over
+	local plan: { FootbridgePlan } = {
+		{ kind = "line", length = zf - (zn + corner), radius = 0, turn = 0 },
+		{ kind = "arc", length = corner * math.pi / 2, radius = corner, turn = math.pi / 2 }, -- (left: + turn)
+		{ kind = "line", length = xe - corner - xt, radius = 0, turn = 0 },
+		{ kind = "arc", length = top * beta, radius = top, turn = -beta }, -- (right)
+		{ kind = "line", length = over, radius = 0, turn = 0 },
 	}
-	local mx, mz = park.x, (z0 + z1) / 2
-	local gardenRamp: { RampPiece } = {}
-	for _, p in parkRamp do
-		table.insert(gardenRamp, { kind = p.kind, ax = 2 * mx - p.ax, az = 2 * mz - p.az, bx = 2 * mx - p.bx, bz = 2 * mz - p.bz, ya = p.ya, yb = p.yb, width = p.width })
-	end
-	Map.Footbridge = {
-		x = park.x,
-		width = width,
-		z0 = z0,
-		z1 = z1,
-		deck = deck,
-		camber = 1,
-		thick = 1,
-		beam = 0.5, -- the beams (the railings over them) along the span's and the flights' edges, outside the walkway
-		tallest = 12.6,
-		landing = landing,
-		rail = 3.2, -- the railings' top over the deck
-		arch = 6, -- the timber arches over the span rise this much over the deck's middle
-		ramps = { park = parkRamp, garden = gardenRamp },
-	} :: Footbridge
-end
-
--- 6.12.15: the footbridge's deck top at z along its span (z0 … z1; the landings' height past its ends).
-function Map.footbridgeDeck(z: number): number
-	local F = Map.Footbridge
-	local half = (F.z1 - F.z0) / 2
-	local t = math.clamp((z - (F.z0 + F.z1) / 2) / half, -1, 1)
-	return F.deck + F.camber * (1 - t * t)
-end
-
--- 6.12.15: how far (x, z) is from the footbridge in plan (0: under it or on it): its span, every landing and ramp (the
--- beams along their edges too).
-function Map.footbridgeGap(x: number, z: number): number
-	local F = Map.Footbridge
-	local function box(x0: number, z0: number, x1: number, z1: number): number
-		local dx = math.max(x0 - x, 0, x - x1)
-		local dz = math.max(z0 - z, 0, z - z1)
-		return math.sqrt(dx * dx + dz * dz)
-	end
-	local best = box(F.x - F.width / 2 - F.beam, math.min(F.z0, F.z1), F.x + F.width / 2 + F.beam, math.max(F.z0, F.z1))
-	for _, ramp in { F.ramps.park, F.ramps.garden } do
-		for _, p in ramp do
-			local half = p.width / 2 + (if p.kind == "ramp" then F.beam else 0)
-			if math.abs(p.ax - p.bx) < 1e-6 then
-				best = math.min(best, box(p.ax - half, math.min(p.az, p.bz), p.ax + half, math.max(p.az, p.bz)))
+	-- Where s (0 … the middle) is on the park's half: x, z, the way (dx, dz) and the turn (k).
+	local function along(s: number): (number, number, number, number, number)
+		local x, z, dx, dz = xe, zf, 0, -1
+		for _, p in plan do
+			local u = math.min(s, p.length)
+			if p.kind == "line" then
+				x, z = x + dx * u, z + dz * u
+				if s <= p.length then
+					return x, z, dx, dz, 0
+				end
 			else
-				best = math.min(best, box(math.min(p.ax, p.bx), p.az - half, math.max(p.ax, p.bx), p.az + half))
+				local side = if p.turn > 0 then 1 else -1
+				local lx, lz = dz, -dx -- (the left of the way)
+				local cx, cz = x + side * p.radius * lx, z + side * p.radius * lz
+				local phi = u / p.radius
+				local ndx, ndz = dx * math.cos(phi) + side * lx * math.sin(phi), dz * math.cos(phi) + side * lz * math.sin(phi)
+				x, z, dx, dz = cx - side * p.radius * ndz, cz + side * p.radius * ndx, ndx, ndz
+				if s <= p.length then
+					return x, z, dx, dz, side / p.radius
+				end
+			end
+			s -= p.length
+		end
+		return x, z, dx, dz, 0
+	end
+	local middle = 0
+	for _, p in plan do
+		middle += p.length
+	end
+	-- The park's half, every `step` (a quarter stud, the middle on one): where the structure first reaches out of
+	-- the lawn (over the sidewalk) …
+	local count = math.ceil(middle / step)
+	step = middle / count
+	local points: { FootbridgePoint } = {}
+	local reach = count
+	for i = 0, count do
+		local s = if i == count then middle else i * step
+		local x, z, dx, dz = along(s)
+		table.insert(points, { s = s, x = x, z = z, dx = dx, dz = dz, k = 0, y = 0, g = 0 })
+		for _, o in { -half, half } do
+			local px, pz = x + dz * o, z - dx * o
+			if reach == count and (math.abs(px - park.x) > lawn or math.abs(pz - park.z) > lawn) then
+				reach = i - 1 -- (the last point whose structure is all on the lawn)
 			end
 		end
 	end
-	return best
+	-- … the climb to `deck` there, as steep as it may be (on a turn's inside edge too: a stretch's sharpest turn) scaled
+	-- to reach it just there …
+	for i = 1, count do
+		local a, b = points[i], points[i + 1]
+		for _, s in { a.s + 1e-6, (a.s + b.s) / 2, b.s - 1e-6 } do
+			local _, _, _, _, k = along(s)
+			if math.abs(k) > math.abs(a.k) then
+				a.k = k -- (a point's turn and grade are the stretch's after it)
+			end
+		end
+	end
+	-- (eased in and out of the turns: the least of it within 1.5 studs, averaged over 1.5 studs either way, which is
+	-- never steeper than it may be anywhere and has no kink where a turn starts or ends)
+	local ease = math.ceil(1.5 / step)
+	local least: { number } = {}
+	for i = 1, count do
+		local g = math.huge
+		for j = math.max(1, i - ease), math.min(count, i + ease) do
+			g = math.min(g, slope * (1 - math.abs(points[j].k) * width / 2))
+		end
+		least[i] = g
+	end
+	local eased: { number } = {}
+	for i = 1, count do
+		local sum, n = 0, 0
+		for j = math.max(1, i - ease), math.min(count, i + ease) do
+			sum, n = sum + least[j], n + 1
+		end
+		eased[i] = sum / n
+	end
+	local function steepest(i: number): number
+		return eased[i]
+	end
+	-- (as steep as it may be from the foot round the north-east corner, where the park's north-east path runs under it:
+	-- as high as it can be there; whatever height is to spare comes off the rest of the climb)
+	local cornerEnd = plan[1].length + plan[2].length
+	local before, after = 0, 0
+	for i = 1, reach do
+		local rise = steepest(i) * (points[i + 1].s - points[i].s)
+		if points[i].s < cornerEnd then
+			before += rise
+		else
+			after += rise
+		end
+	end
+	local scale = (deck - Map.WalkTop - before) / after
+	assert(scale > 0 and scale <= 1, "Map.Footbridge: the ramp is too short to reach the deck at the curb's slope")
+	-- … and past it the hump: the grade eases off to nothing at the middle (a crest)
+	local streetAt = points[reach + 1].s
+	local y = Map.WalkTop
+	local last = 0
+	for i = 1, count do
+		local a, b = points[i], points[i + 1]
+		local g = if i <= reach then (if a.s < cornerEnd then 1 else scale) * steepest(i)
+			else math.min(steepest(i), last * (middle - (a.s + b.s) / 2) / (middle - streetAt))
+		if i <= reach then
+			last = g
+		end
+		a.g = g
+		y += g * (b.s - a.s)
+		b.y = y
+	end
+	points[1].y = Map.WalkTop
+	-- The whole line: the garden's half is the park's turned half round the middle.
+	-- (a point's grade is the stretch's after it: on the garden's half the park's stretch before it, run down)
+	local line: { FootbridgePoint } = table.clone(points)
+	line[count + 1].g, line[count + 1].k = -points[count].g, -points[count].k
+	for i = count, 1, -1 do
+		local p = points[i]
+		table.insert(line, { s = 2 * middle - p.s, x = 2 * xm - p.x, z = 2 * zm - p.z, dx = p.dx, dz = p.dz, k = if i > 1 then -points[i - 1].k else 0, y = p.y, g = if i > 1 then -points[i - 1].g else 0 })
+	end
+	local first = points[1]
+	local bedEnd = middle
+	for i = count + 1, 1, -1 do
+		if points[i].y - slab - Map.WalkTop < low then
+			bedEnd = points[math.min(i + 1, count + 1)].s
+			break
+		end
+	end
+	Map.Footbridge = {
+		x = xm,
+		z = zm,
+		width = width,
+		edge = edge,
+		headroom = 9,
+		slab = slab,
+		low = low,
+		beds = { { 0, bedEnd }, { 2 * middle - bedEnd, 2 * middle } },
+		deck = deck,
+		thick = thick,
+		tallest = 12.6,
+		slope = slope,
+		radius = math.min(corner, top),
+		rail = 3.2, -- the railings' top over the walking surface
+		hump = points[count + 1].y - deck,
+		step = step,
+		plan = plan,
+		line = line,
+		length = 2 * middle,
+		middle = middle,
+		street = { streetAt, 2 * middle - streetAt },
+		gates = { streetAt, 2 * middle - streetAt }, -- (at the span's ends: where it first reaches out over a sidewalk)
+		gatePost = width / 2 + edge + 0.6,
+		feet = {
+			park = { x = first.x, z = first.z, dx = -first.dx, dz = -first.dz },
+			garden = { x = 2 * xm - first.x, z = 2 * zm - first.z, dx = first.dx, dz = first.dz },
+		},
+	} :: Footbridge
+end
+
+-- 6.12.16: the footbridge's centre line at s (0 at the park's foot … Map.Footbridge.length at the garden's): x, the
+-- walking surface's top y, z, the way (dx, dz), the turn (k: 1 / the radius, + to the left) and the grade (+ up the
+-- way s runs).
+function Map.footbridgeAt(s: number): (number, number, number, number, number, number, number)
+	local F = Map.Footbridge
+	local line = F.line
+	local t = math.clamp(s, 0, F.length) / F.step
+	local i = math.clamp(math.floor(t), 0, #line - 2)
+	local a, b = line[i + 1], line[i + 2]
+	local f = math.clamp((math.clamp(s, 0, F.length) - a.s) / math.max(b.s - a.s, 1e-9), 0, 1)
+	local dx, dz = a.dx + (b.dx - a.dx) * f, a.dz + (b.dz - a.dz) * f
+	local n = math.sqrt(dx * dx + dz * dz)
+	return a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, dx / n, dz / n, a.k, a.g -- (the stretch's turn and grade)
+end
+
+-- 6.12.15: how far (x, z) is from the footbridge in plan (0: under it or on it); 6.12.16: from its structure (the
+-- walkway, its railings and fascia) anywhere along its curve.
+function Map.footbridgeGap(x: number, z: number): number
+	local F = Map.Footbridge
+	local line = F.line
+	local best = math.huge
+	local every = math.max(1, math.floor(1 / F.step)) -- (a chord a stud long: a turn's sagitta is a hundredth)
+	local i = 1
+	while i < #line do
+		local a, b = line[i], line[math.min(i + every, #line)]
+		local ux, uz = b.x - a.x, b.z - a.z
+		local t = math.clamp(((x - a.x) * ux + (z - a.z) * uz) / math.max(ux * ux + uz * uz, 1e-9), 0, 1)
+		local px, pz = a.x + ux * t - x, a.z + uz * t - z
+		best = math.min(best, px * px + pz * pz)
+		i += every
+	end
+	return math.max(0, math.sqrt(best) - (F.width / 2 + F.edge))
+end
+
+-- 6.12.16 review: how far (x, z) is in plan from the footbridge's low ramps (its structure where it is lower than
+-- Map.Footbridge.low over the ground: Map.Footbridge.beds), 0 under them.
+function Map.footbridgeLowGap(x: number, z: number): number
+	local F = Map.Footbridge
+	local best = math.huge
+	for _, bed in F.beds do
+		local i = math.floor(bed[1] / F.step) + 1
+		local last = math.min(#F.line, math.floor(bed[2] / F.step) + 2)
+		while i < last do
+			local a, b = F.line[i], F.line[math.min(i + 4, last)]
+			local ux, uz = b.x - a.x, b.z - a.z
+			local t = math.clamp(((x - a.x) * ux + (z - a.z) * uz) / math.max(ux * ux + uz * uz, 1e-9), 0, 1)
+			local px, pz = a.x + ux * t - x, a.z + uz * t - z
+			best = math.min(best, px * px + pz * pz)
+			i += 4
+		end
+	end
+	return math.max(0, math.sqrt(best) - (F.width / 2 + F.edge))
+end
+
+-- 6.12.16 review: the park's paths to its corners (server/CentralPark.luau: from the ring out along each diagonal, 4
+-- wide), each as far as it stays a stud off the footbridge's low ramps: the north-east one ends before the ramp's turn
+-- round that corner (a planted bed under it: nobody walks under the ramp where it is low).
+do
+	local P = Map.Park
+	local ringOut = P.pond + 1.5 + P.ring
+	local full = (BLOCK / 2 - P.walk - 2) * math.sqrt(2) -- (its far end's corners stay on the lawn)
+	for k = 0, 3 do
+		local angle = k * math.pi / 2 + math.pi / 4
+		local dx, dz = math.cos(angle), math.sin(angle)
+		local reach = full
+		local t = ringOut
+		while t <= full do
+			local near = false
+			for _, o in { -2, 0, 2 } do
+				near = near or Map.footbridgeLowGap(P.x + dx * t - dz * o, P.z + dz * t + dx * o) < 1
+			end
+			if near then
+				reach = t - 0.5
+				break
+			end
+			t += 0.25
+		end
+		P.corners[k + 1] = reach
+	end
 end
 
 -- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else

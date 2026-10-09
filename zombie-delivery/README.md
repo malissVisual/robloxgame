@@ -1143,6 +1143,27 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The footbridge wider, curved and clear to walk (6.12.16)
+
+The owner, on the bridge in Studio: "good for walking, only I walk through this [a timber]; make it wider for two
+people, and don't be afraid to make it curve".
+
+- **Nothing in the walkway:** the arch timbers are gone. From the walking surface up to 9 studs nothing stands over
+  the walkway but its railings. A vermilion torii stands at each end of the span: its beams are over 9 studs, its posts
+  outside the railings.
+- **Wider:** 10 studs between the railings everywhere.
+- **Curved:** one walkway, built from segments (`shared/FootbridgeShape.luau`) with steps of at most 0.07.
+  - From the park's east path it goes round its north-east corner, along its north lawn, then in an S over Bone St.
+  - On the garden's side it comes down its south and west edges to its path.
+  - Turns are 12–13 studs in radius, slopes at most 14°, and there is a 3.2-stud hump in the middle.
+  - Clearance over the street is 15.8, against the tallest vehicle's 12.6.
+- **Nobody walks under a low part:** planted beds and clipped hedges fill the ground wherever the ramp is lower than 9
+  studs. The park's north-east path now ends before the corner.
+- `tests/garden_test.luau` checks:
+  - the empty walking volume, the width, the radii and the slopes;
+  - the steps and the clearance;
+  - that the ground under every low part is closed.
+
 ## The Lantern Garden and a wooden footbridge (6.12.15)
 
 The owner: "a bit bigger park, a wooden bridge to another park, its own style".
