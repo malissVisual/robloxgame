@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · standalone thumbnails for all 90 Career unlocks + level rewards, actual-model renders where available; `art/career-thumbnails/`, `design/career-thumbnails/`, `tools/career-thumbnails/`, board only; no gameplay/UI changes · 2026-10-09 · `codex/career-thumbnails`.
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
