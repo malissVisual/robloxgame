@@ -474,6 +474,17 @@ Phone.open("settings")
 check("settings lists every key and the version",text("Weapon wheel")~=nil and text("Sprint")~=nil and text(`ZDC courier terminal · Zombie Delivery {Config.Version}`)~=nil)
 tap("CYCLE SOUND MODE")
 check("settings' sound goes through Phone.onSound",sounds==1)
+-- 6.15: ENEMY OUTLINES off and on (client/EnemyOutline.luau through Phone.onOutline; no button without it).
+check("no outline button before Main wires it",text("ENEMY OUTLINES: ON")==nil and text("ENEMY OUTLINES: OFF")==nil)
+local outlined=true
+Phone.outlineOn=function() return outlined end
+Phone.onOutline=function() outlined=not outlined;return outlined end
+Phone.open("settings")
+tap("ENEMY OUTLINES: ON")
+check("settings turns the enemies' outline off, says so and shows it",not outlined and toasts[#toasts]=="Enemy outlines off" and text("ENEMY OUTLINES: OFF")~=nil)
+tap("ENEMY OUTLINES: OFF")
+check("and on again",outlined and toasts[#toasts]=="Enemy outlines on: zombies red, bandits orange" and text("ENEMY OUTLINES: ON")~=nil)
+Phone.outlineOn,Phone.onOutline=nil,nil
 Phone.open("bank")
 check("bank shows what you earned since you joined",text("+$360")~=nil)
 -- A new message drops a banner while another app shows; it opens MESSAGES.

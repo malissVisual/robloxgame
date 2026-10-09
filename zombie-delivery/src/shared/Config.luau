@@ -1736,6 +1736,28 @@ Config.Zombies = {
 	},
 } :: { [string]: ZombieDef }
 
+-- 6.15, the owner: "I'd outline the zombies: a red outline, but just subtle." A thin outline (a Highlight: no fill,
+-- never through walls) on the nearest living enemies on each client (client/EnemyOutline.luau, shared/OutlinePick.luau):
+-- the zombies in Zombie's colour, the people in Human's (the ones the server marks Bandit: the bandits, the gunners, and
+-- with Pickups the bandits' pickups as a whole, their crew inside; plus any kind HumanKinds names true). Roblox draws at
+-- most 31 Highlights on a client: Count at most (Spare left for anything else), within Range studs of the camera, picked
+-- again every Every seconds; a phone gets DeviceBudget.count / range of them (Config.Performance.Lite). One already
+-- outlined keeps it out to HoldRange × the range and counts HoldRange times nearer (no blinking at the edge).
+Config.Outline = {
+	Zombie = { 255, 45, 45 },
+	Human = { 255, 150, 30 },
+	Transparency = 0.6, -- the outline's (0 solid … 1 none): just subtle
+	Count = 24,
+	Spare = 7, -- Count + Spare stays within Roblox's 31
+	Range = 160,
+	Every = 0.25,
+	HoldRange = 1.15,
+	Pickups = true,
+	-- The base's soldiers bite and look infected since 5.9 (a green face, glowing eyes): red like the zombies. true
+	-- here outlines a kind orange (a person) though the server does not mark it Bandit.
+	HumanKinds = { soldier = false } :: { [string]: boolean },
+}
+
 -- Zombies around the cars.
 Config.Horde = {
 	SpotTime = 0.7, -- 4.0.4: a bandit has to see you this long (a clear line, nothing in between) before it fires

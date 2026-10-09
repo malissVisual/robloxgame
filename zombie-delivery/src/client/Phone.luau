@@ -86,6 +86,8 @@ Phone.onCrew = nil :: (() -> ())? -- CrewPanel.toggle
 Phone.onTop = nil :: (() -> ())? -- Leaderboard.toggle
 Phone.onEstate = nil :: (() -> ())? -- EstateUi.toggleList
 Phone.onSound = nil :: (() -> ())? -- Sounds.cycle
+Phone.onOutline = nil :: (() -> boolean)? -- 6.15, SETTINGS: the enemies' outline off / on, the new state (EnemyOutline.toggle)
+Phone.outlineOn = nil :: (() -> boolean)? -- 6.15: is it on (EnemyOutline.isOn)
 Phone.onCareer = nil :: (() -> ())? -- FULL CAREER: CareerUi.open
 Phone.boardOpen = nil :: (() -> boolean)? -- is the Dispatch board open (DispatchUi.isOpen): no "new runs" then
 Phone.blocked = nil :: (() -> boolean)? -- the NEW PHONE pop-up waits while this says so (Marge's dialog, a result)
@@ -1633,6 +1635,17 @@ renderApp = function()
 					require(script.Parent.Sounds).cycle()
 				end
 			end)
+			local outlineOn, onOutline = Phone.outlineOn, Phone.onOutline -- 6.15: the enemies' subtle outline (client/EnemyOutline.luau)
+			if outlineOn and onOutline then
+				button(list, if outlineOn() then "ENEMY OUTLINES: ON" else "ENEMY OUTLINES: OFF", "quiet", 2, function()
+					local now = onOutline()
+					local notify = Phone.notify
+					if notify then
+						notify(if now then "Enemy outlines on: zombies red, bandits orange" else "Enemy outlines off")
+					end
+					renderApp()
+				end)
+			end
 			button(list, "PUT PHONE AWAY", "main", 3, Phone.close)
 			local tour = Phone.onTour -- 6.7: Marge's tours again (client/TutorialUi.luau: the phone closes first)
 			if tour then
