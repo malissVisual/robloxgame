@@ -259,7 +259,7 @@ local function ongoing(player: Player, run: Run, position: Vector3)
 	end
 	local gap = flat(position, spot)
 	if gap <= tuning.SurvivorReach then
-		PlayerData.addMoney(player, run.tip)
+		PlayerData.addMoney(player, run.tip, "Tip", "Survivor")
 		Tasks.note(player, "tips", run.tip) -- 6.12
 		tell(player, `{run.name}: "Thank you, courier!" +${run.tip} tip`)
 		local npc = run.npc

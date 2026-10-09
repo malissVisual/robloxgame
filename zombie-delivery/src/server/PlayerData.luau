@@ -20,6 +20,12 @@
 -- shared/Tasks.luau's save, kept by server/Tasks.luau; read only from a real save). 6.12: the wardrobe of cosmetics
 -- (style: the items owned and the one worn in each slot, Config.Cosmetics; shared/Style.luau cleans it,
 -- server/StyleWear.luau changes it): a save from before 6.12 has none and gets the empty one; real saves only.
+-- 6.13, analytics (server/Analytics.luau): the onboarding funnel's steps reached (onboarding, a bit a step,
+-- shared/AnalyticsPlan.luau): a new courier starts at 0, a real save from before 6.13 counts as past every step (it
+-- is no new courier; a step is marked only once Roblox took it); every money change tells its reason (addMoney /
+-- spend's `reason` and `sku`, the level rewards, the retired kit's refunds) to PlayerData.onMoney; and the game's
+-- other analytics calls go through PlayerData.track (the hooks Analytics.start puts in PlayerData.analytics: without
+-- them nothing happens, so the game never depends on server/Analytics.luau loading).
 -- Loaded from and saved to a DataStore. In Studio without API access it simply runs without saving.
 -- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
 -- driver level to every client (the HUD's XP bar, the level-up flash, the locks in the shops).
@@ -39,6 +45,7 @@ local Career = require(Shared.Career)
 local JobRules = require(Shared.JobRules)
 local TaskData = require(Shared.Tasks) -- 6.12: the daily and weekly tasks (profile.tasks)
 local Style = require(Shared.Style) -- 6.12: the cosmetics' wardrobe
+local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funnel's steps in the save
 
 export type Profile = {
 	money: number,
@@ -91,6 +98,8 @@ export type Profile = {
 	-- 6.12: the daily and weekly tasks (shared/Tasks.luau: the day, the level, the picks' ids, progress, claims; the
 	-- week the same). nil until server/Tasks.luau starts them (a new courier, a save from before 6.12)
 	tasks: TaskData.Saved?,
+	-- 6.13: the onboarding funnel's steps reached (a bit a step, shared/AnalyticsPlan.luau; server/Analytics.luau)
+	onboarding: number,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -104,6 +113,29 @@ local changed = Instance.new("BindableEvent")
 
 -- Fires (player) whenever money or the inventory changed, so the state is sent to the client.
 PlayerData.Changed = changed.Event
+
+-- 6.13, set by server/Analytics.luau: money moved (delta > 0 came in, < 0 went out) for a reason
+-- (shared/AnalyticsPlan.luau Sources / Sinks; nil: "Other") and the item's id. In a pcall: it never stops a payment.
+PlayerData.onMoney = nil :: ((player: Player, delta: number, reason: string?, sku: string?) -> ())?
+
+local function tellMoney(player: Player, delta: number, reason: string?, sku: string?)
+	local hook = PlayerData.onMoney
+	if hook and delta ~= 0 then
+		pcall(hook, player, delta, reason, sku)
+	end
+end
+
+-- 6.13, filled by server/Analytics.luau's start: its hooks by name (order, stopDone, jobFailed, missionStarted,
+-- missionDone, onPlay, step, died, event, money). The game calls them only through PlayerData.track, never by requiring
+-- Analytics: a hook that is missing (Analytics did not load or start) does nothing, one that errors is caught.
+PlayerData.analytics = {} :: { [string]: (...any) -> () }
+
+function PlayerData.track(name: string, ...: any)
+	local hook = PlayerData.analytics[name]
+	if hook then
+		pcall(hook, ...)
+	end
+end
 
 local store: DataStore? = nil
 pcall(function()
@@ -157,6 +189,7 @@ local function newProfile(): Profile
 		phone = false,
 		vanQuest = nil,
 		tasks = nil, -- 6.12: server/Tasks.luau starts them (it knows the UserId and the level)
+		onboarding = 0, -- 6.13: a new courier, no step yet
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -404,6 +437,8 @@ local function applySaved(profile: Profile, saved: any)
 		-- known items, each worn one owned and in its own slot, shared/Style.luau).
 		profile.style = Style.sanitize(saved.style)
 	end
+	-- 6.13: the onboarding funnel's steps (only a real save has them; one from before 6.13 is past every step).
+	profile.onboarding = AnalyticsPlan.onboardingFrom(saved)
 	-- 6.4: the bag chosen: kept only while it is a bag you own (else nil: the best one)
 	local chosen = if type(saved.activeBag) == "string" then saved.activeBag else nil
 	for _, def in Config.Kit do
@@ -658,6 +693,8 @@ function PlayerData.load(player: Player)
 		deliveries.Parent = stats
 		stats.Parent = player
 		changed:Fire(player)
+		-- 6.13: the retired kit's money back (applySaved), for the economy's numbers
+		tellMoney(player, (profile.packRefund or 0) + (profile.jacketRefund or 0) + (profile.shoeRefund or 0), "Refund", "RetiredKit")
 	end
 end
 
@@ -758,6 +795,7 @@ function PlayerData.save(player: Player, final: boolean?)
 		phone = profile.phone, -- 5.0
 		vanQuest = profile.vanQuest, -- 5.0
 		tasks = profile.tasks, -- 6.12
+		onboarding = profile.onboarding, -- 6.13
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -837,7 +875,8 @@ local function finite(n: any): boolean
 	return type(n) == "number" and n == n and n > -math.huge and n < math.huge
 end
 
-function PlayerData.addMoney(player: Player, amount: number)
+-- 6.13: `reason` and `sku` (the item's id) are for analytics (shared/AnalyticsPlan.luau Sources), nil: "Other".
+function PlayerData.addMoney(player: Player, amount: number, reason: string?, sku: string?)
 	local profile = profiles[player]
 	if not profile or not finite(amount) or amount <= 0 then
 		return
@@ -845,16 +884,18 @@ function PlayerData.addMoney(player: Player, amount: number)
 	profile.money += math.floor(amount)
 	profile.earned += math.floor(amount)
 	changed:Fire(player)
+	tellMoney(player, math.floor(amount), reason, sku)
 end
 
--- Takes the money if there is enough; true when paid.
-function PlayerData.spend(player: Player, amount: number): boolean
+-- Takes the money if there is enough; true when paid. 6.13: `reason` and `sku` as in addMoney (AnalyticsPlan Sinks).
+function PlayerData.spend(player: Player, amount: number, reason: string?, sku: string?): boolean
 	local profile = profiles[player]
 	if not profile or not finite(amount) or amount < 0 or profile.money < amount then
 		return false
 	end
 	profile.money -= amount
 	changed:Fire(player)
+	tellMoney(player, -amount, reason, sku)
 	return true
 end
 
@@ -932,8 +973,10 @@ end
 
 -- 4.6, the career: every level reached whose reward (Config.Levels.Rewards) was not given yet gives it now, once
 -- (profile.levelRewards): money (counted as earned), items (up to their max), a career paint, a title (shown at once
--- when none is). The client's level-up card (client/CareerUi.luau) shows the same reward from Config.
-local function giveLevelRewards(profile: Profile)
+-- when none is). The client's level-up card (client/CareerUi.luau) shows the same reward from Config. 6.13: returns
+-- the money it gave (for analytics).
+local function giveLevelRewards(profile: Profile): number
+	local cash = 0
 	for _, level in Career.pending(Levels.levelFor(profile.xp), profile.levelRewards) do
 		profile.levelRewards[tostring(level)] = true
 		local reward = Career.reward(level)
@@ -944,6 +987,7 @@ local function giveLevelRewards(profile: Profile)
 		if money and money > 0 then
 			profile.money += math.floor(money)
 			profile.earned += math.floor(money)
+			cash += math.floor(money)
 		end
 		if reward.items then
 			for _, def in Config.Items do
@@ -956,6 +1000,7 @@ local function giveLevelRewards(profile: Profile)
 		local kitCash = Career.grantKit(reward, profile.kit) -- 5.7: the shoes, 6.6: the tote (owned: their price)
 		profile.money += kitCash
 		profile.earned += kitCash
+		cash += kitCash
 		local paint = reward.paint
 		if paint and Economy.findPaint(paint) then
 			profile.paints[paint] = true
@@ -968,6 +1013,7 @@ local function giveLevelRewards(profile: Profile)
 			end
 		end
 	end
+	return cash
 end
 
 -- Adds XP; returns the new level and whether it went up.
@@ -982,8 +1028,9 @@ function PlayerData.addXp(player: Player, amount: number): (number, boolean)
 	end
 	profile.xp = math.min(profile.xp + math.floor(amount + 0.5), 2 ^ 50)
 	local after = Levels.levelFor(profile.xp)
-	giveLevelRewards(profile) -- 4.6
+	local cash = giveLevelRewards(profile) -- 4.6
 	changed:Fire(player)
+	tellMoney(player, cash, "LevelReward") -- 6.13
 	return after, after > before
 end
 
@@ -1007,8 +1054,9 @@ function PlayerData.setLevel(player: Player, level: number): number
 	end
 	local target = math.clamp(math.floor(level), 1, Config.Levels.MaxLevel)
 	profile.xp = Levels.xpFor(target)
-	giveLevelRewards(profile) -- 4.6: the levels it reached, once
+	local cash = giveLevelRewards(profile) -- 4.6: the levels it reached, once
 	changed:Fire(player)
+	tellMoney(player, cash, "Admin") -- 6.13: the admin's doing, not earned in play
 	return target
 end
 

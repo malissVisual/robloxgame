@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.16"
+Config.Version = "6.13"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -4245,7 +4245,26 @@ Config.Robust = {
 		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
 		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
 		JobQueue = 4, -- 6.12.8: the board's + QUEUE, ADD ALL and NEXT UP's ✕ (server/JobQueue.luau)
+		ClientError = 0.05, -- 6.13: a client's script error (its script and line): one every 20 s at most (server/Analytics.luau)
 	},
+}
+
+-- 6.13, analytics (server/Analytics.luau, shared/AnalyticsPlan.luau; the owner's guide: design/analytics/NAVOD.md).
+-- Roblox's AnalyticsService gets the onboarding funnel, the Delivery and Mission funnels, the economy in Currency, the
+-- progression and a short fixed list of custom events. Nothing is sent from Studio (the admin panel's WORLD tab counts
+-- what would go). BatchSeconds: the frequent money (kill rewards, fuel at the pump, tips) goes as one economy event a
+-- player this often (and when they leave). Budget: events a minute for the whole server at most (Base + PerPlayer ×
+-- the players), under Roblox's own throttle; the rest is dropped and counted (an onboarding step dropped goes later).
+-- The errors: ErrorsPerMinute warnings and events a minute for the whole server, for ServerError and ClientError each;
+-- a client reports one error every 1 / Robust.Limits.ClientError s at most (client/Unstuck.luau keeps to the server's
+-- limit), ClientErrorsMax from one player a session.
+Config.Analytics = {
+	Enabled = true, -- false: nothing is sent, also in a live server
+	Currency = "Cash",
+	BatchSeconds = 60,
+	Budget = { Base = 100, PerPlayer = 15 },
+	ErrorsPerMinute = 6,
+	ClientErrorsMax = 20,
 }
 
 -- 6.12, the daily and weekly tasks (the owner: "daily and weekly tasks so players come back"; shared/Tasks.luau picks

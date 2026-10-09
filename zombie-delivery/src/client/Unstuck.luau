@@ -4,9 +4,14 @@
 -- when you stand on it: the feet rest on its top) two checks in a row, the body is lifted onto that part's top. Not
 -- while seated, climbing, swimming, flying, platform-standing (zip lines, the interaction moves) or dead. Every lift
 -- warns in the Output with what was going on, so the real cause can be found.
+-- 6.13, the other safety net: a script error on this device goes to the server as its script's name and line only
+-- (the ClientError remote; server/Analytics.luau counts it by script, Roblox's Error Report keeps the message). Each
+-- place once a session, one report every 1 / Config.Robust.Limits.ClientError s at most (the server's limit: none of
+-- them is dropped there); a place is marked only when its report went, so one that came during the wait goes later.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ScriptContext = game:GetService("ScriptContext")
 
 local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
 
@@ -147,11 +152,45 @@ local function check()
 	character:PivotTo(character:GetPivot() + Vector3.new(0, lift, 0))
 end
 
+-- 6.13: the script errors on this device, counted by script on the server (see the top).
+local function reportErrors()
+	local Shared = ReplicatedStorage:WaitForChild("Shared")
+	local Plan = require(Shared:WaitForChild("AnalyticsPlan"))
+	local Net = require(Shared:WaitForChild("Net"))
+	-- (the server's own limit, one report every 1 / Limits.ClientError s, and a second more so none arrives early)
+	local gap = 1 / require(Shared:WaitForChild("Config")).Robust.Limits.ClientError + 1
+	local remote = Net.get("ClientError")
+	local seen: { [string]: boolean } = {}
+	local sentAt = -math.huge
+	ScriptContext.Error:Connect(function(message: string, _trace: string, source: Instance?)
+		pcall(function()
+			local name, line = Plan.errorWhere(message, if source then source.Name else nil)
+			local key = `{name}:{line}`
+			local now = os.clock()
+			-- a place is marked only when its report went: one that came during the wait goes when it happens again
+			if seen[key] or now - sentAt < gap then
+				return
+			end
+			seen[key] = true
+			sentAt = now
+			remote:FireServer(name, line)
+		end)
+	end)
+end
+
 function Unstuck.start()
 	if started then
 		return
 	end
 	started = true
+	task.spawn(function()
+		local ok, err = pcall(function()
+			reportErrors()
+		end)
+		if not ok then
+			warn(`[Unstuck] the error report could not start: {err}`)
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(CHECK)

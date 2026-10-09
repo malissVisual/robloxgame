@@ -415,6 +415,7 @@ local function board(player: Player, bus: Bus)
 		groups = {},
 	}
 	riders[player] = rider
+	require(script.Parent.PlayerData).track("event", player, "BusRide", 1, bus.line.id) -- 6.13
 	setGroups(rider)
 	player:SetAttribute("BusLine", bus.line.id)
 	player:SetAttribute("BusBell", nil)

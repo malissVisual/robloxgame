@@ -379,7 +379,7 @@ function Estate.buy(player: Player, id: string): string?
 	if missing then
 		return `Finish {campaignName(missing)} first: {def.name} opens after its finale (MISSIONS, U).`
 	end
-	if not PlayerData.spend(player, def.price) then
+	if not PlayerData.spend(player, def.price, "RealEstate", id) then
 		return `Not enough money: {def.name} costs {money(def.price)}.`
 	end
 	profile.properties[id] = true
@@ -418,6 +418,7 @@ function Estate.sell(player: Player, id: string): string?
 	local refund = math.floor(def.price * Config.Estate.SellBack)
 	-- Selling is not earning: the money comes back without counting as "earned" (the leaderboard).
 	profile.money += refund
+	PlayerData.track("money", player, refund, "PropertySale", id) -- 6.13: past PlayerData.addMoney
 	local extra = ""
 	if def.kind == "office" and not Estate.officeOf(player) then
 		extra = " Your company has no office now."

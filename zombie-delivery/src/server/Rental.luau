@@ -415,7 +415,7 @@ function rent(player: Player, state: DockState, chosen: number?)
 			warn(`[Rental] {player.Name}'s own vehicle could not come back: {err}`)
 		end
 	end
-	if Tuning.Price > 0 and not PlayerData.spend(player, Tuning.Price) then
+	if Tuning.Price > 0 and not PlayerData.spend(player, Tuning.Price, "Rental") then
 		giveOwnBack()
 		tell(player, "Not enough money.")
 		return
@@ -431,7 +431,7 @@ function rent(player: Player, state: DockState, chosen: number?)
 			pcall(Vehicles.remove, player) -- (a scooter half built before the error)
 		end
 		if Tuning.Price > 0 then
-			PlayerData.addMoney(player, Tuning.Price)
+			PlayerData.addMoney(player, Tuning.Price, "Refund", "Rental")
 		end
 		giveOwnBack()
 		tell(player, if spawned then "Still loading..." else "ZDC RIDE is not working right now: try again in a moment.")
@@ -452,6 +452,7 @@ function rent(player: Player, state: DockState, chosen: number?)
 	refreshDock(state)
 	rides[player] = { car = car, state = state, slot = index, leftAt = nil }
 	player:SetAttribute("Rental", state.dock.id)
+	PlayerData.track("event", player, "ScooterRental", 1, state.dock.id) -- 6.13
 	task.defer(function()
 		if not car.wrecked and car.model.Parent and humanoid.Health > 0 and humanoid.SeatPart == nil then
 			Vehicles.mount(player, car, Vector3.new(state.dock.nx, 0, state.dock.nz) * Config.Interact.DockSlide) -- 5.7: it slides off the dock (6.10: as you hop on)

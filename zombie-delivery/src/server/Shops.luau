@@ -162,7 +162,7 @@ local function buyBike(player: Player, profile: PlayerData.Profile, def: Config.
 	if refuse(player, "bikes") or tooLow(player, def.name, def.level) then
 		return
 	end
-	if not PlayerData.spend(player, def.price) then
+	if not PlayerData.spend(player, def.price, "Bike", def.id) then
 		notice:FireClient(player, "Not enough money.")
 		return
 	end
@@ -211,7 +211,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or tooLow(player, def.name, def.level) or noSlot(player) then
 			return
 		end
-		if not PlayerData.spend(player, def.price) then
+		if not PlayerData.spend(player, def.price, "Car", def.id) then
 			notice:FireClient(player, "Not enough money.")
 			return
 		end
@@ -268,7 +268,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		if refuse(player, "guns") or tooLow(player, def.name, def.level) then
 			return
 		end
-		if not PlayerData.spend(player, def.price) then
+		if not PlayerData.spend(player, def.price, "Gun", def.id) then
 			notice:FireClient(player, "Not enough money.")
 			return
 		end
@@ -298,7 +298,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		if tooLow(player, def.name, def.level) then
 			return
 		end
-		if not PlayerData.spend(player, def.price) then
+		if not PlayerData.spend(player, def.price, "CarGun", def.id) then
 			notice:FireClient(player, "Not enough money.")
 			return
 		end
@@ -321,7 +321,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 			notice:FireClient(player, `You cannot carry more {def.name}s.`)
 			return
 		end
-		if not PlayerData.spend(player, def.price * count) then
+		if not PlayerData.spend(player, def.price * count, "Item", def.id) then
 			notice:FireClient(player, "Not enough money.")
 			return
 		end
@@ -481,7 +481,7 @@ local function buyStage(player: Player, profile: PlayerData.Profile)
 		notice:FireClient(player, "Your car is on the lift: wait for the repair first.")
 		return
 	end
-	if not PlayerData.spend(player, nextStage.price) then
+	if not PlayerData.spend(player, nextStage.price, "Stage", carDef.id) then
 		notice:FireClient(player, "Not enough money.")
 		return
 	end
@@ -534,7 +534,7 @@ local function onUpgrade(player: Player, id: any)
 		notice:FireClient(player, "Finish your delivery first: the mechanics lower the car.")
 		return
 	end
-	if not PlayerData.spend(player, cost) then
+	if not PlayerData.spend(player, cost, "Upgrade", id) then
 		notice:FireClient(player, "Not enough money.")
 		return
 	end
@@ -603,7 +603,7 @@ local function onGear(player: Player, action: any, id: any)
 		if tooLow(player, gear.name, gear.level) then
 			return
 		end
-		if not PlayerData.spend(player, gear.price) then
+		if not PlayerData.spend(player, gear.price, "Gear", gear.id) then
 			notice:FireClient(player, "Not enough money.")
 			return
 		end
@@ -658,7 +658,7 @@ local function onPaint(player: Player, id: any)
 			notice:FireClient(player, `{paint.name} is not for sale. It is a reward.`)
 			return
 		end
-		if not PlayerData.spend(player, paint.price) then
+		if not PlayerData.spend(player, paint.price, "Paint", paint.id) then
 			notice:FireClient(player, "Not enough money.")
 			return
 		end
@@ -725,7 +725,7 @@ local function onKit(player: Player, action: any, id: any)
 	if tooLow(player, def.name, def.level) then
 		return
 	end
-	if not PlayerData.spend(player, def.price) then
+	if not PlayerData.spend(player, def.price, "Kit", def.id) then
 		notice:FireClient(player, "Not enough money.")
 		return
 	end

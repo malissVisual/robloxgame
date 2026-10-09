@@ -393,7 +393,7 @@ local function hire(player: Player, data: BusinessData)
 		say(player, `Every desk is taken: this office seats {seats} couriers. A bigger office seats more.`)
 		return
 	end
-	if not PlayerData.spend(player, B.CourierCost) then
+	if not PlayerData.spend(player, B.CourierCost, "Company", "Courier") then
 		say(player, `Hiring a courier costs ${B.CourierCost}.`)
 		return
 	end
@@ -420,7 +420,7 @@ local function upgrade(player: Player, data: BusinessData, id: any)
 		return
 	end
 	local cost = Business.upgradeCost(def, level)
-	if not PlayerData.spend(player, cost) then
+	if not PlayerData.spend(player, cost, "Company", def.id) then
 		say(player, `{def.name} level {level + 1} costs ${cost}.`)
 		return
 	end
@@ -435,7 +435,7 @@ local function collect(player: Player, data: BusinessData)
 		return
 	end
 	data.safe -= amount
-	PlayerData.addMoney(player, amount)
+	PlayerData.addMoney(player, amount, "CompanySafe")
 	say(player, `You took ${amount} out of the company safe.`)
 end
 

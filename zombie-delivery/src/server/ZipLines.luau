@@ -223,6 +223,7 @@ local function zip(player: Player, line: ZipData.Line)
 	character:SetAttribute("ZipAt", startAt)
 	character:SetAttribute("ZipLine", line.id)
 	Tasks.note(player, "zip", 1) -- 6.12: the daily task "Ride a zip line"
+	require(script.Parent.PlayerData).track("event", player, "ZipRide", 1, line.id) -- 6.13
 end
 
 -- The ride is over: off the cable (putDown: at the end platform, when the rider is not there already).

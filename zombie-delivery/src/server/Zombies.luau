@@ -547,7 +547,7 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 		if profile then
 			profile.kills += 1
 		end
-		PlayerData.addMoney(killer, z.def.reward)
+		PlayerData.addMoney(killer, z.def.reward, "KillReward")
 		rewardRemote:FireClient(killer, z.root.Position + Vector3.new(0, 4, 0), z.def.reward)
 		Zombies.onKill(killer, z)
 		local onKillInfo = Zombies.onKillInfo

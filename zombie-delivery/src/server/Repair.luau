@@ -217,7 +217,7 @@ local function finish(player: Player, job: Running)
 	-- The fee in full, never less: the damage the car took on the lift costs too, and money spent while waiting is
 	-- not there any more (no repair then).
 	local fee = math.max(job.fee, Economy.repairFee(missingOf(car)))
-	if not PlayerData.spend(player, fee) then
+	if not PlayerData.spend(player, fee, "Repair", car.id) then
 		release(player, job)
 		notice:FireClient(player, `The repair of your {job.name} costs {money(fee)}: not enough money. Repair cancelled.`)
 		return

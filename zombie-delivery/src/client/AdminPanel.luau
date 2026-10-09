@@ -13,8 +13,8 @@
 --   OP               the toggles with their ON / OFF state (god, fly, noclip, super jump, car boost, hidden, one-hit
 --                    kills; the attributes the server set on the target), the walk 1× / 2× / 4×, bring / go to, clear
 --                    the target's wanted
---   WORLD            the time of day, enemies near you, a horde, a bandit car, traffic, clear / kill all / FREEZE,
---                    teleport the target to any landmark
+--   WORLD            6.13: the Analytics line (on / off, the counts), the time of day, enemies near you, a horde, a
+--                    bandit car, traffic, clear / kill all / FREEZE, teleport the target to any landmark
 --   JOBS & MISSIONS  any special job or ordinary tier, finish the stop / the whole job, the missions (all at 3 stars,
 --                    reset, start any), the challenges, secrets and titles
 --   ESTATE           properties, the home, teleport to a property, the company's safe
@@ -389,6 +389,12 @@ end
 
 -- WORLD: the clock, the enemies, the traffic, the landmarks.
 R.world = function()
+	-- 6.13: Roblox analytics (server/Analytics.luau): on or off, and what this server logged so far (the attribute
+	-- server/Admin.luau keeps on the admins; REFRESH reads it again)
+	heading("Analytics", tostring(player:GetAttribute("AdminAnalytics") or "No answer from the server yet."))
+	action(grid(150), "REFRESH", C.grey, function()
+		render(true)
+	end)
 	local night = Config.DayNight
 	heading("Time of day", string.format("The clock runs (a day is %d min). Night from %02d:%02d to %02d:%02d: dark, more zombies, bigger waves, better pay, the lamps and headlights on.", math.floor(night.DayLength / 60), math.floor(night.NightFrom), math.floor(night.NightFrom % 1 * 60), math.floor(night.NightTo), math.floor(night.NightTo % 1 * 60)))
 	local cells = grid(150)

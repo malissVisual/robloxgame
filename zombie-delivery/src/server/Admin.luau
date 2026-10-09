@@ -9,6 +9,9 @@
 -- (fly, noclip, speed, super jump, car boost, hidden, one-hit kills), bring / goto, the whole map's enemies killed or
 -- frozen, traffic and hordes, the whole job finished, and NPC buddies (server/Buddy.luau).
 --
+-- 6.13: every admin's player attribute AdminAnalytics carries the analytics line (server/Analytics.luau summary: on or
+-- off, what this server logged), refreshed every second; the panel's WORLD tab shows it.
+--
 -- Commands over the "Admin" remote (name, arg, target?): target = the UserId of a player in this server (nil: you).
 -- Only [T] commands take it; the others always act on / near you. Every notice goes to the target, and a copy to you.
 -- Every argument is checked here (types, NaN, ranges, ids that exist); a bad one does nothing but say so.
@@ -349,7 +352,7 @@ end
 
 local function money(player: Player, arg: any)
 	local amount = if type(arg) == "number" and arg == arg then math.clamp(math.floor(arg), 1, 10_000_000) else 10_000
-	PlayerData.addMoney(player, amount)
+	PlayerData.addMoney(player, amount, "Admin")
 	say(player, `ADMIN: you got {moneyText(amount)}.`)
 end
 
@@ -998,7 +1001,7 @@ function Give.giveAll(player: Player)
 		return
 	end
 	unlockAll(player)
-	PlayerData.addMoney(player, GIVE_ALL_MONEY)
+	PlayerData.addMoney(player, GIVE_ALL_MONEY, "Admin")
 	say(player, `ADMIN: GIVE ALL: everything unlocked and maxed, and {moneyText(GIVE_ALL_MONEY)}.`)
 end
 
@@ -1376,6 +1379,12 @@ function Admin.start()
 			for _, player in Players:GetPlayers() do
 				if player:GetAttribute("AdminBuddies") ~= nil then
 					pcall(showBuddies, player)
+				end
+				-- 6.13: the panel's Analytics line (WORLD): on or off and this server's counts (server/Analytics.luau)
+				if player:GetAttribute("Admin") == true then
+					pcall(function()
+						player:SetAttribute("AdminAnalytics", require(Server.Analytics).summary())
+					end)
 				end
 			end
 		end

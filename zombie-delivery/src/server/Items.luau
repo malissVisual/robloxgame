@@ -354,7 +354,7 @@ local function collect(player: Player, crate: Part)
 	end
 	if not gotItem then
 		local amount = rng:NextInteger(loot.MoneyMin, loot.MoneyMax)
-		PlayerData.addMoney(player, amount)
+		PlayerData.addMoney(player, amount, "CrateLoot")
 		Net.get("Reward"):FireClient(player, position + Vector3.new(0, 3, 0), amount)
 		notice:FireClient(player, `Supply crate: +${amount}`)
 	end

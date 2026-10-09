@@ -206,7 +206,7 @@ local function stopPour(player: Player, why: string?)
 	end
 	pour.pump.prompt.ActionText = "Refuel"
 	local rest = FuelMath.settle(pour.poured, pour.charged)
-	if rest > 0 and money(player) >= rest and PlayerData.spend(player, rest) then
+	if rest > 0 and money(player) >= rest and PlayerData.spend(player, rest, "Fuel") then
 		pour.charged += rest
 	end
 	showPump(pour.pump, pour.poured, FuelMath.cost(pour.poured))
@@ -301,7 +301,7 @@ local function pourAll()
 		local level = Fuel.level(car)
 		local missing = Fuel.tankOf(car) - level
 		local litres, due = FuelMath.pourStep(missing, seconds, pour.poured, pour.charged, money(player))
-		if due > 0 and not PlayerData.spend(player, due) then
+		if due > 0 and not PlayerData.spend(player, due, "Fuel") then
 			stopPour(player, "money")
 			continue
 		end
@@ -355,7 +355,7 @@ local function onKiosk(player: Player)
 		notice:FireClient(player, `You carry {def.max} jerry cans already.`)
 		return
 	end
-	if not PlayerData.spend(player, def.price) then
+	if not PlayerData.spend(player, def.price, "Item", def.id) then
 		notice:FireClient(player, `A jerry can costs {dollars(def.price)}.`)
 		return
 	end
@@ -413,7 +413,7 @@ function Fuel.tow(player: Player): string?
 	local p = car.chassis.Position
 	local station = Map.nearestGas(p.X, p.Z)
 	local bay = freeBay(station, car)
-	if not PlayerData.spend(player, Tuning.TowPrice) then
+	if not PlayerData.spend(player, Tuning.TowPrice, "Tow") then
 		return `The tow costs {dollars(Tuning.TowPrice)}.`
 	end
 	towing[player] = true
@@ -443,6 +443,7 @@ function Fuel.tow(player: Player): string?
 		if profile then
 			profile.money += Tuning.TowPrice -- (back: not earned money)
 			PlayerData.notify(player)
+			PlayerData.track("money", player, Tuning.TowPrice, "Refund", "Tow") -- 6.13
 		end
 		return "The tow truck can't come right now. Try again in a moment."
 	end

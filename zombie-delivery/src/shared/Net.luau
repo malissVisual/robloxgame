@@ -67,6 +67,7 @@ local NAMES = {
 	"Style", -- 6.12: client → server: ("buy", id) | ("wear", id) | ("unwear", slot) a cosmetic (Config.Cosmetics; server/StyleWear.luau decides, the phone's STYLE app asks; a purchase only at a shop that sells it); server → client: ("open", "courier" | "vehicle") a clerk's "Style" prompt opens the STYLE app on that tab (server/ShopClerks.luau)
 	"Throw", -- 6.0: client → server: (the stop: the ThrowStop attribute, a direction Vector3, a power 0 … 1) a throw at a home's door (server/Cargo.luau, client/Throw.luau); server → client: ("landed", { tip, far, over, wall, span }) it hit the door
 	"Tasks", -- 6.12: client → server: ("open") or ("claim", 1 … 3 | "bonus" | "weekly"); server → client: ("state", view), ("done", { title, weekly, money, xp }), ("claimed", { title, money, xp }) (server/Tasks.luau, client/TasksApp.luau)
+	"ClientError", -- 6.13: client → server: (script name, line) a script error on this client, counted by script (client/Unstuck.luau sends it, a few a minute at most; server/Analytics.luau; Roblox's Error Report keeps the message)
 }
 
 local folder: Folder

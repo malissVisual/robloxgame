@@ -200,6 +200,11 @@ local function safely(name: string, start: () -> ())
 	end
 end
 safely("PlayerData", PlayerData.start)
+-- 6.13: Roblox's analytics (its hooks first: before any pay). Required inside `safely`: a module that fails to load
+-- only means no analytics (the game reaches it through PlayerData.track / onMoney, which do nothing without it).
+safely("Analytics", function()
+	require(Server.Analytics).start()
+end)
 safely("Vehicles", Vehicles.start)
 safely("Zombies", Zombies.start)
 safely("Jobs", Jobs.start)
@@ -382,6 +387,7 @@ local function onPlayer(player: Player)
 				if root and root:IsA("BasePart") then
 					fellAt[player] = { at = root.Position, time = os.clock() }
 				end
+				PlayerData.track("died", player, Jobs.involved(player)) -- 6.13: DeathOnJob
 			end)
 		end
 		if playing[player] then
@@ -444,6 +450,9 @@ Net.get("Play").OnServerEvent:Connect(function(player)
 			warn(`[Server] PLAY for {player.Name}: {name} failed: {err}`)
 		end
 	end
+	step("Analytics", function(who: Player) -- 6.13: the onboarding funnel's PressedPlay (inside step's pcall)
+		PlayerData.track("onPlay", who)
+	end)
 	step("CarCall", CarCall.onPlay)
 	step("Estate", Estate.onPlay)
 	step("the car", giveCar)
