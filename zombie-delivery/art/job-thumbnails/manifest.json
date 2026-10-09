@@ -1,0 +1,296 @@
+{
+  "schema": 1,
+  "sourceRevision": "882c11c",
+  "date": "2026-10-09",
+  "scope": "19 ordinary delivery definitions and all 12 configured special job types; some company jobs are offered at employers rather than on the general job board.",
+  "status": "Wired into the job lists in 6.12.11 (src/shared/JobThumbs.luau); robloxImage empty until uploaded (design/job-thumbnails/NAHRAT-OBRAZKY.md, tools/job-thumbnails/fill-ids.py). Generated 2D concept illustrations inspired by existing building cues, not exact Studio renders or 3D models.",
+  "ordinary": {
+    "pizzeria": "pizzeria",
+    "bakery": "bakery",
+    "post": "post",
+    "pharmacy": "pharmacy",
+    "supermarket": "supermarket",
+    "hardware": "hardware",
+    "electronics": "electronics",
+    "pawnshop": "pawnshop",
+    "warehouse": "warehouse",
+    "lab": "lab",
+    "samples": "lab",
+    "bank": "bank",
+    "cake": "bakery",
+    "burgers": "burgers",
+    "noodles": "noodles",
+    "cafe": "cafe",
+    "news": "news",
+    "flowers": "flowers",
+    "icecream": "icecream"
+  },
+  "special": {
+    "schoolrun": "school",
+    "armysupply": "army",
+    "icecream": "icecream",
+    "moving": "movers",
+    "farmrun": "farm",
+    "winter": "lodge",
+    "horses": "ranch",
+    "fuelrun": "gas",
+    "cashrun": "bank",
+    "ambulance": "clinic",
+    "pizzarush": "pizzeria",
+    "freightrun": "warehouse"
+  },
+  "round": "news",
+  "tutorial": "post",
+  "assets": [
+    {
+      "id": "pizzeria",
+      "name": "Luigi's Pizza",
+      "file": "pizzeria.png",
+      "robloxImage": "",
+      "description": "Small street pizzeria, red and cream striped awning, warm brick oven visible through storefront, brick chimney, circular native-part pizza roof ornament. Pickup door and stacked pizza boxes. Ash Street urban plaster buildings.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "4283d4b7889bd5d0ad5aa90b59b6603aa46e9e26458811bc67844f192ec2b9ce"
+    },
+    {
+      "id": "bakery",
+      "name": "Daily Bread Bakery",
+      "file": "bakery.png",
+      "robloxImage": "",
+      "description": "Small bakery, tan and cream awning, trays of loaves at left window, brick bread oven and chimney, plain cake box in pickup window. Normal quiet urban street.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "cede47689d5be9584b9a959377ad3e98d1fc30d401caea4004fd4c72b9369e4f"
+    },
+    {
+      "id": "post",
+      "name": "Post Office",
+      "file": "post.png",
+      "robloxImage": "",
+      "description": "Compact post office, navy blue and yellow trim awning, blue curbside postbox right of entry, stacked parcels visible on interior shelf, small roof flag. Clearly recognizable mail pickup office.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "ceaf8caf545bd1e28741a9cac4b4cdd1bcabf4fe5b7f65fe3f7320aa373d2657"
+    },
+    {
+      "id": "pharmacy",
+      "name": "Corner Pharmacy",
+      "file": "pharmacy.png",
+      "robloxImage": "",
+      "description": "Corner pharmacy, pale concrete cornice, green awning, simple green first-aid cross plate, framed shop windows, prescription packages at pickup counter.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "2f858b6292e468b955327638bae7ccf07c04944b43ce9ebb03b0ebde496fd5ba"
+    },
+    {
+      "id": "supermarket",
+      "name": "FreshMart",
+      "file": "supermarket.png",
+      "robloxImage": "",
+      "description": "Low wide supermarket, pale concrete bands, green brand accent, large storefront glazing, modest entrance canopy, grocery crate stacks visible, metal cart corral beside entrance.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "c73ed8a4731363ad7f884f9589bd22cea58963d6d5f5d7db228d7bb70d69fb41"
+    },
+    {
+      "id": "hardware",
+      "name": "Bolt & Nail Hardware",
+      "file": "hardware.png",
+      "robloxImage": "",
+      "description": "Small hardware store, burnt-orange and charcoal awning, timber plank stack left of door, ladder right, tool pegboard and crates visible inside. Urban plaster walls.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "3cdfec12f228ed539312231f97378c2f5228f053f5420bf2eb212092109a068c"
+    },
+    {
+      "id": "electronics",
+      "name": "Volt Electronics",
+      "file": "electronics.png",
+      "robloxImage": "",
+      "description": "Small electronics shop, blue awning with pale trim, radios and chunky low-poly screens visible inside, roof antenna mast and simple native-cylinder dish.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "3ddfcbf791f18759fe0f6231d2e7421d499b124a62ccb1e21f24fb8450fdecd2"
+    },
+    {
+      "id": "pawnshop",
+      "name": "Second Life Pawn",
+      "file": "pawnshop.png",
+      "robloxImage": "",
+      "description": "Compact pawnbroker, muted plum awning and warm brass trim, three simple brass ball sign on rod to right of door, safe and wooden ammo crates visible behind storefront.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "91789eee6a5b4bd1e9f15cb2e3b48c130c2ce43d297d2910e28eb534213a1bb1"
+    },
+    {
+      "id": "warehouse",
+      "name": "Harbor Warehouse",
+      "file": "warehouse.png",
+      "robloxImage": "",
+      "description": "Wide utilitarian charcoal corrugated warehouse, TWO roller loading doors, short industrial loading canopies with thin red edges, chunky pallets at loading dock, yellow dock bollards. A simple pallet jack visible, no heroic forklift or courier scene.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "2d51bcfa6c51b7c074a540ac47e809f94315189d4bda27d00b1d555866c3f246"
+    },
+    {
+      "id": "lab",
+      "name": "Research Lab",
+      "file": "lab.png",
+      "robloxImage": "",
+      "description": "Low two-story biotech research building, clean pale concrete and charcoal dark window strips, small red accent line, framed secure entry, visible ventilation box and cold-chain sample cases near delivery door. Ordinary game building, no futuristic sci-fi.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "0f290ce7b5832e4cbddcaa0f329ea27bf4f23ff2a7322bf9d1649a4c2b676847"
+    },
+    {
+      "id": "bank",
+      "name": "First Zombie Bank",
+      "file": "bank.png",
+      "robloxImage": "",
+      "description": "Small urban bank, pale stone portico with square columns, tall barred windows, simple ATM at side, security camera, dark secure front door and muted thin red trim.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "fbda77b035629aaa548f2048482042f369a624a9fe3af635470b05504dd10d1c"
+    },
+    {
+      "id": "burgers",
+      "name": "Last Bite Burgers",
+      "file": "burgers.png",
+      "robloxImage": "",
+      "description": "Compact native-part burger diner, mustard and dark-red striped awning, charcoal trim, BIG simple roof burger made of stacked chunky cylinders (bun patty cheese bun), grill hood behind. Takeout pickup window with brown burger bags.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "459b980fcba13ba6587c759803a29fca0330f37419181ef9f4707e214c1a2412"
+    },
+    {
+      "id": "noodles",
+      "name": "Wok Dead",
+      "file": "noodles.png",
+      "robloxImage": "",
+      "description": "Small noodle storefront, deep-red awning with understated gold stripe, two chunky native-cylinder red lanterns at ends, simple roof steam stack, white takeout noodle cartons at pickup window.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "de9338b213b00ddbf7edafcab59888241cb93f3773ace9d00eabf0406dd85418"
+    },
+    {
+      "id": "cafe",
+      "name": "Grind House",
+      "file": "cafe.png",
+      "robloxImage": "",
+      "description": "Small neighborhood cafe, muted forest-green and cream awning, big simple native-cylinder cream coffee cup on roof with block handle, tiny round black metal table beside left window, pastry bags at counter.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "f6605b86b4ee1aff4ecac8e1352b47eec9ab2a8ff050d5f758e2a0550ed62aee"
+    },
+    {
+      "id": "news",
+      "name": "The Daily Undead",
+      "file": "news.png",
+      "robloxImage": "",
+      "description": "Small newspaper print shop, charcoal awning with red stripe, bright but restrained yellow newspaper box left of doorway, tied paper bundles visible in window, simple roof press ventilation.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "b924013b3d343441d7f4262d50f32373e71e31631a36c56e63d7725723442b9f"
+    },
+    {
+      "id": "flowers",
+      "name": "Bloom",
+      "file": "flowers.png",
+      "robloxImage": "",
+      "description": "Small flower shop, muted dusty-rose and cream awning (only this shop), three galvanized flower buckets by left window containing simple rounded native-part flower clusters, pale plaster walls, leafy stems.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "4bf9c52a8c91361db9ab0761b98ba192ea6b7fdf8b7255bdef5b742869a38622"
+    },
+    {
+      "id": "icecream",
+      "name": "Frosty's Ice Cream",
+      "file": "icecream.png",
+      "robloxImage": "",
+      "description": "Low harbor ice cream shop, charcoal fascia with muted raspberry line, TWO serving windows and pale rose awnings, steel serving counters, wide central glazed entry. Simple tubs and native-cylinder ice cream ornament. No candy fantasy.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "9b22efeca3dab194490f5081645c190e1d6d7e669f3092d0dcbad64c56dc9c21"
+    },
+    {
+      "id": "school",
+      "name": "Sunny Hill School",
+      "file": "school.png",
+      "robloxImage": "",
+      "description": "Modest two-story brick school, pale concrete floor bands, grid classroom windows, entrance canopy with thin red edge, simple native-cylinder wall clock. A small section of yellow school bus off to side, school building remains dominant.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "513644ee7df8ab951150d27062c755de01321e77310d09b774b25ecddb1ea84e"
+    },
+    {
+      "id": "army",
+      "name": "Military Base",
+      "file": "army.png",
+      "robloxImage": "",
+      "description": "Military ammo supply bunker, gray concrete reinforced buttresses, thick framed blast doorway, restrained black/yellow hazard strips, caged lamp, olive ammo crates, chain fence at side. Base is commissioning company, no Harbor Docks replacement.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "60e3fba95238b9064ba678243df724320e59776cfabd1491c5ce73a6ddea7c5f"
+    },
+    {
+      "id": "movers",
+      "name": "Big Move Movers",
+      "file": "movers.png",
+      "robloxImage": "",
+      "description": "Small corrugated moving-company warehouse, wide framed loading door, charcoal canopy with thin red edge, quotes office window, chunky cardboard cartons and plain sofa near dock, guard bollards. Company depot rather than customer's home.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "0ae6041ac5cda2da204f768f8c565722256938ec0d3b47874e209a48422ac71d"
+    },
+    {
+      "id": "farm",
+      "name": "Old Farm",
+      "file": "farm.png",
+      "robloxImage": "",
+      "description": "Rust-red wooden barn, cream cross-braced double doors, loft door and simple hay hoist, pitched roof, produce sacks and crates under eaves, short timber fence and rounded distant trees. Farm commissioning workplace.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "733720dcac62aa4e50801f1ad086560efc1136a9a3bf980a596a699866ad7058"
+    },
+    {
+      "id": "ranch",
+      "name": "Silver Spur Ranch",
+      "file": "ranch.png",
+      "robloxImage": "",
+      "description": "Rustic low timber ranch stable with multiple stall doors, open-front porch, simple cupola, lantern posts, short wooden paddock fence and one small plainly blocky native-Roblox horse partly inside stall. Ranch is dominant, not riding-school destination.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "9bcb61a332325d6f5edd133226399b55295f70e07dfa512c8aef4057bbca8ada"
+    },
+    {
+      "id": "clinic",
+      "name": "City Clinic",
+      "file": "clinic.png",
+      "robloxImage": "",
+      "description": "Two-story white city clinic, pale concrete vertical fins, charcoal-framed continuous window bands, large simple red first-aid cross on dark square panel, emergency canopy and ambulance bay. Small edge of white-red ambulance, clinic dominates.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "577c8c0e7b2c965ec6642704ebc253be917e52e3801e6c5ed9b1b6aaac5d20ac"
+    },
+    {
+      "id": "gas",
+      "name": "Gas Station",
+      "file": "gas.png",
+      "robloxImage": "",
+      "description": "Compact north-highway gas station, muted red and white flat pump canopy, TWO simple pumps with black hose, charcoal/red fascia kiosk with glazed frontage, compact price pylon. This is employer for Fuel Run, no invented extra station jobs.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "953407641c514e26afa5b66a04a01a0eaa890dbb5b250221e0a6876a1e7dbc56"
+    },
+    {
+      "id": "lodge",
+      "name": "Ski Lodge",
+      "file": "lodge.png",
+      "robloxImage": "",
+      "description": "Modest winter mountain lodge, dark timber frame, stone lower plinth, snow-dusted sloped roof, plain porch canopy and warm lanterns, simple native-part snowbank, distant softly rounded pine silhouettes. No Minecraft cubes. Lodge commissions Winter Run although pickup is diner.",
+      "width": 1672,
+      "height": 941,
+      "sha256File": "b93f46e1e872c29e1f5e6a8bee1d519a4252fc74da89768007a51ad1795f9afc"
+    }
+  ]
+}

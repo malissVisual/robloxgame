@@ -8,6 +8,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
 - Codex · `codex/polish-icons` · 29 white transparent SVG/PNG transport/landmark/exclusive-gun icons, empty ID slots, upload manifest and sheet in `design/polish-icons/` · check silhouette/tint at map size; after uploading, fill IDs and remove the matching borrowed aliases. Pixel audit and full Luau suite pass. Next groups follow on separate branches.
+- `codex/job-thumbnails` · 25 standalone business PNGs cover all 19 ordinary definitions / 12 special types + round/tutorial; ID mapping/hash audit, gallery/upload checklist, Job Board and Career picture/reward-box previews in `design/job-thumbnails/`. Coverage and full tests pass. Claude: review artwork, upload images, carry ordinary business IDs to UI, wire pictures with fallback and separate unlocks from automatic rewards; no gameplay/UI files changed · 2026-10-09.
 
 ## Questions / handoff
 <!-- notes for the other helper: bugs seen, ideas, "please check X" -->

@@ -52,6 +52,10 @@
 --     stop; DETAILS opens the phone's ORDERS, GIVE UP), NEXT UP (the queued jobs: what, where, pay, why the next one
 --     waits, ✕; review: PAUSE / RESUME, PAUSED after a failed delivery, CLEAR ALL) and ADD ALL · $total. A row's one action during a run: + ADD (AcceptJob: it joins the run) or + QUEUE
 --     (the JobQueue remote: it waits in NEXT UP), else why neither; off duty ACCEPT JOB as before.
+--   * 6.12.11, the job pictures (Codex's business pictures, shared/JobThumbs.luau, client/JobThumbUi.luau): a row's
+--     briefing opens with its business's picture across the column (about 2.4 : 1, at most 150 px tall, cropped: the
+--     sign stays; the business's name on a dark label), a slim banner (the cargo emoji and the name) while it is not
+--     uploaded; NEXT UP's rows a small square of it once uploaded.
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
 -- (Ui.screenScale) and sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
 -- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()). 4.2, a gamepad: the selection starts on the first
@@ -76,6 +80,7 @@ local KitShop = require(script.Parent.KitShop) -- 5.0: the room on foot in words
 local BikeShop = require(script.Parent.BikeShop) -- 5.1: your bike and what it holds
 local Transport = require(Shared.Transport)
 local JobQueue = require(Shared.JobQueue) -- 6.12.8: YOUR RUN and NEXT UP, the same words as the phone's BOARD
+local JobThumbUi = require(script.Parent.JobThumbUi) -- 6.12.11: the job pictures
 
 local K = Theme.Contract
 local C = Theme.Colors
@@ -993,9 +998,20 @@ local function offerTicket(offer: any, number: number, order: number?)
 		BackgroundTransparency = 1,
 		ZIndex = 2,
 	}, body)
-	dangerRow(column, offer)
+	-- 6.12.11: the business's picture across the top of the column (about 2.4 : 1, at most 150 px tall), or while not
+	-- uploaded a slim banner; the briefing goes under it (`inner`, the column below it).
+	local thumb = JobThumbUi.strip(column, offer, 0, math.clamp(math.floor(bodyW / JobThumbUi.RATIO), 56, 150))
+	local shift = 0
+	if thumb then
+		thumb.Position = UDim2.fromOffset(0, 12)
+		shift = thumb.Size.Y.Offset + 6
+	end
+	local inner = if shift > 0
+		then Ui.make("Frame", { Name = "Inner", Size = UDim2.new(1, 0, 1, -shift), Position = UDim2.fromOffset(0, shift), BackgroundTransparency = 1, ZIndex = 2 }, column)
+		else column
+	dangerRow(inner, offer)
 	local title = if offer.jobType then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo} for {offer.customer}`
-	text(column, string.upper(title), UDim2.new(1, 0, 0, 26), { -- 5.8: in caps, like the phone's board cards
+	text(inner, string.upper(title), UDim2.new(1, 0, 0, 26), { -- 5.8: in caps, like the phone's board cards
 		Position = UDim2.fromOffset(0, 38),
 		Font = Theme.HeadingFont,
 		TextSize = 18,
@@ -1004,10 +1020,10 @@ local function offerTicket(offer: any, number: number, order: number?)
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		ZIndex = 2,
 	})
-	local after = details(column, offer, bodyW)
+	local after = details(inner, offer, bodyW)
 	local noteBox: any = nil
 	if note then
-		Ui.caps(column, if waits then "Waits in NEXT UP" else "Locked", UDim2.fromOffset(if waits then 140 else 80, 14), {
+		Ui.caps(inner, if waits then "Waits in NEXT UP" else "Locked", UDim2.fromOffset(if waits then 140 else 80, 14), {
 			Position = UDim2.new(1, 0, 0, 17),
 			AnchorPoint = Vector2.new(1, 0),
 			TextSize = 11,
@@ -1015,9 +1031,9 @@ local function offerTicket(offer: any, number: number, order: number?)
 			TextXAlignment = Enum.TextXAlignment.Right,
 			ZIndex = 2,
 		})
-		after, noteBox = remedy(column, note, after, bodyW)
+		after, noteBox = remedy(inner, note, after, bodyW)
 	end
-	local h = math.max(140, after + 16)
+	local h = math.max(140, after + 16 + shift)
 	slot.Size = UDim2.new(1, 0, 0, h)
 	payStub(stub, offer, lockLevel, why, noteBox, if lockLevel == nil and noVehicle and not licence then "🚐 NEEDS A VEHICLE" else nil)
 	Ui.tactile(holder)
@@ -1245,23 +1261,25 @@ local function nextUpRows()
 		local why = if starting then "starts in a few seconds (PAUSE to wait)" elseif type(entry.why) == "string" and entry.why ~= "" then entry.why else nil
 		local row = Ui.make("Frame", { Name = "NextRow", Size = UDim2.new(1, 0, 0, if why then 66 else 48), BackgroundColor3 = ROW, BorderSizePixel = 0, LayoutOrder = -20 + index }, refs.list)
 		Ui.stroke(row, K.rule, 1)
-		text(row, `{index}  {JobQueue.icon(entry.mode, entry.stars)}  {string.upper(tostring(entry.title or entry.cargo or "Job"))}`, UDim2.new(1, -200, 0, 20), {
-			Position = UDim2.fromOffset(14, 5),
+		-- 6.12.11: a small square of the business's picture on the left (once uploaded; else the row as before).
+		local left = if JobThumbUi.square(row, entry, 38, { Position = UDim2.fromOffset(10, 5) }) then 58 else 14
+		text(row, `{index}  {JobQueue.icon(entry.mode, entry.stars)}  {string.upper(tostring(entry.title or entry.cargo or "Job"))}`, UDim2.new(1, -(186 + left), 0, 20), {
+			Position = UDim2.fromOffset(left, 5),
 			Font = Theme.HeadingFont,
 			TextSize = 14,
 			TextWrapped = false,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
-		text(row, JobQueue.route(entry.from, entry.to), UDim2.new(1, -200, 0, 18), {
-			Position = UDim2.fromOffset(14, 25),
+		text(row, JobQueue.route(entry.from, entry.to), UDim2.new(1, -(186 + left), 0, 18), {
+			Position = UDim2.fromOffset(left, 25),
 			TextSize = 12,
 			TextColor3 = K.secondary,
 			TextWrapped = false,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
 		if why then
-			text(row, if starting then `▶ {why}` else `⏸ Waits: {why}`, UDim2.new(1, -200, 0, 18), {
-				Position = UDim2.fromOffset(14, 43),
+			text(row, if starting then `▶ {why}` else `⏸ Waits: {why}`, UDim2.new(1, -(186 + left), 0, 18), {
+				Position = UDim2.fromOffset(left, 43),
 				Font = Theme.HeadingFont,
 				TextSize = 12,
 				TextColor3 = if starting then K.text else K.red,
