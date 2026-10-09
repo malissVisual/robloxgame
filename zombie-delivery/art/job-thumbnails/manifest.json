@@ -3,7 +3,7 @@
   "sourceRevision": "882c11c",
   "date": "2026-10-09",
   "scope": "19 ordinary delivery definitions and all 12 configured special job types; some company jobs are offered at employers rather than on the general job board.",
-  "status": "Review artwork; not wired into the game. Generated 2D concept illustrations inspired by existing building cues, not exact Studio renders or 3D models.",
+  "status": "Wired into the job lists in 6.12.11 (src/shared/JobThumbs.luau); robloxImage empty until uploaded (design/job-thumbnails/NAHRAT-OBRAZKY.md, tools/job-thumbnails/fill-ids.py). Generated 2D concept illustrations inspired by existing building cues, not exact Studio renders or 3D models.",
   "ordinary": {
     "pizzeria": "pizzeria",
     "bakery": "bakery",

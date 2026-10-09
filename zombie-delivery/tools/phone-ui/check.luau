@@ -302,6 +302,56 @@ do
 	Phone.close()
 end
 
+-- 6.12.11: the job pictures (shared/JobThumbs.luau, client/JobThumbUi.luau). A row's card opens with its business's
+-- picture: while the image id is empty a slim banner (the cargo emoji and the business's name), once uploaded an
+-- ImageLabel with that id (cropped to about 2.4 : 1) with the name over it; a row without a picture (no business: an
+-- older server's) has neither. NEXT UP's rows: a small square once uploaded, nothing while empty.
+do
+	local JobThumbs=require("./JobThumbs")
+	local rows={
+		{index=31,mode="foot",cargo="Pizzas",customer="Hannah",first="Luigi's Pizza",address="3 Oak Ave",distance=300,time=150,pay=60,stars=1,business="pizzeria"},
+		{index=32,mode="car",cargo="Cash",customer="Vault",first="Bank",address="Depot",distance=900,time=300,pay=700,stars=2,tierName="Risky",special=true,jobType={id="cashrun",name="Cash Transport",description=""}},
+		{index=33,mode="foot",cargo="Morning papers",customer="12 doors on Elm St",first="The Daily Undead",address="Elm St",distance=600,time=420,pay=95,stars=1,round=true},
+		{index=34,mode="car",cargo="Crates",customer="Cid",first="Depot",address="Harbor",distance=900,time=300,pay=300,stars=2,tierName="Risky"},
+	}
+	local soup={id=7,title="Soup → Flo",cargo="Soup",customer="Flo",mode="foot",stars=1,from="Wok Dead",to="9 Oak Ave",pay=70,business="noodles"}
+	M.remotes.Offers.OnClientEvent:Fire(rows,M.now+300,{})
+	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={soup}})
+	Phone.open("board")
+	local function cardOf(title) local label=text(title);return label and label.Parent and label.Parent.Parent end
+	local function inPopup(name) return all(named("AppPopup"),function(object) return object.Name==name end) end
+	local pizza=cardOf("PIZZAS → HANNAH")
+	local banner=pizza and pizza:FindFirstChild("ThumbBanner")
+	check("6.12.11: an empty image id: a slim banner on top of the card, the business's name and its emoji",banner~=nil and banner.LayoutOrder<text("PIZZAS → HANNAH").Parent.LayoutOrder
+		and banner:FindFirstChild("Business").Text=="LUIGI'S PIZZA" and banner:FindFirstChild("Emoji").Text=="🍕" and banner.Size.Y.Offset<=30)
+	check("… a special's by its job type, the round's, none for a row without a business",cardOf("CASH TRANSPORT: CASH"):FindFirstChild("ThumbBanner"):FindFirstChild("Business").Text=="FIRST ZOMBIE BANK"
+		and cardOf("MORNING PAPERS → 12 DOORS ON ELM ST"):FindFirstChild("ThumbBanner"):FindFirstChild("Business").Text=="THE DAILY UNDEAD"
+		and cardOf("CRATES → CID"):FindFirstChild("ThumbBanner")==nil and #inPopup("ThumbBanner")==3)
+	check("… no image while the ids are empty, NEXT UP's row as before",#inPopup("Picture")==0 and #inPopup("Thumb")==0 and #inPopup("ThumbSquare")==0 and text("1  🚶  Soup → Flo").Position.X.Offset==0)
+	JobThumbs.Images.pizzeria="rbxassetid://424242"
+	JobThumbs.Images.noodles="rbxassetid://515151"
+	Phone.close();Phone.open("board")
+	pizza=cardOf("PIZZAS → HANNAH")
+	local strip=pizza and pizza:FindFirstChild("Thumb")
+	local picture=strip and strip:FindFirstChild("Picture")
+	check("6.12.11: an uploaded id: an ImageLabel with that id across the top of the card, cropped",picture~=nil and picture.ClassName=="ImageLabel" and picture.Image=="rbxassetid://424242"
+		and picture.ScaleType.Name=="Crop" and strip.LayoutOrder<text("PIZZAS → HANNAH").Parent.LayoutOrder and pizza:FindFirstChild("ThumbBanner")==nil)
+	check("… the business's name on a dark label over its bottom-left corner",strip:FindFirstChild("Business").Text=="LUIGI'S PIZZA" and strip:FindFirstChild("Business").AnchorPoint.Y==1 and strip.ClipsDescendants==true)
+	local size=strip.AbsoluteSize
+	check("… about 2.4 : 1 (its height follows its width)",size.Y>0 and math.abs(size.X/size.Y-2.4)<0.05)
+	check("… the rest of the card unchanged: the pay, the route, the chips, ACCEPT",text("$60")~=nil and text("Luigi's Pizza → 3 Oak Ave")~=nil and pizza:FindFirstChild("Chips")~=nil and #inPopup("ThumbBanner")==2)
+	local square=named("NextUp") and all(named("NextUp"),function(object) return object.Name=="ThumbSquare" end)[1]
+	check("6.12.11: NEXT UP's row: a small square of the picture, its words beside it",square~=nil and square.Image=="rbxassetid://515151" and square.ScaleType.Name=="Crop" and text("1  🚶  Soup → Flo").Position.X.Offset==44)
+	tap("ACCEPT")
+	check("… ACCEPT still takes the row",lastSent("AcceptJob").args[1]==31)
+	JobThumbs.Images.pizzeria=""
+	JobThumbs.Images.noodles=""
+	M.remotes.Job.OnClientEvent:Fire(nil)
+	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={}})
+	check("6.12.11: no warnings with the pictures",#M.warnings==0)
+	Phone.close()
+end
+
 -- CAREER and SHOP: two columns in the wide popup, the phone upright.
 for _,id in {"career","shop"} do
 	Phone.open(id)

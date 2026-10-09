@@ -21,6 +21,9 @@
 --            one add button during a run: + ADD (it joins the run now: AcceptJob) or + QUEUE (the run is full or it
 --            can't stack: JobQueue "queue"); ADD ALL · $total over the rows adds every job it can (JobQueue
 --            "addAll": into the run up to its room and max, the rest into the queue).
+--            6.12.11: every row's card opens with its business's picture (client/JobThumbUi.luau, shared/JobThumbs.luau:
+--            Codex's pictures, cropped to about 2.4 : 1, the name on a dark label), a slim banner (the cargo emoji and
+--            the name) while it is not uploaded; NEXT UP's rows a small square of it once uploaded.
 --   BAG      your bag (client/BagUi.luau's render) in the phone.
 --   GARAGE   BRING MY CAR (SpawnCar: the MENU's old CAR), 🚲 MY BIKE / 🚐 CALL CAR (the Equip remote) and ⛽ TOW while
 --            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
@@ -50,6 +53,7 @@ local BagUi = require(script.Parent.BagUi)
 local OrdersUi = require(script.Parent.OrdersUi)
 local MapView = require(script.Parent.MapView)
 local JobQueue = require(Shared.JobQueue) -- 6.12.8: YOUR RUN, NEXT UP's words
+local JobThumbUi = require(script.Parent.JobThumbUi) -- 6.12.11: the job pictures
 
 local K = Theme.Contract
 local PhoneApps = {}
@@ -159,6 +163,8 @@ local function offerCard(parent: Instance, offer: any, order: number, look: Orde
 	local waits = onDuty and offer.queue == true -- (6.12.8: a job waiting for your car or bike may still queue)
 	local open = label == nil or waits
 	local b = look.block(parent, order, open)
+	-- 6.12.11: the business's picture across the top (its name on it), or while not uploaded a slim banner.
+	JobThumbUi.strip(b, offer, 0)
 	local title = if type(offer.jobType) == "table" then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo or "Cargo"} → {offer.customer or "a customer"}`
 	local payText = Ui.money(tonumber(offer.pay) or 0)
 	local payW = look.width(payText, 18, Theme.HeadingFont)
@@ -310,14 +316,17 @@ function PhoneApps.nextUp(list: Instance, look: OrdersUi.Kit, host: Host, order:
 		local line = Ui.make("Frame", { Name = "Line", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = 1 }, row)
 		local payText = Ui.money(tonumber(entry.pay) or 0)
 		local payW = look.width(payText, 15, Theme.HeadingFont)
-		look.text(line, `{index}  {JobQueue.icon(entry.mode, entry.stars)}  {entry.title or entry.cargo or "Job"}`, UDim2.new(1, -(payW + 64), 0, 18), {
+		-- 6.12.11: a small square of the business's picture on the left (once uploaded; else the row as before).
+		local inset = if JobThumbUi.square(line, entry, 36) then 44 else 0
+		look.text(line, `{index}  {JobQueue.icon(entry.mode, entry.stars)}  {entry.title or entry.cargo or "Job"}`, UDim2.new(1, -(payW + 64 + inset), 0, 18), {
+			Position = UDim2.fromOffset(inset, 0),
 			Font = Theme.HeadingFont,
 			TextSize = 13,
 			TextWrapped = false,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
-		look.text(line, JobQueue.route(entry.from, entry.to), UDim2.new(1, -(payW + 64), 0, 16), {
-			Position = UDim2.fromOffset(0, 19),
+		look.text(line, JobQueue.route(entry.from, entry.to), UDim2.new(1, -(payW + 64 + inset), 0, 16), {
+			Position = UDim2.fromOffset(inset, 19),
 			TextSize = 12,
 			TextColor3 = K.secondary,
 			TextWrapped = false,

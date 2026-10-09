@@ -1,4 +1,6 @@
-"""Audit delivery thumbnail coverage against Config and verify the original PNG assets."""
+"""Audit delivery thumbnail coverage against Config and verify the original PNG assets.
+6.12.11: and that the game's runtime map, src/shared/JobThumbs.luau, agrees with the manifest (ids, order, uploaded
+image ids, names, the job mappings)."""
 
 import hashlib
 import json
@@ -54,9 +56,35 @@ def run():
         files.add(filename.name)
         assert asset["robloxImage"] == "" or re.fullmatch(r"rbxassetid://\d+", asset["robloxImage"])
     assert files == {p.name for p in ART.glob("*.png")}, "Uncatalogued PNG"
+    runtime(manifest)
     print(f"PASS: {len(assets)} original PNGs cover {len(expected['ordinary'])} ordinary definitions, "
-          f"{len(expected['special'])} special types, the paper round and the tutorial.")
+          f"{len(expected['special'])} special types, the paper round and the tutorial; "
+          f"src/shared/JobThumbs.luau agrees ({sum(1 for a in assets if a['robloxImage'])} / {len(assets)} uploaded).")
     return manifest
+
+
+def block(source, name):
+    """The `JobThumbs.<name> = { ... }` table of src/shared/JobThumbs.luau as its lines, in order."""
+    start = source.index(f"\nJobThumbs.{name} = {{\n") + len(f"\nJobThumbs.{name} = {{\n")
+    return source[start:source.index("\n}", start)].splitlines()
+
+
+def runtime(manifest):
+    """6.12.11: the game's runtime map (src/shared/JobThumbs.luau) agrees with the manifest: the same pictures in the
+    same order, the same uploaded ids (tools/job-thumbnails/fill-ids.py writes both), names and job mappings."""
+    source = (ROOT / "src/shared/JobThumbs.luau").read_text(encoding="utf-8")
+    images = [re.fullmatch(r'\t(\w+) = "([^"]*)",', line).groups() for line in block(source, "Images")]
+    wanted = [(asset["id"], asset["robloxImage"]) for asset in manifest["assets"]]
+    assert images == wanted, ("JobThumbs.Images differs from the manifest's assets / robloxImage: "
+                              + (str(sorted(set(images) ^ set(wanted))) if set(images) != set(wanted) else "not in the manifest's order"))
+    names = dict(re.fullmatch(r'\t(\w+) = \{ name = "([^"]+)", emoji = "[^"]+" \},', line).groups() for line in block(source, "Assets"))
+    assert names == {asset["id"]: asset["name"] for asset in manifest["assets"]}, "JobThumbs.Assets names differ from the manifest's"
+    for kind, table in (("ordinary", "Ordinary"), ("special", "Special")):
+        mapped = dict(re.fullmatch(r'\t(\w+) = "(\w+)",', line).groups() for line in block(source, table))
+        assert mapped == manifest[kind], f"JobThumbs.{table} differs from the manifest's {kind}: {set(mapped.items()) ^ set(manifest[kind].items())}"
+    for key, field in (("round", "Round"), ("tutorial", "Tutorial")):
+        found = re.search(rf'^JobThumbs\.{field} = "(\w+)"', source, re.M)
+        assert found and found.group(1) == manifest[key], f"JobThumbs.{field} differs from the manifest's {key}"
 
 
 if __name__ == "__main__":
