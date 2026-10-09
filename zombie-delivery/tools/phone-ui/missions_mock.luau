@@ -1,6 +1,7 @@
 -- 6.8: the stand-ins for the MISSIONS window's check (tools/phone-ui/missions.luau), on top of mock.luau: the Ui and
 -- Theme helpers the window calls (recorded instances: no layout, no fonts), Color3 with Lerp / ToHex, Vector3 maths,
 -- a CFrame that only keeps positions, Instance.new, Clone / PivotTo, and threads that wait until M.resume().
+-- 6.12.13: NumberSequence for the chapter banner's gradient.
 local M = require("./mock")
 
 -- Color3: Lerp and ToHex (the window's colours, the portraits' gradients).
@@ -70,6 +71,13 @@ function M.CFrame.lookAt(at)
 end
 M.ColorSequence = { new = function(a, b)
 	return { a = a, b = b }
+end }
+-- 6.12.13: the chapter banner's dark gradient (client/MissionArtUi.luau): the keypoints kept as given.
+M.NumberSequence = { new = function(points)
+	return { Keypoints = points, kind = "NumberSequence" }
+end }
+M.NumberSequenceKeypoint = { new = function(time, value)
+	return { Time = time, Value = value }
 end }
 M.Instance = { new = function(class)
 	return M.make(class)

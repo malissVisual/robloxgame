@@ -28,6 +28,10 @@
 --     reply to ("open") no longer rebuilds the page under the gamepad's selected START. When it does rebuild (a client
 --     or a step chosen, a new state), the selection goes back to the button of the same Name (START is "Start"), else
 --     START. The portraits are no longer rebuilt for nothing either.
+-- 6.12.13: the chosen chapter opens with its picture (client/MissionArtUi.luau, shared/MissionArt.luau: the chapter's
+-- own once Codex's art is uploaded, meanwhile the job list's picture of the client's place): cropped across the
+-- chapter's list with the chapter's and the client's names on a dark label; on a phone above the story path. A chapter
+-- without a picture looks as before.
 -- The older notes below describe the rest of the window (the other tabs, the banner, the cards outside it).
 --
 --   * (3.0 – 6.7: a campaign list on the left and ten mission cards on the right; 6.8 replaced them, see above.) A
@@ -155,6 +159,7 @@ local refs: { [string]: any } = {}
 local Page = {}
 Page.Layout = require(script.Parent.MissionsLayout)
 Page.Portrait = require(script.Parent.Portrait)
+Page.Art = require(script.Parent.MissionArtUi) -- 6.12.13: the chapter's picture banner
 Page.Levels = require(Shared.Levels)
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
@@ -1678,10 +1683,13 @@ function Page.render()
 	refs.clientsHeadText.Text = string.upper(`Who you work for  ·  {done} / {#Missions.Campaigns} done`)
 	Ui.clear(refs.chapter)
 	local campaign = Missions.findCampaign(selectedCampaign) or Missions.Campaigns[1]
+	-- 6.12.13: the chapter's picture (client/MissionArtUi.luau; none without one): it opens the chapter, on a phone it
+	-- sits above the story path (MissionsLayout artOnTop). A shut chapter's is dimmed like its portrait.
+	Page.Art.banner(refs.chapter, campaign, if layout.artOnTop then 0 else 3, layout, not Missions.chapterState(campaign.id, progress, myLevel()).open)
 	Page.hero(campaign, 1)
 	Page.action(campaign, 2)
 	local got, total = Missions.done(progress, campaign.id)
-	Extras.section(refs.chapter, "The story", `{got} / {total} done`, 3)
+	Extras.section(refs.chapter, "The story", `{got} / {total} done`, 4)
 	local list = Missions.ofCampaign(campaign.id)
 	for index, def in list do
 		Page.step(def, campaign, 10 + index, index == #list)

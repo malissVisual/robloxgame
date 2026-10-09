@@ -46,6 +46,8 @@ for _, screen in SCREENS do
 		and parts.barTop + parts.barH <= parts.contentH and parts.barH >= layout.start and parts.chapterTop >= layout.tabs,
 		`bar {parts.barTop} – {parts.barTop + parts.barH} of {parts.contentH}`)
 	check(`{screen.name}: the chapter keeps room above the bar`, parts.chapterH >= (if layout.narrow then 140 else 360), parts.chapterH)
+	-- 6.12.13: the chapter's picture banner (client/MissionArtUi.luau) fits the chapter's view whole.
+	check(`{screen.name}: the picture banner fits the chapter's view`, layout.art >= 96 and layout.art <= parts.chapterH - 8, `{layout.art} of {parts.chapterH}`)
 end
 
 do
@@ -54,6 +56,12 @@ do
 	local phone = MissionsLayout.fit(667, 375 - TOPBAR)
 	check("iPhone SE: stacked (the clients on top), the slim chrome, the bigger text", phone.narrow and phone.scale >= MissionsLayout.MinScale and phone.header < 78 and phone.text > monitor.text)
 	check("iPhone SE: a smaller hero portrait (6.8 review)", phone.heroW <= 80 and phone.heroW < monitor.heroW, phone.heroW)
+	-- 6.12.13: at 1280 × 720 the banner opens the chapter at 2.6 : 1 (its width: the window less the column and
+	-- MissionsUi's inset, listW + 22, the list's padding 13 and the row's 4); on a phone it sits above the story path.
+	local artW = monitor.width - (monitor.listW + 22) - 13 - 4
+	check("1280 × 720: the picture banner opens the chapter at 2.6 : 1", monitor.artOnTop and math.floor(artW / MissionsLayout.ArtRatio + 0.5) <= monitor.art,
+		`{artW} / {MissionsLayout.ArtRatio} > {monitor.art}`)
+	check("iPhone SE: the banner sits above the story path (the hero and the action card first)", not phone.artOnTop and phone.art < monitor.art)
 	local big = MissionsLayout.fit(3840, 2160)
 	check("a 4K screen: never bigger than MaxScale", big.scale <= MissionsLayout.MaxScale and not big.narrow)
 end

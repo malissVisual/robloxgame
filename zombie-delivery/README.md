@@ -1143,6 +1143,22 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The mission chapters' pictures (6.12.13)
+
+The owner: "pictures for the missions too". The MISSIONS window (U) opens the chosen chapter with a picture banner,
+cropped to 2.6 : 1, with the chapter's name and "client · place" on a dark label (`client/MissionArtUi.luau`). A shut
+chapter's picture is dimmed.
+
+- **The map:** `shared/MissionArt.luau`.
+  - `Images` has one slot per chapter, for Codex's own pictures.
+  - Until those exist, `Fallback` borrows the business picture where the place matches: Code Red → City Clinic, Empty
+    Shelves → FreshMart, Iron Supply → the Military Base, Wild West End → the ranch, Patient Zero → the lab, Dirty
+    Money → Second Life Pawn.
+  - The other five chapters (First Shift, Partners in Crime, Smoke and Sirens, Lights Out, Last Convoy) show no banner
+    yet.
+- **For Codex:** `design/mission-art/BRIEF.md` asks for 11 chapter pictures in the job pictures' style.
+  `tools/mission-art/fill-ids.py` fills their ids once the owner uploads them.
+
 ## The job pictures are uploaded (6.12.12)
 
 The owner uploaded the 25 pictures (Asset Manager → Bulk Import): `shared/JobThumbs.luau`, the manifest and

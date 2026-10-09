@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Execute actual Phone/PhoneContract/PhoneRoute/PhonePopup/OrdersUi (6.12: TasksApp) against a narrow UI instance recorder.
 This checks callbacks, construction, current server data, resizing and cleanup, not Studio layout or fonts.
-6.8: then the MISSIONS window (MissionsUi, MissionsLayout, Portrait) the same way (missions.luau).
+6.8: then the MISSIONS window (MissionsUi, MissionsLayout, Portrait; 6.12.13: MissionArtUi) the same way (missions.luau).
 """
 import argparse
 from pathlib import Path
@@ -36,7 +36,8 @@ local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof
 
 # 6.8: the MISSIONS window (client/MissionsUi.luau with client/MissionsLayout.luau and client/Portrait.luau, the real
 # shared data) against missions_mock.luau's fuller stand-ins: the clients, the chapter, START, the locks, a replay,
-# a phone's narrow layout, the banner, the cleared card (tools/phone-ui/missions.luau).
+# a phone's narrow layout, the banner, the cleared card (tools/phone-ui/missions.luau); 6.12.13: the chapter's picture
+# banner (client/MissionArtUi.luau with client/JobThumbUi.luau's keepRatio).
 with tempfile.TemporaryDirectory() as folder:
     dest = Path(folder)
     for source in (ROOT / "src/shared").glob("*.luau"):
@@ -47,8 +48,9 @@ local game, workspace, task = mock.game, mock.workspace, mock.task
 local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
 local Color3, TweenInfo, typeof, warn = mock.Color3, mock.TweenInfo, mock.typeof, mock.warn
 local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSequence
+local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
 '''
-    for name in ("MissionsUi", "MissionsLayout", "Portrait"):
+    for name in ("MissionsUi", "MissionsLayout", "Portrait", "MissionArtUi", "JobThumbUi"):
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
