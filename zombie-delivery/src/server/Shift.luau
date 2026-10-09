@@ -1,8 +1,8 @@
 --!strict
 -- 6.14, the shift's pay on the server (shared/Shift.luau has the rules, Config.Jobs.Shift the numbers): every player's
 -- shift for this play session (never saved; gone when they leave). server/Jobs.luau payOrder calls Shift.paid once for
--- every delivery paid (the owner's, and each crew member's own when they are paid with it; not a road event's
--- add-on): the shift one further, and when it is full its pay through the economy's own paths (PlayerData.addMoney
+-- every job finished and paid (at a run's last order; the owner's, and each crew member's own when they are there
+-- with them; not a road event's add-on): the shift one further, and when it is full its pay through the economy's own paths (PlayerData.addMoney
 -- "ShiftBonus", PlayerData.addXp: a level-up shows its card as always), the daily task "shift" (server/Tasks.luau),
 -- and an analytics event (ShiftDone, through PlayerData.track). What Shift.paid returns goes into that
 -- player's DeliveryResult as `shift`; Shift.view goes into the State (server/Main.server.luau sendState): the HUD's

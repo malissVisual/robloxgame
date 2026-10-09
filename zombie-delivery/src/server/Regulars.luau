@@ -41,7 +41,7 @@ local function count(who: Player, id: string): boolean
 	return Rules.tierOf(before) ~= nil
 end
 
--- An order paid (server/Jobs.luau payOrder): `offer` is the order's, `pay` its rated pay so far, `crew` everybody
+-- An order paid (server/Jobs.luau payOrder): `offer` is the order's, `pay` its rated pay so far, `crew` the crew there
 -- paid with it besides the owner; `side`: a road event's side pick-up (it counts for nobody). Never fails the pay: a
 -- problem is warned and nothing is added.
 function Regulars.paid(player: Player, offer: any, pay: number, crew: { Player }, side: boolean?): Paid

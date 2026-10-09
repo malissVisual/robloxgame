@@ -5,8 +5,9 @@
 -- chips and the SHIFT DONE moment, client/Hud.luau's result and client/DispatchUi.luau's caption use the words;
 -- tested in tests/shift_test.luau.
 --
--- The shift: every delivery paid to a courier counts one (server/Jobs.luau payOrder: a board job, on foot, by bike,
--- an employer's job, a mission; a crew member's own when they are paid with the job; not a road event's add-on).
+-- The shift: every job finished and paid to a courier counts one (server/Jobs.luau payOrder: a board job, on foot, by
+-- bike, an employer's job, a mission; a run of stacked orders once, at its last order (6.14 review); a crew member
+-- there with you counts their own; not a road event's add-on).
 -- Config.Jobs.Shift.Jobs of them in one go (never more than IdleReset seconds from one to the next) pay the shift
 -- (Money and Xp × (1 + LevelScale × (level − 1))) and a new one starts at 0. A failed job does not count and does
 -- not reset it: the streak already punishes a failure, the shift only rewards keeping at it. One play session: the

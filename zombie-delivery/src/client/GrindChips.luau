@@ -375,7 +375,7 @@ local function done(money: number, xp: number, target: number)
 	end
 	bannerToken += 1
 	local token = bannerToken
-	b.line.Text = `{target} DELIVERIES IN ONE GO`
+	b.line.Text = `{target} JOBS IN ONE GO`
 	b.pay.Text = `+{Ui.money(money)}   ·   +{xp} XP`
 	for _, pip in b.pips do
 		pip.BackgroundColor3 = TRACK

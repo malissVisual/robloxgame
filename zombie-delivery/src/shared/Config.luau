@@ -2767,19 +2767,20 @@ Config.Jobs = {
 		StreakMax = 0.25,
 	},
 	-- 6.14, the shift's pay (shared/Shift.luau, server/Shift.luau; the HUD's SHIFT chip, client/GrindChips.luau): every
-	-- delivery paid to you (a board job, on foot, by bike, an employer's, a mission; a crew member's own share; not a
-	-- road event's add-on) counts one, and Jobs of them in one go pay the shift: Money (rounded to MoneyStep) and Xp,
-	-- both × (1 + LevelScale × (level − 1)) (level 1: $120 and 100 XP; level 7: $300 and 250; level 15: $540 and 450),
-	-- then a new shift starts at 0. A failed job neither counts nor resets it (the streak punishes that already); more
-	-- than IdleReset seconds without a delivery paid start it over (the longest job's clock is about 4 minutes). Per
-	-- play session, never saved.
+	-- job finished and paid to you (a board job, on foot, by bike, an employer's, a mission; a run of stacked orders once,
+	-- at its last order; a crew member there with you counts their own; not a road event's add-on) counts one, and Jobs
+	-- of them in one go pay the shift: Money (rounded to MoneyStep) and Xp, both × (1 + LevelScale × (level − 1)) (level
+	-- 1: $120 and 100 XP; level 7: $300 and 250; level 15: $540 and 450), then a new shift starts at 0. A failed job
+	-- neither counts nor resets it (the streak punishes that already); more than IdleReset seconds without a job finished
+	-- start it over (6.14 review: 20 minutes, a stacked run of several orders takes a while). Per play session, never
+	-- saved.
 	Shift = {
 		Jobs = 5,
 		Money = 120,
 		Xp = 100,
 		LevelScale = 0.25,
 		MoneyStep = 5,
-		IdleReset = 900,
+		IdleReset = 1200,
 	},
 	-- 4.7, the licences (JobRules.hasLicence; profile.licences, profile.licenceJobs): the board's ordinary deliveries of
 	-- a tier listed here (and a board special without its own level, the Winter Run) need its level AND `jobs` jobs
@@ -4376,7 +4377,7 @@ Config.Tasks = {
 		{ id = "ride", event = "ride", text = "Make {n} deliveries on a bike or a scooter", one = "Make a delivery on a bike or a scooter", target = { 2, 4 }, money = 180, xp = 110, level = 2 },
 		{ id = "mission", event = "mission", text = "Finish {n} missions", one = "Finish a mission", target = { 1, 2 }, money = 300, xp = 150, level = 5 },
 		-- 6.14: the shift's pay (Config.Jobs.Shift: its deliveries in one go), server/Shift.luau notes "shift"
-		{ id = "shift", event = "shift", text = "Finish {n} shifts", one = `Finish a shift ({Config.Jobs.Shift.Jobs} deliveries in one go)`, target = { 1, 2 }, money = 200, xp = 120 },
+		{ id = "shift", event = "shift", text = "Finish {n} shifts", one = `Finish a shift ({Config.Jobs.Shift.Jobs} jobs in one go)`, target = { 1, 2 }, money = 200, xp = 120 },
 		-- 6.14: the regulars (an order for a business you are Bronze or better at) and the golden orders
 		{ id = "regular", event = "regular", text = "Deliver {n} orders where you're a regular", one = "Deliver an order where you're a regular", target = { 2, 4 }, money = 180, xp = 110, level = 3 },
 		{ id = "golden", event = "golden", text = "Finish {n} golden orders", one = "Finish a golden order", target = { 1, 1 }, money = 300, xp = 160, level = 3 },

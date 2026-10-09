@@ -1841,7 +1841,7 @@ function Hud.showResult(r: any)
 		if shift then
 			local target = tonumber(shift.target) or Config.Jobs.Shift.Jobs
 			if shift.done == true then
-				line(`🏁 SHIFT DONE: {target} deliveries in one go · +{tonumber(shift.xp) or 0} XP`, "+" .. Ui.money(tonumber(shift.money) or 0), C.green, 25)
+				line(`🏁 SHIFT DONE: {target} jobs in one go · +{tonumber(shift.xp) or 0} XP`, "+" .. Ui.money(tonumber(shift.money) or 0), C.green, 25)
 			else
 				local count = tonumber(shift.count) or 0
 				line(`Shift {count}/{target} · {target - count} more for the shift's pay`, nil, C.dim, 25)

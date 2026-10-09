@@ -3414,8 +3414,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		end
 	end
 	-- 6.14 (server/Regulars.luau): your tier's bonus with its business on the rated pay, the delivery counted for you and
-	-- your crew, a golden or a regular's order's XP, the result's lines (never a mission).
-	local regular = require(script.Parent.Regulars).paid(player, offer, payTotal, crew, order.addOn)
+	-- your crew there (6.14 review: `present`, not a member who stayed home), a golden or a regular's order's XP, the
+	-- result's lines (never a mission).
+	local regular = require(script.Parent.Regulars).paid(player, offer, payTotal, present, order.addOn)
 	payTotal += regular.money
 	if offer.round then
 		-- 5.3, the newspaper round: the tip for no paper in the bushes (a line in the rating's checks).
@@ -3553,9 +3554,10 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		mission = missionResult, -- 3.0: { id, name, stars } of a mission
 		coopPay = if offer.coop then coopPay else nil, -- a co-op mission: the pay × this for the crew
 		rating = ratingInfo, -- 4.7: { stars, checks, ratingPay, streak, streakBonus, streakPay, licence? } (not a mission)
-		-- 6.14: the shift one further (server/Shift.luau: every delivery paid but a road event's add-on), its pay when
-		-- full: { count, target, idleUntil?, shifts, done?, money?, xp? }
-		shift = if order.addOn then nil else require(script.Parent.Shift).paid(player),
+		-- 6.14: the shift one further (server/Shift.luau: every job finished, a run of stacked orders once at its last
+		-- order paid (6.14 review: per order, five short foot orders made a shift); not a road event's add-on), its pay
+		-- when full: { count, target, idleUntil?, shifts, done?, money?, xp? }
+		shift = if order.addOn or not final then nil else require(script.Parent.Shift).paid(player),
 		special = regular.info, -- 6.14: { golden?, regularOrder?, regular? } (client/SpecialOrderUi.luau's lines)
 	}, ownerXp))
 	-- 6.8: what this order paid everybody (a mission's "cleared" card says it); a crew member who has done the mission
@@ -3586,7 +3588,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			total = memberPay,
 			mission = missionResult,
 			rating = if rating then { stars = rating.stars } else nil, -- 4.7: the owner's rating of the job
-			shift = if order.addOn then nil else require(script.Parent.Shift).paid(member), -- 6.14: their own shift
+			-- 6.14: their own shift, only for who is there (6.14 review: a member far away is paid the crew's share as
+			-- ever, but no full shift's pay for somebody else's deliveries)
+			shift = if order.addOn or not final or table.find(present, member) == nil then nil else require(script.Parent.Shift).paid(member),
 			special = regular.crewInfo, -- 6.14: a golden or a regular's order
 		}, giveXp(member, if again then Missions.replayXp(crewXp) else crewXp)))
 	end
@@ -4155,9 +4159,11 @@ local function roadEnemies(player: Player, job: Job, tier: Config.TierDef, posit
 		end
 	end
 	-- Wanted cargo (banditBoost, the hunted twist): the bandit cars and the roadblocks come that many times as often.
-	-- Hunted on a ★ job (no bandits there): the ★★ bandits. 6.14: an open golden order's boost too (Jobs.dangerOf).
+	-- Hunted on a ★ job (no bandits there): the ★★ bandits. 6.14: an open golden order's boost too (Jobs.dangerOf), on
+	-- the job's own modifier only (6.14 review: `multiplier` holds the golden waves already; × the golden boost on top
+	-- made a ★★★★ golden run's roadblocks come about 5× as often)
 	local _, boost = Jobs.dangerOf(job)
-	local bandits = multiplier * boost
+	local bandits = (if offer.modifier then offer.modifier.spawnMultiplier else 1) * boost
 	local banditTier = if offer.twists.hunted and tier.chaseEvery <= 0 then JobsConfig.Tiers[2] or tier else tier
 	local driving = Vehicles.isDriving(player)
 	if driving and banditTier.chaseEvery > 0 and now >= job.nextChase and not World.isSafe(position) then
@@ -5222,6 +5228,13 @@ Jobs.queueApi = {
 		local owner = Crew.ownerOf(player)
 		if not why and owner and owner ~= player then
 			why = `you're in {owner.DisplayName}'s crew`
+		end
+		-- 6.14 review: a golden or a regular's order whose time is up is never taken (+ QUEUE, ADD ALL), not even in the
+		-- second before server/SpecialOrders.luau takes it off the board (accept refuses it the same way)
+		if offer.specialOrder and (tonumber(offer.specialOrder.expiresAt) or 0) <= workspace:GetServerTimeNow() then
+			locked = true
+			permanent = true
+			why = "ran out"
 		end
 		local kind = { special = offer.jobType ~= nil, mission = offer.mission ~= nil, tutorial = offer.tutorial, duo = offer.duo, round = offer.round == true }
 		-- review: may it join the run now, by 5.2's own stackCheck (the new offer's look: a Roof Rack's light piece)

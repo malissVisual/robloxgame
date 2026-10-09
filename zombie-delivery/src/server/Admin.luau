@@ -1197,7 +1197,7 @@ end
 
 function Give.shift(player: Player, arg: any)
 	local count = require(Server.Shift).set(player, finite(arg) or 0)
-	say(player, `ADMIN: your shift is at {count} / {Config.Jobs.Shift.Jobs} (the next delivery paid counts on).`)
+	say(player, `ADMIN: your shift is at {count} / {Config.Jobs.Shift.Jobs} (the next job finished counts on).`)
 end
 
 -- ── 4.5: the buddies (server/Buddy.luau) ───────────────────────────────────
