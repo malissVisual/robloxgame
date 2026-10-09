@@ -40,7 +40,15 @@
 --   job [T]    job type id    any Config.JobTypes id, "ordinary1" … "ordinary4" or (5.0) "foot" (Jobs.adminStart)
 --   finishStop [T]            the current stop is done (Jobs.adminFinishStop)
 --   finishJob [T]             the whole current job done and paid (Jobs.adminComplete)
+--   streak [T] n              6.14: the streak of good jobs (profile.streak, 0 … 50): the HUD's ON A ROLL chip pops
+--                             (or, at 0, cracks)
+--   shift [T]  n              6.14: this session's shift at n deliveries (0 … Config.Jobs.Shift.Jobs − 1; the next
+--                             one paid finishes it at Jobs − 1) (server/Shift.luau)
 --   roadEvent [T] kind        4.8: "survivor" | "addon" | "roadblock" on the current job as you drive on (Jobs.adminRoadEvent)
+--   goldenOrder [T]           6.14: a GOLDEN ORDER on the board now, whatever the roll and the level (the one there
+--                             goes first; server/SpecialOrders.luau force)
+--   regularOrder [T]          6.14: a REGULAR'S ORDER on the board now (needs a business where you are Silver or better)
+--   regulars [T] count        6.14: every business at that many deliveries (0 clears them; server/Regulars.luau adminSet)
 --   god [T]    boolean?       toggle (or set) invulnerable: you and your car
 --   fly [T] / noclip [T] / jump [T] / carBoost [T] / hidden [T] / oneHit [T]   boolean?: toggle (or set) the player
 --                             attributes AdminFly, AdminNoclip (client/AdminFly.luau), AdminJump (super jump, there
@@ -1176,6 +1184,22 @@ function Give.finishJob(player: Player)
 	say(player, if Jobs.adminComplete(player) then "ADMIN: the whole job is done and paid." else "ADMIN: the job could not be finished.")
 end
 
+-- 6.14: the streak of good jobs and the shift, to try the HUD's chips and SHIFT DONE.
+function Give.streak(player: Player, arg: any)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return
+	end
+	profile.streak = math.clamp(math.floor(finite(arg) or 0), 0, 50)
+	PlayerData.notify(player)
+	say(player, `ADMIN: your streak of good jobs is {profile.streak}.`)
+end
+
+function Give.shift(player: Player, arg: any)
+	local count = require(Server.Shift).set(player, finite(arg) or 0)
+	say(player, `ADMIN: your shift is at {count} / {Config.Jobs.Shift.Jobs} (the next job finished counts on).`)
+end
+
 -- ── 4.5: the buddies (server/Buddy.luau) ───────────────────────────────────
 
 local BUDDY_MODES: { [string]: boolean } = { follow = true, stay = true, guard = true }
@@ -1227,6 +1251,16 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	job = job,
 	finishStop = finishStop,
 	roadEvent = roadEvent, -- 4.8
+	-- 6.14: the golden orders and the regulars
+	goldenOrder = function(player: Player)
+		say(player, require(Server.SpecialOrders).force(player, "golden"))
+	end,
+	regularOrder = function(player: Player)
+		say(player, require(Server.SpecialOrders).force(player, "regular"))
+	end,
+	regulars = function(player: Player, arg: any)
+		say(player, require(Server.Regulars).adminSet(player, arg))
+	end,
 	god = setGod,
 	spawn = spawnEnemies,
 	banditCar = banditCar,
@@ -1270,6 +1304,8 @@ local COMMANDS: { [string]: (Player, any, Player) -> () } = {
 	horde = Give.horde,
 	traffic = Give.traffic,
 	finishJob = Give.finishJob,
+	streak = Give.streak, -- 6.14
+	shift = Give.shift, -- 6.14
 	buddy = Give.buddy,
 	buddyDismiss = Give.buddyDismiss,
 	buddyMode = Give.buddyMode,
@@ -1287,7 +1323,7 @@ for _, name in {
 	"weapon", "giveAll", "teleport", "bring", "goto", "job", "finishStop", "finishJob", "roadEvent", "god", "heal", "refuel", "speed",
 	"clearWanted", "buddy", "buddyDismiss", "buddyMode", "giveEstate", "clearEstate", "setHome", "estateTeleport",
 	"businessCash", "missionStart", "missionsAll", "missionsReset", "challengesAll", "secretsAll", "challengesReset",
-	"title",
+	"title", "streak", "shift", "goldenOrder", "regularOrder", "regulars",
 } do
 	TARGETED[name] = true
 end

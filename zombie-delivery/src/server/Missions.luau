@@ -14,6 +14,9 @@
 --                      level, stars, starsMax, active = the mission running (yours, or your crew leader's) or nil,
 --                      crewOwner = your crew leader's name when you are in somebody's crew, else nil,
 --                      crewSize = the members of your own crew (3.2: the DUO missions need Config.Missions.Duo.MinCrew)
+--                      6.14 review: gear = the car's installed gear (the Roof Rack: Economy.capacity), carOut = a vehicle
+--                      of yours is out, onJob = a job of yours runs, partnersNear = your crew's members within the DUO
+--                      StartRange, garages = the ids of your properties that keep cars (all in the signature too)
 --                    ("cleared", { id, name, stars, best, newStars, reward, starBonus, xp, campaignDone, campaignReward,
 --                      crew, owner }) a mission is done: the banner (then the state follows)
 -- A player who opened the window once gets the state again whenever it changes on its own (a mission starts or
@@ -59,6 +62,7 @@ local Jobs = require(Server.Jobs)
 local Crew = require(Server.Crew)
 local Challenges = require(Server.Challenges)
 local Tasks = require(Server.Tasks) -- 6.12: a mission finished counts for the mission tasks
+local Vehicles = require(Server.Vehicles) -- 6.14 review: whether a car of yours is out (the READY CHECK's CALL CAR)
 
 local Missions = {}
 
@@ -116,6 +120,38 @@ local function activeOf(player: Player): string?
 	return id or started[who]
 end
 
+-- Where a player is (their character; in a car the seat carries them along), nil without one.
+local function whereIs(player: Player): Vector3?
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	return if root then root.Position else nil
+end
+
+-- 3.2: the members of your crew online and within Config.Missions.Duo.StartRange of you (a DUO mission's partner).
+local function nearMembers(player: Player): number
+	local here = whereIs(player)
+	local near = 0
+	for _, member in Crew.members(player) do
+		local there = whereIs(member)
+		if here and there and Vector3.new(here.X - there.X, 0, here.Z - there.Z).Magnitude <= Config.Missions.Duo.StartRange then
+			near += 1
+		end
+	end
+	return near
+end
+
+-- 6.14 review: the properties of yours that keep cars (Config.Estate garageSlots > 0), for the READY CHECK's GPS to
+-- the garage where a car of yours waits (server/Garages.luau keptAt).
+local function garagesOf(profile: PlayerData.Profile): { string }
+	local list: { string } = {}
+	for _, def in Config.Estate.Properties do
+		if profile.properties[def.id] and def.garageSlots > 0 then
+			table.insert(list, def.id)
+		end
+	end
+	return list
+end
+
 -- The MissionsState (see the header), or nil before the save has loaded.
 local function stateFor(player: Player): { [string]: any }?
 	local profile = PlayerData.get(player)
@@ -139,6 +175,14 @@ local function stateFor(player: Player): { [string]: any }?
 		carId = carId, -- 3.5: the car and its stage (the window's advice: Economy.roomAdvice); 5.0: nil = no vehicle
 		carStage = if carId then Economy.stageOf(carId, Economy.carLevels(profile.carUpgrades, carId)) else 0,
 		hasCar = carId ~= nil and not TransportRules.isBike(carId), -- 5.0: the missions need a vehicle of your own (5.1: a car)
+		-- 6.14 review (the READY CHECK and the window ask what the server asks): the car's gear (the Roof Rack's slots for
+		-- light pieces: Economy.capacity with it), a vehicle of yours out (server/Jobs.luau "Call your car first"), a job
+		-- of yours running, your crew's members near you (a DUO mission's partner) and your garages.
+		gear = if carId then Economy.installedGear(profile.carGear, carId) else {},
+		carOut = Vehicles.get(player) ~= nil,
+		onJob = Jobs.active(player),
+		partnersNear = nearMembers(player),
+		garages = garagesOf(profile),
 	}
 end
 
@@ -151,9 +195,12 @@ local function signature(player: Player): string
 	if profile then
 		stars = MissionData.stars(profile.missions, nil)
 		local carId = profile.car
-		car = if carId then `{carId}:{Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId))}` else "-"
+		car = if carId then `{carId}:{Economy.capacity(carId, Economy.carLevels(profile.carUpgrades, carId), Economy.installedGear(profile.carGear, carId))}` else "-"
+		car ..= `:{#garagesOf(profile)}` -- (6.14 review: the gear, the garages)
 	end
-	return `{activeOf(player) or "-"}|{if owner then owner.UserId else 0}|{PlayerData.level(player)}|{stars}|{#Crew.members(player)}|{car}`
+	-- 6.14 review: a car out or not, a job of yours, partners coming near or going away
+	local more = `{if Vehicles.get(player) then 1 else 0}{if Jobs.active(player) then 1 else 0}{math.min(nearMembers(player), Config.Missions.Duo.MinCrew)}`
+	return `{activeOf(player) or "-"}|{if owner then owner.UserId else 0}|{PlayerData.level(player)}|{stars}|{#Crew.members(player)}|{car}|{more}`
 end
 
 -- The progress a player's MISSIONS window shows (sent on "open", after every change).
@@ -177,25 +224,9 @@ end
 
 -- ── Starting ───────────────────────────────────────────────────────────────
 
--- Where a player is (their character; in a car the seat carries them along), nil without one.
-local function whereIs(player: Player): Vector3?
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	return if root then root.Position else nil
-end
-
 -- 3.2: a DUO mission needs MinCrew members of your crew online and within StartRange of you. nil = yes, else why not.
 local function duoRefusal(player: Player): string?
-	local tuning = Config.Missions.Duo
-	local here = whereIs(player)
-	local near = 0
-	for _, member in Crew.members(player) do
-		local there = whereIs(member)
-		if here and there and Vector3.new(here.X - there.X, 0, here.Z - there.Z).Magnitude <= tuning.StartRange then
-			near += 1
-		end
-	end
-	if near >= tuning.MinCrew then
+	if nearMembers(player) >= Config.Missions.Duo.MinCrew then
 		return nil
 	end
 	return Config.Missions.Duo.NeedsPartner -- 6.8: one text for the server and the window

@@ -135,7 +135,7 @@ do
 		seen[name] = true
 	end
 	check("the events: valid and unique names", #bad == 0, table.concat(bad, ", "))
-	check("a short fixed list", #Plan.Events >= 10 and #Plan.Events <= 16, #Plan.Events)
+	check("a short fixed list (6.14: with the golden orders' and the regulars')", #Plan.Events >= 10 and #Plan.Events <= 20, #Plan.Events)
 	local wanted = { "DeathOnJob", "JobFailedTime", "JobFailedCargo", "QueueAddAll", "ZipRide", "BusRide", "ScooterRental", "StylePurchase", "SessionLength", "ServerError", "ClientError" }
 	local missing = {}
 	for _, name in wanted do

@@ -19,6 +19,53 @@ function PhoneLayout.fit(width: number, height: number, touch: boolean, cap: num
 	return { scale = scale, width = 340, height = math.min(680, (height - 32) / scale) }
 end
 
+-- 6.14: the home's two wide MAIN tiles (client/Phone.luau mainTile): NEXT MISSION (its lines: the chapter, the mission,
+-- the readiness, the savings bar) over WORK (the board's line and what you earn for). HOME_CHROME: the status bar over
+-- the home's scrolling list and the home bar under it; HOME_HEAD: the list's padding, the shift line and the gap under it.
+PhoneLayout.NEXT_H, PhoneLayout.WORK_H, PhoneLayout.MAIN_GAP = 108, 80, 8
+PhoneLayout.HOME_CHROME, PhoneLayout.HOME_HEAD = 30 + 56, 6 + 18 + 8
+-- 6.14 review: the phone's frame around its screen (client/Phone.luau BEZEL, top and bottom) and the smaller tiles
+-- under the MAIN ones (two to a row: client/Phone.luau's grid).
+PhoneLayout.BEZELS = 9 * 2
+PhoneLayout.TILE_H, PhoneLayout.TILE_GAP = 60, 8
+
+-- 6.14 review: the height of the home's scrolling list on the phone (`fit`: PhoneLayout.fit), at scale 1.
+function PhoneLayout.homeView(fit: Fit): number
+	return fit.height - PhoneLayout.BEZELS - PhoneLayout.HOME_CHROME
+end
+
+-- 6.14: do NEXT MISSION and WORK sit wholly above the fold of the phone's home (no scrolling to see them)?
+function PhoneLayout.mainVisible(fit: Fit): boolean
+	return PhoneLayout.HOME_HEAD + PhoneLayout.NEXT_H + PhoneLayout.MAIN_GAP + PhoneLayout.WORK_H <= PhoneLayout.homeView(fit)
+end
+
+-- 6.14 review: where a home tile is in the home's scrolling list (its top and height, at scale 1), from the layout
+-- itself, not from where the tile is drawn now (a phone opening, a resize: that is a frame late). `main`: the MAIN
+-- tiles (1 NEXT MISSION, 2 WORK), else the index among the smaller tiles (two to a row).
+function PhoneLayout.tileSpan(main: boolean, index: number): (number, number)
+	local top = PhoneLayout.HOME_HEAD
+	if main then
+		if index <= 1 then
+			return top, PhoneLayout.NEXT_H
+		end
+		return top + PhoneLayout.NEXT_H + PhoneLayout.MAIN_GAP, PhoneLayout.WORK_H
+	end
+	local grid = top + PhoneLayout.NEXT_H + PhoneLayout.MAIN_GAP + PhoneLayout.WORK_H + PhoneLayout.MAIN_GAP
+	local row = math.ceil(math.max(1, index) / 2)
+	return grid + (row - 1) * (PhoneLayout.TILE_H + PhoneLayout.TILE_GAP), PhoneLayout.TILE_H
+end
+
+-- 6.14 review: the home list's scroll (`y`, its view `view` tall) that shows `top` .. `top + height` whole: as it is
+-- when it does, else just enough (8 px of air).
+function PhoneLayout.reveal(top: number, height: number, y: number, view: number): number
+	if top < y then
+		return math.max(0, top - 8)
+	elseif top + height > y + view then
+		return math.max(0, top + height - view + 8)
+	end
+	return y
+end
+
 -- 6.0.1: an app's popup: 760 × 520 at the desktop scale (`cap`; touch keeps 1 so its text and targets stay full
 -- size), never wider than 92 % or taller than 86 % of the screen (the content scrolls).
 function PhoneLayout.popup(width: number, height: number, touch: boolean, cap: number): Popup

@@ -1143,6 +1143,111 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Get ready for the mission: a goal, and a grind that is fun (6.14)
+
+The owner: "The game is confusing about how you progress. You and a friend do delivery jobs, and zombies and bandits
+try to stop you. It should feel like 'okay, let's go get ready for that mission'. Jobs are the daily work: you grind,
+you save up for something, and then you progress in the mission." And: "a bit MORE grind, but a FUN grind." So the
+early levels stay as long as they were; 6.14 gives the grind a goal (the next mission and what it needs) and four
+things that make it fun: regulars, golden orders, a streak you can see and the shift's pay.
+
+### Get ready for the mission
+After Marge's first day nothing said what you work toward; now one answer does, in the phone, on the HUD and on the
+results (`shared/Readiness.luau`, `client/ReadyCheck.luau`, `Config.Readiness`).
+- **The next mission** (`Readiness.nextMission`): the first story chapter not finished and its next mission (where
+  the MISSIONS window opens; one step further when that chapter still waits for a level). With every story chapter
+  done: the DUO chapter's next; then the first mission short of ★★★ (a replay for stars).
+- **What it needs** (the READY CHECK's rows, what `server/Missions.luau` asks at START):
+  - ✔ / ✖ the level ("Reach level 4", the XP and about how many runs);
+  - a car of your own that you drive (a bike won't do; Earl's Old Van for $1,800 shows below its level too, so you
+    can save early);
+  - room for its pieces (another car of yours, a stage at Wrench Garage or the dealer's cheapest that holds them; a
+    mission that lends its vehicle needs no room);
+  - a partner in your crew, within 120 studs at START (DUO);
+  - 🌙 the night, for the three night-only missions (Blackout, Moonlight Rustlers, Midnight Formula).
+  - ☆ What would help, never blocking: a friend on a co-op mission, a vest and a two-handed gun from ★★★
+    (`HardTier`), a medkit, a repair kit once you drive. At most `MaxRows` = 5 rows, the required ones first.
+- **The savings goal**: the first row not done that costs money ("Old Van · $640 / $1,800"); never a medkit or a
+  repair kit (`NotGoals`). With the money but not the level it says so in amber ("$1,800 saved · level 4").
+- **START only when it can work** (`Readiness.startOf`, in the order the server refuses): IN PROGRESS, YOUR LEADER
+  PICKS (in somebody else's crew), FINISH YOUR RUN FIRST, NOT READY, CALL CAR FIRST, START. The server sends what it
+  needs in the Missions state (`carOut`, `onJob`, `partnersNear`, `garages`; StreamingEnabled hides far cars from
+  the client). The MISSIONS window's slots check counts the Roof Rack like the server (`Extras.holds`).
+- **The phone's home**: two wide tiles on top.
+  - **NEXT MISSION** (the mission, its chapter and n/N, "✖ 1 OF 2 READY" in red or "✔ READY · START" in green, the
+    goal and its bar) opens the **READY CHECK**: the mission, the rows with their actions (📍 GPS to the shop,
+    INVITE, JOBS, GARAGE), the goal, START (the MISSIONS window on that mission and its own START: the server checks
+    it all) or WORK, and OPEN MISSIONS.
+  - **WORK** is the JOBS app as before, with a second line: "Earn for the Old Van · $1,160 to go".
+  - TASKS and MISSIONS are the first of the smaller tiles (their lines, bars and badges as before).
+- **The HUD**: no big card. One quiet line under the cash, "🚐 OLD VAN $640 / $1,800" over a thin bar ("✓ BUY IT" in
+  green once you have the money; a tap opens the READY CHECK), hidden without a goal and through Marge's first day
+  (`client/SavingsLine.luau`; the money in its own label; on the shortest phones it hides so the left column stays
+  clear of the thumbstick, `TouchLayout.leftColumn`). When the next mission becomes ready: a toast "Ready for Paper Trail · open MISSIONS
+  (U)" and a sting, once.
+- **The job result**: "+$85 · $1,160 to go for the Old Van" (the last line of the result window; the DELIVERED
+  toast's second line after a run on foot or by bike).
+- **LEVEL UP** says what is new and where (`Career.whereOf`, `Career.whereRows`, `client/Gps.luau`): up to three
+  places with GPS (the van at Earl's Used Wheels, a bike at Dead End Motors' BIKES counter, a gun at Lead & Co.'s
+  range, kit at the gear stall, a stage or car gear at Wrench Garage, an employer's job at the employer), then
+  MISSIONS for a new chapter and ESTATE for a garage or a home.
+- **INVITE**: Roblox's game invite (`SocialService`, in pcalls), else the CREW window on the crew board.
+
+### Regulars
+Every business that gives you jobs remembers you (`shared/Regulars.luau`, `server/Regulars.luau`,
+`client/RegularsApp.luau`, `Config.Regulars`, `profile.regulars`).
+- Every order or job you deliver counts for its business: the 25 businesses of the job pictures, the employers'
+  workplaces and the specials' places among them. Missions never count; a crew member there with you counts their own.
+- **Bronze** at 5 deliveries (+5 % pay on every job for them), **Silver** at 15 (+10 %), **Gold** at 40 (+15 %),
+  **Platinum** at 100 (+20 %). A new tier says so with a toast and a sting.
+- Every job card on the phone's JOBS list and on J's board shows your tier with its business ("🥈 SILVER REGULAR
+  +10%", "🤝 3/5 TO BRONZE"); the result says "Regular · Luigi's Pizza (Silver) +$8".
+- MORE → **REGULARS**: every business as a card (its picture, the medal, a bar to the next tier, the bonus); the ones
+  you never delivered for are greyed ("Deliver for them once to meet them").
+- A Silver regular now and then gets a **REGULAR'S ORDER** from that business (×1.5 pay, 5 minutes on the board).
+
+### Golden orders
+`shared/SpecialOrders.luau`, `server/SpecialOrders.luau`, `client/SpecialOrderUi.luau`, `Config.Jobs.Golden`.
+- From level 3, every 2 minutes a 15 % chance of a **GOLDEN ORDER** on your board: one at a time, 3 minutes unless
+  you take it. It is a long haul for the transport you use (a bike run on your bike, one of your two hardest open
+  tiers with a car, else on foot).
+- It pays ×3 and gives ×2 XP, with more danger: bigger, faster waves and more bandits by tier; on foot or by bike
+  more stray zombies, runners among them.
+- It heads the JOBS list and J's board in gold (★ GOLDEN ORDER, its perks, a countdown) and comes with a toast and a
+  sting. It works with the crew like any job; ADD ALL takes it first; in NEXT UP its clock keeps running and it drops
+  out when time is up. The result says "★ GOLDEN ORDER ×3 · ×2 XP".
+
+### On a roll
+The 4.7 streak, its rules as they were (`shared/JobRules.luau`: a job rated ★★ or better makes it one longer, +5 % of
+the pay per job, +25 % at most; a ★ job, a failed job or a lost order ends it), now on the HUD (`client/GrindChips.luau`).
+- **The chip**: from one good job in a row, "🔥 ON A ROLL ×1.2" over "3 GOOD JOBS IN A ROW" (MAX at the top); ×1.2 is
+  what the next ★★+ job's pay is multiplied by. It pops with a bell (higher the longer the streak).
+- **When it breaks** it turns red, cracks, shakes and says "STREAK LOST · 4" ("A ★ JOB ENDS IT" / "A FAILED JOB ENDS
+  IT"), then goes. The result window says "🔥 On a roll: 4 good jobs in a row (+20% pay) +$40" or "Streak lost (4)".
+- **The job board** (J and the phone's JOBS): "7 jobs · ON A ROLL: next ★★+ job ×1.2".
+
+### The shift's pay
+`shared/Shift.luau`, `server/Shift.luau`, `Config.Jobs.Shift`.
+- Every job finished and paid to you counts (a board job, on foot, by bike, an employer's job, a mission; a run of
+  stacked orders once, at its last order; a crew member there with you counts their own; a road event's side pick-up
+  does not). 5 in one go pay the shift: $120 and 100 XP at level 1, × (1 + 0.25 × (level − 1)) ($300 and 250 XP at
+  level 7, $540 and 450 XP at 15). Then a new shift starts at 0/5.
+- 20 minutes without a job finished start it over; a failed job neither counts nor resets it. Per play session, never
+  saved.
+- "SHIFT 3/5" with a bar of five next to ON A ROLL (`TouchLayout.chips`: the top middle on a computer, between the
+  contract column and MAP / PHONE on a phone; they hide while a window is open). **SHIFT DONE** is a banner with the
+  pay, five pips, the till and confetti, after the DELIVERY window.
+
+### Also
+- **Daily tasks**: "Finish a shift", "Deliver N orders where you're a regular", "Finish a golden order".
+- **Analytics**: the `ShiftBonus` source; the `ShiftDone`, `GoldenOffered`, `GoldenTaken`, `GoldenDone`,
+  `GoldenExpired` and `RegularTierUp` events.
+- **Admin** (P → JOBS & MISSIONS): ★ GOLDEN ORDER NOW, ★ REGULAR'S ORDER NOW, REGULARS: NONE / BRONZE / SILVER / GOLD
+  / PLATINUM, STREAK 0 / 1 / 4, SHIFT 0 / 4 of 5.
+- **Tests**: `tests/readiness_test.luau`, `tests/regulars_test.luau`, `tests/specialorders_test.luau`,
+  `tests/shift_test.luau`, `tests/career_test.luau` (whereOf, whereRows), `tests/phone_layout_test.luau` (both tiles
+  above the fold), `tests/touchlayout_test.luau` (the chips), the phone recorder (`tools/phone-ui/check.luau`).
+
 ## Performance and mobile (6.13.1)
 
 The game is public, and many players are on phones. This pass is a static audit plus safe fixes. The report is

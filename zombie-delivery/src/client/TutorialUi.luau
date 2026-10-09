@@ -451,11 +451,11 @@ local function tourTarget(name: string): GuiObject?
 	elseif name == "minimap" then
 		return hudPart({ "LeftStack", "Minimap" }) -- client/MapView.luau
 	end
-	-- a tile of the phone's home (client/Phone.luau: jobsApp, mapApp, shopApp, bagApp)
+	-- a tile of the phone's home (client/Phone.luau: jobsApp, mapApp, shopApp, bagApp; 6.14: anywhere on the home, the
+	-- WORK tile (jobsApp) sits over the smaller tiles since 6.12.5)
 	local phoneGui = playerGui:FindFirstChild("ZombieDeliveryPhone")
 	local body = phoneGui and phoneGui:FindFirstChild("Phone")
-	local tiles = body and body:FindFirstChild("Tiles", true)
-	local tile = tiles and tiles:FindFirstChild(name)
+	local tile = body and body:FindFirstChild(name, true)
 	return if tile and tile:IsA("GuiObject") then tile else nil
 end
 
@@ -537,6 +537,13 @@ applyStop = function()
 			elseif phone.has() then
 				phone.open()
 			end
+			-- 6.14: the tile it points at scrolled into view (a short phone's home scrolls), once laid out
+			local target = stop.target
+			task.defer(function()
+				pcall(function()
+					phone.reveal(target)
+				end)
+			end)
 		elseif phone.isOpen() then
 			phone.close()
 		end
@@ -588,6 +595,11 @@ local function tourTick()
 			tour.phoneSeen = true -- (from now on the NEW PHONE pop-up finds it open and stays away)
 			TutorialArrow.focus() -- (the phone put the gamepad's selection on its first tile)
 		end
+		-- 6.14 review: the tile it points at stays in view (the phone was resized, it opened late)
+		local target = stop.target
+		pcall(function()
+			phone.reveal(target)
+		end)
 	elseif tour.phoneSeen or tour.tries >= PHONE_TRIES then
 		pastPhone() -- (you put it away: the tour never opens it against you; or it never came)
 	else

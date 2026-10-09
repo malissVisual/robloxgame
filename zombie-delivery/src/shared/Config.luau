@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.13.1"
+Config.Version = "6.14"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -2766,6 +2766,22 @@ Config.Jobs = {
 		StreakStep = 0.05,
 		StreakMax = 0.25,
 	},
+	-- 6.14, the shift's pay (shared/Shift.luau, server/Shift.luau; the HUD's SHIFT chip, client/GrindChips.luau): every
+	-- job finished and paid to you (a board job, on foot, by bike, an employer's, a mission; a run of stacked orders once,
+	-- at its last order; a crew member there with you counts their own; not a road event's add-on) counts one, and Jobs
+	-- of them in one go pay the shift: Money (rounded to MoneyStep) and Xp, both × (1 + LevelScale × (level − 1)) (level
+	-- 1: $120 and 100 XP; level 7: $300 and 250; level 15: $540 and 450), then a new shift starts at 0. A failed job
+	-- neither counts nor resets it (the streak punishes that already); more than IdleReset seconds without a job finished
+	-- start it over (6.14 review: 20 minutes, a stacked run of several orders takes a while). Per play session, never
+	-- saved.
+	Shift = {
+		Jobs = 5,
+		Money = 120,
+		Xp = 100,
+		LevelScale = 0.25,
+		MoneyStep = 5,
+		IdleReset = 1200,
+	},
 	-- 4.7, the licences (JobRules.hasLicence; profile.licences, profile.licenceJobs): the board's ordinary deliveries of
 	-- a tier listed here (and a board special without its own level, the Winter Run) need its level AND `jobs` jobs
 	-- rated ★★ or better at danger `atTier` or higher. A save from before 4.7 that has delivered and already has the
@@ -2956,6 +2972,28 @@ Config.Jobs = {
 		CheckEvery = 1.5,
 		RetryAfter = 8,
 		StartDelay = 4,
+	},
+	-- 6.14, the GOLDEN ORDERS (server/SpecialOrders.luau decides with shared/SpecialOrders.luau; the owner: "a bit MORE
+	-- grind, but a FUN grind"): every Every s (the board's refresh) a courier from Level on has Chance of a GOLDEN
+	-- ORDER on their board, one at a time (none while one is on the board, in NEXT UP or on the run). It is an ordinary
+	-- delivery (a LONG HAUL) of the transport you use: on your bike a bike run; with a car of your own one of your two
+	-- hardest open car tiers (the hardest TopTier of the time); else on foot. It pays Pay × the offer's pay, gives Xp ×
+	-- the XP and stays Seconds on the board (and in NEXT UP) unless you take it: a countdown, then it is gone. More
+	-- danger: a car run's waves × Waves[tier] (the way WANTED makes them: bigger, more often, more of them alive) and
+	-- the bandits Bandits[tier] times as often where the tier has bandits; on foot or by bike its own lighter danger
+	-- (Light: the stray walkers Every × as far apart, Chance more likely, Max more of them alive, Runner of them runners).
+	-- It works with the crew like any job (the shares, the XP).
+	Golden = {
+		Level = 3,
+		Every = 120,
+		Chance = 0.15,
+		Seconds = 180,
+		Pay = 3,
+		Xp = 2,
+		TopTier = 0.6,
+		Waves = { 1.6, 1.8, 2, 2.2 } :: { number },
+		Bandits = { 1, 1.75, 2, 2.25 } :: { number },
+		Light = { Every = 0.5, Chance = 0.3, Max = 1, Runner = 0.4 },
 	},
 	-- 5.3, real places (shared/Deliveries.luau, server/Jobs.luau, server/Cargo.luau): the board's deliveries start at
 	-- the business's storefront (Map.Venues; the nearest one to you: within the light job's PickupMax + PickupWiden on
@@ -3802,6 +3840,26 @@ Config.Goal = {
 	HintJobs = 3,
 }
 
+-- 6.14, get ready for the mission (the owner: "jobs are the daily work: you grind, you save up for something, and then
+-- you can progress in the mission"). shared/Readiness.luau picks the next story mission and what it needs; the phone's
+-- NEXT MISSION tile and its READY CHECK (client/ReadyCheck.luau), the HUD's savings line under the cash
+-- (client/SavingsLine.luau) and the job result's "to go" line show it.
+--   MaxRows     the READY CHECK's rows at most: every required one, then the recommended ones (those not done first)
+--   HardTier    a mission of this danger tier or more recommends a vest and a two-handed gun
+--   Medkits     medkits worth carrying into any mission (recommended)
+--   RepairKits  repair kits worth carrying into a mission you drive (recommended once you own a car)
+--   Sound       the sting of the one-time "Ready for …" toast (client/Sounds.luau)
+--   LineHeight  px at scale 1: the HUD's savings line, under the cash line (the left column grows by it while it shows)
+Config.Readiness = {
+	MaxRows = 5,
+	HardTier = 3,
+	Medkits = 1,
+	RepairKits = 1,
+	NotGoals = { medkit = true, repair = true } :: { [string]: boolean }, -- rows that never become the savings goal
+	Sound = "task_done",
+	LineHeight = 20,
+}
+
 export type JobTypeDef = {
 	id: string,
 	name: string,
@@ -4275,9 +4333,10 @@ Config.Analytics = {
 -- A kind: `event` is what server/Tasks.luau's Tasks.note counts (deliver: pieces delivered, `look` only that cargo
 -- look; ride: deliveries on a bike or a scooter; stars3: jobs finished at ★★★; perfect: PERFECT throws; zip: zip-line
 -- rides; wheelie: seconds of wheelie; bus: bus trips; kill: zombies killed, `night` only after dark; tips: tip
--- money; earn: delivery pay; mission: missions finished). `text` is the title ({n} the target; `one` when it is 1),
--- `target` the range it is picked from (in `step`s; `grow`: × (1 + grow × (level − 1)) for the ones that grow with
--- you), `money` and `xp` the reward (× (1 + LevelScale × (level − 1)), the level when the day starts).
+-- money; earn: delivery pay; mission: missions finished; 6.14: shift: shifts finished; regular: orders for a
+-- business you are a regular at; golden: golden orders finished). `text` is the title ({n} the target; `one` when
+-- it is 1), `target` the range it is picked from (in `step`s; `grow`: × (1 + grow × (level − 1)) for the ones that
+-- grow with you), `money` and `xp` the reward (× (1 + LevelScale × (level − 1)), the level when the day starts).
 -- All the dailies done opens the AllDaily bonus (its own CLAIM). A task done and not claimed by the reset is paid then.
 export type TaskDef = {
 	id: string,
@@ -4317,6 +4376,11 @@ Config.Tasks = {
 		{ id = "wheelie", event = "wheelie", text = "Wheelie for {n} seconds in all", target = { 10, 20 }, step = 5, money = 150, xp = 90, level = 2 },
 		{ id = "ride", event = "ride", text = "Make {n} deliveries on a bike or a scooter", one = "Make a delivery on a bike or a scooter", target = { 2, 4 }, money = 180, xp = 110, level = 2 },
 		{ id = "mission", event = "mission", text = "Finish {n} missions", one = "Finish a mission", target = { 1, 2 }, money = 300, xp = 150, level = 5 },
+		-- 6.14: the shift's pay (Config.Jobs.Shift: its deliveries in one go), server/Shift.luau notes "shift"
+		{ id = "shift", event = "shift", text = "Finish {n} shifts", one = `Finish a shift ({Config.Jobs.Shift.Jobs} jobs in one go)`, target = { 1, 2 }, money = 200, xp = 120 },
+		-- 6.14: the regulars (an order for a business you are Bronze or better at) and the golden orders
+		{ id = "regular", event = "regular", text = "Deliver {n} orders where you're a regular", one = "Deliver an order where you're a regular", target = { 2, 4 }, money = 180, xp = 110, level = 3 },
+		{ id = "golden", event = "golden", text = "Finish {n} golden orders", one = "Finish a golden order", target = { 1, 1 }, money = 300, xp = 160, level = 3 },
 	} :: { TaskDef },
 	WeeklyPool = {
 		{ id = "w_deliver", event = "deliver", text = "Deliver {n} pieces of cargo", target = { 40, 60 }, step = 5, money = 1500, xp = 600 },
@@ -4327,6 +4391,35 @@ Config.Tasks = {
 		{ id = "w_tips", event = "tips", text = "Earn ${n} in tips", target = { 300, 500 }, step = 50, grow = 0.25, money = 1500, xp = 600 },
 		{ id = "w_missions", event = "mission", text = "Finish {n} missions", target = { 4, 6 }, money = 2500, xp = 900, level = 5 },
 	} :: { TaskDef },
+}
+
+-- 6.14, the REGULARS (shared/Regulars.luau, server/Regulars.luau, client/RegularsApp.luau; the owner: "a bit MORE
+-- grind, but a FUN grind"): every business whose picture the job lists show (shared/JobThumbs.luau Assets, 25) counts
+-- the orders and jobs you delivered for it (profile.regulars; a mission never counts, a crew member counts their own).
+-- At a tier's `at` deliveries you are its regular: every delivery for it pays `bonus` more (on the rated pay, before
+-- the tips and the crew's split). A count is kept up to Cap.
+-- REGULAR'S ORDER (server/SpecialOrders.luau, the same path as the golden orders): every Order.Every s a courier who
+-- is a regular at Order.Tier (Silver) or better somewhere has Order.Chance of a REGULAR'S ORDER from one of those
+-- businesses on their board (one at a time): an ordinary delivery of that business paying Order.Pay × (Order.Xp × the
+-- XP), on the board (and in NEXT UP) for Order.Seconds.
+export type RegularTier = { id: string, name: string, at: number, bonus: number, icon: string }
+
+Config.Regulars = {
+	Tiers = {
+		{ id = "bronze", name = "Bronze", at = 5, bonus = 0.05, icon = "🥉" },
+		{ id = "silver", name = "Silver", at = 15, bonus = 0.1, icon = "🥈" },
+		{ id = "gold", name = "Gold", at = 40, bonus = 0.15, icon = "🥇" },
+		{ id = "platinum", name = "Platinum", at = 100, bonus = 0.2, icon = "💎" },
+	} :: { RegularTier },
+	Cap = 100000,
+	Order = {
+		Tier = 2,
+		Every = 120,
+		Chance = 0.2,
+		Seconds = 300,
+		Pay = 1.5,
+		Xp = 1,
+	},
 }
 
 -- 5.7, a living city and its air: the towers' four looks (shared/TowerLooks.luau), the street props on every ordinary

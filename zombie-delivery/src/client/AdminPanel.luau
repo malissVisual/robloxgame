@@ -16,8 +16,10 @@
 --   WORLD            6.13: the Analytics line (on / off, the counts); 6.13.1: the PERFORMANCE overlay (yours only); the
 --                    time of day, enemies near you, a horde, a bandit car, traffic, clear / kill all / FREEZE, teleport the
 --                    target to any landmark
---   JOBS & MISSIONS  any special job or ordinary tier, finish the stop / the whole job, the missions (all at 3 stars,
---                    reset, start any), the challenges, secrets and titles
+--   JOBS & MISSIONS  any special job or ordinary tier, finish the stop / the whole job, 6.14: the streak of good jobs
+--                    and the shift (STREAK 0 / 1 / 4, SHIFT 0 / 4 of 5), a GOLDEN ORDER or a REGULAR'S ORDER on the
+--                    board now, every business's deliveries at a regulars' tier (or none), the missions (all at 3
+--                    stars, reset, start any), the challenges, secrets and titles
 --   ESTATE           properties, the home, teleport to a property, the company's safe
 --   BUDDIES          NPC companions (server/Buddy.luau): + ADD, FOLLOW / STAY / GUARD, DISMISS, how many
 
@@ -495,7 +497,7 @@ end
 
 -- JOBS & MISSIONS: the jobs, the missions (shared/Missions.luau) and the challenges (shared/Challenges.luau).
 R.jobs = function()
-	heading(`Jobs · {whom()}`, "Starts it now with its vehicle (a running job is cancelled). FINISH THE JOB pays the whole job as delivered.")
+	heading(`Jobs · {whom()}`, "Starts it now with its vehicle (a running job is cancelled). FINISH THE JOB pays the whole job as delivered. STREAK / SHIFT (6.14) set the streak of good jobs and this session's shift.")
 	local testing = grid(200)
 	action(testing, "FINISH THIS STOP", C.blue, function()
 		send("finishStop")
@@ -507,6 +509,36 @@ R.jobs = function()
 	for _, kind in { "survivor", "addon", "roadblock" } do
 		action(testing, `EVENT: {string.upper(kind)}`, C.grey, function()
 			send("roadEvent", kind)
+		end)
+	end
+	-- 6.14: a golden order or a regular's order on the board now (server/SpecialOrders.luau), and every business's
+	-- deliveries at a regulars' tier (server/Regulars.luau): REGULARS 0 clears them.
+	action(testing, "★ GOLDEN ORDER NOW", P.gold, function()
+		send("goldenOrder")
+	end)
+	action(testing, "★ REGULAR'S ORDER NOW", C.yellow, function()
+		send("regularOrder")
+	end)
+	action(testing, "REGULARS: NONE", C.grey, function()
+		send("regulars", 0)
+	end)
+	for _, tier in Config.Regulars.Tiers do
+		action(testing, `REGULARS: {string.upper(tier.name)} ({tier.at})`, C.grey, function()
+			send("regulars", tier.at)
+		end)
+	end
+	-- 6.14: the streak of good jobs and this session's shift (the HUD's ON A ROLL and SHIFT chips; at SHIFT 4 / 5 the
+	-- next delivery paid is SHIFT DONE).
+	local grind = grid(150)
+	for _, n in { 0, 1, 4 } do
+		action(grind, `STREAK {n}`, if n == 0 then C.red else C.yellow, function()
+			send("streak", n)
+		end)
+	end
+	local last = Config.Jobs.Shift.Jobs - 1
+	for _, n in { 0, last } do
+		action(grind, `SHIFT {n} / {Config.Jobs.Shift.Jobs}`, if n == 0 then C.grey else C.green, function()
+			send("shift", n)
 		end)
 	end
 	local special = grid(150)

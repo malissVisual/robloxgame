@@ -325,6 +325,90 @@ for _, step in road50 do
 end
 check("6.12.14: every gun on the road is sold at Lead & Co.'s range (the pistol: yours from the start)", gunsSay and guns >= 3 and Config.GunRange.Shop == "Lead & Co.'s range", guns)
 
+-- 6.14: Career.whereOf: what a level opens AND where it is (the level-up card's GPS, MISSIONS and ESTATE buttons).
+do
+	local Map = require("./Map")
+	local landmarks: { [string]: boolean } = {}
+	for _, landmark in Map.Landmarks do
+		landmarks[landmark.id] = true
+	end
+	local function where(kind: string, id: string): Career.Where?
+		return Career.whereOf({ kind = kind, id = id, name = id })
+	end
+	local van = where("car", "van") :: Career.Where
+	check("6.14: the Old Van is at Earl's Used Wheels (the GPS to Earl)", van.place == "earl" and van.label == "Earl's Used Wheels" and landmarks.earl == true)
+	check("6.14: a dealer's car at Dead End Motors", (where("car", "boxtruck") :: Career.Where).place == "dealer" and (where("car", "boxtruck") :: Career.Where).label == "Dead End Motors")
+	local bike = where("bike", "rustbike") :: Career.Where
+	check("6.14: a bike at Dead End Motors' BIKES counter (Map.Shops.bikes)", bike.place == "bikes" and Map.Shops.bikes ~= nil and bike.label == "Dead End Motors' BIKES counter")
+	check("6.14: bike gear at the BIKES counter, car gear, stages and car guns at Wrench Garage",
+		(where("gear", "basket") :: Career.Where).place == "bikes" and (where("gear", "straps") :: Career.Where).place == "mechanic"
+			and (where("stage", "van:2") :: Career.Where).place == "mechanic" and (where("cargun", Config.CarGuns[1].id) :: Career.Where).label == "Wrench Garage")
+	check("6.14: a gun at Lead & Co.'s range; the starter pistol and a reward gun need no trip", (where("gun", "shotgun") :: Career.Where).place == "guns" and (where("gun", "shotgun") :: Career.Where).label == Config.GunRange.Shop
+		and where("gun", "pistol") == nil and where("gun", "carbine") == nil)
+	check("6.14: kit at its counter of the gear stall (a bag at ZDC Bags, a vest at Last Stop Supplies), the bat at the range, the starter bag nowhere",
+		(where("kit", "tote") :: Career.Where).place == "bags" and (where("kit", "kevlar") :: Career.Where).place == "supplies" and (where("kit", "kevlar") :: Career.Where).label == "Last Stop Supplies"
+			and (where("kit", "bat") :: Career.Where).place == "guns" and where("kit", "bag") == nil)
+	check("6.14: an employer's job at the employer's place (its landmark), a board job and a danger level on JOBS",
+		(where("job", "schoolrun") :: Career.Where).place == "school" and landmarks.school == true and (where("tier", "1") :: Career.Where).window == "jobs" and (where("foot", "foot") :: Career.Where).window == "jobs")
+	check("6.14: a campaign opens MISSIONS, a garage or a home ESTATE", (where("campaign", "dispatch") :: Career.Where).window == "missions" and (where("garage", "garage_rented") :: Career.Where).window == "estate" and (where("estate", "sunset") :: Career.Where).window == "estate")
+	-- Every unlock on the road: a place the GPS knows (a shop or a landmark), a window, or nothing (the starters).
+	local unknown: { string } = {}
+	for _, step in road do
+		for _, unlock in step.unlocks do
+			local found = Career.whereOf(unlock)
+			if found and found.place and not (Map.Shops[found.place] or landmarks[found.place]) then
+				table.insert(unknown, `{unlock.kind}:{unlock.id}`)
+			elseif found and not found.place and not found.window then
+				table.insert(unknown, `{unlock.kind}:{unlock.id} (neither)`)
+			end
+		end
+	end
+	check("6.14: every unlock on the road is found on the map (a shop or a landmark) or opens a window", #unknown == 0, table.concat(unknown, ", "))
+	local level4 = 0
+	for _, unlock in road[4].unlocks do
+		local found = Career.whereOf(unlock)
+		if found and found.place then
+			level4 += 1
+		end
+	end
+	check("6.14: level 4 opens several placed things (the card shows 3 GPS buttons at most)", level4 > 3, level4)
+	-- The level-up card's rows (Career.whereRows): the vehicles first, grouped by place, 3 places, then MISSIONS.
+	-- (no car yet: the card leaves the Patched Van stage out)
+	local carless: { Career.Unlock } = {}
+	for _, unlock in road[4].unlocks do
+		if unlock.kind ~= "stage" then
+			table.insert(carless, unlock)
+		end
+	end
+	local rows = Career.whereRows(carless, 3, 4)
+	local function labels(): string
+		local out: { string } = {}
+		for _, row in rows do
+			table.insert(out, `{row.place or row.window}={table.concat(row.names, "+")}`)
+		end
+		return table.concat(out, " | ")
+	end
+	check("6.14: level 4's card: Earl's van first, the range's Shotgun, the Padded Messenger Bag at ZDC Bags, then MISSIONS",
+		#rows == 4 and rows[1].place == "earl" and rows[1].names[1] == "Old Van" and #rows[1].names == 1 and rows[2].place == "guns" and rows[2].names[1] == "Shotgun"
+			and rows[3].place == "bags" and rows[4].window == "missions" and rows[4].id == "dispatch" and rows[4].names[1] == "First Shift", labels())
+	local grouped = Career.whereRows(road[4].unlocks, 9, 9)
+	local garage: Career.WhereRow? = nil
+	for _, row in grouped do
+		if row.place == "mechanic" then
+			garage = row
+		end
+	end
+	check("6.14: one row a place: Wrench Garage's stage and gear together", garage ~= nil and #garage.names >= 3, labels())
+	check("6.14: short names leave out where ('SMG at Lead & Co.'s range' → SMG)", Career.shortName({ kind = "gun", id = "smg", name = "SMG at Lead & Co.'s range" }) == "SMG"
+		and Career.shortName({ kind = "job", id = "schoolrun", name = "School Run (Sunny Hill School)" }) == "School Run" and Career.shortName({ kind = "gear", id = "basket", name = "Front Basket" }) == "Front Basket")
+	local two = Career.whereRows(road[2].unlocks, 3, 4)
+	local estateRow = false
+	for _, row in two do
+		estateRow = estateRow or row.window == "estate"
+	end
+	check("6.14: level 2's card: the bikes at the BIKES counter and ESTATE for the Rented Lockup", two[1] ~= nil and two[1].place == "bikes" and estateRow and #two <= 4)
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

@@ -26,7 +26,7 @@
 --     three rows, each with its trade-off as a tag (🛡 SHORT & SAFE, 🛣 LONG HAUL, ☠ RISKY, 📦 BULK ORDER) and a WHY
 --     line, and REROLL $100 on the header (RerollTier: new offers of that tier, once until the board refreshes). A
 --     tier without its licence (shared/JobRules.luau) shows one row locked "🪪 LICENCE 3 / 5" with what it needs; the
---     caption names your streak of good jobs.
+--     caption names your streak of good jobs (6.14: "ON A ROLL: next ★★+ job ×1.2", shared/Shift.luau).
 --   * On a delivery the board shows that job and GIVE UP THIS DELIVERY (CancelJob) instead of offers.
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
 --   * 5.0, the career starts on foot: the offers with mode = "foot" (a missing mode is "car") come first in an ON FOOT
@@ -56,6 +56,10 @@
 --     briefing opens with its business's picture across the column (about 2.4 : 1, at most 150 px tall, cropped: the
 --     sign stays; the business's name on a dark label), a slim banner (the cargo emoji and the name) while it is not
 --     uploaded; NEXT UP's rows a small square of it once uploaded.
+--   * 6.14: a GOLDEN ORDER or a REGULAR'S ORDER (the row's `specialOrder`, client/SpecialOrderUi.luau) heads the list
+--     under its own header, its row in gold (or a cool silver) with a ★ chip and a countdown chip; a queued one says
+--     in NEXT UP when it runs out. Every row's chips name your tier with its business (client/RegularsApp.luau badge:
+--     "🥈 SILVER REGULAR +10%").
 -- The window (Ui.window) is built on first open (lazy) in a ScreenGui of its own, scaled like every window
 -- (Ui.screenScale) and sized to the screen. ESC (and the gamepad's B, and opening the Roblox menu) close it; while it is open the mouse is
 -- free (Main: CameraRig.mouseNeeded checks DispatchUi.isOpen()). 4.2, a gamepad: the selection starts on the first
@@ -81,6 +85,8 @@ local BikeShop = require(script.Parent.BikeShop) -- 5.1: your bike and what it h
 local Transport = require(Shared.Transport)
 local JobQueue = require(Shared.JobQueue) -- 6.12.8: YOUR RUN and NEXT UP, the same words as the phone's BOARD
 local JobThumbUi = require(script.Parent.JobThumbUi) -- 6.12.11: the job pictures
+local SpecialOrderUi = require(script.Parent.SpecialOrderUi) -- 6.14: the golden and the regulars' orders
+local RegularsApp = require(script.Parent.RegularsApp) -- 6.14: your tier with a job's business
 
 local K = Theme.Contract
 local C = Theme.Colors
@@ -692,6 +698,14 @@ local function dangerRow(body: any, offer: any)
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, row)
 	local stars = tonumber(offer.stars) or 1
+	-- 6.14: a golden or a regular's order: its ★ chip and its countdown first
+	local special = if type(offer.specialOrder) == "table" then offer.specialOrder else nil
+	if special then
+		SpecialOrderUi.tintChip(chip(row, if special.kind == "golden" then "★ GOLDEN ORDER" else "★ REGULAR'S ORDER", K.text, 0), offer)
+		local left = chip(row, "", K.text, 0)
+		SpecialOrderUi.tintChip(left, offer)
+		SpecialOrderUi.countdown(left, special.expiresAt, "⏱ ")
+	end
 	if isFoot(offer) then
 		-- 5.0: an on-foot run: no danger level, the walker's chip.
 		chip(row, "🚶 ON FOOT", K.text, 1).TextColor3 = K.text
@@ -745,6 +759,11 @@ local function dangerRow(body: any, offer: any)
 				chip(row, name, if rule == "fragile" then K.red else K.rule, 6 + index)
 			end
 		end
+	end
+	-- 6.14: your tier with its business (client/RegularsApp.luau)
+	local badge, tint = RegularsApp.badge(offer)
+	if badge then
+		chip(row, badge, K.text, 20).TextColor3 = tint or K.secondary
 	end
 end
 
@@ -989,6 +1008,7 @@ local function offerTicket(offer: any, number: number, order: number?)
 	local holder = card.Parent
 	local waits = job ~= nil and offer.queue == true and lockLevel == nil -- 6.12.8: + QUEUE: it waits for your car or bike
 	card.BackgroundColor3 = if note and not waits then LOCKED_ROW else ROW
+	SpecialOrderUi.frame(card, offer) -- 6.14: a golden or a regular's order: its face and frame
 	body.ZIndex = 2
 	stub.ZIndex = 2
 	spine(card, offer, number)
@@ -1096,6 +1116,36 @@ end
 
 -- 5.0: the header of the ON FOOT section: what these runs are, and your room on the right. 5.3 review: `note`, why
 -- there is no run (the board's footNote: the shops near you are shut), in red when there is none.
+-- 6.14: the header of the special orders (a golden one, a regular's): what they are, in their colour.
+local function specialHeader(list: { any }, order: number)
+	local golden = false
+	for _, offer in list do
+		golden = golden or (type(offer.specialOrder) == "table" and offer.specialOrder.kind == "golden")
+	end
+	local color = SpecialOrderUi.colorOf(if golden then { kind = "golden" } else nil)
+	local row = Ui.make("Frame", { Name = "SpecialHeader", Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
+	marker(row)
+	local marked = row:FindFirstChild("Marker")
+	if marked then
+		marked.BackgroundColor3 = color
+	end
+	text(row, if golden then "★  GOLDEN ORDER" else "★  REGULAR'S ORDER", UDim2.new(1, -24, 0, 18), {
+		Position = UDim2.fromOffset(18, 4),
+		Font = Theme.HeadingFont,
+		TextSize = 13,
+		TextColor3 = color,
+		TextWrapped = false,
+	})
+	text(row, "Better pay for a few minutes: take it before its clock runs out (in NEXT UP its clock runs too).", UDim2.new(1, -24, 0, 16), {
+		Position = UDim2.fromOffset(18, 22),
+		TextSize = 12,
+		TextColor3 = K.secondary,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = color, BorderSizePixel = 0 }, row)
+end
+
 local function footHeader(count: number, order: number, note: string?)
 	local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, LayoutOrder = order }, refs.list)
 	marker(row) -- 5.8
@@ -1295,6 +1345,21 @@ local function nextUpRows()
 			TextWrapped = false,
 			TextXAlignment = Enum.TextXAlignment.Right,
 		})
+		-- 6.14: a golden or a regular's order runs out in NEXT UP as on the board
+		local special = if type(entry.specialOrder) == "table" then entry.specialOrder else nil
+		if special then
+			local runs = text(row, "", UDim2.fromOffset(110, 16), {
+				Name = "RunsOut",
+				Position = UDim2.new(1, -70, 0, 29),
+				AnchorPoint = Vector2.new(1, 0),
+				Font = Theme.HeadingFont,
+				TextSize = 11,
+				TextColor3 = SpecialOrderUi.colorOf(special),
+				TextWrapped = false,
+				TextXAlignment = Enum.TextXAlignment.Right,
+			})
+			SpecialOrderUi.countdown(runs, special.expiresAt, "★ ⏱ ")
+		end
 		local id = tonumber(entry.id)
 		action(row, "✕", UDim2.fromOffset(44, 36), UDim2.new(1, -32, 0, 6), nil, function()
 			Net.get("JobQueue"):FireServer("drop", id)
@@ -1364,23 +1429,40 @@ renderList = function()
 		return
 	end
 	local visible = shown(list)
-	-- 4.7: your streak of good jobs (rated ★★ or better) in the caption.
-	local streak = if boardInfo and type(boardInfo.streak) == "number" then boardInfo.streak else 0
-	local bonus = math.floor(math.min(Config.Jobs.Rating.StreakMax, Config.Jobs.Rating.StreakStep * streak) * 100 + 0.5)
-	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board{if streak > 0 then `  ·  STREAK {streak} (+{bonus}% pay)` else ""}`
+	-- 4.7: your streak of good jobs (rated ★★ or better) in the caption. 6.14: as the HUD's ON A ROLL chip says it
+	-- (client/GrindChips.luau: the streak now, the board's own from when it came), what the next ★★+ job pays.
+	local streak = require(script.Parent.GrindChips).streak() or (if boardInfo and type(boardInfo.streak) == "number" then boardInfo.streak else 0)
+	local roll = require(Shared.Shift).boardText(streak)
+	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"}{if roll ~= "" then `  ·  {roll}` else " on the board"}`
 	local footNote = if boardInfo and type(boardInfo.footNote) == "string" then boardInfo.footNote else nil -- 5.3 review
 	if #visible == 0 then
 		message(if footNote and filter == "all" then footNote elseif #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")
 		return
 	end
 	-- 5.0: the on-foot runs first, under their own header; 5.1: then the bike runs under theirs; then the car jobs.
+	-- 6.14: a golden or a regular's order before them all, under its own header.
+	local specials, others = SpecialOrderUi.split(visible)
 	local walks: { any } = {}
 	local rides: { any } = {}
 	local rest: { any } = {}
-	for _, offer in visible do
+	for _, offer in others do
 		table.insert(if isFoot(offer) then walks elseif isBike(offer) then rides else rest, offer)
 	end
 	local order = 0
+	if #specials > 0 then
+		order += 1
+		local ok, err = pcall(specialHeader, specials, order)
+		if not ok then
+			warn(`[DispatchUi] the special orders' header failed: {err}`)
+		end
+		for number, offer in specials do
+			order += 1
+			local ticketOk, ticketErr = pcall(offerTicket, offer, number, order)
+			if not ticketOk then
+				warn(`[DispatchUi] a ticket failed: {ticketErr}`)
+			end
+		end
+	end
 	if #walks > 0 or (footNote ~= nil and filter == "all") then
 		order += 1
 		local ok, err = pcall(footHeader, #walks, order, footNote)
@@ -1389,7 +1471,7 @@ renderList = function()
 		end
 		for number, offer in walks do
 			order += 1
-			local ticketOk, ticketErr = pcall(offerTicket, offer, number, order)
+			local ticketOk, ticketErr = pcall(offerTicket, offer, #specials + number, order)
 			if not ticketOk then
 				warn(`[DispatchUi] a ticket failed: {ticketErr}`)
 			end
@@ -1403,7 +1485,7 @@ renderList = function()
 		end
 		for number, offer in rides do
 			order += 1
-			local ticketOk, ticketErr = pcall(offerTicket, offer, #walks + number, order)
+			local ticketOk, ticketErr = pcall(offerTicket, offer, #specials + #walks + number, order)
 			if not ticketOk then
 				warn(`[DispatchUi] a ticket failed: {ticketErr}`)
 			end
@@ -1424,7 +1506,7 @@ renderList = function()
 			end
 		end
 		order += 1
-		local ok, err = pcall(offerTicket, offer, #walks + #rides + index, order)
+		local ok, err = pcall(offerTicket, offer, #specials + #walks + #rides + index, order)
 		if not ok then
 			warn(`[DispatchUi] a ticket failed: {err}`)
 		end

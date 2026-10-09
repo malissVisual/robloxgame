@@ -269,6 +269,8 @@ leftStack = placed(Ui.make("Frame", {
 	BackgroundTransparency = 1,
 }, gui))
 Ui.list(leftStack, true, 6)
+-- 6.14: the savings line under the cash (client/SavingsLine.luau) grows the column while it shows: lay out again
+leftStack:GetPropertyChangedSignal("Size"):Connect(requestLayout)
 -- 3.8: "$12,480 / LV 7 ROAD RAT" in compact white type, a hairline of the XP under it; the XP numbers only on hover
 -- (or a tap on a touch screen), quietly to the right of the line (3.1.4+).
 local moneyHolder = Ui.make("Frame", { Name = "Cash", Size = UDim2.fromOffset(LEFT_W, MONEY_HEIGHT), BackgroundTransparency = 1, LayoutOrder = 1 }, leftStack)
@@ -1589,13 +1591,17 @@ end
 
 function Hud.showResult(r: any)
 	view.goal.result(r) -- 6.5: the NEXT card says "Delivered! +$45 · Press J for the next job" for a few seconds
+	require(script.Parent.SpecialOrderUi).toast(r, Hud.toast) -- 6.14: a run's toast: its golden / regular's lines
 	-- 5.7: a foot or bike run done (r.mode): a toast and the pay floating up from the money (client/PayFloat.luau), not
 	-- this window; a level-up still shows its card (client/CareerUi.luau). Car jobs, missions and failures keep it.
 	if type(r) == "table" and r.success == true and (r.mode == "foot" or r.mode == "bike") then
 		local got = if type(r.rating) == "table" then math.clamp(math.floor(tonumber(r.rating.stars) or 0), 0, 3) else 0
 		local left = if type(r.order) == "table" then tonumber(r.order.left) or 0 else 0
 		local streak = if type(r.rating) == "table" and got >= 2 then tonumber(r.rating.streak) or 0 else 0
-		Hud.toast(`{if r.midJob == true then "ORDER DONE" else "DELIVERED"}{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · {r.cargo or "cargo"} for {r.customer or r.driver or "the customer"}{if left > 0 then ` · {left} to go` elseif streak > 1 then ` · streak {streak}` else ""}`)
+		-- 6.14: what the pay (6.14 review: and a SHIFT DONE's pay, server/Shift.luau, as the window's line) brings the
+		-- savings goal to, on the DELIVERED toast's second line ("$1,160 to go for the Old Van"; client/ReadyCheck.luau)
+		local saving = if r.midJob ~= true then require(script.Parent.ReadyCheck).goalWords((tonumber(r.total) or 0) + (if type(r.shift) == "table" and r.shift.done == true then tonumber(r.shift.money) or 0 else 0)) else nil
+		Hud.toast(`{if r.midJob == true then "ORDER DONE" else "DELIVERED"}{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · {r.cargo or "cargo"} for {r.customer or r.driver or "the customer"}{if left > 0 then ` · {left} to go` elseif streak > 1 then ` · streak {streak}` else ""}{if saving then `\n💰 {saving}` else ""}`)
 		local xp = tonumber(r.xp) or 0
 		require(script.Parent.PayFloat).show(moneyLabel, `+{Ui.money(tonumber(r.total) or 0)}{if xp > 0 then ` · +{xp} XP` else ""}`)
 		return
@@ -1767,10 +1773,13 @@ function Hud.showResult(r: any)
 			local streak = tonumber(rating.streak) or 0
 			local streakPay = tonumber(rating.streakPay) or 0
 			if got >= 2 and streak > 0 then
+				-- 6.14: as the HUD's ON A ROLL chip (client/GrindChips.luau) calls it
 				local bonus = math.floor((tonumber(rating.streakBonus) or 0) * 100 + 0.5)
-				line(`Streak: {streak} good {if streak == 1 then "job" else "jobs"} in a row (+{bonus}%)`, if streakPay > 0 then "+" .. Ui.money(streakPay) else nil, C.green, 12)
+				line(`🔥 On a roll: {streak} good {if streak == 1 then "job" else "jobs"} in a row (+{bonus}% pay)`, if streakPay > 0 then "+" .. Ui.money(streakPay) else nil, C.green, 12)
+			elseif (tonumber(rating.streakLost) or 0) > 0 then
+				line(`Streak lost ({rating.streakLost}): a ★ job · ★★ or better keeps it`, nil, C.red, 12) -- 6.14: how long it was
 			else
-				line("Streak ended: a ★ job (★★ or better keeps it)", nil, C.red, 12)
+				line("A ★ job starts no streak (★★ or better does)", nil, C.dim, 12)
 			end
 			local licence = if type(rating.licence) == "table" then rating.licence else nil
 			if licence and licence.earned == true then
@@ -1786,6 +1795,13 @@ function Hud.showResult(r: any)
 			line(`Shared with the crew ({riders})`, "-" .. Ui.money(-crewBonus), C.dim, 14)
 		end
 		line("TOTAL", Ui.money(r.total), C.yellow, 20)
+		-- 6.14: what the pay (and a SHIFT DONE's pay, server/Shift.luau) brings the savings goal to (client/ReadyCheck.luau;
+		-- nothing without a goal); the last line, under the shift's
+		local shiftPay = if type(r.shift) == "table" and r.shift.done == true then tonumber(r.shift.money) or 0 else 0
+		local saving = require(script.Parent.ReadyCheck).resultLine((tonumber(r.total) or 0) + shiftPay)
+		if saving then
+			line(saving, nil, C.green, 27)
+		end
 		local employer = r.employer
 		if employer then
 			line(`{employer.name}: {employer.done} jobs done`, nil, C.yellow, 21)
@@ -1812,8 +1828,28 @@ function Hud.showResult(r: any)
 		Ui.label(result.body, r.reason or "", UDim2.new(1, -10, 0, 60), { LayoutOrder = 2, TextColor3 = P.ink })
 		local lostStreak = tonumber(r.streakLost)
 		if lostStreak and lostStreak > 0 then
-			-- 4.7: a failed job ends the streak of good jobs.
-			line(`Streak of {lostStreak} good {if lostStreak == 1 then "job" else "jobs"} lost`, nil, C.red, 3)
+			-- 4.7: a failed job ends the streak of good jobs (6.14: in the HUD chip's words).
+			line(`Streak lost ({lostStreak} good {if lostStreak == 1 then "job" else "jobs"} in a row)`, nil, C.red, 3)
+		end
+	end
+	do
+		-- 6.14: the shift (server/Shift.luau): how far it is, or SHIFT DONE and its pay (the HUD's banner follows this
+		-- window, client/GrindChips.luau). A failed job leaves it as it was: no line.
+		local shift = if r.success and type(r.shift) == "table" then r.shift else nil
+		if shift then
+			local target = tonumber(shift.target) or Config.Jobs.Shift.Jobs
+			if shift.done == true then
+				line(`🏁 SHIFT DONE: {target} jobs in one go · +{tonumber(shift.xp) or 0} XP`, "+" .. Ui.money(tonumber(shift.money) or 0), C.green, 25)
+			else
+				local count = tonumber(shift.count) or 0
+				line(`Shift {count}/{target} · {target - count} more for the shift's pay`, nil, C.dim, 25)
+			end
+		end
+	end
+	do -- 6.14: a golden order, a regular's order, your regular's bonus (client/SpecialOrderUi.luau), before TOTAL
+		local special = require(script.Parent.SpecialOrderUi)
+		for _, extra in special.resultLines(r) do
+			special.tint(line(extra.text, special.money(extra), C.green, 15), extra.gold)
 		end
 	end
 	-- The XP of the job, the level bar and a level-up with what it unlocks.
@@ -3210,11 +3246,18 @@ local levelUpUnlocks = Ui.label(levelUpBody, "", UDim2.new(1, 0, 0, 0), {
 local levelUpStamp = 0
 
 local function showLevelUp(from: number, to: number)
+	-- 6.14 review: the names only and at most 6 ("and 3 more"), as the level-up card's line (client/CareerUi.luau
+	-- unlockLine(…, 6)): the card, with its WHERE rows and GPS buttons, says where each one is.
 	local unlocked: { string } = {}
 	for level = from + 1, to do
 		for _, name in unlocksAt(level) do
 			table.insert(unlocked, name)
 		end
+	end
+	if #unlocked > 6 then
+		local more = #unlocked - 6
+		unlocked = table.move(unlocked, 1, 6, 1, {})
+		table.insert(unlocked, `and {more} more`)
 	end
 	local rank = Levels.rank(to)
 	levelUpTitle.Text = `LEVEL {to}  /  {rank:upper()}`
@@ -3624,17 +3667,24 @@ layout = function()
 	-- What the contract column and the action must stay clear of.
 	local below: { Box } = {}
 
-	-- Left: the cash line, the minimap and the health row.
+	-- Left: the cash line, the minimap and the health row (6.14: its height now, LEFT_H + the savings line while it shows).
 	setScale(leftStack, S)
 	local left: Box
 	if touchLayout then
+		-- 6.14 review (client/TouchLayout.luau leftColumn): with the savings line the column still ends over the
+		-- thumbstick's corner, a little smaller if need be; with no room for it the line stays away (SavingsRoom,
+		-- client/SavingsLine.luau).
+		local fits, leftScale = require(script.Parent.TouchLayout).leftColumn(require(script.Parent.TouchLayout).cluster(W, H, S), S, LEFT_H, Config.Readiness.LineHeight, leftStack.Size.Y.Offset)
+		leftStack:SetAttribute("SavingsRoom", fits)
+		setScale(leftStack, leftScale)
 		leftStack.AnchorPoint = Vector2.zero
 		leftStack.Position = UDim2.fromOffset(MARGIN, MARGIN)
-		left = box(MARGIN, MARGIN, MARGIN + LEFT_W * S, MARGIN + LEFT_H * S)
+		left = box(MARGIN, MARGIN, MARGIN + LEFT_W * leftScale, MARGIN + leftStack.Size.Y.Offset * leftScale)
 	else
+		leftStack:SetAttribute("SavingsRoom", true)
 		leftStack.AnchorPoint = Vector2.new(0, 1)
 		leftStack.Position = UDim2.new(0, MARGIN, 1, -MARGIN)
-		left = box(MARGIN, H - MARGIN - LEFT_H * S, MARGIN + LEFT_W * S, H - MARGIN)
+		left = box(MARGIN, H - MARGIN - leftStack.Size.Y.Offset * S, MARGIN + LEFT_W * S, H - MARGIN)
 		table.insert(below, left)
 	end
 

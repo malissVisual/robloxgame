@@ -40,6 +40,7 @@ local CareerUi = require(Client.CareerUi)
 local RoadEventUi = require(Client.RoadEventUi)
 local Phone = require(Client.Phone)
 local CargoPrompts = require(Client.CargoPrompts)
+local ReadyCheck = require(Client.ReadyCheck) -- 6.14: get ready for the mission (the phone's NEXT MISSION, the HUD's savings line)
 
 -- Every part starts on its own: one that fails (see the Output) does not take the others down.
 local function safely(name: string, start: () -> ())
@@ -56,6 +57,7 @@ safely("ZombieAnimator", ZombieAnimator.start)
 safely("CarVisuals", CarVisuals.start)
 safely("Weather", Weather.start)
 safely("Hud", Hud.start)
+safely("ReadyCheck", ReadyCheck.start) -- 6.14: the Missions and Tutorial states it reads, the HUD's savings line
 safely("CameraRig", CameraRig.start)
 safely("ArmPose", ArmPose.start)
 safely("AdminPanel", AdminPanel.start)
@@ -98,6 +100,7 @@ safely("Unstuck", require(Client.Unstuck).start) -- 6.0.1: lifts your courier ou
 safely("CurbRide", require(Client.CurbRide).start) -- 6.10: up the kerb's slope at speed without a hop off its top
 safely("ShopPropMotion", require(Client.ShopPropMotion).start) -- 6.11: the bank's coin spins, Luigi's pizza slice bobs
 safely("PerfOverlay", require(Client.PerfOverlay).start) -- 6.13.1: the admin's performance overlay (the P panel's WORLD tab)
+safely("GrindChips", require(Client.GrindChips).start) -- 6.14: ON A ROLL and SHIFT 3/5 at the top, SHIFT DONE
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast
@@ -150,6 +153,37 @@ Phone.onMissions = function() -- 6.8: MORE → MISSIONS always opens it (on the 
 end
 Phone.missionInfo = MissionsUi.summary -- 6.12.5: the MISSIONS tile on the phone's home
 Phone.onCrew = CrewPanel.toggle
+-- 6.14, get ready for the mission (client/ReadyCheck.luau): START opens the MISSIONS window on that mission and presses
+-- its own START (the server checks it all, as always); MISSIONS opens the chapter; INVITE falls back to CREW (the crew
+-- board for that mission); the HUD's savings line opens the phone's READY CHECK; the level-up card's buttons.
+ReadyCheck.notify = Hud.toast
+ReadyCheck.toGo = CareerUi.toGo
+ReadyCheck.onStart = function(missionId: string)
+	local def = require(Shared.Missions).find(missionId)
+	MissionsUi.open(if def then def.campaign else nil)
+	MissionsUi.startMission(missionId)
+end
+ReadyCheck.onMissions = function(campaignId: string?)
+	MissionsUi.open(campaignId)
+end
+ReadyCheck.onCrew = function(missionId: string?)
+	if missionId then
+		MissionsUi.findCrew(missionId)
+	else
+		CrewPanel.open()
+	end
+end
+require(Client.SavingsLine).onOpen = function()
+	Phone.open("ready")
+end
+CareerUi.notify = Hud.toast
+CareerUi.openWindow = function(window: string, id: string?)
+	if window == "missions" then
+		MissionsUi.open(id)
+	elseif window == "estate" then
+		EstateUi.openList()
+	end
+end
 Phone.onTop = Leaderboard.toggle
 Phone.onEstate = EstateUi.toggleList
 Phone.onSound = Sounds.cycle
@@ -205,11 +239,14 @@ Net.get("State").OnClientEvent:Connect(function(state)
 	DispatchUi.setState(state)
 	Menu.setState(state)
 	CareerUi.setState(state)
+	ReadyCheck.setState(state) -- 6.14 (before the phone: its NEXT MISSION tile reads it)
 	Phone.setState(state)
 end)
 Net.get("Job").OnClientEvent:Connect(Hud.setJob)
 Net.get("Offers").OnClientEvent:Connect(DispatchUi.setOffers)
 Net.get("DeliveryResult").OnClientEvent:Connect(Hud.showResult)
+require(Client.RegularsApp).start(Hud.toast) -- 6.14: a regulars' tier reached (the State): a toast and a sting
+require(Client.SpecialOrderUi).start(Hud.toast) -- 6.14: a golden or a regular's order on the board: a toast and a sting
 Net.get("Notice").OnClientEvent:Connect(Hud.toast)
 Net.get("OpenShop").OnClientEvent:Connect(Hud.openShop)
 Net.get("Boost").OnClientEvent:Connect(Drive.boost)

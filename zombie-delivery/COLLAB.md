@@ -30,6 +30,11 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.14: the progression made clear and the grind made fun (the owner: "jobs are the daily work: grind, save up, progress in the mission"):
+  - **Get ready for the mission:** the phone's NEXT MISSION tile and READY CHECK (`shared/Readiness.luau`, `client/ReadyCheck.luau`), the savings line under the cash, WORK's "Earn for the Old Van", the result's "to go" line, LEVEL UP with WHERE and GPS (`Career.whereOf`, `client/Gps.luau`), INVITE.
+  - **Regulars** (`shared/Regulars.luau`, `server/Regulars.luau`, MORE → REGULARS) and **golden orders** (`shared/SpecialOrders.luau`, `server/SpecialOrders.luau`).
+  - **ON A ROLL** and **the shift's pay** (`client/GrindChips.luau`, `shared/Shift.luau`, `server/Shift.luau`).
+  - **Test in Studio:** the phone's NEXT MISSION and READY CHECK, admin ★ GOLDEN ORDER NOW / REGULARS: SILVER / STREAK 4 / SHIFT 4 of 5.
 - Claude · 6.13.1: performance and mobile (`shared/RenderBudget.luau`, `client/DeviceBudget.luau`, `client/PerfOverlay.luau`, WorldFx light budget with hysteresis, shadow rule, streaming-safe clients, `Vehicles.claim` network ownership); `design/performance/`.
 - Claude · 6.13: analytics (`server/Analytics.luau`, `shared/AnalyticsPlan.luau`: onboarding funnel, delivery/mission funnels, economy with reasons on every money call, progression, custom events, error counts; `PlayerData.track` hooks so gameplay never depends on it).
 - Claude · 6.12.16: the footbridge reworked: 10 wide, curved in an S with turning ramps (`shared/FootbridgeShape.luau`), nothing in the walking volume (torii at the ends), beds and hedges under its low parts.

@@ -24,6 +24,10 @@
 --            6.12.11: every row's card opens with its business's picture (client/JobThumbUi.luau, shared/JobThumbs.luau:
 --            Codex's pictures, cropped to about 2.4 : 1, the name on a dark label), a slim banner (the cargo emoji and
 --            the name) while it is not uploaded; NEXT UP's rows a small square of it once uploaded.
+--            6.14: a GOLDEN ORDER or a REGULAR'S ORDER heads the list in a section of its own, its card in gold (or a
+--            cool silver) with its perks and its countdown (client/SpecialOrderUi.luau); NEXT UP says when a queued one
+--            runs out. Every card names your tier with its business (client/RegularsApp.luau badge: "🥈 SILVER REGULAR
+--            +10%", "🤝 3/5 TO BRONZE").
 --   BAG      your bag (client/BagUi.luau's render) in the phone.
 --   GARAGE   BRING MY CAR (SpawnCar: the MENU's old CAR), 🚲 MY BIKE / 🚐 CALL CAR (the Equip remote) and ⛽ TOW while
 --            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
@@ -54,6 +58,8 @@ local OrdersUi = require(script.Parent.OrdersUi)
 local MapView = require(script.Parent.MapView)
 local JobQueue = require(Shared.JobQueue) -- 6.12.8: YOUR RUN, NEXT UP's words
 local JobThumbUi = require(script.Parent.JobThumbUi) -- 6.12.11: the job pictures
+local SpecialOrderUi = require(script.Parent.SpecialOrderUi) -- 6.14: the golden and the regulars' orders
+local RegularsApp = require(script.Parent.RegularsApp) -- 6.14: your tier with a job's business
 
 local K = Theme.Contract
 local PhoneApps = {}
@@ -163,6 +169,7 @@ local function offerCard(parent: Instance, offer: any, order: number, look: Orde
 	local waits = onDuty and offer.queue == true -- (6.12.8: a job waiting for your car or bike may still queue)
 	local open = label == nil or waits
 	local b = look.block(parent, order, open)
+	SpecialOrderUi.decorate(b.Parent, b, offer) -- 6.14: a golden or a regular's order: its colours, perks, countdown
 	-- 6.12.11: the business's picture across the top (its name on it), or while not uploaded a slim banner.
 	JobThumbUi.strip(b, offer, 0)
 	local title = if type(offer.jobType) == "table" then `{offer.jobType.name}: {offer.cargo}` else `{offer.cargo or "Cargo"} → {offer.customer or "a customer"}`
@@ -195,6 +202,10 @@ local function offerCard(parent: Instance, offer: any, order: number, look: Orde
 	end
 	if type(offer.jobType) == "table" then
 		look.chip(chips, "Special", K.warn)
+	end
+	local badge, tint = RegularsApp.badge(offer) -- 6.14: your tier with its business
+	if badge then
+		look.chip(chips, badge, tint)
 	end
 	local night = tonumber(offer.nightPay)
 	if night and night > 1 then
@@ -350,6 +361,13 @@ function PhoneApps.nextUp(list: Instance, look: OrdersUi.Kit, host: Host, order:
 		elseif type(entry.why) == "string" and entry.why ~= "" then
 			look.meta(row, `⏸ Waits: {entry.why}`, 2, K.red).Name = "Why"
 		end
+		-- 6.14: a golden or a regular's order runs out in NEXT UP as on the board
+		local special = if type(entry.specialOrder) == "table" then entry.specialOrder else nil
+		if special then
+			local runs = look.meta(row, "", 3, SpecialOrderUi.colorOf(special))
+			runs.Name = "RunsOut"
+			SpecialOrderUi.countdown(runs, special.expiresAt, `{if special.kind == "golden" then "★ GOLDEN ORDER" else "★ REGULAR'S ORDER"} · leaves NEXT UP in `)
+		end
 	end
 	return order + 2
 end
@@ -370,11 +388,14 @@ function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	local rides: { any } = {}
 	local tiers: { Tier } = {}
 	local byStars: { [number]: Tier } = {}
+	local specials: { any } = {} -- 6.14: a golden or a regular's order (their own section, on top)
 	for _, offer in offers do
 		if type(offer) ~= "table" then
 			continue
 		end
-		if offer.mode == "foot" then
+		if type(offer.specialOrder) == "table" then
+			table.insert(specials, offer)
+		elseif offer.mode == "foot" then
 			table.insert(walks, offer)
 		elseif offer.mode == "bike" then
 			table.insert(rides, offer)
@@ -389,7 +410,7 @@ function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 			table.insert(group.list, offer)
 		end
 	end
-	local count = #walks + #rides
+	local count = #walks + #rides + #specials
 	for _, entry in tiers do
 		count += #entry.list
 	end
@@ -440,6 +461,9 @@ function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 				warn(`[PhoneApps] a board card failed: {err}`)
 			end
 		end
+	end
+	if #specials > 0 then
+		group(`★ Special orders · {#specials}`, specials) -- 6.14
 	end
 	if #walks > 0 or footNote then
 		group(`On foot · {#walks}`, walks, footNote)

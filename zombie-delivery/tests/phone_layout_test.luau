@@ -27,6 +27,28 @@ for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{1150,680,f
 	check(`{w}x{h}: the popup is at most 760 x 520`, pop.width <= 760 and pop.height <= 520)
 	if touch then check(`{w}x{h}: popup touch targets >=36`, 54*pop.scale >= 36 and pop.scale == 1) end
 end
+-- 6.14: NEXT MISSION and WORK (the home's two wide tiles) stand wholly above the fold, on the shortest phone too.
+for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{320,448,true},{390,800,true},{844,350,true},{844,390,true},{667,335,true},{640,324,true},{640,316,true}} do
+	local w,h,touch = screen[1],screen[2],screen[3]
+	check(`{w}x{h}: NEXT MISSION and WORK above the fold`, Phone.mainVisible(Phone.fit(w,h,touch,.9)))
+end
+check("6.14: NEXT MISSION is the taller tile, touch-sized", Phone.NEXT_H > Phone.WORK_H and Phone.WORK_H >= 54)
+-- 6.14 review: the home's list is the phone's height less its frame (BEZELS) and its chrome; where each tile is comes
+-- from the layout (Phone.reveal scrolls with it: no stale positions right after opening or a resize).
+check("the home's view: the phone less its frame and chrome", Phone.homeView(Phone.fit(1920,1000,false,.9)) == 680 - Phone.BEZELS - Phone.HOME_CHROME)
+local nextTop, nextH = Phone.tileSpan(true, 1)
+local workTop, workH = Phone.tileSpan(true, 2)
+local firstTop, firstH = Phone.tileSpan(false, 1)
+local secondTop = Phone.tileSpan(false, 2)
+local mapTop = Phone.tileSpan(false, 3)
+check("the tiles' spans: NEXT, WORK under it, the grid two to a row", nextTop == Phone.HOME_HEAD and nextH == Phone.NEXT_H and workTop == nextTop + Phone.NEXT_H + Phone.MAIN_GAP and workH == Phone.WORK_H
+	and firstTop == workTop + Phone.WORK_H + Phone.MAIN_GAP and firstH == Phone.TILE_H and secondTop == firstTop and mapTop == firstTop + Phone.TILE_H + Phone.TILE_GAP)
+check("reveal: a tile in view keeps the scroll", Phone.reveal(mapTop, Phone.TILE_H, 0, 500) == 0)
+local short = Phone.homeView(Phone.fit(640,316,true,.9))
+local bagTop = Phone.tileSpan(false, 5)
+local y = Phone.reveal(bagTop, Phone.TILE_H, 0, short)
+check("reveal: a tile under the fold scrolls up just enough (640 x 316)", y > 0 and bagTop + Phone.TILE_H <= y + short and bagTop >= y)
+check("reveal: a tile over the top scrolls back", Phone.reveal(nextTop, nextH, 200, short) == math.max(0, nextTop - 8))
 local desk = Phone.popup(1150,680,false,1)
 check("the desktop popup is 760 x 520", desk.width == 760 and desk.height == 520 and desk.wide)
 check("a narrow phone's popup has one column", not Phone.popup(390,800,true,1).wide)

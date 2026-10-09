@@ -24,7 +24,8 @@
 --   custom       AnalyticsPlan.Events: DeathOnJob (Main.server: the "died" hook), the failed orders, QueueAddAll
 --                (server/JobQueue.luau), ZipRide (server/ZipLines.luau), BusRide (server/Buses.luau), ScooterRental
 --                (server/Rental.luau), StylePurchase (server/StyleWear.luau), SessionLength (on leave), ServerError
---                and ClientError.
+--                and ClientError. 6.14: GoldenOffered and GoldenExpired (server/SpecialOrders.luau, server/JobQueue.luau),
+--                GoldenTaken and GoldenDone (a golden order's funnel steps, here), RegularTierUp (server/Regulars.luau).
 --   errors       ScriptContext.Error on the server, and the ClientError remote (client/Unstuck.luau sends a script
 --                error's script name and line, one every 1 / Config.Robust.Limits.ClientError s at most, which the
 --                server's Net.limit checks again): a warning with the context and a count by script, ErrorsPerMinute
@@ -333,6 +334,15 @@ Analytics.order = guard("order", function(player: Player, order: any, what: stri
 		return
 	end
 	local offer = order.offer
+	-- 6.14: a golden order's own events (its danger level, its transport)
+	local special = offer.specialOrder
+	if type(special) == "table" and special.kind == "golden" then
+		if what == "taken" then
+			custom(player, "GoldenTaken", tonumber(offer.tier), Plan.fields(tostring(offer.mode)))
+		elseif what == "delivered" then
+			custom(player, "GoldenDone", tonumber(offer.tier), Plan.fields(tostring(offer.mode)))
+		end
+	end
 	if what == "taken" then
 		onboard(player, "FirstJob")
 		if offer.mission then
