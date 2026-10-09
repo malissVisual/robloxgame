@@ -35,13 +35,35 @@ local function appIds(frame)
 	for _,button in buttons do table.insert(ids,(string.gsub(button.Name,"App$",""))) end
 	return table.concat(ids,",")
 end
-check("home: the six tiles JOBS, MAP, SHOP, BAG & ITEMS, GARAGE, MORE in order",appIds(named("Tiles"))=="jobs,map,shop,bag,garage,more")
-for _,name in {"JOBS","MAP","SHOP","BAG & ITEMS","GARAGE","MORE"} do
+-- 6.12.5: the MAIN apps first (JOBS across, MISSIONS and TASKS under it, red-edged, with their live lines and bars),
+-- then six smaller tiles; MORE keeps the other seven.
+check("home: JOBS across the top, then MISSIONS and TASKS side by side",named("jobsApp").Parent==named("Main") and appIds(named("MainPair"))=="missions,tasks" and named("Main").LayoutOrder<named("Tiles").LayoutOrder)
+for _,id in {"jobs","missions","tasks"} do
+	local cell=named(`{id}App`)
+	check(`the MAIN {id} tile: the red edge and a live line`,cell:FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red and cell:FindFirstChild("Edge")~=nil and cell:FindFirstChild("Sub")~=nil and cell:FindFirstChild("Sub").Text~="")
+end
+check("MISSIONS and TASKS carry a progress bar",named("missionsApp"):FindFirstChild("Progress")~=nil and named("tasksApp"):FindFirstChild("Progress")~=nil and named("jobsApp"):FindFirstChild("Progress")==nil)
+check("home: the six tiles MAP, SHOP, BAG & ITEMS, GARAGE, STYLE, MORE in order",appIds(named("Tiles"))=="map,shop,bag,garage,style,more")
+for _,name in {"MAP","SHOP","BAG & ITEMS","GARAGE","STYLE","MORE"} do
 	local label=text(name)
 	check(`the {name} tile has its name and a one-line subtitle`,label~=nil and label.Parent.Parent==named("Tiles") and label.Parent:FindFirstChild("Sub")~=nil and label.Parent:FindFirstChild("Sub").Text~="")
 end
-check("JOBS carries the red edge",named("jobsApp"):FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red)
-check("MORE: career, tasks, style (6.12), missions, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,tasks,style,missions,crew,top,estate,bank,messages,settings")
+check("MORE: career, crew, top, estate, bank, messages, settings",appIds(named("Rows"))=="career,crew,top,estate,bank,messages,settings")
+-- 6.12.5: MISSIONS' line is the chapter you are at (Phone.missionInfo: MissionsUi.summary), with its bar and NEW.
+do
+	local info={name="First Shift",done=0,total=6,open=false,why="Level 4",new=false}
+	Phone.missionInfo=function() return info end
+	Phone.close();Phone.open()
+	check("MISSIONS shut: why, in grey, no badge",named("missionsApp"):FindFirstChild("Sub").Text=="🔒 First Shift · Level 4" and not named("missionsApp"):FindFirstChild("Badge").Visible)
+	info={name="First Shift",done=0,total=6,open=true,new=true}
+	Phone.close();Phone.open()
+	check("a chapter newly open: NEW on MISSIONS",named("missionsApp"):FindFirstChild("Badge").Visible and named("missionsApp"):FindFirstChild("Badge").Text=="NEW")
+	info={name="Code Red",done=2,total=6,open=true,new=false}
+	Phone.close();Phone.open()
+	local fill=all(named("missionsApp"):FindFirstChild("Progress"),function(object) return object.ClassName=="Frame" end)
+	check("MISSIONS on the way: the chapter, its missions done and the bar",named("missionsApp"):FindFirstChild("Sub").Text=="Code Red · 2 / 6" and #fill>0 and math.abs(fill[#fill].Size.X.Scale-1/3)<1e-6 and not named("missionsApp"):FindFirstChild("Badge").Visible)
+	Phone.missionInfo=nil
+end
 check("MORE waits behind the tiles",named("Home").Visible and not named("More").Visible)
 check("all sixteen apps constructed",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==16)
 check("the messages row is always on home",named("MessagesRow")~=nil and named("MessagesRow").Visible and text("No new messages")~=nil)
@@ -259,7 +281,7 @@ named("Close").Activated:Fire()
 check("read: the count goes",not named("Unread").Visible and text("No new messages")~=nil)
 -- 6.0.1: every app opens in the popup and closes back to home; the phone never turns.
 -- 6.5: the tiles (JOBS off duty: the board) and MORE's rows; each closes back to the page it came from.
-for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"tasks","tasks",true},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
+for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"tasks","tasks"},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
 	local id,shows,inMore=entry[1],entry[2],entry[3]==true
 	Phone.close();Phone.open()
 	if inMore then named("moreApp").Activated:Fire() end
@@ -323,9 +345,10 @@ do
 	}
 	Phone.close();Phone.open()
 	M.remotes.Tasks.OnClientEvent:Fire("state",state)
-	check("a reward to claim: a badge on MORE and the HUD's phone dot",named("moreApp"):FindFirstChild("Badge").Visible and named("moreApp"):FindFirstChild("Badge").Text=="1" and told==1)
-	named("moreApp").Activated:Fire()
-	check("MORE has TASKS with its badge",named("tasksApp")~=nil and named("tasksApp"):FindFirstChild("Badge").Visible and named("tasksApp"):FindFirstChild("Badge").Text=="1")
+	check("a reward to claim: a badge on TASKS (home) and the HUD's phone dot, none on MORE",named("tasksApp"):FindFirstChild("Badge").Visible and named("tasksApp"):FindFirstChild("Badge").Text=="1" and told==1 and not named("moreApp"):FindFirstChild("Badge").Visible)
+	check("TASKS' live line on home: the reward waiting and today's dailies",named("tasksApp"):FindFirstChild("Sub").Text=="1 to claim · 1 / 3 today")
+	local fill=all(named("tasksApp"):FindFirstChild("Progress"),function(object) return object.ClassName=="Frame" end)
+	check("TASKS' bar: a third of the dailies done",#fill>0 and math.abs(fill[#fill].Size.X.Scale-1/3)<1e-6)
 	named("tasksApp").Activated:Fire()
 	check("TASKS opens in the popup",showing("tasks") and text("TASKS")~=nil and upright() and #M.warnings==0)
 	check("three daily cards, the bonus card and the weekly card",named("Task_1")~=nil and named("Task_2")~=nil and named("Task_3")~=nil and named("Task_bonus")~=nil and named("Task_weekly")~=nil)
@@ -373,8 +396,8 @@ do
 	end
 	local function styleSent() return lastSent("Style") end
 	Phone.setState({phone=true,money=300,kit={},cars={},style={owned={},worn={}}})
-	Phone.open();named("moreApp").Activated:Fire()
-	check("MORE's STYLE row: your looks, bought at the shops",text("Your looks; buy them at the shops")~=nil)
+	Phone.open()
+	check("home's STYLE tile: your looks",named("styleApp").Parent==named("Tiles") and text("Your looks")~=nil)
 	named("styleApp").Activated:Fire()
 	check("the line under the tabs says who sells them",text("Buy them from Dot at the gear stall; wear them from here, anywhere. Looks only: no item changes a number of the game; your own look stays under them.")~=nil)
 	check("STYLE opens in the popup on COURIER",showing("style") and text("STYLE")~=nil and named("Tab_courier")~=nil and named("Tab_vehicle")~=nil and named("Tab_courier"):FindFirstChild("Underline")~=nil)
@@ -454,7 +477,7 @@ do
 	check("back at the gear stall: BUY again",inCard("beanie_orange","Main").Text=="BUY · $150")
 	named("Close").Activated:Fire()
 	M.flush()
-	check("closed: the keys are free again",M.actions.ZombieDeliveryStyleKeys==nil and Phone.isOpen() and named("More").Visible)
+	check("closed: the keys are free again",M.actions.ZombieDeliveryStyleKeys==nil and Phone.isOpen() and named("Home").Visible)
 	-- a clerk's "Style" prompt: the server's ("open", tab) opens the phone on STYLE at that tab
 	Phone.close()
 	M.remotes.Style.OnClientEvent:Fire("open","vehicle")

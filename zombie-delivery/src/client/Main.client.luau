@@ -141,6 +141,7 @@ Phone.onCareer = CareerUi.open
 Phone.onMissions = function() -- 6.8: MORE → MISSIONS always opens it (on the chapter you are at)
 	MissionsUi.open()
 end
+Phone.missionInfo = MissionsUi.summary -- 6.12.5: the MISSIONS tile on the phone's home
 Phone.onCrew = CrewPanel.toggle
 Phone.onTop = Leaderboard.toggle
 Phone.onEstate = EstateUi.toggleList

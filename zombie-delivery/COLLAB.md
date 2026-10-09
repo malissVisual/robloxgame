@@ -29,6 +29,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.5: the phone's home: JOBS, MISSIONS and TASKS as big MAIN tiles with live lines and bars (`mainTile`, `MissionsUi.summary`, `TasksApp.summary`); MAP, SHOP, BAG, GARAGE, STYLE, MORE smaller; MORE without TASKS, STYLE and MISSIONS.
 - Claude · 6.12.4: `SoundSheet.Sfx3Id` filled in (the owner uploaded `art/audio/sfx3.ogg`): the 6.12 sounds play.
 - Claude · 6.12.3:
   - **Cosmetics** (`Config.Cosmetics`, `server/StyleWear.luau`, shared Style / StyleLooks / StyleBuild): hats, jackets, vest and bag colours, wraps, bike paint, decals.
