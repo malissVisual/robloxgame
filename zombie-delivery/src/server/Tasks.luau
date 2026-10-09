@@ -12,7 +12,6 @@
 --              PERFECT tips of a throw), server/RunEvents.luau (a survivor's tip)
 --   "perfect"  server/Cargo.luau: a PERFECT throw at a door
 --   "zip"      server/ZipLines.luau zip(): a ride starts
---   "wheelie"  server/Wheelie.luau: a wheelie comes down (its seconds)
 --   "bus"      server/Buses.luau getOff: off at a stop after a ride (Config.Tasks.BusTrip seconds seated)
 --   "kill"     Main (Zombies.onKillInfo): a zombie killed (not a bandit), `night` after dark
 --   "mission"  server/Missions.luau onComplete: a mission finished (each credited player)

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.14.1"
+Config.Version = "6.14.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -706,7 +706,7 @@ Config.Cars = {
 	-- (44 before; the Courier Bike 38, the E-Bike 48) and two light pieces stacked on its rack (a ZDC RIDE rental keeps
 	-- one: Config.Rental.Room). 6.7 (it was dearer than the Cargo Bike and held less): three light pieces (two on the
 	-- rack, one on the deck at your feet) for $1,900 at level 3, below the Cargo Bike; the speed stays the owner's 32.
-	-- 6.10: its turn eases off with the speed, a firm brake and the wheelie (Config.Scooter); you hop on (Config.Interact).
+	-- 6.10: its turn eases off with the speed, a firm brake (Config.Scooter); you hop on (Config.Interact).
 	{
 		id = "escooter",
 		bike = true,
@@ -2159,12 +2159,10 @@ Config.Interact = {
 	ZipReach = 0.4, -- seconds: the hands go up to the trolley as a ride starts
 }
 
--- 6.10, the E-Scooter's ride (the owner: "give the scooter better controls, and maybe pop it onto its back wheel"):
--- its handling (client/Drive.luau through shared/ScooterRide.luau, pure: tests/scooter_test.luau) and the wheelie (hold
--- Shift, a gamepad's R1 or the touch WHEELIE button: the deck pitches back round its rear axle, client/CarVisuals.luau;
--- the rider sits back, client/BikeRider.luau; server/Wheelie.luau checks it and tells everybody through the scooter's
--- attribute WheelieAt). A ZDC RIDE rental rides the same (its own top speed and pull: Config.Rental). The bikes and the
--- cars keep their handling.
+-- 6.10, the E-Scooter's ride (the owner: "give the scooter better controls"): its handling (client/Drive.luau through
+-- shared/ScooterRide.luau, pure: tests/scooter_test.luau). A ZDC RIDE rental rides the same (its own top speed and
+-- pull: Config.Rental). The bikes and the cars keep their handling. (6.14.2, the owner: "take the wheelie away, it
+-- looks silly": the 6.10 wheelie is gone.)
 Config.Scooter = {
 	-- The steering: CarDef.turn (rad/s) times a share that eases from LowTurn at walking pace down to HighTurn at the
 	-- scooter's top speed (MaxSpeed): quick and precise in the city's corners, calm at full speed (6.0: 2.8 at any speed)
@@ -2189,21 +2187,6 @@ Config.Scooter = {
 	Reverse = 0.2, -- of the top speed: S from a stand walks it back
 	LeanMax = 0.2, -- radians (about 11°) the scooter leans into a turn at most (the look only; a bike: 0.16)
 	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
-	Wheelie = {
-		Angle = 24, -- degrees the deck pitches back round the rear axle when it is up
-		Pop = 0.18, -- seconds to come up …
-		Drop = 0.22, -- … and to come down
-		MinSpeed = 5, -- studs/s: it pops from this speed (hold the key and it pops as you get there)
-		Hold = 0.12, -- 6.14.1: seconds the key is held before it pops (a tap of Shift is no wheelie)
-		DropSpeed = 3, -- under this it comes down
-		MaxSeconds = 3.5, -- the balance holds this long, then it drops by itself (let go and press again)
-		Cooldown = 0.8, -- seconds after a drop before the next one
-		Turn = 0.4, -- the steering's share while up (the front wheel is in the air)
-		SpeedBonus = 0.08, -- the top speed +8% while up
-		Wobble = 2.5, -- degrees: the balance's wobble at the end (a third of it at the start)
-		WobbleHz = 1.6,
-		ServerSlack = 0.6, -- seconds past MaxSeconds before the server takes it down itself (the trip of the remote)
-	},
 }
 
 -- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit
@@ -4309,7 +4292,6 @@ Config.Robust = {
 		Gear = 5,
 		Kit = 4,
 		Aiming = 12,
-		Wheelie = 8, -- 6.10: up / down on the E-Scooter (server/Wheelie.luau)
 		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
 		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
 		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
@@ -4343,7 +4325,7 @@ Config.Analytics = {
 -- `group` a day, only the kinds open at the courier's level when the day starts (`level`, 1 when missing).
 -- A kind: `event` is what server/Tasks.luau's Tasks.note counts (deliver: pieces delivered, `look` only that cargo
 -- look; ride: deliveries on a bike or a scooter; stars3: jobs finished at ★★★; perfect: PERFECT throws; zip: zip-line
--- rides; wheelie: seconds of wheelie; bus: bus trips; kill: zombies killed, `night` only after dark; tips: tip
+-- rides; bus: bus trips; kill: zombies killed, `night` only after dark; tips: tip
 -- money; earn: delivery pay; mission: missions finished; 6.14: shift: shifts finished; regular: orders for a
 -- business you are a regular at; golden: golden orders finished). `text` is the title ({n} the target; `one` when
 -- it is 1), `target` the range it is picked from (in `step`s; `grow`: × (1 + grow × (level − 1)) for the ones that
@@ -4384,7 +4366,6 @@ Config.Tasks = {
 		{ id = "bus", event = "bus", text = "Take {n} bus trips", one = "Take a bus trip", target = { 1, 2 }, money = 120, xp = 80 },
 		{ id = "night", event = "kill", night = true, text = "Kill {n} zombies at night", target = { 15, 25 }, step = 5, money = 200, xp = 120 },
 		{ id = "tips", event = "tips", text = "Earn ${n} in tips", target = { 40, 80 }, step = 10, grow = 0.25, money = 150, xp = 100 },
-		{ id = "wheelie", event = "wheelie", text = "Wheelie for {n} seconds in all", target = { 10, 20 }, step = 5, money = 150, xp = 90, level = 2 },
 		{ id = "ride", event = "ride", text = "Make {n} deliveries on a bike or a scooter", one = "Make a delivery on a bike or a scooter", target = { 2, 4 }, money = 180, xp = 110, level = 2 },
 		{ id = "mission", event = "mission", text = "Finish {n} missions", one = "Finish a mission", target = { 1, 2 }, money = 300, xp = 150, level = 5 },
 		-- 6.14: the shift's pay (Config.Jobs.Shift: its deliveries in one go), server/Shift.luau notes "shift"

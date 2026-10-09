@@ -1997,7 +1997,7 @@ local function render(session: Session)
 			local base = slots[(index - 1) % #slots + 1]
 			local model = buildLook(piece.look, piece.variant)
 			local _, size = model:GetBoundingBox()
-			-- (6.10: on a scooter onto its frame: the load leans and wheelies with the deck)
+			-- (6.10: on a scooter onto its frame: the load leans with the deck)
 			weldTo(model, Vehicles.cargoHolder(car), car.chassis.CFrame * base * CFrame.new(0, layer * size.Y, 0))
 			model.Parent = car.model
 			table.insert(session.shown, model)

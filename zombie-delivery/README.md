@@ -1143,6 +1143,13 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## No more wheelie (6.14.2)
+
+The owner: "take the wheelie away, it looks silly". The 6.10 wheelie is gone: no Shift / R1 / touch WHEELIE on a
+scooter, no `[Shift] Wheelie` key hint, no deck pitched back and no rider sitting back, no `Wheelie` remote and no
+`server/Wheelie.luau`, no `Config.Scooter.Wheelie`, and the daily task "Wheelie for N seconds" left the pool (a day's
+picks that had it are picked again once). The scooter's lean into a turn stays.
+
 ## A smoother scooter ride (6.14.1)
 
 The owner: "I want a more pleasant ride on the scooter" (the steering; the pull, the brake and the speed; the camera
@@ -1160,7 +1167,7 @@ and the feel). The E-Scooter and the ZDC RIDE rentals (`shared/ScooterRide.luau`
   (8.5 studs behind, 12 before), it swings back behind you after 0.6 s without the mouse (1.2 before), quicker and the
   same at any frame rate, a little into the turn; the picture tilts a few degrees with the lean (not with reduced
   motion); the field of view widens from 40 % of the top speed, up to +9° (a car: from 72 %, +6°).
-- **The wheelie** pops only after holding Shift (R1, WHEELIE) for 0.12 s: a tap is no wheelie.
+- **The wheelie** popped only after holding Shift for 0.12 s (6.14.2: gone altogether).
 - Tests: `tests/scooter_test.luau` (the turn's radius at three speeds, the pull, the brake, the carve, the hold),
   `tests/bikes_test.luau`.
 

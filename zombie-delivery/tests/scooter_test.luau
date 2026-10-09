@@ -1,14 +1,12 @@
 -- Logic test of the 6.10 E-Scooter ride (shared/ScooterRide.luau, Config.Scooter, Config.Interact's Scooter… numbers)
--- in the standalone Luau CLI: the steering curve (quick at walking pace, calm at the top speed) and its ramp, the
--- brake and the coast, the wheelie (when it pops, when it drops, the balance, the cooldown, how far up it is drawn and
--- its pitch), the quick hop on and off (its path and the legs: InteractPose.scooterHop ends in the rider's pose) and
--- the rider sitting back on the back wheel (RiderPose.uprightAt).
+-- in the standalone Luau CLI: the steering curve (quick at walking pace, calm at the top speed) and its ramp, the pull,
+-- the brake, the coast and the carve (6.14.1), the quick hop on and off (its path and the legs: InteractPose.scooterHop
+-- ends in the rider's pose). (6.14.2: the wheelie is gone.)
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
 local ScooterRide = require("./ScooterRide")
 local InteractPose = require("./InteractPose")
-local RiderPose = require("./RiderPose")
 local Economy = require("./Economy")
 
 local failures = 0
@@ -25,7 +23,6 @@ local function near(a: number, b: number, eps: number?): boolean
 end
 
 local S = Config.Scooter
-local W = S.Wheelie
 local I = Config.Interact
 local def = Economy.findCar("escooter")
 local TURN = if def then def.turn else 2.8
@@ -44,13 +41,8 @@ check("… from just left of its deck", I.ScooterPromptOut > 0 and I.ScooterProm
 check("off the deck you land clear of it", I.ScooterOff > 2 and I.ScooterOff < 3.5)
 check("a scooter hopped onto stands within the seating's range", I.ScooterHopReach < Config.Cargo.BoardRange and I.ScooterCallSide < I.ScooterHopReach)
 check("the rental's Ride needs no hold", Config.Rental.Hold == 0)
+check("6.14.2: no wheelie any more", Config.Scooter.Wheelie == nil and (Config.Robust.Limits :: any).Wheelie == nil)
 check("the dock's slide stays short", I.DockUnclip > 0.1 and I.DockUnclip <= I.ScooterHop)
-check("the wheelie pitches 20 – 30°", W.Angle >= 20 and W.Angle <= 30, W.Angle)
-check("the balance holds a few seconds", W.MaxSeconds >= 2 and W.MaxSeconds <= 6)
-check("it pops at a roll, not from a stand", W.MinSpeed > W.DropSpeed and W.DropSpeed > 0 and W.MinSpeed < TOP / 2)
-check("less steering and a little more speed while up", W.Turn > 0 and W.Turn < 1 and W.SpeedBonus > 0 and W.SpeedBonus <= 0.15)
-check("the server waits a moment past the balance", W.ServerSlack > 0 and W.ServerSlack < 2)
-check("the remote is rate-limited", type(Config.Robust.Limits.Wheelie) == "number" and Config.Robust.Limits.Wheelie >= 4)
 
 -- The steering --------------------------------------------------------------------
 
@@ -128,74 +120,6 @@ check("W rolling back brakes first", rate == S.Brake and target > 0)
 check("the lean into a turn is capped", near(ScooterRide.lean(5, 40), S.LeanMax) and near(ScooterRide.lean(-5, 40), -S.LeanMax))
 check("… and none going straight", near(ScooterRide.lean(0, 30), 0))
 
--- The wheelie ---------------------------------------------------------------------
-
-local DT = 1 / 60
-local function run(w: ScooterRide.Wheelie, seconds: number, held: boolean, speed: number, braking: boolean?): number
-	local changes = 0
-	local n = math.floor(seconds / DT + 0.5)
-	for _ = 1, n do
-		if ScooterRide.wheelieStep(w, held, speed, braking == true, DT) then
-			changes += 1
-		end
-	end
-	return changes
-end
-
-local w = ScooterRide.wheelie()
-run(w, 0.5, true, 20)
-check("a key held since before (getting on) does not pop it", not w.up)
-run(w, 0.1, false, 20)
-run(w, 0.05, true, 20)
-check("6.14.1: a tap of the key is no wheelie", not w.up and W.Hold > 0.05 and W.Hold <= 0.2, W.Hold)
-run(w, W.Hold, true, 20)
-check("let go and press (held a moment): it pops", w.up)
-w = ScooterRide.wheelie()
-run(w, 0.1, false, 2)
-run(w, 0.3, true, 2)
-check("not from a crawl", not w.up)
-run(w, 0.05, true, W.MinSpeed + 1)
-check("… held, it pops as the speed comes", w.up)
-run(w, W.Pop + 0.05, true, 20)
-check("drawn all the way up within Pop", near(w.amount, 1))
-local p = ScooterRide.pitch(w.amount, w.time)
-check("the deck pitches back about Angle", math.abs(p - math.rad(W.Angle)) <= math.rad(W.Wobble) + 1e-6, math.deg(p))
-local changes = run(w, W.MaxSeconds, true, 20)
-check("the balance runs out: it drops by itself", not w.up and changes == 1)
-run(w, W.Cooldown + 0.5, true, 20)
-check("held on, it stays down (let go first)", not w.up)
-run(w, 0.05, false, 20)
-run(w, W.Hold + 0.05, true, 20)
-check("let go and press again: up again", w.up)
-run(w, 0.05, true, 20, true)
-check("the brake drops it", not w.up)
-run(w, 0.05, false, 20)
-run(w, 0.05, true, 20)
-check("… and the cooldown holds the next one", not w.up)
-run(w, W.Cooldown, false, 20)
-run(w, W.Hold + 0.05, true, 20)
-check("after the cooldown it pops", w.up)
-run(w, 0.05, true, W.DropSpeed - 1)
-check("slowing right down drops it", not w.up)
-run(w, W.Drop + 0.05, false, 0)
-check("down within Drop", near(w.amount, 0) and near(ScooterRide.pitch(w.amount, w.time), 0))
-w = ScooterRide.wheelie()
-run(w, 0.05, false, 20)
-run(w, 0.5, true, 20)
-ScooterRide.knock(w)
-run(w, DT, true, 20)
-check("a knock brings it down", not w.up)
-check("never a NaN from a long time", ScooterRide.pitch(0.5, math.huge) == ScooterRide.pitch(0.5, math.huge))
-check("faster and less steering while up", near(ScooterRide.speedFactor(1), 1 + W.SpeedBonus) and near(ScooterRide.turnFactor(1), W.Turn)
-	and near(ScooterRide.speedFactor(0), 1) and near(ScooterRide.turnFactor(0), 1))
-local wobbleEarly, wobbleLate = 0, 0
-for n = 0, 60 do
-	local tt = n / 60
-	wobbleEarly = math.max(wobbleEarly, math.abs(ScooterRide.pitch(1, tt) - math.rad(W.Angle)))
-	wobbleLate = math.max(wobbleLate, math.abs(ScooterRide.pitch(1, W.MaxSeconds - 1 + tt) - math.rad(W.Angle)))
-end
-check("the wobble grows as the balance runs out", wobbleLate > wobbleEarly and wobbleLate <= math.rad(W.Wobble) + 1e-6, `{math.deg(wobbleEarly)} {math.deg(wobbleLate)}`)
-
 -- The hop -------------------------------------------------------------------------
 
 local k0, l0, r0 = ScooterRide.hop(0)
@@ -232,16 +156,6 @@ for n = 1, 100 do
 	prev = pose
 end
 check("… smoothly", jump < 0.15, jump)
-
--- The rider on the back wheel ----------------------------------------------------------
-
-local lean0, thigh0, knee0 = RiderPose.uprightAt(0)
-local lean1, thigh1, knee1 = RiderPose.uprightAt(1)
-check("on both wheels: the standing rider as before", near(lean0, RiderPose.Upright.Lean) and near(thigh0, 0) and near(knee0, RiderPose.Upright.Knee))
-check("on the back wheel: the knees bend, the thighs come forward", knee1 < knee0 - math.rad(15) and thigh1 > math.rad(10), `{math.deg(knee1)} {math.deg(thigh1)}`)
-check("… the body sits back (less forward lean)", lean1 > lean0)
-local mlean = RiderPose.uprightAt(0.5)
-check("… blended by how far up", mlean > lean0 and mlean < lean1)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

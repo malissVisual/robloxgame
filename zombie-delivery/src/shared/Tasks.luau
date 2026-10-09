@@ -463,9 +463,9 @@ function Tasks.orderEvents(pieces: number, info: Info): { { event: string, amoun
 	return events
 end
 
--- How a task's progress reads: "$" before money (tips, pay), "s" after seconds (a wheelie), else a count.
+-- How a task's progress reads: "$" before money (tips, pay), else a count.
 local function unitOf(pick: Pick): string?
-	return if pick.event == "tips" or pick.event == "earn" then "$" elseif pick.event == "wheelie" then "s" else nil
+	return if pick.event == "tips" or pick.event == "earn" then "$" else nil
 end
 
 -- The client's table (the Tasks remote's "state"): every task's title, progress, unit, reward and flags, the bonus,
