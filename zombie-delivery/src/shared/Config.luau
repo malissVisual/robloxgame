@@ -3839,6 +3839,26 @@ Config.Goal = {
 	HintJobs = 3,
 }
 
+-- 6.14, get ready for the mission (the owner: "jobs are the daily work: you grind, you save up for something, and then
+-- you can progress in the mission"). shared/Readiness.luau picks the next story mission and what it needs; the phone's
+-- NEXT MISSION tile and its READY CHECK (client/ReadyCheck.luau), the HUD's savings line under the cash
+-- (client/SavingsLine.luau) and the job result's "to go" line show it.
+--   MaxRows     the READY CHECK's rows at most: every required one, then the recommended ones (those not done first)
+--   HardTier    a mission of this danger tier or more recommends a vest and a two-handed gun
+--   Medkits     medkits worth carrying into any mission (recommended)
+--   RepairKits  repair kits worth carrying into a mission you drive (recommended once you own a car)
+--   Sound       the sting of the one-time "Ready for …" toast (client/Sounds.luau)
+--   LineHeight  px at scale 1: the HUD's savings line, under the cash line (the left column grows by it while it shows)
+Config.Readiness = {
+	MaxRows = 5,
+	HardTier = 3,
+	Medkits = 1,
+	RepairKits = 1,
+	NotGoals = { medkit = true, repair = true } :: { [string]: boolean }, -- rows that never become the savings goal
+	Sound = "task_done",
+	LineHeight = 20,
+}
+
 export type JobTypeDef = {
 	id: string,
 	name: string,

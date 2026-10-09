@@ -37,16 +37,20 @@ local function appIds(frame)
 	for _,button in buttons do table.insert(ids,(string.gsub(button.Name,"App$",""))) end
 	return table.concat(ids,",")
 end
--- 6.12.5: the MAIN apps first (JOBS across, MISSIONS and TASKS under it, red-edged, with their live lines and bars),
--- then six smaller tiles; MORE keeps the other seven.
-check("home: JOBS across the top, then MISSIONS and TASKS side by side",named("jobsApp").Parent==named("Main") and appIds(named("MainPair"))=="missions,tasks" and named("Main").LayoutOrder<named("Tiles").LayoutOrder)
-for _,id in {"jobs","missions","tasks"} do
+-- 6.12.5: the MAIN apps first, red-edged, with their live lines. 6.14 (client/ReadyCheck.luau): NEXT MISSION across the
+-- top, WORK (the JOBS app) under it; TASKS and MISSIONS lead the smaller tiles (their lines, bars and badges as before);
+-- MORE keeps the other seven.
+check("6.14 home: NEXT MISSION across the top, WORK under it",appIds(named("Main"))=="next,jobs" and named("Main").LayoutOrder<named("Tiles").LayoutOrder and named("MainPair")==nil and text("WORK")~=nil)
+for _,id in {"next","jobs"} do
 	local cell=named(`{id}App`)
-	check(`the MAIN {id} tile: the red edge and a live line`,cell:FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red and cell:FindFirstChild("Edge")~=nil and cell:FindFirstChild("Sub")~=nil and cell:FindFirstChild("Sub").Text~="")
+	check(`the MAIN {id} tile: the red edge and a live line`,cell:FindFirstChildOfClass("UIStroke").Color==M.Theme.Contract.red and cell:FindFirstChild("Edge")~=nil
+		and ((cell:FindFirstChild("Sub")~=nil and cell:FindFirstChild("Sub").Text~="") or (cell:FindFirstChild("Mission")~=nil and cell:FindFirstChild("Mission").Text~="")))
 end
-check("MISSIONS and TASKS carry a progress bar",named("missionsApp"):FindFirstChild("Progress")~=nil and named("tasksApp"):FindFirstChild("Progress")~=nil and named("jobsApp"):FindFirstChild("Progress")==nil)
-check("home: the six tiles MAP, SHOP, BAG & ITEMS, GARAGE, STYLE, MORE in order",appIds(named("Tiles"))=="map,shop,bag,garage,style,more")
-for _,name in {"MAP","SHOP","BAG & ITEMS","GARAGE","STYLE","MORE"} do
+check("6.14: NEXT MISSION is the tall one, with its savings bar; WORK has its goal line",named("nextApp").Size.Y.Offset>named("jobsApp").Size.Y.Offset and named("nextApp"):FindFirstChild("Progress")~=nil
+	and named("jobsApp"):FindFirstChild("Goal")~=nil and named("jobsApp"):FindFirstChild("Progress")==nil)
+check("MISSIONS and TASKS carry a progress bar",named("missionsApp"):FindFirstChild("Progress")~=nil and named("tasksApp"):FindFirstChild("Progress")~=nil)
+check("6.14 home: the tiles TASKS, MISSIONS, MAP, SHOP, BAG & ITEMS, GARAGE, STYLE, MORE in order",appIds(named("Tiles"))=="tasks,missions,map,shop,bag,garage,style,more")
+for _,name in {"TASKS","MISSIONS","MAP","SHOP","BAG & ITEMS","GARAGE","STYLE","MORE"} do
 	local label=text(name)
 	check(`the {name} tile has its name and a one-line subtitle`,label~=nil and label.Parent.Parent==named("Tiles") and label.Parent:FindFirstChild("Sub")~=nil and label.Parent:FindFirstChild("Sub").Text~="")
 end
@@ -57,20 +61,20 @@ do
 	local info={name="First Shift",done=0,total=6,open=false,why="Level 4",new=false}
 	Phone.missionInfo=function() return info end
 	Phone.close();Phone.open()
-	check("MISSIONS shut: why, in grey, no badge",named("missionsApp"):FindFirstChild("Sub").Text=="🔒 First Shift · Level 4" and not named("missionsApp"):FindFirstChild("Badge").Visible)
+	check("MISSIONS shut: why (6.14: the short words of a smaller tile), in grey, no badge",named("missionsApp"):FindFirstChild("Sub").Text=="🔒 Level 4" and not named("missionsApp"):FindFirstChild("Badge").Visible)
 	info={name="First Shift",done=0,total=6,open=true,new=true}
 	Phone.close();Phone.open()
 	check("a chapter newly open: NEW on MISSIONS",named("missionsApp"):FindFirstChild("Badge").Visible and named("missionsApp"):FindFirstChild("Badge").Text=="NEW")
 	info={name="Code Red",done=2,total=6,open=true,new=false}
 	Phone.close();Phone.open()
 	local fill=all(named("missionsApp"):FindFirstChild("Progress"),function(object) return object.ClassName=="Frame" end)
-	check("MISSIONS on the way: the chapter, its missions done and the bar",named("missionsApp"):FindFirstChild("Sub").Text=="Code Red · 2 / 6" and #fill>0 and math.abs(fill[#fill].Size.X.Scale-1/3)<1e-6 and not named("missionsApp"):FindFirstChild("Badge").Visible)
+	check("MISSIONS on the way: the chapter, its missions done and the bar",named("missionsApp"):FindFirstChild("Sub").Text=="2/6 · Code Red" and #fill>0 and math.abs(fill[#fill].Size.X.Scale-1/3)<1e-6 and not named("missionsApp"):FindFirstChild("Badge").Visible)
 	Phone.missionInfo=nil
 end
 check("MORE waits behind the tiles",named("Home").Visible and not named("More").Visible)
-check("all seventeen apps constructed (6.14: REGULARS)",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==17)
+check("all eighteen apps constructed (6.14: NEXT MISSION, REGULARS)",#all(M.gui,function(object) return string.match(object.Name,"App$") and object.ClassName=="TextButton" end)==18)
 check("the messages row is always on home",named("MessagesRow")~=nil and named("MessagesRow").Visible and text("No new messages")~=nil)
-check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==17)
+check("glyphs work with empty uploaded IDs",#all(M.gui,function(object) return object.Name=="NativeGlyph" end)==18)
 do
 	local icons=require("./Icons")
 	icons.Ids.app_settings="rbxassetid://12345"
@@ -152,7 +156,7 @@ check("a MORE app opens in the popup",showing("settings") and Phone.appOpen())
 named("Close").Activated:Fire()
 check("its ✕ returns to MORE with the focus on the tapped row",named("More").Visible and Phone.isOpen() and M.focus==named("settingsApp"))
 key(M.Enum.KeyCode.Escape)
-check("ESC in MORE goes back to the tiles",named("Home").Visible and not named("More").Visible and Phone.isOpen() and M.focus==named("jobsApp"))
+check("ESC in MORE goes back to the tiles (the gamepad on NEXT MISSION)",named("Home").Visible and not named("More").Visible and Phone.isOpen() and M.focus==named("nextApp"))
 named("moreApp").Activated:Fire();named("MoreBack").Activated:Fire()
 check("‹ BACK goes back to the tiles",named("Home").Visible and not named("More").Visible)
 named("moreApp").Activated:Fire()
@@ -489,7 +493,7 @@ named("Close").Activated:Fire()
 check("read: the count goes",not named("Unread").Visible and text("No new messages")~=nil)
 -- 6.0.1: every app opens in the popup and closes back to home; the phone never turns.
 -- 6.5: the tiles (JOBS off duty: the board) and MORE's rows; each closes back to the page it came from.
-for _,entry in {{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"tasks","tasks"},{"regulars","regulars",true},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
+for _,entry in {{"next","ready"},{"jobs","board"},{"shop","shop"},{"bag","bag"},{"garage","garage"},{"career","career",true},{"tasks","tasks"},{"regulars","regulars",true},{"messages","messages",true},{"bank","bank",true},{"settings","settings",true}} do
 	local id,shows,inMore=entry[1],entry[2],entry[3]==true
 	Phone.close();Phone.open()
 	if inMore then named("moreApp").Activated:Fire() end
@@ -584,7 +588,7 @@ do
 	Phone.close();Phone.open()
 	M.remotes.Tasks.OnClientEvent:Fire("state",state)
 	check("a reward to claim: a badge on TASKS (home) and the HUD's phone dot, none on MORE",named("tasksApp"):FindFirstChild("Badge").Visible and named("tasksApp"):FindFirstChild("Badge").Text=="1" and told==1 and not named("moreApp"):FindFirstChild("Badge").Visible)
-	check("TASKS' live line on home: the reward waiting and today's dailies",named("tasksApp"):FindFirstChild("Sub").Text=="1 to claim · 1 / 3 today")
+	check("TASKS' live line on home: the reward waiting and today's dailies",named("tasksApp"):FindFirstChild("Sub").Text=="1 to claim · 1/3")
 	local fill=all(named("tasksApp"):FindFirstChild("Progress"),function(object) return object.ClassName=="Frame" end)
 	check("TASKS' bar: a third of the dailies done",#fill>0 and math.abs(fill[#fill].Size.X.Scale-1/3)<1e-6)
 	named("tasksApp").Activated:Fire()
@@ -730,6 +734,115 @@ do
 	M.stand(0,0)
 	check("no warnings in STYLE",#M.warnings==0)
 	Phone.close()
+end
+-- 6.14, get ready for the mission (client/ReadyCheck.luau, shared/Readiness.luau): NEXT MISSION's lines from the State
+-- and the Missions state, its READY CHECK (the checklist, each row's action, the savings goal, START / WORK, MISSIONS),
+-- WORK's goal line, INVITE (Roblox's game invite, else CREW), the one-time READY toast and the HUD's savings line.
+do
+	local Ready=require("./ReadyCheck")
+	local Levels=require("./Levels")
+	local Map=require("./Map")
+	local said,started,chapters,crews={},{},{},{}
+	Ready.notify=function(value) table.insert(said,value) end
+	Ready.toGo=M.CareerUi.toGo
+	Ready.onStart=function(id) table.insert(started,id) end
+	Ready.onMissions=function(id) table.insert(chapters,id or "-") end
+	Ready.onCrew=function(id) table.insert(crews,id or "-") end
+	M.played={}
+	Ready.start()
+	-- A level-2 courier with $640, no vehicle: Paper Trail needs level 4 and Earl's van.
+	M.player:SetAttribute("Xp",Levels.xpFor(2)+100)
+	Ready.setState({phone=true,money=640,kit={},cars={},items={}})
+	check("6.14: the first State asks for the Missions state once",lastSent("Missions")~=nil and lastSent("Missions").args[1]=="open")
+	M.remotes.Missions.OnClientEvent:Fire("state",{progress={},level=2,crewSize=0})
+	Phone.close();Phone.open()
+	local tile=named("nextApp")
+	check("6.14 NEXT MISSION: the mission, its chapter and n/N",tile:FindFirstChild("Head").Text=="NEXT MISSION" and tile:FindFirstChild("Mission").Text=="📦 Paper Trail" and tile:FindFirstChild("Chapter").Text=="First Shift · 1/6")
+	check("… not ready yet: '0 of 2 ready' in red",tile:FindFirstChild("Status").Text=="✖ 0 OF 2 READY" and tile:FindFirstChild("Status").TextColor3==M.Theme.Contract.red)
+	local bars=all(tile:FindFirstChild("Progress"),function(object) return object.Name=="Fill" or object.ClassName=="Frame" end)
+	check("… the savings goal and its bar: Old Van · $640 / $1,800",tile:FindFirstChild("Goal").Text=="🚐 Old Van · $640 / $1,800" and math.abs(bars[#bars].Size.X.Scale-640/1800)<1e-6)
+	check("6.14 WORK: the board's line, and what you earn for",named("jobsApp"):FindFirstChild("Sub").Text~="" and named("jobsApp"):FindFirstChild("Goal").Visible and named("jobsApp"):FindFirstChild("Goal").Text=="Earn for the Old Van · $1,160 to go")
+	check("… the job result's line (client/Hud.luau)",Ready.resultLine(85)=="+$85 · $1,075 to go for the Old Van")
+	named("nextApp").Activated:Fire()
+	check("6.14: NEXT MISSION opens the READY CHECK in the popup",showing("ready") and text("READY CHECK")~=nil and upright() and #M.warnings==0)
+	check("… the mission card: its name, the readiness chip",text("PAPER TRAIL")~=nil and text("✖ 0 OF 2 READY")~=nil)
+	check("… the rows: the level, the van (required), a medkit (would help)",named("Check_level")~=nil and named("Check_vehicle")~=nil and named("Check_medkit")~=nil and named("Check_cargo")==nil
+		and named("Check_vehicle"):FindFirstChild("Mark").Text=="✖" and named("Check_medkit"):FindFirstChild("Mark").Text=="☆")
+	check("… the van's row: where and what it costs, a GPS action",text("🚐  A van of your own")~=nil and text("Old Van at Earl's Used Wheels · $1,800 · level 4")~=nil and named("Check_vehicle").ClassName=="TextButton"
+		and named("Check_vehicle"):FindFirstChild("Action").Text=="📍 GPS  ›")
+	check("… the level's row: the XP and about how much work (CareerUi.toGo)",Levels.xpFor(2)+100<1000 and text(`{Levels.xpFor(2)+100} / 2,093 XP · about 8 runs`)~=nil and named("Check_level"):FindFirstChild("Action").Text=="JOBS  ›")
+	check("… the savings goal: Old Van, $640 / $1,800, $1,160 to go",named("SavingsGoal")~=nil and text("$640 / $1,800")~=nil and text("$1,160 to go")~=nil)
+	check("… not ready: WORK · EARN AND LEVEL UP and OPEN MISSIONS, no START",named("Jobs")~=nil and named("OpenMissions")~=nil and named("Start")==nil)
+	-- The van's GPS: Earl's Used Wheels on the map, the phone away so you can go.
+	M.waypoint=nil
+	named("Check_vehicle").Activated:Fire()
+	check("6.14: a row's GPS goes to its shop (Earl's), puts the phone away and says so",M.waypoint~=nil and M.waypoint.X==Map.VanSeller.earl.x and M.waypoint.Z==Map.VanSeller.earl.z and not Phone.isOpen()
+		and toasts[#toasts]=="GPS set: Earl's Used Wheels · Old Van")
+	Phone.open("ready")
+	named("Check_level").Activated:Fire()
+	check("… the level's JOBS opens the board",showing("board"))
+	Phone.open("ready")
+	named("OpenMissions").Activated:Fire()
+	check("… OPEN MISSIONS: the window on First Shift, the phone away",chapters[#chapters]=="dispatch" and not Phone.isOpen())
+	-- With the van at level 4: READY, the one-time toast and its sting, START through the MISSIONS window.
+	M.player:SetAttribute("Xp",Levels.xpFor(4))
+	Ready.setState({phone=true,money=300,kit={},cars={van=true},car="van",vanQuest="done",items={medkit=1,repair=1}})
+	check("6.14: the mission became ready: the toast and the sting, once",said[#said]=="Ready for Paper Trail · open MISSIONS (U)" and M.played[#M.played]=="task_done")
+	local count=#said
+	Ready.setState({phone=true,money=310,kit={},cars={van=true},car="van",vanQuest="done",items={medkit=1,repair=1}})
+	check("… not again",#said==count)
+	Phone.open()
+	tile=named("nextApp")
+	check("6.14 NEXT MISSION: READY · START in green, nothing to buy",tile:FindFirstChild("Status").Text=="✔ READY · START" and tile:FindFirstChild("Status").TextColor3==M.Theme.Contract.good
+		and tile:FindFirstChild("Goal").Text=="Everything it needs is yours" and not named("jobsApp"):FindFirstChild("Goal").Visible)
+	named("nextApp").Activated:Fire()
+	check("… the READY CHECK: every required row ✔, START",named("Start")~=nil and named("Check_vehicle"):FindFirstChild("Mark").Text=="✔" and named("Check_vehicle").ClassName=="Frame" and named("SavingsGoal")==nil)
+	named("Start").Activated:Fire()
+	check("… START goes through the MISSIONS window (ReadyCheck.onStart), the phone away",started[#started]=="dispatch_1" and not Phone.isOpen())
+	-- A co-op mission: bring a friend (INVITE: Roblox's game invite, else the CREW window for that mission).
+	M.remotes.Missions.OnClientEvent:Fire("state",{progress={dispatch_1=1,dispatch_2=1,dispatch_3=1,dispatch_8=1},level=4,crewSize=0})
+	check("6.14: a new mission ready at once (a clear's NEXT: its card says so) is no news: no toast",#said==count)
+	Phone.open("ready")
+	check("6.14: Wheels of Commerce (co-op): READY, a friend would help",text("WHEELS OF COMMERCE")~=nil and named("Start")~=nil and named("Check_friend")~=nil and named("Check_friend"):FindFirstChild("Action").Text=="INVITE  ›")
+	named("Check_friend").Activated:Fire()
+	check("… no game invite here: the CREW window for that mission",crews[#crews]=="dispatch_9")
+	M.services.SocialService={CanSendGameInviteAsync=function() return true end,PromptGameInvite=function() M.invited=true end}
+	named("Check_friend").Activated:Fire()
+	check("… Roblox's game invite when it can be sent, and what to do once they are here",M.invited==true and said[#said]=="Once your friend is here: CREW (K) → INVITE them to your crew" and #crews==1)
+	M.services.SocialService=nil
+	-- Money only: the READY CHECK is not drawn again for every coin (its ticker keeps the goal's money live).
+	M.remotes.Missions.OnClientEvent:Fire("state",{progress={},level=4,crewSize=0})
+	Ready.setState({phone=true,money=100,kit={},cars={},vanQuest="open",items={}})
+	Phone.open("ready")
+	local card=named("MissionCard")
+	Ready.setState({phone=true,money=150,kit={},cars={},vanQuest="open",items={}})
+	check("6.14: a new coin keeps the READY CHECK (no redraw), its ticker moves the goal",card~=nil and named("MissionCard")==card and card.Parent~=nil and Phone.isOpen())
+	Ready.tick()
+	check("… $150 / $1,800 now",text("$150 / $1,800")~=nil and text("$1,650 to go")~=nil)
+	Ready.setState({phone=true,money=150,kit={},cars={},vanQuest="open",items={medkit=1}})
+	check("… a row that changes draws it again",named("MissionCard")~=card and card.Parent==nil and named("Check_medkit")~=nil and named("Check_medkit"):FindFirstChild("Mark").Text=="✔")
+	Phone.close()
+	-- The HUD's savings line under the cash (client/SavingsLine.luau): it grows the Cash frame and the column while it
+	-- shows; quiet through Marge's first day.
+	local hud=M.gui:FindFirstChild("ZombieDeliveryHud")
+	local stack=M.make("Frame",{Name="LeftStack",Size=M.UDim2.fromOffset(200,258)},hud)
+	local cash=M.make("Frame",{Name="Cash",Size=M.UDim2.fromOffset(200,30)},stack)
+	local opened=0
+	require("./SavingsLine").onOpen=function() opened+=1 end
+	require("./SavingsLine").start(Ready)
+	local line=cash:FindFirstChild("Savings")
+	local height=require("./Config").Readiness.LineHeight
+	check("6.14 HUD: the savings line under the cash, the column taller by its height",line~=nil and line.Visible and line:FindFirstChild("Words").Text=="🚐 OLD VAN  $150 / $1,800"
+		and cash.Size.Y.Offset==30+height and stack.Size.Y.Offset==258+height)
+	line.Activated:Fire()
+	check("… a tap opens the READY CHECK (SavingsLine.onOpen)",opened==1)
+	M.remotes.Tutorial.OnClientEvent:Fire("board",{})
+	check("… Marge's first day: hidden, the column back",not line.Visible and cash.Size.Y.Offset==30 and stack.Size.Y.Offset==258 and Ready.resultLine(85)==nil)
+	M.remotes.Tutorial.OnClientEvent:Fire("done",{})
+	Ready.setState({phone=true,money=2000,kit={},cars={},vanQuest="open",items={medkit=1}})
+	check("… enough money: buy it, in green",line.Visible and line:FindFirstChild("Words").Text=="🚐 OLD VAN  ✓ BUY IT · $1,800" and line:FindFirstChild("Words").TextColor3==M.Theme.Contract.good)
+	stack:Destroy()
+	check("6.14: no warnings",#M.warnings==0)
 end
 -- The popup with motion (reduced motion off): it lands centred at full scale, dim and blurred; back on close.
 M.services.GuiService.ReducedMotionEnabled=false

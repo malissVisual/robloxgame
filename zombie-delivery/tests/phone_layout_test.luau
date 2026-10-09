@@ -27,6 +27,12 @@ for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{1150,680,f
 	check(`{w}x{h}: the popup is at most 760 x 520`, pop.width <= 760 and pop.height <= 520)
 	if touch then check(`{w}x{h}: popup touch targets >=36`, 54*pop.scale >= 36 and pop.scale == 1) end
 end
+-- 6.14: NEXT MISSION and WORK (the home's two wide tiles) stand wholly above the fold, on the shortest phone too.
+for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{320,448,true},{390,800,true},{844,350,true},{844,390,true},{667,335,true},{640,324,true},{640,316,true}} do
+	local w,h,touch = screen[1],screen[2],screen[3]
+	check(`{w}x{h}: NEXT MISSION and WORK above the fold`, Phone.mainVisible(Phone.fit(w,h,touch,.9)))
+end
+check("6.14: NEXT MISSION is the taller tile, touch-sized", Phone.NEXT_H > Phone.WORK_H and Phone.WORK_H >= 54)
 local desk = Phone.popup(1150,680,false,1)
 check("the desktop popup is 760 x 520", desk.width == 760 and desk.height == 520 and desk.wide)
 check("a narrow phone's popup has one column", not Phone.popup(390,800,true,1).wide)

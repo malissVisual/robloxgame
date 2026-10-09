@@ -41,6 +41,13 @@
 --   queue, server/JobQueue.luau) is kept in refs.queue: JOBS' line says "Your run · 2 orders · 3 next".
 -- 6.14, MORE → REGULARS (client/RegularsApp.luau): every business that gives jobs, your tier with it and the way to the
 --   next one, in the popup.
+-- 6.14, get ready for the mission (the owner: "jobs are the daily work: grind, save up for something, then progress in
+--   the mission"; client/ReadyCheck.luau, shared/Readiness.luau): home opens with two wide tiles instead of 6.12.5's
+--   three equal ones. NEXT MISSION (the chapter and n/N, the mission, "2 of 3 ready" in red or "READY · START" in green,
+--   the savings goal's bar) opens the READY CHECK in the popup (app "ready": the checklist with its GPS / INVITE / JOBS
+--   / GARAGE actions, START, MISSIONS). WORK is the JOBS app as before (id "jobs", the board) with a second line, what
+--   you earn for ("Earn for the Old Van · $1,160 to go"). TASKS and MISSIONS join the smaller tiles (their lines, bars
+--   and badges as before).
 
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
@@ -103,21 +110,22 @@ local TILE_HOVER = Color3.fromRGB(40, 45, 53)
 
 type Message = { from: string, text: string, time: string, unread: boolean, kind: string }
 -- 5.5: `window` opens a window of its own (the phone closes first); the others open in the popup (6.0.1).
--- 6.5: `sub`, the one line under the name.
-type AppDef = { id: string, name: string, sub: string, window: boolean? }
+-- 6.5: `sub`, the one line under the name. 6.12.5 / 6.14: `bar`, a thin progress bar along the tile's foot.
+type AppDef = { id: string, name: string, sub: string, window: boolean?, bar: boolean? }
 
 -- 6.12.5 (the owner: "the main things, jobs, missions and tasks, more visible in the phone"): home opens with the
--- three main apps, big and red-edged, each with its live line (MAIN: JOBS across the top, MISSIONS and TASKS under it;
--- fillMain) …
+-- main apps, big and red-edged, each with its live lines (fillMain). 6.14: NEXT MISSION (its READY CHECK: the app
+-- "ready", client/ReadyCheck.luau) across the top, WORK (the JOBS app) under it …
 local MAIN: { AppDef } = {
-	{ id = "jobs", name = "JOBS", sub = "Take a delivery" },
-	{ id = "missions", name = "MISSIONS", sub = "Story chapters", window = true },
-	{ id = "tasks", name = "TASKS", sub = "Daily and weekly" },
+	{ id = "next", name = "NEXT MISSION", sub = "Get ready for the story" },
+	{ id = "jobs", name = "WORK", sub = "Take a delivery" },
 }
 
--- … then the six smaller tiles, two to a row (6.5's big tiles; 6.12.8: JOBS always opens BOARD; MORE its
--- sub-screen) …
+-- … then the smaller tiles, two to a row (6.5's big tiles; 6.12.8: JOBS always opens BOARD; MORE its sub-screen;
+-- 6.14: TASKS and MISSIONS, out of the 6.12.5 MAIN row, first) …
 local TILES: { AppDef } = {
+	{ id = "tasks", name = "TASKS", sub = "Daily and weekly", bar = true },
+	{ id = "missions", name = "MISSIONS", sub = "Story chapters", window = true, bar = true },
 	{ id = "map", name = "MAP", sub = "The city, your GPS", window = true },
 	{ id = "shop", name = "SHOP", sub = "Where to buy what" },
 	{ id = "bag", name = "BAG & ITEMS", sub = "Bag, items, bags" },
@@ -152,6 +160,8 @@ refs.tasks = require(script.Parent.TasksApp) -- 6.12: TASKS, the daily and weekl
 refs.style = require(script.Parent.StyleApp) -- 6.12: STYLE, the cosmetics
 refs.regulars = require(script.Parent.RegularsApp) -- 6.14: REGULARS, the businesses that know you
 refs.queueRules = require(Shared.JobQueue) -- 6.12.8: the NEXT UP queue's words (refs.queue: the server's state)
+refs.ready = require(script.Parent.ReadyCheck) -- 6.14: NEXT MISSION, its READY CHECK, WORK's goal line
+refs.gps = require(script.Parent.Gps) -- 6.14: the GPS to a shop or a landmark (gpsTo)
 local tiles: { [string]: any } = {} -- the app tiles' badges by app id
 refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
 refs.bars = {} -- 6.12.5: the MAIN tiles' progress bars by app id (MISSIONS, TASKS: fillMain)
@@ -591,24 +601,9 @@ do
 end
 
 -- The GPS to one of Map.Shops or a landmark (5.0: "earl", Earl's Used Wheels) (the white route on both maps, the HUD's
--- beam and label).
+-- beam and label). 6.14: client/Gps.luau does it (the READY CHECK and the level-up card use it too).
 local function gpsTo(shopId: string)
-	local shop = Map.Shops[shopId]
-	local landmark: Map.Landmark? = nil
-	for _, entry in Map.Landmarks do
-		if entry.id == shopId then
-			landmark = entry
-		end
-	end
-	local x = if shop then shop.x elseif landmark then landmark.x else nil
-	local z = if shop then shop.z elseif landmark then landmark.z else nil
-	if x == nil or z == nil then
-		return
-	end
-	MapView.setWaypoint(Vector3.new(x, Map.RoadTop, z))
-	pcall(function()
-		MapView.onWaypoint(landmark or { id = shopId, name = if shop then shop.name else shopId, icon = "🛒", x = x, z = z, kind = "shop", description = "" })
-	end)
+	refs.gps.to(shopId)
 end
 
 -- ── The apps ───────────────────────────────────────────────────────────────
@@ -1019,6 +1014,8 @@ local function launch(id: string, from: GuiObject?)
 	if id == "more" then
 		refs.showPage("more", true)
 		return
+	elseif id == "next" then
+		id = "ready" -- 6.14: NEXT MISSION's READY CHECK (client/ReadyCheck.luau)
 	elseif id == "jobs" then
 		id = "board"
 	elseif id == "bag" then
@@ -1136,20 +1133,28 @@ local function tile(parent: Instance, def: AppDef, order: number, big: boolean):
 	})
 	if not big then
 		text(cell, "›", UDim2.fromOffset(16, 56), { Position = UDim2.new(1, -24, 0, 0), Font = Theme.HeadingFont, TextSize = 22, TextColor3 = K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
+	elseif def.bar then
+		-- 6.14: TASKS' and MISSIONS' progress along the foot of their tile (refs.bars, fillMain)
+		local holder = Ui.make("Frame", { Name = "Progress", Size = UDim2.new(1, -52, 0, 3), Position = UDim2.new(0, 44, 1, -5), BackgroundTransparency = 1 }, cell)
+		local _, fill = P.bar(holder, UDim2.new(1, 0, 1, 0), K.red)
+		fill.Size = UDim2.fromScale(0, 1)
+		refs.bars[def.id] = fill
 	end
 	local underline = Ui.make("Frame", { Size = UDim2.new(0, 28, 0, 2), Position = if big then UDim2.new(0, 44, 1, -7) else UDim2.new(0, 60, 1, -6), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
 	wire(cell, def, name, underline, if big then UDim2.new(1, -6, 0, 6) else UDim2.new(1, -34, 0.5, -9))
 	return cell
 end
 
--- 6.12.5: a MAIN app's tile (JOBS, MISSIONS, TASKS): bigger, the red edge and a red band on its left, the glyph in a
--- red-edged square, the name in big caps, its live line (refs.subs, fillMain) and, for MISSIONS and TASKS, a thin bar
--- of the progress (refs.bars). `wide`: JOBS across the home (the glyph on the left, the text beside it); else half the
--- row under it (the glyph over the text).
+-- 6.12.5: a MAIN app's tile: bigger, the red edge and a red band on its left, the glyph in a red-edged square, the name
+-- in big caps, its live line (refs.subs, fillMain) and, half a row wide, a thin bar of the progress (refs.bars). `wide`:
+-- across the home (the glyph on the left, the text beside it); else half the row (the glyph over the text). 6.14: both
+-- are wide: NEXT MISSION taller, its lines drawn by client/ReadyCheck.luau (refs.nextTile: the chapter, the mission,
+-- the readiness, the savings bar); WORK (the JOBS app) with a second line, what you earn for (refs.workGoal).
 local function mainTile(parent: Instance, def: AppDef, order: number, wide: boolean): any
+	local tall = def.id == "next"
 	local cell = Ui.make("TextButton", {
 		Name = `{def.id}App`,
-		Size = if wide then UDim2.new(1, 0, 0, 76) else UDim2.new(0.5, -4, 1, 0),
+		Size = if tall then UDim2.new(1, 0, 0, refs.layout.NEXT_H) elseif wide then UDim2.new(1, 0, 0, if def.id == "jobs" then refs.layout.WORK_H else 76) else UDim2.new(0.5, -4, 1, 0),
 		BackgroundColor3 = TILE,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
@@ -1161,37 +1166,57 @@ local function mainTile(parent: Instance, def: AppDef, order: number, wide: bool
 	local face = Ui.make("Frame", {
 		Name = "Face",
 		Size = if wide then UDim2.fromOffset(46, 46) else UDim2.fromOffset(34, 34),
-		Position = if wide then UDim2.new(0, 16, 0.5, 0) else UDim2.fromOffset(14, 10),
-		AnchorPoint = if wide then Vector2.new(0, 0.5) else Vector2.zero,
+		Position = if tall then UDim2.fromOffset(16, 14) elseif wide then UDim2.new(0, 16, 0.5, 0) else UDim2.fromOffset(14, 10),
+		AnchorPoint = if wide and not tall then Vector2.new(0, 0.5) else Vector2.zero,
 		BackgroundColor3 = SCREEN,
 		BorderSizePixel = 0,
 	}, cell)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.red, Thickness = 1, Transparency = 0.45 }, face)
 	refs.design.glyph(face, def.id, if wide then 30 else 22)
 	local left = if wide then 76 else 14
-	local name = P.caps(cell, def.name, UDim2.new(1, -(left + 30), 0, 22), {
-		Position = UDim2.fromOffset(left, if wide then 14 else 48),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextStrokeTransparency = 1,
-		TextSize = if wide then 20 else 16,
-		TextColor3 = K.text,
-	})
-	refs.subs[def.id] = text(cell, def.sub, UDim2.new(1, -(left + 10), 0, 16), {
-		Name = "Sub",
-		Position = UDim2.fromOffset(left, if wide then 40 else 70),
-		TextSize = 12,
-		TextColor3 = K.text,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		TextXAlignment = Enum.TextXAlignment.Left,
-	})
+	local name: any
+	if tall then
+		-- 6.14: NEXT MISSION's lines (client/ReadyCheck.luau; the mission's name is the one the hover lights)
+		refs.nextTile = refs.ready.tile(cell, left)
+		name = refs.nextTile.name
+	else
+		name = P.caps(cell, def.name, UDim2.new(1, -(left + 30), 0, 22), {
+			Position = UDim2.fromOffset(left, if wide then 14 else 48),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextStrokeTransparency = 1,
+			TextSize = if wide then 20 else 16,
+			TextColor3 = K.text,
+		})
+		refs.subs[def.id] = text(cell, def.sub, UDim2.new(1, -(left + 10), 0, 16), {
+			Name = "Sub",
+			Position = UDim2.fromOffset(left, if wide then 40 else 70),
+			TextSize = 12,
+			TextColor3 = K.text,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+		})
+	end
+	if def.id == "jobs" then
+		-- 6.14: what you earn for ("Earn for the Old Van · $1,160 to go"; hidden without a goal)
+		refs.workGoal = text(cell, "", UDim2.new(1, -(left + 10), 0, 16), {
+			Name = "Goal",
+			Position = UDim2.fromOffset(left, 57),
+			TextSize = 11,
+			TextColor3 = K.good,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Visible = false,
+		})
+	end
 	if not wide then
 		local holder = Ui.make("Frame", { Name = "Progress", Size = UDim2.new(1, -28, 0, 4), Position = UDim2.new(0, 14, 1, -10), BackgroundTransparency = 1 }, cell)
 		local _, fill = P.bar(holder, UDim2.new(1, 0, 1, 0), K.red)
 		fill.Size = UDim2.fromScale(0, 1)
 		refs.bars[def.id] = fill
 	end
-	local underline = Ui.make("Frame", { Size = UDim2.new(0, 36, 0, 2), Position = UDim2.new(0, left, 0, if wide then 37 else 68), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
+	local underline = Ui.make("Frame", { Size = UDim2.new(0, 36, 0, 2), Position = UDim2.new(0, left, 0, if tall then 50 elseif wide then 37 else 68), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, cell)
 	wire(cell, def, name, underline, UDim2.new(1, -8, 0, 8))
 	return cell
 end
@@ -1315,15 +1340,26 @@ local function homeWidgets(parent: Instance)
 end
 
 -- 6.12.5: the MAIN tiles' live lines: MISSIONS the chapter you are at (its missions done, or why it is shut), TASKS
--- today's dailies done and the rewards waiting, each with its bar.
+-- today's dailies done and the rewards waiting, each with its bar. 6.14: NEXT MISSION's lines (client/ReadyCheck.luau)
+-- and WORK's goal line; MISSIONS and TASKS are smaller tiles now, the same lines and bars.
 refs.fillMain = function()
+	refs.ready.fillTile(refs.nextTile)
+	local workGoal = refs.workGoal
+	if workGoal then
+		local line = refs.ready.workLine()
+		workGoal.Text = line or ""
+		workGoal.Visible = line ~= nil
+		local goal = refs.ready.current().goal
+		workGoal.TextColor3 = if goal and goal.afford then K.good else K.secondary
+	end
 	local info = Phone.missionInfo and Phone.missionInfo()
 	local missionsSub, missionsBar = refs.subs.missions, refs.bars.missions
 	if info and missionsSub then
 		local finished = info.total > 0 and info.done >= info.total
-		missionsSub.Text = if not info.open then `🔒 {info.name} · {info.why or "Locked"}`
-			elseif finished then `{info.name} · done ✓`
-			else `{info.name} · {info.done} / {info.total}`
+		-- (6.14: a smaller tile: the short words first; the chapter is NEXT MISSION's)
+		missionsSub.Text = if not info.open then `🔒 {info.why or "Locked"}`
+			elseif finished then `{info.name} ✓`
+			else `{info.done}/{info.total} · {info.name}`
 		missionsSub.TextColor3 = if info.open then K.text else K.secondary
 		if missionsBar then
 			missionsBar.Size = UDim2.fromScale(if info.total > 0 then math.clamp(info.done / info.total, 0, 1) else 0, 1)
@@ -1333,9 +1369,9 @@ refs.fillMain = function()
 	local tasksSub, tasksBar = refs.subs.tasks, refs.bars.tasks
 	if tasksSub then
 		tasksSub.Text = if total == 0 then "Daily and weekly"
-			elseif ready > 0 then `{ready} to claim · {done} / {total} today`
+			elseif ready > 0 then `{ready} to claim · {done}/{total}`
 			elseif done >= total then "All done today ✓"
-			else `{done} / {total} done today`
+			else `{done}/{total} done today`
 		tasksSub.TextColor3 = if ready > 0 then K.good else K.text
 	end
 	if tasksBar then
@@ -1478,14 +1514,14 @@ local function buildBody()
 	Ui.list(widgets, true, 8)
 	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 16) }, widgets)
 	homeWidgets(widgets)
-	-- 6.12.5: the MAIN apps right under the shift line: JOBS across, MISSIONS and TASKS side by side under it.
+	-- 6.12.5: the MAIN apps right under the shift line. 6.14: NEXT MISSION across the top, WORK under it.
 	local main = Ui.make("Frame", { Name = "Main", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2 }, widgets)
 	Ui.list(main, true, 8)
-	refs.firstTile = mainTile(main, MAIN[1], 1, true)
-	local pair = Ui.make("Frame", { Name = "MainPair", Size = UDim2.new(1, 0, 0, 104), BackgroundTransparency = 1, LayoutOrder = 2 }, main)
-	Ui.list(pair, false, 8)
-	for order = 2, #MAIN do
-		mainTile(pair, MAIN[order], order, false)
+	for order, def in MAIN do
+		local cell = mainTile(main, def, order, true)
+		if order == 1 then
+			refs.firstTile = cell
+		end
 	end
 	local grid = Ui.make("Frame", {
 		-- (6.5: the big tiles, two to a row; 6.12.5: smaller, under the MAIN apps)
@@ -1537,7 +1573,7 @@ end
 
 -- ── Showing ────────────────────────────────────────────────────────────────
 
-local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE", regulars = "REGULARS" }
+local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOB BOARD", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE", regulars = "REGULARS", ready = "READY CHECK" }
 
 -- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
 renderApp = function()
@@ -1616,6 +1652,9 @@ renderApp = function()
 			refs.style.render(list, look, refs.host, wide) -- 6.12: the cosmetics (client/StyleApp.luau)
 		elseif app == "regulars" then
 			refs.regulars.draw(list, look, wide) -- 6.14: the businesses that know you
+		elseif app == "ready" then
+			refs.readyKey = refs.ready.key()
+			refs.ready.draw(list, look, refs.host, wide) -- 6.14: NEXT MISSION's READY CHECK (client/ReadyCheck.luau)
 		end
 	end)
 	if refs.spareRoute then
@@ -1760,6 +1799,8 @@ local function startTicker()
 					refs.tasks.tick() -- 6.12: the time until the tasks are new
 				elseif app == "style" then
 					refs.style.tick() -- 6.12: you walked up to a shop that sells looks, or away: BUY there, "AT …" elsewhere
+				elseif app == "ready" then
+					refs.ready.tick() -- 6.14: the savings goal's money and bar
 				end
 				if refs.tow and refs.idMoney then
 					refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
@@ -1810,6 +1851,27 @@ end
 -- 5.5: does the player have the phone (Marge gave it)? The HUD's MENU opens it then (Main: Hud.onMenu).
 function Phone.has(): boolean
 	return hasPhone()
+end
+
+-- 6.14: scrolls the open phone's home so the tile `name` ("mapApp") shows whole (Marge's arrow tour points at it,
+-- client/TutorialUi.luau: with NEXT MISSION and WORK on top, MAP or BAG may sit under the fold of a short phone).
+function Phone.reveal(name: string)
+	local home, body = refs.home, refs.body
+	local tile = if body then body:FindFirstChild(name, true) else nil
+	if not (isOpen and home and tile and tile:IsA("GuiObject")) then
+		return
+	end
+	local scale = if refs.scale then math.max(0.1, refs.scale.Scale) else 1
+	local top = (tile.AbsolutePosition.Y - home.AbsolutePosition.Y) / scale + home.CanvasPosition.Y
+	local bottom = top + tile.AbsoluteSize.Y / scale
+	local view = home.AbsoluteSize.Y / scale
+	local y = home.CanvasPosition.Y
+	if top < y then
+		y = math.max(0, top - 8)
+	elseif bottom > y + view then
+		y = bottom - view + 8
+	end
+	home.CanvasPosition = Vector2.new(0, y)
 end
 
 function Phone.close()
@@ -2042,7 +2104,8 @@ local function phoneMoment()
 	end
 	momentShown = true
 	seed()
-	addMessage("Marge", "That's my old phone. It's yours now: JOBS has the work and your run, MAP the city, SHOP where to buy what, BAG & ITEMS what you carry. Don't lose it.", "marge", true)
+	-- (6.14: NEXT MISSION and WORK on top)
+	addMessage("Marge", "That's my old phone. It's yours now: NEXT MISSION says what you're working toward, WORK has the jobs and your run, MAP the city, SHOP where to buy what. Don't lose it.", "marge", true)
 	local notify = Phone.notify
 	if notify then
 		notify(if Ui.touchLayout() then "📱 NEW PHONE · Marge gave you her old phone · tap PHONE" else "📱 NEW PHONE · Marge gave you her old phone · Q opens it")
@@ -2246,6 +2309,19 @@ function Phone.start()
 		end
 	end
 	refs.tasks.start()
+	-- 6.14: the next mission's answer changed (client/ReadyCheck.luau: a state, the Missions state, the XP): home's
+	-- NEXT MISSION and WORK tiles; the READY CHECK drawn again only when what it shows changed (its ticker keeps the
+	-- money live).
+	refs.ready.listen(function()
+		if not isOpen then
+			return
+		end
+		if app == "home" then
+			fillHome()
+		elseif app == "ready" and refs.ready.key() ~= refs.readyKey then
+			renderApp()
+		end
+	end)
 	Net.get("Job").OnClientEvent:Connect(function(payload)
 		job = if type(payload) == "table" then payload else nil
 		refreshBadges()

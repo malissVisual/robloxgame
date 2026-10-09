@@ -21,15 +21,24 @@
 -- Config.Kit: the bags, the vests …). 5.1: bike (a bike of Config.Cars at its level, "at Config.BikeShop.Shop":
 -- 6.12.7: Dead End Motors; before Config.Cars has one, a line "Bikes at …" at BIKE_LEVEL); the bike gear is gear.
 -- 6.12.14: a gun you buy says where ("SMG at Lead & Co.'s range", Config.GunRange.Shop); the starter pistol only its name.
+-- 6.14 (the owner: progress was confusing; the level-up should say what is new AND where it is):
+--   Career.whereOf(unlock)        where an unlock is found: a place for the GPS (a Map.Shops / Map.Landmarks id) or
+--                                 the window that opens it, and the place in words (client/CareerUi.luau's level-up
+--                                 card: GPS / MISSIONS / ESTATE buttons; client/Hud.luau's small banner)
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
 local Levels = require(script.Parent.Levels)
+local Map = require(script.Parent.Map)
 local Missions = require(script.Parent.Missions)
+local Transport = require(script.Parent.Transport)
 
 local Career = {}
 
 export type Unlock = { kind: string, id: string, name: string, car: string? }
+-- 6.14: `place` a Map.Shops / Map.Landmarks id (the GPS goes there), else `window` what opens it ("missions",
+-- "estate", "jobs"); `label` the place in words ("Earl's Used Wheels", "Dead End Motors' BIKES counter").
+export type Where = { place: string?, window: string?, label: string }
 export type Step = {
 	level: number,
 	xp: number, -- the total XP that reaches it (Levels.xpFor)
@@ -279,6 +288,148 @@ function Career.summary(unlocks: { Unlock }, max: number, owned: { [string]: boo
 		table.insert(names, unlock.name)
 	end
 	return table.concat(names, ", ") .. (if more then " …" else "")
+end
+
+-- 6.14: where an unlock is found (see Where above), nil for what needs no trip (the starter pistol, the starter bag):
+--   bike, bike gear  Dead End Motors' BIKES counter (Map.Shops.bikes)
+--   car              the Old Van at Earl's Used Wheels (Map.VanSeller, the landmark "earl"), the others Dead End Motors
+--   stage, car gear, car gun   Wrench Garage
+--   gun              Lead & Co.'s range;  kit  its shop (Transport.kitShop: the gear stall's two counters, the bat the range)
+--   job              an employer's: their place (its landmark); a board job: JOBS
+--   tier, foot       JOBS (the job board);  campaign  MISSIONS;  garage, estate  ESTATE
+function Career.whereOf(unlock: Unlock): Where?
+	local kind = unlock.kind
+	-- ("Dead End Motors' BIKES counter": the possessive of a name ending in s)
+	local bikes = `{Config.BikeShop.Shop}{if string.sub(Config.BikeShop.Shop, -1) == "s" then "'" else "'s"} BIKES counter`
+	local function shop(id: string, label: string?): Where
+		local entry = Map.Shops[id]
+		return { place = id, label = label or (if entry then entry.name else id) }
+	end
+	if kind == "bike" then
+		return shop("bikes", bikes)
+	elseif kind == "car" then
+		if unlock.id == Config.VanQuest.Car then
+			return { place = "earl", label = Config.VanQuest.Place }
+		end
+		return shop("dealer")
+	elseif kind == "stage" or kind == "cargun" then
+		return shop("mechanic")
+	elseif kind == "gear" then
+		local gear = Economy.findGear(unlock.id)
+		if gear and gear.bikeOnly then
+			return shop("bikes", bikes)
+		end
+		return shop("mechanic")
+	elseif kind == "gun" then
+		local gun = Economy.findWeapon(unlock.id)
+		if gun and (gun.starter or Economy.rewardOnly(gun)) then
+			return nil
+		end
+		return shop("guns", Config.GunRange.Shop)
+	elseif kind == "kit" then
+		local kit = Transport.findKit(unlock.id)
+		if not kit or kit.starter then
+			return nil
+		end
+		local id = Transport.kitShop(kit)
+		return shop(id, if id == "guns" then Config.GunRange.Shop else nil)
+	elseif kind == "job" then
+		for _, def in Config.JobTypes do
+			if def.id == unlock.id and def.employer and not def.board then
+				local employer = Economy.findEmployer(def.employer)
+				if employer then
+					return { place = employer.id, label = employer.name }
+				end
+			end
+		end
+		return { window = "jobs", label = "JOBS" }
+	elseif kind == "tier" or kind == "foot" then
+		return { window = "jobs", label = "JOBS" }
+	elseif kind == "campaign" then
+		return { window = "missions", label = "MISSIONS" }
+	elseif kind == "garage" or kind == "estate" then
+		return { window = "estate", label = "ESTATE" }
+	end
+	return nil
+end
+
+-- 6.14: an unlock's own short name, without where it is ("Old Van", "SMG", "School Run").
+function Career.shortName(unlock: Unlock): string
+	local name = unlock.name
+	local cut = #name + 1
+	for _, mark in { " at ", ": ", " (" } do
+		local at = string.find(name, mark, 1, true)
+		if at and at < cut then
+			cut = at
+		end
+	end
+	return string.sub(name, 1, cut - 1)
+end
+
+-- 6.14, the level-up card's rows: the unlocks grouped by where they are. The places first, with the GPS (`places` at
+-- most; the vehicles, then the guns, the kit, the stages, the gear and the employers' jobs: a level-4 player wants
+-- Earl's van more than a school bus), then MISSIONS for a new chapter and ESTATE for a garage or a home; `max` rows in
+-- all. (The card leaves out the stages of cars you do not own before it asks.)
+export type WhereRow = { place: string?, window: string?, label: string, names: { string }, id: string? }
+local WHERE_ORDER: { [string]: number } = { car = 1, bike = 2, gun = 3, kit = 4, stage = 5, gear = 6, cargun = 7, job = 8 }
+
+function Career.whereRows(unlocks: { Unlock }, places: number, max: number): { WhereRow }
+	local sorted = table.clone(unlocks)
+	local position: { [Unlock]: number } = {}
+	for index, unlock in unlocks do
+		position[unlock] = index
+	end
+	table.sort(sorted, function(a: Unlock, b: Unlock): boolean
+		local x, y = WHERE_ORDER[a.kind] or 50, WHERE_ORDER[b.kind] or 50
+		if x ~= y then
+			return x < y
+		end
+		return position[a] < position[b]
+	end)
+	local placed: { WhereRow } = {}
+	local missions: WhereRow? = nil
+	local estate: WhereRow? = nil
+	for _, unlock in sorted do
+		local where = Career.whereOf(unlock)
+		if not where then
+			continue
+		end
+		local name = Career.shortName(unlock)
+		if where.place then
+			local found: WhereRow? = nil
+			for _, row in placed do
+				if row.place == where.place then
+					found = row
+				end
+			end
+			if found then
+				table.insert(found.names, name)
+			elseif #placed < places then
+				table.insert(placed, { place = where.place, label = where.label, names = { name } })
+			end
+		elseif where.window == "missions" and not missions then
+			missions = { window = "missions", label = where.label, names = { name }, id = unlock.id }
+		elseif where.window == "estate" then
+			if estate then
+				table.insert(estate.names, name)
+			else
+				estate = { window = "estate", label = where.label, names = { name } }
+			end
+		end
+	end
+	local rows: { WhereRow } = {}
+	for _, row in placed do
+		if #rows < max then
+			table.insert(rows, row)
+		end
+	end
+	if missions and #rows < max then
+		table.insert(rows, missions)
+	end
+	if estate and #rows < max then
+		table.insert(rows, estate)
+	end
+	return rows
 end
 
 -- The levels 2 … `level` whose reward has not been given (`given`: profile.levelRewards, level → true by its

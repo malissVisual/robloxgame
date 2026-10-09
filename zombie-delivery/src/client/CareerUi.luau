@@ -23,6 +23,11 @@
 -- 5.8, the courier phone's look (design/phone-ui/): the ZDC window header with the career glyph; the road's rows are
 -- slim (a hairline between them), the current one selected (raised, the red rule); the level-up card opens with the
 -- ZDC heading ([■ ZDC] | career glyph  LEVEL UP) and its OK is the red primary action.
+-- 6.14 (the owner: how you progress was confusing): the level-up card says what is new AND where it is: under
+-- UNLOCKED a WHERE block (shared/Career.luau whereRows: the vehicles first, one row a place) with a GPS button for up to
+-- 3 places (a bike: Dead End Motors' BIKES counter; the van: Earl's Used Wheels; a gun: Lead & Co.'s range; kit: the
+-- gear stall; a stage or car gear: Wrench Garage; an employer's job: the employer; client/Gps.luau), then MISSIONS for
+-- a new chapter and ESTATE for a garage or a home (CareerUi.openWindow, set by Main).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +43,7 @@ local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local DialogKeys = require(script.Parent.DialogKeys)
 local P = require(script.Parent.HudContract)
+local Gps = require(script.Parent.Gps) -- 6.14: the level-up card's GPS buttons
 
 local K = Theme.Contract
 local CareerUi = {}
@@ -46,6 +52,10 @@ local CareerUi = {}
 CareerUi.onOpen = nil :: (() -> ())?
 -- Set by Main: while this says so, the level-up card waits (the DELIVERY result, a mission's cleared card).
 CareerUi.blocked = nil :: (() -> boolean)?
+-- 6.14, set by Main: the level-up card's MISSIONS ("missions", the chapter's id) and ESTATE ("estate") buttons, and
+-- its toasts ("GPS set: Earl's Used Wheels").
+CareerUi.openWindow = nil :: ((window: string, id: string?) -> ())?
+CareerUi.notify = nil :: ((text: string) -> ())?
 
 local player = Players.LocalPlayer
 local WIDTH, HEIGHT = 920, 580 -- the window at scale 1 (Ui.screenScale)
@@ -585,10 +595,13 @@ local function buildCard()
 	cardRefs.rank = label(card, "", { LayoutOrder = 3, Font = Theme.HeadingFont, TextSize = 13, TextColor3 = P.danger })
 	P.rule(card, UDim2.new(1, 0, 0, 1), { LayoutOrder = 4 })
 	cardRefs.unlocks = label(card, "", { LayoutOrder = 5, TextColor3 = P.ink, TextSize = 15 })
-	cardRefs.reward = label(card, "", { LayoutOrder = 6, TextColor3 = P.ink, TextSize = 15 })
-	P.rule(card, UDim2.new(1, 0, 0, 1), { LayoutOrder = 7 })
-	cardRefs.nextLine = label(card, "", { LayoutOrder = 8, TextSize = 14 })
-	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 9 }, card)
+	-- 6.14: WHERE: a row a place (its GPS) or a window (MISSIONS, ESTATE); showCard fills it
+	cardRefs.where = Ui.make("Frame", { Name = "Where", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 6 }, card)
+	Ui.list(cardRefs.where, true, 4)
+	cardRefs.reward = label(card, "", { LayoutOrder = 7, TextColor3 = P.ink, TextSize = 15 })
+	P.rule(card, UDim2.new(1, 0, 0, 1), { LayoutOrder = 8 })
+	cardRefs.nextLine = label(card, "", { LayoutOrder = 9, TextSize = 14 })
+	local buttons = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 10 }, card)
 	Ui.list(buttons, false, 10)
 	local function closeCard()
 		cardToken += 1
@@ -643,6 +656,48 @@ local function showCard(from: number, to: number)
 	end
 	local opens = unlockLine(unlocks, 6)
 	cardRefs.unlocks.Text = if opens ~= "" then `<b>UNLOCKED</b>   {opens}` else "<b>UNLOCKED</b>   better pay and harder roads."
+	-- 6.14: WHERE the new things are: up to 3 places with their GPS (the vehicles first), then MISSIONS and ESTATE.
+	for _, child in cardRefs.where:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	local rows = Career.whereRows(shownUnlocks(unlocks), 3, 4)
+	cardRefs.where.Visible = #rows > 0
+	for index, row in rows do
+		local line = Ui.make("Frame", { Name = `Where_{row.place or row.window}`, Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = index }, cardRefs.where)
+		local icon = if row.place then "📍" elseif row.window == "missions" then "⭐" else "🏠"
+		local function esc(text: string): string -- (RichText: "Lead & Co.")
+			return (string.gsub(string.gsub(string.gsub(text, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+		end
+		label(line, `{icon}  <b>{esc(table.concat(row.names, ", "))}</b>  ·  {esc(row.label)}`, {
+			Size = UDim2.new(1, -104, 1, 0),
+			AutomaticSize = Enum.AutomaticSize.None,
+			TextColor3 = P.ink,
+			TextSize = 14,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextYAlignment = Enum.TextYAlignment.Center,
+		})
+		local button = P.button(line, if row.place then "📍 GPS" else row.label, UDim2.fromOffset(96, 28), "quiet", function()
+			cardRefs.close()
+			if row.place then
+				local name = Gps.to(row.place)
+				local tell = CareerUi.notify
+				if tell and name then
+					tell(`GPS set: {name}`)
+				end
+			else
+				local open = CareerUi.openWindow
+				if open then
+					open(row.window or "", row.id)
+				end
+			end
+		end)
+		button.Name = if row.place then "Gps" else "Open"
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, 0, 0.5, 0)
+		button.TextSize = 12
+	end
 	local paid: { string } = {}
 	if money > 0 then
 		table.insert(paid, Career.money(money))

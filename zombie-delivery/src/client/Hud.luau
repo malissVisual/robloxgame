@@ -269,6 +269,8 @@ leftStack = placed(Ui.make("Frame", {
 	BackgroundTransparency = 1,
 }, gui))
 Ui.list(leftStack, true, 6)
+-- 6.14: the savings line under the cash (client/SavingsLine.luau) grows the column while it shows: lay out again
+leftStack:GetPropertyChangedSignal("Size"):Connect(requestLayout)
 -- 3.8: "$12,480 / LV 7 ROAD RAT" in compact white type, a hairline of the XP under it; the XP numbers only on hover
 -- (or a tap on a touch screen), quietly to the right of the line (3.1.4+).
 local moneyHolder = Ui.make("Frame", { Name = "Cash", Size = UDim2.fromOffset(LEFT_W, MONEY_HEIGHT), BackgroundTransparency = 1, LayoutOrder = 1 }, leftStack)
@@ -1599,6 +1601,11 @@ function Hud.showResult(r: any)
 		Hud.toast(`{if r.midJob == true then "ORDER DONE" else "DELIVERED"}{if got > 0 then ` {string.rep("★", got)}{string.rep("☆", 3 - got)}` else ""} · {r.cargo or "cargo"} for {r.customer or r.driver or "the customer"}{if left > 0 then ` · {left} to go` elseif streak > 1 then ` · streak {streak}` else ""}`)
 		local xp = tonumber(r.xp) or 0
 		require(script.Parent.PayFloat).show(moneyLabel, `+{Ui.money(tonumber(r.total) or 0)}{if xp > 0 then ` · +{xp} XP` else ""}`)
+		-- 6.14: what the pay brings the savings goal to ("+$85 · $1,160 to go for the Old Van"; client/ReadyCheck.luau)
+		local saving = if r.midJob ~= true then require(script.Parent.ReadyCheck).resultLine(tonumber(r.total) or 0) else nil
+		if saving then
+			Hud.toast(saving)
+		end
 		return
 	end
 	if type(r) == "table" and r.midJob == true then
@@ -1790,6 +1797,13 @@ function Hud.showResult(r: any)
 			line(`Shared with the crew ({riders})`, "-" .. Ui.money(-crewBonus), C.dim, 14)
 		end
 		line("TOTAL", Ui.money(r.total), C.yellow, 20)
+		-- 6.14: what the pay (and a SHIFT DONE's pay, server/Shift.luau) brings the savings goal to (client/ReadyCheck.luau;
+		-- nothing without a goal); the last line, under the shift's
+		local shiftPay = if type(r.shift) == "table" and r.shift.done == true then tonumber(r.shift.money) or 0 else 0
+		local saving = require(script.Parent.ReadyCheck).resultLine((tonumber(r.total) or 0) + shiftPay)
+		if saving then
+			line(saving, nil, C.green, 27)
+		end
 		local employer = r.employer
 		if employer then
 			line(`{employer.name}: {employer.done} jobs done`, nil, C.yellow, 21)
@@ -3234,10 +3248,18 @@ local levelUpUnlocks = Ui.label(levelUpBody, "", UDim2.new(1, 0, 0, 0), {
 local levelUpStamp = 0
 
 local function showLevelUp(from: number, to: number)
+	-- 6.14: what is new AND where it is (shared/Career.luau whereOf: "Old Van (Earl's Used Wheels)"); the stages only
+	-- of a car you own. (The level-up card, client/CareerUi.luau, has the GPS buttons.)
+	local Career = require(Shared.Career)
 	local unlocked: { string } = {}
 	for level = from + 1, to do
-		for _, name in unlocksAt(level) do
-			table.insert(unlocked, name)
+		for _, unlock in Career.unlocksAt(level) do
+			if unlock.kind == "stage" and not (state and type(state.cars) == "table" and state.cars[unlock.car or ""]) then
+				continue
+			end
+			local where = Career.whereOf(unlock)
+			local known = where == nil or where.place == nil or string.find(unlock.name, where.label, 1, true) ~= nil
+			table.insert(unlocked, if known then unlock.name else `{unlock.name} ({(where :: any).label})`)
 		end
 	end
 	local rank = Levels.rank(to)
@@ -3648,17 +3670,17 @@ layout = function()
 	-- What the contract column and the action must stay clear of.
 	local below: { Box } = {}
 
-	-- Left: the cash line, the minimap and the health row.
+	-- Left: the cash line, the minimap and the health row (6.14: its height now, LEFT_H + the savings line while it shows).
 	setScale(leftStack, S)
 	local left: Box
 	if touchLayout then
 		leftStack.AnchorPoint = Vector2.zero
 		leftStack.Position = UDim2.fromOffset(MARGIN, MARGIN)
-		left = box(MARGIN, MARGIN, MARGIN + LEFT_W * S, MARGIN + LEFT_H * S)
+		left = box(MARGIN, MARGIN, MARGIN + LEFT_W * S, MARGIN + leftStack.Size.Y.Offset * S)
 	else
 		leftStack.AnchorPoint = Vector2.new(0, 1)
 		leftStack.Position = UDim2.new(0, MARGIN, 1, -MARGIN)
-		left = box(MARGIN, H - MARGIN - LEFT_H * S, MARGIN + LEFT_W * S, H - MARGIN)
+		left = box(MARGIN, H - MARGIN - leftStack.Size.Y.Offset * S, MARGIN + LEFT_W * S, H - MARGIN)
 		table.insert(below, left)
 	end
 

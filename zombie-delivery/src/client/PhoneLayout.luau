@@ -19,6 +19,18 @@ function PhoneLayout.fit(width: number, height: number, touch: boolean, cap: num
 	return { scale = scale, width = 340, height = math.min(680, (height - 32) / scale) }
 end
 
+-- 6.14: the home's two wide MAIN tiles (client/Phone.luau mainTile): NEXT MISSION (its lines: the chapter, the mission,
+-- the readiness, the savings bar) over WORK (the board's line and what you earn for). HOME_CHROME: the status bar over
+-- the home's scrolling list and the home bar under it; HOME_HEAD: the list's padding, the shift line and the gap under it.
+PhoneLayout.NEXT_H, PhoneLayout.WORK_H, PhoneLayout.MAIN_GAP = 108, 80, 8
+PhoneLayout.HOME_CHROME, PhoneLayout.HOME_HEAD = 30 + 56, 6 + 18 + 8
+
+-- 6.14: do NEXT MISSION and WORK sit wholly above the fold of the phone's home (no scrolling to see them)?
+function PhoneLayout.mainVisible(fit: Fit): boolean
+	local room = fit.height - PhoneLayout.HOME_CHROME
+	return PhoneLayout.HOME_HEAD + PhoneLayout.NEXT_H + PhoneLayout.MAIN_GAP + PhoneLayout.WORK_H <= room
+end
+
 -- 6.0.1: an app's popup: 760 × 520 at the desktop scale (`cap`; touch keeps 1 so its text and targets stay full
 -- size), never wider than 92 % or taller than 86 % of the screen (the content scrolls).
 function PhoneLayout.popup(width: number, height: number, touch: boolean, cap: number): Popup
