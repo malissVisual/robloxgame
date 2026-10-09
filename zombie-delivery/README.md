@@ -1143,6 +1143,21 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The businesses' pictures on the job list (6.12.11)
+
+The owner: "add Codex's pictures". Codex drew 25 businesses (Luigi's, Daily Bread, the Post Office, the bank, the
+army base …: `art/job-thumbnails/`, `design/job-thumbnails/`). Every job on the board now opens with the picture of
+the business it is for.
+
+- **Each job row** (the phone's BOARD and J's board, `client/JobThumbUi.luau`) has the picture strip across the top,
+  cropped so the sign shows, with the business's name on a dark label. NEXT UP rows get a small square.
+- **The map** is `shared/JobThumbs.luau` (Codex's `manifest.json`): ordinary jobs by their business, specials by
+  their type, the paper round, the tutorial. The server's offers and jobs carry the `business` id.
+- **Until the pictures are uploaded**, the image ids are empty. Each job then shows a slim banner with the cargo
+  emoji and the business's name.
+- **Uploading:** `design/job-thumbnails/NAHRAT-OBRAZKY.md` (Czech: Asset Manager → Bulk Import, then the ids).
+  `tools/job-thumbnails/fill-ids.py` fills them in.
+
 ## JOBS is the job list: ADD ALL and a NEXT UP queue (6.12.10)
 
 The owner: "once I take a job I can't add more; I don't need this window, I want a list with the jobs and what I earn,

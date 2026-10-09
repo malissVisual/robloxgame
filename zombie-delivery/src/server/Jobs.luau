@@ -451,11 +451,12 @@ local function playerPosition(player: Player): Vector3
 	return if rootPart then rootPart.Position else World.DepotSpawn
 end
 
-local function info(def: { name: string, description: string }?): { [string]: string }?
+-- 6.12.11: with its id (a special job's picture: shared/JobThumbs.luau).
+local function info(def: { id: string, name: string, description: string }?): { [string]: string }?
 	if not def then
 		return nil
 	end
-	return { name = def.name, description = def.description }
+	return { id = def.id, name = def.name, description = def.description }
 end
 
 local function article(noun: string): string
@@ -682,6 +683,11 @@ local function ordersInfo(job: Job, focus: Order): { { [string]: any } }
 			focused = order == focus,
 			from = if firstStop then firstStop.address.name else nil,
 			to = if lastStop then lastStop.address.name else nil,
+			-- 6.12.11: what its picture is (shared/JobThumbs.luau): the business, the special, the round, the tutorial
+			business = mine.business,
+			special = if mine.jobType then mine.jobType.id else nil,
+			round = if mine.round then true else nil,
+			tutorial = if mine.tutorial then true else nil,
 		})
 	end
 	return out
@@ -739,7 +745,10 @@ local function payload(job: Job): { [string]: any }
 		wave = job.wave, -- zombie waves so far
 		pay = mine.pay,
 		modifier = info(mine.modifier),
-		jobType = info(mine.jobType),
+		jobType = info(mine.jobType), -- (6.12.11: with its id)
+		business = mine.business, -- 6.12.11: the ordinary delivery's business (Config.Jobs.Businesses id; its picture)
+		round = if mine.round then true else nil,
+		tutorial = if mine.tutorial then true else nil,
 		-- The cargo on foot (server/Cargo.luau).
 		handling = handling, -- drive | carry | lead | board | serve
 		step = step, -- what to do now
@@ -2100,7 +2109,8 @@ local function describe(offer: Offer, from: Vector3, playerLevel: number, nightP
 		pay = offer.pay,
 		time = time,
 		modifier = info(offer.modifier),
-		jobType = info(jobType),
+		jobType = info(jobType), -- (6.12.11: with its id: a special's picture)
+		business = offer.business, -- 6.12.11: an ordinary delivery's business (Config.Jobs.Businesses id; its picture)
 		vehicle = if vehicle then vehicle.name else nil,
 		pieces = offer.total,
 		piece = offer.piece,
@@ -5206,6 +5216,7 @@ Jobs.queueApi = {
 			pieces = offer.total,
 			piece = offer.piece,
 			plural = offer.plural,
+			business = offer.business, -- 6.12.11: its picture (only ordinary jobs queue)
 		}
 	end,
 }
