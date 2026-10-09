@@ -102,7 +102,8 @@ local function sendState(player: Player)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		xp = profile.xp,
-		streak = profile.streak, -- 4.7: good jobs in a row (the board, the CAREER window)
+		streak = profile.streak, -- 4.7: good jobs in a row (the board, the CAREER window; 6.14: the HUD's ON A ROLL chip)
+		shift = require(Server.Shift).view(player), -- 6.14: this session's shift (the HUD's SHIFT chip, client/GrindChips)
 		licences = profile.licences, -- 4.7: the licences held (tier → true)
 		licenceJobs = profile.licenceJobs, -- 4.7: good jobs counted toward each licence
 		kit = profile.kit, -- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau)
@@ -231,6 +232,7 @@ Jobs.onMissionComplete = Missions.onComplete
 safely("Missions", Missions.start)
 safely("Challenges", Challenges.start)
 safely("Tasks", Tasks.start) -- 6.12: the daily and weekly tasks (the phone's TASKS app)
+safely("Shift", require(Server.Shift).start) -- 6.14: the shift's pay (its deliveries in one go), per session
 safely("Garages", Garages.start) -- 3.4: your cars in your garages, switched only there
 safely("Repair", Repair.start) -- 3.4: the repair bays (no free repairs any more)
 safely("Explore", Explore.start) -- 3.7: the map you discover

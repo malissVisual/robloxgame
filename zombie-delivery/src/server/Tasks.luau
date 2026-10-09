@@ -16,6 +16,7 @@
 --   "bus"      server/Buses.luau getOff: off at a stop after a ride (Config.Tasks.BusTrip seconds seated)
 --   "kill"     Main (Zombies.onKillInfo): a zombie killed (not a bandit), `night` after dark
 --   "mission"  server/Missions.luau onComplete: a mission finished (each credited player)
+--   "shift"    6.14, server/Shift.luau: a shift finished (its deliveries in one go, Config.Jobs.Shift)
 -- A note never blocks or breaks its caller (deferred, guarded).
 --
 -- The "Tasks" remote (shared/Net.luau), rate-limited (Config.Robust.Limits.Tasks):

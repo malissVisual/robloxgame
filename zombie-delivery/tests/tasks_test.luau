@@ -25,7 +25,7 @@ local NOW = 1791331200 -- 2026-10-07 00:00 UTC (a Wednesday)
 local USER = 123456789
 
 -- ── The pool ──────────────────────────────────────────────────────────────
-local EVENTS = { deliver = true, ride = true, stars3 = true, perfect = true, zip = true, wheelie = true, bus = true, kill = true, tips = true, earn = true, mission = true }
+local EVENTS = { deliver = true, ride = true, stars3 = true, perfect = true, zip = true, wheelie = true, bus = true, kill = true, tips = true, earn = true, mission = true, shift = true } -- (6.14: shift, server/Shift.luau)
 do
 	local seen: { [string]: boolean } = {}
 	local bad = {}

@@ -19,6 +19,9 @@
 --     between the thumbstick's corner and the right column; when that is too narrow, between the corner and the
 --     buttons with the right column raised over the bar; else (upright) over everything at the bottom, across the
 --     middle. The contextual action sits over the bar (TouchLayout.hint's `floor`).
+--   * 6.14, the grind chips (client/GrindChips.luau: the streak and the shift), TouchLayout.chips: at the top between
+--     the contract column and the actions' row (one over the other when it is narrow), or under the row at the right
+--     edge, clear of all of the above.
 
 local TouchLayout = {}
 
@@ -197,6 +200,64 @@ function TouchLayout.dock(c: Cluster, W: number, H: number, colW: number, colH: 
 	end
 	local x = math.clamp(W / 2, TouchLayout.MARGIN + barW / 2, math.max(TouchLayout.MARGIN + barW / 2, W - TouchLayout.MARGIN - barW / 2))
 	return column, over, TouchLayout.box(x - barW / 2, top - gap - barH, x + barW / 2, top - gap)
+end
+
+
+-- 6.14, the grind chips (client/GrindChips.luau: ON A ROLL and SHIFT 3/5) at the top of the screen, on a computer and
+-- on touch: side by side (`wide`, w × h px at scale 1) or one over the other (`stacked`, for a narrow top), at scale
+-- `s` (the HUD's; on touch at least CHIPS_TOUCH) or smaller, down to CHIPS_MIN. The first of these that stays on the
+-- screen, right of `leftEdge` (what the HUD keeps at the top left: the contract column, on touch the left column
+-- beside it) and clear of `blocks` (the actions' row and ADMIN, the touch buttons, the thumbstick's corner, the right
+-- column, the bottom bar, Roblox's player list ...) wins; `rowLeft` (the row's left edge, ADMIN's) and `rowBottom`
+-- only say where to try:
+--   1 side by side in the middle of the screen's top edge (`top`)
+--   2 side by side in the middle of the span from `leftEdge` to the row;  3 stacked there;  4 stacked at its left end
+--   5 side by side under the row (`rowBottom`) at the right edge;  6 stacked there
+--   7 / 8 stacked at the span's left end / under the row, as small as it takes (CHIPS_MIN at least)
+-- None clear: the last. Returns its box, its scale and whether it is stacked.
+TouchLayout.CHIPS_TOUCH = 0.8
+TouchLayout.CHIPS_MIN = 0.6
+export type Shape = { w: number, h: number }
+-- The chips' sizes at scale 1 (client/GrindChips.luau builds them so): ON A ROLL 168 × 40, SHIFT 120 × 40, 8 apart;
+-- stacked both 168 wide, 6 apart.
+TouchLayout.CHIPS_WIDE = { w = 296, h = 40 } :: Shape
+TouchLayout.CHIPS_STACKED = { w = 168, h = 86 } :: Shape
+function TouchLayout.chips(W: number, H: number, wide: Shape, stacked: Shape, s: number, leftEdge: number, top: number, rowLeft: number, rowBottom: number, blocks: { Box }): (Box, number, boolean)
+	local gap = TouchLayout.GAP
+	local least = math.min(s, TouchLayout.CHIPS_MIN)
+	local spanLeft, spanRight = leftEdge + gap, rowLeft - gap
+	local fit = math.clamp((spanRight - spanLeft) / stacked.w, least, s)
+	local under = W - TouchLayout.MARGIN
+	local candidates: { { box: Box, scale: number, stacked: boolean } } = {}
+	local function add(shape: Shape, x0: number, y0: number, scale: number)
+		table.insert(candidates, {
+			box = TouchLayout.box(x0, y0, x0 + shape.w * scale, y0 + shape.h * scale),
+			scale = scale,
+			stacked = shape == stacked,
+		})
+	end
+	add(wide, W / 2 - wide.w * s / 2, top, s)
+	add(wide, (spanLeft + spanRight - wide.w * s) / 2, top, s)
+	add(stacked, (spanLeft + spanRight - stacked.w * s) / 2, top, s)
+	add(stacked, spanLeft, top, s)
+	add(wide, under - wide.w * s, rowBottom + gap, s)
+	add(stacked, under - stacked.w * s, rowBottom + gap, s)
+	add(stacked, spanLeft, top, fit)
+	add(stacked, under - stacked.w * least, rowBottom + gap, least)
+	for _, candidate in candidates do
+		local b = candidate.box
+		local clear = b.x0 >= math.max(0, spanLeft) - 0.01 and b.y0 >= 0 and b.x1 <= W and b.y1 <= H
+		for _, block in blocks do
+			if clear and TouchLayout.overlap(b, block) then
+				clear = false
+			end
+		end
+		if clear then
+			return b, candidate.scale, candidate.stacked
+		end
+	end
+	local last = candidates[#candidates]
+	return last.box, last.scale, last.stacked
 end
 
 return TouchLayout

@@ -26,7 +26,7 @@
 --     three rows, each with its trade-off as a tag (🛡 SHORT & SAFE, 🛣 LONG HAUL, ☠ RISKY, 📦 BULK ORDER) and a WHY
 --     line, and REROLL $100 on the header (RerollTier: new offers of that tier, once until the board refreshes). A
 --     tier without its licence (shared/JobRules.luau) shows one row locked "🪪 LICENCE 3 / 5" with what it needs; the
---     caption names your streak of good jobs.
+--     caption names your streak of good jobs (6.14: "ON A ROLL: next ★★+ job ×1.2", shared/Shift.luau).
 --   * On a delivery the board shows that job and GIVE UP THIS DELIVERY (CancelJob) instead of offers.
 --   * Footer: an ESC chip, "Close window", and "OLD VAN · 2 CARGO SLOTS · Road Rat / level 4".
 --   * 5.0, the career starts on foot: the offers with mode = "foot" (a missing mode is "car") come first in an ON FOOT
@@ -1364,10 +1364,11 @@ renderList = function()
 		return
 	end
 	local visible = shown(list)
-	-- 4.7: your streak of good jobs (rated ★★ or better) in the caption.
-	local streak = if boardInfo and type(boardInfo.streak) == "number" then boardInfo.streak else 0
-	local bonus = math.floor(math.min(Config.Jobs.Rating.StreakMax, Config.Jobs.Rating.StreakStep * streak) * 100 + 0.5)
-	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"} on the board{if streak > 0 then `  ·  STREAK {streak} (+{bonus}% pay)` else ""}`
+	-- 4.7: your streak of good jobs (rated ★★ or better) in the caption. 6.14: as the HUD's ON A ROLL chip says it
+	-- (client/GrindChips.luau: the streak now, the board's own from when it came), what the next ★★+ job pays.
+	local streak = require(script.Parent.GrindChips).streak() or (if boardInfo and type(boardInfo.streak) == "number" then boardInfo.streak else 0)
+	local roll = require(Shared.Shift).boardText(streak)
+	refs.caption.Text = `{#visible} {if #visible == 1 then "job" else "jobs"}{if roll ~= "" then `  ·  {roll}` else " on the board"}`
 	local footNote = if boardInfo and type(boardInfo.footNote) == "string" then boardInfo.footNote else nil -- 5.3 review
 	if #visible == 0 then
 		message(if footNote and filter == "all" then footNote elseif #list == 0 then "No jobs on the board right now. New ones come soon." else "Nothing of this kind on the board right now.")

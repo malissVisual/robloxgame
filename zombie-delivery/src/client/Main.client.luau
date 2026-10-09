@@ -98,6 +98,7 @@ safely("Unstuck", require(Client.Unstuck).start) -- 6.0.1: lifts your courier ou
 safely("CurbRide", require(Client.CurbRide).start) -- 6.10: up the kerb's slope at speed without a hop off its top
 safely("ShopPropMotion", require(Client.ShopPropMotion).start) -- 6.11: the bank's coin spins, Luigi's pizza slice bobs
 safely("PerfOverlay", require(Client.PerfOverlay).start) -- 6.13.1: the admin's performance overlay (the P panel's WORLD tab)
+safely("GrindChips", require(Client.GrindChips).start) -- 6.14: ON A ROLL and SHIFT 3/5 at the top, SHIFT DONE
 AdminPanel.onPerformance = require(Client.PerfOverlay).toggle
 AdminPanel.performanceOn = require(Client.PerfOverlay).isOn
 require(Client.Throw).notify = Hud.toast

@@ -1767,10 +1767,13 @@ function Hud.showResult(r: any)
 			local streak = tonumber(rating.streak) or 0
 			local streakPay = tonumber(rating.streakPay) or 0
 			if got >= 2 and streak > 0 then
+				-- 6.14: as the HUD's ON A ROLL chip (client/GrindChips.luau) calls it
 				local bonus = math.floor((tonumber(rating.streakBonus) or 0) * 100 + 0.5)
-				line(`Streak: {streak} good {if streak == 1 then "job" else "jobs"} in a row (+{bonus}%)`, if streakPay > 0 then "+" .. Ui.money(streakPay) else nil, C.green, 12)
+				line(`🔥 On a roll: {streak} good {if streak == 1 then "job" else "jobs"} in a row (+{bonus}% pay)`, if streakPay > 0 then "+" .. Ui.money(streakPay) else nil, C.green, 12)
+			elseif (tonumber(rating.streakLost) or 0) > 0 then
+				line(`Streak lost ({rating.streakLost}): a ★ job · ★★ or better keeps it`, nil, C.red, 12) -- 6.14: how long it was
 			else
-				line("Streak ended: a ★ job (★★ or better keeps it)", nil, C.red, 12)
+				line("A ★ job starts no streak (★★ or better does)", nil, C.dim, 12)
 			end
 			local licence = if type(rating.licence) == "table" then rating.licence else nil
 			if licence and licence.earned == true then
@@ -1812,8 +1815,22 @@ function Hud.showResult(r: any)
 		Ui.label(result.body, r.reason or "", UDim2.new(1, -10, 0, 60), { LayoutOrder = 2, TextColor3 = P.ink })
 		local lostStreak = tonumber(r.streakLost)
 		if lostStreak and lostStreak > 0 then
-			-- 4.7: a failed job ends the streak of good jobs.
-			line(`Streak of {lostStreak} good {if lostStreak == 1 then "job" else "jobs"} lost`, nil, C.red, 3)
+			-- 4.7: a failed job ends the streak of good jobs (6.14: in the HUD chip's words).
+			line(`Streak lost ({lostStreak} good {if lostStreak == 1 then "job" else "jobs"} in a row)`, nil, C.red, 3)
+		end
+	end
+	do
+		-- 6.14: the shift (server/Shift.luau): how far it is, or SHIFT DONE and its pay (the HUD's banner follows this
+		-- window, client/GrindChips.luau). A failed job leaves it as it was: no line.
+		local shift = if r.success and type(r.shift) == "table" then r.shift else nil
+		if shift then
+			local target = tonumber(shift.target) or Config.Jobs.Shift.Jobs
+			if shift.done == true then
+				line(`🏁 SHIFT DONE: {target} deliveries in one go · +{tonumber(shift.xp) or 0} XP`, "+" .. Ui.money(tonumber(shift.money) or 0), C.green, 25)
+			else
+				local count = tonumber(shift.count) or 0
+				line(`Shift {count}/{target} · {target - count} more for the shift's pay`, nil, C.dim, 25)
+			end
 		end
 	end
 	-- The XP of the job, the level bar and a level-up with what it unlocks.

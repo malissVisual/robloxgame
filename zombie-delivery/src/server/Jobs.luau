@@ -143,8 +143,8 @@
 --   * Clocks: every order has its own (its offer's, from when it was taken). One that runs out fails alone (its pieces
 --     go back, its stops are skipped, the streak resets, a notice); the job ends when no order is open.
 --   * Pay: every order is paid and rated when its last drop is done (payOrder: money, XP, the 4.7 rating, the streak,
---     the licences, the crew's shares, its own DeliveryResult; `midJob` while others go on). The waves, the bandits
---     and the road events stay the job's; 4.8's add-on is an order of its own (addOnOrder).
+--     the licences, the crew's shares, 6.14 the shift, its own DeliveryResult; `midJob` while others go on). The
+--     waves, the bandits and the road events stay the job's; 4.8's add-on is an order of its own (addOnOrder).
 --   * The payload adds `orders` (every order: its stops, clock, pay, pinned), `ordersLine` ("+2 ORDERS"), `stack`
 --     (may the board add one now, the room) and `carried` (every piece you carry: order, look, name, where, its
 --     customer); its other fields are the focused order's (the one of the current stop).
@@ -3302,6 +3302,7 @@ end
 -- condition, the clock it had left, the kills since the last order paid, the night; its rating, the owner's streak and
 -- licences, the employer's reward, the XP; the crew's shares; its DeliveryResult (`midJob` while other orders go on:
 -- client/Hud.luau shows it as a toast); a mission's stars and rewards. `final`: the job ended with it (endJob first).
+-- 6.14: every one paid moves the owner's and each paid crew member's shift on (server/Shift.luau; not an add-on).
 local function payOrder(player: Player, job: Job, order: Order, crew: { Player }, present: { Player }, final: boolean)
 	local offer = order.offer
 	local session = job.cargo
@@ -3351,10 +3352,6 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		local streak = JobRules.nextStreak(if profile then profile.streak else 0, rating.stars)
 		local total, ratingPart, streakPart = JobRules.ratedPay(payTotal, rating.stars, streak)
 		payTotal = total
-		if profile then
-			profile.streak = streak
-			JobRules.countJob(profile.licenceJobs, offer.tier, rating.stars)
-		end
 		order.rating = rating.stars
 		ratingInfo = {
 			stars = rating.stars,
@@ -3363,9 +3360,15 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			streak = streak,
 			streakBonus = if rating.stars >= 2 then JobRules.streakBonus(streak) else 0,
 			streakPay = streakPart,
+			-- 6.14: a ★ job ended a streak this long (the HUD's chip cracks, the result says it); before it is set below
+			streakLost = if streak == 0 and profile and profile.streak > 0 then profile.streak else nil,
 			freshness = freshness, -- 4.8: food: its freshness (0 … 1) and what it took off the pay (≤ 0)
 			freshPay = if freshness then freshCut else nil,
 		}
+		if profile then
+			profile.streak = streak
+			JobRules.countJob(profile.licenceJobs, offer.tier, rating.stars)
+		end
 	end
 	if offer.round then
 		-- 5.3, the newspaper round: the tip for no paper in the bushes (a line in the rating's checks).
@@ -3502,6 +3505,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		mission = missionResult, -- 3.0: { id, name, stars } of a mission
 		coopPay = if offer.coop then coopPay else nil, -- a co-op mission: the pay × this for the crew
 		rating = ratingInfo, -- 4.7: { stars, checks, ratingPay, streak, streakBonus, streakPay, licence? } (not a mission)
+		-- 6.14: the shift one further (server/Shift.luau: every delivery paid but a road event's add-on), its pay when
+		-- full: { count, target, idleUntil?, shifts, done?, money?, xp? }
+		shift = if order.addOn then nil else require(script.Parent.Shift).paid(player),
 	}, ownerXp))
 	-- 6.8: what this order paid everybody (a mission's "cleared" card says it); a crew member who has done the mission
 	-- before (and is not on a replay of the owner's already) gets the replay share of their pay and XP.
@@ -3531,6 +3537,7 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 			total = memberPay,
 			mission = missionResult,
 			rating = if rating then { stars = rating.stars } else nil, -- 4.7: the owner's rating of the job
+			shift = if order.addOn then nil else require(script.Parent.Shift).paid(member), -- 6.14: their own shift
 		}, giveXp(member, if again then Missions.replayXp(crewXp) else crewXp)))
 	end
 	local missionId = offer.mission

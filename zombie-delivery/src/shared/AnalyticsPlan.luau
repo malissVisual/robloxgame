@@ -138,6 +138,7 @@ AnalyticsPlan.Events = {
 	"BusRide", -- a city bus boarded
 	"ScooterRental", -- a ZDC RIDE scooter taken
 	"StylePurchase", -- a cosmetic bought (value: its price)
+	"ShiftDone", -- 6.14: a shift finished (value: the shifts this session; field: the driver level)
 	"SessionLength", -- a player left (value: the minutes played)
 	"ServerError", -- a script error on the server
 	"ClientError", -- a script error on a player's device
@@ -202,6 +203,7 @@ AnalyticsPlan.Sources = {
 	LevelReward = "Gameplay", -- a driver level's reward
 	CompanySafe = "Gameplay", -- your company's safe emptied
 	TaskReward = "TimedReward", -- the daily and weekly tasks
+	ShiftBonus = "Gameplay", -- 6.14: a shift's pay (Config.Jobs.Shift: its deliveries in one go, server/Shift.luau)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
 	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
 	PropertySale = "Sale", -- real estate sold

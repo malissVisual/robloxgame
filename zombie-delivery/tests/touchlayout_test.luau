@@ -155,7 +155,63 @@ for _, screen in SCREENS do
 		for i, b in buttons do
 			check(`{name}{tag}: the action (with the bar) clear of {names[i]}`, not TouchLayout.overlap(hint2, b), `{show(hint2)} / {show(b)}`)
 		end
+
+		-- 6.14, the grind chips (client/GrindChips.luau: ON A ROLL and SHIFT 3/5, side by side or stacked) at the top,
+		-- clear of the left column (cash, minimap, health: 200 × 258) and the contract column as Hud's layout puts it
+		-- (beside the left column up to the row and ADMIN, 380 wide at most; upright: under them, across), the row,
+		-- ADMIN, the buttons, the docked column and the bar. Big enough to read: CHIPS_TOUCH on a sideways phone 700 px
+		-- or wider (its 16 px title at 12.8 px), never under CHIPS_MIN (9.6 px: still over the HUD's 8.8 px cash line).
+		local leftCol = TouchLayout.box(16, 16, 16 + 200 * S, 16 + 258 * S)
+		local topX = leftCol.x1 + 8
+		local limit = math.min(row.x0 - 8, if admin then W - 16 - 90 - 8 else W - 16)
+		local width = math.clamp((limit - topX) / S, 300, 380)
+		local topScale = math.min(S, (limit - topX) / width)
+		local contract = TouchLayout.box(topX, 16, topX + width * topScale, 16 + 200 * topScale)
+		if topScale < S * 0.8 then
+			contract = TouchLayout.box(16, math.max(leftCol.y1, rowBottom) + 8, W - 16, H - 8)
+		end
+		local chipScale = math.max(S, TouchLayout.CHIPS_TOUCH)
+		local leftEdge = leftCol.x1
+		if contract.y0 < 16 + TouchLayout.CHIPS_STACKED.h * chipScale then
+			leftEdge = math.max(leftEdge, contract.x1)
+		end
+		local blocks: { Box } = table.clone(buttons)
+		for _, b in { c.thumb, c.jump, col2, bar, leftCol, contract, row } do
+			table.insert(blocks, b)
+		end
+		local adminBox = TouchLayout.box(W - 16 - 90, 56, W - 16, 88)
+		if admin then
+			table.insert(blocks, adminBox)
+		end
+		local chips, scale = TouchLayout.chips(W, H, TouchLayout.CHIPS_WIDE, TouchLayout.CHIPS_STACKED, chipScale, leftEdge, 16, rowLeft, rowBottom, blocks)
+		check(`{name}{tag}: the chips on the screen`, inside(chips, W, H), show(chips))
+		check(`{name}{tag}: the chips clear of the actions' row`, not TouchLayout.overlap(chips, row), `{show(chips)} / {show(row)}`)
+		check(`{name}{tag}: the chips clear of the left column`, not TouchLayout.overlap(chips, leftCol), `{show(chips)} / {show(leftCol)}`)
+		check(`{name}{tag}: the chips clear of the contract column`, not TouchLayout.overlap(chips, contract), `{show(chips)} / {show(contract)}`)
+		check(`{name}{tag}: the chips clear of the thumbstick, the jump button, the column and the bar`, not (TouchLayout.overlap(chips, c.thumb) or TouchLayout.overlap(chips, c.jump) or TouchLayout.overlap(chips, col2) or TouchLayout.overlap(chips, bar)), show(chips))
+		if admin then
+			check(`{name}{tag}: the chips clear of ADMIN`, not TouchLayout.overlap(chips, adminBox), show(chips))
+		end
+		for i, b in buttons do
+			check(`{name}{tag}: the chips clear of {names[i]}`, not TouchLayout.overlap(chips, b), `{show(chips)} / {show(b)}`)
+		end
+		check(`{name}{tag}: the chips at CHIPS_MIN or bigger`, scale >= TouchLayout.CHIPS_MIN - 1e-9, scale)
+		if W > H and W >= 700 and not admin then
+			check(`{name}: the chips big enough to read ({math.floor(16 * scale * 10 + 0.5) / 10} px title)`, scale >= TouchLayout.CHIPS_TOUCH - 1e-9, scale)
+		end
 	end
+end
+
+-- 6.14: a computer's wide screen: the chips in the middle of the top edge at the HUD's scale.
+do
+	local W, H = 1920, 1020
+	local S = scaleFor(W, H)
+	local wide, stacked = TouchLayout.CHIPS_WIDE, TouchLayout.CHIPS_STACKED
+	local chips, scale, isStacked = TouchLayout.chips(W, H, wide, stacked, S, 16 + 380 * S, 8, W - 16 - 370 - 200 * S, 4 + 44 * S, {})
+	check("a computer: the chips side by side in the top middle at the HUD's scale", scale == S and not isStacked and math.abs((chips.x0 + chips.x1) / 2 - W / 2) < 1 and chips.y0 == 8, `{show(chips)} {scale}`)
+	-- Little room up there (a narrow window): still on the screen, clear of the column and the row.
+	local narrow, small = TouchLayout.chips(900, 600, wide, stacked, 0.78, 16 + 380 * 0.78, 8, 900 - 16 - 200 * 0.78, 4 + 44 * 0.78, {})
+	check("a narrow computer window: the chips fit somewhere on the screen", inside(narrow, 900, 600) and small >= TouchLayout.CHIPS_MIN, `{show(narrow)} {small}`)
 end
 
 -- The small helpers.

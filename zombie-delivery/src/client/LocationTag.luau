@@ -39,7 +39,7 @@ local SLIDE = 8 -- px (unscaled) it rises while it fades in
 local NAME_SIZE, SUB_SIZE = 17, 12 -- unscaled (about 19 and 13 px at 1080p)
 local PAD, TAIL = 10, 36 -- the text's left inset, the scrim's fade to the right
 local MARGIN, GAP = 16, 10
-local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar" } -- client/Hud.luau's panels (6.0.1: and client/Hotbar.luau's bar)
+local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar", "GrindChips" } -- client/Hud.luau's panels (6.0.1: and client/Hotbar.luau's bar; 6.14: client/GrindChips.luau's chips)
 
 local player = Players.LocalPlayer
 local gui: any = nil
