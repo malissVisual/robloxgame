@@ -116,14 +116,23 @@ check("a job without a picture (a mission, an unknown id, nothing) has none", na
 
 -- An empty image gives nil ---------------------------------------------------------------------
 
+local saved = JobThumbs.Images.pizzeria -- (6.12.11: uploaded; emptied here for the fallback)
+JobThumbs.Images.pizzeria = ""
 local image, label, emoji = JobThumbs.forJob({ business = "pizzeria" })
 check("an empty image id: no image, the name and the emoji (the fallback banner)", image == nil and label == "Luigi's Pizza" and emoji == "🍕")
-local saved = JobThumbs.Images.pizzeria
 JobThumbs.Images.pizzeria = "rbxassetid://123456"
 local uploaded = JobThumbs.forJob({ special = "pizzarush" })
 check("an uploaded image: its id, for every job that shares it", uploaded == "rbxassetid://123456" and JobThumbs.forJob({ business = "pizzeria" }) == "rbxassetid://123456")
-JobThumbs.Images.pizzeria = saved
+JobThumbs.Images.pizzeria = ""
 check("empty again: nil", JobThumbs.forJob({ business = "pizzeria" }) == nil)
+JobThumbs.Images.pizzeria = saved
+local filled = 0
+for _, id in JobThumbs.Images do
+	if string.match(id, "^rbxassetid://%d+$") then
+		filled += 1
+	end
+end
+check("the owner's 25 pictures are uploaded (6.12.11)", filled == 25, filled)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

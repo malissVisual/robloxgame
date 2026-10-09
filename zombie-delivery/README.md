@@ -1143,6 +1143,12 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## The job pictures are uploaded (6.12.12)
+
+The owner uploaded the 25 pictures (Asset Manager → Bulk Import): `shared/JobThumbs.luau`, the manifest and
+`upload.csv` hold their ids (`tools/job-thumbnails/fill-ids.py`). Every job on the board shows its business's picture.
+The tests empty the ids for the fallback banner's checks and put them back.
+
 ## The businesses' pictures on the job list (6.12.11)
 
 The owner: "add Codex's pictures". Codex drew 25 businesses (Luigi's, Daily Bread, the Post Office, the bank, the
