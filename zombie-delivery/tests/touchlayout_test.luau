@@ -41,6 +41,8 @@ local SCREENS: { { any } } = {
 	{ "iPhone SE sideways (new top bar)", 667, 317 },
 	{ "Android 20:9 sideways", 800, 324 },
 	{ "small Android sideways", 640, 324 },
+	{ "small Android sideways (new top bar)", 640, 316 }, -- 6.13.1: a 640 x 360 phone, the smallest the game is tested on
+	{ "old 16:9 phone sideways (new top bar)", 712, 316 },
 	{ "iPad mini sideways", 1133, 708 },
 	{ "iPad sideways", 1180, 784 },
 	{ "iPad Pro 12.9 sideways", 1366, 988 },

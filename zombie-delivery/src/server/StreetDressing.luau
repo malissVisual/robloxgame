@@ -21,6 +21,7 @@ local Config = require(Shared.Config)
 local CurbShape = require(Shared.CurbShape)
 local Map = require(Shared.Map)
 local StreetProps = require(Shared.StreetProps)
+local RenderBudget = require(Shared.RenderBudget) -- 6.13.1: only the parts big enough throw a shadow
 local DayNight = require(script.Parent.DayNight)
 local StreetArt = require(script.Parent.StreetArt.Geometry) -- 5.9: Codex's worn props (design/street-props/)
 local PolishBuilder = require(script.Parent.PolishArt.Builder)
@@ -56,7 +57,7 @@ local function part(parent: Instance, name: string, size: Vector3, cframe: CFram
 	p.CanTouch = false
 	p.CanCollide = solid == true
 	p.CanQuery = false
-	p.CastShadow = size.Magnitude > 4
+	p.CastShadow = RenderBudget.shadowFor(size, cframe)
 	p.Parent = parent
 	return p
 end

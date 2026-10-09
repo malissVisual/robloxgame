@@ -5,7 +5,7 @@ local function check(name: string, value: boolean)
 	print("ok    " .. name)
 end
 
-for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{320,448,true},{390,800,true},{844,350,true},{667,335,true},{1024,720,true}} do
+for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{320,448,true},{390,800,true},{844,350,true},{667,335,true},{640,324,true},{640,316,true},{1024,720,true}} do
 	local w,h,touch = screen[1],screen[2],screen[3]
 	local fit = Phone.fit(w,h,touch,.9)
 	check(`{w}x{h}: fits horizontally`, fit.width*fit.scale <= w-32+.001)
@@ -19,7 +19,7 @@ check("narrow short phone scrolls instead of shrinking", Phone.fit(320,448,true,
 check("a short desktop shrinks the phone a little, never under SHORT_SCALE", Phone.fit(900,500,false,1).scale >= Phone.SHORT_SCALE and Phone.fit(900,500,false,1).scale < 1)
 check("a tall desktop keeps the full phone", Phone.fit(1920,1080,false,.95).scale == .95 and Phone.fit(1920,1080,false,.95).height == 680)
 -- 6.0.1: every app opens in a centred popup: 760 x 520 at the desktop scale, within 92 % / 86 % of the screen.
-for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{1150,680,false},{320,448,true},{390,800,true},{844,350,true},{667,335,true},{1024,720,true}} do
+for _, screen in {{1920,1000,false},{1280,650,false},{900,500,false},{1150,680,false},{320,448,true},{390,800,true},{844,350,true},{667,335,true},{640,324,true},{640,316,true},{1024,720,true}} do
 	local w,h,touch = screen[1],screen[2],screen[3]
 	local pop = Phone.popup(w,h,touch,if touch then 1 else math.clamp(math.min(w/1150,h/680),.85,1.1))
 	check(`{w}x{h}: the popup fits 92 % of the width`, pop.width*pop.scale <= w*.92+.001)

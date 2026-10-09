@@ -13,6 +13,8 @@
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
+local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone moves only the nearer props
+
 local ShopPropMotion = {}
 
 local TAG = "ShopPropMotion" -- (server/ShopProps.luau ShopProps.Tag)
@@ -58,10 +60,11 @@ function ShopPropMotion.start()
 		end
 		local eye = camera.CFrame.Position
 		local now = os.clock()
+		local range = DeviceBudget.range(RANGE)
 		for _, model in items do
 			local saved = model:GetAttribute("Rest")
 			local rest: CFrame? = if typeof(saved) == "CFrame" then saved else poses[model]
-			if not rest or not model.Parent or (rest.Position - eye).Magnitude > RANGE then
+			if not rest or not model.Parent or (rest.Position - eye).Magnitude > range then
 				continue
 			end
 			local kind = model:GetAttribute("Motion")

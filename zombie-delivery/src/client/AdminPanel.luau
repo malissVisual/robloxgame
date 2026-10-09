@@ -13,8 +13,9 @@
 --   OP               the toggles with their ON / OFF state (god, fly, noclip, super jump, car boost, hidden, one-hit
 --                    kills; the attributes the server set on the target), the walk 1× / 2× / 4×, bring / go to, clear
 --                    the target's wanted
---   WORLD            6.13: the Analytics line (on / off, the counts), the time of day, enemies near you, a horde, a
---                    bandit car, traffic, clear / kill all / FREEZE, teleport the target to any landmark
+--   WORLD            6.13: the Analytics line (on / off, the counts); 6.13.1: the PERFORMANCE overlay (yours only); the
+--                    time of day, enemies near you, a horde, a bandit car, traffic, clear / kill all / FREEZE, teleport the
+--                    target to any landmark
 --   JOBS & MISSIONS  any special job or ordinary tier, finish the stop / the whole job, the missions (all at 3 stars,
 --                    reset, start any), the challenges, secrets and titles
 --   ESTATE           properties, the home, teleport to a property, the company's safe
@@ -40,6 +41,9 @@ local Theme = require(script.Parent.Theme)
 local C = Ui.Colors
 local P = Theme.Postage
 local AdminPanel = {}
+-- 6.13.1: the WORLD tab's PERFORMANCE toggle (client/PerfOverlay.luau; client/Main.client.luau sets these)
+AdminPanel.onPerformance = nil :: (() -> ())?
+AdminPanel.performanceOn = nil :: (() -> boolean)?
 
 local player = Players.LocalPlayer
 local remote: RemoteEvent? = nil
@@ -393,6 +397,17 @@ R.world = function()
 	-- server/Admin.luau keeps on the admins; REFRESH reads it again)
 	heading("Analytics", tostring(player:GetAttribute("AdminAnalytics") or "No answer from the server yet."))
 	action(grid(150), "REFRESH", C.grey, function()
+		render(true)
+	end)
+	-- 6.13.1: the performance overlay (client/PerfOverlay.luau, for a screenshot from a phone: design/performance/NAVOD.md)
+	heading("Performance", "A small box at the top of your screen: FPS, memory, ping, the parts, shadows and lights around you, streaming. Only you see it. Open the live game on a phone, turn it on, send a screenshot.")
+	local perf = grid(200)
+	local shown = AdminPanel.performanceOn
+	toggle(perf, "PERFORMANCE", shown ~= nil and shown(), function()
+		local flip = AdminPanel.onPerformance
+		if flip then
+			flip()
+		end
 		render(true)
 	end)
 	local night = Config.DayNight

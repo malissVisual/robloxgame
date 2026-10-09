@@ -30,6 +30,8 @@
 -- (CarVisuals.onSwing, set by client/SoundScape.luau: the doors' and the back's sounds where they are); the back's kind
 -- (two rear doors, a roll-up door, a tailgate / trunk lid / ramp) from its hinge (shared/SoundPlan.luau backKind). A car
 -- just seen (streamed in, its back already open) stays quiet its first second.
+-- 6.13.1 (performance): the prompts and the name tags are looked at PROMPT_EVERY seconds (not every frame); a phone
+-- spins the wheels, poses the riders and smokes the exhausts of the nearer cars only (client/DeviceBudget.luau).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -42,6 +44,7 @@ local SoundPlan = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild(
 local BikeRider = require(script.Parent.BikeRider)
 local Drive = require(script.Parent.Drive)
 local Theme = require(script.Parent.Theme)
+local DeviceBudget = require(script.Parent.DeviceBudget)
 
 local CarVisuals = {}
 
@@ -85,6 +88,8 @@ local player = Players.LocalPlayer
 local states: { [Model]: CarState } = {}
 local RANGE = 260
 local RIDER_RANGE = 160 -- 5.1: riders posed this close to the camera
+local PROMPT_EVERY = 0.1 -- 6.13.1: seconds between the looks at the door, back and trolley prompts
+local promptClock = { at = 0 }
 local LEAN_MAX = 0.16 -- 5.1: radians (about 9°) a bike leans at most (its load, welded to the hull, does not lean)
 local LEAN_RATE = 0.006 -- per (rad/s of turning × stud/s of speed)
 local CADENCE = 0.42 -- 5.1: crank turns per wheel turn
@@ -323,7 +328,17 @@ local function allCars(): { Instance }
 					carListDirty = true
 				end
 				folder.ChildAdded:Connect(changed)
-				folder.ChildRemoved:Connect(changed)
+				folder.ChildRemoved:Connect(function(child: Instance)
+					carListDirty = true
+					-- 6.13.1 (StreamingEnabled): a car that streams out is forgotten here too (its rider let go)
+					local gone = if child:IsA("Model") then states[child] else nil
+					if gone and child:IsA("Model") then
+						if gone.rider then
+							BikeRider.release(gone.rider)
+						end
+						states[child] = nil
+					end
+				end)
 			else
 				carFolders[name] = nil
 			end
@@ -355,6 +370,13 @@ local function step(dt: number)
 	local handsFull = character ~= nil and character:GetAttribute("Carrying") ~= nil
 	local boarding = character ~= nil and character:GetAttribute("Boarding") ~= nil -- 3.10: on the way into a seat
 	local now = workspace:GetServerTimeNow()
+	-- 6.13.1: the prompts a few times a second; the ranges a phone's
+	local clock = os.clock()
+	local prompts = clock - promptClock.at >= PROMPT_EVERY
+	if prompts then
+		promptClock.at = clock
+	end
+	local range, riderRange, smokeRange = DeviceBudget.range(RANGE), DeviceBudget.range(RIDER_RANGE), DeviceBudget.range(SMOKE_RANGE)
 	for _, car in allCars() do
 		if not car:IsA("Model") then
 			continue
@@ -367,51 +389,53 @@ local function step(dt: number)
 		local mine = car:GetAttribute("OwnerId") == player.UserId
 
 		-- Prompts: 3.7, one at every door.
-		local enterable = car:GetAttribute("Chauffeured") ~= true and not handsFull and not boarding and seatedIn == nil
-			and (car:GetAttribute("Health") or 0) > 0
-		for _, entry in state.doorPrompts do
-			local want = if entry.driver
-				then enterable and mine and driverFree(car)
-				else enterable and not mine and car:GetAttribute("Repairing") ~= true and freeSeat(entry.seats)
-			if entry.prompt.Enabled ~= want then
-				entry.prompt.Enabled = want
+		if prompts then
+			local enterable = car:GetAttribute("Chauffeured") ~= true and not handsFull and not boarding and seatedIn == nil
+				and (car:GetAttribute("Health") or 0) > 0
+			for _, entry in state.doorPrompts do
+				local want = if entry.driver
+					then enterable and mine and driverFree(car)
+					else enterable and not mine and car:GetAttribute("Repairing") ~= true and freeSeat(entry.seats)
+				if entry.prompt.Enabled ~= want then
+					entry.prompt.Enabled = want
+				end
 			end
-		end
-		-- 3.2: the back's prompt only for the owner and the crew of the owner's job (the car's BackCrew, server/Cargo.luau);
-		-- out of reach for everybody else, so a stranger's car does not take the E. (Enabled is the server's: one E at a time.)
-		local door = chassis:FindFirstChild("CargoDoor")
-		local back = door and door:FindFirstChild("BackPrompt")
-		local crew = car:GetAttribute("BackCrew")
-		-- (3.10: not from a seat: E there gets you out.)
-		local usable = seatedIn == nil and (mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil))
-		if back and back:IsA("ProximityPrompt") then
-			local reach: number = state.backReach or back.MaxActivationDistance
-			state.backReach = reach
-			local want = if usable then reach else 0
-			if back.MaxActivationDistance ~= want then
-				back.MaxActivationDistance = want
+			-- 3.2: the back's prompt only for the owner and the crew of the owner's job (the car's BackCrew, server/Cargo.luau);
+			-- out of reach for everybody else, so a stranger's car does not take the E. (Enabled is the server's: one E at a time.)
+			local door = chassis:FindFirstChild("CargoDoor")
+			local back = door and door:FindFirstChild("BackPrompt")
+			local crew = car:GetAttribute("BackCrew")
+			-- (3.10: not from a seat: E there gets you out.)
+			local usable = seatedIn == nil and (mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil))
+			if back and back:IsA("ProximityPrompt") then
+				local reach: number = state.backReach or back.MaxActivationDistance
+				state.backReach = reach
+				local want = if usable then reach else 0
+				if back.MaxActivationDistance ~= want then
+					back.MaxActivationDistance = want
+				end
 			end
-		end
-		-- 4.0: the trolley's "Take trolley" (server/Equipment.luau, the chassis' TrolleyTake) the same way, and only with
-		-- empty hands (the server refuses everybody else anyway).
-		local take = chassis:FindFirstChild("TrolleyTake")
-		local takePrompt = take and take:FindFirstChildOfClass("ProximityPrompt")
-		if takePrompt then
-			local reach: number = state.trolleyReach or takePrompt.MaxActivationDistance
-			state.trolleyReach = reach
-			local want = if usable and not handsFull then reach else 0
-			if takePrompt.MaxActivationDistance ~= want then
-				takePrompt.MaxActivationDistance = want
+			-- 4.0: the trolley's "Take trolley" (server/Equipment.luau, the chassis' TrolleyTake) the same way, and only with
+			-- empty hands (the server refuses everybody else anyway).
+			local take = chassis:FindFirstChild("TrolleyTake")
+			local takePrompt = take and take:FindFirstChildOfClass("ProximityPrompt")
+			if takePrompt then
+				local reach: number = state.trolleyReach or takePrompt.MaxActivationDistance
+				state.trolleyReach = reach
+				local want = if usable and not handsFull then reach else 0
+				if takePrompt.MaxActivationDistance ~= want then
+					takePrompt.MaxActivationDistance = want
+				end
 			end
-		end
-		if not mine and not state.tagged and car:GetAttribute("OwnerId") ~= nil then
-			state.tagged = true
-			nameTag(car, chassis)
+			if not mine and not state.tagged and car:GetAttribute("OwnerId") ~= nil then
+				state.tagged = true
+				nameTag(car, chassis)
+			end
 		end
 
 		-- 4.0: the smoking exhaust, near the camera only.
 		local distance = (chassis.Position - eye).Magnitude
-		local smoky = car:GetAttribute("Smoky") == true and distance < SMOKE_RANGE
+		local smoky = car:GetAttribute("Smoky") == true and distance < smokeRange
 		local smoke = state.smoke
 		if smoky and not smoke then
 			local exhaust = chassis:FindFirstChild("Exhaust")
@@ -430,9 +454,9 @@ local function step(dt: number)
 		-- Wheels.
 		local bike = state.lean ~= nil
 		if bike then
-			poseRider(car, state, distance <= RIDER_RANGE)
+			poseRider(car, state, distance <= riderRange)
 		end
-		if distance > RANGE then
+		if distance > range then
 			continue
 		end
 		local forward = chassis.AssemblyLinearVelocity:Dot(chassis.CFrame.LookVector)

@@ -4,12 +4,16 @@
 -- Only joint transforms, no animation assets. The R15 bodies walk with their Animator (server); the bandits among
 -- them hold their guns up with the players' aim pose (client/ArmPose.luau) laid over it.
 -- The joints can be Motor6Ds or AnimationConstraints (shared/Joints.luau).
+-- 6.13.1 (performance): the zombies are a list kept by the folder's ChildAdded / ChildRemoved (streaming too: a zombie
+-- that streams out is forgotten), not a new GetChildren every frame; an R15 body is known once; a phone animates only
+-- the nearer ones (client/DeviceBudget.luau).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Joints = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Joints"))
 local ArmPose = require(script.Parent.ArmPose)
+local DeviceBudget = require(script.Parent.DeviceBudget)
 
 local ZombieAnimator = {}
 
@@ -27,6 +31,8 @@ type Rig = {
 
 local rigs: { [Model]: Rig } = {}
 local RANGE = 220
+local zombies: { Model } = {} -- the Zombies folder's models
+local bodies: { [Model]: boolean } = {} -- the ones known to be real R15 bodies
 
 local function find(model: Model, name: string): any
 	local found: Instance? = nil
@@ -76,23 +82,23 @@ local function set(joint: any, cframe: CFrame)
 end
 
 local function step(dt: number)
-	local folder = workspace:FindFirstChild("Zombies")
 	local camera = workspace.CurrentCamera
-	if not folder or not camera then
+	if not camera or #zombies == 0 then
 		return
 	end
 	local eye = camera.CFrame.Position
 	local t = os.clock()
-	for _, model in folder:GetChildren() do
-		if not model:IsA("Model") then
-			continue
+	local range = DeviceBudget.range(RANGE)
+	for _, model in zombies do
+		if not bodies[model] and model:FindFirstChild("UpperTorso") then
+			bodies[model] = true
 		end
-		if model:FindFirstChild("UpperTorso") then
+		if bodies[model] then
 			-- A real R15 body: animated by its Animator (server). A bandit holds the gun up over the walk.
 			if model:GetAttribute("Bandit") then
 				local humanoid = model:FindFirstChildOfClass("Humanoid")
 				local root = model:FindFirstChild("HumanoidRootPart")
-				if humanoid and humanoid.Health > 0 and root and root:IsA("BasePart") and (root.Position - eye).Magnitude <= RANGE then
+				if humanoid and humanoid.Health > 0 and root and root:IsA("BasePart") and (root.Position - eye).Magnitude <= range then
 					ArmPose.apply(model, 1, 0)
 				end
 			end
@@ -102,7 +108,7 @@ local function step(dt: number)
 		if not rig or rig.humanoid.Health <= 0 then
 			continue
 		end
-		if (rig.root.Position - eye).Magnitude > RANGE then
+		if (rig.root.Position - eye).Magnitude > range then
 			continue
 		end
 		local p = rig.phase + t
@@ -135,9 +141,47 @@ local function step(dt: number)
 	end
 end
 
+-- 6.13.1: the folder's zombies as a list (made by the server, maybe after this client starts).
+local function watch(folder: Instance)
+	local function add(child: Instance)
+		if child:IsA("Model") and not table.find(zombies, child) then
+			table.insert(zombies, child)
+		end
+	end
+	for _, child in folder:GetChildren() do
+		add(child)
+	end
+	folder.ChildAdded:Connect(add)
+	folder.ChildRemoved:Connect(function(child: Instance)
+		if not child:IsA("Model") then
+			return
+		end
+		local at = table.find(zombies, child)
+		if at then
+			table.remove(zombies, at)
+		end
+		rigs[child] = nil
+		bodies[child] = nil
+	end)
+end
+
 function ZombieAnimator.start()
 	-- After the animations, before the engine applies the joints.
 	RunService.PreSimulation:Connect(step)
+	local folder = workspace:FindFirstChild("Zombies")
+	if folder then
+		watch(folder)
+	else
+		local hook: RBXScriptConnection? = nil
+		hook = workspace.ChildAdded:Connect(function(child: Instance)
+			if child.Name == "Zombies" and #zombies == 0 then
+				if hook then
+					hook:Disconnect()
+				end
+				watch(child)
+			end
+		end)
+	end
 end
 
 return ZombieAnimator

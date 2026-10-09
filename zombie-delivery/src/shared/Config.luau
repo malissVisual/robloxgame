@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.13"
+Config.Version = "6.13.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -4396,6 +4396,46 @@ Config.LivingCity = {
 		FovFrom = 0.72, -- … from this share of the car's top speed
 		FovBlend = 3, -- per second
 	},
+}
+
+-- 6.13.1, performance and mobile (the game is public, many players are on phones: design/performance/REPORT.md, the
+-- owner's phone test design/performance/NAVOD.md). shared/RenderBudget.luau has the rules, client/DeviceBudget.luau
+-- the phone's share, client/PerfOverlay.luau the admin's numbers.
+Config.Performance = {
+	-- Shadows (RenderBudget.casts; World's part(), BuildingLooks/Kit, the street props, the stops, the alleys, the zip
+	-- platforms, the docks, the cars' parts): a part throws a shadow only when its longest side is at least ShadowLong
+	-- and its second side at least ShadowWide (a pole, a lamp post, a wall, a crate do; a rail, a strip, a rod, a frame,
+	-- a bolt do not), and never as a plate lying flat on the ground (its thin side up, at most ShadowFlat thick, its
+	-- middle at most ShadowFlatHeight high: road marks, lawns, mats; a raised canopy, an awning, a palm's leaves keep it).
+	ShadowLong = 2,
+	ShadowWide = 0.45,
+	ShadowFlat = 0.25,
+	ShadowFlatHeight = 2.5, -- studs of world height: the walk is at 0.9, so up to about 1.5 over it
+	-- The night's real lights on this client (client/WorldFx.luau): only the MaxLights nearest within LightRange of the
+	-- camera shine (a vehicle's lights together); every other lamp, window and headlight still glows (Neon), it just
+	-- lights nothing. Looked at every LightEvery seconds; one that shines keeps shining out to LightHoldRange × the range
+	-- and LightHoldExtra lights over the count (no blinking at the edge); a light fades in and out over LightFade s.
+	MaxLights = 40,
+	LightRange = 320,
+	LightEvery = 0.5,
+	LightHoldRange = 1.15,
+	LightHoldExtra = 4,
+	LightFade = 0.3,
+	-- A phone or a tablet (a touch screen without a keyboard, client/DeviceBudget.luau): the cosmetic per-frame work
+	-- (the poses, the bag's swing, the zombies' and the animals' legs, the traffic's glide and wheels, the cars' wheels
+	-- and riders, the rooftop props, the flickering lamps) reaches Range of its distance on a computer, the posed bodies
+	-- Count of their number; fewer real lights, closer; the minimap's routes and markers MapHz times a second, and its
+	-- turning picture moved at most MapMoveHz times a second (its CanvasGroup is drawn again on every move).
+	Lite = { Range = 0.6, Count = 0.5, MaxLights = 16, LightRange = 200, MapHz = 10, MapMoveHz = 30 },
+	-- Small text (SurfaceGui.MaxDistance) is drawn only this close: the plain signs (World's sign(): JOBS, BAY 2 …), the
+	-- building looks' labels, the house numbers, buzzers and mailboxes, the FOR SALE plates, the bus stops' boards and
+	-- the alleys' signs; the buildings' name boards (art) from further.
+	SignRange = 220,
+	SignPerStud = 100, -- … but a big board stays readable farther: this many studs per stud of its height (a 6 tall: 600)
+	NameBoardRange = 700,
+	-- The admin's performance overlay (client/PerfOverlay.luau; the P panel's WORLD tab: PERFORMANCE): its numbers
+	-- every Refresh seconds, the workspace counted every Count seconds, PerFrame instances a frame (never a hitch).
+	Overlay = { Refresh = 0.5, Count = 5, PerFrame = 1500 },
 }
 
 return Config

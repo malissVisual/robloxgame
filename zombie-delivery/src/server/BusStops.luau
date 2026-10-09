@@ -21,6 +21,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BusLines = require(Shared.BusLines)
 local CurbShape = require(Shared.CurbShape)
 local Map = require(Shared.Map)
+local RenderBudget = require(Shared.RenderBudget) -- 6.13.1: only the parts big enough throw a shadow
 local DayNight = require(script.Parent.DayNight)
 
 local BusStops = {}
@@ -47,6 +48,7 @@ local function part(parent: Instance, name: string, size: Vector3, cframe: CFram
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.CanTouch = false
+	p.CastShadow = RenderBudget.shadowFor(size, cframe)
 	p.Parent = parent
 	return p
 end
@@ -67,6 +69,7 @@ local function surface(p: BasePart, face: Enum.NormalId, pps: number): SurfaceGu
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = pps
 	gui.LightInfluence = 0
+	gui.MaxDistance = RenderBudget.signRange -- (6.13.1: the boards' text only up close)
 	gui.Parent = p
 	return gui
 end

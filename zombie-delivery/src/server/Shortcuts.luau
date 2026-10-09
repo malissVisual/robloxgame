@@ -12,6 +12,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Map = require(Shared.Map)
 local ShortcutData = require(Shared.Shortcuts)
+local RenderBudget = require(Shared.RenderBudget) -- 6.13.1: only the parts big enough throw a shadow
 local DayNight = require(script.Parent.DayNight)
 
 local Shortcuts = {}
@@ -36,6 +37,7 @@ local function part(parent: Instance, name: string, size: Vector3, cframe: CFram
 	p.CanTouch = false
 	p.CanCollide = collide == true
 	p.CanQuery = collide == true
+	p.CastShadow = RenderBudget.shadowFor(size, cframe)
 	p.Parent = parent
 	return p
 end
@@ -46,6 +48,7 @@ local function signFace(board: BasePart, face: Enum.NormalId)
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 50
 	gui.LightInfluence = 0
+	gui.MaxDistance = RenderBudget.signRange -- (6.13.1: only up close)
 	gui.Parent = board
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)

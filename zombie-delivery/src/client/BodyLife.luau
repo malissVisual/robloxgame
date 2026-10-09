@@ -36,6 +36,7 @@ local ArmPose = require(script.Parent.ArmPose)
 local SprintPose = require(script.Parent.SprintPose)
 local Interact = require(script.Parent.Interact)
 local BikeRider = require(script.Parent.BikeRider)
+local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone poses only the nearer bodies
 
 local BodyLife = {}
 
@@ -456,7 +457,7 @@ local function consider(character: Model?, eye: Vector3, mine: boolean)
 		return
 	end
 	local distance = if mine then 0 else (root.Position - eye).Magnitude
-	if distance <= B.Range then
+	if distance <= DeviceBudget.range(B.Range) then
 		table.insert(chosen, character)
 		near[character] = distance
 	end
@@ -478,9 +479,10 @@ local function choose(eye: Vector3)
 			end
 		end
 	end
-	if #chosen > B.MaxPosed then
+	local most = DeviceBudget.count(B.MaxPosed)
+	if #chosen > most then
 		table.sort(chosen, byDistance)
-		for i = #chosen, B.MaxPosed + 1, -1 do
+		for i = #chosen, most + 1, -1 do
 			near[chosen[i]] = nil
 			chosen[i] = nil
 		end
@@ -526,6 +528,7 @@ local function step(dt: number)
 	end
 	local me = Players.LocalPlayer
 	local mine = if me then me.Character else nil
+	local detail = DeviceBudget.range(B.Detail)
 	for _, character in chosen do
 		if not character.Parent then
 			continue
@@ -535,7 +538,7 @@ local function step(dt: number)
 			continue
 		end
 		posed[character] = true
-		live(character, humanoid, root, dt, now, character == mine, character == mine or (near[character] or math.huge) <= B.Detail)
+		live(character, humanoid, root, dt, now, character == mine, character == mine or (near[character] or math.huge) <= detail)
 	end
 	sweep(now)
 end

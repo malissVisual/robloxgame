@@ -44,6 +44,7 @@ local Roads = require(Shared.Roads)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local Discovery = require(script.Parent.Discovery)
+local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone redraws the minimap less often
 
 local MapView = {}
 
@@ -1463,15 +1464,23 @@ function MapView.start(gui: any, column: any)
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitBig)
 	end
 
-	local elapsed = 0
+	-- 6.13.1: a phone (client/DeviceBudget.luau) redraws the routes and markers fewer times a second and moves the
+	-- turning picture at most MapMoveHz times a second (the minimap's CanvasGroup is drawn again on every move).
+	local elapsed, moved = 0, 0
 	RunService.RenderStepped:Connect(function(dt)
 		elapsed += dt
-		local heavy = elapsed >= 1 / MINI_HZ
+		moved += dt
+		local every = 1 / DeviceBudget.rate(MINI_HZ)
+		local heavy = elapsed >= every
 		if heavy then
-			elapsed = math.min(elapsed - 1 / MINI_HZ, 1 / MINI_HZ)
+			elapsed = math.min(elapsed - every, every)
+		elseif moved < 1 / DeviceBudget.moveRate() then
+			return
 		end
+		local step = moved
+		moved = 0
 		if mini.Visible or big.Visible then
-			refresh(heavy, dt)
+			refresh(heavy, step)
 		end
 	end)
 end

@@ -12,7 +12,7 @@
 --      when stuck, re-routing when you walk away.
 --   3. It parks beside you (on your road's lane; a little before you when you stand in it), the chauffeur gets out
 --      of the driver's door, says a line, walks ~15 studs away and fades out over Config.CarCall.DriverFade s.
---      The car is then yours as always (Vehicles.handOver: the prompts come back, your client owns it again).
+--      The car is then yours as always (Vehicles.handOver: the prompts come back, your client drives it again).
 --   4. 3.9.1: it waits at the red traffic lights (shared/Crossings.luau) like the traffic, behind the queue (no
 --      overtaking it). As long as it gets on (or waits at a light) it takes the time it takes; only when it makes no
 --      progress for Config.CarCall.StuckFor s (or the whole trip passes MaxTime) is it rescued: once it is put back on
@@ -22,7 +22,8 @@
 -- Network ownership: while the chauffeur drives, the SERVER owns the car (SetNetworkOwner(nil)) and sets its movers
 -- (the LinearVelocity "Drive" and AngularVelocity "Steer") every Heartbeat; its Drive / Ride prompts are parked, so
 -- nobody gets in. Your client's Drive.luau keeps writing the movers locally, which changes nothing it does not own.
--- At the hand-over the chauffeur's body is unwelded first, then the car goes to its owner.
+-- At the hand-over the chauffeur's body is unwelded first, then the car goes to its owner (6.13.1: Vehicles.claim:
+-- the owner's client from the moment they sit in the driver's seat, the server until then).
 --
 -- The client hears about it through the CarCall remote: (seconds left, car model) about once a second while it is
 -- on the way, (nil) when it arrived, was placed or the call ended (client/Hud.luau shows "Your car is on the way ·
@@ -1039,9 +1040,7 @@ function CarCall.tow(player: Player, car: Vehicles.Car, spot: CFrame, across: nu
 	end
 	task.delay(0.5, function()
 		if not car.wrecked and not car.chauffeured and not car.repairing and car.chassis.Parent then
-			pcall(function()
-				car.chassis:SetNetworkOwner(car.owner)
-			end)
+			Vehicles.claim(car) -- (6.13.1: the server's until its driver sits)
 		end
 	end)
 	return true

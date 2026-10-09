@@ -235,10 +235,9 @@ local function styleCar(car: Vehicles.Car)
 	end
 	StyleBuild.decals(car.model, car.chassis, decal)
 	if car.model.Parent then
-		-- the new parts joined the car's assembly: its driver keeps simulating it (as Vehicles.refreshStats does)
-		pcall(function()
-			car.chassis:SetNetworkOwner(if car.chauffeured then nil else car.owner)
-		end)
+		-- the new parts joined the car's assembly: its driver keeps simulating it (as Vehicles.refreshStats does; 6.13.1:
+		-- the server while it stands empty)
+		Vehicles.claim(car)
 	end
 end
 

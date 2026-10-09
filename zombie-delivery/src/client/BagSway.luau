@@ -47,6 +47,7 @@ local BagSwing = require(Shared.BagSwing)
 local Joints = require(Shared.Joints) -- 6.7: the bag arm, the lean, the gestures' torso and head
 local Gestures = require(Shared.Gestures)
 local Bodies = require(script.Parent.Bodies)
+local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone poses only the nearer bodies
 local CameraRig = require(script.Parent.CameraRig) -- 6.7: who has the arm now (as client/SprintPose.luau asks)
 local Holster = require(script.Parent.Holster)
 local SprintPose = require(script.Parent.SprintPose)
@@ -385,13 +386,14 @@ local function step(dt: number)
 	local eye = if camera then camera.CFrame.Position else nil
 	local now = os.clock()
 	local serverNow = workspace:GetServerTimeNow()
+	local range = DeviceBudget.range(B.Range)
 	for _, player in Bodies.players() do
 		local character = player.Character
 		if not character then
 			continue
 		end
 		local humanoid, root = Bodies.of(character)
-		if not humanoid or not root or (player ~= me and eye ~= nil and (root.Position - eye).Magnitude > B.Range) then
+		if not humanoid or not root or (player ~= me and eye ~= nil and (root.Position - eye).Magnitude > range) then
 			if recs[character] then
 				forget(character)
 			end

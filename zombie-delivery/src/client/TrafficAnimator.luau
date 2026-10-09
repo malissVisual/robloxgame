@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Crossings = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Crossings"))
+local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone glides and turns the wheels of the nearer cars
 
 local TrafficAnimator = {}
 
@@ -93,6 +94,7 @@ end
 local function place(now: number)
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
+	local range = DeviceBudget.range(RANGE)
 	for model in models do
 		local track = trackOf(model)
 		if not track then
@@ -104,7 +106,7 @@ local function place(now: number)
 			continue
 		end
 		local current = chassis.CFrame
-		if (current.Position - eye).Magnitude > RANGE then
+		if (current.Position - eye).Magnitude > range then
 			track.wrote = nil -- left to the server; picked up again when it comes closer
 			track.shown, track.from, track.to = current, current, current
 			continue
@@ -134,6 +136,7 @@ local function wheels(dt: number)
 	end
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
+	local reach = DeviceBudget.range(WHEEL_RANGE)
 	for _, track in tracks do
 		local shown = track.shown
 		local moved = shown.Position - track.lastPosition
@@ -142,7 +145,7 @@ local function wheels(dt: number)
 		local yaw = math.atan2(track.lastLook:Cross(look).Y, track.lastLook:Dot(look)) / dt
 		track.lastPosition = shown.Position
 		track.lastLook = look
-		if (shown.Position - eye).Magnitude > WHEEL_RANGE or #track.wheels == 0 then
+		if (shown.Position - eye).Magnitude > reach or #track.wheels == 0 then
 			continue
 		end
 		local target = math.clamp(yaw * 0.35, -0.45, 0.45)
