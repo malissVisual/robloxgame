@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Codex · complete business-thumbnail art for all 19 ordinary delivery definitions and 12 special job types (owner request); `art/job-thumbnails/`, `design/job-thumbnails/`, `tools/job-thumbnails/`, board only; no gameplay/UI wiring · 2026-10-09 · `codex/job-thumbnails`.
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
