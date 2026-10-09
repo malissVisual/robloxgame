@@ -46,7 +46,8 @@
 --   three equal ones. NEXT MISSION (the chapter and n/N, the mission, "2 of 3 ready" in red or "READY · START" in green,
 --   the savings goal's bar) opens the READY CHECK in the popup (app "ready": the checklist with its GPS / INVITE / JOBS
 --   / GARAGE actions, START, MISSIONS). WORK is the JOBS app as before (id "jobs", the board) with a second line, what
---   you earn for ("Earn for the Old Van · $1,160 to go"). TASKS and MISSIONS join the smaller tiles (their lines, bars
+--   you earn for ("Earn for the Old Van · $1,160 to go"; 6.15: while a live event pays, "🌕 BLOOD MOON · jobs pay ×2"
+--   in amber first, shared/LiveEvents.luau workLine). TASKS and MISSIONS join the smaller tiles (their lines, bars
 --   and badges as before).
 
 local GuiService = game:GetService("GuiService")
@@ -1348,11 +1349,15 @@ refs.fillMain = function()
 	refs.ready.fillTile(refs.nextTile)
 	local workGoal = refs.workGoal
 	if workGoal then
-		local line = refs.ready.workLine()
+		-- 6.15: a live event that pays says so first ("🌕 BLOOD MOON · jobs pay ×2"; server/LiveEvents.luau's attribute)
+		local live = require(Shared.LiveEvents)
+		local liveId = workspace:GetAttribute(live.Attr.Id)
+		local event = live.workLine(if type(liveId) == "string" then liveId else nil)
+		local line = event or refs.ready.workLine()
 		workGoal.Text = line or ""
 		workGoal.Visible = line ~= nil
 		local goal = refs.ready.current().goal
-		workGoal.TextColor3 = if goal and goal.afford then K.good else K.secondary
+		workGoal.TextColor3 = if event then K.warn elseif goal and goal.afford then K.good else K.secondary
 	end
 	local info = Phone.missionInfo and Phone.missionInfo()
 	local missionsSub, missionsBar = refs.subs.missions, refs.bars.missions

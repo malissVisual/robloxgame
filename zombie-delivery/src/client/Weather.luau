@@ -20,6 +20,10 @@
 --     then): the rain at most RAIN_ALIVE drops alive at the top quality, fewer below; the river's mist and the sun
 --     rays only from MEDIUM_QUALITY up. The wet roads have two looks (dry / wet) and only the ones within WET_RANGE of
 --     the camera are wetted, looked at every WET_EVERY seconds (and as the weather turns).
+--   * 6.15, the BLOOD MOON (server/LiveEvents.luau: the workspace attribute "LiveEvent" is "bloodmoon"): a red sky and
+--     a red fog over the night look, the moonlight on the tops red (Lighting.ColorShift_Top), eased in and out over
+--     Config.LiveEvents.BloodMoon.Fade s (smoothstep). A colour fade only (nothing moves: the same with reduced motion);
+--     the night stays as readable (the red ambient is as bright as the night's, your own light stays).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -104,6 +108,17 @@ local QUALITY_EVERY = 2 -- 5.9.2: seconds between looks at the graphics quality
 local RAIN_ALIVE = 300 -- raindrops alive at most at the top quality (fewer below)
 local MEDIUM_QUALITY = 4 -- the river's mist and the sun rays from this quality (1 … 10) up
 local AUTO_QUALITY = 6 -- the quality assumed when Roblox picks it itself (no number to read)
+-- 6.15, the Blood Moon's look (blended over the rest by how far it has come in): one table, few locals.
+local BLOOD = {
+	ambient = Color3.fromRGB(104, 46, 46),
+	outdoor = Color3.fromRGB(150, 62, 56),
+	haze = Color3.fromRGB(150, 30, 26), -- the atmosphere: the red fog and the sky's glow
+	decay = Color3.fromRGB(96, 14, 12),
+	tint = Color3.fromRGB(255, 178, 168), -- the colour grade
+	shift = Color3.fromRGB(150, 26, 20), -- the moonlight on the tops
+	density = 0.08, -- added to the atmosphere's density (the fog closes in a little)
+	hazeAmount = 0.9, -- added to its haze
+}
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
@@ -325,6 +340,9 @@ function Weather.start()
 	watchSirens()
 
 	local winter = 0 -- 0 … 1: how far the winter look is blended in (fades over ~2 s)
+	local blood = 0 -- 6.15: 0 … 1: how far the Blood Moon has come in (Config.LiveEvents.BloodMoon.Fade s each way)
+	local lastBlood = -1
+	local shiftBase = Lighting.ColorShift_Top -- (the place's own: the Blood Moon blends from it and back)
 	local lastNight, lastWinter, lastCity = -1, -1, -1
 	local city = 0 -- 0 … 1: the town glow (follows the camera, eases over ~1 s)
 	local lookClock, flashClock, beat = 0, 0, 0
@@ -357,37 +375,39 @@ function Weather.start()
 		end
 		aura.Brightness = AURA_BRIGHTNESS * f
 		aura.Enabled = f > 0.02
-		if math.abs(f - lastNight) < 0.002 and math.abs(winter - lastWinter) < 0.002 and math.abs(city - lastCity) < 0.01 and math.abs(wet.density - lastWet) < 0.002 then
+		if math.abs(f - lastNight) < 0.002 and math.abs(winter - lastWinter) < 0.002 and math.abs(city - lastCity) < 0.01 and math.abs(wet.density - lastWet) < 0.002 and math.abs(blood - lastBlood) < 0.002 then
 			return
 		end
+		local red = blood * blood * (3 - 2 * blood) -- 6.15: the Blood Moon, eased in and out
 		local grey = math.clamp(wet.density / math.max(tuning.FogDensity, 0.01), 0, 1) -- 1 in a full fog
 		local gloom = math.clamp(wet.rain * 0.6 + grey * 0.4, 0, 1)
 		local dusk = 4 * f * (1 - f) -- 1 halfway through dusk or dawn
 		local glow = city * f -- the town glow is a night thing
-		Lighting.Brightness = lerp(DAY.brightness, NIGHT.brightness, f) * (1 - 0.25 * gloom)
-		Lighting.Ambient = DAY.ambient:Lerp(NIGHT.ambient, f):Lerp(CITY_AMBIENT, glow)
-		Lighting.OutdoorAmbient = DAY.outdoor:Lerp(NIGHT.outdoor, f):Lerp(CITY_OUTDOOR, glow)
+		Lighting.Brightness = lerp(DAY.brightness, NIGHT.brightness, f) * (1 - 0.25 * gloom) * (1 - 0.1 * red)
+		Lighting.Ambient = DAY.ambient:Lerp(NIGHT.ambient, f):Lerp(CITY_AMBIENT, glow):Lerp(BLOOD.ambient, red * 0.8)
+		Lighting.OutdoorAmbient = DAY.outdoor:Lerp(NIGHT.outdoor, f):Lerp(CITY_OUTDOOR, glow):Lerp(BLOOD.outdoor, red * 0.8)
+		Lighting.ColorShift_Top = shiftBase:Lerp(BLOOD.shift, red)
 		Lighting.ExposureCompensation = lerp(DAY.exposure, NIGHT.exposure, f)
 		local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 		if atmosphere then
 			local haze = DAY.haze:Lerp(NIGHT.haze, f):Lerp(DUSK_HAZE, dusk * 0.55)
 			local wetHaze = WET_HAZE:Lerp(NIGHT.haze, f * 0.7)
-			atmosphere.Color = haze:Lerp(CITY_HAZE, glow * 0.6):Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter):Lerp(wetHaze, gloom * 0.7)
-			atmosphere.Decay = DAY.decay:Lerp(NIGHT.decay, f)
-			atmosphere.Density = lerp(DAY.density, NIGHT.density, f) + WINTER_DENSITY * winter + wet.density
-			atmosphere.Haze = lerp(DAY.hazeAmount, NIGHT.hazeAmount, f) + grey * 1.2
+			atmosphere.Color = haze:Lerp(CITY_HAZE, glow * 0.6):Lerp(WINTER_HAZE_DAY:Lerp(WINTER_HAZE_NIGHT, f), winter):Lerp(wetHaze, gloom * 0.7):Lerp(BLOOD.haze, red * 0.85)
+			atmosphere.Decay = DAY.decay:Lerp(NIGHT.decay, f):Lerp(BLOOD.decay, red)
+			atmosphere.Density = lerp(DAY.density, NIGHT.density, f) + WINTER_DENSITY * winter + wet.density + BLOOD.density * red
+			atmosphere.Haze = lerp(DAY.hazeAmount, NIGHT.hazeAmount, f) + grey * 1.2 + BLOOD.hazeAmount * red
 		end
 		local grade = Lighting:FindFirstChild("ZombieGrade")
 		if grade and grade:IsA("ColorCorrectionEffect") then
-			grade.TintColor = DAY.tint:Lerp(NIGHT.tint, f):Lerp(DUSK_TINT, dusk * 0.5)
-			grade.Saturation = lerp(DAY.saturation, NIGHT.saturation, f) - 0.1 * gloom
-			grade.Contrast = lerp(DAY.contrast, NIGHT.contrast, f)
+			grade.TintColor = DAY.tint:Lerp(NIGHT.tint, f):Lerp(DUSK_TINT, dusk * 0.5):Lerp(BLOOD.tint, red * 0.9)
+			grade.Saturation = lerp(DAY.saturation, NIGHT.saturation, f) - 0.1 * gloom + 0.12 * red
+			grade.Contrast = lerp(DAY.contrast, NIGHT.contrast, f) + 0.06 * red
 		end
 		bloom.Intensity = lerp(DAY.bloom, NIGHT.bloom, f)
 		bloom.Threshold = lerp(1.4, 1.05, f)
 		-- Until the server has made the atmosphere and the grade (the world is still building), try again next time.
 		if atmosphere and grade then
-			lastNight, lastWinter, lastCity, lastWet = f, winter, city, wet.density
+			lastNight, lastWinter, lastCity, lastWet, lastBlood = f, winter, city, wet.density, blood
 		end
 	end
 
@@ -425,6 +445,12 @@ function Weather.start()
 			city += (cityFactor(position.X, position.Z) - city) * math.min(1, lookClock)
 			-- 5.7: the weather blends toward the server's (rain, fog or clear).
 			wet = WeatherPlan.toward(wet, WeatherPlan.look(weatherNow()), lookClock)
+			-- 6.15: the Blood Moon comes in (and goes) over its Fade seconds.
+			local bloodGoal = if workspace:GetAttribute("LiveEvent") == "bloodmoon" then 1 else 0
+			if blood ~= bloodGoal then
+				local stepBy = lookClock / math.max(Config.LiveEvents.BloodMoon.Fade, 0.1)
+				blood = if bloodGoal > blood then math.min(1, blood + stepBy) else math.max(0, blood - stepBy)
+			end
 			lookClock = 0
 			local hour = Lighting.ClockTime
 			local nightF = Map.nightFactor(hour)

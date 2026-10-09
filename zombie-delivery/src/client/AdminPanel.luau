@@ -20,6 +20,9 @@
 --                    and the shift (STREAK 0 / 1 / 4, SHIFT 0 / 4 of 5), a GOLDEN ORDER or a REGULAR'S ORDER on the
 --                    board now, every business's deliveries at a regulars' tier (or none), the missions (all at 3
 --                    stars, reset, 6.15: KILL MISSION ZOMBIES, start any), the challenges, secrets and titles
+--   EVENTS           6.15: the live events for the whole server (server/LiveEvents.luau): START BLOOD MOON / RUSH HOUR /
+--                    SUPPLY DROP / HORDE (the running one ends first; the Blood Moon turns the clock to the night, rush
+--                    hour to the morning), END EVENT, and what runs now with its time left
 --   ESTATE           properties, the home, teleport to a property, the company's safe
 --   BUDDIES          NPC companions (server/Buddy.luau): + ADD, FOLLOW / STAY / GUARD, DISMISS, how many
 
@@ -184,6 +187,7 @@ local SECTIONS = {
 	{ "op", "OP" },
 	{ "world", "WORLD" },
 	{ "jobs", "JOBS & MISSIONS" },
+	{ "events", "EVENTS" }, -- 6.15
 	{ "estate", "ESTATE" },
 	{ "buddies", "BUDDIES" },
 }
@@ -493,6 +497,37 @@ R.world = function()
 			send("teleport", landmark.id)
 		end))
 	end
+end
+
+-- 6.15, EVENTS: the live events for the whole server (server/LiveEvents.luau checks the id; the workspace attributes
+-- say what runs). The section is drawn again when an event starts or ends (see AdminPanel.start).
+R.events = function()
+	local id = workspace:GetAttribute("LiveEvent")
+	local def = if type(id) == "string" then Config.LiveEvents.Events[id] else nil
+	local ends = workspace:GetAttribute("LiveEventEnds")
+	local left = if type(ends) == "number" then math.max(0, math.floor(ends - workspace:GetServerTimeNow())) else 0
+	heading(
+		if def then `Live event · {def.icon} {def.name} · {left // 60}:{string.format("%02d", left % 60)} left` else "Live events · none running",
+		"For the whole server, not the target. START ends a running one first; the Blood Moon turns the clock to the night, rush hour to the morning. Missions are never touched."
+	)
+	local starts = grid(200)
+	local events: { { id: string, color: Color3 } } = {
+		{ id = "bloodmoon", color = C.red },
+		{ id = "rush", color = C.yellow },
+		{ id = "supply", color = C.green },
+		{ id = "horde", color = P.violet },
+	}
+	for _, entry in events do
+		local eventDef = Config.LiveEvents.Events[entry.id]
+		if eventDef then
+			action(starts, `START {eventDef.icon} {eventDef.name}`, entry.color, function()
+				send("liveEvent", entry.id)
+			end)
+		end
+	end
+	action(starts, "END EVENT", C.grey, function()
+		send("liveEvent", "end")
+	end)
 end
 
 -- JOBS & MISSIONS: the jobs, the missions (shared/Missions.luau) and the challenges (shared/Challenges.luau).
@@ -1044,6 +1079,12 @@ function AdminPanel.start()
 	end)
 	workspace:GetAttributeChangedSignal("AdminFrozen"):Connect(function()
 		if section == "world" then
+			rerender()
+		end
+	end)
+	-- 6.15: EVENTS says what runs: drawn again when a live event starts or ends.
+	workspace:GetAttributeChangedSignal("LiveEvent"):Connect(function()
+		if section == "events" then
 			rerender()
 		end
 	end)

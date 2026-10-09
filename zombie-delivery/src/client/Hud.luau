@@ -1749,6 +1749,10 @@ function Hud.showResult(r: any)
 		if nightBonus > 0 then
 			line("Night bonus", "+" .. Ui.money(nightBonus), nil, 9)
 		end
+		-- 6.15: a live event's pay ("🌕 BLOOD MOON ×2"; server/LiveEvents.luau: on the night bonus's subtotal, beside it)
+		if (tonumber(payout.eventBonus) or 0) > 0 then
+			line(require(Shared.LiveEvents).payLine(r.liveEvent), "+" .. Ui.money(tonumber(payout.eventBonus) or 0), C.green, 9)
+		end
 		-- 4.7: the rating (★ … ★★★, why), the streak of good jobs and the licence it counts toward (not a mission).
 		local rating = if type(r.rating) == "table" then r.rating else nil
 		if rating and tonumber(rating.freshness) then

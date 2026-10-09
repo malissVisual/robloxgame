@@ -28,6 +28,8 @@
 --            cool silver) with its perks and its countdown (client/SpecialOrderUi.luau); NEXT UP says when a queued one
 --            runs out. Every card names your tier with its business (client/RegularsApp.luau badge: "🥈 SILVER REGULAR
 --            +10%", "🤝 3/5 TO BRONZE").
+--            6.15: while a live event pays (rush hour, the Blood Moon) its strip heads the jobs ("🕑 RUSH HOUR · ×1.5
+--            pay · 3:12", its clock ticking: shared/LiveEvents.luau, SpecialOrderUi.countdown).
 --   BAG      your bag (client/BagUi.luau's render) in the phone.
 --   GARAGE   BRING MY CAR (SpawnCar: the MENU's old CAR), 🚲 MY BIKE / 🚐 CALL CAR (the Equip remote) and ⛽ TOW while
 --            your own car's tank is empty (the Fuel remote). Home's courier card keeps its quick switch too. 5.6: the
@@ -417,6 +419,18 @@ function PhoneApps.board(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	local fresh = if refreshAt then math.max(0, refreshAt - workspace:GetServerTimeNow()) else nil
 	look.section(list, `{count} {if count == 1 then "job" else "jobs"} on the board{if fresh then ` · new ones in {Ui.clock(fresh)}` else ""}`, top + 1)
 	local order = top + 1
+	-- 6.15: a live event that pays heads the jobs ("🕑 RUSH HOUR · ×1.5 pay · 3:12", its clock ticking; the state is the
+	-- workspace attributes server/LiveEvents.luau keeps, shared/LiveEvents.luau's words)
+	do
+		local live = require(Shared.LiveEvents)
+		local id = workspace:GetAttribute(live.Attr.Id)
+		local prefix = live.boardPrefix(if type(id) == "string" then id else nil)
+		if prefix then
+			order += 1
+			local color = live.color(id)
+			SpecialOrderUi.countdown(look.meta(list, prefix, order, Color3.fromRGB(color[1], color[2], color[3])), workspace:GetAttribute(live.Attr.Ends), prefix)
+		end
+	end
 	-- 6.12.8: ADD ALL · $total: every job it can (the server's plan: into the run, then NEXT UP) and what it will do.
 	local plan = if type(info) == "table" and type(info.addAll) == "table" then info.addAll else nil
 	if plan and (tonumber(plan.count) or 0) > 0 then

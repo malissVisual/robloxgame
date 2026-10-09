@@ -4384,6 +4384,7 @@ Config.Robust = {
 		Style = 4, -- 6.12: the STYLE app's buy / wear / unwear (server/StyleWear.luau)
 		JobQueue = 4, -- 6.12.8: the board's + QUEUE, ADD ALL and NEXT UP's ✕ (server/JobQueue.luau)
 		ClientError = 0.05, -- 6.13: a client's script error (its script and line): one every 20 s at most (server/Analytics.luau)
+		CrateDown = 4, -- 6.15: the PutDown remote (the touch PUT DOWN) while you carry a supply drop's crate (server/LiveEvents.luau)
 	},
 }
 
@@ -4460,6 +4461,9 @@ Config.Tasks = {
 		-- 6.14: the regulars (an order for a business you are Bronze or better at) and the golden orders
 		{ id = "regular", event = "regular", text = "Deliver {n} orders where you're a regular", one = "Deliver an order where you're a regular", target = { 2, 4 }, money = 180, xp = 110, level = 3 },
 		{ id = "golden", event = "golden", text = "Finish {n} golden orders", one = "Finish a golden order", target = { 1, 1 }, money = 300, xp = 160, level = 3 },
+		-- 6.15: a live event (server/LiveEvents.luau notes "liveevent" once an event for each player: a job paid during a
+		-- Blood Moon or a rush hour, the supply drop brought in, a share of the horde's reward)
+		{ id = "liveevent", event = "liveevent", text = "Take part in {n} live events", one = "Take part in a live event", target = { 1, 1 }, money = 220, xp = 130, level = 2 },
 	} :: { TaskDef },
 	WeeklyPool = {
 		{ id = "w_deliver", event = "deliver", text = "Deliver {n} pieces of cargo", target = { 40, 60 }, step = 5, money = 1500, xp = 600 },
@@ -4498,6 +4502,102 @@ Config.Regulars = {
 		Seconds = 300,
 		Pay = 1.5,
 		Xp = 1,
+	},
+}
+
+-- 6.15, LIVE EVENTS (the owner: "events where working is better for earning, e.g. a Blood Moon"): one at a time for
+-- the whole server (server/LiveEvents.luau runs them, shared/LiveEvents.luau holds the rules and the words,
+-- tests/liveevents_test.luau checks them, client/EventBanner.luau shows them). The first one comes First minutes after
+-- a player is in, then one every Every minutes (start to start, random in between), never in an empty server: the next
+-- of a shuffled deck (Order) whose moment it is. The BLOOD MOON only at night with MinNightLeft s of it to go (it ends at
+-- dawn at the latest), RUSH HOUR only by day with MinDayLeft s of it to go (it ends at dusk at the latest); a card whose
+-- moment has not come waits in the deck while a later one goes first; none can start: the server looks again every
+-- Retry s, after MaxWait s the deck is shuffled anew (MaxWait: longer than a day's cycle, Config.DayNight.DayLength,
+-- less the event's window, so the night or the day always comes first). Missions are never touched: no event pay, no
+-- event zombies, no faster zombies (Offer.mission).
+--   Events     each event's name, icon, one-line hint, length in minutes and colour (the banner, the board, the toasts)
+--   LevelScale the supply drop's and the horde's rewards × (1 + this × (level − 1)) for each player
+--   Reach      an event zombie (the horde, the crate's guards) goes after a player this close; else it walks to its spot
+--              (the gate, the crate) and waits there; it never despawns while its event runs (server/Zombies.luau march)
+--   BloodMoon  Pay: jobs finished during it pay × this (on the job's pay: the same subtotal the night bonus takes,
+--              Economy.payout; the rating, the streak, the regulars and the tips come on top as they do on the night's);
+--              Waves: × the job waves' spawn multiplier (Jobs.dangerOf: bigger, more often, a higher cap of the alive
+--              ones, like WANTED); Roam: × the roamers around every player (server/Zombies.luau, on top of the night's);
+--              Speed: × every zombie's speed but a mission's (the people too are spared), at most MaxSpeed studs / s;
+--              Fade: seconds the red sky and fog ease in and out (client/Weather.luau)
+--   Rush       Pay: × the pay of a job finished during it (as the Blood Moon's); ExtraOffers: more ordinary offers a
+--              danger level and on foot / by bike (JobRules.roles); Refresh: the board's new offers this often at most
+--              (Config.Jobs.RefreshSeconds otherwise); every board is made anew when it starts (not during a run)
+--   Supply     a crate falls by parachute (FallFrom studs, FallSpeed studs / s) onto a street Distance studs from the safe
+--              zone's middle (on its square: past SafeHalf + Margin), a light beam and a map marker for everybody; its
+--              Guards gather (First at the landing, Batch every Every s up to Max alive, Near … Far studs round it,
+--              Kinds); anybody picks it up (Pickup studs, Hold s) and carries it on foot (G / PUT DOWN sets it down; it
+--              drops when the carrier dies, sits or leaves); the first who brings it within DeliverRadius of the depot's
+--              drop-off (DropOff: x, z from the depot's middle) gets Money and Xp (× LevelScale) ("SupplyDrop")
+--   Horde      Count zombies (Kinds) in Bursts, one every BurstEvery s, Out studs past the safe zone's edge on the streets
+--              of one side, walking to its Gates gates (Stop studs outside the edge; they never come in); beaten when all
+--              came and fell before its time is up; then (or at its end) everybody who killed some shares Money and Xp
+--              by their kills (× LevelScale; at its end only the share of the horde that fell) ("HordeReward")
+--   Headroom   the supply's guards and the horde only spawn while the server has fewer than Config.Horde.MaxTotal − this
+--              zombies: the job waves of the other players keep their room
+export type LiveEventDef = { name: string, icon: string, hint: string, minutes: number, color: { number } }
+
+Config.LiveEvents = {
+	Enabled = true,
+	First = { 10, 15 } :: { number },
+	Every = { 20, 30 } :: { number },
+	Retry = 5,
+	MaxWait = 840,
+	Tick = 0.25, -- seconds between the server's steps of a running event
+	LevelScale = 0.15,
+	Reach = 140,
+	Headroom = 30,
+	Order = { "bloodmoon", "rush", "supply", "horde" } :: { string },
+	Events = {
+		bloodmoon = { name = "BLOOD MOON", icon = "🌕", hint = "Jobs pay ×2 · more zombies, and faster", minutes = 5, color = { 222, 64, 58 } },
+		rush = { name = "RUSH HOUR", icon = "🕑", hint = "Jobs pay ×1.5 · more jobs on the board", minutes = 5, color = { 232, 174, 84 } },
+		supply = { name = "SUPPLY DROP", icon = "📦", hint = "First to bring the crate to the depot wins", minutes = 6, color = { 126, 196, 120 } },
+		horde = { name = "HORDE AT THE GATES", icon = "🧟", hint = "Hold the gate · share the reward by your kills", minutes = 6, color = { 178, 110, 222 } },
+	} :: { [string]: LiveEventDef },
+	BloodMoon = {
+		Pay = 2,
+		Waves = 1.5,
+		Roam = 1.5,
+		Speed = 1.2,
+		MaxSpeed = 30,
+		MinNightLeft = 300,
+		Fade = 4,
+	},
+	Rush = {
+		Pay = 1.5,
+		ExtraOffers = 1,
+		Refresh = 60,
+		MinDayLeft = 300,
+	},
+	Supply = {
+		Money = 450,
+		Xp = 220,
+		Distance = { 280, 480 } :: { number },
+		Margin = 40,
+		FallFrom = 150,
+		FallSpeed = 7,
+		Pickup = 9,
+		Hold = 0.6,
+		DropOff = { 24, 10 } :: { number },
+		DeliverRadius = 12,
+		Guards = { First = 6, Every = 20, Batch = 2, Max = 10, Near = 18, Far = 45 },
+		Kinds = { walker = 0.65, runner = 0.25, brute = 0.1 } :: { [string]: number },
+	},
+	Horde = {
+		Count = 40,
+		Bursts = 4,
+		BurstEvery = 20,
+		Out = { 150, 300 } :: { number },
+		Stop = 18,
+		Gates = 2,
+		Kinds = { walker = 0.6, runner = 0.28, brute = 0.12 } :: { [string]: number },
+		Money = 900,
+		Xp = 450,
 	},
 }
 

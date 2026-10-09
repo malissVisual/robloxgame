@@ -22,6 +22,8 @@
 --   * 6.14, the grind chips (client/GrindChips.luau: the streak and the shift), TouchLayout.chips: at the top between
 --     the contract column and the actions' row (one over the other when it is narrow), or under the row at the right
 --     edge, clear of all of the above.
+--   * 6.15, the live event's banner (client/EventBanner.luau), TouchLayout.banner: at the top, under the chips or beside
+--     them, clear of the chips and everything above.
 --   * 6.14 review, the HUD's left column at the top left (the cash, 6.14's savings line, the minimap, the health),
 --     TouchLayout.leftColumn: with the savings line it must end over the thumbstick's corner; it may shrink a little
 --     for it (LEFT_SHRINK of the HUD's scale), else the line stays away (the column as it was before 6.14).
@@ -273,6 +275,92 @@ function TouchLayout.chips(W: number, H: number, wide: Shape, stacked: Shape, s:
 	end
 	local last = candidates[#candidates]
 	return last.box, last.scale, last.stacked
+end
+
+-- 6.15, the live event's banner (client/EventBanner.luau: the event's name, its time left, a hint or the horde's bar)
+-- at the top: BANNER (w × h px at scale 1), or BANNER_NARROW where that does not fit, at the HUD's scale `s` (on touch at
+-- least CHIPS_TOUCH) or smaller, down to BANNER_MIN (BANNER_TINY for the narrow one on the most crowded screens: a
+-- small phone held upright, ADMIN showing). The first of these that stays on the screen and clear of `blocks` (the
+-- HUD's groups, the touch buttons, ADMIN, Roblox's player list) and of `chips` (the grind chips' box while they show)
+-- wins, each place at `s`, then as wide as the span allows, then at BANNER_MIN, the wide shape before the narrow one:
+--   1 in the middle of the top edge (`top`);  2 under the chips, centred on them
+--   3 in the middle of the span from `leftEdge` to the row (`rowLeft`), at the top;  4 the same under the chips
+--   5 under the row (`rowBottom`) at the right edge;  6 under the chips at the right edge;  7 at the span's left end
+-- then the narrow one at BANNER_TINY anywhere in the top half (a scan down from `top`). None clear: the first place.
+-- Returns its box, its scale and whether it is the narrow one.
+TouchLayout.BANNER = { w = 320, h = 52 } :: Shape
+TouchLayout.BANNER_NARROW = { w = 210, h = 52 } :: Shape
+TouchLayout.BANNER_MIN = 0.6
+TouchLayout.BANNER_TINY = 0.5
+function TouchLayout.banner(W: number, H: number, shape: Shape, s: number, leftEdge: number, top: number, rowLeft: number, rowBottom: number, chips: Box?, blocks: { Box }): (Box, number, boolean)
+	local gap = TouchLayout.GAP
+	local narrow = TouchLayout.BANNER_NARROW
+	local spanLeft, spanRight = leftEdge + gap, rowLeft - gap
+	local under = if chips then chips.y1 + gap else top
+	local function clear(b: Box): boolean
+		if b.x0 < 0 or b.y0 < 0 or b.x1 > W or b.y1 > H or (chips and TouchLayout.overlap(b, chips)) then
+			return false
+		end
+		for _, block in blocks do
+			if TouchLayout.overlap(b, block) then
+				return false
+			end
+		end
+		return true
+	end
+	local first: { box: Box, scale: number, narrow: boolean }? = nil
+	-- One shape at one scale in the places 1 … 7: the first clear one (and the very first place, for when none is).
+	local function try(form: Shape, scale: number): Box?
+		local w, h = form.w * scale, form.h * scale
+		local places: { Box } = {}
+		local function centred(cx: number, y0: number)
+			table.insert(places, TouchLayout.box(cx - w / 2, y0, cx + w / 2, y0 + h))
+		end
+		centred(W / 2, top)
+		if chips then
+			centred((chips.x0 + chips.x1) / 2, under)
+		end
+		centred((spanLeft + spanRight) / 2, top)
+		centred((spanLeft + spanRight) / 2, under)
+		local right = W - TouchLayout.MARGIN
+		table.insert(places, TouchLayout.box(right - w, rowBottom + gap, right, rowBottom + gap + h))
+		table.insert(places, TouchLayout.box(right - w, under, right, under + h))
+		table.insert(places, TouchLayout.box(spanLeft, under, spanLeft + w, under + h))
+		if not first then
+			first = { box = places[1], scale = scale, narrow = form == narrow }
+		end
+		for _, b in places do
+			if clear(b) then
+				return b
+			end
+		end
+		return nil
+	end
+	for _, form in { shape, narrow } do
+		local least = math.min(s, TouchLayout.BANNER_MIN)
+		local fit = math.clamp((spanRight - spanLeft) / form.w, least, s)
+		for _, scale in { s, fit, least } do
+			local b = try(form, scale)
+			if b then
+				return b, scale, form == narrow
+			end
+		end
+	end
+	-- The most crowded screens: the narrow one, small, the first clear spot in the top half.
+	local tiny = math.min(s, TouchLayout.BANNER_TINY)
+	local w, h = narrow.w * tiny, narrow.h * tiny
+	local y = top
+	while y + h <= H * 0.5 do
+		for _, x0 in { (spanLeft + spanRight - w) / 2, (W - w) / 2, W - TouchLayout.MARGIN - w, spanLeft, TouchLayout.MARGIN } do
+			local b = TouchLayout.box(x0, y, x0 + w, y + h)
+			if clear(b) then
+				return b, tiny, true
+			end
+		end
+		y += 4
+	end
+	local fallback = first :: { box: Box, scale: number, narrow: boolean }
+	return fallback.box, fallback.scale, fallback.narrow
 end
 
 return TouchLayout

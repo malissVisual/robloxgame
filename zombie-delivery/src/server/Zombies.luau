@@ -20,6 +20,14 @@
 --     one away without a kill; Zombies.barricade is a roadblock's bandit car on its own.
 --
 -- The limbs are animated on the clients (client/ZombieAnimator.luau), the server only moves the bodies.
+--
+-- 6.15, the live events (server/LiveEvents.luau sets these; shared/LiveEvents.luau has the numbers' rules):
+--   * Zombies.roamBoost: × the roamers wanted around every player (the Blood Moon's, on top of the night's).
+--   * Zombies.setFrenzy(speedOf, spared): every zombie's full speed through speedOf (the Blood Moon's, capped), but the
+--     people's and the ones `spared` says (a mission's); nil: back to their own speed (Zombie.baseSpeed).
+--   * Zombies.march(z, at): an event's zombie (the horde at the gates, a supply drop's guards): it never despawns, goes
+--     after a player within Config.LiveEvents.Reach, else walks to `at` (never into the safe zone) and waits there;
+--     nil lets it go (it roams on and despawns as a roamer does). Zombie.event says whose it is ("horde", "supply").
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -74,6 +82,9 @@ export type Zombie = {
 	alertAt: number?,
 	mission: string?, -- its mission run (the model's MissionRun attribute)
 	killed: boolean?, -- it died (kill), not just went (a despawn): the mission counts it
+	baseSpeed: number, -- 6.15: its own full speed (walkSpeed is this, or the Blood Moon's frenzy of it)
+	march: Vector3?, -- 6.15: an event's zombie: where it walks to and waits (Zombies.march)
+	event: string?, -- 6.15: the live event it belongs to ("horde", "supply")
 }
 
 local Zombies = {}
@@ -106,6 +117,8 @@ Zombies.extraTargets = nil :: (() -> { ExtraTarget })?
 -- 4.5, the admin tools (server/Admin.luau): FREEZE stops every enemy where it stands (no steps, no bites, no shots).
 -- A player with the attribute AdminHidden is no target for anybody (on foot or in their car).
 Zombies.frozen = false
+-- 6.15, a live event (server/LiveEvents.luau): × the roamers wanted around every player (the Blood Moon's).
+Zombies.roamBoost = 1
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -624,6 +637,67 @@ function Zombies.fromPart(part: Instance): Zombie?
 	return nil
 end
 
+-- ── 6.15: the live events ──────────────────────────────────────────────────
+
+local frenzySpeed: ((number) -> number)? = nil
+local frenzySpared: ((Zombie) -> boolean)? = nil
+
+-- Its full speed as the frenzy says (its own without one, for the people and the spared), at once.
+local function frenzy(z: Zombie)
+	local speedOf = frenzySpeed
+	local speed = z.baseSpeed
+	if speedOf and z.def.jobOnly ~= true then
+		local spared = frenzySpared
+		local ok, skip = true, false
+		if spared then
+			ok, skip = pcall(spared, z)
+		end
+		if ok and not skip then
+			speed = speedOf(z.baseSpeed)
+		end
+	end
+	if speed == z.walkSpeed then
+		return
+	end
+	z.walkSpeed = speed
+	z.humanoid.WalkSpeed = if roams(z) and not z.hunting then math.min(Roam.wanderSpeed, speed) else speed
+end
+
+-- The Blood Moon's frenzy on (speedOf: a zombie's own full speed → its speed now; spared: a zombie that keeps its own)
+-- or off (nil): every living zombie now, every new one as it comes.
+function Zombies.setFrenzy(speedOf: ((number) -> number)?, spared: ((Zombie) -> boolean)?)
+	frenzySpeed, frenzySpared = speedOf, spared
+	for _, z in zombies do
+		if not z.dead then
+			frenzy(z)
+		end
+	end
+end
+
+-- An event's zombie (`event`: "horde", "supply") walks to `at` and waits there (never despawning, going after a player
+-- within Config.LiveEvents.Reach); `at` nil lets it go: it roams on like a roamer (and despawns like one).
+function Zombies.march(z: Zombie, at: Vector3?, event: string?)
+	if z.dead then
+		return
+	end
+	if at then
+		z.march = at
+		z.event = event or z.event
+		return
+	end
+	if z.march == nil then
+		return
+	end
+	z.march = nil
+	z.event = nil
+	if z.def.jobOnly ~= true then
+		z.roamer = true
+		z.home = z.root.Position
+		z.hunting = true -- (it calms down once it lost everybody, like a roamer)
+		z.lostSince = nil
+	end
+end
+
 -- roamer = one of the zombies around a player without a job (Config.Horde.Roam): it wanders until it notices you.
 function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean?, resident: boolean?, roamer: boolean?): Zombie?
 	if #zombies >= Horde.MaxTotal then
@@ -657,7 +731,9 @@ function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean
 		lostSince = nil,
 		nextWander = 0,
 		walkSpeed = humanoid.WalkSpeed,
+		baseSpeed = humanoid.WalkSpeed,
 	}
+	frenzy(z) -- 6.15: a Blood Moon's speed (nothing without one)
 	if roams(z) then
 		calm(z, at)
 	end
@@ -1276,7 +1352,7 @@ local function step()
 		end
 
 		-- Too far from everybody: gone.
-		if slow and (position.Y < -8 or not z.resident and nearestPlayerDistance(position) > (if z.roamer then Roam.despawn else Horde.DespawnDistance)) then
+		if slow and (position.Y < -8 or not z.resident and not z.march and nearestPlayerDistance(position) > (if z.roamer then Roam.despawn else Horde.DespawnDistance)) then
 			-- drowned in the river / the sea, or nobody around
 			remove(z)
 			z.model:Destroy()
@@ -1343,11 +1419,18 @@ local function step()
 				z.lostSince = nil
 			end
 		else
-			local reach = if ranged then range + 40 elseif z.guard then 90 elseif z.resident then 160 else 400
+			local march = z.march
+			local reach = if ranged then range + 40 elseif march then Config.LiveEvents.Reach elseif z.guard then 90 elseif z.resident then 160 else 400
 			best, bestDistance = nearestTarget(position, targets, reach, z.def.jobOnly == true)
 			if not best then
 				if z.def.jobOnly then
 					standGuard(z, position, now)
+				elseif march then
+					-- 6.15: an event's zombie walks to its spot (the gate, the crate) and waits round it; never into the safe zone
+					z.nextPath = now + rng:NextNumber(1, 2)
+					if not World.isSafe(march) and Vector3.new(march.X - position.X, 0, march.Z - position.Z).Magnitude > 8 then
+						z.humanoid:MoveTo(Vector3.new(march.X + rng:NextNumber(-5, 5), position.Y, march.Z + rng:NextNumber(-5, 5)))
+					end
 				elseif not z.guard then
 					z.nextPath = now + rng:NextNumber(2, 4) -- shamble around
 					z.humanoid:MoveTo(position + Vector3.new(rng:NextNumber(-20, 20), 0, rng:NextNumber(-20, 20)))
@@ -1508,7 +1591,7 @@ local function keepRoamers()
 			base = rng:NextInteger(Roam.min, Roam.max)
 			roamWant[player] = { n = base, at = now + Roam.rethink }
 		end
-		local want = math.floor(base * night + 0.5)
+		local want = math.floor(base * night * Zombies.roamBoost + 0.5) -- (6.15: a Blood Moon's more)
 		-- Anybody's roamers count (two friends together share them).
 		local around = 0
 		for _, z in zombies do

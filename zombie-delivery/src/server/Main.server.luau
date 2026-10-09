@@ -215,6 +215,7 @@ safely("Zombies", Zombies.start)
 safely("Jobs", Jobs.start)
 safely("JobQueue", require(Server.JobQueue).start) -- 6.12.8: the NEXT UP queue (+ QUEUE, ADD ALL)
 safely("SpecialOrders", require(Server.SpecialOrders).start) -- 6.14: the golden orders and the regulars' orders
+safely("LiveEvents", require(Server.LiveEvents).start) -- 6.15: the Blood Moon, rush hour, supply drops, the horde
 safely("Gun", Gun.start)
 safely("Items", Items.start)
 safely("Shops", Shops.start)

@@ -225,6 +225,16 @@
 --     and paid as ever. The clock still fails it; the cargo keeps the condition it arrived with. The payload's
 --     mission.enemies = { killed, total, left, label } (the HUD's ZOMBIES 7/20), the result's mission.cleared.
 --   * Jobs.adminKillMission: the admin's KILL MISSION ZOMBIES.
+-- 6.15, the live events (server/LiveEvents.luau, shared/LiveEvents.luau), through Jobs.live (server/LiveEvents.luau
+-- fills it at its start: it requires this module, so this one cannot require it; no new top-level local here). Never a
+-- mission's (Offer.mission):
+--   * payOrder: the event's pay (the Blood Moon's ×2, rush hour's ×1.5) is Economy.payout's eventMultiplier: its bonus
+--     is taken on the same subtotal as the night bonus (the condition's pay, the speed bonus, the kills) and added next
+--     to it; the rating, the streak, the regulars' bonus, the tips and the crew's split then come on top of the total
+--     as they do on the night's. The result says it (`liveEvent`, payout.eventBonus: "🌕 BLOOD MOON ×2 +$…").
+--   * Jobs.dangerOf: the Blood Moon's waves (× the run's spawn multiplier, like WANTED).
+--   * Rush hour's board: more ordinary offers a danger level, on foot and by bike (JobRules.roles' `extra`), the next
+--     offers sooner (refreshAt), and every board made anew when it starts (Jobs.renewBoards).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -468,6 +478,25 @@ Jobs.onQueuePoke = nil :: ((player: Player) -> ())?
 -- mission or an employer's job starts: NEXT UP waits (PAUSED) until the player resumes it.
 Jobs.onQueuePause = nil :: ((player: Player, why: string) -> ())?
 Jobs.onBoardSend = nil :: ((player: Player, board: any, rows: { { [string]: any } }, info: { [string]: any }) -> ())?
+-- 6.15: what a live event changes (server/LiveEvents.luau puts its own in at its start; these: no event): a job's pay
+-- multiplier (and its daily task), the job waves' multiplier, rush hour's extra offers and sooner board, the event's id.
+Jobs.live = {
+	pay = function(_player: Player, _mission: boolean): number
+		return 1
+	end,
+	waves = function(_mission: boolean): number
+		return 1
+	end,
+	extraOffers = function(): number
+		return 0
+	end,
+	refresh = function(seconds: number): number
+		return seconds
+	end,
+	current = function(): string?
+		return nil
+	end,
+}
 
 local boards: { [number]: Board } = {} -- 3.7: by UserId, so leaving and coming back does not reroll the board
 local nextOfferId = 0
@@ -2266,7 +2295,7 @@ local function tierOffers(player: Player, from: Vector3, tierIndex: number, only
 	local open = PlayerData.level(player) >= JobsConfig.Tiers[tierIndex].level and hasLicence(player, tierIndex)
 	local roles: { string } = if open then JobRules.roles(function(): number
 		return rng:NextNumber()
-	end) else { "short" }
+	end, Jobs.live.extraOffers()) else { "short" } -- (6.15: rush hour's extra offers)
 	if only and open then
 		roles = { only }
 	end
@@ -2324,11 +2353,11 @@ local function makeBoard(player: Player): Board
 	local room = Transport.footOf(player).room
 	local footRoles = JobRules.roles(function(): number
 		return rng:NextNumber()
-	end)
+	end, Jobs.live.extraOffers()) -- (6.15: rush hour's extra offers)
 	-- 5.3: in the morning a newspaper round too (Config.Jobs.Round), on foot and by bike.
 	local rounds = require(Shared.Deliveries).inHours(JobsConfig.Round.Hours, DayNight.hour())
 	local walks = 0
-	for index = 1, math.max(1, JobsConfig.Foot.Offers) + (if rounds then 1 else 0) do
+	for index = 1, math.max(1, JobsConfig.Foot.Offers) + (if rounds then 1 else 0) + Jobs.live.extraOffers() do
 		local offer = footOffer(from, if rounds and index == 1 then "round" else footRoles[(index - (if rounds then 2 else 1)) % #footRoles + 1], room)
 		if offer then
 			table.insert(list, offer)
@@ -2351,9 +2380,9 @@ local function makeBoard(player: Player): Board
 		local bikeRoom = if bike then bike.room else JobsConfig.Bike.Pieces[1]
 		local bikeRoles = JobRules.roles(function(): number
 			return rng:NextNumber()
-		end)
+		end, Jobs.live.extraOffers()) -- (6.15: rush hour's extra offers)
 		-- (6.6: every light piece fits the bike's bag and yours: the bike's whole room, and the round)
-		for index = 1, math.max(1, JobsConfig.Bike.Offers) + (if rounds then 1 else 0) do
+		for index = 1, math.max(1, JobsConfig.Bike.Offers) + (if rounds then 1 else 0) + Jobs.live.extraOffers() do
 			local offer = footOffer(from, if rounds and index == 1 then "round" else bikeRoles[(index - (if rounds then 2 else 1)) % #bikeRoles + 1], bikeRoom, nil, true)
 			if offer then
 				table.insert(list, offer)
@@ -2379,7 +2408,8 @@ local function makeBoard(player: Player): Board
 		end
 	end
 	table.sort(list, boardOrder)
-	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, JobsConfig.RefreshSeconds), rerolled = {}, footNote = footNote }
+	-- (6.15: rush hour's new offers sooner, Jobs.live)
+	local board: Board = { list = list, refreshAt = workspace:GetServerTimeNow() + math.max(10, Jobs.live.refresh(JobsConfig.RefreshSeconds)), rerolled = {}, footNote = footNote }
 	boards[player.UserId] = board
 	return board
 end
@@ -2445,6 +2475,15 @@ end
 -- A new board now, sent to the player (3.7: the client cannot ask for this; RequestOffers sends the current board).
 function Jobs.makeOffers(player: Player)
 	sendBoard(player, makeBoard(player))
+end
+
+-- 6.15: rush hour starts (server/LiveEvents.luau): every board is made anew at the next second (refreshBoards: pushed
+-- to its player; a player on a run gets theirs after it), with rush hour's extra offers.
+function Jobs.renewBoards()
+	local now = workspace:GetServerTimeNow()
+	for _, board in boards do
+		board.refreshAt = math.min(board.refreshAt, now)
+	end
 end
 
 -- 5.7: after a run the board is not stale: every offer taken from it (Board.taken) gets a new one of its kind in its
@@ -3443,8 +3482,11 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 	-- Finished at night: the pay is up (smoothly at dusk and dawn).
 	local nightPay = Economy.nightScale(Config.DayNight.NightPay, DayNight.nightFactor())
 	local night = DayNight.isNight()
-	-- The gunner twist: a kill from a passenger seat counts GunnerKillBonus times in the kill bonus.
-	local payout = Economy.payout(pay, condition, timeLeft, offer.time, Economy.paidKills(kills, job.gunnerKills), nightPay)
+	-- The gunner twist: a kill from a passenger seat counts GunnerKillBonus times in the kill bonus. 6.15: a live event's
+	-- pay (the Blood Moon's, rush hour's; never a mission's) on the same subtotal as the night bonus, beside it.
+	-- (6.15 merge: a golden or a regular's order keeps its own ×3 / ×1.5, no event's on top: a golden order in a Blood
+	-- Moon was ×6; the event is still noted for its daily task)
+	local payout = Economy.payout(pay, condition, timeLeft, offer.time, Economy.paidKills(kills, job.gunnerKills), nightPay, math.min(Jobs.live.pay(player, offer.mission ~= nil), if offer.specialOrder then 1 else math.huge))
 	-- A mission is rated (1 – 3 stars): the cargo's condition and the clock left.
 	local stars = Missions.rate(condition, if offer.time > 0 then math.max(0, timeLeft) / offer.time else 0)
 	-- (6.15: `cleared`, the enemies killed of the plan's: the result's "Zombies cleared 20/20")
@@ -3613,8 +3655,9 @@ local function payOrder(player: Player, job: Job, order: Order, crew: { Player }
 		stars = offer.tier,
 		condition = condition,
 		kills = kills,
-		payout = payout, -- with nightBonus
+		payout = payout, -- with nightBonus (6.15: and eventBonus)
 		night = night,
+		liveEvent = if payout.eventBonus > 0 then Jobs.live.current() else nil, -- 6.15: whose bonus
 		crew = split, -- { { name, pay } }: everybody paid on this job, the owner first
 		riders = #crew, -- crew members besides you
 		crewBonus = math.max(0, driverTotal - payTotal), -- (6.8 review: never negative on a replay)
@@ -4761,7 +4804,8 @@ end
 -- 6.14: the run's danger: the waves' spawn multiplier (the job's modifier, WANTED's 2 …) and the bandits' boost of the
 -- job, raised by every open GOLDEN ORDER of the run (its own modifier × its Spec's `waves`, its offer's boost or its
 -- Spec's: shared/SpecialOrders.luau make), and whether one is open (`golden`: a light run's strays, strayStep). Once
--- the golden order is paid the run is as dangerous as before.
+-- the golden order is paid the run is as dangerous as before. 6.15: × a Blood Moon's waves (Jobs.live,
+-- server/LiveEvents.luau; never a mission's).
 function Jobs.dangerOf(job: Job): (number, number, boolean)
 	local modifier = job.offer.modifier
 	local spawn = if modifier then modifier.spawnMultiplier else 1
@@ -4776,7 +4820,7 @@ function Jobs.dangerOf(job: Job): (number, number, boolean)
 			golden = true
 		end
 	end
-	return spawn, boost, golden
+	return spawn * Jobs.live.waves(job.offer.mission ~= nil), boost, golden
 end
 
 -- One player's tick of update (below): the job's timer, crew, cargo, waves and bandits.

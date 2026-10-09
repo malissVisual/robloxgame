@@ -34,6 +34,7 @@ export type Payout = {
 	fastBonus: number,
 	killBonus: number,
 	nightBonus: number, -- finished at night (Config.DayNight.NightPay)
+	eventBonus: number, -- 6.15: finished during a live event that pays (Config.LiveEvents: the Blood Moon, rush hour)
 	total: number,
 }
 
@@ -738,8 +739,11 @@ function Economy.serveLeft(total: number, stops: number, served: number): number
 end
 
 -- condition 0 … 1 (cargo health), timeLeft and timeLimit in seconds. nightMultiplier (Economy.nightScale of
--- Config.DayNight.NightPay, 1 by day) adds the night bonus on top of everything else.
-function Economy.payout(pay: number, condition: number, timeLeft: number, timeLimit: number, kills: number, nightMultiplier: number?): Payout
+-- Config.DayNight.NightPay, 1 by day) adds the night bonus on top of everything else. 6.15: eventMultiplier (a live
+-- event's pay, shared/LiveEvents.luau payOf: the Blood Moon's × 2, rush hour's × 1.5; 1 or nil without one) adds the
+-- event's bonus on the same subtotal, next to the night's (they add up, neither multiplies the other: a Blood Moon at
+-- deep night pays the subtotal × (1 + 0.4 + 1)).
+function Economy.payout(pay: number, condition: number, timeLeft: number, timeLimit: number, kills: number, nightMultiplier: number?, eventMultiplier: number?): Payout
 	local jobs = Config.Jobs
 	local share = jobs.MinCondition + (1 - jobs.MinCondition) * math.clamp(condition, 0, 1)
 	local conditionPay = math.floor(pay * share + 0.5)
@@ -750,13 +754,15 @@ function Economy.payout(pay: number, condition: number, timeLeft: number, timeLi
 	local killBonus = math.max(0, kills) * jobs.KillBonus
 	local subtotal = conditionPay + fastBonus + killBonus
 	local nightBonus = math.max(0, math.floor(subtotal * ((nightMultiplier or 1) - 1) + 0.5))
+	local eventBonus = math.max(0, math.floor(subtotal * ((eventMultiplier or 1) - 1) + 0.5))
 	return {
 		base = pay,
 		conditionPay = conditionPay,
 		fastBonus = fastBonus,
 		killBonus = killBonus,
 		nightBonus = nightBonus,
-		total = subtotal + nightBonus,
+		eventBonus = eventBonus,
+		total = subtotal + nightBonus + eventBonus,
 	}
 end
 
