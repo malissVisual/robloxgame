@@ -29,6 +29,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.12: the 25 job pictures' ids filled in (the owner uploaded them).
 - Claude · 6.12.11: Codex's `codex/job-thumbnails` merged and wired: `shared/JobThumbs.luau` (the ids, empty until the owner uploads: `design/job-thumbnails/NAHRAT-OBRAZKY.md`, `tools/job-thumbnails/fill-ids.py`), the offers and jobs carry `business`, `client/JobThumbUi.luau` draws the picture (or a slim name banner) on the phone BOARD and J's board, a square in NEXT UP.
 - Claude · 6.12.10: JOBS is the job list (YOUR RUN, NEXT UP, + ADD / + QUEUE, ADD ALL); the NEXT UP queue (`server/JobQueue.luau`, `shared/JobQueue.luau`, `Config.Jobs.Queue`: 6, a 4 s start, pause on a failure, mission or employer job; RESUME, PAUSE, CLEAR ALL).
 - Claude · 6.12.9: Dead End Motors sells the bikes too (a BIKES counter with Kip, the stands inside, the bike prop on its roof); Spoke & Chain's old building plain (`Map.FormerBikeShop`).

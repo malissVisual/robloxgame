@@ -308,6 +308,9 @@ end
 -- older server's) has neither. NEXT UP's rows: a small square once uploaded, nothing while empty.
 do
 	local JobThumbs=require("./JobThumbs")
+	-- (6.12.11: the owner uploaded the pictures; these checks start from the ids empty and put them back after)
+	local uploadedIds=table.clone(JobThumbs.Images)
+	for id in JobThumbs.Images do JobThumbs.Images[id]="" end
 	local rows={
 		{index=31,mode="foot",cargo="Pizzas",customer="Hannah",first="Luigi's Pizza",address="3 Oak Ave",distance=300,time=150,pay=60,stars=1,business="pizzeria"},
 		{index=32,mode="car",cargo="Cash",customer="Vault",first="Bank",address="Depot",distance=900,time=300,pay=700,stars=2,tierName="Risky",special=true,jobType={id="cashrun",name="Cash Transport",description=""}},
@@ -344,8 +347,7 @@ do
 	check("6.12.11: NEXT UP's row: a small square of the picture, its words beside it",square~=nil and square.Image=="rbxassetid://515151" and square.ScaleType.Name=="Crop" and text("1  🚶  Soup → Flo").Position.X.Offset==44)
 	tap("ACCEPT")
 	check("… ACCEPT still takes the row",lastSent("AcceptJob").args[1]==31)
-	JobThumbs.Images.pizzeria=""
-	JobThumbs.Images.noodles=""
+	for id,value in uploadedIds do JobThumbs.Images[id]=value end -- (the owner's ids back)
 	M.remotes.Job.OnClientEvent:Fire(nil)
 	M.remotes.JobQueue.OnClientEvent:Fire("state",{max=6,list={}})
 	check("6.12.11: no warnings with the pictures",#M.warnings==0)
