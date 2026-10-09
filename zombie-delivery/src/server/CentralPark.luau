@@ -25,7 +25,10 @@
 -- 6.12.15: the footbridge over Bone St to the Lantern Garden lands on the north lawn (server/Footbridge.luau,
 -- Map.Footbridge): its ramp runs east along the lawn's north edge and down its east side onto the east path. Next to
 -- it the trees are narrow columns (or left out), the north path's lamp stands further in and the east sign stands on
--- the other side of its path.
+-- the other side of its path. 6.12.16: the ramp is wider and curved (round the north-east corner, out over the
+-- sidewalk in a soft S): the north path has no lamp of its own (the bridge runs over it), the north sign stands
+-- further west along the edge; the path to the north-east corner ends before the ramp's turn round that corner (where
+-- the ramp is low a planted bed fills the ground under it: shared/FootbridgeShape.luau).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -315,7 +318,9 @@ function CentralPark.build(parent: Instance, tools: Tools)
 		deco(part(folder, "Path", Vector3.new(5, 0.11, lawnEdge - ringOut + 0.5), CFrame.lookAt(mid, mid + n), GRAVEL, Enum.Material.Pebble))
 		local diagonal = angle + math.pi / 4
 		local d = Vector3.new(math.cos(diagonal), 0, math.sin(diagonal))
-		local reach = (lawnEdge - 2) * math.sqrt(2) -- (its far end's corners stay on the lawn)
+		-- (its far end's corners stay on the lawn; 6.12.16 review: the north-east one ends before the footbridge's low
+		-- ramp round that corner, Map.Park.corners)
+		local reach = P.corners[k + 1]
 		local dmid = origin + d * ((ringOut - 0.5 + reach) / 2) + Vector3.new(0, WALK + 0.0525, 0)
 		deco(part(folder, "Path", Vector3.new(4, 0.105, reach - ringOut + 0.5), CFrame.lookAt(dmid, dmid + d), GRAVEL, Enum.Material.Pebble))
 	end
@@ -330,12 +335,15 @@ function CentralPark.build(parent: Instance, tools: Tools)
 		for _, s in { -1, 1 } do
 			bench(tools, folder, origin + n * (ringOut + 1.2) + t * (s * 6.8) + Vector3.new(0, WALK, 0), -n)
 		end
-		-- (6.12.15: not right by the footbridge's landing, Map.Footbridge: further in along its path)
+		-- (6.12.15: not right by the footbridge, Map.Footbridge: further in along its path; 6.12.16: none where its
+		-- wider walkway runs over the path all the way in, the north path: the bridge's lanterns light it)
 		local reach = 37
 		while reach > 31 and Map.footbridgeGap(cx + (n * reach + t * 3.8).X, cz + (n * reach + t * 3.8).Z) < 2.5 do
 			reach -= 1
 		end
-		lamp(tools, folder, origin + n * reach + t * 3.8 + Vector3.new(0, WALK, 0), false)
+		if Map.footbridgeGap(cx + (n * reach + t * 3.8).X, cz + (n * reach + t * 3.8).Z) >= 2.5 then
+			lamp(tools, folder, origin + n * reach + t * 3.8 + Vector3.new(0, WALK, 0), false)
+		end
 		local diagonal = angle + math.pi / 4
 		local d = Vector3.new(math.cos(diagonal), 0, math.sin(diagonal))
 		local dt = Vector3.new(-d.Z, 0, d.X)
@@ -419,9 +427,12 @@ function CentralPark.build(parent: Instance, tools: Tools)
 		local angle = k * math.pi / 2
 		local n = Vector3.new(math.cos(angle), 0, math.sin(angle))
 		local t = Vector3.new(-n.Z, 0, n.X)
+		-- (6.12.15: on the other side of its path where the footbridge's ramp runs; 6.12.16: or further along the edge)
 		local spot = origin + n * (lawnEdge - 2) - t * 20 + Vector3.new(0, WALK, 0)
-		if Map.footbridgeGap(spot.X, spot.Z) < 8 then
-			spot += t * 40 -- (6.12.15: on the other side of its path, clear of the footbridge's ramp)
+		for _, along in { 20, -32, 32 } do
+			if Map.footbridgeGap(spot.X, spot.Z) < 8 then
+				spot = origin + n * (lawnEdge - 2) + t * along + Vector3.new(0, WALK, 0)
+			end
 		end
 		local frame = CFrame.lookAt(spot, spot + n)
 		for _, x in { -5.5, 5.5 } do
