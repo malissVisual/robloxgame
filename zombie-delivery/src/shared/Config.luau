@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.14"
+Config.Version = "6.12.15"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1163,7 +1163,7 @@ Config.RetiredKit = {
 -- shops feel unnecessarily big"; server/GearStall.luau): one open-air market stall under one awning on the west side of
 -- the depot's yard, next to the JOBS spot (server/JobsSpot.luau), facing the yard (+X): two counters side by side, BAGS
 -- (ZDC Bags, Map.Shops.bags: the bags, as the 6.6 kiosk sold them) to the north and GEAR (Last Stop Supplies,
--- Map.Shops.supplies: the vests and the items; its old building on block (0, -1) is no shop any more) to the south,
+-- Map.Shops.supplies: the vests and the items; its old building on block (0, -1) is gone: 6.12.15) to the south,
 -- each with its clerk (server/ShopClerks.luau: Nell, Dot). Clear of the spawn pad (World.DepotSpawn at 0, 26), the
 -- scooter rack (Config.Rental.SpawnRack, z 44), the JOBS spot round the job board (-18, -25), the garage terminal
 -- (18, -25) and Marge (Config.Tutorial.NpcSpot), all studs from the depot's middle (Map.Depot).

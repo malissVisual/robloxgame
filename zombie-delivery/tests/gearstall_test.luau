@@ -1,9 +1,9 @@
--- 6.12.2, the spawn's corner and the shoes (Config.GearStall, Map.Shops.bags / supplies, Map.LastStop,
+-- 6.12.2, the spawn's corner and the shoes (Config.GearStall, Map.Shops.bags / supplies, Map.Garden,
 -- Config.Goal.BoardSpot; Config.RetiredKit's noShoes, shared/Transport.luau retiredRefunds / packRefund,
 -- shared/KitFit.luau): the gear stall's two counters (ZDC Bags, Last Stop Supplies) side by side on the depot's block in
 -- the safe zone, clear of the spawn pad, the scooter rack, the JOBS spot round the job board, the garage terminal and
--- Marge, their radius the stall's and not the yard's; Last Stop's old block an ordinary building's; the Running Shoes
--- gone and paid back once. Run with tests/run_tests.py.
+-- Marge, their radius the stall's and not the yard's; Last Stop's old block no shop's (6.12.15: the Lantern Garden); the
+-- Running Shoes gone and paid back once. Run with tests/run_tests.py.
 local Config = require("./Config")
 local Map = require("./Map")
 local Transport = require("./Transport")
@@ -86,11 +86,11 @@ check("the landmarks follow the counters (the GPS, the map, the location tag)", 
 	return found == 2
 end)())
 
--- ── Last Stop's old building ───────────────────────────────────────────────
+-- ── Last Stop's old block (6.12.15: the Lantern Garden) ───────────────────
 
-local L = Map.LastStop
-check("Last Stop's old block stays special (its dice as before, no lots)", Map.special("downtown", L.i, L.j) == "supplies" and L.x == L.i * Map.Cell and L.z == L.j * Map.Cell
-	and #Map.lotsAt("downtown", L.i, L.j) == 0)
+local L = Map.Garden
+check("Last Stop's old block stays special (its dice as before, no lots): the Lantern Garden", L.i == 0 and L.j == -1 and Map.special("downtown", L.i, L.j) == "garden"
+	and L.x == L.i * Map.Cell and L.z == L.j * Map.Cell and #Map.lotsAt("downtown", L.i, L.j) == 0)
 check("no shop on it any more", (function()
 	for _, shop in Map.Shops do
 		local d, i, j = Map.blockAt(shop.x, shop.z)

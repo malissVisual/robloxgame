@@ -52,5 +52,13 @@ def main():
         result=subprocess.run([str(Path(args.luau).resolve()),'decal-check.luau'],cwd=temp,text=True,capture_output=True)
         assert result.returncode==0,result.stdout+result.stderr
         print(result.stdout,end='')
+        # 6.12.15: the footbridge over Bone St (Map.Footbridge) clears the tallest vehicle the factory builds by 3 studs
+        # (clearance-check.luau; the city bus's traffic driver rolls a Random, which the mock lacks: a fixed one).
+        source=(temp/'Vehicles.luau').read_text()
+        (temp/'Vehicles.luau').write_text('local Random = Random or {new=function() return {NextInteger=function(_,a) return a end,NextNumber=function(_,a) return a or 0 end} end}\n'+source)
+        (temp/'clearance-check.luau').write_text((HERE/'clearance-check.luau').read_text())
+        result=subprocess.run([str(Path(args.luau).resolve()),'clearance-check.luau'],cwd=temp,text=True,capture_output=True)
+        assert result.returncode==0,result.stdout+result.stderr
+        print(result.stdout,end='')
     print('Fleet compatibility PASS: all 20 stages keep original hulls, seats, joint frames, loading attachments and capacities; 40 variants within part budget (body 170, max kit 220); garage data matches factory')
 if __name__=='__main__':main()

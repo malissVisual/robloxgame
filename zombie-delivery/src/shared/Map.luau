@@ -38,9 +38,14 @@
 --              gun shop's old building on block (-1, 0) an ordinary one (Map.FormerGunShop)
 --   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn;
 --              6.12.2: it and Last Stop Supplies (Map.Shops.supplies) are the two counters of the gear stall there
---              (Config.GearStall), Last Stop's old building on block (0, -1) an ordinary one (Map.LastStop)
+--              (Config.GearStall); 6.12.15: Last Stop's old building on block (0, -1) is gone, the Lantern Garden
+--              stands there (Map.Garden)
 --   Park       (6.11) the Central Park (Map.Park, server/CentralPark.luau): the pond with its island and fountain, the
 --              paths, trees, flowerbeds, benches, lamps and a gazebo, on the middle block in the safe zone
+--   Garden     (6.12.15) the Lantern Garden north of it on block (0, -1) (Map.Garden, server/LanternGarden.luau): a
+--              Japanese-style garden (cherry trees, a koi pond with a waterfall, stone lanterns, a tea pavilion, raked
+--              gravel, bamboo), joined to the park by a wooden footbridge over Bone St (Map.Footbridge,
+--              server/Footbridge.luau) with a ramp down into each park
 --   Gas       (5.4) the gas stations (Map.GasStations): the old one on the North Highway and three on the town's lots
 --   Places     (5.3) what stands on every lot of the ordinary Downtown and Suburbs blocks (Map.lots, seeded: towers,
 --              lawns, parking, houses ...), the storefronts the businesses work from (Map.Venues: Luigi's Pizza, the
@@ -190,7 +195,7 @@ Map.SpecialBlocks = {
 		["1,0"] = "dealer",
 		["-1,0"] = "guns", -- (6.12.14: Lead & Co.'s old building, no shop any more: Map.FormerGunShop; the block stays special)
 		["0,1"] = "mechanic",
-		["0,-1"] = "supplies", -- (6.12.2: Last Stop's old building, no shop any more: Map.LastStop; the block stays special)
+		["0,-1"] = "garden", -- 6.12.15: the Lantern Garden (Map.Garden), where Last Stop Supplies' old building stood (6.12.2)
 		["2,1"] = "movers",
 		["1,-2"] = "bank", -- First Zombie Bank: its front on 6th Ave, just out of the safe zone
 		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
@@ -244,12 +249,6 @@ end
 -- gear stall west of the spawn (Config.GearStall: the ZDC Bags and Last Stop Supplies counters) in place of the kiosk.
 export type Depot = { i: number, j: number, x: number, z: number }
 Map.Depot = { i = 1, j = -1, x = CELL, z = -CELL } :: Depot
-
--- 6.12.2: the building on Downtown block (0, -1) that was Last Stop Supplies until its stock moved to the gear stall at
--- the depot (Map.Shops.supplies): an ordinary building now (server/World.luau buildSupplies: its look, no counter, no
--- clerk, no name board; 6.12.6: a bare roof, its giant vest turns over the gear stall). The block stays special (its
--- dice as before); the bus lines still draw a stop toward it as they did (shared/BusLines.luau), without its name.
-Map.LastStop = { i = 0, j = -1, x = 0, z = -CELL }
 
 -- 6.12.7: the building on Downtown block (-1, 1) that was Spoke & Chain Cycles until the bikes moved to Dead End
 -- Motors' BIKES counter (Map.Shops.bikes, Config.BikeShop: one shop for the cars and the bikes): an ordinary building
@@ -307,6 +306,223 @@ function Map.inPond(x: number, y: number, z: number): boolean
 	return y < Map.WalkTop and dx <= park.pond and dz <= park.pond and (dx + dz) <= park.pond * math.sqrt(2)
 end
 
+-- 6.12.15, the Lantern Garden (the owner: "make the park a bit bigger: a wooden bridge to another park, its own
+-- style"): a Japanese-style garden on Downtown block (0, -1) north of the Central Park, where Last Stop Supplies' old
+-- building stood (6.12.2). server/LanternGarden.luau builds it, client/MapView.luau draws it; the footbridge over Bone St
+-- joins it to the park (Map.Footbridge). Its layout in studs from the block's middle: u east (x), v south (z), the lawn
+-- inside the sidewalk band (`walk` wide, as the park's: the people's walk line stays on it, nothing of the garden there):
+--   pond      the koi pond: discs of water (u, v, r) that run into each other, shallow (`water` over the walk, not
+--             deeper than a step: no swimming, no Map.inPond), rocks round its shore, koi and lotus pads
+--   waterfall the rock pile on the pond's north shore, its water falling into the pond
+--   stones    the stepping stones across the pond: from (u, v0) to (u, v1), `count` of them
+--   planks    the zig-zag plank bridge across its east lobe: from (u, v0) to (u, v1), three planks
+--   pavilion  the open tea pavilion with its curved roof (its middle, its floor's side), its step to the south
+--   gravel    the raked gravel (a box) and its big stones (rocks: u, v, size)
+--   lanterns  the stone lanterns (tall ones and low "snow-viewing" ones), `lit`: a real light at night too
+--   cherries  the cherry trees in blossom; bamboo: the clumps; shrubs: the clipped azaleas (u, v, size)
+--   benches   (u, v) and the way they face (du, dv)
+--   basin     the stone wash basin by the pavilion
+--   paths     the gravel paths (boxes u0, v0, u1, v1)
+--   gates     the four entrances (the middle of the gate on the hedge's line, the way out to the street); the hedge
+--             runs along the lawn's edge (`hedge` in from it to its middle) between them, not under the footbridge's ramp
+--   seed      the garden's own dice (the rocks' and the trees' looks): the world's random numbers are not touched
+export type GardenDisc = { u: number, v: number, r: number }
+export type GardenSpot = { u: number, v: number, size: number? }
+export type GardenBox = { u0: number, v0: number, u1: number, v1: number }
+export type Garden = {
+	id: string,
+	name: string,
+	i: number,
+	j: number,
+	x: number,
+	z: number,
+	walk: number,
+	hedge: number,
+	seed: number,
+	pond: { GardenDisc },
+	water: number,
+	waterfall: GardenSpot,
+	stones: { u: number, v0: number, v1: number, count: number },
+	planks: { u: number, v0: number, v1: number },
+	pavilion: { u: number, v: number, size: number },
+	gravel: GardenBox,
+	rocks: { GardenSpot },
+	lanterns: { { u: number, v: number, kind: string, lit: boolean } },
+	cherries: { GardenSpot },
+	bamboo: { GardenSpot },
+	shrubs: { GardenSpot },
+	benches: { { u: number, v: number, du: number, dv: number } },
+	basin: GardenSpot,
+	paths: { GardenBox },
+	gates: { { u: number, v: number, nu: number, nv: number } },
+}
+Map.Garden = {
+	id = "garden",
+	name = "Lantern Garden",
+	i = 0,
+	j = -1,
+	x = 0,
+	z = -CELL,
+	walk = 10,
+	hedge = 0.6,
+	seed = Config.City.Seed + 61214,
+	pond = { { u = -2, v = -1, r = 10 }, { u = 13, v = 4, r = 7 }, { u = -14, v = 6, r = 5.5 } },
+	water = 0.5,
+	waterfall = { u = 4, v = -12.5 },
+	stones = { u = -8, v0 = 8, v1 = -10, count = 7 },
+	planks = { u = 13, v0 = 12, v1 = -4 },
+	pavilion = { u = 18, v = -32, size = 12 },
+	gravel = { u0 = -38, v0 = -41, u1 = -12, v1 = -26 },
+	rocks = { { u = -31, v = -34, size = 3.2 }, { u = -20.5, v = -30.5, size = 2.2 }, { u = -16, v = -37, size = 1.8 } },
+	lanterns = {
+		{ u = 34, v = 40, kind = "tall", lit = true }, -- by the south gate
+		{ u = 37, v = -11, kind = "tall", lit = false }, -- the east gate
+		{ u = -1, v = -40, kind = "tall", lit = false }, -- the north gate
+		{ u = -40, v = -15, kind = "tall", lit = false }, -- the west gate
+		{ u = 2, v = 12.5, kind = "low", lit = true }, -- the pond's south shore
+		{ u = 23, v = 2, kind = "low", lit = false }, -- its east shore
+		{ u = 13, v = -24, kind = "tall", lit = true }, -- the pavilion's step
+		{ u = -33, v = 5, kind = "tall", lit = true }, -- the foot of the footbridge's ramp
+		{ u = -10, v = -29, kind = "tall", lit = false }, -- the raked gravel
+		{ u = -3, v = -14.5, kind = "low", lit = false }, -- by the waterfall
+	},
+	cherries = { { u = -32, v = 12 }, { u = -14, v = 30 }, { u = 7, v = 30 }, { u = 38, v = 32 }, { u = 38, v = -18 }, { u = 4, v = -32 }, { u = -35, v = -8 } },
+	bamboo = { { u = 36, v = -37 }, { u = 28, v = -41 }, { u = -41.5, v = -30 }, { u = -41.5, v = -39 }, { u = 41, v = 10 }, { u = 41, v = 20 } },
+	shrubs = {
+		{ u = -18, v = -7, size = 2.6 },
+		{ u = 18, v = -8, size = 2.4 },
+		{ u = 24, v = 12, size = 2.6 },
+		{ u = -20, v = 14, size = 2.4 },
+		{ u = 8, v = 14.5, size = 2.2 },
+		{ u = -14, v = -15, size = 2.4 },
+		{ u = 34, v = -28, size = 2.8 },
+		{ u = -22, v = 31, size = 2.6 },
+		{ u = 18, v = 31, size = 2.4 },
+		{ u = 9, v = -41, size = 2.6 },
+	},
+	benches = { { u = -1, v = 16, du = 0, dv = -1 }, { u = 20, v = -14, du = 0, dv = 1 }, { u = -26, v = -24, du = 0, dv = -1 }, { u = 33, v = 6, du = -1, dv = 0 } },
+	basin = { u = 23, v = -24 },
+	paths = {
+		{ u0 = -44.4, v0 = -22, u1 = 31, v1 = -18 }, -- the loop round the pond: north (on to the west gate) …
+		{ u0 = 27, v0 = -22, u1 = 31, v1 = 44.4 }, -- … east (on to the south gate) …
+		{ u0 = -27, v0 = 18, u1 = 31, v1 = 22 }, -- … south …
+		{ u0 = -27, v0 = -22, u1 = -23, v1 = 22 }, -- … west
+		{ u0 = -44, v0 = -2, u1 = -23, v1 = 2 }, -- from the foot of the footbridge's ramp
+		{ u0 = -8, v0 = -44.4, u1 = -4, v1 = -22 }, -- from the north gate
+		{ u0 = 31, v0 = -8, u1 = 44.4, v1 = -4 }, -- from the east gate
+		{ u0 = 16, v0 = -26, u1 = 20, v1 = -22 }, -- to the pavilion's step
+		{ u0 = -10, v0 = 11.5, u1 = -6, v1 = 18 }, -- to the stepping stones from the south …
+		{ u0 = -10, v0 = -18, u1 = -6, v1 = -12 }, -- … and from the north
+		{ u0 = 11, v0 = 13, u1 = 15, v1 = 18 }, -- to the plank bridge from the south …
+		{ u0 = 11, v0 = -18, u1 = 15, v1 = -5.5 }, -- … and from the north
+	},
+	gates = { { u = 29, v = 44.4, nu = 0, nv = 1 }, { u = 44.4, v = -6, nu = 1, nv = 0 }, { u = -6, v = -44.4, nu = 0, nv = -1 }, { u = -44.4, v = -20, nu = -1, nv = 0 } },
+} :: Garden
+
+-- 6.12.15, the footbridge over Bone St between the Central Park (south) and the Lantern Garden (north): an arched timber
+-- bridge mid-block (x = `x`, far from the junctions, their lights and crosswalks), its walkway `width` wide between the
+-- railings. Its span runs from a landing just inside the garden's lawn (z0) to one just inside the park's (z1), over the
+-- garden's sidewalk, the road and the park's sidewalk (nothing of it stands on them); its deck's top is `deck` over the
+-- ground at the landings and `camber` more in the middle (an arch), its beams `thick` under the deck's top. From each
+-- landing a ramp (no steps: a bike or a scooter rolls over it) runs along the lawn's edge and turns down the side of the
+-- park to the ground, no steeper than the curb (shared/CurbShape.luau: every vehicle and every person goes up that):
+--   clearance   the beams' underside over the walk (the vehicles drive up onto the sidewalks too) at least the tallest
+--               vehicle (`tallest`: the Box Truck with the Roof Launcher on it, 12.6; the Freight Truck with its roof
+--               rack 12.4, the city bus 9; tools/vehicle-preview/check_fleet.py builds the whole fleet and holds every
+--               one to it) + 3
+--   ramps       per park the pieces from the bridge's landing down: "landing" (flat) and "ramp" (sloped) pieces, each a
+--               band `width` wide from (ax, az) to (bx, bz) in plan, its top ya at a and yb at b; the garden's are the
+--               park's turned half round the span's middle
+export type RampPiece = { kind: string, ax: number, az: number, bx: number, bz: number, ya: number, yb: number, width: number }
+export type Footbridge = {
+	x: number,
+	width: number,
+	z0: number,
+	z1: number,
+	deck: number,
+	camber: number,
+	thick: number,
+	beam: number,
+	tallest: number,
+	landing: number,
+	rail: number,
+	arch: number,
+	ramps: { park: { RampPiece }, garden: { RampPiece } },
+}
+do
+	local park, garden = Map.Park, Map.Garden
+	local lawn = BLOCK / 2 - park.walk -- (the lawn's edge from a park's middle; the garden's walk is as wide)
+	local inset = 0.5 -- the landings and the ramps stay this far inside the lawns
+	local landing = 7 -- a landing's side: room to turn a bike
+	local width = 6
+	local deck = 17.7
+	local z1 = park.z - lawn + inset -- the span's park end …
+	local z0 = garden.z + lawn - inset -- … and its garden end
+	local zc = z1 + landing / 2 -- the ramp's first flight, along the park's lawn edge …
+	local xc = park.x + lawn - inset - landing / 2 -- … its second, down the park's east side
+	local foot = park.z - 2.5 - 1 -- (a stud before the park's east path, 5 wide: the ramp comes down onto it)
+	local first = xc - landing / 2 - (park.x + landing / 2)
+	local slope = (deck - Map.WalkTop) / (first + foot - (z1 + landing))
+	local turn = deck - first * slope -- the corner landing's top
+	local parkRamp: { RampPiece } = {
+		{ kind = "landing", ax = park.x, az = z1, bx = park.x, bz = z1 + landing, ya = deck, yb = deck, width = landing },
+		{ kind = "ramp", ax = park.x + landing / 2, az = zc, bx = xc - landing / 2, bz = zc, ya = deck, yb = turn, width = width },
+		{ kind = "landing", ax = xc, az = z1, bx = xc, bz = z1 + landing, ya = turn, yb = turn, width = landing },
+		{ kind = "ramp", ax = xc, az = z1 + landing, bx = xc, bz = foot, ya = turn, yb = Map.WalkTop, width = width },
+	}
+	local mx, mz = park.x, (z0 + z1) / 2
+	local gardenRamp: { RampPiece } = {}
+	for _, p in parkRamp do
+		table.insert(gardenRamp, { kind = p.kind, ax = 2 * mx - p.ax, az = 2 * mz - p.az, bx = 2 * mx - p.bx, bz = 2 * mz - p.bz, ya = p.ya, yb = p.yb, width = p.width })
+	end
+	Map.Footbridge = {
+		x = park.x,
+		width = width,
+		z0 = z0,
+		z1 = z1,
+		deck = deck,
+		camber = 1,
+		thick = 1,
+		beam = 0.5, -- the beams (the railings over them) along the span's and the flights' edges, outside the walkway
+		tallest = 12.6,
+		landing = landing,
+		rail = 3.2, -- the railings' top over the deck
+		arch = 6, -- the timber arches over the span rise this much over the deck's middle
+		ramps = { park = parkRamp, garden = gardenRamp },
+	} :: Footbridge
+end
+
+-- 6.12.15: the footbridge's deck top at z along its span (z0 … z1; the landings' height past its ends).
+function Map.footbridgeDeck(z: number): number
+	local F = Map.Footbridge
+	local half = (F.z1 - F.z0) / 2
+	local t = math.clamp((z - (F.z0 + F.z1) / 2) / half, -1, 1)
+	return F.deck + F.camber * (1 - t * t)
+end
+
+-- 6.12.15: how far (x, z) is from the footbridge in plan (0: under it or on it): its span, every landing and ramp (the
+-- beams along their edges too).
+function Map.footbridgeGap(x: number, z: number): number
+	local F = Map.Footbridge
+	local function box(x0: number, z0: number, x1: number, z1: number): number
+		local dx = math.max(x0 - x, 0, x - x1)
+		local dz = math.max(z0 - z, 0, z - z1)
+		return math.sqrt(dx * dx + dz * dz)
+	end
+	local best = box(F.x - F.width / 2 - F.beam, math.min(F.z0, F.z1), F.x + F.width / 2 + F.beam, math.max(F.z0, F.z1))
+	for _, ramp in { F.ramps.park, F.ramps.garden } do
+		for _, p in ramp do
+			local half = p.width / 2 + (if p.kind == "ramp" then F.beam else 0)
+			if math.abs(p.ax - p.bx) < 1e-6 then
+				best = math.min(best, box(p.ax - half, math.min(p.az, p.bz), p.ax + half, math.max(p.az, p.bz)))
+			else
+				best = math.min(best, box(math.min(p.ax, p.bx), p.az - half, math.max(p.ax, p.bx), p.az + half))
+			end
+		end
+	end
+	return best
+end
+
 -- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else
 -- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius). 6.12.2: ZDC Bags and Last Stop
 -- Supplies are the two counters of the gear stall in the depot's yard (Config.GearStall): each spot is its counter's
@@ -319,7 +535,7 @@ Map.Shops = {
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
 	guns = { name = "Lead & Co.", x = 0, z = 0, radius = Config.GunRange.Radius }, -- (6.12.14: the range's counter; it stood on block (-1, 0))
 	mechanic = { name = "Wrench Garage", x = 0, z = CELL },
-	-- 6.12.2: the GEAR counter of the gear stall (its old building on block (0, -1): Map.LastStop)
+	-- 6.12.2: the GEAR counter of the gear stall (its old building on block (0, -1) is gone: 6.12.15, the Lantern Garden)
 	supplies = {
 		name = "Last Stop Supplies",
 		x = Map.Depot.x + Config.GearStall.X + Config.GearStall.Depth / 2,
@@ -1069,6 +1285,8 @@ local landmarks: { Landmark } = {
 	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the JOBS spot with the job board, Marge, the garage terminal (your parked van, the company vehicles) and the gear stall by the spawn (ZDC Bags and Last Stop Supplies). The safe zone." },
 	-- 6.11: the Central Park in the middle of the safe zone (Map.Park).
 	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it (Lead & Co.'s range just outside, to the south-west). The depot is across the junction to the north-east." },
+	-- 6.12.15: the Lantern Garden north of the park, over Bone St on the footbridge (Map.Garden).
+	{ id = Map.Garden.id, name = Map.Garden.name, icon = "🏮", x = Map.Garden.x, z = Map.Garden.z, kind = "place", description = "A Japanese garden north of the Central Park, joined to it by a wooden footbridge over Bone St (ramps at both ends: roll over it on a bike): cherry trees in blossom, a koi pond with a waterfall, stone lanterns that glow at night and a tea pavilion. The safe zone." },
 	-- 6.12.7: one shop for the cars and the bikes (the CARS and BIKES counters; Spoke & Chain's own entry is gone)
 	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4); every car needs a garage slot. And at the BIKES counter, from level 2: bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), faster than walking with more room for the light runs." },
 	-- 6.12.14: Lead & Co.'s range out of the safe zone (the map icon and the GPS at its counter; Map.FormerGunShop: its old building)

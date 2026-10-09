@@ -22,6 +22,10 @@
 -- About 300 parts. The ground, the coping and its posts, the island, the fountain's basin, the bridge, the trunks, the
 -- benches, the lamp posts, the gazebo and the signs' posts are solid; everything else is decoration (no collision, no
 -- ray hits).
+-- 6.12.15: the footbridge over Bone St to the Lantern Garden lands on the north lawn (server/Footbridge.luau,
+-- Map.Footbridge): its ramp runs east along the lawn's north edge and down its east side onto the east path. Next to
+-- it the trees are narrow columns (or left out), the north path's lamp stands further in and the east sign stands on
+-- the other side of its path.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -326,7 +330,12 @@ function CentralPark.build(parent: Instance, tools: Tools)
 		for _, s in { -1, 1 } do
 			bench(tools, folder, origin + n * (ringOut + 1.2) + t * (s * 6.8) + Vector3.new(0, WALK, 0), -n)
 		end
-		lamp(tools, folder, origin + n * 37 + t * 3.8 + Vector3.new(0, WALK, 0), false)
+		-- (6.12.15: not right by the footbridge's landing, Map.Footbridge: further in along its path)
+		local reach = 37
+		while reach > 31 and Map.footbridgeGap(cx + (n * reach + t * 3.8).X, cz + (n * reach + t * 3.8).Z) < 2.5 do
+			reach -= 1
+		end
+		lamp(tools, folder, origin + n * reach + t * 3.8 + Vector3.new(0, WALK, 0), false)
 		local diagonal = angle + math.pi / 4
 		local d = Vector3.new(math.cos(diagonal), 0, math.sin(diagonal))
 		local dt = Vector3.new(-d.Z, 0, d.X)
@@ -344,17 +353,27 @@ function CentralPark.build(parent: Instance, tools: Tools)
 
 	-- ── Trees ───────────────────────────────────────────────────────────────
 	-- Three in every lawn between two paths (a round one, and a column and a blossom further out), none where the
-	-- gazebo stands; the trunks stay well inside the lawn (the walk line along the edge stays clear).
+	-- gazebo stands; the trunks stay well inside the lawn (the walk line along the edge stays clear). 6.12.15: by the
+	-- footbridge's ramp (Map.Footbridge) a tree whose crown would reach over it is a column (a narrow crown) where it
+	-- stands, or else itself 4 studs further in toward the pond, or else left out.
+	local CROWN: { [string]: number } = { round = 6.5, blossom = 5.5, column = 2.6 } -- (a crown's reach from its trunk)
+	local function plant(at: Vector3, style: string, away: number)
+		local inward = at - Vector3.new(at.X - cx, 0, at.Z - cz).Unit * 4
+		for _, try in { { spot = at, look = style }, { spot = at, look = "column" }, { spot = inward, look = style } } do
+			if Map.footbridgeGap(try.spot.X, try.spot.Z) >= CROWN[try.look] + 0.5 then
+				tree(tools, folder, try.spot.X, try.spot.Z, try.look, rng, away)
+				return
+			end
+		end
+	end
 	for k = 0, 7 do
 		if k == GAZEBO then
 			continue
 		end
 		local mid = (k + 0.5) * math.pi / 4
-		local spot = polar(37, mid, 0)
-		tree(tools, folder, spot.X, spot.Z, "round", rng, mid)
+		plant(polar(37, mid, 0), "round", mid)
 		for index, s in { -1, 1 } do
-			local far = polar(41.5, mid + s * math.rad(11), 0)
-			tree(tools, folder, far.X, far.Z, if (k + index) % 2 == 0 then "column" else "blossom", rng, mid + s * math.rad(11))
+			plant(polar(41.5, mid + s * math.rad(11), 0), if (k + index) % 2 == 0 then "column" else "blossom", mid + s * math.rad(11))
 		end
 	end
 
@@ -401,6 +420,9 @@ function CentralPark.build(parent: Instance, tools: Tools)
 		local n = Vector3.new(math.cos(angle), 0, math.sin(angle))
 		local t = Vector3.new(-n.Z, 0, n.X)
 		local spot = origin + n * (lawnEdge - 2) - t * 20 + Vector3.new(0, WALK, 0)
+		if Map.footbridgeGap(spot.X, spot.Z) < 8 then
+			spot += t * 40 -- (6.12.15: on the other side of its path, clear of the footbridge's ramp)
+		end
 		local frame = CFrame.lookAt(spot, spot + n)
 		for _, x in { -5.5, 5.5 } do
 			cylinder(tools, folder, "SignPost", 5.6, 0.35, frame * CFrame.new(x, 2.8, 0.3) * UPRIGHT, IRON, Enum.Material.Metal)

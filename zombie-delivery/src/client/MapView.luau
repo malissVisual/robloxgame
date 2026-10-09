@@ -27,7 +27,9 @@
 -- 5.8 (the courier phone's look): the big map's frame wears the window header: the ZDC mark, the map glyph and MAP
 -- (Ui.heading), the legend in small type after it, a thin line under it and the square ✕.
 -- 6.11: the Central Park (Map.Park) is the one green block, its pond and island drawn in the middle of the map, CENTRAL
--- PARK under it on the big map; the depot is the block north-east of it (Map.Depot).
+-- PARK under it on the big map; the depot is the block north-east of it (Map.Depot). 6.12.15: the Lantern Garden north
+-- of it (Map.Garden) is green too, with its koi pond, LANTERN GARDEN over it on the big map; the footbridge over the
+-- street between them and its ramps (Map.Footbridge) are drawn in wood brown over the road.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -81,6 +83,8 @@ local C = {
 	yard = Color3.fromRGB(48, 52, 58),
 	special = Color3.fromRGB(66, 70, 76),
 	park = Color3.fromRGB(58, 76, 58), -- 6.11: the Central Park's lawns (Map.Park), the one green block
+	garden = Color3.fromRGB(64, 80, 60), -- 6.12.15: the Lantern Garden's moss (Map.Garden)
+	footbridge = Color3.fromRGB(150, 108, 72), -- 6.12.15: the footbridge and its ramps (Map.Footbridge)
 	roadEdge = Color3.fromRGB(22, 25, 30),
 	road = Color3.fromRGB(132, 138, 146),
 	highway = Color3.fromRGB(176, 181, 188),
@@ -384,7 +388,10 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 			for j = d.j0, d.j1 do
 				local cx, cz = d.ox + i * Map.Cell, d.oz + j * Map.Cell
 				local special = Map.special(d.id, i, j)
-				local color = if special == Map.Park.id then C.park elseif special then C.special else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
+				local color = if special == Map.Park.id then C.park
+					elseif special == Map.Garden.id then C.garden
+					elseif special then C.special
+					else BLOCK_COLORS[d.style] or BLOCK_COLORS.downtown
 				rounded(rect(content, cx - half, cz - half, cx + half, cz + half, scale, color, 3), blockRadius)
 			end
 		end
@@ -396,6 +403,23 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, park.x - r, park.z - r, park.x + r, park.z + r, scale, C.water, 3))
 		local island = park.island
 		Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, park.x - island, park.z - island, park.x + island, park.z + island, scale, C.park, 3))
+		-- 6.12.15: the Lantern Garden's koi pond (its discs), and the footbridge with its ramps over the road (ZIndex 6)
+		local garden = Map.Garden
+		for _, disc in garden.pond do
+			local x, z = garden.x + disc.u, garden.z + disc.v
+			Ui.make("UICorner", { CornerRadius = UDim.new(1, 0) }, rect(content, x - disc.r, z - disc.r, x + disc.r, z + disc.r, scale, C.water, 3))
+		end
+		local F = Map.Footbridge
+		local function wood(ax: number, az: number, bx: number, bz: number, width: number)
+			local frame = Ui.make("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = C.footbridge, BorderSizePixel = 0, ZIndex = 6 }, content)
+			band(frame, ax, az, bx, bz, scale, math.max(2, width * scale), 0)
+		end
+		wood(F.x, F.z0, F.x, F.z1, F.width + 2 * F.beam)
+		for _, ramp in { F.ramps.park, F.ramps.garden } do
+			for _, piece in ramp do
+				wood(piece.ax, piece.az, piece.bx, piece.bz, piece.width + (if piece.kind == "ramp" then 2 * F.beam else 0))
+			end
+		end
 	end
 	-- Roads: all the plum edges first, then the fills, so the junctions are clean.
 	local border = if big then 1.5 else 3
@@ -431,6 +455,7 @@ local function draw(parent: any, scale: number, big: boolean): Canvas
 		caption(content, "WINTER", 0, Map.WinterZ - 120, scale, 14, P.ink2)
 		caption(content, "SAFE ZONE", 0, safeHalf + 40, scale, 11, C.safe)
 		caption(content, "CENTRAL PARK", Map.Park.x, Map.Park.z + Map.BlockSize / 2 + 30, scale, 10, P.ink2) -- 6.11
+		caption(content, "LANTERN GARDEN", Map.Garden.x, Map.Garden.z - Map.BlockSize / 2 - 30, scale, 10, P.ink2) -- 6.12.15
 	end
 	-- 5.6, ZDC RIDE: a small marker at every rental dock (shared/RentalDocks.luau), under the fog: found as you uncover
 	-- the map. The scooter's icon when Icons has one, else its emoji.

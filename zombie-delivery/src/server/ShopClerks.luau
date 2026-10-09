@@ -6,7 +6,7 @@
 -- clerk. They greet you (a wave, a line) and look at you when you come to the counter. server/Shops.luau keeps its own
 -- handler on the same prompt (it opens the shop); a counter without room for a clerk keeps its prompt.
 -- 6.12.2: Dot (Last Stop Supplies) and Nell (ZDC Bags) stand side by side, behind the GEAR and BAGS counters of the
--- gear stall at the spawn (server/GearStall.luau); Last Stop's old building has no counter, so nobody stands there.
+-- gear stall at the spawn (server/GearStall.luau); Last Stop's old building is gone (6.12.15: the Lantern Garden).
 -- 6.12.7: Sal (CARS) and Kip (BIKES) stand side by side the same way, behind the two counters of Dead End Motors
 -- (server/World.luau buildDealer); Spoke & Chain's old building has no counter any more.
 -- 6.12.14: Ray stands behind the counter of Lead & Co.'s range shop (server/GunRange.luau), out of the safe zone; the

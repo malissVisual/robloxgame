@@ -7,7 +7,7 @@
 -- (server/ShopClerks.luau: Nell, Dot):
 --   BAGS  ZDC Bags (Map.Shops.bags, shop id "bags"): the five bags on a pegboard behind it (6.6's kiosk, now here)
 --   GEAR  Last Stop Supplies (Map.Shops.supplies, shop id "supplies": the vests and the items; its old building on
---         block (0, -1) is no shop any more): the three vests on a rail behind it, a shelf of energy drinks and medkits
+--         block (0, -1) is gone, 6.12.15): the three vests on a rail behind it, a shelf of energy drinks and medkits
 -- a partition between the two, the name board LAST STOP SUPPLIES · ZDC BAGS on the roof, each counter's own board
 -- (BAGS, GEAR) under the awning, two lamps that light up at night. Where it stands: Config.GearStall (from the depot's
 -- middle, Map.Depot; clear of the spawn pad, the scooter rack, the JOBS spot, the garage terminal and Marge).
