@@ -12,6 +12,8 @@
 -- Every shot that really fires is told to Gun.onShot (3.0: the quiet twist of a mission costs cargo condition per shot;
 -- server/Jobs.luau sets it, Gun does not require Jobs).
 -- 4.5: a player with the attribute AdminOneHit (server/Admin.luau) kills whatever a round hits.
+-- 6.12.14: every part a round hits is handed to GunRange.shot first: a target on Lead & Co.'s lanes tips back and
+-- springs up again (server/GunRange.luau; anything else: nothing happens there).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +26,7 @@ local Vehicles = require(script.Parent.Vehicles)
 local Zombies = require(script.Parent.Zombies)
 local BanditCars = require(script.Parent.BanditCars)
 local PlayerData = require(script.Parent.PlayerData)
+local GunRange = require(script.Parent.GunRange)
 
 local Gun = {}
 
@@ -48,6 +51,7 @@ end
 -- from (3.1): the roof gun ("cargun") or a passenger's gun out of the window ("window"); the challenges count its kills.
 type Hit = { Instance: Instance, Position: Vector3 } -- a RaycastResult, or a hit decided without a ray (latchedHit)
 local function hitPart(player: Player, result: Hit, dir: Vector3, stats: Economy.WeaponStats, from: string?): (Model?, boolean)
+	GunRange.shot(result.Instance) -- 6.12.14: a range target drops (nothing else does anything there)
 	local hit = Net.get("Hit")
 	if stats.splash > 0 then
 		local blast = Instance.new("Explosion")

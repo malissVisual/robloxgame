@@ -1143,6 +1143,25 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Lead & Co. moves to a shooting range outside the safe zone (6.12.14)
+
+The owner: "the gun store out of the safe zone, at a shooting range, a smaller shop, keep the props".
+
+- **The range** is on Downtown block (−2, 1): just south-west of the safe zone, its gate on 4th Ave, 321 studs from the
+  park's middle (`server/GunRange.luau`, `Config.GunRange`, `Map.GunRange`).
+  - **The shop:** a small range shop with Ray behind the counter. It has a gun rack, a pistol case, ammo, and the
+    board LEAD & CO. · RANGE. The GUN STORE letters and the cartridge are on its roof, at 0.45 scale.
+  - **The lanes:** four lanes with benches under a roof, dividers, targets at 25 / 50 / 75 studs and a sand berm.
+  - **Around it:** a fence and a gate, warning signs, and lights at night.
+- **The targets react:** a round that hits one (`Gun.luau` → `GunRange.shot`) tips it back. It springs up again
+  after 4 s.
+- **It is outside the safe zone,** so zombies can come to the gate.
+- **The old building on (−1, 0)** is plain (`Map.FormerGunShop`).
+- **Everywhere else:** the map, GPS, the phone's SHOP list and the location tag ("GUN SHOP · RANGE") send you to the
+  range.
+- **Nothing else moved:** the city's other lots, homes, alleys, zip lines, docks and stops stay as they were. The
+  block keeps its dice.
+
 ## The mission chapters' pictures (6.12.13)
 
 The owner: "pictures for the missions too". The MISSIONS window (U) opens the chosen chapter with a picture banner,

@@ -6,7 +6,8 @@
 -- roof surface), -Z toward the street, so +X is the LEFT hand of someone on the street looking at the shop (the text
 -- reads from +X to -X on the street side and the other way round on the back).
 --   guns      Lead & Co.: GUN STORE in 3D block letters on a double-sided marquee (bulbs along it, readable from both
---             sides) and a giant brass cartridge with its copper bullet standing at the end of the line
+--             sides) and a giant brass cartridge with its copper bullet standing at the end of the line (6.12.14: the
+--             same set piece at GUNS_SCALE on the roof of the range shop, server/GunRange.luau; the old shop's roof bare)
 --   pizza     Luigi's Pizza (every pizzeria venue): a giant slice leaning to the street, pepperoni, basil, cheese drips
 --   gearvest  the gear stall's GEAR counter (Last Stop Supplies, server/GearStall.luau): 6.11's giant hi-vis courier
 --             vest from Last Stop's old roof at half size, on a hanger turning on a pole (6.12.6; the shoe is gone)
@@ -42,10 +43,14 @@ export type Mount = { at: Triple, roof: { number }, sign: { number }?, avoid: { 
 -- (6.12.6: "supplies", the vest and the shoe on Last Stop's old roof, is gone: its vest stands over the gear stall's
 -- GEAR counter as "gearvest", the ZDC bag over BAGS as "zdcbag"; that roof is bare.)
 Art.ids = { "guns", "pizza", "gearvest", "zdcbag", "bikes", "dealer", "mechanic", "depot", "bank", "clinic" }
+-- 6.12.14 (the owner: "keep the props, but make the shop smaller"): the guns' set piece, drawn as 6.11 drew it for the
+-- old shop's 60-wide roof, at this scale on the range shop's (Config.GunRange.Cabin: 22 wide, its roof 23): every part
+-- and its envelope GUNS_SCALE times 6.11's, the letters 2.5 studs tall.
+local GUNS_SCALE = 0.45
 Art.Budgets = { guns = 160, pizza = 120, gearvest = 60, zdcbag = 60, bikes = 120, dealer = 120, mechanic = 120, depot = 120, bank = 120, clinic = 120 }
 -- The box each prop stays in (moving pieces included, through their whole motion): x within ±W/2, y 0 … H, z within ±D/2.
 Art.Envelopes = {
-	guns = { 49.6, 20, 9.4 }, pizza = { 17.2, 17, 8.6 }, gearvest = { 7, 10.2, 7 }, zdcbag = { 7, 10, 7 }, bikes = { 23.2, 19, 6.4 },
+	guns = { 49.6 * GUNS_SCALE, 20 * GUNS_SCALE, 9.4 * GUNS_SCALE }, pizza = { 17.2, 17, 8.6 }, gearvest = { 7, 10.2, 7 }, zdcbag = { 7, 10, 7 }, bikes = { 23.2, 19, 6.4 },
 	dealer = { 25.2, 17.2, 13.8 }, mechanic = { 20.8, 18.8, 8.4 }, depot = { 21.2, 19, 18.6 }, bank = { 13.4, 18, 13.4 },
 	clinic = { 14.8, 20, 10.6 },
 }
@@ -56,8 +61,11 @@ Art.Motion = {
 	zdcbag = { kind = "spin", pivot = { 0, 3.4, 0 }, rate = 0.4 }, -- (about 16 s: the two never turn in step)
 } :: { [string]: Motion }
 Art.Mounts = {
-	-- Lead & Co. (World buildGuns: 60 × 46 × 16); its board LEAD & CO. GUNS on the roof's front edge.
-	guns = { at = { 0, 17, -17 }, roof = { -31, -24, 31, 24 }, sign = { -22.75, 6 }, avoid = { { 17, 7, 23, 13 } } },
+	-- 6.12.14: Lead & Co.'s range shop (server/GunRange.luau, Config.GunRange.Cabin: 22 × 14, its walls 10 tall, the roof
+	-- slab 23 × 15 and 0.5 thick on them; the frame its middle on the walk, -Z out of its door): behind the name board
+	-- LEAD & CO. · RANGE (2.6 tall, its back face at -6.5) on the roof's front edge, clear of the roof unit at the back.
+	-- (On the old shop's roof, World buildGuns: 60 × 46 × 16, it stood at { 0, 17, -17 }, its roof { -31, -24, 31, 24 }.)
+	guns = { at = { 0, 10.5, -4 }, roof = { -11.5, -7.5, 11.5, 7.5 }, sign = { -6.5, 2.6 }, avoid = { { 5.5, 1.5, 9.5, 5.5 } } },
 	-- Luigi's (World buildVenue: Map.VenueSize 30 × 24 × 12). (6.11: the look's little RoofPizza disc, BuildingLooks/
 	-- VenuePizzeria, is gone: the slice took its place.)
 	pizza = { at = { 1, 13, -7 }, roof = { -16, -13, 16, 13 }, sign = { -13.05, 2.8 }, avoid = { { 7, 5.5, 11, 8.5 }, { 7.7, 7.7, 10.3, 10.3 } } },
@@ -267,8 +275,10 @@ end
 -- ── The props ──────────────────────────────────────────────────────────────
 
 local function guns()
+	-- (6.12.14: everything in a root GUNS_SCALE times smaller, on the range shop's roof)
+	local root = child(ORIGIN, { 0, 0, 0 }, nil, GUNS_SCALE)
 	local px, py = 3.2, 11.35 -- the marquee's middle
-	local panel = child(ORIGIN, { px, py, 0 })
+	local panel = child(root, { px, py, 0 })
 	local scale = 1.1
 	local width = textWidth("GUN STORE") * scale + 2.4
 	put(panel, "Marquee", { width, 7.5, 0.6 }, { 0, 0, 0 }, { 30, 32, 36 }, "Metal")
@@ -289,14 +299,14 @@ local function guns()
 	-- Two posts, braces back to the roof, feet.
 	for n, side in { -1, 1 } do
 		local x = px + side * 14.85
-		put(ORIGIN, `Post{n}`, { 0.9, 7.9, 0.9 }, { x, 3.95, 0 }, STEEL, "Metal")
-		put(ORIGIN, `Foot{n}`, { 2, 0.3, 2 }, { x, 0.15, 0 }, DARK, "Metal")
-		put(ORIGIN, `Brace{n}`, { 0.5, 7.16, 0.5 }, { x, 3.35, 2.325 }, STEEL, "Metal", nil, { -31.6, 0, 0 })
+		put(root, `Post{n}`, { 0.9, 7.9, 0.9 }, { x, 3.95, 0 }, STEEL, "Metal")
+		put(root, `Foot{n}`, { 2, 0.3, 2 }, { x, 0.15, 0 }, DARK, "Metal")
+		put(root, `Brace{n}`, { 0.5, 7.16, 0.5 }, { x, 3.35, 2.325 }, STEEL, "Metal", nil, { -31.6, 0, 0 })
 	end
 	-- The cartridge at the end of the line (the reader's right), 19.5 tall: a rifle round standing on its base, brass case,
 	-- extractor groove and rim, a stepped shoulder, the copper bullet, a shine down its front.
 	local cx = px - width / 2 - 3.6
-	local case = child(ORIGIN, { cx, 0, 0 }, nil, 1.15) -- (taller than the marquee)
+	local case = child(root, { cx, 0, 0 }, nil, 1.15) -- (taller than the marquee)
 	local brass, brassDark, copper = { 222, 174, 74 }, { 184, 136, 56 }, { 196, 104, 58 }
 	upright(case, "CaseStand", 0.5, 5, { 0, 0.25, 0 }, DARK, "Metal")
 	upright(case, "CaseRim", 0.6, 4.7, { 0, 0.8, 0 }, brassDark, "Metal")

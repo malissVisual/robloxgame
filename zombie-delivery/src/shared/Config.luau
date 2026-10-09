@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "6.12.13"
+Config.Version = "6.12.14"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1248,6 +1248,49 @@ Config.BikeShop = {
 	Desk = { X = 17.5, Z = 18, Width = 11, Deep = 3 },
 	Stands = { X = { 12.5, 18.75, 25, 31.25, 37.5 } :: { number }, Z = -14, Turn = 30 },
 	Radius = 44,
+}
+
+-- 6.12.14, Lead & Co.'s shooting range (the owner: "move the gun store out of the safe zone, to a shooting range: a
+-- different, smaller shop; keep the props, but make the shop smaller, like the shop at a shooting range";
+-- server/GunRange.luau builds it, Map.GunRange, Map.Shops.guns). It fills Downtown block (-2, 1), south-west of the
+-- park, just outside the safe zone (its gate 8 studs past the line, across 4th Ave from Spoke & Chain's old building):
+-- once an ordinary block (Map.FormerBlocks: its dice still roll, nothing else in the city moved; its three apartment
+-- buildings and its car park are gone). Lead & Co.'s old building on block (-1, 0) is an ordinary one now
+-- (Map.FormerGunShop). The shop id ("guns"), its name ("Lead & Co."), Ray and everything it sells are as before.
+-- Where it all stands, in the range's own frame (its origin the block's middle on the walk, -Z its Facing: the front
+-- with the gate, east to 4th Ave and the park; +X to the right looking out of the gate, south; Map.gunRangeAt turns a
+-- spot of it into the map's x, z):
+--   Fence     the chain-link square round it, Fence studs from its middle each way (10 in from the curb: the people's
+--             walk lines and their detours stay clear), FenceHeight tall
+--   Gate      the opening in the front fence: its middle (X) and Width (cars drive in too)
+--   Cabin     the range shop, Width × Depth × Height (to its roof slab), its middle (X, Z); its door to the front
+--   Counter   in the cabin's own frame (z from its middle, + toward its back wall): the counter's middle Z, Width and
+--             Deep; Ray behind it (server/ShopClerks.luau), the shop's "Shop" prompt on it, Map.Shops.guns its front
+--   Lanes     four lanes side by side: their middles (X), each Width wide, running from the firing line (Line, the
+--             benches' front edge under the pavilion) back toward the berm; a target on a stand in every lane at each
+--             of Targets studs downrange, Plates its plate (width, height) at that distance
+--   Berm      the sand bank behind the farthest targets: from Z, Depth deep, Height tall
+--   Radius    studs from the counter's front that count as "at the shop" (the window's BUY, the server's check): the
+--             cabin, its forecourt and the gate
+--   Down      seconds a target stays down after a hit (server/GunRange.luau GunRange.shot: the server's own ray hits
+--             it, server/Gun.luau); then it springs back up
+--   Board     the cabin's name board (a second line after the double space)
+--   Shop      where a gun on the career road is sold ("SMG at Lead & Co.'s range", shared/Career.luau)
+Config.GunRange = {
+	Block = { -2, 1 } :: { number },
+	Facing = { 1, 0 } :: { number },
+	Fence = 45,
+	FenceHeight = 7,
+	Gate = { X = -7.5, Width = 15 },
+	Cabin = { X = -28, Z = -23, Width = 22, Depth = 14, Height = 10 },
+	Counter = { Z = 1.2, Width = 14, Deep = 2.4 },
+	Lanes = { X = { 14, 22, 30, 38 } :: { number }, Width = 8, Line = -38, Targets = { 25, 50, 75 } :: { number } },
+	Plates = { { 2.2, 3 }, { 2.6, 3.5 }, { 3, 4 } } :: { { number } },
+	Berm = { Z = 38, Depth = 7, Height = 9 },
+	Radius = 40,
+	Down = 4,
+	Board = "LEAD & CO. · RANGE  GUNS · AMMO · LANES",
+	Shop = "Lead & Co.'s range",
 }
 
 Config.Gear = {

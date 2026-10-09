@@ -152,15 +152,17 @@ local function keys(): { KeyPlace }
 		end
 		-- 6.12.2: Last Stop Supplies moved into the depot's yard (the gear stall's GEAR counter): it still draws from its
 		-- old block (Map.LastStop, where its building stands), so every line keeps its stops, and names none there.
+		-- 6.12.14: Lead & Co. moved out to its shooting range (Map.GunRange) the same way: it still draws from its old
+		-- block (Map.FormerGunShop), so every line keeps its stops, and names none (none was named after it).
 		local yard = landmark.id == "depot" or landmark.id == "bags"
-		local former = landmark.id == "supplies"
+		local former = if landmark.id == "supplies" then Map.LastStop elseif landmark.id == "guns" then Map.FormerGunShop else nil
 		local weight = if landmark.id == "depot" then 4
 			elseif landmark.kind == "shop" then 3
 			elseif landmark.kind == "venue" or string.sub(landmark.id, 1, 7) == "garage_" then 1
 			else 2
 		local name = if landmark.id == "depot" then "Depot" elseif former then nil else landmark.name
-		local x = if former then Map.LastStop.x elseif yard then landmark.x - Map.Depot.x + Map.Park.x else landmark.x
-		local z = if former then Map.LastStop.z elseif yard then landmark.z - Map.Depot.z + Map.Park.z else landmark.z
+		local x = if former then former.x elseif yard then landmark.x - Map.Depot.x + Map.Park.x else landmark.x
+		local z = if former then former.z elseif yard then landmark.z - Map.Depot.z + Map.Park.z else landmark.z
 		table.insert(list, { id = landmark.id, name = name, x = x, z = z, weight = weight })
 		-- 6.12.7: Spoke & Chain's own entry (it came after Last Stop's) is gone, its bikes sold at Dead End Motors' BIKES
 		-- counter: its old block (Map.FormerBikeShop) still draws as the shop did, in its old place, and names none.

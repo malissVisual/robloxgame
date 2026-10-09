@@ -311,6 +311,19 @@ local bikeWords = road50[Career.BIKE_LEVEL].unlocks[1].name .. Career.summary(ro
 check("5.1: level 2 opens the bikes (6.12.7: at Dead End Motors, no Spoke & Chain any more)", bikeAt >= 1 and string.find(bikeWords, "Dead End Motors", 1, true) ~= nil
 	and string.find(bikeWords, "Spoke", 1, true) == nil, bikeWords)
 check("5.1: … and no bike counts as a car", not has(road50[Career.BIKE_LEVEL].unlocks, "car", "rustbike") and (not bikes or has(road50[Career.BIKE_LEVEL].unlocks, "bike", "rustbike")))
+-- 6.12.14: Lead & Co. sells at its shooting range: a gun you buy says so on the road; the starter pistol only its name.
+local gunsSay, guns = true, 0
+for _, step in road50 do
+	for _, unlock in step.unlocks do
+		if unlock.kind == "gun" then
+			local def = Economy.findWeapon(unlock.id)
+			local starter = def ~= nil and def.starter == true
+			guns += 1
+			gunsSay = gunsSay and def ~= nil and (if starter then unlock.name == def.name else unlock.name == `{def.name} at {Config.GunRange.Shop}`)
+		end
+	end
+end
+check("6.12.14: every gun on the road is sold at Lead & Co.'s range (the pistol: yours from the start)", gunsSay and guns >= 3 and Config.GunRange.Shop == "Lead & Co.'s range", guns)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

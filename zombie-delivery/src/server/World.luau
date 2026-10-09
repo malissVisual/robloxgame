@@ -71,6 +71,13 @@
 -- gear stall west of the spawn (server/GearStall.luau: ZDC Bags and Last Stop Supplies side by side, in place of 6.6's
 -- bag kiosk); Last Stop's old building on block (0, -1) stands as an ordinary one (buildSupplies, Map.LastStop: no
 -- counter, no clerk, no name board; 6.12.6: no rooftop prop either, its vest turns over the stall's GEAR counter).
+--
+-- Zombie Delivery 6.12.14, Lead & Co.'s shooting range (server/GunRange.luau, Config.GunRange, Map.GunRange): a fenced
+-- compound on Downtown block (-2, 1), just outside the safe zone, its own piece of the build with World's helpers (the
+-- range shop with the "guns" counter and its GUN STORE prop, four lanes, targets that drop when hit, the berm). The
+-- block was ordinary: its towers and its car park roll their dice dry (the world's random numbers as before). Lead &
+-- Co.'s old building on block (-1, 0) stands as an ordinary one (buildGuns, Map.FormerGunShop: no counter, no clerk, no
+-- name board, no prop).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -986,26 +993,30 @@ local function buildDealer(parent: Instance)
 	end
 end
 
+-- Lead & Co. on Downtown block (-1, 0), its door to the east (the park). 6.12.14 (the owner: "move the gun store out of
+-- the safe zone, to a shooting range"): the guns are sold at Lead & Co.'s range on block (-2, 1) (server/GunRange.luau,
+-- Map.Shops.guns), so it stands here as an ordinary building (Map.FormerGunShop): its brick shell, its look's windows,
+-- bars, canopy and lights, but no counter, no prompt, no clerk, no name board, no gun racks and none of the look's shop
+-- signage (its LICENSED / ARMORY plate); its GUN STORE and the giant cartridge stand, smaller, on the range shop's roof.
 local function buildGuns(parent: Instance)
-	local shop = folder(parent, "LeadAndCo")
-	local cx, cz = Map.Shops.guns.x, Map.Shops.guns.z
+	local shop = folder(parent, "LeadAndCoBuilding")
+	local cx, cz = Map.FormerGunShop.x, Map.FormerGunShop.z
 	sidewalk(shop, cx, cz)
 	local facing = Vector3.new(1, 0, 0)
 	local w, d, h = 60, 46, 16
 	local frame = shopFrame(cx, cz, facing, 18)
 	building(shop, frame, w, d, h, Color3.fromRGB(65, 58, 56), Enum.Material.Brick, 12, 10)
-	-- Approved facade only; preserve the shop prompt and gameplay layout.
+	-- Approved facade only, minus its shop signage (the labelled plate).
 	local Kit = require(script.Parent.BuildingLooks.Kit)
-	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Guns), { part = part, deco = deco, nightLight = DayNight.nightLight })
-	sign(shop, "LEAD & CO.  GUNS", Vector3.new(44, 6, 0.5), frame * CFrame.new(0, h + 4, -d / 2), Color3.fromRGB(255, 200, 80), nil, "guns", 10)
-	-- 6.11: its rooftop set piece behind the board, GUN STORE in block letters and a giant cartridge (server/ShopProps.luau)
-	local props = require(script.Parent.ShopProps)
-	props.place(shop, "guns", frame * props.mount("guns"))
-	counter(shop, frame, d, "guns", "Lead & Co.")
-	-- Guns on the wall.
-	for n = -2, 2 do
-		part(shop, "Rack", Vector3.new(5, 1, 0.4), frame * CFrame.new(n * 8, 8, d / 2 - 1.3), Color3.fromRGB(40, 40, 44), Enum.Material.Metal)
+	local look = table.clone(require(script.Parent.BuildingLooks.Guns))
+	local plain = {}
+	for _, detail in look.details do
+		if detail.label == nil then
+			table.insert(plain, detail)
+		end
 	end
+	look.details = plain
+	Kit.build(shop, frame, look, { part = part, deco = deco, nightLight = DayNight.nightLight })
 end
 
 -- 3.4: a repair bay inside a shop (frame: the building's, -Z out through the door): yellow lines on the floor, a
@@ -1563,11 +1574,22 @@ local function buildDistrict(parent: Instance, d: Map.District)
 				buildRepairShop(district, cx, cz)
 				continue
 			elseif special and Map.wasOrdinary(d.id, i, j) then
-				-- 6.11: the depot's block had towers: their dice still roll here (buildDepot builds the depot below);
-				-- a gone lawn or car park would need its own (tests/places_test.luau: they are all towers)
+				-- 6.11: the depot's block had towers: their dice still roll here (buildDepot builds the depot below).
+				-- 6.12.14: and a gone lawn or car park (the range's block: GunRange builds it below) draws what
+				-- downtownBlock draws for it, its trees or its wreck built on a scratch folder that is thrown away
 				for _, lot in Map.formerLotsAt(d.id, i, j) do
 					if lot.kind == "tower" or lot.kind == "apartment" then
 						tower(district, lot, true)
+					elseif lot.kind == "grass" or lot.kind == "parking" then
+						local scratch = Instance.new("Folder")
+						if lot.kind == "grass" then
+							for _ = 1, rng:NextInteger(2, 4) do
+								tree(scratch, lot.x + rng:NextNumber(-lot.size / 3, lot.size / 3), lot.z + rng:NextNumber(-lot.size / 3, lot.size / 3))
+							end
+						else
+							wreck(scratch, CFrame.new(lot.x, WALK_TOP, lot.z) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
+						end
+						scratch:Destroy()
 					else
 						warn(`[World] the gone {lot.kind} on block {i}, {j} rolls no dice: the world's random numbers shift`)
 					end
@@ -1590,7 +1612,12 @@ local function buildDistrict(parent: Instance, d: Map.District)
 	if d.id == "downtown" then
 		buildDepot(district)
 		buildDealer(district)
-		buildGuns(district)
+		buildGuns(district) -- (6.12.14: Lead & Co.'s old building, plain)
+		do
+			-- 6.12.14: Lead & Co.'s shooting range on block (-2, 1) (server/GunRange.luau; World's helpers handed over)
+			local tools = { part = part, deco = deco, sign = sign, prompt = prompt, nightLight = DayNight.nightLight, sidewalk = sidewalk }
+			require(script.Parent.GunRange).build(district, tools)
+		end
 		buildMechanic(district)
 		buildSupplies(district)
 		buildBikeShop(district) -- 5.1: Spoke & Chain

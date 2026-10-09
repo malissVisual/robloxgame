@@ -5,6 +5,7 @@
 -- banner announced waits) and where it sits on the screen (the first spot clear of the HUD).
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
+local Config = require("./Config")
 local Map = require("./Map")
 local LocationTags = require("./LocationTags")
 
@@ -39,7 +40,15 @@ check("every name is a sign's name (no brackets)", #badName == 0, table.concat(b
 check("every second line is in caps", #badSub == 0, table.concat(badSub, ", "))
 local depot = byId.depot
 check("the depot reads like its sign", depot ~= nil and depot.name == "Zombie Delivery Co." and depot.sub == "DEPOT · JOBS · GARAGE", depot and depot.name)
-check("a shop says what it sells", byId.guns ~= nil and byId.guns.sub == "GUN SHOP" and byId.dealer.sub == "CARS · VANS · BIKES")
+check("a shop says what it sells", byId.guns ~= nil and byId.guns.sub == "GUN SHOP · RANGE" and byId.dealer.sub == "CARS · VANS · BIKES")
+-- 6.12.14: Lead & Co. at its range, out of the safe zone: its tag on the range shop's counter, near from its radius (the
+-- gate and the street in front come within it), still "Lead & Co.".
+check("6.12.14: Lead & Co.'s tag at its range", byId.guns ~= nil and byId.guns.name == "Lead & Co." and byId.guns.x == Map.Shops.guns.x and byId.guns.z == Map.Shops.guns.z
+	and byId.guns.near == Map.Shops.guns.radius and not Map.isSafe(byId.guns.x, byId.guns.z), byId.guns and byId.guns.near)
+do
+	local gx, gz = Map.gunRangeAt(Config.GunRange.Gate.X, -Config.GunRange.Fence)
+	check("6.12.14: at the range's gate the tag names Lead & Co.", LocationTags.distance(byId.guns, gx, gz) <= byId.guns.near, LocationTags.distance(byId.guns, gx, gz))
+end
 -- 6.12.7: one shop for the cars and the bikes: Dead End Motors names them both, Spoke & Chain has no tag of its own.
 check("6.12.7: no Spoke & Chain tag, Dead End Motors is the bikes' place", byId.bikes == nil and byId.dealer ~= nil and byId.dealer.name == "Dead End Motors"
 	and (function()

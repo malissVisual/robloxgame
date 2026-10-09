@@ -875,11 +875,11 @@ local function shopApp(list: Instance, wide: boolean)
 	-- The personal gear still worth buying (Config.Kit), the cheapest first.
 	local owned = kit()
 	-- 6.6: the bags first (ZDC Bags, the depot's kiosk), then the rest of the kit (Last Stop Supplies); 6.7: each piece
-	-- at its own shop (Transport.kitShop: the Baseball Bat at Lead & Co.)
+	-- at its own shop (Transport.kitShop: the Baseball Bat at Lead & Co.; 6.12.14: its range)
 	local titles: { [string]: string } = {
 		bags = `{Config.BagShop.Name} · bags (sprint with your deliveries)`,
 		supplies = "Last Stop Supplies · kit",
-		guns = "Lead & Co. · the bat",
+		guns = "Lead & Co. range · the bat",
 	}
 	for _, shopId in { "bags", "supplies", "guns" } do
 		local wanted: { Config.KitDef } = {}

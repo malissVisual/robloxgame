@@ -30,6 +30,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 - Mechanics at the repair bays (an NPC with a wrench, sparks) while a car is on the lift: cosmetic, `server/Repair.luau`.
 
 ## Done (latest first)
+- Claude · 6.12.14: Lead & Co. at a shooting range on (−2, 1) (`server/GunRange.luau`: a small shop with Ray, 4 lanes, targets that tip when shot); the old (−1, 0) building plain.
 - Claude · 6.12.13: the mission chapters' picture banner (`shared/MissionArt.luau`, `client/MissionArtUi.luau`; six chapters borrow business pictures); the brief for Codex's 11 chapter pictures (`design/mission-art/BRIEF.md`).
 - Claude · 6.12.12: the 25 job pictures' ids filled in (the owner uploaded them).
 - Claude · 6.12.11: Codex's `codex/job-thumbnails` merged and wired: `shared/JobThumbs.luau` (the ids, empty until the owner uploads: `design/job-thumbnails/NAHRAT-OBRAZKY.md`, `tools/job-thumbnails/fill-ids.py`), the offers and jobs carry `business`, `client/JobThumbUi.luau` draws the picture (or a slim name banner) on the phone BOARD and J's board, a square in NEXT UP.

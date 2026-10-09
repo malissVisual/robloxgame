@@ -20,6 +20,7 @@
 -- 5.0, the career starts on foot: foot (the ON FOOT runs of the board, Config.Jobs.Foot), kit (personal gear,
 -- Config.Kit: the bags, the vests …). 5.1: bike (a bike of Config.Cars at its level, "at Config.BikeShop.Shop":
 -- 6.12.7: Dead End Motors; before Config.Cars has one, a line "Bikes at …" at BIKE_LEVEL); the bike gear is gear.
+-- 6.12.14: a gun you buy says where ("SMG at Lead & Co.'s range", Config.GunRange.Shop); the starter pistol only its name.
 
 local Config = require(script.Parent.Config)
 local Economy = require(script.Parent.Economy)
@@ -138,7 +139,7 @@ function Career.unlocksAt(level: number): { Unlock }
 	end
 	for _, def in Config.Weapons do
 		if not def.earned and not def.exclusive and (def.level or 1) == level then
-			add(list, "gun", def.id, def.name)
+			add(list, "gun", def.id, if def.starter then def.name else `{def.name} at {Config.GunRange.Shop}`)
 		end
 	end
 	for _, def in Config.CarGuns do
