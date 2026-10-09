@@ -252,7 +252,7 @@ do
 end
 
 -- 6.12, the clerks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): the Style remote's
--- handler on the server, with the character's HumanoidRootPart at the gear stall, at Wrench Garage, at Spoke & Chain
+-- handler on the server, with the character's HumanoidRootPart at the gear stall, at Wrench Garage, at the BIKES counter
 -- and far from any shop (Map.Shops; the money through PlayerData.spend).
 local bought = 0
 do
@@ -298,8 +298,8 @@ do
 	check("a bag colour at Nell's BAGS counter, beside Dot: bought", buy("bag_black"))
 	check("a wrap at the gear stall: refused", not buy("wrap_teal"))
 	at("bikes")
-	check("a wrap at Spoke & Chain: refused", not buy("wrap_teal"))
-	check("bike paint at Spoke & Chain: bought", buy("bike_mint"))
+	check("a wrap at Dead End Motors' BIKES counter (6.12.7; Spoke & Chain before): refused", not buy("wrap_teal"))
+	check("bike paint at Kip's BIKES counter: bought", buy("bike_mint"))
 	at("mechanic")
 	check("bike paint at Wrench Garage too: bought", buy("bike_sky"))
 	check("a vehicle look bought: your cars repainted", repainted == 2, repainted)

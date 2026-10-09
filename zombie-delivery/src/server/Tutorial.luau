@@ -28,9 +28,9 @@
 -- 5.0, the phone: profile.phone = true at SHOW ME (6.7; or when the tutorial ends, delivered or skipped; a player
 -- without the tutorial gets it at once), and the message ("phone", { npc }): client/Phone.luau shows its "NEW PHONE"
 -- moment (TutorialUi ignores it: not a phase; 6.7: the tour opens the phone itself, the moment's pop-up waits for it).
--- 5.1, Spoke & Chain: when a player reaches Career.BIKE_LEVEL while playing and owns no bike, Marge texts them
--- (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's "message" with the GPS to the shop,
--- client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
+-- 5.1, Spoke & Chain (6.12.7: Dead End Motors' BIKES counter): when a player reaches Career.BIKE_LEVEL while playing
+-- and owns no bike, Marge texts them (Config.BikeShop.Unlock with the cheapest bike's price: the Tutorial remote's
+-- "message" with the GPS to the shop, client/Phone.luau, and a toast). On PLAY between that level and the van's, still without a bike: her reminder
 -- (the phone's messages are not saved).
 -- 6.0, Lead & Co.: no free gun; Marge texted a player with the pistol's price and no gun. 6.7: gone: every profile has
 -- the pistol since 6.0.2 (server/PlayerData.luau newProfile, the starterKit flag), so that text could never come.

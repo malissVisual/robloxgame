@@ -29,7 +29,9 @@
 --              View), the Survivor Camp (on the Radio Road) and the Stadium Shelter (south of the Suburbs)
 --   Secrets    (3.1) a lost package hidden at every place, one more up the stadium stands (Map.Secrets)
 --   Repairs    (3.4) the repair shops (Map.RepairShops): Wrench Garage and Rust Bridge Repairs (a Harbor block)
---   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St
+--   Bikes      (5.1) Spoke & Chain Cycles (Map.Shops.bikes), the bike shop on Downtown block (-1, 1), its door on Main St;
+--              6.12.7: the bikes are Dead End Motors' BIKES counter (Map.Shops.bikes, Config.BikeShop), next to its car
+--              counter: one shop; Spoke & Chain's old building an ordinary one (Map.FormerBikeShop)
 --   Bags       (6.6) ZDC Bags (Map.Shops.bags, Config.BagShop): the bag kiosk in the depot's yard, by the spawn;
 --              6.12.2: it and Last Stop Supplies (Map.Shops.supplies) are the two counters of the gear stall there
 --              (Config.GearStall), Last Stop's old building on block (0, -1) an ordinary one (Map.LastStop)
@@ -190,7 +192,7 @@ Map.SpecialBlocks = {
 		["-2,2"] = "clinic", -- City Clinic: its front and the emergency entrance on 4th Ave
 		["-1,-1"] = "dispatchtower", -- Dispatch Tower (the offices), in the safe zone
 		["1,1"] = "parking", -- Downtown Parking (a garage), in the safe zone
-		["-1,1"] = "bikes", -- 5.1, Spoke & Chain Cycles (Map.Shops.bikes): its door on Main St, in the safe zone
+		["-1,1"] = "bikes", -- 5.1, Spoke & Chain Cycles (6.12.7: its old building, no shop any more: Map.FormerBikeShop)
 		-- 3.0, the missions' places in town (all just outside the safe zone):
 		["0,-3"] = "cityhall", -- City Hall: north of the park, its steps down to the street in front (south)
 		["-2,-2"] = "police", -- Precinct 13: its front and the patrol cars on the street to the south
@@ -242,6 +244,13 @@ Map.Depot = { i = 1, j = -1, x = CELL, z = -CELL } :: Depot
 -- dice as before); the bus lines still draw a stop toward it as they did (shared/BusLines.luau), without its name.
 Map.LastStop = { i = 0, j = -1, x = 0, z = -CELL }
 
+-- 6.12.7: the building on Downtown block (-1, 1) that was Spoke & Chain Cycles until the bikes moved to Dead End
+-- Motors' BIKES counter (Map.Shops.bikes, Config.BikeShop: one shop for the cars and the bikes): an ordinary building
+-- now (server/World.luau buildBikeShop: its shell and its shop windows, no counter, no prompt, no clerk, no name board,
+-- no display bikes; its rooftop bike stands on Dead End Motors' roof). The block stays special (its dice as before);
+-- the bus lines still draw a stop toward it as they did (shared/BusLines.luau), without its name.
+Map.FormerBikeShop = { i = -1, j = 1, x = -CELL, z = CELL }
+
 -- 6.11, the Central Park (the owner: "the middle of the map, where the safe zone is, nice: nature, some water in the
 -- middle, a park ... so people remember where the safe zone is and where all the shops are") on the middle block (0, 0),
 -- the shops all round it. server/CentralPark.luau builds it, client/MapView.luau draws it. In studs from its middle:
@@ -268,7 +277,8 @@ end
 -- The shops (their block centres); you must stand within Radius of one to use it (6.6: a shop's own `radius`, else
 -- Map.ShopRadius: ZDC Bags is a small kiosk in the depot's yard, Map.shopRadius). 6.12.2: ZDC Bags and Last Stop
 -- Supplies are the two counters of the gear stall in the depot's yard (Config.GearStall): each spot is its counter's
--- front, with the stall's radius.
+-- front, with the stall's radius. 6.12.7: the bikes ("bikes") are the BIKES counter of Dead End Motors, beside its car
+-- counter ("dealer"): its spot the counter's front, its radius over the counter and the bike stands (Config.BikeShop).
 Map.Shops = {
 	depot = { name = "Depot Garage", x = Map.Depot.x, z = Map.Depot.z }, -- (6.7: the garage terminal, not a shop: it sells nothing, no shop window)
 	dealer = { name = "Dead End Motors", x = CELL, z = 0 },
@@ -281,7 +291,15 @@ Map.Shops = {
 		z = Map.Depot.z + Config.GearStall.Z + Config.GearStall.Counter,
 		radius = Config.GearStall.Radius,
 	},
-	bikes = { name = "Spoke & Chain", x = -CELL, z = CELL }, -- 5.1: bikes and bike gear (Config.BikeShop)
+	-- 5.1: bikes and bike gear (Config.BikeShop). 6.12.7: Dead End Motors' BIKES counter, at the back of its showroom
+	-- (World buildDealer: the building faces west, so its frame's x runs north and its z east, from the block's middle
+	-- plus Back); its old building on block (-1, 1): Map.FormerBikeShop
+	bikes = {
+		name = "Dead End Motors · Bikes",
+		x = CELL + Config.BikeShop.Building.Back + Config.BikeShop.Desk.Z - Config.BikeShop.Desk.Deep / 2,
+		z = 0 - Config.BikeShop.Desk.X,
+		radius = Config.BikeShop.Radius,
+	},
 	bags = { name = Config.BagShop.Name, x = Map.Depot.x + Config.BagShop.X, z = Map.Depot.z + Config.BagShop.Z, radius = Config.BagShop.Radius }, -- 6.6: the bags (6.11: in the depot's yard, wherever the depot is; 6.12.2: the gear stall's BAGS counter)
 } :: { [string]: { name: string, x: number, z: number, radius: number? } }
 Map.ShopRadius = 80
@@ -1011,15 +1029,15 @@ local landmarks: { Landmark } = {
 	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the JOBS spot with the job board, Marge, the garage terminal (your parked van, the company vehicles) and the gear stall by the spawn (ZDC Bags and Last Stop Supplies). The safe zone." },
 	-- 6.11: the Central Park in the middle of the safe zone (Map.Park).
 	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it. The depot is across the junction to the north-east." },
-	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4). Every car needs a garage slot." },
+	-- 6.12.7: one shop for the cars and the bikes (the CARS and BIKES counters; Spoke & Chain's own entry is gone)
+	{ id = "dealer", name = "Dead End Motors", icon = "🚗", x = CELL, z = 0, kind = "shop", description = "Cars, vans and trucks, each with a role (the first van comes from Earl, Marge's quest at level 4); every car needs a garage slot. And at the BIKES counter, from level 2: bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), faster than walking with more room for the light runs." },
 	{ id = "guns", name = "Lead & Co.", icon = "🔫", x = -CELL, z = 0, kind = "shop", description = "Guns from the SMG up (your pistol is the starter), the gun upgrades (Gun Damage, Fire Rate) and a baseball bat." },
 	{ id = "mechanic", name = "Wrench Garage", icon = "🔧", x = 0, z = CELL, kind = "shop", description = "Your car's stages, car upgrades, gear, paint and car guns, and two repair bays: drive in, get out, wait." },
 	{ id = "repairs", name = "Rust Bridge Repairs", icon = "🔧", x = 1080, z = CELL, kind = "shop", description = "A repair shop in the Harbor, where the Rust Bridge comes over: two repair bays. Drive in, get out, wait." },
 	{ id = "bags", name = Config.BagShop.Name, icon = "🛍️", x = Map.Shops.bags.x, z = Map.Shops.bags.z, kind = "shop", description = "Bags: sprint with your deliveries. The BAGS counter of the gear stall in the depot's yard, by the spawn." }, -- 6.6 (6.12.2: the stall)
 	-- 6.12.2: the GEAR counter of the gear stall in the depot's yard (no running shoes any more)
 	{ id = "supplies", name = "Last Stop Supplies", icon = "🛒", x = Map.Shops.supplies.x, z = Map.Shops.supplies.z, kind = "shop", description = "Items: medkits, energy drinks, molotovs, and for a car repair kits, nitro, landmines, jerry cans. Vests (the Courier Vest, Kevlar, heavy armour). The GEAR counter of the gear stall in the depot's yard, by the spawn." },
-	-- 5.1: the bike shop (Config.BikeShop).
-	{ id = "bikes", name = "Spoke & Chain Cycles", icon = "🚲", x = -CELL, z = CELL, kind = "shop", description = "Bikes, the E-Scooter and bike gear (a basket, panniers, a trailer), from level 2, on Main St: faster than walking and more room for the light runs." },
+	-- (5.1: Spoke & Chain Cycles had its own entry here; 6.12.7: the bikes are Dead End Motors' BIKES counter, above)
 	-- 5.0: Earl sells his old van here (Config.VanQuest): your first vehicle.
 	{ id = "earl", name = "Earl's Used Wheels", icon = "🚐", x = Map.VanSeller.earl.x, z = Map.VanSeller.earl.z, kind = "place", description = "Far out west on the West Highway, past the Airfield Road. Earl sells his old van here: your first vehicle (Marge's quest at level 4)." },
 }

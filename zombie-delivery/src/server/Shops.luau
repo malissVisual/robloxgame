@@ -41,6 +41,9 @@
 -- owned bike your bike of choice (and the one you ride, while you ride one); ("ride") gets you on your bike (the
 -- phone's MY BIKE: it comes at once, server/Vehicles.luau); ("drive") back to your car (the phone's CALL CAR: the
 -- chauffeur brings it). Not during a car job. No car upgrades, stages, paint or car guns on a bike.
+-- 6.12.7: one shop, Dead End Motors: the bikes are its BIKES counter (Map.Shops.bikes: Kip, beside Sal's CARS
+-- counter; its radius over the counter and the stands, Config.BikeShop), the display bikes on their stands behind its
+-- front glass. The shop ids, the remotes and the checks are as before; Spoke & Chain's old building sells nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -66,7 +69,7 @@ local Shops = {}
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
 local NO_CAR = `You don't have a vehicle yet. The Old Van: {Config.VanQuest.Where}.`
-local ON_BIKE = "That's your bike: bikes take bike gear at Spoke & Chain, no car upgrades, paint or car guns. CALL CAR on your phone for your car."
+local ON_BIKE = "That's your bike: bikes take bike gear at Dead End Motors' BIKES counter, no car upgrades, paint or car guns. CALL CAR on your phone for your car."
 
 -- 5.1: the cars of your own (not a company vehicle, not a bike) and the bikes you own, in Config.Cars' order.
 local function owned(profile: PlayerData.Profile, bikes: boolean): { string }
@@ -790,8 +793,9 @@ local function buildShowroom()
 	end
 end
 
--- 5.1, Spoke & Chain's display bikes: every bike of Config.Cars on a stand of its own (World.BikeSlots, in their
--- order), with a tag (its name, price and level) and a "Look" prompt that opens the shop on it.
+-- 5.1, Spoke & Chain's display bikes (6.12.7: behind Dead End Motors' front glass): every bike of Config.Cars on a
+-- stand of its own (World.BikeSlots, in their order), with a tag (its name, price and level) and a "Look" prompt that
+-- opens the shop on it (the BIKES counter's window).
 local function buildBikeDisplay()
 	local folder = Instance.new("Folder")
 	folder.Name = "BikeDisplay"
@@ -860,7 +864,7 @@ function Shops.start()
 		buildBikeDisplay() -- 5.1
 	end)
 	if not ok then
-		warn(`[Shops] Spoke & Chain's display bikes failed: {err}`)
+		warn(`[Shops] the display bikes failed: {err}`)
 	end
 	-- 5.7: every shop action is rate limited per player (Config.Robust.Limits; the extra clicks of a flood are dropped).
 	local limits = Config.Robust.Limits

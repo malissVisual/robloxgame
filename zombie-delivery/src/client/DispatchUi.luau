@@ -38,7 +38,7 @@
 --     refuses them anyway.
 --   * 5.1, the bikes: the offers with mode = "bike" come next in a BIKE section (from Config.Jobs.Bike.Level): a header
 --     with your bike and what it holds (the Offers info's `bike`), each row with a 🚲 BIKE chip and "fits your bike
---     (3 / 4)" on its CARGO line; without a bike they are locked "🚲 NEEDS A BIKE" (Spoke & Chain), while your car is
+--     (3 / 4)" on its CARGO line; without a bike they are locked "🚲 NEEDS A BIKE" (the BIKES counter), while your car is
 --     the one you drive "🚲 RIDE YOUR BIKE" (the server's lockText / lockButton). Riding your bike (state.car a bike)
 --     the car card shows the bike, and the car jobs are locked "🚐 CALL YOUR CAR" (the phone's CALL CAR).
 --   * 5.8, the courier phone's look (design/phone-ui/): the ZDC window header (Ui.window, the board glyph), the filters
@@ -333,7 +333,7 @@ local function roomRemedy(offer: any): string
 		return `You carry {room} light {if room == 1 then "piece" else "pieces"} ({KitShop.roomText(myKit(), myBag())}); this run has {math.max(need, tonumber(offer.pieces) or 0)}. A bigger bag at {Config.BagShop.Name} (by the spawn) carries more.`
 	elseif isBike(offer) then
 		-- 5.1: your bike, its bike gear and your bag (6.6: the bike's own bag and yours).
-		return `Your {offer.carName or "bike"}'s bag and yours hold {offer.capacity or 0}; this run has {math.max(need, tonumber(offer.pieces) or 0)}. Bike gear at Spoke & Chain (a basket, panniers) holds more.`
+		return `Your {offer.carName or "bike"}'s bag and yours hold {offer.capacity or 0}; this run has {math.max(need, tonumber(offer.pieces) or 0)}. Bike gear from the BIKES counter at Dead End Motors (a basket, panniers) holds more.`
 	end
 	local head = `Your {offer.carName or "car"} holds {offer.capacity or 0} {if offer.capacity == 1 then "slot" else "slots"}; this job needs {need}.`
 	if offer.vehicle then
@@ -1098,7 +1098,7 @@ local function bikeHeader(count: number, order: number)
 		TextWrapped = false,
 	})
 	local bike = if boardInfo and type(boardInfo.bike) == "table" then boardInfo.bike else nil
-	local sub = if bike == nil then `NEEDS A BIKE · Spoke & Chain on Main St, level {Config.Jobs.Bike.Level}`
+	local sub = if bike == nil then `NEEDS A BIKE · Dead End Motors' BIKES counter, level {Config.Jobs.Bike.Level}`
 		elseif bike.riding ~= true then "Your car is out: MY BIKE on your phone gets you on the bike"
 		else `{count} light {if count == 1 then "run" else "runs"} · longer, better paid · light cargo only`
 	text(row, sub, UDim2.new(1, -234, 0, 16), {

@@ -44,7 +44,7 @@ export type Profile = {
 	money: number,
 	cars: { [string]: boolean },
 	car: string?, -- 5.0: the equipped car; nil = no vehicle yet (on foot). 5.1: or a bike (what CAR / MY BIKE brings)
-	bike: string?, -- 5.1: your bike of choice (an owned Config.Cars bike; Spoke & Chain's EQUIP, the phone's MY BIKE)
+	bike: string?, -- 5.1: your bike of choice (an owned Config.Cars bike; the BIKES counter's EQUIP, the phone's MY BIKE)
 	lastCar: string?, -- 5.1: the car you drove before you got on your bike (the phone's CALL CAR brings it back)
 	weapons: { [string]: boolean },
 	weapon: string?, -- the gun in your hand; 6.0: nil = none yet (a new courier has fists only, Config.Arms)

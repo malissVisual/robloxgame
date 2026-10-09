@@ -13,6 +13,7 @@
 --   zdcbag    the gear stall's BAGS counter (ZDC Bags): a giant red ZDC insulated delivery bag on a turntable, the ZDC
 --             logo front and back, a reflective strip round it, two straps up to a padded grip (6.12.6)
 --   bikes     Spoke & Chain Cycles: a giant bicycle on a pylon (spoked wheels, chain, saddle), a parcel in its basket
+--             (6.12.7: on Dead End Motors' roof beside the car, the bikes are sold there)
 --   dealer    Dead End Motors: a two-tone 50s car tipped up on a pylon, bunting down to the roof
 --   mechanic  Wrench Garage: a giant wrench across a big tyre standing in chocks
 --   depot     the ZDC depot: a giant parcel on a pallet, packing tape, the red ZDC logo front and back, a label
@@ -66,9 +67,12 @@ Art.Mounts = {
 	gearvest = { at = { 6.5, 10.5, 0.3 }, roof = { -13.5, -5, 13.5, 5 }, sign = { -3.7, 3.2 }, avoid = { { -10, -3.2, -3, 3.8 } } },
 	zdcbag = { at = { -6.5, 10.5, 0.3 }, roof = { -13.5, -5, 13.5, 5 }, sign = { -3.7, 3.2 }, avoid = { { 3, -3.2, 10, 3.8 } } },
 	-- Spoke & Chain (World buildBikeShop: 60 × 40 × 16; its board 0.8 in front of the front wall).
-	bikes = { at = { 0, 17, -16 }, roof = { -31, -21, 31, 21 }, sign = { -20.55, 5.2 }, avoid = {} },
-	-- Dead End Motors (World buildDealer: 84 × 52 × 18).
-	dealer = { at = { 0, 19, -18.5 }, roof = { -43, -27, 43, 27 }, sign = { -25.75, 7 }, avoid = { { 23, 8.5, 33, 15.5 }, { -33, 8.5, -23, 15.5 } } },
+	-- 6.12.7: the bikes are sold at Dead End Motors, so the bike stands on its roof (World buildDealer, its frame) beside
+	-- the car on its pylon, over the BIKES counter's end (north, +x): clear of the car's envelope and of the roof units,
+	-- behind the name board. (On Spoke & Chain's roof it stood at { 0, 17, -16 }, its roof { -31, -21, 31, 21 }.)
+	bikes = { at = { 28, 19, -18.5 }, roof = { -43, -27, 43, 27 }, sign = { -25.75, 7 }, avoid = { { 23, 8.5, 33, 15.5 }, { -33, 8.5, -23, 15.5 }, { -12.6, -25.4, 12.6, -11.6 } } },
+	-- Dead End Motors (World buildDealer: 84 × 52 × 18). 6.12.7: the giant bike beside it (the last box, Mounts.bikes').
+	dealer = { at = { 0, 19, -18.5 }, roof = { -43, -27, 43, 27 }, sign = { -25.75, 7 }, avoid = { { 23, 8.5, 33, 15.5 }, { -33, 8.5, -23, 15.5 }, { 16.4, -21.7, 39.6, -15.3 } } },
 	-- Wrench Garage (World buildMechanic: 70 × 60 × 20).
 	mechanic = { at = { 0, 21, -24.5 }, roof = { -36, -31, 36, 31 }, sign = { -29.75, 6 }, avoid = { { 21, 9, 29, 15 }, { -29, 9, -21, 15 } } },
 	-- The depot (World buildDepot: 80 × 40 × 22, its roof 2 thick; the frame of its Kit: turned to face the street).

@@ -5,7 +5,9 @@
 real server/ShopProps.place (a stub DayNight records the night colours): budgets, finite geometry, round cylinders and
 balls, real materials (a glowing piece's day one that DayNight restores), decorative flags, shadows only on big pieces,
 every part (moving ones through their whole motion) inside the prop's envelope, and the envelope on its building
-(Art.Mounts): on the roof, behind the name board, clear of the roof units.
+(Art.Mounts): on the roof, behind the name board, clear of the roof units. 6.12.7: two props on one roof (SHARED_ROOFS:
+Dead End Motors' car and the giant bike from Spoke & Chain's old roof) share that roof's mount data and their envelopes
+stay apart, each listed in the other's avoid boxes.
 6.12.6, the gear stall's two props ("gearvest" over GEAR, "zdcbag" over BAGS): the real server/GearStall.build places
 them, next to the real JOBS booth (server/JobsSpot.build round the job board where World stands it) and the depot
 hall's look (BuildingLooks/Depot through Kit.build, the hall's shell from World's numbers); in the stall's own frame:
@@ -289,6 +291,7 @@ def check(mode,luau,output):
             if mode=="towers":tower_check(p,info)
         if mode=="stops":stop_check(model)
         if mode=="shops":shop_check(model)
+    if mode=="shops":shared_roofs(models)
     city=next((r["city"] for r in rows if "city" in r),None)
     if city:print("City plan PASS:",city)
     if mode=="shops":stall_check(next(r["stall"] for r in rows if "stall" in r))
@@ -426,6 +429,28 @@ def stall_check(stall):
               f"{hi[0]-lo[0]:.1f} x {hi[2]-lo[2]:.1f} at rest, {hi[1]-hidden:.1f} in sight from the spawn, "
               f"{box_gap(env,near['box']):.1f} from the {near['group']}'s {near['name']}")
     assert box_gap(boxes["gearvest"],boxes["zdcbag"])>=1,"the two props apart"
+
+# 6.12.7, the props that stand on one roof together (World buildDealer: Dead End Motors' car and, since the bikes are
+# sold there, the giant bike from Spoke & Chain's old roof): one building (the same roof, name board and roof height),
+# their envelopes apart, and each one's envelope among the other's avoid boxes (what already stands there).
+SHARED_ROOFS=(("dealer","bikes"),)
+
+def envelope_box(info):
+    W,H,D=info["envelope"];ax,ay,az=info["mount"]["at"]
+    return (ax-W/2,az-D/2,ax+W/2,az+D/2)
+
+def shared_roofs(models):
+    infos={m["info"]["id"]:m["info"] for m in models}
+    for a,b in SHARED_ROOFS:
+        A,B=infos[a],infos[b];ma,mb=A["mount"],B["mount"]
+        assert ma["roof"]==mb["roof"] and ma.get("sign")==mb.get("sign") and ma["at"][1]==mb["at"][1],(a,b,"not on one roof")
+        ba,bb=envelope_box(A),envelope_box(B)
+        assert ba[2]<=bb[0] or bb[2]<=ba[0] or ba[3]<=bb[1] or bb[3]<=ba[1],(a,b,"the props overlap")
+        def covered(box,avoid):
+            return any(r[0]<=box[0]+1e-6 and r[1]<=box[1]+1e-6 and box[2]<=r[2]+1e-6 and box[3]<=r[3]+1e-6 for r in avoid)
+        assert covered(bb,ma.get("avoid") or []) and covered(ba,mb.get("avoid") or []),(a,b,"each in the other's avoid boxes")
+        gap=max(bb[0]-ba[2],ba[0]-bb[2],bb[1]-ba[3],ba[1]-bb[3])
+        print(f"  {a} + {b}: one roof, their envelopes {gap:.1f} studs apart, each clear of the other")
 
 def tower_check(p,info):
     w,d,h=info["tower"];x,y,z=p["position"];ex,ey,ez=extent(p)

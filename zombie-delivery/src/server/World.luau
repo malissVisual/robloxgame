@@ -903,21 +903,36 @@ local function counter(parent: Instance, frame: CFrame, d: number, shop: string,
 	return desk
 end
 
+-- Dead End Motors (Map.Shops.dealer) on Downtown block (1, 0), its glass front and its door to the west (6th Ave, the
+-- park): the cars from the catalog at the sales counter (3.5), the showroom's three turntables (World.DealerSlots).
+-- 6.12.7 (the owner: "I wanted to merge the bike shop with Motors, so it's one shop"): it sells the bikes too, one shop
+-- with two counters side by side at the back of the showroom, like the gear stall at the spawn: CARS (Sal, "dealer":
+-- the car catalog, where it always stood) and BIKES to the north of it (Kip, "bikes": the bikes, the E-Scooter, the
+-- bike gear and his bike paint; Map.Shops.bikes is its front), their boards on the back wall, the bike stands in a row
+-- behind the north half of the front glass (World.BikeSlots: server/Shops.luau puts a bike and its "Look" prompt on
+-- each; clear of the door, the counters and the turntables), the name board DEAD END MOTORS over CARS · VANS · BIKES
+-- and Spoke & Chain's giant bike on the roof beside the car on its pylon (ShopProps "bikes"). The layout is
+-- Config.BikeShop's (in this building's frame).
+World.BikeSlots = {} :: { CFrame }
+
 local function buildDealer(parent: Instance)
 	local shop = folder(parent, "DeadEndMotors")
 	local cx, cz = Map.Shops.dealer.x, Map.Shops.dealer.z
 	sidewalk(shop, cx, cz, Color3.fromRGB(70, 70, 74))
 	local facing = Vector3.new(-1, 0, 0)
-	local w, d, h = 84, 52, 18
-	local frame = shopFrame(cx, cz, facing, 22)
+	local layout = Config.BikeShop
+	local w, d, h = layout.Building.Width, layout.Building.Depth, layout.Building.Height
+	local frame = shopFrame(cx, cz, facing, layout.Building.Back)
 	building(shop, frame, w, d, h, Color3.fromRGB(40, 44, 52), Enum.Material.Metal, 16, 12, true)
 	-- Approved facade only; preserve the shop prompt and gameplay layout.
 	local Kit = require(script.Parent.BuildingLooks.Kit)
 	Kit.build(shop, frame, require(script.Parent.BuildingLooks.Dealer), { part = part, deco = deco, nightLight = DayNight.nightLight })
-	sign(shop, "DEAD END MOTORS", Vector3.new(60, 7, 0.5), frame * CFrame.new(0, h + 4.5, -d / 2), Color3.fromRGB(255, 80, 60), nil, "dealer", 12)
-	-- 6.11: its rooftop set piece behind the board, a two-tone car tipped up on a pylon (server/ShopProps.luau)
+	sign(shop, "DEAD END MOTORS  CARS · VANS · BIKES", Vector3.new(60, 7, 0.5), frame * CFrame.new(0, h + 4.5, -d / 2), Color3.fromRGB(255, 80, 60), nil, "dealer", 12)
+	-- 6.11: its rooftop set piece behind the board, a two-tone car tipped up on a pylon (server/ShopProps.luau); 6.12.7:
+	-- the giant bicycle from Spoke & Chain's roof beside it, over the BIKES end
 	local props = require(script.Parent.ShopProps)
 	props.place(shop, "dealer", frame * props.mount("dealer"))
+	props.place(shop, "bikes", frame * props.mount("bikes"))
 	-- 3.5: the cars are sold from the catalog at the sales counter (the dealer window); no lot of every car outside.
 	local desk = counter(shop, frame, d, "dealer", "Dead End Motors")
 	local catalog = desk:FindFirstChildOfClass("ProximityPrompt")
@@ -932,6 +947,37 @@ local function buildDealer(parent: Instance)
 		local pad = cylinder(shop, "Turntable", 0.3, 19, frame * CFrame.new(x, 0.45, 6) * UPRIGHT, Color3.fromRGB(200, 200, 205), Enum.Material.Metal)
 		pad.CanCollide = false
 		table.insert(World.DealerSlots, spot)
+	end
+	-- 6.12.7, the BIKES counter beside the cars' (Config.BikeShop.Desk): the desk with its prompt (Kip stands behind it,
+	-- server/ShopClerks.luau), a steel top, a red front with a cream stripe, its board on the back wall, and behind Kip
+	-- a rack of wheels and a stack of tyres; then the bike stands.
+	do
+		local bikes = layout.Desk
+		local at = frame * CFrame.new(bikes.X, 0, bikes.Z)
+		local front = -bikes.Deep / 2
+		local bikeDesk = part(shop, "BikesCounter", Vector3.new(bikes.Width, 4, bikes.Deep), at * CFrame.new(0, 2, 0), Color3.fromRGB(120, 90, 60), Enum.Material.Wood)
+		prompt(bikeDesk, "bikes", "Shop", Map.Shops.bikes.name)
+		deco(part(shop, "BikesCounterTop", Vector3.new(bikes.Width + 0.4, 0.2, bikes.Deep + 0.4), at * CFrame.new(0, 4.1, 0), Color3.fromRGB(166, 176, 174), Enum.Material.Metal))
+		deco(part(shop, "BikesCounterFront", Vector3.new(bikes.Width - 0.4, 2.6, 0.1), at * CFrame.new(0, 2, front - 0.05), Color3.fromRGB(153, 49, 43), Enum.Material.Metal))
+		deco(part(shop, "BikesCounterStripe", Vector3.new(bikes.Width - 0.4, 0.3, 0.12), at * CFrame.new(0, 2.9, front - 0.1), Color3.fromRGB(236, 230, 214), Enum.Material.Metal))
+		sign(shop, "BIKES · BIKE GEAR", Vector3.new(bikes.Width + 3, 2.4, 0.3), frame * CFrame.new(bikes.X, 7.5, d / 2 - 1.2), Color3.fromRGB(255, 220, 120))
+		local wall = d / 2 - 1 -- the back wall's inner face
+		deco(part(shop, "WheelRack", Vector3.new(bikes.Width - 2, 0.25, 0.3), frame * CFrame.new(bikes.X, 5, wall - 0.15), Color3.fromRGB(166, 176, 174), Enum.Material.Metal))
+		for n = -1, 1 do
+			local wheel = deco(part(shop, "RackWheel", Vector3.new(0.2, 2.6, 2.6), frame * CFrame.new(bikes.X + n * 3, 3.5, wall - 0.5) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(35, 40, 43), Enum.Material.Rubber))
+			wheel.Shape = Enum.PartType.Cylinder
+		end
+		for n = 0, 2 do
+			local tyre = deco(part(shop, "SpareTyre", Vector3.new(0.7, 2.4, 2.4), frame * CFrame.new(bikes.X + bikes.Width / 2 + 2, 0.65 + n * 0.72, wall - 1.6) * UPRIGHT, Color3.fromRGB(25, 25, 25), Enum.Material.Rubber))
+			tyre.Shape = Enum.PartType.Cylinder
+		end
+		-- The stands in the window (Config.BikeShop.Stands; 5.1.1: the fifth, at the north end, the E-Scooter's).
+		local stands = layout.Stands
+		for n, x in stands.X do
+			local stand = frame * CFrame.new(x, 0.3, stands.Z) * CFrame.Angles(0, math.rad(stands.Turn), 0)
+			deco(part(shop, "BikeStand", Vector3.new(2.6, 0.1, 7.4), stand * CFrame.new(0, 0.05, 0), Color3.fromRGB(150, 156, 158), Enum.Material.DiamondPlate))
+			World.BikeSlots[n] = stand * CFrame.new(0, 0.1, 0)
+		end
 	end
 	-- Flags by the street.
 	for _, z in { -52, 52 } do
@@ -1086,36 +1132,34 @@ local function buildSupplies(parent: Instance)
 	end
 end
 
--- 5.1, Spoke & Chain Cycles (Map.Shops.bikes, Config.BikeShop) on Downtown block (-1, 1), its door on Main St (north):
--- a brick shop 60 × 40 with a 12-wide door near the street, Codex's look (BuildingLooks/BikeShop: the shop windows,
--- the counter, the wall racks, the repair stand, the bike rack on the pavement), the SPOKE & CHAIN CYCLES board, the
--- "Shop" prompt on the look's counter (an invisible solid box there) and four display stands on the floor
--- (World.BikeSlots: server/Shops.luau puts a bike on each, facing the door at an angle). 5.1.1: a fifth stand at the
--- right end of the row (between the repair stand and the tool chest's front) for the E-Scooter.
-World.BikeSlots = {} :: { CFrame }
-
+-- 5.1, Spoke & Chain Cycles on Downtown block (-1, 1), its door on Main St (north): a brick shop 60 × 40 with a 12-wide
+-- door near the street, Codex's look (BuildingLooks/BikeShop). 6.12.7: its bikes are sold at Dead End Motors' BIKES
+-- counter (Map.Shops.bikes, buildDealer: one shop for the cars and the bikes), so it stands here as an ordinary building
+-- (Map.FormerBikeShop): its shell, its shop windows, the fascia and the door's canopy and lamp, but no counter, no
+-- prompt, no clerk, no name board, no display bikes and none of the bike shop's insides (the look's counter and its
+-- RENT / BUY / REPAIR plate, the wall racks with their bikes, the repair stand, the tool chest, the spare tyres, the
+-- parts board and the bike rack outside); its giant rooftop bike stands on Dead End Motors' roof.
 local function buildBikeShop(parent: Instance)
-	local shop = folder(parent, "SpokeAndChain")
-	local cx, cz = Map.Shops.bikes.x, Map.Shops.bikes.z
+	local shop = folder(parent, "SpokeAndChainBuilding")
+	local cx, cz = Map.FormerBikeShop.x, Map.FormerBikeShop.z
 	sidewalk(shop, cx, cz)
 	local w, d, h = 60, 40, 16
 	local frame = shopFrame(cx, cz, Vector3.new(0, 0, -1), -12)
 	building(shop, frame, w, d, h, Color3.fromRGB(92, 70, 60), Enum.Material.Brick, 12, 10)
 	local Kit = require(script.Parent.BuildingLooks.Kit)
-	Kit.build(shop, frame, require(script.Parent.BuildingLooks.BikeShop), { part = part, deco = deco, nightLight = DayNight.nightLight })
-	-- The name board in the look's slot over the fascia (its bottom at y ≈ 17.2, in front of the front wall).
-	sign(shop, "SPOKE & CHAIN  CYCLES", Vector3.new(44, 5, 0.5), frame * CFrame.new(0, 19.7, -d / 2 - 0.8), Color3.fromRGB(255, 120, 90), nil, "bikes", 10)
-	-- 6.11: its rooftop set piece behind the board, a giant bicycle on a pylon (server/ShopProps.luau)
-	local props = require(script.Parent.ShopProps)
-	props.place(shop, "bikes", frame * props.mount("bikes"))
-	local desk = part(shop, "CounterPrompt", Vector3.new(12, 4, 3.5), frame * CFrame.new(-15, 2, -5), Color3.fromRGB(35, 40, 43), Enum.Material.Metal)
-	desk.Transparency = 1
-	prompt(desk, "bikes", "Shop", Map.Shops.bikes.name)
-	for n, x in { -15, -7.5, 0, 7.5, 15 } do
-		local stand = frame * CFrame.new(x, 0.3, 9) * CFrame.Angles(0, math.rad(25), 0)
-		deco(part(shop, "BikeStand", Vector3.new(2.6, 0.1, 7.4), stand * CFrame.new(0, 0.05, 0), Color3.fromRGB(150, 156, 158), Enum.Material.DiamondPlate))
-		World.BikeSlots[n] = stand * CFrame.new(0, 0.1, 0)
+	local look = table.clone(require(script.Parent.BuildingLooks.BikeShop))
+	local plain = {}
+	for _, detail in look.details do
+		local shopLike = false
+		for _, prefix in { "Counter", "PartsPegboard", "RepairStand", "ToolChest", "DrawerPull", "WallRack", "Hanging", "SpareTyre", "SidewalkRack" } do
+			shopLike = shopLike or string.sub(detail.name, 1, #prefix) == prefix
+		end
+		if not shopLike then
+			table.insert(plain, detail)
+		end
 	end
+	look.details = plain
+	Kit.build(shop, frame, look, { part = part, deco = deco, nightLight = DayNight.nightLight })
 end
 
 -- The safe zone border: a green line on the ground and signs.

@@ -1143,6 +1143,24 @@ West Highway, ~1600 studs from the depot) sells his rusty Old Van for $1 800 —
 missions. The dealer no longer sells it. Every other car, job tier and campaign moved up (the Courier and High-Roof at
 5, car tiers ★ 4 / ★★ 5 / ★★★ 6 / ★★★★ 9 with their licences, campaigns from 4).
 
+## Dead End Motors sells the bikes too (6.12.9)
+
+The owner: "I wanted to merge the bike shop with Motors, so it's one shop".
+
+- **One shop, two counters** in Dead End Motors' building on (1, 0) (`World.buildDealer`, `Config.BikeShop`):
+  - **CARS:** Sal, as before.
+  - **BIKES:** Kip, beside it. He sells the bikes, the E-Scooter and the bike gear, and keeps his "Style" [R]
+    for bike paint.
+  - The shop ids stay "dealer" and "bikes"; `Map.Shops.bikes` is the BIKES counter.
+- **The display bikes:** five stands with their "Look" prompts, behind the front glass beside the cars.
+- **The board** reads DEAD END MOTORS · CARS · VANS · BIKES. The giant bike now rides the roof next to the car on its
+  pylon.
+- **One shop everywhere:** the map, the GPS and the phone's SHOP list show Dead End Motors for cars and bikes. Marge's
+  texts, the career and the windows say Dead End Motors.
+- **Spoke & Chain's old building** on (−1, 1) (`Map.FormerBikeShop`) is an ordinary building. The bus stop there is
+  now called City Clinic.
+- `tests/motors_test.luau`, and a shared-roof case in the polish-art shops check.
+
 ## The vest and a ZDC bag spin over the gear stall (6.12.8)
 
 The owner, about Last Stop's old building: "that shop has nothing, put those props on my stalls".

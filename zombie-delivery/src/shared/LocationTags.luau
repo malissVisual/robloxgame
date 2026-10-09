@@ -53,12 +53,12 @@ export type State = {
 -- What the second line says.
 local SHOP_SUB: { [string]: string } = {
 	depot = "DEPOT · JOBS · GARAGE",
-	dealer = "CAR DEALER",
+	dealer = "CARS · VANS · BIKES", -- (6.12.7: one shop, its CARS and BIKES counters, like its board)
 	guns = "GUN SHOP",
 	mechanic = "UPGRADES · REPAIRS",
 	repairs = "REPAIR SHOP",
 	supplies = "GEAR", -- (6.12.2: the gear stall's GEAR counter, near from its radius)
-	bikes = "BIKES · BIKE GEAR", -- 5.1
+	-- (5.1: Spoke & Chain, "BIKES · BIKE GEAR"; 6.12.7: no landmark of its own, the bikes are Dead End Motors')
 	bags = "BAGS", -- 6.6: the depot's bag kiosk (6.12.2: the gear stall's BAGS counter)
 }
 local PLACE_SUB: { [string]: string } = {

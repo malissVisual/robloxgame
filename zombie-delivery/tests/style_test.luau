@@ -6,7 +6,7 @@
 -- lamps and labels. The fit on real bodies and on the real fleet: tools/character-art/style-check.luau and
 -- tools/vehicle-preview/decal-check.luau. Run with tests/run_tests.py.
 -- The clerks (the owner: "things are bought only from the NPCs in the shops, for the vibe"): every slot is sold at
--- shops that exist (Dot's gear stall, Gus's Wrench Garage, Kip's Spoke & Chain), where you stand decides a purchase
+-- shops that exist (Dot's gear stall, Gus's Wrench Garage, Kip's BIKES counter at Dead End Motors), where you stand decides a purchase
 -- (Style.shopAt / Style.canBuyAt: server/StyleWear.luau's "buy" and the app's BUY), and the toasts say who sells it.
 local Config = require("./Config")
 local Map = require("./Map")
@@ -186,7 +186,7 @@ local mx, mz = at("mechanic")
 check("at Wrench Garage: wraps, decals, bike paint; no hats", Style.shopAt(wrap, mx, mz) == "mechanic" and Style.shopAt(decal, mx, mz) == "mechanic"
 	and Style.shopAt(bikePaint, mx, mz) == "mechanic" and Style.shopAt(cap, mx, mz) == nil)
 local bx, bz = at("bikes")
-check("at Spoke & Chain: bike paint only", Style.shopAt(bikePaint, bx, bz) == "bikes" and Style.shopAt(wrap, bx, bz) == nil and Style.shopAt("hat", bx, bz) == nil)
+check("at the BIKES counter (6.12.7: Dead End Motors'): bike paint only", Style.shopAt(bikePaint, bx, bz) == "bikes" and Style.shopAt(wrap, bx, bz) == nil and Style.shopAt("hat", bx, bz) == nil)
 local gx, gz = at("supplies")
 local nx, nz = at("bags")
 check("at the gear stall (Dot's GEAR or Nell's BAGS): the courier's looks, no wraps", Style.shopAt(cap, gx, gz) == "supplies" and Style.shopAt("vest", nx, nz) ~= nil
@@ -210,11 +210,11 @@ local mine = Style.empty()
 mine.owned.cap_red = true
 check("owned stays owned (no second purchase) anywhere", select(2, Style.canBuyAt(mine, cap, 99999, 15, "supplies")) == "owned" and select(2, Style.canBuyAt(mine, cap, 99999, 15, nil)) == "owned")
 check("the toasts name the clerk and the shop", Style.say("shop", wrap) == "Buy it from Gus at Wrench Garage." and Style.say("shop", cap) == "Buy it from Dot at the gear stall."
-	and Style.say("shop", bikePaint) == "Buy it from Kip at Spoke & Chain or Gus at Wrench Garage."
-	and Style.say("where", wrap) == "Gus sells it at Wrench Garage. It's on your GPS." and Style.say("where", bikePaint) == "Kip sells it at Spoke & Chain. It's on your GPS."
+	and Style.say("shop", bikePaint) == "Buy it from Kip at Dead End Motors or Gus at Wrench Garage."
+	and Style.say("where", wrap) == "Gus sells it at Wrench Garage. It's on your GPS." and Style.say("where", bikePaint) == "Kip sells it at Dead End Motors. It's on your GPS."
 	and Style.say("sold", cap) == "Dot sells it at the gear stall." and Style.say("notOwned", decal) == "Buy ZDC Logo first, from Gus at Wrench Garage.")
-check("the app's button away from the shop", Style.atLabel(wrap) == "AT WRENCH GARAGE" and Style.atLabel(cap) == "AT THE GEAR STALL" and Style.atLabel(bikePaint) == "AT SPOKE & CHAIN")
-check("who sells a tab's looks", Style.soldBy("courier") == "Dot at the gear stall" and Style.soldBy("vehicle") == "Gus at Wrench Garage and Kip at Spoke & Chain")
+check("the app's button away from the shop", Style.atLabel(wrap) == "AT WRENCH GARAGE" and Style.atLabel(cap) == "AT THE GEAR STALL" and Style.atLabel(bikePaint) == "AT DEAD END MOTORS")
+check("who sells a tab's looks", Style.soldBy("courier") == "Dot at the gear stall" and Style.soldBy("vehicle") == "Gus at Wrench Garage and Kip at Dead End Motors")
 check("no toast says the phone sells", not string.find(string.lower(Style.say("shop", wrap) .. Style.say("where", cap) .. Style.say("notOwned", cap)), "phone", 1, true))
 
 -- The hats and jackets on the classic R15 body ---------------------------------------------------------------------
